@@ -1,0 +1,537 @@
+/**
+ * index.css
+ * ------------------------------------------------------------------
+ * Estilos GLOBALES: importación de fuentes, reset mínimo, variables
+ * CSS por tema (usadas solo donde JS no puede llegar, como :hover y
+ * :focus) y todas las animaciones @keyframes de la app.
+ *
+ * La mayoría de los colores se aplican vía inline styles en JS
+ * (theme/themes.js -> ThemeContext -> useTheme()). Este archivo cubre
+ * el resto: fuentes, reset, keyframes y un puñado de variables para
+ * pseudo-clases que no pueden leer el estado de React.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+/* ---------- Reset mínimo ---------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: "Inter", sans-serif;
+}
+
+/* ---------- Variables por tema (para :hover / :focus / pseudo-elementos) ---------- */
+:root[data-theme="light"] {
+  --color-hover: #f1f3f8;
+  --color-border: #e7eaf0;
+  --color-accent: #3654e0;
+  --color-accent-soft: #eef0fd;
+  --grad-accent: linear-gradient(135deg, #3654e0 0%, #6c86f0 100%);
+}
+
+:root[data-theme="dark"] {
+  --color-hover: #1b2333;
+  --color-border: #232b3b;
+  --color-accent: #5c82f5;
+  --color-accent-soft: #1b2436;
+  --grad-accent: linear-gradient(135deg, #5c82f5 0%, #8aa3fa 100%);
+}
+
+/* ---------- Utilidades que dependen de las variables de arriba ---------- */
+.field:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.table-row:hover {
+  background: var(--color-hover);
+}
+
+.nav-item:hover:not(.nav-active) {
+  background: var(--color-hover);
+}
+
+.gradient-text {
+  background: var(--grad-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ---------- Micro-interacciones genéricas ---------- */
+.app-btn:hover {
+  transform: translateY(-1px);
+}
+
+.app-btn:active {
+  transform: translateY(0);
+}
+
+.shuffle-btn:hover {
+  transform: translateY(-1px);
+}
+
+.toggle-track:hover {
+  filter: brightness(1.08);
+}
+
+.chip {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+/* Tarjetas: la sombra de hover se pasa como custom property inline
+   (--shadow-hover) desde el componente Panel/metric-card, así cada
+   tarjeta puede tener su propio tinte de sombra sin depender de CSS global. */
+.panel-card {
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.panel-card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.metric-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ---------- Movimiento reducido ----------
+   Respeta la preferencia del sistema. Además del motivo de
+   accesibilidad, en el comparativo hay una razón funcional: al iterar
+   fechas con los atajos, las gráficas volvían a animarse en cada cambio
+   y el parpadeo hacía imposible seguir la diferencia entre un día y el
+   siguiente. Las gráficas de esa vista ya entran sin animación; esto
+   cubre el resto de la app. */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+    /* El retraso también, y no es un detalle: las entradas escalonadas usan
+       `animation-delay` con relleno `both`, así que con la duración a cero
+       pero el retraso intacto cada tarjeta se queda en su fotograma inicial
+       —opacidad 0— durante su medio segundo de delay. Quien pide menos
+       movimiento se encontraba media página en blanco al entrar. */
+    animation-delay: 0ms !important;
+  }
+
+  .panel-card:hover,
+  .metric-card:hover,
+  .app-btn:hover,
+  .app-btn:active {
+    transform: none;
+  }
+}
+
+/* ---------- Comparativo: layout espejo ----------
+   Las dos fechas se reflejan con un canal central estrecho para los
+   deltas. Vive en CSS y no inline porque necesita una media query: por
+   debajo de 900px el espejo deja de tener sentido (las columnas se
+   aplastan) y se apila en vertical, con el canal de deltas convertido
+   en una fila horizontal entre A y B. */
+.cmp-mirror {
+  display: grid;
+  grid-template-columns: 1fr 116px 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.cmp-channel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+@media (max-width: 900px) {
+  .cmp-mirror {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* El canal pasa a fila y se coloca ENTRE las dos columnas. */
+  .cmp-channel {
+    order: 2;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 8px;
+    padding: 12px 0;
+  }
+
+  .cmp-side-b {
+    order: 3;
+  }
+}
+
+/* ---------- Scrollbar delgado (paneles con overflow) ---------- */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+/* ================= ANIMACIONES ================= */
+
+/* Entradas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-fade {
+  animation: fadeIn 0.35s ease both;
+}
+
+.row-fade {
+  animation: fadeInUp 0.4s ease both;
+}
+
+/* Manchas decorativas de fondo */
+@keyframes blobFloat {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -20px) scale(1.08);
+  }
+
+  66% {
+    transform: translate(-20px, 15px) scale(0.95);
+  }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  animation: blobFloat 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Loaders */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.spin-slow {
+  animation: spin 2.2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes dotbounce {
+
+  0%,
+  80%,
+  100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.dot-bounce {
+  display: inline-block;
+  animation: dotbounce 1s infinite ease-in-out;
+}
+
+@keyframes pulsering {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  animation: pulsering 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes orbitspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin {
+  animation: orbitspin 1.4s linear infinite;
+}
+
+@keyframes sweepmove {
+  0% {
+    left: -40%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+.sweep-bar {
+  animation: sweepmove 1.3s ease-in-out infinite;
+}
+
+.shuffle-icon-spin {
+  animation: spin 0.5s ease;
+}
+
+/* Tooltips */
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.tooltip-pop {
+  animation: tooltipIn 0.15s ease both;
+}
+
+/* Toasts */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-in {
+  animation: toastIn 0.25s ease both;
+}
+
+/* Modal */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-pop {
+  animation: modalIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.modal-overlay {
+  animation: fadeIn 0.18s ease both;
+}
+
+
+/* ================= ALARMA ==================
+   El ÚNICO bucle permitido en los tableros de planta. Ver la nota de
+   `lib/motion.js`: si parpadean seis cosas a la vez, el ojo aprende a
+   ignorarlas todas, incluida esta.
+
+   Los colores llegan como custom properties inline desde el componente
+   (mismo patrón que `--shadow-hover` en Panel), porque un @keyframes no
+   puede leer el tema de React y el latido tiene que funcionar en claro y
+   en oscuro con los tokens de cada uno. */
+@keyframes alertaLatido {
+  0%,
+  100% {
+    background: var(--alerta-base);
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  55% {
+    background: var(--alerta-tinte);
+    box-shadow: 0 0 0 3px var(--alerta-halo), 0 0 22px 2px var(--alerta-halo);
+  }
+}
+
+/* El icono de la franja de atención respira al mismo compás que las
+   tarjetas en alarma: un solo pulso en toda la página, no dos ritmos. */
+@keyframes alertaIcono {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  55% {
+    transform: scale(1.16);
+    opacity: 0.7;
+  }
+}
+
+.alerta-icono {
+  animation: alertaIcono 2.4s ease-in-out infinite;
+}
+
+/* ---------- Trazado de líneas (sparklines) ----------
+   Depende de que el <path> declare `pathLength="100"`, que normaliza la
+   longitud real del trazo a 100 unidades. Así el mismo keyframe sirve para
+   cualquier serie sin tener que medir la ruta en JS. */
+@keyframes trazoDibujo {
+  from {
+    stroke-dashoffset: 100;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.trazo-dibujo {
+  stroke-dasharray: 100;
+  animation: trazoDibujo 900ms ease-out both;
+}
+
+/* ---------- Animaciones extra para los gauges KPI ---------- */
+@keyframes gaugeGlowPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+.gauge-glow {
+  animation: gaugeGlowPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes tickDrawIn {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tick-draw {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tickDrawIn 0.4s ease both;
+}
+
+@keyframes iconFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.icon-float {
+  animation: iconFloat 2.4s ease-in-out infinite;
+}
+
+@keyframes hubPulse {
+
+  0%,
+  100% {
+    r: 9;
+  }
+
+  50% {
+    r: 10.5;
+  }
+}
+
+.hub-pulse {
+  animation: hubPulse 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}

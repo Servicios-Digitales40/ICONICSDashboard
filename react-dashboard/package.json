@@ -1,0 +1,29 @@
+{
+  "name": "aurora-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Panel de administración (dashboard) de ejemplo construido con React + Vite. Incluye gráficas (recharts), tablas, formularios, loaders animados, alertas, tooltips, toasts y modales, organizados en un proyecto multi-página con sidebar.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "d3-sankey": "^0.12.3",
+    "d3-shape": "^3.2.0",
+    "lucide-react": "^0.383.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^29.1.1",
+    "vite": "^5.4.0",
+    "vitest": "^4.1.10"
+  }
+}

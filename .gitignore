@@ -1,0 +1,19 @@
+node_modules/
+dist/
+build/
+
+# Variables de entorno y credenciales
+.env
+.env.*
+*.local
+
+# Ajustes locales de herramientas
+.claude/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
