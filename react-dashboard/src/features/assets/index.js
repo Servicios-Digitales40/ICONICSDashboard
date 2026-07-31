@@ -1,6 +1,5 @@
 /**
- * features/assets — explorador de AssetWorX (ac:) y propiedades en vivo.
- *
- * API pública del módulo: SOLO el componente de ruta.
+ * Explorador de AssetWorX (`ac:`) y propiedades en vivo.
+ * La API pública es solo el componente de ruta.
  */
 export { default as Assets } from "./views/Assets.jsx";

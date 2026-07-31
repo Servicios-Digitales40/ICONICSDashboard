@@ -1,11 +1,9 @@
 /**
- * pages/Data.jsx
- * ------------------------------------------------------------------
- * Vista de datos crudos de ICONICS a través del backend puente
- * (backend/server.mjs). Se divide en dos subsecciones (Tabs, sin tocar
- * el router — el estado vive local, patrón igual a MachineDetail):
- *   - Lectura:   consumir puntos de ICONICS (solo-lectura).
- *   - Escritura: escribir valores hacia ICONICS (pendiente).
+ * Vista de datos crudos de ICONICS a través del backend puente. Se divide en
+ * subsecciones por pestañas, con estado local y sin tocar el router:
+ *
+ *   - Lectura:   consumir puntos de ICONICS (solo lectura).
+ *   - Escritura: escribir valores hacia ICONICS.
  */
 import { useState } from "react";
 import { BookOpen, PenLine, Trash2 } from "lucide-react";

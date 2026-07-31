@@ -1,31 +1,27 @@
 /**
- * ui/Panel.jsx
- * ------------------------------------------------------------------
- * Tarjeta contenedora reutilizada en TODA la app (gráficas, tablas,
- * formularios, loaders...). Da fondo, borde, sombra, radio y una
- * animación de entrada escalonada automática.
+ * Tarjeta contenedora reutilizada en toda la app (gráficas, tablas,
+ * formularios, loaders). Da fondo, borde, sombra, radio y una animación de
+ * entrada escalonada.
  *
  * Props:
- *  - title, code: encabezado opcional (code = subtítulo tipo monospace)
- *  - right: nodo opcional a la derecha del encabezado (botón, filtro...)
- *  - noPad: si es true, quita el padding interno (útil para tablas)
- *  - className: clases extra, ADEMÁS de `panel-card` (para reglas que
- *    necesitan CSS real, p. ej. `order` dentro de una media query)
- *  - delay: retraso de entrada EXPLÍCITO, en segundos. Ver la nota de abajo.
+ *  - title, code: encabezado opcional (code = subtítulo en monospace)
+ *  - right: nodo opcional a la derecha del encabezado (botón, filtro)
+ *  - noPad: quita el padding interno, útil para tablas
+ *  - className: clases extra además de `panel-card`, para reglas que necesitan
+ *    CSS real (por ejemplo `order` dentro de una media query)
+ *  - delay: retraso de entrada explícito, en segundos. Ver la nota de abajo.
  */
 import { useMemo } from "react";
 import { useTheme } from "@/theme";
 
-// Contador de módulo: da a cada Panel un pequeño retraso distinto para que la
-// animación de entrada se vea "en cascada".
+// Contador de módulo que da a cada Panel un retraso distinto, para que la
+// animación de entrada se vea en cascada.
 //
-// ⚠ NO se reinicia entre montajes, así que el índice con el que arranca una
-// página depende de cuántos Panel se hayan montado antes en la sesión: la
-// cascada sale unas veces en orden y otras al revés, según por dónde hayas
-// navegado. Por eso una vista que quiera una entrada ORDENADA debe pasar
-// `delay` explícito (arriba-izquierda → abajo-derecha) en lugar de confiar en
-// este contador. Se conserva como comportamiento por defecto para no tocar las
-// decenas de Panel del resto de la app, que no dependen del orden.
+// No se reinicia entre montajes, así que el índice con el que arranca una
+// página depende de cuántos Panel se hayan montado antes en la sesión y la
+// cascada sale unas veces en orden y otras al revés. Una vista que quiera una
+// entrada ordenada debe pasar `delay` explícito en lugar de confiar en este
+// contador, que se conserva por defecto para el resto de la app.
 let panelIndex = 0;
 
 export function Panel({ title, code, children, right, style, noPad, className, delay: delayProp }) {

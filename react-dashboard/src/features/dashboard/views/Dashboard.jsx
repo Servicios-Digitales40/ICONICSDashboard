@@ -1,11 +1,8 @@
 /**
- * features/dashboard/views/Dashboard.jsx
- * ------------------------------------------------------------------
  * Dashboard general de planta: el nivel de zoom más alto de la app.
  *
- * Responde "¿cómo va el turno?" de un vistazo y sirve de puerta de entrada
- * al detalle: planta → área → máquina. Todo lo que se ve aquí es agregado;
- * para lo particular de un equipo se entra a su vista de detalle.
+ * Responde «¿cómo va el turno?» de un vistazo y es la puerta de entrada al
+ * detalle (planta → área → máquina). Todo lo que se ve aquí es agregado.
  *
  * Orden de lectura, de arriba abajo:
  *   1. Banda de KPIs      · el titular en cifras absolutas
@@ -15,10 +12,9 @@
  *   5. Tiempo muerto      · cuánto del paro no debía ocurrir
  *   6. Tira por área      · el salto al siguiente nivel de detalle
  *
- * TODO sale de datos que la máquina ya entrega. Los tiles de la referencia
- * que dependían de órdenes de producción, operarios o catálogo de producto
- * se omiten a propósito: no hay fuente, y un número inventado en un tablero
- * de planta es peor que un hueco.
+ * Todo sale de datos que la máquina ya entrega. Los tiles que dependerían de
+ * órdenes de producción, operarios o catálogo de producto se omiten porque no
+ * hay fuente para ellos.
  */
 import { useMemo } from "react";
 import { useTheme } from "@/theme";
@@ -37,10 +33,9 @@ export default function Dashboard({ onNavigate }) {
   const { theme: t } = useTheme();
   const { machines, loading, error } = usePlantData();
 
-  // El rollup recorre las 10 máquinas y genera 12 puntos de serie por
-  // cada una. Con polling cada 15 s esto deja de ser gratis, así que se
-  // memoiza sobre `machines`: cambiar de tema ya no lo recalcula, y una
-  // lectura nueva sí.
+  // El rollup recorre las 10 máquinas y genera 12 puntos de serie por cada
+  // una, así que se memoiza sobre `machines`: cambiar de tema no lo recalcula
+  // y una lectura nueva sí.
   const model = useMemo(
     () => ({
       resumen: buildPlantSummary(machines),

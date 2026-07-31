@@ -1,27 +1,13 @@
 /**
- * features/machines/views/AreaView.jsx
- * ------------------------------------------------------------------
  * Monitor de un área: la parrilla de tarjetas de sus máquinas.
  *
- * ── POR QUÉ UN SOLO COMPONENTE Y NO Area1 / Area2 ──────────────────
+ * Es un solo componente parametrizado por `areaId` y no un archivo por área,
+ * porque las áreas salen del catálogo de ICONICS (`LIN`, `REC`) y duplicarlo
+ * obligaría a tocar varios sitios por cada cambio de parrilla.
  *
- * Antes eran dos archivos idénticos salvo por una constante. Ahora que
- * las áreas salen del catálogo de ICONICS (`LIN` y `REC`), duplicar el
- * archivo obligaría a tocar dos sitios cada vez que cambie la parrilla,
- * y a crear un tercero el día que aparezca un área nueva.
- *
- * ── EL CAMBIO IMPORTANTE: YA NO ES SÍNCRONO ────────────────────────
- *
- * La versión anterior hacía
- *
- *     const EQUIPOS = getMachinesByArea("area1");
- *
- * a NIVEL DE MÓDULO, es decir, se evaluaba al importar el archivo. Eso
- * era exactamente lo que impedía que los datos vinieran de la red: un
- * `import` no puede esperar a una petición. Con el hook, la vista se
- * suscribe al montar y se da de baja al desmontar, que es lo que
- * permite al motor de polling contar referencias y pedir solo lo que
- * hay en pantalla.
+ * Los datos llegan por hook y no por una constante de módulo: la vista se
+ * suscribe al montar y se da de baja al desmontar, que es lo que permite al
+ * motor de polling contar referencias y pedir solo lo que hay en pantalla.
  */
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { AREAS } from "@/lib/iconics/tagCatalog.js";

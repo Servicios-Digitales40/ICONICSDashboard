@@ -1,19 +1,16 @@
 /**
- * index.css
- * ------------------------------------------------------------------
- * Estilos GLOBALES: importación de fuentes, reset mínimo, variables
- * CSS por tema (usadas solo donde JS no puede llegar, como :hover y
- * :focus) y todas las animaciones @keyframes de la app.
+ * Estilos globales: importación de fuentes, reset mínimo, variables CSS por
+ * tema y todas las animaciones @keyframes de la app.
  *
- * La mayoría de los colores se aplican vía inline styles en JS
- * (theme/themes.js -> ThemeContext -> useTheme()). Este archivo cubre
- * el resto: fuentes, reset, keyframes y un puñado de variables para
- * pseudo-clases que no pueden leer el estado de React.
+ * La mayoría de los colores se aplican por estilos inline desde JS
+ * (theme/themes.js → useTheme). Este archivo cubre el resto: fuentes, reset,
+ * keyframes y un puñado de variables para pseudo-clases como :hover y :focus,
+ * que no pueden leer el estado de React.
  */
 
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
 
-/* ---------- Reset mínimo ---------- */
+/* Reset mínimo */
 * {
   box-sizing: border-box;
 }
@@ -30,7 +27,7 @@ button {
   font-family: "Inter", sans-serif;
 }
 
-/* ---------- Variables por tema (para :hover / :focus / pseudo-elementos) ---------- */
+/* Variables por tema (para :hover / :focus / pseudo-elementos) */
 :root[data-theme="light"] {
   --color-hover: #f1f3f8;
   --color-border: #e7eaf0;
@@ -47,7 +44,7 @@ button {
   --grad-accent: linear-gradient(135deg, #5c82f5 0%, #8aa3fa 100%);
 }
 
-/* ---------- Utilidades que dependen de las variables de arriba ---------- */
+/* Utilidades que dependen de las variables de arriba */
 .field:focus {
   outline: none;
   box-shadow: 0 0 0 3px var(--color-accent-soft);
@@ -70,7 +67,7 @@ button {
   color: transparent;
 }
 
-/* ---------- Micro-interacciones genéricas ---------- */
+/* Micro-interacciones genéricas */
 .app-btn:hover {
   transform: translateY(-1px);
 }
@@ -113,7 +110,7 @@ button {
   box-shadow: var(--shadow-hover);
 }
 
-/* ---------- Movimiento reducido ----------
+/* Movimiento reducido
    Respeta la preferencia del sistema. Además del motivo de
    accesibilidad, en el comparativo hay una razón funcional: al iterar
    fechas con los atajos, las gráficas volvían a animarse en cada cambio
@@ -129,11 +126,10 @@ button {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
-    /* El retraso también, y no es un detalle: las entradas escalonadas usan
+     /* El retraso también hay que anularlo: las entradas escalonadas usan
        `animation-delay` con relleno `both`, así que con la duración a cero
        pero el retraso intacto cada tarjeta se queda en su fotograma inicial
-       —opacidad 0— durante su medio segundo de delay. Quien pide menos
-       movimiento se encontraba media página en blanco al entrar. */
+       (opacidad 0) durante todo su delay, y media página aparece en blanco. */
     animation-delay: 0ms !important;
   }
 
@@ -145,7 +141,7 @@ button {
   }
 }
 
-/* ---------- Comparativo: layout espejo ----------
+/* Comparativo: layout espejo
    Las dos fechas se reflejan con un canal central estrecho para los
    deltas. Vive en CSS y no inline porque necesita una media query: por
    debajo de 900px el espejo deja de tener sentido (las columnas se
@@ -172,7 +168,7 @@ button {
     gap: 14px;
   }
 
-  /* El canal pasa a fila y se coloca ENTRE las dos columnas. */
+  /* El canal pasa a fila y se coloca entre las dos columnas. */
   .cmp-channel {
     order: 2;
     flex-direction: row;
@@ -186,7 +182,7 @@ button {
   }
 }
 
-/* ---------- Scrollbar delgado (paneles con overflow) ---------- */
+/* Scrollbar delgado (paneles con overflow) */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -197,7 +193,7 @@ button {
   border-radius: 4px;
 }
 
-/* ================= ANIMACIONES ================= */
+/* ANIMACIONES */
 
 /* Entradas */
 @keyframes fadeIn {
@@ -404,9 +400,9 @@ button {
 }
 
 
-/* ================= ALARMA ==================
-   El ÚNICO bucle permitido en los tableros de planta. Ver la nota de
-   `lib/motion.js`: si parpadean seis cosas a la vez, el ojo aprende a
+/* Alarma
+   El único bucle permitido en los tableros de planta; ver la nota de
+   `lib/motion.js`. Si parpadean varias cosas a la vez, el ojo aprende a
    ignorarlas todas, incluida esta.
 
    Los colores llegan como custom properties inline desde el componente
@@ -446,7 +442,7 @@ button {
   animation: alertaIcono 2.4s ease-in-out infinite;
 }
 
-/* ---------- Trazado de líneas (sparklines) ----------
+/* Trazado de líneas (sparklines)
    Depende de que el <path> declare `pathLength="100"`, que normaliza la
    longitud real del trazo a 100 unidades. Así el mismo keyframe sirve para
    cualquier serie sin tener que medir la ruta en JS. */
@@ -465,7 +461,7 @@ button {
   animation: trazoDibujo 900ms ease-out both;
 }
 
-/* ---------- Animaciones extra para los gauges KPI ---------- */
+/* Animaciones extra para los gauges KPI */
 @keyframes gaugeGlowPulse {
 
   0%,

@@ -1,25 +1,17 @@
 /**
- * features/dashboard/lib/plantModel.js
- * ------------------------------------------------------------------
- * Rollup de máquina → planta. Funciones PURAS, sin React y sin tema.
+ * Rollup de máquina → planta. Funciones puras, sin React y sin tema.
  *
- * Aquí se decide CÓMO se agrega, que es la parte con criterio y la que
- * hay que poder revisar de un vistazo.
+ * Aquí se decide cómo se agrega, que es la parte con criterio y la que hay que
+ * poder revisar de un vistazo.
  *
- * ── NO CONOCE EL ORIGEN DE LOS DATOS ───────────────────────────────
+ * Recibe las máquinas por parámetro y no sabe si vienen de ICONICS o del modo
+ * demo. La prueba `plantModel.golden.test.js` fija los números contra una
+ * referencia congelada.
  *
- * Antes importaba `MACHINES` directamente. Ahora recibe las máquinas por
- * parámetro y no sabe si vienen de ICONICS o del modo demo. Eso también
- * es lo que protege la aritmética durante la migración (riesgo R-02):
- * cambió QUIÉN llama, no QUÉ se calcula, así que los números no pueden
- * moverse. La prueba `plantModel.golden.test.js` lo verifica.
- *
- * ── TOLERANCIA A HUECOS ────────────────────────────────────────────
- *
- * Con datos reales, cualquier factor puede llegar como `null` (mala
- * calidad, tag ausente, división por cero en el servidor). `media` y
- * `suma` DESCARTAN esos huecos en vez de tratarlos como ceros: un cero
- * falso hundiría la media de toda la planta sin que nadie lo notara.
+ * Cualquier factor puede llegar como `null` (mala calidad, tag ausente,
+ * división por cero en el servidor). `media` y `suma` descartan esos huecos en
+ * vez de tratarlos como ceros, que hundirían la media de toda la planta sin
+ * que nadie lo notara.
  */
 import { AREAS, AREA_IDS } from "@/lib/iconics/tagCatalog.js";
 import { ESTADOS_ORDEN, calcOEE, estaOperando, estadoInfo, hasValue } from "@/lib/domain/index.js";
@@ -36,18 +28,13 @@ export const AREA_LABELS = Object.fromEntries(
 const finitos = (xs) => xs.filter((x) => hasValue(x) && Number.isFinite(x));
 
 /**
- * Media y suma que ignoran los huecos… y que devuelven NULL —no 0— si no
+ * Media y suma que ignoran los huecos y devuelven `null`, no 0, cuando no
  * queda ninguna medición.
  *
- * La versión anterior devolvía 0, y ese 0 subía intacto hasta la banda de
- * KPIs: con el servidor caído el dashboard mostraba «OEE 0.00 %» y
- * «0 piezas producidas», que no se lee como "sin datos" sino como una
- * planta parada que no produjo nada en el turno. Es el mismo fallo del
- * cero inventado que ya se corrigió en las tarjetas y el detalle, una
- * capa más arriba — la más visible de todas.
- *
- * `null` aquí significa lo mismo que en el dominio: «no hay medición».
- * Los tiles ya saben pintarlo como hueco vía lib/format.
+ * Un 0 subiría intacto hasta la banda de KPIs, y con el servidor caído el
+ * dashboard mostraría «OEE 0.00 %» y «0 piezas producidas», que no se lee como
+ * ausencia de datos sino como una planta parada. `null` significa lo mismo que
+ * en el dominio y los tiles ya lo pintan como hueco vía lib/format.
  */
 const media = (xs) => {
   const v = finitos(xs);
@@ -62,26 +49,20 @@ const suma = (xs) => {
 export { ESTADOS_ORDEN };
 
 /**
- * Agrega la planta entera.
+ * Agrega la planta entera. El criterio de agregación no es trivial:
  *
- * Criterio de agregación (importa, y es revisable):
+ *  - Disponibilidad, Rendimiento y Calidad se promedian sin ponderar. No todas
+ *    las máquinas hacen la misma pieza, así que ponderar por producción
+ *    mezclaría magnitudes distintas; con tiempos reales por máquina lo
+ *    correcto sería ponderar por tiempo planificado.
  *
- *  · Disponibilidad, Rendimiento y Calidad → MEDIA SIMPLE entre máquinas.
- *    No se ponderan por producción porque no todas las máquinas hacen la
- *    misma pieza: ponderar mezclaría magnitudes distintas. Si algún día
- *    hay tiempos reales por máquina, lo correcto sería ponderar por tiempo
- *    planificado.
+ *  - El OEE de planta no es la media de los OEE, sino D × R × C de los
+ *    agregados, para que el número grande y los tres gauges que lo acompañan
+ *    cuenten la misma historia.
  *
- *  · OEE de planta → NO es la media de los OEE, sino D × R × C de los
- *    agregados. Así el número grande y los tres gauges que lo acompañan
- *    cuentan exactamente la misma historia; si se promediaran los OEE,
- *    el titular no cuadraría con sus propios factores.
- *
- *  · FTY (First Time Yield) → sí es un cociente de PIEZAS reales
- *    (aceptadas ÷ producidas), ponderado por naturaleza. Por eso difiere
- *    ligeramente de la Calidad media: son dos lecturas distintas y ambas
- *    son correctas. La Calidad dice "cómo va cada máquina en promedio";
- *    el FTY dice "de todo lo que salió hoy, cuánto sirve".
+ *  - El FTY sí es un cociente de piezas reales (aceptadas ÷ producidas), y por
+ *    eso difiere ligeramente de la Calidad media: esta dice cómo va cada
+ *    máquina en promedio, el FTY dice cuánto sirve de todo lo que salió.
  */
 export function buildPlantSummary(machines = []) {
   const disponibilidad = media(machines.map((m) => m.disponibilidad));
@@ -90,8 +71,8 @@ export function buildPlantSummary(machines = []) {
 
   const aceptadas = suma(machines.map((m) => m.aprobadas));
   const rechazadas = suma(machines.map((m) => m.rechazadas));
-  // Con un solo conteo presente la suma es parcial pero honesta; con los
-  // dos ausentes no hay producción que afirmar.
+  // Con un solo conteo presente la suma es parcial pero válida; con los dos
+  // ausentes no hay producción que afirmar.
   const producidas =
     hasValue(aceptadas) || hasValue(rechazadas) ? (aceptadas ?? 0) + (rechazadas ?? 0) : null;
 
@@ -111,21 +92,21 @@ export function buildPlantSummary(machines = []) {
     totalMaquinas: machines.length,
     operando: machines.filter((m) => estaOperando(m.estado)).length,
     // Cuántas máquinas no han dicho nada. La banda de KPIs lo usa para no
-    // afirmar «10 detenidas» cuando lo cierto es «10 sin leer».
+    // afirmar «10 detenidas» cuando en realidad son «10 sin leer».
     sinDato: machines.filter((m) => m.estado === "unknown").length,
 
     disponibilidad,
     rendimiento,
     calidad,
-    // Sin `?? 0`: calcOEE ya devuelve null cuando falta un factor, y ese
-    // null debe llegar hasta el gauge, no disfrazarse de planta parada.
+    // Sin `?? 0`: calcOEE ya devuelve null cuando falta un factor, y ese null
+    // tiene que llegar hasta el gauge en vez de disfrazarse de planta parada.
     oee: calcOEE({ disponibilidad, rendimiento, calidad }),
 
     producidas,
     aceptadas,
     rechazadas,
-    // `producidas` en 0 real (turno recién empezado) tampoco da un yield:
-    // 0/0 no es una medición, es la ausencia de piezas que medir.
+    // `producidas` en 0 real (turno recién empezado) tampoco da un yield: 0/0
+    // no es una medición, es la ausencia de piezas que medir.
     fty: producidas ? ((aceptadas ?? 0) / producidas) * 100 : null,
 
     paroPlanificado,
@@ -137,10 +118,9 @@ export function buildPlantSummary(machines = []) {
 /**
  * Producción por máquina, de mayor a menor. Alimenta el pastel de reparto.
  *
- * La referencia lo parte "por producto"; nosotros no tenemos catálogo de
- * producto —`Modelo` es la receta del PLC, no un SKU— así que se reparte
- * por equipo. Es la misma pregunta —¿de dónde sale el volumen?— con el
- * eje que sí existe.
+ * Se reparte por equipo y no por producto porque no hay catálogo de producto:
+ * `Modelo` es la receta del PLC, no un SKU. Responde la misma pregunta —de
+ * dónde sale el volumen— con el eje que sí existe.
  */
 export function productionByMachine(machines = []) {
   return machines
@@ -157,9 +137,8 @@ export function productionByMachine(machines = []) {
 /**
  * ¿Tiene la máquina los tres factores medidos?
  *
- * `getMachineHistory` construye la serie a partir de ellos y no tolera
- * huecos: con un `null` reventaría al formatear. Filtrar aquí es además
- * lo correcto conceptualmente — una máquina sin medición no puede
+ * `getMachineHistory` construye la serie a partir de ellos y no tolera huecos:
+ * un `null` reventaría al formatear. Además, una máquina sin medición no puede
  * aportar a una tendencia, y meterla como ceros la falsearía.
  */
 const conFactores = (m) =>
@@ -168,15 +147,13 @@ const conFactores = (m) =>
 /**
  * Tendencia horaria de los cuatro factores, promediada sobre la planta.
  *
- * ⚠ La serie sigue siendo SIMULADA: `getMachineHistory` genera una rejilla
- * determinista de 12 horas anclada al valor actual. La historia real vive
- * en los puntos `hda:` de ICONICS y se conectará en la Fase 7 del Plan 1,
- * cuando `apiClient` exponga la ruta `/api/iconics/history` que el backend
- * ya tiene. Hasta entonces esto es una ilustración, no una medición.
+ * La serie es simulada: `getMachineHistory` genera una rejilla determinista
+ * anclada al valor actual, así que es una ilustración y no una medición. La
+ * historia real vive en los puntos `hda:` de ICONICS.
  *
  * Solo entran las máquinas con los tres factores. Si ninguna los tiene
- * —servidor caído, arranque en frío— se devuelve una serie vacía y las
- * gráficas se pintan sin datos, que es lo honesto.
+ * (servidor caído, arranque en frío) se devuelve una serie vacía y las
+ * gráficas se pintan sin datos.
  */
 export function plantTrend(machines = [], points = 12) {
   const medidas = machines.filter(conFactores);
@@ -199,24 +176,22 @@ export function plantTrend(machines = [], points = 12) {
 }
 
 /**
- * Producción y rechazo por hora, repartiendo el total del turno según el
- * peso de cada hora en la calidad de esa hora.
+ * Producción y rechazo por hora.
  *
- * ⚠ Es una DERIVACIÓN, no una medición: la máquina entrega el acumulado del
- * turno, no piezas por hora. Se reparte el total uniformemente entre las
- * horas y se aplica la calidad horaria real para separar buenas de malas,
- * de modo que la suma de las barras cuadra con el total del turno. Cuando
- * el PLC entregue conteo por hora, se sustituye esta función y la vista no
- * se entera.
+ * Es una derivación y no una medición: la máquina entrega el acumulado del
+ * turno, no piezas por hora. Se reparte el total uniformemente entre las horas
+ * y se aplica la calidad horaria para separar buenas de malas, de modo que la
+ * suma de las barras cuadre con el total del turno. Con conteo por hora del
+ * PLC se sustituye esta función y la vista no se entera.
  */
 export function productionTrend(machines = [], points = 12) {
   const trend = plantTrend(machines, points);
   if (!trend.length) return [];
 
   const { producidas } = buildPlantSummary(machines);
-  // Puede haber tendencia sin conteo: máquinas con factores medidos pero
-  // con `Pz_OK` en mala calidad. Sin piezas no hay barras que repartir —
-  // repartir un null daría doce barras de cero, que es una afirmación.
+  // Puede haber tendencia sin conteo: máquinas con factores medidos pero con
+  // `Pz_OK` en mala calidad. Repartir un null daría doce barras de cero, que
+  // es una afirmación.
   if (!hasValue(producidas)) return [];
 
   const porHora = producidas / trend.length;

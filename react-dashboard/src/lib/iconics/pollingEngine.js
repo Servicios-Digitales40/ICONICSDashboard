@@ -1,50 +1,25 @@
 /**
- * lib/iconics/pollingEngine.js
- * ------------------------------------------------------------------
- * UN POLLER, UNA PETICIÓN, MUCHOS SUSCRIPTORES.
+ * Un poller, una petición, muchos suscriptores.
  *
- * JS puro: ni React ni DOM obligatorio, para poder probarlo en node.
+ * JS puro (sin React ni DOM obligatorio) para poder probarlo en node.
  *
- * ── EL PROBLEMA QUE RESUELVE ───────────────────────────────────────
+ * Un hook con `setInterval` por componente abriría un temporizador y una
+ * petición por cada uno de los ~140 puntos en pantalla. Aquí hay un solo
+ * temporizador y una sola petición por ciclo con la unión de todos ellos.
  *
- * Son 10 máquinas × hasta 14 propiedades = ~140 puntos. Con el hook
- * `useIconicsPoint`, que abre un `setInterval` por componente, la vista
- * de área abriría 10 temporizadores y la de detalle 14, cada uno con su
- * propia petición. Multiplicado por un refresco de 5 s son ~120 y ~168
- * peticiones por minuto para enseñar lo mismo.
+ * Características:
  *
- * Aquí hay un solo temporizador y una sola petición por ciclo: 4 y 12
- * peticiones por minuto respectivamente.
- *
- * ── LAS OCHO PROPIEDADES ───────────────────────────────────────────
- *
- * 1 · Registro con CONTEO DE REFERENCIAS. Los componentes declaran qué
- *     puntos necesitan al montar y los liberan al desmontar; el motor
- *     mantiene la unión. Así la vista de planta pide 8 tags × 10
- *     máquinas y el detalle añade el resto de UNA sola máquina.
- *
- * 2 · UNA PETICIÓN POR CICLO con la unión completa, aprovechando la
- *     lectura en lote que el backend ya expone.
- *
- * 3 · TROCEADO con concurrencia acotada, para no pasarse del límite del
- *     servidor ni abrir una avalancha de conexiones.
- *
- * 4 · GUARDA DE PETICIÓN EN VUELO: si el ciclo anterior sigue corriendo,
- *     el siguiente se OMITE en vez de encolarse. Con un servidor lento
- *     es la diferencia entre degradarse y colapsar.
- *
- * 5 · CONSCIENTE DE VISIBILIDAD: con la pestaña oculta no se sondea. Un
- *     dashboard abierto toda la noche pasa de ~5760 peticiones a 0.
- *
- * 6 · BACKOFF EXPONENCIAL ante fallo, con tope, reiniciado al primer
- *     éxito: un servidor caído no recibe tráfico de martillo.
- *
- * 7 · STALE-WHILE-REVALIDATE: nunca se vacía lo ya leído. Tras N ciclos
- *     sin noticias de un punto se marca como rancio y la UI lo advierte,
- *     en vez de dejar un hueco donde había un número.
- *
- * 8 · FILTRO POR CALIDAD: ver lib/iconics/quality.js. Un valor con
- *     calidad ≠ 192 no es un cero, es la ausencia de un dato.
+ *  - Registro con conteo de referencias: los componentes declaran qué puntos
+ *    necesitan al montar y los liberan al desmontar.
+ *  - Troceado con concurrencia acotada, para no pasarse del límite del servidor.
+ *  - Guarda de petición en vuelo: si el ciclo anterior sigue corriendo, el
+ *    siguiente se omite en vez de encolarse.
+ *  - Consciente de visibilidad: con la pestaña oculta no se sondea.
+ *  - Backoff exponencial acotado ante fallo, reiniciado al primer éxito.
+ *  - Stale-while-revalidate: nunca se vacía lo ya leído; tras N ciclos sin
+ *    noticias el punto se marca como rancio y la UI lo advierte.
+ *  - Filtro por calidad en la frontera (ver quality.js): un valor de mala
+ *    calidad es ausencia de dato, no un cero.
  */
 import { isGoodQuality } from "./quality.js";
 
@@ -80,8 +55,8 @@ export function createPollingEngine({
   staleAfterCycles = 3,
   /**
    * Ventana para agrupar altas seguidas de puntos. Navegar rápido entre
-   * máquinas registra y libera tags a gran velocidad; sin esta ventana
-   * cada cambio dispararía su propia petición inmediata (riesgo R-08).
+   * máquinas registra y libera tags muy deprisa; sin esta ventana cada
+   * cambio dispararía su propia petición inmediata.
    */
   coalesceMs = 250,
   visibility = visibilidadDelNavegador(),
@@ -122,7 +97,7 @@ export function createPollingEngine({
 
   const puntosActivos = () => [...refs.keys()];
 
-  /** Troceado con concurrencia acotada (propiedad 3). */
+  /** Troceado con concurrencia acotada. */
   async function leerTodo(points) {
     const lotes = trocear(points, maxBatch);
     const salida = new Map();
@@ -147,7 +122,7 @@ export function createPollingEngine({
    * pruebas lo usan para no depender de temporizadores.
    */
   async function poll() {
-    // Propiedad 4: guarda de petición en vuelo.
+    // Si el ciclo anterior sigue en vuelo, este se omite.
     if (enVuelo) {
       stats.omitidos += 1;
       return;
@@ -166,16 +141,16 @@ export function createPollingEngine({
         const bruto = respuesta.get(name);
 
         if (bruto === undefined) {
-          // Propiedad 7: el punto no vino. Se conserva el último valor
-          // bueno y se cuenta el fallo; solo tras N ciclos se declara
-          // rancio. Un hueco puntual no debe parpadear en pantalla.
+          // El punto no vino: se conserva el último valor bueno y se cuenta
+          // el fallo. Solo tras N ciclos se declara rancio, para que un
+          // hueco puntual no parpadee en pantalla.
           const previo = values.get(name);
           if (previo) previo.misses += 1;
           else values.set(name, { value: null, quality: null, ok: false, receivedAt: null, misses: 1 });
           continue;
         }
 
-        // Propiedad 8: la calidad se filtra AQUÍ, en la frontera.
+        // La calidad se filtra aquí, en la frontera.
         const ok = isGoodQuality(bruto.quality);
         values.set(name, {
           value: ok ? bruto.value : null,
@@ -186,7 +161,7 @@ export function createPollingEngine({
         });
       }
 
-      // Propiedad 6: el éxito reinicia el backoff.
+      // El éxito reinicia el backoff.
       fallos = 0;
       stats.ultimoError = null;
       stats.ultimaLectura = ahora;
@@ -214,7 +189,7 @@ export function createPollingEngine({
   function agendar() {
     if (!corriendo) return;
     clearTimeout(timer);
-    // Propiedad 5: con la pestaña oculta no se agenda nada.
+    // Con la pestaña oculta no se agenda nada.
     if (!visibility.esVisible()) return;
     timer = setTimeout(poll, proximoRetardo());
   }
@@ -235,8 +210,8 @@ export function createPollingEngine({
 
     bajaVisibilidad = visibility.suscribir((visible) => {
       if (visible) {
-        // Al volver al foco, refresco inmediato: lo primero que ve el
-        // usuario no puede ser el estado de hace media hora.
+        // Al volver al foco, refresco inmediato para no enseñar el estado
+        // de hace media hora.
         fallos = 0;
         pollPronto();
       } else {
@@ -259,12 +234,11 @@ export function createPollingEngine({
   }
 
   /**
-   * Propiedad 1: alta de puntos con conteo de referencias.
+   * Alta de puntos con conteo de referencias.
    *
-   * La función de baja es idempotente. Importa por React 18 en
-   * StrictMode, que monta, desmonta y vuelve a montar en desarrollo
-   * (riesgo R-06): con el conteo la secuencia +1 −1 +1 deja exactamente
-   * una referencia, y una baja repetida no puede dejarla en negativo.
+   * La función de baja es idempotente por el doble montaje de StrictMode en
+   * desarrollo: la secuencia +1 −1 +1 deja exactamente una referencia y una
+   * baja repetida no puede dejarla en negativo.
    */
   function acquire(pointNames) {
     let nuevos = 0;
@@ -319,7 +293,7 @@ export function createPollingEngine({
     start,
     stop,
     poll,
-    /** Instantánea de instrumentación. Alimenta el contador de la Fase 3.5. */
+    /** Instantánea de instrumentación. */
     stats: () => ({
       ...stats,
       peticionesPorMinuto: marcasDePeticion.length,

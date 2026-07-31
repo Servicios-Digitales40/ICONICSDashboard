@@ -1,17 +1,16 @@
 /**
- * theme/index.js — API pública del sistema de tema.
+ * API pública del sistema de tema.
  *
- * Re-exports NOMBRADOS y explícitos, no `export *`: así queda documentado
- * qué es API pública del módulo y se hace imposible el fallo de "ambiguous
- * star export" (dos `export *` con el mismo nombre lo excluyen en silencio,
- * dejándolo `undefined` en el consumidor y sin error de build).
+ * Los re-exports son nombrados y explícitos en vez de `export *`, que deja
+ * documentado qué es API pública y evita el fallo del star export ambiguo: dos
+ * `export *` con el mismo nombre lo excluyen en silencio, y el consumidor
+ * recibe `undefined` sin error de build.
  *
- * `useTheme()` se llama desde ~57 archivos: este barrel es el especificador
- * corto y estable que todos comparten (`@/theme`).
+ * `useTheme()` se llama desde casi todas partes, y este barrel es el
+ * especificador corto y estable que todos comparten (`@/theme`).
  *
- * `chartPalette` NO se exporta aquí a propósito: está deprecado y sin
- * consumidores vivos. Sigue accesible en `@/theme/themes.js` para el código
- * archivado, pero no forma parte de la API pública.
+ * `chartPalette` no se exporta aquí: está deprecado y sin consumidores vivos.
+ * Sigue accesible en `@/theme/themes.js` para el código archivado.
  */
 export { ThemeProvider, useTheme } from "./ThemeProvider.jsx";
 export { THEMES } from "./themes.js";

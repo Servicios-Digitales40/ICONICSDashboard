@@ -1,46 +1,28 @@
 /**
- * lib/domain/estado.js
- * ------------------------------------------------------------------
- * FUENTE ÚNICA del vocabulario de estados de máquina.
+ * Fuente única del vocabulario de estados de máquina: clave canónica,
+ * etiqueta y token de color. El icono lo pone el componente, que es la parte
+ * que sí es presentación.
  *
- * Antes vivía duplicado en dos sitios que podían divergir: `ESTADO_TOKEN`
- * en lib/machines.js (colores) y el mapa `ESTADOS` de GaugeCard (colores
- * + iconos). Ahora el dominio manda: aquí están la clave canónica, la
- * etiqueta y el token de color; el icono lo pone el componente, porque
- * es la única parte que sí es presentación.
+ * El vocabulario es el de ICONICS y no el que tenía la app, porque un tablero
+ * de planta no debe prometer estados que el servidor no va a enviar nunca.
+ * Para añadir otros (los de mantenimiento, por ejemplo) hay que darlos de alta
+ * primero en el servidor y luego aquí.
  *
- * ── LA DECISIÓN (Plan 1 §5.1) ──────────────────────────────────────
+ * Los códigos salen de la expresión de la propiedad `Estado`:
  *
- * El vocabulario canónico es EL DE ICONICS, no el que tenía la app.
- *
- * La app manejaba seis estados en español (Operando, Mantenimiento
- * Correctivo, Mantenimiento Preventivo, Limpieza, Receso, Paro de
- * Emergencia). El servidor solo emite cinco enteros, y de todos ellos
- * únicamente «Operando ↔ 1» coincidía. Los otros cinco de la app no
- * existen en ICONICS y nunca se recibirían; los cuatro de ICONICS que
- * faltaban (Stand By, Set-Up, Comm Fail, Alarma) no se podrían mostrar.
- *
- * Se adopta el del servidor porque un tablero de planta no debe prometer
- * estados que nadie va a enviar jamás. Si producción necesita los de
- * mantenimiento, hay que añadirlos EN EL SERVIDOR y luego aquí — no
- * inventarlos en el frontend.
- *
- * Los códigos salen de la propia expresión de la propiedad `Estado` en
- * el Excel:
- *
- *     IF   B_Run    THEN 1   ← Running
- *     ELSEIF B_Std_By THEN 0 ← Stand By
- *     ELSEIF B_SetUp  THEN 2 ← Set-Up / No identificada
- *     ELSEIF Comm Fail THEN 3 ← Fallo de comunicación
- *     ELSE 4                 ← Alarma
+ *     IF     B_Run      THEN 1   ← Running
+ *     ELSEIF B_Std_By   THEN 0   ← Stand By
+ *     ELSEIF B_SetUp    THEN 2   ← Set-Up / No identificada
+ *     ELSEIF Comm Fail  THEN 3   ← Fallo de comunicación
+ *     ELSE                   4   ← Alarma
  */
 
 /**
- * `token` es un nombre de color del TEMA, no un hex: quien pinta resuelve
- * `theme[token]` y así funciona igual en claro y en oscuro.
+ * `token` es un nombre de color del tema, no un hex: quien pinta resuelve
+ * `theme[token]` y funciona igual en claro y en oscuro.
  *
- * `orden` va de peor a mejor y manda en la leyenda de la dona del
- * dashboard, para que lo grave quede arriba.
+ * `orden` va de peor a mejor y manda en la leyenda de la dona del dashboard,
+ * para que lo grave quede arriba.
  */
 export const ESTADOS = {
   alarma:   { key: "alarma",   codigo: 4,    label: "Alarma",              token: "coral",     orden: 0, critico: true },
@@ -64,11 +46,9 @@ const POR_CODIGO = Object.fromEntries(
 );
 
 /**
- * Entero de ICONICS → clave canónica.
- *
- * Cualquier cosa que no sea uno de los cinco códigos conocidos cae en
- * `unknown`: un código nuevo aparecido en el servidor debe verse como
- * «sin dato» y no colarse como el estado equivocado.
+ * Entero de ICONICS → clave canónica. Cualquier cosa que no sea uno de los
+ * cinco códigos conocidos cae en `unknown`, para que un código nuevo del
+ * servidor se vea como «sin dato» y no como el estado equivocado.
  */
 export function estadoFromCode(codigo) {
   if (codigo === null || codigo === undefined) return "unknown";
@@ -81,5 +61,5 @@ export const estadoInfo = (key) => ESTADOS[key] ?? ESTADOS.unknown;
 /** Etiqueta legible. */
 export const estadoLabel = (key) => estadoInfo(key).label;
 
-/** ¿Cuenta como máquina produciendo? Un solo sitio decide qué es «operando». */
+/** ¿Cuenta como máquina produciendo? Un solo sitio define qué es «operando». */
 export const estaOperando = (key) => key === ESTADOS.running.key;

@@ -1,4 +1,4 @@
-/** ui/HoverTip.jsx — envuelve cualquier elemento y muestra un tooltip flotante al pasar el cursor. */
+/** Envuelve cualquier elemento y le añade un tooltip flotante al pasar el cursor. */
 import { useState } from "react";
 import { useTheme } from "@/theme";
 

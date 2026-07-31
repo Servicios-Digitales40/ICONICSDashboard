@@ -1,11 +1,9 @@
 /**
- * ui/KpiTile.jsx
- * ------------------------------------------------------------------
- * Tarjeta-KPI: etiqueta, cifra y subtítulo opcional. `strong` la resalta
- * con el color de acento para marcar el dato accionable.
+ * Tarjeta-KPI: etiqueta, cifra y subtítulo opcional. `strong` la resalta con
+ * el color de acento para marcar el dato accionable.
  *
- * Presentacional pura — recibe el tema por prop, igual que el resto de
- * piezas que se comparten entre el detalle de máquina y el dashboard.
+ * Presentacional pura: recibe el tema por prop, igual que el resto de piezas
+ * compartidas entre el detalle de máquina y el dashboard.
  */
 
 /** Tarjeta-KPI grande. `strong` marca el dato accionable. */

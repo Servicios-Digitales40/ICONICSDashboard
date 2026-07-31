@@ -1,9 +1,7 @@
 /**
- * hooks/useIconicsPoint.js
- * ------------------------------------------------------------------
- * Consulta un punto de ICONICS vía el backend puente y lo refresca
- * cada `intervalMs`. Expone el resultado crudo del punto, estado de
- * carga/error y una función `refresh` para forzar una nueva lectura.
+ * Consulta un punto de ICONICS vía el backend puente y lo refresca cada
+ * `intervalMs`. Expone el resultado crudo, estado de carga/error y un
+ * `refresh` para forzar una nueva lectura.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchIconicsPoint } from "./apiClient.js";

@@ -1,32 +1,21 @@
 /**
- * lib/domain/machine.js
- * ------------------------------------------------------------------
  * La forma `Machine`: el único vocabulario que conocen las vistas.
  *
- * Se define desde el EXCEL (lo que el servidor ofrece) y no desde lo que
- * la UI usa hoy. Si se congelara según la pantalla actual, cada dato
- * nuevo obligaría a tocar las dos fuentes de datos y el normalizador.
+ * Se define desde lo que el servidor ofrece y no desde lo que la UI usa hoy;
+ * congelarla según la pantalla actual obligaría a tocar las dos fuentes y el
+ * normalizador cada vez que apareciera un dato nuevo.
  *
- * ── AUSENCIA DE DATO ───────────────────────────────────────────────
+ * Todo campo numérico es `number | null`, donde `null` significa «no hay
+ * medición» y las vistas pintan un hueco, nunca un cero. Se pierde un dato de
+ * dos maneras, y ambas acaban en `null`:
  *
- * Todo campo numérico es `number | null`. `null` significa «no hay
- * medición», y las vistas deben pintar un hueco, jamás un cero.
+ *  - Mala calidad, que ya filtró el adaptador de ICONICS (ver quality.js).
+ *  - Aritmética inválida (`NaN` o `Infinity`). El servidor calcula `OEE_Cal`
+ *    como (Pz_OK / Prod_Real_Total) × 100 sin proteger la división, así que a
+ *    inicio de turno desborda y un solo NaN contaminaría el resumen de la
+ *    planta entera.
  *
- * Hay dos formas de perder un dato y ambas terminan en `null`:
- *
- *   1. Mala calidad — el adaptador de ICONICS ya lo filtró con la regla
- *      de la calidad 192 (ver lib/iconics/quality.js).
- *   2. Aritmética inválida — `NaN` o `Infinity`.
- *
- * El caso 2 no es teórico. En el Excel, `OEE_Cal` a nivel de instancia
- * es (Pz_OK / Prod_Real_Total) × 100 SIN protección por abajo: al inicio
- * del turno, con `Prod_Real_Total` en 0, el servidor devuelve Infinity o
- * NaN. Como `buildPlantSummary` promedia sin comprobar, un solo NaN
- * contamina el resumen de la planta entera. Revelador: la clase
- * `Calculos` del propio Excel sí acota a 0–120, señal de que el problema
- * ya se detectó en el servidor pero no en todas las rutas.
- *
- * Por eso el saneamiento vive AQUÍ, en la frontera, y no en las vistas.
+ * Por eso el saneamiento vive aquí, en la frontera, y no en las vistas.
  */
 import { estadoFromCode, ESTADOS } from "./estado.js";
 
@@ -48,13 +37,12 @@ export function toText(raw) {
   return s === "" ? null : s;
 }
 
-/** ¿Hay medición? Úsese en las vistas antes de formatear. */
+/** ¿Hay medición? Se usa en las vistas antes de formatear. */
 export const hasValue = (v) => v !== null && v !== undefined;
 
 /**
- * OEE a partir de sus tres factores, en %.
- * Devuelve `null` si falta alguno: un OEE calculado con un factor
- * ausente sería un número inventado.
+ * OEE a partir de sus tres factores, en %. Devuelve `null` si falta alguno:
+ * un OEE calculado con un factor ausente sería un número inventado.
  */
 export function calcOEE({ disponibilidad, rendimiento, calidad }) {
   if (!hasValue(disponibilidad) || !hasValue(rendimiento) || !hasValue(calidad)) return null;
@@ -68,10 +56,10 @@ export function calcOEE({ disponibilidad, rendimiento, calidad }) {
  * `readings` llega ya filtrado por calidad: cada clave es un campo de
  * dominio y su valor es el crudo del servidor o `null`.
  *
- * Las dos derivaciones son deliberadamente conservadoras:
- *   · `producidas` cae a aprobadas + rechazadas solo si ambas existen.
- *   · `oee` se recalcula desde los factores solo si el servidor no lo dio.
- * Nunca se rellena un hueco con una estimación.
+ * Las dos derivaciones son conservadoras a propósito, para no rellenar nunca
+ * un hueco con una estimación: `producidas` cae a aprobadas + rechazadas solo
+ * si ambas existen, y `oee` se recalcula desde los factores solo si el
+ * servidor no lo dio.
  */
 export function createMachine({ id, areaId, machineId, equipo, readings = {}, receivedAt = null, stale = false }) {
   const disponibilidad = toNumber(readings.disponibilidad);
@@ -96,9 +84,8 @@ export function createMachine({ id, areaId, machineId, equipo, readings = {}, re
     machineId,
     equipo,
 
-    // `estado` es el único campo que nunca es null: la ausencia de dato
-    // es un estado en sí misma (`unknown`), y así las vistas no necesitan
-    // un camino especial para pintarlo.
+    // `estado` nunca es null: la ausencia de dato es un estado en sí misma
+    // (`unknown`), así que las vistas no necesitan un camino especial.
     estado: estadoFromCode(toNumber(readings.estado)),
     modelo: toText(readings.modelo),
 
@@ -119,7 +106,7 @@ export function createMachine({ id, areaId, machineId, equipo, readings = {}, re
     tInacPlan: toNumber(readings.tInacPlan),
     tMuerto: toNumber(readings.tMuerto),
 
-    // Metadatos de frescura: la UI los usa para el semáforo de dato.
+    // Frescura del dato: la UI los usa para el semáforo.
     receivedAt,
     stale,
   };

@@ -1,33 +1,19 @@
 /**
- * lib/datasource/demoSource.js
- * ------------------------------------------------------------------
- * Fuente de datos SIN SERVIDOR. Alimenta el modo demo del botón del
- * Topbar y sirve además como banco de pruebas de toda la UI.
+ * Fuente de datos sin servidor. Alimenta el modo demo del Topbar y sirve como
+ * banco de pruebas de toda la UI.
  *
- * ── SE CONSTRUYE ANTES QUE LA FUENTE REAL, A PROPÓSITO ─────────────
+ * Los números son exactamente los de `lib/machines.js`, que no se toca porque
+ * los prototipos siguen importando de ahí; `demoSource.test.js` comprueba
+ * contra una referencia congelada que los agregados no se han movido.
  *
- * Si esta fuente existe desde el principio, toda la arquitectura nueva y
- * toda la UI se construyen y validan sobre ella, y conectar ICONICS al
- * final es un paso pequeño. Al revés sería un salto al vacío.
- *
- * ── QUÉ CONSERVA Y QUÉ TRADUCE ─────────────────────────────────────
- *
- * Los NÚMEROS son exactamente los de `lib/machines.js`, que no se toca:
- * los 11 prototipos siguen importando de ahí y no deben romperse
- * (riesgo R-03). La prueba `demoSource.test.js` verifica contra la
- * referencia congelada que los agregados no se han movido.
- *
- * Lo que sí se traduce es el VOCABULARIO, porque cambió por diseño:
+ * Lo que sí se traduce es el vocabulario:
  *
  *   area1 (7 máquinas)  →  LIN 1..7      "Lineal n"
  *   area2 (3 máquinas)  →  REC 10,11,13  "Multi n"
  *
- * Y los estados en español pasan al vocabulario de ICONICS. No se
- * "traducen" uno a uno porque no hay equivalencia: se REASIGNAN a los
- * cinco estados que el servidor sí emite, conservando la variedad visual
- * que una demo necesita. Mostrar "Limpieza" en la demo cuando el
- * servidor nunca enviará ese estado sería enseñar una pantalla que no
- * existe.
+ * Los estados en español se reasignan a los cinco que emite el servidor, sin
+ * equivalencia uno a uno: enseñar en la demo un estado que ICONICS nunca
+ * manda sería mostrar una pantalla que no existe.
  */
 import { createMachine, calcOEE } from "../domain/index.js";
 import { AREAS, listMachines } from "../iconics/tagCatalog.js";
@@ -40,11 +26,8 @@ import {
 import { PARO_PLANIFICADO_S, TURNO_S } from "../shiftModel.js";
 
 /**
- * Estado canónico de cada máquina de la demo.
- *
- * Se elige a mano para que la demo enseñe los cinco estados reales de un
- * vistazo: si todas salieran "Operando" no se podría revisar el diseño
- * de los demás.
+ * Estado canónico de cada máquina de la demo. Se elige a mano para que se
+ * vean los cinco estados de un vistazo y se pueda revisar su diseño.
  */
 const ESTADO_DEMO = {
   "LIN/1": "commfail",
@@ -59,7 +42,7 @@ const ESTADO_DEMO = {
   "REC/13": "running",
 };
 
-/** Código de ICONICS a partir de la clave canónica, para pasar por el normalizador real. */
+/** Código de ICONICS por clave canónica, para pasar por el normalizador real. */
 const CODIGO = { standby: 0, running: 1, setup: 2, commfail: 3, alarma: 4 };
 
 /**
@@ -80,9 +63,9 @@ function emparejar() {
 /**
  * Traduce una máquina mock a la forma `Machine` del dominio.
  *
- * `deriva` desplaza ligeramente los factores para que la demo se vea
- * viva al refrescar. Con 0 devuelve los valores mock exactos, que es lo
- * que compara la prueba contra la referencia congelada.
+ * `deriva` desplaza ligeramente los factores para que la demo se vea viva al
+ * refrescar. Con 0 devuelve los valores mock exactos, que es contra lo que
+ * compara la prueba de referencia congelada.
  */
 function aDominio({ real, mock }, deriva = 0) {
   if (!mock) return createMachine({ ...real, readings: {} });
@@ -107,18 +90,17 @@ function aDominio({ real, mock }, deriva = 0) {
       producidas: mock.aprobadas + mock.rechazadas,
 
       estado: CODIGO[ESTADO_DEMO[real.id] ?? "running"],
-      // El `Modelo` real es una cadena que viene del PLC ("Modelo 00"),
-      // no el entero `noParte` del mock. Se imita el formato del PLC.
+      // El `Modelo` real es una cadena del PLC ("Modelo 00"), no el entero
+      // `noParte` del mock, así que se imita el formato.
       modelo: `Modelo ${String(mock.noParte ?? 0).padStart(2, "0")}`,
 
       // El mock guarda `tiempoMuerto` en minutos; el dominio trabaja en
       // segundos, como ICONICS.
       tMuerto: (mock.tiempoMuerto ?? 0) * 60,
 
-      // En modo demo NO hay `T_Disp_pot` ni `T_Inac_plan` del servidor,
-      // así que se sirven las constantes de turno de `shiftModel`. Es la
-      // degradación prevista en el Plan 1 §5.2: 8 h de turno con 1 h de
-      // paro previsto, en lugar de las 24 h que calcula ICONICS.
+      // En demo no hay `T_Disp_pot` ni `T_Inac_plan` del servidor, así que
+      // se usan las constantes de turno de `shiftModel`: 8 h con 1 h de paro
+      // previsto, en lugar de las 24 h que calcula ICONICS.
       tDispPot: TURNO_S,
       tInacPlan: PARO_PLANIFICADO_S,
     },
@@ -131,11 +113,8 @@ export function snapshotDemo() {
 }
 
 /**
- * Crea la fuente demo.
- *
- * `intervalMs` solo controla el latido visual: no hay red que saturar,
- * pero un dashboard completamente inmóvil no permite revisar animaciones
- * ni transiciones de valor.
+ * Crea la fuente demo. `intervalMs` solo controla el latido visual: no hay red
+ * que saturar, pero un dashboard inmóvil no permite revisar las animaciones.
  */
 export function createDemoSource({ intervalMs = 5000 } = {}) {
   const suscriptores = new Set();
@@ -143,7 +122,8 @@ export function createDemoSource({ intervalMs = 5000 } = {}) {
   let tick = 0;
 
   const instantanea = () => {
-    // Onda suave y determinista: la misma máquina no salta entre renders.
+    // Onda suave y determinista, para que la misma máquina no salte entre
+    // renders. Desactivada de momento.
     // const deriva = Math.sin(tick / 3) * 2.5;
     const deriva = 0
     return {
@@ -190,9 +170,9 @@ export function createDemoSource({ intervalMs = 5000 } = {}) {
     subscribeMachine: (id, cb) => suscribir(cb, (m) => m.id === id),
 
     /**
-     * Historia simulada. Reutiliza el generador determinista de
-     * `machines.js`, que ancla su último punto al valor actual para que
-     * la gráfica y el gauge cuenten lo mismo.
+     * Historia simulada. Reutiliza el generador determinista de `machines.js`,
+     * que ancla su último punto al valor actual para que la gráfica y el gauge
+     * cuenten lo mismo.
      */
     async readHistory(id, { points = 12 } = {}) {
       const m = snapshotDemo().find((x) => x.id === id);
@@ -201,8 +181,8 @@ export function createDemoSource({ intervalMs = 5000 } = {}) {
 
     /**
      * Un día simulado, con la misma forma que entrega el historiador real:
-     * serie horaria + resumen. Es determinista por (máquina, fecha), así
-     * que la demo del comparativo enseña siempre la misma comparación.
+     * serie horaria y resumen. Determinista por (máquina, fecha), para que el
+     * comparativo en demo enseñe siempre la misma comparación.
      */
     async readDay(id, iso, { points = 12 } = {}) {
       const m = snapshotDemo().find((x) => x.id === id);
@@ -219,8 +199,7 @@ export function createDemoSource({ intervalMs = 5000 } = {}) {
           aprobadas: foto.aprobadas,
           rechazadas: foto.rechazadas,
           producidas: foto.aprobadas + foto.rechazadas,
-          // El mock lleva minutos; el dominio —y por tanto la vista— habla
-          // en segundos, como ICONICS.
+          // El mock lleva minutos; el dominio habla en segundos, como ICONICS.
           tMuerto: foto.tiempoMuerto * 60,
           muestras: points,
         },

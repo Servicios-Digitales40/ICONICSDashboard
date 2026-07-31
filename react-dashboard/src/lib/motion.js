@@ -1,34 +1,21 @@
 /**
- * lib/motion.js
- * ------------------------------------------------------------------
- * Los tres primitivos de animación que comparten las vistas.
+ * Los tres primitivos de animación que comparten las vistas. Vive en `lib/`
+ * porque lo consumen el dashboard, el prototipo v2 y el detalle de máquina.
  *
- * Vive en `lib/` —y no en un feature ni en `prototypes/`— porque lo consumen
- * el dashboard de producción, el prototipo v2 y el detalle de máquina. Ya
- * existía un `useCountUp` en `prototypes/machine-cards/cardShared.js`, pero
- * producción no puede importar de `prototypes/` (esa carpeta es hoja del
- * grafo), y además aquel siempre cuenta DESDE CERO: con datos en vivo, un
- * valor que pasa de 57.0 a 57.4 se desplomaría a 0 para volver a subir.
- *
- * ── La regla de movimiento de estas vistas ────────────────────────────
- *
- *   Una animación en BUCLE es una alarma. Todo lo demás se anima UNA vez:
- *   al entrar, o al cambiar de valor.
- *
- * Un tablero de planta se mira ocho horas seguidas. Si parpadean seis cosas
- * a la vez, el ojo aprende a ignorarlas todas — incluida la que sí importa.
- * Por eso el único bucle permitido es el del paro de emergencia.
- * ──────────────────────────────────────────────────────────────────────
+ * Regla de movimiento: una animación en bucle es una alarma, y todo lo demás
+ * se anima una sola vez, al entrar o al cambiar de valor. Un tablero de planta
+ * se mira ocho horas seguidas, y si parpadean seis cosas a la vez el ojo
+ * aprende a ignorarlas todas, incluida la que importa.
  */
 import { useEffect, useRef, useState } from "react";
 
 /**
  * ¿El sistema pide menos movimiento?
  *
- * `index.css` ya neutraliza duraciones y retrasos por CSS, pero eso no basta:
- * hay animación que vive en JS (el conteo de cifras) y decisiones que no son
- * de temporización sino de DISEÑO — la tarjeta en alarma, sin su latido,
- * necesita un fondo de alerta fijo o deja de leerse como alarma.
+ * `index.css` ya neutraliza duraciones y retrasos, pero no basta: hay animación
+ * que vive en JS (el conteo de cifras) y decisiones que son de diseño y no de
+ * temporización, como la tarjeta en alarma, que sin su latido necesita un fondo
+ * de alerta fijo para seguir leyéndose como tal.
  */
 export function usePrefersReducedMotion() {
   const [reduce, setReduce] = useState(
@@ -49,15 +36,13 @@ export function usePrefersReducedMotion() {
 /**
  * Conteo animado hacia `target` con easing (ease-out cúbico).
  *
- * Arranca DESDE EL VALOR ACTUAL, no desde cero: en el primer montaje eso es 0
- * —la cifra sube desde nada, que es el efecto que se busca al entrar— pero en
- * una actualización posterior es el número que ya estaba en pantalla, así que
- * un cambio de dato se lee como un MOVIMIENTO del valor y no como un reinicio.
- * Es lo que hará que el tablero se vea vivo cuando el PLC empiece a refrescar.
+ * Arranca desde el valor actual y no desde cero: en el primer montaje eso es 0
+ * y la cifra sube desde nada, pero en una actualización posterior es el número
+ * que ya estaba en pantalla, así que un cambio de dato se lee como un
+ * movimiento del valor y no como un reinicio.
  *
- * `actual` es una ref y no estado a propósito: se lee al arrancar cada
- * animación para poder retomar desde donde se quedó si la anterior se
- * interrumpió a media transición.
+ * `actual` es una ref y no estado para poder retomar desde donde se quedó si
+ * la animación anterior se interrumpió a media transición.
  */
 export function useCountUp(target, duration = 900) {
   const reduce = usePrefersReducedMotion();
@@ -95,11 +80,10 @@ export function useCountUp(target, duration = 900) {
 /**
  * `false` en el primer render, `true` en el siguiente fotograma.
  *
- * Es el disparador de las transiciones CSS que tienen que ir «de cero a su
- * valor»: barras que crecen, arcos que se trazan, agujas que barren. Sin esto
- * el elemento se pinta ya en su posición final y la transición nunca llega a
- * dispararse — que es exactamente lo que le pasaba a la aguja de `BandGauge`,
- * con su `transition` de 900 ms sin ejecutar una sola vez.
+ * Es el disparador de las transiciones CSS que van «de cero a su valor»:
+ * barras que crecen, arcos que se trazan, agujas que barren. Sin esto el
+ * elemento se pinta ya en su posición final y la transición nunca se dispara,
+ * porque solo corre cuando el valor cambia después del primer pintado.
  */
 export function useMounted() {
   const [listo, setListo] = useState(false);

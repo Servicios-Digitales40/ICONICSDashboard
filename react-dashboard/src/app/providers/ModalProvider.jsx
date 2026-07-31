@@ -1,10 +1,9 @@
 /**
- * context/ModalContext.jsx
- * ------------------------------------------------------------------
- * Controla qué modal (si alguno) está abierto en este momento.
- * Se maneja como un simple identificador de texto ("confirm", "danger", ...)
- * en vez de un booleano por modal, así solo puede haber uno abierto a la vez
- * y es trivial agregar nuevos tipos de modal en el futuro.
+ * Controla qué modal está abierto en cada momento.
+ *
+ * Se maneja como un identificador de texto ("confirm", "danger", …) en vez de
+ * un booleano por modal, así solo puede haber uno abierto a la vez y añadir
+ * tipos nuevos es inmediato.
  *
  *   const { openModal } = useModal();
  *   <button onClick={() => openModal("danger")}>Eliminar</button>

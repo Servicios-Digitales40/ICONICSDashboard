@@ -1,31 +1,15 @@
 /**
- * lib/machines.js
- * ------------------------------------------------------------------
- * Fuente ÚNICA de las máquinas/equipos monitoreados, agrupadas por área.
+ * Máquinas/equipos monitoreados, agrupadas por área. Vive en `lib/` porque lo
+ * consumen varios features además de los prototipos.
  *
- * Vive en `lib/` (infraestructura compartida) y NO dentro de
- * `features/machines/`, por el mismo motivo que el cliente ICONICS: lo
- * consumen varios features —`machines` y `sankey`— además de los
- * prototipos. Meterlo dentro de uno crearía una arista cruzada entre
- * features, que es justo lo que la estructura modular existe para evitar.
+ * Módulo heredado: las vistas de producción no lo leen, consumen
+ * `lib/datasource`. Se conserva porque `demoSource` lo usa como origen de los
+ * datos de ejemplo y porque los prototipos de `src/prototypes/` lo importan
+ * directamente con el vocabulario anterior (area1/area2, estados en español).
+ * Al retirar los prototipos puede reducirse a lo que necesite `demoSource`.
  *
- * ⚠ ESTE ES YA UN MÓDULO HEREDADO. Las vistas de producción NO lo leen:
- * consumen `lib/datasource`, que entrega máquinas en la forma `Machine`
- * del dominio y decide si vienen de ICONICS o del modo demo.
- *
- * Se conserva intacto a propósito, por dos motivos:
- *   · `demoSource` lo usa como origen de los datos de ejemplo, y por eso
- *     el modo demo enseña exactamente las mismas cifras de siempre;
- *   · los 11 prototipos de `src/prototypes/` lo importan directamente y
- *     siguen hablando el vocabulario anterior (area1/area2, estados en
- *     español). Cambiar su API los rompería a todos.
- *
- * Al retirar `src/prototypes/` este archivo se puede reducir a los datos
- * que necesite `demoSource`.
- *
- * Cada máquina tiene un `id` estable y único en toda la app, con el
- * que la vista de detalle la resuelve. El OEE NO se guarda: se calcula
- * en GaugeCard desde Disponibilidad × Rendimiento × Calidad.
+ * Cada máquina tiene un `id` estable con el que la resuelve la vista de
+ * detalle. El OEE no se guarda: se calcula desde D × R × C.
  */
 
 export const MACHINES = {
@@ -43,13 +27,12 @@ export const MACHINES = {
     { id: "a2-2", estado: "Operando", noParte: 2, equipo: "Multi 11", aprobadas: 600, rechazadas: 400, disponibilidad: 82.0, calidad: 88.0, rendimiento: 75.0, tiempoMuerto: 1 },
     { id: "a2-3", estado: "Operando", noParte: 3, equipo: "Multi 13", aprobadas: 800, rechazadas: 200, disponibilidad: 92.0, calidad: 95.0, rendimiento: 88.0, tiempoMuerto: 2 },
   ],
-  // TODO(prototypes): clave que NO es un área. La lee `getMachinesByArea("sandbox")`
-  // desde `prototypes/SandboxPage.jsx` para pintar todas las propuestas con la
-  // misma máquina. Se borra junto con `src/prototypes/` — ver el README de esa
-  // carpeta. Ojo: duplica el id "a1-1" de area1, y como `getMachineById` recorre
-  // las claves en orden, el de area1 lo tapa. Inofensivo hoy, pero significa que
-  // cualquier consumidor de Object.keys(MACHINES) verá "sandbox" como si fuese
-  // un área más.
+  // TODO(prototypes): esta clave no es un área. La lee
+  // `getMachinesByArea("sandbox")` desde `prototypes/SandboxPage.jsx` para
+  // pintar todas las propuestas con la misma máquina, y se borra junto con
+  // `src/prototypes/`. Duplica el id "a1-1" de area1, que lo tapa porque
+  // `getMachineById` recorre las claves en orden; el efecto secundario es que
+  // cualquier consumidor de Object.keys(MACHINES) ve "sandbox" como un área más.
   sandbox: [
         { id: "a1-1", estado: "Mantenimiento Correctivo", noParte: 1, equipo: "Lineal 1", aprobadas: 850, rechazadas: 150, disponibilidad: 71.43, calidad: 85.0, rendimiento: 62.5, tiempoMuerto: 2 }
   ]
@@ -62,12 +45,12 @@ export const AREA_LABELS = {
 };
 
 /**
- * Semántica de color de cada estado, como NOMBRE DE TOKEN del tema (no un
- * hex): quien pinta resuelve `theme[token]` y así funciona en claro y en
- * oscuro. Lectura rápida en piso de planta:
- *   verde  → operando          ámbar   → falla no prevista (correctivo)
- *   azul   → intervención prevista     violeta → limpieza
- *   gris   → inactivo por descanso     coral   → detención crítica
+ * Color de cada estado como nombre de token del tema, no un hex: quien pinta
+ * resuelve `theme[token]` y funciona en claro y en oscuro.
+ *
+ *   verde → operando                   ámbar   → falla no prevista
+ *   azul  → intervención prevista      violeta → limpieza
+ *   gris  → inactivo por descanso      coral   → detención crítica
  *
  * TODO: `GaugeCard` mantiene su propio mapa equivalente (con iconos). Al
  * tocarlo, que lea de aquí para que no puedan divergir.
@@ -103,20 +86,19 @@ export function calcOEE({ disponibilidad, rendimiento, calidad }) {
   return (disponibilidad * rendimiento * calidad) / 10000;
 }
 
-/* ------------------------------------------------------------------
- * Historial simulado por máquina (para las gráficas del detalle).
+/*
+ * Historial simulado por máquina, para las gráficas del detalle.
  *
- * Hoy la API/PLC solo entrega un valor "instantáneo" por métrica. Para
- * poder graficar tendencias, generamos un historial PSEUDO-aleatorio
- * pero DETERMINISTA: la misma máquina produce siempre la misma serie
- * (no "salta" entre renders) y el ÚLTIMO punto coincide con el valor
- * real actual, de modo que la gráfica y el gauge cuentan lo mismo.
+ * El PLC solo entrega un valor instantáneo por métrica, así que la serie es
+ * pseudo-aleatoria pero determinista: la misma máquina produce siempre la
+ * misma, y el último punto coincide con el valor actual para que la gráfica y
+ * el gauge cuenten lo mismo.
  *
- * Cuando exista histórico real, reemplaza `getMachineHistory` por la
- * consulta correspondiente; las subvistas del detalle no cambian.
- * ------------------------------------------------------------------ */
+ * Con histórico real basta sustituir `getMachineHistory` por la consulta
+ * correspondiente; las subvistas del detalle no cambian.
+ */
 
-// PRNG determinista a partir de una cadena semilla (variante xmur3+mulberry32).
+// PRNG determinista a partir de una cadena semilla (xmur3 + mulberry32).
 function seeded(seedStr) {
   let h = 1779033703 ^ seedStr.length;
   for (let i = 0; i < seedStr.length; i++) {
@@ -134,16 +116,16 @@ function seeded(seedStr) {
 const clamp100 = (v) => Math.max(0, Math.min(100, v));
 
 /**
- * Construye una serie horaria alrededor de unos valores base, con una
- * semilla dada (para que sea estable). El ruido se atenúa hacia el final
- * y el último punto ancla exactamente a los valores base.
+ * Serie horaria alrededor de unos valores base, con semilla fija para que sea
+ * estable. El ruido se atenúa hacia el final y el último punto ancla
+ * exactamente a los valores base.
  */
 function buildHourly(seedKey, base, points = 12) {
   const rnd = seeded(seedKey);
   const out = [];
   for (let i = 0; i < points; i++) {
     const isLast = i === points - 1;
-    // conv: 0 al inicio → 1 al final; reduce el ruido conforme se acerca al ancla.
+    // De 0 al inicio a 1 al final: reduce el ruido al acercarse al ancla.
     const conv = points > 1 ? i / (points - 1) : 1;
     const jitter = (b) => clamp100(b + (rnd() - 0.5) * 16 * (1 - conv * 0.65));
 
@@ -163,18 +145,17 @@ function buildHourly(seedKey, base, points = 12) {
 }
 
 /**
- * Serie temporal por hora para una máquina (valor "en vivo"). El último
- * punto ancla al valor real actual, de modo que gráfica y gauge coinciden.
+ * Serie horaria de una máquina en vivo. El último punto ancla al valor actual,
+ * de modo que gráfica y gauge coinciden.
  */
 export function getMachineHistory(machine, points = 12) {
   return buildHourly(machine.id, machine, points);
 }
 
 /**
- * Instantánea de una máquina para una FECHA concreta (YYYY-MM-DD).
- * Determinista por `id + fecha`: la misma fecha devuelve siempre la misma
- * foto, pero fechas distintas varían de forma realista. Las piezas se
- * derivan de la calidad de ese día. Es la base del comparativo por fechas.
+ * Instantánea de una máquina para una fecha concreta (YYYY-MM-DD), base del
+ * comparativo. Determinista por `id + fecha`, así que la misma fecha devuelve
+ * siempre la misma foto. Las piezas se derivan de la calidad de ese día.
  */
 export function getMachineSnapshot(machine, dateStr) {
   const rnd = seeded(`${machine.id}:${dateStr}`);
@@ -189,10 +170,9 @@ export function getMachineSnapshot(machine, dateStr) {
   const aprobadas = Math.round((total * calidad) / 100);
   const rechazadas = total - aprobadas;
 
-  // Acepta las dos formas del campo: `tiempoMuerto` (minutos) es la del
-  // mock heredado que consumen los prototipos; `tMuerto` (segundos) es la
-  // del dominio, que llega desde el comparativo del detalle. Sin este
-  // puente, `undefined + n` daría NaN y se propagaría en silencio.
+  // Acepta las dos formas del campo: `tiempoMuerto` (minutos) del mock
+  // heredado y `tMuerto` (segundos) del dominio. Sin este puente,
+  // `undefined + n` daría NaN y se propagaría en silencio.
   const base = machine.tiempoMuerto ?? (machine.tMuerto != null ? machine.tMuerto / 60 : 0);
   const tiempoMuerto = Math.max(0, Math.round(base + (rnd() - 0.5) * 6));
 

@@ -1,4 +1,4 @@
-/** ui/ChartTooltip.jsx — tooltip personalizado para las gráficas de recharts (reemplaza el feo por defecto). */
+/** Tooltip propio para las gráficas de recharts, en lugar del que trae. */
 import { useTheme } from "@/theme";
 
 export function ChartTooltip({ active, payload, label }) {

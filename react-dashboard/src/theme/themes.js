@@ -1,15 +1,13 @@
 /**
- * theme/themes.js
- * ------------------------------------------------------------------
- * Fuente única de verdad para los colores de la aplicación.
+ * Fuente única de los colores de la aplicación.
  *
- * Cada tema expone los mismos "tokens" (nombres) con valores distintos,
- * así los componentes nunca escriben colores literales: siempre piden
- * `theme.accent`, `theme.textSoft`, etc. Esto es lo que permite que
- * TODA la app cambie de claro a oscuro con un solo booleano.
+ * Cada tema expone los mismos tokens con valores distintos, así que los
+ * componentes nunca escriben colores literales: siempre piden `theme.accent`,
+ * `theme.textSoft`, etc. Es lo que permite cambiar toda la app de claro a
+ * oscuro con un solo booleano.
  *
- * Si mañana quieres un tercer tema (p. ej. "alto contraste"), solo
- * agregas un objeto más aquí, con las mismas llaves.
+ * Para un tercer tema (por ejemplo alto contraste) basta añadir otro objeto
+ * aquí con las mismas llaves.
  */
 export const THEMES = {
   light: {
@@ -52,7 +50,7 @@ export const THEMES = {
     blob1: "rgba(54,84,224,0.12)",
     blob2: "rgba(217,138,27,0.10)",
 
-    // Paleta de DATOS (ver nota al pie del archivo)
+    // Paleta de datos (ver nota al pie del archivo)
     viz: {
       azul: "#7B95F5",
       ambar: "#E2A54B",
@@ -97,7 +95,7 @@ export const THEMES = {
     blob1: "rgba(92,130,245,0.18)",
     blob2: "rgba(229,169,60,0.12)",
 
-    // Paleta de DATOS (ver nota al pie del archivo)
+    // Paleta de datos (ver nota al pie del archivo)
     viz: {
       azul: "#8AB4FF",
       ambar: "#F2C57C",
@@ -109,34 +107,29 @@ export const THEMES = {
 };
 
 /**
- * Paleta de DATOS — no confundir con los tokens de UI de arriba.
- * ------------------------------------------------------------------
- * Los tokens `accent`, `amber`, `coral`… están afinados para INTERFAZ:
- * botones, bordes, texto. Son deliberadamente sobrios porque conviven
- * con mucho texto. Usados como relleno de una gráfica se ven apagados
- * — y usar un token de TEXTO (`textSoft`) como color de dato es lo que
- * hace que un diagrama se vea muerto.
+ * Paleta de datos, distinta de los tokens de UI de arriba.
  *
- * Por eso `viz` es un juego aparte, en tonos pastel, pensado para marcas
- * grandes de color plano (cintas, barras, áreas). Cada modo tiene sus
- * propios valores: el oscuro NO es el claro aclarado, sino una selección
- * hecha contra el fondo #151B27, donde el pastel luce y contrasta.
+ * Los tokens `accent`, `amber`, `coral`… están afinados para interfaz (botones,
+ * bordes, texto) y son sobrios porque conviven con mucho texto. Como relleno de
+ * una gráfica se ven apagados, y usar un token de texto como color de dato deja
+ * el diagrama muerto.
+ *
+ * Por eso `viz` es un juego aparte, en tonos pastel, para marcas grandes de
+ * color plano (cintas, barras, áreas). Cada modo tiene sus propios valores: el
+ * oscuro no es el claro aclarado, sino una selección hecha contra su fondo.
  *
  * Ambos juegos están validados para daltonismo (protanopía, deuteranopía,
- * tritanopía) y contraste contra su superficie. Si cambias un valor,
- * revalida: la separación entre ámbar y verde es la más frágil.
+ * tritanopía) y contraste contra su superficie. Al cambiar un valor conviene
+ * revalidar; la separación entre ámbar y verde es la más frágil.
  *
- * Nota consciente: en modo oscuro estos tonos quedan por encima de la banda
- * de luminosidad recomendada para marcas de datos — es lo que significa
- * "pastel". Se aceptó a cambio del acabado visual; la separación entre
- * colores y el contraste contra el fondo sí se respetan.
+ * En modo oscuro estos tonos quedan por encima de la banda de luminosidad
+ * recomendada para marcas de datos, que es lo que significa «pastel». Se acepta
+ * a cambio del acabado visual, respetando separación y contraste.
  */
 /**
- * @deprecated 2026-07 · sin consumidores vivos
- * Su único consumidor era `pages/Dashboard.jsx`, hoy en `_deprecated/pages/`.
- * Se marca en su sitio en vez de moverlo porque extraerlo obligaría a editar
- * este archivo, que sí está vivo. Si restauras el Dashboard, quita este tag.
- * Revisar para borrado definitivo: 2026-Q4
+ * @deprecated sin consumidores vivos. Su único consumidor era el Dashboard
+ * antiguo, hoy en `_deprecated/pages/`. Se marca aquí en vez de moverlo porque
+ * extraerlo obligaría a editar este archivo, que sí está vivo.
  */
 export const chartPalette = (theme) => [
   theme.viz.azul,

@@ -1,17 +1,14 @@
 /**
- * lib/datasource/hooks.js
- * ------------------------------------------------------------------
- * Los hooks que consumen las vistas. Es TODO lo que una vista necesita
- * saber sobre el origen de los datos: nada.
+ * Los hooks que consumen las vistas. Ninguna vista necesita saber de dónde
+ * salen sus datos.
  *
- * Los tres siguen el mismo patrón —suscribirse al montar, darse de baja
- * al desmontar— porque es lo que permite al motor de polling contar
- * referencias y pedir solo lo que hay en pantalla.
+ * Todos siguen el mismo patrón: suscribirse al montar y darse de baja al
+ * desmontar, que es lo que permite al motor de polling contar referencias y
+ * pedir solo lo que hay en pantalla.
  *
- * ⚠ La baja debe ser simétrica y estar en el `return` del efecto. React
- * 18 en StrictMode monta, desmonta y vuelve a montar en desarrollo: si
- * el efecto no limpiara, cada visita a una vista dejaría un suscriptor
- * huérfano y los puntos nunca se liberarían (riesgos R-05 y R-06).
+ * La baja tiene que ser simétrica y vivir en el `return` del efecto. Con el
+ * doble montaje de StrictMode en desarrollo, un efecto sin limpieza dejaría
+ * un suscriptor huérfano en cada visita y los puntos nunca se liberarían.
  */
 import { useEffect, useMemo, useState } from "react";
 
@@ -59,9 +56,8 @@ export function useMachineData(id) {
 }
 
 /**
- * Serie histórica. NO se sondea: se pide una vez por (máquina, rango).
- * El pasado no cambia, así que repetir la consulta al volver a la misma
- * vista sería gasto puro.
+ * Serie histórica. No se sondea: se pide una vez por (máquina, rango), porque
+ * el pasado no cambia.
  */
 export function useMachineHistory(id, range = { points: 12 }) {
   const { source } = useDataSource();
@@ -89,17 +85,14 @@ export function useMachineHistory(id, range = { points: 12 }) {
 }
 
 /**
- * UN DÍA de historia de una máquina: la serie horaria de los factores y
- * el resumen del día. Es lo que alimenta cada lado del comparativo.
+ * Un día de historia de una máquina: la serie horaria de los factores y el
+ * resumen del día. Alimenta cada lado del comparativo.
  *
- * Tampoco se sondea, y por el mismo motivo: un día pasado ya no cambia.
- * El día de HOY sí crece por su borde derecho, pero para eso está el
- * valor en vivo de la tarjeta; volver a pedir la serie entera cada pocos
- * segundos sería gasto puro para mover el último punto.
+ * Tampoco se sondea. El día de hoy crece por su borde derecho, pero para eso
+ * está el valor en vivo de la tarjeta.
  *
- * `resumen: null` significa "ese día no tiene historia", que NO es lo
- * mismo que "ese día fue malo": quien consuma esto debe decirlo con
- * palabras distintas.
+ * `resumen: null` significa «ese día no tiene historia», que no es lo mismo
+ * que «ese día fue malo»; quien lo consuma debe decirlo con otras palabras.
  */
 export function useMachineDay(id, iso) {
   const { source } = useDataSource();
@@ -126,15 +119,12 @@ export function useMachineDay(id, iso) {
 }
 
 /**
- * OEE día a día en un rango, indexado por fecha.
+ * OEE día a día en un rango, indexado por fecha, para el mapa de calor del
+ * calendario.
  *
- * Existe para el mapa de calor del calendario, que necesita responder
- * "¿cómo fue este día?" de forma SÍNCRONA mientras el usuario navega. De
- * ahí que devuelva una función `oeeDe(iso)` sobre un mapa ya cargado y no
- * una promesa por celda: treinta peticiones al abrir un calendario serían
- * treinta peticiones por cada mes que se hojee.
- *
- * Un día sin dato devuelve `null` y el calendario simplemente no lo tiñe.
+ * Devuelve una función `oeeDe(iso)` sobre un mapa ya cargado, y no una promesa
+ * por celda, porque el calendario necesita responder de forma síncrona
+ * mientras el usuario hojea meses. Un día sin dato devuelve `null` y no se tiñe.
  */
 export function useMachineDailyOee(id, { desde, hasta } = {}) {
   const { source } = useDataSource();
@@ -167,11 +157,8 @@ export function useMachineDailyOee(id, { desde, hasta } = {}) {
 }
 
 /**
- * Instrumentación del motor (Fase 3.5 del Plan 1).
- *
- * Existe para DEMOSTRAR el presupuesto de red en vez de suponerlo: la
- * vista de planta debe quedarse en ~4 peticiones/min y el detalle en ~12.
- * Devuelve `null` en modo demo, donde no hay red que medir.
+ * Instrumentación del motor, para medir el presupuesto de red en vez de
+ * suponerlo. Devuelve `null` en modo demo, donde no hay red que medir.
  */
 export function useIconicsStats({ intervalMs = 2000 } = {}) {
   const { source, isDemo } = useDataSource();

@@ -1,21 +1,19 @@
 /**
- * pages/data/EscrituraView.jsx
- * ------------------------------------------------------------------
  * Subsección "Escritura" de la vista Data.
  *
- * Formulario para AGREGAR un cliente a `db:Northwind.Customers` usando un
- * Data Manipulator de GridWorX (la vía nativa de ICONICS para insertar
- * filas — escribir a una celda NO inserta, solo actualiza).
+ * Formulario para agregar un cliente a `db:Northwind.Customers` usando un Data
+ * Manipulator de GridWorX, que es la vía nativa de ICONICS para insertar
+ * filas: escribir a una celda no inserta, solo actualiza.
  *
- * Mecanismo (verificado contra el servidor):
- *   - El manipulador se invoca ESCRIBIENDO `true` a su punto `.@@Execute`,
- *     con los parámetros inline:
- *       db:Northwind.AddCustomer<@CustomerID='X', @CompanyName='Y'>.@@Execute
- *   - El resultado viene en { success, errorMessage } del WriteResult.
+ * El manipulador se invoca escribiendo `true` a su punto `.@@Execute` con los
+ * parámetros inline:
  *
- * Los parámetros de `PARAMS` deben coincidir EXACTAMENTE con los que define
- * el manipulador en el Workbench. Aquí van los confirmados (CustomerID y
- * CompanyName); si tu AddCustomer acepta más, agrégalos a la lista.
+ *     db:Northwind.AddCustomer<@CustomerID='X', @CompanyName='Y'>.@@Execute
+ *
+ * El resultado viene en { success, errorMessage } del WriteResult.
+ *
+ * Los nombres de `PARAMS` deben coincidir con los que define el manipulador en
+ * el Workbench; si acepta más, hay que añadirlos a la lista.
  */
 import { useState } from "react";
 import { UserPlus, Hash, Building2, User, Briefcase, MapPin, Building, Map, Mailbox, Globe, Phone, Printer } from "lucide-react";
@@ -27,9 +25,9 @@ import { writeIconicsPoint } from "@/lib/iconics";
 const CONFIG = "db:Northwind";
 const MANIPULATOR = "AddCustomer";
 
-// Parámetros que se envían al Data Manipulator (nombre EXACTO, sin la @).
-// Deben coincidir con los que define AddCustomer en el Workbench; si tu
-// manipulador no acepta alguno, ICONICS lo reportará en errorMessage.
+// Parámetros que se envían al Data Manipulator, con el nombre exacto y sin
+// la @. Si el manipulador no acepta alguno, ICONICS lo reporta en
+// errorMessage.
 const PARAMS = [
   { name: "CustomerID", label: "CustomerID", icon: <Hash size={14} />, required: true, hint: "5 caracteres, único (clave primaria)" },
   { name: "CompanyName", label: "CompanyName", icon: <Building2 size={14} />, required: true },
@@ -84,7 +82,7 @@ export default function EscrituraView() {
     }
     setSaving(true);
     try {
-      // Disparar el manipulador: ESCRIBIR true a su punto .@@Execute.
+      // Disparar el manipulador escribiendo true a su punto .@@Execute.
       const res = await writeIconicsPoint(buildExecutePoint(form), true);
       const result = res.result ?? {};
 

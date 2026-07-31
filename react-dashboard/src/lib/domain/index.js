@@ -1,12 +1,9 @@
 /**
- * lib/domain/index.js — API pública del modelo de dominio.
+ * API pública del modelo de dominio: el vocabulario compartido entre las dos
+ * fuentes de datos y todas las vistas.
  *
- * Es el vocabulario COMPARTIDO entre las dos fuentes de datos (ICONICS y
- * demo) y todas las vistas. Nadie fuera de `lib/` construye una `Machine`
- * a mano: se pasa siempre por `createMachine`, que es donde vive el
- * saneamiento de calidad y de NaN.
- *
- * Re-exports nombrados y explícitos, no `export *`.
+ * Nadie fuera de `lib/` construye una `Machine` a mano; siempre se pasa por
+ * `createMachine`, que es donde vive el saneamiento de calidad y de NaN.
  */
 export {
   createMachine,

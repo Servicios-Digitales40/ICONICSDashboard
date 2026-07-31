@@ -1,18 +1,14 @@
 /**
- * pages/machine-detail/OeeView.jsx
- * ------------------------------------------------------------------
- * Subvista "OEE". Actualmente en MODO COMPARACIÓN DE DISEÑO: muestra
- * 4 maneras distintas de representar el OEE actual para elegir una.
- * Cuando se decida, se conserva solo la opción elegida y se elimina el
- * andamiaje (OptionSection + el aviso superior).
+ * Subvista "OEE", en modo comparación de diseño: muestra cuatro maneras de
+ * representar el OEE actual para poder elegir una. Al decidirse, se conserva
+ * solo esa y se retira el andamiaje (OptionSection y el aviso superior).
  *
- * Las 4 propuestas:
  *   A · Cadena multiplicativa   (D × R × C → OEE + escala clase mundial)
  *   B · Sankey de pérdidas      (a dónde se va la capacidad, en piezas)
  *   C · Benchmark protagonista  (¿en qué banda de clase mundial cae?)
  *   D · Barras + tendencia      (lectura rápida, densa, sin gauges)
  *
- * Todo se alimenta de los valores en vivo de la máquina (calcOEE).
+ * Todo se alimenta de los valores en vivo de la máquina.
  */
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from "recharts";
 import { Panel } from "@/components/ui/index.js";
@@ -32,22 +28,15 @@ export const OEE_BANDS = [
 const oeeBand = (v) => OEE_BANDS.find((b) => v < b.to) ?? OEE_BANDS[OEE_BANDS.length - 1];
 
 /**
- * Color de banda. Con `null` devuelve el tono apagado del texto: sin
- * medición no se puede afirmar que el OEE sea malo (rojo) ni bueno.
+ * Color de banda. Con `null` devuelve el tono apagado del texto, para no
+ * afirmar que el OEE sea malo ni bueno cuando no hay medición.
  */
 const bandColor = (t, v) => (!hasValue(v) ? t.textFaint : v < 50 ? t.coral : v < 75 ? t.amber : t.success);
 
-/**
- * ⚠ `clampPct` se sustituyó por `pctSeguro` de lib/format.
- *
- * El anterior era `Math.max(0, Math.min(100, v))`, que con `null` devuelve
- * 0 por coerción — y entonces la vista pintaba un «0.00 %» perfectamente
- * creíble donde en realidad no había medición. Ese fallo es peor que un
- * error en consola, porque nadie lo nota.
- *
- * `pctSeguro` sigue devolviendo 0 (hace falta para la GEOMETRÍA: un arco
- * o una barra necesitan un número), pero el TEXTO se resuelve siempre con
- * `fmtNum`, que distingue el hueco y escribe «—».
+/*
+ * La geometría (arcos, barras) usa `pctSeguro`, que devuelve 0 ante un hueco
+ * porque necesita un número. El texto se resuelve siempre con `fmtNum`, que
+ * distingue el hueco y escribe «—».
  */
 
 /* Encabezado de sección para separar visualmente cada propuesta. */
@@ -70,8 +59,8 @@ function OptionSection({ tag, title, desc, accent, t, children }) {
 function SemiGauge({ value, label, color, t, size = 130, strong = false }) {
   const sinDato = !hasValue(value);
   const v = pctSeguro(value);
-  // Sin medición el arco no se pinta de color y el número es un guion:
-  // un arco a cero en verde afirmaría un 0 % que nadie ha medido.
+  // Sin medición el arco va apagado y el número es un guion: un arco a cero
+  // en verde afirmaría un 0 % que nadie ha medido.
   const trazo = sinDato ? t.textFaint : color;
   const cx = size / 2, cy = size * 0.56, r = size * 0.4, sw = strong ? size * 0.11 : size * 0.09;
   const polar = (pct) => {
@@ -135,7 +124,7 @@ function WorldClassScale({ value, t }) {
   );
 }
 
-/* ---------- Opción A: cadena multiplicativa ---------- */
+/* Opción A: cadena multiplicativa */
 function OptionChain({ machine, oee, t, C }) {
   const Times = () => <span style={{ fontSize: 26, fontWeight: 300, color: t.textFaint, alignSelf: "center", padding: "0 4px" }}>×</span>;
   return (
@@ -156,36 +145,28 @@ function OptionChain({ machine, oee, t, C }) {
   );
 }
 
-/* ---------- Opción B: Sankey de pérdidas (flujo de piezas) ----------
+/* Opción B: Sankey de pérdidas (flujo de piezas)
  *
- * La misma historia que contaba la cascada de barras (dónde se pierde el
- * OEE), pero como FLUJO y en piezas reales en vez de puntos porcentuales.
- *
- * De dónde sale cada número (todo se deriva de los campos que YA tiene la
- * máquina: aprobadas, rechazadas, disponibilidad, rendimiento):
+ * Dónde se pierde el OEE, como flujo y en piezas reales en vez de puntos
+ * porcentuales. Todo se deriva de campos que la máquina ya tiene:
  *
  *   producción real  = aprobadas + rechazadas          ← dato directo
- *   capacidad ideal  = real / (D/100 × R/100)          ← lo que habría salido
- *                                                        sin paros ni pérdidas
+ *   capacidad ideal  = real / (D/100 × R/100)          ← sin paros ni pérdidas
  *                                                        de velocidad
- *   por paros        = ideal × (1 − D/100)             ← pérdida de DISPONIBILIDAD
+ *   por paros        = ideal × (1 − D/100)             ← pérdida de disponibilidad
  *   tiempo operativo = ideal × D/100
- *   por velocidad    = operativo × (1 − R/100)         ← pérdida de RENDIMIENTO
+ *   por velocidad    = operativo × (1 − R/100)         ← pérdida de rendimiento
  *   producción real  = operativo × R/100               ← cierra con el dato real
- *   aprobadas / rechazadas                             ← pérdida de CALIDAD
+ *   aprobadas / rechazadas                             ← pérdida de calidad
  *
- * El invariante que hace válida la gráfica: en estos datos `calidad` es
- * exactamente aprobadas/(aprobadas+rechazadas), así que la cadena cierra
- * sola y **el ancho de "Aprobadas" frente a "Capacidad ideal" ES el OEE**.
- * No hay ningún valor inventado ni constante mágica.
- *
- * Color: columna central neutra (el flujo que sobrevive), pérdidas en coral
- * (cada una nombrada por el factor que la causa) y el resultado en verde.
+ * La gráfica es válida porque `calidad` es exactamente
+ * aprobadas/(aprobadas+rechazadas): la cadena cierra sola y el ancho de
+ * «Aprobadas» frente a «Capacidad ideal» es el OEE, sin constantes mágicas.
  */
 function OptionFlow({ machine, oee, t }) {
-  // El diagrama necesita CINCO mediciones a la vez y no admite huecos: la
+  // El diagrama necesita cinco mediciones a la vez y no admite huecos: la
   // cadena se calcula por división encadenada, así que un solo `null`
-  // produciría NaN en toda la cascada. Se comprueban todas por delante.
+  // produciría NaN en toda la cascada.
   const completo =
     hasValue(machine.aprobadas) && hasValue(machine.rechazadas) &&
     hasValue(machine.disponibilidad) && hasValue(machine.rendimiento) &&
@@ -195,8 +176,8 @@ function OptionFlow({ machine, oee, t }) {
   const d = completo ? machine.disponibilidad / 100 : 0;
   const r = completo ? machine.rendimiento / 100 : 0;
 
-  // Sin lecturas completas, sin producción, o con D/R en cero, la capacidad
-  // ideal no está definida (división por cero): no hay flujo que dibujar.
+  // Sin lecturas completas, sin producción o con D/R en cero, la capacidad
+  // ideal no está definida y no hay flujo que dibujar.
   if (!completo || !real || d <= 0 || r <= 0) {
     return (
       <Panel>
@@ -214,19 +195,17 @@ function OptionFlow({ machine, oee, t }) {
   const porParos = ideal - operativo;
   const porVelocidad = operativo - real;
 
-  // OEE "visto por el flujo": aprobadas sobre capacidad ideal. Cuando el dato
-  // es coherente coincide con calcOEE(); si no, avisamos en vez de mentir.
+  // OEE visto por el flujo: aprobadas sobre capacidad ideal. Con datos
+  // coherentes coincide con calcOEE(); si no, se avisa.
   const oeePiezas = (machine.aprobadas / ideal) * 100;
   const calidadPiezas = (machine.aprobadas / real) * 100;
   const coherente = Math.abs(calidadPiezas - machine.calidad) < 0.5;
 
-  // Tres familias de color, no siete tonos sueltos:
+  // Familias de color, en lugar de siete tonos sueltos:
   //   azul  = el material que sigue vivo (el tronco del flujo)
-  //   ámbar = tiempo perdido (paros y velocidad): la máquina pudo, no lo hizo
-  //   coral = material desperdiciado (rechazos): se gastó y se tiró
+  //   ámbar = tiempo perdido (paros y velocidad)
+  //   coral = material desperdiciado (rechazos)
   //   verde = lo único que cuenta al final
-  // El tronco iba en `textSoft` — un token de TEXTO, gris por diseño — y eso
-  // era lo que apagaba todo el diagrama.
   const V = t.viz;
   const nodes = [
     { id: "ideal", label: "Capacidad ideal", color: V.azul, note: "Sin paros ni pérdidas de velocidad" },
@@ -238,8 +217,8 @@ function OptionFlow({ machine, oee, t }) {
     { id: "aprobadas", label: "Aprobadas", color: V.verde, note: "Piezas buenas = OEE del turno", hero: true },
   ];
 
-  // d3-sankey no admite enlaces de valor 0; una máquina sin rechazos (o sin
-  // pérdidas en un factor) simplemente no dibuja esa cinta.
+  // d3-sankey no admite enlaces de valor 0: una máquina sin rechazos, o sin
+  // pérdidas en un factor, no dibuja esa cinta.
   const links = [
     { source: "ideal", target: "operativo", value: operativo },
     ...(porParos > 0 ? [{ source: "ideal", target: "paros", value: porParos }] : []),
@@ -259,15 +238,15 @@ function OptionFlow({ machine, oee, t }) {
         unit=" pz"
         format={(v) => Math.round(v).toLocaleString("es-MX")}
         margin={{ top: 14, right: 132, bottom: 16, left: 132 }}
-        // `left` (y no el `justify` por defecto) es lo que produce la cascada:
-        // cada columna es el estado TRAS aplicar un factor, y las pérdidas se
-        // quedan en la columna donde ocurrieron en vez de irse todas al final.
+        // `left`, y no el `justify` por defecto, es lo que produce la cascada:
+        // cada columna es el estado tras aplicar un factor, y las pérdidas se
+        // quedan donde ocurrieron en vez de irse todas al final.
         align="left"
-        // Cada columna se rotula con el factor que la produjo: así se ve que
-        // el diagrama y la fórmula D × R × C son la misma cosa.
+        // Cada columna se rotula con el factor que la produjo, para que se vea
+        // que el diagrama y la fórmula D × R × C son lo mismo.
         stageLabels={["Capacidad ideal", "− Disponibilidad", "− Rendimiento", "− Calidad"]}
         // La silueta punteada mantiene la altura de la capacidad original en
-        // todas las columnas: el hueco que va quedando ES la pérdida acumulada.
+        // todas las columnas: el hueco que queda es la pérdida acumulada.
         capacityGhost
       />
       {/* <p style={{ textAlign: "center", fontSize: 12, color: t.textFaint, margin: "10px 0 0" }}>
@@ -292,7 +271,7 @@ function OptionFlow({ machine, oee, t }) {
   );
 }
 
-/* ---------- Opción C: benchmark protagonista ---------- */
+/* Opción C: benchmark protagonista */
 function OptionBenchmark({ machine, oee, t, C }) {
   const sinDato = !hasValue(oee);
   const v = pctSeguro(oee);
@@ -344,7 +323,7 @@ function OptionBenchmark({ machine, oee, t, C }) {
   );
 }
 
-/* ---------- Opción D: barras + tendencia denso ---------- */
+/* Opción D: barras + tendencia denso */
 function FactorRow({ label, value, meta, color, t }) {
   const sinDato = !hasValue(value);
   const v = pctSeguro(value);
@@ -407,9 +386,8 @@ function OptionDense({ machine, oee, history, t, C }) {
 }
 
 export default function OeeView({ machine, history, t, C }) {
-  // Se prefiere el OEE que calcula ICONICS; si no llegó, se compone de
-  // los tres factores. `calcOEE` del dominio devuelve `null` cuando falta
-  // alguno, en lugar de un número construido con huecos.
+  // Se prefiere el OEE que calcula ICONICS; si no llegó, se compone de los
+  // tres factores. `calcOEE` devuelve `null` cuando falta alguno.
   const oee = hasValue(machine.oee) ? machine.oee : calcOEE(machine);
 
   return (

@@ -1,17 +1,16 @@
 /**
- * app/App.jsx
- * ------------------------------------------------------------------
  * Punto de composición de la app:
- *   1) Envuelve todo con los providers de contexto (tema, toasts, modal).
- *      El anidamiento se deja visible aquí a propósito, y no escondido tras
- *      un <AppProviders>, porque el orden es funcional: un provider que
- *      consuma el hook de otro tiene que ir por dentro.
- *   2) Dentro, <Shell> arma el layout (sidebar + topbar + contenido)
- *      y decide qué página mostrar según el estado `page`.
  *
- * Este archivo NO conoce las páginas: `PAGES` sale del registro único de
- * `app/routes/`, que es también de donde el Sidebar saca `NAV` y el Topbar
- * `PAGE_META`. Añadir una página es una sola edición, en `routes.jsx`.
+ *   1. Envuelve todo con los providers de contexto (tema, toasts, modal). El
+ *      anidamiento se deja visible aquí y no escondido tras un
+ *      <AppProviders>, porque el orden es funcional: un provider que consuma
+ *      el hook de otro tiene que ir por dentro.
+ *   2. Dentro, <Shell> arma el layout (sidebar, topbar y contenido) y decide
+ *      qué página mostrar según el estado `page`.
+ *
+ * Este archivo no conoce las páginas: `PAGES` sale del registro único de
+ * `app/routes/`, de donde también salen `NAV` para el Sidebar y `PAGE_META`
+ * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
 import { useState } from "react";
 import { ThemeProvider, useTheme } from "@/theme";
@@ -40,17 +39,15 @@ export default function App() {
 
 function Shell() {
   const { theme: t } = useTheme();
-  // Estado de navegación: qué página y con qué parámetros. `navigate`
-  // se pasa a las páginas (como onNavigate) para moverse entre vistas,
-  // p. ej. de un monitor de área a la vista de detalle de una máquina.
+  // Estado de navegación: qué página y con qué parámetros. `navigate` se pasa
+  // a las páginas como `onNavigate` para moverse entre vistas, por ejemplo de
+  // un monitor de área al detalle de una máquina.
   const [nav, setNav] = useState({ page: DEFAULT_ROUTE, params: {} });
   const navigate = (page, params = {}) => setNav({ page, params });
 
-  // Un id de página desconocido cae a la ruta por defecto en vez de
-  // renderizar `undefined`, que tumbaría la aplicación entera. No es
-  // hipotético: al renombrar las rutas de área ("area1" → "area-LIN"),
-  // los prototipos siguieron navegando a los ids viejos durante un
-  // tiempo, y cada clic era una pantalla en blanco sin mensaje.
+  // Un id de página desconocido cae a la ruta por defecto en vez de renderizar
+  // `undefined`, que tumbaría la aplicación entera. Pasa al renombrar rutas,
+  // cuando algo sigue navegando al id viejo.
   const PageComponent = PAGES[nav.page] ?? PAGES[DEFAULT_ROUTE];
 
   return (

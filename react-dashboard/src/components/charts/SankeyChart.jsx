@@ -1,26 +1,19 @@
 /**
- * ui/SankeyChart.jsx
- * ------------------------------------------------------------------
- * Diagrama de Sankey (flujos) construido sobre `d3-sankey`.
+ * Diagrama de Sankey construido sobre `d3-sankey`.
  *
- * Un Sankey responde una sola pregunta: **cómo se reparte una magnitud
- * al pasar de una etapa a la siguiente**. El grosor de cada cinta ES el
- * valor; por eso no lleva ejes ni cuadrícula: la geometría es el dato.
- * Úsalo para balances (tiempo calendario → tiempo productivo → piezas
- * buenas) o para repartos (materia prima → líneas → resultado). NO lo
- * uses para series de tiempo ni para comparar categorías sueltas.
+ * Un Sankey responde cómo se reparte una magnitud al pasar de una etapa a la
+ * siguiente. El grosor de cada cinta es el valor, y por eso no lleva ejes ni
+ * cuadrícula: la geometría es el dato. Sirve para balances (tiempo calendario
+ * → tiempo productivo → piezas buenas) o repartos (materia prima → líneas →
+ * resultado), no para series de tiempo ni categorías sueltas.
  *
- * Cómo funciona por dentro
- * ------------------------------------------------------------------
- * `d3-sankey` NO dibuja: solo calcula geometría. Le pasamos nodos y
- * enlaces y nos devuelve, para cada nodo, su rectángulo (x0,y0,x1,y1) y
- * para cada enlace su grosor y sus puntos de anclaje. Nosotros pintamos
- * ese resultado con SVG plano, con los colores del ThemeProvider.
- * Ojo: d3-sankey MUTA los objetos que recibe, por eso clonamos siempre
- * antes de calcular (`toMutable`).
+ * `d3-sankey` no dibuja, solo calcula geometría: recibe nodos y enlaces y
+ * devuelve el rectángulo de cada nodo y el grosor y los anclajes de cada
+ * enlace. Aquí se pinta ese resultado con SVG plano y los colores del tema.
+ * Muta los objetos que recibe, así que siempre se clona antes (`toMutable`).
  *
- * Props
- * ------------------------------------------------------------------
+ * Props:
+ *
  *  - nodes: [{ id, label?, color?, note?, hero? }]   (id único y estable)
  *  - links: [{ source, target, value }]              (source/target = id)
  *  - height, nodeWidth, nodePadding, margin          (geometría)
@@ -34,23 +27,16 @@
  *  - flowOnHover: boolean                            (destellos en la cinta)
  *  - animate: boolean                                (barrido de entrada)
  *
- * Color
- * ------------------------------------------------------------------
- * La identidad va por nodo, tomada de los tokens del tema en un orden
- * FIJO (accent, amber, success, violet, coral) — validado para daltonismo
- * en claro y oscuro. Un nodo puede forzar el suyo con `color` (p. ej. un
- * token semántico: verde para "Aprobadas", coral para "Rechazadas"). Si
- * hay más nodos que colores, los sobrantes caen a un gris neutro en lugar
- * de reciclar tonos: repetir un color mentiría sobre la identidad.
- * Cada nodo lleva SIEMPRE su etiqueta visible, así que la lectura nunca
- * depende solo del color.
+ * El color va por nodo, tomado de los tokens del tema en un orden fijo
+ * validado para daltonismo en claro y oscuro. Un nodo puede forzar el suyo con
+ * `color`, por ejemplo un token semántico. Con más nodos que colores, los
+ * sobrantes caen a un gris neutro en vez de reciclar tonos, y todos llevan
+ * siempre su etiqueta visible para que la lectura no dependa del color.
  *
- * Movimiento
- * ------------------------------------------------------------------
- * La entrada es un barrido escalonado por columna (las cintas se dibujan
- * de izquierda a derecha) y el "flujo" de destellos aparece SOLO en hover:
- * una animación permanente en una pantalla que vive encendida todo el
- * turno cansa y deja de comunicar. Todo se apaga con `prefers-reduced-motion`.
+ * La entrada es un barrido escalonado por columna y los destellos de flujo
+ * solo aparecen en hover: una animación permanente en una pantalla encendida
+ * todo el turno cansa y deja de comunicar. Todo se apaga con
+ * `prefers-reduced-motion`.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -87,7 +73,7 @@ const defaultFormat = (v) => v.toLocaleString("es-MX", { maximumFractionDigits: 
 const STAGE_BAND = 26;
 /* Retardo entre columnas en el barrido de entrada. */
 const STEP_MS = 130;
-/* Longitud "suficientemente grande" para el dash del barrido: cualquier
+/* Longitud suficientemente grande para el dash del barrido: cualquier
    cinta de este tamaño de gráfica mide bastante menos que esto. */
 const DRAW_LEN = 6000;
 
@@ -118,7 +104,7 @@ export function SankeyChart({
   const [tip, setTip] = useState(null); // { x, y, title, value, sub }
 
   // Ancho responsivo: el SVG se redibuja cuando el contenedor cambia de
-  // tamaño (sidebar plegado, resize de ventana, cambio de layout...).
+  // tamaño (sidebar plegado, resize de ventana, cambio de layout).
   useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -133,8 +119,8 @@ export function SankeyChart({
   const uid = useMemo(() => Math.random().toString(36).slice(2), []);
 
   const stageCount = stageLabels?.length ?? 0;
-  // Los rótulos de columna necesitan su propia banda: se la robamos al área
-  // de dibujo, no al margen que pidió quien llama.
+  // Los rótulos de columna necesitan su propia banda, que se toma del área de
+  // dibujo y no del margen que pidió quien llama.
   const topPad = margin.top + (stageCount ? STAGE_BAND : 0);
 
   const layout = useMemo(() => {
@@ -161,8 +147,8 @@ export function SankeyChart({
       });
       return graph;
     } catch (err) {
-      // Un ciclo o un id inexistente hace que d3-sankey lance; preferimos
-      // no romper la página entera por un dato mal formado.
+      // Un ciclo o un id inexistente hace que d3-sankey lance, y un dato mal
+      // formado no debe romper la página entera.
       console.error("[SankeyChart] no se pudo calcular el layout:", err);
       return null;
     }
@@ -174,9 +160,9 @@ export function SankeyChart({
   );
 
   /**
-   * Columnas: agrupa los nodos por profundidad para poder dibujar los
-   * rótulos de etapa y la silueta de capacidad. `total` es la magnitud que
-   * sigue viva en esa columna — la que se va encogiendo hacia la derecha.
+   * Columnas: agrupa los nodos por profundidad para poder dibujar los rótulos
+   * de etapa y la silueta de capacidad. `total` es la magnitud que sigue viva
+   * en esa columna, la que se va encogiendo hacia la derecha.
    */
   const columns = useMemo(() => {
     if (!layout) return [];
@@ -190,14 +176,14 @@ export function SankeyChart({
     return [...byDepth.values()].sort((a, b) => a.depth - b.depth);
   }, [layout]);
 
-  // La magnitud de la columna más grande: la referencia contra la que se
-  // compara el encogimiento del resto (d3-sankey escala todas las columnas
-  // con la misma relación valor→píxeles, así que los altos son comparables).
+  // Magnitud de la columna más grande, referencia contra la que se compara el
+  // encogimiento del resto. d3-sankey escala todas las columnas con la misma
+  // relación valor→píxeles, así que los altos son comparables.
   const capacity = columns.length ? Math.max(...columns.map((c) => c.total)) : 0;
 
   const linkKey = (l) => `${l.source.id}→${l.target.id}`;
 
-  /** ¿Este enlace participa en lo que está enfocado? (define atenuados vs. resaltados) */
+  /** ¿Participa este enlace en lo enfocado? Decide atenuados y resaltados. */
   const linkActive = useCallback(
     (l) => {
       if (!focus) return null; // sin foco: todos al alfa base
@@ -222,7 +208,7 @@ export function SankeyChart({
     setTip(null);
   };
 
-  // Si el componente se desmonta con el puntero encima, no dejamos estado colgando.
+  // Si el componente se desmonta con el puntero encima, se limpia el foco.
   useEffect(() => hideAll, []);
 
   const empty = !nodes.length || !links.length;
@@ -281,10 +267,10 @@ export function SankeyChart({
               hueco vacío ES la pérdida acumulada: se ve sin leer un número. */}
           {capacityGhost &&
             columns.map((c) => {
-              // Solo tiene sentido en las columnas que YA perdieron algo. La
-              // silueta ocupa todo el alto útil porque ese alto es, por
-              // construcción de d3-sankey, el de la columna más grande: lo que
-              // quede vacío es exactamente lo que se perdió por el camino.
+              // Solo tiene sentido en las columnas que ya perdieron algo. La
+              // silueta ocupa todo el alto útil, que por construcción de
+              // d3-sankey es el de la columna más grande, así que lo que quede
+              // vacío es lo que se perdió por el camino.
               if (c.total >= capacity - 0.5) return null;
               return (
                 <rect
@@ -355,8 +341,8 @@ export function SankeyChart({
                     showTip(e, {
                       title: `${l.source.label ?? l.source.id} → ${l.target.label ?? l.target.id}`,
                       value: `${format(l.value)}${unit}`,
-                      // Cuánto pesa este enlace dentro de todo lo que sale del origen:
-                      // es la lectura útil ("el 15% de la línea 4 se rechaza").
+                      // Cuánto pesa este enlace dentro de todo lo que sale del
+                      // origen: «el 15 % de la línea 4 se rechaza».
                       sub: `${((l.value / l.source.value) * 100).toFixed(1)}% de ${l.source.label ?? l.source.id}`,
                     });
                   }}
@@ -428,10 +414,10 @@ export function SankeyChart({
             {layout?.nodes.map((n) => {
               const focused = focus?.type === "node" && focus.key === n.id;
               const dimmed = focus && !focused && !layout.links.some((l) => linkActive(l) && (l.source.id === n.id || l.target.id === n.id));
-              // Solo la primera columna rotula a la izquierda; todo lo demás,
-              // a la derecha. Alternar según la mitad de la pantalla hacía que
-              // dos columnas vecinas escribieran hacia el MISMO hueco y las
-              // etiquetas largas chocaran de frente.
+              // Solo la primera columna rotula a la izquierda y el resto a la
+              // derecha. Alternar según la mitad de la pantalla hace que dos
+              // columnas vecinas escriban hacia el mismo hueco y las etiquetas
+              // largas choquen.
               const outward = n.depth === 0 ? "left" : "right";
               const labelX = outward === "right" ? n.x1 + 10 : n.x0 - 10;
               const anchor = outward === "right" ? "start" : "end";
@@ -486,8 +472,8 @@ export function SankeyChart({
                     // cintas que la tocan, igual que el gap entre segmentos.
                     stroke={t.panel}
                     strokeWidth={1}
-                    // Halo del propio color: en pastel el resplandor es lo que
-                    // da presencia, ya que el color en sí es suave.
+                    // Halo del propio color: en tonos pastel el resplandor es
+                    // lo que da presencia.
                     style={{ filter: `drop-shadow(0 0 ${n.hero ? 14 : 8}px ${n._color}${n.hero ? "99" : "66"})` }}
                   />
                   {focused && (
@@ -515,8 +501,8 @@ export function SankeyChart({
                       fontSize: n.hero ? 13.5 : 12,
                       fontWeight: n.hero ? 800 : 600,
                       fill: t.text,
-                      // Halo del color del panel: las columnas centrales rotulan
-                      // POR ENCIMA de las cintas, y sin esto el texto se pierde.
+                      // Halo del color del panel: las columnas centrales
+                      // rotulan sobre las cintas y sin esto el texto se pierde.
                       stroke: t.panel,
                       strokeWidth: 3.5,
                       paintOrder: "stroke",
@@ -534,8 +520,8 @@ export function SankeyChart({
                       style={{
                         fontSize: n.hero ? 15 : 11.5,
                         fontWeight: n.hero ? 700 : 500,
-                        // El valor sube a `textSoft` (antes `textFaint`): sobre
-                        // una cinta de color, el gris más apagado desaparecía.
+                        // `textSoft` y no `textFaint`: sobre una cinta de
+                        // color, el gris más apagado desaparece.
                         fill: n.hero ? n._color : t.textSoft,
                         stroke: t.panel,
                         strokeWidth: 3.5,

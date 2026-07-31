@@ -1,29 +1,21 @@
 /**
- * pages/MachineDetail.jsx
- * ------------------------------------------------------------------
- * Vista de detalle de una máquina/equipo. Se suscribe a la máquina por
- * su id de ICONICS (`params.machineId`, con la forma "LIN/1").
+ * Vista de detalle de una máquina. Se suscribe por su id de ICONICS
+ * (`params.machineId`, con la forma "LIN/1").
  *
- * Es la única vista que consume la CADENCIA RÁPIDA (5 s) del motor de
- * polling, y solo mientras está montada: al entrar registra el juego
- * completo de propiedades de UNA máquina, al salir lo libera. Eso es lo
- * que mantiene el presupuesto de red en ~12 peticiones/min aquí y en ~4
- * en la vista de planta, en vez de pedir 14 tags de las 10 máquinas
- * todo el tiempo.
+ * Es la única vista que consume la cadencia rápida del motor de polling, y
+ * solo mientras está montada: al entrar registra el juego completo de
+ * propiedades de una máquina y al salir lo libera, en vez de pedir todos los
+ * tags de todas las máquinas todo el tiempo.
  *
- * Estructura:
- *   ┌ columna izq (fija) ┐   ┌ columna der (flexible) ────────────┐
- *   │  GaugeCard          │   │  Tabs: subvistas                   │
- *   │  Identificación     │   │  Subvista activa                   │
- *   └────────────────────┘   └────────────────────────────────────┘
+ * El layout son dos columnas: a la izquierda la GaugeCard y el panel de
+ * identificación, a la derecha las pestañas con la subvista activa. Cada
+ * subvista vive en su propio archivo dentro de `machine-detail/`, una por
+ * métrica más el comparativo; aquí solo se arma el layout y se orquesta el
+ * cambio de pestaña. El estado de la subvista es local y no toca el router,
+ * así que «Volver» sigue funcionando.
  *
- * Cada subvista vive en su propio archivo dentro de `machine-detail/`
- * (una por métrica + comparativo). Este componente solo arma el layout,
- * el panel de identificación y orquesta el cambio de pestaña. El estado
- * de la subvista es local: no toca el router, así "Volver" queda intacto.
- *
- * Navegación: recibe `onNavigate(pageId, params)` y `params.from` para
- * saber a qué vista volver (Área 1 / Área 2).
+ * Recibe `onNavigate(pageId, params)` y usa `params.from` para saber a qué
+ * vista volver.
  */
 import { useState } from "react";
 import { ArrowLeft, Package, Activity, Clock, CheckCircle2, Zap, GitCompareArrows } from "lucide-react";
@@ -61,15 +53,13 @@ export default function MachineDetail({ params = {}, onNavigate }) {
   const { machineId, from } = params;
   const [sub, setSub] = useState("oee");
 
-  // TEMPORAL: si se llegó desde una vista de propuesta (src/prototypes), esa
-  // vista EMPUJA la variante en los params y el detalle la usa en lugar de la
-  // GaugeCard estándar, para poder evaluar cada estilo de punta a punta y no
-  // solo en la parrilla.
+  // Temporal: al llegar desde una vista de propuesta (src/prototypes), esa
+  // vista empuja la variante en los params y aquí se usa en lugar de la
+  // GaugeCard estándar, para poder evaluar cada estilo de punta a punta.
   //
-  // La dirección importa: producción no consulta el registro de prototipos,
-  // son los prototipos los que se anuncian. Así `src/prototypes/` se puede
-  // borrar entero sin tocar este archivo: `cardVariant` queda siempre
-  // undefined y todo cae a GaugeCard.
+  // La dirección importa: son los prototipos los que se anuncian, no
+  // producción la que consulta su registro. Al borrar `src/prototypes/`,
+  // `cardVariant` queda undefined y todo cae a GaugeCard.
   const propuesta = params.cardVariant ?? null;
   const Tarjeta = propuesta?.Comp ?? GaugeCard;
   // Las variantes tipo banner necesitan más aire que los 320px de la columna.

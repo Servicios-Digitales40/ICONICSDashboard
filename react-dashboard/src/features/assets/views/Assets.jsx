@@ -1,18 +1,13 @@
 /**
- * pages/Assets.jsx
- * ------------------------------------------------------------------
  * Explorador de Assets de AssetWorX (espacio de nombres `ac:`).
  *
- * Layout de dos columnas:
- *   ┌ Árbol (izq) ─────────┐  ┌ Propiedades del asset (der) ──────────┐
- *   │ browse perezoso vía   │  │ lee .PropertyPointNames del nodo       │
- *   │ /api/iconics/browse   │  │ seleccionado y muestra sus valores en  │
- *   │ (expandir = fetch)    │  │ vivo (polling).                        │
- *   └───────────────────────┘  └────────────────────────────────────────┘
+ * Dos columnas: a la izquierda el árbol, con browse perezoso (expandir hace
+ * fetch); a la derecha las propiedades del nodo seleccionado, leídas de
+ * `.PropertyPointNames` y refrescadas por polling.
  *
- * - Los nodos navegables (equipos/carpetas) tienen pointName terminado en "/".
- * - Las propiedades son hojas; sus valores se leen como cualquier punto.
- * - Se ocultan los nodos de sistema (shortName que empieza con ".").
+ *  - Los nodos navegables (equipos, carpetas) tienen pointName terminado en "/".
+ *  - Las propiedades son hojas y sus valores se leen como cualquier punto.
+ *  - Se ocultan los nodos de sistema, cuyo shortName empieza por ".".
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, ChevronDown, Box, Boxes, Gauge, RefreshCw, Radio } from "lucide-react";
@@ -25,9 +20,7 @@ const ASSETS_ROOT = "ac:";
 const isFolder = (node) => typeof node.pointName === "string" && node.pointName.endsWith("/");
 const isSystem = (node) => (node.shortName ?? "").startsWith(".");
 
-/* ---------------------------------------------------------------- */
-/* Nodo de árbol con carga perezosa: al expandir, hace browse.       */
-/* ---------------------------------------------------------------- */
+/* Nodo de árbol con carga perezosa: al expandir, hace browse. */
 function AssetNode({ node, depth, selectedPath, onSelect }) {
   const { theme: t } = useTheme();
   const [open, setOpen] = useState(false);
@@ -110,9 +103,7 @@ function AssetNode({ node, depth, selectedPath, onSelect }) {
   );
 }
 
-/* ---------------------------------------------------------------- */
-/* Panel derecho: propiedades en vivo del asset seleccionado.        */
-/* ---------------------------------------------------------------- */
+/* Panel derecho: propiedades en vivo del asset seleccionado. */
 function AssetProperties({ node, intervalMs = 5000 }) {
   const { theme: t } = useTheme();
   const [props, setProps] = useState([]);
@@ -127,8 +118,8 @@ function AssetProperties({ node, intervalMs = 5000 }) {
   const load = useCallback(async () => {
     if (!path) return;
     try {
-      // Hoja (punto de valor directo, p.ej. "ac:today"): se lee tal cual.
-      // Asset/carpeta (pointName con "/"): se leen sus propiedades e hijos.
+      // Una hoja (punto de valor directo, p. ej. "ac:today") se lee tal cual;
+      // de un asset o carpeta (pointName con "/") se leen propiedades e hijos.
       if (!path.endsWith("/")) {
         const res = await fetchIconicsPoint(path);
         const p = res?.payload ?? {};
@@ -263,9 +254,7 @@ function AssetProperties({ node, intervalMs = 5000 }) {
   );
 }
 
-/* ---------------------------------------------------------------- */
-/* Página                                                            */
-/* ---------------------------------------------------------------- */
+/* Página. */
 export default function Assets() {
   const { theme: t } = useTheme();
   const [roots, setRoots] = useState(null);

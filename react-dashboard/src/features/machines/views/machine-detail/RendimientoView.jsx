@@ -1,30 +1,18 @@
 /**
- * pages/machine-detail/RendimientoView.jsx
- * ------------------------------------------------------------------
- * Subvista "Rendimiento" · MODO COMPARACIÓN DE DISEÑO.
+ * Subvista "Rendimiento", en modo comparación de diseño. Tres maneras de
+ * contar lo mismo:
  *
- * Tres maneras de contar lo mismo:
+ *   A · Balance de producción → ¿de dónde sale el porcentaje?
+ *   B · Ciclo por pieza       → ¿por qué se pierde?
+ *   C · Tablero de KPIs       → ¿cuánto falta para la meta?
  *
- *   A · Balance de producción → ¿DE DÓNDE sale el porcentaje?
- *                               1 600 teóricas → 1 000 reales
- *   B · Ciclo por pieza       → ¿POR QUÉ se pierde?
- *                               cada pieza tarda 6.75 s de más
- *   C · Tablero de KPIs       → ¿CUÁNTO falta para la meta?
- *                               ritmo, brecha en piezas y ciclo objetivo
+ * El ciclo nominal no está en los datos, así que en lugar de fijarlo como
+ * constante se deriva del rendimiento real: pasa de supuesto a KPI calculado,
+ * y así la producción teórica cuadra con las piezas que la máquina reporta y
+ * con el nodo «En tiempo operativo» del Sankey de la subvista OEE.
  *
- * De dónde salen los números (ver `produccion` más abajo)
- * ------------------------------------------------------------------
- * El mockup de referencia trata el TIEMPO DE CICLO como un dato de
- * entrada (30 s) y deriva la producción teórica. Aquí se hace al revés,
- * y a propósito: el ciclo nominal no está en los datos, y fijarlo en 30 s
- * daría una producción teórica de 600 pz que CONTRADICE las 1 000 piezas
- * que la propia máquina reporta en Calidad. Se deriva del rendimiento
- * real, con lo que el ciclo ideal pasa de ser un supuesto a ser un KPI
- * calculado — y además coincide exactamente con el nodo "En tiempo
- * operativo" (1 600 pz) del Sankey de la subvista OEE.
- *
- * Color: verde = producción lograda · ámbar = producción perdida por ir
- * por debajo de la velocidad nominal (tiempo, no material).
+ * Color: verde = producción lograda · ámbar = producción perdida por ir por
+ * debajo de la velocidad nominal (tiempo, no material).
  */
 import { useMemo } from "react";
 import { Panel, BandGauge, KpiTile } from "@/components/ui/index.js";
@@ -47,13 +35,12 @@ const fmtSegDec = (s) => (hasValue(s) ? `${s.toFixed(2)} s` : SIN_DATO);
  *   ciclo ideal = tiempo de ejecución / teórica  ← KPI derivado, no supuesto
  *   ciclo real  = tiempo de ejecución / real
  *
- * El tiempo de ejecución viene del modelo de turno de Disponibilidad, así
- * que las tres subvistas hablan de los mismos segundos.
+ * El tiempo de ejecución viene del modelo de turno de Disponibilidad, así que
+ * las tres subvistas hablan de los mismos segundos.
  *
- * ⚠ Devuelve `null` en `real` cuando faltan las lecturas que hacen falta.
- * Toda la cadena se calcula por división encadenada, así que un solo hueco
- * arrastraría NaN hasta los cinco KPIs finales — y `null / null` en
- * JavaScript no es NaN sino 0, que es aún peor porque parece un dato.
+ * Devuelve `null` en `real` cuando faltan lecturas. La cadena se calcula por
+ * división encadenada, y un solo hueco arrastraría NaN hasta los cinco KPIs
+ * finales; peor aún, `null / null` en JavaScript da 0, que parece un dato.
  */
 function produccion(machine) {
   const { ejecucion } = tiemposTurno(machine);
@@ -84,7 +71,7 @@ function produccion(machine) {
     cicloIdeal,
     cicloReal,
     perdidaCiclo: cicloReal - cicloIdeal,
-    // Los segundos que la máquina pasó produciendo "de más" por ir lenta.
+    // Los segundos que la máquina pasó produciendo de más por ir lenta.
     tiempoPerdido: Math.round(perdida * cicloIdeal),
     ritmoReal: ejecucion ? (real / ejecucion) * 3600 : 0,
     ritmoIdeal: ejecucion ? (teorica / ejecucion) * 3600 : 0,
@@ -92,9 +79,7 @@ function produccion(machine) {
   };
 }
 
-/* ================================================================
- * OPCIÓN A · Balance de producción
- * ================================================================ */
+/* Opción A · Balance de producción */
 function OptionBalance({ P, t }) {
   const V = t.viz;
   return (
@@ -145,13 +130,12 @@ function OptionBalance({ P, t }) {
   );
 }
 
-/* ================================================================
- * OPCIÓN B · Ciclo por pieza
- * ================================================================
- * El rendimiento es un problema de VELOCIDAD, y la velocidad se entiende
- * mejor en la escala de una sola pieza que en la del turno completo.
- * Aquí se comparan los dos ciclos lado a lado y se multiplica el retraso
- * por las piezas del turno para aterrizar el coste.
+/*
+ * Opción B · Ciclo por pieza.
+ *
+ * El rendimiento es un problema de velocidad, y la velocidad se entiende mejor
+ * en la escala de una pieza que en la del turno. Se comparan los dos ciclos
+ * lado a lado y se multiplica el retraso por las piezas del turno.
  */
 function CicloBar({ label, value, max, color, t, i, sub }) {
   const w = max ? (value / max) * 100 : 0;
@@ -220,16 +204,14 @@ function OptionCiclo({ P, t }) {
   );
 }
 
-/* ================================================================
- * OPCIÓN C · Tablero de KPIs
- * ================================================================ */
+/* Opción C · Tablero de KPIs */
 function OptionTablero({ P, t }) {
   const V = t.viz;
   const v = clampPct(P.pct);
   const col = bandColor(t, v);
   const delta = v - META_RENDIMIENTO;
-  // Piezas que faltan para la meta y el ciclo al que habría que bajar
-  // para conseguirlas en el mismo tiempo de ejecución.
+  // Piezas que faltan para la meta y ciclo al que habría que bajar para
+  // conseguirlas en el mismo tiempo de ejecución.
   const faltan = Math.max(0, Math.round((P.teorica * (META_RENDIMIENTO - v)) / 100));
   const cicloObjetivo = P.teorica ? P.ejecucion / ((P.teorica * META_RENDIMIENTO) / 100) : 0;
 
@@ -300,7 +282,6 @@ function OptionTablero({ P, t }) {
   );
 }
 
-/* ================================================================ */
 export default function RendimientoView({ machine, t, C }) {
   const P = useMemo(() => produccion(machine), [machine]);
 

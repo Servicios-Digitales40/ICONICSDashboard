@@ -1,12 +1,9 @@
 /**
- * ui/BandGauge.jsx
- * ------------------------------------------------------------------
  * Dial semicircular con bandas de color, ticks, aguja y marca de meta.
  *
- * Vive en el kit compartido y no en un feature porque es presentacional
- * puro: recibe un valor 0-100, una etiqueta y una meta, y no sabe nada del
- * dominio. Lo usan las subvistas de factor del detalle de máquina y el
- * dashboard de planta.
+ * Vive en el kit compartido porque es presentacional puro: recibe un valor
+ * 0-100, una etiqueta y una meta, y no sabe nada del dominio. Lo usan las
+ * subvistas de factor del detalle de máquina y el dashboard de planta.
  */
 import { hasValue } from "@/lib/domain/index.js";
 import { SIN_DATO } from "@/lib/format.js";
@@ -14,23 +11,21 @@ import { clampPct, bandColor } from "@/lib/shiftModel.js";
 import { useCountUp, useMounted } from "@/lib/motion.js";
 
 /**
- * Semicírculo con bandas de color, ticks, aguja y marca de meta — el dial
- * clásico de planta: se lee sin saber leer, por la posición de la aguja.
+ * El dial clásico de planta: se lee por la posición de la aguja.
  *
- * MOVIMIENTO. La aguja barre desde 0 hasta su valor al montar, y la cifra
- * cuenta con ella. Antes la `transition` de 900 ms de la aguja estaba escrita
- * pero NUNCA se ejecutaba: el elemento se pintaba ya en su ángulo final, y una
- * transición solo corre cuando el valor CAMBIA después del primer pintado.
- * `useMounted` es el fotograma extra que hace falta para que arranque.
+ * La aguja barre desde 0 hasta su valor al montar y la cifra cuenta con ella.
+ * `useMounted` aporta el fotograma extra que hace falta para que la transición
+ * arranque, porque una transición CSS solo corre cuando el valor cambia
+ * después del primer pintado.
  *
- * El barrido no es adorno: en un dial la información está en la POSICIÓN de la
- * aguja, y verla llegar es lo que fija esa posición en el ojo.
+ * El barrido no es adorno: en un dial la información está en la posición de la
+ * aguja, y verla llegar es lo que la fija en el ojo.
  */
 export function BandGauge({ value, label, meta, t, size = 260 }) {
   const listo = useMounted();
-  // Sin medición no hay aguja ni cifra: un dial marcando 0.00 % es una
-  // lectura («la planta está parada»), no la ausencia de una. Las bandas
-  // y la meta sí se dibujan — son la escala, no el dato.
+  // Sin medición no hay aguja ni cifra: un dial marcando 0.00 % es una lectura
+  // y no la ausencia de una. Las bandas y la meta sí se dibujan, porque son la
+  // escala y no el dato.
   const sinDato = !hasValue(value);
   const objetivo = clampPct(value);
   // La aguja va a 0 hasta el segundo fotograma; la cifra cuenta en paralelo.
@@ -45,10 +40,9 @@ export function BandGauge({ value, label, meta, t, size = 260 }) {
     const A = polar(from, rad), B = polar(to, rad);
     return `M ${A.x} ${A.y} A ${rad} ${rad} 0 0 1 ${B.x} ${B.y}`;
   };
-  // El color sale del VALOR crudo, no del animado: si saliera de `v`, el
-  // dial arrancaría en rojo (porque parte de 0) y viraría a verde por el
-  // camino — un falso positivo de alarma en cada carga de página. Con
-  // `null`, bandColor devuelve el tono apagado.
+  // El color sale del valor crudo y no del animado: con `v`, el dial arrancaría
+  // en rojo por partir de 0 y viraría a verde por el camino, un falso positivo
+  // de alarma en cada carga. Con `null`, bandColor devuelve el tono apagado.
   const col = bandColor(t, value);
   const metaA = polar(meta, r - sw * 0.6), metaB = polar(meta, r + sw * 0.6);
 
@@ -75,12 +69,10 @@ export function BandGauge({ value, label, meta, t, size = 260 }) {
         {/* marca de meta */}
         <line x1={metaA.x} y1={metaA.y} x2={metaB.x} y2={metaB.y} stroke={t.text} strokeWidth={2.5} strokeDasharray="3 2" />
 
-        {/* Aguja. Se dibuja SIEMPRE apuntando al 0 (a la izquierda) y se lleva
-            a su valor girándola. No se mueven `x2`/`y2`: los atributos
-            geométricos de <line> no son propiedades CSS, así que la
-            `transition` que había sobre ellos no animaba nada — saltaba. El
-            giro sí es transicionable, y además rota alrededor del eje, que es
-            como se mueve una aguja de verdad. */}
+        {/* Aguja. Se dibuja siempre apuntando al 0 y se lleva a su valor
+            girándola, en lugar de mover `x2`/`y2`: los atributos geométricos
+            de <line> no son propiedades CSS y no se pueden transicionar. El
+            giro sí, y además rota alrededor del eje, como una aguja real. */}
         {!sinDato && (
           <line
             x1={cx} y1={cy} x2={cx - (r - sw * 0.9)} y2={cy}

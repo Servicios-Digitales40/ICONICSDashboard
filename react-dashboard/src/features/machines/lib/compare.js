@@ -1,25 +1,17 @@
 /**
- * features/machines/lib/compare.js
- * ------------------------------------------------------------------
- * Núcleo lógico del comparativo por fechas. Funciones PURAS, sin React
- * y sin tema: reciben datos, devuelven datos.
+ * Núcleo lógico del comparativo por fechas. Funciones puras, sin React y sin
+ * tema, testeables sin montar un componente.
  *
- * Existe por una razón concreta: el comparativo dibuja la MISMA
- * diferencia en cuatro sitios (veredicto, columnas espejo, dumbbell por
- * métrica y banda por hora). Si cada panel la recalcula por su cuenta,
- * tarde o temprano dos de ellos discrepan — redondeos distintos, umbrales
- * distintos, criterios distintos de "mejoró" — y la vista pierde toda
- * credibilidad. Aquí se calcula una vez y se reparte.
- *
- * Todo lo que vive en este archivo es testeable sin montar un componente.
+ * El comparativo dibuja la misma diferencia en cuatro sitios (veredicto,
+ * columnas espejo, dumbbell por métrica y banda por hora). Calculándola aquí
+ * una vez y repartiéndola se evita que dos paneles discrepen por redondeos o
+ * umbrales distintos.
  */
 import { METAS } from "@/lib/shiftModel.js";
 
-/* ==================================================================
- * FECHAS
- * ================================================================== */
+/* Fechas. */
 
-/** Date → "YYYY-MM-DD" en hora LOCAL (no UTC: evita el corrimiento de un día). */
+/** Date → "YYYY-MM-DD" en hora local (en UTC se correría un día). */
 export const isoDay = (d) => {
   const off = d.getTimezoneOffset() * 60000;
   return new Date(d - off).toISOString().slice(0, 10);
@@ -43,9 +35,9 @@ export const addDays = (iso, n) => {
 };
 
 /**
- * Mismo día del mes anterior. Si no existe (31 de marzo → 31 de febrero),
- * cae al último día del mes destino en lugar de desbordar a marzo, que es
- * lo que haría `setMonth` por defecto.
+ * Mismo día del mes anterior. Si no existe (31 de marzo → 31 de febrero), cae
+ * al último día del mes destino en lugar de desbordar al siguiente, que es lo
+ * que haría `setMonth` por defecto.
  */
 export const addMonths = (iso, n) => {
   const d = parseIso(iso);
@@ -69,13 +61,13 @@ export const daysBetween = (isoA, isoB) =>
   Math.abs(Math.round((parseIso(isoB) - parseIso(isoA)) / 86400000));
 
 /**
- * Rótulo que explica la RELACIÓN entre las dos fechas elegidas.
- *   "7 días de diferencia · lunes vs. lunes"
- *   "3 días de diferencia · sábado vs. martes ⚠ distinto día de la semana"
+ * Rótulo que explica la relación entre las dos fechas elegidas:
  *
- * Es la defensa contra el error silencioso más caro de esta vista:
- * comparar un domingo contra un miércoles y leer la caída como un
- * problema de la máquina en lugar de un problema de la comparación.
+ *   "7 días de diferencia · lunes vs. lunes"
+ *   "3 días de diferencia · sábado vs. martes"
+ *
+ * Avisa cuando los días de la semana no coinciden, para que no se lea como un
+ * problema de la máquina lo que es un problema de la comparación.
  */
 export function relationLabel(isoA, isoB) {
   if (isoA === isoB) {
@@ -93,10 +85,9 @@ export function relationLabel(isoA, isoB) {
         : dias % 7 === 0 ? `${dias / 7} semanas de diferencia`
           : `${dias} días de diferencia`;
 
-  // El orden importa: B es siempre el sujeto y A la línea base, así que
-  // conviene decir en voz alta cuándo B es la fecha ANTERIOR — es lo que
-  // deja el botón de intercambio y, sin avisar, invierte el signo de
-  // todos los deltas sin que nada más en pantalla lo delate.
+  // B es siempre el sujeto y A la línea base, así que conviene marcar cuándo
+  // B es la fecha anterior: es lo que deja el botón de intercambio, y invierte
+  // el signo de todos los deltas sin que nada en pantalla lo delate.
   const invertido = parseIso(isoB) < parseIso(isoA);
 
   return {
@@ -108,12 +99,10 @@ export function relationLabel(isoA, isoB) {
   };
 }
 
-/* ==================================================================
- * PRESETS DE COMPARACIÓN
- * ==================================================================
- * Las cuatro preguntas que cubren la mayoría de las comparaciones
- * reales. Cada preset es una función pura de "hoy" a un par [A, B],
- * para que el conjunto sea trivial de probar y de ampliar.
+/*
+ * Presets de comparación: las cuatro preguntas que cubren la mayoría de los
+ * casos. Cada uno es una función pura de "hoy" a un par [A, B], para que el
+ * conjunto sea fácil de probar y de ampliar.
  */
 export const PRESETS = [
   {
@@ -154,17 +143,12 @@ export function matchPreset(isoA, isoB, hoy) {
   return found ? found.id : null;
 }
 
-/* ==================================================================
- * COMPARACIÓN
- * ================================================================== */
+/* Comparación. */
 
 /**
- * Umbral de significancia, en puntos porcentuales.
- *
- * Por debajo de esto un delta es RUIDO, no señal, y la vista debe decirlo
- * en vez de pintar un +0.1 con el mismo verde triunfal que un +12. Sin
- * zona muerta el comparativo produce falsos positivos todos los días y
- * la gente deja de creerle.
+ * Umbral de significancia, en puntos porcentuales. Por debajo de esto un delta
+ * es ruido y la vista lo dice, en vez de pintar un +0.1 con el mismo verde que
+ * un +12.
  *
  * 1.0 pt es un punto de partida razonable para OEE de planta; conviene
  * calibrarlo contra la variabilidad real cuando haya datos del PLC.
@@ -172,10 +156,9 @@ export function matchPreset(isoA, isoB, hoy) {
 export const DEAD_BAND = 1.0;
 
 /**
- * Metas por métrica (%). La definición vive en `@/lib/shiftModel.js`, que es
- * la fuente única compartida por el comparativo, las subvistas de factor y
- * el dashboard de planta. Se reexporta aquí para no romper a quien ya la
- * importaba desde este módulo.
+ * Metas por métrica (%). La definición vive en `@/lib/shiftModel.js`, fuente
+ * única compartida con las subvistas de factor y el dashboard. Se reexporta
+ * aquí para no romper a quien ya la importaba desde este módulo.
  */
 export { METAS };
 
@@ -190,10 +173,10 @@ export const METRICS = [
 /**
  * Compara dos snapshots y devuelve una fila por métrica.
  *
- * En las cuatro métricas "más es mejor", así que la dirección se deduce
- * del signo. Si algún día entra una métrica invertida (scrap, tiempo
- * muerto), se añade `lowerIsBetter` al catálogo METRICS y se aplica aquí:
- * ningún consumidor tendría que enterarse.
+ * En las cuatro métricas más es mejor, así que la dirección se deduce del
+ * signo. Para una métrica invertida (scrap, tiempo muerto) bastaría añadir
+ * `lowerIsBetter` al catálogo METRICS y aplicarlo aquí, sin que ningún
+ * consumidor se entere.
  */
 export function buildComparison(snapA, snapB) {
   return METRICS.map(({ key, label, short, primary }) => {
@@ -206,8 +189,8 @@ export function buildComparison(snapA, snapB) {
     return {
       key, label, short, primary: !!primary,
       a, b, delta, missing, significant,
-      // "flat" cubre tanto el empate exacto como el cambio irrelevante:
-      // para el usuario son la misma noticia.
+      // "flat" cubre el empate exacto y el cambio irrelevante: para quien
+      // lee son la misma noticia.
       direction: !significant ? "flat" : delta > 0 ? "up" : "down",
       meta: METAS[key] ?? null,
     };
@@ -215,14 +198,12 @@ export function buildComparison(snapA, snapB) {
 }
 
 /**
- * Reduce la comparación a UNA frase: qué pasó con el OEE y qué lo explica.
+ * Reduce la comparación a una frase: qué pasó con el OEE y qué lo explica, de
+ * modo que las gráficas queden como evidencia y no como el único camino para
+ * responder «¿mejoramos?».
  *
- * Es el corazón de la Fase 2. Hoy la vista obliga a leer tres gráficas
- * para responder "¿mejoramos?"; esto responde en la primera fijación
- * ocular y deja las gráficas como la evidencia que lo sostiene.
- *
- *   driver → la métrica que más empujó EN EL MISMO sentido que el OEE
- *   drag   → la que más tiró EN CONTRA (puede no haber ninguna)
+ *   driver → la métrica que más empujó en el mismo sentido que el OEE
+ *   drag   → la que más tiró en contra (puede no haber ninguna)
  */
 export function verdict(comparison) {
   const oee = comparison.find((m) => m.key === "oee");
@@ -249,8 +230,8 @@ export function verdict(comparison) {
   const byMagnitude = (arr) =>
     arr.slice().sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))[0] ?? null;
 
-  // Solo se nombra el freno si es significativo: mencionar un −0.2
-  // convertiría el veredicto en el mismo ruido que intenta filtrar.
+  // Solo se nombra el freno si es significativo; mencionar un −0.2 metería
+  // en el veredicto el mismo ruido que intenta filtrar.
   const drag = byMagnitude(enContra.filter((m) => m.significant));
 
   return {
@@ -262,7 +243,7 @@ export function verdict(comparison) {
   };
 }
 
-/** 6.4 → "+6.4" · −1.2 → "−1.2" (menos tipográfico, no guion ASCII). */
+/** 6.4 → "+6.4" · −1.2 → "−1.2" (con el menos tipográfico, no el guion ASCII). */
 export function signed(n, digits = 1) {
   const v = +Number(n).toFixed(digits);
   if (v > 0) return `+${v}`;
@@ -270,21 +251,18 @@ export function signed(n, digits = 1) {
   return "0";
 }
 
-/* ==================================================================
- * ESCALAS
- * ================================================================== */
+/* Escalas. */
 
 /**
  * Dominio de eje ajustado a los datos, redondeado a múltiplos de `step`.
  *
- * `domain={[0, 100]}` desperdicia ~70 % del lienzo: el OEE real vive
- * entre 55 y 90, así que una diferencia de 6 puntos — significativa en
- * planta — queda reducida a unos pocos píxeles.
+ * Un `domain={[0, 100]}` desperdicia buena parte del lienzo, porque el OEE
+ * real vive entre 55 y 90 y una diferencia de 6 puntos queda reducida a unos
+ * píxeles.
  *
- * CONTRAPARTIDA OBLIGATORIA: truncar el eje amplifica visualmente la
- * diferencia. Solo es honesto si el eje sigue mostrando sus valores
- * numéricos y hay una referencia absoluta a la vista (la línea de meta).
- * Quien consuma esto no debe ocultar las etiquetas del eje.
+ * A cambio, truncar el eje amplifica visualmente la diferencia: quien consuma
+ * esto debe mantener visibles las etiquetas del eje y alguna referencia
+ * absoluta (la línea de meta).
  */
 export function niceDomain(values, { pad = 8, step = 5, min = 0, max = 100 } = {}) {
   const nums = (values ?? []).filter((v) => Number.isFinite(v));
@@ -292,11 +270,10 @@ export function niceDomain(values, { pad = 8, step = 5, min = 0, max = 100 } = {
 
   const lo = Math.max(min, Math.floor((Math.min(...nums) - pad) / step) * step);
 
-  // El eje NO se recorta por arriba a 100. El rendimiento real pasa de
-  // 100 % siempre que el ciclo medido va más rápido que el teórico —en el
-  // historiador hay puntos de 144— y con el tope, esos picos quedaban
-  // pegados al borde, indistinguibles de un 100 clavado. `max` solo actúa
-  // como dominio de reserva cuando no hay ni un valor utilizable.
+  // El eje no se recorta por arriba a 100: el rendimiento real pasa de 100 %
+  // siempre que el ciclo medido va más rápido que el teórico, y con el tope
+  // esos picos quedarían pegados al borde, indistinguibles de un 100 clavado.
+  // `max` solo actúa como dominio de reserva cuando no hay valores.
   const hi = Math.ceil((Math.max(...nums) + pad) / step) * step;
 
   // Serie plana: no dejar un dominio de altura cero.

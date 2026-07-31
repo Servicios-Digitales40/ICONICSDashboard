@@ -1,24 +1,17 @@
 /**
- * pages/machine-detail/DisponibilidadView.jsx
- * ------------------------------------------------------------------
- * Subvista "Disponibilidad" · MODO COMPARACIÓN DE DISEÑO.
+ * Subvista "Disponibilidad", en modo comparación de diseño. Dos maneras de
+ * contar lo mismo, cada una respondiendo una pregunta distinta:
  *
- * Dos maneras de contar lo mismo, cada una respondiendo una pregunta
- * distinta del operador:
+ *   A · Cascada de tiempo → ¿de dónde sale el porcentaje?
+ *   B · Tablero de KPIs   → ¿cuánto falta para la meta?
  *
- *   A · Cascada de tiempo   → ¿DE DÓNDE sale el porcentaje?
- *                             el desglose 28 800 → 25 200 → 18 000 s
- *   B · Tablero de KPIs     → ¿CUÁNTO falta para la meta?
- *                             lectura de reporte, densa y accionable
+ * Los tiempos salen de `tiemposTurno()`: dos constantes de trabajo (duración
+ * de turno y paro previsto) y el resto derivado del dato real de la máquina.
+ * Cuando el PLC entregue tiempos solo cambia ese helper.
  *
- * Los tiempos salen de `tiemposTurno()` (ver shared.jsx): dos constantes
- * de trabajo — duración de turno y paro previsto — y el resto derivado
- * del dato real de la máquina. Cuando el PLC entregue tiempos, solo
- * cambia ese helper.
- *
- * Color: azul = tiempo que produce · ámbar = paro previsto (esperado) ·
- * coral = paro NO previsto (lo accionable). Se usa la paleta de datos
- * `theme.viz`, no los tokens de UI, porque son manchas grandes de color.
+ * Color: azul = tiempo que produce · ámbar = paro previsto · coral = paro no
+ * previsto, que es lo accionable. Se usa la paleta de datos `theme.viz` y no
+ * los tokens de UI, porque son manchas grandes de color.
  */
 import { useMemo } from "react";
 import { Panel, BandGauge, KpiTile } from "@/components/ui/index.js";
@@ -31,9 +24,7 @@ import {
   OptionSection, FormulaStrip, WaterfallRow, MdKeyframes,
 } from "../../components/factorUi.jsx";
 
-/* ================================================================
- * OPCIÓN A · Cascada de tiempo
- * ================================================================ */
+/* Opción A · Cascada de tiempo */
 
 function OptionCascada({ machine, T, t }) {
   const V = t.viz;
@@ -70,20 +61,17 @@ function OptionCascada({ machine, T, t }) {
   );
 }
 
-/* ================================================================
- * OPCIÓN B · Tablero de KPIs
- * ================================================================ */
+/* Opción B · Tablero de KPIs */
 
 function OptionTablero({ machine, T, t }) {
   const V = t.viz;
   const sinDato = !hasValue(machine.disponibilidad);
   const v = clampPct(machine.disponibilidad);
   const col = bandColor(t, machine.disponibilidad);
-  // Sin medición no hay brecha contra la meta que calcular: un delta de
-  // −90 pts diría que el equipo está parado, y eso no lo sabemos.
+  // Sin medición no hay brecha contra la meta: un delta de −90 pts diría que
+  // el equipo está parado, y eso no se sabe.
   const delta = sinDato ? null : v - META_DISPONIBILIDAD;
-  // Minutos de ejecución que faltan para alcanzar la meta: el KPI que
-  // convierte "te falta un 18.6 %" en una cifra sobre la que se actúa.
+  // Minutos de ejecución que faltan para la meta, que es lo accionable.
   const faltan = sinDato ? null : Math.max(0, Math.round((T.planificado * (META_DISPONIBILIDAD - v)) / 100));
 
   const R = 62, SW = 13, CIRC = 2 * Math.PI * R;
@@ -174,7 +162,6 @@ function OptionTablero({ machine, T, t }) {
   );
 }
 
-/* ================================================================ */
 export default function DisponibilidadView({ machine, t, C }) {
   const T = useMemo(() => tiemposTurno(machine), [machine]);
 

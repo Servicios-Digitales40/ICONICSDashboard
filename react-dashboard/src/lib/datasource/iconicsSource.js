@@ -1,27 +1,19 @@
 /**
- * lib/datasource/iconicsSource.js
- * ------------------------------------------------------------------
- * Fuente de datos REAL. Traduce entre el mundo de ICONICS (puntos con
- * nombre y calidad) y el mundo del dominio (`Machine`).
+ * Fuente de datos real. Traduce entre el mundo de ICONICS (puntos con nombre
+ * y calidad) y el del dominio (`Machine`).
  *
- * Es deliberadamente delgada: no sabe agendar —eso es del motor— ni
- * sanear números —eso es del dominio—. Solo empareja unos con otros.
+ * Es delgada a propósito: no agenda (eso es del motor) ni sanea números (eso
+ * es del dominio), solo empareja unos con otros.
  *
- * ── TRES CADENCIAS, TRES MOTORES ───────────────────────────────────
+ * Usa tres motores con cadencias distintas, porque un único intervalo
+ * obligaría a elegir entre gastar de más o refrescar de menos:
  *
- * No todo necesita el mismo ritmo, y un único intervalo obligaría a
- * elegir entre gastar de más o refrescar de menos:
+ *  - resumen  · 15 s  · vistas de planta y de área
+ *  - detalle  · 5 s   · solo la máquina abierta, con todos sus tags
+ *  - estático · 5 min · Modelo, T_Disp_pot, T_Inac_plan
  *
- *   · resumen  · 15 s · vista de planta y de área (8 tags × 10 máquinas)
- *   · detalle  ·  5 s · SOLO la máquina abierta (todos sus tags)
- *   · estático ·  5 min · Modelo, T_Disp_pot, T_Inac_plan
- *
- * Cada motor es tonto e independiente. Cuando nadie mira el detalle, ese
- * motor tiene cero referencias y no emite ni una petición — el guardián
- * de «sin puntos registrados no se pide nada» lo garantiza.
- *
- * El servidor escanea a 1 s, pero ninguna persona lee a 1 s: refrescar
- * el detalle cada 5 s ya va más rápido de lo que nadie puede seguir.
+ * Cada motor es independiente y sin puntos registrados no emite peticiones,
+ * así que el de detalle queda en silencio mientras nadie lo mira.
  */
 import { createMachine, daySummary, emptyMachine } from "../domain/index.js";
 import { createPollingEngine } from "../iconics/pollingEngine.js";
@@ -65,16 +57,15 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
   /**
    * Caché de historia, indexada por (máquina, rango).
    *
-   * Guarda la PROMESA y no el resultado: si dos gráficas piden la misma
-   * serie a la vez —cosa habitual al montar una vista— comparten una
-   * única petición en lugar de lanzar dos. Se vacía al parar la fuente.
+   * Guarda la promesa y no el resultado, para que dos gráficas que piden la
+   * misma serie a la vez compartan una única petición. Se vacía al parar
+   * la fuente.
    */
   const cacheHistoria = new Map();
 
   /**
-   * Memoiza una lectura histórica. Un fallo NO se cachea: la próxima
-   * visita debe poder reintentar, que es justo lo que hace falta cuando
-   * el historiador estaba caído un momento.
+   * Memoiza una lectura histórica. Un fallo no se cachea, para que la próxima
+   * visita pueda reintentar si el historiador estaba caído un momento.
    */
   function cachear(clave, producir) {
     if (cacheHistoria.has(clave)) return cacheHistoria.get(clave);
@@ -91,9 +82,9 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
   /**
    * Reúne las lecturas de los tres motores para una máquina.
    *
-   * El orden importa: `detalle` pisa a `resumen` porque, cuando ambos
-   * están activos, el detalle es el más fresco. Y solo pisa si trae dato,
-   * para que un hueco del detalle no borre un valor bueno del resumen.
+   * El orden importa: `detalle` pisa a `resumen` porque es el más fresco
+   * cuando ambos están activos. Y solo pisa si trae dato, para que un hueco
+   * del detalle no borre un valor bueno del resumen.
    */
   function leerMaquina(meta, tags) {
     const readings = {};
@@ -188,12 +179,11 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
     },
 
     /**
-     * Historia. NO se sondea: se pide al abrir la gráfica y se cachea por
-     * (máquina, rango), porque el pasado no cambia — solo puede crecer su
-     * borde derecho, y para eso ya está el valor en vivo.
+     * Historia. No se sondea: se pide al abrir la gráfica y se cachea por
+     * (máquina, rango), porque el pasado no cambia.
      *
      * El transporte falso no simula histórico, así que en desarrollo sin
-     * servidor devuelve vacío. Es deliberado: un gráfico vacío se ve, uno
+     * servidor devuelve vacío a propósito: un gráfico vacío se ve, uno
      * inventado no.
      */
     async readHistory(id, range = {}) {
@@ -206,13 +196,11 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
     },
 
     /**
-     * UN DÍA de una máquina, tal como lo tiene el historiador: la serie
-     * horaria de los factores y el resumen del día.
+     * Un día de una máquina tal como lo tiene el historiador: la serie horaria
+     * de los factores y el resumen del día. Lo consume el comparativo.
      *
-     * Es lo que consume el comparativo. Devuelve `resumen: null` cuando
-     * ese día no tiene ni una muestra —un día sin historizar y un día con
-     * OEE 0 son noticias opuestas— y la vista lo dice en voz alta en vez
-     * de pintar ceros.
+     * Devuelve `resumen: null` cuando el día no tiene ni una muestra, para que
+     * la vista pueda distinguir un día sin historizar de un día con OEE 0.
      */
     async readDay(id, iso) {
       const meta = porId.get(id);
@@ -226,8 +214,8 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
     },
 
     /**
-     * OEE día a día, para el mapa de calor del calendario. Una petición
-     * cubre todo el rango: pintar un mes NO son treinta lecturas.
+     * OEE día a día, para el mapa de calor del calendario. El resultado se
+     * cachea por rango para no repetir la ronda al reabrir el selector.
      */
     async readDailyOee(id, rango) {
       const meta = porId.get(id);
@@ -242,7 +230,7 @@ export function createIconicsSource({ transport, cadencia = CADENCIA } = {}) {
       cacheHistoria.clear();
     },
 
-    /** Instrumentación agregada de los tres motores (Fase 3.5). */
+    /** Instrumentación agregada de los tres motores. */
     stats() {
       const partes = Object.entries(motor).map(([nombre, m]) => ({ nombre, ...m.stats() }));
       return {

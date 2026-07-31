@@ -1,4 +1,4 @@
-/** ui/SectionLabel.jsx — título de sección con una barrita degradada a la izquierda. */
+/** Título de sección con una barrita degradada a la izquierda. */
 import { useTheme } from "@/theme";
 
 export function SectionLabel({ children, sub }) {

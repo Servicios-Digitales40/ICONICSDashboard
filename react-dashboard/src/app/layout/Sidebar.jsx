@@ -1,9 +1,7 @@
 /**
- * layout/Sidebar.jsx
- * ------------------------------------------------------------------
- * Barra lateral fija: marca, navegación entre páginas y tarjeta de
- * perfil. Recibe `page`/`onNavigate` desde App.jsx, que es quien
- * decide qué página renderizar en el área principal.
+ * Barra lateral fija: marca, navegación entre páginas y tarjeta de perfil.
+ * Recibe `page` y `onNavigate` desde App.jsx, que es quien decide qué página
+ * renderizar en el área principal.
  */
 import { useEffect, useState } from "react";
 import { Zap, LogOut, ChevronDown, PanelLeftClose, PanelLeftOpen } from "lucide-react";
@@ -11,7 +9,7 @@ import { useTheme } from "@/theme";
 import { NAV } from "../routes/index.js";
 import { Avatar, HoverTip } from "@/components/ui/index.js";
 
-/** Envuelve en tooltip sólo cuando la barra está colapsada (el texto ya no se ve). */
+/** Envuelve en tooltip solo cuando la barra está colapsada y no se ve el texto. */
 function MaybeTip({ collapsed, label, children }) {
   return collapsed ? <HoverTip label={label}>{children}</HoverTip> : children;
 }
@@ -60,7 +58,8 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
         <button
           className="nav-item"
           onClick={() => {
-            // Colapsada no hay sitio para los hijos: se despliega la barra y se abre el grupo.
+            // Colapsada no hay sitio para los hijos: se despliega la barra y
+            // se abre el grupo.
             if (collapsed) { onExpandSidebar?.(); setOpen(true); return; }
             setOpen((o) => !o);
           }}

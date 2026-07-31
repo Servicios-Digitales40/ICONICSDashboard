@@ -1,31 +1,21 @@
 /**
- * lib/domain/history.js
- * ------------------------------------------------------------------
- * Cómo se lee un DÍA de historia. Reduce una serie del historiador a la
- * misma forma que ya tiene una máquina en vivo, para que el comparativo
- * no tenga que hablar dos vocabularios distintos.
+ * Cómo se lee un día de historia. Reduce una serie del historiador a la misma
+ * forma que tiene una máquina en vivo, para que el comparativo no maneje dos
+ * vocabularios distintos.
  *
- * ── POR QUÉ NO BASTA CON PROMEDIARLO TODO ──────────────────────────
+ * No vale promediarlo todo, porque los tags son de dos naturalezas:
  *
- * Los tags de este servidor son de dos naturalezas y agregarlos igual
- * produce números sin sentido:
+ *  - Factores (`OEE`, `OEE_Disp`, `OEE_Rend`, `OEE_Cal`): porcentajes
+ *    instantáneos, cuyo resumen del día es la media.
+ *  - Contadores (`Pz_OK`, `Pz_NOK`, `T_Muerto_Ico`): se acumulan y se
+ *    reinician con el día, así que su resumen es el cierre y no la media.
  *
- *   · FACTORES (`OEE`, `OEE_Disp`, `OEE_Rend`, `OEE_Cal`) son porcentajes
- *     instantáneos. El resumen del día es su MEDIA.
- *   · CONTADORES (`Pz_OK`, `Pz_NOK`, `T_Muerto_Ico`) se acumulan y se
- *     reinician con el día. El resumen del día es su ÚLTIMO valor, no la
- *     media: promediar un contador da "la mitad de lo producido".
+ * Ambas salen de la misma lectura del historiador; lo que cambia es cómo se
+ * reducen, y por eso el `cierre` llega ya resuelto por el transporte.
  *
- * Las dos salen de la MISMA lectura del historiador —24 puntos por tag—;
- * lo que cambia es cómo se reducen, y por eso el `cierre` llega ya
- * resuelto por el transporte.
- *
- * ── HUECOS ─────────────────────────────────────────────────────────
- *
- * Una hora sin muestra NO cuenta como cero: se ignora en la media y se
- * refleja en `muestras`. Con cero muestras el resumen entero es `null`,
- * porque un día sin historizar y un día con OEE 0 son noticias opuestas
- * y la vista debe poder distinguirlas.
+ * Una hora sin muestra no cuenta como cero: se ignora en la media y se refleja
+ * en `muestras`. Sin ninguna muestra el resumen entero es `null`, para poder
+ * distinguir un día sin historizar de un día con OEE 0.
  */
 import { calcOEE, hasValue, toNumber } from "./machine.js";
 
@@ -53,10 +43,9 @@ export function daySummary(serie = [], cierre = {}) {
   const rendimiento = media(filas, "rendimiento");
   const calidad = media(filas, "calidad");
 
-  // El OEE del día se toma del propio tag `OEE` cuando el historiador lo
-  // tiene: es el que calcula el servidor y el que ve el operador en la
-  // pantalla de ICONICS. Solo si falta se deriva de los tres factores,
-  // para no inventar una cifra que discrepe de la del servidor.
+  // El OEE del día sale del propio tag `OEE` cuando el historiador lo tiene,
+  // que es el que ve el operador en la pantalla de ICONICS. Solo si falta se
+  // deriva de los tres factores, para no discrepar de la cifra del servidor.
   const oeeLeido = media(filas, "oee");
   const oee = hasValue(oeeLeido) ? oeeLeido : calcOEE({ disponibilidad, rendimiento, calidad });
 
@@ -81,8 +70,8 @@ export function daySummary(serie = [], cierre = {}) {
     rechazadas,
     producidas: hasValue(aprobadas) && hasValue(rechazadas) ? aprobadas + rechazadas : null,
 
-    // Segundos, como los entrega ICONICS. La UI del comparativo trabaja
-    // en minutos, y la conversión la hace quien pinta.
+    // Segundos, como los entrega ICONICS. La conversión a minutos que usa el
+    // comparativo la hace quien pinta.
     tMuerto,
 
     muestras,

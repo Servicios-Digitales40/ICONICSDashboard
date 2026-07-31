@@ -1,31 +1,18 @@
 /**
- * lib/datasource/DataSourceProvider.jsx
- * ------------------------------------------------------------------
- * EL ÚNICO SITIO DE LA APP QUE SABE SI ESTAMOS EN DEMO O EN VIVO.
+ * El único sitio de la app que sabe si estamos en demo o en vivo.
  *
- * ── POR QUÉ VIVE EN LA RAÍZ Y NO EN LOS COMPONENTES ────────────────
+ * La elección se hace aquí una sola vez, entre dos objetos que cumplen la
+ * misma interfaz (ver types.js); aguas abajo nadie pregunta. Repartir un
+ * `if (demoMode)` por cada vista multiplicaría los caminos a probar y
+ * acabaría dejando alguno pegando al servidor con la demo encendida.
  *
- * La forma obvia de implementar el botón de demo es un `if (demoMode)`
- * en cada vista. Es también la peor: multiplica el número de caminos que
- * hay que probar, ensucia componentes que no tienen por qué saber de
- * dónde salen sus datos, y garantiza que tarde o temprano alguien olvide
- * un camino y siga pegando al servidor con la demo encendida.
+ * Dos detalles que hacen falta para que el interruptor sea real:
  *
- * Aquí se elige UNA vez entre dos objetos que cumplen la misma interfaz
- * (ver types.js). Aguas abajo, nadie pregunta.
- *
- * ── EL REMONTAJE POR `key` (riesgo R-09) ───────────────────────────
- *
- * Al cambiar de modo, los hijos se remontan mediante `key={mode}`. Sin
- * eso, un componente que ya tuviera datos en memoria seguiría
- * enseñándolos: quedarían valores del servidor real mezclados con los de
- * la demo, que es justo la confusión que este interruptor debe evitar.
- *
- * ── PARAR DE VERDAD ────────────────────────────────────────────────
- *
- * Al salir de «live» la fuente anterior recibe `stop()`. No basta con
- * dejar de leer sus datos: el motor seguiría sondeando en segundo plano
- * y la demo no sería una demo, sería una máscara.
+ *  - Los hijos se remontan con `key={mode}`. Sin eso, un componente que ya
+ *    tuviera datos en memoria los seguiría enseñando y se mezclarían valores
+ *    del servidor con los de la demo.
+ *  - Al salir de «live» la fuente anterior recibe `stop()`, o su motor
+ *    seguiría sondeando en segundo plano.
  */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
@@ -36,24 +23,14 @@ import { createIconicsSource } from "./iconicsSource.js";
 export const MODOS = { LIVE: "live", DEMO: "demo" };
 
 /**
- * ORIGEN REAL DE LOS DATOS EN PANTALLA. Son TRES, no dos.
+ * Origen real de los datos en pantalla. Son tres, no dos: el interruptor del
+ * Topbar elige la fuente (live/demo), pero dentro de «live» hay dos
+ * transportes posibles, el servidor real y el simulador.
  *
- * El interruptor del Topbar elige la FUENTE (live/demo), pero dentro de
- * «live» hay a su vez dos transportes: el servidor real y el simulador.
- * Eso da tres estados con apariencia idéntica y significado muy distinto.
- *
- * ── POR QUÉ ESTO ES UNA ENTIDAD Y NO UN BOOLEANO ───────────────────
- *
- * Durante un tiempo la app mostraba «En vivo» tanto leyendo ICONICS como
- * leyendo el simulador, sin nada que los distinguiera. Los valores del
- * simulador son plausibles a propósito —el OEE es el producto real de
- * sus factores, las piezas crecen, los estados rotan— así que no había
- * forma de notarlo mirando la pantalla.
- *
- * Es el mismo riesgo que motivó la cinta del modo demo, y era peor:
- * la demo al menos avisaba. Se resuelve igual, nombrando los tres
- * estados en un solo sitio y obligando a los dos que NO son reales a
- * anunciarse.
+ * Es una entidad y no un booleano porque los valores del simulador son
+ * plausibles a propósito y no hay forma de distinguirlos del servidor real
+ * mirando la pantalla. Los dos orígenes que no son reales están obligados a
+ * anunciarse (`avisa`).
  */
 export const ORIGENES = {
   real: {
@@ -79,12 +56,7 @@ export const ORIGENES = {
   },
 };
 
-/**
- * Deriva el origen activo. Extraída del provider para poder probarla:
- * una edición descuidada la dejó una vez con «real» inalcanzable —las
- * dos ramas finales devolvían `simulado`— y ninguna prueba lo notó
- * porque la derivación vivía dentro del useMemo.
- */
+/** Deriva el origen activo. Vive fuera del provider para poder probarla. */
 export function origenActual(mode) {
   if (mode === MODOS.DEMO) return ORIGENES.demo;
   return esTransporteFalso() ? ORIGENES.simulado : ORIGENES.real;
@@ -95,9 +67,8 @@ const CLAVE_ALMACEN = "iconics.dataSourceMode";
 const Ctx = createContext(null);
 
 /**
- * Modo inicial. `live` es SIEMPRE el valor por defecto en una instalación
- * limpia: una app que arranca en demo sin que nadie lo haya pedido es una
- * app que un día enseñará datos falsos en producción.
+ * Modo inicial. En una instalación limpia siempre es `live`: arrancar en demo
+ * sin que nadie lo pida acabaría enseñando datos falsos en producción.
  */
 function modoInicial() {
   try {
@@ -138,9 +109,8 @@ export function DataSourceProvider({ children }) {
       isDemo: mode === MODOS.DEMO,
 
       /**
-       * Qué se está viendo REALMENTE. Es lo que deben consumir el Topbar
-       * y la cinta de aviso: `mode` por sí solo no distingue el servidor
-       * real del simulador, que es justo la confusión a evitar.
+       * Qué se está viendo realmente. Lo consumen el Topbar y la cinta de
+       * aviso; `mode` por sí solo no distingue el servidor del simulador.
        */
       origen: origenActual(mode),
 

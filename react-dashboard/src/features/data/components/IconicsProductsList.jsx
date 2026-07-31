@@ -1,15 +1,12 @@
 /**
- * ui/IconicsProductsList.jsx
- * ------------------------------------------------------------------
- * Lista TODOS los productos de la tabla `db:Northwind.Products`.
+ * Lista los productos de la tabla `db:Northwind.Products`, en dos pasos contra
+ * ICONICS a través del backend puente:
  *
- * Estrategia (2 pasos contra ICONICS a través del backend puente):
  *   1. Leer el total de filas con el agregado `.@@Count`.
- *   2. Pedir en UNA sola petición batch todos los `[ProductName][i]`
- *      (i = 0 .. count-1) usando POST /Data del lado de ICONICS.
+ *   2. Pedir en una sola petición batch todos los `[ProductName][i]`.
  *
- * Así evitamos N peticiones sueltas: el conteo dice cuántos hay y el
- * batch los trae todos juntos.
+ * Así se evitan N peticiones sueltas: el conteo dice cuántos hay y el batch
+ * los trae juntos.
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Package } from "lucide-react";
@@ -44,7 +41,7 @@ export function IconicsProductsList() {
       const batchRes = await fetchIconicsBatch(points);
       const map = batchRes?.payload ?? {};
 
-      // Preservamos el orden por índice; buscamos cada punto en el mapa.
+      // Se preserva el orden por índice buscando cada punto en el mapa.
       const list = points.map((point, i) => {
         const entry = map[point];
         const value = entry?.payload?.value ?? entry?.payload?.Value;

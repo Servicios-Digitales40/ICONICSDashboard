@@ -1,12 +1,10 @@
 /**
- * features/dashboard/components/dashboardTiles.jsx
- * ------------------------------------------------------------------
- * Los tiles del dashboard de planta. Cada uno recibe datos ya agregados
- * por `../lib/plantModel.js` y el tema `t` por prop: son componentes
- * "tontos", no calculan nada ni conocen el origen del dato.
+ * Los tiles del dashboard de planta. Cada uno recibe datos ya agregados por
+ * `../lib/plantModel.js` y el tema `t` por prop: son componentes tontos, no
+ * calculan nada ni conocen el origen del dato.
  *
- * Nombre en camelCase a propósito: el archivo exporta varios componentes
- * hermanos sin uno principal, así que no es "un componente".
+ * El nombre va en camelCase porque el archivo exporta varios componentes
+ * hermanos sin uno principal.
  */
 import {
   PieChart, Pie, Cell, LineChart, Line, ComposedChart, Bar, Area,
@@ -19,44 +17,38 @@ import { fmtEntero, fmtNum, fmtPct } from "@/lib/format.js";
 import { METAS, fmtHM, bandColor } from "@/lib/shiftModel.js";
 import { useCountUp, useMounted, usePrefersReducedMotion } from "@/lib/motion.js";
 
-/* Formateo tolerante a huecos.
- *
- * Los agregados de `plantModel` ya vienen saneados —`media` y `suma`
- * descartan los nulos— así que aquí no debería llegar ninguno. Se
- * delegan igualmente en `lib/format`: cuesta lo mismo y evita que un
- * cambio futuro en el rollup se manifieste como un «NaN %» en pantalla. */
+/* Formateo tolerante a huecos. Los agregados de `plantModel` ya vienen
+ * saneados, pero se delega igualmente en `lib/format` para que un cambio
+ * futuro en el rollup no acabe como un «NaN %» en pantalla. */
 const num = (n) => fmtEntero(n);
 const pct = (n) => fmtPct(n, 1);
 
 /**
  * Cifra que cuenta hasta su valor.
  *
- * Se extrae como componente porque el conteo es un hook: hace falta uno por
- * número y dentro de un `.map()` no cabe. Al recibir el NÚMERO y no la cadena
- * ya formateada, el formato se reaplica en cada fotograma y los millares
- * siguen puestos mientras la cifra sube.
+ * Es un componente aparte porque el conteo es un hook: hace falta uno por
+ * número y dentro de un `.map()` no cabe. Recibe el número y no la cadena ya
+ * formateada, de modo que el formato se reaplica en cada fotograma y los
+ * millares siguen puestos mientras la cifra sube.
  */
 function Cifra({ valor, fmt, duracion = 1000, style }) {
-  // Con `valor` null el conteo no tiene destino: se anima hacia 0 (los
-  // hooks no pueden ser condicionales) pero lo que se PINTA es fmt(null),
-  // es decir «—». Sin esta guarda, useCountUp interpolaba hacia NaN.
+  // Con `valor` null el conteo se anima hacia 0, porque los hooks no pueden
+  // ser condicionales, pero lo que se pinta es fmt(null), es decir «—». Sin
+  // esta guarda useCountUp interpolaría hacia NaN.
   const hay = hasValue(valor);
   const v = useCountUp(hay ? valor : 0, duracion);
   return <span style={style}>{hay ? fmt(v) : fmt(null)}</span>;
 }
 
-/* ==================================================================
- * BANDA DE KPIs · el titular del turno
- * ================================================================== */
+/* Banda de KPIs: el titular del turno. */
 
 /**
  * Celda de la banda superior. Cifra grande, etiqueta pequeña.
  *
- * `delay` escalona la entrada de izquierda a derecha, en el orden en que se
- * leen. La cifra cuenta hasta su valor: en el primer montaje sube desde cero,
- * y cuando el dato se refresque subirá (o bajará) desde el número que ya
- * estaba en pantalla — el cambio se verá como un movimiento, no como un
- * reinicio. Ver `lib/motion.js`.
+ * `delay` escalona la entrada de izquierda a derecha, en el orden de lectura.
+ * La cifra cuenta hasta su valor: en el primer montaje sube desde cero, y al
+ * refrescarse el dato se mueve desde el número que ya estaba en pantalla, de
+ * modo que el cambio se ve como un movimiento y no como un reinicio.
  */
 function KpiCell({ label, valor, fmt, sub, color, t, alert, delay = 0 }) {
   return (
@@ -81,14 +73,13 @@ function KpiCell({ label, valor, fmt, sub, color, t, alert, delay = 0 }) {
 }
 
 export function KpiBand({ s, t }) {
-  // El complemento de un hueco es otro hueco: `100 - null` en JavaScript
-  // vale 100, y el tile de rechazadas habría dicho «100.0 % del total»
-  // con el servidor caído.
+  // El complemento de un hueco es otro hueco: `100 - null` vale 100 en
+  // JavaScript, y el tile de rechazadas diría «100.0 % del total» con el
+  // servidor caído.
   const resto = (v) => (hasValue(v) ? 100 - v : null);
 
-  // «Detenidas» solo cuenta máquinas cuyo estado SE CONOCE y no es
-  // operar. Las que no han dicho nada van aparte: afirmar «10 detenidas»
-  // cuando lo cierto es «10 sin leer» es diagnosticar sin datos.
+  // «Detenidas» solo cuenta máquinas cuyo estado se conoce y no es operar.
+  // Las que no han dicho nada van aparte, para no diagnosticar sin datos.
   const detenidas = s.totalMaquinas - s.operando - s.sinDato;
 
   return (
@@ -113,12 +104,11 @@ export function KpiBand({ s, t }) {
   );
 }
 
-/* ==================================================================
- * GAUGES · OEE y sus tres factores
- * ==================================================================
- * El OEE de planta NO es la media de los OEE: es D × R × C de estos tres
- * gauges (ver plantModel). Por eso los cuatro se muestran juntos — el
- * titular y sus componentes cuentan la misma historia.
+/*
+ * Gauges: OEE y sus tres factores.
+ *
+ * El OEE de planta no es la media de los OEE, sino D × R × C de estos tres
+ * gauges (ver plantModel). Por eso los cuatro se muestran juntos.
  */
 export function FactorGauges({ s, t }) {
   const gauges = [
@@ -132,7 +122,7 @@ export function FactorGauges({ s, t }) {
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
       {gauges.map((g, i) => (
         // `delay` explícito: sin él la cascada la decide el contador global de
-        // Panel, que no se reinicia y saca los cuatro diales en orden aleatorio.
+        // Panel, que no se reinicia y saca los diales en orden aleatorio.
         <Panel key={g.key} delay={0.3 + i * 0.08} style={{ flex: "1 1 210px", minWidth: 200, display: "flex", justifyContent: "center" }}>
           <BandGauge value={g.value} label={g.label} meta={g.meta} t={t} size={200} />
         </Panel>
@@ -141,13 +131,10 @@ export function FactorGauges({ s, t }) {
   );
 }
 
-/* ==================================================================
- * DONA DE ESTADOS · qué está haciendo la planta ahora mismo
- * ================================================================== */
+/* Dona de estados: qué está haciendo la planta ahora mismo. */
 export function EstadoDonut({ s, t }) {
-  // La etiqueta y el color salen del dominio, que es la fuente única del
-  // vocabulario de estados: así la dona no puede pintar de un color lo
-  // que la tarjeta de máquina pinta de otro.
+  // La etiqueta y el color salen del dominio, para que la dona no pinte de un
+  // color lo que la tarjeta de máquina pinta de otro.
   const data = s.porEstado.map((e) => ({
     name: estadoInfo(e.estado).label,
     value: e.valor,
@@ -194,12 +181,12 @@ export function EstadoDonut({ s, t }) {
   );
 }
 
-/* ==================================================================
- * PASTEL DE RECHAZOS · de dónde sale el scrap
- * ==================================================================
- * Cuenta rechazos y no volumen a propósito: hoy todas las máquinas
- * producen ~1 000 pz, así que un pastel de producción serían diez
- * porciones idénticas. Ver la nota en plantModel.shareByMachine().
+/*
+ * Pastel de rechazos: de dónde sale el scrap.
+ *
+ * Cuenta rechazos y no volumen a propósito: todas las máquinas producen
+ * cantidades parecidas, así que un pastel de producción serían diez porciones
+ * casi idénticas.
  */
 export function RechazosPie({ reparto, s, t }) {
   const paleta = [t.viz.coral, t.viz.ambar, t.viz.violeta, t.viz.azul, t.viz.verde];
@@ -227,9 +214,7 @@ export function RechazosPie({ reparto, s, t }) {
   );
 }
 
-/* ==================================================================
- * PRODUCCIÓN POR HORA · aceptadas vs rechazadas
- * ================================================================== */
+/* Producción por hora: aceptadas frente a rechazadas. */
 export function ProduccionTrend({ data, t }) {
   return (
     <Panel title="Producción por hora" code="aceptadas vs. rechazadas · derivado del acumulado del turno">
@@ -247,11 +232,9 @@ export function ProduccionTrend({ data, t }) {
   );
 }
 
-/* ==================================================================
- * TENDENCIA DE OEE · los cuatro factores a lo largo del turno
- * ==================================================================
- * El último punto ancla al valor actual, así que el extremo derecho de
- * esta gráfica coincide con los gauges de arriba.
+/*
+ * Tendencia de OEE: los cuatro factores a lo largo del turno. El último punto
+ * ancla al valor actual, así que el extremo derecho coincide con los gauges.
  */
 export function OeeTrend({ data, t }) {
   const series = [
@@ -283,18 +266,18 @@ export function OeeTrend({ data, t }) {
   );
 }
 
-/* ==================================================================
- * TIEMPOS MUERTOS · previsto vs. no previsto
- * ==================================================================
- * El ámbar ya estaba en el plan (comidas, cambios de formato); el coral
- * es el que no debía ocurrir — ese es el accionable. Mismo criterio de
- * color que la subvista de Disponibilidad.
+/*
+ * Tiempos muertos: previsto frente a no previsto.
+ *
+ * El ámbar ya estaba en el plan (comidas, cambios de formato); el coral es el
+ * que no debía ocurrir, y es el accionable. Mismo criterio de color que la
+ * subvista de Disponibilidad.
  */
 export function DowntimeTiles({ s, t }) {
   const listo = useMounted();
-  // El paro planificado sale de constantes de turno (siempre hay número),
-  // pero el NO planificado se deriva de la disponibilidad medida: sin
-  // lecturas es null, y `número + null` en JS da un total que parece real.
+  // El paro planificado sale de constantes de turno y siempre hay número,
+  // pero el no planificado se deriva de la disponibilidad medida: sin lecturas
+  // es null, y `número + null` en JS daría un total que parece real.
   const total =
     hasValue(s.paroPlanificado) && hasValue(s.paroNoPlanificado)
       ? s.paroPlanificado + s.paroNoPlanificado
@@ -349,9 +332,7 @@ export function DowntimeTiles({ s, t }) {
   );
 }
 
-/* ==================================================================
- * TIRA POR ÁREA · el puente al siguiente nivel de zoom
- * ================================================================== */
+/* Tira por área: el puente al siguiente nivel de zoom. */
 export function AreaStrip({ areas, t, onNavigate }) {
   const reduce = usePrefersReducedMotion();
 
@@ -359,10 +340,9 @@ export function AreaStrip({ areas, t, onNavigate }) {
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
       {areas.map((a) => {
         const col = bandColor(t, a.oee);
-        // `porEstado` ya viene del rollup: si el área contiene una máquina en
-        // alarma, la tarjeta late. Es la única señal de alarma que esta vista
-        // puede dar — no pinta las máquinas una a una, así que el área es el
-        // grano más fino disponible.
+        // `porEstado` viene del rollup: si el área contiene una máquina en
+        // alarma, la tarjeta late. Es la señal más fina que puede dar esta
+        // vista, que no pinta las máquinas una a una.
         const emergencia = a.porEstado.some((e) => e.estado === ESTADOS.alarma.key && e.valor > 0);
 
         return (
@@ -372,8 +352,8 @@ export function AreaStrip({ areas, t, onNavigate }) {
             style={{
               flex: "1 1 260px", minWidth: 240, cursor: "pointer",
               borderLeft: `3px solid ${emergencia ? t.coral : col}`,
-              // Con movimiento reducido el latido no corre: la alarma pasa a
-              // ser un fondo fijo, o quien pidió menos movimiento no la vería.
+              // Con movimiento reducido el latido no corre, así que la alarma
+              // pasa a ser un fondo fijo para seguir siendo visible.
               ...(emergencia && reduce ? { background: t.coralSoft } : null),
               ...(emergencia && !reduce
                 ? {

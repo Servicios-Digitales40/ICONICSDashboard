@@ -1,16 +1,14 @@
 /**
- * pages/data/EliminarView.jsx
- * ------------------------------------------------------------------
  * Subsección "Eliminar" de la vista Data.
  *
- * Muestra TODOS los clientes de `db:Northwind.Customers` como tabla y
- * permite borrar cada uno con el Data Manipulator DeleteCustomer:
- *     db:Northwind.DeleteCustomer<@CustomerID='X'>.@@Execute   (escribir true)
+ * Muestra los clientes de `db:Northwind.Customers` como tabla y permite borrar
+ * cada uno con el Data Manipulator DeleteCustomer, escribiendo `true` a:
  *
- * Lectura de la tabla (igual patrón que la tabla de productos):
- *   1. `.@@Count` para el total de filas.
- *   2. Un punto por celda (columna, fila), traídos en lotes.
- *   3. Se reconstruye la matriz fila x columna.
+ *     db:Northwind.DeleteCustomer<@CustomerID='X'>.@@Execute
+ *
+ * La tabla se lee con el mismo patrón que la de productos: `.@@Count` para el
+ * total de filas, un punto por celda traídos en lotes, y reconstrucción de la
+ * matriz fila × columna.
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Trash2 } from "lucide-react";

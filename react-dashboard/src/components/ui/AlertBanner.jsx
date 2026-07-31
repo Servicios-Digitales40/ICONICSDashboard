@@ -1,4 +1,4 @@
-/** ui/AlertBanner.jsx — banner de alerta inline (no flotante) en 4 variantes semánticas. */
+/** Banner de alerta inline (no flotante), en cuatro variantes semánticas. */
 import { CheckCircle2, XCircle, AlertTriangle, Info } from "lucide-react";
 import { useTheme } from "@/theme";
 

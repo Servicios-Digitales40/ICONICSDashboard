@@ -1,19 +1,13 @@
 /**
- * pages/Sankey.jsx
- * ------------------------------------------------------------------
- * Página de prueba del componente `SankeyChart` (d3-sankey).
+ * Página de prueba del componente `SankeyChart` (d3-sankey), con dos ejemplos:
  *
- * Dos ejemplos con la forma de dato que un Sankey sí sabe contar:
- *   1) Reparto — cómo se distribuye la materia prima entre las líneas
- *      (área LIN) y en qué termina (aprobadas / rechazadas). Se arma
- *      desde la fuente de datos activa, no está cableado: en vivo lee
- *      ICONICS y en modo demo, los datos de ejemplo.
- *   2) Balance — el desglose clásico del OEE: de las 24 h de calendario,
- *      cuánto sobrevive hasta convertirse en pieza buena. Cada bifurcación
- *      es una pérdida, y el grosor final ES el OEE.
+ *   1. Reparto: cómo se distribuye la materia prima entre las líneas y en qué
+ *      termina (aprobadas / rechazadas). Se arma desde la fuente de datos
+ *      activa, así que en vivo lee ICONICS y en demo los datos de ejemplo.
+ *   2. Balance: el desglose clásico del OEE, de las 24 h de calendario a la
+ *      pieza buena. Cada bifurcación es una pérdida y el grosor final es el OEE.
  *
- * Si esta página se promueve a definitiva, lo único que hay que llevarse
- * es `components/ui/SankeyChart.jsx`; los datos de aquí son de muestra.
+ * Los datos de aquí son de muestra; lo reutilizable es `SankeyChart`.
  */
 import { useMemo } from "react";
 import { useTheme } from "@/theme";
@@ -27,9 +21,9 @@ export default function Sankey() {
 
   /* --- Ejemplo 1: reparto de producción de las líneas --- */
   const produccion = useMemo(() => {
-    // Color por ETAPA, no por línea: todas las líneas son la misma clase de
-    // entidad (las distingue su etiqueta), mientras que el destino sí tiene
-    // significado propio — verde = aprobada, coral = rechazada.
+    // Color por etapa y no por línea: todas las líneas son la misma clase de
+    // entidad y las distingue su etiqueta, mientras que el destino sí tiene
+    // significado propio (verde = aprobada, coral = rechazada).
     const nodes = [
       { id: "entrada", label: "Materia prima", color: t.viz.azul },
       ...lineas.map((m) => ({ id: m.id, label: m.equipo, color: t.viz.azul })),

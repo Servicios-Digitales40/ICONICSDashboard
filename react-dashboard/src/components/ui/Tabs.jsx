@@ -1,23 +1,20 @@
 /**
- * ui/Tabs.jsx
- * ------------------------------------------------------------------
- * Control segmentado reutilizable (pestañas). Deriva sus colores del
- * tema global vía useTheme(), por lo que respeta claro/oscuro.
+ * Control segmentado de pestañas. Deriva sus colores del tema global, así que
+ * respeta claro y oscuro.
  *
- * Diseñado para navegar entre "subvistas" de una misma pantalla sin
- * tocar el router: el estado de la pestaña activa vive en el componente
- * padre y se comunica por `value` / `onChange` (patrón controlado).
+ * Sirve para navegar entre subvistas de una misma pantalla sin tocar el
+ * router: el estado de la pestaña activa vive en el componente padre y se
+ * comunica por `value` / `onChange`.
  *
- * Accesibilidad: implementa el patrón ARIA de tabs — role="tablist" y
- * role="tab", aria-selected, y navegación por teclado con flechas
- * ←/→ (y Home/End). Cada consumidor debe envolver su contenido en un
- * contenedor role="tabpanel" (ver MachineDetail).
+ * Implementa el patrón ARIA de tabs (role="tablist" y role="tab",
+ * aria-selected, navegación con flechas y Home/End). Cada consumidor debe
+ * envolver su contenido en un contenedor role="tabpanel".
  *
  * Props:
- *  - items: [{ key, label, icon?, color? }]  color opcional por pestaña
+ *  - items: [{ key, label, icon?, color? }], con color opcional por pestaña
  *  - value: key de la pestaña activa
  *  - onChange: (key) => void
- *  - size: "md" (default) | "sm"
+ *  - size: "md" (por defecto) | "sm"
  */
 import { useRef } from "react";
 import { useTheme } from "@/theme";

@@ -1,30 +1,19 @@
 /**
- * layout/DataSourceBanner.jsx
- * ------------------------------------------------------------------
- * Cinta permanente que avisa cuando los datos en pantalla NO vienen del
+ * Cinta permanente que avisa cuando los datos en pantalla no vienen del
  * servidor ICONICS.
  *
- * ── POR QUÉ NO BASTA CON EL BOTÓN DEL TOPBAR ───────────────────────
+ * El botón del Topbar no basta: un interruptor cambia de estado y se olvida, y
+ * media hora después nada distingue datos inventados de la planta real, con
+ * los mismos equipos, los mismos gauges y cifras plausibles. Por eso el aviso
+ * es una cinta ancha, siempre visible y no descartable.
  *
- * Un interruptor cambia de estado y se olvida. Media hora después, en una
- * reunión y con un proyector, nada distinguiría datos inventados de la
- * planta real: los mismos equipos, los mismos gauges, cifras plausibles.
- * Alguien podría tomar una decisión sobre números que no existen.
+ * Cubre los dos orígenes falsos, no solo la demo:
  *
- * Por eso el aviso es una cinta ancha, siempre visible y no descartable.
- * Es deliberadamente difícil de ignorar: ese es justo su trabajo.
+ *  - demo: el mock fijo, elegido a mano con el botón.
+ *  - simulado: el transporte falso, que se usa mientras el servidor no está
+ *    configurado y que el Topbar por sí solo etiquetaría como «En vivo».
  *
- * ── CUBRE LOS DOS ORÍGENES FALSOS, NO SOLO LA DEMO ─────────────────
- *
- * Antes se llamaba `DemoBanner` y solo miraba el modo demo. Pero hay dos
- * formas de estar viendo datos que no son de ICONICS:
- *
- *   · demo     — el mock fijo, elegido a mano con el botón;
- *   · simulado — el transporte falso, que es lo que se usa mientras el
- *                servidor no está configurado. Este era el peligroso: el
- *                Topbar decía «En vivo» y no había nada que lo desmintiera.
- *
- * Con el origen real no renderiza absolutamente nada.
+ * Con el origen real no renderiza nada.
  */
 import { FlaskConical, Radio } from "lucide-react";
 import { useTheme } from "@/theme";

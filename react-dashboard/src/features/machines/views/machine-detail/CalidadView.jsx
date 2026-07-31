@@ -1,25 +1,16 @@
 /**
- * pages/machine-detail/CalidadView.jsx
- * ------------------------------------------------------------------
- * Subvista "Calidad" · MODO COMPARACIÓN DE DISEÑO.
+ * Subvista "Calidad", en modo comparación de diseño. Tres maneras de contar
+ * lo mismo, cada una respondiendo una pregunta distinta:
  *
- * Tres maneras de contar lo mismo, cada una respondiendo una pregunta
- * distinta:
+ *   A · Balance de piezas → ¿de dónde sale el porcentaje?
+ *   B · Mosaico de 100    → ¿qué significa ese porcentaje?
+ *   C · Tablero de KPIs   → ¿cuánto falta para la meta?
  *
- *   A · Balance de piezas  → ¿DE DÓNDE sale el porcentaje?
- *                            1 000 totales → 850 buenas / 150 malas
- *   B · Mosaico de 100     → ¿QUÉ SIGNIFICA ese porcentaje?
- *                            de cada 100 piezas, 15 se tiran
- *   C · Tablero de KPIs    → ¿CUÁNTO falta para la meta?
- *                            PPM, exceso de rechazos y brecha accionable
+ * A diferencia de Disponibilidad, aquí no hay que reponer nada: las piezas
+ * buenas y malas son dato directo y `calidad` es exactamente
+ * aprobadas/(aprobadas+rechazadas), así que todo lo que se muestra es medición.
  *
- * A diferencia de Disponibilidad, aquí NO hay que reponer nada: las
- * piezas buenas y malas son dato directo de la máquina y `calidad` es
- * exactamente aprobadas/(aprobadas+rechazadas). Todo lo que se muestra
- * es medición, no supuesto.
- *
- * Color: verde = pieza buena · coral = pieza rechazada (material que se
- * gastó y se tiró). Mismo criterio que el resto del detalle.
+ * Color: verde = pieza buena · coral = pieza rechazada.
  */
 import { useMemo } from "react";
 import { Panel, BandGauge, KpiTile } from "@/components/ui/index.js";
@@ -35,11 +26,9 @@ const fmtPz = (n) => (hasValue(n) ? `${Math.round(n).toLocaleString("es-MX")} pz
 /**
  * Magnitudes de calidad del turno.
  *
- * ⚠ Todos los campos pueden ser `null`. La versión anterior hacía
- * `buenas + malas` sin comprobar, y en JavaScript `null + null` vale 0 —
- * así que con la máquina sin lecturas la vista mostraba un balance de
- * cero piezas y una calidad del 0 %, ambos perfectamente creíbles y
- * ambos inventados.
+ * Todos los campos pueden ser `null` y hay que comprobarlos: en JavaScript
+ * `null + null` vale 0, así que una máquina sin lecturas mostraría un balance
+ * de cero piezas y una calidad del 0 %, ambos creíbles y ambos inventados.
  */
 function piezas(machine) {
   const buenas = machine.aprobadas;
@@ -51,8 +40,8 @@ function piezas(machine) {
     buenas,
     malas,
     total,
-    // Calidad "vista por las piezas". Coincide con machine.calidad cuando
-    // el dato es coherente (ver el aviso de la subvista OEE).
+    // Calidad vista por las piezas. Coincide con machine.calidad cuando el
+    // dato es coherente (ver el aviso de la subvista OEE).
     pct: total ? (buenas / total) * 100 : null,
     ppm: total ? Math.round((malas / total) * 1000000) : null,
     // Rechazos que la meta todavía toleraría.
@@ -60,9 +49,7 @@ function piezas(machine) {
   };
 }
 
-/* ================================================================
- * OPCIÓN A · Balance de piezas
- * ================================================================ */
+/* Opción A · Balance de piezas */
 function OptionBalance({ P, t }) {
   const V = t.viz;
   return (
@@ -98,12 +85,11 @@ function OptionBalance({ P, t }) {
   );
 }
 
-/* ================================================================
- * OPCIÓN B · Mosaico de 100 piezas
- * ================================================================
- * Un porcentaje es abstracto; cien cuadritos no. Cada celda es el 1 % de
- * la producción y las coral son las que se tiran. Es la lectura que
- * entiende cualquiera en piso sin explicación previa.
+/*
+ * Opción B · Mosaico de 100 piezas.
+ *
+ * Un porcentaje es abstracto; cien cuadritos no. Cada celda es el 1 % de la
+ * producción y las coral son las que se tiran.
  */
 function Leyenda({ color, label, value, pct, t }) {
   return (
@@ -129,8 +115,8 @@ function OptionMosaico({ P, t }) {
         {/* la rejilla */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5, width: 300, flexShrink: 0 }}>
           {Array.from({ length: 100 }).map((_, i) => {
-            // Las defectuosas se agrupan al final: juntas se perciben como
-            // bloque y se comparan mejor que salpicadas al azar.
+            // Las defectuosas se agrupan al final: en bloque se comparan
+            // mejor que salpicadas al azar.
             const mala = i >= 100 - malas100;
             return (
               <div
@@ -178,16 +164,13 @@ function OptionMosaico({ P, t }) {
   );
 }
 
-/* ================================================================
- * OPCIÓN C · Tablero de KPIs
- * ================================================================ */
+/* Opción C · Tablero de KPIs */
 function OptionTablero({ P, t }) {
   const V = t.viz;
   const v = clampPct(P.pct);
   const col = bandColor(t, v);
   const delta = v - META_CALIDAD;
-  // Rechazos que sobran para cumplir la meta: convierte "te falta un 14 %"
-  // en una cifra sobre la que se puede actuar.
+  // Rechazos que sobran para cumplir la meta, que es lo accionable.
   const exceso = Math.max(0, P.malas - P.maxRechazos);
 
   const R = 62, SW = 13, CIRC = 2 * Math.PI * R;
@@ -258,13 +241,11 @@ function OptionTablero({ P, t }) {
   );
 }
 
-/* ================================================================ */
 export default function CalidadView({ machine, t, C }) {
   const P = useMemo(() => piezas(machine), [machine]);
 
-  // Toda la vista se deriva del conteo de piezas: sin él, las tres
-  // propuestas mostrarían ceros indistinguibles de una máquina que no
-  // produjo nada. Se dice una vez y no se pinta nada más.
+  // Toda la vista se deriva del conteo de piezas: sin él las tres propuestas
+  // mostrarían ceros indistinguibles de una máquina que no produjo nada.
   if (!hasValue(P.total)) return <SinLecturas que="producción" t={t} />;
 
   return (

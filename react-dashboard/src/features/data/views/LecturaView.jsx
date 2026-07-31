@@ -1,8 +1,7 @@
 /**
- * pages/data/LecturaView.jsx
- * ------------------------------------------------------------------
- * Subsección "Lectura" de la vista Data. Agrupa todo lo que consume
- * datos de ICONICS de solo-lectura a través del backend puente:
+ * Subsección "Lectura" de la vista Data. Agrupa todo lo que consume datos de
+ * ICONICS en solo lectura a través del backend puente:
+ *
  *   - Tarjetas en vivo (polling) de puntos individuales.
  *   - Lista de productos.
  *   - Tabla completa de productos.

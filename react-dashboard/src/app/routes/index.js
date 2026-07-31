@@ -1,12 +1,9 @@
 /**
- * app/routes/index.js
- * ------------------------------------------------------------------
  * Deriva las tres vistas del registro único de `routes.jsx`.
  *
- * Estrategia: DERIVAR, no reescribir. `PAGES`, `NAV` y `PAGE_META` conservan
- * exactamente la misma forma que tenían cuando se mantenían a mano, así que
- * `App.jsx`, `Sidebar.jsx` y `Topbar.jsx` no cambian ni una línea de lógica
- * — solo de dónde importan.
+ * `PAGES`, `NAV` y `PAGE_META` conservan la misma forma que tenían cuando se
+ * mantenían a mano, así que `App.jsx`, `Sidebar.jsx` y `Topbar.jsx` solo
+ * cambian de dónde importan.
  */
 import { ROUTES, NAV_GROUPS, DEFAULT_ROUTE } from "./routes.jsx";
 import { buildNav } from "./buildNav.js";

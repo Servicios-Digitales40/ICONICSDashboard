@@ -1,14 +1,10 @@
 /**
- * app/routes/routes.jsx
- * ------------------------------------------------------------------
- * REGISTRO ÚNICO de rutas: la sola fuente de verdad sobre qué páginas
- * existen, en qué orden salen en el sidebar y qué título muestra el Topbar.
- *
- * Antes esto vivía en tres sitios que había que mantener sincronizados a
- * mano (el mapa `PAGES` de App.jsx, y `NAV` + `PAGE_META` de navConfig.jsx).
- * Añadir una página eran 3 ediciones; ahora es 1.
+ * Registro único de rutas: qué páginas existen, en qué orden salen en el
+ * sidebar y qué título muestra el Topbar. Añadir una página es una sola
+ * edición aquí.
  *
  * Forma de una ruta:
+ *
  *   {
  *     id:        string   — clave de navegación, única
  *     component: Comp     — el componente de página
@@ -17,12 +13,12 @@
  *     nav?:      { label, icon, group? }
  *   }
  *
- * Sin `nav` → la ruta existe pero NO aparece en el sidebar (p. ej.
- * `machine-detail`, al que se llega pulsando una tarjeta de máquina).
+ * Sin `nav`, la ruta existe pero no aparece en el sidebar; es el caso de
+ * `machine-detail`, al que se llega pulsando una tarjeta de máquina.
  *
- * ⚠ EL ORDEN DE ESTE ARRAY ES EL ORDEN DEL SIDEBAR. Las rutas con `group`
- * se agrupan bajo la cabecera correspondiente, y el grupo aparece en la
- * posición de su PRIMER hijo. Ver `./index.js`.
+ * El orden de este array es el orden del sidebar. Las rutas con `group` se
+ * agrupan bajo su cabecera, y el grupo aparece en la posición de su primer
+ * hijo; ver `./index.js`.
  */
 import { FlaskConical, Gauge, Database, Palette, Waypoints, Boxes, LayoutPanelTop, Sparkles, Radar, LayoutDashboard } from "lucide-react";
 

@@ -1,15 +1,12 @@
 /**
- * features/machines/components/factorUi.jsx
- * ------------------------------------------------------------------
- * Piezas de UI compartidas por las subvistas de factor del detalle de
- * maquina (Disponibilidad, Calidad, Rendimiento). Se centralizan aqui para
- * no duplicarlas en cada archivo de subvista.
+ * Piezas de UI compartidas por las subvistas de factor del detalle de máquina
+ * (Disponibilidad, Calidad, Rendimiento).
  *
- * Todas reciben el tema `t` por prop (en lugar de llamar useTheme) para
- * mantener las subvistas como componentes "tontos" y faciles de testear.
+ * Todas reciben el tema `t` por prop, en lugar de llamar a useTheme, para que
+ * las subvistas sigan siendo componentes tontos y fáciles de testear.
  *
- * Nombre en camelCase y no PascalCase a proposito: el archivo exporta varios
- * componentes hermanos sin uno principal, asi que no es "un componente".
+ * El nombre va en camelCase porque el archivo exporta varios componentes
+ * hermanos sin uno principal.
  */
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -20,20 +17,17 @@ import { Panel } from "@/components/ui/index.js";
 import { fmtNum } from "@/lib/format.js";
 import { clampPct, bandColor } from "@/lib/shiftModel.js";
 
-/* ==================================================================
- * PIEZAS DE LAS SUBVISTAS DE FACTOR (Disponibilidad · Calidad · Rendimiento)
- * ==================================================================
- * Los tres factores se cuentan igual: una fórmula (numerador/denominador),
- * un desglose en barras y un dial contra su meta. Solo cambian las
- * unidades — segundos, piezas, ciclos. Por eso viven aquí y no en cada
- * subvista: si divergen visualmente, el usuario cree que miden cosas
- * distintas cuando en realidad miden lo mismo.
- * ================================================================== */
+/*
+ * Los tres factores se cuentan igual: una fórmula (numerador/denominador), un
+ * desglose en barras y un dial contra su meta; solo cambian las unidades.
+ * Están centralizados para que no diverjan visualmente y parezca que miden
+ * cosas distintas.
+ */
 
 /**
- * Tira con la fórmula del factor y sus valores reales sustituidos.
- * Es el puente entre el porcentaje y las magnitudes: sin ella el número
- * es algo que hay que creerse.
+ * Tira con la fórmula del factor y sus valores reales sustituidos. Es el
+ * puente entre el porcentaje y las magnitudes que lo producen.
+ *
  *   num / den : { label, value } — `value` ya formateado
  */
 export function FormulaStrip({ titulo, num, den, result, color, t }) {
@@ -65,9 +59,9 @@ export function FormulaStrip({ titulo, num, den, result, color, t }) {
 }
 
 /**
- * Fila de desglose: barra de lo que sobrevive + trozo de pérdida pegado
- * a su derecha. Ambas escaladas contra el total, que es lo que permite
- * compararlas entre filas de un vistazo.
+ * Fila de desglose: la barra de lo que sobrevive con el trozo de pérdida
+ * pegado a su derecha. Ambas se escalan contra el total, que es lo que permite
+ * compararlas entre filas.
  */
 export function WaterfallRow({ label, value, loss, lossLabel, total, color, lossColor, format, t, i = 0, hero }) {
   const fmt = format ?? ((n) => Math.round(n).toLocaleString("es-MX"));
@@ -79,7 +73,7 @@ export function WaterfallRow({ label, value, loss, lossLabel, total, color, loss
         {label}
       </span>
       <div style={{ flex: 1, position: "relative", height: 34, display: "flex", alignItems: "center" }}>
-        {/* pista del total, como referencia muda */}
+        {/* pista del total, como referencia de fondo */}
         <div style={{ position: "absolute", inset: "6px 0", borderRadius: 6, background: t.hover, border: `1px solid ${t.border}` }} />
         <div
           style={{
@@ -114,8 +108,8 @@ export function WaterfallRow({ label, value, loss, lossLabel, total, color, loss
   );
 }
 
-/* `BandGauge` y `KpiTile` vivían aquí; se promovieron a `@/components/ui`
-   al ser presentacionales puros y necesitarlos también el dashboard. */
+/* `BandGauge` y `KpiTile` viven ahora en `@/components/ui`: son
+   presentacionales puros y los necesita también el dashboard. */
 
 /** Keyframes compartidos por las subvistas. Se renderiza una vez por vista. */
 export function MdKeyframes() {
@@ -131,15 +125,14 @@ export function MdKeyframes() {
 }
 
 /**
- * Panel de AUSENCIA DE LECTURAS.
+ * Panel de ausencia de lecturas.
  *
- * Las subvistas de factor derivan casi todo de dos o tres mediciones
- * (piezas, tiempos, factores). Cuando esas faltan no tiene sentido
- * guardar treinta puntos de formateo uno a uno: el desglose entero
- * carece de sentido, y lo honesto es decirlo una vez y no pintar nada.
+ * Las subvistas de factor derivan casi todo de dos o tres mediciones. Cuando
+ * faltan, el desglose entero deja de tener sentido y sale más a cuenta decirlo
+ * una vez que proteger treinta puntos de formateo uno a uno.
  *
- * Es distinto de «no hubo producción», que sí es una lectura válida y
- * cada vista comunica a su manera. Aquí no se sabe qué pasó.
+ * Es distinto de «no hubo producción», que sí es una lectura válida y cada
+ * vista comunica a su manera.
  */
 export function SinLecturas({ que, t }) {
   return (

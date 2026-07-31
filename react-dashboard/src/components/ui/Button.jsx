@@ -1,7 +1,5 @@
 /**
- * ui/Button.jsx
- * ------------------------------------------------------------------
- * Botón con variantes semánticas. Elige colores según `variant`:
+ * Botón con variantes semánticas. Los colores salen de `variant`:
  * primary | danger-solid | secondary | ghost | danger | success | icon
  */
 import { Loader2 } from "lucide-react";

@@ -1,16 +1,14 @@
 /**
- * ui/IconicsProductsTable.jsx
- * ------------------------------------------------------------------
- * Muestra TODOS los productos de `db:Northwind.Products` como tabla,
- * con todas sus columnas.
+ * Muestra los productos de `db:Northwind.Products` como tabla, con todas sus
+ * columnas.
  *
- * ICONICS lee las tablas por celda: `db:Northwind.Products[Columna][fila]`.
- * Estrategia:
- *   1. Leer el total de filas con `.@@Count`.
- *   2. Generar un punto por cada (columna, fila) y traerlos en lotes
- *      (batch) — troceamos porque 77 filas x 10 columnas = 770 puntos
- *      no caben en una sola URL GET.
- *   3. Reconstruir la matriz fila x columna a partir del mapa devuelto.
+ * ICONICS lee las tablas por celda (`db:Northwind.Products[Columna][fila]`),
+ * así que:
+ *
+ *   1. Se lee el total de filas con `.@@Count`.
+ *   2. Se genera un punto por cada (columna, fila) y se traen en lotes: el
+ *      producto de filas por columnas no cabe en una sola URL GET.
+ *   3. Se reconstruye la matriz fila × columna a partir del mapa devuelto.
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -34,8 +32,8 @@ const COLUMNS = [
   "SupplierID",
 ];
 
-// Máximo de puntos por petición batch (mantiene la URL por debajo del
-// límite de tamaño de header de Node ~16 KB).
+// Máximo de puntos por petición batch, para mantener la URL por debajo del
+// límite de tamaño de header de Node (~16 KB).
 const CHUNK_SIZE = 120;
 
 function chunk(arr, size) {
@@ -80,14 +78,14 @@ export function IconicsProductsTable() {
         for (const col of COLUMNS) points.push(`${TABLE}[${col}][${i}]`);
       }
 
-      // Traemos en lotes y unimos todos los mapas.
+      // Se traen en lotes y se unen todos los mapas.
       const map = {};
       for (const group of chunk(points, CHUNK_SIZE)) {
         const res = await fetchIconicsBatch(group);
         Object.assign(map, res?.payload ?? {});
       }
 
-      // Paso 3: reconstruimos filas
+      // Paso 3: reconstrucción de las filas
       const table = Array.from({ length: total }, (_, i) => {
         const row = { __index: i };
         for (const col of COLUMNS) {

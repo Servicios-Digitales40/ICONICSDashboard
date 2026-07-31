@@ -1,9 +1,7 @@
 /**
- * main.jsx
- * ------------------------------------------------------------------
  * Punto de entrada de la aplicación: monta <App /> dentro de
- * <React.StrictMode> en el div#root de index.html, e importa los
- * estilos globales (fuentes, animaciones, variables CSS de tema).
+ * <React.StrictMode> en el div#root de index.html e importa los estilos
+ * globales (fuentes, animaciones y variables CSS de tema).
  */
 import React from "react";
 import ReactDOM from "react-dom/client";

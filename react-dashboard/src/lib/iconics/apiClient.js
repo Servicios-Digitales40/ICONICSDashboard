@@ -1,11 +1,10 @@
 /**
- * lib/api.js
- * ------------------------------------------------------------------
  * Cliente mínimo para el backend puente hacia ICONICS (backend/server.mjs).
- * En build de producción el backend sirve el dashboard desde el mismo
- * origen (mismo puerto), así que las rutas relativas "/api/..." funcionan
- * directo. En desarrollo (vite dev server en otro puerto) apuntamos al
- * puerto del backend (3001 por defecto, VITE_API_BASE lo sobreescribe).
+ *
+ * En producción el backend sirve el dashboard desde el mismo origen, así que
+ * las rutas relativas "/api/..." funcionan directo. En desarrollo el dev
+ * server de Vite corre en otro puerto y hay que apuntar al del backend
+ * (3001 por defecto; `VITE_API_BASE` lo sobreescribe).
  */
 const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "http://localhost:3001" : "");
 
@@ -37,19 +36,15 @@ export function fetchIconicsBatch(pointNames) {
 /**
  * Lee la serie HISTÓRICA de un punto (Hyper Historian, prefijo `hda:`).
  *
- * Devuelve `{ ok, data: [{ timestamp, value, quality }], hasMore }`; el
- * backend ya normaliza la respuesta de ICONICS, que llega envuelta en
+ * Devuelve `{ ok, data: [{ timestamp, value, quality }], hasMore }`; el backend
+ * ya normaliza la respuesta de ICONICS, que llega envuelta en
  * `historicalSamples`.
  *
- * ── NO SE SONDEA ───────────────────────────────────────────────────
+ * La historia no se sondea: se pide una vez por (punto, rango) y se cachea,
+ * porque el pasado no cambia. El borde derecho lo cubre el valor en vivo.
  *
- * A diferencia del tiempo real, la historia se pide UNA vez por
- * (punto, rango) y se cachea: el pasado no cambia. Solo el borde derecho
- * puede crecer, y para eso ya está el valor en vivo.
- *
- * `aggregate` e `interval` los resuelve el servidor: pedir 8 horas
- * agregadas a 5 minutos son 96 puntos en vez de 28 800, y la gráfica se
- * ve igual. Sin agregado, el backend limita a 100 muestras por llamada
+ * `aggregate` e `interval` los resuelve el servidor y reducen mucho el volumen
+ * de puntos. Sin agregado, el backend limita a 100 muestras por llamada
  * (cabecera `X-ICO-MAX-ITEM-COUNT`) y avisa con `hasMore`.
  *
  * @param {string} pointName  p. ej. `hda:\Configuration\RESONAC\LIN\1:OEE`

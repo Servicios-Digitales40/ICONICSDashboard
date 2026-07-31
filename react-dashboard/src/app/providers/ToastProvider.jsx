@@ -1,17 +1,15 @@
 /**
- * context/ToastContext.jsx
- * ------------------------------------------------------------------
- * Sistema global de notificaciones "toast" (las burbujas que aparecen
- * arriba a la derecha y se autodestruyen a los pocos segundos).
+ * Sistema global de notificaciones toast: las burbujas que aparecen arriba a
+ * la derecha y desaparecen solas a los pocos segundos.
  *
- * Cualquier componente puede disparar una desde cualquier parte del
- * árbol sin pasar callbacks a mano:
+ * Cualquier componente puede disparar una desde cualquier parte del árbol sin
+ * pasar callbacks a mano:
  *
  *   const { pushToast } = useToast();
  *   pushToast("success", "Cambios guardados");
  *
- * El contenedor visual (<ToastContainer>) se monta una sola vez aquí
- * mismo, así que no hay que acordarse de renderizarlo en cada página.
+ * El contenedor visual se monta una sola vez aquí mismo, así que no hay que
+ * renderizarlo en cada página.
  */
 import { createContext, useContext, useRef, useState } from "react";
 import { ToastContainer } from "./Toast.jsx";

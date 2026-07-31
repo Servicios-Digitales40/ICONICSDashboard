@@ -1,20 +1,14 @@
 /**
- * pages/machine-detail/comparativo-ui.jsx
- * ------------------------------------------------------------------
- * Piezas visuales de la vista comparativa (Fase 2 del rediseño).
+ * Piezas visuales de la vista comparativa: el titular sobre dos columnas
+ * espejo. El banco de pruebas de `prototypes/comparativo/` las consume por
+ * re-exportación, así que hay una sola definición y no se desincronizan.
  *
- * Salieron del banco de pruebas (`prototypes/comparativo/`) tras
- * elegir la disposición ganadora: el TITULAR de la propuesta editorial
- * sobre las COLUMNAS ESPEJO de la propuesta simétrica. El banco sigue
- * consumiendo estas mismas piezas por re-exportación, de modo que hay
- * una sola definición y los prototipos no se desincronizan de la vista
- * real mientras se siga iterando.
+ * Reglas de color que conviene no romper:
  *
- * Reglas de color que aplica este archivo, y que conviene no romper:
- *   • El color de identidad (azul/violeta) codifica SOLO qué fecha es.
- *   • Verde/coral se reservan EXCLUSIVAMENTE a la dirección del cambio.
- *   • Ninguna métrica tiene color propio: su identidad la da la etiqueta
- *     y la posición, no el tono.
+ *  - El color de identidad (azul/violeta) codifica solo qué fecha es.
+ *  - Verde y coral se reservan a la dirección del cambio.
+ *  - Ninguna métrica tiene color propio: la identifican la etiqueta y la
+ *    posición, no el tono.
  *
  * Todo el cálculo vive en `compare.js`; aquí solo se pinta.
  */
@@ -34,10 +28,8 @@ export function verdictColors(state, t) {
 }
 
 /**
- * Pastilla de delta con ZONA MUERTA: por debajo de DEAD_BAND se pinta en
- * gris y sin flecha. Un +0.1 no merece el mismo verde que un +12; sin
- * este filtro la vista produce falsos positivos a diario y la gente deja
- * de creerle.
+ * Pastilla de delta con zona muerta: por debajo de DEAD_BAND se pinta en gris
+ * y sin flecha, para que un +0.1 no reciba el mismo verde que un +12.
  */
 export function DeltaChip({ metric, t, size = "md", showBar = false, max = 10 }) {
   const { fg, bg } = verdictColors(metric.direction, t);
@@ -48,8 +40,8 @@ export function DeltaChip({ metric, t, size = "md", showBar = false, max = 10 })
       ? { font: 12, pad: "2px 7px", icon: 11 }
       : { font: 14.5, pad: "3px 9px", icon: 13 };
 
-  // Micro-barra divergente: distingue "señal fuerte" de "señal apenas
-  // significativa", que el número por sí solo no separa de un vistazo.
+  // Micro-barra divergente: separa de un vistazo la señal fuerte de la
+  // apenas significativa, que el número por sí solo no distingue.
   const pct = Math.min(100, (Math.abs(metric.delta) / max) * 100);
 
   return (
@@ -117,15 +109,12 @@ export function SideHeader({ label, iso, snap, accent, t, align = "left" }) {
 /**
  * Mini-tendencia de un día.
  *
- * Recibe el dominio YA calculado y COMPARTIDO entre A y B: dos
- * sparklines con escalas distintas mienten, porque la misma altura
- * significaría valores diferentes en cada columna.
+ * Recibe el dominio ya calculado y compartido entre A y B: con escalas
+ * distintas, la misma altura significaría valores diferentes en cada columna.
  *
- * `showAxis` existe por honestidad gráfica: cuando el dominio está
- * recortado (que es el caso), esconder el eje deja al lector sin ninguna
- * referencia absoluta y convierte una diferencia de 6 puntos en lo que
- * parezca. En la vista real se muestra; en miniaturas muy pequeñas,
- * donde el eje no cabe, hay que dar la escala por otro medio.
+ * `showAxis` se activa en la vista real porque el dominio está recortado y sin
+ * eje el lector se queda sin referencia absoluta. En miniaturas donde el eje
+ * no cabe hay que dar la escala por otro medio.
  */
 export function MiniTrend({ data, accent, t, domain, height = 110, id, showAxis = false }) {
   return (
@@ -158,9 +147,8 @@ export const sharedDomain = (trendA, trendB) =>
   niceDomain([...(trendA ?? []), ...(trendB ?? [])].map((r) => r.oee), { pad: 6 });
 
 /**
- * Frase de causa: qué métrica empujó y cuál frenó. Es lo que convierte
- * el veredicto de dato en explicación — sin ella el titular dice "subió"
- * pero no da nada sobre lo que actuar.
+ * Frase de causa: qué métrica empujó y cuál frenó. Sin ella el titular dice
+ * «subió» pero no deja nada sobre lo que actuar.
  */
 export function CauseLine({ v, t, size = 12.5 }) {
   if (!v.driver && !v.drag) return null;
@@ -180,12 +168,9 @@ export function CauseLine({ v, t, size = 12.5 }) {
 }
 
 /**
- * TITULAR — la conclusión, sin competencia visual.
- *
- * Es el corazón de la Fase 2: antes había que leer tres gráficas para
- * responder "¿mejoramos?". La cifra a 68px y la frase a 21px contestan
- * en la primera fijación ocular, y las columnas de abajo pasan a ser la
- * evidencia que lo sostiene en lugar del trabajo que hay que hacer.
+ * Titular: la conclusión, sin competencia visual. La cifra grande y la frase
+ * responden «¿mejoramos?» de un vistazo, y las columnas de abajo quedan como
+ * la evidencia que lo sostiene.
  */
 export function VerdictHeadline({ v, t }) {
   const { fg, bg } = verdictColors(v.state, t);
@@ -215,25 +200,18 @@ export function VerdictHeadline({ v, t }) {
   );
 }
 
-/* ==================================================================
- * DUMBBELL POR MÉTRICA
- * ==================================================================
- * Sustituye a las barras agrupadas.
+/*
+ * Dumbbell por métrica, en lugar de barras agrupadas.
  *
- * Con 4 métricas × 2 series, las barras obligan al ojo a comparar
- * alturas DENTRO de cada par y luego entre pares: cuatro comparaciones
- * independientes, y la percepción de altura entre elementos separados es
- * de las menos precisas del sistema visual.
+ * Con 4 métricas × 2 series, las barras obligan a comparar alturas dentro de
+ * cada par y luego entre pares. El dumbbell codifica la diferencia como
+ * longitud de un segmento, que es la variable de interés: las cuatro brechas
+ * se leen de un vistazo y el color del conector da la dirección.
  *
- * El dumbbell codifica la diferencia como LONGITUD de un segmento — que
- * es exactamente la variable de interés, y una de las magnitudes que
- * mejor estimamos. Las cuatro brechas se leen de un vistazo y el color
- * del conector da la dirección.
- *
- * Va en HTML posicionado y no en SVG a propósito: son cuatro filas con
- * dos puntos cada una, y el posicionamiento porcentual es responsive por
- * construcción, sin ResponsiveContainer ni recálculos en resize.
- * ================================================================== */
+ * Va en HTML posicionado y no en SVG: son cuatro filas con dos puntos cada
+ * una, y el posicionamiento porcentual es responsive por construcción, sin
+ * ResponsiveContainer ni recálculos en resize.
+ */
 
 /** Una fila: etiqueta · pista con los dos puntos y su conector · delta. */
 function DumbbellRow({ m, lo, hi, colorA, colorB, t, maxAbs }) {
@@ -259,8 +237,7 @@ function DumbbellRow({ m, lo, hi, colorA, colorB, t, maxAbs }) {
         {/* pista */}
         <div style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 2, marginTop: -1, background: t.grid, borderRadius: 2 }} />
 
-        {/* marca de meta: la referencia absoluta que el eje recortado
-            no puede dar por sí solo */}
+        {/* marca de meta: la referencia absoluta que el eje recortado no da */}
         {meta != null && (
           <div
             title={`Meta ${m.meta}%`}
@@ -271,7 +248,7 @@ function DumbbellRow({ m, lo, hi, colorA, colorB, t, maxAbs }) {
           />
         )}
 
-        {/* conector A→B: su longitud ES la diferencia */}
+        {/* conector A→B: su longitud es la diferencia */}
         {pA != null && pB != null && (
           <div style={{
             position: "absolute", top: "50%", height: strong ? 6 : 5, marginTop: strong ? -3 : -2.5,
@@ -304,11 +281,9 @@ function DumbbellRow({ m, lo, hi, colorA, colorB, t, maxAbs }) {
 }
 
 /**
- * Dumbbell de las cuatro métricas, todas sobre la MISMA escala.
- *
- * Compartir escala entre filas permite comparar también en vertical
- * ("Calidad va muy por delante de Disponibilidad"), lectura que las
- * barras agrupadas ya permitían y que no conviene perder.
+ * Dumbbell de las cuatro métricas, todas sobre la misma escala. Compartirla
+ * permite comparar también en vertical («Calidad va por delante de
+ * Disponibilidad»), lectura que las barras agrupadas ya daban.
  */
 export function MetricDumbbell({ cmp, colorA, colorB, t, maxAbs }) {
   const valores = cmp.flatMap((m) => [m.a, m.b]).filter((v) => v != null);
@@ -321,9 +296,9 @@ export function MetricDumbbell({ cmp, colorA, colorB, t, maxAbs }) {
         <DumbbellRow key={m.key} m={m} lo={lo} hi={hi} colorA={colorA} colorB={colorB} t={t} maxAbs={maxAbs} />
       ))}
 
-      {/* Eje: SIEMPRE con sus valores. El dominio está recortado para
-          que las diferencias se vean, y eso solo es honesto si el lector
-          puede situar los puntos en su escala real. */}
+      {/* Eje con sus valores. El dominio está recortado para que las
+          diferencias se vean, así que hace falta poder situar los puntos
+          en su escala real. */}
       <div />
       <div style={{ position: "relative", height: 20, marginTop: 4, borderTop: `1px solid ${t.border}` }}>
         {ticks.map((v) => (
@@ -344,11 +319,9 @@ export function MetricDumbbell({ cmp, colorA, colorB, t, maxAbs }) {
   );
 }
 
-/* ==================================================================
- * BANDA DE DIFERENCIA POR HORA
- * ================================================================== */
+/* Banda de diferencia por hora. */
 
-/** Tooltip que muestra A, B y Δ juntos: la resta ya hecha. */
+/** Tooltip que muestra A, B y Δ juntos, con la resta ya hecha. */
 export function CompareTooltip({ active, payload, label, t, dateA, dateB }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
@@ -383,9 +356,9 @@ function TipRow({ label, value, color }) {
 }
 
 /**
- * Leyenda propia. La de recharts no sabe explicar que el trazo punteado
- * significa "referencia" ni qué codifican los dos rellenos, que es
- * justamente lo que hay que aprender para leer esta gráfica.
+ * Leyenda propia: la de recharts no explica que el trazo punteado es la
+ * referencia ni qué codifican los dos rellenos, que es lo que hace falta
+ * saber para leer esta gráfica.
  */
 export function DiffLegend({ dateA, dateB, colorA, colorB, t }) {
   const Item = ({ children }) => (
@@ -416,22 +389,18 @@ export function DiffLegend({ dateA, dateB, colorA, colorB, t }) {
 }
 
 /**
- * OEE por hora con la diferencia RELLENA entre las dos series.
+ * OEE por hora con la diferencia rellena entre las dos series:
  *
- * Antes eran dos áreas superpuestas al 10 % de opacidad, que se
- * ensucian justo donde se cruzan — el sitio más interesante. Aquí:
+ *  - A va en línea punteada (la referencia).
+ *  - B va en línea sólida (el sujeto).
+ *  - El área entre ambas se rellena verde donde B>A y coral donde B<A.
  *
- *   • A va en línea PUNTEADA (es la referencia)
- *   • B va en línea SÓLIDA (es el sujeto)
- *   • el área ENTRE ambas se rellena verde donde B>A y coral donde B<A
+ * Así se ve en qué horas se ganó o se perdió, que es la pregunta operativa,
+ * en vez del nivel absoluto de cada serie.
  *
- * Así se ve de un golpe EN QUÉ HORAS se ganó o se perdió, que es la
- * pregunta operativa real — no el nivel absoluto de cada serie.
- *
- * El relleno se consigue apilando tres series: `lower` (el mínimo,
- * invisible) más `gapUp` o `gapDown`, de las cuales solo una es distinta
- * de cero en cada punto. La suma reproduce exactamente la banda
- * [min, max] y el color lo pone la que esté activa.
+ * El relleno se consigue apilando tres series: `lower` (el mínimo, invisible)
+ * más `gapUp` o `gapDown`, de las que solo una es distinta de cero en cada
+ * punto. La suma reproduce la banda [min, max] y el color lo pone la activa.
  */
 export function HourlyDiff({ overlay, dateA, dateB, colorA, colorB, t, height = 300 }) {
   const data = overlay.map((r) => {
@@ -461,7 +430,7 @@ export function HourlyDiff({ overlay, dateA, dateB, colorA, colorB, t, height = 
           />
         )}
 
-        {/* Banda de diferencia (apilada; ver comentario del bloque). */}
+        {/* Banda de diferencia, apilada como se describe arriba. */}
         <Area dataKey="lower" stackId="band" stroke="none" fill="none" isAnimationActive={false} legendType="none" />
         <Area dataKey="gapUp" stackId="band" stroke="none" fill={t.success} fillOpacity={0.28} isAnimationActive={false} legendType="none" />
         <Area dataKey="gapDown" stackId="band" stroke="none" fill={t.coral} fillOpacity={0.28} isAnimationActive={false} legendType="none" />
@@ -477,11 +446,8 @@ export function HourlyDiff({ overlay, dateA, dateB, colorA, colorB, t, height = 
 /**
  * Estado degenerado: la misma fecha en A y en B.
  *
- * Ocupa el hueco del titular en vez de dejar que este afirme "sin
- * cambio en el OEE" — que es literalmente cierto y completamente
- * engañoso, porque sugiere que se compararon dos días y salieron
- * iguales. Ante un dato que no significa nada, la vista debe decir que
- * no significa nada, no inventar una lectura.
+ * Ocupa el hueco del titular para que este no afirme «sin cambio en el OEE»,
+ * que siendo cierto sugiere que se compararon dos días y salieron iguales.
  */
 export function SameDateNotice({ iso, t }) {
   return (
@@ -502,13 +468,12 @@ export function SameDateNotice({ iso, t }) {
 }
 
 /**
- * Aviso sobre el ESTADO DE LA LECTURA del historiador (leyendo, sin
- * historia, error), no sobre el dato.
+ * Aviso sobre el estado de la lectura del historiador (leyendo, sin historia,
+ * error), no sobre el dato.
  *
- * Ocupa el mismo hueco que el titular a propósito: la pregunta que la
- * vista responde ahí es "¿mejoramos?", y cuando no se puede responder hay
- * que decir por qué exactamente en ese sitio. Rellenarlo con ceros o con
- * una estimación sería contestar a una pregunta que nadie hizo.
+ * Ocupa el mismo hueco que el titular: es donde la vista responde
+ * «¿mejoramos?», así que cuando no se puede responder hay que decir por qué
+ * ahí mismo, en vez de rellenarlo con ceros o una estimación.
  */
 export function HistoryNotice({ icon, titulo, detalle, tono = "neutro", t }) {
   const color = tono === "error" ? t.coral : tono === "aviso" ? t.amber : t.textFaint;

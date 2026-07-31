@@ -1,14 +1,11 @@
 /**
- * lib/iconics/tagCatalog.js
- * ------------------------------------------------------------------
- * EL CONTRATO CON ICONICS. Fuente única de verdad sobre qué máquinas
- * existen, qué propiedades tiene cada una y cómo se nombra un punto.
+ * Contrato con ICONICS: qué máquinas existen, qué propiedades tiene cada una
+ * y cómo se nombra un punto.
  *
- * Derivado del export de configuración unificada
- * `IcoUnifiedConfigSetIco_Assets_2026-07-28`, hoja `EquipmentProperty`.
- * Cuando la configuración del servidor cambie, se edita ESTE archivo y
- * ninguno más: el resto de la app habla en términos de dominio
- * (`disponibilidad`, `aprobadas`) y nunca de nombres de tag.
+ * Derivado del export de configuración unificada, hoja `EquipmentProperty`.
+ * Cuando cambie la configuración del servidor se edita este archivo y ninguno
+ * más: el resto de la app habla en términos de dominio (`disponibilidad`,
+ * `aprobadas`) y nunca de nombres de tag.
  *
  * Ver docs/TAGS.md para la tabla completa Excel → punto → dominio.
  */
@@ -17,15 +14,13 @@
 export const PLANT = "RESONAC";
 
 /**
- * Las 10 máquinas REALES. Ojo con dos trampas del árbol de ICONICS:
+ * Las 10 máquinas reales. Conviene usar esta lista y no recorrer el árbol de
+ * ICONICS, que produce máquinas fantasma e infla los agregados de planta:
  *
- *   · `RESONAC_` (con guión bajo) es un árbol paralelo de navegación de
- *     pantallas. Duplica los nombres pero sus nodos están vacíos.
- *   · La numeración de rectificadoras tiene huecos reales: son la 10, la
- *     11 y la 13. No existen la 12 ni las 1-9.
- *
- * Recorrer el árbol en vez de usar esta lista produce máquinas fantasma
- * que inflan todos los agregados de planta.
+ *  - `RESONAC_` (con guión bajo) es un árbol paralelo de navegación de
+ *    pantallas; duplica los nombres pero sus nodos están vacíos.
+ *  - La numeración de rectificadoras tiene huecos reales: son la 10, la 11
+ *    y la 13.
  */
 export const AREAS = {
   LIN: { id: "LIN", label: "Lineales", machineIds: ["1", "2", "3", "4", "5", "6", "7"] },
@@ -57,13 +52,12 @@ export const TAGS = {
 };
 
 /**
- * Tags que NO existen en todas las áreas.
+ * Tags que no existen en todas las áreas.
  *
- * `T_Ciclo_Calc` está en las 7 líneas y NO en las 3 rectificadoras: las
- * líneas calculan el rendimiento como T_Ciclo_Teo/T_Ciclo_Calc y las
- * rectificadoras como T_Ciclo_Teo/T_Ciclo. Pedir un tag inexistente no
- * rompe la petición en lote, pero devuelve un hueco que se confundiría
- * con un fallo real de lectura — así que no se pide.
+ * `T_Ciclo_Calc` solo está en las líneas, que calculan el rendimiento como
+ * T_Ciclo_Teo/T_Ciclo_Calc; las rectificadoras usan T_Ciclo_Teo/T_Ciclo.
+ * Pedir un tag inexistente devuelve un hueco indistinguible de un fallo de
+ * lectura, así que no se pide.
  */
 const TAGS_POR_AREA = {
   LIN: Object.keys(TAGS),
@@ -71,11 +65,9 @@ const TAGS_POR_AREA = {
 };
 
 /**
- * Subconjunto que basta para la vista de planta y de área.
- *
- * Es la mitad del presupuesto de red: pedir los 14 tags de las 10
- * máquinas cuando la pantalla solo muestra el OEE y sus factores es
- * gastar el doble para no enseñar nada más.
+ * Subconjunto que basta para las vistas de planta y de área. Pedir los 14
+ * tags cuando la pantalla solo muestra el OEE y sus factores duplicaría el
+ * tráfico sin enseñar nada más.
  */
 export const RESUMEN_TAGS = [
   "oee", "disponibilidad", "rendimiento", "calidad",
@@ -83,11 +75,9 @@ export const RESUMEN_TAGS = [
 ];
 
 /**
- * Tags casi estáticos: se refrescan en la cadencia lenta (5 min).
- *
- * `Modelo` cambia con el cambio de receta, `T_Disp_pot` es una constante
- * de 86400 s y `T_Inac_plan` viene de una consulta SQL que se actualiza
- * por turno. Sondearlos cada 15 s es tráfico regalado.
+ * Tags casi estáticos: se refrescan en la cadencia lenta (5 min). `Modelo`
+ * cambia con la receta, `T_Disp_pot` es una constante y `T_Inac_plan` se
+ * actualiza por turno.
  */
 export const TAGS_ESTATICOS = ["modelo", "tDispPot", "tInacPlan"];
 
@@ -117,8 +107,7 @@ export const tagsForArea = (areaId) => TAGS_POR_AREA[areaId] ?? [];
 
 /**
  * Punto de tiempo real: `ac:RESONAC/LIN/1/OEE`.
- * `ac:` es el espacio de nombres de AssetWorX — el mismo que ya navega
- * la vista de Assets.
+ * `ac:` es el espacio de nombres de AssetWorX.
  */
 export function pointName(areaId, machineId, tag) {
   return `ac:${PLANT}/${areaId}/${machineId}/${TAGS[tag]}`;
@@ -126,8 +115,8 @@ export function pointName(areaId, machineId, tag) {
 
 /**
  * Punto histórico: `hda:\Configuration\RESONAC\LIN\1:OEE`.
- * Otro prefijo y otra sintaxis (contrabarras y dos puntos) — por eso no
- * se derivan uno del otro con un simple reemplazo.
+ * Usa otro prefijo y otra sintaxis (contrabarras y dos puntos), así que no
+ * se deriva del de tiempo real con un reemplazo.
  */
 export function historyPointName(areaId, machineId, tag) {
   return `hda:\\Configuration\\${PLANT}\\${areaId}\\${machineId}:${TAGS[tag]}`;
@@ -139,13 +128,12 @@ const DOMINIO_POR_PROPIEDAD = Object.fromEntries(
 );
 
 /**
- * Inverso de `pointName`. El motor de polling recibe la respuesta en lote
- * indexada por nombre de punto y necesita repartir cada valor a su máquina
- * y su campo de dominio.
+ * Inverso de `pointName`: reparte cada valor de la respuesta en lote a su
+ * máquina y su campo de dominio.
  *
- * Devuelve `null` ante cualquier punto que no reconozca, para que un
- * cambio en el servidor se manifieste como dato ausente y no como una
- * asignación silenciosa al campo equivocado.
+ * Devuelve `null` ante un punto que no reconozca, para que un cambio en el
+ * servidor se vea como dato ausente y no como una asignación al campo
+ * equivocado.
  */
 export function parsePointName(name) {
   if (typeof name !== "string" || !name.startsWith("ac:")) return null;

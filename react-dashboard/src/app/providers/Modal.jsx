@@ -1,9 +1,7 @@
 /**
- * ui/Modal.jsx
- * ------------------------------------------------------------------
- * Modal genérico controlado por ModalContext. Se monta UNA vez en
- * App.jsx y lee `modalType` para decidir qué variante mostrar
- * ("confirm" | "danger"). Cerrar: clic en el fondo, la X o los botones.
+ * Modal genérico controlado por ModalContext. Se monta una vez en App.jsx y
+ * lee `modalType` para decidir qué variante mostrar ("confirm" | "danger").
+ * Se cierra con clic en el fondo, la X o los botones.
  */
 import { ShieldAlert, MessageSquareWarning } from "lucide-react";
 import { useTheme } from "@/theme";

@@ -1,15 +1,9 @@
 /**
- * lib/iconics/index.js — API pública del cliente ICONICS.
+ * API pública del cliente ICONICS.
  *
- * Es infraestructura COMPARTIDA, no de un feature: la consumen tanto
- * `features/data` como `features/assets`. Meterla dentro de cualquiera de
- * los dos crearía una arista cruzada entre features, que es justo lo que la
- * modularidad existe para evitar.
- *
- * Toda la E/S de red de la app pasa por aquí: no hay un solo `fetch(` fuera
- * de `apiClient.js`.
- *
- * Re-exports nombrados y explícitos, no `export *`.
+ * Es infraestructura compartida, no de un feature: la consumen tanto
+ * `features/data` como `features/assets`. Toda la E/S de red de la app pasa
+ * por aquí; no hay ningún `fetch(` fuera de `apiClient.js`.
  */
 export {
   fetchIconicsPoint,
@@ -21,18 +15,14 @@ export {
 } from "./apiClient.js";
 
 /**
- * ⚠ `useIconicsPoint` abre UN `setInterval` POR COMPONENTE.
- *
- * Es correcto para lo que hace `features/data`: leer un punto suelto que
- * el usuario escribe a mano. NO debe usarse para pintar máquinas: diez
- * tarjetas serían diez temporizadores y diez peticiones por ciclo.
- *
- * Para datos de planta se usa `lib/datasource`, que agrupa todos los
- * puntos de la pantalla en una sola petición por ciclo.
+ * `useIconicsPoint` abre un `setInterval` por componente. Sirve para leer un
+ * punto suelto (`features/data`), pero no para pintar máquinas: diez tarjetas
+ * serían diez temporizadores y diez peticiones por ciclo. Para datos de planta
+ * está `lib/datasource`, que agrupa todo en una sola petición.
  */
 export { useIconicsPoint } from "./useIconicsPoint.js";
 
-/* --- Contrato con el servidor y motor de lectura --- */
+/* Contrato con el servidor y motor de lectura. */
 export {
   AREAS,
   AREA_IDS,

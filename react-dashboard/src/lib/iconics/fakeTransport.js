@@ -1,32 +1,20 @@
 /**
- * lib/iconics/fakeTransport.js
- * ------------------------------------------------------------------
- * Imita la respuesta de ICONICS para poder construir y probar el motor
- * de polling SIN SERVIDOR.
+ * Imita la respuesta de ICONICS para construir y probar el motor de polling
+ * sin servidor.
  *
- * ── POR QUÉ NO BASTA CON `demoSource` ──────────────────────────────
+ * No basta con `demoSource`, que sustituye la capa de dominio entregando
+ * `Machine` ya hechas: el motor vive por debajo y su trabajo es justamente lo
+ * que `demoSource` se salta (agrupar puntos, trocear lotes, filtrar por
+ * calidad, reintentar con backoff y marcar datos rancios).
  *
- * `demoSource` sustituye la capa de DOMINIO: entrega `Machine` ya
- * hechas. Pero el motor de polling vive por debajo, y su trabajo es
- * justo lo que `demoSource` se salta: agrupar puntos, trocear lotes,
- * filtrar por calidad, reintentar con backoff y marcar datos rancios.
- * Para ejercitar eso hace falta un falso al nivel del TRANSPORTE.
- *
- * ── ES ADVERSARIAL A PROPÓSITO (riesgo R-04) ───────────────────────
- *
- * Este es el riesgo característico de construir contra un falso: si solo
- * devolviera datos buenos, la UI se escribiría dando por hecho que todos
- * los tags existen siempre y que la calidad siempre es 192 — y esas dos
- * suposiciones reventarían justo el día de la conexión real.
- *
- * Por eso el caos está desde el primer día y ENCENDIDO por defecto en
- * un grado suave. La Fase 4 no se da por cerrada hasta que la UI se
- * comporta con dignidad con `chaos: CAOS_ALTO`.
+ * El caos viene encendido en grado suave a propósito. Sin él la UI se
+ * escribiría dando por hecho que todos los tags existen siempre y que la
+ * calidad siempre es buena, y ambas suposiciones fallan con el servidor real.
  */
 import { AREAS, parsePointName, tagsForArea } from "./tagCatalog.js";
 import { QUALITY_GOOD } from "./quality.js";
 
-/** Calidad OPC "uncertain": el caso que más se parece a un dato bueno y no lo es. */
+/** Calidad OPC "uncertain": lo que más se parece a un dato bueno sin serlo. */
 const QUALITY_UNCERTAIN = 64;
 
 /** Grado suave: suficiente para que los caminos de error se ejerciten a diario. */
@@ -55,7 +43,7 @@ export const SIN_CAOS = {
   latenciaMs: 0,
 };
 
-/** PRNG determinista (xmur3 + mulberry32), el mismo patrón que usa `machines.js`. */
+/** PRNG determinista (xmur3 + mulberry32), el mismo que usa `machines.js`. */
 function seeded(seedStr) {
   let h = 1779033703 ^ seedStr.length;
   for (let i = 0; i < seedStr.length; i++) {
@@ -71,9 +59,8 @@ function seeded(seedStr) {
 }
 
 /**
- * Valor base plausible por tag. Determinista por máquina para que la
- * misma máquina no salte entre lecturas, y coherente entre sí: el OEE
- * es el producto de sus tres factores, no un número suelto.
+ * Valor base plausible por tag. Determinista por máquina para que no salte
+ * entre lecturas, y coherente: el OEE es el producto de sus tres factores.
  */
 function valorBase(areaId, machineId, tag, tick) {
   const rnd = seeded(`${areaId}/${machineId}`);
@@ -127,8 +114,8 @@ export function createFakeTransport({ chaos = CAOS_SUAVE, seed = "fake" } = {}) 
       await new Promise((r) => setTimeout(r, chaos.latenciaMs));
     }
 
-    // Fallo de la petición ENTERA: es como se comporta un servidor caído
-    // o un token caducado, y debe disparar el backoff del motor.
+    // Fallo de la petición entera, como un servidor caído o un token
+    // caducado. Debe disparar el backoff del motor.
     if (rnd() < chaos.errorPeticion) {
       throw new Error("fakeTransport: fallo simulado de la petición");
     }
@@ -139,16 +126,14 @@ export function createFakeTransport({ chaos = CAOS_SUAVE, seed = "fake" } = {}) 
       const punto = parsePointName(name);
       if (!punto) continue;
 
-      // Punto simplemente AUSENTE de la respuesta. Es el caso más
-      // traicionero: no es un error, es un hueco silencioso.
+      // Punto ausente de la respuesta: no es un error, es un hueco silencioso.
       if (rnd() < chaos.ausente) continue;
 
       let value = valorBase(punto.areaId, punto.machineId, punto.tag, tick);
       let quality = QUALITY_GOOD;
 
       if (rnd() < chaos.malaCalidad) {
-        // Mala calidad que llega con un CERO, que es justo como se
-        // comporta ICONICS y por lo que existe la regla del 192.
+        // Mala calidad que llega con un cero, igual que hace ICONICS.
         quality = QUALITY_UNCERTAIN;
         value = 0;
       } else if (typeof value === "number" && rnd() < chaos.noFinito) {

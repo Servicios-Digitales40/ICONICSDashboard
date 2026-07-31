@@ -1,21 +1,13 @@
 /**
- * lib/format.js
- * ------------------------------------------------------------------
- * Formateo consciente de la AUSENCIA DE DATO.
+ * Formateo consciente de la ausencia de dato.
  *
- * Con datos reales cualquier medición puede faltar: mala calidad, tag
- * ausente o división por cero en el servidor. El dominio ya convierte
- * todo eso en `null` (ver lib/domain/machine.js); aquí se decide cómo
- * se ve un `null` en pantalla.
+ * Cualquier medición puede faltar (mala calidad, tag ausente, división por
+ * cero en el servidor). El dominio ya lo convierte todo en `null`; aquí se
+ * decide cómo se ve un `null` en pantalla.
  *
- * La regla es una sola y se aplica sin excepciones:
- *
- *     un hueco se pinta como hueco, JAMÁS como cero
- *
- * Un «0.00 %» donde no hubo medición es indistinguible de una máquina
- * parada de verdad. En un tablero de planta eso no es un detalle
- * cosmético: es una lectura equivocada que puede mover a alguien a
- * intervenir un equipo que estaba bien.
+ * La regla es que un hueco se pinta como hueco y nunca como cero: un
+ * «0.00 %» donde no hubo medición es indistinguible de una máquina parada de
+ * verdad, y puede llevar a intervenir un equipo que estaba bien.
  */
 import { hasValue } from "./domain/index.js";
 
@@ -36,8 +28,8 @@ export const fmtEntero = (v) =>
 
 /**
  * Segundos → forma legible. 45 → "45 s" · 5400 → "1 h 30 m".
- * ICONICS entrega todos los tiempos en segundos, y los tiempos muertos
- * reales son de miles: mostrarlos crudos sería ilegible.
+ * ICONICS entrega todos los tiempos en segundos y los tiempos muertos reales
+ * son de miles, así que en crudo resultan ilegibles.
  */
 export function fmtDuracion(segundos) {
   if (!hasValue(segundos)) return SIN_DATO;

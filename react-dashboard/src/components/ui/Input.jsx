@@ -1,8 +1,6 @@
 /**
- * ui/Input.jsx
- * ------------------------------------------------------------------
- * Campo de texto con ícono a la izquierda y estados de validación
- * visual (error en rojo con mensaje, éxito con check verde).
+ * Campo de texto con icono a la izquierda y estados de validación: error en
+ * rojo con mensaje, éxito con check verde.
  */
 import { AlertTriangle, Check } from "lucide-react";
 import { useTheme } from "@/theme";

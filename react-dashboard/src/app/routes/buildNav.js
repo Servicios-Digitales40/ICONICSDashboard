@@ -1,12 +1,10 @@
 /**
- * app/routes/buildNav.js
- * ------------------------------------------------------------------
  * Deriva el árbol del sidebar a partir del registro de rutas.
  *
- * Vive en su propio archivo, sin JSX y sin imports con alias, para que sea
- * JS puro ejecutable en node y por tanto verificable. Es el único punto del
- * refactor con un modo de fallo SILENCIOSO: si el orden se altera, el build
- * pasa, la app funciona, y lo único que cambia es cómo sale el sidebar.
+ * Vive en su propio archivo, sin JSX ni imports con alias, para que sea JS
+ * puro ejecutable en node y por tanto verificable: su modo de fallo es
+ * silencioso, porque si el orden se altera el build pasa y la app funciona,
+ * y lo único que cambia es cómo sale el sidebar.
  */
 
 /**
@@ -15,11 +13,11 @@
  * @returns array de items: `{ id, label, icon }` o
  *          `{ group, label, icon, children: [...] }`
  *
- * Reglas, que reproducen exactamente la disposición previa a mano:
+ * Reglas:
  *   1. Los items de primer nivel salen en orden de declaración.
- *   2. Un grupo se inserta en la posición de su PRIMER hijo, y desde ahí
- *      absorbe al resto de sus hijos, estén donde estén en el array.
- *   3. Las rutas sin `nav` se omiten (rutas ocultas, p. ej. machine-detail).
+ *   2. Un grupo se inserta en la posición de su primer hijo, y desde ahí
+ *      absorbe al resto, estén donde estén en el array.
+ *   3. Las rutas sin `nav` se omiten (rutas ocultas, como machine-detail).
  */
 export function buildNav(routes, groups) {
   const items = [];

@@ -1,12 +1,9 @@
 /**
- * features/data/components/IconicsLiveCard.jsx
- * ------------------------------------------------------------------
- * Tarjeta que muestra en vivo el valor de un punto de ICONICS,
- * leído a través del backend puente (/api/iconics/data). Hace polling
- * automático y permite refrescar manualmente.
+ * Tarjeta que muestra en vivo el valor de un punto de ICONICS, leído a través
+ * del backend puente. Hace polling automático y permite refrescar a mano.
  *
  * Vive en el feature y no en el kit compartido porque es específico del
- * dominio ICONICS y además hace su propio fetching: no es una primitiva
+ * dominio ICONICS y hace su propio fetching: no es una primitiva
  * presentacional.
  */
 import { RefreshCw, Radio } from "lucide-react";
@@ -14,9 +11,8 @@ import { useTheme } from "@/theme";
 import { useIconicsPoint } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
 
-// ICONICS puede devolver el resultado como objeto único o como arreglo
-// de ReadResult; normalizamos a un solo objeto con los campos que nos
-// interesan mostrar.
+// ICONICS puede devolver el resultado como objeto único o como arreglo de
+// ReadResult; se normaliza a un solo objeto con los campos que se muestran.
 function normalize(payload) {
   const item = Array.isArray(payload) ? payload[0] : payload;
   if (!item || typeof item !== "object") return null;
@@ -28,8 +24,8 @@ function normalize(payload) {
   };
 }
 
-// La REST API de ICONICS FrameWorX devuelve quality como StatusCode de OPC
-// UA: 0 = Good. También se acepta la convención clásica OPC DA (192 = Good)
+// La REST API de FrameWorX devuelve quality como StatusCode de OPC UA
+// (0 = Good). Se acepta también la convención clásica de OPC DA (192 = Good)
 // y variantes en texto, por si el punto viene de otro tipo de servidor.
 const QUALITY_GOOD = new Set([0, 192, "Good", "good"]);
 

@@ -1,47 +1,41 @@
 /**
- * ui/DatePicker.jsx
- * ------------------------------------------------------------------
- * Calendario propio en popover, con HEATMAP de valor por día.
+ * Calendario propio en popover, con heatmap de valor por día.
  *
- * Por qué existe, si `<input type="date">` ya funcionaba:
+ * Existe en vez de `<input type="date">` por dos motivos: el popover nativo lo
+ * dibuja el sistema operativo y desentona en una vista cuya acción principal
+ * es elegir fechas, y sobre todo no puede mostrar datos. Aquí cada celda se
+ * tiñe según el valor de ese día, así que el control deja de ser una elección
+ * a ciegas.
  *
- *   1. El popover nativo lo dibuja el sistema operativo. En una vista
- *      cuya acción principal ES elegir fechas, el momento de mayor
- *      interacción era el único que se veía ajeno al producto.
- *   2. Y sobre todo: el calendario nativo no puede mostrar datos. Aquí
- *      cada celda se tiñe según el valor de ese día, así que dejas de
- *      elegir a ciegas y empiezas a elegir el día interesante. El
- *      control se convierte en instrumento.
- *
- * Lo que se pierde al abandonar el input nativo es accesibilidad y
- * localización gratuitas, así que hay que reponerlas a mano: navegación
- * completa por teclado, roles ARIA de rejilla, foco atrapado mientras
- * está abierto y devuelto al disparador al cerrar. Está implementado
- * abajo y conviene NO tocarlo sin volver a probarlo con teclado.
+ * A cambio hay que reponer a mano lo que el input nativo daba gratis:
+ * navegación completa por teclado, roles ARIA de rejilla, foco atrapado
+ * mientras está abierto y devuelto al disparador al cerrar. Está implementado
+ * abajo y conviene no tocarlo sin volver a probarlo con teclado.
  *
  * Props principales:
- *  - value / onChange   controlado (string YYYY-MM-DD)
- *  - min / max          límites opcionales
- *  - accent             color de identidad (selección y tinte del mapa)
- *  - dayValue(iso)      → número 0..100 o null. Alimenta el heatmap.
- *                         Genérico a propósito: este componente no sabe
- *                         nada de máquinas ni de OEE.
- *  - marker / markerColor  otra fecha a señalar (la del otro extremo de
- *                         una comparación), visible mientras eliges.
  *
- * ⚠ APILADO: el popover es `position: absolute` con z-index alto, pero
- * eso solo lo sube DENTRO de su stacking context. Si un ancestro crea
- * uno propio —y `Panel` lo hace, porque anima con `fadeInUp ... both` y
- * conserva el `transform` final— el calendario quedará por detrás de los
- * paneles hermanos posteriores. La solución no es subir más el z-index
- * de aquí, sino dar `position: relative` + `zIndex` AL CONTENEDOR que
- * aloja el campo. Ver `DateRangeControl` en ComparativoView.jsx.
+ *  - value / onChange      controlado (string YYYY-MM-DD)
+ *  - min / max             límites opcionales
+ *  - accent                color de identidad (selección y tinte del mapa)
+ *  - dayValue(iso)         número 0..100 o null, que alimenta el heatmap. Es
+ *                          genérico a propósito: este componente no sabe nada
+ *                          de máquinas ni de OEE.
+ *  - marker / markerColor  otra fecha a señalar (el otro extremo de una
+ *                          comparación), visible mientras se elige.
+ *
+ * Sobre el apilado: el popover es `position: absolute` con z-index alto, pero
+ * eso solo lo sube dentro de su stacking context. Si un ancestro crea uno
+ * propio —y `Panel` lo hace, porque anima con `fadeInUp … both` y conserva el
+ * `transform` final— el calendario queda por detrás de los paneles hermanos
+ * posteriores. La solución no es subir el z-index de aquí, sino dar
+ * `position: relative` y `zIndex` al contenedor que aloja el campo; ver
+ * `DateRangeControl` en ComparativoView.jsx.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { useTheme } from "@/theme";
 
-/* ---------------- utilidades de fecha (locales, sin dependencias) --------- */
+/* Utilidades de fecha, locales y sin dependencias. */
 
 const pad2 = (n) => String(n).padStart(2, "0");
 const toIso = (y, m, d) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
@@ -77,21 +71,20 @@ const shiftMonthIso = (iso, n) => {
 };
 const inRange = (iso, min, max) => (!min || iso >= min) && (!max || iso <= max);
 
-/* ---------------- rejilla del mes ---------------- */
+/* Rejilla del mes. */
 
 function CalendarGrid({ view, value, marker, markerColor, min, max, accent, dayValue, focusIso, setFocusIso, onPick, t }) {
   const { y, m } = view;
   const total = daysInMonth(y, m);
   const offset = firstWeekday(y, m);
 
-  // Escala del heatmap: se normaliza contra el propio mes visible, no
-  // contra 0-100. Un mes que se mueve entre 34 y 41 debe mostrar
-  // contraste; con escala absoluta se vería plano y el mapa no diría
-  // nada. La contrapartida es que el tinte es relativo AL MES, así que
-  // la leyenda de abajo indica los extremos reales.
-  // Solo días seleccionables: los que caen fuera de min/max no se tiñen,
-  // así que tampoco deben estirar la escala ni los extremos de la
-  // leyenda — si no, el degradado prometería un rango que no se ve.
+  // El heatmap se normaliza contra el propio mes visible y no contra 0-100:
+  // un mes que se mueve entre 34 y 41 se vería plano con escala absoluta. A
+  // cambio el tinte es relativo al mes, y por eso la leyenda de abajo indica
+  // los extremos reales.
+  //
+  // Solo entran los días seleccionables: los que caen fuera de min/max no se
+  // tiñen, así que tampoco deben estirar la escala ni la leyenda.
   const valores = [];
   for (let d = 1; d <= total; d++) {
     const iso = toIso(y, m, d);
@@ -186,7 +179,7 @@ function CalendarGrid({ view, value, marker, markerColor, min, max, accent, dayV
   );
 }
 
-/* ---------------- popover ---------------- */
+/* Popover. */
 
 function Popover({ value, onChange, min, max, accent, dayValue, marker, markerColor, onClose, triggerRef, t }) {
   const [focusIso, setFocusIso] = useState(value);
@@ -196,15 +189,15 @@ function Popover({ value, onChange, min, max, accent, dayValue, marker, markerCo
     return { y, m };
   }, [focusIso, value]);
 
-  // Mueve el foco real del navegador al día "enfocado" lógicamente.
+  // Mueve el foco real del navegador al día enfocado lógicamente.
   useLayoutEffect(() => {
     const el = boxRef.current?.querySelector(`[data-iso="${focusIso}"]`);
     if (el && !el.disabled) el.focus({ preventScroll: true });
   }, [focusIso]);
 
-  // Cierre al hacer clic fuera. El disparador se EXCLUYE a propósito:
-  // si no, su `mousedown` cerraría el popover y su `click` posterior lo
-  // volvería a abrir, con lo que el botón nunca podría cerrarlo.
+  // Cierre al hacer clic fuera. El disparador se excluye: si no, su
+  // `mousedown` cerraría el popover y su `click` posterior lo volvería a
+  // abrir, con lo que el botón nunca podría cerrarlo.
   useEffect(() => {
     const onDown = (e) => {
       if (boxRef.current?.contains(e.target)) return;
@@ -269,8 +262,8 @@ function Popover({ value, onChange, min, max, accent, dayValue, marker, markerCo
       onKeyDown={onKeyDown}
       style={{
         position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 60,
-        // maxWidth evita que el popover empuje scroll horizontal cuando
-        // el campo es más estrecho que él (móvil, columnas apiladas).
+        // maxWidth evita que el popover empuje scroll horizontal cuando el
+        // campo es más estrecho que él (móvil, columnas apiladas).
         width: 288, maxWidth: "calc(100vw - 32px)", padding: 14, borderRadius: 14,
         background: t.panel, border: `1px solid ${t.border}`, boxShadow: t.shadowHover,
       }}
@@ -300,7 +293,7 @@ function Popover({ value, onChange, min, max, accent, dayValue, marker, markerCo
   );
 }
 
-/* ---------------- disparador + popover ---------------- */
+/* Disparador y popover. */
 
 export function DatePicker({ label, value, onChange, min, max, accent, dayValue, marker, markerColor }) {
   const { theme: t } = useTheme();

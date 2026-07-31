@@ -1,8 +1,6 @@
 /**
- * layout/Topbar.jsx
- * ------------------------------------------------------------------
- * Barra superior fija (sticky): título de la página actual, buscador,
- * notificaciones, interruptor demo/live y el interruptor de tema.
+ * Barra superior fija: título de la página actual, buscador, notificaciones e
+ * interruptores de origen de datos y de tema.
  */
 import { Search, Bell, Sun, Moon, Shuffle, FlaskConical, Radio, Wifi } from "lucide-react";
 import { useTheme } from "@/theme";
@@ -13,12 +11,9 @@ import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { Avatar } from "@/components/ui/Avatar.jsx";
 
 /**
- * Contador de peticiones por minuto (Fase 3.5 del Plan 1).
- *
- * Existe para DEMOSTRAR el presupuesto de red en vez de suponerlo: la
- * vista de planta debe quedarse en ~4 peticiones/min y el detalle en
- * ~12. Si alguna vez se dispara, es que alguien reintrodujo un poller
- * por componente.
+ * Contador de peticiones por minuto, para medir el presupuesto de red en vez
+ * de suponerlo. Si se dispara, suele significar que se ha reintroducido un
+ * poller por componente.
  *
  * Solo en desarrollo: es instrumentación, no una función del producto.
  */

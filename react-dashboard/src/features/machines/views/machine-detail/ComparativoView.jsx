@@ -1,35 +1,24 @@
 /**
- * pages/machine-detail/ComparativoView.jsx
- * ------------------------------------------------------------------
- * Subvista "Comparativo": compara el OEE de una máquina entre DOS fechas.
+ * Subvista "Comparativo": compara el OEE de una máquina entre dos fechas.
  *
- * La vista no muestra dos días — muestra LA DIFERENCIA entre dos días, y
- * los dos días son el contexto que la explica. De ahí su orden:
+ * Lo que muestra no son dos días, sino la diferencia entre ellos, con los dos
+ * días como contexto que la explica. De ahí su orden:
  *
  *   1. Selección   presets, cápsula A⇄B y relación entre ambas fechas
  *   2. Titular     la conclusión y su causa, antes que nada más
  *   3. Espejo      las dos fechas enfrentadas, deltas en el eje central
  *   4. Gráficas    la evidencia por métrica y por hora
  *
- * Todo el cálculo (deltas, zona muerta, veredicto, escalas) vive en
- * `compare.js` y todo el pintado en `comparativo-ui.jsx`; aquí solo se
- * compone. Que la comparación se calcule UNA vez y se reparta es lo que
+ * Todo el cálculo vive en `compare.js` y todo el pintado en `comparativoUi`;
+ * aquí solo se compone. Calcular la comparación una vez y repartirla es lo que
  * impide que dos paneles de la misma pantalla se contradigan.
  *
- * ── DE DÓNDE SALEN LOS NÚMEROS ─────────────────────────────────────
+ * Los números salen del historiador de ICONICS, un día por lado, vía
+ * `useMachineDay`. Por eso la vista tiene tres estados de lectura (leyendo,
+ * sin historia, error) y ninguno rellena el hueco con cifras: un día sin
+ * historizar y un día malo son noticias opuestas.
  *
- * Del HISTORIADOR de ICONICS (`hda:\Configuration\RESONAC\…`), un día por
- * lado, vía `useMachineDay`. Antes se derivaban del valor en vivo con un
- * generador determinista: era andamiaje para poder diseñar la vista sin
- * histórico, y producía una comparación creíble y falsa — el peor tipo de
- * dato en una pantalla de planta.
- *
- * De ahí que ahora la vista tenga tres estados que antes no podía tener
- * (leyendo · sin historia · error de lectura) y que NINGUNO de ellos
- * rellene el hueco con cifras: un día sin historizar y un día malo son
- * noticias opuestas.
- *
- * El estado de las fechas vive aquí (local): no toca el router.
+ * El estado de las fechas es local y no toca el router.
  */
 import { useMemo, useState } from "react";
 import { GitCompareArrows, AlertTriangle, DatabaseZap, Loader } from "lucide-react";
@@ -44,11 +33,11 @@ import {
   MetricDumbbell, HourlyDiff, DiffLegend, HistoryNotice,
 } from "../../components/comparativoUi.jsx";
 
-/* ------------------------------------------------------------------
- * Chip de preset. Las cuatro comparaciones habituales a un clic: sin
- * ellos, la pregunta más frecuente de la vista ("¿cómo vamos contra la
- * semana pasada?") cuesta teclear dos fechas completas.
- * ------------------------------------------------------------------ */
+/*
+ * Chip de preset: las cuatro comparaciones habituales a un clic. Sin ellos, la
+ * pregunta más frecuente («¿cómo vamos contra la semana pasada?») cuesta
+ * teclear dos fechas completas.
+ */
 function PresetChip({ preset, active, onClick, t }) {
   return (
     <button
@@ -71,15 +60,15 @@ function PresetChip({ preset, active, onClick, t }) {
   );
 }
 
-/* ------------------------------------------------------------------
- * Control de rango: los dos campos, el botón de intercambio y el rótulo
- * que explica la relación entre ambas fechas.
+/*
+ * Control de rango: los dos campos, el botón de intercambio y el rótulo que
+ * explica la relación entre ambas fechas.
  *
- * Se presenta como UNA cápsula y no como dos campos sueltos porque lo
- * que se elige no son dos fechas independientes, sino una comparación.
- * El degradado A→B tiñe cada extremo con su color de identidad, de modo
- * que la correspondencia campo↔columna se aprende sin leer etiquetas.
- * ------------------------------------------------------------------ */
+ * Va como una cápsula y no como dos campos sueltos porque lo que se elige no
+ * son dos fechas independientes, sino una comparación. El degradado A→B tiñe
+ * cada extremo con su color de identidad, así que la correspondencia
+ * campo↔columna se aprende sin leer etiquetas.
+ */
 function DateRangeControl({ dateA, dateB, setDateA, setDateB, todayIso, colorA, colorB, dayOee, t }) {
   const activePreset = matchPreset(dateA, dateB, todayIso);
   const rel = relationLabel(dateA, dateB);
@@ -169,20 +158,16 @@ function DateRangeControl({ dateA, dateB, setDateA, setDateB, todayIso, colorA, 
 }
 
 /**
- * Ventana del mapa de calor del calendario, en días hacia atrás.
- *
- * 90 y no "todo lo que haya" por un límite real del transporte: el
- * backend pide como mucho 100 muestras por llamada
- * (`X-ICO-MAX-ITEM-COUNT`), y con un punto por día eso son 100 días. Se
- * deja margen para no rozar el tope.
+ * Ventana del mapa de calor del calendario, en días hacia atrás. El límite lo
+ * marca el transporte: el backend pide como mucho 100 muestras por llamada
+ * (`X-ICO-MAX-ITEM-COUNT`), y con un punto por día eso son 100 días.
  */
 const DIAS_CALENDARIO = 90;
 
-// Sin prop `C` a propósito: el color de identidad codifica SOLO la fecha
-// (azul = A, violeta = B) y verde/coral quedan reservados a la dirección
-// del cambio. La paleta por métrica era un tercer sistema compitiendo por
-// el mismo canal visual, y el resultado era que el color no significaba
-// nada en concreto.
+// Sin prop `C` a propósito: el color de identidad codifica solo la fecha
+// (azul = A, violeta = B) y verde/coral quedan para la dirección del cambio.
+// Una paleta por métrica sería un tercer sistema compitiendo por el mismo
+// canal visual.
 export default function ComparativoView({ machine, t }) {
   const todayIso = isoDay(new Date());
   const weekAgoIso = isoDay(new Date(Date.now() - 7 * 86400000));
@@ -192,16 +177,15 @@ export default function ComparativoView({ machine, t }) {
   const colorA = t.accent;
   const colorB = t.violet;
 
-  // Un día por lado, cada uno con su propia lectura al historiador. La
-  // fuente cachea por (máquina, fecha), así que alternar entre presets ya
-  // vistos no vuelve a la red.
+  // Un día por lado, cada uno con su lectura al historiador. La fuente cachea
+  // por (máquina, fecha), así que alternar entre presets ya vistos no vuelve
+  // a la red.
   const diaA = useMachineDay(machine.id, dateA);
   const diaB = useMachineDay(machine.id, dateB);
 
-  // Mapa de calor del calendario: UNA petición para toda la ventana, no
-  // una por celda. El DatePicker no sabe nada de máquinas ni de OEE —
-  // solo recibe una función iso → número — así que este es el único
-  // punto que hubo que tocar al pasar de datos simulados a reales.
+  // Mapa de calor del calendario: se carga la ventana entera de golpe y no
+  // una celda por vez. El DatePicker no sabe nada de máquinas ni de OEE, solo
+  // recibe una función iso → número.
   const ventana = useMemo(
     () => ({ desde: addDays(todayIso, -DIAS_CALENDARIO), hasta: todayIso }),
     [todayIso]
@@ -213,30 +197,27 @@ export default function ComparativoView({ machine, t }) {
   const trendA = diaA.serie;
   const trendB = diaB.serie;
 
-  // Comparación y veredicto: un solo cálculo que alimenta el titular,
-  // el canal de deltas y (en la Fase 3) las gráficas. Que todo salga de
-  // aquí es lo que impide que dos paneles se contradigan.
+  // Comparación y veredicto: un solo cálculo que alimenta el titular, el canal
+  // de deltas y las gráficas, para que ningún par de paneles se contradiga.
   const cmp = useMemo(() => buildComparison(snapA, snapB), [snapA, snapB]);
   const v = useMemo(() => verdict(cmp), [cmp]);
 
-  // Escala común a las dos mini-tendencias: con escalas independientes,
-  // la misma altura significaría valores distintos en cada columna.
+  // Escala común a las dos mini-tendencias: con escalas independientes, la
+  // misma altura significaría valores distintos en cada columna.
   const domain = useMemo(() => sharedDomain(trendA, trendB), [trendA, trendB]);
 
-  // Referencia para las micro-barras de los deltas: el mayor cambio de
-  // esta comparación, con un suelo de 5 pts para que un día tranquilo no
-  // convierta un ±0.3 en una barra a tope.
+  // Referencia para las micro-barras de los deltas: el mayor cambio de esta
+  // comparación, con un suelo de 5 pts para que un día tranquilo no convierta
+  // un ±0.3 en una barra a tope.
   const maxAbs = useMemo(
     () => Math.max(...cmp.map((m) => Math.abs(m.delta)), 5),
     [cmp]
   );
 
-  // Serie combinada por hora. Se empareja por LA HORA, no por índice, y
-  // con datos reales eso ha dejado de ser una precaución teórica: dos
-  // días del historiador rara vez traen el mismo número de puntos —un
-  // turno corto, una parada, un día que aún no ha terminado— y el
-  // emparejado posicional compararía las 10:00 contra las 11:00 sin
-  // avisar de nada.
+  // Serie combinada por hora, emparejada por la hora y no por índice: dos días
+  // del historiador rara vez traen el mismo número de puntos (un turno corto,
+  // una parada, un día sin terminar) y el emparejado posicional compararía
+  // las 10:00 contra las 11:00 sin avisar.
   const overlay = useMemo(() => {
     const porHora = new Map(trendB.map((r) => [r.t, r.oee]));
     return trendA.map((row) => ({
@@ -246,15 +227,13 @@ export default function ComparativoView({ machine, t }) {
     }));
   }, [trendA, trendB]);
 
-  // Comparar una fecha consigo misma no es un error que haya que
-  // bloquear, pero sí uno que hay que decir en voz alta: todos los
-  // deltas valen 0 y la vista parecería estar afirmando "sin cambios".
+  // Comparar una fecha consigo misma no hay que bloquearlo, pero sí decirlo:
+  // todos los deltas valen 0 y la vista parecería afirmar «sin cambios».
   const mismaFecha = dateA === dateB;
 
-  // Estado de la LECTURA, que no es lo mismo que el estado del dato. Se
-  // resuelve en este orden porque cada caso hace irrelevante al
-  // siguiente: si aún se está leyendo, no se sabe si hay historia; si la
-  // lectura falló, "no hay historia" sería una conclusión falsa.
+  // Estado de la lectura, que no es el estado del dato. El orden importa
+  // porque cada caso hace irrelevante al siguiente: mientras se lee no se sabe
+  // si hay historia, y si la lectura falló «no hay historia» sería falso.
   const leyendo = diaA.loading || diaB.loading;
   const errorLectura = diaA.error ?? diaB.error;
   const sinHistoria = !snapA && !snapB;

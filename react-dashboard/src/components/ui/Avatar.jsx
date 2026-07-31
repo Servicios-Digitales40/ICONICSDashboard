@@ -1,4 +1,4 @@
-/** ui/Avatar.jsx — círculo con iniciales, usado en usuarios, top performers, perfil, etc. */
+/** Círculo con iniciales, para usuarios y perfil. */
 import { useTheme } from "@/theme";
 
 export function Avatar({ name, grad, size = 36 }) {

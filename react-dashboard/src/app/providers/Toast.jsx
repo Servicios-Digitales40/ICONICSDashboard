@@ -1,10 +1,9 @@
 /**
- * ui/Toast.jsx
- * ------------------------------------------------------------------
- * Exporta dos cosas:
+ * Exporta dos piezas:
+ *
  *  - <Toast>: una notificación individual.
- *  - <ToastContainer>: la lista fija en la esquina; la monta
- *    ToastContext una sola vez para toda la app.
+ *  - <ToastContainer>: la lista fija en la esquina, que monta `ToastProvider`
+ *    una sola vez para toda la app.
  */
 import { CheckCircle2, XCircle, Info, X } from "lucide-react";
 import { useTheme } from "@/theme";
