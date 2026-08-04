@@ -27,8 +27,11 @@ rectificadoras (`REC 10, 11, 13`).
 ```
 .
 ├── backend/            Servidor puente hacia ICONICS (Node, sin dependencias)
+│   ├── http/             Mecánica HTTP: router, respuestas, estáticos
+│   ├── iconics/          Autenticación OIDC, cliente REST y validación
+│   └── routes/           Traducción HTTP ↔ cliente
 ├── react-dashboard/    Frontend React + Vite
-├── scripts/            Utilidades de verificación contra el servidor
+├── scripts/            Utilidades de verificación
 └── docs/               Plan de conexión, mejoras y tabla de tags
 ```
 
@@ -42,7 +45,7 @@ rectificadoras (`REC 10, 11, 13`).
 Las credenciales van en un archivo `.env.local` en la raíz, que **no se versiona**:
 
 ```
-ICONICS_API_BASE=https://tu-servidor/...
+ICONICS_API_BASE=https://tu-servidor/fwxapi/rest/v1
 ICONICS_USERNAME=usuario
 ICONICS_PASSWORD=contraseña
 ICONICS_POINT_NAME=punto por defecto para /api/iconics/data
@@ -62,8 +65,20 @@ npm install
 npm run dev                                       # Vite, normalmente en :5173
 ```
 
-En producción el backend sirve el `dist/` compilado desde el mismo origen, así
-que basta con un proceso.
+El resto de variables —puerto, nivel de log, directorio de estáticos— están en
+[`backend/README.md`](backend/README.md).
+
+### En producción
+
+Un solo proceso: el backend sirve el frontend compilado desde el mismo origen,
+así que no hace falta ni segundo servidor ni CORS.
+
+```bash
+cd react-dashboard && npm run build    # genera react-dashboard/dist
+cd .. && node --env-file=.env.local backend/server.mjs
+```
+
+Sin ese build, el backend responde 503 diciendo que falta compilar.
 
 ## Orígenes de datos
 
@@ -82,21 +97,30 @@ build, así que un bundle compilado sin ella siempre irá al backend real.
 
 ## Pruebas
 
+Frontend:
+
 ```bash
 cd react-dashboard
 npm test
 ```
 
-Para comprobar que el catálogo de tags sigue coincidiendo con el servidor, con
-el backend levantado:
+Backend, sin necesidad de servidor ni configuración —levanta un ICONICS falso y
+comprueba que cada endpoint devuelve la forma que el frontend espera:
 
 ```bash
-node scripts/verificar-catalogo.mjs
-node scripts/verificar-historia.mjs
+node scripts/verificar-backend.mjs
+```
+
+Contra el servidor real, con el backend levantado:
+
+```bash
+node scripts/verificar-catalogo.mjs    # los puntos del catálogo existen
+node scripts/verificar-historia.mjs    # el historiador entrega muestras
 ```
 
 ## Documentación
 
+- [`backend/README.md`](backend/README.md) — arquitectura del puente y referencia de la API
 - [`react-dashboard/README.md`](react-dashboard/README.md) — arquitectura del frontend
 - [`docs/PLAN-1-CONEXION-ICONICS.md`](docs/PLAN-1-CONEXION-ICONICS.md) — plan de conexión
 - [`docs/PLAN-2-MEJORAS.md`](docs/PLAN-2-MEJORAS.md) — mejoras propuestas
