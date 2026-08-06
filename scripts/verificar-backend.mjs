@@ -35,7 +35,8 @@
 import { createServer } from 'node:http'
 import assert from 'node:assert/strict'
 import { connect } from 'node:net'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
@@ -693,6 +694,35 @@ console.log('\n── Endurecimiento · caché de lote (B.7) ──────�
     assert.equal(batchCount, 3, `llamadas upstream=${batchCount}`)
   })
   server2.close()
+}
+
+console.log('\n── Dónde busca el tablero compilado ────────────────────────')
+{
+  // Una release empaquetada no tiene `react-dashboard/`: el bundle está en
+  // `public/`. Arrancarla sin `STATIC_DIR` respondía un 503 aconsejando
+  // «ejecuta npm run build en react-dashboard/», que en un servidor de planta
+  // es imposible de seguir.
+  const raizFalsa = new URL('../', import.meta.url)
+  const rutaPublic = fileURLToPath(new URL('public/', raizFalsa))
+
+  check('STATIC_DIR explícito manda sobre todo lo demás', () => {
+    const c = loadConfig({ STATIC_DIR: 'C:\\ruta\\elegida' })
+    assert.match(c.staticDir, /ruta[\\/]elegida$/)
+  })
+
+  check('sin STATIC_DIR, se prefiere public/ cuando existe', () => {
+    mkdirSync(rutaPublic, { recursive: true })
+    writeFileSync(fileURLToPath(new URL('index.html', pathToFileURL(rutaPublic + '/'))), '<!doctype html>')
+    try {
+      assert.match(loadConfig({}).staticDir, /public$/)
+    } finally {
+      rmSync(rutaPublic, { recursive: true, force: true })
+    }
+  })
+
+  check('sin public/, cae al build del repositorio', () => {
+    assert.match(loadConfig({}).staticDir, /react-dashboard[\\/]dist$/)
+  })
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')

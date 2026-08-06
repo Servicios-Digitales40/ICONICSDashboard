@@ -80,7 +80,7 @@ fábrica en las ediciones de servidor, al contrario que en Windows cliente.
 # ── en el servidor, como administrador ───────────────────────────
 
 # 1 · La release, con su humo previo
-.\desplegar.ps1 -Paquete C:\temp\dashboard-<version>.zip
+.\desplegar.ps1 -Paquete <ruta-al-zip-copiado>
 
 # 2 · La configuración. Copia la plantilla y rellena credenciales.
 copy env.production.example D:\IconicsDashboard\config\.env.production
@@ -115,7 +115,7 @@ intentó salir del paso con `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 .\deploy\empaquetar.ps1
 
 # en el servidor
-.\desplegar.ps1 -Paquete C:\temp\dashboard-<version>.zip
+.\desplegar.ps1 -Paquete <ruta-al-zip-copiado>
 ```
 
 Eso es todo. El guion extrae, **prueba la release en un puerto aparte antes de
@@ -124,6 +124,21 @@ humo falla, no toca nada y la versión que estaba sirviendo sigue sirviendo.
 
 Para confirmar qué build quedó, sin entrar al servidor: la versión se ve en la
 esquina del Topbar y en `https://<host>/api/health`.
+
+---
+
+## Arrancar una release a mano
+
+Para un ensayo, o para mirar qué hace una versión sin tocar el servicio:
+
+```powershell
+cd D:\IconicsDashboard\current
+node --env-file=D:\IconicsDashboard\config\.env.production backend\server.mjs
+```
+
+No hace falta `STATIC_DIR`: sin esa variable el backend busca el tablero en
+`public/`, que es donde lo deja el empaquetado, y sólo si no lo encuentra cae
+al `react-dashboard/dist` del repositorio.
 
 ---
 

@@ -7,14 +7,29 @@
  * falle *aquí* —con un mensaje que dice qué variable está mal— en vez de
  * reventar más tarde con un `TypeError: Invalid URL` sin contexto.
  */
+import { existsSync } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const BACKEND_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = normalize(join(BACKEND_DIR, '..'))
 
-/** Salida de `vite build`, que vive dentro del propio frontend. */
-const DEFAULT_STATIC_DIR = join('react-dashboard', 'dist')
+/**
+ * Dónde está el tablero compilado cuando nadie lo dice con `STATIC_DIR`.
+ *
+ * Son dos sitios porque el backend corre en dos formas distintas:
+ *
+ *  - En el repositorio, el bundle es la salida de `vite build` y vive dentro
+ *    del propio frontend (`react-dashboard/dist`).
+ *  - En una release empaquetada no hay `react-dashboard/`: el guion deja el
+ *    bundle en `public/`, junto a `backend/`.
+ *
+ * Se prueba `public/` primero. Sin esto, arrancar una release a mano —sin
+ * acordarse de `STATIC_DIR`— respondía un 503 diciendo «ejecuta npm run build
+ * en react-dashboard/», que en un servidor de planta es un consejo imposible
+ * de seguir: allí no hay ni frontend ni con qué compilarlo.
+ */
+const STATIC_DIR_CANDIDATOS = ['public', join('react-dashboard', 'dist')]
 
 const DEFAULTS = {
   port: 3001,
@@ -150,10 +165,19 @@ function checkTlsVerification(env, isProduction) {
 }
 
 function readStaticDir(rawValue) {
-  const relativeOrAbsolute = rawValue || DEFAULT_STATIC_DIR
-  return normalize(
-    isAbsolute(relativeOrAbsolute) ? relativeOrAbsolute : join(PROJECT_ROOT, relativeOrAbsolute)
-  )
+  if (rawValue) {
+    return normalize(isAbsolute(rawValue) ? rawValue : join(PROJECT_ROOT, rawValue))
+  }
+
+  // Sin `STATIC_DIR`, se elige el primer candidato que exista de verdad. Si
+  // no existe ninguno, se devuelve el último para que el 503 de
+  // `staticFiles.mjs` nombre la ruta del repositorio, que es donde tiene
+  // sentido el consejo de compilar.
+  for (const candidato of STATIC_DIR_CANDIDATOS) {
+    const ruta = normalize(join(PROJECT_ROOT, candidato))
+    if (existsSync(join(ruta, 'index.html'))) return ruta
+  }
+  return normalize(join(PROJECT_ROOT, STATIC_DIR_CANDIDATOS[STATIC_DIR_CANDIDATOS.length - 1]))
 }
 
 /**
