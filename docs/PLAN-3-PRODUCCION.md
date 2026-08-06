@@ -24,8 +24,20 @@
 > **Decisión de despliegue tomada:** Windows Server con IIS delante (§3.2,
 > opción B). El §4 está reescrito para ese destino.
 >
-> **Siguiente:** el diagnóstico de O-1 con quien configura ICONICS —es lo que
-> bloquea la Fase A y con ella todo lo demás— y la Fase D.
+> **Fase D escrita, a medio verificar.** `empaquetar.ps1` y `desplegar.ps1`
+> están **probados** —los tres rechazos del primero, y el ciclo completo de
+> despliegue y reversión del segundo, con la reversión medida en 0,1 s—.
+> `instalar-servicio.ps1` y el `web.config` de IIS están escritos pero **sin
+> ejecutar**: necesitan NSSM, IIS y el servidor. Runbook en
+> [`deploy/LEEME.md`](../deploy/LEEME.md).
+>
+> **Siguiente, y por este orden:**
+>
+> 1. El diagnóstico de **O-1** con quien configura ICONICS. Bloquea la Fase A
+>    y, con ella, la validación de planta: hoy no hay números que enseñar.
+> 2. Los **siete accesos** que pide el runbook (máquina, certificado, grupo de
+>    AD, cuenta ICONICS de solo lectura, CA, cuenta de servicio, NSSM+IIS).
+>    Son la parte lenta y no dependen de este repositorio.
 
 Tercer plan. **Subordinado al [Plan 1](PLAN-1-CONEXION-ICONICS.md)** en lo funcional —las
 Fases 7 y 8 siguen abiertas— e **independiente del [Plan 2](PLAN-2-MEJORAS.md)**, que es
@@ -657,29 +669,50 @@ despliegue y poco más, ese es el número que se nota.
 El build de **demo** añade sobre eso 12 trozos con las propuestas (~80 KB en total, ninguno
 mayor de 38 KB) que se descargan sólo al abrir cada una. Pruebas del frontend: **141**.
 
-### Fase D · Empaquetar y desplegar ▄ · **Windows Server**
+### Fase D · Empaquetar y desplegar ▄ · **Windows Server** · escrita, a medio verificar
 
-Requiere accesos que no dependen de este repositorio: la máquina, el certificado corporativo,
-el grupo de AD y una cuenta de servicio en ICONICS. Conviene pedirlos **antes** de empezar,
-porque son la parte lenta.
+Todo lo que no necesita el servidor delante está hecho y probado. Lo que sí lo necesita está
+escrito y comentado, pero **sin ejecutar ni una vez**, y conviene tratarlo como tal.
 
-- **D.1** `deploy\empaquetar.ps1` (§4.3): banderas, suites, build y carpeta de release.
-- **D.2** Estructura `releases\` + junction `current` en el servidor (§4.2). Es lo que hace
-  posible revertir sin recompilar.
-- **D.3** Servicio de Windows con NSSM: arranque automático, reinicio ante caída, cuenta
-  dedicada y rotación de logs (P1-1, P1-4).
-- **D.4** IIS: TLS con el certificado corporativo (P0-4), compresión y cabeceras (P1-6, P1-8).
-  No olvidar `TRUST_PROXY=true` ni el `no-cache` del `index.html`.
-- **D.5** Autenticación de Windows/AD en el sitio de IIS, contra el grupo que decida planta
-  (P0-1.2). Es el bloqueante más grande de todo el plan y aquí sale casi gratis.
-- **D.6** Cuenta ICONICS de mínimo privilegio —**de solo lectura**, que ahora es coherente con
-  el defecto del puente— y `.env.production` con ACL restringida (P0-5).
-- **D.7** Instalar la CA de ICONICS y apuntar `NODE_EXTRA_CA_CERTS`. Con `NODE_ENV=production`
-  el servicio no arranca si alguien intenta salir del paso con el TLS relajado (P0-3).
-- **D.8** Staging contra el ICONICS real. Una semana encendido, mirando.
+| | Estado |
+|---|---|
+| **D.1** `deploy\empaquetar.ps1` | ✅ **probado** — los tres rechazos y el camino feliz |
+| **D.2** `deploy\desplegar.ps1` | ✅ **probado** — despliegue, cambio de versión y reversión |
+| **D.3** `deploy\instalar-servicio.ps1` | ⚠️ escrito, sin ejecutar (necesita NSSM y admin) |
+| **D.4/D.5** `deploy\iis\web.config` | ⚠️ escrito, sin ejecutar (necesita IIS) |
+| **D.6/D.7** `deploy\env.production.example` | ⚠️ plantilla lista; los valores dependen de accesos |
+| **D.8** Staging | ⛔ bloqueada: no hay servidor |
 
-*Criterio de salida:* el despliegue completo se levanta desde cero, en una máquina limpia,
-siguiendo el runbook y sin pasos que sólo sepa dar quien lo escribió.
+**Lo probado, y con qué resultado.**
+`empaquetar.ps1` se niega a producir un paquete en los tres casos que lo justifican: con una
+bandera de demo en el entorno, con el árbol de git sucio, y —el que de verdad importa— con la
+bandera colada por `react-dashboard\.env.local`, que ninguna revisión del entorno detecta. Ese
+tercer guarda inspecciona el bundle **ya compilado**; se comprobó ensuciando el `.env.local` a
+propósito y cazó los 13 trozos de propuesta.
+
+`desplegar.ps1` se ejecutó completo contra una raíz de ensayo: extrae, prueba la release **en
+un puerto aparte antes de darle tráfico** —arrancando Node de verdad—, cambia el junction,
+sincroniza `APP_VERSION` y reinicia. La **reversión tardó 0,1 s** más el reinicio del servicio,
+con las dos releases intactas en disco y las credenciales del `.env.production` sin tocar. Eso
+cubre **E.4** salvo por hacerlo una vez sobre el servidor real.
+
+**Dos decisiones que salieron de escribirlo.**
+
+- Los guiones del servidor están escritos para **Windows PowerShell 5.1**, no para el 7. Es el
+  que trae un Windows Server de fábrica, y no compensa exigir una instalación más sólo para
+  desplegar. Eso descartó `Start-Process -Environment` y obligó a desempaquetar el `.Target`
+  del junction, que en 5.1 es una colección y no una cadena — un fallo que habría dejado la
+  reversión sin saber a dónde volver, justo cuando hace falta.
+- `desplegar.ps1` exige privilegios **sólo si hay un servicio que reiniciar**, que es lo único
+  que los necesita. Así un ensayo sobre una raíz de prueba se puede lanzar sin elevar, y la
+  comprobación sigue protegiendo el caso real. Y se hace antes de tocar nada: fallar a mitad,
+  con `current` ya borrado, deja el tablero caído por una razón evitable.
+
+*Criterio de salida:* **no cumplido todavía.** Falta levantarlo desde cero en una máquina
+limpia siguiendo el runbook ([`deploy/LEEME.md`](../deploy/LEEME.md)). Lo que ese runbook pide
+por adelantado son siete accesos, no siete tareas: la máquina, el certificado corporativo, el
+grupo de AD, la cuenta ICONICS de solo lectura, la CA del servidor, la cuenta de servicio, y
+NSSM con los módulos de IIS.
 
 ### Fase E · Operación ▄
 
