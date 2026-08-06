@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SINOPSIS
     Construye el paquete de release del tablero ICONICS.
 

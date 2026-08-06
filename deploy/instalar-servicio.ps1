@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SINOPSIS
     Registra el tablero como servicio de Windows con NSSM.
 

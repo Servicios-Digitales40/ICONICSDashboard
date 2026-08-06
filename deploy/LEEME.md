@@ -34,6 +34,42 @@ pedirlo con tiempo:
 
 ---
 
+## Antes del primer `.\algo.ps1`: la política de ejecución
+
+Windows bloquea por defecto la ejecución de guiones, y el mensaje —«la ejecución
+de scripts está deshabilitada en este sistema»— no dice cómo salir de ahí. Tres
+formas, de menos a más permanente:
+
+```powershell
+# a) Sólo para esta ejecución. No deja nada configurado.
+powershell -ExecutionPolicy Bypass -File .\empaquetar.ps1
+
+# b) Sólo para esta ventana.
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# c) Para tu usuario, de forma permanente. No necesita administrador.
+#    RemoteSigned permite los guiones locales y sigue exigiendo firma a los
+#    descargados, que es el equilibrio razonable.
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+**La trampa:** *PowerShell 7 y Windows PowerShell 5.1 guardan esa política en
+claves de registro distintas.* Configurarla en uno no la configura en el otro,
+así que el mismo guion puede correr en `pwsh` y ser rechazado en
+`powershell.exe` de la misma máquina. Si el rechazo aparece de la nada, es casi
+siempre eso.
+
+En un **Windows Server** suele no hacer falta: 5.1 viene con `RemoteSigned` de
+fábrica en las ediciones de servidor, al contrario que en Windows cliente.
+
+> Si alguien edita estos guiones, hay que **guardarlos en UTF-8 con BOM**.
+> Windows PowerShell 5.1 lee los `.ps1` como ANSI cuando no hay BOM, y los
+> acentos y los caracteres de los separadores se convierten en un error de
+> sintaxis que no señala la causa. Los editores suelen ofrecer
+> «UTF-8 with BOM» en el selector de codificación.
+
+---
+
 ## Instalación, la primera vez
 
 ```powershell
