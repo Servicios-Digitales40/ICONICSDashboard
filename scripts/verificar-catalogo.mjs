@@ -149,7 +149,11 @@ async function main() {
   console.log(`${c.verde}✓ correctos${c.reset}          ${correctos}`);
 
   bloque("✗ NO EXISTEN en el servidor", c.rojo, ausentes, (x) => x.propiedad);
-  bloque(`⚠ MALA CALIDAD (≠ ${QUALITY_GOOD})`, c.ambar, malaCalidad,
+  // El criterio real es `isGoodQuality`, que acepta las DOS convenciones que
+  // conviven: 192 de OPC-DA y 0 de OPC-UA. El rótulo decía "≠ 192" y hacía
+  // pensar que un `q=0` —que es bueno, y el que devuelve la REST API— estaba
+  // contado aquí.
+  bloque(`⚠ MALA CALIDAD (ni ${QUALITY_GOOD} de OPC-DA ni 0 de OPC-UA)`, c.ambar, malaCalidad,
     (x) => `${x.propiedad}[q=${x.calidad}]`);
   bloque("⚠ SIN VALOR utilizable", c.ambar, sinValor,
     (x) => `${x.propiedad}=${x.valor}`);

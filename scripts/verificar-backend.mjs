@@ -40,6 +40,10 @@ import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
 let loginCount = 0
+/** Pings a `/echo`: sirve para demostrar que `/api/health/live` no consulta. */
+let echoCount = 0
+/** Llamadas reales de lote: demuestra que la caché colapsa las repetidas. */
+let batchCount = 0
 
 /* ── Servidor ICONICS falso ──────────────────────────────────────────── */
 const fake = createServer(async (req, res) => {
@@ -98,15 +102,24 @@ const fake = createServer(async (req, res) => {
     if (!authed) return json(401, { error: 'unauthorized' })
   }
 
-  if (p === '/fwxapi/echo/v1') return json(200, { echo: true })
+  if (p === '/fwxapi/echo/v1') {
+    echoCount += 1
+    return json(200, { echo: true })
+  }
   if (p === '/fwxapi/systeminfo/v1/UserInfo') return json(200, { userName: 'u' })
 
   if (p === '/fwxapi/rest/v1/Data' && req.method === 'GET') {
     const pn = url.searchParams.get('pointName')
     if (pn === 'boom') return json(500, { detail: 'upstream exploded' })
+    // Un servidor saturado no rechaza la conexión: la acepta y no contesta.
+    // `unref` para que este temporizador no retrase la salida del script.
+    if (pn === 'lento') {
+      return void setTimeout(() => json(200, { pointName: pn, value: 1 }), 1500).unref()
+    }
     return json(200, { pointName: pn, value: 42, quality: 192 })
   }
   if (p === '/fwxapi/rest/v1/Data' && req.method === 'POST') {
+    batchCount += 1
     let body = ''
     for await (const chunk of req) body += chunk
     const { pointName } = JSON.parse(body)
@@ -145,7 +158,8 @@ await new Promise(r => fake.listen(0, '127.0.0.1', r))
 const fakeBase = `http://127.0.0.1:${fake.address().port}`
 
 /* ── Backend bajo prueba ─────────────────────────────────────────────── */
-const config = loadConfig({
+/** Entorno base de prueba. Cada bloque lo ajusta con lo que quiere demostrar. */
+const baseEnv = {
   PORT: '0',
   LOG_LEVEL: 'ERROR',
   ICONICS_API_BASE: `${fakeBase}/fwxapi/rest/v1/`,
@@ -153,6 +167,36 @@ const config = loadConfig({
   ICONICS_PASSWORD: 'p',
   ICONICS_POINT_NAME: 'ac:default',
   STATIC_DIR: 'react-dashboard/dist',
+}
+
+const config = loadConfig({
+  ...baseEnv,
+  // El contrato histórico se comprueba con la escritura habilitada: el modo
+  // solo lectura —que es el DEFECTO— tiene su propio bloque más abajo.
+  ICONICS_READ_ONLY: 'false',
+  CORS_ORIGINS: 'http://localhost:5173',
+})
+
+/** Levanta una app con el entorno indicado y devuelve su URL base. */
+async function mount(env) {
+  const server = createServer(createApp(loadConfig({ ...baseEnv, ...env })))
+  await new Promise(r => server.listen(0, '127.0.0.1', r))
+  return { base: `http://127.0.0.1:${server.address().port}`, server }
+}
+
+/** `fetch` + parseo tolerante contra una base arbitraria. */
+async function call(baseUrl, path, init) {
+  const res = await fetch(`${baseUrl}${path}`, init)
+  const text = await res.text()
+  let body
+  try { body = JSON.parse(text) } catch { body = text }
+  return { status: res.status, body, headers: res.headers }
+}
+
+const postJson = payload => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
 })
 
 const app = createServer(createApp(config))
@@ -378,7 +422,10 @@ console.log('\n── Regresiones corregidas ───────────�
 
 // A. CORS: el preflight debe anunciar los métodos que la API acepta
 {
-  const res = await fetch(`${base}/api/iconics/write`, { method: 'OPTIONS' })
+  const res = await fetch(`${base}/api/iconics/write`, {
+    method: 'OPTIONS',
+    headers: { Origin: 'http://localhost:5173' },
+  })
   check('preflight anuncia POST y PUT (antes solo GET, OPTIONS)', () => {
     assert.equal(res.status, 204)
     const allow = res.headers.get('access-control-allow-methods')
@@ -491,12 +538,181 @@ console.log('\n── Sin ICONICS configurado ───────────�
   bare.close()
 }
 
+console.log('\n── Endurecimiento · modo solo lectura (B.1) ────────────────')
+{
+  // Sin ICONICS_READ_ONLY: el defecto debe ser NO poder escribir en la planta.
+  const { base: ro, server } = await mount({})
+
+  const write = await call(ro, '/api/iconics/write', postJson({ pointName: 'ac:a', value: 1 }))
+  check('por defecto, POST /write → 403 (no 200, y no el index.html)', () => {
+    assert.equal(write.status, 403)
+    assert.equal(write.body.ok, false)
+    assert.match(write.body.error, /solo lectura/)
+    assert.match(write.body.error, /ICONICS_READ_ONLY=false/)
+  })
+
+  const batch = await call(ro, '/api/iconics/write/batch', postJson({ items: [{ pointName: 'ac:a', value: 1 }] }))
+  check('por defecto, POST /write/batch → 403', () => assert.equal(batch.status, 403))
+
+  const ack = await call(ro, '/api/iconics/alarms/acknowledge', {
+    ...postJson({ eventIds: ['e1'] }),
+    method: 'PUT',
+  })
+  check('por defecto, PUT /alarms/acknowledge → 403', () => assert.equal(ack.status, 403))
+
+  const read = await call(ro, '/api/iconics/data?pointName=ac:a')
+  check('en solo lectura, la LECTURA sigue funcionando', () => {
+    assert.equal(read.status, 200)
+    assert.equal(read.body.ok, true)
+  })
+
+  check('ICONICS_READ_ONLY con un valor que no es booleano no arranca', () => {
+    assert.throws(() => loadConfig({ ICONICS_READ_ONLY: 'flase' }), /"true" o "false"/)
+  })
+  server.close()
+}
+
+console.log('\n── Endurecimiento · CORS (B.2) ─────────────────────────────')
+{
+  const permitido = await call(base, '/api/health/live', {
+    headers: { Origin: 'http://localhost:5173' },
+  })
+  check('origen en CORS_ORIGINS → se devuelve ese origen, nunca "*"', () => {
+    assert.equal(permitido.headers.get('access-control-allow-origin'), 'http://localhost:5173')
+    assert.match(permitido.headers.get('vary') ?? '', /Origin/)
+  })
+
+  const ajeno = await call(base, '/api/health/live', { headers: { Origin: 'http://malicioso.example' } })
+  check('origen fuera de la lista → sin cabecera de permiso', () => {
+    assert.equal(ajeno.headers.get('access-control-allow-origin'), null)
+  })
+
+  const { base: sinCors, server } = await mount({})
+  const r = await call(sinCors, '/api/health/live', { headers: { Origin: 'http://localhost:5173' } })
+  check('sin CORS_ORIGINS (el defecto) no se autoriza ningún origen', () => {
+    assert.equal(r.headers.get('access-control-allow-origin'), null)
+  })
+  server.close()
+}
+
+console.log('\n── Endurecimiento · timeout de salida (B.3) ────────────────')
+console.log(`  ${c.gris}(el ERROR de "aborted due to timeout" que sigue es el esperado:`)
+console.log(`   el corte tiene que quedar registrado)${c.reset}`)
+{
+  const { base: lento, server } = await mount({ UPSTREAM_TIMEOUT_MS: '200' })
+  const inicio = Date.now()
+  const r = await call(lento, '/api/iconics/data?pointName=lento')
+  const duracion = Date.now() - inicio
+
+  check('servidor que acepta y no contesta → 504, no una petición colgada', () => {
+    assert.equal(r.status, 504)
+    assert.match(r.body.error, /no respondió en 200 ms/)
+    assert.ok(duracion < 1200, `tardó ${duracion} ms: no cortó`)
+  })
+  check('UPSTREAM_TIMEOUT_MS inválido no arranca', () => {
+    assert.throws(() => loadConfig({ UPSTREAM_TIMEOUT_MS: 'pronto' }), /entero >= 1/)
+  })
+  server.close()
+}
+
+console.log('\n── Endurecimiento · salud partida (B.4) ────────────────────')
+{
+  const antes = echoCount
+  const live = await call(base, '/api/health/live')
+  check('GET /api/health/live no consulta a ICONICS', () => {
+    assert.equal(live.status, 200)
+    assert.equal(live.body.status, 'ok')
+    assert.equal(echoCount, antes, 'la sonda del orquestador hizo un ping')
+  })
+
+  const ready = await call(base, '/api/health/ready')
+  check('GET /api/health/ready sí consulta, y equivale a /api/health', () => {
+    assert.equal(ready.body.status, 'ok')
+    assert.equal(ready.body.iconicsReachable, true)
+    assert.ok(echoCount > antes, 'no consultó a ICONICS')
+  })
+
+  const { base: versionado, server } = await mount({ APP_VERSION: 'v1.2.3-abc' })
+  const r = await call(versionado, '/api/health/live')
+  check('la salud dice qué build corre (APP_VERSION)', () => {
+    assert.equal(r.body.version, 'v1.2.3-abc')
+    assert.equal(live.body.version, 'dev', 'sin APP_VERSION debe valer "dev"')
+  })
+  check('/api/health/ready informa del modo solo lectura', () => {
+    assert.equal(ready.body.readOnly, false, 'esta instancia arrancó con escritura')
+  })
+  server.close()
+}
+
+console.log('\n── Endurecimiento · límite de peticiones (B.5) ─────────────')
+{
+  const { base: limitado, server } = await mount({ RATE_LIMIT_MAX: '3', RATE_LIMIT_WINDOW_MS: '60000' })
+
+  const respuestas = []
+  for (let i = 0; i < 5; i++) respuestas.push(await call(limitado, '/api/health/live'))
+
+  check('pasado el tope, la API responde 429 con Retry-After', () => {
+    assert.deepEqual(respuestas.map(r => r.status), [200, 200, 200, 429, 429])
+    assert.match(respuestas[3].headers.get('retry-after') ?? '', /^\d+$/)
+    assert.match(respuestas[3].body.error, /Demasiadas peticiones/)
+  })
+
+  const estatico = await call(limitado, '/una/ruta/de/la/spa')
+  check('el límite no alcanza a los estáticos de la SPA', () => {
+    assert.notEqual(estatico.status, 429)
+  })
+  server.close()
+}
+
+console.log('\n── Endurecimiento · caché de lote (B.7) ────────────────────')
+{
+  const puntos = 'points=' + ['ac:x', 'ac:y'].map(encodeURIComponent).join(',')
+
+  const { base: conCache, server } = await mount({ BATCH_CACHE_TTL_MS: '2000' })
+  batchCount = 0
+  const lotes = await Promise.all(
+    Array.from({ length: 5 }, () => call(conCache, `/api/iconics/data/batch?${puntos}`))
+  )
+  check('cinco pantallas pidiendo los mismos tags → UNA llamada a ICONICS', () => {
+    assert.ok(lotes.every(r => r.body.ok === true), 'todas deben resolverse bien')
+    assert.equal(lotes[0].body.payload['ac:x'].payload.value, 0)
+    assert.equal(batchCount, 1, `llamadas upstream=${batchCount}`)
+  })
+
+  const otroOrden = await call(conCache, '/api/iconics/data/batch?points=ac%3Ay,ac%3Ax')
+  check('el mismo conjunto en otro orden es la misma lectura', () => {
+    assert.equal(otroOrden.body.ok, true)
+    assert.equal(batchCount, 1, `llamadas upstream=${batchCount}`)
+  })
+  server.close()
+
+  const { base: sinCache, server: server2 } = await mount({ BATCH_CACHE_TTL_MS: '0' })
+  batchCount = 0
+  for (let i = 0; i < 3; i++) await call(sinCache, `/api/iconics/data/batch?${puntos}`)
+  check('BATCH_CACHE_TTL_MS=0 desactiva la caché', () => {
+    assert.equal(batchCount, 3, `llamadas upstream=${batchCount}`)
+  })
+  server2.close()
+}
+
 console.log('\n── Configuración inválida ──────────────────────────────────')
 check('ICONICS_API_BASE mal formada falla al cargar, con mensaje', () => {
   assert.throws(() => loadConfig({ ICONICS_API_BASE: 'no-es-url' }), /URL absoluta válida/)
 })
 check('PORT inválido falla al cargar, con mensaje', () => {
   assert.throws(() => loadConfig({ PORT: '99999' }), /entre 0 y 65535/)
+})
+
+// B.6 · El descuido de R-13: que el `.env` de desarrollo viaje al servidor.
+check('NODE_TLS_REJECT_UNAUTHORIZED=0 en producción impide el arranque', () => {
+  assert.throws(
+    () => loadConfig({ NODE_ENV: 'production', NODE_TLS_REJECT_UNAUTHORIZED: '0' }),
+    /NODE_EXTRA_CA_CERTS/
+  )
+})
+check('fuera de producción arranca, pero queda marcado para avisarlo', () => {
+  assert.equal(loadConfig({ NODE_TLS_REJECT_UNAUTHORIZED: '0' }).tlsVerificationDisabled, true)
+  assert.equal(loadConfig({}).tlsVerificationDisabled, false)
 })
 
 app.close()

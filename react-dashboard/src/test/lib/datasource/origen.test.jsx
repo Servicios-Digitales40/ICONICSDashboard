@@ -83,3 +83,34 @@ describe("derivación del origen activo", () => {
     expect(origenActual(MODOS.DEMO)).toBe(ORIGENES.demo);
   });
 });
+
+describe("el modo demo se compila bajo bandera", () => {
+  /*
+   * El interruptor de demo sustituye la planta entera por datos inventados
+   * plausibles. En un monitor de planta —sin teclado y sin nadie delante—
+   * sólo puede activarse por accidente, y una vez activado nadie lo
+   * desactiva: la cinta de aviso funciona con público delante, no en una
+   * pared.
+   *
+   * Por eso el cierre tiene que estar en el MODELO y no sólo en que el
+   * Topbar oculte el botón; si el cierre viviera únicamente en la interfaz,
+   * cualquier consumidor futuro lo reabriría sin enterarse. Se recarga el
+   * módulo porque la bandera se resuelve al importarlo, igual que en el build.
+   */
+  const cargarCon = async (valor) => {
+    vi.resetModules();
+    if (valor === undefined) vi.stubEnv("VITE_ENABLE_DEMO", "");
+    else vi.stubEnv("VITE_ENABLE_DEMO", valor);
+    return import("@/lib/datasource/DataSourceProvider.jsx");
+  };
+
+  it("está apagado si nadie lo pide", async () => {
+    expect((await cargarCon(undefined)).DEMO_HABILITADO).toBe(false);
+  });
+
+  it("no lo enciende cualquier valor: sólo la cadena 'true'", async () => {
+    expect((await cargarCon("1")).DEMO_HABILITADO).toBe(false);
+    expect((await cargarCon("yes")).DEMO_HABILITADO).toBe(false);
+    expect((await cargarCon("true")).DEMO_HABILITADO).toBe(true);
+  });
+});

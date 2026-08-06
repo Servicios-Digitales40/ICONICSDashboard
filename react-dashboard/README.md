@@ -38,12 +38,21 @@ y los dos que no son reales llevan además una cinta permanente.
 |---|---|---|
 | 🟢 **En vivo** | Servidor ICONICS | **Por defecto** |
 | 🟣 **Simulado** | Transporte falso, sin red | `VITE_ICONICS_FAKE=true` |
-| 🟠 **Demo** | Datos de ejemplo fijos | Botón del Topbar |
+| 🟠 **Demo** | Datos de ejemplo fijos | Botón del Topbar, si `VITE_ENABLE_DEMO=true` |
 
 ```bash
 npm run dev                            # → En vivo (necesita el backend puente)
 VITE_ICONICS_FAKE=true npm run dev     # → Simulado (desarrollo sin servidor)
+VITE_ENABLE_DEMO=true npm run dev      # → con el interruptor de demo disponible
 ```
+
+> **El botón de demo se compila bajo bandera y está apagado por defecto.** El
+> destino de esto son monitores de planta: sin teclado y sin nadie delante, un
+> interruptor que sustituye la planta entera por datos inventados sólo puede
+> activarse por accidente, y una vez activado nadie lo desactiva. La cinta de
+> aviso funciona con público delante, no en una pared. Con la bandera apagada
+> sobreviven el indicador de origen y su cinta —que siguen distinguiendo el
+> servidor real del simulador—; lo que desaparece es el interruptor.
 
 > El defecto estuvo invertido durante el desarrollo y se corrigió a
 > propósito: la variable se resuelve en **build**, así que un `npm run build`
@@ -83,8 +92,9 @@ src/
 │
 ├── app/                      Armazón: providers, layout y rutas
 │   ├── App.jsx               Composición de providers + Shell
+│   ├── ErrorBoundary.jsx     Barrera de render: raíz y por página
 │   ├── layout/               Sidebar, Topbar, cinta de modo demo
-│   └── routes/               Registro ÚNICO de rutas (routes.jsx)
+│   └── routes/               Registro ÚNICO de rutas (routes.jsx) + URL
 │
 ├── lib/                      Infraestructura compartida
 │   ├── domain/               Forma `Machine`, estados, saneamiento
@@ -98,13 +108,31 @@ src/
 │   ├── dashboard/            Resumen de planta (rollup + tiles)
 │   ├── machines/             Monitor de área y detalle de máquina
 │   ├── assets/               Explorador del árbol de AssetWorX
-│   ├── data/                 Lectura/escritura de puntos sueltos
-│   └── sankey/               Diagramas de flujo
+│   ├── data/                 Puntos sueltos — SIN RUTA (ver abajo)
+│   └── sankey/               Diagramas de flujo — SIN RUTA (ver abajo)
 │
 ├── components/               Átomos de UI reutilizables (ui/, charts/)
-├── theme/                    Colores claro/oscuro + useTheme()
-└── prototypes/               Propuestas en evaluación (desechables)
+└── theme/                    Colores claro/oscuro + useTheme()
 ```
+
+### Qué se retiró para producción
+
+En la Fase C del [Plan 3](../docs/PLAN-3-PRODUCCION.md) se acotó la superficie
+de la aplicación a lo que un operador debe poder abrir en un monitor sin
+teclado:
+
+- **`src/prototypes/` se borró entera** — las 13 rutas de propuestas de diseño
+  en evaluación (Sandbox, «Planta · v2» y las diez variantes de área). Su
+  invariante de hoja del grafo hizo que retirarlas no tocara una sola línea de
+  producción, que era exactamente para lo que estaba puesto.
+- **`features/data/` y `features/sankey/` siguen en el árbol pero nadie los
+  importa**, así que no entran en el bundle. `Data` hacía altas, escrituras y
+  **borrados** contra `db:Northwind`, la base de ejemplo de ICONICS; si vuelve,
+  vuelve detrás de autenticación y sin la pestaña de borrado. `SankeyChart` sí
+  sigue en producción: lo usa el detalle de máquina.
+
+El registro de rutas (`app/routes/routes.jsx`) es el único sitio donde se
+decide esto.
 
 ### Flujo de datos
 
@@ -143,6 +171,22 @@ vistas  ──usePlantData() / useMachineData()──►  DataSourceProvider
 
 - **El vocabulario de estados vive en `lib/domain/estado.js`**, no duplicado
   entre la tarjeta y el dashboard.
+
+- **La ruta actual vive en la URL.** `/area-REC` abre las rectificadoras
+  directamente, una recarga vuelve donde estaba y el enlace de una máquina se
+  puede enviar. Antes era un `useState` y la barra de direcciones no cambiaba
+  nunca: en un escritorio no se nota, pero obligaba a ir pantalla por pantalla
+  a dejarlas en su vista, y cualquier reinicio las devolvía a Planta.
+
+- **Una excepción de render no apaga el tablero.** `ErrorBoundary` envuelve
+  cada página y la raíz; una vista rota se queda en su sitio con un panel que
+  lo dice, y la barra lateral sigue navegable. En un monitor de planta nadie
+  recarga, así que una pantalla en blanco se queda en blanco hasta que alguien
+  sube a verla.
+
+- **La pantalla dice qué build corre.** El Topbar muestra el `git describe` del
+  build. Es lo primero que hace falta cuando alguien reporta que un número está
+  mal: saber si esa pantalla concreta ya tiene el arreglo.
 
 ---
 

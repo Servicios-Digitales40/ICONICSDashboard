@@ -44,11 +44,48 @@ function ContadorRed({ t }) {
 /** Icono por origen. Es lo único de presentación que no vive en el dominio. */
 const ICONO_ORIGEN = { real: Wifi, simulado: Radio, demo: FlaskConical };
 
+/**
+ * Qué build está corriendo esta pantalla.
+ *
+ * Lo inyecta el empaquetado desde `git describe`. Es lo primero que hace
+ * falta cuando alguien de planta reporta que un número está mal: saber si esa
+ * pantalla concreta ya tiene el arreglo, sin tener que ir hasta ella. Discreto
+ * a propósito —no es información para el operador— pero visible sin
+ * herramientas, que es lo que lo diferencia de mirarlo en la consola.
+ */
+function VersionBuild({ t }) {
+  const version = import.meta.env.VITE_APP_VERSION;
+  if (!version) return null;
+
+  return (
+    <span
+      title={`Build ${version}`}
+      style={{
+        fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace",
+        color: t.textFaint, opacity: 0.65, letterSpacing: 0.2,
+      }}
+    >
+      {version}
+    </span>
+  );
+}
+
 export function Topbar({ page }) {
   const { theme: t, dark, toggleTheme } = useTheme();
-  const { isDemo, toggleMode, origen } = useDataSource();
+  const { isDemo, toggleMode, origen, demoDisponible } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
+
+  /* El indicador de origen es el mismo con y sin modo demo; lo que cambia es
+     si además es pulsable. Se comparte el estilo para que no puedan derivar. */
+  const estiloOrigen = {
+    display: "flex", alignItems: "center", gap: 6,
+    padding: "7px 12px", borderRadius: 999,
+    background: origen.avisa ? `${t[origen.token]}22` : t.panel,
+    border: `1px solid ${origen.avisa ? t[origen.token] : t.border}`,
+    color: origen.avisa ? t[origen.token] : t.textSoft,
+    fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+  };
 
   return (
     <div
@@ -94,6 +131,7 @@ export function Topbar({ page }) {
         </button> */}
 
         <ContadorRed t={t} />
+        <VersionBuild t={t} />
 
         {/* Indicador de ORIGEN, con sus tres estados reales.
 
@@ -103,26 +141,29 @@ export function Topbar({ page }) {
             propósito, no había forma de notar la diferencia mirando la
             pantalla.
 
-            Pulsar sigue alternando entre la fuente real y la demo; lo que
-            cambia es que ahora el botón dice cuál de las tres es. */}
-        <HoverTip label={isDemo ? "Volver a datos de ICONICS" : `${origen.descripcion} · pulsa para usar datos de ejemplo`}>
-          <button
-            onClick={toggleMode}
-            aria-pressed={isDemo}
-            aria-label={`Origen de datos: ${origen.descripcion}`}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 12px", borderRadius: 999, cursor: "pointer",
-              background: origen.avisa ? `${t[origen.token]}22` : t.panel,
-              border: `1px solid ${origen.avisa ? t[origen.token] : t.border}`,
-              color: origen.avisa ? t[origen.token] : t.textSoft,
-              fontSize: 12, fontWeight: 700, fontFamily: "inherit",
-            }}
-          >
-            <IconoOrigen size={13} strokeWidth={2.5} />
-            {origen.label}
-          </button>
-        </HoverTip>
+            Sin modo demo compilado (`VITE_ENABLE_DEMO`) el indicador se
+            queda, porque distinguir el servidor real del simulador sigue
+            importando; lo que desaparece es la posibilidad de pulsarlo. */}
+        {demoDisponible ? (
+          <HoverTip label={isDemo ? "Volver a datos de ICONICS" : `${origen.descripcion} · pulsa para usar datos de ejemplo`}>
+            <button
+              onClick={toggleMode}
+              aria-pressed={isDemo}
+              aria-label={`Origen de datos: ${origen.descripcion}`}
+              style={{ ...estiloOrigen, cursor: "pointer" }}
+            >
+              <IconoOrigen size={13} strokeWidth={2.5} />
+              {origen.label}
+            </button>
+          </HoverTip>
+        ) : (
+          <HoverTip label={origen.descripcion}>
+            <span role="status" aria-label={`Origen de datos: ${origen.descripcion}`} style={estiloOrigen}>
+              <IconoOrigen size={13} strokeWidth={2.5} />
+              {origen.label}
+            </span>
+          </HoverTip>
+        )}
 
         <button
           onClick={toggleTheme}

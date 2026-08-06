@@ -26,16 +26,33 @@ function start() {
 
   server.listen(config.port, '0.0.0.0', () => {
     logger.info('ICONICS bridge started', {
+      version: config.version,
       port: config.port,
       iconicsBase: config.iconics.apiBase || null,
       defaultPoint: config.iconics.defaultPointName || null,
       staticDir: config.staticDir,
+      readOnly: config.iconics.readOnly,
+      corsOrigins: config.corsOrigins.length,
     })
 
     if (!config.iconics.isConfigured) {
       logger.warn('ICONICS_API_BASE sin configurar: la API responderá 500', {})
     } else if (!config.iconics.canAuthenticate) {
       logger.warn('Sin credenciales ICONICS: las peticiones saldrán sin token', {})
+    }
+
+    // Los dos avisos siguientes son de las cosas que hay que ver en el log al
+    // levantar un servidor y preguntarse "¿esto está como debería?". Se
+    // anuncian aunque sean legítimos en desarrollo, porque el descuido no es
+    // activarlos: es no darse cuenta de que siguen activos.
+    if (!config.iconics.readOnly) {
+      logger.warn('ICONICS_READ_ONLY=false: la escritura sobre la planta está HABILITADA', {})
+    }
+    if (config.tlsVerificationDisabled) {
+      logger.warn(
+        'NODE_TLS_REJECT_UNAUTHORIZED=0: verificación de certificados DESACTIVADA en todo el proceso',
+        { arreglo: 'instala la CA de ICONICS y usa NODE_EXTRA_CA_CERTS' }
+      )
     }
   })
 

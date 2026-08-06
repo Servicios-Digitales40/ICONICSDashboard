@@ -23,6 +23,22 @@ import { createIconicsSource } from "./iconicsSource.js";
 export const MODOS = { LIVE: "live", DEMO: "demo" };
 
 /**
+ * ¿Se compiló esta app con el modo demo disponible?
+ *
+ * Apagado salvo que se pida, y se resuelve en BUILD, igual que
+ * `VITE_ICONICS_FAKE`. El motivo es el destino: en un monitor de planta, sin
+ * teclado y sin nadie delante, un botón que sustituye la planta entera por
+ * datos inventados sólo puede activarse por accidente — y una vez activado,
+ * nadie lo desactiva. La cinta de aviso cumple su papel en una demostración
+ * con público; no en una pared.
+ *
+ * Con la bandera apagada sobreviven el INDICADOR de origen y su cinta, que
+ * siguen distinguiendo el servidor real del simulador. Lo que desaparece es
+ * el interruptor.
+ */
+export const DEMO_HABILITADO = import.meta.env?.VITE_ENABLE_DEMO === "true";
+
+/**
  * Origen real de los datos en pantalla. Son tres, no dos: el interruptor del
  * Topbar elige la fuente (live/demo), pero dentro de «live» hay dos
  * transportes posibles, el servidor real y el simulador.
@@ -69,8 +85,14 @@ const Ctx = createContext(null);
 /**
  * Modo inicial. En una instalación limpia siempre es `live`: arrancar en demo
  * sin que nadie lo pida acabaría enseñando datos falsos en producción.
+ *
+ * La preferencia guardada se ignora si el build no trae demo. Sin esa línea,
+ * una pantalla que quedó en demo antes de apagar la bandera volvería a
+ * arrancar en demo para siempre, y ya sin botón para sacarla.
  */
 function modoInicial() {
+  if (!DEMO_HABILITADO) return MODOS.LIVE;
+
   try {
     const guardado = globalThis.localStorage?.getItem(CLAVE_ALMACEN);
     return guardado === MODOS.DEMO ? MODOS.DEMO : MODOS.LIVE;
@@ -95,7 +117,10 @@ export function DataSourceProvider({ children }) {
   // La fuente se crea una sola vez por modo. Recrearla en cada render
   // abriría un motor de polling nuevo cada vez.
   const source = useMemo(
-    () => (mode === MODOS.DEMO ? createDemoSource() : createIconicsSource({ transport: createTransport() })),
+    () =>
+      mode === MODOS.DEMO && DEMO_HABILITADO
+        ? createDemoSource()
+        : createIconicsSource({ transport: createTransport() }),
     [mode]
   );
 
@@ -107,6 +132,8 @@ export function DataSourceProvider({ children }) {
       mode,
       source,
       isDemo: mode === MODOS.DEMO,
+      /** Lo lee el Topbar para decidir si pinta un interruptor o una etiqueta. */
+      demoDisponible: DEMO_HABILITADO,
 
       /**
        * Qué se está viendo realmente. Lo consumen el Topbar y la cinta de
@@ -114,16 +141,23 @@ export function DataSourceProvider({ children }) {
        */
       origen: origenActual(mode),
 
+      // Las dos comprueban la bandera además de que el Topbar oculte el
+      // botón: el interruptor tiene que estar cerrado en el modelo, no sólo
+      // en la interfaz, o cualquier consumidor futuro lo reabriría sin
+      // enterarse.
       setMode: (nuevo) => {
+        if (nuevo === MODOS.DEMO && !DEMO_HABILITADO) return;
         guardarModo(nuevo);
         setModeState(nuevo);
       },
-      toggleMode: () =>
+      toggleMode: () => {
+        if (!DEMO_HABILITADO) return;
         setModeState((actual) => {
           const nuevo = actual === MODOS.DEMO ? MODOS.LIVE : MODOS.DEMO;
           guardarModo(nuevo);
           return nuevo;
-        }),
+        });
+      },
     }),
     [mode, source]
   );

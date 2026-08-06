@@ -26,8 +26,29 @@ function sendResult(response, result) {
 }
 
 export function registerIconicsRoutes(router, { config, client }) {
-  const { defaultPointName } = config.iconics
+  const { defaultPointName, readOnly } = config.iconics
   const { maxRequestBodyBytes, maxAlarmHours } = config.limits
+
+  /**
+   * Envuelve una ruta que modifica algo en ICONICS.
+   *
+   * Con `ICONICS_READ_ONLY` la ruta se registra igual y responde 403. Podría
+   * no registrarse, pero entonces no habría ruta y la petición caería al
+   * respaldo de la SPA: un `POST /api/iconics/write` devolvería el
+   * `index.html` con un **200**, que es lo peor de los dos mundos —el cliente
+   * no escribe nada y cree que sí—. Un 403 que nombra la variable dice qué
+   * pasa y dónde se cambia.
+   */
+  function whenWritable(handler) {
+    if (!readOnly) return handler
+
+    return ({ response }) =>
+      sendError(
+        response,
+        403,
+        'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.'
+      )
+  }
 
   /**
    * Lee el cuerpo JSON. Si es inválido responde el error y devuelve `null`,
@@ -121,7 +142,7 @@ export function registerIconicsRoutes(router, { config, client }) {
 
   /* ── Escritura ────────────────────────────────────────────────────── */
 
-  router.post('/api/iconics/write', async ({ request, response }) => {
+  router.post('/api/iconics/write', whenWritable(async ({ request, response }) => {
     const body = await parseBody(request, response)
     if (!body) return
 
@@ -134,9 +155,9 @@ export function registerIconicsRoutes(router, { config, client }) {
     }
 
     sendResult(response, await client.writePoint(pointName, value))
-  })
+  }))
 
-  router.post('/api/iconics/write/batch', async ({ request, response }) => {
+  router.post('/api/iconics/write/batch', whenWritable(async ({ request, response }) => {
     const body = await parseBody(request, response)
     if (!body) return
 
@@ -155,7 +176,7 @@ export function registerIconicsRoutes(router, { config, client }) {
     }
 
     sendResult(response, await client.writePoints(items))
-  })
+  }))
 
   /* ── Alarmas ──────────────────────────────────────────────────────── */
 
@@ -180,7 +201,7 @@ export function registerIconicsRoutes(router, { config, client }) {
     )
   })
 
-  router.put('/api/iconics/alarms/acknowledge', async ({ request, response }) => {
+  router.put('/api/iconics/alarms/acknowledge', whenWritable(async ({ request, response }) => {
     const body = await parseBody(request, response)
     if (!body) return
 
@@ -190,5 +211,5 @@ export function registerIconicsRoutes(router, { config, client }) {
     }
 
     sendResult(response, await client.acknowledgeAlarms(eventIds, comment ?? ''))
-  })
+  }))
 }

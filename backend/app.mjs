@@ -5,8 +5,10 @@
  * Está separado de `server.mjs` para poder montar la app entera —con una
  * configuración de prueba— sin abrir un puerto.
  */
+import { createCors } from './http/cors.mjs'
+import { createRateLimiter } from './http/rateLimit.mjs'
 import { createRouter } from './http/router.mjs'
-import { sendError, sendPreflight, sendText } from './http/responses.mjs'
+import { sendError, sendText } from './http/responses.mjs'
 import { createStaticFileServer, isAssetPath } from './http/staticFiles.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
@@ -22,6 +24,12 @@ export function createApp(config) {
   const authenticator = createAuthenticator(config)
   const client = createIconicsClient(config, authenticator)
   const staticFiles = createStaticFileServer(config.staticDir)
+  const cors = createCors(config.corsOrigins)
+  const rateLimiter = createRateLimiter({
+    windowMs: config.limits.rateLimitWindowMs,
+    max: config.limits.rateLimitMax,
+    trustProxy: config.trustProxy,
+  })
 
   const router = createRouter()
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
@@ -33,10 +41,16 @@ export function createApp(config) {
       return
     }
 
+    // Las cabeceras de CORS se fijan aquí, una sola vez, y Node las fusiona
+    // con las de cada `writeHead()`: así las heredan por igual el JSON, los
+    // estáticos y el 405 del router, sin que ninguna función de respuesta
+    // tenga que acordarse de ellas.
+    cors.apply(request, response)
+
     // El preflight se responde antes de cualquier otra cosa: no consulta nada
     // y contestarlo tarde retrasa toda petición con cuerpo JSON.
     if (request.method === 'OPTIONS') {
-      sendPreflight(response)
+      cors.preflight(request, response)
       return
     }
 
@@ -46,6 +60,23 @@ export function createApp(config) {
       url: url.pathname,
       ip: request.socket.remoteAddress ?? 'unknown',
     })
+
+    // El límite cubre sólo la API. Los estáticos quedan fuera a propósito:
+    // abrir el tablero son decenas de peticiones de archivos en un segundo, y
+    // contarlas gastaría la cuota del cliente antes de que la primera vista
+    // llegue a pedir un dato.
+    if (url.pathname.startsWith('/api/')) {
+      const { allowed, retryAfterSeconds } = rateLimiter.check(request)
+      if (!allowed) {
+        logger.warn('Rate limit exceeded', {
+          url: url.pathname,
+          ip: request.socket.remoteAddress ?? 'unknown',
+        })
+        response.setHeader('Retry-After', String(retryAfterSeconds))
+        sendError(response, 429, 'Demasiadas peticiones. Inténtalo de nuevo en unos segundos.')
+        return
+      }
+    }
 
     if (await router.handle({ request, response, url })) return
 

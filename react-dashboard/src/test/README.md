@@ -24,7 +24,13 @@ su sujeto.
 | [lib/iconics/pollingEngine.test.js](lib/iconics/pollingEngine.test.js) | Ciclo de vida del motor y **presupuesto de red**: una petición por ciclo, no una por tag. |
 | [lib/datasource/iconicsSource.test.js](lib/datasource/iconicsSource.test.js) | La fuente real pide lo justo y traduce bien. |
 | [lib/datasource/demoSource.test.js](lib/datasource/demoSource.test.js) | La arquitectura nueva no mueve ni un número respecto a la referencia congelada. |
-| [lib/datasource/origen.test.jsx](lib/datasource/origen.test.jsx) | Los tres orígenes (ICONICS / simulador / demo) y su señalización en pantalla. |
+| [lib/datasource/origen.test.jsx](lib/datasource/origen.test.jsx) | Los tres orígenes (ICONICS / simulador / demo), su señalización, y que el modo demo quede cerrado sin `VITE_ENABLE_DEMO`. |
+
+### `app/` — el armazón
+
+| Archivo | Qué fija |
+|---|---|
+| [app/navegacion.test.jsx](app/navegacion.test.jsx) | La ruta vive en la URL: enlace profundo, recarga, botón «atrás» y ruta desconocida. |
 
 ### `features/` — agregación y vistas de producción
 
@@ -36,16 +42,10 @@ su sujeto.
 | [features/dashboard/dashboardTiles.test.jsx](features/dashboard/dashboardTiles.test.jsx) | Los tiles RENDERIZADOS con el resumen de un servidor caído. |
 | [features/machines/subviews.test.jsx](features/machines/subviews.test.jsx) | Las cinco subvistas del detalle, con máquinas agujereadas. |
 
-### `prototypes/` — propuestas de diseño
-
-Se prueban igual que producción a propósito: un prototipo anclado a datos
-inventados enseña una verdad distinta a la de «Planta», que está a una
-pestaña de distancia.
-
-| Archivo | Qué fija |
-|---|---|
-| [prototypes/dashboard-v2/model.test.js](prototypes/dashboard-v2/model.test.js) | El modelo v2 sobre la fuente única, en sus dos extremos. |
-| [prototypes/dashboard-v2/tiles.test.jsx](prototypes/dashboard-v2/tiles.test.jsx) | Los tiles v2 renderizados sin conexión. |
+> Aquí hubo una carpeta `prototypes/` con las pruebas de las propuestas de
+> diseño en evaluación. Se retiró junto con `src/prototypes/` en la Fase C del
+> [Plan 3](../../../docs/PLAN-3-PRODUCCION.md), al decidir la superficie de la
+> aplicación en planta.
 
 ### `fixtures/` — datos y ayudantes compartidos
 

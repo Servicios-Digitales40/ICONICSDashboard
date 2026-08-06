@@ -7,6 +7,9 @@ build/
 .env.*
 *.local
 
+# La plantilla sí se versiona: documenta las variables y no lleva secretos.
+!.env.example
+
 # Ajustes locales de herramientas
 .claude/settings.local.json
 

@@ -9,9 +9,13 @@ import { ROUTES, NAV_GROUPS, DEFAULT_ROUTE } from "./routes.jsx";
 import { buildNav } from "./buildNav.js";
 
 export { ROUTES, DEFAULT_ROUTE };
+export { useNavegacion } from "./useNavegacion.js";
 
 /** id de página → componente. Lo consume el <Shell> de App.jsx. */
 export const PAGES = Object.fromEntries(ROUTES.map((r) => [r.id, r.component]));
+
+/** Ids navegables. Lo consume `useNavegacion` para validar lo que llega en la URL. */
+export const ROUTE_IDS = ROUTES.map((r) => r.id);
 
 /** id de página → { title, sub }. Lo consume el Topbar. */
 export const PAGE_META = Object.fromEntries(
