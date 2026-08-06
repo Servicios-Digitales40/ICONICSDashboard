@@ -1,0 +1,45 @@
+Tablero ICONICS - paquete de release
+====================================
+
+Que hay aqui:
+
+  backend\    El servidor puente hacia ICONICS. Sin dependencias: solo Node.
+  public\     El tablero ya compilado, que sirve ese mismo backend.
+  VERSION     Que version es esto, cuando y donde se compilo, y si paso
+              las pruebas.
+
+Que NO hay, a proposito:
+
+  - node_modules: el backend no tiene dependencias y el frontend ya esta
+    compilado. No hay nada que instalar en el servidor.
+  - Ningun .env: la configuracion y las credenciales viven fuera de las
+    releases, en config\.env.production, para sobrevivir a los despliegues.
+  - Las vistas de propuesta (Sandbox, Planta v2, variantes de area): este
+    es un build de PLANTA. Si aparecen, no despliegues: alguien empaqueto
+    un build de demo.
+
+Como se instala
+---------------
+
+NO extraigas esto a mano. Usa el guion, que prueba la release en un puerto
+aparte antes de darle trafico y sabe revertir:
+
+    .\desplegar.ps1 -Paquete <este .zip>
+
+Y para volver atras:
+
+    .\desplegar.ps1 -Revertir
+
+El runbook completo esta en deploy\LEEME.md del repositorio.
+
+Comprobacion rapida tras desplegar
+----------------------------------
+
+    Invoke-WebRequest http://127.0.0.1:3001/api/health -UseBasicParsing
+
+  status ok        se llega a ICONICS y hay token
+  status degraded  se llega, pero no autentica -> credenciales o permisos
+  status error     no se llega -> red, ICONICS caido, o ICONICS_API_BASE
+
+El campo "version" debe coincidir con el VERSION de este paquete. Si no,
+revisa APP_VERSION en config\.env.production.
