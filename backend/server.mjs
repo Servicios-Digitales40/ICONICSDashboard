@@ -25,6 +25,12 @@ function start() {
   const server = createServer(createApp(config))
 
   server.listen(config.port, '0.0.0.0', () => {
+    // La URL, primero y en su propia línea. El servidor sirve el tablero
+    // además de la API, así que quien lo arranca necesita saber dónde
+    // abrirlo; sin esto sólo veía una línea de log y había que deducirlo del
+    // puerto. Es lo que hace el dev server de Vite y se echaba de menos.
+    logger.info(`Tablero disponible en http://localhost:${config.port}`, {})
+
     logger.info('ICONICS bridge started', {
       version: config.version,
       port: config.port,
