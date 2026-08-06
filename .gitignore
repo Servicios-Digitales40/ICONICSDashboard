@@ -2,6 +2,9 @@ node_modules/
 dist/
 build/
 
+# Paquetes de release que produce deploy/empaquetar.ps1
+dist-release/
+
 # Variables de entorno y credenciales
 .env
 .env.*
