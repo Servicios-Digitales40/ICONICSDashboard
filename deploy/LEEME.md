@@ -145,11 +145,15 @@ al `react-dashboard/dist` del repositorio.
 ## Reversión
 
 ```powershell
-.\desplegar.ps1 -Revertir
+.\desplegar.ps1 -Revertir                    # a la anterior
+.\desplegar.ps1 -Revertir -Version 1a2b3c4   # a una concreta
 ```
 
-Vuelve a la release anterior: rehace el junction, sincroniza `APP_VERSION` y
-reinicia. **Medido en ensayo: 0,1 s** más el reinicio del servicio. No
+Vuelve a la release indicada: **la prueba en un puerto aparte antes de cambiar
+el puntero** —igual que al instalar—, rehace el junction, sincroniza
+`APP_VERSION` y reinicia. Si esa release no arranca, no la activa y te dice
+cuáles quedan: se revierte con prisa, y descubrir entonces que la reversión
+tampoco sirve es el peor momento posible. **Medido en ensayo: 0,1 s** más el reinicio del servicio. No
 recompila, no necesita red y no depende de que la máquina de desarrollo esté
 encendida.
 

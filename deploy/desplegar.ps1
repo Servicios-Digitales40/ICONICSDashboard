@@ -40,9 +40,14 @@
 .PARAMETER Revertir
     Ignora -Paquete y vuelve a la release anterior a la activa.
 
+.PARAMETER Version
+    Con -Revertir, la release concreta a la que volver. Util cuando la
+    anterior tampoco sirve.
+
 .EJEMPLO
     .\desplegar.ps1 -Paquete C:\temp\dashboard-1a2b3c4.zip
     .\desplegar.ps1 -Revertir
+    .\desplegar.ps1 -Revertir -Version 9f8e7d6
 
 .NOTAS
     Escrito para funcionar en Windows PowerShell 5.1, que es el que trae un
@@ -58,6 +63,12 @@ param(
 
   [Parameter(ParameterSetName = "Revertir", Mandatory = $true)]
   [switch]$Revertir,
+
+  # Con -Revertir, a que release volver. Sin esto se elige la anterior a la
+  # activa, que es lo que se quiere casi siempre; se indica cuando esa
+  # tampoco sirve y hay que retroceder mas.
+  [Parameter(ParameterSetName = "Revertir")]
+  [string]$Version,
 
   [string]$Raiz = "D:\IconicsDashboard",
   [string]$Servicio = "IconicsDashboard",
@@ -241,8 +252,41 @@ if ($Revertir) {
     Where-Object { $_.Name -ne $anterior })
   if ($candidatas.Count -eq 0) { throw "No hay ninguna release anterior a la que volver." }
 
-  $destino = $candidatas[0]
+  if ($Version) {
+    $destino = $candidatas | Where-Object { $_.Name -eq $Version } | Select-Object -First 1
+    if (-not $destino) {
+      throw "No hay ninguna release '$Version'. Disponibles: $(($candidatas.Name) -join ', ')"
+    }
+  } else {
+    $destino = $candidatas[0]
+  }
   Bien "volviendo a $($destino.Name) (de $($destino.LastWriteTime))"
+
+  <#
+    Humo también al revertir, y por la misma razón que al instalar: cambiar el
+    puntero a algo que no arranca deja el tablero caído, sólo que ahora con la
+    versión buena ya descartada y con prisa encima.
+
+    Instalar lo hacía y revertir no. La asimetría no tenía justificación: la
+    release a la que se vuelve puede estar incompleta, puede no haber servido
+    nunca —si se instaló y se pasó de largo— o puede haber perdido archivos.
+    Cuestan tres segundos y se hacen antes de tocar nada.
+  #>
+  try {
+    Probar-Release $destino.FullName
+    Bien "la release a la que se vuelve arranca y sirve el tablero"
+  } catch {
+    throw @"
+La release $($destino.Name) NO pasa el humo, así que no se activa:
+
+    $($_.Exception.Message)
+
+El tablero sigue en $anterior. Otras releases disponibles:
+$(($candidatas.Name | Where-Object { $_ -ne $destino.Name }) -join ', ')
+
+Para volver a una concreta:  .\desplegar.ps1 -Revertir -Version <nombre>
+"@
+  }
 
   Apuntar-Current $destino.FullName
   Sincronizar-Version $destino.Name
