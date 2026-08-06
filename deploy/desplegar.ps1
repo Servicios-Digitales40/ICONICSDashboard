@@ -260,13 +260,71 @@ foreach ($d in $Releases, (Join-Path $Raiz "config"), (Join-Path $Raiz "logs")) 
 Bien "releases\, config\ y logs\ en su sitio"
 
 Paso "Extracción"
-if (-not (Test-Path $Paquete)) { throw "No existe el paquete: $Paquete" }
+<#
+  Si la ruta no existe, se buscan paquetes cerca y se ofrecen por su nombre.
+
+  El error escueto —«No existe el paquete: X»— es correcto y no sirve de nada:
+  deja al que despliega adivinando si se equivocó de carpeta, de version o de
+  extension. Los dos tropiezos reales fueron pegar una ruta de EJEMPLO de la
+  documentacion y pegar un marcador `<nueva-version>` sin sustituir; en ambos
+  casos el paquete bueno estaba a un `dir` de distancia.
+#>
+<#
+  ¿Existe esa ruta? Devuelve un booleano de verdad, pase lo que pase.
+
+  Dos trampas, y las dos costaron una depuración:
+
+  1. `Test-Path` LANZA —no devuelve $false— cuando la ruta tiene caracteres
+     ilegales como `<` o `>`, que es justo lo que ocurre al pegar un marcador
+     de la documentación sin sustituir. Por eso se descartan ANTES, con la
+     lista del propio .NET, en vez de confiar en atrapar la excepción.
+
+  2. Envolver `Test-Path` en try/catch no bastaba: la versión anterior
+     devolvía DOS valores (`False False`), y en PowerShell un array de dos
+     elementos es **verdadero** aunque ambos sean falsos. La comprobación
+     pasaba de largo y el guion moría más adelante, en `Get-Item`, con el
+     mismo mensaje que se pretendía evitar. De ahí el `[bool]` explícito.
+#>
+function Existe-Ruta($ruta) {
+  if ([string]::IsNullOrWhiteSpace($ruta)) { return $false }
+  if ($ruta.IndexOfAny([IO.Path]::GetInvalidPathChars()) -ge 0) { return $false }
+
+  try { return [bool](Test-Path -LiteralPath $ruta) } catch { return $false }
+}
+
+if (-not (Existe-Ruta $Paquete)) {
+  $donde = @(
+    (Join-Path (Split-Path $PSScriptRoot -Parent) "dist-release"),
+    (Join-Path $PWD "dist-release"),
+    $PWD,
+    $PSScriptRoot
+  ) | Select-Object -Unique | Where-Object { Test-Path $_ }
+
+  $encontrados = @($donde | ForEach-Object {
+    Get-ChildItem $_ -Filter "dashboard-*.zip" -ErrorAction SilentlyContinue
+  } | Sort-Object LastWriteTime -Descending | Select-Object -Unique -First 5)
+
+  $mensaje = "No existe el paquete: $Paquete"
+  if ($Paquete -match '[<>]') {
+    $mensaje += "`n`nEsa ruta lleva un marcador sin sustituir (<...>): copiala del nombre real."
+  }
+  if ($encontrados.Count -gt 0) {
+    $mensaje += "`n`nPaquetes encontrados, del mas reciente al mas antiguo:`n"
+    foreach ($p in $encontrados) { $mensaje += "`n    $($p.FullName)" }
+    $mensaje += "`n`nPor ejemplo:`n`n    .\desplegar.ps1 -Paquete `"$($encontrados[0].FullName)`""
+    if ($Raiz -ne "D:\IconicsDashboard") { $mensaje += " -Raiz `"$Raiz`"" }
+  } else {
+    $mensaje += "`n`nNo se ha encontrado ningun dashboard-*.zip cerca. Genera uno con"
+    $mensaje += "`ndeploy\empaquetar.ps1 en la maquina de desarrollo y copialo aqui."
+  }
+  throw $mensaje
+}
 
 $temporal = Join-Path $env:TEMP "dashboard-release-$(Get-Random)"
-if ((Get-Item $Paquete).PSIsContainer) {
-  Copy-Item $Paquete $temporal -Recurse
+if ((Get-Item -LiteralPath $Paquete).PSIsContainer) {
+  Copy-Item -LiteralPath $Paquete $temporal -Recurse
 } else {
-  Expand-Archive $Paquete -DestinationPath $temporal
+  Expand-Archive -LiteralPath $Paquete -DestinationPath $temporal
 }
 
 $versionArchivo = Join-Path $temporal "VERSION"
