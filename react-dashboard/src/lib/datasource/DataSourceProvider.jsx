@@ -35,8 +35,16 @@ export const MODOS = { LIVE: "live", DEMO: "demo" };
  * Con la bandera apagada sobreviven el INDICADOR de origen y su cinta, que
  * siguen distinguiendo el servidor real del simulador. Lo que desaparece es
  * el interruptor.
+ *
+ * Se accede a `import.meta.env.VITE_ENABLE_DEMO` **sin** encadenamiento
+ * opcional, a diferencia de `esTransporteFalso()`. No es un descuido: el
+ * empaquetador sustituye ese acceso por un literal y puede plegar la
+ * comparación, y de ese plegado depende que las 13 rutas de propuesta —que se
+ * cargan con `import()` dinámico— no lleguen a generar sus trozos en el build
+ * de planta. Con `?.` la expresión sobrevive a la compilación y los trozos se
+ * emiten igual.
  */
-export const DEMO_HABILITADO = import.meta.env?.VITE_ENABLE_DEMO === "true";
+export const DEMO_HABILITADO = import.meta.env.VITE_ENABLE_DEMO === "true";
 
 /**
  * Origen real de los datos en pantalla. Son tres, no dos: el interruptor del

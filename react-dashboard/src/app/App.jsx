@@ -12,6 +12,7 @@
  * `app/routes/`, de donde también salen `NAV` para el Sidebar y `PAGE_META`
  * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
+import { Suspense } from "react";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
@@ -40,6 +41,20 @@ export default function App() {
         </DataSourceProvider>
       </ThemeProvider>
     </ErrorBoundary>
+  );
+}
+
+/**
+ * Respaldo mientras se descarga una vista partida en su propio trozo.
+ *
+ * Deliberadamente sobrio y sin cifras: un esqueleto con números de mentira
+ * en un tablero de planta se lee como un dato durante el instante que dura.
+ */
+function CargandoVista({ t }) {
+  return (
+    <div style={{ padding: 40, textAlign: "center", color: t.textFaint, fontSize: 13 }}>
+      Cargando vista…
+    </div>
   );
 }
 
@@ -78,7 +93,13 @@ function Shell() {
               vista que falló una vez dejaría el error clavado y navegar a
               otra página mostraría el mismo panel. */}
           <ErrorBoundary resetKey={nav.page} etiqueta={PAGE_META[nav.page]?.title}>
-            <PageComponent params={nav.params} onNavigate={navigate} />
+            {/* Las vistas de PROPUESTA del build de demo se cargan con
+                `lazy()`, así que suspenden en su primer render. Las de planta
+                son imports normales y nunca llegan a mostrar este respaldo:
+                si algún día se parte alguna por ruta, aquí ya está el hueco. */}
+            <Suspense fallback={<CargandoVista t={t} />}>
+              <PageComponent params={nav.params} onNavigate={navigate} />
+            </Suspense>
           </ErrorBoundary>
         </div>
       </div>

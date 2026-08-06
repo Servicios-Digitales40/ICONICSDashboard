@@ -83,7 +83,7 @@ Ver la cabecera de `palette.js` para las cifras y el reemplazo validado.
 
 1. Promover la propuesta ganadora al kit definitivo (copiar el componente a donde corresponda y ajustar sus imports).
 2. Borrar la carpeta `src/prototypes/` entera.
-3. Quitar del registro de rutas las **13 entradas** de prototipo: `sandbox`, `dashboard-v2`, `area1-editorial`, `area1-aurora`, `area1-aurora-v`, `area1-neon`, `area1-neon-v`, y las cinco equivalentes de `area2`.
+3. Quitar del registro de rutas las **12 entradas** de prototipo: `sandbox`, `dashboard-v2`, `area1-editorial`, `area1-aurora`, `area1-aurora-v`, `area1-neon`, `area1-neon-v`, y las cinco equivalentes de `area2`.
 4. Borrar la clave `sandbox` de `MACHINES` en el módulo de datos de máquinas (lleva un `TODO(prototypes)` apuntando aquí). Es la máquina de muestra que consume `SandboxPage.jsx`, y duplica el id `a1-1` de `area1`.
 5. **No hay paso 5.** `MachineDetail` no necesita ningún cambio: `params.cardVariant` pasa a ser siempre `undefined` y todo cae a `GaugeCard`.
 

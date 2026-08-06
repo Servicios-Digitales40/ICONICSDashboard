@@ -5,7 +5,14 @@
  * `createDemoSource`, `createIconicsSource` ni el motor de polling, que es
  * lo que evita que el modo demo se filtre por toda la UI.
  */
-export { DataSourceProvider, useDataSource, MODOS, ORIGENES } from "./DataSourceProvider.jsx";
+export {
+  DataSourceProvider,
+  useDataSource,
+  MODOS,
+  ORIGENES,
+  /** Lo lee el registro de rutas para decidir si existen las de propuesta. */
+  DEMO_HABILITADO,
+} from "./DataSourceProvider.jsx";
 
 export {
   usePlantData,

@@ -103,6 +103,22 @@ describe("navegación en la URL", () => {
     expect(pagina()).toBe("dashboard");
   });
 
+  it("los parámetros que no caben en una URL se quedan en memoria", () => {
+    // Las vistas de propuesta empujan al detalle un `cardVariant` con un
+    // COMPONENTE dentro. Sin filtro acababa en la URL como
+    // `cardVariant=[object Object]`, y al recargar ese texto llegaba al
+    // render como si fuera la variante.
+    render(<Sonda alMontar={(navigate) => (globalThis.__nav = navigate)} />);
+
+    const Comp = () => null;
+    act(() => globalThis.__nav("machine-detail", { machineId: "LIN-3", cardVariant: { label: "neon", Comp } }));
+
+    expect(globalThis.location.search).toBe("?machineId=LIN-3");
+    expect(globalThis.location.search).not.toContain("object");
+    // Pero en memoria sigue completo, que es lo que usa el render.
+    expect(params().machineId).toBe("LIN-3");
+  });
+
   it("no interpreta las rutas de los estáticos del build", () => {
     // Sin esta guarda, entrar por error a un archivo del build pintaría la
     // ruta por defecto y taparía el fallo real.

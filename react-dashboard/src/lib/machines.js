@@ -2,11 +2,10 @@
  * Máquinas/equipos monitoreados, agrupadas por área.
  *
  * Módulo heredado: las vistas de producción no lo leen, consumen
- * `lib/datasource`. Su único consumidor es ya `demoSource`, que lo usa como
- * origen de los datos de ejemplo; los prototipos que lo importaban con el
- * vocabulario anterior (area1/area2, estados en español) se retiraron en la
- * Fase C del Plan 3. Puede reducirse a lo que necesite `demoSource`, que es
- * menos de lo que hay aquí.
+ * `lib/datasource`. Se conserva porque `demoSource` lo usa como origen de los
+ * datos de ejemplo y porque los prototipos de `src/prototypes/` —que sólo se
+ * cargan en el build de demo— lo importan directamente con el vocabulario
+ * anterior (area1/area2, estados en español).
  *
  * Cada máquina tiene un `id` estable con el que la resuelve la vista de
  * detalle. El OEE no se guarda: se calcula desde D × R × C.
@@ -26,6 +25,18 @@ export const MACHINES = {
     { id: "a2-1", estado: "Mantenimiento Correctivo", noParte: 1, equipo: "Multi 10", aprobadas: 400, rechazadas: 600, disponibilidad: 71.43, calidad: 85.0, rendimiento: 62.5, tiempoMuerto: 2 },
     { id: "a2-2", estado: "Operando", noParte: 2, equipo: "Multi 11", aprobadas: 600, rechazadas: 400, disponibilidad: 82.0, calidad: 88.0, rendimiento: 75.0, tiempoMuerto: 1 },
     { id: "a2-3", estado: "Operando", noParte: 3, equipo: "Multi 13", aprobadas: 800, rechazadas: 200, disponibilidad: 92.0, calidad: 95.0, rendimiento: 88.0, tiempoMuerto: 2 },
+  ],
+  // Esta clave no es un área: la lee `getMachinesByArea("sandbox")` desde
+  // `prototypes/SandboxPage.jsx` para pintar todas las propuestas con la misma
+  // máquina, y se borra cuando se borren los prototipos.
+  //
+  // Duplica el id "a1-1" de area1, que lo tapa porque `getMachineById` recorre
+  // las claves en orden; el efecto secundario es que cualquier consumidor de
+  // `Object.keys(MACHINES)` ve "sandbox" como un área más. Los prototipos sólo
+  // se cargan en el build de demo, pero este dato viaja igual en los dos: es
+  // una constante de un módulo que `demoSource` ya importa.
+  sandbox: [
+    { id: "a1-1", estado: "Mantenimiento Correctivo", noParte: 1, equipo: "Lineal 1", aprobadas: 850, rechazadas: 150, disponibilidad: 71.43, calidad: 85.0, rendimiento: 62.5, tiempoMuerto: 2 },
   ],
 };
 

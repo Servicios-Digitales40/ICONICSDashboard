@@ -45,10 +45,26 @@ function leerUbicacion(rutasValidas, rutaPorDefecto) {
   return { page, params: Object.fromEntries(new URLSearchParams(search)) };
 }
 
-/** `{ page, params }` → `/page?clave=valor`. */
+/**
+ * `{ page, params }` → `/page?clave=valor`.
+ *
+ * A la URL van sólo los parámetros que sobreviven al viaje de ida y vuelta:
+ * cadenas, números y booleanos. Los objetos se quedan en memoria.
+ *
+ * No es una precaución teórica. Las vistas de propuesta empujan al detalle de
+ * máquina un `cardVariant: { label, Comp, wide }` con un **componente de React
+ * dentro**; sin este filtro, la URL acababa con `cardVariant=[object Object]`
+ * y al recargar ese texto llegaba al render como si fuera la variante. Con el
+ * filtro, una recarga simplemente cae a la tarjeta estándar, que es lo que el
+ * detalle ya hace cuando no le pasan variante.
+ */
+function esSerializable(valor) {
+  return ["string", "number", "boolean"].includes(typeof valor);
+}
+
 function construirUrl(page, params) {
   const query = new URLSearchParams(
-    Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null)
+    Object.entries(params ?? {}).filter(([, v]) => esSerializable(v))
   ).toString();
 
   return `/${encodeURIComponent(page)}${query ? `?${query}` : ""}`;

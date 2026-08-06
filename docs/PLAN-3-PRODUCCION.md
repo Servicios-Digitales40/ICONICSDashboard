@@ -11,7 +11,8 @@
 > - **Fase C** (recortar el frontend): superficie acotada a operación +
 >   Assets, modo demo bajo bandera, `ErrorBoundary`, versión en el Topbar,
 >   navegación en la URL y bundle partido. Cierra **P0-6**, P1-7, P1-9 y
->   P1-10. La suite de frontend queda en **125 pruebas**.
+>   P1-10. La suite de frontend queda en **141 pruebas**. Las 12 propuestas de
+>   diseño se conservan y viven **sólo en el build de demo** (C.2·bis).
 >
 > **Fase A · hallazgo de O-1.** El servidor ICONICS **sí responde** —la
 > premisa de que la Fase A estaba bloqueada era falsa— y el verificador de
@@ -237,8 +238,9 @@ versión de Node.
 | P2-6 | `src/_deprecated/` sigue en el repositorio (no entra al bundle: nadie lo importa) |
 
 **Dos hallazgos de color heredados.** Salieron de la evaluación de `dashboard-v2` y estaban
-anotados sólo en `src/prototypes/README.md`, que desaparece con la Fase C. Aplican a la vista
-de **producción** y siguen sin corregir; se recogen aquí para que no se pierdan con la carpeta:
+anotados sólo en `src/prototypes/README.md`. Aplican a la vista de **producción** —no al
+prototipo— y siguen sin corregir, así que se recogen también aquí, donde se leen junto al resto
+de lo pendiente:
 
 - `ESTADO_TOKEN` (`src/lib/machines.js`) deja «Limpieza» y «Mant. Preventivo» a ΔE 0.9 bajo
   protanopía —indistinguibles entre sí— y usa `textSoft`, que es un token de **texto**, como
@@ -247,8 +249,8 @@ de **producción** y siguen sin corregir; se recogen aquí para que no se pierda
   (`paleta[i % 5]`) y asigna el color por posición en el rango, no por entidad: dos rebanadas
   distintas comparten color y la misma categoría cambia de color al reordenarse.
 
-El reemplazo ya validado estaba en la cabecera de `prototypes/dashboard-v2/palette.js`; si se
-aborda, conviene recuperarlo del historial de git. Enlaza con Plan 2 · A-09.
+El reemplazo ya validado está en la cabecera de `prototypes/dashboard-v2/palette.js`. Enlaza
+con Plan 2 · A-09.
 
 ### 2.4 Lo que no es código
 
@@ -600,11 +602,23 @@ con un bloque por cada punto de la fase.
 
 - **C.1** ✅ Decidido: **operación + Assets**. Assets se queda porque es la herramienta con la
   que se diagnostica un «falta un dato en el panel», que es justo lo que §2.5 anticipa.
-- **C.2** ✅ `src/prototypes/` **borrada entera** siguiendo su propia receta —su invariante de
-  hoja del grafo hizo que no hubiera que tocar una línea de producción—, más las 13 rutas y la
-  clave `sandbox` de `machines.js`. `Data` y `Sankey` se quedan en el árbol **sin ruta**: nadie
-  los importa, así que no entran en el bundle, y son reversibles si Data vuelve detrás de
-  autenticación. `SankeyChart` sí sigue en producción: lo usa el detalle de máquina.
+- **C.2** ✅ `Data` y `Sankey` se quedan en el árbol **sin ruta**: nadie los importa, así que no
+  entran en el bundle, y son reversibles si Data vuelve detrás de autenticación. `SankeyChart`
+  sí sigue en producción: lo usa el detalle de máquina.
+- **C.2·bis** ✅ **Las 12 propuestas de `src/prototypes/` vuelven, pero sólo al build de demo.**
+  Primero se borraron y después se recuperaron por decisión de producto: son útiles para
+  enseñar y comparar diseños, y no tienen por qué estar en la pared de la planta para eso. Se
+  cargan con `import()` dinámico dentro de un ternario sobre `DEMO_HABILITADO`, así que en el
+  build de planta **ni siquiera se generan sus trozos**.
+
+  Las dos condiciones son frágiles y las dos se descubrieron rompiéndolas: con un `import`
+  normal el módulo viaja al bundle aunque su ruta no se registre, y con una función auxiliar
+  —que leía mejor— el empaquetador ya no puede probar que la rama está muerta y emitía los doce
+  `import()` igualmente. Por eso `DEMO_HABILITADO` se escribe sin `?.` y la condición es un
+  ternario literal. `src/test/app/routes.test.jsx` fija el lado observable.
+
+  De paso: el README de `src/prototypes/` decía «13 entradas» y su propia lista enumeraba doce.
+  Son **12**.
 - **C.3** ✅ Modo demo bajo `VITE_ENABLE_DEMO`, apagado por defecto. El cierre está en el
   modelo y no sólo en que el Topbar oculte el botón: `setMode`/`toggleMode` ignoran la demo, y
   la preferencia guardada se descarta al arrancar —si no, una pantalla que quedó en demo antes
@@ -627,18 +641,21 @@ fijaba este plan **era irreal y se corrige aquí**: recharts pesa 382 KB por sí
 vista de Planta, que es la ruta por defecto, así que ninguna partición lo saca del primer
 arranque. Lo que sí se consiguió:
 
-| | Antes | Ahora |
+| | Antes | Ahora (build de planta) |
 |---|---|---|
 | Archivos | 1 | 4 |
-| Código de la aplicación | — | **157 KB** (45 KB gzip) |
+| Código de la aplicación | — | **153 KB** (44 KB gzip) |
 | `charts` (recharts + d3) | — | 382 KB |
 | `react` | — | 142 KB |
 | `vendor` | — | 77 KB |
-| **Total** | **868 KB** | **759 KB** |
+| **Total** | **868 KB** | **755 KB** |
 
-El total baja poco; lo que cambia de verdad es que **un despliegue normal invalida 157 KB en
+El total baja poco; lo que cambia de verdad es que **un despliegue normal invalida 153 KB en
 vez de 868 KB**, porque las librerías conservan su hash. En un wallboard, que recarga tras cada
-despliegue y poco más, ese es el número que se nota. Pruebas del frontend: **125**.
+despliegue y poco más, ese es el número que se nota.
+
+El build de **demo** añade sobre eso 12 trozos con las propuestas (~80 KB en total, ninguno
+mayor de 38 KB) que se descargan sólo al abrir cada una. Pruebas del frontend: **141**.
 
 ### Fase D · Empaquetar y desplegar ▄ · **Windows Server**
 

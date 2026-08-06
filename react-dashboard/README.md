@@ -46,13 +46,20 @@ VITE_ICONICS_FAKE=true npm run dev     # → Simulado (desarrollo sin servidor)
 VITE_ENABLE_DEMO=true npm run dev      # → con el interruptor de demo disponible
 ```
 
-> **El botón de demo se compila bajo bandera y está apagado por defecto.** El
-> destino de esto son monitores de planta: sin teclado y sin nadie delante, un
-> interruptor que sustituye la planta entera por datos inventados sólo puede
+> **El botón de demo está apagado salvo que se pida, y se decide en el build.**
+> El destino de esto son monitores de planta: sin teclado y sin nadie delante,
+> un interruptor que sustituye la planta entera por datos inventados sólo puede
 > activarse por accidente, y una vez activado nadie lo desactiva. La cinta de
 > aviso funciona con público delante, no en una pared. Con la bandera apagada
 > sobreviven el indicador de origen y su cinta —que siguen distinguiendo el
 > servidor real del simulador—; lo que desaparece es el interruptor.
+>
+> Precisión sobre qué garantiza la bandera: `VITE_ENABLE_DEMO` se resuelve en
+> compilación y deja `DEMO_HABILITADO` en `false`, así que el botón no se pinta
+> y `setMode`/`toggleMode` ignoran la demo aunque alguien los llame. Lo que
+> **no** hace es sacar del bundle el código de `demoSource` ni la rama JSX del
+> botón: siguen ahí, pesan poco y son inalcanzables. La garantía es de
+> comportamiento, no de bytes.
 
 > El defecto estuvo invertido durante el desarrollo y se corrigió a
 > propósito: la variable se resuelve en **build**, así que un `npm run build`
@@ -112,27 +119,36 @@ src/
 │   └── sankey/               Diagramas de flujo — SIN RUTA (ver abajo)
 │
 ├── components/               Átomos de UI reutilizables (ui/, charts/)
-└── theme/                    Colores claro/oscuro + useTheme()
+├── theme/                    Colores claro/oscuro + useTheme()
+└── prototypes/               Propuestas en evaluación — SOLO en el build de demo
 ```
 
-### Qué se retiró para producción
+### Qué ve cada build
 
 En la Fase C del [Plan 3](../docs/PLAN-3-PRODUCCION.md) se acotó la superficie
 de la aplicación a lo que un operador debe poder abrir en un monitor sin
-teclado:
+teclado. El registro de rutas (`app/routes/routes.jsx`) es el único sitio donde
+se decide:
 
-- **`src/prototypes/` se borró entera** — las 13 rutas de propuestas de diseño
-  en evaluación (Sandbox, «Planta · v2» y las diez variantes de área). Su
-  invariante de hoja del grafo hizo que retirarlas no tocara una sola línea de
-  producción, que era exactamente para lo que estaba puesto.
+| | Planta | Demo |
+|---|---|---|
+| Planta, Lineales, Rectificadoras, Detalle, Assets | ✅ | ✅ |
+| Las 12 propuestas de `src/prototypes/` | — | ✅ |
+| Interruptor de origen de datos | — | ✅ |
+
+- **Las propuestas de diseño existen sólo en el build de demo.** No es que
+  estén ocultas: en el build de planta **no se generan siquiera sus trozos**.
+  Eso depende de dos detalles que conviene no «limpiar» sin leer el comentario
+  de `routes.jsx` — se cargan con `import()` dinámico, y la condición es un
+  ternario y no una función auxiliar. Con un import normal viajarían a planta
+  aunque su ruta no se registrara; con una función auxiliar, el empaquetador no
+  puede probar que la rama está muerta y los emite igual. Las dos cosas se
+  descubrieron rompiéndolas, y `src/test/app/routes.test.jsx` las fija.
 - **`features/data/` y `features/sankey/` siguen en el árbol pero nadie los
-  importa**, así que no entran en el bundle. `Data` hacía altas, escrituras y
-  **borrados** contra `db:Northwind`, la base de ejemplo de ICONICS; si vuelve,
-  vuelve detrás de autenticación y sin la pestaña de borrado. `SankeyChart` sí
-  sigue en producción: lo usa el detalle de máquina.
-
-El registro de rutas (`app/routes/routes.jsx`) es el único sitio donde se
-decide esto.
+  importa**, así que no entran en ningún bundle. `Data` hacía altas, escrituras
+  y **borrados** contra `db:Northwind`, la base de ejemplo de ICONICS; si
+  vuelve, vuelve detrás de autenticación y sin la pestaña de borrado.
+  `SankeyChart` sí sigue en producción: lo usa el detalle de máquina.
 
 ### Flujo de datos
 
