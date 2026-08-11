@@ -45,7 +45,7 @@
  * forma exacta del ternario son necesarios para que no viajen a planta.
  */
 import { lazy } from "react";
-import { FlaskConical, Gauge, Boxes, LayoutDashboard, Palette, Sparkles, LayoutPanelTop, Radar } from "lucide-react";
+import { Box, Cog, Factory, FlaskConical, Gauge, Boxes, LayoutDashboard, Palette, Sparkles, LayoutPanelTop, Radar } from "lucide-react";
 
 import { DEMO_HABILITADO } from "@/lib/datasource";
 import { Dashboard } from "@/features/dashboard";
@@ -103,6 +103,7 @@ export const DEFAULT_ROUTE = "dashboard";
 /** Cabeceras de los grupos desplegables del sidebar. */
 export const NAV_GROUPS = {
   "vistas-resonac": { label: "Vistas Resonac", icon: <FlaskConical size={17} /> },
+  "3d": { label: "3D", icon: <Box size={17} /> },
 };
 
 export const ROUTES = [
@@ -222,6 +223,47 @@ export const ROUTES = [
       title: "Área 2 Neon HUD Vertical",
       sub: "Propuesta en evaluación · HUD en formato vertical",
       nav: { label: "A2 · Neon HUD Vertical", icon: <Radar size={15} />, group: "vistas-resonac" },
+    },
+  ] : []),
+
+  /* ---- Grupo «3D» ------------------------------------------------ */
+  /*
+   * Las dos vistas 3D. Ver docs/PLAN-4-VISTAS-3D.md.
+   *
+   * ── POR QUÉ SÓLO EN EL BUILD DE DEMO, DE MOMENTO ───────────────────
+   *
+   * Por el mismo criterio que encabeza este archivo: una vista que se orbita
+   * con el ratón todavía no pasa el listón de «un operador debe poder abrirla
+   * en un monitor sin teclado». «Maqueta 3D» se promueve a planta cuando esté
+   * medida en el equipo real y sea usable sin teclado (Fase 5 del plan);
+   * mover una ruta de un lado al otro es esta línea.
+   *
+   * ── POR QUÉ `lazy()` IMPORTA AQUÍ MÁS QUE EN NINGÚN SITIO ──────────
+   *
+   * La pila 3D (three + r3f + drei) pesa del orden del bundle entero de
+   * planta. Con `lazy()`, quien no abra estas vistas no la descarga. El
+   * reparto que la mantiene fuera del arranque está en `vite.config.js`
+   * (`PAQUETES_3D`), y la comprobación en `scripts/verificar-bundle.mjs`.
+   *
+   * Se importa el ARCHIVO de cada vista y no un barril del módulo: un barril
+   * que reexportara las dos las metería en el mismo trozo y, sobre todo,
+   * cualquier import estático de ese barril desde otro sitio arrastraría
+   * three.js al arranque sin que nadie lo notara.
+   */
+  ...(DEMO_HABILITADO ? [
+    {
+      id: "maquina-3d",
+      component: lazy(() => import("@/features/three-d/views/Maquina3D.jsx")),
+      title: "Máquina 3D",
+      sub: "El modelo se comporta según el estado del equipo",
+      nav: { label: "Máquina 3D", icon: <Cog size={16} />, group: "3d" },
+    },
+    {
+      id: "maqueta-3d",
+      component: lazy(() => import("@/features/three-d/views/Maqueta3D.jsx")),
+      title: "Maqueta 3D",
+      sub: "La planta en miniatura · pulsa una máquina para ver sus indicadores",
+      nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "3d" },
     },
   ] : []),
 

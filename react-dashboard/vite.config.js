@@ -24,6 +24,64 @@ function versionDelBuild() {
   }
 }
 
+/**
+ * El cierre de dependencias de la pila 3D (three + r3f + drei), para apartarlo
+ * en su propio trozo.
+ *
+ * ── POR QUÉ HACE FALTA LA LISTA ENTERA Y NO BASTA `three` ──────────
+ *
+ * Las dos vistas 3D se cargan con `lazy()`, así que su código no viaja en el
+ * arranque. Pero `manualChunks` reparte por PAQUETE, no por quién lo usa: el
+ * catch-all `return "vendor"` de abajo se lleva todo lo que no reconozca, y
+ * "vendor" SÍ es de carga inmediata. Sin esta lista, las dependencias
+ * transitivas de drei —`zustand`, `react-reconciler`, `three-stdlib`,
+ * `troika-*`…— acabarían en el trozo que descarga la pantalla de Planta,
+ * y el `lazy()` no serviría de nada.
+ *
+ * `react-reconciler` es el ejemplo de por qué la regla de React de abajo no lo
+ * salva: su patrón exige `react/` y ahí pone `react-reconciler/`.
+ *
+ * ── CÓMO SE REGENERA ───────────────────────────────────────────────
+ *
+ * Es el listado de paquetes que añadió la instalación de la pila 3D, menos los
+ * de tipos y los de herramientas (no entran en el bundle):
+ *
+ *     git diff package-lock.json | grep -E '^\+\s+"node_modules/'
+ *
+ * La comprobación de verdad no es esta lista sino el `dist`: si al añadir algo
+ * a 3D crecen `index` o `vendor`, es que un paquete nuevo se coló por el
+ * catch-all. Ver `scripts/verificar-bundle.mjs`.
+ */
+const PAQUETES_3D = [
+  "three", "three-stdlib", "three-mesh-bvh", "@react-three", "@react-spring",
+  "@use-gesture", "@monogrid", "@mediapipe", "@dimforge", "@tweenjs",
+  "camera-controls", "maath", "meshline", "meshoptimizer", "potpack",
+  "troika-three-text", "troika-three-utils", "troika-worker-utils",
+  "webgl-constants", "webgl-sdf-generator", "glsl-noise", "draco3d",
+  "detect-gpu", "stats-gl", "stats.js", "hls.js", "fflate",
+  "zustand", "react-reconciler", "react-use-measure", "react-composer",
+  "its-fine", "suspend-react", "tunnel-rat", "use-sync-external-store",
+  "utility-types", "is-promise", "promise-worker-transferable", "lie",
+  "immediate", "buffer", "base64-js", "ieee754",
+];
+
+/**
+ * ¿El módulo pertenece a la pila 3D?
+ *
+ * Se extrae el nombre de paquete COMPLETO que sigue a `node_modules/` y se
+ * compara por igualdad, no con `includes`, para que `three` no capture un
+ * futuro `three-cualquier-cosa` que no tenga nada que ver.
+ *
+ * Los paquetes con ámbito valen por su ámbito entero: en la lista basta poner
+ * `@react-three` para que entren `fiber` y `drei`.
+ */
+function esDe3D(id) {
+  const m = id.replace(/\\/g, "/").match(/node_modules\/((?:@[^/]+\/)?[^/]+)/);
+  if (!m) return false;
+  const [ambito] = m[1].split("/");
+  return PAQUETES_3D.includes(m[1]) || (m[1].startsWith("@") && PAQUETES_3D.includes(ambito));
+}
+
 // Configuración mínima de Vite: el plugin de React para JSX/Fast Refresh,
 // más un único alias "@" -> src/.
 //
@@ -61,7 +119,24 @@ export default defineConfig({
          * con React entero dentro del de gráficas.
          */
         manualChunks(id) {
+          /*
+           * El ayudante de precarga de Vite (`__vitePreload`), que es lo que
+           * ejecuta cada `import()` diferido.
+           *
+           * No vive en node_modules, así que sin esta línea cae en el
+           * `return` de abajo y lo coloca Rollup — que lo metió DENTRO del
+           * trozo `three`. El efecto era silencioso y grave: el trozo de
+           * entrada importaba el ayudante, con él los 840 KB de la pila 3D, y
+           * el `index.html` acababa con un `modulepreload` de three. Las dos
+           * vistas 3D seguían siendo diferidas y aun así la pantalla de
+           * Planta descargaba three.js en el arranque.
+           *
+           * Va a `vendor`, que es de carga inmediata igualmente.
+           */
+          if (id.includes("vite/preload-helper")) return "vendor";
+
           if (!id.includes("node_modules")) return;
+          if (esDe3D(id)) return "three";
           if (/[\\/]node_modules[\\/](recharts|d3-|victory|decimal)/.test(id)) return "charts";
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
           return "vendor";

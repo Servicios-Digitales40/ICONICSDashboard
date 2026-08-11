@@ -38,6 +38,21 @@ async function rutasCon(demo) {
 const ES_PROPUESTA = (id) =>
   id === "sandbox" || id === "dashboard-v2" || /^area[12]-/.test(id);
 
+/**
+ * Las vistas 3D. No son propuestas de diseño —no compiten contra ninguna
+ * pantalla existente— pero comparten con ellas la condición de vivir sólo en
+ * el build de demo, y por el mismo criterio: una vista que se orbita con el
+ * ratón no pasa todavía el listón de «abrirla en un monitor sin teclado».
+ *
+ * Lo que está en juego aquí es distinto y más caro que en las propuestas: la
+ * pila 3D pesa ~840 KB. Ver `scripts/verificar-bundle.mjs`, que comprueba el
+ * otro lado —que ese peso no viaje en el arranque— sobre el `dist`.
+ */
+const ES_3D = (id) => id === "maquina-3d" || id === "maqueta-3d";
+
+/** Todo lo que la demo AÑADE sobre el build de planta. */
+const ES_SOLO_DEMO = (id) => ES_PROPUESTA(id) || ES_3D(id);
+
 afterEach(() => vi.unstubAllEnvs());
 
 describe("superficie de la aplicación", () => {
@@ -45,7 +60,15 @@ describe("superficie de la aplicación", () => {
     const ids = await rutasCon(false);
 
     expect(ids).toEqual(["dashboard", "area-LIN", "area-REC", "assets", "machine-detail"]);
-    expect(ids.filter(ES_PROPUESTA)).toEqual([]);
+    expect(ids.filter(ES_SOLO_DEMO)).toEqual([]);
+  });
+
+  it("las vistas 3D existen sólo en el build de demo", async () => {
+    // El listón de `routes.jsx`: lo que se abre en un monitor sin teclado.
+    // «Maqueta 3D» pasará a planta cuando esté medida en el equipo real; el
+    // día que eso ocurra, esta prueba es la que hay que cambiar a propósito.
+    expect((await rutasCon(false)).filter(ES_3D)).toEqual([]);
+    expect((await rutasCon(true)).filter(ES_3D)).toEqual(["maquina-3d", "maqueta-3d"]);
   });
 
   it("el build de demo añade las 12 propuestas", async () => {
@@ -76,9 +99,9 @@ describe("superficie de la aplicación", () => {
   });
 
   it("las vistas de operación son las mismas en los dos builds", async () => {
-    // La demo AÑADE propuestas; no debe cambiar lo que se ve en planta.
+    // La demo AÑADE vistas; no debe cambiar lo que se ve en planta.
     const planta = await rutasCon(false);
-    const demo = (await rutasCon(true)).filter((id) => !ES_PROPUESTA(id));
+    const demo = (await rutasCon(true)).filter((id) => !ES_SOLO_DEMO(id));
 
     expect(demo).toEqual(planta);
   });

@@ -43,6 +43,19 @@ su sujeto.
 | [features/dashboard/dashboardTiles.test.jsx](features/dashboard/dashboardTiles.test.jsx) | Los tiles RENDERIZADOS con el resumen de un servidor caído. |
 | [features/machines/subviews.test.jsx](features/machines/subviews.test.jsx) | Las cinco subvistas del detalle, con máquinas agujereadas. |
 
+### `features/three-d/` — el 3D
+
+Todo lo que se prueba aquí es **puro o DOM**: la tabla de comportamiento, la
+distribución de la maqueta y el camino de respaldo. No se intenta renderizar
+`<Canvas>` en jsdom — no hay WebGL, y la prueba sólo mediría el mock.
+
+| Archivo | Qué fija |
+|---|---|
+| [features/three-d/estadoVisual.test.js](features/three-d/estadoVisual.test.js) | El contrato estado → comportamiento 3D, y **la regla de movimiento de `lib/motion.js` como aserción exacta**: sólo dos bucles en toda la aplicación. Además, que ningún par de estados se distinga sólo por el color. |
+| [features/three-d/layout.test.js](features/three-d/layout.test.js) | La maqueta contra el catálogo de ICONICS: las 10 máquinas, sin solapes y dentro del suelo. Su modo de fallo es silencioso — una máquina que falta en un plano no se echa de menos. |
+| [features/three-d/frameloop.test.js](features/three-d/frameloop.test.js) | Cuándo la escena tiene derecho a repintar. Una planta parada deja la GPU a cero. |
+| [features/three-d/sinWebgl.test.jsx](features/three-d/sinWebgl.test.jsx) | Sin WebGL —escritorio remoto, equipo sin GPU— la vista no revienta: enseña los mismos datos en una tabla. |
+
 ### `prototypes/` — propuestas de diseño
 
 Se prueban igual que producción a propósito: un prototipo anclado a datos
