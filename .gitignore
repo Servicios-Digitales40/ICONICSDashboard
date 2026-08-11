@@ -2,6 +2,10 @@ node_modules/
 dist/
 build/
 
+# Paquetes de release: se generan desde el codigo, no se versionan.
+# Para distribuirlos, sube el .zip como asset de un GitHub Release.
+dist-release/
+
 # Variables de entorno y credenciales
 .env
 .env.*
