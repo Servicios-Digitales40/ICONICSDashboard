@@ -5,9 +5,9 @@
  *
  * Es de SOLO LECTURA por defecto, a propósito. La primera versión
  * generaba el fichero cuando faltaba, pero vitest ejecuta los archivos
- * de prueba en paralelo: si `demoSource.test.js` arrancaba antes que
- * `plantModel.golden.test.js`, la referencia aún no existía y la prueba
- * fallaba de forma intermitente. Una red de seguridad que falla al azar
+ * de prueba en paralelo: si otro archivo que leyera la referencia arrancaba
+ * antes que `plantModel.golden.test.js`, aún no existía y la prueba fallaba de
+ * forma intermitente. Una red de seguridad que falla al azar
  * se acaba desactivando.
  *
  * Para regenerarla tras un cambio DELIBERADO en el cálculo:

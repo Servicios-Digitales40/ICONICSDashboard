@@ -1,14 +1,21 @@
 /**
- * Contrato que cumplen las dos fuentes de datos: `iconicsSource` (servidor
- * real) y `demoSource` (datos fijos).
+ * Contrato que cumple la fuente de datos, `iconicsSource`.
  *
- * Con dos objetos que cumplen la misma interfaz y un único punto de elección
- * en la raíz (DataSourceProvider), ningún componente pregunta nunca si está
- * en demo.
+ * ── POR QUÉ SIGUE SIENDO UNA INTERFAZ CON UNA SOLA IMPLEMENTACIÓN ──
+ *
+ * Hasta el Plan 5 había dos: `iconicsSource` y un `demoSource` que entregaba
+ * `Machine` ya construidas saltándose el motor de polling. Se retiró porque
+ * evitaba justo lo que había que ejercitar; lo que varía ahora es el
+ * TRANSPORTE, una capa más abajo.
+ *
+ * El contrato se conserva porque sigue siendo la frontera entre las vistas y
+ * la maquinaria: es lo que permite que `hooks.js` no sepa nada de puntos, de
+ * lotes ni de calidad OPC. Que hoy sólo haya un implementador no lo hace menos
+ * frontera.
  *
  * La suscripción es push, no pull: la fuente empuja instantáneas cuando las
- * tiene. Así la vista no decide cuándo pedir —eso lo gobierna el motor de
- * polling, que es quien sabe agrupar— y el modo demo emite a su propio ritmo.
+ * tiene. Así la vista no decide cuándo pedir — eso lo gobierna el motor de
+ * polling, que es quien sabe agrupar.
  *
  * @typedef {object} Snapshot
  * @property {import("../domain/machine.js").Machine[]} machines
@@ -31,8 +38,8 @@
  *           OEE día a día, para el mapa de calor del calendario.
  * @property {() => void} stop
  *           Detiene toda actividad de red. La llama el provider al cambiar de
- *           modo: el poller tiene que parar de verdad, no basta con ignorar
- *           sus datos.
+ *           transporte: el poller tiene que parar de verdad, no basta con
+ *           ignorar sus datos.
  */
 
 /** Instantánea vacía, para el primer render antes de cualquier lectura. */

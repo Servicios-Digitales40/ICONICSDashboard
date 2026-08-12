@@ -39,15 +39,20 @@
  *
  * ── LAS RUTAS DE PROTOTIPO ─────────────────────────────────────────
  *
- * Las 12 propuestas de diseño de `src/prototypes/` existen SÓLO en el build
- * de demo (`VITE_ENABLE_DEMO=true`). El bloque de comentario que precede a
- * `propuesta()` explica el mecanismo, y por qué tanto el `lazy()` como la
- * forma exacta del ternario son necesarios para que no viajen a planta.
+ * Las 12 propuestas de diseño de `src/prototypes/` y la vista «Máquina 3D»
+ * existen SÓLO con `VITE_ENABLE_PROTOTYPES=true`. El bloque de comentario que
+ * precede a `propuesta()` explica el mecanismo, y por qué tanto el `lazy()`
+ * como la forma exacta del ternario son necesarios para que no viajen a planta.
+ *
+ * Esa bandera es de SUPERFICIE y nada tiene que ver con el origen de los
+ * datos: vive en `lib/flags.js`, no en `lib/datasource/`. Antes las dos cosas
+ * las gateaba una sola variable —`VITE_ENABLE_DEMO`— y no se podían tener las
+ * propuestas sin ofrecer además datos falsos. Ver docs/PLAN-5-DOS-ORIGENES.md.
  */
 import { lazy } from "react";
 import { Box, Cog, Factory, FlaskConical, Gauge, Boxes, LayoutDashboard, Palette, Sparkles, LayoutPanelTop, Radar } from "lucide-react";
 
-import { DEMO_HABILITADO } from "@/lib/datasource";
+import { PROTOTIPOS_HABILITADOS } from "@/lib/flags.js";
 import { Dashboard } from "@/features/dashboard";
 import { Assets } from "@/features/assets";
 import { AreaView, MachineDetail } from "@/features/machines";
@@ -65,9 +70,9 @@ const Lineales = (props) => <AreaView {...props} areaId="LIN" />;
 const Rectificadoras = (props) => <AreaView {...props} areaId="REC" />;
 
 /**
- * Rutas que sólo existen en el build de demo.
+ * Rutas que sólo existen con `VITE_ENABLE_PROTOTYPES`.
  *
- * Se escriben como `...(DEMO_HABILITADO ? [ … ] : [])` y con *spread*, para
+ * Se escriben como `...(PROTOTIPOS_HABILITADOS ? [ … ] : [])` y con *spread*, para
  * que las propuestas queden **intercaladas** donde importan: «Planta · v2»
  * justo detrás de «Planta», y las variantes de cada área detrás de su área,
  * que es lo que permite saltar de una a otra y compararlas.
@@ -91,7 +96,8 @@ const Rectificadoras = (props) => <AreaView {...props} areaId="REC" />;
  * Con el ternario sobre una constante que el empaquetador pliega, la rama
  * desaparece entera y con ella los trozos. Es la diferencia entre «no se puede
  * abrir» y «no está»; para la superficie de un tablero de planta, la segunda.
- * De ahí también que `DEMO_HABILITADO` se escriba sin `?.` — ver su cabecera.
+ * De ahí también que `PROTOTIPOS_HABILITADOS` se escriba sin `?.` — ver su
+ * cabecera en `lib/flags.js`.
  */
 
 /** Azúcar para no repetir el `lazy(() => import(...))` doce veces. */
@@ -117,7 +123,7 @@ export const ROUTES = [
 
   // PROPUESTA · va justo detrás de «Planta» para poder saltar de una a otra
   // y comparar. Compite contra la vista de producción, no contra variantes.
-  ...(DEMO_HABILITADO ? [
+  ...(PROTOTIPOS_HABILITADOS ? [
     {
       id: "dashboard-v2",
       component: propuesta(() => import("@/prototypes/dashboard-v2/DashboardV2.jsx")),
@@ -141,7 +147,7 @@ export const ROUTES = [
 
   // Las cinco variantes de tarjeta, sobre el área 1. El prefijo «A1 ·»
   // mantiene la lista legible en la barra; el nombre completo va en el Topbar.
-  ...(DEMO_HABILITADO ? [
+  ...(PROTOTIPOS_HABILITADOS ? [
     {
       id: "area1-editorial",
       component: propuesta(() => import("@/prototypes/area-views/Area1Editorial.jsx")),
@@ -188,7 +194,7 @@ export const ROUTES = [
   },
 
   // Las mismas cinco, sobre el área 2.
-  ...(DEMO_HABILITADO ? [
+  ...(PROTOTIPOS_HABILITADOS ? [
     {
       id: "area2-editorial",
       component: propuesta(() => import("@/prototypes/area-views/Area2Editorial.jsx")),
@@ -227,49 +233,74 @@ export const ROUTES = [
   ] : []),
 
   /* ---- Grupo «3D» ------------------------------------------------ */
+  /* ---- Grupo «3D» ------------------------------------------------ */
   /*
-   * Las dos vistas 3D. Ver docs/PLAN-4-VISTAS-3D.md.
+   * Las dos vistas 3D, en los DOS builds. Ver docs/PLAN-4-VISTAS-3D.md.
    *
-   * ── POR QUÉ SÓLO EN EL BUILD DE DEMO, DE MOMENTO ───────────────────
+   * ── POR QUÉ NO VAN DETRÁS DE `VITE_ENABLE_PROTOTYPES` ─────────────
    *
-   * Por el mismo criterio que encabeza este archivo: una vista que se orbita
-   * con el ratón todavía no pasa el listón de «un operador debe poder abrirla
-   * en un monitor sin teclado». «Maqueta 3D» se promueve a planta cuando esté
-   * medida en el equipo real y sea usable sin teclado (Fase 5 del plan);
-   * mover una ruta de un lado al otro es esta línea.
+   * «Máquina 3D» estuvo un tiempo ahí, y era una conflación heredada: nació
+   * junto al antiguo modo demo y se quedó con su bandera al partirla. No es un
+   * prototipo. Las propuestas de `src/prototypes/` son variantes de diseño que
+   * COMPITEN contra una pantalla existente y de las que hay que elegir una; las
+   * vistas 3D son funcionalidad pedida, sin nada a lo que sustituir.
+   *
+   * Las dos son además operativas con datos reales:
+   *
+   *  - «Maqueta 3D» enseña el estado real de las diez máquinas y sirve para
+   *    localizar de un vistazo cuál está en alarma.
+   *  - «Máquina 3D» en modo «En vivo» obedece al estado real de la máquina
+   *    elegida, así que es la herramienta con la que se verifica que un equipo
+   *    está reportando lo que se cree.
+   *
+   * Las dos se manejan sin teclado, que es el listón que encabeza este archivo:
+   * los encuadres son botones y la tarjeta se abre pulsando la máquina.
+   *
+   * ── LA RESERVA QUE QUEDA, Y CÓMO SE MITIGA ────────────────────────
+   *
+   * El selector manual de «Máquina 3D» enseña cuatro estados que ICONICS **no
+   * emite hoy** —los mantenimientos, la limpieza y el paro de emergencia—, y
+   * en un tablero de planta eso roza el prometer una pantalla que no existe.
+   *
+   * No se resuelve escondiendo la vista sino diciéndolo: el selector los separa
+   * en un grupo rotulado «Estados propuestos · aún NO los emite ICONICS», y la
+   * ficha lateral pinta un aviso ámbar al elegir uno. Si algún día se decide
+   * que en planta no deben verse siquiera, lo que hay que gatear es el
+   * SELECTOR, no la ruta.
    *
    * ── POR QUÉ `lazy()` IMPORTA AQUÍ MÁS QUE EN NINGÚN SITIO ──────────
    *
    * La pila 3D (three + r3f + drei) pesa del orden del bundle entero de
-   * planta. Con `lazy()`, quien no abra estas vistas no la descarga. El
-   * reparto que la mantiene fuera del arranque está en `vite.config.js`
-   * (`PAQUETES_3D`), y la comprobación en `scripts/verificar-bundle.mjs`.
+   * planta. Con las dos vistas en el build de planta, `lazy()` deja de ser una
+   * precaución y pasa a ser lo único que impide que la pantalla de Planta
+   * descargue three.js en el arranque. El reparto que lo sostiene está en
+   * `vite.config.js` (`PAQUETES_3D`) y la comprobación en
+   * `scripts/verificar-bundle.mjs`, que hay que ejecutar tras cada build.
    *
    * Se importa el ARCHIVO de cada vista y no un barril del módulo: un barril
    * que reexportara las dos las metería en el mismo trozo y, sobre todo,
    * cualquier import estático de ese barril desde otro sitio arrastraría
    * three.js al arranque sin que nadie lo notara.
    */
-  ...(DEMO_HABILITADO ? [
-    {
-      id: "maquina-3d",
-      component: lazy(() => import("@/features/three-d/views/Maquina3D.jsx")),
-      title: "Máquina 3D",
-      sub: "El modelo se comporta según el estado del equipo",
-      nav: { label: "Máquina 3D", icon: <Cog size={16} />, group: "3d" },
-    },
-    {
-      id: "maqueta-3d",
-      component: lazy(() => import("@/features/three-d/views/Maqueta3D.jsx")),
-      title: "Maqueta 3D",
-      sub: "La planta en miniatura · pulsa una máquina para ver sus indicadores",
-      nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "3d" },
-    },
-  ] : []),
+  {
+    id: "maquina-3d",
+    component: lazy(() => import("@/features/three-d/views/Maquina3D.jsx")),
+    title: "Máquina 3D",
+    sub: "El modelo se comporta según el estado del equipo",
+    nav: { label: "Máquina 3D", icon: <Cog size={16} />, group: "3d" },
+  },
+
+  {
+    id: "maqueta-3d",
+    component: lazy(() => import("@/features/three-d/views/Maqueta3D.jsx")),
+    title: "Maqueta 3D",
+    sub: "La planta en miniatura · pulsa una máquina para ver sus indicadores",
+    nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "3d" },
+  },
 
   // Banco de pruebas: todas las variantes juntas, para compararlas de un
   // vistazo en vez de saltando entre rutas.
-  ...(DEMO_HABILITADO ? [
+  ...(PROTOTIPOS_HABILITADOS ? [
     {
       id: "sandbox",
       component: propuesta(() => import("@/prototypes/SandboxPage.jsx")),

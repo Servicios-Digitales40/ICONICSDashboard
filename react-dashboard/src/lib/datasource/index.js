@@ -2,16 +2,19 @@
  * API pública de la capa de datos.
  *
  * Las vistas importan solo de aquí. Fuera de esta carpeta nadie conoce
- * `createDemoSource`, `createIconicsSource` ni el motor de polling, que es
- * lo que evita que el modo demo se filtre por toda la UI.
+ * `createIconicsSource`, los transportes ni el motor de polling, que es lo que
+ * evita que el origen de los datos se filtre por toda la UI.
+ *
+ * Aquí NO vive ninguna bandera de superficie: la que decide qué rutas existen
+ * está en `lib/flags.js`. Antes se exportaba `DEMO_HABILITADO` desde este
+ * barril y la consumía el registro de rutas, que es lo que mezclaba «de dónde
+ * vienen los datos» con «qué pantallas hay». Ver docs/PLAN-5-DOS-ORIGENES.md.
  */
 export {
   DataSourceProvider,
   useDataSource,
-  MODOS,
+  TRANSPORTES,
   ORIGENES,
-  /** Lo lee el registro de rutas para decidir si existen las de propuesta. */
-  DEMO_HABILITADO,
 } from "./DataSourceProvider.jsx";
 
 export {

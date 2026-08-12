@@ -88,28 +88,49 @@ Sin ese build, el backend responde 503 diciendo que falta compilar.
 
 El build se estampa solo con el `git describe` del árbol, y esa versión se ve
 en el Topbar y en `/api/health`. En producción **no** deben aparecer
-`VITE_ICONICS_FAKE`, `VITE_ENABLE_DEMO` ni `NODE_TLS_REJECT_UNAUTHORIZED`: las
-dos primeras se hornean en el bundle, y la tercera impide el arranque con
-`NODE_ENV=production`.
+`VITE_ICONICS_FAKE`, `VITE_ENABLE_SIMULATOR`, `VITE_ENABLE_PROTOTYPES` ni
+`NODE_TLS_REJECT_UNAUTHORIZED`: las tres primeras se hornean en el bundle, y la
+última impide el arranque con `NODE_ENV=production`.
 
 El paso a producción —lo que falta, cómo se compila y cómo se despliega— está
 en [`docs/PLAN-3-PRODUCCION.md`](docs/PLAN-3-PRODUCCION.md).
 
 ## Orígenes de datos
 
-Hay tres, y los tres se ven igual de plausibles en pantalla. El indicador del
-Topbar dice cuál está activo, y los dos que no son reales llevan además una
-cinta de aviso permanente.
+Hay **dos**, y los dos se ven igual de plausibles en pantalla. El indicador del
+Topbar dice cuál está activo, y el que no es real lleva además una cinta de
+aviso permanente.
 
 | Origen | De dónde salen los datos | Cómo se activa |
 |---|---|---|
 | En vivo | Servidor ICONICS | Por defecto |
-| Simulado | Transporte falso, sin red | `VITE_ICONICS_FAKE=true` |
-| Demo | Datos de ejemplo fijos | Botón del Topbar, sólo si se compiló con `VITE_ENABLE_DEMO=true` |
+| Simulado | Transporte falso, sin red | `VITE_ICONICS_FAKE=true` al arrancar, o el botón del Topbar si se compiló con `VITE_ENABLE_SIMULATOR=true` |
 
-El simulador sirve para desarrollar sin servidor. Las dos variables se
-resuelven en build, así que un bundle compilado sin ellas va al backend real y
-no trae interruptor de demo — que es lo que debe llegar a un monitor de planta.
+El simulador sirve para desarrollar sin servidor **y** para enseñar la
+aplicación. Pasa por el motor de polling igual que el servidor real, así que
+ejercita la calidad OPC, los reintentos y la marca de dato rancio; lo único que
+cambia es de dónde salen los bytes.
+
+Hasta agosto de 2026 había un tercer origen, «Demo», con su propia fuente de
+datos fijos. Se retiró porque se saltaba el motor entero —justo lo que había
+que ejercitar—, y lo único valioso que aportaba, poder cambiar en caliente, lo
+heredó el simulador. Ver [`docs/PLAN-5-DOS-ORIGENES.md`](docs/PLAN-5-DOS-ORIGENES.md).
+
+### Banderas de compilación
+
+| Variable | Qué hace | Por defecto |
+|---|---|---|
+| `VITE_ICONICS_FAKE` | Arranca en el simulador | real |
+| `VITE_ENABLE_SIMULATOR` | Añade el **botón** para cambiar de origen en caliente | apagada |
+| `VITE_ICONICS_CHAOS` | `none` · `soft` · `high` — cuántos fallos inyecta el simulador | `soft` |
+| `VITE_ENABLE_PROTOTYPES` | Añade las 12 propuestas de diseño y la vista «Máquina 3D» | apagada |
+
+Todas se resuelven en **build**, así que un bundle compilado sin ellas va al
+backend real, no trae interruptor y no tiene rutas experimentales — que es lo
+que debe llegar a un monitor de planta.
+
+Para una demostración con público, `VITE_ICONICS_CHAOS=none` apaga la
+aleatoriedad del simulador: sin huecos, sin calidad mala y sin latencia.
 
 ## Pruebas
 

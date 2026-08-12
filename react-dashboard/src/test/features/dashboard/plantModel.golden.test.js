@@ -10,8 +10,10 @@
  * que un panel caído, porque nadie se entera.
  *
  * Esta prueba congela el esqueleto numérico partiendo de los datos mock
- * originales. La prueba hermana, `datasource/demoSource.test.js`,
- * comprueba que la arquitectura nueva sigue produciendo lo mismo.
+ * originales. Su prueba hermana, `datasource/demoSource.test.js`, comprobaba
+ * que la arquitectura nueva no movía ningún número; se borró con el modo demo
+ * en el Plan 5, y sus invariantes de series viven ahora al final de este
+ * archivo.
  *
  * Qué se congela y qué no: ver `../../fixtures/numericSnapshot.js`.
  * Cómo regenerar la referencia: ver `../../fixtures/golden.js`.
@@ -20,7 +22,7 @@ import { describe, expect, it } from "vitest";
 
 import { MACHINES, AREA_LABELS } from "@/lib/machines.js";
 import { debeActualizar, escribirGolden, leerGolden } from "../../fixtures/golden.js";
-import { numericSnapshot } from "../../fixtures/numericSnapshot.js";
+import { numericSnapshot, trendInvariants } from "../../fixtures/numericSnapshot.js";
 
 /**
  * Las máquinas de referencia, tomadas de AREA_LABELS y no de
@@ -43,5 +45,30 @@ describe("plantModel · referencia numérica congelada", () => {
     }
 
     expect(actual).toEqual(leerGolden());
+  });
+});
+
+/*
+ * Estas invariantes vivían en `demoSource.test.js`, que se borró en el Plan 5
+ * junto con el modo demo. No son sobre la fuente sino sobre `plantModel`, así
+ * que su sitio natural era éste desde el principio: son las dos promesas que
+ * el propio módulo hace en sus comentarios, y que ninguna otra prueba fijaba.
+ */
+describe("plantModel · invariantes de las series", () => {
+  it("la gráfica y los gauges cuentan lo mismo", () => {
+    const inv = trendInvariants(machinesMock());
+
+    expect(inv.puntos).toBe(12);
+    // El extremo derecho de la tendencia ancla a los agregados actuales. Sin
+    // esto, la curva y el número grande de la misma pantalla pueden discrepar
+    // sin que nada falle.
+    expect(inv.ultimoCoincide).toBe(true);
+  });
+
+  it("las barras reparten el turno sin perder ni inventar piezas", () => {
+    const inv = trendInvariants(machinesMock());
+
+    expect(inv.sumaProduccion).toBe(inv.totalEsperado);
+    expect(inv.barrasCuadran).toBe(true);
   });
 });

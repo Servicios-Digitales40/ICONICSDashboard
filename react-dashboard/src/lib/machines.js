@@ -2,10 +2,18 @@
  * Máquinas/equipos monitoreados, agrupadas por área.
  *
  * Módulo heredado: las vistas de producción no lo leen, consumen
- * `lib/datasource`. Se conserva porque `demoSource` lo usa como origen de los
- * datos de ejemplo y porque los prototipos de `src/prototypes/` —que sólo se
- * cargan en el build de demo— lo importan directamente con el vocabulario
- * anterior (area1/area2, estados en español).
+ * `lib/datasource`. Se conserva por tres consumidores vivos:
+ *
+ *  - `features/dashboard/lib/plantModel.js`, que usa `getMachineHistory` para
+ *    la tendencia horaria simulada del dashboard.
+ *  - Los prototipos de `src/prototypes/` —sólo con `VITE_ENABLE_PROTOTYPES`—,
+ *    que lo importan con el vocabulario anterior (area1/area2, estados en
+ *    español).
+ *  - `src/test/fixtures/machinesDemo.js`, que lo traduce al dominio para las
+ *    pruebas.
+ *
+ * Su cuarto consumidor era `demoSource`, que el Plan 5 borró junto con el modo
+ * demo. Ver docs/PLAN-5-DOS-ORIGENES.md.
  *
  * Cada máquina tiene un `id` estable con el que la resuelve la vista de
  * detalle. El OEE no se guarda: se calcula desde D × R × C.
@@ -34,7 +42,7 @@ export const MACHINES = {
   // las claves en orden; el efecto secundario es que cualquier consumidor de
   // `Object.keys(MACHINES)` ve "sandbox" como un área más. Los prototipos sólo
   // se cargan en el build de demo, pero este dato viaja igual en los dos: es
-  // una constante de un módulo que `demoSource` ya importa.
+  // una constante de un módulo que los prototipos ya importan.
   sandbox: [
     { id: "a1-1", estado: "Mantenimiento Correctivo", noParte: 1, equipo: "Lineal 1", aprobadas: 850, rechazadas: 150, disponibilidad: 71.43, calidad: 85.0, rendimiento: 62.5, tiempoMuerto: 2 },
   ],

@@ -28,38 +28,61 @@ npm run test:watch  # pruebas en modo watch
 
 ---
 
-## Los tres orígenes de datos
+## Los dos orígenes de datos
 
-Hay **tres**, y conviene tenerlos claros porque los tres se ven igual de
+Hay **dos**, y conviene tenerlos claros porque los dos se ven igual de
 plausibles en pantalla. El indicador del Topbar dice siempre cuál está activo,
-y los dos que no son reales llevan además una cinta permanente.
+y el que no es real lleva además una cinta permanente.
 
 | Origen | De dónde salen los datos | Cómo se activa |
 |---|---|---|
 | 🟢 **En vivo** | Servidor ICONICS | **Por defecto** |
-| 🟣 **Simulado** | Transporte falso, sin red | `VITE_ICONICS_FAKE=true` |
-| 🟠 **Demo** | Datos de ejemplo fijos | Botón del Topbar, si `VITE_ENABLE_DEMO=true` |
+| 🟣 **Simulado** | Transporte falso, sin red | `VITE_ICONICS_FAKE=true`, o el botón del Topbar si se compiló con `VITE_ENABLE_SIMULATOR=true` |
 
 ```bash
-npm run dev                            # → En vivo (necesita el backend puente)
-VITE_ICONICS_FAKE=true npm run dev     # → Simulado (desarrollo sin servidor)
-VITE_ENABLE_DEMO=true npm run dev      # → con el interruptor de demo disponible
+npm run dev                                  # → En vivo (necesita el backend puente)
+VITE_ICONICS_FAKE=true npm run dev           # → arranca en Simulado
+VITE_ENABLE_SIMULATOR=true npm run dev       # → con el botón para cambiar en caliente
+VITE_ICONICS_CHAOS=none npm run dev          # → simulador sin fallos, para enseñar
 ```
 
-> **El botón de demo está apagado salvo que se pida, y se decide en el build.**
-> El destino de esto son monitores de planta: sin teclado y sin nadie delante,
-> un interruptor que sustituye la planta entera por datos inventados sólo puede
+> En PowerShell el prefijo `VAR=valor comando` no funciona: usa
+> `$env:VAR="valor"; comando`, o deja las variables fijas en `.env.local`.
+
+> **El botón está apagado salvo que se pida, y se decide en el build.** El
+> destino de esto son monitores de planta: sin teclado y sin nadie delante, un
+> interruptor que sustituye la planta entera por datos inventados sólo puede
 > activarse por accidente, y una vez activado nadie lo desactiva. La cinta de
 > aviso funciona con público delante, no en una pared. Con la bandera apagada
 > sobreviven el indicador de origen y su cinta —que siguen distinguiendo el
 > servidor real del simulador—; lo que desaparece es el interruptor.
 >
-> Precisión sobre qué garantiza la bandera: `VITE_ENABLE_DEMO` se resuelve en
-> compilación y deja `DEMO_HABILITADO` en `false`, así que el botón no se pinta
-> y `setMode`/`toggleMode` ignoran la demo aunque alguien los llame. Lo que
-> **no** hace es sacar del bundle el código de `demoSource` ni la rama JSX del
-> botón: siguen ahí, pesan poco y son inalcanzables. La garantía es de
-> comportamiento, no de bytes.
+> Precisión sobre qué garantiza la bandera: `VITE_ENABLE_SIMULATOR` se resuelve
+> en compilación y deja `SIMULADOR_CONMUTABLE` en `false`, así que el botón no
+> se pinta y `setTransporte`/`alternarTransporte` no hacen nada aunque alguien
+> los llame. Además, una preferencia de «simulado» guardada en `localStorage`
+> **se ignora** sin la bandera: sin eso, una pantalla que quedó en simulado
+> antes de apagarla arrancaría en simulado para siempre, y ya sin botón para
+> sacarla. La garantía es de comportamiento, no de bytes.
+
+> **Antes había un tercer origen, «Demo»,** con su propia fuente de datos
+> fijos. Se retiró en agosto de 2026 porque se saltaba el motor de polling —y
+> con él la calidad OPC, los reintentos y la marca de dato rancio—, que es
+> justo lo que hacía falta ejercitar. Lo único valioso que aportaba, poder
+> cambiar de origen en caliente, lo heredó el simulador; y su predecibilidad la
+> recupera `VITE_ICONICS_CHAOS=none`. Ver
+> [`../docs/PLAN-5-DOS-ORIGENES.md`](../docs/PLAN-5-DOS-ORIGENES.md).
+
+### El grado de caos del simulador
+
+| Valor | Para qué |
+|---|---|
+| `soft` *(defecto)* | Desarrollar. 2 % de calidad mala, 1 % de puntos ausentes, 1 % de no finitos |
+| `none` | **Enseñar.** Cero fallos, cero latencia: la pantalla es predecible |
+| `high` | Revisar a conciencia el comportamiento degradado, incluidos errores de petición |
+
+Un valor desconocido cae en `soft`, no en `none`: importa la dirección del
+fallo, porque un simulador que no ejercita nada pasaría inadvertido.
 
 > El defecto estuvo invertido durante el desarrollo y se corrigió a
 > propósito: la variable se resuelve en **build**, así que un `npm run build`
@@ -69,9 +92,9 @@ VITE_ENABLE_DEMO=true npm run dev      # → con el interruptor de demo disponib
 > un estado de error honesto (huecos «—» y aviso), no cifras plausibles.
 
 **Ningún componente sabe en qué origen está**: se elige una sola vez en
-`DataSourceProvider` y las vistas consumen hooks. Al pasar a demo, el motor de
-polling **se detiene de verdad** y el árbol de datos se remonta, para que no
-queden valores del modo anterior en pantalla.
+`DataSourceProvider` y las vistas consumen hooks. Al cambiar de origen, el
+motor de polling anterior **se detiene de verdad** y el árbol de datos se
+remonta, para que no queden valores del origen anterior en pantalla.
 
 ### Por qué «Simulado» se anuncia tan insistentemente
 
@@ -155,15 +178,21 @@ se decide:
 ```
 vistas  ──usePlantData() / useMachineData()──►  DataSourceProvider
                                                    │
+                                              iconicsSource
+                                                   │
+                                              pollingEngine  ── 1 petición por ciclo
+                                                   │
                                     ┌──────────────┴──────────────┐
-                              iconicsSource                  demoSource
-                                    │
-                              pollingEngine  ── 1 petición por ciclo
-                                    │
-                              transporte (falso | real)
-                                    │
+                              transporte real                transporte falso
+                                    │                        (fakeTransport)
                               backend/server.mjs  ── OIDC + FWX REST
 ```
+
+**Un solo camino, y la bifurcación abajo del todo.** Hasta el Plan 5 había una
+segunda rama a la altura de la fuente —`demoSource`— que entregaba `Machine` ya
+construidas y por tanto se saltaba el motor, la calidad OPC, los reintentos y la
+marca de dato rancio. Ahora lo único que cambia es de dónde salen los bytes, así
+que el simulador ejercita exactamente el mismo código que el servidor.
 
 ---
 

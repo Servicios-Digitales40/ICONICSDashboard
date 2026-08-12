@@ -158,14 +158,20 @@ export function useMachineDailyOee(id, { desde, hasta } = {}) {
 
 /**
  * Instrumentación del motor, para medir el presupuesto de red en vez de
- * suponerlo. Devuelve `null` en modo demo, donde no hay red que medir.
+ * suponerlo.
+ *
+ * Ya no hay que preguntar por el origen: desde el Plan 5 **siempre** hay motor
+ * de polling, también con el simulador, así que sus cifras son reales en los
+ * dos casos —una petición por ciclo, no una por tag—. Antes devolvía `null` en
+ * modo demo porque `demoSource` se saltaba el motor entero y no había nada que
+ * medir.
  */
 export function useIconicsStats({ intervalMs = 2000 } = {}) {
-  const { source, isDemo } = useDataSource();
+  const { source } = useDataSource();
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    if (isDemo || typeof source.stats !== "function") {
+    if (typeof source.stats !== "function") {
       setStats(null);
       return undefined;
     }
@@ -173,7 +179,7 @@ export function useIconicsStats({ intervalMs = 2000 } = {}) {
     leer();
     const id = setInterval(leer, intervalMs);
     return () => clearInterval(id);
-  }, [source, isDemo, intervalMs]);
+  }, [source, intervalMs]);
 
   return stats;
 }

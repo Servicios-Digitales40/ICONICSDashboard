@@ -42,7 +42,7 @@ function ContadorRed({ t }) {
 }
 
 /** Icono por origen. Es lo único de presentación que no vive en el dominio. */
-const ICONO_ORIGEN = { real: Wifi, simulado: Radio, demo: FlaskConical };
+const ICONO_ORIGEN = { real: Wifi, simulado: Radio };
 
 /**
  * Qué build está corriendo esta pantalla.
@@ -72,11 +72,11 @@ function VersionBuild({ t }) {
 
 export function Topbar({ page }) {
   const { theme: t, dark, toggleTheme } = useTheme();
-  const { isDemo, toggleMode, origen, demoDisponible } = useDataSource();
+  const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
 
-  /* El indicador de origen es el mismo con y sin modo demo; lo que cambia es
+  /* El indicador de origen es el mismo con y sin interruptor; lo que cambia es
      si además es pulsable. Se comparte el estilo para que no puedan derivar. */
   const estiloOrigen = {
     display: "flex", alignItems: "center", gap: 6,
@@ -133,7 +133,7 @@ export function Topbar({ page }) {
         <ContadorRed t={t} />
         <VersionBuild t={t} />
 
-        {/* Indicador de ORIGEN, con sus tres estados reales.
+        {/* Indicador de ORIGEN.
 
             Antes solo decía «En vivo» o «Demo», y ese «En vivo» tapaba dos
             situaciones muy distintas: leer ICONICS de verdad o leer el
@@ -141,14 +141,14 @@ export function Topbar({ page }) {
             propósito, no había forma de notar la diferencia mirando la
             pantalla.
 
-            Sin modo demo compilado (`VITE_ENABLE_DEMO`) el indicador se
-            queda, porque distinguir el servidor real del simulador sigue
+            Sin el interruptor compilado (`VITE_ENABLE_SIMULATOR`) el indicador
+            se queda, porque distinguir el servidor real del simulador sigue
             importando; lo que desaparece es la posibilidad de pulsarlo. */}
-        {demoDisponible ? (
-          <HoverTip label={isDemo ? "Volver a datos de ICONICS" : `${origen.descripcion} · pulsa para usar datos de ejemplo`}>
+        {conmutable ? (
+          <HoverTip label={esSimulado ? "Volver a datos de ICONICS" : `${origen.descripcion} · pulsa para usar el simulador`}>
             <button
-              onClick={toggleMode}
-              aria-pressed={isDemo}
+              onClick={alternarTransporte}
+              aria-pressed={esSimulado}
               aria-label={`Origen de datos: ${origen.descripcion}`}
               style={{ ...estiloOrigen, cursor: "pointer" }}
             >

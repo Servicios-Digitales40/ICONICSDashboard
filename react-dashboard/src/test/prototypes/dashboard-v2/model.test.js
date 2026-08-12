@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { createMachine } from "@/lib/domain/index.js";
 import { listMachines } from "@/lib/iconics/tagCatalog.js";
-import { snapshotDemo } from "@/lib/datasource/demoSource.js";
+import { machinesDemo } from "../../fixtures/machinesDemo.js";
 import { atencion, buildV2Model, paretoRechazos, porArea } from "@/prototypes/dashboard-v2/model.js";
 
 const muertas = () => listMachines().map((m) => createMachine({ ...m, readings: {} }));
@@ -58,7 +58,7 @@ describe("v2 · servidor caído", () => {
 
 describe("v2 · con la fuente demo (misma verdad que producción)", () => {
   it("consume las 10 máquinas reales con ids de ICONICS", () => {
-    const m = buildV2Model(snapshotDemo());
+    const m = buildV2Model(machinesDemo());
     const ids = m.areas.flatMap((a) => a.maquinas.map((x) => x.id));
 
     expect(ids).toHaveLength(10);
@@ -67,7 +67,7 @@ describe("v2 · con la fuente demo (misma verdad que producción)", () => {
   });
 
   it("la franja de atención habla el vocabulario del dominio", () => {
-    const filas = atencion(snapshotDemo());
+    const filas = atencion(machinesDemo());
 
     // La demo reparte estados a propósito: alarma y commfail existen.
     expect(filas.length).toBeGreaterThan(0);
@@ -79,7 +79,7 @@ describe("v2 · con la fuente demo (misma verdad que producción)", () => {
 
   it("el pareto ignora los null pero cuenta los rechazos medidos", () => {
     const conHueco = [
-      ...snapshotDemo().slice(0, 3),
+      ...machinesDemo().slice(0, 3),
       createMachine({ id: "REC/13", areaId: "REC", machineId: "13", equipo: "Multi 13", readings: {} }),
     ];
     const p = paretoRechazos(conHueco);

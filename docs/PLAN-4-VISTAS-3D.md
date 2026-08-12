@@ -19,9 +19,26 @@
 > se retiraron tres bucles de animación que no informaban de nada (§4), y el
 > reparto de trozos necesitó fijar `__vitePreload` a mano (§7).
 >
-> **Pendiente:** la Fase 5 —decidir si «Maqueta 3D» pasa al build de planta—,
-> que requiere medir FPS en el equipo real. Y la Fase 6, los modelos GLB, que
-> sigue bloqueada por D-1: no existen.
+> **Fase 5 ejecutada, y corregida después.** La **sección 3D entera** va en los
+> dos builds (§8). Se hizo en dos pasos: primero sólo «Maqueta 3D», y luego
+> «Máquina 3D» al detectar que estaba detrás de la bandera de prototipos por
+> **herencia** del antiguo modo demo, no por ser un prototipo.
+>
+> Se promovió **sin la medición de FPS** que el plan pedía como requisito. Es
+> una decisión tomada a sabiendas, y el riesgo está acotado por lo que ya hay:
+> respaldo sin WebGL, `frameloop` bajo demanda y `dpr` con techo. **La medición
+> sigue pendiente** (§9) y es lo que dirá si hace falta compartir geometría o
+> pasar a `<Instances>`.
+>
+> **Pendiente:**
+>
+> - Medir FPS y memoria en el wallboard (§9). Es lo único que queda del §9.
+> - Compartir geometría y materiales entre las diez máquinas (§9). **No hecho**:
+>   ahorraría memoria y tiempo de subida, pero **no llamadas de dibujo**, así
+>   que sin la medición sería optimizar a ciegas.
+> - Fase 6, los modelos GLB: bloqueada por D-1 —confirmado que no existen— y
+>   aplazada por decisión, no por falta de tiempo.
+> - D-6, las coordenadas reales del plano de planta.
 
 Cuarto plan. **Independiente de los [1](PLAN-1-CONEXION-ICONICS.md),
 [2](PLAN-2-MEJORAS.md) y [3](PLAN-3-PRODUCCION.md)**: no toca el puente con ICONICS
@@ -346,29 +363,51 @@ Las dos rutas van **detrás de `area-REC`** y delante de `assets`, con
 `nav: { label: …, icon: …, group: "3d" }`. `buildNav` coloca el grupo en la posición de su
 primer hijo, así que la sección «3D» aparece ahí.
 
-### ¿Build de planta o sólo demo?
+### Cuál va a planta — **las dos**
 
 `routes.jsx` fija el listón: *«si un operador debe poder abrirla en un monitor sin teclado»*.
-Una vista que se orbita con el ratón no lo pasa todavía.
+Las dos vistas lo pasan, y las dos van en los dos builds.
 
-**Recomendación:** empezar **sólo en el build de demo**, con el ternario sobre
-`DEMO_HABILITADO` —y con `lazy()`, que es lo que de verdad las mantiene fuera del bundle—, y
-**promover «Maqueta 3D» a planta en la Fase 5**, cuando esté medida en el equipo real y sea
-usable sin teclado (encuadres como botones grandes, clic para la tarjeta). Mover una ruta de
-un lado al otro es una línea; meter three.js en el tablero antes de tiempo, no.
+| Vista | Por qué es operativa |
+|---|---|
+| **Maqueta 3D** | Enseña el estado **real** de los diez equipos y sirve para localizar de un vistazo cuál está en alarma. |
+| **Máquina 3D** | En modo «En vivo» obedece al estado real de la máquina elegida: es la herramienta con la que se verifica que un equipo reporta lo que se cree. |
 
-### La prueba que se rompe
+Las dos se manejan sin teclado: los encuadres son botones y la tarjeta se abre pulsando la
+máquina.
 
-`src/test/app/routes.test.jsx:47` afirma la lista exacta de rutas de planta. **Hay que
-actualizarla en los dos escenarios**:
+> **Se corrigió dos veces, y la segunda por un motivo que conviene registrar.** La Fase 5
+> promovió sólo «Maqueta 3D», dejando «Máquina 3D» detrás de la bandera de prototipos por su
+> selector manual. Era una **conflación heredada**: esa vista nació junto al modo demo y se
+> quedó con su bandera al partirla en el [Plan 5](PLAN-5-DOS-ORIGENES.md), no porque fuera un
+> prototipo.
+>
+> La distinción que faltaba: las propuestas de `src/prototypes/` **compiten** contra una
+> pantalla existente y de ellas hay que elegir una; las vistas 3D son funcionalidad pedida, sin
+> nada a lo que sustituir.
 
-- *Sólo demo:* la lista de planta no cambia, pero `«las vistas de operación son las mismas en
-  los dos builds»` (línea 78) **sí falla**: `ES_PROPUESTA` no reconoce `maquina-3d`, así que las
-  dos rutas se cuelan en el lado de demo. Se amplía el predicado o se añade `ES_3D`.
-- *En planta:* cambia además el `toEqual` de la línea 47.
+**La reserva que queda.** El selector manual de «Máquina 3D» enseña cuatro estados que ICONICS
+no emite. No se resuelve escondiendo la vista sino diciéndolo: el selector los separa en un
+grupo rotulado *«Estados propuestos · aún NO los emite ICONICS»* y la ficha lateral pinta un
+aviso ámbar al elegir uno. Si algún día se decide que en planta no deben verse siquiera, lo que
+hay que gatear es el **selector**, no la ruta.
 
-Está previsto y es sano: esa prueba existe justamente para que la superficie no se mueva sin
-que nadie lo decida.
+**Consecuencia para el bundle:** `lazy()` deja de ser una precaución y pasa a ser lo único que
+impide que la pantalla de Planta descargue 827 KB de three.js en el arranque. Medido con las
+dos vistas dentro: `index` 154.02 KB, `vendor` 79.73 KB, y ningún `modulepreload` del trozo
+`three`. Los dos trozos de vista pesan 7.56 y 9.01 KB, y sólo se descargan al navegar.
+`scripts/verificar-bundle.mjs` hay que ejecutarlo tras cada build.
+
+### La prueba de superficie
+
+`src/test/app/routes.test.jsx` afirma la lista exacta de rutas de planta, y por eso registró el
+cambio. Quedó así:
+
+- `ES_SOLO_PROTOTIPOS` cubre las propuestas y **nada más**: la sección 3D va entera.
+- La lista de planta incluye `maquina-3d` y `maqueta-3d`, entre las áreas y Assets.
+- Una prueba fija que la sección 3D esté **completa en los dos builds**, con el motivo al lado.
+- Otra fija que la sección «3D» sale en la misma posición del sidebar en los dos builds, que es
+  lo que depende del orden de declaración vía `buildNav`.
 
 ---
 

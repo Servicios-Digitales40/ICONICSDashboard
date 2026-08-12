@@ -7,29 +7,27 @@
  * los mismos equipos, los mismos gauges y cifras plausibles. Por eso el aviso
  * es una cinta ancha, siempre visible y no descartable.
  *
- * Cubre los dos orígenes falsos, no solo la demo:
- *
- *  - demo: el mock fijo, elegido a mano con el botón.
- *  - simulado: el transporte falso, que se usa mientras el servidor no está
- *    configurado y que el Topbar por sí solo etiquetaría como «En vivo».
- *
  * Con el origen real no renderiza nada.
+ *
+ * ── QUÉ CAMBIÓ EN EL PLAN 5 ────────────────────────────────────────
+ *
+ * Antes había dos orígenes falsos —`demo` y `simulado`— y sólo del primero se
+ * podía salir desde aquí, porque el segundo dependía de una variable de
+ * compilación. Ahora hay uno solo, y salir de él depende de si el build trae
+ * el interruptor: con él, un botón; sin él, la instrucción de qué tocar.
  */
-import { FlaskConical, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 import { useTheme } from "@/theme";
-import { MODOS, useDataSource } from "@/lib/datasource";
-
-const ICONO = { demo: FlaskConical, simulado: Radio };
+import { TRANSPORTES, useDataSource } from "@/lib/datasource";
 
 export function DataSourceBanner() {
   const { theme: t } = useTheme();
-  const { origen, mode, setMode } = useDataSource();
+  const { origen, conmutable, setTransporte } = useDataSource();
 
   if (!origen.avisa) return null;
 
   const color = t[origen.token];
   const fondo = t[`${origen.token}Soft`] ?? `${color}22`;
-  const Icono = ICONO[origen.key] ?? FlaskConical;
 
   return (
     <div
@@ -50,16 +48,15 @@ export function DataSourceBanner() {
         zIndex: 31,
       }}
     >
-      <Icono size={14} strokeWidth={2.5} />
+      <Radio size={14} strokeWidth={2.5} />
       {origen.label.toUpperCase()} · {origen.descripcion}
 
-      {/* Solo la demo se puede abandonar desde aquí: el modo simulado no
-          depende de una preferencia del usuario sino de la configuración
-          del arranque, y un botón que no arregla nada sería peor que
-          ninguno. Se explica cómo salir en su lugar. */}
-      {mode === MODOS.DEMO ? (
+      {/* Sólo se ofrece salida si el build trae el interruptor. Sin él, el
+          origen lo fija la configuración del arranque y un botón que no
+          arregla nada sería peor que ninguno: se explica qué tocar. */}
+      {conmutable ? (
         <button
-          onClick={() => setMode(MODOS.LIVE)}
+          onClick={() => setTransporte(TRANSPORTES.REAL)}
           style={{
             marginLeft: 6,
             background: "transparent",

@@ -5,9 +5,9 @@
  *
  * Cuatro de los estados que se piden demostrar —los mantenimientos, la
  * limpieza y el paro de emergencia— **el servidor no los emite hoy**. Sólo
- * viven en `lib/machines.js`, el mock anterior, y `demoSource` ya explica por
- * qué no los resucita: «enseñar en la demo un estado que ICONICS nunca manda
- * sería mostrar una pantalla que no existe».
+ * viven en `lib/machines.js`, el mock anterior. El proyecto ya decidió una vez
+ * no resucitarlos: enseñar un estado que ICONICS nunca manda sería mostrar una
+ * pantalla que no existe.
  *
  * Aquí se enseñan igual, porque para eso está la vista, pero separados y con
  * su rótulo. Es la diferencia entre demostrar una capacidad y prometer una

@@ -146,7 +146,7 @@ El build de producción incluye hoy, visibles en el menú lateral:
 
 Decisión necesaria antes de compilar: qué rutas existen en producción. Mi recomendación es
 dejar Planta, Lineales, Rectificadoras, Detalle de máquina y Assets; sacar prototipos, Sandbox,
-Sankey y Data; y compilar el modo demo bajo bandera (`VITE_ENABLE_DEMO`, apagada). La receta
+Sankey y Data; y dejar los prototipos bajo bandera (`VITE_ENABLE_PROTOTYPES`, apagada). La receta
 para retirar los prototipos ya está escrita en `src/prototypes/README.md`.
 
 **P0-7 · Ninguna llamada saliente tiene timeout.**
@@ -375,8 +375,13 @@ gesto y no una reconstrucción.
 1. **`VITE_ICONICS_FAKE` no debe existir en el entorno de build.** Se resuelve en compilación:
    un bundle compilado con ella queda **pegado al simulador para siempre**, enseñando datos
    inventados con aspecto de reales. El guion de empaquetado lo comprueba, no lo confía.
-2. **`VITE_ENABLE_DEMO` tampoco.** Mismo mecanismo: hornea el interruptor que sustituye la
-   planta por datos de ejemplo. Un bundle de planta no lo lleva.
+2. **`VITE_ENABLE_SIMULATOR` y `VITE_ENABLE_PROTOTYPES` tampoco.** Mismo mecanismo: la primera
+   hornea el interruptor que sustituye la planta por datos inventados; la segunda, las rutas
+   experimentales. Un bundle de planta no lleva ninguna de las dos.
+
+   > Las dos eran una sola —`VITE_ENABLE_DEMO`— hasta el [Plan 5](PLAN-5-DOS-ORIGENES.md), que
+   > las separó porque gateaban cosas sin relación. Si un entorno de build aún la define, ya no
+   > surte efecto y **Vite no avisa**: hay que quitarla a mano.
 3. **`VITE_API_BASE` vacía.** El backend sirve el bundle desde su mismo origen y las rutas
    relativas `/api/...` funcionan solas ([apiClient.js:9](../react-dashboard/src/lib/iconics/apiClient.js#L9)).
    Vacía significa además que **el mismo build sirve para cualquier servidor**.
@@ -420,7 +425,7 @@ ni git, ni `node_modules`— y se copia el resultado.
 $ErrorActionPreference = "Stop"
 
 # 1 · Las banderas que no deben viajar al bundle
-foreach ($v in "VITE_ICONICS_FAKE", "VITE_ENABLE_DEMO") {
+foreach ($v in "VITE_ICONICS_FAKE", "VITE_ENABLE_SIMULATOR", "VITE_ENABLE_PROTOTYPES") {
   if (Test-Path "env:$v") { throw "$v está definida: ese bundle no puede ir a planta." }
 }
 
@@ -624,6 +629,11 @@ con un bloque por cada punto de la fase.
   la preferencia guardada se descarta al arrancar —si no, una pantalla que quedó en demo antes
   de apagar la bandera volvería a arrancar en demo, y ya sin botón para sacarla—. Sobrevive el
   **indicador** de origen, que sigue distinguiendo servidor real de simulador.
+
+  > **Superado por el [Plan 5](PLAN-5-DOS-ORIGENES.md) (ago-2026).** El modo demo se retiró
+  > entero. El mecanismo de cierre que se describe aquí sigue vigente palabra por palabra, sólo
+  > que aplicado al interruptor del **simulador** y bajo `VITE_ENABLE_SIMULATOR`; y la bandera
+  > de rutas se separó a `VITE_ENABLE_PROTOTYPES`.
 - **C.4** ✅ `ErrorBoundary` por página (con `resetKey`, para que se rearme al navegar) y en la
   raíz. No usa `useTheme()` a propósito: si lo que falla fuera el proveedor de tema, la
   pantalla de error fallaría con él (P1-9).

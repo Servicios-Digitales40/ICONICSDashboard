@@ -1,13 +1,13 @@
 /**
- * Frontera con la red: elige entre el servidor real y el simulador.
+ * Frontera con la red: el servidor real o el simulador.
  *
- * Por defecto se usa el servidor real; el simulador se pide a propósito
- * con `VITE_ICONICS_FAKE=true`. La variable se resuelve en build, no en
- * runtime, así que un bundle compilado sin ella siempre irá al backend.
- * Para enseñar la UI sin servidor está el modo demo del Topbar.
+ * Por defecto se usa el servidor real. `VITE_ICONICS_FAKE=true` cambia cuál se
+ * usa **al arrancar**; desde el Plan 5, si el build trae el interruptor
+ * (`VITE_ENABLE_SIMULATOR`) se puede cambiar en caliente sin recompilar, que
+ * es lo que antes obligaba a tener un modo demo aparte.
  */
 import { fetchIconicsBatch, fetchIconicsHistory } from "./apiClient.js";
-import { CAOS_SUAVE, createFakeTransport } from "./fakeTransport.js";
+import { CAOS_ALTO, CAOS_SUAVE, SIN_CAOS, createFakeTransport } from "./fakeTransport.js";
 import { historyPointName } from "./tagCatalog.js";
 
 /**
@@ -287,14 +287,53 @@ export function createRealTransport() {
   };
 }
 
-/** ¿Se pidió explícitamente el simulador? */
+/** Los dos transportes posibles. */
+export const TRANSPORTES = { REAL: "real", SIMULADO: "simulado" };
+
+/** ¿El build arranca en el simulador? */
 export const esTransporteFalso = () => import.meta.env?.VITE_ICONICS_FAKE === "true";
 
 /**
- * Transporte a usar. El simulador lleva caos suave a propósito: sin él la UI
- * se construiría dando por hecho que todos los tags existen siempre y que la
- * calidad siempre es buena.
+ * Con qué transporte arranca la aplicación. Real salvo que se pida lo
+ * contrario: un build sin configurar tiene que ir al servidor, nunca quedarse
+ * enseñando datos inventados sin que nadie lo haya decidido.
  */
-export function createTransport() {
-  return esTransporteFalso() ? createFakeTransport({ chaos: CAOS_SUAVE }) : createRealTransport();
+export const transporteInicial = () =>
+  esTransporteFalso() ? TRANSPORTES.SIMULADO : TRANSPORTES.REAL;
+
+/**
+ * Grado de caos del simulador.
+ *
+ * ── POR QUÉ ES ELEGIBLE ────────────────────────────────────────────
+ *
+ * El caos viene encendido en grado suave a propósito: sin él la UI se
+ * escribiría dando por hecho que todos los tags existen siempre y que la
+ * calidad siempre es buena, y ambas suposiciones fallan con el servidor real.
+ * Ése es el valor por defecto y el que hay que usar para desarrollar.
+ *
+ * Pero el caos es aleatorio, y eso choca con el otro uso del simulador:
+ * enseñar la aplicación. Con `none` no hay huecos ni mala calidad, así que la
+ * pantalla es predecible — es lo que sustituye a los números fijos del modo
+ * demo que se retiró. `high` es para revisar a conciencia el comportamiento
+ * degradado.
+ *
+ * Un valor desconocido cae en `soft`, que es el que no miente sobre la
+ * fiabilidad del servidor.
+ */
+const PRESETS_CAOS = { none: SIN_CAOS, soft: CAOS_SUAVE, high: CAOS_ALTO };
+
+export function presetCaos() {
+  return PRESETS_CAOS[import.meta.env?.VITE_ICONICS_CHAOS] ?? CAOS_SUAVE;
+}
+
+/**
+ * Transporte a usar.
+ *
+ * Sin argumento se toma el del build, que es lo que quieren las pruebas y
+ * cualquier consumidor que no participe del interruptor.
+ */
+export function createTransport(clase = transporteInicial()) {
+  return clase === TRANSPORTES.SIMULADO
+    ? createFakeTransport({ chaos: presetCaos() })
+    : createRealTransport();
 }

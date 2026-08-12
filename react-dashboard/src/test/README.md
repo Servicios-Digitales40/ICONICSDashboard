@@ -23,15 +23,16 @@ su sujeto.
 | [lib/domain/machine.test.js](lib/domain/machine.test.js) | La frontera de saneamiento (R-07): `Infinity`/`NaN` del servidor no entran al modelo. |
 | [lib/iconics/pollingEngine.test.js](lib/iconics/pollingEngine.test.js) | Ciclo de vida del motor y **presupuesto de red**: una petición por ciclo, no una por tag. |
 | [lib/datasource/iconicsSource.test.js](lib/datasource/iconicsSource.test.js) | La fuente real pide lo justo y traduce bien. |
-| [lib/datasource/demoSource.test.js](lib/datasource/demoSource.test.js) | La arquitectura nueva no mueve ni un número respecto a la referencia congelada. |
-| [lib/datasource/origen.test.jsx](lib/datasource/origen.test.jsx) | Los tres orígenes (ICONICS / simulador / demo), su señalización, y que el modo demo quede cerrado sin `VITE_ENABLE_DEMO`. |
+| [lib/iconics/tagCatalog.test.js](lib/iconics/tagCatalog.test.js) | El contrato con ICONICS: las 10 máquinas reales, el hueco de la rectificadora 12 y las dos sintaxis de nombre de punto. |
+| [lib/iconics/caos.test.js](lib/iconics/caos.test.js) | Que `VITE_ICONICS_CHAOS=none` sea **de verdad** cero fallos —es lo que sustituye a los números fijos del modo demo— y que `soft` siga ejercitando los caminos de error. |
+| [lib/datasource/origen.test.jsx](lib/datasource/origen.test.jsx) | Los dos orígenes (ICONICS / simulador), su señalización, que el interruptor quede cerrado sin `VITE_ENABLE_SIMULATOR`, y que una preferencia guardada se ignore sin la bandera. |
 
 ### `app/` — el armazón
 
 | Archivo | Qué fija |
 |---|---|
 | [app/navegacion.test.jsx](app/navegacion.test.jsx) | La ruta vive en la URL: enlace profundo, recarga, botón «atrás» y ruta desconocida. |
-| [app/routes.test.jsx](app/routes.test.jsx) | Qué vistas existe en cada build: planta lleva cinco, demo añade las doce propuestas. |
+| [app/routes.test.jsx](app/routes.test.jsx) | Qué vistas existen en cada build: planta lleva siete —incluida la sección 3D entera—, `VITE_ENABLE_PROTOTYPES` añade las doce propuestas. |
 
 ### `features/` — agregación y vistas de producción
 
@@ -68,13 +69,14 @@ pestaña de distancia.
 | [prototypes/dashboard-v2/tiles.test.jsx](prototypes/dashboard-v2/tiles.test.jsx) | Los tiles v2 renderizados sin conexión. |
 
 Estas pruebas corren **siempre**, aunque las propuestas sólo se compilen en el
-build de demo: la suite ejercita el código fuente, no el bundle.
+build con `VITE_ENABLE_PROTOTYPES`: la suite ejercita el código fuente, no el bundle.
 
 ### `fixtures/` — datos y ayudantes compartidos
 
 | Archivo | Para qué |
 |---|---|
 | [fixtures/golden.js](fixtures/golden.js) | Lee/escribe la referencia congelada. Solo lectura salvo `UPDATE_GOLDEN=1`. |
+| [fixtures/machinesDemo.js](fixtures/machinesDemo.js) | Diez máquinas de dominio con estados repartidos a mano. Era `demoSource` en producción; el Plan 5 lo dejó donde siempre debió estar. |
 | [fixtures/numericSnapshot.js](fixtures/numericSnapshot.js) | Reduce unas máquinas a su esqueleto numérico. Documenta qué se congela y qué **no**. |
 | `fixtures/plantModel.golden.json` | La referencia. Generado — no se edita a mano. |
 

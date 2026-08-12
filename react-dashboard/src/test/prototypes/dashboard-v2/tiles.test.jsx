@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createMachine } from "@/lib/domain/index.js";
 import { listMachines } from "@/lib/iconics/tagCatalog.js";
-import { snapshotDemo } from "@/lib/datasource/demoSource.js";
+import { machinesDemo } from "../../fixtures/machinesDemo.js";
 import { ThemeProvider } from "@/theme";
 import { THEMES } from "@/theme/themes.js";
 import { buildV2Model } from "@/prototypes/dashboard-v2/model.js";
@@ -82,7 +82,7 @@ describe("v2 · tiles con servidor caído", () => {
 
 describe("v2 · tiles con la fuente demo", () => {
   it("renderiza el caso normal completo", () => {
-    const m = buildV2Model(snapshotDemo());
+    const m = buildV2Model(machinesDemo());
 
     expect(() =>
       pintar(
