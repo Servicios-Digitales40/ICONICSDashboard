@@ -83,11 +83,18 @@ function esDe3D(id) {
 }
 
 // Configuración mínima de Vite: el plugin de React para JSX/Fast Refresh,
-// más un único alias "@" -> src/.
+// más dos alias: "@" -> src/ y "@shared" -> ../shared/.
 //
-// Un solo alias a propósito: cada alias extra es un segundo sistema de
-// nombres que hay que sincronizar entre este archivo Y jsconfig.json Y el
-// árbol de carpetas. Con uno solo, el árbol es la única fuente de verdad.
+// Los alias se mantienen al mínimo a propósito: cada uno es un segundo
+// sistema de nombres que hay que sincronizar entre este archivo Y
+// jsconfig.json Y el árbol de carpetas.
+//
+// "@shared" es la excepción que justifica la regla, y por eso son dos y no
+// tres: apunta FUERA de src/, así que "@" no puede alcanzarlo por mucho que
+// se estire. `shared/` vive en la raíz del repositorio porque lo importan dos
+// programas distintos —este frontend y el backend de Node—, y ninguno de los
+// dos puede ser su dueño. La alternativa era un relativo de tres niveles
+// (`../../../shared/...`) que se rompe al mover cualquier archivo.
 //
 // Regla de uso: alias para cruzar de módulo, relativo dentro del propio
 // módulo. Ver jsconfig.json para el equivalente que consume el editor.
@@ -149,6 +156,7 @@ export default defineConfig({
     // fileURLToPath y no __dirname: package.json declara "type": "module".
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@shared": fileURLToPath(new URL("../shared", import.meta.url)),
     },
   },
 

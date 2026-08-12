@@ -52,7 +52,27 @@ const DEFAULTS = {
   /** Ventana y tope del limitador por IP. */
   rateLimitWindowMs: 60000,
   rateLimitMax: 300,
+  /**
+   * Corte de la llamada al modelo de lenguaje.
+   *
+   * Deliberadamente NO reutiliza `upstreamTimeoutMs`: son dos escalas
+   * distintas. 15 s es holgado para ICONICS y ridículo para un modelo de 9B
+   * que corre parcialmente en CPU, donde una respuesta con herramientas son
+   * dos pasadas y puede irse a 90 s. Compartir la variable cortaría todas las
+   * respuestas del asistente por sistema.
+   */
+  iaTimeoutMs: 180000,
+  /** Tope de tokens de la respuesta. Con este presupuesto, cada token se paga. */
+  iaMaxTokens: 512,
 }
+
+/**
+ * Máquinas con tags coleccionados en el historiador.
+ *
+ * Hoy es solo la Lineal 1; las otras nueve responden 500. Es configurable
+ * porque cambia marcando una casilla en el Data Historian, sin tocar código.
+ */
+const DEFAULT_MAQUINAS_CON_HISTORIA = 'LIN/1'
 
 /** Cliente OIDC que ICONICS 11.x trae dado de alta de fábrica. */
 const OIDC_CLIENT_ID = 'in_house_client'
@@ -149,6 +169,20 @@ function checkTlsVerification(env, isProduction) {
   return true
 }
 
+/**
+ * Base de llama-server, sin barra final. Vacío significa «sin asistente», no
+ * es un error: es el estado por defecto de una instalación normal.
+ */
+function readIaBase(rawValue) {
+  if (!rawValue) return ''
+
+  try {
+    return new URL(rawValue).origin
+  } catch {
+    throw new Error(`IA_BASE no es una URL absoluta válida (recibido: "${rawValue}")`)
+  }
+}
+
 function readStaticDir(rawValue) {
   const relativeOrAbsolute = rawValue || DEFAULT_STATIC_DIR
   return normalize(
@@ -235,6 +269,29 @@ export function loadConfig(env = process.env) {
       clientId: OIDC_CLIENT_ID,
       scope: OIDC_SCOPE,
       endpoints: Object.freeze(buildEndpoints(origin, apiBase)),
+    }),
+
+    /**
+     * Asistente de lenguaje natural (Plan 6).
+     *
+     * `IA_BASE` vacío —el defecto— apaga el chat entero: `/api/chat` responde
+     * 503 diciendo que no está configurado y el tablero funciona igual. Es la
+     * misma regla de la casa que `ICONICS_READ_ONLY` y `CORS_ORIGINS`: una
+     * instalación que nadie configuró no expone un asistente a medias.
+     */
+    ia: Object.freeze({
+      base: readIaBase(env.IA_BASE),
+      isConfigured: Boolean(env.IA_BASE),
+      timeoutMs: readInteger('IA_TIMEOUT_MS', env.IA_TIMEOUT_MS, DEFAULTS.iaTimeoutMs, 1),
+      maxTokens: readInteger('IA_MAX_TOKENS', env.IA_MAX_TOKENS, DEFAULTS.iaMaxTokens, 1),
+      /** llama-server sirve un solo modelo; el nombre es informativo. */
+      modelo: env.IA_MODELO || 'local',
+      maquinasConHistoria: Object.freeze(
+        (env.IA_MAQUINAS_CON_HISTORIA ?? DEFAULT_MAQUINAS_CON_HISTORIA)
+          .split(',')
+          .map(id => id.trim())
+          .filter(Boolean)
+      ),
     }),
 
     /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */

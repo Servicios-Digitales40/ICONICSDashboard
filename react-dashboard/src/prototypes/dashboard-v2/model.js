@@ -30,7 +30,7 @@
  * hueco jamás se cuenta como cero.
  */
 import { calcOEE, hasValue } from "@/lib/domain/index.js";
-import { AREAS, AREA_IDS } from "@/lib/iconics/tagCatalog.js";
+import { AREAS, AREA_IDS } from "@shared/tagCatalog.js";
 import {
   buildPlantSummary, plantTrend, productionTrend,
 } from "@/features/dashboard/lib/plantModel.js";

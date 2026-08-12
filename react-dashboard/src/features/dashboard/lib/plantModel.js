@@ -13,7 +13,7 @@
  * vez de tratarlos como ceros, que hundirían la media de toda la planta sin
  * que nadie lo notara.
  */
-import { AREAS, AREA_IDS } from "@/lib/iconics/tagCatalog.js";
+import { AREAS, AREA_IDS } from "@shared/tagCatalog.js";
 import { ESTADOS_ORDEN, calcOEE, estaOperando, estadoInfo, hasValue } from "@/lib/domain/index.js";
 import { getMachineHistory } from "@/lib/machines.js";
 import { tiemposTurno } from "@/lib/shiftModel.js";

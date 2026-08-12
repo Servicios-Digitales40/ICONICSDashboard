@@ -22,7 +22,7 @@ import { ArrowLeft, Package, Activity, Clock, CheckCircle2, Zap, GitCompareArrow
 import { useTheme } from "@/theme";
 import { Panel, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import GaugeCard from "../components/GaugeCard.jsx";
-import { AREAS } from "@/lib/iconics/tagCatalog.js";
+import { AREAS } from "@shared/tagCatalog.js";
 import { useMachineData, useMachineHistory } from "@/lib/datasource";
 import { estadoInfo } from "@/lib/domain/index.js";
 import { SIN_DATO, fmtDuracion } from "@/lib/format.js";

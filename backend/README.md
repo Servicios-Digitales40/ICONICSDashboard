@@ -59,6 +59,29 @@ plantilla comentada de todas las variables está en
 | `UPSTREAM_TIMEOUT_MS` | `15000` | Corte de cualquier llamada hacia ICONICS. |
 | `BATCH_CACHE_TTL_MS` | `2000` | Vida de la caché de lecturas en lote. `0` la desactiva. |
 
+**Asistente** (Plan 6)
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `IA_BASE` | *(vacío)* | Base de llama-server. Vacío = **sin asistente**: `/api/chat` responde 503 y el frontend no lo pinta. |
+| `IA_TIMEOUT_MS` | `180000` | Corte de la llamada al modelo. Ver abajo por qué no reutiliza `UPSTREAM_TIMEOUT_MS`. |
+| `IA_MAX_TOKENS` | `512` | Tope de la respuesta. |
+| `IA_MODELO` | `local` | Nombre informativo; llama-server sirve un solo modelo. |
+| `IA_MAQUINAS_CON_HISTORIA` | `LIN/1` | Máquinas con tags «Is Collected». Las demás responden 500 al historiador. |
+
+`IA_TIMEOUT_MS` es una variable aparte y no `UPSTREAM_TIMEOUT_MS` porque son
+dos escalas distintas: 15 s es holgado para ICONICS y ridículo para un modelo
+de 9B que corre parcialmente en CPU. Compartirlas cortaría **todas** las
+respuestas del asistente por sistema, y el síntoma —un timeout siempre—
+apuntaría al modelo en vez de a la configuración.
+
+> ⚠️ **llama-server hay que arrancarlo con `--jinja`.** Sin esa bandera el
+> modelo no ve las herramientas y contesta de memoria, con una cifra inventada
+> y el mismo aplomo que si la hubiera consultado. El puente lo detecta —una
+> respuesta con cifras y sin herramienta no sale— pero el arreglo está en la
+> línea de arranque. Y `--host 127.0.0.1`, nunca `0.0.0.0`: llama-server no
+> lleva autenticación de ninguna clase.
+
 Si `ICONICS_API_BASE` no es una URL válida, `PORT` no es un puerto, o un
 booleano no es `true`/`false`, el servidor **no arranca** y dice cuál está mal.
 Es deliberado: una configuración rota que arranca a medias se diagnostica mucho
@@ -103,14 +126,23 @@ backend/
 │   ├── client.mjs         Operaciones contra la API REST
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
+├── ia/                  El asistente (Plan 6)
+│   ├── herramientas.mjs   Las cuatro que el modelo puede invocar
+│   └── chat.mjs           El bucle de dos pasadas contra llama-server
+│
 └── routes/              Traducción HTTP ↔ cliente
     ├── iconicsRoutes.mjs
+    ├── chatRoutes.mjs
     └── systemRoutes.mjs
 ```
 
-Las dependencias apuntan en un solo sentido —`routes` → `iconics` → `http`— y
-ningún módulo de abajo conoce a los de arriba. `iconics/client.mjs` no sabe qué
-es una respuesta HTTP; `http/` no sabe qué es un punto de ICONICS.
+Las dependencias apuntan en un solo sentido —`routes` → `ia` → `iconics` →
+`http`— y ningún módulo de abajo conoce a los de arriba. `iconics/client.mjs`
+no sabe qué es una respuesta HTTP; `http/` no sabe qué es un punto de ICONICS.
+
+`ia/` importa además de [`shared/`](../shared/README.md), en la raíz del
+repositorio: las reglas del historiador y el catálogo de tags son las mismas
+que usa el frontend, y tenerlas dos veces las haría divergir.
 
 ## Endpoints
 
@@ -154,6 +186,40 @@ valor por defecto.
 |---|---|---|
 | `GET /api/iconics/alarms?pointName=&hours=` | — | `{ ok, alarms: [] }` (máx. 48 h) |
 | `PUT /api/iconics/alarms/acknowledge` | `{ eventIds, comment }` | `{ ok, result }` |
+
+### Asistente
+
+| Ruta | Cuerpo | Respuesta |
+|---|---|---|
+| `GET /api/chat` | — | `{ ok, habilitado, modelo, ocupado }` |
+| `POST /api/chat` | `{ pregunta }` | Flujo **SSE** de eventos (ver abajo) |
+
+`GET` existe para que el frontend sepa si pintar el asistente sin necesidad de
+una bandera de compilación: el mismo `dist` sirve a una planta con modelo y a
+otra sin él.
+
+`POST` responde `text/event-stream`, no un JSON al final. Con el modelo que
+corre en el servidor una respuesta tarda **entre 30 y 90 segundos**, y un
+`fetch` mudo durante minuto y medio es indistinguible de uno colgado: el
+operador vuelve a pulsar y deja dos preguntas compitiendo por la misma GPU.
+
+| Evento | Cuándo |
+|---|---|
+| `{ tipo: 'estado', valor }` | Cambia el paso: pensando → consultando → redactando |
+| `{ tipo: 'herramienta', nombre, argumentos }` | El modelo decidió qué consultar |
+| `{ tipo: 'texto', delta }` | Un trozo de la respuesta |
+| `{ tipo: 'fin', herramienta, bloqueada, duracionMs }` | Terminó |
+| `{ tipo: 'error', mensaje }` | Falló, con el motivo accionable |
+
+Códigos que no son 200: **503** sin `IA_BASE`, **409** si ya hay otra consulta
+en curso —llama-server corre con `--parallel 1`, y dos preguntas simultáneas
+tardan el doble las dos—, **400** si la pregunta está vacía o pasa de 2000
+caracteres.
+
+**El asistente no puede escribir.** El registro de herramientas contiene
+cuatro lecturas y ninguna escritura, así que `POST /write` no es alcanzable
+desde el chat ni con la instrucción más astuta. `ICONICS_READ_ONLY` sigue
+siendo la última puerta; ésta es la primera.
 
 ### Del propio puente
 
@@ -235,12 +301,23 @@ en vez de un 404 que se confunde con una ruta mal escrita.
 ## Verificación
 
 ```bash
-node scripts/verificar-backend.mjs
+node scripts/verificar-backend.mjs        # 51 · el contrato HTTP
+node scripts/verificar-herramientas.mjs   # 21 · las herramientas del asistente
+node scripts/verificar-chat.mjs           # 17 · el bucle de conversación
 ```
 
-Levanta un ICONICS falso —flujo OIDC incluido— y comprueba que cada endpoint
-devuelve la forma exacta que consume el frontend. No necesita red, ni
-configuración, ni el backend levantado.
+El primero levanta un ICONICS falso —flujo OIDC incluido— y comprueba que cada
+endpoint devuelve la forma exacta que consume el frontend.
+
+Los otros dos existen porque una respuesta real del asistente tarda entre 30 y
+90 segundos: una capa que solo se pudiera probar esperando eso no se probaría
+nunca. `verificar-herramientas` ejecuta las cuatro contra un cliente de
+mentira; `verificar-chat` levanta un **llama-server falso** al que se le dicta
+qué contestar, lo que permite provocar en milisegundos casos que con el modelo
+de verdad no se pueden provocar a voluntad —el principal: que conteste de
+memoria, sin llamar a ninguna herramienta—.
+
+Ninguno necesita red, ni configuración, ni GPU, ni el backend levantado.
 
 Contra el servidor real, con el backend en marcha:
 

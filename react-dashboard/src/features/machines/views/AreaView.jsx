@@ -10,7 +10,7 @@
  * motor de polling contar referencias y pedir solo lo que hay en pantalla.
  */
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
-import { AREAS } from "@/lib/iconics/tagCatalog.js";
+import { AREAS } from "@shared/tagCatalog.js";
 import { useAreaData } from "@/lib/datasource";
 import GaugeCard from "../components/GaugeCard.jsx";
 

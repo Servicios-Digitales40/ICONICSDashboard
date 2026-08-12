@@ -21,7 +21,7 @@
  *  - Filtro por calidad en la frontera (ver quality.js): un valor de mala
  *    calidad es ausencia de dato, no un cero.
  */
-import { isGoodQuality } from "./quality.js";
+import { isGoodQuality } from "@shared/quality.js";
 
 /** Adaptador de visibilidad. Fuera del navegador se comporta como «siempre visible». */
 function visibilidadDelNavegador() {

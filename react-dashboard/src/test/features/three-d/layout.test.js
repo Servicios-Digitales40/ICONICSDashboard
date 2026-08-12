@@ -17,7 +17,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { listMachines } from "@/lib/iconics/tagCatalog.js";
+import { listMachines } from "@shared/tagCatalog.js";
 import {
   ESCALA_MAQUETA,
   FILAS,

@@ -13,9 +13,9 @@ export {
   toText,
   hasValue,
   tieneDatos,
-} from "./machine.js";
+} from "@shared/domain/machine.js";
 
-export { daySummary } from "./history.js";
+export { daySummary } from "@shared/domain/history.js";
 
 export {
   ESTADOS,
@@ -24,4 +24,4 @@ export {
   estadoInfo,
   estadoLabel,
   estaOperando,
-} from "./estado.js";
+} from "@shared/domain/estado.js";

@@ -11,8 +11,8 @@
  * escribiría dando por hecho que todos los tags existen siempre y que la
  * calidad siempre es buena, y ambas suposiciones fallan con el servidor real.
  */
-import { AREAS, parsePointName, tagsForArea } from "./tagCatalog.js";
-import { QUALITY_GOOD } from "./quality.js";
+import { AREAS, parsePointName, tagsForArea } from "@shared/tagCatalog.js";
+import { QUALITY_GOOD } from "@shared/quality.js";
 
 /** Calidad OPC "uncertain": lo que más se parece a un dato bueno sin serlo. */
 const QUALITY_UNCERTAIN = 64;

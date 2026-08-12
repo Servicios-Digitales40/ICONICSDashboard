@@ -18,6 +18,9 @@ autenticación contra ICONICS, y un frontend en React que consume ese backend.
 - **Explorador de assets** — navegación del árbol de AssetWorX con lectura de
   propiedades en vivo.
 - **Datos crudos** — lectura, escritura y borrado de puntos sueltos de ICONICS.
+- **Asistente** — un chat que responde en lenguaje natural consultando ICONICS
+  de verdad, con un modelo que corre en el propio servidor. Opcional: sin
+  `IA_BASE` no aparece.
 
 Las máquinas son 10, repartidas en dos áreas: siete líneas (`LIN 1..7`) y tres
 rectificadoras (`REC 10, 11, 13`).
@@ -31,9 +34,15 @@ rectificadoras (`REC 10, 11, 13`).
 │   ├── iconics/          Autenticación OIDC, cliente REST y validación
 │   └── routes/           Traducción HTTP ↔ cliente
 ├── react-dashboard/    Frontend React + Vite
+├── shared/             Dominio que usan los dos: catálogo de tags e historiador
 ├── scripts/            Utilidades de verificación
 └── docs/               Plan de conexión, mejoras y tabla de tags
 ```
+
+`shared/` existe porque el backend y el frontend necesitan las mismas reglas de
+negocio —qué máquinas hay, cómo se nombra un punto, cómo se resume un día del
+historiador— y duplicarlas las haría divergir. Ver
+[`shared/README.md`](shared/README.md).
 
 ## Requisitos
 
@@ -86,6 +95,12 @@ cd .. && node --env-file=.env.production backend/server.mjs
 
 Sin ese build, el backend responde 503 diciendo que falta compilar.
 
+> ⚠️ **`shared/` tiene que viajar en la release.** Desde el Plan 6 el backend
+> importa de ahí el catálogo de tags y las reglas del historiador. Un paquete
+> que lleve solo `backend/` y `dist/` arranca y falla en el primer `import`.
+> El guion de empaquetado está archivado en el tag `archivo/plan-produccion` y
+> **no incluye `shared/` todavía**: hay que añadirlo al recuperarlo.
+
 El build se estampa solo con el `git describe` del árbol, y esa versión se ve
 en el Topbar y en `/api/health`. En producción **no** deben aparecer
 `VITE_ICONICS_FAKE`, `VITE_ENABLE_SIMULATOR`, `VITE_ENABLE_PROTOTYPES` ni
@@ -132,6 +147,37 @@ que debe llegar a un monitor de planta.
 Para una demostración con público, `VITE_ICONICS_CHAOS=none` apaga la
 aleatoriedad del simulador: sin huecos, sin calidad mala y sin latencia.
 
+## El asistente
+
+Un chat, disponible desde cualquier pantalla, que responde preguntas en
+lenguaje natural consultando ICONICS. «¿Cuál fue el OEE de la Línea 1 el 25 de
+marzo de 2025?» se convierte en una lectura real del historiador, no en una
+cifra recitada por el modelo.
+
+Es **opcional y está apagado por defecto**. Se enciende apuntando `IA_BASE` a
+un llama-server local:
+
+```bash
+llama-server.exe -m <modelo>.gguf --jinja --host 127.0.0.1 --port 8080 -c 4096 -ngl 99 --parallel 1
+```
+
+Dos cosas de esa línea no son opcionales. **`--jinja`** activa la plantilla de
+chat del modelo: sin ella no ve las herramientas y contesta de memoria, que es
+el modo de fallo más peligroso porque parece que funciona. Y **`127.0.0.1`**,
+porque llama-server no tiene autenticación de ninguna clase.
+
+Tres reglas del diseño, por si sorprenden en pantalla:
+
+- **Toda cifra viene de una consulta.** Debajo de cada respuesta se dice de
+  dónde salió el dato. Si el modelo contesta con números sin haber consultado
+  nada, el puente **no** deja salir la respuesta.
+- **Una consulta a la vez.** La segunda pregunta simultánea recibe un aviso, no
+  una espera muda: dos a la vez se reparten la GPU y tardan el doble las dos.
+- **Solo algunas máquinas tienen historia.** Hoy, la Lineal 1. Preguntar por
+  otra fecha pasada devuelve «no tengo ese dato», nunca un cero.
+
+El detalle está en [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md).
+
 ## Pruebas
 
 Frontend:
@@ -141,11 +187,14 @@ cd react-dashboard
 npm test
 ```
 
-Backend, sin necesidad de servidor ni configuración —levanta un ICONICS falso y
-comprueba que cada endpoint devuelve la forma que el frontend espera:
+Backend, sin necesidad de servidor ni configuración —levantan un ICONICS falso
+y un llama-server falso, y comprueban que cada pieza devuelve la forma que
+espera la siguiente:
 
 ```bash
-node scripts/verificar-backend.mjs
+node scripts/verificar-backend.mjs        # el contrato HTTP
+node scripts/verificar-herramientas.mjs   # las herramientas del asistente
+node scripts/verificar-chat.mjs           # el bucle de conversación
 ```
 
 Contra el servidor real, con el backend levantado:
@@ -162,4 +211,5 @@ node scripts/verificar-historia.mjs    # el historiador entrega muestras
 - [`docs/PLAN-1-CONEXION-ICONICS.md`](docs/PLAN-1-CONEXION-ICONICS.md) — plan de conexión
 - [`docs/PLAN-2-MEJORAS.md`](docs/PLAN-2-MEJORAS.md) — mejoras propuestas
 - [`docs/PLAN-3-PRODUCCION.md`](docs/PLAN-3-PRODUCCION.md) — paso a producción: huecos, build y despliegue
+- [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md) — chat con IA local sobre los datos (propuesto)
 - [`docs/TAGS.md`](docs/TAGS.md) — tabla Excel → punto ICONICS → campo de dominio

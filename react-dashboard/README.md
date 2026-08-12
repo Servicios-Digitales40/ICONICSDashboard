@@ -127,8 +127,8 @@ src/
 │   └── routes/               Registro ÚNICO de rutas (routes.jsx) + URL
 │
 ├── lib/                      Infraestructura compartida
-│   ├── domain/               Forma `Machine`, estados, saneamiento
-│   ├── iconics/              Catálogo de tags, motor de polling, transporte
+│   ├── domain/               Barril sobre ../../shared/domain/
+│   ├── iconics/              Motor de polling, transporte y cliente HTTP
 │   ├── datasource/           Interfaz + fuente ICONICS + fuente demo + hooks
 │   ├── format.js             Formateo consciente de la ausencia de dato
 │   ├── machines.js           Datos de ejemplo (heredado; lo usa la demo)
@@ -145,6 +145,18 @@ src/
 ├── theme/                    Colores claro/oscuro + useTheme()
 └── prototypes/               Propuestas en evaluación — SOLO en el build de demo
 ```
+
+**`lib/domain/` y `lib/iconics/` ya no son dueños de las reglas de negocio.**
+Desde el [Plan 6](../docs/PLAN-6-IA-LOCAL.md), el catálogo de tags, la forma
+`Machine`, el enum de estados y la mecánica del historiador viven en
+[`shared/`](../shared/README.md), en la raíz del repositorio, porque el backend
+necesita exactamente las mismas reglas para las herramientas del asistente.
+`lib/domain/index.js` y `lib/iconics/index.js` siguen siendo la API pública que
+consumen las vistas, así que para ellas no cambió nada.
+
+Se importa con el alias `@shared`, el segundo del proyecto y la excepción a la
+regla de tener uno solo: apunta fuera de `src/`, que es justo lo que `@` no
+puede hacer. Está declarado a la vez en `vite.config.js` y en `jsconfig.json`.
 
 ### Qué ve cada build
 
@@ -214,7 +226,7 @@ que el simulador ejercita exactamente el mismo código que el servidor.
 - **Un solo lugar para los colores.** Todo componente lee de `useTheme()` y nunca
   escribe un color literal.
 
-- **El vocabulario de estados vive en `lib/domain/estado.js`**, no duplicado
+- **El vocabulario de estados vive en `shared/domain/estado.js`**, no duplicado
   entre la tarjeta y el dashboard.
 
 - **La ruta actual vive en la URL.** `/area-REC` abre las rectificadoras

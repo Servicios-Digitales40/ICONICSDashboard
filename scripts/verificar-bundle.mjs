@@ -118,7 +118,29 @@ for (const a of archivos) {
 
 /* 2 · Los trozos del arranque no se salen del presupuesto. ----------- */
 for (const [prefijo, techo] of Object.entries(PRESUPUESTO_KB)) {
-  const a = archivos.find((x) => x.nombre.startsWith(`${prefijo}-`));
+  const candidatos = archivos.filter((x) => x.nombre.startsWith(`${prefijo}-`));
+
+  /*
+   * Más de un trozo con el mismo prefijo hace ambigua la medición, y el modo
+   * de fallo es silencioso: se mediría el primero que apareciera y el techo
+   * dejaría de comprobar nada. Pasó al diferir el asistente con `lazy()`
+   * importando su barril `index.js`, que produjo un segundo `index-*.js` de
+   * 7 KB — y este guion lo dio por bueno frente al techo de 170.
+   *
+   * Se arregla en el origen (importando el componente y no el barril), pero
+   * la comprobación se queda: es más barato que volver a descubrirlo.
+   */
+  if (candidatos.length > 1) {
+    fallos.push(
+      `Hay ${candidatos.length} trozos que empiezan por «${prefijo}-»: ` +
+      `${candidatos.map((x) => x.nombre).join(", ")}.\n` +
+      `    No se puede saber cuál es el del arranque. Importa el componente concreto ` +
+      `en vez de un barril \`index.js\` en el \`lazy()\` que lo generó.`
+    );
+    continue;
+  }
+
+  const a = candidatos[0];
   if (!a) continue;
   const tam = kb(a.bytes);
   const ok = tam <= techo;

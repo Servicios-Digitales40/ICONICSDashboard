@@ -23,7 +23,7 @@ import {
   listMachines,
   pointName,
   tagsForArea,
-} from "../iconics/tagCatalog.js";
+} from "@shared/tagCatalog.js";
 
 const CADENCIA = {
   resumen: 15_000,

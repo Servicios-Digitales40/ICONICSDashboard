@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { QUALITY_GOOD } from "@/lib/iconics/quality.js";
+import { QUALITY_GOOD } from "@shared/quality.js";
 import { SIN_CAOS, createFakeTransport } from "@/lib/iconics/fakeTransport.js";
 import { createIconicsSource } from "@/lib/datasource/iconicsSource.js";
 

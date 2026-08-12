@@ -20,7 +20,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createMachine } from "@/lib/domain/index.js";
-import { listMachines } from "@/lib/iconics/tagCatalog.js";
+import { listMachines } from "@shared/tagCatalog.js";
 import { ThemeProvider } from "@/theme";
 import { THEMES } from "@/theme/themes.js";
 import { buildPlantSummary } from "@/features/dashboard/lib/plantModel.js";

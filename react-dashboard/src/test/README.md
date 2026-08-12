@@ -105,7 +105,12 @@ que necesitan DOM lo declaran en su primera línea:
 Se ve al abrir el archivo, en vez de estar escondido en un glob de
 `vite.config.js`.
 
-**Alias `@` para cruzar, relativo dentro de `test/`.** Una prueba importa
-su sujeto igual que lo haría la aplicación (`@/lib/domain/machine.js`),
-así que la ruta no cambia si la prueba se mueve. Solo los `fixtures/` se
-importan en relativo, porque viven en este mismo módulo.
+**Alias para cruzar, relativo dentro de `test/`.** Una prueba importa su
+sujeto igual que lo haría la aplicación (`@/lib/datasource/hooks.js`, o
+`@shared/domain/machine.js` para lo que vive en `shared/`), así que la ruta
+no cambia si la prueba se mueve. Solo los `fixtures/` se importan en
+relativo, porque viven en este mismo módulo.
+
+Que el sujeto esté en `shared/` no saca la prueba de aquí: la suite entera
+vive en `src/test/` y su árbol espeja el de la aplicación, no el del
+repositorio.
