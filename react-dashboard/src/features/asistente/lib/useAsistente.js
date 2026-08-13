@@ -29,6 +29,31 @@ const nuevoTurno = () => ({
   error: null,
 });
 
+/**
+ * Los turnos anteriores que se le recuerdan al modelo.
+ *
+ * Se manda el TEXTO y nada más: ni la herramienta que se usó ni su resultado.
+ * Devolverle el JSON de consultas pasadas le invita a mezclarlo con la
+ * pregunta nueva y a citar la cifra del turno anterior como si fuera la de
+ * este. El texto basta para entender el hilo y no se confunde con un dato
+ * recién leído.
+ *
+ * Quedan fuera dos clases de turno, y por el mismo motivo: son turnos en los
+ * que **decidimos no dar una respuesta**, así que recordarlos como si la
+ * hubiéramos dado es contradecirse.
+ *
+ *  - Los bloqueados, donde el modelo intentó recitar de memoria.
+ *  - Los que acabaron en error.
+ *
+ * El recorte por número de turnos lo hace el servidor, que es quien sabe lo
+ * que cuesta cada uno.
+ */
+function historialParaEnviar(mensajes) {
+  return mensajes
+    .filter((m) => m.texto?.trim() && !m.bloqueada && !m.error)
+    .map((m) => ({ rol: m.rol, texto: m.texto }));
+}
+
 export function useAsistente() {
   const [disponible, setDisponible] = useState(null);   // null = comprobando
   const [mensajes, setMensajes] = useState([]);
@@ -90,6 +115,9 @@ export function useAsistente() {
       const control = new AbortController();
       abortador.current = control;
 
+      // El hilo se toma ANTES de añadir el turno nuevo, que aún está vacío.
+      const historial = historialParaEnviar(mensajes);
+
       setMensajes((previos) => [...previos, { rol: "usuario", texto: limpia }, nuevoTurno()]);
       setOcupado(true);
       setEstado("Enviando…");
@@ -98,7 +126,7 @@ export function useAsistente() {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta: limpia }),
+          body: JSON.stringify({ pregunta: limpia, historial }),
           signal: control.signal,
         });
 
@@ -129,7 +157,7 @@ export function useAsistente() {
         abortador.current = null;
       }
     },
-    [ocupado, actualizarUltimo]
+    [ocupado, mensajes, actualizarUltimo]
   );
 
   const limpiar = useCallback(() => {
@@ -185,6 +213,7 @@ async function leerFlujo(respuesta, manejadores) {
 /** Nombre técnico de la herramienta → lo que se le enseña al operador. */
 export const ETIQUETA_HERRAMIENTA = {
   listar_maquinas: "Consultó el catálogo de máquinas",
+  estado_de_planta: "Leyó la planta entera de ICONICS",
   estado_actual: "Leyó el estado en vivo de ICONICS",
   oee_de_maquina: "Leyó el historiador",
   comparar_dias: "Comparó dos días del historiador",

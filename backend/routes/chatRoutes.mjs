@@ -70,6 +70,11 @@ export function registerChatRoutes(router, { config, chat }) {
       return sendError(response, 400, `La pregunta no puede pasar de ${MAX_PREGUNTA} caracteres.`)
     }
 
+    // El hilo anterior, para que «¿y el día anterior?» signifique algo. Lo
+    // recorta `chat.responder()`, que es donde vive el criterio de cuánto
+    // contexto vale la pena pagar; aquí solo se comprueba que sea una lista.
+    const historial = Array.isArray(cuerpo?.historial) ? cuerpo.historial : []
+
     /* ── A partir de aquí la respuesta es un flujo ─────────────────── */
 
     const abortador = new AbortController()
@@ -107,18 +112,28 @@ export function registerChatRoutes(router, { config, chat }) {
     try {
       const resumen = await chat.responder({
         pregunta,
+        historial,
         signal: abortador.signal,
         onEvento: emitir,
       })
 
       emitir({ tipo: 'fin', ...resumen, duracionMs: Date.now() - empezado })
-      logger.info('Chat respondido', { ...resumen, duracionMs: Date.now() - empezado })
+
+      // La PREGUNTA va en el log a propósito (Plan 7, Fase B). Sin ella, una
+      // línea de registro dice que no hizo falta herramienta pero no qué se
+      // preguntó, y no hay forma de saber qué herramienta falta. Con ella, una
+      // semana en planta contesta esa pregunta con datos.
+      logger.info('Chat respondido', {
+        pregunta,
+        ...resumen,
+        duracionMs: Date.now() - empezado,
+      })
     } catch (error) {
       // Cancelar no es un error que reportar: el cliente ya se fue.
       const cancelado = error?.name === 'AbortError' || abortador.signal.aborted
 
       if (!cancelado) {
-        logger.error('Chat falló', { err: error, duracionMs: Date.now() - empezado })
+        logger.error('Chat falló', { pregunta, err: error, duracionMs: Date.now() - empezado })
         emitir({ tipo: 'error', mensaje: mensajeDeFallo(error, config.ia.timeoutMs) })
       }
     } finally {

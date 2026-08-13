@@ -91,6 +91,10 @@ const llama = createServer(async (req, res) => {
     }
     for (const trozo of (guion.texto ?? 'Respuesta.').match(/.{1,6}/gs) ?? []) {
       res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: trozo } }] })}\n\n`)
+      // Cede el turno para que Node entregue cada evento por separado. Sin
+      // esto los fusiona en un solo trozo del cuerpo y no se estaría probando
+      // el flujo, sino una entrega de golpe.
+      await new Promise(r => setImmediate(r))
     }
     res.write('data: [DONE]\n\n')
     return res.end()
@@ -139,9 +143,9 @@ function chatDePrueba(extra = {}) {
 }
 
 /** Recoge todos los eventos de una respuesta. */
-async function preguntar(chat, pregunta) {
+async function preguntar(chat, pregunta, historial) {
   const eventos = []
-  const resumen = await chat.responder({ pregunta, onEvento: e => eventos.push(e) })
+  const resumen = await chat.responder({ pregunta, historial, onEvento: e => eventos.push(e) })
   const texto = eventos.filter(e => e.tipo === 'texto').map(e => e.delta).join('')
   return { eventos, resumen, texto }
 }
@@ -243,7 +247,46 @@ await check('el razonamiento NO se enseña: no es la respuesta', async () => {
   assert.ok(!texto.includes('El usuario pregunta'), 'el borrador del modelo no va a la pantalla')
 })
 
-await check('si el modelo no redacta nada, se dice el dato igual', async () => {
+await check('el marcado de una SEGUNDA herramienta no llega a la pantalla', async () => {
+  // Visto en planta: preguntando por «el OEE más alto de julio», el modelo
+  // consultó el catálogo y luego intentó llamar a otra herramienta. Como la
+  // pasada de redactar no lleva herramientas, llama-server no lo interpretó y
+  // su marcado salió como texto: un `<tool_call>` crudo en la burbuja.
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    texto: 'LIN/1 tiene datos históricos. Consulto el OEE de julio.\n\n<tool_call>\n<function=get_oee_historico>\n</function>\n</tool_call>',
+  }
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿el OEE más alto de julio?')
+
+  assert.ok(!texto.includes('<tool_call>'), 'el marcado no puede llegar al operador')
+  assert.ok(!texto.includes('<function='), 'ni en su forma abreviada')
+  assert.equal(resumen.marcado, true, 'y tiene que quedar registrado que pasó')
+})
+
+await check('lo que dijo ANTES del marcado sí se conserva', async () => {
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    texto: 'Voy a consultarlo.<tool_call>basura</tool_call>',
+  }
+  const { texto } = await preguntar(chatDePrueba(), 'algo')
+
+  assert.match(texto, /Voy a consultarlo/, 'el preámbulo es texto legítimo')
+  assert.ok(!texto.includes('basura'), 'lo de dentro del marcado no')
+})
+
+await check('tras cortar el marcado, el DATO se cuenta igual', async () => {
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    texto: 'Ahora consulto.<tool_call>x</tool_call>',
+  }
+  const { texto } = await preguntar(chatDePrueba(), 'algo')
+
+  // La herramienta ya devolvió el dato; perderlo porque el modelo no supo
+  // redactarlo sería tirar una consulta que salió bien.
+  assert.match(texto, /LIN\/1/, 'el resumen de respaldo tiene que aparecer')
+})
+
+await check('si no redacta nada, se dice el dato igual', async () => {
   // Pasó de verdad con el 4B: el razonamiento se comió `max_tokens` entero y
   // `content` llegó vacío. Una burbuja en blanco no se distingue de una avería.
   guion = {
@@ -269,7 +312,40 @@ await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)'
   assert.equal(resumen.bloqueada, true, 'la respuesta debía bloquearse')
   assert.equal(resumen.herramienta, null)
   assert.ok(!texto.includes('87,3'), 'la cifra inventada no puede llegar al usuario')
-  assert.match(texto, /--jinja/, 'y debe decir dónde mirar')
+  assert.match(texto, /día/i, 'dice lo que SÍ se puede preguntar, que es lo accionable')
+  assert.match(texto, /--jinja/, 'y, sin ninguna llamada aún, sugiere revisar la bandera')
+})
+
+await check('si el modelo YA usó herramientas, el aviso no culpa a --jinja', async () => {
+  // Con `--jinja` bien puesto, una respuesta sin consultar significa que la
+  // pregunta no encaja en ninguna herramienta —un rango, un mes—, no que
+  // falte la bandera. Mandar a revisarla es enviar a nadie a buscar nada.
+  const chat = chatDePrueba()
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Hay 10 máquinas.',
+  }
+  await preguntar(chat, '¿qué máquinas hay?')
+
+  guion = { contenido: 'El OEE más alto de julio fue del 87,3 %.', toolCall: null }
+  const { resumen, texto } = await preguntar(chat, '¿el OEE más alto de julio?')
+
+  assert.equal(resumen.bloqueada, true)
+  assert.ok(!texto.includes('--jinja'), 'la bandera está bien; no hay que mandar a revisarla')
+  assert.match(texto, /rangos|día/i, 'y sí decir qué SÍ se puede preguntar')
+})
+
+await check('ni herramienta ni texto: NUNCA una burbuja vacía', async () => {
+  // Visto con el 4B: preguntando por «el OEE más alto de julio» gastó 16 s
+  // pensando, no llamó a nada y devolvió contenido vacío. En pantalla es una
+  // burbuja en blanco, indistinguible de una avería.
+  guion = { contenido: '', toolCall: null }
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿el OEE más alto de julio?')
+
+  assert.ok(texto.trim().length > 0, 'tiene que decir algo')
+  assert.match(texto, /día/i, 'y enumerar lo que sí se puede preguntar')
+  assert.equal(resumen.sinRedactar, true)
 })
 
 await check('una respuesta SIN cifras sí pasa: un saludo es legítimo', async () => {
@@ -284,6 +360,126 @@ await check('nombrar una máquina no cuenta como cifra inventada', async () => {
   const { resumen, texto } = await preguntar(chatDePrueba(), 'la linea')
   assert.equal(resumen.bloqueada, false, 'pedir una aclaración es legítimo')
   assert.match(texto, /Multi 13/)
+})
+
+/* ── Memoria de conversación (Plan 7) ────────────────────────────────── */
+
+console.log('\n── Memoria de conversación ─────────────────────────────────')
+
+/** Los mensajes que recibió el modelo en la pasada de elegir herramienta. */
+const mensajesDeDecidir = () => peticiones.find(p => p.tools).messages
+
+const turnoBase = [
+  { rol: 'usuario', texto: '¿OEE de la Línea 1 el 30 de julio de 2026?' },
+  { rol: 'asistente', texto: 'El OEE de la Línea 1 el 30 de julio fue del 61,9 %.' },
+]
+
+await check('el hilo anterior llega al modelo, y en orden', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  await preguntar(chatDePrueba(), '¿y el día anterior?', turnoBase)
+
+  const m = mensajesDeDecidir()
+  assert.equal(m[0].role, 'system', 'las instrucciones van primero')
+  assert.equal(m[1].role, 'user')
+  assert.match(m[1].content, /30 de julio/)
+  assert.equal(m[2].role, 'assistant')
+  assert.match(m[2].content, /61,9/)
+  assert.equal(m[3].role, 'user')
+  assert.equal(m[3].content, '¿y el día anterior?', 'la pregunta nueva va la última')
+})
+
+await check('sin historial se comporta como antes', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  const { resumen } = await preguntar(chatDePrueba(), '¿qué máquinas hay?')
+
+  assert.equal(mensajesDeDecidir().length, 2, 'solo system + pregunta')
+  assert.equal(resumen.turnosRecordados, 0)
+})
+
+await check('el tope lo pone el SERVIDOR, no el cliente', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+
+  // Un cliente que manda cincuenta turnos no puede alargar el prompt de todos.
+  const largo = Array.from({ length: 50 }, (_, i) => ({
+    rol: i % 2 ? 'asistente' : 'usuario',
+    texto: `turno ${i}`,
+  }))
+  const { resumen } = await preguntar(chatDePrueba(), 'otra', largo)
+
+  assert.equal(resumen.turnosRecordados, 8, 'ocho mensajes = cuatro intercambios')
+  assert.equal(mensajesDeDecidir().length, 10, 'system + 8 + pregunta')
+})
+
+await check('se conservan los ÚLTIMOS turnos, no los primeros', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  const largo = Array.from({ length: 20 }, (_, i) => ({
+    rol: i % 2 ? 'asistente' : 'usuario',
+    texto: `turno ${i}`,
+  }))
+  await preguntar(chatDePrueba(), 'otra', largo)
+
+  const m = mensajesDeDecidir()
+  assert.match(m[1].content, /turno 12/, 'el hilo reciente es el que importa')
+  assert.match(m.at(-2).content, /turno 19/)
+})
+
+await check('un turno larguísimo se recorta', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  await preguntar(chatDePrueba(), 'otra', [{ rol: 'usuario', texto: 'x'.repeat(5000) }])
+
+  const m = mensajesDeDecidir()
+  assert.ok(m[1].content.length <= 600, `llegó con ${m[1].content.length} caracteres`)
+})
+
+await check('la basura en el historial se descarta sin lanzar', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  const basura = [null, 'texto suelto', { rol: 'usuario' }, { texto: '   ' }, { rol: 'usuario', texto: 'válido' }]
+  const { resumen } = await preguntar(chatDePrueba(), 'otra', basura)
+
+  assert.equal(resumen.turnosRecordados, 1, 'solo sobrevive el turno bien formado')
+})
+
+await check('el historial NO lleva resultados de herramientas', async () => {
+  peticiones = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  await preguntar(chatDePrueba(), '¿y la Línea 2?', turnoBase)
+
+  // Los `role: tool` de turnos pasados invitarían al modelo a citar la cifra
+  // vieja como si fuera la nueva. Solo puede haberlos en la pasada de
+  // redactar, que es la de ESTE turno.
+  const m = mensajesDeDecidir()
+  assert.deepEqual(
+    [...new Set(m.map(x => x.role))].sort(),
+    ['assistant', 'system', 'user'],
+    'en la pasada de decidir no puede haber mensajes de herramienta'
+  )
 })
 
 /* ── Caminos tristes ─────────────────────────────────────────────────── */

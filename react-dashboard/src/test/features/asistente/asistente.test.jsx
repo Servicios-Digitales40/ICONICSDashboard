@@ -55,11 +55,16 @@ function flujo(eventos) {
  * @param {object[]} [opciones.eventos]
  * @param {object} [opciones.fallo]  { status, error } para el POST
  */
+/** Cuerpos de los POST que hizo el panel, para inspeccionar el historial. */
+let enviados = [];
+
 function backend({ habilitado, eventos = [], fallo }) {
+  enviados = [];
   return vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
     if (!init || init.method !== "POST") {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, habilitado }), { status: 200 }));
     }
+    enviados.push(JSON.parse(init.body));
     if (fallo) {
       return Promise.resolve(
         new Response(JSON.stringify({ ok: false, error: fallo.error }), { status: fallo.status })
@@ -77,7 +82,11 @@ function backend({ habilitado, eventos = [], fallo }) {
  * secuencia real de teclas, solo el efecto de enviar.
  */
 async function preguntar(texto = "¿OEE de la Línea 1?") {
-  fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+  // Solo hay que abrirlo la primera vez; en las siguientes ya está abierto y
+  // el botón flotante no existe.
+  if (!screen.queryByRole("dialog")) {
+    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+  }
   fireEvent.change(screen.getByLabelText("Escribe tu pregunta"), { target: { value: texto } });
   fireEvent.click(screen.getByLabelText("Enviar la pregunta"));
 }
@@ -171,6 +180,53 @@ describe("una respuesta", () => {
     await preguntar();
 
     await waitFor(() => expect(screen.getByText(/otra consulta en curso/i)).toBeTruthy());
+  });
+
+  it("la segunda pregunta lleva el hilo anterior", async () => {
+    backend({
+      habilitado: true,
+      eventos: [
+        { tipo: "herramienta", nombre: "oee_de_maquina" },
+        { tipo: "texto", delta: "Fue del 61,9 %." },
+        { tipo: "fin", herramienta: "oee_de_maquina", bloqueada: false },
+      ],
+    });
+    montar();
+
+    await preguntar("¿OEE de la Línea 1 el 30 de julio?");
+    await waitFor(() => expect(screen.getByText(/61,9/)).toBeTruthy());
+
+    // Sin esto, «¿y el día anterior?» llega al modelo sin contexto.
+    await preguntar("¿y el día anterior?");
+    await waitFor(() => expect(enviados.length).toBe(2));
+
+    const { historial } = enviados[1];
+    expect(historial).toEqual([
+      { rol: "usuario", texto: "¿OEE de la Línea 1 el 30 de julio?" },
+      { rol: "asistente", texto: "Fue del 61,9 %." },
+    ]);
+  });
+
+  it("un turno BLOQUEADO no entra en el hilo", async () => {
+    backend({
+      habilitado: true,
+      eventos: [
+        { tipo: "texto", delta: "No he podido consultar los datos." },
+        { tipo: "fin", herramienta: null, bloqueada: true },
+      ],
+    });
+    montar();
+
+    await preguntar("¿OEE de la Línea 1?");
+    await waitFor(() => expect(screen.getByText(/no consultó los datos/i)).toBeTruthy());
+
+    await preguntar("¿y la Línea 2?");
+    await waitFor(() => expect(enviados.length).toBe(2));
+
+    // Recordar como respuesta un turno en el que decidimos NO responder sería
+    // contradecirse: la pregunta del usuario sí queda, la no-respuesta no.
+    const roles = enviados[1].historial.map((t) => t.rol);
+    expect(roles).toEqual(["usuario"]);
   });
 
   it("mientras espera ofrece cancelar, no una barra muda", async () => {

@@ -21,12 +21,15 @@
  */
 import {
   AREAS,
+  RESUMEN_TAGS,
+  TAGS_ESTATICOS,
   historyPointName,
   listMachines,
   pointName,
   tagsForArea,
 } from '../../shared/tagCatalog.js'
-import { createMachine } from '../../shared/domain/machine.js'
+import { buildPlantSummary, summaryByArea } from '../../shared/plantModel.js'
+import { createMachine, hasValue } from '../../shared/domain/machine.js'
 import { estadoLabel } from '../../shared/domain/estado.js'
 import { daySummary } from '../../shared/domain/history.js'
 import { isGoodQuality } from '../../shared/quality.js'
@@ -144,36 +147,55 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
   /* ── Lectura en vivo ───────────────────────────────────────────────── */
 
   /**
-   * Lee todos los tags de una máquina en una sola llamada en lote y los
-   * convierte en una `Machine` de dominio.
+   * Lee varias máquinas en **una sola** llamada en lote y las convierte en
+   * `Machine` de dominio.
+   *
+   * Una llamada y no una por máquina: la planta entera son ~110 puntos, y
+   * diez peticiones en vez de una multiplicarían por diez el trabajo del
+   * servidor de planta para responder a una sola pregunta. La caché de lote
+   * del cliente (2 s) además colapsa esta lectura con la que ya están
+   * haciendo las pantallas encendidas.
    *
    * La calidad se filtra aquí, en la frontera, exactamente igual que hace el
    * motor de sondeo del frontend: un valor de mala calidad llega como 0 y, sin
    * filtrar, el asistente diría «el OEE es 0 %» de una máquina que está
    * produciendo.
    */
-  async function leerEnVivo(meta) {
-    const tags = tagsForArea(meta.areaId)
-    const puntos = tags.map(tag => pointName(meta.areaId, meta.machineId, tag))
+  async function leerMaquinas(metas, tagsDe) {
+    const puntos = metas.flatMap(meta =>
+      tagsDe(meta).map(tag => pointName(meta.areaId, meta.machineId, tag))
+    )
 
     const respuesta = await client.readPoints(puntos)
     if (!respuesta.ok) return { ok: false, error: respuesta.error, status: respuesta.status }
 
     const mapa = respuesta.payload ?? {}
-    const readings = {}
+    const receivedAt = new Date().toISOString()
 
-    for (const tag of tags) {
-      const entrada = mapa[pointName(meta.areaId, meta.machineId, tag)]
-      if (!entrada?.ok) continue
+    const machines = metas.map(meta => {
+      const readings = {}
 
-      const p = entrada.payload ?? {}
-      const quality = p.quality ?? p.Quality ?? null
-      if (!isGoodQuality(quality)) continue
+      for (const tag of tagsDe(meta)) {
+        const entrada = mapa[pointName(meta.areaId, meta.machineId, tag)]
+        if (!entrada?.ok) continue
 
-      readings[tag] = p.value ?? p.Value ?? null
-    }
+        const p = entrada.payload ?? {}
+        const quality = p.quality ?? p.Quality ?? null
+        if (!isGoodQuality(quality)) continue
 
-    return { ok: true, machine: createMachine({ ...meta, readings, receivedAt: new Date().toISOString() }) }
+        readings[tag] = p.value ?? p.Value ?? null
+      }
+
+      return createMachine({ ...meta, readings, receivedAt })
+    })
+
+    return { ok: true, machines }
+  }
+
+  /** Una sola máquina, con todos sus tags. */
+  async function leerEnVivo(meta) {
+    const lectura = await leerMaquinas([meta], m => tagsForArea(m.areaId))
+    return lectura.ok ? { ok: true, machine: lectura.machines[0] } : lectura
   }
 
   /* ── Lectura histórica ─────────────────────────────────────────────── */
@@ -199,13 +221,30 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
           aggregate: AGREGADO.serie,
           interval: INTERVALO.hora,
         })
-        return { tag, ok: Boolean(r?.ok), muestras: Array.isArray(r?.data) ? r.data : [] }
+        return {
+          tag,
+          ok: Boolean(r?.ok),
+          status: r?.status ?? 0,
+          muestras: Array.isArray(r?.data) ? r.data : [],
+        }
       })
     )
 
     const fallaron = resultados.filter(r => !r.ok)
     if (fallaron.length === TAGS_DIA.length) {
-      return { ok: false, sinHistoria: true }
+      /*
+       * Los siete tags fallaron, pero el motivo importa y no es el mismo.
+       *
+       * ICONICS responde 500 cuando el punto existe y no está coleccionado —o
+       * cuando no existe—, y ahí «esta máquina no tiene historia» es la
+       * verdad. Pero un 502 o un 504 los pone el propio puente: significan que
+       * no se llegó al servidor, y decir entonces «no está coleccionado»
+       * manda a revisar el Data Historian cuando lo que hay que hacer es
+       * levantar los servicios. Es la misma distinción que el puente ya hace
+       * entre 502 y 504, y por el mismo motivo: se arreglan en sitios
+       * distintos.
+       */
+      return { ok: false, sinHistoria: true, incomunicado: fallaron.every(r => r.status >= 502) }
     }
 
     const porTag = Object.fromEntries(resultados.map(r => [r.tag, r.muestras]))
@@ -226,6 +265,14 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
     const dia = await leerDia(meta, fecha)
 
     if (!dia.ok) {
+      if (dia.incomunicado) {
+        return fallo(
+          'No se pudo contactar con el servidor ICONICS para leer el historiador. ' +
+            'No es que falten datos: el servidor no está respondiendo. Si acaban de ' +
+            'arrancarse los servicios GENESIS, tardan 3-4 minutos en atender.'
+        )
+      }
+
       return fallo(
         `La máquina ${meta.equipo} (${meta.id}) no tiene datos históricos en el servidor. ` +
           `Sus tags no están marcados «Is Collected» en el Data Historian.`,
@@ -271,6 +318,84 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
       }
     },
 
+    /**
+     * La planta entera, de una vez.
+     *
+     * ── POR QUÉ UNA SOLA HERRAMIENTA Y NO TRES ─────────────────────
+     *
+     * `oee_de_planta`, `peor_maquina` y `resumen_por_area` responderían lo
+     * mismo y triplicarían las ocasiones de que el modelo elija mal — que es
+     * justo donde un 4B es más frágil. Devolviéndolo todo junto, «¿cómo va la
+     * planta?» y «¿qué máquina va peor?» son la misma llamada y al modelo solo
+     * le queda redactar la parte que le preguntaron.
+     *
+     * Las cifras salen de `buildPlantSummary`, el mismo cálculo que pinta el
+     * tablero. Recalcularlo aquí daría dos OEE de planta distintos y el chat
+     * contradiría a la pantalla que el operador tiene delante.
+     */
+    async estado_de_planta() {
+      const metas = listMachines()
+
+      // Los mismos tags que sondea el tablero, para que la caché de lote del
+      // cliente colapse esta lectura con la suya en vez de duplicarla.
+      const tagsDe = meta => [
+        ...RESUMEN_TAGS.filter(t => tagsForArea(meta.areaId).includes(t)),
+        ...TAGS_ESTATICOS,
+      ]
+
+      const lectura = await leerMaquinas(metas, tagsDe)
+      if (!lectura.ok) {
+        return fallo(`No se pudo leer la planta del servidor ICONICS: ${lectura.error}`)
+      }
+
+      const resumen = buildPlantSummary(lectura.machines)
+
+      // Sin una sola lectura buena no hay planta que resumir. Devolver el
+      // resumen con todo a null invitaría a redactarlo como «la planta está
+      // al 0 %», que es una avería contada como si fuera producción.
+      if (resumen.sinDato === resumen.totalMaquinas) {
+        return fallo(
+          'Ninguna de las 10 máquinas está entregando lecturas ahora mismo. ' +
+            'Suele ser el servidor de planta caído o la licencia de ICONICS caducada; ' +
+            'si acaban de reiniciarse los servicios GENESIS, tardan 3-4 minutos en responder.'
+        )
+      }
+
+      const conOee = lectura.machines.filter(m => hasValue(m.oee))
+      const porOee = [...conOee].sort((a, b) => b.oee - a.oee)
+
+      return {
+        ok: true,
+        fuente: 'tiempo real',
+        planta: {
+          oee: red1(resumen.oee),
+          disponibilidad: red1(resumen.disponibilidad),
+          rendimiento: red1(resumen.rendimiento),
+          calidad: red1(resumen.calidad),
+          fty: red1(resumen.fty),
+          producidas: resumen.producidas,
+          aceptadas: resumen.aceptadas,
+          rechazadas: resumen.rechazadas,
+        },
+        maquinas: {
+          total: resumen.totalMaquinas,
+          operando: resumen.operando,
+          sinDato: resumen.sinDato,
+          porEstado: resumen.porEstado.map(e => ({ estado: e.label, cuantas: e.valor })),
+        },
+        // Ordenado de mejor a peor: la primera y la última contestan
+        // «¿cuál va mejor?» y «¿cuál va peor?» sin otra llamada.
+        rankingPorOee: porOee.map(m => ({ id: m.id, nombre: m.equipo, oee: red1(m.oee) })),
+        areas: summaryByArea(lectura.machines).map(a => ({
+          area: a.label,
+          oee: red1(a.oee),
+          operando: a.operando,
+          de: a.totalMaquinas,
+        })),
+        unidades: { oee: '%', disponibilidad: '%', rendimiento: '%', calidad: '%', fty: '%' },
+      }
+    },
+
     async estado_actual({ maquina } = {}) {
       const id = resolverMaquina(maquina)
       if (!id) {
@@ -309,10 +434,10 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
         return fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() })
       }
 
-      const problema = validarFecha(fecha)
-      if (problema) return fallo(problema)
+      const dia = resolverFecha(fecha)
+      if (dia.error) return fallo(dia.error)
 
-      return resumenDelDia(porId.get(id), fecha)
+      return resumenDelDia(porId.get(id), dia.iso)
     },
 
     async comparar_dias({ maquina, fechaA, fechaB } = {}) {
@@ -321,13 +446,13 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
         return fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() })
       }
 
-      for (const f of [fechaA, fechaB]) {
-        const problema = validarFecha(f)
-        if (problema) return fallo(problema)
-      }
+      const diaA = resolverFecha(fechaA)
+      if (diaA.error) return fallo(diaA.error)
+      const diaB = resolverFecha(fechaB)
+      if (diaB.error) return fallo(diaB.error)
 
       const meta = porId.get(id)
-      const [a, b] = await Promise.all([resumenDelDia(meta, fechaA), resumenDelDia(meta, fechaB)])
+      const [a, b] = await Promise.all([resumenDelDia(meta, diaA.iso), resumenDelDia(meta, diaB.iso)])
 
       if (!a.ok) return a
       if (!b.ok) return b
@@ -337,8 +462,10 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
         maquina: meta.id,
         nombre: meta.equipo,
         fuente: 'historiador',
-        [fechaA]: a,
-        [fechaB]: b,
+        // Las claves son las fechas YA resueltas, para que el modelo redacte
+        // con el día real y no con el «ayer» que escribió él.
+        [diaA.iso]: a,
+        [diaB.iso]: b,
         diferencia: {
           oee: resta(b.oee, a.oee),
           disponibilidad: resta(b.disponibilidad, a.disponibilidad),
@@ -347,7 +474,7 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
           aprobadas: resta(b.aprobadas, a.aprobadas),
           rechazadas: resta(b.rechazadas, a.rechazadas),
         },
-        nota: `La diferencia es ${fechaB} menos ${fechaA}. Un valor negativo significa que empeoró.`,
+        nota: `La diferencia es ${diaB.iso} menos ${diaA.iso}. Un valor negativo significa que empeoró.`,
       }
     },
   }
@@ -378,6 +505,14 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
 
 /* ── Auxiliares ─────────────────────────────────────────────────────── */
 
+/**
+ * Redondeo a un decimal que **conserva el hueco**.
+ *
+ * `Math.round(null)` vale 0 en JavaScript, y ese 0 se leería como una planta
+ * parada en vez de como una lectura que no llegó.
+ */
+const red1 = (v) => (v === null || v === undefined ? null : +Number(v).toFixed(1))
+
 /** Diferencia tolerante a huecos: sin los dos valores no hay diferencia que dar. */
 function resta(b, a) {
   return b === null || b === undefined || a === null || a === undefined
@@ -401,23 +536,75 @@ function formatearResumen(r) {
   }
 }
 
+/** Días de la semana en la forma en que los escribe una persona. */
+const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
+
+/** Date → "YYYY-MM-DD" desplazando `dias` desde hoy. */
+function desdeHoy(dias) {
+  const d = new Date()
+  d.setDate(d.getDate() + dias)
+  return isoLocal(d)
+}
+
 /**
- * Valida una fecha del modelo. Devuelve el motivo o `null` si está bien.
+ * Resuelve la fecha que manda el modelo, en ISO o en lenguaje llano.
  *
- * El futuro se rechaza a propósito: `Interpolative` rellenaría el día entero
- * repitiendo el último valor conocido y devolvería un resumen con pinta de
- * real para un día que no ha ocurrido.
+ * ── POR QUÉ ESTO VIVE AQUÍ Y NO EN EL PROMPT ───────────────────────
+ *
+ * Es la misma regla que ya siguen los nombres de máquina: **resolver es
+ * trabajo del backend; elegir es trabajo del modelo.** Pedirle a un 4B que
+ * calcule qué día fue «anteayer» es pedirle aritmética de calendario, que es
+ * justo lo que peor hace y lo que aquí no se puede fallar en silencio: una
+ * fecha mal calculada devuelve datos reales del día equivocado, y eso no se
+ * distingue de la respuesta correcta.
+ *
+ * La conversación del Plan 7 lo vuelve imprescindible: en cuanto se puede
+ * preguntar «¿y ayer?», esto deja de ser una comodidad.
+ *
+ * @returns {{ iso: string } | { error: string }}
  */
-function validarFecha(fecha) {
-  if (!FECHA_RE.test(String(fecha ?? ''))) {
-    return `La fecha "${fecha}" no tiene el formato correcto. Debe ser YYYY-MM-DD, por ejemplo 2025-03-25.`
+export function resolverFecha(fecha) {
+  const crudo = String(fecha ?? '').trim()
+  const texto = normalizar(crudo)
+
+  let iso = null
+
+  if (FECHA_RE.test(crudo)) iso = crudo
+  else if (texto === 'hoy') iso = desdeHoy(0)
+  else if (texto === 'ayer') iso = desdeHoy(-1)
+  else if (texto === 'anteayer' || texto === 'antier') iso = desdeHoy(-2)
+  else {
+    // «martes» es el martes más reciente, hoy incluido; «martes pasado» es el
+    // anterior a hoy. Es como se usan las dos formas al hablar.
+    const pasado = /\bpasad[oa]\b/.test(texto)
+    const dia = DIAS_SEMANA.indexOf(texto.replace(/\b(el|la|pasad[oa])\b/g, '').trim())
+
+    if (dia >= 0) {
+      const hoy = new Date().getDay()
+      let atras = (hoy - dia + 7) % 7
+      if (pasado && atras === 0) atras = 7
+      iso = desdeHoy(-atras)
+    }
   }
 
-  const d = new Date(`${fecha}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return `La fecha "${fecha}" no existe en el calendario.`
-  if (fecha > isoLocal(new Date())) return `La fecha ${fecha} está en el futuro; no hay datos todavía.`
+  if (!iso) {
+    return {
+      error: `No entiendo la fecha "${crudo}". Escríbela como YYYY-MM-DD ` +
+        `(por ejemplo 2025-03-25) o di "hoy", "ayer", "anteayer" o un día de la semana.`,
+    }
+  }
 
-  return null
+  const d = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return { error: `La fecha "${crudo}" no existe en el calendario.` }
+
+  // El futuro se rechaza a propósito: `Interpolative` rellenaría el día entero
+  // repitiendo el último valor conocido y devolvería un resumen con pinta de
+  // real para un día que no ha ocurrido.
+  if (iso > isoLocal(new Date())) {
+    return { error: `La fecha ${iso} está en el futuro; no hay datos todavía.` }
+  }
+
+  return { iso }
 }
 
 /**
@@ -437,6 +624,20 @@ export const DEFINICIONES = [
         'Lista las 10 máquinas de la planta con su identificador, su nombre visible y si tienen ' +
         'datos históricos disponibles. Úsala cuando no sepas el nombre exacto de una máquina o ' +
         'cuando el usuario pregunte qué máquinas hay.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'estado_de_planta',
+      description:
+        'Estado de TODA la planta ahora mismo, de una sola vez: el OEE de planta y sus tres ' +
+        'factores, la producción y los rechazos totales, cuántas máquinas están operando, el ' +
+        'resumen por área y el ranking de las 10 máquinas ordenadas por OEE. Úsala para ' +
+        '"¿cómo va la planta?", "¿qué máquina va mejor o peor?", "¿cuántas están paradas?" o ' +
+        'cualquier pregunta que abarque más de una máquina. NO la llames varias veces: lo ' +
+        'devuelve todo junto.',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -478,7 +679,10 @@ export const DEFINICIONES = [
           },
           fecha: {
             type: 'string',
-            description: 'Día a consultar en formato YYYY-MM-DD, por ejemplo "2025-03-25".',
+            description:
+              'Día a consultar. Puedes escribirlo como YYYY-MM-DD ("2025-03-25") o en lenguaje ' +
+              'llano: "hoy", "ayer", "anteayer", "martes" o "martes pasado". NO calcules tú la ' +
+              'fecha de una expresión relativa; pásala tal cual y el servidor la resuelve.',
           },
         },
         required: ['maquina', 'fecha'],
@@ -497,8 +701,8 @@ export const DEFINICIONES = [
         type: 'object',
         properties: {
           maquina: { type: 'string', description: 'Identificador o nombre de la máquina.' },
-          fechaA: { type: 'string', description: 'Primer día, YYYY-MM-DD. Es la referencia.' },
-          fechaB: { type: 'string', description: 'Segundo día, YYYY-MM-DD. Se compara contra el primero.' },
+          fechaA: { type: 'string', description: 'Primer día. Es la referencia. Admite "ayer" o YYYY-MM-DD.' },
+          fechaB: { type: 'string', description: 'Segundo día, se compara contra el primero. Admite "hoy" o YYYY-MM-DD.' },
         },
         required: ['maquina', 'fechaA', 'fechaB'],
       },

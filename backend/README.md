@@ -127,7 +127,7 @@ backend/
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Las cuatro que el modelo puede invocar
+│   ├── herramientas.mjs   Las cinco que el modelo puede invocar
 │   └── chat.mjs           El bucle de dos pasadas contra llama-server
 │
 └── routes/              Traducción HTTP ↔ cliente
@@ -192,7 +192,13 @@ valor por defecto.
 | Ruta | Cuerpo | Respuesta |
 |---|---|---|
 | `GET /api/chat` | — | `{ ok, habilitado, modelo, ocupado }` |
-| `POST /api/chat` | `{ pregunta }` | Flujo **SSE** de eventos (ver abajo) |
+| `POST /api/chat` | `{ pregunta, historial? }` | Flujo **SSE** de eventos (ver abajo) |
+
+`historial` son los turnos anteriores (`{ rol, texto }`), para que «¿y el día
+anterior?» signifique algo. Va el **texto** y nunca el resultado de las
+herramientas: devolverle el JSON de consultas pasadas invita al modelo a citar
+la cifra del turno anterior como si fuera la de este. El recorte —cuatro
+intercambios— lo aplica el servidor, no el cliente.
 
 `GET` existe para que el frontend sepa si pintar el asistente sin necesidad de
 una bandera de compilación: el mismo `dist` sirve a una planta con modelo y a
@@ -217,7 +223,7 @@ tardan el doble las dos—, **400** si la pregunta está vacía o pasa de 2000
 caracteres.
 
 **El asistente no puede escribir.** El registro de herramientas contiene
-cuatro lecturas y ninguna escritura, así que `POST /write` no es alcanzable
+cinco lecturas y ninguna escritura, así que `POST /write` no es alcanzable
 desde el chat ni con la instrucción más astuta. `ICONICS_READ_ONLY` sigue
 siendo la última puerta; ésta es la primera.
 

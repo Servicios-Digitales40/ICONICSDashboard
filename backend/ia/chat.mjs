@@ -38,6 +38,51 @@ import { logger } from '../logger.mjs'
  */
 const RESERVA_RAZONAMIENTO = 512
 
+/**
+ * Cuántos mensajes del hilo anterior se le recuerdan al modelo: cuatro
+ * intercambios, es decir ocho mensajes.
+ *
+ * No es una cifra bonita. La primera pasada —la que elige la herramienta— es
+ * la cara del bucle y crece con el prompt, así que un historial sin tope
+ * convierte una conversación larga en una lenta, justo al revés de lo que
+ * espera quien está preguntando.
+ *
+ * El tope se aplica AQUÍ y no en el frontend: un cliente que mande cincuenta
+ * turnos no puede degradar el servicio de las demás pantallas.
+ */
+const MAX_MENSAJES_HISTORIAL = 8
+
+/** Recorte por mensaje, para que un turno larguísimo no se coma el contexto. */
+const MAX_CARACTERES_TURNO = 600
+
+/**
+ * Convierte el historial que manda el cliente en mensajes para el modelo.
+ *
+ * ── QUÉ ENTRA Y QUÉ NO ─────────────────────────────────────────────
+ *
+ * Entra el TEXTO de cada turno. **No entran los resultados de las
+ * herramientas**, y esa es la decisión importante: devolverle al modelo el
+ * JSON de consultas anteriores le invita a mezclarlo con la pregunta nueva y
+ * a citar la cifra del turno pasado como si fuera la de este. El texto ya
+ * dice lo que hace falta para entender el hilo, y no se puede confundir con
+ * un dato recién leído.
+ *
+ * Tampoco entran los turnos bloqueados ni los que fallaron; de eso se encarga
+ * el cliente, que es quien sabe cuáles fueron, y aquí se descarta lo que no
+ * tenga forma de turno.
+ */
+function historialAMensajes(historial) {
+  if (!Array.isArray(historial)) return []
+
+  return historial
+    .filter(t => t && typeof t.texto === 'string' && t.texto.trim())
+    .map(t => ({
+      role: t.rol === 'asistente' ? 'assistant' : 'user',
+      content: t.texto.trim().slice(0, MAX_CARACTERES_TURNO),
+    }))
+    .slice(-MAX_MENSAJES_HISTORIAL)
+}
+
 /** Estados que se le enseñan al usuario mientras espera. */
 export const ESTADOS = {
   pensando: 'Pensando…',
@@ -57,6 +102,30 @@ function contieneCifras(texto) {
     .replace(/\b(l[ií]nea|lineal|multi|rectificadora|lin|rec)\s*\/?\s*\d+/gi, '')
     .replace(/\b(LIN|REC)\/\d+/g, '')
   return /\d/.test(sinMaquinas)
+}
+
+/**
+ * Marcado con el que Qwen anuncia una llamada a herramienta.
+ *
+ * En la pasada de redactar **no** se le pasan herramientas, así que si el
+ * modelo intenta llamar a otra —porque la primera no le bastó— llama-server no
+ * lo interpreta y su marcado interno sale como texto plano. En pantalla eso es
+ * un `<tool_call>` crudo en mitad de la respuesta, que es lo peor de los dos
+ * mundos: ni contesta ni parece un error.
+ */
+const MARCADO_HERRAMIENTA = ['<tool_call>', '<function=', '<tools>', '<|tool_call|>']
+
+/** Longitud del marcador más largo, para no partirlo entre dos trozos. */
+const MARGEN_MARCADO = Math.max(...MARCADO_HERRAMIENTA.map(m => m.length))
+
+/** Posición del primer marcado en el texto, o -1. */
+function buscarMarcado(texto) {
+  let primero = -1
+  for (const marca of MARCADO_HERRAMIENTA) {
+    const i = texto.indexOf(marca)
+    if (i !== -1 && (primero === -1 || i < primero)) primero = i
+  }
+  return primero
 }
 
 /** Fecha de hoy en local, para que el modelo resuelva «hoy» y «ayer». */
@@ -89,6 +158,22 @@ function instrucciones(catalogo) {
     '4. No existen todas las máquinas que suenan plausibles: la numeración tiene huecos reales.',
     '   Usa listar_maquinas si dudas en vez de suponer.',
     '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de qué día.',
+    '6. Esto es una conversación: «¿y el día anterior?» o «¿y la Línea 2?» se refieren a lo que',
+    '   se acaba de hablar. Resuelve a qué máquina y a qué fecha se refieren, y VUELVE A',
+    '   CONSULTAR con la herramienta. Nunca deduzcas una cifra nueva a partir de otra que ya',
+    '   dijiste: los datos se leen, no se calculan.',
+    '7. No hagas aritmética. Cita los números tal y como vienen de la herramienta. Si te dice',
+    '   que hay 10 máquinas, 1 operando y 9 sin dato, di exactamente eso; no restes, no sumes',
+    '   y no repartas por áreas de tu cuenta. Una cuenta mal hecha en la frase final estropea',
+    '   una consulta que salió bien.',
+    '8. Tienes UNA sola consulta por pregunta. No planees varios pasos ni anuncies que vas a',
+    '   consultar algo más: no vas a poder. Las herramientas leen UN día concreto o el estado',
+    '   actual, nunca un rango. Si te piden el máximo, el mínimo o el promedio de una semana o',
+    '   de un mes, di que solo puedes consultar días sueltos y pide uno; NO elijas un día al',
+    '   azar del rango y lo des como respuesta.',
+    '',
+    'Para fechas puedes escribir "ayer", "anteayer", "hoy" o un día de la semana; se',
+    'entienden igual que YYYY-MM-DD.',
     '',
     'Las máquinas de la planta:',
     catalogo,
@@ -97,6 +182,20 @@ function instrucciones(catalogo) {
 
 export function createChat({ config, herramientas }) {
   const { base, timeoutMs, maxTokens, modelo } = config.ia
+
+  /**
+   * ¿Ha llamado el modelo a alguna herramienta desde que arrancó el proceso?
+   *
+   * Distingue las dos causas de una respuesta sin consultar, que se arreglan
+   * en sitios distintos:
+   *
+   *  - Si NUNCA ha llamado a ninguna, lo más probable es que llama-server se
+   *    arrancara sin `--jinja` y el modelo no las vea.
+   *  - Si ya ha llamado antes, la bandera está bien y lo que pasa es que esta
+   *    pregunta concreta no encaja en ninguna herramienta. Mandar a revisar
+   *    `--jinja` en ese caso es enviar a nadie a buscar nada.
+   */
+  let vistaAlgunaLlamada = false
 
   /**
    * Una llamada a llama-server. Combina el corte por tiempo con la
@@ -175,13 +274,48 @@ export function createChat({ config, herramientas }) {
    * Pasada con streaming: la que redacta. Va emitiendo `texto` conforme
    * llegan los tokens, que con este presupuesto de tiempo es la diferencia
    * entre una pantalla viva y una que parece colgada.
+   *
+   * Filtra el marcado de herramienta por el camino. El texto se retiene unos
+   * caracteres antes de emitirlo —lo que mide el marcador más largo— para que
+   * un `<tool_call>` partido entre dos trozos del flujo no se cuele por la
+   * rendija. Es imperceptible: son unos pocos caracteres de retraso sobre un
+   * texto que llega a 40 tok/s.
+   *
+   * @returns {{ texto: string, marcado: boolean }}
    */
   async function pasadaRedactando(messages, signal, onEvento) {
     // Sin pensar: el dato ya está en la conversación y esto es reformularlo.
     const respuesta = await llamarModelo({ messages, stream: true, signal, pensar: false })
 
-    let completo = ''
-    let resto = ''
+    let resto = ''        // trozo de línea SSE a medias
+    let pendiente = ''    // texto leído y aún no emitido
+    let emitido = ''
+    let marcado = false
+
+    /** Emite lo que ya es seguro y avisa si aparece marcado de herramienta. */
+    const vaciar = (final = false) => {
+      if (marcado) return
+
+      const corte = buscarMarcado(pendiente)
+      if (corte !== -1) {
+        // A partir de aquí el modelo dejó de contestar y empezó a pedir otra
+        // herramienta. Lo que va delante suele ser un preámbulo («voy a
+        // consultar…»), así que se emite y se corta ahí.
+        const util = pendiente.slice(0, corte)
+        if (util) { emitido += util; onEvento({ tipo: 'texto', delta: util }) }
+        pendiente = ''
+        marcado = true
+        return
+      }
+
+      // Se retiene la cola por si es el principio de un marcador partido.
+      const seguro = final ? pendiente : pendiente.slice(0, Math.max(0, pendiente.length - MARGEN_MARCADO))
+      if (!seguro) return
+
+      pendiente = pendiente.slice(seguro.length)
+      emitido += seguro
+      onEvento({ tipo: 'texto', delta: seguro })
+    }
 
     for await (const trozo of respuesta.body) {
       resto += Buffer.from(trozo).toString('utf8')
@@ -196,18 +330,18 @@ export function createChat({ config, herramientas }) {
 
         try {
           const delta = JSON.parse(dato)?.choices?.[0]?.delta?.content
-          if (delta) {
-            completo += delta
-            onEvento({ tipo: 'texto', delta })
-          }
+          if (delta) pendiente += delta
         } catch {
           // Un trozo mal formado no tumba la respuesta entera: se ignora y se
           // sigue leyendo, que es lo que hace cualquier cliente de SSE.
         }
       }
+
+      vaciar()
     }
 
-    return completo
+    vaciar(true)
+    return { texto: emitido, marcado }
   }
 
   /**
@@ -216,16 +350,20 @@ export function createChat({ config, herramientas }) {
    *
    * @param {object} opciones
    * @param {string} opciones.pregunta
+   * @param {object[]} [opciones.historial]  turnos anteriores `{ rol, texto }`
    * @param {AbortSignal} [opciones.signal]  cancelación del usuario
    * @param {(evento: object) => void} opciones.onEvento
    */
-  async function responder({ pregunta, signal, onEvento }) {
+  async function responder({ pregunta, historial = [], signal, onEvento }) {
     const catalogo = (await herramientas.ejecutar('listar_maquinas')).maquinas
       .map(m => `  ${m.id} — ${m.nombre} (${m.area})${m.tieneHistoria ? ' · con historia' : ''}`)
       .join('\n')
 
+    const previos = historialAMensajes(historial)
+
     const messages = [
       { role: 'system', content: instrucciones(catalogo) },
+      ...previos,
       { role: 'user', content: pregunta },
     ]
 
@@ -237,20 +375,34 @@ export function createChat({ config, herramientas }) {
       if (contieneCifras(primera.contenido)) {
         logger.warn('El modelo respondió con cifras sin llamar a ninguna herramienta', {
           pregunta: pregunta.slice(0, 120),
+          vistaAlgunaLlamada,
         })
-        onEvento({
-          tipo: 'texto',
-          delta:
-            'No he podido consultar los datos de la planta para responder a eso, así que no voy ' +
-            'a darte cifras. Si llama-server se arrancó sin la opción --jinja, no ve las ' +
-            'herramientas y contesta de memoria: revísalo antes de fiarte de ninguna respuesta.',
+        onEvento({ tipo: 'texto', delta: avisoDeBloqueo(vistaAlgunaLlamada) })
+        return { herramienta: null, bloqueada: true, turnosRecordados: previos.length }
+      }
+
+      /*
+       * Ni herramienta ni texto: el modelo se quedó en blanco.
+       *
+       * Pasa con preguntas que no encajan en ninguna herramienta —un rango,
+       * un mes— donde se gasta el presupuesto pensando y no llega a escribir.
+       * Una burbuja vacía no se distingue de una avería, así que se dice qué
+       * sí se puede preguntar, que además es la información útil.
+       */
+      if (!primera.contenido.trim()) {
+        logger.warn('El modelo no llamó a ninguna herramienta y tampoco escribió nada', {
+          pregunta: pregunta.slice(0, 120),
         })
-        return { herramienta: null, bloqueada: true }
+        onEvento({ tipo: 'texto', delta: NO_SE_QUE_CONTESTAR })
+        return {
+          herramienta: null, bloqueada: false, sinRedactar: true,
+          turnosRecordados: previos.length,
+        }
       }
 
       // Sin cifras es una respuesta legítima: un saludo, una aclaración.
       onEvento({ tipo: 'texto', delta: primera.contenido })
-      return { herramienta: null, bloqueada: false }
+      return { herramienta: null, bloqueada: false, turnosRecordados: previos.length }
     }
 
     /* ── Ejecutar la herramienta ───────────────────────────────────── */
@@ -263,6 +415,8 @@ export function createChat({ config, herramientas }) {
     } catch {
       argumentos = {}
     }
+
+    vistaAlgunaLlamada = true
 
     onEvento({ tipo: 'estado', valor: ESTADOS.consultando })
     onEvento({ tipo: 'herramienta', nombre, argumentos })
@@ -280,27 +434,86 @@ export function createChat({ config, herramientas }) {
     })
 
     onEvento({ tipo: 'estado', valor: ESTADOS.redactando })
-    const texto = await pasadaRedactando(messages, signal, onEvento)
+    const { texto, marcado } = await pasadaRedactando(messages, signal, onEvento)
 
     /*
-     * Red de seguridad: el modelo consultó el dato pero no escribió nada.
+     * Red de seguridad, por dos motivos distintos que acaban igual:
      *
-     * La causa conocida es el razonamiento comiéndose el presupuesto entero,
-     * y va atajada apagándolo en esta pasada. Pero el modelo se cambia con un
-     * `-m` y sin tocar código, así que la red se queda: una burbuja vacía en
-     * la pantalla del operador no se distingue de una avería, y el dato ya
-     * está aquí como para perderlo por no saber redactarlo.
+     *  - `!texto`  → el modelo no escribió nada. La causa conocida es el
+     *    razonamiento comiéndose el presupuesto, ya atajada apagándolo en
+     *    esta pasada; pero el modelo se cambia con un `-m` y sin tocar
+     *    código, así que la red se queda.
+     *  - `marcado` → el modelo intentó llamar a OTRA herramienta en vez de
+     *    redactar, porque la primera no le bastó. Lo que dijo antes es un
+     *    preámbulo («voy a consultar…»), no una respuesta.
+     *
+     * En ambos casos el dato ya está aquí y sería absurdo perderlo por que el
+     * modelo no supiera contarlo.
      */
-    if (!texto.trim()) {
-      logger.warn('El modelo no redactó nada pese a tener el dato', { herramienta: nombre })
-      onEvento({ tipo: 'texto', delta: resumirSinModelo(nombre, resultado) })
-      return { herramienta: nombre, ok: resultado.ok, bloqueada: false, sinRedactar: true }
+    if (marcado || !texto.trim()) {
+      logger.warn('El modelo no llegó a redactar la respuesta', {
+        herramienta: nombre,
+        motivo: marcado ? 'intentó otra herramienta' : 'no escribió nada',
+      })
+      onEvento({
+        tipo: 'texto',
+        delta: (texto.trim() ? '\n\n' : '') + resumirSinModelo(nombre, resultado),
+      })
+      return {
+        herramienta: nombre, ok: resultado.ok, bloqueada: false,
+        sinRedactar: true, marcado, turnosRecordados: previos.length,
+      }
     }
 
-    return { herramienta: nombre, ok: resultado.ok, bloqueada: false, longitud: texto.length }
+    return {
+      herramienta: nombre, ok: resultado.ok, bloqueada: false,
+      longitud: texto.length, turnosRecordados: previos.length,
+    }
   }
 
   return { responder }
+}
+
+/**
+ * Lo que se dice cuando el modelo no produce nada aprovechable.
+ *
+ * Enumera lo que SÍ se puede preguntar en vez de disculparse: es lo único
+ * accionable, y la causa más común de llegar aquí es haber pedido un rango.
+ */
+const NO_SE_QUE_CONTESTAR =
+  'No he sabido responder a eso. Puedo consultarte el estado actual de una máquina o de la ' +
+  'planta entera, el OEE de un DÍA concreto del historiador, y comparar dos días. Los rangos ' +
+  '—una semana, un mes, el máximo de un período— todavía no. Prueba con un día suelto.'
+
+/**
+ * Qué se le dice al usuario cuando se bloquea una respuesta.
+ *
+ * El mensaje cambia según si el modelo ha usado herramientas alguna vez en
+ * este proceso, porque son dos averías con arreglos distintos. Antes estaba
+ * cableado el diagnóstico de `--jinja`, y con la bandera bien puesta mandaba
+ * a revisar algo que no tenía nada que ver.
+ */
+function avisoDeBloqueo(vistaAlgunaLlamada) {
+  const base =
+    'No voy a darte cifras porque no he consultado los datos de la planta para esta pregunta. ' +
+    'Puedo leer el estado actual de una máquina o de la planta entera, el OEE de un DÍA ' +
+    'concreto del historiador, y comparar dos días. Los rangos —una semana, un mes, el máximo ' +
+    'de un período— todavía no. Prueba con un día suelto.'
+
+  /*
+   * El aviso de `--jinja` solo se añade si el modelo NO ha usado herramientas
+   * en todo el proceso, y aun así en condicional.
+   *
+   * Antes se afirmaba como causa, y era falso a menudo: con la bandera bien
+   * puesta, esto pasa simplemente cuando la pregunta no encaja en ninguna
+   * herramienta. Un diagnóstico equivocado con aplomo cuesta más tiempo que
+   * no dar ninguno, y aquí el dato accionable es lo de arriba.
+   */
+  if (vistaAlgunaLlamada) return base
+
+  return base +
+    '\n\nSi esto te pasa con TODAS las preguntas, comprueba que llama-server esté arrancado ' +
+    'con la opción --jinja: sin ella el modelo no ve las herramientas y contesta de memoria.'
 }
 
 /**

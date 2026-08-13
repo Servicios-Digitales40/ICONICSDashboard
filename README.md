@@ -211,5 +211,6 @@ node scripts/verificar-historia.mjs    # el historiador entrega muestras
 - [`docs/PLAN-1-CONEXION-ICONICS.md`](docs/PLAN-1-CONEXION-ICONICS.md) — plan de conexión
 - [`docs/PLAN-2-MEJORAS.md`](docs/PLAN-2-MEJORAS.md) — mejoras propuestas
 - [`docs/PLAN-3-PRODUCCION.md`](docs/PLAN-3-PRODUCCION.md) — paso a producción: huecos, build y despliegue
-- [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md) — chat con IA local sobre los datos (propuesto)
+- [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md) — chat con IA local sobre los datos
+- [`docs/PLAN-7-ALCANCE-ASISTENTE.md`](docs/PLAN-7-ALCANCE-ASISTENTE.md) — memoria de conversación y planta entera (propuesto)
 - [`docs/TAGS.md`](docs/TAGS.md) — tabla Excel → punto ICONICS → campo de dominio

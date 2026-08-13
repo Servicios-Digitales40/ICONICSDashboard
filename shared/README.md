@@ -32,6 +32,8 @@ desplegar.
 | `tagCatalog.js` | Contrato con ICONICS: las 10 máquinas, las 15 propiedades y cómo se nombra un punto en vivo (`ac:`) o histórico (`hda:`) |
 | `historia.js` | Mecánica del historiador: qué agregado, cómo se formatean las fechas, cómo se totaliza un contador y cómo se unen varias series |
 | `quality.js` | Qué código de calidad OPC cuenta como bueno. Un valor malo es un hueco, nunca un cero |
+| `turno.js` | Aritmética del turno y metas por factor. El **formateo** se queda en el frontend |
+| `plantModel.js` | Rollup de máquina → planta. El OEE de planta es D×R×C de los agregados, no la media de los OEE |
 | `domain/machine.js` | La forma `Machine` y su saneamiento de calidad y aritmética |
 | `domain/estado.js` | El enum de estados de ICONICS |
 | `domain/history.js` | `daySummary()`: reduce un día del historiador a la forma de una `Machine` |
