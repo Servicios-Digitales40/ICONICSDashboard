@@ -43,6 +43,7 @@ export function createApp(config) {
   const herramientas = createHerramientas({
     client,
     maquinasConHistoria: config.ia.maquinasConHistoria,
+    turnos: config.ia.turnos,
   })
   const chat = createChat({ config, herramientas })
 

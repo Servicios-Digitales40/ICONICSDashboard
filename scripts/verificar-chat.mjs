@@ -124,6 +124,10 @@ const herramientasFalsas = {
     { type: 'function', function: { name: 'oee_de_maquina', description: 'x', parameters: {} } },
   ],
   nombres: ['oee_de_maquina', 'listar_maquinas'],
+
+  // El catálogo NO es una herramienta: va en las instrucciones del sistema.
+  catalogo: () => [{ id: 'LIN/1', nombre: 'Lineal 1', area: 'Lineales', tieneHistoria: true }],
+
   async ejecutar(nombre, argumentos) {
     ejecutadas.push({ nombre, argumentos })
 
@@ -284,6 +288,52 @@ await check('tras cortar el marcado, el DATO se cuenta igual', async () => {
   // La herramienta ya devolvió el dato; perderlo porque el modelo no supo
   // redactarlo sería tirar una consulta que salió bien.
   assert.match(texto, /LIN\/1/, 'el resumen de respaldo tiene que aparecer')
+})
+
+await check('un AVISO de la herramienta llega aunque el modelo lo ignore', async () => {
+  // Visto en planta: con `rendimiento = 110,4 %` el modelo dio la cifra sin
+  // una palabra. Una advertencia que depende de que se acuerde no sirve.
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true, maquina: 'LIN/1', oee: 107.9,
+      aviso: 'Valor superior al 100 %, no es una medición válida.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    texto: 'El OEE fue del 107,9 por ciento.',   // el modelo omite el aviso
+  }
+  const { texto } = await preguntar(chat, 'algo')
+
+  assert.match(texto, /no es una medición válida/i, 'el backend tiene que añadirlo')
+})
+
+await check('si el modelo YA contó el aviso, no se repite', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true, maquina: 'LIN/1', oee: 107.9,
+      aviso: 'Valor superior al 100 %, no es una medición válida.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    texto: 'El OEE fue 107,9 pero no es una medición válida por un fallo de cálculo.',
+  }
+  const { texto } = await preguntar(chat, 'algo')
+
+  assert.equal(texto.match(/no es una medición válida/gi)?.length, 1, 'una sola vez')
 })
 
 await check('si no redacta nada, se dice el dato igual', async () => {

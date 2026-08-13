@@ -119,6 +119,48 @@ export function totalDelDia(muestras) {
   return total;
 }
 
+/** ¿Cae la marca de tiempo dentro de `[desde, hasta)` en horas locales? */
+function enVentana(ts, desde, hasta) {
+  const h = new Date(ts).getHours()
+  // Un turno de noche cruza la medianoche: 22→6 significa «22:00 o antes de
+  // las 6:00», no un rango vacío.
+  return desde <= hasta ? h >= desde && h < hasta : h >= desde || h < hasta
+}
+
+/** Filas horarias que caen dentro de la ventana. */
+export function filasEnVentana(filas, desde, hasta) {
+  if (desde === 0 && hasta >= 24) return filas
+  return filas.filter(f => enVentana(f.ts, desde, hasta))
+}
+
+/**
+ * Cuánto SUBIÓ un contador dentro de una ventana.
+ *
+ * No es `totalDelDia` recortado, y la diferencia importa. El total del día
+ * incluye el valor con el que arranca la serie —lo acumulado hasta entonces—
+ * porque a las 00:00 el contador ya trae lo que lleve el turno de noche. En
+ * una ventana que empieza a las 12:00 ese valor inicial es producción de
+ * antes, y contarlo triplicaría la cifra de la tarde.
+ *
+ * Así que aquí solo se suman los incrementos. Un reinicio dentro de la
+ * ventana aporta desde su propio valor, igual que en el total del día.
+ */
+export function incrementoEnVentana(muestras, desde, hasta) {
+  const nums = muestras
+    .filter(m => enVentana(m.timestamp, desde, hasta))
+    .map(m => m.value)
+    .filter(v => Number.isFinite(v))
+
+  if (nums.length < 2) return null
+
+  let total = 0
+  for (let i = 1; i < nums.length; i++) {
+    const salto = nums[i] - nums[i - 1]
+    total += salto > 0 ? salto : nums[i]
+  }
+  return total
+}
+
 /**
  * Corta la serie en la hora actual cuando el día pedido es el de hoy.
  *

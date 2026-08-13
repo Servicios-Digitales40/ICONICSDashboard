@@ -9,6 +9,7 @@
  */
 import { isAbsolute, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { leerTurnos } from '../shared/periodo.js'
 
 const BACKEND_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = normalize(join(BACKEND_DIR, '..'))
@@ -292,6 +293,16 @@ export function loadConfig(env = process.env) {
           .map(id => id.trim())
           .filter(Boolean)
       ),
+      /**
+       * Horario de turnos, `manana=6-14,tarde=14-22,noche=22-6`.
+       *
+       * **Vacío por defecto, y ese defecto es la decisión.** Sin el horario
+       * real de esta planta, un turno inventado devolvería datos verdaderos
+       * de las horas equivocadas, que es indistinguible de la respuesta
+       * correcta — el peor modo de fallo posible aquí. Con esto vacío,
+       * preguntar por un turno responde que no está configurado.
+       */
+      turnos: Object.freeze(leerTurnos(env.IA_TURNOS)),
     }),
 
     /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */

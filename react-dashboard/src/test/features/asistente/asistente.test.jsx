@@ -126,10 +126,10 @@ describe("una respuesta", () => {
       habilitado: true,
       eventos: [
         { tipo: "estado", valor: "Consultando ICONICS…" },
-        { tipo: "herramienta", nombre: "oee_de_maquina" },
+        { tipo: "herramienta", nombre: "datos_de_maquina" },
         { tipo: "texto", delta: "El OEE fue del " },
         { tipo: "texto", delta: "62,4 %." },
-        { tipo: "fin", herramienta: "oee_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
       ],
     });
     montar();
@@ -142,9 +142,9 @@ describe("una respuesta", () => {
     backend({
       habilitado: true,
       eventos: [
-        { tipo: "herramienta", nombre: "oee_de_maquina" },
+        { tipo: "herramienta", nombre: "datos_de_maquina" },
         { tipo: "texto", delta: "62,4 %." },
-        { tipo: "fin", herramienta: "oee_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
       ],
     });
     montar();
@@ -186,9 +186,9 @@ describe("una respuesta", () => {
     backend({
       habilitado: true,
       eventos: [
-        { tipo: "herramienta", nombre: "oee_de_maquina" },
+        { tipo: "herramienta", nombre: "datos_de_maquina" },
         { tipo: "texto", delta: "Fue del 61,9 %." },
-        { tipo: "fin", herramienta: "oee_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
       ],
     });
     montar();

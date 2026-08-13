@@ -215,6 +215,6 @@ export const ETIQUETA_HERRAMIENTA = {
   listar_maquinas: "Consultó el catálogo de máquinas",
   estado_de_planta: "Leyó la planta entera de ICONICS",
   estado_actual: "Leyó el estado en vivo de ICONICS",
-  oee_de_maquina: "Leyó el historiador",
-  comparar_dias: "Comparó dos días del historiador",
+  datos_de_maquina: "Leyó el historiador",
+  comparar_periodos: "Comparó dos períodos del historiador",
 };

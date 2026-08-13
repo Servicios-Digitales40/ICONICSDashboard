@@ -68,6 +68,7 @@ plantilla comentada de todas las variables está en
 | `IA_MAX_TOKENS` | `512` | Tope de la respuesta. |
 | `IA_MODELO` | `local` | Nombre informativo; llama-server sirve un solo modelo. |
 | `IA_MAQUINAS_CON_HISTORIA` | `LIN/1` | Máquinas con tags «Is Collected». Las demás responden 500 al historiador. |
+| `IA_TURNOS` | *(vacío)* | `manana=6-14,tarde=14-22,noche=22-6`. Vacío = preguntar por un turno responde que no está configurado, en vez de inventarse el horario. |
 
 `IA_TIMEOUT_MS` es una variable aparte y no `UPSTREAM_TIMEOUT_MS` porque son
 dos escalas distintas: 15 s es holgado para ICONICS y ridículo para un modelo

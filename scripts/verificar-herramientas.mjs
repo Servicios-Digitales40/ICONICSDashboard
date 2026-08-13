@@ -2,7 +2,7 @@
 /**
  * scripts/verificar-herramientas.mjs
  * ------------------------------------------------------------------
- * Comprueba las cuatro herramientas que el modelo de lenguaje puede invocar,
+ * Comprueba las cinco herramientas que el modelo de lenguaje puede invocar,
  * **sin modelo y sin servidor ICONICS**.
  *
  * ── POR QUÉ SIN MODELO ─────────────────────────────────────────────
@@ -32,6 +32,7 @@
 import assert from 'node:assert/strict'
 import { createHerramientas, resolverFecha, resolverMaquina } from '../backend/ia/herramientas.mjs'
 import { historyPointName, pointName } from '../shared/tagCatalog.js'
+import { TIPOS, leerTurnos, resolverPeriodo } from '../shared/periodo.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -167,20 +168,30 @@ console.log('\n── listar_maquinas ──────────────
 
 const herramientas = createHerramientas({ client: clienteFalso() })
 
-await checkAsync('devuelve las 10 máquinas reales', async () => {
-  const r = await herramientas.ejecutar('listar_maquinas')
-  assert.equal(r.ok, true)
-  assert.equal(r.maquinas.length, 10)
+check('el catálogo trae las 10 máquinas reales', () => {
   assert.deepEqual(
-    r.maquinas.map(m => m.id),
+    herramientas.catalogo().map(m => m.id),
     ['LIN/1', 'LIN/2', 'LIN/3', 'LIN/4', 'LIN/5', 'LIN/6', 'LIN/7', 'REC/10', 'REC/11', 'REC/13']
   )
 })
 
-await checkAsync('dice cuáles tienen historia, que hoy es solo LIN/1', async () => {
-  const r = await herramientas.ejecutar('listar_maquinas')
-  const conHistoria = r.maquinas.filter(m => m.tieneHistoria).map(m => m.id)
+check('dice cuáles tienen historia, que hoy es solo LIN/1', () => {
+  const conHistoria = herramientas.catalogo().filter(m => m.tieneHistoria).map(m => m.id)
   assert.deepEqual(conHistoria, ['LIN/1'])
+})
+
+check('el catálogo NO es una herramienta que el modelo pueda gastar', () => {
+  // Gastaba la única llamada del turno en pedir lo que ya tiene delante en
+  // las instrucciones, y se quedaba sin poder consultar el historiador.
+  assert.ok(!herramientas.nombres.includes('listar_maquinas'))
+  assert.ok(!herramientas.definiciones.some(d => d.function.name === 'listar_maquinas'))
+})
+
+await checkAsync('sin nombrar máquina, si solo una tiene historia, se usa esa', () => {
+  return herramientas.ejecutar('datos_de_maquina', { periodo: DIA }).then(r => {
+    assert.equal(r.ok, true, 'no hay ambigüedad que resolver: es esa o ninguna')
+    assert.equal(r.maquina, 'LIN/1')
+  })
 })
 
 /* ── estado_actual ───────────────────────────────────────────────────── */
@@ -319,12 +330,12 @@ await checkAsync('una máquina muda no hunde el resumen de las demás', async ()
   assert.equal(r.planta.oee, 68.4, 'y no arrastran la media a cero')
 })
 
-/* ── oee_de_maquina ──────────────────────────────────────────────────── */
+/* ── datos_de_maquina ──────────────────────────────────────────────────── */
 
-console.log('\n── oee_de_maquina ──────────────────────────────────────────')
+console.log('\n── datos_de_maquina ──────────────────────────────────────────')
 
 await checkAsync('resume el día leyendo del historiador', async () => {
-  const r = await herramientas.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: DIA })
+  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
   assert.equal(r.ok, true)
   assert.equal(r.maquina, 'LIN/1')
   assert.equal(r.fecha, DIA)
@@ -333,7 +344,7 @@ await checkAsync('resume el día leyendo del historiador', async () => {
 })
 
 await checkAsync('los CONTADORES se suman por tramos, no se lee el último', async () => {
-  const r = await herramientas.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: DIA })
+  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
   assert.equal(
     r.aprobadas, TOTAL_ESPERADO,
     `esperaba ${TOTAL_ESPERADO} (suma de tramos), no ${r.aprobadas}. ` +
@@ -350,7 +361,7 @@ await checkAsync('una máquina SIN historizar lo dice, y no devuelve un día vac
   )
   const h = createHerramientas({ client: clienteFalso({ tagsQueFallan: todos }) })
 
-  const r = await h.ejecutar('oee_de_maquina', { maquina: 'Línea 3', fecha: DIA })
+  const r = await h.ejecutar('datos_de_maquina', { maquina: 'Línea 3', periodo: DIA })
   assert.equal(r.ok, false, 'no puede devolver ok con un resumen vacío')
   assert.match(r.error, /no tiene datos históricos/i)
   assert.deepEqual(r.maquinasConHistoria, ['LIN/1'], 'debe decir cuáles sí')
@@ -367,7 +378,7 @@ await checkAsync('«servidor caído» NO se cuenta como «tag sin coleccionar»'
   )
   const h = createHerramientas({ client: clienteFalso({ tagsQueFallan: todos, statusDeFallo: 502 }) })
 
-  const r = await h.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: DIA })
+  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
   assert.equal(r.ok, false)
   assert.match(r.error, /no se pudo contactar/i)
   assert.doesNotMatch(r.error, /Is Collected/i, 'no debe mandar a revisar el historiador')
@@ -376,23 +387,25 @@ await checkAsync('«servidor caído» NO se cuenta como «tag sin coleccionar»'
 
 await checkAsync('un día sin ninguna muestra se distingue de un día con OEE 0', async () => {
   const h = createHerramientas({ client: clienteFalso({ historiaVacia: true }) })
-  const r = await h.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: DIA })
+  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
   assert.equal(r.ok, false)
   assert.match(r.error, /no hay ninguna muestra/i)
 })
 
-await checkAsync('una fecha que no se entiende se rechaza con instrucciones', async () => {
-  // `ayer` YA NO está aquí: desde el Plan 7 se resuelve en el backend.
-  for (const mala of ['25 de marzo de 2025', '25/03/2025', 'la semana pasada', '2025-3-5', '']) {
-    const r = await herramientas.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: mala })
+await checkAsync('un período que no se entiende se rechaza enseñando las formas válidas', async () => {
+  // Van saliendo de esta lista según se amplía el resolvedor: «ayer» se fue
+  // en el Plan 7, y «25 de marzo de 2025» y «la semana pasada» al añadir los
+  // períodos. Lo que queda es lo que de verdad no se sabe interpretar.
+  for (const mala of ['25/03/2025', '2025-3-5', 'cuando estaba lloviendo', '']) {
+    const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: mala })
     assert.equal(r.ok, false, `"${mala}" debería rechazarse`)
-    assert.match(r.error, /YYYY-MM-DD/)
+    assert.match(r.error, /formas que entiendo|no me has dicho/i, `sin instrucciones: ${r.error}`)
   }
 })
 
 await checkAsync('una fecha futura se rechaza', async () => {
   const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-  const r = await herramientas.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: manana })
+  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: manana })
   assert.equal(r.ok, false)
   assert.match(r.error, /futuro/i)
 })
@@ -452,30 +465,171 @@ check('lo que no se entiende dice cómo escribirlo', () => {
 })
 
 await checkAsync('la herramienta acepta "ayer" de punta a punta', async () => {
-  const r = await herramientas.ejecutar('oee_de_maquina', { maquina: 'LIN/1', fecha: 'ayer' })
+  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: 'ayer' })
   assert.equal(r.ok, true)
   assert.equal(r.fecha, esperado(-1), 'la respuesta lleva la fecha YA resuelta, no la palabra')
 })
 
-/* ── comparar_dias ───────────────────────────────────────────────────── */
+/* ── Períodos: horas, turnos y rangos ────────────────────────────────── */
 
-console.log('\n── comparar_dias ───────────────────────────────────────────')
+console.log('\n── Resolución de períodos ──────────────────────────────────')
 
-await checkAsync('devuelve los dos días y su diferencia', async () => {
-  const r = await herramientas.ejecutar('comparar_dias', {
-    maquina: 'LIN/1', fechaA: '2025-03-24', fechaB: DIA,
+check('cada forma cae en su tipo', () => {
+  assert.equal(resolverPeriodo('2025-03-25').tipo, TIPOS.DIA)
+  assert.equal(resolverPeriodo('ayer').tipo, TIPOS.DIA)
+  assert.equal(resolverPeriodo('20 de julio de 2025').tipo, TIPOS.DIA)
+  assert.equal(resolverPeriodo('ayer a las 12').tipo, TIPOS.HORA)
+  assert.equal(resolverPeriodo('2025-03-25 14:00').tipo, TIPOS.HORA)
+  assert.equal(resolverPeriodo('julio 2025').tipo, TIPOS.RANGO)
+  assert.equal(resolverPeriodo('últimos 7 días').tipo, TIPOS.RANGO)
+})
+
+check('la hora se entiende en las formas en que se dice', () => {
+  assert.equal(resolverPeriodo('2025-03-25 14:00').horaDesde, 14)
+  assert.equal(resolverPeriodo('2025-03-25 a las 14').horaDesde, 14)
+  assert.equal(resolverPeriodo('2025-03-25 a las 2 pm').horaDesde, 14)
+  assert.equal(resolverPeriodo('2025-03-25 a las 2 de la tarde').horaDesde, 14)
+  // Una hora es un bucket de una hora: el historiador agrega así.
+  assert.equal(resolverPeriodo('2025-03-25 14:00').horaHasta, 15)
+})
+
+check('un mes se convierte en sus días, recortado en hoy si sigue en curso', () => {
+  const julio = resolverPeriodo('julio 2025')
+  assert.equal(julio.diaDesde, '2025-07-01')
+  assert.equal(julio.diaHasta, '2025-07-31')
+
+  const esteMes = resolverPeriodo('este mes')
+  assert.ok(esteMes.diaHasta <= new Date().toISOString().slice(0, 10), 'no puede pasar de hoy')
+})
+
+check('el futuro se rechaza también como período', () => {
+  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  assert.match(resolverPeriodo(manana).error, /futuro/i)
+})
+
+check('sin turnos configurados NO se inventa el horario', () => {
+  const r = resolverPeriodo('turno de la mañana del 2025-03-25')
+  assert.ok(r.error, 'no puede resolver un turno que no conoce')
+  assert.match(r.error, /no están configurados/i)
+  assert.match(r.error, /hora concreta/i, 'y ofrece la alternativa que sí funciona')
+})
+
+check('con turnos configurados sí, y se leen del entorno', () => {
+  const turnos = leerTurnos('manana=6-14,tarde=14-22,noche=22-6')
+  assert.deepEqual(turnos.manana, [6, 14])
+
+  const r = resolverPeriodo('turno de la tarde del 2025-03-25', { turnos })
+  assert.equal(r.tipo, TIPOS.VENTANA)
+  assert.equal(r.horaDesde, 14)
+  assert.equal(r.horaHasta, 22)
+})
+
+console.log('\n── datos_de_maquina · horas y rangos ───────────────────────')
+
+await checkAsync('una hora concreta devuelve SOLO esa hora', async () => {
+  // La serie falsa tiene 60,70,80,90 en las horas 0,1,2,3.
+  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: `${DIA} 02:00` })
+  assert.equal(r.ok, true)
+  assert.equal(r.oee, 80, 'la hora 2, no la media del día')
+  assert.match(r.horas, /2:00 a 3:00/)
+})
+
+await checkAsync('en una VENTANA los contadores se cuentan por incremento', async () => {
+  // Es la regla que más fácil se hace mal. El total del día son 2145 porque
+  // incluye el valor con el que arranca la serie —lo acumulado del turno de
+  // noche—. En una ventana que empieza a media mañana ese arranque es
+  // producción de ANTES, y contarlo dispararía la cifra.
+  const h = createHerramientas({ client: clienteFalso(), turnos: leerTurnos('tarde=1-3') })
+
+  const dia = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
+  assert.equal(dia.aprobadas, TOTAL_ESPERADO, 'el día entero sí incluye el arranque')
+
+  const ventana = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: `turno de la tarde del ${DIA}` })
+  assert.equal(ventana.ok, true)
+  // Horas 1 y 2 del contador: 1551 → 48. Es un reinicio, así que el tramo
+  // nuevo aporta desde su propio valor.
+  assert.equal(ventana.aprobadas, 48, `esperaba 48, no ${ventana.aprobadas}`)
+  assert.notEqual(ventana.aprobadas, TOTAL_ESPERADO, 'no puede ser el total del día')
+})
+
+await checkAsync('un rango devuelve máximo, mínimo y promedio YA calculados', async () => {
+  const r = await herramientas.ejecutar('datos_de_maquina', {
+    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'oee',
+  })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.metrica, 'oee')
+  assert.equal(r.diasConDato, 31, 'julio tiene 31 días')
+  // Pedirle al modelo que encuentre el mayor de 31 sería pedirle aritmética.
+  assert.ok(r.maximo?.fecha, 'el máximo tiene que venir con su fecha')
+  assert.ok(r.minimo?.fecha)
+  assert.equal(r.promedio, 75, 'media de 60,70,80,90')
+  assert.equal(r.porDia.length, 31)
+})
+
+await checkAsync('en un rango, un contador se totaliza en vez de promediarse', async () => {
+  const r = await herramientas.ejecutar('datos_de_maquina', {
+    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'aprobadas',
   })
   assert.equal(r.ok, true)
-  assert.equal(r['2025-03-24'].oee, 75)
-  assert.equal(r[DIA].oee, 75)
+  assert.equal(r.unidad, 'piezas')
+  assert.equal(r.maximo.valor, TOTAL_ESPERADO, 'cada día suma sus tramos')
+  assert.equal(r.total, TOTAL_ESPERADO * 31, 'y el rango los suma todos')
+})
+
+await checkAsync('un porcentaje imposible se AVISA, no se presenta como bueno', async () => {
+  // Medido en el servidor real: LIN/1 el 2026-07-24 devuelve 15 de 24
+  // muestras por encima de 100, con un máximo de 160,4 %. Es el fallo de
+  // OEE_Cal sin acotar que documenta TAGS.md. La media diaria lo disimulaba;
+  // un máximo de un mes lo saca a la luz.
+  const h = createHerramientas({
+    client: {
+      readPoints: async () => ({ ok: true, payload: {} }),
+      readHistory: async () => ({
+        ok: true, status: 200, hasMore: false,
+        data: [0, 1, 2].map(i => ({ timestamp: hora(i), value: 130 + i, quality: 192 })),
+      }),
+    },
+  })
+
+  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
+  assert.equal(r.ok, true, 'el dato se entrega: esconderlo sería el otro extremo')
+  assert.ok(r.aviso, 'pero tiene que venir con su aviso')
+  assert.match(r.aviso, /100 %/)
+  assert.match(r.aviso, /no es una medición válida/i)
+  // El aviso se redacta como HECHO, no como orden: en imperativo, el modelo
+  // lo copiaba literal y el operador leía las instrucciones del sistema.
+  assert.doesNotMatch(r.aviso, /\b(dilo|di\b|no la presentes|debes)\b/i)
+})
+
+await checkAsync('una métrica inventada se rechaza con la lista de las buenas', async () => {
+  const r = await herramientas.ejecutar('datos_de_maquina', {
+    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'temperatura',
+  })
+  assert.equal(r.ok, false)
+  assert.ok(r.metricas.includes('oee'))
+})
+
+/* ── comparar_periodos ───────────────────────────────────────────────────── */
+
+console.log('\n── comparar_periodos ───────────────────────────────────────────')
+
+await checkAsync('devuelve los dos días y su diferencia', async () => {
+  const r = await herramientas.ejecutar('comparar_periodos', {
+    maquina: 'LIN/1', periodoA: '2025-03-24', periodoB: DIA,
+  })
+  assert.equal(r.ok, true)
+  // Las claves son las etiquetas ya resueltas, no lo que escribió el modelo.
+  assert.equal(r['el 2025-03-24'].oee, 75)
+  assert.equal(r[`el ${DIA}`].oee, 75)
   assert.equal(r.diferencia.oee, 0, 'mismos datos → diferencia cero')
   assert.match(r.nota, /negativo/i, 'debe explicar el signo al modelo')
 })
 
 await checkAsync('si un día no tiene datos, lo dice en vez de comparar a medias', async () => {
   const h = createHerramientas({ client: clienteFalso({ historiaVacia: true }) })
-  const r = await h.ejecutar('comparar_dias', {
-    maquina: 'LIN/1', fechaA: '2025-03-24', fechaB: DIA,
+  const r = await h.ejecutar('comparar_periodos', {
+    maquina: 'LIN/1', periodoA: '2025-03-24', periodoB: DIA,
   })
   assert.equal(r.ok, false)
 })
@@ -484,10 +638,10 @@ await checkAsync('si un día no tiene datos, lo dice en vez de comparar a medias
 
 console.log('\n── El registro de herramientas ─────────────────────────────')
 
-check('son exactamente cinco, y ninguna escribe', () => {
+check('son exactamente cuatro, y ninguna escribe', () => {
   assert.deepEqual(
     herramientas.nombres.sort(),
-    ['comparar_dias', 'estado_actual', 'estado_de_planta', 'listar_maquinas', 'oee_de_maquina']
+    ['comparar_periodos', 'datos_de_maquina', 'estado_actual', 'estado_de_planta']
   )
   const sospechosas = herramientas.nombres.filter(n => /escrib|write|set|ack|borr|delete/i.test(n))
   assert.deepEqual(sospechosas, [], 'el registro no puede contener escrituras')
@@ -503,7 +657,7 @@ check('el esquema que ve el modelo coincide con el registro', () => {
 })
 
 check('el esquema avisa de que no todas las máquinas tienen historia', () => {
-  const oee = herramientas.definiciones.find(d => d.function.name === 'oee_de_maquina')
+  const oee = herramientas.definiciones.find(d => d.function.name === 'datos_de_maquina')
   assert.match(
     oee.function.description, /solo algunas máquinas tienen datos históricos/i,
     'sin ese aviso el modelo pedirá historia de máquinas que no la tienen'
@@ -514,7 +668,7 @@ await checkAsync('una herramienta inventada no lanza: devuelve las válidas', as
   const r = await herramientas.ejecutar('borrar_todo', {})
   assert.equal(r.ok, false)
   assert.match(r.error, /no existe la herramienta/i)
-  assert.equal(r.herramientas.length, 5)
+  assert.equal(r.herramientas.length, 4)
 })
 
 await checkAsync('un fallo del cliente se cuenta, no se traga', async () => {

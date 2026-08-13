@@ -39,12 +39,31 @@ import {
   TAGS_CIERRE,
   TAGS_DIA,
   TAGS_FACTOR,
+  filasEnVentana,
+  incrementoEnVentana,
   isoLocal,
   rangoDelDia,
   recortarAlPresente,
   totalDelDia,
   unir,
 } from '../../shared/historia.js'
+import {
+  TIPOS,
+  diasDelRango,
+  resolverDia,
+  resolverPeriodo,
+} from '../../shared/periodo.js'
+
+/**
+ * Días que se piden a la vez en un rango.
+ *
+ * Tres, como el calendario del tablero. En serie, un mes serían 31 idas y
+ * vueltas; de golpe, 31 peticiones simultáneas al servidor de planta.
+ */
+const CONCURRENCIA_RANGO = 3
+
+/** Métricas que el historiador guarda y que se pueden barrer en un rango. */
+const METRICAS_HISTORICAS = TAGS_DIA
 
 /**
  * Máquinas cuyos tags están marcados «Is Collected» en el Data Historian.
@@ -60,9 +79,6 @@ import {
  * marque más tags, se añaden aquí o se pasan por `maquinasConHistoria`.
  */
 export const CON_HISTORIA_POR_DEFECTO = ['LIN/1']
-
-/** Fecha en formato `YYYY-MM-DD`, que es lo único que aceptan las herramientas. */
-const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Quita acentos y unifica separadores para poder comparar nombres escritos a mano. */
 function normalizar(texto) {
@@ -136,7 +152,19 @@ function catalogoBreve() {
   return listMachines().map(m => ({ id: m.id, nombre: m.equipo }))
 }
 
-export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_POR_DEFECTO } = {}) {
+export function createHerramientas({
+  client,
+  maquinasConHistoria = CON_HISTORIA_POR_DEFECTO,
+  /**
+   * Horario de turnos, `{ manana: [6,14], … }`. **Vacío por defecto.**
+   *
+   * Sin el horario real de esta planta, un turno inventado devolvería datos
+   * verdaderos de las horas equivocadas — y eso no se distingue de la
+   * respuesta correcta. Con el mapa vacío, preguntar por un turno responde
+   * que no está configurado y ofrece preguntar por una hora concreta.
+   */
+  turnos = {},
+} = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
   }
@@ -254,37 +282,60 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
       parcial: fallaron.length > 0,
       serie: recortarAlPresente(unir(porTag, TAGS_FACTOR), iso),
       cierre: Object.fromEntries(TAGS_CIERRE.map(tag => [tag, totalDelDia(porTag[tag] ?? [])])),
+      // Las muestras crudas, para poder recortar a una ventana. Un tramo de
+      // horas no reduce los contadores igual que el día entero: ver
+      // `incrementoEnVentana` en shared/historia.js.
+      porTag,
     }
   }
 
-  /**
-   * Resumen de un día ya validado, con el motivo exacto cuando no hay dato.
-   * Lo comparten `oee_de_maquina` y `comparar_dias`.
-   */
-  async function resumenDelDia(meta, fecha) {
-    const dia = await leerDia(meta, fecha)
-
-    if (!dia.ok) {
-      if (dia.incomunicado) {
-        return fallo(
-          'No se pudo contactar con el servidor ICONICS para leer el historiador. ' +
-            'No es que falten datos: el servidor no está respondiendo. Si acaban de ' +
-            'arrancarse los servicios GENESIS, tardan 3-4 minutos en atender.'
-        )
-      }
-
+  /** El fallo de lectura histórica, con el motivo exacto. */
+  function falloDeHistoria(meta, dia) {
+    if (dia.incomunicado) {
       return fallo(
-        `La máquina ${meta.equipo} (${meta.id}) no tiene datos históricos en el servidor. ` +
-          `Sus tags no están marcados «Is Collected» en el Data Historian.`,
-        { maquinasConHistoria: [...conHistoria] }
+        'No se pudo contactar con el servidor ICONICS para leer el historiador. ' +
+          'No es que falten datos: el servidor no está respondiendo. Si acaban de ' +
+          'arrancarse los servicios GENESIS, tardan 3-4 minutos en atender.'
       )
     }
 
-    const resumen = daySummary(dia.serie, dia.cierre)
+    return fallo(
+      `La máquina ${meta.equipo} (${meta.id}) no tiene datos históricos en el servidor. ` +
+        `Sus tags no están marcados «Is Collected» en el Data Historian.`,
+      { maquinasConHistoria: [...conHistoria] }
+    )
+  }
+
+  /**
+   * Un período que cabe en un día: el día entero, una hora suelta o un turno.
+   *
+   * Se lee el día completo —siete tags, 24 puntos cada uno— y se recorta. No
+   * merece la pena pedirle al historiador solo unas horas: la petición cuesta
+   * lo mismo y así una segunda pregunta sobre otro tramo del mismo día no
+   * vuelve a salir a la red.
+   */
+  async function resumenDeUnDia(meta, periodo) {
+    const dia = await leerDia(meta, periodo.diaDesde)
+    if (!dia.ok) return falloDeHistoria(meta, dia)
+
+    const completo = periodo.horaDesde === 0 && periodo.horaHasta >= 24
+    const serie = completo
+      ? dia.serie
+      : filasEnVentana(dia.serie, periodo.horaDesde, periodo.horaHasta)
+
+    // Dentro de una ventana los contadores se reducen distinto: no es el
+    // total del día recortado, es cuánto SUBIERON en ese tramo.
+    const cierre = completo
+      ? dia.cierre
+      : Object.fromEntries(TAGS_CIERRE.map(tag => [
+        tag, incrementoEnVentana(dia.porTag[tag] ?? [], periodo.horaDesde, periodo.horaHasta),
+      ]))
+
+    const resumen = daySummary(serie, cierre)
     if (!resumen) {
       return fallo(
-        `No hay ninguna muestra de ${meta.equipo} (${meta.id}) el ${fecha}. ` +
-          `El historiador no guarda ese día, o la máquina no estuvo en marcha.`
+        `No hay ninguna muestra de ${meta.equipo} (${meta.id}) en ${periodo.etiqueta}. ` +
+          `El historiador no guarda ese tramo, o la máquina no estuvo en marcha.`
       )
     }
 
@@ -292,32 +343,185 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
       ok: true,
       maquina: meta.id,
       nombre: meta.equipo,
-      fecha,
+      periodo: periodo.etiqueta,
+      fecha: periodo.diaDesde,
+      ...(completo ? {} : { horas: `${periodo.horaDesde}:00 a ${periodo.horaHasta}:00` }),
       fuente: 'historiador',
       ...formatearResumen(resumen),
-      ...(dia.parcial ? { aviso: 'Algunos tags del día no respondieron; el resumen es parcial.' } : {}),
+      ...avisoDeImposibles({
+        oee: resumen.oee,
+        disponibilidad: resumen.disponibilidad,
+        rendimiento: resumen.rendimiento,
+        calidad: resumen.calidad,
+      }),
+      ...(dia.parcial ? { avisoParcial: 'Algunos tags no respondieron; el resumen es parcial.' } : {}),
     }
+  }
+
+  /**
+   * Un período de varios días, para UNA métrica.
+   *
+   * Solo una métrica a propósito: el historiador rechaza los rangos
+   * multi-día, así que hay que ir día a día. Un mes de una métrica son 31
+   * peticiones; de las siete serían 217, y eso ya no es una consulta, es un
+   * ataque al servidor de planta.
+   *
+   * Los extremos y el promedio se calculan AQUÍ. Devolver los 31 días crudos
+   * y pedirle al modelo que encuentre el mayor es pedirle aritmética, que es
+   * justo lo que se le ha quitado en todo lo demás.
+   */
+  async function resumenDeRango(meta, periodo, metrica) {
+    const dias = diasDelRango(periodo.diaDesde, periodo.diaHasta)
+    const esContador = TAGS_CIERRE.includes(metrica)
+    const punto = historyPointName(meta.areaId, meta.machineId, metrica)
+
+    const porDia = []
+    let incomunicado = true
+    let alguna = false
+
+    // De tres en tres, como hace el calendario del tablero: en serie serían
+    // 31 idas y vueltas, y de golpe se satura el historiador.
+    for (let i = 0; i < dias.length; i += CONCURRENCIA_RANGO) {
+      const lote = await Promise.all(
+        dias.slice(i, i + CONCURRENCIA_RANGO).map(async iso => {
+          const rango = rangoDelDia(iso)
+          const r = await client.readHistory({
+            pointName: punto,
+            startDate: rango.startDate,
+            endDate: rango.endDate,
+            aggregate: AGREGADO.serie,
+            interval: INTERVALO.hora,
+          })
+
+          if (!r?.ok) return { iso, valor: null, status: r?.status ?? 0 }
+
+          const muestras = Array.isArray(r.data) ? r.data : []
+          const finitos = muestras.map(m => m.value).filter(v => Number.isFinite(v))
+          if (!finitos.length) return { iso, valor: null, status: 200 }
+
+          // Los factores son porcentajes instantáneos: su resumen del día es
+          // la media. Los contadores se acumulan: es el total. Mismo criterio
+          // que `daySummary`, para que las cifras cuadren entre herramientas.
+          const valor = esContador
+            ? totalDelDia(muestras)
+            : finitos.reduce((a, b) => a + b, 0) / finitos.length
+
+          return { iso, valor, status: 200 }
+        })
+      )
+
+      for (const d of lote) {
+        if (d.status < 502) incomunicado = false
+        if (d.valor !== null) alguna = true
+        porDia.push({ fecha: d.iso, valor: red1(d.valor) })
+      }
+    }
+
+    if (!alguna) {
+      return incomunicado
+        ? falloDeHistoria(meta, { incomunicado: true })
+        : fallo(
+          `No hay datos de ${metrica} de ${meta.equipo} (${meta.id}) en ${periodo.etiqueta}. ` +
+            `El historiador no guarda ese período, o la máquina no tiene esos tags coleccionados.`,
+          { maquinasConHistoria: [...conHistoria] }
+        )
+    }
+
+    const conDato = porDia.filter(d => d.valor !== null)
+    const ordenados = [...conDato].sort((a, b) => b.valor - a.valor)
+    const suma = conDato.reduce((a, d) => a + d.valor, 0)
+
+    return {
+      ok: true,
+      maquina: meta.id,
+      nombre: meta.equipo,
+      periodo: periodo.etiqueta,
+      metrica,
+      fuente: 'historiador',
+      maximo: ordenados[0],
+      minimo: ordenados.at(-1),
+      promedio: red1(suma / conDato.length),
+      // Un máximo es justo donde asoman los valores imposibles que la media
+      // disimula, así que se comprueba sobre él.
+      ...(esContador ? {} : avisoDeImposibles({ [metrica]: ordenados[0]?.valor })),
+      ...(esContador ? { total: red1(suma) } : {}),
+      diasConDato: conDato.length,
+      diasSinDato: porDia.length - conDato.length,
+      porDia,
+      unidad: TAGS_CIERRE.includes(metrica)
+        ? (metrica === 'tMuerto' ? 'segundos' : 'piezas')
+        : '%',
+    }
+  }
+
+  /** Cualquier período: el tipo decide cómo se lee. */
+  function resumenDePeriodo(meta, periodo, metrica) {
+    return periodo.tipo === TIPOS.RANGO
+      ? resumenDeRango(meta, periodo, metrica)
+      : resumenDeUnDia(meta, periodo)
   }
 
   /* ── Las cuatro herramientas ───────────────────────────────────────── */
 
-  const herramientas = {
-    listar_maquinas() {
-      return {
-        ok: true,
-        total: 10,
-        maquinas: listMachines().map(m => ({
-          id: m.id,
-          nombre: m.equipo,
-          area: AREAS[m.areaId].label,
-          tieneHistoria: conHistoria.has(m.id),
-        })),
-        nota:
-          'Solo las máquinas con tieneHistoria=true admiten preguntas sobre fechas pasadas. ' +
-          'El resto solo puede consultarse en tiempo real con estado_actual.',
-      }
-    },
+  /**
+   * El catálogo de máquinas. **No es una herramienta.**
+   *
+   * Lo fue, y era un error caro: el catálogo entero —con qué máquina tiene
+   * historia— ya viaja en las instrucciones del sistema, así que llamarlo no
+   * le daba al modelo ni un dato nuevo. Pero el bucle permite UNA llamada por
+   * pregunta, y ante «¿qué días de julio pasaron del 100 %?» —sin máquina
+   * nombrada— el modelo la gastaba aquí, se quedaba sin poder consultar el
+   * historiador, y acababa recitando la lista de máquinas como respuesta.
+   *
+   * Quitarla del registro arregla eso y además le deja una decisión menos que
+   * tomar, que es donde un 4B es más frágil.
+   */
+  function catalogo() {
+    return listMachines().map(m => ({
+      id: m.id,
+      nombre: m.equipo,
+      area: AREAS[m.areaId].label,
+      tieneHistoria: conHistoria.has(m.id),
+    }))
+  }
 
+  /** Las máquinas que sí se pueden consultar en histórico. */
+  const conHistoriaReal = () => catalogo().filter(m => m.tieneHistoria).map(m => m.id)
+
+  /**
+   * Qué máquina se consulta cuando la pregunta no la nombra.
+   *
+   * Si solo hay UNA con historia, no hay ambigüedad que resolver: es esa o
+   * ninguna, y contestar por ella —diciéndolo— es más útil que devolver un
+   * error. Con dos o más sí hay que preguntar, y entonces se devuelve el
+   * error con la lista. Se arregla solo el día que historicen más máquinas.
+   */
+  function maquinaImplicita() {
+    const conDatos = conHistoriaReal()
+    return conDatos.length === 1 ? conDatos[0] : null
+  }
+
+  /** Resuelve la máquina pedida, o la implícita si no se nombró ninguna. */
+  function elegirMaquina(maquina) {
+    if (maquina) {
+      const id = resolverMaquina(maquina)
+      return id
+        ? { id }
+        : { error: fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() }) }
+    }
+
+    const implicita = maquinaImplicita()
+    if (implicita) return { id: implicita }
+
+    return {
+      error: fallo(
+        'No me has dicho de qué máquina, y hay varias con datos históricos.',
+        { maquinasConHistoria: conHistoriaReal() }
+      ),
+    }
+  }
+
+  const herramientas = {
     /**
      * La planta entera, de una vez.
      *
@@ -428,53 +632,83 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
       }
     },
 
-    async oee_de_maquina({ maquina, fecha } = {}) {
-      const id = resolverMaquina(maquina)
-      if (!id) {
-        return fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() })
+    /**
+     * Cualquier dato histórico de una máquina, en cualquier período.
+     *
+     * Una sola herramienta y no cinco porque la pregunta es siempre la misma
+     * —«qué pasó en tal máquina en tal momento»— y lo único que cambia es la
+     * granularidad. Quien decide cómo leerlo es `resolverPeriodo`, con código
+     * determinista, no el modelo.
+     */
+    async datos_de_maquina({ maquina, periodo, metrica } = {}) {
+      const elegida = elegirMaquina(maquina)
+      if (elegida.error) return elegida.error
+      const { id } = elegida
+
+      const p = resolverPeriodo(periodo, { turnos })
+      if (p.error) return fallo(p.error)
+
+      // La métrica solo manda en los rangos: en un día o una ventana se
+      // devuelven todas, que cuestan lo mismo.
+      const cual = metrica ?? 'oee'
+      if (p.tipo === TIPOS.RANGO && !METRICAS_HISTORICAS.includes(cual)) {
+        return fallo(
+          `No conozco la métrica "${cual}".`,
+          { metricas: METRICAS_HISTORICAS }
+        )
       }
 
-      const dia = resolverFecha(fecha)
-      if (dia.error) return fallo(dia.error)
-
-      return resumenDelDia(porId.get(id), dia.iso)
+      return resumenDePeriodo(porId.get(id), p, cual)
     },
 
-    async comparar_dias({ maquina, fechaA, fechaB } = {}) {
-      const id = resolverMaquina(maquina)
-      if (!id) {
-        return fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() })
-      }
+    /**
+     * Dos períodos de la misma máquina, con su diferencia.
+     *
+     * Sirve para dos días, dos horas o dos turnos: el resolvedor no distingue,
+     * así que «compara la mañana con la tarde del 20 de julio» y «compara el
+     * lunes con el martes» son la misma llamada.
+     */
+    async comparar_periodos({ maquina, periodoA, periodoB, metrica } = {}) {
+      const elegida = elegirMaquina(maquina)
+      if (elegida.error) return elegida.error
+      const { id } = elegida
 
-      const diaA = resolverFecha(fechaA)
-      if (diaA.error) return fallo(diaA.error)
-      const diaB = resolverFecha(fechaB)
-      if (diaB.error) return fallo(diaB.error)
+      const pa = resolverPeriodo(periodoA, { turnos })
+      if (pa.error) return fallo(pa.error)
+      const pb = resolverPeriodo(periodoB, { turnos })
+      if (pb.error) return fallo(pb.error)
 
+      const cual = metrica ?? 'oee'
       const meta = porId.get(id)
-      const [a, b] = await Promise.all([resumenDelDia(meta, diaA.iso), resumenDelDia(meta, diaB.iso)])
+      const [a, b] = await Promise.all([
+        resumenDePeriodo(meta, pa, cual),
+        resumenDePeriodo(meta, pb, cual),
+      ])
 
       if (!a.ok) return a
       if (!b.ok) return b
+
+      // Comparar un día contra un rango mezclaría un valor con un promedio.
+      const campos = pa.tipo === TIPOS.RANGO || pb.tipo === TIPOS.RANGO
+        ? ['promedio']
+        : ['oee', 'disponibilidad', 'rendimiento', 'calidad', 'aprobadas', 'rechazadas', 'tMuertoSegundos']
 
       return {
         ok: true,
         maquina: meta.id,
         nombre: meta.equipo,
         fuente: 'historiador',
-        // Las claves son las fechas YA resueltas, para que el modelo redacte
-        // con el día real y no con el «ayer» que escribió él.
-        [diaA.iso]: a,
-        [diaB.iso]: b,
-        diferencia: {
-          oee: resta(b.oee, a.oee),
-          disponibilidad: resta(b.disponibilidad, a.disponibilidad),
-          rendimiento: resta(b.rendimiento, a.rendimiento),
-          calidad: resta(b.calidad, a.calidad),
-          aprobadas: resta(b.aprobadas, a.aprobadas),
-          rechazadas: resta(b.rechazadas, a.rechazadas),
-        },
-        nota: `La diferencia es ${diaB.iso} menos ${diaA.iso}. Un valor negativo significa que empeoró.`,
+        // Las claves son las etiquetas YA resueltas, para que el modelo
+        // redacte con el período real y no con el «ayer» que escribió él.
+        [pa.etiqueta]: a,
+        [pb.etiqueta]: b,
+        diferencia: Object.fromEntries(campos.map(c => [c, resta(b[c], a[c])])),
+      // El aviso de valores imposibles vive dentro de cada período; si se
+      // queda ahí anidado, comparar dos días con OEE por encima de 100 los
+      // presenta como si compitieran de verdad. Se sube al primer nivel.
+      ...(a.aviso || b.aviso ? { aviso: a.aviso ?? b.aviso } : {}),
+        nota: `La diferencia es «${pb.etiqueta}» menos «${pa.etiqueta}». ` +
+          `Un valor negativo significa que el segundo fue peor.`,
       }
     },
   }
@@ -500,10 +734,48 @@ export function createHerramientas({ client, maquinasConHistoria = CON_HISTORIA_
     }
   }
 
-  return { definiciones: DEFINICIONES, ejecutar, nombres: Object.keys(herramientas) }
+  return { definiciones: DEFINICIONES, ejecutar, nombres: Object.keys(herramientas), catalogo }
 }
 
 /* ── Auxiliares ─────────────────────────────────────────────────────── */
+
+/**
+ * Avisa de porcentajes que no pueden serlo.
+ *
+ * ── POR QUÉ HACE FALTA ─────────────────────────────────────────────
+ *
+ * El servidor entrega OEE por encima del 100 %. Está documentado en
+ * docs/TAGS.md: calcula `OEE_Cal = Pz_OK / Prod_Real_Total` sin acotarlo por
+ * arriba, y cuando los contadores se desfasan al cambiar de turno la calidad
+ * pasa de 100 y el OEE la sigue. Medido en LIN/1 el 2026-07-24: 15 de 24
+ * muestras horarias por encima de 100, con un máximo de 160,4 %.
+ *
+ * La media diaria lo disimulaba. **Un máximo no**: preguntar por el mejor día
+ * de un mes es preguntar justo por el peor dato. Y un 107,9 % presentado sin
+ * comentario invita a creerlo.
+ *
+ * No se recorta ni se descarta a propósito. Recortar a 100 escondería un
+ * problema real del servidor, y descartarlo dejaría el día sin dato sin decir
+ * por qué. Se entrega con el aviso, para que el asistente lo cuente.
+ */
+function avisoDeImposibles(valores) {
+  const malos = Object.entries(valores)
+    .filter(([, v]) => typeof v === 'number' && v > 100)
+    .map(([k]) => k)
+
+  if (!malos.length) return {}
+
+  // Redactado como HECHO y no como orden al modelo. Escrito en imperativo
+  // («dilo al dar la cifra»), el 4B lo copiaba literal en su respuesta y el
+  // operador leía las instrucciones internas del sistema. Lo que el modelo
+  // debe hacer con esto ya se lo dice la regla 2 del prompt.
+  return {
+    aviso:
+      `El servidor devuelve un valor superior al 100 % en: ${malos.join(', ')}, ` +
+      'lo cual no es una medición válida. Es un fallo conocido del cálculo de OEE_Cal en ' +
+      'ICONICS, que no acota ese porcentaje por arriba.',
+  }
+}
 
 /**
  * Redondeo a un decimal que **conserva el hueco**.
@@ -536,16 +808,6 @@ function formatearResumen(r) {
   }
 }
 
-/** Días de la semana en la forma en que los escribe una persona. */
-const DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado']
-
-/** Date → "YYYY-MM-DD" desplazando `dias` desde hoy. */
-function desdeHoy(dias) {
-  const d = new Date()
-  d.setDate(d.getDate() + dias)
-  return isoLocal(d)
-}
-
 /**
  * Resuelve la fecha que manda el modelo, en ISO o en lenguaje llano.
  *
@@ -565,27 +827,11 @@ function desdeHoy(dias) {
  */
 export function resolverFecha(fecha) {
   const crudo = String(fecha ?? '').trim()
-  const texto = normalizar(crudo)
 
-  let iso = null
-
-  if (FECHA_RE.test(crudo)) iso = crudo
-  else if (texto === 'hoy') iso = desdeHoy(0)
-  else if (texto === 'ayer') iso = desdeHoy(-1)
-  else if (texto === 'anteayer' || texto === 'antier') iso = desdeHoy(-2)
-  else {
-    // «martes» es el martes más reciente, hoy incluido; «martes pasado» es el
-    // anterior a hoy. Es como se usan las dos formas al hablar.
-    const pasado = /\bpasad[oa]\b/.test(texto)
-    const dia = DIAS_SEMANA.indexOf(texto.replace(/\b(el|la|pasad[oa])\b/g, '').trim())
-
-    if (dia >= 0) {
-      const hoy = new Date().getDay()
-      let atras = (hoy - dia + 7) % 7
-      if (pasado && atras === 0) atras = 7
-      iso = desdeHoy(-atras)
-    }
-  }
+  // La resolución vive en `shared/periodo.js`, que la comparte con el
+  // resolvedor de períodos completo. Aquí solo queda la comprobación de que
+  // el día no esté en el futuro.
+  const iso = resolverDia(crudo)
 
   if (!iso) {
     return {
@@ -616,17 +862,6 @@ export function resolverFecha(fecha) {
  * y luego presente el error como si fuera un dato.
  */
 export const DEFINICIONES = [
-  {
-    type: 'function',
-    function: {
-      name: 'listar_maquinas',
-      description:
-        'Lista las 10 máquinas de la planta con su identificador, su nombre visible y si tienen ' +
-        'datos históricos disponibles. Úsala cuando no sepas el nombre exacto de una máquina o ' +
-        'cuando el usuario pregunte qué máquinas hay.',
-      parameters: { type: 'object', properties: {}, required: [] },
-    },
-  },
   {
     type: 'function',
     function: {
@@ -664,12 +899,14 @@ export const DEFINICIONES = [
   {
     type: 'function',
     function: {
-      name: 'oee_de_maquina',
+      name: 'datos_de_maquina',
       description:
-        'Devuelve el OEE de una máquina en un día concreto del pasado, con sus tres factores y las ' +
-        'piezas producidas, leídos del historiador. IMPORTANTE: solo algunas máquinas tienen datos ' +
-        'históricos; consulta listar_maquinas si no estás seguro. Si la máquina no tiene historia, ' +
-        'la herramienta lo dirá y debes comunicarlo tal cual, sin inventar cifras.',
+        'Datos históricos de una máquina en CUALQUIER período: un día entero, una hora concreta, ' +
+        'un turno, un mes o un rango de días. Devuelve el OEE y sus tres factores, las piezas ' +
+        'aprobadas y rechazadas y el tiempo muerto. Si el período abarca varios días, devuelve ' +
+        'además el MÁXIMO, el mínimo y el promedio de la métrica pedida, cada uno con su fecha. ' +
+        'IMPORTANTE: solo algunas máquinas tienen datos históricos; consulta listar_maquinas si ' +
+        'dudas. Si no hay datos, la herramienta lo dirá y debes comunicarlo tal cual.',
       parameters: {
         type: 'object',
         properties: {
@@ -677,34 +914,52 @@ export const DEFINICIONES = [
             type: 'string',
             description: 'Identificador o nombre: "LIN/1", "Línea 1", "REC/13", "Multi 13".',
           },
-          fecha: {
+          periodo: {
             type: 'string',
             description:
-              'Día a consultar. Puedes escribirlo como YYYY-MM-DD ("2025-03-25") o en lenguaje ' +
-              'llano: "hoy", "ayer", "anteayer", "martes" o "martes pasado". NO calcules tú la ' +
-              'fecha de una expresión relativa; pásala tal cual y el servidor la resuelve.',
+              'El período, en lenguaje llano. Ejemplos válidos: "2026-07-20", "ayer", "martes", ' +
+              '"ayer a las 12", "2026-07-20 14:00", "turno de la mañana del 2026-07-20", ' +
+              '"julio 2026", "últimos 7 días", "esta semana", "el mes pasado". ' +
+              'NO lo conviertas tú a fechas: pásalo tal cual y el servidor lo resuelve.',
+          },
+          metrica: {
+            type: 'string',
+            description:
+              'Solo hace falta cuando el período abarca VARIOS días, para saber de qué métrica ' +
+              'quieres el máximo o el promedio. Una de: oee, disponibilidad, rendimiento, ' +
+              'calidad, aprobadas, rechazadas, tMuerto. Por defecto oee.',
           },
         },
-        required: ['maquina', 'fecha'],
+        required: ['maquina', 'periodo'],
       },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'comparar_dias',
+      name: 'comparar_periodos',
       description:
-        'Compara el rendimiento de una máquina entre dos días del pasado y devuelve los dos ' +
-        'resúmenes junto con la diferencia. Úsala para preguntas del tipo "cómo cambió", ' +
-        '"fue mejor o peor que" o "compara".',
+        'Compara dos períodos de la misma máquina y devuelve los dos resúmenes con su diferencia. ' +
+        'Sirve para dos días, dos horas o dos turnos: "compara el lunes con el martes", ' +
+        '"la mañana contra la tarde del 20 de julio", "cómo cambió respecto a ayer".',
       parameters: {
         type: 'object',
         properties: {
           maquina: { type: 'string', description: 'Identificador o nombre de la máquina.' },
-          fechaA: { type: 'string', description: 'Primer día. Es la referencia. Admite "ayer" o YYYY-MM-DD.' },
-          fechaB: { type: 'string', description: 'Segundo día, se compara contra el primero. Admite "hoy" o YYYY-MM-DD.' },
+          periodoA: {
+            type: 'string',
+            description: 'Primer período. Es la referencia. Mismas formas que en datos_de_maquina.',
+          },
+          periodoB: {
+            type: 'string',
+            description: 'Segundo período, se compara contra el primero.',
+          },
+          metrica: {
+            type: 'string',
+            description: 'Solo si los períodos abarcan varios días. Por defecto oee.',
+          },
         },
-        required: ['maquina', 'fechaA', 'fechaB'],
+        required: ['maquina', 'periodoA', 'periodoB'],
       },
     },
   },

@@ -33,6 +33,7 @@ desplegar.
 | `historia.js` | Mecánica del historiador: qué agregado, cómo se formatean las fechas, cómo se totaliza un contador y cómo se unen varias series |
 | `quality.js` | Qué código de calidad OPC cuenta como bueno. Un valor malo es un hueco, nunca un cero |
 | `turno.js` | Aritmética del turno y metas por factor. El **formateo** se queda en el frontend |
+| `periodo.js` | De «julio 2026» o «ayer a las 12» a un rango concreto. Lo usa el asistente |
 | `plantModel.js` | Rollup de máquina → planta. El OEE de planta es D×R×C de los agregados, no la media de los OEE |
 | `domain/machine.js` | La forma `Machine` y su saneamiento de calidad y aritmética |
 | `domain/estado.js` | El enum de estados de ICONICS |

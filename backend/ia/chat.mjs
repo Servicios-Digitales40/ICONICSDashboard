@@ -101,6 +101,12 @@ function contieneCifras(texto) {
   const sinMaquinas = String(texto ?? '')
     .replace(/\b(l[ií]nea|lineal|multi|rectificadora|lin|rec)\s*\/?\s*\d+/gi, '')
     .replace(/\b(LIN|REC)\/\d+/g, '')
+    // «Hay 10 máquinas» tampoco es una medición inventada: el catálogo entero
+    // viaja en las instrucciones, así que contar sus filas es leer, no
+    // suponer. Sin esta excepción, la pregunta más básica de todas —«¿qué
+    // máquinas hay?»— se bloqueaba. Es deliberadamente estrecha: ninguna
+    // cifra de proceso se escribe jamás seguida de la palabra «máquinas».
+    .replace(/\b\d+\s+m[aá]quinas?\b/gi, '')
   return /\d/.test(sinMaquinas)
 }
 
@@ -126,6 +132,18 @@ function buscarMarcado(texto) {
     if (i !== -1 && (primero === -1 || i < primero)) primero = i
   }
   return primero
+}
+
+/**
+ * ¿Ya contó el modelo el aviso de la herramienta?
+ *
+ * Se busca la idea, no la frase literal: el modelo la reformula. Basta con
+ * que haya dicho que el valor no es válido o haya nombrado el cálculo
+ * culpable; si no, el backend lo añade detrás.
+ */
+function mencionaElAviso(texto) {
+  return /no es una medici[oó]n v[aá]lida|OEE_Cal|no (?:es|son) v[aá]lid|fallo (?:conocido|de c[aá]lculo)/i
+    .test(String(texto ?? ''))
 }
 
 /** Fecha de hoy en local, para que el modelo resuelva «hoy» y «ayer». */
@@ -155,8 +173,9 @@ function instrucciones(catalogo) {
     '   maquilles ni lo sustituyas por una estimación.',
     '3. Solo algunas máquinas tienen datos históricos. Si el usuario pregunta por una fecha',
     '   pasada de una máquina que no los tiene, dilo claramente y ofrece su estado actual.',
-    '4. No existen todas las máquinas que suenan plausibles: la numeración tiene huecos reales.',
-    '   Usa listar_maquinas si dudas en vez de suponer.',
+    '4. La lista completa de máquinas está más abajo, con marca de cuáles tienen historia.',
+    '   Úsala: no existen todas las que suenan plausibles, la numeración tiene huecos reales.',
+    '   Si la pregunta no dice de qué máquina y solo una tiene historia, es esa; no preguntes.',
     '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de qué día.',
     '6. Esto es una conversación: «¿y el día anterior?» o «¿y la Línea 2?» se refieren a lo que',
     '   se acaba de hablar. Resuelve a qué máquina y a qué fecha se refieren, y VUELVE A',
@@ -167,13 +186,11 @@ function instrucciones(catalogo) {
     '   y no repartas por áreas de tu cuenta. Una cuenta mal hecha en la frase final estropea',
     '   una consulta que salió bien.',
     '8. Tienes UNA sola consulta por pregunta. No planees varios pasos ni anuncies que vas a',
-    '   consultar algo más: no vas a poder. Las herramientas leen UN día concreto o el estado',
-    '   actual, nunca un rango. Si te piden el máximo, el mínimo o el promedio de una semana o',
-    '   de un mes, di que solo puedes consultar días sueltos y pide uno; NO elijas un día al',
-    '   azar del rango y lo des como respuesta.',
-    '',
-    'Para fechas puedes escribir "ayer", "anteayer", "hoy" o un día de la semana; se',
-    'entienden igual que YYYY-MM-DD.',
+    '   consultar algo más: no vas a poder. Elige la herramienta que responda de una vez.',
+    '9. No traduzcas los períodos ni las fechas. Si te preguntan por "ayer a las 12", por',
+    '   "julio de 2026" o por "el turno de la mañana", pasa ESE TEXTO tal cual a la',
+    '   herramienta: el servidor sabe resolverlo y tú no. Calcular calendarios no es tu',
+    '   trabajo aquí.',
     '',
     'Las máquinas de la planta:',
     catalogo,
@@ -355,7 +372,10 @@ export function createChat({ config, herramientas }) {
    * @param {(evento: object) => void} opciones.onEvento
    */
   async function responder({ pregunta, historial = [], signal, onEvento }) {
-    const catalogo = (await herramientas.ejecutar('listar_maquinas')).maquinas
+    // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
+    // información fija y barata, y tenerla delante evita que el modelo gaste
+    // su única llamada en pedir lo que ya tiene.
+    const catalogo = herramientas.catalogo()
       .map(m => `  ${m.id} — ${m.nombre} (${m.area})${m.tieneHistoria ? ' · con historia' : ''}`)
       .join('\n')
 
@@ -465,6 +485,21 @@ export function createChat({ config, herramientas }) {
       }
     }
 
+    /*
+     * El aviso de dato imposible no puede depender de que el modelo se
+     * acuerde de contarlo.
+     *
+     * Comprobado en planta: con `rendimiento = 110,4 %` el 4B dio la cifra
+     * sin una palabra, y al comparar dos días con OEE por encima de 100
+     * declaró ganador a uno de ellos. El aviso viaja en el resultado de la
+     * herramienta para que pueda redactarlo con naturalidad, pero si no lo
+     * hace lo añade el backend. Una advertencia que se pierde no es una
+     * advertencia.
+     */
+    if (resultado.aviso && !mencionaElAviso(texto)) {
+      onEvento({ tipo: 'texto', delta: `\n\n⚠ ${resultado.aviso}` })
+    }
+
     return {
       herramienta: nombre, ok: resultado.ok, bloqueada: false,
       longitud: texto.length, turnosRecordados: previos.length,
@@ -482,8 +517,8 @@ export function createChat({ config, herramientas }) {
  */
 const NO_SE_QUE_CONTESTAR =
   'No he sabido responder a eso. Puedo consultarte el estado actual de una máquina o de la ' +
-  'planta entera, el OEE de un DÍA concreto del historiador, y comparar dos días. Los rangos ' +
-  '—una semana, un mes, el máximo de un período— todavía no. Prueba con un día suelto.'
+  'planta entera, y los datos históricos de una máquina en cualquier período: un día, una ' +
+  'hora concreta, un mes o un rango. También comparar dos períodos entre sí.'
 
 /**
  * Qué se le dice al usuario cuando se bloquea una respuesta.
@@ -496,9 +531,9 @@ const NO_SE_QUE_CONTESTAR =
 function avisoDeBloqueo(vistaAlgunaLlamada) {
   const base =
     'No voy a darte cifras porque no he consultado los datos de la planta para esta pregunta. ' +
-    'Puedo leer el estado actual de una máquina o de la planta entera, el OEE de un DÍA ' +
-    'concreto del historiador, y comparar dos días. Los rangos —una semana, un mes, el máximo ' +
-    'de un período— todavía no. Prueba con un día suelto.'
+    'Puedo leer el estado actual de una máquina o de la planta entera, y los datos históricos ' +
+    'de una máquina en cualquier período: un día, una hora concreta, un mes o un rango. ' +
+    'También comparar dos períodos entre sí.'
 
   /*
    * El aviso de `--jinja` solo se añade si el modelo NO ha usado herramientas
@@ -526,13 +561,6 @@ function avisoDeBloqueo(vistaAlgunaLlamada) {
 function resumirSinModelo(nombre, resultado) {
   if (!resultado?.ok) {
     return resultado?.error ?? 'La consulta no devolvió ningún dato.'
-  }
-
-  if (nombre === 'listar_maquinas') {
-    const conHistoria = resultado.maquinas.filter(m => m.tieneHistoria).map(m => m.id)
-    return `Hay ${resultado.maquinas.length} máquinas: ` +
-      resultado.maquinas.map(m => `${m.nombre} (${m.id})`).join(', ') + '. ' +
-      `Con datos históricos: ${conHistoria.join(', ') || 'ninguna'}.`
   }
 
   const donde = resultado.fecha ? `el ${resultado.fecha}` : 'ahora mismo'
