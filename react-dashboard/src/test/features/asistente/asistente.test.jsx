@@ -49,6 +49,42 @@ function flujo(eventos) {
 }
 
 /**
+ * Un flujo SSE que se queda ABIERTO, con el mando para ir soltando eventos.
+ *
+ * Es el estado que dura entre 30 y 90 segundos en planta —el modelo pensando
+ * y escribiendo— y el único desde el que se puede probar lo que pasa si el
+ * usuario cancela o cierra el panel a mitad de la respuesta.
+ */
+function flujoAbierto() {
+  const enc = new TextEncoder();
+  let mando;
+
+  const cuerpo = new ReadableStream({ start(c) { mando = c; } });
+  const respuesta = new Response(cuerpo, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+
+  return {
+    respuesta,
+    emitir: (evento) => mando.enqueue(enc.encode(`data: ${JSON.stringify(evento)}\n\n`)),
+    cerrar: () => mando.close(),
+  };
+}
+
+/**
+ * Backend cuyo POST responde distinto en cada llamada, para encadenar «esta
+ * consulta se quedó a medias» con «la siguiente sí contestó».
+ */
+function backendPorTurnos(respuestas) {
+  enviados = [];
+  return vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+    if (!init || init.method !== "POST") {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, habilitado: true }), { status: 200 }));
+    }
+    enviados.push(JSON.parse(init.body));
+    return Promise.resolve(respuestas[enviados.length - 1]);
+  });
+}
+
+/**
  * Simula el backend: el GET dice si hay asistente, el POST devuelve el flujo.
  * @param {object} opciones
  * @param {boolean} opciones.habilitado
@@ -155,6 +191,30 @@ describe("una respuesta", () => {
     await waitFor(() => expect(screen.getByText("Leyó el historiador")).toBeTruthy());
   });
 
+  it("dice también CON QUÉ se consultó: máquina y período", async () => {
+    backend({
+      habilitado: true,
+      eventos: [
+        {
+          tipo: "herramienta",
+          nombre: "datos_de_maquina",
+          argumentos: { maquina: "Línea 1", periodo: "ayer" },
+        },
+        { tipo: "texto", delta: "62,4 %." },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+      ],
+    });
+    montar();
+    await preguntar("¿OEE de la Línea 1 ayer?");
+
+    // Saber que leyó el historiador no distingue una respuesta correcta de
+    // una en la que el modelo entendió otra máquina u otro día. Los
+    // argumentos con los que llamó a la herramienta sí.
+    await waitFor(() =>
+      expect(screen.getByText("Leyó el historiador · Línea 1 · ayer")).toBeTruthy()
+    );
+  });
+
   it("una respuesta BLOQUEADA se anuncia (llama-server sin --jinja)", async () => {
     backend({
       habilitado: true,
@@ -229,6 +289,34 @@ describe("una respuesta", () => {
     expect(roles).toEqual(["usuario"]);
   });
 
+  it("una respuesta cancelada a medias NO entra en el hilo", async () => {
+    const enCurso = flujoAbierto();
+    backendPorTurnos([
+      enCurso.respuesta,
+      flujo([
+        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "texto", delta: "Fue del 58,1 %." },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+      ]),
+    ]);
+    montar();
+
+    await preguntar("¿OEE de la Línea 1 ayer?");
+    enCurso.emitir({ tipo: "texto", delta: "El OEE fue del 6" });
+    await waitFor(() => expect(screen.getByText(/El OEE fue del 6/)).toBeTruthy());
+
+    fireEvent.click(screen.getByText("Cancelar"));
+    await waitFor(() => expect(screen.getByText(/quedó a medias/i)).toBeTruthy());
+
+    await preguntar("¿y anteayer?");
+    await waitFor(() => expect(enviados.length).toBe(2));
+
+    // «El OEE fue del 6» es media cifra. Recordarla como respuesta es
+    // ofrecerle al modelo un 6 para que lo cite en el turno siguiente.
+    const roles = enviados[1].historial.map((t) => t.rol);
+    expect(roles).toEqual(["usuario"]);
+  });
+
   it("mientras espera ofrece cancelar, no una barra muda", async () => {
     // Un POST que no resuelve: es el estado «esperando al modelo», que con
     // este hardware dura entre 30 y 90 segundos.
@@ -244,5 +332,94 @@ describe("una respuesta", () => {
 
     await waitFor(() => expect(screen.getByText("Cancelar")).toBeTruthy());
     expect(screen.getByText("Enviando…")).toBeTruthy();
+  });
+});
+
+describe("cuando la espera se tuerce", () => {
+  it("cancelar no se cuenta como fallo, y deja repetir la pregunta", async () => {
+    const enCurso = flujoAbierto();
+    backendPorTurnos([
+      enCurso.respuesta,
+      flujo([
+        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "texto", delta: "Fue del 61,9 %." },
+        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+      ]),
+    ]);
+    montar();
+
+    await preguntar("¿OEE de la Línea 1 ayer?");
+    await waitFor(() => expect(screen.getByText("Cancelar")).toBeTruthy());
+    fireEvent.click(screen.getByText("Cancelar"));
+
+    // Es una decisión del usuario: se cuenta en gris y sin triángulo de
+    // aviso, que es el lenguaje de «algo se ha roto».
+    await waitFor(() => expect(screen.getByText("Cancelaste la consulta.")).toBeTruthy());
+
+    // Y los tres finales malos —cancelar, el 409 de otra pantalla, el corte
+    // por tiempo— se arreglan repitiendo, no reescribiendo a mano.
+    fireEvent.click(screen.getByText("Reintentar"));
+    await waitFor(() => expect(enviados.length).toBe(2));
+
+    expect(enviados[1].pregunta).toBe("¿OEE de la Línea 1 ayer?");
+    expect(screen.getAllByText("¿OEE de la Línea 1 ayer?").length).toBe(1);
+    await waitFor(() => expect(screen.getByText(/61,9/)).toBeTruthy());
+  });
+
+  it("si la respuesta llega con el panel cerrado, el botón lo avisa", async () => {
+    const enCurso = flujoAbierto();
+    backendPorTurnos([enCurso.respuesta]);
+    montar();
+
+    await preguntar();
+    await waitFor(() => expect(screen.getByText("Cancelar")).toBeTruthy());
+
+    // Cerrar y volver al tablero durante minuto y medio de espera es lo
+    // natural; sin aviso, la respuesta se queda ahí sin que nadie la lea.
+    fireEvent.click(screen.getByLabelText("Cerrar el asistente"));
+    enCurso.emitir({ tipo: "texto", delta: "62,4 %." });
+    enCurso.emitir({ tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false });
+    enCurso.cerrar();
+
+    expect(await screen.findByLabelText(/La respuesta está lista/)).toBeTruthy();
+  });
+});
+
+describe("los ejemplos", () => {
+  it("pulsar uno manda esa pregunta", async () => {
+    backend({
+      habilitado: true,
+      eventos: [
+        { tipo: "herramienta", nombre: "estado_de_planta" },
+        { tipo: "texto", delta: "La planta va al 58 %." },
+        { tipo: "fin", herramienta: "estado_de_planta", bloqueada: false },
+      ],
+    });
+    montar();
+    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+
+    // Parece un botón de preguntar: pedir un segundo gesto para lo que ya se
+    // había pulsado sobra.
+    fireEvent.click(screen.getByText("¿Cómo va la planta ahora mismo?"));
+
+    await waitFor(() => expect(enviados.length).toBe(1));
+    expect(enviados[0].pregunta).toBe("¿Cómo va la planta ahora mismo?");
+    await waitFor(() => expect(screen.getByText(/58 %/)).toBeTruthy());
+  });
+
+  it("no tira lo que estuvieras escribiendo", async () => {
+    backend({ habilitado: true, eventos: [{ tipo: "fin", herramienta: null, bloqueada: false }] });
+    montar();
+    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+
+    const campo = screen.getByLabelText("Escribe tu pregunta");
+    fireEvent.change(campo, { target: { value: "¿OEE de la Línea 1 el" } });
+    fireEvent.click(screen.getByText("¿Está operando la Línea 1?"));
+
+    await waitFor(() => expect(enviados.length).toBe(1));
+    expect(enviados[0].pregunta).toBe("¿Está operando la Línea 1?");
+    // La pregunta que va es la del ejemplo, pero tirar lo que alguien estaba
+    // escribiendo no es asunto de un botón de ayuda.
+    expect(campo.value).toBe("¿OEE de la Línea 1 el");
   });
 });

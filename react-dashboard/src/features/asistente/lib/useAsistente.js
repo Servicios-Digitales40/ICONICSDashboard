@@ -25,7 +25,10 @@ const nuevoTurno = () => ({
   rol: "asistente",
   texto: "",
   herramienta: null,
+  argumentos: null,
   bloqueada: false,
+  sinRespuesta: false,
+  cancelado: false,
   error: null,
 });
 
@@ -38,19 +41,23 @@ const nuevoTurno = () => ({
  * este. El texto basta para entender el hilo y no se confunde con un dato
  * recién leído.
  *
- * Quedan fuera dos clases de turno, y por el mismo motivo: son turnos en los
- * que **decidimos no dar una respuesta**, así que recordarlos como si la
- * hubiéramos dado es contradecirse.
+ * Quedan fuera tres clases de turno, y por el mismo motivo: son turnos en los
+ * que **no llegó a haber respuesta**, así que recordarlos como si la hubiera
+ * habido es contradecirse.
  *
  *  - Los bloqueados, donde el modelo intentó recitar de memoria.
  *  - Los que acabaron en error.
+ *  - Los cancelados. Aunque hubieran alcanzado a escribir media frase: una
+ *    respuesta cortada por la mitad acaba a menudo dentro de una cifra («el
+ *    OEE fue del 6»), y esa cifra a medias es justo lo que el modelo citaría
+ *    en el turno siguiente como si fuera un dato.
  *
  * El recorte por número de turnos lo hace el servidor, que es quien sabe lo
  * que cuesta cada uno.
  */
 function historialParaEnviar(mensajes) {
   return mensajes
-    .filter((m) => m.texto?.trim() && !m.bloqueada && !m.error)
+    .filter((m) => m.texto?.trim() && !m.bloqueada && !m.error && !m.cancelado)
     .map((m) => ({ rol: m.rol, texto: m.texto }));
 }
 
@@ -96,29 +103,30 @@ export function useAsistente() {
     });
   }, []);
 
+  /**
+   * Cancelar NO es un fallo: es una decisión del usuario, y marcarla como
+   * error la pinta en rojo con un triángulo de aviso, que es el lenguaje de
+   * «algo se ha roto». Va en su propia bandera para que el panel pueda
+   * contarla en gris — y para que el turno quede fuera del hilo.
+   */
   const cancelar = useCallback(() => {
     abortador.current?.abort();
     abortador.current = null;
     setOcupado(false);
     setEstado(null);
-    actualizarUltimo((m) => ({
-      texto: m.texto,
-      error: m.texto ? null : "Consulta cancelada.",
-    }));
+    actualizarUltimo(() => ({ cancelado: true }));
   }, [actualizarUltimo]);
 
-  const preguntar = useCallback(
-    async (pregunta) => {
-      const limpia = String(pregunta ?? "").trim();
-      if (!limpia || ocupado) return;
-
+  /**
+   * La consulta en sí. Da por hecho que el último mensaje ya es el turno
+   * vacío del asistente: quien llama decide cómo llegó ahí, que es lo único
+   * que distingue preguntar de reintentar.
+   */
+  const correr = useCallback(
+    async (pregunta, historial) => {
       const control = new AbortController();
       abortador.current = control;
 
-      // El hilo se toma ANTES de añadir el turno nuevo, que aún está vacío.
-      const historial = historialParaEnviar(mensajes);
-
-      setMensajes((previos) => [...previos, { rol: "usuario", texto: limpia }, nuevoTurno()]);
       setOcupado(true);
       setEstado("Enviando…");
 
@@ -126,7 +134,7 @@ export function useAsistente() {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta: limpia, historial }),
+          body: JSON.stringify({ pregunta, historial }),
           signal: control.signal,
         });
 
@@ -140,8 +148,20 @@ export function useAsistente() {
         await leerFlujo(respuesta, {
           onEstado: (valor) => vivo.current && setEstado(valor),
           onTexto: (delta) => actualizarUltimo((m) => ({ texto: m.texto + delta })),
-          onHerramienta: (nombre) => actualizarUltimo(() => ({ herramienta: nombre })),
-          onFin: (fin) => actualizarUltimo(() => ({ bloqueada: Boolean(fin.bloqueada) })),
+          // Los argumentos viajan con la herramienta y se guardan enteros: son
+          // lo que convierte «leyó el historiador» en «leyó el historiador de
+          // la Línea 1 el 25 de marzo», que es lo que deja ver que el modelo
+          // entendió otra máquina o otro día.
+          onHerramienta: (nombre, argumentos) =>
+            actualizarUltimo(() => ({ herramienta: nombre, argumentos: argumentos ?? null })),
+          // `sinRedactar` sin herramienta es el callejón sin salida del
+          // servidor: no supo qué contestar. Con herramienta significa otra
+          // cosa —el backend resumió el dato él mismo— y esa sí es respuesta.
+          onFin: (fin) =>
+            actualizarUltimo(() => ({
+              bloqueada: Boolean(fin.bloqueada),
+              sinRespuesta: Boolean(fin.sinRedactar) && !fin.herramienta,
+            })),
           onError: (mensaje) => actualizarUltimo(() => ({ error: mensaje })),
         });
       } catch (error) {
@@ -154,18 +174,67 @@ export function useAsistente() {
           setOcupado(false);
           setEstado(null);
         }
-        abortador.current = null;
+        // Solo se borra el abortador si sigue siendo el DE ESTA consulta.
+        // Cancelar y reintentar en seguida deja dos `correr` solapados un
+        // instante, y el que muere borrando la referencia del que acaba de
+        // nacer dejaría al botón «Cancelar» sin nada que abortar: la pantalla
+        // diría que se canceló y la GPU seguiría generando tokens.
+        if (abortador.current === control) abortador.current = null;
       }
     },
-    [ocupado, mensajes, actualizarUltimo]
+    [actualizarUltimo]
   );
+
+  const preguntar = useCallback(
+    (pregunta) => {
+      const limpia = String(pregunta ?? "").trim();
+      if (!limpia || ocupado) return;
+
+      // El hilo se toma ANTES de añadir el turno nuevo, que aún está vacío.
+      const historial = historialParaEnviar(mensajes);
+
+      setMensajes((previos) => [...previos, { rol: "usuario", texto: limpia }, nuevoTurno()]);
+      correr(limpia, historial);
+    },
+    [ocupado, mensajes, correr]
+  );
+
+  /**
+   * Repite la última pregunta cuando su turno acabó en nada.
+   *
+   * Existe porque los tres finales malos —el 409 de otra pantalla, el corte
+   * por tiempo y la cancelación— son de los que se arreglan volviendo a
+   * intentarlo, y sin esto hay que reescribir la pregunta a mano después de
+   * haber esperado minuto y medio.
+   *
+   * Solo se reintenta el ÚLTIMO turno: más atrás habría que decidir qué pasa
+   * con lo que vino después, y la respuesta honesta —tirarlo— no es la que
+   * espera quien pulsa un botón que dice «reintentar».
+   */
+  const reintentar = useCallback(() => {
+    if (ocupado) return;
+
+    const n = mensajes.length;
+    const fallido = mensajes[n - 1];
+    const pregunta = mensajes[n - 2];
+
+    if (!fallido || fallido.rol !== "asistente" || !(fallido.error || fallido.cancelado)) return;
+    if (!pregunta || pregunta.rol !== "usuario") return;
+
+    // El hilo se toma sin la pregunta que se repite —viaja aparte— y sin el
+    // turno fallido, que no es historia de nada.
+    const historial = historialParaEnviar(mensajes.slice(0, n - 2));
+
+    setMensajes((previos) => [...previos.slice(0, -1), nuevoTurno()]);
+    correr(pregunta.texto, historial);
+  }, [ocupado, mensajes, correr]);
 
   const limpiar = useCallback(() => {
     if (ocupado) return;
     setMensajes([]);
   }, [ocupado]);
 
-  return { disponible, mensajes, estado, ocupado, preguntar, cancelar, limpiar };
+  return { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar };
 }
 
 /**
@@ -203,7 +272,7 @@ async function leerFlujo(respuesta, manejadores) {
 
       if (evento.tipo === "estado") manejadores.onEstado(evento.valor);
       else if (evento.tipo === "texto") manejadores.onTexto(evento.delta);
-      else if (evento.tipo === "herramienta") manejadores.onHerramienta(evento.nombre);
+      else if (evento.tipo === "herramienta") manejadores.onHerramienta(evento.nombre, evento.argumentos);
       else if (evento.tipo === "fin") manejadores.onFin(evento);
       else if (evento.tipo === "error") manejadores.onError(evento.mensaje);
     }
@@ -212,9 +281,49 @@ async function leerFlujo(respuesta, manejadores) {
 
 /** Nombre técnico de la herramienta → lo que se le enseña al operador. */
 export const ETIQUETA_HERRAMIENTA = {
-  listar_maquinas: "Consultó el catálogo de máquinas",
   estado_de_planta: "Leyó la planta entera de ICONICS",
   estado_actual: "Leyó el estado en vivo de ICONICS",
   datos_de_maquina: "Leyó el historiador",
   comparar_periodos: "Comparó dos períodos del historiador",
 };
+
+/**
+ * Con qué se hizo la consulta: máquina, período, métrica.
+ *
+ * ── POR QUÉ SE ENSEÑA EL TEXTO CRUDO ───────────────────────────────
+ *
+ * Estos valores los eligió el MODELO al llamar a la herramienta, y se pintan
+ * tal cual, sin embellecer. Decir «Leyó el historiador» no permite distinguir
+ * una respuesta correcta de una en la que el modelo entendió otra máquina u
+ * otro día; decir «Leyó el historiador · Línea 2 · ayer» cuando se preguntó
+ * por la Línea 1 lo delata de un vistazo. Traducir o normalizar aquí lo que
+ * pidió el modelo taparía justo el error que esta línea existe para enseñar.
+ *
+ * El período se ve como lo mandó —«ayer», «turno de la mañana»— porque quien
+ * lo resuelve a fechas es el servidor, dentro de la herramienta, y esa fecha
+ * ya resuelta no viaja en el flujo.
+ */
+export function describirConsulta(nombre, argumentos) {
+  if (!argumentos || typeof argumentos !== "object") return [];
+
+  const leer = (v) => (typeof v === "string" || typeof v === "number" ? String(v).trim() : "");
+  const partes = [];
+
+  const maquina = leer(argumentos.maquina);
+  if (maquina) partes.push(maquina);
+
+  if (nombre === "comparar_periodos") {
+    const a = leer(argumentos.periodoA);
+    const b = leer(argumentos.periodoB);
+    if (a && b) partes.push(`${a} vs. ${b}`);
+    else if (a || b) partes.push(a || b);
+  } else {
+    const periodo = leer(argumentos.periodo);
+    if (periodo) partes.push(periodo);
+  }
+
+  const metrica = leer(argumentos.metrica);
+  if (metrica) partes.push(metrica);
+
+  return partes;
+}
