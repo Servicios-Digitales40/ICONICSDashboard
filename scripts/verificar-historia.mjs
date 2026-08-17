@@ -41,7 +41,7 @@
  *
  * Código de salida: 0 si el historiador entrega datos, 1 si no.
  */
-import { AREAS, historyPointName, TAGS } from "../react-dashboard/src/lib/iconics/tagCatalog.js";
+import { AREAS, historyPointName, TAGS } from "../shared/tagCatalog.js";
 
 const API_BASE = (process.env.API_BASE ?? "http://localhost:3001").replace(/\/+$/, "");
 const TODAS = process.env.TODAS === "1";

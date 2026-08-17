@@ -10,9 +10,12 @@ import { createRateLimiter } from './http/rateLimit.mjs'
 import { createRouter } from './http/router.mjs'
 import { sendError, sendText } from './http/responses.mjs'
 import { createStaticFileServer, isAssetPath } from './http/staticFiles.mjs'
+import { createChat } from './ia/chat.mjs'
+import { createHerramientas } from './ia/herramientas.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
 import { logger } from './logger.mjs'
+import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
 
@@ -31,9 +34,23 @@ export function createApp(config) {
     trustProxy: config.trustProxy,
   })
 
+  // El asistente se monta siempre, pero sin `IA_BASE` sus rutas responden
+  // 503 diciendo qué falta. Montarlo solo cuando está configurado dejaría
+  // `/api/chat` cayendo al respaldo de la SPA, que devuelve el index.html con
+  // un 200: el frontend creería que el asistente existe y que su respuesta es
+  // una página HTML. Es el mismo motivo por el que la escritura en modo solo
+  // lectura responde 403 y no 404.
+  const herramientas = createHerramientas({
+    client,
+    maquinasConHistoria: config.ia.maquinasConHistoria,
+    turnos: config.ia.turnos,
+  })
+  const chat = createChat({ config, herramientas })
+
   const router = createRouter()
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
   registerIconicsRoutes(router, { config, client })
+  registerChatRoutes(router, { config, chat })
 
   async function route(request, response) {
     if (!request.url) {

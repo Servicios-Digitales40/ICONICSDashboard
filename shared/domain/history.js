@@ -7,11 +7,14 @@
  *
  *  - Factores (`OEE`, `OEE_Disp`, `OEE_Rend`, `OEE_Cal`): porcentajes
  *    instantáneos, cuyo resumen del día es la media.
- *  - Contadores (`Pz_OK`, `Pz_NOK`, `T_Muerto_Ico`): se acumulan y se
- *    reinician con el día, así que su resumen es el cierre y no la media.
+ *  - Contadores (`Pz_OK`, `Pz_NOK`, `T_Muerto_Ico`): se acumulan y **se
+ *    reinician con el turno**, así que su total del día es la suma de los
+ *    incrementos de cada tramo. Ese total llega ya resuelto en `cierre`; lo
+ *    calcula `totalDelDia()` en `shared/historia.js`, y NO es el último valor
+ *    de la serie —que serían solo las piezas del último turno—.
  *
  * Ambas salen de la misma lectura del historiador; lo que cambia es cómo se
- * reducen, y por eso el `cierre` llega ya resuelto por el transporte.
+ * reducen.
  *
  * Una hora sin muestra no cuenta como cero: se ignora en la media y se refleja
  * en `muestras`. Sin ninguna muestra el resumen entero es `null`, para poder
@@ -33,7 +36,7 @@ const red1 = (v) => (hasValue(v) ? +v.toFixed(1) : null);
  * Resumen de un día a partir de lo leído del historiador.
  *
  * @param {object[]} serie  filas horarias { t, disponibilidad, rendimiento, calidad, oee }
- * @param {object} cierre   valores de cierre del día { aprobadas, rechazadas, tMuerto }
+ * @param {object} cierre   totales del día { aprobadas, rechazadas, tMuerto }
  * @returns {object|null}   misma forma que una `Machine` en vivo, o `null` sin datos
  */
 export function daySummary(serie = [], cierre = {}) {

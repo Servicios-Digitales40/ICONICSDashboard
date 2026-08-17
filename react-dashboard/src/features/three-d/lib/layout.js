@@ -23,7 +23,7 @@
  * Ejes: X a la derecha, Z hacia el observador. Unidades: metros de la escena,
  * no de la planta. `rotY` en radianes.
  */
-import { listMachines } from "@/lib/iconics/tagCatalog.js";
+import { listMachines } from "@shared/tagCatalog.js";
 
 /**
  * Escala de cada máquina en la maqueta.

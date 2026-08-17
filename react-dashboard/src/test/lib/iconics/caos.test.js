@@ -28,8 +28,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CAOS_ALTO, CAOS_SUAVE, SIN_CAOS, createFakeTransport } from "@/lib/iconics/fakeTransport.js";
-import { RESUMEN_TAGS, listMachines, pointName } from "@/lib/iconics/tagCatalog.js";
-import { isGoodQuality } from "@/lib/iconics/quality.js";
+import { RESUMEN_TAGS, listMachines, pointName } from "@shared/tagCatalog.js";
+import { isGoodQuality } from "@shared/quality.js";
 
 afterEach(() => vi.unstubAllEnvs());
 

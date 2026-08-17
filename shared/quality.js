@@ -15,7 +15,8 @@
  * Un valor de mala calidad suele llegar como 0 en el valor, no en la calidad.
  * Si ese 0 entra en los agregados se promedia como una medición real y hunde
  * el OEE de la planta entera, así que la calidad se filtra en la frontera
- * (el adaptador de ICONICS) y nunca en las vistas.
+ * —el motor de sondeo en el frontend, la capa de herramientas en el backend—
+ * y nunca en las vistas ni en la respuesta del asistente.
  */
 
 /** OPC-DA "good" (expresiones del servidor y transporte falso). */

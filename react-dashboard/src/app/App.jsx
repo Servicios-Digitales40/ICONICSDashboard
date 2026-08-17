@@ -12,13 +12,31 @@
  * `app/routes/`, de donde también salen `NAV` para el Sidebar y `PAGE_META`
  * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
-import { Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
+
+/**
+ * El asistente va en su propio trozo, como la pila 3D y las propuestas.
+ *
+ * No hace falta en el primer pintado —el operador tiene que pulsar el botón
+ * para usarlo, y en un wallboard no lo pulsa nadie—, así que el arranque de
+ * la pantalla de Planta no debe pagarlo. Sin `lazy()` sumaba 7,5 KB al trozo
+ * `index`, que tiene techo comprobado en `scripts/verificar-bundle.mjs`.
+ *
+ * ⚠️ Se importa el COMPONENTE y no el barril `@/features/asistente`. Con el
+ * barril, Rollup nombra el trozo según su módulo de entrada —`index.js`— y
+ * genera un segundo `index-*.js` en `assets/`. `verificar-bundle.mjs` busca
+ * el trozo de arranque por ese prefijo y medía el que encontrara primero:
+ * daba 7 KB por bueno y el techo de 170 KB dejaba de comprobar nada.
+ */
+const Asistente = lazy(() =>
+  import("@/features/asistente/components/Asistente.jsx").then((m) => ({ default: m.Asistente }))
+);
 
 export default function App() {
   return (
@@ -102,6 +120,19 @@ function Shell() {
             </Suspense>
           </ErrorBoundary>
         </div>
+
+        {/* El asistente es estrictamente ADITIVO: se pinta solo si el servidor
+            tiene un modelo configurado, y va en su propia barrera de errores
+            para que un fallo suyo no se lleve por delante el tablero. Un
+            wallboard de planta tiene que seguir mostrando el OEE aunque el
+            chat reviente. */}
+        <ErrorBoundary etiqueta="Asistente">
+          {/* Sin respaldo visible: mientras se descarga su trozo no debe
+              aparecer ni un hueco ni un esqueleto encima del tablero. */}
+          <Suspense fallback={null}>
+            <Asistente />
+          </Suspense>
+        </ErrorBoundary>
       </div>
     </div>
   );

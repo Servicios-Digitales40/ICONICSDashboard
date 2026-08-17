@@ -24,7 +24,7 @@
  * que mirar.
  */
 import { calcOEE, createMachine } from "@/lib/domain/index.js";
-import { AREAS, listMachines } from "@/lib/iconics/tagCatalog.js";
+import { AREAS, listMachines } from "@shared/tagCatalog.js";
 import { MACHINES } from "@/lib/machines.js";
 import { PARO_PLANIFICADO_S, TURNO_S } from "@/lib/shiftModel.js";
 

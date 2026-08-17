@@ -9,7 +9,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { createPollingEngine } from "@/lib/iconics/pollingEngine.js";
-import { QUALITY_GOOD } from "@/lib/iconics/quality.js";
+import { QUALITY_GOOD } from "@shared/quality.js";
 import { CAOS_ALTO, SIN_CAOS, createFakeTransport } from "@/lib/iconics/fakeTransport.js";
 
 const P1 = "ac:RESONAC/LIN/1/OEE";

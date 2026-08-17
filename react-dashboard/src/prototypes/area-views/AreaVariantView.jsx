@@ -22,7 +22,7 @@ import { useState } from "react";
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { tieneDatos } from "@/lib/domain/index.js";
 import { useAreaData } from "@/lib/datasource";
-import { AREAS } from "@/lib/iconics/tagCatalog.js";
+import { AREAS } from "@shared/tagCatalog.js";
 import { getVariant } from "../machine-cards/variants.js";
 
 /** Las rutas de estas vistas siguen llamándose "area1"/"area2"; el dato no. */

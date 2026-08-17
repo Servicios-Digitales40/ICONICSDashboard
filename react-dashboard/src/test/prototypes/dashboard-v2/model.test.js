@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createMachine } from "@/lib/domain/index.js";
-import { listMachines } from "@/lib/iconics/tagCatalog.js";
+import { listMachines } from "@shared/tagCatalog.js";
 import { machinesDemo } from "../../fixtures/machinesDemo.js";
 import { atencion, buildV2Model, paretoRechazos, porArea } from "@/prototypes/dashboard-v2/model.js";
 

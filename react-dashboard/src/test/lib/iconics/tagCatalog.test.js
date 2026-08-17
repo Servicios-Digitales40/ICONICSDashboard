@@ -26,7 +26,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { AREAS, listMachines, machineKey, pointName, historyPointName } from "@/lib/iconics/tagCatalog.js";
+import { AREAS, listMachines, machineKey, pointName, historyPointName } from "@shared/tagCatalog.js";
 
 describe("las 10 máquinas reales", () => {
   it("son exactamente éstas, en este orden", () => {

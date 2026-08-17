@@ -9,7 +9,7 @@
  * eso llega a `buildPlantSummary`, contamina el resumen de toda la planta.
  */
 import { describe, expect, it } from "vitest";
-import { calcOEE, createMachine, hasValue, toNumber } from "@/lib/domain/machine.js";
+import { calcOEE, createMachine, hasValue, toNumber } from "@shared/domain/machine.js";
 
 const base = { id: "LIN/1", areaId: "LIN", machineId: "1", equipo: "Lineal 1" };
 

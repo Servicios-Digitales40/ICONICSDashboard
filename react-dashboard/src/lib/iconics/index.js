@@ -33,9 +33,9 @@ export {
   historyPointName,
   parsePointName,
   tagsForArea,
-} from "./tagCatalog.js";
+} from "@shared/tagCatalog.js";
 
-export { QUALITY_GOOD, isGoodQuality } from "./quality.js";
+export { QUALITY_GOOD, isGoodQuality } from "@shared/quality.js";
 export { createPollingEngine } from "./pollingEngine.js";
 export { createTransport, createRealTransport, esTransporteFalso } from "./transport.js";
 export { createFakeTransport, CAOS_SUAVE, CAOS_ALTO, SIN_CAOS } from "./fakeTransport.js";

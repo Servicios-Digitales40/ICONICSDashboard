@@ -11,7 +11,7 @@
  *   · un día sin muestras es `null`, no un día con ceros.
  */
 import { describe, expect, it } from "vitest";
-import { daySummary } from "@/lib/domain/history.js";
+import { daySummary } from "@shared/domain/history.js";
 
 const hora = (t, oee, d, r, c) => ({ t, oee, disponibilidad: d, rendimiento: r, calidad: c });
 

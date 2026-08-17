@@ -8,7 +8,7 @@
  * Usa tres motores con cadencias distintas, porque un único intervalo
  * obligaría a elegir entre gastar de más o refrescar de menos:
  *
- *  - resumen  · 15 s  · vistas de planta y de área
+ *  - resumen  · 3 s   · vistas de planta y de área
  *  - detalle  · 5 s   · solo la máquina abierta, con todos sus tags
  *  - estático · 5 min · Modelo, T_Disp_pot, T_Inac_plan
  *
@@ -23,10 +23,30 @@ import {
   listMachines,
   pointName,
   tagsForArea,
-} from "../iconics/tagCatalog.js";
+} from "@shared/tagCatalog.js";
 
+/**
+ * Cada cadencia está atada a una medida, no a un gusto:
+ *
+ *  - `resumen` (3 s) es lo que se mira desde la planta, así que manda la
+ *    sensación de "está vivo". El lote de las 10 máquinas —80 puntos— tarda
+ *    ~275 ms contra el servidor real, así que a 3 s el ciclo está ocupado un
+ *    10 % del tiempo y queda holgura de sobra para un pico.
+ *
+ *    El suelo NO es ese 275 ms, es `batchCacheTtlMs` del backend (2 s): las
+ *    lecturas en lote se cachean esa ventana para que diez wallboards sean
+ *    una sola llamada a ICONICS. Sondear por debajo de 2 s no trae dato más
+ *    nuevo, solo repite el cacheado. 3 s deja margen sobre ese suelo; si
+ *    alguna vez hace falta bajar más, hay que bajar las dos cosas a la vez.
+ *
+ *  - `detalle` (5 s) NO lo limita este número sino el servidor: su lote de 12
+ *    tags incluye `T_Ciclo_Calc` y `T_Ciclo_Teo`, que tardan 5,3 s en
+ *    resolverse y vuelven con calidad mala. Mientras esos dos tags sigan sin
+ *    configurar en AssetWorX, bajar este valor solo añade ciclos que la guarda
+ *    de petición en vuelo descarta.
+ */
 const CADENCIA = {
-  resumen: 15_000,
+  resumen: 3_000,
   detalle: 5_000,
   estatico: 300_000,
 };
