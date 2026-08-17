@@ -50,7 +50,7 @@
  * propuestas sin ofrecer además datos falsos. Ver docs/PLAN-5-DOS-ORIGENES.md.
  */
 import { lazy } from "react";
-import { Box, Cog, Factory, FlaskConical, Gauge, Boxes, LayoutDashboard, Palette, Sparkles, LayoutPanelTop, Radar } from "lucide-react";
+import { Box, Cog, Droplets, Factory, FlaskConical, Gauge, Boxes, LayoutDashboard, Palette, Sparkles, LayoutPanelTop, Radar } from "lucide-react";
 
 import { PROTOTIPOS_HABILITADOS } from "@/lib/flags.js";
 import { Dashboard } from "@/features/dashboard";
@@ -103,16 +103,69 @@ const Rectificadoras = (props) => <AreaView {...props} areaId="REC" />;
 /** Azúcar para no repetir el `lazy(() => import(...))` doce veces. */
 const propuesta = (importar) => lazy(importar);
 
-/** Ruta que se muestra al arrancar la app. */
-export const DEFAULT_ROUTE = "dashboard";
+/* ==================================================================
+ * MODO «SÓLO DEMO EVA»
+ * ==================================================================
+ * Con esto en `true`, el sidebar enseña **únicamente** la sección «Demo EVA»:
+ * se ocultan «Planta», «Vistas Resonac», «3D» y «Assets».
+ *
+ * ── QUÉ ES OCULTAR, Y QUÉ NO ES ────────────────────────────────────
+ *
+ * Es quitar el `nav`, que es el mecanismo que este archivo ya usa para
+ * `machine-detail`: **la ruta sigue existiendo y sigue funcionando**. Se llega
+ * escribiendo su id en la barra de direcciones (`?page=dashboard`) y la
+ * navegación entre vistas sigue intacta —la rejilla de la maqueta de Resonac
+ * sigue abriendo el detalle de máquina—. No se borra nada.
+ *
+ * Eso importa por dos motivos:
+ *
+ *  1. Es reversible en un carácter. Volver al tablero completo es poner esto en
+ *     `false`, no reconstruir seis entradas de menú.
+ *  2. Las vistas de Resonac siguen siendo la referencia de UI/UX del proyecto y
+ *     se pueden seguir abriendo para compararlas contra Demo EVA.
+ *
+ * ── POR QUÉ UN INTERRUPTOR Y NO BORRAR SEIS `nav` ──────────────────
+ *
+ * Seis ediciones sueltas no dicen que sean la misma decisión, y la primera vez
+ * que alguien añada una ruta a Resonac volverá a aparecer en el menú sin que
+ * nadie lo haya decidido. Con el filtro, cualquier ruta nueva queda oculta
+ * mientras el modo esté puesto, que es lo que la decisión significa.
+ *
+ * Se aplica también a las propuestas de `src/prototypes/`: con la bandera de
+ * prototipos encendida, dejar «A1 · Aurora Hero» en el menú sin «Lineales»
+ * delante no sería esconder la sección, sería descuartizarla.
+ *
+ * ── LO QUE NO SE PUEDE OLVIDAR AL PONERLO ──────────────────────────
+ *
+ * `DEFAULT_ROUTE`. Arrancar en una ruta sin `nav` deja la aplicación abierta en
+ * una vista que no está en el menú, sin ninguna entrada resaltada: se lee como
+ * que el sidebar está roto. Por eso la ruta por defecto se deriva de aquí y no
+ * se escribe dos veces.
+ */
+export const SOLO_DEMO_EVA = true;
+
+/** ¿Pertenece esta ruta a la sección Demo EVA? */
+const esDemoEva = (id) => id.startsWith("eva-");
+
+/**
+ * Ruta que se muestra al arrancar la app.
+ *
+ * Se deriva del modo para que no puedan quedar en desacuerdo. Ver arriba.
+ */
+export const DEFAULT_ROUTE = SOLO_DEMO_EVA ? "eva-planta" : "dashboard";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
 export const NAV_GROUPS = {
   "vistas-resonac": { label: "Vistas Resonac", icon: <FlaskConical size={17} /> },
   "3d": { label: "3D", icon: <Box size={17} /> },
+  "demo-eva": { label: "Demo EVA", icon: <Droplets size={17} /> },
 };
 
-export const ROUTES = [
+/**
+ * El registro completo. `ROUTES` es lo que sale de aplicarle el modo de arriba;
+ * las dos listas tienen las MISMAS rutas y sólo cambia qué se ve en el menú.
+ */
+const ROUTES_COMPLETAS = [
   {
     id: "dashboard",
     component: Dashboard,
@@ -298,6 +351,65 @@ export const ROUTES = [
     nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "3d" },
   },
 
+  /* ---- Grupo «Demo EVA» ------------------------------------------ */
+  /*
+   * La demo de SISTEMAS DE AGUA INDUSTRIAL, sobre `ac:TDCON/DEMO/SENSORES/`.
+   * Todo su código vive en `src/Demo-EVA/`. Ver docs/PLAN-8-DEMO-EVA.md.
+   *
+   * ── POR QUÉ NO VA DETRÁS DE `VITE_ENABLE_PROTOTYPES` ──────────────
+   *
+   * Por el mismo criterio con el que las vistas 3D salieron de esa bandera: las
+   * propuestas de `src/prototypes/` son variantes de diseño que COMPITEN contra
+   * una pantalla existente y de las que hay que elegir una. Demo EVA no
+   * sustituye a nada — es una instalación distinta, con sus propios tags reales
+   * en el mismo servidor.
+   *
+   * ── POR QUÉ LAS CUATRO VAN CON `lazy()`, Y NO SÓLO LAS DE 3D ──────
+   *
+   * En «3D» el `lazy()` protege del peso de three.js. Aquí protege de algo más
+   * simple: **el arranque de Planta no debe pagar NADA de Demo EVA**. Con las
+   * dos vistas 2D importadas de forma estática, su dominio, sus tiles y su
+   * fuente de datos entrarían en el trozo `index`, que tiene techo comprobado en
+   * `scripts/verificar-bundle.mjs`, a cambio de nada: quien abre el tablero de
+   * Resonac no las va a ver.
+   *
+   * Se importa el ARCHIVO de cada vista y no un barril del módulo: un `lazy()`
+   * sobre un `index.js` hace que Rollup nombre el trozo según su módulo de
+   * entrada y genere un segundo `index-*.js`, que es exactamente lo que dejó de
+   * medir el presupuesto del arranque cuando pasó con el asistente.
+   */
+  {
+    id: "eva-planta",
+    component: lazy(() => import("@/Demo-EVA/views/PlantaEva.jsx")),
+    title: "Demo EVA · Planta",
+    sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
+    nav: { label: "Planta", icon: <LayoutDashboard size={16} />, group: "demo-eva" },
+  },
+
+  {
+    id: "eva-maquina-3d",
+    component: lazy(() => import("@/Demo-EVA/views/EquipoEva3D.jsx")),
+    title: "Demo EVA · Máquina 3D",
+    sub: "El grupo de bombeo se comporta según el estado derivado de sus señales",
+    nav: { label: "Máquina 3D", icon: <Cog size={16} />, group: "demo-eva" },
+  },
+
+  {
+    id: "eva-maqueta",
+    component: lazy(() => import("@/Demo-EVA/views/MaquetaEva3D.jsx")),
+    title: "Demo EVA · Maqueta 3D",
+    sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
+    nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "demo-eva" },
+  },
+
+  {
+    id: "eva-assets",
+    component: lazy(() => import("@/Demo-EVA/views/AssetsEva.jsx")),
+    title: "Demo EVA · Assets",
+    sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
+    nav: { label: "Assets", icon: <Boxes size={16} />, group: "demo-eva" },
+  },
+
   // Banco de pruebas: todas las variantes juntas, para compararlas de un
   // vistazo en vez de saltando entre rutas.
   ...(PROTOTIPOS_HABILITADOS ? [
@@ -331,3 +443,19 @@ export const ROUTES = [
     sub: "Métricas y estado del equipo seleccionado",
   },
 ];
+
+/**
+ * El registro que consume la aplicación.
+ *
+ * En modo «sólo Demo EVA» se le quita el `nav` a todo lo que no sea de esa
+ * sección. La ruta se conserva entera —mismo id, mismo componente, mismo
+ * título— así que sigue siendo navegable; lo único que desaparece es su entrada
+ * de menú. Ver la cabecera de `SOLO_DEMO_EVA`.
+ *
+ * Se construye con `map` y no mutando la lista de arriba: `ROUTES_COMPLETAS`
+ * tiene que seguir siendo legible como lo que la aplicación PUEDE enseñar,
+ * independientemente de lo que hoy enseñe.
+ */
+export const ROUTES = SOLO_DEMO_EVA
+  ? ROUTES_COMPLETAS.map((r) => (esDemoEva(r.id) ? r : { ...r, nav: undefined }))
+  : ROUTES_COMPLETAS;

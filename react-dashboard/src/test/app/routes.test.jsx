@@ -62,6 +62,23 @@ const ES_PROPUESTA = (id) =>
  */
 const ES_3D = (id) => id === "maquina-3d" || id === "maqueta-3d";
 
+/**
+ * Las cuatro subvistas de «Demo EVA», la demo de sistemas de agua sobre
+ * `ac:TDCON/DEMO/SENSORES/`. Ver docs/PLAN-8-DEMO-EVA.md.
+ *
+ * Van en los DOS builds y **no** dependen de la bandera de prototipos, por el
+ * mismo criterio que sacó de ella a las vistas 3D: una propuesta COMPITE contra
+ * una pantalla existente y hay que elegir una; Demo EVA no sustituye a nada —es
+ * otra instalación, con sus propios tags reales en el mismo servidor—.
+ *
+ * Lo que sí comparten con las 3D es que las cuatro se registran con `lazy()`,
+ * aquí no por el peso de three.js sino para que el arranque de Planta no pague
+ * ni el dominio ni los tiles de una sección que no va a abrir. Eso lo comprueba
+ * `scripts/verificar-bundle.mjs` sobre el `dist`; esta prueba sólo cubre qué
+ * rutas existen.
+ */
+const ES_EVA = (id) => id.startsWith("eva-");
+
 /** Todo lo que la bandera de prototipos AÑADE sobre el build de planta. */
 const ES_SOLO_PROTOTIPOS = ES_PROPUESTA;
 
@@ -77,10 +94,58 @@ describe("superficie de la aplicación", () => {
       "area-REC",
       "maquina-3d",
       "maqueta-3d",
+      "eva-planta",
+      "eva-maquina-3d",
+      "eva-maqueta",
+      "eva-assets",
       "assets",
       "machine-detail",
     ]);
     expect(ids.filter(ES_SOLO_PROTOTIPOS)).toEqual([]);
+  });
+
+  it("la sección «Demo EVA» está entera en los dos builds", async () => {
+    // Las cuatro subvistas, no tres. Si alguien esconde una detrás de una
+    // bandera, aquí se ve — y el sitio de esa decisión sería el catálogo de
+    // señales o los umbrales, no el registro de rutas.
+    for (const proto of [false, true]) {
+      expect((await rutasCon(proto)).filter(ES_EVA), `prototipos=${proto}`).toEqual([
+        "eva-planta",
+        "eva-maquina-3d",
+        "eva-maqueta",
+        "eva-assets",
+      ]);
+    }
+  });
+
+  it("«Demo EVA» arma un grupo del sidebar con sus cuatro hijos", async () => {
+    // `buildNav` LANZA si una ruta referencia un grupo que no está declarado en
+    // NAV_GROUPS, y ese fallo sólo aparece al importar el registro. Comprobarlo
+    // aquí lo convierte en un fallo de la suite y no en una pantalla en blanco.
+    vi.resetModules();
+    vi.stubEnv("VITE_ENABLE_PROTOTYPES", "");
+    const { NAV } = await import("@/app/routes/index.js");
+
+    const grupo = NAV.find((n) => n.group === "demo-eva");
+    expect(grupo, "no hay grupo «demo-eva» en el sidebar").toBeTruthy();
+    expect(grupo.label).toBe("Demo EVA");
+    expect(grupo.children.map((c) => c.id)).toEqual([
+      "eva-planta",
+      "eva-maquina-3d",
+      "eva-maqueta",
+      "eva-assets",
+    ]);
+  });
+
+  it("«Demo EVA» sale detrás de la sección 3D y delante de Assets", async () => {
+    // `buildNav` coloca un grupo en la posición de su primer hijo, así que el
+    // orden de declaración decide dónde aparece la sección en el sidebar.
+    for (const proto of [false, true]) {
+      const ids = await rutasCon(proto);
+      const primerEva = ids.findIndex(ES_EVA);
+      expect(primerEva, `prototipos=${proto}`).toBeGreaterThan(ids.indexOf("maqueta-3d"));
+      expect(primerEva, `prototipos=${proto}`).toBeLessThan(ids.indexOf("assets"));
+    }
   });
 
   it("la sección 3D está entera en los dos builds", async () => {
@@ -143,5 +208,73 @@ describe("superficie de la aplicación", () => {
     const conProto = (await rutasCon(true)).filter((id) => !ES_SOLO_PROTOTIPOS(id));
 
     expect(conProto).toEqual(planta);
+  });
+});
+
+/**
+ * El modo «sólo Demo EVA» de `routes.jsx`: el sidebar enseña únicamente esa
+ * sección, y las demás rutas quedan ocultas pero VIVAS.
+ *
+ * ── POR QUÉ SE PRUEBA ──────────────────────────────────────────────
+ *
+ * Es una decisión de superficie que se toma con una constante, y las dos formas
+ * de romperla son silenciosas:
+ *
+ *  - Añadir una ruta a Resonac y que reaparezca en el menú sin que nadie lo
+ *    decida. El filtro lo impide, pero sólo mientras el filtro exista.
+ *  - Ocultar de más: convertir «esconder» en «borrar» y dejar sin destino a la
+ *    navegación interna —la rejilla de la maqueta, que abre `machine-detail`—.
+ */
+describe("modo «sólo Demo EVA»", () => {
+  async function registro(prototipos = false) {
+    vi.resetModules();
+    vi.stubEnv("VITE_ENABLE_PROTOTYPES", prototipos ? "true" : "");
+    const rutas = await import("@/app/routes/routes.jsx");
+    const indice = await import("@/app/routes/index.js");
+    return { ...rutas, ...indice };
+  }
+
+  it("el sidebar enseña «Demo EVA» y nada más, con la bandera de prototipos puesta o no", async () => {
+    for (const proto of [false, true]) {
+      const { NAV, SOLO_DEMO_EVA } = await registro(proto);
+      if (!SOLO_DEMO_EVA) continue; // el modo está apagado: no aplica
+
+      expect(NAV.map((n) => n.group ?? n.id), `prototipos=${proto}`).toEqual(["demo-eva"]);
+      expect(NAV[0].children.map((c) => c.id)).toEqual([
+        "eva-planta",
+        "eva-maquina-3d",
+        "eva-maqueta",
+        "eva-assets",
+      ]);
+    }
+  });
+
+  it("esconder no es borrar: las rutas ocultas siguen existiendo y navegables", async () => {
+    const { ROUTES, ROUTE_IDS, PAGES, SOLO_DEMO_EVA } = await registro(false);
+    if (!SOLO_DEMO_EVA) return;
+
+    // Las seis vistas escondidas siguen en el registro, con su componente.
+    for (const id of ["dashboard", "area-LIN", "area-REC", "maquina-3d", "maqueta-3d", "assets"]) {
+      expect(ROUTE_IDS, `"${id}" desapareció del registro`).toContain(id);
+      expect(PAGES[id], `"${id}" se quedó sin componente`).toBeTruthy();
+      expect(ROUTES.find((r) => r.id === id).nav, `"${id}" sigue en el menú`).toBeUndefined();
+    }
+
+    // Y el destino de la navegación interna sigue en pie: sin él, pulsar una
+    // máquina en la maqueta de Resonac no llevaría a ninguna parte.
+    expect(PAGES["machine-detail"]).toBeTruthy();
+  });
+
+  it("la ruta por defecto SIEMPRE está visible en el menú", async () => {
+    // Es el error clásico al esconder secciones: la app arranca en una vista
+    // sin entrada de menú y ninguna queda resaltada, que se lee como que el
+    // sidebar está roto. La invariante vale en los dos modos.
+    for (const proto of [false, true]) {
+      const { NAV, DEFAULT_ROUTE } = await registro(proto);
+      const visibles = NAV.flatMap((n) => (n.children ? n.children.map((c) => c.id) : [n.id]));
+
+      expect(visibles, `prototipos=${proto}: la ruta por defecto no está en el menú`)
+        .toContain(DEFAULT_ROUTE);
+    }
   });
 });
