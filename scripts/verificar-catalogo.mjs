@@ -37,8 +37,8 @@
  * Código de salida: 0 si todo responde, 1 si hay algún problema — para
  * poder encadenarlo en un script de despliegue.
  */
-import { AREAS, pointName, tagsForArea, TAGS } from "../react-dashboard/src/lib/iconics/tagCatalog.js";
-import { QUALITY_GOOD, isGoodQuality } from "../react-dashboard/src/lib/iconics/quality.js";
+import { AREAS, pointName, tagsForArea, TAGS } from "../shared/tagCatalog.js";
+import { QUALITY_GOOD, isGoodQuality } from "../shared/quality.js";
 
 const API_BASE = (process.env.API_BASE ?? "http://localhost:3001").replace(/\/+$/, "");
 const LOTE = Number(process.env.LOTE ?? 50);
