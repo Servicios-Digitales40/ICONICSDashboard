@@ -905,8 +905,9 @@ export const DEFINICIONES = [
         'un turno, un mes o un rango de días. Devuelve el OEE y sus tres factores, las piezas ' +
         'aprobadas y rechazadas y el tiempo muerto. Si el período abarca varios días, devuelve ' +
         'además el MÁXIMO, el mínimo y el promedio de la métrica pedida, cada uno con su fecha. ' +
-        'IMPORTANTE: solo algunas máquinas tienen datos históricos; consulta listar_maquinas si ' +
-        'dudas. Si no hay datos, la herramienta lo dirá y debes comunicarlo tal cual.',
+        'IMPORTANTE: solo algunas máquinas tienen datos históricos; la lista con esa marca ya ' +
+        'la tienes en tus instrucciones. Si no hay datos, la herramienta lo dirá y debes ' +
+        'comunicarlo tal cual.',
       parameters: {
         type: 'object',
         properties: {
