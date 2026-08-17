@@ -105,6 +105,55 @@ export default defineConfig({
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(versionDelBuild()),
   },
 
+  /*
+   * ── EL TABLERO SE VE DESDE LA RED, NO SÓLO DESDE ESTA MÁQUINA ──────
+   *
+   * `host: true` ata el dev server a todas las interfaces. El defecto de Vite
+   * es `localhost`, que en Windows resuelve a 127.0.0.1: el puerto quedaba
+   * abierto pero ningún otro equipo lo alcanzaba, aunque hiciera ping. El
+   * backend ya escuchaba en 0.0.0.0 (ver backend/server.mjs), así que esto es
+   * lo que faltaba para que las dos mitades estuvieran expuestas por igual.
+   *
+   * `strictPort` porque la URL se reparte a mano: si 5173 está ocupado
+   * preferimos que falle a que Vite se mude a 5174 en silencio y el resto de
+   * la planta abra un puerto donde no hay nada.
+   *
+   * `proxy` es lo que quita el host del código de la aplicación. El frontend
+   * pide `/api/...` al origen de la página y el dev server lo reenvía al
+   * backend; así el mismo bundle sirve para localhost y para 10.10.17.x sin
+   * ninguna IP escrita en ningún sitio, y el navegador no ve dos orígenes,
+   * luego no hay CORS que configurar. Ver src/lib/apiBase.js.
+   *
+   * El destino es 127.0.0.1 y no localhost a propósito: con localhost, Node
+   * puede resolver a ::1 y encontrarse el puerto cerrado si el backend sólo
+   * escucha en IPv4.
+   */
+  server: {
+    host: true,
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
+  },
+
+  // `npm run preview` sirve el build compilado; se expone igual, porque es la
+  // forma de que otro equipo vea exactamente lo que verá la planta.
+  preview: {
+    host: true,
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+      },
+    },
+  },
+
   build: {
     /*
      * Un solo archivo de 755 KB significa que cambiar una etiqueta obliga a

@@ -17,8 +17,7 @@
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "http://localhost:3001" : "");
+import { API_BASE } from "@/lib/apiBase";
 
 /** Mensaje del asistente aún vacío, al que se le van pegando los deltas. */
 const nuevoTurno = () => ({

@@ -1,12 +1,11 @@
 /**
  * Cliente mínimo para el backend puente hacia ICONICS (backend/server.mjs).
  *
- * En producción el backend sirve el dashboard desde el mismo origen, así que
- * las rutas relativas "/api/..." funcionan directo. En desarrollo el dev
- * server de Vite corre en otro puerto y hay que apuntar al del backend
- * (3001 por defecto; `VITE_API_BASE` lo sobreescribe).
+ * Las rutas son relativas al origen de la página en los dos despliegues: en
+ * planta porque el backend sirve el bundle, y en desarrollo porque el dev
+ * server reenvía /api al backend. Ver `lib/apiBase.js`.
  */
-const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "http://localhost:3001" : "");
+import { API_BASE } from "@/lib/apiBase";
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE}${path}`);

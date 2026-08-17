@@ -62,9 +62,13 @@ ICONICS_PASSWORD=contraseña
 ICONICS_POINT_NAME=punto por defecto para /api/iconics/data
 
 # Sólo para desarrollo:
-CORS_ORIGINS=http://localhost:5173   # el dev server de Vite es otro origen
 ICONICS_READ_ONLY=false              # la escritura está deshabilitada por defecto
 ```
+
+`CORS_ORIGINS` se queda vacío: en los dos despliegues la API cuelga del mismo
+origen que la página. En planta porque el backend sirve el bundle, y en
+desarrollo porque el dev server reenvía `/api` al backend (`server.proxy` en
+[`react-dashboard/vite.config.js`](react-dashboard/vite.config.js)).
 
 Backend, en una terminal:
 
@@ -82,6 +86,51 @@ npm run dev                                       # Vite, normalmente en :5173
 
 El resto de variables —puerto, nivel de log, directorio de estáticos— están en
 [`backend/README.md`](backend/README.md).
+
+### Desde otro equipo de la red
+
+Los dos procesos escuchan en todas las interfaces, así que basta abrir
+`http://<ip-de-esta-máquina>:5173`. No hay ninguna IP escrita en el código: el
+frontend pide `/api` a su propio origen y el dev server lo reenvía.
+
+Si el equipo remoto hace ping pero el puerto no responde, es el Firewall de
+Windows y no la aplicación. Una vez, como administrador:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\exponer-en-red.ps1
+#                                                   -Quitar lo deja como estaba
+```
+
+El `-ExecutionPolicy Bypass` va porque Windows PowerShell 5.1 viene en
+`Restricted` de fábrica y no ejecuta ningún script, ni local. Su política es
+**independiente** de la de PowerShell 7: `Get-ExecutionPolicy` en `pwsh` puede
+decir `RemoteSigned` y el 5.1 seguir negándose. Afecta sólo a esa invocación,
+que es lo que se quiere: no hay motivo para relajar la política de la máquina
+por dos guiones. Lo mismo vale para `scripts\dev.ps1`.
+
+Abre 3001, 5173 y 4173 sólo para la subred local, y desactiva la regla que
+bloquea `node.exe` —la que crea Windows cuando alguien pulsa "Cancelar" en el
+aviso del firewall— porque un *Bloquear* vence a cualquier *Permitir* y deja el
+puerto cerrado aunque las reglas de abrirlo estén puestas.
+
+**Si quien mira está en otra subred**, «local» no le incluye: con esta máquina
+en `10.10.17.14/24`, un equipo en `10.10.21.11` llega encaminado por el router y
+la regla lo rechaza. Se autoriza con `-Desde`, que añade sin quitar la subred
+local:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\exponer-en-red.ps1 -Desde 10.10.21.11
+```
+
+Mejor la IP concreta que el rango (`10.10.0.0/16`): es la diferencia entre «ese
+equipo puede entrar» y «cualquiera de esa red puede entrar», y aquí no hay
+contraseña que respalde lo segundo.
+
+> ⚠️ Esto no pone autenticación delante del tablero: quien alcance el puerto
+> entra, y el backend habla con ICONICS con una sesión privilegiada. Vale para
+> una red de planta o de laboratorio; no para una Wi-Fi compartida con
+> desconocidos. Deja `ICONICS_READ_ONLY` sin tocar y al menos nadie podrá
+> escribir en la planta.
 
 ### En producción
 

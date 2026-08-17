@@ -52,7 +52,7 @@ plantilla comentada de todas las variables está en
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `CORS_ORIGINS` | *(vacío)* | Orígenes autorizados, separados por comas. Vacío = ninguno. |
+| `CORS_ORIGINS` | *(vacío)* | Orígenes autorizados, separados por comas, con esquema y puerto. Vacío = ninguno, y normalmente no hace falta: en desarrollo el dev server reenvía `/api` aquí, así que para el navegador es el mismo origen. **No existe el comodín `*`**: la comparación es por igualdad exacta, y ponerlo autoriza a un origen llamado literalmente «\*». |
 | `TRUST_PROXY` | `false` | Leer la IP del cliente de `X-Forwarded-For`. Sólo con proxy inverso delante. |
 | `RATE_LIMIT_MAX` | `300` | Peticiones a `/api/` por ventana y cliente. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | La ventana. |
