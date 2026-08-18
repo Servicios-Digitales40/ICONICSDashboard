@@ -4,42 +4,28 @@
  */
 import { Search, Bell, Sun, Moon, Shuffle, FlaskConical, Radio, Wifi } from "lucide-react";
 import { useTheme } from "@/theme";
-import { useDataSource, useIconicsStats } from "@/lib/datasource";
+import { useDataSource } from "@/lib/datasource";
 import { PAGE_META } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { Avatar } from "@/components/ui/Avatar.jsx";
 
-/**
- * Contador de peticiones por minuto, para medir el presupuesto de red en vez
- * de suponerlo. Si se dispara, suele significar que se ha reintroducido un
- * poller por componente.
+/*
+ * ── EL CONTADOR DE RED QUE ESTABA AQUÍ ─────────────────────────────
  *
- * Solo en desarrollo: es instrumentación, no una función del producto.
+ * Hubo un indicador de peticiones/minuto, sólo en desarrollo, para medir el
+ * presupuesto de red en vez de suponerlo: si se disparaba, alguien había
+ * reintroducido un poller por componente.
+ *
+ * Leía el motor de sondeo global que creaba `DataSourceProvider` para las
+ * máquinas de Resonac. Ya no hay motor global: cada sección monta el suyo
+ * dentro de su provider, y el Topbar vive por FUERA de todos ellos, así que
+ * desde aquí no hay nada que medir.
+ *
+ * La instrumentación no se perdió: `evaSource.stats()` devuelve lo mismo. Para
+ * recuperar el indicador hay que ponerlo dentro de la sección —una vista bajo
+ * `<EvaProvider>`—, que es donde el dato existe.
  */
-function ContadorRed({ t }) {
-  const stats = useIconicsStats();
-  if (!import.meta.env.DEV || !stats) return null;
-
-  const alto = stats.peticionesPorMinuto > 30;
-
-  return (
-    <HoverTip label={`${stats.puntos} puntos activos · ${stats.motores.length} motores`}>
-      <span
-        style={{
-          display: "flex", alignItems: "center", gap: 5,
-          padding: "5px 9px", borderRadius: 8,
-          background: t.panel, border: `1px solid ${alto ? t.coral : t.border}`,
-          fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
-          color: alto ? t.coral : t.textFaint,
-        }}
-      >
-        <Radio size={12} />
-        {stats.peticionesPorMinuto}/min
-      </span>
-    </HoverTip>
-  );
-}
 
 /** Icono por origen. Es lo único de presentación que no vive en el dominio. */
 const ICONO_ORIGEN = { real: Wifi, simulado: Radio };
@@ -130,7 +116,6 @@ export function Topbar({ page }) {
           regenerar
         </button> */}
 
-        <ContadorRed t={t} />
         <VersionBuild t={t} />
 
         {/* Indicador de ORIGEN.

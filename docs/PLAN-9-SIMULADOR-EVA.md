@@ -1,5 +1,13 @@
 # Plan 9 · El simulador aprende Demo EVA
 
+> ⚠️ **DOCUMENTO HISTÓRICO (actualizado 18-ago-2026).** Este plan se escribió
+> cuando convivían dos simuladores. El de Resonac, `lib/iconics/fakeTransport.js`,
+> **ya no existe**: se retiró con su tablero en agosto de 2026, y con él
+> `@shared/tagCatalog.js`. Los presets de caos que definía viven ahora en
+> `lib/iconics/caos.js`. El simulador que este plan construye es hoy el único, y
+> sigue donde lo dejó: `Demo-EVA/data/simulador.js`.
+
+
 > **Objetivo.** Que el origen «Simulado» del Topbar sirva la instalación de agua
 > de `ac:TDCON/DEMO/SENSORES/`, para poder seguir trabajando la interfaz de
 > Demo EVA sin servidor de planta y sin red.

@@ -1,9 +1,9 @@
 {
-  "name": "aurora-dashboard",
+  "name": "eva-dashboard",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Panel de administración (dashboard) de ejemplo construido con React + Vite. Incluye gráficas (recharts), tablas, formularios, loaders animados, alertas, tooltips, toasts y modales, organizados en un proyecto multi-página con sidebar.",
+  "description": "Tablero del sistema de agua industrial (Demo EVA): las señales de ac:TDCON/DEMO/SENSORES/ leídas de ICONICS, en 2D y en 3D, con un asistente de lenguaje natural opcional.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,8 +14,6 @@
   "dependencies": {
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
-    "d3-sankey": "^0.12.3",
-    "d3-shape": "^3.2.0",
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

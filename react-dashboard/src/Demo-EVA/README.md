@@ -1,8 +1,12 @@
 # Demo EVA · Sistemas de agua industrial
 
-Sección de demostración sobre `ac:TDCON/DEMO/SENSORES/`, un árbol **real** del
-mismo servidor ICONICS que alimenta el tablero de Resonac. Cuatro subvistas:
-Planta, Máquina 3D, Maqueta 3D y Assets.
+La aplicación, sobre `ac:TDCON/DEMO/SENSORES/`, un árbol **real** del servidor
+ICONICS. Cuatro subvistas: Planta, Máquina 3D, Maqueta 3D y Assets.
+
+Nació como una sección más dentro del tablero de OEE de Resonac; en agosto de
+2026 aquél se retiró y esto pasó a ser todo lo que hay. De ahí que el módulo
+siga siendo una isla autocontenida: las convenciones de más abajo son las que
+lo mantuvieron separable, y ese aislamiento es lo que hizo barata la transición.
 
 El plan completo, con todo lo que se midió contra el servidor antes de escribir
 una línea, está en [`docs/PLAN-8-DEMO-EVA.md`](../../../docs/PLAN-8-DEMO-EVA.md).
@@ -125,24 +129,26 @@ sección y lo que el asistente contesta.
 ## Convenciones propias
 
 **El nombre de la carpeta lleva mayúsculas.** El resto de `src/` va en
-minúscula-kebab (`three-d`, `dashboard-v2`); ésta se llama `Demo-EVA` porque así
+minúscula-kebab (`three-d`, `asistente`); ésta se llama `Demo-EVA` porque así
 se pidió. Windows no distingue mayúsculas pero un servidor de build en Linux sí,
 así que **el import se escribe siempre exactamente `@/Demo-EVA/…`**.
 
 **Nada de esto entra en el arranque.** Las cuatro rutas se registran con
-`lazy()` en `app/routes/routes.jsx`, así que quien abre el tablero de Resonac no
-descarga ni el dominio ni los tiles ni los modelos. Por eso **este módulo no
+`lazy()` en `app/routes/routes.jsx`, así que abrir una vista no descarga las
+otras tres —y sobre todo, las 2D no pagan la pila 3D. Por eso **este módulo no
 tiene barril `index.js`**: un `lazy()` sobre un barril hace que Rollup nombre el
 trozo según su módulo de entrada y genere un segundo `index-*.js`, que es lo que
 dejó de medir el presupuesto del arranque la última vez que pasó. Importa
 siempre el archivo concreto.
 
-**El simulador no conoce este árbol.** `fakeTransport` genera valores para los
-puntos de Resonac; con el simulador activo, Demo EVA se ve entera sin dato. Es
-lo correcto: fingir que el simulador conoce esta instalación sería el tipo de
-dato inventado que el Plan 5 quitó de en medio.
+**El simulador es de la sección.** Vive en [`data/simulador.js`](data/simulador.js)
+y sirve las ocho señales con su historia. No está en `lib/iconics/` a propósito:
+un simulador allí tendría que importar el catálogo de señales para saber qué
+generar, invirtiendo la dependencia. Hubo un tiempo en que el único simulador
+era el del tablero anterior, que generaba otros puntos, y pulsar «Simulado»
+dejaba esta sección entera sin dato.
 
-**Dos bucles de animación en toda la sección**, igual que en el 3D de Resonac:
+**Dos bucles de animación en toda la sección**:
 el destello de la baliza en crítico, y el giro del impulsor cuando la bomba
 impulsa. Cualquier tercero hay que justificarlo contra la regla de
 [`lib/motion.js`](../lib/motion.js) — y el flujo circulando por las tuberías ya

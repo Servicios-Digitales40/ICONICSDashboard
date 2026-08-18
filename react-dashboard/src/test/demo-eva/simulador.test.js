@@ -93,7 +93,7 @@ describe("el valor es función del reloj, no del azar", () => {
     const salida = await enT(T0).read(["ac:RESONAC/LIN/1/OEE", pointName("nivelTanque")]);
 
     // Para el motor de polling eso es un hueco, que es exactamente lo que es:
-    // el simulador de Resonac es otro y vive en `lib/iconics/fakeTransport.js`.
+    // hubo otro simulador, el del tablero de Resonac, que se fue con su sección.
     expect(salida.size).toBe(1);
     expect(salida.has(pointName("nivelTanque"))).toBe(true);
   });

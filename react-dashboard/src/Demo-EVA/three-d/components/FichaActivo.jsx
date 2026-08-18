@@ -3,7 +3,7 @@
  *
  * ── POR QUÉ ES DOM Y NO GEOMETRÍA ──────────────────────────────────
  *
- * Mismos tres motivos que la `TarjetaKpi` de Resonac, en el mismo orden:
+ * Tres motivos, en orden de peso:
  * reutiliza el formateo que ya sabe pintar «—» cuando no hay medición —la regla
  * más importante de esta aplicación y la más fácil de romper al reescribirla—,
  * hereda tema y tipografías, y evita arrastrar `troika-three-text` (~120 KB y

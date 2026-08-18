@@ -17,7 +17,8 @@
  *   1. Los items de primer nivel salen en orden de declaración.
  *   2. Un grupo se inserta en la posición de su primer hijo, y desde ahí
  *      absorbe al resto, estén donde estén en el array.
- *   3. Las rutas sin `nav` se omiten (rutas ocultas, como machine-detail).
+ *   3. Las rutas sin `nav` se omiten: existen y son navegables por id, pero
+ *      no tienen entrada de menú.
  */
 export function buildNav(routes, groups) {
   const items = [];

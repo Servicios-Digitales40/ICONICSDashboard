@@ -124,7 +124,7 @@ function Shell() {
         {/* El asistente es estrictamente ADITIVO: se pinta solo si el servidor
             tiene un modelo configurado, y va en su propia barrera de errores
             para que un fallo suyo no se lleve por delante el tablero. Un
-            wallboard de planta tiene que seguir mostrando el OEE aunque el
+            wallboard de planta tiene que seguir mostrando sus señales aunque el
             chat reviente. */}
         <ErrorBoundary etiqueta="Asistente">
           {/* Sin respaldo visible: mientras se descarga su trozo no debe

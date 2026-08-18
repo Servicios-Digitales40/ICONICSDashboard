@@ -72,9 +72,9 @@ export const TONO = {
 /**
  * Color de una BANDA de umbral, para barras y arcos de magnitud.
  *
- * Es el equivalente de `bandColor` de `lib/shiftModel.js`, que no sirve aquí:
- * aquél parte de que el número es un porcentaje de OEE y aplica cortes fijos en
- * 50 y 75. Nuestras señales son magnitudes con banda propia —una tensión de 122
+ * Hubo un `bandColor` en el tablero de OEE que no servía aquí: partía de que el
+ * número era un porcentaje y aplicaba cortes fijos en 50 y 75. Nuestras
+ * señales son magnitudes con banda propia —una tensión de 122
  * es excelente y una de 50 sería catastrófica—, así que el color lo decide la
  * BANDA que ya calculó el dominio, nunca el valor en bruto.
  */

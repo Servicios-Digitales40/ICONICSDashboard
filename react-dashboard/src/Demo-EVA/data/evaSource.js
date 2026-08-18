@@ -2,7 +2,7 @@
  * Fuente de datos de Demo EVA. Traduce entre el mundo de ICONICS (puntos con
  * nombre y calidad) y el del dominio (`Sistema`).
  *
- * Es delgada a propósito, igual que `iconicsSource.js`: no agenda (eso es del
+ * Es delgada a propósito: no agenda (eso es del
  * motor), no sanea números (eso es del dominio) y no decide colores (eso es de
  * los umbrales). Sólo empareja unos con otros.
  *

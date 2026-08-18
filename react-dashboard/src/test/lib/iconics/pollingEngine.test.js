@@ -1,7 +1,7 @@
 /**
  * pollingEngine.test.js
  * ------------------------------------------------------------------
- * Fase 3.3 del Plan 1: ciclo de vida y presupuesto de red.
+ * Ciclo de vida y presupuesto de red del motor de sondeo.
  *
  * Las pruebas NO arrancan el motor (`start()`), sino que invocan `poll()`
  * a mano. Así no dependen de temporizadores reales y cada aserción mide
@@ -10,10 +10,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPollingEngine } from "@/lib/iconics/pollingEngine.js";
 import { QUALITY_GOOD } from "@shared/quality.js";
-import { CAOS_ALTO, SIN_CAOS, createFakeTransport } from "@/lib/iconics/fakeTransport.js";
+import { CAOS_ALTO, SIN_CAOS } from "@/lib/iconics/caos.js";
+import { createTransporteEva } from "@/Demo-EVA/data/simulador.js";
+import { pointName } from "@shared/eva/senales.js";
 
-const P1 = "ac:RESONAC/LIN/1/OEE";
-const P2 = "ac:RESONAC/LIN/2/OEE";
+/* Dos puntos cualesquiera. Los del motor no tienen que existir en ninguna
+   parte —para él son cadenas— salvo en el bloque del simulador, que sí los
+   resuelve contra el catálogo de señales. */
+const P1 = "ac:PRUEBA/PUNTO/1";
+const P2 = "ac:PRUEBA/PUNTO/2";
+const E1 = pointName("nivelTanque");
+const E2 = pointName("presionDescarga");
 
 /** Transporte que responde siempre bien, contando cuántas veces se le llama. */
 function transporteContador(valor = 42) {
@@ -45,7 +52,7 @@ describe("presupuesto de red", () => {
     const { read } = transporteContador();
     const engine = createPollingEngine({ read, maxBatch: 50 });
 
-    const puntos = Array.from({ length: 140 }, (_, i) => `ac:RESONAC/LIN/1/T${i}`);
+    const puntos = Array.from({ length: 140 }, (_, i) => `ac:PRUEBA/PUNTO/T${i}`);
     engine.acquire(puntos);
     await engine.poll();
 
@@ -225,49 +232,58 @@ describe("consciencia de visibilidad", () => {
   });
 });
 
-describe("integración con el transporte falso", () => {
+describe("integración con el simulador", () => {
+  /*
+   * El simulador que se ejercita aquí es el de Demo EVA. Antes era
+   * `fakeTransport.js`, el de Resonac, que se fue con esa sección; lo que se
+   * comprueba no cambió, porque nunca fue sobre las máquinas sino sobre el
+   * contrato: el motor tiene que digerir un transporte que a veces falla, a
+   * veces devuelve menos puntos de los pedidos y a veces devuelve basura.
+   */
   it("sin caos entrega todos los puntos con calidad buena", async () => {
-    const transporte = createFakeTransport({ chaos: SIN_CAOS });
+    const transporte = createTransporteEva({ chaos: SIN_CAOS });
     const engine = createPollingEngine({ read: transporte.read });
 
-    engine.acquire([P1, P2]);
+    engine.acquire([E1, E2]);
     await engine.poll();
 
-    expect(engine.get(P1).ok).toBe(true);
-    expect(typeof engine.get(P1).value).toBe("number");
+    expect(engine.get(E1).ok).toBe(true);
+    expect(typeof engine.get(E1).value).toBe("number");
 
     engine.stop();
   });
 
   it("con caos alto degrada sin lanzar excepciones", async () => {
     // Sin latencia: aquí se mide el comportamiento degradado, no la espera.
-    const transporte = createFakeTransport({
+    // `rnd` se siembra para que el caos ocurra de verdad en esta pasada sin
+    // depender de Math.random, que algún día no degradaría nada y dejaría la
+    // prueba pasando en verde sin probar el camino triste.
+    let n = 0;
+    const transporte = createTransporteEva({
       chaos: { ...CAOS_ALTO, latenciaMs: 0 },
-      seed: "caos",
+      rnd: () => ((n = (n * 1103515245 + 12345) % 2147483648) / 2147483648),
     });
     const engine = createPollingEngine({ read: transporte.read });
 
-    engine.acquire([P1, P2]);
+    engine.acquire([E1, E2]);
 
     // Varios ciclos: unos fallarán enteros, otros traerán huecos o mala
     // calidad. Ninguno debe propagar una excepción al llamante.
     const degradaciones = [];
     for (let i = 0; i < 20; i++) {
       await expect(engine.poll()).resolves.not.toThrow();
-      const l = engine.get(P1);
+      const l = engine.get(E1);
       if (!l.ok || l.stale) degradaciones.push(i);
     }
 
     // La lectura siempre está bien formada, haya dato o no.
-    const lectura = engine.get(P1);
+    const lectura = engine.get(E1);
     expect(lectura).toHaveProperty("ok");
     expect(lectura).toHaveProperty("stale");
     expect(lectura).toHaveProperty("receivedAt");
 
-    // Y el caos alto tiene que haber ejercitado ALGÚN camino degradado:
-    // si no, la prueba no estaría probando nada. No se afina más porque
-    // el reparto exacto depende de la semilla, y una prueba que depende
-    // de la semilla del generador es una prueba que falla sola algún día.
+    // Y el caos alto tiene que haber ejercitado ALGÚN camino degradado: si no,
+    // la prueba no estaría probando nada.
     expect(degradaciones.length).toBeGreaterThan(0);
 
     engine.stop();

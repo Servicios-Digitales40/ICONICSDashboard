@@ -1,27 +1,26 @@
 /**
  * Lo que se ve cuando la escena 3D no se puede dibujar.
  *
- * ── POR QUÉ UNA TABLA Y NO UN CARTEL ───────────────────────────────
+ * ── POR QUÉ DICE POR QUÉ, Y NO SÓLO QUE NO SE PUEDE ────────────────
  *
- * Un aviso de «no se puede mostrar el 3D» deja la pantalla sin información, y
- * en una pared de planta eso es peor que la vista que se perdió. El 3D es una
- * forma de enseñar el estado de las máquinas, no la información en sí: sin él,
- * la información sigue existiendo y cabe en una tabla.
+ * «No se puede mostrar el 3D» deja a quien mira sin nada que hacer. Los dos
+ * motivos por los que esto ocurre tienen remedios distintos —uno es el equipo,
+ * el otro se arregla recargando— y sólo distinguiéndolos se puede actuar.
  *
- * Se construye con los mismos hooks y el mismo formateo que el resto del
- * tablero, así que un hueco se sigue pintando «—» y nunca 0.
+ * ── POR QUÉ ACEPTA UN RESPALDO Y NO PINTA UNA TABLA ────────────────
  *
- * ── POR QUÉ NO REUTILIZA `GaugeCard` ───────────────────────────────
+ * El 3D es una forma de enseñar el estado de una instalación, no la
+ * información en sí: sin él, la información sigue existiendo y cabe en una
+ * tabla. Pero la tabla depende de QUÉ instalación se estaba mirando, y este
+ * componente es genérico.
  *
- * Sería la tarjeta correcta, pero vive en `features/machines/` y traerla aquí
- * ataría dos features entre sí por su interior. Una tabla de cinco columnas no
- * merece esa deuda.
+ * Antes traía la de las diez máquinas de Resonac, cableada con `usePlantData`.
+ * Eso ataba la escena —que no sabe de dominios— a una sección concreta, y al
+ * retirarse esa sección se habría quedado pintando una tabla vacía. Ahora la
+ * aporta quien monta la escena, con `respaldo`; sin ella queda el aviso solo,
+ * que es lo honesto cuando nadie tiene una alternativa que ofrecer.
  */
 import { AlertBanner } from "@/components/ui/index.js";
-import { useTheme } from "@/theme";
-import { usePlantData } from "@/lib/datasource";
-import { estadoInfo, hasValue } from "@/lib/domain/index.js";
-import { SIN_DATO, fmtNum } from "@/lib/format.js";
 
 const MOTIVOS = {
   "sin-webgl": {
@@ -29,7 +28,7 @@ const MOTIVOS = {
     detalle:
       "El navegador no ha podido crear un contexto WebGL. Suele pasar en equipos sin GPU utilizable, " +
       "por escritorio remoto sin aceleración, o con el controlador en la lista negra del navegador. " +
-      "Los datos son los mismos que en las vistas de Planta y de área.",
+      "Los datos son los mismos que en la vista de Planta.",
   },
   "contexto-perdido": {
     titulo: "Se perdió el contexto gráfico y no se pudo recuperar",
@@ -40,110 +39,13 @@ const MOTIVOS = {
   },
 };
 
-function Celda({ children, alinear = "left", color, mono, t }) {
-  return (
-    <td
-      style={{
-        padding: "9px 12px",
-        borderTop: `1px solid ${t.border}`,
-        textAlign: alinear,
-        color: color ?? t.text,
-        fontFamily: mono ? "'IBM Plex Mono', monospace" : "'Inter', sans-serif",
-        fontWeight: mono ? 700 : 500,
-        fontSize: 12.5,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </td>
-  );
-}
-
-function Encabezado({ children, alinear = "left", t }) {
-  return (
-    <th
-      style={{
-        padding: "0 12px 8px",
-        textAlign: alinear,
-        color: t.textFaint,
-        fontSize: 10.5,
-        fontWeight: 700,
-        letterSpacing: 0.5,
-        textTransform: "uppercase",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </th>
-  );
-}
-
-export default function Sin3D({ motivo = "sin-webgl" }) {
-  const { theme: t } = useTheme();
-  const { machines } = usePlantData();
+export default function Sin3D({ motivo = "sin-webgl", respaldo = null }) {
   const { titulo, detalle } = MOTIVOS[motivo] ?? MOTIVOS["sin-webgl"];
 
   return (
     <div>
       <AlertBanner type="warning" title={titulo} message={detalle} />
-
-      <div
-        style={{
-          background: t.panel,
-          border: `1px solid ${t.border}`,
-          borderRadius: 14,
-          padding: "16px 4px 6px",
-          boxShadow: t.shadow,
-          marginTop: 16,
-          overflowX: "auto",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
-          <thead>
-            <tr>
-              <Encabezado t={t}>Equipo</Encabezado>
-              <Encabezado t={t}>Estado</Encabezado>
-              <Encabezado alinear="right" t={t}>OEE</Encabezado>
-              <Encabezado alinear="right" t={t}>Disponibilidad</Encabezado>
-              <Encabezado alinear="right" t={t}>Rendimiento</Encabezado>
-              <Encabezado alinear="right" t={t}>Calidad</Encabezado>
-            </tr>
-          </thead>
-          <tbody>
-            {machines.map((m) => {
-              const info = estadoInfo(m.estado);
-              const color = t[info.token] ?? t.textFaint;
-              return (
-                <tr key={m.id}>
-                  <Celda t={t}>{m.equipo}</Celda>
-                  <Celda color={color} t={t}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-                      {info.label}
-                    </span>
-                  </Celda>
-                  <Celda alinear="right" mono color={hasValue(m.oee) ? t.text : t.textFaint} t={t}>
-                    {fmtNum(m.oee)}
-                  </Celda>
-                  <Celda alinear="right" mono t={t}>{fmtNum(m.disponibilidad)}</Celda>
-                  <Celda alinear="right" mono t={t}>{fmtNum(m.rendimiento)}</Celda>
-                  <Celda alinear="right" mono t={t}>{fmtNum(m.calidad)}</Celda>
-                </tr>
-              );
-            })}
-            {!machines.length && (
-              <tr>
-                <Celda t={t} color={t.textFaint}>{SIN_DATO}</Celda>
-                <Celda t={t} color={t.textFaint}>Leyendo equipos…</Celda>
-                <Celda alinear="right" t={t} color={t.textFaint}>{SIN_DATO}</Celda>
-                <Celda alinear="right" t={t} color={t.textFaint}>{SIN_DATO}</Celda>
-                <Celda alinear="right" t={t} color={t.textFaint}>{SIN_DATO}</Celda>
-                <Celda alinear="right" t={t} color={t.textFaint}>{SIN_DATO}</Celda>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {respaldo}
     </div>
   );
 }

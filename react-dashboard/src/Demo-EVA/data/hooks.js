@@ -2,7 +2,7 @@
  * Los hooks que consumen las vistas de Demo EVA. Ninguna vista sabe de dónde
  * salen sus datos.
  *
- * Mismo patrón que `lib/datasource/hooks.js`: suscribirse al montar y darse de
+ * El patrón es siempre el mismo: suscribirse al montar y darse de
  * baja al desmontar, con la baja SIEMPRE en el `return` del efecto. Con el doble
  * montaje de StrictMode en desarrollo, un efecto sin limpieza dejaría un
  * suscriptor huérfano en cada visita y los puntos nunca se liberarían.

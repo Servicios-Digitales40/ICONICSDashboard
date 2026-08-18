@@ -16,12 +16,13 @@
  *  2. **Un hueco nunca se convierte en cero ni en un estado tranquilizador.**
  *  3. **El reposo silencia sólo lo que debe.** Sin esta regla la demo abre en
  *     rojo permanente; con ella de más, taparía una avería real.
- *  4. **El vocabulario no colisiona con el de Resonac.** Un `import` cruzado por
- *     accidente tiene que fallar, no colar.
+ *  4. **El vocabulario es el suyo y no el de un tablero de OEE.** Hubo un
+ *     segundo juego de estados —`running`, `alarma`— mientras convivió el
+ *     tablero de Resonac, y esta prueba comprobaba que no colisionaran. Aquel
+ *     se fue con su sección; lo que queda es que estos estados digan lo que
+ *     esta instalación necesita decir, empezando por distinguir un hueco.
  */
 import { describe, expect, it } from "vitest";
-
-import { ESTADOS as ESTADOS_RESONAC } from "@/lib/domain/index.js";
 
 import {
   RAIZ,
@@ -172,14 +173,6 @@ describe("umbrales y bandas", () => {
 });
 
 describe("estado derivado", () => {
-  it("el vocabulario no colisiona con el de Resonac", () => {
-    // Ni un `running` ni un `alarma` aquí: un import cruzado tiene que fallar,
-    // no colar con el estado equivocado.
-    for (const key of Object.keys(ESTADOS)) {
-      expect(ESTADOS_RESONAC[key], `"${key}" existe en los dos vocabularios`).toBeUndefined();
-    }
-  });
-
   it("«sin dato» es más grave que «en banda»: un hueco no es una tranquilidad", () => {
     expect(ESTADOS.sin_dato.orden).toBeLessThan(ESTADOS.nominal.orden);
     expect(peor(["nominal", "sin_dato"])).toBe("sin_dato");

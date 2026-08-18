@@ -1,14 +1,18 @@
 /**
- * API pública de la capa de datos.
+ * API pública de la capa de origen de datos.
  *
- * Las vistas importan solo de aquí. Fuera de esta carpeta nadie conoce
- * `createIconicsSource`, los transportes ni el motor de polling, que es lo que
- * evita que el origen de los datos se filtre por toda la UI.
+ * Lo que se publica aquí es el ORIGEN —qué transporte está activo y cómo se
+ * anuncia en pantalla—, no los datos. Cada sección construye su fuente sobre
+ * el transporte que diga este contexto; la de Demo EVA vive en
+ * `Demo-EVA/data/`.
  *
- * Aquí NO vive ninguna bandera de superficie: la que decide qué rutas existen
- * está en `lib/flags.js`. Antes se exportaba `DEMO_HABILITADO` desde este
- * barril y la consumía el registro de rutas, que es lo que mezclaba «de dónde
- * vienen los datos» con «qué pantallas hay». Ver docs/PLAN-5-DOS-ORIGENES.md.
+ * Aquí NO vive ninguna bandera de superficie. Hubo una, `VITE_ENABLE_DEMO`, que
+ * gateaba a la vez el origen de los datos y qué rutas existían, y esa
+ * conflación fue justamente lo que se deshizo.
+ *
+ * Antes este barril exportaba además `usePlantData`, `useAreaData`,
+ * `useMachineData` y compañía: los hooks de las diez máquinas de Resonac. Se
+ * fueron con esa sección, junto con `iconicsSource` y el tipo `Snapshot`.
  */
 export {
   DataSourceProvider,
@@ -16,15 +20,3 @@ export {
   TRANSPORTES,
   ORIGENES,
 } from "./DataSourceProvider.jsx";
-
-export {
-  usePlantData,
-  useAreaData,
-  useMachineData,
-  useMachineHistory,
-  useMachineDay,
-  useMachineDailyOee,
-  useIconicsStats,
-} from "./hooks.js";
-
-export { SNAPSHOT_INICIAL } from "./types.js";

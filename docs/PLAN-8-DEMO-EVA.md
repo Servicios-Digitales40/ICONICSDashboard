@@ -1,5 +1,16 @@
 # Plan 8 · Demo EVA · Sistemas de Agua Industrial
 
+> ⚠️ **DOCUMENTO HISTÓRICO (actualizado 18-ago-2026).** Este plan se escribió
+> cuando Demo EVA era una sección dentro del tablero de OEE de Resonac, así que
+> se lee entero en contraste con aquél. **La transición terminó**: el tablero de
+> Resonac se retiró y esta demo es la aplicación. Las rutas de archivo que este
+> documento cita de aquel lado —`shared/tagCatalog.js`, `shared/plantModel.js`,
+> `shared/domain/*`, `features/dashboard/`, `features/machines/`,
+> `src/prototypes/`— **ya no existen**, y los enlaces a los planes 1 a 7 tampoco.
+> El razonamiento sigue valiendo; las rutas, no. La «fase aparte de una tarde»
+> que anuncia el apartado «Lo que este plan NO hace» es la que se ejecutó.
+
+
 > **ESTADO (17-ago-2026)** — **Fases 0 a 8 ejecutadas. Suite en verde, bundle
 > dentro de presupuesto. Falta la verificación EN PANTALLA con datos vivos.**
 >

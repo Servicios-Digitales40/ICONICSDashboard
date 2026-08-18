@@ -2,15 +2,14 @@
  * Estado derivado → cómo se comporta el modelo 3D del sistema de agua.
  *
  * Funciones puras y una tabla. Sin React, sin three, sin tema: aquí se decide
- * QUÉ comunica cada estado y en `components/` cómo se dibuja. Es el mismo
- * reparto que hace `features/three-d/lib/estadoVisual.js`, y por el mismo
- * motivo: la parte con criterio tiene que poder revisarse de un vistazo y
+ * QUÉ comunica cada estado y en `components/` cómo se dibuja. El motivo del
+ * reparto: la parte con criterio tiene que poder revisarse de un vistazo y
  * probarse en node.
  *
  * ── SE HEREDA EL PRINCIPIO DE DISEÑO, NO LA TABLA ──────────────────
  *
- * El principio es el de la vista de Resonac, y sigue valiendo palabra por
- * palabra: a tres metros de una televisión el estado se lee por SILUETA y COLOR
+ * El principio venía de la vista 3D del tablero anterior y sigue valiendo
+ * palabra por palabra: a tres metros de una televisión el estado se lee por SILUETA y COLOR
  * antes que por movimiento, así que el orden de los canales es baliza → pose →
  * movimiento, y el tinte del material refuerza pero nunca es la única señal.
  *

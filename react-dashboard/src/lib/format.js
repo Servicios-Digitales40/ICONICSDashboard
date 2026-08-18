@@ -9,7 +9,7 @@
  * «0.00 %» donde no hubo medición es indistinguible de una máquina parada de
  * verdad, y puede llevar a intervenir un equipo que estaba bien.
  */
-import { hasValue } from "./domain/index.js";
+import { hasValue } from "@shared/valores.js";
 
 /** Lo que se muestra cuando no hay medición. Un solo sitio lo decide. */
 export const SIN_DATO = "—";

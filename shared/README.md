@@ -8,17 +8,17 @@ react-dashboard/  ─┐
 backend/           ─┘
 ```
 
-Nació con el [Plan 6](../docs/PLAN-6-IA-LOCAL.md). Hasta entonces todo esto vivía
-en `react-dashboard/src/lib/`, que era su sitio mientras el frontend fuera el
-único que leía historia. Las herramientas que consulta el modelo de lenguaje
-—`backend/ia/`— necesitan exactamente las mismas reglas, y había que elegir.
+Nació cuando el asistente de lenguaje natural entró en escena. Hasta entonces
+todo esto vivía en `react-dashboard/src/lib/`, que era su sitio mientras el
+frontend fuera el único que leía historia. Las herramientas que consulta el
+modelo —`backend/ia/`— necesitan exactamente las mismas reglas, y había que
+elegir.
 
 **Por qué no se duplicó.** Es la lección que el backend ya había aprendido con
 `request()` en `iconics/client.mjs`: *«antes cada operación repetía ese bloque, y
-cada copia podía divergir —de hecho divergían»*. Dos copias de la regla de que
-los contadores se suman por tramos son dos oportunidades de que una se quede
-atrás, y el síntoma sería que el chat y el tablero dan cifras distintas del mismo
-día.
+cada copia podía divergir —de hecho divergían»*. Dos copias de la regla de qué
+señales tienen historia propia son dos oportunidades de que una se quede atrás,
+y el síntoma sería que el chat y el tablero dan cifras distintas del mismo día.
 
 **Por qué no se importa desde `react-dashboard/src`.** El empaquetado de la
 release copia `backend/` y `react-dashboard/dist`, no el árbol de fuentes del
@@ -29,29 +29,20 @@ desplegar.
 
 | Archivo | Qué contiene |
 |---|---|
-| `tagCatalog.js` | Contrato con ICONICS: las 10 máquinas, las 15 propiedades y cómo se nombra un punto en vivo (`ac:`) o histórico (`hda:`) |
-| `historia.js` | Mecánica del historiador: qué agregado, cómo se formatean las fechas, cómo se totaliza un contador y cómo se unen varias series |
+| `valores.js` | Saneamiento en la frontera: `toNumber`, `toText`, `hasValue`. Un `NaN` o un `Infinity` del servidor se convierten en hueco, nunca en cero |
 | `quality.js` | Qué código de calidad OPC cuenta como bueno. Un valor malo es un hueco, nunca un cero |
-| `turno.js` | Aritmética del turno y metas por factor. El **formateo** se queda en el frontend |
 | `periodo.js` | De «julio 2026» o «ayer a las 12» a un rango concreto. Lo usa el asistente |
-| `plantModel.js` | Rollup de máquina → planta. El OEE de planta es D×R×C de los agregados, no la media de los OEE |
-| `domain/machine.js` | La forma `Machine` y su saneamiento de calidad y aritmética |
-| `domain/estado.js` | El enum de estados de ICONICS |
-| `domain/history.js` | `daySummary()`: reduce un día del historiador a la forma de una `Machine` |
 
 ### `eva/` · el sistema de agua industrial
 
-Lo de arriba describe la planta de Resonac. `eva/` es la otra instalación del
-mismo servidor —`ac:TDCON/DEMO/SENSORES/`, ocho señales planas sin OEE, sin
-máquinas y sin producción— y **no comparte ni un archivo con ella**: no es el
-mismo dominio con otros nombres, es otra forma de datos. Ver
-[`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
+El dominio de la instalación: `ac:TDCON/DEMO/SENSORES/`, ocho señales planas.
+Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 
 | Archivo | Qué contiene |
 |---|---|
 | `eva/senales.js` | Contrato con ICONICS: las 8 señales, sus tags y **cuáles tienen serie propia** |
 | `eva/umbrales.js` | Las bandas y su declaración de procedencia (`PROVISIONALES`) |
-| `eva/estado.js` | Los 5 estados DERIVADOS y su agregación. Vocabulario distinto del de Resonac a propósito |
+| `eva/estado.js` | Los 5 estados DERIVADOS y su agregación |
 | `eva/activos.js` | Los 4 activos, derivados del campo `activo` de las señales |
 | `eva/sistema.js` | `createSistema()`: saneamiento y evaluación en la frontera |
 | `eva/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
@@ -62,7 +53,7 @@ caso que abre este documento: las herramientas de `backend/ia/` necesitan
 exactamente las mismas reglas que las vistas, y había que elegir entre duplicar
 o compartir.
 
-Aquí duplicar habría sido peor que en Resonac. **A tres de las ocho señales el
+Y aquí duplicar sale especialmente caro. **A tres de las ocho señales el
 historiador les devuelve la serie de otra, y responde `ok: true`.** La única
 defensa es el campo `historizado` del catálogo; dos copias del catálogo son dos
 oportunidades de que una se quede atrás, y el síntoma no sería una cifra
@@ -71,8 +62,14 @@ tanque bajo el nombre «carga del motor», con marcas de tiempo correctas y sin
 un solo error en el log.
 
 En `Demo-EVA/domain/` quedan cinco reexports de una línea, para que el módulo
-conserve su regla de importar siempre como `@/Demo-EVA/…`. Es lo mismo que hace
-`react-dashboard/src/lib/domain/index.js` con el dominio de Resonac.
+conserve su regla de importar siempre como `@/Demo-EVA/…`.
+
+> **Qué había aquí antes.** Hasta agosto de 2026 este directorio llevaba además
+> el dominio del tablero de OEE de Resonac: `tagCatalog.js` (las 10 máquinas y
+> sus 15 propiedades), `plantModel.js`, `historia.js`, `turno.js` y
+> `domain/{machine,estado,history}.js`. Se fue entero con la transición al
+> modelo de agua. Lo único que se conservó de ese bloque es el saneamiento de
+> valores, que no sabía de máquinas y hoy es `valores.js`.
 
 ## Reglas
 
@@ -89,8 +86,8 @@ arranque.
 
 | Desde | Forma |
 |---|---|
-| `backend/` | `import { listMachines } from '../shared/tagCatalog.js'` |
-| `react-dashboard/` | `import { listMachines } from '@shared/tagCatalog.js'` |
+| `backend/` | `import { SENALES } from '../shared/eva/senales.js'` |
+| `react-dashboard/` | `import { SENALES } from '@shared/eva/senales.js'` |
 
 El alias `@shared` está declarado en `vite.config.js` y en `jsconfig.json`, y hay
 que tocarlos a la vez. Es el segundo alias del frontend y la excepción a su regla

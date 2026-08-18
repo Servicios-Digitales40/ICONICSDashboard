@@ -4,18 +4,18 @@
  *
  * ── DE DÓNDE SALEN Y POR QUÉ SE COPIAN ─────────────────────────────
  *
- * Son las de `prototypes/dashboard-v2/tiles.jsx`, con los mismos números,
- * porque el encargo es que Demo EVA se vea como «Planta · v2». Se **copian** en
- * vez de importarse por dos motivos, y el segundo es el que manda:
+ * Son las de `dashboard-v2`, una propuesta de diseño para el tablero de
+ * Resonac que se evaluaba tras `VITE_ENABLE_PROTOTYPES`, con los mismos
+ * números: el encargo era que esta sección se viera como «Planta · v2». Se
+ * copiaron en vez de importarse por dos motivos, y el segundo es el que manda:
  *
- *  1. `src/prototypes/` es superficie en evaluación y está detrás de
- *     `VITE_ENABLE_PROTOTYPES`. Importar de ahí ataría una sección pedida a una
- *     carpeta que puede desaparecer, y arrastraría además sus doce propuestas
- *     al grafo de dependencias.
- *  2. Los tiles de allá reciben datos de OEE: `s.oee`, `s.producidas`,
- *     `pareto.filas`. Reutilizarlos obligaría a un adaptador que tradujera agua
- *     a piezas, y ese adaptador sería el sitio exacto donde se colarían los
- *     números inventados que este módulo evita.
+ *  1. Aquella carpeta era superficie en evaluación y podía desaparecer.
+ *     Desapareció, en efecto, con la transición al modelo de agua — y esta
+ *     copia es lo único que sobrevive de ella.
+ *  2. Sus tiles recibían datos de OEE (`s.oee`, `s.producidas`). Reutilizarlos
+ *     habría obligado a un adaptador que tradujera agua a piezas, y ese
+ *     adaptador sería el sitio exacto donde se colarían los números
+ *     inventados que este módulo evita.
  *
  * Lo que se copia es la FORMA —escala, ritmo, superficies, animación—; los
  * datos son otros. Es la distinción que pedía el encargo.
@@ -25,7 +25,7 @@
  * `@/lib/format.js`. Eso es infraestructura compartida y duplicarla sería un
  * error, no una decisión.
  */
-import { hasValue } from "@/lib/domain/index.js";
+import { hasValue } from "@shared/valores.js";
 import { SIN_DATO } from "@/lib/format.js";
 import { useCountUp } from "@/lib/motion.js";
 

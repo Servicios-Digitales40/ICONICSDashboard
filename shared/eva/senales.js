@@ -2,7 +2,7 @@
  * Contrato con ICONICS para la demo de sistemas de agua: qué señales existen,
  * cómo se llama cada punto y qué se puede afirmar de cada una.
  *
- * Es el equivalente de `@shared/tagCatalog.js` para este árbol, y cumple el
+ * Es el catálogo de puntos de este árbol, y cumple el
  * mismo pacto: **es el único archivo de Demo EVA que contiene nombres de tag**.
  * El resto del módulo habla en claves de dominio (`nivelTanque`, `cargaMotor`)
  * y nunca de `SNIVEL_TANQUE`.

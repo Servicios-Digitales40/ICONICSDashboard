@@ -14,9 +14,10 @@
  * esto viva en `shared/` en vez de repetirse en los dos lados:
  *
  * 1. **El punto histórico se nombra con `ac:`, igual que el de tiempo real.**
- *    La sintaxis `hda:\Configuration\…` de `shared/tagCatalog.js` responde 500
- *    para este árbol, con las dos variantes de barra probadas. Por eso el
- *    asistente NO puede reutilizar `historyPointName`: usa `pointName`.
+ *    La sintaxis `hda:\Configuration\…` que usaba el catálogo del tablero
+ *    anterior responde 500 para este árbol, con las dos variantes de barra
+ *    probadas. Por eso aquí el punto histórico se nombra con `pointName` y no
+ *    hay un `historyPointName` aparte.
  *
  * 2. **Sólo cuatro de las ocho señales tienen serie propia.** A las otras tres
  *    el historiador les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica

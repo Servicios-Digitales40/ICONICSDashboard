@@ -1,9 +1,9 @@
 /**
  * Vista «Assets» de Demo EVA — el explorador, anclado al árbol de la demo.
  *
- * Es el mismo componente que usa la vista de Resonac, con otra raíz. No es una
- * copia: `features/assets/components/ExploradorAssets.jsx` se extrajo
- * precisamente para esto, y las dos vistas se corrigen a la vez.
+ * El explorador es genérico y vive en `components/assets/ExploradorAssets.jsx`;
+ * aquí sólo se le fija la raíz. Se extrajo cuando lo compartían dos secciones y
+ * se quedó donde está: no sabe de esta instalación ni de ninguna.
  *
  * ── POR QUÉ ANCLADO, Y POR QUÉ CON SALIDA ──────────────────────────
  *
@@ -26,7 +26,7 @@
 import { useState } from "react";
 import { CornerLeftUp, FolderTree } from "lucide-react";
 
-import { ExploradorAssets, RAIZ_ASSETS } from "@/features/assets/components/ExploradorAssets.jsx";
+import { ExploradorAssets, RAIZ_ASSETS } from "@/components/assets/ExploradorAssets.jsx";
 import { SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 

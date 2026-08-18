@@ -1,29 +1,34 @@
-# ICONICS Dashboard
+# Demo EVA — Sistemas de agua industrial
 
-Tablero de planta que muestra el **OEE**, la producción y el estado de las
-máquinas de Resonac, leyendo los datos de un servidor **ICONICS** (AssetWorX y
-Hyper Historian).
+Tablero que muestra el estado de una instalación de agua industrial leyendo sus
+señales de un servidor **ICONICS** (AssetWorX y Hyper Historian).
 
 El proyecto son dos piezas: un backend puente en Node que resuelve la
 autenticación contra ICONICS, y un frontend en React que consume ese backend.
 
 ## Qué hace
 
-- **Resumen de planta** — OEE agregado, sus tres factores, producción, reparto
-  de rechazos, tiempos muertos y estado de cada área.
-- **Monitor por área** — parrilla de tarjetas con las máquinas de cada línea.
-- **Detalle de máquina** — desglose por factor (disponibilidad, rendimiento,
-  calidad), el OEE representado de varias formas, y un comparativo entre dos
-  fechas sobre datos del historiador.
-- **Explorador de assets** — navegación del árbol de AssetWorX con lectura de
-  propiedades en vivo.
-- **Datos crudos** — lectura, escritura y borrado de puntos sueltos de ICONICS.
+Ocho señales, todas bajo `ac:TDCON/DEMO/SENSORES/`, presentadas de cuatro
+formas:
+
+- **Planta** — el estado del sistema derivado de sus señales, con la serie
+  histórica de las que el historiador entrega.
+- **Máquina 3D** — el grupo de bombeo, que se comporta según ese estado.
+- **Maqueta 3D** — la instalación en miniatura; el nivel del tanque es el dato
+  en vivo.
+- **Assets** — los ocho puntos con su valor y su calidad en crudo, navegando el
+  árbol de AssetWorX.
 - **Asistente** — un chat que responde en lenguaje natural consultando ICONICS
   de verdad, con un modelo que corre en el propio servidor. Opcional: sin
   `IA_BASE` no aparece.
 
-Las máquinas son 10, repartidas en dos áreas: siete líneas (`LIN 1..7`) y tres
-rectificadoras (`REC 10, 11, 13`).
+> **De dónde viene esto.** Hasta agosto de 2026 la aplicación era un tablero de
+> **OEE** sobre las diez máquinas de Resonac —siete líneas y tres
+> rectificadoras—, y la demo de agua era una sección más. La transición invirtió
+> los papeles y el tablero de OEE se retiró entero: sus vistas, su modelo de
+> planta, su catálogo de tags, su simulador y sus doce propuestas de diseño. Lo
+> que sobrevivió es lo que nunca supo de máquinas: el puente HTTP, el motor de
+> sondeo, el explorador de assets y las primitivas 3D.
 
 ## Estructura
 
@@ -31,17 +36,19 @@ rectificadoras (`REC 10, 11, 13`).
 .
 ├── backend/            Servidor puente hacia ICONICS (Node, sin dependencias)
 │   ├── http/             Mecánica HTTP: router, respuestas, estáticos
+│   ├── ia/               Asistente: herramientas y bucle de conversación
 │   ├── iconics/          Autenticación OIDC, cliente REST y validación
 │   └── routes/           Traducción HTTP ↔ cliente
 ├── react-dashboard/    Frontend React + Vite
-├── shared/             Dominio que usan los dos: catálogo de tags e historiador
+│   └── src/Demo-EVA/     Todo lo que sabe de la instalación de agua
+├── shared/             Dominio que usan los dos: señales, estado y umbrales
 ├── scripts/            Utilidades de verificación
-└── docs/               Plan de conexión, mejoras y tabla de tags
+└── docs/               Planes de la demo y del simulador
 ```
 
 `shared/` existe porque el backend y el frontend necesitan las mismas reglas de
-negocio —qué máquinas hay, cómo se nombra un punto, cómo se resume un día del
-historiador— y duplicarlas las haría divergir. Ver
+negocio —qué señales hay, cómo se nombra un punto, cuándo una medida está fuera
+de banda— y duplicarlas las haría divergir. Ver
 [`shared/README.md`](shared/README.md).
 
 ## Requisitos
@@ -144,20 +151,18 @@ cd .. && node --env-file=.env.production backend/server.mjs
 
 Sin ese build, el backend responde 503 diciendo que falta compilar.
 
-> ⚠️ **`shared/` tiene que viajar en la release.** Desde el Plan 6 el backend
-> importa de ahí el catálogo de tags y las reglas del historiador. Un paquete
-> que lleve solo `backend/` y `dist/` arranca y falla en el primer `import`.
-> El guion de empaquetado está archivado en el tag `archivo/plan-produccion` y
-> **no incluye `shared/` todavía**: hay que añadirlo al recuperarlo.
+> ⚠️ **`shared/` tiene que viajar en la release.** El backend importa de ahí el
+> catálogo de señales y las reglas del historiador. Un paquete que lleve solo
+> `backend/` y `dist/` arranca y falla en el primer `import`.
 
 El build se estampa solo con el `git describe` del árbol, y esa versión se ve
 en el Topbar y en `/api/health`. En producción **no** deben aparecer
-`VITE_ICONICS_FAKE`, `VITE_ENABLE_SIMULATOR`, `VITE_ENABLE_PROTOTYPES` ni
-`NODE_TLS_REJECT_UNAUTHORIZED`: las tres primeras se hornean en el bundle, y la
-última impide el arranque con `NODE_ENV=production`.
+`VITE_ICONICS_FAKE`, `VITE_ENABLE_SIMULATOR` ni `NODE_TLS_REJECT_UNAUTHORIZED`:
+las dos primeras se hornean en el bundle, y la última impide el arranque con
+`NODE_ENV=production`.
 
-El paso a producción —lo que falta, cómo se compila y cómo se despliega— está
-en [`docs/PLAN-3-PRODUCCION.md`](docs/PLAN-3-PRODUCCION.md).
+Tras cada build hay que ejecutar [`scripts/verificar-bundle.mjs`](scripts/verificar-bundle.mjs),
+que comprueba que la pila 3D no se ha colado en el arranque.
 
 ## Orígenes de datos
 
@@ -173,22 +178,9 @@ aviso permanente.
 El simulador sirve para desarrollar sin servidor **y** para enseñar la
 aplicación. Pasa por el motor de polling igual que el servidor real, así que
 ejercita la calidad OPC, los reintentos y la marca de dato rancio; lo único que
-cambia es de dónde salen los bytes.
-
-Cada sección tiene su generador, porque son dos árboles con formas distintas:
-`lib/iconics/fakeTransport.js` para Resonac y
-[`Demo-EVA/data/simulador.js`](react-dashboard/src/Demo-EVA/data/simulador.js)
-para la instalación de agua, éste con serie histórica incluida. Ver
-[`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md).
-
-**Lo que el simulador no cubre:** el histórico de Resonac. El comparativo del
-detalle de máquina y el mapa de calor del calendario se quedan en blanco con el
-origen simulado, a propósito — un gráfico vacío se ve, uno inventado no.
-
-Hasta agosto de 2026 había un tercer origen, «Demo», con su propia fuente de
-datos fijos. Se retiró porque se saltaba el motor entero —justo lo que había
-que ejercitar—, y lo único valioso que aportaba, poder cambiar en caliente, lo
-heredó el simulador. Ver [`docs/PLAN-5-DOS-ORIGENES.md`](docs/PLAN-5-DOS-ORIGENES.md).
+cambia es de dónde salen los bytes. Vive en
+[`Demo-EVA/data/simulador.js`](react-dashboard/src/Demo-EVA/data/simulador.js) e
+incluye serie histórica. Ver [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md).
 
 ### Banderas de compilación
 
@@ -197,11 +189,10 @@ heredó el simulador. Ver [`docs/PLAN-5-DOS-ORIGENES.md`](docs/PLAN-5-DOS-ORIGEN
 | `VITE_ICONICS_FAKE` | Arranca en el simulador | real |
 | `VITE_ENABLE_SIMULATOR` | Añade el **botón** para cambiar de origen en caliente | apagada |
 | `VITE_ICONICS_CHAOS` | `none` · `soft` · `high` — cuántos fallos inyecta el simulador | `soft` |
-| `VITE_ENABLE_PROTOTYPES` | Añade las 12 propuestas de diseño y la vista «Máquina 3D» | apagada |
 
 Todas se resuelven en **build**, así que un bundle compilado sin ellas va al
-backend real, no trae interruptor y no tiene rutas experimentales — que es lo
-que debe llegar a un monitor de planta.
+backend real y no trae interruptor — que es lo que debe llegar a un monitor de
+planta.
 
 Para una demostración con público, `VITE_ICONICS_CHAOS=none` apaga la
 aleatoriedad del simulador: sin huecos, sin calidad mala y sin latencia.
@@ -209,9 +200,9 @@ aleatoriedad del simulador: sin huecos, sin calidad mala y sin latencia.
 ## El asistente
 
 Un chat, disponible desde cualquier pantalla, que responde preguntas en
-lenguaje natural consultando ICONICS. «¿Cuál fue el OEE de la Línea 1 el 25 de
-marzo de 2025?» se convierte en una lectura real del historiador, no en una
-cifra recitada por el modelo.
+lenguaje natural consultando ICONICS. «¿Cuánto ha bajado el nivel del tanque
+desde ayer?» se convierte en una lectura real del historiador, no en una cifra
+recitada por el modelo.
 
 Es **opcional y está apagado por defecto**. Se enciende apuntando `IA_BASE` a
 un llama-server local:
@@ -232,10 +223,10 @@ Tres reglas del diseño, por si sorprenden en pantalla:
   nada, el puente **no** deja salir la respuesta.
 - **Una consulta a la vez.** La segunda pregunta simultánea recibe un aviso, no
   una espera muda: dos a la vez se reparten la GPU y tardan el doble las dos.
-- **Solo algunas máquinas tienen historia.** Hoy, la Lineal 1. Preguntar por
-  otra fecha pasada devuelve «no tengo ese dato», nunca un cero.
-
-El detalle está en [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md).
+- **Sólo algunas señales tienen historia.** A tres de las ocho el historiador
+  les devuelve la serie de otra sin dar error, así que la marca vive como hecho
+  medido en `shared/eva/senales.js` (campo `historizado`). Preguntar por el
+  pasado de una que no la tiene devuelve «no tengo ese dato», nunca un cero.
 
 ## Pruebas
 
@@ -256,20 +247,16 @@ node scripts/verificar-herramientas.mjs   # las herramientas del asistente
 node scripts/verificar-chat.mjs           # el bucle de conversación
 ```
 
-Contra el servidor real, con el backend levantado:
+Tras compilar:
 
 ```bash
-node scripts/verificar-catalogo.mjs    # los puntos del catálogo existen
-node scripts/verificar-historia.mjs    # el historiador entrega muestras
+node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 ```
 
 ## Documentación
 
 - [`backend/README.md`](backend/README.md) — arquitectura del puente y referencia de la API
 - [`react-dashboard/README.md`](react-dashboard/README.md) — arquitectura del frontend
-- [`docs/PLAN-1-CONEXION-ICONICS.md`](docs/PLAN-1-CONEXION-ICONICS.md) — plan de conexión
-- [`docs/PLAN-2-MEJORAS.md`](docs/PLAN-2-MEJORAS.md) — mejoras propuestas
-- [`docs/PLAN-3-PRODUCCION.md`](docs/PLAN-3-PRODUCCION.md) — paso a producción: huecos, build y despliegue
-- [`docs/PLAN-6-IA-LOCAL.md`](docs/PLAN-6-IA-LOCAL.md) — chat con IA local sobre los datos
-- [`docs/PLAN-7-ALCANCE-ASISTENTE.md`](docs/PLAN-7-ALCANCE-ASISTENTE.md) — memoria de conversación y planta entera (propuesto)
-- [`docs/TAGS.md`](docs/TAGS.md) — tabla Excel → punto ICONICS → campo de dominio
+- [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué
+- [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
+- [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección

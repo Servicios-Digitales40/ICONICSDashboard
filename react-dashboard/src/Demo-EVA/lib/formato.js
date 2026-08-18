@@ -15,7 +15,7 @@
  * que quien lo sepa pueda reconocerlo.
  */
 import { SIN_DATO, fmtNum, pctSeguro } from "@/lib/format.js";
-import { hasValue } from "@/lib/domain/index.js";
+import { hasValue } from "@shared/valores.js";
 
 /**
  * Valor de una señal, con su unidad. `51.537` → `"51.5 %"`.

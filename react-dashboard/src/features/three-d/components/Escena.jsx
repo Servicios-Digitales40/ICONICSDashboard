@@ -1,5 +1,5 @@
 /**
- * El `<Canvas>` configurado. Las dos vistas 3D entran por aquí y ninguna
+ * El `<Canvas>` configurado. Todas las vistas 3D entran por aquí y ninguna
  * repite ajustes de renderizador, cámara ni luces.
  *
  * Reúne las decisiones que afectan a un equipo encendido ocho horas:
@@ -8,7 +8,7 @@
  *    los píxeles sombreados a cambio de nada visible a tres metros.
  *  - `frameloop` que el llamador controla. Con todas las máquinas quietas la
  *    vista pasa a "demand" y la GPU baja a cero en vez de repintar 60 veces por
- *    segundo. Ver `useFrameloop` en `lib/frameloop.js`.
+ *    segundo. Lo decide la vista, que es quien sabe si algo se mueve.
  *  - Una sola luz con sombra (`Luces.jsx`), y ningún recurso remoto.
  *
  * El fondo NO se pinta con `<color attach="background">` sino con el CSS del
@@ -37,7 +37,7 @@ const POLAR_MAX = Math.PI / 2 - 0.035;
  * El navegador cierra el contexto WebGL cuando el controlador de vídeo se
  * reinicia, y eso en un equipo de planta encendido meses pasa. Remontar lo
  * recupera; remontar SIEMPRE convierte un controlador que falla en bucle en
- * una pantalla que parpadea sin parar. Al tercer intento se pasa a la tabla.
+ * una pantalla que parpadea sin parar. Al tercer intento se pasa al aviso.
  */
 const REINTENTOS = 2;
 
@@ -48,7 +48,7 @@ export default function Escena({
   fov = 40,
   /** Punto al que mira y alrededor del que orbita. */
   objetivo = [0, 0.9, 0],
-  /** "always" | "demand" | "never". Ver `lib/frameloop.js`. */
+  /** "always" | "demand" | "never". Lo elige la vista según si algo se mueve. */
   frameloop = "always",
   controles = true,
   /** Distancias de órbita. La maqueta necesita alejarse más que una máquina. */
@@ -57,6 +57,11 @@ export default function Escena({
   altura = 520,
   /** Se monta DENTRO del canvas pero fuera de la escena (p. ej. <Html>). */
   extras = null,
+  /**
+   * Qué enseñar en lugar de la escena cuando no hay WebGL. La escena no sabe
+   * de dominios, así que la alternativa la aporta la vista. Ver `Sin3D.jsx`.
+   */
+  respaldo = null,
 }) {
   const { theme, dark } = useTheme();
   const paleta = useMemo(() => construirPaleta(theme, dark), [theme, dark]);
@@ -77,8 +82,8 @@ export default function Escena({
 
   // La sonda va antes de montar el `<Canvas>`: construirlo sin WebGL lanza, y
   // lo que quedaría en la pared es el panel del ErrorBoundary.
-  if (!hayWebGL()) return <Sin3D motivo="sin-webgl" />;
-  if (generacion > REINTENTOS) return <Sin3D motivo="contexto-perdido" />;
+  if (!hayWebGL()) return <Sin3D motivo="sin-webgl" respaldo={respaldo} />;
+  if (generacion > REINTENTOS) return <Sin3D motivo="contexto-perdido" respaldo={respaldo} />;
 
   return (
     <div

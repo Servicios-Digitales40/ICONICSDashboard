@@ -14,8 +14,5 @@ export * from "./Tabs.jsx";
 export * from "./Avatar.jsx";
 export * from "./Button.jsx";
 export * from "./Input.jsx";
-export * from "./DatePicker.jsx";
 export * from "./HoverTip.jsx";
 export * from "./AlertBanner.jsx";
-export * from "./BandGauge.jsx";
-export * from "./KpiTile.jsx";

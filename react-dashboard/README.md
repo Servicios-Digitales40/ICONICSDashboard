@@ -1,8 +1,9 @@
-# Dashboard Resonac · OEE sobre ICONICS
+# Demo EVA · Frontend
 
-Panel de planta construido con **React + Vite**. Lee el OEE, la producción y el
-estado de las 10 máquinas de Resonac desde un servidor **ICONICS** (AssetWorX),
-a través de un backend puente que resuelve la autenticación.
+Panel construido con **React + Vite**. Lee las ocho señales del sistema de agua
+industrial (`ac:TDCON/DEMO/SENSORES/`) desde un servidor **ICONICS**
+(AssetWorX y Hyper Historian), a través de un backend puente que resuelve la
+autenticación.
 
 ## Requisitos
 
@@ -51,9 +52,9 @@ VITE_ICONICS_CHAOS=none npm run dev          # → simulador sin fallos, para en
 
 > **El botón está apagado salvo que se pida, y se decide en el build.** El
 > destino de esto son monitores de planta: sin teclado y sin nadie delante, un
-> interruptor que sustituye la planta entera por datos inventados sólo puede
-> activarse por accidente, y una vez activado nadie lo desactiva. La cinta de
-> aviso funciona con público delante, no en una pared. Con la bandera apagada
+> interruptor que sustituye la instalación entera por datos inventados sólo
+> puede activarse por accidente, y una vez activado nadie lo desactiva. La cinta
+> de aviso funciona con público delante, no en una pared. Con la bandera apagada
 > sobreviven el indicador de origen y su cinta —que siguen distinguiendo el
 > servidor real del simulador—; lo que desaparece es el interruptor.
 >
@@ -64,14 +65,6 @@ VITE_ICONICS_CHAOS=none npm run dev          # → simulador sin fallos, para en
 > **se ignora** sin la bandera: sin eso, una pantalla que quedó en simulado
 > antes de apagarla arrancaría en simulado para siempre, y ya sin botón para
 > sacarla. La garantía es de comportamiento, no de bytes.
-
-> **Antes había un tercer origen, «Demo»,** con su propia fuente de datos
-> fijos. Se retiró en agosto de 2026 porque se saltaba el motor de polling —y
-> con él la calidad OPC, los reintentos y la marca de dato rancio—, que es
-> justo lo que hacía falta ejercitar. Lo único valioso que aportaba, poder
-> cambiar de origen en caliente, lo heredó el simulador; y su predecibilidad la
-> recupera `VITE_ICONICS_CHAOS=none`. Ver
-> [`../docs/PLAN-5-DOS-ORIGENES.md`](../docs/PLAN-5-DOS-ORIGENES.md).
 
 ### El grado de caos del simulador
 
@@ -98,9 +91,9 @@ remonta, para que no queden valores del origen anterior en pantalla.
 
 ### Por qué «Simulado» se anuncia tan insistentemente
 
-Los valores del transporte falso son plausibles a propósito: el OEE es el
-producto real de sus tres factores, las piezas crecen y los estados rotan entre
-los cinco códigos reales. No hay forma de distinguirlo de la planta mirando la
+Los valores del transporte falso son plausibles a propósito: el nivel del tanque
+sube y baja con el consumo, la presión sigue a la bomba y las temperaturas
+derivan despacio. No hay forma de distinguirlo de la instalación mirando la
 pantalla — de ahí la cinta.
 
 Además imita las respuestas de ICONICS **incluidos los fallos**: calidad mala,
@@ -123,117 +116,111 @@ src/
 ├── app/                      Armazón: providers, layout y rutas
 │   ├── App.jsx               Composición de providers + Shell
 │   ├── ErrorBoundary.jsx     Barrera de render: raíz y por página
-│   ├── layout/               Sidebar, Topbar, cinta de modo demo
+│   ├── layout/               Sidebar, Topbar, cinta de origen
 │   └── routes/               Registro ÚNICO de rutas (routes.jsx) + URL
 │
-├── lib/                      Infraestructura compartida
-│   ├── domain/               Barril sobre ../../shared/domain/
-│   ├── iconics/              Motor de polling, transporte y cliente HTTP
-│   ├── datasource/           Interfaz + fuente ICONICS + fuente demo + hooks
+├── Demo-EVA/                 TODO lo que sabe de la instalación de agua
+│   ├── data/                 Fuente, simulador, historia y hooks
+│   ├── domain/               Reexports de @shared/eva/
+│   ├── components/           Tiles y primitivas visuales de la sección
+│   ├── three-d/              Modelos y comportamiento 3D de la instalación
+│   └── views/                Las cuatro vistas (rutas)
+│
+├── lib/                      Infraestructura compartida, sin dominio
+│   ├── iconics/              Motor de polling, transporte real, caos, cliente HTTP
+│   ├── datasource/           Qué origen está activo (no los datos)
 │   ├── format.js             Formateo consciente de la ausencia de dato
-│   ├── machines.js           Datos de ejemplo (heredado; lo usa la demo)
-│   └── shiftModel.js         Tiempos de turno y metas
+│   └── motion.js             Animación respetuosa con `prefers-reduced-motion`
 │
-├── features/                 Un módulo por área funcional
-│   ├── dashboard/            Resumen de planta (rollup + tiles)
-│   ├── machines/             Monitor de área y detalle de máquina
-│   ├── assets/               Explorador del árbol de AssetWorX
-│   ├── data/                 Puntos sueltos — SIN RUTA (ver abajo)
-│   └── sankey/               Diagramas de flujo — SIN RUTA (ver abajo)
+├── features/
+│   ├── asistente/            El chat de lenguaje natural
+│   ├── three-d/              Toolkit 3D genérico: Escena, Luces, Piso, Baliza…
+│   └── data/                 Puntos sueltos — SIN RUTA (ver abajo)
 │
-├── components/               Átomos de UI reutilizables (ui/, charts/)
-├── theme/                    Colores claro/oscuro + useTheme()
-└── prototypes/               Propuestas en evaluación — SOLO en el build de demo
+├── components/               Átomos de UI reutilizables (ui/, charts/, assets/)
+└── theme/                    Colores claro/oscuro + useTheme()
 ```
 
-**`lib/domain/` y `lib/iconics/` ya no son dueños de las reglas de negocio.**
-Desde el [Plan 6](../docs/PLAN-6-IA-LOCAL.md), el catálogo de tags, la forma
-`Machine`, el enum de estados y la mecánica del historiador viven en
-[`shared/`](../shared/README.md), en la raíz del repositorio, porque el backend
-necesita exactamente las mismas reglas para las herramientas del asistente.
-`lib/domain/index.js` y `lib/iconics/index.js` siguen siendo la API pública que
-consumen las vistas, así que para ellas no cambió nada.
+**`lib/` no es dueño de ninguna regla de negocio, y no debe serlo.** El catálogo
+de señales, los umbrales, el estado derivado y la mecánica del historiador viven
+en [`shared/`](../shared/README.md), en la raíz del repositorio, porque el
+backend necesita exactamente las mismas reglas para las herramientas del
+asistente.
 
 Se importa con el alias `@shared`, el segundo del proyecto y la excepción a la
 regla de tener uno solo: apunta fuera de `src/`, que es justo lo que `@` no
 puede hacer. Está declarado a la vez en `vite.config.js` y en `jsconfig.json`.
 
-### Qué ve cada build
+### Qué queda fuera de la superficie
 
-En la Fase C del [Plan 3](../docs/PLAN-3-PRODUCCION.md) se acotó la superficie
-de la aplicación a lo que un operador debe poder abrir en un monitor sin
-teclado. El registro de rutas (`app/routes/routes.jsx`) es el único sitio donde
-se decide:
+El registro de rutas (`app/routes/routes.jsx`) es el único sitio donde se decide
+qué puede abrir un operador en un monitor sin teclado.
 
-| | Planta | Demo |
-|---|---|---|
-| Planta, Lineales, Rectificadoras, Detalle, Assets | ✅ | ✅ |
-| Las 12 propuestas de `src/prototypes/` | — | ✅ |
-| Interruptor de origen de datos | — | ✅ |
+**`features/data/` sigue en el árbol pero nadie lo importa**, así que no entra
+en ningún bundle. Hacía altas, escrituras y **borrados** de puntos sueltos
+contra `db:Northwind`, la base de ejemplo de ICONICS; si vuelve, vuelve detrás
+de autenticación y sin la pestaña de borrado.
 
-- **Las propuestas de diseño existen sólo en el build de demo.** No es que
-  estén ocultas: en el build de planta **no se generan siquiera sus trozos**.
-  Eso depende de dos detalles que conviene no «limpiar» sin leer el comentario
-  de `routes.jsx` — se cargan con `import()` dinámico, y la condición es un
-  ternario y no una función auxiliar. Con un import normal viajarían a planta
-  aunque su ruta no se registrara; con una función auxiliar, el empaquetador no
-  puede probar que la rama está muerta y los emite igual. Las dos cosas se
-  descubrieron rompiéndolas, y `src/test/app/routes.test.jsx` las fija.
-- **`features/data/` y `features/sankey/` siguen en el árbol pero nadie los
-  importa**, así que no entran en ningún bundle. `Data` hacía altas, escrituras
-  y **borrados** contra `db:Northwind`, la base de ejemplo de ICONICS; si
-  vuelve, vuelve detrás de autenticación y sin la pestaña de borrado.
-  `SankeyChart` sí sigue en producción: lo usa el detalle de máquina.
+> **Lo que se fue en agosto de 2026.** Este frontend era el tablero de OEE de
+> Resonac, y la demo de agua una sección suya. La transición invirtió los
+> papeles y se retiró el tablero entero: `features/dashboard/`,
+> `features/machines/`, `features/sankey/`, las dos vistas 3D de máquinas, las
+> doce propuestas de `src/prototypes/`, el kit heredado de `src/_deprecated/`,
+> el simulador `fakeTransport.js`, la fuente `iconicsSource.js` con sus hooks
+> de planta y todo el dominio de máquinas de `shared/`. Lo que sobrevivió es lo
+> que nunca supo de máquinas.
 
 ### Flujo de datos
 
 ```
-vistas  ──usePlantData() / useMachineData()──►  DataSourceProvider
-                                                   │
-                                              iconicsSource
-                                                   │
-                                              pollingEngine  ── 1 petición por ciclo
-                                                   │
-                                    ┌──────────────┴──────────────┐
-                              transporte real                transporte falso
-                                    │                        (fakeTransport)
-                              backend/server.mjs  ── OIDC + FWX REST
+vistas  ──useSistemaAgua()──►  EvaProvider
+                                   │
+                              evaSource
+                                   │
+                              pollingEngine  ── 1 petición por ciclo
+                                   │
+                    ┌──────────────┴──────────────┐
+              transporte real                transporte simulado
+                    │                        (Demo-EVA/data/simulador.js)
+              backend/server.mjs  ── OIDC + FWX REST
 ```
 
-**Un solo camino, y la bifurcación abajo del todo.** Hasta el Plan 5 había una
-segunda rama a la altura de la fuente —`demoSource`— que entregaba `Machine` ya
-construidas y por tanto se saltaba el motor, la calidad OPC, los reintentos y la
-marca de dato rancio. Ahora lo único que cambia es de dónde salen los bytes, así
-que el simulador ejercita exactamente el mismo código que el servidor.
+**Un solo camino, y la bifurcación abajo del todo.** La fuente y el motor son
+los mismos en los dos casos; lo único que cambia es de dónde salen los bytes,
+así que el simulador ejercita exactamente el mismo código que el servidor.
+
+`DataSourceProvider` publica **qué transporte** está activo, no una fuente: cada
+sección construye la suya. Antes creaba además un motor global para las máquinas
+de Resonac, que seguía sondeando el servidor mucho después de que nadie pintara
+esos datos.
 
 ---
 
 ## Cómo está pensado
 
 - **Las vistas no saben de dónde vienen los datos.** Consumen hooks; el origen
-  se decide en la raíz. Eso es lo que permite que el botón de demo sea un solo
+  se decide en la raíz. Eso es lo que permite que el interruptor sea un solo
   `if` y no un flag repartido por toda la UI.
 
 - **Un poller, una petición, muchos suscriptores.** Los componentes declaran qué
-  tags necesitan al montar y los liberan al desmontar; el motor agrupa la unión
-  en una sola llamada en lote. Son ~4 peticiones/min en la vista de planta y ~12
-  en el detalle, frente a ~120 y ~168 con un intervalo por componente.
+  puntos necesitan al montar y los liberan al desmontar; el motor agrupa la
+  unión en una sola llamada en lote, frente a un intervalo por componente.
 
-- **Un hueco se pinta como hueco, nunca como cero.** Cualquier métrica puede
-  faltar (mala calidad, tag ausente, división por cero en el servidor). Un
-  `0.00 %` inventado en un tablero de planta se lee como una máquina parada.
+- **Un hueco se pinta como hueco, nunca como cero.** Cualquier medida puede
+  faltar (mala calidad, punto ausente, división por cero en el servidor). Un
+  `0.00` inventado en un tablero de planta se lee como una instalación parada.
 
 - **Un solo lugar para los colores.** Todo componente lee de `useTheme()` y nunca
   escribe un color literal.
 
-- **El vocabulario de estados vive en `shared/domain/estado.js`**, no duplicado
-  entre la tarjeta y el dashboard.
+- **El vocabulario de estados vive en `@shared/eva/estado.js`**, no duplicado
+  entre los tiles, el 3D y el asistente.
 
-- **La ruta actual vive en la URL.** `/area-REC` abre las rectificadoras
-  directamente, una recarga vuelve donde estaba y el enlace de una máquina se
-  puede enviar. Antes era un `useState` y la barra de direcciones no cambiaba
-  nunca: en un escritorio no se nota, pero obligaba a ir pantalla por pantalla
-  a dejarlas en su vista, y cualquier reinicio las devolvía a Planta.
+- **La ruta actual vive en la URL.** Una recarga vuelve donde estaba y el enlace
+  de una vista se puede enviar. Antes era un `useState` y la barra de
+  direcciones no cambiaba nunca: en un escritorio no se nota, pero obligaba a ir
+  pantalla por pantalla a dejarlas en su vista, y cualquier reinicio las
+  devolvía a la primera.
 
 - **Una excepción de render no apaga el tablero.** `ErrorBoundary` envuelve
   cada página y la raíz; una vista rota se queda en su sitio con un panel que
@@ -241,17 +228,15 @@ que el simulador ejercita exactamente el mismo código que el servidor.
   recarga, así que una pantalla en blanco se queda en blanco hasta que alguien
   sube a verla.
 
+- **La pila 3D no se paga al arrancar.** Las cuatro vistas se registran con
+  `lazy()`, y `../scripts/verificar-bundle.mjs` comprueba sobre el `dist` que
+  `three` sigue en su propio trozo diferido. Hay que ejecutarlo tras cada build.
+
 - **La pantalla dice qué build corre.** El Topbar muestra el `git describe` del
   build. Es lo primero que hace falta cuando alguien reporta que un número está
   mal: saber si esa pantalla concreta ya tiene el arreglo.
 
 ---
-
-## Documentación
-
-- [`docs/PLAN-1-CONEXION-ICONICS.md`](../docs/PLAN-1-CONEXION-ICONICS.md) — plan de conexión y riesgos
-- [`docs/PLAN-2-MEJORAS.md`](../docs/PLAN-2-MEJORAS.md) — mejoras propuestas
-- [`docs/TAGS.md`](../docs/TAGS.md) — tabla Excel → punto ICONICS → campo de dominio
 
 ## Pruebas
 
@@ -259,36 +244,7 @@ que el simulador ejercita exactamente el mismo código que el servidor.
 npm test
 ```
 
-Cubren cuatro cosas:
-
-- **Saneamiento del dominio** — calidad ≠ 192, `NaN`, `Infinity`.
-- **Motor de polling** — presupuesto de red, ciclo de vida, backoff, troceado.
-- **Referencia numérica congelada** — garantiza que la migración a ICONICS no
-  movió ningún cálculo del rollup de planta.
-- **Render de las vistas con datos incompletos** — las subvistas del detalle se
-  montan de verdad con máquinas agujereadas, porque los dos fallos que llegaron
-  a pantalla fueron de render, no de lógica.
-
-Si un cambio deliberado altera los números del rollup, se regenera la referencia:
-
-```bash
-UPDATE_GOLDEN=1 npm test
-```
-
-### Verificar el catálogo contra el servidor
-
-El catálogo de tags se derivó del Excel de configuración, no del servidor: son
-dos artefactos que pueden divergir. Este script lee de una vez los 147 puntos
-que la app puede pedir y reporta cuáles no existen o vuelven con mala calidad.
-
-```bash
-node backend/server.mjs               # en una terminal
-node scripts/verificar-catalogo.mjs   # en otra
-```
-
-Conviene lanzarlo cada vez que cambie la configuración de ICONICS y ante
-cualquier «falta un dato en el panel»: resuelve en una ejecución lo que si no
-obliga a ir vista por vista.
+Lo que cubren y por qué está en [`src/test/README.md`](src/test/README.md).
 
 ## Stack
 
@@ -296,4 +252,5 @@ obliga a ir vista por vista.
 - [Vite](https://vitejs.dev) — bundler y servidor de desarrollo
 - [Vitest](https://vitest.dev) — pruebas
 - [Recharts](https://recharts.org) — gráficas
+- [three](https://threejs.org) + [@react-three/fiber](https://r3f.docs.pmnd.rs) + drei — 3D
 - [Lucide React](https://lucide.dev) — iconos

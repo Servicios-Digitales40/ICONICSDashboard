@@ -1,36 +1,32 @@
 /**
- * El único sitio de la app que sabe de dónde salen los datos.
+ * El único sitio de la app que decide de dónde salen los datos.
  *
  * La elección se hace aquí una sola vez y aguas abajo nadie pregunta. Repartir
  * un `if` por cada vista multiplicaría los caminos a probar y acabaría dejando
  * alguno pegando al servidor con el simulador encendido.
  *
- * ── QUÉ CONMUTA EL INTERRUPTOR (y qué conmutaba antes) ─────────────
+ * ── QUÉ PUBLICA, Y QUÉ NO ──────────────────────────────────────────
  *
- * Conmuta el **transporte**: el servidor real o el simulador. Antes conmutaba
- * la **fuente** entera, entre `iconicsSource` y un `demoSource` que entregaba
- * `Machine` ya construidas.
+ * Publica la **clase de transporte** —el servidor real o el simulador—, no una
+ * fuente de datos. Quien la necesita la construye: hoy `EvaProvider`, que sabe
+ * qué puntos tiene su instalación y monta su propio motor de polling.
  *
- * Ese modo demo se retiró en el Plan 5 porque se saltaba justo lo que hacía
- * falta ejercitar. `fakeTransport.js` lo decía desde el otro lado: «el motor
- * vive por debajo y su trabajo es justamente lo que `demoSource` se salta»
- * —agrupar puntos, trocear lotes, filtrar por calidad, reintentar con backoff
- * y marcar datos rancios—. Ahora hay **un solo camino de datos**: siempre
- * `iconicsSource` sobre el motor de polling, y lo único que cambia es de dónde
- * salen los bytes.
+ * Antes este provider creaba además `iconicsSource`, la fuente de las diez
+ * máquinas de Resonac, y lo hacía en el arranque de la aplicación entera: con
+ * la sección retirada seguía sondeando el servidor por unos datos que ya no
+ * pintaba nadie. Se fue con ella.
  *
  * Dos detalles que hacen falta para que el interruptor sea real:
  *
  *  - Los hijos se remontan con `key`. Sin eso, un componente que ya tuviera
  *    datos en memoria los seguiría enseñando y se mezclarían valores del
  *    servidor con los del simulador.
- *  - Al cambiar, la fuente anterior recibe `stop()`, o su motor seguiría
- *    sondeando en segundo plano.
+ *  - Cada fuente para su motor al cambiar el transporte; eso lo hace su
+ *    provider, que es quien la creó.
  */
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
-import { TRANSPORTES, createTransport, transporteInicial } from "../iconics/transport.js";
-import { createIconicsSource } from "./iconicsSource.js";
+import { TRANSPORTES, transporteInicial } from "../iconics/transport.js";
 
 export { TRANSPORTES };
 
@@ -51,8 +47,8 @@ export { TRANSPORTES };
  * interruptor.
  *
  * Se accede a `import.meta.env` **sin** encadenamiento opcional, para que el
- * empaquetador pueda plegar la comparación. Ver `lib/flags.js`, donde el mismo
- * detalle tiene consecuencias mayores.
+ * empaquetador pueda plegar la comparación: con `?.` la expresión deja de ser
+ * constante y la rama muerta viajaría igual en el bundle.
  */
 export const SIMULADOR_CONMUTABLE = import.meta.env.VITE_ENABLE_SIMULATOR === "true";
 
@@ -125,16 +121,6 @@ function guardarTransporte(t) {
 export function DataSourceProvider({ children }) {
   const [transporte, setTransporteState] = useState(transporteAlArrancar);
 
-  // La fuente se crea una sola vez por transporte. Recrearla en cada render
-  // abriría un motor de polling nuevo cada vez.
-  const source = useMemo(
-    () => createIconicsSource({ transport: createTransport(transporte) }),
-    [transporte]
-  );
-
-  // Al cambiar de transporte (o al desmontar) la fuente anterior se detiene.
-  useEffect(() => () => source.stop?.(), [source]);
-
   const value = useMemo(() => {
     const origen = origenActual(transporte);
 
@@ -152,7 +138,6 @@ export function DataSourceProvider({ children }) {
 
     return {
       transporte,
-      source,
       origen,
       /** ¿Lo que se ve NO es el servidor real? Lo usan el Topbar y la cinta. */
       esSimulado: transporte === TRANSPORTES.SIMULADO,
@@ -163,7 +148,7 @@ export function DataSourceProvider({ children }) {
       alternarTransporte: () =>
         fijar(transporte === TRANSPORTES.SIMULADO ? TRANSPORTES.REAL : TRANSPORTES.SIMULADO),
     };
-  }, [transporte, source]);
+  }, [transporte]);
 
   return (
     <Ctx.Provider value={value}>

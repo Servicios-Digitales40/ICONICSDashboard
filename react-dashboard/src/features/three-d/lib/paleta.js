@@ -51,7 +51,7 @@ export function construirPaleta(theme, dark) {
 }
 
 /**
- * Token del tema → color, para lo que llega desde `estadoVisual.js`.
+ * Token del tema → color, para lo que llega ya resuelto a un token.
  *
  * Los descriptores hablan en tokens (`"coral"`, `"success"`) y no en hexes,
  * igual que el dominio, así que la traducción vive en un solo sitio. Un token

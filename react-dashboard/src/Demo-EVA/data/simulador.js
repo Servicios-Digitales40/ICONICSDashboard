@@ -6,14 +6,14 @@
  * `readSerie()` que sustituye al historiador, y con eso el interruptor de origen
  * del Topbar sirve también esta sección. Ver docs/PLAN-9-SIMULADOR-EVA.md.
  *
- * ── POR QUÉ NO VIVE EN `lib/iconics/fakeTransport.js` ──────────────
+ * ── POR QUÉ VIVE AQUÍ Y NO EN `lib/iconics/` ───────────────────────
  *
- * Porque aquel es infraestructura compartida y depende de `@shared/tagCatalog.js`.
- * Enseñarle este árbol le obligaría a importar `domain/senales.js`, invirtiendo
- * la dependencia y rompiendo desde fuera el pacto de que ese archivo es **el
- * único de Demo EVA con nombres de tag**. Los dos simuladores comparten la forma
- * (`read`, los presets de caos) y nada más, que es la misma relación que ya
- * tienen `iconicsSource.js` y `evaSource.js`.
+ * Porque `lib/` es infraestructura compartida y no debe conocer ninguna
+ * instalación. Un simulador allí tendría que importar `domain/senales.js` para
+ * saber qué puntos generar, invirtiendo la dependencia y rompiendo desde fuera
+ * el pacto de que ese archivo es **el único de Demo EVA con nombres de tag**.
+ * Lo que sí es compartido —la firma `read` y los presets de caos— vive en
+ * `lib/iconics/`; lo que sabe de agua, aquí.
  *
  * ── EL VALOR ES FUNCIÓN DEL RELOJ DE PARED ─────────────────────────
  *
@@ -294,7 +294,7 @@ export function createTransporteEva({
    * Lectura en lote, con la misma firma que el transporte real.
    *
    * Un punto que no sea de este árbol se ignora en silencio, igual que hace
-   * `fakeTransport` con los que no reconoce: para el motor de polling eso es un
+   * el transporte real con los que el servidor no tiene: para el motor eso es un
    * hueco, que es exactamente lo que es.
    */
   async function read(pointNames) {

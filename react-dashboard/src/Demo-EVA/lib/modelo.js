@@ -1,7 +1,6 @@
 /**
  * Derivaciones que necesita la vista de Planta, sobre un `Sistema` ya
- * construido. Funciones puras, sin React y sin tema — mismo criterio que
- * `plantModel.js` y que `prototypes/dashboard-v2/model.js`.
+ * construido. Funciones puras, sin React y sin tema.
  *
  * El sistema LLEGA POR PARÁMETRO desde `useSistemaAgua()`. Este archivo no sabe
  * si viene de ICONICS o del simulador, y esa ignorancia es el requisito: es lo

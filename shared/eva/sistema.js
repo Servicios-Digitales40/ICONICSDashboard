@@ -23,7 +23,7 @@
  * evaluación de las otras: invertirlo dejaría media instalación evaluada contra
  * sus bandas de marcha mientras la bomba está parada.
  */
-import { hasValue, toNumber } from "../domain/machine.js";
+import { hasValue, toNumber } from "../valores.js";
 
 import { SENALES, SENAL_KEYS } from "./senales.js";
 import { ACTIVO_IDS, ACTIVOS } from "./activos.js";

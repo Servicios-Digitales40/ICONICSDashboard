@@ -69,10 +69,11 @@ plantilla comentada de todas las variables está en
 | `IA_MODELO` | `local` | Nombre informativo; llama-server sirve un solo modelo. |
 | `IA_TURNOS` | *(vacío)* | `manana=6-14,tarde=14-22,noche=22-6`. Vacío = preguntar por un turno responde que no está configurado, en vez de inventarse el horario. |
 
-`IA_MAQUINAS_CON_HISTORIA` **ya no existe**. Declaraba qué máquinas de Resonac
-tenían tags «Is Collected», y era configurable con razón: eso cambia marcando
-una casilla en el Data Historian. El asistente responde hoy sobre el sistema de
-agua de `ac:TDCON/DEMO/SENSORES/`, donde el problema no es el mismo: a tres de
+`IA_MAQUINAS_CON_HISTORIA` **ya no existe**. Venía del tablero de OEE, donde
+declaraba qué máquinas tenían tags «Is Collected», y allí era configurable con
+razón: eso cambia marcando una casilla en el Data Historian. El asistente
+responde hoy sobre el sistema de agua de `ac:TDCON/DEMO/SENSORES/`, donde el
+problema no es el mismo: a tres de
 las ocho señales el historiador les devuelve **la serie de otra**, sin dar
 error. Eso no se arregla marcando una casilla, y no puede quedar en manos de una
 variable de entorno mal escrita. Vive como hecho medido en `shared/eva/senales.js`

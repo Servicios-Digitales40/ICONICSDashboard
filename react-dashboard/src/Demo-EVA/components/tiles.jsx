@@ -27,7 +27,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { AlertTriangle, ChevronRight, Droplets } from "lucide-react";
 
 import { ChartTooltip } from "@/components/charts/index.js";
-import { hasValue } from "@/lib/domain/index.js";
+import { hasValue } from "@shared/valores.js";
 import { SIN_DATO, fmtNum } from "@/lib/format.js";
 import { useCountUp, useMounted, usePrefersReducedMotion } from "@/lib/motion.js";
 

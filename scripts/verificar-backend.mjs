@@ -126,7 +126,7 @@ const fake = createServer(async (req, res) => {
     return json(200, pointName.map((n, i) => ({ pointName: n, value: i, quality: 192 })))
   }
   if (p === '/fwxapi/rest/v1/Data/Browse') {
-    return json(200, [{ shortName: 'LIN', pointName: 'ac:RESONAC/LIN/' }])
+    return json(200, [{ shortName: 'SENSORES', pointName: 'ac:TDCON/DEMO/SENSORES/' }])
   }
   if (p === '/fwxapi/rest/v1/Data/Search') return json(200, [{ shortName: 'hit' }])
   if (p === '/fwxapi/rest/v1/Data/Write') {
@@ -236,11 +236,11 @@ console.log('\n── Contrato de la API ─────────────
 
 // 1. Lectura de un punto
 {
-  const r = await get('/api/iconics/data?pointName=ac:RESONAC/LIN/1/OEE')
+  const r = await get('/api/iconics/data?pointName=ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE')
   check('GET /api/iconics/data → { ok, status, payload, pointName }', () => {
     assert.equal(r.status, 200)
     assert.equal(r.body.ok, true)
-    assert.equal(r.body.pointName, 'ac:RESONAC/LIN/1/OEE')
+    assert.equal(r.body.pointName, 'ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE')
     assert.equal(r.body.payload.value, 42)
   })
 }
@@ -295,7 +295,7 @@ console.log('\n── Contrato de la API ─────────────
 // 6. Historia: normalización + hasMore
 {
   const r = await get(
-    '/api/iconics/history?pointName=' + encodeURIComponent('hda:\\Configuration\\X:OEE') +
+    '/api/iconics/history?pointName=' + encodeURIComponent('hda:\\Configuration\\X:SNIVEL_TANQUE') +
     '&startDate=2026-08-04T00:00:00%2B02:00&endDate=2026-08-05T00:00:00%2B02:00' +
     '&aggregate=Interpolative&interval=01:00:00'
   )
@@ -314,14 +314,14 @@ console.log('\n── Contrato de la API ─────────────
 
 // 7. Browse / search / userinfo
 {
-  const r = await get('/api/iconics/browse?path=' + encodeURIComponent('ac:RESONAC/'))
+  const r = await get('/api/iconics/browse?path=' + encodeURIComponent('ac:TDCON/DEMO/'))
   check('GET /api/iconics/browse → { ok, payload[] }', () => {
     assert.equal(r.body.ok, true)
-    assert.equal(r.body.payload[0].pointName, 'ac:RESONAC/LIN/')
+    assert.equal(r.body.payload[0].pointName, 'ac:TDCON/DEMO/SENSORES/')
   })
 }
 {
-  const r = await get('/api/iconics/points?query=OEE')
+  const r = await get('/api/iconics/points?query=NIVEL')
   check('GET /api/iconics/points → { ok, payload }', () => assert.equal(r.body.ok, true))
 }
 {
