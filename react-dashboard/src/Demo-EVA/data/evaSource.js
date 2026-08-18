@@ -30,6 +30,7 @@ import { createPollingEngine } from "@/lib/iconics";
 import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "../domain/senales.js";
 import { createSistema } from "../domain/sistema.js";
 import { createBufferRodante } from "../lib/buffer.js";
+import { leerSerie as leerDelHistoriador } from "./historia.js";
 
 export const CADENCIA_MS = 3_000;
 
@@ -39,6 +40,21 @@ export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
   }
 
   const motor = createPollingEngine({ read: transport.read, intervalMs });
+
+  /**
+   * De dónde sale una serie histórica.
+   *
+   * El transporte simulado trae la suya (`readSerie`); el real no, porque el
+   * histórico de este árbol no se pide como el de Resonac —lleva el nombre de
+   * tiempo real, con `ac:`— y por eso vive en `historia.js` en vez de en el
+   * transporte. Ver la cabecera de ese archivo.
+   *
+   * La elección se hace **aquí y una sola vez**, por el mismo motivo por el que
+   * `DataSourceProvider` es el único sitio que elige transporte: repartir el `if`
+   * por los hooks acabaría dejando alguna gráfica pegando a la red con el
+   * simulador encendido.
+   */
+  const leerSerie = transport.readSerie ?? leerDelHistoriador;
 
   /**
    * El búfer vive en la FUENTE y no en un componente: así sobrevive a que una
@@ -97,6 +113,12 @@ export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
         baja();
       };
     },
+
+    /**
+     * Serie histórica de una señal. No se sondea: se pide al montar, porque el
+     * pasado no cambia y el borde derecho lo cubre el valor en vivo.
+     */
+    leerSerie: (clave, ventana) => leerSerie(clave, ventana),
 
     /** Las muestras en vivo acumuladas en esta sesión. Ver `lib/buffer.js`. */
     buffer,

@@ -6,12 +6,18 @@
  * baja al desmontar, con la baja SIEMPRE en el `return` del efecto. Con el doble
  * montaje de StrictMode en desarrollo, un efecto sin limpieza dejaría un
  * suscriptor huérfano en cada visita y los puntos nunca se liberarían.
+ *
+ * La historia se pide a la FUENTE (`source.leerSerie`) y no importando el lector
+ * de `historia.js`. Antes se hacía así y era lo que dejaba las gráficas atadas al
+ * servidor: con el simulador puesto seguían saliendo a la red mientras el resto
+ * de la pantalla leía datos generados. Quién lee el pasado lo decide `evaSource`,
+ * una vez, a partir del transporte.
  */
 import { useEffect, useMemo, useState } from "react";
 
 import { SISTEMA_VACIO } from "../domain/sistema.js";
 import { SENAL_KEYS } from "../domain/senales.js";
-import { VENTANA, leerSerie } from "./historia.js";
+import { VENTANA } from "./historia.js";
 import { useEvaSource } from "./EvaProvider.jsx";
 
 const INICIAL = { sistema: SISTEMA_VACIO, loading: true, error: null, lastUpdated: null };
@@ -60,6 +66,7 @@ export function useSistemaAgua() {
  * como tal: es un hecho de la instalación que la tarjeta tiene que explicar.
  */
 export function useSerieHistorica(clave, ventana = VENTANA) {
+  const source = useEvaSource();
   const [estado, setEstado] = useState({ datos: [], motivo: null, loading: true, error: null });
 
   const horas = ventana?.horas ?? VENTANA.horas;
@@ -71,14 +78,15 @@ export function useSerieHistorica(clave, ventana = VENTANA) {
 
     if (!clave) return undefined;
 
-    leerSerie(clave, { horas, puntos })
+    source
+      .leerSerie(clave, { horas, puntos })
       .then(({ datos, motivo }) => vivo && setEstado({ datos, motivo, loading: false, error: null }))
       .catch((err) => vivo && setEstado({ datos: [], motivo: null, loading: false, error: err.message }));
 
     return () => {
       vivo = false;
     };
-  }, [clave, horas, puntos]);
+  }, [source, clave, horas, puntos]);
 
   return estado;
 }
@@ -92,6 +100,7 @@ export function useSerieHistorica(clave, ventana = VENTANA) {
  * resolverlo dentro del `render` obligaría a recalcularlo en cada repintado.
  */
 export function useSeriesHistoricas(claves, ventana = VENTANA) {
+  const source = useEvaSource();
   const [estado, setEstado] = useState({ filas: [], porClave: {}, loading: true, error: null });
 
   const clavesKey = claves.join("|");
@@ -108,7 +117,9 @@ export function useSeriesHistoricas(claves, ventana = VENTANA) {
       return undefined;
     }
 
-    Promise.all(lista.map((k) => leerSerie(k, { horas, puntos }).catch(() => ({ datos: [], motivo: null }))))
+    Promise.all(
+      lista.map((k) => source.leerSerie(k, { horas, puntos }).catch(() => ({ datos: [], motivo: null })))
+    )
       .then((resultados) => {
         if (!vivo) return;
         const porClave = Object.fromEntries(lista.map((k, i) => [k, resultados[i].datos]));
@@ -119,7 +130,7 @@ export function useSeriesHistoricas(claves, ventana = VENTANA) {
     return () => {
       vivo = false;
     };
-  }, [clavesKey, horas, puntos]);
+  }, [source, clavesKey, horas, puntos]);
 
   return estado;
 }

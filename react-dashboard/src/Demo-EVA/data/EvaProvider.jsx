@@ -16,12 +16,17 @@
  * hereda con eso el interruptor, su cinta de aviso y el remontaje al cambiar de
  * origen, sin duplicar ninguna de las tres cosas.
  *
- * Nota sobre el simulador: `fakeTransport` genera valores para los puntos de
- * Resonac (`ac:RESONAC/LIN/1/OEE`), no para los de este árbol. Con el simulador
- * activo, Demo EVA se ve **entera sin dato**, y eso es lo correcto: el simulador
- * no conoce esta instalación, y fingir que sí sería exactamente la clase de
- * dato inventado que el Plan 5 quitó de en medio. En un build normal no ocurre:
- * `transporteInicial()` es el servidor real.
+ * ── QUÉ SIMULADOR, Y POR QUÉ NO EL DE RESONAC ─────────────────────
+ *
+ * `fakeTransport` genera los puntos de Resonac (`ac:RESONAC/LIN/1/OEE`), no los
+ * de este árbol: durante un tiempo, pulsar «Simulado» dejó Demo EVA **entera sin
+ * dato**. Desde el Plan 9 la sección trae su propio simulador
+ * (`data/simulador.js`), que sirve las ocho señales y su historia.
+ *
+ * Lo que NO cambia es de quién depende la decisión: el origen sigue saliendo de
+ * `useDataSource()`, así que el interruptor del Topbar, su cinta de aviso y el
+ * remontaje al conmutar siguen siendo los mismos para las dos secciones. Aquí
+ * sólo se elige QUÉ transporte construir, nunca CUÁL está activo.
  *
  * ── EL ÁMBITO DEL PROVIDER ES LA VISTA ─────────────────────────────
  *
@@ -33,26 +38,40 @@
  */
 import { createContext, useContext, useEffect, useMemo } from "react";
 
-import { useDataSource } from "@/lib/datasource";
-import { createTransport } from "@/lib/iconics";
+import { TRANSPORTES, useDataSource } from "@/lib/datasource";
+import { createTransport, presetCaos } from "@/lib/iconics";
 import { createEvaSource } from "./evaSource.js";
+import { createTransporteEva } from "./simulador.js";
 
 const Ctx = createContext(null);
+
+/**
+ * El transporte de esta sección para un origen dado.
+ *
+ * El simulado es el de Demo EVA; el real es el compartido, que ya sabe hablar
+ * con el puente y no distingue de qué árbol son los puntos. El grado de caos sale
+ * de la misma variable que gobierna el simulador de Resonac
+ * (`VITE_ICONICS_CHAOS`), para que los dos degraden igual y no haya que
+ * acordarse de dos ajustes.
+ */
+const transporteDe = (clase) =>
+  clase === TRANSPORTES.SIMULADO
+    ? createTransporteEva({ chaos: presetCaos() })
+    : createTransport(clase);
 
 export function EvaProvider({ children }) {
   /*
    * `useDataSource()` publica la CLASE de transporte, no la instancia: su
    * `source` es el de Resonac y no sirve aquí. Así que se construye una
-   * instancia propia de la misma clase, que es barata —un cierre sobre `fetch`,
-   * sin estado— y deja el interruptor de origen mandando sobre las dos
-   * secciones por igual.
+   * instancia propia, que es barata —un cierre, sin estado— y deja el
+   * interruptor de origen mandando sobre las dos secciones por igual.
    */
   const { transporte } = useDataSource();
 
   // La fuente se crea una sola vez por transporte. Recrearla en cada render
   // abriría un motor de polling nuevo cada vez.
   const source = useMemo(
-    () => createEvaSource({ transport: createTransport(transporte) }),
+    () => createEvaSource({ transport: transporteDe(transporte) }),
     [transporte]
   );
 

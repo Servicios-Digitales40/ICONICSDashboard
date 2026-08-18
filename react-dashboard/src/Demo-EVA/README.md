@@ -49,6 +49,29 @@ Caudal ≈ 0, motor a 0, presión de succión. De ahí el estado `reposo` y el c
 `soloEnMarcha` del catálogo: sin ellos, media instalación caería bajo su límite
 duro y la demo abriría en rojo permanente.
 
+### 5. La sección se puede trabajar sin servidor
+
+El origen **Simulado** del Topbar sirve también este árbol desde
+[`data/simulador.js`](data/simulador.js): las ocho señales en vivo y la serie de
+las cuatro historizadas, sin red y sin backend. Ver
+[`docs/PLAN-9-SIMULADOR-EVA.md`](../../../docs/PLAN-9-SIMULADOR-EVA.md).
+
+```bash
+VITE_ENABLE_SIMULATOR=true npm run dev   # el botón «Simulado» del Topbar
+VITE_ICONICS_FAKE=true npm run dev       # arrancar ya en simulado
+VITE_ICONICS_CHAOS=none npm run dev      # sin huecos ni mala calidad, para enseñar
+```
+
+Dos cosas que **no** hace, y son las que lo hacen útil:
+
+- **No inventa las cuatro series que el servidor no publica.** `readSerie` repite
+  la guarda de `historizado`, así que una gráfica escrita contra el simulador
+  sigue funcionando contra el servidor real. Ver el punto 2.
+- **No se queda en verde.** Un ciclo de bombeo de 6 min recorre marcha y reposo,
+  y un evento cada siete ciclos lleva alguna señal a `critico`. Con el caos en
+  `soft` —el valor por defecto— hay además huecos y mala calidad. Si la interfaz
+  sólo se prueba en `nominal`, la mitad de la pantalla no se ejercita nunca.
+
 ---
 
 ## Estructura
@@ -62,8 +85,9 @@ domain/     JS puro · sin React · sin tema · probado en node
   sistema.js    createSistema(): saneamiento y evaluación en la frontera
 
 data/       la frontera con la red
-  evaSource.js    un motor de polling, un lote, 3 s
+  evaSource.js    un motor de polling, un lote, 3 s · elige quién lee el pasado
   historia.js     lectura del historiador, con la guarda de `historizado`
+  simulador.js    la instalación entera sin red: `read()` y `readSerie()`
   EvaProvider.jsx el único sitio que crea una fuente
   hooks.js        useSistemaAgua(), useSerieHistorica()
 

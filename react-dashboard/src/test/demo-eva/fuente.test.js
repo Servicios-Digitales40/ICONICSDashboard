@@ -22,6 +22,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createEvaSource } from "@/Demo-EVA/data/evaSource.js";
+import { SIN_SERIE } from "@/Demo-EVA/data/historia.js";
 import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "@/Demo-EVA/domain/senales.js";
 import { createBufferRodante } from "@/Demo-EVA/lib/buffer.js";
 import { createSistema } from "@/Demo-EVA/domain/sistema.js";
@@ -159,6 +160,41 @@ describe("la mala calidad es ausencia de dato, nunca un cero", () => {
     expect(ultima.sistema.resumen.medidas).toBe(7);
 
     baja();
+    source.stop();
+  });
+});
+
+describe("quién lee el pasado lo decide la fuente", () => {
+  /*
+   * Es lo que hace conmutable la historia. Antes los hooks importaban el lector
+   * del historiador directamente, así que con el simulador puesto las gráficas
+   * seguían saliendo a la red mientras el resto de la pantalla leía datos
+   * generados. La elección se hace una sola vez, aquí.
+   */
+  it("usa el `readSerie` del transporte cuando lo trae", async () => {
+    const transport = transporteFalso(EN_MARCHA);
+    transport.readSerie = vi.fn(async () => ({ datos: [{ t: new Date(0), valor: 42 }], motivo: null }));
+
+    const source = createEvaSource({ transport, intervalMs: 60_000 });
+    const { datos } = await source.leerSerie("nivelTanque", { horas: 1, puntos: 4 });
+
+    expect(transport.readSerie).toHaveBeenCalledWith("nivelTanque", { horas: 1, puntos: 4 });
+    expect(datos).toEqual([{ t: new Date(0), valor: 42 }]);
+
+    source.stop();
+  });
+
+  it("sin `readSerie` cae en el lector del historiador, que respeta `historizado`", async () => {
+    // El transporte real no trae serie: el histórico de este árbol no se pide
+    // como el de Resonac y vive en `data/historia.js`. Se comprueba con una
+    // señal NO historizada, que se rechaza por catálogo antes de tocar la red.
+    const source = createEvaSource({ transport: transporteFalso(EN_MARCHA), intervalMs: 60_000 });
+
+    const { datos, motivo } = await source.leerSerie("cargaMotor");
+
+    expect(datos).toEqual([]);
+    expect(motivo).toBe(SIN_SERIE);
+
     source.stop();
   });
 });

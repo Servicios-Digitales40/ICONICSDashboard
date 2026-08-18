@@ -175,6 +175,16 @@ aplicación. Pasa por el motor de polling igual que el servidor real, así que
 ejercita la calidad OPC, los reintentos y la marca de dato rancio; lo único que
 cambia es de dónde salen los bytes.
 
+Cada sección tiene su generador, porque son dos árboles con formas distintas:
+`lib/iconics/fakeTransport.js` para Resonac y
+[`Demo-EVA/data/simulador.js`](react-dashboard/src/Demo-EVA/data/simulador.js)
+para la instalación de agua, éste con serie histórica incluida. Ver
+[`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md).
+
+**Lo que el simulador no cubre:** el histórico de Resonac. El comparativo del
+detalle de máquina y el mapa de calor del calendario se quedan en blanco con el
+origen simulado, a propósito — un gráfico vacío se ve, uno inventado no.
+
 Hasta agosto de 2026 había un tercer origen, «Demo», con su propia fuente de
 datos fijos. Se retiró porque se saltaba el motor entero —justo lo que había
 que ejercitar—, y lo único valioso que aportaba, poder cambiar en caliente, lo

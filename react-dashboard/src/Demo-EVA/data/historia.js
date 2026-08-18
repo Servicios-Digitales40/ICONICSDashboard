@@ -27,6 +27,18 @@
  * horas»), y una caché eterna congelaría el borde derecho de la gráfica sin que
  * nadie lo notara. Se pide al abrir la vista y punto; el borde derecho lo cubre
  * el valor en vivo, que es lo que hace el resto de la aplicación.
+ *
+ * ── ESTE ES EL LECTOR REAL, Y HAY OTRO ─────────────────────────────
+ *
+ * Con el origen «Simulado» la serie no sale de aquí sino de `data/simulador.js`,
+ * que trae su propio `readSerie`. Quién de los dos lee lo decide `evaSource.js`
+ * a partir del transporte, y nadie más: las vistas piden `source.leerSerie()` sin
+ * saber cuál está detrás.
+ *
+ * `SIN_SERIE` y `VENTANA` se exportan desde aquí para los dos, porque son hechos
+ * de la instalación y no del origen: el simulador repite la misma guarda de
+ * `historizado` para no enseñarle a la pantalla ocho series que el servidor real
+ * no tiene.
  */
 import { fetchIconicsHistory } from "@/lib/iconics";
 import { esHistorizada, pointName, senalInfo } from "../domain/senales.js";

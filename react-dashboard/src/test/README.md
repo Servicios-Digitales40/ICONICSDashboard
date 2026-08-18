@@ -57,6 +57,19 @@ distribución de la maqueta y el camino de respaldo. No se intenta renderizar
 | [features/three-d/frameloop.test.js](features/three-d/frameloop.test.js) | Cuándo la escena tiene derecho a repintar. Una planta parada deja la GPU a cero. |
 | [features/three-d/sinWebgl.test.jsx](features/three-d/sinWebgl.test.jsx) | Sin WebGL —escritorio remoto, equipo sin GPU— la vista no revienta: enseña los mismos datos en una tabla. |
 
+### `demo-eva/` — la demo de sistemas de agua
+
+Sección con **dominio propio**: ni OEE, ni máquinas, ni tag de estado. Ver
+[`src/Demo-EVA/README.md`](../Demo-EVA/README.md).
+
+| Archivo | Qué fija |
+|---|---|
+| [demo-eva/dominio.test.js](demo-eva/dominio.test.js) | El saneamiento y la evaluación contra bandas: un booleano no es un cero y un hueco no es un límite roto. |
+| [demo-eva/fuente.test.js](demo-eva/fuente.test.js) | El camino de datos con transporte de mentira, y **quién lee el pasado**: el `readSerie` del transporte si lo trae, el historiador si no. |
+| [demo-eva/tres-d.test.js](demo-eva/tres-d.test.js) | El contrato estado → comportamiento y la distribución de la maqueta. |
+| [demo-eva/simulador.test.js](demo-eva/simulador.test.js) | Que el simulador sea determinista en el reloj, **recorra los estados** en vez de quedarse en `nominal`, respete `historizado` y no se salga de la `escala` del catálogo. |
+| [demo-eva/planta-simulada.test.jsx](demo-eva/planta-simulada.test.jsx) | La vista real sobre el provider real con el origen simulado y **`fetch` convertido en trampa**: se ven las ocho señales sin que nadie salga a la red. Es lo que ninguna prueba de unidad podía ver, porque cada pieza por separado estaba bien. |
+
 ### `prototypes/` — propuestas de diseño
 
 Se prueban igual que producción a propósito: un prototipo anclado a datos
