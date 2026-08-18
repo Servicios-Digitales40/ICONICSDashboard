@@ -1,174 +1,18 @@
 /**
  * La forma `Sistema`: el único vocabulario que conocen las vistas de Demo EVA.
  *
- * Es el equivalente de `createMachine` para este árbol, y respeta el mismo pacto
- * que ya rige en todo el proyecto:
+ * El contenido vive en [`@shared/eva/sistema.js`](../../../../shared/eva/sistema.js);
+ * aquí queda la puerta. El motivo del traslado está en `./senales.js`.
  *
- *  - Todo valor es `number | boolean | null`, y `null` significa **no hay
- *    medición**. Las vistas pintan un hueco, nunca un cero.
- *  - El saneamiento vive aquí, en la frontera, y no en los componentes.
- *  - Nadie fuera de este archivo construye una señal a mano.
+ * De los cinco archivos del dominio éste es el que más se gana compartiendo:
+ * el asistente no evalúa nada por su cuenta, llama a `createSistema()` con las
+ * ocho lecturas y responde con el MISMO objeto que pinta la pantalla. Por eso
+ * no puede haber un caso en que el chat diga «en banda» de una señal que la
+ * tarjeta pinta en rojo.
  *
- * Se reutilizan `toNumber` y `hasValue` del dominio compartido: son
- * saneadores genéricos —descartan `NaN`, `Infinity`, cadenas vacías y
- * objetos— y no tienen nada de OEE. Lo que NO se reutiliza es `createMachine`,
- * que impone campos (`oee`, `aprobadas`, `estado` por código) que aquí no
- * existen y que sólo se podrían rellenar inventándolos.
- *
- * ── EL ORDEN DE CONSTRUCCIÓN NO ES ARBITRARIO ──────────────────────
- *
- * Primero se sanean los ocho valores, LUEGO se decide si el sistema está en
- * reposo, y sólo entonces se evalúa cada señal. Tiene que ser en ese orden
- * porque el reposo se calcula con dos señales (caudal y carga) y condiciona la
- * evaluación de las otras: invertirlo dejaría media instalación evaluada contra
- * sus bandas de marcha mientras la bomba está parada.
+ * Al mudarse cambió una sola línea: `toNumber` y `hasValue` se toman de
+ * `shared/domain/machine.js` directamente, en vez de por el barril
+ * `@/lib/domain/index.js` —que es frontend y el backend no puede alcanzar—.
+ * Son los mismos saneadores.
  */
-import { hasValue, toNumber } from "@/lib/domain/index.js";
-
-import { SENALES, SENAL_KEYS } from "./senales.js";
-import { ACTIVO_IDS, ACTIVOS } from "./activos.js";
-import { ESTADOS_ORDEN, enReposo, estadoDeSenal, peor } from "./estado.js";
-import { bandaDe, margenConsumido } from "./umbrales.js";
-
-/**
- * Booleano utilizable o `null`.
- *
- * No vale `toNumber`: convertiría `false` en 0 y un 0 es un número perfectamente
- * válido, así que «modo automático» se volvería indistinguible de «modo sin
- * leer». ICONICS entrega este punto como booleano nativo, pero se aceptan
- * también las formas que llegan de un servidor OPC mal tipado.
- */
-export function toBooleano(raw) {
-  if (raw === true || raw === false) return raw;
-  if (raw === 1 || raw === 0) return Boolean(raw);
-  if (typeof raw === "string") {
-    const s = raw.trim().toLowerCase();
-    if (s === "true" || s === "1") return true;
-    if (s === "false" || s === "0") return false;
-  }
-  return null;
-}
-
-/** Sanea un valor crudo según el tipo declarado de su señal. */
-function sanear(key, raw) {
-  return SENALES[key]?.tipo === "booleano" ? toBooleano(raw) : toNumber(raw);
-}
-
-/**
- * Construye una señal ya evaluada.
- *
- * `texto` sólo lo llevan las booleanas, y sale de `etiquetas` del catálogo: es
- * la única forma de que «Manual»/«Automático» se escriba en un sitio y no en
- * cada tarjeta que lo pinte.
- */
-export function createSenal({ key, valor = null, receivedAt = null, stale = false, reposo = false }) {
-  const meta = SENALES[key];
-  if (!meta) return null;
-
-  const v = sanear(key, valor);
-  const estado = estadoDeSenal(key, v, { reposo });
-
-  return {
-    ...meta,
-    valor: v,
-    texto: meta.tipo === "booleano" && v !== null ? meta.etiquetas?.[String(v)] ?? null : null,
-    estado,
-    // La banda cruda se conserva junto al estado porque no son lo mismo: una
-    // señal en `reposo` puede estar fuera de banda, y la tarjeta lo explica.
-    banda: meta.tipo === "booleano" ? null : bandaDe(key, v),
-    margen: meta.tipo === "booleano" ? null : margenConsumido(key, v),
-    receivedAt,
-    stale,
-  };
-}
-
-/** Agrupa las señales ya evaluadas en su activo y le asigna el peor estado. */
-function createActivo(id, porClave) {
-  const meta = ACTIVOS[id];
-  const senales = meta.senales.map((k) => porClave[k]).filter(Boolean);
-
-  return {
-    ...meta,
-    senales,
-    estado: peor(senales.map((s) => s.estado)),
-    sinDato: senales.filter((s) => s.estado === "sin_dato").length,
-  };
-}
-
-/**
- * Reparto por estado, respetando `ESTADOS_ORDEN` y omitiendo los vacíos.
- * Alimenta la barra apilada y su leyenda, igual que `porEstado` en Resonac.
- */
-const repartoPorEstado = (senales) =>
-  ESTADOS_ORDEN.map((estado) => ({
-    estado,
-    valor: senales.filter((s) => s.estado === estado).length,
-  })).filter((e) => e.valor > 0);
-
-/**
- * Punto de entrada único.
- *
- * `lecturas` es `{ [clave]: { value, receivedAt, stale } }`, tal como lo entrega
- * el motor de polling: valor ya filtrado por calidad, o `null`.
- */
-export function createSistema(lecturas = {}) {
-  const crudos = Object.fromEntries(
-    SENAL_KEYS.map((k) => [k, sanear(k, lecturas[k]?.value ?? null)])
-  );
-
-  const reposo = enReposo(crudos);
-
-  const porClave = {};
-  for (const key of SENAL_KEYS) {
-    porClave[key] = createSenal({
-      key,
-      valor: crudos[key],
-      receivedAt: lecturas[key]?.receivedAt ?? null,
-      stale: lecturas[key]?.stale ?? false,
-      reposo,
-    });
-  }
-
-  const lista = SENAL_KEYS.map((k) => porClave[k]);
-  const activos = ACTIVO_IDS.map((id) => createActivo(id, porClave));
-
-  // La lectura más reciente de cualquier señal: es lo que fecha la pantalla.
-  const receivedAt = lista.reduce(
-    (max, s) => (s.receivedAt && (!max || s.receivedAt > max) ? s.receivedAt : max),
-    null
-  );
-
-  return {
-    senales: porClave,
-    lista,
-    activos,
-
-    /** El peor estado de todo el sistema. Es el titular de la cabecera. */
-    estado: peor(activos.map((a) => a.estado)),
-    enReposo: reposo,
-
-    receivedAt,
-    stale: lista.some((s) => s.stale),
-
-    resumen: {
-      totalSenales: lista.length,
-      medidas: lista.filter((s) => hasValue(s.valor)).length,
-      sinDato: lista.filter((s) => s.estado === "sin_dato").length,
-      enAviso: lista.filter((s) => s.estado === "atencion").length,
-      fueraDeLimite: lista.filter((s) => s.estado === "critico").length,
-      enBanda: lista.filter((s) => s.estado === "nominal").length,
-      totalActivos: activos.length,
-      activosEnBanda: activos.filter((a) => a.estado === "nominal").length,
-      porEstado: repartoPorEstado(lista),
-    },
-  };
-}
-
-/**
- * Sistema sin ninguna lectura todavía. Evita que la primera pintada tenga que
- * tratar el caso «no hay objeto»: hay objeto, y todo dentro dice «sin dato».
- */
-export const SISTEMA_VACIO = createSistema({});
-
-/** ¿Ha llegado al menos una medición utilizable? */
-export const tieneDatos = (sistema) => (sistema?.resumen?.medidas ?? 0) > 0;
+export * from "@shared/eva/sistema.js";

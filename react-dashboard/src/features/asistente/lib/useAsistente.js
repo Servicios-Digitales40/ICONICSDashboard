@@ -280,26 +280,32 @@ async function leerFlujo(respuesta, manejadores) {
 
 /** Nombre técnico de la herramienta → lo que se le enseña al operador. */
 export const ETIQUETA_HERRAMIENTA = {
-  estado_de_planta: "Leyó la planta entera de ICONICS",
-  estado_actual: "Leyó el estado en vivo de ICONICS",
-  datos_de_maquina: "Leyó el historiador",
+  estado_del_sistema: "Leyó las ocho señales en vivo de ICONICS",
+  historia_de_senal: "Leyó el historiador",
   comparar_periodos: "Comparó dos períodos del historiador",
 };
 
 /**
- * Con qué se hizo la consulta: máquina, período, métrica.
+ * Con qué se hizo la consulta: señal y período.
  *
  * ── POR QUÉ SE ENSEÑA EL TEXTO CRUDO ───────────────────────────────
  *
  * Estos valores los eligió el MODELO al llamar a la herramienta, y se pintan
  * tal cual, sin embellecer. Decir «Leyó el historiador» no permite distinguir
- * una respuesta correcta de una en la que el modelo entendió otra máquina u
- * otro día; decir «Leyó el historiador · Línea 2 · ayer» cuando se preguntó
- * por la Línea 1 lo delata de un vistazo. Traducir o normalizar aquí lo que
- * pidió el modelo taparía justo el error que esta línea existe para enseñar.
+ * una respuesta correcta de una en la que el modelo entendió otra señal u otro
+ * momento; decir «Leyó el historiador · presión · última hora» cuando se
+ * preguntó por el nivel lo delata de un vistazo. Traducir o normalizar aquí lo
+ * que pidió el modelo taparía justo el error que esta línea existe para
+ * enseñar.
  *
- * El período se ve como lo mandó —«ayer», «turno de la mañana»— porque quien
- * lo resuelve a fechas es el servidor, dentro de la herramienta, y esa fecha
+ * Aquí eso importa MÁS que en el tablero de Resonac, y por un motivo concreto:
+ * el resolvedor de señales del backend acepta sinónimos («la bomba», «el
+ * voltaje») a propósito, así que la traducción de lo que dijo el usuario a la
+ * señal que se leyó ocurre fuera de la vista. Esta línea es donde vuelve a
+ * verse.
+ *
+ * El período se ve como lo mandó —«última hora», «ayer a las 12»— porque quien
+ * lo resuelve a fechas es el servidor, dentro de la herramienta, y esa ventana
  * ya resuelta no viaja en el flujo.
  */
 export function describirConsulta(nombre, argumentos) {
@@ -308,8 +314,8 @@ export function describirConsulta(nombre, argumentos) {
   const leer = (v) => (typeof v === "string" || typeof v === "number" ? String(v).trim() : "");
   const partes = [];
 
-  const maquina = leer(argumentos.maquina);
-  if (maquina) partes.push(maquina);
+  const senal = leer(argumentos.senal);
+  if (senal) partes.push(senal);
 
   if (nombre === "comparar_periodos") {
     const a = leer(argumentos.periodoA);
@@ -318,11 +324,11 @@ export function describirConsulta(nombre, argumentos) {
     else if (a || b) partes.push(a || b);
   } else {
     const periodo = leer(argumentos.periodo);
+    // Sin período el backend usa las últimas 6 h, y callarlo aquí haría creer
+    // que la respuesta es del instante. Se dice cuál fue el defecto.
     if (periodo) partes.push(periodo);
+    else if (nombre === "historia_de_senal") partes.push("últimas 6 h (por defecto)");
   }
-
-  const metrica = leer(argumentos.metrica);
-  if (metrica) partes.push(metrica);
 
   return partes;
 }

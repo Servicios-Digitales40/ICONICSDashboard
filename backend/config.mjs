@@ -67,13 +67,18 @@ const DEFAULTS = {
   iaMaxTokens: 512,
 }
 
-/**
- * Máquinas con tags coleccionados en el historiador.
+/*
+ * `IA_MAQUINAS_CON_HISTORIA` se retiró al pasar el asistente al sistema de
+ * agua.
  *
- * Hoy es solo la Lineal 1; las otras nueve responden 500. Es configurable
- * porque cambia marcando una casilla en el Data Historian, sin tocar código.
+ * Declaraba qué máquinas de Resonac tenían tags «Is Collected», y era
+ * configurable con razón: eso cambia marcando una casilla en el Data
+ * Historian, sin tocar código. En la instalación de agua no es lo mismo — a
+ * tres de las ocho señales el historiador les devuelve **la serie de otra**,
+ * y eso no se arregla marcando una casilla ni se puede permitir que lo
+ * desactive una variable de entorno mal escrita. Vive como hecho medido en
+ * `shared/eva/senales.js` (campo `historizado`). Ver `backend/ia/herramientas.mjs`.
  */
-const DEFAULT_MAQUINAS_CON_HISTORIA = 'LIN/1'
 
 /** Cliente OIDC que ICONICS 11.x trae dado de alta de fábrica. */
 const OIDC_CLIENT_ID = 'in_house_client'
@@ -287,12 +292,6 @@ export function loadConfig(env = process.env) {
       maxTokens: readInteger('IA_MAX_TOKENS', env.IA_MAX_TOKENS, DEFAULTS.iaMaxTokens, 1),
       /** llama-server sirve un solo modelo; el nombre es informativo. */
       modelo: env.IA_MODELO || 'local',
-      maquinasConHistoria: Object.freeze(
-        (env.IA_MAQUINAS_CON_HISTORIA ?? DEFAULT_MAQUINAS_CON_HISTORIA)
-          .split(',')
-          .map(id => id.trim())
-          .filter(Boolean)
-      ),
       /**
        * Horario de turnos, `manana=6-14,tarde=14-22,noche=22-6`.
        *

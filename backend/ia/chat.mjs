@@ -93,21 +93,40 @@ export const ESTADOS = {
 /**
  * Detecta cifras en una respuesta sin herramienta.
  *
- * Deja pasar los números que forman parte de un nombre de máquina («Línea 1»,
- * «Multi 13») porque el modelo los repite al pedir aclaraciones, y esas
- * respuestas son legítimas. Cualquier otro número es una medición inventada.
+ * Deja pasar dos clases de número, y sólo dos:
+ *
+ *  - **Contar el catálogo.** «Hay 8 señales», «4 activos», «sólo 4 tienen
+ *    historia». El catálogo entero viaja en las instrucciones, así que contar
+ *    sus filas es leer, no suponer. Sin esta excepción se bloqueaba la
+ *    pregunta más básica de todas: «¿qué puedes consultar?».
+ *  - **Los nombres propios que llevan número dentro**, como la raíz del árbol
+ *    `ac:TDCON/DEMO/SENSORES/`, que no lleva ninguno hoy pero sí lo llevan las
+ *    unidades citadas de memoria en una aclaración («en °C»). Se cubren con la
+ *    lista de sustantivos de abajo y no con una regla general.
+ *
+ * Cualquier otro número es una medición inventada. Se es deliberadamente
+ * estrecho: ninguna cifra de proceso —un nivel, una presión— se escribe jamás
+ * seguida de la palabra «señales» o «activos».
+ *
+ * ── POR QUÉ ESTA LISTA Y NO LA DE ANTES ────────────────────────────
+ *
+ * La versión anterior perdonaba los números pegados a un nombre de máquina
+ * («Línea 1», «Multi 13», «LIN/1»). En esta instalación **no hay máquinas
+ * numeradas**: es un solo sistema con ocho señales. Mantener aquella
+ * excepción no sería inofensivo — dejaría pasar «el nivel bajó a 1» si el
+ * modelo escribiera «línea» por «línea de distribución», que es justo la
+ * palabra que más va a usar hablando de tuberías.
  */
 function contieneCifras(texto) {
-  const sinMaquinas = String(texto ?? '')
-    .replace(/\b(l[ií]nea|lineal|multi|rectificadora|lin|rec)\s*\/?\s*\d+/gi, '')
-    .replace(/\b(LIN|REC)\/\d+/g, '')
-    // «Hay 10 máquinas» tampoco es una medición inventada: el catálogo entero
-    // viaja en las instrucciones, así que contar sus filas es leer, no
-    // suponer. Sin esta excepción, la pregunta más básica de todas —«¿qué
-    // máquinas hay?»— se bloqueaba. Es deliberadamente estrecha: ninguna
-    // cifra de proceso se escribe jamás seguida de la palabra «máquinas».
-    .replace(/\b\d+\s+m[aá]quinas?\b/gi, '')
-  return /\d/.test(sinMaquinas)
+  const sinRecuentos = String(texto ?? '')
+    // «8 señales», «4 activos», «ocho puntos».
+    .replace(/\b\d+\s+(se[ñn]al|activo|punto|tag|magnitud)(es)?\b/gi, '')
+    // «sólo 4 tienen historia». Es el otro modo de contar el catálogo, y sin
+    // esta forma se bloqueaba la respuesta a «¿qué puedes consultar?» por su
+    // segunda mitad. Se ata a las palabras «serie» o «historia» a propósito:
+    // ninguna medición de proceso se escribe jamás así.
+    .replace(/\b\d+\s+(?:de\s+(?:ellas|ellos|las\s+ocho)\s+)?(?:s[oó]lo\s+)?tienen?\s+(?:serie|historia)\b/gi, '')
+  return /\d/.test(sinRecuentos)
 }
 
 /**
@@ -137,12 +156,17 @@ function buscarMarcado(texto) {
 /**
  * ¿Ya contó el modelo el aviso de la herramienta?
  *
- * Se busca la idea, no la frase literal: el modelo la reformula. Basta con
- * que haya dicho que el valor no es válido o haya nombrado el cálculo
- * culpable; si no, el backend lo añade detrás.
+ * Se busca la idea, no la frase literal: el modelo la reformula. Aquí el aviso
+ * que más viaja es el de procedencia de los umbrales —que las bandas son
+ * nuestras y no del servidor—, así que basta con que haya dicho que el límite
+ * es una estimación, que no está confirmado, o que el estado lo calcula el
+ * tablero. Si no, el backend lo añade detrás.
  */
 function mencionaElAviso(texto) {
-  return /no es una medici[oó]n v[aá]lida|OEE_Cal|no (?:es|son) v[aá]lid|fallo (?:conocido|de c[aá]lculo)/i
+  // `estimad[oa]s?` además de `estimación`: medido con el 4B, la forma que le
+  // sale de dentro es «el límite inferior estimado es 15 %», y sin cubrirla el
+  // backend añadía el aviso entero detrás de una frase que ya lo decía.
+  return /estimaci[oó]n|estimad[oa]s?|no (?:est[aá]n?|son|es) confirmad|sin confirmar|provisional|no (?:los|lo) publica|no (?:es|son) (?:un )?dato de ICONICS|c[aá]lculo del tablero|l[ií]mites? (?:propios|nuestros)/i
     .test(String(texto ?? ''))
 }
 
@@ -161,9 +185,17 @@ function hoyLocal() {
  */
 function instrucciones(catalogo) {
   return [
-    'Eres el asistente del tablero de planta de Resonac. Respondes en español, con frases cortas.',
+    'Eres el asistente de un tablero que vigila un SISTEMA DE AGUA INDUSTRIAL: un tanque, un',
+    'grupo de bombeo, una red de distribución y su suministro eléctrico. Respondes en español,',
+    'con frases cortas.',
     '',
     `Hoy es ${hoyLocal()}. Las fechas se escriben siempre como YYYY-MM-DD.`,
+    '',
+    'QUÉ ES ESTA INSTALACIÓN, Y QUÉ NO ES:',
+    '',
+    'El servidor publica OCHO señales y nada más. Aquí no hay máquinas, ni líneas de producción,',
+    'ni piezas, ni OEE, ni disponibilidad, ni rendimiento, ni calidad, ni turnos de fabricación.',
+    'Si te preguntan por algo de eso, di que esta instalación no lo mide y enumera lo que sí.',
     '',
     'REGLAS QUE NO PUEDES SALTARTE:',
     '',
@@ -171,28 +203,57 @@ function instrucciones(catalogo) {
     '   acabes de llamar en este mismo turno. Si no tienes el dato, dilo.',
     '2. Si una herramienta devuelve un error, cuéntaselo al usuario con tus palabras. No lo',
     '   maquilles ni lo sustituyas por una estimación.',
-    '3. Solo algunas máquinas tienen datos históricos. Si el usuario pregunta por una fecha',
-    '   pasada de una máquina que no los tiene, dilo claramente y ofrece su estado actual.',
-    '4. La lista completa de máquinas está más abajo, con marca de cuáles tienen historia.',
-    '   Úsala: no existen todas las que suenan plausibles, la numeración tiene huecos reales.',
-    '   Si la pregunta no dice de qué máquina y solo una tiene historia, es esa; no preguntes.',
-    '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de qué día.',
-    '6. Esto es una conversación: «¿y el día anterior?» o «¿y la Línea 2?» se refieren a lo que',
-    '   se acaba de hablar. Resuelve a qué máquina y a qué fecha se refieren, y VUELVE A',
+    '3. Sólo CUATRO de las ocho señales tienen historia: nivel del tanque, temperatura del',
+    '   tanque, caudal instantáneo y presión relativa. A tres de las otras cuatro —carga del',
+    '   motor, eficiencia energética y tensión de línea— el historiador les devuelve la curva',
+    '   de OTRA señal sin dar error, así que no se les pide nunca. Si preguntan por el pasado',
+    '   de cualquiera de las cuatro, dilo claramente y ofrece su valor actual.',
+    '4. NUNCA inventes una unidad. El servidor no declara las unidades: el caudal y la presión',
+    '   vienen sin unidad, y decir "l/s" o "bares" sería inventarse la magnitud. Si la',
+    '   herramienta te da la unidad, úsala; si te la da vacía, di el número a secas.',
+    '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de cuándo.',
+    '6. El ESTADO de una señal («en banda», «en aviso», «fuera de límite») lo calcula el tablero',
+    '   comparando el valor contra límites estimados por nosotros, NO por quien opera la',
+    '   instalación, y este árbol no tiene alarmas configuradas. Cuando digas que algo está',
+    '   fuera de límite, di también de quién es ese límite. La herramienta te manda el aviso',
+    '   hecho; no hace falta que lo copies literal, pero la idea tiene que estar.',
+    '7. La instalación está PARADA la mayor parte del tiempo, y eso es normal. Con el motor a',
+    '   cero y sin caudal, el caudal, la presión, la carga del motor y la eficiencia no',
+    '   significan nada y aparecen como "En reposo". Reposo no es avería: no lo cuentes como',
+    '   un problema ni propongas revisar nada por ello.',
+    '8. Esto es una conversación: «¿y hace tres horas?» o «¿y la presión?» se refieren a lo que',
+    '   se acaba de hablar. Resuelve a qué señal y a qué momento se refieren, y VUELVE A',
     '   CONSULTAR con la herramienta. Nunca deduzcas una cifra nueva a partir de otra que ya',
     '   dijiste: los datos se leen, no se calculan.',
-    '7. No hagas aritmética. Cita los números tal y como vienen de la herramienta. Si te dice',
-    '   que hay 10 máquinas, 1 operando y 9 sin dato, di exactamente eso; no restes, no sumes',
-    '   y no repartas por áreas de tu cuenta. Una cuenta mal hecha en la frase final estropea',
+    '9. No hagas aritmética. Cita los números tal y como vienen de la herramienta. Si te dice',
+    '   que hay 8 señales, 5 en banda y 3 en reposo, di exactamente eso; no restes, no sumes',
+    '   y no repartas por activos de tu cuenta. Una cuenta mal hecha en la frase final estropea',
     '   una consulta que salió bien.',
-    '8. Tienes UNA sola consulta por pregunta. No planees varios pasos ni anuncies que vas a',
-    '   consultar algo más: no vas a poder. Elige la herramienta que responda de una vez.',
-    '9. No traduzcas los períodos ni las fechas. Si te preguntan por "ayer a las 12", por',
-    '   "julio de 2026" o por "el turno de la mañana", pasa ESE TEXTO tal cual a la',
-    '   herramienta: el servidor sabe resolverlo y tú no. Calcular calendarios no es tu',
-    '   trabajo aquí.',
+    '10. Tienes UNA sola consulta por pregunta. No planees varios pasos ni anuncies que vas a',
+    '    consultar algo más: no vas a poder. Elige la herramienta que responda de una vez.',
+    '    estado_del_sistema devuelve las OCHO señales juntas, así que casi cualquier pregunta',
+    '    sobre el momento actual se responde con esa sola llamada.',
+    /*
+     * Esta regla se mantiene CORTA a propósito.
+     *
+     * Tuvo una versión larga que enumeraba aquí todas las formas de período
+     * aceptadas. Medido con el 4B: la pasada de elegir herramienta se fue a
+     * 17 s y devolvió `content` vacío y sin llamada — el razonamiento se comió
+     * el presupuesto entero. La lista ya vive en la descripción del parámetro
+     * `periodo`, que es donde el modelo la lee al decidir; repetirla aquí no
+     * añadía información, sólo prompt.
+     */
+    '11. No traduzcas los períodos ni las fechas. Si te preguntan por "la última hora", por',
+    '    "las últimas 3 horas" o por "ayer a las 12", pasa ESE TEXTO tal cual a la herramienta:',
+    '    el servidor sabe resolverlo y tú no. Calcular calendarios no es tu trabajo aquí.',
+    '12. Escribe en TEXTO LLANO. Nada de markdown: ni **negritas**, ni ## títulos, ni viñetas',
+    '    con * o -. El panel del asistente pinta el texto tal cual, así que los asteriscos se',
+    '    ven como asteriscos. Si necesitas enumerar, usa una línea por cosa y frases cortas.',
+    '13. Responde a lo que se te ha preguntado y para ahí. La herramienta te devuelve las ocho',
+    '    señales siempre, pero a "¿qué nivel tiene el tanque?" se contesta con el nivel, no',
+    '    con un informe de la instalación entera.',
     '',
-    'Las máquinas de la planta:',
+    'Las señales de la instalación:',
     catalogo,
   ].join('\n')
 }
@@ -376,7 +437,16 @@ export function createChat({ config, herramientas }) {
     // información fija y barata, y tenerla delante evita que el modelo gaste
     // su única llamada en pedir lo que ya tiene.
     const catalogo = herramientas.catalogo()
-      .map(m => `  ${m.id} — ${m.nombre} (${m.area})${m.tieneHistoria ? ' · con historia' : ''}`)
+      .map(s => [
+        `  ${s.nombre}`,
+        s.unidad ? ` (${s.unidad})` : ' (sin unidad declarada)',
+        ` · ${s.activo}`,
+        s.historia ? ' · con historia' : ' · SIN historia',
+        // Que una señal sólo valga en marcha es la mitad de por qué la demo no
+        // abre en rojo: sin esta marca, el modelo lee «caudal 0» con la bomba
+        // parada y lo cuenta como una avería.
+        s.soloEnMarcha ? ' · sólo con la bomba en marcha' : '',
+      ].join(''))
       .join('\n')
 
     const previos = historialAMensajes(historial)
@@ -516,9 +586,11 @@ export function createChat({ config, herramientas }) {
  * accionable, y la causa más común de llegar aquí es haber pedido un rango.
  */
 const NO_SE_QUE_CONTESTAR =
-  'No he sabido responder a eso. Puedo consultarte el estado actual de una máquina o de la ' +
-  'planta entera, y los datos históricos de una máquina en cualquier período: un día, una ' +
-  'hora concreta, un mes o un rango. También comparar dos períodos entre sí.'
+  'No he sabido responder a eso. Puedo darte el estado actual de toda la instalación de agua ' +
+  '—el nivel y la temperatura del tanque, el caudal, la presión, la carga del motor, el modo ' +
+  'del variador, la tensión de línea y la eficiencia energética— y la evolución de las cuatro ' +
+  'señales que el historiador guarda: nivel, temperatura, caudal y presión. También comparar ' +
+  'dos períodos de una de ellas.'
 
 /**
  * Qué se le dice al usuario cuando se bloquea una respuesta.
@@ -530,10 +602,11 @@ const NO_SE_QUE_CONTESTAR =
  */
 function avisoDeBloqueo(vistaAlgunaLlamada) {
   const base =
-    'No voy a darte cifras porque no he consultado los datos de la planta para esta pregunta. ' +
-    'Puedo leer el estado actual de una máquina o de la planta entera, y los datos históricos ' +
-    'de una máquina en cualquier período: un día, una hora concreta, un mes o un rango. ' +
-    'También comparar dos períodos entre sí.'
+    'No voy a darte cifras porque no he consultado los datos de la instalación para esta ' +
+    'pregunta. Puedo leer el estado actual de las ocho señales del sistema de agua, y la ' +
+    'evolución de las cuatro que el historiador guarda —nivel del tanque, temperatura del ' +
+    'tanque, caudal y presión— en el período que quieras. También comparar dos períodos ' +
+    'entre sí.'
 
   /*
    * El aviso de `--jinja` solo se añade si el modelo NO ha usado herramientas
@@ -563,17 +636,47 @@ function resumirSinModelo(nombre, resultado) {
     return resultado?.error ?? 'La consulta no devolvió ningún dato.'
   }
 
-  const donde = resultado.fecha ? `el ${resultado.fecha}` : 'ahora mismo'
-  const partes = [
-    resultado.oee !== null && resultado.oee !== undefined && `OEE ${resultado.oee} %`,
-    resultado.disponibilidad != null && `disponibilidad ${resultado.disponibilidad} %`,
-    resultado.rendimiento != null && `rendimiento ${resultado.rendimiento} %`,
-    resultado.calidad != null && `calidad ${resultado.calidad} %`,
-    resultado.aprobadas != null && `${resultado.aprobadas} piezas aprobadas`,
-    resultado.rechazadas != null && `${resultado.rechazadas} rechazadas`,
-    resultado.estado && `estado: ${resultado.estado}`,
-  ].filter(Boolean)
+  /* Estado en vivo: se listan las ocho señales, una por línea. En una pantalla
+     de 420 px una tabla no cabe, pero ocho líneas sí — y son el dato entero. */
+  if (Array.isArray(resultado.activos)) {
+    const lineas = resultado.activos.flatMap(a =>
+      a.senales.map(s => `· ${s.senal}: ${valorLegible(s)} — ${s.estado}`)
+    )
 
-  return `${resultado.nombre ?? resultado.maquina}, ${donde}: ${partes.join(', ')}. ` +
-    `Dato leído del ${resultado.fuente ?? 'servidor'}.`
+    return [
+      `Instalación de agua, ahora mismo: ${resultado.estadoGeneral}` +
+        `${resultado.enReposo ? ' (en reposo: no se está impulsando agua)' : ''}.`,
+      ...lineas,
+      `Lectura en tiempo real de ICONICS.`,
+      resultado.avisoUmbrales ? `⚠ ${resultado.avisoUmbrales}` : '',
+    ].filter(Boolean).join('\n')
+  }
+
+  /* Historia de una señal. */
+  if (resultado.senal && resultado.promedio !== undefined) {
+    const u = resultado.unidad ? ` ${resultado.unidad}` : ''
+    return (
+      `${resultado.senal}, ${resultado.periodo}: mínimo ${resultado.minimo}${u}, ` +
+      `máximo ${resultado.maximo}${u}, promedio ${resultado.promedio}${u}, ` +
+      `último ${resultado.ultimo}${u}, sobre ${resultado.muestras} muestras. ` +
+      `Dato leído del historiador.` +
+      (resultado.avisoUmbrales ? `\n⚠ ${resultado.avisoUmbrales}` : '')
+    )
+  }
+
+  return 'La consulta devolvió datos, pero no he podido resumirlos.'
+}
+
+/**
+ * El valor de una señal tal y como se puede escribir.
+ *
+ * Tres casos y los tres importan: la booleana se dice con su palabra
+ * («Automático»), la que no tiene lectura dice «sin dato» —y no cero—, y la
+ * que no tiene unidad declarada va a secas, porque ponerle una sería
+ * inventarse la magnitud.
+ */
+function valorLegible(s) {
+  if (s.texto) return s.texto
+  if (s.valor === null || s.valor === undefined) return 'sin dato'
+  return s.unidad ? `${s.valor} ${s.unidad}` : String(s.valor)
 }

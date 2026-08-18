@@ -2,13 +2,13 @@
 /**
  * scripts/verificar-herramientas.mjs
  * ------------------------------------------------------------------
- * Comprueba las cinco herramientas que el modelo de lenguaje puede invocar,
- * **sin modelo y sin servidor ICONICS**.
+ * Comprueba las tres herramientas que el modelo de lenguaje puede invocar
+ * sobre el sistema de agua industrial, **sin modelo y sin servidor ICONICS**.
  *
  * ── POR QUÉ SIN MODELO ─────────────────────────────────────────────
  *
- * Con el Q8 en una GPU de 8 GB, una respuesta del asistente tarda entre 30 y
- * 90 segundos. Una capa de herramientas que solo se pudiera probar esperando
+ * Con el 4B en una GPU de 8 GB, una respuesta del asistente tarda entre 30 y
+ * 90 segundos. Una capa de herramientas que sólo se pudiera probar esperando
  * eso no se probaría nunca. Aquí se ejecutan directamente, contra un cliente
  * de ICONICS de mentira, y tardan milisegundos.
  *
@@ -17,10 +17,15 @@
  * Las reglas de dominio que son el motivo de que estas herramientas existan en
  * vez de dejar que el modelo llame a la API REST en crudo:
  *
- *  - Los contadores se SUMAN por tramos, porque se reinician con el turno.
+ *  - **Tres señales devuelven la serie de OTRA, y el servidor no da error.**
+ *    Es la invariante cara de este archivo: pedir la historia de la carga del
+ *    motor NO puede llegar a la red. Si esta prueba se cae, el asistente pasa
+ *    a contestar grados centígrados bajo el nombre «carga del motor».
+ *  - El punto histórico se nombra con `ac:`, no con `hda:`.
  *  - Un valor de mala calidad es un HUECO, nunca un cero.
- *  - Una máquina sin historizar lo DICE; no devuelve un día vacío que el
- *    modelo presentaría como producción nula.
+ *  - Una instalación PARADA no es una instalación en alarma.
+ *  - Las unidades no se inventan: las que el servidor no declara van vacías.
+ *  - Los umbrales son NUESTROS, y cada respuesta que los usa lo dice.
  *  - Ninguna herramienta escribe.
  *
  * ── USO ────────────────────────────────────────────────────────────
@@ -30,9 +35,22 @@
  * Código de salida: 0 si todo se cumple, 1 si algo falla.
  */
 import assert from 'node:assert/strict'
-import { createHerramientas, resolverFecha, resolverMaquina } from '../backend/ia/herramientas.mjs'
-import { historyPointName, pointName } from '../shared/tagCatalog.js'
-import { TIPOS, leerTurnos, resolverPeriodo } from '../shared/periodo.js'
+import {
+  createHerramientas,
+  resolverSenal,
+  resolverVentana,
+} from '../backend/ia/herramientas.mjs'
+import {
+  RAIZ,
+  SENALES,
+  SENAL_KEYS,
+  TODOS_LOS_PUNTOS,
+  esHistorizada,
+  historizadas,
+  pointName,
+} from '../shared/eva/senales.js'
+import { PROVISIONALES } from '../shared/eva/umbrales.js'
+import { MAX_PUNTOS } from '../shared/eva/historia.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -67,631 +85,624 @@ async function checkAsync(nombre, fn) {
 
 /* ── Cliente de ICONICS de mentira ───────────────────────────────────── */
 
-const DIA = '2025-03-25'
-const BAD_QUALITY = 0x80000000
-
-/** Marca horaria del día de prueba, para que `unir` empareje de verdad. */
-const hora = h => `${DIA}T${String(h).padStart(2, '0')}:00:00-06:00`
+/**
+ * Valores en vivo por tag. Es la instalación PARADA, que es como está la mayor
+ * parte del tiempo: caudal 0, motor 0, eficiencia 0. Elegido a propósito —es
+ * el estado en el que un tablero mal hecho abre en rojo permanente—.
+ */
+const EN_REPOSO = {
+  SNIVEL_TANQUE: 62.5,
+  STEMPERATURA_TANQUE: 21.3,
+  CARGA_TRABAJO_MOTOR: 0,
+  'Modo AM VDF': false,
+  SFLUJO_INSTANTANEO: 0,
+  SPRESION_RELATIVA: 0.2,
+  INDICE_DESVIACION_VOLTAJE: 122.1,
+  KPIEFICIENCIA_ENERGETICA: 0,
+}
 
 /**
- * Serie de un contador que se reinicia con el turno, tal y como pasa en la
- * planta: sube hasta 1551 y a la mañana siguiente arranca de nuevo en 48.
+ * Un cliente falso.
  *
- * El total honesto son 2145. Leer el último valor daría 594, que son las
- * piezas del último turno y no las del día — el error que esta capa existe
- * para no cometer.
+ * `historial` registra TODA llamada al historiador: es como se comprueba que
+ * una consulta prohibida no llegó a salir a la red, que es distinto de que
+ * devolviera un error.
  */
-const CONTADOR_CON_REINICIO = [700, 1551, 48, 594]
-const TOTAL_ESPERADO = 2145
+function clienteFalso({ valores = EN_REPOSO, calidad = {}, historia = null } = {}) {
+  const historial = []
+  const lotes = []
 
-/**
- * @param {object} opciones
- * @param {Set<string>} opciones.tagsQueFallan  historyPointName completos que devuelven 500
- * @param {object} opciones.vivo                tag de dominio → { value, quality }
- */
-function clienteFalso({
-  tagsQueFallan = new Set(), vivo = {}, vivoPorMaquina = null,
-  historiaVacia = false, statusDeFallo = 500,
-} = {}) {
   return {
+    historial,
+    lotes,
+
     async readPoints(puntos) {
+      lotes.push(puntos)
       const payload = {}
-      for (const punto of puntos) {
-        // `ac:RESONAC/LIN/1/OEE` → id "LIN/1"
-        const partes = punto.slice(3).split('/')
-        const id = `${partes[1]}/${partes[2]}`
-        const lecturas = vivoPorMaquina ? (vivoPorMaquina[id] ?? {}) : vivo
-
-        const tag = Object.keys(lecturas).find(t => punto.endsWith(`/${TAG_PROP[t]}`))
-        if (!tag) continue
-        payload[punto] = { ok: true, status: 200, payload: { pointName: punto, ...lecturas[tag] } }
+      for (const p of puntos) {
+        const tag = p.slice(RAIZ.length)
+        payload[p] = {
+          ok: true,
+          payload: { value: valores[tag], quality: calidad[tag] ?? 0 },
+        }
       }
-      return { ok: true, status: 200, payload }
+      return { ok: true, payload }
     },
 
-    async readHistory({ pointName: punto }) {
-      if (tagsQueFallan.has(punto)) {
-        // 500 = ICONICS contestó y el tag no está coleccionado.
-        // 502 = no se llegó al servidor. Son averías distintas.
-        return { ok: false, status: statusDeFallo, error: 'ICONICS History request failed.' }
-      }
-      if (historiaVacia) return { ok: true, status: 200, data: [], hasMore: false }
+    async readHistory(opciones) {
+      historial.push(opciones)
+      if (historia) return historia(opciones)
 
-      const esContador = /Pz_OK|Pz_NOK|T_Muerto_Ico/.test(punto)
-      const valores = esContador ? CONTADOR_CON_REINICIO : [60, 70, 80, 90]
-
-      return {
-        ok: true,
-        status: 200,
-        data: valores.map((value, i) => ({ timestamp: hora(i), value, quality: 192 })),
-        hasMore: false,
+      const t0 = new Date(opciones.startDate).getTime()
+      const t1 = new Date(opciones.endDate).getTime()
+      const data = []
+      for (let i = 0; i < 24; i++) {
+        data.push({
+          timestamp: new Date(t0 + (i * (t1 - t0)) / 24).toISOString(),
+          value: 60 + Math.sin(i / 3) * 8,
+          quality: 0,
+        })
       }
+      return { ok: true, data }
     },
   }
 }
 
-/** Campo de dominio → propiedad de ICONICS, para construir el mapa en vivo. */
-const TAG_PROP = {
-  oee: 'OEE', disponibilidad: 'OEE_Disp', rendimiento: 'OEE_Rend', calidad: 'OEE_Cal',
-  aprobadas: 'Pz_OK', rechazadas: 'Pz_NOK', estado: 'Estado', modelo: 'Modelo',
-}
+console.log(`\n${c.negrita}Herramientas del asistente · sistema de agua${c.reset}`)
 
-/* ── Resolución de nombres ───────────────────────────────────────────── */
+/* ── El catálogo ─────────────────────────────────────────────────────── */
 
-console.log(`\n${c.negrita}Herramientas del asistente${c.reset}`)
-console.log('\n── Resolución de nombres ───────────────────────────────────')
+console.log('\n── El catálogo ─────────────────────────────────────────────')
 
-check('el id canónico se resuelve', () => {
-  assert.equal(resolverMaquina('LIN/1'), 'LIN/1')
-  assert.equal(resolverMaquina('REC/13'), 'REC/13')
-})
-
-check('los nombres que escribe un operador también', () => {
-  for (const forma of ['Línea 1', 'linea 1', 'Lineal 1', 'LIN 1', 'lin1', 'l 1']) {
-    assert.equal(resolverMaquina(forma), 'LIN/1', `falló "${forma}"`)
-  }
-  for (const forma of ['Multi 13', 'multi 13', 'REC 13', 'rectificadora 13']) {
-    assert.equal(resolverMaquina(forma), 'REC/13', `falló "${forma}"`)
+check('los ocho puntos se nombran bajo la raíz de la demo', () => {
+  assert.equal(TODOS_LOS_PUNTOS.length, 8)
+  for (const p of TODOS_LOS_PUNTOS) {
+    assert.ok(p.startsWith(RAIZ), `"${p}" no cuelga de ${RAIZ}`)
   }
 })
 
-check('las máquinas que no existen no se resuelven', () => {
-  // La numeración tiene huecos reales: no hay REC 12 ni REC 1-9, ni LIN 8.
-  for (const fantasma of ['LIN/8', 'Línea 8', 'REC/12', 'Multi 12', 'REC/1', 'la de arriba']) {
-    assert.equal(resolverMaquina(fantasma), null, `"${fantasma}" no debería resolver`)
+check('el punto histórico es el de TIEMPO REAL, con ac: y no con hda:', () => {
+  // Medido contra el servidor: `hda:\Configuration\…` responde 500 para este
+  // árbol. Es la diferencia con el catálogo de Resonac, y la que hace que estas
+  // herramientas no puedan reutilizar `historyPointName`.
+  const p = pointName('nivelTanque')
+  assert.ok(p.startsWith('ac:'), 'tiene que empezar por ac:')
+  assert.ok(!p.includes('hda:'), 'hda: responde 500 en este árbol')
+})
+
+check('sólo cuatro señales están marcadas como historizadas', () => {
+  assert.deepEqual(historizadas().sort(), [
+    'flujoInstantaneo', 'nivelTanque', 'presionRelativa', 'temperaturaTanque',
+  ])
+  // Las tres a las que el servidor devuelve la serie de la temperatura.
+  for (const k of ['cargaMotor', 'eficienciaEnergetica', 'tensionLinea']) {
+    assert.equal(esHistorizada(k), false, `${k} NO puede estar historizada`)
   }
 })
 
-/* ── listar_maquinas ─────────────────────────────────────────────────── */
-
-console.log('\n── listar_maquinas ─────────────────────────────────────────')
-
-const herramientas = createHerramientas({ client: clienteFalso() })
-
-check('el catálogo trae las 10 máquinas reales', () => {
-  assert.deepEqual(
-    herramientas.catalogo().map(m => m.id),
-    ['LIN/1', 'LIN/2', 'LIN/3', 'LIN/4', 'LIN/5', 'LIN/6', 'LIN/7', 'REC/10', 'REC/11', 'REC/13']
-  )
+check('el catálogo que va al prompt no inventa unidades', () => {
+  const cat = createHerramientas({ client: clienteFalso() }).catalogo()
+  const caudal = cat.find(s => s.nombre === 'Caudal instantáneo')
+  // El tag no dice si son l/s o m³/h. Poner una de las dos sería inventarse
+  // la magnitud, y el modelo la copiaría tal cual.
+  assert.equal(caudal.unidad, null, 'el caudal no tiene unidad declarada')
+  assert.equal(cat.find(s => s.nombre === 'Nivel del tanque').unidad, '%')
 })
 
-check('dice cuáles tienen historia, que hoy es solo LIN/1', () => {
-  const conHistoria = herramientas.catalogo().filter(m => m.tieneHistoria).map(m => m.id)
-  assert.deepEqual(conHistoria, ['LIN/1'])
+/* ── Resolver el nombre de una señal ─────────────────────────────────── */
+
+console.log('\n── Resolver la señal ───────────────────────────────────────')
+
+check('la clave, el tag y los dos rótulos resuelven solos', () => {
+  for (const k of SENAL_KEYS) {
+    const s = SENALES[k]
+    assert.equal(resolverSenal(k), k, `falló la clave "${k}"`)
+    assert.equal(resolverSenal(s.tag), k, `falló el tag "${s.tag}"`)
+    assert.equal(resolverSenal(s.label), k, `falló el rótulo "${s.label}"`)
+    assert.equal(resolverSenal(s.corto), k, `falló el corto "${s.corto}"`)
+  }
 })
 
-check('el catálogo NO es una herramienta que el modelo pueda gastar', () => {
-  // Gastaba la única llamada del turno en pedir lo que ya tiene delante en
-  // las instrucciones, y se quedaba sin poder consultar el historiador.
-  assert.ok(!herramientas.nombres.includes('listar_maquinas'))
-  assert.ok(!herramientas.definiciones.some(d => d.function.name === 'listar_maquinas'))
+check('se aceptan las formas en que habla un operador', () => {
+  const formas = {
+    nivelTanque: ['nivel', 'el nivel del tanque', 'NIVEL', ' nivel '],
+    temperaturaTanque: ['temperatura', 'temperatura del agua', 'los grados'],
+    cargaMotor: ['la bomba', 'el motor', 'carga del motor'],
+    flujoInstantaneo: ['caudal', 'el flujo'],
+    presionRelativa: ['presion', 'presión', 'la presión de red'],
+    tensionLinea: ['voltaje', 'tensión', 'la tensión de línea'],
+    eficienciaEnergetica: ['eficiencia', 'eficiencia energética'],
+    modoVdf: ['el variador', 'modo del variador'],
+  }
+
+  for (const [clave, lista] of Object.entries(formas)) {
+    for (const forma of lista) {
+      assert.equal(resolverSenal(forma), clave, `falló "${forma}"`)
+    }
+  }
 })
 
-await checkAsync('sin nombrar máquina, si solo una tiene historia, se usa esa', () => {
-  return herramientas.ejecutar('datos_de_maquina', { periodo: DIA }).then(r => {
-    assert.equal(r.ok, true, 'no hay ambigüedad que resolver: es esa o ninguna')
-    assert.equal(r.maquina, 'LIN/1')
-  })
+check('«índice de desviación» resuelve a la tensión, que es lo que entrega', () => {
+  // El tag se llama así pero devuelve ~122, que es una tensión. Quien pregunte
+  // por el nombre del tag está preguntando por esta señal; mandarle un «no
+  // existe» sería mentirle.
+  assert.equal(resolverSenal('índice de desviación de voltaje'), 'tensionLinea')
+  assert.equal(resolverSenal('INDICE_DESVIACION_VOLTAJE'), 'tensionLinea')
 })
 
-/* ── estado_actual ───────────────────────────────────────────────────── */
+check('un nombre que no existe NO resuelve a nada', () => {
+  // Sobre todo el vocabulario del tablero anterior: si «OEE» resolviera a
+  // cualquier cosa, el asistente contestaría una señal de agua a una pregunta
+  // de producción.
+  for (const fantasma of ['OEE', 'la Línea 1', 'disponibilidad', 'piezas rechazadas',
+    'el compresor', 'la válvula', '']) {
+    assert.equal(resolverSenal(fantasma), null, `"${fantasma}" no debería resolver`)
+  }
+})
 
-console.log('\n── estado_actual ───────────────────────────────────────────')
+check('una frase con DOS señales no elige ninguna', () => {
+  // Elegir la primera daría una respuesta correcta sobre la señal equivocada,
+  // que es peor que un error: nadie la revisaría.
+  assert.equal(resolverSenal('compara el nivel y la presion'), null)
+})
 
-await checkAsync('traduce la lectura en vivo a campos de dominio', async () => {
-  const h = createHerramientas({
-    client: clienteFalso({
-      vivo: {
-        oee: { value: 62.4, quality: 192 },
-        disponibilidad: { value: 78.1, quality: 192 },
-        aprobadas: { value: 1551, quality: 192 },
-        estado: { value: 1, quality: 192 },
-        modelo: { value: 'RECETA-A', quality: 192 },
-      },
-    }),
-  })
+/* ── Resolver el período ─────────────────────────────────────────────── */
 
-  const r = await h.ejecutar('estado_actual', { maquina: 'Línea 1' })
+console.log('\n── Resolver el período ─────────────────────────────────────')
+
+check('sin período se usan las últimas 6 horas, como las gráficas de Planta', () => {
+  const v = resolverVentana('')
+  const horas = (v.fin - v.inicio) / 3_600_000
+  assert.ok(Math.abs(horas - 6) < 0.01, `fueron ${horas} h`)
+  assert.match(v.etiqueta, /6 horas/)
+})
+
+check('las horas relativas son la forma natural aquí', () => {
+  const casos = [['última hora', 1], ['últimas 3 horas', 3], ['hace 12 horas', 12]]
+  for (const [texto, esperadas] of casos) {
+    const v = resolverVentana(texto)
+    assert.ok(!v.error, `"${texto}" dio error: ${v.error}`)
+    const horas = (v.fin - v.inicio) / 3_600_000
+    assert.ok(Math.abs(horas - esperadas) < 0.01, `"${texto}" dio ${horas} h`)
+  }
+})
+
+check('«esta hora» y los números con letra, que es como se pregunta de verdad', () => {
+  // Los dos salieron de probar contra el modelo real. El ejemplo de la
+  // interfaz —«compara la presión de esta hora con la de hace seis horas»— usa
+  // ambas formas, y el 4B las copia tal cual porque es lo que se le pide.
+  const esta = resolverVentana('esta hora')
+  assert.ok(!esta.error, `"esta hora" dio error: ${esta.error}`)
+  assert.ok(Math.abs((esta.fin - esta.inicio) / 3_600_000 - 1) < 0.01)
+
+  const seis = resolverVentana('hace seis horas')
+  assert.ok(!seis.error, `"hace seis horas" dio error: ${seis.error}`)
+  assert.ok(Math.abs((seis.fin - seis.inicio) / 3_600_000 - 6) < 0.01, 'seis tiene que ser 6')
+
+  assert.ok(!resolverVentana('últimas doce horas').error)
+})
+
+check('«últimas horas» en plural son las 6 de la vista de Planta, no una', () => {
+  // Con 1 h se contestaba a «¿cómo ha ido la temperatura estas últimas horas?»
+  // con un tramo seis veces más corto del que se enseña en pantalla.
+  const v = resolverVentana('últimas horas')
+  assert.ok(Math.abs((v.fin - v.inicio) / 3_600_000 - 6) < 0.01, 'el plural sin número son 6 h')
+
+  const una = resolverVentana('última hora')
+  assert.ok(Math.abs((una.fin - una.inicio) / 3_600_000 - 1) < 0.01, 'el singular sigue siendo 1 h')
+})
+
+check('los minutos también, porque el sondeo vivo va a 3 s', () => {
+  const v = resolverVentana('últimos 30 minutos')
+  const minutos = (v.fin - v.inicio) / 60_000
+  assert.ok(Math.abs(minutos - 30) < 0.1, `fueron ${minutos} min`)
+})
+
+check('el calendario se delega en shared/periodo.js y sigue funcionando', () => {
+  const ayer = resolverVentana('ayer')
+  assert.ok(!ayer.error, ayer.error)
+  assert.match(ayer.etiqueta, /^el \d{4}-\d{2}-\d{2}$/)
+
+  const hoy = resolverVentana('hoy')
+  assert.ok(!hoy.error, hoy.error)
+  // Un período que llega hasta hoy se recorta en el presente: pedir las horas
+  // que no han pasado sólo trae muestras vacías.
+  assert.ok(hoy.fin <= new Date(Date.now() + 1000), 'no puede pasar del presente')
+})
+
+check('una ventana demasiado larga se NIEGA en vez de suavizar los extremos', () => {
+  // Con `MAX_PUNTOS` fijo, alargar no cuesta red: cuesta resolución. Un mes en
+  // 100 puntos es una muestra cada 7,5 h, y su «máximo» ya no es el pico real.
+  const v = resolverVentana('julio 2026')
+  assert.ok(v.error, 'un mes tendría que rechazarse')
+  assert.match(v.error, /7 días|más corto/i, 'y decir qué hacer en su lugar')
+
+  const h = resolverVentana('últimas 500 horas')
+  assert.ok(h.error, '500 horas tendría que rechazarse')
+})
+
+check('las alternativas que ofrece un rechazo se entienden de verdad', () => {
+  /*
+   * La trampa cerrada aquí: al negar «el mes pasado», el 4B proponía por su
+   * cuenta «la última semana» — que en ese momento NO se entendía. El
+   * operador seguía el consejo del asistente y volvía a chocar, después de
+   * haber esperado dos veces.
+   *
+   * Ahora las alternativas se escriben en el propio error, así que esta prueba
+   * comprueba lo único que importa: que todas las que ofrecemos funcionen.
+   */
+  for (const forma of ['últimas 6 horas', 'últimos 3 días', 'la última semana', 'ayer']) {
+    const v = resolverVentana(forma)
+    assert.ok(!v.error, `ofrecemos "${forma}" y no se entiende: ${v.error}`)
+  }
+})
+
+check('el futuro se rechaza', () => {
+  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  const v = resolverVentana(manana)
+  assert.ok(v.error, 'mañana no tiene datos')
+  assert.match(v.error, /futuro/i)
+})
+
+/* ── estado_del_sistema ──────────────────────────────────────────────── */
+
+console.log('\n── estado_del_sistema ──────────────────────────────────────')
+
+await checkAsync('las ocho señales se leen en UNA sola llamada en lote', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+
   assert.equal(r.ok, true)
-  assert.equal(r.maquina, 'LIN/1')
-  assert.equal(r.oee, 62.4)
-  assert.equal(r.disponibilidad, 78.1)
-  assert.equal(r.aprobadas, 1551)
-  assert.equal(r.estado, 'Operando')
-  assert.equal(r.modelo, 'RECETA-A')
-  assert.equal(r.fuente, 'tiempo real')
+  assert.equal(client.lotes.length, 1, 'una petición, no ocho')
+  assert.equal(client.lotes[0].length, 8)
+})
+
+await checkAsync('una instalación PARADA no es una instalación en alarma', async () => {
+  // Es el motivo de que exista `reposo`. Sin él, caudal 0 y eficiencia 0 caen
+  // bajo su límite duro y la demo abre en rojo permanente — la pantalla que
+  // enseña a ignorar las alertas.
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+
+  assert.equal(r.enReposo, true)
+  assert.equal(r.recuento.fueraDeLimite, 0, 'parada no es fuera de límite')
+  assert.ok(r.queSignificaReposo, 'y hay que explicar qué significa')
+
+  const senales = r.activos.flatMap(a => a.senales)
+  const caudal = senales.find(s => s.clave === 'flujoInstantaneo')
+  assert.equal(caudal.estado, 'En reposo')
+  assert.ok(caudal.porQueReposo, 'con su explicación al lado')
 })
 
 await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
-  const h = createHerramientas({
-    client: clienteFalso({
-      vivo: {
-        // Así llega de verdad: la calidad mala trae el valor a 0. Si ese 0
-        // pasara, el asistente diría «produjo 0 piezas» de una máquina que
-        // está produciendo.
-        aprobadas: { value: 0, quality: BAD_QUALITY },
-        rechazadas: { value: 12, quality: 192 },
-      },
-    }),
-  })
+  // Sin este filtro el asistente diría «el tanque está al 0 %» de una
+  // instalación llena, que es la peor respuesta posible: parece un dato.
+  const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
 
-  const r = await h.ejecutar('estado_actual', { maquina: 'LIN/1' })
-  assert.equal(r.ok, true)
-  assert.equal(r.aprobadas, null, 'el valor de mala calidad debería ser null')
-  assert.equal(r.rechazadas, 12, 'el de buena calidad sí pasa')
+  const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
+  assert.equal(nivel.valor, null, 'mala calidad tiene que ser null')
+  assert.notEqual(nivel.valor, 0, 'y desde luego no un cero')
+  assert.equal(nivel.estado, 'Sin dato')
+  assert.equal(r.recuento.sinDato, 1)
 })
 
-await checkAsync('una máquina inventada devuelve error CON el catálogo', async () => {
-  const r = await herramientas.ejecutar('estado_actual', { maquina: 'Línea 42' })
+await checkAsync('las unidades que el servidor no declara viajan vacías', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const senales = r.activos.flatMap(a => a.senales)
+
+  const caudal = senales.find(s => s.clave === 'flujoInstantaneo')
+  assert.equal(caudal.unidad, null, 'inventarle l/s sería inventarse la magnitud')
+  assert.ok(caudal.nota, 'y hay que decir por qué está vacía')
+
+  assert.equal(senales.find(s => s.clave === 'nivelTanque').unidad, '%')
+})
+
+await checkAsync('el float crudo del PLC se redondea a los decimales del catálogo', async () => {
+  /*
+   * Salió probando contra el servidor REAL, no contra este cliente falso: los
+   * valores de aquí venían ya limpios y no podían enseñarlo. ICONICS entrega
+   * `50.09765625` y `23.258464813232422`, y el modelo los citaba tal cual —«el
+   * tanque está al 50.09765625 %»—. Trece decimales sugieren una exactitud que
+   * el sensor no tiene.
+   */
+  const client = clienteFalso({
+    valores: { ...EN_REPOSO, SNIVEL_TANQUE: 50.09765625, STEMPERATURA_TANQUE: 23.258464813232422 },
+  })
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const senales = r.activos.flatMap(a => a.senales)
+
+  assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, 50.1)
+  assert.equal(senales.find(s => s.clave === 'temperaturaTanque').valor, 23.3)
+})
+
+await checkAsync('redondear no convierte un hueco ni un booleano en cero', async () => {
+  const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const senales = r.activos.flatMap(a => a.senales)
+
+  assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, null, 'null, no 0')
+  assert.equal(senales.find(s => s.clave === 'modoVdf').valor, false, 'false, no 0')
+})
+
+await checkAsync('la booleana se dice con su palabra, no con true/false', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const modo = r.activos.flatMap(a => a.senales).find(s => s.clave === 'modoVdf')
+
+  assert.equal(modo.texto, 'Automático')
+  assert.ok(modo.nota, 'y se confiesa que la correspondencia no está confirmada')
+})
+
+await checkAsync('el aviso de umbrales viaja en el campo QUE VIGILA la red de seguridad', async () => {
+  /*
+   * Va en el RESULTADO y no sólo en el prompt: una advertencia que sólo vive
+   * en las instrucciones se diluye a los tres turnos de conversación.
+   *
+   * Y va en el campo `aviso` concretamente, que es el que `chat.mjs` mira para
+   * añadirlo detrás cuando el modelo no lo cuenta. Con cualquier otro nombre
+   * el aviso sigue viéndose en el JSON —así que a veces el modelo lo dice— y
+   * la red de seguridad no salta nunca. Medido con el 4B: contestó «el nivel
+   * está fuera de límite» sin decir de quién era el límite.
+   */
+  const h = createHerramientas({ client: clienteFalso() })
+
+  for (const [nombre, args] of [
+    ['estado_del_sistema', {}],
+    ['historia_de_senal', { senal: 'nivel' }],
+    ['comparar_periodos', { senal: 'nivel', periodoA: 'última hora', periodoB: 'hace 3 horas' }],
+  ]) {
+    const r = await h.ejecutar(nombre, args)
+    if (PROVISIONALES) {
+      assert.ok(r.aviso, `${nombre} tiene que llevar el aviso en \`aviso\``)
+      assert.match(r.aviso, /estimaciones|no.*confirmad/i)
+    }
+  }
+})
+
+await checkAsync('la hora de lectura se da legible y en local, no en ISO', async () => {
+  // Medido con el 4B: con un ISO delante lo copió tal cual en la respuesta
+  // («leído a las 2026-08-18T14:48:44.253Z»). Además va en UTC, así que en
+  // España marcaría dos horas menos que el reloj de la pared.
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+
+  assert.match(r.leidoA, /^\d{2}:\d{2}:\d{2}$/, `leidoA fue "${r.leidoA}"`)
+})
+
+await checkAsync('cada señal lleva su banda, para no obligar al modelo a restar', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
+
+  assert.deepEqual(nivel.banda, {
+    limiteInferior: 15, avisoInferior: 25, avisoSuperior: 90, limiteSuperior: 95,
+  })
+
+  // `null` en un extremo es «sin límite», no cero. Leído como 0 marcaría en
+  // rojo media instalación.
+  const carga = r.activos.flatMap(a => a.senales).find(s => s.clave === 'cargaMotor')
+  assert.equal(carga.banda.limiteInferior, 'sin límite')
+})
+
+await checkAsync('un servidor caído se cuenta como tal y no como instalación vacía', async () => {
+  const client = {
+    async readPoints() { return { ok: false, error: 'ICONICS no responde', status: 502 } },
+    async readHistory() { return { ok: false, status: 502 } },
+  }
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+
   assert.equal(r.ok, false)
-  assert.match(r.error, /no existe/i)
-  assert.equal(r.maquinas.length, 10, 'el error debe traer las opciones válidas')
+  assert.match(r.error, /no se pudo leer/i)
 })
 
-/* ── estado_de_planta (Plan 7) ───────────────────────────────────────── */
+/* ── historia_de_senal · LA GUARDA ───────────────────────────────────── */
 
-console.log('\n── estado_de_planta ────────────────────────────────────────')
+console.log('\n── historia_de_senal · la guarda ───────────────────────────')
 
-/** Las mismas lecturas en las 10 máquinas, para cifras predecibles. */
-const PLANTA_UNIFORME = {
-  disponibilidad: { value: 80, quality: 192 },
-  rendimiento: { value: 90, quality: 192 },
-  calidad: { value: 95, quality: 192 },
-  aprobadas: { value: 100, quality: 192 },
-  rechazadas: { value: 10, quality: 192 },
-  estado: { value: 1, quality: 192 },
-  // A propósito distinto del producto D×R×C: ver la comprobación de abajo.
-  oee: { value: 50, quality: 192 },
-}
+await checkAsync('pedir la historia de una señal NO historizada no llega a la red', async () => {
+  /*
+   * La invariante cara de todo el archivo.
+   *
+   * El servidor NO da error: devuelve `ok: true`, con marcas de tiempo
+   * correctas, y la serie de `STEMPERATURA_TANQUE`. Así que no basta con
+   * comprobar que la herramienta falla — hay que comprobar que **no preguntó**.
+   * Si algún día alguien mueve la guarda detrás de la llamada, esto se cae.
+   */
+  const client = clienteFalso()
+  const h = createHerramientas({ client })
 
-await checkAsync('resume la planta entera en una sola llamada', async () => {
-  const h = createHerramientas({ client: clienteFalso({ vivo: PLANTA_UNIFORME }) })
-  const r = await h.ejecutar('estado_de_planta')
+  for (const nombre of ['carga del motor', 'eficiencia energética', 'tensión de línea']) {
+    const r = await h.ejecutar('historia_de_senal', { senal: nombre })
+    assert.equal(r.ok, false, `"${nombre}" no puede devolver serie`)
+    assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
+    assert.ok(r.senalesConHistoria?.length === 4, 'y decir cuáles sí la tienen')
+  }
+
+  assert.equal(client.historial.length, 0, 'NINGUNA de las tres pudo salir a la red')
+})
+
+await checkAsync('el modo del variador tampoco tiene serie', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'modo del variador' })
+
+  assert.equal(r.ok, false)
+  assert.equal(client.historial.length, 0)
+})
+
+await checkAsync('las cuatro que SÍ tienen serie se leen con Average y bajo el tope', async () => {
+  const client = clienteFalso()
+  const h = createHerramientas({ client })
+
+  for (const nombre of ['nivel', 'temperatura', 'caudal', 'presión']) {
+    const r = await h.ejecutar('historia_de_senal', { senal: nombre, periodo: 'últimas 6 horas' })
+    assert.equal(r.ok, true, `"${nombre}" falló: ${r.error}`)
+  }
+
+  assert.equal(client.historial.length, 4)
+  for (const llamada of client.historial) {
+    // `Average` y no `Interpolative`: las ocho señales son magnitudes
+    // instantáneas y ninguna es acumulativa.
+    assert.equal(llamada.aggregate, 'Average')
+    assert.ok(llamada.pointName.startsWith('ac:'), 'con ac:, no con hda:')
+    assert.match(llamada.interval, /^\d{2}:\d{2}:\d{2}$/, 'el intervalo va como HH:MM:SS')
+  }
+})
+
+await checkAsync('nunca se piden más muestras de las que el servidor entrega', async () => {
+  // Si se piden más, el servidor recorta y devuelve una serie incompleta SIN
+  // decirlo: el máximo de un día sería el de sus primeras horas.
+  const client = clienteFalso()
+  await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  const { startDate, endDate, interval } = client.historial[0]
+  const segundos = (new Date(endDate) - new Date(startDate)) / 1000
+  const [h, m, s] = interval.split(':').map(Number)
+  const puntos = segundos / (h * 3600 + m * 60 + s)
+
+  assert.ok(puntos <= MAX_PUNTOS, `pidió ${Math.round(puntos)} puntos, el tope es ${MAX_PUNTOS}`)
+})
+
+await checkAsync('el resumen trae los extremos CON su hora, y no las muestras crudas', async () => {
+  // Devolverle 24 muestras al modelo y pedirle el mayor es pedirle aritmética,
+  // que es justo lo que el prompt le prohíbe.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'nivel del tanque', periodo: 'últimas 6 horas' })
 
   assert.equal(r.ok, true)
-  assert.equal(r.maquinas.total, 10)
-  assert.equal(r.maquinas.operando, 10)
-  assert.equal(r.planta.producidas, 1100, '10 máquinas × (100 + 10)')
-  assert.equal(r.rankingPorOee.length, 10)
-  assert.equal(r.areas.length, 2, 'Lineales y Rectificadoras')
-})
-
-await checkAsync('el OEE de planta se COMPONE, no se promedia', async () => {
-  const h = createHerramientas({ client: clienteFalso({ vivo: PLANTA_UNIFORME }) })
-  const r = await h.ejecutar('estado_de_planta')
-
-  // Es la regla documentada en shared/plantModel.js: el OEE de planta es
-  // D×R×C de los agregados, para que el número grande y los tres gauges
-  // cuenten la misma historia. Promediar los OEE de cada máquina daría 50, y
-  // el chat contradiría al tablero.
-  assert.equal(r.planta.oee, 68.4, '80 × 90 × 95 / 10000')
-  assert.notEqual(r.planta.oee, 50, 'eso sería promediar los OEE de cada máquina')
-})
-
-await checkAsync('el ranking va de mejor a peor, para contestar las dos preguntas', async () => {
-  const conOee = oee => ({ ...PLANTA_UNIFORME, oee: { value: oee, quality: 192 } })
-  const h = createHerramientas({
-    client: clienteFalso({
-      vivoPorMaquina: {
-        'LIN/1': conOee(90), 'LIN/2': conOee(30), 'LIN/3': conOee(60),
-        'LIN/4': conOee(55), 'LIN/5': conOee(70), 'LIN/6': conOee(45),
-        'LIN/7': conOee(80), 'REC/10': conOee(20), 'REC/11': conOee(65), 'REC/13': conOee(75),
-      },
-    }),
-  })
-
-  const r = await h.ejecutar('estado_de_planta')
-  assert.equal(r.rankingPorOee[0].id, 'LIN/1', 'la mejor va primera')
-  assert.equal(r.rankingPorOee.at(-1).id, 'REC/10', 'la peor va última')
-
-  const valores = r.rankingPorOee.map(m => m.oee)
-  assert.deepEqual(valores, [...valores].sort((a, b) => b - a), 'tiene que venir ordenado')
-})
-
-await checkAsync('sin ninguna lectura lo DICE, y no informa de una planta al 0 %', async () => {
-  const h = createHerramientas({ client: clienteFalso({ vivo: {} }) })
-  const r = await h.ejecutar('estado_de_planta')
-
-  assert.equal(r.ok, false, 'un resumen con todo a null se redactaría como planta parada')
-  assert.match(r.error, /ninguna de las 10 máquinas/i)
-  assert.match(r.error, /3-4 minutos/, 'y dice cuánto tardan los servicios en levantar')
-})
-
-await checkAsync('una máquina muda no hunde el resumen de las demás', async () => {
-  const h = createHerramientas({
-    client: clienteFalso({
-      vivoPorMaquina: { 'LIN/1': PLANTA_UNIFORME, 'LIN/2': PLANTA_UNIFORME },
-    }),
-  })
-
-  const r = await h.ejecutar('estado_de_planta')
-  assert.equal(r.ok, true)
-  assert.equal(r.maquinas.sinDato, 8, 'las ocho sin lectura se cuentan aparte')
-  assert.equal(r.planta.oee, 68.4, 'y no arrastran la media a cero')
-})
-
-/* ── datos_de_maquina ──────────────────────────────────────────────────── */
-
-console.log('\n── datos_de_maquina ──────────────────────────────────────────')
-
-await checkAsync('resume el día leyendo del historiador', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
-  assert.equal(r.ok, true)
-  assert.equal(r.maquina, 'LIN/1')
-  assert.equal(r.fecha, DIA)
+  for (const campo of ['minimo', 'maximo', 'promedio', 'primero', 'ultimo', 'muestras']) {
+    assert.ok(r[campo] !== undefined, `falta ${campo}`)
+  }
+  assert.ok(r.minimoEn && r.maximoEn, 'un extremo sin su hora no se puede contrastar')
+  assert.ok(r.minimo <= r.maximo)
   assert.equal(r.fuente, 'historiador')
-  assert.equal(r.oee, 75, 'media de 60,70,80,90')
 })
 
-await checkAsync('los CONTADORES se suman por tramos, no se lee el último', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
-  assert.equal(
-    r.aprobadas, TOTAL_ESPERADO,
-    `esperaba ${TOTAL_ESPERADO} (suma de tramos), no ${r.aprobadas}. ` +
-    'Leer el último valor daría 594, que son solo las piezas del último turno.'
-  )
+await checkAsync('una señal que sólo vale en marcha lo advierte en su historia', async () => {
+  // La instalación está parada casi siempre, así que un promedio de caudal
+  // cercano a cero refleja las horas en reposo y no una avería.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'caudal', periodo: 'ayer' })
+
+  assert.ok(r.avisoReposo, 'el caudal sólo significa algo con la bomba en marcha')
 })
 
-await checkAsync('una máquina SIN historizar lo dice, y no devuelve un día vacío', async () => {
-  // Las 9 máquinas sin «Is Collected» responden 500 a los siete tags, igual
-  // que un punto que no existe.
-  const todos = new Set(
-    ['oee', 'disponibilidad', 'rendimiento', 'calidad', 'aprobadas', 'rechazadas', 'tMuerto']
-      .map(tag => historyPointName('LIN', '3', tag))
-  )
-  const h = createHerramientas({ client: clienteFalso({ tagsQueFallan: todos }) })
+await checkAsync('sin ninguna muestra se dice, en vez de devolver un resumen de ceros', async () => {
+  const client = clienteFalso({ historia: async () => ({ ok: true, data: [] }) })
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
 
-  const r = await h.ejecutar('datos_de_maquina', { maquina: 'Línea 3', periodo: DIA })
-  assert.equal(r.ok, false, 'no puede devolver ok con un resumen vacío')
-  assert.match(r.error, /no tiene datos históricos/i)
-  assert.deepEqual(r.maquinasConHistoria, ['LIN/1'], 'debe decir cuáles sí')
-})
-
-await checkAsync('«servidor caído» NO se cuenta como «tag sin coleccionar»', async () => {
-  // Pasó de verdad con el servidor real: con los servicios GENESIS apagados,
-  // los siete tags fallaban y el asistente mandaba a revisar el Data
-  // Historian. Son dos averías que se arreglan en sitios distintos, y confundir
-  // «no llego al servidor» con «falta una casilla» hace perder la tarde.
-  const todos = new Set(
-    ['oee', 'disponibilidad', 'rendimiento', 'calidad', 'aprobadas', 'rechazadas', 'tMuerto']
-      .map(tag => historyPointName('LIN', '1', tag))
-  )
-  const h = createHerramientas({ client: clienteFalso({ tagsQueFallan: todos, statusDeFallo: 502 }) })
-
-  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
-  assert.equal(r.ok, false)
-  assert.match(r.error, /no se pudo contactar/i)
-  assert.doesNotMatch(r.error, /Is Collected/i, 'no debe mandar a revisar el historiador')
-  assert.match(r.error, /3-4 minutos/, 'y sí decir cuánto tardan los servicios')
-})
-
-await checkAsync('un día sin ninguna muestra se distingue de un día con OEE 0', async () => {
-  const h = createHerramientas({ client: clienteFalso({ historiaVacia: true }) })
-  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
   assert.equal(r.ok, false)
   assert.match(r.error, /no hay ninguna muestra/i)
 })
 
-await checkAsync('un período que no se entiende se rechaza enseñando las formas válidas', async () => {
-  // Van saliendo de esta lista según se amplía el resolvedor: «ayer» se fue
-  // en el Plan 7, y «25 de marzo de 2025» y «la semana pasada» al añadir los
-  // períodos. Lo que queda es lo que de verdad no se sabe interpretar.
-  for (const mala of ['25/03/2025', '2025-3-5', 'cuando estaba lloviendo', '']) {
-    const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: mala })
-    assert.equal(r.ok, false, `"${mala}" debería rechazarse`)
-    assert.match(r.error, /formas que entiendo|no me has dicho/i, `sin instrucciones: ${r.error}`)
+await checkAsync('toda la serie de mala calidad es un hueco, no una serie de ceros', async () => {
+  const client = clienteFalso({
+    historia: async () => ({
+      ok: true,
+      data: [{ timestamp: new Date().toISOString(), value: 0, quality: 24 }],
+    }),
+  })
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
+
+  assert.equal(r.ok, false, 'una muestra mala no es una muestra')
+})
+
+await checkAsync('un 502 manda a levantar servicios, no a revisar el historiador', async () => {
+  // Son dos averías que se arreglan en sitios distintos. 500 es «el punto no
+  // está coleccionado»; 502/504 los pone el puente y significan que no se
+  // llegó al servidor.
+  const client = clienteFalso({ historia: async () => ({ ok: false, status: 504 }) })
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no se pudo contactar|GENESIS/i)
+})
+
+await checkAsync('una señal inventada devuelve el catálogo para corregirse sin otra ronda', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'el OEE' })
+
+  assert.equal(r.ok, false)
+  assert.equal(client.historial.length, 0, 'ni siquiera se pregunta')
+  assert.equal(r.senales.length, 8, 'y viaja la lista de las que sí existen')
+})
+
+/* ── comparar_periodos ───────────────────────────────────────────────── */
+
+console.log('\n── comparar_periodos ───────────────────────────────────────')
+
+await checkAsync('la diferencia la calcula el backend, no el modelo', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
+    senal: 'nivel', periodoA: 'últimas 4 horas', periodoB: 'última hora',
+  })
+
+  assert.equal(r.ok, true)
+  assert.ok(r.diferencia, 'la resta viene hecha')
+  assert.ok('promedio' in r.diferencia)
+  assert.match(r.nota, /menos/, 'y se dice en qué sentido va la resta')
+})
+
+await checkAsync('las claves son los períodos YA resueltos, no el texto del modelo', async () => {
+  // Para que redacte con el período real y no con el «ayer» que escribió él.
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
+    senal: 'nivel', periodoA: 'última hora', periodoB: 'últimas 2 horas',
+  })
+
+  assert.ok(r['la última hora'], 'falta el período A resuelto')
+  assert.ok(r['las últimas 2 horas'], 'falta el período B resuelto')
+})
+
+await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a la red', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client }).ejecutar('comparar_periodos', {
+    senal: 'carga del motor', periodoA: 'última hora', periodoB: 'ayer',
+  })
+
+  assert.equal(r.ok, false)
+  assert.equal(client.historial.length, 0)
+})
+
+/* ── Invariantes del registro ────────────────────────────────────────── */
+
+console.log('\n── El registro ─────────────────────────────────────────────')
+
+check('son tres herramientas, y ninguna escribe', () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  assert.deepEqual(h.nombres, ['estado_del_sistema', 'historia_de_senal', 'comparar_periodos'])
+
+  // La primera puerta contra una instrucción astuta metida en el chat no es
+  // `ICONICS_READ_ONLY`: es que aquí no existe nada que escriba.
+  const texto = JSON.stringify(h.definiciones).toLowerCase()
+  for (const prohibido of ['write', 'escrib', 'borrar', 'delete', 'acknowledge']) {
+    assert.ok(!texto.includes(prohibido), `"${prohibido}" no puede aparecer`)
   }
 })
 
-await checkAsync('una fecha futura se rechaza', async () => {
-  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: manana })
+check('las definiciones avisan de que sólo cuatro señales tienen historia', () => {
+  // Las descripciones son parte del programa: es lo único que el modelo lee
+  // para decidir, y éste es el fallo más caro que puede cometer.
+  const h = createHerramientas({ client: clienteFalso() })
+  const def = h.definiciones.find(d => d.function.name === 'historia_de_senal')
+
+  assert.match(def.function.description, /cuatro/i)
+})
+
+await checkAsync('el registro no lanza ante una herramienta inventada', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('borrar_planta', {})
+
   assert.equal(r.ok, false)
-  assert.match(r.error, /futuro/i)
+  assert.ok(r.herramientas, 'y devuelve las válidas para que se corrija')
 })
 
-/* ── Fechas relativas (Plan 7) ───────────────────────────────────────── */
-
-console.log('\n── Fechas relativas ────────────────────────────────────────')
-
-/** "YYYY-MM-DD" de hoy más `dias`, calculado aparte de la implementación. */
-const esperado = (dias) => {
-  const d = new Date()
-  d.setDate(d.getDate() + dias)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
-check('hoy, ayer y anteayer se resuelven en el backend', () => {
-  assert.equal(resolverFecha('hoy').iso, esperado(0))
-  assert.equal(resolverFecha('ayer').iso, esperado(-1))
-  assert.equal(resolverFecha('anteayer').iso, esperado(-2))
-  assert.equal(resolverFecha('antier').iso, esperado(-2))
+check('sin cliente de ICONICS, el fallo es en el arranque y dice qué falta', () => {
+  assert.throws(() => createHerramientas({}), /cliente de ICONICS/)
 })
 
-check('las mayúsculas y los acentos dan igual', () => {
-  assert.equal(resolverFecha('AYER').iso, esperado(-1))
-  assert.equal(resolverFecha(' Ayer ').iso, esperado(-1))
-  assert.equal(resolverFecha('miércoles').iso, resolverFecha('miercoles').iso)
-})
-
-check('un día de la semana cae en el pasado, nunca en el futuro', () => {
-  const hoy = esperado(0)
-  for (const dia of ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']) {
-    const { iso } = resolverFecha(dia)
-    assert.ok(iso <= hoy, `"${dia}" resolvió a ${iso}, que es futuro`)
-    assert.ok(iso >= esperado(-6), `"${dia}" resolvió a ${iso}, demasiado atrás`)
-  }
-})
-
-check('«pasado» retrocede una semana cuando el día es hoy', () => {
-  const nombreDeHoy = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'][new Date().getDay()]
-  assert.equal(resolverFecha(nombreDeHoy).iso, esperado(0), 'sin "pasado" es hoy mismo')
-  assert.equal(resolverFecha(`${nombreDeHoy} pasado`).iso, esperado(-7), 'con "pasado" es el de la semana anterior')
-})
-
-check('el formato ISO sigue funcionando igual', () => {
-  assert.equal(resolverFecha('2025-03-25').iso, '2025-03-25')
-})
-
-check('el futuro se sigue rechazando, venga como venga', () => {
-  assert.match(resolverFecha(esperado(1)).error, /futuro/i)
-})
-
-check('lo que no se entiende dice cómo escribirlo', () => {
-  const r = resolverFecha('el jueves de la semana que viene')
-  assert.ok(r.error, 'no debería resolver')
-  assert.match(r.error, /YYYY-MM-DD/)
-})
-
-await checkAsync('la herramienta acepta "ayer" de punta a punta', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: 'ayer' })
-  assert.equal(r.ok, true)
-  assert.equal(r.fecha, esperado(-1), 'la respuesta lleva la fecha YA resuelta, no la palabra')
-})
-
-/* ── Períodos: horas, turnos y rangos ────────────────────────────────── */
-
-console.log('\n── Resolución de períodos ──────────────────────────────────')
-
-check('cada forma cae en su tipo', () => {
-  assert.equal(resolverPeriodo('2025-03-25').tipo, TIPOS.DIA)
-  assert.equal(resolverPeriodo('ayer').tipo, TIPOS.DIA)
-  assert.equal(resolverPeriodo('20 de julio de 2025').tipo, TIPOS.DIA)
-  assert.equal(resolverPeriodo('ayer a las 12').tipo, TIPOS.HORA)
-  assert.equal(resolverPeriodo('2025-03-25 14:00').tipo, TIPOS.HORA)
-  assert.equal(resolverPeriodo('julio 2025').tipo, TIPOS.RANGO)
-  assert.equal(resolverPeriodo('últimos 7 días').tipo, TIPOS.RANGO)
-})
-
-check('la hora se entiende en las formas en que se dice', () => {
-  assert.equal(resolverPeriodo('2025-03-25 14:00').horaDesde, 14)
-  assert.equal(resolverPeriodo('2025-03-25 a las 14').horaDesde, 14)
-  assert.equal(resolverPeriodo('2025-03-25 a las 2 pm').horaDesde, 14)
-  assert.equal(resolverPeriodo('2025-03-25 a las 2 de la tarde').horaDesde, 14)
-  // Una hora es un bucket de una hora: el historiador agrega así.
-  assert.equal(resolverPeriodo('2025-03-25 14:00').horaHasta, 15)
-})
-
-check('un mes se convierte en sus días, recortado en hoy si sigue en curso', () => {
-  const julio = resolverPeriodo('julio 2025')
-  assert.equal(julio.diaDesde, '2025-07-01')
-  assert.equal(julio.diaHasta, '2025-07-31')
-
-  const esteMes = resolverPeriodo('este mes')
-  assert.ok(esteMes.diaHasta <= new Date().toISOString().slice(0, 10), 'no puede pasar de hoy')
-})
-
-check('el futuro se rechaza también como período', () => {
-  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-  assert.match(resolverPeriodo(manana).error, /futuro/i)
-})
-
-check('sin turnos configurados NO se inventa el horario', () => {
-  const r = resolverPeriodo('turno de la mañana del 2025-03-25')
-  assert.ok(r.error, 'no puede resolver un turno que no conoce')
-  assert.match(r.error, /no están configurados/i)
-  assert.match(r.error, /hora concreta/i, 'y ofrece la alternativa que sí funciona')
-})
-
-check('con turnos configurados sí, y se leen del entorno', () => {
-  const turnos = leerTurnos('manana=6-14,tarde=14-22,noche=22-6')
-  assert.deepEqual(turnos.manana, [6, 14])
-
-  const r = resolverPeriodo('turno de la tarde del 2025-03-25', { turnos })
-  assert.equal(r.tipo, TIPOS.VENTANA)
-  assert.equal(r.horaDesde, 14)
-  assert.equal(r.horaHasta, 22)
-})
-
-console.log('\n── datos_de_maquina · horas y rangos ───────────────────────')
-
-await checkAsync('una hora concreta devuelve SOLO esa hora', async () => {
-  // La serie falsa tiene 60,70,80,90 en las horas 0,1,2,3.
-  const r = await herramientas.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: `${DIA} 02:00` })
-  assert.equal(r.ok, true)
-  assert.equal(r.oee, 80, 'la hora 2, no la media del día')
-  assert.match(r.horas, /2:00 a 3:00/)
-})
-
-await checkAsync('en una VENTANA los contadores se cuentan por incremento', async () => {
-  // Es la regla que más fácil se hace mal. El total del día son 2145 porque
-  // incluye el valor con el que arranca la serie —lo acumulado del turno de
-  // noche—. En una ventana que empieza a media mañana ese arranque es
-  // producción de ANTES, y contarlo dispararía la cifra.
-  const h = createHerramientas({ client: clienteFalso(), turnos: leerTurnos('tarde=1-3') })
-
-  const dia = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
-  assert.equal(dia.aprobadas, TOTAL_ESPERADO, 'el día entero sí incluye el arranque')
-
-  const ventana = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: `turno de la tarde del ${DIA}` })
-  assert.equal(ventana.ok, true)
-  // Horas 1 y 2 del contador: 1551 → 48. Es un reinicio, así que el tramo
-  // nuevo aporta desde su propio valor.
-  assert.equal(ventana.aprobadas, 48, `esperaba 48, no ${ventana.aprobadas}`)
-  assert.notEqual(ventana.aprobadas, TOTAL_ESPERADO, 'no puede ser el total del día')
-})
-
-await checkAsync('un rango devuelve máximo, mínimo y promedio YA calculados', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', {
-    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'oee',
-  })
-
-  assert.equal(r.ok, true)
-  assert.equal(r.metrica, 'oee')
-  assert.equal(r.diasConDato, 31, 'julio tiene 31 días')
-  // Pedirle al modelo que encuentre el mayor de 31 sería pedirle aritmética.
-  assert.ok(r.maximo?.fecha, 'el máximo tiene que venir con su fecha')
-  assert.ok(r.minimo?.fecha)
-  assert.equal(r.promedio, 75, 'media de 60,70,80,90')
-  assert.equal(r.porDia.length, 31)
-})
-
-await checkAsync('en un rango, un contador se totaliza en vez de promediarse', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', {
-    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'aprobadas',
-  })
-  assert.equal(r.ok, true)
-  assert.equal(r.unidad, 'piezas')
-  assert.equal(r.maximo.valor, TOTAL_ESPERADO, 'cada día suma sus tramos')
-  assert.equal(r.total, TOTAL_ESPERADO * 31, 'y el rango los suma todos')
-})
-
-await checkAsync('un porcentaje imposible se AVISA, no se presenta como bueno', async () => {
-  // Medido en el servidor real: LIN/1 el 2026-07-24 devuelve 15 de 24
-  // muestras por encima de 100, con un máximo de 160,4 %. Es el fallo de
-  // OEE_Cal sin acotar que documenta TAGS.md. La media diaria lo disimulaba;
-  // un máximo de un mes lo saca a la luz.
-  const h = createHerramientas({
-    client: {
-      readPoints: async () => ({ ok: true, payload: {} }),
-      readHistory: async () => ({
-        ok: true, status: 200, hasMore: false,
-        data: [0, 1, 2].map(i => ({ timestamp: hora(i), value: 130 + i, quality: 192 })),
-      }),
-    },
-  })
-
-  const r = await h.ejecutar('datos_de_maquina', { maquina: 'LIN/1', periodo: DIA })
-  assert.equal(r.ok, true, 'el dato se entrega: esconderlo sería el otro extremo')
-  assert.ok(r.aviso, 'pero tiene que venir con su aviso')
-  assert.match(r.aviso, /100 %/)
-  assert.match(r.aviso, /no es una medición válida/i)
-  // El aviso se redacta como HECHO, no como orden: en imperativo, el modelo
-  // lo copiaba literal y el operador leía las instrucciones del sistema.
-  assert.doesNotMatch(r.aviso, /\b(dilo|di\b|no la presentes|debes)\b/i)
-})
-
-await checkAsync('una métrica inventada se rechaza con la lista de las buenas', async () => {
-  const r = await herramientas.ejecutar('datos_de_maquina', {
-    maquina: 'LIN/1', periodo: 'julio 2025', metrica: 'temperatura',
-  })
-  assert.equal(r.ok, false)
-  assert.ok(r.metricas.includes('oee'))
-})
-
-/* ── comparar_periodos ───────────────────────────────────────────────────── */
-
-console.log('\n── comparar_periodos ───────────────────────────────────────────')
-
-await checkAsync('devuelve los dos días y su diferencia', async () => {
-  const r = await herramientas.ejecutar('comparar_periodos', {
-    maquina: 'LIN/1', periodoA: '2025-03-24', periodoB: DIA,
-  })
-  assert.equal(r.ok, true)
-  // Las claves son las etiquetas ya resueltas, no lo que escribió el modelo.
-  assert.equal(r['el 2025-03-24'].oee, 75)
-  assert.equal(r[`el ${DIA}`].oee, 75)
-  assert.equal(r.diferencia.oee, 0, 'mismos datos → diferencia cero')
-  assert.match(r.nota, /negativo/i, 'debe explicar el signo al modelo')
-})
-
-await checkAsync('si un día no tiene datos, lo dice en vez de comparar a medias', async () => {
-  const h = createHerramientas({ client: clienteFalso({ historiaVacia: true }) })
-  const r = await h.ejecutar('comparar_periodos', {
-    maquina: 'LIN/1', periodoA: '2025-03-24', periodoB: DIA,
-  })
-  assert.equal(r.ok, false)
-})
-
-/* ── El registro ─────────────────────────────────────────────────────── */
-
-console.log('\n── El registro de herramientas ─────────────────────────────')
-
-check('son exactamente cuatro, y ninguna escribe', () => {
-  assert.deepEqual(
-    herramientas.nombres.sort(),
-    ['comparar_periodos', 'datos_de_maquina', 'estado_actual', 'estado_de_planta']
-  )
-  const sospechosas = herramientas.nombres.filter(n => /escrib|write|set|ack|borr|delete/i.test(n))
-  assert.deepEqual(sospechosas, [], 'el registro no puede contener escrituras')
-})
-
-check('el esquema que ve el modelo coincide con el registro', () => {
-  const enEsquema = herramientas.definiciones.map(d => d.function.name).sort()
-  assert.deepEqual(enEsquema, herramientas.nombres.sort())
-  for (const d of herramientas.definiciones) {
-    assert.ok(d.function.description?.length > 40, `${d.function.name} sin descripción útil`)
-    assert.equal(d.type, 'function')
-  }
-})
-
-check('el esquema avisa de que no todas las máquinas tienen historia', () => {
-  const oee = herramientas.definiciones.find(d => d.function.name === 'datos_de_maquina')
-  assert.match(
-    oee.function.description, /solo algunas máquinas tienen datos históricos/i,
-    'sin ese aviso el modelo pedirá historia de máquinas que no la tienen'
-  )
-})
-
-await checkAsync('una herramienta inventada no lanza: devuelve las válidas', async () => {
-  const r = await herramientas.ejecutar('borrar_todo', {})
-  assert.equal(r.ok, false)
-  assert.match(r.error, /no existe la herramienta/i)
-  assert.equal(r.herramientas.length, 4)
-})
-
-await checkAsync('un fallo del cliente se cuenta, no se traga', async () => {
-  const roto = {
-    readPoints: async () => ({ ok: false, status: 502, error: 'no se pudo conectar' }),
-    readHistory: async () => ({ ok: false, status: 502 }),
-  }
-  const h = createHerramientas({ client: roto })
-  const r = await h.ejecutar('estado_actual', { maquina: 'LIN/1' })
-  assert.equal(r.ok, false)
-  assert.match(r.error, /no se pudo/i)
-})
-
-/* ── Cierre ──────────────────────────────────────────────────────────── */
+/* ── Resumen ─────────────────────────────────────────────────────────── */
 
 console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Las herramientas son lo único que separa al modelo de inventarse`)
-  console.log(`una cifra. Revisa backend/ia/herramientas.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/herramientas.mjs y shared/eva/.${c.reset}`)
   process.exit(1)
 }
 
-console.log(`${c.verde}${c.negrita}${passed} comprobaciones correctas: las herramientas no inventan datos.${c.reset}`)
-process.exit(0)
+console.log(`${c.verde}${c.negrita}${passed} comprobaciones correctas: las herramientas se mantienen.${c.reset}`)

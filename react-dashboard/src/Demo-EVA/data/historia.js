@@ -1,24 +1,18 @@
 /**
- * Lectura del historiador para las señales de Demo EVA.
+ * Lectura del historiador para las señales de Demo EVA: **la red, no las
+ * reglas**.
  *
- * ── DOS DIFERENCIAS CON EL HISTÓRICO DE RESONAC, LAS DOS MEDIDAS ───
+ * Las reglas —qué agregado se pide, cómo se escribe un intervalo, qué muestra
+ * se tira y por qué sólo cuatro señales tienen serie— viven en
+ * [`@shared/eva/historia.js`](../../../../shared/eva/historia.js). Se mudaron
+ * allí cuando el asistente pasó a responder sobre esta instalación: sus
+ * herramientas leen el mismo historiador desde Node y tienen que repetir la
+ * guarda de `historizado` **exactamente igual**, o contestarían la curva de la
+ * temperatura del tanque bajo el nombre de otra señal. Ver la cabecera de ese
+ * archivo, y `shared/README.md` para por qué no se duplica ni se importa desde
+ * `src/`.
  *
- * 1. **El nombre del punto es el de tiempo real, con `ac:`.** La sintaxis
- *    `hda:\Configuration\…` que usa `historyPointName` en el catálogo de
- *    Resonac responde **500** para este árbol, con las dos variantes probadas
- *    (contrabarras y barras). `ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE` sí
- *    devuelve la serie. Por eso este archivo no reutiliza `transport.readHistory`.
- *
- * 2. **Sólo cuatro señales tienen serie propia.** A `CARGA_TRABAJO_MOTOR`,
- *    `KPIEFICIENCIA_ENERGETICA` e `INDICE_DESVIACION_VOLTAJE` el historiador les
- *    devuelve la curva de `STEMPERATURA_TANQUE`: misma serie hasta el último
- *    decimal, con dos agregados distintos, mientras sus valores vivos son 0,
- *    0 y 122.1. No da error — devuelve `ok: true` y datos plausibles.
- *
- * De ahí la guarda de `leerSerie`: **rechaza por catálogo antes de salir a la
- * red**. Es deliberado que la comprobación esté aquí y no en cada vista: una
- * gráfica que se olvide de mirar `historizado` no puede llegar a pintar la
- * serie equivocada, porque no va a recibir ninguna.
+ * Lo que queda aquí es lo único que no puede cruzar: `fetch` y el alias `@/`.
  *
  * ── POR QUÉ NO SE CACHEA COMO EN RESONAC ───────────────────────────
  *
@@ -35,38 +29,23 @@
  * a partir del transporte, y nadie más: las vistas piden `source.leerSerie()` sin
  * saber cuál está detrás.
  *
- * `SIN_SERIE` y `VENTANA` se exportan desde aquí para los dos, porque son hechos
- * de la instalación y no del origen: el simulador repite la misma guarda de
- * `historizado` para no enseñarle a la pantalla ocho series que el servidor real
- * no tiene.
+ * `SIN_SERIE` y `VENTANA` se **reexportan** desde aquí porque los dos lectores y
+ * las vistas los venían pidiendo a este archivo, y son hechos de la instalación
+ * y no del origen. Cambiar treinta imports para que apunten a `@shared` no
+ * habría arreglado nada: son el mismo valor, y ahora salen del mismo sitio.
  */
 import { fetchIconicsHistory } from "@/lib/iconics";
+import {
+  AGREGADO,
+  SIN_SERIE,
+  VENTANA,
+  intervaloHMS,
+  normalizar,
+} from "@shared/eva/historia.js";
+
 import { esHistorizada, pointName, senalInfo } from "../domain/senales.js";
 
-/**
- * Agregado del servidor. `Average` sobre una rejilla regular es lo que quiere
- * una tendencia; para un contador habría que sumar, pero aquí las ocho señales
- * son magnitudes instantáneas y ninguna es acumulativa.
- */
-const AGREGADO = "Average";
-
-/** Ventana por defecto: 6 h en 24 puntos (uno cada 15 min). */
-export const VENTANA = { horas: 6, puntos: 24 };
-
-/** Segundos → `HH:MM:SS`, que es el formato de intervalo que espera ICONICS. */
-export function intervaloHMS(segundos) {
-  const s = Math.max(1, Math.round(segundos));
-  const dos = (n) => String(n).padStart(2, "0");
-  return `${dos(Math.floor(s / 3600))}:${dos(Math.floor((s % 3600) / 60))}:${dos(s % 60)}`;
-}
-
-/**
- * Motivo por el que una señal no tiene serie. Se devuelve en vez de lanzar
- * porque **no es un error**: es un hecho de la instalación que la interfaz
- * tiene que poder explicar, y una excepción acabaría pintada como «fallo al
- * leer», que es otra cosa.
- */
-export const SIN_SERIE = "El historiador no publica una serie propia de esta señal.";
+export { SIN_SERIE, VENTANA, intervaloHMS, normalizar };
 
 /**
  * Serie histórica de una señal.
@@ -93,21 +72,4 @@ export async function leerSerie(clave, { horas, puntos } = VENTANA) {
   });
 
   return { datos: normalizar(respuesta?.data), motivo: null };
-}
-
-/**
- * Muestras del servidor → `[{ t, valor }]`.
- *
- * Se descarta la muestra de mala calidad y la que no trae número. El
- * historiador rellena los huecos de la rejilla con muestras vacías, y sin este
- * filtro la gráfica bajaría a cero en cada tramo sin datos — que es justo la
- * lectura contraria a «aquí no se midió».
- */
-export function normalizar(muestras) {
-  if (!Array.isArray(muestras)) return [];
-
-  return muestras
-    .filter((m) => (m?.quality ?? 0) === 0 && Number.isFinite(Number(m?.value)))
-    .map((m) => ({ t: new Date(m.timestamp), valor: Number(m.value) }))
-    .filter((m) => !Number.isNaN(m.t.getTime()));
 }

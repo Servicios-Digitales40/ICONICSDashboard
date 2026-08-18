@@ -40,11 +40,11 @@ export function createApp(config) {
   // un 200: el frontend creería que el asistente existe y que su respuesta es
   // una página HTML. Es el mismo motivo por el que la escritura en modo solo
   // lectura responde 403 y no 404.
-  const herramientas = createHerramientas({
-    client,
-    maquinasConHistoria: config.ia.maquinasConHistoria,
-    turnos: config.ia.turnos,
-  })
+  // `maquinasConHistoria` ya no se pasa: qué señal tiene historia no es
+  // configurable en esta instalación, es un hecho medido del servidor y vive
+  // en el catálogo (`shared/eva/senales.js`, campo `historizado`). Ver la
+  // cabecera de `ia/herramientas.mjs`.
+  const herramientas = createHerramientas({ client, turnos: config.ia.turnos })
   const chat = createChat({ config, herramientas })
 
   const router = createRouter()

@@ -77,7 +77,7 @@ Dos cosas que **no** hace, y son las que lo hacen útil:
 ## Estructura
 
 ```
-domain/     JS puro · sin React · sin tema · probado en node
+domain/     cinco reexports de una línea · el contenido vive en @shared/eva/
   senales.js    las 8 señales: el ÚNICO archivo con nombres de tag
   activos.js    los 4 activos, derivados del campo `activo` de las señales
   estado.js     las 5 claves derivadas y su agregación
@@ -86,7 +86,7 @@ domain/     JS puro · sin React · sin tema · probado en node
 
 data/       la frontera con la red
   evaSource.js    un motor de polling, un lote, 3 s · elige quién lee el pasado
-  historia.js     lectura del historiador, con la guarda de `historizado`
+  historia.js     el `fetch` · las reglas están en @shared/eva/historia.js
   simulador.js    la instalación entera sin red: `read()` y `readSerie()`
   EvaProvider.jsx el único sitio que crea una fuente
   hooks.js        useSistemaAgua(), useSerieHistorica()
@@ -103,6 +103,22 @@ views/      las cuatro subvistas
 
 Las pruebas viven en [`src/test/demo-eva/`](../test/demo-eva/), espejando este
 árbol, como manda [`src/test/README.md`](../test/README.md).
+
+### El dominio ya no vive aquí
+
+Los cinco archivos de `domain/` —y las reglas del historiador que estaban en
+`data/historia.js`— subieron a [`shared/eva/`](../../../shared/eva/) cuando **el
+asistente pasó a responder sobre esta instalación**. Sus herramientas
+(`backend/ia/herramientas.mjs`) leen los mismos ocho tags, aplican los mismos
+umbrales y repiten la misma guarda de `historizado`; `shared/README.md` explica
+por qué el backend no puede importar de `react-dashboard/src` ni conformarse con
+una copia.
+
+Para quien trabaja en esta carpeta no cambia nada: los imports se siguen
+escribiendo `@/Demo-EVA/domain/…`, y `data/historia.js` sigue exportando
+`VENTANA` y `SIN_SERIE`. Lo que sí cambia es dónde se edita una banda o se marca
+una señal como historizada — y que hacerlo mueve ahora **dos** programas: esta
+sección y lo que el asistente contesta.
 
 ---
 

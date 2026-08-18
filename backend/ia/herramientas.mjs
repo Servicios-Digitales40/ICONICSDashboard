@@ -1,16 +1,53 @@
 /**
- * Las herramientas que el modelo de lenguaje puede invocar.
+ * Las herramientas que el modelo de lenguaje puede invocar, sobre el **sistema
+ * de agua industrial** de `ac:TDCON/DEMO/SENSORES/`.
  *
- * ── POR QUÉ SON DE DOMINIO Y NO LA API REST EN CRUDO ───────────────
+ * ── QUÉ CAMBIÓ, Y POR QUÉ NO FUE UN RENOMBRADO ─────────────────────
+ *
+ * Este archivo consultaba OEE, disponibilidad, rendimiento, calidad y
+ * contadores de pieza de las diez máquinas de Resonac. Nada de eso existe en
+ * el árbol de la demo: bajo esa raíz hay **ocho magnitudes planas de una sola
+ * instalación**, sin tag `Estado`, sin alarmas configuradas y sin producción
+ * (Plan 8 §1.1 y §1.4). No es el mismo dominio con otros nombres — es otra
+ * forma de datos, y por eso las herramientas son otras y no las de antes con
+ * las etiquetas cambiadas.
+ *
+ * Lo que **no** cambió es el criterio, que es lo que hacía útiles a las
+ * anteriores:
+ *
+ * ── SON DE DOMINIO Y NO LA API REST EN CRUDO ───────────────────────
  *
  * La alternativa era dejar que el modelo construyera la llamada al
- * historiador. No funciona: hay cinco reglas no obvias que hay que acertar a
- * la vez —`Interpolative` y nunca `Average`, un día por petición, desfase
- * horario explícito, tope de 100 muestras, y los contadores sumados por tramos
- * porque se reinician con el turno— y un modelo de 9B las inventa con aplomo.
- * Están medidas en docs/TAGS.md y resueltas en `shared/historia.js`.
+ * historiador. Aquí hay cuatro reglas no obvias que hay que acertar a la vez
+ * —el punto histórico se nombra con `ac:` y no con `hda:`, el agregado es
+ * `Average` y no `Interpolative`, hay tope de 100 muestras por petición, y
+ * **tres de las ocho señales devuelven la serie de otra**— y un modelo de 4B
+ * las inventa con aplomo. Están medidas en `docs/PLAN-8-DEMO-EVA.md` y
+ * resueltas en `shared/eva/historia.js`.
  *
  * Aquí el modelo elige QUÉ preguntar; el CÓMO lo sabe este archivo.
+ *
+ * ── LA GUARDA QUE JUSTIFICA TODO EL ARCHIVO ────────────────────────
+ *
+ * A `CARGA_TRABAJO_MOTOR`, `KPIEFICIENCIA_ENERGETICA` e
+ * `INDICE_DESVIACION_VOLTAJE` el Data Historian les devuelve la curva de
+ * `STEMPERATURA_TANQUE`. **No da error**: responde `ok: true`, con marcas de
+ * tiempo correctas y valores plausibles. Un asistente que pidiera la serie sin
+ * comprobarlo no fallaría, contestaría — y diría que la carga del motor llegó
+ * al 41 % cuando eso son grados centígrados de un tanque.
+ *
+ * Por eso `historia_de_senal` rechaza por catálogo **antes de salir a la red**,
+ * y por eso la marca vive en `shared/eva/senales.js` y no en cada consulta.
+ *
+ * ── EL ESTADO ES NUESTRO, Y SE DICE ────────────────────────────────
+ *
+ * El servidor no publica estado para este árbol. Los cinco estados salen de
+ * comparar cada señal contra los umbrales de `shared/eva/umbrales.js`, que son
+ * **nuestros y siguen sin confirmar**. Las respuestas lo llevan escrito
+ * (`avisoUmbrales`) mientras `PROVISIONALES` esté en `true`, igual que la vista
+ * de Planta pinta su aviso. Un asistente que afirmara «está fuera de límite»
+ * sin decir de quién es el límite estaría prestando al servidor una autoridad
+ * que no nos ha dado.
  *
  * ── DE SOLO LECTURA POR CONSTRUCCIÓN ───────────────────────────────
  *
@@ -20,75 +57,80 @@
  * algo que no existe aquí.
  */
 import {
-  AREAS,
-  RESUMEN_TAGS,
-  TAGS_ESTATICOS,
-  historyPointName,
-  listMachines,
+  RAIZ,
+  SENALES,
+  SENAL_KEYS,
+  TODOS_LOS_PUNTOS,
+  esHistorizada,
+  historizadas,
+  parsePointName,
   pointName,
-  tagsForArea,
-} from '../../shared/tagCatalog.js'
-import { buildPlantSummary, summaryByArea } from '../../shared/plantModel.js'
-import { createMachine, hasValue } from '../../shared/domain/machine.js'
-import { estadoLabel } from '../../shared/domain/estado.js'
-import { daySummary } from '../../shared/domain/history.js'
-import { isGoodQuality } from '../../shared/quality.js'
+  senalInfo,
+} from '../../shared/eva/senales.js'
+import { ACTIVOS, ACTIVO_IDS } from '../../shared/eva/activos.js'
+import { DERIVADO, estadoInfo } from '../../shared/eva/estado.js'
+import { PROVISIONALES, UMBRALES } from '../../shared/eva/umbrales.js'
+import { createSistema } from '../../shared/eva/sistema.js'
 import {
   AGREGADO,
-  INTERVALO,
-  TAGS_CIERRE,
-  TAGS_DIA,
-  TAGS_FACTOR,
-  filasEnVentana,
-  incrementoEnVentana,
-  isoLocal,
-  rangoDelDia,
-  recortarAlPresente,
-  totalDelDia,
-  unir,
-} from '../../shared/historia.js'
-import {
-  TIPOS,
-  diasDelRango,
-  resolverDia,
-  resolverPeriodo,
-} from '../../shared/periodo.js'
+  MAX_PUNTOS,
+  SIN_SERIE,
+  VENTANA,
+  intervaloHMS,
+  normalizar,
+  resumirSerie,
+} from '../../shared/eva/historia.js'
+import { isGoodQuality } from '../../shared/quality.js'
+import { TIPOS, isoLocal, resolverPeriodo } from '../../shared/periodo.js'
 
 /**
- * Días que se piden a la vez en un rango.
+ * Ventana máxima que se puede pedir de una vez, en horas. Siete días.
  *
- * Tres, como el calendario del tablero. En serie, un mes serían 31 idas y
- * vueltas; de golpe, 31 peticiones simultáneas al servidor de planta.
+ * ── POR QUÉ HAY TOPE ───────────────────────────────────────────────
+ *
+ * Con `MAX_PUNTOS` fijo, alargar la ventana no cuesta más red: cuesta
+ * RESOLUCIÓN. Un mes en 100 puntos es una muestra cada siete horas y media, y
+ * el «máximo» de ese resumen ya no es el pico real sino el promedio del tramo
+ * en que ocurrió. Preferimos negar el mes a devolver un extremo suavizado que
+ * nadie podría distinguir del bueno.
  */
-const CONCURRENCIA_RANGO = 3
-
-/** Métricas que el historiador guarda y que se pueden barrer en un rango. */
-const METRICAS_HISTORICAS = TAGS_DIA
+const MAX_HORAS_VENTANA = 24 * 7
 
 /**
- * Máquinas cuyos tags están marcados «Is Collected» en el Data Historian.
- *
- * Hoy es solo la Lineal 1 (verificado en `user1690-pc`, ver docs/TAGS.md). Las
- * otras nueve responden 500 a cualquier lectura histórica, igual que un punto
- * que no existe.
- *
- * Es una PISTA, no la verdad: la verdad es lo que conteste el servidor, y
- * `oee_de_maquina` la comprueba de todos modos. Existe para que el modelo
- * pueda decir «esa máquina no tiene historia» sin gastar medio minuto en
- * descubrirlo, que con este presupuesto de tiempo importa. Cuando alguien
- * marque más tags, se añaden aquí o se pasan por `maquinasConHistoria`.
+ * Ventana relativa por defecto cuando no se dice período: las mismas 6 h que
+ * pintan las gráficas de la vista de Planta (`VENTANA`), para que el chat y la
+ * pantalla no cuenten dos historias distintas del mismo momento.
  */
-export const CON_HISTORIA_POR_DEFECTO = ['LIN/1']
+const VENTANA_POR_DEFECTO = VENTANA.horas
+
+/**
+ * Los períodos que SÍ se entienden, para ofrecerlos al negar uno.
+ *
+ * Se escriben aquí, literales, porque un error que sólo dice «pide un tramo
+ * más corto» deja al modelo improvisando la alternativa — y medido con el 4B,
+ * improvisó «la última semana», que en ese momento tampoco se entendía. Un
+ * asistente que sugiere una frase que luego rechaza manda al operador a un
+ * callejón sin salida por el que ya ha esperado.
+ */
+const ALTERNATIVAS =
+  'Pide un tramo más corto: "últimas 6 horas", "últimos 3 días", "la última semana", ' +
+  '"ayer" o un día concreto.'
+
+/** Error uniforme que además enseña al modelo cómo corregirse en la misma pasada. */
+function fallo(error, extra = {}) {
+  return { ok: false, error, ...extra }
+}
+
+/* ── Resolver el nombre de una señal ─────────────────────────────────── */
 
 /** Quita acentos y unifica separadores para poder comparar nombres escritos a mano. */
-function normalizar(texto) {
+function normalizarTexto(texto) {
   return String(texto ?? '')
     .normalize('NFD')
-    // El rango va escrito con escapes y no con los acentos literales: son
-    // caracteres combinantes, invisibles al abrir el archivo, y un editor que
-    // los recomponga al guardar rompería la expresión sin dejar rastro.
-    // Tiene que ir ANTES del filtro alfanumérico: si no, cada tilde se
-    // convertiría en un espacio y «Línea» acabaría como «li nea».
+    // Escrito con escapes y no con acentos literales: son caracteres
+    // combinantes, invisibles al abrir el archivo, y un editor que los
+    // recomponga al guardar rompería la expresión sin dejar rastro. Mismo
+    // motivo y misma forma que en `shared/periodo.js`.
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
@@ -96,621 +138,674 @@ function normalizar(texto) {
 }
 
 /**
- * Índice de nombres → id de máquina.
+ * Sinónimos con los que un operador nombra cada señal.
  *
- * Se aceptan muchas formas porque quien escribe en el chat es un operador, no
- * un integrador: «LIN/1», «linea 1», «lineal 1», «l1», «multi 13», «REC 13».
- * Resolver el nombre es trabajo del backend y nunca del modelo, que si lo
- * hiciera inventaría máquinas —la numeración de rectificadoras tiene huecos
- * reales y no existen ni la REC 12 ni las REC 1-9—.
+ * ── POR QUÉ ESTO NO ES TRABAJO DEL MODELO ──────────────────────────
+ *
+ * Es la misma regla que regía con las máquinas de Resonac: **resolver es
+ * trabajo del backend; elegir es trabajo del modelo.** Un 4B al que se le pide
+ * que traduzca «la bomba» a una clave de dominio se inventa `bomba` o
+ * `caudalBomba`, y el error llega como «señal desconocida» después de treinta
+ * segundos de espera.
+ *
+ * La lista es corta a propósito. No pretende cubrir toda forma de hablar: los
+ * rótulos del catálogo ya entran solos (ver `construirIndice`), y esto sólo
+ * añade las palabras que la pantalla NO enseña pero la gente sí dice —«bomba»
+ * por el grupo de bombeo, «voltaje» por la tensión, «litros» por el caudal—.
+ *
+ * Ojo con `tensionLinea`: el tag se llama «índice de desviación de voltaje» y
+ * entrega ~122 V, así que se aceptan los dos nombres. Quien pregunte por «el
+ * índice de desviación» está preguntando por esta señal aunque el rótulo de la
+ * pantalla diga otra cosa, y mandarle un «no existe» sería mentirle.
+ */
+const SINONIMOS = {
+  nivelTanque: ['nivel', 'nivel del tanque', 'tanque', 'llenado', 'agua', 'cuanta agua'],
+  temperaturaTanque: ['temperatura', 'temperatura del agua', 'temp', 'grados', 'calor'],
+  cargaMotor: ['carga', 'carga del motor', 'motor', 'bomba', 'bombeo', 'esfuerzo del motor'],
+  modoVdf: ['modo', 'vdf', 'variador', 'modo del variador', 'automatico', 'manual', 'modo am'],
+  flujoInstantaneo: ['caudal', 'flujo', 'caudal instantaneo', 'litros', 'cuanta agua sale'],
+  presionRelativa: ['presion', 'presion relativa', 'bares', 'presion de red'],
+  tensionLinea: ['tension', 'voltaje', 'tension de linea', 'volts', 'voltios', 'red electrica',
+    'indice de desviacion', 'indice de desviacion de voltaje', 'desviacion de voltaje'],
+  eficienciaEnergetica: ['eficiencia', 'eficiencia energetica', 'kpi', 'rendimiento energetico',
+    'consumo'],
+}
+
+/**
+ * Índice de nombres → clave de señal.
+ *
+ * Entran solas las cuatro formas que ya existen en el catálogo —la clave, el
+ * tag, el rótulo largo y el corto—, de modo que **renombrar una señal actualiza
+ * el índice sin tocar este archivo**. Los sinónimos se añaden encima.
  */
 function construirIndice() {
   const indice = new Map()
-  const registrar = (clave, id) => {
-    const k = normalizar(clave)
-    if (k) indice.set(k, id)
+  const registrar = (clave, key) => {
+    const k = normalizarTexto(clave)
+    if (k && !indice.has(k)) indice.set(k, key)
   }
 
-  for (const m of listMachines()) {
-    const { id, areaId, machineId, equipo } = m
-
-    registrar(id, id)                              // LIN/1
-    registrar(`${areaId} ${machineId}`, id)        // lin 1
-    registrar(`${areaId}${machineId}`, id)         // lin1
-    registrar(equipo, id)                          // lineal 1 · multi 10
-
-    if (areaId === 'LIN') {
-      registrar(`linea ${machineId}`, id)
-      registrar(`line ${machineId}`, id)
-      registrar(`l ${machineId}`, id)
-    } else {
-      registrar(`rectificadora ${machineId}`, id)
-      registrar(`rec ${machineId}`, id)
-      registrar(`r ${machineId}`, id)
-    }
+  for (const key of SENAL_KEYS) {
+    const s = SENALES[key]
+    registrar(key, key)          // nivelTanque
+    registrar(s.tag, key)        // SNIVEL_TANQUE
+    registrar(s.label, key)      // Nivel del tanque
+    registrar(s.corto, key)      // Nivel
+    for (const alias of SINONIMOS[key] ?? []) registrar(alias, key)
   }
   return indice
 }
 
-const INDICE = construirIndice()
+const INDICE_SENALES = construirIndice()
 
-/** Nombre escrito por una persona → id canónico, o `null`. */
-export function resolverMaquina(texto) {
-  return INDICE.get(normalizar(texto)) ?? null
+/** Nombre escrito por una persona → clave de señal, o `null`. */
+export function resolverSenal(texto) {
+  const k = normalizarTexto(texto)
+  if (!k) return null
+
+  const exacto = INDICE_SENALES.get(k)
+  if (exacto) return exacto
+
+  /*
+   * Respaldo por CONTENCIÓN, y sólo si una entrada gana sin empate.
+   *
+   * Cubre lo que el modelo escribe de más —«el nivel del tanque ahora mismo»,
+   * «temperatura del tanque en °C»— sin abrir la puerta a la adivinanza: si
+   * la frase contiene dos nombres de señal distintos no se elige ninguno, se
+   * pregunta. Elegir el primero en un «compara el nivel y la presión» daría
+   * una respuesta correcta sobre la señal equivocada, que es peor que un error.
+   */
+  const candidatas = new Set()
+  for (const [nombre, key] of INDICE_SENALES) {
+    // Se exigen 4 caracteres para no disparar con fragmentos como «kpi» o «vdf»
+    // metidos dentro de otra palabra.
+    if (nombre.length >= 4 && k.includes(nombre)) candidatas.add(key)
+  }
+
+  return candidatas.size === 1 ? [...candidatas][0] : null
 }
 
-/** Error uniforme que además enseña al modelo cómo corregirse en la misma pasada. */
-function fallo(error, extra = {}) {
-  return { ok: false, error, ...extra }
+/** Catálogo breve que viaja DENTRO del error, para que el reintento no gaste otra ronda. */
+function catalogoBreve() {
+  return SENAL_KEYS.map(k => ({
+    senal: SENALES[k].label,
+    clave: k,
+    historia: SENALES[k].historizado,
+  }))
+}
+
+/** El error de señal no reconocida, siempre con la lista de las que sí existen. */
+function senalDesconocida(texto) {
+  return fallo(
+    `No hay ninguna señal llamada "${texto}" en esta instalación. Sólo existen las ocho de la ` +
+      `lista, y no hay más puntos bajo ${RAIZ}.`,
+    { senales: catalogoBreve() }
+  )
+}
+
+/* ── Resolver el período ─────────────────────────────────────────────── */
+
+/**
+ * De texto llano a una ventana absoluta `{ inicio, fin }`.
+ *
+ * ── POR QUÉ HAY UN RESOLVEDOR PROPIO Y NO SOLO `resolverPeriodo` ───
+ *
+ * Porque la pregunta natural sobre esta instalación es **relativa a ahora** y
+ * no de calendario. En Resonac se pregunta por el turno de ayer; aquí se
+ * pregunta «cómo ha ido el nivel esta última hora», porque lo que se vigila es
+ * una tendencia en curso y no el cierre de un día de producción. `resolverPeriodo`
+ * no conoce las horas relativas —fue escrito para días— y añadírselas allí
+ * cambiaría el comportamiento del tablero de Resonac, que no lo ha pedido.
+ *
+ * El orden importa: primero lo relativo, y lo que no lo sea se delega en
+ * `shared/periodo.js`, que ya sabe de «ayer», «julio 2026» y «últimos 7 días».
+ * Así una forma sólo se implementa una vez.
+ *
+ * @returns {{ inicio: Date, fin: Date, etiqueta: string } | { error: string }}
+ */
+export function resolverVentana(texto, { turnos = {} } = {}) {
+  const crudo = String(texto ?? '').trim()
+  const ahora = new Date()
+
+  // Sin período, o preguntando por el presente: la ventana por defecto.
+  if (!crudo || /^(ahora|ahora mismo|actual|en vivo|hoy mismo)$/i.test(normalizarTexto(crudo))) {
+    return ventanaDeHoras(VENTANA_POR_DEFECTO, ahora)
+  }
+
+  // Los números se escriben con letra tan a menudo como con cifra —«hace seis
+  // horas»— y el modelo copia la frase del usuario tal cual, que es justo lo
+  // que se le pide. Sin esto, «hace seis horas» no resolvía y la respuesta era
+  // pedirle al operador que reescribiera su propia pregunta.
+  const t = enCifras(normalizarTexto(crudo))
+
+  /*
+   * 1 · La hora en curso: «esta hora», «la hora actual».
+   *
+   * Va antes que el resto porque `resolverPeriodo` no la conoce —fue escrito
+   * para días— y sin ella caía hasta el error final. Se descubrió al pulsar el
+   * ejemplo «compara la presión de esta hora con la de hace seis horas», que
+   * es exactamente la forma en que se pregunta esto.
+   */
+  if (/\b(esta|la) hora( actual| en curso)?\b/.test(t) && !/ultim|pasad|hace/.test(t)) {
+    return ventanaDeHoras(1, ahora, 'la última hora')
+  }
+
+  /* 2 · Horas relativas: «última hora», «últimas 6 horas», «hace 2 horas». */
+  const horas = t.match(/\b(?:ultim[oa]s?|pasad[oa]s?|hace|en las?)\s*(\d+)?\s*(hora|horas|h)\b/)
+  if (horas) {
+    /*
+     * Sin número, el plural manda: «la última hora» es una, «estas últimas
+     * horas» son las 6 de la ventana por defecto —las mismas que pintan las
+     * gráficas de Planta—. Antes ambas daban 1 h, y a «¿cómo ha ido la
+     * temperatura estas últimas horas?» se le contestaba con un tramo seis
+     * veces más corto del que se le enseña en pantalla.
+     */
+    const n = horas[1] ? Number(horas[1]) : (horas[2] === 'horas' ? VENTANA_POR_DEFECTO : 1)
+    if (n < 1) return { error: 'La ventana tiene que ser de al menos una hora.' }
+    if (n > MAX_HORAS_VENTANA) {
+      return {
+        error:
+          `${n} horas son demasiadas para una sola lectura: con el tope de ${MAX_PUNTOS} muestras ` +
+          `del servidor, cada punto sería el promedio de varias horas y el máximo dejaría de ser ` +
+          `el pico real. Como mucho ${MAX_HORAS_VENTANA} horas (7 días). ${ALTERNATIVAS}`,
+      }
+    }
+    return ventanaDeHoras(n, ahora)
+  }
+
+  /*
+   * 3 · «última semana».
+   *
+   * `resolverPeriodo` conoce «esta semana» y «semana pasada», pero no ésta — y
+   * es la forma que el propio modelo propone cuando rechazamos un mes por
+   * demasiado largo. Un asistente que sugiere una frase que luego no entiende
+   * manda al operador a un callejón sin salida, así que se resuelve como los
+   * últimos 7 días, que es lo que significa.
+   */
+  if (/\bultimas? semanas?\b/.test(t)) {
+    return ventanaDeHoras(24 * 7, ahora, 'los últimos 7 días')
+  }
+
+  /* 4 · Minutos relativos: «últimos 30 minutos». Se aceptan porque el sondeo
+   *     vivo va a 3 s y una tendencia corta es una pregunta razonable aquí. */
+  const minutos = t.match(/\b(?:ultim[oa]s?|pasad[oa]s?|hace|en los?)\s*(\d+)\s*(minutos?|min)\b/)
+  if (minutos) {
+    const n = Number(minutos[1])
+    if (n < 1) return { error: 'La ventana tiene que ser de al menos un minuto.' }
+    return ventanaDeHoras(n / 60, ahora, `los últimos ${n} minutos`)
+  }
+
+  /* 5 · Todo lo demás es calendario, y de eso sabe `shared/periodo.js`. */
+  const p = resolverPeriodo(crudo, { turnos })
+  if (p.error) return { error: p.error }
+
+  const inicio = fecha(p.diaDesde, p.horaDesde)
+  // `horaHasta === 24` es «hasta el final del día», que es el día siguiente a
+  // las 00:00. Sumarlo como hora 24 daría una fecha inválida en algunos husos.
+  const fin = p.horaHasta >= 24 ? fecha(siguienteDia(p.diaHasta), 0) : fecha(p.diaHasta, p.horaHasta)
+
+  // Un período que llega hasta hoy se recorta en el presente: pedirle al
+  // historiador las horas que aún no han pasado devuelve muestras vacías que
+  // sólo sirven para ensuciar el recuento.
+  const finReal = fin > ahora ? ahora : fin
+
+  if (finReal <= inicio) {
+    return { error: `El período "${crudo}" no ha empezado todavía; no hay datos que leer.` }
+  }
+
+  const duracionHoras = (finReal - inicio) / 3_600_000
+  if (duracionHoras > MAX_HORAS_VENTANA) {
+    return {
+      error:
+        `"${p.etiqueta}" abarca más de 7 días. Con el tope de ${MAX_PUNTOS} muestras del ` +
+        `servidor, cada punto sería el promedio de varias horas y los extremos dejarían de ser ` +
+        `los reales. ${ALTERNATIVAS}`,
+    }
+  }
+
+  return { inicio, fin: finReal, etiqueta: p.etiqueta }
 }
 
 /**
- * Catálogo con el que el modelo puede corregir un nombre inventado. Se manda
- * dentro del propio error, para que el reintento no necesite otra ronda.
+ * Números escritos con letra → cifra, del uno al veinticuatro.
+ *
+ * Sólo hasta 24 a propósito: es el techo útil aquí —más horas que eso ya se
+ * piden en días— y una tabla corta no puede confundir «un» artículo con «un»
+ * número, que es el error clásico de hacer esto con una lista larga. Por eso
+ * «un/una» NO está: «en una hora» quiere decir una hora, y el respaldo del
+ * plural ya lo resuelve sin ayuda.
  */
-function catalogoBreve() {
-  return listMachines().map(m => ({ id: m.id, nombre: m.equipo }))
+const NUMEROS = {
+  dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
+  diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15,
+  dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20,
+  veintiuna: 21, veintiuno: 21, veintidos: 22, veintitres: 23, veinticuatro: 24,
 }
 
-export function createHerramientas({
-  client,
-  maquinasConHistoria = CON_HISTORIA_POR_DEFECTO,
-  /**
-   * Horario de turnos, `{ manana: [6,14], … }`. **Vacío por defecto.**
-   *
-   * Sin el horario real de esta planta, un turno inventado devolvería datos
-   * verdaderos de las horas equivocadas — y eso no se distingue de la
-   * respuesta correcta. Con el mapa vacío, preguntar por un turno responde
-   * que no está configurado y ofrece preguntar por una hora concreta.
-   */
-  turnos = {},
-} = {}) {
+/** Sustituye los números escritos con letra por su cifra. */
+function enCifras(texto) {
+  return texto.replace(
+    /\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|veinte|veintiuna|veintiuno|veintidos|veintitres|veinticuatro)\b/g,
+    (m) => String(NUMEROS[m])
+  )
+}
+
+/** Una ventana de N horas que termina ahora. */
+function ventanaDeHoras(n, ahora, etiqueta) {
+  return {
+    inicio: new Date(ahora.getTime() - n * 3_600_000),
+    fin: ahora,
+    etiqueta: etiqueta ?? (n === 1 ? 'la última hora' : `las últimas ${n} horas`),
+  }
+}
+
+/** `YYYY-MM-DD` + hora → `Date` en la zona local del servidor. */
+function fecha(iso, hora) {
+  return new Date(`${iso}T${String(hora).padStart(2, '0')}:00:00`)
+}
+
+/** El día siguiente en ISO, sin aritmética de milisegundos que el horario de verano rompe. */
+function siguienteDia(iso) {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(d.getDate() + 1)
+  return isoLocal(d)
+}
+
+/* ── Las herramientas ────────────────────────────────────────────────── */
+
+export function createHerramientas({ client, turnos = {} } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
   }
 
-  const conHistoria = new Set(maquinasConHistoria)
-  const porId = new Map(listMachines().map(m => [m.id, m]))
-
-  /* ── Lectura en vivo ───────────────────────────────────────────────── */
-
   /**
-   * Lee varias máquinas en **una sola** llamada en lote y las convierte en
-   * `Machine` de dominio.
+   * Lee las ocho señales en **una sola** llamada en lote y las convierte en el
+   * `Sistema` de dominio — el mismo objeto que pinta la vista de Planta.
    *
-   * Una llamada y no una por máquina: la planta entera son ~110 puntos, y
-   * diez peticiones en vez de una multiplicarían por diez el trabajo del
-   * servidor de planta para responder a una sola pregunta. La caché de lote
-   * del cliente (2 s) además colapsa esta lectura con la que ya están
-   * haciendo las pantallas encendidas.
+   * Que sea el mismo objeto no es una comodidad, es la garantía: no puede
+   * haber un caso en que el chat diga «en banda» de una señal que la tarjeta
+   * pinta en rojo, porque los dos llaman a `createSistema` con las mismas
+   * lecturas y los mismos umbrales.
    *
    * La calidad se filtra aquí, en la frontera, exactamente igual que hace el
    * motor de sondeo del frontend: un valor de mala calidad llega como 0 y, sin
-   * filtrar, el asistente diría «el OEE es 0 %» de una máquina que está
-   * produciendo.
+   * filtrar, el asistente diría «el tanque está al 0 %» de una instalación
+   * llena. Un hueco es `null` y el dominio lo pinta como «sin dato».
    */
-  async function leerMaquinas(metas, tagsDe) {
-    const puntos = metas.flatMap(meta =>
-      tagsDe(meta).map(tag => pointName(meta.areaId, meta.machineId, tag))
-    )
-
-    const respuesta = await client.readPoints(puntos)
+  async function leerSistema() {
+    const respuesta = await client.readPoints(TODOS_LOS_PUNTOS)
     if (!respuesta.ok) return { ok: false, error: respuesta.error, status: respuesta.status }
 
     const mapa = respuesta.payload ?? {}
     const receivedAt = new Date().toISOString()
+    const lecturas = {}
 
-    const machines = metas.map(meta => {
-      const readings = {}
+    for (const [nombre, entrada] of Object.entries(mapa)) {
+      // `parsePointName` devuelve `null` ante cualquier punto que no reconozca,
+      // para que un cambio en el servidor se vea como dato ausente y nunca como
+      // una asignación a la señal equivocada.
+      const clave = parsePointName(nombre)
+      if (!clave || !entrada?.ok) continue
 
-      for (const tag of tagsDe(meta)) {
-        const entrada = mapa[pointName(meta.areaId, meta.machineId, tag)]
-        if (!entrada?.ok) continue
+      const p = entrada.payload ?? {}
+      const quality = p.quality ?? p.Quality ?? null
+      if (!isGoodQuality(quality)) continue
 
-        const p = entrada.payload ?? {}
-        const quality = p.quality ?? p.Quality ?? null
-        if (!isGoodQuality(quality)) continue
+      lecturas[clave] = { value: p.value ?? p.Value ?? null, receivedAt }
+    }
 
-        readings[tag] = p.value ?? p.Value ?? null
-      }
+    return { ok: true, sistema: createSistema(lecturas), receivedAt }
+  }
 
-      return createMachine({ ...meta, readings, receivedAt })
+  /**
+   * Una serie del historiador, ya normalizada.
+   *
+   * **La guarda de `historizado` va antes que la red**, no después: ver la
+   * cabecera del archivo. Devolver `motivo` en vez de lanzar es deliberado —no
+   * es una avería, es un hecho de la instalación que el asistente tiene que
+   * poder explicar—.
+   */
+  async function leerSerie(clave, ventana) {
+    if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
+
+    const segundos = (ventana.fin - ventana.inicio) / 1000
+    // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
+    // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
+    const puntos = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundos / 900)))
+
+    const r = await client.readHistory({
+      // Con `ac:`, el mismo nombre que en vivo. `hda:\Configuration\…` responde
+      // 500 para este árbol: ver `shared/eva/historia.js`.
+      pointName: pointName(clave),
+      startDate: ventana.inicio.toISOString(),
+      endDate: ventana.fin.toISOString(),
+      aggregate: AGREGADO,
+      interval: intervaloHMS(segundos / puntos),
     })
 
-    return { ok: true, machines }
+    if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
+
+    return { ok: true, datos: normalizar(r.data) }
   }
 
-  /** Una sola máquina, con todos sus tags. */
-  async function leerEnVivo(meta) {
-    const lectura = await leerMaquinas([meta], m => tagsForArea(m.areaId))
-    return lectura.ok ? { ok: true, machine: lectura.machines[0] } : lectura
-  }
-
-  /* ── Lectura histórica ─────────────────────────────────────────────── */
+  /* ── Presentación de una señal ─────────────────────────────────────── */
 
   /**
-   * Un día del historiador, con la misma mecánica que usa el comparativo del
-   * tablero: siete tags, una petición por tag, 24 puntos cada una.
+   * Una señal evaluada → lo que el modelo puede citar.
    *
-   * A diferencia del frontend —que traga los fallos por tag para no dejar la
-   * gráfica en blanco— aquí se cuentan: si fallan los siete, la respuesta
-   * honesta es «esta máquina no tiene historia», y no un resumen vacío que el
-   * modelo presentaría como un día de producción nula.
+   * ── POR QUÉ VIAJA LA BANDA Y NO SOLO EL ESTADO ─────────────────────
+   *
+   * Porque «en aviso» sin el número del umbral no es accionable: el operador
+   * no sabe si está rozando el límite o muy pasado. Y porque el modelo tiene
+   * prohibido hacer aritmética, así que si no le damos la banda no puede
+   * decir cuánto margen queda — lo estimaría, que es exactamente lo que no
+   * queremos.
+   *
+   * `unidad` es `null` cuando el servidor no la declara, y entonces viaja
+   * `nota` diciéndolo. Es la diferencia entre «el caudal es 12,4» y «el caudal
+   * es 12,4 l/s»: lo segundo nadie nos ha dicho que sea verdad.
    */
-  async function leerDia(meta, iso) {
-    const rango = rangoDelDia(iso)
+  function describirSenal(s) {
+    const u = UMBRALES[s.key]
 
-    const resultados = await Promise.all(
-      TAGS_DIA.map(async tag => {
-        const r = await client.readHistory({
-          pointName: historyPointName(meta.areaId, meta.machineId, tag),
-          startDate: rango.startDate,
-          endDate: rango.endDate,
-          aggregate: AGREGADO.serie,
-          interval: INTERVALO.hora,
-        })
-        return {
-          tag,
-          ok: Boolean(r?.ok),
-          status: r?.status ?? 0,
-          muestras: Array.isArray(r?.data) ? r.data : [],
-        }
-      })
-    )
-
-    const fallaron = resultados.filter(r => !r.ok)
-    if (fallaron.length === TAGS_DIA.length) {
+    return {
+      senal: s.label,
+      clave: s.key,
+      tag: s.tag,
       /*
-       * Los siete tags fallaron, pero el motivo importa y no es el mismo.
+       * Redondeado a los decimales del catálogo, y esto NO es cosmética.
        *
-       * ICONICS responde 500 cuando el punto existe y no está coleccionado —o
-       * cuando no existe—, y ahí «esta máquina no tiene historia» es la
-       * verdad. Pero un 502 o un 504 los pone el propio puente: significan que
-       * no se llegó al servidor, y decir entonces «no está coleccionado»
-       * manda a revisar el Data Historian cuando lo que hay que hacer es
-       * levantar los servicios. Es la misma distinción que el puente ya hace
-       * entre 502 y 504, y por el mismo motivo: se arreglan en sitios
-       * distintos.
+       * ICONICS entrega el float crudo del PLC. Medido contra el servidor
+       * real: el nivel llega como `50.09765625` y la temperatura como
+       * `23.258464813232422`, y el modelo los cita tal cual —«el tanque está
+       * al 50.09765625 %»—. Trece decimales en una lectura de tanque no son
+       * precisión, son ruido: sugieren una exactitud que el sensor no tiene y
+       * hacen la frase ilegible de un vistazo, que es justo lo que un
+       * operador necesita.
+       *
+       * Los decimales son los MISMOS que usa la pantalla (`decimales` del
+       * catálogo), así que el chat y la tarjeta dicen la misma cifra. El
+       * histórico ya lo hacía por su cuenta, en `resumirSerie`.
        */
-      return { ok: false, sinHistoria: true, incomunicado: fallaron.every(r => r.status >= 502) }
-    }
-
-    const porTag = Object.fromEntries(resultados.map(r => [r.tag, r.muestras]))
-
-    return {
-      ok: true,
-      parcial: fallaron.length > 0,
-      serie: recortarAlPresente(unir(porTag, TAGS_FACTOR), iso),
-      cierre: Object.fromEntries(TAGS_CIERRE.map(tag => [tag, totalDelDia(porTag[tag] ?? [])])),
-      // Las muestras crudas, para poder recortar a una ventana. Un tramo de
-      // horas no reduce los contadores igual que el día entero: ver
-      // `incrementoEnVentana` en shared/historia.js.
-      porTag,
-    }
-  }
-
-  /** El fallo de lectura histórica, con el motivo exacto. */
-  function falloDeHistoria(meta, dia) {
-    if (dia.incomunicado) {
-      return fallo(
-        'No se pudo contactar con el servidor ICONICS para leer el historiador. ' +
-          'No es que falten datos: el servidor no está respondiendo. Si acaban de ' +
-          'arrancarse los servicios GENESIS, tardan 3-4 minutos en atender.'
-      )
-    }
-
-    return fallo(
-      `La máquina ${meta.equipo} (${meta.id}) no tiene datos históricos en el servidor. ` +
-        `Sus tags no están marcados «Is Collected» en el Data Historian.`,
-      { maquinasConHistoria: [...conHistoria] }
-    )
-  }
-
-  /**
-   * Un período que cabe en un día: el día entero, una hora suelta o un turno.
-   *
-   * Se lee el día completo —siete tags, 24 puntos cada uno— y se recorta. No
-   * merece la pena pedirle al historiador solo unas horas: la petición cuesta
-   * lo mismo y así una segunda pregunta sobre otro tramo del mismo día no
-   * vuelve a salir a la red.
-   */
-  async function resumenDeUnDia(meta, periodo) {
-    const dia = await leerDia(meta, periodo.diaDesde)
-    if (!dia.ok) return falloDeHistoria(meta, dia)
-
-    const completo = periodo.horaDesde === 0 && periodo.horaHasta >= 24
-    const serie = completo
-      ? dia.serie
-      : filasEnVentana(dia.serie, periodo.horaDesde, periodo.horaHasta)
-
-    // Dentro de una ventana los contadores se reducen distinto: no es el
-    // total del día recortado, es cuánto SUBIERON en ese tramo.
-    const cierre = completo
-      ? dia.cierre
-      : Object.fromEntries(TAGS_CIERRE.map(tag => [
-        tag, incrementoEnVentana(dia.porTag[tag] ?? [], periodo.horaDesde, periodo.horaHasta),
-      ]))
-
-    const resumen = daySummary(serie, cierre)
-    if (!resumen) {
-      return fallo(
-        `No hay ninguna muestra de ${meta.equipo} (${meta.id}) en ${periodo.etiqueta}. ` +
-          `El historiador no guarda ese tramo, o la máquina no estuvo en marcha.`
-      )
-    }
-
-    return {
-      ok: true,
-      maquina: meta.id,
-      nombre: meta.equipo,
-      periodo: periodo.etiqueta,
-      fecha: periodo.diaDesde,
-      ...(completo ? {} : { horas: `${periodo.horaDesde}:00 a ${periodo.horaHasta}:00` }),
-      fuente: 'historiador',
-      ...formatearResumen(resumen),
-      ...avisoDeImposibles({
-        oee: resumen.oee,
-        disponibilidad: resumen.disponibilidad,
-        rendimiento: resumen.rendimiento,
-        calidad: resumen.calidad,
-      }),
-      ...(dia.parcial ? { avisoParcial: 'Algunos tags no respondieron; el resumen es parcial.' } : {}),
+      valor: redondear(s.valor, s.decimales),
+      ...(s.texto ? { texto: s.texto } : {}),
+      unidad: s.unidad || null,
+      estado: estadoInfo(s.estado).label,
+      ...(s.estado === 'reposo'
+        ? { porQueReposo: 'El sistema no está impulsando, así que esta señal no significa nada ahora.' }
+        : {}),
+      ...(u ? { banda: bandaLegible(u) } : {}),
+      historia: s.historizado,
+      ...(s.nota ? { nota: s.nota } : {}),
     }
   }
 
   /**
-   * Un período de varios días, para UNA métrica.
+   * La banda en palabras que el modelo pueda copiar sin restar nada.
    *
-   * Solo una métrica a propósito: el historiador rechaza los rangos
-   * multi-día, así que hay que ir día a día. Un mes de una métrica son 31
-   * peticiones; de las siete serían 217, y eso ya no es una consulta, es un
-   * ataque al servidor de planta.
-   *
-   * Los extremos y el promedio se calculan AQUÍ. Devolver los 31 días crudos
-   * y pedirle al modelo que encuentre el mayor es pedirle aritmética, que es
-   * justo lo que se le ha quitado en todo lo demás.
+   * `null` en un extremo significa **sin límite por ese lado**, no cero: una
+   * eficiencia energética no es peor por ser alta. Escribirlo como «sin límite»
+   * y no omitirlo evita que el modelo rellene el hueco con un 0 inventado.
    */
-  async function resumenDeRango(meta, periodo, metrica) {
-    const dias = diasDelRango(periodo.diaDesde, periodo.diaHasta)
-    const esContador = TAGS_CIERRE.includes(metrica)
-    const punto = historyPointName(meta.areaId, meta.machineId, metrica)
+  function bandaLegible(u) {
+    const lado = (v) => (v === null || v === undefined ? 'sin límite' : v)
+    return {
+      limiteInferior: lado(u.min),
+      avisoInferior: lado(u.avisoMin),
+      avisoSuperior: lado(u.avisoMax),
+      limiteSuperior: lado(u.max),
+    }
+  }
 
-    const porDia = []
-    let incomunicado = true
-    let alguna = false
-
-    // De tres en tres, como hace el calendario del tablero: en serie serían
-    // 31 idas y vueltas, y de golpe se satura el historiador.
-    for (let i = 0; i < dias.length; i += CONCURRENCIA_RANGO) {
-      const lote = await Promise.all(
-        dias.slice(i, i + CONCURRENCIA_RANGO).map(async iso => {
-          const rango = rangoDelDia(iso)
-          const r = await client.readHistory({
-            pointName: punto,
-            startDate: rango.startDate,
-            endDate: rango.endDate,
-            aggregate: AGREGADO.serie,
-            interval: INTERVALO.hora,
-          })
-
-          if (!r?.ok) return { iso, valor: null, status: r?.status ?? 0 }
-
-          const muestras = Array.isArray(r.data) ? r.data : []
-          const finitos = muestras.map(m => m.value).filter(v => Number.isFinite(v))
-          if (!finitos.length) return { iso, valor: null, status: 200 }
-
-          // Los factores son porcentajes instantáneos: su resumen del día es
-          // la media. Los contadores se acumulan: es el total. Mismo criterio
-          // que `daySummary`, para que las cifras cuadren entre herramientas.
-          const valor = esContador
-            ? totalDelDia(muestras)
-            : finitos.reduce((a, b) => a + b, 0) / finitos.length
-
-          return { iso, valor, status: 200 }
-        })
-      )
-
-      for (const d of lote) {
-        if (d.status < 502) incomunicado = false
-        if (d.valor !== null) alguna = true
-        porDia.push({ fecha: d.iso, valor: red1(d.valor) })
+  /**
+   * El aviso de procedencia de los umbrales, cuando toca.
+   *
+   * Va en el RESULTADO y no en el prompt del sistema por el mismo motivo por
+   * el que iba el aviso de OEE imposible: una advertencia que sólo vive en las
+   * instrucciones se diluye a los tres turnos de conversación, y ésta tiene que
+   * acompañar a cada cifra que se compare contra una banda.
+   */
+  const avisoDeUmbrales = () =>
+    PROVISIONALES
+      ? {
+        /*
+         * La clave es `aviso` y no `avisoUmbrales`, y no es cosmético: es el
+         * campo que `chat.mjs` vigila para añadir la advertencia detrás cuando
+         * el modelo no la cuenta. Con cualquier otro nombre la red de
+         * seguridad no se entera, y medido con el 4B eso pasa: contestó «el
+         * nivel está fuera de límite» sin decir de quién era el límite.
+         */
+        aviso:
+            'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
+            'sistema de agua genérico, no rangos confirmados por quien opera esta instalación, y ' +
+            'el servidor no publica alarmas para este árbol. El estado de cada señal es un ' +
+            'cálculo del tablero, no un dato de ICONICS.',
       }
-    }
-
-    if (!alguna) {
-      return incomunicado
-        ? falloDeHistoria(meta, { incomunicado: true })
-        : fallo(
-          `No hay datos de ${metrica} de ${meta.equipo} (${meta.id}) en ${periodo.etiqueta}. ` +
-            `El historiador no guarda ese período, o la máquina no tiene esos tags coleccionados.`,
-          { maquinasConHistoria: [...conHistoria] }
-        )
-    }
-
-    const conDato = porDia.filter(d => d.valor !== null)
-    const ordenados = [...conDato].sort((a, b) => b.valor - a.valor)
-    const suma = conDato.reduce((a, d) => a + d.valor, 0)
-
-    return {
-      ok: true,
-      maquina: meta.id,
-      nombre: meta.equipo,
-      periodo: periodo.etiqueta,
-      metrica,
-      fuente: 'historiador',
-      maximo: ordenados[0],
-      minimo: ordenados.at(-1),
-      promedio: red1(suma / conDato.length),
-      // Un máximo es justo donde asoman los valores imposibles que la media
-      // disimula, así que se comprueba sobre él.
-      ...(esContador ? {} : avisoDeImposibles({ [metrica]: ordenados[0]?.valor })),
-      ...(esContador ? { total: red1(suma) } : {}),
-      diasConDato: conDato.length,
-      diasSinDato: porDia.length - conDato.length,
-      porDia,
-      unidad: TAGS_CIERRE.includes(metrica)
-        ? (metrica === 'tMuerto' ? 'segundos' : 'piezas')
-        : '%',
-    }
-  }
-
-  /** Cualquier período: el tipo decide cómo se lee. */
-  function resumenDePeriodo(meta, periodo, metrica) {
-    return periodo.tipo === TIPOS.RANGO
-      ? resumenDeRango(meta, periodo, metrica)
-      : resumenDeUnDia(meta, periodo)
-  }
-
-  /* ── Las cuatro herramientas ───────────────────────────────────────── */
-
-  /**
-   * El catálogo de máquinas. **No es una herramienta.**
-   *
-   * Lo fue, y era un error caro: el catálogo entero —con qué máquina tiene
-   * historia— ya viaja en las instrucciones del sistema, así que llamarlo no
-   * le daba al modelo ni un dato nuevo. Pero el bucle permite UNA llamada por
-   * pregunta, y ante «¿qué días de julio pasaron del 100 %?» —sin máquina
-   * nombrada— el modelo la gastaba aquí, se quedaba sin poder consultar el
-   * historiador, y acababa recitando la lista de máquinas como respuesta.
-   *
-   * Quitarla del registro arregla eso y además le deja una decisión menos que
-   * tomar, que es donde un 4B es más frágil.
-   */
-  function catalogo() {
-    return listMachines().map(m => ({
-      id: m.id,
-      nombre: m.equipo,
-      area: AREAS[m.areaId].label,
-      tieneHistoria: conHistoria.has(m.id),
-    }))
-  }
-
-  /** Las máquinas que sí se pueden consultar en histórico. */
-  const conHistoriaReal = () => catalogo().filter(m => m.tieneHistoria).map(m => m.id)
-
-  /**
-   * Qué máquina se consulta cuando la pregunta no la nombra.
-   *
-   * Si solo hay UNA con historia, no hay ambigüedad que resolver: es esa o
-   * ninguna, y contestar por ella —diciéndolo— es más útil que devolver un
-   * error. Con dos o más sí hay que preguntar, y entonces se devuelve el
-   * error con la lista. Se arregla solo el día que historicen más máquinas.
-   */
-  function maquinaImplicita() {
-    const conDatos = conHistoriaReal()
-    return conDatos.length === 1 ? conDatos[0] : null
-  }
-
-  /** Resuelve la máquina pedida, o la implícita si no se nombró ninguna. */
-  function elegirMaquina(maquina) {
-    if (maquina) {
-      const id = resolverMaquina(maquina)
-      return id
-        ? { id }
-        : { error: fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() }) }
-    }
-
-    const implicita = maquinaImplicita()
-    if (implicita) return { id: implicita }
-
-    return {
-      error: fallo(
-        'No me has dicho de qué máquina, y hay varias con datos históricos.',
-        { maquinasConHistoria: conHistoriaReal() }
-      ),
-    }
-  }
+      : {}
 
   const herramientas = {
     /**
-     * La planta entera, de una vez.
+     * Todo el sistema de una vez.
      *
-     * ── POR QUÉ UNA SOLA HERRAMIENTA Y NO TRES ─────────────────────
+     * ── POR QUÉ DEVUELVE LAS OCHO Y NO ADMITE FILTRO ───────────────────
      *
-     * `oee_de_planta`, `peor_maquina` y `resumen_por_area` responderían lo
-     * mismo y triplicarían las ocasiones de que el modelo elija mal — que es
-     * justo donde un 4B es más frágil. Devolviéndolo todo junto, «¿cómo va la
-     * planta?» y «¿qué máquina va peor?» son la misma llamada y al modelo solo
-     * le queda redactar la parte que le preguntaron.
-     *
-     * Las cifras salen de `buildPlantSummary`, el mismo cálculo que pinta el
-     * tablero. Recalcularlo aquí daría dos OEE de planta distintos y el chat
-     * contradiría a la pantalla que el operador tiene delante.
+     * Porque son ocho. El catálogo entero cabe en una respuesta que cuesta una
+     * sola lectura en lote, y el modelo tiene **una consulta por pregunta**
+     * (ver `chat.mjs`): una herramienta que devolviera sólo la señal pedida
+     * obligaría a elegir bien a la primera, y «¿va todo bien?» no nombra
+     * ninguna señal. Devolverlo todo hace que la pregunta vaga y la concreta
+     * se respondan con la misma llamada.
      */
-    async estado_de_planta() {
-      const metas = listMachines()
-
-      // Los mismos tags que sondea el tablero, para que la caché de lote del
-      // cliente colapse esta lectura con la suya en vez de duplicarla.
-      const tagsDe = meta => [
-        ...RESUMEN_TAGS.filter(t => tagsForArea(meta.areaId).includes(t)),
-        ...TAGS_ESTATICOS,
-      ]
-
-      const lectura = await leerMaquinas(metas, tagsDe)
+    async estado_del_sistema() {
+      const lectura = await leerSistema()
       if (!lectura.ok) {
-        return fallo(`No se pudo leer la planta del servidor ICONICS: ${lectura.error}`)
-      }
-
-      const resumen = buildPlantSummary(lectura.machines)
-
-      // Sin una sola lectura buena no hay planta que resumir. Devolver el
-      // resumen con todo a null invitaría a redactarlo como «la planta está
-      // al 0 %», que es una avería contada como si fuera producción.
-      if (resumen.sinDato === resumen.totalMaquinas) {
         return fallo(
-          'Ninguna de las 10 máquinas está entregando lecturas ahora mismo. ' +
-            'Suele ser el servidor de planta caído o la licencia de ICONICS caducada; ' +
-            'si acaban de reiniciarse los servicios GENESIS, tardan 3-4 minutos en responder.'
+          `No se pudo leer la instalación del servidor ICONICS: ${lectura.error}`
         )
       }
 
-      const conOee = lectura.machines.filter(m => hasValue(m.oee))
-      const porOee = [...conOee].sort((a, b) => b.oee - a.oee)
+      const s = lectura.sistema
+      const r = s.resumen
 
       return {
         ok: true,
+        instalacion: 'Sistema de agua industrial',
+        raiz: RAIZ,
         fuente: 'tiempo real',
-        planta: {
-          oee: red1(resumen.oee),
-          disponibilidad: red1(resumen.disponibilidad),
-          rendimiento: red1(resumen.rendimiento),
-          calidad: red1(resumen.calidad),
-          fty: red1(resumen.fty),
-          producidas: resumen.producidas,
-          aceptadas: resumen.aceptadas,
-          rechazadas: resumen.rechazadas,
+        /*
+         * La hora, en local y legible, NO en ISO.
+         *
+         * Medido con el 4B: con `2026-08-18T14:48:44.253Z` delante lo copió
+         * tal cual en la respuesta —«leído a las 2026-08-18T14:48:44.253Z»—.
+         * El operador no lee eso, y además está en UTC, así que en España
+         * marcaría dos horas menos que el reloj de la pared.
+         */
+        leidoA: horaLocal(lectura.receivedAt),
+
+        estadoGeneral: estadoInfo(s.estado).label,
+        enReposo: s.enReposo,
+        ...(s.enReposo
+          ? {
+            queSignificaReposo:
+                'La instalación no está impulsando agua: el motor está a cero y no circula caudal. ' +
+                'Es su situación habitual. Las señales que sólo tienen sentido en marcha (caudal, ' +
+                'presión, carga del motor y eficiencia) no se evalúan contra su banda mientras dure, ' +
+                'y aparecen como «En reposo» en vez de fuera de límite.',
+          }
+          : {}),
+
+        recuento: {
+          senales: r.totalSenales,
+          conMedicion: r.medidas,
+          enBanda: r.enBanda,
+          enAviso: r.enAviso,
+          fueraDeLimite: r.fueraDeLimite,
+          sinDato: r.sinDato,
         },
-        maquinas: {
-          total: resumen.totalMaquinas,
-          operando: resumen.operando,
-          sinDato: resumen.sinDato,
-          porEstado: resumen.porEstado.map(e => ({ estado: e.label, cuantas: e.valor })),
-        },
-        // Ordenado de mejor a peor: la primera y la última contestan
-        // «¿cuál va mejor?» y «¿cuál va peor?» sin otra llamada.
-        rankingPorOee: porOee.map(m => ({ id: m.id, nombre: m.equipo, oee: red1(m.oee) })),
-        areas: summaryByArea(lectura.machines).map(a => ({
-          area: a.label,
-          oee: red1(a.oee),
-          operando: a.operando,
-          de: a.totalMaquinas,
-        })),
-        unidades: { oee: '%', disponibilidad: '%', rendimiento: '%', calidad: '%', fty: '%' },
-      }
-    },
 
-    async estado_actual({ maquina } = {}) {
-      const id = resolverMaquina(maquina)
-      if (!id) {
-        return fallo(`No existe ninguna máquina llamada "${maquina}".`, { maquinas: catalogoBreve() })
-      }
+        // Agrupadas como en la pantalla: cada activo responde una pregunta
+        // («¿hay agua?», «¿se está impulsando?»), y esa agrupación es NUESTRA
+        // porque el servidor no publica equipos bajo esta raíz.
+        activos: ACTIVO_IDS.map(id => {
+          const a = s.activos.find(x => x.id === id)
+          return {
+            activo: ACTIVOS[id].label,
+            responde: ACTIVOS[id].pregunta,
+            estado: estadoInfo(a.estado).label,
+            senales: a.senales.map(describirSenal),
+          }
+        }),
 
-      const meta = porId.get(id)
-      const lectura = await leerEnVivo(meta)
-      if (!lectura.ok) {
-        return fallo(`No se pudo leer ${meta.equipo} del servidor ICONICS: ${lectura.error}`)
-      }
-
-      const m = lectura.machine
-      return {
-        ok: true,
-        maquina: m.id,
-        nombre: m.equipo,
-        fuente: 'tiempo real',
-        estado: estadoLabel(m.estado),
-        modelo: m.modelo,
-        oee: m.oee,
-        disponibilidad: m.disponibilidad,
-        rendimiento: m.rendimiento,
-        calidad: m.calidad,
-        aprobadas: m.aprobadas,
-        rechazadas: m.rechazadas,
-        producidas: m.producidas,
-        tMuertoSegundos: m.tMuerto,
-        unidades: { oee: '%', disponibilidad: '%', rendimiento: '%', calidad: '%', piezas: 'unidades' },
+        conHistoria: historizadas().map(k => SENALES[k].label),
+        ...(DERIVADO ? avisoDeUmbrales() : {}),
       }
     },
 
     /**
-     * Cualquier dato histórico de una máquina, en cualquier período.
+     * La tendencia de UNA señal en un período.
      *
-     * Una sola herramienta y no cinco porque la pregunta es siempre la misma
-     * —«qué pasó en tal máquina en tal momento»— y lo único que cambia es la
-     * granularidad. Quien decide cómo leerlo es `resolverPeriodo`, con código
-     * determinista, no el modelo.
+     * Una señal y no varias: el historiador se pide punto a punto, y cuatro
+     * señales serían cuatro idas y vueltas para una pregunta que casi siempre
+     * es sobre una sola magnitud. Si hicieran falta dos, la segunda pregunta
+     * las trae — y el modelo tiene una consulta por turno de todos modos.
      */
-    async datos_de_maquina({ maquina, periodo, metrica } = {}) {
-      const elegida = elegirMaquina(maquina)
-      if (elegida.error) return elegida.error
-      const { id } = elegida
+    async historia_de_senal({ senal, periodo } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
 
-      const p = resolverPeriodo(periodo, { turnos })
-      if (p.error) return fallo(p.error)
+      const meta = senalInfo(clave)
 
-      // La métrica solo manda en los rangos: en un día o una ventana se
-      // devuelven todas, que cuestan lo mismo.
-      const cual = metrica ?? 'oee'
-      if (p.tipo === TIPOS.RANGO && !METRICAS_HISTORICAS.includes(cual)) {
+      /*
+       * La guarda, ANTES de la red. Ver la cabecera del archivo.
+       *
+       * El error nombra las cuatro que sí tienen serie y explica el motivo real
+       * —el tag no está coleccionado— para que el modelo pueda ofrecer el valor
+       * en vivo en su lugar en vez de quedarse en «no puedo».
+       */
+      if (!esHistorizada(clave)) {
         return fallo(
-          `No conozco la métrica "${cual}".`,
-          { metricas: METRICAS_HISTORICAS }
+          `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
+            `Pedírsela devolvería la curva de otra señal —la temperatura del tanque— sin avisar, ` +
+            `así que no se pide. Sí se puede dar su valor actual con estado_del_sistema.`,
+          {
+            senalesConHistoria: historizadas().map(k => SENALES[k].label),
+            senalPedida: meta.label,
+          }
         )
       }
 
-      return resumenDePeriodo(porId.get(id), p, cual)
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const serie = await leerSerie(clave, v)
+      if (!serie.ok) {
+        // 502 y 504 los pone el puente: significan que no se llegó al servidor.
+        // Decir entonces «no hay datos» manda a revisar el Data Historian
+        // cuando lo que hay que hacer es levantar los servicios.
+        if (serie.status >= 502) {
+          return fallo(
+            'No se pudo contactar con el servidor ICONICS para leer el historiador. No es que ' +
+              'falten datos: el servidor no está respondiendo. Si acaban de arrancarse los ' +
+              'servicios GENESIS, tardan 3-4 minutos en atender.'
+          )
+        }
+        return fallo(
+          `El historiador no devolvió la serie de ${meta.label} en ${v.etiqueta}: ` +
+            `${serie.error ?? 'error del servidor'}.`
+        )
+      }
+
+      const resumen = resumirSerie(serie.datos, meta.decimales)
+      if (!resumen) {
+        return fallo(
+          `No hay ninguna muestra de ${meta.label} en ${v.etiqueta}. El historiador no guarda ` +
+            `ese tramo, o todas las muestras vinieron con mala calidad.`
+        )
+      }
+
+      return {
+        ok: true,
+        senal: meta.label,
+        tag: meta.tag,
+        periodo: v.etiqueta,
+        fuente: 'historiador',
+        unidad: meta.unidad || null,
+        ...resumen,
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        ...(meta.nota ? { nota: meta.nota } : {}),
+        ...(meta.soloEnMarcha
+          ? {
+            avisoReposo:
+                'Esta señal sólo significa algo con la instalación impulsando. La instalación está ' +
+                'parada la mayor parte del tiempo, así que un promedio bajo o un mínimo de cero ' +
+                'reflejan las horas en reposo y no un problema.',
+          }
+          : {}),
+        ...avisoDeUmbrales(),
+      }
     },
 
     /**
-     * Dos períodos de la misma máquina, con su diferencia.
+     * La misma señal en dos períodos, con su diferencia.
      *
-     * Sirve para dos días, dos horas o dos turnos: el resolvedor no distingue,
-     * así que «compara la mañana con la tarde del 20 de julio» y «compara el
-     * lunes con el martes» son la misma llamada.
+     * La diferencia se calcula AQUÍ. Es la misma regla que ya regía con el OEE:
+     * pedirle al modelo que reste dos números es pedirle aritmética, y una
+     * resta mal hecha en la frase final estropea una consulta que salió bien.
      */
-    async comparar_periodos({ maquina, periodoA, periodoB, metrica } = {}) {
-      const elegida = elegirMaquina(maquina)
-      if (elegida.error) return elegida.error
-      const { id } = elegida
+    async comparar_periodos({ senal, periodoA, periodoB } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
 
-      const pa = resolverPeriodo(periodoA, { turnos })
-      if (pa.error) return fallo(pa.error)
-      const pb = resolverPeriodo(periodoB, { turnos })
-      if (pb.error) return fallo(pb.error)
-
-      const cual = metrica ?? 'oee'
-      const meta = porId.get(id)
       const [a, b] = await Promise.all([
-        resumenDePeriodo(meta, pa, cual),
-        resumenDePeriodo(meta, pb, cual),
+        herramientas.historia_de_senal({ senal, periodo: periodoA }),
+        herramientas.historia_de_senal({ senal, periodo: periodoB }),
       ])
 
       if (!a.ok) return a
       if (!b.ok) return b
 
-      // Comparar un día contra un rango mezclaría un valor con un promedio.
-      const campos = pa.tipo === TIPOS.RANGO || pb.tipo === TIPOS.RANGO
-        ? ['promedio']
-        : ['oee', 'disponibilidad', 'rendimiento', 'calidad', 'aprobadas', 'rechazadas', 'tMuertoSegundos']
+      const meta = senalInfo(clave)
 
       return {
         ok: true,
-        maquina: meta.id,
-        nombre: meta.equipo,
+        senal: meta.label,
         fuente: 'historiador',
-        // Las claves son las etiquetas YA resueltas, para que el modelo
-        // redacte con el período real y no con el «ayer» que escribió él.
-        [pa.etiqueta]: a,
-        [pb.etiqueta]: b,
-        diferencia: Object.fromEntries(campos.map(c => [c, resta(b[c], a[c])])),
-      // El aviso de valores imposibles vive dentro de cada período; si se
-      // queda ahí anidado, comparar dos días con OEE por encima de 100 los
-      // presenta como si compitieran de verdad. Se sube al primer nivel.
-      ...(a.aviso || b.aviso ? { aviso: a.aviso ?? b.aviso } : {}),
-        nota: `La diferencia es «${pb.etiqueta}» menos «${pa.etiqueta}». ` +
-          `Un valor negativo significa que el segundo fue peor.`,
+        unidad: meta.unidad || null,
+        // Las claves son las etiquetas YA resueltas, para que el modelo redacte
+        // con el período real y no con el «ayer» que escribió él.
+        [a.periodo]: a,
+        [b.periodo]: b,
+        diferencia: {
+          promedio: resta(b.promedio, a.promedio),
+          minimo: resta(b.minimo, a.minimo),
+          maximo: resta(b.maximo, a.maximo),
+        },
+        nota:
+          `La diferencia es «${b.periodo}» menos «${a.periodo}». Un valor negativo significa que ` +
+          `el segundo período fue más bajo.`,
+        ...avisoDeUmbrales(),
       }
     },
+  }
+
+  /**
+   * El catálogo que viaja en las instrucciones del sistema.
+   *
+   * Va en el prompt y NO como herramienta: es información fija y barata, y
+   * tenerla delante evita que el modelo gaste su única llamada en pedir lo que
+   * ya tiene. Lo consume `chat.mjs`.
+   */
+  function catalogo() {
+    return SENAL_KEYS.map(k => {
+      const s = SENALES[k]
+      return {
+        nombre: s.label,
+        unidad: s.unidad || null,
+        activo: ACTIVOS[s.activo].label,
+        historia: s.historizado,
+        soloEnMarcha: s.soloEnMarcha,
+      }
+    })
   }
 
   /**
@@ -740,198 +835,97 @@ export function createHerramientas({
 /* ── Auxiliares ─────────────────────────────────────────────────────── */
 
 /**
- * Avisa de porcentajes que no pueden serlo.
+ * Redondeo que **conserva el hueco**.
  *
- * ── POR QUÉ HACE FALTA ─────────────────────────────────────────────
- *
- * El servidor entrega OEE por encima del 100 %. Está documentado en
- * docs/TAGS.md: calcula `OEE_Cal = Pz_OK / Prod_Real_Total` sin acotarlo por
- * arriba, y cuando los contadores se desfasan al cambiar de turno la calidad
- * pasa de 100 y el OEE la sigue. Medido en LIN/1 el 2026-07-24: 15 de 24
- * muestras horarias por encima de 100, con un máximo de 160,4 %.
- *
- * La media diaria lo disimulaba. **Un máximo no**: preguntar por el mejor día
- * de un mes es preguntar justo por el peor dato. Y un 107,9 % presentado sin
- * comentario invita a creerlo.
- *
- * No se recorta ni se descarta a propósito. Recortar a 100 escondería un
- * problema real del servidor, y descartarlo dejaría el día sin dato sin decir
- * por qué. Se entrega con el aviso, para que el asistente lo cuente.
+ * `Math.round(null)` vale 0 en JavaScript, y ese 0 se leería como un tanque
+ * vacío en vez de como una lectura que no llegó. Los booleanos pasan intactos:
+ * redondear `false` daría 0, y «modo automático» dejaría de distinguirse de un
+ * número.
  */
-function avisoDeImposibles(valores) {
-  const malos = Object.entries(valores)
-    .filter(([, v]) => typeof v === 'number' && v > 100)
-    .map(([k]) => k)
-
-  if (!malos.length) return {}
-
-  // Redactado como HECHO y no como orden al modelo. Escrito en imperativo
-  // («dilo al dar la cifra»), el 4B lo copiaba literal en su respuesta y el
-  // operador leía las instrucciones internas del sistema. Lo que el modelo
-  // debe hacer con esto ya se lo dice la regla 2 del prompt.
-  return {
-    aviso:
-      `El servidor devuelve un valor superior al 100 % en: ${malos.join(', ')}, ` +
-      'lo cual no es una medición válida. Es un fallo conocido del cálculo de OEE_Cal en ' +
-      'ICONICS, que no acota ese porcentaje por arriba.',
-  }
+function redondear(valor, decimales) {
+  if (typeof valor !== 'number' || !Number.isFinite(valor)) return valor
+  return +valor.toFixed(decimales ?? 1)
 }
 
 /**
- * Redondeo a un decimal que **conserva el hueco**.
+ * Marca de tiempo → `HH:MM:SS` en la zona del servidor.
  *
- * `Math.round(null)` vale 0 en JavaScript, y ese 0 se leería como una planta
- * parada en vez de como una lectura que no llegó.
+ * Se da la hora y no la fecha porque esto acompaña a una lectura en vivo: el
+ * día es hoy por definición, y ponerlo invita al modelo a repetirlo.
  */
-const red1 = (v) => (v === null || v === undefined ? null : +Number(v).toFixed(1))
+function horaLocal(iso) {
+  const d = new Date(iso)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
 
 /** Diferencia tolerante a huecos: sin los dos valores no hay diferencia que dar. */
 function resta(b, a) {
   return b === null || b === undefined || a === null || a === undefined
     ? null
-    : +(b - a).toFixed(1)
-}
-
-/** Los campos del resumen, con nombres que el modelo pueda citar tal cual. */
-function formatearResumen(r) {
-  return {
-    oee: r.oee,
-    disponibilidad: r.disponibilidad,
-    rendimiento: r.rendimiento,
-    calidad: r.calidad,
-    aprobadas: r.aprobadas,
-    rechazadas: r.rechazadas,
-    producidas: r.producidas,
-    tMuertoSegundos: r.tMuerto,
-    horasConMuestra: r.muestras,
-    unidades: { oee: '%', disponibilidad: '%', rendimiento: '%', calidad: '%', piezas: 'unidades' },
-  }
-}
-
-/**
- * Resuelve la fecha que manda el modelo, en ISO o en lenguaje llano.
- *
- * ── POR QUÉ ESTO VIVE AQUÍ Y NO EN EL PROMPT ───────────────────────
- *
- * Es la misma regla que ya siguen los nombres de máquina: **resolver es
- * trabajo del backend; elegir es trabajo del modelo.** Pedirle a un 4B que
- * calcule qué día fue «anteayer» es pedirle aritmética de calendario, que es
- * justo lo que peor hace y lo que aquí no se puede fallar en silencio: una
- * fecha mal calculada devuelve datos reales del día equivocado, y eso no se
- * distingue de la respuesta correcta.
- *
- * La conversación del Plan 7 lo vuelve imprescindible: en cuanto se puede
- * preguntar «¿y ayer?», esto deja de ser una comodidad.
- *
- * @returns {{ iso: string } | { error: string }}
- */
-export function resolverFecha(fecha) {
-  const crudo = String(fecha ?? '').trim()
-
-  // La resolución vive en `shared/periodo.js`, que la comparte con el
-  // resolvedor de períodos completo. Aquí solo queda la comprobación de que
-  // el día no esté en el futuro.
-  const iso = resolverDia(crudo)
-
-  if (!iso) {
-    return {
-      error: `No entiendo la fecha "${crudo}". Escríbela como YYYY-MM-DD ` +
-        `(por ejemplo 2025-03-25) o di "hoy", "ayer", "anteayer" o un día de la semana.`,
-    }
-  }
-
-  const d = new Date(`${iso}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return { error: `La fecha "${crudo}" no existe en el calendario.` }
-
-  // El futuro se rechaza a propósito: `Interpolative` rellenaría el día entero
-  // repitiendo el último valor conocido y devolvería un resumen con pinta de
-  // real para un día que no ha ocurrido.
-  if (iso > isoLocal(new Date())) {
-    return { error: `La fecha ${iso} está en el futuro; no hay datos todavía.` }
-  }
-
-  return { iso }
+    : +(b - a).toFixed(2)
 }
 
 /**
  * Esquema que se le manda a llama-server en cada petición.
  *
- * Las descripciones son parte del programa: es lo único que el modelo lee
- * para decidir. Dicen explícitamente que solo algunas máquinas tienen
- * historia, porque el fallo más caro es que pregunte por una que no la tiene
- * y luego presente el error como si fuera un dato.
+ * Las descripciones son parte del programa: es lo único que el modelo lee para
+ * decidir. Dicen explícitamente que sólo cuatro señales tienen historia, porque
+ * el fallo más caro es que pida la de otra y el servidor le conteste con la
+ * curva equivocada **sin dar error**.
  */
 export const DEFINICIONES = [
   {
     type: 'function',
     function: {
-      name: 'estado_de_planta',
+      name: 'estado_del_sistema',
       description:
-        'Estado de TODA la planta ahora mismo, de una sola vez: el OEE de planta y sus tres ' +
-        'factores, la producción y los rechazos totales, cuántas máquinas están operando, el ' +
-        'resumen por área y el ranking de las 10 máquinas ordenadas por OEE. Úsala para ' +
-        '"¿cómo va la planta?", "¿qué máquina va mejor o peor?", "¿cuántas están paradas?" o ' +
-        'cualquier pregunta que abarque más de una máquina. NO la llames varias veces: lo ' +
-        'devuelve todo junto.',
+        'Estado de TODA la instalación de agua ahora mismo, de una sola vez: las ocho señales con ' +
+        'su valor, su unidad, su estado y su banda de límites; los cuatro activos (tanque, grupo ' +
+        'de bombeo, red de distribución y suministro eléctrico) con su estado; si la instalación ' +
+        'está impulsando o en reposo; y cuántas señales están en banda, en aviso, fuera de límite ' +
+        'o sin dato. Úsala para "¿cómo va la instalación?", "¿está bombeando?", "¿qué nivel tiene ' +
+        'el tanque?", "¿hay algo fuera de límite?", "¿qué temperatura hay?" y para CUALQUIER ' +
+        'pregunta sobre el momento actual. NO la llames varias veces: lo devuelve todo junto, ' +
+        'incluidas las señales que no tienen historia.',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
   {
     type: 'function',
     function: {
-      name: 'estado_actual',
+      name: 'historia_de_senal',
       description:
-        'Lee el estado en tiempo real de una máquina: si está operando, su OEE actual y los tres ' +
-        'factores, las piezas aprobadas y rechazadas del turno, y el modelo cargado. Funciona en ' +
-        'las 10 máquinas. Úsala para preguntas sobre "ahora", "en este momento" o "hoy".',
+        'Cómo ha evolucionado UNA señal en un período: devuelve el mínimo y el máximo con la hora ' +
+        'en que ocurrieron, el promedio, el primer y el último valor, y cuántas muestras hubo. ' +
+        'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿cuál fue la temperatura máxima ayer?", ' +
+        '"¿ha subido la presión?". IMPORTANTE: sólo cuatro de las ocho señales tienen serie propia ' +
+        '—nivel del tanque, temperatura del tanque, caudal instantáneo y presión relativa—; la ' +
+        'lista con esa marca ya la tienes en tus instrucciones. Si pides otra, la herramienta lo ' +
+        'dirá y tendrás que comunicarlo tal cual y ofrecer su valor actual.',
       parameters: {
         type: 'object',
         properties: {
-          maquina: {
+          senal: {
             type: 'string',
-            description: 'Identificador o nombre: "LIN/1", "Línea 1", "Lineal 1", "REC/13", "Multi 13".',
-          },
-        },
-        required: ['maquina'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'datos_de_maquina',
-      description:
-        'Datos históricos de una máquina en CUALQUIER período: un día entero, una hora concreta, ' +
-        'un turno, un mes o un rango de días. Devuelve el OEE y sus tres factores, las piezas ' +
-        'aprobadas y rechazadas y el tiempo muerto. Si el período abarca varios días, devuelve ' +
-        'además el MÁXIMO, el mínimo y el promedio de la métrica pedida, cada uno con su fecha. ' +
-        'IMPORTANTE: solo algunas máquinas tienen datos históricos; la lista con esa marca ya ' +
-        'la tienes en tus instrucciones. Si no hay datos, la herramienta lo dirá y debes ' +
-        'comunicarlo tal cual.',
-      parameters: {
-        type: 'object',
-        properties: {
-          maquina: {
-            type: 'string',
-            description: 'Identificador o nombre: "LIN/1", "Línea 1", "REC/13", "Multi 13".',
+            description:
+              'Nombre de la señal, tal y como lo diga el usuario: "nivel del tanque", "nivel", ' +
+              '"temperatura", "caudal", "presión", "carga del motor", "tensión", "eficiencia". ' +
+              'No lo traduzcas a una clave técnica: pásalo tal cual y el servidor lo resuelve.',
           },
           periodo: {
             type: 'string',
             description:
-              'El período, en lenguaje llano. Ejemplos válidos: "2026-07-20", "ayer", "martes", ' +
-              '"ayer a las 12", "2026-07-20 14:00", "turno de la mañana del 2026-07-20", ' +
-              '"julio 2026", "últimos 7 días", "esta semana", "el mes pasado". ' +
-              'NO lo conviertas tú a fechas: pásalo tal cual y el servidor lo resuelve.',
-          },
-          metrica: {
-            type: 'string',
-            description:
-              'Solo hace falta cuando el período abarca VARIOS días, para saber de qué métrica ' +
-              'quieres el máximo o el promedio. Una de: oee, disponibilidad, rendimiento, ' +
-              'calidad, aprobadas, rechazadas, tMuerto. Por defecto oee.',
+              'El período, en lenguaje llano. Lo habitual aquí es relativo a ahora: "última hora", ' +
+              '"últimas 6 horas", "últimos 30 minutos", "esta hora". También vale calendario: ' +
+              '"hoy", "ayer", "2026-07-20", "ayer a las 12", "últimos 3 días", "la última semana". ' +
+              'MÁXIMO 7 días: un mes entero no cabe, y si lo piden llama igualmente y la ' +
+              'herramienta te dará las alternativas. Si el usuario no dice período, omítelo y se ' +
+              'usan las últimas 6 horas. NO lo conviertas tú a fechas: pásalo tal cual y el ' +
+              'servidor lo resuelve.',
           },
         },
-        required: ['maquina', 'periodo'],
+        required: ['senal'],
       },
     },
   },
@@ -940,27 +934,27 @@ export const DEFINICIONES = [
     function: {
       name: 'comparar_periodos',
       description:
-        'Compara dos períodos de la misma máquina y devuelve los dos resúmenes con su diferencia. ' +
-        'Sirve para dos días, dos horas o dos turnos: "compara el lunes con el martes", ' +
-        '"la mañana contra la tarde del 20 de julio", "cómo cambió respecto a ayer".',
+        'Compara la MISMA señal en dos períodos y devuelve los dos resúmenes con su diferencia ya ' +
+        'calculada. Sirve para "compara el nivel de esta hora con el de hace tres", "¿la ' +
+        'temperatura de hoy contra la de ayer?", "¿ha mejorado la presión respecto a esta mañana?". ' +
+        'Sólo funciona con las cuatro señales que tienen historia.',
       parameters: {
         type: 'object',
         properties: {
-          maquina: { type: 'string', description: 'Identificador o nombre de la máquina.' },
+          senal: {
+            type: 'string',
+            description: 'Nombre de la señal, en lenguaje llano. Mismas formas que en historia_de_senal.',
+          },
           periodoA: {
             type: 'string',
-            description: 'Primer período. Es la referencia. Mismas formas que en datos_de_maquina.',
+            description: 'Primer período. Es la referencia. Mismas formas que en historia_de_senal.',
           },
           periodoB: {
             type: 'string',
             description: 'Segundo período, se compara contra el primero.',
           },
-          metrica: {
-            type: 'string',
-            description: 'Solo si los períodos abarcan varios días. Por defecto oee.',
-          },
         },
-        required: ['maquina', 'periodoA', 'periodoB'],
+        required: ['senal', 'periodoA', 'periodoB'],
       },
     },
   },

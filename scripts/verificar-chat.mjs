@@ -119,25 +119,52 @@ const llamaBase = `http://127.0.0.1:${llama.address().port}`
 
 let ejecutadas = []
 
+/**
+ * Las herramientas son de mentira **a propósito**, y por eso este archivo no
+ * tuvo que reescribirse al cambiar la demo de OEE a sistemas de agua.
+ *
+ * Lo que se prueba aquí es el BUCLE —que una respuesta con cifras y sin
+ * consultar no sale, que un marcado de herramienta no llega a la pantalla, que
+ * dos preguntas no se reparten la GPU—, y ninguna de esas reglas depende de
+ * qué mida la instalación. Lo único que se ha adaptado son las FORMAS: el
+ * catálogo que va en las instrucciones y el resultado que `resumirSinModelo`
+ * tiene que saber contar cuando el modelo no redacta.
+ */
 const herramientasFalsas = {
   definiciones: [
-    { type: 'function', function: { name: 'oee_de_maquina', description: 'x', parameters: {} } },
+    { type: 'function', function: { name: 'historia_de_senal', description: 'x', parameters: {} } },
   ],
-  nombres: ['oee_de_maquina', 'listar_maquinas'],
+  nombres: ['historia_de_senal', 'estado_del_sistema'],
 
   // El catálogo NO es una herramienta: va en las instrucciones del sistema.
-  catalogo: () => [{ id: 'LIN/1', nombre: 'Lineal 1', area: 'Lineales', tieneHistoria: true }],
+  catalogo: () => [
+    { nombre: 'Nivel del tanque', unidad: '%', activo: 'Tanque de almacenamiento', historia: true, soloEnMarcha: false },
+  ],
 
   async ejecutar(nombre, argumentos) {
     ejecutadas.push({ nombre, argumentos })
 
-    if (nombre === 'listar_maquinas') {
-      return { ok: true, maquinas: [{ id: 'LIN/1', nombre: 'Lineal 1', area: 'Lineales', tieneHistoria: true }] }
+    // La forma que devuelve `estado_del_sistema`: lo que la reconoce es el
+    // array `activos`, y de ahí saca `resumirSinModelo` sus ocho líneas.
+    if (nombre === 'estado_del_sistema') {
+      return {
+        ok: true,
+        estadoGeneral: 'En banda',
+        enReposo: false,
+        activos: [{
+          activo: 'Tanque de almacenamiento',
+          estado: 'En banda',
+          senales: [{ senal: 'Nivel del tanque', valor: 62.5, unidad: '%', estado: 'En banda' }],
+        }],
+      }
     }
-    if (nombre === 'oee_de_maquina') {
-      return { ok: true, maquina: 'LIN/1', fecha: argumentos.fecha, oee: 62.4 }
+    if (nombre === 'historia_de_senal') {
+      return {
+        ok: true, senal: 'Nivel del tanque', periodo: argumentos.periodo ?? 'las últimas 6 horas',
+        unidad: '%', minimo: 52, maximo: 68, promedio: 61, ultimo: 67.9, muestras: 24,
+      }
     }
-    return { ok: false, error: `No existe la herramienta "${nombre}".`, herramientas: ['oee_de_maquina'] }
+    return { ok: false, error: `No existe la herramienta "${nombre}".`, herramientas: ['historia_de_senal'] }
   },
 }
 
@@ -162,25 +189,28 @@ await check('una pregunta con herramienta: se ejecuta y se redacta', async () =>
   guion = {
     toolCall: {
       id: 'c1', type: 'function',
-      function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' },
+      function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' },
     },
-    texto: 'El OEE de la Lineal 1 el 25 de marzo de 2025 fue del 62,4 %.',
+    texto: 'El nivel del tanque estuvo ayer entre el 52 % y el 68 %.',
   }
 
-  const { eventos, resumen, texto } = await preguntar(chatDePrueba(), '¿OEE de la Línea 1 el 25/3/2025?')
+  const { eventos, resumen, texto } = await preguntar(chatDePrueba(), '¿cómo fue el nivel ayer?')
 
-  const ejecutada = ejecutadas.find(e => e.nombre === 'oee_de_maquina')
+  const ejecutada = ejecutadas.find(e => e.nombre === 'historia_de_senal')
   assert.ok(ejecutada, 'la herramienta debía ejecutarse')
-  assert.equal(ejecutada.argumentos.fecha, '2025-03-25')
-  assert.equal(resumen.herramienta, 'oee_de_maquina')
+  // Los argumentos llegan TAL CUAL los escribió el modelo: quien resuelve
+  // «ayer» a un rango de fechas es el backend, dentro de la herramienta.
+  assert.equal(ejecutada.argumentos.senal, 'nivel del tanque')
+  assert.equal(ejecutada.argumentos.periodo, 'ayer')
+  assert.equal(resumen.herramienta, 'historia_de_senal')
   assert.equal(resumen.bloqueada, false)
-  assert.match(texto, /62,4/)
+  assert.match(texto, /52|68/)
   assert.ok(eventos.some(e => e.tipo === 'herramienta'), 'debe anunciar qué herramienta usa')
 })
 
 await check('los estados se emiten en orden, para que la pantalla no parezca colgada', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
     texto: 'Listo.',
   }
   const { eventos } = await preguntar(chatDePrueba(), 'algo')
@@ -193,7 +223,7 @@ await check('los estados se emiten en orden, para que la pantalla no parezca col
 
 await check('el texto llega troceado, no de golpe al final', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
     texto: 'Una respuesta bastante larga para que se parta en varios trozos.',
   }
   const { eventos } = await preguntar(chatDePrueba(), 'algo')
@@ -207,7 +237,7 @@ console.log('\n── Razonamiento (Qwen y similares) ────────�
 await check('se piensa para ELEGIR la herramienta y no para redactar', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Hay 10 máquinas.',
   }
   await preguntar(chatDePrueba(), '¿qué máquinas hay?')
@@ -226,7 +256,7 @@ await check('se piensa para ELEGIR la herramienta y no para redactar', async () 
 await check('la pasada de decidir lleva presupuesto propio para pensar', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   await preguntar(chatDePrueba({ IA_MAX_TOKENS: '512' }), 'algo')
@@ -241,7 +271,7 @@ await check('la pasada de decidir lleva presupuesto propio para pensar', async (
 
 await check('el razonamiento NO se enseña: no es la respuesta', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     razonamiento: 'El usuario pregunta por las máquinas. Debería mirar el catálogo y...',
     texto: 'Hay 10 máquinas.',
   }
@@ -257,7 +287,7 @@ await check('el marcado de una SEGUNDA herramienta no llega a la pantalla', asyn
   // pasada de redactar no lleva herramientas, llama-server no lo interpretó y
   // su marcado salió como texto: un `<tool_call>` crudo en la burbuja.
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' } },
     texto: 'LIN/1 tiene datos históricos. Consulto el OEE de julio.\n\n<tool_call>\n<function=get_oee_historico>\n</function>\n</tool_call>',
   }
   const { resumen, texto } = await preguntar(chatDePrueba(), '¿el OEE más alto de julio?')
@@ -269,7 +299,7 @@ await check('el marcado de una SEGUNDA herramienta no llega a la pantalla', asyn
 
 await check('lo que dijo ANTES del marcado sí se conserva', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' } },
     texto: 'Voy a consultarlo.<tool_call>basura</tool_call>',
   }
   const { texto } = await preguntar(chatDePrueba(), 'algo')
@@ -280,24 +310,29 @@ await check('lo que dijo ANTES del marcado sí se conserva', async () => {
 
 await check('tras cortar el marcado, el DATO se cuenta igual', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' } },
     texto: 'Ahora consulto.<tool_call>x</tool_call>',
   }
   const { texto } = await preguntar(chatDePrueba(), 'algo')
 
   // La herramienta ya devolvió el dato; perderlo porque el modelo no supo
   // redactarlo sería tirar una consulta que salió bien.
-  assert.match(texto, /LIN\/1/, 'el resumen de respaldo tiene que aparecer')
+  assert.match(texto, /Nivel del tanque/, 'el resumen de respaldo tiene que aparecer')
 })
 
 await check('un AVISO de la herramienta llega aunque el modelo lo ignore', async () => {
   // Visto en planta: con `rendimiento = 110,4 %` el modelo dio la cifra sin
   // una palabra. Una advertencia que depende de que se acuerde no sirve.
+  //
+  // El aviso que viaja HOY es otro —que las bandas contra las que se juzga cada
+  // señal son estimaciones nuestras y no rangos confirmados de la instalación—
+  // pero el mecanismo que se prueba es el mismo, y la lección también: el
+  // backend lo añade detrás si el modelo no lo cuenta.
   const conAviso = {
     ...herramientasFalsas,
     ejecutar: async () => ({
-      ok: true, maquina: 'LIN/1', oee: 107.9,
-      aviso: 'Valor superior al 100 %, no es una medición válida.',
+      ok: true, senal: 'Nivel del tanque', valor: 12.1,
+      aviso: 'Los límites son estimaciones nuestras, no rangos confirmados de la instalación.',
     }),
   }
   const chat = createChat({
@@ -306,20 +341,20 @@ await check('un AVISO de la herramienta llega aunque el modelo lo ignore', async
   })
 
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
-    texto: 'El OEE fue del 107,9 por ciento.',   // el modelo omite el aviso
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: 'El nivel del tanque está al 12,1 %, fuera de límite.',   // omite el aviso
   }
   const { texto } = await preguntar(chat, 'algo')
 
-  assert.match(texto, /no es una medición válida/i, 'el backend tiene que añadirlo')
+  assert.match(texto, /estimaciones/i, 'el backend tiene que añadirlo')
 })
 
 await check('si el modelo YA contó el aviso, no se repite', async () => {
   const conAviso = {
     ...herramientasFalsas,
     ejecutar: async () => ({
-      ok: true, maquina: 'LIN/1', oee: 107.9,
-      aviso: 'Valor superior al 100 %, no es una medición válida.',
+      ok: true, senal: 'Nivel del tanque', valor: 12.1,
+      aviso: 'Los límites son estimaciones nuestras, no rangos confirmados de la instalación.',
     }),
   }
   const chat = createChat({
@@ -328,26 +363,26 @@ await check('si el modelo YA contó el aviso, no se repite', async () => {
   })
 
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
-    texto: 'El OEE fue 107,9 pero no es una medición válida por un fallo de cálculo.',
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: 'El nivel está al 12,1 %, por debajo del límite; pero ese límite es una estimación nuestra.',
   }
   const { texto } = await preguntar(chat, 'algo')
 
-  assert.equal(texto.match(/no es una medición válida/gi)?.length, 1, 'una sola vez')
+  assert.equal(texto.match(/estimaci[oó]n/gi)?.length, 1, 'una sola vez')
 })
 
 await check('si no redacta nada, se dice el dato igual', async () => {
   // Pasó de verdad con el 4B: el razonamiento se comió `max_tokens` entero y
   // `content` llegó vacío. Una burbuja en blanco no se distingue de una avería.
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{"maquina":"LIN/1","fecha":"2025-03-25"}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' } },
     texto: '',
   }
-  const { resumen, texto } = await preguntar(chatDePrueba(), '¿OEE de la Línea 1?')
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿cómo fue el nivel ayer?')
 
   assert.equal(resumen.sinRedactar, true)
   assert.ok(texto.trim().length > 0, 'no puede quedarse en blanco')
-  assert.match(texto, /LIN\/1|Lineal 1/, 'el dato consultado tiene que aparecer')
+  assert.match(texto, /Nivel del tanque/, 'el dato consultado tiene que aparecer')
 })
 
 /* ── La regla que no se puede relajar ────────────────────────────────── */
@@ -355,61 +390,75 @@ await check('si no redacta nada, se dice el dato igual', async () => {
 console.log('\n── Respuestas sin herramienta ──────────────────────────────')
 
 await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)', async () => {
-  guion = { contenido: 'El OEE de la Línea 1 el 25 de marzo fue del 87,3 %.', toolCall: null }
+  guion = { contenido: 'El nivel del tanque está al 87,3 %.', toolCall: null }
 
-  const { resumen, texto } = await preguntar(chatDePrueba(), '¿OEE de la Línea 1?')
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿qué nivel tiene el tanque?')
 
   assert.equal(resumen.bloqueada, true, 'la respuesta debía bloquearse')
   assert.equal(resumen.herramienta, null)
   assert.ok(!texto.includes('87,3'), 'la cifra inventada no puede llegar al usuario')
-  assert.match(texto, /día/i, 'dice lo que SÍ se puede preguntar, que es lo accionable')
+  assert.match(texto, /se[ñn]al/i, 'dice lo que SÍ se puede preguntar, que es lo accionable')
   assert.match(texto, /--jinja/, 'y, sin ninguna llamada aún, sugiere revisar la bandera')
 })
 
 await check('si el modelo YA usó herramientas, el aviso no culpa a --jinja', async () => {
   // Con `--jinja` bien puesto, una respuesta sin consultar significa que la
-  // pregunta no encaja en ninguna herramienta —un rango, un mes—, no que
-  // falte la bandera. Mandar a revisarla es enviar a nadie a buscar nada.
+  // pregunta no encaja en ninguna herramienta —el pasado de una señal que no
+  // está historizada, algo que esta instalación no mide—, no que falte la
+  // bandera. Mandar a revisarla es enviar a nadie a buscar nada.
   const chat = chatDePrueba()
 
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
-    texto: 'Hay 10 máquinas.',
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
+    texto: 'Hay 8 señales.',
   }
-  await preguntar(chat, '¿qué máquinas hay?')
+  await preguntar(chat, '¿qué señales hay?')
 
-  guion = { contenido: 'El OEE más alto de julio fue del 87,3 %.', toolCall: null }
-  const { resumen, texto } = await preguntar(chat, '¿el OEE más alto de julio?')
+  guion = { contenido: 'La carga del motor llegó al 87,3 % la semana pasada.', toolCall: null }
+  const { resumen, texto } = await preguntar(chat, '¿carga del motor la semana pasada?')
 
   assert.equal(resumen.bloqueada, true)
   assert.ok(!texto.includes('--jinja'), 'la bandera está bien; no hay que mandar a revisarla')
-  assert.match(texto, /rangos|día/i, 'y sí decir qué SÍ se puede preguntar')
+  assert.match(texto, /se[ñn]al|historiador/i, 'y sí decir qué SÍ se puede preguntar')
 })
 
 await check('ni herramienta ni texto: NUNCA una burbuja vacía', async () => {
-  // Visto con el 4B: preguntando por «el OEE más alto de julio» gastó 16 s
+  // Visto con el 4B: preguntando por un período que no encajaba gastó 16 s
   // pensando, no llamó a nada y devolvió contenido vacío. En pantalla es una
   // burbuja en blanco, indistinguible de una avería.
   guion = { contenido: '', toolCall: null }
-  const { resumen, texto } = await preguntar(chatDePrueba(), '¿el OEE más alto de julio?')
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿la eficiencia del mes pasado?')
 
   assert.ok(texto.trim().length > 0, 'tiene que decir algo')
-  assert.match(texto, /día/i, 'y enumerar lo que sí se puede preguntar')
+  assert.match(texto, /se[ñn]al|instalaci[oó]n/i, 'y enumerar lo que sí se puede preguntar')
   assert.equal(resumen.sinRedactar, true)
 })
 
 await check('una respuesta SIN cifras sí pasa: un saludo es legítimo', async () => {
-  guion = { contenido: 'Hola, puedo consultarte el estado de las máquinas de la planta.', toolCall: null }
+  guion = { contenido: 'Hola, puedo consultarte el estado de la instalación de agua.', toolCall: null }
   const { resumen, texto } = await preguntar(chatDePrueba(), 'hola')
   assert.equal(resumen.bloqueada, false)
   assert.match(texto, /Hola/)
 })
 
-await check('nombrar una máquina no cuenta como cifra inventada', async () => {
-  guion = { contenido: '¿Te refieres a la Línea 1 o a la Multi 13?', toolCall: null }
-  const { resumen, texto } = await preguntar(chatDePrueba(), 'la linea')
-  assert.equal(resumen.bloqueada, false, 'pedir una aclaración es legítimo')
-  assert.match(texto, /Multi 13/)
+await check('CONTAR el catálogo no cuenta como cifra inventada', async () => {
+  // El catálogo entero viaja en las instrucciones del sistema, así que contar
+  // sus filas es leer, no suponer. Sin esta excepción se bloqueaba la pregunta
+  // más básica de todas: «¿qué puedes consultar?».
+  guion = { contenido: 'Puedo ver 8 señales, y sólo 4 tienen historia.', toolCall: null }
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿qué puedes consultar?')
+  assert.equal(resumen.bloqueada, false, 'contar el catálogo es legítimo')
+  assert.match(texto, /8 señales/)
+})
+
+await check('una MEDICIÓN sin herramienta sigue bloqueada aunque suene a recuento', async () => {
+  // El reverso de la anterior: la excepción es deliberadamente estrecha. Un
+  // valor de proceso jamás va seguido de la palabra «señales», así que esto
+  // tiene que caer.
+  guion = { contenido: 'El tanque está al 62 % y la presión en 3,4.', toolCall: null }
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿cómo va?')
+  assert.equal(resumen.bloqueada, true, 'una cifra de proceso sin consultar no sale')
+  assert.ok(!texto.includes('62'), 'la cifra inventada no puede llegar al usuario')
 })
 
 /* ── Memoria de conversación (Plan 7) ────────────────────────────────── */
@@ -427,7 +476,7 @@ const turnoBase = [
 await check('el hilo anterior llega al modelo, y en orden', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
     texto: 'Listo.',
   }
   await preguntar(chatDePrueba(), '¿y el día anterior?', turnoBase)
@@ -445,7 +494,7 @@ await check('el hilo anterior llega al modelo, y en orden', async () => {
 await check('sin historial se comporta como antes', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const { resumen } = await preguntar(chatDePrueba(), '¿qué máquinas hay?')
@@ -457,7 +506,7 @@ await check('sin historial se comporta como antes', async () => {
 await check('el tope lo pone el SERVIDOR, no el cliente', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
 
@@ -475,7 +524,7 @@ await check('el tope lo pone el SERVIDOR, no el cliente', async () => {
 await check('se conservan los ÚLTIMOS turnos, no los primeros', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const largo = Array.from({ length: 20 }, (_, i) => ({
@@ -492,7 +541,7 @@ await check('se conservan los ÚLTIMOS turnos, no los primeros', async () => {
 await check('un turno larguísimo se recorta', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   await preguntar(chatDePrueba(), 'otra', [{ rol: 'usuario', texto: 'x'.repeat(5000) }])
@@ -504,7 +553,7 @@ await check('un turno larguísimo se recorta', async () => {
 await check('la basura en el historial se descarta sin lanzar', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const basura = [null, 'texto suelto', { rol: 'usuario' }, { texto: '   ' }, { rol: 'usuario', texto: 'válido' }]
@@ -516,7 +565,7 @@ await check('la basura en el historial se descarta sin lanzar', async () => {
 await check('el historial NO lleva resultados de herramientas', async () => {
   peticiones = []
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   await preguntar(chatDePrueba(), '¿y la Línea 2?', turnoBase)
@@ -548,11 +597,11 @@ await check('una herramienta inventada por el modelo no tumba la petición', asy
 
 await check('argumentos mal formados no lanzan', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'oee_de_maquina', arguments: '{esto no es json' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{esto no es json' } },
     texto: 'Necesito la fecha.',
   }
   const { resumen } = await preguntar(chatDePrueba(), 'algo')
-  assert.equal(resumen.herramienta, 'oee_de_maquina')
+  assert.equal(resumen.herramienta, 'historia_de_senal')
 })
 
 await check('llama-server caído da un error que dice que el tablero sigue', async () => {
@@ -622,7 +671,7 @@ await check('una pregunta vacía se rechaza con 400', async () => {
 
 await check('la respuesta es un flujo SSE con sus eventos', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Hay 10 máquinas.',
   }
   const { base, server } = await montar({ IA_BASE: llamaBase })
@@ -650,7 +699,7 @@ await check('la respuesta es un flujo SSE con sus eventos', async () => {
 await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda', async () => {
   guion = {
     retrasoMs: 400,
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const { base, server } = await montar({ IA_BASE: llamaBase })
@@ -674,7 +723,7 @@ await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda',
 
 await check('tras terminar, el hueco queda libre para la siguiente', async () => {
   guion = {
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const { base, server } = await montar({ IA_BASE: llamaBase })
@@ -698,7 +747,7 @@ await check('tras terminar, el hueco queda libre para la siguiente', async () =>
 await check('cancelar aborta también la llamada al modelo', async () => {
   guion = {
     retrasoMs: 3000,
-    toolCall: { id: 'c1', type: 'function', function: { name: 'listar_maquinas', arguments: '{}' } },
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
   const { base, server } = await montar({ IA_BASE: llamaBase })

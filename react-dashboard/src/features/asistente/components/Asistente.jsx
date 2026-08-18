@@ -20,7 +20,7 @@
  *    la respuesta se queda ahí sin que nadie la lea.
  *  - Debajo de cada respuesta se dice DE DÓNDE salió el dato y CON QUÉ se
  *    preguntó. Es lo que permite al operador detectar una respuesta recitada
- *    de memoria, y también una consulta hecha sobre la máquina equivocada.
+ *    de memoria, y también una consulta hecha sobre la señal equivocada.
  *
  * No se monta si el servidor no tiene asistente configurado, y su caída no
  * puede tocar ninguna vista del tablero: es estrictamente aditivo.
@@ -36,21 +36,34 @@ import { ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente } from "../lib/us
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
  * vistazo lo que este asistente sabe hacer.
  *
- * Tres detalles que no son casuales:
+ * Cuatro detalles que no son casuales:
  *
- *  - Las fechas van en RELATIVO. El ejemplo anterior decía «el 25 de marzo de
- *    2025» y a los pocos meses enseñaba a preguntar por un día que ya no le
- *    importaba a nadie.
- *  - La máquina es la Línea 1 porque es la única con historia en el
- *    historiador (`IA_MAQUINAS_CON_HISTORIA`), y un ejemplo que falla al
- *    pulsarlo enseña lo contrario de lo que pretende.
+ *  - Los períodos van en RELATIVO, y además en HORAS. Un ejemplo anterior
+ *    decía «el 25 de marzo de 2025» y a los pocos meses enseñaba a preguntar
+ *    por un día que ya no le importaba a nadie. Y aquí lo que se vigila es una
+ *    tendencia en curso, no el cierre de un día: la pregunta natural sobre un
+ *    tanque es «cómo va yendo», no «cuánto produjo el martes».
+ *  - Las señales de los ejemplos son las que **tienen historia** —nivel,
+ *    temperatura, caudal, presión—, porque un ejemplo que falla al pulsarlo
+ *    enseña lo contrario de lo que pretende. La carga del motor y la
+ *    eficiencia no aparecen aquí por eso.
+ *  - El primero no nombra ninguna señal a propósito: es el que enseña que se
+ *    puede preguntar en vago y que la respuesta llega igual.
  *  - Están escritos como los escribiría un operador, no como un comando.
+ *
+ * ── EL CUARTO DICE «HACE SEIS HORAS» Y NO «HACE SEIS» ──────────────
+ *
+ * Probado contra el modelo: con el ejemplo escrito «…con la de hace seis», el
+ * 4B copió literalmente `periodoB: "hace seis"` —hace lo correcto, que es
+ * pasar el texto tal cual— y el resolvedor no tenía forma de saber seis QUÉ.
+ * El ejemplo fallaba al pulsarlo, que es justo lo que un ejemplo no puede
+ * hacer. El sustantivo se queda.
  */
 const SUGERENCIAS = [
-  "¿Cómo va la planta ahora mismo?",
-  "¿Está operando la Línea 1?",
-  "¿Cuál fue el OEE de la Línea 1 ayer?",
-  "Compara ayer con anteayer en la Línea 1",
+  "¿Cómo va la instalación ahora mismo?",
+  "¿Qué nivel tiene el tanque?",
+  "¿Cómo ha ido la temperatura estas últimas horas?",
+  "Compara la presión de esta hora con la de hace seis horas",
 ];
 
 /**
@@ -218,7 +231,7 @@ export function Asistente() {
   return (
     <section
       role="dialog"
-      aria-label="Asistente de planta"
+      aria-label="Asistente de la instalación"
       style={{
         position: "fixed", right: 24, bottom: 24, zIndex: 60,
         width: "min(420px, calc(100vw - 48px))", height: "min(560px, calc(100vh - 48px))",
@@ -234,7 +247,7 @@ export function Asistente() {
         }}
       >
         <Bot size={17} color={t.accent} />
-        <strong style={{ flex: 1, fontSize: 13.5, color: t.text }}>Asistente de planta</strong>
+        <strong style={{ flex: 1, fontSize: 13.5, color: t.text }}>Asistente de la instalación</strong>
 
         <button
           type="button" onClick={limpiar} disabled={ocupado || !mensajes.length}
@@ -340,22 +353,33 @@ export function Asistente() {
 }
 
 /**
- * Lo primero que se ve. Dice qué se puede preguntar y, sobre todo, qué NO:
- * que solo algunas máquinas tienen historia es la limitación con la que se
- * tropieza cualquiera en la segunda pregunta.
+ * Lo primero que se ve. Dice qué se puede preguntar y, sobre todo, qué NO.
+ *
+ * Aquí las limitaciones son dos y las dos se encuentran pronto, así que se
+ * cuentan antes de que muerdan:
+ *
+ *  - **Sólo cuatro de las ocho señales tienen historia.** Es la limitación con
+ *    la que tropieza cualquiera en la segunda pregunta, igual que pasaba con
+ *    las máquinas sin historiar en el tablero de Resonac.
+ *  - **Los límites son nuestros.** El servidor no publica alarmas para este
+ *    árbol y las bandas contra las que se dice «en aviso» son estimaciones sin
+ *    confirmar. La vista de Planta ya lo rotula; el chat, que es donde la cifra
+ *    se lee suelta y sin la banda al lado, lo tiene que decir también.
  *
  * Los ejemplos van como botones y no como prosa porque son, literalmente, las
- * cuatro cosas que este asistente sabe hacer: leídos se olvidan, pulsados se
- * aprenden.
+ * cosas que este asistente sabe hacer: leídos se olvidan, pulsados se aprenden.
  */
 function Bienvenida({ t, ocupado, onPreguntar }) {
   return (
     <div style={{ fontSize: 12.5, color: t.textSoft, lineHeight: 1.6 }}>
-      Pregunta por el estado de una máquina o por el OEE de un día pasado.
+      Pregunta por el estado del sistema de agua o por cómo ha evolucionado una
+      de sus señales.
       <div style={{ marginTop: 8, color: t.textFaint }}>
-        Las respuestas salen de ICONICS, no de la memoria del modelo. Los datos
-        históricos solo existen para algunas máquinas; si preguntas por otra, te
-        lo dirá en vez de inventarlo.
+        Las respuestas salen de ICONICS, no de la memoria del modelo. Sólo cuatro
+        de las ocho señales tienen historia —nivel, temperatura, caudal y
+        presión—; si preguntas por el pasado de otra, te lo dirá en vez de
+        inventarlo. Los límites con los que se juzga cada valor son estimaciones
+        nuestras, no rangos confirmados de la instalación.
       </div>
 
       <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />

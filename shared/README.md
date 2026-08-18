@@ -39,6 +39,41 @@ desplegar.
 | `domain/estado.js` | El enum de estados de ICONICS |
 | `domain/history.js` | `daySummary()`: reduce un día del historiador a la forma de una `Machine` |
 
+### `eva/` · el sistema de agua industrial
+
+Lo de arriba describe la planta de Resonac. `eva/` es la otra instalación del
+mismo servidor —`ac:TDCON/DEMO/SENSORES/`, ocho señales planas sin OEE, sin
+máquinas y sin producción— y **no comparte ni un archivo con ella**: no es el
+mismo dominio con otros nombres, es otra forma de datos. Ver
+[`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
+
+| Archivo | Qué contiene |
+|---|---|
+| `eva/senales.js` | Contrato con ICONICS: las 8 señales, sus tags y **cuáles tienen serie propia** |
+| `eva/umbrales.js` | Las bandas y su declaración de procedencia (`PROVISIONALES`) |
+| `eva/estado.js` | Los 5 estados DERIVADOS y su agregación. Vocabulario distinto del de Resonac a propósito |
+| `eva/activos.js` | Los 4 activos, derivados del campo `activo` de las señales |
+| `eva/sistema.js` | `createSistema()`: saneamiento y evaluación en la frontera |
+| `eva/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
+
+Estos seis vivían en `react-dashboard/src/Demo-EVA/domain/` y subieron aquí
+cuando el asistente pasó a responder sobre esta instalación. Es literalmente el
+caso que abre este documento: las herramientas de `backend/ia/` necesitan
+exactamente las mismas reglas que las vistas, y había que elegir entre duplicar
+o compartir.
+
+Aquí duplicar habría sido peor que en Resonac. **A tres de las ocho señales el
+historiador les devuelve la serie de otra, y responde `ok: true`.** La única
+defensa es el campo `historizado` del catálogo; dos copias del catálogo son dos
+oportunidades de que una se quede atrás, y el síntoma no sería una cifra
+distinta entre el chat y el tablero —sería el chat contando la temperatura del
+tanque bajo el nombre «carga del motor», con marcas de tiempo correctas y sin
+un solo error en el log.
+
+En `Demo-EVA/domain/` quedan cinco reexports de una línea, para que el módulo
+conserve su regla de importar siempre como `@/Demo-EVA/…`. Es lo mismo que hace
+`react-dashboard/src/lib/domain/index.js` con el dominio de Resonac.
+
 ## Reglas
 
 **JavaScript puro.** Ni `fetch`, ni `import.meta.env`, ni DOM, ni React, ni

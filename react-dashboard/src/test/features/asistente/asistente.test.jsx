@@ -162,10 +162,10 @@ describe("una respuesta", () => {
       habilitado: true,
       eventos: [
         { tipo: "estado", valor: "Consultando ICONICS…" },
-        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "herramienta", nombre: "historia_de_senal" },
         { tipo: "texto", delta: "El OEE fue del " },
         { tipo: "texto", delta: "62,4 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ],
     });
     montar();
@@ -178,9 +178,9 @@ describe("una respuesta", () => {
     backend({
       habilitado: true,
       eventos: [
-        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "herramienta", nombre: "historia_de_senal" },
         { tipo: "texto", delta: "62,4 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ],
     });
     montar();
@@ -191,17 +191,17 @@ describe("una respuesta", () => {
     await waitFor(() => expect(screen.getByText("Leyó el historiador")).toBeTruthy());
   });
 
-  it("dice también CON QUÉ se consultó: máquina y período", async () => {
+  it("dice también CON QUÉ se consultó: señal y período", async () => {
     backend({
       habilitado: true,
       eventos: [
         {
           tipo: "herramienta",
-          nombre: "datos_de_maquina",
-          argumentos: { maquina: "Línea 1", periodo: "ayer" },
+          nombre: "historia_de_senal",
+          argumentos: { senal: "nivel del tanque", periodo: "ayer" },
         },
         { tipo: "texto", delta: "62,4 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ],
     });
     montar();
@@ -211,7 +211,7 @@ describe("una respuesta", () => {
     // una en la que el modelo entendió otra máquina u otro día. Los
     // argumentos con los que llamó a la herramienta sí.
     await waitFor(() =>
-      expect(screen.getByText("Leyó el historiador · Línea 1 · ayer")).toBeTruthy()
+      expect(screen.getByText("Leyó el historiador · nivel del tanque · ayer")).toBeTruthy()
     );
   });
 
@@ -246,9 +246,9 @@ describe("una respuesta", () => {
     backend({
       habilitado: true,
       eventos: [
-        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "herramienta", nombre: "historia_de_senal" },
         { tipo: "texto", delta: "Fue del 61,9 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ],
     });
     montar();
@@ -294,9 +294,9 @@ describe("una respuesta", () => {
     backendPorTurnos([
       enCurso.respuesta,
       flujo([
-        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "herramienta", nombre: "historia_de_senal" },
         { tipo: "texto", delta: "Fue del 58,1 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ]),
     ]);
     montar();
@@ -341,9 +341,9 @@ describe("cuando la espera se tuerce", () => {
     backendPorTurnos([
       enCurso.respuesta,
       flujo([
-        { tipo: "herramienta", nombre: "datos_de_maquina" },
+        { tipo: "herramienta", nombre: "historia_de_senal" },
         { tipo: "texto", delta: "Fue del 61,9 %." },
-        { tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false },
+        { tipo: "fin", herramienta: "historia_de_senal", bloqueada: false },
       ]),
     ]);
     montar();
@@ -378,7 +378,7 @@ describe("cuando la espera se tuerce", () => {
     // natural; sin aviso, la respuesta se queda ahí sin que nadie la lea.
     fireEvent.click(screen.getByLabelText("Cerrar el asistente"));
     enCurso.emitir({ tipo: "texto", delta: "62,4 %." });
-    enCurso.emitir({ tipo: "fin", herramienta: "datos_de_maquina", bloqueada: false });
+    enCurso.emitir({ tipo: "fin", herramienta: "historia_de_senal", bloqueada: false });
     enCurso.cerrar();
 
     expect(await screen.findByLabelText(/La respuesta está lista/)).toBeTruthy();
@@ -390,9 +390,9 @@ describe("los ejemplos", () => {
     backend({
       habilitado: true,
       eventos: [
-        { tipo: "herramienta", nombre: "estado_de_planta" },
-        { tipo: "texto", delta: "La planta va al 58 %." },
-        { tipo: "fin", herramienta: "estado_de_planta", bloqueada: false },
+        { tipo: "herramienta", nombre: "estado_del_sistema" },
+        { tipo: "texto", delta: "La instalación está en banda, al 58 %." },
+        { tipo: "fin", herramienta: "estado_del_sistema", bloqueada: false },
       ],
     });
     montar();
@@ -400,10 +400,10 @@ describe("los ejemplos", () => {
 
     // Parece un botón de preguntar: pedir un segundo gesto para lo que ya se
     // había pulsado sobra.
-    fireEvent.click(screen.getByText("¿Cómo va la planta ahora mismo?"));
+    fireEvent.click(screen.getByText("¿Cómo va la instalación ahora mismo?"));
 
     await waitFor(() => expect(enviados.length).toBe(1));
-    expect(enviados[0].pregunta).toBe("¿Cómo va la planta ahora mismo?");
+    expect(enviados[0].pregunta).toBe("¿Cómo va la instalación ahora mismo?");
     await waitFor(() => expect(screen.getByText(/58 %/)).toBeTruthy());
   });
 
@@ -413,13 +413,13 @@ describe("los ejemplos", () => {
     fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
 
     const campo = screen.getByLabelText("Escribe tu pregunta");
-    fireEvent.change(campo, { target: { value: "¿OEE de la Línea 1 el" } });
-    fireEvent.click(screen.getByText("¿Está operando la Línea 1?"));
+    fireEvent.change(campo, { target: { value: "¿qué presión tiene la re" } });
+    fireEvent.click(screen.getByText("¿Qué nivel tiene el tanque?"));
 
     await waitFor(() => expect(enviados.length).toBe(1));
-    expect(enviados[0].pregunta).toBe("¿Está operando la Línea 1?");
+    expect(enviados[0].pregunta).toBe("¿Qué nivel tiene el tanque?");
     // La pregunta que va es la del ejemplo, pero tirar lo que alguien estaba
     // escribiendo no es asunto de un botón de ayuda.
-    expect(campo.value).toBe("¿OEE de la Línea 1 el");
+    expect(campo.value).toBe("¿qué presión tiene la re");
   });
 });
