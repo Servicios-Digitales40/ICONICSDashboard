@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-18T00:00:00.000Z",
+  "title": "Design System: Demo EVA",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Azul Señal",
+        "canonical": "oklch(51.5% 0.215 268.2)",
+        "darkPair": "#5C82F5",
+        "tonalRamp": [
+          "oklch(15.0% 0.172 268.2)",
+          "oklch(26.0% 0.215 268.2)",
+          "oklch(37.0% 0.215 268.2)",
+          "oklch(48.0% 0.215 268.2)",
+          "oklch(59.0% 0.215 268.2)",
+          "oklch(70.0% 0.215 268.2)",
+          "oklch(82.0% 0.215 268.2)",
+          "oklch(95.0% 0.097 268.2)"
+        ]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Verde Instrumento",
+        "canonical": "oklch(58.5% 0.117 164.2)",
+        "darkPair": "#3ED9A5",
+        "tonalRamp": [
+          "oklch(15.0% 0.094 164.2)",
+          "oklch(26.0% 0.117 164.2)",
+          "oklch(37.0% 0.117 164.2)",
+          "oklch(48.0% 0.117 164.2)",
+          "oklch(59.0% 0.117 164.2)",
+          "oklch(70.0% 0.117 164.2)",
+          "oklch(82.0% 0.117 164.2)",
+          "oklch(95.0% 0.053 164.2)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Ámbar Atención",
+        "canonical": "oklch(69.9% 0.147 67.8)",
+        "darkPair": "#E5A93C",
+        "tonalRamp": [
+          "oklch(15.0% 0.117 67.8)",
+          "oklch(26.0% 0.147 67.8)",
+          "oklch(37.0% 0.147 67.8)",
+          "oklch(48.0% 0.147 67.8)",
+          "oklch(59.0% 0.147 67.8)",
+          "oklch(70.0% 0.147 67.8)",
+          "oklch(82.0% 0.147 67.8)",
+          "oklch(95.0% 0.066 67.8)"
+        ]
+      },
+      "coral": {
+        "role": "secondary",
+        "displayName": "Coral Alarma",
+        "canonical": "oklch(62.2% 0.168 32.5)",
+        "darkPair": "#E37A63",
+        "tonalRamp": [
+          "oklch(15.0% 0.135 32.5)",
+          "oklch(26.0% 0.168 32.5)",
+          "oklch(37.0% 0.168 32.5)",
+          "oklch(48.0% 0.168 32.5)",
+          "oklch(59.0% 0.168 32.5)",
+          "oklch(70.0% 0.168 32.5)",
+          "oklch(82.0% 0.168 32.5)",
+          "oklch(95.0% 0.076 32.5)"
+        ]
+      },
+      "violet": {
+        "role": "tertiary",
+        "displayName": "Violeta Contexto",
+        "canonical": "oklch(55.7% 0.209 292.6)",
+        "darkPair": "#A98CF0",
+        "tonalRamp": [
+          "oklch(15.0% 0.167 292.6)",
+          "oklch(26.0% 0.209 292.6)",
+          "oklch(37.0% 0.209 292.6)",
+          "oklch(48.0% 0.209 292.6)",
+          "oklch(59.0% 0.209 292.6)",
+          "oklch(70.0% 0.209 292.6)",
+          "oklch(82.0% 0.209 292.6)",
+          "oklch(95.0% 0.094 292.6)"
+        ]
+      },
+      "text-soft": {
+        "role": "neutral",
+        "displayName": "Tinta Suave",
+        "canonical": "oklch(50.1% 0.025 259.2)",
+        "darkPair": "#9AA4B8",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 259.2)",
+          "oklch(26.0% 0.025 259.2)",
+          "oklch(37.0% 0.025 259.2)",
+          "oklch(48.0% 0.025 259.2)",
+          "oklch(59.0% 0.025 259.2)",
+          "oklch(70.0% 0.025 259.2)",
+          "oklch(82.0% 0.025 259.2)",
+          "oklch(95.0% 0.011 259.2)"
+        ]
+      },
+      "viz-azul": {
+        "role": "data",
+        "displayName": "Azul de dato",
+        "canonical": "#7B95F5",
+        "darkPair": "#8AB4FF",
+        "note": "Paleta de datos, no de interfaz. Validada para protanopía, deuteranopía y tritanopía."
+      },
+      "viz-verde": {
+        "role": "data",
+        "displayName": "Verde de dato",
+        "canonical": "#35B894",
+        "darkPair": "#6EE7B7",
+        "note": "Su separación frente a viz-ambar es la más frágil de la paleta; revalidar al tocarla."
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Encabezado de sección, siempre junto a la barrita de marca." },
+      "headline": { "displayName": "Headline", "purpose": "Título de panel; techo tipográfico dentro de una tarjeta." },
+      "body": { "displayName": "Body", "purpose": "Texto de la aplicación y tamaño de todos los controles." },
+      "caption": { "displayName": "Caption", "purpose": "Subtítulo y texto auxiliar, en Tinta Tenue." },
+      "label": { "displayName": "Label", "purpose": "Identidad de máquina: tags, códigos, marcas de tiempo." }
+    },
+    "shadows": [
+      {
+        "name": "ambiental",
+        "value": "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06)",
+        "purpose": "Reposo de toda tarjeta. Un contacto de 1px más una difusa amplia.",
+        "darkValue": "0 1px 2px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.28)"
+      },
+      {
+        "name": "elevada",
+        "value": "0 4px 10px rgba(16,24,40,0.06), 0 16px 40px rgba(54,84,224,0.12)",
+        "purpose": "Hover de tarjeta. La capa amplia va teñida del azul de marca.",
+        "darkValue": "0 4px 14px rgba(0,0,0,0.32), 0 20px 44px rgba(92,130,245,0.20)"
+      },
+      {
+        "name": "halo-boton",
+        "value": "0 4px 14px rgba(54,84,224,0.30)",
+        "purpose": "Bajo el botón primario y el de peligro sólido."
+      },
+      {
+        "name": "anillo-foco",
+        "value": "0 0 0 3px #EEF0FD",
+        "purpose": "Campo con foco, junto al cambio de color de borde."
+      }
+    ],
+    "motion": [
+      { "name": "ease-superficie", "value": "0.25s ease", "purpose": "Transición de fondo, borde, sombra y transform en tarjetas." },
+      { "name": "ease-control", "value": "0.15s ease", "purpose": "Chips y controles pequeños." },
+      { "name": "ease-metrica", "value": "0.2s ease", "purpose": "Transform y sombra de las tarjetas de métrica." },
+      { "name": "entrada-panel", "value": "fadeInUp 0.5s ease both", "purpose": "Entrada de panel, con retraso escalonado de 0 a 0.4s." },
+      { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce)", "purpose": "Anula duración, iteración Y animation-delay; sin lo último, las entradas escalonadas se quedan congeladas en opacidad 0." }
+    ],
+    "breakpoints": [
+      { "name": "planta-columna", "value": "720px" },
+      { "name": "espejo-apilado", "value": "900px" },
+      { "name": "planta-rejilla", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "La única acción principal de una vista. Único elemento con gradiente y sombra a la vez.",
+      "html": "<button class=\"ds-btn-primary\">Consultar</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 7px; background: linear-gradient(135deg, #3654E0 0%, #6C86F0 100%); color: #FFFFFF; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 16px; border: none; border-radius: 9px; box-shadow: 0 4px 14px rgba(54,84,224,0.30); cursor: pointer; transition: transform 0.15s ease; } .ds-btn-primary:hover { transform: translateY(-1px); } .ds-btn-primary:active { transform: translateY(0); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px #EEF0FD, 0 4px 14px rgba(54,84,224,0.30); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acción alternativa. Transparente con borde de 1px; no compite con la primaria.",
+      "html": "<button class=\"ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 7px; background: transparent; color: #111528; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 16px; border: 1px solid #E7EAF0; border-radius: 9px; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease; } .ds-btn-secondary:hover { transform: translateY(-1px); background: #F1F3F8; } .ds-btn-secondary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Danger Button (tinted)",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Acción destructiva no confirmada: el semántico al 9% como fondo y como texto. El relleno sólido se reserva a la confirmación.",
+      "html": "<button class=\"ds-btn-danger\">Descartar</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; gap: 7px; background: rgba(217,87,63,0.09); color: #D9573F; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 9px 16px; border: none; border-radius: 9px; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease; } .ds-btn-danger:hover { transform: translateY(-1px); background: rgba(217,87,63,0.16); } .ds-btn-danger:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "Cuadrado de 9px de padding para acciones sin rótulo en cabeceras de panel.",
+      "html": "<button class=\"ds-btn-icon\" aria-label=\"Actualizar\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M3 21v-5h5\"/></svg></button>",
+      "css": ".ds-btn-icon { display: inline-flex; align-items: center; justify-content: center; background: #F1F3F8; color: #5B6472; padding: 9px; border: none; border-radius: 9px; cursor: pointer; transition: transform 0.15s ease, color 0.15s ease; } .ds-btn-icon:hover { transform: translateY(-1px); color: #111528; } .ds-btn-icon:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campo con icono a la izquierda. El foco es anillo de 3px más borde de marca.",
+      "html": "<div class=\"ds-field-wrap\"><svg class=\"ds-field-icon\" width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input class=\"ds-field\" type=\"text\" placeholder=\"Buscar un asset\"></div>",
+      "css": ".ds-field-wrap { position: relative; display: block; } .ds-field-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: #8A93A3; } .ds-field { width: 100%; box-sizing: border-box; background: #F1F3F8; border: 1px solid #E7EAF0; border-radius: 9px; padding: 9px 12px 9px 32px; font-family: 'Inter', sans-serif; font-size: 13px; color: #111528; } .ds-field::placeholder { color: #8A93A3; } .ds-field:focus { outline: none; border-color: #3654E0; box-shadow: 0 0 0 3px #EEF0FD; }"
+    },
+    {
+      "name": "Panel Card",
+      "kind": "card",
+      "refersTo": "panel-card",
+      "description": "El contenedor de todo. Cabecera con título y código de máquina, sombra ambiental en reposo y elevación teñida en hover.",
+      "html": "<div class=\"ds-panel\"><div class=\"ds-panel-head\"><div><h3 class=\"ds-panel-title\">Nivel del tanque</h3><span class=\"ds-panel-code\">ac:TDCON/DEMO/SENSORES/NIVEL</span></div></div><div class=\"ds-panel-body\">78 %</div></div>",
+      "css": ".ds-panel { background: #FFFFFF; border: 1px solid #E7EAF0; border-radius: 16px; padding: 20px 22px 24px; box-shadow: 0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06); transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease; } .ds-panel:hover { box-shadow: 0 4px 10px rgba(16,24,40,0.06), 0 16px 40px rgba(54,84,224,0.12); transform: translateY(-2px); } .ds-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #E7EAF0; } .ds-panel-title { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 600; color: #111528; } .ds-panel-code { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #8A93A3; } .ds-panel-body { font-family: 'Inter', sans-serif; font-size: 13px; color: #111528; }"
+    },
+    {
+      "name": "Section Label",
+      "kind": "custom",
+      "refersTo": "section-label",
+      "description": "Marca de agua del sistema: barrita de gradiente más título. Separa bloques sin usar una línea horizontal.",
+      "html": "<div class=\"ds-section\"><div class=\"ds-section-row\"><span class=\"ds-section-bar\"></span><h2 class=\"ds-section-title\">Señales en vivo</h2></div><p class=\"ds-section-sub\">Ocho puntos bajo ac:TDCON/DEMO/SENSORES/</p></div>",
+      "css": ".ds-section { margin: 30px 0 14px; } .ds-section-row { display: flex; align-items: center; gap: 8px; } .ds-section-bar { width: 5px; height: 16px; border-radius: 3px; background: linear-gradient(135deg, #3654E0 0%, #6C86F0 100%); } .ds-section-title { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 16px; font-weight: 700; color: #111528; } .ds-section-sub { margin: 4px 0 0 13px; font-family: 'Inter', sans-serif; font-size: 12.5px; color: #8A93A3; }"
+    },
+    {
+      "name": "Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Ítem del sidebar. El activo se marca con el azul tenue de fondo y el azul de marca en texto e icono.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-active\" href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\"/></svg>Planta</a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m21 16-9 5-9-5V8l9-5 9 5z\"/><path d=\"m3.3 7 8.7 5 8.7-5\"/><path d=\"M12 22V12\"/></svg>Assets</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; background: #FFFFFF; padding: 8px; } .ds-nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; color: #5B6472; text-decoration: none; transition: background 0.15s ease, color 0.15s ease; } .ds-nav-item:hover:not(.ds-nav-active) { background: #F1F3F8; color: #111528; } .ds-nav-active { background: #EEF0FD; color: #3654E0; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Gemelo Digital",
+    "overview": "La instalación de agua existe dos veces: como geometría en las vistas 3D y como número en las tablas y las series. El sistema visual entero está construido sobre la idea de que ambas son la misma verdad vista de dos formas, nunca dos aplicaciones cosidas. Un valor que sube en la gráfica es el mismo que llena el tanque de la maqueta, y el diseño debe hacer evidente ese parentesco: los mismos colores semánticos gobiernan el 3D y el 2D, y una lectura fuera de banda se ve coral en los dos sitios.\n\nLa personalidad es instrumental y contenida. El fondo es un gris-azulado casi blanco sobre el que flotan superficies blancas de esquina generosa; el color aparece poco y siempre significa algo. La densidad es media-alta —cuerpo de 13px, padding de 9/16— porque el escenario real es un portátil o un monitor de escritorio a distancia de lectura, no una pantalla de pared. El modo oscuro no es el claro invertido: es una segunda selección hecha contra su propio fondo.\n\nEl movimiento es de entrada y de respuesta, nunca decorativo: los paneles suben al aparecer en cascada corta y se levantan 2px cuando el cursor los toca. Todo ello se apaga bajo prefers-reduced-motion.",
+    "keyCharacteristics": [
+      "Superficie blanca sobre fondo gris-azulado; la jerarquía nace del tono, no del peso.",
+      "Un solo azul de marca, casi siempre en gradiente de 135°, reservado a lo accionable.",
+      "Tres tipografías con trabajos disjuntos: geométrica para títulos, neogrotesca para texto, monoespaciada para identificadores de máquina.",
+      "Esquinas de dos tamaños: 16px para contenedores, 9px para controles.",
+      "Dos paletas separadas por función: la de interfaz y la de datos (viz)."
+    ],
+    "rules": [
+      { "name": "La Regla de las Dos Paletas", "body": "Los tokens de interfaz (accent, amber, coral…) nunca se usan como color de dato, y los de viz nunca se usan como color de interfaz. Los primeros están afinados para convivir con texto y salen apagados como relleno; los segundos son pastel y no tienen contraste para servir de texto o borde. Un token viz en un botón es un error de sistema, no una preferencia.", "section": "colors" },
+      { "name": "La Regla del Color con Significado", "body": "Verde, ámbar y coral solo aparecen cuando una señal está en ese estado. Un panel no es verde porque quede bien. El azul es la única excepción: marca lo accionable, no lo saludable.", "section": "colors" },
+      { "name": "La Regla de la Segunda Selección", "body": "El modo oscuro no se deriva del claro aclarando u oscureciendo valores. Cada token oscuro se eligió contra #0B0E16. Añadir un color al tema claro obliga a elegir su pareja oscura a mano, en themes.js, y a revalidar contraste y separación por daltonismo — la más frágil es ámbar contra verde.", "section": "colors" },
+      { "name": "La Regla de la Máquina en Monoespaciada", "body": "Todo lo que un humano no escribió —nombre de tag, código de asset, marca de tiempo, valor crudo de calidad— va en IBM Plex Mono. Es lo que permite leer una pantalla de Assets sin confundir un rótulo con un identificador.", "section": "typography" },
+      { "name": "La Regla del Techo de 16px", "body": "Ningún texto de la aplicación pasa de 16px. La jerarquía se construye con peso, familia y color, no con tamaño: el escenario es un monitor a distancia de lectura y el espacio vertical se gasta en datos.", "section": "typography" },
+      { "name": "La Regla del Media Query Adyacente", "body": "Un breakpoint vive junto al layout que gobierna, con un comentario que explique por qué ese ancho y no otro. No hay una tabla global de breakpoints, y no debe crearse.", "section": "layout" },
+      { "name": "La Regla de la Sombra Teñida", "body": "La sombra de hover se pasa a la tarjeta como custom property inline (--shadow-hover) desde el componente, no desde CSS global, para que cada tarjeta pueda llevar el tinte que le corresponda. El CSS solo declara la transición y el translateY.", "section": "elevation" },
+      { "name": "La Regla del Levantamiento Corto", "body": "El hover eleva 2px (tarjeta), 3px (métrica) o 1px (botón). Nunca más: es acuse de recibo, no animación.", "section": "elevation" },
+      { "name": "La Regla de los Dos Radios", "body": "16px contiene, 9px se pulsa. Un radio nuevo necesita justificarse contra esos dos; un valor intermedio (10px, 12px) rompe la lectura del sistema sin aportar nada.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do pedir el color a useTheme() (t.accent, t.viz.azul). Un hexadecimal literal en un componente es la forma en que este sistema se rompe.",
+      "Do usar 16px de radio para lo que contiene y 9px para lo que se pulsa.",
+      "Do poner en IBM Plex Mono todo identificador que venga del servidor.",
+      "Do declarar el @media junto al layout que gobierna, con el porqué del ancho.",
+      "Do dejar sin unidad los valores cuyo tag no la declara: cuatro de las ocho señales no tienen unidad y el diseño debe verse bien sin sufijo.",
+      "Do revalidar contraste y daltonismo al tocar la paleta viz, empezando por la separación ámbar/verde.",
+      "Do apagar toda animación bajo prefers-reduced-motion, incluidos los animation-delay."
+    ],
+    "donts": [
+      "Don't usar un color de viz en un botón, un borde o un texto, ni un token de interfaz como relleno de gráfica.",
+      "Don't pintar de verde, ámbar o coral nada que no esté en ese estado.",
+      "Don't derivar el tema oscuro del claro por fórmula; cada valor se elige contra su fondo.",
+      "Don't pasar de 16px en ningún texto ni introducir un cuarto nivel de tinta.",
+      "Don't añadir un radio intermedio (10px, 12px) ni un borde de más de 1px.",
+      "Don't elevar más de 3px en hover, ni poner sombra a un elemento que no sea tarjeta, botón primario o campo con foco.",
+      "Don't introducir affordances de escritura o borrado: el backend es de solo lectura y un botón que no cumple es peor que su ausencia."
+    ]
+  }
+}

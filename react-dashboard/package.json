@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "design:detect": "npx -y impeccable@3 detect src index.html",
+    "design:detect:json": "npx -y impeccable@3 detect --json src index.html"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
