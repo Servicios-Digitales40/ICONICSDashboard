@@ -30,9 +30,9 @@ const SUAVIZADO = 6;
 /** Apertura máxima de la puerta, en radianes (~100°). */
 const APERTURA = 1.75;
 
-const ANCHO = 0.9;
-const ALTO = 1.5;
-const FONDO = 0.42;
+const ANCHO = 1.15;
+const ALTO = 1.0;
+const FONDO = 0.6;
 
 export default function ArmarioModel({ descriptor, abierto = false, detalle = true, ...props }) {
   const P = usePaleta3D();

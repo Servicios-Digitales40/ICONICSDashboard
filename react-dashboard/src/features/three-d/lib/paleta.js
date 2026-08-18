@@ -35,6 +35,14 @@ export function construirPaleta(theme, dark) {
     // Cuerpo de la máquina. No son tokens de interfaz: una carcasa industrial
     // pintada con `theme.panel` se funde con el fondo y la silueta se pierde.
     carcasa: dark ? "#8E99AE" : "#B9C1D0",
+    // El depósito es azul en el equipo real, y es lo primero por lo que se
+    // reconoce. Va aquí y no en el modelo porque es color de escena, no de
+    // estado: el tinte del estado se le aplica encima con `tono()`.
+    deposito: dark ? "#2F63C4" : "#27549F",
+    // El cabezal del sensor de nivel. Turquesa porque lo es en el equipo, y
+    // porque conviene que se distinga del resto del inoxidable: es la pieza que
+    // explica de dónde sale el número que mueve el líquido de la columna.
+    sensor: dark ? "#4CC7DF" : "#2C9EBC",
     carcasaOscura: dark ? "#5A6478" : "#8892A6",
     metal: dark ? "#C7CEDC" : "#9AA3B4",
     goma: dark ? "#2A3140" : "#3C4353",

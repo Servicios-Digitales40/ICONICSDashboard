@@ -3,6 +3,12 @@
 La aplicación, sobre `ac:TDCON/DEMO/SENSORES/`, un árbol **real** del servidor
 ICONICS. Cuatro subvistas: Planta, Máquina 3D, Maqueta 3D y Assets.
 
+La **Maqueta 3D** reproduce el skid real, a partir de un dibujo del equipo que
+está en [`react-dashboard/img/`](../../img/). Hubo brevemente una quinta vista
+que dibujaba esa misma instalación en SVG, para comparar los dos medios; se
+comparó y ganó la maqueta. El porqué, y lo que la comparación dejó en el
+código, está en [`docs/PLAN-10-VISTA-SVG.md`](../../../docs/PLAN-10-VISTA-SVG.md).
+
 Nació como una sección más dentro del tablero de OEE de Resonac; en agosto de
 2026 aquél se retiró y esto pasó a ser todo lo que hay. De ahí que el módulo
 siga siendo una isla autocontenida: las convenciones de más abajo son las que

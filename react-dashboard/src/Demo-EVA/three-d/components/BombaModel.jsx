@@ -40,6 +40,16 @@ export default function BombaModel({
   rpm = 0,
   /** Presión en 0-1 sobre su escala, o `null` si no hay medición. */
   presionPct = null,
+  /**
+   * ¿Se dibuja el manómetro?
+   *
+   * En la vista «Máquina 3D» sí: allí el sujeto es el grupo de bombeo y el
+   * manómetro de descarga forma parte de él. En la maqueta no, porque la
+   * presión se mide en la válvula de aguas abajo y allí es donde tiene su
+   * tarjeta: enseñar la misma cifra en dos sitios de una misma escena no
+   * informa el doble, sólo obliga a comprobar que dicen lo mismo.
+   */
+  manometro = true,
   detalle = true,
   ...props
 }) {
@@ -147,7 +157,7 @@ export default function BombaModel({
       </mesh>
 
       {/* Manómetro en la impulsión, que es donde va en una instalación real. */}
-      {detalle && (
+      {detalle && manometro && (
         <group position={[0.52, 1.22, 0.14]}>
           <mesh castShadow>
             <cylinderGeometry args={[0.15, 0.15, 0.05, 20]} />

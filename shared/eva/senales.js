@@ -74,6 +74,13 @@ const CATALOGO = [
     escala: { min: 0, max: 100 },
     subirEsBueno: true,
     soloEnMarcha: false,
+    // El sensor está montado ENCIMA DE LA COLUMNA de distribución, no sobre
+    // el bidón de almacenamiento: el porcentaje es el llenado de ese vaso.
+    // Lo confirmó quien conoce la instalación, en agosto de 2026, y hasta
+    // entonces la maqueta 3D lo pintaba dentro del bidón de abajo. La señal
+    // se queda en el activo `tanque` —responde a «¿hay agua, y en qué
+    // condiciones?»— pero se DIBUJA donde se mide.
+    nota: "El sensor de nivel está sobre la columna de distribución, no sobre el depósito.",
   },
   {
     key: "temperaturaTanque",

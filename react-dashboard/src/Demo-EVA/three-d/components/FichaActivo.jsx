@@ -102,6 +102,24 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
           ))}
         </div>
 
+        {/*
+          Las notas del catálogo, que hasta ahora no se pintaban en ningún
+          sitio: existían en `domain/senales.js`, las verificaba una prueba y no
+          las veía nadie.
+          Hacen falta desde que el nivel se dibuja en la columna: quien lea
+          «Nivel 62 %» bajo «Tanque de almacenamiento» y mire el bidón vacío
+          tiene derecho a saber por qué, y la respuesta está escrita en el
+          catálogo desde que se supo.
+        */}
+        {activo.senales.filter((s) => s.nota).map((s) => (
+          <p
+            key={`nota-${s.key}`}
+            style={{ margin: "6px 0 0", fontSize: 10, lineHeight: 1.45, color: t.textFaint }}
+          >
+            {s.corto}: {s.nota}
+          </p>
+        ))}
+
         {onDetalle && (
           <button
             onClick={onDetalle}

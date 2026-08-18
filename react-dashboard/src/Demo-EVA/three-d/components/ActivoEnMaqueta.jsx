@@ -23,8 +23,8 @@ import { comportamiento, comportamientoReducido } from "../lib/comportamiento.js
 import { ALTURA_FICHA } from "../lib/layout.js";
 import ArmarioModel from "./ArmarioModel.jsx";
 import BombaModel from "./BombaModel.jsx";
-import DistribucionModel from "./DistribucionModel.jsx";
-import TanqueModel from "./TanqueModel.jsx";
+import ColumnaModel from "./ColumnaModel.jsx";
+import ValvulaModel from "./ValvulaModel.jsx";
 import FichaActivo, { EtiquetaActivo } from "./FichaActivo.jsx";
 
 /** Radio de la zona de captura del puntero de cada activo. */
@@ -39,8 +39,15 @@ function Modelo({ activo, sistema, descriptor, rpm, detalle }) {
 
   switch (activo.id) {
     case "tanque":
+      /*
+       * La COLUMNA, no el bidón de abajo. Las dos señales de este activo
+       * —nivel y temperatura— las publica la instrumentación montada sobre
+       * ella, así que es donde va su tarjeta y donde se dibuja su nivel. El
+       * bidón lo pinta la vista como parte del skid, sin tarjeta, porque no
+       * publica nada. Ver `LAYOUT` y `DepositoModel`.
+       */
       return (
-        <TanqueModel
+        <ColumnaModel
           descriptor={descriptor}
           nivelPct={senal("nivelTanque").valor}
           detalle={detalle}
@@ -48,22 +55,27 @@ function Modelo({ activo, sistema, descriptor, rpm, detalle }) {
       );
 
     case "bombeo":
+      /*
+       * Sin manómetro: la presión se mide en la válvula, aguas abajo, y ahí se
+       * dibuja. Enseñar la misma cifra en dos sitios de la misma escena no
+       * informa el doble, sólo obliga a comprobar que dicen lo mismo. En la
+       * vista «Máquina 3D» sí lo lleva, porque allí el sujeto es la bomba.
+       */
+      return <BombaModel descriptor={descriptor} rpm={rpm} manometro={false} detalle={detalle} />;
+
+    case "distribucion":
+      /*
+       * La VÁLVULA del tramo de impulsión, no un recipiente: es donde se miden
+       * el caudal y la presión, que son las dos señales de este activo. Lleva
+       * por eso el manómetro que antes iba en la bomba.
+       */
       return (
-        <BombaModel
+        <ValvulaModel
           descriptor={descriptor}
-          rpm={rpm}
+          hayCaudal={!sistema.enReposo && senal("flujoInstantaneo").valor !== null}
           presionPct={
             senal("presionRelativa").valor === null ? null : pctDeEscala(senal("presionRelativa"))
           }
-          detalle={detalle}
-        />
-      );
-
-    case "distribucion":
-      return (
-        <DistribucionModel
-          descriptor={descriptor}
-          hayCaudal={!sistema.enReposo && senal("flujoInstantaneo").valor !== null}
           detalle={detalle}
         />
       );
@@ -96,13 +108,25 @@ export default function ActivoEnMaqueta({
 
   const resaltado = señalado || seleccionado;
 
+  /*
+   * La válvula está montada sobre la tubería, a cuatro metros del suelo, así
+   * que su anillo de selección no puede ser un disco tumbado: quedaría flotando
+   * como una bandeja. Para los que van por el aire el anillo se pone de canto,
+   * mirando al observador, y el halo pasa a ser una esfera.
+   */
+  const aire = pos.aire === true;
+  const alturaFicha = pos.ficha ?? ALTURA_FICHA;
+
   return (
-    <group position={[pos.x, 0, pos.z]} rotation={[0, pos.rotY ?? 0, 0]}>
+    <group position={[pos.x, pos.y ?? 0, pos.z]} rotation={[0, pos.rotY ?? 0, 0]}>
       {/* Anillo de selección en el suelo. Es lo que responde al señalar: mover
           o escalar el activo lo sacaría de la línea del agua, que es justo lo
           que la maqueta usa para organizarse. */}
       {resaltado && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, 0]}>
+        <mesh
+          rotation={aire ? [0, 0, 0] : [-Math.PI / 2, 0, 0]}
+          position={aire ? [0, 0, 0] : [0, 0.014, 0]}
+        >
           <ringGeometry args={[RADIO_CAPTURA + 0.05, seleccionado ? RADIO_CAPTURA + 0.28 : RADIO_CAPTURA + 0.18, 44]} />
           <meshBasicMaterial
             color={seleccionado ? P.accent : colorDeToken(P, descriptor.token)}
@@ -120,8 +144,12 @@ export default function ActivoEnMaqueta({
           `three-d/lib/comportamiento.js`. */}
       {descriptor.halo !== "ninguno" &&
         (descriptor.halo === "doble" ? [0.35, 0.72] : [0.35]).map((extra) => (
-          <mesh key={extra} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]}>
-            <circleGeometry args={[RADIO_CAPTURA + extra, 36]} />
+          <mesh key={extra} rotation={aire ? [0, 0, 0] : [-Math.PI / 2, 0, 0]} position={[0, aire ? 0 : 0.008, 0]}>
+            {aire ? (
+              <sphereGeometry args={[RADIO_CAPTURA * 0.55 + extra, 20, 14]} />
+            ) : (
+              <circleGeometry args={[RADIO_CAPTURA + extra, 36]} />
+            )}
             <meshBasicMaterial
               color={colorDeToken(P, descriptor.token)}
               transparent
@@ -139,13 +167,13 @@ export default function ActivoEnMaqueta({
           translúcidas y estrechas —difíciles de acertar— justo cuando más falta
           hace poder consultarlas. */}
       <mesh
-        position={[0, 0.9, 0]}
+        position={[0, aire ? 0 : 0.9, 0]}
         visible={false}
         onPointerOver={(e) => { e.stopPropagation(); onSeñalar(activo.id); }}
         onPointerOut={(e) => { e.stopPropagation(); onSeñalar(null); }}
         onClick={(e) => { e.stopPropagation(); onSeleccionar(activo.id); }}
       >
-        <cylinderGeometry args={[RADIO_CAPTURA, RADIO_CAPTURA, 2.1, 12]} />
+        <cylinderGeometry args={[RADIO_CAPTURA, RADIO_CAPTURA, aire ? 0.9 : 2.1, 12]} />
       </mesh>
 
       <Modelo activo={activo} sistema={sistema} descriptor={descriptor} rpm={rpm} detalle={detalle} />
@@ -153,12 +181,12 @@ export default function ActivoEnMaqueta({
       {seleccionado ? (
         <FichaActivo
           activo={activo}
-          altura={ALTURA_FICHA}
+          altura={alturaFicha}
           onCerrar={() => onSeleccionar(null)}
           onDetalle={onDetalle ? () => onDetalle(activo.id) : null}
         />
       ) : (
-        señalado && <EtiquetaActivo activo={activo} altura={ALTURA_FICHA - 0.3} />
+        señalado && <EtiquetaActivo activo={activo} altura={alturaFicha - 0.3} />
       )}
     </group>
   );

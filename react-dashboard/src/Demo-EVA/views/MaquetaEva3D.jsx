@@ -6,10 +6,15 @@
  *
  * ── LO QUE HACE QUE ESTA VISTA VALGA LA PENA ───────────────────────
  *
- * El nivel del líquido dentro del tanque **es `SNIVEL_TANQUE` en vivo**. Es el
- * único sitio del proyecto donde la geometría no ilustra el dato: lo ES. Un
- * tanque a un cuarto se distingue de uno lleno desde el otro lado de la sala,
- * sin leer un número y sin saber qué es un tag.
+ * El nivel del líquido dentro de la COLUMNA de distribución **es
+ * `SNIVEL_TANQUE` en vivo**. Es el único sitio del proyecto donde la geometría
+ * no ilustra el dato: lo ES. Un vaso a un cuarto se distingue de uno lleno
+ * desde el otro lado de la sala, sin leer un número y sin saber qué es un tag.
+ *
+ * En la columna y no en el bidón azul de abajo porque **ahí está el sensor**:
+ * el cabezal que remata el vaso es el que publica `SNIVEL_TANQUE`. Hasta agosto
+ * de 2026 el líquido se pintaba en el depósito, que es un recipiente distinto
+ * del que se mide. El depósito no tiene sensor y por eso ahora va vacío.
  *
  * ── QUÉ NO HACE, A PROPÓSITO ───────────────────────────────────────
  *
@@ -32,14 +37,23 @@ import { useSistemaAgua } from "../data/hooks.js";
 import { ESTADOS_ORDEN, estadoInfo } from "../domain/estado.js";
 import { estadoColor } from "../components/paleta.js";
 import ActivoEnMaqueta from "../three-d/components/ActivoEnMaqueta.jsx";
+import BastidorModel from "../three-d/components/BastidorModel.jsx";
+import DepositoModel from "../three-d/components/DepositoModel.jsx";
 import Tuberias from "../three-d/components/Tuberias.jsx";
-import { RADIO_PISO, posicionDe, tramos } from "../three-d/lib/layout.js";
+import { DEPOSITO, RADIO_PISO, posicionDe, tramos } from "../three-d/lib/layout.js";
 import { frameloopDe, rpmDe } from "../three-d/lib/comportamiento.js";
 
+/*
+ * Los tres encuadres, rehechos cuando la instalación pasó de estar repartida
+ * por el suelo a ser un skid de dos niveles: la escena es ahora la mitad de
+ * ancha y el doble de alta, así que las cámaras de antes dejaban el equipo
+ * pequeño y descentrado. El objetivo apunta a media altura del bastidor, que es
+ * donde está la bandeja.
+ */
 const ENCUADRES = {
-  isometrica: { etiqueta: "Isométrica", posicion: [6.5, 5.5, 8.5], objetivo: [-0.2, 0.6, -0.4] },
-  superior: { etiqueta: "Superior", posicion: [0.01, 13, 0.01], objetivo: [-0.2, 0, -0.4] },
-  frontal: { etiqueta: "Frontal", posicion: [-0.2, 2.4, 11], objetivo: [-0.2, 0.9, -0.4] },
+  isometrica: { etiqueta: "Isométrica", posicion: [6.2, 5.2, 7.6], objetivo: [-0.1, 2.1, 0] },
+  superior: { etiqueta: "Superior", posicion: [0.01, 10, 0.01], objetivo: [-0.1, 1.4, 0] },
+  frontal: { etiqueta: "Frontal", posicion: [-0.1, 2.9, 9.2], objetivo: [-0.1, 2.1, 0] },
 };
 
 /** Leyenda de estados, sólo con los que hay ahora mismo en la instalación. */
@@ -106,7 +120,7 @@ function MaquetaEva3D({ params, onNavigate }) {
 
   return (
     <>
-      <SectionLabel sub="Señala un activo para verlo, púlsalo para sus señales · el nivel del tanque es el dato en vivo">
+      <SectionLabel sub="Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide">
         Maqueta 3D · Sistema de agua
       </SectionLabel>
 
@@ -119,7 +133,7 @@ function MaquetaEva3D({ params, onNavigate }) {
       <Escena
         camara={ENCUADRES.isometrica.posicion}
         objetivo={ENCUADRES.isometrica.objetivo}
-        zoom={{ min: 5, max: 26 }}
+        zoom={{ min: 3.5, max: 18 }}
         altura={560}
         frameloop={frameloop}
         extras={<Encuadre preset={encuadre} />}
@@ -127,7 +141,14 @@ function MaquetaEva3D({ params, onNavigate }) {
         {/* Pulsar el suelo cierra la ficha. Sin esto la única forma de cerrarla
             es acertar con la «×», que en una pantalla táctil es pedir demasiado. */}
         <group onPointerMissed={() => setSeleccionado(null)}>
-          <Piso radio={RADIO_PISO} divisiones={15} />
+          <Piso radio={RADIO_PISO} divisiones={10} />
+
+          {/* El bastidor y el depósito primero: lo demás se apoya en ellos, y
+              son lo que hace que las piezas se lean como UNA máquina. Ninguno
+              de los dos es un activo ni cambia nunca de color —el bidón no
+              tiene un solo sensor—; ver sus cabeceras. */}
+          <BastidorModel />
+          <DepositoModel position={[DEPOSITO.x, DEPOSITO.y, DEPOSITO.z]} />
 
           <Tuberias tramos={tramos()} hayCaudal={!sistema.enReposo} />
 
@@ -187,7 +208,8 @@ function MaquetaEva3D({ params, onNavigate }) {
       <p style={{ marginTop: 14, fontSize: 11, color: t.textFaint, lineHeight: 1.6 }}>
         Los colores de estado salen de umbrales locales; ICONICS no publica un
         estado para <code style={{ fontFamily: "'IBM Plex Mono', monospace" }}>ac:TDCON/DEMO/SENSORES/</code>.
-        La disposición reproduce el recorrido del agua, no un plano real de la instalación.
+        La disposición sale de un dibujo del equipo real, con cotas tomadas a
+        ojo sobre una perspectiva: es la del skid, no la de un plano acotado.
       </p>
     </>
   );
