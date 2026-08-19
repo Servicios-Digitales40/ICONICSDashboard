@@ -44,7 +44,11 @@ export function createApp(config) {
   // configurable en esta instalación, es un hecho medido del servidor y vive
   // en el catálogo (`shared/eva/senales.js`, campo `historizado`). Ver la
   // cabecera de `ia/herramientas.mjs`.
-  const herramientas = createHerramientas({ client, turnos: config.ia.turnos })
+  const herramientas = createHerramientas({
+    client,
+    turnos: config.ia.turnos,
+    readOnly: config.iconics.readOnly,
+  })
   const chat = createChat({ config, herramientas })
 
   const router = createRouter()

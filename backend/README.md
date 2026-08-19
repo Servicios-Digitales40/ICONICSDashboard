@@ -137,7 +137,7 @@ backend/
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Las cinco que el modelo puede invocar
+│   ├── herramientas.mjs   Las cuatro que el modelo puede invocar
 │   └── chat.mjs           El bucle de dos pasadas contra llama-server
 │
 └── routes/              Traducción HTTP ↔ cliente
@@ -232,10 +232,14 @@ en curso —llama-server corre con `--parallel 1`, y dos preguntas simultáneas
 tardan el doble las dos—, **400** si la pregunta está vacía o pasa de 2000
 caracteres.
 
-**El asistente no puede escribir.** El registro de herramientas contiene
-cinco lecturas y ninguna escritura, así que `POST /write` no es alcanzable
-desde el chat ni con la instrucción más astuta. `ICONICS_READ_ONLY` sigue
-siendo la última puerta; ésta es la primera.
+**El asistente sólo puede escribir una cosa: encender o apagar la bomba**, con
+la herramienta `controlar_bomba`, que escribe en `ac:TDCON/DEMO/SENSORES/CONTROL`.
+El resto del registro son lecturas; `POST /write` en crudo no es alcanzable
+desde el chat ni con la instrucción más astuta. Dos guardas protegen esa única
+escritura: `ICONICS_READ_ONLY` (la misma que gobierna `/api/iconics/write`) y,
+sólo al encender, el nivel del tanque — por encima del aviso superior de
+`shared/eva/umbrales.js`, la herramienta se niega antes de escribir para no
+arriesgar un desbordamiento.
 
 ### Del propio puente
 
