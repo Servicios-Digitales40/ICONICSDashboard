@@ -46,6 +46,9 @@ colors:
   dark-viz-verde: "#6EE7B7"
   dark-viz-violeta: "#C4A0FC"
   dark-viz-coral: "#FF9B85"
+  mitsubishi-accent: "#C40001"
+  mitsubishi-accent-soft: "#FFF2F2"
+  mitsubishi-accent-gradient-end: "#FF5454"
 typography:
   display:
     fontFamily: "Plus Jakarta Sans, sans-serif"
@@ -180,6 +183,21 @@ solo aparecen cuando el dato lo justifica.
 - **Borde** (`#E7EAF0`) y **Rejilla** (`#E3E7EE`): el borde separa superficies; la rejilla estructura las gráficas y es un punto más clara para no competir con los datos.
 - **Tinta** (`#111528`), **Tinta Suave** (`#5B6472`), **Tinta Tenue** (`#8A93A3`): los tres únicos niveles de texto. El tercero es para metadatos y unidades, nunca para contenido que haya que leer.
 
+### Tercer tema: Mitsubishi Electric
+
+Un tercer tema seleccionable (`themes.js` → `mitsubishi`), a pedido del
+cliente, con el rojo de acción real de `mitsubishielectric.com`
+(`#C40001`, confirmado en su hoja de estilos de producción, no en una fuente
+de terceros). Se construye SOBRE `light` y sólo reemplaza el eje de marca:
+
+- **Rojo Mitsubishi** (`#C40001`) sustituye a Azul Señal como `accent` — botón
+  primario, ítem activo, foco de campo, `SectionLabel`. Mismo `gradAccent` a
+  135°, ahora hacia `#FF5454`, la variante clara ya presente en su propio CSS.
+- **Rojo Mitsubishi Tenue** (`#FFF2F2`) sustituye a Azul Señal Tenue —también
+  tomado tal cual de su fondo de estado seleccionado.
+- Todo lo demás —papel, superficie, texto, borde, rejilla y los cuatro
+  semánticos (verde/ámbar/coral/violeta)— se hereda de `light` sin tocar.
+
 ### Named Rules
 
 **La Regla de las Dos Paletas.** Los tokens de interfaz (`accent`, `amber`, `coral`…) nunca se usan como color de dato, y los de `viz` nunca se usan como color de interfaz. Los primeros están afinados para convivir con texto y salen apagados como relleno; los segundos son pastel y no tienen contraste para servir de texto o borde. Un token `viz` en un botón es un error de sistema, no una preferencia.
@@ -187,6 +205,8 @@ solo aparecen cuando el dato lo justifica.
 **La Regla del Color con Significado.** Verde, ámbar y coral solo aparecen cuando una señal está en ese estado. Un panel no es verde porque quede bien. El azul es la única excepción: marca lo accionable, no lo saludable.
 
 **La Regla de la Segunda Selección.** El modo oscuro no se deriva del claro aclarando u oscureciendo valores. Cada token oscuro se eligió contra `#0B0E16`. Añadir un color al tema claro obliga a elegir su pareja oscura a mano, en `themes.js`, y a revalidar contraste y separación por daltonismo — la más frágil es ámbar contra verde.
+
+**La Regla del Rojo que No Es Alarma.** El tema Mitsubishi pone un rojo (`accent`) al lado de otro rojo (`coral`, la alarma) y los dos tienen que seguir leyéndose distintos sin ayuda de memoria: se separan en croma y en calidez además de en matiz —`#C40001` casi sin verde ni azul contra el `#D9573F` anaranjado y más claro de `coral`—, la variación que mejor sobrevive a protanopía y deuteranopía. Por eso `coral` NO cambia con este tema: moverlo habría exigido revalidar esa separación desde cero, y dejarlo quieto la conserva gratis.
 
 ## Typography
 

@@ -2,7 +2,7 @@
  * Barra superior fija: título de la página actual, buscador, notificaciones e
  * interruptores de origen de datos y de tema.
  */
-import { Search, Bell, Sun, Moon, Shuffle, FlaskConical, Radio, Wifi } from "lucide-react";
+import { Search, Bell, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
 import { PAGE_META } from "../routes/index.js";
@@ -31,6 +31,17 @@ import { Avatar } from "@/components/ui/Avatar.jsx";
 const ICONO_ORIGEN = { real: Wifi, simulado: Radio };
 
 /**
+ * Icono y nombre por modo de tema. `Zap` para Mitsubishi y no su logo de tres
+ * diamantes: es una marca registrada ajena, y el rayo ya lee «Electric» sin
+ * reproducirla.
+ */
+const MODO_TEMA = {
+  light: { Icono: Sun, etiqueta: "Claro" },
+  dark: { Icono: Moon, etiqueta: "Oscuro" },
+  mitsubishi: { Icono: Zap, etiqueta: "Mitsubishi Electric" },
+};
+
+/**
  * Qué build está corriendo esta pantalla.
  *
  * Lo inyecta el empaquetado desde `git describe`. Es lo primero que hace
@@ -57,7 +68,8 @@ function VersionBuild({ t }) {
 }
 
 export function Topbar({ page }) {
-  const { theme: t, dark, toggleTheme } = useTheme();
+  const { theme: t, modo, toggleTheme } = useTheme();
+  const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
@@ -150,12 +162,15 @@ export function Topbar({ page }) {
           </HoverTip>
         )}
 
-        <button
-          onClick={toggleTheme}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", background: t.accentSoft, border: "none", cursor: "pointer" }}
-        >
-          {dark ? <Moon size={15} color={t.accent} /> : <Sun size={15} color={t.accent} />}
-        </button>
+        <HoverTip label={`Tema: ${etiquetaTema} · pulsa para cambiar`}>
+          <button
+            onClick={toggleTheme}
+            aria-label={`Tema: ${etiquetaTema}. Pulsa para cambiar de tema.`}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", background: t.accentSoft, border: "none", cursor: "pointer" }}
+          >
+            <IconoTema size={15} color={t.accent} />
+          </button>
+        </HoverTip>
 
         {/* <Avatar name="Ana Torres" size={34} /> */}
       </div>

@@ -24,13 +24,53 @@
  *
  * No se monta si el servidor no tiene asistente configurado, y su caída no
  * puede tocar ninguna vista del tablero: es estrictamente aditivo.
+ *
+ * ── EL PANEL MAXIMIZADO, EL DICTADO Y EL ADJUNTO ────────────────────
+ *
+ * Tres añadidos sobre el diseño original, elegidos entre tres direcciones
+ * visuales reales comparadas en vivo (concept-seed, seed 0c4916e5):
+ *
+ *  - «Maximizar» abre un panel grande y centrado en vez del recuadro de
+ *    esquina de siempre — un overlay, no una ruta nueva: se cierra con
+ *    Escape o con clic fuera y vuelve exactamente a donde estaba.
+ *  - El dictado usa la Web Speech API del propio navegador: no compite por
+ *    la GPU que ya tarda 30-90 s en responder texto, y el botón desaparece
+ *    solo donde el navegador no lo soporta (Firefox, hoy).
+ *  - Adjuntar sólo acepta texto plano (.txt/.csv/.md), leído en el propio
+ *    navegador y sumado a la pregunta como contexto: el modelo de hoy es
+ *    texto-solo y el endpoint no acepta imágenes ni PDF, así que ese botón
+ *    no se ofrece — prometerlo sería mentir sobre lo que el backend hace.
+ *
+ * ── POR QUÉ EL TRAZO, Y POR QUÉ YA NO ES VERDE ──────────────────────
+ *
+ * La dirección elegida lee la respuesta como se lee una señal real en un
+ * osciloscopio: un trazo que se DIBUJA SOLO mientras el texto llega —
+ * derivado de los caracteres que de verdad llegaron, nunca una onda
+ * decorativa— en vez de un spinner genérico. Eso es la identidad
+ * ESTRUCTURAL de esta versión, y se queda.
+ *
+ * El primer boceto pintaba esa pantalla en un verde fósforo fijo, fuera del
+ * sistema de temas — una identidad propia, como si el asistente fuera una
+ * app aparte. No sobrevivió: la demo ya tiene tres temas seleccionables
+ * (claro, oscuro, Mitsubishi Electric — `theme/themes.js`) y el resto de la
+ * aplicación entera lee su color de `useTheme()`, nunca de un hexadecimal
+ * propio. Aquí pasa lo mismo ahora: el trazo, la retícula y el resplandor
+ * usan `t.accent` — azul en claro/oscuro, rojo en Mitsubishi — así que el
+ * osciloscopio "brilla" en el color que cada tema llama su señal, y no hay
+ * un cuarto mundo visual que mantener aparte de los otros tres.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, Loader2, RotateCw, Send, Trash2, TriangleAlert, X,
+  ArrowDown, Ban, Bot, Check, Copy, FileText, Maximize2, Mic, MicOff,
+  Minimize2, Paperclip, RotateCw, Send, Square, Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
 import { ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente } from "../lib/useAsistente.js";
+import { useDictado } from "../lib/useDictado.js";
+import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
+
+const MONO = "'IBM Plex Mono', monospace";
+const SANS = "'Plus Jakarta Sans', sans-serif";
 
 /**
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
@@ -50,14 +90,6 @@ import { ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente } from "../lib/us
  *  - El primero no nombra ninguna señal a propósito: es el que enseña que se
  *    puede preguntar en vago y que la respuesta llega igual.
  *  - Están escritos como los escribiría un operador, no como un comando.
- *
- * ── EL CUARTO DICE «HACE SEIS HORAS» Y NO «HACE SEIS» ──────────────
- *
- * Probado contra el modelo: con el ejemplo escrito «…con la de hace seis», el
- * 4B copió literalmente `periodoB: "hace seis"` —hace lo correcto, que es
- * pasar el texto tal cual— y el resolvedor no tenía forma de saber seis QUÉ.
- * El ejemplo fallaba al pulsarlo, que es justo lo que un ejemplo no puede
- * hacer. El sustantivo se queda.
  */
 const SUGERENCIAS = [
   "¿Cómo va la instalación ahora mismo?",
@@ -73,23 +105,105 @@ const SUGERENCIAS = [
  */
 const UMBRAL_ANCLA = 48;
 
+/*
+ * `--eva-asis-retic` es la única propiedad de color que el `<style>` no
+ * puede leer directamente: el fondo de retícula vive en una regla CSS
+ * estática, pero el matiz cambia con el tema. Se resuelve como en
+ * `InicioEva.jsx` (`--tv-border`/`--tv-shadow`): la variable viaja inline,
+ * por instancia, y la hoja de estilos sólo la consume con `var()`.
+ */
+const ESTILOS = `
+.eva-asis-reticula {
+  background-image:
+    linear-gradient(var(--eva-asis-retic) 1px, transparent 1px),
+    linear-gradient(90deg, var(--eva-asis-retic) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.eva-asis-boton { transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
+.eva-asis-boton:active:not(:disabled) { transform: translateY(1px) scale(0.96); }
+
+@keyframes evaAsisTrazo { from { stroke-dashoffset: 240; } to { stroke-dashoffset: 0; } }
+.eva-asis-trazo { stroke-dasharray: 240; animation: evaAsisTrazo 0.9s linear infinite; }
+
+@keyframes evaAsisPunto {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+.eva-asis-punto { animation: evaAsisPunto 2.4s ease-in-out infinite; }
+
+/* Maximizar cambia el ancla de posicionado (esquina fija ↔ centrado): animar
+   width/height interpolaría layout. Se anima transform+opacity en su lugar,
+   disparado por el remontaje que fuerza la key en <section>. */
+@keyframes evaAsisEntrada {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.eva-asis-entrada { animation: evaAsisEntrada 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .eva-asis-trazo, .eva-asis-punto, .eva-asis-entrada { animation: none !important; }
+}
+`;
+
+/**
+ * Un trazo derivado del texto que de verdad llegó — no una onda decorativa
+ * de mentira. Cada carácter nuevo aporta un punto; la señal crece con la
+ * respuesta y se congela cuando el turno termina, como la traza de un
+ * osciloscopio en modo «hold».
+ */
+function useTrazo(mensajes) {
+  const ultimo = mensajes[mensajes.length - 1];
+  const texto = ultimo?.rol === "asistente" ? ultimo.texto : "";
+
+  return useMemo(() => {
+    const muestras = 48;
+    const base = texto || "iconics-agua";
+    const puntos = Array.from({ length: muestras }, (_, i) => {
+      const c = base.charCodeAt(i % base.length) || 60;
+      const fase = Math.sin(i * 0.6 + c) * 0.5 + 0.5;
+      return fase;
+    });
+    const w = 280;
+    const h = 28;
+    return puntos
+      .map((v, i) => `${i ? "L" : "M"} ${((i / (muestras - 1)) * w).toFixed(1)} ${(h - 4 - v * (h - 8)).toFixed(1)}`)
+      .join(" ");
+  }, [texto]);
+}
+
+function PantallaTrazo({ ocupado, mensajes, t }) {
+  const d = useTrazo(mensajes);
+  return (
+    <svg width={90} height={20} viewBox="0 0 280 28" style={{ flexShrink: 0, overflow: "visible" }} aria-hidden="true">
+      <path d={d} fill="none" stroke={t.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+        opacity={ocupado ? 0.95 : 0.35} className={ocupado ? "eva-asis-trazo" : ""}
+        style={{ filter: `drop-shadow(0 0 3px ${t.accent})` }} />
+    </svg>
+  );
+}
+
 export function Asistente() {
   const { theme: t } = useTheme();
   const [abierto, setAbierto] = useState(false);
+  const [maximizado, setMaximizado] = useState(false);
   const [borrador, setBorrador] = useState("");
   const [ejemplo, setEjemplo] = useState(0);
   const [anclado, setAnclado] = useState(true);
   const [sinLeer, setSinLeer] = useState(false);
   const [segundos, setSegundos] = useState(0);
 
-  const {
-    disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
-  } = useAsistente();
+  const { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar } = useAsistente();
+  const { adjunto, error: errorAdjunto, cargar, quitar } = useAdjuntoTexto();
 
   const finRef = useRef(null);
   const campoRef = useRef(null);
   const hiloRef = useRef(null);
+  const archivoRef = useRef(null);
   const ocupadoPrevio = useRef(false);
+
+  const { soportado: dictadoSoportado, escuchando, alternar: alternarDictado } = useDictado({
+    onResultado: (texto, esFinal) => { if (texto) setBorrador(texto); if (esFinal) campoRef.current?.focus(); },
+  });
 
   /*
    * El hilo se desplaza solo al llegar texto nuevo, PERO solo si el usuario
@@ -98,13 +212,8 @@ export function Asistente() {
    * panel te arranca de la pantalla lo que estabas leyendo varias veces por
    * segundo.
    */
-  useEffect(() => {
-    if (anclado) finRef.current?.scrollIntoView({ block: "end" });
-  }, [mensajes, estado, anclado]);
-
-  useEffect(() => {
-    if (abierto) campoRef.current?.focus();
-  }, [abierto]);
+  useEffect(() => { if (anclado) finRef.current?.scrollIntoView({ block: "end" }); }, [mensajes, estado, anclado]);
+  useEffect(() => { if (abierto) campoRef.current?.focus(); }, [abierto, maximizado]);
 
   /*
    * Los segundos que lleva la consulta en curso. Con una espera de 30 a 90 s,
@@ -113,7 +222,6 @@ export function Asistente() {
    */
   useEffect(() => {
     if (!ocupado) return;
-
     setSegundos(0);
     const desde = Date.now();
     const id = setInterval(() => setSegundos(Math.round((Date.now() - desde) / 1000)), 1000);
@@ -132,17 +240,20 @@ export function Asistente() {
     ocupadoPrevio.current = ocupado;
   }, [ocupado, abierto]);
 
-  useEffect(() => {
-    if (abierto) setSinLeer(false);
-  }, [abierto]);
+  useEffect(() => { if (abierto) setSinLeer(false); }, [abierto]);
 
-  // Escape cierra, que es lo que espera cualquiera de un panel flotante.
+  // Escape restaura el panel maximizado, y si ya estaba en su tamaño de
+  // esquina, cierra — lo que espera cualquiera de un panel flotante.
   useEffect(() => {
     if (!abierto) return;
-    const alPulsar = (e) => { if (e.key === "Escape") setAbierto(false); };
+    const alPulsar = (e) => {
+      if (e.key !== "Escape") return;
+      if (maximizado) setMaximizado(false);
+      else setAbierto(false);
+    };
     window.addEventListener("keydown", alPulsar);
     return () => window.removeEventListener("keydown", alPulsar);
-  }, [abierto]);
+  }, [abierto, maximizado]);
 
   // El servidor manda: sin `IA_BASE` no hay asistente y no se pinta nada.
   if (disponible !== true) return null;
@@ -158,7 +269,6 @@ export function Asistente() {
    */
   const lanzar = (texto) => {
     if (!String(texto ?? "").trim() || ocupado) return false;
-
     preguntar(texto);
     setAnclado(true);
     setEjemplo((i) => (i + 1) % SUGERENCIAS.length);
@@ -167,7 +277,8 @@ export function Asistente() {
 
   const enviar = (e) => {
     e?.preventDefault();
-    if (lanzar(borrador)) setBorrador("");
+    const pregunta = conAdjunto(borrador, adjunto).slice(0, 2000);
+    if (lanzar(pregunta)) { setBorrador(""); quitar(); }
   };
 
   /**
@@ -177,10 +288,6 @@ export function Asistente() {
    * ya se había pulsado sobra. El borrador que hubiera en el campo se queda
    * como estaba: la pregunta que va es la del ejemplo, pero tirar lo que
    * alguien estaba escribiendo no es asunto de un botón de ayuda.
-   *
-   * A cambio, cada consulta ocupa la GPU entre 30 y 90 segundos y bloquea a
-   * las demás pantallas, así que los ejemplos se apagan mientras hay una en
-   * curso en vez de quedarse pulsables sin efecto.
    */
   const preguntarEjemplo = (texto) => { lanzar(texto); };
 
@@ -190,165 +297,186 @@ export function Asistente() {
     setAnclado(el.scrollHeight - el.scrollTop - el.clientHeight < UMBRAL_ANCLA);
   };
 
-  const irAlFinal = () => {
-    setAnclado(true);
-    finRef.current?.scrollIntoView({ block: "end" });
-  };
+  const irAlFinal = () => { setAnclado(true); finRef.current?.scrollIntoView({ block: "end" }); };
 
   if (!abierto) {
     return (
       <button
-        type="button"
-        onClick={() => setAbierto(true)}
+        type="button" onClick={() => setAbierto(true)}
         aria-label={sinLeer ? "Abrir el asistente. La respuesta está lista." : "Abrir el asistente"}
+        className="eva-asis-boton"
         style={{
           position: "fixed", right: 24, bottom: 24, zIndex: 60,
-          width: 52, height: 52, borderRadius: "50%", border: "none", cursor: "pointer",
-          background: t.gradAccent, color: "#FFFFFF",
-          boxShadow: t.shadowHover,
+          width: 54, height: 54, borderRadius: "50%", border: "none", cursor: "pointer",
+          background: t.gradAccent, color: "#FFFFFF", boxShadow: t.shadowHover,
           display: "grid", placeItems: "center",
         }}
       >
         <Bot size={22} />
-
-        {/* El punto va con el color de aviso y un anillo del color del fondo
-            de la página, que es lo que lo despega del degradado azul del
-            botón en los dos temas. */}
+        {/* El punto vive en blanco sobre el degradado de marca: es el único
+            color que se lee limpio encima de un acento saturado en los tres
+            temas (azul, azul oscuro y rojo Mitsubishi). */}
+        <span aria-hidden="true" className="eva-asis-punto" style={{ position: "absolute", bottom: 9, width: 5, height: 5, borderRadius: "50%", background: "#FFFFFF", boxShadow: "0 0 6px 1px rgba(255,255,255,0.85)" }} />
         {sinLeer && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute", top: 2, right: 2,
-              width: 13, height: 13, borderRadius: "50%",
-              background: t.coral, border: `2.5px solid ${t.page}`,
-            }}
-          />
+          <span aria-hidden="true" style={{ position: "absolute", top: 3, right: 3, width: 13, height: 13, borderRadius: "50%", background: t.coral, border: `2.5px solid ${t.page}` }} />
         )}
       </button>
     );
   }
 
+  const grande = maximizado;
+
   return (
-    <section
-      role="dialog"
-      aria-label="Asistente de la instalación"
-      style={{
-        position: "fixed", right: 24, bottom: 24, zIndex: 60,
-        width: "min(420px, calc(100vw - 48px))", height: "min(560px, calc(100vh - 48px))",
-        display: "flex", flexDirection: "column",
-        background: t.panel, border: `1px solid ${t.border}`, borderRadius: 14,
-        boxShadow: t.shadowHover, overflow: "hidden",
-      }}
-    >
-      <header
+    <>
+      <style>{ESTILOS}</style>
+
+      {grande && (
+        <div aria-hidden="true" onClick={() => setMaximizado(false)} style={{ position: "fixed", inset: 0, zIndex: 59, background: t.overlay, backdropFilter: "blur(2px)" }} />
+      )}
+
+      <section
+        key={grande ? "grande" : "chico"}
+        role="dialog" aria-label="Asistente de la instalación"
+        className="eva-asis-reticula eva-asis-entrada"
         style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "12px 14px", borderBottom: `1px solid ${t.border}`,
+          position: "fixed", zIndex: 60,
+          "--eva-asis-retic": `${t.accent}0F`,
+          ...(grande
+            ? { inset: 0, margin: "auto", width: "min(920px, 92vw)", height: "min(760px, 88vh)" }
+            : { right: 24, bottom: 24, width: "min(420px, calc(100vw - 48px))", height: "min(560px, calc(100vh - 48px))" }),
+          display: "flex", flexDirection: "column",
+          background: `radial-gradient(120% 130% at 50% 0%, ${t.panel} 0%, ${t.page} 65%)`,
+          border: `1px solid ${t.border}`, borderRadius: 16,
+          boxShadow: t.shadowHover, overflow: "hidden",
         }}
       >
-        <Bot size={17} color={t.accent} />
-        <strong style={{ flex: 1, fontSize: 13.5, color: t.text }}>Asistente de la instalación</strong>
+        <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderBottom: `1px solid ${t.border}` }}>
+          <Bot size={17} color={t.accent} />
+          <strong style={{ flex: 1, fontSize: 13.5, color: t.text, fontFamily: SANS }}>Asistente de la instalación</strong>
+          <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
 
-        <button
-          type="button" onClick={limpiar} disabled={ocupado || !mensajes.length}
-          aria-label="Borrar la conversación" title="Borrar la conversación"
-          style={botonIcono(t, ocupado || !mensajes.length)}
-        >
-          <Trash2 size={15} />
-        </button>
-        <button
-          type="button" onClick={() => setAbierto(false)}
-          aria-label="Cerrar el asistente" style={botonIcono(t, false)}
-        >
-          <X size={16} />
-        </button>
-      </header>
+          <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
+            <Trash2 size={15} />
+          </button>
+          <button type="button" onClick={() => setMaximizado((m) => !m)} aria-label={grande ? "Restaurar tamaño" : "Maximizar"} title={grande ? "Restaurar" : "Maximizar"} className="eva-asis-boton" style={botonIcono(t, false)}>
+            {grande ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+          </button>
+          <button type="button" onClick={() => setAbierto(false)} aria-label="Cerrar el asistente" className="eva-asis-boton" style={botonIcono(t, false)}>
+            <X size={16} />
+          </button>
+        </header>
 
-      {/* El envoltorio existe para poder colgar el botón de «ir al final»
-          encima del hilo: dentro del contenedor con scroll se desplazaría
-          junto al texto, que es justo lo contrario de lo que hace falta. */}
-      <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
-        <div
-          ref={hiloRef}
-          onScroll={alDesplazar}
-          style={{ flex: 1, overflowY: "auto", padding: 14, display: "grid", gap: 12, alignContent: "start" }}
-        >
-          {!mensajes.length && <Bienvenida t={t} ocupado={ocupado} onPreguntar={preguntarEjemplo} />}
+        {/* El envoltorio existe para poder colgar el botón de «ir al final»
+            encima del hilo: dentro del contenedor con scroll se desplazaría
+            junto al texto, que es justo lo contrario de lo que hace falta. */}
+        <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
+          <div
+            ref={hiloRef} onScroll={alDesplazar}
+            style={{ flex: 1, overflowY: "auto", padding: grande ? "20px max(14px, calc(50% - 340px))" : 14, display: "grid", gap: 12, alignContent: "start" }}
+          >
+            {!mensajes.length && <Bienvenida t={t} ocupado={ocupado} onPreguntar={preguntarEjemplo} />}
 
-          {mensajes.map((m, i) => (
-            <Turno
-              key={i}
-              mensaje={m}
-              t={t}
-              // Solo el último turno se puede repetir: ver `reintentar()`.
-              puedeReintentar={i === mensajes.length - 1 && !ocupado && Boolean(m.error || m.cancelado)}
-              onReintentar={() => { setAnclado(true); reintentar(); }}
-              ocupado={ocupado}
-              onPreguntar={preguntarEjemplo}
-            />
-          ))}
+            {mensajes.map((m, i) => (
+              <Turno
+                key={i} mensaje={m} t={t}
+                // Solo el último turno se puede repetir: ver `reintentar()`.
+                puedeReintentar={i === mensajes.length - 1 && !ocupado && Boolean(m.error || m.cancelado)}
+                onReintentar={() => { setAnclado(true); reintentar(); }}
+                ocupado={ocupado} onPreguntar={preguntarEjemplo}
+              />
+            ))}
 
-          {estado && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: t.textSoft }}>
-              <Loader2 size={13} className="spin" />
-              {/* El aria-live abarca solo las palabras del estado. Con los
-                  segundos dentro, un lector de pantalla cantaría el contador
-                  una vez por segundo durante minuto y medio. */}
-              <span aria-live="polite">{estado}</span>
-              {segundos > 0 && <span aria-hidden="true" style={{ color: t.textFaint }}>· {segundos} s</span>}
-            </div>
+            {estado && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: t.textSoft, fontFamily: MONO }}>
+                <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: t.accent, boxShadow: `0 0 6px 1px ${t.accent}` }} />
+                {/* El aria-live abarca solo las palabras del estado. Con los
+                    segundos dentro, un lector de pantalla cantaría el contador
+                    una vez por segundo durante minuto y medio. */}
+                <span aria-live="polite">{estado}</span>
+                {segundos > 0 && <span aria-hidden="true" style={{ color: t.textFaint }}>· {segundos} s</span>}
+              </div>
+            )}
+
+            <div ref={finRef} />
+          </div>
+
+          {!anclado && Boolean(mensajes.length) && (
+            <button type="button" onClick={irAlFinal} aria-label="Ir al final de la conversación" className="eva-asis-boton" style={botonBajar(t)}>
+              <ArrowDown size={13} /> Ir al final
+            </button>
           )}
-
-          <div ref={finRef} />
         </div>
 
-        {/* Sin `app-btn`: su hover es un `transform`, y aquí el transform ya
-            está ocupado centrando el botón, así que al pasar por encima se
-            descolocaría media anchura hacia la izquierda. */}
-        {!anclado && Boolean(mensajes.length) && (
-          <button
-            type="button" onClick={irAlFinal}
-            aria-label="Ir al final de la conversación"
-            style={botonBajar(t)}
-          >
-            <ArrowDown size={13} /> Ir al final
-          </button>
+        {adjunto && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 0" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: MONO, color: t.textSoft, background: t.hover, border: `1px solid ${t.border}`, borderRadius: 8, padding: "4px 8px" }}>
+              <FileText size={12} />
+              {adjunto.nombre}{adjunto.truncado && " (recortado)"}
+              <button type="button" onClick={quitar} aria-label="Quitar el adjunto" style={{ background: "none", border: "none", color: t.textFaint, cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}>
+                <X size={12} />
+              </button>
+            </span>
+          </div>
         )}
-      </div>
-
-      <form
-        onSubmit={enviar}
-        style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${t.border}` }}
-      >
-        <input
-          ref={campoRef}
-          value={borrador}
-          onChange={(e) => setBorrador(e.target.value)}
-          placeholder={ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]}
-          disabled={ocupado}
-          aria-label="Escribe tu pregunta"
-          style={{
-            flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
-            border: `1px solid ${t.border}`, background: t.page, color: t.text,
-            fontFamily: "'Inter', sans-serif",
-          }}
-        />
-
-        {ocupado ? (
-          <button type="button" onClick={cancelar} className="app-btn" style={botonCancelar(t)}>
-            Cancelar
-          </button>
-        ) : (
-          <button
-            type="submit" className="app-btn" aria-label="Enviar la pregunta"
-            disabled={!borrador.trim()}
-            style={botonEnviar(t, !borrador.trim())}
-          >
-            <Send size={15} />
-          </button>
+        {errorAdjunto && (
+          <div style={{ padding: "6px 12px 0", fontSize: 11, color: t.coral, fontFamily: MONO }}>{errorAdjunto}</div>
         )}
-      </form>
-    </section>
+
+        <form onSubmit={enviar} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${t.border}` }}>
+          <input
+            ref={archivoRef} type="file" accept=".txt,.csv,.md" style={{ display: "none" }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) cargar(f); e.target.value = ""; }}
+          />
+          <button
+            type="button" onClick={() => archivoRef.current?.click()} disabled={ocupado}
+            aria-label="Adjuntar un documento de texto" title="Adjuntar .txt, .csv o .md"
+            className="eva-asis-boton" style={botonIcono(t, ocupado)}
+          >
+            <Paperclip size={16} />
+          </button>
+
+          {dictadoSoportado && (
+            <button
+              type="button" onClick={alternarDictado} disabled={ocupado}
+              aria-label={escuchando ? "Detener el dictado" : "Dictar la pregunta"}
+              title={escuchando ? "Escuchando…" : "Dictar"}
+              className="eva-asis-boton"
+              style={{ ...botonIcono(t, ocupado), color: escuchando ? t.coral : t.textFaint, background: escuchando ? `${t.coral}22` : "transparent" }}
+            >
+              {escuchando ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+          )}
+
+          <input
+            ref={campoRef}
+            value={borrador}
+            onChange={(e) => setBorrador(e.target.value)}
+            placeholder={ocupado ? "Esperando respuesta…" : escuchando ? "Escuchando…" : SUGERENCIAS[ejemplo]}
+            disabled={ocupado}
+            aria-label="Escribe tu pregunta"
+            style={{
+              flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
+              border: `1px solid ${escuchando ? t.coral : t.border}`, background: t.hover, color: t.text,
+              fontFamily: "'Inter', sans-serif",
+            }}
+          />
+
+          {ocupado ? (
+            <button type="button" onClick={cancelar} className="eva-asis-boton" style={botonCancelar(t)}>
+              <Square size={12} /> Cancelar
+            </button>
+          ) : (
+            <button
+              type="submit" aria-label="Enviar la pregunta"
+              disabled={!borrador.trim()}
+              className="eva-asis-boton" style={botonEnviar(t, !borrador.trim())}
+            >
+              <Send size={15} />
+            </button>
+          )}
+        </form>
+      </section>
+    </>
   );
 }
 
@@ -371,7 +499,7 @@ export function Asistente() {
  */
 function Bienvenida({ t, ocupado, onPreguntar }) {
   return (
-    <div style={{ fontSize: 12.5, color: t.textSoft, lineHeight: 1.6 }}>
+    <div style={{ fontSize: 12.5, color: t.textSoft, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
       Pregunta por el estado del sistema de agua o por cómo ha evolucionado una
       de sus señales.
       <div style={{ marginTop: 8, color: t.textFaint }}>
@@ -394,7 +522,7 @@ function Sugerencias({ t, ocupado, onPreguntar }) {
       {SUGERENCIAS.map((s) => (
         <button
           key={s} type="button" onClick={() => onPreguntar(s)} disabled={ocupado}
-          className="chip app-btn" style={estiloChip(t, ocupado)}
+          className="eva-asis-boton" style={estiloChip(t, ocupado)}
         >
           {s}
         </button>
@@ -441,6 +569,7 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
           style={{
             background: t.hover, color: t.text, fontSize: 13, lineHeight: 1.6,
             padding: "10px 12px", borderRadius: "10px 10px 10px 2px", whiteSpace: "pre-wrap",
+            borderLeft: `2px solid ${t.accent}`,
           }}
         >
           {mensaje.texto || "…"}
@@ -471,14 +600,14 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
       )}
 
       {puedeReintentar && (
-        <button type="button" onClick={onReintentar} className="app-btn" style={botonReintentar(t)}>
+        <button type="button" onClick={onReintentar} className="eva-asis-boton" style={botonReintentar(t)}>
           <RotateCw size={12} /> Reintentar
         </button>
       )}
 
       {(procedencia || mensaje.texto) && (
         <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45 }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45, fontFamily: MONO }}>
             {procedencia}
           </div>
           {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
@@ -524,6 +653,7 @@ function BotonCopiar({ t, texto }) {
       type="button" onClick={copiar}
       aria-label={copiado ? "Respuesta copiada" : "Copiar la respuesta"}
       title={copiado ? "Copiada" : "Copiar"}
+      className="eva-asis-boton"
       style={{
         ...botonIcono(t, false),
         color: copiado ? t.success : t.textFaint,
@@ -590,6 +720,7 @@ const botonEnviar = (t, deshabilitado) => ({
 });
 
 const botonCancelar = (t) => ({
+  display: "inline-flex", alignItems: "center", gap: 5,
   fontSize: 12.5, fontWeight: 600, padding: "0 14px", borderRadius: 9,
   border: `1px solid ${t.border}`, background: "transparent", color: t.textSoft,
   cursor: "pointer", fontFamily: "'Inter', sans-serif",

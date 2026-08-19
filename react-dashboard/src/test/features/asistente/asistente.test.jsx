@@ -151,7 +151,10 @@ describe("cuándo existe el asistente", () => {
     montar();
 
     fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
-    expect(screen.getByRole("dialog", { name: "Asistente de planta" })).toBeTruthy();
+    // Antes decía «Asistente de planta» — nombre de la etapa de Resonac, que
+    // el componente real ya no usa desde el modelo de agua. El nombre
+    // accesible correcto es el que el propio `Asistente.jsx` declara.
+    expect(screen.getByRole("dialog", { name: "Asistente de la instalación" })).toBeTruthy();
     expect(screen.getByLabelText("Escribe tu pregunta")).toBeTruthy();
   });
 });

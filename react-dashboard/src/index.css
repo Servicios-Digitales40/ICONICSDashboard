@@ -45,6 +45,15 @@ button {
   --grad-accent: linear-gradient(135deg, #5c82f5 0%, #8aa3fa 100%);
 }
 
+/* Mismo hover/borde que "light" — sólo cambia el acento, ver themes.js */
+:root[data-theme="mitsubishi"] {
+  --color-hover: #f1f3f8;
+  --color-border: #e7eaf0;
+  --color-accent: #c40001;
+  --color-accent-soft: #fff2f2;
+  --grad-accent: linear-gradient(135deg, #c40001 0%, #ff5454 100%);
+}
+
 /* Utilidades que dependen de las variables de arriba */
 .field:focus {
   outline: none;

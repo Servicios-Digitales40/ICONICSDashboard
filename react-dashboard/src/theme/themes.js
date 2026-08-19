@@ -104,6 +104,88 @@ export const THEMES = {
       coral: "#FF9B85",
     },
   },
+
+  /**
+   * Tercer tema, a pedido: los colores de marca de Mitsubishi Electric.
+   *
+   * ── DE DÓNDE SALEN LOS TONOS ────────────────────────────────────────
+   *
+   * De la hoja de estilos que sirve hoy `mitsubishielectric.com` — no de una
+   * paleta de terceros ni de la memoria: `#c40001` aparece más de 50 veces en
+   * su CSS de producción como el rojo de acción (enlaces, botones, estados
+   * activos), con `#ff5454` como su variante clara y `#fff2f2` como el fondo
+   * rojo casi blanco de estados seleccionados — el mismo papel que cumple
+   * `accent-soft` aquí. El resto del sitio es blanco y gris neutro puro, sin
+   * un segundo color de marca.
+   *
+   * ── POR QUÉ SÓLO CAMBIA EL ACENTO ───────────────────────────────────
+   *
+   * Este tema se construye sobre `light`, no desde cero: page, superficie,
+   * texto, borde, rejilla Y LOS CUATRO SEMÁNTICOS (ámbar/coral/verde/violeta)
+   * se heredan sin tocar. Es deliberado y no un atajo — DESIGN.md reserva el
+   * coral para «fuera de banda, error de lectura, estado de fallo»
+   * (La Regla del Color con Significado), y el rojo de Mitsubishi es,
+   * literalmente, otro rojo. Ponerlo en el lugar de `accent` sin tocar
+   * `coral` mantiene los dos significados separables por tono además de por
+   * icono y texto (ver `paleta.js`, «el color nunca va solo»): el acento de
+   * marca es un rojo saturado casi sin verde ni azul (`#c40001`, R230 sobre
+   * G0 B1), y la alarma sigue siendo el coral anaranjado ya validado
+   * (`#d9573f`, con G87 B63) — se separan en croma y en calidez, no sólo en
+   * matiz, que es la variación que sobrevive mejor a una simulación de
+   * protanopía o deuteranopía. Cambiar `coral` también habría exigido
+   * revalidar contraste y separación por daltonismo desde cero (La Regla de
+   * la Segunda Selección); heredarlo no.
+   *
+   * Por el mismo motivo, `viz` —la paleta de DATOS, no de marca— tampoco se
+   * toca: son cinco colores para distinguir series en una misma gráfica, y
+   * `viz.coral` ya es casi rojo. Sumarle un segundo rojo de interfaz sólo le
+   * restaría separación al conjunto.
+   */
+  mitsubishi: {
+    page: "#F5F6FA",
+    sidebar: "#FFFFFF",
+    panel: "#FFFFFF",
+    hover: "#F1F3F8",
+    grid: "#E3E7EE",
+    border: "#E7EAF0",
+    overlay: "rgba(16,20,30,0.5)",
+
+    text: "#111528",
+    textSoft: "#5B6472",
+    textFaint: "#8A93A3",
+
+    // El rojo de acción real de mitsubishielectric.com (ver cabecera).
+    accent: "#C40001",
+    accentSoft: "#FFF2F2",
+    amber: "#D98A1B",
+    amberSoft: "#FBF0DC",
+    coral: "#D9573F",
+    coralSoft: "#FCEAE6",
+    success: "#1B9169",
+    successSoft: "#E3F5EE",
+    violet: "#7C4FE0",
+    violetSoft: "#F1ECFC",
+
+    shadow: "0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06)",
+    shadowHover: "0 4px 10px rgba(16,24,40,0.06), 0 16px 40px rgba(196,0,1,0.14)",
+    gradAccent: "linear-gradient(135deg, #C40001 0%, #FF5454 100%)",
+    gradWarm: "linear-gradient(135deg, #D98A1B 0%, #D9573F 100%)",
+    gradSuccess: "linear-gradient(135deg, #1B9169 0%, #4FC79A 100%)",
+    gradViolet: "linear-gradient(135deg, #7C4FE0 0%, #A98CF0 100%)",
+    shimmer: "linear-gradient(90deg, #E7EAF0 25%, #F3F5F9 37%, #E7EAF0 63%)",
+
+    blob1: "rgba(196,0,1,0.10)",
+    blob2: "rgba(20,20,20,0.05)",
+
+    // Paleta de datos: SIN CAMBIOS respecto a `light` — ver cabecera del tema.
+    viz: {
+      azul: "#7B95F5",
+      ambar: "#E2A54B",
+      verde: "#35B894",
+      violeta: "#A283EE",
+      coral: "#F0736B",
+    },
+  },
 };
 
 /**
