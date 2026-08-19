@@ -24,19 +24,20 @@
  *   TendenciaSenales ← producción por hora · no hay producción
  */
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, ChevronRight, Droplets } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplets, Info } from "lucide-react";
 
 import { ChartTooltip } from "@/components/charts/index.js";
+import { HoverTip } from "@/components/ui/index.js";
 import { hasValue } from "@shared/valores.js";
 import { SIN_DATO, fmtNum } from "@/lib/format.js";
-import { useCountUp, useMounted, usePrefersReducedMotion } from "@/lib/motion.js";
+import { navegarConMorph, useCountUp, useMounted, usePrefersReducedMotion } from "@/lib/motion.js";
 
 import { estadoInfo } from "../domain/estado.js";
 import { UMBRALES } from "../domain/umbrales.js";
 import { fmtCifra, fmtSenal, fmtVentana, formateadorDe, pctDeEscala } from "../lib/formato.js";
 import { delta } from "../lib/modelo.js";
 import { Card, Cifra, Delta, ESCALA, MONO, PuntoEstado, Spark } from "./base.jsx";
-import { TONO, bandaColor, estadoColor } from "./paleta.js";
+import { TONO, bandaColor, estadoColor, estadoTextColor } from "./paleta.js";
 
 /* ==================================================================
  * FRANJA DE ATENCIÓN
@@ -59,12 +60,27 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
       style={{
         display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
         padding: "10px 16px", borderRadius: 12,
-        background: tono.fondo, borderLeft: `3px solid ${tono.borde}`,
+        background: tono.fondo, border: `1px solid ${tono.borde}33`,
         animation: "fadeInUp 0.5s ease both", animationDelay: `${delay}s`,
       }}
     >
       <AlertTriangle className={critico ? "alerta-icono" : undefined} size={16} color={tono.texto} style={{ flexShrink: 0 }} />
-      <span style={{ ...ESCALA.etiqueta, color: tono.texto, flexShrink: 0 }}>Requiere atención</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        <span style={{ ...ESCALA.etiqueta, color: tono.texto }}>Requiere atención</span>
+        <HoverTip
+          wide
+          label="Umbral que definimos nosotros, no una alarma de ICONICS: la señal salió de su banda cómoda. No hace falta ninguna acción sobre la instalación real."
+        >
+          <Info
+            size={13}
+            color={tono.texto}
+            tabIndex={0}
+            role="img"
+            aria-label="Qué significa este aviso"
+            style={{ cursor: "help", opacity: 0.75 }}
+          />
+        </HoverTip>
+      </span>
 
       {atencion.map((a) => (
         <span key={a.estado} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -447,7 +463,15 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, delay = 0 }) 
     ? `${entrada}, alertaLatido 2.4s ease-in-out ${delay + 0.5}s infinite`
     : entrada;
 
-  const ir = () => onNavigate?.("eva-maqueta", { activo: activo.id });
+  // navegarConMorph, no onNavigate directo: esta tarjeta lleva
+  // `view-transition-name: activo-<id>` (ver style abajo) y su destino en la
+  // Maqueta 3D lleva el mismo nombre, así que el navegador las morphea en vez
+  // de cortar entre pantallas — la misma señal, vista dos veces, es
+  // literalmente el North Star "El Gemelo Digital" de DESIGN.md.
+  const ir = () => {
+    if (!onNavigate) return;
+    navegarConMorph(onNavigate, "eva-maqueta", { activo: activo.id });
+  };
 
   return (
     <div
@@ -460,9 +484,12 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, delay = 0 }) 
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
       }}
       style={{
-        padding: "11px 13px 12px", borderRadius: 10, cursor: "pointer", outline: "none",
+        padding: "11px 13px 12px", borderRadius: 10, cursor: "pointer",
+        // Sin `outline: none`: `.metric-card:focus-visible` en index.css
+        // necesita el outline nativo del navegador para marcar el foco de
+        // teclado (WCAG 2.4.7). El color de estado ya lo lleva PuntoEstado en
+        // la cabecera; un borde lateral aquí duplicaría la misma información.
         border: `1px solid ${critico ? alerta.borde : t.border}`,
-        borderLeft: `3px solid ${col}`,
         animation: animacion,
         "--shadow-hover": t.shadowHover,
         // Con movimiento reducido el latido no corre, así que lo crítico tiene
@@ -471,6 +498,11 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, delay = 0 }) 
         "--alerta-base": t.panel,
         "--alerta-tinte": alerta.fondo,
         "--alerta-halo": `${t.coral}59`,
+        // Nombre compartido con el resumen de activo en la Maqueta 3D: es lo
+        // único que necesita el navegador para morphear una tarjeta en la
+        // otra. Inerte fuera de una transición activa, así que no afecta al
+        // resto del ciclo de vida de la tarjeta.
+        viewTransitionName: `activo-${activo.id}`,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
@@ -628,7 +660,7 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
       <p style={{ margin: "0 0 14px", fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>
         <strong style={{ color: t.text }}>{lider.nombre}</strong> es la señal más
         cerca de su límite, con{" "}
-        <strong style={{ color: estadoColor(dark, lider.estado) }}>{fmtNum(lider.valor, 0)} %</strong>{" "}
+        <strong style={{ color: estadoTextColor(t, lider.estado) }}>{fmtNum(lider.valor, 0)} %</strong>{" "}
         del margen consumido.
       </p>
 
@@ -654,11 +686,17 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
                     // Se recorta a 100 para la GEOMETRÍA —una barra al 340 %
                     // reventaría la caja— pero el orden ya lo fijó el valor
                     // real, así que la señal más grave sigue encabezando.
-                    width: listo ? `${Math.min(100, f.valor)}%` : 0,
+                    //
+                    // Ancho fijo al 100 % y escala por transform en vez de
+                    // animar `width`: evita el recálculo de layout en cada
+                    // fotograma sin cambiar el resultado visual.
+                    width: "100%",
                     height: 14,
                     borderRadius: "0 4px 4px 0",
                     background: col,
-                    transition: `width 700ms cubic-bezier(0.22,1,0.36,1) ${delay + i * 0.07}s`,
+                    transformOrigin: "left",
+                    transform: `scaleX(${listo ? Math.min(100, f.valor) / 100 : 0})`,
+                    transition: `transform 700ms cubic-bezier(0.22,1,0.36,1) ${delay + i * 0.07}s`,
                   }}
                 />
               </div>

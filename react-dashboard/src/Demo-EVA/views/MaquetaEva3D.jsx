@@ -35,6 +35,7 @@ import { useTheme } from "@/theme";
 import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSistemaAgua } from "../data/hooks.js";
 import { ESTADOS_ORDEN, estadoInfo } from "../domain/estado.js";
+import { PuntoEstado } from "../components/base.jsx";
 import { estadoColor } from "../components/paleta.js";
 import ActivoEnMaqueta from "../three-d/components/ActivoEnMaqueta.jsx";
 import BastidorModel from "../three-d/components/BastidorModel.jsx";
@@ -81,6 +82,41 @@ function Leyenda({ activos, t, dark }) {
   );
 }
 
+/**
+ * Resumen 2D del activo seleccionado, fuera del canvas.
+ *
+ * Es el destino del morph que arranca en `TarjetaActivo` (Planta): mismo
+ * `view-transition-name`, mismo orden punto-nombre-etiqueta, para que la
+ * tarjeta de Planta se sienta como SI llegara aquí, no como si desapareciera
+ * y otra cosa apareciera en su sitio.
+ *
+ * Vive fuera de `<Escena>` a propósito. La ficha real —`FichaActivo`— es un
+ * `<Html>` de drei posicionado por la cámara: no existe todavía en el primer
+ * fotograma tras montar (WebGL necesita al menos uno para proyectar su
+ * posición), así que no es un blanco fiable para una API que captura su
+ * "después" en cuanto el DOM se asienta. Este resumen es DOM plano, listo en
+ * el mismo commit que el resto de la vista.
+ */
+function ResumenActivo({ activo, t, dark }) {
+  if (!activo) return null;
+  const info = estadoInfo(activo.estado);
+
+  return (
+    <div
+      style={{
+        display: "flex", alignItems: "center", gap: 7,
+        padding: "11px 13px 12px", borderRadius: 10, marginBottom: 12,
+        border: `1px solid ${t.border}`, background: t.panel,
+        viewTransitionName: `activo-${activo.id}`,
+      }}
+    >
+      <PuntoEstado color={estadoColor(dark, activo.estado)} size={7} />
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>{activo.corto}</span>
+      <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>{info.corto}</span>
+    </div>
+  );
+}
+
 function MaquetaEva3D({ params, onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, loading, error } = useSistemaAgua();
@@ -118,6 +154,11 @@ function MaquetaEva3D({ params, onNavigate }) {
 
   const irA = (id) => setEncuadre((e) => ({ id, ...ENCUADRES[id], n: e.n + 1 }));
 
+  const activoSeleccionado = useMemo(
+    () => sistema.activos.find((a) => a.id === seleccionado) ?? null,
+    [sistema.activos, seleccionado]
+  );
+
   return (
     <>
       <SectionLabel sub="Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide">
@@ -129,6 +170,8 @@ function MaquetaEva3D({ params, onNavigate }) {
       {loading && !sistema.resumen.medidas && (
         <p style={{ textAlign: "center", fontSize: 13, opacity: 0.7 }}>Leyendo señales…</p>
       )}
+
+      <ResumenActivo activo={activoSeleccionado} t={t} dark={dark} />
 
       <Escena
         camara={ENCUADRES.isometrica.posicion}

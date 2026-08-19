@@ -56,6 +56,22 @@ export const estadoColor = (dark, estado) => {
 };
 
 /**
+ * Color de TEXTO para un estado — no confundir con `estadoColor`.
+ *
+ * `estadoColor` viene de `ESTADO_VIZ`, una paleta de DATO (puntos, barras):
+ * validada contra la superficie de panel, pero sin el contraste que exige un
+ * string de texto. Un mismo estado necesita dos colores según dónde aterriza;
+ * este usa los tokens semánticos de interfaz del tema, que sí se midieron
+ * para convivir con texto (DESIGN.md § Colors, "La Regla de las Dos
+ * Paletas"). `reposo` y `sin_dato` no tienen semántico propio: caen a
+ * `textSoft`, que es neutro por diseño.
+ */
+export const estadoTextColor = (t, estado) => {
+  const mapa = { critico: t.coral, atencion: t.amber, nominal: t.success };
+  return mapa[estado] ?? t.textSoft;
+};
+
+/**
  * Fondo suave semántico, POR TEMA.
  *
  * Se usan los tokens `*Soft` del tema y no tintes hex-alfa (`${color}12`): un

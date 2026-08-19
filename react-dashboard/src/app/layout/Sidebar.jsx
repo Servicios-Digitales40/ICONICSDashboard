@@ -116,7 +116,8 @@ export function Sidebar({ page, onNavigate }) {
       style={{
         width: collapsed ? 72 : 246, flexShrink: 0, background: t.sidebar, borderRight: `1px solid ${t.border}`,
         display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh",
-        transition: "width 220ms ease", overflow: "hidden",
+        // El contenido colapsa a solo icono, no encoge proporcionalmente: no hay transform equivalente sin distorsionar el texto.
+        transition: "width 220ms ease", overflow: "hidden", // impeccable-disable-line layout-transition -- único elemento reflowing, coste despreciable
       }}
     >
       {/* Marca + botón de colapso */}

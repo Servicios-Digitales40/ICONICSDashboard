@@ -2,29 +2,31 @@
  * Las primitivas visuales de Demo EVA: escala tipográfica, tarjeta, sparkline,
  * delta y cifra animada.
  *
- * ── DE DÓNDE SALEN Y POR QUÉ SE COPIAN ─────────────────────────────
+ * ── DE DÓNDE SALEN ─────────────────────────────────────────────────
  *
- * Son las de `dashboard-v2`, una propuesta de diseño para el tablero de
- * Resonac que se evaluaba tras `VITE_ENABLE_PROTOTYPES`, con los mismos
- * números: el encargo era que esta sección se viera como «Planta · v2». Se
- * copiaron en vez de importarse por dos motivos, y el segundo es el que manda:
+ * La forma —escala, ritmo, superficies, animación— viene de `dashboard-v2`,
+ * una propuesta de diseño para el tablero de Resonac ya retirada; esta es la
+ * única pieza que sobrevive de ella, adaptada al modelo de agua.
  *
- *  1. Aquella carpeta era superficie en evaluación y podía desaparecer.
- *     Desapareció, en efecto, con la transición al modelo de agua — y esta
- *     copia es lo único que sobrevive de ella.
- *  2. Sus tiles recibían datos de OEE (`s.oee`, `s.producidas`). Reutilizarlos
- *     habría obligado a un adaptador que tradujera agua a piezas, y ese
- *     adaptador sería el sitio exacto donde se colarían los números
- *     inventados que este módulo evita.
- *
- * Lo que se copia es la FORMA —escala, ritmo, superficies, animación—; los
- * datos son otros. Es la distinción que pedía el encargo.
+ * `Card` empezó como una copia completa del `Panel` del kit —incluido el
+ * fondo/borde/sombra/animación de entrada— porque aquella carpeta podía
+ * desaparecer y porque sus tiles recibían datos de OEE que habrían obligado a
+ * un adaptador agua↔piezas. Las dos razones ya no aplican: dashboard-v2 se
+ * fue, y `Card` nunca tradujo datos de otro dominio. Lo que sigue siendo
+ * genuinamente distinto de `Panel` —tres variantes `tono`, alturas iguales en
+ * rejilla, encabezado sin borde inferior— ahora vive SOLO aquí; el
+ * fondo/borde/sombra/animación compartidos los da `Panel` con `bare`, así que
+ * un cambio de paleta o de sombra en el kit se propaga sin tocar este
+ * archivo.
  *
  * Lo que NO se copia y se importa de verdad: `useCountUp`, `useMounted` y
  * `usePrefersReducedMotion` de `@/lib/motion.js`, y todo el formateo de
  * `@/lib/format.js`. Eso es infraestructura compartida y duplicarla sería un
  * error, no una decisión.
  */
+import { useEffect, useState } from "react";
+
+import { Panel } from "@/components/ui/index.js";
 import { hasValue } from "@shared/valores.js";
 import { SIN_DATO } from "@/lib/format.js";
 import { useCountUp } from "@/lib/motion.js";
@@ -71,8 +73,9 @@ export function Card({ title, code, right, children, t, tono = "detalle", delay 
   };
 
   return (
-    <div
-      className="panel-card"
+    <Panel
+      bare
+      delay={delay}
       onClick={onClick}
       style={{
         ...fondos[tono],
@@ -83,9 +86,6 @@ export function Card({ title, code, right, children, t, tono = "detalle", delay 
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        animation: "fadeInUp 0.5s ease both",
-        animationDelay: `${delay}s`,
-        "--shadow-hover": t.shadowHover,
         ...style,
       }}
     >
@@ -99,7 +99,7 @@ export function Card({ title, code, right, children, t, tono = "detalle", delay 
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
-    </div>
+    </Panel>
   );
 }
 
@@ -155,8 +155,11 @@ export function Delta({ valor, t, subirEsBueno = true, unidad = "", decimales = 
   }
 
   const sube = valor > 0;
+  // t.success/t.coral, no t.viz.*: viz está pensado para puntos y relleno de
+  // gráfica, no para texto — a este tamaño no llega al contraste de la Regla
+  // de las Dos Paletas (DESIGN.md § Colors).
   const color =
-    subirEsBueno === null ? t.textSoft : sube === subirEsBueno ? t.viz.verde : t.viz.coral;
+    subirEsBueno === null ? t.textSoft : sube === subirEsBueno ? t.success : t.coral;
 
   return (
     <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: MONO }}>
@@ -192,5 +195,55 @@ export function PuntoEstado({ color, size = 8 }) {
         background: color, flexShrink: 0, display: "inline-block",
       }}
     />
+  );
+}
+
+/** Texto relativo de una fecha ("hace 4 s"), que se refresca solo. */
+function useTiempoRelativo(fecha) {
+  const [, marcar] = useState(0);
+
+  useEffect(() => {
+    if (!fecha) return;
+    const id = setInterval(() => marcar((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [fecha]);
+
+  if (!fecha) return null;
+  const segundos = Math.max(0, Math.round((Date.now() - fecha.getTime()) / 1000));
+  if (segundos < 2) return "justo ahora";
+  if (segundos < 60) return `hace ${segundos} s`;
+  return `hace ${Math.round(segundos / 60)} min`;
+}
+
+/**
+ * "Última lectura: hace N s", con un anillo que se expande UNA vez por cada
+ * lectura nueva del servidor — no un parpadeo continuo, un acuse de recibo.
+ *
+ * El `key={fecha.getTime()}` es lo que dispara el "una vez": al cambiar,
+ * React desmonta y vuelve a montar el `<span>` del anillo, y su animación CSS
+ * (`pulsoLectura` en index.css, sin `infinite`) arranca de cero. Es el mismo
+ * patrón que ya usa `Panel`/`Card` para escalonar la entrada, aplicado a un
+ * dato que cambia en vivo en vez de a un montaje.
+ *
+ * Existe porque `useSistemaAgua()` ya lleva la marca de tiempo de cada
+ * lectura (`lastUpdated`) y nada en pantalla la mostraba — PRODUCT.md promete
+ * "su marca de tiempo" por lectura, y hasta ahora esa promesa no se veía.
+ */
+export function UltimaLectura({ fecha, t }) {
+  const texto = useTiempoRelativo(fecha);
+  if (!texto) return null;
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, color: t.textFaint, fontFamily: MONO, flexShrink: 0 }}>
+      <span style={{ position: "relative", width: 6, height: 6, flexShrink: 0 }}>
+        <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: t.success }} />
+        <span
+          key={fecha.getTime()}
+          className="pulso-lectura"
+          style={{ position: "absolute", inset: -3, borderRadius: "50%", border: `1.5px solid ${t.success}` }}
+        />
+      </span>
+      Última lectura: {texto}
+    </span>
   );
 }

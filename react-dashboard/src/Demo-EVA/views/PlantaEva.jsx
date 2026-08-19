@@ -20,7 +20,7 @@
  */
 import { useMemo } from "react";
 
-import { AlertBanner } from "@/components/ui/index.js";
+import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
@@ -30,6 +30,7 @@ import { DERIVADO } from "../domain/estado.js";
 import { esHistorizada, historizadas } from "../domain/senales.js";
 import { PROVISIONALES } from "../domain/umbrales.js";
 import { buildModeloEva } from "../lib/modelo.js";
+import { UltimaLectura } from "../components/base.jsx";
 import {
   BandaSenales, EstadoSenales, FranjaAtencion, HeroeNivel,
   MargenesConsumidos, RejillaActivos, TendenciaSenales,
@@ -110,7 +111,7 @@ function NotaProcedencia({ t }) {
 
 function PlantaEva({ onNavigate }) {
   const { theme: t, dark } = useTheme();
-  const { sistema, series, ventana, loading, error } = useSistemaAgua();
+  const { sistema, series, ventana, loading, error, lastUpdated } = useSistemaAgua();
 
   // Las cuatro series del historiador se piden UNA vez y se reparten: los
   // sparklines de la banda de KPIs, la tendencia del héroe y los cuatro
@@ -165,12 +166,20 @@ function PlantaEva({ onNavigate }) {
           <AlertBanner type="error" title="No se pudo leer el sistema de agua" message={error} />
         )}
 
-        <NotaProcedencia t={t} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <NotaProcedencia t={t} />
+          </div>
+          <UltimaLectura fecha={lastUpdated} t={t} />
+        </div>
 
         {/* 1 · ATENCIÓN — condicional: sin nada fuera de banda, no se pinta. */}
         <FranjaAtencion atencion={m.atencion} t={t} dark={dark} delay={0} />
 
         {/* 2 · Las cuatro señales con serie propia, cada una con su tendencia. */}
+        <SectionLabel sub="Las cuatro señales con historia propia, con su tendencia">
+          Señales destacadas
+        </SectionLabel>
         <div className="eva-band">
           <BandaSenales senales={m.destacadas} series={porClave} t={t} dark={dark} base={0.05} />
         </div>
@@ -202,6 +211,9 @@ function PlantaEva({ onNavigate }) {
         </div>
 
         {/* 5 · Cierre: las cuatro series del historiador, con escala propia. */}
+        <SectionLabel sub="Las series del historiador, cada una con su propia escala">
+          Tendencias
+        </SectionLabel>
         <div className="eva-band">
           <div className="eva-full">
             {cargandoHistoria ? (

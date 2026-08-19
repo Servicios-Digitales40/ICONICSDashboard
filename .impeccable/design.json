@@ -4,6 +4,13 @@
   "title": "Design System: Demo EVA",
   "extensions": {
     "colorMeta": {
+      "accent-gradient-end": {
+        "role": "primary",
+        "displayName": "Azul Señal (extremo de gradiente)",
+        "canonical": "#6C86F0",
+        "darkPair": "#8AA3FA",
+        "note": "Segundo extremo de gradAccent (135°), nunca plano por sí solo."
+      },
       "accent": {
         "role": "primary",
         "displayName": "Azul Señal",

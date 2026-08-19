@@ -25,7 +25,3 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Impeccable: las skills son de terceros y se regeneran con `npx impeccable install`.
-# Lo que sí se versiona es el contexto propio: PRODUCT.md, DESIGN.md y
-# .impeccable/design.json.
-.claude/skills/
