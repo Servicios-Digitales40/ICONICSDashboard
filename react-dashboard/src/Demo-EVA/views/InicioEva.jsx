@@ -30,9 +30,9 @@
  * nada conectado», justo lo contrario de lo que esta pantalla existe para
  * demostrar.
  */
-import { ArrowRight, Boxes, Cog, Factory, LayoutDashboard } from "lucide-react";
+import { ArrowRight, Boxes, Cog, Factory, LayoutDashboard, WifiOff } from "lucide-react";
 
-import { Button } from "@/components/ui/index.js";
+import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
@@ -64,12 +64,25 @@ const REJILLA = `
 
 .eva-inicio-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 16px;
 }
 
+/* border y sombra viven aquí, parametrizados por variables por instancia, y
+   no en el estilo inline: un color inline nunca cede ante un :hover de hoja
+   de estilos, así que el tinte de acento al pasar el cursor sólo puede
+   ocurrir si la propiedad real la declara la hoja, no el componente. */
+.eva-tarjeta-vista {
+  border: 1px solid var(--tv-border);
+  box-shadow: var(--tv-shadow);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.eva-tarjeta-vista:hover {
+  border-color: var(--color-accent);
+}
+
 .eva-tarjeta-flecha { transition: transform 0.18s ease; }
-.eva-tarjeta-vista:hover .eva-tarjeta-flecha { transform: translateX(3px); }
+.eva-tarjeta-vista:hover .eva-tarjeta-flecha { transform: translateX(3px); color: var(--color-accent); }
 
 /* Por debajo de 560px el número deja de caber en una línea junto al
    denominador; se recorta para que la primera pantalla siga sin scroll. */
@@ -115,9 +128,22 @@ function CifraEnVivo({ sistema, loading, error, t }) {
   const listo = !loading || medidas > 0;
 
   if (error) {
+    // Coral porque esto ES el caso que DESIGN.md reserva para ese color —
+    // "error de lectura" — y no un gris neutro que subestime lo que pasó.
+    // Sin latido: `alertaLatido` (index.css) es el vocabulario que `tiles.jsx`
+    // reserva para una SEÑAL fuera de banda; prestárselo a un corte de red
+    // confundiría dos alarmas de gravedad distinta. La reafirmación es una
+    // frase, no un bucle — el motor de sondeo ya reintenta solo cada pocos
+    // segundos (`evaSource.js`), así que decirlo es honesto y no un adorno.
     return (
-      <div style={{ fontSize: 16, fontWeight: 600, color: t.textSoft, padding: "22px 0" }}>
-        Sin conexión con el servidor por ahora
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "18px 0" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 600, color: t.coral }}>
+          <WifiOff size={17} />
+          Sin conexión con el servidor por ahora
+        </span>
+        <span style={{ fontSize: 12, color: t.textFaint }}>
+          Vuelve a intentarlo solo, cada pocos segundos
+        </span>
       </div>
     );
   }
@@ -149,11 +175,14 @@ function TarjetaVista({ vista, onNavigate, t, delay }) {
       onClick={() => onNavigate?.(vista.id)}
       className="panel-card eva-tarjeta-vista"
       style={{
-        textAlign: "left", cursor: "pointer", border: `1px solid ${t.border}`,
-        background: t.panel, borderRadius: 16, padding: "20px 22px 22px",
-        boxShadow: t.shadow, "--shadow-hover": t.shadowHover,
+        textAlign: "left", cursor: "pointer",
+        background: t.panel, borderRadius: 16, padding: "22px 22px 24px",
+        // border y box-shadow: ver la regla `.eva-tarjeta-vista` en REJILLA.
+        // Un color puesto aquí, inline, nunca cedería ante el :hover de la
+        // hoja de estilos — por eso viajan como variables, no como propiedad.
+        "--tv-border": t.border, "--tv-shadow": t.shadow, "--shadow-hover": t.shadowHover,
         animation: "fadeInUp 0.5s ease both", animationDelay: `${delay}s`,
-        display: "flex", flexDirection: "column", gap: 12, width: "100%",
+        display: "flex", flexDirection: "column", gap: 14, width: "100%",
         fontFamily: "'Inter', sans-serif",
       }}
     >
@@ -161,14 +190,21 @@ function TarjetaVista({ vista, onNavigate, t, delay }) {
         <span
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 38, height: 38, borderRadius: 11, background: t.accentSoft, color: t.accent, flexShrink: 0,
+            width: 46, height: 46, borderRadius: 9, background: t.gradAccent, color: "#FFFFFF",
+            boxShadow: `0 4px 14px ${t.accent}4D`, flexShrink: 0,
           }}
         >
-          <Icono size={18} />
+          <Icono size={20} />
         </span>
-        <ArrowRight size={16} color={t.textFaint} className="eva-tarjeta-flecha" />
+        {/* Sin `color` por prop: así el trazo queda en `currentColor` y hereda
+            del `color` del wrapper, que sí puede perder ante el :hover de la
+            hoja de estilos (la herencia cede ante cualquier regla explícita,
+            a diferencia de un valor puesto inline en el propio elemento). */}
+        <span className="eva-tarjeta-flecha" style={{ display: "inline-flex", color: t.textFaint }}>
+          <ArrowRight size={16} />
+        </span>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: t.text, fontFamily: SANS }}>{vista.label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: SANS }}>{vista.label}</div>
       <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>{vista.frase}</p>
     </button>
   );
@@ -177,6 +213,12 @@ function TarjetaVista({ vista, onNavigate, t, delay }) {
 function InicioEva({ onNavigate }) {
   const { theme: t } = useTheme();
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
+  // Mismo criterio que dentro de `CifraEnVivo`: sin la primera lectura, "ahora
+  // mismo" hablaría de un conteo que todavía no llegó. La espera se convierte
+  // en un dato ("qué está pasando") en vez de quedar en un silencio junto a
+  // los puntos suspensivos — la única red que puede tardar de verdad es la
+  // real, y `VITE_ICONICS_CHAOS` existe justo para poder ensayar este momento.
+  const listo = !loading || sistema.resumen.medidas > 0;
 
   return (
     <>
@@ -195,14 +237,15 @@ function InicioEva({ onNavigate }) {
 
           <div style={{ position: "relative" }}>
             <CifraEnVivo sistema={sistema} loading={loading} error={error} t={t} />
-            <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3, color: t.textSoft, marginTop: 8 }}>
-              señales con lectura, ahora mismo
-            </div>
-
             {!error && (
-              <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
-                <UltimaLectura fecha={lastUpdated} t={t} />
-              </div>
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3, color: t.textSoft, marginTop: 8 }}>
+                  {listo ? "señales con lectura, ahora mismo" : "conectando con el servidor ICONICS…"}
+                </div>
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
+                  <UltimaLectura fecha={lastUpdated} t={t} />
+                </div>
+              </>
             )}
 
             <p className="eva-inicio-hero__frase" style={{ color: t.textSoft }}>
@@ -215,6 +258,10 @@ function InicioEva({ onNavigate }) {
             </Button>
           </div>
         </section>
+
+        <SectionLabel sub="La misma instalación, cuatro lentes distintas">
+          Cuatro formas de verlo
+        </SectionLabel>
 
         <div className="eva-inicio-grid">
           {VISTAS.map((vista, i) => (
