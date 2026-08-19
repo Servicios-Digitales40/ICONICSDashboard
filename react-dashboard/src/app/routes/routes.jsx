@@ -49,10 +49,14 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Box, Boxes, Cog, Factory, LayoutDashboard } from "lucide-react";
+import { Box, Boxes, Cog, Factory, Home, LayoutDashboard } from "lucide-react";
 
-/** Ruta que se muestra al arrancar la app. */
-export const DEFAULT_ROUTE = "eva-planta";
+/**
+ * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
+ * demo: prueba con una lectura en vivo que el dato es real y ofrece las
+ * cuatro vistas como entradas propias, antes de que el prospecto elija.
+ */
+export const DEFAULT_ROUTE = "eva-inicio";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
 export const NAV_GROUPS = {
@@ -81,6 +85,14 @@ export const NAV_GROUPS = {
  * medir el presupuesto del arranque cuando pasó con el asistente.
  */
 export const ROUTES = [
+  {
+    id: "eva-inicio",
+    component: lazy(() => import("@/Demo-EVA/views/InicioEva.jsx")),
+    title: "Inicio",
+    sub: "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/",
+    nav: { label: "Inicio", icon: <Home size={17} /> },
+  },
+
   {
     id: "eva-planta",
     component: lazy(() => import("@/Demo-EVA/views/PlantaEva.jsx")),

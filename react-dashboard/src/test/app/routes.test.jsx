@@ -25,14 +25,16 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las cinco vistas de la demo de agua, en su orden", () => {
-    // Las cuatro del sidebar, en orden, más `eva-detalle`: sin `nav` porque no
-    // es una pantalla a la que un operador llegue en frío —¿de qué activo?—,
-    // pero sigue siendo superficie navegable y tiene que aparecer aquí igual.
-    // Si alguien esconde una vista detrás de una bandera, aquí se ve — y el
+  it("son las seis vistas de la demo de agua, en su orden", () => {
+    // `eva-inicio` primero —la landing, y `DEFAULT_ROUTE`—, luego las cuatro
+    // del sidebar, y `eva-detalle` al final: sin `nav` porque no es una
+    // pantalla a la que un operador llegue en frío —¿de qué activo?—, pero
+    // sigue siendo superficie navegable y tiene que aparecer aquí igual. Si
+    // alguien esconde una vista detrás de una bandera, aquí se ve — y el
     // sitio de esa decisión sería el catálogo de señales o los umbrales, no
     // el registro de rutas.
     expect(ids).toEqual([
+      "eva-inicio",
       "eva-planta",
       "eva-maquina-3d",
       "eva-maqueta",
@@ -65,6 +67,7 @@ describe("el sidebar que sale del registro", () => {
     // NAV_GROUPS, y ese fallo sólo aparece al importar el registro. Comprobarlo
     // aquí lo convierte en un fallo de la suite y no en una pantalla en blanco.
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
+      "eva-inicio",
       "eva-planta",
       "eva-3d",
       "eva-assets",
