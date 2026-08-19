@@ -19,8 +19,9 @@
  *   6. Tendencias   · las cuatro series del historiador, con escala propia
  */
 import { useMemo } from "react";
+import { LayoutGrid } from "lucide-react";
 
-import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
@@ -171,6 +172,9 @@ function PlantaEva({ onNavigate }) {
             <NotaProcedencia t={t} />
           </div>
           <UltimaLectura fecha={lastUpdated} t={t} />
+          <Button variant="primary" icon={<LayoutGrid size={14} />} onClick={() => onNavigate?.("eva-detalle")}>
+            Detalle
+          </Button>
         </div>
 
         {/* 1 · ATENCIÓN — condicional: sin nada fuera de banda, no se pinta. */}

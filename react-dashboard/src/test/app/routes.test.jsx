@@ -25,15 +25,19 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las cuatro vistas de la demo de agua, en su orden", () => {
-    // Las cuatro, no tres. Si alguien esconde una detrás de una bandera, aquí
-    // se ve — y el sitio de esa decisión sería el catálogo de señales o los
-    // umbrales, no el registro de rutas.
+  it("son las cinco vistas de la demo de agua, en su orden", () => {
+    // Las cuatro del sidebar, en orden, más `eva-detalle`: sin `nav` porque no
+    // es una pantalla a la que un operador llegue en frío —¿de qué activo?—,
+    // pero sigue siendo superficie navegable y tiene que aparecer aquí igual.
+    // Si alguien esconde una vista detrás de una bandera, aquí se ve — y el
+    // sitio de esa decisión sería el catálogo de señales o los umbrales, no
+    // el registro de rutas.
     expect(ids).toEqual([
       "eva-planta",
       "eva-maquina-3d",
       "eva-maqueta",
       "eva-assets",
+      "eva-detalle",
     ]);
   });
 

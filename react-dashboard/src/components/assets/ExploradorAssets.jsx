@@ -27,6 +27,7 @@ import { Box, Boxes, ChevronDown, ChevronRight, Gauge, Radio, RefreshCw } from "
 import { AlertBanner, Button, Panel } from "@/components/ui/index.js";
 import { browseIconics, fetchIconicsBatch, fetchIconicsPoint } from "@/lib/iconics";
 import { useTheme } from "@/theme";
+import { isGoodQuality } from "@shared/quality.js";
 
 /** Raíz del espacio de nombres de AssetWorX. */
 export const RAIZ_ASSETS = "ac:";
@@ -76,7 +77,10 @@ function AssetNode({ node, depth, selectedPath, onSelect }) {
           display: "flex", alignItems: "center", gap: 6,
           padding: "5px 8px", paddingLeft: 8 + depth * 15,
           cursor: "pointer", borderRadius: 7, userSelect: "none",
-          background: selected ? `${t.accent}1f` : "transparent",
+          // t.accentSoft, no un tinte hex-alfa: el oscuro se eligió a mano
+          // contra su panel (DESIGN.md § "La Regla de la Segunda Selección"),
+          // y un alfa fijo se apaga casi invisible sobre el panel oscuro.
+          background: selected ? t.accentSoft : "transparent",
         }}
         onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = t.hover; }}
         onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = "transparent"; }}
@@ -232,13 +236,32 @@ function AssetProperties({ node, intervalMs = 5000 }) {
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {props.map((p) => {
-            const good = p.quality === undefined || p.quality === 0;
+            const good = isGoodQuality(p.quality);
+            const tieneCodigo = p.quality !== undefined && p.quality !== null;
             return (
               <div key={p.pointName} style={{ minWidth: 0, padding: "10px 12px", borderRadius: 10, background: t.hover, border: `1px solid ${t.border}` }}>
-                {/* Encabezado: nombre + indicador de calidad */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                {/* Encabezado: nombre + calidad. Punto + etiqueta + código crudo, nunca
+                    color solo (misma regla que el resto de la app: el estado nunca se
+                    codifica sólo con un tono). El código es el valor que devuelve
+                    ICONICS tal cual — ver shared/quality.js para las dos convenciones. */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: t.text, minWidth: 0, wordBreak: "break-word" }}>{p.name}</span>
-                  <Radio size={11} color={good ? t.success : t.coral} style={{ flexShrink: 0 }} />
+                  <span
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0,
+                      padding: "2px 8px", borderRadius: 999,
+                      background: good ? t.successSoft : t.coralSoft, color: good ? t.success : t.coral,
+                      fontSize: 10.5, fontWeight: 700,
+                    }}
+                  >
+                    <Radio size={10} />
+                    {good ? "Buena" : "Degradada"}
+                    {tieneCodigo && (
+                      <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, opacity: 0.75 }}>
+                        {p.quality}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 {/* Valor: apilado debajo, con wrap y tope de altura para valores gigantes */}
                 <div

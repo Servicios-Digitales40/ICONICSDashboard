@@ -24,7 +24,7 @@
  * silencioso dejaría pasar una gráfica que sigue saliendo a pedir el histórico
  * — que es exactamente el segundo agujero que tapó el Plan 9.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
@@ -55,11 +55,11 @@ afterEach(() => {
   delete globalThis.fetch;
 });
 
-const montar = () =>
+const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <PlantaEva onNavigate={() => {}} />
+        <PlantaEva onNavigate={onNavigate} />
       </DataSourceProvider>
     </ThemeProvider>
   );
@@ -101,5 +101,17 @@ describe("Demo EVA en modo simulado", () => {
     );
 
     expect(fetchTrampa).not.toHaveBeenCalled();
+  });
+
+  it("el botón «Detalle» lleva a la subvista de detalle, sin activo fijo", async () => {
+    cortarLaRed();
+    const onNavigate = vi.fn();
+
+    montar(onNavigate);
+
+    const boton = await screen.findByRole("button", { name: /Detalle/ });
+    fireEvent.click(boton);
+
+    expect(onNavigate).toHaveBeenCalledWith("eva-detalle");
   });
 });

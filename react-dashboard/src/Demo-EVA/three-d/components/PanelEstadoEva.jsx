@@ -21,14 +21,15 @@
 import { useTheme } from "@/theme";
 
 import { ESTADOS_ORDEN, estadoInfo } from "../../domain/estado.js";
+import { Card } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
 import { RPM_MAX, RPM_MIN, comportamiento } from "../lib/comportamiento.js";
 
-export function SelectorEstado({ valor, onSelect }) {
+export function SelectorEstado({ valor, onSelect, delay = 0 }) {
   const { theme: t, dark } = useTheme();
 
   return (
-    <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 14, padding: 14, boxShadow: t.shadow }}>
+    <Card t={t} delay={delay} style={{ padding: 14 }}>
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.9, textTransform: "uppercase", color: t.textFaint, marginBottom: 4 }}>
         Estados derivados
       </div>
@@ -67,7 +68,7 @@ export function SelectorEstado({ valor, onSelect }) {
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -87,7 +88,7 @@ const PATRON = {
   apagada: "Apagada",
 };
 
-export function FichaComportamiento({ descriptor, rpm }) {
+export function FichaComportamiento({ descriptor, rpm, delay = 0 }) {
   const { theme: t, dark } = useTheme();
   const c = comportamiento(descriptor.key);
   const color = estadoColor(dark, descriptor.key);
@@ -105,7 +106,7 @@ export function FichaComportamiento({ descriptor, rpm }) {
   };
 
   return (
-    <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 14, padding: 14, boxShadow: t.shadow }}>
+    <Card t={t} delay={delay} style={{ padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
         <span style={{ fontSize: 14, fontWeight: 700, color: t.text }}>{descriptor.label}</span>
@@ -139,6 +140,6 @@ export function FichaComportamiento({ descriptor, rpm }) {
         }
         t={t}
       />
-    </div>
+    </Card>
   );
 }

@@ -39,6 +39,7 @@ import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSistemaAgua } from "../data/hooks.js";
 import { estadoInfo } from "../domain/estado.js";
 import { fmtSenal, pctDeEscala } from "../lib/formato.js";
+import { Card } from "../components/base.jsx";
 import BombaModel from "../three-d/components/BombaModel.jsx";
 import { FichaComportamiento, SelectorEstado } from "../three-d/components/PanelEstadoEva.jsx";
 import { comportamiento, comportamientoReducido, frameloopDe, rpmDe } from "../three-d/lib/comportamiento.js";
@@ -57,7 +58,7 @@ function BotonEncuadre({ id, activo, onClick, t }) {
       aria-pressed={activo}
       style={{
         padding: "6px 12px",
-        borderRadius: 8,
+        borderRadius: 9,
         cursor: "pointer",
         border: `1px solid ${activo ? t.accent : t.border}`,
         background: activo ? t.accentSoft : t.panel,
@@ -135,7 +136,7 @@ function EquipoEva3D() {
         {/* ---- Panel lateral ----------------------------------------- */}
         <div style={{ flex: "0 1 340px", minWidth: 300, display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Origen del estado */}
-          <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: 14, padding: 14, boxShadow: t.shadow }}>
+          <Card t={t} delay={0.05} style={{ padding: 14 }}>
             <div style={{ display: "flex", gap: 6, marginBottom: enVivo ? 12 : 0 }}>
               {[
                 { v: false, label: "Manual" },
@@ -178,12 +179,12 @@ function EquipoEva3D() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
 
-          <FichaComportamiento descriptor={descriptor} rpm={rpm} />
+          <FichaComportamiento descriptor={descriptor} rpm={rpm} delay={0.1} />
 
           {/* En vivo el selector sobra: lo que manda es el servidor. */}
-          {!enVivo && <SelectorEstado valor={claveManual} onSelect={setClaveManual} />}
+          {!enVivo && <SelectorEstado valor={claveManual} onSelect={setClaveManual} delay={0.15} />}
         </div>
       </div>
     </>

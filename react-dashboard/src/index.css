@@ -479,14 +479,17 @@ button {
   animation: gaugeGlowPulse 2.8s ease-in-out infinite;
 }
 
+/* Sólo escala, nunca opacidad: el elemento ya lleva su opacidad de reposo
+   propia (p. ej. las marcas de umbral del arco de nivel, a 0.45), y animar
+   opacity aquí la sobrescribiría a 1 de forma permanente (animation-fill-mode:
+   both). Aparecer ya visible y sólo crecer es además el patrón que pide el
+   resto del sistema de movimiento. */
 @keyframes tickDrawIn {
   from {
-    opacity: 0;
     transform: scale(0.4);
   }
 
   to {
-    opacity: 1;
     transform: scale(1);
   }
 }

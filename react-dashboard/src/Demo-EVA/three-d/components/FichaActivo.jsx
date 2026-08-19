@@ -129,7 +129,7 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
               fontSize: 11.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
             }}
           >
-            Ver en Planta
+            Ver detalle completo
           </button>
         )}
       </div>

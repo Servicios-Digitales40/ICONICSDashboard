@@ -115,4 +115,16 @@ export const ROUTES = [
     sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
     nav: { label: "Assets", icon: <Boxes size={17} /> },
   },
+
+  {
+    // Sin `nav`: no es una pantalla a la que un operador llegue en frío desde
+    // el sidebar —¿de qué activo?—, sino un destino de detalle. Se llega
+    // desde la ficha de un activo en la Maqueta 3D («Ver detalle completo»),
+    // con `?activo=` en la URL. Genérica para los cuatro activos: ver
+    // `domain/activos.js`.
+    id: "eva-detalle",
+    component: lazy(() => import("@/Demo-EVA/views/DetalleActivo.jsx")),
+    title: "Detalle de activo",
+    sub: "Cada variable, con su valor y su histórico completo",
+  },
 ];

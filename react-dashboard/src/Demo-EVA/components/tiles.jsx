@@ -165,7 +165,7 @@ function StatSenal({ senal, serie, t, dark, delay }) {
  * quedarse, y por eso se dibuja como una ZONA y no como un tick: se lee «entre
  * aquí y aquí» en vez de «llega hasta aquí».
  */
-function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
+export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
   const listo = useMounted();
   const u = UMBRALES[senal.key];
   const sinDato = !hasValue(senal.valor);
@@ -269,13 +269,17 @@ function ArcoNivel({ senal, t, dark }) {
           style={{ transition: "stroke-dashoffset 900ms cubic-bezier(0.22,1,0.36,1)" }}
         />
         {/* Los dos extremos de la banda cómoda, no una marca de meta: aquí no
-            se persigue un número, se permanece en un intervalo. */}
-        {[u?.avisoMin, u?.avisoMax].filter(hasValue).map((valor) => {
-          const { i, o } = tickEn(valor);
+            se persigue un número, se permanece en un intervalo. Aparecen con
+            un pop de escala cuando el arco termina de barrer, para que el
+            héroe de la vista se sienta trazado con intención y no puesto de
+            golpe. */}
+        {[u?.avisoMin, u?.avisoMax].filter(hasValue).map((valor, i) => {
+          const { i: desde, o: hasta } = tickEn(valor);
           return (
             <line
-              key={valor} x1={i.x} y1={i.y} x2={o.x} y2={o.y}
+              key={valor} x1={desde.x} y1={desde.y} x2={hasta.x} y2={hasta.y}
               stroke={t.text} strokeWidth={2} strokeLinecap="round" opacity={0.45}
+              className="tick-draw" style={{ animationDelay: `${0.75 + i * 0.07}s` }}
             />
           );
         })}

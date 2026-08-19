@@ -52,7 +52,7 @@ export default function AssetsEva() {
             onClick={() => setRaiz(enDemo ? RAIZ_ASSETS : RAIZ)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "5px 11px", borderRadius: 8, cursor: "pointer",
+              padding: "5px 11px", borderRadius: 9, cursor: "pointer",
               border: `1px solid ${t.border}`, background: t.panel, color: t.textSoft,
               fontSize: 11.5, fontWeight: 600, fontFamily: "'Inter', sans-serif",
             }}

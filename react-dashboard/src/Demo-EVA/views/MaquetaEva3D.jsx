@@ -18,9 +18,10 @@
  *
  * ── QUÉ NO HACE, A PROPÓSITO ───────────────────────────────────────
  *
- * No duplica la vista de Planta. La ficha enseña lo justo para decidir si hay
- * que mirar un activo, y el botón lleva a la vista que ya existe. Una maqueta
- * que intentara contarlo todo acabaría siendo una Planta peor dentro de un
+ * No duplica el detalle. La ficha enseña lo justo para decidir si hay que
+ * mirar un activo, y el botón lleva a `eva-detalle` —cada variable con su
+ * histórico completo—, que es donde vive esa profundidad. Una maqueta que
+ * intentara contarlo todo acabaría siendo un detalle peor dentro de un
  * canvas.
  */
 import { useEffect, useMemo, useState } from "react";
@@ -206,7 +207,7 @@ function MaquetaEva3D({ params, onNavigate }) {
               seleccionado={seleccionado === a.id}
               onSeñalar={setSeñalado}
               onSeleccionar={(id) => setSeleccionado((actual) => (actual === id ? null : id))}
-              onDetalle={() => onNavigate?.("eva-planta")}
+              onDetalle={() => onNavigate?.("eva-detalle", { activo: a.id })}
               detalle
             />
           ))}
@@ -230,7 +231,7 @@ function MaquetaEva3D({ params, onNavigate }) {
               aria-pressed={encuadre.id === id}
               style={{
                 padding: "6px 12px",
-                borderRadius: 8,
+                borderRadius: 9,
                 cursor: "pointer",
                 border: `1px solid ${encuadre.id === id ? t.accent : t.border}`,
                 background: encuadre.id === id ? t.accentSoft : t.panel,
