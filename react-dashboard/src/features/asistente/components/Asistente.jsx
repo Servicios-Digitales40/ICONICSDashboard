@@ -25,21 +25,30 @@
  * No se monta si el servidor no tiene asistente configurado, y su caída no
  * puede tocar ninguna vista del tablero: es estrictamente aditivo.
  *
- * ── EL PANEL MAXIMIZADO, EL DICTADO Y EL ADJUNTO ────────────────────
+ * ── EL PANEL MAXIMIZADO, LA VOZ Y EL ADJUNTO ────────────────────────
  *
- * Tres añadidos sobre el diseño original, elegidos entre tres direcciones
- * visuales reales comparadas en vivo (concept-seed, seed 0c4916e5):
+ * Cuatro añadidos sobre el diseño original. Los tres primeros salieron de
+ * comparar en vivo tres direcciones visuales (concept-seed, seed 0c4916e5);
+ * el cuarto llegó al juntar esta rama con la del asistente por voz:
  *
  *  - «Maximizar» abre un panel grande y centrado en vez del recuadro de
  *    esquina de siempre — un overlay, no una ruta nueva: se cierra con
  *    Escape o con clic fuera y vuelve exactamente a donde estaba.
- *  - El dictado usa la Web Speech API del propio navegador: no compite por
- *    la GPU que ya tarda 30-90 s en responder texto, y el botón desaparece
- *    solo donde el navegador no lo soporta (Firefox, hoy).
  *  - Adjuntar sólo acepta texto plano (.txt/.csv/.md), leído en el propio
  *    navegador y sumado a la pregunta como contexto: el modelo de hoy es
  *    texto-solo y el endpoint no acepta imágenes ni PDF, así que ese botón
  *    no se ofrece — prometerlo sería mentir sobre lo que el backend hace.
+ *  - El dictado transcribe con `whisper-server`, en el servidor, y NO con la
+ *    Web Speech API del navegador. Hubo una versión con la del navegador y
+ *    no sobrevivió a la comparación: no existe en Firefox y, sobre todo, no
+ *    entrega el flujo de audio que necesita el modo de abajo para saber
+ *    cuándo has dejado de hablar. Sin `IA_WHISPER_BASE` el botón no aparece,
+ *    igual que antes no aparecía en Firefox.
+ *  - El manos libres es una llamada, no un walkie: hablas, el turno se cierra
+ *    solo al callarte, y la respuesta llega en voz alta. Es el modo para
+ *    quien está delante del equipo con las manos ocupadas, que es cuando de
+ *    verdad hace falta poder preguntarle algo al tablero. Ver
+ *    `useManosLibres`.
  *
  * ── POR QUÉ EL TRAZO, Y POR QUÉ YA NO ES VERDE ──────────────────────
  *
@@ -61,12 +70,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, FileText, Maximize2, Mic, MicOff,
-  Minimize2, Paperclip, RotateCw, Send, Square, Trash2, TriangleAlert, X,
+  ArrowDown, Ban, Bot, Check, Copy, FileText, Loader2, Maximize2, Mic,
+  Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square, Trash2,
+  TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
-import { ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente } from "../lib/useAsistente.js";
-import { useDictado } from "../lib/useDictado.js";
+import {
+  ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
+} from "../lib/useAsistente.js";
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 
 const MONO = "'IBM Plex Mono', monospace";
@@ -91,6 +102,24 @@ const SANS = "'Plus Jakarta Sans', sans-serif";
  *    puede preguntar en vago y que la respuesta llega igual.
  *  - Están escritos como los escribiría un operador, no como un comando.
  */
+/**
+ * Cómo se llama el asistente de cara al usuario.
+ *
+ * En una constante y no repartido por el archivo, porque el nombre de un
+ * producto cambia: ya pasó dos veces —«Asistente de planta», luego «Asistente
+ * de la instalación»— y estaba escrito en cinco sitios entre rótulos y
+ * etiquetas de accesibilidad, de los que se actualizaron cuatro. Un lector de
+ * pantalla anunciando un nombre distinto del que se ve escrito es un fallo
+ * difícil de detectar mirando la pantalla.
+ *
+ * Los identificadores INTERNOS no lo siguen a propósito: el archivo sigue
+ * siendo `Asistente.jsx` y los turnos siguen llevando `rol: "asistente"`.
+ * Renombrar eso sería tocar decenas de sitios, y las pruebas y el historial
+ * de git para nada — el nombre comercial y el nombre del módulo no tienen por
+ * qué coincidir.
+ */
+export const NOMBRE = "Tdconcito";
+
 const SUGERENCIAS = [
   "¿Cómo va la instalación ahora mismo?",
   "¿Qué nivel tiene el tanque?",
@@ -201,8 +230,16 @@ export function Asistente() {
   const archivoRef = useRef(null);
   const ocupadoPrevio = useRef(false);
 
-  const { soportado: dictadoSoportado, escuchando, alternar: alternarDictado } = useDictado({
-    onResultado: (texto, esFinal) => { if (texto) setBorrador(texto); if (esFinal) campoRef.current?.focus(); },
+  const dictado = useDictado();
+
+  // El manos libres necesita el ÚLTIMO turno del asistente para leerlo en voz
+  // alta cuando esté completo. Se le pasa el mensaje entero y no sólo el texto
+  // porque también mira si acabó en error: un fallo no se lee como si fuera un
+  // dato. Ver `useManosLibres`.
+  const manosLibres = useManosLibres({
+    preguntar,
+    ocupado,
+    ultimaRespuesta: mensajes.at(-1)?.rol === "asistente" ? mensajes.at(-1) : null,
   });
 
   /*
@@ -282,6 +319,21 @@ export function Asistente() {
   };
 
   /**
+   * Lo transcrito se AÑADE a lo que hubiera escrito, no lo sustituye.
+   *
+   * El caso real es empezar a escribir, quedarse a medias y terminar la frase
+   * hablando. Sustituir tiraría lo ya escrito sin manera de recuperarlo, y es
+   * el tipo de pérdida que hace que nadie vuelva a pulsar el micrófono.
+   *
+   * El foco vuelve al campo porque el paso siguiente casi siempre es corregir
+   * una palabra que Whisper oyó mal antes de enviar.
+   */
+  const anadirAlBorrador = (texto) => {
+    setBorrador((previo) => (previo.trim() ? `${previo.trim()} ${texto}` : texto));
+    campoRef.current?.focus();
+  };
+
+  /**
    * Un ejemplo SE ENVÍA al pulsarlo.
    *
    * Parece un botón de preguntar, así que pedir un segundo gesto para lo que
@@ -303,7 +355,7 @@ export function Asistente() {
     return (
       <button
         type="button" onClick={() => setAbierto(true)}
-        aria-label={sinLeer ? "Abrir el asistente. La respuesta está lista." : "Abrir el asistente"}
+        aria-label={sinLeer ? `Abrir ${NOMBRE}. La respuesta está lista.` : `Abrir ${NOMBRE}`}
         className="eva-asis-boton"
         style={{
           position: "fixed", right: 24, bottom: 24, zIndex: 60,
@@ -336,7 +388,7 @@ export function Asistente() {
 
       <section
         key={grande ? "grande" : "chico"}
-        role="dialog" aria-label="Asistente de la instalación"
+        role="dialog" aria-label={NOMBRE}
         className="eva-asis-reticula eva-asis-entrada"
         style={{
           position: "fixed", zIndex: 60,
@@ -352,7 +404,7 @@ export function Asistente() {
       >
         <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderBottom: `1px solid ${t.border}` }}>
           <Bot size={17} color={t.accent} />
-          <strong style={{ flex: 1, fontSize: 13.5, color: t.text, fontFamily: SANS }}>Asistente de la instalación</strong>
+          <strong style={{ flex: 1, fontSize: 13.5, color: t.text, fontFamily: SANS }}>{NOMBRE}</strong>
           <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
 
           <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
@@ -361,7 +413,7 @@ export function Asistente() {
           <button type="button" onClick={() => setMaximizado((m) => !m)} aria-label={grande ? "Restaurar tamaño" : "Maximizar"} title={grande ? "Restaurar" : "Maximizar"} className="eva-asis-boton" style={botonIcono(t, false)}>
             {grande ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
-          <button type="button" onClick={() => setAbierto(false)} aria-label="Cerrar el asistente" className="eva-asis-boton" style={botonIcono(t, false)}>
+          <button type="button" onClick={() => setAbierto(false)} aria-label={`Cerrar ${NOMBRE}`} className="eva-asis-boton" style={botonIcono(t, false)}>
             <X size={16} />
           </button>
         </header>
@@ -422,41 +474,60 @@ export function Asistente() {
           <div style={{ padding: "6px 12px 0", fontSize: 11, color: t.coral, fontFamily: MONO }}>{errorAdjunto}</div>
         )}
 
+        {/* El fallo del dictado se cuenta aquí y NO como un turno del hilo: no
+            llegó a haber pregunta, así que meterlo en la conversación la
+            ensuciaría con algo que nadie llegó a preguntar. */}
+        {dictado.error && (
+          <div style={{ padding: "6px 12px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
+            {dictado.error}
+          </div>
+        )}
+
         <form onSubmit={enviar} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${t.border}` }}>
           <input
             ref={archivoRef} type="file" accept=".txt,.csv,.md" style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) cargar(f); e.target.value = ""; }}
           />
+          {/* En manos libres no hay envío desde este formulario: un adjunto
+              puesto ahí se quedaría colgado sin viajar con ninguna pregunta. */}
           <button
-            type="button" onClick={() => archivoRef.current?.click()} disabled={ocupado}
+            type="button" onClick={() => archivoRef.current?.click()}
+            disabled={ocupado || manosLibres.activo}
             aria-label="Adjuntar un documento de texto" title="Adjuntar .txt, .csv o .md"
-            className="eva-asis-boton" style={botonIcono(t, ocupado)}
+            className="eva-asis-boton" style={botonIcono(t, ocupado || manosLibres.activo)}
           >
             <Paperclip size={16} />
           </button>
 
-          {dictadoSoportado && (
-            <button
-              type="button" onClick={alternarDictado} disabled={ocupado}
-              aria-label={escuchando ? "Detener el dictado" : "Dictar la pregunta"}
-              title={escuchando ? "Escuchando…" : "Dictar"}
-              className="eva-asis-boton"
-              style={{ ...botonIcono(t, ocupado), color: escuchando ? t.coral : t.textFaint, background: escuchando ? `${t.coral}22` : "transparent" }}
-            >
-              {escuchando ? <MicOff size={16} /> : <Mic size={16} />}
-            </button>
+          {/* El micrófono sólo aparece si el servidor tiene whisper Y el
+              navegador puede grabar. Un botón que siempre falla es peor que
+              no tenerlo. Y desaparece durante el manos libres: ahí el turno
+              lo abre y lo cierra el otro botón. */}
+          {dictado.disponible && !ocupado && !manosLibres.activo && (
+            <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} />
+          )}
+
+          {/* El manos libres exige además que el navegador sepa hablar. */}
+          {manosLibres.disponible && (
+            <BotonManosLibres t={t} manosLibres={manosLibres} />
           )}
 
           <input
             ref={campoRef}
             value={borrador}
             onChange={(e) => setBorrador(e.target.value)}
-            placeholder={ocupado ? "Esperando respuesta…" : escuchando ? "Escuchando…" : SUGERENCIAS[ejemplo]}
-            disabled={ocupado}
+            placeholder={
+              manosLibres.activo
+                ? FASE_MANOS_LIBRES[manosLibres.fase]
+                : dictado.grabando ? "Te escucho…"
+                : ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]
+            }
+            disabled={ocupado || manosLibres.activo}
             aria-label="Escribe tu pregunta"
             style={{
               flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
-              border: `1px solid ${escuchando ? t.coral : t.border}`, background: t.hover, color: t.text,
+              border: `1px solid ${dictado.grabando || manosLibres.activo ? t.coral : t.border}`,
+              background: t.hover, color: t.text,
               fontFamily: "'Inter', sans-serif",
             }}
           />
@@ -477,6 +548,150 @@ export function Asistente() {
         </form>
       </section>
     </>
+  );
+}
+
+/**
+ * El botón de dictar: pulsar para hablar, pulsar otra vez para parar.
+ *
+ * ── POR QUÉ CONMUTA Y NO ES MANTENER PULSADO ───────────────────────
+ *
+ * «Mantener pulsado» es el gesto de un walkie y parece lo natural, pero aquí
+ * falla: una pregunta de diagnóstico son diez o quince segundos hablando, y
+ * sostener el ratón todo ese rato mientras se piensa la frase es incómodo — y
+ * en una pantalla táctil de planta, con guantes, se suelta sola. Al conmutar,
+ * el gesto no compite con pensar la pregunta.
+ *
+ * ── POR QUÉ EL TEXTO SE AÑADE Y NO SE ENVÍA ────────────────────────
+ *
+ * Lo que devuelve la transcripción va al cuadro de entrada, no a la consulta.
+ * Whisper se equivoca con el ruido de una sala de máquinas y con los nombres
+ * de tag; una pregunta lanzada sobre una frase mal oída gasta un minuto de GPU
+ * en responder a algo que nadie preguntó. Ver `backend/routes/vozRoutes.mjs`.
+ */
+function BotonMicrofono({ t, dictado, onTexto }) {
+  const { grabando, transcribiendo, empezar, detener } = dictado;
+
+  if (transcribiendo) {
+    return (
+      <button
+        type="button" disabled
+        aria-label="Transcribiendo lo que has dicho"
+        style={botonVoz(t, "transcribiendo")}
+      >
+        <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+      </button>
+    );
+  }
+
+  const alPulsar = async () => {
+    if (!grabando) return empezar();
+    const texto = await detener();
+    if (texto) onTexto(texto);
+  };
+
+  return (
+    <button
+      type="button" onClick={alPulsar} className="eva-asis-boton"
+      aria-label={grabando ? "Parar de grabar y transcribir" : "Dictar la pregunta"}
+      title={grabando ? "Parar y transcribir" : "Dictar la pregunta"}
+      style={botonVoz(t, grabando ? "grabando" : "listo")}
+    >
+      {grabando ? <Square size={13} fill="currentColor" /> : <Mic size={16} />}
+    </button>
+  );
+}
+
+/**
+ * Qué está pasando en el modo manos libres, en el sitio donde se escribiría.
+ *
+ * El campo de texto está bloqueado mientras dura, así que su hueco es el mejor
+ * sitio para decir de quién es el turno. Sin esto, un modo sin teclado y sin
+ * pantalla no da ninguna pista de si te está escuchando o pensando, y la gente
+ * habla encima de la respuesta.
+ */
+const FASE_MANOS_LIBRES = {
+  parado: "Manos libres listo",
+  escuchando: "Te escucho… se envía solo cuando dejes de hablar",
+  pensando: "Entendiendo lo que has dicho…",
+  hablando: "Contestando en voz alta…",
+};
+
+/**
+ * El botón del modo manos libres.
+ *
+ * ── POR QUÉ CAMBIA DE FUNCIÓN SEGÚN LA FASE ────────────────────────
+ *
+ * Mientras escucha, pulsar significa «he terminado de hablar» — es el gesto
+ * que más se usa y tiene que ser el mismo botón, no otro. En cualquier otra
+ * fase significa colgar.
+ *
+ * Suena a dos cosas en un botón, y es al revés: es un teléfono. Descolgar,
+ * hablar, ceder el turno y colgar son los cuatro gestos de una llamada, y
+ * repartirlos en tres botones obligaría a mirar la pantalla, que es
+ * exactamente lo que este modo existe para evitar.
+ */
+function BotonManosLibres({ t, manosLibres }) {
+  const { activo, fase, encender, apagar, cerrarTurno, transcribiendo, nivel } = manosLibres;
+
+  if (!activo) {
+    return (
+      <button
+        type="button" onClick={encender} className="eva-asis-boton"
+        aria-label={`Hablar con ${NOMBRE} en manos libres`}
+        title="Manos libres: hablar y escuchar la respuesta"
+        style={botonVoz(t, "listo")}
+      >
+        <PhoneCall size={16} />
+      </button>
+    );
+  }
+
+  if (fase === "escuchando") {
+    /*
+     * El anillo crece con la voz.
+     *
+     * No es adorno: en un modo sin teclado y sin texto, es la única prueba de
+     * que el micrófono está captando algo. Sin ella, alguien que hable con el
+     * micrófono silenciado por el sistema espera una respuesta que nunca va a
+     * llegar, y no tiene forma de saber por qué.
+     *
+     * El turno se cierra SOLO al detectar silencio; el botón queda como salida
+     * manual para cuando el ruido de fondo impida ese corte.
+     */
+    const escala = 1 + Math.min(nivel * 6, 0.9);
+    return (
+      <button
+        type="button" onClick={cerrarTurno} className="eva-asis-boton"
+        aria-label="He terminado de hablar"
+        title="Te escucho. Se envía solo al callarte, o pulsa para enviar ya."
+        style={botonVoz(t, "grabando")}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute", inset: 0, borderRadius: 7,
+            background: t.coral, opacity: 0.18,
+            transform: `scale(${escala})`,
+            transition: "transform 100ms linear",
+          }}
+        />
+        <Square size={13} fill="currentColor" style={{ position: "relative" }} />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button" onClick={apagar} className="eva-asis-boton"
+      aria-label="Salir del manos libres"
+      title="Colgar"
+      style={botonVoz(t, "grabando")}
+    >
+      {transcribiendo
+        ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+        : <PhoneOff size={16} />}
+    </button>
   );
 }
 
@@ -555,12 +770,13 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
 
   // De dónde salió el dato y con qué se preguntó. Es la invariante que permite
   // detectar una respuesta recitada: si no hay esta línea, no hubo consulta.
-  const procedencia = mensaje.herramienta && !mensaje.error
-    ? [
-        ETIQUETA_HERRAMIENTA[mensaje.herramienta] ?? mensaje.herramienta,
-        ...describirConsulta(mensaje.herramienta, mensaje.argumentos),
-      ].join(" · ")
-    : "";
+  //
+  // Se enseñan TODAS las consultas, una por línea, porque desde que el backend
+  // encadena herramientas un diagnóstico son varias. Resumirlas en «consultó 3
+  // cosas» ahorraría dos líneas y destruiría justo lo que esto sirve para ver:
+  // que la señal y el período de cada paso eran los que el operador esperaba.
+  const consultas = mensaje.error ? [] : (mensaje.consultas ?? []);
+  const adjuntos = mensaje.error ? [] : (mensaje.adjuntos ?? []);
 
   return (
     <div style={{ maxWidth: "92%" }}>
@@ -575,6 +791,13 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
           {mensaje.texto || "…"}
         </div>
       )}
+
+      {/* Los gráficos, debajo de la respuesta que los comenta. Llegan por su
+          propio evento y nunca pasan por el modelo: lo que se ve aquí son
+          puntos del historiador, no algo que el asistente haya «dibujado». */}
+      {adjuntos.map((adjunto, i) => (
+        <Grafico key={i} t={t} adjunto={adjunto} />
+      ))}
 
       {mensaje.error && (
         <Nota t={t} color={t.coral} fondo={t.coralSoft} icono={<TriangleAlert size={12} />}>
@@ -605,10 +828,17 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         </button>
       )}
 
-      {(procedencia || mensaje.texto) && (
-        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+      {(consultas.length > 0 || mensaje.texto) && (
+        <div style={{ marginTop: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45, fontFamily: MONO }}>
-            {procedencia}
+            {consultas.map((consulta, i) => (
+              <div key={i}>
+                {[
+                  ETIQUETA_HERRAMIENTA[consulta.nombre] ?? consulta.nombre,
+                  ...describirConsulta(consulta.nombre, consulta.argumentos),
+                ].join(" · ")}
+              </div>
+            ))}
           </div>
           {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
         </div>
@@ -622,6 +852,39 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />
       )}
     </div>
+  );
+}
+
+/**
+ * Un gráfico que acompaña la respuesta.
+ *
+ * ── POR QUÉ UN `<img>` CON DATA URI Y NO EL SVG EN LÍNEA ───────────
+ *
+ * Porque el SVG lo genera el servidor y meterlo en el DOM con
+ * `dangerouslySetInnerHTML` haría que cualquier cosa que acabara dentro de esa
+ * cadena se ejecutara en la página. Hoy el contenido viene sólo del catálogo de
+ * señales y del historiador, pero la ruta es la misma por la que viajan los
+ * rótulos, y una etiqueta de señal la cambia quien configure el servidor
+ * ICONICS. Dentro de un `<img>` el SVG se pinta igual y no ejecuta nada:
+ * el navegador lo trata como imagen, no como documento.
+ *
+ * `encodeURIComponent` y no base64: pesa menos, se lee al depurar, y evita el
+ * viaje por `btoa`, que además rompe con los acentos de los rótulos.
+ */
+function Grafico({ t, adjunto }) {
+  if (adjunto?.formato !== "svg" || !adjunto.contenido) return null;
+
+  return (
+    <figure style={{ margin: "8px 0 0" }}>
+      <img
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(adjunto.contenido)}`}
+        alt={adjunto.titulo ? `Evolución de ${adjunto.titulo}` : "Gráfico de la señal"}
+        style={{
+          display: "block", width: "100%", height: "auto",
+          borderRadius: 8, border: `1px solid ${t.border}`, background: "#fff",
+        }}
+      />
+    </figure>
   );
 }
 
@@ -711,6 +974,29 @@ const botonIcono = (t, deshabilitado) => ({
   cursor: deshabilitado ? "default" : "pointer", opacity: deshabilitado ? 0.4 : 1,
   padding: 5, borderRadius: 7, display: "grid", placeItems: "center",
 });
+
+/**
+ * El micrófono y el teléfono, en sus tres estados.
+ *
+ * Grabando va en rojo y con un cuadrado —el símbolo universal de «parar»— y no
+ * con otro micrófono: el problema real de un botón que conmuta es que, si no
+ * cambia de forma, no se sabe si está escuchando. El color solo no basta en
+ * una pantalla de planta con reflejos.
+ *
+ * Parte de `botonIcono` y no de un estilo propio para que el micrófono, el
+ * teléfono y el clip se lean como la misma fila de herramientas.
+ */
+const botonVoz = (t, estado) => {
+  const base = { ...botonIcono(t, false), position: "relative", flexShrink: 0 };
+
+  if (estado === "grabando") {
+    return { ...base, color: t.coral, background: `${t.coral}22` };
+  }
+  if (estado === "transcribiendo") {
+    return { ...base, color: t.textFaint, cursor: "default" };
+  }
+  return base;
+};
 
 const botonEnviar = (t, deshabilitado) => ({
   display: "grid", placeItems: "center", width: 38, borderRadius: 9, border: "none",

@@ -18,13 +18,28 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
+import { aWav, grabar, puedeGrabar } from "./audio.js";
+import { callar, hablar, puedeHablar } from "./vozSalida.js";
+import { borrar, cargar, guardar } from "./persistencia.js";
 
-/** Mensaje del asistente aún vacío, al que se le van pegando los deltas. */
+/**
+ * Mensaje del asistente aún vacío, al que se le van pegando los deltas.
+ *
+ * `consultas` es una LISTA porque desde que el backend encadena herramientas un
+ * turno puede tener varias: un diagnóstico lee el estado, mira la historia de
+ * la señal sospechosa y busca en el manual. Antes había un solo hueco
+ * (`herramienta` + `argumentos`) y cada consulta pisaba a la anterior, así que
+ * la traza que se enseñaba al operador mentía por omisión: decía que la
+ * respuesta salió del manual cuando también había leído dos series.
+ *
+ * `adjuntos` son los gráficos, que llegan por su propio evento y nunca pasan
+ * por el modelo. Ver `separarAdjuntos` en `backend/ia/chat.mjs`.
+ */
 const nuevoTurno = () => ({
   rol: "asistente",
   texto: "",
-  herramienta: null,
-  argumentos: null,
+  consultas: [],
+  adjuntos: [],
   bloqueada: false,
   sinRespuesta: false,
   cancelado: false,
@@ -62,12 +77,31 @@ function historialParaEnviar(mensajes) {
 
 export function useAsistente() {
   const [disponible, setDisponible] = useState(null);   // null = comprobando
-  const [mensajes, setMensajes] = useState([]);
+  /*
+   * El hilo arranca de lo GUARDADO, con el inicializador perezoso de
+   * `useState` —la función, no el valor—. Con `useState(cargar())` se leería
+   * `localStorage` en cada render y se tiraría el resultado, que en un
+   * componente que se repinta con cada token del flujo son cientos de lecturas
+   * por respuesta.
+   */
+  const [mensajes, setMensajes] = useState(cargar);
   const [estado, setEstado] = useState(null);           // "Consultando ICONICS…"
   const [ocupado, setOcupado] = useState(false);
 
   const abortador = useRef(null);
   const vivo = useRef(true);
+
+  /*
+   * Se guarda cuando el hilo cambia Y no hay consulta en curso.
+   *
+   * La condición de `ocupado` es lo importante: sin ella se escribiría en
+   * `localStorage` con cada token que llega —cuarenta veces por segundo— y
+   * cada escritura serializa el hilo entero. Al terminar la respuesta se
+   * guarda una vez, que es cuando de verdad hay algo nuevo que conservar.
+   */
+  useEffect(() => {
+    if (!ocupado) guardar(mensajes);
+  }, [mensajes, ocupado]);
 
   useEffect(() => {
     vivo.current = true;
@@ -146,20 +180,41 @@ export function useAsistente() {
 
         await leerFlujo(respuesta, {
           onEstado: (valor) => vivo.current && setEstado(valor),
+          /*
+           * El puesto en la fila, mientras espera turno.
+           *
+           * Se pinta en el mismo hueco que el estado porque responde a la
+           * misma pregunta —«¿qué está pasando?»— y porque tener dos
+           * indicadores compitiendo por 420 px de panel no cabe. En cuanto la
+           * consulta arranca de verdad, el bucle del chat emite «Pensando…» y
+           * lo sustituye solo.
+           */
+          onCola: (porDelante) =>
+            vivo.current && setEstado(
+              porDelante === 1
+                ? "Hay 1 consulta por delante…"
+                : `Hay ${porDelante} consultas por delante…`
+            ),
           onTexto: (delta) => actualizarUltimo((m) => ({ texto: m.texto + delta })),
           // Los argumentos viajan con la herramienta y se guardan enteros: son
           // lo que convierte «leyó el historiador» en «leyó el historiador de
-          // la Línea 1 el 25 de marzo», que es lo que deja ver que el modelo
-          // entendió otra máquina o otro día.
+          // la presión en la última hora», que es lo que deja ver que el modelo
+          // entendió otra señal u otro momento.
+          //
+          // Se ACUMULAN, no se sustituyen: ver `nuevoTurno`.
           onHerramienta: (nombre, argumentos) =>
-            actualizarUltimo(() => ({ herramienta: nombre, argumentos: argumentos ?? null })),
-          // `sinRedactar` sin herramienta es el callejón sin salida del
-          // servidor: no supo qué contestar. Con herramienta significa otra
+            actualizarUltimo((m) => ({
+              consultas: [...m.consultas, { nombre, argumentos: argumentos ?? null }],
+            })),
+          onAdjunto: (adjunto) =>
+            actualizarUltimo((m) => ({ adjuntos: [...m.adjuntos, adjunto] })),
+          // `sinRedactar` sin ninguna consulta es el callejón sin salida del
+          // servidor: no supo qué contestar. Con consultas significa otra
           // cosa —el backend resumió el dato él mismo— y esa sí es respuesta.
           onFin: (fin) =>
             actualizarUltimo(() => ({
               bloqueada: Boolean(fin.bloqueada),
-              sinRespuesta: Boolean(fin.sinRedactar) && !fin.herramienta,
+              sinRespuesta: Boolean(fin.sinRedactar) && !fin.herramientas?.length,
             })),
           onError: (mensaje) => actualizarUltimo(() => ({ error: mensaje })),
         });
@@ -231,6 +286,10 @@ export function useAsistente() {
   const limpiar = useCallback(() => {
     if (ocupado) return;
     setMensajes([]);
+    // Y del almacenamiento, no sólo de la pantalla: si sólo se vaciara el
+    // estado, al recargar reaparecería la conversación que el usuario acaba de
+    // borrar, que es lo contrario de lo que pidió el botón.
+    borrar();
   }, [ocupado]);
 
   return { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar };
@@ -270,19 +329,377 @@ async function leerFlujo(respuesta, manejadores) {
       }
 
       if (evento.tipo === "estado") manejadores.onEstado(evento.valor);
+      else if (evento.tipo === "cola") manejadores.onCola(evento.porDelante);
       else if (evento.tipo === "texto") manejadores.onTexto(evento.delta);
       else if (evento.tipo === "herramienta") manejadores.onHerramienta(evento.nombre, evento.argumentos);
+      else if (evento.tipo === "adjunto") manejadores.onAdjunto(evento);
       else if (evento.tipo === "fin") manejadores.onFin(evento);
       else if (evento.tipo === "error") manejadores.onError(evento.mensaje);
     }
   }
 }
 
-/** Nombre técnico de la herramienta → lo que se le enseña al operador. */
+/**
+ * Dictado por voz: grabar, transcribir y devolver el texto.
+ *
+ * ── POR QUÉ ES UN HOOK APARTE Y NO PARTE DE `useAsistente` ─────────
+ *
+ * Porque no comparte nada con él. El dictado no toca la conversación, no usa
+ * el historial y no depende de que el modelo de lenguaje esté vivo: produce
+ * texto y ahí acaba. De hecho funciona con `IA_BASE` apagado, que es una
+ * combinación rara pero perfectamente válida.
+ *
+ * Y porque su disponibilidad es OTRA: el chat depende de `IA_BASE`, el
+ * micrófono de `IA_WHISPER_BASE` **y** de que el navegador esté en un contexto
+ * seguro. Meterlos en el mismo estado obligaría a distinguir cuatro
+ * combinaciones dentro de un hook que ya tiene bastante.
+ *
+ * Lo que devuelve `detener()` es TEXTO, no una pregunta enviada. Quien lo llama
+ * lo mete en el cuadro de entrada para que el usuario lo revise. Ver la
+ * cabecera de `backend/routes/vozRoutes.mjs`.
+ */
+export function useDictado() {
+  const [disponible, setDisponible] = useState(null);   // null = comprobando
+  const [grabando, setGrabando] = useState(false);
+  const [transcribiendo, setTranscribiendo] = useState(false);
+  const [error, setError] = useState(null);
+
+  const sesion = useRef(null);
+  const vivo = useRef(true);
+
+  useEffect(() => {
+    vivo.current = true;
+    return () => {
+      vivo.current = false;
+      // Desmontar con el micrófono abierto lo dejaría encendido: el piloto del
+      // portátil seguiría diciendo que la aplicación escucha.
+      sesion.current?.cancelar();
+      sesion.current = null;
+    };
+  }, []);
+
+  /* ── ¿Hay dictado en este servidor Y en este navegador? ──────────── */
+  useEffect(() => {
+    let cancelado = false;
+
+    if (!puedeGrabar()) {
+      setDisponible(false);
+      return;
+    }
+
+    fetch(`${API_BASE}/api/voz`)
+      .then((r) => r.json())
+      .then((r) => { if (!cancelado) setDisponible(Boolean(r?.habilitado)); })
+      // Un backend sin esta ruta responde con el index.html; eso es «no hay
+      // dictado», no un error que enseñar.
+      .catch(() => { if (!cancelado) setDisponible(false); });
+
+    return () => { cancelado = true; };
+  }, []);
+
+  /** Manda un WAV a transcribir. Compartido por el micrófono y por un archivo. */
+  const transcribir = useCallback(async (wav) => {
+    setTranscribiendo(true);
+    setError(null);
+    try {
+      const respuesta = await fetch(`${API_BASE}/api/voz`, {
+        method: "POST",
+        headers: { "Content-Type": "audio/wav" },
+        body: wav,
+      });
+
+      const cuerpo = await respuesta.json().catch(() => ({}));
+      if (!respuesta.ok) throw new Error(cuerpo?.error ?? `El servidor respondió ${respuesta.status}.`);
+
+      return cuerpo?.texto ?? "";
+    } catch (e) {
+      if (vivo.current) setError(e.message);
+      return "";
+    } finally {
+      if (vivo.current) setTranscribiendo(false);
+    }
+  }, []);
+
+  const empezar = useCallback(async (opciones) => {
+    setError(null);
+    try {
+      // Las opciones llegan del modo llamada: la detección de silencio y el
+      // nivel del micrófono. El dictado con botón no las pasa, y entonces
+      // `grabar` ni siquiera monta el grafo de audio.
+      sesion.current = await grabar(opciones);
+      if (vivo.current) setGrabando(true);
+    } catch {
+      // El caso normal es que el usuario diga «no» al permiso del micrófono.
+      // No es una avería y no se pinta como tal.
+      if (vivo.current) setError("No se ha podido acceder al micrófono. Revisa el permiso del navegador.");
+    }
+  }, []);
+
+  /** Para de grabar y devuelve lo que se entendió, o cadena vacía. */
+  const detener = useCallback(async () => {
+    const actual = sesion.current;
+    sesion.current = null;
+    setGrabando(false);
+    if (!actual) return "";
+
+    let wav;
+    try {
+      wav = await actual.detener();
+    } catch (e) {
+      if (vivo.current) setError(e.message);
+      return "";
+    }
+    return transcribir(wav);
+  }, [transcribir]);
+
+  const cancelar = useCallback(() => {
+    sesion.current?.cancelar();
+    sesion.current = null;
+    setGrabando(false);
+    setError(null);
+  }, []);
+
+  /** Un archivo de audio que el usuario arrastre o elija. */
+  const desdeArchivo = useCallback(async (archivo) => {
+    setError(null);
+    try {
+      return transcribir(await aWav(archivo));
+    } catch (e) {
+      if (vivo.current) setError(e.message);
+      return "";
+    }
+  }, [transcribir]);
+
+  return {
+    disponible, grabando, transcribiendo, error,
+    empezar, detener, cancelar, desdeArchivo,
+  };
+}
+
+/**
+ * Modo manos libres: hablar con el asistente como por teléfono.
+ *
+ * Encadena el ciclo entero — escuchar, preguntar, oír la respuesta, y volver a
+ * escuchar — sin tocar el teclado. Es para el operador que está delante del
+ * equipo, con guantes o con las manos ocupadas, que es cuando de verdad hace
+ * falta preguntarle algo al tablero.
+ *
+ * ── LAS TRES REGLAS QUE LO HACEN USABLE ────────────────────────────
+ *
+ * 1. **Se envía sin confirmar.** Es la diferencia con el dictado normal, donde
+ *    el texto va al cuadro para revisarlo. Aquí no hay cuadro que mirar: pedir
+ *    confirmación convertiría el manos libres en un manos-ocupadas. El precio
+ *    es real —una frase mal oída gasta una consulta— y se paga a cambio de que
+ *    la función sirva para algo. Lo que se entendió se dice en pantalla, así
+ *    que el malentendido se ve.
+ *
+ * 2. **Se para solo al terminar el ciclo si el usuario lo apagó.** Cada paso
+ *    comprueba `activoRef` antes de encadenar el siguiente. Sin eso, apagar el
+ *    modo en mitad de una respuesta de noventa segundos no serviría de nada:
+ *    la respuesta llegaría, se leería en voz alta y volvería a escuchar.
+ *
+ * 3. **No se escucha mientras habla.** El micrófono captaría el altavoz y el
+ *    asistente se preguntaría a sí mismo. Los turnos son estrictos.
+ *
+ * ── LO QUE NO HACE ─────────────────────────────────────────────────
+ *
+ * No detecta el final de la frase por silencio. Se pulsa para parar de hablar,
+ * igual que en el dictado. Un detector de silencio en una sala de máquinas
+ * corta a mitad de frase con el ruido de fondo, y eso es peor que un botón.
+ */
+export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
+  const [activo, setActivo] = useState(false);
+  const [fase, setFase] = useState("parado");   // parado | escuchando | pensando | hablando
+  /** Nivel del micrófono, 0 a 1. Es la prueba visible de que te está oyendo. */
+  const [nivel, setNivel] = useState(0);
+
+  const dictado = useDictado();
+  const vivoEnLlamada = useRef(true);
+  const activoRef = useRef(false);
+  const yaLeido = useRef(null);
+  /** Evita que el silencio y el botón cierren el mismo turno dos veces. */
+  const cerrandoTurno = useRef(false);
+
+  const disponible = dictado.disponible === true && puedeHablar();
+
+  useEffect(() => { activoRef.current = activo; }, [activo]);
+
+  /*
+   * `escuchar` vive en una referencia, y no es un adorno.
+   *
+   * `useDictado` devuelve un objeto literal nuevo en cada render, así que
+   * cualquier callback que dependa de él cambia de identidad continuamente. Si
+   * el efecto que lee la respuesta dependiera de `escuchar`, se reiniciaría en
+   * cada render: su limpieza marcaría `cancelado` mientras la voz aún habla, y
+   * la ejecución nueva saldría por el guardia de `yaLeido`. Resultado: lee la
+   * respuesta una vez y NO vuelve a escuchar — el ciclo se rompe en la primera
+   * pregunta, que es todo el modo.
+   *
+   * Con la referencia, el efecto sólo depende de lo que de verdad significa un
+   * turno nuevo: que el modo esté activo, que la consulta haya terminado y que
+   * la respuesta sea otra.
+   */
+  const escucharRef = useRef(null);
+
+  const apagar = useCallback(() => {
+    activoRef.current = false;
+    cerrandoTurno.current = false;
+    setActivo(false);
+    setFase("parado");
+    setNivel(0);
+    callar();
+    dictado.cancelar();
+  }, [dictado]);
+
+  // Desmontar con el modo encendido dejaría el micrófono abierto y la voz
+  // hablando sola sobre una pantalla que ya no existe.
+  useEffect(() => {
+    vivoEnLlamada.current = true;
+    return () => { vivoEnLlamada.current = false; apagar(); };
+  }, [apagar]);
+
+  /**
+   * Escucha un turno y lo cierra solo cuando el que habla se calla.
+   *
+   * ── POR QUÉ AHORA SÍ HAY DETECCIÓN DE SILENCIO ─────────────────────
+   *
+   * La primera versión obligaba a pulsar para terminar de hablar, por miedo a
+   * que el ruido de una sala de máquinas cortara a mitad de frase. Pero eso no
+   * era una llamada: era un walkie con pasos extra, y en el escenario que
+   * justifica el modo —las manos ocupadas delante del equipo— tener que buscar
+   * un botón lo invalida entero.
+   *
+   * El corte se hace robusto en vez de evitarlo: el umbral se CALIBRA contra el
+   * ruido ambiente de los primeros instantes en vez de ser un número fijo, hace
+   * falta silencio sostenido de más de un segundo, y no puede dispararse antes
+   * de que a nadie le haya dado tiempo a hablar. Y el botón sigue ahí para
+   * cerrar el turno a mano cuando haga falta.
+   */
+  const escuchar = useCallback(async () => {
+    if (!activoRef.current) return;
+
+    cerrandoTurno.current = false;
+    setFase("escuchando");
+    setNivel(0);
+
+    await dictado.empezar({
+      alNivel: (v) => vivoEnLlamada.current && setNivel(v),
+      alDetectarSilencio: () => cerrarTurnoRef.current?.(),
+    });
+  }, [dictado]);
+
+  escucharRef.current = escuchar;
+
+  /**
+   * Cierra el turno de habla y manda lo que se haya entendido.
+   *
+   * Lo llaman DOS cosas: el detector de silencio y el botón. La guarda existe
+   * porque llegan casi a la vez cuando alguien pulsa justo cuando termina de
+   * hablar, y sin ella se enviaría la pregunta dos veces — dos consultas a la
+   * cola por una sola frase.
+   */
+  const cerrarTurno = useCallback(async () => {
+    if (!activoRef.current || cerrandoTurno.current) return;
+    cerrandoTurno.current = true;
+
+    setFase("pensando");
+    setNivel(0);
+    const texto = await dictado.detener();
+
+    if (!activoRef.current) return;
+
+    // Sin texto se vuelve a escuchar en vez de parar: lo normal es que no se
+    // oyera bien, y apagar el modo obligaría a encenderlo otra vez con las
+    // manos, que es justo lo que se quería evitar.
+    if (!texto) return escuchar();
+
+    preguntar(texto);
+  }, [dictado, preguntar, escuchar]);
+
+  // Por referencia, para que el detector de silencio —que se registra al
+  // arrancar la grabación— llame siempre a la versión actual.
+  const cerrarTurnoRef = useRef(null);
+  cerrarTurnoRef.current = cerrarTurno;
+
+  const encender = useCallback(() => {
+    if (!disponible) return;
+    activoRef.current = true;
+    setActivo(true);
+    // Lo que ya hubiera en pantalla no se lee: el modo empieza a partir de
+    // ahora, y leer la respuesta anterior al encenderlo desconcierta.
+    yaLeido.current = ultimaRespuesta?.texto ?? null;
+    escuchar();
+  }, [disponible, escuchar, ultimaRespuesta]);
+
+  /*
+   * Llegó una respuesta nueva y completa: se lee y se vuelve a escuchar.
+   *
+   * Se dispara con `ocupado` bajando a falso, y NO con cada trozo de texto: ver
+   * la cabecera de `vozSalida.js` sobre por qué no se lee mientras escribe.
+   */
+  useEffect(() => {
+    if (!activo || ocupado) return;
+
+    const texto = ultimaRespuesta?.texto?.trim();
+    if (!texto || texto === yaLeido.current) return;
+
+    // Un turno que acabó en error o bloqueado no se lee como si fuera una
+    // respuesta: la nota de la pantalla ya lo cuenta, y leerlo en voz alta
+    // haría sonar un fallo con el mismo tono que un dato.
+    if (ultimaRespuesta.error || ultimaRespuesta.cancelado) {
+      activoRef.current = false;
+      setActivo(false);
+      setFase("parado");
+      callar();
+      return;
+    }
+
+    yaLeido.current = texto;
+    let cancelado = false;
+
+    (async () => {
+      setFase("hablando");
+      await hablar(texto);
+      if (cancelado || !activoRef.current) return;
+      escucharRef.current?.();
+    })();
+
+    return () => { cancelado = true; };
+    // `escuchar` y `apagar` quedan fuera a propósito: cambian de identidad en
+    // cada render y reiniciarían el efecto a media respuesta. Ver `escucharRef`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activo, ocupado, ultimaRespuesta]);
+
+  return {
+    disponible,
+    activo,
+    fase,
+    nivel,
+    transcribiendo: dictado.transcribiendo,
+    error: dictado.error,
+    encender,
+    apagar,
+    cerrarTurno,
+  };
+}
+
+/**
+ * Nombre técnico de la herramienta → lo que se le enseña al operador.
+ *
+ * Cada entrada dice DE DÓNDE salió el dato, no qué hizo el modelo. Es la
+ * distinción que permite creerse la respuesta: «leyó el historiador» y «buscó
+ * en el manual» son procedencias verificables, y «calculó sobre la serie» avisa
+ * de que ese número no se leyó de ninguna parte, se derivó.
+ */
 export const ETIQUETA_HERRAMIENTA = {
   estado_del_sistema: "Leyó las ocho señales en vivo de ICONICS",
   historia_de_senal: "Leyó el historiador",
   comparar_periodos: "Comparó dos períodos del historiador",
+  analisis_de_senal: "Calculó tendencia y anomalías sobre la serie",
+  perfil_de_senal: "Midió qué es normal, sobre semanas de historial",
+  correlacionar_senales: "Cruzó varias señales del historiador",
+  grafico_de_senal: "Dibujó la serie del historiador",
+  consultar_documentacion: "Buscó en la documentación de planta",
 };
 
 /**
@@ -316,6 +733,21 @@ export function describirConsulta(nombre, argumentos) {
 
   const senal = leer(argumentos.senal);
   if (senal) partes.push(senal);
+
+  // `correlacionar_senales` recibe una lista, no una señal suelta. Sin esto la
+  // línea de traza salía sólo con el período y no dejaba ver QUÉ cruzó, que es
+  // precisamente lo que hay que poder comprobar en un diagnóstico.
+  if (Array.isArray(argumentos.senales)) {
+    const nombres = argumentos.senales.map(leer).filter(Boolean);
+    if (nombres.length) partes.push(nombres.join(" + "));
+  } else if (leer(argumentos.senales)) {
+    partes.push(leer(argumentos.senales));
+  }
+
+  // Lo que se buscó en el manual se enseña literal: es la traducción que hizo
+  // el modelo de la pregunta del usuario, y es donde se ve si buscó otra cosa.
+  const consulta = leer(argumentos.pregunta);
+  if (consulta) partes.push(`«${consulta}»`);
 
   if (nombre === "comparar_periodos") {
     const a = leer(argumentos.periodoA);

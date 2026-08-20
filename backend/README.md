@@ -222,15 +222,20 @@ operador vuelve a pulsar y deja dos preguntas compitiendo por la misma GPU.
 | Evento | Cuándo |
 |---|---|
 | `{ tipo: 'estado', valor }` | Cambia el paso: pensando → consultando → redactando |
+| `{ tipo: 'cola', porDelante }` | Cuántas consultas hay por delante mientras espera turno |
 | `{ tipo: 'herramienta', nombre, argumentos }` | El modelo decidió qué consultar |
 | `{ tipo: 'texto', delta }` | Un trozo de la respuesta |
 | `{ tipo: 'fin', herramienta, bloqueada, duracionMs }` | Terminó |
 | `{ tipo: 'error', mensaje }` | Falló, con el motivo accionable |
 
-Códigos que no son 200: **503** sin `IA_BASE`, **409** si ya hay otra consulta
-en curso —llama-server corre con `--parallel 1`, y dos preguntas simultáneas
-tardan el doble las dos—, **400** si la pregunta está vacía o pasa de 2000
-caracteres.
+Una consulta en curso ya no rechaza a la siguiente. Se atiende de una en una
+—llama-server corre con `--parallel 1`, y dos preguntas simultáneas tardan el
+doble las dos— pero la segunda se **encola** (`ia/cola.mjs`): su flujo SSE se
+abre en el acto y recibe `{ tipo: 'cola', porDelante }` con su puesto, que se
+reemite cada vez que alguien de delante termina.
+
+Códigos que no son 200: **503** sin `IA_BASE` o con la cola llena (tope de 8 en
+espera), **400** si la pregunta está vacía o pasa de 2000 caracteres.
 
 **El asistente sólo puede escribir una cosa: encender o apagar la bomba**, con
 la herramienta `controlar_bomba`, que escribe en `ac:TDCON/DEMO/SENSORES/CONTROL`.

@@ -136,7 +136,7 @@ function Shell() {
             para que un fallo suyo no se lleve por delante el tablero. Un
             wallboard de planta tiene que seguir mostrando sus señales aunque el
             chat reviente. */}
-        <ErrorBoundary etiqueta="Asistente">
+        <ErrorBoundary etiqueta="Tdconcito">
           {/* Sin respaldo visible: mientras se descarga su trozo no debe
               aparecer ni un hueco ni un esqueleto encima del tablero. */}
           <Suspense fallback={null}>

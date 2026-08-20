@@ -87,7 +87,64 @@ function historialAMensajes(historial) {
 export const ESTADOS = {
   pensando: 'Pensando…',
   consultando: 'Consultando ICONICS…',
+  documentacion: 'Buscando en la documentación…',
+  analizando: 'Analizando los datos…',
+  // La bomba no se «consulta»: se actúa sobre ella, y la escritura tarda lo
+  // suyo porque `controlar_bomba` relee el punto para confirmar el efecto. Un
+  // «Consultando ICONICS…» ahí diría que se está leyendo algo que no es.
+  controlando: 'Actuando sobre la bomba…',
   redactando: 'Redactando la respuesta…',
+}
+
+/**
+ * Qué se le enseña al operador mientras corre cada herramienta.
+ *
+ * No es decoración. Una consulta encadenada son entre uno y tres minutos, y
+ * «Pensando…» fijo durante ese rato es indistinguible de un cuelgue: el
+ * operador pulsa otra vez y ahora hay dos preguntas peleándose por la misma
+ * GPU. Ver la cabecera de `chatRoutes.mjs`.
+ */
+const ESTADO_POR_HERRAMIENTA = {
+  estado_del_sistema: ESTADOS.consultando,
+  historia_de_senal: ESTADOS.consultando,
+  comparar_periodos: ESTADOS.consultando,
+  analisis_de_senal: ESTADOS.analizando,
+  perfil_de_senal: ESTADOS.analizando,
+  correlacionar_senales: ESTADOS.analizando,
+  grafico_de_senal: ESTADOS.consultando,
+  consultar_documentacion: ESTADOS.documentacion,
+  controlar_bomba: ESTADOS.controlando,
+}
+
+/**
+ * Saca del resultado de una herramienta lo que NO puede entrar en el contexto
+ * del modelo.
+ *
+ * El contrato es el guion bajo: cualquier clave `_algo` es carga útil para la
+ * pantalla, no para el modelo. Hoy sólo la usa `grafico_de_senal`, cuyo SVG
+ * son decenas de miles de caracteres — meterlo en los mensajes desbordaba la
+ * ventana de contexto y expulsaba las instrucciones y el propio dato que había
+ * que contar.
+ *
+ * @returns {{ paraElModelo: object, adjuntos: object[] }}
+ */
+function separarAdjuntos(resultado) {
+  if (!resultado || typeof resultado !== 'object') {
+    return { paraElModelo: resultado, adjuntos: [] }
+  }
+
+  const paraElModelo = {}
+  const adjuntos = []
+
+  for (const [clave, valor] of Object.entries(resultado)) {
+    if (clave.startsWith('_')) {
+      if (valor) adjuntos.push(valor)
+    } else {
+      paraElModelo[clave] = valor
+    }
+  }
+
+  return { paraElModelo, adjuntos }
 }
 
 /**
@@ -143,6 +200,65 @@ const MARCADO_HERRAMIENTA = ['<tool_call>', '<function=', '<tools>', '<|tool_cal
 /** Longitud del marcador más largo, para no partirlo entre dos trozos. */
 const MARGEN_MARCADO = Math.max(...MARCADO_HERRAMIENTA.map(m => m.length))
 
+/**
+ * Quita el markdown que el modelo escribe pese a tenerlo prohibido.
+ *
+ * ── POR QUÉ HACE FALTA SI YA ESTÁ EN LAS INSTRUCCIONES ─────────────
+ *
+ * Porque la regla 12 se la salta. Medido con qwen2.5:7b contra Ollama, a la
+ * pregunta más simple de todas:
+ *
+ *     - **Nivel del tanque**: 55.2%
+ *
+ * El panel del asistente pinta el texto tal cual —es `whiteSpace: pre-wrap`,
+ * no un renderizador de markdown— así que eso llega a la pantalla de planta
+ * con los asteriscos puestos. No es un fallo grave, es un fallo FEO, y de los
+ * que aparecen en la primera frase de una demostración.
+ *
+ * Mismo criterio que las demás redes de seguridad de este archivo: una regla
+ * del prompt que el modelo puede ignorar no es una garantía. Y el modelo se
+ * cambia con una variable de entorno, así que el arreglo no puede vivir sólo
+ * en unas instrucciones escritas para el que corre hoy.
+ *
+ * ── QUÉ NO TOCA ────────────────────────────────────────────────────
+ *
+ * Los guiones y asteriscos que NO son marcado. Un rango como «3-5 bar» o una
+ * resta llevan guion, y el de viñeta sólo cuenta al principio de línea. Los
+ * asteriscos sueltos se dejan: sólo se quitan los pares, que es lo que produce
+ * la negrita.
+ */
+function limpiarMarkdown(texto, empiezaLinea) {
+  /*
+   * Los marcadores se quitan SUELTOS, no por pares, y esto es lo único no
+   * obvio de la función.
+   *
+   * Una expresión que exigiera el par —abrir con dos asteriscos, capturar el
+   * contenido y cerrar con otros dos— no funciona aquí, y falla de una forma
+   * que sólo se ve con el flujo real: el texto se emite en trozos, y entre el
+   * marcador que abre y el que cierra caben más caracteres de los que se
+   * retienen, así que casi nunca caen en el mismo trozo. La expresión no
+   * casaba jamás y los asteriscos salían igual a la pantalla.
+   *
+   * Quitarlos sueltos es seguro AQUÍ porque el asistente escribe texto llano
+   * sobre lecturas de proceso: ni un nivel, ni una presión, ni un nombre de
+   * tag de este árbol lleva asteriscos dobles, guiones bajos dobles ni acentos
+   * graves. En un chat de propósito general esto sería demasiado agresivo; en
+   * éste, un asterisco doble sólo puede venir de que el modelo se saltó la
+   * regla 12 de sus instrucciones.
+   */
+  let resultado = texto
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .replace(/`/g, '')
+
+  // Los marcadores de principio de línea: títulos y viñetas. Sólo cuentan
+  // pegados al salto, por eso hace falta saber si este trozo empieza línea.
+  resultado = resultado.replace(/\n[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+)/g, '\n')
+  if (empiezaLinea) resultado = resultado.replace(/^[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+)/, '')
+
+  return resultado
+}
+
 /** Posición del primer marcado en el texto, o -1. */
 function buscarMarcado(texto) {
   let primero = -1
@@ -183,9 +299,10 @@ function hoyLocal() {
  * Son parte del programa, no un adorno: es lo único que el modelo lee para
  * decidir cuándo llamar a una herramienta y qué hacer cuando no hay dato.
  */
-function instrucciones(catalogo) {
+function instrucciones(catalogo, maxPasos) {
   return [
-    'Eres el asistente de un tablero que vigila un SISTEMA DE AGUA INDUSTRIAL: un tanque, un',
+    'Te llamas Tdconcito. Eres el asistente de un tablero que vigila un SISTEMA DE AGUA',
+    'INDUSTRIAL: un tanque, un',
     'grupo de bombeo, una red de distribución y su suministro eléctrico. Respondes en español,',
     'con frases cortas.',
     '',
@@ -212,6 +329,10 @@ function instrucciones(catalogo) {
     '   vienen sin unidad, y decir "l/s" o "bares" sería inventarse la magnitud. Si la',
     '   herramienta te da la unidad, úsala; si te la da vacía, di el número a secas.',
     '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de cuándo.',
+    '5b. Las BANDAS con las que se juzga cada señal son estimaciones nuestras y NO se parecen a',
+    '    esta instalación: medido contra el servidor real, la presión relativa pasa el 92 % del',
+    '    tiempo por debajo de su «mínimo». Por eso, cuando te pregunten si un valor es normal o',
+    '    raro, NO contestes con la banda: usa perfil_de_senal, que lo mide.',
     '6. El ESTADO de una señal («en banda», «en aviso», «fuera de límite») lo calcula el tablero',
     '   comparando el valor contra límites estimados por nosotros, NO por quien opera la',
     '   instalación, y este árbol no tiene alarmas configuradas. Cuando digas que algo está',
@@ -229,10 +350,43 @@ function instrucciones(catalogo) {
     '   que hay 8 señales, 5 en banda y 3 en reposo, di exactamente eso; no restes, no sumes',
     '   y no repartas por activos de tu cuenta. Una cuenta mal hecha en la frase final estropea',
     '   una consulta que salió bien.',
-    '10. Tienes UNA sola consulta por pregunta. No planees varios pasos ni anuncies que vas a',
-    '    consultar algo más: no vas a poder. Elige la herramienta que responda de una vez.',
-    '    estado_del_sistema devuelve las OCHO señales juntas, así que casi cualquier pregunta',
-    '    sobre el momento actual se responde con esa sola llamada.',
+    `10. Puedes encadenar hasta ${maxPasos} consultas para una misma pregunta, y en cada ronda`,
+    '    puedes pedir varias herramientas a la vez. Pero no gastes pasos de más: si la pregunta',
+    '    es "¿qué nivel tiene el tanque?", una llamada a estado_del_sistema la responde entera,',
+    '    porque devuelve las OCHO señales juntas. Encadena sólo cuando la respuesta lo necesite',
+    '    de verdad — un diagnóstico, una comparación, algo que hay que buscar en el manual.',
+    '    Cuando ya tengas con qué contestar, contesta: cada consulta de más son segundos que',
+    '    el operador pasa mirando una pantalla que no dice nada.',
+    '',
+    'CÓMO SE DIAGNOSTICA UNA AVERÍA:',
+    '',
+    'Si te preguntan por qué ha fallado algo, o qué ha podido causar un problema, ése es',
+    'justamente el caso para encadenar consultas. El camino que funciona es:',
+    '',
+    '  a) estado_del_sistema, para ver cómo está todo AHORA y qué señal está mal.',
+    '  b) analisis_de_senal o historia_de_senal sobre las señales sospechosas, para ver qué',
+    '     pasó ANTES del fallo. Las anomalías que devuelve analisis_de_senal son las candidatas.',
+    '  b2) perfil_de_senal si necesitas saber si un valor es RARO. Compara contra semanas de',
+    '     historia real en vez de contra las bandas, que son estimaciones nuestras. Antes de',
+    '     decir que algo es anómalo, compruébalo aquí.',
+    '  c) correlacionar_senales cuando quieras saber si dos magnitudes se movieron a la vez.',
+    '     Eso es lo que distingue "la presión cayó porque cayó la tensión" de "las dos cosas',
+    '     pasaron el mismo día".',
+    '  d) consultar_documentacion si el manual dice algo del componente o del código de error.',
+    '',
+    'Y AL REDACTAR EL DIAGNÓSTICO:',
+    '',
+    'Separa SIEMPRE dos cosas, y dilo con estas palabras o parecidas: lo que has MEDIDO y lo',
+    'que es una HIPÓTESIS. "La tensión cayó a 96 V a las 14:32 y la carga del motor se fue a',
+    'cero un minuto después" es medido. "Probablemente el motor se paró por subtensión" es una',
+    'hipótesis, y va marcada como tal. Nunca las mezcles en la misma frase sin distinguirlas.',
+    '',
+    'Si los datos NO permiten explicar el fallo, dilo. "Con lo que mide esta instalación no',
+    'puedo determinar la causa; lo que sí veo es esto" es una respuesta correcta y útil. Una',
+    'causa inventada que suena razonable manda a alguien a revisar el equipo equivocado.',
+    '',
+    'CORRELACIÓN NO ES CAUSA. Si dos señales se mueven a la vez, eso es un indicio, no una',
+    'demostración. Dilo cuando lo uses.',
     /*
      * Esta regla se mantiene CORTA a propósito.
      *
@@ -264,8 +418,73 @@ function instrucciones(catalogo) {
   ].join('\n')
 }
 
+/**
+ * La firma con la que se reconoce una consulta ya hecha.
+ *
+ * ── POR QUÉ NO BASTA `JSON.stringify` ──────────────────────────────
+ *
+ * Porque el modelo escribe el mismo argumento de formas distintas. Medido con
+ * qwen2.5:7b en una sola pregunta de diagnóstico:
+ *
+ *     historia_de_senal({ senal: "Presión relativa", periodo: "últimas 24 horas" })
+ *     historia_de_senal({ senal: "presión relativa", periodo: "las últimas 24 horas" })
+ *
+ * Son la MISMA lectura —el resolvedor de señales y el de períodos las llevan al
+ * mismo sitio— pero como cadenas no se parecen, así que la guarda de repetidas
+ * no las veía y se pagaban dos viajes a ICONICS y treinta segundos de espera
+ * por el segundo.
+ *
+ * Se normaliza igual que hace `herramientas.mjs` para resolver nombres —sin
+ * acentos, en minúsculas, sin signos— y además se quitan los artículos
+ * iniciales, que es la otra forma en que varía («la última hora» / «última
+ * hora»). Las claves se ordenan porque el orden en que el modelo escribe los
+ * argumentos tampoco es estable.
+ *
+ * Es deliberadamente conservador: normaliza la FORMA, no el significado. Dos
+ * períodos que se resuelven a la misma ventana pero se escriben distinto
+ * («ayer» y una fecha concreta) siguen contando como consultas distintas, y
+ * eso está bien: aquí un falso positivo le negaría al modelo un dato que
+ * necesita, que es mucho peor que un viaje de más.
+ */
+function firmaDe(nombre, argumentos) {
+  const normalizar = (valor) => {
+    if (Array.isArray(valor)) return valor.map(normalizar).join('|')
+    if (valor === null || valor === undefined) return ''
+    if (typeof valor !== 'string') return String(valor)
+
+    return valor
+      .normalize('NFD')
+      // Escrito con escapes y no con acentos literales: son caracteres
+      // combinantes, invisibles al abrir el archivo. Mismo motivo y misma
+      // forma que en `shared/periodo.js` y en `herramientas.mjs`.
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/^(?:el|la|los|las|un|una|de|del)\s+/g, '')
+      .trim()
+  }
+
+  const partes = Object.keys(argumentos ?? {})
+    .sort()
+    .map(clave => `${clave}=${normalizar(argumentos[clave])}`)
+
+  return `${nombre}:${partes.join(';')}`
+}
+
 export function createChat({ config, herramientas }) {
   const { base, timeoutMs, maxTokens, modelo } = config.ia
+  const maxPasos = config.ia.maxPasos ?? 1
+
+  /**
+   * Tope duro de herramientas ejecutadas en un turno.
+   *
+   * `maxPasos` limita las RONDAS, pero en cada ronda el modelo puede pedir
+   * varias herramientas a la vez, así que sin este segundo tope tres rondas
+   * podrían ser quince lecturas contra ICONICS por una sola pregunta. Se fija
+   * en el doble de las rondas: deja sitio para el paralelismo útil —estado e
+   * historia en la misma ronda— y corta el bucle patológico.
+   */
+  const MAX_HERRAMIENTAS = maxPasos * 2
 
   /**
    * ¿Ha llamado el modelo a alguna herramienta desde que arrancó el proceso?
@@ -375,6 +594,10 @@ export function createChat({ config, herramientas }) {
     let pendiente = ''    // texto leído y aún no emitido
     let emitido = ''
     let marcado = false
+    // Si el próximo trozo empieza una línea: lo necesita `limpiarMarkdown`
+    // para saber si un «- » es una viñeta o un signo menos. Empieza en `true`
+    // porque el primer carácter de la respuesta sí abre línea.
+    let enInicioDeLinea = true
 
     /** Emite lo que ya es seguro y avisa si aparece marcado de herramienta. */
     const vaciar = (final = false) => {
@@ -385,7 +608,7 @@ export function createChat({ config, herramientas }) {
         // A partir de aquí el modelo dejó de contestar y empezó a pedir otra
         // herramienta. Lo que va delante suele ser un preámbulo («voy a
         // consultar…»), así que se emite y se corta ahí.
-        const util = pendiente.slice(0, corte)
+        const util = limpiarMarkdown(pendiente.slice(0, corte), enInicioDeLinea)
         if (util) { emitido += util; onEvento({ tipo: 'texto', delta: util }) }
         pendiente = ''
         marcado = true
@@ -393,12 +616,58 @@ export function createChat({ config, herramientas }) {
       }
 
       // Se retiene la cola por si es el principio de un marcador partido.
-      const seguro = final ? pendiente : pendiente.slice(0, Math.max(0, pendiente.length - MARGEN_MARCADO))
+      let corteSeguro = final ? pendiente.length : Math.max(0, pendiente.length - MARGEN_MARCADO)
+
+      /*
+       * Y se retrocede si el corte cae DENTRO de un marcador de markdown.
+       *
+       * Sin esto, `limpiarMarkdown` recibía un `*` suelto al final de un trozo
+       * y el otro `*` al principio del siguiente: ninguno de los dos parecía un
+       * marcador, y el par salía intacto a la pantalla. El síntoma medido era
+       * «Presión**: 3.1» — con el asterisco de apertura bien quitado y el de
+       * cierre puesto, que es de los fallos que parecen aleatorios porque
+       * dependen de dónde caiga el trozo.
+       *
+       * Son como mucho dos caracteres de retroceso, imperceptibles.
+       */
+      while (corteSeguro > 0 && !final && /[*_#]/.test(pendiente[corteSeguro - 1])) {
+        corteSeguro -= 1
+      }
+
+      /*
+       * Lo mismo con las VIÑETAS, que se parten de otra manera.
+       *
+       * Un marcador de principio de línea son tres cosas seguidas —el salto, el
+       * guion y el espacio— y `limpiarMarkdown` sólo lo reconoce si las tres
+       * están en el mismo trozo. Medido contra qwen2.5:7b: un trozo acabó en
+       * «…encender si:\n-» y el siguiente empezó en « El nivel», así que ni el
+       * primero tenía el espacio ni el segundo el salto, y el guion salía a la
+       * pantalla. Cuatro de las cinco viñetas se limpiaban y una no, que es lo
+       * que hacía parecer el fallo aleatorio.
+       *
+       * Se retrocede hasta antes del salto de línea, dejando la línea entera
+       * para el trozo siguiente. Cuesta unos caracteres de retraso sobre un
+       * texto que ya llega troceado.
+       */
+      if (!final) {
+        const colaIncompleta = pendiente.slice(0, corteSeguro).match(/\n[ \t]*[-*+#]{0,6}[ \t]*$/)
+        if (colaIncompleta) corteSeguro -= colaIncompleta[0].length
+      }
+
+      const seguro = pendiente.slice(0, corteSeguro)
       if (!seguro) return
 
       pendiente = pendiente.slice(seguro.length)
-      emitido += seguro
-      onEvento({ tipo: 'texto', delta: seguro })
+
+      const limpio = limpiarMarkdown(seguro, enInicioDeLinea)
+      enInicioDeLinea = seguro.endsWith('\n')
+
+      // Un trozo que era SÓLO marcado —«- » al abrir una viñeta— se queda
+      // vacío al limpiarlo. Emitirlo mandaría un delta vacío a la pantalla.
+      if (!limpio) return
+
+      emitido += limpio
+      onEvento({ tipo: 'texto', delta: limpio })
     }
 
     for await (const trozo of respuesta.body) {
@@ -458,23 +727,182 @@ export function createChat({ config, herramientas }) {
     const previos = historialAMensajes(historial)
 
     const messages = [
-      { role: 'system', content: instrucciones(catalogo) },
+      { role: 'system', content: instrucciones(catalogo, maxPasos) },
       ...previos,
       { role: 'user', content: pregunta },
     ]
 
-    onEvento({ tipo: 'estado', valor: ESTADOS.pensando })
-    const primera = await pasadaConHerramientas(messages, signal)
+    /* ── El bucle de consultas ─────────────────────────────────────── */
 
-    /* ── El modelo no pidió ninguna herramienta ────────────────────── */
-    if (!primera.llamadas.length) {
-      if (contieneCifras(primera.contenido)) {
+    /** Nombres de lo que se ha ejecutado, en orden. Es la traza del turno. */
+    const ejecutadas = []
+    /** `herramienta:{argumentos}` de todo lo pedido, para no repetir consultas. */
+    const firmasVistas = new Set()
+    /** Resultados, para la red de seguridad y para los avisos obligatorios. */
+    const resultados = []
+    let ejecutadasTotal = 0
+
+    /**
+     * Lo que dijo el modelo cuando decidió NO llamar a nada.
+     *
+     * Se guarda porque en la primera ronda puede ser la respuesta entera —un
+     * saludo, una aclaración— mientras que en las siguientes es el preámbulo de
+     * una redacción que aún no ha empezado.
+     */
+    let sinLlamadas = null
+
+    for (let paso = 0; paso < maxPasos; paso++) {
+      onEvento({
+        tipo: 'estado',
+        // A partir de la segunda ronda ya está trabajando sobre datos, no
+        // decidiendo desde cero. Decir «Pensando…» otra vez haría parecer que
+        // ha vuelto al principio.
+        valor: paso === 0 ? ESTADOS.pensando : ESTADOS.analizando,
+      })
+
+      const ronda = await pasadaConHerramientas(messages, signal)
+
+      if (!ronda.llamadas.length) {
+        sinLlamadas = ronda.contenido
+        break
+      }
+
+      /*
+       * Se ejecutan TODAS las herramientas de la ronda, y en paralelo.
+       *
+       * En paralelo porque son lecturas independientes contra el mismo
+       * servidor: pedir el estado y la historia de una señal una detrás de otra
+       * sería sumar dos veces la latencia de ICONICS por nada. `ejecutar()` no
+       * lanza —devuelve el fallo como dato—, así que no hace falta envolver
+       * cada una: un error de una no cancela las demás, que es justo lo que se
+       * quiere en un diagnóstico.
+       */
+      const dePaso = ronda.llamadas.slice(0, Math.max(0, MAX_HERRAMIENTAS - ejecutadasTotal))
+      if (!dePaso.length) {
+        logger.warn('Se alcanzó el tope de herramientas del turno', {
+          pregunta: pregunta.slice(0, 120), ejecutadas,
+        })
+        break
+      }
+
+      const invocaciones = dePaso.map(llamada => {
+        const nombre = llamada.function?.name ?? ''
+        let argumentos = {}
+        try {
+          argumentos = JSON.parse(llamada.function?.arguments || '{}')
+        } catch {
+          // Argumentos ilegibles no abortan la llamada: casi todas las
+          // herramientas tienen defaults razonables, y `estado_del_sistema` ni
+          // siquiera lleva parámetros. Que la herramienta se queje es más útil
+          // que un error de parseo que el modelo no sabe corregir.
+          argumentos = {}
+        }
+        return { llamada, nombre, argumentos, firma: firmaDe(nombre, argumentos) }
+      })
+
+      /*
+       * Una consulta repetida no se vuelve a ejecutar.
+       *
+       * ── POR QUÉ HACE FALTA ESTO ────────────────────────────────────
+       *
+       * Un modelo pequeño que no sabe qué hacer con un resultado tiende a
+       * volver a pedirlo, palabra por palabra. Sin esta guarda, esa indecisión
+       * gasta las tres rondas en la MISMA lectura: tres viajes a ICONICS y
+       * hasta dos minutos de espera para acabar redactando con lo que ya tenía
+       * en el primer paso.
+       *
+       * Se le contesta con una nota en vez de con el dato repetido, y la nota
+       * le dice explícitamente que conteste. Devolverle el mismo JSON otra vez
+       * sería premiar el bucle.
+       */
+      const repetidas = invocaciones.filter(i => firmasVistas.has(i.firma))
+      for (const { firma } of invocaciones) firmasVistas.add(firma)
+
+      onEvento({
+        tipo: 'estado',
+        valor: ESTADO_POR_HERRAMIENTA[invocaciones[0].nombre] ?? ESTADOS.consultando,
+      })
+      for (const { nombre, argumentos, firma } of invocaciones) {
+        if (!repetidas.some(r => r.firma === firma)) {
+          onEvento({ tipo: 'herramienta', nombre, argumentos })
+        }
+      }
+
+      vistaAlgunaLlamada = true
+      ejecutadasTotal += invocaciones.length
+
+      const crudos = await Promise.all(
+        invocaciones.map(({ nombre, argumentos, firma }) =>
+          repetidas.some(r => r.firma === firma)
+            ? Promise.resolve({
+              ok: true,
+              yaConsultado: true,
+              nota:
+                  `Ya llamaste a ${nombre} con estos mismos argumentos en este turno y tienes su ` +
+                  `resultado más arriba. No lo vuelvas a pedir: responde ya con lo que tienes, o ` +
+                  `si de verdad te falta algo, pide una consulta DISTINTA.`,
+            })
+            : herramientas.ejecutar(nombre, argumentos)
+        )
+      )
+
+      // Un solo mensaje `assistant` con todas las llamadas de la ronda, y
+      // después un mensaje `tool` por cada una: es el formato que espera la
+      // plantilla de Qwen, y partirlo en varios turnos de assistant confunde al
+      // modelo sobre qué respuesta corresponde a qué llamada.
+      messages.push({ role: 'assistant', content: null, tool_calls: dePaso })
+
+      for (let i = 0; i < invocaciones.length; i++) {
+        const { llamada, nombre } = invocaciones[i]
+        const { paraElModelo, adjuntos } = separarAdjuntos(crudos[i])
+
+        // Los adjuntos van directos a la pantalla y NUNCA a los mensajes. Ver
+        // `separarAdjuntos`.
+        for (const adjunto of adjuntos) onEvento({ tipo: 'adjunto', ...adjunto })
+
+        // Una repetición no se apunta en la traza ni cuenta como consulta: no
+        // se leyó nada. Enseñarla al operador como una línea más de procedencia
+        // diría que el dato se consultó dos veces, que es falso.
+        if (!paraElModelo?.yaConsultado) {
+          logger.info('Herramienta ejecutada', { nombre, ok: paraElModelo?.ok, paso })
+          ejecutadas.push(nombre)
+          resultados.push({ nombre, resultado: paraElModelo })
+        } else {
+          logger.warn('El modelo repitió una consulta idéntica; se le devuelve una nota', {
+            nombre, paso,
+          })
+        }
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: llamada.id ?? `${nombre}-${i}`,
+          name: nombre,
+          content: JSON.stringify(paraElModelo),
+        })
+      }
+
+      /*
+       * Si TODA la ronda fue repetición, se sale a redactar sin gastar otra.
+       *
+       * El modelo ya tiene la nota diciéndole que conteste, y darle una ronda
+       * más para que decida lo mismo son otros treinta segundos de espera por
+       * una lectura que no va a ocurrir. La pasada de redactar es la que hace
+       * falta ahora, y va justo después del bucle.
+       */
+      if (repetidas.length === invocaciones.length) break
+    }
+
+    /* ── Nunca llamó a nada: la respuesta es lo que escribió ────────── */
+    if (!ejecutadas.length) {
+      const contenido = sinLlamadas ?? ''
+
+      if (contieneCifras(contenido)) {
         logger.warn('El modelo respondió con cifras sin llamar a ninguna herramienta', {
           pregunta: pregunta.slice(0, 120),
           vistaAlgunaLlamada,
         })
         onEvento({ tipo: 'texto', delta: avisoDeBloqueo(vistaAlgunaLlamada) })
-        return { herramienta: null, bloqueada: true, turnosRecordados: previos.length }
+        return { herramientas: [], bloqueada: true, turnosRecordados: previos.length }
       }
 
       /*
@@ -485,50 +913,23 @@ export function createChat({ config, herramientas }) {
        * Una burbuja vacía no se distingue de una avería, así que se dice qué
        * sí se puede preguntar, que además es la información útil.
        */
-      if (!primera.contenido.trim()) {
+      if (!contenido.trim()) {
         logger.warn('El modelo no llamó a ninguna herramienta y tampoco escribió nada', {
           pregunta: pregunta.slice(0, 120),
         })
         onEvento({ tipo: 'texto', delta: NO_SE_QUE_CONTESTAR })
         return {
-          herramienta: null, bloqueada: false, sinRedactar: true,
+          herramientas: [], bloqueada: false, sinRedactar: true,
           turnosRecordados: previos.length,
         }
       }
 
       // Sin cifras es una respuesta legítima: un saludo, una aclaración.
-      onEvento({ tipo: 'texto', delta: primera.contenido })
-      return { herramienta: null, bloqueada: false, turnosRecordados: previos.length }
+      onEvento({ tipo: 'texto', delta: contenido })
+      return { herramientas: [], bloqueada: false, turnosRecordados: previos.length }
     }
 
-    /* ── Ejecutar la herramienta ───────────────────────────────────── */
-    const llamada = primera.llamadas[0]
-    const nombre = llamada.function?.name ?? ''
-
-    let argumentos = {}
-    try {
-      argumentos = JSON.parse(llamada.function?.arguments || '{}')
-    } catch {
-      argumentos = {}
-    }
-
-    vistaAlgunaLlamada = true
-
-    onEvento({ tipo: 'estado', valor: ESTADOS.consultando })
-    onEvento({ tipo: 'herramienta', nombre, argumentos })
-
-    const resultado = await herramientas.ejecutar(nombre, argumentos)
-    logger.info('Herramienta ejecutada', { nombre, ok: resultado.ok })
-
-    /* ── Redactar con el dato delante ──────────────────────────────── */
-    messages.push({ role: 'assistant', content: null, tool_calls: [llamada] })
-    messages.push({
-      role: 'tool',
-      tool_call_id: llamada.id ?? nombre,
-      name: nombre,
-      content: JSON.stringify(resultado),
-    })
-
+    /* ── Redactar con los datos delante ─────────────────────────────── */
     onEvento({ tipo: 'estado', valor: ESTADOS.redactando })
     const { texto, marcado } = await pasadaRedactando(messages, signal, onEvento)
 
@@ -540,23 +941,26 @@ export function createChat({ config, herramientas }) {
      *    esta pasada; pero el modelo se cambia con un `-m` y sin tocar
      *    código, así que la red se queda.
      *  - `marcado` → el modelo intentó llamar a OTRA herramienta en vez de
-     *    redactar, porque la primera no le bastó. Lo que dijo antes es un
-     *    preámbulo («voy a consultar…»), no una respuesta.
+     *    redactar, porque ya se le habían acabado las rondas. Lo que dijo antes
+     *    es un preámbulo («voy a consultar…»), no una respuesta.
      *
-     * En ambos casos el dato ya está aquí y sería absurdo perderlo por que el
-     * modelo no supiera contarlo.
+     * En ambos casos los datos ya están aquí y sería absurdo perderlos por que
+     * el modelo no supiera contarlos. Se resume el ÚLTIMO resultado que salió
+     * bien: es el que el modelo estaba a punto de redactar.
      */
     if (marcado || !texto.trim()) {
       logger.warn('El modelo no llegó a redactar la respuesta', {
-        herramienta: nombre,
+        herramientas: ejecutadas,
         motivo: marcado ? 'intentó otra herramienta' : 'no escribió nada',
       })
+      const ultimoBueno = [...resultados].reverse().find(r => r.resultado?.ok) ?? resultados.at(-1)
       onEvento({
         tipo: 'texto',
-        delta: (texto.trim() ? '\n\n' : '') + resumirSinModelo(nombre, resultado),
+        delta: (texto.trim() ? '\n\n' : '') +
+          resumirSinModelo(ultimoBueno.nombre, ultimoBueno.resultado),
       })
       return {
-        herramienta: nombre, ok: resultado.ok, bloqueada: false,
+        herramientas: ejecutadas, bloqueada: false,
         sinRedactar: true, marcado, turnosRecordados: previos.length,
       }
     }
@@ -571,14 +975,22 @@ export function createChat({ config, herramientas }) {
      * herramienta para que pueda redactarlo con naturalidad, pero si no lo
      * hace lo añade el backend. Una advertencia que se pierde no es una
      * advertencia.
+     *
+     * Con varias herramientas por turno el aviso se repite en cada resultado,
+     * así que se deduplica: verlo tres veces seguidas al pie de una respuesta
+     * lo convierte en ruido que se deja de leer, que es como perderlo.
      */
-    if (resultado.aviso && !mencionaElAviso(texto)) {
-      onEvento({ tipo: 'texto', delta: `\n\n⚠ ${resultado.aviso}` })
+    const avisos = [...new Set(resultados.map(r => r.resultado?.aviso).filter(Boolean))]
+    for (const aviso of avisos) {
+      if (!mencionaElAviso(texto)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
     }
 
     return {
-      herramienta: nombre, ok: resultado.ok, bloqueada: false,
-      longitud: texto.length, turnosRecordados: previos.length,
+      herramientas: ejecutadas,
+      ok: resultados.every(r => r.resultado?.ok),
+      bloqueada: false,
+      longitud: texto.length,
+      turnosRecordados: previos.length,
     }
   }
 

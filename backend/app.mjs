@@ -11,13 +11,17 @@ import { createRouter } from './http/router.mjs'
 import { sendError, sendText } from './http/responses.mjs'
 import { createStaticFileServer, isAssetPath } from './http/staticFiles.mjs'
 import { createChat } from './ia/chat.mjs'
+import { createCola } from './ia/cola.mjs'
+import { createIndiceDocumentos } from './ia/documentos.mjs'
 import { createHerramientas } from './ia/herramientas.mjs'
+import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
 import { logger } from './logger.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
+import { registerVozRoutes } from './routes/vozRoutes.mjs'
 
 export function createApp(config) {
   const startedAt = Date.now()
@@ -44,17 +48,52 @@ export function createApp(config) {
   // configurable en esta instalación, es un hecho medido del servidor y vive
   // en el catálogo (`shared/eva/senales.js`, campo `historizado`). Ver la
   // cabecera de `ia/herramientas.mjs`.
+  //
+  // La documentación de planta se monta sólo si hay carpeta configurada. Sin
+  // `IA_DOCS_DIR` la herramienta `consultar_documentacion` existe igual pero
+  // responde que no hay documentación en este servidor — que es un hecho que el
+  // asistente puede contar, y no un hueco silencioso donde se pondría a
+  // contestar de memoria sobre un manual que nadie le ha dado.
+  //
+  // La carga es PEREZOSA a propósito: leer y trocear los PDF de una carpeta
+  // grande retrasaría el arranque del puente, y el puente sirve las pantallas
+  // de planta, que no dependen del asistente. El primer `buscar()` la dispara.
+  const indiceDocumentos = config.ia.docsDir
+    ? createIndiceDocumentos({
+      carpeta: config.ia.docsDir,
+      embeddingBase: config.ia.embeddingBase,
+      embeddingModelo: config.ia.embeddingModelo,
+    })
+    : null
+
+  // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
+  // `controlar_bomba` escribe, y necesita la misma puerta que usa
+  // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
   const herramientas = createHerramientas({
     client,
     turnos: config.ia.turnos,
     readOnly: config.iconics.readOnly,
+    indiceDocumentos,
   })
   const chat = createChat({ config, herramientas })
+
+  // Las consultas se atienden de una en una, pero NINGUNA se rechaza por eso:
+  // el que llega segundo espera su turno con el flujo abierto y sabiendo
+  // cuántos tiene delante. Ver la cabecera de `ia/cola.mjs`.
+  const cola = createCola()
+
+  // El dictado se monta siempre, igual que el chat: sin `IA_WHISPER_BASE` sus
+  // rutas responden 503 diciendo qué falta. Montarlas sólo cuando está
+  // configurado las dejaría cayendo al respaldo de la SPA, que devuelve el
+  // index.html con un 200 — y el frontend creería que existe el micrófono y que
+  // una página HTML es una transcripción.
+  const voz = createVoz({ config })
 
   const router = createRouter()
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
   registerIconicsRoutes(router, { config, client })
-  registerChatRoutes(router, { config, chat })
+  registerChatRoutes(router, { config, chat, cola })
+  registerVozRoutes(router, { config, voz })
 
   async function route(request, response) {
     if (!request.url) {

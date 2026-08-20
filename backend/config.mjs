@@ -65,6 +65,28 @@ const DEFAULTS = {
   iaTimeoutMs: 180000,
   /** Tope de tokens de la respuesta. Con este presupuesto, cada token se paga. */
   iaMaxTokens: 512,
+  /**
+   * Herramientas encadenadas por pregunta. Tres cubre el diagnóstico completo
+   * —estado, historia de la señal sospechosa y manual— sin dejar que un modelo
+   * indeciso se quede consultando en bucle mientras el operador espera.
+   */
+  iaMaxPasos: 3,
+  /**
+   * Corte de una transcripción de voz.
+   *
+   * Escala propia, como `iaTimeoutMs`: en CPU, `whisper small` tarda algo menos
+   * que la duración del audio, así que 60 s cubren holgadamente el minuto de
+   * voz que admite `maxAudioBytes`. En GPU sobra de largo.
+   */
+  whisperTimeoutMs: 60000,
+  /**
+   * Audio máximo aceptado, en bytes: unos 3 minutos de WAV de 16 kHz mono.
+   *
+   * NO reutiliza `maxRequestBodyBytes` (1 MB): ese tope está pensado para JSON
+   * y rechazaría media frase dictada. Va aparte para que subir el techo del
+   * audio no suba de paso el de todos los POST de la API.
+   */
+  maxAudioBytes: 6 * 1024 * 1024,
 }
 
 /*
@@ -189,6 +211,16 @@ function readIaBase(rawValue) {
   }
 }
 
+/**
+ * Carpeta de documentación. Vacío significa «sin documentación», no es un
+ * error: es el estado por defecto de una instalación normal, igual que
+ * `IA_BASE`.
+ */
+function readDocsDir(rawValue) {
+  if (!rawValue) return ''
+  return normalize(isAbsolute(rawValue) ? rawValue : join(PROJECT_ROOT, rawValue))
+}
+
 function readStaticDir(rawValue) {
   const relativeOrAbsolute = rawValue || DEFAULT_STATIC_DIR
   return normalize(
@@ -292,6 +324,47 @@ export function loadConfig(env = process.env) {
       maxTokens: readInteger('IA_MAX_TOKENS', env.IA_MAX_TOKENS, DEFAULTS.iaMaxTokens, 1),
       /** llama-server sirve un solo modelo; el nombre es informativo. */
       modelo: env.IA_MODELO || 'local',
+
+      /**
+       * Carpeta de documentación de planta: manuales, hojas de datos,
+       * procedimientos. Vacío —el defecto— apaga la herramienta
+       * `consultar_documentacion`, que entonces dice que no hay documentación
+       * configurada en vez de inventarse una respuesta.
+       *
+       * Se admite relativa a la raíz del proyecto para que `.env.local` no
+       * tenga que llevar una ruta absoluta de esta máquina concreta.
+       */
+      docsDir: readDocsDir(env.IA_DOCS_DIR),
+
+      /**
+       * Segundo servidor, sólo para embeddings.
+       *
+       * **Vacío por defecto, y ese defecto es la decisión.** llama-server sirve
+       * un modelo a la vez: el que atiende el chat no puede además generar
+       * embeddings, y pedírselos devuelve los de un modelo generativo, que para
+       * buscar son malos. Sin esto, la documentación se busca con BM25 —léxico,
+       * sin servidor, sin dependencias—, que en manuales técnicos acierta
+       * porque quien pregunta usa el vocabulario del manual. Con esto apuntando
+       * a un llama-server arrancado con `--embedding` sobre un modelo de
+       * embeddings, se mezclan los dos.
+       */
+      embeddingBase: readIaBase(env.IA_EMBEDDING_BASE),
+      embeddingModelo: env.IA_EMBEDDING_MODELO || 'local',
+
+      /**
+       * Cuántas herramientas puede encadenar el modelo para una sola pregunta.
+       *
+       * Antes era una fija y no era configurable, porque el bucle sólo daba dos
+       * pasadas. Ese tope hacía imposible la pregunta que más importa —«¿por
+       * qué falló esto?»—, que necesita el estado, la historia de la señal
+       * sospechosa y el manual: tres lecturas, no una.
+       *
+       * Es configurable porque el precio lo pone el hardware, no el código: en
+       * una GPU holgada cada paso son segundos y cuatro salen gratis; en una de
+       * 8 GB con el modelo a medias en CPU, cuatro pasos son dos minutos de
+       * espera y quizá se prefiera bajarlo a dos.
+       */
+      maxPasos: readInteger('IA_MAX_PASOS', env.IA_MAX_PASOS, DEFAULTS.iaMaxPasos, 1),
       /**
        * Horario de turnos, `manana=6-14,tarde=14-22,noche=22-6`.
        *
@@ -302,6 +375,42 @@ export function loadConfig(env = process.env) {
        * preguntar por un turno responde que no está configurado.
        */
       turnos: Object.freeze(leerTurnos(env.IA_TURNOS)),
+
+      /*
+       * Aquí vivió un segundo bloque `embeddings` / `docsPlantaDir` que leía
+       * `process.env` directamente. Se retiró por dos motivos:
+       *
+       *  - Era código muerto: nadie lo leía. La documentación la configuran
+       *    `docsDir` y `embeddingBase`, unas líneas más arriba.
+       *  - Saltarse el parámetro `env` rompe la propiedad que da sentido a este
+       *    archivo: `loadConfig({ ... })` deja de poder montar el servidor con
+       *    una configuración de prueba, porque parte de la config seguiría
+       *    leyendo el entorno real de la máquina. Ver la cabecera.
+       */
+
+      /**
+       * Dictado y notas de voz, contra `whisper-server`.
+       *
+       * `IA_WHISPER_BASE` vacío —el defecto— apaga el micrófono: la ruta
+       * responde 503 diciendo qué falta y el panel no pinta el botón. Misma
+       * regla de la casa que `IA_BASE` y `IA_DOCS_DIR`: una instalación que
+       * nadie configuró no expone una función a medias.
+       */
+      whisper: Object.freeze({
+        base: readIaBase(env.IA_WHISPER_BASE),
+        isConfigured: Boolean(env.IA_WHISPER_BASE),
+        /**
+         * Idioma del dictado. Fijo en español y NO 'auto' a propósito: con
+         * detección automática, una frase corta y con ruido de planta se
+         * confunde a menudo con portugués o italiano, y entonces la
+         * transcripción sale traducida a un idioma que nadie pidió. Quien
+         * necesite otro idioma lo declara.
+         */
+        idioma: env.IA_WHISPER_IDIOMA || 'es',
+        timeoutMs: readInteger(
+          'IA_WHISPER_TIMEOUT_MS', env.IA_WHISPER_TIMEOUT_MS, DEFAULTS.whisperTimeoutMs, 1
+        ),
+      }),
     }),
 
     /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */
@@ -315,6 +424,7 @@ export function loadConfig(env = process.env) {
 
     limits: Object.freeze({
       maxRequestBodyBytes: DEFAULTS.maxRequestBodyBytes,
+      maxAudioBytes: DEFAULTS.maxAudioBytes,
       maxUpstreamItems: DEFAULTS.maxUpstreamItems,
       maxAlarmHours: DEFAULTS.maxAlarmHours,
       healthTimeoutMs: DEFAULTS.healthTimeoutMs,

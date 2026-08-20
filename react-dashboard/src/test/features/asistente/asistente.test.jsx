@@ -32,6 +32,13 @@ afterEach(() => {
 // jsdom no implementa scrollIntoView, y el panel lo llama al llegar texto.
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  /*
+   * El hilo se persiste en `localStorage` desde que la conversación sobrevive a
+   * cerrar el panel. Sin limpiarlo, cada prueba arranca con lo que dejó la
+   * anterior y las consultas del DOM encuentran dos coincidencias del mismo
+   * texto — que es exactamente cómo se detectó este acoplamiento.
+   */
+  window.localStorage.clear();
 });
 
 const montar = () => render(<ThemeProvider><Asistente /></ThemeProvider>);
@@ -121,7 +128,7 @@ async function preguntar(texto = "¿OEE de la Línea 1?") {
   // Solo hay que abrirlo la primera vez; en las siguientes ya está abierto y
   // el botón flotante no existe.
   if (!screen.queryByRole("dialog")) {
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
   }
   fireEvent.change(screen.getByLabelText("Escribe tu pregunta"), { target: { value: texto } });
   fireEvent.click(screen.getByLabelText("Enviar la pregunta"));
@@ -135,7 +142,7 @@ describe("cuándo existe el asistente", () => {
     // Se espera a que la comprobación termine para no confundir «aún no
     // sabemos» con «no hay».
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir el asistente")).toBeNull();
+    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
   });
 
   it("si el backend no conoce la ruta, tampoco: el tablero sigue igual", async () => {
@@ -143,18 +150,19 @@ describe("cuándo existe el asistente", () => {
     montar();
 
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir el asistente")).toBeNull();
+    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
   });
 
   it("con modelo configurado aparece el botón, y abre el panel", async () => {
     backend({ habilitado: true });
     montar();
 
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
-    // Antes decía «Asistente de planta» — nombre de la etapa de Resonac, que
-    // el componente real ya no usa desde el modelo de agua. El nombre
-    // accesible correcto es el que el propio `Asistente.jsx` declara.
-    expect(screen.getByRole("dialog", { name: "Asistente de la instalación" })).toBeTruthy();
+    // El nombre accesible sale de `NOMBRE` en `Asistente.jsx`, que es lo que
+    // hace que el rótulo visible y el que anuncia un lector de pantalla no
+    // puedan separarse. Fue «Asistente de planta», luego «Asistente de la
+    // instalación», y hoy es «Tdconcito».
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+    expect(screen.getByRole("dialog", { name: "Tdconcito" })).toBeTruthy();
     expect(screen.getByLabelText("Escribe tu pregunta")).toBeTruthy();
   });
 });
@@ -234,15 +242,41 @@ describe("una respuesta", () => {
     );
   });
 
-  it("un 409 se enseña con su motivo, no como un fallo genérico", async () => {
+  it("esperar turno se cuenta como espera, no como error", async () => {
+    /*
+     * El servidor ya no rechaza la segunda consulta con un 409: la encola y
+     * anuncia el puesto en la fila. Eso NO es un fallo y no puede pintarse como
+     * tal — un triángulo rojo por estar el segundo haría que la gente dejara de
+     * preguntar cuando hay otra pantalla abierta, que es el caso normal.
+     */
     backend({
       habilitado: true,
-      fallo: { status: 409, error: "Hay otra consulta en curso. El asistente atiende una cada vez." },
+      eventos: [
+        { tipo: "cola", porDelante: 2 },
+        { tipo: "estado", valor: "Pensando…" },
+        { tipo: "texto", delta: "El tanque está al 62 %." },
+        { tipo: "fin", herramientas: ["estado_del_sistema"] },
+      ],
     });
     montar();
     await preguntar();
 
-    await waitFor(() => expect(screen.getByText(/otra consulta en curso/i)).toBeTruthy());
+    // La respuesta llega igual, sin rastro de error.
+    await waitFor(() => expect(screen.getByText(/El tanque está al 62 %/)).toBeTruthy());
+    expect(screen.queryByText(/otra consulta en curso/i)).toBeNull();
+  });
+
+  it("un error del servidor SÍ se enseña con su motivo", async () => {
+    // El 503 se reserva para cuando la fila es tan larga que esperar deja de
+    // tener sentido. Eso sí hay que contarlo.
+    backend({
+      habilitado: true,
+      fallo: { status: 503, error: "Hay 8 consultas esperando. Inténtalo en un par de minutos." },
+    });
+    montar();
+    await preguntar();
+
+    await waitFor(() => expect(screen.getByText(/8 consultas esperando/i)).toBeTruthy());
   });
 
   it("la segunda pregunta lleva el hilo anterior", async () => {
@@ -359,7 +393,7 @@ describe("cuando la espera se tuerce", () => {
     // aviso, que es el lenguaje de «algo se ha roto».
     await waitFor(() => expect(screen.getByText("Cancelaste la consulta.")).toBeTruthy());
 
-    // Y los tres finales malos —cancelar, el 409 de otra pantalla, el corte
+    // Y los tres finales malos —cancelar, un 503 de cola llena, el corte
     // por tiempo— se arreglan repitiendo, no reescribiendo a mano.
     fireEvent.click(screen.getByText("Reintentar"));
     await waitFor(() => expect(enviados.length).toBe(2));
@@ -379,7 +413,7 @@ describe("cuando la espera se tuerce", () => {
 
     // Cerrar y volver al tablero durante minuto y medio de espera es lo
     // natural; sin aviso, la respuesta se queda ahí sin que nadie la lea.
-    fireEvent.click(screen.getByLabelText("Cerrar el asistente"));
+    fireEvent.click(screen.getByLabelText("Cerrar Tdconcito"));
     enCurso.emitir({ tipo: "texto", delta: "62,4 %." });
     enCurso.emitir({ tipo: "fin", herramienta: "historia_de_senal", bloqueada: false });
     enCurso.cerrar();
@@ -399,7 +433,7 @@ describe("los ejemplos", () => {
       ],
     });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
 
     // Parece un botón de preguntar: pedir un segundo gesto para lo que ya se
     // había pulsado sobra.
@@ -413,7 +447,7 @@ describe("los ejemplos", () => {
   it("no tira lo que estuvieras escribiendo", async () => {
     backend({ habilitado: true, eventos: [{ tipo: "fin", herramienta: null, bloqueada: false }] });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
 
     const campo = screen.getByLabelText("Escribe tu pregunta");
     fireEvent.change(campo, { target: { value: "¿qué presión tiene la re" } });

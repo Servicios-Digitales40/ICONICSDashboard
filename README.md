@@ -219,14 +219,108 @@ porque llama-server no tiene autenticación de ninguna clase.
 Tres reglas del diseño, por si sorprenden en pantalla:
 
 - **Toda cifra viene de una consulta.** Debajo de cada respuesta se dice de
-  dónde salió el dato. Si el modelo contesta con números sin haber consultado
-  nada, el puente **no** deja salir la respuesta.
-- **Una consulta a la vez.** La segunda pregunta simultánea recibe un aviso, no
-  una espera muda: dos a la vez se reparten la GPU y tardan el doble las dos.
+  dónde salió el dato, una línea por consulta. Si el modelo contesta con
+  números sin haber consultado nada, el puente **no** deja salir la respuesta.
+- **Una consulta a la vez, pero nadie recibe un error por llegar el segundo.**
+  Se atiende de una en una porque dos a la vez se reparten la GPU y tardan el
+  doble las dos; quien llega después espera en la cola viendo cuántos tiene
+  por delante, y luego recibe su respuesta entera.
 - **Sólo algunas señales tienen historia.** A tres de las ocho el historiador
   les devuelve la serie de otra sin dar error, así que la marca vive como hecho
   medido en `shared/eva/senales.js` (campo `historizado`). Preguntar por el
   pasado de una que no la tiene devuelve «no tengo ese dato», nunca un cero.
+
+### Qué sabe hacer
+
+Nueve herramientas, y el modelo puede **encadenar hasta tres** para una misma
+pregunta (`IA_MAX_PASOS`). Ese encadenado es lo que hace posible la pregunta
+que más importa —«¿por qué falló esto?»—, que necesita el estado, la historia
+de la señal sospechosa y a veces el manual: tres lecturas, no una.
+
+| Herramienta | Para qué |
+|---|---|
+| `estado_del_sistema` | Las ocho señales ahora mismo, de una sola lectura |
+| `historia_de_senal` | Cómo evolucionó una señal en un período |
+| `comparar_periodos` | La misma señal en dos períodos, con la diferencia ya calculada |
+| `analisis_de_senal` | Media, tendencia, proyección y valores atípicos |
+| `perfil_de_senal` | Qué es **normal**, medido sobre semanas de historial real |
+| `correlacionar_senales` | Varias señales cruzadas: la herramienta del **diagnóstico** |
+| `grafico_de_senal` | Dibuja la serie y la manda a la pantalla |
+| `consultar_documentacion` | Busca en los manuales de planta y cita archivo y página |
+| `controlar_bomba` | **La única que escribe:** enciende o apaga la bomba |
+
+Al diagnosticar, las instrucciones le obligan a separar **lo medido** de **la
+hipótesis**, y a decir que correlación no es causa.
+
+Las ocho primeras sólo leen. `controlar_bomba` es la excepción y está sujeta a
+dos guardas antes de tocar nada —`ICONICS_READ_ONLY`, y el nivel del tanque al
+encender— más una relectura del punto después, porque un `ok` del servidor no
+demuestra que la bomba haya arrancado. Ver
+[`backend/README.md`](backend/README.md#asistente).
+
+### Los umbrales están sin confirmar, y eso limita todo
+
+`shared/eva/umbrales.js` son **estimaciones nuestras** para un sistema de agua
+genérico (`PROVISIONALES = true`). Medidos contra el servidor real en agosto de
+2026, no se parecen a esta instalación:
+
+| Señal | Banda declarada | Medido en 14 días |
+|---|---|---|
+| Nivel del tanque | crítico > 95 % | máximo real **100 %**, mediana 50 % |
+| Temperatura | 4–45 °C | varía sólo 22,9–25,1 °C |
+| Caudal | aviso hasta 45 | máximo real **4,4**, con valores negativos |
+| Presión relativa | crítico < 0,5 | **el 91 % de las lecturas cae por debajo** |
+
+Mientras eso siga así, «en banda» y «fuera de límite» no informan de nada. Por
+eso existe `perfil_de_senal`: mide qué hace la instalación de verdad en vez de
+compararla contra números inventados, y **avisa sola** cuando la banda y la
+realidad no cuadran. Las instrucciones del asistente le prohíben responder «esto
+es raro» apoyándose en la banda.
+
+Arreglarlo de raíz no es código: es confirmar los rangos reales con quien opera
+la instalación, corregir la tabla y poner `PROVISIONALES` en `false`. Una causa inventada que
+suena razonable manda a alguien a revisar el equipo equivocado.
+
+### Documentación de planta
+
+`IA_DOCS_DIR` apunta a una carpeta con manuales. Se leen `.txt`, `.md`, `.csv`,
+`.log` y **`.pdf`** — el texto se extrae con el `zlib` de Node, sin
+dependencias, lo que cubre los PDF generados por Word o InDesign. Un PDF
+**escaneado** es una imagen: el índice lo detecta y lo dice, en vez de indexar
+basura.
+
+La búsqueda es BM25 (léxica, sin servidor). En manuales técnicos acierta porque
+quien pregunta usa el vocabulario del manual. Con `IA_EMBEDDING_BASE` apuntando
+a un segundo llama-server con `--embedding` se mezcla con búsqueda semántica.
+
+### Voz
+
+Opcional y también apagado por defecto. Necesita un tercer proceso,
+`whisper-server`, que hay un atajo para arrancar:
+
+```powershell
+.\scripts\whisper.ps1
+```
+
+Se apunta con `IA_WHISPER_BASE=http://127.0.0.1:8082` y aparecen dos botones en
+la barra del asistente:
+
+- **Micrófono** — dicta la pregunta. El texto va al cuadro de entrada para que
+  se revise antes de enviar: Whisper se equivoca con el ruido de planta y con
+  los nombres de tag, y una consulta lanzada sobre una frase mal oída gasta un
+  minuto de GPU respondiendo a algo que nadie preguntó.
+- **Teléfono** — manos libres. Escucha, pregunta, lee la respuesta en voz alta
+  y vuelve a escuchar, sin tocar el teclado. Aquí sí se envía sin confirmar:
+  pedir confirmación convertiría el manos libres en un manos-ocupadas.
+
+Dos cosas que **no** hacen falta: **ffmpeg**, porque el audio se convierte a WAV
+de 16 kHz en el navegador con la Web Audio API; y ningún modelo de voz para
+hablar, porque se usa el sintetizador del sistema (SAPI en Windows), que
+funciona sin red y no ocupa VRAM — el recurso escaso cuando ya compiten el
+modelo de lenguaje y el de audio.
+
+Los binarios de whisper.cpp **no hace falta compilarlos**: las releases
+oficiales traen `whisper-blas-bin-x64.zip`, que se descomprime y funciona.
 
 ## Pruebas
 
@@ -245,6 +339,8 @@ espera la siguiente:
 node scripts/verificar-backend.mjs        # el contrato HTTP
 node scripts/verificar-herramientas.mjs   # las herramientas del asistente
 node scripts/verificar-chat.mjs           # el bucle de conversación
+node scripts/verificar-voz.mjs            # el dictado (con un whisper falso)
+node scripts/verificar-manos-libres.mjs   # cómo suena una respuesta, y el ciclo
 ```
 
 Tras compilar:
@@ -260,3 +356,7 @@ node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 - [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué
 - [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
 - [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
+- [`docs/PLAN-10-VISTA-SVG.md`](docs/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
+- [`docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md`](docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md) — el selector de rango del historiador
+- [`docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md`](docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md) — cómo se juntaron las dos ramas
+- [`DESIGN.md`](DESIGN.md) — el sistema visual del tablero

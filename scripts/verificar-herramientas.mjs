@@ -26,7 +26,7 @@
  *  - Una instalación PARADA no es una instalación en alarma.
  *  - Las unidades no se inventan: las que el servidor no declara van vacías.
  *  - Los umbrales son NUESTROS, y cada respuesta que los usa lo dice.
- *  - Ninguna herramienta escribe.
+ *  - **Una sola herramienta escribe**, y con dos guardas propias.
  *
  * ── USO ────────────────────────────────────────────────────────────
  *
@@ -108,13 +108,28 @@ const EN_REPOSO = {
  * una consulta prohibida no llegó a salir a la red, que es distinto de que
  * devolviera un error.
  */
-function clienteFalso({ valores = EN_REPOSO, calidad = {}, historia = null } = {}) {
+function clienteFalso({
+  valores = EN_REPOSO,
+  calidad = {},
+  historia = null,
+  aceptaEscritura = true,
+  // Que el servidor acepte la escritura NO significa que el punto cambie: es
+  // el caso real que vive `controlar_bomba` contra un tag mal configurado, y
+  // el motivo de que relea antes de dar la orden por cumplida.
+  escrituraTomaEfecto = true,
+  controlInicial = false,
+} = {}) {
   const historial = []
   const lotes = []
+  const escrituras = []
+  const lecturasSueltas = []
+  const control = { valor: controlInicial }
 
   return {
     historial,
     lotes,
+    escrituras,
+    lecturasSueltas,
 
     async readPoints(puntos) {
       lotes.push(puntos)
@@ -127,6 +142,26 @@ function clienteFalso({ valores = EN_REPOSO, calidad = {}, historia = null } = {
         }
       }
       return { ok: true, payload }
+    },
+
+    /*
+     * `CONTROL` no es una señal del catálogo: es el punto sobre el que escribe
+     * `controlar_bomba`. Vive aparte, en su propia variable, porque lo que
+     * estas comprobaciones miran es justamente que una escritura aceptada por
+     * el servidor y una lectura que la confirma son dos cosas distintas.
+     */
+    control,
+
+    async writePoint(punto, valor) {
+      escrituras.push({ punto, valor })
+      if (!aceptaEscritura) return { ok: false, error: 'punto de solo lectura' }
+      if (escrituraTomaEfecto) control.valor = valor
+      return { ok: true }
+    },
+
+    async readPoint(punto) {
+      lecturasSueltas.push(punto)
+      return { ok: true, payload: { value: control.valor, quality: 0 } }
     },
 
     async readHistory(opciones) {
@@ -662,16 +697,144 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son tres herramientas, y ninguna escribe', () => {
+check('son nueve herramientas, y sólo una de ellas escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
-  assert.deepEqual(h.nombres, ['estado_del_sistema', 'historia_de_senal', 'comparar_periodos'])
+  assert.deepEqual(h.nombres, [
+    'estado_del_sistema',
+    'historia_de_senal',
+    'comparar_periodos',
+    'controlar_bomba',
+    'analisis_de_senal',
+    'perfil_de_senal',
+    'correlacionar_senales',
+    'grafico_de_senal',
+    'consultar_documentacion',
+  ])
 
-  // La primera puerta contra una instrucción astuta metida en el chat no es
-  // `ICONICS_READ_ONLY`: es que aquí no existe nada que escriba.
+  /*
+   * Esta comprobación decía «ninguna escribe» y era la primera puerta contra
+   * una instrucción astuta metida en el chat: lo que no existe en el catálogo
+   * no se puede alcanzar. Desde `controlar_bomba` eso ya no es cierto, así que
+   * lo que se fija aquí es lo siguiente más fuerte que sí lo es: la escritura
+   * está en UNA herramienta y se llama por su nombre.
+   *
+   * Si algún día aparece una segunda, esta prueba se cae — y ése es justo el
+   * momento en que alguien tiene que mirarla, no seis meses después.
+   */
+  const conEscritura = h.definiciones.filter((d) => {
+    const texto = JSON.stringify(d).toLowerCase()
+    return ['escrib', 'encender', 'apagar', 'write'].some((v) => texto.includes(v))
+  })
+  assert.deepEqual(conEscritura.map((d) => d.function.name), ['controlar_bomba'])
+
+  // Y las que de verdad no pueden tocar nada siguen sin poder: ni borrar, ni
+  // reconocer alarmas, ni escribir por la puerta de atrás.
   const texto = JSON.stringify(h.definiciones).toLowerCase()
-  for (const prohibido of ['write', 'escrib', 'borrar', 'delete', 'acknowledge']) {
+  for (const prohibido of ['borrar', 'delete', 'acknowledge']) {
     assert.ok(!texto.includes(prohibido), `"${prohibido}" no puede aparecer`)
+  }
+})
+
+/* ── controlar_bomba: la única escritura ─────────────────────────────── */
+
+console.log('\n── controlar_bomba ─────────────────────────────────────────')
+
+await checkAsync('en modo solo lectura no escribe, y dice de quién es el límite', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client, readOnly: true }).ejecutar('controlar_bomba', {
+    encender: true,
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /ICONICS_READ_ONLY/)
+  // Lo que importa no es el mensaje: es que la escritura no llegó a la red.
+  assert.equal(client.escrituras.length, 0)
+})
+
+await checkAsync('con el tanque por encima del aviso se niega a encender', async () => {
+  const client = clienteFalso({ valores: { ...EN_REPOSO, SNIVEL_TANQUE: 97 } })
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
+    encender: true,
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /desbordar/i)
+  assert.equal(client.escrituras.length, 0)
+})
+
+await checkAsync('apagar NO mira el nivel: vaciar nunca desborda', async () => {
+  const client = clienteFalso({ valores: { ...EN_REPOSO, SNIVEL_TANQUE: 97 }, controlInicial: true })
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
+    encender: false,
+  })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.accion, 'apagada')
+})
+
+await checkAsync('una escritura aceptada pero sin efecto NO se cuenta como cumplida', async () => {
+  const client = clienteFalso({ escrituraTomaEfecto: false })
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
+    encender: true,
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no ha tenido efecto real/)
+  // Sí lo intentó, y sí releyó para comprobarlo: eso es lo que la distingue de
+  // una herramienta que se cree el `ok: true` del servidor.
+  assert.equal(client.escrituras.length, 1)
+  assert.ok(client.lecturasSueltas.length >= 1)
+})
+
+await checkAsync('si el servidor rechaza la escritura, se cuenta el motivo', async () => {
+  const client = clienteFalso({ aceptaEscritura: false })
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
+    encender: true,
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no aceptó la escritura/)
+})
+
+await checkAsync('sin decir encender o apagar no se adivina', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {})
+
+  assert.equal(r.ok, false)
+  assert.equal(client.escrituras.length, 0)
+})
+
+/**
+ * Esta comprobación existe por un fallo real, y por eso mira algo tan tonto.
+ *
+ * Las tres herramientas de análisis se añadieron pegadas DENTRO del array
+ * `DEFINICIONES`, como métodos de uno de sus objetos, en vez de dentro del
+ * objeto `herramientas`. El archivo era JavaScript válido y el backend
+ * arrancaba; el modelo veía las siete herramientas anunciadas y al llamar a
+ * cualquiera de las tres nuevas recibía «no existe la herramienta».
+ *
+ * Un desajuste entre lo que se anuncia y lo que se puede ejecutar no da error
+ * en ninguna parte: se manifiesta como un asistente que falla sólo con ciertas
+ * preguntas, que es de los que cuestan una tarde.
+ */
+check('toda definición anunciada al modelo tiene implementación, y al revés', () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const anunciadas = h.definiciones.map(d => d.function?.name)
+
+  assert.deepEqual(
+    [...anunciadas].sort(),
+    [...h.nombres].sort(),
+    'lo que se le anuncia al modelo y lo que se puede ejecutar tienen que coincidir'
+  )
+
+  // Y que ninguna definición lleve pegado algo que no sea `type`/`function`,
+  // que es exactamente la forma que tenía el archivo roto.
+  for (const d of h.definiciones) {
+    assert.deepEqual(
+      Object.keys(d).sort(), ['function', 'type'],
+      `la definición de ${d.function?.name} lleva claves de más`
+    )
   }
 })
 

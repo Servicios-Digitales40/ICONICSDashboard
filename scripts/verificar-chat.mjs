@@ -58,6 +58,9 @@ async function check(nombre, fn) {
  */
 let guion = {}
 let llamadasAlModelo = 0
+/** Peticiones al modelo a la vez, y el máximo visto. Lo usa la prueba de cola. */
+let simultaneasAlModelo = 0
+let maximoSimultaneasAlModelo = 0
 /** Cuerpos que recibió el modelo, para comprobar QUÉ se le pidió. */
 let peticiones = []
 
@@ -72,6 +75,10 @@ const llama = createServer(async (req, res) => {
   const peticion = JSON.parse(body)
   llamadasAlModelo += 1
   peticiones.push(peticion)
+
+  simultaneasAlModelo += 1
+  maximoSimultaneasAlModelo = Math.max(maximoSimultaneasAlModelo, simultaneasAlModelo)
+  res.on('close', () => { simultaneasAlModelo -= 1 })
 
   if (guion.retrasoMs) await new Promise(r => setTimeout(r, guion.retrasoMs))
   if (guion.status) {
@@ -202,7 +209,7 @@ await check('una pregunta con herramienta: se ejecuta y se redacta', async () =>
   // «ayer» a un rango de fechas es el backend, dentro de la herramienta.
   assert.equal(ejecutada.argumentos.senal, 'nivel del tanque')
   assert.equal(ejecutada.argumentos.periodo, 'ayer')
-  assert.equal(resumen.herramienta, 'historia_de_senal')
+  assert.deepEqual(resumen.herramientas, ['historia_de_senal'])
   assert.equal(resumen.bloqueada, false)
   assert.match(texto, /52|68/)
   assert.ok(eventos.some(e => e.tipo === 'herramienta'), 'debe anunciar qué herramienta usa')
@@ -215,10 +222,91 @@ await check('los estados se emiten en orden, para que la pantalla no parezca col
   }
   const { eventos } = await preguntar(chatDePrueba(), 'algo')
   const estados = eventos.filter(e => e.tipo === 'estado').map(e => e.valor)
-  assert.equal(estados.length, 3, `esperaba 3 estados, hubo ${estados.length}`)
+
+  // El primero y el último están fijados; los de en medio dependen de cuántas
+  // rondas encadene el modelo, y eso lo decide él. Lo que esta comprobación
+  // protege es que la pantalla nunca se quede sin señal de vida: siempre
+  // empieza diciendo que piensa y siempre acaba diciendo que redacta.
+  assert.ok(estados.length >= 3, `esperaba al menos 3 estados, hubo ${estados.length}`)
   assert.match(estados[0], /pensando/i)
-  assert.match(estados[1], /consultando/i)
-  assert.match(estados[2], /redactando/i)
+  assert.match(estados.at(-1), /redactando/i)
+  assert.ok(
+    estados.some(e => /consultando/i.test(e)),
+    'tiene que decir en algún momento que está consultando ICONICS'
+  )
+})
+
+/**
+ * Un modelo indeciso que vuelve a pedir la misma lectura no puede gastar el
+ * turno entero en ella.
+ *
+ * El guion de este archivo devuelve SIEMPRE la misma llamada, así que sirve
+ * exactamente para reproducir esa indecisión: sin la guarda de repetidas, las
+ * tres rondas se van en tres lecturas idénticas contra ICONICS.
+ */
+await check('una consulta repetida no se vuelve a ejecutar', async () => {
+  ejecutadas = []
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel"}' } },
+    texto: 'Listo.',
+  }
+
+  const { resumen } = await preguntar(chatDePrueba(), 'algo')
+
+  const lecturas = ejecutadas.filter(e => e.nombre === 'historia_de_senal')
+  assert.equal(lecturas.length, 1, `la lectura debía hacerse UNA vez, se hizo ${lecturas.length}`)
+  assert.deepEqual(resumen.herramientas, ['historia_de_senal'], 'y la traza no la cuenta dos veces')
+})
+
+/**
+ * Varias rondas tienen que poder encadenarse de verdad.
+ *
+ * Es la capacidad que el bucle ganó, y la que hace posible un diagnóstico: sin
+ * ella, «¿por qué falló esto?» se contestaba con una sola lectura o no se
+ * contestaba. Se comprueba con un guion que pide una herramienta DISTINTA cada
+ * vez, porque la guarda de repetidas cortaría el encadenamiento si fueran
+ * iguales — y esa interacción entre las dos reglas es justo lo que hay que
+ * dejar fijado.
+ */
+await check('el modelo puede encadenar varias consultas distintas', async () => {
+  ejecutadas = []
+  const pedidas = ['estado_del_sistema', 'historia_de_senal']
+
+  /*
+   * El captador se memoiza por petición, y no es un adorno: el servidor falso
+   * lee `guion.toolCall` DOS veces por respuesta —una en la condición y otra
+   * para el valor—, así que un contador que avanzara en cada lectura se saltaría
+   * la mitad del guion. `llamadasAlModelo` ya se incrementó cuando esto se lee,
+   * así que identifica la petición en curso.
+   */
+  // `llamadasAlModelo` es global y viene crecido de las pruebas anteriores, así
+  // que se ancla su valor de partida y se cuenta desde ahí.
+  const base = llamadasAlModelo
+  let peticionCacheada = -1
+  let llamadaCacheada = null
+
+  guion = {
+    get toolCall() {
+      if (peticionCacheada !== llamadasAlModelo) {
+        peticionCacheada = llamadasAlModelo
+        const nombre = pedidas[llamadasAlModelo - base - 1]
+        llamadaCacheada = nombre
+          ? { id: `c${llamadasAlModelo}`, type: 'function', function: { name: nombre, arguments: '{}' } }
+          : null
+      }
+      return llamadaCacheada
+    },
+    texto: 'Con esto ya puedo explicarlo.',
+  }
+
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿por qué pasó esto?')
+
+  assert.deepEqual(
+    resumen.herramientas, pedidas,
+    'las dos consultas tienen que quedar en la traza, en orden'
+  )
+  assert.equal(resumen.bloqueada, false)
+  assert.match(texto, /explicarlo/, 'y la respuesta se redacta al final, con todo delante')
 })
 
 await check('el texto llega troceado, no de golpe al final', async () => {
@@ -387,6 +475,83 @@ await check('si no redacta nada, se dice el dato igual', async () => {
 
 /* ── La regla que no se puede relajar ────────────────────────────────── */
 
+await check('el markdown que el modelo escribe igualmente no llega a la pantalla', async () => {
+  /*
+   * La regla 12 del prompt prohíbe el markdown, y el modelo se la salta.
+   * Medido con qwen2.5:7b contra Ollama, a la pregunta más simple:
+   *
+   *     - **Nivel del tanque**: 55.2%
+   *
+   * El panel pinta el texto tal cual (`whiteSpace: pre-wrap`), así que eso
+   * llega con los asteriscos puestos. Una regla del prompt que el modelo puede
+   * ignorar no es una garantía, y el modelo se cambia con una variable de
+   * entorno.
+   */
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: '- **Nivel del tanque**: 62 %\n- **Presión**: 3.1\n## Resumen\nTodo en banda.',
+  }
+  const { texto } = await preguntar(chatDePrueba(), 'algo')
+
+  assert.ok(!texto.includes('**'), 'la negrita no puede llegar')
+  assert.ok(!texto.includes('##'), 'los títulos tampoco')
+  assert.ok(!/^\s*-\s/m.test(texto), 'ni las viñetas de guion')
+  // Y lo que importa: el contenido sobrevive entero.
+  assert.match(texto, /Nivel del tanque: 62 %/)
+  assert.match(texto, /Presión: 3\.1/)
+  assert.match(texto, /Todo en banda/)
+})
+
+await check('un guion que NO es viñeta se respeta', async () => {
+  // Un rango o una resta llevan guion, y quitarlo cambiaría la cifra.
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: 'La banda normal es 3-5 bar.',
+  }
+  const { texto } = await preguntar(chatDePrueba(), 'algo')
+  assert.match(texto, /3-5 bar/)
+})
+
+await check('la misma consulta escrita de otra forma tampoco se repite', async () => {
+  /*
+   * Medido con qwen2.5:7b en una sola pregunta de diagnóstico:
+   *
+   *     historia_de_senal({ senal: "Presión relativa", periodo: "últimas 24 horas" })
+   *     historia_de_senal({ senal: "presión relativa", periodo: "las últimas 24 horas" })
+   *
+   * Son la MISMA lectura, y como cadenas no se parecen: la guarda de repetidas
+   * no las veía y se pagaba un viaje a ICONICS y treinta segundos de mas.
+   */
+  ejecutadas = []
+  const variantes = [
+    '{"senal":"Presión relativa","periodo":"últimas 24 horas"}',
+    '{"periodo":"las últimas 24 horas","senal":"presión relativa"}',
+  ]
+  const base = llamadasAlModelo
+  let peticionCacheada = -1
+  let llamadaCacheada = null
+
+  guion = {
+    get toolCall() {
+      if (peticionCacheada !== llamadasAlModelo) {
+        peticionCacheada = llamadasAlModelo
+        const args = variantes[llamadasAlModelo - base - 1]
+        llamadaCacheada = args
+          ? { id: `c${llamadasAlModelo}`, type: 'function', function: { name: 'historia_de_senal', arguments: args } }
+          : null
+      }
+      return llamadaCacheada
+    },
+    texto: 'Listo.',
+  }
+
+  await preguntar(chatDePrueba(), '¿por qué cayó la presión?')
+
+  const lecturas = ejecutadas.filter(e => e.nombre === 'historia_de_senal')
+  assert.equal(lecturas.length, 1, `la lectura debía hacerse UNA vez, se hizo ${lecturas.length}`)
+})
+
+
 console.log('\n── Respuestas sin herramienta ──────────────────────────────')
 
 await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)', async () => {
@@ -395,7 +560,7 @@ await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)'
   const { resumen, texto } = await preguntar(chatDePrueba(), '¿qué nivel tiene el tanque?')
 
   assert.equal(resumen.bloqueada, true, 'la respuesta debía bloquearse')
-  assert.equal(resumen.herramienta, null)
+  assert.deepEqual(resumen.herramientas, [])
   assert.ok(!texto.includes('87,3'), 'la cifra inventada no puede llegar al usuario')
   assert.match(texto, /se[ñn]al/i, 'dice lo que SÍ se puede preguntar, que es lo accionable')
   assert.match(texto, /--jinja/, 'y, sin ninguna llamada aún, sugiere revisar la bandera')
@@ -601,7 +766,7 @@ await check('argumentos mal formados no lanzan', async () => {
     texto: 'Necesito la fecha.',
   }
   const { resumen } = await preguntar(chatDePrueba(), 'algo')
-  assert.equal(resumen.herramienta, 'historia_de_senal')
+  assert.deepEqual(resumen.herramientas, ['historia_de_senal'])
 })
 
 await check('llama-server caído da un error que dice que el tablero sigue', async () => {
@@ -696,9 +861,14 @@ await check('la respuesta es un flujo SSE con sus eventos', async () => {
   server.close()
 })
 
-await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda', async () => {
+await check('dos preguntas a la vez: la segunda ESPERA turno, no recibe un error', async () => {
+  /*
+   * Antes esto devolvía un 409. Con el tablero abierto en la sala de control y
+   * en el taller ese es el caso normal, no el raro: quien pregunta el segundo
+   * recibía un error por hacer algo razonable, sin saber cuándo reintentar.
+   */
   guion = {
-    retrasoMs: 400,
+    retrasoMs: 300,
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
@@ -711,17 +881,64 @@ await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda',
   })
 
   const primera = pedir()
-  await new Promise(r => setTimeout(r, 120))
+  await new Promise(r => setTimeout(r, 100))
   const segunda = await pedir()
 
-  assert.equal(segunda.status, 409)
-  assert.match((await segunda.json()).error, /otra consulta en curso/i)
+  assert.equal(segunda.status, 200, 'la segunda no puede recibir un error')
+
+  const cuerpo = await segunda.text()
+  const eventos = cuerpo.split('\n\n')
+    .filter(b => b.startsWith('data:'))
+    .map(b => JSON.parse(b.slice(5)))
+
+  // Y no espera muda: se le dice cuántos tiene delante ANTES de que le toque.
+  const cola = eventos.find(e => e.tipo === 'cola')
+  assert.ok(cola, 'debía anunciarse el puesto en la fila')
+  assert.ok(cola.porDelante >= 1, `porDelante fue ${cola.porDelante}`)
+
+  // Y acaba contestando de verdad, no sólo esperando.
+  assert.ok(eventos.some(e => e.tipo === 'texto'), 'la segunda tiene que responder')
+  assert.equal(eventos.at(-1).tipo, 'fin')
 
   await (await primera).text()
   server.close()
 })
 
-await check('tras terminar, el hueco queda libre para la siguiente', async () => {
+await check('las consultas encoladas se atienden DE UNA EN UNA', async () => {
+  /*
+   * La cola no está para hacer cola: está para no rechazar a nadie. Si dejara
+   * pasar dos a la vez no habría ganado nada — se repartirían la GPU y
+   * tardarían el doble las dos, que es lo que la cola existe para evitar.
+   *
+   * Se mide en el servidor del MODELO, que es el recurso escaso: es donde de
+   * verdad importa que no haya dos a la vez.
+   */
+  maximoSimultaneasAlModelo = 0
+  simultaneasAlModelo = 0
+
+  guion = {
+    retrasoMs: 120,
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  const { base, server } = await montar({ IA_BASE: llamaBase })
+
+  await Promise.all([0, 1, 2].map(() =>
+    fetch(`${base}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta: 'hola' }),
+    }).then(r => r.text())
+  ))
+
+  assert.equal(
+    maximoSimultaneasAlModelo, 1,
+    `hubo ${maximoSimultaneasAlModelo} peticiones al modelo a la vez`
+  )
+  server.close()
+})
+
+await check('tras terminar, la siguiente pasa sin esperar', async () => {
   guion = {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',

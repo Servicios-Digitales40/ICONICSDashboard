@@ -44,3 +44,53 @@ export async function readJsonBody(request, maxBytes) {
     throw new RequestBodyError(400, 'Invalid JSON body.')
   }
 }
+
+/**
+ * El cuerpo en crudo, sin interpretarlo.
+ *
+ * Existe para el audio del asistente. `readJsonBody` no sirve: convierte a
+ * UTF-8 antes de parsear, y eso destroza un WAV — los bytes que no son
+ * secuencias UTF-8 válidas se sustituyen por el carácter de reemplazo, así que
+ * el audio llegaría corrupto **sin dar ningún error**, y el síntoma sería una
+ * transcripción vacía o de ruido.
+ *
+ * El límite se pasa aparte y es mucho mayor que el de JSON: un minuto de voz en
+ * WAV de 16 kHz son casi 2 MB, y el tope de JSON (1 MB) rechazaría media frase.
+ *
+ * @param {import('node:http').IncomingMessage} request
+ * @param {number} maxBytes
+ * @returns {Promise<Buffer>}
+ * @throws {RequestBodyError} 413 si excede el límite
+ */
+export async function readRawBody(request, maxBytes) {
+  const chunks = []
+  let size = 0
+
+  for await (const chunk of request) {
+    size += chunk.length
+    if (size > maxBytes) {
+      /*
+       * Se PAUSA la lectura; no se destruye la conexión.
+       *
+       * `readJsonBody` sí la destruye, y ahí funciona porque con 1 MB el
+       * cliente ya ha terminado de enviar cuando saltamos. Con audio no: 6 MB
+       * siguen subiendo, y destruir el socket en ese momento mata también la
+       * respuesta — el cliente ve la conexión cortada y NUNCA lee el 413, así
+       * que quien graba un audio demasiado largo recibe un error de red en vez
+       * del motivo. Medido: `UND_ERR_SOCKET` en lugar del 413.
+       *
+       * Pausar detiene el consumo igual (que es lo que protege la memoria) y
+       * deja el canal de respuesta vivo. Cerrar del todo es cosa de quien
+       * responde, y sólo DESPUÉS de haber escrito el 413.
+       */
+      request.pause()
+      throw new RequestBodyError(
+        413,
+        `El audio supera el límite de ${Math.round(maxBytes / 1024 / 1024)} MB.`
+      )
+    }
+    chunks.push(chunk)
+  }
+
+  return Buffer.concat(chunks)
+}
