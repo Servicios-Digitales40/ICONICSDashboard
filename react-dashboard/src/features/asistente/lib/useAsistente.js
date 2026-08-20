@@ -420,10 +420,13 @@ export function useDictado() {
     }
   }, []);
 
-  const empezar = useCallback(async () => {
+  const empezar = useCallback(async (opciones) => {
     setError(null);
     try {
-      sesion.current = await grabar();
+      // Las opciones llegan del modo llamada: la detección de silencio y el
+      // nivel del micrófono. El dictado con botón no las pasa, y entonces
+      // `grabar` ni siquiera monta el grafo de audio.
+      sesion.current = await grabar(opciones);
       if (vivo.current) setGrabando(true);
     } catch {
       // El caso normal es que el usuario diga «no» al permiso del micrófono.
@@ -507,10 +510,15 @@ export function useDictado() {
 export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const [activo, setActivo] = useState(false);
   const [fase, setFase] = useState("parado");   // parado | escuchando | pensando | hablando
+  /** Nivel del micrófono, 0 a 1. Es la prueba visible de que te está oyendo. */
+  const [nivel, setNivel] = useState(0);
 
   const dictado = useDictado();
+  const vivoEnLlamada = useRef(true);
   const activoRef = useRef(false);
   const yaLeido = useRef(null);
+  /** Evita que el silencio y el botón cierren el mismo turno dos veces. */
+  const cerrandoTurno = useRef(false);
 
   const disponible = dictado.disponible === true && puedeHablar();
 
@@ -535,31 +543,67 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
 
   const apagar = useCallback(() => {
     activoRef.current = false;
+    cerrandoTurno.current = false;
     setActivo(false);
     setFase("parado");
+    setNivel(0);
     callar();
     dictado.cancelar();
   }, [dictado]);
 
   // Desmontar con el modo encendido dejaría el micrófono abierto y la voz
   // hablando sola sobre una pantalla que ya no existe.
-  useEffect(() => apagar, [apagar]);
+  useEffect(() => {
+    vivoEnLlamada.current = true;
+    return () => { vivoEnLlamada.current = false; apagar(); };
+  }, [apagar]);
 
-  /** Escucha un turno y manda lo que se haya entendido. */
+  /**
+   * Escucha un turno y lo cierra solo cuando el que habla se calla.
+   *
+   * ── POR QUÉ AHORA SÍ HAY DETECCIÓN DE SILENCIO ─────────────────────
+   *
+   * La primera versión obligaba a pulsar para terminar de hablar, por miedo a
+   * que el ruido de una sala de máquinas cortara a mitad de frase. Pero eso no
+   * era una llamada: era un walkie con pasos extra, y en el escenario que
+   * justifica el modo —las manos ocupadas delante del equipo— tener que buscar
+   * un botón lo invalida entero.
+   *
+   * El corte se hace robusto en vez de evitarlo: el umbral se CALIBRA contra el
+   * ruido ambiente de los primeros instantes en vez de ser un número fijo, hace
+   * falta silencio sostenido de más de un segundo, y no puede dispararse antes
+   * de que a nadie le haya dado tiempo a hablar. Y el botón sigue ahí para
+   * cerrar el turno a mano cuando haga falta.
+   */
   const escuchar = useCallback(async () => {
     if (!activoRef.current) return;
 
+    cerrandoTurno.current = false;
     setFase("escuchando");
-    await dictado.empezar();
+    setNivel(0);
+
+    await dictado.empezar({
+      alNivel: (v) => vivoEnLlamada.current && setNivel(v),
+      alDetectarSilencio: () => cerrarTurnoRef.current?.(),
+    });
   }, [dictado]);
 
   escucharRef.current = escuchar;
 
-  /** El usuario pulsa para indicar que ha terminado de hablar. */
-  const heTerminado = useCallback(async () => {
-    if (!activoRef.current) return;
+  /**
+   * Cierra el turno de habla y manda lo que se haya entendido.
+   *
+   * Lo llaman DOS cosas: el detector de silencio y el botón. La guarda existe
+   * porque llegan casi a la vez cuando alguien pulsa justo cuando termina de
+   * hablar, y sin ella se enviaría la pregunta dos veces — dos consultas a la
+   * cola por una sola frase.
+   */
+  const cerrarTurno = useCallback(async () => {
+    if (!activoRef.current || cerrandoTurno.current) return;
+    cerrandoTurno.current = true;
 
     setFase("pensando");
+    setNivel(0);
     const texto = await dictado.detener();
 
     if (!activoRef.current) return;
@@ -571,6 +615,11 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
 
     preguntar(texto);
   }, [dictado, preguntar, escuchar]);
+
+  // Por referencia, para que el detector de silencio —que se registra al
+  // arrancar la grabación— llame siempre a la versión actual.
+  const cerrarTurnoRef = useRef(null);
+  cerrarTurnoRef.current = cerrarTurno;
 
   const encender = useCallback(() => {
     if (!disponible) return;
@@ -625,11 +674,12 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     disponible,
     activo,
     fase,
+    nivel,
     transcribiendo: dictado.transcribiendo,
     error: dictado.error,
     encender,
     apagar,
-    heTerminado,
+    cerrarTurno,
   };
 }
 

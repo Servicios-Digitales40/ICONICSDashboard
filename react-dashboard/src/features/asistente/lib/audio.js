@@ -47,7 +47,7 @@ export function puedeGrabar() {
  *
  * @returns {Promise<{ detener: () => Promise<Blob>, cancelar: () => void }>}
  */
-export async function grabar() {
+export async function grabar({ alDetectarSilencio, alNivel } = {}) {
   const pista = await navigator.mediaDevices.getUserMedia({
     audio: {
       // Los tres ayudan de verdad con el ruido de una sala de máquinas. El
@@ -65,7 +65,17 @@ export async function grabar() {
   })
   grabadora.start()
 
-  const apagarMicrofono = () => pista.getTracks().forEach((t) => t.stop())
+  // El detector de silencio sólo se monta si alguien lo pide: el dictado con
+  // botón no lo quiere, y montar un `AudioContext` para nada cuesta CPU y deja
+  // el micrófono con un grafo de audio colgando.
+  const escucha = alDetectarSilencio || alNivel
+    ? vigilarSilencio(pista, { alDetectarSilencio, alNivel })
+    : null
+
+  const apagarMicrofono = () => {
+    escucha?.parar()
+    pista.getTracks().forEach((t) => t.stop())
+  }
 
   return {
     detener: () =>
@@ -79,7 +89,10 @@ export async function grabar() {
             reject(error)
           }
         }, { once: true })
-        grabadora.stop()
+        // Parar una grabadora ya parada lanza. Pasa cuando el silencio
+        // dispara el fin de turno y el usuario pulsa el botón casi a la vez.
+        if (grabadora.state !== 'inactive') grabadora.stop()
+        else apagarMicrofono()
       }),
 
     cancelar: () => {
@@ -88,6 +101,126 @@ export async function grabar() {
       // quedaría la pista viva unos milisegundos de más.
       if (grabadora.state !== 'inactive') grabadora.stop()
       apagarMicrofono()
+    },
+  }
+}
+
+/* ── Detección de fin de turno ───────────────────────────────────────── */
+
+/** Cada cuánto se mide el nivel del micrófono, en milisegundos. */
+const MS_ENTRE_MEDIDAS = 100
+
+/**
+ * Silencio sostenido que se considera «he terminado de hablar».
+ *
+ * 1,2 s es la cifra que sale de probarlo hablando de verdad: por debajo de un
+ * segundo corta en las pausas naturales de una frase —«el nivel del tanque…
+ * ¿cuánto ha bajado?»— y por encima de segundo y medio la conversación se
+ * siente lenta, porque hay que esperar mirando la pantalla a que reaccione.
+ */
+const MS_SILENCIO_FIN = 1200
+
+/**
+ * Mínimo hablando antes de poder cortar por silencio.
+ *
+ * Sin esto, el ruido de fondo de una sala de máquinas dispara el fin de turno
+ * en el primer instante, antes de que a nadie le dé tiempo a decir nada, y el
+ * modo de llamada entra en un bucle de transcripciones vacías.
+ */
+const MS_MINIMO_HABLA = 600
+
+/**
+ * Umbral de voz, sobre el nivel RMS normalizado (0 a 1).
+ *
+ * ── POR QUÉ SE CALIBRA Y NO ES UN NÚMERO FIJO ──────────────────────
+ *
+ * Porque el suelo de ruido de una oficina y el de una sala de bombas no se
+ * parecen en nada, y un umbral fijo o corta siempre o no corta nunca. Se toman
+ * los primeros instantes como referencia del silencio ambiente y se exige
+ * superarlo con margen: lo que se detecta es «hay bastante más ruido que
+ * antes», que es lo que distingue una voz del zumbido de un motor.
+ */
+const MARGEN_SOBRE_RUIDO = 2.5
+
+/** Suelo absoluto, por si el micrófono arranca ya con voz encima. */
+const UMBRAL_MINIMO = 0.012
+
+/**
+ * Vigila el micrófono y avisa cuando el que habla se calla.
+ *
+ * Se mide sobre el dominio del tiempo (`getByteTimeDomainData`) y no sobre el
+ * espectro: para saber si hay voz basta la energía de la señal, y la FFT
+ * costaría más CPU en un bucle que corre diez veces por segundo mientras el
+ * modelo ya está ocupando la máquina.
+ */
+function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
+  const AudioCtx = window.AudioContext ?? window.webkitAudioContext
+  if (!AudioCtx) return null
+
+  const contexto = new AudioCtx()
+  const fuente = contexto.createMediaStreamSource(pista)
+  const analizador = contexto.createAnalyser()
+  analizador.fftSize = 1024
+  fuente.connect(analizador)
+
+  const muestras = new Uint8Array(analizador.fftSize)
+  const empezado = Date.now()
+
+  let ruidoAmbiente = null
+  let medidasDeCalibrado = 0
+  let hablando = false
+  let calladoDesde = null
+  let terminado = false
+
+  const temporizador = setInterval(() => {
+    if (terminado) return
+
+    analizador.getByteTimeDomainData(muestras)
+
+    // RMS de la desviación respecto al centro (128 en 8 bits sin signo).
+    let suma = 0
+    for (const m of muestras) {
+      const v = (m - 128) / 128
+      suma += v * v
+    }
+    const nivel = Math.sqrt(suma / muestras.length)
+    alNivel?.(nivel)
+
+    // Los primeros 300 ms se usan para saber cómo suena el silencio aquí.
+    if (medidasDeCalibrado < 3) {
+      ruidoAmbiente = ruidoAmbiente === null ? nivel : Math.max(ruidoAmbiente, nivel)
+      medidasDeCalibrado += 1
+      return
+    }
+
+    const umbral = Math.max(UMBRAL_MINIMO, ruidoAmbiente * MARGEN_SOBRE_RUIDO)
+
+    if (nivel > umbral) {
+      hablando = true
+      calladoDesde = null
+      return
+    }
+
+    // Callado. Sólo cuenta si antes llegó a hablar y ya lleva un rato con el
+    // micrófono abierto: ver `MS_MINIMO_HABLA`.
+    if (!hablando || Date.now() - empezado < MS_MINIMO_HABLA) return
+
+    calladoDesde ??= Date.now()
+    if (Date.now() - calladoDesde >= MS_SILENCIO_FIN) {
+      terminado = true
+      clearInterval(temporizador)
+      alDetectarSilencio?.()
+    }
+  }, MS_ENTRE_MEDIDAS)
+
+  return {
+    parar() {
+      terminado = true
+      clearInterval(temporizador)
+      // Cerrar el contexto libera el hilo de audio. Sin esto, cada turno de
+      // una llamada larga deja uno abierto y el navegador acaba negándose a
+      // crear más.
+      contexto.close().catch(() => {})
     },
   }
 }

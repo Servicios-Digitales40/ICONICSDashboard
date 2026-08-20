@@ -485,7 +485,7 @@ function BotonMicrofono({ t, dictado, onTexto }) {
  */
 const FASE_MANOS_LIBRES = {
   parado: "Manos libres listo",
-  escuchando: "Te escucho… pulsa el teléfono cuando termines",
+  escuchando: "Te escucho… se envía solo cuando dejes de hablar",
   pensando: "Entendiendo lo que has dicho…",
   hablando: "Contestando en voz alta…",
 };
@@ -505,7 +505,7 @@ const FASE_MANOS_LIBRES = {
  * exactamente lo que este modo existe para evitar.
  */
 function BotonManosLibres({ t, manosLibres }) {
-  const { activo, fase, encender, apagar, heTerminado, transcribiendo } = manosLibres;
+  const { activo, fase, encender, apagar, cerrarTurno, transcribiendo, nivel } = manosLibres;
 
   if (!activo) {
     return (
@@ -521,14 +521,35 @@ function BotonManosLibres({ t, manosLibres }) {
   }
 
   if (fase === "escuchando") {
+    /*
+     * El anillo crece con la voz.
+     *
+     * No es adorno: en un modo sin teclado y sin texto, es la única prueba de
+     * que el micrófono está captando algo. Sin ella, alguien que hable con el
+     * micrófono silenciado por el sistema espera una respuesta que nunca va a
+     * llegar, y no tiene forma de saber por qué.
+     *
+     * El turno se cierra SOLO al detectar silencio; el botón queda como salida
+     * manual para cuando el ruido de fondo impida ese corte.
+     */
+    const escala = 1 + Math.min(nivel * 6, 0.9);
     return (
       <button
-        type="button" onClick={heTerminado} className="app-btn"
+        type="button" onClick={cerrarTurno} className="app-btn"
         aria-label="He terminado de hablar"
-        title="He terminado de hablar"
-        style={botonMicro(t, "grabando")}
+        title="Te escucho. Se envía solo al callarte, o pulsa para enviar ya."
+        style={{ ...botonMicro(t, "grabando"), position: "relative" }}
       >
-        <Square size={13} fill="currentColor" />
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute", inset: 0, borderRadius: 9,
+            background: t.coral, opacity: 0.18,
+            transform: `scale(${escala})`,
+            transition: "transform 100ms linear",
+          }}
+        />
+        <Square size={13} fill="currentColor" style={{ position: "relative" }} />
       </button>
     );
   }
