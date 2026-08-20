@@ -66,10 +66,11 @@ function TarjetaVariable({ senal, t, dark, delay }) {
             t={t}
             dark={dark}
             alto={150}
+            delay={delay + 0.2}
           />
         ) : esBooleano ? null : tieneBufer ? (
           <>
-            <GraficaBufer senal={senal} valores={senal.bufferVivo} t={t} dark={dark} alto={64} />
+            <GraficaBufer senal={senal} valores={senal.bufferVivo} t={t} dark={dark} alto={64} delay={delay + 0.2} />
             <div style={{ marginTop: 6 }}>
               <InsigniaOrigen real={false} t={t} />
             </div>

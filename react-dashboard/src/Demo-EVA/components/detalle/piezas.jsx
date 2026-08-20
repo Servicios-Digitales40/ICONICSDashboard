@@ -88,8 +88,17 @@ export function TooltipHistoria(props) {
  * nada que mostrar) o añade una insignia sobre la curva anterior (si ya
  * había algo) — nunca un parpadeo en blanco al cambiar de rango. En modo
  * vivo no hay «cargando»: el búfer no sale a la red, sólo crece.
+ *
+ * El área se revela una vez con `.grafica-revela` (index.css) al MONTAR este
+ * bloque — que sólo ocurre cuando pasa de "sin datos" a "con datos": primera
+ * carga, o cambio de activo. Un cambio de rango con la misma serie ya
+ * cargada no remonta nada (mismo nodo, sólo cambian sus atributos), así que
+ * no vuelve a dispararse; y en vivo, cada muestra nueva sólo actualiza el
+ * `d` del área ya revelada. Por eso `isAnimationActive` sigue en `false`: la
+ * animación de Recharts se repetiría en cada actualización, que es
+ * exactamente el parpadeo que ya se evitó a propósito en `tiles.jsx`.
  */
-export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto = 150 }) {
+export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto = 150, delay = 0 }) {
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
 
@@ -105,7 +114,7 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto 
   const multiDia = filas[filas.length - 1].t - filas[0].t > UMBRAL_MULTIDIA_MS;
 
   return (
-    <div style={{ position: "relative" }}>
+    <div className="grafica-revela" style={{ position: "relative", animationDelay: `${delay}s` }}>
       <ResponsiveContainer width="100%" height={alto}>
         <AreaChart data={filas} margin={{ top: 6, right: 6, left: -28, bottom: 0 }}>
           <XAxis
@@ -137,8 +146,18 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto 
   );
 }
 
-/** Búfer de sesión: `valores` son números planos, sin marca de tiempo. */
-export function GraficaBufer({ senal, valores, t, dark, alto = 60 }) {
+/**
+ * Búfer de sesión: `valores` son números planos, sin marca de tiempo.
+ *
+ * Se revela con la misma `.grafica-revela` (index.css) que `GraficaHistoria`,
+ * en vez del trazado de `Spark`: el `pathLength` que usa `Spark` para
+ * animar `stroke-dasharray` no combina con el `preserveAspectRatio="none"` +
+ * `vector-effect="non-scaling-stroke"` de este SVG (la escala anisotrópica
+ * del viewBox rompe el cálculo de longitud del trazo y el "dibujo" sale
+ * discontinuo). El clip-path no toca esa geometría, así que es la vía segura
+ * — y de paso iguala el lenguaje de revelado con `GraficaHistoria`.
+ */
+export function GraficaBufer({ senal, valores, t, dark, alto = 60, delay = 0 }) {
   if (!valores || valores.length < 2) {
     return <GraficaAusente t={t} alto={alto} mensaje="Sin muestras todavía en esta sesión." compacta />;
   }
@@ -153,8 +172,16 @@ export function GraficaBufer({ senal, valores, t, dark, alto = 60 }) {
   const d = valores.map((v, i) => `${i ? "L" : "M"} ${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={alto} preserveAspectRatio="none" style={{ display: "block" }} aria-hidden="true">
-      <path d={d} fill="none" stroke={col} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" opacity={0.85} />
+    <svg
+      className="grafica-revela"
+      viewBox={`0 0 ${w} ${h}`} width="100%" height={alto} preserveAspectRatio="none"
+      style={{ display: "block", animationDelay: `${delay}s` }} aria-hidden="true"
+    >
+      <path
+        d={d}
+        fill="none" stroke={col} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke" opacity={0.85}
+      />
     </svg>
   );
 }

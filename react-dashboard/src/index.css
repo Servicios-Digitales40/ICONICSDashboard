@@ -485,6 +485,29 @@ button {
   animation: trazoDibujo 900ms ease-out both;
 }
 
+/* Revelado de GraficaHistoria (detalle de activo): la curva no aparece
+   hecha, se descubre de izquierda a derecha una sola vez al montar la
+   tarjeta — misma familia que `.trazo-dibujo`, en clip-path porque el área
+   la pinta Recharts y no hay un único `<path>` que trazar. Sólo corre al
+   crear el nodo (primera carga o cambio de activo); una muestra en vivo o un
+   cambio de rango sólo actualizan el `d` interno del área ya revelada, así
+   que no la repite — por eso `<Area isAnimationActive={false}>` sigue
+   apagado, para no sumarle la propia repetición de Recharts en cada
+   actualización. */
+@keyframes graficaRevela {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.grafica-revela {
+  animation: graficaRevela 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Animaciones extra para los gauges KPI */
 @keyframes gaugeGlowPulse {
 
