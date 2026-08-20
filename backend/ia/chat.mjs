@@ -105,6 +105,7 @@ const ESTADO_POR_HERRAMIENTA = {
   historia_de_senal: ESTADOS.consultando,
   comparar_periodos: ESTADOS.consultando,
   analisis_de_senal: ESTADOS.analizando,
+  perfil_de_senal: ESTADOS.analizando,
   correlacionar_senales: ESTADOS.analizando,
   grafico_de_senal: ESTADOS.consultando,
   consultar_documentacion: ESTADOS.documentacion,
@@ -322,6 +323,10 @@ function instrucciones(catalogo, maxPasos) {
     '   vienen sin unidad, y decir "l/s" o "bares" sería inventarse la magnitud. Si la',
     '   herramienta te da la unidad, úsala; si te la da vacía, di el número a secas.',
     '5. Di siempre de dónde viene el dato: si es de tiempo real o del historiador, y de cuándo.',
+    '5b. Las BANDAS con las que se juzga cada señal son estimaciones nuestras y NO se parecen a',
+    '    esta instalación: medido contra el servidor real, la presión relativa pasa el 92 % del',
+    '    tiempo por debajo de su «mínimo». Por eso, cuando te pregunten si un valor es normal o',
+    '    raro, NO contestes con la banda: usa perfil_de_senal, que lo mide.',
     '6. El ESTADO de una señal («en banda», «en aviso», «fuera de límite») lo calcula el tablero',
     '   comparando el valor contra límites estimados por nosotros, NO por quien opera la',
     '   instalación, y este árbol no tiene alarmas configuradas. Cuando digas que algo está',
@@ -355,6 +360,9 @@ function instrucciones(catalogo, maxPasos) {
     '  a) estado_del_sistema, para ver cómo está todo AHORA y qué señal está mal.',
     '  b) analisis_de_senal o historia_de_senal sobre las señales sospechosas, para ver qué',
     '     pasó ANTES del fallo. Las anomalías que devuelve analisis_de_senal son las candidatas.',
+    '  b2) perfil_de_senal si necesitas saber si un valor es RARO. Compara contra semanas de',
+    '     historia real en vez de contra las bandas, que son estimaciones nuestras. Antes de',
+    '     decir que algo es anómalo, compruébalo aquí.',
     '  c) correlacionar_senales cuando quieras saber si dos magnitudes se movieron a la vez.',
     '     Eso es lo que distingue "la presión cayó porque cayó la tensión" de "las dos cosas',
     '     pasaron el mismo día".',
@@ -612,6 +620,26 @@ export function createChat({ config, herramientas }) {
        */
       while (corteSeguro > 0 && !final && /[*_#]/.test(pendiente[corteSeguro - 1])) {
         corteSeguro -= 1
+      }
+
+      /*
+       * Lo mismo con las VIÑETAS, que se parten de otra manera.
+       *
+       * Un marcador de principio de línea son tres cosas seguidas —el salto, el
+       * guion y el espacio— y `limpiarMarkdown` sólo lo reconoce si las tres
+       * están en el mismo trozo. Medido contra qwen2.5:7b: un trozo acabó en
+       * «…encender si:\n-» y el siguiente empezó en « El nivel», así que ni el
+       * primero tenía el espacio ni el segundo el salto, y el guion salía a la
+       * pantalla. Cuatro de las cinco viñetas se limpiaban y una no, que es lo
+       * que hacía parecer el fallo aleatorio.
+       *
+       * Se retrocede hasta antes del salto de línea, dejando la línea entera
+       * para el trozo siguiente. Cuesta unos caracteres de retraso sobre un
+       * texto que ya llega troceado.
+       */
+      if (!final) {
+        const colaIncompleta = pendiente.slice(0, corteSeguro).match(/\n[ \t]*[-*+#]{0,6}[ \t]*$/)
+        if (colaIncompleta) corteSeguro -= colaIncompleta[0].length
       }
 
       const seguro = pendiente.slice(0, corteSeguro)

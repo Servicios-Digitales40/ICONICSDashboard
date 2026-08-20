@@ -107,6 +107,25 @@ import { TIPOS, isoLocal, resolverPeriodo } from '../../shared/periodo.js'
 const MAX_HORAS_VENTANA = 24 * 7
 
 /**
+ * Días máximos que puede abarcar un perfil.
+ *
+ * Treinta son treinta lecturas al historiador —una por día, en paralelo—, que
+ * es lo más que se le puede pedir sin que la pregunta tarde más que la
+ * paciencia de quien la hizo. Y un mes ya cubre el ciclo de casi cualquier
+ * cosa que haga esta instalación.
+ */
+const MAX_DIAS_PERFIL = 30
+
+/**
+ * Muestras mínimas para atreverse a decir qué es normal.
+ *
+ * Medido contra el servidor real: el historiador guarda unas doce muestras al
+ * día de estas señales, así que 30 son dos días y medio. Por debajo de eso un
+ * percentil no distingue lo habitual de lo que pasó el martes.
+ */
+const MIN_MUESTRAS_PERFIL = 30
+
+/**
  * Ventana relativa por defecto cuando no se dice período: las mismas 6 h que
  * pintan las gráficas de la vista de Planta (`VENTANA`), para que el chat y la
  * pantalla no cuenten dos historias distintas del mismo momento.
@@ -498,6 +517,48 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
     return { ok: true, datos: normalizar(r.data) }
   }
 
+  /**
+   * Muchos días de una señal, leídos DÍA A DÍA.
+   *
+   * ── POR QUÉ NO SE PIDE LA VENTANA ENTERA DE UNA VEZ ────────────────
+   *
+   * Porque el servidor topa en `MAX_PUNTOS` muestras por petición, y ese tope
+   * es por PETICIÓN, no por día. Pedir treinta días de golpe devuelve cien
+   * puntos: uno cada siete horas. Sobre eso no se puede decir qué es normal —
+   * cada punto es ya el promedio de media jornada, así que los extremos han
+   * desaparecido y la variabilidad medida es la de los promedios, no la de la
+   * señal.
+   *
+   * Troceando por días se conserva la resolución de un cuarto de hora, que es
+   * la que hace falta para que un percentil signifique algo.
+   *
+   * Un día que falle no invalida el perfil: se cuenta y se sigue. Con treinta
+   * días, perder uno no cambia la respuesta, y abortar por él dejaría al
+   * operador sin perfil por un hueco del historiador.
+   */
+  async function leerHistoriaLarga(clave, dias) {
+    const muestras = []
+    let diasLeidos = 0
+    const ahora = Date.now()
+
+    // Se piden en paralelo: son lecturas independientes, y treinta idas y
+    // vueltas en serie contra el historiador convertirían esto en un minuto.
+    const peticiones = []
+    for (let d = 0; d < dias; d++) {
+      const fin = new Date(ahora - d * 86400000)
+      const inicio = new Date(fin.getTime() - 86400000)
+      peticiones.push(leerSerie(clave, { inicio, fin }))
+    }
+
+    for (const resultado of await Promise.all(peticiones)) {
+      if (!resultado.ok) continue
+      diasLeidos++
+      muestras.push(...resultado.datos)
+    }
+
+    return { muestras, diasLeidos }
+  }
+
   /* ── Presentación de una señal ─────────────────────────────────────── */
 
   /**
@@ -883,6 +944,164 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
     },
 
     /**
+     * Qué es NORMAL para una señal, medido sobre semanas de historia.
+     *
+     * ── EL PROBLEMA QUE RESUELVE ───────────────────────────────────────
+     *
+     * Las demás herramientas juzgan contra `UMBRALES`, que son suposiciones
+     * nuestras y siguen sin confirmar (ver `shared/eva/umbrales.js`). Medido
+     * contra la instalación real en agosto de 2026, esas suposiciones no se
+     * parecen a esta planta: la banda de la temperatura es veinte veces más
+     * ancha que su variación real, la del caudal está en una escala diez veces
+     * mayor, y la presión relativa vive ENTERA por debajo de su «mínimo
+     * crítico». Sobre bandas así, «está en banda» no informa de nada.
+     *
+     * Esta herramienta no supone: mide. Dice dónde ha vivido la señal, cuánto
+     * ha variado y qué percentiles ocupa, y sitúa el valor de AHORA dentro de
+     * esa distribución. «La presión está en 0,9 y eso es más alta que el 97 %
+     * de las lecturas del último mes» es una frase accionable; «la presión
+     * está fuera de límite» contra un límite inventado no lo es.
+     *
+     * ── POR QUÉ ES LA BASE DE LO PREDICTIVO ────────────────────────────
+     *
+     * Una tendencia sin línea base no predice: `analisis_de_senal` dice que el
+     * nivel sube 2 puntos por hora, pero no si eso es lo de siempre a esta
+     * hora o algo que no había pasado nunca. Con el perfil delante, el modelo
+     * puede decir cuál de las dos cosas es.
+     */
+    async perfil_de_senal({ senal, dias = 14 } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
+      const meta = senalInfo(clave)
+
+      if (!esHistorizada(clave)) {
+        return fallo(
+          `${meta.label} no tiene serie histórica propia, así que no se puede perfilar. ` +
+            `${SIN_SERIE} Su valor actual sí se puede dar con estado_del_sistema.`,
+          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+        )
+      }
+
+      const cuantos = Math.max(1, Math.min(MAX_DIAS_PERFIL, Math.round(Number(dias) || 14)))
+      const { muestras, diasLeidos } = await leerHistoriaLarga(clave, cuantos)
+
+      const valores = muestras
+        .filter(m => typeof m.valor === 'number' && Number.isFinite(m.valor))
+        .map(m => m.valor)
+
+      if (valores.length < MIN_MUESTRAS_PERFIL) {
+        return fallo(
+          `Sólo hay ${valores.length} muestras de ${meta.label} en ${cuantos} días ` +
+            `(${diasLeidos} de ${cuantos} días respondieron). Hacen falta al menos ` +
+            `${MIN_MUESTRAS_PERFIL} para decir qué es normal. El historiador guarda muy poco de ` +
+            `esta señal, o el período pedido cae fuera de lo que conserva.`
+        )
+      }
+
+      const orden = [...valores].sort((a, b) => a - b)
+      const stats = estadisticasBasicas(valores, meta.decimales)
+      const p = (q) => redondear(percentil(orden, q), meta.decimales)
+
+      // El valor de ahora, para situarlo dentro de la distribución. Es lo que
+      // convierte el perfil en una respuesta y no en una tabla.
+      // `sistema.senales` es un objeto indexado POR CLAVE, no un array: la
+      // lista plana es `sistema.lista`. Buscarlo con `.find` devolvía siempre
+      // `undefined` y el perfil salía sin el dato de ahora, que es justo lo que
+      // convierte la tabla de percentiles en una respuesta.
+      const lectura = await leerSistema()
+      const actual = lectura.ok ? lectura.sistema.senales[clave]?.valor ?? null : null
+
+      /*
+       * Cuántas lecturas hubo POR DEBAJO del valor actual, en tanto por ciento.
+       *
+       * Es la cifra que de verdad responde «¿esto es raro?». Un 50 significa
+       * que está justo en lo habitual; un 99, que sólo una de cada cien
+       * lecturas del período fue tan alta.
+       */
+      const posicion = typeof actual === 'number'
+        ? Math.round(100 * orden.filter(v => v < actual).length / orden.length)
+        : null
+
+      const ceros = valores.filter(v => Math.abs(v) < 1e-9).length
+
+      return {
+        ok: true,
+        senal: meta.label,
+        unidad: meta.unidad || null,
+        fuente: 'historiador',
+        periodo: `los últimos ${cuantos} días`,
+        diasConDatos: diasLeidos,
+        muestras: valores.length,
+
+        rangoObservado: { minimo: redondear(orden[0], meta.decimales), maximo: redondear(orden.at(-1), meta.decimales) },
+        estadisticas: stats,
+        /*
+         * Percentiles y no «media ± desviación».
+         *
+         * Estas señales no se distribuyen como una campana: el caudal está a
+         * cero el 15 % del tiempo y el nivel vive clavado en 50 con subidas
+         * ocasionales al 100. Sobre eso, «media ± 2 desviaciones» produce
+         * límites que no existen —incluido un caudal negativo— mientras que un
+         * percentil siempre cae sobre una lectura que de verdad ocurrió.
+         */
+        percentiles: { p1: p(0.01), p5: p(0.05), p25: p(0.25), p50: p(0.5), p75: p(0.75), p95: p(0.95), p99: p(0.99) },
+
+        ...(ceros
+          ? {
+            aCero: `${Math.round(100 * ceros / valores.length)} % de las lecturas fueron exactamente 0` +
+              (meta.soloEnMarcha ? ', que en esta señal es la instalación en reposo.' : '.'),
+          }
+          : {}),
+
+        ...(typeof actual === 'number'
+          ? {
+            valorActual: redondear(actual, meta.decimales),
+            posicionDelActual:
+                `El valor de ahora es más alto que el ${posicion} % de las lecturas del período.`,
+          }
+          : { valorActual: null }),
+
+        /*
+         * Se compara la banda inventada contra lo observado, y se dice cuando
+         * no cuadran.
+         *
+         * Es la forma de que el desajuste salga a la luz por sí solo en vez de
+         * quedarse en un comentario de código: si la instalación pasa la mitad
+         * del tiempo fuera de su «banda normal», el problema es la banda.
+         */
+        ...(UMBRALES[clave] ? comparacionConLaBanda(clave, orden) : {}),
+
+        /*
+         * El aviso que evita el error de lectura más probable de esta
+         * herramienta, y que se vio en la primera prueba contra el servidor
+         * real: la presión marcaba 5,66 y el perfil de 14 días topaba en 1,05,
+         * así que salía «más alta que el 100 % de las lecturas» — cierto, y
+         * engañoso. La instalación estaba bombeando en ese momento y llevaba
+         * dos semanas parada casi siempre, de modo que el percentil describía
+         * el reposo, no la marcha.
+         *
+         * Sin esta advertencia, el modelo redacta «valor nunca visto» y manda a
+         * alguien a revisar una bomba que está funcionando como debe.
+         */
+        ...(meta.soloEnMarcha
+          ? {
+            avisoReposo:
+                'Esta señal sólo significa algo con la instalación impulsando, y la instalación ' +
+                'está parada la mayor parte del tiempo. El perfil mezcla las dos situaciones, así ' +
+                'que los percentiles describen sobre todo el reposo: un valor por encima del p95 ' +
+                'puede ser simplemente que ahora está bombeando y antes no. NO lo cuentes como ' +
+                'anomalía sin comprobar antes, con estado_del_sistema, si el sistema está en marcha.',
+          }
+          : {}),
+
+        aviso:
+          'Este perfil es lo que la instalación ha hecho de verdad, medido del historiador. No ' +
+          'dice qué es correcto, dice qué es habitual: si la instalación lleva semanas ' +
+          'funcionando mal, lo anómalo aquí sería lo bueno.',
+      }
+    },
+
+    /**
      * Varias señales sobre la MISMA ventana, con su correlación y sus
      * coincidencias en el tiempo.
      *
@@ -1086,11 +1305,20 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
             anomaliasSimultaneas:
                 'Ninguna. No hubo valores atípicos de dos señales distintas en el mismo instante.',
           }),
+        /*
+         * Éste SÍ es un `aviso`: tiene que llegar al operador aunque el modelo
+         * se olvide de contarlo, porque es la diferencia entre un indicio y un
+         * diagnóstico, y sobre él se decide si se va a abrir una máquina.
+         *
+         * Por eso está redactado para que se lea BIEN pegado al final de la
+         * respuesta, sin imperativos dirigidos al modelo. La versión anterior
+         * decía «Dilo así al redactar», y cuando la red de seguridad lo añadía
+         * el operador leía una orden dada a otro.
+         */
         aviso:
-          'CORRELACIÓN NO ES CAUSA. Que dos señales se muevan juntas es un indicio de que ' +
-          'algo las relaciona, no una prueba de que una cause la otra: puede haber una tercera ' +
-          'causa común, o ser casualidad en una ventana corta. Dilo así al redactar, y no ' +
-          'afirmes una causa que estos datos no demuestran.',
+          'Que dos señales se muevan juntas es un indicio de que algo las relaciona, no una ' +
+          'prueba de que una cause la otra: puede haber una tercera causa común, o ser ' +
+          'casualidad en una ventana corta. Correlación no es causa.',
         ...avisoDeUmbrales(),
       }
     },
@@ -1218,7 +1446,22 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
           texto: r.texto,
           relevancia: +r.score.toFixed(2),
         })),
-        aviso:
+        /*
+         * `comoRedactar` y NO `aviso`, y la diferencia importa.
+         *
+         * `aviso` es el campo que `chat.mjs` vigila para PEGARLO detrás de la
+         * respuesta cuando el modelo no lo cuenta. Ese mecanismo existe para
+         * las advertencias que el operador tiene que leer sí o sí —que los
+         * umbrales son estimaciones nuestras—, y aquí no aplica: esto es una
+         * instrucción de estilo para el modelo.
+         *
+         * Con la clave `aviso` se veía en pantalla, literal, debajo de una
+         * respuesta correcta: «Cita el documento y la página… La relevancia va
+         * de 0 a 1…». Al operador eso no le dice nada y le hace desconfiar de
+         * la respuesta. Cualquier clave que no sea `aviso` la lee el modelo y
+         * no la copia nadie.
+         */
+        comoRedactar:
           'Cita el documento y la página de donde viene cada dato. La relevancia va de 0 a 1: ' +
           'por debajo de 0,4 el fragmento probablemente no responde la pregunta, y entonces di ' +
           'que no lo has encontrado en vez de completarlo con conocimiento general. Estos ' +
@@ -1296,6 +1539,57 @@ function horaLocal(iso) {
   const d = new Date(iso)
   const p = (n) => String(n).padStart(2, '0')
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/**
+ * Un percentil sobre una lista YA ordenada, interpolando entre vecinos.
+ *
+ * Interpola en vez de redondear al índice más cercano porque con pocas
+ * muestras —y aquí el historiador da unas doce al día— el salto entre dos
+ * posiciones consecutivas es grande, y el p95 de 87 muestras acabaría siendo
+ * literalmente la cuarta lectura más alta, sin matiz ninguno.
+ */
+function percentil(ordenados, q) {
+  if (!ordenados.length) return null
+  const i = (ordenados.length - 1) * q
+  const bajo = Math.floor(i)
+  const alto = Math.ceil(i)
+  if (bajo === alto) return ordenados[bajo]
+  return ordenados[bajo] + (ordenados[alto] - ordenados[bajo]) * (i - bajo)
+}
+
+/**
+ * Cuánto se parece la banda declarada a lo que la señal hace de verdad.
+ *
+ * Devuelve la comparación sólo cuando hay algo que decir. Si la instalación
+ * respeta su banda, callar es lo correcto: el operador no necesita leer que
+ * todo encaja.
+ */
+function comparacionConLaBanda(clave, ordenados) {
+  const u = UMBRALES[clave]
+  if (!u) return {}
+
+  const n = ordenados.length
+  const porcentaje = (cuantas) => Math.round((100 * cuantas) / n)
+
+  const bajoMinimo = u.min === null || u.min === undefined
+    ? 0 : porcentaje(ordenados.filter(v => v < u.min).length)
+  const sobreMaximo = u.max === null || u.max === undefined
+    ? 0 : porcentaje(ordenados.filter(v => v > u.max).length)
+
+  const fuera = bajoMinimo + sobreMaximo
+  if (fuera < 5) return {}
+
+  return {
+    desajusteConLaBanda:
+      `El ${fuera} % de las lecturas de este período cae fuera de la banda con la que el ` +
+      `tablero evalúa esta señal` +
+      (bajoMinimo ? `, un ${bajoMinimo} % por debajo del mínimo` : '') +
+      (sobreMaximo ? `, un ${sobreMaximo} % por encima del máximo` : '') +
+      `. Una instalación no pasa la mayor parte del tiempo fuera de su rango normal: lo más ` +
+      `probable es que la banda esté mal, no la instalación. Esos límites son estimaciones ` +
+      `nuestras sin confirmar. Dilo cuando cites el estado de esta señal.`,
+  }
 }
 
 /**
@@ -1420,7 +1714,12 @@ export const DEFINICIONES = [
         'Análisis estadístico de UNA señal historizada: media, mediana, desviación, tendencia ' +
         '(subiendo/bajando/estable con un ajuste de 0 a 100), una proyección a futuro con su ' +
         'margen de error, y las muestras anómalas si las hay. Úsala para "¿va a seguir subiendo ' +
-        'el nivel?", "¿cómo se está comportando la presión?", "¿hay algo raro en la temperatura?". ' +
+        'el nivel?", "¿cómo se está comportando la presión?". ' +
+        'NO la uses para saber si un valor es NORMAL o RARO: esta herramienta sólo mira el ' +
+        'período que le pides (unas horas), y con eso no se puede saber qué es habitual. Para ' +
+        'eso está perfil_de_senal, que mide semanas. Si respondes "es un valor raro" o "está por ' +
+        'encima de lo normal" apoyándote sólo en ésta, estás afirmando algo que no has ' +
+        'consultado. ' +
         'Sólo funciona con las cuatro señales que tienen historia. La proyección es un cálculo, ' +
         'no una certeza: cítala siempre con su rango.',
       parameters: {
@@ -1431,6 +1730,33 @@ export const DEFINICIONES = [
           horizonteMinutos: {
             type: 'number',
             description: 'Cuántos minutos hacia el futuro proyectar. Por defecto 60.',
+          },
+        },
+        required: ['senal'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'perfil_de_senal',
+      description:
+        'Qué es NORMAL para una señal, medido sobre semanas de historia real: dónde ha vivido, ' +
+        'cuánto ha variado, sus percentiles, y en qué punto de esa distribución cae el valor de ' +
+        'ahora. Úsala para "¿es normal este valor?", "¿esto es raro?", "¿qué presión suele ' +
+        'tener?", "¿había pasado antes?", y SIEMPRE antes de afirmar que algo es anómalo. ' +
+        'IMPORTANTE: las bandas con las que el tablero dice "en banda" o "fuera de límite" son ' +
+        'estimaciones NUESTRAS sin confirmar; esta herramienta mide lo que la instalación hace ' +
+        'de verdad, y avisa cuando las dos cosas no cuadran. Sólo las cuatro señales con historia.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
+          dias: {
+            type: 'number',
+            description:
+              'Cuántos días de historia perfilar. Por defecto 14, máximo 30. Más días dan una ' +
+              'idea más fiable de lo normal, pero tardan más en leerse.',
           },
         },
         required: ['senal'],

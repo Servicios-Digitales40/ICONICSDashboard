@@ -606,6 +606,7 @@ export const ETIQUETA_HERRAMIENTA = {
   historia_de_senal: "Leyó el historiador",
   comparar_periodos: "Comparó dos períodos del historiador",
   analisis_de_senal: "Calculó tendencia y anomalías sobre la serie",
+  perfil_de_senal: "Midió qué es normal, sobre semanas de historial",
   correlacionar_senales: "Cruzó varias señales del historiador",
   grafico_de_senal: "Dibujó la serie del historiador",
   consultar_documentacion: "Buscó en la documentación de planta",

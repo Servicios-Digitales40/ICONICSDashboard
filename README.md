@@ -241,12 +241,35 @@ de la señal sospechosa y a veces el manual: tres lecturas, no una.
 | `historia_de_senal` | Cómo evolucionó una señal en un período |
 | `comparar_periodos` | La misma señal en dos períodos, con la diferencia ya calculada |
 | `analisis_de_senal` | Media, tendencia, proyección y valores atípicos |
+| `perfil_de_senal` | Qué es **normal**, medido sobre semanas de historial real |
 | `correlacionar_senales` | Varias señales cruzadas: la herramienta del **diagnóstico** |
 | `grafico_de_senal` | Dibuja la serie y la manda a la pantalla |
 | `consultar_documentacion` | Busca en los manuales de planta y cita archivo y página |
 
 Al diagnosticar, las instrucciones le obligan a separar **lo medido** de **la
-hipótesis**, y a decir que correlación no es causa. Una causa inventada que
+hipótesis**, y a decir que correlación no es causa.
+
+### Los umbrales están sin confirmar, y eso limita todo
+
+`shared/eva/umbrales.js` son **estimaciones nuestras** para un sistema de agua
+genérico (`PROVISIONALES = true`). Medidos contra el servidor real en agosto de
+2026, no se parecen a esta instalación:
+
+| Señal | Banda declarada | Medido en 14 días |
+|---|---|---|
+| Nivel del tanque | crítico > 95 % | máximo real **100 %**, mediana 50 % |
+| Temperatura | 4–45 °C | varía sólo 22,9–25,1 °C |
+| Caudal | aviso hasta 45 | máximo real **4,4**, con valores negativos |
+| Presión relativa | crítico < 0,5 | **el 91 % de las lecturas cae por debajo** |
+
+Mientras eso siga así, «en banda» y «fuera de límite» no informan de nada. Por
+eso existe `perfil_de_senal`: mide qué hace la instalación de verdad en vez de
+compararla contra números inventados, y **avisa sola** cuando la banda y la
+realidad no cuadran. Las instrucciones del asistente le prohíben responder «esto
+es raro» apoyándose en la banda.
+
+Arreglarlo de raíz no es código: es confirmar los rangos reales con quien opera
+la instalación, corregir la tabla y poner `PROVISIONALES` en `false`. Una causa inventada que
 suena razonable manda a alguien a revisar el equipo equivocado.
 
 ### Documentación de planta

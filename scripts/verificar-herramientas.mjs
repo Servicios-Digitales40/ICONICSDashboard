@@ -662,7 +662,7 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son siete herramientas, y ninguna escribe', () => {
+check('son ocho herramientas, y ninguna escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -670,6 +670,7 @@ check('son siete herramientas, y ninguna escribe', () => {
     'historia_de_senal',
     'comparar_periodos',
     'analisis_de_senal',
+    'perfil_de_senal',
     'correlacionar_senales',
     'grafico_de_senal',
     'consultar_documentacion',
