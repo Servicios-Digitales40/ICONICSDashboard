@@ -32,6 +32,13 @@ afterEach(() => {
 // jsdom no implementa scrollIntoView, y el panel lo llama al llegar texto.
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  /*
+   * El hilo se persiste en `localStorage` desde que la conversación sobrevive a
+   * cerrar el panel. Sin limpiarlo, cada prueba arranca con lo que dejó la
+   * anterior y las consultas del DOM encuentran dos coincidencias del mismo
+   * texto — que es exactamente cómo se detectó este acoplamiento.
+   */
+  window.localStorage.clear();
 });
 
 const montar = () => render(<ThemeProvider><Asistente /></ThemeProvider>);

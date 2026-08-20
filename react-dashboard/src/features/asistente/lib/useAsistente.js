@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { callar, hablar, puedeHablar } from "./vozSalida.js";
+import { borrar, cargar, guardar } from "./persistencia.js";
 
 /**
  * Mensaje del asistente aún vacío, al que se le van pegando los deltas.
@@ -76,12 +77,31 @@ function historialParaEnviar(mensajes) {
 
 export function useAsistente() {
   const [disponible, setDisponible] = useState(null);   // null = comprobando
-  const [mensajes, setMensajes] = useState([]);
+  /*
+   * El hilo arranca de lo GUARDADO, con el inicializador perezoso de
+   * `useState` —la función, no el valor—. Con `useState(cargar())` se leería
+   * `localStorage` en cada render y se tiraría el resultado, que en un
+   * componente que se repinta con cada token del flujo son cientos de lecturas
+   * por respuesta.
+   */
+  const [mensajes, setMensajes] = useState(cargar);
   const [estado, setEstado] = useState(null);           // "Consultando ICONICS…"
   const [ocupado, setOcupado] = useState(false);
 
   const abortador = useRef(null);
   const vivo = useRef(true);
+
+  /*
+   * Se guarda cuando el hilo cambia Y no hay consulta en curso.
+   *
+   * La condición de `ocupado` es lo importante: sin ella se escribiría en
+   * `localStorage` con cada token que llega —cuarenta veces por segundo— y
+   * cada escritura serializa el hilo entero. Al terminar la respuesta se
+   * guarda una vez, que es cuando de verdad hay algo nuevo que conservar.
+   */
+  useEffect(() => {
+    if (!ocupado) guardar(mensajes);
+  }, [mensajes, ocupado]);
 
   useEffect(() => {
     vivo.current = true;
@@ -251,6 +271,10 @@ export function useAsistente() {
   const limpiar = useCallback(() => {
     if (ocupado) return;
     setMensajes([]);
+    // Y del almacenamiento, no sólo de la pantalla: si sólo se vaciara el
+    // estado, al recargar reaparecería la conversación que el usuario acaba de
+    // borrar, que es lo contrario de lo que pidió el botón.
+    borrar();
   }, [ocupado]);
 
   return { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar };
