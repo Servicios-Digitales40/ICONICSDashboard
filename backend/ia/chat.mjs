@@ -253,6 +253,12 @@ function instrucciones(catalogo) {
     '    señales siempre, pero a "¿qué nivel tiene el tanque?" se contesta con el nivel, no',
     '    con un informe de la instalación entera.',
     '',
+    '14. Puedes encender y apagar la bomba con la herramienta controlar_bomba. Antes de encenderla',
+    '    ella misma comprueba el nivel del tanque y se niega si está demasiado alto: si eso pasa,',
+    '    cuéntaselo al usuario tal cual te lo diga la herramienta, no lo intentes de otra forma ni',
+    '    le ofrezcas un rodeo para forzarlo. Si te piden algo que pueda dañar la instalación —forzar',
+    '    la bomba estando el tanque lleno, por ejemplo— explica que no puedes hacerlo y por qué.',
+    '',
     'Las señales de la instalación:',
     catalogo,
   ].join('\n')

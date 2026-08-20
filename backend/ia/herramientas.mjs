@@ -49,12 +49,31 @@
  * sin decir de quién es el límite estaría prestando al servidor una autoridad
  * que no nos ha dado.
  *
- * ── DE SOLO LECTURA POR CONSTRUCCIÓN ───────────────────────────────
+ * ── LA ÚNICA ESCRITURA, Y CON GUARDA PROPIA ─────────────────────────
  *
- * El registro no contiene ni una operación de escritura. `ICONICS_READ_ONLY`
- * sigue siendo la última puerta, pero la primera es que `writePoint` no está
- * en el catálogo: ninguna instrucción astuta metida en el chat puede alcanzar
- * algo que no existe aquí.
+ * `controlar_bomba` es la única función del catálogo que llama a
+ * `client.writePoint`. Dos puertas la protegen, en este orden:
+ *
+ *  1. `ICONICS_READ_ONLY` (server-side, la misma que usa `/api/iconics/write`):
+ *     con el puente en solo lectura la herramienta ni intenta escribir.
+ *  2. El nivel del tanque: encender la bomba con el tanque ya por encima del
+ *     aviso superior de `UMBRALES.nivelTanque` se rechaza aquí, ANTES de
+ *     escribir, para que una instrucción del chat no pueda desbordarlo.
+ *
+ * Hay una tercera comprobación DESPUÉS de escribir: un `writePoint` que
+ * responde `ok: true` no demuestra que el punto haya cambiado. Se comprobó
+ * contra el tag real de esta demo primero configurado como «Static value»
+ * —aceptaba la escritura y seguía leyendo `true` siempre— y luego como fuente
+ * en tiempo real con escaneo cada ~1 s, donde una relectura inmediata puede
+ * traer el valor de antes del ciclo. `controlar_bomba` relee el mismo punto
+ * tras escribir, con un par de reintentos cortos para dar tiempo al escaneo,
+ * y sólo confirma el encendido o apagado si la relectura coincide; si no, lo
+ * dice como lo que es, una escritura sin efecto confirmado, y no como una
+ * orden cumplida.
+ *
+ * El resto del catálogo sigue siendo de solo lectura: ninguna otra función
+ * llama a `writePoint`, así que ninguna instrucción astuta metida en el chat
+ * puede alcanzar una escritura que no sea ésta.
  */
 import {
   RAIZ,
@@ -70,7 +89,7 @@ import {
 import { ACTIVOS, ACTIVO_IDS } from '../../shared/eva/activos.js'
 import { DERIVADO, estadoInfo } from '../../shared/eva/estado.js'
 import { PROVISIONALES, UMBRALES } from '../../shared/eva/umbrales.js'
-import { createSistema } from '../../shared/eva/sistema.js'
+import { createSistema, toBooleano } from '../../shared/eva/sistema.js'
 import {
   AGREGADO,
   MAX_PUNTOS,
@@ -413,7 +432,27 @@ function siguienteDia(iso) {
 
 /* ── Las herramientas ────────────────────────────────────────────────── */
 
-export function createHerramientas({ client, turnos = {} } = {}) {
+/** Punto de control de la bomba: no es una señal del catálogo, así que vive aparte. */
+const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`
+
+/**
+ * Veces que se relee `CONTROL` tras escribir, y espera entre cada una.
+ *
+ * El tag escanea cada ~1 s (su `Scan rate` en el servidor), así que hacen
+ * falta varios intentos separados por algo más de un ciclo de escaneo para no
+ * confundir «todavía no ha llegado» con «la escritura no sirvió de nada».
+ * Tres intentos con 700 ms de espera cubren de sobra ese ciclo sin alargar la
+ * respuesta más de 1,4 s en el caso normal.
+ */
+const INTENTOS_RELECTURA_CONTROL = 3
+const ESPERA_RELECTURA_CONTROL_MS = 700
+
+/** Pausa async simple, para esperar entre reintentos de relectura. */
+function esperar(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+export function createHerramientas({ client, turnos = {}, readOnly = true } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
   }
@@ -786,6 +825,98 @@ export function createHerramientas({ client, turnos = {} } = {}) {
         ...avisoDeUmbrales(),
       }
     },
+
+    /**
+     * Enciende o apaga la bomba escribiendo en `ac:TDCON/DEMO/SENSORES/CONTROL`.
+     *
+     * La única función de este archivo que escribe. Dos guardas, en orden: ver
+     * la cabecera del archivo. La del nivel sólo se aplica al ENCENDIDO — apagar
+     * la bomba nunca puede desbordar el tanque, así que no se retrasa.
+     */
+    async controlar_bomba({ encender } = {}) {
+      if (typeof encender !== 'boolean') {
+        return fallo('Falta decir si hay que encender (true) o apagar (false) la bomba.')
+      }
+
+      if (readOnly) {
+        return fallo(
+          'El puente ICONICS está en modo solo lectura (ICONICS_READ_ONLY=true), así que no puedo ' +
+            'escribir en la instalación. Dile al operador que para habilitar el control tiene que ' +
+            'arrancar el servidor con ICONICS_READ_ONLY=false.'
+        )
+      }
+
+      if (encender) {
+        const lectura = await leerSistema()
+        if (!lectura.ok) {
+          return fallo(
+            `No puedo comprobar el nivel del tanque antes de encender la bomba, así que no la ` +
+              `enciendo: ${lectura.error}`
+          )
+        }
+
+        const nivel = lectura.sistema.senales?.nivelTanque?.valor
+        const u = UMBRALES.nivelTanque
+        if (typeof nivel !== 'number' || !Number.isFinite(nivel)) {
+          return fallo(
+            'No hay una lectura válida del nivel del tanque ahora mismo, así que no enciendo la ' +
+              'bomba: encenderla a ciegas podría desbordarlo.'
+          )
+        }
+        if (u && typeof u.avisoMax === 'number' && nivel >= u.avisoMax) {
+          return fallo(
+            `No enciendo la bomba: el tanque está al ${redondear(nivel, 1)} %, por encima del ` +
+              `${u.avisoMax} % de aviso. Encenderla ahora arriesga desbordarlo. Espera a que baje ` +
+              `el nivel o dile al operador que lo revise antes de forzarlo.`,
+            { nivelTanque: redondear(nivel, 1), avisoSuperior: u.avisoMax }
+          )
+        }
+      }
+
+      const r = await client.writePoint(TAG_CONTROL_BOMBA, encender)
+      if (!r?.ok) {
+        return fallo(
+          `El servidor ICONICS no aceptó la escritura sobre la bomba: ${r?.error ?? 'error del servidor'}.`
+        )
+      }
+
+      /*
+       * El servidor puede responder `ok: true` a la escritura sin que el punto
+       * cambie de verdad todavía. `CONTROL` es una fuente en tiempo real que el
+       * motor de ICONICS escanea cada ~1 s (ver `Scan rate` del tag), así que
+       * una relectura inmediata puede devolver el valor anterior aunque la
+       * escritura sí vaya a tomar efecto en el siguiente ciclo. Se reintenta
+       * unas pocas veces con una espera corta antes de dar la escritura por
+       * sin efecto — confirmar sólo porque la petición HTTP no dio error sería
+       * prestarle al servidor una ejecución que no ha demostrado.
+       */
+      let valorLeido = null
+      let relecturaOk = false
+      for (let intento = 0; intento < INTENTOS_RELECTURA_CONTROL; intento++) {
+        if (intento > 0) await esperar(ESPERA_RELECTURA_CONTROL_MS)
+        const relectura = await client.readPoint(TAG_CONTROL_BOMBA)
+        relecturaOk = Boolean(relectura?.ok)
+        valorLeido = toBooleano(relectura?.payload?.value ?? relectura?.payload?.Value ?? null)
+        if (relecturaOk && valorLeido === encender) break
+      }
+
+      if (!relecturaOk || valorLeido === null || valorLeido !== encender) {
+        return fallo(
+          `Mandé la orden de ${encender ? 'encender' : 'apagar'} la bomba y el servidor la aceptó, ` +
+            `pero al releer ${TAG_CONTROL_BOMBA} sigue valiendo ${valorLeido ?? 'sin dato'} en vez de ` +
+            `${encender}. La escritura no ha tenido efecto real sobre la instalación: dile al usuario ` +
+            `que la orden no se aplicó y que hay que revisar la configuración de ese punto en el ` +
+            `servidor ICONICS, no reintentarlo tal cual.`,
+          { valorEscrito: encender, valorLeido }
+        )
+      }
+
+      return {
+        ok: true,
+        accion: encender ? 'encendida' : 'apagada',
+        tag: TAG_CONTROL_BOMBA,
+      }
+    },
   }
 
   /**
@@ -955,6 +1086,29 @@ export const DEFINICIONES = [
           },
         },
         required: ['senal', 'periodoA', 'periodoB'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'controlar_bomba',
+      description:
+        'Enciende o apaga la bomba de la instalación. Úsala cuando te pidan explícitamente ' +
+        'encender, apagar, arrancar o parar la bomba. Antes de encenderla se comprueba el nivel ' +
+        'del tanque; si está por encima del umbral de aviso, la herramienta se niega a encenderla ' +
+        'para no desbordarlo y te lo explica — comunícaselo al usuario tal cual, no lo intentes de ' +
+        'otra forma. Si el servidor está en modo solo lectura también se niega, y hay que decírselo ' +
+        'al usuario con el motivo.',
+      parameters: {
+        type: 'object',
+        properties: {
+          encender: {
+            type: 'boolean',
+            description: 'true para encender la bomba, false para apagarla.',
+          },
+        },
+        required: ['encender'],
       },
     },
   },
