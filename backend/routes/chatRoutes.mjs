@@ -10,13 +10,22 @@
  * misma GPU. Con SSE la pantalla recibe el primer estado en milisegundos y
  * los tokens conforme se generan.
  *
- * ── POR QUÉ UNA CONSULTA A LA VEZ ──────────────────────────────────
+ * ── UNA CONSULTA A LA VEZ, PERO SIN RECHAZAR NINGUNA ───────────────
  *
- * llama-server corre con `--parallel 1` y una sola GPU. Dos preguntas
- * simultáneas no tardan lo mismo cada una: se reparten el hardware y tardan
- * el doble las dos. Con varias pantallas de planta abiertas eso es el caso
- * normal, no el raro, así que la segunda recibe un 409 que dice qué pasa en
- * vez de una espera silenciosa.
+ * El modelo corre parcialmente en CPU y una sola GPU. Dos preguntas
+ * simultáneas no tardan lo mismo cada una: se reparten el hardware y tardan el
+ * doble las dos, así que atenderlas en paralelo no gana tiempo total.
+ *
+ * Antes, la segunda recibía un 409 diciendo que esperara. Con el tablero
+ * abierto en la sala de control y en el taller eso es el caso NORMAL, no el
+ * raro: quien pregunta el segundo recibe un error por hacer algo razonable, no
+ * sabe cuándo reintentar, y lo natural es que vuelva a pulsar y vuelva a
+ * chocar.
+ *
+ * Ahora se encola (`ia/cola.mjs`). El flujo SSE se abre de inmediato y el que
+ * espera recibe su puesto en la fila —«hay 2 consultas por delante»— y luego su
+ * respuesta, sola, cuando le toca. El 503 se reserva para cuando la fila es tan
+ * larga que esperar dejaría de tener sentido.
  */
 import { RequestBodyError, readJsonBody } from '../http/requestBody.mjs'
 import { sendError, sendJson } from '../http/responses.mjs'
@@ -25,19 +34,21 @@ import { logger } from '../logger.mjs'
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
 const MAX_PREGUNTA = 2000
 
-export function registerChatRoutes(router, { config, chat }) {
-  /**
-   * Quién está preguntando ahora mismo, o `null`. Es un único hueco a
-   * propósito: ver la cabecera del archivo.
-   */
-  let enCurso = null
+export function registerChatRoutes(router, { config, chat, cola }) {
 
   router.get('/api/chat', ({ response }) => {
     sendJson(response, 200, {
       ok: true,
       habilitado: config.ia.isConfigured,
       modelo: config.ia.isConfigured ? config.ia.modelo : null,
-      ocupado: enCurso !== null,
+      /*
+       * `ocupado` se mantiene por compatibilidad con clientes anteriores, pero
+       * ya no significa «no puedes preguntar»: significa «hay alguien delante».
+       * Un frontend viejo que lo lea seguirá pintando el aviso; el nuevo pinta
+       * el puesto en la fila, que es más útil.
+       */
+      ocupado: cola.estado().atendiendo,
+      enEspera: cola.estado().enEspera,
     })
   })
 
@@ -46,13 +57,6 @@ export function registerChatRoutes(router, { config, chat }) {
       return sendError(
         response, 503,
         'El asistente no está configurado en este servidor. Falta la variable IA_BASE.'
-      )
-    }
-
-    if (enCurso) {
-      return sendError(
-        response, 409,
-        'Hay otra consulta en curso. El asistente atiende una cada vez; espera a que termine.'
       )
     }
 
@@ -78,7 +82,6 @@ export function registerChatRoutes(router, { config, chat }) {
     /* ── A partir de aquí la respuesta es un flujo ─────────────────── */
 
     const abortador = new AbortController()
-    enCurso = abortador
 
     // Si el usuario cierra la pestaña o pulsa cancelar, se aborta también la
     // petición al modelo. Sin esto, llama-server sigue generando tokens para
@@ -110,11 +113,27 @@ export function registerChatRoutes(router, { config, chat }) {
 
     const empezado = Date.now()
     try {
-      const resumen = await chat.responder({
-        pregunta,
-        historial,
+      /*
+       * La consulta se encola. El flujo ya está abierto, así que quien espera
+       * ve su puesto en la fila desde el primer momento en vez de una pantalla
+       * muda o un error.
+       *
+       * `onPuesto` puede llamarse varias veces —cada vez que alguien de
+       * delante termina— y el cliente pinta el último valor. Un 0 significa
+       * «te toca ya» y se traduce al estado normal de «Pensando…», que lo
+       * emite el propio bucle del chat un instante después.
+       */
+      const resumen = await cola.encolar({
         signal: abortador.signal,
-        onEvento: emitir,
+        onPuesto: (porDelante) => {
+          if (porDelante > 0) emitir({ tipo: 'cola', porDelante })
+        },
+        ejecutar: () => chat.responder({
+          pregunta,
+          historial,
+          signal: abortador.signal,
+          onEvento: emitir,
+        }),
       })
 
       emitir({ tipo: 'fin', ...resumen, duracionMs: Date.now() - empezado })
@@ -137,7 +156,6 @@ export function registerChatRoutes(router, { config, chat }) {
         emitir({ tipo: 'error', mensaje: mensajeDeFallo(error, config.ia.timeoutMs) })
       }
     } finally {
-      enCurso = null
       if (!response.writableEnded) response.end()
     }
   })

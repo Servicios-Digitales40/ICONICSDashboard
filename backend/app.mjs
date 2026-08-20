@@ -11,6 +11,7 @@ import { createRouter } from './http/router.mjs'
 import { sendError, sendText } from './http/responses.mjs'
 import { createStaticFileServer, isAssetPath } from './http/staticFiles.mjs'
 import { createChat } from './ia/chat.mjs'
+import { createCola } from './ia/cola.mjs'
 import { createIndiceDocumentos } from './ia/documentos.mjs'
 import { createHerramientas } from './ia/herramientas.mjs'
 import { createVoz } from './ia/voz.mjs'
@@ -72,6 +73,11 @@ export function createApp(config) {
   })
   const chat = createChat({ config, herramientas })
 
+  // Las consultas se atienden de una en una, pero NINGUNA se rechaza por eso:
+  // el que llega segundo espera su turno con el flujo abierto y sabiendo
+  // cuántos tiene delante. Ver la cabecera de `ia/cola.mjs`.
+  const cola = createCola()
+
   // El dictado se monta siempre, igual que el chat: sin `IA_WHISPER_BASE` sus
   // rutas responden 503 diciendo qué falta. Montarlas sólo cuando está
   // configurado las dejaría cayendo al respaldo de la SPA, que devuelve el
@@ -82,7 +88,7 @@ export function createApp(config) {
   const router = createRouter()
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
   registerIconicsRoutes(router, { config, client })
-  registerChatRoutes(router, { config, chat })
+  registerChatRoutes(router, { config, chat, cola })
   registerVozRoutes(router, { config, voz })
 
   async function route(request, response) {

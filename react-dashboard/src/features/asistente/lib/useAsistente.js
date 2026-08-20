@@ -180,6 +180,21 @@ export function useAsistente() {
 
         await leerFlujo(respuesta, {
           onEstado: (valor) => vivo.current && setEstado(valor),
+          /*
+           * El puesto en la fila, mientras espera turno.
+           *
+           * Se pinta en el mismo hueco que el estado porque responde a la
+           * misma pregunta —«¿qué está pasando?»— y porque tener dos
+           * indicadores compitiendo por 420 px de panel no cabe. En cuanto la
+           * consulta arranca de verdad, el bucle del chat emite «Pensando…» y
+           * lo sustituye solo.
+           */
+          onCola: (porDelante) =>
+            vivo.current && setEstado(
+              porDelante === 1
+                ? "Hay 1 consulta por delante…"
+                : `Hay ${porDelante} consultas por delante…`
+            ),
           onTexto: (delta) => actualizarUltimo((m) => ({ texto: m.texto + delta })),
           // Los argumentos viajan con la herramienta y se guardan enteros: son
           // lo que convierte «leyó el historiador» en «leyó el historiador de
@@ -314,6 +329,7 @@ async function leerFlujo(respuesta, manejadores) {
       }
 
       if (evento.tipo === "estado") manejadores.onEstado(evento.valor);
+      else if (evento.tipo === "cola") manejadores.onCola(evento.porDelante);
       else if (evento.tipo === "texto") manejadores.onTexto(evento.delta);
       else if (evento.tipo === "herramienta") manejadores.onHerramienta(evento.nombre, evento.argumentos);
       else if (evento.tipo === "adjunto") manejadores.onAdjunto(evento);

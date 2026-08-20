@@ -238,15 +238,41 @@ describe("una respuesta", () => {
     );
   });
 
-  it("un 409 se enseña con su motivo, no como un fallo genérico", async () => {
+  it("esperar turno se cuenta como espera, no como error", async () => {
+    /*
+     * El servidor ya no rechaza la segunda consulta con un 409: la encola y
+     * anuncia el puesto en la fila. Eso NO es un fallo y no puede pintarse como
+     * tal — un triángulo rojo por estar el segundo haría que la gente dejara de
+     * preguntar cuando hay otra pantalla abierta, que es el caso normal.
+     */
     backend({
       habilitado: true,
-      fallo: { status: 409, error: "Hay otra consulta en curso. El asistente atiende una cada vez." },
+      eventos: [
+        { tipo: "cola", porDelante: 2 },
+        { tipo: "estado", valor: "Pensando…" },
+        { tipo: "texto", delta: "El tanque está al 62 %." },
+        { tipo: "fin", herramientas: ["estado_del_sistema"] },
+      ],
     });
     montar();
     await preguntar();
 
-    await waitFor(() => expect(screen.getByText(/otra consulta en curso/i)).toBeTruthy());
+    // La respuesta llega igual, sin rastro de error.
+    await waitFor(() => expect(screen.getByText(/El tanque está al 62 %/)).toBeTruthy());
+    expect(screen.queryByText(/otra consulta en curso/i)).toBeNull();
+  });
+
+  it("un error del servidor SÍ se enseña con su motivo", async () => {
+    // El 503 se reserva para cuando la fila es tan larga que esperar deja de
+    // tener sentido. Eso sí hay que contarlo.
+    backend({
+      habilitado: true,
+      fallo: { status: 503, error: "Hay 8 consultas esperando. Inténtalo en un par de minutos." },
+    });
+    montar();
+    await preguntar();
+
+    await waitFor(() => expect(screen.getByText(/8 consultas esperando/i)).toBeTruthy());
   });
 
   it("la segunda pregunta lleva el hilo anterior", async () => {
@@ -363,7 +389,7 @@ describe("cuando la espera se tuerce", () => {
     // aviso, que es el lenguaje de «algo se ha roto».
     await waitFor(() => expect(screen.getByText("Cancelaste la consulta.")).toBeTruthy());
 
-    // Y los tres finales malos —cancelar, el 409 de otra pantalla, el corte
+    // Y los tres finales malos —cancelar, un 503 de cola llena, el corte
     // por tiempo— se arreglan repitiendo, no reescribiendo a mano.
     fireEvent.click(screen.getByText("Reintentar"));
     await waitFor(() => expect(enviados.length).toBe(2));

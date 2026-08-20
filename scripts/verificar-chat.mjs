@@ -58,6 +58,9 @@ async function check(nombre, fn) {
  */
 let guion = {}
 let llamadasAlModelo = 0
+/** Peticiones al modelo a la vez, y el máximo visto. Lo usa la prueba de cola. */
+let simultaneasAlModelo = 0
+let maximoSimultaneasAlModelo = 0
 /** Cuerpos que recibió el modelo, para comprobar QUÉ se le pidió. */
 let peticiones = []
 
@@ -72,6 +75,10 @@ const llama = createServer(async (req, res) => {
   const peticion = JSON.parse(body)
   llamadasAlModelo += 1
   peticiones.push(peticion)
+
+  simultaneasAlModelo += 1
+  maximoSimultaneasAlModelo = Math.max(maximoSimultaneasAlModelo, simultaneasAlModelo)
+  res.on('close', () => { simultaneasAlModelo -= 1 })
 
   if (guion.retrasoMs) await new Promise(r => setTimeout(r, guion.retrasoMs))
   if (guion.status) {
@@ -854,9 +861,14 @@ await check('la respuesta es un flujo SSE con sus eventos', async () => {
   server.close()
 })
 
-await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda', async () => {
+await check('dos preguntas a la vez: la segunda ESPERA turno, no recibe un error', async () => {
+  /*
+   * Antes esto devolvía un 409. Con el tablero abierto en la sala de control y
+   * en el taller ese es el caso normal, no el raro: quien pregunta el segundo
+   * recibía un error por hacer algo razonable, sin saber cuándo reintentar.
+   */
   guion = {
-    retrasoMs: 400,
+    retrasoMs: 300,
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
@@ -869,17 +881,64 @@ await check('dos preguntas a la vez: la segunda recibe 409, no una espera muda',
   })
 
   const primera = pedir()
-  await new Promise(r => setTimeout(r, 120))
+  await new Promise(r => setTimeout(r, 100))
   const segunda = await pedir()
 
-  assert.equal(segunda.status, 409)
-  assert.match((await segunda.json()).error, /otra consulta en curso/i)
+  assert.equal(segunda.status, 200, 'la segunda no puede recibir un error')
+
+  const cuerpo = await segunda.text()
+  const eventos = cuerpo.split('\n\n')
+    .filter(b => b.startsWith('data:'))
+    .map(b => JSON.parse(b.slice(5)))
+
+  // Y no espera muda: se le dice cuántos tiene delante ANTES de que le toque.
+  const cola = eventos.find(e => e.tipo === 'cola')
+  assert.ok(cola, 'debía anunciarse el puesto en la fila')
+  assert.ok(cola.porDelante >= 1, `porDelante fue ${cola.porDelante}`)
+
+  // Y acaba contestando de verdad, no sólo esperando.
+  assert.ok(eventos.some(e => e.tipo === 'texto'), 'la segunda tiene que responder')
+  assert.equal(eventos.at(-1).tipo, 'fin')
 
   await (await primera).text()
   server.close()
 })
 
-await check('tras terminar, el hueco queda libre para la siguiente', async () => {
+await check('las consultas encoladas se atienden DE UNA EN UNA', async () => {
+  /*
+   * La cola no está para hacer cola: está para no rechazar a nadie. Si dejara
+   * pasar dos a la vez no habría ganado nada — se repartirían la GPU y
+   * tardarían el doble las dos, que es lo que la cola existe para evitar.
+   *
+   * Se mide en el servidor del MODELO, que es el recurso escaso: es donde de
+   * verdad importa que no haya dos a la vez.
+   */
+  maximoSimultaneasAlModelo = 0
+  simultaneasAlModelo = 0
+
+  guion = {
+    retrasoMs: 120,
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
+    texto: 'Listo.',
+  }
+  const { base, server } = await montar({ IA_BASE: llamaBase })
+
+  await Promise.all([0, 1, 2].map(() =>
+    fetch(`${base}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pregunta: 'hola' }),
+    }).then(r => r.text())
+  ))
+
+  assert.equal(
+    maximoSimultaneasAlModelo, 1,
+    `hubo ${maximoSimultaneasAlModelo} peticiones al modelo a la vez`
+  )
+  server.close()
+})
+
+await check('tras terminar, la siguiente pasa sin esperar', async () => {
   guion = {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
