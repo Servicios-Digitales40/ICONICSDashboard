@@ -310,15 +310,43 @@ check('el calendario se delega en shared/periodo.js y sigue funcionando', () => 
   assert.ok(hoy.fin <= new Date(Date.now() + 1000), 'no puede pasar del presente')
 })
 
-check('una ventana demasiado larga se NIEGA en vez de suavizar los extremos', () => {
-  // Con `MAX_PUNTOS` fijo, alargar no cuesta red: cuesta resolución. Un mes en
-  // 100 puntos es una muestra cada 7,5 h, y su «máximo» ya no es el pico real.
-  const v = resolverVentana('julio 2026')
-  assert.ok(v.error, 'un mes tendría que rechazarse')
-  assert.match(v.error, /7 días|más corto/i, 'y decir qué hacer en su lugar')
+check('un mes YA SE PUEDE pedir: la serie se lee troceada por días', () => {
+  /*
+   * Esto se rechazaba, y el motivo estaba mal razonado: con `MAX_PUNTOS` fijo,
+   * un mes en una sola petición son cien puntos —uno cada 7,5 h— y su «máximo»
+   * deja de ser el pico real. Pero ese tope es por PETICIÓN, no por consulta:
+   * troceando por días cada petición cabe holgada y la resolución se mantiene.
+   *
+   * Lo que se negaba no era un límite del servidor, era la consecuencia de
+   * pedirlo mal.
+   */
+  const v = resolverVentana('el último mes')
+  assert.ok(!v.error, v.error)
+  assert.match(v.etiqueta, /último mes/)
 
-  const h = resolverVentana('últimas 500 horas')
-  assert.ok(h.error, '500 horas tendría que rechazarse')
+  const dias = (v.fin - v.inicio) / 86400000
+  assert.ok(dias > 29 && dias < 31, `el último mes tendría que ser ~30 días, fue ${dias}`)
+})
+
+check('«desde que se instaló» da todo lo legible, sin fingir que se sabe la fecha', () => {
+  // El historiador no publica cuándo se puso en marcha la instalación, así que
+  // se devuelve la ventana máxima y la etiqueta lo dice con esas palabras en
+  // vez de inventarse una fecha de arranque.
+  const v = resolverVentana('desde que se instaló')
+  assert.ok(!v.error, v.error)
+  assert.match(v.etiqueta, /todo lo que guarda el historiador/i)
+})
+
+check('una ventana absurdamente larga se sigue negando', () => {
+  // El tope existe todavía, sólo que mucho más arriba: noventa tramos diarios
+  // son noventa peticiones, y pasar de ahí castiga al servidor de planta por
+  // una pregunta que casi nadie hace.
+  const v = resolverVentana('últimos 6 meses')
+  assert.ok(v.error, 'seis meses tendría que rechazarse')
+  assert.match(v.error, /90 días|más corto/i, 'y decir qué hacer en su lugar')
+
+  const h = resolverVentana('últimas 5000 horas')
+  assert.ok(h.error, '5000 horas tendría que rechazarse')
 })
 
 check('las alternativas que ofrece un rechazo se entienden de verdad', () => {

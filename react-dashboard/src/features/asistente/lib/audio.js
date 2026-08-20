@@ -29,12 +29,54 @@ const FRECUENCIA_WHISPER = 16000
  * se pueda sortear desde aquí; enseñar un botón que siempre falla sería peor.
  */
 export function puedeGrabar() {
-  return Boolean(
-    typeof navigator !== 'undefined' &&
-    navigator.mediaDevices?.getUserMedia &&
-    typeof window !== 'undefined' &&
-    window.MediaRecorder
-  )
+  return motivoSinMicrofono() === null
+}
+
+/**
+ * Por qué este navegador no puede grabar, o `null` si sí puede.
+ *
+ * ── POR QUÉ HACE FALTA UN MOTIVO Y NO UN BOOLEANO ──────────────────
+ *
+ * Porque la causa casi siempre es la misma y NO se puede arreglar desde el
+ * código: `navigator.mediaDevices` sólo existe en contextos seguros —HTTPS o
+ * localhost—. Al abrir el tablero por IP desde otro equipo de la planta
+ * (`http://192.168.x.x:3001`), el navegador retira la API entera y el botón
+ * del micrófono simplemente no se pintaba.
+ *
+ * Sin motivo visible eso es indistinguible de que la función no exista, de que
+ * el servidor no la tenga configurada o de que esté rota. Alguien acaba
+ * revisando whisper-server, el `.env.local` y los permisos del micrófono para
+ * descubrir que bastaba con escribir «localhost» en la barra de direcciones.
+ */
+export function motivoSinMicrofono() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return 'Este navegador no soporta la captura de audio.'
+  }
+
+  /*
+   * `isSecureContext` se comprueba ANTES que `mediaDevices`, aunque el síntoma
+   * sea la ausencia de `mediaDevices`. Es la relación causa/efecto: decir «tu
+   * navegador no soporta grabar» cuando el navegador soporta grabar
+   * perfectamente y lo que pasa es que la página va por HTTP manda a la
+   * persona a buscar en el sitio equivocado.
+   */
+  if (!window.isSecureContext) {
+    return (
+      'El micrófono sólo funciona en páginas seguras. Estás abriendo el tablero por HTTP ' +
+      'desde otro equipo, y el navegador bloquea la grabación por seguridad. Ábrelo como ' +
+      'http://localhost:3001 en el propio servidor, o publica el tablero por HTTPS.'
+    )
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return 'Este navegador no da acceso al micrófono.'
+  }
+
+  if (!window.MediaRecorder) {
+    return 'Este navegador no puede grabar audio (falta MediaRecorder).'
+  }
+
+  return null
 }
 
 /**

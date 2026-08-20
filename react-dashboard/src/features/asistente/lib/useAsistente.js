@@ -18,7 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
-import { aWav, grabar, puedeGrabar } from "./audio.js";
+import { aWav, grabar, motivoSinMicrofono, puedeGrabar } from "./audio.js";
 import { callar, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
 
@@ -363,6 +363,8 @@ export function useDictado() {
   const [grabando, setGrabando] = useState(false);
   const [transcribiendo, setTranscribiendo] = useState(false);
   const [error, setError] = useState(null);
+  /** Por qué este navegador no puede grabar. Se enseña; no es un fallo nuestro. */
+  const [impedimento, setImpedimento] = useState(null);
 
   const sesion = useRef(null);
   const vivo = useRef(true);
@@ -382,8 +384,12 @@ export function useDictado() {
   useEffect(() => {
     let cancelado = false;
 
-    if (!puedeGrabar()) {
+    const motivo = motivoSinMicrofono();
+    if (motivo) {
       setDisponible(false);
+      // El motivo se guarda para poder ENSEÑARLO. Antes el botón desaparecía
+      // sin más y la causa —la página va por HTTP— era invisible.
+      setImpedimento(motivo);
       return;
     }
 
@@ -471,7 +477,7 @@ export function useDictado() {
   }, [transcribir]);
 
   return {
-    disponible, grabando, transcribiendo, error,
+    disponible, grabando, transcribiendo, error, impedimento,
     empezar, detener, cancelar, desdeArchivo,
   };
 }

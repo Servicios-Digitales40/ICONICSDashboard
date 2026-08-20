@@ -111,7 +111,20 @@ import { TIPOS, isoLocal, resolverPeriodo } from '../../shared/periodo.js'
  * en que ocurrió. Preferimos negar el mes a devolver un extremo suavizado que
  * nadie podría distinguir del bueno.
  */
-const MAX_HORAS_VENTANA = 24 * 7
+const MAX_HORAS_VENTANA = 24 * 90
+
+/** Un día en segundos. Por encima de esto, la serie se lee troceada. */
+const SEGUNDOS_POR_DIA = 24 * 3600
+
+/**
+ * Tramos de un día que se piden como mucho en una sola consulta.
+ *
+ * Noventa días son noventa peticiones en paralelo al historiador. Es asumible
+ * —cada una es pequeña— pero pasar de ahí empieza a castigar al servidor de
+ * planta por una pregunta que casi nadie hace, y el tiempo de espera deja de
+ * ser razonable para quien la hizo.
+ */
+const MAX_TRAMOS = 90
 
 /**
  * Días máximos que puede abarcar un perfil.
@@ -150,7 +163,7 @@ const VENTANA_POR_DEFECTO = VENTANA.horas
  */
 const ALTERNATIVAS =
   'Pide un tramo más corto: "últimas 6 horas", "últimos 3 días", "la última semana", ' +
-  '"ayer" o un día concreto.'
+  '"el último mes", "ayer" o un día concreto.'
 
 /** Error uniforme que además enseña al modelo cómo corregirse en la misma pasada. */
 function fallo(error, extra = {}) {
@@ -343,7 +356,7 @@ export function resolverVentana(texto, { turnos = {} } = {}) {
         error:
           `${n} horas son demasiadas para una sola lectura: con el tope de ${MAX_PUNTOS} muestras ` +
           `del servidor, cada punto sería el promedio de varias horas y el máximo dejaría de ser ` +
-          `el pico real. Como mucho ${MAX_HORAS_VENTANA} horas (7 días). ${ALTERNATIVAS}`,
+          `el pico real. Como mucho ${Math.round(MAX_HORAS_VENTANA / 24)} días. ${ALTERNATIVAS}`,
       }
     }
     return ventanaDeHoras(n, ahora)
@@ -360,6 +373,48 @@ export function resolverVentana(texto, { turnos = {} } = {}) {
    */
   if (/\bultimas? semanas?\b/.test(t)) {
     return ventanaDeHoras(24 * 7, ahora, 'los últimos 7 días')
+  }
+
+  /*
+   * 3b · Meses: «el último mes», «los últimos 3 meses».
+   *
+   * `resolverPeriodo` conoce «julio 2026» —un mes de CALENDARIO— pero no «el
+   * último mes», que es otra cosa: los treinta días que acaban ahora. Se
+   * resuelve en días y no saltando de mes a mes porque la pregunta es sobre una
+   * tendencia reciente, no sobre el cierre de un mes natural.
+   */
+  const meses = t.match(/\b(?:ultim[oa]s?|pasad[oa]s?|hace|en los?)\s*(\d+)?\s*(?:mes|meses)\b/)
+  if (meses) {
+    const n = meses[1] ? Number(meses[1]) : 1
+    const dias = n * 30
+    if (dias * 24 > MAX_HORAS_VENTANA) {
+      return {
+        error:
+          `${n} ${n === 1 ? 'mes' : 'meses'} son más de los ` +
+          `${Math.round(MAX_HORAS_VENTANA / 24)} días que se pueden leer de una vez. ${ALTERNATIVAS}`,
+      }
+    }
+    return ventanaDeHoras(dias * 24, ahora, n === 1 ? 'el último mes' : `los últimos ${n} meses`)
+  }
+
+  /*
+   * 3c · «todo», «desde que se instaló», «desde el principio».
+   *
+   * No se puede saber cuándo se puso en marcha la instalación: el historiador
+   * no publica esa fecha. Así que se devuelve la ventana MÁXIMA legible y la
+   * etiqueta lo dice con esas palabras.
+   *
+   * Es la respuesta honesta a lo que se está preguntando —«todo lo que haya»—
+   * sin fingir que se conoce una fecha de puesta en marcha que nadie ha
+   * declarado. Si el historiador guarda menos, la serie vendrá más corta y el
+   * resumen dirá cuántas muestras hubo de verdad.
+   */
+  if (/\b(todo|todos los datos|desde (?:que|el principio|siempre)|historico completo|todo el historial)\b/
+    .test(t)) {
+    return ventanaDeHoras(
+      MAX_HORAS_VENTANA, ahora,
+      `todo lo que guarda el historiador (hasta ${Math.round(MAX_HORAS_VENTANA / 24)} días atrás)`
+    )
   }
 
   /* 4 · Minutos relativos: «últimos 30 minutos». Se aceptan porque el sondeo
@@ -393,7 +448,7 @@ export function resolverVentana(texto, { turnos = {} } = {}) {
   if (duracionHoras > MAX_HORAS_VENTANA) {
     return {
       error:
-        `"${p.etiqueta}" abarca más de 7 días. Con el tope de ${MAX_PUNTOS} muestras del ` +
+        `"${p.etiqueta}" abarca más de ${Math.round(MAX_HORAS_VENTANA / 24)} días. Con el tope de ${MAX_PUNTOS} muestras del ` +
         `servidor, cada punto sería el promedio de varias horas y los extremos dejarían de ser ` +
         `los reales. ${ALTERNATIVAS}`,
     }
@@ -505,6 +560,22 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
     if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
 
     const segundos = (ventana.fin - ventana.inicio) / 1000
+
+    /*
+     * Ventanas largas se leen DÍA A DÍA, y eso es lo que quita el techo.
+     *
+     * El tope de `MAX_PUNTOS` es por PETICIÓN, no por consulta. Pedir un mes de
+     * una vez devuelve cien puntos —uno cada siete horas— y con esa resolución
+     * el «máximo» ya no es el pico real sino el promedio del tramo en que
+     * ocurrió. Por eso la ventana estaba limitada a una semana: no era un
+     * límite del servidor, era la consecuencia de pedirlo mal.
+     *
+     * Troceando por días, cada petición cabe holgada —un día a un cuarto de
+     * hora son 96 puntos— y la resolución se mantiene sea cual sea el período.
+     * Un mes deja de ser una serie borrosa y pasa a ser treinta series buenas.
+     */
+    if (segundos > SEGUNDOS_POR_DIA) return leerSerieLarga(clave, ventana)
+
     // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
     // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
     const puntos = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundos / 900)))
@@ -522,6 +593,75 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
     if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
 
     return { ok: true, datos: normalizar(r.data) }
+  }
+
+  /**
+   * Una ventana de más de un día, troceada en peticiones de un día.
+   *
+   * ── QUÉ PASA SI UN TRAMO FALLA ─────────────────────────────────────
+   *
+   * Se cuenta y se sigue. Con treinta días, abortar por un hueco del
+   * historiador dejaría al operador sin respuesta por un día que quizá ni le
+   * importa. Pero el resultado dice cuántos tramos faltaron, porque un resumen
+   * de «los últimos 30 días» construido con veinte no es lo que se pidió y
+   * quien lo lea tiene derecho a saberlo.
+   */
+  async function leerSerieLarga(clave, ventana) {
+    const tramos = []
+    for (let fin = ventana.fin.getTime(); fin > ventana.inicio.getTime();) {
+      const inicio = Math.max(fin - SEGUNDOS_POR_DIA * 1000, ventana.inicio.getTime())
+      tramos.push({ inicio: new Date(inicio), fin: new Date(fin) })
+      fin = inicio
+    }
+
+    if (tramos.length > MAX_TRAMOS) {
+      return {
+        ok: false,
+        error:
+          `El período pedido son ${tramos.length} días y el historiador se lee día a día, así ` +
+          `que serían ${tramos.length} lecturas. Como mucho ${MAX_TRAMOS}.`,
+      }
+    }
+
+    // En paralelo: son lecturas independientes, y treinta idas y vueltas en
+    // serie contra el historiador convertirían esto en un minuto de espera.
+    const resultados = await Promise.all(
+      tramos.map(t => {
+        const segundos = (t.fin - t.inicio) / 1000
+        const puntos = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundos / 900)))
+        return client.readHistory({
+          pointName: pointName(clave),
+          startDate: t.inicio.toISOString(),
+          endDate: t.fin.toISOString(),
+          aggregate: AGREGADO,
+          interval: intervaloHMS(segundos / puntos),
+        })
+      })
+    )
+
+    const datos = []
+    let fallidos = 0
+    for (const r of resultados) {
+      if (!r?.ok) { fallidos += 1; continue }
+      datos.push(...normalizar(r.data))
+    }
+
+    // Si NO se pudo leer ni un tramo, es un fallo de verdad y no un hueco.
+    if (fallidos === tramos.length) {
+      return { ok: false, status: resultados[0]?.status ?? 0, error: resultados[0]?.error }
+    }
+
+    // Los tramos se pidieron del más reciente al más antiguo, así que la serie
+    // sale invertida. Ordenarla importa: la regresión de `analisis_de_senal`
+    // usa el eje de tiempo, y con los puntos al revés la tendencia sale con el
+    // signo cambiado — «bajando» donde estaba subiendo.
+    datos.sort((a, b) => a.t - b.t)
+
+    return {
+      ok: true,
+      datos,
+      ...(fallidos ? { tramosFallidos: fallidos, tramosTotales: tramos.length } : {}),
+    }
   }
 
   /**
@@ -867,6 +1007,8 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
         )
       }
 
+      const cobertura = avisoDeCobertura(serie.datos, v, v.etiqueta)
+
       return {
         ok: true,
         senal: meta.label,
@@ -875,6 +1017,14 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
         fuente: 'historiador',
         unidad: meta.unidad || null,
         ...resumen,
+        ...(cobertura ? { avisoCobertura: cobertura } : {}),
+        ...(serie.tramosFallidos
+          ? {
+            avisoLecturas:
+                `${serie.tramosFallidos} de ${serie.tramosTotales} tramos diarios no se pudieron ` +
+                `leer del historiador; el resumen se hizo con el resto.`,
+          }
+          : {}),
         ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
         ...(meta.nota ? { nota: meta.nota } : {}),
         ...(meta.soloEnMarcha
@@ -1701,6 +1851,49 @@ function horaLocal(iso) {
   const d = new Date(iso)
   const p = (n) => String(n).padStart(2, '0')
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/**
+ * Cuánto del período pedido cubre de verdad la serie que llegó.
+ *
+ * ── POR QUÉ ESTO TIENE QUE VIAJAR AL MODELO ────────────────────────
+ *
+ * Porque el historiador de esta instalación NO guarda de forma continua.
+ * Medido contra el servidor real: hoy 30 muestras, ayer 24, hace tres días 15,
+ * hace cuatro **cero**, hace seis cinco, hace diez cero.
+ *
+ * Con esa cobertura, «el nivel del último mes» devuelve un resumen construido
+ * con los últimos cuatro días, y sin avisar suena exactamente igual que un
+ * resumen de treinta. Alguien decidiría sobre la tendencia mensual de una
+ * planta mirando el fin de semana pasado.
+ *
+ * Devuelve `null` cuando la cobertura es razonable: no hay nada que advertir
+ * y un aviso en cada respuesta se deja de leer.
+ */
+function avisoDeCobertura(datos, ventana, etiqueta) {
+  if (!datos?.length) return null
+
+  const pedidoMs = ventana.fin - ventana.inicio
+  // Menos de un día pedido no se juzga: en ventanas cortas es normal que la
+  // primera muestra no caiga justo en el borde.
+  if (pedidoMs < 24 * 3600 * 1000) return null
+
+  const primera = datos[0].t.getTime()
+  const ultima = datos[datos.length - 1].t.getTime()
+  const cubiertoMs = ultima - primera
+
+  const fraccion = cubiertoMs / pedidoMs
+  if (fraccion > 0.6) return null
+
+  const dias = (ms) => Math.max(1, Math.round(ms / 86400000))
+
+  return (
+    `ATENCIÓN, COBERTURA PARCIAL: se pidió ${etiqueta} (${dias(pedidoMs)} días) pero el ` +
+    `historiador sólo tiene datos en un tramo de ${dias(cubiertoMs)} día(s), del ` +
+    `${horaYFecha(datos[0].t.toISOString())} al ${horaYFecha(datos[datos.length - 1].t.toISOString())}. ` +
+    `Este resumen describe ESE tramo, no el período pedido. Dilo al contestar: quien pregunta ` +
+    `por un mes y recibe cuatro días sin saberlo decide sobre una tendencia que no ha visto.`
+  )
 }
 
 /**

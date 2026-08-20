@@ -28,7 +28,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown, Ban, Bell, Bot, Check, ChevronDown, ChevronRight, Copy, Loader2, Mic,
-  PhoneCall, PhoneOff, RotateCw, Send, Square, Trash2, TriangleAlert, X,
+  MicOff, PhoneCall, PhoneOff, RotateCw, Send, Square, Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
 import {
@@ -446,6 +446,31 @@ export function Asistente() {
       {dictado.error && (
         <div style={{ padding: "0 12px 10px", fontSize: 11, color: t.coral, lineHeight: 1.45 }}>
           {dictado.error}
+        </div>
+      )}
+
+      {/*
+        Por qué NO están los botones de voz.
+
+        Sólo se dice cuando el SERVIDOR sí tiene la voz configurada: si no la
+        tiene, el operador no ha pedido esta función y explicarle una carencia
+        que no le afecta es ruido. Cuando sí la tiene y aun así no aparece el
+        micrófono, la causa es del navegador —casi siempre abrir el tablero por
+        HTTP desde otro equipo— y sin este aviso desaparece un botón sin que
+        nadie sepa por qué. Se acaba revisando whisper-server, el `.env.local`
+        y los permisos del micrófono para descubrir que bastaba con escribir
+        «localhost».
+      */}
+      {dictado.disponible === false && dictado.impedimento && (
+        <div
+          style={{
+            display: "flex", gap: 7, alignItems: "flex-start",
+            padding: "0 12px 10px", fontSize: 11,
+            color: t.textSoft, lineHeight: 1.45,
+          }}
+        >
+          <MicOff size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{dictado.impedimento}</span>
         </div>
       )}
     </section>
