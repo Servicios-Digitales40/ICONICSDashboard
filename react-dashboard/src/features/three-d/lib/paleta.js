@@ -39,6 +39,18 @@ export function construirPaleta(theme, dark) {
     // reconoce. Va aquí y no en el modelo porque es color de escena, no de
     // estado: el tinte del estado se le aplica encima con `tono()`.
     deposito: dark ? "#2F63C4" : "#27549F",
+    // El AGUA de la columna (`ColumnaModel`), literal y no de marca. Vivía
+    // como `theme.accent` — bastaba con que un tema tuviera el acento rojo
+    // (Mitsubishi Electric) para que el líquido se pintara de rojo, como si
+    // el sensor hubiera medido una alarma en vez de un nivel. El agua es
+    // azul siempre, en los tres temas, igual que el depósito de abajo — es
+    // color de escena, no de interfaz, así que no debe seguir al acento.
+    agua: dark ? "#2F63C4" : "#27549F",
+    // El cuerpo de la válvula instrumentada (`ValvulaModel`) es azul en el
+    // dibujo del equipo real (ver la cabecera de ese archivo: «su cuerpo
+    // azul y su cabezal negro»). Tenía el mismo fallo que el agua: coloreado
+    // con `theme.accent`, se volvía rojo bajo Mitsubishi Electric.
+    valvula: dark ? "#2F63C4" : "#27549F",
     // El cabezal del sensor de nivel. Turquesa porque lo es en el equipo, y
     // porque conviene que se distinga del resto del inoxidable: es la pieza que
     // explica de dónde sale el número que mueve el líquido de la columna.

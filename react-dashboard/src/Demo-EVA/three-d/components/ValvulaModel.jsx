@@ -70,7 +70,7 @@ export default function ValvulaModel({
   const { material } = descriptor;
   const hayPresion = Number.isFinite(presionPct);
 
-  const colorCuerpo = tono(P, P.accent, material, descriptor.token);
+  const colorCuerpo = tono(P, P.valvula, material, descriptor.token);
   const colorOscuro = tono(P, P.carcasaOscura, material, descriptor.token);
   const colorMetal = tono(P, P.metal, material, descriptor.token);
   const props3 = propsMaterial(material);

@@ -14,6 +14,18 @@
  * Sin `distanceFactor` la ficha mantiene su tamaño en pantalla aunque la cámara
  * se aleje. Se pierde el efecto de estar «pegada» al modelo y a cambio el dato
  * se lee siempre, que es a lo que viene.
+ *
+ * ── POR QUÉ SE ANCLA POR ARRIBA Y NO SE CENTRA ─────────────────────
+ *
+ * `bombeo` y `tanque` flotan su ficha a 2,4 m de altura de bandeja más 2,5 m
+ * de holgura: casi 5 m de mundo, que la cámara isométrica de la maqueta
+ * proyecta muy cerca del borde superior del lienzo. Centrada en ese punto
+ * (`center` de drei, que reparte la caja mitad arriba mitad abajo), la mitad
+ * superior de la ficha —la cabecera con el nombre del activo y la «×»— caía
+ * por encima del lienzo y el `overflow: hidden` de `Escena.jsx` se la comía
+ * en silencio: no era un fallo de tamaño, era un recorte invisible. Ancorada
+ * por su borde SUPERIOR, la caja sólo crece hacia abajo, hacia donde la
+ * escena siempre tiene sitio de sobra.
  */
 import { Html } from "@react-three/drei";
 import { X } from "lucide-react";
@@ -64,7 +76,14 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
   const color = estadoColor(dark, activo.estado);
 
   return (
-    <Html position={[0, altura, 0]} center zIndexRange={[40, 0]} style={{ pointerEvents: "auto" }}>
+    <Html
+      position={[0, altura, 0]}
+      zIndexRange={[40, 0]}
+      // Centrado sólo en horizontal (`translate(-50%, …)`); en vertical el
+      // punto ancla el borde SUPERIOR de la caja (ver la nota de cabecera),
+      // con 6px de aire para que no quede pegada a la línea de nivel.
+      style={{ transform: "translate(-50%, 6px)", pointerEvents: "auto" }}
+    >
       <div
         // El clic no debe llegar al suelo, que cierra la ficha.
         onClick={(e) => e.stopPropagation()}
@@ -142,7 +161,14 @@ export function EtiquetaActivo({ activo, altura = 2.2 }) {
   const { theme: t } = useTheme();
 
   return (
-    <Html position={[0, altura, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+    <Html
+      position={[0, altura, 0]}
+      zIndexRange={[30, 0]}
+      // Mismo anclaje por el borde superior que `FichaActivo`, y por la misma
+      // razón: un punto cerca del techo del lienzo no deja mitad de caja
+      // arriba sin que el `overflow: hidden` de la escena se la recorte.
+      style={{ transform: "translate(-50%, 4px)", pointerEvents: "none" }}
+    >
       <div
         style={{
           padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap",

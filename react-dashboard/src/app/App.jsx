@@ -12,7 +12,7 @@
  * `app/routes/`, de donde también salen `NAV` para el Sidebar y `PAGE_META`
  * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
@@ -89,9 +89,19 @@ function Shell() {
   // cuando algo sigue navegando al id viejo.
   const PageComponent = PAGES[nav.page] ?? PAGES[DEFAULT_ROUTE];
 
+  // El cajón de navegación (Sidebar por debajo de 900px) es del Shell y no del
+  // Sidebar: el botón que lo abre vive en el Topbar, así que el estado tiene
+  // que vivir por encima de los dos.
+  const [cajonAbierto, setCajonAbierto] = useState(false);
+
   return (
     <div style={{ minHeight: "100vh", background: t.page, display: "flex" }}>
-      <Sidebar page={nav.page} onNavigate={(p) => navigate(p)} />
+      <Sidebar
+        page={nav.page}
+        onNavigate={(p) => navigate(p)}
+        abiertaCajon={cajonAbierto}
+        onCerrarCajon={() => setCajonAbierto(false)}
+      />
 
       {/* overflowX: "clip" recorta las manchas decorativas que se salen por la
           derecha (blob2 está en right: -140) sin generar scroll horizontal.
@@ -104,9 +114,9 @@ function Shell() {
 
         <Modal />
         <DataSourceBanner />
-        <Topbar page={nav.page} />
+        <Topbar page={nav.page} onAbrirMenu={() => setCajonAbierto(true)} />
 
-        <div key={nav.page} className="page-fade" style={{ padding: "26px 32px 50px", position: "relative" }}>
+        <div key={nav.page} className="page-fade eva-page-shell" style={{ position: "relative" }}>
           {/* `resetKey` rearma la barrera al cambiar de ruta: sin él, una
               vista que falló una vez dejaría el error clavado y navegar a
               otra página mostraría el mismo panel. */}

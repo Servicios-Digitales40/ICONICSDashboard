@@ -31,6 +31,7 @@ import Encuadre from "@/features/three-d/components/Encuadre.jsx";
 import Escena from "@/features/three-d/components/Escena.jsx";
 import Piso from "@/features/three-d/components/Piso.jsx";
 import { usePrefersReducedMotion } from "@/lib/motion.js";
+import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
@@ -122,6 +123,8 @@ function MaquetaEva3D({ params, onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, loading, error } = useSistemaAgua();
   const reduce = usePrefersReducedMotion();
+  // Mismo umbral que `EquipoEva3D` y que la columna única de `PlantaEva`.
+  const angosto = useMediaQuery("(max-width: 720px)");
 
   const [señalado, setSeñalado] = useState(null);
   const [seleccionado, setSeleccionado] = useState(null);
@@ -178,7 +181,7 @@ function MaquetaEva3D({ params, onNavigate }) {
         camara={ENCUADRES.isometrica.posicion}
         objetivo={ENCUADRES.isometrica.objetivo}
         zoom={{ min: 3.5, max: 18 }}
-        altura={560}
+        altura={angosto ? 380 : 560}
         frameloop={frameloop}
         extras={<Encuadre preset={encuadre} />}
       >

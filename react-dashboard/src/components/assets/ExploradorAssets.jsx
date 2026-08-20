@@ -32,6 +32,29 @@ import { isGoodQuality } from "@shared/quality.js";
 /** Raíz del espacio de nombres de AssetWorX. */
 export const RAIZ_ASSETS = "ac:";
 
+/*
+ * Las dos columnas —árbol y propiedades— necesitan sitio propio para no
+ * quedar en una franja inútil: el árbol pide al menos sus 280px de mínimo, y
+ * las propiedades por debajo de eso empiezan a envolver hasta perder el
+ * badge de calidad. Por debajo de 640px ya no queda margen para las dos a la
+ * vez, así que se apilan — el árbol primero, porque es el punto de partida
+ * de cualquier búsqueda en esta vista.
+ */
+const REJILLA = `
+.eva-explorador-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .eva-explorador-grid {
+    grid-template-columns: 1fr;
+  }
+}
+`;
+
 const isFolder = (node) => typeof node.pointName === "string" && node.pointName.endsWith("/");
 const isSystem = (node) => (node.shortName ?? "").startsWith(".");
 
@@ -327,26 +350,29 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de asset
   }, [raiz]);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 380px) 1fr", gap: 16, alignItems: "start" }}>
-      <Panel title={titulo} code={raiz} right={acciones}>
-        {error ? (
-          <AlertBanner type="error" title="No se pudo cargar el árbol" message={error} />
-        ) : roots === null ? (
-          <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>cargando árbol…</div>
-        ) : roots.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: t.textFaint }}>No hay assets bajo esta raíz.</div>
-        ) : (
-          <div style={{ maxHeight: 560, overflow: "auto" }}>
-            {roots.map((node) => (
-              <AssetNode key={node.pointName ?? node.shortName} node={node} depth={0} selectedPath={selected?.pointName} onSelect={setSelected} />
-            ))}
-          </div>
-        )}
-      </Panel>
+    <>
+      <style>{REJILLA}</style>
+      <div className="eva-explorador-grid">
+        <Panel title={titulo} code={raiz} right={acciones}>
+          {error ? (
+            <AlertBanner type="error" title="No se pudo cargar el árbol" message={error} />
+          ) : roots === null ? (
+            <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>cargando árbol…</div>
+          ) : roots.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: t.textFaint }}>No hay assets bajo esta raíz.</div>
+          ) : (
+            <div style={{ maxHeight: 560, overflow: "auto" }}>
+              {roots.map((node) => (
+                <AssetNode key={node.pointName ?? node.shortName} node={node} depth={0} selectedPath={selected?.pointName} onSelect={setSelected} />
+              ))}
+            </div>
+          )}
+        </Panel>
 
-      <Panel title="Propiedades">
-        <AssetProperties node={selected} />
-      </Panel>
-    </div>
+        <Panel title="Propiedades">
+          <AssetProperties node={selected} />
+        </Panel>
+      </div>
+    </>
   );
 }

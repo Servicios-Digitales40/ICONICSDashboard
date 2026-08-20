@@ -169,7 +169,7 @@ function PlantaEva({ onNavigate }) {
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <NotaProcedencia t={t} />
+            {/* <NotaProcedencia t={t} /> */}
           </div>
           <UltimaLectura fecha={lastUpdated} t={t} />
           <Button variant="primary" icon={<LayoutGrid size={14} />} onClick={() => onNavigate?.("eva-detalle")}>

@@ -36,6 +36,7 @@ export function DataSourceBanner() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        flexWrap: "wrap",
         gap: 10,
         padding: "7px 16px",
         background: fondo,

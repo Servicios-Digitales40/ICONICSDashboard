@@ -33,6 +33,7 @@ import Encuadre from "@/features/three-d/components/Encuadre.jsx";
 import Escena from "@/features/three-d/components/Escena.jsx";
 import Piso from "@/features/three-d/components/Piso.jsx";
 import { usePrefersReducedMotion } from "@/lib/motion.js";
+import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
@@ -77,6 +78,10 @@ function EquipoEva3D() {
   const { theme: t } = useTheme();
   const { sistema } = useSistemaAgua();
   const reduce = usePrefersReducedMotion();
+  // Mismo umbral que `PlantaEva` para su columna única: por debajo de ahí el
+  // lienzo fijo de 520px ya no es una ventana al equipo, es la mitad de la
+  // pantalla que hay que cruzar con el pulgar para llegar al panel.
+  const angosto = useMediaQuery("(max-width: 720px)");
 
   const [enVivo, setEnVivo] = useState(false);
   const [claveManual, setClaveManual] = useState("nominal");
@@ -104,12 +109,12 @@ function EquipoEva3D() {
 
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* ---- Escena ------------------------------------------------ */}
-        <div style={{ flex: "1 1 560px", minWidth: 380 }}>
+        <div style={{ flex: "1 1 560px", minWidth: 260 }}>
           <Escena
             camara={ENCUADRES.isometrica.posicion}
             objetivo={ENCUADRES.isometrica.objetivo}
             zoom={{ min: 2.6, max: 14 }}
-            altura={520}
+            altura={angosto ? 340 : 520}
             frameloop={frameloop}
             extras={<Encuadre preset={encuadre} />}
           >
@@ -134,7 +139,7 @@ function EquipoEva3D() {
         </div>
 
         {/* ---- Panel lateral ----------------------------------------- */}
-        <div style={{ flex: "0 1 340px", minWidth: 300, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ flex: "0 1 340px", minWidth: 260, display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Origen del estado */}
           <Card t={t} delay={0.05} style={{ padding: 14 }}>
             <div style={{ display: "flex", gap: 6, marginBottom: enVivo ? 12 : 0 }}>

@@ -46,6 +46,7 @@ export function Tabs({ items = [], value, onChange, size = "md" }) {
       role="tablist"
       aria-label="Subvistas"
       onKeyDown={onKeyDown}
+      className="scrollbar-thin"
       style={{
         display: "inline-flex",
         gap: 4,
@@ -53,6 +54,12 @@ export function Tabs({ items = [], value, onChange, size = "md" }) {
         borderRadius: 12,
         background: t.hover,
         border: `1px solid ${t.border}`,
+        // El shell recorta el desbordamiento horizontal en vez de dar scroll
+        // (ver `App.jsx`, `overflowX: "clip"`), así que sin esto una lista de
+        // pestañas más ancha que el viewport perdería las últimas sin aviso:
+        // ni se leen ni hay forma de llegar a ellas. Con esto, se deslizan.
+        maxWidth: "100%",
+        overflowX: "auto",
       }}
     >
       {items.map((it, i) => {
@@ -75,6 +82,8 @@ export function Tabs({ items = [], value, onChange, size = "md" }) {
               borderRadius: 9,
               border: "none",
               cursor: "pointer",
+              flexShrink: 0,
+              whiteSpace: "nowrap",
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               fontSize: font,
               fontWeight: active ? 700 : 600,

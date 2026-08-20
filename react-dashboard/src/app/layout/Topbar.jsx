@@ -2,13 +2,17 @@
  * Barra superior fija: título de la página actual, buscador, notificaciones e
  * interruptores de origen de datos y de tema.
  */
-import { Search, Bell, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi } from "lucide-react";
+import { Search, Bell, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
+import { useMediaQuery } from "@/lib/viewport.js";
 import { PAGE_META } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { Avatar } from "@/components/ui/Avatar.jsx";
+
+/** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
+const UMBRAL_CAJON = "(max-width: 900px)";
 
 /*
  * ── EL CONTADOR DE RED QUE ESTABA AQUÍ ─────────────────────────────
@@ -67,12 +71,13 @@ function VersionBuild({ t }) {
   );
 }
 
-export function Topbar({ page }) {
+export function Topbar({ page, onAbrirMenu }) {
   const { theme: t, modo, toggleTheme } = useTheme();
   const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
+  const esCajon = useMediaQuery(UMBRAL_CAJON);
 
   /* El indicador de origen es el mismo con y sin interruptor; lo que cambia es
      si además es pulsable. Se comparte el estilo para que no puedan derivar. */
@@ -89,16 +94,34 @@ export function Topbar({ page }) {
     <div
       style={{
         position: "sticky", top: 0, zIndex: 30, background: `${t.page}E6`, backdropFilter: "blur(10px)",
-        borderBottom: `1px solid ${t.border}`, padding: "18px 32px",
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20,
+        padding: esCajon ? "14px 16px" : "18px 32px",
+        borderBottom: `1px solid ${t.border}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap",
       }}
     >
-      <div>
-        <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
-        <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{meta.sub}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        {/* Sólo existe como cajón: en escritorio la barra ya está siempre a
+            la vista y este botón no tendría qué abrir. */}
+        {esCajon && (
+          <button
+            onClick={onAbrirMenu}
+            aria-label="Abrir el menú de navegación"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              width: 34, height: 34, borderRadius: 9, border: `1px solid ${t.border}`,
+              background: t.panel, color: t.textSoft, cursor: "pointer",
+            }}
+          >
+            <Menu size={17} />
+          </button>
+        )}
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
+          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{meta.sub}</p>
+        </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
         {/* <div style={{ width: 210 }}>
           <Input icon={<Search size={14} />} placeholder="Buscar…" />
         </div> */}

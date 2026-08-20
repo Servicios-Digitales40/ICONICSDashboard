@@ -116,7 +116,7 @@ export default function ColumnaModel({
       <mesh ref={liquido} position={[0, PEANA + 0.05, 0]}>
         <cylinderGeometry args={[RADIO - 0.03, RADIO - 0.03, 1, 26]} />
         <meshStandardMaterial
-          color={P.accent}
+          color={P.agua}
           transparent
           opacity={0.75 * material.opacidad}
           roughness={0.12}
