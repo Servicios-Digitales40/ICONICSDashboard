@@ -6,8 +6,12 @@
 > rango personalizado de días— en vez de la ventana fija de 6 h que traía
 > `VENTANA`.
 
-> **ESTADO (20-ago-2026)** — **Fases 0-7 cerradas (3 y 4 se hicieron juntas,
-> ver §3). Falta solo la revisión final en pantalla del usuario — ver §5.**
+> **ESTADO (20-ago-2026)** — **PLAN CERRADO.** Fases 0-7 completas (3 y 4
+> se hicieron juntas, ver §3); checklist de §5 confirmado en pantalla por
+> el usuario, incluidos los dos últimos ítems (persistencia de rango al
+> cambiar de pestaña, envoltura en ancho angosto). El recorte de `fin` a
+> "ahora" y la escala fija del eje Y quedaron además verificados contra el
+> servidor real, en vivo — no sólo contra el simulador de las pruebas.
 >
 > | Fase | Entregable | Verificación |
 > |---|---|---|
@@ -17,7 +21,7 @@
 > | 3+4 | `SelectorRango`: accesos rápidos + calendario + puntos de «hay dato» | **+7 pruebas** en `selector-rango.test.jsx`, suite completa en verde (179 ok) — confirmado en pantalla por el usuario |
 > | 5 | Carga sin vaciar, mensaje según causa, `hasMore`, eje X real | **+4 pruebas** en `grafica-historia.test.jsx`, suite completa en verde (183 ok) + detector de diseño sin hallazgos |
 > | 6 | Verificación completa | `npm test` (183 ok) + `verificar-bundle.mjs` (✔ arranque no paga la 3D) + detector de diseño (sin hallazgos) |
-> | 7 | «Hoy» → «Tiempo real»: el búfer en vivo, no el historiador | **+4 pruebas** netas, suite completa en verde (187 ok) + `verificar-bundle.mjs` + detector de diseño (sin hallazgos) — **revisión en pantalla del usuario pendiente, ver §5** |
+> | 7 | «Hoy» → «Tiempo real»: el búfer en vivo, no el historiador | **+4 pruebas** netas + fix del recorte de `fin` futuro + fix del eje Y a escala fija, **191 pruebas en verde** — confirmados en pantalla y contra el servidor real por el usuario |
 
 **Nota de investigación en vivo (20-ago-2026):** entre las Fases 4 y 5 se
 confirmó contra el servidor real —ver
@@ -390,7 +394,22 @@ reemplazó por un preset que lee de una fuente que YA se repinta sola.
   no desaparece del recuadro, pero el ruido normal ya no parece un colapso.
   +3 pruebas sobre `dominioY()`. Suite completa: **191 pruebas en verde, 0
   fallos.** Detector de diseño: sin hallazgos.
-- **Revisión en pantalla del usuario: pendiente.** Ver checklist en §5.
+- **Verificación final contra el servidor real, en vivo (no en el plan
+  original):** el usuario reportó que "Personalizado 14→20 ago" no
+  mostraba ni el 20 de agosto ni el valor forzado al 102 %. Se investigó con
+  la Network tab: el `endDate` enviado ya llegaba correctamente hasta "ahora"
+  (confirma el fix de arriba) y la respuesta sí traía una fila del 20 de
+  agosto — sólo que el historiador tenía muy pocas cubetas con dato
+  utilizable en ese rango tan amplio, ninguna cercana al 102 % en ESE
+  momento. Se verificó el "Signal Name" de "Nivel porc" en el Data Explorer
+  nativo de ICONICS: apunta al mismo `ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE`
+  que usa la app, así que no era un punto distinto. Al repetir la misma
+  consulta un rato después (el colector de ese punto loguea cada 10 s), el
+  102 % sí apareció. Conclusión: nunca hubo bug — el valor forzado sí llega
+  al historiador, sólo que la primera consulta se hizo antes de que el
+  colector absorbiera esa muestra. Cierra la duda sobre si el recorte de
+  `fin` y la escala del eje Y funcionan de verdad contra el servidor real, no
+  sólo contra el simulador de las pruebas.
 
 ---
 
@@ -408,28 +427,35 @@ reemplazó por un preset que lee de una fuente que YA se repinta sola.
 
 Lo único que falta para cerrar el plan entero. En `eva-detalle`:
 
-- [ ] **Tanque** y **Distribución**: aparece la fila de 4 controles (Tiempo
+- [x] **Tanque** y **Distribución**: aparece la fila de 4 controles (Tiempo
       real · Ayer · Hace una semana · Personalizado) sobre la rejilla de
       tarjetas, con «Tiempo real» activo al entrar.
-- [ ] **Bombeo** y **Eléctrico**: el control NO aparece.
-- [ ] **«Tiempo real»**: la insignia de la tarjeta dice «Sesión actual», y
-      forzar un valor en vivo (como el 102 % que motivó esta fase) sí
-      termina apareciendo en la curva en cuanto pasan un par de ciclos de
-      sondeo (~6-9 s) — ya no depende de volver a pulsar un botón.
-- [ ] Clic en «Ayer» y en «Hace una semana»: cambia el marcado activo, la
+- [x] **Bombeo** y **Eléctrico**: el control NO aparece.
+- [x] **«Tiempo real»**: la insignia de la tarjeta dice «Sesión actual», y
+      forzar un valor en vivo (el 102 % que motivó esta fase) sí terminó
+      apareciendo en la curva — confirmado con capturas reales.
+- [x] Clic en «Ayer» y en «Hace una semana»: cambia el marcado activo, la
       insignia pasa a decir «Historiador», y la gráfica se actualiza sin
-      parpadear en blanco (debería verse brevemente la insignia
-      «Actualizando…» sobre la curva anterior).
-- [ ] «Personalizado»: abre el calendario; los días con muestras reales
-      llevan el punto de acento; elegir dos días y «Aplicar» cierra el
-      panel y deja «Personalizado» marcado; «Cancelar» no cambia nada.
-- [ ] Cambiar de pestaña (p. ej. Tanque → Distribución) conserva el preset
+      parpadear en blanco.
+- [x] «Personalizado»: abre el calendario; los días con muestras reales
+      llevan el punto de acento; «Aplicar»/«Cancelar» funcionan — y de
+      paso se verificó contra el servidor real que el recorte de `fin` a
+      "ahora" y la escala fija del eje Y funcionan de verdad, no sólo en
+      las pruebas.
+- [x] Cambiar de pestaña (p. ej. Tanque → Distribución) conserva el preset
       elegido — no vuelve a «Tiempo real» por defecto.
-- [ ] El eje X de las gráficas se lee bien tanto en modo vivo/«Ayer»
-      (horas) como en un rango de varios días si llega a haber alguno
-      (fechas), y el tooltip muestra fecha y hora, no un número crudo.
-- [ ] Se ve correcto en modo oscuro y en el tema Mitsubishi.
-- [ ] Ancho angosto (ventana estrecha o el sidebar plegado): el grupo de 4
+- [x] El eje X de las gráficas se lee bien tanto en modo vivo/«Ayer»
+      (horas) como en un rango de varios días (fechas), y el tooltip
+      muestra fecha y hora, no un número crudo — confirmado con capturas.
+- [x] Se ve correcto en modo oscuro y en el tema Mitsubishi — confirmado
+      con capturas de ambos.
+- [x] Ancho angosto (ventana estrecha o el sidebar plegado): el grupo de 4
       controles envuelve en dos filas en vez de encogerse hasta ilegible.
 
-Con esto marcado, el Plan 11 queda cerrado.
+**Plan 11 cerrado el 20-ago-2026**, confirmado por el usuario ("Sí, todo
+funciona"). Ocho fases (una fusión 3+4, más la Fase 7 no prevista), 191
+pruebas en verde, dos bugs reales encontrados y corregidos en la revisión
+(tooltip con epoch crudo; eje Y estirando ruido), y una investigación de
+campo contra el servidor real que confirmó — sin necesidad de cambiar
+código — que el historiador de esta instalación es joven y que el recorte
+de rango funciona de punta a punta.
