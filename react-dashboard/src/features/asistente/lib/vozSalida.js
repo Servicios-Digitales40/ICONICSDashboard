@@ -24,8 +24,22 @@
  * segundos de audio; esperar a tenerla entera cuesta poco y se entiende.
  */
 
-/** Idioma de la voz. El mismo que habla el asistente. */
-const IDIOMA = 'es-ES'
+/**
+ * Idioma que se pide si NO hay ninguna voz en español instalada.
+ *
+ * ── POR QUÉ NO SE FIJA 'es-ES' Y YA ────────────────────────────────
+ *
+ * Porque fijarlo dejó el asistente MUDO en la máquina de planta. Windows trae
+ * voces de español de MÉXICO —Sabina, Raúl, todas `es-MX`— y ninguna `es-ES`.
+ * Al pedir un locale sin voz instalada, Chrome no lanza ningún error: no suena
+ * nada. Es el peor modo de fallo posible, porque no deja rastro en ninguna
+ * parte.
+ *
+ * Ahora el idioma se toma de la VOZ que se haya elegido, sea la que sea. Este
+ * valor es sólo el último recurso para cuando no hay ninguna en español y hay
+ * que dejar que el sistema decida.
+ */
+const IDIOMA_POR_DEFECTO = 'es'
 
 /**
  * Velocidad. Un poco por encima de la normal.
@@ -51,13 +65,29 @@ export function puedeHablar() {
  * sistema —que en un Windows en inglés lee el español con acento inglés y es
  * ininteligible— y sólo a partir de la segunda suena bien.
  */
-function vocesEnEspanol() {
-  const todas = window.speechSynthesis.getVoices()
-  return todas
+/**
+ * La mejor voz disponible para hablar español.
+ *
+ * Cualquier variante vale —`es-MX`, `es-ES`, `es-AR`— porque una cifra de
+ * proceso se entiende igual con acento mexicano que peninsular, y exigir una
+ * región concreta es lo que dejó mudo al asistente en planta.
+ *
+ * Si no hay NINGUNA en español devuelve `null`, y entonces habla la voz por
+ * defecto del sistema. Se entenderá regular, pero se oye — que es infinitamente
+ * mejor que el silencio, porque el silencio no se puede diagnosticar.
+ */
+function elegirVoz(todas) {
+  const espanolas = (todas ?? [])
     .filter(v => v.lang?.toLowerCase().startsWith('es'))
     // Las locales antes que las de red: una voz remota no funcionaría en una
     // planta sin salida a internet, que es el escenario de esta instalación.
     .sort((a, b) => Number(b.localService) - Number(a.localService))
+
+  return espanolas[0] ?? null
+}
+
+function vocesEnEspanol() {
+  return window.speechSynthesis.getVoices()
 }
 
 /** Espera a que el navegador tenga las voces cargadas. */
@@ -99,16 +129,34 @@ let vozElegida = null
  * navegador marque la página como autorizada, y a partir de ahí todo lo demás
  * suena. No se oye nada al hacerlo.
  */
-export function desbloquearVoz() {
+export function desbloquearVoz(saludo) {
   if (!puedeHablar()) return
 
   try {
-    const vacio = new SpeechSynthesisUtterance('')
-    vacio.volume = 0
-    window.speechSynthesis.speak(vacio)
-    // Se pide la lista de voces aquí también: es lo que dispara su carga
-    // asíncrona, así que para cuando llegue la primera respuesta ya estarán.
-    window.speechSynthesis.getVoices()
+    // Pedir la lista dispara su carga asíncrona: para cuando llegue la primera
+    // respuesta ya estarán. Y aquí, síncrono, puede que ya estén.
+    const voces = window.speechSynthesis.getVoices()
+    if (!vozElegida && voces.length) vozElegida = elegirVoz(voces)
+
+    /*
+     * Se habla AQUÍ MISMO, sin `await` de por medio, y eso es lo importante.
+     *
+     * `hablar()` espera a que carguen las voces antes de llamar a `speak()`, y
+     * ese `await` rompe la cadena del gesto: para el navegador, la llamada ya
+     * no viene de un clic sino de un temporizador, y vuelve a bloquearla. La
+     * frase de saludo tiene que salir en la misma vuelta del clic.
+     */
+    const frase = new SpeechSynthesisUtterance(saludo ?? '')
+    frase.rate = VELOCIDAD
+    if (vozElegida) {
+      frase.voice = vozElegida
+      frase.lang = vozElegida.lang
+    } else {
+      frase.lang = IDIOMA_POR_DEFECTO
+    }
+    if (!saludo) frase.volume = 0
+
+    window.speechSynthesis.speak(frase)
   } catch {
     // Si el navegador se queja, se seguirá intentando al hablar de verdad.
   }
@@ -126,10 +174,7 @@ export async function hablar(texto) {
   const limpio = paraLeer(texto)
   if (!limpio) return
 
-  if (!vozElegida) {
-    const voces = await esperarVoces()
-    vozElegida = voces[0] ?? null
-  }
+  if (!vozElegida) vozElegida = elegirVoz(await esperarVoces())
 
   // Cancelar lo anterior antes de empezar: si no, las respuestas se encolan y
   // el asistente sigue leyendo la de hace tres preguntas.
@@ -137,9 +182,20 @@ export async function hablar(texto) {
 
   return new Promise(resolve => {
     const frase = new SpeechSynthesisUtterance(limpio)
-    frase.lang = IDIOMA
     frase.rate = VELOCIDAD
-    if (vozElegida) frase.voice = vozElegida
+
+    /*
+     * El `lang` acompaña a la VOZ, no al revés.
+     *
+     * Poner `es-ES` con una voz `es-MX` seleccionada es pedirle al navegador
+     * dos cosas incompatibles, y su forma de resolverlo es no decir nada.
+     */
+    if (vozElegida) {
+      frase.voice = vozElegida
+      frase.lang = vozElegida.lang
+    } else {
+      frase.lang = IDIOMA_POR_DEFECTO
+    }
 
     let acabado = false
     const terminar = () => {

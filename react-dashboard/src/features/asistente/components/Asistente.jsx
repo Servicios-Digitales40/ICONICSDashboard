@@ -216,9 +216,29 @@ export function Asistente() {
    * El foco vuelve al campo porque el paso siguiente casi siempre es corregir
    * una palabra que Whisper oyó mal antes de enviar.
    */
-  const anadirAlBorrador = (texto) => {
-    setBorrador((previo) => (previo.trim() ? `${previo.trim()} ${texto}` : texto));
-    campoRef.current?.focus();
+  /**
+   * Lo dictado se ENVÍA solo al callarte.
+   *
+   * ── POR QUÉ SE CAMBIÓ DE OPINIÓN ───────────────────────────────────
+   *
+   * La primera versión dejaba el texto en el cuadro para revisarlo antes de
+   * enviar, razonando que Whisper se equivoca con el ruido de planta y con los
+   * nombres de tag. El razonamiento sigue siendo cierto, pero el precio era
+   * peor: dictar y luego tener que ir al teclado a pulsar Enter deja el gesto a
+   * medias, y quien dicta lo hace precisamente porque no quiere tocar el
+   * teclado.
+   *
+   * El error de transcripción sigue siendo visible —la pregunta se pinta en el
+   * hilo tal y como se entendió— así que un malentendido se ve igual, sólo que
+   * después en vez de antes. A cambio de una consulta ocasional gastada, el
+   * dictado sirve para lo que existe.
+   *
+   * Se envía lo que hubiera escrito MÁS lo dictado: el caso real es empezar a
+   * escribir, quedarse a medias y terminar la frase hablando.
+   */
+  const enviarDictado = (texto) => {
+    const completo = borrador.trim() ? `${borrador.trim()} ${texto}` : texto;
+    if (lanzar(completo)) setBorrador("");
   };
 
   /**
@@ -418,7 +438,7 @@ export function Asistente() {
         {/* El micrófono sólo aparece si el servidor tiene whisper Y el navegador
             puede grabar. Un botón que siempre falla es peor que no tenerlo. */}
         {dictado.disponible && !ocupado && !manosLibres.activo && (
-          <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} />
+          <BotonMicrofono t={t} dictado={dictado} onTexto={enviarDictado} />
         )}
 
         {/* El manos libres exige además que el navegador sepa hablar. */}

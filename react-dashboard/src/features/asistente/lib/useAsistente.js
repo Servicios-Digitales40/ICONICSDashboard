@@ -559,7 +559,10 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
    * Va justo después del clic, que es cuando el navegador sí autoriza a hablar.
    */
   const saludar = useCallback(() => {
-    hablar("Te escucho.");
+    // NO se usa `hablar()`: espera a que carguen las voces, y ese `await`
+    // rompe la cadena del clic — que es justo lo que el navegador exige para
+    // autorizar el audio. `desbloquearVoz` lo dice en la misma vuelta.
+    desbloquearVoz("Te escucho.");
   }, []);
 
   const apagar = useCallback(() => {
@@ -654,7 +657,6 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
      * `speak()` no da ningún error y simplemente no suena nada, que es el
      * síntoma de «no me contesta por voz».
      */
-    desbloquearVoz();
     saludar();
 
     activoRef.current = true;
