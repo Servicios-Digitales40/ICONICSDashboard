@@ -35,6 +35,7 @@ import {
   ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
 } from "../lib/useAsistente.js";
 import { nivelDeSeveridad, preguntaDeDiagnostico, useAlarmas } from "../lib/useAlarmas.js";
+import { MS_SILENCIO_DICTADO } from "../lib/audio.js";
 
 /**
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
@@ -497,6 +498,12 @@ export function Asistente() {
  */
 function BotonMicrofono({ t, dictado, onTexto }) {
   const { grabando, transcribiendo, empezar, detener } = dictado;
+  const [nivel, setNivel] = useState(0);
+
+  // Por referencia: el detector de silencio se registra al arrancar la
+  // grabación y tiene que invocar la versión actual del cierre, no la que
+  // existía en ese render. Mismo motivo que en `useManosLibres`.
+  const cerrarRef = useRef(null);
 
   if (transcribiendo) {
     return (
@@ -510,20 +517,72 @@ function BotonMicrofono({ t, dictado, onTexto }) {
     );
   }
 
-  const alPulsar = async () => {
-    if (!grabando) return empezar();
+  /*
+   * El dictado también se cierra solo al callarte, a los 3 segundos.
+   *
+   * Antes había que pulsar dos veces —una para hablar y otra para parar— y con
+   * el micrófono abierto esperando, no hay forma de saber si te está oyendo.
+   * Ahora basta con hablar y callarse.
+   *
+   * Tres segundos y no 1,2 como en el modo llamada, y la diferencia importa:
+   * dictar no es un turno de conversación, es componer una frase, y ahí uno se
+   * para a pensar cómo decir algo. Cortar a 1,2 s convertiría cada duda en un
+   * envío a medias.
+   *
+   * El botón sigue cerrando el turno a mano para quien no quiera esperar.
+   */
+  const cerrar = async () => {
     const texto = await detener();
     if (texto) onTexto(texto);
   };
 
+  cerrarRef.current = cerrar;
+
+  const alPulsar = async () => {
+    if (grabando) return cerrar();
+
+    await empezar({
+      msSilencio: MS_SILENCIO_DICTADO,
+      alNivel: setNivel,
+      alDetectarSilencio: () => cerrarRef.current?.(),
+    });
+  };
+
+  if (!grabando) {
+    return (
+      <button
+        type="button" onClick={alPulsar} className="app-btn"
+        aria-label="Dictar la pregunta"
+        title="Dictar la pregunta"
+        style={botonMicro(t, "listo")}
+      >
+        <Mic size={15} />
+      </button>
+    );
+  }
+
+  // El anillo crece con la voz: es la prueba de que te está oyendo. Sin ella,
+  // quien tenga el micrófono silenciado por el sistema espera un texto que no
+  // va a llegar, sin saber por qué.
+  const escala = 1 + Math.min(nivel * 6, 0.9);
+
   return (
     <button
       type="button" onClick={alPulsar} className="app-btn"
-      aria-label={grabando ? "Parar de grabar y transcribir" : "Dictar la pregunta"}
-      title={grabando ? "Parar y transcribir" : "Dictar la pregunta"}
-      style={botonMicro(t, grabando ? "grabando" : "listo")}
+      aria-label="Parar de grabar y transcribir"
+      title="Te escucho. Se envía solo al callarte, o pulsa para enviar ya."
+      style={{ ...botonMicro(t, "grabando"), position: "relative" }}
     >
-      {grabando ? <Square size={13} fill="currentColor" /> : <Mic size={15} />}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute", inset: 0, borderRadius: 9,
+          background: t.coral, opacity: 0.18,
+          transform: `scale(${escala})`,
+          transition: "transform 100ms linear",
+        }}
+      />
+      <Square size={13} fill="currentColor" style={{ position: "relative" }} />
     </button>
   );
 }
