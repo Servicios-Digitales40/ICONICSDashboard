@@ -13,7 +13,7 @@
  * de la pantalla leía datos generados. Quién lee el pasado lo decide `evaSource`,
  * una vez, a partir del transporte.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SISTEMA_VACIO } from "../domain/sistema.js";
 import { SENAL_KEYS } from "../domain/senales.js";
@@ -58,35 +58,75 @@ export function useSistemaAgua() {
 }
 
 /**
- * Serie histórica de una señal. No se sondea: se pide al montar, porque el
- * pasado no cambia y el borde derecho lo cubre el valor en vivo.
+ * `{ horas, puntos }` o `{ inicio, fin }` → una clave primitiva estable para
+ * dependencia de efecto. Un `Date` es un objeto nuevo en cada render aunque
+ * represente el mismo instante, así que no puede ir tal cual en un array de
+ * dependencias sin refetchear en bucle; esta clave es lo único que compara
+ * por VALOR.
+ */
+function claveRango(rango) {
+  if (rango?.inicio instanceof Date && rango?.fin instanceof Date) {
+    return `abs:${rango.inicio.getTime()}-${rango.fin.getTime()}`;
+  }
+  const horas = rango?.horas ?? VENTANA.horas;
+  const puntos = rango?.puntos ?? VENTANA.puntos;
+  return `rel:${horas}-${puntos}`;
+}
+
+/**
+ * Serie histórica de una señal. No se sondea dentro de un mismo rango: se
+ * pide al montar, y otra vez cada vez que el RANGO cambia de valor, porque el
+ * pasado ya pedido no cambia y el borde derecho lo cubre el valor en vivo.
+ *
+ * Al cambiar sólo el RANGO (misma señal), la gráfica anterior se conserva
+ * mientras llega la nueva — `loading` sube a `true` pero `datos` no se vacía,
+ * así la tarjeta puede seguir mostrando la curva vieja con un aviso discreto
+ * en vez de parpadear en blanco. Al cambiar de SEÑAL sí se vacía de
+ * inmediato: mostrar la curva de otra variable bajo esta etiqueta, aunque
+ * sea un instante, sería mentir sobre el dato.
  *
  * `motivo` es un texto cuando la señal **no tiene serie propia en el
  * historiador** (ver `data/historia.js`). No es un error y no debe pintarse
  * como tal: es un hecho de la instalación que la tarjeta tiene que explicar.
  */
-export function useSerieHistorica(clave, ventana = VENTANA) {
+export function useSerieHistorica(clave, rango = VENTANA) {
   const source = useEvaSource();
-  const [estado, setEstado] = useState({ datos: [], motivo: null, loading: true, error: null });
+  const [estado, setEstado] = useState({ datos: [], motivo: null, loading: true, error: null, hasMore: false });
+  const claveAnterior = useRef(null);
 
-  const horas = ventana?.horas ?? VENTANA.horas;
-  const puntos = ventana?.puntos ?? VENTANA.puntos;
+  const key = claveRango(rango);
 
   useEffect(() => {
     let vivo = true;
-    setEstado({ datos: [], motivo: null, loading: true, error: null });
+    const mismaClave = claveAnterior.current === clave;
+    claveAnterior.current = clave;
+
+    setEstado((prev) =>
+      mismaClave
+        ? { ...prev, loading: true, error: null }
+        : { datos: [], motivo: null, loading: true, error: null, hasMore: false }
+    );
 
     if (!clave) return undefined;
 
     source
-      .leerSerie(clave, { horas, puntos })
-      .then(({ datos, motivo }) => vivo && setEstado({ datos, motivo, loading: false, error: null }))
-      .catch((err) => vivo && setEstado({ datos: [], motivo: null, loading: false, error: err.message }));
+      .leerSerie(clave, rango)
+      .then(
+        ({ datos, motivo, hasMore }) =>
+          vivo && setEstado({ datos, motivo, loading: false, error: null, hasMore: Boolean(hasMore) })
+      )
+      .catch(
+        (err) => vivo && setEstado({ datos: [], motivo: null, loading: false, error: err.message, hasMore: false })
+      );
 
     return () => {
       vivo = false;
     };
-  }, [source, clave, horas, puntos]);
+    // `rango` no va en las dependencias a propósito: `key` ya es su
+    // representación por valor, y meter el objeto refetchearía en cada
+    // render (los presets del selector construyen uno nuevo cada vez).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, clave, key]);
 
   return estado;
 }
@@ -99,38 +139,55 @@ export function useSerieHistorica(clave, ventana = VENTANA) {
  * historiador puede devolver rejillas con huecos distintos por señal, y
  * resolverlo dentro del `render` obligaría a recalcularlo en cada repintado.
  */
-export function useSeriesHistoricas(claves, ventana = VENTANA) {
+export function useSeriesHistoricas(claves, rango = VENTANA) {
   const source = useEvaSource();
-  const [estado, setEstado] = useState({ filas: [], porClave: {}, loading: true, error: null });
+  const [estado, setEstado] = useState({ filas: [], porClave: {}, loading: true, error: null, hasMore: false });
+  const clavesAnteriores = useRef(null);
 
   const clavesKey = claves.join("|");
-  const horas = ventana?.horas ?? VENTANA.horas;
-  const puntos = ventana?.puntos ?? VENTANA.puntos;
+  const key = claveRango(rango);
 
   useEffect(() => {
     let vivo = true;
-    setEstado({ filas: [], porClave: {}, loading: true, error: null });
+    // Mismo criterio que `useSerieHistorica`: sólo se conserva la rejilla
+    // anterior cuando lo que cambió fue el RANGO, no el conjunto de señales
+    // (cambiar de pestaña no debe dejar ver, ni un instante, las curvas del
+    // activo anterior bajo las tarjetas del nuevo).
+    const mismasClaves = clavesAnteriores.current === clavesKey;
+    clavesAnteriores.current = clavesKey;
+
+    setEstado((prev) =>
+      mismasClaves
+        ? { ...prev, loading: true, error: null }
+        : { filas: [], porClave: {}, loading: true, error: null, hasMore: false }
+    );
 
     const lista = clavesKey ? clavesKey.split("|") : [];
     if (!lista.length) {
-      setEstado({ filas: [], porClave: {}, loading: false, error: null });
+      setEstado({ filas: [], porClave: {}, loading: false, error: null, hasMore: false });
       return undefined;
     }
 
     Promise.all(
-      lista.map((k) => source.leerSerie(k, { horas, puntos }).catch(() => ({ datos: [], motivo: null })))
+      lista.map((k) => source.leerSerie(k, rango).catch(() => ({ datos: [], motivo: null, hasMore: false })))
     )
       .then((resultados) => {
         if (!vivo) return;
         const porClave = Object.fromEntries(lista.map((k, i) => [k, resultados[i].datos]));
-        setEstado({ filas: unir(porClave), porClave, loading: false, error: null });
+        const hasMore = resultados.some((r) => r.hasMore);
+        setEstado({ filas: unir(porClave), porClave, loading: false, error: null, hasMore });
       })
-      .catch((err) => vivo && setEstado({ filas: [], porClave: {}, loading: false, error: err.message }));
+      .catch(
+        (err) => vivo && setEstado({ filas: [], porClave: {}, loading: false, error: err.message, hasMore: false })
+      );
 
     return () => {
       vivo = false;
     };
-  }, [source, clavesKey, horas, puntos]);
+    // Mismo criterio que `useSerieHistorica`: `key` es el valor de `rango`,
+    // el objeto no va en las dependencias.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, clavesKey, key]);
 
   return estado;
 }

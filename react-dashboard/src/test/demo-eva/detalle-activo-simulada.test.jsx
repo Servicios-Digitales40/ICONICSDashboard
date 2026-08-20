@@ -70,9 +70,16 @@ describe("Detalle de activo en modo simulado", () => {
   });
 
   it("Tanque sí afirma «Historiador»: sus dos señales tienen serie propia", async () => {
+    // El selector de rango (Plan 11) arranca en «Tiempo real», que lee del
+    // búfer de sesión — ahí la insignia dice «Sesión actual», con razón.
+    // Para probar que la señal SÍ tiene serie propia hay que mirarla contra
+    // el historiador de verdad, así que se elige «Ayer» primero.
     const fetchTrampa = cortarLaRed();
 
     montar({ activo: "tanque" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ayer" })).toBeTruthy(), { timeout: 4_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Ayer" }));
 
     await waitFor(() => expect(screen.getAllByText(/Historiador/).length).toBeGreaterThan(0), { timeout: 4_000 });
 

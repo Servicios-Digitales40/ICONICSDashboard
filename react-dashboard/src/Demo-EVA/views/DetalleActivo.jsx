@@ -15,16 +15,27 @@
  * variable, gráfica a tamaño real): de tres acomodos comparados en vivo, fue
  * el elegido.
  */
+import { useState } from "react";
+
 import { AlertBanner, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useDetalleActivo } from "../data/detalleActivo.js";
+import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../data/historia.js";
 import { ACTIVO_IDS, activoInfo } from "../domain/activos.js";
 import { estadoInfo } from "../domain/estado.js";
 import { UltimaLectura, PuntoEstado } from "../components/base.jsx";
 import { estadoColor } from "../components/paleta.js";
 import { DetalleGrid } from "../components/detalle/DetalleGrid.jsx";
+import { SelectorRango } from "../components/detalle/SelectorRango.jsx";
+
+/**
+ * Con qué función se calcula el rango de cada acceso rápido contra el
+ * historiador. «Tiempo real» no está aquí a propósito: no le pide nada al
+ * historiador, lee del búfer en vivo (ver `data/detalleActivo.js`).
+ */
+const PRESETS_RANGO = { ayer: rangoAyer, semana: rangoSemana };
 
 function CabeceraActivo({ activo, dark, t, lastUpdated }) {
   const info = estadoInfo(activo.estado);
@@ -52,8 +63,37 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
 function DetalleActivo({ params, onNavigate }) {
   const { theme: t, dark } = useTheme();
 
+  // El estado del rango vive AQUÍ y no en `useDetalleActivo`, para que
+  // sobreviva al cambio de pestaña: `Shell` mantiene montado este componente
+  // mientras la ruta siga siendo `eva-detalle` (su `key` es `nav.page`, no
+  // `nav.params`), así que cambiar de activo no lo reinicia. Por defecto
+  // arranca en «Tiempo real».
+  //
+  // `rango` es irrelevante mientras `presetActivo === "vivo"` — en ese modo
+  // `useDetalleActivo` no le pide nada al historiador — así que su valor
+  // inicial es sólo un relleno inofensivo, nunca `rangoAyer()` ni parecido
+  // (calcularlo de más sin usarlo sería trabajo sin motivo).
+  const [presetActivo, setPresetActivo] = useState("vivo");
+  const [rango, setRango] = useState(VENTANA);
+
+  function elegirPreset(key) {
+    setPresetActivo(key);
+    const calculador = PRESETS_RANGO[key];
+    if (calculador) setRango(calculador());
+  }
+
+  function elegirPersonalizado(diaInicio, diaFin) {
+    setPresetActivo("personalizado");
+    setRango(rangoPersonalizado(diaInicio, diaFin));
+  }
+
   const activoId = ACTIVO_IDS.includes(params?.activo) ? params.activo : ACTIVO_IDS[0];
-  const { activo, activos, variables, loading, error, lastUpdated } = useDetalleActivo(activoId);
+  const enVivo = presetActivo === "vivo";
+  const { activo, activos, variables, loading, error, lastUpdated, historiaHasMore } = useDetalleActivo(
+    activoId,
+    rango,
+    enVivo
+  );
 
   if (loading && !activo?.senales?.some((s) => s.receivedAt)) {
     return <p style={{ fontSize: 13, opacity: 0.7 }}>Leyendo el activo…</p>;
@@ -64,6 +104,16 @@ function DetalleActivo({ params, onNavigate }) {
   }
 
   const pestañas = activos.map((a) => ({ key: a.id, label: a.corto, color: estadoColor(dark, a.estado) }));
+
+  // Sólo tiene sentido un selector de rango si hay al menos una gráfica que
+  // consulte el historiador. Bombeo y Eléctrico no tienen ninguna señal con
+  // `historizado: true` y no deben mostrar el control, igual que sus
+  // tarjetas ya no muestran `GraficaHistoria`. La primera historizada del
+  // activo hace de sonda para pintar, en el calendario, qué días tienen
+  // muestras reales — las dos de un mismo activo comparten fuente física,
+  // así que una alcanza sin duplicar la consulta.
+  const claveSonda = activo.senales.find((s) => s.historizado)?.key;
+  const tieneHistoriadas = Boolean(claveSonda);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -77,6 +127,26 @@ function DetalleActivo({ params, onNavigate }) {
 
       <div role="tabpanel" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <CabeceraActivo activo={activo} dark={dark} t={t} lastUpdated={lastUpdated} />
+
+        {tieneHistoriadas && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <SelectorRango
+              activo={presetActivo}
+              onPreset={elegirPreset}
+              onPersonalizado={elegirPersonalizado}
+              t={t}
+              claveSonda={claveSonda}
+            />
+            {historiaHasMore && (
+              // Debería ser rarísimo: el intervalo ya se calcula para caber en
+              // MAX_PUNTOS. Si aun así el servidor recorta, se dice en vez de
+              // fingir que la gráfica está completa.
+              <span style={{ fontSize: 10.5, color: t.textFaint }}>
+                El servidor tiene más muestras de las que caben aquí; se muestra una selección representativa.
+              </span>
+            )}
+          </div>
+        )}
 
         <DetalleGrid variables={variables} t={t} dark={dark} />
       </div>

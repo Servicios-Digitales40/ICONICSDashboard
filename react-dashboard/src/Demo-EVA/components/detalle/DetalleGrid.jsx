@@ -26,7 +26,7 @@ function TarjetaVariable({ senal, t, dark, delay }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>{senal.label}</div>
           <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.textFaint, marginTop: 2 }}>{senal.tag}</div>
         </div>
-        {senal.historizado && <InsigniaOrigen real t={t} />}
+        {senal.historizado && <InsigniaOrigen real={!senal.historiaEnVivo} t={t} />}
       </div>
 
       {esBooleano ? (
@@ -58,7 +58,15 @@ function TarjetaVariable({ senal, t, dark, delay }) {
 
       <div style={{ marginTop: 16 }}>
         {senal.historizado ? (
-          <GraficaHistoria senal={senal} datos={senal.historiaReal} t={t} dark={dark} alto={150} />
+          <GraficaHistoria
+            senal={senal}
+            datos={senal.historiaReal}
+            cargando={senal.historiaCargando}
+            enVivo={senal.historiaEnVivo}
+            t={t}
+            dark={dark}
+            alto={150}
+          />
         ) : esBooleano ? null : tieneBufer ? (
           <>
             <GraficaBufer senal={senal} valores={senal.bufferVivo} t={t} dark={dark} alto={64} />

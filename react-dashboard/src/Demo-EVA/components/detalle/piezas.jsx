@@ -36,31 +36,104 @@ export function InsigniaOrigen({ real, t }) {
   );
 }
 
-/** Histórico real del historiador: `datos` es `[{ t, valor }]`. */
-export function GraficaHistoria({ senal, datos, t, dark, alto = 150 }) {
-  const filas = (datos ?? []).map((p) => ({
-    hora: p.t.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-    valor: p.valor,
-  }));
+/** Menos de 36 h: se lee mejor por hora. Más: por hora sola no dice de qué día es. */
+const UMBRAL_MULTIDIA_MS = 36 * 3_600_000;
+
+function formatoTick(multiDia) {
+  return (ms) =>
+    multiDia
+      ? new Date(ms).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })
+      : new Date(ms).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatoTooltip(ms) {
+  return new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Dominio del eje Y: la escala declarada de la señal (`BandaValor` usa la
+ * misma), no `dataMin`/`dataMax`. Un rango que se ajusta a los propios datos
+ * estira CUALQUIER variación —incluido el ruido de una décima— hasta llenar
+ * el alto entero del recuadro, y una oscilación de 102.01 a 102.12 se lee
+ * como un desplome. Fijar la escala real hace que un movimiento pequeño se
+ * VEA pequeño. Se expande sólo si la serie se sale de la escala —un valor
+ * fuera de rango no debe desaparecer del recuadro— y cae en `dataMin`/`Max`
+ * si la señal no declara escala.
+ */
+export function dominioY(escala) {
+  if (!escala) return ["dataMin", "dataMax"];
+  return [
+    (dataMin) => Math.min(dataMin, escala.min),
+    (dataMax) => Math.max(dataMax, escala.max),
+  ];
+}
+
+/**
+ * `labelFormatter` de Recharts sólo se aplica al tooltip por defecto — con
+ * un `content` propio, como `ChartTooltip`, Recharts pasa el `label` tal
+ * cual venía en la fila (aquí, el epoch en milisegundos crudo). Por eso el
+ * formateo se hace aquí, envolviendo `ChartTooltip` sin tocarlo: es un
+ * componente compartido con gráficas que sí le pasan una hora ya en texto.
+ */
+export function TooltipHistoria(props) {
+  return <ChartTooltip {...props} label={typeof props.label === "number" ? formatoTooltip(props.label) : props.label} />;
+}
+
+/**
+ * Histórico real del historiador, o del búfer en vivo cuando `enVivo` —
+ * `datos` es `[{ t, valor }]` en los dos casos.
+ *
+ * `cargando` no vacía la gráfica: la sube `useSeriesHistoricas` mientras trae
+ * el rango nuevo, y aquí sólo cambia el mensaje de ausencia (si aún no hay
+ * nada que mostrar) o añade una insignia sobre la curva anterior (si ya
+ * había algo) — nunca un parpadeo en blanco al cambiar de rango. En modo
+ * vivo no hay «cargando»: el búfer no sale a la red, sólo crece.
+ */
+export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto = 150 }) {
+  const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
 
   if (filas.length < 2) {
-    return <GraficaAusente t={t} alto={alto} mensaje="El historiador aún no tiene suficientes muestras." />;
+    const mensaje = enVivo
+      ? "Sin muestras todavía en esta sesión."
+      : cargando
+      ? "Consultando el historiador…"
+      : "No hay muestras del historiador en este rango.";
+    return <GraficaAusente t={t} alto={alto} mensaje={mensaje} />;
   }
 
+  const multiDia = filas[filas.length - 1].t - filas[0].t > UMBRAL_MULTIDIA_MS;
+
   return (
-    <ResponsiveContainer width="100%" height={alto}>
-      <AreaChart data={filas} margin={{ top: 6, right: 6, left: -28, bottom: 0 }}>
-        <XAxis dataKey="hora" tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-        <YAxis domain={["dataMin", "dataMax"]} tick={false} axisLine={false} tickLine={false} width={30} />
-        <Tooltip content={<ChartTooltip />} />
-        <Area
-          type="monotone" dataKey="valor" name={senal.corto}
-          stroke={col} strokeWidth={2} fill={col} fillOpacity={0.14}
-          isAnimationActive={false} dot={false}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+    <div style={{ position: "relative" }}>
+      <ResponsiveContainer width="100%" height={alto}>
+        <AreaChart data={filas} margin={{ top: 6, right: 6, left: -28, bottom: 0 }}>
+          <XAxis
+            dataKey="t" type="number" scale="time" domain={["dataMin", "dataMax"]}
+            tickFormatter={formatoTick(multiDia)}
+            tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false} interval="preserveStartEnd"
+          />
+          <YAxis domain={dominioY(senal.escala)} tick={false} axisLine={false} tickLine={false} width={30} />
+          <Tooltip content={<TooltipHistoria />} />
+          <Area
+            type="monotone" dataKey="valor" name={senal.corto}
+            stroke={col} strokeWidth={2} fill={col} fillOpacity={0.14}
+            isAnimationActive={false} dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+      {cargando && (
+        <span
+          style={{
+            position: "absolute", top: 2, right: 2,
+            fontFamily: MONO, fontSize: 9.5, fontWeight: 600, letterSpacing: 0.3, textTransform: "uppercase",
+            color: t.textFaint, background: t.hover, borderRadius: 999, padding: "2px 8px",
+          }}
+        >
+          Actualizando…
+        </span>
+      )}
+    </div>
   );
 }
 

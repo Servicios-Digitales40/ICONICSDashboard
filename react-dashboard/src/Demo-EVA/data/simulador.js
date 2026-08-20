@@ -50,7 +50,7 @@ import { QUALITY_GOOD } from "@shared/quality.js";
 import { CAOS_SUAVE } from "@/lib/iconics";
 
 import { esHistorizada, parsePointName, senalInfo } from "../domain/senales.js";
-import { SIN_SERIE, VENTANA } from "./historia.js";
+import { MAX_PUNTOS, SIN_SERIE, VENTANA } from "./historia.js";
 
 /** Calidad OPC "uncertain": lo que más se parece a un dato bueno sin serlo. */
 const QUALITY_UNCERTAIN = 64;
@@ -334,6 +334,29 @@ export function createTransporteEva({
   }
 
   /**
+   * `{ horas, puntos }` (relativo a `ahora()`) o `{ inicio, fin }` (rango
+   * absoluto, los presets del selector o el calendario personalizado) → el
+   * cierre y el paso de la rejilla que arma `readSerie`.
+   *
+   * Repite la misma distinción que `resolverRango` de `data/historia.js` —el
+   * lector real—: sin ella, un rango absoluto se destructuraría en
+   * `{horas: undefined, puntos: undefined}` y el simulador serviría siempre
+   * la ventana de 6 h por defecto, **en silencio**, mientras el historiador
+   * real sí obedeciera el rango. La demo se rompería exactamente donde nadie
+   * la mira: en el origen Simulado.
+   */
+  function resolverRangoSimulado(rango) {
+    if (rango?.inicio instanceof Date && rango?.fin instanceof Date) {
+      const finMs = rango.fin.getTime();
+      const inicioMs = rango.inicio.getTime();
+      return { finMs, pasoMs: (finMs - inicioMs) / MAX_PUNTOS, n: MAX_PUNTOS };
+    }
+    const h = rango?.horas ?? VENTANA.horas;
+    const n = rango?.puntos ?? VENTANA.puntos;
+    return { finMs: ahora(), pasoMs: (h * 3_600_000) / n, n };
+  }
+
+  /**
    * Serie histórica, en el lugar del historiador.
    *
    * **Repite la guarda de `data/historia.js` a propósito.** Cuatro de las ocho
@@ -343,21 +366,19 @@ export function createTransporteEva({
    * Un simulador que devolviera ocho series enseñaría a la pantalla una
    * instalación que no existe, y se rompería al volver a datos reales.
    *
-   * Devuelve `{ datos, motivo }` con la misma forma que el lector real: `datos`
-   * son `[{ t: Date, valor }]` y `motivo` es un texto cuando no hay serie que
-   * pedir. Nunca las dos cosas a la vez.
+   * Devuelve `{ datos, motivo, hasMore }` con la misma forma que el lector
+   * real: `datos` son `[{ t: Date, valor }]`, `motivo` es un texto cuando no
+   * hay serie que pedir (nunca las dos cosas a la vez), y `hasMore` siempre
+   * es `false` — el simulador genera exactamente los puntos que se le piden,
+   * nunca recorta de más como podría hacer el servidor real.
    */
-  async function readSerie(clave, { horas, puntos } = VENTANA) {
-    if (!senalInfo(clave)) return { datos: [], motivo: `Señal desconocida: ${clave}` };
-    if (!esHistorizada(clave)) return { datos: [], motivo: SIN_SERIE };
+  async function readSerie(clave, rango = VENTANA) {
+    if (!senalInfo(clave)) return { datos: [], motivo: `Señal desconocida: ${clave}`, hasMore: false };
+    if (!esHistorizada(clave)) return { datos: [], motivo: SIN_SERIE, hasMore: false };
 
     if (chaos.latenciaMs > 0) await espera(chaos.latenciaMs);
 
-    const h = horas ?? VENTANA.horas;
-    const n = puntos ?? VENTANA.puntos;
-
-    const fin = ahora();
-    const pasoMs = (h * 3_600_000) / n;
+    const { finMs: fin, pasoMs, n } = resolverRangoSimulado(rango);
     const datos = [];
 
     for (let i = n - 1; i >= 0; i--) {
@@ -371,7 +392,7 @@ export function createTransporteEva({
       datos.push({ t: new Date(cierre), valor: mediaDelTramo(clave, cierre - pasoMs, cierre) });
     }
 
-    return { datos, motivo: null };
+    return { datos, motivo: null, hasMore: false };
   }
 
   return { read, readSerie };

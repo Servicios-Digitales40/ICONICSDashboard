@@ -241,4 +241,31 @@ describe("la historia no miente sobre lo que el servidor publica", () => {
     expect(datos.at(-1).valor).toBeCloseTo(mediaDelTramo("nivelTanque", T0 - paso, T0), 6);
     expect(Math.abs(datos.at(-1).valor - valorEn("nivelTanque", T0))).toBeLessThan(6);
   });
+
+  it("con un rango absoluto {inicio, fin} obedece ESE rango, no la ventana de 6 h por defecto", async () => {
+    // Regresión del Plan 11 §Fase 2: antes de `resolverRangoSimulado`, un rango
+    // absoluto se destructuraba en `{horas: undefined, puntos: undefined}` y el
+    // simulador servía siempre la ventana por defecto, en silencio — el
+    // selector de rango habría parecido funcionar y no habría hecho nada con
+    // el origen Simulado puesto.
+    const inicio = new Date(T0 - 7 * 24 * 3_600_000);
+    const fin = new Date(T0);
+
+    const { datos, motivo } = await enT(T0).readSerie("nivelTanque", { inicio, fin });
+
+    expect(motivo).toBeNull();
+    expect(datos).toHaveLength(100); // MAX_PUNTOS, no los 24 de VENTANA
+    expect(datos.at(-1).t.getTime()).toBe(fin.getTime());
+    expect(datos[0].t.getTime()).toBeGreaterThan(inicio.getTime());
+    expect(datos[0].t.getTime()).toBeLessThan(fin.getTime());
+  });
+
+  it("un rango absoluto de un día entero sigue vacío para lo no historizado", async () => {
+    const { datos, motivo } = await enT(T0).readSerie("cargaMotor", {
+      inicio: new Date(T0 - 24 * 3_600_000),
+      fin: new Date(T0),
+    });
+    expect(datos).toEqual([]);
+    expect(motivo).toBe(SIN_SERIE);
+  });
 });
