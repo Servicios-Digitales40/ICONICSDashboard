@@ -1,0 +1,40 @@
+# Tdconcito: qwen2.5:7b con el contexto que este asistente necesita.
+#
+# ── POR QUÉ HACE FALTA UN MODELO PROPIO ───────────────────────────────
+#
+# Ollama carga los modelos con num_ctx = 4096 por defecto, sin importar lo que
+# soporte el modelo (qwen2.5 llega a 32768). Con 4096 este asistente NO CABE:
+#
+#     instrucciones del sistema   ~2800 tokens
+#     definiciones de las 9 herramientas  ~2150 tokens
+#     ------------------------------------------------
+#     ~4950 tokens ANTES de leer la pregunta
+#
+# El síntoma no es un error: el modelo devuelve vacío. Medido contra el
+# servidor real, a «¿hay alguna alarma activa?» contestaba «no he sabido
+# responder» tras 38 segundos, sin llamar a ninguna herramienta y sin escribir
+# nada. Un fallo por desbordamiento de contexto que parece que el modelo no
+# entiende la pregunta.
+#
+# ── POR QUÉ 16384 Y NO 32768 ──────────────────────────────────────────
+#
+# Porque la caché KV ocupa VRAM, y aquí la VRAM es el recurso escaso: en la
+# máquina de desarrollo (4 GB) el modelo ya corre al 55 % en CPU. 16384 deja
+# sitio holgado para el prompt, los resultados de tres herramientas encadenadas
+# —perfil_de_senal devuelve bastante— y la respuesta, sin duplicar el coste de
+# memoria de la caché.
+#
+# ── USO ───────────────────────────────────────────────────────────────
+#
+#   ollama create tdconcito -f ollama/Modelfile
+#
+# Y en .env.local:  IA_MODELO=tdconcito
+
+FROM qwen2.5:7b
+
+PARAMETER num_ctx 16384
+
+# Baja pero no nula. Con 0 el modelo se atasca repitiendo cuando una
+# herramienta devuelve un error que no sabe explicar. El backend manda su
+# propia temperatura en cada petición; esto es sólo el defecto.
+PARAMETER temperature 0.2

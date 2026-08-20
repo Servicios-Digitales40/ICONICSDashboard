@@ -692,6 +692,7 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
  * de que ese número no se leyó de ninguna parte, se derivó.
  */
 export const ETIQUETA_HERRAMIENTA = {
+  alarmas_activas: "Leyó las alarmas del servidor ICONICS",
   estado_del_sistema: "Leyó las ocho señales en vivo de ICONICS",
   historia_de_senal: "Leyó el historiador",
   comparar_periodos: "Comparó dos períodos del historiador",

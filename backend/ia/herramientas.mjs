@@ -78,6 +78,13 @@ import {
   senalInfo,
 } from '../../shared/eva/senales.js'
 import { ACTIVOS, ACTIVO_IDS } from '../../shared/eva/activos.js'
+import {
+  ALARMAS,
+  RAIZ_ALARMAS,
+  estadoDeAlarma,
+  parsePuntoAlarma,
+  puntosDeAlarmas,
+} from '../../shared/eva/alarmas.js'
 import { DERIVADO, estadoInfo } from '../../shared/eva/estado.js'
 import { PROVISIONALES, UMBRALES } from '../../shared/eva/umbrales.js'
 import { createSistema } from '../../shared/eva/sistema.js'
@@ -648,11 +655,77 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
          */
         aviso:
             'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
-            'sistema de agua genérico, no rangos confirmados por quien opera esta instalación, y ' +
-            'el servidor no publica alarmas para este árbol. El estado de cada señal es un ' +
-            'cálculo del tablero, no un dato de ICONICS.',
+            'sistema de agua genérico, no rangos confirmados por quien opera esta instalación. El ' +
+            'estado de cada señal es un cálculo del tablero, no un dato de ICONICS. Las ALARMAS ' +
+            'del servidor sí son del operador: consúltalas con alarmas_activas si necesitas saber ' +
+            'qué considera la planta un problema de verdad.',
       }
       : {}
+
+  /**
+   * El estado en vivo de las once alarmas configuradas, en UNA lectura.
+   *
+   * ── POR QUÉ SE LEEN COMO PUNTOS Y NO CON AlarmHistory ──────────────
+   *
+   * Porque `GET /AlarmHistory` devuelve 500 en este servidor: lee de un
+   * registro histórico de alarmas que no está configurado (bajo «Historical
+   * Data» sólo hay `hda:` y `hdaqi:`, no hay logger). Y no existe ninguna otra
+   * ruta REST de alarmas: el catálogo de la API sólo publica `AlarmHistory` y
+   * `Alarm/SetAlarmState`.
+   *
+   * Lo que sí funciona es que cada alarma expone sus campos como puntos
+   * legibles (`@NewState`, `@Severity`, `@ActiveTime`, `@Message`), y eso se
+   * lee con el mismo `readPoints` en lote que las señales. Cincuenta y cinco
+   * puntos —once alarmas por cinco campos— en una sola llamada.
+   *
+   * La contrapartida es que se ve el AHORA y no el pasado: se sabe qué alarmas
+   * están activas y desde cuándo, pero no las que entraron y salieron ayer.
+   * Para eso haría falta el logger.
+   */
+  async function leerAlarmas() {
+    const respuesta = await client.readPoints(puntosDeAlarmas())
+    if (!respuesta.ok) return { ok: false, error: respuesta.error, status: respuesta.status }
+
+    const porAlarma = {}
+    for (const [punto, entrada] of Object.entries(respuesta.payload ?? {})) {
+      const ref = parsePuntoAlarma(punto)
+      if (!ref || !entrada?.ok) continue
+
+      const p = entrada.payload ?? {}
+      /*
+       * La calidad NO se filtra aquí, al revés que con las señales.
+       *
+       * Una alarma que nunca se ha disparado devuelve calidad mala en sus
+       * campos, y eso no es un hueco: es información —«esta alarma no ha
+       * llegado a activarse»—. Descartarla haría desaparecer de la lista
+       * precisamente las alarmas que están bien.
+       */
+      porAlarma[ref.nombre] ??= {}
+      porAlarma[ref.nombre][ref.campo] = p.value ?? p.Value ?? null
+    }
+
+    return { ok: true, porAlarma }
+  }
+
+  /** Una alarma cruda del servidor → lo que el modelo y la pantalla pueden usar. */
+  function describirAlarma(nombre, campos) {
+    const meta = ALARMAS[nombre] ?? {}
+    const estado = estadoDeAlarma(campos?.NewState)
+
+    return {
+      alarma: nombre,
+      estado: estado.label,
+      activa: estado.activa,
+      severidad: campos?.Severity ?? null,
+      // La hora de la ÚLTIMA transición, sea a activa o a normal. En una
+      // alarma activa es «desde cuándo»; en una normal, «cuándo se fue».
+      desde: campos?.ActiveTime ? horaYFecha(campos.ActiveTime) : null,
+      mensaje: campos?.Message ?? null,
+      requiereReconocimiento: campos?.AckRequired ?? null,
+      ...(meta.senal ? { vigilaLaSenal: senalInfo(meta.senal)?.label ?? meta.senal } : {}),
+      ...(meta.queSignifica ? { queSignifica: meta.queSignifica } : {}),
+    }
+  }
 
   const herramientas = {
     /**
@@ -940,6 +1013,76 @@ export function createHerramientas({ client, turnos = {}, indiceDocumentos = nul
                 'en reposo, la tendencia puede reflejar eso y no un cambio real.',
             }
           : {}),
+      }
+    },
+
+    /**
+     * Las alarmas del servidor: cuáles están activas y desde cuándo.
+     *
+     * ── POR QUÉ ESTA HERRAMIENTA MANDA SOBRE LAS DEMÁS ─────────────────
+     *
+     * Porque es lo único que dice qué considera un problema **quien opera la
+     * planta**, y no nosotros. Todo lo que devuelven las otras herramientas
+     * —«en banda», «fuera de límite», «valor atípico»— sale de comparar contra
+     * `UMBRALES`, que son estimaciones nuestras y que, medidas contra el
+     * servidor real, no se parecen a esta instalación.
+     *
+     * Una alarma de ICONICS no tiene ese problema: sus límites, su severidad y
+     * su criterio los configuró alguien que conoce el proceso. Si el asistente
+     * tiene que elegir entre su propio cálculo y una alarma, gana la alarma.
+     *
+     * ── LO QUE VE Y LO QUE NO ──────────────────────────────────────────
+     *
+     * Ve el AHORA: qué alarmas están activas, con qué severidad y desde
+     * cuándo. NO ve el pasado —qué se disparó ayer y se fue— porque este
+     * servidor no tiene registro histórico de alarmas configurado. La
+     * herramienta lo dice en vez de callarlo, para que nadie interprete «no
+     * hay alarmas» como «no ha pasado nada».
+     */
+    async alarmas_activas() {
+      const lectura = await leerAlarmas()
+      if (!lectura.ok) {
+        return fallo(`No se pudieron leer las alarmas del servidor ICONICS: ${lectura.error}`)
+      }
+
+      const todas = Object.keys(ALARMAS).map(n => describirAlarma(n, lectura.porAlarma[n]))
+      const activas = todas.filter(a => a.activa)
+
+      /*
+       * Las que NO están activas viajan también, pero en corto.
+       *
+       * Sin ellas, el modelo no puede distinguir «esa alarma existe y está
+       * tranquila» de «esa alarma no existe», y contesta lo segundo. Con la
+       * lista delante puede decir «hay alarma de nivel alto configurada, y
+       * ahora mismo no está disparada», que es la respuesta correcta.
+       */
+      const enNormal = todas
+        .filter(a => !a.activa)
+        .map(a => ({ alarma: a.alarma, estado: a.estado, ...(a.desde ? { ultimoCambio: a.desde } : {}) }))
+
+      return {
+        ok: true,
+        fuente: 'servidor de alarmas de ICONICS',
+        raiz: RAIZ_ALARMAS,
+        hayAlarmasActivas: activas.length > 0,
+        cuantasActivas: activas.length,
+        activas,
+        enNormal,
+        ...(activas.length
+          ? {
+            comoDiagnosticar:
+                'Para explicar una alarma, mira la señal que vigila y las relacionadas en la ' +
+                'ventana que contenga su hora de activación: correlacionar_senales es la ' +
+                'herramienta. Antes de proponer una causa, comprueba con estado_del_sistema si ' +
+                'la instalación estaba en marcha, porque con la bomba parada el caudal y la ' +
+                'presión bajos son lo normal y no una avería.',
+          }
+          : {}),
+
+        soloElPresente:
+          'Esto es el estado de AHORA. Este servidor no tiene registro histórico de alarmas, ' +
+          'así que no se puede saber qué alarmas entraron y salieron en días pasados. Si no hay ' +
+          'ninguna activa, di que ninguna lo está AHORA MISMO, no que no haya pasado nada.',
       }
     },
 
@@ -1530,6 +1673,25 @@ function redondear(valor, decimales) {
 }
 
 /**
+ * Marca de tiempo de una alarma → fecha y hora legibles.
+ *
+ * A diferencia de `horaLocal`, aquí SÍ va la fecha: una alarma puede llevar
+ * activa desde hace días —«BAJO FLUJO desde el 17 de agosto»— y darle sólo la
+ * hora al modelo le hace decir que se disparó esta mañana.
+ *
+ * Y en local, no en UTC: el servidor entrega ISO con Z, y en España eso son
+ * dos horas menos que el reloj de la pared de la sala de control.
+ */
+function horaYFecha(iso) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/**
  * Marca de tiempo → `HH:MM:SS` en la zona del servidor.
  *
  * Se da la hora y no la fecha porque esto acompaña a una lectura en vivo: el
@@ -1622,6 +1784,22 @@ function resta(b, a) {
  * curva equivocada **sin dar error**.
  */
 export const DEFINICIONES = [
+  {
+    type: 'function',
+    function: {
+      name: 'alarmas_activas',
+      description:
+        'Las alarmas que el servidor ICONICS tiene configuradas para esta instalación, con ' +
+        'cuáles están ACTIVAS ahora mismo, su severidad y desde cuándo. Son las alarmas reales ' +
+        'de la planta —NIVEL ALTO, FALTA DE PRESIÓN, BAJO FLUJO, FALLA VARIADOR…— configuradas ' +
+        'por quien la opera. Úsala para "¿hay alguna alarma?", "¿qué está mal?", "¿por qué se ' +
+        'disparó X?" y SIEMPRE que te pregunten si hay algún problema. IMPORTANTE: una alarma ' +
+        'del servidor manda sobre cualquier estado que calcule el tablero, porque sus límites ' +
+        'los puso el operador y los del tablero son estimaciones nuestras. Sólo ve el presente: ' +
+        'este servidor no guarda histórico de alarmas.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
   {
     type: 'function',
     function: {
