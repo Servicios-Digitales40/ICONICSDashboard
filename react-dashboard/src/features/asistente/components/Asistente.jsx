@@ -27,13 +27,14 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, Loader2, Mic, PhoneCall, PhoneOff, RotateCw, Send,
-  Square, Trash2, TriangleAlert, X,
+  ArrowDown, Ban, Bell, Bot, Check, ChevronDown, ChevronRight, Copy, Loader2, Mic,
+  PhoneCall, PhoneOff, RotateCw, Send, Square, Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
 import {
   ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
 } from "../lib/useAsistente.js";
+import { nivelDeSeveridad, preguntaDeDiagnostico, useAlarmas } from "../lib/useAlarmas.js";
 
 /**
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
@@ -108,6 +109,7 @@ export function Asistente() {
   } = useAsistente();
 
   const dictado = useDictado();
+  const { activas: alarmas } = useAlarmas();
 
   // El manos libres necesita el ÚLTIMO turno del asistente para leerlo en voz
   // alta cuando esté completo. Se le pasa el mensaje entero y no sólo el texto
@@ -261,14 +263,36 @@ export function Asistente() {
 
         {/* El punto va con el color de aviso y un anillo del color del fondo
             de la página, que es lo que lo despega del degradado azul del
-            botón en los dos temas. */}
-        {sinLeer && (
+            botón en los dos temas.
+
+            Dos avisos distintos, y NO comparten forma. Un punto es «tu
+            respuesta está lista»; el número es «la planta tiene alarmas
+            disparadas». Con el mismo indicador para los dos, quien vuelve al
+            tablero y ve una marca no sabría si le contestaron o si algo se ha
+            roto — y son cosas que se atienden de forma muy distinta. La alarma
+            tiene prioridad si coinciden: importa más que la planta esté en
+            alarma que el que haya una respuesta esperando. */}
+        {alarmas.length > 0 ? (
+          <span
+            aria-label={`${alarmas.length} alarma${alarmas.length === 1 ? "" : "s"} activa${alarmas.length === 1 ? "" : "s"}`}
+            style={{
+              position: "absolute", top: -3, right: -3,
+              minWidth: 19, height: 19, padding: "0 5px", borderRadius: 10,
+              background: t.coral, color: "#FFFFFF",
+              border: `2.5px solid ${t.page}`,
+              fontSize: 10.5, fontWeight: 700, lineHeight: "14px",
+              display: "grid", placeItems: "center",
+            }}
+          >
+            {alarmas.length}
+          </span>
+        ) : sinLeer && (
           <span
             aria-hidden="true"
             style={{
               position: "absolute", top: 2, right: 2,
               width: 13, height: 13, borderRadius: "50%",
-              background: t.coral, border: `2.5px solid ${t.page}`,
+              background: t.accent, border: `2.5px solid ${t.page}`,
             }}
           />
         )}
@@ -311,6 +335,10 @@ export function Asistente() {
           <X size={16} />
         </button>
       </header>
+
+      {alarmas.length > 0 && (
+        <PanelAlarmas t={t} alarmas={alarmas} ocupado={ocupado} onDiagnosticar={lanzar} />
+      )}
 
       {/* El envoltorio existe para poder colgar el botón de «ir al final»
           encima del hilo: dentro del contenedor con scroll se desplazaría
@@ -747,6 +775,123 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />
       )}
     </div>
+  );
+}
+
+/**
+ * Las alarmas disparadas, arriba del hilo, con un botón para preguntar por qué.
+ *
+ * ── POR QUÉ AQUÍ Y NO COMO UN TURNO DEL CHAT ───────────────────────
+ *
+ * Se pensó en inyectar la alarma como un mensaje más de la conversación, y es
+ * peor por dos motivos. Uno: el hilo se guarda, así que una alarma que ya se
+ * fue seguiría ahí mañana contando algo que dejó de ser cierto. Dos: una
+ * conversación se lee de arriba abajo y una alarma no es un turno de nadie —
+ * mezclarla con las preguntas del operador convierte el historial en un sitio
+ * donde ya no se distingue lo que uno preguntó de lo que la planta avisó.
+ *
+ * Como panel fijo refleja SIEMPRE el estado de ahora, que es lo único que este
+ * servidor puede saber: no hay registro histórico de alarmas.
+ *
+ * ── PULSAR PREGUNTA, NO ABRE UN DETALLE ────────────────────────────
+ *
+ * La acción de una alarma es «¿por qué?», y eso es exactamente una pregunta al
+ * asistente. Abrir una ficha con más campos del evento no ayudaría: el operador
+ * no necesita el `@SubConditionName`, necesita saber qué pasó.
+ */
+function PanelAlarmas({ t, alarmas, ocupado, onDiagnosticar }) {
+  // Abierto de entrada: una alarma que aparece plegada es una alarma que nadie
+  // ve. Se puede cerrar para que no coma sitio del hilo si son varias.
+  const [abierto, setAbierto] = useState(true);
+
+  const plural = alarmas.length === 1 ? "alarma activa" : "alarmas activas";
+
+  return (
+    <section
+      aria-label="Alarmas de la instalación"
+      style={{
+        borderBottom: `1px solid ${t.border}`,
+        background: t.coralSoft,
+        flexShrink: 0,
+        maxHeight: "42%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        aria-expanded={abierto}
+        style={{
+          display: "flex", alignItems: "center", gap: 7, width: "100%",
+          padding: "8px 12px", border: "none", background: "transparent",
+          color: t.coral, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          fontFamily: "inherit", textAlign: "left",
+        }}
+      >
+        {abierto ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Bell size={13} />
+        <span style={{ flex: 1 }}>{alarmas.length} {plural}</span>
+      </button>
+
+      {abierto && (
+        <div style={{ overflowY: "auto", padding: "0 10px 10px" }}>
+          {alarmas.map((a) => {
+            const sev = nivelDeSeveridad(a.severidad);
+            return (
+              <div
+                key={a.alarma}
+                style={{
+                  background: t.panel, border: `1px solid ${t.border}`,
+                  borderRadius: 8, padding: "8px 10px", marginBottom: 6,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <strong style={{ fontSize: 12.5, color: t.text, flex: 1, minWidth: 0 }}>
+                    {a.alarma}
+                  </strong>
+                  <span
+                    style={{
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                      color: sev.clave === "alta" ? t.coral : t.amber,
+                    }}
+                  >
+                    {sev.label.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* La hora va SIEMPRE, y con fecha. Una alarma puede llevar
+                    días activa —la de BAJO FLUJO de esta instalación lleva
+                    tres— y sin la fecha se lee como que acaba de saltar. */}
+                {a.desde && (
+                  <div style={{ fontSize: 10.5, color: t.textFaint, marginTop: 2 }}>
+                    Activa desde {a.desde}
+                    {a.vigilaLaSenal ? ` · ${a.vigilaLaSenal}` : ""}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onDiagnosticar(preguntaDeDiagnostico(a))}
+                  disabled={ocupado}
+                  className="app-btn"
+                  style={{
+                    marginTop: 7, padding: "4px 9px", fontSize: 11,
+                    borderRadius: 6, cursor: ocupado ? "default" : "pointer",
+                    border: `1px solid ${t.border}`,
+                    background: ocupado ? t.page : t.hover,
+                    color: ocupado ? t.textFaint : t.text,
+                    fontFamily: "inherit",
+                  }}
+                >
+                  ¿Por qué se disparó?
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

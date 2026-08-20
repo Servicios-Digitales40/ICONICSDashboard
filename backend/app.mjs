@@ -18,6 +18,7 @@ import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
 import { logger } from './logger.mjs'
+import { registerAlarmasRoutes } from './routes/alarmasRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
@@ -89,6 +90,7 @@ export function createApp(config) {
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
   registerIconicsRoutes(router, { config, client })
   registerChatRoutes(router, { config, chat, cola })
+  registerAlarmasRoutes(router, { config, herramientas })
   registerVozRoutes(router, { config, voz })
 
   async function route(request, response) {
