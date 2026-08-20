@@ -84,6 +84,37 @@ function esperarVoces() {
 let vozElegida = null
 
 /**
+ * Desbloquea la síntesis de voz. Hay que llamarla DENTRO de un clic.
+ *
+ * ── POR QUÉ HACE FALTA ─────────────────────────────────────────────
+ *
+ * Chrome no deja hablar a una página que nunca ha recibido una interacción
+ * del usuario — es la misma política que impide que un anuncio suene solo al
+ * abrir una pestaña—. Y en el modo llamada, la primera respuesta se lee uno o
+ * dos MINUTOS después del clic que encendió el modo, cuando el navegador ya no
+ * considera que haya gesto reciente. El resultado es silencio: `speak()` no
+ * lanza ningún error, simplemente no suena nada.
+ *
+ * Pronunciar una cadena vacía en el momento del clic basta para que el
+ * navegador marque la página como autorizada, y a partir de ahí todo lo demás
+ * suena. No se oye nada al hacerlo.
+ */
+export function desbloquearVoz() {
+  if (!puedeHablar()) return
+
+  try {
+    const vacio = new SpeechSynthesisUtterance('')
+    vacio.volume = 0
+    window.speechSynthesis.speak(vacio)
+    // Se pide la lista de voces aquí también: es lo que dispara su carga
+    // asíncrona, así que para cuando llegue la primera respuesta ya estarán.
+    window.speechSynthesis.getVoices()
+  } catch {
+    // Si el navegador se queja, se seguirá intentando al hablar de verdad.
+  }
+}
+
+/**
  * Lee un texto en voz alta.
  *
  * @param {string} texto
@@ -110,11 +141,51 @@ export async function hablar(texto) {
     frase.rate = VELOCIDAD
     if (vozElegida) frase.voice = vozElegida
 
+    let acabado = false
+    const terminar = () => {
+      if (acabado) return
+      acabado = true
+      clearInterval(latido)
+      clearTimeout(corte)
+      resolve()
+    }
+
+    /*
+     * El latido que mantiene viva la voz de Chrome.
+     *
+     * Chrome tiene un fallo antiguo y muy conocido: deja de hablar a los ~15
+     * segundos y no emite ni `end` ni `error`. Una respuesta de este asistente
+     * pasa de quince segundos leída con facilidad, así que se corta a mitad y
+     * el modo llamada se queda esperando un `end` que no va a llegar nunca.
+     *
+     * El apaño aceptado es pausar y reanudar periódicamente: reinicia el
+     * temporizador interno del navegador sin que se note en el audio. En las
+     * demás plataformas es inocuo.
+     */
+    const latido = setInterval(() => {
+      if (acabado) return
+      if (!window.speechSynthesis.speaking) return
+      window.speechSynthesis.pause()
+      window.speechSynthesis.resume()
+    }, 10000)
+
+    /*
+     * Y un corte por tiempo, por si aun así se queda muda.
+     *
+     * Sin él, un `end` que no llega deja la promesa colgada, y con ella el
+     * ciclo del modo llamada: no vuelve a escuchar nunca. Se calcula sobre la
+     * longitud del texto —unos 12 caracteres por segundo a esta velocidad— con
+     * margen generoso, porque cortar una respuesta a medias es peor que
+     * esperar unos segundos de más.
+     */
+    const msEstimados = (limpio.length / 12) * 1000 * 2 + 5000
+    const corte = setTimeout(terminar, msEstimados)
+
     // Se resuelve igual si falla: quien llama encadena el turno siguiente, y
     // dejarlo colgado por una voz que no arrancó dejaría el modo manos libres
     // esperando para siempre.
-    frase.addEventListener('end', () => resolve())
-    frase.addEventListener('error', () => resolve())
+    frase.addEventListener('end', terminar)
+    frase.addEventListener('error', terminar)
 
     window.speechSynthesis.speak(frase)
   })

@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, motivoSinMicrofono, puedeGrabar } from "./audio.js";
-import { callar, hablar, puedeHablar } from "./vozSalida.js";
+import { callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
 
 /**
@@ -547,6 +547,21 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
    */
   const escucharRef = useRef(null);
 
+  /**
+   * Saluda al descolgar, y no es cortesía: es la PRUEBA de que la voz funciona.
+   *
+   * Sin esto, si el navegador tiene la síntesis bloqueada no te enteras hasta
+   * uno o dos minutos después —cuando llega la primera respuesta y no suena—,
+   * y para entonces no hay forma de saber si el problema es la voz, el
+   * micrófono o el asistente. Con el saludo, si no oyes nada al descolgar ya
+   * sabes cuál de los tres es.
+   *
+   * Va justo después del clic, que es cuando el navegador sí autoriza a hablar.
+   */
+  const saludar = useCallback(() => {
+    hablar("Te escucho.");
+  }, []);
+
   const apagar = useCallback(() => {
     activoRef.current = false;
     cerrandoTurno.current = false;
@@ -629,13 +644,26 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
 
   const encender = useCallback(() => {
     if (!disponible) return;
+
+    /*
+     * Se desbloquea la voz AQUÍ, dentro del clic.
+     *
+     * Chrome no deja hablar a una página sin interacción previa del usuario, y
+     * la primera respuesta se lee uno o dos MINUTOS después de este clic —
+     * cuando el navegador ya no considera que haya gesto reciente—. Sin esto,
+     * `speak()` no da ningún error y simplemente no suena nada, que es el
+     * síntoma de «no me contesta por voz».
+     */
+    desbloquearVoz();
+    saludar();
+
     activoRef.current = true;
     setActivo(true);
     // Lo que ya hubiera en pantalla no se lee: el modo empieza a partir de
     // ahora, y leer la respuesta anterior al encenderlo desconcierta.
     yaLeido.current = ultimaRespuesta?.texto ?? null;
     escuchar();
-  }, [disponible, escuchar, ultimaRespuesta]);
+  }, [disponible, escuchar, ultimaRespuesta, saludar]);
 
   /*
    * Llegó una respuesta nueva y completa: se lee y se vuelve a escuchar.
