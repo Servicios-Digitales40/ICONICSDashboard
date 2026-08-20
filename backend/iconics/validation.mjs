@@ -23,8 +23,27 @@
  * Sin él, `scripts/verificar-historia.mjs` no puede distinguir un servidor en
  * modo Demo —que apaga la lectura histórica y devuelve 500— de un servicio
  * realmente roto.
+ *
+ * ── EL `+` ES DE LAS ALARMAS ───────────────────────────────────────
+ *
+ * El servidor de alarmas (`ae:`) cuelga los campos de cada alarma de subnodos
+ * separados con `+`:
+ *
+ *   ae:/DEMO.NIVEL ALTO+AdjustableInputs      (los LÍMITES configurados)
+ *   ae:/DEMO.NIVEL ALTO+SystemEventFields     (severidad, estado, marca de tiempo)
+ *
+ * Sin el `+` esos nodos no se pueden ni explorar ni leer, y con ellos se cae
+ * la única fuente FIABLE de umbrales que tiene esta instalación: los límites
+ * con los que la propia planta dispara sus alarmas. La alternativa —los
+ * valores de `shared/eva/umbrales.js`— son estimaciones nuestras que, medidas
+ * contra el servidor real, no se parecen a esta instalación.
+ *
+ * Añadirlo no abre nada: esto es una lista blanca de CARACTERES para un valor
+ * que viaja como parámetro de query ya codificado, no un intérprete de rutas.
+ * El `+` no significa nada especial en un nombre de punto de ICONICS ni en el
+ * cliente HTTP que lo reenvía.
  */
-const SAFE_PARAM_RE = /^[a-zA-Z0-9:._\-\s@#$()[\]/\\<>=',"]{1,300}$/
+const SAFE_PARAM_RE = /^[a-zA-Z0-9:._+\-\s@#$()[\]/\\<>=',"]{1,300}$/
 
 /**
  * Fechas y agregados del historiador: alfanuméricos más la puntuación que
