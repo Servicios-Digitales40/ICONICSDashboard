@@ -27,10 +27,13 @@
  */
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, Loader2, RotateCw, Send, Trash2, TriangleAlert, X,
+  ArrowDown, Ban, Bot, Check, Copy, Loader2, Mic, PhoneCall, PhoneOff, RotateCw, Send,
+  Square, Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
-import { ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente } from "../lib/useAsistente.js";
+import {
+  ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
+} from "../lib/useAsistente.js";
 
 /**
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
@@ -85,6 +88,18 @@ export function Asistente() {
   const {
     disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
   } = useAsistente();
+
+  const dictado = useDictado();
+
+  // El manos libres necesita el ÚLTIMO turno del asistente para leerlo en voz
+  // alta cuando esté completo. Se le pasa el mensaje entero y no sólo el texto
+  // porque también mira si acabó en error: un fallo no se lee como si fuera un
+  // dato. Ver `useManosLibres`.
+  const manosLibres = useManosLibres({
+    preguntar,
+    ocupado,
+    ultimaRespuesta: mensajes.at(-1)?.rol === "asistente" ? mensajes.at(-1) : null,
+  });
 
   const finRef = useRef(null);
   const campoRef = useRef(null);
@@ -168,6 +183,21 @@ export function Asistente() {
   const enviar = (e) => {
     e?.preventDefault();
     if (lanzar(borrador)) setBorrador("");
+  };
+
+  /**
+   * Lo transcrito se AÑADE a lo que hubiera escrito, no lo sustituye.
+   *
+   * El caso real es empezar a escribir, quedarse a medias y terminar la frase
+   * hablando. Sustituir tiraría lo ya escrito sin manera de recuperarlo, y es
+   * el tipo de pérdida que hace que nadie vuelva a pulsar el micrófono.
+   *
+   * El foco vuelve al campo porque el paso siguiente casi siempre es corregir
+   * una palabra que Whisper oyó mal antes de enviar.
+   */
+  const anadirAlBorrador = (texto) => {
+    setBorrador((previo) => (previo.trim() ? `${previo.trim()} ${texto}` : texto));
+    campoRef.current?.focus();
   };
 
   /**
@@ -324,8 +354,12 @@ export function Asistente() {
           ref={campoRef}
           value={borrador}
           onChange={(e) => setBorrador(e.target.value)}
-          placeholder={ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]}
-          disabled={ocupado}
+          placeholder={
+            manosLibres.activo
+              ? FASE_MANOS_LIBRES[manosLibres.fase]
+              : ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]
+          }
+          disabled={ocupado || manosLibres.activo}
           aria-label="Escribe tu pregunta"
           style={{
             flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
@@ -333,6 +367,17 @@ export function Asistente() {
             fontFamily: "'Inter', sans-serif",
           }}
         />
+
+        {/* El micrófono sólo aparece si el servidor tiene whisper Y el navegador
+            puede grabar. Un botón que siempre falla es peor que no tenerlo. */}
+        {dictado.disponible && !ocupado && !manosLibres.activo && (
+          <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} />
+        )}
+
+        {/* El manos libres exige además que el navegador sepa hablar. */}
+        {manosLibres.disponible && (
+          <BotonManosLibres t={t} manosLibres={manosLibres} />
+        )}
 
         {ocupado ? (
           <button type="button" onClick={cancelar} className="app-btn" style={botonCancelar(t)}>
@@ -348,8 +393,163 @@ export function Asistente() {
           </button>
         )}
       </form>
+
+      {/* El fallo del dictado se cuenta bajo la barra y NO como un turno del
+          hilo: no llegó a haber pregunta, así que meterlo en la conversación
+          la ensuciaría con algo que nadie llegó a preguntar. */}
+      {dictado.error && (
+        <div style={{ padding: "0 12px 10px", fontSize: 11, color: t.coral, lineHeight: 1.45 }}>
+          {dictado.error}
+        </div>
+      )}
     </section>
   );
+}
+
+/**
+ * El botón de dictar: pulsar para hablar, pulsar otra vez para parar.
+ *
+ * ── POR QUÉ CONMUTA Y NO ES MANTENER PULSADO ───────────────────────
+ *
+ * «Mantener pulsado» es el gesto de un walkie y parece lo natural, pero aquí
+ * falla: una pregunta de diagnóstico son diez o quince segundos hablando, y
+ * sostener el ratón todo ese rato mientras se piensa la frase es incómodo — y
+ * en una pantalla táctil de planta, con guantes, se suelta sola. Al conmutar,
+ * el gesto no compite con pensar la pregunta.
+ *
+ * ── POR QUÉ EL TEXTO SE AÑADE Y NO SE ENVÍA ────────────────────────
+ *
+ * Lo que devuelve la transcripción va al cuadro de entrada, no a la consulta.
+ * Whisper se equivoca con el ruido de una sala de máquinas y con los nombres
+ * de tag; una pregunta lanzada sobre una frase mal oída gasta un minuto de GPU
+ * en responder a algo que nadie preguntó. Ver `backend/routes/vozRoutes.mjs`.
+ */
+function BotonMicrofono({ t, dictado, onTexto }) {
+  const { grabando, transcribiendo, empezar, detener } = dictado;
+
+  if (transcribiendo) {
+    return (
+      <button
+        type="button" disabled
+        aria-label="Transcribiendo lo que has dicho"
+        style={botonMicro(t, "transcribiendo")}
+      >
+        <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+      </button>
+    );
+  }
+
+  const alPulsar = async () => {
+    if (!grabando) return empezar();
+    const texto = await detener();
+    if (texto) onTexto(texto);
+  };
+
+  return (
+    <button
+      type="button" onClick={alPulsar} className="app-btn"
+      aria-label={grabando ? "Parar de grabar y transcribir" : "Dictar la pregunta"}
+      title={grabando ? "Parar y transcribir" : "Dictar la pregunta"}
+      style={botonMicro(t, grabando ? "grabando" : "listo")}
+    >
+      {grabando ? <Square size={13} fill="currentColor" /> : <Mic size={15} />}
+    </button>
+  );
+}
+
+/**
+ * Qué está pasando en el modo manos libres, en el sitio donde se escribiría.
+ *
+ * El campo de texto está bloqueado mientras dura, así que su hueco es el mejor
+ * sitio para decir de quién es el turno. Sin esto, un modo sin teclado y sin
+ * pantalla no da ninguna pista de si te está escuchando o pensando, y la gente
+ * habla encima de la respuesta.
+ */
+const FASE_MANOS_LIBRES = {
+  parado: "Manos libres listo",
+  escuchando: "Te escucho… pulsa el teléfono cuando termines",
+  pensando: "Entendiendo lo que has dicho…",
+  hablando: "Contestando en voz alta…",
+};
+
+/**
+ * El botón del modo manos libres.
+ *
+ * ── POR QUÉ CAMBIA DE FUNCIÓN SEGÚN LA FASE ────────────────────────
+ *
+ * Mientras escucha, pulsar significa «he terminado de hablar» — es el gesto
+ * que más se usa y tiene que ser el mismo botón, no otro. En cualquier otra
+ * fase significa colgar.
+ *
+ * Suena a dos cosas en un botón, y es al revés: es un teléfono. Descolgar,
+ * hablar, ceder el turno y colgar son los cuatro gestos de una llamada, y
+ * repartirlos en tres botones obligaría a mirar la pantalla, que es
+ * exactamente lo que este modo existe para evitar.
+ */
+function BotonManosLibres({ t, manosLibres }) {
+  const { activo, fase, encender, apagar, heTerminado, transcribiendo } = manosLibres;
+
+  if (!activo) {
+    return (
+      <button
+        type="button" onClick={encender} className="app-btn"
+        aria-label="Hablar con el asistente en manos libres"
+        title="Manos libres: hablar y escuchar la respuesta"
+        style={botonMicro(t, "listo")}
+      >
+        <PhoneCall size={15} />
+      </button>
+    );
+  }
+
+  if (fase === "escuchando") {
+    return (
+      <button
+        type="button" onClick={heTerminado} className="app-btn"
+        aria-label="He terminado de hablar"
+        title="He terminado de hablar"
+        style={botonMicro(t, "grabando")}
+      >
+        <Square size={13} fill="currentColor" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button" onClick={apagar} className="app-btn"
+      aria-label="Salir del manos libres"
+      title="Colgar"
+      style={botonMicro(t, "grabando")}
+    >
+      {transcribiendo
+        ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} />
+        : <PhoneOff size={15} />}
+    </button>
+  );
+}
+
+/**
+ * El micrófono, en sus tres estados.
+ *
+ * Grabando va en rojo y con un cuadrado —el símbolo universal de «parar»— y no
+ * con otro micrófono: el problema real de un botón que conmuta es que, si no
+ * cambia de forma, no se sabe si está escuchando. El color solo no basta en
+ * una pantalla de planta con reflejos.
+ */
+function botonMicro(t, estado) {
+  const base = {
+    display: "grid", placeItems: "center", width: 36, borderRadius: 9,
+    border: `1px solid ${t.border}`, cursor: "pointer", flexShrink: 0,
+  };
+
+  if (estado === "grabando") {
+    return { ...base, background: t.coralSoft, color: t.coral, borderColor: t.coral };
+  }
+  if (estado === "transcribiendo") {
+    return { ...base, background: t.page, color: t.textFaint, cursor: "default" };
+  }
+  return { ...base, background: t.page, color: t.textSoft };
 }
 
 /**
@@ -427,12 +627,13 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
 
   // De dónde salió el dato y con qué se preguntó. Es la invariante que permite
   // detectar una respuesta recitada: si no hay esta línea, no hubo consulta.
-  const procedencia = mensaje.herramienta && !mensaje.error
-    ? [
-        ETIQUETA_HERRAMIENTA[mensaje.herramienta] ?? mensaje.herramienta,
-        ...describirConsulta(mensaje.herramienta, mensaje.argumentos),
-      ].join(" · ")
-    : "";
+  //
+  // Se enseñan TODAS las consultas, una por línea, porque desde que el backend
+  // encadena herramientas un diagnóstico son varias. Resumirlas en «consultó 3
+  // cosas» ahorraría dos líneas y destruiría justo lo que esto sirve para ver:
+  // que la señal y el período de cada paso eran los que el operador esperaba.
+  const consultas = mensaje.error ? [] : (mensaje.consultas ?? []);
+  const adjuntos = mensaje.error ? [] : (mensaje.adjuntos ?? []);
 
   return (
     <div style={{ maxWidth: "92%" }}>
@@ -446,6 +647,13 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
           {mensaje.texto || "…"}
         </div>
       )}
+
+      {/* Los gráficos, debajo de la respuesta que los comenta. Llegan por su
+          propio evento y nunca pasan por el modelo: lo que se ve aquí son
+          puntos del historiador, no algo que el asistente haya «dibujado». */}
+      {adjuntos.map((adjunto, i) => (
+        <Grafico key={i} t={t} adjunto={adjunto} />
+      ))}
 
       {mensaje.error && (
         <Nota t={t} color={t.coral} fondo={t.coralSoft} icono={<TriangleAlert size={12} />}>
@@ -476,10 +684,17 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         </button>
       )}
 
-      {(procedencia || mensaje.texto) && (
-        <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+      {(consultas.length > 0 || mensaje.texto) && (
+        <div style={{ marginTop: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45 }}>
-            {procedencia}
+            {consultas.map((consulta, i) => (
+              <div key={i}>
+                {[
+                  ETIQUETA_HERRAMIENTA[consulta.nombre] ?? consulta.nombre,
+                  ...describirConsulta(consulta.nombre, consulta.argumentos),
+                ].join(" · ")}
+              </div>
+            ))}
           </div>
           {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
         </div>
@@ -493,6 +708,39 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />
       )}
     </div>
+  );
+}
+
+/**
+ * Un gráfico que acompaña la respuesta.
+ *
+ * ── POR QUÉ UN `<img>` CON DATA URI Y NO EL SVG EN LÍNEA ───────────
+ *
+ * Porque el SVG lo genera el servidor y meterlo en el DOM con
+ * `dangerouslySetInnerHTML` haría que cualquier cosa que acabara dentro de esa
+ * cadena se ejecutara en la página. Hoy el contenido viene sólo del catálogo de
+ * señales y del historiador, pero la ruta es la misma por la que viajan los
+ * rótulos, y una etiqueta de señal la cambia quien configure el servidor
+ * ICONICS. Dentro de un `<img>` el SVG se pinta igual y no ejecuta nada:
+ * el navegador lo trata como imagen, no como documento.
+ *
+ * `encodeURIComponent` y no base64: pesa menos, se lee al depurar, y evita el
+ * viaje por `btoa`, que además rompe con los acentos de los rótulos.
+ */
+function Grafico({ t, adjunto }) {
+  if (adjunto?.formato !== "svg" || !adjunto.contenido) return null;
+
+  return (
+    <figure style={{ margin: "8px 0 0" }}>
+      <img
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(adjunto.contenido)}`}
+        alt={adjunto.titulo ? `Evolución de ${adjunto.titulo}` : "Gráfico de la señal"}
+        style={{
+          display: "block", width: "100%", height: "auto",
+          borderRadius: 8, border: `1px solid ${t.border}`, background: "#fff",
+        }}
+      />
+    </figure>
   );
 }
 

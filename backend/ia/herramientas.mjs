@@ -57,6 +57,16 @@
  * algo que no existe aquí.
  */
 import {
+  alinearSeries,
+  correlacionPearson,
+  describirCorrelacion,
+  estadisticasBasicas,
+  regresionLineal,
+  proyectar,
+  detectarAnomalias,
+} from '../../shared/eva/estadistica.js'
+import { renderizarGraficoSerie } from '../../shared/eva/graficos.js'
+import {
   RAIZ,
   SENALES,
   SENAL_KEYS,
@@ -413,7 +423,7 @@ function siguienteDia(iso) {
 
 /* ── Las herramientas ────────────────────────────────────────────────── */
 
-export function createHerramientas({ client, turnos = {} } = {}) {
+export function createHerramientas({ client, turnos = {}, indiceDocumentos = null } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
   }
@@ -786,6 +796,435 @@ export function createHerramientas({ client, turnos = {} } = {}) {
         ...avisoDeUmbrales(),
       }
     },
+
+    /**
+     * Análisis estadístico y proyección de una señal.
+     */
+    async analisis_de_senal({ senal, periodo, horizonteMinutos = 60 } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
+      const meta = senalInfo(clave)
+
+      if (!esHistorizada(clave)) {
+        return fallo(
+          `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE}`
+        )
+      }
+
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const serie = await leerSerie(clave, v)
+      if (!serie.ok) {
+        if (serie.status >= 502) {
+          return fallo(
+            'No se pudo contactar con el servidor ICONICS para leer el historiador.'
+          )
+        }
+        return fallo(`El historiador no devolvió la serie de ${meta.label} en ${v.etiqueta}.`)
+      }
+
+      const validos = serie.datos.filter(d => typeof d.valor === 'number')
+      if (validos.length < 3) {
+        return fallo(
+          `Hay ${validos.length} muestra(s) de ${meta.label} en ${v.etiqueta}: no son ` +
+            `suficientes para un análisis estadístico. Hacen falta al menos 3.`
+        )
+      }
+
+      const stats = estadisticasBasicas(validos.map(d => d.valor), meta.decimales)
+      const regresion = regresionLineal(validos)
+      const proyeccion = regresion ? proyectar(regresion, horizonteMinutos, meta.decimales) : null
+      const anomalias = detectarAnomalias(validos, { media: stats.media, desv: stats.desv })
+
+      const pendientePorHora = regresion ? +(regresion.pendiente * 3600).toFixed(3) : null
+
+      return {
+        ok: true,
+        senal: meta.label,
+        periodo: v.etiqueta,
+        unidad: meta.unidad || null,
+        estadisticas: stats,
+        tendencia: regresion
+          ? {
+              direccion:
+                Math.abs(pendientePorHora) < 0.01
+                  ? 'estable'
+                  : pendientePorHora > 0
+                    ? 'subiendo'
+                    : 'bajando',
+              cambioPorHora: pendientePorHora,
+              ajuste: `${Math.round(regresion.r2 * 100)} de 100`,
+              nota:
+                regresion.r2 < 0.4
+                  ? 'El ajuste es bajo: hay mucho ruido y la tendencia no es muy fiable.'
+                  : 'El ajuste es razonable para esta ventana.',
+            }
+          : { direccion: 'sin datos suficientes para calcularla' },
+        proyeccion: proyeccion
+          ? {
+              horizonteMinutos,
+              valorEstimado: proyeccion.valor,
+              rangoEsperado: [proyeccion.valorMin, proyeccion.valorMax],
+              aviso:
+                'Proyección lineal simple a partir de la tendencia reciente, con un margen ' +
+                'del 95%. No es una predicción garantizada ni sustituye una alarma.',
+            }
+          : null,
+        anomalias: anomalias.length ? anomalias : undefined,
+        ...(meta.soloEnMarcha
+          ? {
+              avisoReposo:
+                'Esta señal sólo significa algo con la instalación impulsando; si hubo tramos ' +
+                'en reposo, la tendencia puede reflejar eso y no un cambio real.',
+            }
+          : {}),
+      }
+    },
+
+    /**
+     * Varias señales sobre la MISMA ventana, con su correlación y sus
+     * coincidencias en el tiempo.
+     *
+     * ── PARA QUÉ EXISTE ────────────────────────────────────────────────
+     *
+     * Es la herramienta del diagnóstico. «¿Por qué se paró la bomba?» no se
+     * responde con una señal: se responde viendo que la tensión de línea se
+     * hundió a las 14:32 y que la carga del motor cayó a cero justo después.
+     * Con `historia_de_senal` eso exigía dos consultas y que el modelo cruzara
+     * las horas de cabeza — y cruzar horas de cabeza es aritmética, que es
+     * justo lo que tiene prohibido hacer.
+     *
+     * ── LO QUE ESTA HERRAMIENTA NO DICE ────────────────────────────────
+     *
+     * No dice cuál causó cuál. Devuelve el coeficiente, las anomalías de cada
+     * señal con su hora, y qué anomalías cayeron cerca en el tiempo. Que dos
+     * cosas pasen juntas es un indicio; el aviso que viaja en la respuesta lo
+     * dice con esas palabras para que el modelo no lo convierta en una
+     * afirmación causal al redactar.
+     */
+    async correlacionar_senales({ senales, periodo } = {}) {
+      /*
+       * Se acepta lista o cadena separada por comas.
+       *
+       * Medido con el 4B: pide un array de strings unas veces y una cadena
+       * «nivel, presión» otras, con el mismo esquema delante. Rechazar la
+       * cadena costaría una ronda entera de 30 segundos para corregir algo que
+       * se entiende perfectamente.
+       */
+      const lista = Array.isArray(senales)
+        ? senales
+        : String(senales ?? '').split(/[,;]|\by\b/).map(s => s.trim()).filter(Boolean)
+
+      if (lista.length < 2) {
+        return fallo(
+          'Para correlacionar hacen falta al menos DOS señales. Dime cuáles quieres comparar.',
+          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+        )
+      }
+
+      /* Se resuelven todas antes de salir a la red: si una no existe o no tiene
+         historia, decirlo ahora ahorra las lecturas de las demás. */
+      const claves = []
+      for (const nombre of lista) {
+        const clave = resolverSenal(nombre)
+        if (!clave) return senalDesconocida(nombre)
+        if (!esHistorizada(clave)) {
+          return fallo(
+            `${senalInfo(clave).label} no tiene serie histórica propia, así que no se puede ` +
+              `correlacionar. ${SIN_SERIE}`,
+            { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+          )
+        }
+        if (!claves.includes(clave)) claves.push(clave)
+      }
+
+      if (claves.length < 2) {
+        return fallo('Las señales que has dado son la misma. Dime dos distintas para comparar.')
+      }
+      if (claves.length > 4) {
+        // Sólo hay cuatro señales historizadas; más que eso es que algo se
+        // repitió. El tope existe para que el resultado quepa en el contexto:
+        // cuatro señales ya son seis pares.
+        return fallo('Como mucho cuatro señales a la vez.')
+      }
+
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const series = await Promise.all(claves.map(clave => leerSerie(clave, v)))
+
+      const fallidas = claves.filter((_, i) => !series[i].ok)
+      if (fallidas.length) {
+        return fallo(
+          `El historiador no devolvió la serie de ${fallidas.map(k => senalInfo(k).label).join(' y ')} ` +
+            `en ${v.etiqueta}.`
+        )
+      }
+
+      /*
+       * Tolerancia de emparejamiento: media distancia entre muestras.
+       *
+       * Se deriva de la ventana y no es fija porque el intervalo lo fija
+       * `leerSerie` en función de lo que se pida —15 min en una ventana corta,
+       * más en una larga—. Una tolerancia fija de un minuto no emparejaría nada
+       * en una ventana de una semana; una de una hora emparejaría muestras
+       * sin relación en una de treinta minutos.
+       */
+      const segundosVentana = (v.fin - v.inicio) / 1000
+      const puntosEsperados = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundosVentana / 900)))
+      const toleranciaMs = (segundosVentana / puntosEsperados) * 1000 * 0.5
+
+      /* ── Cada señal por separado: resumen y anomalías ───────────────── */
+      const porSenal = claves.map((clave, i) => {
+        const meta = senalInfo(clave)
+        const validos = series[i].datos.filter(d => typeof d.valor === 'number')
+        const stats = validos.length >= 2
+          ? estadisticasBasicas(validos.map(d => d.valor), meta.decimales)
+          : null
+
+        return {
+          clave,
+          meta,
+          datos: series[i].datos,
+          senal: meta.label,
+          unidad: meta.unidad || null,
+          muestras: validos.length,
+          ...(stats ? { estadisticas: stats } : {}),
+          anomalias: stats?.desv
+            ? detectarAnomalias(validos, { media: stats.media, desv: stats.desv })
+                .map(a => ({ hora: horaLocal(a.hora), valor: a.valor, z: a.z }))
+            : [],
+        }
+      })
+
+      const pobres = porSenal.filter(s => s.muestras < 3)
+      if (pobres.length) {
+        return fallo(
+          `No hay muestras suficientes de ${pobres.map(s => s.senal).join(' y ')} en ` +
+            `${v.etiqueta} para correlacionar: hacen falta al menos 3 de cada una.`
+        )
+      }
+
+      /* ── Cada par: correlación sobre instantes alineados ────────────── */
+      const pares = []
+      for (let i = 0; i < porSenal.length; i++) {
+        for (let j = i + 1; j < porSenal.length; j++) {
+          const { xs, ys } = alinearSeries(porSenal[i].datos, porSenal[j].datos, toleranciaMs)
+          const r = correlacionPearson(xs, ys)
+
+          pares.push({
+            entre: `${porSenal[i].senal} y ${porSenal[j].senal}`,
+            muestrasComparadas: xs.length,
+            ...(xs.length < 3
+              ? {
+                relacion:
+                    'no se puede calcular: las dos señales no tienen muestras en los mismos ' +
+                    'instantes dentro de esta ventana',
+              }
+              : {
+                coeficiente: r === null ? null : +r.toFixed(2),
+                relacion: describirCorrelacion(r),
+              }),
+          })
+        }
+      }
+
+      /* ── Anomalías que cayeron juntas ───────────────────────────────── */
+      const coincidencias = []
+      for (let i = 0; i < porSenal.length; i++) {
+        for (let j = i + 1; j < porSenal.length; j++) {
+          for (const a of porSenal[i].anomalias) {
+            for (const b of porSenal[j].anomalias) {
+              // Se comparan las horas ya formateadas a HH:MM:SS, que es la
+              // resolución con la que se van a citar de todos modos.
+              const distancia = Math.abs(segundosDeHora(a.hora) - segundosDeHora(b.hora))
+              if (distancia * 1000 <= toleranciaMs * 2) {
+                coincidencias.push({
+                  hora: a.hora,
+                  descripcion:
+                    `${porSenal[i].senal} marcó ${a.valor} y ${porSenal[j].senal} marcó ` +
+                    `${b.valor} casi en el mismo instante; las dos son valores atípicos para ` +
+                    `esta ventana.`,
+                })
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ok: true,
+        periodo: v.etiqueta,
+        fuente: 'historiador',
+        senales: porSenal.map(({ clave, meta, datos, ...resto }) => resto),
+        correlaciones: pares,
+        /*
+         * Se recortan a seis, y se dice cuántas quedaron fuera.
+         *
+         * Un solo evento de treinta segundos produce una anomalía por muestra
+         * de cada señal, y cruzarlas da decenas de coincidencias que describen
+         * el MISMO suceso. Mandárselas todas al modelo no añade información:
+         * llena el contexto y le invita a contar «hubo 28 anomalías» de algo
+         * que fue una sola caída de presión. Seis bastan para situarlo en el
+         * tiempo, y el recuento real va aparte para no ocultar nada.
+         */
+        ...(coincidencias.length
+          ? {
+            anomaliasSimultaneas: coincidencias.slice(0, 6),
+            ...(coincidencias.length > 6
+              ? {
+                notaCoincidencias:
+                      `Hay ${coincidencias.length} pares de valores atípicos simultáneos en ` +
+                      `total; arriba van los primeros 6. Suelen ser el mismo suceso repetido ` +
+                      `muestra a muestra, así que descríbelo como UN episodio y no como ` +
+                      `${coincidencias.length} incidencias distintas.`,
+              }
+              : {}),
+          }
+          : {
+            anomaliasSimultaneas:
+                'Ninguna. No hubo valores atípicos de dos señales distintas en el mismo instante.',
+          }),
+        aviso:
+          'CORRELACIÓN NO ES CAUSA. Que dos señales se muevan juntas es un indicio de que ' +
+          'algo las relaciona, no una prueba de que una cause la otra: puede haber una tercera ' +
+          'causa común, o ser casualidad en una ventana corta. Dilo así al redactar, y no ' +
+          'afirmes una causa que estos datos no demuestran.',
+        ...avisoDeUmbrales(),
+      }
+    },
+
+    /**
+     * Gráfico de una señal. La serie es real, no generada.
+     *
+     * ── LA IMAGEN NO ENTRA EN EL CONTEXTO DEL MODELO ───────────────────
+     *
+     * Viaja bajo `_adjunto`, y el guion bajo es el contrato: `chat.mjs` saca
+     * esas claves del resultado ANTES de meterlo en los mensajes y las emite
+     * por su propio evento SSE hacia la pantalla.
+     *
+     * Sin eso, el dibujo entero —decenas de miles de caracteres— se le
+     * entregaba al modelo como texto de la herramienta. Con 512 tokens de
+     * presupuesto y un contexto de 4k, eso no es una ineficiencia: desborda la
+     * ventana, expulsa las instrucciones y el dato que había que contar, y el
+     * modelo redacta sobre lo que quedó. Un gráfico correcto acompañado de una
+     * frase equivocada.
+     *
+     * Al modelo se le manda en su lugar el RESUMEN de la serie: es lo que
+     * necesita para escribir («subió de 41 a 63 entre las 8 y las 11») y no
+     * puede describir de memoria una imagen que nunca ve.
+     */
+    async grafico_de_senal({ senal, periodo } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
+      const meta = senalInfo(clave)
+
+      if (!esHistorizada(clave)) {
+        return fallo(`${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE}`)
+      }
+
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const serie = await leerSerie(clave, v)
+      if (!serie.ok) {
+        return fallo(`El historiador no devolvió la serie de ${meta.label} en ${v.etiqueta}.`)
+      }
+      if (!serie.datos.length) {
+        return fallo(`No hay muestras de ${meta.label} en ${v.etiqueta} para dibujar.`)
+      }
+
+      let svg
+      try {
+        svg = renderizarGraficoSerie(serie.datos, {
+          titulo: meta.label,
+          unidad: meta.unidad || null,
+          banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave]) : null,
+        })
+      } catch (error) {
+        // El caso conocido es una sola muestra válida en la ventana. Se cuenta
+        // como lo que es —no hay con qué dibujar— y no como una avería.
+        return fallo(
+          `No se pudo dibujar ${meta.label} en ${v.etiqueta}: ${error.message} ` +
+            `Su resumen numérico sí se puede dar con historia_de_senal.`
+        )
+      }
+
+      const resumen = resumirSerie(serie.datos, meta.decimales)
+
+      return {
+        ok: true,
+        senal: meta.label,
+        periodo: v.etiqueta,
+        fuente: 'historiador',
+        unidad: meta.unidad || null,
+        // El resumen, para que el modelo pueda hablar de la curva que no ve.
+        ...(resumen ?? {}),
+        graficoEntregado: true,
+        nota:
+          'El gráfico ya se le ha enviado a la pantalla del usuario; no hace falta que lo ' +
+          'describas punto por punto. Menciona que lo acompañas y comenta lo que se ve usando ' +
+          'las cifras de este resumen.',
+        _adjunto: { tipo: 'grafico', formato: 'svg', contenido: svg, titulo: meta.label },
+      }
+    },
+
+    /**
+     * Busca en la documentación de planta.
+     *
+     * ── POR QUÉ VIAJA LA RELEVANCIA ────────────────────────────────────
+     *
+     * Porque BM25 SIEMPRE devuelve algo si alguna palabra coincide, y ese algo
+     * puede no responder la pregunta. Sin el número, el modelo trata igual el
+     * fragmento que encaja exactamente y el que sólo comparte la palabra
+     * «presión» con un manual entero sobre presión. Con él —y con la
+     * instrucción de abajo— puede decir que no lo encontró, que es la respuesta
+     * correcta cuando no está documentado.
+     */
+    async consultar_documentacion({ pregunta } = {}) {
+      if (!indiceDocumentos) {
+        return fallo(
+          'Este servidor no tiene documentación de planta cargada (falta la variable ' +
+            'IA_DOCS_DIR). No puedo consultar manuales: dilo así y no contestes de memoria.'
+        )
+      }
+      if (!pregunta || !pregunta.trim()) {
+        return fallo('Necesito saber sobre qué quieres consultar en la documentación.')
+      }
+
+      const resultados = await indiceDocumentos.buscar(pregunta, { top: 3 })
+
+      if (!resultados.length) {
+        const estado = indiceDocumentos.estado()
+        // Qué documentos SÍ hay viaja en el error a propósito: «no lo encontré»
+        // a secas deja al operador sin saber si el manual no está cargado o si
+        // está y no lo dice. Son dos problemas con arreglos distintos.
+        return fallo(
+          'No he encontrado nada sobre eso en la documentación cargada. Puede que no esté ' +
+            'documentado, o que el manual lo llame de otra forma.',
+          {
+            documentosDisponibles: estado.documentos.map(d => d.archivo),
+            ...(estado.ilegibles.length ? { noSePudieronLeer: estado.ilegibles } : {}),
+          }
+        )
+      }
+
+      return {
+        ok: true,
+        fragmentos: resultados.map(r => ({
+          documento: r.archivo,
+          pagina: r.pagina,
+          texto: r.texto,
+          relevancia: +r.score.toFixed(2),
+        })),
+        aviso:
+          'Cita el documento y la página de donde viene cada dato. La relevancia va de 0 a 1: ' +
+          'por debajo de 0,4 el fragmento probablemente no responde la pregunta, y entonces di ' +
+          'que no lo has encontrado en vez de completarlo con conocimiento general. Estos ' +
+          'fragmentos son del manual, NO son mediciones de la instalación.',
+      }
+    },
   }
 
   /**
@@ -857,6 +1296,20 @@ function horaLocal(iso) {
   const d = new Date(iso)
   const p = (n) => String(n).padStart(2, '0')
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/**
+ * `HH:MM:SS` → segundos desde medianoche.
+ *
+ * Se comparan horas ya formateadas y no marcas de tiempo porque es la
+ * resolución con la que se van a citar. La contrapartida —dos anomalías a un
+ * lado y otro de la medianoche salen a 24 h de distancia en vez de a un
+ * segundo— es aceptable: la ventana máxima son 7 días y una coincidencia
+ * perdida se ve igual en las listas de anomalías, que viajan enteras.
+ */
+function segundosDeHora(hhmmss) {
+  const [h, m, s] = String(hhmmss).split(':').map(Number)
+  return (h || 0) * 3600 + (m || 0) * 60 + (s || 0)
 }
 
 /** Diferencia tolerante a huecos: sin los dos valores no hay diferencia que dar. */
@@ -955,6 +1408,104 @@ export const DEFINICIONES = [
           },
         },
         required: ['senal', 'periodoA', 'periodoB'],
+      },
+    },
+  },
+
+    {
+    type: 'function',
+    function: {
+      name: 'analisis_de_senal',
+      description:
+        'Análisis estadístico de UNA señal historizada: media, mediana, desviación, tendencia ' +
+        '(subiendo/bajando/estable con un ajuste de 0 a 100), una proyección a futuro con su ' +
+        'margen de error, y las muestras anómalas si las hay. Úsala para "¿va a seguir subiendo ' +
+        'el nivel?", "¿cómo se está comportando la presión?", "¿hay algo raro en la temperatura?". ' +
+        'Sólo funciona con las cuatro señales que tienen historia. La proyección es un cálculo, ' +
+        'no una certeza: cítala siempre con su rango.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
+          periodo: { type: 'string', description: 'Período sobre el que calcular. Igual que en historia_de_senal.' },
+          horizonteMinutos: {
+            type: 'number',
+            description: 'Cuántos minutos hacia el futuro proyectar. Por defecto 60.',
+          },
+        },
+        required: ['senal'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'correlacionar_senales',
+      description:
+        'Compara DOS O MÁS señales sobre la misma ventana de tiempo y devuelve, para cada par, si ' +
+        'se movieron juntas (coeficiente de -1 a 1 y su lectura en palabras), más los valores ' +
+        'atípicos de cada señal CON SU HORA y cuáles de ellos cayeron en el mismo instante. ' +
+        'ÉSTA ES LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?", "¿qué ' +
+        'pasó cuando cayó la presión?", "¿tiene que ver la tensión con el fallo del motor?". ' +
+        'Sólo funciona con las cuatro señales que tienen historia. Lo que devuelve es un INDICIO, ' +
+        'no una demostración de causa: dilo así al redactar.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senales: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Las señales a comparar, en lenguaje llano, de dos a cuatro: por ejemplo ' +
+              '["presión", "caudal"]. Mismas formas de nombrarlas que en historia_de_senal.',
+          },
+          periodo: {
+            type: 'string',
+            description:
+              'La ventana en la que mirar. Si el usuario menciona cuándo ocurrió el fallo, pon ' +
+              'un período que lo contenga con margen: "últimas 6 horas", "ayer", "2026-08-19". ' +
+              'Igual que en historia_de_senal. Si no lo dice, omítelo.',
+          },
+        },
+        required: ['senales'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'grafico_de_senal',
+      description:
+        'Genera un gráfico de la evolución de UNA señal historizada en un período, para ' +
+        'acompañar la respuesta. Úsala cuando pidan "muéstrame", "un gráfico de", "dibuja" o ' +
+        'cuando una tendencia se explique mejor viéndola. Sólo las cuatro señales con historia.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
+          periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
+        },
+        required: ['senal'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'consultar_documentacion',
+      description:
+        'Busca en la documentación de planta (manuales, procedimientos) y devuelve los fragmentos ' +
+        'más parecidos a la pregunta, citables por archivo. Úsala para "¿cómo se arranca la bomba?", ' +
+        '"procedimiento de mantenimiento", "especificaciones de la válvula".',
+      parameters: {
+        type: 'object',
+        properties: {
+          pregunta: {
+            type: 'string',
+            description: 'Qué quieres consultar en la documentación, en lenguaje llano.',
+          },
+        },
+        required: ['pregunta'],
       },
     },
   },

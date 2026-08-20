@@ -219,14 +219,76 @@ porque llama-server no tiene autenticación de ninguna clase.
 Tres reglas del diseño, por si sorprenden en pantalla:
 
 - **Toda cifra viene de una consulta.** Debajo de cada respuesta se dice de
-  dónde salió el dato. Si el modelo contesta con números sin haber consultado
-  nada, el puente **no** deja salir la respuesta.
+  dónde salió el dato, una línea por consulta. Si el modelo contesta con
+  números sin haber consultado nada, el puente **no** deja salir la respuesta.
 - **Una consulta a la vez.** La segunda pregunta simultánea recibe un aviso, no
   una espera muda: dos a la vez se reparten la GPU y tardan el doble las dos.
 - **Sólo algunas señales tienen historia.** A tres de las ocho el historiador
   les devuelve la serie de otra sin dar error, así que la marca vive como hecho
   medido en `shared/eva/senales.js` (campo `historizado`). Preguntar por el
   pasado de una que no la tiene devuelve «no tengo ese dato», nunca un cero.
+
+### Qué sabe hacer
+
+Siete herramientas, y el modelo puede **encadenar hasta tres** para una misma
+pregunta (`IA_MAX_PASOS`). Ese encadenado es lo que hace posible la pregunta
+que más importa —«¿por qué falló esto?»—, que necesita el estado, la historia
+de la señal sospechosa y a veces el manual: tres lecturas, no una.
+
+| Herramienta | Para qué |
+|---|---|
+| `estado_del_sistema` | Las ocho señales ahora mismo, de una sola lectura |
+| `historia_de_senal` | Cómo evolucionó una señal en un período |
+| `comparar_periodos` | La misma señal en dos períodos, con la diferencia ya calculada |
+| `analisis_de_senal` | Media, tendencia, proyección y valores atípicos |
+| `correlacionar_senales` | Varias señales cruzadas: la herramienta del **diagnóstico** |
+| `grafico_de_senal` | Dibuja la serie y la manda a la pantalla |
+| `consultar_documentacion` | Busca en los manuales de planta y cita archivo y página |
+
+Al diagnosticar, las instrucciones le obligan a separar **lo medido** de **la
+hipótesis**, y a decir que correlación no es causa. Una causa inventada que
+suena razonable manda a alguien a revisar el equipo equivocado.
+
+### Documentación de planta
+
+`IA_DOCS_DIR` apunta a una carpeta con manuales. Se leen `.txt`, `.md`, `.csv`,
+`.log` y **`.pdf`** — el texto se extrae con el `zlib` de Node, sin
+dependencias, lo que cubre los PDF generados por Word o InDesign. Un PDF
+**escaneado** es una imagen: el índice lo detecta y lo dice, en vez de indexar
+basura.
+
+La búsqueda es BM25 (léxica, sin servidor). En manuales técnicos acierta porque
+quien pregunta usa el vocabulario del manual. Con `IA_EMBEDDING_BASE` apuntando
+a un segundo llama-server con `--embedding` se mezcla con búsqueda semántica.
+
+### Voz
+
+Opcional y también apagado por defecto. Necesita un tercer proceso,
+`whisper-server`, que hay un atajo para arrancar:
+
+```powershell
+.\scripts\whisper.ps1
+```
+
+Se apunta con `IA_WHISPER_BASE=http://127.0.0.1:8082` y aparecen dos botones en
+la barra del asistente:
+
+- **Micrófono** — dicta la pregunta. El texto va al cuadro de entrada para que
+  se revise antes de enviar: Whisper se equivoca con el ruido de planta y con
+  los nombres de tag, y una consulta lanzada sobre una frase mal oída gasta un
+  minuto de GPU respondiendo a algo que nadie preguntó.
+- **Teléfono** — manos libres. Escucha, pregunta, lee la respuesta en voz alta
+  y vuelve a escuchar, sin tocar el teclado. Aquí sí se envía sin confirmar:
+  pedir confirmación convertiría el manos libres en un manos-ocupadas.
+
+Dos cosas que **no** hacen falta: **ffmpeg**, porque el audio se convierte a WAV
+de 16 kHz en el navegador con la Web Audio API; y ningún modelo de voz para
+hablar, porque se usa el sintetizador del sistema (SAPI en Windows), que
+funciona sin red y no ocupa VRAM — el recurso escaso cuando ya compiten el
+modelo de lenguaje y el de audio.
+
+Los binarios de whisper.cpp **no hace falta compilarlos**: las releases
+oficiales traen `whisper-blas-bin-x64.zip`, que se descomprime y funciona.
 
 ## Pruebas
 
@@ -245,6 +307,8 @@ espera la siguiente:
 node scripts/verificar-backend.mjs        # el contrato HTTP
 node scripts/verificar-herramientas.mjs   # las herramientas del asistente
 node scripts/verificar-chat.mjs           # el bucle de conversación
+node scripts/verificar-voz.mjs            # el dictado (con un whisper falso)
+node scripts/verificar-manos-libres.mjs   # cómo suena una respuesta, y el ciclo
 ```
 
 Tras compilar:

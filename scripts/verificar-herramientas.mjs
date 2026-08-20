@@ -662,16 +662,57 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son tres herramientas, y ninguna escribe', () => {
+check('son siete herramientas, y ninguna escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
-  assert.deepEqual(h.nombres, ['estado_del_sistema', 'historia_de_senal', 'comparar_periodos'])
+  assert.deepEqual(h.nombres, [
+    'estado_del_sistema',
+    'historia_de_senal',
+    'comparar_periodos',
+    'analisis_de_senal',
+    'correlacionar_senales',
+    'grafico_de_senal',
+    'consultar_documentacion',
+  ])
 
   // La primera puerta contra una instrucción astuta metida en el chat no es
   // `ICONICS_READ_ONLY`: es que aquí no existe nada que escriba.
   const texto = JSON.stringify(h.definiciones).toLowerCase()
   for (const prohibido of ['write', 'escrib', 'borrar', 'delete', 'acknowledge']) {
     assert.ok(!texto.includes(prohibido), `"${prohibido}" no puede aparecer`)
+  }
+})
+
+/**
+ * Esta comprobación existe por un fallo real, y por eso mira algo tan tonto.
+ *
+ * Las tres herramientas de análisis se añadieron pegadas DENTRO del array
+ * `DEFINICIONES`, como métodos de uno de sus objetos, en vez de dentro del
+ * objeto `herramientas`. El archivo era JavaScript válido y el backend
+ * arrancaba; el modelo veía las siete herramientas anunciadas y al llamar a
+ * cualquiera de las tres nuevas recibía «no existe la herramienta».
+ *
+ * Un desajuste entre lo que se anuncia y lo que se puede ejecutar no da error
+ * en ninguna parte: se manifiesta como un asistente que falla sólo con ciertas
+ * preguntas, que es de los que cuestan una tarde.
+ */
+check('toda definición anunciada al modelo tiene implementación, y al revés', () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const anunciadas = h.definiciones.map(d => d.function?.name)
+
+  assert.deepEqual(
+    [...anunciadas].sort(),
+    [...h.nombres].sort(),
+    'lo que se le anuncia al modelo y lo que se puede ejecutar tienen que coincidir'
+  )
+
+  // Y que ninguna definición lleve pegado algo que no sea `type`/`function`,
+  // que es exactamente la forma que tenía el archivo roto.
+  for (const d of h.definiciones) {
+    assert.deepEqual(
+      Object.keys(d).sort(), ['function', 'type'],
+      `la definición de ${d.function?.name} lleva claves de más`
+    )
   }
 })
 
