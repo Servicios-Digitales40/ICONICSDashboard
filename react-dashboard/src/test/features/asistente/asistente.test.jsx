@@ -121,7 +121,7 @@ async function preguntar(texto = "¿OEE de la Línea 1?") {
   // Solo hay que abrirlo la primera vez; en las siguientes ya está abierto y
   // el botón flotante no existe.
   if (!screen.queryByRole("dialog")) {
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
   }
   fireEvent.change(screen.getByLabelText("Escribe tu pregunta"), { target: { value: texto } });
   fireEvent.click(screen.getByLabelText("Enviar la pregunta"));
@@ -135,7 +135,7 @@ describe("cuándo existe el asistente", () => {
     // Se espera a que la comprobación termine para no confundir «aún no
     // sabemos» con «no hay».
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir el asistente")).toBeNull();
+    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
   });
 
   it("si el backend no conoce la ruta, tampoco: el tablero sigue igual", async () => {
@@ -143,15 +143,15 @@ describe("cuándo existe el asistente", () => {
     montar();
 
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir el asistente")).toBeNull();
+    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
   });
 
   it("con modelo configurado aparece el botón, y abre el panel", async () => {
     backend({ habilitado: true });
     montar();
 
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
-    expect(screen.getByRole("dialog", { name: "Asistente de planta" })).toBeTruthy();
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+    expect(screen.getByRole("dialog", { name: "Tdconcito" })).toBeTruthy();
     expect(screen.getByLabelText("Escribe tu pregunta")).toBeTruthy();
   });
 });
@@ -376,7 +376,7 @@ describe("cuando la espera se tuerce", () => {
 
     // Cerrar y volver al tablero durante minuto y medio de espera es lo
     // natural; sin aviso, la respuesta se queda ahí sin que nadie la lea.
-    fireEvent.click(screen.getByLabelText("Cerrar el asistente"));
+    fireEvent.click(screen.getByLabelText("Cerrar Tdconcito"));
     enCurso.emitir({ tipo: "texto", delta: "62,4 %." });
     enCurso.emitir({ tipo: "fin", herramienta: "historia_de_senal", bloqueada: false });
     enCurso.cerrar();
@@ -396,7 +396,7 @@ describe("los ejemplos", () => {
       ],
     });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
 
     // Parece un botón de preguntar: pedir un segundo gesto para lo que ya se
     // había pulsado sobra.
@@ -410,7 +410,7 @@ describe("los ejemplos", () => {
   it("no tira lo que estuvieras escribiendo", async () => {
     backend({ habilitado: true, eventos: [{ tipo: "fin", herramienta: null, bloqueada: false }] });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir el asistente"));
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
 
     const campo = screen.getByLabelText("Escribe tu pregunta");
     fireEvent.change(campo, { target: { value: "¿qué presión tiene la re" } });

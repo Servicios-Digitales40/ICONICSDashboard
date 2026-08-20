@@ -296,7 +296,8 @@ function hoyLocal() {
  */
 function instrucciones(catalogo, maxPasos) {
   return [
-    'Eres el asistente de un tablero que vigila un SISTEMA DE AGUA INDUSTRIAL: un tanque, un',
+    'Te llamas Tdconcito. Eres el asistente de un tablero que vigila un SISTEMA DE AGUA',
+    'INDUSTRIAL: un tanque, un',
     'grupo de bombeo, una red de distribución y su suministro eléctrico. Respondes en español,',
     'con frases cortas.',
     '',

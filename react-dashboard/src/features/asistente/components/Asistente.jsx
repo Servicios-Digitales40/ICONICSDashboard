@@ -62,6 +62,24 @@ import {
  * El ejemplo fallaba al pulsarlo, que es justo lo que un ejemplo no puede
  * hacer. El sustantivo se queda.
  */
+/**
+ * Cómo se llama el asistente de cara al usuario.
+ *
+ * En una constante y no repartido por el archivo, porque el nombre de un
+ * producto cambia: ya pasó una vez —era «Asistente de la instalación»— y
+ * estaba escrito en cinco sitios entre rótulos y etiquetas de accesibilidad,
+ * de los que se actualizaron cuatro. Un lector de pantalla anunciando un
+ * nombre distinto del que se ve escrito es un fallo difícil de detectar
+ * mirando la pantalla.
+ *
+ * Los identificadores INTERNOS no lo siguen a propósito: el archivo sigue
+ * siendo `Asistente.jsx` y los turnos siguen llevando `rol: "asistente"`.
+ * Renombrar eso sería tocar decenas de sitios, y las pruebas y el historial
+ * de git para nada — el nombre comercial y el nombre del módulo no tienen por
+ * qué coincidir.
+ */
+export const NOMBRE = "Tdconcito";
+
 const SUGERENCIAS = [
   "¿Cómo va la instalación ahora mismo?",
   "¿Qué nivel tiene el tanque?",
@@ -230,7 +248,7 @@ export function Asistente() {
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        aria-label={sinLeer ? "Abrir el asistente. La respuesta está lista." : "Abrir el asistente"}
+        aria-label={sinLeer ? `Abrir ${NOMBRE}. La respuesta está lista.` : `Abrir ${NOMBRE}`}
         style={{
           position: "fixed", right: 24, bottom: 24, zIndex: 60,
           width: 52, height: 52, borderRadius: "50%", border: "none", cursor: "pointer",
@@ -261,7 +279,7 @@ export function Asistente() {
   return (
     <section
       role="dialog"
-      aria-label="Asistente de la instalación"
+      aria-label={NOMBRE}
       style={{
         position: "fixed", right: 24, bottom: 24, zIndex: 60,
         width: "min(420px, calc(100vw - 48px))", height: "min(560px, calc(100vh - 48px))",
@@ -277,7 +295,7 @@ export function Asistente() {
         }}
       >
         <Bot size={17} color={t.accent} />
-        <strong style={{ flex: 1, fontSize: 13.5, color: t.text }}>Asistente de la instalación</strong>
+        <strong style={{ flex: 1, fontSize: 13.5, color: t.text }}>{NOMBRE}</strong>
 
         <button
           type="button" onClick={limpiar} disabled={ocupado || !mensajes.length}
@@ -288,7 +306,7 @@ export function Asistente() {
         </button>
         <button
           type="button" onClick={() => setAbierto(false)}
-          aria-label="Cerrar el asistente" style={botonIcono(t, false)}
+          aria-label={`Cerrar ${NOMBRE}`} style={botonIcono(t, false)}
         >
           <X size={16} />
         </button>
@@ -493,7 +511,7 @@ function BotonManosLibres({ t, manosLibres }) {
     return (
       <button
         type="button" onClick={encender} className="app-btn"
-        aria-label="Hablar con el asistente en manos libres"
+        aria-label={`Hablar con ${NOMBRE} en manos libres`}
         title="Manos libres: hablar y escuchar la respuesta"
         style={botonMicro(t, "listo")}
       >
