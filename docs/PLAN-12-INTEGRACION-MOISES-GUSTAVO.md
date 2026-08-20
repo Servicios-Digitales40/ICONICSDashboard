@@ -6,7 +6,9 @@
 > documentación de `Gustavo`. La rama intermedia es
 > **`integracion/moises-gustavo`**, creada desde `Moises`.
 
-> **ESTADO** — en ejecución. Ver §5 para el resultado de cada fase.
+> **ESTADO (20-ago-2026)** — **MERGE HECHO** en `integracion/moises-gustavo`
+> (commit `3980d8d`). Todo lo automatizable está en verde; queda la prueba en
+> pantalla del §6, que necesita el servidor ICONICS y los tres procesos de IA.
 
 ---
 
@@ -125,7 +127,44 @@ Todo lo automatizable, y el resto anotado para la prueba en pantalla:
 
 ## 5 · Resultado por fase
 
-_(se rellena al ejecutar)_
+| Fase | Qué pasó | Verificación |
+|---|---|---|
+| 0 | Línea base medida en `Moises` | 191 pruebas de frontend en verde; `verificar-herramientas.mjs` **ya fallaba** (ver Fase 3) |
+| 1 | Merge y los tres conflictos mecánicos | `app.mjs`, `herramientas.mjs` y `asistente.test.jsx` resueltos por unión; `chat.mjs` y `App.jsx` los resolvió Git |
+| 2 | `Asistente.jsx` a mano | Carcasa de `Moises` + voz de `Gustavo`; `lib/useDictado.js` borrado |
+| 3 | `verificar-herramientas.mjs` puesto al día | 53 comprobaciones, **6 nuevas** sobre `controlar_bomba` |
+| 4 | Documentación | `README.md`, `backend/README.md` y `.env.example` |
+| 5 | Verificación completa | **205** frontend · **51** contrato · **53** herramientas · **42** chat · **12** voz · **11** manos libres · compila · arranque sin 3D |
+
+### Lo que la Fase 2 encontró y no estaba en el plan
+
+Tres cosas que sólo salen al juntar las ramas, y que ninguna prueba habría
+señalado porque ninguna de las dos está mal por separado:
+
+1. **La línea de procedencia se habría quedado muda.** `useAsistente.js` pasó a
+   emitir `consultas` en plural y `adjuntos`; el `Asistente.jsx` de `Moises`
+   seguía leyendo `mensaje.herramienta`. Sin portar el `Turno`, debajo de cada
+   respuesta no habría aparecido de dónde salió el dato —la invariante que
+   permite creerse una cifra— y los gráficos no se habrían pintado. Sin error y
+   sin aviso.
+2. **La bomba no tenía estado que enseñar.** `ESTADO_POR_HERRAMIENTA` es de
+   `Gustavo` y no conocía `controlar_bomba`, así que mientras se escribe y se
+   relee el punto la pantalla decía «Consultando ICONICS…». Ahora dice
+   «Actuando sobre la bomba…».
+3. **El clip seguía activo en manos libres.** Un adjunto puesto ahí no viaja con
+   ninguna pregunta —el manos libres no pasa por ese formulario— y se habría
+   quedado colgado en la barra. Se deshabilita mientras dure la llamada.
+
+### Y lo que venía roto de antes
+
+`scripts/verificar-herramientas.mjs` fallaba en `Moises` desde `2c344a4`:
+fijaba «son ocho herramientas, y ninguna escribe», y `controlar_bomba` rompe
+las dos mitades de esa frase. La comprobación se reescribe contra lo que ahora
+es cierto —nueve, y la escritura está en una sola, comprobada por nombre— y la
+única escritura pasa a tener las pruebas que no tenía: solo lectura, tanque
+lleno al encender, apagado sin mirar el nivel, escritura rechazada, y el caso
+que de verdad importa, **una escritura que el servidor acepta y que el punto no
+refleja**.
 
 ## 6 · Lo que queda para la prueba en pantalla
 
