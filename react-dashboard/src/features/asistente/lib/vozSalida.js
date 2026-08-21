@@ -114,6 +114,27 @@ function esperarVoces() {
 let vozElegida = null
 
 /**
+ * Se piden las voces AL CARGAR LA PÁGINA, no al primer clic.
+ *
+ * `getVoices()` devuelve una lista vacía la primera vez y la rellena de forma
+ * asíncrona. Si la primera petición ocurre en el clic del teléfono, la lista
+ * aún está vacía en ese instante: no hay voz que asignar, y la frase de saludo
+ * sale sin `voice`. Chrome, ante un `lang` que no puede resolver a una voz
+ * concreta, descarta la frase sin decir nada.
+ *
+ * Pidiéndolas al importar el módulo —que ocurre al abrir el tablero, mucho
+ * antes de que nadie pulse nada— para cuando llegue el clic ya están.
+ */
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  const cargar = () => {
+    const voces = window.speechSynthesis.getVoices()
+    if (voces.length && !vozElegida) vozElegida = elegirVoz(voces)
+  }
+  cargar()
+  window.speechSynthesis.addEventListener?.('voiceschanged', cargar)
+}
+
+/**
  * Desbloquea la síntesis de voz. Hay que llamarla DENTRO de un clic.
  *
  * ── POR QUÉ HACE FALTA ─────────────────────────────────────────────
@@ -148,15 +169,11 @@ export function desbloquearVoz(saludo) {
      */
     const frase = new SpeechSynthesisUtterance(saludo ?? '')
     frase.rate = VELOCIDAD
-    if (vozElegida) {
-      frase.voice = vozElegida
-      frase.lang = vozElegida.lang
-    } else {
-      frase.lang = IDIOMA_POR_DEFECTO
-    }
+    aplicarVoz(frase)
     if (!saludo) frase.volume = 0
 
     window.speechSynthesis.speak(frase)
+    avisarSiSeQuedaMuda()
   } catch {
     // Si el navegador se queja, se seguirá intentando al hablar de verdad.
   }
@@ -183,19 +200,7 @@ export async function hablar(texto) {
   return new Promise(resolve => {
     const frase = new SpeechSynthesisUtterance(limpio)
     frase.rate = VELOCIDAD
-
-    /*
-     * El `lang` acompaña a la VOZ, no al revés.
-     *
-     * Poner `es-ES` con una voz `es-MX` seleccionada es pedirle al navegador
-     * dos cosas incompatibles, y su forma de resolverlo es no decir nada.
-     */
-    if (vozElegida) {
-      frase.voice = vozElegida
-      frase.lang = vozElegida.lang
-    } else {
-      frase.lang = IDIOMA_POR_DEFECTO
-    }
+    aplicarVoz(frase)
 
     let acabado = false
     const terminar = () => {
@@ -245,6 +250,59 @@ export async function hablar(texto) {
 
     window.speechSynthesis.speak(frase)
   })
+}
+
+/**
+ * Le pone voz e idioma a una frase.
+ *
+ * ── POR QUÉ SIN VOZ NO SE TOCA `lang` ──────────────────────────────
+ *
+ * Porque un `lang` que el navegador no sabe resolver a una voz concreta hace
+ * que descarte la frase en silencio. Si no hemos podido elegir voz, lo seguro
+ * es no pedir NADA y dejar que hable con la del sistema: se entenderá regular,
+ * pero se oye — y el silencio es el único fallo que no se puede diagnosticar.
+ */
+function aplicarVoz(frase) {
+  if (!vozElegida) vozElegida = elegirVoz(window.speechSynthesis.getVoices())
+
+  if (vozElegida) {
+    frase.voice = vozElegida
+    // El `lang` acompaña a la VOZ, no al revés: pedir `es-ES` con una voz
+    // `es-MX` asignada es pedirle al navegador dos cosas incompatibles.
+    frase.lang = vozElegida.lang
+  }
+}
+
+/**
+ * Qué hacer cuando el navegador se traga una frase sin decir nada.
+ *
+ * Se comprueba poco después de mandarla: si no está hablando NI tiene nada
+ * pendiente, la frase se descartó. No hay evento para eso —ni `error`, ni
+ * `end`— así que sin esta comprobación el síntoma es «no suena» y punto, que
+ * es exactamente lo que costó dos rondas de diagnóstico encontrar.
+ *
+ * Lo que se hace con el aviso lo decide quien escuche `onVozMuda`; aquí sólo
+ * se detecta.
+ */
+let onVozMuda = null
+export function alQuedarseMuda(manejador) {
+  onVozMuda = manejador
+}
+
+function avisarSiSeQuedaMuda() {
+  setTimeout(() => {
+    const s = window.speechSynthesis
+    if (s.speaking || s.pending) return
+
+    const voces = s.getVoices()
+    onVozMuda?.(
+      voces.length
+        ? 'El navegador no reprodujo la voz. Comprueba el volumen del sistema y que la ' +
+          'pestaña no esté silenciada (clic derecho en la pestaña → «Activar sonido»).'
+        : 'Este navegador no encuentra ninguna voz instalada, así que no puede hablar. ' +
+          'Prueba con otro navegador, o reinícialo: Chrome a veces pierde la lista de voces.'
+    )
+  }, 400)
 }
 
 /** Corta lo que se esté leyendo. */

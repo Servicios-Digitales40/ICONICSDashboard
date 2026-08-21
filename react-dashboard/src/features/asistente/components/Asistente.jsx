@@ -464,9 +464,9 @@ export function Asistente() {
       {/* El fallo del dictado se cuenta bajo la barra y NO como un turno del
           hilo: no llegó a haber pregunta, así que meterlo en la conversación
           la ensuciaría con algo que nadie llegó a preguntar. */}
-      {dictado.error && (
+      {(dictado.error || manosLibres.error) && (
         <div style={{ padding: "0 12px 10px", fontSize: 11, color: t.coral, lineHeight: 1.45 }}>
-          {dictado.error}
+          {dictado.error ?? manosLibres.error}
         </div>
       )}
 

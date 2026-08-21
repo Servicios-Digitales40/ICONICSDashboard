@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, motivoSinMicrofono, puedeGrabar } from "./audio.js";
-import { callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
+import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
 
 /**
@@ -518,6 +518,8 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const [fase, setFase] = useState("parado");   // parado | escuchando | pensando | hablando
   /** Nivel del micrófono, 0 a 1. Es la prueba visible de que te está oyendo. */
   const [nivel, setNivel] = useState(0);
+  /** Por qué no se oyó nada. El navegador no lo dice; hay que detectarlo. */
+  const [errorVoz, setErrorVoz] = useState(null);
 
   const dictado = useDictado();
   const vivoEnLlamada = useRef(true);
@@ -529,6 +531,18 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const disponible = dictado.disponible === true && puedeHablar();
 
   useEffect(() => { activoRef.current = activo; }, [activo]);
+
+  /*
+   * Que el silencio del navegador se vea.
+   *
+   * `speechSynthesis` descarta frases sin emitir ningún evento, así que sin
+   * esto el único síntoma es «no suena» — que es lo que costó dos rondas de
+   * diagnóstico. Ahora sale escrito qué comprobar.
+   */
+  useEffect(() => {
+    alQuedarseMuda((motivo) => vivoEnLlamada.current && setErrorVoz(motivo));
+    return () => alQuedarseMuda(null);
+  }, []);
 
   /*
    * `escuchar` vive en una referencia, y no es un adorno.
@@ -559,6 +573,7 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
    * Va justo después del clic, que es cuando el navegador sí autoriza a hablar.
    */
   const saludar = useCallback(() => {
+    setErrorVoz(null);
     // NO se usa `hablar()`: espera a que carguen las voces, y ese `await`
     // rompe la cadena del clic — que es justo lo que el navegador exige para
     // autorizar el audio. `desbloquearVoz` lo dice en la misma vuelta.
@@ -712,7 +727,9 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     fase,
     nivel,
     transcribiendo: dictado.transcribiendo,
-    error: dictado.error,
+    // El fallo del micrófono y el de la voz son distintos y se arreglan en
+    // sitios distintos, así que se cuentan por separado.
+    error: dictado.error ?? errorVoz,
     encender,
     apagar,
     cerrarTurno,
