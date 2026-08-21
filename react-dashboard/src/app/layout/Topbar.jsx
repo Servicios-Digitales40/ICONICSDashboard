@@ -91,7 +91,9 @@ export function Topbar({ page, onAbrirMenu }) {
   };
 
   return (
-    <div
+    // `<header>` y no `<div>`: junto al `<main>` de App.jsx y el `<aside>` +
+    // `<nav>` de Sidebar, cierra el juego de landmarks de la aplicación.
+    <header
       style={{
         position: "sticky", top: 0, zIndex: 30, background: `${t.page}E6`, backdropFilter: "blur(10px)",
         padding: esCajon ? "14px 16px" : "18px 32px",
@@ -197,6 +199,6 @@ export function Topbar({ page, onAbrirMenu }) {
 
         {/* <Avatar name="Ana Torres" size={34} /> */}
       </div>
-    </div>
+    </header>
   );
 }

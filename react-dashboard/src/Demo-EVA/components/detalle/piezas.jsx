@@ -12,7 +12,8 @@ import { ChartTooltip } from "@/components/charts/index.js";
 import { hasValue } from "@shared/valores.js";
 
 import { bandaColor } from "../paleta.js";
-import { MONO } from "../base.jsx";
+import { MONO, PuntoEstado } from "../base.jsx";
+import { estadoInfo } from "../../domain/estado.js";
 
 /**
  * Insignia que declara el ORIGEN de una serie. Nunca se deja a que el lector
@@ -202,7 +203,26 @@ export function GraficaAusente({ t, alto = 150, mensaje, compacta }) {
   );
 }
 
-/** Posición de un valor dentro de su banda, como zona — misma idea que `BarraBanda` de tiles.jsx. */
+/**
+ * Posición de un valor dentro de su banda, como zona — misma idea que
+ * `BarraBanda` de tiles.jsx.
+ *
+ * La marca vertical lleva el color de la banda (`bandaColor`), pero el color
+ * NUNCA es el único portador aquí: a diferencia de `BarraBanda` —que siempre
+ * aparece junto al `corto` del estado en su tarjeta—, esta pieza podía
+ * quedarse sola bajo la cifra sin ningún texto de estado en toda la tarjeta.
+ * El punto + `corto` de abajo es el mismo par que usa el resto del tablero
+ * (`PuntoEstado`, ver `FilaSenal` en tiles.jsx): quien no distingue verde de
+ * ámbar sigue leyendo «En banda» o «En aviso» igual que cualquiera.
+ *
+ * El texto describe `senal.banda`, no `senal.estado`: son dos cosas
+ * distintas a propósito (ver la cabecera de `createSenal` en
+ * `shared/eva/sistema.js`) — una señal `en reposo` puede seguir fuera de
+ * banda, y la marca de este componente ya usa `bandaColor(senal.banda)`
+ * para el color. Etiquetarla con `senal.estado` la haría decir «En reposo»
+ * junto a una marca coral: dos verdades distintas contradiciéndose en la
+ * misma línea.
+ */
 export function BandaValor({ senal, t, dark, alto = 7 }) {
   const sinDato = !hasValue(senal.valor);
   const pct = senal.escala && hasValue(senal.valor)
@@ -210,6 +230,8 @@ export function BandaValor({ senal, t, dark, alto = 7 }) {
     : null;
 
   if (!senal.escala) return null;
+
+  const info = estadoInfo(senal.banda);
 
   return (
     <div>
@@ -224,8 +246,14 @@ export function BandaValor({ senal, t, dark, alto = 7 }) {
           />
         )}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9.5, color: t.textFaint, fontFamily: MONO }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, fontSize: 9.5, color: t.textFaint, fontFamily: MONO }}>
         <span>{senal.escala.min}</span>
+        {!sinDato && (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: "'Inter', sans-serif" }}>
+            <PuntoEstado color={bandaColor(t, dark, senal.banda)} size={5} />
+            {info.corto}
+          </span>
+        )}
         <span>{senal.escala.max}</span>
       </div>
     </div>

@@ -78,6 +78,20 @@ button {
   transform: translateY(0);
 }
 
+/*
+ * Anillo de foco para navegación por teclado. Mismos valores que
+ * `.metric-card:focus-visible`, más arriba: es el mismo token de foco del
+ * sistema (ver DESIGN.md, "Anillo de foco"), aplicado a las dos clases de
+ * botón más repetidas del tablero y que hasta ahora no lo llevaban — quien
+ * navega con Tab por el Sidebar o por cualquier `.app-btn` no tenía ninguna
+ * marca de dónde estaba parado.
+ */
+.nav-item:focus-visible,
+.app-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .shuffle-btn:hover {
   transform: translateY(-1px);
 }

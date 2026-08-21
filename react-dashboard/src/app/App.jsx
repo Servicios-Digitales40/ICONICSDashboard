@@ -116,7 +116,12 @@ function Shell() {
         <DataSourceBanner />
         <Topbar page={nav.page} onAbrirMenu={() => setCajonAbierto(true)} />
 
-        <div key={nav.page} className="page-fade eva-page-shell" style={{ position: "relative" }}>
+        {/* `<main>` y no `<div>`: es el único landmark de contenido que le
+            faltaba a la aplicación entera (Sidebar ya es `<aside>`+`<nav>`,
+            Topbar ya es `<header>`). Sin él, un lector de pantalla no tiene
+            forma de saltar directo al tablero sin recorrer primero la barra
+            lateral completa en cada visita. */}
+        <main key={nav.page} className="page-fade eva-page-shell" style={{ position: "relative" }}>
           {/* `resetKey` rearma la barrera al cambiar de ruta: sin él, una
               vista que falló una vez dejaría el error clavado y navegar a
               otra página mostraría el mismo panel. */}
@@ -129,7 +134,7 @@ function Shell() {
               <PageComponent params={nav.params} onNavigate={navigate} />
             </Suspense>
           </ErrorBoundary>
-        </div>
+        </main>
 
         {/* El asistente es estrictamente ADITIVO: se pinta solo si el servidor
             tiene un modelo configurado, y va en su propia barrera de errores

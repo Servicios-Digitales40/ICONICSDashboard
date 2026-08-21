@@ -256,7 +256,10 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
       )}
 
       {/* Navegación */}
-      <nav style={{ padding: collapsed ? "8px 10px" : "8px 14px", display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+      <nav
+        aria-label="Navegación principal"
+        style={{ padding: collapsed ? "8px 10px" : "8px 14px", display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto", overflowX: "hidden" }}
+      >
         {NAV.map((item) =>
           item.children ? (
             <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} />

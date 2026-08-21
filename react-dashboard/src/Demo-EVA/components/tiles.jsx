@@ -165,10 +165,19 @@ function StatSenal({ senal, serie, t, dark, delay }) {
  * quedarse, y por eso se dibuja como una ZONA y no como un tick: se lee «entre
  * aquí y aquí» en vez de «llega hasta aquí».
  */
+/**
+ * La marca vertical lleva el color de la banda y NUNCA es su único portador:
+ * el `corto` del estado —el mismo par punto+texto que usa el resto del
+ * tablero, ver `FilaSenal`— va debajo, en el hueco entre los extremos de
+ * escala. Antes de este cambio, `StatSenal` y `Medidor` (los dos
+ * consumidores) no repetían el estado en ningún otro sitio de su tarjeta:
+ * quien no distinguía verde de ámbar no tenía ninguna otra pista.
+ */
 export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
   const listo = useMounted();
   const u = UMBRALES[senal.key];
   const sinDato = !hasValue(senal.valor);
+  const info = estadoInfo(senal.banda);
 
   const pctDe = (v) => (hasValue(v) ? pctDeEscala(senal, v) : null);
   const desde = pctDe(u?.avisoMin) ?? 0;
@@ -202,8 +211,14 @@ export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
         )}
       </div>
       {senal.escala && (
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9.5, color: t.textFaint, fontFamily: MONO }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, fontSize: 9.5, color: t.textFaint, fontFamily: MONO }}>
           <span>{senal.escala.min}</span>
+          {!sinDato && (
+            <span style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: "'Inter', sans-serif" }}>
+              <PuntoEstado color={bandaColor(t, dark, senal.banda)} size={5} />
+              {info.corto}
+            </span>
+          )}
           <span>{senal.escala.max}</span>
         </div>
       )}
