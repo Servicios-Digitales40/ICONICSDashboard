@@ -357,6 +357,44 @@ export function Asistente() {
         </button>
       </header>
 
+      {/*
+        En qué paso va la llamada, bien visible.
+
+        Estaba sólo en el `placeholder` del cuadro de texto: gris, pequeño y
+        dentro de un campo desactivado, o sea invisible. En un modo que se usa
+        SIN mirar la pantalla eso da igual mientras funcione, pero cuando algo
+        se atasca es lo único que dice dónde — y sin ello no queda más remedio
+        que ir probando a ciegas.
+      */}
+      {manosLibres.activo && (
+        <div
+          role="status"
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", flexShrink: 0,
+            background: t.accentSoft, color: t.text,
+            fontSize: 12, borderBottom: `1px solid ${t.border}`,
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+              background: manosLibres.fase === "escuchando" ? t.coral : t.accent,
+            }}
+          />
+          <span style={{ flex: 1 }}>{FASE_MANOS_LIBRES[manosLibres.fase]}</span>
+
+          {/* El nivel del micrófono en número. Si al hablar se queda en 0, el
+              micrófono no capta — y eso se distingue de cualquier otro fallo. */}
+          {manosLibres.fase === "escuchando" && (
+            <span style={{ fontSize: 10.5, color: t.textFaint, fontVariantNumeric: "tabular-nums" }}>
+              nivel {Math.round(manosLibres.nivel * 100)}
+            </span>
+          )}
+        </div>
+      )}
+
       {alarmas.length > 0 && (
         <PanelAlarmas t={t} alarmas={alarmas} ocupado={ocupado} onDiagnosticar={lanzar} />
       )}
@@ -616,8 +654,8 @@ function BotonMicrofono({ t, dictado, onTexto }) {
  * habla encima de la respuesta.
  */
 const FASE_MANOS_LIBRES = {
-  parado: "Manos libres listo",
-  escuchando: "Te escucho… se envía solo cuando dejes de hablar",
+  parado: "Llamada conectada… saludando",
+  escuchando: "Te escucho — habla, se envía solo al callarte",
   pensando: "Entendiendo lo que has dicho…",
   hablando: "Contestando en voz alta…",
 };
