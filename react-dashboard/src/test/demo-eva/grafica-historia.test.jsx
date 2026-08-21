@@ -95,6 +95,63 @@ describe("Plan 13 F9: un fallo de red no se confunde con un rango vacío", () =>
   });
 });
 
+describe("Plan 13 F4: la banda cómoda, dibujada y rotulada como estimación", () => {
+  // Recharts no llega a pintar SVG bajo jsdom sin `ResizeObserver` real (ver
+  // `test/setup.js`): el `<ReferenceArea>` en sí no es inspeccionable aquí.
+  // Lo que SÍ es una superficie HTML normal, y lo que se prueba, es la
+  // insignia "banda estimada" — cuelga del MISMO booleano (`hayBanda`) que
+  // decide si se pinta la zona, así que su presencia es un proxy fiel.
+  const BADGE = "banda estimada, sin confirmar";
+
+  it("una señal con avisoMin y avisoMax declarados muestra la insignia", () => {
+    montar({ datos: DOS_PUNTOS, cargando: false }); // SENAL = nivelTanque, con banda completa
+    expect(screen.getByText(BADGE)).toBeTruthy();
+  });
+
+  it("sin ningún umbral declarado (modoVdf), no hay insignia ni banda que rotular", () => {
+    const senalSinUmbral = { key: "modoVdf", corto: "Modo", banda: "nominal" };
+    render(
+      <ThemeProvider>
+        <ConTema>
+          {(t, dark) => <GraficaHistoria senal={senalSinUmbral} datos={DOS_PUNTOS} t={t} dark={dark} />}
+        </ConTema>
+      </ThemeProvider>
+    );
+    expect(screen.queryByText(BADGE)).toBeNull();
+  });
+
+  it("con avisoMin nulo (cargaMotor), la banda igual se dibuja recortando al mínimo de la escala", () => {
+    // No es sólo "no revienta": es que `hayBanda` tiene que seguir siendo
+    // true — un umbral con un lado sin límite no es lo mismo que un umbral
+    // ausente (modoVdf), y antes de este recorte un `avisoMin: null` habría
+    // dejado el `ReferenceArea` con un borde en `undefined`.
+    const cargaMotor = { key: "cargaMotor", corto: "Carga", banda: "nominal", escala: { min: 0, max: 100 } };
+    render(
+      <ThemeProvider>
+        <ConTema>{(t, dark) => <GraficaHistoria senal={cargaMotor} datos={DOS_PUNTOS} t={t} dark={dark} />}</ConTema>
+      </ThemeProvider>
+    );
+    expect(screen.getByText(BADGE)).toBeTruthy();
+  });
+
+  it("con avisoMax nulo (eficienciaEnergetica), mismo recorte por el lado de arriba", () => {
+    const eficiencia = {
+      key: "eficienciaEnergetica", corto: "Eficiencia", banda: "nominal", escala: { min: 0, max: 100 },
+    };
+    render(
+      <ThemeProvider>
+        <ConTema>{(t, dark) => <GraficaHistoria senal={eficiencia} datos={DOS_PUNTOS} t={t} dark={dark} />}</ConTema>
+      </ThemeProvider>
+    );
+    expect(screen.getByText(BADGE)).toBeTruthy();
+  });
+
+  it("sin datos suficientes no hay insignia: no hay gráfica que rotular", () => {
+    montar({ datos: [], cargando: false });
+    expect(screen.queryByText(BADGE)).toBeNull();
+  });
+});
+
 describe("el eje Y usa la escala de la señal, no el rango de los propios datos", () => {
   // Regresión: con domain=["dataMin","dataMax"] una oscilación de 0.1 (p.
   // ej. 102.01 a 102.12, un valor forzado fuera del 0-100 normal) se

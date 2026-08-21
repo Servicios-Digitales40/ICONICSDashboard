@@ -5,7 +5,7 @@
  * acomodos comparados en vivo se quedó uno, pero la verdad sobre el origen
  * del dato es la misma independientemente de cuál hubiera ganado.
  */
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { History, Radio } from "lucide-react";
 
 import { ChartTooltip } from "@/components/charts/index.js";
@@ -15,6 +15,7 @@ import { bandaColor } from "../paleta.js";
 import { MONO, PuntoEstado } from "../base.jsx";
 import { estadoInfo } from "../../domain/estado.js";
 import { HISTORIAL, estadoHistorial } from "../../data/estadoDelDato.js";
+import { PROVISIONALES, UMBRALES } from "../../domain/umbrales.js";
 
 /**
  * Insignia que declara el ORIGEN de una serie. Nunca se deja a que el lector
@@ -134,6 +135,23 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark
 
   const multiDia = filas[filas.length - 1].t - filas[0].t > UMBRAL_MULTIDIA_MS;
 
+  /*
+   * La banda cómoda, dibujada — no sólo citada en un `code` como hace
+   * `HeroeNivel`. Mismo par (avisoMin, avisoMax) y mismo relleno
+   * (`t.successSoft`) que ya usan `BarraBanda`/`BandaValor` para la zona
+   * cómoda: es el vocabulario visual que el resto del tablero ya tiene, no
+   * uno nuevo para esta gráfica.
+   *
+   * Los `?? senal.escala?.*` son el mismo recorte que hace `BarraBanda`: la
+   * carga del motor no tiene `avisoMin` (no hay límite inferior que tenga
+   * sentido) y la eficiencia no tiene `avisoMax` — sin el recorte, la banda
+   * se dibujaría con un borde en `undefined` y Recharts la omitiría entera.
+   */
+  const u = UMBRALES[senal.key];
+  const bandaY1 = u?.avisoMin ?? senal.escala?.min;
+  const bandaY2 = u?.avisoMax ?? senal.escala?.max;
+  const hayBanda = u && hasValue(bandaY1) && hasValue(bandaY2);
+
   return (
     <div className="grafica-revela" style={{ position: "relative", animationDelay: `${delay}s` }}>
       <ResponsiveContainer width="100%" height={alto}>
@@ -145,6 +163,9 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark
           />
           <YAxis domain={dominioY(senal.escala)} tick={false} axisLine={false} tickLine={false} width={30} />
           <Tooltip content={<TooltipHistoria />} />
+          {hayBanda && (
+            <ReferenceArea y1={bandaY1} y2={bandaY2} fill={t.successSoft} stroke="none" ifOverflow="visible" />
+          )}
           <Area
             type="monotone" dataKey="valor" name={senal.corto}
             stroke={col} strokeWidth={2} fill={col} fillOpacity={0.14}
@@ -161,6 +182,26 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark
           }}
         >
           Actualizando…
+        </span>
+      )}
+      {/*
+       * Mientras `PROVISIONALES` sea `true`, la banda de arriba es una
+       * ESTIMACIÓN nuestra, no un límite medido — el 91 % de las lecturas de
+       * presión reales cae por debajo del "crítico" declarado. Decirlo aquí,
+       * y no sólo en el código o en la documentación, es lo que evita que se
+       * lea como un hecho confirmado del servidor. El día que se confirmen
+       * los umbrales, `PROVISIONALES` pasa a `false` y este aviso desaparece
+       * solo, sin tocar el componente.
+       */}
+      {hayBanda && PROVISIONALES && (
+        <span
+          style={{
+            position: "absolute", bottom: 2, left: 2,
+            fontFamily: MONO, fontSize: 9, color: t.textFaint,
+            background: t.hover, borderRadius: 999, padding: "2px 8px",
+          }}
+        >
+          banda estimada, sin confirmar
         </span>
       )}
     </div>
