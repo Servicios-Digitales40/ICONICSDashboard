@@ -6,9 +6,11 @@
 > forma de llevarse nada a un parte. F10 (presupuesto de rendimiento 3D) queda
 > fuera por decisión del usuario.
 
-> **ESTADO (21-ago-2026)** — en ejecución. Rama de trabajo: **`Moises2`**
-> (no `integracion/moises-gustavo`: esa rama quedó cerrada al fusionarse en
-> el Plan 12; el trabajo de este plan sigue en la rama activa del usuario).
+> **ESTADO (21-ago-2026)** — **completado, las nueve fases**. Rama de trabajo:
+> **`Moises2`** (no `integracion/moises-gustavo`: esa rama quedó cerrada al
+> fusionarse en el Plan 12; el trabajo de este plan sigue en la rama activa
+> del usuario). Queda pendiente sólo la revisión en pantalla del §6, que
+> necesita el servidor ICONICS real.
 >
 > | Fase | Entregable | Mejora | Verificación |
 > |---|---|---|---|
@@ -21,9 +23,9 @@
 > | 6 ✅ | `GraficaComparada` + `lib/comparar.js` (alineado por tolerancia) | **F3** | 18 pruebas, contra el simulador real |
 > | 7 ✅ | `leerRangoDeUrl` + re-sync ante popstate + `parametrosDeRango` | **F7** | 15 pruebas, incluido el flujo completo del calendario |
 > | 8 ✅ | `?muro=1`: sin cromo, `zoom` (no `rem`), rotación opcional | **F8** | 20 pruebas + revisión en pantalla pendiente |
-> | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
+> | 9 ✅ | `AlarmasEva.jsx` (historial + filtro + ack) + badge del Topbar (`useAlarmCount`) | **F1** | 24 pruebas nuevas: contrato de `apiClient`, dominio (`alarmas.js`), vista, badge |
 >
-> Suite: **317/323** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **355/361** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -378,7 +380,7 @@ que menos se puede juzgar sin ponerla en el monitor de verdad.
 
 ---
 
-### Fase 9 — F1 · Las alarmas del servidor, en pantalla
+### Fase 9 — F1 · Las alarmas del servidor, en pantalla ✅
 
 **La más grande, y la única con dependencia fuera del frontend.** Va última por
 eso, no por importancia.
@@ -561,6 +563,29 @@ calculaba la siguiente vista a partir de la página actual DEL RENDER, con lo
 que su propio avance reiniciaba el temporizador y la rotación se quedaba
 oscilando entre las dos primeras vistas sin llegar nunca a la tercera.
 
+**Fase 9.** El plan pedía el contador del Topbar sin decir de dónde saca el
+dato; se resolvió con un hook nuevo (`lib/iconics/useAlarmCount.js`) y no
+reutilizando `Demo-EVA/data/alarmas.js`, porque el Topbar vive por FUERA de
+toda sección y no puede depender del catálogo de puntos de una instalación
+concreta — la separación domain/infra que ya regía el resto de `lib/iconics/`
+se sostuvo también aquí.
+
+Y un desvío del propio texto del plan, no sólo del código: proponía pintar el
+badge y el botón "Reconocer" implícitamente en un color de estado (el primer
+borrador usaba `variant="success"`, verde). La *Regla del Color con
+Significado* de DESIGN.md reserva verde/ámbar/coral para una señal EN ese
+estado ahora mismo — un conteo de la última hora no lo es, puede estar ya
+resuelto, y "reconocer" es una acción, no una declaración de salud. Los dos
+quedaron en `accent` (azul), que la propia regla marca como su única
+excepción: "lo accionable, no lo saludable". Se corrigió antes de que
+`design:detect` u otra revisión tuviera que atraparlo.
+
+La tensión de la §4 se resolvió reescribiendo el Don't de DESIGN.md que decía
+"el backend es de solo lectura": dejó de ser cierto con `controlar_bomba`
+(Plan 12) y ahora con el *ack* de alarmas, así que la regla pasó a decir lo
+que de verdad protege — no que no haya escritura, sino que ninguna escritura
+se ofrezca sin que `readOnly` de `/api/health` la confirme primero.
+
 ## 6 · Checklist de revisión en pantalla
 
 Nada de esto lo confirma una prueba automática. Necesita el servidor ICONICS
@@ -578,4 +603,6 @@ avería del tablero.
 - [ ] `?muro=1` (escala 1.6x por defecto) se lee a tres metros de verdad; con `vistas=eva-inicio,eva-planta,eva-maqueta&rotarCada=30` rota sin quedarse pegado a las dos primeras.
 - [ ] Las alarmas coinciden con las que muestra GENESIS64 en la misma ventana.
 - [ ] Con `ICONICS_READ_ONLY=true` no hay botón de reconocer por ninguna parte.
+- [ ] El número del badge del Topbar coincide con los eventos de la última hora que muestra la vista Alarmas, y desaparece (no queda en "0") si se corta la red.
+- [ ] Las columnas de la vista Alarmas —punto, mensaje— traen dato real de GENESIS64 y no sólo `eventId`/`startDate`; si vienen vacías, confirmar el nombre real del campo contra la respuesta cruda del servidor.
 - [ ] Con el simulador de daltonismo del navegador, verde y ámbar se distinguen.
