@@ -190,8 +190,9 @@ export function desbloquearVoz(saludo) {
     aplicarVoz(frase)
     if (!saludo) frase.volume = 0
 
-    window.speechSynthesis.speak(frase)
+    // El detector se arma ANTES de hablar: ver su cabecera.
     avisarSiSeQuedaMuda(frase)
+    window.speechSynthesis.speak(frase)
   } catch {
     // Si el navegador se queja, se seguirá intentando al hablar de verdad.
   }
@@ -266,12 +267,12 @@ export async function hablar(texto) {
     frase.addEventListener('end', terminar)
     frase.addEventListener('error', terminar)
 
-    window.speechSynthesis.speak(frase)
-
     // También aquí, y no sólo en el saludo: si una RESPUESTA se descarta en
     // silencio, el operador se queda esperando una voz que no va a llegar y
-    // sin nada en pantalla que lo explique.
+    // sin nada en pantalla que lo explique. Antes de `speak`: ver su cabecera.
     avisarSiSeQuedaMuda(frase)
+
+    window.speechSynthesis.speak(frase)
   })
 }
 
@@ -320,6 +321,17 @@ export function alQuedarseMuda(manejador) {
 }
 
 function avisarSiSeQuedaMuda(frase) {
+  /*
+   * SE LLAMA ANTES DE `speak()`, y el orden no es un detalle.
+   *
+   * `speak()` puede despachar `start` de inmediato. Registrando el oyente
+   * después, ese evento ya ha pasado y nunca se recoge: `empezo` se queda en
+   * `false` y se avisa de una mudez que no existe.
+   *
+   * Es el segundo falso positivo seguido de esta función, y los dos por lo
+   * mismo — dar por supuesto cuándo ocurren los eventos del navegador en vez
+   * de escucharlos desde antes de provocarlos.
+   */
   let empezo = false
   frase.addEventListener('start', () => { empezo = true })
 
@@ -338,11 +350,22 @@ function avisarSiSeQuedaMuda(frase) {
   setTimeout(() => {
     if (empezo) return
 
+    /*
+     * El aviso lleva los DATOS, no sólo un consejo.
+     *
+     * Un mensaje genérico manda a revisar el volumen y la pestaña, y cuando no
+     * es ninguna de las dos cosas deja a quien lo lee sin nada. Diciendo qué
+     * voz se intentó usar y cuántas hay, el propio mensaje distingue las tres
+     * averías posibles sin tener que abrir la consola del navegador.
+     */
     const voces = window.speechSynthesis.getVoices()
+    const usada = frase.voice ? `${frase.voice.name} [${frase.voice.lang}]` : 'ninguna (voz del sistema)'
+
     onVozMuda?.(
       voces.length
-        ? 'El navegador no reprodujo la voz. Comprueba el volumen del sistema y que la ' +
-          'pestaña no esté silenciada (clic derecho en la pestaña → «Activar sonido»).'
+        ? `La voz no arrancó. Se intentó con: ${usada}. Hay ${voces.length} voces disponibles. ` +
+          'Comprueba el volumen de Chrome en el mezclador de Windows y que la pestaña no esté ' +
+          'silenciada.'
         : 'Este navegador no encuentra ninguna voz instalada, así que no puede hablar. ' +
           'Prueba con otro navegador, o reinícialo: Chrome a veces pierde la lista de voces.'
     )
