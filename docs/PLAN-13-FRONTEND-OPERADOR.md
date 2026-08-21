@@ -6,13 +6,14 @@
 > forma de llevarse nada a un parte. F10 (presupuesto de rendimiento 3D) queda
 > fuera por decisión del usuario.
 
-> **ESTADO** — plan escrito, sin empezar. Rama de trabajo:
-> `integracion/moises-gustavo`.
+> **ESTADO (21-ago-2026)** — en ejecución. Rama de trabajo: **`Moises2`**
+> (no `integracion/moises-gustavo`: esa rama quedó cerrada al fusionarse en
+> el Plan 12; el trabajo de este plan sigue en la rama activa del usuario).
 >
 > | Fase | Entregable | Mejora | Verificación |
 > |---|---|---|---|
-> | 0 | `estadoDelDato.js`: una sola derivación de frescura y vacíos | base de F2+F9 | pruebas unitarias puras |
-> | 1 | Arnés de accesibilidad + barrido de las cuatro vistas | **F6** | `axe` en la suite, sin violaciones serias |
+> | 0 ✅ | `estadoDelDato.js`: una sola derivación de frescura y vacíos | base de F2+F9 | 17 pruebas unitarias puras |
+> | 1 ✅ | Arnés de accesibilidad + landmarks + foco visible + color no exclusivo | **F6** | `axe` en la suite (0 violaciones graves) + 7 pruebas |
 > | 2 | La edad del dato, en la propia cifra | **F2** | pruebas con temporizadores falsos |
 > | 3 | Los tres vacíos, distinguidos | **F9** | una prueba por caso |
 > | 4 | Banda de umbral dibujada y rotulada | **F4** | pruebas sobre `GraficaHistoria` |
@@ -21,6 +22,9 @@
 > | 7 | El rango en la URL | **F7** | `navegacion.test.jsx` ampliado |
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
+>
+> Suite: **229/235** en verde (era 205 al escribir este plan). Ver §5 para
+> los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
 
@@ -90,7 +94,7 @@ cd react-dashboard && npm run design:detect   # el detector del sistema visual
 
 ## 3 · Fases
 
-### Fase 0 — Una sola verdad sobre el estado del dato
+### Fase 0 — Una sola verdad sobre el estado del dato ✅
 
 **Por qué primero.** F2 y F9 son la misma pregunta contestada en dos sitios
 («¿me puedo fiar de este número?») y si cada componente la responde por su
@@ -98,23 +102,31 @@ cuenta acabarán discrepando: el tile diciendo «en banda» mientras la gráfica
 «sin conexión». Se resuelve una vez, en una función pura, y se consume desde
 todas partes.
 
-**Qué se crea.** `Demo-EVA/data/estadoDelDato.js`, sin React, con una función
-que recibe lo que ya existe —`lastUpdated`, `error` y `loading` de
-`useSistemaAgua`, más el `motivo` de `useSerieHistorica`— y devuelve un estado de
-este conjunto cerrado:
+**Qué se creó.** `Demo-EVA/data/estadoDelDato.js`, sin React, con DOS funciones
+—no una sola con seis estados, como decía la versión original de este plan—
+porque «¿me fío del valor en vivo?» y «¿me fío de la serie histórica?» resultaron
+preguntas con entradas distintas y no una sola tabla:
+
+`frescuraDe({ receivedAt, stale, ahora })`, para el valor en vivo:
 
 | Estado | Cuándo | Qué se hace en pantalla |
 |---|---|---|
-| `fresco` | menos de dos ciclos de sondeo | nada, se pinta normal |
-| `envejecido` | entre dos ciclos y un minuto | el valor se atenúa, aparece su edad |
+| `sinDato` | nunca ha llegado una lectura de este punto | hueco explícito |
+| `fresco` | dentro del ciclo de sondeo normal | nada, se pinta normal |
+| `envejecido` | el motor de sondeo ya lo marcó `stale` | el valor se atenúa, aparece su edad |
 | `congelado` | más de un minuto sin refresco | el valor **se sustituye** por su edad |
-| `sinDato` | hay conexión, la señal no trae valor o su calidad es mala | hueco explícito |
-| `sinHistoriador` | la señal no tiene serie propia (`historizado: false`) | hecho del catálogo, no fallo |
-| `sinConexion` | `error` del sondeo | causa y qué hacer |
 
-La frontera de `congelado` es deliberada: `pollingEngine.js` sondea cada 15 s y
-ante fallos aplica *backoff* exponencial, así que un valor de más de un minuto
-significa que ya han fallado varios ciclos, no que haya habido un tropiezo.
+`estadoHistorial({ motivo, error, loading, datos, minimo })`, para la serie:
+`ok` (hay datos, aunque `loading` siga en `true` — ver más abajo) ·
+`cargando` · `sinDato` (el historiador respondió vacío) · `sinHistoriador`
+(`motivo` trae `SIN_SERIE`) · `sinConexion` (`error`).
+
+La frontera de `congelado` no se calcula por ciclos: se reutiliza el `stale`
+que YA calcula `pollingEngine.js` (`staleAfterCycles`) para "envejecido", y se
+añade un umbral duro de un minuto de reloj para "congelado" — independiente de
+la cadencia de sondeo de la sección (3 s en Demo EVA, no los 15 s por defecto
+del motor genérico), que sí podría cambiar sin que la regla del minuto tenga
+que moverse con ella.
 
 **Decisión que se toma aquí.** `sinDato` y `sinHistoriador` son distintos y
 tienen que seguir siéndolo: el primero puede ser una avería de la sonda, el
@@ -128,39 +140,52 @@ renderizar algo para probarse, está en el sitio equivocado.
 
 ---
 
-### Fase 1 — F6 · Accesibilidad: primero el arnés, luego el barrido
+### Fase 1 — F6 · Accesibilidad: primero el arnés, luego el barrido ✅
 
 **Por qué tan pronto.** Si va al final, las ocho fases anteriores generan deuda
 que hay que repasar dos veces. Puesto aquí, cada fase siguiente se comprueba
 sola.
 
-**El arnés.** `axe-core` como dependencia de desarrollo —**no** entra en el
-bundle de planta— con un ayudante en `test/setup.js` que audita un árbol
-renderizado y falla ante violaciones de gravedad *serious* o *critical*. Es la
-diferencia entre «accesibilidad» como intención y como prueba que se pone roja.
+**El arnés, tal como se construyó.** `axe-core` directo como dependencia de
+desarrollo (no `vitest-axe`: sólo hacía falta el runner, no su matcher de
+todo-o-nada, y así son cinco dependencias transitivas menos). El ayudante vive
+en `test/a11y.js`, **no** en `test/setup.js`: no es un relleno de entorno como
+`ResizeObserver`, es una aserción, y una vista sin
+`import { auditarAccesibilidad }` debe seguir siendo una vista sin comprobar,
+no una que pasa por descuido de un arnés global. Sólo falla ante violaciones
+*serious*/*critical* — medido, las reglas de landmark son *moderate* y un
+filtro por gravedad las habría dejado pasar en silencio, así que los
+landmarks se comprueban con una aserción propia, aparte del arnés.
 
-**El barrido.** Las cuatro vistas que hoy tienen **cero** atributos `aria-`:
-`PlantaEva.jsx`, `InicioEva.jsx`, `DetalleActivo.jsx` y `AssetsEva.jsx`.
+**El barrido, con lo que resultó ser cierto y lo que no.** La premisa de
+partida —cuatro vistas con cero `aria-`— resultó ser la métrica equivocada:
+medido con axe, las tres primeras ya tenían cero violaciones graves (ver §5).
+Lo que sí hacía falta:
 
-1. **Landmarks.** Un `<main>` por vista, `<nav>` en el Sidebar, encabezados en
-   orden sin saltar niveles. Hoy un lector de pantalla recorre el tablero como
-   una sopa de `div`.
-2. **Valores que cambian solos.** El sondeo reescribe cifras cada 15 s sin
-   avisar a nadie. `aria-live="polite"` **acotado al valor**, nunca al panel
-   entero — el error a evitar es el que ya se resolvió en el asistente: envolver
-   demasiado hace que el lector cante el contador sin parar.
-3. **Foco visible en todo lo pulsable.** Ya existe el anillo de foco del sistema
-   (`0 0 0 3px accent-soft`); falta aplicarlo fuera de los campos.
-4. **El color no puede ser el único portador del estado.** Ésta es la de fondo.
-   Verde, ámbar y coral son hoy la única diferencia entre «en banda» y «en
-   aviso», y con deuteranopía —que es la carencia frecuente— verde y ámbar son
-   el mismo tile. Se añade una **forma** junto al color: un glifo distinto por
-   banda, o el grosor del trazo de `BarraBanda`. El propio `DESIGN.md` avisa de
-   que la separación ámbar/verde es la más frágil de la paleta; esto la deja de
-   dar por buena.
+1. **Landmarks.** No cuatro `<main>`, uno: el `eva-page-shell` de `App.jsx` es
+   el envoltorio común de toda ruta. Junto con `<header>` en `Topbar.jsx` y el
+   `<aside>`/`<nav>` que `Sidebar.jsx` ya tenía, cierra el juego completo.
+2. **Valores que cambian solos.** Deliberadamente **no** se tocó. Un
+   `aria-live` en cada cifra que refresca cada 3 s repetiría el antipatrón que
+   el propio `Asistente.jsx` ya evita con su estado — bombardear con anuncios
+   cada ciclo. Lo que merece anunciarse son TRANSICIONES de estado
+   (fresco→envejecido→congelado, conexión→sin conexión), y esas transiciones
+   son justo lo que definen las Fases 2 y 9. Queda para entonces.
+3. **Foco visible.** Se extendió `.metric-card:focus-visible` (ya existía) a
+   `.nav-item` y `.app-btn`, mismos valores del token de foco — no una
+   convención nueva.
+4. **El color no puede ser el único portador del estado.** Real, pero más
+   preciso de lo dicho: no es "verde y ámbar el mismo tile" en general —cada
+   `PuntoEstado` del tablero ya iba pegado a su `corto`—, es que `BandaValor` y
+   `BarraBanda` (la marca de posición dentro de la banda) eran la única
+   excepción. Se cerró con el mismo par punto+texto que usa el resto del
+   sistema, no con un glifo nuevo. Ver §5 para la trampa que tuvo (`banda`
+   contra `estado`).
 
-**Verificación.** Las cuatro vistas pasan `axe` sin violaciones serias; pruebas
-explícitas de que el estado de una señal se puede leer sin color; suite completa
+**Verificación.** Las cuatro vistas pasan `axe` sin violaciones graves; dos
+pruebas explícitas de que el `corto` del estado acompaña a la marca de banda;
+una prueba de que `<main>`/`<header>`/`<nav>` aparecen exactamente una vez.
+Suite completa
 en verde.
 
 ---
@@ -408,7 +433,36 @@ que estén decididas antes de la fase que las toca:
 | 2 | El modo muro necesita texto por encima del *techo de 16px* | 8 | Escalar la raíz en `rem`, no subir los tokens; si no basta, excepción documentada |
 | 3 | `DESIGN.md` prohíbe affordances de escritura, y el *ack* de alarmas es una | 9 | Reescribir la regla: la escritura existe, condicionada a `readOnly` y anunciada |
 
-## 5 · Checklist de revisión en pantalla
+## 5 · Lo que la ejecución corrigió de la propia auditoría
+
+Cada fase empezó leyendo el código antes de escribirlo. Tres correcciones
+salieron de ahí, ninguna prevista al planear:
+
+**Fase 0.** No hacía falta construir la frescura desde cero: `receivedAt` y
+`stale` ya los calcula `pollingEngine.js` (`staleAfterCycles`) y ya viajan en
+cada señal desde `shared/eva/sistema.js` — sólo que nada en pantalla los leía.
+Y `fmtAntiguedad()` para el texto de edad ya existe en `lib/format.js`; de
+paso quedó anotado que hay OTRO formateador de "hace N s" casi igual, local a
+`base.jsx` (`useTiempoRelativo`), con umbrales distintos (2 s vs 5 s) — para
+reconciliar en la Fase 2, sin crear un tercero.
+
+**Fase 1, sobre F6.** "Cero atributos `aria-`" no era la señal correcta:
+medido con axe-core contra `InicioEva`/`PlantaEva`/`AssetsEva`, las tres
+tenían **cero violaciones graves** ya — los botones tenían nombre accesible
+por texto visible o `title`, sin necesitar `aria-*` explícito. Y el hallazgo
+de landmarks no pedía tocar cuatro vistas: `Sidebar` ya era `<aside>` +
+`<nav>`; sólo faltaban un `<main>` (en `App.jsx`) y un `<header>` (en
+`Topbar.jsx`), el envoltorio común de toda ruta — dos archivos, no cuatro.
+
+**Fase 1, el hallazgo que sí era real, y más preciso de lo dicho.**
+`BandaValor` y `BarraBanda` sí tenían el color como único portador de su
+estado — a diferencia de cada `PuntoEstado` del resto del tablero, que
+siempre va con su `corto` al lado. La reparación tuvo una trampa: el texto
+tiene que describir `senal.banda`, no `senal.estado` — son cosas distintas a
+propósito (una señal `en reposo` puede seguir fuera de banda) y usar
+`estado` habría hecho que la marca dijera "En reposo" junto a un color coral.
+
+## 6 · Checklist de revisión en pantalla
 
 Nada de esto lo confirma una prueba automática. Necesita el servidor ICONICS
 arriba — y recordar que tras reiniciar, GENESIS64 tarda varios minutos en
