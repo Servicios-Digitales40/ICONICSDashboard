@@ -20,10 +20,10 @@
 > | 5 ✅ | `lib/exportar.js`: CSV + PNG, sólo en el Detalle | **F5** | 18 pruebas, PNG probado hasta donde jsdom deja |
 > | 6 ✅ | `GraficaComparada` + `lib/comparar.js` (alineado por tolerancia) | **F3** | 18 pruebas, contra el simulador real |
 > | 7 ✅ | `leerRangoDeUrl` + re-sync ante popstate + `parametrosDeRango` | **F7** | 15 pruebas, incluido el flujo completo del calendario |
-> | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
+> | 8 ✅ | `?muro=1`: sin cromo, `zoom` (no `rem`), rotación opcional | **F8** | 20 pruebas + revisión en pantalla pendiente |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **297/303** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **317/323** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -346,7 +346,7 @@ defecto sin lanzar.
 
 ---
 
-### Fase 8 — F8 · Modo muro
+### Fase 8 — F8 · Modo muro ✅
 
 **El escenario.** La densidad actual está calculada para un portátil a 60 cm. El
 destino real es un monitor colgado a tres metros, sin teclado ni ratón, encendido
@@ -549,6 +549,18 @@ navegaba con `{ activo: id }` a secas desde antes de este plan, y como
 silencio. `parametrosDeRango()` se añadió a los tres sitios que navegan, no
 sólo a los dos que ya escribían el rango a propósito.
 
+**Fase 8.** El plan pedía escalar la raíz en `rem`. Medido antes de escribir
+nada: 199 declaraciones de `fontSize` en todo `src/`, ninguna en `rem`/`em`,
+sin un `html { font-size }` del que partir — escalar la raíz no habría
+movido un solo píxel. Se usó `zoom` en su lugar, y salieron dos bugs reales
+que sólo una prueba que afirmara el resultado (no sólo "no revienta") pudo
+atrapar: React le añade "px" a un `zoom` numérico —inválido, y el estilo se
+descarta en silencio, en un navegador real igual que en la prueba— así que
+hace falta pasarlo como cadena; y la primera versión de la rotación
+calculaba la siguiente vista a partir de la página actual DEL RENDER, con lo
+que su propio avance reiniciaba el temporizador y la rotación se quedaba
+oscilando entre las dos primeras vistas sin llegar nunca a la tercera.
+
 ## 6 · Checklist de revisión en pantalla
 
 Nada de esto lo confirma una prueba automática. Necesita el servidor ICONICS
@@ -563,7 +575,7 @@ avería del tablero.
 - [ ] Un PNG descargado se abre con fondo sólido (no transparente) y el título dentro de la imagen — es la parte que ninguna prueba automática pudo confirmar (jsdom no tiene canvas).
 - [ ] La gráfica comparada se lee bien en los tres temas, incluido Mitsubishi.
 - [ ] Un enlace copiado del detalle abre el mismo activo **y el mismo rango**.
-- [ ] El modo muro se lee a tres metros y no tiene nada pulsable por accidente.
+- [ ] `?muro=1` (escala 1.6x por defecto) se lee a tres metros de verdad; con `vistas=eva-inicio,eva-planta,eva-maqueta&rotarCada=30` rota sin quedarse pegado a las dos primeras.
 - [ ] Las alarmas coinciden con las que muestra GENESIS64 en la misma ventana.
 - [ ] Con `ICONICS_READ_ONLY=true` no hay botón de reconocer por ninguna parte.
 - [ ] Con el simulador de daltonismo del navegador, verde y ámbar se distinguen.
