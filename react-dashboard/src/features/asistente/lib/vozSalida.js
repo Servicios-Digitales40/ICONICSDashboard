@@ -226,11 +226,32 @@ function pronunciar(texto, { volumen, alTerminar } = {}) {
    * está hablando, y volvería a grabarse a sí mismo.
    */
   let avisado = false
+  let corteFinal = null
   const terminado = () => {
     if (avisado) return
     avisado = true
+    clearTimeout(corteFinal)
     alTerminar?.()
   }
+
+  /*
+   * Corte por tiempo, SIEMPRE, arranque o no arranque la frase.
+   *
+   * Chrome no siempre emite `end`. Si quien espera ese aviso es el modo
+   * llamada —que abre el micrófono cuando el saludo acaba— un `end` que no
+   * llega deja el micrófono cerrado para siempre: el botón nunca se pone en
+   * rojo y hablar no hace nada.
+   *
+   * Es justo lo que pasó al secuenciar el saludo con la escucha. Antes no se
+   * notaba porque nadie esperaba el final del saludo.
+   *
+   * El margen se estima sobre la longitud del texto —unos 12 caracteres por
+   * segundo a esta velocidad—, con holgura pero SIN pasarse: cortar antes de
+   * tiempo solaparía la voz con el micrófono, que es el problema que se venía
+   * de arreglar, pero un margen enorme convierte el fallo en una espera muerta
+   * mirando un botón que no reacciona. Para «Te escucho» son ~3 s.
+   */
+  corteFinal = setTimeout(terminado, (texto.length / 12) * 1000 * 1.5 + 2000)
 
   const intentar = (conVoz) => {
     let cancelado = false
