@@ -16,7 +16,7 @@
  * servidor. Sin ir pintando los estados y los tokens conforme llegan, la
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, motivoSinMicrofono, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
@@ -476,10 +476,28 @@ export function useDictado() {
     }
   }, [transcribir]);
 
-  return {
-    disponible, grabando, transcribiendo, error, impedimento,
-    empezar, detener, cancelar, desdeArchivo,
-  };
+  /*
+   * Memoizado, y no es una optimización: es corrección.
+   *
+   * Devolver un objeto literal hace que cambie de identidad en CADA render, y
+   * cualquier `useEffect` o `useCallback` que dependa de él se considera
+   * obsoleto continuamente. Eso ya rompió el modo llamada de la peor forma
+   * posible: la limpieza de un efecto —que apagaba el micrófono— se ejecutaba
+   * en cada repintado, y como el nivel de voz repinta diez veces por segundo,
+   * la grabación se cancelaba a sí misma sin parar. La pantalla decía «Te
+   * escucho» y no pasaba nada nunca.
+   *
+   * Con la identidad estable, quien dependa de este objeto sólo reacciona
+   * cuando algo cambia de verdad.
+   */
+  return useMemo(
+    () => ({
+      disponible, grabando, transcribiendo, error, impedimento,
+      empezar, detener, cancelar, desdeArchivo,
+    }),
+    [disponible, grabando, transcribiendo, error, impedimento,
+      empezar, detener, cancelar, desdeArchivo]
+  );
 }
 
 /**
@@ -606,12 +624,38 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     dictado.cancelar();
   }, [dictado]);
 
-  // Desmontar con el modo encendido dejaría el micrófono abierto y la voz
-  // hablando sola sobre una pantalla que ya no existe.
+  /*
+   * Sólo al DESMONTAR, nunca antes.
+   *
+   * ── EL FALLO QUE ESTO ARREGLA ──────────────────────────────────────
+   *
+   * Este efecto dependía de `apagar`, y `apagar` depende de `dictado`, que es
+   * un objeto literal NUEVO en cada render. Resultado: React consideraba el
+   * efecto obsoleto en cada repintado y ejecutaba su limpieza — o sea,
+   * `apagar()`— continuamente.
+   *
+   * Y el modo llamada repinta diez veces por segundo mientras escucha, porque
+   * el nivel del micrófono es estado. Así que el micrófono se cancelaba a sí
+   * mismo una y otra vez: la barra decía «Te escucho», el nivel se movía, y no
+   * pasaba nada nunca porque ninguna grabación llegaba a durar lo suficiente
+   * para detectar un silencio.
+   *
+   * La limpieza se queda con las dependencias vacías —corre sólo al
+   * desmontar— y llama a `apagar` por referencia para no capturar una versión
+   * vieja.
+   */
+  const apagarRef = useRef(null);
+  apagarRef.current = apagar;
+
   useEffect(() => {
     vivoEnLlamada.current = true;
-    return () => { vivoEnLlamada.current = false; apagar(); };
-  }, [apagar]);
+    return () => {
+      vivoEnLlamada.current = false;
+      // Desmontar con el modo encendido dejaría el micrófono abierto y la voz
+      // hablando sola sobre una pantalla que ya no existe.
+      apagarRef.current?.();
+    };
+  }, []);
 
   /**
    * Escucha un turno y lo cierra solo cuando el que habla se calla.
@@ -694,11 +738,6 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   // arrancar la grabación— llame siempre a la versión actual.
   const cerrarTurnoRef = useRef(null);
   cerrarTurnoRef.current = cerrarTurno;
-
-  // Por referencia, para poder apagar desde `cerrarTurno` sin que las dos
-  // funciones dependan la una de la otra.
-  const apagarRef = useRef(null);
-  apagarRef.current = apagar;
 
   const encender = useCallback(() => {
     if (!disponible) return;
