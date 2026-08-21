@@ -16,14 +16,14 @@
 > | 1 ✅ | Arnés de accesibilidad + landmarks + foco visible + color no exclusivo | **F6** | `axe` en la suite (0 violaciones graves) + 7 pruebas |
 > | 2 ✅ | La edad del dato, en `StatSenal`/`FilaSenal`/`TarjetaVariable` | **F2** | `useAhora` + 6 pruebas de cableado, `createSenal()` real |
 > | 3 ✅ | `metaPorClave` (error real) + `GraficaHistoria`/`PanelTendencia` distinguen sinConexion | **F9** | 9 pruebas, `errorPeticion` nuevo en el simulador |
-> | 4 | Banda de umbral dibujada y rotulada | **F4** | pruebas sobre `GraficaHistoria` |
+> | 4 ✅ | `ReferenceArea` + insignia "banda estimada, sin confirmar" | **F4** | 5 pruebas, proxy vía la insignia (Recharts no pinta SVG bajo jsdom) |
 > | 5 | Exportar CSV y PNG | **F5** | contenido y nombre del archivo |
 > | 6 | Dos señales, eje doble | **F3** | pruebas sobre la gráfica comparada |
 > | 7 | El rango en la URL | **F7** | `navegacion.test.jsx` ampliado |
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **248/254** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **253/259** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -244,7 +244,7 @@ si no puede, esa parte se construye aquí.
 
 ---
 
-### Fase 4 — F4 · La banda de umbral, dibujada y rotulada como lo que es
+### Fase 4 — F4 · La banda de umbral, dibujada y rotulada como lo que es ✅
 
 **El problema.** El estado se comunica por color de tile, pero `GraficaHistoria`
 no dibuja dónde están el aviso y el crítico. Se ve una línea subir sin saber
@@ -493,6 +493,21 @@ historia —`readSerie()` no miraba `chaos.errorPeticion`, sólo `read()` lo
 hacía—, con lo que "sin conexión" ahí sólo se podía ensayar desenchufando el
 puente de verdad. Las dos cosas se corrigieron antes de tocar el mensaje que
 se ve en pantalla.
+
+**Fase 4.** El plan pedía la banda RAYADA para distinguirla de un límite
+medido. Al revisar antes de escribir, `BarraBanda`/`BandaValor` ya dibujan
+exactamente esta banda en todo el resto del tablero, siempre con el mismo
+relleno suave (`t.successSoft`) — un rayado habría sido un vocabulario
+visual nuevo justo donde ya hay uno consistente. Se usó el mismo relleno, y
+la advertencia de "sin confirmar" quedó en el TEXTO de la insignia, que es
+lo que de verdad hacía falta decir y lo que el rayado sólo insinuaba.
+
+Y una limitación real de las pruebas, no del código: confirmado con una
+prueba de humo, Recharts no llega a pintar ningún `<svg>` bajo jsdom sin
+`ResizeObserver` real (`test/setup.js` ya lo avisaba para las gráficas en
+general). El `<ReferenceArea>` no es inspeccionable por DOM; las pruebas
+verifican en su lugar la insignia "banda estimada", que cuelga del mismo
+booleano y es una superficie HTML normal.
 
 ## 6 · Checklist de revisión en pantalla
 
