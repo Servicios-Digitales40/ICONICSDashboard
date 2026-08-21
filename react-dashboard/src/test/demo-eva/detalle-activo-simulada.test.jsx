@@ -98,6 +98,121 @@ describe("Detalle de activo en modo simulado", () => {
     expect(pestañas.map((p) => p.textContent)).toEqual(["Tanque", "Bombeo", "Distribución", "Eléctrico"]);
 
     fireEvent.click(screen.getByRole("tab", { name: "Bombeo" }));
-    expect(onNavigate).toHaveBeenCalledWith("eva-detalle", { activo: "bombeo" });
+    // Plan 13 F7: el rango viaja también, para que cambiar de pestaña no lo
+    // borre de la URL — "vivo" es el valor por defecto sin nada elegido aún.
+    expect(onNavigate).toHaveBeenCalledWith("eva-detalle", { activo: "bombeo", rango: "vivo" });
+  });
+});
+
+describe("Plan 13 F7: el rango sobrevive en la URL", () => {
+  it("un enlace con ?rango=ayer abre ya con «Ayer» seleccionado, no en Tiempo real", async () => {
+    cortarLaRed();
+    montar({ activo: "tanque", rango: "ayer" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ayer" })).toBeTruthy(), { timeout: 4_000 });
+    expect(screen.getByRole("button", { name: "Ayer" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("un enlace con rango personalizado reconstruye las dos fechas, sin volver a preguntar", async () => {
+    cortarLaRed();
+    montar({ activo: "tanque", rango: "personalizado", desde: "2026-08-10", hasta: "2026-08-12" });
+
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /Personalizado/ }).getAttribute("aria-pressed")).toBe("true"),
+      { timeout: 4_000 }
+    );
+  });
+
+  it("un ?rango= desconocido no revienta la vista: cae en Tiempo real", async () => {
+    cortarLaRed();
+    montar({ activo: "tanque", rango: "el-mes-pasado" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tiempo real" })).toBeTruthy(), { timeout: 4_000 });
+    expect(screen.getByRole("button", { name: "Tiempo real" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("personalizado sin desde/hasta, o con fechas que no parsean, cae en Tiempo real igual", async () => {
+    cortarLaRed();
+    montar({ activo: "tanque", rango: "personalizado", desde: "no-es-una-fecha", hasta: "tampoco" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tiempo real" })).toBeTruthy(), { timeout: 4_000 });
+    expect(screen.getByRole("button", { name: "Tiempo real" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("elegir «Ayer» escribe el rango en la URL, junto con el activo", async () => {
+    cortarLaRed();
+    const onNavigate = vi.fn();
+    montar({ activo: "tanque" }, onNavigate);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Ayer" })).toBeTruthy(), { timeout: 4_000 });
+    fireEvent.click(screen.getByRole("button", { name: "Ayer" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("eva-detalle", { activo: "tanque", rango: "ayer" });
+  });
+
+  it("cambiar de pestaña con «Ayer» ya elegido conserva el rango — no lo resetea a vivo", async () => {
+    cortarLaRed();
+    const onNavigate = vi.fn();
+    montar({ activo: "tanque", rango: "ayer" }, onNavigate);
+
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Bombeo" })).toBeTruthy(), { timeout: 4_000 });
+    fireEvent.click(screen.getByRole("tab", { name: "Bombeo" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("eva-detalle", { activo: "bombeo", rango: "ayer" });
+  });
+
+  it("aplicar un rango personalizado desde el calendario escribe desde/hasta como texto en la URL", async () => {
+    cortarLaRed();
+    const onNavigate = vi.fn();
+    montar({ activo: "tanque" }, onNavigate);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Personalizado/ })).toBeTruthy(), { timeout: 4_000 });
+    fireEvent.click(screen.getByRole("button", { name: /Personalizado/ }));
+
+    const hoy = new Date();
+    const diaValido = (delta) => {
+      const d = new Date(hoy);
+      d.setDate(d.getDate() - delta);
+      return d.getDate() > 3 ? d : null;
+    };
+    const diaFin = diaValido(0) ?? hoy;
+    const diaInicio = diaValido(2) ?? hoy;
+
+    fireEvent.click(await screen.findByRole("button", { name: String(diaInicio.getDate()) }));
+    fireEvent.click(screen.getByRole("button", { name: String(diaFin.getDate()) }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Aplicar" }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("eva-detalle", {
+      activo: "tanque",
+      rango: "personalizado",
+      // "2026-08-19", nunca un objeto Date: useNavegacion lo descartaría de la URL.
+      desde: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      hasta: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    });
+  });
+
+  it("«atrás»/«adelante» del navegador (params nuevos, mismo montaje) re-sincroniza el rango", async () => {
+    // `Shell` no desmonta `DetalleActivo` al cambiar sólo los parámetros
+    // (su `key` es `nav.page`) — así que un popstate real llega como un
+    // rerender con `params` distintos, no como un montaje nuevo.
+    cortarLaRed();
+    const { rerender } = montar({ activo: "tanque", rango: "vivo" });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Tiempo real" })).toBeTruthy(), { timeout: 4_000 });
+    expect(screen.getByRole("button", { name: "Tiempo real" }).getAttribute("aria-pressed")).toBe("true");
+
+    rerender(
+      <ThemeProvider>
+        <DataSourceProvider>
+          <DetalleActivo params={{ activo: "tanque", rango: "ayer" }} onNavigate={() => {}} />
+        </DataSourceProvider>
+      </ThemeProvider>
+    );
+
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: "Ayer" }).getAttribute("aria-pressed")).toBe("true"),
+      { timeout: 4_000 }
+    );
   });
 });
