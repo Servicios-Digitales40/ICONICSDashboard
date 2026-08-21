@@ -5,8 +5,9 @@
  * acomodos comparados en vivo se quedó uno, pero la verdad sobre el origen
  * del dato es la misma independientemente de cuál hubiera ganado.
  */
+import { useRef } from "react";
 import { Area, AreaChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { History, Radio } from "lucide-react";
+import { FileSpreadsheet, History, ImageDown, Radio } from "lucide-react";
 
 import { ChartTooltip } from "@/components/charts/index.js";
 import { hasValue } from "@shared/valores.js";
@@ -16,6 +17,7 @@ import { MONO, PuntoEstado } from "../base.jsx";
 import { estadoInfo } from "../../domain/estado.js";
 import { HISTORIAL, estadoHistorial } from "../../data/estadoDelDato.js";
 import { PROVISIONALES, UMBRALES } from "../../domain/umbrales.js";
+import { datosACSV, descargarCSV, descargarPNG, nombreArchivo } from "../../lib/exportar.js";
 
 /**
  * Insignia que declara el ORIGEN de una serie. Nunca se deja a que el lector
@@ -101,7 +103,10 @@ export function TooltipHistoria(props) {
  * animación de Recharts se repetiría en cada actualización, que es
  * exactamente el parpadeo que ya se evitó a propósito en `tiles.jsx`.
  */
-export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark, alto = 150, delay = 0 }) {
+export function GraficaHistoria({
+  senal, datos, cargando, enVivo, error, exportable = false, t, dark, alto = 150, delay = 0,
+}) {
+  const svgRef = useRef(null);
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
 
@@ -152,8 +157,19 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark
   const bandaY2 = u?.avisoMax ?? senal.escala?.max;
   const hayBanda = u && hasValue(bandaY1) && hasValue(bandaY2);
 
+  // El título viaja DENTRO del PNG: pegado en un correo o un parte, la
+  // imagen pierde su nombre de archivo, y el título es la única procedencia
+  // que le queda. Ver la cabecera de `lib/exportar.js`.
+  const tituloExportado = `${senal.label ?? senal.corto}${senal.unidad ? ` (${senal.unidad})` : ""}`;
+
+  const alExportarCSV = () => descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos));
+  const alExportarPNG = () => {
+    const svg = svgRef.current?.querySelector("svg");
+    if (svg) descargarPNG(svg, nombreArchivo(senal, datos, "png"), { titulo: tituloExportado, fondo: t.panel });
+  };
+
   return (
-    <div className="grafica-revela" style={{ position: "relative", animationDelay: `${delay}s` }}>
+    <div ref={svgRef} className="grafica-revela" style={{ position: "relative", animationDelay: `${delay}s` }}>
       <ResponsiveContainer width="100%" height={alto}>
         <AreaChart data={filas} margin={{ top: 6, right: 6, left: -28, bottom: 0 }}>
           <XAxis
@@ -204,9 +220,33 @@ export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark
           banda estimada, sin confirmar
         </span>
       )}
+      {exportable && (
+        <div style={{ position: "absolute", bottom: 2, right: 2, display: "flex", gap: 4 }}>
+          <button
+            type="button" onClick={alExportarCSV}
+            title={`Descargar ${senal.corto} como CSV`} aria-label={`Descargar ${senal.corto} como CSV`}
+            style={botonExportar(t)}
+          >
+            <FileSpreadsheet size={12} />
+          </button>
+          <button
+            type="button" onClick={alExportarPNG}
+            title={`Descargar ${senal.corto} como imagen`} aria-label={`Descargar ${senal.corto} como imagen`}
+            style={botonExportar(t)}
+          >
+            <ImageDown size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
+const botonExportar = (t) => ({
+  display: "flex", alignItems: "center", justifyContent: "center",
+  width: 22, height: 22, borderRadius: 999, border: "none", cursor: "pointer",
+  background: t.hover, color: t.textFaint,
+});
 
 /**
  * Búfer de sesión: `valores` son números planos, sin marca de tiempo.

@@ -11,8 +11,8 @@
  * importa es esta distinción de mensajes — la integración con el historiador
  * real ya la cubre `detalle-activo-simulada.test.jsx`.
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider, useTheme } from "@/theme";
 import { GraficaHistoria, TooltipHistoria, dominioY } from "@/Demo-EVA/components/detalle/piezas.jsx";
@@ -92,6 +92,49 @@ describe("Plan 13 F9: un fallo de red no se confunde con un rango vacío", () =>
     montar({ datos: [], cargando: false, error: "ECONNREFUSED", enVivo: true });
     expect(screen.getByText("Sin muestras todavía en esta sesión.")).toBeTruthy();
     expect(screen.queryByText(/No se pudo consultar el historiador/)).toBeNull();
+  });
+});
+
+describe("Plan 13 F5: exportar CSV y PNG, sólo cuando se pide", () => {
+  it("sin exportable, no hay botones de descarga", () => {
+    montar({ datos: DOS_PUNTOS, cargando: false });
+    expect(screen.queryByLabelText(/Descargar Nivel como/)).toBeNull();
+  });
+
+  it("con exportable, aparecen los dos botones — CSV e imagen", () => {
+    montar({ datos: DOS_PUNTOS, cargando: false, exportable: true });
+    expect(screen.getByLabelText("Descargar Nivel como CSV")).toBeTruthy();
+    expect(screen.getByLabelText("Descargar Nivel como imagen")).toBeTruthy();
+  });
+
+  it("sin datos suficientes, no hay botones: no hay gráfica que exportar", () => {
+    montar({ datos: [], cargando: false, exportable: true });
+    expect(screen.queryByLabelText(/Descargar Nivel como/)).toBeNull();
+  });
+
+  it("pulsar «CSV» dispara una descarga real: Blob + URL.createObjectURL, no un clic sin efecto", () => {
+    const crearUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+    const revocar = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    montar({ datos: DOS_PUNTOS, cargando: false, exportable: true });
+    fireEvent.click(screen.getByLabelText("Descargar Nivel como CSV"));
+
+    expect(crearUrl).toHaveBeenCalledTimes(1);
+    expect(crearUrl.mock.calls[0][0]).toBeInstanceOf(Blob);
+    expect(revocar).toHaveBeenCalledWith("blob:mock");
+
+    crearUrl.mockRestore();
+    revocar.mockRestore();
+  });
+
+  it("pulsar «imagen» no revienta aunque Recharts no haya pintado SVG en esta prueba", () => {
+    // Bajo jsdom, `ResponsiveContainer` mide 0×0 (sin ResizeObserver real) y
+    // Recharts no llega a renderizar el `<svg>` — confirmado antes de escribir
+    // esto. El botón, por tanto, no encuentra nada que exportar y no hace
+    // nada: lo que aquí se protege es que ESE camino no lance una excepción,
+    // no el resultado del PNG en sí, que queda para la revisión en pantalla.
+    montar({ datos: DOS_PUNTOS, cargando: false, exportable: true });
+    expect(() => fireEvent.click(screen.getByLabelText("Descargar Nivel como imagen"))).not.toThrow();
   });
 });
 
