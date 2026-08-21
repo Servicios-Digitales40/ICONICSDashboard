@@ -70,10 +70,10 @@ export function browseIconics(path) {
   return getJson(`/api/iconics/browse${query}`);
 }
 
-/** POST genérico con cuerpo JSON hacia el backend puente. */
-async function postJson(path, body) {
+/** Verbo HTTP genérico con cuerpo JSON hacia el backend puente. */
+async function enviarJson(metodo, path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
+    method: metodo,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -83,6 +83,9 @@ async function postJson(path, body) {
   }
   return payload;
 }
+
+/** POST genérico con cuerpo JSON hacia el backend puente. */
+const postJson = (path, body) => enviarJson("POST", path, body);
 
 /**
  * Escribe varias celdas/puntos de ICONICS de una sola vez.
@@ -100,4 +103,39 @@ export function writeIconicsBatch(items) {
  */
 export function writeIconicsPoint(pointName, value) {
   return postJson(`/api/iconics/write`, { pointName, value });
+}
+
+/**
+ * Historial de alarmas de las últimas `hours` horas (máx. 48, recortado por
+ * el propio servidor). Sin `pointName`, trae las de toda la instalación.
+ * Devuelve `{ ok, alarms: [...] }` — la forma exacta de cada evento la
+ * decide ICONICS y este cliente no la interpreta; sólo se ha confirmado
+ * `eventId` y `startDate` (`scripts/verificar-backend.mjs`), así que quien
+ * pinte esto no puede dar por hecho ningún otro campo.
+ */
+export function fetchIconicsAlarms(pointName, hours = 1) {
+  const params = new URLSearchParams({ hours: String(hours) });
+  if (pointName) params.set("pointName", pointName);
+  return getJson(`/api/iconics/alarms?${params}`);
+}
+
+/**
+ * Reconoce una o varias alarmas. Responde 403 —y este cliente lo propaga
+ * como excepción— si el puente está en modo solo lectura
+ * (`ICONICS_READ_ONLY`); quien llame a esto ya debería haber comprobado
+ * `fetchHealth().readOnly` antes de ofrecer el botón.
+ */
+export function acknowledgeIconicsAlarms(eventIds, comment = "") {
+  return enviarJson("PUT", `/api/iconics/alarms/acknowledge`, { eventIds, comment });
+}
+
+/**
+ * Estado del propio puente: si ICONICS responde, si el token es válido, y
+ * —lo que le importa a esta vista— si está en modo solo lectura. Es la
+ * misma respuesta que ya usa `scripts/verificar-backend.mjs` para probar el
+ * arranque; aquí se lee para decidir si el botón de reconocer alarmas tiene
+ * sentido ofrecerlo.
+ */
+export function fetchHealth() {
+  return getJson(`/api/health`);
 }

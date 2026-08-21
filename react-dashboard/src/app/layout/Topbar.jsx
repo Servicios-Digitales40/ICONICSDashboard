@@ -5,6 +5,7 @@
 import { Search, Bell, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
+import { useAlarmCount } from "@/lib/iconics";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { PAGE_META } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
@@ -71,13 +72,17 @@ function VersionBuild({ t }) {
   );
 }
 
-export function Topbar({ page, onAbrirMenu, muro = false }) {
+export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
   const { theme: t, modo, toggleTheme } = useTheme();
   const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
   const esCajon = useMediaQuery(UMBRAL_CAJON);
+  // `null` mientras no se sabe, o si /api/iconics/alarms falló — ver la
+  // cabecera de `useAlarmCount.js`. No se muestra badge en ninguno de los
+  // dos casos: un 0 falso sería peor que ningún número.
+  const alarmas1h = useAlarmCount();
 
   /* El indicador de origen es el mismo con y sin interruptor; lo que cambia es
      si además es pulsable. Se comparte el estilo para que no puedan derivar. */
@@ -134,12 +139,37 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
           <Input icon={<Search size={14} />} placeholder="Buscar…" />
         </div> */}
 
-        {/* <HoverTip label="3 notificaciones">
-          <span style={{ position: "relative", display: "flex", padding: 9, borderRadius: 9, background: t.panel, border: `1px solid ${t.border}`, cursor: "pointer" }}>
+        {/* Contador de eventos (Plan 13, F1/Fase 9). Rotulado como "eventos
+            recientes" y no "alarmas activas": es un historial, no un
+            semáforo en vivo — ver la cabecera de `Demo-EVA/data/alarmas.js`.
+            Sin badge cuando `alarmas1h` es `null` (sin dato aún, o falló la
+            lectura) o 0 (nada que contar). En `accent` y no `coral`: la
+            *Regla del Color con Significado* reserva coral para una señal EN
+            ese estado ahora mismo, y este número es historial de la última
+            hora, no necesariamente vigente — azul es justo la excepción de la
+            regla, "lo accionable, no lo saludable". */}
+        <HoverTip label={alarmas1h ? `${alarmas1h} evento${alarmas1h === 1 ? "" : "s"} en la última hora · ver alarmas` : "Ver alarmas"}>
+          <button
+            onClick={onAbrirAlarmas}
+            aria-label={alarmas1h ? `${alarmas1h} eventos en la última hora. Ver alarmas.` : "Ver alarmas"}
+            style={{ position: "relative", display: "flex", padding: 9, borderRadius: 9, background: t.panel, border: `1px solid ${t.border}`, cursor: "pointer" }}
+          >
             <Bell size={16} color={t.textSoft} />
-            <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: t.coral, border: `1.5px solid ${t.panel}` }} />
-          </span>
-        </HoverTip> */}
+            {Boolean(alarmas1h) && (
+              <span
+                style={{
+                  position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 3px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: 999, background: t.accent, border: `1.5px solid ${t.panel}`,
+                  fontSize: 9.5, fontWeight: 700, color: "#FFFFFF", fontFamily: "'IBM Plex Mono', monospace",
+                }}
+              >
+                {alarmas1h > 99 ? "99+" : alarmas1h}
+              </span>
+            )}
+          </button>
+        </HoverTip>
+
 {/* Para restaurar este botón hay que volver a montar <DataProvider> (hoy
             archivado en _deprecated/providers/) y recuperar aquí el
             `const { regenerate, regenerating } = useData();`. Se retiró la

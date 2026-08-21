@@ -136,7 +136,12 @@ function Shell() {
 
         <Modal />
         <DataSourceBanner />
-        <Topbar page={nav.page} onAbrirMenu={() => setCajonAbierto(true)} muro={muro.activo} />
+        <Topbar
+          page={nav.page}
+          onAbrirMenu={() => setCajonAbierto(true)}
+          onAbrirAlarmas={() => navigate("eva-alarmas")}
+          muro={muro.activo}
+        />
 
         {/* `<main>` y no `<div>`: es el único landmark de contenido que le
             faltaba a la aplicación entera (Sidebar ya es `<aside>`+`<nav>`,

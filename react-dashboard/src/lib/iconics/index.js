@@ -14,6 +14,9 @@ export {
   fetchIconicsPoint,
   fetchIconicsBatch,
   fetchIconicsHistory,
+  fetchIconicsAlarms,
+  acknowledgeIconicsAlarms,
+  fetchHealth,
   browseIconics,
   writeIconicsPoint,
   writeIconicsBatch,
@@ -26,6 +29,13 @@ export {
  * eso está el motor de polling, que agrupa todo en una sola petición.
  */
 export { useIconicsPoint } from "./useIconicsPoint.js";
+
+/**
+ * Sólo el conteo de eventos de la última hora, para el badge del Topbar. Ver
+ * la cabecera de `useAlarmCount.js` para por qué no vive junto al resto del
+ * dominio de alarmas (`Demo-EVA/data/alarmas.js`).
+ */
+export { useAlarmCount } from "./useAlarmCount.js";
 
 export { QUALITY_GOOD, isGoodQuality } from "@shared/quality.js";
 export { createPollingEngine } from "./pollingEngine.js";

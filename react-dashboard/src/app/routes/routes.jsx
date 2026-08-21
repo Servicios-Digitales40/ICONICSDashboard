@@ -49,7 +49,7 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Box, Boxes, Cog, Factory, Home, LayoutDashboard } from "lucide-react";
+import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard } from "lucide-react";
 
 /**
  * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
@@ -115,6 +115,17 @@ export const ROUTES = [
     title: "Maqueta 3D",
     sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
     nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "eva-3d" },
+  },
+
+  {
+    // Historial, no un semáforo de alarmas activas — ver la cabecera de
+    // `data/alarmas.js`. `GET /api/iconics/alarms` es lo único que hay hoy:
+    // el evento "activo ahora" necesitaría otra llamada al servidor.
+    id: "eva-alarmas",
+    component: lazy(() => import("@/Demo-EVA/views/AlarmasEva.jsx")),
+    title: "Alarmas",
+    sub: "Historial de eventos de la instalación",
+    nav: { label: "Alarmas", icon: <Bell size={17} /> },
   },
 
   {

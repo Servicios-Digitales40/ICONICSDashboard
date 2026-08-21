@@ -350,4 +350,4 @@ separa dos bloques dentro de una vista sin recurrir a una línea horizontal.
 - **Don't** pasar de 16px en ningún texto ni introducir un cuarto nivel de tinta.
 - **Don't** añadir un radio intermedio (10px, 12px) ni un borde de más de 1px.
 - **Don't** elevar más de 3px en hover, ni poner sombra a un elemento que no sea tarjeta, botón primario o campo con foco.
-- **Don't** introducir affordances de escritura o borrado: el backend es de solo lectura y un botón que no cumple es peor que su ausencia.
+- **Don't** ofrecer una escritura sin condicionarla a `readOnly` de `/api/health`. Esto dejó de decir «el backend es de solo lectura» con `controlar_bomba` (el asistente) y el *ack* de alarmas (Plan 13, Fase 9): la escritura ya existe, pero sigue la misma norma de fondo — va siempre detrás de la confirmación del servidor y se anuncia antes de ejecutarse, porque un botón que puede fallar es peor que su ausencia.
