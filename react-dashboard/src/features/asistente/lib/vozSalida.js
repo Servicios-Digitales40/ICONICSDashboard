@@ -217,7 +217,23 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 function pronunciar(texto, { volumen, alTerminar } = {}) {
   const sintesis = window.speechSynthesis
 
+  /*
+   * `alTerminar` se llama UNA sola vez.
+   *
+   * Con el reintento hay dos frases en juego, y cancelar la primera puede
+   * dispararle su `end`. Sin esta guarda, quien espera el final —el modo
+   * llamada, para abrir el micrófono— arrancaría mientras la segunda todavía
+   * está hablando, y volvería a grabarse a sí mismo.
+   */
+  let avisado = false
+  const terminado = () => {
+    if (avisado) return
+    avisado = true
+    alTerminar?.()
+  }
+
   const intentar = (conVoz) => {
+    let cancelado = false
     const frase = new SpeechSynthesisUtterance(texto)
     frase.rate = VELOCIDAD
     if (typeof volumen === 'number') frase.volume = volumen
@@ -225,8 +241,10 @@ function pronunciar(texto, { volumen, alTerminar } = {}) {
 
     let empezo = false
     frase.addEventListener('start', () => { empezo = true })
-    frase.addEventListener('end', () => alTerminar?.())
-    frase.addEventListener('error', () => alTerminar?.())
+    // El `end` de un intento cancelado NO cuenta como final: lo marca el
+    // propio reintento poniendo `cancelado`.
+    frase.addEventListener('end', () => { if (!cancelado) terminado() })
+    frase.addEventListener('error', () => { if (!cancelado) terminado() })
 
     /*
      * El oyente se registra ANTES de `speak()`: la llamada puede despachar
@@ -241,6 +259,7 @@ function pronunciar(texto, { volumen, alTerminar } = {}) {
       if (conVoz) {
         // No arrancó con la voz elegida. Se repite sin ella, que es lo que en
         // planta demostró funcionar.
+        cancelado = true
         sintesis.cancel()
         return intentar(false)
       }
@@ -256,7 +275,7 @@ function pronunciar(texto, { volumen, alTerminar } = {}) {
           : 'Este navegador no encuentra ninguna voz instalada. Prueba con otro, o reinícialo: ' +
             'Chrome a veces pierde la lista de voces.'
       )
-      alTerminar?.()
+      terminado()
     }, MS_PARA_ARRANCAR)
   }
 
@@ -282,7 +301,7 @@ const MS_PARA_ARRANCAR = 1000
  * navegador marque la página como autorizada, y a partir de ahí todo lo demás
  * suena. No se oye nada al hacerlo.
  */
-export function desbloquearVoz(saludo) {
+export function desbloquearVoz(saludo, alTerminar) {
   if (!puedeHablar()) return
 
   try {
@@ -299,9 +318,12 @@ export function desbloquearVoz(saludo) {
      * no viene de un clic sino de un temporizador, y vuelve a bloquearla. La
      * frase de saludo tiene que salir en la misma vuelta del clic.
      */
-    pronunciar(saludo ?? '', { volumen: saludo ? undefined : 0 })
+    pronunciar(saludo ?? '', { volumen: saludo ? undefined : 0, alTerminar })
   } catch {
-    // Si el navegador se queja, se seguirá intentando al hablar de verdad.
+    // Si el navegador se queja, se seguirá intentando al hablar de verdad —
+    // pero hay que continuar igualmente, o el modo llamada se quedaría sin
+    // arrancar por no haber podido saludar.
+    alTerminar?.()
   }
 }
 
