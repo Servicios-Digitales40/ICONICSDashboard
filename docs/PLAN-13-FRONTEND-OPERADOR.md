@@ -12,9 +12,9 @@
 >
 > | Fase | Entregable | Mejora | Verificación |
 > |---|---|---|---|
-> | 0 ✅ | `estadoDelDato.js`: una sola derivación de frescura y vacíos | base de F2+F9 | 17 pruebas unitarias puras |
+> | 0 ✅ | `estadoDelDato.js`: una sola derivación de frescura y vacíos | base de F2+F9 | 21 pruebas unitarias puras |
 > | 1 ✅ | Arnés de accesibilidad + landmarks + foco visible + color no exclusivo | **F6** | `axe` en la suite (0 violaciones graves) + 7 pruebas |
-> | 2 | La edad del dato, en la propia cifra | **F2** | pruebas con temporizadores falsos |
+> | 2 ✅ | La edad del dato, en `StatSenal`/`FilaSenal`/`TarjetaVariable` | **F2** | `useAhora` + 6 pruebas de cableado, `createSenal()` real |
 > | 3 | Los tres vacíos, distinguidos | **F9** | una prueba por caso |
 > | 4 | Banda de umbral dibujada y rotulada | **F4** | pruebas sobre `GraficaHistoria` |
 > | 5 | Exportar CSV y PNG | **F5** | contenido y nombre del archivo |
@@ -23,7 +23,7 @@
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **229/235** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **242/248** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -190,7 +190,7 @@ en verde.
 
 ---
 
-### Fase 2 — F2 · La edad del dato, en la propia cifra
+### Fase 2 — F2 · La edad del dato, en la propia cifra ✅
 
 **El problema, medido.** `useSistemaAgua` ya devuelve `lastUpdated`, y nadie lo
 pinta. Con el puente caído, `pollingEngine` reintenta con *backoff* creciente y
@@ -461,6 +461,21 @@ siempre va con su `corto` al lado. La reparación tuvo una trampa: el texto
 tiene que describir `senal.banda`, no `senal.estado` — son cosas distintas a
 propósito (una señal `en reposo` puede seguir fuera de banda) y usar
 `estado` habría hecho que la marca dijera "En reposo" junto a un color coral.
+
+**Fase 2.** El plan preveía UNA función con seis estados; se construyeron DOS
+(`frescuraDe` y `estadoHistorial`) porque el valor en vivo y la serie
+histórica resultaron preguntas con entradas distintas — forzarlas a una sola
+tabla habría dejado parámetros que unos consumidores necesitan y otros no.
+
+Y de los tres sitios que el plan nombraba como destino (`HeroeNivel`,
+`EstadoSenales`, `RejillaActivos`), sólo uno encajaba tal cual. `EstadoSenales`
+no tiene cifra por señal —son agregados del sistema entero— y `HeroeNivel`
+resultó ser dos cosas: el arco del nivel (complejo, animado, se dejó fuera a
+propósito) y tres `Medidor` de apoyo (más simples, también fuera por tiempo).
+En su lugar entraron `StatSenal` y `TarjetaVariable`, que sí son cifra por
+señal y no estaban en la lista original — el criterio real terminó siendo
+"¿esta pieza muestra un valor con su propio `receivedAt`?", no la lista de
+componentes que parecía obvia al escribir el plan.
 
 ## 6 · Checklist de revisión en pantalla
 
