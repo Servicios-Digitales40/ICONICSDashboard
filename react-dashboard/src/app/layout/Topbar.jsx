@@ -71,7 +71,7 @@ function VersionBuild({ t }) {
   );
 }
 
-export function Topbar({ page, onAbrirMenu }) {
+export function Topbar({ page, onAbrirMenu, muro = false }) {
   const { theme: t, modo, toggleTheme } = useTheme();
   const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
@@ -103,8 +103,9 @@ export function Topbar({ page, onAbrirMenu }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
         {/* Sólo existe como cajón: en escritorio la barra ya está siempre a
-            la vista y este botón no tendría qué abrir. */}
-        {esCajon && (
+            la vista y este botón no tendría qué abrir. En modo muro no hay
+            Sidebar que abrir, cajón o no. */}
+        {esCajon && !muro && (
           <button
             onClick={onAbrirMenu}
             aria-label="Abrir el menú de navegación"
@@ -123,6 +124,11 @@ export function Topbar({ page, onAbrirMenu }) {
         </div>
       </div>
 
+      {/* Modo muro (Plan 13, F8): ni un solo control pulsable — es justo lo
+          que "sin nada pulsable por accidente" pide, y en un monitor sin
+          teclado ni ratón nadie iba a usar el interruptor de origen o de
+          tema de todos modos. */}
+      {!muro && (
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
         {/* <div style={{ width: 210 }}>
           <Input icon={<Search size={14} />} placeholder="Buscar…" />
@@ -199,6 +205,7 @@ export function Topbar({ page, onAbrirMenu }) {
 
         {/* <Avatar name="Ana Torres" size={34} /> */}
       </div>
+      )}
     </header>
   );
 }

@@ -19,6 +19,7 @@ import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
+import { leerModoMuro, useRotacionMuro } from "./modoMuro.js";
 
 /**
  * El asistente va en su propio trozo, como la pila 3D y las propuestas.
@@ -94,14 +95,35 @@ function Shell() {
   // que vivir por encima de los dos.
   const [cajonAbierto, setCajonAbierto] = useState(false);
 
+  // Modo muro (Plan 13, F8): `?muro=1`, opcionalmente con `vistas=a,b,c`,
+  // `rotarCada` (segundos) y `escala`. Ver la cabecera de `modoMuro.js` para
+  // por qué esto es `zoom` y no `rem`.
+  const muro = leerModoMuro(nav.params);
+  useRotacionMuro({
+    activo: muro.activo, vistas: muro.vistas, intervaloS: muro.intervaloS,
+    paginaActual: nav.page, navigate,
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: t.page, display: "flex" }}>
-      <Sidebar
-        page={nav.page}
-        onNavigate={(p) => navigate(p)}
-        abiertaCajon={cajonAbierto}
-        onCerrarCajon={() => setCajonAbierto(false)}
-      />
+    <div
+      style={{
+        minHeight: "100vh", background: t.page, display: "flex",
+        // `String(...)`, no el número tal cual: React le añade "px" a un
+        // valor numérico de `zoom` porque no está en su lista de propiedades
+        // sin unidad — y "zoom: 1.6px" es un valor inválido que el
+        // navegador (y jsdom, medido antes de este fix) descarta en
+        // silencio. Como cadena, viaja sin unidad y el estilo se aplica.
+        zoom: muro.activo ? String(muro.escala) : undefined,
+      }}
+    >
+      {!muro.activo && (
+        <Sidebar
+          page={nav.page}
+          onNavigate={(p) => navigate(p)}
+          abiertaCajon={cajonAbierto}
+          onCerrarCajon={() => setCajonAbierto(false)}
+        />
+      )}
 
       {/* overflowX: "clip" recorta las manchas decorativas que se salen por la
           derecha (blob2 está en right: -140) sin generar scroll horizontal.
@@ -114,7 +136,7 @@ function Shell() {
 
         <Modal />
         <DataSourceBanner />
-        <Topbar page={nav.page} onAbrirMenu={() => setCajonAbierto(true)} />
+        <Topbar page={nav.page} onAbrirMenu={() => setCajonAbierto(true)} muro={muro.activo} />
 
         {/* `<main>` y no `<div>`: es el único landmark de contenido que le
             faltaba a la aplicación entera (Sidebar ya es `<aside>`+`<nav>`,
