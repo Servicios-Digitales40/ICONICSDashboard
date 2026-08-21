@@ -29,6 +29,7 @@ import { useAhora } from "../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../components/base.jsx";
 import { estadoColor } from "../components/paleta.js";
 import { DetalleGrid } from "../components/detalle/DetalleGrid.jsx";
+import { GraficaComparada } from "../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../components/detalle/SelectorRango.jsx";
 
 /**
@@ -153,6 +154,16 @@ function DetalleActivo({ params, onNavigate }) {
 
         <DetalleGrid variables={variables} t={t} dark={dark} ahora={ahora} />
       </div>
+
+      {/*
+       * Fuera del `tabpanel`: las cuatro señales con serie propia viven en
+       * DOS activos (Tanque y Distribución), así que esto no es contenido
+       * de la pestaña actual — es visible sin importar cuál esté abierta.
+       */}
+      <SectionLabel sub="Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente">
+        Comparar señales
+      </SectionLabel>
+      <GraficaComparada rango={enVivo ? null : rango} t={t} dark={dark} />
     </div>
   );
 }
