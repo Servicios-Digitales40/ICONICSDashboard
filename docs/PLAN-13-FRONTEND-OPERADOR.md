@@ -17,13 +17,13 @@
 > | 2 ✅ | La edad del dato, en `StatSenal`/`FilaSenal`/`TarjetaVariable` | **F2** | `useAhora` + 6 pruebas de cableado, `createSenal()` real |
 > | 3 ✅ | `metaPorClave` (error real) + `GraficaHistoria`/`PanelTendencia` distinguen sinConexion | **F9** | 9 pruebas, `errorPeticion` nuevo en el simulador |
 > | 4 ✅ | `ReferenceArea` + insignia "banda estimada, sin confirmar" | **F4** | 5 pruebas, proxy vía la insignia (Recharts no pinta SVG bajo jsdom) |
-> | 5 | Exportar CSV y PNG | **F5** | contenido y nombre del archivo |
+> | 5 ✅ | `lib/exportar.js`: CSV + PNG, sólo en el Detalle | **F5** | 18 pruebas, PNG probado hasta donde jsdom deja |
 > | 6 | Dos señales, eje doble | **F3** | pruebas sobre la gráfica comparada |
 > | 7 | El rango en la URL | **F7** | `navegacion.test.jsx` ampliado |
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **253/259** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **271/277** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -271,7 +271,7 @@ respetan los nulos, y el rótulo de provisional está mientras la bandera lo est
 
 ---
 
-### Fase 5 — F5 · Llevarse lo que se está viendo
+### Fase 5 — F5 · Llevarse lo que se está viendo ✅
 
 **El problema.** No hay ninguna descarga en el tablero. Una tendencia que va a un
 parte de turno se resuelve hoy con una foto del monitor.
@@ -509,6 +509,22 @@ general). El `<ReferenceArea>` no es inspeccionable por DOM; las pruebas
 verifican en su lugar la insignia "banda estimada", que cuelga del mismo
 booleano y es una superficie HTML normal.
 
+**Fase 5.** El plan pedía una columna de calidad en el CSV; no se hizo,
+porque no hay dato que ponerle: `normalizar()` (`shared/eva/historia.js`)
+descarta la muestra de mala calidad ANTES de que llegue a `GraficaHistoria`
+— no sobrevive un valor de calidad que exportar, sólo huecos que ya no
+están en el arreglo. Pedirla habría sido inventar una columna vacía.
+
+Y la verificación del PNG, tal como el plan la pedía —«una prueba de humo,
+que se produzca un blob no vacío»— resultó irrealizable: confirmado con una
+prueba de humo previa, `canvas.toBlob()` bajo jsdom **nunca llama a su
+callback**, así que un `await` sobre ella cuelga la prueba para siempre en
+vez de fallar con un mensaje útil. Se probó en su lugar todo lo que SÍ es
+observable sin canvas —`prepararSvgParaExportar` a fondo, y que el botón de
+CSV dispare un `Blob` real— y se dejó constancia explícita, en el propio
+código y en la suite, de qué parte del PNG sólo la puede confirmar la
+revisión en pantalla.
+
 ## 6 · Checklist de revisión en pantalla
 
 Nada de esto lo confirma una prueba automática. Necesita el servidor ICONICS
@@ -518,8 +534,9 @@ avería del tablero.
 
 - [ ] Con el puente parado a propósito, ninguna cifra vieja se sigue leyendo como actual.
 - [ ] Los tres vacíos se distinguen de un vistazo, sin leer el texto entero.
-- [ ] Las bandas de umbral se ven rayadas y el rótulo «estimado» está.
-- [ ] Un CSV descargado se abre en Excel con el rango correcto y las comas donde tocan.
+- [ ] Las bandas de umbral se ven teñidas y la insignia «banda estimada, sin confirmar» está.
+- [ ] Un CSV descargado se abre en Excel con acentos legibles, el rango correcto y las comas donde tocan.
+- [ ] Un PNG descargado se abre con fondo sólido (no transparente) y el título dentro de la imagen — es la parte que ninguna prueba automática pudo confirmar (jsdom no tiene canvas).
 - [ ] La gráfica comparada se lee bien en los tres temas, incluido Mitsubishi.
 - [ ] Un enlace copiado del detalle abre el mismo activo **y el mismo rango**.
 - [ ] El modo muro se lee a tres metros y no tiene nada pulsable por accidente.
