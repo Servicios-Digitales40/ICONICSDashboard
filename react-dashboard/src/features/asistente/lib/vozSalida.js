@@ -77,13 +77,50 @@ export function puedeHablar() {
  * mejor que el silencio, porque el silencio no se puede diagnosticar.
  */
 function elegirVoz(todas) {
-  const espanolas = (todas ?? [])
-    .filter(v => v.lang?.toLowerCase().startsWith('es'))
-    // Las locales antes que las de red: una voz remota no funcionaría en una
-    // planta sin salida a internet, que es el escenario de esta instalación.
-    .sort((a, b) => Number(b.localService) - Number(a.localService))
+  const espanolas = (todas ?? []).filter(v => v.lang?.toLowerCase().startsWith('es'))
+  if (!espanolas.length) return null
 
-  return espanolas[0] ?? null
+  /*
+   * ── EL ORDEN DE PREFERENCIA SALE DE UN FALLO MEDIDO ────────────────
+   *
+   * En la máquina de planta, Chrome ofrecía 21 voces y se eligió «Microsoft
+   * Raul - Spanish (Mexico)». No sonó NADA: ni audio, ni evento `start`, ni
+   * error. La misma frase sin `voice` asignada sonaba perfectamente.
+   *
+   * Esas voces —las que Windows llama OneCore, con el nombre en formato
+   * «Microsoft X - Idioma (País)»— aparecen en la lista de Chrome pero muchas
+   * no reproducen nada. Es un fallo conocido del navegador, no de la
+   * instalación: el motor OneCore y el que Chrome sabe manejar no son el
+   * mismo.
+   *
+   * Las que sí funcionan, por orden de fiabilidad:
+   *
+   *   1. Las de Google (`Google español`). Son las propias de Chrome y las
+   *      más fiables, cuando están.
+   *   2. Las SAPI clásicas, que se reconocen por acabar en «Desktop»
+   *      (`Microsoft Sabina Desktop`). Es el motor de toda la vida.
+   *   3. Cualquier otra local.
+   *   4. Las de red, sólo como último recurso: una planta sin salida a
+   *      internet no puede depender de ellas.
+   *
+   * Y aunque se elija mal, `pronunciar` reintenta sin voz si no arranca. Este
+   * orden reduce la probabilidad de necesitar ese reintento, no la sustituye.
+   */
+  const puntos = (v) => {
+    const nombre = v.name ?? ''
+    if (/google/i.test(nombre)) return 0
+    if (/desktop$/i.test(nombre)) return 1
+    // Formato OneCore: «Microsoft Raul - Spanish (Mexico)». Las últimas.
+    if (/^Microsoft .+ - .+\(.+\)$/.test(nombre)) return 3
+    return 2
+  }
+
+  return [...espanolas].sort((a, b) => {
+    // Las locales siempre antes que las de red.
+    const red = Number(a.localService === false) - Number(b.localService === false)
+    if (red !== 0) return red
+    return puntos(a) - puntos(b)
+  })[0]
 }
 
 function vocesEnEspanol() {
@@ -153,6 +190,83 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 }
 
 /**
+ * Dice una frase, y si no arranca la repite SIN voz asignada.
+ *
+ * ── POR QUÉ EL REINTENTO ES LA PIEZA CLAVE ─────────────────────────
+ *
+ * Medido en la máquina de planta: con «Microsoft Raul - Spanish (Mexico)»
+ * asignada no sonaba nada —ni audio, ni evento `start`, ni error— y la misma
+ * frase sin `voice` sonaba perfectamente. Son las voces OneCore de Windows,
+ * que Chrome lista pero no siempre sabe reproducir.
+ *
+ * Elegir mejor la voz reduce la probabilidad de caer ahí, pero no la elimina:
+ * cada equipo tiene su combinación de motores instalados y no se puede saber
+ * de antemano cuál falla. El reintento sí lo resuelve, porque no depende de
+ * acertar: si la voz elegida no arranca en un segundo, se repite dejando que
+ * el navegador use la suya.
+ *
+ * Se preferirá siempre la voz en español; el reintento suena peor —puede leer
+ * el español con voz inglesa— pero SE OYE, y una respuesta mal pronunciada es
+ * infinitamente mejor que el silencio.
+ *
+ * @param {string} texto
+ * @param {object} [opciones]
+ * @param {number} [opciones.volumen]
+ * @param {() => void} [opciones.alTerminar]
+ */
+function pronunciar(texto, { volumen, alTerminar } = {}) {
+  const sintesis = window.speechSynthesis
+
+  const intentar = (conVoz) => {
+    const frase = new SpeechSynthesisUtterance(texto)
+    frase.rate = VELOCIDAD
+    if (typeof volumen === 'number') frase.volume = volumen
+    if (conVoz) aplicarVoz(frase)
+
+    let empezo = false
+    frase.addEventListener('start', () => { empezo = true })
+    frase.addEventListener('end', () => alTerminar?.())
+    frase.addEventListener('error', () => alTerminar?.())
+
+    /*
+     * El oyente se registra ANTES de `speak()`: la llamada puede despachar
+     * `start` de inmediato, y engancharse después significa perdérselo y
+     * concluir que la frase no arrancó cuando sí lo hizo.
+     */
+    sintesis.speak(frase)
+
+    setTimeout(() => {
+      if (empezo) return
+
+      if (conVoz) {
+        // No arrancó con la voz elegida. Se repite sin ella, que es lo que en
+        // planta demostró funcionar.
+        sintesis.cancel()
+        return intentar(false)
+      }
+
+      // Ni con la voz ni sin ella: ahora sí es un problema del navegador o del
+      // audio del equipo, y hay que decirlo.
+      const voces = sintesis.getVoices()
+      onVozMuda?.(
+        voces.length
+          ? `La voz no arrancó ni con «${nombreDeVoz ?? 'la del sistema'}» ni sin ella, y hay ` +
+            `${voces.length} voces disponibles. El navegador no está reproduciendo audio de esta ` +
+            `página: revisa el volumen de Chrome en el mezclador de Windows.`
+          : 'Este navegador no encuentra ninguna voz instalada. Prueba con otro, o reinícialo: ' +
+            'Chrome a veces pierde la lista de voces.'
+      )
+      alTerminar?.()
+    }, MS_PARA_ARRANCAR)
+  }
+
+  intentar(true)
+}
+
+/** Cuánto se le da al navegador para arrancar una frase antes de reintentar. */
+const MS_PARA_ARRANCAR = 1000
+
+/**
  * Desbloquea la síntesis de voz. Hay que llamarla DENTRO de un clic.
  *
  * ── POR QUÉ HACE FALTA ─────────────────────────────────────────────
@@ -185,14 +299,7 @@ export function desbloquearVoz(saludo) {
      * no viene de un clic sino de un temporizador, y vuelve a bloquearla. La
      * frase de saludo tiene que salir en la misma vuelta del clic.
      */
-    const frase = new SpeechSynthesisUtterance(saludo ?? '')
-    frase.rate = VELOCIDAD
-    aplicarVoz(frase)
-    if (!saludo) frase.volume = 0
-
-    // El detector se arma ANTES de hablar: ver su cabecera.
-    avisarSiSeQuedaMuda(frase)
-    window.speechSynthesis.speak(frase)
+    pronunciar(saludo ?? '', { volumen: saludo ? undefined : 0 })
   } catch {
     // Si el navegador se queja, se seguirá intentando al hablar de verdad.
   }
@@ -217,10 +324,6 @@ export async function hablar(texto) {
   window.speechSynthesis.cancel()
 
   return new Promise(resolve => {
-    const frase = new SpeechSynthesisUtterance(limpio)
-    frase.rate = VELOCIDAD
-    aplicarVoz(frase)
-
     let acabado = false
     const terminar = () => {
       if (acabado) return
@@ -239,8 +342,7 @@ export async function hablar(texto) {
      * el modo llamada se queda esperando un `end` que no va a llegar nunca.
      *
      * El apaño aceptado es pausar y reanudar periódicamente: reinicia el
-     * temporizador interno del navegador sin que se note en el audio. En las
-     * demás plataformas es inocuo.
+     * temporizador interno del navegador sin que se note en el audio.
      */
     const latido = setInterval(() => {
       if (acabado) return
@@ -250,29 +352,14 @@ export async function hablar(texto) {
     }, 10000)
 
     /*
-     * Y un corte por tiempo, por si aun así se queda muda.
-     *
-     * Sin él, un `end` que no llega deja la promesa colgada, y con ella el
-     * ciclo del modo llamada: no vuelve a escuchar nunca. Se calcula sobre la
-     * longitud del texto —unos 12 caracteres por segundo a esta velocidad— con
-     * margen generoso, porque cortar una respuesta a medias es peor que
-     * esperar unos segundos de más.
+     * Corte por tiempo, por si aun así se queda muda. Sin él, un `end` que no
+     * llega deja la promesa colgada, y con ella el ciclo del modo llamada: no
+     * vuelve a escuchar nunca. Se estima sobre la longitud del texto con
+     * margen generoso: esperar de más es preferible a cortar una respuesta.
      */
-    const msEstimados = (limpio.length / 12) * 1000 * 2 + 5000
-    const corte = setTimeout(terminar, msEstimados)
+    const corte = setTimeout(terminar, (limpio.length / 12) * 1000 * 2 + 8000)
 
-    // Se resuelve igual si falla: quien llama encadena el turno siguiente, y
-    // dejarlo colgado por una voz que no arrancó dejaría el modo manos libres
-    // esperando para siempre.
-    frase.addEventListener('end', terminar)
-    frase.addEventListener('error', terminar)
-
-    // También aquí, y no sólo en el saludo: si una RESPUESTA se descarta en
-    // silencio, el operador se queda esperando una voz que no va a llegar y
-    // sin nada en pantalla que lo explique. Antes de `speak`: ver su cabecera.
-    avisarSiSeQuedaMuda(frase)
-
-    window.speechSynthesis.speak(frase)
+    pronunciar(limpio, { alTerminar: terminar })
   })
 }
 
@@ -320,57 +407,6 @@ export function alQuedarseMuda(manejador) {
   onVozMuda = manejador
 }
 
-function avisarSiSeQuedaMuda(frase) {
-  /*
-   * SE LLAMA ANTES DE `speak()`, y el orden no es un detalle.
-   *
-   * `speak()` puede despachar `start` de inmediato. Registrando el oyente
-   * después, ese evento ya ha pasado y nunca se recoge: `empezo` se queda en
-   * `false` y se avisa de una mudez que no existe.
-   *
-   * Es el segundo falso positivo seguido de esta función, y los dos por lo
-   * mismo — dar por supuesto cuándo ocurren los eventos del navegador en vez
-   * de escucharlos desde antes de provocarlos.
-   */
-  let empezo = false
-  frase.addEventListener('start', () => { empezo = true })
-
-  /*
-   * Se mira si LLEGÓ A EMPEZAR, no si sigue hablando.
-   *
-   * La primera versión comprobaba `speechSynthesis.speaking` a los 400 ms, y
-   * eso da falsos positivos: una frase corta como «Te escucho» ya ha terminado
-   * para entonces, así que `speaking` es `false` y se avisaba de un fallo que
-   * no existía. El evento `start` no miente — o la frase arrancó, o el
-   * navegador la descartó.
-   *
-   * Segundo y medio de margen: el navegador puede tardar en arrancar la voz la
-   * primera vez de la sesión, mientras carga el motor de síntesis.
-   */
-  setTimeout(() => {
-    if (empezo) return
-
-    /*
-     * El aviso lleva los DATOS, no sólo un consejo.
-     *
-     * Un mensaje genérico manda a revisar el volumen y la pestaña, y cuando no
-     * es ninguna de las dos cosas deja a quien lo lee sin nada. Diciendo qué
-     * voz se intentó usar y cuántas hay, el propio mensaje distingue las tres
-     * averías posibles sin tener que abrir la consola del navegador.
-     */
-    const voces = window.speechSynthesis.getVoices()
-    const usada = frase.voice ? `${frase.voice.name} [${frase.voice.lang}]` : 'ninguna (voz del sistema)'
-
-    onVozMuda?.(
-      voces.length
-        ? `La voz no arrancó. Se intentó con: ${usada}. Hay ${voces.length} voces disponibles. ` +
-          'Comprueba el volumen de Chrome en el mezclador de Windows y que la pestaña no esté ' +
-          'silenciada.'
-        : 'Este navegador no encuentra ninguna voz instalada, así que no puede hablar. ' +
-          'Prueba con otro navegador, o reinícialo: Chrome a veces pierde la lista de voces.'
-    )
-  }, 1500)
-}
 
 /** Corta lo que se esté leyendo. */
 export function callar() {
