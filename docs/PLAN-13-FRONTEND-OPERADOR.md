@@ -15,7 +15,7 @@
 > | 0 ✅ | `estadoDelDato.js`: una sola derivación de frescura y vacíos | base de F2+F9 | 21 pruebas unitarias puras |
 > | 1 ✅ | Arnés de accesibilidad + landmarks + foco visible + color no exclusivo | **F6** | `axe` en la suite (0 violaciones graves) + 7 pruebas |
 > | 2 ✅ | La edad del dato, en `StatSenal`/`FilaSenal`/`TarjetaVariable` | **F2** | `useAhora` + 6 pruebas de cableado, `createSenal()` real |
-> | 3 | Los tres vacíos, distinguidos | **F9** | una prueba por caso |
+> | 3 ✅ | `metaPorClave` (error real) + `GraficaHistoria`/`PanelTendencia` distinguen sinConexion | **F9** | 9 pruebas, `errorPeticion` nuevo en el simulador |
 > | 4 | Banda de umbral dibujada y rotulada | **F4** | pruebas sobre `GraficaHistoria` |
 > | 5 | Exportar CSV y PNG | **F5** | contenido y nombre del archivo |
 > | 6 | Dos señales, eje doble | **F3** | pruebas sobre la gráfica comparada |
@@ -23,7 +23,7 @@
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **242/248** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **248/254** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -217,7 +217,7 @@ valor. Y una prueba de que hay **un** intervalo, no ocho.
 
 ---
 
-### Fase 3 — F9 · Los tres vacíos, distinguidos
+### Fase 3 — F9 · Los tres vacíos, distinguidos ✅
 
 **Qué falta.** La Fase 5 del Plan 11 ya resolvió esto para las gráficas de
 historia: `GraficaAusente` recibe un `mensaje` distinto según la causa. Los
@@ -476,6 +476,23 @@ En su lugar entraron `StatSenal` y `TarjetaVariable`, que sí son cifra por
 señal y no estaban en la lista original — el criterio real terminó siendo
 "¿esta pieza muestra un valor con su propio `receivedAt`?", no la lista de
 componentes que parecía obvia al escribir el plan.
+
+**Fase 3.** Los dos destinos que el plan nombraba —`PanelEstadoEva.jsx` y el
+explorador de activos— resultaron ser los dos equivocados. El primero es un
+selector DEMOSTRATIVO de los cinco estados del 3D, elegido a mano; nunca lee
+un dato real, así que "sin dato" no le aplica nunca. El segundo ya distinguía
+error, vacío y carga en sus tres niveles — la auditoría original se equivocó
+también ahí, del mismo modo que se equivocó con "cero `aria-`" en la Fase 1.
+
+El hueco real estaba una capa más abajo de lo que el plan miró:
+`useSeriesHistoricas` tragaba el error de cada señal
+(`.catch(() => ({ datos: [], motivo: null }))`), así que una falla de red y
+un rango honestamente vacío llegaban a `GraficaHistoria` indistinguibles. Y
+el simulador no podía siquiera producir ese fallo en una gráfica de
+historia —`readSerie()` no miraba `chaos.errorPeticion`, sólo `read()` lo
+hacía—, con lo que "sin conexión" ahí sólo se podía ensayar desenchufando el
+puente de verdad. Las dos cosas se corrigieron antes de tocar el mensaje que
+se ve en pantalla.
 
 ## 6 · Checklist de revisión en pantalla
 
