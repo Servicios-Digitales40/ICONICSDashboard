@@ -19,11 +19,11 @@
 > | 4 ✅ | `ReferenceArea` + insignia "banda estimada, sin confirmar" | **F4** | 5 pruebas, proxy vía la insignia (Recharts no pinta SVG bajo jsdom) |
 > | 5 ✅ | `lib/exportar.js`: CSV + PNG, sólo en el Detalle | **F5** | 18 pruebas, PNG probado hasta donde jsdom deja |
 > | 6 ✅ | `GraficaComparada` + `lib/comparar.js` (alineado por tolerancia) | **F3** | 18 pruebas, contra el simulador real |
-> | 7 | El rango en la URL | **F7** | `navegacion.test.jsx` ampliado |
+> | 7 ✅ | `leerRangoDeUrl` + re-sync ante popstate + `parametrosDeRango` | **F7** | 15 pruebas, incluido el flujo completo del calendario |
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **289/295** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **297/303** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -323,7 +323,7 @@ su eje.
 
 ---
 
-### Fase 7 — F7 · El rango, en la URL
+### Fase 7 — F7 · El rango, en la URL ✅
 
 **Qué falta exactamente.** `presetActivo` y `rango` en `DetalleActivo.jsx`. Todo
 lo demás ya viaja.
@@ -540,6 +540,14 @@ nada— no tiene un solo consumidor hoy, nunca se había probado con más de una
 señal real. El alineado que sí existe y sí está en uso (`alinearSeries()`)
 vive en `shared/eva/estadistica.js` para el asistente, y se trajo tal cual
 al frontend en vez de reinventarlo o de confiar a ciegas en `unir()`.
+
+**Fase 7.** Salió tan pequeña como preveía la corrección del §1 — pero
+apareció un bug que el plan no había previsto: el cambio de PESTAÑA ya
+navegaba con `{ activo: id }` a secas desde antes de este plan, y como
+`navigate()` reemplaza los parámetros enteros en vez de combinarlos, elegir
+"Ayer" y después cambiar de pestaña habría borrado el rango de la URL en
+silencio. `parametrosDeRango()` se añadió a los tres sitios que navegan, no
+sólo a los dos que ya escribían el rango a propósito.
 
 ## 6 · Checklist de revisión en pantalla
 
