@@ -111,7 +111,25 @@ function esperarVoces() {
   })
 }
 
-let vozElegida = null
+/**
+ * Se guarda el NOMBRE de la voz, nunca el objeto.
+ *
+ * ── POR QUÉ ESTO IMPORTA TANTO ─────────────────────────────────────
+ *
+ * Chrome recrea los objetos `SpeechSynthesisVoice` cuando le apetece —al
+ * cambiar de pestaña, al reanudar el equipo, al recargar la lista— y asignar
+ * uno CADUCADO a `utterance.voice` hace que descarte la frase **sin emitir
+ * ningún evento**. Ni `error`, ni `end`, ni nada.
+ *
+ * Fue exactamente lo que pasó en planta: pegar en la consola una frase sin
+ * `voice` ni `lang` sonaba perfectamente, y la misma frase desde el código
+ * —con un objeto de voz cacheado desde la carga de la página— no sonaba. La
+ * diferencia entre las dos era el objeto caducado.
+ *
+ * Guardando el nombre y buscándolo en la lista ACTUAL en cada frase, el objeto
+ * siempre es fresco.
+ */
+let nombreDeVoz = null
 
 /**
  * Se piden las voces AL CARGAR LA PÁGINA, no al primer clic.
@@ -128,7 +146,7 @@ let vozElegida = null
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   const cargar = () => {
     const voces = window.speechSynthesis.getVoices()
-    if (voces.length && !vozElegida) vozElegida = elegirVoz(voces)
+    if (voces.length && !nombreDeVoz) nombreDeVoz = elegirVoz(voces)?.name ?? null
   }
   cargar()
   window.speechSynthesis.addEventListener?.('voiceschanged', cargar)
@@ -157,7 +175,7 @@ export function desbloquearVoz(saludo) {
     // Pedir la lista dispara su carga asíncrona: para cuando llegue la primera
     // respuesta ya estarán. Y aquí, síncrono, puede que ya estén.
     const voces = window.speechSynthesis.getVoices()
-    if (!vozElegida && voces.length) vozElegida = elegirVoz(voces)
+    if (!nombreDeVoz && voces.length) nombreDeVoz = elegirVoz(voces)?.name ?? null
 
     /*
      * Se habla AQUÍ MISMO, sin `await` de por medio, y eso es lo importante.
@@ -173,7 +191,7 @@ export function desbloquearVoz(saludo) {
     if (!saludo) frase.volume = 0
 
     window.speechSynthesis.speak(frase)
-    avisarSiSeQuedaMuda()
+    avisarSiSeQuedaMuda(frase)
   } catch {
     // Si el navegador se queja, se seguirá intentando al hablar de verdad.
   }
@@ -191,7 +209,7 @@ export async function hablar(texto) {
   const limpio = paraLeer(texto)
   if (!limpio) return
 
-  if (!vozElegida) vozElegida = elegirVoz(await esperarVoces())
+  if (!nombreDeVoz) nombreDeVoz = elegirVoz(await esperarVoces())?.name ?? null
 
   // Cancelar lo anterior antes de empezar: si no, las respuestas se encolan y
   // el asistente sigue leyendo la de hace tres preguntas.
@@ -249,6 +267,11 @@ export async function hablar(texto) {
     frase.addEventListener('error', terminar)
 
     window.speechSynthesis.speak(frase)
+
+    // También aquí, y no sólo en el saludo: si una RESPUESTA se descarta en
+    // silencio, el operador se queda esperando una voz que no va a llegar y
+    // sin nada en pantalla que lo explique.
+    avisarSiSeQuedaMuda(frase)
   })
 }
 
@@ -263,14 +286,21 @@ export async function hablar(texto) {
  * pero se oye — y el silencio es el único fallo que no se puede diagnosticar.
  */
 function aplicarVoz(frase) {
-  if (!vozElegida) vozElegida = elegirVoz(window.speechSynthesis.getVoices())
+  const voces = window.speechSynthesis.getVoices()
+  if (!nombreDeVoz) nombreDeVoz = elegirVoz(voces)?.name ?? null
 
-  if (vozElegida) {
-    frase.voice = vozElegida
+  // Se busca en la lista de AHORA, no se reutiliza un objeto guardado. Ver la
+  // cabecera de `nombreDeVoz`.
+  const voz = nombreDeVoz ? voces.find(v => v.name === nombreDeVoz) : null
+
+  if (voz) {
+    frase.voice = voz
     // El `lang` acompaña a la VOZ, no al revés: pedir `es-ES` con una voz
     // `es-MX` asignada es pedirle al navegador dos cosas incompatibles.
-    frase.lang = vozElegida.lang
+    frase.lang = voz.lang
   }
+  // Sin voz no se toca `lang`: un idioma que el navegador no sabe resolver a
+  // una voz concreta es otra de las formas de que descarte la frase callado.
 }
 
 /**
@@ -289,12 +319,26 @@ export function alQuedarseMuda(manejador) {
   onVozMuda = manejador
 }
 
-function avisarSiSeQuedaMuda() {
-  setTimeout(() => {
-    const s = window.speechSynthesis
-    if (s.speaking || s.pending) return
+function avisarSiSeQuedaMuda(frase) {
+  let empezo = false
+  frase.addEventListener('start', () => { empezo = true })
 
-    const voces = s.getVoices()
+  /*
+   * Se mira si LLEGÓ A EMPEZAR, no si sigue hablando.
+   *
+   * La primera versión comprobaba `speechSynthesis.speaking` a los 400 ms, y
+   * eso da falsos positivos: una frase corta como «Te escucho» ya ha terminado
+   * para entonces, así que `speaking` es `false` y se avisaba de un fallo que
+   * no existía. El evento `start` no miente — o la frase arrancó, o el
+   * navegador la descartó.
+   *
+   * Segundo y medio de margen: el navegador puede tardar en arrancar la voz la
+   * primera vez de la sesión, mientras carga el motor de síntesis.
+   */
+  setTimeout(() => {
+    if (empezo) return
+
+    const voces = window.speechSynthesis.getVoices()
     onVozMuda?.(
       voces.length
         ? 'El navegador no reprodujo la voz. Comprueba el volumen del sistema y que la ' +
@@ -302,7 +346,7 @@ function avisarSiSeQuedaMuda() {
         : 'Este navegador no encuentra ninguna voz instalada, así que no puede hablar. ' +
           'Prueba con otro navegador, o reinícialo: Chrome a veces pierde la lista de voces.'
     )
-  }, 400)
+  }, 1500)
 }
 
 /** Corta lo que se esté leyendo. */
