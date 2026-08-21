@@ -120,3 +120,41 @@ describe("useSeriesHistoricas y el cambio de rango", () => {
     restaurar();
   });
 });
+
+/** Sonda para F9: expone el estado entero de `useSeriesHistoricas`, sin resumir. */
+function SondaMeta({ rango, salida }) {
+  const estado = useSeriesHistoricas(["nivelTanque"], rango);
+  Object.assign(salida, estado);
+  return <span data-testid="loading">{String(estado.loading)}</span>;
+}
+
+describe("Plan 13 F9: metaPorClave, sin tocar la forma de porClave que ya existía", () => {
+  it("en el camino sin fallo, metaPorClave existe y va vacío por clave", async () => {
+    // El simulador ahora SÍ puede fallar a propósito (`errorPeticion`, ver
+    // simulador.test.js), pero es un azar (`Math.random`) que este test de
+    // integración no controla sin inyectar un transporte propio — eso ya lo
+    // cubre `simulador.test.js` de forma determinista, a nivel del transporte.
+    // Lo que se protege aquí es el CONTRATO: `metaPorClave` existe, tiene la
+    // forma `{motivo, error}` por clave, y `porClave` sigue siendo el arreglo
+    // de puntos de siempre — nada de esto debía cambiar para quien ya
+    // consumía el hook antes de esta fase.
+    const restaurar = cortarLaRed();
+    const salida = {};
+
+    render(
+      <ThemeProvider>
+        <DataSourceProvider>
+          <EvaProvider>
+            <SondaMeta rango={rangoSemana()} salida={salida} />
+          </EvaProvider>
+        </DataSourceProvider>
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(salida.loading).toBe(false));
+    expect(salida.metaPorClave).toEqual({ nivelTanque: { motivo: null, error: null } });
+    expect(Array.isArray(salida.porClave.nivelTanque)).toBe(true);
+    expect(salida.porClave.nivelTanque.length).toBeGreaterThan(0);
+    restaurar();
+  });
+});

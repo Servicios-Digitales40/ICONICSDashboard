@@ -14,6 +14,7 @@ import { hasValue } from "@shared/valores.js";
 import { bandaColor } from "../paleta.js";
 import { MONO, PuntoEstado } from "../base.jsx";
 import { estadoInfo } from "../../domain/estado.js";
+import { HISTORIAL, estadoHistorial } from "../../data/estadoDelDato.js";
 
 /**
  * Insignia que declara el ORIGEN de una serie. Nunca se deja a que el lector
@@ -99,17 +100,36 @@ export function TooltipHistoria(props) {
  * animación de Recharts se repetiría en cada actualización, que es
  * exactamente el parpadeo que ya se evitó a propósito en `tiles.jsx`.
  */
-export function GraficaHistoria({ senal, datos, cargando, enVivo, t, dark, alto = 150, delay = 0 }) {
+export function GraficaHistoria({ senal, datos, cargando, enVivo, error, t, dark, alto = 150, delay = 0 }) {
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
 
-  if (filas.length < 2) {
-    const mensaje = enVivo
-      ? "Sin muestras todavía en esta sesión."
-      : cargando
-      ? "Consultando el historiador…"
-      : "No hay muestras del historiador en este rango.";
-    return <GraficaAusente t={t} alto={alto} mensaje={mensaje} />;
+  if (enVivo) {
+    // El búfer de sesión no pasa por `estadoHistorial`: no hay historiador
+    // al que preguntarle, así que "sin conexión" no aplica aquí — sólo
+    // "todavía no ha llegado nada".
+    if (filas.length < 2) {
+      return <GraficaAusente t={t} alto={alto} mensaje="Sin muestras todavía en esta sesión." />;
+    }
+  } else {
+    /*
+     * Antes esto sólo miraba `cargando` para elegir entre "consultando" y
+     * "no hay nada": una petición que fallaba de verdad (el puente caído, el
+     * historiador sin responder) acababa mostrando el mismo "no hay muestras
+     * del historiador en este rango" que un rango honestamente vacío — y
+     * para quien mira, "no pasó nada ayer" y "no pude preguntar por ayer"
+     * son conclusiones opuestas.
+     */
+    const estado = estadoHistorial({ error, loading: cargando, datos: filas, minimo: 2 });
+    if (estado !== HISTORIAL.OK) {
+      const mensaje =
+        estado === HISTORIAL.SIN_CONEXION
+          ? "No se pudo consultar el historiador. Reintenta en unos segundos."
+          : estado === HISTORIAL.CARGANDO
+          ? "Consultando el historiador…"
+          : "No hay muestras del historiador en este rango.";
+      return <GraficaAusente t={t} alto={alto} mensaje={mensaje} />;
+    }
   }
 
   const multiDia = filas[filas.length - 1].t - filas[0].t > UMBRAL_MULTIDIA_MS;

@@ -268,4 +268,24 @@ describe("la historia no miente sobre lo que el servidor publica", () => {
     expect(datos).toEqual([]);
     expect(motivo).toBe(SIN_SERIE);
   });
+
+  it("Plan 13 F9: errorPeticion también degrada el historiador, no sólo la lectura en vivo", () => {
+    // Antes `readSerie` no miraba `chaos.errorPeticion` en absoluto: con el
+    // caos al máximo, un tile podía verse en gris por un fallo simulado y la
+    // gráfica de al lado seguía respondiendo siempre — algo que el servidor
+    // real no promete, y sin lo cual "sin conexión" en una gráfica de
+    // historia sólo se podía ensayar desenchufando el puente de verdad.
+    const transporte = createTransporteEva({
+      chaos: { ...SIN_CAOS, errorPeticion: 1 },
+      ahora: () => T0,
+      rnd: () => 0,
+    });
+    return expect(transporte.readSerie("nivelTanque")).rejects.toThrow(/fallo simulado/);
+  });
+
+  it("con errorPeticion en cero, nunca lanza — el defecto sigue siendo el de siempre", async () => {
+    const { datos, motivo } = await enT(T0).readSerie("nivelTanque");
+    expect(motivo).toBeNull();
+    expect(datos.length).toBeGreaterThan(0);
+  });
 });

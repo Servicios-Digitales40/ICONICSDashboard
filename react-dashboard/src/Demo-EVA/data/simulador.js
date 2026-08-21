@@ -378,6 +378,16 @@ export function createTransporteEva({
 
     if (chaos.latenciaMs > 0) await espera(chaos.latenciaMs);
 
+    // Mismo `errorPeticion` que `read()`, aplicado al historiador. Antes SÓLO
+    // el sondeo en vivo podía fallar en este simulador: con el caos alto se
+    // veía un tile en gris pero la gráfica de al lado seguía respondiendo
+    // siempre, algo que el servidor real no promete. Sin esto no había forma
+    // de ensayar "sin conexión" en una gráfica de historia sin desenchufar el
+    // puente de verdad.
+    if (rnd() < chaos.errorPeticion) {
+      throw new Error("simulador EVA: fallo simulado de la petición al historiador");
+    }
+
     const { finMs: fin, pasoMs, n } = resolverRangoSimulado(rango);
     const datos = [];
 

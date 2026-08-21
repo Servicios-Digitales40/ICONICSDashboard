@@ -141,7 +141,9 @@ export function useSerieHistorica(clave, rango = VENTANA) {
  */
 export function useSeriesHistoricas(claves, rango = VENTANA) {
   const source = useEvaSource();
-  const [estado, setEstado] = useState({ filas: [], porClave: {}, loading: true, error: null, hasMore: false });
+  const [estado, setEstado] = useState({
+    filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false,
+  });
   const clavesAnteriores = useRef(null);
 
   const clavesKey = claves.join("|");
@@ -159,27 +161,40 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
     setEstado((prev) =>
       mismasClaves
         ? { ...prev, loading: true, error: null }
-        : { filas: [], porClave: {}, loading: true, error: null, hasMore: false }
+        : { filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false }
     );
 
     const lista = clavesKey ? clavesKey.split("|") : [];
     if (!lista.length) {
-      setEstado({ filas: [], porClave: {}, loading: false, error: null, hasMore: false });
+      setEstado({ filas: [], porClave: {}, metaPorClave: {}, loading: false, error: null, hasMore: false });
       return undefined;
     }
 
+    /*
+     * Antes se descartaba el error de cada señal con
+     * `.catch(() => ({ datos: [], motivo: null, hasMore: false }))`: una
+     * falla de red y un rango genuinamente vacío llegaban indistinguibles a
+     * `porClave`, y `GraficaHistoria` no tenía forma de decir "no se pudo
+     * leer" en vez de "no hay nada aquí". Ahora el motivo de la falla viaja
+     * en `metaPorClave[clave].error`, sin tocar la forma de `porClave` —
+     * `unir()` y el resto de consumidores existentes siguen recibiendo
+     * exactamente los arreglos de puntos que ya esperaban.
+     */
     Promise.all(
-      lista.map((k) => source.leerSerie(k, rango).catch(() => ({ datos: [], motivo: null, hasMore: false })))
-    )
-      .then((resultados) => {
-        if (!vivo) return;
-        const porClave = Object.fromEntries(lista.map((k, i) => [k, resultados[i].datos]));
-        const hasMore = resultados.some((r) => r.hasMore);
-        setEstado({ filas: unir(porClave), porClave, loading: false, error: null, hasMore });
-      })
-      .catch(
-        (err) => vivo && setEstado({ filas: [], porClave: {}, loading: false, error: err.message, hasMore: false })
+      lista.map((k) =>
+        source.leerSerie(k, rango).catch((err) => ({ datos: [], motivo: null, hasMore: false, error: err.message }))
+      )
+    ).then((resultados) => {
+      if (!vivo) return;
+      const porClave = Object.fromEntries(lista.map((k, i) => [k, resultados[i].datos]));
+      const metaPorClave = Object.fromEntries(
+        lista.map((k, i) => [k, { motivo: resultados[i].motivo ?? null, error: resultados[i].error ?? null }])
       );
+      const hasMore = resultados.some((r) => r.hasMore);
+      setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore });
+    });
+    // Sin `.catch` aquí: cada promesa de la lista ya captura su propio
+    // fallo arriba, así que `Promise.all` no puede rechazar por esta vía.
 
     return () => {
       vivo = false;

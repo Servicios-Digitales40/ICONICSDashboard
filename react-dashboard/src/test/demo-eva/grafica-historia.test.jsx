@@ -70,6 +70,31 @@ describe("GraficaHistoria: mensaje según carga y datos", () => {
   });
 });
 
+describe("Plan 13 F9: un fallo de red no se confunde con un rango vacío", () => {
+  // La distinción que importa: "no pasó nada ayer" (sinDato) y "no pude
+  // preguntar por ayer" (sinConexion) llevan a conclusiones opuestas, y antes
+  // de esta fase `useSeriesHistoricas` tragaba el error de cada señal
+  // (`.catch(() => ({ datos: [], motivo: null }))`) así que las dos caían en
+  // el mismo mensaje genérico.
+  it("con error y sin datos: dice que no se pudo consultar, no que el rango está vacío", () => {
+    montar({ datos: [], cargando: false, error: "ECONNREFUSED" });
+    expect(screen.getByText(/No se pudo consultar el historiador/)).toBeTruthy();
+    expect(screen.queryByText("No hay muestras del historiador en este rango.")).toBeNull();
+  });
+
+  it("el error manda incluso si además dice cargando: la causa no se pisa con el estado transitorio", () => {
+    montar({ datos: [], cargando: true, error: "ECONNREFUSED" });
+    expect(screen.getByText(/No se pudo consultar el historiador/)).toBeTruthy();
+    expect(screen.queryByText("Consultando el historiador…")).toBeNull();
+  });
+
+  it("en vivo, un error del historiador no aplica: el búfer no depende de esa consulta", () => {
+    montar({ datos: [], cargando: false, error: "ECONNREFUSED", enVivo: true });
+    expect(screen.getByText("Sin muestras todavía en esta sesión.")).toBeTruthy();
+    expect(screen.queryByText(/No se pudo consultar el historiador/)).toBeNull();
+  });
+});
+
 describe("el eje Y usa la escala de la señal, no el rango de los propios datos", () => {
   // Regresión: con domain=["dataMin","dataMax"] una oscilación de 0.1 (p.
   // ej. 102.01 a 102.12, un valor forzado fuera del 0-100 normal) se

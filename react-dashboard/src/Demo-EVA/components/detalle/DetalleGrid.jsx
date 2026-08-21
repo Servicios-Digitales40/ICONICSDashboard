@@ -80,6 +80,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay }) {
             datos={senal.historiaReal}
             cargando={senal.historiaCargando}
             enVivo={senal.historiaEnVivo}
+            error={senal.historiaError}
             t={t}
             dark={dark}
             alto={150}

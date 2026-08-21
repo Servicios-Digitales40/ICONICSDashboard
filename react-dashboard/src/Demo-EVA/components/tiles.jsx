@@ -34,7 +34,7 @@ import { navegarConMorph, useCountUp, useMounted, usePrefersReducedMotion } from
 
 import { estadoInfo } from "../domain/estado.js";
 import { UMBRALES } from "../domain/umbrales.js";
-import { FRESCURA, presentarValor } from "../data/estadoDelDato.js";
+import { FRESCURA, HISTORIAL, estadoHistorial, presentarValor } from "../data/estadoDelDato.js";
 import { fmtCifra, fmtSenal, fmtVentana, formateadorDe, pctDeEscala } from "../lib/formato.js";
 import { delta } from "../lib/modelo.js";
 import { Card, Cifra, Delta, ESCALA, MONO, PuntoEstado, Spark } from "./base.jsx";
@@ -782,13 +782,17 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
  * Cuatro paneles pequeños con eje propio se comparan por FORMA, que es la
  * pregunta real («¿qué se movió a la vez?»), y cada uno conserva su escala.
  */
-function PanelTendencia({ senal, datos, t, dark }) {
+function PanelTendencia({ senal, datos, error, t, dark }) {
   const filas = (datos ?? []).map((p) => ({
     hora: p.t.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
     valor: p.valor,
   }));
   const col = bandaColor(t, dark, senal.banda);
   const fmt = formateadorDe(senal);
+  // `TendenciaSenales` sólo se monta cuando `PlantaEva` ya terminó de cargar
+  // el historiador (ver su "Leyendo el historiador…"), así que aquí no hay
+  // estado de carga que distinguir: sólo si sobrevivió un fallo de red.
+  const sinConexion = estadoHistorial({ error, datos: filas, minimo: 2 }) === HISTORIAL.SIN_CONEXION;
 
   return (
     <div style={{ minWidth: 0 }}>
@@ -802,8 +806,8 @@ function PanelTendencia({ senal, datos, t, dark }) {
       </div>
 
       {filas.length < 2 ? (
-        <div style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: t.textFaint, textAlign: "center", border: `1px dashed ${t.border}`, borderRadius: 8 }}>
-          sin muestras suficientes
+        <div style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: t.textFaint, textAlign: "center", border: `1px dashed ${t.border}`, borderRadius: 8, padding: "0 10px" }}>
+          {sinConexion ? "no se pudo consultar el historiador" : "sin muestras suficientes"}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={116}>
@@ -823,7 +827,7 @@ function PanelTendencia({ senal, datos, t, dark }) {
   );
 }
 
-export function TendenciaSenales({ senales, porClave, horas, t, dark, delay = 0 }) {
+export function TendenciaSenales({ senales, porClave, metaPorClave, horas, t, dark, delay = 0 }) {
   return (
     <Card
       t={t} delay={delay}
@@ -838,7 +842,10 @@ export function TendenciaSenales({ senales, porClave, horas, t, dark, delay = 0 
     >
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 }}>
         {senales.map((s) => (
-          <PanelTendencia key={s.key} senal={s} datos={porClave[s.key]} t={t} dark={dark} />
+          <PanelTendencia
+            key={s.key} senal={s} datos={porClave[s.key]} error={metaPorClave?.[s.key]?.error}
+            t={t} dark={dark}
+          />
         ))}
       </div>
     </Card>

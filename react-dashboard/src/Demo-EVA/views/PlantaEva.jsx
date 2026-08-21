@@ -122,7 +122,7 @@ function PlantaEva({ onNavigate }) {
   // paneles de cierre leen todos de aquí. Pedirlas por componente serían tres
   // rondas de cuatro peticiones para dibujar exactamente los mismos puntos.
   const claves = useMemo(historizadas, []);
-  const { porClave, loading: cargandoHistoria } = useSeriesHistoricas(claves, VENTANA);
+  const { porClave, metaPorClave, loading: cargandoHistoria } = useSeriesHistoricas(claves, VENTANA);
 
   const m = useMemo(() => buildModeloEva(sistema), [sistema]);
 
@@ -229,7 +229,7 @@ function PlantaEva({ onNavigate }) {
               </p>
             ) : (
               <TendenciaSenales
-                senales={m.destacadas} porClave={porClave} horas={VENTANA.horas}
+                senales={m.destacadas} porClave={porClave} metaPorClave={metaPorClave} horas={VENTANA.horas}
                 t={t} dark={dark} delay={0.45}
               />
             )}

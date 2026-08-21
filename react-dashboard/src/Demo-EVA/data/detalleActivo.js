@@ -40,7 +40,7 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
     [activo]
   );
 
-  const { porClave, loading: historiaLoading, hasMore: historiaHasMore } = useSeriesHistoricas(
+  const { porClave, metaPorClave, loading: historiaLoading, hasMore: historiaHasMore } = useSeriesHistoricas(
     enVivo ? [] : clavesHistoriables,
     rango
   );
@@ -61,16 +61,22 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
     return activo.senales.map((s) => {
       const bufferVivo = series[s.key] ?? [];
       const historiaEnVivo = s.historizado && enVivo;
+      // El modo vivo no le pide nada al historiador, así que un motivo o un
+      // error de una consulta anterior no le pertenecen: `metaPorClave` sólo
+      // se lee fuera de `enVivo`.
+      const meta = s.historizado && !enVivo ? metaPorClave[s.key] : null;
       return {
         ...s,
         historiaReal: s.historizado ? (enVivo ? seriesVivas[s.key] ?? [] : porClave[s.key] ?? []) : null,
         historiaCargando: s.historizado && !enVivo ? historiaLoading : false,
+        historiaMotivo: meta?.motivo ?? null,
+        historiaError: meta?.error ?? null,
         historiaEnVivo,
         bufferVivo,
         deltaBuffer: delta(bufferVivo),
       };
     });
-  }, [activo, porClave, historiaLoading, seriesVivas, enVivo, series]);
+  }, [activo, porClave, metaPorClave, historiaLoading, seriesVivas, enVivo, series]);
 
   return { activo, activos: sistema.activos, variables, loading, error, lastUpdated, historiaHasMore };
 }
