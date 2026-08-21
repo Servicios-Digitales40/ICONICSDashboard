@@ -18,12 +18,12 @@
 > | 3 ✅ | `metaPorClave` (error real) + `GraficaHistoria`/`PanelTendencia` distinguen sinConexion | **F9** | 9 pruebas, `errorPeticion` nuevo en el simulador |
 > | 4 ✅ | `ReferenceArea` + insignia "banda estimada, sin confirmar" | **F4** | 5 pruebas, proxy vía la insignia (Recharts no pinta SVG bajo jsdom) |
 > | 5 ✅ | `lib/exportar.js`: CSV + PNG, sólo en el Detalle | **F5** | 18 pruebas, PNG probado hasta donde jsdom deja |
-> | 6 | Dos señales, eje doble | **F3** | pruebas sobre la gráfica comparada |
+> | 6 ✅ | `GraficaComparada` + `lib/comparar.js` (alineado por tolerancia) | **F3** | 18 pruebas, contra el simulador real |
 > | 7 | El rango en la URL | **F7** | `navegacion.test.jsx` ampliado |
 > | 8 | Modo muro | **F8** | prueba de escala + revisión en pantalla |
 > | 9 | Alarmas del servidor en pantalla | **F1** | contrato + UI con doble |
 >
-> Suite: **271/277** en verde (era 205 al escribir este plan). Ver §5 para
+> Suite: **289/295** en verde (era 205 al escribir este plan). Ver §5 para
 > los hallazgos que corrigieron la propia auditoría al ejecutar.
 
 ---
@@ -296,7 +296,7 @@ un `<a download>` y no necesita prueba de navegador.
 
 ---
 
-### Fase 6 — F3 · Dos señales en la misma gráfica
+### Fase 6 — F3 · Dos señales en la misma gráfica ✅
 
 **Por qué.** «¿La presión cayó cuando cayó la tensión?» es la pregunta de
 diagnóstico, y hoy sólo la puede contestar el asistente con
@@ -524,6 +524,22 @@ observable sin canvas —`prepararSvgParaExportar` a fondo, y que el botón de
 CSV dispare un `Blob` real— y se dejó constancia explícita, en el propio
 código y en la suite, de qué parte del PNG sólo la puede confirmar la
 revisión en pantalla.
+
+**Fase 6.** El propio ejemplo del plan estaba mal: "¿la presión cayó cuando
+cayó la tensión?" usa una señal, tensión de línea, que **no está
+historizada** (`historizado: false` en el catálogo). Nunca podría entrar en
+esta comparación. Se corrigió al ejemplo real —caudal y presión, las dos
+únicas junto con nivel y temperatura— y de paso se confirmó algo más
+importante: las cuatro señales comparables viven en DOS activos distintos
+(Tanque, Distribución), así que la pieza tuvo que salir de la rejilla por
+pestaña, no vivir dentro de ella.
+
+Y "el alineado por tolerancia ya está hecho" tampoco era cierto para el
+frontend: `unir()` exige milisegundo exacto y —comprobado antes de escribir
+nada— no tiene un solo consumidor hoy, nunca se había probado con más de una
+señal real. El alineado que sí existe y sí está en uso (`alinearSeries()`)
+vive en `shared/eva/estadistica.js` para el asistente, y se trajo tal cual
+al frontend en vez de reinventarlo o de confiar a ciegas en `unir()`.
 
 ## 6 · Checklist de revisión en pantalla
 
