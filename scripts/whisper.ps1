@@ -40,8 +40,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$raiz    = Split-Path -Parent $PSScriptRoot
-$whisper = Join-Path (Split-Path -Parent $raiz) 'whisper.cpp'
+$whisper = 'C:\Users\Victor\Desktop\DemoIa\whisper.cpp'
 $exe     = Join-Path $whisper 'bin\Release\whisper-server.exe'
 
 if (-not $Modelo) { $Modelo = Join-Path $whisper 'models\ggml-small.bin' }
