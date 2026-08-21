@@ -31,6 +31,7 @@ import { DERIVADO } from "../domain/estado.js";
 import { esHistorizada, historizadas } from "../domain/senales.js";
 import { PROVISIONALES } from "../domain/umbrales.js";
 import { buildModeloEva } from "../lib/modelo.js";
+import { useAhora } from "../lib/useAhora.js";
 import { UltimaLectura } from "../components/base.jsx";
 import {
   BandaSenales, EstadoSenales, FranjaAtencion, HeroeNivel,
@@ -113,6 +114,8 @@ function NotaProcedencia({ t }) {
 function PlantaEva({ onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, series, ventana, loading, error, lastUpdated } = useSistemaAgua();
+  // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
+  const ahora = useAhora();
 
   // Las cuatro series del historiador se piden UNA vez y se reparten: los
   // sparklines de la banda de KPIs, la tendencia del héroe y los cuatro
@@ -185,7 +188,7 @@ function PlantaEva({ onNavigate }) {
           Señales destacadas
         </SectionLabel>
         <div className="eva-band">
-          <BandaSenales senales={m.destacadas} series={porClave} t={t} dark={dark} base={0.05} />
+          <BandaSenales senales={m.destacadas} series={porClave} t={t} dark={dark} ahora={ahora} base={0.05} />
         </div>
 
         {/* 3 · TITULAR — el nivel del tanque, y lo que lo mueve. */}
@@ -199,7 +202,7 @@ function PlantaEva({ onNavigate }) {
           <div className="eva-activos">
             <RejillaActivos
               activos={sistema.activos} seriesVivas={series} ventana={ventana}
-              t={t} dark={dark} onNavigate={onNavigate} delay={0.3}
+              t={t} dark={dark} onNavigate={onNavigate} ahora={ahora} delay={0.3}
             />
           </div>
         </div>

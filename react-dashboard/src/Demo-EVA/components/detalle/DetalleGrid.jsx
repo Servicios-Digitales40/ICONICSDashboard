@@ -9,15 +9,23 @@
  */
 import { Card, Cifra, Delta, MONO } from "../base.jsx";
 import { fmtNum } from "@/lib/format.js";
+import { FRESCURA, presentarValor } from "../../data/estadoDelDato.js";
 import {
   BandaValor, EstadoBooleano, GraficaAusente, GraficaBufer, GraficaHistoria, InsigniaOrigen,
 } from "./piezas.jsx";
 
 const VALOR_GRANDE = { fontFamily: MONO, fontSize: 30, fontWeight: 700, lineHeight: 1 };
 
-function TarjetaVariable({ senal, t, dark, delay }) {
+function TarjetaVariable({ senal, t, dark, ahora, delay }) {
   const esBooleano = senal.tipo === "booleano";
   const tieneBufer = senal.bufferVivo.length >= 2;
+
+  // La cifra grande es SIEMPRE la lectura en vivo, esté la gráfica de abajo
+  // mirando "Ayer" o lo que sea: ver la cabecera de `data/detalleActivo.js`.
+  const { atenuado, texto: textoCongelado, frescura } = presentarValor({
+    receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: null,
+  });
+  const congelado = frescura === FRESCURA.CONGELADO;
 
   return (
     <Card t={t} delay={delay} style={{ padding: "18px 20px 20px" }}>
@@ -34,12 +42,21 @@ function TarjetaVariable({ senal, t, dark, delay }) {
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-            <Cifra
-              valor={senal.valor}
-              fmt={(v) => fmtNum(v, senal.decimales)}
-              duracion={1000}
-              style={VALOR_GRANDE}
-            />
+            {congelado ? (
+              <span
+                title="El puente no ha vuelto a leer este punto recientemente."
+                style={{ ...VALOR_GRANDE, fontSize: 17, color: t.textFaint }}
+              >
+                {textoCongelado}
+              </span>
+            ) : (
+              <Cifra
+                valor={senal.valor}
+                fmt={(v) => fmtNum(v, senal.decimales)}
+                duracion={1000}
+                style={{ ...VALOR_GRANDE, color: atenuado ? t.textFaint : undefined }}
+              />
+            )}
             {senal.unidad && <span style={{ fontSize: 15, fontWeight: 600, color: t.textSoft }}>{senal.unidad}</span>}
             <Delta
               valor={senal.deltaBuffer}
@@ -87,11 +104,11 @@ function TarjetaVariable({ senal, t, dark, delay }) {
   );
 }
 
-export function DetalleGrid({ variables, t, dark }) {
+export function DetalleGrid({ variables, t, dark, ahora }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18 }}>
       {variables.map((senal, i) => (
-        <TarjetaVariable key={senal.key} senal={senal} t={t} dark={dark} delay={i * 0.07} />
+        <TarjetaVariable key={senal.key} senal={senal} t={t} dark={dark} ahora={ahora} delay={i * 0.07} />
       ))}
     </div>
   );

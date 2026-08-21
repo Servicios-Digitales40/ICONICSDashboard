@@ -27,6 +27,7 @@
  * tiene serie propia (`SIN_SERIE` de `shared/eva/historia.js`), `error`
  * cuando falló la petición. `estadoHistorial()` sólo les pone nombre.
  */
+import { fmtAntiguedad } from "@/lib/format.js";
 
 /** Los cuatro estados de un valor en vivo, de mejor a peor. */
 export const FRESCURA = Object.freeze({
@@ -72,6 +73,34 @@ export function frescuraDe({ receivedAt, stale = false, ahora = new Date() } = {
   if (edadMs >= UMBRAL_CONGELADO_MS) return FRESCURA.CONGELADO;
   if (stale) return FRESCURA.ENVEJECIDO;
   return FRESCURA.FRESCO;
+}
+
+/**
+ * Qué enseñar en el sitio donde hoy va la cifra: el valor mismo, o su edad.
+ *
+ * No decide ESTILOS —eso es de quien lo pinte, que conoce su propio espacio y
+ * su propia tipografía— sólo decide QUÉ TEXTO va ahí y si hace falta atenuar.
+ * `envejecido` atenúa sin sustituir: el valor sigue siendo el dato, sólo que
+ * hay que dejarlo claro con menos énfasis. `congelado` sustituye del todo,
+ * porque a partir de `UMBRAL_CONGELADO_MS` mostrar el número como si fuera de
+ * ahora mismo es la cosa exacta que este módulo existe para evitar.
+ *
+ * @param {object} p
+ * @param {Date|null} p.receivedAt
+ * @param {boolean}   [p.stale]
+ * @param {Date}      [p.ahora]
+ * @param {string}    p.formateado  El valor ya formateado por quien llama
+ *   (`fmtNum`, `fmtSenal`…) — este módulo no sabe de decimales ni de unidades.
+ * @returns {{ texto: string, atenuado: boolean, frescura: string }}
+ */
+export function presentarValor({ receivedAt, stale = false, ahora = new Date(), formateado } = {}) {
+  const frescura = frescuraDe({ receivedAt, stale, ahora });
+
+  if (frescura === FRESCURA.CONGELADO) {
+    return { texto: fmtAntiguedad(receivedAt, ahora.getTime()), atenuado: true, frescura };
+  }
+
+  return { texto: formateado, atenuado: frescura === FRESCURA.ENVEJECIDO, frescura };
 }
 
 /** Los cinco estados de una serie del historiador. */

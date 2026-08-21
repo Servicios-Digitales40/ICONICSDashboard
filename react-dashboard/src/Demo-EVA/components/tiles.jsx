@@ -34,6 +34,7 @@ import { navegarConMorph, useCountUp, useMounted, usePrefersReducedMotion } from
 
 import { estadoInfo } from "../domain/estado.js";
 import { UMBRALES } from "../domain/umbrales.js";
+import { FRESCURA, presentarValor } from "../data/estadoDelDato.js";
 import { fmtCifra, fmtSenal, fmtVentana, formateadorDe, pctDeEscala } from "../lib/formato.js";
 import { delta } from "../lib/modelo.js";
 import { Card, Cifra, Delta, ESCALA, MONO, PuntoEstado, Spark } from "./base.jsx";
@@ -118,9 +119,20 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
  * devuelve la curva de la temperatura del tanque. Esas viven en la tarjeta de
  * su activo, donde la ausencia de serie cabe explicada en una línea.
  */
-function StatSenal({ senal, serie, t, dark, delay }) {
+function StatSenal({ senal, serie, t, dark, delay, ahora }) {
   const valores = serie?.map((p) => p.valor) ?? [];
   const color = bandaColor(t, dark, senal.banda);
+
+  const { atenuado, texto: textoCongelado, frescura } = presentarValor({
+    receivedAt: senal.receivedAt,
+    stale: senal.stale,
+    ahora,
+    formateado: null, // fresco/envejecido no lo usan: los pinta <Cifra> animado.
+  });
+  // `atenuado` cubre envejecido Y congelado; sólo congelado sustituye por
+  // completo el número — animar un conteo hacia un valor que va a
+  // desaparecer bajo su propia edad no tendría sentido.
+  const congelado = frescura === FRESCURA.CONGELADO;
 
   return (
     <Card t={t} delay={delay} style={{ padding: "14px 16px 15px", gap: 0 }}>
@@ -128,12 +140,21 @@ function StatSenal({ senal, serie, t, dark, delay }) {
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
         <div>
-          <Cifra
-            valor={senal.valor}
-            fmt={(v) => fmtNum(v, senal.decimales)}
-            duracion={1100}
-            style={{ ...ESCALA.kpi, color, display: "block" }}
-          />
+          {congelado ? (
+            <span
+              title="El puente no ha vuelto a leer este punto recientemente."
+              style={{ ...ESCALA.kpi, fontSize: 15, color: t.textFaint, display: "block" }}
+            >
+              {textoCongelado}
+            </span>
+          ) : (
+            <Cifra
+              valor={senal.valor}
+              fmt={(v) => fmtNum(v, senal.decimales)}
+              duracion={1100}
+              style={{ ...ESCALA.kpi, color: atenuado ? t.textFaint : color, display: "block" }}
+            />
+          )}
           <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
             <Delta
               valor={delta(valores)}
@@ -226,12 +247,12 @@ export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
   );
 }
 
-export function BandaSenales({ senales, series, t, dark, base = 0 }) {
+export function BandaSenales({ senales, series, t, dark, ahora, base = 0 }) {
   return (
     <>
       {senales.map((s, i) => (
         <div className="eva-kpi" key={s.key}>
-          <StatSenal senal={s} serie={series[s.key]} t={t} dark={dark} delay={base + i * 0.05} />
+          <StatSenal senal={s} serie={series[s.key]} t={t} dark={dark} ahora={ahora} delay={base + i * 0.05} />
         </div>
       ))}
     </>
@@ -428,10 +449,17 @@ function TendenciaNivel({ datos, senal, t, dark }) {
  * El estado NUNCA se codifica sólo con color: punto + borde + etiqueta de
  * texto. El color es refuerzo, no el canal de identidad.
  */
-function FilaSenal({ senal, serieViva, t, dark }) {
+function FilaSenal({ senal, serieViva, t, dark, ahora }) {
   const info = estadoInfo(senal.estado);
   const col = estadoColor(dark, senal.estado);
   const reposo = senal.estado === "reposo";
+
+  const { texto: textoValor, atenuado } = presentarValor({
+    receivedAt: senal.receivedAt,
+    stale: senal.stale,
+    ahora,
+    formateado: fmtSenal(senal),
+  });
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0" }}>
@@ -455,12 +483,14 @@ function FilaSenal({ senal, serieViva, t, dark }) {
       )}
 
       <span
+        title={atenuado ? "El puente no ha vuelto a leer este punto recientemente." : undefined}
         style={{
-          ...ESCALA.dato, fontSize: 13, color: reposo ? t.textFaint : t.text,
+          ...ESCALA.dato, fontSize: atenuado ? 11 : 13,
+          color: atenuado ? t.textFaint : reposo ? t.textFaint : t.text,
           textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap",
         }}
       >
-        {fmtSenal(senal)}
+        {textoValor}
       </span>
 
       <span style={{ fontSize: 9.5, color: t.textFaint, width: 52, textAlign: "right", flexShrink: 0 }}>
@@ -470,7 +500,7 @@ function FilaSenal({ senal, serieViva, t, dark }) {
   );
 }
 
-function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, delay = 0 }) {
+function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay = 0 }) {
   const reduce = usePrefersReducedMotion();
   const col = estadoColor(dark, activo.estado);
   const info = estadoInfo(activo.estado);
@@ -535,14 +565,14 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, delay = 0 }) 
 
       <div style={{ borderTop: `1px solid ${t.border}` }}>
         {activo.senales.map((s) => (
-          <FilaSenal key={s.key} senal={s} serieViva={seriesVivas[s.key]} t={t} dark={dark} />
+          <FilaSenal key={s.key} senal={s} serieViva={seriesVivas[s.key]} t={t} dark={dark} ahora={ahora} />
         ))}
       </div>
     </div>
   );
 }
 
-export function RejillaActivos({ activos, seriesVivas, ventana, t, dark, onNavigate, delay = 0 }) {
+export function RejillaActivos({ activos, seriesVivas, ventana, t, dark, onNavigate, ahora, delay = 0 }) {
   return (
     <Card
       t={t} tono="navegacion" delay={delay}
@@ -558,7 +588,7 @@ export function RejillaActivos({ activos, seriesVivas, ventana, t, dark, onNavig
         {activos.map((a, i) => (
           <TarjetaActivo
             key={a.id} activo={a} seriesVivas={seriesVivas} t={t} dark={dark}
-            onNavigate={onNavigate} delay={delay + 0.1 + i * 0.05}
+            onNavigate={onNavigate} ahora={ahora} delay={delay + 0.1 + i * 0.05}
           />
         ))}
       </div>

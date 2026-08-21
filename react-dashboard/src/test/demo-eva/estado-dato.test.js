@@ -16,6 +16,7 @@ import {
   UMBRAL_CONGELADO_MS,
   estadoHistorial,
   frescuraDe,
+  presentarValor,
 } from "@/Demo-EVA/data/estadoDelDato.js";
 
 describe("frescuraDe: el valor en vivo", () => {
@@ -56,6 +57,38 @@ describe("frescuraDe: el valor en vivo", () => {
   it("un reloj ligeramente adelantado no produce una edad negativa ni revienta", () => {
     const receivedAt = new Date(ahora.getTime() + 500);
     expect(frescuraDe({ receivedAt, stale: false, ahora })).toBe(FRESCURA.FRESCO);
+  });
+});
+
+describe("presentarValor: qué texto va en el sitio de la cifra", () => {
+  const ahora = new Date("2026-08-21T12:00:00Z");
+
+  it("fresco: el formateado tal cual, sin atenuar", () => {
+    const receivedAt = new Date(ahora.getTime() - 2_000);
+    expect(presentarValor({ receivedAt, stale: false, ahora, formateado: "62,5 %" }))
+      .toEqual({ texto: "62,5 %", atenuado: false, frescura: FRESCURA.FRESCO });
+  });
+
+  it("envejecido: el mismo formateado, pero atenuado — no se sustituye", () => {
+    const receivedAt = new Date(ahora.getTime() - 10_000);
+    const r = presentarValor({ receivedAt, stale: true, ahora, formateado: "62,5 %" });
+    expect(r.texto).toBe("62,5 %");
+    expect(r.atenuado).toBe(true);
+    expect(r.frescura).toBe(FRESCURA.ENVEJECIDO);
+  });
+
+  it("congelado: el formateado SE SUSTITUYE por la edad, y va atenuado", () => {
+    const receivedAt = new Date(ahora.getTime() - 90_000);
+    const r = presentarValor({ receivedAt, stale: true, ahora, formateado: "62,5 %" });
+    expect(r.texto).not.toBe("62,5 %");
+    expect(r.texto).toMatch(/hace/);
+    expect(r.atenuado).toBe(true);
+    expect(r.frescura).toBe(FRESCURA.CONGELADO);
+  });
+
+  it("sinDato: pasa el formateado tal cual (el «—» ya lo decide quien formatea)", () => {
+    const r = presentarValor({ receivedAt: null, ahora, formateado: "—" });
+    expect(r).toEqual({ texto: "—", atenuado: false, frescura: FRESCURA.SIN_DATO });
   });
 });
 

@@ -25,6 +25,7 @@ import { useDetalleActivo } from "../data/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../data/historia.js";
 import { ACTIVO_IDS, activoInfo } from "../domain/activos.js";
 import { estadoInfo } from "../domain/estado.js";
+import { useAhora } from "../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../components/base.jsx";
 import { estadoColor } from "../components/paleta.js";
 import { DetalleGrid } from "../components/detalle/DetalleGrid.jsx";
@@ -75,6 +76,8 @@ function DetalleActivo({ params, onNavigate }) {
   // (calcularlo de más sin usarlo sería trabajo sin motivo).
   const [presetActivo, setPresetActivo] = useState("vivo");
   const [rango, setRango] = useState(VENTANA);
+  // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
+  const ahora = useAhora();
 
   function elegirPreset(key) {
     setPresetActivo(key);
@@ -148,7 +151,7 @@ function DetalleActivo({ params, onNavigate }) {
           </div>
         )}
 
-        <DetalleGrid variables={variables} t={t} dark={dark} />
+        <DetalleGrid variables={variables} t={t} dark={dark} ahora={ahora} />
       </div>
     </div>
   );
