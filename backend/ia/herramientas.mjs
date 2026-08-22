@@ -111,6 +111,9 @@ import {
 } from '../../shared/eva/historia.js'
 import { isGoodQuality } from '../../shared/quality.js'
 import { TIPOS, isoLocal, resolverPeriodo } from '../../shared/periodo.js'
+import { randomUUID } from 'node:crypto'
+import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 /**
  * Ventana máxima que se puede pedir de una vez, en horas. Siete días.
@@ -143,6 +146,17 @@ const MAX_DIAS_PERFIL = 30
  * percentil no distingue lo habitual de lo que pasó el martes.
  */
 const MIN_MUESTRAS_PERFIL = 30
+
+/**
+ * Ventana máxima de un reporte, en días (Plan 14 Fase 5).
+ *
+ * Más ancha que `MAX_HORAS_VENTANA` (7 días) a propósito: un reporte agrega
+ * por día, no por punto de 15 min, así que el mismo argumento de resolución
+ * que limita `historia_de_senal` no aplica aquí igual de estricto. Un mes
+ * cubre con margen el ejemplo de referencia del plan ("un reporte de 8
+ * días") sin dejarlo sin techo.
+ */
+const MAX_DIAS_REPORTE = 31
 
 /**
  * Ventana relativa por defecto cuando no se dice período: las mismas 6 h que
@@ -329,7 +343,7 @@ function senalDesconocida(texto) {
  *
  * @returns {{ inicio: Date, fin: Date, etiqueta: string } | { error: string }}
  */
-export function resolverVentana(texto, { turnos = {} } = {}) {
+export function resolverVentana(texto, { turnos = {}, maxHoras = MAX_HORAS_VENTANA } = {}) {
   const crudo = String(texto ?? '').trim()
   const ahora = new Date()
 
@@ -368,12 +382,12 @@ export function resolverVentana(texto, { turnos = {} } = {}) {
      */
     const n = horas[1] ? Number(horas[1]) : (horas[2] === 'horas' ? VENTANA_POR_DEFECTO : 1)
     if (n < 1) return { error: 'La ventana tiene que ser de al menos una hora.' }
-    if (n > MAX_HORAS_VENTANA) {
+    if (n > maxHoras) {
       return {
         error:
           `${n} horas son demasiadas para una sola lectura: con el tope de ${MAX_PUNTOS} muestras ` +
           `del servidor, cada punto sería el promedio de varias horas y el máximo dejaría de ser ` +
-          `el pico real. Como mucho ${MAX_HORAS_VENTANA} horas (7 días). ${ALTERNATIVAS}`,
+          `el pico real. Como mucho ${maxHoras} horas (${Math.round(maxHoras / 24)} días). ${ALTERNATIVAS}`,
       }
     }
     return ventanaDeHoras(n, ahora)
@@ -420,12 +434,12 @@ export function resolverVentana(texto, { turnos = {} } = {}) {
   }
 
   const duracionHoras = (finReal - inicio) / 3_600_000
-  if (duracionHoras > MAX_HORAS_VENTANA) {
+  if (duracionHoras > maxHoras) {
     return {
       error:
-        `"${p.etiqueta}" abarca más de 7 días. Con el tope de ${MAX_PUNTOS} muestras del ` +
-        `servidor, cada punto sería el promedio de varias horas y los extremos dejarían de ser ` +
-        `los reales. ${ALTERNATIVAS}`,
+        `"${p.etiqueta}" abarca más de ${Math.round(maxHoras / 24)} días. Con el tope de ` +
+        `${MAX_PUNTOS} muestras del servidor, cada punto sería el promedio de varias horas y los ` +
+        `extremos dejarían de ser los reales. ${ALTERNATIVAS}`,
     }
   }
 
@@ -504,6 +518,10 @@ export function createHerramientas({
   turnos = {},
   readOnly = true,
   indiceDocumentos = null,
+  // Carpeta y purga de los PDF de `generar_reporte` (Plan 14 Fase 5). Mismo
+  // criterio que `indiceDocumentos`: un objeto de configuración, no variables
+  // de entorno leídas aquí — eso lo hace `config.mjs`.
+  reportes = null,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -599,17 +617,31 @@ export function createHerramientas({
    * operador sin perfil por un hueco del historiador.
    */
   async function leerHistoriaLarga(clave, dias) {
+    const ahora = new Date()
+    const { muestras, diasLeidos } = await leerSerieEnRango(clave, {
+      inicio: new Date(ahora.getTime() - dias * 86400000),
+      fin: ahora,
+    })
+    return { muestras, diasLeidos }
+  }
+
+  /**
+   * Igual que arriba, pero para un rango explícito en vez de "N días hacia
+   * atrás desde ahora". La usa `generar_reporte` (Plan 14 Fase 5), que puede
+   * pedir cualquier ventana, no sólo la que termina en el presente.
+   */
+  async function leerSerieEnRango(clave, { inicio, fin }) {
     const muestras = []
     let diasLeidos = 0
-    const ahora = Date.now()
+    const dias = Math.max(1, Math.ceil((fin - inicio) / 86400000))
 
-    // Se piden en paralelo: son lecturas independientes, y treinta idas y
+    // Se piden en paralelo: son lecturas independientes, y muchas idas y
     // vueltas en serie contra el historiador convertirían esto en un minuto.
     const peticiones = []
     for (let d = 0; d < dias; d++) {
-      const fin = new Date(ahora - d * 86400000)
-      const inicio = new Date(fin.getTime() - 86400000)
-      peticiones.push(leerSerie(clave, { inicio, fin }))
+      const diaInicio = new Date(inicio.getTime() + d * 86400000)
+      const diaFin = new Date(Math.min(diaInicio.getTime() + 86400000, fin.getTime()))
+      peticiones.push(leerSerie(clave, { inicio: diaInicio, fin: diaFin }))
     }
 
     for (const resultado of await Promise.all(peticiones)) {
@@ -618,7 +650,7 @@ export function createHerramientas({
       muestras.push(...resultado.datos)
     }
 
-    return { muestras, diasLeidos }
+    return { muestras, diasLeidos, diasTotal: dias }
   }
 
   /* ── Presentación de una señal ─────────────────────────────────────── */
@@ -1553,6 +1585,173 @@ export function createHerramientas({
     },
 
     /**
+     * Reporte PDF de la instalación: gráficos de las señales con historia,
+     * tabla de valores actuales de las demás (Plan 14 Fase 5).
+     *
+     * ── MISMO CONTRATO QUE grafico_de_senal, CON UN ENLACE EN VEZ DE UNA IMAGEN ──
+     *
+     * El PDF nunca viaja al modelo, ni siquiera como adjunto binario: viaja
+     * un ENLACE (`_adjunto.url`), porque a diferencia del SVG del gráfico —que
+     * la pantalla pinta inline— el reporte es un archivo que se descarga.
+     * `GET /api/reportes` lo sirve por separado. Ninguna cifra del PDF la
+     * escribe el modelo: las compone este archivo con datos reales del
+     * historiador, igual que hace `grafico_de_senal`.
+     */
+    async generar_reporte({ senales, periodo } = {}) {
+      const v = resolverVentana(periodo, { turnos, maxHoras: MAX_DIAS_REPORTE * 24 })
+      if (v.error) return fallo(v.error)
+
+      let claves
+      const desconocidas = []
+      if (senales && senales.length) {
+        claves = []
+        for (const nombre of senales) {
+          const clave = resolverSenal(nombre)
+          if (clave) claves.push(clave)
+          else desconocidas.push(nombre)
+        }
+        if (!claves.length) {
+          return fallo(
+            `Ninguna de las señales pedidas se reconoce: ${desconocidas.join(', ')}. El catálogo ` +
+              'está en tus instrucciones.'
+          )
+        }
+      } else {
+        claves = [...SENAL_KEYS]
+      }
+
+      const historizadasPedidas = claves.filter(esHistorizada)
+      const sinHistoriaPedidas = claves.filter(c => !esHistorizada(c))
+      const notas = []
+
+      const graficos = historizadasPedidas.length
+        ? await Promise.all(
+          historizadasPedidas.map(async clave => {
+            const meta = senalInfo(clave)
+            const { muestras, diasLeidos, diasTotal } = await leerSerieEnRango(clave, v)
+
+            if (!muestras.length) {
+              return {
+                titulo: meta.label,
+                unidad: meta.unidad || null,
+                svg: null,
+                resumen: null,
+                nota: `Sin muestras de ${meta.label} en ${v.etiqueta}.`,
+              }
+            }
+
+            let svg
+            try {
+              svg = renderizarGraficoSerie(muestras, {
+                titulo: meta.label,
+                unidad: meta.unidad || null,
+                banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave]) : null,
+              })
+            } catch (error) {
+              return {
+                titulo: meta.label,
+                unidad: meta.unidad || null,
+                svg: null,
+                resumen: null,
+                nota: `No se pudo dibujar ${meta.label}: ${error.message}`,
+              }
+            }
+
+            if (diasLeidos < diasTotal) {
+              notas.push(
+                `${meta.label}: sólo se pudieron leer ${diasLeidos} de ${diasTotal} días del historiador.`
+              )
+            }
+
+            return {
+              titulo: meta.label,
+              unidad: meta.unidad || null,
+              svg,
+              resumen: resumirSerie(muestras, meta.decimales),
+              nota: null,
+            }
+          })
+        )
+        : []
+
+      let tablaActual = []
+      if (sinHistoriaPedidas.length) {
+        const estado = await herramientas.estado_del_sistema()
+        if (estado.ok) {
+          const todas = estado.activos.flatMap(a => a.senales)
+          tablaActual = sinHistoriaPedidas.map(clave => {
+            const meta = senalInfo(clave)
+            const s = todas.find(x => x.clave === clave)
+            return s
+              ? { senal: s.senal, valor: s.valor, unidad: s.unidad, estado: s.estado }
+              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: 'sin dato' }
+          })
+        } else {
+          notas.push('No se pudo leer el valor actual de las señales sin historia.')
+        }
+      }
+
+      if (desconocidas.length) {
+        notas.push(`No se reconocieron estas señales y se omitieron: ${desconocidas.join(', ')}.`)
+      }
+      if (sinHistoriaPedidas.length) {
+        notas.push(
+          `${sinHistoriaPedidas.length} de las ${claves.length} señales pedidas no tienen serie ` +
+            'histórica en este servidor; van con su valor actual, sin gráfico.'
+        )
+      }
+
+      // Carga perezosa DENTRO de la herramienta, nunca en la cabecera del
+      // módulo: si pdfkit no está instalado, esto falla y se captura aquí sin
+      // tumbar el backend. Ver la cabecera de `reporte.mjs`.
+      let reporteMod
+      try {
+        reporteMod = await import('./reporte.mjs')
+      } catch (error) {
+        return fallo(
+          'Los reportes PDF no están disponibles ahora mismo: falta instalar las dependencias del ' +
+            `backend. El resto del asistente sigue funcionando. (${error.message})`
+        )
+      }
+
+      if (!reportes?.dir) {
+        return fallo('Los reportes PDF no están configurados en este servidor.')
+      }
+
+      const pdf = await reporteMod.componerReportePdf({
+        instalacion: 'Sistema de agua industrial',
+        periodo: v.etiqueta,
+        generadoEl: horaLocal(new Date().toISOString()),
+        graficos,
+        tablaActual,
+        notas,
+      })
+
+      const id = randomUUID()
+      await mkdir(reportes.dir, { recursive: true })
+      await purgarReportesViejos(reportes.dir, reportes.maxDias)
+      await writeFile(join(reportes.dir, `${id}.pdf`), pdf)
+
+      return {
+        ok: true,
+        instalacion: 'Sistema de agua industrial',
+        periodo: v.etiqueta,
+        senalesConGrafico: historizadasPedidas.map(c => senalInfo(c).label),
+        senalesEnTabla: sinHistoriaPedidas.map(c => senalInfo(c).label),
+        ...(notas.length ? { notas } : {}),
+        nota:
+          'El reporte ya se ha generado y el enlace de descarga se le ha entregado al usuario; no ' +
+          'hace falta que describas el PDF punto por punto, sólo confirma qué trae.',
+        _adjunto: {
+          tipo: 'reporte',
+          formato: 'pdf',
+          url: `/api/reportes?id=${id}`,
+          titulo: `Reporte — ${v.etiqueta}`,
+        },
+      }
+    },
+
+    /**
      * Busca en la documentación de planta.
      *
      * ── POR QUÉ VIAJA LA RELEVANCIA ────────────────────────────────────
@@ -1897,6 +2096,38 @@ export function createHerramientas({
 }
 
 /* ── Auxiliares ─────────────────────────────────────────────────────── */
+
+/**
+ * Purga perezosa de reportes viejos (Plan 14 Fase 5).
+ *
+ * Mismo criterio que `pruneBatchCache` en `iconics/client.mjs` y `prune` en
+ * `http/rateLimit.mjs`: se dispara en la propia operación —aquí, antes de
+ * escribir el siguiente PDF— y no con un `setInterval`. Un directorio que no
+ * existe todavía no es un error: no hay nada que purgar.
+ */
+async function purgarReportesViejos(dir, maxDias) {
+  let nombres
+  try {
+    nombres = await readdir(dir)
+  } catch {
+    return
+  }
+
+  const limite = Date.now() - maxDias * 86400000
+  await Promise.all(
+    nombres
+      .filter(nombre => nombre.endsWith('.pdf'))
+      .map(async nombre => {
+        const ruta = join(dir, nombre)
+        try {
+          const stats = await stat(ruta)
+          if (stats.mtimeMs < limite) await unlink(ruta)
+        } catch {
+          // Otro proceso pudo haberlo borrado ya; no es un fallo de esta purga.
+        }
+      })
+  )
+}
 
 /**
  * Redondeo que **conserva el hueco**.
@@ -2452,6 +2683,39 @@ export const DEFINICIONES = [
           periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
         },
         required: ['senal'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'generar_reporte',
+      description:
+        'Genera un PDF descargable de la instalación: un gráfico por cada señal con historia que ' +
+        'se pida (o las cuatro, si no se nombra ninguna) más una tabla con el valor actual de las ' +
+        'que no tienen serie. Úsala para "genera un reporte", "quiero un PDF de esta semana", ' +
+        '"expórtame los datos del tanque". El período admite hasta unos 31 días —más que ' +
+        'historia_de_senal— porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
+        'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senales: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Nombres de señal en lenguaje llano, ej. ["nivel", "temperatura"]. Si se omite, entra ' +
+              'la instalación entera: las cuatro señales con historia como gráfico y las otras ' +
+              'cuatro como tabla de valores actuales.',
+          },
+          periodo: {
+            type: 'string',
+            description:
+              'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, pero ' +
+              'admite ventanas más largas (hasta ~31 días). Si se omite, las últimas 6 horas.',
+          },
+        },
+        required: [],
       },
     },
   },

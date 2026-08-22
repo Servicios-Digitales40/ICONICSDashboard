@@ -87,6 +87,10 @@ const DEFAULTS = {
    * audio no suba de paso el de todos los POST de la API.
    */
   maxAudioBytes: 6 * 1024 * 1024,
+  /** Carpeta de salida de los PDF de `generar_reporte` (Plan 14 Fase 5). */
+  reportesDir: join('datos', 'reportes'),
+  /** Antigüedad, en días, a partir de la cual un reporte se purga solo. */
+  reportesMaxDias: 30,
 }
 
 /*
@@ -219,6 +223,19 @@ function readIaBase(rawValue) {
 function readDocsDir(rawValue) {
   if (!rawValue) return ''
   return normalize(isAbsolute(rawValue) ? rawValue : join(PROJECT_ROOT, rawValue))
+}
+
+/**
+ * Carpeta de salida de los reportes PDF. A diferencia de `readDocsDir`, vacío
+ * NO significa «desactivado» — `generar_reporte` no depende de un sistema
+ * externo ni de credenciales, sólo de disco, así que siempre tiene un sitio
+ * donde escribir. La carpeta se crea sola en la primera escritura.
+ */
+function readReportesDir(rawValue) {
+  const relativeOrAbsolute = rawValue || DEFAULTS.reportesDir
+  return normalize(
+    isAbsolute(relativeOrAbsolute) ? relativeOrAbsolute : join(PROJECT_ROOT, relativeOrAbsolute)
+  )
 }
 
 function readStaticDir(rawValue) {
@@ -431,6 +448,17 @@ export function loadConfig(env = process.env) {
           'IA_WHISPER_TIMEOUT_MS', env.IA_WHISPER_TIMEOUT_MS, DEFAULTS.whisperTimeoutMs, 1
         ),
       }),
+    }),
+
+    /**
+     * Reportes PDF (Plan 14 Fase 5). `dir` es donde se guardan y desde donde
+     * los sirve `GET /api/reportes`; `maxDias` es el umbral de la purga
+     * perezosa que `generar_reporte` dispara en cada escritura, mismo
+     * criterio que `pruneBatchCache` en `iconics/client.mjs`.
+     */
+    reportes: Object.freeze({
+      dir: readReportesDir(env.IA_REPORTES_DIR),
+      maxDias: readInteger('IA_REPORTES_MAX_DIAS', env.IA_REPORTES_MAX_DIAS, DEFAULTS.reportesMaxDias, 1),
     }),
 
     /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */

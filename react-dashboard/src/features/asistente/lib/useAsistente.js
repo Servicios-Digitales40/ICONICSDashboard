@@ -332,7 +332,7 @@ async function leerFlujo(respuesta, manejadores) {
       else if (evento.tipo === "cola") manejadores.onCola(evento.porDelante);
       else if (evento.tipo === "texto") manejadores.onTexto(evento.delta);
       else if (evento.tipo === "herramienta") manejadores.onHerramienta(evento.nombre, evento.argumentos);
-      else if (evento.tipo === "adjunto") manejadores.onAdjunto(evento);
+      else if (evento.tipo === "adjunto") manejadores.onAdjunto(evento.adjunto);
       else if (evento.tipo === "fin") manejadores.onFin(evento);
       else if (evento.tipo === "error") manejadores.onError(evento.mensaje);
     }

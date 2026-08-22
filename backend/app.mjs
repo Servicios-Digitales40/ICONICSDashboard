@@ -21,6 +21,7 @@ import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import { logger } from './logger.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
+import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
 import { registerVozRoutes } from './routes/vozRoutes.mjs'
 
@@ -84,6 +85,7 @@ export function createApp(config) {
     turnos: config.ia.turnos,
     readOnly: config.iconics.readOnly,
     indiceDocumentos,
+    reportes: config.reportes,
   })
   const chat = createChat({ config, herramientas })
 
@@ -104,6 +106,7 @@ export function createApp(config) {
   registerIconicsRoutes(router, { config, client })
   registerChatRoutes(router, { config, chat, cola })
   registerVozRoutes(router, { config, voz })
+  registerReportesRoutes(router, { config })
 
   async function route(request, response) {
     if (!request.url) {

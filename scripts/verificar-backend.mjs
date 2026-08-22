@@ -36,6 +36,9 @@ import { createServer } from 'node:http'
 import assert from 'node:assert/strict'
 import { connect } from 'node:net'
 import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
@@ -693,6 +696,35 @@ console.log('\n── Endurecimiento · caché de lote (B.7) ──────�
     assert.equal(batchCount, 3, `llamadas upstream=${batchCount}`)
   })
   server2.close()
+}
+
+console.log('\n── Reportes PDF (Plan 14 §5) ────────────────────────────────')
+{
+  const reportesDir = await mkdtemp(join(tmpdir(), 'iconics-reportes-http-'))
+  const { base: reportesBase, server } = await mount({ IA_REPORTES_DIR: reportesDir })
+
+  const idInvalido = await call(reportesBase, '/api/reportes?id=no-es-un-uuid')
+  check('id con formato inválido → 400, sin tocar disco', () => {
+    assert.equal(idInvalido.status, 400)
+  })
+
+  const idBienFormadoPeroInexistente = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
+  const noExiste = await call(reportesBase, `/api/reportes?id=${idBienFormadoPeroInexistente}`)
+  check('id bien formado pero inexistente → 404', () => {
+    assert.equal(noExiste.status, 404)
+  })
+
+  const idReal = '11111111-2222-3333-4444-555555555555'
+  await mkdir(reportesDir, { recursive: true })
+  await writeFile(join(reportesDir, `${idReal}.pdf`), '%PDF-1.4 contenido de prueba')
+  const descarga = await call(reportesBase, `/api/reportes?id=${idReal}`)
+  check('un reporte existente se descarga con Content-Type y Content-Disposition correctos', () => {
+    assert.equal(descarga.status, 200)
+    assert.equal(descarga.headers.get('content-type'), 'application/pdf')
+    assert.match(descarga.headers.get('content-disposition') ?? '', /^attachment; filename="reporte-/)
+  })
+
+  server.close()
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')

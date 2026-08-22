@@ -329,6 +329,9 @@ function instrucciones(catalogo, maxPasos) {
     '  d) consultar_documentacion para texto libre del manual, o limites_del_manual para un',
     '     número de límite concreto —máximo, mínimo, rango admisible— de una señal.',
     '',
+    'Si piden un reporte, un PDF o "expórtame los datos", usa generar_reporte en vez de las',
+    'herramientas sueltas: entrega un enlace de descarga, no describas cifras que no has leído.',
+    '',
     'Y AL REDACTAR EL DIAGNÓSTICO:',
     '',
     'Separa SIEMPRE dos cosas, y dilo con estas palabras o parecidas: lo que has MEDIDO y lo',
@@ -770,7 +773,16 @@ export function createChat({ config, herramientas }) {
 
         // Los adjuntos van directos a la pantalla y NUNCA a los mensajes. Ver
         // `separarAdjuntos`.
-        for (const adjunto of adjuntos) onEvento({ tipo: 'adjunto', ...adjunto })
+        //
+        // Anidado, y NO `{ tipo: 'adjunto', ...adjunto }`: un adjunto ya trae
+        // su propio campo `tipo` ('grafico', 'reporte'...), y ese spread lo
+        // colocaba DESPUÉS del `tipo: 'adjunto'` de fuera — así que lo
+        // sobrescribía. El evento llegaba como `{ tipo: 'grafico', ... }` o
+        // `{ tipo: 'reporte', ... }`, nunca como `{ tipo: 'adjunto' }`, y
+        // `useAsistente.js` sólo enruta a `onAdjunto` cuando `tipo` es
+        // exactamente "adjunto": el adjunto entero se perdía en silencio, sin
+        // error en ningún lado. Anidarlo bajo `adjunto` es inequívoco.
+        for (const adjunto of adjuntos) onEvento({ tipo: 'adjunto', adjunto })
 
         // Una repetición no se apunta en la traza ni cuenta como consulta: no
         // se leyó nada. Enseñarla al operador como una línea más de procedencia

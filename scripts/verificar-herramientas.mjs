@@ -35,6 +35,9 @@
  * Código de salida: 0 si todo se cumple, 1 si algo falla.
  */
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   createHerramientas,
   resolverSenal,
@@ -913,11 +916,111 @@ await checkAsync('el dossier es repetible: mismo síntoma, mismo resultado', asy
   assert.equal(sinReloj(a), sinReloj(b))
 })
 
+/* ── generar_reporte (Plan 14 §5) ────────────────────────────────────── */
+
+console.log('\n── generar_reporte ──────────────────────────────────────────')
+
+/** Carpeta temporal aislada por prueba, para no ensuciar `datos/reportes` real. */
+async function reportesTmp() {
+  const dir = await mkdtemp(join(tmpdir(), 'iconics-reportes-'))
+  return { dir, maxDias: 30 }
+}
+
+await checkAsync('sin período válido, error, sin tocar el historiador', async () => {
+  const client = clienteFalso()
+  const manana = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+  const r = await createHerramientas({ client, reportes: await reportesTmp() }).ejecutar(
+    'generar_reporte',
+    { periodo: manana }
+  )
+  assert.equal(r.ok, false)
+  assert.equal(client.historial.length, 0)
+})
+
+await checkAsync('sin carpeta de reportes configurada, se niega con un error claro', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('generar_reporte', {})
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no están configurados/i)
+})
+
+await checkAsync(
+  'señales por defecto: las 4 con historia como gráfico, las 4 sin historia en tabla, y el PDF ' +
+    'se escribe a disco de verdad',
+  async () => {
+    const reportes = await reportesTmp()
+    const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
+      'generar_reporte',
+      {}
+    )
+
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.senalesConGrafico.sort(), [
+      'Caudal instantáneo', 'Nivel del tanque', 'Presión relativa', 'Temperatura del tanque',
+    ].sort())
+    assert.deepEqual(r.senalesEnTabla.sort(), [
+      'Carga de trabajo del motor', 'Eficiencia energética', 'Modo del variador', 'Tensión de línea',
+    ].sort())
+
+    // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo
+    // contrato que `grafico_de_senal` con el SVG.
+    assert.equal(r._adjunto.tipo, 'reporte')
+    assert.match(r._adjunto.url, /^\/api\/reportes\?id=[0-9a-f-]{36}$/i)
+
+    const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
+    const contenido = await readFile(join(reportes.dir, `${id}.pdf`))
+    assert.equal(contenido.subarray(0, 4).toString(), '%PDF', 'el archivo escrito es un PDF de verdad')
+  }
+)
+
+await checkAsync('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
+  const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
+    'generar_reporte',
+    { senales: ['nivel', 'tensión'] }
+  )
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
+  assert.deepEqual(r.senalesEnTabla, ['Tensión de línea'])
+})
+
+await checkAsync('una señal inventada en la lista se ignora y se reporta, no rompe el reporte', async () => {
+  const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
+    'generar_reporte',
+    { senales: ['nivel', 'xyzzy inexistente'] }
+  )
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
+  assert.ok(r.notas.some(n => /no se reconocieron/i.test(n)))
+})
+
+await checkAsync('si ninguna señal pedida se reconoce, error claro y no un reporte vacío', async () => {
+  const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
+    'generar_reporte',
+    { senales: ['inventada uno', 'inventada dos'] }
+  )
+  assert.equal(r.ok, false)
+})
+
+await checkAsync('la purga borra reportes más viejos que el umbral, sin tocar los recientes', async () => {
+  const reportes = await reportesTmp()
+  const viejo = join(reportes.dir, 'viejo.pdf')
+  const reciente = join(reportes.dir, 'reciente.pdf')
+  await writeFile(viejo, 'x')
+  await writeFile(reciente, 'x')
+  const haceMucho = new Date(Date.now() - 40 * 86400000)
+  await utimes(viejo, haceMucho, haceMucho)
+
+  await createHerramientas({ client: clienteFalso(), reportes }).ejecutar('generar_reporte', {})
+
+  const nombres = await readdir(reportes.dir)
+  assert.ok(!nombres.includes('viejo.pdf'), 'el viejo (40 días, tope 30) se purga')
+  assert.ok(nombres.includes('reciente.pdf'), 'el recién creado no se toca')
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son once herramientas, y sólo una de ellas escribe', () => {
+check('son doce herramientas, y sólo una de ellas escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -929,6 +1032,7 @@ check('son once herramientas, y sólo una de ellas escribe', () => {
     'perfil_de_senal',
     'correlacionar_senales',
     'grafico_de_senal',
+    'generar_reporte',
     'consultar_documentacion',
     'limites_del_manual',
     'diagnostico',

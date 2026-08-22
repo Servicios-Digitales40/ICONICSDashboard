@@ -1,0 +1,9 @@
+{
+  "name": "iconics-backend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pdfkit": "^0.15.0",
+    "svg-to-pdfkit": "^0.1.8"
+  }
+}

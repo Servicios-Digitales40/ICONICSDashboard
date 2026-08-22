@@ -70,9 +70,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, FileText, Loader2, Maximize2, Mic,
-  Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square, Trash2,
-  TriangleAlert, X,
+  ArrowDown, Ban, Bot, Check, Copy, FileDown, FileText, Loader2, Maximize2,
+  Mic, Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
+  Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
 import {
@@ -823,11 +823,12 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         )
       )}
 
-      {/* Los gráficos, debajo de la respuesta que los comenta. Llegan por su
-          propio evento y nunca pasan por el modelo: lo que se ve aquí son
-          puntos del historiador, no algo que el asistente haya «dibujado». */}
+      {/* Gráficos y reportes, debajo de la respuesta que los comenta. Llegan
+          por su propio evento y nunca pasan por el modelo: lo que se ve aquí
+          son puntos del historiador o un PDF ya compuesto por el backend,
+          nunca algo que el asistente haya «dibujado» o inventado. */}
       {adjuntos.map((adjunto, i) => (
-        <Grafico key={i} t={t} adjunto={adjunto} />
+        <AdjuntoVista key={i} t={t} adjunto={adjunto} />
       ))}
 
       {mensaje.error && (
@@ -902,6 +903,18 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
  * `encodeURIComponent` y no base64: pesa menos, se lee al depurar, y evita el
  * viaje por `btoa`, que además rompe con los acentos de los rótulos.
  */
+/**
+ * Reparte un adjunto al componente que sabe pintarlo, por `formato` — no por
+ * `tipo`: el `tipo` del adjunto ('grafico', 'reporte'...) no sobrevive al
+ * evento SSE que lo envuelve (ver la nota en `chat.mjs` junto a donde se
+ * emite), así que `formato` es el campo estable para distinguir uno de otro.
+ */
+function AdjuntoVista({ t, adjunto }) {
+  if (adjunto?.formato === "svg") return <Grafico t={t} adjunto={adjunto} />;
+  if (adjunto?.formato === "pdf") return <ReporteDescarga t={t} adjunto={adjunto} />;
+  return null;
+}
+
 function Grafico({ t, adjunto }) {
   if (adjunto?.formato !== "svg" || !adjunto.contenido) return null;
 
@@ -916,6 +929,34 @@ function Grafico({ t, adjunto }) {
         }}
       />
     </figure>
+  );
+}
+
+/**
+ * El enlace de descarga de un reporte PDF (Plan 14 Fase 5).
+ *
+ * El PDF nunca pasa por el modelo ni por este componente: `adjunto.url` es
+ * la ruta de `GET /api/reportes`, y es el navegador quien lo descarga. Un
+ * `<a href download>` normal basta — no hay nada que sanear, porque no hay
+ * contenido ajeno inyectado en el DOM, sólo un enlace.
+ */
+function ReporteDescarga({ t, adjunto }) {
+  if (adjunto?.formato !== "pdf" || !adjunto.url) return null;
+
+  return (
+    <a
+      href={adjunto.url}
+      download
+      style={{
+        marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6,
+        fontSize: 12, fontWeight: 600, padding: "7px 12px", borderRadius: 8,
+        border: `1px solid ${t.border}`, background: t.hover, color: t.text,
+        textDecoration: "none", fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      <FileDown size={14} />
+      {adjunto.titulo || "Descargar reporte"}
+    </a>
   );
 }
 
