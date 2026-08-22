@@ -8,7 +8,11 @@ Fase 3 (markdown) completa y verificada: 42/42 en verificar-chat.mjs, 17/17 en a
 
 Fase 7.1 (transporte falso) completa y verificada: 12/12 en el nuevo verificar-transporte-falso.mjs, sin regresiones en verificar-herramientas.mjs (53), verificar-backend.mjs (51) ni la suite del frontend (355). `ICONICS_FAKE=true` levanta el backend entero —tablero, historiador, asistente— sin `ICONICS_API_BASE`. La física se movió a `shared/eva/simulador.js` y la sirven por igual el simulador del frontend y `backend/iconics/fakeClient.mjs`.
 
-Desbloqueadas para trabajar sin hardware ni servidor ICONICS: fase 2 (modelo, sólo necesita GPU), fase 4 (diagnóstico, con calidad limitada por umbrales sin confirmar) y ~90 % de la fase 5 (reportes).
+Desbloqueadas para trabajar sin hardware ni servidor ICONICS: fase 2 (modelo, sólo necesita GPU) y ~90 % de la fase 5 (reportes).
+
+Fase 4 (diagnóstico) completa y verificada: dos herramientas nuevas en `backend/ia/herramientas.mjs` —`limites_del_manual({ senal })` y `diagnostico({ sintoma, periodo })`—, con `chat.mjs` actualizado para que el modelo prefiera `diagnostico` como primera llamada ante una avería. Los dos escenarios del entregable están cubiertos por prueba y pasan de forma repetible: "caudal abundante por sobretensión progresiva" (mezcla una señal con historia y otra sin ella, sin romper ni inventar la correlación que falta) y "parada tras un pico de 200 V contra el manual" (el exceso sale calculado y fechado — 53 V sobre el máximo documentado de 150 V, comparado contra la lectura en vivo porque la tensión de línea no tiene historia). 9 comprobaciones nuevas en `verificar-herramientas.mjs` (62/62 en total), sin regresiones en verificar-chat.mjs (42), verificar-backend.mjs (51), verificar-transporte-falso.mjs (12) ni la suite del frontend (355).
+
+Nota de calidad: el diagnóstico depende de umbrales sin confirmar (§0.3) para todo lo que no venga de `limites_del_manual` — los candidatos del manual sí son datos reales del PDF, pero las bandas de "en aviso"/"fuera de límite" del resto de la respuesta siguen siendo estimaciones nuestras.
 
 Pendiente: si hay alarmas configuradas (§6) y si se puede exportar historia real del servidor (§7.3).
 

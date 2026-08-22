@@ -93,6 +93,10 @@ export const ESTADOS = {
   // suyo porque `controlar_bomba` relee el punto para confirmar el efecto. Un
   // «Consultando ICONICS…» ahí diría que se está leyendo algo que no es.
   controlando: 'Actuando sobre la bomba…',
+  // `diagnostico` hace varias lecturas por dentro (estado, historia,
+  // correlación, manual): un «Consultando ICONICS…» fijo durante ese rato
+  // parece colgado porque no cambia, cuando SÍ está avanzando.
+  diagnosticando: 'Reuniendo el dossier de diagnóstico…',
   redactando: 'Redactando la respuesta…',
 }
 
@@ -113,6 +117,8 @@ const ESTADO_POR_HERRAMIENTA = {
   correlacionar_senales: ESTADOS.analizando,
   grafico_de_senal: ESTADOS.consultando,
   consultar_documentacion: ESTADOS.documentacion,
+  limites_del_manual: ESTADOS.documentacion,
+  diagnostico: ESTADOS.diagnosticando,
   controlar_bomba: ESTADOS.controlando,
 }
 
@@ -301,8 +307,15 @@ function instrucciones(catalogo, maxPasos) {
     '',
     'CÓMO SE DIAGNOSTICA UNA AVERÍA:',
     '',
-    'Si te preguntan por qué ha fallado algo, o qué ha podido causar un problema, ése es',
-    'justamente el caso para encadenar consultas. El camino que funciona es:',
+    'Si te preguntan por qué ha fallado algo, o qué ha podido causar un problema, o te describen',
+    'un síntoma, EMPIEZA por diagnostico({ sintoma }): en una sola llamada reúne el estado, la',
+    'historia con fecha de los extremos, la correlación entre las señales implicadas y los',
+    'límites del manual, con el exceso sobre esos límites ya calculado. Nombra en el síntoma las',
+    'señales que el usuario haya mencionado. Normalmente es la ÚNICA llamada que hace falta para',
+    'un diagnóstico; no la sigas con las herramientas sueltas de abajo salvo que el dossier se',
+    'quede corto de verdad.',
+    '',
+    'Si necesitas algo más suelto que diagnostico no cubre, o quieres una sola pieza:',
     '',
     '  a) estado_del_sistema, para ver cómo está todo AHORA y qué señal está mal.',
     '  b) analisis_de_senal o historia_de_senal sobre las señales sospechosas, para ver qué',
@@ -313,7 +326,8 @@ function instrucciones(catalogo, maxPasos) {
     '  c) correlacionar_senales cuando quieras saber si dos magnitudes se movieron a la vez.',
     '     Eso es lo que distingue "la presión cayó porque cayó la tensión" de "las dos cosas',
     '     pasaron el mismo día".',
-    '  d) consultar_documentacion si el manual dice algo del componente o del código de error.',
+    '  d) consultar_documentacion para texto libre del manual, o limites_del_manual para un',
+    '     número de límite concreto —máximo, mínimo, rango admisible— de una señal.',
     '',
     'Y AL REDACTAR EL DIAGNÓSTICO:',
     '',

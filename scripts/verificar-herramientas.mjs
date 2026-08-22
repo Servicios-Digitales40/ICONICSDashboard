@@ -183,6 +183,23 @@ function clienteFalso({
   }
 }
 
+/**
+ * Índice de documentación de mentira: `buscar()` ignora la consulta y
+ * devuelve los fragmentos que se le pasan, en el mismo orden. Aquí no se
+ * prueba BM25 —eso es cosa de `documentos.mjs`— sino que `limites_del_manual`
+ * y `diagnostico` extraen y componen bien lo que el índice les da.
+ */
+function indiceDocumentosFalso(fragmentos) {
+  return {
+    async buscar(_consulta, { top = 3 } = {}) {
+      return fragmentos.slice(0, top)
+    },
+    estado() {
+      return { cargado: true, carpeta: 'x', modo: 'BM25', documentos: [], ilegibles: [] }
+    },
+  }
+}
+
 console.log(`\n${c.negrita}Herramientas del asistente · sistema de agua${c.reset}`)
 
 /* ── El catálogo ─────────────────────────────────────────────────────── */
@@ -693,11 +710,214 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
   assert.equal(client.historial.length, 0)
 })
 
+/* ── limites_del_manual (Plan 14 §4) ─────────────────────────────────── */
+
+console.log('\n── limites_del_manual ───────────────────────────────────────')
+
+await checkAsync('sin documentación cargada, lo dice y no inventa un límite', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('limites_del_manual', {
+    senal: 'tensión',
+  })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene documentación/i)
+})
+
+await checkAsync('una señal que no existe se rechaza igual que en las demás herramientas', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'el OEE' })
+  assert.equal(r.ok, false)
+  assert.equal(r.senales.length, 8)
+})
+
+await checkAsync('un número junto a una palabra de límite es un candidato citable', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'Manual_Sistema.pdf', pagina: 12, score: 0.8,
+      texto: 'La tensión de línea no debe exceder los 150 V en ningún momento de operación.',
+    },
+  ])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'tensión' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.candidatos.length, 1)
+  const [cand] = r.candidatos
+  assert.equal(cand.valor, 150)
+  assert.equal(cand.unidad, 'v')
+  assert.equal(cand.documento, 'Manual_Sistema.pdf')
+  assert.equal(cand.pagina, 12)
+})
+
+await checkAsync('una página sobre la señal sin ningún patrón de límite lo dice, no inventa uno', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'Manual.pdf', pagina: 3, score: 0.5, texto: 'La tensión de línea alimenta el variador de frecuencia.' },
+  ])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'tensión' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /ning[uú]na tiene un n[uú]mero/i)
+})
+
+await checkAsync('«máximo» y «mínimo» CON acento se reconocen, no sólo sin él', async () => {
+  // Bug real, encontrado probando contra un PDF de verdad: el patrón sólo
+  // cubría "maxim"/"minim" sin tilde, así que nunca casaba con el texto
+  // normal de un manual en español, que casi siempre lleva acento.
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'M.pdf', pagina: 1, score: 0.8,
+      texto: 'La presión relativa tiene un mínimo de 2 psi y un máximo de 5.8 psi.',
+    },
+  ])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'presión' })
+
+  assert.equal(r.ok, true)
+  const valores = r.candidatos.map(c => c.valor).sort((a, b) => a - b)
+  assert.deepEqual(valores, [2, 5.8])
+})
+
+await checkAsync('el límite de una señal no se cuela como candidato de otra en el mismo fragmento', async () => {
+  // Bug real: un fragmento de 900 caracteres habla de varias señales
+  // seguidas, y sin comprobar que el nombre de la señal está en la misma
+  // oración, pedir el límite de la tensión devolvía también el de la carga.
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'M.pdf', pagina: 1, score: 0.8,
+      texto:
+        'Tensión de línea. La tensión de línea no debe exceder los 150 V.\n' +
+        'Carga del motor. La carga del motor no debe exceder el 95 por ciento.',
+    },
+  ])
+  const h = createHerramientas({ client: clienteFalso(), indiceDocumentos })
+
+  const tension = await h.ejecutar('limites_del_manual', { senal: 'tensión' })
+  assert.equal(tension.candidatos.length, 1)
+  assert.equal(tension.candidatos[0].valor, 150)
+
+  const carga = await h.ejecutar('limites_del_manual', { senal: 'carga del motor' })
+  assert.equal(carga.candidatos.length, 1)
+  assert.equal(carga.candidatos[0].valor, 95)
+})
+
+await checkAsync('un rango ambiguo ("de 100 a 132") no produce un exceso falso en el diagnóstico', async () => {
+  // Bug real: "rango admisible de 100 V a 132 V" capturaba el 100 —el SUELO
+  // del rango— y `diagnostico` lo trataba como un techo, así que una lectura
+  // normal de 121 V salía como "21 V por encima del máximo documentado".
+  // "rango admisible" es ambiguo a propósito y no debe alimentar el cálculo.
+  const client = clienteFalso({ valores: { ...EN_REPOSO, INDICE_DESVIACION_VOLTAJE: 121 } })
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'M.pdf', pagina: 1, score: 0.8,
+      texto: 'La tensión de línea tiene un rango admisible de 100 V a 132 V.',
+    },
+  ])
+  const r = await createHerramientas({ client, indiceDocumentos }).ejecutar('diagnostico', {
+    sintoma: 'revisar la tensión de línea',
+  })
+
+  assert.equal(r.excesosSobreLimite.length, 0, 'un rango ambiguo no debe producir un exceso')
+})
+
+/* ── diagnostico (Plan 14 §4) ────────────────────────────────────────── */
+
+console.log('\n── diagnostico ──────────────────────────────────────────────')
+
+await checkAsync('sin síntoma no hay nada que diagnosticar', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {})
+  assert.equal(r.ok, false)
+})
+
+await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se dice por qué', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
+    sintoma: 'algo va mal, no sé qué',
+  })
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.senalesConsideradas.sort(), [
+    'Caudal instantáneo', 'Nivel del tanque', 'Presión relativa', 'Temperatura del tanque',
+  ].sort())
+  assert.match(r.nota, /no nombraba ninguna señal/i)
+})
+
+await checkAsync(
+  'escenario 1 · "caudal abundante por sobretensión progresiva": mezcla una señal CON historia ' +
+    'y otra SIN historia, y no rompe ni inventa la correlación que falta',
+  async () => {
+    const client = clienteFalso()
+    const r = await createHerramientas({ client }).ejecutar('diagnostico', {
+      sintoma: 'caudal abundante por una sobretensión progresiva en la línea',
+    })
+
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.senalesConsideradas.sort(), ['Caudal instantáneo', 'Tensión de línea'].sort())
+
+    // El caudal SÍ tiene historia: tiene que haberse leído.
+    assert.ok(r.medido.historia.some(h => h.senal === 'Caudal instantáneo'))
+    // La tensión NO tiene historia: no puede aparecer como serie leída, y
+    // tampoco puede haber salido a la red a pedirla (client.historial vacío
+    // de esa señal, igual que comprueba verificar-herramientas para
+    // historia_de_senal).
+    assert.ok(!r.medido.historia.some(h => h.senal === 'Tensión de línea'))
+
+    // Con una sola señal historizada de las dos consideradas, no se pide
+    // correlación — y el dossier tiene que decir por qué, no callarlo.
+    assert.equal(typeof r.medido.correlacion, 'string')
+    assert.match(r.medido.correlacion, /al menos dos/i)
+  }
+)
+
+await checkAsync(
+  'escenario 2 · "parada tras un pico de 200 V contra el manual": el exceso sale calculado y ' +
+    'fechado, con la señal SIN historia comparada contra su lectura en vivo',
+  async () => {
+    const client = clienteFalso({ valores: { ...EN_REPOSO, INDICE_DESVIACION_VOLTAJE: 203 } })
+    const indiceDocumentos = indiceDocumentosFalso([
+      {
+        archivo: 'Manual_Sistema.pdf', pagina: 12, score: 0.8,
+        texto: 'La tensión de línea no debe exceder los 150 V en ningún momento de operación.',
+      },
+    ])
+
+    const r = await createHerramientas({ client, indiceDocumentos }).ejecutar('diagnostico', {
+      sintoma: 'la bomba se paró después de un pico de tensión',
+    })
+
+    assert.equal(r.ok, true)
+    assert.ok(r.documentacion.porSenal.some(d => d.senal === 'Tensión de línea'))
+
+    assert.equal(r.excesosSobreLimite.length, 1)
+    const [exceso] = r.excesosSobreLimite
+    assert.equal(exceso.senal, 'Tensión de línea')
+    assert.equal(exceso.fuente, 'lectura en vivo', 'la tensión no tiene historia: tiene que venir de la lectura en vivo')
+    assert.equal(exceso.medido, 203)
+    assert.equal(exceso.limiteDocumentado, 150)
+    assert.equal(exceso.exceso, 53)
+    assert.ok(exceso.cuando, 'el exceso tiene que llevar fecha/hora')
+    assert.equal(exceso.documento, 'Manual_Sistema.pdf')
+  }
+)
+
+await checkAsync('el dossier es repetible: mismo síntoma, mismo resultado', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'M.pdf', pagina: 1, score: 0.5, texto: 'El nivel del tanque máximo admisible es 95 %.' },
+  ])
+  const nuevo = () => createHerramientas({ client: clienteFalso(), indiceDocumentos })
+
+  const a = await nuevo().ejecutar('diagnostico', { sintoma: 'el nivel del tanque parece alto' })
+  const b = await nuevo().ejecutar('diagnostico', { sintoma: 'el nivel del tanque parece alto' })
+
+  // Se descarta `leidoA`/`cuando`, que dependen del reloj de la máquina que
+  // ejecuta la prueba y no de la lógica que se quiere comprobar.
+  const sinReloj = (x) => JSON.stringify(x, (k, v) => (k === 'leidoA' || k === 'cuando' ? undefined : v))
+  assert.equal(sinReloj(a), sinReloj(b))
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son nueve herramientas, y sólo una de ellas escribe', () => {
+check('son once herramientas, y sólo una de ellas escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -710,6 +930,8 @@ check('son nueve herramientas, y sólo una de ellas escribe', () => {
     'correlacionar_senales',
     'grafico_de_senal',
     'consultar_documentacion',
+    'limites_del_manual',
+    'diagnostico',
   ])
 
   /*

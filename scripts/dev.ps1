@@ -16,6 +16,11 @@
            COMPILACION: Vite la pliega a un literal y la rama entera
            desaparece del bundle. Ver react-dashboard/src/lib/flags.js.
 
+           El script compila `dist` antes de arrancar (`npm run build`), asi
+           que :3001 siempre enseña el build de HOY y no uno de hace tres
+           dias. Es un paso mas de arranque -unos segundos-, saltable con
+           -SinBuild si ya compilaste y solo quieres reiniciar rapido.
+
     :5173  el dev server de Vite, que lee las banderas al arrancar. Aqui si
            salen los prototipos, y ademas hay recarga en caliente.
 
@@ -33,8 +38,17 @@
   Arranca Vite sin las banderas de superficie, para ver la aplicacion tal y
   como la vera la planta pero con recarga en caliente.
 
+.PARAMETER SinBuild
+  Se salta el `npm run build` y arranca con el `dist` que ya hubiera. Para
+  cuando acabas de compilar y solo quieres reiniciar los dos procesos rapido;
+  sin este parametro, :3001 puede quedarse enseñando un build de una sesion
+  anterior sin que nada lo avise.
+
 .EXAMPLE
   .\scripts\dev.ps1
+
+.EXAMPLE
+  .\scripts\dev.ps1 -SinBuild
 
 .EXAMPLE
   # Si responde "la ejecucion de scripts esta deshabilitada en este sistema":
@@ -44,7 +58,8 @@
 #>
 [CmdletBinding()]
 param(
-  [switch]$SinPrototipos
+  [switch]$SinPrototipos,
+  [switch]$SinBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,6 +75,25 @@ if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
   throw "Faltan las dependencias del frontend. Ejecuta: cd react-dashboard; npm install"
 }
 
+# Se compila ANTES de arrancar nada, no en paralelo con los dos procesos: el
+# backend en :3001 sirve `dist` desde el primer segundo, y arrancarlo contra
+# un build a medio escribir serviria una pantalla rota o vieja sin que nada lo
+# avisara. `npm run build` no vuela en Windows PowerShell 5.1: su codigo de
+# salida solo llega a $LASTEXITCODE, nunca lanza por si mismo.
+if (-not $SinBuild) {
+  Write-Host ''
+  Write-Host '  compilando el frontend (npm run build)...' -ForegroundColor DarkGray
+  Push-Location $frontend
+  try {
+    npm run build
+    if ($LASTEXITCODE -ne 0) {
+      throw "npm run build fallo (codigo $LASTEXITCODE). Revisa el error de arriba; -SinBuild lo salta si ya tienes un dist valido."
+    }
+  } finally {
+    Pop-Location
+  }
+  Write-Host '  build listo' -ForegroundColor DarkGray
+}
 
 # pwsh si esta; si no, Windows PowerShell. El script funciona en ambos.
 $shell = if (Get-Command pwsh -ErrorAction SilentlyContinue) { 'pwsh' } else { 'powershell' }

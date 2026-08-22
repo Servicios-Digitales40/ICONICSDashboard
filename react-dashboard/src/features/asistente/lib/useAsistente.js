@@ -700,6 +700,8 @@ export const ETIQUETA_HERRAMIENTA = {
   correlacionar_senales: "Cruzó varias señales del historiador",
   grafico_de_senal: "Dibujó la serie del historiador",
   consultar_documentacion: "Buscó en la documentación de planta",
+  limites_del_manual: "Buscó un límite documentado en el manual",
+  diagnostico: "Reunió estado + historia + correlación + manual en un dossier",
 };
 
 /**
@@ -748,6 +750,10 @@ export function describirConsulta(nombre, argumentos) {
   // el modelo de la pregunta del usuario, y es donde se ve si buscó otra cosa.
   const consulta = leer(argumentos.pregunta);
   if (consulta) partes.push(`«${consulta}»`);
+
+  // El síntoma de `diagnostico`, igual de literal y por el mismo motivo.
+  const sintoma = leer(argumentos.sintoma);
+  if (sintoma) partes.push(`«${sintoma}»`);
 
   if (nombre === "comparar_periodos") {
     const a = leer(argumentos.periodoA);
