@@ -17,6 +17,7 @@ import { createHerramientas } from './ia/herramientas.mjs'
 import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
+import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import { logger } from './logger.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
@@ -29,7 +30,16 @@ export function createApp(config) {
   logger.setLevel(config.logLevel)
 
   const authenticator = createAuthenticator(config)
-  const client = createIconicsClient(config, authenticator)
+  // `ICONICS_FAKE=true` (Plan 14 §7.1): el resto del backend —rutas, chat,
+  // herramientas— no se entera de cuál de los dos corre, porque los dos
+  // cumplen la misma firma. Con el falso arriba se avisa alto: es el único
+  // modo en el que ningún dato de este proceso viene de la planta.
+  if (config.iconics.fake) {
+    logger.warn('ICONICS_FAKE=true: sirviendo datos SIMULADOS, ningún dato viene de la planta')
+  }
+  const client = config.iconics.fake
+    ? createFakeIconicsClient()
+    : createIconicsClient(config, authenticator)
   const staticFiles = createStaticFileServer(config.staticDir)
   const cors = createCors(config.corsOrigins)
   const rateLimiter = createRateLimiter({

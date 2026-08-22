@@ -128,9 +128,13 @@ export function callar() {
 /**
  * Prepara un texto para que suene bien dicho.
  *
- * El asistente ya escribe en texto llano —se le prohíbe el markdown en las
- * instrucciones— así que aquí sólo quedan las cosas que se ven bien y se oyen
- * mal:
+ * El asistente escribe markdown desde la fase 3 (regla 12 del prompt): el
+ * panel lo renderiza, pero la voz lee texto plano, así que aquí hace falta
+ * quitar el marcado ANTES de las sustituciones de siempre. Sin esto, «**62
+ * %**» se oiría con los asteriscos deletreados o, según la voz de SAPI, en
+ * silencio — ninguna de las dos es aceptable en una lectura de proceso.
+ *
+ * Lo que ya quitaba esta función sigue haciendo falta:
  *
  *  - Los símbolos que la voz deletrea o se salta. El «⚠» del aviso se lee como
  *    nada en unas voces y como «símbolo de advertencia» en otras; decir la
@@ -142,6 +146,15 @@ export function callar() {
  */
 function paraLeer(texto) {
   return String(texto ?? '')
+    // Marcado de markdown: negrita, títulos, código, comillas de cita.
+    // Sueltos y no por pares, mismo motivo que tenía `limpiarMarkdown` en el
+    // backend antes de retirarse: aquí ya no hace falta ese cuidado porque el
+    // texto llega ENTERO, no en trozos de streaming.
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .replace(/`/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s?/gm, '')
     .replace(/⚠\s*/g, 'Atención: ')
     .replace(/^[·•\-*]\s*/gm, '')
     .replace(/(\d)\s*%/g, '$1 por ciento')

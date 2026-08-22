@@ -200,65 +200,6 @@ const MARCADO_HERRAMIENTA = ['<tool_call>', '<function=', '<tools>', '<|tool_cal
 /** Longitud del marcador más largo, para no partirlo entre dos trozos. */
 const MARGEN_MARCADO = Math.max(...MARCADO_HERRAMIENTA.map(m => m.length))
 
-/**
- * Quita el markdown que el modelo escribe pese a tenerlo prohibido.
- *
- * ── POR QUÉ HACE FALTA SI YA ESTÁ EN LAS INSTRUCCIONES ─────────────
- *
- * Porque la regla 12 se la salta. Medido con qwen2.5:7b contra Ollama, a la
- * pregunta más simple de todas:
- *
- *     - **Nivel del tanque**: 55.2%
- *
- * El panel del asistente pinta el texto tal cual —es `whiteSpace: pre-wrap`,
- * no un renderizador de markdown— así que eso llega a la pantalla de planta
- * con los asteriscos puestos. No es un fallo grave, es un fallo FEO, y de los
- * que aparecen en la primera frase de una demostración.
- *
- * Mismo criterio que las demás redes de seguridad de este archivo: una regla
- * del prompt que el modelo puede ignorar no es una garantía. Y el modelo se
- * cambia con una variable de entorno, así que el arreglo no puede vivir sólo
- * en unas instrucciones escritas para el que corre hoy.
- *
- * ── QUÉ NO TOCA ────────────────────────────────────────────────────
- *
- * Los guiones y asteriscos que NO son marcado. Un rango como «3-5 bar» o una
- * resta llevan guion, y el de viñeta sólo cuenta al principio de línea. Los
- * asteriscos sueltos se dejan: sólo se quitan los pares, que es lo que produce
- * la negrita.
- */
-function limpiarMarkdown(texto, empiezaLinea) {
-  /*
-   * Los marcadores se quitan SUELTOS, no por pares, y esto es lo único no
-   * obvio de la función.
-   *
-   * Una expresión que exigiera el par —abrir con dos asteriscos, capturar el
-   * contenido y cerrar con otros dos— no funciona aquí, y falla de una forma
-   * que sólo se ve con el flujo real: el texto se emite en trozos, y entre el
-   * marcador que abre y el que cierra caben más caracteres de los que se
-   * retienen, así que casi nunca caen en el mismo trozo. La expresión no
-   * casaba jamás y los asteriscos salían igual a la pantalla.
-   *
-   * Quitarlos sueltos es seguro AQUÍ porque el asistente escribe texto llano
-   * sobre lecturas de proceso: ni un nivel, ni una presión, ni un nombre de
-   * tag de este árbol lleva asteriscos dobles, guiones bajos dobles ni acentos
-   * graves. En un chat de propósito general esto sería demasiado agresivo; en
-   * éste, un asterisco doble sólo puede venir de que el modelo se saltó la
-   * regla 12 de sus instrucciones.
-   */
-  let resultado = texto
-    .replace(/\*\*/g, '')
-    .replace(/__/g, '')
-    .replace(/`/g, '')
-
-  // Los marcadores de principio de línea: títulos y viñetas. Sólo cuentan
-  // pegados al salto, por eso hace falta saber si este trozo empieza línea.
-  resultado = resultado.replace(/\n[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+)/g, '\n')
-  if (empiezaLinea) resultado = resultado.replace(/^[ \t]*(?:#{1,6}[ \t]+|[-*+][ \t]+)/, '')
-
-  return resultado
-}
-
 /** Posición del primer marcado en el texto, o -1. */
 function buscarMarcado(texto) {
   let primero = -1
@@ -400,9 +341,10 @@ function instrucciones(catalogo, maxPasos) {
     '11. No traduzcas los períodos ni las fechas. Si te preguntan por "la última hora", por',
     '    "las últimas 3 horas" o por "ayer a las 12", pasa ESE TEXTO tal cual a la herramienta:',
     '    el servidor sabe resolverlo y tú no. Calcular calendarios no es tu trabajo aquí.',
-    '12. Escribe en TEXTO LLANO. Nada de markdown: ni **negritas**, ni ## títulos, ni viñetas',
-    '    con * o -. El panel del asistente pinta el texto tal cual, así que los asteriscos se',
-    '    ven como asteriscos. Si necesitas enumerar, usa una línea por cosa y frases cortas.',
+    '12. Puedes usar markdown para dar estructura: **negrita** para resaltar una cifra o una',
+    '    palabra clave, viñetas con - para enumerar, ## para un título si la respuesta tiene',
+    '    varias secciones. El panel lo renderiza. No lo fuerces en una respuesta corta de una',
+    '    frase: úsalo cuando de verdad ayude a leer, no como decoración.',
     '13. Responde a lo que se te ha preguntado y para ahí. La herramienta te devuelve las ocho',
     '    señales siempre, pero a "¿qué nivel tiene el tanque?" se contesta con el nivel, no',
     '    con un informe de la instalación entera.',
@@ -584,6 +526,9 @@ export function createChat({ config, herramientas }) {
    * rendija. Es imperceptible: son unos pocos caracteres de retraso sobre un
    * texto que llega a 40 tok/s.
    *
+   * El markdown que escribe el modelo sale tal cual: lo renderiza el panel
+   * (ver `Asistente.jsx`), así que aquí no se toca.
+   *
    * @returns {{ texto: string, marcado: boolean }}
    */
   async function pasadaRedactando(messages, signal, onEvento) {
@@ -594,10 +539,6 @@ export function createChat({ config, herramientas }) {
     let pendiente = ''    // texto leído y aún no emitido
     let emitido = ''
     let marcado = false
-    // Si el próximo trozo empieza una línea: lo necesita `limpiarMarkdown`
-    // para saber si un «- » es una viñeta o un signo menos. Empieza en `true`
-    // porque el primer carácter de la respuesta sí abre línea.
-    let enInicioDeLinea = true
 
     /** Emite lo que ya es seguro y avisa si aparece marcado de herramienta. */
     const vaciar = (final = false) => {
@@ -608,7 +549,7 @@ export function createChat({ config, herramientas }) {
         // A partir de aquí el modelo dejó de contestar y empezó a pedir otra
         // herramienta. Lo que va delante suele ser un preámbulo («voy a
         // consultar…»), así que se emite y se corta ahí.
-        const util = limpiarMarkdown(pendiente.slice(0, corte), enInicioDeLinea)
+        const util = pendiente.slice(0, corte)
         if (util) { emitido += util; onEvento({ tipo: 'texto', delta: util }) }
         pendiente = ''
         marcado = true
@@ -616,58 +557,15 @@ export function createChat({ config, herramientas }) {
       }
 
       // Se retiene la cola por si es el principio de un marcador partido.
-      let corteSeguro = final ? pendiente.length : Math.max(0, pendiente.length - MARGEN_MARCADO)
-
-      /*
-       * Y se retrocede si el corte cae DENTRO de un marcador de markdown.
-       *
-       * Sin esto, `limpiarMarkdown` recibía un `*` suelto al final de un trozo
-       * y el otro `*` al principio del siguiente: ninguno de los dos parecía un
-       * marcador, y el par salía intacto a la pantalla. El síntoma medido era
-       * «Presión**: 3.1» — con el asterisco de apertura bien quitado y el de
-       * cierre puesto, que es de los fallos que parecen aleatorios porque
-       * dependen de dónde caiga el trozo.
-       *
-       * Son como mucho dos caracteres de retroceso, imperceptibles.
-       */
-      while (corteSeguro > 0 && !final && /[*_#]/.test(pendiente[corteSeguro - 1])) {
-        corteSeguro -= 1
-      }
-
-      /*
-       * Lo mismo con las VIÑETAS, que se parten de otra manera.
-       *
-       * Un marcador de principio de línea son tres cosas seguidas —el salto, el
-       * guion y el espacio— y `limpiarMarkdown` sólo lo reconoce si las tres
-       * están en el mismo trozo. Medido contra qwen2.5:7b: un trozo acabó en
-       * «…encender si:\n-» y el siguiente empezó en « El nivel», así que ni el
-       * primero tenía el espacio ni el segundo el salto, y el guion salía a la
-       * pantalla. Cuatro de las cinco viñetas se limpiaban y una no, que es lo
-       * que hacía parecer el fallo aleatorio.
-       *
-       * Se retrocede hasta antes del salto de línea, dejando la línea entera
-       * para el trozo siguiente. Cuesta unos caracteres de retraso sobre un
-       * texto que ya llega troceado.
-       */
-      if (!final) {
-        const colaIncompleta = pendiente.slice(0, corteSeguro).match(/\n[ \t]*[-*+#]{0,6}[ \t]*$/)
-        if (colaIncompleta) corteSeguro -= colaIncompleta[0].length
-      }
+      const corteSeguro = final ? pendiente.length : Math.max(0, pendiente.length - MARGEN_MARCADO)
 
       const seguro = pendiente.slice(0, corteSeguro)
       if (!seguro) return
 
       pendiente = pendiente.slice(seguro.length)
 
-      const limpio = limpiarMarkdown(seguro, enInicioDeLinea)
-      enInicioDeLinea = seguro.endsWith('\n')
-
-      // Un trozo que era SÓLO marcado —«- » al abrir una viñeta— se queda
-      // vacío al limpiarlo. Emitirlo mandaría un delta vacío a la pantalla.
-      if (!limpio) return
-
-      emitido += limpio
-      onEvento({ tipo: 'texto', delta: limpio })
+      emitido += seguro
+      onEvento({ tipo: 'texto', delta: seguro })
     }
 
     for await (const trozo of respuesta.body) {

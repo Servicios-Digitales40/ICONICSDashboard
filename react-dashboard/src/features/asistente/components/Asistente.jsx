@@ -79,6 +79,7 @@ import {
   ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
 } from "../lib/useAsistente.js";
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
+import { markdownSeguro } from "../lib/markdown.js";
 
 const MONO = "'IBM Plex Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
@@ -172,6 +173,22 @@ const ESTILOS = `
 @media (prefers-reduced-motion: reduce) {
   .eva-asis-trazo, .eva-asis-punto, .eva-asis-entrada { animation: none !important; }
 }
+
+/* La burbuja del asistente, ahora que trae markdown renderizado (regla 12 del
+   prompt) en vez de texto llano. Tipografía compacta a propósito: es una
+   burbuja de chat de 13px, no un documento. */
+.eva-asis-markdown p { margin: 0 0 6px; }
+.eva-asis-markdown p:last-child { margin-bottom: 0; }
+.eva-asis-markdown ul, .eva-asis-markdown ol { margin: 4px 0; padding-left: 18px; }
+.eva-asis-markdown li { margin: 2px 0; }
+.eva-asis-markdown h1, .eva-asis-markdown h2, .eva-asis-markdown h3, .eva-asis-markdown h4 {
+  margin: 8px 0 4px; font-size: 1em; font-weight: 700;
+}
+.eva-asis-markdown h1:first-child, .eva-asis-markdown h2:first-child,
+.eva-asis-markdown h3:first-child, .eva-asis-markdown h4:first-child { margin-top: 0; }
+.eva-asis-markdown code { font-family: 'IBM Plex Mono', monospace; font-size: 0.9em; background: rgba(127,127,127,0.16); padding: 1px 4px; border-radius: 4px; }
+.eva-asis-markdown pre { overflow-x: auto; margin: 4px 0; }
+.eva-asis-markdown blockquote { margin: 4px 0; padding-left: 8px; border-left: 2px solid currentColor; opacity: 0.85; }
 `;
 
 /**
@@ -781,15 +798,29 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
   return (
     <div style={{ maxWidth: "92%" }}>
       {hayBurbuja && (
-        <div
-          style={{
-            background: t.hover, color: t.text, fontSize: 13, lineHeight: 1.6,
-            padding: "10px 12px", borderRadius: "10px 10px 10px 2px", whiteSpace: "pre-wrap",
-            borderLeft: `2px solid ${t.accent}`,
-          }}
-        >
-          {mensaje.texto || "…"}
-        </div>
+        mensaje.texto ? (
+          <div
+            className="eva-asis-markdown"
+            style={{
+              background: t.hover, color: t.text, fontSize: 13, lineHeight: 1.6,
+              padding: "10px 12px", borderRadius: "10px 10px 10px 2px",
+              borderLeft: `2px solid ${t.accent}`,
+            }}
+            // El HTML ya pasó por DOMPurify en `markdownSeguro`: ver ese
+            // archivo para por qué el saneado no es opcional aquí.
+            dangerouslySetInnerHTML={{ __html: markdownSeguro(mensaje.texto) }}
+          />
+        ) : (
+          <div
+            style={{
+              background: t.hover, color: t.text, fontSize: 13, lineHeight: 1.6,
+              padding: "10px 12px", borderRadius: "10px 10px 10px 2px",
+              borderLeft: `2px solid ${t.accent}`,
+            }}
+          >
+            …
+          </div>
+        )
       )}
 
       {/* Los gráficos, debajo de la respuesta que los comenta. Llegan por su

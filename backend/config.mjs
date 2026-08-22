@@ -263,6 +263,7 @@ export function loadConfig(env = process.env) {
   const apiBase = (env.ICONICS_API_BASE ?? '').replace(/\/+$/, '')
   const origin = readOrigin(apiBase)
   const isProduction = env.NODE_ENV === 'production'
+  const iconicsFake = readBoolean('ICONICS_FAKE', env.ICONICS_FAKE, false)
 
   return Object.freeze({
     port: readPort(env.PORT),
@@ -302,7 +303,26 @@ export function loadConfig(env = process.env) {
        * el defecto tiene que ser el seguro, y lo peligroso se pide a propósito.
        */
       readOnly: readBoolean('ICONICS_READ_ONLY', env.ICONICS_READ_ONLY, true),
-      isConfigured: Boolean(apiBase),
+      /**
+       * Transporte simulado (Plan 14 §7.1): sirve las ocho señales de
+       * `shared/eva/simulador.js` sin salir a la red, con la MISMA firma que
+       * `iconics/client.mjs`. Pensado para trabajar en el asistente, el
+       * historiador y el resto del backend sin depender de que el servidor
+       * de planta esté alcanzable — que es justo lo que bloqueaba antes las
+       * fases 2, 4 y 5 mientras llegaba la máquina de IA. Ver
+       * `iconics/fakeClient.mjs`.
+       *
+       * No es un secreto que haya que ocultar en producción: al revés, con
+       * `ICONICS_FAKE=true` el arranque debería anunciarlo bien alto, porque
+       * es el modo en el que NINGÚN dato es real. `app.mjs` decide con esto
+       * qué cliente construir.
+       */
+      fake: iconicsFake,
+      // Con el transporte falso no hace falta ICONICS_API_BASE: no hay a
+      // dónde conectarse. Misma regla que ICONICS_READ_ONLY: el peligro (usar
+      // datos inventados) se pide a propósito con la otra variable, no con
+      // esta.
+      isConfigured: Boolean(apiBase) || iconicsFake,
       canAuthenticate: Boolean(origin && env.ICONICS_USERNAME && env.ICONICS_PASSWORD),
       clientId: OIDC_CLIENT_ID,
       scope: OIDC_SCOPE,

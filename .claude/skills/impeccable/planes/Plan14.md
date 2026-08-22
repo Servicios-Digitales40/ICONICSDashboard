@@ -2,14 +2,22 @@ Plan 14 · Modelo en máquina propia, diagnóstico y reportes
 
 Objetivo. Separar el modelo de IA en su propia máquina con la red cerrada, y sobre esa base subir el acierto del asistente hasta que pueda diagnosticar contra el manual y entregar reportes en PDF.
 
-ESTADO (21-ago-2026) — PLANIFICADO. Ninguna fase empezada. Pendiente confirmar la GPU (§0.1), si hay alarmas configuradas (§6) y si se puede exportar historia real del servidor (§7.3).
+ESTADO (21-ago-2026) — EN MARCHA. GPU confirmada: 5070 Ti, 16 GB (§0.1).
+
+Fase 3 (markdown) completa y verificada: 42/42 en verificar-chat.mjs, 17/17 en asistente.test.jsx.
+
+Fase 7.1 (transporte falso) completa y verificada: 12/12 en el nuevo verificar-transporte-falso.mjs, sin regresiones en verificar-herramientas.mjs (53), verificar-backend.mjs (51) ni la suite del frontend (355). `ICONICS_FAKE=true` levanta el backend entero —tablero, historiador, asistente— sin `ICONICS_API_BASE`. La física se movió a `shared/eva/simulador.js` y la sirven por igual el simulador del frontend y `backend/iconics/fakeClient.mjs`.
+
+Desbloqueadas para trabajar sin hardware ni servidor ICONICS: fase 2 (modelo, sólo necesita GPU), fase 4 (diagnóstico, con calidad limitada por umbrales sin confirmar) y ~90 % de la fase 5 (reportes).
+
+Pendiente: si hay alarmas configuradas (§6) y si se puede exportar historia real del servidor (§7.3).
 
 0 · Las cuatro cosas que gobiernan el plan
 0.1 · La VRAM, no la GPU compartida
 
-El candidato mencionado es una 3070 Ti: 8 GB, el mismo techo que hoy castiga al sistema. Los 30-90 s por respuesta y las fugas del 4B no vienen de que la GPU esté compartida con el backend — vienen de que el modelo no cabe.
+Candidato actualizado: 5070 Ti, 16 GB GDDR7 (el plan original barajaba una 3070 Ti de 8 GB, el mismo techo que hoy castiga al sistema — ya no es la GPU disponible). Los 30-90 s por respuesta y las fugas del 4B no vienen de que la GPU esté compartida con el backend — vienen de que el modelo no cabe.
 
-Con 8 GB dedicados siguen sin caber los tres consumidores nuevos que este plan introduce:
+Con 16 GB dedicados entran los tres consumidores nuevos que este plan introduce, aunque con poco margen si los tres se activan a la vez:
 
 Consumidor VRAM aprox.
 Modelo 8-9B Q4_K_M 5,0-5,5 GB
@@ -19,9 +27,7 @@ Whisper medium (si se activa el dictado) ~1,5 GB
 
 Y --ctx-size se reparte entre slots, no se multiplica, así que los 2-4 usuarios simultáneos que se piden son justo lo que más memoria consume.
 
-Mínimo recomendado: 16 GB (5060 Ti nueva, o 3090 24 GB de segunda mano). Con 16 GB entra un 14B con contexto holgado; con 24 GB entra además el servidor de embeddings, que hará falta cuando la carpeta de manuales crezca.
-
-Si se queda en 8 GB, la fase 2 pierde casi todo su valor y hay que aceptar que el asistente responde como hoy, sólo que sin robarle recursos al backend. Las fases 4 y 5 se construyen igual, pero aciertan menos.
+Mínimo recomendado: 16 GB (5060 Ti nueva, o 3090 24 GB de segunda mano) — la 5070 Ti de 16 GB confirmada lo cumple. Con 16 GB entra un 14B con contexto holgado; el servidor de embeddings entraría también pero con poco margen si además se activa Whisper medium a la vez (16 GB es justo, no los 24 GB que dan holgura total). Si crece la carpeta de manuales y hace falta el servidor de embeddings de forma permanente, conviene medir el consumo real antes de comprometer --parallel 2 (§1.4) con los tres consumidores activos simultáneamente.
 
 0.2 · llama-server no tiene autenticación
 

@@ -475,17 +475,13 @@ await check('si no redacta nada, se dice el dato igual', async () => {
 
 /* ── La regla que no se puede relajar ────────────────────────────────── */
 
-await check('el markdown que el modelo escribe igualmente no llega a la pantalla', async () => {
+await check('el markdown que escribe el modelo llega intacto al streaming', async () => {
   /*
-   * La regla 12 del prompt prohíbe el markdown, y el modelo se la salta.
-   * Medido con qwen2.5:7b contra Ollama, a la pregunta más simple:
-   *
-   *     - **Nivel del tanque**: 55.2%
-   *
-   * El panel pinta el texto tal cual (`whiteSpace: pre-wrap`), así que eso
-   * llega con los asteriscos puestos. Una regla del prompt que el modelo puede
-   * ignorar no es una garantía, y el modelo se cambia con una variable de
-   * entorno.
+   * Desde la fase 3, la regla 12 del prompt PIDE markdown en vez de
+   * prohibirlo: el panel lo renderiza (`markdown.js` + DOMPurify en el
+   * frontend), así que el backend ya no tiene que limpiarlo por el camino —
+   * sólo filtrar el marcado de herramienta, que es una cosa distinta. Ver
+   * `pasadaRedactando` en chat.mjs.
    */
   guion = {
     toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
@@ -493,12 +489,9 @@ await check('el markdown que el modelo escribe igualmente no llega a la pantalla
   }
   const { texto } = await preguntar(chatDePrueba(), 'algo')
 
-  assert.ok(!texto.includes('**'), 'la negrita no puede llegar')
-  assert.ok(!texto.includes('##'), 'los títulos tampoco')
-  assert.ok(!/^\s*-\s/m.test(texto), 'ni las viñetas de guion')
-  // Y lo que importa: el contenido sobrevive entero.
-  assert.match(texto, /Nivel del tanque: 62 %/)
-  assert.match(texto, /Presión: 3\.1/)
+  assert.match(texto, /\*\*Nivel del tanque\*\*: 62 %/)
+  assert.match(texto, /\*\*Presión\*\*: 3\.1/)
+  assert.match(texto, /## Resumen/)
   assert.match(texto, /Todo en banda/)
 })
 
