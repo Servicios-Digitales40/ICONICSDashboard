@@ -159,6 +159,17 @@ const MIN_MUESTRAS_PERFIL = 30
 const MAX_DIAS_REPORTE = 31
 
 /**
+ * Puntos con los que se dibuja un gráfico de reporte, como mucho.
+ *
+ * Mismo orden de magnitud que `MAX_PUNTOS` (el tope del historiador por
+ * petición) porque es exactamente para lo que se diseñó el ancho del SVG de
+ * `renderizarGraficoSerie`. Un reporte de varios días junta muchas de esas
+ * peticiones y hay que volver a bajar a esta escala antes de dibujar — ver
+ * `downsamplear`.
+ */
+const PUNTOS_GRAFICO_REPORTE = 120
+
+/**
  * Ventana relativa por defecto cuando no se dice período: las mismas 6 h que
  * pintan las gráficas de la vista de Planta (`VENTANA`), para que el chat y la
  * pantalla no cuenten dos historias distintas del mismo momento.
@@ -181,6 +192,62 @@ const ALTERNATIVAS =
 /** Error uniforme que además enseña al modelo cómo corregirse en la misma pasada. */
 function fallo(error, extra = {}) {
   return { ok: false, error, ...extra }
+}
+
+/**
+ * Tendencia de una serie, en palabras que el modelo pueda citar sin restar.
+ *
+ * Antes vivía sólo dentro de `analisis_de_senal`; ahora también la usan
+ * `grafico_de_senal` y `generar_reporte` (Plan 14 §5, feedback de que el
+ * modelo se limitaba a repetir mínimo/máximo/promedio en vez de interpretar
+ * la curva). Un mismo cálculo, no tres copias del mismo criterio de
+ * clasificación —qué pendiente cuenta como "estable"— que podrían divergir.
+ */
+function calcularTendencia(puntos) {
+  const regresion = regresionLineal(puntos)
+  if (!regresion) return { direccion: 'sin datos suficientes para calcularla' }
+
+  const cambioPorHora = +(regresion.pendiente * 3600).toFixed(3)
+  return {
+    direccion:
+      Math.abs(cambioPorHora) < 0.01 ? 'estable' : cambioPorHora > 0 ? 'subiendo' : 'bajando',
+    cambioPorHora,
+    ajuste: `${Math.round(regresion.r2 * 100)} de 100`,
+    nota:
+      regresion.r2 < 0.4
+        ? 'El ajuste es bajo: hay mucho ruido y la tendencia no es muy fiable.'
+        : 'El ajuste es razonable para esta ventana.',
+  }
+}
+
+/**
+ * `calcularTendencia()` en una frase, para sitios sin modelo delante que la
+ * narre — el PDF de `generar_reporte` es el caso: el documento ya está
+ * cerrado y guardado antes de que el modelo escriba nada, así que si la
+ * interpretación depende de que el modelo la redacte, el PDF sale sin ella
+ * salvo que se acuerde de pedirlo. Mismo criterio que `describirCorrelacion`:
+ * la frase la escribe el backend siempre igual, para no dejar la explicación
+ * del reporte a que un 9B se acuerde de darla.
+ */
+function describirTendencia(tendencia, unidad = '') {
+  if (!tendencia || tendencia.cambioPorHora === undefined) {
+    return 'No hay muestras suficientes en este período para calcular una tendencia.'
+  }
+
+  if (tendencia.direccion === 'estable') {
+    return 'Se mantuvo prácticamente estable en el período, sin una tendencia clara de subida o bajada.'
+  }
+
+  const u = unidad ? ` ${unidad}` : ''
+  const verbo = tendencia.direccion === 'subiendo' ? 'Subió' : 'Bajó'
+  const pocoFiable = tendencia.nota?.startsWith('El ajuste es bajo')
+
+  return (
+    `${verbo} a un ritmo medio de ${Math.abs(tendencia.cambioPorHora)}${u} por hora` +
+    (pocoFiable
+      ? ', aunque con bastante variación dentro del período: la tendencia no es muy fiable.'
+      : ' de forma razonablemente sostenida.')
+  )
 }
 
 /* ── Resolver el nombre de una señal ─────────────────────────────────── */
@@ -653,6 +720,32 @@ export function createHerramientas({
     return { muestras, diasLeidos, diasTotal: dias }
   }
 
+  /**
+   * Reduce una serie a como mucho `max` puntos, promediando por grupos.
+   *
+   * Sólo para el DIBUJO de `generar_reporte` (Plan 14 Fase 5): el SVG de
+   * `renderizarGraficoSerie` tiene 640 px de ancho fijo y fue pensado para
+   * las ventanas cortas del resto de herramientas (como mucho ~100 puntos,
+   * el tope del historiador por petición). Un reporte de varios días junta
+   * muchas de esas peticiones, y sin reducir el trazo se convierte en un
+   * bloque sólido ilegible. Promediar por grupo (y no descartar puntos sin
+   * más) conserva la forma de la curva; los extremos EXACTOS para el
+   * resumen numérico siguen viniendo de la serie completa, sin pasar por
+   * aquí.
+   */
+  function downsamplear(muestras, max) {
+    if (muestras.length <= max) return muestras
+
+    const factor = Math.ceil(muestras.length / max)
+    const resultado = []
+    for (let i = 0; i < muestras.length; i += factor) {
+      const grupo = muestras.slice(i, i + factor)
+      const suma = grupo.reduce((acc, m) => acc + m.valor, 0)
+      resultado.push({ t: grupo[Math.floor(grupo.length / 2)].t, valor: suma / grupo.length })
+    }
+    return resultado
+  }
+
   /* ── Presentación de una señal ─────────────────────────────────────── */
 
   /**
@@ -1084,30 +1177,13 @@ export function createHerramientas({
       const proyeccion = regresion ? proyectar(regresion, horizonteMinutos, meta.decimales) : null
       const anomalias = detectarAnomalias(validos, { media: stats.media, desv: stats.desv })
 
-      const pendientePorHora = regresion ? +(regresion.pendiente * 3600).toFixed(3) : null
-
       return {
         ok: true,
         senal: meta.label,
         periodo: v.etiqueta,
         unidad: meta.unidad || null,
         estadisticas: stats,
-        tendencia: regresion
-          ? {
-              direccion:
-                Math.abs(pendientePorHora) < 0.01
-                  ? 'estable'
-                  : pendientePorHora > 0
-                    ? 'subiendo'
-                    : 'bajando',
-              cambioPorHora: pendientePorHora,
-              ajuste: `${Math.round(regresion.r2 * 100)} de 100`,
-              nota:
-                regresion.r2 < 0.4
-                  ? 'El ajuste es bajo: hay mucho ruido y la tendencia no es muy fiable.'
-                  : 'El ajuste es razonable para esta ventana.',
-            }
-          : { direccion: 'sin datos suficientes para calcularla' },
+        tendencia: calcularTendencia(validos),
         proyeccion: proyeccion
           ? {
               horizonteMinutos,
@@ -1567,6 +1643,21 @@ export function createHerramientas({
 
       const resumen = resumirSerie(serie.datos, meta.decimales)
 
+      /*
+       * Tendencia y anomalías, calculadas aquí y no adivinadas por el modelo.
+       *
+       * Antes el `nota` de abajo le pedía al modelo que INTERPRETARA la curva
+       * a partir de mínimo/máximo/promedio — y con un 9B eso, medido, seguía
+       * saliendo como una lista de cifras reformulada, no una lectura real.
+       * `calcularTendencia` (misma función que usa `analisis_de_senal`) le da
+       * un veredicto YA calculado —sube, baja o está estable, con su propio
+       * aviso de fiabilidad— para que el modelo lo cite en vez de inferirlo.
+       */
+      const valores = serie.datos.filter(d => typeof d.valor === 'number').map(d => d.valor)
+      const stats = estadisticasBasicas(valores, meta.decimales)
+      const tendencia = calcularTendencia(serie.datos)
+      const anomalias = detectarAnomalias(serie.datos, { media: stats.media, desv: stats.desv })
+
       return {
         ok: true,
         senal: meta.label,
@@ -1575,11 +1666,17 @@ export function createHerramientas({
         unidad: meta.unidad || null,
         // El resumen, para que el modelo pueda hablar de la curva que no ve.
         ...(resumen ?? {}),
+        tendencia,
+        anomalias: anomalias.length ? anomalias : undefined,
         graficoEntregado: true,
         nota:
           'El gráfico ya se le ha enviado a la pantalla del usuario; no hace falta que lo ' +
-          'describas punto por punto. Menciona que lo acompañas y comenta lo que se ve usando ' +
-          'las cifras de este resumen.',
+          'describas punto por punto ni repitas mínimo/máximo/promedio como una lista. Usa ' +
+          '"tendencia.direccion" para decir si sube, baja o se mantiene estable —cita ' +
+          '"tendencia.nota" si el ajuste es poco fiable, en vez de sonar más seguro de lo que el ' +
+          'dato permite—; si "anomalias" trae algo, son los puntos que más se apartaron de lo ' +
+          'habitual y merece la pena señalarlos con su hora. No inventes una tendencia, un ciclo o ' +
+          'una causa que estos campos no sostengan.',
         _adjunto: { tipo: 'grafico', formato: 'svg', contenido: svg, titulo: meta.label },
       }
     },
@@ -1596,8 +1693,22 @@ export function createHerramientas({
      * `GET /api/reportes` lo sirve por separado. Ninguna cifra del PDF la
      * escribe el modelo: las compone este archivo con datos reales del
      * historiador, igual que hace `grafico_de_senal`.
+     *
+     * ── DOS EXPLICACIONES, NO UNA (feedback: "el PDF no traía explicación") ──
+     *
+     * El PDF se cierra y se guarda ANTES de que el modelo escriba una sola
+     * palabra —es una única llamada síncrona—, así que una explicación que
+     * dependiera SÓLO de que el modelo se acuerde de dársela saldría del PDF
+     * la mayoría de las veces. Por eso cada gráfico lleva una `interpretacion`
+     * que compone el propio backend con `describirTendencia` (garantizada,
+     * siempre igual para los mismos datos, igual que `describirCorrelacion`).
+     * El parámetro `explicacion` es la SEGUNDA capa, opcional: si el usuario
+     * pide explícitamente que se comente el reporte, el modelo puede mirar
+     * antes la tendencia de la señal principal (con `grafico_de_senal` o
+     * `analisis_de_senal`) y pasar aquí su propio comentario, que se imprime
+     * aparte y con su procedencia dicha, nunca mezclado con las cifras.
      */
-    async generar_reporte({ senales, periodo } = {}) {
+    async generar_reporte({ senales, periodo, explicacion } = {}) {
       const v = resolverVentana(periodo, { turnos, maxHoras: MAX_DIAS_REPORTE * 24 })
       if (v.error) return fallo(v.error)
 
@@ -1642,7 +1753,13 @@ export function createHerramientas({
 
             let svg
             try {
-              svg = renderizarGraficoSerie(muestras, {
+              // Downsample SÓLO para el dibujo: un mes son miles de muestras
+              // (~100/día × 31 días) apretadas en 640 px de ancho, que sin
+              // esto se ven como un bloque sólido en vez de una curva. El
+              // resumen numérico de abajo sigue viniendo de `muestras`
+              // completo, sin downsamplear — los extremos reales no se
+              // pierden, sólo se suaviza el dibujo.
+              svg = renderizarGraficoSerie(downsamplear(muestras, PUNTOS_GRAFICO_REPORTE), {
                 titulo: meta.label,
                 unidad: meta.unidad || null,
                 banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave]) : null,
@@ -1663,11 +1780,20 @@ export function createHerramientas({
               )
             }
 
+            // Sobre la serie COMPLETA, no la downsampleada: la tendencia real
+            // no debe depender de cuántos puntos entraron en el dibujo.
+            // Mismo cálculo que `grafico_de_senal`.
+            const tendencia = calcularTendencia(muestras)
+
             return {
               titulo: meta.label,
               unidad: meta.unidad || null,
               svg,
               resumen: resumirSerie(muestras, meta.decimales),
+              tendencia,
+              // La explicación GARANTIZADA del PDF — ver la cabecera de
+              // `generar_reporte`. No depende de que el modelo la pida.
+              interpretacion: describirTendencia(tendencia, meta.unidad),
               nota: null,
             }
           })
@@ -1725,6 +1851,11 @@ export function createHerramientas({
         graficos,
         tablaActual,
         notas,
+        // Comentario del MODELO, opcional y aparte de `interpretacion` (que
+        // pone el propio backend en cada gráfico). Se imprime con su
+        // procedencia dicha — ver `reporte.mjs` — para no mezclar lo medido
+        // con lo que el modelo opina.
+        explicacion: typeof explicacion === 'string' && explicacion.trim() ? explicacion.trim() : null,
       })
 
       const id = randomUUID()
@@ -1741,7 +1872,9 @@ export function createHerramientas({
         ...(notas.length ? { notas } : {}),
         nota:
           'El reporte ya se ha generado y el enlace de descarga se le ha entregado al usuario; no ' +
-          'hace falta que describas el PDF punto por punto, sólo confirma qué trae.',
+          'hace falta que describas el PDF punto por punto, sólo confirma qué trae. Cada gráfico del ' +
+          'PDF YA incluye su propia interpretación de la tendencia, generada por el sistema — no ' +
+          'digas que el reporte "no trae explicación".',
         _adjunto: {
           tipo: 'reporte',
           formato: 'pdf',
@@ -2696,7 +2829,9 @@ export const DEFINICIONES = [
         'que no tienen serie. Úsala para "genera un reporte", "quiero un PDF de esta semana", ' +
         '"expórtame los datos del tanque". El período admite hasta unos 31 días —más que ' +
         'historia_de_senal— porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
-        'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta.',
+        'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta. Cada gráfico del PDF ' +
+        'YA lleva su propia interpretación de la tendencia, escrita por el sistema — no hace falta ' +
+        'pedirla aparte.',
       parameters: {
         type: 'object',
         properties: {
@@ -2713,6 +2848,16 @@ export const DEFINICIONES = [
             description:
               'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, pero ' +
               'admite ventanas más largas (hasta ~31 días). Si se omite, las últimas 6 horas.',
+          },
+          explicacion: {
+            type: 'string',
+            description:
+              'OPCIONAL — casi nunca hace falta, porque el PDF YA trae interpretación automática de ' +
+              'cada gráfico. Sólo rellénalo si YA sabes la tendencia de la señal principal por algo ' +
+              'que consultaste antes en esta conversación: entonces sí puedes resumirla aquí en una ' +
+              'frase. Nunca hagas una consulta aparte sólo para rellenar esto, y nunca dejes de ' +
+              'llamar a generar_reporte por intentarlo — grafico_de_senal y analisis_de_senal sólo ' +
+              'admiten 7 días, y este reporte puede pedir más.',
           },
         },
         required: [],
