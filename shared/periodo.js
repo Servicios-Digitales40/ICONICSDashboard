@@ -145,9 +145,81 @@ function extraerHora(t) {
   return { hora, resto: t.replace(m[0], ' ').replace(/\s+/g, ' ').trim() }
 }
 
+/**
+ * Un INSTANTE concreto: «el 21 de agosto de 2026 a las 11:16».
+ *
+ * ── POR QUÉ ESTO NO ES `resolverPeriodo` ───────────────────────────
+ *
+ * Porque son dos preguntas distintas y sólo una de ellas tiene minutos.
+ * `resolverPeriodo` contesta «¿cómo fue ese tramo?» y para eso el minuto
+ * sobra: se responde con el mínimo, el máximo y el promedio de la hora. Ésta
+ * contesta «¿cuánto marcaba en ese momento?», donde el minuto ES la pregunta
+ * y redondearlo a la hora cambia la respuesta.
+ *
+ * `extraerHora` tira los minutos a propósito —y bien, para lo suyo—, así que
+ * aquí se leen aparte en vez de cambiar aquella regla.
+ *
+ * @returns {{ instante: Date, etiqueta: string } | { error: string }}
+ */
+export function resolverInstante(texto) {
+  const crudo = String(texto ?? '').trim()
+  if (!crudo) return error('No me has dicho de qué momento.')
+
+  const t = sinZona(normalizar(crudo))
+
+  // Los minutos, antes de que `extraerHora` los descarte.
+  const conMinutos = t.match(/\b(\d{1,2}):(\d{2})/)
+  const minutos = conMinutos ? Number(conMinutos[2]) : 0
+  if (minutos > 59) return error(`"${crudo}" no tiene una hora válida.`)
+
+  const { hora, resto } = extraerHora(t)
+  if (hora === null) {
+    return error(
+      `"${crudo}" no dice de qué hora. Para un valor puntual hace falta el momento: ` +
+        `"ayer a las 14:30", "2026-08-21 a las 11:16".`
+    )
+  }
+
+  const dia = resolverDia(resto) ?? (resto === '' ? isoLocal(new Date()) : null)
+  if (!dia) return error(`No entiendo de qué día es "${crudo}". ${AYUDA}`)
+
+  const instante = new Date(`${dia}T${p2(hora)}:${p2(minutos)}:00`)
+  if (Number.isNaN(instante.getTime())) return error(`"${crudo}" no es un momento válido.`)
+  if (instante > new Date()) {
+    return error(`Ese momento (${dia} ${p2(hora)}:${p2(minutos)}) está en el futuro; no hay dato.`)
+  }
+
+  return { instante, etiqueta: `el ${dia} a las ${p2(hora)}:${p2(minutos)}` }
+}
+
 /* ── El resolvedor ───────────────────────────────────────────────────── */
 
 const error = mensaje => ({ error: mensaje })
+
+/**
+ * Quita el sufijo de zona horaria: «… hora mexico», «… hora local», «… cst».
+ *
+ * ── POR QUÉ SE TIRA Y NO SE INTERPRETA ─────────────────────────────
+ *
+ * Porque el servidor YA está en la zona de la planta, así que «11:16 hora
+ * México» y «11:16» son el mismo instante: lo único que hacía el sufijo era
+ * impedir que la frase se reconociera. «el 21 de agosto de 2026 a las 11:16am
+ * hora mexico» caía hasta el error final —«no entiendo el período»— por tres
+ * palabras que no cambiaban nada, y el operador recibía una negativa a una
+ * pregunta perfectamente formada.
+ *
+ * Ojo con el alcance: sólo se aceptan las zonas que SON la de la planta. Un
+ * «hora de españa» tiene que seguir sin resolverse, porque ahí el sufijo sí
+ * cambiaría el instante y descartarlo devolvería datos reales de la hora
+ * equivocada —el modo de fallo que no se ve—.
+ */
+function sinZona(t) {
+  return t
+    .replace(/\bhora(?:rio)? (?:de |del )?(?:mexico|centro|local|planta|cdmx)\b/g, ' ')
+    .replace(/\b(?:hora )?(?:cst|cdt|gmt-6|utc-6)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 const AYUDA =
   'Formas que entiendo: un día ("2026-07-20", "ayer", "martes"), una hora ' +
@@ -166,7 +238,7 @@ export function resolverPeriodo(texto, { turnos = {} } = {}) {
   const crudo = String(texto ?? '').trim()
   if (!crudo) return error(`No me has dicho de qué período. ${AYUDA}`)
 
-  let t = normalizar(crudo)
+  let t = sinZona(normalizar(crudo))
   const hoy = isoLocal(new Date())
 
   /* 1 · Turnos. Van primero porque llevan un día dentro. */

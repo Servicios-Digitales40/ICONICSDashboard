@@ -107,10 +107,11 @@ import {
   VENTANA,
   intervaloHMS,
   normalizar,
+  horaLocal as horaLocalDe,
   resumirSerie,
 } from '../../shared/eva/historia.js'
 import { isGoodQuality } from '../../shared/quality.js'
-import { TIPOS, isoLocal, resolverPeriodo } from '../../shared/periodo.js'
+import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -141,9 +142,29 @@ const MAX_DIAS_PERFIL = 30
 /**
  * Muestras mínimas para atreverse a decir qué es normal.
  *
- * Medido contra el servidor real: el historiador guarda unas doce muestras al
- * día de estas señales, así que 30 son dos días y medio. Por debajo de eso un
- * percentil no distingue lo habitual de lo que pasó el martes.
+ * Aquí «muestras» son las que devuelve `leerSerie` —`Average` sobre una
+ * rejilla de 15 min—, NO las que guarda el historiador. Con un punto cada
+ * cuarto de hora, 30 son unas siete horas y media de operación; por debajo de
+ * eso un percentil no distingue lo habitual de lo que pasó el martes.
+ *
+ * ── LO QUE EL HISTORIADOR GUARDA DE VERDAD ─────────────────────────
+ *
+ * Medido por paginación sobre el 21-08-2026 (nivel del tanque): **26.754
+ * muestras en el día**, repartidas de forma muy desigual —y esa desigualdad
+ * es lo que importa, no la media:
+ *
+ *   · en operación (allí 07:00-16:00): ~3.200 por hora, cerca de 1 Hz
+ *   · en reposo (allí 00:00-07:00):    exactamente 12 por hora, una cada 5 min
+ *
+ * De ahí venía el «unas doce muestras al día» que decía este comentario: el
+ * 12 era real y medido, pero es 12 por HORA en reposo. Y por eso la media
+ * diaria no describe ningún momento real de la instalación: no hay instante
+ * en que se muestree a esa velocidad.
+ *
+ * La consecuencia práctica está en `leerSerie`: contra ~1 Hz, `MAX_PUNTOS`
+ * (100) se agota en menos de dos minutos de datos crudos. Cualquier lectura
+ * sin agregar que abarque más se trunca, y por eso el aviso de `hasMore` no
+ * es un adorno — ver `AVISO_TRUNCADA`.
  */
 const MIN_MUESTRAS_PERFIL = 30
 
@@ -188,6 +209,21 @@ const VENTANA_POR_DEFECTO = VENTANA.horas
 const ALTERNATIVAS =
   'Pide un tramo más corto: "últimas 6 horas", "últimos 3 días", "la última semana", ' +
   '"ayer" o un día concreto.'
+
+/**
+ * Lo que hay que decir cuando el servidor recortó la serie.
+ *
+ * Va redactado como instrucción al modelo y no como dato suelto porque un
+ * `truncada: true` en el JSON no se traduce solo: el resumen que lo acompaña
+ * tiene pinta de completo —promedio, mínimo y máximo, todos reales— y sin esta
+ * frase el modelo lo citaría como el del período entero. El extremo que falta
+ * es justo el que haría cambiar de opinión a quien pregunta.
+ */
+const AVISO_TRUNCADA =
+  'ATENCIÓN: el servidor recortó esta serie por su tope de muestras y sólo se leyó el ' +
+  'PRINCIPIO del período pedido. El mínimo, el máximo y el promedio son de ese trozo, no ' +
+  'del período completo: dilo así y no presentes estas cifras como las del período entero. ' +
+  'Para una respuesta completa, pide un tramo más corto.'
 
 /** Error uniforme que además enseña al modelo cómo corregirse en la misma pasada. */
 function fallo(error, extra = {}) {
@@ -661,7 +697,28 @@ export function createHerramientas({
 
     if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
 
-    return { ok: true, datos: normalizar(r.data) }
+    /*
+     * `hasMore` se propaga porque el recorte del servidor es SILENCIOSO en los
+     * datos: con el tope de `MAX_PUNTOS` la respuesta llega `ok: true` y con
+     * marcas de tiempo correctas, sólo que le faltan las horas del final. Un
+     * mínimo diario calculado sobre ese trozo es un número real del período
+     * equivocado —indistinguible del bueno—, que es justo el modo de fallo que
+     * el resto de este archivo se esfuerza en evitar.
+     *
+     * El frontend ya lo consumía (`data/historia.js`); esta ruta lo tiraba.
+     */
+    /*
+     * La rejilla viaja con los datos para que `resumirSerie` pueda declarar la
+     * COBERTURA: cuántos tramos de los pedidos traían dato. Sin ella, un día
+     * con nueve horas de actividad y quince de silencio se resume con el
+     * promedio de las nueve y se lee como el del día entero.
+     */
+    return {
+      ok: true,
+      datos: normalizar(r.data),
+      truncada: Boolean(r.hasMore),
+      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto: segundos / puntos },
+    }
   }
 
   /**
@@ -973,7 +1030,7 @@ export function createHerramientas({
         )
       }
 
-      const resumen = resumirSerie(serie.datos, meta.decimales)
+      const resumen = resumirSerie(serie.datos, meta.decimales, serie.ventana)
       if (!resumen) {
         return fallo(
           `No hay ninguna muestra de ${meta.label} en ${v.etiqueta}. El historiador no guarda ` +
@@ -989,6 +1046,7 @@ export function createHerramientas({
         fuente: 'historiador',
         unidad: meta.unidad || null,
         ...resumen,
+        ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
         ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
         ...(meta.nota ? { nota: meta.nota } : {}),
         ...(meta.soloEnMarcha
@@ -999,6 +1057,101 @@ export function createHerramientas({
                 'reflejan las horas en reposo y no un problema.',
           }
           : {}),
+        ...avisoDeUmbrales(),
+      }
+    },
+
+    /**
+     * Cuánto marcaba UNA señal en UN momento concreto.
+     *
+     * ── POR QUÉ NO VALÍA `historia_de_senal` ───────────────────────────
+     *
+     * Porque contestan preguntas distintas. Aquélla resume un TRAMO —mínimo,
+     * máximo, promedio— y para «¿cuánto marcaba a las 11:16?» eso obliga al
+     * modelo a elegir una de las tres cifras, que es justo la interpretación
+     * que no queremos que haga. Preguntado eso mismo, el asistente contestaba
+     * con el rango del día entero y decía no tener el dato de esa hora.
+     *
+     * ── POR QUÉ `Interpolative` Y NO `Average` ─────────────────────────
+     *
+     * `Average` promedia lo que haya DENTRO de la ventana, así que necesita
+     * una ventana ancha para no salir vacía —y entonces ya no es el valor de
+     * ese momento, sino el de un tramo—. `Interpolative` devuelve el valor
+     * vigente EN el instante, que es literalmente la pregunta. Medido contra
+     * el servidor real: a las 11:16 del 21-08-2026 el interpolado (6.10 %) y
+     * la muestra cruda más cercana —a 20 s— (6.19 %) coinciden dentro del
+     * ruido de la señal, porque este historiador guarda del orden de una
+     * muestra por segundo.
+     *
+     * Aun así se devuelve `exacto: false` y la hora real de la muestra: es un
+     * valor reconstruido, y el operador tiene derecho a saberlo.
+     */
+    async valor_en_momento({ senal, momento } = {}) {
+      const clave = resolverSenal(senal)
+      if (!clave) return senalDesconocida(senal)
+
+      const meta = senalInfo(clave)
+
+      // La misma guarda de catálogo que el resto, y por el mismo motivo: sin
+      // ella el servidor devuelve la curva de otra señal sin dar error.
+      if (!esHistorizada(clave)) {
+        return fallo(
+          `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
+            `Sí se puede dar su valor actual con estado_del_sistema.`,
+          { senalesConHistoria: historizadas().map(k => SENALES[k].label), senalPedida: meta.label }
+        )
+      }
+
+      const m = resolverInstante(momento)
+      if (m.error) return fallo(m.error)
+
+      /*
+       * Una ventana de un minuto que EMPIEZA en el instante pedido: con
+       * `Interpolative` el servidor rotula el punto al inicio del bucket, así
+       * que así el único punto que vuelve es el del momento exacto.
+       */
+      const r = await client.readHistory({
+        pointName: pointName(clave),
+        startDate: m.instante.toISOString(),
+        endDate: new Date(m.instante.getTime() + 60_000).toISOString(),
+        aggregate: 'Interpolative',
+        interval: '00:01:00',
+      })
+
+      if (!r?.ok) {
+        if (r?.status >= 502) {
+          return fallo(
+            'No se pudo contactar con el servidor ICONICS para leer el historiador. No es que ' +
+              'falten datos: el servidor no está respondiendo.'
+          )
+        }
+        return fallo(`El historiador no devolvió el valor de ${meta.label} en ${m.etiqueta}.`)
+      }
+
+      const [punto] = normalizar(r.data)
+      if (!punto) {
+        return fallo(
+          `El historiador no tiene ningún valor de ${meta.label} en ${m.etiqueta}. Puede que ese ` +
+            `tramo no se guardara o que la muestra viniera con mala calidad.`
+        )
+      }
+
+      return {
+        ok: true,
+        senal: meta.label,
+        tag: meta.tag,
+        momento: m.etiqueta,
+        fuente: 'historiador',
+        unidad: meta.unidad || null,
+        valor: +punto.valor.toFixed(meta.decimales),
+        exacto: false,
+        marcaDeTiempo: horaLocalDe(punto.t),
+        nota:
+          'Es el valor vigente en ese instante, reconstruido por el historiador entre las dos ' +
+          'muestras que lo rodean. Cítalo como el valor de ese momento; no lo llames mínimo, ' +
+          'máximo ni promedio, que son de un tramo y esto es un punto.',
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        ...(meta.nota ? { nota2: meta.nota } : {}),
         ...avisoDeUmbrales(),
       }
     },
@@ -1641,7 +1794,7 @@ export function createHerramientas({
         )
       }
 
-      const resumen = resumirSerie(serie.datos, meta.decimales)
+      const resumen = resumirSerie(serie.datos, meta.decimales, serie.ventana)
 
       /*
        * Tendencia y anomalías, calculadas aquí y no adivinadas por el modelo.
@@ -1666,6 +1819,7 @@ export function createHerramientas({
         unidad: meta.unidad || null,
         // El resumen, para que el modelo pueda hablar de la curva que no ve.
         ...(resumen ?? {}),
+        ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
         tendencia,
         anomalias: anomalias.length ? anomalias : undefined,
         graficoEntregado: true,
@@ -2291,8 +2445,9 @@ function horaLocal(iso) {
  * Un percentil sobre una lista YA ordenada, interpolando entre vecinos.
  *
  * Interpola en vez de redondear al índice más cercano porque con pocas
- * muestras —y aquí el historiador da unas doce al día— el salto entre dos
- * posiciones consecutivas es grande, y el p95 de 87 muestras acabaría siendo
+ * muestras —y la rejilla de 15 min de `leerSerie` deja pocas decenas por día,
+ * por mucho que el historiador grabe a 1 Hz— el salto entre dos posiciones
+ * consecutivas es grande, y el p95 de 87 muestras acabaría siendo
  * literalmente la cuarta lectura más alta, sin matiz ninguno.
  */
 function percentil(ordenados, q) {
@@ -2677,6 +2832,37 @@ export const DEFINICIONES = [
           },
         },
         required: ['senal'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'valor_en_momento',
+      description:
+        'Cuánto marcaba UNA señal en UN momento concreto, con minutos. Úsala cuando pregunten por ' +
+        'un instante y no por un tramo: "¿cuál era el nivel del tanque el 21 de agosto a las ' +
+        '11:16?", "¿qué presión había ayer a las 14:30?". Para "¿cómo ha ido X esta mañana?" o ' +
+        '"¿cuál fue el máximo de ayer?" usa historia_de_senal, que resume un período. Mismas ' +
+        'cuatro señales con serie propia que historia_de_senal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senal: {
+            type: 'string',
+            description:
+              'Nombre de la señal, tal y como lo diga el usuario. Igual que en historia_de_senal: ' +
+              'pásalo tal cual y el servidor lo resuelve.',
+          },
+          momento: {
+            type: 'string',
+            description:
+              'El momento exacto, en lenguaje llano y CON los minutos si los dice: "21 de agosto ' +
+              'de 2026 a las 11:16", "ayer a las 14:30", "2026-08-21 a las 11:16". No lo ' +
+              'conviertas tú a fecha ni a UTC, y no le quites los minutos: pásalo tal cual.',
+          },
+        },
+        required: ['senal', 'momento'],
       },
     },
   },

@@ -53,7 +53,7 @@ import {
   pointName,
 } from '../shared/eva/senales.js'
 import { PROVISIONALES } from '../shared/eva/umbrales.js'
-import { MAX_PUNTOS } from '../shared/eva/historia.js'
+import { MAX_PUNTOS, resumirSerie } from '../shared/eva/historia.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -910,9 +910,21 @@ await checkAsync('el dossier es repetible: mismo síntoma, mismo resultado', asy
   const a = await nuevo().ejecutar('diagnostico', { sintoma: 'el nivel del tanque parece alto' })
   const b = await nuevo().ejecutar('diagnostico', { sintoma: 'el nivel del tanque parece alto' })
 
-  // Se descarta `leidoA`/`cuando`, que dependen del reloj de la máquina que
-  // ejecuta la prueba y no de la lógica que se quiere comprobar.
-  const sinReloj = (x) => JSON.stringify(x, (k, v) => (k === 'leidoA' || k === 'cuando' ? undefined : v))
+  /*
+   * Se descartan las claves que dependen del RELOJ y no de la lógica: el
+   * simulador fecha sus muestras con `Date.now()`, así que dos llamadas
+   * seguidas caen en milisegundos distintos. Antes sólo se quitaban `leidoA`
+   * y `cuando`, y la prueba fallaba de vez en cuando —cuando las dos
+   * ejecuciones cruzaban un milisegundo— por una diferencia de `.981Z` a
+   * `.982Z` que no tenía nada que ver con lo que aquí se comprueba.
+   */
+  const DEL_RELOJ = new Set([
+    'leidoA', 'cuando',
+    'minimoEn', 'maximoEn', 'desde', 'hasta',
+    'minimoEnUtc', 'maximoEnUtc', 'desdeUtc', 'hastaUtc',
+    'marcaDeTiempo',
+  ])
+  const sinReloj = (x) => JSON.stringify(x, (k, v) => (DEL_RELOJ.has(k) ? undefined : v))
   assert.equal(sinReloj(a), sinReloj(b))
 })
 
@@ -1016,16 +1028,215 @@ await checkAsync('la purga borra reportes más viejos que el umbral, sin tocar l
   assert.ok(nombres.includes('reciente.pdf'), 'el recién creado no se toca')
 })
 
+/* ── valor_en_momento y las marcas de tiempo (el fallo de las 11:16) ─── */
+
+console.log('\n── El momento puntual y su hora ────────────────────────────')
+
+await checkAsync('las marcas del resumen van en HORA LOCAL, no en UTC', async () => {
+  /*
+   * El fallo que motivó todo esto: con `toISOString()` una serie de las 11:00
+   * locales salía rotulada «17:00Z», el asistente la comparaba con la hora que
+   * había escrito el operador, no coincidían, y contestaba que no tenía el
+   * dato TENIÉNDOLO. Aquí se fija que la marca legible es la de la planta.
+   */
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'nivel del tanque', periodo: 'últimas 6 horas' })
+
+  assert.equal(r.ok, true)
+  for (const campo of ['desde', 'hasta', 'minimoEn', 'maximoEn']) {
+    assert.ok(!/[TZ]/.test(r[campo]), `${campo} sigue en formato UTC: ${r[campo]}`)
+    assert.match(r[campo], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/, `${campo} mal formado`)
+  }
+
+  // La UTC no se pierde: la máquina la sigue necesitando.
+  assert.match(r.desdeUtc, /Z$/)
+  assert.equal(new Date(r.desdeUtc).getHours(), Number(r.desde.slice(11, 13)))
+})
+
+await checkAsync('una serie recortada por el servidor se declara truncada', async () => {
+  /*
+   * El recorte es SILENCIOSO en los datos: llega `ok: true`, con marcas
+   * correctas, y sólo faltan las horas del final. Sin este aviso el modelo
+   * presenta el mínimo del trozo como el del período entero — un número real
+   * del período equivocado, indistinguible del bueno.
+   */
+  const client = clienteFalso({
+    historia: ({ startDate }) => ({
+      ok: true,
+      hasMore: true,
+      data: [{ timestamp: startDate, value: 42, quality: 0 }],
+    }),
+  })
+
+  const r = await createHerramientas({ client })
+    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  assert.equal(r.ok, true)
+  assert.ok(r.avisoTruncada, 'una serie recortada tiene que decirlo')
+  assert.match(r.avisoTruncada, /recort/i)
+})
+
+await checkAsync('sin recorte no se inventa el aviso', async () => {
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  assert.equal(r.avisoTruncada, undefined, 'una serie completa no se marca como truncada')
+})
+
+await checkAsync('valor_en_momento pide el INSTANTE, con sus minutos', async () => {
+  /*
+   * Los minutos son la pregunta: `resolverPeriodo` los descarta a propósito
+   * —y bien, para un tramo—, así que un instante necesita su propio camino.
+   * Y el agregado tiene que ser `Interpolative`: `Average` sobre un minuto
+   * promedia lo que haya dentro, que ya no es «cuánto marcaba entonces».
+   */
+  const client = clienteFalso({
+    historia: ({ startDate }) => ({
+      ok: true,
+      data: [{ timestamp: startDate, value: 6.1, quality: 0 }],
+    }),
+  })
+
+  const r = await createHerramientas({ client })
+    .ejecutar('valor_en_momento', { senal: 'nivel del tanque', momento: '2026-08-21 a las 11:16' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.valor, 6.1)
+  assert.equal(r.exacto, false, 'un valor reconstruido no puede anunciarse como exacto')
+
+  const pedido = client.historial[0]
+  assert.equal(pedido.aggregate, 'Interpolative')
+
+  const inicio = new Date(pedido.startDate)
+  assert.equal(inicio.getHours(), 11, 'la hora local pedida')
+  assert.equal(inicio.getMinutes(), 16, 'los minutos NO se redondean a la hora')
+})
+
+await checkAsync('el sufijo de zona horaria de la planta no rompe la frase', async () => {
+  // «hora mexico» no cambia el instante —el servidor YA está en esa zona—,
+  // pero antes impedía que la frase se reconociera y el operador recibía un
+  // «no entiendo el período» a una pregunta perfectamente formada.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', {
+      senal: 'nivel del tanque',
+      periodo: 'el 21 de agosto de 2026 a las 11:16am hora mexico',
+    })
+
+  assert.equal(r.ok, true, r.error)
+  assert.match(r.periodo, /11:00/)
+})
+
+await checkAsync('una zona que NO es la de la planta se sigue rechazando', async () => {
+  // Descartar «hora de españa» devolvería datos reales de la hora equivocada,
+  // que es el modo de fallo que no se ve. Mejor no entender la frase.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('valor_en_momento', { senal: 'nivel', momento: 'ayer a las 11 hora de espana' })
+
+  assert.equal(r.ok, false)
+})
+
+await checkAsync('valor_en_momento sin hora no adivina, y el futuro se rechaza', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  const sinHora = await h.ejecutar('valor_en_momento', { senal: 'nivel', momento: '2026-08-21' })
+  assert.equal(sinHora.ok, false, 'un día entero no es un instante')
+
+  const futuro = await h.ejecutar('valor_en_momento', { senal: 'nivel', momento: '2099-01-01 a las 10:00' })
+  assert.equal(futuro.ok, false, 'el futuro no tiene dato')
+})
+
+await checkAsync('valor_en_momento respeta la guarda de señales sin historia', async () => {
+  // La misma regla que el resto: sin ella el servidor devuelve la curva de la
+  // temperatura del tanque bajo el nombre de otra señal, y sin dar error.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('valor_en_momento', { senal: 'carga del motor', momento: 'ayer a las 11:16' })
+
+  assert.equal(r.ok, false)
+  assert.ok(r.senalesConHistoria, 'tiene que ofrecer las que sí tienen serie')
+})
+
+/* ── Cobertura: qué significa el recuento de puntos ──────────────────── */
+
+console.log('\n── La cobertura del período ────────────────────────────────')
+
+await checkAsync('el recuento se llama `puntos`, y `muestras` sigue como alias', async () => {
+  /*
+   * «28 muestras registradas» hacía entender que el sensor midió 28 veces en
+   * todo el día; midió decenas de miles. Lo que hay son 28 promedios de 15
+   * min. El alias se mantiene porque el frontend ya lo leía.
+   */
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.puntos, r.muestras, '`puntos` y `muestras` tienen que coincidir')
+  assert.equal(r.tramoPorPunto, '15 min', 'hay que decir de cuánto es cada punto')
+})
+
+await checkAsync('un período con huecos declara su cobertura y advierte del sesgo', async () => {
+  /*
+   * El caso real del 21-08-2026: 28 de 96 tramos con dato, porque la
+   * instalación sólo operó de 07:30 a 17:00. El promedio es el de esas horas,
+   * no el del día, y sin decirlo se lee como si fuera el del día completo.
+   */
+  const client = clienteFalso({
+    historia: ({ startDate }) => {
+      const t0 = new Date(startDate).getTime()
+      // Cuatro puntos sueltos donde caben muchos más.
+      return {
+        ok: true,
+        data: [0, 1, 2, 3].map((i) => ({
+          timestamp: new Date(t0 + i * 900_000).toISOString(),
+          value: 50 + i,
+          quality: 0,
+        })),
+      }
+    },
+  })
+
+  const r = await createHerramientas({ client })
+    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.tramosConDato, 4)
+  assert.ok(r.tramosPosibles > 4, 'un día da para muchos más de cuatro tramos de 15 min')
+  assert.ok(r.avisoCobertura, 'con huecos hay que advertir del sesgo del promedio')
+  assert.match(r.avisoCobertura, /no del período completo/)
+})
+
+await checkAsync('sin huecos no se advierte de nada', async () => {
+  // El cliente falso rellena las 24 posiciones de la ventana por defecto: ahí
+  // el promedio SÍ es el del período, y un aviso sobraría.
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.tramosConDato, r.tramosPosibles, 'la ventana por defecto viene completa')
+  assert.equal(r.avisoCobertura, undefined, 'sin huecos no se inventa un aviso')
+})
+
+await checkAsync('resumirSerie sin rejilla sigue funcionando, sin cobertura', async () => {
+  // `generar_reporte` junta varios días y no tiene una rejilla única, así que
+  // el parámetro es opcional y su ausencia no puede romper el resumen.
+  const t = new Date('2026-08-21T10:00:00')
+  const r = resumirSerie([{ t, valor: 10 }, { t: new Date(t.getTime() + 60_000), valor: 20 }], 1)
+
+  assert.equal(r.puntos, 2)
+  assert.equal(r.promedio, 15)
+  assert.equal(r.tramosPosibles, undefined, 'sin rejilla no se inventa una cobertura')
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son doce herramientas, y sólo una de ellas escribe', () => {
+check('son trece herramientas, y sólo una de ellas escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
     'estado_del_sistema',
     'historia_de_senal',
+    'valor_en_momento',
     'comparar_periodos',
     'controlar_bomba',
     'analisis_de_senal',

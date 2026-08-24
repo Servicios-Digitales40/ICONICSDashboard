@@ -62,6 +62,20 @@ export const VENTANA = { horas: 6, puntos: 24 };
  * se pide más, el servidor recorta y devuelve una serie incompleta **sin
  * decirlo**: la gráfica saldría cortada por la derecha y el máximo de un día
  * sería el máximo de las primeras horas.
+ *
+ * ── CUÁNTO DE ESTRECHO ES ESTE TOPE ────────────────────────────────
+ *
+ * Mucho más de lo que sugiere el número. Medido por paginación sobre el
+ * 21-08-2026, el historiador guardó **26.754 muestras de un solo día** del
+ * nivel del tanque: en operación graba cerca de 1 Hz (~3.200 por hora), y
+ * sólo en reposo baja a 12 por hora.
+ *
+ * Contra eso, 100 muestras son **menos de dos minutos** de datos crudos. Por
+ * eso ninguna lectura de este proyecto pide muestras sin agregar: se pide
+ * `Average` sobre una rejilla calculada para no pasar de aquí (ver
+ * `leerSerie`). Quien añada una lectura cruda tiene que paginar o declarar el
+ * recorte; darlo por completo es resumir el 0,4 % de un día llamándolo «el
+ * día», que fue exactamente el fallo que motivó `hasMore`.
  */
 export const MAX_PUNTOS = 100;
 
@@ -103,6 +117,30 @@ const red = (v, decimales) =>
   v === null || v === undefined || !Number.isFinite(v) ? null : +Number(v).toFixed(decimales);
 
 /**
+ * `Date` → `"YYYY-MM-DD HH:MM:SS"` en la zona del servidor.
+ *
+ * ── POR QUÉ NO BASTA CON `toISOString()` ───────────────────────────
+ *
+ * Porque `toISOString()` da UTC, y la planta está en UTC-6. Una serie de las
+ * 11:00 locales sale rotulada `17:00Z`, y el asistente —que compara esa marca
+ * con la hora que escribió el operador— concluye que los datos son de otro
+ * momento y dice que no los tiene, teniéndolos delante. Ocurrió: a «el nivel
+ * del tanque a las 11:16» se contestó que los datos «cubren desde las 17:00
+ * hasta las 17:45», que eran ESAS MISMAS 11:00 a 11:45 escritas en UTC.
+ *
+ * Sin `Z` ni desplazamiento a propósito: la marca es para leerla en una frase
+ * («el mínimo fue a las 11:15»), no para volver a parsearla. Las de máquina
+ * siguen ahí, en los campos `…Utc`.
+ */
+export function horaLocal(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ` +
+    `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  );
+}
+
+/**
  * Reduce una serie a lo que se puede citar en una frase.
  *
  * Devuelve `null` con la serie vacía, y quien llama decide qué decir de eso.
@@ -113,10 +151,32 @@ const red = (v, decimales) =>
  * bajó al 12 %» no se puede contrastar con nada; con ella, quien lea la
  * respuesta puede ir a la gráfica y mirar ese momento.
  *
+ * ── «MUESTRAS» NO SON LECTURAS DEL SENSOR ──────────────────────────
+ *
+ * `datos` no son mediciones crudas: son los promedios que devuelve el
+ * servidor sobre la rejilla que se le pidió (15 min en este proyecto). Un día
+ * entero cabe en unas pocas decenas de puntos aunque el historiador haya
+ * grabado decenas de miles de lecturas — ver `MAX_PUNTOS`.
+ *
+ * Por eso el recuento se llama `puntos` y no `muestras`: «28 muestras
+ * registradas» hacía entender a quien leía la respuesta que el sensor midió
+ * 28 veces en todo el día, cuando midió miles. `muestras` se mantiene como
+ * alias porque el frontend ya lo usaba.
+ *
+ * ── Y POR QUÉ VIAJA LA COBERTURA ───────────────────────────────────
+ *
+ * Porque los tramos SIN dato no vienen en la respuesta: sencillamente faltan.
+ * El promedio es entonces el de las horas en que hubo actividad, no el del
+ * período pedido, y sin decirlo se lee como si fuera el del día completo.
+ * Con `rejilla` se puede contar cuántos tramos cabían y cuántos hubo.
+ *
  * @param {{t: Date, valor: number}[]} datos  serie ya normalizada
  * @param {number} decimales                  los de la señal, del catálogo
+ * @param {object} [ventana]                  { inicio, fin, segundosPorPunto }
+ *   de la petición, para poder declarar la cobertura. Opcional: sin ella el
+ *   resumen sale igual, sólo que sin los campos de cobertura.
  */
-export function resumirSerie(datos, decimales = 1) {
+export function resumirSerie(datos, decimales = 1, ventana = null) {
   if (!Array.isArray(datos) || !datos.length) return null;
 
   let min = datos[0];
@@ -129,16 +189,74 @@ export function resumirSerie(datos, decimales = 1) {
     suma += d.valor;
   }
 
+  const primera = datos[0].t;
+  const ultima = datos[datos.length - 1].t;
+
+  /*
+   * Las marcas van DOS VECES: la local para citarla y la UTC para la máquina.
+   *
+   * La local va primera y con el nombre corto porque es la que el asistente
+   * lee y repite; la UTC conserva el instante exacto para quien tenga que
+   * volver a calcular con él (gráficas, comparaciones entre husos). Quitar la
+   * UTC habría sido más limpio, pero es la que ya consumía el frontend.
+   */
   return {
+    puntos: datos.length,
+    // Alias histórico: el frontend y las pruebas ya leían `muestras`.
     muestras: datos.length,
+    ...cobertura(datos.length, ventana),
     minimo: red(min.valor, decimales),
-    minimoEn: min.t.toISOString(),
+    minimoEn: horaLocal(min.t),
+    minimoEnUtc: min.t.toISOString(),
     maximo: red(max.valor, decimales),
-    maximoEn: max.t.toISOString(),
+    maximoEn: horaLocal(max.t),
+    maximoEnUtc: max.t.toISOString(),
     promedio: red(suma / datos.length, decimales),
     primero: red(datos[0].valor, decimales),
     ultimo: red(datos[datos.length - 1].valor, decimales),
-    desde: datos[0].t.toISOString(),
-    hasta: datos[datos.length - 1].t.toISOString(),
+    desde: horaLocal(primera),
+    hasta: horaLocal(ultima),
+    desdeUtc: primera.toISOString(),
+    hastaUtc: ultima.toISOString(),
+    zona: "hora local de la planta",
+  };
+}
+
+/**
+ * Cuántos tramos de la rejilla traían dato, y qué significa que falten.
+ *
+ * Devuelve `{}` sin `ventana`, para no inventar una cobertura que no se puede
+ * calcular. El texto va redactado para el asistente: un `4 de 96` suelto no
+ * se traduce solo, y lo que hay que evitar es que presente el promedio de
+ * nueve horas de actividad como el del día entero.
+ */
+function cobertura(conDato, ventana) {
+  if (!ventana?.inicio || !ventana?.fin || !ventana?.segundosPorPunto) return {};
+
+  const total = Math.round(
+    (new Date(ventana.fin) - new Date(ventana.inicio)) / 1000 / ventana.segundosPorPunto
+  );
+  if (!Number.isFinite(total) || total <= 0) return {};
+
+  const minutos = Math.round(ventana.segundosPorPunto / 60);
+  const tramo = minutos >= 60 ? `${Math.round(minutos / 60)} h` : `${minutos} min`;
+
+  const base = {
+    tramoPorPunto: tramo,
+    tramosConDato: conDato,
+    tramosPosibles: total,
+  };
+
+  // Sin huecos no hace falta advertir de nada: el promedio ES el del período.
+  if (conDato >= total) return base;
+
+  return {
+    ...base,
+    avisoCobertura:
+      `Cada punto es el promedio de ${tramo} de mediciones, no una lectura suelta del sensor: ` +
+      `detrás de estos ${conDato} puntos hay muchas más mediciones reales. Sólo ${conDato} de ` +
+      `los ${total} tramos del período tienen dato; en el resto el historiador no registró nada. ` +
+      `Eso quiere decir que el promedio, el mínimo y el máximo son de las horas CON actividad, ` +
+      `no del período completo: dilo así si das el promedio como representativo del día.`,
   };
 }

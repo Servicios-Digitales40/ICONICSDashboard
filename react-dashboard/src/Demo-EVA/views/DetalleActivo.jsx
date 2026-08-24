@@ -159,7 +159,9 @@ function DetalleActivo({ params, onNavigate }) {
   }
 
   const enVivo = presetActivo === "vivo";
-  const { activo, activos, variables, loading, error, lastUpdated, historiaHasMore } = useDetalleActivo(
+  const {
+    activo, activos, variables, loading, error, lastUpdated, historiaHasMore, historiaCobertura,
+  } = useDetalleActivo(
     activoId,
     rango,
     enVivo
@@ -210,6 +212,19 @@ function DetalleActivo({ params, onNavigate }) {
               t={t}
               claveSonda={claveSonda}
             />
+            {historiaCobertura && !historiaCobertura.completa && (
+              /*
+               * Un rango con días sin registro se dibuja como una curva
+               * continua entre los que sí lo tienen, y se lee como si la
+               * señal hubiera evolucionado así. Decir cuántos tramos traen
+               * dato es lo que distingue «la planta estuvo parada» de «la
+               * consulta se quedó corta».
+               */
+              <span style={{ fontSize: 10.5, color: t.textFaint }}>
+                {historiaCobertura.tramosConDato} de {historiaCobertura.tramos} tramos del rango tienen
+                registro en el historiador; el resto no tiene muestras.
+              </span>
+            )}
             {historiaHasMore && (
               // Debería ser rarísimo: el intervalo ya se calcula para caber en
               // MAX_PUNTOS. Si aun así el servidor recorta, se dice en vez de
@@ -221,7 +236,7 @@ function DetalleActivo({ params, onNavigate }) {
           </div>
         )}
 
-        <DetalleGrid variables={variables} t={t} dark={dark} ahora={ahora} />
+        <DetalleGrid variables={variables} t={t} dark={dark} ahora={ahora} cobertura={historiaCobertura} />
       </div>
 
       {/*

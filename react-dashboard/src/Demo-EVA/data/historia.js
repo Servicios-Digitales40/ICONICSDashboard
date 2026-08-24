@@ -95,16 +95,150 @@ export async function leerSerie(clave, rango = VENTANA) {
   if (!esHistorizada(clave)) return { datos: [], motivo: SIN_SERIE, hasMore: false };
 
   const { inicio, fin, puntos } = resolverRango(rango);
-  const segundos = Math.max(1, (fin.getTime() - inicio.getTime()) / 1000);
+  const tramos = trocear(inicio, fin);
 
-  const respuesta = await fetchIconicsHistory(pointName(clave), {
-    startDate: inicio.toISOString(),
-    endDate: fin.toISOString(),
-    aggregate: AGREGADO,
-    interval: intervaloHMS(segundos / puntos),
+  // Un solo tramo es el camino de siempre: una petición, sin recomponer nada.
+  if (tramos.length === 1) {
+    const segundos = Math.max(1, (fin.getTime() - inicio.getTime()) / 1000);
+    const respuesta = await fetchIconicsHistory(pointName(clave), {
+      startDate: inicio.toISOString(),
+      endDate: fin.toISOString(),
+      aggregate: AGREGADO,
+      interval: intervaloHMS(segundos / puntos),
+    });
+    const datos = normalizar(respuesta?.data);
+    return {
+      datos,
+      motivo: null,
+      hasMore: Boolean(respuesta?.hasMore),
+      // Un solo tramo: o trae dato (índice 0) o no trae ninguno.
+      cobertura: cobertura(tramos, datos.length ? [0] : []),
+    };
+  }
+
+  /*
+   * Varios tramos: en paralelo, como hace el backend. Un tramo que falle no
+   * invalida el resto —se cuenta y se sigue—, porque perder un día de diez no
+   * cambia la forma de la curva y abortar dejaría la gráfica vacía por un
+   * hueco del historiador.
+   */
+  const respuestas = await Promise.all(
+    tramos.map(({ desde, hasta }) => {
+      const segundos = Math.max(1, (hasta.getTime() - desde.getTime()) / 1000);
+      return fetchIconicsHistory(pointName(clave), {
+        startDate: desde.toISOString(),
+        endDate: hasta.toISOString(),
+        aggregate: AGREGADO,
+        interval: intervaloHMS(segundos / PUNTOS_POR_TRAMO),
+      }).catch(() => null);
+    })
+  );
+
+  const datos = [];
+  const conDato = [];
+  let hasMore = false;
+  respuestas.forEach((r, i) => {
+    const trozo = normalizar(r?.data);
+    if (trozo.length) conDato.push(i);
+    if (r?.hasMore) hasMore = true;
+    datos.push(...trozo);
   });
 
-  return { datos: normalizar(respuesta?.data), motivo: null, hasMore: Boolean(respuesta?.hasMore) };
+  // El orden importa: la gráfica y el CSV recorren la serie tal cual llega, y
+  // `Promise.all` conserva el orden de los tramos pero no el de sus muestras
+  // si dos tramos se solapan en el borde.
+  datos.sort((a, b) => a.t - b.t);
+
+  return { datos, motivo: null, hasMore, cobertura: cobertura(tramos, conDato) };
+}
+
+/**
+ * Puntos que se piden POR TRAMO cuando el rango se trocea.
+ *
+ * 96 son los cuartos de hora de un día — la misma rejilla que usan el backend
+ * y la vista de Planta—, y deja margen bajo `MAX_PUNTOS` para que el servidor
+ * no recorte por su cuenta.
+ */
+const PUNTOS_POR_TRAMO = 96;
+
+/** Días de un tramo según lo largo que sea el rango. Ver `trocear`. */
+const ESCALONES = [
+  { hastaDias: 14, diasPorTramo: 1 },
+  { hastaDias: 60, diasPorTramo: 3 },
+  { hastaDias: 180, diasPorTramo: 7 },
+];
+const DIAS_POR_TRAMO_MAXIMO = 30;
+
+/**
+ * Parte un rango largo en tramos de un día (o varios, si el rango es enorme).
+ *
+ * ── POR QUÉ NO SE PIDE EL RANGO ENTERO DE UNA VEZ ──────────────────
+ *
+ * Porque el historiador no lo contesta bien. Medido contra el servidor real
+ * con el rango 14→24 de agosto de 2026, que tiene 119 puntos de datos
+ * repartidos entre el 17 y el 21:
+ *
+ *     interval=02:24:00  ->  1 punto    hasMore=false
+ *     interval=01:00:00  ->  2 puntos   hasMore=true
+ *     interval=00:15:00  ->  0 puntos   hasMore=true
+ *
+ * Cuanto más fino el intervalo, MENOS datos: el servidor agota su cupo
+ * recorriendo los buckets vacíos del principio del rango y devuelve
+ * `hasMore` con la lista vacía, sin llegar nunca a los días que sí tienen
+ * muestras. Una gráfica de diez días salía con dos puntos y una recta entre
+ * ellos, con toda la pinta de ser la señal real.
+ *
+ * Es la misma regla que el backend ya seguía (`leerSerieEnRango`) y que
+ * `shared/periodo.js` documenta: quien lea rangos largos tiene que ir día a
+ * día. Esto la trae a la vista de detalle, que era la única que faltaba.
+ *
+ * ── POR QUÉ ESCALONADO Y NO SIEMPRE UN DÍA ─────────────────────────
+ *
+ * Un día por tramo es una petición por día: diez días son diez peticiones,
+ * razonable. Un año serían 365 a la vez, que no lo es. Los escalones
+ * mantienen el número de peticiones acotado a unas pocas decenas sin perder
+ * resolución en los rangos que la gente pide de verdad.
+ */
+function trocear(inicio, fin) {
+  const dias = Math.max(1, Math.ceil((fin.getTime() - inicio.getTime()) / 86_400_000));
+  if (dias <= 1) return [{ desde: inicio, hasta: fin }];
+
+  const escalon = ESCALONES.find((e) => dias <= e.hastaDias);
+  const diasPorTramo = escalon ? escalon.diasPorTramo : DIAS_POR_TRAMO_MAXIMO;
+
+  const tramos = [];
+  for (let t = inicio.getTime(); t < fin.getTime(); t += diasPorTramo * 86_400_000) {
+    tramos.push({
+      desde: new Date(t),
+      hasta: new Date(Math.min(t + diasPorTramo * 86_400_000, fin.getTime())),
+    });
+  }
+  return tramos;
+}
+
+/**
+ * Qué parte del rango pedido traía datos.
+ *
+ * Se declara siempre, también cuando está completa, para que quien lea la
+ * gráfica —o el CSV dentro de seis meses— pueda distinguir «la planta estuvo
+ * parada» de «la consulta se quedó corta». Sin esto, un rango con la mitad de
+ * los días vacíos se dibuja como una recta y parece un dato.
+ */
+function cobertura(tramos, indicesConDato) {
+  const total = tramos.length;
+  const con = indicesConDato.length;
+  if (!total) return null;
+
+  const primeros = indicesConDato.length ? tramos[indicesConDato[0]].desde : null;
+  const ultimos = indicesConDato.length ? tramos[indicesConDato[indicesConDato.length - 1]].hasta : null;
+
+  return {
+    tramos: total,
+    tramosConDato: con,
+    completa: con === total,
+    desde: primeros,
+    hasta: ultimos,
+  };
 }
 
 /**

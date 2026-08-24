@@ -40,7 +40,10 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
     [activo]
   );
 
-  const { porClave, metaPorClave, loading: historiaLoading, hasMore: historiaHasMore } = useSeriesHistoricas(
+  const {
+    porClave, metaPorClave, loading: historiaLoading, hasMore: historiaHasMore,
+    cobertura: historiaCobertura,
+  } = useSeriesHistoricas(
     enVivo ? [] : clavesHistoriables,
     rango
   );
@@ -78,5 +81,8 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
     });
   }, [activo, porClave, metaPorClave, historiaLoading, seriesVivas, enVivo, series]);
 
-  return { activo, activos: sistema.activos, variables, loading, error, lastUpdated, historiaHasMore };
+  return {
+    activo, activos: sistema.activos, variables, loading, error, lastUpdated,
+    historiaHasMore, historiaCobertura,
+  };
 }

@@ -16,7 +16,7 @@ import {
 
 const VALOR_GRANDE = { fontFamily: MONO, fontSize: 30, fontWeight: 700, lineHeight: 1 };
 
-function TarjetaVariable({ senal, t, dark, ahora, delay }) {
+function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
   const esBooleano = senal.tipo === "booleano";
   const tieneBufer = senal.bufferVivo.length >= 2;
 
@@ -81,6 +81,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay }) {
             cargando={senal.historiaCargando}
             enVivo={senal.historiaEnVivo}
             error={senal.historiaError}
+            cobertura={cobertura}
             exportable
             t={t}
             dark={dark}
@@ -106,11 +107,14 @@ function TarjetaVariable({ senal, t, dark, ahora, delay }) {
   );
 }
 
-export function DetalleGrid({ variables, t, dark, ahora }) {
+export function DetalleGrid({ variables, t, dark, ahora, cobertura = null }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18 }}>
       {variables.map((senal, i) => (
-        <TarjetaVariable key={senal.key} senal={senal} t={t} dark={dark} ahora={ahora} delay={i * 0.07} />
+        <TarjetaVariable
+          key={senal.key} senal={senal} t={t} dark={dark} ahora={ahora}
+          cobertura={cobertura} delay={i * 0.07}
+        />
       ))}
     </div>
   );

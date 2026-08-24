@@ -104,7 +104,7 @@ export function TooltipHistoria(props) {
  * exactamente el parpadeo que ya se evitó a propósito en `tiles.jsx`.
  */
 export function GraficaHistoria({
-  senal, datos, cargando, enVivo, error, exportable = false, t, dark, alto = 150, delay = 0,
+  senal, datos, cargando, enVivo, error, cobertura = null, exportable = false, t, dark, alto = 150, delay = 0,
 }) {
   const svgRef = useRef(null);
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
@@ -162,7 +162,8 @@ export function GraficaHistoria({
   // que le queda. Ver la cabecera de `lib/exportar.js`.
   const tituloExportado = `${senal.label ?? senal.corto}${senal.unidad ? ` (${senal.unidad})` : ""}`;
 
-  const alExportarCSV = () => descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos));
+  const alExportarCSV = () =>
+    descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos, cobertura));
   const alExportarPNG = () => {
     const svg = svgRef.current?.querySelector("svg");
     if (svg) descargarPNG(svg, nombreArchivo(senal, datos, "png"), { titulo: tituloExportado, fondo: t.panel });
@@ -218,6 +219,26 @@ export function GraficaHistoria({
           }}
         >
           banda estimada, sin confirmar
+        </span>
+      )}
+      {/*
+       * Cobertura: qué parte del rango pedido traía datos.
+       *
+       * Sin esto, un rango de diez días con cinco vacíos se dibuja como una
+       * curva continua entre los días que sí tienen muestras, y se lee como
+       * si la señal hubiera evolucionado así — cuando lo que hubo fue
+       * silencio. Es el mismo aviso que el asistente da con `avisoCobertura`.
+       */}
+      {cobertura && !cobertura.completa && (
+        <span
+          title={`Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango tienen registro en el historiador.`}
+          style={{
+            position: "absolute", bottom: 2, left: hayBanda && PROVISIONALES ? 150 : 2,
+            fontFamily: MONO, fontSize: 9, color: t.textFaint,
+            background: t.hover, borderRadius: 999, padding: "2px 8px",
+          }}
+        >
+          {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
         </span>
       )}
       {exportable && (

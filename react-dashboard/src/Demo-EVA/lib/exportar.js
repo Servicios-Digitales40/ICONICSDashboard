@@ -79,15 +79,51 @@ function celdaCSV(valor) {
  * descarta la muestra de mala calidad antes de que llegue aquí — no hay un
  * dato de calidad que exportar, sólo huecos que ya no están en el arreglo.
  */
-export function datosACSV(senal, datos) {
+/** Fin de línea de CSV: Windows/Excel lo esperan así. */
+const CRLF = "\r\n";
+
+export function datosACSV(senal, datos, cobertura = null) {
   const cabecera = ["instante_iso", "hora_local", senal.unidad ? `valor (${senal.unidad})` : "valor"];
   const filas = (datos ?? []).map((p) => [
     p.t.toISOString(),
     p.t.toLocaleString("es-MX"),
     String(p.valor),
   ]);
-  return [cabecera, ...filas].map((fila) => fila.map(celdaCSV).join(",")).join("\r\n");
+
+  const cuerpo = [cabecera, ...filas].map((fila) => fila.map(celdaCSV).join(",")).join(CRLF);
+  const nota = notaDeCobertura(cobertura);
+  return nota ? nota + CRLF + cuerpo : cuerpo;
 }
+
+/**
+ * Una linea de comentario `#` con la cobertura real, delante de la cabecera.
+ *
+ * -- POR QUE VA DENTRO DEL ARCHIVO ----------------------------------
+ *
+ * Porque el CSV se abre meses despues, fuera de la aplicacion, y sin esto no
+ * hay forma de distinguir <<la planta estuvo parada esos dias>> de <<la
+ * consulta se quedo corta>>. Es la misma distincion que el asistente declara
+ * con su `avisoCobertura`: un archivo con cinco dias de los diez pedidos no
+ * es un archivo completo ni uno roto, y solo quien lo genero lo sabe.
+ *
+ * Va como `#` para que Excel y pandas la traten como comentario o como una
+ * fila suelta, nunca como parte de la cabecera.
+ */
+function notaDeCobertura(cobertura) {
+  if (!cobertura || cobertura.completa) return null;
+
+  const { tramos, tramosConDato, desde, hasta } = cobertura;
+  const sinDato = tramos - tramosConDato;
+  const cuando =
+    desde && hasta
+      ? ` Los datos van del ${desde.toLocaleDateString("es-MX")} al ${hasta.toLocaleDateString("es-MX")}.`
+      : "";
+
+  return celdaCSV(
+    `# ${sinDato} de los ${tramos} tramos del rango pedido no tienen registro en el historiador.${cuando}`
+  );
+}
+
 
 /** BOM UTF-8: sin él, Excel en español abre el CSV interpretando los acentos como otra cosa. */
 const BOM_UTF8 = "﻿";

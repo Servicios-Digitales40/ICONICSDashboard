@@ -111,6 +111,7 @@ export const ESTADOS = {
 const ESTADO_POR_HERRAMIENTA = {
   estado_del_sistema: ESTADOS.consultando,
   historia_de_senal: ESTADOS.consultando,
+  valor_en_momento: ESTADOS.consultando,
   comparar_periodos: ESTADOS.consultando,
   analisis_de_senal: ESTADOS.analizando,
   perfil_de_senal: ESTADOS.analizando,

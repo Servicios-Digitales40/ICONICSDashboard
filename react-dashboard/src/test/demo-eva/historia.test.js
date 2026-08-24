@@ -84,19 +84,80 @@ describe("leerSerie pide el intervalo correcto según el tipo de rango", () => {
     expect(params.interval).toBe("00:15:00");
   });
 
-  it("con {inicio, fin} absoluto, el intervalo escala a MAX_PUNTOS", async () => {
+  it("un rango de varios días se pide DÍA A DÍA, no de una vez", async () => {
+    /*
+     * Medido contra el servidor real con el rango 14→24 de agosto de 2026,
+     * que tiene 119 puntos de datos repartidos entre el 17 y el 21:
+     *
+     *     interval=02:24:00  ->  1 punto    hasMore=false
+     *     interval=01:00:00  ->  2 puntos   hasMore=true
+     *     interval=00:15:00  ->  0 puntos   hasMore=true
+     *
+     * Cuanto más fino el intervalo, MENOS datos: el servidor agota su cupo
+     * recorriendo los buckets vacíos del principio y devuelve `hasMore` con
+     * la lista vacía. Una gráfica de diez días salía con dos puntos y una
+     * recta entre ellos. El backend ya troceaba por días
+     * (`leerSerieEnRango`); esto lo trae a la vista de detalle.
+     */
     fetchIconicsHistory.mockClear();
     const inicio = new Date("2026-08-13T00:00:00Z");
     const fin = new Date("2026-08-20T00:00:00Z"); // una semana exacta
 
     await leerSerie("nivelTanque", { inicio, fin });
 
-    const [punto, params] = fetchIconicsHistory.mock.calls[0];
+    expect(fetchIconicsHistory.mock.calls).toHaveLength(7);
+
+    const [punto, primero] = fetchIconicsHistory.mock.calls[0];
     expect(punto).toBe("ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE");
-    expect(params.startDate).toBe(inicio.toISOString());
-    expect(params.endDate).toBe(fin.toISOString());
-    // 7 días de segundos / 100 puntos = 6048 s = 01:40:48.
-    expect(params.interval).toBe("01:40:48");
+    expect(primero.startDate).toBe(inicio.toISOString());
+    // Un día en 96 puntos: la misma rejilla de 15 min del resto del proyecto.
+    expect(primero.interval).toBe("00:15:00");
+
+    // Los tramos cubren el rango entero, sin huecos ni solapes.
+    const ultimo = fetchIconicsHistory.mock.calls[6][1];
+    expect(ultimo.endDate).toBe(fin.toISOString());
+  });
+
+  it("un rango largo agrupa días para no disparar cientos de peticiones", async () => {
+    // Diez días son diez peticiones, razonable. Un año serían 365 a la vez,
+    // que no lo es: los escalones acotan el número sin perder resolución en
+    // los rangos que la gente pide de verdad.
+    fetchIconicsHistory.mockClear();
+    await leerSerie("nivelTanque", {
+      inicio: new Date("2026-01-01T00:00:00Z"),
+      fin: new Date("2026-08-20T00:00:00Z"), // ~8 meses
+    });
+
+    const peticiones = fetchIconicsHistory.mock.calls.length;
+    expect(peticiones).toBeGreaterThan(1);
+    expect(peticiones).toBeLessThanOrEqual(30);
+  });
+
+  it("la cobertura declara cuántos tramos traían dato", async () => {
+    // Un rango con días vacíos se dibuja como una curva continua entre los
+    // que sí tienen muestras. Sin la cobertura, eso se lee como si la señal
+    // hubiera evolucionado así, cuando lo que hubo fue silencio.
+    fetchIconicsHistory.mockClear();
+    fetchIconicsHistory.mockImplementation((_punto, params) => {
+      // Sólo el primer día del rango trae muestras.
+      const esPrimero = params.startDate.startsWith("2026-08-13");
+      return Promise.resolve({
+        data: esPrimero
+          ? [{ timestamp: "2026-08-13T06:00:00Z", value: 50, quality: 0 }]
+          : [],
+        hasMore: false,
+      });
+    });
+
+    const { datos, cobertura } = await leerSerie("nivelTanque", {
+      inicio: new Date("2026-08-13T00:00:00Z"),
+      fin: new Date("2026-08-20T00:00:00Z"),
+    });
+
+    expect(datos).toHaveLength(1);
+    expect(cobertura.tramos).toBe(7);
+    expect(cobertura.tramosConDato).toBe(1);
+    expect(cobertura.completa).toBe(false);
   });
 
   it("un {inicio, fin} con `fin` en el futuro se recorta a `ahora`", async () => {

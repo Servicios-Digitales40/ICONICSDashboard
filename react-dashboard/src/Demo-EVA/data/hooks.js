@@ -91,7 +91,7 @@ function claveRango(rango) {
  */
 export function useSerieHistorica(clave, rango = VENTANA) {
   const source = useEvaSource();
-  const [estado, setEstado] = useState({ datos: [], motivo: null, loading: true, error: null, hasMore: false });
+  const [estado, setEstado] = useState({ datos: [], motivo: null, loading: true, error: null, hasMore: false, cobertura: null });
   const claveAnterior = useRef(null);
 
   const key = claveRango(rango);
@@ -104,7 +104,7 @@ export function useSerieHistorica(clave, rango = VENTANA) {
     setEstado((prev) =>
       mismaClave
         ? { ...prev, loading: true, error: null }
-        : { datos: [], motivo: null, loading: true, error: null, hasMore: false }
+        : { datos: [], motivo: null, loading: true, error: null, hasMore: false, cobertura: null }
     );
 
     if (!clave) return undefined;
@@ -112,11 +112,28 @@ export function useSerieHistorica(clave, rango = VENTANA) {
     source
       .leerSerie(clave, rango)
       .then(
-        ({ datos, motivo, hasMore }) =>
-          vivo && setEstado({ datos, motivo, loading: false, error: null, hasMore: Boolean(hasMore) })
+        ({ datos, motivo, hasMore, cobertura }) =>
+          vivo &&
+          setEstado({
+            datos,
+            motivo,
+            loading: false,
+            error: null,
+            hasMore: Boolean(hasMore),
+            cobertura: cobertura ?? null,
+          })
       )
       .catch(
-        (err) => vivo && setEstado({ datos: [], motivo: null, loading: false, error: err.message, hasMore: false })
+        (err) =>
+          vivo &&
+          setEstado({
+            datos: [],
+            motivo: null,
+            loading: false,
+            error: err.message,
+            hasMore: false,
+            cobertura: null,
+          })
       );
 
     return () => {
@@ -142,7 +159,7 @@ export function useSerieHistorica(clave, rango = VENTANA) {
 export function useSeriesHistoricas(claves, rango = VENTANA) {
   const source = useEvaSource();
   const [estado, setEstado] = useState({
-    filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false,
+    filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false, cobertura: null,
   });
   const clavesAnteriores = useRef(null);
 
@@ -161,12 +178,14 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
     setEstado((prev) =>
       mismasClaves
         ? { ...prev, loading: true, error: null }
-        : { filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false }
+        : { filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false, cobertura: null }
     );
 
     const lista = clavesKey ? clavesKey.split("|") : [];
     if (!lista.length) {
-      setEstado({ filas: [], porClave: {}, metaPorClave: {}, loading: false, error: null, hasMore: false });
+      setEstado({
+        filas: [], porClave: {}, metaPorClave: {}, loading: false, error: null, hasMore: false, cobertura: null,
+      });
       return undefined;
     }
 
@@ -191,7 +210,10 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
         lista.map((k, i) => [k, { motivo: resultados[i].motivo ?? null, error: resultados[i].error ?? null }])
       );
       const hasMore = resultados.some((r) => r.hasMore);
-      setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore });
+      // La cobertura es del RANGO, no de cada señal: todas se piden sobre los
+      // mismos tramos, así que la primera que la traiga vale para todas.
+      const cobertura = resultados.find((r) => r.cobertura)?.cobertura ?? null;
+      setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore, cobertura });
     });
     // Sin `.catch` aquí: cada promesa de la lista ya captura su propio
     // fallo arriba, así que `Promise.all` no puede rechazar por esta vía.
