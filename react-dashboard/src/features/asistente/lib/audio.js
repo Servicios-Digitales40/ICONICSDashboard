@@ -146,6 +146,26 @@ const MARGEN_SOBRE_RUIDO = 2.5
 const UMBRAL_MINIMO = 0.012
 
 /**
+ * Techo del umbral, pase lo que pase en el calibrado.
+ *
+ * El calibrado toma los primeros instantes como referencia y da por hecho que
+ * en ellos nadie habla. Pero el gesto natural es pulsar el teléfono y hablar en
+ * el acto, y entonces la propia voz se mide como «ruido ambiente»: el umbral
+ * queda en voz × MARGEN —muy por encima de lo que se diga después— y el turno
+ * no se cierra jamás.
+ *
+ * El tope va sobre el UMBRAL YA CALCULADO, no sobre el suelo de ruido: limitar
+ * el suelo antes de multiplicar deja que el margen lo vuelva a subir fuera de
+ * alcance. Lo que tiene que seguir siendo alcanzable es el umbral.
+ *
+ * 0,06 queda por debajo de una voz normal de cerca (~0,08 RMS) y por encima del
+ * zumbido de una sala. Un umbral demasiado bajo sólo alarga el turno —se corta
+ * un poco más tarde—; uno inalcanzable rompe el modo entero, así que el error
+ * se inclina a propósito hacia el lado barato.
+ */
+const UMBRAL_MAXIMO = 0.06
+
+/**
  * Vigila el micrófono y avisa cuando el que habla se calla.
  *
  * Se mide sobre el dominio del tiempo (`getByteTimeDomainData`) y no sobre el
@@ -158,6 +178,17 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
   if (!AudioCtx) return null
 
   const contexto = new AudioCtx()
+  /*
+   * Un contexto creado fuera del gesto del usuario nace SUSPENDIDO.
+   *
+   * Y aquí siempre lo está: `encender()` llama a `escuchar()`, que espera a
+   * `getUserMedia` antes de llegar hasta aquí, así que el clic ya caducó. Un
+   * analizador suspendido devuelve un buffer plano —todo 128, es decir, nivel
+   * 0— para siempre: nunca se cruza el umbral, `hablando` se queda en falso y
+   * el turno no se cierra solo jamás. El micrófono grababa bien; lo que no
+   * corría era el reloj de audio que lo vigila.
+   */
+  contexto.resume?.().catch(() => {})
   const fuente = contexto.createMediaStreamSource(pista)
   const analizador = contexto.createAnalyser()
   analizador.fftSize = 1024
@@ -193,7 +224,10 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
       return
     }
 
-    const umbral = Math.max(UMBRAL_MINIMO, ruidoAmbiente * MARGEN_SOBRE_RUIDO)
+    // El tope entra DESPUÉS del margen: un calibrado hecho sobre la propia voz
+    // daría aquí un umbral que ya nadie puede superar. Ver `UMBRAL_MAXIMO`.
+    const calibrado = Math.max(UMBRAL_MINIMO, ruidoAmbiente * MARGEN_SOBRE_RUIDO)
+    const umbral = Math.min(calibrado, UMBRAL_MAXIMO)
 
     if (nivel > umbral) {
       hablando = true

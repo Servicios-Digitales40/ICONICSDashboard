@@ -565,9 +565,11 @@ export function useDictado() {
  *
  * ── LO QUE NO HACE ─────────────────────────────────────────────────
  *
- * No detecta el final de la frase por silencio. Se pulsa para parar de hablar,
- * igual que en el dictado. Un detector de silencio en una sala de máquinas
- * corta a mitad de frase con el ruido de fondo, y eso es peor que un botón.
+ * No adivina a quién escucha: si hay dos personas hablando cerca, el turno se
+ * cierra con el primer silencio de la sala, no con el de quien preguntaba.
+ *
+ * (El final de frase SÍ se detecta por silencio — ver `escuchar` más abajo y
+ * `vigilarSilencio` en `audio.js`. El botón queda como salida manual.)
  */
 export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const [activo, setActivo] = useState(false);
@@ -613,12 +615,28 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     dictado.cancelar();
   }, [dictado]);
 
-  // Desmontar con el modo encendido dejaría el micrófono abierto y la voz
-  // hablando sola sobre una pantalla que ya no existe.
+  /*
+   * Desmontar con el modo encendido dejaría el micrófono abierto y la voz
+   * hablando sola sobre una pantalla que ya no existe.
+   *
+   * `apagar` va por referencia por la misma razón que `escuchar` y
+   * `cerrarTurno`: depende de `dictado`, que es un objeto literal nuevo en cada
+   * render, así que cambia de identidad continuamente. Con `[apagar]` en las
+   * dependencias esto NO era un efecto de desmontaje — se rehacía en cada
+   * render y su limpieza llamaba a `apagar()` cada vez. El modo se apagaba solo
+   * en el render siguiente a encenderlo: pulsar el botón no dejaba nada
+   * encendido y cortaba el micrófono recién abierto.
+   *
+   * Con la lista de dependencias vacía, la limpieza corre una sola vez, al
+   * desmontar de verdad, y la referencia garantiza que apague la versión buena.
+   */
+  const apagarRef = useRef(null);
+  apagarRef.current = apagar;
+
   useEffect(() => {
     vivoEnLlamada.current = true;
-    return () => { vivoEnLlamada.current = false; apagar(); };
-  }, [apagar]);
+    return () => { vivoEnLlamada.current = false; apagarRef.current?.(); };
+  }, []);
 
   /**
    * Escucha un turno y lo cierra solo cuando el que habla se calla.
