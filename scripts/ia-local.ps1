@@ -22,10 +22,12 @@
 .PARAMETER Local
   Restringe los dos servidores a 127.0.0.1 en vez de 0.0.0.0.
 
-.PARAMETER Modelo
-  Ruta del .gguf de llama-server. Por defecto el Qwen 4B en uso (ver
-  docs/PLAN-6-IA-LOCAL.md): el 9B no entra entero en una GPU de 8 GB y sale
-  20x mas lento.
+.PARAMETER Presets
+  Ruta del .ini de presets de llama-server (--models-preset): una seccion por
+  modelo (Qwen 4B, Qwen 9B, LFM, etc.), cada una con su .gguf, mmproj y
+  ctx-size. Por defecto model.ini junto a llama-server.exe. Con esto
+  llama-server sirve varios modelos y se cambia de uno a otro sin reiniciar
+  el proceso; ver docs/PLAN-6-IA-LOCAL.md para cual esta en uso y por que.
 
 .EXAMPLE
   .\scripts\ia-local.ps1
@@ -40,7 +42,7 @@
 [CmdletBinding()]
 param(
   [switch] $Local,
-  [string] $Modelo = 'C:\Users\USER\Desktop\llama-b9940-bin-win-cuda-12.4-x64\qwen3.5_4b\Qwen3.5-4B-UD-Q4_K_XL.gguf'
+  [string] $Presets = 'C:\Users\USER\Desktop\llama-b9940-bin-win-cuda-12.4-x64\model.ini'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -52,8 +54,8 @@ $raiz     = Split-Path -Parent $PSScriptRoot
 if (-not (Test-Path $llamaExe)) {
   throw "No esta llama-server.exe en: $llamaExe"
 }
-if (-not (Test-Path $Modelo)) {
-  throw "No esta el modelo en: $Modelo`nPasa -Modelo con la ruta correcta si lo moviste o cambiaste de version."
+if (-not (Test-Path $Presets)) {
+  throw "No esta el archivo de presets en: $Presets`nPasa -Presets con la ruta correcta si lo moviste."
 }
 
 $host_ = if ($Local) { '127.0.0.1' } else { '0.0.0.0' }
@@ -67,7 +69,7 @@ function Start-Ventana([string]$titulo, [string]$directorio, [string]$comando) {
 }
 
 Start-Ventana "llama-server :8080 ($host_)" $llamaDir `
-  "& '$llamaExe' -m '$Modelo' --jinja --host $host_ --port 8080"
+  "& '$llamaExe' --models-preset '$Presets' --jinja --host $host_ --port 8080"
 
 $argWhisper = if ($Local) { ' -Local' } else { '' }
 Start-Ventana "whisper-server :8082 ($host_)" $raiz `
