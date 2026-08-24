@@ -27,15 +27,26 @@
   Idioma del dictado. Fijo y no 'auto' a proposito: con deteccion automatica,
   una frase corta con ruido de planta se confunde a menudo con portugues.
 
+.PARAMETER Red
+  Escucha en 0.0.0.0 en vez de 127.0.0.1, para que otros equipos de la red
+  hablen directo con whisper-server (sin pasar por el backend). Sin esto, el
+  server queda accesible solo desde esta maquina, que es el default seguro:
+  whisper-server no lleva autenticacion de ninguna clase, asi que con -Red
+  cualquiera que alcance el puerto puede mandarle audio y leer transcripciones.
+  Ademas del flag hace falta abrir el puerto en el Firewall si el perfil de
+  red lo bloquea.
+
 .EXAMPLE
   .\scripts\whisper.ps1
   .\scripts\whisper.ps1 -Modelo ..\whisper.cpp\models\ggml-medium.bin
+  .\scripts\whisper.ps1 -Red
 #>
 param(
   [int]    $Puerto = 8082,
   [string] $Modelo = '',
   [string] $Idioma = 'es',
-  [int]    $Hilos  = 0
+  [int]    $Hilos  = 0,
+  [switch] $Red
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,24 +102,33 @@ if ($ocupado) {
 
 <# ---- Arranque ---- #>
 
+$host_ = if ($Red) { '0.0.0.0' } else { '127.0.0.1' }
+
 Write-Host ""
 Write-Host "whisper-server" -ForegroundColor Cyan
 Write-Host "  modelo : $(Split-Path -Leaf $Modelo) ($([math]::Round($tam/1MB)) MB)"
 Write-Host "  idioma : $Idioma"
 Write-Host "  hilos  : $Hilos"
-Write-Host "  escucha: http://127.0.0.1:$Puerto"
+Write-Host "  escucha: http://$($host_):$Puerto"
 Write-Host ""
 Write-Host "  Pon esto en .env.local para que el backend lo use:" -ForegroundColor DarkGray
 Write-Host "    IA_WHISPER_BASE=http://127.0.0.1:$Puerto" -ForegroundColor DarkGray
 Write-Host ""
+if ($Red) {
+  Write-Host "  -Red: expuesto a la red, SIN autenticacion de ninguna clase." -ForegroundColor Yellow
+  Write-Host "  Cualquiera que alcance el puerto $Puerto puede mandar audio y leer" -ForegroundColor Yellow
+  Write-Host "  transcripciones. Falta ademas abrir el puerto en el Firewall si el" -ForegroundColor Yellow
+  Write-Host "  perfil de red lo bloquea." -ForegroundColor Yellow
+  Write-Host ""
+}
 
-# --host 127.0.0.1 y no 0.0.0.0: whisper-server no lleva autenticacion de
-# ninguna clase, igual que llama-server. Quien tenga que alcanzarlo es el
-# backend, que corre en la misma maquina.
+# --host 127.0.0.1 por defecto: whisper-server no lleva autenticacion de
+# ninguna clase, igual que llama-server. -Red lo cambia a 0.0.0.0 a proposito
+# (pedido explicito), no es el default.
 & $exe `
   -m $Modelo `
   -l $Idioma `
   -t $Hilos `
   -nt `
-  --host 127.0.0.1 `
+  --host $host_ `
   --port $Puerto
