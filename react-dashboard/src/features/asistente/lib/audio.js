@@ -29,12 +29,54 @@ const FRECUENCIA_WHISPER = 16000
  * se pueda sortear desde aquí; enseñar un botón que siempre falla sería peor.
  */
 export function puedeGrabar() {
-  return Boolean(
-    typeof navigator !== 'undefined' &&
-    navigator.mediaDevices?.getUserMedia &&
-    typeof window !== 'undefined' &&
-    window.MediaRecorder
-  )
+  return motivoSinMicrofono() === null
+}
+
+/**
+ * Por qué este navegador no puede grabar, o `null` si sí puede.
+ *
+ * ── POR QUÉ HACE FALTA UN MOTIVO Y NO UN BOOLEANO ──────────────────
+ *
+ * Porque la causa casi siempre es la misma y NO se puede arreglar desde el
+ * código: `navigator.mediaDevices` sólo existe en contextos seguros —HTTPS o
+ * localhost—. Al abrir el tablero por IP desde otro equipo de la planta
+ * (`http://192.168.x.x:3001`), el navegador retira la API entera y el botón
+ * del micrófono simplemente no se pintaba.
+ *
+ * Sin motivo visible eso es indistinguible de que la función no exista, de que
+ * el servidor no la tenga configurada o de que esté rota. Alguien acaba
+ * revisando whisper-server, el `.env.local` y los permisos del micrófono para
+ * descubrir que bastaba con escribir «localhost» en la barra de direcciones.
+ */
+export function motivoSinMicrofono() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return 'Este navegador no soporta la captura de audio.'
+  }
+
+  /*
+   * `isSecureContext` se comprueba ANTES que `mediaDevices`, aunque el síntoma
+   * sea la ausencia de `mediaDevices`. Es la relación causa/efecto: decir «tu
+   * navegador no soporta grabar» cuando el navegador soporta grabar
+   * perfectamente y lo que pasa es que la página va por HTTP manda a la
+   * persona a buscar en el sitio equivocado.
+   */
+  if (!window.isSecureContext) {
+    return (
+      'El micrófono sólo funciona en páginas seguras. Estás abriendo el tablero por HTTP ' +
+      'desde otro equipo, y el navegador bloquea la grabación por seguridad. Ábrelo como ' +
+      'http://localhost:3001 en el propio servidor, o publica el tablero por HTTPS.'
+    )
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return 'Este navegador no da acceso al micrófono.'
+  }
+
+  if (!window.MediaRecorder) {
+    return 'Este navegador no puede grabar audio (falta MediaRecorder).'
+  }
+
+  return null
 }
 
 /**
@@ -47,7 +89,7 @@ export function puedeGrabar() {
  *
  * @returns {Promise<{ detener: () => Promise<Blob>, cancelar: () => void }>}
  */
-export async function grabar({ alDetectarSilencio, alNivel } = {}) {
+export async function grabar({ alDetectarSilencio, alNivel, msSilencio } = {}) {
   const pista = await navigator.mediaDevices.getUserMedia({
     audio: {
       // Los tres ayudan de verdad con el ruido de una sala de máquinas. El
@@ -69,7 +111,7 @@ export async function grabar({ alDetectarSilencio, alNivel } = {}) {
   // botón no lo quiere, y montar un `AudioContext` para nada cuesta CPU y deja
   // el micrófono con un grafo de audio colgando.
   const escucha = alDetectarSilencio || alNivel
-    ? vigilarSilencio(pista, { alDetectarSilencio, alNivel })
+    ? vigilarSilencio(pista, { alDetectarSilencio, alNivel, msSilencio })
     : null
 
   const apagarMicrofono = () => {
@@ -117,8 +159,23 @@ const MS_ENTRE_MEDIDAS = 100
  * segundo corta en las pausas naturales de una frase —«el nivel del tanque…
  * ¿cuánto ha bajado?»— y por encima de segundo y medio la conversación se
  * siente lenta, porque hay que esperar mirando la pantalla a que reaccione.
+ *
+ * Es el defecto del modo LLAMADA, donde la conversación tiene ritmo y esperar
+ * cansa. El dictado con botón usa uno más largo (`MS_SILENCIO_DICTADO`): ahí
+ * no hay conversación, se está componiendo una frase, y las pausas para pensar
+ * son más largas y más frecuentes.
  */
 const MS_SILENCIO_FIN = 1200
+
+/**
+ * Silencio que cierra un DICTADO, más largo que el de la llamada.
+ *
+ * Tres segundos, que es lo que se pidió y además es lo razonable aquí: el
+ * dictado no es un turno de conversación sino redactar una pregunta, y ahí uno
+ * se para a pensar cómo decir algo. Cortar a 1,2 s convertiría cada duda en un
+ * envío a medias.
+ */
+export const MS_SILENCIO_DICTADO = 3000
 
 /**
  * Mínimo hablando antes de poder cortar por silencio.
@@ -130,40 +187,66 @@ const MS_SILENCIO_FIN = 1200
 const MS_MINIMO_HABLA = 600
 
 /**
- * Umbral de voz, sobre el nivel RMS normalizado (0 a 1).
+ * Qué fracción del volumen reciente marca la frontera entre hablar y callar.
  *
- * ── POR QUÉ SE CALIBRA Y NO ES UN NÚMERO FIJO ──────────────────────
+ * ── POR QUÉ SE MIDE CONTRA EL PICO Y NO CONTRA EL SUELO ────────────
  *
- * Porque el suelo de ruido de una oficina y el de una sala de bombas no se
- * parecen en nada, y un umbral fijo o corta siempre o no corta nunca. Se toman
- * los primeros instantes como referencia del silencio ambiente y se exige
- * superarlo con margen: lo que se detecta es «hay bastante más ruido que
- * antes», que es lo que distingue una voz del zumbido de un motor.
+ * Dos intentos anteriores fallaron por el mismo motivo, y merece la pena
+ * dejarlo escrito porque el error es tentador.
+ *
+ * El primero calibraba el ruido ambiente con el máximo de los primeros 300 ms.
+ * Falla en el caso normal —la gente pulsa y habla— porque toma su propia voz
+ * como silencio de referencia: el umbral queda por encima del volumen al que
+ * está hablando, no se detecta habla, y por tanto tampoco que ha parado. El
+ * turno NO SE CIERRA JAMÁS, y en pantalla eso es «el micrófono se activa pero
+ * no registra nada ni contesta».
+ *
+ * El segundo seguía un suelo de ruido rodante. Mismo problema por otro camino:
+ * el suelo nace en la primera muestra, que también es voz, y un mínimo rodante
+ * no puede subir por encima de lo que ve — se queda clavado en el nivel de la
+ * voz durante toda la frase.
+ *
+ * La raíz es que **desde una sola medida no se distingue una sala ruidosa de
+ * una persona hablando**. Lo que sí se distingue es una CAÍDA: si el nivel se
+ * desploma muy por debajo de lo que venía sonando, el que hablaba se ha
+ * callado. Por eso se sigue el PICO reciente y se compara contra una fracción
+ * suya. Funciona empiece la voz cuando empiece, porque el pico se forma con la
+ * voz misma.
  */
-const MARGEN_SOBRE_RUIDO = 2.5
-
-/** Suelo absoluto, por si el micrófono arranca ya con voz encima. */
-const UMBRAL_MINIMO = 0.012
+const FRACCION_DEL_PICO = 0.25
 
 /**
- * Techo del umbral, pase lo que pase en el calibrado.
+ * Suelo absoluto de voz.
  *
- * El calibrado toma los primeros instantes como referencia y da por hecho que
- * en ellos nadie habla. Pero el gesto natural es pulsar el teléfono y hablar en
- * el acto, y entonces la propia voz se mide como «ruido ambiente»: el umbral
- * queda en voz × MARGEN —muy por encima de lo que se diga después— y el turno
- * no se cierra jamás.
- *
- * El tope va sobre el UMBRAL YA CALCULADO, no sobre el suelo de ruido: limitar
- * el suelo antes de multiplicar deja que el margen lo vuelva a subir fuera de
- * alcance. Lo que tiene que seguir siendo alcanzable es el umbral.
- *
- * 0,06 queda por debajo de una voz normal de cerca (~0,08 RMS) y por encima del
- * zumbido de una sala. Un umbral demasiado bajo sólo alarga el turno —se corta
- * un poco más tarde—; uno inalcanzable rompe el modo entero, así que el error
- * se inclina a propósito hacia el lado barato.
+ * Por debajo de esto no hay habla aunque supere la fracción del pico: en una
+ * sala silenciosa el pico también es minúsculo, y sin este suelo el roce de la
+ * ropa contra el micrófono mantendría el turno abierto indefinidamente.
  */
-const UMBRAL_MAXIMO = 0.06
+const UMBRAL_MINIMO = 0.015
+
+/**
+ * Cuánto se desvanece el pico en cada medida.
+ *
+ * Tiene que bajar, o una frase alta al principio dejaría el listón tan arriba
+ * que el resto de la conversación contaría como silencio. Un 1 % cada 100 ms
+ * lo reduce a la mitad en unos siete segundos: lo bastante lento para que
+ * aguante una frase entera, lo bastante rápido para adaptarse a alguien que
+ * baja la voz.
+ */
+const DECAIMIENTO_DEL_PICO = 0.99
+
+/**
+ * Tope de un turno de habla, en milisegundos.
+ *
+ * Es la red de seguridad: si por lo que sea el silencio no se detecta —un
+ * micrófono silenciado por el sistema, que no entrega nada— el turno se cierra
+ * igualmente y la conversación sigue. Sin esto, un fallo del detector deja el
+ * modo llamada colgado para siempre, que es precisamente el fallo que se está
+ * arreglando.
+ *
+ * Cuarenta segundos son de sobra para cualquier pregunta hablada.
+ */
+const MS_MAXIMO_TURNO = 40000
 
 /**
  * Vigila el micrófono y avisa cuando el que habla se calla.
@@ -173,7 +256,7 @@ const UMBRAL_MAXIMO = 0.06
  * costaría más CPU en un bucle que corre diez veces por segundo mientras el
  * modelo ya está ocupando la máquina.
  */
-function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
+function vigilarSilencio(pista, { alDetectarSilencio, alNivel, msSilencio }) {
   const AudioCtx = window.AudioContext ?? window.webkitAudioContext
   if (!AudioCtx) return null
 
@@ -184,9 +267,12 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
    * Y aquí siempre lo está: `encender()` llama a `escuchar()`, que espera a
    * `getUserMedia` antes de llegar hasta aquí, así que el clic ya caducó. Un
    * analizador suspendido devuelve un buffer plano —todo 128, es decir, nivel
-   * 0— para siempre: nunca se cruza el umbral, `hablando` se queda en falso y
-   * el turno no se cierra solo jamás. El micrófono grababa bien; lo que no
-   * corría era el reloj de audio que lo vigila.
+   * 0— para siempre: el pico nunca se forma, no se detecta habla y el turno no
+   * se cierra jamás. El micrófono graba bien; lo que no corre es el reloj de
+   * audio que lo vigila.
+   *
+   * `resume()` es asíncrono y puede rechazar si el navegador lo bloquea; no se
+   * espera porque el vigilante ya tolera medidas planas al principio.
    */
   contexto.resume?.().catch(() => {})
   const fuente = contexto.createMediaStreamSource(pista)
@@ -197,8 +283,8 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
   const muestras = new Uint8Array(analizador.fftSize)
   const empezado = Date.now()
 
-  let ruidoAmbiente = null
-  let medidasDeCalibrado = 0
+  /** El volumen más alto reciente: se forma con la voz y decae solo. */
+  let pico = 0
   let hablando = false
   let calladoDesde = null
   let terminado = false
@@ -218,16 +304,19 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
     alNivel?.(nivel)
 
     // Los primeros 300 ms se usan para saber cómo suena el silencio aquí.
-    if (medidasDeCalibrado < 3) {
-      ruidoAmbiente = ruidoAmbiente === null ? nivel : Math.max(ruidoAmbiente, nivel)
-      medidasDeCalibrado += 1
-      return
+    const cerrar = () => {
+      terminado = true
+      clearInterval(temporizador)
+      alDetectarSilencio?.()
     }
 
-    // El tope entra DESPUÉS del margen: un calibrado hecho sobre la propia voz
-    // daría aquí un umbral que ya nadie puede superar. Ver `UMBRAL_MAXIMO`.
-    const calibrado = Math.max(UMBRAL_MINIMO, ruidoAmbiente * MARGEN_SOBRE_RUIDO)
-    const umbral = Math.min(calibrado, UMBRAL_MAXIMO)
+    // Red de seguridad: pase lo que pase con el detector, el turno acaba.
+    if (Date.now() - empezado >= MS_MAXIMO_TURNO) return cerrar()
+
+    // El pico sube con la voz al instante y se desvanece solo. Ver arriba.
+    pico = Math.max(nivel, pico * DECAIMIENTO_DEL_PICO)
+
+    const umbral = Math.max(UMBRAL_MINIMO, pico * FRACCION_DEL_PICO)
 
     if (nivel > umbral) {
       hablando = true
@@ -240,11 +329,7 @@ function vigilarSilencio(pista, { alDetectarSilencio, alNivel }) {
     if (!hablando || Date.now() - empezado < MS_MINIMO_HABLA) return
 
     calladoDesde ??= Date.now()
-    if (Date.now() - calladoDesde >= MS_SILENCIO_FIN) {
-      terminado = true
-      clearInterval(temporizador)
-      alDetectarSilencio?.()
-    }
+    if (Date.now() - calladoDesde >= (msSilencio ?? MS_SILENCIO_FIN)) cerrar()
   }, MS_ENTRE_MEDIDAS)
 
   return {

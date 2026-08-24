@@ -37,6 +37,12 @@ afterEach(() => {
  * ejercitar nada.
  */
 beforeEach(() => {
+  /*
+   * `puedeGrabar()` exige contexto seguro: `navigator.mediaDevices` sólo existe
+   * en HTTPS o localhost, y jsdom no marca la página como segura por su cuenta.
+   */
+  Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+
   navigator.mediaDevices = { getUserMedia: vi.fn(() => Promise.resolve({ getTracks: () => [] })) };
   window.MediaRecorder = class {};
   window.speechSynthesis = { cancel: vi.fn(), speak: vi.fn(), getVoices: () => [] };

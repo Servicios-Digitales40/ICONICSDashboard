@@ -45,6 +45,12 @@ beforeEach(() => {
   resumeLlamado = false;
   estadoContexto = "suspended";
 
+  /*
+   * `puedeGrabar()` exige contexto seguro: `navigator.mediaDevices` sólo existe
+   * en HTTPS o localhost, y jsdom no marca la página como segura por su cuenta.
+   */
+  Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
+
   navigator.mediaDevices = {
     getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })),
   };

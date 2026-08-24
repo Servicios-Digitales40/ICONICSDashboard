@@ -16,10 +16,10 @@
  * servidor. Sin ir pintando los estados y los tokens conforme llegan, la
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
-import { callar, hablar, puedeHablar } from "./vozSalida.js";
+import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
 
 /**
@@ -532,10 +532,28 @@ export function useDictado() {
     }
   }, [transcribir]);
 
-  return {
-    disponible, grabando, transcribiendo, error,
-    empezar, detener, cancelar, desdeArchivo,
-  };
+  /*
+   * Memoizado, y no es una optimización: es corrección.
+   *
+   * Devolver un objeto literal hace que cambie de identidad en CADA render, y
+   * cualquier `useEffect` o `useCallback` que dependa de él se considera
+   * obsoleto continuamente. Eso ya rompió el modo llamada de la peor forma
+   * posible: la limpieza de un efecto —que apagaba el micrófono— se ejecutaba
+   * en cada repintado, y como el nivel de voz repinta diez veces por segundo,
+   * la grabación se cancelaba a sí misma sin parar. La pantalla decía «Te
+   * escucho» y no pasaba nada nunca.
+   *
+   * Con la identidad estable, quien dependa de este objeto sólo reacciona
+   * cuando algo cambia de verdad.
+   */
+  return useMemo(
+    () => ({
+      disponible, grabando, transcribiendo, error,
+      empezar, detener, cancelar, desdeArchivo,
+    }),
+    [disponible, grabando, transcribiendo, error,
+      empezar, detener, cancelar, desdeArchivo]
+  );
 }
 
 /**
@@ -571,11 +589,22 @@ export function useDictado() {
  * (El final de frase SÍ se detecta por silencio — ver `escuchar` más abajo y
  * `vigilarSilencio` en `audio.js`. El botón queda como salida manual.)
  */
+/**
+ * Cuántos turnos seguidos sin entender nada antes de rendirse.
+ *
+ * Reintentar una o dos veces es lo correcto: lo normal es que una frase no se
+ * oyera bien. Pero girar en silencio para siempre es el peor fallo posible en
+ * un modo sin pantalla — el operador habla y no pasa nada, sin ninguna pista.
+ */
+const MAX_TURNOS_VACIOS = 3;
+
 export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const [activo, setActivo] = useState(false);
   const [fase, setFase] = useState("parado");   // parado | escuchando | pensando | hablando
   /** Nivel del micrófono, 0 a 1. Es la prueba visible de que te está oyendo. */
   const [nivel, setNivel] = useState(0);
+  /** Fallo de la VOZ, que se arregla en otro sitio que el del micrófono. */
+  const [errorVoz, setErrorVoz] = useState(null);
 
   const dictado = useDictado();
   const vivoEnLlamada = useRef(true);
@@ -583,10 +612,24 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const yaLeido = useRef(null);
   /** Evita que el silencio y el botón cierren el mismo turno dos veces. */
   const cerrandoTurno = useRef(false);
+  /** Turnos seguidos sin entender nada. Ver `MAX_TURNOS_VACIOS`. */
+  const vacios = useRef(0);
 
   const disponible = dictado.disponible === true && puedeHablar();
 
   useEffect(() => { activoRef.current = activo; }, [activo]);
+
+  /*
+   * Que el silencio de la voz deje de ser invisible.
+   *
+   * `speechSynthesis` se traga frases sin emitir ningún evento: ni `error`, ni
+   * `end`, ni nada. Sin esto el único síntoma es «no suena», que es lo que
+   * costó varias rondas de diagnóstico. Ahora sale escrito qué comprobar.
+   */
+  useEffect(() => {
+    alQuedarseMuda((motivo) => vivoEnLlamada.current && setErrorVoz(motivo));
+    return () => alQuedarseMuda(null);
+  }, []);
 
   /*
    * `escuchar` vive en una referencia, y no es un adorno.
@@ -604,6 +647,26 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
    * la respuesta sea otra.
    */
   const escucharRef = useRef(null);
+
+  /**
+   * Saluda al descolgar, y no es cortesía: es la PRUEBA de que la voz funciona.
+   *
+   * Sin esto, si el navegador tiene la síntesis bloqueada no te enteras hasta
+   * uno o dos minutos después —cuando llega la primera respuesta y no suena—,
+   * y para entonces no hay forma de saber si el problema es la voz, el
+   * micrófono o el asistente. Con el saludo, si no oyes nada al descolgar ya
+   * sabes cuál de los tres es.
+   *
+   * El aviso de fin importa: hasta que el saludo no acaba NO se puede abrir el
+   * micrófono. Ver `encender`.
+   */
+  const saludar = useCallback((alTerminar) => {
+    setErrorVoz(null);
+    // NO se usa `hablar()`: espera a que carguen las voces, y ese `await`
+    // rompe la cadena del clic — que es justo lo que el navegador exige para
+    // autorizar el audio. `desbloquearVoz` lo dice en la misma vuelta.
+    desbloquearVoz("Te escucho.", alTerminar);
+  }, []);
 
   const apagar = useCallback(() => {
     activoRef.current = false;
@@ -688,11 +751,30 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
 
     if (!activoRef.current) return;
 
-    // Sin texto se vuelve a escuchar en vez de parar: lo normal es que no se
-    // oyera bien, y apagar el modo obligaría a encenderlo otra vez con las
-    // manos, que es justo lo que se quería evitar.
-    if (!texto) return escuchar();
+    /*
+     * Sin texto se vuelve a escuchar, pero NO indefinidamente.
+     *
+     * Reintentar es lo correcto una o dos veces: lo normal es que no se oyera
+     * bien, y apagar el modo obligaría a encenderlo otra vez con las manos,
+     * que es justo lo que se quería evitar.
+     *
+     * Pero si NADA se entiende varias veces seguidas, algo va mal de verdad
+     * —el micrófono capta silencio, o whisper no está respondiendo— y seguir
+     * girando en silencio es lo peor que puede hacer: el operador ve el
+     * círculo rojo, habla, y no pasa nada nunca, sin ninguna pista de por qué.
+     */
+    if (!texto) {
+      vacios.current += 1;
+      if (vacios.current < MAX_TURNOS_VACIOS) return escuchar();
 
+      setErrorVoz(
+        "No he entendido nada en varios intentos. Comprueba que el micrófono capta tu voz: " +
+        "al hablar, el anillo del botón tiene que crecer."
+      );
+      return apagarRef.current?.();
+    }
+
+    vacios.current = 0;
     preguntar(texto);
   }, [dictado, preguntar, escuchar]);
 
@@ -703,13 +785,37 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
 
   const encender = useCallback(() => {
     if (!disponible) return;
+    vacios.current = 0;
     activoRef.current = true;
     setActivo(true);
     // Lo que ya hubiera en pantalla no se lee: el modo empieza a partir de
     // ahora, y leer la respuesta anterior al encenderlo desconcierta.
     yaLeido.current = ultimaRespuesta?.texto ?? null;
-    escuchar();
-  }, [disponible, escuchar, ultimaRespuesta]);
+
+    /*
+     * Se escucha DESPUÉS de terminar el saludo, no a la vez.
+     *
+     * Abrir el micrófono mientras el altavoz aún dice «Te escucho» hace que se
+     * grabe a sí mismo: el medidor de nivel toma la propia voz del asistente
+     * como si fuera la del operador, marca que «ya se habló», y en cuanto el
+     * saludo acaba detecta silencio y cierra el turno con audio vacío. Sin
+     * texto, el ciclo vuelve a escuchar — y así indefinidamente.
+     *
+     * El síntoma es exactamente «me dice que me escucha pero no entabla la
+     * conversación ni manda nada».
+     *
+     * La cancelación de eco del navegador no basta: filtra el altavoz para el
+     * INTERLOCUTOR, no para el medidor de nivel local. Lo que sirve es no
+     * solapar los turnos, que además es como funciona una conversación.
+     *
+     * Y el saludo va dentro del clic porque Chrome no deja hablar a una página
+     * sin gesto reciente del usuario: la primera respuesta llega minutos
+     * después, cuando ya no lo hay.
+     */
+    saludar(() => {
+      if (activoRef.current) escuchar();
+    });
+  }, [disponible, escuchar, ultimaRespuesta, saludar]);
 
   /*
    * Llegó una respuesta nueva y completa: se lee y se vuelve a escuchar.
@@ -756,7 +862,9 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     fase,
     nivel,
     transcribiendo: dictado.transcribiendo,
-    error: dictado.error,
+    // El fallo del micrófono y el de la voz son distintos y se arreglan en
+    // sitios distintos, así que se cuentan por separado.
+    error: dictado.error ?? errorVoz,
     encender,
     apagar,
     cerrarTurno,
