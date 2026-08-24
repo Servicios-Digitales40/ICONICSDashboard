@@ -460,3 +460,124 @@ describe("los ejemplos", () => {
     expect(campo.value).toBe("¿qué presión tiene la re");
   });
 });
+
+/**
+ * ── EL SELECTOR DE MODELO ──────────────────────────────────────────
+ *
+ * Lo que estas pruebas fijan no es que el desplegable se pinte, sino las dos
+ * cosas que lo hacen honesto:
+ *
+ *  1. Que sólo aparece cuando de verdad HAY elección. El servidor puede estar
+ *     arrancado con un solo modelo (`-m ruta.gguf`), y ahí el campo `model` de
+ *     la petición se ignora: un selector prometería un cambio que no ocurre.
+ *  2. Que enseña el modelo que CONFIRMA el servidor, no el que se pulsó. Como
+ *     el modelo es uno solo para todo el servidor, un cambio puede fallar
+ *     —otra pantalla tiene una consulta en curso— y entonces el rótulo tiene
+ *     que seguir diciendo cuál responde de verdad.
+ */
+describe("el selector de modelo", () => {
+  /** Backend con catálogo de modelos y un PUT que puede aceptar o rechazar. */
+  function backendConModelos({ modelos, activo, rechazo }) {
+    const puestos = [];
+    const espia = vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      if (init?.method === "PUT") {
+        puestos.push(JSON.parse(init.body).modelo);
+        if (rechazo) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ ok: false, error: rechazo }), { status: 409 })
+          );
+        }
+        const pedido = puestos[puestos.length - 1];
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, modelo: pedido }), { status: 200 }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, habilitado: true, modelo: activo, modelos }), { status: 200 })
+      );
+    });
+    return { espia, puestos };
+  }
+
+  const abrir = async () => fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+  const selector = () => screen.queryByLabelText(/Modelo de IA/);
+
+  it("con un solo modelo servido no se ofrece ninguna elección", async () => {
+    // El caso de `llama-server -m ruta.gguf`: el backend manda `modelos: []`.
+    backendConModelos({ modelos: [], activo: "local" });
+    montar();
+    await abrir();
+
+    expect(selector()).toBeNull();
+  });
+
+  it("un backend anterior a esta función no rompe el panel", async () => {
+    // `modelos` no viaja en la respuesta. Antes de esto el panel hacía
+    // `.length` sobre `undefined` y se caía entero, que es mucho peor que no
+    // tener selector.
+    backend({ habilitado: true });
+    montar();
+    await abrir();
+
+    expect(selector()).toBeNull();
+    expect(screen.getByLabelText("Escribe tu pregunta")).toBeTruthy();
+  });
+
+  it("con varios modelos aparece el desplegable con el activo elegido", async () => {
+    backendConModelos({ modelos: ["qwen-3.5-4B", "qwen-3.5-9B"], activo: "qwen-3.5-4B" });
+    montar();
+    await abrir();
+
+    await waitFor(() => expect(selector()).toBeTruthy());
+    expect(selector().value).toBe("qwen-3.5-4B");
+    expect([...selector().options].map((o) => o.value)).toEqual(["qwen-3.5-4B", "qwen-3.5-9B"]);
+  });
+
+  it("elegir otro lo manda al servidor y enseña el que él confirma", async () => {
+    const { puestos } = backendConModelos({ modelos: ["qwen-3.5-4B", "qwen-3.5-9B"], activo: "qwen-3.5-4B" });
+    montar();
+    await abrir();
+
+    await waitFor(() => expect(selector()).toBeTruthy());
+    fireEvent.change(selector(), { target: { value: "qwen-3.5-9B" } });
+
+    await waitFor(() => expect(puestos).toEqual(["qwen-3.5-9B"]));
+    await waitFor(() => expect(selector().value).toBe("qwen-3.5-9B"));
+  });
+
+  it("si el servidor lo rechaza, dice por qué y NO miente sobre cuál responde", async () => {
+    const rechazo = "Hay una consulta en curso. El modelo se cambia para todas las pantallas.";
+    backendConModelos({ modelos: ["qwen-3.5-4B", "qwen-3.5-9B"], activo: "qwen-3.5-4B", rechazo });
+    montar();
+    await abrir();
+
+    await waitFor(() => expect(selector()).toBeTruthy());
+    fireEvent.change(selector(), { target: { value: "qwen-3.5-9B" } });
+
+    // El motivo se enseña tal cual lo manda el backend: «hay una consulta en
+    // curso» y «ese modelo no existe» se arreglan de formas distintas.
+    await waitFor(() => expect(screen.getByText(rechazo)).toBeTruthy());
+    // Y el rótulo vuelve al que de verdad va a contestar. Dejarlo en el que se
+    // pulsó sería el fallo que este selector existe para no cometer.
+    expect(selector().value).toBe("qwen-3.5-4B");
+  });
+
+  it("no se puede cambiar de modelo con una consulta en curso", async () => {
+    // Cambiarlo a mitad de turno parte el bucle por dentro: la pasada de
+    // herramientas iría con un modelo y la de redactar con otro.
+    const abierto = flujoAbierto();
+    vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      if (init?.method === "POST") return Promise.resolve(abierto.respuesta);
+      return Promise.resolve(new Response(JSON.stringify({
+        ok: true, habilitado: true, modelo: "qwen-3.5-4B", modelos: ["qwen-3.5-4B", "qwen-3.5-9B"],
+      }), { status: 200 }));
+    });
+    montar();
+    await abrir();
+
+    await waitFor(() => expect(selector()).toBeTruthy());
+    fireEvent.change(screen.getByLabelText("Escribe tu pregunta"), { target: { value: "hola" } });
+    fireEvent.click(screen.getByLabelText("Enviar la pregunta"));
+
+    await waitFor(() => expect(selector().disabled).toBe(true));
+    abierto.cerrar();
+  });
+});
