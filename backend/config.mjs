@@ -216,6 +216,40 @@ function readIaBase(rawValue) {
 }
 
 /**
+ * El catálogo de modelos elegibles y cuál se usa por defecto.
+ *
+ * Devuelve siempre las dos cosas juntas porque no son independientes: el
+ * defecto es el primero de la lista, y calcularlos por separado invita a que
+ * se contradigan.
+ *
+ * `lista` vacía es el estado normal de una instalación con un solo modelo, y
+ * significa «no ofrezcas elección». No es lo mismo que una lista de un
+ * elemento: con un elemento hay un selector con una sola opción, que es peor
+ * que ninguno.
+ *
+ * Los nombres se dejan TAL CUAL —sin normalizar mayúsculas ni acentos— porque
+ * son identificadores de otro sistema: `qwen-3.5-4B` y `qwen-3.5-4b` son
+ * distintos para el router de llama-server, y "arreglar" el que escribió el
+ * operador lo llevaría a un modelo que no pidió. Los duplicados sí se quitan:
+ * son un descuido al editar el `.env`, no una intención.
+ */
+function readModelos(env) {
+  const lista = Object.freeze([
+    ...new Set(
+      (env.IA_MODELOS ?? '')
+        .split(',')
+        .map(nombre => nombre.trim())
+        .filter(Boolean)
+    ),
+  ])
+
+  return {
+    lista,
+    porDefecto: lista[0] || env.IA_MODELO || 'local',
+  }
+}
+
+/**
  * Carpeta de documentación. Vacío significa «sin documentación», no es un
  * error: es el estado por defecto de una instalación normal, igual que
  * `IA_BASE`.
@@ -281,6 +315,7 @@ export function loadConfig(env = process.env) {
   const origin = readOrigin(apiBase)
   const isProduction = env.NODE_ENV === 'production'
   const iconicsFake = readBoolean('ICONICS_FAKE', env.ICONICS_FAKE, false)
+  const modelos = readModelos(env)
 
   return Object.freeze({
     port: readPort(env.PORT),
@@ -359,8 +394,33 @@ export function loadConfig(env = process.env) {
       isConfigured: Boolean(env.IA_BASE),
       timeoutMs: readInteger('IA_TIMEOUT_MS', env.IA_TIMEOUT_MS, DEFAULTS.iaTimeoutMs, 1),
       maxTokens: readInteger('IA_MAX_TOKENS', env.IA_MAX_TOKENS, DEFAULTS.iaMaxTokens, 1),
-      /** llama-server sirve un solo modelo; el nombre es informativo. */
-      modelo: env.IA_MODELO || 'local',
+      /**
+       * Modelo por defecto, y el catálogo de los que se pueden elegir.
+       *
+       * ── ESTO ERA UN SOLO NOMBRE, Y ERA INFORMATIVO ─────────────────
+       *
+       * Aquí ponía «llama-server sirve un solo modelo; el nombre es
+       * informativo», y era verdad: arrancado con `-m ruta.gguf`, el campo
+       * `model` del cuerpo lo ignora, así que daba igual lo que dijera esta
+       * variable. Dejó de serlo al arrancar el servidor con `--models-preset`,
+       * que expone varios modelos bajo un router y **sí** honra el `model` de
+       * cada petición. El nombre pasó de etiqueta a interruptor.
+       *
+       * `IA_MODELOS` es la lista de los elegibles, separados por comas, y el
+       * PRIMERO es el que se usa cuando nadie pide otro. Tienen que ser los
+       * identificadores exactos que publica `GET /v1/models` del servidor —
+       * que son los nombres de sección del `.ini` de presets, p. ej.
+       * `qwen-3.5-4B`. Un nombre que no exista allí no da error: el router
+       * cae en su modelo por defecto, y entonces el selector diría una cosa
+       * mientras responde otra. Por eso `/api/chat/modelos` los contrasta
+       * contra el servidor en vez de creerse esta lista a ciegas.
+       *
+       * Vacío deja el comportamiento de siempre: se manda `IA_MODELO` (o
+       * 'local') y no se ofrece ninguna elección, que es lo correcto para una
+       * instalación con un `-m` de toda la vida.
+       */
+      modelo: modelos.porDefecto,
+      modelos: modelos.lista,
 
       /**
        * Carpeta de documentación de planta: manuales, hojas de datos,

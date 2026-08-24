@@ -88,6 +88,22 @@ export function useAsistente() {
   const [estado, setEstado] = useState(null);           // "Consultando ICONICS…"
   const [ocupado, setOcupado] = useState(false);
 
+  /*
+   * El modelo activo y el catálogo de elegibles.
+   *
+   * NO se guardan en `localStorage` como el hilo, y esa es la decisión: el
+   * modelo es estado del SERVIDOR, uno solo para todas las pantallas (ver
+   * `chat.mjs`). Persistirlo aquí haría que al recargar la pantalla dijera el
+   * que eligió esta pestaña la última vez, que puede no ser el que está
+   * cargado ahora — y una etiqueta que miente sobre qué modelo responde es
+   * peor que no tenerla. Se pregunta al backend, siempre.
+   *
+   * `modelos` vacío significa «un solo modelo»: el panel no pinta el selector.
+   */
+  const [modelo, setModelo] = useState(null);
+  const [modelos, setModelos] = useState([]);
+  const [errorModelo, setErrorModelo] = useState(null);
+
   const abortador = useRef(null);
   const vivo = useRef(true);
 
@@ -117,13 +133,56 @@ export function useAsistente() {
 
     fetch(`${API_BASE}/api/chat`)
       .then((r) => r.json())
-      .then((r) => { if (!cancelado) setDisponible(Boolean(r?.habilitado)); })
+      .then((r) => {
+        if (cancelado) return;
+        setDisponible(Boolean(r?.habilitado));
+        setModelo(r?.modelo ?? null);
+        // `?? []` y no `r.modelos`: un backend anterior a esta función no
+        // manda el campo, y `undefined` rompería el `.length` del panel. Sin
+        // campo es «no hay elección», que es justo lo que era antes.
+        setModelos(Array.isArray(r?.modelos) ? r.modelos : []);
+      })
       // Un backend viejo no conoce la ruta y responde con el index.html; eso
       // es «no hay asistente», no un error que enseñar.
       .catch(() => { if (!cancelado) setDisponible(false); });
 
     return () => { cancelado = true; };
   }, []);
+
+  /**
+   * Cambia el modelo para TODO el servidor.
+   *
+   * El estado local se actualiza con lo que CONFIRMA el backend, no con lo que
+   * se pidió: si el servidor rechaza el cambio —hay una consulta en curso, el
+   * nombre no está en su catálogo— el selector tiene que seguir enseñando el
+   * modelo que de verdad va a responder. Pintar el elegido de inmediato y
+   * corregirlo después sería enseñar medio segundo de mentira justo en el
+   * indicador que existe para no mentir.
+   */
+  const elegirModelo = useCallback(
+    async (nombre) => {
+      if (ocupado || !nombre || nombre === modelo) return;
+
+      setErrorModelo(null);
+      try {
+        const respuesta = await fetch(`${API_BASE}/api/chat/modelo`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ modelo: nombre }),
+        });
+
+        const cuerpo = await respuesta.json().catch(() => ({}));
+        if (!respuesta.ok) {
+          throw new Error(cuerpo?.error ?? `El servidor respondió ${respuesta.status}.`);
+        }
+
+        if (vivo.current) setModelo(cuerpo?.modelo ?? nombre);
+      } catch (error) {
+        if (vivo.current) setErrorModelo(error.message);
+      }
+    },
+    [ocupado, modelo]
+  );
 
   /** Aplica un cambio al último mensaje, que siempre es el turno en curso. */
   const actualizarUltimo = useCallback((cambio) => {
@@ -292,7 +351,10 @@ export function useAsistente() {
     borrar();
   }, [ocupado]);
 
-  return { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar };
+  return {
+    disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
+    modelo, modelos, elegirModelo, errorModelo,
+  };
 }
 
 /**

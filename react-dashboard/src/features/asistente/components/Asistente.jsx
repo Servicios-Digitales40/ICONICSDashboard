@@ -192,6 +192,70 @@ const ESTILOS = `
 `;
 
 /**
+ * Elige qué modelo responde. Un `<select>` nativo, a propósito.
+ *
+ * ── POR QUÉ NO UN DESPLEGABLE PROPIO ───────────────────────────────
+ *
+ * Porque el nativo ya trae teclado, lector de pantalla y —lo que aquí decide—
+ * un menú que se pinta FUERA del panel. Uno propio dentro de una cabecera de
+ * 420 px con `overflow: hidden` se recorta, y arreglarlo pide un portal y un
+ * posicionador para ganar un menú más bonito en un control que se usa una vez
+ * al día.
+ *
+ * ── LO QUE ESTA UI TIENE QUE DECIR, Y CASI SE NOS OLVIDA ────────────
+ *
+ * Que el cambio es GLOBAL. El modelo es uno para todo el servidor (ver
+ * `chat.mjs`), así que quien lo cambia se lo cambia también a la pantalla del
+ * taller. Un selector mudo se lee como una preferencia de esta pantalla, que
+ * es exactamente lo contrario, y el operador de al lado vería cambiar la
+ * velocidad de sus respuestas sin ninguna explicación. Lo dice el `title`, y
+ * el aviso bajo la cabecera cuando el servidor rechaza el cambio.
+ *
+ * No se pinta si hay menos de dos modelos: un desplegable de una sola opción
+ * es ruido que además promete una elección que no existe.
+ */
+function SelectorModelo({ modelo, modelos, elegir, error, ocupado, t }) {
+  if (!modelos || modelos.length < 2) return <span style={{ flex: 1 }} />;
+
+  return (
+    <span style={{ flex: 1, display: "flex", alignItems: "center", minWidth: 0 }}>
+      <select
+        value={modelo ?? ""}
+        onChange={(e) => elegir(e.target.value)}
+        disabled={ocupado}
+        aria-label="Modelo de IA (afecta a todas las pantallas)"
+        title={
+          ocupado
+            ? "No se puede cambiar el modelo con una consulta en curso"
+            : "Modelo de IA. El cambio afecta a TODAS las pantallas y la primera " +
+              "respuesta tarda más mientras se carga."
+        }
+        style={{
+          maxWidth: "100%", fontFamily: SANS, fontSize: 11,
+          // `coral` es el color de error de la casa —«fuera de banda, error de
+          // lectura, estado de fallo», ver `themes.js`— y es el que usa el
+          // resto del panel. `textSoft` para el estado normal: el nombre del
+          // modelo es contexto, no el rótulo principal de la cabecera.
+          color: error ? t.coral : t.textSoft,
+          background: "transparent",
+          border: `1px solid ${error ? t.coral : t.border}`,
+          borderRadius: 6, padding: "2px 4px",
+          cursor: ocupado ? "not-allowed" : "pointer",
+          opacity: ocupado ? 0.5 : 1,
+        }}
+      >
+        {/* El activo puede no estar en la lista si alguien editó `IA_MODELOS`
+            sin reiniciar. Se ofrece igual, porque es el que responde: omitirlo
+            dejaría al `<select>` enseñando otro nombre por su cuenta. */}
+        {(modelos.includes(modelo) ? modelos : [modelo, ...modelos].filter(Boolean)).map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/**
  * Un trazo derivado del texto que de verdad llegó — no una onda decorativa
  * de mentira. Cada carácter nuevo aporta un punto; la señal crece con la
  * respuesta y se congela cuando el turno termina, como la traza de un
@@ -238,7 +302,10 @@ export function Asistente() {
   const [sinLeer, setSinLeer] = useState(false);
   const [segundos, setSegundos] = useState(0);
 
-  const { disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar } = useAsistente();
+  const {
+    disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
+    modelo, modelos, elegirModelo, errorModelo,
+  } = useAsistente();
   const { adjunto, error: errorAdjunto, cargar, quitar } = useAdjuntoTexto();
 
   const finRef = useRef(null);
@@ -421,7 +488,11 @@ export function Asistente() {
       >
         <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderBottom: `1px solid ${t.border}` }}>
           <Bot size={17} color={t.accent} />
-          <strong style={{ flex: 1, fontSize: 13.5, color: t.text, fontFamily: SANS }}>{NOMBRE}</strong>
+          <strong style={{ fontSize: 13.5, color: t.text, fontFamily: SANS }}>{NOMBRE}</strong>
+          <SelectorModelo
+            modelo={modelo} modelos={modelos} elegir={elegirModelo}
+            error={errorModelo} ocupado={ocupado} t={t}
+          />
           <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
 
           <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
@@ -434,6 +505,17 @@ export function Asistente() {
             <X size={16} />
           </button>
         </header>
+
+        {/* El servidor rechazó el cambio de modelo —hay una consulta en curso,
+            o el nombre no está en su catálogo—. Se enseña el motivo tal cual lo
+            manda el backend: los dos casos se arreglan de formas distintas y un
+            «no se pudo» genérico no dice cuál es. `role="status"` y no `alert`
+            porque no interrumpe nada: el modelo anterior sigue sirviendo. */}
+        {errorModelo && (
+          <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
+            {errorModelo}
+          </div>
+        )}
 
         {/* El envoltorio existe para poder colgar el botón de «ir al final»
             encima del hilo: dentro del contenedor con scroll se desplazaría

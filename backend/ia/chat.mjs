@@ -437,8 +437,29 @@ function firmaDe(nombre, argumentos) {
 }
 
 export function createChat({ config, herramientas }) {
-  const { base, timeoutMs, maxTokens, modelo } = config.ia
+  const { base, timeoutMs, maxTokens } = config.ia
   const maxPasos = config.ia.maxPasos ?? 1
+
+  /**
+   * Qué modelo se está usando. **Es estado del SERVIDOR, no de la pantalla.**
+   *
+   * ── POR QUÉ GLOBAL Y NO POR CLIENTE ────────────────────────────────
+   *
+   * Porque el router de llama-server carga los modelos BAJO DEMANDA y no tiene
+   * sitio para los dos a la vez: atender una petición del 9B descarga el 4B de
+   * la VRAM, y la siguiente del 4B lo vuelve a cargar. Con el tablero abierto
+   * en la sala de control y en el taller —el caso normal, ver `cola.mjs`— dejar
+   * que cada pantalla elija el suyo convertiría CADA mensaje en una recarga de
+   * varios gigas: los dos operadores pagarían la espera del otro sin entender
+   * por qué, y el tablero parecería roto justo cuando hay más gente usándolo.
+   *
+   * Con un solo modelo activo, cambiarlo es un acto deliberado y poco frecuente
+   * —«ponme el grande para este diagnóstico»— y la recarga se paga una vez.
+   *
+   * El precio es que quien cambia el modelo lo cambia para todos, y eso hay que
+   * DECIRLO en la pantalla, no esconderlo. Ver `Asistente.jsx`.
+   */
+  let modelo = config.ia.modelo
 
   /**
    * Tope duro de herramientas ejecutadas en un turno.
@@ -924,7 +945,37 @@ export function createChat({ config, herramientas }) {
     }
   }
 
-  return { responder }
+  /**
+   * Cambia el modelo activo del servidor.
+   *
+   * Sólo admite nombres del catálogo de `IA_MODELOS`. Es una lista blanca y no
+   * una validación de formato a propósito: este valor acaba viajando al router
+   * de llama-server, y un nombre que él no conozca **no da error** — cae en su
+   * modelo por defecto. Eso dejaría al selector diciendo una cosa mientras el
+   * servidor responde con otra, que es el peor fallo posible aquí porque no se
+   * ve: las respuestas siguen llegando, sólo que del modelo equivocado.
+   *
+   * @returns {boolean} si el cambio se aplicó
+   */
+  function usarModelo(nombre) {
+    if (!config.ia.modelos.includes(nombre)) return false
+
+    if (nombre !== modelo) {
+      // Se registra porque explica un salto en los tiempos de respuesta: la
+      // primera consulta tras el cambio paga la carga del GGUF en VRAM, y sin
+      // esta línea ese minuto largo parece un cuelgue en los registros.
+      logger.info('Modelo del asistente cambiado', { anterior: modelo, nuevo: nombre })
+      modelo = nombre
+    }
+    return true
+  }
+
+  return {
+    responder,
+    usarModelo,
+    /** Para `GET /api/chat`, que dice cuál está activo AHORA. */
+    modeloActivo: () => modelo,
+  }
 }
 
 /**

@@ -3,7 +3,7 @@ dist/
 build/
 
 # Reportes PDF generados por el asistente (Plan 14 Fase 5): datos, no codigo.
-datos/
+Reportes/
 
 # Paquetes de release: se generan desde el codigo, no se versionan.
 # Para distribuirlos, sube el .zip como asset de un GitHub Release.
@@ -27,4 +27,5 @@ npm-debug.log*
 # Sistema
 .DS_Store
 Thumbs.db
+
 

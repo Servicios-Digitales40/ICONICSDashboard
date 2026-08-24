@@ -40,7 +40,13 @@ export function registerChatRoutes(router, { config, chat, cola }) {
     sendJson(response, 200, {
       ok: true,
       habilitado: config.ia.isConfigured,
-      modelo: config.ia.isConfigured ? config.ia.modelo : null,
+      modelo: config.ia.isConfigured ? chat.modeloActivo() : null,
+      /*
+       * El catálogo elegible. Vacío significa «no ofrezcas selector», que es lo
+       * correcto en una instalación con un solo modelo: un desplegable de una
+       * sola opción es peor que ninguno. Ver `readModelos` en `config.mjs`.
+       */
+      modelos: config.ia.isConfigured ? config.ia.modelos : [],
       /*
        * `ocupado` se mantiene por compatibilidad con clientes anteriores, pero
        * ya no significa «no puedes preguntar»: significa «hay alguien delante».
@@ -50,6 +56,63 @@ export function registerChatRoutes(router, { config, chat, cola }) {
       ocupado: cola.estado().atendiendo,
       enEspera: cola.estado().enEspera,
     })
+  })
+
+  /**
+   * Cambia el modelo activo, para TODAS las pantallas.
+   *
+   * Es un `PUT` y no un `POST` porque es idempotente: pedir dos veces el mismo
+   * modelo deja el servidor igual que pedirlo una.
+   *
+   * ── POR QUÉ SE RECHAZA MIENTRAS HAY UNA CONSULTA EN CURSO ──────────
+   *
+   * Porque cambiar el modelo a mitad de un turno lo parte por dentro: el bucle
+   * de `chat.mjs` hace la pasada de herramientas con un modelo y la de redactar
+   * con otro, sobre unos `tool_calls` que el segundo no emitió. Encima, con el
+   * router cargando bajo demanda, ese cambio descarga de la VRAM el modelo que
+   * está generando ahora mismo. Un 409 aquí es honesto: la consulta de alguien
+   * está en marcha y esto puede esperar diez segundos.
+   */
+  router.put('/api/chat/modelo', async ({ request, response }) => {
+    if (!config.ia.isConfigured) {
+      return sendError(response, 503, 'El asistente no está configurado en este servidor.')
+    }
+    if (!config.ia.modelos.length) {
+      return sendError(
+        response, 409,
+        'Este servidor sirve un solo modelo. Para poder elegir, arranca llama-server con ' +
+        '--models-preset y declara los nombres en IA_MODELOS.'
+      )
+    }
+
+    const { atendiendo, enEspera } = cola.estado()
+    if (atendiendo || enEspera) {
+      return sendError(
+        response, 409,
+        'Hay una consulta en curso. El modelo se cambia para todas las pantallas, así que ' +
+        'espera a que termine e inténtalo otra vez.'
+      )
+    }
+
+    let cuerpo
+    try {
+      cuerpo = await readJsonBody(request, config.limits.maxRequestBodyBytes)
+    } catch (error) {
+      if (error instanceof RequestBodyError) return sendError(response, error.statusCode, error.message)
+      throw error
+    }
+
+    const modelo = String(cuerpo?.modelo ?? '').trim()
+    if (!modelo) return sendError(response, 400, 'Falta el modelo.')
+
+    if (!chat.usarModelo(modelo)) {
+      return sendError(
+        response, 400,
+        `"${modelo}" no está en los modelos de este servidor: ${config.ia.modelos.join(', ')}.`
+      )
+    }
+
+    sendJson(response, 200, { ok: true, modelo: chat.modeloActivo() })
   })
 
   router.post('/api/chat', async ({ request, response }) => {
