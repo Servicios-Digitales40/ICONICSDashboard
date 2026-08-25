@@ -27,6 +27,9 @@
  * respuesta, sola, cuando le toca. El 503 se reserva para cuando la fila es tan
  * larga que esperar dejaría de tener sentido.
  */
+import { randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { RequestBodyError, readJsonBody } from '../http/requestBody.mjs'
 import { sendError, sendJson } from '../http/responses.mjs'
 import { logger } from '../logger.mjs'
@@ -221,6 +224,62 @@ export function registerChatRoutes(router, { config, chat, cola }) {
     } finally {
       if (!response.writableEnded) response.end()
     }
+  })
+
+  /**
+   * Exporta a PDF la conversación tal como está en pantalla — el botón
+   * «Exportar PDF» del panel de chat, no una herramienta del modelo.
+   *
+   * JSON simple, sin streaming (a diferencia de `POST /api/chat`): esto no
+   * llama al modelo, sólo compone un documento con turnos que el cliente ya
+   * tiene. Mismo directorio y mismo mecanismo de descarga que los reportes
+   * de `generar_reporte` (`backend/ia/reporte.mjs`, `GET /api/reportes`):
+   * no hace falta un endpoint de descarga nuevo.
+   */
+  router.post('/api/chat/exportar', async ({ request, response }) => {
+    let cuerpo
+    try {
+      cuerpo = await readJsonBody(request, config.limits.maxRequestBodyBytes)
+    } catch (error) {
+      if (error instanceof RequestBodyError) return sendError(response, error.statusCode, error.message)
+      throw error
+    }
+
+    const turnos = Array.isArray(cuerpo?.historial) ? cuerpo.historial : []
+    const validos = turnos.filter(
+      t => t && (t.rol === 'usuario' || t.rol === 'asistente') && typeof t.texto === 'string' && t.texto.trim()
+    )
+    if (!validos.length) return sendError(response, 400, 'No hay conversación que exportar.')
+
+    // Carga perezosa, mismo motivo que en `herramientas.mjs::generar_reporte`:
+    // si pdfkit no está instalado, esto falla aquí sin tumbar el backend.
+    let reporteMod
+    try {
+      reporteMod = await import('../ia/reporte.mjs')
+    } catch (error) {
+      return sendError(
+        response, 503,
+        `La exportación a PDF no está disponible ahora mismo: falta instalar las dependencias del ` +
+        `backend. (${error.message})`
+      )
+    }
+
+    if (!config.reportes?.dir) {
+      return sendError(response, 503, 'La exportación de conversaciones no está configurada en este servidor.')
+    }
+
+    const pdf = await reporteMod.componerConversacionPdf({
+      instalacion: 'Sistema de agua industrial',
+      generadoEl: new Date().toLocaleString('es-MX'),
+      turnos: validos,
+    })
+
+    const id = randomUUID()
+    await mkdir(config.reportes.dir, { recursive: true })
+    await writeFile(join(config.reportes.dir, `${id}.pdf`), pdf)
+
+    logger.info('Conversación exportada a PDF', { turnos: validos.length })
+    sendJson(response, 200, { ok: true, url: `/api/reportes?id=${id}` })
   })
 }
 

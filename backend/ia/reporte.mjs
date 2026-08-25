@@ -148,3 +148,47 @@ export async function componerReportePdf({
   doc.end()
   return cerrado
 }
+
+/**
+ * PDF de una conversación completa con el asistente (botón «Exportar PDF»
+ * del panel de chat).
+ *
+ * A diferencia de `componerReportePdf`, aquí el contenido es texto de
+ * turnos, no gráficos SVG: no hay que fijar `doc.y` a mano tras dibujar un
+ * SVG que no lo mueve —ver la cabecera de este archivo—, así que basta la
+ * paginación AUTOMÁTICA de pdfkit entre un `doc.text()` y el siguiente.
+ *
+ * @param {object} datos
+ * @param {string} datos.instalacion
+ * @param {string} datos.generadoEl Fecha/hora local, legible.
+ * @param {{rol: 'usuario'|'asistente', texto: string}[]} datos.turnos
+ * @returns {Promise<Buffer>}
+ */
+export async function componerConversacionPdf({ instalacion, generadoEl, turnos }) {
+  const doc = new PDFDocument({ margin: MARGEN, size: 'A4' })
+  const trozos = []
+  doc.on('data', trozo => trozos.push(trozo))
+  const cerrado = new Promise((resolve, reject) => {
+    doc.on('end', () => resolve(Buffer.concat(trozos)))
+    doc.on('error', reject)
+  })
+
+  doc.fontSize(20).fillColor('#000').text(instalacion, { align: 'left' })
+  doc.fontSize(12).fillColor('#555').text('Conversación con el asistente')
+  doc.text(`Generado el: ${generadoEl}`)
+  doc.fillColor('#000')
+  doc.moveDown()
+
+  for (const turno of turnos) {
+    const esUsuario = turno.rol === 'usuario'
+    doc
+      .fontSize(11)
+      .fillColor(esUsuario ? '#1a5fb4' : '#333')
+      .text(esUsuario ? 'Operador' : 'Asistente', { underline: true })
+    doc.fontSize(10.5).fillColor('#000').text(turno.texto, { align: 'left' })
+    doc.moveDown()
+  }
+
+  doc.end()
+  return cerrado
+}

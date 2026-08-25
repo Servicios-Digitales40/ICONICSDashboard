@@ -750,6 +750,46 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
   server.close()
 }
 
+console.log('\n── Exportar la conversación a PDF ──────────────────────────')
+{
+  const reportesDir = await mkdtemp(join(tmpdir(), 'iconics-conversacion-pdf-'))
+  const { base: exportarBase, server } = await mount({ IA_REPORTES_DIR: reportesDir })
+
+  const sinHistorial = await call(exportarBase, '/api/chat/exportar', postJson({}))
+  check('sin historial → 400', () => {
+    assert.equal(sinHistorial.status, 400)
+    assert.match(sinHistorial.body.error, /No hay conversación/)
+  })
+
+  const soloInvalidos = await call(exportarBase, '/api/chat/exportar', postJson({
+    historial: [{ rol: 'sistema', texto: 'no cuenta' }, { rol: 'usuario', texto: '   ' }],
+  }))
+  check('turnos todos inválidos (rol o texto) → 400', () => {
+    assert.equal(soloInvalidos.status, 400)
+  })
+
+  const exportado = await call(exportarBase, '/api/chat/exportar', postJson({
+    historial: [
+      { rol: 'usuario', texto: '¿Cómo va el tanque?' },
+      { rol: 'asistente', texto: 'El nivel está en banda, al 58 %.' },
+      { rol: 'sistema', texto: 'se filtra: rol no reconocido' },
+    ],
+  }))
+  check('historial válido → 200, { ok:true, url } con formato /api/reportes?id=<uuid>', () => {
+    assert.equal(exportado.status, 200)
+    assert.equal(exportado.body.ok, true)
+    assert.match(exportado.body.url, /^\/api\/reportes\?id=[0-9a-f-]{36}$/)
+  })
+
+  const descarga = await call(exportarBase, exportado.body.url)
+  check('el PDF recién exportado se descarga de inmediato', () => {
+    assert.equal(descarga.status, 200)
+    assert.equal(descarga.headers.get('content-type'), 'application/pdf')
+  })
+
+  server.close()
+}
+
 console.log('\n── Control de la bomba (Controles) ─────────────────────────')
 {
   // Este bloque prueba sólo el MAPEO HTTP (status codes, forma del JSON): la
