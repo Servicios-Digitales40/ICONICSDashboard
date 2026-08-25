@@ -48,6 +48,19 @@ let echoCount = 0
 /** Llamadas reales de lote: demuestra que la caché colapsa las repetidas. */
 let batchCount = 0
 
+/*
+ * Estado simulado del punto de control de la bomba y del nivel del tanque,
+ * para el bloque de `POST /api/control/bomba` más abajo. `nivelTanque`
+ * controla si `controlar_bomba` deja pasar el encendido (< 90, el
+ * `avisoMax` de `shared/eva/umbrales.js`); `controlValor` es lo que
+ * devuelve la RELECTURA tras escribir en `SENSORES/CONTROL` — normalmente
+ * el mismo valor que se escribió, salvo que `controlIgnoraEscritura` esté
+ * activo, que simula un punto cuya escritura no tiene efecto real.
+ */
+let nivelTanque = 42
+let controlValor = false
+let controlIgnoraEscritura = false
+
 /* ── Servidor ICONICS falso ──────────────────────────────────────────── */
 const fake = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`)
@@ -119,6 +132,7 @@ const fake = createServer(async (req, res) => {
     if (pn === 'lento') {
       return void setTimeout(() => json(200, { pointName: pn, value: 1 }), 1500).unref()
     }
+    if (pn?.endsWith('SENSORES/CONTROL')) return json(200, { pointName: pn, value: controlValor, quality: 192 })
     return json(200, { pointName: pn, value: 42, quality: 192 })
   }
   if (p === '/fwxapi/rest/v1/Data' && req.method === 'POST') {
@@ -126,7 +140,11 @@ const fake = createServer(async (req, res) => {
     let body = ''
     for await (const chunk of req) body += chunk
     const { pointName } = JSON.parse(body)
-    return json(200, pointName.map((n, i) => ({ pointName: n, value: i, quality: 192 })))
+    return json(200, pointName.map((n, i) => ({
+      pointName: n,
+      value: n.endsWith('SENSORES/SNIVEL_TANQUE') ? nivelTanque : i,
+      quality: 192,
+    })))
   }
   if (p === '/fwxapi/rest/v1/Data/Browse') {
     return json(200, [{ shortName: 'SENSORES', pointName: 'ac:TDCON/DEMO/SENSORES/' }])
@@ -137,6 +155,11 @@ const fake = createServer(async (req, res) => {
     for await (const chunk of req) body += chunk
     const items = JSON.parse(body)
     assert.ok(Array.isArray(items), 'Write debe recibir un array')
+    for (const item of items) {
+      if (item.pointName?.endsWith('SENSORES/CONTROL') && !controlIgnoraEscritura) {
+        controlValor = item.value
+      }
+    }
     return json(200, items.map(i => ({ pointName: i.pointName, success: true })))
   }
   if (p === '/fwxapi/rest/v1/History') {
@@ -725,6 +748,68 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
   })
 
   server.close()
+}
+
+console.log('\n── Control de la bomba (Controles) ─────────────────────────')
+{
+  // Este bloque prueba sólo el MAPEO HTTP (status codes, forma del JSON): la
+  // lógica de negocio de `controlar_bomba` —las dos guardas, la relectura de
+  // confirmación— ya está cubierta en `scripts/verificar-herramientas.mjs`
+  // contra un `clienteFalso()`, y no se duplica aquí.
+  //
+  // Monta su propia app con `BATCH_CACHE_TTL_MS: '0'`: la caché de lote (de
+  // 2 s por defecto, ver B.7 arriba) serviría el nivel de tanque VIEJO justo
+  // cuando este bloque lo cambia para simular un tanque lleno.
+  nivelTanque = 42
+  controlValor = false
+  controlIgnoraEscritura = false
+  const { base: controlBase, server: controlServer } = await mount({ ICONICS_READ_ONLY: 'false', BATCH_CACHE_TTL_MS: '0' })
+
+  const sinEncender = await call(controlBase, '/api/control/bomba', postJson({}))
+  check('sin "encender" → 400', () => {
+    assert.equal(sinEncender.status, 400)
+    assert.match(sinEncender.body.error, /Falta decir/)
+  })
+
+  const encendido = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('nivel normal + encender:true → 200, confirma con relectura', () => {
+    assert.equal(encendido.status, 200)
+    assert.equal(encendido.body.ok, true)
+    assert.equal(encendido.body.accion, 'encendida')
+    assert.match(encendido.body.tag, /SENSORES\/CONTROL$/)
+  })
+
+  const apagado = await call(controlBase, '/api/control/bomba', postJson({ encender: false }))
+  check('apagar → 200 (apagar nunca mira el nivel)', () => {
+    assert.equal(apagado.status, 200)
+    assert.equal(apagado.body.accion, 'apagada')
+  })
+
+  nivelTanque = 92 // por encima de UMBRALES.nivelTanque.avisoMax (90)
+  const nivelAlto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('nivel alto + encender:true → 409, sin llegar a escribir', () => {
+    assert.equal(nivelAlto.status, 409)
+    assert.equal(nivelAlto.body.ok, false)
+    assert.match(nivelAlto.body.error, /tanque está al/)
+  })
+  nivelTanque = 42
+
+  controlIgnoraEscritura = true
+  const sinEfecto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('la escritura se acepta pero la relectura no confirma → 409', () => {
+    assert.equal(sinEfecto.status, 409)
+    assert.match(sinEfecto.body.error, /no ha tenido efecto real/)
+  })
+  controlIgnoraEscritura = false
+  controlServer.close()
+
+  const { base: soloLectura, server: soloLecturaServer } = await mount({ ICONICS_READ_ONLY: 'true' })
+  const bloqueado = await call(soloLectura, '/api/control/bomba', postJson({ encender: true }))
+  check('ICONICS_READ_ONLY=true → 403, menciona la causa', () => {
+    assert.equal(bloqueado.status, 403)
+    assert.match(bloqueado.body.error, /ICONICS_READ_ONLY/)
+  })
+  soloLecturaServer.close()
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')
