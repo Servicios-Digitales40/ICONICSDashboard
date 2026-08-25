@@ -5,16 +5,22 @@
  *
  * `wide` permite una frase explicativa que puede envolver en varias líneas,
  * en vez del rótulo corto de una palabra que asume `nowrap`.
+ *
+ * `style` se mezcla en el `<span>` raíz — hace falta cuando el propio
+ * `HoverTip` es la zona de captura (p. ej. un overlay `absolute` del tamaño
+ * de otra cosa) y no un envoltorio ajustado a su contenido: sin él, el
+ * `inline-flex` por defecto se encoge a su contenido y un `<span>` hijo con
+ * `width: 100%` no tiene contra qué expandirse.
  */
 import { useState } from "react";
 import { useTheme } from "@/theme";
 
-export function HoverTip({ children, label, wide }) {
+export function HoverTip({ children, label, wide, style }) {
   const { theme: t } = useTheme();
   const [show, setShow] = useState(false);
   return (
     <span
-      style={{ position: "relative", display: "inline-flex" }}
+      style={{ position: "relative", display: "inline-flex", ...style }}
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}

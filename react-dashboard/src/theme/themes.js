@@ -50,6 +50,9 @@ export const THEMES = {
     blob1: "rgba(54,84,224,0.12)",
     blob2: "rgba(217,138,27,0.10)",
 
+    // Exclusivo del hero de Inicio (ver nota al pie del archivo, "heroAgua").
+    heroAgua: "#1CAFC4",
+
     // Paleta de datos (ver nota al pie del archivo)
     viz: {
       azul: "#7B95F5",
@@ -94,6 +97,9 @@ export const THEMES = {
 
     blob1: "rgba(92,130,245,0.18)",
     blob2: "rgba(229,169,60,0.12)",
+
+    // Exclusivo del hero de Inicio (ver nota al pie del archivo, "heroAgua").
+    heroAgua: "#4DD8E8",
 
     // Paleta de datos (ver nota al pie del archivo)
     viz: {
@@ -177,6 +183,10 @@ export const THEMES = {
     blob1: "rgba(196,0,1,0.10)",
     blob2: "rgba(20,20,20,0.05)",
 
+    // Exclusivo del hero de Inicio, SIN CAMBIOS respecto a `light` — no es
+    // parte del rojo de marca de este tema, así que no hay nada que adaptar.
+    heroAgua: "#1CAFC4",
+
     // Paleta de datos: SIN CAMBIOS respecto a `light` — ver cabecera del tema.
     viz: {
       azul: "#7B95F5",
@@ -187,6 +197,24 @@ export const THEMES = {
     },
   },
 };
+
+/**
+ * `heroAgua` — EXCEPCIÓN DELIBERADA a "todo color sale de un token
+ * semántico o de `viz`", exclusiva del hero de Inicio (`InicioEva.jsx`).
+ *
+ * No es un semántico (no significa "estado", como `success` o `coral`) ni es
+ * `viz` (no distingue series de datos): es un tinte de escena, el mismo
+ * papel que ya cumplen `blob1`/`blob2` para esa sección. DESIGN.md permite
+ * expresamente una "paleta ampliada... sólo en esta sección Persuade, sin
+ * tocar los tokens semánticos del resto" (Plan Moises3 UI/UX, punto 3,
+ * propuesta 8) — de ahí que viva junto a los blobs y no junto a los
+ * semánticos de arriba.
+ *
+ * Vale UN valor por tema (no claro/oscuro derivados por fórmula, misma Regla
+ * de la Segunda Selección que rige el resto): cian-verde de agua, elegido
+ * contra cada fondo. El tema Mitsubishi lo hereda sin cambios de `light`
+ * porque no es parte de su rojo de marca — no hay nada que adaptar.
+ */
 
 /**
  * Paleta de datos, distinta de los tokens de UI de arriba.

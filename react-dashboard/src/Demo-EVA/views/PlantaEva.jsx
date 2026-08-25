@@ -16,7 +16,8 @@
  *   3. Señales      · las cuatro con historia propia, con su tendencia
  *   4. Titular      · el nivel del tanque y lo que lo está moviendo
  *   5. Estado       · qué dicen las ocho señales y dónde aprieta el margen
- *   6. Tendencias   · las cuatro series del historiador, con escala propia
+ *   6. Recorrido    · cómo se conectan los 4 activos (topología, no flujo)
+ *   7. Tendencias   · las cuatro series del historiador, con escala propia
  */
 import { useMemo } from "react";
 import { LayoutGrid } from "lucide-react";
@@ -35,7 +36,7 @@ import { useAhora } from "../lib/useAhora.js";
 import { UltimaLectura } from "../components/base.jsx";
 import {
   BandaSenales, EstadoSenales, FranjaAtencion, HeroeNivel,
-  MargenesConsumidos, RejillaActivos, TendenciaSenales,
+  MargenesConsumidos, RecorridoSistema, RejillaActivos, TendenciaSenales,
 } from "../components/tiles.jsx";
 
 /* ==================================================================
@@ -217,7 +218,14 @@ function PlantaEva({ onNavigate }) {
           </div>
         </div>
 
-        {/* 5 · Cierre: las cuatro series del historiador, con escala propia. */}
+        {/* 5 · Topología del proceso: cómo se conectan los 4 activos. */}
+        <div className="eva-band">
+          <div className="eva-full">
+            <RecorridoSistema activos={sistema.activos} t={t} dark={dark} delay={0.42} />
+          </div>
+        </div>
+
+        {/* 6 · Cierre: las cuatro series del historiador, con escala propia. */}
         <SectionLabel sub="Las series del historiador, cada una con su propia escala">
           Tendencias
         </SectionLabel>

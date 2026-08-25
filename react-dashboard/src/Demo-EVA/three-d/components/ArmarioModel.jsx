@@ -1,45 +1,69 @@
 /**
  * El armario del variador (VDF) y la acometida eléctrica.
  *
- * ── LA PUERTA ES EL CANAL DE `Modo AM VDF` ─────────────────────────
+ * ── LA PUERTA YA NO ES EL CANAL DE `Modo AM VDF` ───────────────────
  *
- * Cerrada = Automático; abierta = Manual. Es el mismo recurso que la pose
- * «abierta» de Resonac para el Set-Up, y por la misma razón: un panel abierto
- * dice «hay alguien interviniendo» desde el otro lado de la sala, mientras que
- * un color distinto en el mismo armario no dice nada a esa distancia.
+ * Lo fue: cerrada = Automático, abierta = Manual, mismo recurso que la pose
+ * «abierta» de Resonac para el Set-Up. Se retiró porque la puerta abierta
+ * tapaba la bomba contigua —obligaba a rotar la cámara para comprobar que
+ * seguía girando— y el giro de la bomba ya comunica su estado por sí solo. La
+ * puerta queda fija, cerrada, como pieza estática del modelo.
  *
- * Con la puerta abierta se ven las tarjetas del variador, que es lo que hace
- * que la apertura se lea como intervención y no como un fallo de dibujado.
+ * El modo se representa ahora con `BannerModo`, una pastilla `<Html>` flotante
+ * sobre el armario — mismo patrón que `EtiquetaActivo` en `FichaActivo.jsx`.
  *
  * ⚠ Qué lado del booleano es «Manual» **no está confirmado en el servidor**
- * (ver `domain/senales.js`). Este modelo obedece a lo que diga el catálogo, así
- * que el día que se confirme lo contrario se corrige allí y la puerta se abre
- * al revés sin tocar este archivo.
+ * (ver `domain/senales.js`). Este modelo obedece a lo que diga el catálogo.
  */
-import { useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { MathUtils } from "three";
+import { Html } from "@react-three/drei";
 
 import Baliza from "@/features/three-d/components/Baliza.jsx";
 import { usePaleta3D } from "@/features/three-d/lib/paleta.js";
+import { useTheme } from "@/theme";
 
 import { propsMaterial, tono } from "../lib/materiales.js";
-
-const SUAVIZADO = 6;
-
-/** Apertura máxima de la puerta, en radianes (~100°). */
-const APERTURA = 1.75;
 
 const ANCHO = 1.15;
 const ALTO = 1.0;
 const FONDO = 0.6;
 
-export default function ArmarioModel({ descriptor, abierto = false, detalle = true, ...props }) {
+/**
+ * Pastilla flotante para el modo Manual. Sólo se pinta en Manual —la
+ * excepción/aviso— y no en Automático, que es lo normal: mismo principio que
+ * ya sigue el resto de la maqueta de no meter ruido en el caso esperado.
+ */
+function BannerModo({ altura }) {
+  const { theme: t } = useTheme();
   const P = usePaleta3D();
-  const invalidate = useThree((s) => s.invalidate);
 
-  const puerta = useRef();
-  const anim = useRef({ apertura: 0 });
+  return (
+    <Html
+      position={[0, altura, 0]}
+      zIndexRange={[30, 0]}
+      style={{ transform: "translate(-50%, 4px)", pointerEvents: "none" }}
+    >
+      <div
+        style={{
+          padding: "3px 9px",
+          borderRadius: 999,
+          whiteSpace: "nowrap",
+          background: t.panel,
+          border: `1px solid ${P.amber}`,
+          boxShadow: t.shadow,
+          fontSize: 11,
+          fontWeight: 600,
+          color: P.amber,
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        Modo Manual
+      </div>
+    </Html>
+  );
+}
+
+export default function ArmarioModel({ descriptor, modoManual = false, detalle = true, ...props }) {
+  const P = usePaleta3D();
 
   const { material } = descriptor;
 
@@ -47,14 +71,6 @@ export default function ArmarioModel({ descriptor, abierto = false, detalle = tr
   const colorOscuro = tono(P, P.carcasaOscura, material, descriptor.token);
   const colorMetal = tono(P, P.metal, material, descriptor.token);
   const props3 = propsMaterial(material);
-
-  useFrame((_, dt) => {
-    const objetivo = abierto ? APERTURA : 0;
-    const siguiente = MathUtils.damp(anim.current.apertura, objetivo, SUAVIZADO, dt);
-    if (Math.abs(siguiente - anim.current.apertura) > 0.001) invalidate();
-    anim.current.apertura = siguiente;
-    if (puerta.current) puerta.current.rotation.y = -anim.current.apertura;
-  });
 
   return (
     <group {...props}>
@@ -70,27 +86,13 @@ export default function ArmarioModel({ descriptor, abierto = false, detalle = tr
         <meshStandardMaterial color={colorOscuro} {...props3} />
       </mesh>
 
-      {/* Las tarjetas del variador, dentro. Sólo se ven con la puerta abierta,
-          y son lo que hace que la apertura signifique algo. */}
-      {detalle &&
-        [0.32, 0.55, 0.78].map((f, i) => (
-          <mesh key={f} position={[-0.12 + i * 0.11, 0.12 + ALTO * f, FONDO / 2 - 0.09]} castShadow>
-            <boxGeometry args={[0.08, 0.34, 0.14]} />
-            <meshStandardMaterial
-              color={i === 1 ? P.accent : colorMetal}
-              emissive={i === 1 ? P.accent : "#000000"}
-              emissiveIntensity={i === 1 ? 0.25 : 0}
-              {...props3}
-            />
-          </mesh>
-        ))}
-
       {/*
-        La puerta. El grupo tiene su origen en la BISAGRA (canto izquierdo) y la
-        malla se desplaza media hoja hacia dentro: sin eso la puerta giraría
-        alrededor de su centro y atravesaría el armario.
+        La puerta. Fija y cerrada — ya no anima con el modo VDF (ver cabecera).
+        El grupo tiene su origen en la BISAGRA (canto izquierdo) y la malla se
+        desplaza media hoja hacia dentro por coherencia con ese origen, aunque
+        con la puerta siempre cerrada ya no hay rotación que dependa de ello.
       */}
-      <group ref={puerta} position={[-ANCHO / 2, 0.12 + ALTO / 2, FONDO / 2 + 0.005]}>
+      <group position={[-ANCHO / 2, 0.12 + ALTO / 2, FONDO / 2 + 0.005]}>
         <mesh position={[ANCHO / 2, 0, 0]} castShadow>
           <boxGeometry args={[ANCHO, ALTO - 0.06, 0.03]} />
           <meshStandardMaterial color={colorCarcasa} {...props3} />
@@ -116,6 +118,8 @@ export default function ArmarioModel({ descriptor, abierto = false, detalle = tr
       <group position={[0, 0.12 + ALTO + 0.02, 0]}>
         <Baliza descriptor={descriptor} luz={detalle} />
       </group>
+
+      {modoManual && <BannerModo altura={0.12 + ALTO + 0.85} />}
     </group>
   );
 }

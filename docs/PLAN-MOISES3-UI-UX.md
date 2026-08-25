@@ -12,6 +12,11 @@ problema para no tener que re-investigar al momento de implementar.
 [`PLAN-MOISES3-ALARMAS.md`](./PLAN-MOISES3-ALARMAS.md). Reabrir este
 documento si surge un nuevo punto de UI/UX general fuera de alarmas.
 
+**Estado general (2026-08-25):** los 4 puntos están implementados y
+verificados en el navegador, incluidas las 10 propuestas del punto 3 (Hero
+de Inicio) — ver el detalle dentro de cada punto para las desviaciones
+deliberadas confirmadas con el usuario durante la implementación.
+
 ---
 
 ## Pendientes
@@ -43,7 +48,10 @@ igual que ya se excluyen las de estado `"sin_dato"`.
 .filter((s) => s.tipo !== "booleano" && s.margen !== null && s.estado !== "sin_dato" && s.estado !== "reposo")
 ```
 
-**Estado:** confirmado por el usuario, pendiente de implementar.
+**Estado:** ✅ implementado. `modelo.js` filtra `estado !== "reposo"`, y el
+subtítulo (`code`) de `MargenesConsumidos` en `tiles.jsx` ahora dice
+"señales en reposo no entran". Verificado en el navegador: con el sistema
+parado, la tarjeta pasó de mostrar Eficiencia al 220% a no mostrarla.
 
 ---
 
@@ -64,7 +72,12 @@ igual que ya se excluyen las de estado `"sin_dato"`.
 - Si el banner es permanente (siempre visible) o solo aparece al señalar/pasar el cursor por el armario — probablemente permanente solo cuando el modo es "Manual" (que es la excepción/aviso), y ausente en "Automático" (que es lo normal), siguiendo el mismo principio que ya usa el resto de la maqueta de no mostrar ruido en el caso normal. Confirmar con el usuario al implementar.
 - Color/estilo del banner: revisar paleta existente (`paleta.js`, tono `accent` o similar) para que "Manual" se lea como aviso sin ser alarma.
 
-**Estado:** confirmado por el usuario, pendiente de implementar.
+**Estado:** ✅ implementado. La puerta quedó fija/cerrada (se retiró la
+animación, `useFrame` y la prop `abierto`; las tarjetas del variador de
+dentro también se quitaron porque nunca vuelven a verse). El banner es
+permanente mientras el modo es "Manual" y ausente en "Automático", en tono
+`amber` (aviso, no alarma) — mismo patrón `<Html>` que `EtiquetaActivo`.
+Verificado forzando el reloj del simulador hasta el ciclo con modo Manual.
 
 ---
 
@@ -79,26 +92,33 @@ igual que ya se excluyen las de estado `"sin_dato"`.
 
 **Las 10 propuestas generadas (todas aprobadas por el usuario para explorar en implementación):**
 
-1. **Hero con la Maqueta 3D real de fondo, en vivo** — montar el `<Canvas>` de la Maqueta 3D como fondo del hero con auto-rotación lenta y datos reales (tanque llenándose, bomba girando), en vez del gradiente/blobs actuales.
-2. **Cifra "8/8" con micro-narrativa de dato entrando** — pulso sutil sincronizado a `lastUpdated` + mini-sparkline detrás del número.
-3. **Grid de 4 tarjetas con mini-preview en vivo** — reemplazar el icono de cada `TarjetaVista` por una miniatura real (snapshot/render) de esa vista, animada al hover.
-4. **Scroll-triggered reveal** — secciones se revelan progresivamente al hacer scroll (parallax sutil, stagger real) en vez de solo `fadeInUp` al montar.
-5. **Línea de flujo animada (tubería) como elemento gráfico de fondo** — trazo SVG tanque→bomba→válvula con partículas que fluyen solo cuando `caudal > 0` (dato real).
-6. **Badge "En vivo" con pulso tipo heartbeat** — junto a "Última lectura: justo ahora", animado solo con lectura fresca del servidor.
-7. **Sección "Cómo funciona" con diagrama del pipeline** — ICONICS → servidor → app, con animación de paquete de dato viajando entre nodos.
-8. **Gradiente "profundidad de agua" exclusivo del hero** — paleta ampliada (azul de marca → cian/verde-agua) solo en esta sección Persuade, sin tocar los tokens semánticos del resto del sistema (Operate).
-9. **CTA dual** — "Entrar a Planta" (operativo) + "Ver la Maqueta en vivo" (espectáculo/ghost), dos caminos según el tipo de visitante.
-10. **Layout split en desktop grande (>1280px)** — escena 3D del punto 1 ocupando el lateral derecho del hero, texto a la izquierda; colapsa a apilado en móvil.
+1. ✅ **Hero con la Maqueta 3D real de fondo, en vivo** — `three-d/components/MaquetaHero.jsx`: mismo ensamblaje que `MaquetaEva3D` (bastidor, depósito, tuberías, los 4 activos con estado real), sin `OrbitControls` interactivo, auto-rotación propia vía `useFrame`, `detalle={false}` por costo de render, degradación a `null` sin WebGL. Ancla al tercio derecho del hero con `mask-image` para no competir con el texto (ver nota de composición abajo).
+2. ✅ **Cifra "8/8" con micro-narrativa de dato entrando** — sparkline de fondo detrás de la cifra (`CifraEnVivo`, reutiliza el componente `Spark` ya existente y la serie de sesión `series.nivelTanque` que ya trae `useSistemaAgua()`). **Nota honesta:** el sparkline es del NIVEL DEL TANQUE, no de "8/8" — ese conteo no tiene serie propia que valga la pena dibujar. Rotulado con `title` en el SVG para no fingir que es la serie de la cifra.
+3. 🔁 **Grid de 4 tarjetas con mini-preview en vivo** — **reinterpretado**: no son 4 escenas 3D/`<Canvas>` adicionales (riesgo de estabilidad, confirmado con el usuario — 5 WebGL simultáneos en la landing), sino un mini-tablero de datos en vivo por tarjeta (`vista.dato(sistema)` en `InicioEva.jsx`): 1 señal real por vista con punto de color de estado, reutilizando `estadoColor`/`fmtSenal` ya existentes.
+4. ✅ **Scroll-triggered reveal** — nuevo hook `useEnVista()` en `lib/motion.js` (`IntersectionObserver`, dispara una sola vez y deja de observar). Aplicado sólo a la sección `ComoFunciona` (punto 7): es la única sección que de verdad vive fuera del primer viewport — el hero y la rejilla de 4 tarjetas ya tenían su `fadeInUp` al montar, que cumple el mismo papel al estar ya en pantalla.
+5. ✅ **Línea de flujo animada (tubería) como elemento gráfico de fondo** — `TrazoFlujo` en `InicioEva.jsx`, SVG tanque→bomba→válvula. **Reinterpretado en el mecanismo, no en el resultado:** sin partículas en bucle continuo — eso habría violado la regla de `lib/motion.js` de que la única animación en bucle del sistema es una señal en alarma. El trazo se dibuja una sola vez al montar (mismo `.trazo-dibujo` que ya usa `Spark`) y lo que cambia con `caudal > 0` (en realidad `!sistema.enReposo`, mismo criterio que `Tuberias.jsx`) es el color/brillo del trazo ya dibujado.
+6. ✅ **Badge "En vivo" con pulso tipo heartbeat** — `UltimaLectura` (`components/base.jsx`) extendido con una prop `grande`: mismo mecanismo de pulso de una sola vez por lectura fresca que ya existía (`key={fecha.getTime()}` + animación CSS sin `infinite`), en tamaño de pastilla/badge. Sin bucle continuo, por la misma razón que el punto 5.
+7. ✅ **Sección "Cómo funciona" con diagrama del pipeline** — `ComoFunciona` en `InicioEva.jsx`, 3 nodos reales (ICONICS/AssetWorX+Hyper Historian → servidor de la demo → este tablero, tal como los documenta `PRODUCT.md`, nada inventado). El "paquete viajando" es, otra vez, un disparo de una sola vez por cada `lastUpdated` nuevo (mismo mecanismo `key={...}` que `UltimaLectura`), no un bucle.
+8. ✅ **Gradiente "profundidad de agua" exclusivo del hero** — token nuevo `heroAgua` en `theme/themes.js` (3 variantes: claro `#1CAFC4`, oscuro `#4DD8E8`, Mitsubishi heredado de claro sin cambios), documentado como excepción deliberada a la Regla de las Dos Paletas — no es semántico ni `viz`, es tinte de escena exclusivo de esta sección Persuade, mismo papel que ya cumplían `blob1`/`blob2`. Usado en la parada intermedia del gradiente del hero. **De paso corrigió un bug real:** la ronda anterior usaba `t.accentGradientEnd`, un token que nunca existió en `themes.js` — el navegador lo descartaba en silencio (`"undefined22"` en el string del gradiente) sin que ningún build fallara.
+9. ✅ **CTA dual** — "Entrar a Planta" (primario) + "Ver la Maqueta en vivo" (ghost, con icono `Factory`), dos preguntas distintas para dos visitantes distintos.
+10. ✅ **Layout split en desktop grande** — cubierto por el ajuste que ya forzó el punto 1: desde 900px (no exactamente 1280px como decía la propuesta original, pero mismo principio) el texto del hero se alinea a la izquierda y la maqueta 3D ocupa el tercio derecho; por debajo de 900px, apilado con la maqueta retirada.
+
+**Nota de composición (no estaba en el plan original):** la primera versión centraba la maqueta 3D detrás de todo el bloque de texto y resultó ilegible (la cifra y la frase competían visualmente con la geometría). Se resolvió ligando el punto 1 y el 10: maqueta acotada al tercio derecho + texto alineado a la izquierda en desktop, en vez de superposición centrada. Ver el bloque `RONDA 2` en la cabecera de `InicioEva.jsx` para el detalle completo.
 
 **Recomendación dada (no descartada, a considerar al priorizar implementación):** los puntos 1, 3 y 6 son los de mayor impacto por menor costo — reutilizan geometría y datos ya construidos en vez de requerir imágenes/ilustraciones nuevas, y son los más alineados al North Star "Gemelo Digital" sin inventar contenido falso.
 
-**Estado:** las 10 propuestas confirmadas por el usuario para el plan. Pendiente definir alcance/orden de implementación (¿todas, o priorizadas?) y pasar por `impeccable` (modo new-work / Persuade) antes de tocar código, dado que implica decisiones de dirección visual (paleta ampliada, layout, posible nuevo DESIGN.md o extensión del actual para esta sección).
+**Estado:** ✅ las 10 propuestas implementadas (en 2 rondas: 1/3/6 primero, luego 2/4/5/7/8/9/10) y verificadas en navegador (build limpio, 375 tests, `impeccable detect` sin hallazgos, capturas en claro/oscuro/Mitsubishi y desktop/tablet/móvil). Se pasó por `impeccable` en modo "extend an existing surface" (no new-work completo: el mundo visual de DESIGN.md ya estaba fijado, así que no aplicó torneo de conceptos) — reference: `.claude/skills/impeccable/reference/new-work.md` sección 3. Tres desviaciones deliberadas de la propuesta original, todas confirmadas con el usuario antes de implementar: (a) el mini-preview del punto 3 es un mini-tablero de datos, no 4 escenas 3D; (b) los "flujos"/"paquetes" de los puntos 5 y 7 son disparos de una sola vez, no bucles continuos, por la regla de movimiento de `lib/motion.js`; (c) el token de paleta ampliada del punto 8 se sumó en la segunda ronda, no en la primera.
 
 ---
 
-### 4. Nueva gráfica: "Recorrido del sistema" (Sankey, d3-sankey) dentro de Planta
+### 4. Nueva gráfica: "Recorrido del sistema" (Sankey) dentro de Planta
 
-**Librería:** [d3-sankey](https://github.com/d3/d3-sankey) — a integrar como nueva dependencia.
+**Librería:** ~~[d3-sankey](https://github.com/d3/d3-sankey)~~ — **no se integró.** Con el
+usuario decidido: topología fija de 4 nodos y 3 tramos, sin variación en el
+layout entre lecturas, así que un motor de layout no resolvía nada que 4
+coordenadas escritas a mano no resolvieran ya. Se implementó en SVG puro,
+mismo criterio que ya usa `MargenesConsumidos` ("HTML/SVG y no una librería
+de gráficos, a propósito"). Cero dependencias nuevas en `package.json`.
 
 **Dónde vive:**
 - Nueva tarjeta en [`react-dashboard/src/Demo-EVA/views/PlantaEva.jsx`](../react-dashboard/src/Demo-EVA/views/PlantaEva.jsx), como banda `eva-full` (ancho completo, ver `REJILLA` líneas 56-75) después de la fila `eva-margenes` / `eva-estado`. Necesita ancho completo para que el diagrama se lea bien.
@@ -117,17 +137,20 @@ Eléctrico ──────────→ Bombeo   (alimenta al motor)
 - **Color de cada tramo:** dinámico, ligado al peor estado (`nominal`/`atencion`/`critico`/`reposo`) de las señales de ese activo — mismo criterio de color-con-significado que ya rige el resto del tablero (`estadoColor`, `paleta.js`). Así el Sankey funciona como mapa fijo con semáforo de salud superpuesto, igual que ya hace `RejillaActivos`.
 - Se descartó ligar el grosor al "margen consumido" del activo porque hereda el mismo problema ya identificado en el punto 1 de este plan: una señal en reposo (p. ej. eficiencia en 0%) infla su margen a 220% y engrosaría de forma engañosa el tramo Eléctrico→Bombeo. Si el punto 1 se implementa primero (excluir `reposo` del cálculo de margen), esta opción podría reconsiderarse más adelante, pero por ahora se prioriza la opción fija y honesta.
 
-**A definir en implementación:**
-- Confirmar que `d3-sankey` (cálculo de layout) se combine con SVG propio para el dibujo, siguiendo el mismo criterio que ya usa `MargenesConsumidos` ("HTML y no recharts a propósito: control total") — evaluar si conviene el mismo enfoque de control manual o si aquí sí conviene apoyarse en el layout que da la librería.
-- Tooltip o ficha lateral al pasar/pulsar un nodo o tramo, reutilizando el patrón ya usado en la maqueta 3D (`FichaActivo`/`EtiquetaActivo`) para no inventar un tercer patrón de "detalle al interactuar".
-- Redacción del título/subtítulo de la tarjeta, dejando claro que es topología y no una medición de flujo físico (mismo espíritu que el `code` explicativo de `MargenesConsumidos`: "0 % es el centro de la banda cómoda...").
+**Cómo quedó resuelto lo que estaba "a definir en implementación":**
+- ~~d3-sankey vs. SVG propio~~ → SVG propio, confirmado con el usuario (ver "Librería" arriba).
+- Tooltip al pasar el cursor → `HoverTip` (patrón 2D ya usado en la vista de Planta), no `FichaActivo`/`EtiquetaActivo`: esas dos son específicas del canvas 3D (`<Html>` de drei anclado en el mundo), y este Sankey es SVG 2D dentro de una tarjeta, no una escena 3D. Se extendió `HoverTip` con una prop `style` opcional para que pudiera servir de zona de captura del tamaño exacto de cada nodo/tramo — arreglo genérico, no algo local a este componente.
+- Redacción del subtítulo → `code="Topología del proceso, no una medición de flujo físico"` en la tarjeta.
 
-**Estado:** confirmado por el usuario — topología del proceso, grosor fijo por nº de señales, color dinámico por estado, ubicación en Planta. Pendiente de implementar.
+**Estado:** ✅ implementado y verificado en el navegador (claro/oscuro), como
+`RecorridoSistema` en `components/tiles.jsx`, integrado en `PlantaEva.jsx`
+en banda `eva-full` después de Estado/Márgenes. Grosor fijo por nº de
+señales, color dinámico por peor estado del activo, tooltip funcional en
+nodos y tramos.
 
 ---
 
 ## Notas de contexto
 
-- Título de la tarjeta / subtítulo (`code`) puede necesitar ajuste de
-  redacción una vez se excluyan las señales en reposo, para que quede claro
-  que la lista solo muestra señales activas evaluables. Revisar al implementar.
+- ✅ Resuelto: el subtítulo (`code`) de `MargenesConsumidos` ya dice
+  "señales en reposo no entran" desde que se excluyeron del cálculo (punto 1).

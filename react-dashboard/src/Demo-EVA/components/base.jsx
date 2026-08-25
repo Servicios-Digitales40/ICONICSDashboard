@@ -228,14 +228,22 @@ function useTiempoRelativo(fecha) {
  * Existe porque `useSistemaAgua()` ya lleva la marca de tiempo de cada
  * lectura (`lastUpdated`) y nada en pantalla la mostraba — PRODUCT.md promete
  * "su marca de tiempo" por lectura, y hasta ahora esa promesa no se veía.
+ *
+ * `grande` es la misma pieza —mismo dato, mismo mecanismo de pulso de una
+ * sola vez— en la escala de un badge, para el hero de Inicio: ahí el pulso
+ * de "en vivo" es la prueba central de la promesa Persuade, no una nota al
+ * pie, así que gana una pastilla con fondo y un punto más grande en vez de
+ * quedarse en el tamaño de metadato que le basta al resto del tablero.
  */
-export function UltimaLectura({ fecha, t }) {
+export function UltimaLectura({ fecha, t, grande = false }) {
   const texto = useTiempoRelativo(fecha);
   if (!texto) return null;
 
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, color: t.textFaint, fontFamily: MONO, flexShrink: 0 }}>
-      <span style={{ position: "relative", width: 6, height: 6, flexShrink: 0 }}>
+  const punto = grande ? 8 : 6;
+
+  const contenido = (
+    <>
+      <span style={{ position: "relative", width: punto, height: punto, flexShrink: 0 }}>
         <span style={{ position: "absolute", inset: 0, borderRadius: "50%", background: t.success }} />
         <span
           key={fecha.getTime()}
@@ -243,7 +251,29 @@ export function UltimaLectura({ fecha, t }) {
           style={{ position: "absolute", inset: -3, borderRadius: "50%", border: `1.5px solid ${t.success}` }}
         />
       </span>
-      Última lectura: {texto}
+      {grande ? "En vivo" : `Última lectura: ${texto}`}
+      {grande && <span style={{ opacity: 0.7, fontWeight: 500 }}>· {texto}</span>}
+    </>
+  );
+
+  if (!grande) {
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 11, color: t.textFaint, fontFamily: MONO, flexShrink: 0 }}>
+        {contenido}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        display: "inline-flex", alignItems: "center", gap: 9, flexShrink: 0,
+        padding: "7px 14px", borderRadius: 999,
+        background: t.panel, border: `1px solid ${t.border}`, boxShadow: t.shadow,
+        fontSize: 12.5, fontWeight: 700, color: t.text, fontFamily: MONO,
+      }}
+    >
+      {contenido}
     </span>
   );
 }

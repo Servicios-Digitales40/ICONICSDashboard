@@ -22,6 +22,10 @@
  *   EstadoSenales    ← estado y paros      · no hay tiempos de paro
  *   MargenesConsumidos ← Pareto de rechazos · no hay rechazos
  *   TendenciaSenales ← producción por hora · no hay producción
+ *
+ * `RecorridoSistema` no tiene equivalente en la v2: es nuevo, la topología
+ * de los 4 activos como diagrama, sin la magnitud de flujo que un Sankey
+ * físico prometería y que este servidor no puede respaldar (ver su cabecera).
  */
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ChevronRight, Droplets, Info } from "lucide-react";
@@ -704,7 +708,7 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
   return (
     <Card
       t={t} delay={delay} title="Margen consumido por señal"
-      code="0 % es el centro de la banda cómoda · 100 % es tocar el límite"
+      code="0 % es el centro de la banda cómoda · 100 % es tocar el límite · señales en reposo no entran"
     >
       <p style={{ margin: "0 0 14px", fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>
         <strong style={{ color: t.text }}>{lider.nombre}</strong> es la señal más
@@ -759,6 +763,206 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
             </div>
           );
         })}
+      </div>
+    </Card>
+  );
+}
+
+/* ==================================================================
+ * RECORRIDO DEL SISTEMA · topología del proceso, no un flujo físico
+ * ==================================================================
+ * Nodos = los 4 activos, en el orden real del recorrido del agua y la
+ * energía. Tanque y Eléctrico alimentan a Bombeo; Bombeo alimenta a
+ * Distribución:
+ *
+ *   Tanque ──────┐
+ *                ├──► Bombeo ──► Distribución
+ *   Eléctrico ───┘
+ *
+ * NO es un Sankey de magnitud física: las 8 señales del catálogo tienen
+ * unidades incompatibles (%, °C, V, y dos sin unidad — caudal y presión), así
+ * que no hay ninguna cantidad que "fluya" y se conserve entre activos.
+ * Forzar esa lectura inventaría una conversión que el servidor no respalda.
+ *
+ * Por eso el grosor de cada tramo es FIJO —proporcional al nº de señales del
+ * activo de origen, siempre 2 aquí— y no cambia con cada lectura: es un mapa
+ * estructural, no una serie en vivo. Lo dinámico es sólo el COLOR de cada
+ * tramo y nodo, ligado al peor estado del activo de origen — mismo criterio
+ * de color-con-significado que ya usa `RejillaActivos`.
+ *
+ * SVG a mano y no `d3-sankey`: con topología fija de 4 nodos y 3 tramos, el
+ * layout no varía nunca — no hay nada que un motor de layout resuelva mejor
+ * que cuatro coordenadas escritas una vez. Mismo espíritu que
+ * `MargenesConsumidos`: "HTML/SVG y no una librería de gráficos, a propósito".
+ */
+const RECORRIDO_ANCHO = 720;
+const RECORRIDO_ALTO = 220;
+
+/** Columna X de cada nodo. Tanque y Eléctrico comparten la de origen. */
+const RECORRIDO_X = { tanque: 40, electrico: 40, bombeo: 320, distribucion: 548 };
+/** Centro Y de cada nodo. */
+const RECORRIDO_Y = { tanque: 55, electrico: 165, bombeo: 110, distribucion: 110 };
+/** Alto del bloque-nodo: proporcional al nº de señales del activo (todas 2). */
+const RECORRIDO_ALTO_NODO = 46;
+const RECORRIDO_ANCHO_NODO = 132;
+
+const RECORRIDO_TRAMOS = [
+  { id: "tanque-bombeo", de: "tanque", a: "bombeo" },
+  { id: "electrico-bombeo", de: "electrico", a: "bombeo" },
+  { id: "bombeo-distribucion", de: "bombeo", a: "distribucion" },
+];
+
+/** Curva cúbica horizontal entre el borde derecho de un nodo y el izquierdo del otro. */
+function curvaTramo(x1, y1, x2, y2) {
+  const mx = (x1 + x2) / 2;
+  return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+}
+
+/**
+ * El dibujo es SVG puro —sin nada de DOM mezclado dentro—, y el hover vive en
+ * una capa HTML aparte, superpuesta con posiciones en `%` sobre el mismo
+ * contenedor: mezclar `HoverTip` (un `<span>`) dentro del árbol SVG rompería
+ * el namespace de `<path>`/`<g>`, y un `<foreignObject>` por elemento sería
+ * más código para el mismo resultado.
+ */
+function CapaRecorrido({ activos, t, dark, listo, delay }) {
+  return (
+    <svg
+      viewBox={`0 0 ${RECORRIDO_ANCHO} ${RECORRIDO_ALTO}`}
+      style={{ width: "100%", height: "auto", minWidth: 420, display: "block" }}
+    >
+      {RECORRIDO_TRAMOS.map((tr, i) => {
+        const origen = activos[tr.de];
+        const x1 = RECORRIDO_X[tr.de] + RECORRIDO_ANCHO_NODO;
+        const y1 = RECORRIDO_Y[tr.de];
+        const x2 = RECORRIDO_X[tr.a];
+        const y2 = RECORRIDO_Y[tr.a];
+
+        return (
+          <path
+            key={tr.id}
+            d={curvaTramo(x1, y1, x2, y2)}
+            fill="none"
+            stroke={estadoColor(dark, origen.estado)}
+            strokeWidth={origen.senales.length * 6}
+            strokeLinecap="round"
+            opacity={listo ? 0.55 : 0}
+            style={{ transition: `opacity 500ms ease ${delay + 0.1 + i * 0.06}s` }}
+          />
+        );
+      })}
+
+      {Object.keys(RECORRIDO_X).map((id, i) => {
+        const activo = activos[id];
+        const x = RECORRIDO_X[id];
+        const y = RECORRIDO_Y[id] - RECORRIDO_ALTO_NODO / 2;
+        const col = estadoColor(dark, activo.estado);
+        const t2 = delay + 0.2 + i * 0.05;
+
+        return (
+          <g
+            key={id}
+            style={{
+              opacity: listo ? 1 : 0,
+              transform: listo ? "translateY(0)" : "translateY(4px)",
+              transition: `opacity 500ms ease ${t2}s, transform 500ms ease ${t2}s`,
+            }}
+          >
+            <rect
+              x={x} y={y} width={RECORRIDO_ANCHO_NODO} height={RECORRIDO_ALTO_NODO}
+              rx={10} fill={t.panel} stroke={col} strokeWidth={1.5}
+            />
+            <circle cx={x + 14} cy={y + RECORRIDO_ALTO_NODO / 2} r={4} fill={col} />
+            <text
+              x={x + 26} y={y + RECORRIDO_ALTO_NODO / 2 + 4}
+              fontSize={12} fontWeight={700} fill={t.text}
+              fontFamily="'Inter', sans-serif"
+            >
+              {activo.corto}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/**
+ * Zonas invisibles en `%` del mismo lienzo, cada una envuelta en `HoverTip`:
+ * es lo que da el tooltip por nodo y por tramo reutilizando el componente que
+ * ya usa el resto de la vista, sin duplicar su lógica de mostrar/ocultar.
+ */
+function CapaHover({ activos, t }) {
+  const zonaNodo = (id) => ({
+    left: `${(RECORRIDO_X[id] / RECORRIDO_ANCHO) * 100}%`,
+    top: `${((RECORRIDO_Y[id] - RECORRIDO_ALTO_NODO / 2) / RECORRIDO_ALTO) * 100}%`,
+    width: `${(RECORRIDO_ANCHO_NODO / RECORRIDO_ANCHO) * 100}%`,
+    height: `${(RECORRIDO_ALTO_NODO / RECORRIDO_ALTO) * 100}%`,
+  });
+
+  const zonaTramo = (tr) => {
+    const x1 = RECORRIDO_X[tr.de] + RECORRIDO_ANCHO_NODO;
+    const x2 = RECORRIDO_X[tr.a];
+    const y = Math.min(RECORRIDO_Y[tr.de], RECORRIDO_Y[tr.a]);
+    const alto = Math.max(24, Math.abs(RECORRIDO_Y[tr.de] - RECORRIDO_Y[tr.a]));
+    return {
+      left: `${(x1 / RECORRIDO_ANCHO) * 100}%`,
+      top: `${((y - alto / 2) / RECORRIDO_ALTO) * 100}%`,
+      width: `${((x2 - x1) / RECORRIDO_ANCHO) * 100}%`,
+      height: `${(alto / RECORRIDO_ALTO) * 100}%`,
+    };
+  };
+
+  // `HoverTip` es un `<span inline-flex>` que se ajusta a su contenido: sin
+  // forzar sus propias dimensiones se encoge a (0,0) y el hover nunca llega a
+  // dispararse. `absolute inset:0` sobre el propio span de `HoverTip` (vía
+  // `style` vertido con `{...zona}`) lo estira a la zona del `div` padre,
+  // que es lo que hace que el área de captura coincida con el nodo/tramo real.
+  return (
+    <div style={{ position: "absolute", inset: 0 }}>
+      {RECORRIDO_TRAMOS.map((tr) => {
+        const origen = activos[tr.de];
+        const destino = activos[tr.a];
+        return (
+          <HoverTip
+            key={tr.id}
+            wide
+            label={`${origen.corto} → ${destino.corto} · ${estadoInfo(origen.estado).label.toLowerCase()}`}
+            style={{ position: "absolute", ...zonaTramo(tr) }}
+          >
+            <span style={{ display: "block", width: "100%", height: "100%" }} />
+          </HoverTip>
+        );
+      })}
+      {Object.keys(RECORRIDO_X).map((id) => {
+        const activo = activos[id];
+        return (
+          <HoverTip
+            key={id}
+            wide
+            label={`${activo.label} · ${estadoInfo(activo.estado).label.toLowerCase()}`}
+            style={{ position: "absolute", ...zonaNodo(id) }}
+          >
+            <span style={{ display: "block", width: "100%", height: "100%" }} />
+          </HoverTip>
+        );
+      })}
+    </div>
+  );
+}
+
+export function RecorridoSistema({ activos, t, dark, delay = 0 }) {
+  const listo = useMounted();
+  const porId = Object.fromEntries(activos.map((a) => [a.id, a]));
+
+  return (
+    <Card
+      t={t} delay={delay} title="Recorrido del sistema"
+      code="Topología del proceso, no una medición de flujo físico"
+    >
+      <div style={{ width: "100%", position: "relative", overflowX: "auto" }}>
+        <CapaRecorrido activos={porId} t={t} dark={dark} listo={listo} delay={delay} />
+        <CapaHover activos={porId} t={t} />
       </div>
     </Card>
   );

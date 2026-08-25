@@ -69,13 +69,22 @@ export const destacadas = (sistema) => sistema.lista.filter((s) => esHistorizada
  * así que la columna de la derecha dice la banda en la que cae cada señal, que
  * es lo que sí informa.
  *
- * Se excluyen las booleanas (no tienen banda) y las que están sin dato: un
+ * Se excluyen las booleanas (no tienen banda), las que están sin dato —un
  * hueco no consume margen, y ponerlo a 0 lo pintaría como la señal más
- * tranquila del sistema.
+ * tranquila del sistema— y las que están en reposo: con la bomba parada,
+ * caudal y eficiencia en 0 es lo esperado, no un consumo real de margen (la
+ * fórmula pura mide distancia al límite duro sin saber que el sistema está
+ * apagado, y las marcaría con el peor valor de toda la lista).
  */
 export function margenes(sistema) {
   return sistema.lista
-    .filter((s) => s.tipo !== "booleano" && s.margen !== null && s.estado !== "sin_dato")
+    .filter(
+      (s) =>
+        s.tipo !== "booleano" &&
+        s.margen !== null &&
+        s.estado !== "sin_dato" &&
+        s.estado !== "reposo",
+    )
     .map((s) => ({
       key: s.key,
       nombre: s.corto,
