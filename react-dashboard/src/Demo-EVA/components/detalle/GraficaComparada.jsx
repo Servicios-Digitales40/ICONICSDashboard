@@ -24,9 +24,8 @@
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-import { ChartTooltip } from "@/components/charts/index.js";
-
 import { Card, MONO, PuntoEstado } from "../base.jsx";
+import { TooltipHistoria } from "./piezas.jsx";
 import { useSeriesHistoricas } from "../../data/hooks.js";
 import { SENALES, historizadas } from "../../domain/senales.js";
 import { combinarPorTolerancia, normalizarAEscala } from "../../lib/comparar.js";
@@ -168,7 +167,13 @@ export function GraficaComparada({ rango, t, dark, delay = 0 }) {
                 tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false}
                 tickFormatter={(ms) => new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
               />
-              <Tooltip content={<ChartTooltip />} />
+              {/*
+                Mismo tooltip que la gráfica de detalle, y por la misma razón:
+                el eje X lleva el epoch en milisegundos, y con un `content`
+                propio Recharts entrega el `label` crudo. Sin envolverlo salía
+                «1787609088000» donde tiene que ir «24-ago, 02:24 p.m.».
+              */}
+              <Tooltip content={<TooltipHistoria />} />
               {normalizar ? (
                 <YAxis yAxisId="unica" domain={[0, 100]} tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false} width={30} />
               ) : (

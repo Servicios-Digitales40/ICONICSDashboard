@@ -54,7 +54,17 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
                 valor={senal.valor}
                 fmt={(v) => fmtNum(v, senal.decimales)}
                 duracion={1000}
-                style={{ ...VALOR_GRANDE, color: atenuado ? t.textFaint : undefined }}
+                /*
+                 * El color va SIEMPRE explícito, nunca `undefined`.
+                 *
+                 * `Cifra` pinta un `<span>` sin color propio, y `Card` tampoco
+                 * lo declara, así que un `undefined` acababa heredando el del
+                 * documento: en los temas claros coincide con el del texto y
+                 * no se notaba, pero en el oscuro dejaba la cifra en un tono
+                 * oscuro sobre panel oscuro — el número grande, que es lo
+                 * primero que se mira, era lo peor legible de la tarjeta.
+                 */
+                style={{ ...VALOR_GRANDE, color: atenuado ? t.textFaint : t.text }}
               />
             )}
             {senal.unidad && <span style={{ fontSize: 15, fontWeight: 600, color: t.textSoft }}>{senal.unidad}</span>}
