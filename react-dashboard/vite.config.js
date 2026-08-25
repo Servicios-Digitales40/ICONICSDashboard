@@ -195,6 +195,14 @@ export default defineConfig({
           if (esDe3D(id)) return "three";
           if (/[\\/]node_modules[\\/](recharts|d3-|victory|decimal)/.test(id)) return "charts";
           if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
+          // `xlsx` sólo lo usa `Demo-EVA/lib/exportarExcel.js`, importado desde
+          // la vista Detalle, que ya es `lazy()` (ver ROUTES en routes.jsx).
+          // Sin esta regla cae en el catch-all de "vendor" — que SÍ es de
+          // carga inmediata — igual que le pasaría a la pila 3D sin la lista
+          // de arriba. Chunk propio y no "charts"/"vendor": así el arranque
+          // no paga por una librería que sólo entra en juego al pulsar
+          // "Exportar todo" en Detalle.
+          if (/[\\/]node_modules[\\/]xlsx[\\/]/.test(id)) return "xlsx";
           return "vendor";
         },
       },

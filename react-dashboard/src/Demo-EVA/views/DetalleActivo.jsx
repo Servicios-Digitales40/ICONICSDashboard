@@ -16,21 +16,24 @@
  * el elegido.
  */
 import { useEffect, useState } from "react";
+import { FileSpreadsheet } from "lucide-react";
 
-import { AlertBanner, SectionLabel, Tabs } from "@/components/ui/index.js";
+import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva } from "../data/EvaProvider.jsx";
+import { conFuenteEva, useEvaSource } from "../data/EvaProvider.jsx";
 import { useDetalleActivo } from "../data/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../data/historia.js";
 import { ACTIVO_IDS, activoInfo } from "../domain/activos.js";
 import { estadoInfo } from "../domain/estado.js";
+import { historizadas, senalInfo } from "../domain/senales.js";
 import { useAhora } from "../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../components/base.jsx";
 import { estadoColor } from "../components/paleta.js";
 import { DetalleGrid } from "../components/detalle/DetalleGrid.jsx";
 import { GraficaComparada } from "../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../components/detalle/SelectorRango.jsx";
+import { armarLibro, descargarLibro, nombreArchivoGeneral } from "../lib/exportarExcel.js";
 
 /**
  * Con qué función se calcula el rango de cada acceso rápido contra el
@@ -95,6 +98,7 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
 
 function DetalleActivo({ params, onNavigate }) {
   const { theme: t, dark } = useTheme();
+  const source = useEvaSource();
 
   // El estado del rango vive AQUÍ y no en `useDetalleActivo`, para que
   // sobreviva al cambio de pestaña: `Shell` mantiene montado este componente
@@ -111,6 +115,8 @@ function DetalleActivo({ params, onNavigate }) {
   const [personalizado, setPersonalizado] = useState(inicial.personalizado);
   // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
   const ahora = useAhora();
+
+  const [exportandoTodo, setExportandoTodo] = useState(false);
 
   const activoId = ACTIVO_IDS.includes(params?.activo) ? params.activo : ACTIVO_IDS[0];
 
@@ -156,6 +162,28 @@ function DetalleActivo({ params, onNavigate }) {
       return { rango: "personalizado", desde: personalizado.desde, hasta: personalizado.hasta };
     }
     return { rango: presetActivo };
+  }
+
+  /**
+   * El .xlsx de TODAS las señales historizadas del catálogo (hoy cinco),
+   * con el rango de fechas ya elegido en esta vista — no las señales del
+   * activo/pestaña actual: mismo criterio de alcance transversal que
+   * `GraficaComparada`, que vive fuera del `tabpanel` por el mismo motivo.
+   */
+  async function exportarTodo() {
+    setExportandoTodo(true);
+    try {
+      const claves = historizadas();
+      const hojas = await Promise.all(
+        claves.map(async (clave) => {
+          const { datos } = await source.leerSerie(clave, rango);
+          return { senal: senalInfo(clave), datos };
+        })
+      );
+      descargarLibro(armarLibro(hojas), nombreArchivoGeneral(rango));
+    } finally {
+      setExportandoTodo(false);
+    }
   }
 
   const enVivo = presetActivo === "vivo";
@@ -205,13 +233,30 @@ function DetalleActivo({ params, onNavigate }) {
 
         {tieneHistoriadas && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-            <SelectorRango
-              activo={presetActivo}
-              onPreset={elegirPreset}
-              onPersonalizado={elegirPersonalizado}
-              t={t}
-              claveSonda={claveSonda}
-            />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <SelectorRango
+                activo={presetActivo}
+                onPreset={elegirPreset}
+                onPersonalizado={elegirPersonalizado}
+                t={t}
+                claveSonda={claveSonda}
+              />
+              {/*
+               * Sin rango del historiador (modo «Tiempo real») no hay nada
+               * que exportar: mismo criterio que `GraficaComparada`, que
+               * tampoco pide nada al historiador en ese modo.
+               */}
+              {!enVivo && (
+                <Button
+                  variant="secondary"
+                  icon={<FileSpreadsheet size={14} />}
+                  loading={exportandoTodo}
+                  onClick={exportarTodo}
+                >
+                  Exportar todo
+                </Button>
+              )}
+            </div>
             {historiaCobertura && !historiaCobertura.completa && (
               /*
                * Un rango con días sin registro se dibuja como una curva

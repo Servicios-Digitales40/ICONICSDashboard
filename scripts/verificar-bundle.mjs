@@ -158,6 +158,22 @@ if (three) {
   console.log("  · sin trozo `three` (build sin las vistas 3D — normal en el build de planta)");
 }
 
+/*
+ * 4 · Igual que `three`, pero para `xlsx` — sólo lo usa el botón «Exportar
+ * todo» de la vista Detalle (`Demo-EVA/lib/exportarExcel.js`), que ya es
+ * `lazy()`. Sin la regla de `vite.config.js` que le da chunk propio, caería
+ * en el catch-all de "vendor", que SÍ es de carga inmediata — sería el mismo
+ * modo de fallo silencioso que ya cubre el bloque de arriba.
+ */
+const xlsx = archivos.find((x) => x.nombre.startsWith("xlsx-"));
+if (xlsx) {
+  const diferido = !arranque.has(xlsx.nombre);
+  console.log(`  ${diferido ? "✔" : "✖"} xlsx     ${String(kb(xlsx.bytes)).padStart(8)} KB  (${diferido ? "diferido" : "EN EL ARRANQUE"})`);
+  if (!diferido) fallos.push(`${xlsx.nombre} se descarga en el arranque; debería cargarse sólo al exportar desde Detalle.`);
+} else {
+  console.log("  · sin trozo `xlsx` (build sin la vista Detalle — no debería pasar en el build de planta)");
+}
+
 console.log();
 if (fallos.length) {
   console.error(`✖ ${fallos.length} problema(s):\n`);
