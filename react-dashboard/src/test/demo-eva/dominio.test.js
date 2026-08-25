@@ -76,15 +76,25 @@ describe("catálogo de señales", () => {
     }
   });
 
-  it("SOLO las cuatro verificadas están marcadas como historizadas", () => {
-    // Medido contra el servidor: a las otras tres el historiador les devuelve
-    // la serie de STEMPERATURA_TANQUE. Si alguien marca una de más, la vista
-    // pintaría la curva de la temperatura con otro rótulo y nadie lo notaría.
+  it("SOLO las verificadas están marcadas como historizadas", () => {
+    /*
+     * Medido contra el servidor: a las que quedan fuera el historiador les
+     * devuelve la serie de STEMPERATURA_TANQUE. Si alguien marca una de más,
+     * la vista pintaría la curva de la temperatura con otro rótulo y nadie lo
+     * notaría — que es justo lo que pasó con `tensionLinea` hasta que se le
+     * configuró su `Historical data source` el 24-08-2026.
+     *
+     * La lista NO es un número fijo: es lo que esté verificado en el servidor.
+     * Al historizar otra señal se añade aquí y se quita de abajo.
+     */
     expect(historizadas().sort()).toEqual(
-      ["flujoInstantaneo", "nivelTanque", "presionRelativa", "temperaturaTanque"].sort()
+      [
+        "flujoInstantaneo", "nivelTanque", "presionRelativa", "temperaturaTanque",
+        "tensionLinea",
+      ].sort()
     );
 
-    for (const key of ["cargaMotor", "eficienciaEnergetica", "tensionLinea", "modoVdf"]) {
+    for (const key of ["cargaMotor", "eficienciaEnergetica", "modoVdf"]) {
       expect(esHistorizada(key), `${key} NO tiene serie propia en el historiador`).toBe(false);
     }
   });

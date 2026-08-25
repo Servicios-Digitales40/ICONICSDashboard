@@ -62,12 +62,27 @@ describe("selector de rango: dónde aparece", () => {
     expect(screen.getByRole("button", { name: "Hace una semana" })).toBeTruthy();
   });
 
-  it.each(["bombeo", "electrico"])("«%s» (sin señales historizadas) no muestra el selector", async (activo) => {
+  it.each(["bombeo"])("«%s» (sin señales historizadas) no muestra el selector", async (activo) => {
     cortarLaRed();
     montar({ activo });
 
     await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy());
     expect(screen.queryByRole("group", { name: /Rango de tiempo/i })).toBeNull();
+  });
+
+  /*
+   * «electrico» SÍ lo muestra desde el 24-08-2026.
+   *
+   * Estaba en la lista de arriba porque ninguna de sus señales tenía serie
+   * propia. Al historizarse la tensión de línea, el activo pasó a tener una —y
+   * el selector aparece solo, que es justo lo que se quería del catálogo: la
+   * vista no lleva ninguna lista escrita a mano.
+   */
+  it("«electrico» sí lo muestra: la tensión de línea ya tiene serie", async () => {
+    cortarLaRed();
+    montar({ activo: "electrico" });
+
+    await waitFor(() => expect(screen.getByRole("group", { name: /Rango de tiempo/i })).toBeTruthy());
   });
 });
 

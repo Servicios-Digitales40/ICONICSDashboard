@@ -127,9 +127,12 @@ await checkAsync('un punto ajeno al árbol no rompe el lote: llega como hueco', 
 
 console.log('\n── El historiador ───────────────────────────────────────────')
 
-await checkAsync('las cuatro historizadas sirven SU PROPIA serie', async () => {
+await checkAsync('las historizadas sirven SU PROPIA serie', async () => {
   const cliente = sinCaos()
-  for (const clave of ['nivelTanque', 'temperaturaTanque', 'flujoInstantaneo', 'presionRelativa']) {
+  for (const clave of [
+    'nivelTanque', 'temperaturaTanque', 'flujoInstantaneo', 'presionRelativa',
+    'tensionLinea',
+  ]) {
     assert.ok(esHistorizada(clave), `${clave} debería estar historizada`)
     const r = await cliente.readHistory({
       pointName: pointName(clave),
@@ -160,7 +163,8 @@ await checkAsync('las tres SIN historia reciben la serie de la temperatura, como
 
   const temperatura = await cliente.readHistory({ pointName: pointName('temperaturaTanque'), ...rango })
 
-  for (const clave of ['cargaMotor', 'tensionLinea', 'eficienciaEnergetica']) {
+  // `tensionLinea` ya NO está aquí: desde el 24-08-2026 sirve su propia serie.
+  for (const clave of ['cargaMotor', 'eficienciaEnergetica']) {
     assert.ok(!esHistorizada(clave), `${clave} no debería estar historizada`)
     const r = await cliente.readHistory({ pointName: pointName(clave), ...rango })
 

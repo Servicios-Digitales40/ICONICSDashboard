@@ -17,9 +17,14 @@
  * ── EL CAMPO `historizado` NO ES UN DETALLE ────────────────────────
  *
  * Se midió contra el servidor real (Plan 8 §1.3) que el historiador devuelve
- * **la serie de `STEMPERATURA_TANQUE`** cuando se le piden `CARGA_TRABAJO_MOTOR`,
- * `KPIEFICIENCIA_ENERGETICA` o `INDICE_DESVIACION_VOLTAJE`. No falla: responde
- * `ok: true`, con marcas de tiempo correctas y valores plausibles.
+ * **la serie de `STEMPERATURA_TANQUE`** cuando se le piden `CARGA_TRABAJO_MOTOR`
+ * o `KPIEFICIENCIA_ENERGETICA`. No falla: responde `ok: true`, con marcas de
+ * tiempo correctas y valores plausibles.
+ *
+ * `INDICE_DESVIACION_VOLTAJE` estuvo en esa lista hasta el 24-08-2026. Se le
+ * configuró el `Historical data source` del activo —apuntando a la entrada del
+ * Data Historian `hda:\Configuration\DEMO DANONE:Tension`— y desde entonces
+ * sirve la suya: su histórico da ~121 V donde antes daba ~23, que eran grados.
  *
  * Un sparkline de «Carga del motor» alimentado de ahí sería la curva de la
  * temperatura del tanque, rotulada con otro nombre, y nadie lo notaría mirando
@@ -27,8 +32,10 @@
  * quiera una serie tiene que pasar por `historizadas()`, y lo que no está
  * verificado no se puede pedir.
  *
- * Si algún día se marcan «Is Collected» esos tres tags en el Data Historian,
- * se pone `historizado: true` aquí y las gráficas aparecen solas.
+ * Si algún día se configura el `Historical data source` de los que quedan, se
+ * pone `historizado: true` aquí y las gráficas aparecen solas. Marcar «Is
+ * Collected» sobre la señal NO basta: lo que redirige el histórico del activo
+ * es ese campo, y sin él la petición se resuelve a otra serie del árbol.
  *
  * ── LO QUE ESTÁ SUPUESTO, MARCADO COMO TAL ─────────────────────────
  *
@@ -179,7 +186,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: { min: 90, max: 150 },
     subirEsBueno: null,
     soloEnMarcha: false,

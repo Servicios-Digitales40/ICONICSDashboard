@@ -225,12 +225,24 @@ check('el punto histórico es el de TIEMPO REAL, con ac: y no con hda:', () => {
   assert.ok(!p.includes('hda:'), 'hda: responde 500 en este árbol')
 })
 
-check('sólo cuatro señales están marcadas como historizadas', () => {
+check('sólo las señales verificadas están marcadas como historizadas', () => {
   assert.deepEqual(historizadas().sort(), [
     'flujoInstantaneo', 'nivelTanque', 'presionRelativa', 'temperaturaTanque',
+    'tensionLinea',
   ])
-  // Las tres a las que el servidor devuelve la serie de la temperatura.
-  for (const k of ['cargaMotor', 'eficienciaEnergetica', 'tensionLinea']) {
+  /*
+   * Las que el servidor sigue resolviendo a la serie de la temperatura.
+   *
+   * `tensionLinea` salió de esta lista el 24-08-2026: se le configuró el
+   * `Historical data source` del activo —`hda:\Configuration\DEMO DANONE:Tension`—
+   * y desde entonces sirve SU serie. Comprobado contra el servidor real: su
+   * histórico da ~121 V donde antes daba ~23, que era la temperatura.
+   *
+   * Las otras dos siguen sin recolectarse. El día que se les configure el
+   * mismo campo, se marcan arriba y se quitan de aquí — la lista no es un
+   * número fijo, es lo que esté verificado.
+   */
+  for (const k of ['cargaMotor', 'eficienciaEnergetica']) {
     assert.equal(esHistorizada(k), false, `${k} NO puede estar historizada`)
   }
 })
@@ -563,14 +575,16 @@ await checkAsync('pedir la historia de una señal NO historizada no llega a la r
   const client = clienteFalso()
   const h = createHerramientas({ client })
 
-  for (const nombre of ['carga del motor', 'eficiencia energética', 'tensión de línea']) {
+  for (const nombre of ['carga del motor', 'eficiencia energética']) {
     const r = await h.ejecutar('historia_de_senal', { senal: nombre })
     assert.equal(r.ok, false, `"${nombre}" no puede devolver serie`)
     assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
-    assert.ok(r.senalesConHistoria?.length === 4, 'y decir cuáles sí la tienen')
+    // Cuántas hay se lee del catálogo, no de un número escrito aquí: la lista
+    // crece según se configuren en el Data Historian.
+    assert.equal(r.senalesConHistoria?.length, historizadas().length, 'y decir cuáles sí la tienen')
   }
 
-  assert.equal(client.historial.length, 0, 'NINGUNA de las tres pudo salir a la red')
+  assert.equal(client.historial.length, 0, 'NINGUNA pudo salir a la red')
 })
 
 await checkAsync('el modo del variador tampoco tiene serie', async () => {
@@ -581,7 +595,7 @@ await checkAsync('el modo del variador tampoco tiene serie', async () => {
   assert.equal(client.historial.length, 0)
 })
 
-await checkAsync('las cuatro que SÍ tienen serie se leen con Average y bajo el tope', async () => {
+await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', async () => {
   const client = clienteFalso()
   const h = createHerramientas({ client })
 
@@ -844,24 +858,30 @@ await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se 
 })
 
 await checkAsync(
-  'escenario 1 · "caudal abundante por sobretensión progresiva": mezcla una señal CON historia ' +
+  'escenario 1 · "caudal abundante con el motor muy cargado": mezcla una señal CON historia ' +
     'y otra SIN historia, y no rompe ni inventa la correlación que falta',
   async () => {
+    /*
+     * La señal SIN historia es la CARGA DEL MOTOR, no la tensión.
+     *
+     * El escenario usaba la tensión hasta el 24-08-2026, cuando pasó a servir
+     * su propia serie. Lo que se prueba aquí no es esa señal en concreto sino
+     * la mezcla —una con historia y otra sin ella—, así que se cambia por una
+     * que siga sin tenerla en vez de reescribir la invariante.
+     */
     const client = clienteFalso()
     const r = await createHerramientas({ client }).ejecutar('diagnostico', {
-      sintoma: 'caudal abundante por una sobretensión progresiva en la línea',
+      sintoma: 'caudal abundante con el motor muy cargado',
     })
 
     assert.equal(r.ok, true)
-    assert.deepEqual(r.senalesConsideradas.sort(), ['Caudal instantáneo', 'Tensión de línea'].sort())
+    assert.deepEqual(r.senalesConsideradas.sort(), ['Caudal instantáneo', 'Carga de trabajo del motor'].sort())
 
     // El caudal SÍ tiene historia: tiene que haberse leído.
     assert.ok(r.medido.historia.some(h => h.senal === 'Caudal instantáneo'))
-    // La tensión NO tiene historia: no puede aparecer como serie leída, y
-    // tampoco puede haber salido a la red a pedirla (client.historial vacío
-    // de esa señal, igual que comprueba verificar-herramientas para
-    // historia_de_senal).
-    assert.ok(!r.medido.historia.some(h => h.senal === 'Tensión de línea'))
+    // La carga NO tiene historia: no puede aparecer como serie leída, y
+    // tampoco puede haber salido a la red a pedirla.
+    assert.ok(!r.medido.historia.some(h => h.senal === 'Carga de trabajo del motor'))
 
     // Con una sola señal historizada de las dos consideradas, no se pide
     // correlación — y el dossier tiene que decir por qué, no callarlo.
@@ -871,14 +891,24 @@ await checkAsync(
 )
 
 await checkAsync(
-  'escenario 2 · "parada tras un pico de 200 V contra el manual": el exceso sale calculado y ' +
-    'fechado, con la señal SIN historia comparada contra su lectura en vivo',
+  'escenario 2 · "parada tras un pico de tensión contra el manual": el exceso sale calculado y ' +
+    'fechado contra la serie del historiador',
   async () => {
-    const client = clienteFalso({ valores: { ...EN_REPOSO, INDICE_DESVIACION_VOLTAJE: 203 } })
+    /*
+     * El límite documentado es 60 V, no 150.
+     *
+     * Desde el 24-08-2026 la tensión SÍ tiene serie propia, así que el exceso
+     * se calcula contra el máximo del historiador —que es la fuente preferida
+     * porque data el momento exacto— y no contra la lectura en vivo. El
+     * simulador mueve la tensión entre ~52 y ~68 V, así que un techo de 60 es
+     * el que ejercita de verdad la resta; con 150 no se excedía nada y la
+     * prueba no comprobaba nada.
+     */
+    const client = clienteFalso()
     const indiceDocumentos = indiceDocumentosFalso([
       {
         archivo: 'Manual_Sistema.pdf', pagina: 12, score: 0.8,
-        texto: 'La tensión de línea no debe exceder los 150 V en ningún momento de operación.',
+        texto: 'La tensión de línea no debe exceder los 60 V en ningún momento de operación.',
       },
     ])
 
@@ -892,10 +922,13 @@ await checkAsync(
     assert.equal(r.excesosSobreLimite.length, 1)
     const [exceso] = r.excesosSobreLimite
     assert.equal(exceso.senal, 'Tensión de línea')
-    assert.equal(exceso.fuente, 'lectura en vivo', 'la tensión no tiene historia: tiene que venir de la lectura en vivo')
-    assert.equal(exceso.medido, 203)
-    assert.equal(exceso.limiteDocumentado, 150)
-    assert.equal(exceso.exceso, 53)
+    assert.equal(
+      exceso.fuente, 'historiador',
+      'la tensión ya tiene serie propia: el exceso se data con el historiador, no con la lectura en vivo'
+    )
+    assert.equal(exceso.limiteDocumentado, 60)
+    assert.ok(exceso.medido > 60, 'el máximo de la serie tiene que exceder el límite')
+    assert.equal(exceso.exceso, +(exceso.medido - 60).toFixed(2))
     assert.ok(exceso.cuando, 'el exceso tiene que llevar fecha/hora')
     assert.equal(exceso.documento, 'Manual_Sistema.pdf')
   }
@@ -956,7 +989,7 @@ await checkAsync('sin carpeta de reportes configurada, se niega con un error cla
 })
 
 await checkAsync(
-  'señales por defecto: las 4 con historia como gráfico, las 4 sin historia en tabla, y el PDF ' +
+  'señales por defecto: las que tienen historia como gráfico, el resto en tabla, y el PDF ' +
     'se escribe a disco de verdad',
   async () => {
     const reportes = await reportesTmp()
@@ -966,11 +999,14 @@ await checkAsync(
     )
 
     assert.equal(r.ok, true)
+    // El reparto sale del catálogo, no de una lista escrita aquí: al historizar
+    // una señal más, pasa sola de la tabla al gráfico.
     assert.deepEqual(r.senalesConGrafico.sort(), [
       'Caudal instantáneo', 'Nivel del tanque', 'Presión relativa', 'Temperatura del tanque',
+      'Tensión de línea',
     ].sort())
     assert.deepEqual(r.senalesEnTabla.sort(), [
-      'Carga de trabajo del motor', 'Eficiencia energética', 'Modo del variador', 'Tensión de línea',
+      'Carga de trabajo del motor', 'Eficiencia energética', 'Modo del variador',
     ].sort())
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo
@@ -987,11 +1023,13 @@ await checkAsync(
 await checkAsync('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
   const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
     'generar_reporte',
-    { senales: ['nivel', 'tensión'] }
+    // Una CON historia (gráfico) y otra SIN ella (tabla). La tensión servía de
+    // ejemplo de «sin historia» hasta que pasó a tener la suya el 24-08-2026.
+    { senales: ['nivel', 'carga del motor'] }
   )
   assert.equal(r.ok, true)
   assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
-  assert.deepEqual(r.senalesEnTabla, ['Tensión de línea'])
+  assert.deepEqual(r.senalesEnTabla, ['Carga de trabajo del motor'])
 })
 
 await checkAsync('una señal inventada en la lista se ignora y se reporta, no rompe el reporte', async () => {

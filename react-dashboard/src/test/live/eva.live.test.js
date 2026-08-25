@@ -121,11 +121,12 @@ describe.skipIf(!vivo)("Demo EVA contra el servidor real", () => {
     );
   });
 
-  it("las tres señales sin serie propia siguen sin tenerla", () => {
+  it("las señales sin serie propia siguen sin tenerla", () => {
     // Doble filo a propósito: el día que alguien las marque «Is Collected» en
-    // el Data Historian, esta prueba falla y recuerda que hay tres sparklines
+    // el Data Historian, esta prueba falla y recuerda que hay sparklines
     // esperando a que se ponga `historizado: true` en `domain/senales.js`.
-    for (const clave of ["cargaMotor", "eficienciaEnergetica", "tensionLinea"]) {
+    // Así salió `tensionLinea` de esta lista.
+    for (const clave of ["cargaMotor", "eficienciaEnergetica"]) {
       expect(esHistorizada(clave), clave).toBe(false);
     }
 

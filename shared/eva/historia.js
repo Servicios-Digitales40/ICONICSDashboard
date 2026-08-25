@@ -19,10 +19,14 @@
  *    probadas. Por eso aquí el punto histórico se nombra con `pointName` y no
  *    hay un `historyPointName` aparte.
  *
- * 2. **Sólo cuatro de las ocho señales tienen serie propia.** A las otras tres
- *    el historiador les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica
- *    hasta el último decimal, con dos agregados distintos— y no da error:
- *    responde `ok: true` con marcas de tiempo correctas.
+ * 2. **Sólo algunas señales tienen serie propia.** A las demás el historiador
+ *    les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica hasta el último
+ *    decimal, con dos agregados distintos— y no da error: responde `ok: true`
+ *    con marcas de tiempo correctas.
+ *
+ *    Cuáles son vive en el catálogo (`historizado`), no en este texto: la
+ *    lista cambia según lo que se configure en el Data Historian. Eran cuatro
+ *    hasta el 24-08-2026, cuando `tensionLinea` pasó a servir la suya.
  *
  * La segunda es la que hace peligroso compartir este archivo a medias. Un
  * asistente que se olvidara de la guarda no fallaría: contestaría, con
