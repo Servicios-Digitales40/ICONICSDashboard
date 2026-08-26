@@ -377,15 +377,22 @@ check('el calendario se delega en shared/periodo.js y sigue funcionando', () => 
   assert.ok(hoy.fin <= new Date(Date.now() + 1000), 'no puede pasar del presente')
 })
 
-check('una ventana demasiado larga se NIEGA en vez de suavizar los extremos', () => {
-  // Con `MAX_PUNTOS` fijo, alargar no cuesta red: cuesta resolución. Un mes en
-  // 100 puntos es una muestra cada 7,5 h, y su «máximo» ya no es el pico real.
+check('un mes cabe dentro del tope (Plan 15 Fase 4: 90 días, no 7)', () => {
+  // Con el troceado unificado (Fase 2) siguiendo la continuación real del
+  // servidor (Fase 1) y una concurrencia acotada (Fase 3), alargar la
+  // ventana ya no diluye la resolución de la misma forma que cuando esto
+  // eran 100 puntos sin trocear: un mes entero ahora se acepta.
   const v = resolverVentana('julio 2026')
-  assert.ok(v.error, 'un mes tendría que rechazarse')
-  assert.match(v.error, /7 días|más corto/i, 'y decir qué hacer en su lugar')
+  assert.ok(!v.error, `un mes debería caber en el nuevo tope de 90 días: ${v.error}`)
+})
 
-  const h = resolverVentana('últimas 500 horas')
-  assert.ok(h.error, '500 horas tendría que rechazarse')
+check('una ventana que SÍ excede el nuevo tope (90 días) se NIEGA y dice qué hacer', () => {
+  const v = resolverVentana('últimos 200 días')
+  assert.ok(v.error, '200 días tendría que rechazarse')
+  assert.match(v.error, /90 días|más corto/i, 'y decir qué hacer en su lugar')
+
+  const h = resolverVentana('últimas 3000 horas') // 125 días
+  assert.ok(h.error, '3000 horas (125 días) tendría que rechazarse')
 })
 
 check('las alternativas que ofrece un rechazo se entienden de verdad', () => {
@@ -612,6 +619,58 @@ await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', 
     assert.ok(llamada.pointName.startsWith('ac:'), 'con ac:, no con hda:')
     assert.match(llamada.interval, /^\d{2}:\d{2}:\d{2}$/, 'el intervalo va como HH:MM:SS')
   }
+})
+
+await checkAsync('un rango largo se trocea (Plan 15 Fase 4): no cae en el patrón "1 muestra de todo el mes"', async () => {
+  // Medido contra el servidor real: una ventana de 30 días pedida en UNA
+  // sola llamada con un intervalo grueso devolvía una única muestra de todo
+  // el mes, sin ningún error — el mismo patrón patológico que documenta
+  // planificar()/trocear(). `leerSerie()` trocea por dentro cuando el rango
+  // lo pide (>14 días con la regla de tramosDe), y aquí se comprueba que
+  // hace VARIAS llamadas (no una) y fusiona sus datos.
+  let llamadas = 0
+  const client = clienteFalso({
+    historia: async (opciones) => {
+      llamadas += 1
+      // Cada tramo trae una muestra propia, con timestamp dentro de su rango
+      // — así se puede comprobar que el orden final está bien fusionado.
+      return {
+        ok: true,
+        data: [{ timestamp: opciones.startDate, value: 50 + llamadas, quality: 0 }],
+      }
+    },
+  })
+
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', {
+    senal: 'nivel', periodo: 'últimos 30 días',
+  })
+
+  assert.equal(r.ok, true, `debería tener éxito: ${r.error}`)
+  assert.ok(llamadas > 1, `llamadas=${llamadas}: un rango de 30 días debe trocearse, no ser 1 sola llamada`)
+  assert.equal(r.muestras, llamadas, 'una muestra por tramo, todas fusionadas')
+})
+
+await checkAsync('un rango largo con tramos parcialmente vacíos no falla si ALGUNO trae dato', async () => {
+  // Reproduce el caso real medido: el historiador sólo tiene datos desde
+  // hace unos días, así que un período de 30 días tiene ~20 tramos vacíos y
+  // unos pocos con dato. Un tramo sin datos no debe invalidar el resto.
+  let llamada = 0
+  const client = clienteFalso({
+    historia: async () => {
+      llamada += 1
+      // Sólo la mitad de los tramos "responden" con una muestra.
+      return llamada % 2 === 0
+        ? { ok: true, data: [{ timestamp: new Date().toISOString(), value: 55, quality: 0 }] }
+        : { ok: true, data: [] }
+    },
+  })
+
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', {
+    senal: 'nivel', periodo: 'últimos 60 días',
+  })
+
+  assert.equal(r.ok, true, `no debería fallar por tramos parciales: ${r.error}`)
+  assert.ok(r.muestras > 0, 'al menos los tramos con dato deben contarse')
 })
 
 await checkAsync('nunca se piden más muestras de las que el servidor entrega', async () => {

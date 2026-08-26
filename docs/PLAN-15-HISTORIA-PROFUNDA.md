@@ -97,10 +97,47 @@
 > reescritas para el nuevo tamaño de tramo), `scripts/verificar-transporte-falso.mjs`
 > (13/13), `scripts/verificar-chat.mjs` (42/42), frontend (403/403, +11).
 >
-> Siguiente: Fase 4 (levantar los topes de ventana — `MAX_HORAS_VENTANA`,
-> `MAX_DIAS_PERFIL`, `MAX_DIAS_REPORTE`) — con las Fases 1, 2 y 3 debajo, ya
-> hay paginación real, una sola regla de troceado, y concurrencia acotada
-> para sostenerlo. Ver el orden recomendado en §5.
+> **Fase 4 completada (26-ago-2026)** — `MAX_HORAS_VENTANA` (7→90 días),
+> `MAX_DIAS_PERFIL` (30→90) y `MAX_DIAS_REPORTE` (31→90) suben al mismo
+> techo de un trimestre, consistentes entre sí. Reescritos los mensajes de
+> error y las descripciones de las tools (`historia_de_senal`,
+> `generar_reporte`) que citaban "el tope de 100 muestras del servidor" como
+> la razón del rechazo — esa razón ya no es cierta desde la Fase 1.
+>
+> **Hallazgo real al subir el tope, no anticipado por el plan original**:
+> `leerSerie()` (la función que usan `historia_de_senal`, `analisis_de_senal`,
+> `comparar_periodos` y `grafico_de_senal`) pedía la ventana ENTERA en una
+> sola llamada sin trocear, a diferencia de `leerSerieEnRango()`. Con 7 días
+> de techo esto rara vez importaba; con 90, es el mismo patrón patológico
+> que motivó el plan entero. Medido contra el servidor real: "últimos 30
+> días" con un intervalo de 7h12min devolvió **una sola muestra de todo el
+> mes**, con `ok:true, hasMore:false` — el servidor no estaba ocultando
+> nada, simplemente ese intervalo cae mal alineado con dónde vive el dato
+> real. La Fase 1 (paginación) no arregla esto: el servidor no decía "hay
+> más", decía honestamente "esto es todo con este intervalo".
+>
+> Corregido troceando `leerSerie()` por dentro con `planificar()` (Fase 2)
+> cuando la ventana lo pide, con concurrencia acotada (Fase 3) para varios
+> tramos, fusionando el resultado para que los cuatro llamadores seguidos no
+> tengan que saber que se troceó. `leerUnTramo()` (la llamada suelta a
+> `readHistory`) queda compartida entre `leerSerie()` y `leerSerieEnRango()`.
+>
+> Verificado contra el servidor real: "últimos 30 días" (antes 0 muestras,
+> ahora 46), "últimos 90 días" (10 muestras), `grafico_de_senal` de 60 días,
+> `analisis_de_senal` de 30 días y `comparar_periodos` — los cuatro
+> llamadores, todos en menos de 520 ms. Dos pruebas nuevas: que un rango
+> largo trocea en más de una llamada, y que tramos parcialmente vacíos no
+> invalidan el resultado. Suite completa sin regresión:
+> `scripts/verificar-backend.mjs` (67/67), `scripts/verificar-herramientas.mjs`
+> (89/89, +2), `scripts/verificar-transporte-falso.mjs` (13/13),
+> `scripts/verificar-chat.mjs` (42/42), frontend (414/414).
+>
+> Con las Fases 1-4 completas, el objetivo del plan —leer un trimestre
+> completo, con la resolución máxima que ese período permita— está
+> cumplido de punta a punta y verificado contra el servidor real. Quedan 5
+> (caché de días cerrados), 6 (antigüedad como capacidad del backend) y 7
+> (progreso incremental en la gráfica) como mejoras de usabilidad, ninguna
+> bloqueante — ver el orden recomendado en §5.
 
 ---
 
