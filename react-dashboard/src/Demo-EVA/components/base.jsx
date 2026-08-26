@@ -237,7 +237,31 @@ function useTiempoRelativo(fecha) {
  */
 export function UltimaLectura({ fecha, t, grande = false }) {
   const texto = useTiempoRelativo(fecha);
-  if (!texto) return null;
+
+  // En el hero de Inicio (`grande`) esta pastilla es la señal de confianza
+  // central de la promesa Persuade ("en vivo, de verdad") — desaparecer del
+  // todo mientras la primera lectura no llega (`texto` sigue null hasta
+  // entonces) se lee como que algo se rompió, no como que sigue conectando
+  // (hallazgo de /impeccable critique 2026-08-26). El resto del tablero
+  // (`!grande`, metadato de cabecera) no tiene ese mismo peso de primera
+  // impresión, así que mantiene su comportamiento de siempre: sin dato, sin
+  // pastilla.
+  if (!texto) {
+    if (!grande) return null;
+    return (
+      <span
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 9, flexShrink: 0,
+          padding: "7px 14px", borderRadius: 999,
+          background: t.panel, border: `1px solid ${t.border}`,
+          fontSize: 12.5, fontWeight: 700, color: t.textFaint, fontFamily: MONO,
+        }}
+      >
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.textFaint, opacity: 0.5, flexShrink: 0 }} />
+        Conectando…
+      </span>
+    );
+  }
 
   const punto = grande ? 8 : 6;
 

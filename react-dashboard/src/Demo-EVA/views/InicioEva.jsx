@@ -158,6 +158,27 @@ const REJILLA = `
   gap: 16px;
 }
 
+/* El botón flotante del Asistente (position: fixed, right/bottom: 24px,
+   54px de alto — Asistente.jsx) ignora el flujo del documento: un padding
+   al final de la rejilla no lo aparta si la página cabe entera en el
+   viewport sin scroll, que es el caso normal aquí. La única forma de
+   garantizar que ninguna tarjeta —Assets en escritorio, o la que caiga en
+   esa esquina según reordene auto-fit en otros anchos— quede bajo el
+   círculo es reservarle su hueco real en la propia tarjeta: padding extra
+   a la derecha, sólo en la última columna de la fila final, del ancho de
+   su huella (54px + margen). En pantallas de una sola columna no hay
+   "última columna de la fila final" que distinguir — el bloque entero de
+   abajo (last-child) lleva el margen en su lugar. */
+.eva-inicio-grid > *:last-child {
+  padding-right: calc(22px + 62px);
+}
+@media (max-width: 720px) {
+  .eva-inicio-grid > *:last-child {
+    padding-right: 22px;
+    margin-bottom: 78px;
+  }
+}
+
 /* border y sombra viven aquí, parametrizados por variables por instancia, y
    no en el estilo inline: un color inline nunca cede ante un :hover de hoja
    de estilos, así que el tinte de acento al pasar el cursor sólo puede
@@ -169,6 +190,15 @@ const REJILLA = `
 }
 .eva-tarjeta-vista:hover {
   border-color: var(--color-accent);
+}
+/* Sin esto, tabular hasta las cuatro tarjetas no dejaba ningún indicador de
+   foco visible (sólo llevaban :hover) — la navegación "cuatro formas de
+   verlo" completa quedaba invisible por teclado. Mismo tratamiento que ya
+   usa .app-btn (index.css) para los dos CTA del hero: anillo de acento,
+   no sólo el borde del navegador. */
+.eva-tarjeta-vista:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .eva-tarjeta-flecha { transition: transform 0.18s ease; }

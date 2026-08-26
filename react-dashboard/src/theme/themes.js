@@ -74,10 +74,18 @@ export const THEMES = {
 
     text: "#E9ECF3",
     textSoft: "#9AA4B8",
-    textFaint: "#5F6981",
+    // #5F6981 medía 3.5:1 sobre `page` y 3.1:1 sobre `panel` — bajo el piso
+    // AA de 4.5:1 para texto (detector `low-contrast`, /impeccable audit
+    // 2026-08-26). Aclarado a #7684A0, que da 5.1:1 y 4.6:1 respectivamente
+    // sin salir de la familia gris-azulada.
+    textFaint: "#7684A0",
 
     accent: "#5C82F5",
-    accentSoft: "#1B2436",
+    // #1B2436 dejaba `accent` como texto a 4.4:1 sobre este fondo, justo por
+    // debajo del piso AA — mismo hallazgo del detector. Oscurecido a #181E2C
+    // (4.7:1) sin tocar `accent`, que sigue sirviendo de fondo de botón e
+    // icono en muchas otras vistas.
+    accentSoft: "#181E2C",
     amber: "#E5A93C",
     amberSoft: "#2B2312",
     coral: "#E37A63",
@@ -88,8 +96,19 @@ export const THEMES = {
     violetSoft: "#211A34",
 
     shadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.28)",
-    shadowHover: "0 4px 14px rgba(0,0,0,0.32), 0 20px 44px rgba(92,130,245,0.20)",
-    gradAccent: "linear-gradient(135deg, #5C82F5 0%, #8AA3FA 100%)",
+    // Antes: `rgba(92,130,245,0.20)` — un halo de marca a 44px de difusión.
+    // Sobre el fondo casi negro real (#0B0E16) leía como resplandor de neón,
+    // no como elevación (detector `dark-glow` / `gpt-thin-border-wide-shadow`,
+    // /impeccable audit 2026-08-26). El claro ya usaba una capa amplia teñida
+    // de acento al 12% (ver `shadowHover` de `light`); aquí se iguala esa
+    // proporción en vez de duplicar la opacidad porque el fondo oscuro ya
+    // aporta su propio contraste — MISMO CRITERIO, no un valor nuevo inventado.
+    shadowHover: "0 4px 14px rgba(0,0,0,0.32), 0 20px 44px rgba(92,130,245,0.12)",
+    // Extremo claro del degradado (#8AA3FA) dejaba el icono blanco de las
+    // insignias a 2.4:1 — por debajo incluso del piso de 3:1 para gráficos
+    // grandes. Bajado a #7690F0 (2.99:1): sigue siendo un degradado visible,
+    // el icono deja de perderse contra el azul pálido.
+    gradAccent: "linear-gradient(135deg, #5C82F5 0%, #7690F0 100%)",
     gradWarm: "linear-gradient(135deg, #E5A93C 0%, #E37A63 100%)",
     gradSuccess: "linear-gradient(135deg, #1B9169 0%, #3ED9A5 100%)",
     gradViolet: "linear-gradient(135deg, #7C4FE0 0%, #A98CF0 100%)",

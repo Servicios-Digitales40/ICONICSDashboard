@@ -64,7 +64,7 @@ function VersionBuild({ t }) {
     <span
       title={`Build ${version}`}
       style={{
-        fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
         color: t.textFaint, opacity: 0.65, letterSpacing: 0.2,
       }}
     >
