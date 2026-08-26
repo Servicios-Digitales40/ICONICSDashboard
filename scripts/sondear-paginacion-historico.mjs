@@ -9,13 +9,23 @@
  *  A · ¿El tope de 100 muestras es del SERVIDOR o nuestro?
  *      `X-ICO-MAX-ITEM-COUNT: 100` lo elegimos nosotros
  *      (`config.limits.maxUpstreamItems`, constante, sin variable de
- *      entorno). Si pidiendo 1000 llegan 1000, media biblioteca de este
- *      proyecto está construida sobre un límite autoimpuesto.
+ *      entorno). RESULTADO (26-ago-2026, contra el servidor real): es del
+ *      SERVIDOR — pedir más de 100 responde 400 con
+ *      "Maximum allowed number of samples in a single request is 100.",
+ *      subir la cabecera no cambia nada.
  *
  *  B · ¿`X-ICO-CONTINUATION` sirve para PAGINAR?
  *      Hoy sólo se lee su presencia como `hasMore` y se tira el valor
- *      (`iconics/client.mjs`). Si reenviándolo llega la página siguiente,
- *      existe paginación de verdad y no hay que simularla troceando.
+ *      (`iconics/client.mjs`). RESULTADO (26-ago-2026): SÍ pagina de
+ *      verdad — reenviando el token llegan páginas distintas, sin repetir
+ *      ninguna muestra, hasta agotar el rango. **Ojo con la ventana**: la
+ *      primera corrida de esta sonda usó sólo la última hora para la
+ *      sección B, que con esta señal nunca llega a las 100 muestras
+ *      crudas y por tanto nunca activa la continuación — dio un falso
+ *      "no hay nada que paginar". Por eso A.2 y B usan `inicioLargo` (3
+ *      días agregados), una ventana que sí supera el tope de forma
+ *      fiable. Confirmado también en modo crudo (sin agregado) con una
+ *      ventana de varias horas.
  *
  * Sólo LEE. No escribe nada en ICONICS.
  *
@@ -76,10 +86,18 @@ async function historia({ inicio, fin, aggregate, interval, maxItems, continuati
 }
 
 const fin = new Date()
-const inicio = new Date(fin.getTime() - 3600_000)   // una hora: sobra dato crudo
+// Una hora es DEMASIADO CORTA: por debajo de 100 muestras crudas de sobra,
+// nunca dispara paginación y hace parecer que no existe. Medido: con 1 h no
+// aparece `X-ICO-CONTINUATION` en ninguna respuesta; con 3 días (sección A.2
+// más abajo, agregada) sí aparece y SÍ pagina de verdad. La ventana A sigue
+// siendo de 1 h para medir el tope crudo tal cual (esa pregunta no necesita
+// más), pero A.2 y B usan una ventana que garantiza superar el tope.
+const inicio = new Date(fin.getTime() - 3600_000)
+const inicioLargo = new Date(fin.getTime() - 3 * 86400_000)
 
 console.log(`\nSeñal: ${clave}  ·  punto: ${punto}`)
-console.log(`Ventana de sondeo: última hora (${inicio.toISOString()} → ${fin.toISOString()})\n`)
+console.log(`Ventana de sondeo (A): última hora (${inicio.toISOString()} → ${fin.toISOString()})`)
+console.log(`Ventana de sondeo (A.2, B): últimos 3 días (${inicioLargo.toISOString()} → ${fin.toISOString()})\n`)
 
 /* ── A · ¿Cuánto nos deja pedir de verdad? ─────────────────────────── */
 console.log('A · Tope real de muestras por petición (crudo, sin agregado)')
@@ -96,9 +114,19 @@ for (const maxItems of [100, 500, 1000, 5000, 50000]) {
   } catch (e) { console.log(`    ${String(maxItems).padStart(8)} | FALLO: ${e.message}`) }
 }
 
+/* ── A.2 · El mismo tope, pero con una ventana que SÍ lo supera ────── */
+console.log('A.2 · Igual que A pero sobre 3 días agregados (ventana que sí dispara continuación)')
+{
+  const r = await historia({ inicio: inicioLargo, fin, aggregate: 'Average', interval: '00:15:00', maxItems: 100 })
+  console.log(
+    `    muestras=${r.muestras.length}  continuation=${r.continuation ? 'SÍ' : 'no'}  ` +
+    `cabeceras X-ICO: ${JSON.stringify(r.ico)}`
+  )
+}
+
 /* ── B · ¿El token de continuación pagina? ─────────────────────────── */
 console.log('\nB · Continuación: ¿reenviar el token trae la página siguiente?')
-let pagina = await historia({ inicio, fin, maxItems: 100 })
+let pagina = await historia({ inicio: inicioLargo, fin, aggregate: 'Average', interval: '00:15:00', maxItems: 100 })
 console.log(`    página 1: ${pagina.muestras.length} muestras, cabeceras X-ICO: ${JSON.stringify(pagina.ico)}`)
 
 if (!pagina.continuation) {
@@ -106,8 +134,8 @@ if (!pagina.continuation) {
 } else {
   const vistas = new Set(pagina.muestras.map(m => m.timestamp))
   let ultima = pagina.muestras.at(-1)?.timestamp
-  for (let p = 2; p <= 4 && pagina.continuation; p++) {
-    pagina = await historia({ inicio, fin, maxItems: 100, continuation: pagina.continuation })
+  for (let p = 2; p <= 6 && pagina.continuation; p++) {
+    pagina = await historia({ inicio: inicioLargo, fin, aggregate: 'Average', interval: '00:15:00', maxItems: 100, continuation: pagina.continuation })
     const nuevas = pagina.muestras.filter(m => !vistas.has(m.timestamp)).length
     pagina.muestras.forEach(m => vistas.add(m.timestamp))
     console.log(

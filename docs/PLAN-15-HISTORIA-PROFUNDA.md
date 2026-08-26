@@ -5,9 +5,24 @@
 > trimestre o un año— en vez de la ventana de 7 días y la única página de 100
 > muestras que hoy son el techo de todo el proyecto.
 
-> **ESTADO (25-ago-2026)** — Fase 0 pendiente de servidor. La sonda
-> (`scripts/sondear-paginacion-historico.mjs`) está escrita y no se ha podido
-> ejecutar: `ICONICS_FAKE=true`, sin servidor real disponible.
+> **ESTADO (26-ago-2026)** — **Fase 0 confirmada contra el servidor real.**
+> Resultado de `scripts/sondear-paginacion-historico.mjs`:
+>
+> - **A** · 100 muestras es un tope DURO del servidor, no autoimpuesto: pedir
+>   más responde `400 "Maximum allowed number of samples in a single request
+>   is 100."`. `X-ICO-MAX-ITEM-COUNT` no lo sube.
+> - **B** · `X-ICO-CONTINUATION` SÍ pagina de verdad, en crudo y en agregado:
+>   reenviar el token trae páginas sin repetir ninguna muestra, hasta agotar
+>   el rango (medido: 3 páginas, 288 muestras distintas, sin duplicados).
+>   **Trampa de la primera corrida**: con una ventana de sólo 1 hora la
+>   sección B nunca llegaba a 100 muestras crudas, así que nunca disparaba
+>   continuación — eso dio el falso "no hay nada que paginar" que aparecía
+>   aquí antes. La sonda ahora fuerza una ventana de varios días (`A.2`) para
+>   la comprobación de B, y queda documentado en su propia cabecera para que
+>   no se repita el mismo error de método.
+> - **C** confirma el patrón patológico que ya documentaba `trocear()`.
+>
+> Con B confirmado, las Fases 1-7 sí aplican tal como están escritas. Siguiente: Fase 1.
 
 ---
 
