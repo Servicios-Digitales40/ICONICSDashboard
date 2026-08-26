@@ -45,7 +45,51 @@
  * valor. Preferimos un rótulo que confiese la duda a uno que invente autoridad.
  */
 
-/** Raíz del árbol de la demo en AssetWorX. */
+/**
+ * ── ESTE CATÁLOGO ES DE UN SOLO SISTEMA, Y HAY DOS ─────────────────
+ *
+ * En planta hay DOS instalaciones separadas, cada una con su PLC y su
+ * variador propios:
+ *
+ *   1. EL SISTEMA DEL TANQUE  — PLC_1, `ua:DEMO2`. Es el que describe este
+ *      archivo: tanque, grupo de bombeo, red y suministro. **No tiene
+ *      sensores de vibración.**
+ *
+ *   2. EL SISTEMA DE VIBRACIONES — PLC_2, `ua:DEMO3`, con un SIPLUS CMS 1200
+ *      SM 1281 y los sensores S1/S2. Es OTRA máquina, con OTRO motor y OTRO
+ *      variador. Sus tags viven bajo `ServerInterfaces → BMS_1 → Variables
+ *      CMS` y hoy **no están publicados en AssetWorX**.
+ *
+ *      Lo confirmado de esa máquina, que hace falta para configurar el
+ *      SM 1281 y para poner umbrales que signifiquen algo:
+ *
+ *        motor        WEG W22 143/5T, 2 HP (1,5 kW), **2 polos** → 3475 rpm
+ *                     a plena carga; con variador, la velocidad varía y las
+ *                     frecuencias de defecto varían con ella.
+ *        rodamientos  6205 ZZ (lado acople) y 6204 ZZ (lado ventilador)
+ *        norma        1,5 kW está MUY por debajo de los 15 kW de ISO 10816-3.
+ *                     La tabla que aplica es **ISO 10816-1 Clase I**:
+ *                     0,71 / 1,8 / 4,5 mm/s. Usar la de 10816-3 pondría el
+ *                     aviso en 4,5 y se perdería la mitad del margen.
+ *        eléctrico    ese PLC publica además un medidor de energía **Janitza**.
+ *                     Es la pareja natural de la vibración: mide la MISMA
+ *                     máquina, así que su potencia sirve de punto de
+ *                     operación para normalizar la vibración, y sus armónicos
+ *                     confirman los fallos eléctricos que el espectro de
+ *                     velocidad ve a 2× la frecuencia de red.
+ *
+ * Por qué esto va escrito aquí y no en una nota suelta: los cuatro activos de
+ * `activos.js` —tanque, bombeo, distribución, eléctrico— son todos del
+ * sistema 1. Cuando lleguen las vibraciones, la tentación va a ser colgarlas
+ * del activo «bombeo» porque suena a bomba. **Sería falso**: vigilarían un
+ * motor que no es ése, alimentado por un variador que no es ése, y cualquier
+ * correlación que alguien sacara entre el caudal de aquí y la vibración de
+ * allí estaría uniendo dos máquinas distintas.
+ *
+ * Las vibraciones necesitan su propio activo, y probablemente su propia raíz.
+ */
+
+/** Raíz del árbol del SISTEMA DEL TANQUE en AssetWorX (ver nota de arriba). */
 export const RAIZ = "ac:TDCON/DEMO/SENSORES/";
 
 /**
@@ -180,6 +224,10 @@ const CATALOGO = [
     // una desviación catastrófica sobre una red probablemente sana, así que
     // manda el valor observado y el nombre del tag queda a la vista en la
     // tarjeta para que nadie pierda el rastro.
+    //
+    // Red CONFIRMADA por el usuario el 25-08-2026: 208Y/120, y la señal mide
+    // UNA sola línea contra neutro. Por eso lee 121-127 V y no 208. El nominal
+    // que aplica a los umbrales es 120 V, no 208.
     label: "Tensión de línea",
     corto: "Tensión",
     unidad: "V",

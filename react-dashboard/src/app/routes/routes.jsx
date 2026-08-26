@@ -49,7 +49,7 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard } from "lucide-react";
+import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, ShieldAlert, Waves } from "lucide-react";
 
 /**
  * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
@@ -99,6 +99,28 @@ export const ROUTES = [
     title: "Planta",
     sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
     nav: { label: "Planta", icon: <LayoutDashboard size={17} /> },
+  },
+
+  {
+    // Va justo detrás de «Planta» a propósito: contesta la pregunta siguiente.
+    // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
+    id: "eva-riesgos",
+    component: lazy(() => import("@/Demo-EVA/views/RiesgosEva.jsx")),
+    title: "Riesgos",
+    sub: "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros",
+    nav: { label: "Riesgos", icon: <ShieldAlert size={17} /> },
+  },
+
+  {
+    // Pantalla APARTE, y no una sección de «Riesgos», porque es OTRA MÁQUINA:
+    // otro motor, otro variador, otro PLC. Juntarlas invitaría a leerlas
+    // juntas, y la primera correlación que alguien sacara entre el caudal del
+    // tanque y la vibración de aquí uniría dos instalaciones que no se tocan.
+    id: "eva-vibraciones",
+    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
+    title: "Vibraciones",
+    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
+    nav: { label: "Vibraciones", icon: <Waves size={17} /> },
   },
 
   {

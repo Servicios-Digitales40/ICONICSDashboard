@@ -80,6 +80,7 @@ import {
 } from "../lib/useAsistente.js";
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 import { markdownSeguro } from "../lib/markdown.js";
+import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
 
 const MONO = "'IBM Plex Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
@@ -375,6 +376,31 @@ export function Asistente() {
     window.addEventListener("keydown", alPulsar);
     return () => window.removeEventListener("keydown", alPulsar);
   }, [abierto, maximizado]);
+
+  /**
+   * Preguntas que llegan desde otra pantalla (ver `lib/preguntaExterna.js`).
+   *
+   * Va aquí arriba, con los demás efectos, y no junto a `lanzar()`: `lanzar`
+   * se define DESPUÉS del `return null` de la línea siguiente, y un hook
+   * declarado tras un return condicional cambia de orden entre renders.
+   *
+   * Con una consulta en vuelo NO se manda la nueva —sería una segunda petición
+   * pisando a la primera— pero el panel se abre igual: quien pulsó el botón
+   * tiene que ver que ya hay algo contestándose, no quedarse sin señal alguna
+   * de que su gesto llegó.
+   */
+  useEffect(() => {
+    const alPedir = (e) => {
+      const texto = String(e?.detail?.texto ?? "").trim();
+      if (!texto) return;
+      setAbierto(true);
+      if (ocupado) return;
+      setAnclado(true);
+      preguntar(texto);
+    };
+    window.addEventListener(EVENTO_PREGUNTA, alPedir);
+    return () => window.removeEventListener(EVENTO_PREGUNTA, alPedir);
+  }, [ocupado, preguntar]);
 
   // El servidor manda: sin `IA_BASE` no hay asistente y no se pinta nada.
   if (disponible !== true) return null;
