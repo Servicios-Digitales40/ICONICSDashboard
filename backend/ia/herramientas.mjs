@@ -111,6 +111,7 @@ import {
   resumirSerie,
 } from '../../shared/eva/historia.js'
 import { isGoodQuality } from '../../shared/quality.js'
+import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
 import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
@@ -625,6 +626,11 @@ export function createHerramientas({
   // criterio que `indiceDocumentos`: un objeto de configuración, no variables
   // de entorno leídas aquí — eso lo hace `config.mjs`.
   reportes = null,
+  // Tope de tramos simultáneos en `leerSerieEnRango()` (Plan 15 Fase 3):
+  // `config.limits.historyConcurrencia`, mismo criterio que los dos de
+  // arriba — un número que viene de fuera, no una variable de entorno leída
+  // aquí.
+  historyConcurrencia = 6,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -759,16 +765,20 @@ export function createHerramientas({
     let diasLeidos = 0
     const dias = Math.max(1, Math.ceil((fin - inicio) / 86400000))
 
-    // Se piden en paralelo: son lecturas independientes, y muchas idas y
-    // vueltas en serie contra el historiador convertirían esto en un minuto.
-    const peticiones = []
+    // Concurrencia ACOTADA, no todo a la vez (Plan 15 Fase 3): un mes son 30
+    // tramos, y con la Fase 1 (`readHistory` siguiendo la continuación) cada
+    // tramo puede ser varias peticiones HTTP por debajo — lanzarlos todos de
+    // golpe multiplicaría la carga contra el historiador de producción justo
+    // cuando se amplíe cuánto se puede leer (Fase 4).
+    const tareas = []
     for (let d = 0; d < dias; d++) {
       const diaInicio = new Date(inicio.getTime() + d * 86400000)
       const diaFin = new Date(Math.min(diaInicio.getTime() + 86400000, fin.getTime()))
-      peticiones.push(leerSerie(clave, { inicio: diaInicio, fin: diaFin }))
+      tareas.push(() => leerSerie(clave, { inicio: diaInicio, fin: diaFin }))
     }
 
-    for (const resultado of await Promise.all(peticiones)) {
+    const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+    for (const resultado of resultados) {
       if (!resultado.ok) continue
       diasLeidos++
       muestras.push(...resultado.datos)

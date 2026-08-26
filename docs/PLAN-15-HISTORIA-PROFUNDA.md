@@ -46,9 +46,31 @@
 > (84/84), `scripts/verificar-transporte-falso.mjs` (13/13),
 > `scripts/verificar-chat.mjs` (42/42), suite frontend (397/397).
 >
-> Siguiente: Fase 3 (concurrencia acotada) antes que la Fase 2 o la Fase 4 —
-> ver el orden recomendado en §5: no levantar los topes de ventana sin la
-> cola de concurrencia debajo.
+> **Fase 3 completada (26-ago-2026)** — `shared/concurrencia.js`
+> (`conConcurrenciaAcotada`, JavaScript puro, mismo patrón de tandas que ya
+> usaba `leerTodo()` en `pollingEngine.js`) sustituye los dos `Promise.all`
+> sin tope: `leerSerieEnRango()` en `backend/ia/herramientas.mjs`
+> (`historyConcurrencia`, defecto 6, configurable con
+> `HISTORY_CONCURRENCIA`) y la lectura por tramos de
+> `Demo-EVA/data/historia.js` (`CONCURRENCIA_TRAMOS`, mismo valor). Antes de
+> esto, `perfil_de_senal` con 30 días lanzaba las 30 peticiones de golpe; con
+> la Fase 1 debajo, cada una puede ser varias páginas HTTP más.
+>
+> Verificado que el PICO real de tareas en vuelo nunca supera el tope
+> (instrumentando el cliente falso para contar cuántas llamadas están
+> simultáneamente en curso, no sólo cuántas se hacen en total) y contra el
+> servidor real: `perfil_de_senal` con 10 días, concurrencia 6, en 408 ms.
+> `shared/concurrencia.js` tiene su propia suite (6 pruebas: tope respetado,
+> orden conservado pese a duraciones distintas, propagación de rechazo,
+> `maxConcurrent >= longitud` se comporta como `Promise.all`, lista vacía,
+> `maxConcurrent < 1` no cuelga). Suite completa sin regresión:
+> `scripts/verificar-backend.mjs` (67/67), `scripts/verificar-herramientas.mjs`
+> (86/86, +2 de concurrencia), `scripts/verificar-transporte-falso.mjs`
+> (13/13), `scripts/verificar-chat.mjs` (42/42), frontend (403/403, +6).
+>
+> Siguiente: Fase 2 (unificar las tres reglas de troceado en
+> `shared/eva/rango.js`) antes de la Fase 4 (levantar los topes de ventana) —
+> ver el orden recomendado en §5.
 
 ---
 

@@ -35,6 +35,7 @@
  * habría arreglado nada: son el mismo valor, y ahora salen del mismo sitio.
  */
 import { fetchIconicsHistory } from "@/lib/iconics";
+import { conConcurrenciaAcotada } from "@shared/concurrencia.js";
 import {
   AGREGADO,
   MAX_PUNTOS,
@@ -117,13 +118,17 @@ export async function leerSerie(clave, rango = VENTANA) {
   }
 
   /*
-   * Varios tramos: en paralelo, como hace el backend. Un tramo que falle no
-   * invalida el resto —se cuenta y se sigue—, porque perder un día de diez no
-   * cambia la forma de la curva y abortar dejaría la gráfica vacía por un
-   * hueco del historiador.
+   * Varios tramos: con concurrencia ACOTADA, no todos a la vez (Plan 15 Fase
+   * 3) — mismo motivo que `leerSerieEnRango()` en `backend/ia/herramientas.mjs`:
+   * un trimestre son ~90 tramos, y con la Fase 1 (el backend siguiendo
+   * `X-ICO-CONTINUATION`) cada petición HTTP de este frontend puede disparar
+   * varias páginas por debajo. Un tramo que falle no invalida el resto —se
+   * cuenta y se sigue—, porque perder un día de diez no cambia la forma de
+   * la curva y abortar dejaría la gráfica vacía por un hueco del
+   * historiador.
    */
-  const respuestas = await Promise.all(
-    tramos.map(({ desde, hasta }) => {
+  const respuestas = await conConcurrenciaAcotada(
+    tramos.map(({ desde, hasta }) => () => {
       const segundos = Math.max(1, (hasta.getTime() - desde.getTime()) / 1000);
       return fetchIconicsHistory(pointName(clave), {
         startDate: desde.toISOString(),
@@ -131,7 +136,8 @@ export async function leerSerie(clave, rango = VENTANA) {
         aggregate: AGREGADO,
         interval: intervaloHMS(segundos / PUNTOS_POR_TRAMO),
       }).catch(() => null);
-    })
+    }),
+    CONCURRENCIA_TRAMOS
   );
 
   const datos = [];
@@ -160,6 +166,13 @@ export async function leerSerie(clave, rango = VENTANA) {
  * no recorte por su cuenta.
  */
 const PUNTOS_POR_TRAMO = 96;
+
+/**
+ * Tramos simultáneos como mucho (Plan 15 Fase 3). Mismo valor que
+ * `historyConcurrencia` en `backend/config.mjs`: el frontend y el backend
+ * acotan la carga que le meten al mismo historiador, con el mismo criterio.
+ */
+const CONCURRENCIA_TRAMOS = 6;
 
 /** Días de un tramo según lo largo que sea el rango. Ver `trocear`. */
 const ESCALONES = [

@@ -87,6 +87,7 @@ export function createApp(config) {
     readOnly: config.iconics.readOnly,
     indiceDocumentos,
     reportes: config.reportes,
+    historyConcurrencia: config.limits.historyConcurrencia,
   })
   const chat = createChat({ config, herramientas })
 

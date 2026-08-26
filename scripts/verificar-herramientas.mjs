@@ -1264,6 +1264,69 @@ await checkAsync('resumirSerie sin rejilla sigue funcionando, sin cobertura', as
   assert.equal(r.tramosPosibles, undefined, 'sin rejilla no se inventa una cobertura')
 })
 
+/* ── Concurrencia acotada (Plan 15 Fase 3) ───────────────────────────── */
+
+console.log('\n── Concurrencia acotada al leer varios días ─────────────────')
+
+await checkAsync('leerSerieEnRango nunca supera el tope de tramos simultáneos', async () => {
+  // `readHistory` cuenta cuántas llamadas están EN VUELO a la vez: sube el
+  // contador al entrar, espera un instante (para que las que arrancan juntas
+  // se solapen de verdad) y lo baja al salir. Si `leerSerieEnRango` lanzara
+  // todos los días de golpe (el comportamiento de antes de esta fase), el
+  // pico llegaría a 30; con la cola acotada no debe pasar del tope pedido.
+  let enVuelo = 0
+  let pico = 0
+  const client = clienteFalso({
+    historia: async () => {
+      enVuelo += 1
+      pico = Math.max(pico, enVuelo)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      enVuelo -= 1
+      return {
+        ok: true,
+        data: [{ timestamp: new Date().toISOString(), value: 60, quality: 0 }],
+      }
+    },
+  })
+
+  const TOPE = 4
+  const r = await createHerramientas({ client, historyConcurrencia: TOPE }).ejecutar(
+    'perfil_de_senal',
+    { senal: 'nivel del tanque', dias: 30 }
+  )
+
+  assert.equal(r.ok, true)
+  assert.ok(pico <= TOPE, `pico de llamadas simultáneas=${pico}, tope=${TOPE}`)
+  assert.ok(pico > 1, `pico=${pico}: si es 1, la prueba no está midiendo concurrencia de verdad`)
+})
+
+await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
+  let enVuelo = 0
+  let pico = 0
+  const client = clienteFalso({
+    historia: async () => {
+      enVuelo += 1
+      pico = Math.max(pico, enVuelo)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      enVuelo -= 1
+      return {
+        ok: true,
+        data: [{ timestamp: new Date().toISOString(), value: 60, quality: 0 }],
+      }
+    },
+  })
+
+  // Sin pasar `historyConcurrencia`: el defecto de la propia función (6).
+  const r = await createHerramientas({ client }).ejecutar('perfil_de_senal', {
+    senal: 'nivel del tanque',
+    dias: 30,
+  })
+
+  assert.equal(r.ok, true)
+  assert.ok(pico <= 6, `pico=${pico}, defecto=6`)
+  assert.ok(pico < 30, `pico=${pico}: 30 sería "todos los días a la vez", el comportamiento de antes de esta fase`)
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
