@@ -436,6 +436,32 @@ export const RPM_BORDE_ISO = 720;
 export const RPM_MINIMA_MODULO = 120;
 
 /**
+ * En qué zona de ISO 10816-1 Clase I cae una velocidad eficaz.
+ *
+ * ── POR QUÉ ESTO ES UNA FUNCIÓN Y NO SE DEJA COMPARAR AL QUE PINTA ─
+ *
+ * Porque quien lee estos datos no siempre es una persona. El asistente recibe
+ * las medidas y la norma en la misma respuesta, y medido con el modelo local
+ * el resultado fue: «velocidad eficaz 1,13 mm/s, por encima del aviso de 1,8
+ * mm/s». Dos errores en una frase —el 1,13 era la aceleración, y 1,13 no está
+ * por encima de 1,8— dichos con total aplomo.
+ *
+ * Dar el número y el umbral por separado es invitar a esa frase. Dando la zona
+ * ya resuelta, lo único que queda por hacer es citarla.
+ *
+ * Devuelve `null` cuando la norma no se ha pronunciado —sin dato, o sin saber
+ * si aplica—, y quien lo use tiene que tratarlo como «no evaluado» y no como
+ * «bien». Un verde ahí sería la mentira más barata de todo el módulo.
+ */
+export function bandaISO(vRMS, normaAplicable) {
+  if (!Number.isFinite(vRMS) || normaAplicable !== true) return null;
+  if (vRMS > LIMITES_ISO.alarma) return { zona: "D", label: "zona D · daño", nivel: "critico" };
+  if (vRMS > LIMITES_ISO.aviso) return { zona: "C", label: "zona C · insatisfactoria", nivel: "atencion" };
+  if (vRMS > LIMITES_ISO.nueva) return { zona: "B", label: "zona B · admisible", nivel: "ok" };
+  return { zona: "A", label: "zona A · como nueva", nivel: "ok" };
+}
+
+/**
  * ── EL VARIADOR ────────────────────────────────────────────────────
  *
  * El mismo PLC publica el variador de ESTA máquina. Importa por dos motivos:

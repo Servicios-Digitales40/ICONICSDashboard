@@ -110,6 +110,29 @@ import {
   horaLocal as horaLocalDe,
   resumirSerie,
 } from '../../shared/eva/historia.js'
+import { evaluarRiesgos } from '../../shared/eva/riesgos.js'
+import { evaluarPronostico } from '../../shared/eva/pronostico.js'
+import { evaluarRiesgosVibracion } from '../../shared/eva/riesgosVibracion.js'
+import { NO_COMPARTEN, resumenDeSistemas, SISTEMAS } from '../../shared/eva/sistemas.js'
+import {
+  BANDERAS as BANDERAS_VIB,
+  CALIDADES as CALIDADES_VIB,
+  CANALES as CANALES_VIB,
+  CONTADORES_ALARMA,
+  LIMITES_ISO,
+  bandaISO,
+  MEDIDAS as MEDIDAS_VIB,
+  VARIADOR as VARIADOR_VIB,
+  VIGILANCIAS as VIGILANCIAS_VIB,
+  decodificarVigilancia,
+  puntoAlarma as puntoAlarmaVib,
+  puntoBandera as puntoBanderaVib,
+  puntoCalidad as puntoCalidadVib,
+  puntoMedida as puntoMedidaVib,
+  puntoVariador as puntoVariadorVib,
+  puntoVigilancia as puntoVigilanciaVib,
+  todosLosPuntos as todosLosPuntosVib,
+} from '../../shared/eva/vibraciones.js'
 import { isGoodQuality } from '../../shared/quality.js'
 import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
 import { randomUUID } from 'node:crypto'
@@ -898,7 +921,316 @@ export function createHerramientas({
       }
       : {}
 
+  /*
+   * Las señales del pronóstico: sólo las que tienen serie PROPIA verificada.
+   * `cargaMotor` no está y no puede estar — el historiador devuelve ahí la
+   * curva de la temperatura del tanque sin dar error.
+   */
+  const SENALES_PRONOSTICO = [
+    'nivelTanque', 'temperaturaTanque', 'presionRelativa', 'tensionLinea', 'flujoInstantaneo',
+  ]
+
   const herramientas = {
+    /**
+     * ── QUÉ SISTEMAS HAY EN ESTA PLANTA ───────────────────────────────
+     *
+     * El asistente no puede saber de antemano cuántos hay: hoy dos, mañana
+     * los que se den de alta en `shared/eva/sistemas.js`. Esta herramienta es
+     * como los descubre, con lo que cada uno mide, qué herramientas lo cubren
+     * y —lo que importa— qué NO se puede afirmar de él.
+     *
+     * Existe sobre todo por el error que evita: sin ella, preguntado por algo
+     * de un sistema que no conoce, el modelo llamaría a la herramienta del
+     * otro y contestaría con datos de la máquina equivocada, en una frase
+     * perfectamente redactada.
+     */
+    async sistemas_de_la_planta() {
+      return {
+        ok: true,
+        cuantos: SISTEMAS.length,
+        sistemas: resumenDeSistemas(),
+        aviso: NO_COMPARTEN,
+      }
+    },
+
+    /**
+     * ── LO QUE PUEDE PASAR, NO LO QUE ESTÁ PASANDO ─────────────────────
+     *
+     * `estado_del_sistema` contesta «¿cómo va?». Ésta contesta «¿qué puede
+     * pasar si sigue así?», que es otra pregunta y tiene otras respuestas: las
+     * reglas cruzan VARIAS señales, y una combinación puede ser peligrosa con
+     * las ocho señales dentro de su banda —nivel alto no es un problema; nivel
+     * alto CON la bomba impulsando, sí—.
+     *
+     * Devuelve `sin_comprobar` siempre, y no sólo cuando hay riesgos. Es la
+     * mitad que evita el peor fallo del modelo con esta herramienta: contestar
+     * «no hay ningún riesgo» cuando lo que pasa es que faltaba una lectura y no
+     * se pudo mirar nada.
+     */
+    async riesgos_activos() {
+      const lectura = await leerSistema()
+      if (!lectura.ok) {
+        return fallo(`No se pudo leer la instalación del servidor ICONICS: ${lectura.error}`)
+      }
+
+      const r = evaluarRiesgos(lectura.sistema)
+
+      return {
+        ok: true,
+        sistema: 'Tanque y grupo de bombeo',
+        fuente: 'tiempo real',
+        momento: lectura.receivedAt,
+        reglas_evaluadas: r.evaluadas,
+        riesgos: r.activos.map((x) => ({
+          titulo: x.titulo,
+          severidad: x.severidad,
+          /* Separadas a propósito, y el modelo tiene que mantenerlas separadas
+             al contestar: la evidencia es un hecho medido y la consecuencia es
+             una hipótesis nuestra. Juntarlas suena a que el sistema sabe lo que
+             está pasando, y no lo sabe. */
+          evidencia_medida: x.evidencia,
+          hipotesis: x.consecuencia,
+          que_revisar: x.accion,
+          nota: x.nota ?? undefined,
+        })),
+        sin_comprobar: r.noEvaluables.map((x) => ({
+          titulo: x.titulo,
+          por_que: x.porque,
+        })),
+        aviso:
+          (r.activos.length === 0 && r.noEvaluables.length > 0
+            ? 'NO digas que no hay riesgos: hay reglas que no se pudieron evaluar por falta de ' +
+              'lecturas. «Sin riesgos detectados» y «no se pudo mirar» son cosas distintas. '
+            : '') +
+          'Estas reglas las evalúa el tablero cruzando señales, NO son alarmas del servidor ' +
+          'ICONICS, y los límites con los que se cruzan son estimaciones nuestras para un ' +
+          'sistema de agua genérico.',
+      }
+    },
+
+    /**
+     * ── EL OTRO SISTEMA, Y HAY QUE DECIRLO EN CADA RESPUESTA ───────────
+     *
+     * Estos sensores NO están en el tanque. Son otra máquina, con otro motor,
+     * otro variador y otro PLC. El error que esta herramienta existe para
+     * evitar es que alguien —persona o modelo— cruce el caudal de allí con la
+     * vibración de aquí y saque una correlación entre dos instalaciones que no
+     * se tocan. Por eso el campo `sistema` va el primero y el aviso lo repite.
+     */
+    async estado_de_vibraciones() {
+      const puntos = todosLosPuntosVib()
+      const respuesta = await client.readPoints(puntos)
+      if (!respuesta.ok) {
+        return fallo(`No se pudo leer el módulo de vibraciones: ${respuesta.error}`)
+      }
+
+      const mapa = respuesta.payload ?? {}
+      /* Calidad mala y calidad buena sin campo `value` acaban las dos en null:
+         un `?? 0` descuidado convertiría «sin lectura» en «vibración nula». */
+      const val = (p) => {
+        const x = mapa[p]?.payload
+        if (!x || !isGoodQuality(x.quality)) return null
+        return x.value === undefined || x.value === null ? null : x.value
+      }
+
+      const canales = {}
+      for (const c of CANALES_VIB) {
+        const d = {}
+        for (const m of MEDIDAS_VIB) d[m.key] = val(puntoMedidaVib(m.key, c.id))
+        for (const b of BANDERAS_VIB) d[b.key] = val(puntoBanderaVib(b.key, c.id))
+        d.vigilancias = Object.fromEntries(
+          VIGILANCIAS_VIB.map((v) => [v.key, decodificarVigilancia(val(puntoVigilanciaVib(v.key, c.id)))]),
+        )
+        d.calidades = Object.fromEntries(
+          CALIDADES_VIB.map((q) => [q.key, val(puntoCalidadVib(q.key, c.id))]),
+        )
+        canales[c.id] = d
+      }
+      const variador = Object.fromEntries(VARIADOR_VIB.map((v) => [v.key, val(puntoVariadorVib(v.key))]))
+      const alarmas = Object.fromEntries(CONTADORES_ALARMA.map((a) => [a.key, val(puntoAlarmaVib(a.key))]))
+
+      const r = evaluarRiesgosVibracion({ canales, variador, alarmas })
+      const sinLectura = puntos.filter((p) => val(p) === null).length
+
+      return {
+        ok: true,
+        sistema: 'Sistema de vibraciones — OTRA MÁQUINA, no el tanque',
+        maquina: 'Motor WEG W22 143/5T, 2 HP, 2 polos',
+        fuente: 'tiempo real',
+        /*
+         * ── POR QUE CADA APOYO TRAE SU FRASE YA ESCRITA ─────────────
+         *
+         * Porque el modelo local es pequeno y, con los campos sueltos, lee mal:
+         * medido tres veces seguidas, dijo «velocidad eficaz 1,13 mm/s» cuando
+         * el 1,13 era la ACELERACION —otra magnitud y otras unidades—, y
+         * convirtio un «NO SE PUDO LEER» en «tiene aviso activo».
+         *
+         * Reforzar las instrucciones no bastó. Lo que sí funciona es no
+         * pedirle que arme la frase: `resumen` viene redactado de aqui, donde
+         * el que junta el numero con su nombre y su unidad es codigo, no un
+         * modelo de lenguaje. Los campos sueltos se quedan para cuando alguien
+         * pregunte por uno concreto.
+         */
+        apoyos: CANALES_VIB.map((c) => {
+          const d = canales[c.id]
+          const apagadas = VIGILANCIAS_VIB
+            .filter((v) => v.grupo === 'rodamiento' && d.vigilancias[v.key]?.id === 'apagado')
+            .map((v) => v.key.toUpperCase())
+          const veredicto = bandaISO(d.vRMS, r.normaAplicable)
+          const cifra = (x, u, n) => (Number.isFinite(x) ? `${x.toFixed(n)} ${u}` : 'sin lectura')
+          /*
+           * Las banderas se cuentan en UNA frase, y nunca como «¿Aviso? no se
+           * pudo leer»: con esa forma, el modelo pequeño se quedaba con las
+           * palabras «aviso» y «módulo» juntas y escribía «tiene aviso
+           * activo». La ausencia se dice sin nombrar lo que estaría activo.
+           */
+          const banderas = (alarma, aviso) => {
+            if (alarma === null || aviso === null) {
+              return 'El módulo no está entregando el estado de este apoyo, así que no consta ni una cosa ni la otra.'
+            }
+            if (alarma === true) return 'El módulo tiene la ALARMA encendida en este apoyo.'
+            if (aviso === true) return 'El módulo tiene el AVISO encendido en este apoyo.'
+            return 'El módulo lo da por correcto: ni alarma ni aviso encendidos.'
+          }
+          return {
+            resumen:
+              `${c.label} (${c.id}): velocidad eficaz ${cifra(d.vRMS, 'mm/s', 3)}` +
+              (veredicto ? `, que es ${veredicto.label} de ISO 10816-1 Clase I` : '') +
+              `. Aceleración eficaz ${cifra(d.aRMS, 'm/s²', 3)}. ` +
+              `Valor de daño: ${Number.isFinite(d.DKW) ? d.DKW.toFixed(3) : 'sin referencia aprendida'}. ` +
+              `${banderas(d.alarma, d.aviso)}` +
+              (apagadas.length
+                ? ` El diagnóstico de rodamiento está APAGADO en este apoyo (${apagadas.join(', ')}): nadie lo vigila.`
+                : ''),
+            canal: c.id,
+            donde: c.label,
+            rodamiento: c.rodamiento ?? 'sin identificar',
+            /* La zona va RESUELTA, no el numero y el umbral por separado: el
+               modelo comparandolos escribio «1,13 mm/s, por encima del aviso
+               de 1,8». Lo unico que tiene que hacer es citar la zona. */
+            veredicto_iso: bandaISO(d.vRMS, r.normaAplicable)?.label
+              ?? 'la norma no se ha pronunciado a este regimen',
+            velocidad_eficaz_mm_s: d.vRMS ?? 'NO SE PUDO LEER',
+            aceleracion_eficaz_m_s2: d.aRMS ?? 'NO SE PUDO LEER',
+            pico_m_s2: d.aPeak ?? 'NO SE PUDO LEER',
+            valor_de_dano: d.DKW ?? 'NO SE PUDO LEER',
+            /*
+             * `null` NO puede viajar tal cual: medido con el modelo local, un
+             * `alarma_del_modulo: null` se redactó como «tiene alarmas
+             * activas». Un booleano ausente y un booleano en `true` se parecen
+             * demasiado cuando lo que los lee es un modelo de lenguaje, así
+             * que la ausencia se dice con palabras. Y con ESTAS palabras: un
+             * «sin lectura» se redactó como «tiene alarmas»; «NO SE PUDO LEER»
+             * sigue diciendo la verdad aunque se copie literal en una frase.
+             */
+            alarma_del_modulo: d.alarma === null ? 'NO SE PUDO LEER' : d.alarma,
+            aviso_del_modulo: d.aviso === null ? 'NO SE PUDO LEER' : d.aviso,
+            diagnostico_de_rodamiento_apagado: apagadas.length ? apagadas : undefined,
+          }
+        }),
+        variador: {
+          velocidad_rpm: variador.velocidad ?? 'NO SE PUDO LEER',
+          frecuencia_hz: variador.frecuencia ?? 'NO SE PUDO LEER',
+          par_pct: variador.par ?? 'NO SE PUDO LEER',
+          fallo: variador.fallo ?? 'NO SE PUDO LEER',
+        },
+        servidor_de_alarmas: {
+          activas_sin_reconocer: alarmas.activasSinReconocer ?? 'NO SE PUDO LEER',
+          activas_reconocidas: alarmas.activasReconocidas ?? 'NO SE PUDO LEER',
+          volvieron_a_normal_sin_reconocer: alarmas.normalSinReconocer ?? 'NO SE PUDO LEER',
+          detalle: 'Sólo hay contadores del área: CUÁL alarma se disparó no se puede saber desde aquí.',
+        },
+        norma: `ISO 10816-1 Clase I: aviso ${LIMITES_ISO.aviso} mm/s, alarma ${LIMITES_ISO.alarma} mm/s`,
+        norma_aplicable: r.normaAplicable,
+        riesgos: r.activos.map((x) => ({
+          titulo: x.titulo,
+          apoyo: x.canalLabel ?? 'toda la máquina',
+          severidad: x.nivel,
+          evidencia_medida: x.evidencia,
+          hipotesis: x.consecuencia,
+          que_revisar: x.accion,
+          nota: x.nota ?? undefined,
+        })),
+        sin_comprobar: r.noEvaluables.map((x) => ({
+          titulo: x.titulo,
+          apoyo: x.canalLabel ?? 'toda la máquina',
+          por_que: x.porque,
+        })),
+        puntos_sin_lectura: sinLectura,
+        aviso:
+          'ESTE NO ES EL SISTEMA DEL TANQUE: es otra máquina, con otro motor, otro variador y ' +
+          'otro PLC. No relaciones estas vibraciones con el caudal, la presión ni el nivel del ' +
+          'tanque: son instalaciones distintas. Y NO hay histórico utilizable de estas señales, ' +
+          'así que no afirmes tendencias («lleva subiendo», «cada vez peor») ni pongas plazo a ' +
+          'ninguna avería.' +
+          (sinLectura > 0
+            ? ` Ahora mismo ${sinLectura} de ${puntos.length} puntos no entregan lectura: eso no ` +
+              'es una máquina tranquila, es una máquina callada.'
+            : ''),
+      }
+    },
+
+    /**
+     * ── DESGASTE ACUMULADO, CON SUS CUATRO LÍMITES DECLARADOS ──────────
+     *
+     * Cuenta horas de exposición sobre el histórico del tanque. Los límites de
+     * lo que puede afirmar van EN LA RESPUESTA y no sólo en el código, porque
+     * es el modelo quien va a redactar la frase final y el error caro es que
+     * convierta «horas estimadas de exposición» en «le quedan dos años».
+     */
+    async pronostico_de_desgaste({ dias = 30 } = {}) {
+      const d = Math.max(1, Math.min(90, Number(dias) || 30))
+      const fin = new Date()
+      const inicio = new Date(fin.getTime() - d * 86400000)
+
+      const claves = SENALES_PRONOSTICO.filter((k) => esHistorizada(k))
+      const series = {}
+      for (const k of claves) {
+        const r = await leerSerieEnRango(k, { inicio, fin })
+        series[k] = r?.muestras ?? []
+      }
+
+      /* Las series llegan por separado y el motor necesita filas: se alinean
+         por marca de tiempo, y una fila con un hueco se queda con el hueco en
+         vez de rellenarse — un valor inventado ahí contaría horas falsas. */
+      const marcas = new Set()
+      for (const k of claves) for (const m of series[k]) marcas.add(m.timestamp)
+      const filas = [...marcas].sort().map((t) => {
+        const fila = {}
+        for (const k of claves) {
+          const m = series[k].find((x) => x.timestamp === t)
+          fila[k] = m && Number.isFinite(m.value) ? m.value : null
+        }
+        return fila
+      })
+
+      const r = evaluarPronostico(filas, d * 24)
+
+      return {
+        ok: true,
+        sistema: 'Tanque y grupo de bombeo',
+        ventana_dias: d,
+        muestras: r.muestras,
+        mecanismos: r.activos.map((x) => ({
+          titulo: x.titulo,
+          componente: x.componente,
+          horas_estimadas: x.horasEstimadas,
+          fraccion_del_tiempo: x.fraccion,
+          por_que_degrada: x.mecanismo,
+          a_donde_lleva: x.consecuencia,
+          que_revisar: x.accion,
+          norma: x.norma ?? undefined,
+        })),
+        sin_exposicion: r.sinExposicion?.map((x) => x.titulo) ?? [],
+        sin_comprobar: r.noEvaluables?.map((x) => ({ titulo: x.titulo, por_que: x.porque })) ?? [],
+        aviso:
+          'Las horas son ESTIMADAS a partir de la fracción de muestras que cumplían la condición, ' +
+          'no contadas reloj en mano. El historiador promedia, así que los episodios más cortos ' +
+          'que el intervalo no aparecen. NO estimes cuántos meses o años tardará en averiarse ' +
+          'nada: estas horas dicen cuánta exposición se ha acumulado, no cuánta vida queda.',
+      }
+    },
+
     /**
      * Todo el sistema de una vez.
      *
@@ -2781,6 +3113,79 @@ function compararConLimites(estado, historiasOk, documentacionOk) {
  * curva equivocada **sin dar error**.
  */
 export const DEFINICIONES = [
+  {
+    type: 'function',
+    function: {
+      name: 'sistemas_de_la_planta',
+      description:
+        'Qué sistemas hay en esta planta, qué mide cada uno, qué herramientas lo cubren y qué NO ' +
+        'se puede afirmar de él. Llámala CUANDO NO SEPAS a qué sistema se refiere la pregunta, o ' +
+        'cuando te pregunten "¿qué puedes ver?", "¿qué hay instalado?", "¿qué sistemas vigilas?". ' +
+        'IMPORTANTE: cada sistema es una instalación SEPARADA, con su propio motor, su propio ' +
+        'variador y su propio PLC. No relaciones una señal de un sistema con una de otro. Es ' +
+        'barata y no toca el servidor de planta.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'riesgos_activos',
+      description:
+        'Qué PUEDE pasar en el sistema del tanque si las cosas siguen como están: cruza varias ' +
+        'señales a la vez y devuelve las combinaciones peligrosas, cada una con su evidencia ' +
+        'medida, la hipótesis y qué revisar. Úsala para "¿hay algún riesgo?", "¿puede pasar algo ' +
+        'malo?", "¿por qué avisa la pantalla de riesgos?", "¿es peligroso que siga así?". Es ' +
+        'DISTINTA de estado_del_sistema: aquella dice cómo está cada señal AHORA, ésta dice qué ' +
+        'combinaciones son peligrosas aunque cada señal esté dentro de su banda —nivel alto no ' +
+        'es problema; nivel alto CON la bomba impulsando, sí—. Devuelve además `sin_comprobar`: ' +
+        'reglas que no se pudieron evaluar por falta de lecturas. Si esa lista no está vacía, NO ' +
+        'digas que no hay riesgos: di que hay cosas que no se pudieron mirar. NO es el panel de ' +
+        'alarmas de ICONICS: son reglas del tablero contra límites estimados.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'estado_de_vibraciones',
+      description:
+        'Estado mecánico del SISTEMA DE VIBRACIONES, que es OTRA MÁQUINA distinta del tanque: ' +
+        'otro motor, otro variador y otro PLC. Devuelve los tres apoyos —lado acople, rodamiento ' +
+        'intermedio y lado libre— con su velocidad eficaz, aceleración, pico y valor de daño; qué ' +
+        'vigila el módulo y qué tiene apagado; el estado de su variador; y los contadores del ' +
+        'servidor de alarmas. Úsala para "¿cómo están las vibraciones?", "¿los rodamientos están ' +
+        'bien?", "¿vibra mucho el motor?", "¿hay alarmas de vibración?". NUNCA relaciones estos ' +
+        'valores con el caudal, la presión o el nivel del tanque: son instalaciones que no se ' +
+        'tocan. Y NO hay histórico utilizable: no afirmes tendencias ni pongas plazo a una avería.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'pronostico_de_desgaste',
+      description:
+        'Cuánta EXPOSICIÓN a condiciones que desgastan ha acumulado el sistema del tanque en los ' +
+        'últimos días: horas estimadas aspirando con nivel insuficiente, con presión alta, con la ' +
+        'tensión fuera de tolerancia... y a qué avería lleva cada una. Úsala para "¿se está ' +
+        'desgastando algo?", "¿cuánto tiempo lleva trabajando mal?", "¿hay que hacer ' +
+        'mantenimiento?". Las horas son ESTIMADAS a partir de la fracción de muestras que ' +
+        'cumplían la condición, no contadas reloj en mano, y el historiador promedia, así que los ' +
+        'episodios cortos no aparecen. NO estimes cuántos meses o años tardará en averiarse nada: ' +
+        'esto dice cuánta exposición se ha acumulado, no cuánta vida queda.',
+      parameters: {
+        type: 'object',
+        properties: {
+          dias: {
+            type: 'number',
+            description: 'Días hacia atrás a considerar. Entre 1 y 90; por omisión 30.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
   {
     type: 'function',
     function: {

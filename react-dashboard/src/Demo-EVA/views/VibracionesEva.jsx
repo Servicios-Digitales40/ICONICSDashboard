@@ -50,6 +50,7 @@ import {
 } from "../domain/riesgosVibracion.js";
 import {
   AREA_ALARMAS, CANALES, CONTADORES_ALARMA, LIMITES_ISO, MEDIDAS, VIGILANCIAS,
+  bandaISO,
 } from "../domain/vibraciones.js";
 
 /* ── Presentación ──────────────────────────────────────────────────── */
@@ -70,19 +71,14 @@ const NIVELES = {
 const nivelInfo = (key) => NIVELES[key] ?? NIVELES.informativo;
 
 /**
- * Color de una lectura de velocidad eficaz según ISO 10816-1 Clase I.
+ * Token de color de una zona de ISO 10816-1 Clase I.
  *
- * Devuelve `null` cuando la norma no se ha pronunciado —sin dato, o sin saber
- * si aplica—, y quien pinta usa el color neutro. Un verde ahí sería la mentira
- * más barata de toda la pantalla.
+ * La ZONA la resuelve `bandaISO` en el catálogo, que es el único sitio donde
+ * vive ese criterio: aquí sólo se decide de qué color se pinta. Antes esta
+ * vista tenía su propia copia de la comparación, y dos copias de un umbral son
+ * dos umbrales en cuanto alguien toca uno.
  */
-function bandaISO(vRMS, normaAplicable) {
-  if (vRMS === null || vRMS === undefined || normaAplicable !== true) return null;
-  if (vRMS > LIMITES_ISO.alarma) return { token: "coral", label: "zona D · daño" };
-  if (vRMS > LIMITES_ISO.aviso) return { token: "amber", label: "zona C · insatisfactoria" };
-  if (vRMS > LIMITES_ISO.nueva) return { token: "text", label: "zona B · admisible" };
-  return { token: "success", label: "zona A · como nueva" };
-}
+const COLOR_ZONA = { D: "coral", C: "amber", B: "text", A: "success" };
 
 const fmt = (v, dec) =>
   v === null || v === undefined || !Number.isFinite(v) ? "—" : v.toFixed(dec);
@@ -147,7 +143,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
         {MEDIDAS.map((m) => {
           const v = datos?.[m.key];
           const esVelocidad = m.key === "vRMS";
-          const color = esVelocidad && banda ? t[banda.token] : t.text;
+          const color = esVelocidad && banda ? t[COLOR_ZONA[banda.zona]] : t.text;
           return (
             <div key={m.key}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: t.textFaint }}>
@@ -160,7 +156,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
                 </span>
               </div>
               {esVelocidad && banda && (
-                <div style={{ fontSize: 10, color: t[banda.token], marginTop: 2 }}>{banda.label}</div>
+                <div style={{ fontSize: 10, color: t[COLOR_ZONA[banda.zona]], marginTop: 2 }}>{banda.label}</div>
               )}
             </div>
           );
