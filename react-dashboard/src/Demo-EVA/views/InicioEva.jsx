@@ -56,7 +56,7 @@
  * los tokens semánticos del resto"). El resto del gradiente sigue en
  * `accent`/`accentSoft`, los tokens de marca de siempre.
  */
-import { ArrowRight, Boxes, Cog, Factory, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
+import { ArrowRight, Boxes, Cog, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -212,29 +212,77 @@ const REJILLA = `
   margin-top: auto; padding-top: 12px; border-top: 1px solid var(--tv-border);
 }
 
-/* Pipeline "Cómo funciona": tres nodos en fila con dos enlaces entre ellos,
-   cada enlace flexible (crece con el espacio) para que el ancho lo reparta
-   el propio contenedor y no una cuenta a mano de anchos fijos. En una sola
-   columna por debajo de 720px, mismo umbral que ya usa Planta para el mismo
-   motivo — la fila de tres deja de caber sin apretar el texto.
+/* Pipeline "Cómo funciona": cinco nodos en fila con cuatro enlaces entre
+   ellos, cada enlace flexible (crece con el espacio) para que el ancho lo
+   reparta el propio contenedor y no una cuenta a mano de anchos fijos.
 
    Reveal por scroll: sin la clase --visible (que pone useEnVista()) los
    pasos quedan invisibles y desplazados, listos para el mismo fadeInUp que
    usa el resto de la vista al montar — aquí se dispara al entrar en
    viewport en vez de al montar el componente. */
 .eva-inicio-pipeline { display: flex; align-items: center; margin-top: 20px; }
+/* min-width: 0 aquí, no sólo en .eva-inicio-pipeline__nodo más abajo: un
+   flex item que además ES flex container (.paso lo es) hereda su propio
+   min-width: auto por defecto, que se resuelve contra el min-content de SU
+   hijo — el .nodo — sin importar que el .nodo ya sepa encogerse. Sin este
+   min-width: 0 el .paso se negaba a bajar de ese suelo y el navegador lo
+   dejaba desbordar la fila entera en vez de encogerlo, con el mismo
+   resultado de antes (un nodo empujado fuera del overflow-x: clip del
+   Shell) pero ahora en CUALQUIER paso, no sólo en el último. Cada nivel de
+   una cadena flex anidada necesita su propio min-width: 0; el de un nivel
+   no se hereda al de abajo. */
 .eva-inicio-pipeline__paso {
-  display: flex; align-items: center; flex: 1 1 0;
+  display: flex; align-items: center; flex: 1 1 0; min-width: 0;
   opacity: 0; transform: translateY(14px);
 }
 .eva-inicio-pipeline--visible .eva-inicio-pipeline__paso {
   animation: fadeInUp 0.5s ease both;
 }
-.eva-inicio-pipeline__paso:last-child { flex: 0 0 auto; }
+/* Antes el último paso llevaba flex: 0 0 auto porque, sin enlace de salida,
+   "no tenía por qué encogerse". Con tres nodos daba igual: siempre sobraba
+   ancho. Con cinco, ese mismo flex-shrink: 0 implícito es la causa de un
+   bug real, más grave que un simple solape: el <main> del Shell recorta con
+   overflow-x: clip, así que un último paso que no puede encogerse termina
+   empujado fuera del viewport —invisible, no sólo tapado— entre 1000px y
+   1280px (confirmado en pantalla: "Este tablero" desaparecía del todo).
+   Encogiendo igual que sus hermanos (mismo flex: 1 1 0 de arriba, sin
+   excepción) el nodo vuelve a caber siempre; min-width: 0 en .nodo ya se
+   encarga de que el contenido ceda envolviendo texto en vez de desbordar. */
+/* flex-shrink: 0 funcionaba con tres nodos porque siempre sobraba ancho:
+   cada .paso tenía sitio de sobra para el contenido intrínseco del nodo.
+   Con cinco nodos en la misma fila el .paso (que sí se encoge, flex: 1 1 0
+   arriba) puede terminar más angosto que el ancho natural del nodo — icono
+   + título + detalle en una línea— y un nodo que no puede encogerse se
+   desborda sobre el siguiente en vez de respetar su slot. Ahora el nodo
+   encoge con su .paso, y es el texto (min-width: 0 más abajo) el que cede
+   envolviendo a dos líneas en vez de la tarjeta entera invadiendo a la de al
+   lado. */
 .eva-inicio-pipeline__nodo {
   display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px; border-radius: 14px; flex-shrink: 0;
+  padding: 14px 16px; border-radius: 14px; min-width: 0;
 }
+/* min-width: 0 es lo que deja al bloque de texto ceder por debajo de su
+   ancho de contenido —el comportamiento por defecto de un hijo flex— en
+   vez de empujar al nodo entero contra su vecino. Pero sin un PISO ese
+   "puede encogerse" no tiene límite: con cinco nodos en la misma fila el
+   texto llegó a comprimirse a 1-2 caracteres por línea ("sensore/s",
+   "AssetW/orX"), técnicamente sin desbordar pero ilegible — el mismo tipo
+   de sobre-corrección que ya rompió el ancho del nodo en rondas
+   anteriores, aquí a nivel de texto. 92px es el mínimo que sigue
+   mostrando 2-3 palabras españolas cortas por línea a 11.5px sin obligar
+   a una sola letra por renglón; por debajo de eso el texto para de ceder
+   y es el propio nodo/paso (que sí puede seguir encogiendo) el que absorbe
+   el resto de la compresión. */
+.eva-inicio-pipeline__nodo > div:last-child { min-width: 92px; flex: 1 1 auto; }
+/* overflow-wrap: break-word ya es "última instancia" por spec —sólo rompe
+   una palabra si no cabe entera en un renglón—, pero "ac:TDCON/DEMO/
+   SENSORES/" (el detalle de Sensores) es una cadena sin espacios de 23
+   caracteres: incluso con el piso de 92px de arriba, esa cadena en
+   particular nunca cabe entera y break-word la corte letra a letra, sin
+   mejor alternativa. hyphens: auto además guionaliza las palabras
+   españolas normales en un punto silábico cuando SÍ hace falta romperlas,
+   en vez de a la mitad arbitraria. */
+.eva-inicio-pipeline__nodo p { overflow-wrap: break-word; hyphens: auto; }
 .eva-inicio-pipeline__enlace { flex: 1 1 40px; min-width: 24px; margin: 0 4px; }
 
 /* El paquete recorre el enlace en transform, no en cx: cx no se anima con
@@ -251,10 +299,57 @@ const REJILLA = `
   animation: paqueteViaja 1.1s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* Con tres nodos la fila cabía apretando el texto hasta 720px (mismo umbral
+   que Planta). Con cinco, cinco chasises de icono+padding más cuatro
+   enlaces empiezan a apretar el texto mucho antes — 1040px es donde el
+   título más largo ("Servidor de la demo") y su detalle en dos líneas
+   dejan de tener aire cómodo en escritorio real, no un punto arbitrario.
+   Reducir el padding y el gap del nodo, y acortar el enlace, gana margen
+   antes de tener que colapsar del todo. */
+@media (max-width: 1040px) {
+  .eva-inicio-pipeline__nodo { padding: 12px 12px; gap: 9px; }
+  .eva-inicio-pipeline__enlace { flex-basis: 20px; min-width: 14px; margin: 0 2px; }
+}
+
+/* Mismo botón flotante del Asistente que ya cubre la Regla del Hueco
+   Reservado en .eva-inicio-grid (ver ese comentario más arriba) — TRES
+   intentos de reservarle hueco al último nodo aquí mismo fallaron, cada
+   uno por una razón distinta:
+     1) padding-right fijo en .nodo, siempre activo: competía con el texto
+        en cualquier ancho donde el slot ya fuera angosto.
+     2) el mismo padding, sólo por encima de 1040px: el colapso simplemente
+        se desplazó a 1041-1300px, la frontera nueva del breakpoint.
+     3) margin-right en el .paso exterior en vez de padding en el .nodo:
+        parecía correcto (reduce el slot ANTES del reparto), pero los cinco
+        .paso comparten flex: 1 1 0 — un margen en un hermano no le resta
+        SÓLO a su propio slot, reduce el POOL de espacio libre que el
+        algoritmo de flex reparte por igual entre los cinco. El hueco
+        terminó pagado a medias por los otros cuatro nodos, que ya tenían
+        menos margen que el último (compiten también con los enlaces) y
+        colapsaron peor que el bug original.
+
+   La lección real: en una fila de cinco slots ya ajustados, CUALQUIER
+   reserva geométrica fija para el botón compite con algo que necesita ese
+   mismo pixel — no hay combinación de padding/margin/breakpoint que lo
+   resuelva sin sacrificar otro nodo. La rejilla de 4 tarjetas de arriba
+   puede permitirse el hueco porque ahí sí sobra ancho de sobra en todo su
+   rango soportado; este pipeline, con cinco nodos en la misma fila, no.
+   Se renuncia a la reserva geométrica: por debajo de ~1400px la fila ya
+   está lo bastante ocupada como para que el botón —pequeño, 54px, esquina
+   inferior— tenga poca superficie de la sección bajo la que caer, y toda
+   la sección ya vive dentro de .eva-page-shell con el padding inferior
+   de 50/36px que cada vista comparte; un roce ocasional con el borde del
+   botón en el ancho más apretado es un costo menor que perder el título
+   por completo, que es lo que las tres reservas anteriores causaban. */
+
 @media (max-width: 720px) {
   .eva-inicio-pipeline { flex-direction: column; align-items: stretch; gap: 10px; }
   .eva-inicio-pipeline__paso { flex-direction: column; align-items: stretch; }
   .eva-inicio-pipeline__enlace { display: none; }
+  /* Sin margen extra aquí: el padding-bottom de la <section> (ComoFunciona,
+     InicioEva.jsx) ya reserva el hueco del botón en TODOS los anchos, este
+     incluido — duplicarlo en el último .paso sólo alejaría "Este tablero"
+     del botón el doble de lo necesario. */
 }
 
 /* Por debajo de 900px el hero vuelve a estar centrado (ver el @media de
@@ -524,24 +619,41 @@ function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
 }
 
 /**
- * "Cómo funciona" — el pipeline real en tres nodos, no un diagrama genérico
- * de arquitectura. Nombra exactamente lo que PRODUCT.md documenta: ICONICS
- * (AssetWorX + Hyper Historian) → el backend de la demo → este tablero. Nada
- * inventado — es la misma cadena que explica por qué "el dato es real" en
- * vez de sólo afirmarlo.
+ * "Cómo funciona" — el pipeline real en cinco nodos, no un diagrama genérico
+ * de arquitectura. Nombra la cadena completa desde el origen físico: el
+ * sensor mide, el PLC lo lee y lo expone, ICONICS (AssetWorX + Hyper
+ * Historian) lo históriza, el backend de la demo lo sirve por API, y este
+ * tablero lo pinta. Nada inventado — es la misma cadena que explica por qué
+ * "el dato es real" en vez de sólo afirmarlo.
+ *
+ * Los dos primeros nodos (Sensores, PLC) son la extensión que faltaba: hasta
+ * ahora el pipeline empezaba en ICONICS, que es donde arranca el software de
+ * este tablero, pero el prospecto veía "un servidor lee un servidor" sin que
+ * quedara claro que detrás hay una magnitud física de verdad, medida por un
+ * instrumento de verdad, antes de que cualquier software la toque. Sensores
+ * y PLC no llevan marca ni modelo: la instalación de la demo no tiene un PLC
+ * propio que nombrar (a diferencia de ICONICS, que sí es el producto real
+ * instalado), así que el detalle describe el ROL genérico de la etapa —igual
+ * de cierto para cualquier instalación de agua industrial— en vez de
+ * inventar un fabricante que no está ahí.
  *
  * ── EL "PAQUETE VIAJANDO" ES UN DISPARO, NO UN BUCLE ───────────────
  *
  * La propuesta original imaginaba una animación continua de un paquete de
- * dato recorriendo los tres nodos. Con el mismo límite que ya aplicó
+ * dato recorriendo los nodos. Con el mismo límite que ya aplicó
  * `TrazoFlujo`: un bucle nuevo compite con el vocabulario que
  * `lib/motion.js` reserva para las alarmas. Aquí el disparo es literal en
  * vez de decorativo — el punto viaja UNA vez cada vez que `lastUpdated`
  * cambia, que es cuando de verdad llegó un paquete nuevo del servidor. Mismo
  * mecanismo que `UltimaLectura`: `key={lastUpdated.getTime()}` remonta el
- * elemento y su animación CSS (sin `infinite`) arranca de cero.
+ * elemento y su animación CSS (sin `infinite`) arranca de cero. Con dos
+ * nodos más el punto ahora recorre CUATRO enlaces en vez de dos — mismo
+ * `flex: 1 1 40px` por enlace (ver `.eva-inicio-pipeline__enlace` en
+ * REJILLA), así que la fila sigue repartiendo el ancho sola.
  */
 const NODOS_PIPELINE = [
+  { id: "sensores", Icono: Gauge, titulo: "Sensores", detalle: "Los ocho puntos físicos de ac:TDCON/​DEMO/​SENSORES/" },
+  { id: "plc", Icono: Cpu, titulo: "PLC", detalle: "Lee los sensores y expone sus valores por OPC" },
   { id: "iconics", Icono: Server, titulo: "ICONICS", detalle: "AssetWorX + Hyper Historian, en la instalación real" },
   { id: "backend", Icono: Radio, titulo: "Servidor de la demo", detalle: "Lee ICONICS y sirve los ocho puntos por API" },
   { id: "tablero", Icono: Monitor, titulo: "Este tablero", detalle: "Pinta lo que el servidor acaba de leer, nada más" },
@@ -562,7 +674,18 @@ function ComoFunciona({ t, lastUpdated }) {
   const [ref, visible] = useEnVista();
 
   return (
-    <section ref={ref}>
+    // `ComoFunciona` es la última sección de la vista: el hueco del botón
+    // flotante del Asistente se resuelve en VERTICAL, no en horizontal —
+    // tres intentos de reservarle ancho a la última tarjeta de la fila
+    // (padding-right en el nodo, luego sólo sobre 1040px, luego margin-right
+    // en el slot) rompieron el título de algún otro nodo cada vez, porque
+    // cualquier reserva de ANCHO en una fila de cinco slots ya ajustados
+    // compite con el propio texto (ver el comentario en REJILLA junto a
+    // `.eva-inicio-pipeline__paso:last-child`). Un padding-bottom en la
+    // sección entera no compite con nada del layout horizontal: sólo aleja
+    // TODA la fila del borde inferior donde vive el botón, igual que
+    // `.eva-page-shell` ya hace globalmente para cada vista.
+    <section ref={ref} style={{ paddingBottom: 70 }}>
       <SectionLabel sub="El camino que hace cada número antes de llegar a esta pantalla">
         Cómo funciona
       </SectionLabel>
