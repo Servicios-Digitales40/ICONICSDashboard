@@ -4,11 +4,39 @@
  * renderizar en el área principal.
  */
 import { useEffect, useState } from "react";
-import { LogOut, ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { ChevronDown, PanelLeftClose, X } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { NAV } from "../routes/index.js";
-import { Avatar, HoverTip } from "@/components/ui/index.js";
+import { HoverTip } from "@/components/ui/index.js";
+import { useSistemaAgua } from "@/Demo-EVA/data/hooks.js";
+import { estadoColor } from "@/Demo-EVA/components/paleta.js";
+import { RAIZ } from "@shared/eva/senales.js";
+
+/**
+ * Raíz de instalación para el pie de la barra, sin el tramo de puntos
+ * (`SENSORES/`): el pie identifica LA INSTALACIÓN, no el catálogo de
+ * señales — el mismo recorte que ya hace el subtítulo del Topbar en
+ * `routes.jsx` para "Assets" frente al de "Inicio"/"Planta".
+ */
+const RAIZ_INSTALACION = RAIZ.replace(/\/?SENSORES\/?$/, "");
+
+/**
+ * Estado de "Planta" para el punto de la barra: mismo criterio y mismos
+ * tres estados que ya usa la tarjeta de Planta en el Inicio
+ * (`InicioEva.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más que
+ * varios en aviso, y sin lectura no hay punto que pintar. Vive aquí y no
+ * como import compartido porque son cuatro líneas y las dos vistas ya
+ * evalúan `sistema.resumen` de formas ligeramente distintas (aquí no hace
+ * falta el texto, sólo el estado).
+ */
+function estadoPlanta(sistema) {
+  const { fueraDeLimite, enAviso, medidas } = sistema.resumen;
+  if (!medidas) return null;
+  if (fueraDeLimite > 0) return "critico";
+  if (enAviso > 0) return "atencion";
+  return "nominal";
+}
 
 /**
  * La marca de la demo: una gota con su línea de nivel, no un rayo genérico.
@@ -52,14 +80,24 @@ function MaybeTip({ collapsed, label, children }) {
   return collapsed ? <HoverTip label={label}>{children}</HoverTip> : children;
 }
 
+/** Texto que acompaña al punto de estado, para el tooltip y el `title` — el color nunca va solo (DESIGN.md). */
+const ESTADO_TEXTO = {
+  critico: "fuera de límite",
+  atencion: "en aviso",
+  nominal: "en banda",
+};
+
 /** Botón de navegación reutilizable (página simple o hijo de un grupo). */
-function NavButton({ item, active, onNavigate, t, indent = false, collapsed = false }) {
+function NavButton({ item, active, onNavigate, t, dark, indent = false, collapsed = false, estado = null }) {
+  const etiquetaEstado = estado && ESTADO_TEXTO[estado];
+  const etiqueta = etiquetaEstado ? `${item.label} — ${etiquetaEstado}` : item.label;
+
   return (
-    <MaybeTip collapsed={collapsed} label={item.label}>
+    <MaybeTip collapsed={collapsed} label={etiqueta}>
       <button
         className={`nav-item ${active ? "nav-active" : ""}`}
         onClick={() => onNavigate(item.id)}
-        title={collapsed ? undefined : item.label}
+        title={collapsed ? undefined : etiqueta}
         style={{
           display: "flex", alignItems: "center", gap: 11, width: "100%",
           padding: collapsed ? "10px 0" : indent ? "9px 12px 9px 22px" : "10px 12px",
@@ -71,7 +109,22 @@ function NavButton({ item, active, onNavigate, t, indent = false, collapsed = fa
           fontSize: indent ? 13 : 13.5, fontWeight: active ? 700 : 500, fontFamily: "'Inter', sans-serif",
         }}
       >
-        <span style={{ display: "flex", color: active ? t.accent : t.textFaint }}>{item.icon}</span>
+        {/* El punto de estado vive pegado al icono, no a la etiqueta: así el
+            mismo layout sirve colapsada (sólo icono) y expandida sin mover
+            nada — un badge de esquina, no un elemento de línea aparte que
+            desaparecería justo donde más se necesita, la barra en 72px. */}
+        <span style={{ position: "relative", display: "flex", flexShrink: 0 }}>
+          <span style={{ display: "flex", color: active ? t.accent : t.textFaint }}>{item.icon}</span>
+          {estado && (
+            <span
+              aria-hidden="true"
+              style={{
+                position: "absolute", top: -2, right: -3, width: 7, height: 7, borderRadius: "50%",
+                background: estadoColor(dark, estado), border: `1.5px solid ${t.sidebar}`,
+              }}
+            />
+          )}
+        </span>
         {!collapsed && item.label}
         {!collapsed && active && <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: t.gradAccent }} />}
       </button>
@@ -145,8 +198,13 @@ const STORAGE_KEY = "sidebar:collapsed";
  *                       fondo, y lo llama el Topbar al pulsar el botón de menú.
  */
 export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon }) {
-  const { theme: t } = useTheme();
+  const { theme: t, dark } = useTheme();
   const esCajon = useMediaQuery(UMBRAL_CAJON);
+  // Fuente compartida por `EvaProvider` (App.jsx envuelve el Shell entero con
+  // él) — mismo hook que usa cada vista, así que el punto de "Planta" no abre
+  // un segundo motor de sondeo, sólo lee el que ya corre.
+  const { sistema } = useSistemaAgua();
+  const estadoPorId = { "eva-planta": estadoPlanta(sistema) };
   const [collapsedPref, setCollapsedPref] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEY) === "1"; } catch { return false; }
   });
@@ -197,7 +255,8 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           transition: "width 220ms ease, transform 220ms ease", overflow: "hidden", // impeccable-disable-line layout-transition -- único elemento reflowing, coste despreciable
         }}
       >
-      {/* Marca + botón de colapso (o de cierre, en el cajón) */}
+      {/* Marca (+ botón de cerrar, sólo en el cajón móvil: el colapso de
+          escritorio vive ahora en el ancla del borde, ver más abajo). */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: collapsed ? "22px 0 18px" : "22px 20px 18px", justifyContent: collapsed ? "center" : "flex-start" }}>
         <span style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: t.gradAccent, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 6px 16px ${t.accent}40` }}>
           <MarcaEstacion size={17} />
@@ -206,10 +265,10 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           <>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 15.5, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.15, whiteSpace: "nowrap" }}>Estación de Llenado</div>
-              <div style={{ fontSize: 10.5, color: t.textFaint, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>ENTERPRISE</div>
+              <div style={{ fontSize: 11, color: t.textFaint, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>ENTERPRISE</div>
             </div>
-            <span style={{ marginLeft: "auto", display: "flex" }}>
-              {esCajon ? (
+            {esCajon && (
+              <span style={{ marginLeft: "auto", display: "flex" }}>
                 <HoverTip label="Cerrar menú">
                   <button
                     className="nav-item"
@@ -220,40 +279,11 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
                     <X size={18} />
                   </button>
                 </HoverTip>
-              ) : (
-                <HoverTip label="Colapsar barra">
-                  <button
-                    className="nav-item"
-                    onClick={() => setCollapsedPref(true)}
-                    aria-label="Colapsar barra lateral"
-                    aria-expanded
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 6, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: t.textFaint }}
-                  >
-                    <PanelLeftClose size={17} />
-                  </button>
-                </HoverTip>
-              )}
-            </span>
+              </span>
+            )}
           </>
         )}
       </div>
-
-      {/* Botón de expandir (visible sólo colapsada, y sólo en escritorio: el cajón nunca colapsa) */}
-      {collapsed && !esCajon && (
-        <div style={{ display: "flex", justifyContent: "center", padding: "0 0 8px" }}>
-          <HoverTip label="Expandir barra">
-            <button
-              className="nav-item"
-              onClick={() => setCollapsedPref(false)}
-              aria-label="Expandir barra lateral"
-              aria-expanded={false}
-              style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 8, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: t.textFaint }}
-            >
-              <PanelLeftOpen size={17} />
-            </button>
-          </HoverTip>
-        </div>
-      )}
 
       {/* Navegación */}
       <nav
@@ -264,29 +294,95 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           item.children ? (
             <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} />
           ) : (
-            <NavButton key={item.id} item={item} active={page === item.id} onNavigate={navegar} t={t} collapsed={collapsed} />
+            <NavButton
+              key={item.id} item={item} active={page === item.id} onNavigate={navegar} t={t} dark={dark}
+              collapsed={collapsed} estado={estadoPorId[item.id] ?? null}
+            />
           )
         )}
       </nav>
 
-      {/* Perfil */}
-      {/* <div style={{ padding: collapsed ? "14px 10px" : 14, borderTop: `1px solid ${t.border}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: collapsed ? "8px 0" : "8px 8px", justifyContent: collapsed ? "center" : "flex-start", borderRadius: 12, background: t.hover }}>
-          <Avatar name="Ana Torres" size={collapsed ? 28 : 34} />
-          {!collapsed && (
-            <>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Ana Torres</div>
-                <div style={{ fontSize: 11, color: t.textFaint }}>Plan Pro</div>
+      {/* Pie: identidad de INSTALACIÓN, no de persona — no hay login real
+          detrás de este tablero (PRODUCT.md), así que un nombre y un "Plan
+          Pro" de mentira prometerían una cuenta que no existe. En su lugar,
+          la raíz real del servidor que está leyendo: el mismo hecho que
+          `shared/eva/senales.js` ya trata como la única fuente de verdad
+          para "qué instalación es esta". */}
+      <div style={{ padding: collapsed ? "12px 10px" : "12px 14px", borderTop: `1px solid ${t.border}` }}>
+        <MaybeTip collapsed={collapsed} label={`Instalación: ${RAIZ_INSTALACION}`}>
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: collapsed ? "8px 0" : "8px 10px",
+              justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: 10, background: t.hover,
+            }}
+          >
+            <span
+              style={{
+                width: 26, height: 26, flexShrink: 0, borderRadius: 7,
+                background: t.panel, border: `1px solid ${t.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, color: t.textFaint, fontFamily: "'IBM Plex Mono', monospace",
+              }}
+              aria-hidden="true"
+            >
+              ac
+            </span>
+            {!collapsed && (
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text, fontFamily: "'IBM Plex Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {RAIZ_INSTALACION}
+                </div>
+                <div style={{ fontSize: 11, color: t.textFaint, marginTop: 1 }}>Instalación</div>
               </div>
-              <HoverTip label="Cerrar sesión">
-                <LogOut size={15} color={t.textFaint} style={{ cursor: "pointer" }} />
-              </HoverTip>
-            </>
-          )}
-        </div>
-      </div> */}
+            )}
+          </div>
+        </MaybeTip>
+      </div>
       </aside>
+
+      {/* Ancla de colapso: un solo control, en el mismo sitio en los dos
+          estados —a caballo del borde derecho de la barra, a la altura del
+          logo— en vez de los dos botones que había antes (uno junto a la
+          marca cuando expandida, otro centrado debajo cuando colapsada).
+          Ese control saltaba de sitio al cambiar de estado; éste no se
+          mueve, sólo gira 180° el mismo icono. Sólo existe en escritorio: el
+          cajón móvil no colapsa a solo-icono (ver `collapsed` arriba), así
+          que no tiene nada que anclar. `position: fixed` y no `sticky`
+          porque vive fuera de `<aside>` —que recorta con `overflow: hidden`
+          lo que se saliera de su borde— y necesita su propia coordenada, no
+          heredar la del flujo. `zIndex: 31`, no 10: el Topbar es `sticky`
+          a 30 (Topbar.jsx) y su cabecera cubre exactamente esta franja
+          horizontal — con un z-index menor el botón se veía pero el propio
+          Topbar le ganaba el hit-test, así que ni el click ni el hover del
+          ratón llegaban a tocarlo (sólo Tab+Enter funcionaba). 31 es "justo
+          encima del Topbar", nada más — muy por debajo del overlay del
+          cajón móvil (69/70), que además nunca coincide con este botón
+          porque `esCajon` lo oculta. */}
+      {!esCajon && (
+        <HoverTip label={collapsed ? "Expandir barra" : "Colapsar barra"} style={{ position: "fixed", top: 30, left: collapsed ? 72 : 246, zIndex: 31, transition: "left 220ms ease" }}>
+          <button
+            onClick={() => setCollapsedPref((c) => !c)}
+            aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
+            aria-expanded={!collapsed}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              width: 22, height: 22, borderRadius: "50%", transform: "translateX(-50%)",
+              // `t.hover`, no `t.panel`: sobre un fondo tan oscuro como el de
+              // la barra los dos superficies casi no se separan (hallazgo de
+              // /impeccable shape, contraste bajo). `t.hover` es el mismo
+              // tono que ya usa el estado :hover de cualquier `nav-item`, así
+              // que el botón en reposo se lee tan "elevado" como cualquier
+              // ítem de nav lo hace al pasar el cursor — no un tono inventado.
+              border: `1px solid ${t.border}`, background: t.hover, boxShadow: t.shadow,
+              cursor: "pointer", color: t.textSoft,
+            }}
+          >
+            <PanelLeftClose size={13} style={{ transition: "transform 220ms ease", transform: collapsed ? "rotate(180deg)" : "none" }} />
+          </button>
+        </HoverTip>
+      )}
     </>
   );
 }
