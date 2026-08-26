@@ -68,9 +68,39 @@
 > (86/86, +2 de concurrencia), `scripts/verificar-transporte-falso.mjs`
 > (13/13), `scripts/verificar-chat.mjs` (42/42), frontend (403/403, +6).
 >
-> Siguiente: Fase 2 (unificar las tres reglas de troceado en
-> `shared/eva/rango.js`) antes de la Fase 4 (levantar los topes de ventana) —
-> ver el orden recomendado en §5.
+> **Fase 2 completada (26-ago-2026)** — `shared/eva/rango.js`
+> (`planificar()`/`tramosDe()`) sustituye las dos reglas de troceado que
+> arman una serie: `trocear()` en `Demo-EVA/data/historia.js` (escalonada:
+> 1d/≤14, 3d/≤60, 7d/≤180, 30d después) y el troceado interno de
+> `leerSerieEnRango()` en `backend/ia/herramientas.mjs` (que antes SIEMPRE
+> usaba 1 día por tramo). Ganó la regla escalonada: menos tramos en rangos
+> largos son menos peticiones HTTP, y con la Fase 1 cada tramo ya puede ser
+> varias páginas por debajo — un mes que antes eran 30 tramos ahora son 10.
+>
+> El troceado del script de antigüedad (`DIAS_TRAMO` fijo, sin
+> `objetivoPuntos`) se quedó fuera a propósito: no arma una serie, sólo
+> pregunta "¿hay o no hay dato aquí", una pregunta distinta a la de densidad
+> que resuelve `planificar()` — ver la cabecera de `rango.js`.
+>
+> `leerSerieEnRango()` sigue narrando cobertura en DÍAS de calendario
+> ("12 de 30 días respondieron"), no en tramos: cada tramo declara cuántos
+> días cubre, y un tramo con dato cuenta como todos sus días leídos —
+> aproximado, pero mantiene la frase al usuario con el mismo significado sin
+> pedir cada día suelto para contar fino.
+>
+> Verificado contra el servidor real: `perfil_de_senal` (10 días, 496 ms) y
+> `generar_reporte` (8 días con PDF real) funcionan igual que antes de la
+> unificación. Nueva suite en `rango.test.js` (11 pruebas: escalones,
+> cobertura sin huecos, `interval` por densidad, estimación de peticiones).
+> Suite completa sin regresión: `scripts/verificar-backend.mjs` (67/67),
+> `scripts/verificar-herramientas.mjs` (86/86, 2 pruebas de concurrencia
+> reescritas para el nuevo tamaño de tramo), `scripts/verificar-transporte-falso.mjs`
+> (13/13), `scripts/verificar-chat.mjs` (42/42), frontend (403/403, +11).
+>
+> Siguiente: Fase 4 (levantar los topes de ventana — `MAX_HORAS_VENTANA`,
+> `MAX_DIAS_PERFIL`, `MAX_DIAS_REPORTE`) — con las Fases 1, 2 y 3 debajo, ya
+> hay paginación real, una sola regla de troceado, y concurrencia acotada
+> para sostenerlo. Ver el orden recomendado en §5.
 
 ---
 

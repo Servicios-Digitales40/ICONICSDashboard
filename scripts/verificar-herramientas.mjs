@@ -1277,15 +1277,25 @@ await checkAsync('leerSerieEnRango nunca supera el tope de tramos simultáneos',
   let enVuelo = 0
   let pico = 0
   const client = clienteFalso({
-    historia: async () => {
+    // Varias muestras por LLAMADA, como el servidor real: con el troceado
+    // escalonado (Plan 15 Fase 2) un rango de 30 días son unos pocos tramos
+    // anchos, no 30 tramos de un día — un fake que sólo diera una muestra
+    // por llamada, sin importar cuánto abarque el tramo, se quedaría corto
+    // de `MIN_MUESTRAS_PERFIL` antes incluso de llegar a medir concurrencia.
+    historia: async (opciones) => {
       enVuelo += 1
       pico = Math.max(pico, enVuelo)
       await new Promise((resolve) => setTimeout(resolve, 5))
       enVuelo -= 1
-      return {
-        ok: true,
-        data: [{ timestamp: new Date().toISOString(), value: 60, quality: 0 }],
-      }
+      const dias = Math.max(
+        1, Math.round((new Date(opciones.endDate) - new Date(opciones.startDate)) / 86400000)
+      )
+      const data = Array.from({ length: dias * 8 }, (_, i) => ({
+        timestamp: new Date(new Date(opciones.startDate).getTime() + i * 3600000).toISOString(),
+        value: 60,
+        quality: 0,
+      }))
+      return { ok: true, data }
     },
   })
 
@@ -1303,16 +1313,27 @@ await checkAsync('leerSerieEnRango nunca supera el tope de tramos simultáneos',
 await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
   let enVuelo = 0
   let pico = 0
+  let llamadas = 0
   const client = clienteFalso({
-    historia: async () => {
+    // Mismo criterio que la prueba anterior: varias muestras por llamada,
+    // proporcional al tramo pedido, para no quedarse corto de
+    // `MIN_MUESTRAS_PERFIL` con los tramos más anchos del troceado
+    // escalonado (Plan 15 Fase 2).
+    historia: async (opciones) => {
+      llamadas += 1
       enVuelo += 1
       pico = Math.max(pico, enVuelo)
       await new Promise((resolve) => setTimeout(resolve, 5))
       enVuelo -= 1
-      return {
-        ok: true,
-        data: [{ timestamp: new Date().toISOString(), value: 60, quality: 0 }],
-      }
+      const dias = Math.max(
+        1, Math.round((new Date(opciones.endDate) - new Date(opciones.startDate)) / 86400000)
+      )
+      const data = Array.from({ length: dias * 8 }, (_, i) => ({
+        timestamp: new Date(new Date(opciones.startDate).getTime() + i * 3600000).toISOString(),
+        value: 60,
+        quality: 0,
+      }))
+      return { ok: true, data }
     },
   })
 
@@ -1324,7 +1345,12 @@ await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acot
 
   assert.equal(r.ok, true)
   assert.ok(pico <= 6, `pico=${pico}, defecto=6`)
-  assert.ok(pico < 30, `pico=${pico}: 30 sería "todos los días a la vez", el comportamiento de antes de esta fase`)
+  // Con el troceado escalonado (Plan 15 Fase 2), 30 días son unos pocos
+  // tramos anchos, no 30 tramos de un día — así que "todo de golpe" ya no
+  // se mide en llamadas totales (siempre serán pocas), sino en que el PICO
+  // de concurrencia sea menor que el total de llamadas: si coincidieran,
+  // significaría que se lanzaron todas a la vez pese al tope.
+  assert.ok(pico < llamadas, `pico=${pico}, llamadas=${llamadas}: deberían lanzarse en más de una tanda`)
 })
 
 /* ── Invariantes del registro ────────────────────────────────────────── */

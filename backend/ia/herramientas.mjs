@@ -110,6 +110,7 @@ import {
   horaLocal as horaLocalDe,
   resumirSerie,
 } from '../../shared/eva/historia.js'
+import { planificar } from '../../shared/eva/rango.js'
 import { isGoodQuality } from '../../shared/quality.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
 import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
@@ -683,13 +684,20 @@ export function createHerramientas({
    * es una avería, es un hecho de la instalación que el asistente tiene que
    * poder explicar—.
    */
-  async function leerSerie(clave, ventana) {
+  async function leerSerie(clave, ventana, tramoPlanificado) {
     if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
 
     const segundos = (ventana.fin - ventana.inicio) / 1000
     // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
     // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
     const puntos = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundos / 900)))
+    // `leerSerieEnRango()` ya calculó el tramo con `planificar()` (Plan 15
+    // Fase 2, la MISMA regla que usa el frontend) y lo pasa aquí para no
+    // recalcularlo dos veces con criterios distintos dentro del mismo
+    // archivo; sin este tercer argumento (llamadas directas con una ventana
+    // corta) se calcula como siempre.
+    const interval = tramoPlanificado?.interval ?? intervaloHMS(segundos / puntos)
+    const segundosPorPunto = tramoPlanificado?.segundosPorPunto ?? segundos / puntos
 
     const r = await client.readHistory({
       // Con `ac:`, el mismo nombre que en vivo. `hda:\Configuration\…` responde
@@ -698,7 +706,7 @@ export function createHerramientas({
       startDate: ventana.inicio.toISOString(),
       endDate: ventana.fin.toISOString(),
       aggregate: AGREGADO,
-      interval: intervaloHMS(segundos / puntos),
+      interval,
     })
 
     if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
@@ -723,7 +731,7 @@ export function createHerramientas({
       ok: true,
       datos: normalizar(r.data),
       truncada: Boolean(r.hasMore),
-      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto: segundos / puntos },
+      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto },
     }
   }
 
@@ -759,32 +767,48 @@ export function createHerramientas({
    * Igual que arriba, pero para un rango explícito en vez de "N días hacia
    * atrás desde ahora". La usa `generar_reporte` (Plan 14 Fase 5), que puede
    * pedir cualquier ventana, no sólo la que termina en el presente.
+   *
+   * El troceado en tramos es `planificar()` de `@shared/eva/rango.js` (Plan
+   * 15 Fase 2) — la MISMA regla escalonada que usa el frontend, en vez de la
+   * de "siempre 1 día por tramo" que tenía este archivo antes: menos tramos
+   * en rangos largos son menos peticiones HTTP, y con la Fase 1
+   * (`readHistory` siguiendo la continuación) cada tramo ya puede ser varias
+   * páginas por debajo.
+   *
+   * `diasLeidos`/`diasTotal` siguen contando en DÍAS DE CALENDARIO, no en
+   * tramos —el asistente narra cobertura como "12 de 30 días respondieron"—,
+   * así que un tramo de varios días que trae dato cuenta como TODOS sus
+   * días leídos, sin distinguir si sólo una parte del tramo respondió. Es
+   * una aproximación deliberada: la alternativa (pedir cada día suelto para
+   * contar fino) es exactamente el problema que esta unificación resuelve.
    */
   async function leerSerieEnRango(clave, { inicio, fin }) {
     const muestras = []
     let diasLeidos = 0
-    const dias = Math.max(1, Math.ceil((fin - inicio) / 86400000))
+    const diasTotal = Math.max(1, Math.ceil((fin - inicio) / 86400000))
 
-    // Concurrencia ACOTADA, no todo a la vez (Plan 15 Fase 3): un mes son 30
-    // tramos, y con la Fase 1 (`readHistory` siguiendo la continuación) cada
-    // tramo puede ser varias peticiones HTTP por debajo — lanzarlos todos de
-    // golpe multiplicaría la carga contra el historiador de producción justo
-    // cuando se amplíe cuánto se puede leer (Fase 4).
-    const tareas = []
-    for (let d = 0; d < dias; d++) {
-      const diaInicio = new Date(inicio.getTime() + d * 86400000)
-      const diaFin = new Date(Math.min(diaInicio.getTime() + 86400000, fin.getTime()))
-      tareas.push(() => leerSerie(clave, { inicio: diaInicio, fin: diaFin }))
-    }
+    // 96 puntos por tramo, el mismo techo bajo `MAX_PUNTOS` que ya usaba
+    // este archivo para un tramo de 1 día — `planificar()` sólo cambia CUÁN
+    // ANCHO es cada tramo, no cuánta densidad se le pide dentro.
+    const { tramos } = planificar({ inicio, fin, puntosPorTramo: 96 })
+
+    // Concurrencia ACOTADA, no todo a la vez (Plan 15 Fase 3): un mes son
+    // varios tramos, y con la Fase 1 (`readHistory` siguiendo la
+    // continuación) cada tramo puede ser varias peticiones HTTP por debajo —
+    // lanzarlos todos de golpe multiplicaría la carga contra el historiador
+    // de producción justo cuando se amplíe cuánto se puede leer (Fase 4).
+    const tareas = tramos.map(
+      (tramo) => () => leerSerie(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo)
+    )
 
     const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
-    for (const resultado of resultados) {
-      if (!resultado.ok) continue
-      diasLeidos++
+    resultados.forEach((resultado, i) => {
+      if (!resultado.ok) return
+      diasLeidos += tramos[i].dias
       muestras.push(...resultado.datos)
-    }
+    })
 
-    return { muestras, diasLeidos, diasTotal: dias }
+    return { muestras, diasLeidos: Math.min(diasLeidos, diasTotal), diasTotal }
   }
 
   /**
