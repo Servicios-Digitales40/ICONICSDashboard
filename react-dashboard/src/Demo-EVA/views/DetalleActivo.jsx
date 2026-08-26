@@ -47,6 +47,23 @@ const PRESETS_VALIDOS = ["vivo", "ayer", "semana", "personalizado"];
 const aFechaUrl = (dia) => dia.toISOString().slice(0, 10);
 
 /**
+ * "2026-08-19" → `Date` a medianoche LOCAL de ese día.
+ *
+ * `new Date("2026-08-19")` (sin más) la interpreta como medianoche UTC, no
+ * local: en cualquier huso al oeste de Greenwich eso cae en la TARDE del día
+ * anterior. `rangoPersonalizado` recibía ese valor tal cual y arrastraba el
+ * rango entero un día hacia atrás —el día de fin elegido en el calendario
+ * perdía justo las horas de la tarde, que es cuando el historiador de esta
+ * planta tiene muestras—. Construir con año/mes/día por separado usa el
+ * constructor LOCAL de `Date`, igual que hace el calendario al generar los
+ * días que se clickean.
+ */
+function deFechaUrl(fechaIso) {
+  const [anio, mes, dia] = fechaIso.split("-").map(Number);
+  return new Date(anio, mes - 1, dia);
+}
+
+/**
  * `params` de la URL → el rango que hay que mostrar.
  *
  * Un valor corrupto —un `rango` desconocido, o un `personalizado` con
@@ -61,7 +78,7 @@ function leerRangoDeUrl(params) {
   if (preset === "personalizado") {
     const { desde, hasta } = params ?? {};
     if (desde && hasta) {
-      const rango = rangoPersonalizado(desde, hasta);
+      const rango = rangoPersonalizado(deFechaUrl(desde), deFechaUrl(hasta));
       if (!Number.isNaN(rango.inicio.getTime()) && !Number.isNaN(rango.fin.getTime())) {
         return { presetActivo: "personalizado", rango, personalizado: { desde, hasta } };
       }
