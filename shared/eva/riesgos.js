@@ -175,6 +175,60 @@ export const REGLAS = [
     accion: "Revisar válvulas de la línea de impulsión y el estado de los filtros.",
   },
   {
+    /*
+     * ── LA BOMBA GIRA, HAY PRESIÓN, Y NO SALE NADA ────────────────
+     *
+     * Caudal CERO —no «bajo»: cero— con la bomba impulsando y presión en la
+     * línea. Es la firma de una válvula de impulsión cerrada, y no la cubría
+     * ninguna de las reglas que parecen cubrirla:
+     *
+     *   `obstruccion`  exige presión por encima del aviso. Una bomba a caudal
+     *                  cero contra su altura de cierre puede quedarse en
+     *                  presión perfectamente normal, y entonces esa regla
+     *                  calla.
+     *
+     *   `esfuerzo-sin-resultado`  exige carga de motor ALTA, y aquí la física
+     *                  va justo al revés: al cerrar la impulsión, una bomba
+     *                  centrífuga de impulsor radial se desplaza hacia su
+     *                  punto de cierre, donde absorbe MENOS potencia. O sea
+     *                  que la regla pensada para «trabaja y no rinde» es
+     *                  precisamente la que no puede ver esto.
+     *
+     *   `marcha-en-seco`  es el otro caso de caudal cero, pero SIN presión:
+     *                  no hay nada que bombear. La presión es lo que separa
+     *                  los dos, y por eso entra en la condición.
+     *
+     * Es crítica porque el daño es rápido: sin caudal, toda la potencia del
+     * eje se queda dentro de la voluta calentando la misma agua atrapada.
+     */
+    id: "bomba-sin-salida",
+    titulo: "La bomba gira contra una salida cerrada",
+    severidad: "critico",
+    necesita: ["presionRelativa", "flujoInstantaneo", "cargaMotor"],
+    cuando: (v, ctx) =>
+      ctx.impulsando &&
+      Math.abs(v.flujoInstantaneo) <= REPOSO.flujo &&
+      v.presionRelativa >= lim("presionRelativa", "min"),
+    evidencia: (v) =>
+      `Caudal ${v.flujoInstantaneo.toFixed(2)} —prácticamente nulo— con presión ` +
+      `${v.presionRelativa.toFixed(2)} y la bomba impulsando (carga ${v.cargaMotor.toFixed(1)} %).`,
+    consecuencia:
+      "Sin caudal no hay agua que se lleve el calor: toda la potencia del eje se queda " +
+      "dentro de la bomba calentando el mismo líquido atrapado. El sello mecánico y el " +
+      "impulsor se dañan en minutos, no en semanas, y el vapor que se forma puede llegar " +
+      "a reventar la voluta.",
+    accion:
+      "Comprobar si la válvula de impulsión está cerrada y si existe línea de recirculación " +
+      "mínima. Parar la bomba antes que abrir de golpe: abrir contra una bomba caliente " +
+      "mete un golpe de ariete en la red.",
+    /*
+     * La sensibilidad de esta regla cuelga del límite inferior de presión, que
+     * hoy es una estimación (`PROVISIONALES`). Con el número real de la
+     * instalación se afina; con éste puede callar cuando debería hablar.
+     */
+    nota: "El umbral de «hay presión» todavía es una estimación nuestra, no un dato de la instalación.",
+  },
+  {
     id: "posible-fuga",
     titulo: "Posible fuga en la red",
     severidad: "atencion",

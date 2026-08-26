@@ -316,6 +316,86 @@ check('el umbral de reposo se respeta en el borde', () => {
   assert.ok(ids(evaluarRiesgos(sistemaCon(justoEncima))).includes('derrame'))
 })
 
+console.log('\n── Bomba girando contra una salida cerrada ────────────────')
+
+check('la bomba girando contra una salida cerrada es CRÍTICA', () => {
+  /*
+   * Caudal cero, con presión, y la bomba impulsando. Sin caudal no hay agua
+   * que se lleve el calor: toda la potencia del eje se queda dentro de la
+   * voluta. El daño va en minutos, así que no puede quedar en «conviene
+   * mirarlo».
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: 0, presionRelativa: 3.0, cargaMotor: 55 }))
+  const r = res.activos.find((a) => a.id === 'bomba-sin-salida')
+
+  assert.ok(r, 'tiene que salir')
+  assert.equal(r.severidad, 'critico')
+  assert.match(r.evidencia, /0\.00/, 'la evidencia lleva el caudal medido')
+  assert.match(r.accion, /v[áa]lvula/i, 'y manda mirar la válvula de impulsión')
+})
+
+check('con la bomba PARADA no se avisa de salida cerrada', () => {
+  /*
+   * La instalación pasa la mayor parte del tiempo parada, y parada el caudal
+   * es cero. Sin la condición de impulsión esta regla estaría siempre roja y
+   * dejaría de significar nada.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: 0, presionRelativa: 3.0, cargaMotor: 0 }))
+  assert.ok(!ids(res).includes('bomba-sin-salida'))
+})
+
+check('sin presión NO es salida cerrada: eso es otra avería', () => {
+  /*
+   * Caudal cero SIN presión es que no hay nada que bombear, y esa es
+   * `marcha-en-seco`. Confundirlas mandaría a mirar la válvula cuando el
+   * problema está en la aspiración.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: 0, presionRelativa: 0, cargaMotor: 55 }))
+  assert.ok(!ids(res).includes('bomba-sin-salida'), 'sin presión, esta regla calla')
+})
+
+check('un caudal NEGATIVO tan pequeño como cero también cuenta', () => {
+  /*
+   * El caudal de esta instalación mide valores negativos —está documentado en
+   * `umbrales-sin-confirmar`—. Comparar sin valor absoluto dejaría pasar un
+   * −0,2 como si fuera caudal, y es exactamente igual de nulo que un +0,2.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: -0.2, presionRelativa: 3.0, cargaMotor: 55 }))
+  assert.ok(ids(res).includes('bomba-sin-salida'))
+})
+
+check('la salida cerrada se ve aunque la carga del motor sea BAJA', () => {
+  /*
+   * Es la razón de ser de esta regla. Al cerrar la impulsión, una bomba
+   * centrífuga de impulsor radial se desplaza hacia su punto de cierre, donde
+   * absorbe MENOS potencia. Así que `esfuerzo-sin-resultado` —que exige carga
+   * alta— es justo la regla que no puede ver esto, y si esta otra copiara esa
+   * condición el hueco seguiría abierto.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: 0, presionRelativa: 3.0, cargaMotor: 40 }))
+  assert.ok(ids(res).includes('bomba-sin-salida'), 'con 40 % de carga tiene que salir igual')
+  assert.ok(!ids(res).includes('esfuerzo-sin-resultado'), 'y la otra, como es de esperar, no la ve')
+})
+
+check('con presión NORMAL sale igual, que es lo que obstruccion no cubría', () => {
+  /*
+   * `obstruccion` exige presión por encima del aviso. Una bomba a caudal cero
+   * contra su altura de cierre puede quedarse en presión perfectamente
+   * normal; si esta regla copiara ese umbral, el caso se perdería otra vez.
+   */
+  const normal = (UMBRALES.presionRelativa.avisoMin + UMBRALES.presionRelativa.avisoMax) / 2
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: 0, presionRelativa: normal, cargaMotor: 55 }))
+  assert.ok(ids(res).includes('bomba-sin-salida'))
+  assert.ok(!ids(res).includes('obstruccion'), 'a presión normal, obstruccion calla')
+})
+
+check('sin la lectura de caudal se declara no evaluable, no silencio', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA,  flujoInstantaneo: null, presionRelativa: 3.0, cargaMotor: 55 }))
+  assert.ok(!ids(res).includes('bomba-sin-salida'))
+  assert.ok(idsNoEval(res).includes('bomba-sin-salida'),
+    'tiene que constar que no se pudo mirar')
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {
