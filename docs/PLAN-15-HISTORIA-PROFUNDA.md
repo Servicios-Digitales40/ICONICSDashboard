@@ -22,7 +22,33 @@
 >   no se repita el mismo error de método.
 > - **C** confirma el patrón patológico que ya documentaba `trocear()`.
 >
-> Con B confirmado, las Fases 1-7 sí aplican tal como están escritas. Siguiente: Fase 1.
+> Con B confirmado, las Fases 1-7 sí aplican tal como están escritas.
+>
+> **Fase 1 completada (26-ago-2026)** — `readHistory` (`backend/iconics/client.mjs`
+> y `backend/iconics/fakeClient.mjs`) sigue `X-ICO-CONTINUATION` de verdad, con
+> presupuesto acotado por `HISTORY_MAX_PAGINAS` (defecto 20) y `HISTORY_MAX_MS`
+> (defecto 20000 — el plazo TOTAL de la cadena, distinto de
+> `UPSTREAM_TIMEOUT_MS` que sigue cortando cada `fetch` individual).
+> Contrato nuevo, compatible: `{ ok, status, data, hasMore, paginas, truncada,
+> motivoCorte }` — `hasMore` conserva su significado de siempre, los tres
+> campos nuevos distinguen si el corte lo puso el servidor o el presupuesto.
+> Una página intermedia que falla no descarta las anteriores.
+>
+> Medido contra el servidor real: la misma consulta de 3 días agregados a 15
+> min que antes volvía **0 muestras** (agotaba su única página recorriendo el
+> hueco vacío del principio, el patrón patológico de `trocear()`) ahora trae
+> **55 muestras reales** en 3 páginas.
+>
+> El simulador (`fakeClient.mjs`) aprendió a paginar con el MISMO contrato y
+> el MISMO presupuesto — sin esto, las pruebas contra `ICONICS_FAKE=true`
+> dejarían de ejercitar el camino real que esta fase añade. Verificado:
+> `scripts/verificar-backend.mjs` (67/67), `scripts/verificar-herramientas.mjs`
+> (84/84), `scripts/verificar-transporte-falso.mjs` (13/13),
+> `scripts/verificar-chat.mjs` (42/42), suite frontend (397/397).
+>
+> Siguiente: Fase 3 (concurrencia acotada) antes que la Fase 2 o la Fase 4 —
+> ver el orden recomendado en §5: no levantar los topes de ventana sin la
+> cola de concurrencia debajo.
 
 ---
 

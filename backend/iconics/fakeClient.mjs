@@ -22,8 +22,15 @@
  *    responde `ok: true` con la serie de `temperaturaTanque`, sin dar error.
  *    Un transporte falso que sólo sirviera datos buenos enseñaría un asistente
  *    que nunca choca con esa trampa — y la trampa es real.
- *  - **El tope de muestras** (`X-ICO-MAX-ITEM-COUNT`, 100 aquí): pedir más
- *    intervalo del que caben 100 puntos se recorta, con `hasMore` puesto.
+ *  - **El tope de muestras y la paginación real** (`X-ICO-MAX-ITEM-COUNT` /
+ *    `X-ICO-CONTINUATION`, Plan 15 §0-1): pedir más intervalo del que caben
+ *    100 puntos en una página YA NO se recorta en silencio — `readHistory`
+ *    sigue páginas sucesivas, igual que el cliente real, hasta agotar el
+ *    rango o el mismo presupuesto (`maxHistoryPaginas`/`maxHistoryMs`) que
+ *    usa `iconics/client.mjs`. Antes de la Fase 1 este transporte cortaba en
+ *    la primera página y ponía `hasMore`, sin encadenar — con el cliente
+ *    real siguiendo la continuación de verdad, un fake que se quedara ahí
+ *    dejaría de ejercitar exactamente el camino que Plan 15 vino a arreglar.
  *  - **Calidad mala y huecos**, con la misma probabilidad que usa el
  *    simulador del frontend (`lib/iconics/caos.js`, `CAOS_SUAVE`) — no se
  *    importa de ahí porque es un módulo de React; se repite el NÚMERO, no el
@@ -77,20 +84,18 @@ function intervaloAMs(interval) {
 const MAX_UPSTREAM_ITEMS = MAX_PUNTOS
 
 /**
- * Serie histórica de una clave entre dos instantes, con el mismo recorte por
- * `X-ICO-MAX-ITEM-COUNT` que aplica `client.mjs` al servidor real: si la
- * rejilla pedida no cabe en `MAX_PUNTOS`, se sirven las primeras y se avisa
- * con `hasMore`. Igual que el servidor real, el recorte es silencioso en los
- * DATOS — sólo `hasMore` lo delata, que es justo lo que hace `readHistory()`
- * del cliente real con la cabecera `X-ICO-CONTINUATION`.
+ * Una PÁGINA de la serie histórica de una clave entre dos instantes, desde
+ * el punto `offset` de la rejilla — el equivalente falso al servidor real
+ * paginando con `X-ICO-CONTINUATION` (Plan 15 §0-1). Sirve hasta
+ * `MAX_UPSTREAM_ITEMS` puntos empezando en `offset`; `siguienteOffset` es
+ * `null` cuando esa página llega al final de la rejilla.
  */
-function serieDe(clave, startMs, endMs, pasoMs, rnd) {
+function paginaDe(clave, startMs, endMs, pasoMs, offset, rnd) {
   const totalPuntos = Math.max(1, Math.round((endMs - startMs) / pasoMs))
-  const hasMore = totalPuntos > MAX_UPSTREAM_ITEMS
-  const n = Math.min(totalPuntos, MAX_UPSTREAM_ITEMS)
+  const fin = Math.min(offset + MAX_UPSTREAM_ITEMS, totalPuntos)
 
   const data = []
-  for (let i = 0; i < n; i++) {
+  for (let i = offset; i < fin; i++) {
     const cierre = startMs + (i + 1) * pasoMs
     if (rnd() < CAOS.ausente) continue
 
@@ -100,15 +105,26 @@ function serieDe(clave, startMs, endMs, pasoMs, rnd) {
 
     data.push({ timestamp: new Date(cierre).toISOString(), value, quality })
   }
-  return { data, hasMore }
+  return { data, siguienteOffset: fin < totalPuntos ? fin : null }
 }
+
+/**
+ * Presupuesto de paginación por defecto, igual al de `config.mjs`
+ * (`DEFAULTS.maxHistoryPaginas`/`maxHistoryMs`) — repetido aquí porque este
+ * módulo no siempre recibe `config` (`app.mjs` construye el fake sin él
+ * hasta que algo lo necesite), y "el simulador no pagina de verdad" sería
+ * peor que un valor por defecto que coincide con el real.
+ */
+const PRESUPUESTO_POR_DEFECTO = { maxHistoryPaginas: 20, maxHistoryMs: 20000 }
 
 /**
  * @param {object} [opciones]
  * @param {() => number} [opciones.ahora]  inyectable para pruebas
  * @param {() => number} [opciones.rnd]    inyectable para pruebas — Math.random por defecto
+ * @param {{maxHistoryPaginas?: number, maxHistoryMs?: number}} [opciones.limits] mismo presupuesto que usa el cliente real
  */
-export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.random } = {}) {
+export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.random, limits } = {}) {
+  const { maxHistoryPaginas, maxHistoryMs } = { ...PRESUPUESTO_POR_DEFECTO, ...limits }
   /**
    * Puntos de escritura que no son señales del catálogo (`CONTROL`, el que usa
    * `controlar_bomba`). Cualquier punto ajeno al árbol de la demo también cae
@@ -192,6 +208,11 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
    * vive en `herramientas.mjs` (`esHistorizada`, comprobada ANTES de salir a
    * la red) y en `shared/eva/historia.js`; este transporte imita al servidor,
    * que tampoco la tiene.
+   *
+   * Sigue páginas sucesivas (`paginaDe`) con el MISMO contrato y el MISMO
+   * presupuesto que `iconics/client.mjs` — ver la cabecera del archivo sobre
+   * por qué esto dejó de cortarse en la primera página con la Fase 1 del
+   * Plan 15.
    */
   async function readHistory({ pointName: nombrePunto, startDate, endDate, interval }) {
     const clave = parsePointName(nombrePunto)
@@ -208,9 +229,49 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     }
 
     const pasoMs = Math.max(1000, intervaloAMs(interval))
-    const { data, hasMore } = serieDe(claveServida, startMs, endMs, pasoMs, rnd)
 
-    return { ok: true, status: 200, data, hasMore }
+    const inicioReloj = Date.now()
+    const data = []
+    let offset = 0
+    let siguienteOffset = 0
+    let paginasPedidas = 0
+    let truncada = false
+    let motivoCorte = null
+
+    while (paginasPedidas < maxHistoryPaginas) {
+      if (paginasPedidas > 0 && Date.now() - inicioReloj > maxHistoryMs) {
+        truncada = true
+        motivoCorte = `se alcanzó el plazo de ${maxHistoryMs} ms tras ${paginasPedidas} página(s).`
+        break
+      }
+
+      const pagina = paginaDe(claveServida, startMs, endMs, pasoMs, offset, rnd)
+      paginasPedidas += 1
+      data.push(...pagina.data)
+      siguienteOffset = pagina.siguienteOffset
+
+      if (siguienteOffset === null) break
+      offset = siguienteOffset
+    }
+
+    // `siguienteOffset` sigue apuntando a más rejilla si el bucle salió por
+    // presupuesto (páginas o plazo) en vez de por agotar la serie — el mismo
+    // criterio que `hasMore` del cliente real: "queda algo por leer que esta
+    // llamada no trajo", sea culpa del servidor o del propio presupuesto.
+    if (siguienteOffset !== null && paginasPedidas >= maxHistoryPaginas && !truncada) {
+      truncada = true
+      motivoCorte = `se alcanzó el tope de ${maxHistoryPaginas} páginas.`
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      data,
+      hasMore: siguienteOffset !== null,
+      paginas: paginasPedidas,
+      truncada,
+      motivoCorte,
+    }
   }
 
   /** Sin alarmas configuradas para este árbol (Plan 14 §6): lista vacía siempre. */

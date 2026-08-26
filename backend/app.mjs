@@ -40,7 +40,7 @@ export function createApp(config) {
     logger.warn('ICONICS_FAKE=true: sirviendo datos SIMULADOS, ningún dato viene de la planta')
   }
   const client = config.iconics.fake
-    ? createFakeIconicsClient()
+    ? createFakeIconicsClient({ limits: config.limits })
     : createIconicsClient(config, authenticator)
   const staticFiles = createStaticFileServer(config.staticDir)
   const cors = createCors(config.corsOrigins)
