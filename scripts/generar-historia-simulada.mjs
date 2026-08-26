@@ -16,6 +16,31 @@
  * en el mismo rango antes de escribir (`--limpiar-antes`, activado por
  * defecto) para que dos corridas seguidas no dupliquen datos.
  *
+ * ── EL "MIN TIME EXTENT" DEL DATA LOGGER PURGA LO QUE ESCRIBAS ─────
+ *
+ * Descubierto el 26-08-2026: la primera corrida escribió una semana
+ * completa con éxito (`success: true` en las 3.025 muestras) y horas
+ * después ya no estaba nada — ni siquiera con `Average`. La causa NO es
+ * ningún código de este proyecto: es la configuración del Data Logger en
+ * ICONICS (`MyProject/Historical Data/Data Historian/Loggers/Data Logger` →
+ * pestaña "Archiving Information" → "Storage Limit - Condition"), que tenía
+ * `Min Time Extent: 7 días` con acción `Delete Older Files`, revisada cada
+ * `Storage Limit - Check Condition` (5 min por defecto). Ese logger purga
+ * por la FECHA DEL DATO, no por cuándo se escribió: una muestra insertada
+ * hace un segundo con fecha de hace 20 días se purga en el siguiente ciclo
+ * igual que si llevara 20 días ahí de verdad.
+ *
+ * Medido con muestras de prueba a antigüedades escalonadas (1 a 17 días):
+ * con el límite en 7, sobrevivían hasta 7 días y desaparecían desde 10. El
+ * usuario subió `Min Time Extent` a 100 días en la consola, y una muestra
+ * de 15 días escrita DESPUÉS de ese cambio sobrevivió al siguiente ciclo de
+ * purga — confirmado antes de repetir la escritura completa de este script.
+ *
+ * **Si vuelves a ver que los datos que escribiste desaparecen**, lo primero
+ * que hay que revisar es ese `Min Time Extent`, no este script ni el
+ * backend: cualquier rango que pidas generar tiene que caber dentro de esa
+ * ventana de retención configurada en el propio Data Logger.
+ *
  * ── LA FÍSICA: CALIBRADA CONTRA DATOS REALES, NO EL SIMULADOR DE DEMO ──
  *
  * `shared/eva/simulador.js` existe, pero está calibrado para verse VIVO en
