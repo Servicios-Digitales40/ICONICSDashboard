@@ -609,14 +609,15 @@ const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`
 /**
  * Veces que se relee `CONTROL` tras escribir, y espera entre cada una.
  *
- * El tag escanea cada ~1 s (su `Scan rate` en el servidor), así que hacen
- * falta varios intentos separados por algo más de un ciclo de escaneo para no
- * confundir «todavía no ha llegado» con «la escritura no sirvió de nada».
- * Tres intentos con 700 ms de espera cubren de sobra ese ciclo sin alargar la
- * respuesta más de 1,4 s en el caso normal.
+ * El tag escanea cada ~1 s (su `Scan rate` en el servidor), pero ese ciclo
+ * tiene jitter (cola de escaneo, latencia de red al PLC/OPC): con 3 intentos
+ * de 700 ms (1,4 s de margen total) se vieron falsos rechazos en los que la
+ * bomba sí llegaba a encenderse, solo que después de que el guard ya había
+ * dado la escritura por perdida. Cinco intentos con 800 ms (3,2 s de margen)
+ * cubren ese jitter sin alargar demasiado la respuesta en el caso normal.
  */
-const INTENTOS_RELECTURA_CONTROL = 3
-const ESPERA_RELECTURA_CONTROL_MS = 700
+const INTENTOS_RELECTURA_CONTROL = 5
+const ESPERA_RELECTURA_CONTROL_MS = 800
 
 /** Pausa async simple, para esperar entre reintentos de relectura. */
 function esperar(ms) {
