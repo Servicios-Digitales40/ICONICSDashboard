@@ -113,7 +113,15 @@ function tieneDatoReal(resultado) {
 }
 
 /**
- * Un sondeo de `readHistory` con un intervalo FIJO de una hora.
+ * Un sondeo de `readHistory` con un intervalo FIJO de una hora — SIEMPRE con
+ * `aggregate: 'Average'`, nunca crudo. Ver la nota 3 de la cabecera de
+ * `shared/eva/historia.js`: sin agregar, un rango sin dato real no vuelve
+ * `data: []` — vuelve la muestra LÍMITE de todo el historiador, sin
+ * importar cuán lejos esté del rango pedido (medido: pedir el 14-ago, el
+ * 17-ago o el año 2020 sin agregar devolvió siempre la misma muestra del
+ * 18-ago). Un script que confía en `data.length` para decidir "¿hay dato
+ * aquí?" tiene que agregar, o la propia pregunta que hace este archivo
+ * daría un falso positivo en CUALQUIER rango, no sólo en el borde real.
  *
  * Probado a mano contra el servidor real: un intervalo que no divide al
  * rango pedido en un número entero de tramos vuelve `ok:true` con

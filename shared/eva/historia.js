@@ -34,6 +34,20 @@
  * `motivoSinSerie()` se pregunta ANTES de salir a la red, en los dos lados, y
  * la marca vive en el catálogo (`historizado`) y no en cada consulta.
  *
+ * 3. **Sin `aggregate`, un rango vacío no vuelve vacío: vuelve la muestra
+ *    LÍMITE del historiador entero, sin importar cuán lejos esté del rango
+ *    pedido.** Medido el 26-08-2026: pedir `SNIVEL_TANQUE` sin agregar para
+ *    el 14-ago, el 17-ago o incluso el año 2020 devuelve LA MISMA muestra
+ *    —`2026-08-18T18:54:21.491Z`, que resultó ser la primera del
+ *    historiador entero para esa señal— con `ok: true` y sin ningún aviso
+ *    de que está fuera del rango pedido. Con `aggregate: 'Average'` el
+ *    mismo rango vacío sí devuelve `data: []`, limpio. Por eso este
+ *    proyecto entero pide SIEMPRE agregado (ver el resto del archivo) y
+ *    nunca lectura cruda para construir una serie: una lectura cruda que
+ *    alguna vez se necesite tiene que comprobar el `timestamp` de cada
+ *    muestra contra el rango pedido antes de darla por buena, porque el
+ *    servidor no lo hace.
+ *
  * ── POR QUÉ EL RESUMEN SE CALCULA AQUÍ ─────────────────────────────
  *
  * `resumirSerie` existe por el asistente, pero se queda en `shared/` porque es
