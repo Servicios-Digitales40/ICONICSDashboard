@@ -156,6 +156,7 @@ export function GraficaHistoria({
   const bandaY1 = u?.avisoMin ?? senal.escala?.min;
   const bandaY2 = u?.avisoMax ?? senal.escala?.max;
   const hayBanda = u && hasValue(bandaY1) && hasValue(bandaY2);
+  const hayBandaConAviso = hayBanda && PROVISIONALES;
 
   // El título viaja DENTRO del PNG: pegado en un correo o un parte, la
   // imagen pierde su nombre de archivo, y el título es la única procedencia
@@ -202,66 +203,71 @@ export function GraficaHistoria({
         </span>
       )}
       {/*
-       * Mientras `PROVISIONALES` sea `true`, la banda de arriba es una
-       * ESTIMACIÓN nuestra, no un límite medido — el 91 % de las lecturas de
-       * presión reales cae por debajo del "crítico" declarado. Decirlo aquí,
-       * y no sólo en el código o en la documentación, es lo que evita que se
-       * lea como un hecho confirmado del servidor. El día que se confirmen
-       * los umbrales, `PROVISIONALES` pasa a `false` y este aviso desaparece
-       * solo, sin tocar el componente.
+       * Avisos y exportación, en su propia fila BAJO la gráfica — no
+       * flotando sobre ella. Flotantes, se solapaban con las horas del eje X
+       * (los mismos 2 px del borde inferior). Los avisos van a la izquierda,
+       * en el orden en que ya se generaban; exportar se ancla a la derecha
+       * con `marginLeft: auto` y no desaparece cuando no hay ningún aviso.
        */}
-      {hayBanda && PROVISIONALES && (
-        <span
-          style={{
-            position: "absolute", bottom: 2, left: 2,
-            fontFamily: MONO, fontSize: 9, color: t.textFaint,
-            background: t.hover, borderRadius: 999, padding: "2px 8px",
-          }}
-        >
-          banda estimada, sin confirmar
-        </span>
-      )}
-      {/*
-       * Cobertura: qué parte del rango pedido traía datos.
-       *
-       * Sin esto, un rango de diez días con cinco vacíos se dibuja como una
-       * curva continua entre los días que sí tienen muestras, y se lee como
-       * si la señal hubiera evolucionado así — cuando lo que hubo fue
-       * silencio. Es el mismo aviso que el asistente da con `avisoCobertura`.
-       */}
-      {cobertura && !cobertura.completa && (
-        <span
-          title={`Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango tienen registro en el historiador.`}
-          style={{
-            position: "absolute", bottom: 2, left: hayBanda && PROVISIONALES ? 150 : 2,
-            fontFamily: MONO, fontSize: 9, color: t.textFaint,
-            background: t.hover, borderRadius: 999, padding: "2px 8px",
-          }}
-        >
-          {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
-        </span>
-      )}
-      {exportable && (
-        <div style={{ position: "absolute", bottom: 2, right: 2, display: "flex", gap: 4 }}>
-          <button
-            type="button" onClick={alExportarCSV}
-            title={`Descargar ${senal.corto} como CSV`} aria-label={`Descargar ${senal.corto} como CSV`}
-            style={botonExportar(t)}
-          >
-            <FileSpreadsheet size={12} />
-          </button>
-          <button
-            type="button" onClick={alExportarPNG}
-            title={`Descargar ${senal.corto} como imagen`} aria-label={`Descargar ${senal.corto} como imagen`}
-            style={botonExportar(t)}
-          >
-            <ImageDown size={12} />
-          </button>
+      {(hayBandaConAviso || cobertura?.completa === false || exportable) && (
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          {/*
+           * Mientras `PROVISIONALES` sea `true`, la banda de arriba es una
+           * ESTIMACIÓN nuestra, no un límite medido — el 91 % de las lecturas
+           * de presión reales cae por debajo del "crítico" declarado. Decirlo
+           * aquí, y no sólo en el código o en la documentación, es lo que
+           * evita que se lea como un hecho confirmado del servidor. El día
+           * que se confirmen los umbrales, `PROVISIONALES` pasa a `false` y
+           * este aviso desaparece solo, sin tocar el componente.
+           */}
+          {hayBandaConAviso && (
+            <span style={avisoPastilla(t)}>banda estimada, sin confirmar</span>
+          )}
+          {/*
+           * Cobertura: qué parte del rango pedido traía datos.
+           *
+           * Sin esto, un rango de diez días con cinco vacíos se dibuja como
+           * una curva continua entre los días que sí tienen muestras, y se
+           * lee como si la señal hubiera evolucionado así — cuando lo que
+           * hubo fue silencio. Es el mismo aviso que el asistente da con
+           * `avisoCobertura`.
+           */}
+          {cobertura && !cobertura.completa && (
+            <span
+              title={`Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango tienen registro en el historiador.`}
+              style={avisoPastilla(t)}
+            >
+              {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
+            </span>
+          )}
+          {exportable && (
+            <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
+              <button
+                type="button" onClick={alExportarCSV}
+                title={`Descargar ${senal.corto} como CSV`} aria-label={`Descargar ${senal.corto} como CSV`}
+                style={botonExportar(t)}
+              >
+                <FileSpreadsheet size={12} />
+              </button>
+              <button
+                type="button" onClick={alExportarPNG}
+                title={`Descargar ${senal.corto} como imagen`} aria-label={`Descargar ${senal.corto} como imagen`}
+                style={botonExportar(t)}
+              >
+                <ImageDown size={12} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+const avisoPastilla = (t) => ({
+  fontFamily: MONO, fontSize: 9, color: t.textFaint,
+  background: t.hover, borderRadius: 999, padding: "2px 8px",
+});
 
 const botonExportar = (t) => ({
   display: "flex", alignItems: "center", justifyContent: "center",
