@@ -31,6 +31,7 @@ import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { auditarAccesibilidad } from "../a11y.js";
 
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import InicioEva from "@/Demo-EVA/views/InicioEva.jsx";
 import PlantaEva from "@/Demo-EVA/views/PlantaEva.jsx";
 import AssetsEva from "@/Demo-EVA/views/AssetsEva.jsx";
@@ -58,13 +59,15 @@ function montarComoLaApp(vista) {
   return render(
     <ThemeProvider>
       <DataSourceProvider>
-        <header>
-          <h1>Título de la página</h1>
-        </header>
-        <nav aria-label="Navegación principal">
-          <a href="/x">Un enlace</a>
-        </nav>
-        <main>{vista}</main>
+        <EvaProvider>
+          <header>
+            <h1>Título de la página</h1>
+          </header>
+          <nav aria-label="Navegación principal">
+            <a href="/x">Un enlace</a>
+          </nav>
+          <main>{vista}</main>
+        </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
   );

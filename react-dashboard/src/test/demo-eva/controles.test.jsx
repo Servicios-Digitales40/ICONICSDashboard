@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import ControlesEva from "@/Demo-EVA/views/ControlesEva.jsx";
 
 beforeEach(() => {
@@ -34,7 +35,9 @@ const montar = () =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <ControlesEva />
+        <EvaProvider>
+          <ControlesEva />
+        </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
   );

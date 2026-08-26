@@ -61,7 +61,6 @@ import { ArrowRight, Boxes, Cog, Factory, LayoutDashboard, Monitor, Radio, Serve
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSistemaAgua } from "../data/hooks.js";
 import { useEnVista } from "@/lib/motion.js";
 import { Cifra, MONO, SANS, Spark, UltimaLectura } from "../components/base.jsx";
@@ -662,4 +661,4 @@ function InicioEva({ onNavigate }) {
   );
 }
 
-export default conFuenteEva(InicioEva);
+export default InicioEva;

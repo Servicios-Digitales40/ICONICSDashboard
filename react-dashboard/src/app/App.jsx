@@ -15,8 +15,9 @@
 import { lazy, Suspense, useState } from "react";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
-import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
+import { Sidebar, Topbar, DataSourceBanner, EstadoMaquinaBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { leerModoMuro, useRotacionMuro } from "./modoMuro.js";
@@ -52,11 +53,19 @@ export default function App() {
             —no lo necesita, pero el banner de demo sí— y por fuera del
             Shell, para que el cambio de modo remonte todas las vistas. */}
         <DataSourceProvider>
-          <ToastProvider>
-            <ModalProvider>
-              <Shell />
-            </ModalProvider>
-          </ToastProvider>
+          {/* EvaProvider por encima del Shell, no por vista (Plan 16): toda la
+              app es Demo EVA desde que se retiró el tablero de Resonac, así
+              que un solo motor de sondeo alcanza para las ocho señales Y para
+              EstadoMaquinaBanner, que necesita verse en cualquier pestaña sin
+              volver a montar su propia fuente. Ver la cabecera de
+              `Demo-EVA/data/EvaProvider.jsx`. */}
+          <EvaProvider>
+            <ToastProvider>
+              <ModalProvider>
+                <Shell />
+              </ModalProvider>
+            </ToastProvider>
+          </EvaProvider>
         </DataSourceProvider>
       </ThemeProvider>
     </ErrorBoundary>

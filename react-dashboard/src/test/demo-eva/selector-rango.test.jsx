@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import DetalleActivo from "@/Demo-EVA/views/DetalleActivo.jsx";
 
 beforeEach(() => {
@@ -46,7 +47,9 @@ const montar = (params) =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <DetalleActivo params={params} onNavigate={() => {}} />
+        <EvaProvider>
+          <DetalleActivo params={params} onNavigate={() => {}} />
+        </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
   );

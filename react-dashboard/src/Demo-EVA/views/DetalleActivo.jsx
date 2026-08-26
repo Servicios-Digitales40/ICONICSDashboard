@@ -21,7 +21,7 @@ import { FileSpreadsheet } from "lucide-react";
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva, useEvaSource } from "../data/EvaProvider.jsx";
+import { useEvaSource } from "../data/EvaProvider.jsx";
 import { useDetalleActivo } from "../data/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../data/historia.js";
 import { ACTIVO_IDS, activoInfo } from "../domain/activos.js";
@@ -314,4 +314,4 @@ function DetalleActivo({ params, onNavigate }) {
   );
 }
 
-export default conFuenteEva(DetalleActivo);
+export default DetalleActivo;

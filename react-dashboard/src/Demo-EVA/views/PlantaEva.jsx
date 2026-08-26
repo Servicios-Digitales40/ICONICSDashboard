@@ -25,7 +25,6 @@ import { LayoutGrid } from "lucide-react";
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSeriesHistoricas, useSistemaAgua } from "../data/hooks.js";
 import { VENTANA } from "../data/historia.js";
 import { DERIVADO } from "../domain/estado.js";
@@ -248,4 +247,4 @@ function PlantaEva({ onNavigate }) {
   );
 }
 
-export default conFuenteEva(PlantaEva);
+export default PlantaEva;
