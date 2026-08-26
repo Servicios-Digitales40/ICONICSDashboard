@@ -35,6 +35,7 @@
  * habría arreglado nada: son el mismo valor, y ahora salen del mismo sitio.
  */
 import { fetchIconicsHistory } from "@/lib/iconics";
+import { conConcurrenciaAcotada } from "@shared/concurrencia.js";
 import {
   AGREGADO,
   MAX_PUNTOS,
@@ -43,6 +44,7 @@ import {
   intervaloHMS,
   normalizar,
 } from "@shared/eva/historia.js";
+import { planificar } from "@shared/eva/rango.js";
 
 import { esHistorizada, pointName, senalInfo } from "../domain/senales.js";
 
@@ -95,9 +97,12 @@ export async function leerSerie(clave, rango = VENTANA) {
   if (!esHistorizada(clave)) return { datos: [], motivo: SIN_SERIE, hasMore: false };
 
   const { inicio, fin, puntos } = resolverRango(rango);
-  const tramos = trocear(inicio, fin);
+  const { tramos } = planificar({ inicio, fin, puntosPorTramo: PUNTOS_POR_TRAMO });
 
   // Un solo tramo es el camino de siempre: una petición, sin recomponer nada.
+  // Con un solo tramo `planificar()` no conoce `puntos` (el de la ventana
+  // relativa, distinto de `PUNTOS_POR_TRAMO`), así que este caso sigue
+  // calculando su propio `interval` en vez de usar el del tramo.
   if (tramos.length === 1) {
     const segundos = Math.max(1, (fin.getTime() - inicio.getTime()) / 1000);
     const respuesta = await fetchIconicsHistory(pointName(clave), {
@@ -117,21 +122,25 @@ export async function leerSerie(clave, rango = VENTANA) {
   }
 
   /*
-   * Varios tramos: en paralelo, como hace el backend. Un tramo que falle no
-   * invalida el resto —se cuenta y se sigue—, porque perder un día de diez no
-   * cambia la forma de la curva y abortar dejaría la gráfica vacía por un
-   * hueco del historiador.
+   * Varios tramos: con concurrencia ACOTADA, no todos a la vez (Plan 15 Fase
+   * 3) — mismo motivo que `leerSerieEnRango()` en `backend/ia/herramientas.mjs`:
+   * un trimestre son ~90 tramos, y con la Fase 1 (el backend siguiendo
+   * `X-ICO-CONTINUATION`) cada petición HTTP de este frontend puede disparar
+   * varias páginas por debajo. Un tramo que falle no invalida el resto —se
+   * cuenta y se sigue—, porque perder un día de diez no cambia la forma de
+   * la curva y abortar dejaría la gráfica vacía por un hueco del
+   * historiador.
    */
-  const respuestas = await Promise.all(
-    tramos.map(({ desde, hasta }) => {
-      const segundos = Math.max(1, (hasta.getTime() - desde.getTime()) / 1000);
-      return fetchIconicsHistory(pointName(clave), {
+  const respuestas = await conConcurrenciaAcotada(
+    tramos.map(({ desde, hasta, interval }) => () =>
+      fetchIconicsHistory(pointName(clave), {
         startDate: desde.toISOString(),
         endDate: hasta.toISOString(),
         aggregate: AGREGADO,
-        interval: intervaloHMS(segundos / PUNTOS_POR_TRAMO),
-      }).catch(() => null);
-    })
+        interval,
+      }).catch(() => null)
+    ),
+    CONCURRENCIA_TRAMOS
   );
 
   const datos = [];
@@ -158,63 +167,26 @@ export async function leerSerie(clave, rango = VENTANA) {
  * 96 son los cuartos de hora de un día — la misma rejilla que usan el backend
  * y la vista de Planta—, y deja margen bajo `MAX_PUNTOS` para que el servidor
  * no recorte por su cuenta.
+ *
+ * ── POR QUÉ EL TROCEADO YA NO VIVE AQUÍ (Plan 15 Fase 2) ───────────
+ *
+ * `trocear()` se mudó a `planificar()`/`tramosDe()` en
+ * `@shared/eva/rango.js`: era la MISMA regla que `leerSerieEnRango()`
+ * repetía en `backend/ia/herramientas.mjs` con un valor distinto (ahí
+ * siempre 1 día por tramo, aquí escalonado) — dos copias de "cómo trocear un
+ * rango largo" son dos oportunidades de que la gráfica, el asistente y el
+ * script de antigüedad no lean el mismo histórico ante el mismo rango. Ver
+ * la cabecera de `rango.js` para la comparación completa y qué se decidió
+ * conservar de cada versión.
  */
 const PUNTOS_POR_TRAMO = 96;
 
-/** Días de un tramo según lo largo que sea el rango. Ver `trocear`. */
-const ESCALONES = [
-  { hastaDias: 14, diasPorTramo: 1 },
-  { hastaDias: 60, diasPorTramo: 3 },
-  { hastaDias: 180, diasPorTramo: 7 },
-];
-const DIAS_POR_TRAMO_MAXIMO = 30;
-
 /**
- * Parte un rango largo en tramos de un día (o varios, si el rango es enorme).
- *
- * ── POR QUÉ NO SE PIDE EL RANGO ENTERO DE UNA VEZ ──────────────────
- *
- * Porque el historiador no lo contesta bien. Medido contra el servidor real
- * con el rango 14→24 de agosto de 2026, que tiene 119 puntos de datos
- * repartidos entre el 17 y el 21:
- *
- *     interval=02:24:00  ->  1 punto    hasMore=false
- *     interval=01:00:00  ->  2 puntos   hasMore=true
- *     interval=00:15:00  ->  0 puntos   hasMore=true
- *
- * Cuanto más fino el intervalo, MENOS datos: el servidor agota su cupo
- * recorriendo los buckets vacíos del principio del rango y devuelve
- * `hasMore` con la lista vacía, sin llegar nunca a los días que sí tienen
- * muestras. Una gráfica de diez días salía con dos puntos y una recta entre
- * ellos, con toda la pinta de ser la señal real.
- *
- * Es la misma regla que el backend ya seguía (`leerSerieEnRango`) y que
- * `shared/periodo.js` documenta: quien lea rangos largos tiene que ir día a
- * día. Esto la trae a la vista de detalle, que era la única que faltaba.
- *
- * ── POR QUÉ ESCALONADO Y NO SIEMPRE UN DÍA ─────────────────────────
- *
- * Un día por tramo es una petición por día: diez días son diez peticiones,
- * razonable. Un año serían 365 a la vez, que no lo es. Los escalones
- * mantienen el número de peticiones acotado a unas pocas decenas sin perder
- * resolución en los rangos que la gente pide de verdad.
+ * Tramos simultáneos como mucho (Plan 15 Fase 3). Mismo valor que
+ * `historyConcurrencia` en `backend/config.mjs`: el frontend y el backend
+ * acotan la carga que le meten al mismo historiador, con el mismo criterio.
  */
-function trocear(inicio, fin) {
-  const dias = Math.max(1, Math.ceil((fin.getTime() - inicio.getTime()) / 86_400_000));
-  if (dias <= 1) return [{ desde: inicio, hasta: fin }];
-
-  const escalon = ESCALONES.find((e) => dias <= e.hastaDias);
-  const diasPorTramo = escalon ? escalon.diasPorTramo : DIAS_POR_TRAMO_MAXIMO;
-
-  const tramos = [];
-  for (let t = inicio.getTime(); t < fin.getTime(); t += diasPorTramo * 86_400_000) {
-    tramos.push({
-      desde: new Date(t),
-      hasta: new Date(Math.min(t + diasPorTramo * 86_400_000, fin.getTime())),
-    });
-  }
-  return tramos;
-}
+const CONCURRENCIA_TRAMOS = 6;
 
 /**
  * Qué parte del rango pedido traía datos.

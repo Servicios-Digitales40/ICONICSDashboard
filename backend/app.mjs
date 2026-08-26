@@ -20,6 +20,7 @@ import { createIconicsClient } from './iconics/client.mjs'
 import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import { logger } from './logger.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
+import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
@@ -39,7 +40,7 @@ export function createApp(config) {
     logger.warn('ICONICS_FAKE=true: sirviendo datos SIMULADOS, ningún dato viene de la planta')
   }
   const client = config.iconics.fake
-    ? createFakeIconicsClient()
+    ? createFakeIconicsClient({ limits: config.limits })
     : createIconicsClient(config, authenticator)
   const staticFiles = createStaticFileServer(config.staticDir)
   const cors = createCors(config.corsOrigins)
@@ -86,6 +87,7 @@ export function createApp(config) {
     readOnly: config.iconics.readOnly,
     indiceDocumentos,
     reportes: config.reportes,
+    historyConcurrencia: config.limits.historyConcurrencia,
   })
   const chat = createChat({ config, herramientas })
 
@@ -104,6 +106,7 @@ export function createApp(config) {
   const router = createRouter()
   registerSystemRoutes(router, { config, client, authenticator, startedAt })
   registerIconicsRoutes(router, { config, client })
+  registerControlRoutes(router, { config, herramientas })
   registerChatRoutes(router, { config, chat, cola })
   registerVozRoutes(router, { config, voz })
   registerReportesRoutes(router, { config })

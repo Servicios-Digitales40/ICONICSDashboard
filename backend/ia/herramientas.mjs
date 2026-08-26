@@ -110,34 +110,45 @@ import {
   horaLocal as horaLocalDe,
   resumirSerie,
 } from '../../shared/eva/historia.js'
+import { planificar } from '../../shared/eva/rango.js'
 import { isGoodQuality } from '../../shared/quality.js'
+import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
 import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /**
- * Ventana máxima que se puede pedir de una vez, en horas. Siete días.
+ * Ventana máxima que se puede pedir de una vez, en horas. Noventa días
+ * (Plan 15 Fase 4).
  *
- * ── POR QUÉ HAY TOPE ───────────────────────────────────────────────
+ * ── POR QUÉ 90 DÍAS, Y POR QUÉ YA NO ES "EL TOPE DE 100 MUESTRAS" ──
  *
- * Con `MAX_PUNTOS` fijo, alargar la ventana no cuesta más red: cuesta
- * RESOLUCIÓN. Un mes en 100 puntos es una muestra cada siete horas y media, y
- * el «máximo» de ese resumen ya no es el pico real sino el promedio del tramo
- * en que ocurrió. Preferimos negar el mes a devolver un extremo suavizado que
- * nadie podría distinguir del bueno.
+ * Hasta el Plan 15 esto eran 7 días, justificados por `MAX_PUNTOS` (100):
+ * una ventana más larga en una sola petición SIN trocear diluía la
+ * resolución hasta que el «máximo» dejaba de ser el pico real. Esa
+ * justificación ya no aplica igual — `leerSerie`/`leerSerieEnRango`
+ * TROCEAN el rango con `planificar()` (Fase 2, densidad fija por tramo) y
+ * cada tramo sigue la paginación real del servidor (Fase 1), así que la
+ * resolución no se degrada al alargar la ventana, sólo crece el número de
+ * tramos — acotado por la concurrencia de la Fase 3.
+ *
+ * El tope que queda es de EXPERIENCIA, no de protocolo: medido contra el
+ * servidor real, un perfil de 90 días tarda bastante menos de un segundo
+ * (`historyConcurrencia` en paralelo), así que 90 días es holgado para
+ * cualquier pregunta de diagnóstico razonable sin dejar una ventana
+ * ilimitada que pudiera convertirse en cientos de tramos por una frase mal
+ * interpretada del modelo.
  */
-const MAX_HORAS_VENTANA = 24 * 7
+const MAX_HORAS_VENTANA = 24 * 90
 
 /**
- * Días máximos que puede abarcar un perfil.
- *
- * Treinta son treinta lecturas al historiador —una por día, en paralelo—, que
- * es lo más que se le puede pedir sin que la pregunta tarde más que la
- * paciencia de quien la hizo. Y un mes ya cubre el ciclo de casi cualquier
- * cosa que haga esta instalación.
+ * Días máximos que puede abarcar un perfil. Noventa (Plan 15 Fase 4), el
+ * mismo techo que `MAX_HORAS_VENTANA` — ver esa constante para el porqué del
+ * cambio. Con la Fase 3 (concurrencia acotada) esto sigue siendo del orden
+ * de un segundo, no de "la paciencia de quien preguntó".
  */
-const MAX_DIAS_PERFIL = 30
+const MAX_DIAS_PERFIL = 90
 
 /**
  * Muestras mínimas para atreverse a decir qué es normal.
@@ -169,15 +180,13 @@ const MAX_DIAS_PERFIL = 30
 const MIN_MUESTRAS_PERFIL = 30
 
 /**
- * Ventana máxima de un reporte, en días (Plan 14 Fase 5).
- *
- * Más ancha que `MAX_HORAS_VENTANA` (7 días) a propósito: un reporte agrega
- * por día, no por punto de 15 min, así que el mismo argumento de resolución
- * que limita `historia_de_senal` no aplica aquí igual de estricto. Un mes
- * cubre con margen el ejemplo de referencia del plan ("un reporte de 8
- * días") sin dejarlo sin techo.
+ * Ventana máxima de un reporte, en días (Plan 14 Fase 5; subido a 90 en el
+ * Plan 15 Fase 4 para quedar consistente con `MAX_HORAS_VENTANA` y
+ * `MAX_DIAS_PERFIL` — las tres preguntas del asistente que tocan un rango
+ * largo comparten ya el mismo techo de un trimestre, en vez de tres números
+ * distintos sin relación entre sí).
  */
-const MAX_DIAS_REPORTE = 31
+const MAX_DIAS_REPORTE = 90
 
 /**
  * Puntos con los que se dibuja un gráfico de reporte, como mucho.
@@ -488,9 +497,8 @@ export function resolverVentana(texto, { turnos = {}, maxHoras = MAX_HORAS_VENTA
     if (n > maxHoras) {
       return {
         error:
-          `${n} horas son demasiadas para una sola lectura: con el tope de ${MAX_PUNTOS} muestras ` +
-          `del servidor, cada punto sería el promedio de varias horas y el máximo dejaría de ser ` +
-          `el pico real. Como mucho ${maxHoras} horas (${Math.round(maxHoras / 24)} días). ${ALTERNATIVAS}`,
+          `${n} horas son demasiadas para una sola lectura: como mucho ${maxHoras} horas ` +
+          `(${Math.round(maxHoras / 24)} días). ${ALTERNATIVAS}`,
       }
     }
     return ventanaDeHoras(n, ahora)
@@ -540,9 +548,8 @@ export function resolverVentana(texto, { turnos = {}, maxHoras = MAX_HORAS_VENTA
   if (duracionHoras > maxHoras) {
     return {
       error:
-        `"${p.etiqueta}" abarca más de ${Math.round(maxHoras / 24)} días. Con el tope de ` +
-        `${MAX_PUNTOS} muestras del servidor, cada punto sería el promedio de varias horas y los ` +
-        `extremos dejarían de ser los reales. ${ALTERNATIVAS}`,
+        `"${p.etiqueta}" abarca más de ${Math.round(maxHoras / 24)} días, el máximo de una sola ` +
+        `lectura. ${ALTERNATIVAS}`,
     }
   }
 
@@ -602,14 +609,15 @@ const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`
 /**
  * Veces que se relee `CONTROL` tras escribir, y espera entre cada una.
  *
- * El tag escanea cada ~1 s (su `Scan rate` en el servidor), así que hacen
- * falta varios intentos separados por algo más de un ciclo de escaneo para no
- * confundir «todavía no ha llegado» con «la escritura no sirvió de nada».
- * Tres intentos con 700 ms de espera cubren de sobra ese ciclo sin alargar la
- * respuesta más de 1,4 s en el caso normal.
+ * El tag escanea cada ~1 s (su `Scan rate` en el servidor), pero ese ciclo
+ * tiene jitter (cola de escaneo, latencia de red al PLC/OPC): con 3 intentos
+ * de 700 ms (1,4 s de margen total) se vieron falsos rechazos en los que la
+ * bomba sí llegaba a encenderse, solo que después de que el guard ya había
+ * dado la escritura por perdida. Cinco intentos con 800 ms (3,2 s de margen)
+ * cubren ese jitter sin alargar demasiado la respuesta en el caso normal.
  */
-const INTENTOS_RELECTURA_CONTROL = 3
-const ESPERA_RELECTURA_CONTROL_MS = 700
+const INTENTOS_RELECTURA_CONTROL = 5
+const ESPERA_RELECTURA_CONTROL_MS = 800
 
 /** Pausa async simple, para esperar entre reintentos de relectura. */
 function esperar(ms) {
@@ -625,6 +633,11 @@ export function createHerramientas({
   // criterio que `indiceDocumentos`: un objeto de configuración, no variables
   // de entorno leídas aquí — eso lo hace `config.mjs`.
   reportes = null,
+  // Tope de tramos simultáneos en `leerSerieEnRango()` (Plan 15 Fase 3):
+  // `config.limits.historyConcurrencia`, mismo criterio que los dos de
+  // arriba — un número que viene de fuera, no una variable de entorno leída
+  // aquí.
+  historyConcurrencia = 6,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -670,20 +683,22 @@ export function createHerramientas({
   }
 
   /**
-   * Una serie del historiador, ya normalizada.
-   *
-   * **La guarda de `historizado` va antes que la red**, no después: ver la
-   * cabecera del archivo. Devolver `motivo` en vez de lanzar es deliberado —no
-   * es una avería, es un hecho de la instalación que el asistente tiene que
-   * poder explicar—.
+   * Una llamada SUELTA a `readHistory`, sin trocear — la pieza de más abajo
+   * de `leerSerie()`. Existe separada porque tanto una ventana corta (un
+   * único tramo) como cada tramo de una ventana larga acaban aquí.
    */
-  async function leerSerie(clave, ventana) {
-    if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
-
+  async function leerUnTramo(clave, ventana, tramoPlanificado) {
     const segundos = (ventana.fin - ventana.inicio) / 1000
     // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
     // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
     const puntos = Math.max(2, Math.min(MAX_PUNTOS, Math.round(segundos / 900)))
+    // `leerSerie()` ya calculó el tramo con `planificar()` (Plan 15 Fase 2,
+    // la MISMA regla que usa el frontend) y lo pasa aquí para no
+    // recalcularlo dos veces con criterios distintos dentro del mismo
+    // archivo; sin este tercer argumento (una ventana corta, de un único
+    // tramo) se calcula como siempre.
+    const interval = tramoPlanificado?.interval ?? intervaloHMS(segundos / puntos)
+    const segundosPorPunto = tramoPlanificado?.segundosPorPunto ?? segundos / puntos
 
     const r = await client.readHistory({
       // Con `ac:`, el mismo nombre que en vivo. `hda:\Configuration\…` responde
@@ -692,7 +707,7 @@ export function createHerramientas({
       startDate: ventana.inicio.toISOString(),
       endDate: ventana.fin.toISOString(),
       aggregate: AGREGADO,
-      interval: intervaloHMS(segundos / puntos),
+      interval,
     })
 
     if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
@@ -717,7 +732,80 @@ export function createHerramientas({
       ok: true,
       datos: normalizar(r.data),
       truncada: Boolean(r.hasMore),
-      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto: segundos / puntos },
+      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto },
+    }
+  }
+
+  /**
+   * Una serie del historiador, ya normalizada — la función pública que usan
+   * `historia_de_senal`, `analisis_de_senal`, `comparar_periodos` y
+   * `grafico_de_senal`.
+   *
+   * **La guarda de `historizado` va antes que la red**, no después: ver la
+   * cabecera del archivo. Devolver `motivo` en vez de lanzar es deliberado —no
+   * es una avería, es un hecho de la instalación que el asistente tiene que
+   * poder explicar—.
+   *
+   * ── POR QUÉ TROCEA POR DENTRO (Plan 15 Fase 4) ─────────────────────
+   *
+   * Antes de esto, una ventana larga se pedía en UNA sola llamada con un
+   * intervalo grueso — y ese es exactamente el patrón patológico que
+   * documenta `planificar()`/`trocear()`: medido contra el servidor real,
+   * un rango de 30 días con un intervalo de 7 h 12 min devolvió **una sola
+   * muestra** de todo el mes, sin ningún error que lo delate (`hasMore:
+   * false`, la petición "terminó bien"). Con `MAX_HORAS_VENTANA` subido a
+   * 90 días (Fase 4), este archivo empezó a poder disparar esa trampa desde
+   * una herramienta que un operador usa todos los días.
+   *
+   * La solución no es la Fase 1 (paginación): el servidor no estaba diciendo
+   * "hay más", estaba diciendo honestamente "esto es todo lo que hay con
+   * este intervalo" — el problema es la ELECCIÓN del intervalo, no la
+   * paginación. La solución es la Fase 2: trocear con `planificar()`, igual
+   * que ya hacía `leerSerieEnRango()`, y fusionar los tramos aquí para que
+   * los cuatro llamadores no tengan que saber que la ventana se troceó.
+   */
+  async function leerSerie(clave, ventana) {
+    if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
+
+    const { tramos } = planificar({ inicio: ventana.inicio, fin: ventana.fin, puntosPorTramo: 96 })
+
+    // Un solo tramo: la ventana ya es corta, la llamada de siempre sin
+    // recomponer nada — mismo `interval` que si `planificar()` no existiera.
+    if (tramos.length === 1) return leerUnTramo(clave, ventana)
+
+    // Concurrencia ACOTADA (Plan 15 Fase 3): mismo criterio que
+    // `leerSerieEnRango()`, y por el mismo motivo — más tramos con la Fase 1
+    // debajo pueden ser más páginas HTTP por tramo.
+    const tareas = tramos.map(
+      (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo)
+    )
+    const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+
+    const datos = []
+    let truncada = false
+    let huboExito = false
+    for (const resultado of resultados) {
+      if (!resultado.ok) continue
+      huboExito = true
+      datos.push(...resultado.datos)
+      if (resultado.truncada) truncada = true
+    }
+
+    // Sin ningún tramo con éxito, se propaga el primer error real — mismo
+    // criterio de `leerSerieEnRango`: un tramo que falla no invalida el
+    // resto, pero si fallan TODOS no hay nada bueno que devolver.
+    if (!huboExito) {
+      const primerFallo = resultados.find((r) => !r.ok)
+      return primerFallo ?? { ok: false, status: 0, error: 'El historiador no devolvió ningún tramo.' }
+    }
+
+    datos.sort((a, b) => a.t - b.t)
+    const segundos = (ventana.fin - ventana.inicio) / 1000
+    return {
+      ok: true,
+      datos,
+      truncada,
+      ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto: segundos / 96 },
     }
   }
 
@@ -753,28 +841,52 @@ export function createHerramientas({
    * Igual que arriba, pero para un rango explícito en vez de "N días hacia
    * atrás desde ahora". La usa `generar_reporte` (Plan 14 Fase 5), que puede
    * pedir cualquier ventana, no sólo la que termina en el presente.
+   *
+   * El troceado en tramos es `planificar()` de `@shared/eva/rango.js` (Plan
+   * 15 Fase 2) — la MISMA regla escalonada que usa el frontend, en vez de la
+   * de "siempre 1 día por tramo" que tenía este archivo antes: menos tramos
+   * en rangos largos son menos peticiones HTTP, y con la Fase 1
+   * (`readHistory` siguiendo la continuación) cada tramo ya puede ser varias
+   * páginas por debajo.
+   *
+   * `diasLeidos`/`diasTotal` siguen contando en DÍAS DE CALENDARIO, no en
+   * tramos —el asistente narra cobertura como "12 de 30 días respondieron"—,
+   * así que un tramo de varios días que trae dato cuenta como TODOS sus
+   * días leídos, sin distinguir si sólo una parte del tramo respondió. Es
+   * una aproximación deliberada: la alternativa (pedir cada día suelto para
+   * contar fino) es exactamente el problema que esta unificación resuelve.
    */
   async function leerSerieEnRango(clave, { inicio, fin }) {
     const muestras = []
     let diasLeidos = 0
-    const dias = Math.max(1, Math.ceil((fin - inicio) / 86400000))
+    const diasTotal = Math.max(1, Math.ceil((fin - inicio) / 86400000))
 
-    // Se piden en paralelo: son lecturas independientes, y muchas idas y
-    // vueltas en serie contra el historiador convertirían esto en un minuto.
-    const peticiones = []
-    for (let d = 0; d < dias; d++) {
-      const diaInicio = new Date(inicio.getTime() + d * 86400000)
-      const diaFin = new Date(Math.min(diaInicio.getTime() + 86400000, fin.getTime()))
-      peticiones.push(leerSerie(clave, { inicio: diaInicio, fin: diaFin }))
-    }
+    // 96 puntos por tramo, el mismo techo bajo `MAX_PUNTOS` que ya usaba
+    // este archivo para un tramo de 1 día — `planificar()` sólo cambia CUÁN
+    // ANCHO es cada tramo, no cuánta densidad se le pide dentro.
+    const { tramos } = planificar({ inicio, fin, puntosPorTramo: 96 })
 
-    for (const resultado of await Promise.all(peticiones)) {
-      if (!resultado.ok) continue
-      diasLeidos++
+    // Concurrencia ACOTADA, no todo a la vez (Plan 15 Fase 3): un mes son
+    // varios tramos, y con la Fase 1 (`readHistory` siguiendo la
+    // continuación) cada tramo puede ser varias peticiones HTTP por debajo —
+    // lanzarlos todos de golpe multiplicaría la carga contra el historiador
+    // de producción justo cuando se amplíe cuánto se puede leer (Fase 4).
+    // `leerUnTramo`, no `leerSerie`: cada elemento de `tramos` YA es un
+    // tramo final de `planificar()` — pasarlo por `leerSerie()` volvería a
+    // trocearlo (con otro `puntosPorTramo` distinto) en vez de pedirlo tal
+    // cual.
+    const tareas = tramos.map(
+      (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo)
+    )
+
+    const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+    resultados.forEach((resultado, i) => {
+      if (!resultado.ok) return
+      diasLeidos += tramos[i].dias
       muestras.push(...resultado.datos)
-    }
+    })
 
-    return { muestras, diasLeidos, diasTotal: dias }
+    return { muestras, diasLeidos: Math.min(diasLeidos, diasTotal), diasTotal }
   }
 
   /**
@@ -1907,9 +2019,10 @@ export function createHerramientas({
 
             let svg
             try {
-              // Downsample SÓLO para el dibujo: un mes son miles de muestras
-              // (~100/día × 31 días) apretadas en 640 px de ancho, que sin
-              // esto se ven como un bloque sólido en vez de una curva. El
+              // Downsample SÓLO para el dibujo: un trimestre son miles de
+              // muestras (~100/día × hasta 90 días) apretadas en 640 px de
+              // ancho, que sin esto se ven como un bloque sólido en vez de
+              // una curva. El
               // resumen numérico de abajo sigue viniendo de `muestras`
               // completo, sin downsamplear — los extremos reales no se
               // pierden, sólo se suaviza el dibujo.
@@ -2499,7 +2612,7 @@ function comparacionConLaBanda(clave, ordenados) {
  * Se comparan horas ya formateadas y no marcas de tiempo porque es la
  * resolución con la que se van a citar. La contrapartida —dos anomalías a un
  * lado y otro de la medianoche salen a 24 h de distancia en vez de a un
- * segundo— es aceptable: la ventana máxima son 7 días y una coincidencia
+ * segundo— es aceptable: la ventana máxima son 90 días y una coincidencia
  * perdida se ve igual en las listas de anomalías, que viajan enteras.
  */
 function segundosDeHora(hhmmss) {
@@ -2824,11 +2937,11 @@ export const DEFINICIONES = [
             description:
               'El período, en lenguaje llano. Lo habitual aquí es relativo a ahora: "última hora", ' +
               '"últimas 6 horas", "últimos 30 minutos", "esta hora". También vale calendario: ' +
-              '"hoy", "ayer", "2026-07-20", "ayer a las 12", "últimos 3 días", "la última semana". ' +
-              'MÁXIMO 7 días: un mes entero no cabe, y si lo piden llama igualmente y la ' +
-              'herramienta te dará las alternativas. Si el usuario no dice período, omítelo y se ' +
-              'usan las últimas 6 horas. NO lo conviertas tú a fechas: pásalo tal cual y el ' +
-              'servidor lo resuelve.',
+              '"hoy", "ayer", "2026-07-20", "ayer a las 12", "últimos 3 días", "la última semana", ' +
+              '"el último mes". MÁXIMO 90 días: un año entero no cabe, y si lo piden llama ' +
+              'igualmente y la herramienta te dará las alternativas. Si el usuario no dice ' +
+              'período, omítelo y se usan las últimas 6 horas. NO lo conviertas tú a fechas: ' +
+              'pásalo tal cual y el servidor lo resuelve.',
           },
         },
         required: ['senal'],
@@ -2945,7 +3058,7 @@ export const DEFINICIONES = [
           dias: {
             type: 'number',
             description:
-              'Cuántos días de historia perfilar. Por defecto 14, máximo 30. Más días dan una ' +
+              'Cuántos días de historia perfilar. Por defecto 14, máximo 90. Más días dan una ' +
               'idea más fiable de lo normal, pero tardan más en leerse.',
           },
         },
@@ -3013,8 +3126,8 @@ export const DEFINICIONES = [
         'Genera un PDF descargable de la instalación: un gráfico por cada señal con historia que ' +
         'se pida (o las cuatro, si no se nombra ninguna) más una tabla con el valor actual de las ' +
         'que no tienen serie. Úsala para "genera un reporte", "quiero un PDF de esta semana", ' +
-        '"expórtame los datos del tanque". El período admite hasta unos 31 días —más que ' +
-        'historia_de_senal— porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
+        '"expórtame los datos del tanque". El período admite hasta unos 90 días, igual que ' +
+        'historia_de_senal, porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
         'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta. Cada gráfico del PDF ' +
         'YA lleva su propia interpretación de la tendencia, escrita por el sistema — no hace falta ' +
         'pedirla aparte.',
@@ -3032,8 +3145,8 @@ export const DEFINICIONES = [
           periodo: {
             type: 'string',
             description:
-              'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, pero ' +
-              'admite ventanas más largas (hasta ~31 días). Si se omite, las últimas 6 horas.',
+              'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, hasta ' +
+              '~90 días. Si se omite, las últimas 6 horas.',
           },
           explicacion: {
             type: 'string',
@@ -3042,8 +3155,7 @@ export const DEFINICIONES = [
               'cada gráfico. Sólo rellénalo si YA sabes la tendencia de la señal principal por algo ' +
               'que consultaste antes en esta conversación: entonces sí puedes resumirla aquí en una ' +
               'frase. Nunca hagas una consulta aparte sólo para rellenar esto, y nunca dejes de ' +
-              'llamar a generar_reporte por intentarlo — grafico_de_senal y analisis_de_senal sólo ' +
-              'admiten 7 días, y este reporte puede pedir más.',
+              'llamar a generar_reporte por intentarlo.',
           },
         },
         required: [],

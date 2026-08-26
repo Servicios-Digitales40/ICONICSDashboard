@@ -581,3 +581,101 @@ describe("el selector de modelo", () => {
     abierto.cerrar();
   });
 });
+
+/**
+ * ── EXPORTAR LA CONVERSACIÓN A PDF ──────────────────────────────────
+ *
+ * `POST /api/chat/exportar` es JSON simple, no el flujo SSE de `/api/chat`:
+ * el mock de `fetch` de este bloque distingue las dos rutas por la URL, algo
+ * que `backend()` no necesita hacer porque nunca la ejercita.
+ */
+describe("exportar la conversación a PDF", () => {
+  /** @param {{url?:string, status?:number, error?:string}} [opciones] */
+  function backendConExportar(opciones = {}) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      if (typeof url === "string" && url.includes("/api/chat/exportar")) {
+        if (opciones.error) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ ok: false, error: opciones.error }), { status: opciones.status ?? 400 })
+          );
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, url: opciones.url ?? "/api/reportes?id=abc" }), { status: 200 })
+        );
+      }
+      if (!init || init.method !== "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, habilitado: true }), { status: 200 }));
+      }
+      return Promise.resolve(flujo([{ tipo: "fin", herramienta: null, bloqueada: false }]));
+    });
+  }
+
+  it("está deshabilitado sin mensajes", async () => {
+    backendConExportar();
+    montar();
+    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+
+    expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(true);
+  });
+
+  it("con mensajes, el clic llama a POST /api/chat/exportar con el historial", async () => {
+    backendConExportar();
+    montar();
+    await preguntar("hola");
+    await waitFor(() => expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(false));
+
+    fireEvent.click(screen.getByLabelText("Exportar la conversación a PDF"));
+
+    await waitFor(() => {
+      const llamada = globalThis.fetch.mock.calls.find(([u]) => String(u).includes("/api/chat/exportar"));
+      expect(llamada).toBeTruthy();
+      expect(llamada[1].method).toBe("POST");
+      const cuerpo = JSON.parse(llamada[1].body);
+      expect(cuerpo.historial.some((t) => t.rol === "usuario" && t.texto === "hola")).toBe(true);
+    });
+  });
+
+  it("una respuesta {ok:true, url} abre esa URL", async () => {
+    backendConExportar({ url: "/api/reportes?id=xyz" });
+    const abrir = vi.spyOn(window, "open").mockImplementation(() => {});
+    montar();
+    await preguntar("hola");
+    await waitFor(() => expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(false));
+
+    fireEvent.click(screen.getByLabelText("Exportar la conversación a PDF"));
+
+    await waitFor(() => expect(abrir).toHaveBeenCalledWith("/api/reportes?id=xyz", "_blank"));
+  });
+
+  it("un error del backend se pinta tal cual", async () => {
+    backendConExportar({ error: "No hay conversación que exportar.", status: 400 });
+    montar();
+    await preguntar("hola");
+    await waitFor(() => expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(false));
+
+    fireEvent.click(screen.getByLabelText("Exportar la conversación a PDF"));
+
+    await waitFor(() => expect(screen.getByText(/No hay conversación que exportar\./)).toBeTruthy());
+  });
+
+  it("mientras exporta, el botón muestra el spinner y queda deshabilitado", async () => {
+    let resolver;
+    const promesa = new Promise((resolve) => { resolver = resolve; });
+    vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      if (typeof url === "string" && url.includes("/api/chat/exportar")) return promesa;
+      if (!init || init.method !== "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ ok: true, habilitado: true }), { status: 200 }));
+      }
+      return Promise.resolve(flujo([{ tipo: "fin", herramienta: null, bloqueada: false }]));
+    });
+    montar();
+    await preguntar("hola");
+    await waitFor(() => expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(false));
+
+    fireEvent.click(screen.getByLabelText("Exportar la conversación a PDF"));
+
+    await waitFor(() => expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(true));
+
+    resolver(new Response(JSON.stringify({ ok: true, url: "/api/reportes?id=abc" }), { status: 200 }));
+  });
+});

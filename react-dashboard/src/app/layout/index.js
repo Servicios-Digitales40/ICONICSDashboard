@@ -8,3 +8,4 @@
 export { Sidebar } from "./Sidebar.jsx";
 export { Topbar } from "./Topbar.jsx";
 export { DataSourceBanner } from "./DataSourceBanner.jsx";
+export { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";

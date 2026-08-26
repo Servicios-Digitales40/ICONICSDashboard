@@ -34,7 +34,6 @@ import { usePrefersReducedMotion } from "@/lib/motion.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSistemaAgua } from "../data/hooks.js";
 import { ESTADOS_ORDEN, estadoInfo } from "../domain/estado.js";
 import { PuntoEstado } from "../components/base.jsx";
@@ -262,4 +261,4 @@ function MaquetaEva3D({ params, onNavigate }) {
   );
 }
 
-export default conFuenteEva(MaquetaEva3D);
+export default MaquetaEva3D;

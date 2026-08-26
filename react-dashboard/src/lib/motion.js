@@ -159,3 +159,49 @@ export function useMounted() {
   }, []);
   return listo;
 }
+
+/**
+ * `[ref, visible]` — `visible` pasa a `true` la primera vez que el elemento
+ * referenciado entra al viewport, y se queda en `true` para siempre.
+ *
+ * ── POR QUÉ SE DEJA DE OBSERVAR TRAS LA PRIMERA ENTRADA ────────────
+ *
+ * Es la misma regla de `useMounted` aplicada al scroll en vez de al montaje:
+ * "todo se anima una sola vez, al entrar". Un reveal que se repite cada vez
+ * que el elemento sale y vuelve a entrar en pantalla —lo que haría un
+ * `IntersectionObserver` que sigue observando— es la misma clase de
+ * movimiento repetitivo que la regla de `lib/motion.js` prohíbe para todo lo
+ * que no sea una alarma, sólo que disparado por scroll en vez de por reloj.
+ *
+ * Con `prefers-reduced-motion` o sin soporte de `IntersectionObserver`
+ * (entornos de prueba, navegadores muy antiguos), `visible` empieza en
+ * `true`: el contenido se ve entero desde el primer pintado, que es la
+ * degradación segura — nunca un elemento oculto porque el observer no llegó
+ * a dispararse.
+ */
+export function useEnVista({ margen = "-80px" } = {}) {
+  const ref = useRef(null);
+  const reduce = usePrefersReducedMotion();
+  const [visible, setVisible] = useState(
+    () => reduce || typeof IntersectionObserver === "undefined"
+  );
+
+  useEffect(() => {
+    if (visible || !ref.current) return;
+    const el = ref.current;
+    const observer = new IntersectionObserver(
+      ([entrada]) => {
+        if (entrada.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: margen, threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  return [ref, visible];
+}

@@ -36,7 +36,6 @@ import { usePrefersReducedMotion } from "@/lib/motion.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
-import { conFuenteEva } from "../data/EvaProvider.jsx";
 import { useSistemaAgua } from "../data/hooks.js";
 import { estadoInfo } from "../domain/estado.js";
 import { fmtSenal, pctDeEscala } from "../lib/formato.js";
@@ -196,4 +195,4 @@ function EquipoEva3D() {
   );
 }
 
-export default conFuenteEva(EquipoEva3D);
+export default EquipoEva3D;

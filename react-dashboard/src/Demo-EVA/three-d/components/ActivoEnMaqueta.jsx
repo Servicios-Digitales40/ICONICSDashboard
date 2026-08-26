@@ -81,9 +81,9 @@ function Modelo({ activo, sistema, descriptor, rpm, detalle }) {
       );
 
     case "electrico":
-      // La puerta obedece al catálogo, no a este archivo: si mañana se confirma
-      // que el booleano va al revés, se corrige en `domain/senales.js`.
-      return <ArmarioModel descriptor={descriptor} abierto={senal("modoVdf").texto === "Manual"} detalle={detalle} />;
+      // El banner de modo obedece al catálogo, no a este archivo: si mañana se
+      // confirma que el booleano va al revés, se corrige en `domain/senales.js`.
+      return <ArmarioModel descriptor={descriptor} modoManual={senal("modoVdf").texto === "Manual"} detalle={detalle} />;
 
     default:
       return null;

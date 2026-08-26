@@ -34,6 +34,20 @@
  * `motivoSinSerie()` se pregunta ANTES de salir a la red, en los dos lados, y
  * la marca vive en el catálogo (`historizado`) y no en cada consulta.
  *
+ * 3. **Sin `aggregate`, un rango vacío no vuelve vacío: vuelve la muestra
+ *    LÍMITE del historiador entero, sin importar cuán lejos esté del rango
+ *    pedido.** Medido el 26-08-2026: pedir `SNIVEL_TANQUE` sin agregar para
+ *    el 14-ago, el 17-ago o incluso el año 2020 devuelve LA MISMA muestra
+ *    —`2026-08-18T18:54:21.491Z`, que resultó ser la primera del
+ *    historiador entero para esa señal— con `ok: true` y sin ningún aviso
+ *    de que está fuera del rango pedido. Con `aggregate: 'Average'` el
+ *    mismo rango vacío sí devuelve `data: []`, limpio. Por eso este
+ *    proyecto entero pide SIEMPRE agregado (ver el resto del archivo) y
+ *    nunca lectura cruda para construir una serie: una lectura cruda que
+ *    alguna vez se necesite tiene que comprobar el `timestamp` de cada
+ *    muestra contra el rango pedido antes de darla por buena, porque el
+ *    servidor no lo hace.
+ *
  * ── POR QUÉ EL RESUMEN SE CALCULA AQUÍ ─────────────────────────────
  *
  * `resumirSerie` existe por el asistente, pero se queda en `shared/` porque es
@@ -59,27 +73,40 @@ export const AGREGADO = "Average";
 export const VENTANA = { horas: 6, puntos: 24 };
 
 /**
- * Tope de muestras que se pueden pedir de una vez.
+ * Techo de muestras POR PÁGINA del servidor — `maxUpstreamItems` del puente
+ * (`X-ICO-MAX-ITEM-COUNT`), repetido aquí como número porque `shared/` no
+ * puede leer la configuración del backend.
  *
- * Es `maxUpstreamItems` del puente (`X-ICO-MAX-ITEM-COUNT`), y se repite aquí
- * como número porque `shared/` no puede leer la configuración del backend. Si
- * se pide más, el servidor recorta y devuelve una serie incompleta **sin
- * decirlo**: la gráfica saldría cortada por la derecha y el máximo de un día
- * sería el máximo de las primeras horas.
+ * ── YA NO ES "EL TOPE DEL SERVIDOR": ES EL TAMAÑO DE PÁGINA (Plan 15) ──
  *
- * ── CUÁNTO DE ESTRECHO ES ESTE TOPE ────────────────────────────────
+ * Hasta el Plan 15 pedir más de esto recortaba la serie **en silencio**: el
+ * servidor devolvía sólo la primera página y `hasMore` avisaba de que
+ * quedaba más sin que nadie lo persiguiera. Con la Fase 1
+ * (`backend/iconics/client.mjs` siguiendo `X-ICO-CONTINUATION`), el backend
+ * SÍ persigue esa continuación hasta agotar el rango o su propio presupuesto
+ * (`HISTORY_MAX_PAGINAS`/`HISTORY_MAX_MS`) — así que `GET
+ * /api/iconics/history` puede devolver bastante más de `MAX_PUNTOS` muestras
+ * cuando el rango las tiene.
  *
- * Mucho más de lo que sugiere el número. Medido por paginación sobre el
- * 21-08-2026, el historiador guardó **26.754 muestras de un solo día** del
- * nivel del tanque: en operación graba cerca de 1 Hz (~3.200 por hora), y
- * sólo en reposo baja a 12 por hora.
+ * Lo que este número sigue fijando es la DENSIDAD que se le pide a cada
+ * tramo al trocear un rango largo (ver `planificar()` en `rango.js`, Plan 15
+ * Fase 2): sigue siendo el techo razonable de puntos por petición para que
+ * el servidor no tenga que paginar dentro de un solo tramo, no el límite
+ * real de cuánto se puede leer en total.
+ *
+ * ── CUÁNTO DE ESTRECHO ES EL TAMAÑO DE PÁGINA ───────────────────────
+ *
+ * Mucho más estrecho de lo que sugiere el número, frente a la densidad real
+ * del historiador. Medido por paginación sobre el 21-08-2026, el
+ * historiador guardó **26.754 muestras de un solo día** del nivel del
+ * tanque: en operación graba cerca de 1 Hz (~3.200 por hora), y sólo en
+ * reposo baja a 12 por hora.
  *
  * Contra eso, 100 muestras son **menos de dos minutos** de datos crudos. Por
  * eso ninguna lectura de este proyecto pide muestras sin agregar: se pide
- * `Average` sobre una rejilla calculada para no pasar de aquí (ver
- * `leerSerie`). Quien añada una lectura cruda tiene que paginar o declarar el
- * recorte; darlo por completo es resumir el 0,4 % de un día llamándolo «el
- * día», que fue exactamente el fallo que motivó `hasMore`.
+ * `Average` sobre una rejilla calculada para no pasar de aquí por tramo (ver
+ * `leerSerie`) — es la Fase 1, no esta constante, la que resuelve leer un
+ * rango que por su densidad real necesitaría varias páginas.
  */
 export const MAX_PUNTOS = 100;
 

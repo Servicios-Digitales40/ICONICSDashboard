@@ -48,6 +48,19 @@ let echoCount = 0
 /** Llamadas reales de lote: demuestra que la caché colapsa las repetidas. */
 let batchCount = 0
 
+/*
+ * Estado simulado del punto de control de la bomba y del nivel del tanque,
+ * para el bloque de `POST /api/control/bomba` más abajo. `nivelTanque`
+ * controla si `controlar_bomba` deja pasar el encendido (< 90, el
+ * `avisoMax` de `shared/eva/umbrales.js`); `controlValor` es lo que
+ * devuelve la RELECTURA tras escribir en `SENSORES/CONTROL` — normalmente
+ * el mismo valor que se escribió, salvo que `controlIgnoraEscritura` esté
+ * activo, que simula un punto cuya escritura no tiene efecto real.
+ */
+let nivelTanque = 42
+let controlValor = false
+let controlIgnoraEscritura = false
+
 /* ── Servidor ICONICS falso ──────────────────────────────────────────── */
 const fake = createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`)
@@ -119,6 +132,7 @@ const fake = createServer(async (req, res) => {
     if (pn === 'lento') {
       return void setTimeout(() => json(200, { pointName: pn, value: 1 }), 1500).unref()
     }
+    if (pn?.endsWith('SENSORES/CONTROL')) return json(200, { pointName: pn, value: controlValor, quality: 192 })
     return json(200, { pointName: pn, value: 42, quality: 192 })
   }
   if (p === '/fwxapi/rest/v1/Data' && req.method === 'POST') {
@@ -126,7 +140,11 @@ const fake = createServer(async (req, res) => {
     let body = ''
     for await (const chunk of req) body += chunk
     const { pointName } = JSON.parse(body)
-    return json(200, pointName.map((n, i) => ({ pointName: n, value: i, quality: 192 })))
+    return json(200, pointName.map((n, i) => ({
+      pointName: n,
+      value: n.endsWith('SENSORES/SNIVEL_TANQUE') ? nivelTanque : i,
+      quality: 192,
+    })))
   }
   if (p === '/fwxapi/rest/v1/Data/Browse') {
     return json(200, [{ shortName: 'SENSORES', pointName: 'ac:TDCON/DEMO/SENSORES/' }])
@@ -137,17 +155,75 @@ const fake = createServer(async (req, res) => {
     for await (const chunk of req) body += chunk
     const items = JSON.parse(body)
     assert.ok(Array.isArray(items), 'Write debe recibir un array')
+    for (const item of items) {
+      if (item.pointName?.endsWith('SENSORES/CONTROL') && !controlIgnoraEscritura) {
+        controlValor = item.value
+      }
+    }
     return json(200, items.map(i => ({ pointName: i.pointName, success: true })))
   }
   if (p === '/fwxapi/rest/v1/History') {
-    return json(
-      200,
-      [
-        { historicalSamples: [{ timestamp: 't1', value: 1, quality: 192 }] },
-        { historicalSamples: [{ timestamp: 't2', value: 2 }] },
-      ],
-      { 'X-ICO-CONTINUATION': 'more' }
-    )
+    // Dos páginas de verdad, como el servidor real (Plan 15 §0): la primera
+    // trae continuación y una muestra, la segunda —sólo si llega con ESE
+    // token— trae la última y cierra sin continuación. Antes esto devolvía
+    // siempre 'X-ICO-CONTINUATION: more' sin importar el token recibido, lo
+    // que simulaba "hay más, pero nunca lo perseguimos" — el comportamiento
+    // que Plan 15 Fase 1 corrige. Con `readHistory` siguiendo la
+    // continuación de verdad, ese fake haría un bucle hasta el tope de
+    // páginas en vez de reflejar un servidor que sí termina.
+    const pn = url.searchParams.get('pointName')
+
+    // Un punto especial cuya "historia" nunca se agota: sirve para probar
+    // que el presupuesto de páginas (`maxHistoryPaginas`) corta la cadena en
+    // vez de seguir para siempre contra un servidor que jamás dice basta.
+    if (pn === 'historia-infinita') {
+      const num = Number(req.headers['x-ico-continuation'] ?? '0') + 1
+      return json(
+        200,
+        [{ historicalSamples: [{ timestamp: `pagina-${num}`, value: num, quality: 192 }] }],
+        { 'X-ICO-CONTINUATION': String(num) }
+      )
+    }
+
+    // Como el anterior, pero cada página tarda 60 ms: sirve para probar el
+    // corte por PLAZO (`maxHistoryMs`), distinto del corte por número de
+    // páginas — un servidor lento puede agotar el tiempo sin agotar nunca
+    // `maxHistoryPaginas`.
+    if (pn === 'historia-lenta') {
+      const num = Number(req.headers['x-ico-continuation'] ?? '0') + 1
+      return void setTimeout(() => json(
+        200,
+        [{ historicalSamples: [{ timestamp: `pagina-${num}`, value: num, quality: 192 }] }],
+        { 'X-ICO-CONTINUATION': String(num) }
+      ), 60).unref()
+    }
+
+    // Falla justo en la segunda página: sirve para probar que un fallo A
+    // MITAD de la cadena no descarta la primera página ya obtenida.
+    if (pn === 'historia-falla-pagina-2') {
+      const token = req.headers['x-ico-continuation']
+      if (!token) {
+        return json(
+          200,
+          [{ historicalSamples: [{ timestamp: 't1', value: 1, quality: 192 }] }],
+          { 'X-ICO-CONTINUATION': 'pagina-2' }
+        )
+      }
+      return json(500, { detail: 'la página 2 explotó' })
+    }
+
+    const token = req.headers['x-ico-continuation']
+    if (!token) {
+      return json(
+        200,
+        [{ historicalSamples: [{ timestamp: 't1', value: 1, quality: 192 }] }],
+        { 'X-ICO-CONTINUATION': 'pagina-2' }
+      )
+    }
+    if (token === 'pagina-2') {
+      return json(200, [{ historicalSamples: [{ timestamp: 't2', value: 2 }] }])
+    }
+    return json(400, { detail: 'continuation token desconocido' })
   }
   if (p === '/fwxapi/rest/v1/AlarmHistory') {
     return json(200, [{ eventId: 'e1', startDate: url.searchParams.get('startDate') }])
@@ -295,17 +371,23 @@ console.log('\n── Contrato de la API ─────────────
   })
 }
 
-// 6. Historia: normalización + hasMore
+// 6. Historia: normalización + paginación real (Plan 15 Fase 1)
 {
   const r = await get(
     '/api/iconics/history?pointName=' + encodeURIComponent('hda:\\Configuration\\X:SNIVEL_TANQUE') +
     '&startDate=2026-08-04T00:00:00%2B02:00&endDate=2026-08-05T00:00:00%2B02:00' +
     '&aggregate=Interpolative&interval=01:00:00'
   )
-  check('GET /api/iconics/history → { ok, data[], hasMore }', () => {
+  check('GET /api/iconics/history → sigue la continuación y acumula las dos páginas', () => {
     assert.equal(r.body.ok, true)
-    assert.equal(r.body.hasMore, true)
-    assert.equal(r.body.data.length, 2, 'debe acumular muestras de todos los items')
+    // El fake devuelve dos páginas reales (ver el handler de /History más
+    // arriba): la primera con continuación, la segunda sin ella — así que
+    // `readHistory` las sigue las dos y `hasMore` queda en false al agotarse,
+    // no en true como cuando esto se quedaba en la primera página siempre.
+    assert.equal(r.body.hasMore, false)
+    assert.equal(r.body.paginas, 2, 'debe haber pedido las dos páginas')
+    assert.equal(r.body.truncada, false)
+    assert.equal(r.body.data.length, 2, 'debe acumular muestras de las dos páginas')
     assert.deepEqual(r.body.data[0], { timestamp: 't1', value: 1, quality: 192 })
     assert.equal(r.body.data[1].quality, 0, 'quality ausente → 0')
   })
@@ -725,6 +807,149 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
   })
 
   server.close()
+}
+
+console.log('\n── Exportar la conversación a PDF ──────────────────────────')
+{
+  const reportesDir = await mkdtemp(join(tmpdir(), 'iconics-conversacion-pdf-'))
+  const { base: exportarBase, server } = await mount({ IA_REPORTES_DIR: reportesDir })
+
+  const sinHistorial = await call(exportarBase, '/api/chat/exportar', postJson({}))
+  check('sin historial → 400', () => {
+    assert.equal(sinHistorial.status, 400)
+    assert.match(sinHistorial.body.error, /No hay conversación/)
+  })
+
+  const soloInvalidos = await call(exportarBase, '/api/chat/exportar', postJson({
+    historial: [{ rol: 'sistema', texto: 'no cuenta' }, { rol: 'usuario', texto: '   ' }],
+  }))
+  check('turnos todos inválidos (rol o texto) → 400', () => {
+    assert.equal(soloInvalidos.status, 400)
+  })
+
+  const exportado = await call(exportarBase, '/api/chat/exportar', postJson({
+    historial: [
+      { rol: 'usuario', texto: '¿Cómo va el tanque?' },
+      { rol: 'asistente', texto: 'El nivel está en banda, al 58 %.' },
+      { rol: 'sistema', texto: 'se filtra: rol no reconocido' },
+    ],
+  }))
+  check('historial válido → 200, { ok:true, url } con formato /api/reportes?id=<uuid>', () => {
+    assert.equal(exportado.status, 200)
+    assert.equal(exportado.body.ok, true)
+    assert.match(exportado.body.url, /^\/api\/reportes\?id=[0-9a-f-]{36}$/)
+  })
+
+  const descarga = await call(exportarBase, exportado.body.url)
+  check('el PDF recién exportado se descarga de inmediato', () => {
+    assert.equal(descarga.status, 200)
+    assert.equal(descarga.headers.get('content-type'), 'application/pdf')
+  })
+
+  server.close()
+}
+
+console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1) ──')
+{
+  const { base: acotado, server } = await mount({ HISTORY_MAX_PAGINAS: '3' })
+
+  const r = await call(acotado, '/api/iconics/history?pointName=historia-infinita&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
+  check('un servidor que nunca dice basta se corta en HISTORY_MAX_PAGINAS, no en un bucle', () => {
+    assert.equal(r.body.ok, true)
+    assert.equal(r.body.paginas, 3, 'debe haber pedido exactamente el tope, ni una más')
+    assert.equal(r.body.data.length, 3, 'una muestra por página')
+    assert.equal(r.body.hasMore, true, 'el servidor seguía teniendo continuación cuando se cortó')
+    assert.equal(r.body.truncada, true)
+    assert.match(r.body.motivoCorte, /tope de 3 páginas/)
+  })
+  server.close()
+}
+{
+  // Con páginas de 60 ms y un plazo de 130 ms, caben dos páginas completas
+  // (120 ms) pero no una tercera: el corte debe ser por TIEMPO, no porque
+  // `HISTORY_MAX_PAGINAS` (holgado a propósito) lo haya impedido antes.
+  const { base: lento, server } = await mount({ HISTORY_MAX_MS: '130', HISTORY_MAX_PAGINAS: '50' })
+
+  const r = await call(lento, '/api/iconics/history?pointName=historia-lenta&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
+  check('un servidor lento se corta por HISTORY_MAX_MS antes de agotar las páginas', () => {
+    assert.equal(r.body.ok, true)
+    assert.ok(r.body.paginas >= 2 && r.body.paginas < 50, `paginas=${r.body.paginas}`)
+    assert.equal(r.body.truncada, true)
+    assert.match(r.body.motivoCorte, /plazo de 130 ms/)
+  })
+  server.close()
+}
+{
+  const r = await call(base, '/api/iconics/history?pointName=historia-falla-pagina-2&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
+  check('un fallo a mitad de la cadena conserva las páginas ya obtenidas', () => {
+    assert.equal(r.body.ok, true)
+    assert.equal(r.body.paginas, 2, 'la página que falló también cuenta como pedida')
+    assert.equal(r.body.data.length, 1, 'sólo la primera página, la que sí llegó')
+    assert.equal(r.body.truncada, true)
+    assert.match(r.body.motivoCorte, /página 2 falló/)
+  })
+}
+
+console.log('\n── Control de la bomba (Controles) ─────────────────────────')
+{
+  // Este bloque prueba sólo el MAPEO HTTP (status codes, forma del JSON): la
+  // lógica de negocio de `controlar_bomba` —las dos guardas, la relectura de
+  // confirmación— ya está cubierta en `scripts/verificar-herramientas.mjs`
+  // contra un `clienteFalso()`, y no se duplica aquí.
+  //
+  // Monta su propia app con `BATCH_CACHE_TTL_MS: '0'`: la caché de lote (de
+  // 2 s por defecto, ver B.7 arriba) serviría el nivel de tanque VIEJO justo
+  // cuando este bloque lo cambia para simular un tanque lleno.
+  nivelTanque = 42
+  controlValor = false
+  controlIgnoraEscritura = false
+  const { base: controlBase, server: controlServer } = await mount({ ICONICS_READ_ONLY: 'false', BATCH_CACHE_TTL_MS: '0' })
+
+  const sinEncender = await call(controlBase, '/api/control/bomba', postJson({}))
+  check('sin "encender" → 400', () => {
+    assert.equal(sinEncender.status, 400)
+    assert.match(sinEncender.body.error, /Falta decir/)
+  })
+
+  const encendido = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('nivel normal + encender:true → 200, confirma con relectura', () => {
+    assert.equal(encendido.status, 200)
+    assert.equal(encendido.body.ok, true)
+    assert.equal(encendido.body.accion, 'encendida')
+    assert.match(encendido.body.tag, /SENSORES\/CONTROL$/)
+  })
+
+  const apagado = await call(controlBase, '/api/control/bomba', postJson({ encender: false }))
+  check('apagar → 200 (apagar nunca mira el nivel)', () => {
+    assert.equal(apagado.status, 200)
+    assert.equal(apagado.body.accion, 'apagada')
+  })
+
+  nivelTanque = 92 // por encima de UMBRALES.nivelTanque.avisoMax (90)
+  const nivelAlto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('nivel alto + encender:true → 409, sin llegar a escribir', () => {
+    assert.equal(nivelAlto.status, 409)
+    assert.equal(nivelAlto.body.ok, false)
+    assert.match(nivelAlto.body.error, /tanque está al/)
+  })
+  nivelTanque = 42
+
+  controlIgnoraEscritura = true
+  const sinEfecto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
+  check('la escritura se acepta pero la relectura no confirma → 409', () => {
+    assert.equal(sinEfecto.status, 409)
+    assert.match(sinEfecto.body.error, /no ha tenido efecto real/)
+  })
+  controlIgnoraEscritura = false
+  controlServer.close()
+
+  const { base: soloLectura, server: soloLecturaServer } = await mount({ ICONICS_READ_ONLY: 'true' })
+  const bloqueado = await call(soloLectura, '/api/control/bomba', postJson({ encender: true }))
+  check('ICONICS_READ_ONLY=true → 403, menciona la causa', () => {
+    assert.equal(bloqueado.status, 403)
+    assert.match(bloqueado.body.error, /ICONICS_READ_ONLY/)
+  })
+  soloLecturaServer.close()
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')

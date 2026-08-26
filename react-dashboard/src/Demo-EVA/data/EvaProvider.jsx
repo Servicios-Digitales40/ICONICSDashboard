@@ -28,13 +28,17 @@
  * remontaje al conmutar siguen siendo los mismos para las dos secciones. Aquí
  * sólo se elige QUÉ transporte construir, nunca CUÁL está activo.
  *
- * ── EL ÁMBITO DEL PROVIDER ES LA VISTA ─────────────────────────────
+ * ── EL ÁMBITO DEL PROVIDER ES EL SHELL, NO LA VISTA ─────────────────
  *
- * Se envuelve cada vista con `conFuenteEva()` en vez de tocar `App.jsx`, para
- * que el módulo entero sea aditivo: no hay una sola línea de Demo EVA en el
- * arranque de la aplicación. El coste es que navegar entre las subvistas
- * reinicia el búfer de muestras vivas, lo que la interfaz ya rotula («en esta
- * sesión»); a cambio, salir de la sección detiene el sondeo del todo.
+ * Hasta que la app tuvo el tablero de Resonac como sección aparte, cada vista
+ * se envolvía con `conFuenteEva()` y el sondeo se detenía al salir de Demo
+ * EVA. Desde que ese tablero se retiró (agosto de 2026, ver la cabecera de
+ * `app/routes/routes.jsx`) TODA la app es Demo EVA, así que un provider por
+ * vista sólo abría un motor de polling nuevo en cada navegación sin ahorrar
+ * nada. Ahora `<EvaProvider>` envuelve el Shell entero en `App.jsx`, junto al
+ * resto de providers globales: el sondeo corre mientras la aplicación esté
+ * abierta, y es lo que necesita `EstadoMaquinaBanner` para verse en cualquier
+ * pestaña sin que cada una vuelva a montar su propia fuente.
  */
 import { createContext, useContext, useEffect, useMemo } from "react";
 
@@ -83,20 +87,4 @@ export function useEvaSource() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useEvaSource debe usarse dentro de <EvaProvider>");
   return ctx;
-}
-
-/**
- * Envuelve una vista con su fuente. Se usa en el `export default` de cada
- * vista, para que el registro de rutas no tenga que saber nada de esto.
- */
-export function conFuenteEva(Vista) {
-  function ConFuenteEva(props) {
-    return (
-      <EvaProvider>
-        <Vista {...props} />
-      </EvaProvider>
-    );
-  }
-  ConFuenteEva.displayName = `conFuenteEva(${Vista.displayName ?? Vista.name ?? "Vista"})`;
-  return ConFuenteEva;
 }

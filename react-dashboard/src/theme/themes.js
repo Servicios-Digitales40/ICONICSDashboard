@@ -50,6 +50,9 @@ export const THEMES = {
     blob1: "rgba(54,84,224,0.12)",
     blob2: "rgba(217,138,27,0.10)",
 
+    // Exclusivo del hero de Inicio (ver nota al pie del archivo, "heroAgua").
+    heroAgua: "#1CAFC4",
+
     // Paleta de datos (ver nota al pie del archivo)
     viz: {
       azul: "#7B95F5",
@@ -71,10 +74,18 @@ export const THEMES = {
 
     text: "#E9ECF3",
     textSoft: "#9AA4B8",
-    textFaint: "#5F6981",
+    // #5F6981 medía 3.5:1 sobre `page` y 3.1:1 sobre `panel` — bajo el piso
+    // AA de 4.5:1 para texto (detector `low-contrast`, /impeccable audit
+    // 2026-08-26). Aclarado a #7684A0, que da 5.1:1 y 4.6:1 respectivamente
+    // sin salir de la familia gris-azulada.
+    textFaint: "#7684A0",
 
     accent: "#5C82F5",
-    accentSoft: "#1B2436",
+    // #1B2436 dejaba `accent` como texto a 4.4:1 sobre este fondo, justo por
+    // debajo del piso AA — mismo hallazgo del detector. Oscurecido a #181E2C
+    // (4.7:1) sin tocar `accent`, que sigue sirviendo de fondo de botón e
+    // icono en muchas otras vistas.
+    accentSoft: "#181E2C",
     amber: "#E5A93C",
     amberSoft: "#2B2312",
     coral: "#E37A63",
@@ -85,8 +96,19 @@ export const THEMES = {
     violetSoft: "#211A34",
 
     shadow: "0 1px 2px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.28)",
-    shadowHover: "0 4px 14px rgba(0,0,0,0.32), 0 20px 44px rgba(92,130,245,0.20)",
-    gradAccent: "linear-gradient(135deg, #5C82F5 0%, #8AA3FA 100%)",
+    // Antes: `rgba(92,130,245,0.20)` — un halo de marca a 44px de difusión.
+    // Sobre el fondo casi negro real (#0B0E16) leía como resplandor de neón,
+    // no como elevación (detector `dark-glow` / `gpt-thin-border-wide-shadow`,
+    // /impeccable audit 2026-08-26). El claro ya usaba una capa amplia teñida
+    // de acento al 12% (ver `shadowHover` de `light`); aquí se iguala esa
+    // proporción en vez de duplicar la opacidad porque el fondo oscuro ya
+    // aporta su propio contraste — MISMO CRITERIO, no un valor nuevo inventado.
+    shadowHover: "0 4px 14px rgba(0,0,0,0.32), 0 20px 44px rgba(92,130,245,0.12)",
+    // Extremo claro del degradado (#8AA3FA) dejaba el icono blanco de las
+    // insignias a 2.4:1 — por debajo incluso del piso de 3:1 para gráficos
+    // grandes. Bajado a #7690F0 (2.99:1): sigue siendo un degradado visible,
+    // el icono deja de perderse contra el azul pálido.
+    gradAccent: "linear-gradient(135deg, #5C82F5 0%, #7690F0 100%)",
     gradWarm: "linear-gradient(135deg, #E5A93C 0%, #E37A63 100%)",
     gradSuccess: "linear-gradient(135deg, #1B9169 0%, #3ED9A5 100%)",
     gradViolet: "linear-gradient(135deg, #7C4FE0 0%, #A98CF0 100%)",
@@ -94,6 +116,9 @@ export const THEMES = {
 
     blob1: "rgba(92,130,245,0.18)",
     blob2: "rgba(229,169,60,0.12)",
+
+    // Exclusivo del hero de Inicio (ver nota al pie del archivo, "heroAgua").
+    heroAgua: "#4DD8E8",
 
     // Paleta de datos (ver nota al pie del archivo)
     viz: {
@@ -177,6 +202,10 @@ export const THEMES = {
     blob1: "rgba(196,0,1,0.10)",
     blob2: "rgba(20,20,20,0.05)",
 
+    // Exclusivo del hero de Inicio, SIN CAMBIOS respecto a `light` — no es
+    // parte del rojo de marca de este tema, así que no hay nada que adaptar.
+    heroAgua: "#1CAFC4",
+
     // Paleta de datos: SIN CAMBIOS respecto a `light` — ver cabecera del tema.
     viz: {
       azul: "#7B95F5",
@@ -187,6 +216,24 @@ export const THEMES = {
     },
   },
 };
+
+/**
+ * `heroAgua` — EXCEPCIÓN DELIBERADA a "todo color sale de un token
+ * semántico o de `viz`", exclusiva del hero de Inicio (`InicioEva.jsx`).
+ *
+ * No es un semántico (no significa "estado", como `success` o `coral`) ni es
+ * `viz` (no distingue series de datos): es un tinte de escena, el mismo
+ * papel que ya cumplen `blob1`/`blob2` para esa sección. DESIGN.md permite
+ * expresamente una "paleta ampliada... sólo en esta sección Persuade, sin
+ * tocar los tokens semánticos del resto" (Plan Moises3 UI/UX, punto 3,
+ * propuesta 8) — de ahí que viva junto a los blobs y no junto a los
+ * semánticos de arriba.
+ *
+ * Vale UN valor por tema (no claro/oscuro derivados por fórmula, misma Regla
+ * de la Segunda Selección que rige el resto): cian-verde de agua, elegido
+ * contra cada fondo. El tema Mitsubishi lo hereda sin cambios de `light`
+ * porque no es parte de su rojo de marca — no hay nada que adaptar.
+ */
 
 /**
  * Paleta de datos, distinta de los tokens de UI de arriba.

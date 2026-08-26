@@ -49,7 +49,7 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard } from "lucide-react";
+import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, Power } from "lucide-react";
 
 /**
  * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
@@ -99,6 +99,14 @@ export const ROUTES = [
     title: "Planta",
     sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
     nav: { label: "Planta", icon: <LayoutDashboard size={17} /> },
+  },
+
+  {
+    id: "eva-controles",
+    component: lazy(() => import("@/Demo-EVA/views/ControlesEva.jsx")),
+    title: "Controles",
+    sub: "Encendido y apagado directo de la bomba de la instalación",
+    nav: { label: "Controles", icon: <Power size={17} /> },
   },
 
   {

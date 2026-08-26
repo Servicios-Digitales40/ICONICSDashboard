@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import InicioEva from "@/Demo-EVA/views/InicioEva.jsx";
 
 function cortarLaRed() {
@@ -39,7 +40,9 @@ const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <InicioEva onNavigate={onNavigate} />
+        <EvaProvider>
+          <InicioEva onNavigate={onNavigate} />
+        </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
   );

@@ -24,6 +24,33 @@ const DEFAULTS = {
   maxRequestBodyBytes: 1024 * 1024,
   /** `X-ICO-MAX-ITEM-COUNT` para historia y alarmas. */
   maxUpstreamItems: 100,
+  /**
+   * Presupuesto de `readHistory` al seguir `X-ICO-CONTINUATION` (Plan 15
+   * Fase 1). Cada página son hasta `maxUpstreamItems` muestras — con el
+   * defecto de 100, `maxHistoryPaginas: 20` son hasta 2.000 muestras por
+   * consulta, sin necesidad de trocear el rango en varias peticiones HTTP
+   * distintas desde el frontend/asistente para conseguir esa profundidad.
+   */
+  maxHistoryPaginas: 20,
+  /**
+   * Corte de TIEMPO TOTAL para una cadena de páginas, distinto de
+   * `upstreamTimeoutMs`: ese corta cada `fetch` individual; este corta la
+   * cadena entera. Veinte páginas de 100-200 ms cada una son 2-4 s en el
+   * caso normal, pero un servidor lento con 20 páginas podría sumar minutos
+   * sin este tope.
+   */
+  maxHistoryMs: 20000,
+  /**
+   * Cuántos tramos de `leerSerieEnRango()` (`ia/herramientas.mjs`) se piden a
+   * la vez (Plan 15 Fase 3). Antes de esto un rango de 30 días eran 30
+   * peticiones simultáneas contra el historiador, y con la Fase 1 cada una
+   * puede ser hasta `maxHistoryPaginas` peticiones HTTP por debajo — sin este
+   * tope, levantar la ventana de lectura (Fase 4) multiplicaría la carga
+   * contra el servidor de producción en vez de sólo la profundidad leída. 6
+   * es el valor sugerido por el propio plan: acota la carga sin alargar de
+   * forma perceptible una consulta de un mes (30 tramos ÷ 6 = 5 tandas).
+   */
+  historyConcurrencia: 6,
   /** Ventana máxima que se puede pedir a `/api/iconics/alarms`. */
   maxAlarmHours: 48,
   /** Corte del ping de salud: un servidor colgado no debe colgar `/api/health`. */
@@ -556,6 +583,15 @@ export function loadConfig(env = process.env) {
         'RATE_LIMIT_WINDOW_MS', env.RATE_LIMIT_WINDOW_MS, DEFAULTS.rateLimitWindowMs, 1
       ),
       rateLimitMax: readInteger('RATE_LIMIT_MAX', env.RATE_LIMIT_MAX, DEFAULTS.rateLimitMax, 1),
+      maxHistoryPaginas: readInteger(
+        'HISTORY_MAX_PAGINAS', env.HISTORY_MAX_PAGINAS, DEFAULTS.maxHistoryPaginas, 1
+      ),
+      maxHistoryMs: readInteger(
+        'HISTORY_MAX_MS', env.HISTORY_MAX_MS, DEFAULTS.maxHistoryMs, 1
+      ),
+      historyConcurrencia: readInteger(
+        'HISTORY_CONCURRENCIA', env.HISTORY_CONCURRENCIA, DEFAULTS.historyConcurrencia, 1
+      ),
     }),
   })
 }

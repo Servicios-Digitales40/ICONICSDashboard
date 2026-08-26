@@ -301,6 +301,8 @@ export function Asistente() {
   const [anclado, setAnclado] = useState(true);
   const [sinLeer, setSinLeer] = useState(false);
   const [segundos, setSegundos] = useState(0);
+  const [exportando, setExportando] = useState(false);
+  const [errorExportar, setErrorExportar] = useState(null);
 
   const {
     disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
@@ -435,6 +437,37 @@ export function Asistente() {
 
   const irAlFinal = () => { setAnclado(true); finRef.current?.scrollIntoView({ block: "end" }); };
 
+  /**
+   * Exporta la conversación completa a PDF (`POST /api/chat/exportar`,
+   * `backend/ia/reporte.mjs::componerConversacionPdf`) y abre la descarga.
+   *
+   * Es una acción de UI puntual —no estado del hilo—, así que vive aquí y no
+   * en `useAsistente.js`. `cuerpo.url` se abre TAL CUAL, sin anteponer nada:
+   * mismo criterio que `ReporteDescarga` más abajo, que usa `adjunto.url`
+   * directo como `href` porque frontend y backend comparten origen.
+   */
+  const exportarPdf = async () => {
+    setExportando(true);
+    setErrorExportar(null);
+    try {
+      const historial = mensajes
+        .filter((m) => m.texto?.trim())
+        .map((m) => ({ rol: m.rol, texto: m.texto }));
+      const r = await fetch("/api/chat/exportar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ historial }),
+      });
+      const cuerpo = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(cuerpo?.error ?? `El servidor respondió ${r.status}.`);
+      window.open(cuerpo.url, "_blank");
+    } catch (e) {
+      setErrorExportar(e.message);
+    } finally {
+      setExportando(false);
+    }
+  };
+
   if (!abierto) {
     return (
       <button
@@ -495,6 +528,17 @@ export function Asistente() {
           />
           <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
 
+          <button
+            type="button"
+            onClick={exportarPdf}
+            disabled={ocupado || !mensajes.length || exportando}
+            aria-label="Exportar la conversación a PDF"
+            title="Exportar PDF"
+            className="eva-asis-boton"
+            style={botonIcono(t, ocupado || !mensajes.length || exportando)}
+          >
+            {exportando ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}
+          </button>
           <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
             <Trash2 size={15} />
           </button>
@@ -514,6 +558,12 @@ export function Asistente() {
         {errorModelo && (
           <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
             {errorModelo}
+          </div>
+        )}
+
+        {errorExportar && (
+          <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
+            No se pudo exportar la conversación: {errorExportar}
           </div>
         )}
 

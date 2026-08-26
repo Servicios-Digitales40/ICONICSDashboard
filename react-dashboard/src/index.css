@@ -41,8 +41,15 @@ button {
   --color-hover: #1b2333;
   --color-border: #232b3b;
   --color-accent: #5c82f5;
-  --color-accent-soft: #1b2436;
-  --grad-accent: linear-gradient(135deg, #5c82f5 0%, #8aa3fa 100%);
+  /* Sincronizado con theme/themes.js (dark.accentSoft, dark.gradAccent) tras
+     el hallazgo de contraste de /impeccable audit 2026-08-26 — ver el
+     comentario junto a esos tokens para el porqué de cada valor. Este
+     archivo mantiene su propia copia porque las pseudo-clases de abajo no
+     pueden leer el estado de React (nota de cabecera), así que un cambio en
+     themes.js sin este archivo deja el :focus de campos usando el valor
+     viejo aunque el resto de la app ya muestre el nuevo. */
+  --color-accent-soft: #181e2c;
+  --grad-accent: linear-gradient(135deg, #5c82f5 0%, #7690f0 100%);
 }
 
 /* Mismo hover/borde que "light" — sólo cambia el acento, ver themes.js */

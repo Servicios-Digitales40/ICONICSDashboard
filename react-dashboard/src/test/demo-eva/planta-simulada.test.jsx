@@ -29,6 +29,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import PlantaEva from "@/Demo-EVA/views/PlantaEva.jsx";
 
 /** Cualquier salida a la red es un fallo de esta prueba, no un caso a doblar. */
@@ -59,7 +60,9 @@ const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <PlantaEva onNavigate={onNavigate} />
+        <EvaProvider>
+          <PlantaEva onNavigate={onNavigate} />
+        </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
   );

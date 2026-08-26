@@ -5,14 +5,15 @@
 import { Loader2 } from "lucide-react";
 import { useTheme } from "@/theme";
 
-export function Button({ variant = "primary", icon, children, loading, onClick, type = "button" }) {
+export function Button({ variant = "primary", icon, children, loading, disabled, onClick, type = "button" }) {
   const { theme: t } = useTheme();
+  const inactivo = loading || disabled;
 
   const base = {
     display: "inline-flex", alignItems: "center", gap: 7,
     fontSize: 13, fontWeight: 600, padding: "9px 16px", borderRadius: 9,
-    cursor: loading ? "default" : "pointer", border: "none",
-    fontFamily: "'Inter', sans-serif", opacity: loading ? 0.75 : 1,
+    cursor: inactivo ? "default" : "pointer", border: "none",
+    fontFamily: "'Inter', sans-serif", opacity: inactivo ? 0.75 : 1,
   };
 
   const variants = {
@@ -26,7 +27,13 @@ export function Button({ variant = "primary", icon, children, loading, onClick, 
   };
 
   return (
-    <button type={type} className="app-btn" onClick={onClick} style={{ ...base, ...variants[variant] }}>
+    <button
+      type={type}
+      className="app-btn"
+      onClick={onClick}
+      disabled={disabled}
+      style={{ ...base, ...variants[variant] }}
+    >
       {loading ? <Loader2 size={14} className="spin" /> : icon}
       {children}
     </button>

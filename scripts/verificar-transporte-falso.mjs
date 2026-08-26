@@ -176,19 +176,46 @@ await checkAsync('las tres SIN historia reciben la serie de la temperatura, como
   }
 })
 
-await checkAsync('más de 100 puntos se recorta, con hasMore puesto', async () => {
+await checkAsync('más de 100 puntos se sirve en varias páginas, no se recorta (Plan 15 Fase 1)', async () => {
   const cliente = sinCaos()
   const r = await cliente.readHistory({
     pointName: pointName('nivelTanque'),
     startDate: new Date(1_700_000_000_000 - 30 * 3_600_000).toISOString(),
     endDate: new Date(1_700_000_000_000).toISOString(),
-    // Un punto por minuto durante 30 h son 1800 puntos: muy por encima del tope.
+    // Un punto por minuto durante 30 h son 1800 puntos: 18 páginas de 100,
+    // por debajo del presupuesto por defecto (20) — así que la serie
+    // COMPLETA debe llegar, no sólo la primera página como antes de la
+    // Fase 1 del Plan 15.
     interval: '00:01:00',
   })
 
   assert.equal(r.ok, true)
-  assert.ok(r.data.length <= 100, `pidió ${r.data.length}, el tope es 100`)
-  assert.equal(r.hasMore, true, 'con más de lo que cabe, hasMore tiene que avisarlo')
+  assert.equal(r.data.length, 1800, 'debe traer la serie completa, paginando')
+  assert.equal(r.paginas, 18)
+  assert.equal(r.hasMore, false, 'la serie se agotó, no queda nada por leer')
+  assert.equal(r.truncada, false)
+})
+
+await checkAsync('un rango que excede el presupuesto de páginas se corta y lo dice', async () => {
+  const cliente = createFakeIconicsClient({
+    ahora: () => 1_700_000_000_000,
+    rnd: () => 0.99,
+    limits: { maxHistoryPaginas: 3, maxHistoryMs: 20000 },
+  })
+  const r = await cliente.readHistory({
+    pointName: pointName('nivelTanque'),
+    startDate: new Date(1_700_000_000_000 - 30 * 3_600_000).toISOString(),
+    endDate: new Date(1_700_000_000_000).toISOString(),
+    // Mismas 18 páginas de antes, pero con el presupuesto bajado a 3.
+    interval: '00:01:00',
+  })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.paginas, 3, 'no debe pedir ni una página más que el tope')
+  assert.equal(r.data.length, 300)
+  assert.equal(r.hasMore, true, 'quedaba serie sin leer cuando se cortó')
+  assert.equal(r.truncada, true)
+  assert.match(r.motivoCorte, /tope de 3 páginas/)
 })
 
 await checkAsync('un punto que no es del catálogo falla igual que en el servidor real', async () => {

@@ -11,6 +11,7 @@ import { PAGE_META } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { Avatar } from "@/components/ui/Avatar.jsx";
+import { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
 const UMBRAL_CAJON = "(max-width: 900px)";
@@ -63,7 +64,7 @@ function VersionBuild({ t }) {
     <span
       title={`Build ${version}`}
       style={{
-        fontSize: 10.5, fontFamily: "'IBM Plex Mono', monospace",
+        fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
         color: t.textFaint, opacity: 0.65, letterSpacing: 0.2,
       }}
     >
@@ -124,7 +125,13 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
           </button>
         )}
         <div style={{ minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
+            {/* Permanente entre pestañas — a diferencia de los controles de la
+                derecha, no se oculta en modo muro: es información de estado,
+                no algo que un wallboard sin teclado necesite pulsar. */}
+            <EstadoMaquinaBanner />
+          </div>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{meta.sub}</p>
         </div>
       </div>
