@@ -59,6 +59,14 @@ const SENALES_PRONOSTICO = [
   "nivelTanque", "temperaturaTanque", "presionRelativa", "tensionLinea", "flujoInstantaneo",
 ];
 
+/*
+ * La lista que se pasa mientras el pronóstico no se ha pedido. Es una
+ * constante de módulo, y no un `[]` escrito en la llamada, porque el hook
+ * memoiza por `claves.join("|")`: un arreglo nuevo en cada render daría la
+ * misma clave pero volvería a entrar en el efecto sin necesidad.
+ */
+const VACIO = [];
+
 /**
  * Períodos ofrecidos, con la resolución que cada uno consigue de verdad.
  *
@@ -316,13 +324,34 @@ function RiesgosEva() {
    * instante que ya trae `useSistemaAgua`, y esto necesita semanas de historia.
    * Son dos preguntas distintas sobre la misma planta, y por eso conviven en
    * una sola pantalla en vez de en dos.
+   *
+   * ── POR QUÉ NO SE PIDE SOLO AL ENTRAR ──────────────────────────────
+   *
+   * Porque cuesta, y quien abre «Riesgos» no ha pedido esto. El troceado del
+   * historiador vive en el navegador (`data/historia.js`), así que cada tramo
+   * es una petición a /api: cinco señales por diez tramos son CINCUENTA para
+   * una ventana de 30 días, contra las cuatro que gasta «Planta» entera. Con
+   * el límite del puente en 300/min, un par de cambios de período y una
+   * vuelta a la pestaña bastaban para llevarse un 429 —y el 429 no lo paga
+   * esta pantalla, lo paga la siguiente persona que pregunte cualquier cosa.
+   *
+   * Los riesgos, que son los que dan nombre a la vista, no cuestan NADA
+   * aparte: salen del instante que el proveedor ya está sondeando. Así que la
+   * parte cara se pide cuando alguien la quiere, y mientras tanto la pantalla
+   * abre instantánea. El período arranca en el más corto por el mismo motivo.
    */
-  const [periodo, setPeriodo] = useState(PERIODOS[1]);
+  const [periodo, setPeriodo] = useState(PERIODOS[0]);
+  const [pedirPronostico, setPedirPronostico] = useState(false);
   const rango = useMemo(
     () => ({ horas: periodo.horas, puntos: periodo.puntos }),
     [periodo]
   );
-  const historia = useSeriesHistoricas(SENALES_PRONOSTICO, rango);
+  /*
+   * Sin claves, `useSeriesHistoricas` no llega a pedir nada: devuelve el
+   * estado vacío y no monta ninguna lectura. Es el mismo camino que ya
+   * recorría una vista sin señales, no un caso nuevo.
+   */
+  const historia = useSeriesHistoricas(pedirPronostico ? SENALES_PRONOSTICO : VACIO, rango);
 
   const pronostico = useMemo(
     () => evaluarPronostico(historia.filas, periodo.horas),
@@ -440,8 +469,13 @@ function RiesgosEva() {
             gap: 12, flexWrap: "wrap",
           }}
         >
-          <SectionLabel>Desgaste acumulado · últimos {periodo.label}</SectionLabel>
-          <div style={{ display: "flex", gap: 6 }}>
+          <SectionLabel>
+            {pedirPronostico
+              ? `Desgaste acumulado · últimos ${periodo.label}`
+              : "Desgaste acumulado"}
+          </SectionLabel>
+          {/* Los períodos sólo tienen sentido cuando ya hay algo que reencuadrar. */}
+          <div style={{ display: "flex", gap: 6 }} hidden={!pedirPronostico}>
             {PERIODOS.map((p) => (
               <button
                 key={p.horas}
@@ -462,6 +496,41 @@ function RiesgosEva() {
           </div>
         </div>
 
+        {!pedirPronostico ? (
+          /*
+           * El estado de reposo. Dice lo que va a hacer y lo que cuesta ANTES
+           * de hacerlo: es una lectura larga del historiador, y quien la pide
+           * merece saber que no es gratis. Nada de esto se lee al entrar.
+           */
+          <div
+            style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10,
+              padding: 16, borderRadius: 12,
+              border: `1px dashed ${t.border}`, background: t.panel,
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 13, color: t.textSoft, maxWidth: "68ch" }}>
+              El desgaste acumulado se calcula sobre <strong>semanas de historia</strong>, no
+              sobre el instante: hay que leer el historiador de cinco señales y trocear el
+              rango, así que tarda unos segundos. Los riesgos de arriba no dependen de esto y
+              ya están evaluados.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPedirPronostico(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "9px 16px", borderRadius: 8, cursor: "pointer",
+                fontSize: 13, fontWeight: 600,
+                border: `1px solid ${t.accent}`, background: t.accentSoft, color: t.accent,
+              }}
+            >
+              <TrendingUp size={15} />
+              Calcular desgaste de los últimos {periodo.label}
+            </button>
+          </div>
+        ) : (
+        <>
         {/*
          * Este aviso NO es opcional y no se puede resumir. El historiador se lee
          * con media por intervalo, así que la pantalla es ciega a todo lo que
@@ -539,6 +608,8 @@ function RiesgosEva() {
               ))}
             </ul>
           </div>
+        )}
+        </>
         )}
       </section>
 
