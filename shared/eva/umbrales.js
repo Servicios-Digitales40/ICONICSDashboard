@@ -67,8 +67,11 @@ export const UMBRALES = {
   // Sin límite superior: más eficiencia nunca es un problema.
   eficienciaEnergetica: { min: 30, avisoMin: 55, avisoMax: null, max: null },
 
-  // ±10 % sobre 120 V nominales, que es la tolerancia habitual de servicio.
-  tensionLinea: { min: 105, avisoMin: 114, avisoMax: 126, max: 132 },
+  // Red 208Y/120, CONFIRMADA por el usuario el 25-08-2026. La señal mide una
+  // línea contra neutro —de ahí que lea 121-127 V y no 208—, así que el
+  // nominal que aplica es 120 V. La banda dura es el ±10 % de NEMA MG-1 §12.44
+  // y la de aviso queda un ±5 % por dentro, para avisar antes de la falta.
+  tensionLinea: { min: 108, avisoMin: 114, avisoMax: 126, max: 132 },
 
   // Booleano: no hay banda que aplicar.
   modoVdf: null,

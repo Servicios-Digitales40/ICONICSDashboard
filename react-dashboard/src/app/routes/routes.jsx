@@ -49,7 +49,7 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, Power } from "lucide-react";
+import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, Power, ShieldAlert, Waves } from "lucide-react";
 
 /**
  * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
@@ -102,6 +102,30 @@ export const ROUTES = [
   },
 
   {
+    // Va justo detrás de «Planta» a propósito: contesta la pregunta siguiente.
+    // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
+    id: "eva-riesgos",
+    component: lazy(() => import("@/Demo-EVA/views/RiesgosEva.jsx")),
+    title: "Riesgos",
+    sub: "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros",
+    nav: { label: "Riesgos", icon: <ShieldAlert size={17} /> },
+  },
+
+  {
+    // Pantalla APARTE, y no una sección de «Riesgos», porque es OTRA MÁQUINA:
+    // otro motor, otro variador, otro PLC. Juntarlas invitaría a leerlas
+    // juntas, y la primera correlación que alguien sacara entre el caudal del
+    // tanque y la vibración de aquí uniría dos instalaciones que no se tocan.
+    id: "eva-vibraciones",
+    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
+    title: "Vibraciones",
+    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
+    nav: { label: "Vibraciones", icon: <Waves size={17} /> },
+  },
+
+  {
+    // Detrás de las dos de diagnóstico, pero ANTES de las 3D: es una acción
+    // operativa de primer nivel (encender/apagar la bomba), no un diagnóstico.
     id: "eva-controles",
     component: lazy(() => import("@/Demo-EVA/views/ControlesEva.jsx")),
     title: "Controles",

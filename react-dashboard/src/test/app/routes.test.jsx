@@ -25,8 +25,8 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las ocho vistas de la demo de agua, en su orden", () => {
-    // `eva-inicio` primero —la landing, y `DEFAULT_ROUTE`—, luego las seis
+  it("son las diez vistas de la demo de agua, en su orden", () => {
+    // `eva-inicio` primero —la landing, y `DEFAULT_ROUTE`—, luego las ocho
     // del sidebar, y `eva-detalle` al final: sin `nav` porque no es una
     // pantalla a la que un operador llegue en frío —¿de qué activo?—, pero
     // sigue siendo superficie navegable y tiene que aparecer aquí igual. Si
@@ -41,9 +41,15 @@ describe("superficie de la aplicación", () => {
     // `eva-alarmas` (Plan 13, Fase 9) entra antes de `eva-assets`: el
     // historial de eventos es una herramienta de OPERACIÓN — assets es de
     // diagnóstico, y va detrás por criterio de uso más frecuente primero.
+    // `eva-riesgos` va inmediatamente detrás de `eva-planta` porque contesta la
+    // pregunta siguiente: «Planta» dice qué está pasando y «Riesgos» qué puede
+    // pasar si sigue así. Separarlas con las dos vistas 3D rompería esa
+    // secuencia de lectura, que es la razón de que exista la pantalla.
     expect(ids).toEqual([
       "eva-inicio",
       "eva-planta",
+      "eva-riesgos",
+      "eva-vibraciones",
       "eva-controles",
       "eva-maquina-3d",
       "eva-maqueta",
@@ -79,6 +85,8 @@ describe("el sidebar que sale del registro", () => {
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
       "eva-inicio",
       "eva-planta",
+      "eva-riesgos",
+      "eva-vibraciones",
       "eva-controles",
       "eva-3d",
       "eva-alarmas",

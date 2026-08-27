@@ -7,3 +7,4 @@
  */
 export { Asistente } from "./components/Asistente.jsx";
 export { useAsistente } from "./lib/useAsistente.js";
+export { pedirAlAsistente } from "./lib/preguntaExterna.js";

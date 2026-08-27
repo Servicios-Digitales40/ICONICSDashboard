@@ -1416,10 +1416,17 @@ await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acot
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son trece herramientas, y sólo una de ellas escribe', () => {
+check('son diecisiete herramientas, y sólo una de ellas escribe', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
+    /* Las cuatro de sistemas van primero a propósito: `sistemas_de_la_planta`
+       es la que el modelo tiene que encontrar cuando no sabe de qué máquina le
+       hablan, y el orden del catálogo es lo primero que lee. */
+    'sistemas_de_la_planta',
+    'riesgos_activos',
+    'estado_de_vibraciones',
+    'pronostico_de_desgaste',
     'estado_del_sistema',
     'historia_de_senal',
     'valor_en_momento',
