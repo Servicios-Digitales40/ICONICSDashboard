@@ -12,17 +12,49 @@
  *
  * ── CÓMO SE DIRECCIONAN ESTOS PUNTOS ───────────────────────────────
  *
- * Por su nombre en el Hyper Historian, no por node id de OPC UA:
+ * Por su ruta en AssetWorX, igual que el tanque:
  *
- *     hda:\Configuration\DEMO 3:vRMS_S1
+ *     ac:TDCON/Motors/01/S1/vRMS_S1
  *
- * **El grupo lleva un ESPACIO: `DEMO 3`, no `DEMO3`.** Sin él, ICONICS
- * responde 500 y parece que el tag no existe.
+ * Ni por node id de OPC UA (`ua:DEMO3\[http://BMS_1]i=458..592`) ni por el
+ * grupo del historiador. Los tres caminos llevan al mismo dato; la diferencia
+ * está en de qué depende cada uno.
  *
- * Se comprobó el 25-08-2026 que estos nombres se pueden LEER EN VIVO por esta
- * ruta —los 119 tags del grupo devolvieron valor—, así que no hace falta el
- * mapa de node ids (`ua:DEMO3\[http://BMS_1]i=458..592`). Es preferible: un id
- * numérico se mueve al recompilar el programa del PLC; un nombre, no.
+ * ── POR QUÉ SE DEJÓ DE LEER POR `hda:` (27-08-2026) ────────────────
+ *
+ * Este catálogo nació apuntando al Hyper Historian —`hda:\Configuration\DEMO
+ * 3:`—, y se validó comprobando que los 119 tags del grupo devolvían valor.
+ * La comprobación fue verde y la decisión se cerró ahí; el problema es que
+ * medía el estado del historiador, no el del dato.
+ *
+ * Lo que se vio después: `DKW_S1` y `MonState_v_f_S3` tardaban **5 segundos
+ * clavados** y volvían sin valor y con calidad de error. No eran el sensor ni
+ * el PLC: por `ac:` los dos entregan lectura buena al instante. `DKW_S1`
+ * estaba declarado en el historiador pero SIN muestras (`Empty value`), y
+ * `MonState_v_f_S3` ni siquiera estaba declarado.
+ *
+ * Y el coste no lo pagaban esos dos puntos, sino la pantalla entera: el sondeo
+ * pide los 73 en UN solo lote, así que los otros 71 esperaban a que esos dos
+ * agotaran su plazo. Medido sobre el lote real:
+ *
+ *     los 73 por hda:                    ~5030 ms, 71 de 73 con valor
+ *     69 por ac: + 4 alarmas por ae:       11-30 ms, 73 de 73 con valor
+ *
+ * El fondo del asunto: `hda:` es el ARCHIVO y `ac:` es el VALOR EN VIVO. Esta
+ * pantalla mira el instante —`historizado` sigue en `false` más abajo, y no se
+ * afirma ninguna tendencia—, así que estaba pidiendo lecturas en vivo por la
+ * ruta del histórico. Funcionaba porque el historiador también sabe devolver
+ * el último valor, pero añadía dos condiciones que este uso no necesita: que
+ * cada punto esté declarado Y recogiendo.
+ *
+ * Se conserva lo que motivó la decisión original: esto sigue siendo un NOMBRE
+ * y no un node id, así que sigue sin moverse cuando se recompile el PLC.
+ *
+ * Las 4 alarmas NO cambian: son contadores de AlarmWorX (`ae:`), no puntos de
+ * activo, y responden bien. Ver `AREA_ALARMAS`.
+ *
+ * Para leer SERIES —el día que las haya— el sitio sigue siendo `hda:`. La ruta
+ * de activo es para el instante.
  *
  * ── LA HISTORIA ACABA DE EMPEZAR, Y TODAVÍA NO SE PROMETE ──────────
  *
@@ -55,8 +87,26 @@
  *                del margen útil.
  */
 
-/** Grupo del Hyper Historian. El espacio de «DEMO 3» es literal. */
-export const RAIZ_VIB = "hda:\\Configuration\\DEMO 3:";
+/**
+ * Rama de este motor en AssetWorX. Los puntos NO cuelgan de aquí directamente:
+ * cada apoyo tiene su carpeta (`S1/`, `S2/`, `S3/`) y el variador la suya
+ * (`V20/`). Enumerado con `Data/Browse` el 27-08-2026.
+ */
+export const RAIZ_VIB = "ac:TDCON/Motors/01/";
+
+/**
+ * Carpeta del variador dentro de la rama. Los tags `*_BMS` viven aquí y no
+ * junto a los apoyos —se comprobó pidiéndolos bajo `01/` y no respondían—.
+ */
+export const CARPETA_VARIADOR = "V20/";
+
+/**
+ * Grupo del Hyper Historian. Ya no se usa para leer el instante (ver la nota
+ * de cabecera), pero se conserva porque es donde vivirán las SERIES el día que
+ * el grupo registre de verdad. El espacio de «DEMO 3» es literal: sin él
+ * ICONICS responde 500 y parece que el tag no existe.
+ */
+export const GRUPO_HISTORIADOR = "hda:\\Configuration\\DEMO 3:";
 
 /**
  * ── LOS TRES CANALES ───────────────────────────────────────────────
@@ -503,12 +553,45 @@ export const VARIADOR_POR_CLAVE = Object.fromEntries(VARIADOR.map((v) => [v.key,
  */
 export const JANITZA_SIN_DATO = true;
 
+/**
+ * Carpeta de un canal dentro de la rama: `ac:TDCON/Motors/01/S1/`.
+ *
+ * Los tres apoyos son carpetas hermanas y el nombre de la carpeta es el id del
+ * canal, no su sufijo — coinciden hoy, pero son dos cosas distintas: el sufijo
+ * puede ser irregular (ver `sufijoDe`) y la carpeta nunca lo es.
+ */
+function carpetaDe(canal) {
+  return `${RAIZ_VIB}${canal.id}/`;
+}
+
+/**
+ * ── UN TAG MAL ESCRITO EN EL SERVIDOR ──────────────────────────────
+ *
+ * En `S1/` la alarma se llama **`Alarrma_S1`**, con dos erres. En S2 y S3 está
+ * bien escrita. Es un error de dedo en la configuración de ICONICS, visto al
+ * enumerar el árbol el 27-08-2026.
+ *
+ * Se respeta aquí por lo mismo que se respetan `MonState_vRMS_2` y
+ * `Sensor_state_1` más abajo: escribirlo «bien» pediría un punto que no
+ * existe, y el fallo no se vería —la pantalla enseñaría un guión y nadie
+ * sabría que el nombre estaba mal armado—.
+ *
+ * **Es una errata del servidor, no una convención.** Si se corrige allí, esta
+ * excepción sobra y hay que quitarla; la prueba de `verificar-riesgos-vibracion`
+ * lo detecta porque comprueba el nombre contra el servidor.
+ */
+const ERRATAS_DEL_SERVIDOR = { Alarma_S1: "Alarrma_S1" };
+
+function comoLoEscribeElServidor(nombre) {
+  return ERRATAS_DEL_SERVIDOR[nombre] ?? nombre;
+}
+
 /** Nombre completo del punto de una medida en un canal. */
 export function puntoMedida(medidaKey, canalId) {
   const m = MEDIDAS.find((x) => x.key === medidaKey);
   const c = CANAL[canalId];
   if (!m || !c) return null;
-  return `${RAIZ_VIB}${m.tag}_${c.sufijo}`;
+  return `${carpetaDe(c)}${m.tag}_${c.sufijo}`;
 }
 
 /** Nombre completo del punto de una bandera en un canal. */
@@ -516,7 +599,7 @@ export function puntoBandera(banderaKey, canalId) {
   const b = BANDERAS.find((x) => x.key === banderaKey);
   const c = CANAL[canalId];
   if (!b || !c) return null;
-  return `${RAIZ_VIB}${b.tag}_${c.sufijo}`;
+  return `${carpetaDe(c)}${comoLoEscribeElServidor(`${b.tag}_${c.sufijo}`)}`;
 }
 
 /**
@@ -542,7 +625,7 @@ export function puntoVigilancia(vigilanciaKey, canalId) {
   const v = VIGILANCIAS.find((x) => x.key === vigilanciaKey);
   const c = CANAL[canalId];
   if (!v || !c) return null;
-  return `${RAIZ_VIB}${v.tag}_${sufijoDe(v.tag, c)}`;
+  return `${carpetaDe(c)}${v.tag}_${sufijoDe(v.tag, c)}`;
 }
 
 /** Nombre completo del punto de una confianza en un canal. */
@@ -550,19 +633,19 @@ export function puntoCalidad(calidadKey, canalId) {
   const q = CALIDADES.find((x) => x.key === calidadKey);
   const c = CANAL[canalId];
   if (!q || !c) return null;
-  return `${RAIZ_VIB}${q.tag}_${c.sufijo}`;
+  return `${carpetaDe(c)}${q.tag}_${c.sufijo}`;
 }
 
 /** Estado del propio sensor (montaje y cableado), por canal. */
 export function puntoSensor(canalId) {
   const c = CANAL[canalId];
-  return c ? `${RAIZ_VIB}Sensor_state_${sufijoDe("Sensor_state", c)}` : null;
+  return c ? `${carpetaDe(c)}Sensor_state_${sufijoDe("Sensor_state", c)}` : null;
 }
 
-/** Nombre completo de un punto del variador. */
+/** Nombre completo de un punto del variador, que vive en su propia carpeta. */
 export function puntoVariador(key) {
   const v = VARIADOR_POR_CLAVE[key];
-  return v ? `${RAIZ_VIB}${v.tag}` : null;
+  return v ? `${RAIZ_VIB}${CARPETA_VARIADOR}${v.tag}` : null;
 }
 
 /**

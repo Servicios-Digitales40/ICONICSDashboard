@@ -47,6 +47,7 @@ import {
   RPM_MINIMA_ISO,
   MEDIDAS,
   parsePunto,
+  puntoBandera,
   puntoMedida,
   puntoVariador,
   puntoVigilancia,
@@ -122,19 +123,40 @@ const noEvaluable = (res, id, canal = null) =>
 
 console.log(`\n${c.negrita}── El catálogo de puntos ───────────────────────────────────${c.reset}`)
 
-check('la raíz lleva el espacio de «DEMO 3»', () => {
+check('el instante se lee por AssetWorX, no por el historiador', () => {
   /*
-   * `DEMO3` sin espacio devuelve HTTP 500 y parece que el tag no existe. Es un
-   * fallo silencioso y caro, así que se fija aquí.
+   * Se leía por `hda:\Configuration\DEMO 3:` y se cambió el 27-08-2026: dos
+   * puntos que el historiador no tenía recogidos (`DKW_S1` sin muestras,
+   * `MonState_v_f_S3` ni declarado) costaban 5 s de espera al lote ENTERO,
+   * porque los 73 van en una sola petición. Por `ac:` los dos entregan lectura
+   * buena y el lote baja a ~14 ms.
+   *
+   * Volver a `hda:` para leer el instante reintroduciría eso, así que se fija
+   * aquí. Para SERIES el sitio sigue siendo el historiador.
    */
-  assert.ok(RAIZ_VIB.includes('DEMO 3'), `la raíz es «${RAIZ_VIB}»`)
-  assert.ok(!RAIZ_VIB.includes('DEMO3:'), 'no puede llevar «DEMO3» sin espacio')
+  assert.ok(RAIZ_VIB.startsWith('ac:'), `la raíz es «${RAIZ_VIB}»`)
+  assert.ok(!RAIZ_VIB.startsWith('hda:'), 'el instante no se pide al historiador')
 })
 
 check('los puntos se construyen como los devuelve el servidor', () => {
-  assert.equal(puntoMedida('vRMS', 'S1'), 'hda:\\Configuration\\DEMO 3:vRMS_S1')
-  assert.equal(puntoMedida('aRMS', 'S3'), 'hda:\\Configuration\\DEMO 3:aRMS_S3')
-  assert.equal(puntoVariador('velocidad'), 'hda:\\Configuration\\DEMO 3:SPEED_BMS')
+  assert.equal(puntoMedida('vRMS', 'S1'), 'ac:TDCON/Motors/01/S1/vRMS_S1')
+  assert.equal(puntoMedida('aRMS', 'S3'), 'ac:TDCON/Motors/01/S3/aRMS_S3')
+  // El variador vive en su propia carpeta: bajo `01/` no responde.
+  assert.equal(puntoVariador('velocidad'), 'ac:TDCON/Motors/01/V20/SPEED_BMS')
+})
+
+check('la errata «Alarrma_S1» del servidor se respeta, y sólo en S1', () => {
+  /*
+   * En `S1/` la alarma está escrita con dos erres en ICONICS; en S2 y S3 no.
+   * Escribirla «bien» pediría un punto inexistente y la pantalla enseñaría un
+   * guión sin que nadie supiera por qué.
+   *
+   * Si alguien corrige el nombre en el servidor, esta prueba falla — que es lo
+   * que se quiere: obliga a quitar la excepción en vez de dejarla arrastrada.
+   */
+  assert.equal(puntoBandera('alarma', 'S1'), 'ac:TDCON/Motors/01/S1/Alarrma_S1')
+  assert.equal(puntoBandera('alarma', 'S2'), 'ac:TDCON/Motors/01/S2/Alarma_S2')
+  assert.equal(puntoBandera('alarma', 'S3'), 'ac:TDCON/Motors/01/S3/Alarma_S3')
 })
 
 check('parsePunto es el inverso exacto, y rechaza lo que no reconoce', () => {
@@ -148,8 +170,13 @@ check('parsePunto es el inverso exacto, y rechaza lo que no reconoce', () => {
      un cambio en el servidor debe verse como dato ausente, nunca como una
      asignación a la señal equivocada. */
   assert.equal(parsePunto('ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE'), null)
-  assert.equal(parsePunto('hda:\\Configuration\\DEMO 3:INVENTADO_S1'), null)
+  assert.equal(parsePunto('ac:TDCON/Motors/01/S1/INVENTADO_S1'), null)
   assert.equal(parsePunto(null), null)
+  /* El nombre VIEJO de un punto que sí existe: se leía así hasta el
+     27-08-2026. Tiene que dar `null` como cualquier otro desconocido — si
+     `parsePunto` siguiera aceptándolo, un resto de código apuntando al
+     historiador pasaría inadvertido en vez de verse como dato ausente. */
+  assert.equal(parsePunto('hda:\\Configuration\\DEMO 3:vRMS_S1'), null)
 })
 
 check('hay TRES canales, no dos', () => {
@@ -193,19 +220,19 @@ check('el catálogo no promete historia que no existe', () => {
 
 check('el catálogo abarca DOS espacios de nombres, no uno', () => {
   /*
-   * Las medidas viven en el historiador (`hda:`) y las alarmas en el servidor
-   * de alarmas (`ae:`). Son subsistemas distintos de ICONICS y fallan por
-   * separado —el 26-08-2026 el historial de alarmas daba 500 mientras los
+   * Las medidas viven en el árbol de activos (`ac:`) y las alarmas en el
+   * servidor de alarmas (`ae:`). Son subsistemas distintos de ICONICS y fallan
+   * por separado —el 26-08-2026 el historial de alarmas daba 500 mientras los
    * contadores del área respondían—, así que el sondeo tiene que pedir de los
    * dos y no dar por hecho que si uno va, va el otro.
    */
   const puntos = todosLosPuntos()
-  const enHistoriador = puntos.filter((p) => p.startsWith(RAIZ_VIB))
+  const enActivos = puntos.filter((p) => p.startsWith(RAIZ_VIB))
   const enAlarmas = puntos.filter((p) => p.startsWith(AREA_ALARMAS))
 
-  assert.ok(enHistoriador.length > 50, `sólo ${enHistoriador.length} del historiador`)
+  assert.ok(enActivos.length > 50, `sólo ${enActivos.length} del árbol de activos`)
   assert.equal(enAlarmas.length, CONTADORES_ALARMA.length, 'los contadores del área')
-  assert.equal(enHistoriador.length + enAlarmas.length, puntos.length,
+  assert.equal(enActivos.length + enAlarmas.length, puntos.length,
     'ningún punto se queda fuera de los dos espacios')
 })
 
@@ -576,9 +603,9 @@ check('los nombres irregulares del servidor se respetan tal cual', () => {
    * número suelto. Está así en el servidor: «arreglarlo» pediría un tag que no
    * existe y el punto volvería vacío sin que nadie se enterase.
    */
-  assert.equal(puntoVigilancia('monVRMS', 'S2'), 'hda:\\Configuration\\DEMO 3:MonState_vRMS_2')
-  assert.equal(puntoVigilancia('monVRMS', 'S1'), 'hda:\\Configuration\\DEMO 3:MonState_vRMS_S1')
-  assert.equal(puntoVigilancia('bpfo', 'S3'), 'hda:\\Configuration\\DEMO 3:MonState_e_f_BPFO_S3')
+  assert.equal(puntoVigilancia('monVRMS', 'S2'), 'ac:TDCON/Motors/01/S2/MonState_vRMS_2')
+  assert.equal(puntoVigilancia('monVRMS', 'S1'), 'ac:TDCON/Motors/01/S1/MonState_vRMS_S1')
+  assert.equal(puntoVigilancia('bpfo', 'S3'), 'ac:TDCON/Motors/01/S3/MonState_e_f_BPFO_S3')
 })
 
 check('parsePunto sigue siendo el inverso exacto de TODAS las familias', () => {

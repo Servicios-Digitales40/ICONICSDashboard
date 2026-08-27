@@ -83,7 +83,7 @@ export const SISTEMAS = [
     nombre: "Sistema de vibraciones",
     maquina: "Motor WEG W22 143/5T, 2 HP (1,5 kW), 2 polos, con SIPLUS CMS 1200 SM 1281",
     plc: "PLC_2 · ua:DEMO3",
-    raiz: "hda:\\Configuration\\DEMO 3:",
+    raiz: "ac:TDCON/Motors/01/",
     mide: [
       "velocidad eficaz, aceleración eficaz, pico y valor de daño en TRES apoyos",
       "estado de las vigilancias del módulo, incluidas las frecuencias de defecto de rodamiento",
