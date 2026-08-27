@@ -1268,13 +1268,18 @@ await checkAsync('resumirSerie sin rejilla sigue funcionando, sin cobertura', as
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son diecisiete herramientas, y sólo una de ellas escribe', () => {
+check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
     /* Las cuatro de sistemas van primero a propósito: `sistemas_de_la_planta`
        es la que el modelo tiene que encontrar cuando no sabe de qué máquina le
        hablan, y el orden del catálogo es lo primero que lee. */
+    /* Las tres de aprendizaje escriben, pero en un JSON nuestro: ninguna toca
+       el servidor de planta. La única que sí lo toca sigue siendo una. */
+    'hechos_de_la_planta',
+    'recordar_hecho',
+    'proponer_regla',
     'sistemas_de_la_planta',
     'riesgos_activos',
     'estado_de_vibraciones',

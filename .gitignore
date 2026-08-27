@@ -29,3 +29,9 @@ npm-debug.log*
 Thumbs.db
 
 
+
+# Datos que genera el backend en marcha: reportes en PDF y lo que el
+# asistente va aprendiendo. Lo DURADERO no vive aqui: cuando un hecho
+# demuestra que vale, se sube a HECHOS_INICIALES en shared/eva/aprendizaje.js,
+# donde pasa por revision como cualquier otro codigo.
+datos/
