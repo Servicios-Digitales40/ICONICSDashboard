@@ -602,3 +602,63 @@ button {
   transform-box: fill-box;
   transform-origin: center;
 }
+/* Predicción (Beta) · MetroPT-3 V4.4 */
+.prediction-beta-grid {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(0, 1.8fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.prediction-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prediction-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.35fr);
+  gap: 22px;
+}
+
+.prediction-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prediction-technical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 1180px) {
+  .prediction-beta-grid {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.4fr);
+  }
+
+  .prediction-kpi-grid,
+  .prediction-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prediction-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 840px) {
+  .prediction-beta-grid,
+  .prediction-technical-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .prediction-kpi-grid,
+  .prediction-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
