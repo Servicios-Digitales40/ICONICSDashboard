@@ -67,13 +67,9 @@ function ControlesVibraciones({ onNavigate }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <AlertBanner
         type="warning"
-        title="Esta vista todavía no está construida, y no hay ningún botón a propósito"
+        title="Esta vista todavía no está construida"
         message={
-          "Aquí vivirán el encendido y el apagado de esta máquina. No hay un botón de " +
-          "muestra porque esta pantalla ESCRIBE en el PLC: uno que no hiciera nada enseñaría " +
-          "a pulsar controles que no responden, y uno que hiciera algo arrancaría un motor " +
-          "sin que nadie haya revisado sus guardas. Los controles de la estación de llenado " +
-          "sí funcionan y están en su propia sección."
+          "Aquí vivirán el encendido y el apagado de esta máquina"
         }
       />
 
@@ -88,10 +84,7 @@ function ControlesVibraciones({ onNavigate }) {
         <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
           Encendido y apagado del sistema de vibraciones
         </div>
-        <p style={{ margin: 0, maxWidth: "56ch", textAlign: "center", fontSize: 13, color: t.textSoft, lineHeight: 1.6 }}>
-          Mientras tanto, el estado de la máquina —si gira, a qué régimen y con qué carga—
-          se lee en «Gráficas», y lo que se deduce de él en «Riesgos».
-        </p>
+
         <button
           type="button"
           onClick={() => onNavigate?.("eva-vibraciones")}
@@ -107,27 +100,6 @@ function ControlesVibraciones({ onNavigate }) {
         </button>
       </div>
 
-      <SectionLabel>Qué falta antes de que esto exista</SectionLabel>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {PENDIENTE.map((p) => (
-          <div
-            key={p.titulo}
-            style={{
-              display: "flex", gap: 10, padding: 14, borderRadius: 12,
-              background: t.panel, border: `1px solid ${t.border}`,
-            }}
-          >
-            <ShieldAlert size={16} color={t.textFaint} style={{ flexShrink: 0, marginTop: 2 }} />
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: t.text }}>{p.titulo}</div>
-              <div style={{ fontSize: 12, color: t.textSoft, marginTop: 3, lineHeight: 1.55 }}>
-                {p.porque}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
