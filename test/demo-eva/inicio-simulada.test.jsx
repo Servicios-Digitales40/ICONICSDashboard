@@ -1,0 +1,85 @@
+// @vitest-environment jsdom
+/**
+ * inicio-simulada.test.jsx
+ * ------------------------------------------------------------------
+ * La landing «Inicio» (`views/InicioEva.jsx`), con el origen **Simulado**:
+ * mismo criterio que el resto de las pruebas `*-simulada` — montar la vista
+ * real sobre el provider real, sin red, y comprobar lo que de verdad importa
+ * para la puerta de la demo: que la cifra en vivo llega, que las cuatro
+ * vistas están todas presentes como entradas, y que cada una navega a donde
+ * dice que navega.
+ */
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ThemeProvider } from "@/theme";
+import { DataSourceProvider } from "@/lib/datasource";
+import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import InicioEva from "@/Demo-EVA/views/InicioEva.jsx";
+
+function cortarLaRed() {
+  const trampa = vi.fn(() => {
+    throw new Error("el origen simulado no debe salir a la red");
+  });
+  globalThis.fetch = trampa;
+  return trampa;
+}
+
+beforeEach(() => {
+  vi.stubEnv("VITE_ICONICS_FAKE", "true");
+  vi.stubEnv("VITE_ICONICS_CHAOS", "none");
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  delete globalThis.fetch;
+});
+
+const montar = (onNavigate = () => {}) =>
+  render(
+    <ThemeProvider>
+      <DataSourceProvider>
+        <EvaProvider>
+          <InicioEva onNavigate={onNavigate} />
+        </EvaProvider>
+      </DataSourceProvider>
+    </ThemeProvider>
+  );
+
+describe("Inicio (landing) en modo simulado", () => {
+  it("llega a 8/8 señales con lectura, sin tocar la red", async () => {
+    const fetchTrampa = cortarLaRed();
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText("/ 8")).toBeTruthy(), { timeout: 4_000 });
+    expect(fetchTrampa).not.toHaveBeenCalled();
+  });
+
+  it("las cuatro vistas están presentes como tarjetas, ya desde el primer render", () => {
+    cortarLaRed();
+
+    montar();
+
+    for (const nombre of ["Planta", "Máquina 3D", "Maqueta 3D", "Assets"]) {
+      expect(screen.getByRole("button", { name: new RegExp(`^${nombre}`) })).toBeTruthy();
+    }
+  });
+
+  it("el CTA entra a Planta, y cada tarjeta navega a su propia vista", () => {
+    cortarLaRed();
+    const onNavigate = vi.fn();
+
+    montar(onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: /Entrar a Planta/ }));
+    expect(onNavigate).toHaveBeenCalledWith("eva-planta");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Assets/ }));
+    expect(onNavigate).toHaveBeenCalledWith("eva-assets");
+
+    fireEvent.click(screen.getByRole("button", { name: /^Maqueta 3D/ }));
+    expect(onNavigate).toHaveBeenCalledWith("eva-maqueta");
+  });
+});

@@ -1,0 +1,664 @@
+/**
+ * Estilos globales: importación de fuentes, reset mínimo, variables CSS por
+ * tema y todas las animaciones @keyframes de la app.
+ *
+ * La mayoría de los colores se aplican por estilos inline desde JS
+ * (theme/themes.js → useTheme). Este archivo cubre el resto: fuentes, reset,
+ * keyframes y un puñado de variables para pseudo-clases como :hover y :focus,
+ * que no pueden leer el estado de React.
+ */
+
+/* impeccable-disable-next-line overused-font -- tipografía establecida del sistema, ver DESIGN.md § Typography; ya está en cada componente */
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+
+/* Reset mínimo */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif; /* impeccable-disable-line overused-font -- ver nota junto al @import */
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: "Inter", sans-serif; /* impeccable-disable-line overused-font -- ver nota junto al @import */
+}
+
+/* Variables por tema (para :hover / :focus / pseudo-elementos) */
+:root[data-theme="light"] {
+  --color-hover: #f1f3f8;
+  --color-border: #e7eaf0;
+  --color-accent: #3654e0;
+  --color-accent-soft: #eef0fd;
+  --grad-accent: linear-gradient(135deg, #3654e0 0%, #6c86f0 100%);
+}
+
+:root[data-theme="dark"] {
+  --color-hover: #1b2333;
+  --color-border: #232b3b;
+  --color-accent: #5c82f5;
+  /* Sincronizado con theme/themes.js (dark.accentSoft, dark.gradAccent) tras
+     el hallazgo de contraste de /impeccable audit 2026-08-26 — ver el
+     comentario junto a esos tokens para el porqué de cada valor. Este
+     archivo mantiene su propia copia porque las pseudo-clases de abajo no
+     pueden leer el estado de React (nota de cabecera), así que un cambio en
+     themes.js sin este archivo deja el :focus de campos usando el valor
+     viejo aunque el resto de la app ya muestre el nuevo. */
+  --color-accent-soft: #181e2c;
+  --grad-accent: linear-gradient(135deg, #5c82f5 0%, #7690f0 100%);
+}
+
+/* Mismo hover/borde que "light" — sólo cambia el acento, ver themes.js */
+:root[data-theme="mitsubishi"] {
+  --color-hover: #f1f3f8;
+  --color-border: #e7eaf0;
+  --color-accent: #c40001;
+  --color-accent-soft: #fff2f2;
+  --grad-accent: linear-gradient(135deg, #c40001 0%, #ff5454 100%);
+}
+
+/* Utilidades que dependen de las variables de arriba */
+.field:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.table-row:hover {
+  background: var(--color-hover);
+}
+
+.nav-item:hover:not(.nav-active) {
+  background: var(--color-hover);
+}
+
+/* Micro-interacciones genéricas */
+.app-btn:hover {
+  transform: translateY(-1px);
+}
+
+.app-btn:active {
+  transform: translateY(0);
+}
+
+/*
+ * Anillo de foco para navegación por teclado. Mismos valores que
+ * `.metric-card:focus-visible`, más arriba: es el mismo token de foco del
+ * sistema (ver DESIGN.md, "Anillo de foco"), aplicado a las dos clases de
+ * botón más repetidas del tablero y que hasta ahora no lo llevaban — quien
+ * navega con Tab por el Sidebar o por cualquier `.app-btn` no tenía ninguna
+ * marca de dónde estaba parado.
+ */
+.nav-item:focus-visible,
+.app-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.shuffle-btn:hover {
+  transform: translateY(-1px);
+}
+
+.toggle-track:hover {
+  filter: brightness(1.08);
+}
+
+.chip {
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+/* Tarjetas: la sombra de hover se pasa como custom property inline
+   (--shadow-hover) desde el componente Panel/metric-card, así cada
+   tarjeta puede tener su propio tinte de sombra sin depender de CSS global. */
+.panel-card {
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.panel-card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.metric-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+}
+
+.metric-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Morph Planta → Maqueta 3D (View Transitions API)
+   Los cuatro activos son un conjunto fijo (`shared/eva/activos.js`), así que
+   se listan por nombre en vez de un selector genérico: `activo-tanque`,
+   `activo-bombeo`, `activo-distribucion`, `activo-electrico`. Misma curva que
+   ya usan el arco del héroe y la barra de márgenes (`cubic-bezier(0.22,1,
+   0.36,1)`), para que un morph entre vistas se sienta de la misma familia que
+   el resto de las transiciones de la app y no como un efecto aparte.
+   navegarConMorph (lib/motion.js) no dispara esto si el usuario pidió menos
+   movimiento: cae a una navegación normal, sin tocar esta regla. */
+::view-transition-group(activo-tanque),
+::view-transition-group(activo-bombeo),
+::view-transition-group(activo-distribucion),
+::view-transition-group(activo-electrico) {
+  animation-duration: 700ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Movimiento reducido
+   Respeta la preferencia del sistema. Además del motivo de
+   accesibilidad, en el comparativo hay una razón funcional: al iterar
+   fechas con los atajos, las gráficas volvían a animarse en cada cambio
+   y el parpadeo hacía imposible seguir la diferencia entre un día y el
+   siguiente. Las gráficas de esa vista ya entran sin animación; esto
+   cubre el resto de la app. */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+     /* El retraso también hay que anularlo: las entradas escalonadas usan
+       `animation-delay` con relleno `both`, así que con la duración a cero
+       pero el retraso intacto cada tarjeta se queda en su fotograma inicial
+       (opacidad 0) durante todo su delay, y media página aparece en blanco. */
+    animation-delay: 0ms !important;
+  }
+
+  .panel-card:hover,
+  .metric-card:hover,
+  .app-btn:hover,
+  .app-btn:active {
+    transform: none;
+  }
+}
+
+/* Comparativo: layout espejo
+   Las dos fechas se reflejan con un canal central estrecho para los
+   deltas. Vive en CSS y no inline porque necesita una media query: por
+   debajo de 900px el espejo deja de tener sentido (las columnas se
+   aplastan) y se apila en vertical, con el canal de deltas convertido
+   en una fila horizontal entre A y B. */
+.cmp-mirror {
+  display: grid;
+  grid-template-columns: 1fr 116px 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.cmp-channel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+@media (max-width: 900px) {
+  .cmp-mirror {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  /* El canal pasa a fila y se coloca entre las dos columnas. */
+  .cmp-channel {
+    order: 2;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 8px;
+    padding: 12px 0;
+  }
+
+  .cmp-side-b {
+    order: 3;
+  }
+}
+
+/* Relleno del área de contenido, bajo el Topbar.
+   Vive aquí porque lo lleva CADA vista, no una en particular — el mismo
+   criterio que ya reparte `.blob`, `.page-fade` y el resto del cromado del
+   Shell. Por debajo de 720px (el mismo punto en el que `PlantaEva` renuncia
+   a su rejilla, ver ese archivo) el padding lateral de 32px es una fracción
+   demasiado grande de un viewport que ya va sobrado de estrecho. */
+.eva-page-shell {
+  padding: 26px 32px 50px;
+}
+
+@media (max-width: 720px) {
+  .eva-page-shell {
+    padding: 18px 16px 36px;
+  }
+}
+
+/* Scrollbar delgado (paneles con overflow) */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+/* ANIMACIONES */
+
+/* Entradas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-fade {
+  animation: fadeIn 0.35s ease both;
+}
+
+.row-fade {
+  animation: fadeInUp 0.4s ease both;
+}
+
+/* Manchas decorativas de fondo */
+@keyframes blobFloat {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -20px) scale(1.08);
+  }
+
+  66% {
+    transform: translate(-20px, 15px) scale(0.95);
+  }
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  animation: blobFloat 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Loaders */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+.spin-slow {
+  animation: spin 2.2s linear infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes pulsering {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+/* Acuse de recibo de UltimaLectura (base.jsx): un solo disparo por lectura
+   nueva, nunca en bucle — la regla de movimiento de lib/motion.js aplicada a
+   un dato que llega en vivo. React vuelve a montar este `<span>` en cada
+   `key` nueva, así que la animación siempre arranca desde cero. */
+.pulso-lectura {
+  animation: pulsering 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes orbitspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin {
+  animation: orbitspin 1.4s linear infinite;
+}
+
+@keyframes sweepmove {
+  0% {
+    left: -40%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
+
+.sweep-bar {
+  animation: sweepmove 1.3s ease-in-out infinite;
+}
+
+.shuffle-icon-spin {
+  animation: spin 0.5s ease;
+}
+
+/* Tooltips */
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.tooltip-pop {
+  animation: tooltipIn 0.15s ease both;
+}
+
+/* Toasts */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-in {
+  animation: toastIn 0.25s ease both;
+}
+
+/* Modal */
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-pop {
+  animation: modalIn 0.22s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.modal-overlay {
+  animation: fadeIn 0.18s ease both;
+}
+
+
+/* Alarma
+   El único bucle permitido en los tableros de planta; ver la nota de
+   `lib/motion.js`. Si parpadean varias cosas a la vez, el ojo aprende a
+   ignorarlas todas, incluida esta.
+
+   Los colores llegan como custom properties inline desde el componente
+   (mismo patrón que `--shadow-hover` en Panel), porque un @keyframes no
+   puede leer el tema de React y el latido tiene que funcionar en claro y
+   en oscuro con los tokens de cada uno. */
+@keyframes alertaLatido {
+  0%,
+  100% {
+    background: var(--alerta-base);
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  55% {
+    background: var(--alerta-tinte);
+    box-shadow: 0 0 0 3px var(--alerta-halo), 0 0 22px 2px var(--alerta-halo);
+  }
+}
+
+/* El icono de la franja de atención respira al mismo compás que las
+   tarjetas en alarma: un solo pulso en toda la página, no dos ritmos. */
+@keyframes alertaIcono {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  55% {
+    transform: scale(1.16);
+    opacity: 0.7;
+  }
+}
+
+.alerta-icono {
+  animation: alertaIcono 2.4s ease-in-out infinite;
+}
+
+/* Trazado de líneas (sparklines)
+   Depende de que el <path> declare `pathLength="100"`, que normaliza la
+   longitud real del trazo a 100 unidades. Así el mismo keyframe sirve para
+   cualquier serie sin tener que medir la ruta en JS. */
+@keyframes trazoDibujo {
+  from {
+    stroke-dashoffset: 100;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.trazo-dibujo {
+  stroke-dasharray: 100;
+  animation: trazoDibujo 900ms ease-out both;
+}
+
+/* Revelado de GraficaHistoria (detalle de activo): la curva no aparece
+   hecha, se descubre de izquierda a derecha una sola vez al montar la
+   tarjeta — misma familia que `.trazo-dibujo`, en clip-path porque el área
+   la pinta Recharts y no hay un único `<path>` que trazar. Sólo corre al
+   crear el nodo (primera carga o cambio de activo); una muestra en vivo o un
+   cambio de rango sólo actualizan el `d` interno del área ya revelada, así
+   que no la repite — por eso `<Area isAnimationActive={false}>` sigue
+   apagado, para no sumarle la propia repetición de Recharts en cada
+   actualización. */
+@keyframes graficaRevela {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.grafica-revela {
+  animation: graficaRevela 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Animaciones extra para los gauges KPI */
+@keyframes gaugeGlowPulse {
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+.gauge-glow {
+  animation: gaugeGlowPulse 2.8s ease-in-out infinite;
+}
+
+/* Sólo escala, nunca opacidad: el elemento ya lleva su opacidad de reposo
+   propia (p. ej. las marcas de umbral del arco de nivel, a 0.45), y animar
+   opacity aquí la sobrescribiría a 1 de forma permanente (animation-fill-mode:
+   both). Aparecer ya visible y sólo crecer es además el patrón que pide el
+   resto del sistema de movimiento. */
+@keyframes tickDrawIn {
+  from {
+    transform: scale(0.4);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+.tick-draw {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tickDrawIn 0.4s ease both;
+}
+
+@keyframes iconFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.icon-float {
+  animation: iconFloat 2.4s ease-in-out infinite;
+}
+
+@keyframes hubPulse {
+
+  0%,
+  100% {
+    r: 9;
+  }
+
+  50% {
+    r: 10.5;
+  }
+}
+
+.hub-pulse {
+  animation: hubPulse 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* Predicción (Beta) · MetroPT-3 V4.4 */
+.prediction-beta-grid {
+  display: grid;
+  grid-template-columns: minmax(270px, 0.72fr) minmax(0, 1.8fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.prediction-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prediction-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.35fr);
+  gap: 22px;
+}
+
+.prediction-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prediction-technical-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+@media (max-width: 1180px) {
+  .prediction-beta-grid {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.4fr);
+  }
+
+  .prediction-kpi-grid,
+  .prediction-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prediction-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 840px) {
+  .prediction-beta-grid,
+  .prediction-technical-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .prediction-kpi-grid,
+  .prediction-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
