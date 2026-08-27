@@ -518,9 +518,7 @@ function InicioVibraciones({ onNavigate }) {
 
             <p className="vib-inicio-hero__frase" style={{ color: t.textSoft }}>
               Ésta es <strong>otra máquina</strong>: su propio motor, su propio variador y su
-              propio PLC. No comparte nada con la estación de llenado más que la planta y el
-              servidor, así que ninguna lectura de aquí explica una de allí. Y de este sistema
-              todavía no se usa el histórico: lo que se ve es el instante, sin tendencias.
+              propio PLC.  Y este sistema todavía no se usa el histórico: lo que se ve es el instante, sin tendencias.
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
