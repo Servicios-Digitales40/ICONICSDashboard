@@ -50,7 +50,8 @@
  */
 import { lazy } from "react";
 import {
-  Bell, Box, Boxes, Cog, Droplets, Factory, Home, LayoutDashboard, Power, ShieldAlert, Waves,
+  Bell, Box, Boxes, BrainCircuit, Cog, Droplets, Factory, Home, LayoutDashboard, Power,
+  ShieldAlert, Waves,
 } from "lucide-react";
 
 /**
@@ -237,6 +238,38 @@ export const ROUTES = [
     title: "Assets",
     sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
     nav: { label: "Assets", icon: <Boxes size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ ESTA VISTA VA EN «GENERAL» Y NO EN UNA MÁQUINA ─────────
+     *
+     * Porque no habla de ninguna de las dos. Las otras pantallas de este
+     * registro leen el servidor ICONICS de ESTA planta; ésta consulta OTRO
+     * backend —Django, en el puerto 8000— que reproduce el conjunto de datos
+     * público MetroPT-3, que son compresores de metro.
+     *
+     * Colgarla de «Estación de llenado» o de «Estación de vibraciones» diría
+     * que sus curvas son de ese tanque o de ese motor, y no lo son. Ése es
+     * justo el cruce que la partición del sidebar existe para impedir, y aquí
+     * sería peor que entre las dos máquinas de la planta: al menos ésas
+     * comparten servidor.
+     *
+     * ── POR QUÉ «BETA» VA EN EL RÓTULO ─────────────────────────────────
+     *
+     * Porque depende de un servicio que puede no estar levantado. Si el
+     * backend predictivo no responde, la pantalla no puede enseñar nada; el
+     * resto del tablero no tiene esa dependencia. El rótulo lo dice antes de
+     * que alguien lo descubra con una pantalla vacía.
+     *
+     * Su dirección se configura con `VITE_PREDICTION_API_BASE`; sin esa
+     * variable apunta al mismo host del tablero en el puerto 8000.
+     */
+    id: "eva-prediccion",
+    component: lazy(() => import("@/Demo-EVA/views/PrediccionBeta.jsx")),
+    title: "Predicción (Beta)",
+    sub: "Reproducción histórica MetroPT-3 · consulta del backend predictivo V4.4",
+    nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-general" },
   },
 
   {
