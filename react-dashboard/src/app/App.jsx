@@ -56,8 +56,8 @@ export default function App() {
           {/* EvaProvider por encima del Shell, no por vista (Plan 16): toda la
               app es Demo EVA desde que se retiró el tablero de Resonac, así
               que un solo motor de sondeo alcanza para las ocho señales Y para
-              EstadoMaquinaBanner, que necesita verse en cualquier pestaña sin
-              volver a montar su propia fuente. Ver la cabecera de
+              EstadoMaquinaBanner, que cruza las pestañas de la estación de
+              llenado sin volver a montar su propia fuente. Ver la cabecera de
               `Demo-EVA/data/EvaProvider.jsx`. */}
           <EvaProvider>
             <ToastProvider>

@@ -1,6 +1,22 @@
 /**
- * Indicador permanente de si la bomba está encendida o apagada, siempre
- * visible en la esquina superior izquierda del Topbar, en cualquier pestaña.
+ * Indicador permanente de si la bomba está encendida o apagada, visible en la
+ * esquina superior izquierda del Topbar en las pestañas de LA ESTACIÓN DE
+ * LLENADO.
+ *
+ * ── POR QUÉ NO EN TODAS LAS PESTAÑAS ───────────────────────────────
+ *
+ * Porque la bomba es de UNA máquina. Nació cuando toda la aplicación era la
+ * estación de llenado y «la máquina» no era ambiguo; desde que la planta se
+ * partió en dos sistemas, el mismo indicador junto al título de una pantalla
+ * de vibraciones dice «Encendida» sobre una instalación que no es la que se
+ * está mirando — y el Topbar es el peor sitio para ese cruce, porque se lee
+ * como contexto de lo que hay debajo.
+ *
+ * Quién lo enseña y quién no lo decide el Topbar a partir de la sección de la
+ * página (`SECCION_DE_PAGINA`), no este archivo: el componente sigue sabiendo
+ * sólo de su tag. Cuando la máquina de vibraciones tenga su propio control,
+ * lo que hará falta es OTRO indicador con su propio tag —«encendida» no
+ * significa lo mismo en las dos—, no una condición más aquí.
  *
  * ── POR QUÉ HACE FALTA, SI YA HAY UN INDICADOR EN CONTROLES ────────
  *

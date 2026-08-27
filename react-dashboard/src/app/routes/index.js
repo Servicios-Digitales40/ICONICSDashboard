@@ -22,5 +22,23 @@ export const PAGE_META = Object.fromEntries(
   ROUTES.map((r) => [r.id, { title: r.title, sub: r.sub }])
 );
 
+/**
+ * id de página → id de su sección del sidebar (`sec-llenado`,
+ * `sec-vibraciones`, `sec-general`), o `null` si la ruta no está en ninguna.
+ *
+ * Existe para que nadie tenga que preguntar «¿esta pantalla es de la estación
+ * de llenado?» con una lista de ids escrita a mano. Esa lista es una copia del
+ * registro, y una copia se queda vieja en cuanto alguien añada una vista: la
+ * pantalla nueva heredaría la respuesta equivocada sin que nada lo delate.
+ *
+ * Lo consume el Topbar para decidir si el indicador de encendido de la bomba
+ * tiene algo que decir en la pestaña actual — ese indicador lee un tag del
+ * TANQUE, así que en una pantalla de vibraciones estaría enseñando el estado
+ * de la máquina equivocada.
+ */
+export const SECCION_DE_PAGINA = Object.fromEntries(
+  ROUTES.map((r) => [r.id, r.nav?.group ?? null])
+);
+
 /** Árbol del sidebar, en orden. Ver `buildNav.js` para las reglas de orden. */
 export const NAV = buildNav(ROUTES, NAV_GROUPS);

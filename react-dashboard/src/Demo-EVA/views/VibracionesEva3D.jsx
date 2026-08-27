@@ -35,7 +35,7 @@
  */
 import { Box, Waves } from "lucide-react";
 
-import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { AlertBanner } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { CANALES } from "../domain/vibraciones.js";
@@ -49,11 +49,7 @@ function VibracionesEva3D({ onNavigate }) {
         type="info"
         title="Esta vista todavía no está construida"
         message={
-          "El gemelo digital del sistema de vibraciones va a vivir aquí. No hay una escena " +
-          "provisional a propósito: un motor genérico girando junto a lecturas reales se " +
-          "leería como la máquina real, y hoy la mayoría de sus puntos no entregan dato. " +
-          "Mientras tanto, las medidas están en «Gráficas» y lo que se deduce de ellas " +
-          "en «Riesgos»."
+          "El gemelo digital del sistema de vibraciones va a vivir aquí."
         }
       />
 
@@ -68,11 +64,6 @@ function VibracionesEva3D({ onNavigate }) {
         <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
           Gemelo digital del sistema de vibraciones
         </div>
-        <p style={{ margin: 0, maxWidth: "56ch", textAlign: "center", fontSize: 13, color: t.textSoft, lineHeight: 1.6 }}>
-          Enseñará el motor WEG W22 143/5T con sus {CANALES.length} apoyos en su posición
-          real, y el estado de cada uno sobre la propia geometría. Falta el modelo del motor
-          y decidir cómo se pinta un apoyo que no contesta.
-        </p>
         <button
           type="button"
           onClick={() => onNavigate?.("eva-vibraciones")}
@@ -88,7 +79,6 @@ function VibracionesEva3D({ onNavigate }) {
         </button>
       </div>
 
-      <SectionLabel>Los apoyos que enseñará</SectionLabel>
 
       {/*
         Los tres apoyos se listan con su rodamiento porque ese dato ya es

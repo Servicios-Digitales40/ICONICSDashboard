@@ -70,13 +70,10 @@ function RiesgosVibracionEva() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <AlertBanner
         type="info"
-        title="Riesgos del sistema de vibraciones, no del tanque"
+        title="Riesgos del sistema de vibraciones"
         message={
           "Estas reglas evalúan el motor con acelerómetros: su propio motor, su propio " +
-          "variador y su propio PLC. Los riesgos de la estación de llenado —derrame, " +
-          "marcha en seco, sobrepresión— están en su propia pantalla y no tienen relación " +
-          "con éstos. Y como de esta máquina no se usa el histórico, aquí no hay tendencias " +
-          "ni plazos: sólo lo que se puede afirmar del instante."
+          "variador y su propio PLC."
         }
       />
 

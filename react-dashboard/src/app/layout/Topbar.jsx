@@ -7,7 +7,7 @@ import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
 import { useAlarmCount } from "@/lib/iconics";
 import { useMediaQuery } from "@/lib/viewport.js";
-import { PAGE_META } from "../routes/index.js";
+import { PAGE_META, SECCION_DE_PAGINA } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { Avatar } from "@/components/ui/Avatar.jsx";
@@ -79,6 +79,23 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   const meta = PAGE_META[page];
+  /*
+   * El indicador de encendido lee un tag del TANQUE
+   * (`ac:TDCON/DEMO/SENSORES/CONTROL`), así que sólo tiene algo que decir en
+   * las pantallas de esa máquina. En una de vibraciones estaba enseñando el
+   * estado de OTRA instalación junto al título, que es exactamente el cruce
+   * que la separación en secciones existe para impedir — y el peor sitio para
+   * cometerlo, porque el Topbar se lee como contexto de lo que hay debajo.
+   *
+   * La sección sale del registro de rutas y no de una lista de ids escrita
+   * aquí: una lista paralela se queda vieja en cuanto se añada una pantalla, y
+   * la nueva heredaría la respuesta equivocada sin que nada lo delate.
+   *
+   * Cuando la máquina de vibraciones tenga su propio control, esto no será un
+   * `if` con dos ramas sino un indicador por sección — su tag es otro, su
+   * estado es otro, y «encendida» no significa lo mismo en las dos.
+   */
+  const esDeLlenado = SECCION_DE_PAGINA[page] === "sec-llenado";
   const esCajon = useMediaQuery(UMBRAL_CAJON);
   // `null` mientras no se sabe, o si /api/iconics/alarms falló — ver la
   // cabecera de `useAlarmCount.js`. No se muestra badge en ninguno de los
@@ -127,10 +144,11 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
-            {/* Permanente entre pestañas — a diferencia de los controles de la
-                derecha, no se oculta en modo muro: es información de estado,
-                no algo que un wallboard sin teclado necesite pulsar. */}
-            <EstadoMaquinaBanner />
+            {/* Permanente entre las pestañas de SU máquina — a diferencia de los
+                controles de la derecha, no se oculta en modo muro: es
+                información de estado, no algo que un wallboard sin teclado
+                necesite pulsar. */}
+            {esDeLlenado && <EstadoMaquinaBanner />}
           </div>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{meta.sub}</p>
         </div>
