@@ -56,7 +56,7 @@
  * los tokens semánticos del resto"). El resto del gradiente sigue en
  * `accent`/`accentSoft`, los tokens de marca de siempre.
  */
-import { ArrowRight, Boxes, Cog, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
+import { ArrowRight, Boxes, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -389,7 +389,7 @@ const REJILLA = `
 const VISTAS = [
   {
     id: "eva-planta",
-    label: "Planta",
+    label: "Gráficas",
     frase: "El estado de las ocho señales, con su histórico.",
     Icono: LayoutDashboard,
     dato: (sistema) => {
@@ -401,19 +401,8 @@ const VISTAS = [
     },
   },
   {
-    id: "eva-maquina-3d",
-    label: "Máquina 3D",
-    frase: "El grupo de bombeo se comporta según el estado derivado de sus señales.",
-    Icono: Cog,
-    dato: (sistema) => {
-      const s = sistema.senales.cargaMotor;
-      if (!s || s.estado === "sin_dato") return null;
-      return { texto: `Carga motor ${fmtSenal(s)}`, estado: s.estado };
-    },
-  },
-  {
     id: "eva-maqueta",
-    label: "Maqueta 3D",
+    label: "Vista 3D",
     frase: "La instalación en miniatura — el nivel del tanque es el dato en vivo.",
     Icono: Factory,
     dato: (sistema) => {
@@ -786,10 +775,10 @@ function InicioEva({ onNavigate }) {
                 no con uno solo que tenga que servir a los dos visitantes. */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => onNavigate?.("eva-planta")}>
-                Entrar a Planta
+                Entrar a Gráficas
               </Button>
               <Button variant="ghost" icon={<Factory size={15} />} onClick={() => onNavigate?.("eva-maqueta")}>
-                Ver la Maqueta en vivo
+                Ver la Vista 3D en vivo
               </Button>
             </div>
           </div>

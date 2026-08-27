@@ -1,5 +1,5 @@
 /**
- * Vista «Maqueta 3D» de Demo EVA — la instalación de agua en miniatura.
+ * Vista «Vista 3D» de Demo EVA — la instalación de agua en miniatura.
  *
  * Los cuatro activos con su estado en vivo, colocados según el recorrido del
  * agua, y una ficha por activo con las señales que lo componen.
@@ -165,7 +165,7 @@ function MaquetaEva3D({ params, onNavigate }) {
   return (
     <>
       <SectionLabel sub="Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide">
-        Maqueta 3D · Sistema de agua
+        Vista 3D · Sistema de agua
       </SectionLabel>
 
       {error && <AlertBanner type="error" title="No se pudo leer la instalación" message={error} />}

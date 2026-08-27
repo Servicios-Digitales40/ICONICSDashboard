@@ -83,7 +83,7 @@ export const DEFAULT_ROUTE = "eva-inicio";
  */
 export const NAV_GROUPS = {
   "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
-  "sec-vibraciones": { label: "Vibraciones", icon: <Waves size={17} /> },
+  "sec-vibraciones": { label: "Estación de vibraciones", icon: <Waves size={17} /> },
   "sec-general": { label: "General", icon: <Boxes size={17} /> },
 };
 
@@ -120,9 +120,9 @@ export const ROUTES = [
   {
     id: "eva-planta",
     component: lazy(() => import("@/Demo-EVA/views/PlantaEva.jsx")),
-    title: "Planta",
+    title: "Gráficas",
     sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
-    nav: { label: "Planta", icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
+    nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -146,19 +146,11 @@ export const ROUTES = [
   },
 
   {
-    id: "eva-maquina-3d",
-    component: lazy(() => import("@/Demo-EVA/views/EquipoEva3D.jsx")),
-    title: "Máquina 3D",
-    sub: "El grupo de bombeo se comporta según el estado derivado de sus señales",
-    nav: { label: "Máquina 3D", icon: <Cog size={17} />, group: "sec-llenado" },
-  },
-
-  {
     id: "eva-maqueta",
     component: lazy(() => import("@/Demo-EVA/views/MaquetaEva3D.jsx")),
-    title: "Maqueta 3D",
+    title: "Vista 3D",
     sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
-    nav: { label: "Maqueta 3D", icon: <Factory size={17} />, group: "sec-llenado" },
+    nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-llenado" },
   },
 
   /*
@@ -187,6 +179,31 @@ export const ROUTES = [
   },
 
   {
+    // Todavía sin construir. Enseñará lo mismo que «Gráficas» de la estación
+    // de llenado —series del historiador— y por eso no está ya: de esta
+    // máquina NO se usan sus series. El historiador empezó a guardar sus tags
+    // el 26-08-2026 con la configuración todavía moviéndose, así que una
+    // gráfica hoy dibujaría una curva sobre un tramo que no cubre lo que
+    // aparenta cubrir. Ver la cabecera de la vista.
+    id: "vib-graficas",
+    component: lazy(() => import("@/Demo-EVA/views/GraficasVibraciones.jsx")),
+    title: "Gráficas · Vibraciones",
+    sub: "Histórico del sistema de vibraciones · todavía sin construir",
+    nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
+  },
+
+  {
+    // Todavía sin construir, y es el placeholder con más cuidado de los tres:
+    // esta pantalla ESCRIBIRÁ en el PLC. Un botón que parezca operativo y no
+    // lo sea es peor que no tener pantalla, así que no hay ninguno.
+    id: "vib-controles",
+    component: lazy(() => import("@/Demo-EVA/views/ControlesVibraciones.jsx")),
+    title: "Controles · Vibraciones",
+    sub: "Encendido y apagado del sistema de vibraciones · todavía sin construir",
+    nav: { label: "Controles", icon: <Power size={17} />, group: "sec-vibraciones" },
+  },
+
+  {
     // Su propio «Riesgos», separado del de la estación de llenado: aquél
     // evalúa el tanque —nivel, presión, caudal— y éste un motor con
     // acelerómetros. Las dos listas juntas serían la invitación a buscar una
@@ -204,9 +221,9 @@ export const ROUTES = [
     // hay una escena provisional mientras tanto.
     id: "vib-3d",
     component: lazy(() => import("@/Demo-EVA/views/VibracionesEva3D.jsx")),
-    title: "3D · Vibraciones",
+    title: "Vista 3D · Vibraciones",
     sub: "Gemelo digital del sistema de vibraciones · todavía sin construir",
-    nav: { label: "3D", icon: <Box size={17} />, group: "sec-vibraciones" },
+    nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-vibraciones" },
   },
 
   {

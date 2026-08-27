@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las trece vistas, agrupadas por SISTEMA", () => {
+  it("son las catorce vistas, agrupadas por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -46,11 +46,12 @@ describe("superficie de la aplicación", () => {
       "eva-planta",
       "eva-riesgos",
       "eva-controles",
-      "eva-maquina-3d",
       "eva-maqueta",
       // Vibraciones — OTRA máquina: otro motor, otro variador, otro PLC.
       "vib-inicio",
       "eva-vibraciones",
+      "vib-graficas",
+      "vib-controles",
       "eva-riesgos-vibracion",
       "vib-3d",
       // General — del servidor, no de una máquina: valen para las dos.
@@ -93,14 +94,14 @@ describe("el sidebar que sale del registro", () => {
     const llenado = NAV.find((n) => n.group === "sec-llenado");
     expect(llenado.label).toBe("Estación de llenado");
     expect(llenado.children.map((c) => c.id)).toEqual([
-      "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles",
-      "eva-maquina-3d", "eva-maqueta",
+      "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta",
     ]);
 
     const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
-    expect(vibraciones.label).toBe("Vibraciones");
+    expect(vibraciones.label).toBe("Estación de vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
-      "vib-inicio", "eva-vibraciones", "eva-riesgos-vibracion", "vib-3d",
+      "vib-inicio", "eva-vibraciones", "vib-graficas", "vib-controles",
+      "eva-riesgos-vibracion", "vib-3d",
     ]);
 
     // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara

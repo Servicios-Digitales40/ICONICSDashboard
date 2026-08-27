@@ -12,13 +12,21 @@
  * leerlas como una: la primera persona que viera un riesgo de cavitación
  * encima de uno de rodamiento buscaría la relación, y no hay ninguna.
  *
- * ── POR QUÉ NO COMPARTE FORMA CON LA OTRA PANTALLA ─────────────────
+ * ── MISMO LAYOUT QUE «RIESGOS» DE LA ESTACIÓN DE LLENADO ───────────
  *
- * Los riesgos de aquí cuelgan de un APOYO concreto —de ahí `canalLabel`— y
- * citan una norma con su zona; los del tanque no tienen ni una cosa ni la
- * otra, y a cambio traen `nota` cuando su sensibilidad depende de un umbral
- * que todavía es estimación nuestra. Forzar una tarjeta común dejaría media
- * docena de campos opcionales que se leen peor que las dos por separado.
+ * Deliberadamente el MISMO: «Situaciones detectadas · N», la misma rejilla de
+ * tarjetas, la misma tarjeta de estado tranquilo diciendo cuántas reglas se
+ * comprobaron, y el mismo «Sin comprobar · N». Son la misma pregunta sobre
+ * dos máquinas distintas, y dos layouts distintos harían pensar que son dos
+ * cosas distintas — que es el error inverso al que separa las secciones.
+ *
+ * Lo que NO se unificó es la TARJETA, y sólo por lo que cada riesgo trae de
+ * verdad: uno de vibración cuelga de un APOYO —de ahí la segunda etiqueta con
+ * `canalLabel`— y cita una norma; uno del tanque no tiene ninguna de las dos,
+ * y a cambio trae `nota` cuando su sensibilidad depende de un umbral que
+ * todavía es estimación nuestra. Los tres campos que importan —MEDIDO, PUEDE
+ * OCURRIR, QUÉ REVISAR—, el canto de color por severidad, la etiqueta de
+ * nivel y el botón de preguntarle al asistente son idénticos en las dos.
  *
  * ── LA MITAD QUE NO SE VE ──────────────────────────────────────────
  *
@@ -29,7 +37,7 @@
  * no entregan lectura.
  */
 import { useMemo } from "react";
-import { HelpCircle, WifiOff } from "lucide-react";
+import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -91,26 +99,56 @@ function RiesgosVibracionEva() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        {/*
+          MISMO rótulo que «Riesgos» de la estación de llenado, y no
+          «N riesgos activos»: son la misma pregunta sobre dos máquinas, y
+          dos rótulos distintos harían pensar que son dos cosas distintas.
+        */}
         <SectionLabel>
           {res.activos.length > 0
-            ? `${res.activos.length} riesgo${res.activos.length === 1 ? "" : "s"} activo${res.activos.length === 1 ? "" : "s"}`
-            : "Sin riesgos activos"}
+            ? `Situaciones detectadas · ${res.activos.length}`
+            : "Situaciones detectadas"}
         </SectionLabel>
         <UltimaLectura fecha={lastUpdated} t={t} />
       </div>
 
       {res.activos.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "grid", gap: 16,
+            gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+          }}
+        >
           {res.activos.map((r) => (
             <TarjetaRiesgo key={`${r.id}-${r.canal ?? "maquina"}`} riesgo={r} t={t} />
           ))}
         </div>
       ) : (
-        <p style={{ margin: 0, fontSize: 13, color: t.textSoft }}>
-          {res.evaluadas > 0
-            ? `Se comprobaron ${res.evaluadas} reglas y ninguna se cumple.`
-            : "No se pudo comprobar ninguna regla: no hay lecturas con las que evaluar."}
-        </p>
+        /*
+         * El estado tranquilo dice CUÁNTAS reglas se comprobaron, con la misma
+         * tarjeta que la estación de llenado. «Sin riesgos» a secas no
+         * distingue entre «se miraron dieciocho cosas y ninguna se cumple» y
+         * «no se miró nada», y en esta máquina —donde la mitad de los puntos
+         * puede estar muda— esa diferencia es la pantalla entera.
+         */
+        <div
+          style={{
+            background: t.panel, border: `1px solid ${t.border}`, borderRadius: 12,
+            padding: 24, display: "flex", alignItems: "center", gap: 12,
+          }}
+        >
+          <CheckCircle2 size={20} color={t.success} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
+              {loading ? "Comprobando…" : "Ninguna situación de riesgo ahora mismo"}
+            </div>
+            <div style={{ fontSize: 12, color: t.textSoft, marginTop: 2 }}>
+              {res.evaluadas > 0
+                ? `${res.evaluadas} regla${res.evaluadas === 1 ? "" : "s"} comprobada${res.evaluadas === 1 ? "" : "s"} con las lecturas actuales.`
+                : "No se pudo comprobar ninguna: no hay lecturas con las que evaluar."}
+            </div>
+          </div>
+        </div>
       )}
 
       {/*
@@ -119,9 +157,7 @@ function RiesgosVibracionEva() {
       */}
       {res.noEvaluables.length > 0 && (
         <>
-          <SectionLabel>
-            {res.noEvaluables.length} sin comprobar
-          </SectionLabel>
+          <SectionLabel>Sin comprobar · {res.noEvaluables.length}</SectionLabel>
           <div
             style={{
               background: t.panel, border: `1px solid ${t.border}`,
