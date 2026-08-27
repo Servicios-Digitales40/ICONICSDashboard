@@ -171,29 +171,20 @@ export const ROUTES = [
   },
 
   {
+    // Se llama «Gráficas» —no «Vibraciones»— por el mismo criterio que en la
+    // estación de llenado: la entrada nombra lo que la pantalla ENSEÑA, no la
+    // máquina, que ya la nombra la sección. Aquí no hay curvas todavía porque
+    // de este sistema no se usa el histórico (ver `sistemas.js`): lo que se ve
+    // son las medidas del instante, con su escala y su banda de norma.
     id: "eva-vibraciones",
     component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
-    title: "Vibraciones",
-    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
-    nav: { label: "Vibraciones", icon: <Waves size={17} />, group: "sec-vibraciones" },
-  },
-
-  {
-    // Todavía sin construir. Enseñará lo mismo que «Gráficas» de la estación
-    // de llenado —series del historiador— y por eso no está ya: de esta
-    // máquina NO se usan sus series. El historiador empezó a guardar sus tags
-    // el 26-08-2026 con la configuración todavía moviéndose, así que una
-    // gráfica hoy dibujaría una curva sobre un tramo que no cubre lo que
-    // aparenta cubrir. Ver la cabecera de la vista.
-    id: "vib-graficas",
-    component: lazy(() => import("@/Demo-EVA/views/GraficasVibraciones.jsx")),
     title: "Gráficas · Vibraciones",
-    sub: "Histórico del sistema de vibraciones · todavía sin construir",
+    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
     nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
   },
 
   {
-    // Todavía sin construir, y es el placeholder con más cuidado de los tres:
+    // Todavía sin construir, y es el placeholder con más cuidado de los dos:
     // esta pantalla ESCRIBIRÁ en el PLC. Un botón que parezca operativo y no
     // lo sea es peor que no tener pantalla, así que no hay ninguno.
     id: "vib-controles",

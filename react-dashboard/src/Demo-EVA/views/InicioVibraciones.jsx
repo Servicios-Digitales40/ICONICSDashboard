@@ -26,7 +26,7 @@
  * otras pantallas.
  */
 import { useMemo } from "react";
-import { ArrowRight, HelpCircle, ShieldAlert, Waves } from "lucide-react";
+import { ArrowRight, HelpCircle, LayoutDashboard, ShieldAlert } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -44,8 +44,8 @@ import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../domain/vibracion
 const VISTAS = [
   {
     id: "eva-vibraciones",
-    label: "Vibraciones",
-    Icono: Waves,
+    label: "Gráficas",
+    Icono: LayoutDashboard,
     que: "Los tres apoyos, sus cuatro medidas y qué vigilancias tiene encendidas el módulo.",
   },
   {

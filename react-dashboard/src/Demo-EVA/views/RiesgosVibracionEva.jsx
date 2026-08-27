@@ -189,7 +189,7 @@ function RiesgosVibracionEva() {
 
       <p style={{ margin: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.6 }}>
         Las medidas que sostienen estas reglas —los tres apoyos, sus cuatro magnitudes y qué
-        vigilancias tiene encendidas el módulo— están en la pantalla <strong>Vibraciones</strong>.
+        vigilancias tiene encendidas el módulo— están en la pantalla <strong>Gráficas</strong>.
       </p>
     </div>
   );

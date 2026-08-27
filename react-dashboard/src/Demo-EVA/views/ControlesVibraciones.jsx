@@ -3,8 +3,8 @@
  *
  * ── POR QUÉ ESTE PLACEHOLDER NO LLEVA NI UN BOTÓN ──────────────────
  *
- * Porque los otros dos —«Gráficas» y «Vista 3D»— enseñarían un dato de menos
- * si se equivocaran, y éste ESCRIBIRÍA EN EL PLC. Un botón de encendido
+ * Porque el otro placeholder de esta sección —«Vista 3D»— enseñaría un dato
+ * de menos si se equivocara, y éste ESCRIBIRÍA EN EL PLC. Un botón de encendido
  * puesto «para ver cómo queda» tiene dos finales, y los dos son malos: si no
  * hace nada, enseña a pulsar botones que no responden —y el día que responda,
  * nadie se lo tomará en serio—; y si hace algo, esta pantalla arrancó
@@ -90,7 +90,7 @@ function ControlesVibraciones({ onNavigate }) {
         </div>
         <p style={{ margin: 0, maxWidth: "56ch", textAlign: "center", fontSize: 13, color: t.textSoft, lineHeight: 1.6 }}>
           Mientras tanto, el estado de la máquina —si gira, a qué régimen y con qué carga—
-          se lee en «Vibraciones», y lo que se deduce de él en «Riesgos».
+          se lee en «Gráficas», y lo que se deduce de él en «Riesgos».
         </p>
         <button
           type="button"
@@ -103,7 +103,7 @@ function ControlesVibraciones({ onNavigate }) {
           }}
         >
           <Waves size={15} />
-          Ver el estado de la máquina
+          Ver las medidas de la máquina
         </button>
       </div>
 

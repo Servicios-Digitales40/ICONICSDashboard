@@ -28,7 +28,7 @@
  *   · La GEOMETRÍA del motor WEG W22 143/5T con sus tres apoyos ubicados
  *     donde están de verdad — no un motor cualquiera con tres puntos
  *     repartidos, porque la posición es justamente lo que esta vista
- *     aportaría sobre la tabla de la pantalla «Vibraciones».
+ *     aportaría sobre la tabla de la pantalla «Gráficas».
  *   · Decidir qué se pinta cuando un apoyo NO contesta. En las vistas 3D del
  *     tanque el activo sin dato se apaga; aquí hará falta el mismo criterio
  *     antes de la primera escena, no después.
@@ -52,7 +52,7 @@ function VibracionesEva3D({ onNavigate }) {
           "El gemelo digital del sistema de vibraciones va a vivir aquí. No hay una escena " +
           "provisional a propósito: un motor genérico girando junto a lecturas reales se " +
           "leería como la máquina real, y hoy la mayoría de sus puntos no entregan dato. " +
-          "Mientras tanto, las medidas están en «Vibraciones» y lo que se deduce de ellas " +
+          "Mientras tanto, las medidas están en «Gráficas» y lo que se deduce de ellas " +
           "en «Riesgos»."
         }
       />

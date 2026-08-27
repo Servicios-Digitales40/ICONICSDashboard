@@ -1,5 +1,5 @@
 /**
- * Vista «Vibraciones» — el estado mecánico del SEGUNDO sistema.
+ * Vista «Gráficas» del sistema de vibraciones — su estado mecánico.
  *
  * ── POR QUÉ ES UNA PANTALLA APARTE Y NO UNA SECCIÓN DE «RIESGOS» ───
  *
