@@ -397,6 +397,76 @@ console.log('\n── Contrato de la API ─────────────
   check('history sin pointName → 400', () => assert.equal(r.status, 400))
 }
 
+/*
+ * `/api/iconics/history/batch` (varias series, troceadas en el SERVIDOR).
+ *
+ * Lo que protege: que el troceado no vuelva al navegador. Cuando vivía allí,
+ * cinco señales de una ventana de 30 días eran CINCUENTA peticiones para
+ * pintar una pantalla, y el limitador corta en 300 por minuto y por IP.
+ * Nada en la interfaz delata esa regresión —la pantalla se ve igual—, así
+ * que se fija aquí el contrato: UNA petición devuelve TODAS las series.
+ */
+{
+  const r = await get('/api/iconics/history/batch', postJson({
+    points: ['ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE', 'ac:TDCON/DEMO/SENSORES/SPRESION_RELATIVA'],
+    startDate: '2026-08-01T00:00:00Z',
+    endDate: '2026-08-08T00:00:00Z',
+    aggregate: 'Average',
+  }))
+
+  check('POST /history/batch → una serie por punto pedido', () => {
+    assert.equal(r.status, 200)
+    assert.equal(r.body.ok, true)
+    const series = r.body.payload.series
+    assert.deepEqual(Object.keys(series).sort(), [
+      'ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE',
+      'ac:TDCON/DEMO/SENSORES/SPRESION_RELATIVA',
+    ])
+  })
+
+  check('POST /history/batch → declara la cobertura del troceado', () => {
+    const s = r.body.payload.series['ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE']
+    // Sin estos contadores, una serie corta por huecos del historiador y una
+    // corta porque fallaron tramos se ven igual: es la distinción que la
+    // pantalla necesita para declarar lo leído en vez de suponerlo.
+    assert.ok(Number.isInteger(s.tramos), 'tramos debe ser un entero')
+    assert.ok(Number.isInteger(s.tramosConDato), 'tramosConDato debe ser un entero')
+    assert.ok(Number.isInteger(s.tramosFallidos), 'tramosFallidos debe ser un entero')
+    assert.ok(s.tramos >= 1, 'una ventana de 7 días se trocea en al menos un tramo')
+  })
+
+  check('POST /history/batch → la ventana vuelve declarada', () => {
+    const v = r.body.payload.ventana
+    assert.equal(v.startDate, '2026-08-01T00:00:00.000Z')
+    assert.equal(v.endDate, '2026-08-08T00:00:00.000Z')
+    assert.ok(v.segundosPorPunto > 0, 'la densidad real se declara, no se supone')
+  })
+}
+{
+  const r = await get('/api/iconics/history/batch', postJson({ points: [] }))
+  check('history/batch sin puntos → 400', () => assert.equal(r.status, 400))
+}
+{
+  const r = await get('/api/iconics/history/batch', postJson({
+    points: ['ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE'],
+    startDate: '2026-08-08T00:00:00Z',
+    endDate: '2026-08-01T00:00:00Z',
+  }))
+  // Un rango invertido no puede trocearse, y devolver una serie vacía lo
+  // haría indistinguible de un historiador sin muestras.
+  check('history/batch con fin anterior al inicio → 400', () => assert.equal(r.status, 400))
+}
+{
+  const r = await get('/api/iconics/history/batch', postJson({
+    points: Array.from({ length: 11 }, (_, n) => `ac:TDCON/DEMO/SENSORES/S${n}`),
+    startDate: '2026-08-01T00:00:00Z',
+    endDate: '2026-08-02T00:00:00Z',
+  }))
+  // Cada señal multiplica los tramos: una lista sin techo convierte una
+  // petición en cientos de lecturas al historiador.
+  check('history/batch con más de 10 puntos → 400', () => assert.equal(r.status, 400))
+}
+
 // 7. Browse / search / userinfo
 {
   const r = await get('/api/iconics/browse?path=' + encodeURIComponent('ac:TDCON/DEMO/'))

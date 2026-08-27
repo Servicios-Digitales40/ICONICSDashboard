@@ -14,6 +14,7 @@ export {
   fetchIconicsPoint,
   fetchIconicsBatch,
   fetchIconicsHistory,
+  fetchIconicsHistoryBatch,
   fetchIconicsAlarms,
   acknowledgeIconicsAlarms,
   fetchHealth,

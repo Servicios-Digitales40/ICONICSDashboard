@@ -8,6 +8,28 @@
 import { readJsonBody, RequestBodyError } from '../http/requestBody.mjs'
 import { sendError, sendJson } from '../http/responses.mjs'
 import { isSafeHistoryArgument, isSafePointName, parsePointList } from '../iconics/validation.mjs'
+import { planificar } from '../../shared/eva/rango.js'
+import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
+
+/**
+ * Series que se admiten en una sola llamada a `/history/batch`.
+ *
+ * Cinco son las del pronóstico, que es el consumidor que motivó la ruta; ocho,
+ * el catálogo entero del sistema del tanque. Diez deja margen sin dejarlo
+ * abierto: cada señal multiplica los tramos, y una lista sin techo convierte
+ * una petición en cientos de lecturas al historiador.
+ */
+const MAX_SERIES_BATCH = 10
+
+/**
+ * Puntos por tramo cuando se trocea una ventana larga.
+ *
+ * 96 son los cuartos de hora de un día — el MISMO valor que usa
+ * `Demo-EVA/data/historia.js`. Está repetido aquí a propósito y no importado
+ * de allí: `backend/` no puede depender de `react-dashboard/`. Si uno de los
+ * dos cambia, las series dejan de caer sobre la misma rejilla.
+ */
+const PUNTOS_POR_TRAMO = 96
 
 /** Formato de fecha local `YYYY-MM-DD HH:mm:ss` que espera `/AlarmHistory`. */
 function formatLocalTimestamp(date) {
@@ -27,7 +49,7 @@ function sendResult(response, result) {
 
 export function registerIconicsRoutes(router, { config, client }) {
   const { defaultPointName, readOnly } = config.iconics
-  const { maxRequestBodyBytes, maxAlarmHours } = config.limits
+  const { maxRequestBodyBytes, maxAlarmHours, historyConcurrencia } = config.limits
 
   /**
    * Envuelve una ruta que modifica algo en ICONICS.
@@ -114,6 +136,140 @@ export function registerIconicsRoutes(router, { config, client }) {
     }
 
     sendResult(response, await client.readHistory({ pointName, ...range }))
+  })
+
+  /**
+   * ── VARIAS SERIES DE UNA VEZ, TROCEADAS AQUÍ ───────────────────────
+   *
+   * `GET /api/iconics/history` sirve UN tramo de UNA señal, y el troceado
+   * de una ventana larga vivía entero en el navegador: cada tramo salía como
+   * una petición HTTP propia. Cinco señales por diez tramos de una ventana
+   * de 30 días eran CINCUENTA peticiones para pintar una pantalla, contra
+   * las cuatro que gasta «Planta» — y el limitador de `app.mjs` corta en 300
+   * por minuto y por IP, así que quien abría esa vista un par de veces se
+   * llevaba un 429 que luego pagaba el siguiente en preguntar.
+   *
+   * Aquí el cliente pide LA VENTANA, no los tramos: el plan se calcula con
+   * el mismo `planificar()` que usaban los dos lados, las lecturas salen con
+   * la misma concurrencia acotada que ya usa el asistente, y vuelve una sola
+   * respuesta. Cincuenta peticiones pasan a ser una.
+   *
+   * ── POR QUÉ POST Y NO GET ──────────────────────────────────────────
+   *
+   * Porque la entrada es una lista de nombres de punto, y los de este
+   * servidor llevan barras invertidas y espacios (`hda:\Configuration\DEMO 3:`).
+   * En una cadena de consulta eso son nombres escapados dentro de un
+   * separador por comas — justo el sitio donde un nombre con una coma
+   * partiría la lista en dos puntos que no existen. En un cuerpo JSON cada
+   * nombre es un elemento y no hay nada que reparsear.
+   *
+   * No modifica nada: es una lectura con cuerpo, y por eso NO pasa por
+   * `whenWritable`.
+   */
+  router.post('/api/iconics/history/batch', async ({ request, response }) => {
+    let cuerpo
+    try {
+      cuerpo = await readJsonBody(request, maxRequestBodyBytes)
+    } catch (error) {
+      if (error instanceof RequestBodyError) return sendError(response, error.statusCode, error.message)
+      throw error
+    }
+
+    const puntos = Array.isArray(cuerpo?.points) ? cuerpo.points : []
+    if (puntos.length === 0) {
+      return sendError(response, 400, 'points must be a non-empty array of point names.')
+    }
+    if (puntos.length > MAX_SERIES_BATCH) {
+      return sendError(response, 400, `No more than ${MAX_SERIES_BATCH} points per request.`)
+    }
+    if (!puntos.every(isSafePointName)) {
+      return sendError(response, 400, 'One or more point names are invalid.')
+    }
+
+    const inicio = new Date(cuerpo?.startDate)
+    const fin = new Date(cuerpo?.endDate)
+    if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) {
+      return sendError(response, 400, 'startDate and endDate must be valid dates.')
+    }
+    if (fin <= inicio) {
+      return sendError(response, 400, 'endDate must be after startDate.')
+    }
+
+    const aggregate = String(cuerpo?.aggregate ?? '')
+    if (aggregate && !isSafeHistoryArgument(aggregate)) {
+      return sendError(response, 400, 'Invalid aggregate parameter.')
+    }
+
+    /*
+     * El MISMO plan para todas las señales: comparten ventana, así que
+     * comparten tramos. Calcularlo una vez y no por señal es lo que garantiza
+     * que las series vuelvan sobre la misma rejilla — que es la premisa de
+     * `unir()` en el frontend.
+     */
+    const { tramos, segundosPorPunto } = planificar({
+      inicio, fin, puntosPorTramo: PUNTOS_POR_TRAMO,
+    })
+
+    /*
+     * Las tareas son señal x tramo, todas en la MISMA cola: acotar por señal
+     * dejaría la concurrencia real multiplicada por el número de señales,
+     * que es justo lo que se venía a limitar.
+     */
+    const tareas = []
+    for (const pointName of puntos) {
+      for (const tramo of tramos) {
+        tareas.push(async () => ({
+          pointName,
+          resultado: await client.readHistory({
+            pointName,
+            startDate: tramo.desde.toISOString(),
+            endDate: tramo.hasta.toISOString(),
+            aggregate,
+            interval: tramo.interval,
+          }),
+        }))
+      }
+    }
+
+    const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+
+    /*
+     * Un tramo que falla NO invalida su serie: mismo criterio que ya seguían
+     * el frontend y el asistente —perder un día de diez no cambia la forma de
+     * la curva, y abortar dejaría la gráfica vacía por un hueco del
+     * historiador—. Lo que sí viaja es CUÁNTOS tramos respondieron, para que
+     * quien lo pinte pueda declarar la cobertura en vez de suponerla.
+     */
+    const series = Object.fromEntries(
+      puntos.map(pointName => [pointName, { data: [], hasMore: false, tramos: tramos.length, tramosConDato: 0, tramosFallidos: 0 }])
+    )
+
+    for (const { pointName, resultado } of resultados) {
+      const serie = series[pointName]
+      if (!resultado?.ok) { serie.tramosFallidos += 1; continue }
+      const trozo = resultado.data ?? []
+      if (trozo.length) serie.tramosConDato += 1
+      if (resultado.hasMore) serie.hasMore = true
+      serie.data.push(...trozo)
+    }
+
+    /*
+     * El orden importa: la gráfica y el CSV recorren la serie tal cual llega,
+     * y la cola acotada no garantiza que los tramos terminen en orden.
+     * Ordenar aquí evita que cada consumidor tenga que acordarse.
+     */
+    for (const serie of Object.values(series)) {
+      serie.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    }
+
+    sendJson(response, 200, {
+      ok: true,
+      status: 200,
+      payload: {
+        series,
+        ventana: { startDate: inicio.toISOString(), endDate: fin.toISOString(), segundosPorPunto },
+      },
+    })
   })
 
   router.get('/api/iconics/browse', async ({ response, url }) => {

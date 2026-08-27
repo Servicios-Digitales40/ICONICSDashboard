@@ -65,6 +65,35 @@ export function fetchIconicsHistory(pointName, { startDate, endDate, aggregate, 
  * cada nodo trae { shortName, displayName, pointName, browsePointName, ... }.
  * Los nodos navegables (carpetas/equipos) tienen pointName terminado en "/".
  */
+/**
+ * Varias series históricas de una ventana, en UNA sola petición.
+ *
+ * ── POR QUÉ EXISTE, Y QUÉ SUSTITUYE ────────────────────────────────
+ *
+ * Porque el troceado de una ventana larga vivía aquí, en el navegador: cada
+ * tramo salía como una petición HTTP propia, y cinco señales por diez tramos
+ * de una ventana de 30 días eran CINCUENTA peticiones para pintar una
+ * pantalla. El limitador del puente corta en 300 por minuto y por IP, así que
+ * ese patrón se llevaba un 429 que acababa pagando el siguiente en preguntar.
+ *
+ * Ahora el cliente pide LA VENTANA y el servidor trocea: mismo `planificar()`,
+ * misma concurrencia acotada, una respuesta. Ver la ruta en
+ * `backend/routes/iconicsRoutes.mjs`.
+ *
+ * Devuelve `{ ok, payload: { series, ventana } }`, donde `series` va indexado por
+ * nombre de punto y cada entrada trae `data` —las muestras crudas, en el mismo
+ * formato que `fetchIconicsHistory`— junto a la cobertura del troceado
+ * (`tramos`, `tramosConDato`, `tramosFallidos`): quien lo pinte puede DECLARAR
+ * lo que se leyó en vez de suponerlo.
+ */
+export function fetchIconicsHistoryBatch(points, { startDate, endDate, aggregate } = {}) {
+  return enviarJson("POST", "/api/iconics/history/batch", {
+    points,
+    startDate,
+    endDate,
+    aggregate,
+  });
+}
 export function browseIconics(path) {
   const query = path ? `?path=${encodeURIComponent(path)}` : "";
   return getJson(`/api/iconics/browse${query}`);

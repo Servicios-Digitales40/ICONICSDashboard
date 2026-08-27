@@ -30,7 +30,7 @@ import { createPollingEngine } from "@/lib/iconics";
 import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "../domain/senales.js";
 import { createSistema } from "../domain/sistema.js";
 import { createBufferRodante } from "../lib/buffer.js";
-import { leerSerie as leerDelHistoriador } from "./historia.js";
+import { leerSerie as leerDelHistoriador, leerSeries as leerVariasDelHistoriador } from "./historia.js";
 
 export const CADENCIA_MS = 3_000;
 
@@ -55,6 +55,24 @@ export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
    * simulador encendido.
    */
   const leerSerie = transport.readSerie ?? leerDelHistoriador;
+
+  /**
+   * VARIAS series de una vez. Con transporte real va en UNA petición —el
+   * servidor trocea—; con el simulador puesto no hay a quién pedírselo en
+   * lote, así que se resuelve llamando a su `readSerie` una vez por señal.
+   *
+   * El respaldo NO es un detalle de implementación que se pueda quitar: sin
+   * él, encender el simulador dejaría esta lectura pegando a la red, que es
+   * exactamente el fallo contra el que existe la línea de arriba.
+   */
+  const leerSeries = transport.readSerie
+    ? async (claves, ventana) => {
+        const pares = await Promise.all(
+          claves.map(async (clave) => [clave, await transport.readSerie(clave, ventana)])
+        );
+        return Object.fromEntries(pares);
+      }
+    : leerVariasDelHistoriador;
 
   /**
    * El búfer vive en la FUENTE y no en un componente: así sobrevive a que una
@@ -119,6 +137,14 @@ export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
      * pasado no cambia y el borde derecho lo cubre el valor en vivo.
      */
     leerSerie: (clave, ventana) => leerSerie(clave, ventana),
+
+    /**
+     * Varias series sobre la MISMA ventana. Existe aparte de `leerSerie` y no
+     * como un bucle sobre ella porque el troceado de una ventana larga son
+     * varias peticiones por señal: pedirlas juntas es lo que las convierte en
+     * una sola. Devuelve `{ [clave]: { datos, motivo, hasMore, cobertura } }`.
+     */
+    leerSeries: (claves, ventana) => leerSeries(claves, ventana),
 
     /** Las muestras en vivo acumuladas en esta sesión. Ver `lib/buffer.js`. */
     buffer,

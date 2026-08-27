@@ -199,24 +199,48 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
      * `unir()` y el resto de consumidores existentes siguen recibiendo
      * exactamente los arreglos de puntos que ya esperaban.
      */
-    Promise.all(
-      lista.map((k) =>
-        source.leerSerie(k, rango).catch((err) => ({ datos: [], motivo: null, hasMore: false, error: err.message }))
-      )
-    ).then((resultados) => {
-      if (!vivo) return;
-      const porClave = Object.fromEntries(lista.map((k, i) => [k, resultados[i].datos]));
-      const metaPorClave = Object.fromEntries(
-        lista.map((k, i) => [k, { motivo: resultados[i].motivo ?? null, error: resultados[i].error ?? null }])
-      );
-      const hasMore = resultados.some((r) => r.hasMore);
-      // La cobertura es del RANGO, no de cada señal: todas se piden sobre los
-      // mismos tramos, así que la primera que la traiga vale para todas.
-      const cobertura = resultados.find((r) => r.cobertura)?.cobertura ?? null;
-      setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore, cobertura });
-    });
-    // Sin `.catch` aquí: cada promesa de la lista ya captura su propio
-    // fallo arriba, así que `Promise.all` no puede rechazar por esta vía.
+    /*
+     * UNA llamada para todas las señales, no una por señal.
+     *
+     * Antes esto era un `Promise.all` sobre `leerSerie`, y como el troceado de
+     * una ventana larga vivía en el navegador, cada señal se convertía en
+     * tantas peticiones HTTP como tramos: cinco señales por diez tramos eran
+     * CINCUENTA para pintar una pantalla, y el puente corta en 300 por minuto
+     * y por IP. Ahora `leerSeries` pide la ventana entera y trocea el
+     * servidor. Ver `data/historia.js` y la ruta `/api/iconics/history/batch`.
+     */
+    source
+      .leerSeries(lista, rango)
+      .then((porSenal) => {
+        if (!vivo) return;
+        const porClave = Object.fromEntries(lista.map((k) => [k, porSenal[k]?.datos ?? []]));
+        const metaPorClave = Object.fromEntries(
+          lista.map((k) => [k, { motivo: porSenal[k]?.motivo ?? null, error: null }])
+        );
+        const valores = lista.map((k) => porSenal[k]).filter(Boolean);
+        const hasMore = valores.some((r) => r.hasMore);
+        // La cobertura es del RANGO, no de cada señal: todas se piden sobre los
+        // mismos tramos, así que la primera que la traiga vale para todas.
+        const cobertura = valores.find((r) => r.cobertura)?.cobertura ?? null;
+        setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore, cobertura });
+      })
+      .catch((err) => {
+        if (!vivo) return;
+        /*
+         * El fallo es de LA PETICIÓN, así que cae sobre todas las señales: con
+         * una sola llamada ya no hay «esta señal falló y esta no». Se escribe
+         * en `metaPorClave[*].error` —y no como rango vacío— porque una caída
+         * de red y un historiador sin muestras tienen que poder distinguirse
+         * en la gráfica.
+         */
+        const metaPorClave = Object.fromEntries(
+          lista.map((k) => [k, { motivo: null, error: err.message }])
+        );
+        setEstado({
+          filas: [], porClave: {}, metaPorClave,
+          loading: false, error: err.message, hasMore: false, cobertura: null,
+        });
+      });
 
     return () => {
       vivo = false;

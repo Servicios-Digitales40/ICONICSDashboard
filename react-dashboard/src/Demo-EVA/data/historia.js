@@ -34,7 +34,7 @@
  * y no del origen. Cambiar treinta imports para que apunten a `@shared` no
  * habría arreglado nada: son el mismo valor, y ahora salen del mismo sitio.
  */
-import { fetchIconicsHistory } from "@/lib/iconics";
+import { fetchIconicsHistory, fetchIconicsHistoryBatch } from "@/lib/iconics";
 import { conConcurrenciaAcotada } from "@shared/concurrencia.js";
 import {
   AGREGADO,
@@ -179,6 +179,98 @@ export async function leerSerie(clave, rango = VENTANA) {
  * la cabecera de `rango.js` para la comparación completa y qué se decidió
  * conservar de cada versión.
  */
+/**
+ * VARIAS series sobre la misma ventana, en UNA sola petición.
+ *
+ * ── QUÉ RESUELVE, Y POR QUÉ NO ES `leerSerie()` EN UN BUCLE ────────
+ *
+ * Porque el bucle era el problema. `leerSerie()` trocea AQUÍ, en el
+ * navegador, y cada tramo sale como una petición HTTP propia: cinco señales
+ * por diez tramos de una ventana de 30 días eran CINCUENTA peticiones para
+ * pintar una pantalla —contra las cuatro que gasta «Planta» entera—. El
+ * puente corta en 300 por minuto y por IP, así que esa pantalla se llevaba un
+ * 429 que luego pagaba el siguiente en preguntar cualquier cosa.
+ *
+ * Aquí se pide LA VENTANA y trocea el servidor, con el mismo `planificar()`
+ * y la misma concurrencia acotada. Cincuenta peticiones pasan a ser una.
+ *
+ * ── LO QUE NO CAMBIA ───────────────────────────────────────────────
+ *
+ * La forma de la respuesta por señal: `{ datos, motivo, hasMore, cobertura }`,
+ * la misma que devuelve `leerSerie()`, para que quien las pinte no tenga que
+ * saber por qué camino llegaron. Las señales sin serie propia se resuelven
+ * sin salir a la red —igual que antes—, y por eso ni siquiera viajan en la
+ * petición: pedirlas devolvería la curva de OTRA señal sin dar error (ver la
+ * nota de las tres señales en `senales.js`).
+ */
+export async function leerSeries(claves, rango = VENTANA) {
+  const salida = {};
+  const pedibles = [];
+
+  for (const clave of claves) {
+    if (!senalInfo(clave)) {
+      salida[clave] = { datos: [], motivo: `Señal desconocida: ${clave}`, hasMore: false, cobertura: null };
+    } else if (!esHistorizada(clave)) {
+      salida[clave] = { datos: [], motivo: SIN_SERIE, hasMore: false, cobertura: null };
+    } else {
+      pedibles.push(clave);
+    }
+  }
+
+  if (!pedibles.length) return salida;
+
+  const { inicio, fin } = resolverRango(rango);
+  const respuesta = await fetchIconicsHistoryBatch(
+    pedibles.map((clave) => pointName(clave)),
+    { startDate: inicio.toISOString(), endDate: fin.toISOString(), aggregate: AGREGADO }
+  );
+
+  /*
+   * Un fallo de la petición NO se disfraza de rango vacío: sin esto, una caída
+   * de red y un historiador sin muestras llegarían indistinguibles a la
+   * gráfica, que es el modo de fallo que `metaPorClave.error` existe para
+   * evitar. Se propaga para que el hook lo cuente como error de cada señal.
+   */
+  if (!respuesta?.ok) {
+    throw new Error(respuesta?.error ?? "El historiador no respondió.");
+  }
+
+  const series = respuesta.payload?.series ?? {};
+  for (const clave of pedibles) {
+    const serie = series[pointName(clave)];
+    const datos = normalizar(serie?.data);
+    /*
+     * La cobertura viene CONTADA por el servidor, que es quien troceó: los
+     * índices de los tramos con dato ya no existen aquí, sólo cuántos fueron.
+     * Se reconstruye la forma que `cobertura()` produce para no cambiar el
+     * contrato de quien la lee.
+     */
+    const tramos = serie?.tramos ?? 0;
+    salida[clave] = {
+      datos,
+      motivo: null,
+      hasMore: Boolean(serie?.hasMore),
+      cobertura: tramos
+        ? {
+            tramos,
+            tramosConDato: serie.tramosConDato ?? 0,
+            completa: (serie.tramosConDato ?? 0) === tramos,
+            /*
+             * `desde`/`hasta` van en null a propósito: nombran el PRIMER y
+             * ÚLTIMO tramo que trajeron muestras, y esa posición se pierde al
+             * contar en el servidor. Declararlo vacío es honesto; rellenarlo
+             * con los bordes de la ventana diría que la cobertura llega hasta
+             * ahí cuando no se sabe.
+             */
+            desde: null,
+            hasta: null,
+          }
+        : null,
+    };
+  }
+
+  return salida;
+}
 const PUNTOS_POR_TRAMO = 96;
 
 /**
