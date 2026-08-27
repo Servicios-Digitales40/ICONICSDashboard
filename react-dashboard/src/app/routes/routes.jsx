@@ -49,7 +49,9 @@
  * aparenta ser: lo que la aplicación enseña.
  */
 import { lazy } from "react";
-import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, Power, ShieldAlert, Waves } from "lucide-react";
+import {
+  Bell, Box, Boxes, Cog, Droplets, Factory, Home, LayoutDashboard, Power, ShieldAlert, Waves,
+} from "lucide-react";
 
 /**
  * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
@@ -59,8 +61,30 @@ import { Bell, Box, Boxes, Cog, Factory, Home, LayoutDashboard, Power, ShieldAle
 export const DEFAULT_ROUTE = "eva-inicio";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
+/**
+ * Las secciones del sidebar.
+ *
+ * ── POR QUÉ LA PLANTA SE PARTE EN DOS ──────────────────────────────
+ *
+ * Porque son DOS MÁQUINAS que no comparten nada: la estación de llenado
+ * —tanque, bomba, red— cuelga de PLC_1, y el sistema de vibraciones —otro
+ * motor, otro variador— de PLC_2. Están en la misma planta y en el mismo
+ * servidor, y ahí se acaba el parecido.
+ *
+ * Con las nueve vistas en una sola lista, la separación existía sólo en la
+ * cabeza de quien ya la sabía: «Riesgos» y «Vibraciones» salían seguidas y
+ * nada decía que hablaban de instalaciones distintas. La primera persona que
+ * cruzara el caudal de una con la vibración de la otra estaría uniendo dos
+ * máquinas que no se tocan — el mismo error que `shared/eva/sistemas.js`
+ * existe para evitarle al asistente.
+ *
+ * «General» agrupa lo que es del SERVIDOR y no de una máquina: el historial
+ * de alarmas y el navegador de puntos valen para las dos.
+ */
 export const NAV_GROUPS = {
-  "eva-3d": { label: "3D", icon: <Box size={17} /> },
+  "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
+  "sec-vibraciones": { label: "Vibraciones", icon: <Waves size={17} /> },
+  "sec-general": { label: "General", icon: <Boxes size={17} /> },
 };
 
 /*
@@ -90,7 +114,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/InicioEva.jsx")),
     title: "Inicio",
     sub: "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/",
-    nav: { label: "Inicio", icon: <Home size={17} /> },
+    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -98,7 +122,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/PlantaEva.jsx")),
     title: "Planta",
     sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
-    nav: { label: "Planta", icon: <LayoutDashboard size={17} /> },
+    nav: { label: "Planta", icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -108,19 +132,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/RiesgosEva.jsx")),
     title: "Riesgos",
     sub: "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros",
-    nav: { label: "Riesgos", icon: <ShieldAlert size={17} /> },
-  },
-
-  {
-    // Pantalla APARTE, y no una sección de «Riesgos», porque es OTRA MÁQUINA:
-    // otro motor, otro variador, otro PLC. Juntarlas invitaría a leerlas
-    // juntas, y la primera correlación que alguien sacara entre el caudal del
-    // tanque y la vibración de aquí uniría dos instalaciones que no se tocan.
-    id: "eva-vibraciones",
-    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
-    title: "Vibraciones",
-    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
-    nav: { label: "Vibraciones", icon: <Waves size={17} /> },
+    nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -130,7 +142,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/ControlesEva.jsx")),
     title: "Controles",
     sub: "Encendido y apagado directo de la bomba de la instalación",
-    nav: { label: "Controles", icon: <Power size={17} /> },
+    nav: { label: "Controles", icon: <Power size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -138,7 +150,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/EquipoEva3D.jsx")),
     title: "Máquina 3D",
     sub: "El grupo de bombeo se comporta según el estado derivado de sus señales",
-    nav: { label: "Máquina 3D", icon: <Cog size={16} />, group: "eva-3d" },
+    nav: { label: "Máquina 3D", icon: <Cog size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -146,7 +158,55 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/MaquetaEva3D.jsx")),
     title: "Maqueta 3D",
     sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
-    nav: { label: "Maqueta 3D", icon: <Factory size={16} />, group: "eva-3d" },
+    nav: { label: "Maqueta 3D", icon: <Factory size={17} />, group: "sec-llenado" },
+  },
+
+  /*
+   * ── EL SEGUNDO SISTEMA ──────────────────────────────────────────
+   *
+   * Sección APARTE, y no unas pantallas más de la estación de llenado, porque
+   * es OTRA MÁQUINA: otro motor, otro variador, otro PLC. Mezclarlas
+   * invitaría a leerlas juntas, y la primera correlación que alguien sacara
+   * entre el caudal del tanque y la vibración de aquí uniría dos
+   * instalaciones que no se tocan.
+   */
+  {
+    id: "vib-inicio",
+    component: lazy(() => import("@/Demo-EVA/views/InicioVibraciones.jsx")),
+    title: "Inicio · Vibraciones",
+    sub: "Sistema de vibraciones · qué contesta la máquina ahora mismo",
+    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-vibraciones" },
+  },
+
+  {
+    id: "eva-vibraciones",
+    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
+    title: "Vibraciones",
+    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
+    nav: { label: "Vibraciones", icon: <Waves size={17} />, group: "sec-vibraciones" },
+  },
+
+  {
+    // Su propio «Riesgos», separado del de la estación de llenado: aquél
+    // evalúa el tanque —nivel, presión, caudal— y éste un motor con
+    // acelerómetros. Las dos listas juntas serían la invitación a buscar una
+    // relación entre ellas que no existe.
+    id: "eva-riesgos-vibracion",
+    component: lazy(() => import("@/Demo-EVA/views/RiesgosVibracionEva.jsx")),
+    title: "Riesgos · Vibraciones",
+    sub: "Qué se deduce del estado mecánico · evidencia separada de la hipótesis",
+    nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-vibraciones" },
+  },
+
+  {
+    // Todavía sin construir, y en el sidebar a propósito: el sitio está
+    // decidido y el contenido no. Ver la cabecera de la vista para por qué no
+    // hay una escena provisional mientras tanto.
+    id: "vib-3d",
+    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva3D.jsx")),
+    title: "3D · Vibraciones",
+    sub: "Gemelo digital del sistema de vibraciones · todavía sin construir",
+    nav: { label: "3D", icon: <Box size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -157,7 +217,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/AlarmasEva.jsx")),
     title: "Alarmas",
     sub: "Historial de eventos de la instalación",
-    nav: { label: "Alarmas", icon: <Bell size={17} /> },
+    nav: { label: "Alarmas", icon: <Bell size={17} />, group: "sec-general" },
   },
 
   {
@@ -168,7 +228,7 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/AssetsEva.jsx")),
     title: "Assets",
     sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
-    nav: { label: "Assets", icon: <Boxes size={17} /> },
+    nav: { label: "Assets", icon: <Boxes size={17} />, group: "sec-general" },
   },
 
   {

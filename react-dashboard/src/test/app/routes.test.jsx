@@ -25,36 +25,38 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las diez vistas de la demo de agua, en su orden", () => {
-    // `eva-inicio` primero —la landing, y `DEFAULT_ROUTE`—, luego las ocho
-    // del sidebar, y `eva-detalle` al final: sin `nav` porque no es una
-    // pantalla a la que un operador llegue en frío —¿de qué activo?—, pero
-    // sigue siendo superficie navegable y tiene que aparecer aquí igual. Si
-    // alguien esconde una vista detrás de una bandera, aquí se ve — y el
-    // sitio de esa decisión sería el catálogo de señales o los umbrales, no
-    // el registro de rutas.
+  it("son las trece vistas, agrupadas por SISTEMA", () => {
+    // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
+    // `buildNav` coloca cada sección en la posición de su primer hijo, así
+    // que un bloque declarado fuera de sitio saldría bien en el menú y
+    // dejaría este archivo diciendo otra cosa que la pantalla.
     //
-    // `eva-controles` entra justo después de `eva-planta`: es una acción
-    // operativa de primer nivel (encender/apagar la bomba), no un
-    // diagnóstico — va antes de las vistas 3D.
+    // El corte por sistema (agosto de 2026) es lo que ordena todo lo demás:
+    // la estación de llenado cuelga de PLC_1 y el sistema de vibraciones de
+    // PLC_2, y no comparten nada. Antes iban en una sola lista y la
+    // separación existía sólo en la cabeza de quien ya la sabía.
     //
-    // `eva-alarmas` (Plan 13, Fase 9) entra antes de `eva-assets`: el
-    // historial de eventos es una herramienta de OPERACIÓN — assets es de
-    // diagnóstico, y va detrás por criterio de uso más frecuente primero.
-    // `eva-riesgos` va inmediatamente detrás de `eva-planta` porque contesta la
-    // pregunta siguiente: «Planta» dice qué está pasando y «Riesgos» qué puede
-    // pasar si sigue así. Separarlas con las dos vistas 3D rompería esa
-    // secuencia de lectura, que es la razón de que exista la pantalla.
+    // `eva-detalle` cierra la lista sin `nav`: no es una pantalla a la que un
+    // operador llegue en frío —¿de qué activo?—, pero sigue siendo superficie
+    // navegable. Si alguien esconde una vista detrás de una bandera, aquí se
+    // ve.
     expect(ids).toEqual([
+      // Estación de llenado — el tanque y su grupo de bombeo.
       "eva-inicio",
       "eva-planta",
       "eva-riesgos",
-      "eva-vibraciones",
       "eva-controles",
       "eva-maquina-3d",
       "eva-maqueta",
+      // Vibraciones — OTRA máquina: otro motor, otro variador, otro PLC.
+      "vib-inicio",
+      "eva-vibraciones",
+      "eva-riesgos-vibracion",
+      "vib-3d",
+      // General — del servidor, no de una máquina: valen para las dos.
       "eva-alarmas",
       "eva-assets",
+      // Sin `nav`.
       "eva-detalle",
     ]);
   });
@@ -78,24 +80,49 @@ describe("superficie de la aplicación", () => {
 });
 
 describe("el sidebar que sale del registro", () => {
-  it("las dos vistas 3D arman su grupo, y las 2D quedan sueltas", () => {
+  it("las tres secciones salen del registro, con sus vistas dentro", () => {
     // `buildNav` LANZA si una ruta referencia un grupo que no está declarado en
     // NAV_GROUPS, y ese fallo sólo aparece al importar el registro. Comprobarlo
     // aquí lo convierte en un fallo de la suite y no en una pantalla en blanco.
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
-      "eva-inicio",
-      "eva-planta",
-      "eva-riesgos",
-      "eva-vibraciones",
-      "eva-controles",
-      "eva-3d",
-      "eva-alarmas",
-      "eva-assets",
+      "sec-llenado",
+      "sec-vibraciones",
+      "sec-general",
     ]);
 
-    const grupo = NAV.find((n) => n.group === "eva-3d");
-    expect(grupo.label).toBe("3D");
-    expect(grupo.children.map((c) => c.id)).toEqual(["eva-maquina-3d", "eva-maqueta"]);
+    const llenado = NAV.find((n) => n.group === "sec-llenado");
+    expect(llenado.label).toBe("Estación de llenado");
+    expect(llenado.children.map((c) => c.id)).toEqual([
+      "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles",
+      "eva-maquina-3d", "eva-maqueta",
+    ]);
+
+    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
+    expect(vibraciones.label).toBe("Vibraciones");
+    expect(vibraciones.children.map((c) => c.id)).toEqual([
+      "vib-inicio", "eva-vibraciones", "eva-riesgos-vibracion", "vib-3d",
+    ]);
+
+    // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
+    // dentro de un sistema, estaría diciendo que sus eventos son sólo de ése.
+    const general = NAV.find((n) => n.group === "sec-general");
+    expect(general.label).toBe("General");
+    expect(general.children.map((c) => c.id)).toEqual(["eva-alarmas", "eva-assets"]);
+  });
+
+  it("cada sistema tiene su propio «Riesgos», y no se mezclan", () => {
+    // Son dos motores de reglas distintos sobre dos máquinas distintas:
+    // `riesgos.js` evalúa el tanque —nivel, presión, caudal— y
+    // `riesgosVibracion.js` un motor con acelerómetros. Una sola pantalla con
+    // las dos listas invitaría a buscar entre ellas una relación que no
+    // existe, que es el error que `shared/eva/sistemas.js` evita al asistente.
+    const conRiesgos = NAV.flatMap((s) =>
+      (s.children ?? []).filter((c) => c.label === "Riesgos").map((c) => [s.group, c.id])
+    );
+    expect(conRiesgos).toEqual([
+      ["sec-llenado", "eva-riesgos"],
+      ["sec-vibraciones", "eva-riesgos-vibracion"],
+    ]);
   });
 
   it("la ruta por defecto está visible en el menú", () => {

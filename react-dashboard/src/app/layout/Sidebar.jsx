@@ -135,12 +135,36 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
 /** Grupo desplegable: cabecera que colapsa/expande sus hijos. */
 function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSidebar }) {
   const childActive = item.children.some((c) => c.id === page);
-  const [open, setOpen] = useState(childActive);
 
-  // Al colapsar la barra se ocultan los hijos; al reabrirla se recupera el grupo activo.
+  /*
+   * ── POR QUÉ ARRANCAN ABIERTOS ──────────────────────────────────────
+   *
+   * Hasta que la planta se partió en dos sistemas (agosto de 2026), el único
+   * grupo era «3D» —dos vistas dentro de una lista de items sueltos—, y
+   * arrancar cerrado tenía sentido: el menú se leía entero de un vistazo y
+   * ese grupo era un pliegue opcional dentro de él.
+   *
+   * Ahora TODO el menú son secciones. Con el criterio anterior, quien abría
+   * la aplicación veía tres cabeceras y las cuatro vistas de la sección
+   * activa: las otras nueve estaban a un clic que nada anunciaba, y la
+   * pantalla no decía que existieran. Un menú que esconde dos tercios de la
+   * aplicación no es un menú.
+   *
+   * Se conserva el plegado MANUAL —quien quiera quitar de en medio el sistema
+   * que no está mirando, puede— y el cierre al colapsar la barra, que ahí es
+   * obligado porque no hay sitio para los hijos.
+   */
+  const [open, setOpen] = useState(!collapsed);
+
   useEffect(() => {
     if (collapsed) setOpen(false);
-    else if (childActive) setOpen(true);
+    else setOpen(true);
+  }, [collapsed]);
+
+  // Navegar a una vista de una sección plegada la abre: si no, el item activo
+  // quedaría escondido y la barra señalaría una sección sin decir cuál.
+  useEffect(() => {
+    if (!collapsed && childActive) setOpen(true);
   }, [collapsed, childActive]);
 
   return (
@@ -264,7 +288,7 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
         {!collapsed && (
           <>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 15.5, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.15, whiteSpace: "nowrap" }}>Estación de Llenado</div>
+              <div style={{ fontSize: 15.5, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1.15, whiteSpace: "nowrap" }}>Demo TDCON</div>
               <div style={{ fontSize: 11, color: t.textFaint, fontFamily: "'IBM Plex Mono', monospace", marginTop: 2 }}>ENTERPRISE</div>
             </div>
             {esCajon && (
