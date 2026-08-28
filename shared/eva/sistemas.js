@@ -119,6 +119,8 @@ import { estadoDeVibraciones, resumenVibracionesParaAsistente } from "./estadoVi
 import { MECANISMOS } from "./pronostico.js";
 import {
   AREA_ALARMAS,
+  BANDERAS as BANDERAS_VIB,
+  CALIDADES as CALIDADES_VIB,
   CANALES as CANALES_VIB,
   GRUPO_HISTORIADOR,
   MEDIDAS as MEDIDAS_VIB,
@@ -230,20 +232,38 @@ export const SISTEMAS = [
     modelo: valorVibracionEn,
     estado: estadoDeVibraciones,
     resumen: resumenVibracionesParaAsistente,
-    /* Las claves de esta máquina son compuestas: la medida y su apoyo. Es lo
+    /* Las claves de esta máquina son compuestas: la familia y su apoyo. Es lo
        que hace que «vRMS» sola sea ambigua —hay tres— y que el resolvedor
-       tenga que pedir el apoyo en vez de elegir uno. */
+       tenga que pedir el apoyo en vez de elegir uno.
+
+       Entran las TRES familias que tienen serie: las medidas, las banderas
+       (alarma, aviso, offset) y la calidad de cada medida. Las vigilancias y
+       el estado del sensor se quedan fuera porque no se historizan, y este
+       método es lo que usa el resolvedor de nombres para saber por qué se
+       puede preguntar. */
     claves: () => [
-      ...CANALES_VIB.flatMap((c) => MEDIDAS_VIB.map((m) => `${m.key}_${c.id}`)),
+      ...CANALES_VIB.flatMap((c) => [
+        ...MEDIDAS_VIB.map((m) => `${m.key}_${c.id}`),
+        ...BANDERAS_VIB.map((b) => `${b.key}_${c.id}`),
+        ...CALIDADES_VIB.map((q) => `${q.key}_${c.id}`),
+      ]),
       ...VARIADOR_VIB.map((v) => v.key),
     ],
     etiquetaDe: (clave) => {
       const v = VARIADOR_VIB.find((x) => x.key === clave);
       if (v) return v.label;
-      const [medida, canalId] = [clave.slice(0, clave.lastIndexOf("_")), clave.slice(clave.lastIndexOf("_") + 1)];
-      const m = MEDIDAS_VIB.find((x) => x.key === medida);
-      const c = CANALES_VIB.find((x) => x.id === canalId);
-      return m && c ? `${m.label} · ${c.label}` : null;
+
+      const corte = clave.lastIndexOf("_");
+      const base = clave.slice(0, corte);
+      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
+      if (!c) return null;
+
+      /* Las tres familias de apoyo, en el mismo orden que `claves()`. */
+      const f =
+        MEDIDAS_VIB.find((x) => x.key === base) ??
+        BANDERAS_VIB.find((x) => x.key === base) ??
+        CALIDADES_VIB.find((x) => x.key === base);
+      return f ? `${f.label} · ${c.label}` : null;
     },
     esHistorizada: esHistorizadaVibracion,
     /*
@@ -267,10 +287,12 @@ export const SISTEMAS = [
       agregado: "Average",
       punto: puntoHistoricoVibracion,
       nota:
-        "Veintitrés de las veinticuatro señales tienen serie propia verificada desde el " +
-        "28-08-2026. La excepción es la aceleración de pico del lado acople (aPeak_S1): el " +
-        "historiador devuelve ahí la serie de la aceleración eficaz del mismo apoyo, sin dar " +
-        "error, así que NO se puede pedir.",
+        "El grupo DEMO 3 registra 40 de los 73 puntos de esta máquina, sondeados uno a uno el " +
+        "28-08-2026: las doce medidas de los tres apoyos (menos aPeak_S1), sus banderas y su " +
+        "calidad, y el variador entero. NO se historizan las vigilancias del módulo " +
+        "(MonState_*), el estado de los sensores ni los contadores de alarma. La aceleración " +
+        "de pico del lado acople (aPeak_S1) queda fuera aunque el servidor conteste: devuelve " +
+        "la serie de la aceleración eficaz del mismo apoyo, sin dar error.",
     },
     /* Sin mecanismos de desgaste: sin historia no hay exposición acumulada
        que contar, y un pronóstico sobre el instante sería adivinación. */
@@ -296,12 +318,15 @@ export const SISTEMAS = [
        tanque y todavía no aceptan `sistema`: ver B3 del backlog. */
     herramientas: ["estado_del_sistema", "riesgos_activos", "historia_de_senal"],
     historia:
-      "Veintitrés de las veinticuatro señales tienen serie propia desde el 28-08-2026. La " +
-      "excepción es aPeak_S1, que devuelve la serie de aRMS_S1 sin dar error.",
+      "40 de los 73 puntos tienen serie propia desde el 28-08-2026: medidas, banderas, calidad " +
+      "y variador. Las vigilancias del módulo y el estado de los sensores NO se historizan, " +
+      "aunque sí se leen en vivo. aPeak_S1 devuelve la serie de aRMS_S1 y queda fuera.",
     limitaciones: [
       "La aceleración de pico del lado acople (aPeak_S1) NO tiene serie propia: el " +
         "historiador devuelve ahí la de la aceleración eficaz del mismo apoyo. No se puede " +
         "hablar de su evolución, aunque las de los otros dos apoyos sí.",
+      "Las vigilancias del módulo (MonState_*) y el estado de los sensores se leen EN VIVO " +
+        "pero no se historizan: se puede decir cómo están ahora, nunca cómo estaban antes.",
       "El histórico empezó el 26-08-2026: no hay nada anterior, y las primeras horas se " +
         "grabaron mientras la configuración todavía se movía.",
       "Sin mecanismos de desgaste declarados no hay pronóstico: se puede describir cómo ha " +
@@ -555,14 +580,27 @@ export function sistemasDeSenal(texto) {
     for (const k of sistema.claves()) {
       const candidatos = [normalizar(sistema.etiquetaDe(k)), normalizar(k)].filter(Boolean);
       let largo = 0;
+      let sobra = Infinity;
       for (const n of candidatos) {
         const encaja =
           (n.length >= MIN_CONTENCION && q.includes(n)) ||
           (q.length >= MIN_CONTENCION && n.includes(q));
-        if (encaja) largo = Math.max(largo, Math.min(n.length, q.length));
-        else largo = Math.max(largo, cubiertoPorPalabras(n, q));
+        const puntos = encaja
+          ? Math.min(n.length, q.length)
+          : cubiertoPorPalabras(n, q);
+        /* Cuánto texto pone el nombre ANTES de lo que se preguntó. Ver el
+           desempate: es lo que separa «Velocidad eficaz · Lado acople» de
+           «Confianza de la velocidad eficaz · Lado acople», y lo que NO separa
+           a los tres apoyos entre sí —su diferencia va detrás—. */
+        const prefijo = n.includes(q) ? n.indexOf(q) : 0;
+        if (puntos > largo) {
+          largo = puntos;
+          sobra = prefijo;
+        } else if (puntos === largo && puntos > 0) {
+          sobra = Math.min(sobra, prefijo);
+        }
       }
-      if (largo > 0) contenidos.push({ sistema: sistema.id, clave: k, largo });
+      if (largo > 0) contenidos.push({ sistema: sistema.id, clave: k, largo, sobra });
     }
   }
 
@@ -587,8 +625,29 @@ export function sistemasDeSenal(texto) {
    */
   if (!contenidos.length) return [];
   const mejor = Math.max(...contenidos.map((c) => c.largo));
-  return contenidos
-    .filter((c) => c.largo === mejor)
+  const empatados = contenidos.filter((c) => c.largo === mejor);
+
+  /*
+   * ── SEGUNDO DESEMPATE: EL QUE MENOS AÑADE DE SU COSECHA ────────────
+   *
+   * «Velocidad eficaz · Lado acople» y «Confianza de la velocidad eficaz ·
+   * Lado acople» contienen las dos la frase «velocidad eficaz», y con la misma
+   * longitud encajada: el primer desempate no las separa.
+   *
+   * Pero no son igual de buenas. La segunda es el indicador de CONFIANZA de la
+   * primera —otra señal, otra unidad— y quien pregunta por la velocidad eficaz
+   * no está preguntando por su calidad de medida.
+   *
+   * Lo que las separa es cuánto texto pone el nombre ANTES de lo preguntado:
+   * cero en «Velocidad eficaz · Lado acople», trece en «Confianza de la…».
+   * Y es a propósito que se mida sólo el prefijo: lo que va DETRÁS es el apoyo
+   * —«· Lado libre», «· Rodamiento intermedio»— y ahí los tres empatan, así
+   * que los tres siguen saliendo. Preguntado sin decir el apoyo, quien llama
+   * tiene que preguntar cuál; ésa es la regla que no se toca.
+   */
+  const ajuste = Math.min(...empatados.map((c) => c.sobra));
+  return empatados
+    .filter((c) => c.sobra === ajuste)
     .map(({ sistema, clave }) => ({ sistema, clave }));
 }
 

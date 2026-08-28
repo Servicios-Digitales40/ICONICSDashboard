@@ -714,32 +714,59 @@ export function parsePunto(nombre) {
 }
 
 /**
- * ── LAS SERIES, DESDE EL 28-08-2026 ────────────────────────────────
+ * ── LAS SERIES, SONDEADAS PUNTO POR PUNTO EL 28-08-2026 ────────────
  *
- * El grupo `DEMO 3` del Hyper Historian YA REGISTRA. Sondeado punto por punto
- * contra el servidor real ese día: las doce medidas de los tres apoyos y las
- * doce del variador devuelven serie con marcas de tiempo correctas.
+ * El grupo `DEMO 3` del Hyper Historian registra **41 de los 73 puntos** de
+ * esta máquina. No es una estimación: se pidió la serie de cada uno contra el
+ * servidor real y se anotó cuál devolvió muestras.
  *
- * ── Y UNA NO ESTÁ, AUNQUE EL SERVIDOR DIGA QUE SÍ ──────────────────
+ *   medidas    12 de 12   vRMS, aRMS, aPeak y DKW en los tres apoyos
+ *   banderas    8 de  9   alarma, aviso y offset (ver la excepción abajo)
+ *   calidades   9 de  9   QC_vRMS, QC_aRMS, QC_DKW
+ *   variador   12 de 12   entero
+ *   ─────────────────────
+ *   vigilancias 0 de 24   los `MonState_*` NO se historizan
+ *   sensor      0 de  3   `Sensor_state_*` tampoco
+ *   alarmas     0 de  4   los contadores de `ae:` no son de este grupo
  *
- * `aPeak_S1` devuelve **la serie de `aRMS_S1`**, muestra por muestra y con las
- * mismas marcas de tiempo. No da error: contesta `ok` con datos plausibles de
- * OTRA señal. Se comprobó cruzando las doce series entre sí, y es el único par
- * que colisiona — `aPeak_S2` y `aPeak_S3` traen la suya.
+ * ── LO QUE ESTA LISTA NO DECIDE ────────────────────────────────────
  *
- * Es exactamente el fallo que el tanque ya tiene con tres de sus ocho señales,
- * y el motivo de que esta lista sea una LISTA BLANCA y no `() => true`: lo que
- * no está aquí no se puede pedir. Declarar las 24 porque «el grupo registra»
- * habría hecho que el asistente contestara la aceleración eficaz del lado
- * acople bajo el nombre «aceleración de pico», sin un solo error en el log.
+ * Qué se lee EN VIVO. Los 73 puntos se siguen sondeando: 72 responden con
+ * calidad buena, y los que no tienen serie son justamente los que alimentan
+ * las reglas de vigilancia —los `MonState_*` dicen si el módulo vigila cada
+ * banda—. No tener histórico y no tener valor son cosas distintas, y recortar
+ * el sondeo por la primera dejaría sin datos a reglas que hoy funcionan.
  *
- * El día que se corrija en Workbench, se añade `aPeak_S1` y ya está.
+ * Esta lista es sólo la puerta del historiador.
+ *
+ * ── DOS EXCEPCIONES, Y LAS DOS SON DEL SERVIDOR ────────────────────
+ *
+ * `aPeak_S1` devuelve **la serie de `aRMS_S1`**: muestra por muestra y con las
+ * mismas marcas de tiempo. Se comprobó cruzando las doce series de los apoyos
+ * entre sí y es el único par que colisiona — `aPeak_S2` y `aPeak_S3` traen la
+ * suya. Es el mismo fallo que el tanque tiene con tres de sus ocho señales, y
+ * el motivo de que esto sea una LISTA BLANCA: lo que no está aquí no se pide.
+ *
+ * `alarma_S1` no está por otra razón. En vivo ese tag se llama `Alarrma_S1`
+ * —con dos erres, ver `ERRATAS_DEL_SERVIDOR`— pero en el historiador está
+ * escrito bien, `Alarma_S1`, y responde. La errata es sólo del árbol `ac:`.
+ * Se deja fuera igualmente porque la lista se hizo con el nombre en vivo y
+ * conviene que el sondeo y la declaración digan lo mismo; corregir las dos
+ * puntas a la vez es un cambio aparte, no un efecto colateral de éste.
  */
 const CON_SERIE = new Set([
-  // Los tres apoyos, menos `aPeak_S1` (ver arriba).
+  // Las cuatro medidas de los tres apoyos, menos `aPeak_S1`.
   "vRMS_S1", "aRMS_S1", "DKW_S1",
   "vRMS_S2", "aRMS_S2", "aPeak_S2", "DKW_S2",
   "vRMS_S3", "aRMS_S3", "aPeak_S3", "DKW_S3",
+  // Banderas. `alarma_S1` fuera, ver arriba.
+  "aviso_S1", "offset_S1",
+  "alarma_S2", "aviso_S2", "offset_S2",
+  "alarma_S3", "aviso_S3", "offset_S3",
+  // Calidad de cada medida, en los tres apoyos.
+  "qcVRMS_S1", "qcARMS_S1", "qcDKW_S1",
+  "qcVRMS_S2", "qcARMS_S2", "qcDKW_S2",
+  "qcVRMS_S3", "qcARMS_S3", "qcDKW_S3",
   // El variador entero.
   "velocidad", "frecuencia", "tensionSalida", "corriente", "par", "potencia",
   "busCC", "fallo", "ultimoFallo", "aviso", "listo", "habilitado",
@@ -766,17 +793,34 @@ export const historizadas = () => [...CON_SERIE];
  * máquina, `pointName()` del tanque servía para las dos cosas.
  *
  * El espacio de «DEMO 3» es literal: sin él ICONICS responde 500 y parece que
- * el tag no existe. El tag va PELADO, sin la carpeta del apoyo — comprobado
- * contra el servidor el 28-08-2026.
+ * el tag no existe. El tag va PELADO, sin la carpeta del apoyo, y **sin pasar
+ * por `ERRATAS_DEL_SERVIDOR`**: la doble erre de `Alarrma_S1` es del árbol
+ * `ac:` y el historiador lo tiene bien escrito.
  */
 export function puntoHistorico(clave) {
   if (!CON_SERIE.has(clave)) return null;
 
+  /* El variador va primero: sus claves no llevan sufijo de canal, así que el
+     troceado por `_` de abajo las partiría mal (`tensionSalida` no tiene `_`,
+     pero `ultimoFallo` tampoco y `FREQ OUTPUT_BMS` sí lo tiene en el TAG). */
   const v = VARIADOR.find((x) => x.key === clave);
   if (v) return `${GRUPO_HISTORIADOR}${v.tag}`;
 
   const corte = clave.lastIndexOf("_");
-  const medida = MEDIDAS.find((m) => m.key === clave.slice(0, corte));
+  const base = clave.slice(0, corte);
   const canal = CANAL[clave.slice(corte + 1)];
-  return medida && canal ? `${GRUPO_HISTORIADOR}${medida.tag}_${canal.sufijo}` : null;
+  if (!canal) return null;
+
+  /* Las tres familias que tienen serie y viven en un apoyo. Cada una nombra su
+     tag a su manera —`vRMS_S1`, `Warning_S1`, `QC_vRMS_S1`— y la única forma
+     de acertar es preguntarle a su catálogo, no armar el nombre a mano. */
+  const familia =
+    MEDIDAS.find((m) => m.key === base) ??
+    BANDERAS.find((b) => b.key === base) ??
+    CALIDADES.find((q) => q.key === base);
+
+  /* Sin `comoLoEscribeElServidor`: la doble erre de `Alarrma_S1` es del árbol
+     `ac:`, y el historiador tiene ese tag bien escrito. Meterla aquí pediría
+     un punto que en `hda:` no existe. */
+  return familia ? `${GRUPO_HISTORIADOR}${familia.tag}_${canal.sufijo}` : null;
 }

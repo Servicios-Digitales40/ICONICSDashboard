@@ -843,7 +843,76 @@ await checkAsync('una señal ambigua dentro de una máquina se pregunta, no se e
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no identifica UNA señal/i)
-  assert.equal(r.claves.length, 3)
+  assert.equal(r.claves.length, 3, 'los tres apoyos, sin colar sus indicadores de confianza')
+  assert.equal(r.claves.every((k) => k.startsWith('vRMS_')), true)
+})
+
+await checkAsync('«velocidad eficaz» no arrastra su indicador de CONFIANZA', () => {
+  /*
+   * Al declarar historizadas las calidades (QC_*), sus etiquetas pasaron a ser
+   * «Confianza de la velocidad eficaz · Lado acople» — que CONTIENE la frase
+   * «velocidad eficaz» igual de bien que la medida misma. Sin desempate salían
+   * seis candidatos donde hay tres, y tres de ellos eran otra señal con otra
+   * unidad: la calidad de la medida, no la medida.
+   *
+   * Los separa cuánto texto pone el nombre ANTES de lo preguntado. Y se mide
+   * sólo el prefijo a propósito: lo que va detrás es el apoyo, y ahí los tres
+   * empatan, así que preguntar sin decir el apoyo sigue devolviendo los tres.
+   */
+  const medida = sistemasDeSenal('velocidad eficaz')
+  assert.equal(medida.length, 3)
+  assert.equal(medida.some((x) => x.clave.startsWith('qc')), false, 'la confianza no es la medida')
+
+  // Y pedirla explícitamente sí la trae: no se ha escondido, se ha ordenado.
+  const calidad = sistemasDeSenal('confianza de la velocidad eficaz')
+  assert.equal(calidad.length, 3)
+  assert.equal(calidad.every((x) => x.clave.startsWith('qcVRMS')), true)
+})
+
+await checkAsync('las cuatro familias con serie se pueden pedir; las otras tres no', () => {
+  /*
+   * Sondeado punto por punto el 28-08-2026: de los 73 puntos de la máquina,
+   * 40 tienen serie —medidas, banderas, calidad y variador— y 33 no: las
+   * vigilancias del módulo (MonState_*), el estado de los sensores y los
+   * contadores de alarma de `ae:`.
+   *
+   * Esos 33 se siguen leyendo EN VIVO, y es deliberado: son los que alimentan
+   * las reglas de vigilancia. No tener histórico y no tener valor son cosas
+   * distintas.
+   */
+  const con = historizadasDe('vibraciones')
+  assert.equal(con.length, 40)
+
+  // Una de cada familia que sí tiene serie.
+  for (const k of ['vRMS_S2', 'alarma_S2', 'qcVRMS_S3', 'corriente']) {
+    assert.equal(con.includes(k), true, `${k} debería tener serie`)
+    assert.ok(SISTEMA.vibraciones.series.punto(k), `${k} no sabe cómo se pide`)
+  }
+
+  // Y ninguna de las que no la tienen: no basta con omitirlas de la lista,
+  // tampoco pueden tener punto de historiador que alguien acabe usando.
+  for (const k of ['monVRMS_S1', 'bpfo_S2', 'sensor_S3', 'aPeak_S1']) {
+    assert.equal(con.includes(k), false, `${k} NO tiene serie y no puede estar`)
+    assert.equal(SISTEMA.vibraciones.series.punto(k), null)
+  }
+})
+
+await checkAsync('lo que NO se historiza se sigue leyendo en vivo', () => {
+  /*
+   * La regla que este recorte no puede romper. Las vigilancias son 24 de los
+   * 73 puntos y son las que dicen si el módulo vigila cada banda: sin ellas,
+   * las reglas de `riesgosVibracion` se quedan sin evidencia. Que no tengan
+   * serie no las hace prescindibles.
+   */
+  const enVivo = SISTEMA.vibraciones.puntos()
+  assert.equal(enVivo.length, 73, 'el sondeo en vivo no se recorta')
+
+  const vigilancias = enVivo.filter((p) => p.includes('MonState_'))
+  assert.equal(vigilancias.length, 24)
+  for (const p of vigilancias) {
+    const d = SISTEMA.vibraciones.parse(p)
+    assert.ok(d, `${p} tiene que seguir siendo reconocible por su catálogo`)
+  }
 })
 
 await checkAsync('el registro no acepta una máquina que no declare su comportamiento', () => {
