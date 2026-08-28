@@ -54,7 +54,7 @@ const BASE = process.env.BASE_PRUEBA ?? 'http://127.0.0.1:3099'
 const PREGUNTAS = [
   {
     pregunta: '¿cómo están las vibraciones? ¿el lado acople está dentro de norma?',
-    herramienta: 'estado_de_vibraciones',
+    herramienta: 'estado_del_sistema',
     debe: [
       { que: /zona a|como nueva|dentro de (la )?norma/i, es: 'dice la zona de la norma' },
       { que: /0[.,]\d{2,3}\s*mm\/s/i, es: 'cita la velocidad eficaz con su unidad' },

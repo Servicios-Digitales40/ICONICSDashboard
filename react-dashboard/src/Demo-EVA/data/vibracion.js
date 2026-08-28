@@ -45,25 +45,11 @@ import { TRANSPORTES, useDataSource } from "@/lib/datasource";
 import { fetchIconicsBatch } from "@/lib/iconics";
 import { isGoodQuality } from "@shared/quality.js";
 
+import { createSistemaVibraciones } from "@shared/eva/sistemaVibraciones.js";
+
 import { transporteDe } from "./transportes.js";
 
-import {
-  BANDERAS,
-  CALIDADES,
-  CONTADORES_ALARMA,
-  CANALES,
-  MEDIDAS,
-  VARIADOR,
-  VIGILANCIAS,
-  decodificarVigilancia,
-  puntoAlarma,
-  puntoBandera,
-  puntoCalidad,
-  puntoMedida,
-  puntoSensor,
-  puntoVariador,
-  puntoVigilancia,
-} from "../domain/vibraciones.js";
+import { todosLosPuntos } from "../domain/vibraciones.js";
 
 /** Cada cuánto se relee. El SM 1281 publica cada pocos segundos. */
 const CADENCIA_MS = 5000;
@@ -156,16 +142,10 @@ export function useVibracion() {
   const lector = useMemo(() => crearLector(transporte), [transporte]);
 
   const leer = useCallback(async () => {
-    const puntos = [];
-    for (const c of CANALES) {
-      for (const m of MEDIDAS) puntos.push(puntoMedida(m.key, c.id));
-      for (const b of BANDERAS) puntos.push(puntoBandera(b.key, c.id));
-      for (const v of VIGILANCIAS) puntos.push(puntoVigilancia(v.key, c.id));
-      for (const q of CALIDADES) puntos.push(puntoCalidad(q.key, c.id));
-      puntos.push(puntoSensor(c.id));
-    }
-    for (const v of VARIADOR) puntos.push(puntoVariador(v.key));
-    for (const a of CONTADORES_ALARMA) puntos.push(puntoAlarma(a.key));
+    // La lista la da el catálogo: `todosLosPuntos()` y el recorrido de
+    // `createSistemaVibraciones` salen de las mismas constantes, así que no
+    // pueden desincronizarse.
+    const puntos = todosLosPuntos();
 
     try {
       const res = await lector(puntos);
@@ -176,69 +156,16 @@ export function useVibracion() {
         return;
       }
 
-      const mapa = res.mapa;
-      const sinDato = [];
-
-      const canales = {};
-      for (const c of CANALES) {
-        const d = {};
-        for (const m of MEDIDAS) {
-          const punto = puntoMedida(m.key, c.id);
-          d[m.key] = valorDe(mapa.get(punto));
-          if (d[m.key] === null) sinDato.push(punto);
-        }
-        for (const b of BANDERAS) {
-          const punto = puntoBandera(b.key, c.id);
-          d[b.key] = valorDe(mapa.get(punto));
-          if (d[b.key] === null) sinDato.push(punto);
-        }
-
-        /*
-         * Los estados de vigilancia se decodifican AQUÍ, en la frontera, y no
-         * en las reglas: el base64 del módulo es un detalle del transporte, y
-         * el motor de riesgos no tiene por qué saber que existe. Lo que le
-         * llega es «apagado» o «en orden».
-         */
-        d.vigilancias = {};
-        for (const v of VIGILANCIAS) {
-          const punto = puntoVigilancia(v.key, c.id);
-          const estado = decodificarVigilancia(valorDe(mapa.get(punto)));
-          d.vigilancias[v.key] = estado;
-          if (estado === null) sinDato.push(punto);
-        }
-
-        d.calidades = {};
-        for (const q of CALIDADES) {
-          const punto = puntoCalidad(q.key, c.id);
-          d.calidades[q.key] = valorDe(mapa.get(punto));
-          if (d.calidades[q.key] === null) sinDato.push(punto);
-        }
-
-        const puntoS = puntoSensor(c.id);
-        d.sensor = decodificarVigilancia(valorDe(mapa.get(puntoS)));
-        if (d.sensor === null) sinDato.push(puntoS);
-
-        canales[c.id] = d;
-      }
-
-      const variador = {};
-      for (const v of VARIADOR) {
-        const punto = puntoVariador(v.key);
-        variador[v.key] = valorDe(mapa.get(punto));
-        if (variador[v.key] === null) sinDato.push(punto);
-      }
-
       /*
-       * Los contadores del servidor de alarmas. Van aparte de `variador` y de
-       * `canales` porque no son de la máquina: son de ICONICS, que vigila esta
-       * área con 57 alarmas configuradas por quien conoce el proceso.
+       * El recorrido del catálogo —tres canales por cinco familias, más el
+       * variador y los contadores— vive en `@shared/eva/sistemaVibraciones.js`
+       * y no aquí. Estaba escrito a mano en este archivo y OTRA VEZ en
+       * `backend/ia/herramientas.mjs`: dos copias del mismo recorrido sobre el
+       * mismo catálogo, y el síntoma de que divergieran no habría sido un
+       * error, sino el chat contestando sobre un apoyo con los datos de otro.
        */
-      const alarmas = {};
-      for (const a of CONTADORES_ALARMA) {
-        const punto = puntoAlarma(a.key);
-        alarmas[a.key] = valorDe(mapa.get(punto));
-        if (alarmas[a.key] === null) sinDato.push(punto);
-      }
+      const { canales, variador, alarmas, sinDato, puntosPedidos } =
+        createSistemaVibraciones((punto) => valorDe(res.mapa.get(punto)));
 
       setEstado({
         canales,
@@ -248,7 +175,7 @@ export function useVibracion() {
         error: null,
         lastUpdated: new Date(),
         puntosSinDato: sinDato,
-        puntosPedidos: puntos.length,
+        puntosPedidos,
       });
     } catch (e) {
       if (!vivo.current) return;

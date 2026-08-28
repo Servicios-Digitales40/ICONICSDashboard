@@ -53,6 +53,8 @@ import {
   pointName,
 } from '../shared/eva/senales.js'
 import { PROVISIONALES } from '../shared/eva/umbrales.js'
+import { SISTEMAS, tieneHistoria } from '../shared/eva/sistemas.js'
+import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/historia.js'
 
 const c = {
@@ -418,13 +420,112 @@ check('el futuro se rechaza', () => {
   assert.match(v.error, /futuro/i)
 })
 
+/* ── Una herramienta, todas las máquinas ─────────────────────────────── */
+
+console.log('\n-- Una herramienta, todas las maquinas ---------------------')
+
+/*
+ * Este bloque recorre `SISTEMAS`, no nombra máquinas. Lo que fija es que
+ * `estado_del_sistema` y `riesgos_activos` sirvan a CUALQUIERA de las dadas de
+ * alta — el motivo entero de haberlas parametrizado en vez de escribir una por
+ * instalación, que es como el tanque llegó a tener ocho herramientas y
+ * vibraciones una.
+ */
+for (const sistema of SISTEMAS) {
+  await checkAsync(`«${sistema.id}»: estado_del_sistema lo sirve`, async () => {
+    const client = createFakeIconicsClient({ rnd: () => 0.99 })
+    const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: sistema.id })
+
+    assert.equal(r.ok, true, r.error)
+    // Cada máquina se narra a su manera —el tanque con campos sueltos,
+    // vibraciones con la frase ya hecha— pero las dos tienen que decir de
+    // QUIÉN hablan, o el modelo mezcla instalaciones al redactar.
+    assert.match(JSON.stringify(r), /sistema|instalacion/i)
+  })
+
+  await checkAsync(`«${sistema.id}»: riesgos_activos lo evalúa de verdad`, async () => {
+    const client = createFakeIconicsClient({ rnd: () => 0.99 })
+    const r = await createHerramientas({ client }).ejecutar('riesgos_activos', { sistema: sistema.id })
+
+    assert.equal(r.ok, true, r.error)
+    // `evaluadas: 0` significaría que esta máquina no tiene motor de reglas
+    // enchufado: la herramienta contestaría «sin riesgos» de algo que nadie
+    // miró, que es el peor silencio posible.
+    assert.equal(r.reglas_evaluadas > 0, true, `${sistema.id} no evaluó ninguna regla`)
+    assert.ok(r.sin_comprobar, 'falta el recuento de lo que NO se pudo mirar')
+  })
+}
+
+await checkAsync('sin `sistema` no se contesta: se pregunta cuál', async () => {
+  /*
+   * El defecto tendría que ser el tanque, y entonces una pregunta sobre
+   * vibraciones a la que el modelo olvidara el argumento se contestaría
+   * CORRECTAMENTE SOBRE LA MÁQUINA EQUIVOCADA: cifras reales, unidades reales,
+   * y ni un error en el log. Fallar cuesta un turno y se corrige solo.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('estado_del_sistema', {})
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /de qué sistema/i)
+  assert.equal(r.sistemas.length, SISTEMAS.length, 'el fallo tiene que enseñar los ids')
+})
+
+await checkAsync('un sistema inventado no se sirve con el de al lado', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('estado_del_sistema', { sistema: 'prensa' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no hay ningún sistema/i)
+})
+
+await checkAsync('una señal de OTRA máquina se identifica, no se declara inexistente', async () => {
+  /*
+   * Antes el mensaje era «sólo existen las ocho de la lista», cierto del tanque
+   * y mentira de la planta: preguntado por la velocidad eficaz de un apoyo, el
+   * asistente contestaba que esa señal no existe — y existe, en la otra máquina.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', periodo: 'hoy' })
+
+  assert.equal(r.ok, false)
+  assert.equal(r.sistema, 'vibraciones', 'tiene que decir DE QUÉ máquina es')
+  assert.equal(r.con_historia, false)
+  assert.match(r.error, /no tiene histórico utilizable/i)
+})
+
+await checkAsync('una máquina SIN historia se niega a pronosticar, y dice por qué', async () => {
+  // El punto 3 del alta: sin histórico no hay exposición acumulada que contar,
+  // y sin mecanismos declarados no se sabe a qué avería llevaría. Inventar una
+  // tendencia sobre el instante es la respuesta que más convence y más daño hace.
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('pronostico_de_desgaste', { sistema: 'vibraciones' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene pronóstico de desgaste/i)
+  assert.equal(r.con_historia, false)
+})
+
+await checkAsync('el registro no deja dar de alta una máquina que calle sobre su historia', () => {
+  // Una máquina sin series es válida; el silencio no, porque se lee como que sí
+  // las tiene. Lo valida `sistemas.js` al cargarse, y aquí se comprueba que la
+  // declaración existe de verdad en las dadas de alta.
+  for (const sistema of SISTEMAS) {
+    assert.ok(sistema.series?.nota, `«${sistema.id}» no declara qué se puede pedir de su historia`)
+    assert.equal(
+      tieneHistoria(sistema.id), sistema.series.historizadas().length > 0,
+      `«${sistema.id}»: tieneHistoria no concuerda con su lista`,
+    )
+  }
+})
+
 /* ── estado_del_sistema ──────────────────────────────────────────────── */
 
 console.log('\n── estado_del_sistema ──────────────────────────────────────')
 
 await checkAsync('las ocho señales se leen en UNA sola llamada en lote', async () => {
   const client = clienteFalso()
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   assert.equal(r.ok, true)
   assert.equal(client.lotes.length, 1, 'una petición, no ocho')
@@ -435,7 +536,7 @@ await checkAsync('una instalación PARADA no es una instalación en alarma', asy
   // Es el motivo de que exista `reposo`. Sin él, caudal 0 y eficiencia 0 caen
   // bajo su límite duro y la demo abre en rojo permanente — la pantalla que
   // enseña a ignorar las alertas.
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   assert.equal(r.enReposo, true)
   assert.equal(r.recuento.fueraDeLimite, 0, 'parada no es fuera de límite')
@@ -451,7 +552,7 @@ await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async ()
   // Sin este filtro el asistente diría «el tanque está al 0 %» de una
   // instalación llena, que es la peor respuesta posible: parece un dato.
   const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
   assert.equal(nivel.valor, null, 'mala calidad tiene que ser null')
@@ -461,7 +562,7 @@ await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async ()
 })
 
 await checkAsync('las unidades que el servidor no declara viajan vacías', async () => {
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
 
   const caudal = senales.find(s => s.clave === 'flujoInstantaneo')
@@ -482,7 +583,7 @@ await checkAsync('el float crudo del PLC se redondea a los decimales del catálo
   const client = clienteFalso({
     valores: { ...EN_REPOSO, SNIVEL_TANQUE: 50.09765625, STEMPERATURA_TANQUE: 23.258464813232422 },
   })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
 
   assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, 50.1)
@@ -491,7 +592,7 @@ await checkAsync('el float crudo del PLC se redondea a los decimales del catálo
 
 await checkAsync('redondear no convierte un hueco ni un booleano en cero', async () => {
   const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
 
   assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, null, 'null, no 0')
@@ -499,7 +600,7 @@ await checkAsync('redondear no convierte un hueco ni un booleano en cero', async
 })
 
 await checkAsync('la booleana se dice con su palabra, no con true/false', async () => {
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const modo = r.activos.flatMap(a => a.senales).find(s => s.clave === 'modoVdf')
 
   assert.equal(modo.texto, 'Automático')
@@ -520,7 +621,7 @@ await checkAsync('el aviso de umbrales viaja en el campo QUE VIGILA la red de se
   const h = createHerramientas({ client: clienteFalso() })
 
   for (const [nombre, args] of [
-    ['estado_del_sistema', {}],
+    ['estado_del_sistema', { sistema: 'tanque' }],
     ['historia_de_senal', { senal: 'nivel' }],
     ['comparar_periodos', { senal: 'nivel', periodoA: 'última hora', periodoB: 'hace 3 horas' }],
   ]) {
@@ -536,13 +637,13 @@ await checkAsync('la hora de lectura se da legible y en local, no en ISO', async
   // Medido con el 4B: con un ISO delante lo copió tal cual en la respuesta
   // («leído a las 2026-08-18T14:48:44.253Z»). Además va en UTC, así que en
   // España marcaría dos horas menos que el reloj de la pared.
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   assert.match(r.leidoA, /^\d{2}:\d{2}:\d{2}$/, `leidoA fue "${r.leidoA}"`)
 })
 
 await checkAsync('cada señal lleva su banda, para no obligar al modelo a restar', async () => {
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
 
   assert.deepEqual(nivel.banda, {
@@ -560,7 +661,7 @@ await checkAsync('un servidor caído se cuenta como tal y no como instalación v
     async readPoints() { return { ok: false, error: 'ICONICS no responde', status: 502 } },
     async readHistory() { return { ok: false, status: 502 } },
   }
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', {})
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no se pudo leer/i)
@@ -1416,13 +1517,19 @@ await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acot
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
+check('son diecinueve herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
-    /* Las cuatro de sistemas van primero a propósito: `sistemas_de_la_planta`
-       es la que el modelo tiene que encontrar cuando no sabe de qué máquina le
-       hablan, y el orden del catálogo es lo primero que lee. */
+    /* Las de sistemas van primero a propósito: `sistemas_de_la_planta` es la
+       que el modelo tiene que encontrar cuando no sabe de qué máquina le
+       hablan, y el orden del catálogo es lo primero que lee.
+
+       Eran veinte hasta que `estado_de_vibraciones` se fusionó con
+       `estado_del_sistema`. Que el número BAJE al añadir capacidad es el punto
+       del cambio: las herramientas se parametrizan por sistema en vez de
+       multiplicarse por máquina, porque veinte descripciones parecidas hacen
+       que un modelo local elija peor cuál llamar. */
     /* Las tres de aprendizaje escriben, pero en un JSON nuestro: ninguna toca
        el servidor de planta. La única que sí lo toca sigue siendo una. */
     'hechos_de_la_planta',
@@ -1430,7 +1537,6 @@ check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
     'proponer_regla',
     'sistemas_de_la_planta',
     'riesgos_activos',
-    'estado_de_vibraciones',
     'pronostico_de_desgaste',
     'estado_del_sistema',
     'historia_de_senal',

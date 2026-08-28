@@ -313,7 +313,7 @@ function instrucciones(catalogo, maxPasos) {
     '    separado lo MEDIDO de la HIPÓTESIS. La herramienta te los da en campos distintos por',
     '    esa razón: juntarlos en una frase suena a que el sistema sabe lo que está pasando, y',
     '    no lo sabe.',
-    '11. Si riesgos_activos o estado_de_vibraciones traen cosas en `sin_comprobar`, NO digas',
+    '11. Si riesgos_activos o estado_del_sistema traen cosas en `sin_comprobar`, NO digas',
     '    que está todo bien. Faltaban lecturas y no se pudo mirar. «Sin riesgos detectados» y',
     '    «no se pudo mirar» son cosas distintas, y confundirlas es el error más caro que puedes',
     '    cometer con estas herramientas: deja tranquilo a alguien que no debería estarlo.',

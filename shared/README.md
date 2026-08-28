@@ -40,7 +40,8 @@ Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 
 | Archivo | Qué contiene |
 |---|---|
-| `eva/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `esHistorizada()` |
+| `eva/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `estado()`, `resumen()`, `series`, `desgaste` |
+| `eva/estadoMaquina.js` | **La forma común.** Cómo cuenta cualquier máquina cómo está: señales, grupos, recuento y —lo que más importa— los puntos que NO contestaron |
 
 **El tanque** — `ac:TDCON/DEMO/SENSORES/`, ocho señales planas:
 
@@ -54,6 +55,8 @@ Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 | `eva/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
 | `eva/riesgos.js` | Las 10 reglas de riesgo de esta instalación |
 | `eva/simulador.js` | Su física: `valorEn(clave, ms)` y `valorDePunto(punto, ms)` |
+| `eva/pronostico.js` | Sus 5 mecanismos de desgaste acumulado |
+| `eva/estadoTanque.js` | Su proyección a la forma común, y cómo se narra al asistente |
 
 **El sistema de vibraciones** — `ac:TDCON/Motors/01/` más `ae:/DEMO VIBRACIONES`,
 73 puntos sobre tres apoyos:
@@ -63,10 +66,27 @@ Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 | `eva/vibraciones.js` | Catálogo compuesto: canales × medidas, banderas, vigilancias, confianzas, variador y contadores de alarma. Incluye las erratas del servidor, respetadas |
 | `eva/riesgosVibracion.js` | Las 18 reglas sobre los tres apoyos, con ISO 10816-1 Clase I |
 | `eva/simuladorVibraciones.js` | Su física: `valorVibracionEn(punto, ms)` |
+| `eva/sistemaVibraciones.js` | De puntos sueltos a `{ canales, variador, alarmas }` — el recorrido que antes estaba escrito dos veces |
+| `eva/estadoVibraciones.js` | Su proyección a la forma común, y su narración (la frase viene hecha: ver su cabecera) |
 
 Los dos catálogos **no se unifican**, y no es pendiente de nadie: son dos formas
 de datos, no dos versiones de la misma. Lo que sí se comparte es el PUERTO que
 ambos implementan, y eso es lo que declara `sistemas.js`.
+
+Lo que sí se unificó es **cómo se cuentan hacia afuera**. Cada máquina proyecta
+su dominio a la forma de `estadoMaquina.js`, y sobre esa forma se escriben una
+sola vez el asistente, los informes y —cuando llegue— la predicción de fallos.
+El dominio de cada una sigue intacto y viaja en `estado.dominio`, que es lo que
+esperan sus motores de reglas.
+
+> **Por qué importaba.** Sin forma común, el catálogo de herramientas del
+> asistente tenía OCHO para el tanque y UNA para vibraciones — no porque
+> faltaran por escribir, sino porque cada una estaba escrita contra la forma de
+> una máquina concreta. Hoy `estado_del_sistema(sistema)` y
+> `riesgos_activos(sistema)` sirven a las dos, y el número total de herramientas
+> BAJÓ de veinte a diecinueve al ganar capacidad. Eso también es deliberado: con
+> veinte descripciones parecidas en el contexto, un modelo local elige peor cuál
+> llamar.
 
 Los del tanque vivían en `react-dashboard/src/Demo-EVA/domain/` y subieron aquí
 cuando el asistente pasó a responder sobre esta instalación. Es literalmente el
@@ -101,7 +121,7 @@ que eso produce **ya ha ocurrido dos veces** — la máquina nueva no está en l
 ramas, cae en la de «punto de escritura» y sale con `value: null` y calidad
 BUENA. La pantalla no ve un fallo; ve una máquina que contesta y no dice nada.
 
-Hoy son **cinco pasos**, y ninguno toca el transporte:
+Hoy son **seis pasos**, y ninguno toca el transporte ni el asistente:
 
 1. **Su catálogo** — `shared/eva/prensa.js`. Los tags, con sus irregularidades
    del servidor respetadas, y un `parsePunto` que sea el inverso exacto por
@@ -109,17 +129,30 @@ Hoy son **cinco pasos**, y ninguno toca el transporte:
 2. **Su física** — `shared/eva/simuladorPrensa.js`, una función pura
    `(punto, ms) → valor | null | undefined`. Sin `Math.random()`: lo aleatorio
    es del transporte, no de la señal.
-3. **Sus reglas** — `shared/eva/riesgosPrensa.js`, si la máquina va a tener
-   pantalla de riesgos.
-4. **Una entrada en `sistemas.js`** que enchufe los tres, con sus `raices`, su
-   `cadenciaMs` y sus `limitaciones`.
-5. **Sus vistas y su ruta**, más el hook de lectura — que para el origen
+3. **Su proyección** — `shared/eva/estadoPrensa.js`, que la lleva a la forma de
+   `estadoMaquina.js` y declara cómo se narra al asistente. Aquí se decide una
+   cosa que hay que decidir mirando la máquina y no copiando la de al lado: si
+   los campos sueltos bastan (como el tanque) o si la frase tiene que venir
+   hecha desde el código (como vibraciones, y está medido por qué).
+4. **Sus reglas** — `shared/eva/riesgosPrensa.js`, si va a tener pantalla de
+   riesgos, más su línea en `evaluarRiesgosDe` de `herramientas.mjs`.
+5. **Una entrada en `sistemas.js`** que enchufe todo lo anterior, con sus
+   `raices`, su `cadenciaMs`, sus `series` y sus `limitaciones`.
+6. **Sus vistas y su ruta**, más el hook de lectura — que para el origen
    simulado es una línea: `transporteDe("prensa", clase)`.
 
 Lo que **no** hay que tocar: el transporte falso del backend, el transporte
 simulado del frontend, el interruptor de origen, su cinta de aviso, el
-remontaje al conmutar, ni el asistente — que descubre la máquina nueva solo, con
-sus limitaciones, en cuanto está en el registro.
+remontaje al conmutar, ni las herramientas del asistente — `estado_del_sistema`,
+`riesgos_activos` y `pronostico_de_desgaste` sirven a cualquier máquina del
+registro, y las de historia se niegan solas citando `series.nota` si la nueva
+todavía no tiene series.
+
+> **Lo que el registro te obliga a declarar, y por qué.** `sistemas.js` valida
+> al cargarse y **lanza** si falta algo — el proceso no arranca. Entre lo
+> obligatorio está `series.nota`: una máquina sin histórico es perfectamente
+> válida, pero el silencio no, porque se lee como que sí lo tiene. Es el punto 3
+> del alta, puesto en el código.
 
 Y hay dos pruebas que la cubren **el día que se añada**, sin que nadie se
 acuerde de ir a escribirlas: `src/test/demo-eva/sistemas.test.js` y el bloque

@@ -138,7 +138,7 @@ backend/
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Las cuatro que el modelo puede invocar
+│   ├── herramientas.mjs   Las 19 que el modelo puede invocar
 │   └── chat.mjs           El bucle de dos pasadas contra llama-server
 │
 └── routes/              Traducción HTTP ↔ cliente
@@ -327,9 +327,10 @@ en vez de un 404 que se confunde con una ruta mal escrita.
 ## Verificación
 
 ```bash
-node scripts/verificar-backend.mjs        # 51 · el contrato HTTP
-node scripts/verificar-herramientas.mjs   # 21 · las herramientas del asistente
-node scripts/verificar-chat.mjs           # 17 · el bucle de conversación
+node scripts/verificar-backend.mjs        # 73 · el contrato HTTP
+node scripts/verificar-herramientas.mjs   # 98 · las herramientas del asistente
+node scripts/verificar-chat.mjs           # 42 · el bucle de conversación
+node scripts/verificar-transporte-falso.mjs # 21 · ICONICS_FAKE, las dos máquinas
 ```
 
 El primero levanta un ICONICS falso —flujo OIDC incluido— y comprueba que cada
@@ -337,7 +338,7 @@ endpoint devuelve la forma exacta que consume el frontend.
 
 Los otros dos existen porque una respuesta real del asistente tarda entre 30 y
 90 segundos: una capa que solo se pudiera probar esperando eso no se probaría
-nunca. `verificar-herramientas` ejecuta las cuatro contra un cliente de
+nunca. `verificar-herramientas` las ejecuta contra un cliente de
 mentira; `verificar-chat` levanta un **llama-server falso** al que se le dicta
 qué contestar, lo que permite provocar en milisegundos casos que con el modelo
 de verdad no se pueden provocar a voluntad —el principal: que conteste de

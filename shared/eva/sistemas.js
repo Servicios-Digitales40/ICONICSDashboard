@@ -104,15 +104,25 @@
  *   puntos, parse, modelo, esHistorizada, cadenciaMs
  */
 import {
+  SENALES,
+  SENAL_KEYS,
   TODOS_LOS_PUNTOS,
   RAIZ,
   esHistorizada as esHistorizadaTanque,
+  historizadas as historizadasTanque,
   parsePointName,
 } from "./senales.js";
 import { valorDePunto } from "./simulador.js";
+import { estadoDelTanque, resumenTanqueParaAsistente } from "./estadoTanque.js";
+import { estadoDeVibraciones, resumenVibracionesParaAsistente } from "./estadoVibraciones.js";
+import { MECANISMOS } from "./pronostico.js";
 import {
   AREA_ALARMAS,
+  CANALES as CANALES_VIB,
+  GRUPO_HISTORIADOR,
+  MEDIDAS as MEDIDAS_VIB,
   RAIZ_VIB,
+  VARIADOR as VARIADOR_VIB,
   esHistorizada as esHistorizadaVibracion,
   parsePunto,
   todosLosPuntos as todosLosPuntosVibracion,
@@ -135,7 +145,37 @@ export const SISTEMAS = [
       return clave === null ? null : { tipo: "senal", clave, canal: null };
     },
     modelo: valorDePunto,
+    estado: estadoDelTanque,
+    /** Cómo se cuenta esta máquina al asistente. Ver `estadoTanque.js`. */
+    resumen: resumenTanqueParaAsistente,
+    /** Claves de esta máquina, para resolver un nombre de señal. */
+    claves: () => SENAL_KEYS,
+    etiquetaDe: (clave) => SENALES[clave]?.label ?? null,
     esHistorizada: esHistorizadaTanque,
+    /*
+     * ── LA MECÁNICA DEL HISTORIADOR ES DE CADA MÁQUINA ─────────────
+     *
+     * Estaba dentro de `historia.js`, escrita para el tanque: `ac:` y no
+     * `hda:`, `Average` y no `Interpolative`. Otra máquina puede necesitar
+     * otra combinación —vibraciones ya sabe que su sitio es `hda:` el día que
+     * registre—, y con una sola copia la segunda tendría que elegir entre
+     * mentir o tocar el archivo de la primera.
+     *
+     * `historizadas` es la puerta, y no una lista informativa: a TRES de las
+     * ocho señales el historiador les devuelve la serie de la temperatura del
+     * tanque, con marcas de tiempo correctas y sin dar error. Lo que no está
+     * aquí no se puede pedir.
+     */
+    series: {
+      historizadas: historizadasTanque,
+      ruta: "ac:",
+      agregado: "Average",
+      nota:
+        "Cinco de las ocho señales tienen serie propia verificada. A las otras tres el " +
+        "historiador les devuelve la serie de la temperatura del tanque, sin dar error.",
+    },
+    /** Mecanismos de desgaste acumulado, para el pronóstico. */
+    desgaste: MECANISMOS,
     cadenciaMs: 3_000,
     mide: [
       "nivel y temperatura del tanque",
@@ -181,7 +221,44 @@ export const SISTEMAS = [
     puntos: todosLosPuntosVibracion,
     parse: parsePunto,
     modelo: valorVibracionEn,
+    estado: estadoDeVibraciones,
+    resumen: resumenVibracionesParaAsistente,
+    /* Las claves de esta máquina son compuestas: la medida y su apoyo. Es lo
+       que hace que «vRMS» sola sea ambigua —hay tres— y que el resolvedor
+       tenga que pedir el apoyo en vez de elegir uno. */
+    claves: () => [
+      ...CANALES_VIB.flatMap((c) => MEDIDAS_VIB.map((m) => `${m.key}_${c.id}`)),
+      ...VARIADOR_VIB.map((v) => v.key),
+    ],
+    etiquetaDe: (clave) => {
+      const v = VARIADOR_VIB.find((x) => x.key === clave);
+      if (v) return v.label;
+      const [medida, canalId] = [clave.slice(0, clave.lastIndexOf("_")), clave.slice(clave.lastIndexOf("_") + 1)];
+      const m = MEDIDAS_VIB.find((x) => x.key === medida);
+      const c = CANALES_VIB.find((x) => x.id === canalId);
+      return m && c ? `${m.label} · ${c.label}` : null;
+    },
     esHistorizada: esHistorizadaVibracion,
+    /*
+     * SIN SERIES, y declarado como tal en vez de omitido.
+     *
+     * `historizadas` devuelve una lista vacía, así que `tieneHistoria()` dice
+     * que no y las herramientas de historia se niegan citando `nota` en vez de
+     * contestar con datos de otra máquina o con una serie inventada. La ruta
+     * queda apuntada para el día que el grupo `DEMO 3` deje de moverse: ahí sí
+     * es `hda:` y no `ac:`, al revés que en el tanque.
+     */
+    series: {
+      historizadas: () => [],
+      ruta: GRUPO_HISTORIADOR,
+      agregado: "Average",
+      nota:
+        "El historiador empezó a guardar estos tags el 26-08-2026 y la configuración " +
+        "todavía se estaba moviendo. NO se usan sus series: sólo el instante.",
+    },
+    /* Sin mecanismos de desgaste: sin historia no hay exposición acumulada
+       que contar, y un pronóstico sobre el instante sería adivinación. */
+    desgaste: null,
     /* Más lenta que el tanque: el SM 1281 publica cada pocos segundos y no
        tiene sentido pedirle más de lo que produce. */
     cadenciaMs: 5_000,
@@ -191,7 +268,13 @@ export const SISTEMAS = [
       "velocidad, frecuencia, par y fallo de su propio variador",
       "contadores del área de alarmas de ICONICS",
     ],
-    herramientas: ["estado_de_vibraciones"],
+    /*
+     * Eran una sola —`estado_de_vibraciones`— porque cada herramienta estaba
+     * escrita contra la forma de dominio del tanque. Desde que hay una forma
+     * común (`estadoMaquina.js`) esta máquina hereda las que no dependen de
+     * tener histórico, y las que sí se niegan solas citando `series.nota`.
+     */
+    herramientas: ["estado_del_sistema", "riesgos_activos"],
     historia:
       "El historiador empezó a guardar estos tags el 26-08-2026 y la configuración " +
       "todavía se estaba moviendo. NO se usan sus series: sólo el instante.",
@@ -292,6 +375,91 @@ export function parsePuntoDeSistema(punto) {
 export function valorSimuladoDe(punto, ms) {
   return sistemaDePunto(punto)?.modelo(punto, ms);
 }
+
+/**
+ * ¿Esta máquina tiene alguna señal con serie propia?
+ *
+ * Es la puerta del punto 3 del alta: **siempre habrá al menos una**, salvo
+ * cuando el servidor todavía no la entregue. Una máquina sin historia se da de
+ * alta igual, pero queda declarada como tal y las herramientas de tendencia se
+ * NIEGAN citando su nota, en vez de contestar con una serie que no existe o
+ * —peor— con la de otra señal.
+ */
+export function tieneHistoria(sistemaId) {
+  return (SISTEMA[sistemaId]?.series?.historizadas() ?? []).length > 0;
+}
+
+/** Las claves con serie propia de una máquina. Vacío = no se puede pedir. */
+export function historizadasDe(sistemaId) {
+  return SISTEMA[sistemaId]?.series?.historizadas() ?? [];
+}
+
+/**
+ * Qué máquinas reclaman una señal con este nombre.
+ *
+ * ── POR QUÉ DEVUELVE UNA LISTA Y NO LA PRIMERA ─────────────────────
+ *
+ * Porque elegir la primera es cómo se contesta correctamente sobre la máquina
+ * equivocada. Hoy los dos catálogos no comparten ni un nombre de clave, así
+ * que la lista tiene siempre cero o un elemento; con cinco máquinas eso deja
+ * de ser cierto —«temperatura» y «presión» son nombres que se repiten en
+ * cualquier planta— y quien llame tendrá que preguntar en vez de adivinar.
+ *
+ * Se compara contra la clave y contra la etiqueta, sin acentos ni mayúsculas,
+ * porque quien pregunta escribe «velocidad eficaz» y no `vRMS_S1`.
+ */
+const normalizar = (t) =>
+  String(t ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+export function sistemasDeSenal(texto) {
+  const q = normalizar(texto);
+  if (!q) return [];
+
+  const encontrados = [];
+  for (const sistema of SISTEMAS) {
+    const clave = sistema.claves().find(
+      (k) => normalizar(k) === q || normalizar(sistema.etiquetaDe(k)) === q,
+    );
+    if (clave) encontrados.push({ sistema: sistema.id, clave });
+  }
+  return encontrados;
+}
+
+/**
+ * Comprobaciones que se hacen al cargar el registro.
+ *
+ * Se ejecutan en el import y LANZAN, en vez de devolver una lista de avisos.
+ * Una entrada mal declarada no produce un error visible más adelante: produce
+ * una máquina que no aparece en el transporte falso, o que contesta `null` con
+ * calidad buena — el fallo que este proyecto ya ha cometido dos veces. Es
+ * mejor que el proceso no arranque.
+ */
+function validarRegistro() {
+  for (const s of SISTEMAS) {
+    const falta = [
+      "raices", "puntos", "parse", "modelo", "estado", "resumen", "claves", "series",
+    ].filter(
+      (campo) => s[campo] === undefined || s[campo] === null,
+    );
+    if (falta.length) {
+      throw new Error(`sistemas.js: «${s.id}» no declara ${falta.join(", ")}`);
+    }
+    if (!s.raices.length) throw new Error(`sistemas.js: «${s.id}» no declara ninguna raíz`);
+    if (!s.puntos().length) throw new Error(`sistemas.js: «${s.id}» no declara ningún punto`);
+    if (!s.series.nota) {
+      throw new Error(
+        `sistemas.js: «${s.id}» no dice qué se puede pedir de su historia. Una máquina sin ` +
+          "series es válida, pero tiene que declararlo — el silencio se lee como que sí las tiene.",
+      );
+    }
+  }
+}
+
+validarRegistro();
 
 /** Resumen del registro, para que el asistente pueda enumerarlos. */
 export function resumenDeSistemas() {

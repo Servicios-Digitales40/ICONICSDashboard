@@ -4,7 +4,7 @@
  * ── PARA QUÉ (Plan 14 §7.1) ─────────────────────────────────────────
  *
  * El simulador vivía sólo en el frontend (`Demo-EVA/data/simulador.js`): sin
- * `ICONICS_API_BASE` alcanzable, las nueve herramientas del asistente
+ * `ICONICS_API_BASE` alcanzable, las herramientas del asistente
  * devuelven error y no hay forma de ejercitar el bucle de chat con datos.
  * `ICONICS_FAKE=true` lo levanta también aquí, con la MISMA FIRMA que
  * `iconics/client.mjs` (`readPoint`, `readPoints`, `writePoint`, `writePoints`,
