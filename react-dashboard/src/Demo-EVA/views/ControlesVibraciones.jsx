@@ -28,9 +28,9 @@
  *   · Relectura de confirmación. Escribir y creerse el éxito de la escritura
  *     es la diferencia entre «se apagó» y «se mandó apagar».
  */
-import { Power, ShieldAlert, Waves } from "lucide-react";
+import { Power, Waves } from "lucide-react";
 
-import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { AlertBanner } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 /**

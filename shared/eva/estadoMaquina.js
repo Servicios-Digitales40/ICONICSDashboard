@@ -39,8 +39,6 @@
  * que no sabía nada.
  */
 
-/** Los grupos que puede declarar una máquina para ordenar sus señales. */
-export const GRUPO_VACIO = Object.freeze({ id: null, label: null, responde: null });
 
 /**
  * Una señal en la forma común.

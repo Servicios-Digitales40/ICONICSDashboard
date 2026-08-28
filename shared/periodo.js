@@ -347,21 +347,6 @@ function rango(desde, hasta, etiqueta) {
   }
 }
 
-/**
- * Días de un rango, en orden.
- *
- * El historiador rechaza los rangos de varios días —fallan de forma
- * intermitente con «Invalid Point Name»—, así que quien lea tiene que ir día
- * a día. Ver docs/TAGS.md.
- */
-export function diasDelRango(desde, hasta) {
-  const dias = []
-  const fin = new Date(`${hasta}T00:00:00`)
-  for (let d = new Date(`${desde}T00:00:00`); d <= fin; d.setDate(d.getDate() + 1)) {
-    dias.push(isoLocal(d))
-  }
-  return dias
-}
 
 /**
  * Lee la configuración de turnos de una cadena tipo

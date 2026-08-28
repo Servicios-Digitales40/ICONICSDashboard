@@ -74,5 +74,3 @@ export const ACTIVO_IDS = CATALOGO.map((a) => a.id);
 /** Metadatos de un activo. `null` ante un id desconocido. */
 export const activoInfo = (id) => ACTIVOS[id] ?? null;
 
-/** Claves de señal de un activo, o `[]` si no existe. */
-export const senalesDe = (id) => ACTIVOS[id]?.senales ?? [];

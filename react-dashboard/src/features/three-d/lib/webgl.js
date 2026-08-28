@@ -50,7 +50,3 @@ export function hayWebGL() {
   }
 }
 
-/** Sólo para las pruebas: olvida el resultado cacheado. */
-export function _resetCacheWebGL() {
-  cache = undefined;
-}

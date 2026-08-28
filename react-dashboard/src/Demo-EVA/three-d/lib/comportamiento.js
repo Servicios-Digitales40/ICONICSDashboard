@@ -36,7 +36,7 @@
  * «operando» ES un estado del servidor; aquí «impulsando» es un hecho que se
  * deduce de dos magnitudes, y puede coexistir con una alarma de otra señal.
  */
-import { ESTADOS, estadoInfo } from "../../domain/estado.js";
+import { estadoInfo } from "../../domain/estado.js";
 
 const materialNormal = { opacidad: 1, desaturar: 0, tinte: null, wireframe: false };
 
@@ -111,8 +111,6 @@ const TABLA = {
   },
 };
 
-/** Claves, en el orden de gravedad del dominio. */
-export const CLAVES = Object.keys(ESTADOS);
 
 /**
  * Descriptor completo de un estado.

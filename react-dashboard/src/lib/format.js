@@ -22,27 +22,6 @@ export const fmtPct = (v, decimales = 2) =>
 export const fmtNum = (v, decimales = 2) =>
   hasValue(v) ? v.toFixed(decimales) : SIN_DATO;
 
-/** 1234 → "1 234" · null → "—" */
-export const fmtEntero = (v) =>
-  hasValue(v) ? Math.round(v).toLocaleString("es-MX") : SIN_DATO;
-
-/**
- * Segundos → forma legible. 45 → "45 s" · 5400 → "1 h 30 m".
- * ICONICS entrega todos los tiempos en segundos y los tiempos muertos reales
- * son de miles, así que en crudo resultan ilegibles.
- */
-export function fmtDuracion(segundos) {
-  if (!hasValue(segundos)) return SIN_DATO;
-
-  const s = Math.round(segundos);
-  if (s < 60) return `${s} s`;
-
-  const min = Math.floor(s / 60);
-  if (min < 60) return `${min} m`;
-
-  const h = Math.floor(min / 60);
-  return `${h} h ${String(min % 60).padStart(2, "0")} m`;
-}
 
 /** Antigüedad legible de una lectura: "hace 3 s", "hace 2 m". */
 export function fmtAntiguedad(fecha, ahora = Date.now()) {

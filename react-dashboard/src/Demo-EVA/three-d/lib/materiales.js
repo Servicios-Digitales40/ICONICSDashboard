@@ -51,5 +51,3 @@ export function propsMaterial(material) {
   };
 }
 
-/** ¿Este descriptor pinta un modelo fantasma? */
-export const esFantasma = (descriptor) => descriptor.material.opacidad < 1;

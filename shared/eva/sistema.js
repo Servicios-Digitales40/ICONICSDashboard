@@ -170,5 +170,3 @@ export function createSistema(lecturas = {}) {
  */
 export const SISTEMA_VACIO = createSistema({});
 
-/** ¿Ha llegado al menos una medición utilizable? */
-export const tieneDatos = (sistema) => (sistema?.resumen?.medidas ?? 0) > 0;

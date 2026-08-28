@@ -133,7 +133,7 @@ import {
 } from '../../shared/eva/aprendizaje.js'
 import { isGoodQuality } from '../../shared/quality.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
-import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
+import { isoLocal, resolverInstante, resolverPeriodo } from '../../shared/periodo.js'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
