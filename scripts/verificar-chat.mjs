@@ -437,6 +437,61 @@ await check('un AVISO de la herramienta llega aunque el modelo lo ignore', async
   assert.match(texto, /estimaciones/i, 'el backend tiene que añadirlo')
 })
 
+await check('el aviso de correlación se reconoce por SU idea, no por la de umbrales', async () => {
+  /*
+   * La red de seguridad nació cuando sólo viajaba un aviso —el de procedencia
+   * de los umbrales— y buscaba sus palabras. Desde que `correlacionar_senales`
+   * trae el suyo, una respuesta que YA decía «es un indicio, no una prueba de
+   * causa» se llevaba el aviso repetido detrás: el ruido que convierte la línea
+   * del ⚠ en algo que se deja de leer, y entonces se pierde el día que dice
+   * algo.
+   */
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true,
+      correlaciones: [{ entre: 'A y B', coeficiente: 0.9 }],
+      aviso: 'Que dos señales se muevan juntas es un indicio, no una prueba de que una cause la otra. Correlación no es causa.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'correlacionar_senales', arguments: '{}' } },
+    texto: 'Se movieron juntas (0,9). Es un indicio de que algo las relaciona, no una causa demostrada.',
+  }
+  const { texto } = await preguntar(chat, 'algo')
+
+  assert.doesNotMatch(texto, /⚠/, 'ya lo contó: no hay que repetirlo')
+})
+
+await check('y si NO lo cuenta, el de correlación sí se añade', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true,
+      correlaciones: [{ entre: 'A y B', coeficiente: 0.9 }],
+      aviso: 'Que dos señales se muevan juntas es un indicio, no una prueba de que una cause la otra. Correlación no es causa.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'correlacionar_senales', arguments: '{}' } },
+    // Lo peor que puede decir: la correlación como causa, y sin matizar.
+    texto: 'El nivel baja PORQUE la presión está al mínimo.',
+  }
+  const { texto } = await preguntar(chat, 'algo')
+
+  assert.match(texto, /correlaci[oó]n no es causa/i, 'el backend tiene que añadirlo')
+})
+
 await check('si el modelo YA contó el aviso, no se repite', async () => {
   const conAviso = {
     ...herramientasFalsas,

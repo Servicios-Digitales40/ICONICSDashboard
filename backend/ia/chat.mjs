@@ -218,20 +218,44 @@ function buscarMarcado(texto) {
 }
 
 /**
+ * La idea del aviso de UMBRALES, dicha con las palabras del modelo.
+ *
+ * `estimad[oa]s?` además de `estimación`: medido con el 4B, la forma que le
+ * sale de dentro es «el límite inferior estimado es 15 %», y sin cubrirla el
+ * backend añadía el aviso entero detrás de una frase que ya lo decía.
+ */
+const DICE_LO_DE_LOS_UMBRALES =
+  /estimaci[oó]n|estimad[oa]s?|no (?:est[aá]n?|son|es) confirmad|sin confirmar|provisional|no (?:los|lo) publica|no (?:es|son) (?:un )?dato de ICONICS|c[aá]lculo del tablero|l[ií]mites? (?:propios|nuestros)/i
+
+/** La idea del aviso de CORRELACIÓN: que un indicio no es una causa. */
+const DICE_LO_DE_LA_CORRELACION =
+  /indicio|correlaci[oó]n no es causa|no (?:implica|demuestra|prueba) (?:que|una causa|causalidad)|casualidad|tercera causa/i
+
+/**
  * ¿Ya contó el modelo el aviso de la herramienta?
  *
- * Se busca la idea, no la frase literal: el modelo la reformula. Aquí el aviso
- * que más viaja es el de procedencia de los umbrales —que las bandas son
- * nuestras y no del servidor—, así que basta con que haya dicho que el límite
- * es una estimación, que no está confirmado, o que el estado lo calcula el
- * tablero. Si no, el backend lo añade detrás.
+ * Se busca la IDEA, no la frase literal: el modelo la reformula. Si no la ha
+ * contado, el backend la añade detrás.
+ *
+ * ── POR QUÉ MIRA DE QUÉ AVISO SE TRATA ─────────────────────────────
+ *
+ * Porque no hay uno solo. Durante un tiempo sí lo hubo —el de procedencia de
+ * los umbrales— y esta función se escribió para él; desde entonces
+ * `correlacionar_senales` trae el suyo, que dice algo distinto. Con una sola
+ * lista de palabras, una respuesta que YA decía «es un indicio, no una causa»
+ * se llevaba el aviso repetido detrás, y ése es justo el ruido que convierte la
+ * línea del ⚠ en algo que se deja de leer.
+ *
+ * Se elige por el contenido del propio aviso y no por qué herramienta lo mandó:
+ * así una máquina nueva que traiga el suyo entra sin tocar esto, y lo peor que
+ * puede pasar es que su aviso se añada aunque el modelo ya lo hubiera contado.
+ * Repetirlo es molesto; callarlo, no.
  */
-function mencionaElAviso(texto) {
-  // `estimad[oa]s?` además de `estimación`: medido con el 4B, la forma que le
-  // sale de dentro es «el límite inferior estimado es 15 %», y sin cubrirla el
-  // backend añadía el aviso entero detrás de una frase que ya lo decía.
-  return /estimaci[oó]n|estimad[oa]s?|no (?:est[aá]n?|son|es) confirmad|sin confirmar|provisional|no (?:los|lo) publica|no (?:es|son) (?:un )?dato de ICONICS|c[aá]lculo del tablero|l[ií]mites? (?:propios|nuestros)/i
-    .test(String(texto ?? ''))
+function mencionaElAviso(texto, aviso = '') {
+  const t = String(texto ?? '')
+  return /indicio|correlaci[oó]n no es causa/i.test(String(aviso))
+    ? DICE_LO_DE_LA_CORRELACION.test(t)
+    : DICE_LO_DE_LOS_UMBRALES.test(t)
 }
 
 /** Fecha de hoy en local, para que el modelo resuelva «hoy» y «ayer». */
@@ -1004,7 +1028,7 @@ export function createChat({ config, herramientas }) {
      */
     const avisos = [...new Set(resultados.map(r => r.resultado?.aviso).filter(Boolean))]
     for (const aviso of avisos) {
-      if (!mencionaElAviso(texto)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
+      if (!mencionaElAviso(texto, aviso)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
     }
 
     return {

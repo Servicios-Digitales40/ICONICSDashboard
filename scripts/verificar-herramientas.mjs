@@ -577,6 +577,36 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
   assert.equal(r.sistema, 'vibraciones')
 })
 
+await checkAsync('el aviso de una correlación habla de la correlación, no de umbrales', async () => {
+  /*
+   * Visto en pantalla el 27-08-2026: al pie de una correlación aparecía «los
+   * límites con los que se ha evaluado cada señal son estimaciones nuestras»,
+   * sobre una respuesta que no evaluó ninguna señal contra ningún límite —esta
+   * herramienta devuelve un coeficiente y unos atípicos, no estado ni banda—.
+   *
+   * La causa: `...avisoDeUmbrales()` iba DESPUÉS de `aviso:` en el mismo objeto
+   * y usaba la misma clave, así que pisaba el aviso propio. El que se perdía
+   * llevaba tres frases escritas para leerse pegado al final y no llegaba
+   * nunca.
+   *
+   * Un aviso que no viene a cuento cuesta lo mismo que uno que falta: enseña a
+   * saltarse la línea del ⚠, y entonces se pierde el día que dice algo.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('correlacionar_senales', {
+    senales: ['nivel del tanque', 'presión relativa'],
+    periodo: 'hoy',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.match(r.aviso, /correlaci[oó]n no es causa/i)
+  assert.doesNotMatch(r.aviso, /estimaciones nuestras/i)
+
+  // Y la premisa: esta respuesta no trae nada que un umbral pudiera calificar.
+  assert.equal('banda' in r, false)
+  assert.equal('estado' in r, false)
+})
+
 check('el aviso de sistemas separados declara su LÍMITE', () => {
   // Una prohibición sin su límite se aplica de más, y aplicarse de más cuesta
   // lo mismo que aplicarse de menos: una respuesta que no sirve.

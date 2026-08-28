@@ -2373,11 +2373,26 @@ export function createHerramientas({
          * decía «Dilo así al redactar», y cuando la red de seguridad lo añadía
          * el operador leía una orden dada a otro.
          */
+        /*
+         * ── SIN `avisoDeUmbrales()`, Y NO ES UN OLVIDO ───────────────
+         *
+         * Estaba, y PISABA este aviso. Los dos usan la clave `aviso` y el
+         * spread iba detrás, así que el operador leía «los límites con los que
+         * se ha evaluado cada señal son estimaciones nuestras» al pie de una
+         * respuesta que no evaluó ninguna señal contra ningún límite — esta
+         * herramienta no devuelve estado, ni banda, ni límite: devuelve un
+         * coeficiente y unos atípicos. Visto en pantalla el 27-08-2026.
+         *
+         * El aviso de umbrales no aplica aquí, y el que sí aplica —correlación
+         * no es causa— es el que llevaba tres frases escritas para leerse bien
+         * pegado al final y nunca llegaba. Un aviso que no viene a cuento
+         * cuesta lo mismo que uno que falta: enseña a saltarse la línea del ⚠,
+         * y entonces se pierde el día que dice algo.
+         */
         aviso:
           'Que dos señales se muevan juntas es un indicio de que algo las relaciona, no una ' +
           'prueba de que una cause la otra: puede haber una tercera causa común, o ser ' +
           'casualidad en una ventana corta. Correlación no es causa.',
-        ...avisoDeUmbrales(),
       }
     },
 
