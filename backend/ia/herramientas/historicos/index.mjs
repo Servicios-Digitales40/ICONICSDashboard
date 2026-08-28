@@ -216,6 +216,28 @@ function resolverSenalDeSistema(senal, sistemaId) {
 }
 
 /**
+ * Metadatos de presentación de una clave, venga de la máquina que venga.
+ *
+ * `senalInfo` es del catálogo del tanque y devuelve `null` para una clave de
+ * otra: al parametrizar `correlacionar_senales` eso reventaba con «Cannot read
+ * properties of null». Aquí se pregunta primero a la máquina que la reclama.
+ *
+ * Los `decimales` importan más de lo que parece: ICONICS entrega el float
+ * crudo del PLC y un modelo de lenguaje lo cita tal cual. Trece decimales
+ * sugieren una exactitud que el sensor no tiene.
+ */
+function metaDe(clave, sistemaId) {
+  if (sistemaId === 'tanque') return senalInfo(clave)
+
+  const s = SISTEMA[sistemaId]
+  return {
+    label: s?.etiquetaDe(clave) ?? clave,
+    unidad: '',
+    decimales: 3,
+  }
+}
+
+/**
  * Las nueve herramientas de historia.
  *
  * `dameHerramientas` es la misma indirección que usa `documentacion/`:
@@ -503,15 +525,14 @@ export function crearHerramientasDeHistoricos({
      * Aun así se devuelve `exacto: false` y la hora real de la muestra: es un
      * valor reconstruido, y el operador tiene derecho a saberlo.
      */
-    async valor_en_momento({ senal, momento } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-
-      const meta = senalInfo(clave)
+    async valor_en_momento({ senal, momento, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
 
       // La misma guarda de catálogo que el resto, y por el mismo motivo: sin
       // ella el servidor devuelve la curva de otra señal sin dar error.
-      if (!esHistorizada(clave)) {
+      if (!historizada) {
         return fallo(
           `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
             `Sí se puede dar su valor actual con estado_del_sistema.`,
@@ -580,13 +601,17 @@ export function crearHerramientasDeHistoricos({
      * pedirle al modelo que reste dos números es pedirle aritmética, y una
      * resta mal hecha en la frase final estropea una consulta que salió bien.
      */
-    async comparar_periodos({ senal, periodoA, periodoB } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
+    async comparar_periodos({ senal, periodoA, periodoB, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, sistemaId } = resuelto
 
+      /* El `sistema` viaja a las dos llamadas: sin él, la de dentro volvería a
+         resolver contra el tanque y las dos mitades de la comparación podrían
+         hablar de máquinas distintas. */
       const [a, b] = await Promise.all([
-        dameHerramientas().historia_de_senal({ senal, periodo: periodoA }),
-        dameHerramientas().historia_de_senal({ senal, periodo: periodoB }),
+        dameHerramientas().historia_de_senal({ senal, periodo: periodoA, sistema: sistemaId }),
+        dameHerramientas().historia_de_senal({ senal, periodo: periodoB, sistema: sistemaId }),
       ])
 
       if (!a.ok) return a
@@ -619,12 +644,12 @@ export function crearHerramientasDeHistoricos({
     /**
      * Análisis estadístico y proyección de una señal.
      */
-    async analisis_de_senal({ senal, periodo, horizonteMinutos = 60 } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-      const meta = senalInfo(clave)
+    async analisis_de_senal({ senal, periodo, horizonteMinutos = 60, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
 
-      if (!esHistorizada(clave)) {
+      if (!historizada) {
         return fallo(
           `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE}`
         )
@@ -633,7 +658,7 @@ export function crearHerramientasDeHistoricos({
       const v = resolverVentana(periodo, { turnos })
       if (v.error) return fallo(v.error)
 
-      const serie = await leerSerie(clave, v)
+      const serie = await leerSerie(clave, v, sistemaId)
       if (!serie.ok) {
         if (serie.status >= 502) {
           return fallo(
@@ -710,12 +735,12 @@ export function crearHerramientasDeHistoricos({
      * hora o algo que no había pasado nunca. Con el perfil delante, el modelo
      * puede decir cuál de las dos cosas es.
      */
-    async perfil_de_senal({ senal, dias = 14 } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-      const meta = senalInfo(clave)
+    async perfil_de_senal({ senal, dias = 14, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
 
-      if (!esHistorizada(clave)) {
+      if (!historizada) {
         return fallo(
           `${meta.label} no tiene serie histórica propia, así que no se puede perfilar. ` +
             `${SIN_SERIE} Su valor actual sí se puede dar con estado_del_sistema.`,
@@ -724,7 +749,7 @@ export function crearHerramientasDeHistoricos({
       }
 
       const cuantos = Math.max(1, Math.min(MAX_DIAS_PERFIL, Math.round(Number(dias) || 14)))
-      const { muestras, diasLeidos } = await leerHistoriaLarga(clave, cuantos)
+      const { muestras, diasLeidos } = await leerHistoriaLarga(clave, cuantos, sistemaId)
 
       const valores = muestras
         .filter(m => typeof m.valor === 'number' && Number.isFinite(m.valor))
@@ -863,7 +888,7 @@ export function crearHerramientasDeHistoricos({
      * dice con esas palabras para que el modelo no lo convierta en una
      * afirmación causal al redactar.
      */
-    async correlacionar_senales({ senales, periodo } = {}) {
+    async correlacionar_senales({ senales, periodo, sistema } = {}) {
       /*
        * Se acepta lista o cadena separada por comas.
        *
@@ -884,19 +909,28 @@ export function crearHerramientasDeHistoricos({
       }
 
       /* Se resuelven todas antes de salir a la red: si una no existe o no tiene
-         historia, decirlo ahora ahorra las lecturas de las demás. */
+         historia, decirlo ahora ahorra las lecturas de las demás.
+
+         Cada una se resuelve por su cuenta y se anota DE QUÉ MÁQUINA salió: es
+         lo que permite la comprobación de abajo sin volver a mirar el nombre,
+         que es la regla que el registro pide —la identidad del sistema viaja
+         pegada, no se deduce después—. */
       const claves = []
+      const sistemasDe = []
       for (const nombre of lista) {
-        const clave = resolverSenal(nombre)
-        if (!clave) return senalDesconocida(nombre, { paraHistoria: true })
-        if (!esHistorizada(clave)) {
+        const r = resolverSenalDeSistema(nombre, sistema)
+        if (!r.ok) return r
+        if (!r.historizada) {
           return fallo(
-            `${senalInfo(clave).label} no tiene serie histórica propia, así que no se puede ` +
+            `${r.meta.label} no tiene serie histórica propia, así que no se puede ` +
               `correlacionar. ${SIN_SERIE}`,
-            { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+            { senalesConHistoria: SISTEMA[r.sistemaId].series.historizadas() }
           )
         }
-        if (!claves.includes(clave)) claves.push(clave)
+        if (!claves.includes(r.clave)) {
+          claves.push(r.clave)
+          sistemasDe.push(r.sistemaId)
+        }
       }
 
       /*
@@ -917,7 +951,7 @@ export function crearHerramientasDeHistoricos({
        * tal cual. Es además el primer llamador de `mismoSistema`, que llevaba
        * exportada desde que existe el registro sin que nadie la usara.
        */
-      const deSistemas = [...new Set(claves.map((k) => sistemaDePunto(pointName(k))?.id))]
+      const deSistemas = [...new Set(sistemasDe)]
       if (deSistemas.length > 1) {
         return fallo(
           `Esas señales no son de la misma máquina: pertenecen a ${deSistemas.join(' y ')}. ` +
@@ -930,21 +964,24 @@ export function crearHerramientasDeHistoricos({
         return fallo('Las señales que has dado son la misma. Dime dos distintas para comparar.')
       }
       if (claves.length > 4) {
-        // Sólo hay cuatro señales historizadas; más que eso es que algo se
-        // repitió. El tope existe para que el resultado quepa en el contexto:
-        // cuatro señales ya son seis pares.
+        // El tope existe para que el resultado quepa en el contexto: cuatro
+        // señales ya son seis pares. Vale para cualquier máquina —vibraciones
+        // tiene cuarenta series— y por eso ya no se justifica diciendo cuántas
+        // hay historizadas.
         return fallo('Como mucho cuatro señales a la vez.')
       }
 
       const v = resolverVentana(periodo, { turnos })
       if (v.error) return fallo(v.error)
 
-      const series = await Promise.all(claves.map(clave => leerSerie(clave, v)))
+      /* Todas son de la misma máquina —lo garantiza la comprobación de
+         arriba— así que basta el primer sistema para leerlas. */
+      const series = await Promise.all(claves.map(clave => leerSerie(clave, v, deSistemas[0])))
 
       const fallidas = claves.filter((_, i) => !series[i].ok)
       if (fallidas.length) {
         return fallo(
-          `El historiador no devolvió la serie de ${fallidas.map(k => senalInfo(k).label).join(' y ')} ` +
+          `El historiador no devolvió la serie de ${fallidas.map(k => metaDe(k, deSistemas[0]).label).join(' y ')} ` +
             `en ${v.etiqueta}.`
         )
       }
@@ -964,7 +1001,7 @@ export function crearHerramientasDeHistoricos({
 
       /* ── Cada señal por separado: resumen y anomalías ───────────────── */
       const porSenal = claves.map((clave, i) => {
-        const meta = senalInfo(clave)
+        const meta = metaDe(clave, deSistemas[0])
         const validos = series[i].datos.filter(d => typeof d.valor === 'number')
         const stats = validos.length >= 2
           ? estadisticasBasicas(validos.map(d => d.valor), meta.decimales)
@@ -1126,19 +1163,19 @@ export function crearHerramientasDeHistoricos({
      * necesita para escribir («subió de 41 a 63 entre las 8 y las 11») y no
      * puede describir de memoria una imagen que nunca ve.
      */
-    async grafico_de_senal({ senal, periodo } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-      const meta = senalInfo(clave)
+    async grafico_de_senal({ senal, periodo, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
 
-      if (!esHistorizada(clave)) {
+      if (!historizada) {
         return fallo(`${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE}`)
       }
 
       const v = resolverVentana(periodo, { turnos })
       if (v.error) return fallo(v.error)
 
-      const serie = await leerSerie(clave, v)
+      const serie = await leerSerie(clave, v, sistemaId)
       if (!serie.ok) {
         return fallo(`El historiador no devolvió la serie de ${meta.label} en ${v.etiqueta}.`)
       }

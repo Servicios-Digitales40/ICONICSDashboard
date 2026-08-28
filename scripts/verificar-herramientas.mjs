@@ -821,6 +821,68 @@ await checkAsync('lo corto no dispara dentro de otra palabra', () => {
   assert.deepEqual(sistemasDeSenal('zumbido del compresor'), [])
 })
 
+await checkAsync('las seis de historia sirven a cualquier máquina, no sólo al tanque', async () => {
+  /*
+   * ── EL CASO QUE FALLÓ EN PANTALLA ──────────────────────────────
+   *
+   * «Cómo se ha comportado vRMS de lado acople de diferente entre ayer y hoy»
+   * → «Ayer: NO SE PUDO LEER. Hoy: NO SE PUDO LEER. No hay datos históricos
+   * disponibles para esta señal.» Los había: 40 de los 73 puntos de esa
+   * máquina tienen serie.
+   *
+   * La causa no era el dato ni el nombre: era que `comparar_periodos` y
+   * `valor_en_momento` sólo servían al tanque. `historia_de_senal` se había
+   * parametrizado y las otras seis no, así que el modelo elegía la herramienta
+   * correcta para la pregunta y recibía «esa señal es de otra máquina».
+   *
+   * Peor que un error: el modelo lo redactó como **ausencia de datos**, y
+   * llegó a sugerir revisar si los sensores estaban averiados. Un límite de la
+   * herramienta contado como un fallo de la planta.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+
+  const llamadas = [
+    ['valor_en_momento', { senal: 'vRMS_S1', momento: 'ayer a las 12:00' }],
+    ['comparar_periodos', { senal: 'vRMS_S1', periodoA: 'ayer', periodoB: 'hoy' }],
+    ['analisis_de_senal', { senal: 'vRMS_S1', periodo: 'ayer' }],
+    ['perfil_de_senal', { senal: 'vRMS_S1', dias: 7 }],
+    ['grafico_de_senal', { senal: 'vRMS_S1', periodo: 'ayer' }],
+    ['correlacionar_senales', { senales: ['vRMS_S1', 'aRMS_S2'], periodo: 'ayer' }],
+  ]
+
+  for (const [nombre, args] of llamadas) {
+    const r = await h.ejecutar(nombre, args)
+    /* El cliente falso no simula el historiador de esta máquina, así que fallan
+       al leer. Lo que se fija es que LLEGUEN: que ninguna rebote por no ser del
+       tanque, que era el fallo. */
+    assert.doesNotMatch(
+      r.error ?? '', /no es una señal del tanque|sólo sirve al tanque/i,
+      `${nombre} sigue sirviendo sólo al tanque`,
+    )
+  }
+})
+
+await checkAsync('las seis declaran `sistema` al modelo, no sólo lo aceptan', () => {
+  /*
+   * Una herramienta que acepta un argumento sin anunciarlo es un argumento que
+   * el modelo no usa: sólo lee el esquema. Es la mitad que se olvida, y la que
+   * hace que el arreglo no sirva de nada en la conversación real.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const conSistema = [
+    'historia_de_senal', 'valor_en_momento', 'comparar_periodos', 'analisis_de_senal',
+    'perfil_de_senal', 'grafico_de_senal', 'correlacionar_senales',
+  ]
+
+  for (const nombre of conSistema) {
+    const d = h.definiciones.find((x) => x.function.name === nombre)
+    assert.ok(
+      d.function.parameters.properties.sistema,
+      `${nombre} acepta \`sistema\` pero no se lo dice al modelo`,
+    )
+  }
+})
+
 await checkAsync('el registro no acepta una máquina que no declare su comportamiento', () => {
   /*
    * `validarRegistro()` corre en el import y no se puede volver a llamar desde
@@ -894,8 +956,42 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
   })
 
   assert.equal(r.ok, false)
-  // Se identifica la otra máquina en vez de decir que la señal no existe.
-  assert.equal(r.sistema, 'vibraciones')
+
+  /*
+   * ── Y AHORA LO RECHAZA POR EL MOTIVO CORRECTO ──────────────────
+   *
+   * Antes esta llamada moría antes de llegar a la comprobación: `vRMS_S1` no
+   * era del catálogo del tanque y `correlacionar_senales` sólo servía al
+   * tanque, así que el error era «esa señal es de otra máquina» — cierto, pero
+   * por casualidad. Desde que la herramienta sirve a cualquier máquina, las dos
+   * señales se resuelven y lo que las rechaza es la regla de verdad: son de
+   * INSTALACIONES distintas y no se correlacionan.
+   *
+   * El campo cambia de `sistema` a `sistemas` porque ahora hay dos, y ésa es
+   * justo la información: cuáles se intentó cruzar.
+   */
+  assert.deepEqual(r.sistemas, ['tanque', 'vibraciones'])
+  assert.match(r.error, /no son de la misma máquina/i)
+})
+
+await checkAsync('dos señales de la MISMA otra máquina sí se correlacionan', async () => {
+  /*
+   * La contrapartida, y la que faltaba: la regla prohíbe cruzar máquinas, no
+   * usar una que no sea el tanque. Con las seis herramientas de historia
+   * parametrizadas, dos señales de vibraciones son una correlación legítima.
+   *
+   * El cliente falso no simula el historiador de esa máquina, así que la
+   * llamada falla al leer. Lo que se fija es que llegue hasta ahí: que NO la
+   * pare ni la resolución de nombres ni la regla de cruce.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('correlacionar_senales', {
+    senales: ['vRMS_S1', 'aRMS_S2'],
+    periodo: 'hoy',
+  })
+
+  assert.doesNotMatch(r.error ?? '', /no son de la misma máquina/i)
+  assert.doesNotMatch(r.error ?? '', /no es una señal del tanque/i)
 })
 
 await checkAsync('el aviso de una correlación habla de la correlación, no de umbrales', async () => {
@@ -2109,13 +2205,24 @@ check('toda definición anunciada al modelo tiene implementación, y al revés',
   }
 })
 
-check('las definiciones avisan de que sólo cuatro señales tienen historia', () => {
-  // Las descripciones son parte del programa: es lo único que el modelo lee
-  // para decidir, y éste es el fallo más caro que puede cometer.
+check('las definiciones avisan de que NO toda señal tiene serie propia', () => {
+  /*
+   * Las descripciones son parte del programa: es lo único que el modelo lee
+   * para decidir, y pedir la serie de una señal no historizada es el fallo más
+   * caro que puede cometer —el servidor devuelve la curva de OTRA sin dar
+   * error—.
+   *
+   * Antes esta prueba buscaba la palabra «cuatro», y esa cifra ha cambiado dos
+   * veces: eran cuatro señales del tanque, luego cinco, y hoy hay además
+   * cuarenta de vibraciones. Fijar el número obligaba a tocar la prueba cada
+   * vez que el servidor registra un tag más, y lo que importa no es cuántas
+   * son: es que la descripción lo ADVIERTA.
+   */
   const h = createHerramientas({ client: clienteFalso() })
   const def = h.definiciones.find(d => d.function.name === 'historia_de_senal')
 
-  assert.match(def.function.description, /cuatro/i)
+  assert.match(def.function.description, /no todas las señales tienen serie propia/i)
+  assert.match(def.function.description, /la herramienta lo dice/i)
 })
 
 await checkAsync('el registro no lanza ante una herramienta inventada', async () => {

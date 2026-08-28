@@ -42,7 +42,7 @@
  * Esquema que se le manda a llama-server en cada petición.
  *
  * Las descripciones son parte del programa: es lo único que el modelo lee para
- * decidir. Dicen explícitamente que sólo cuatro señales tienen historia, porque
+ * decidir. Dicen explícitamente que no toda señal tiene serie propia, porque
  * el fallo más caro es que pida la de otra y el servidor le conteste con la
  * curva equivocada **sin dar error**.
  */
@@ -214,12 +214,9 @@ export const DEFINICIONES = [
       description:
         'Cómo ha evolucionado UNA señal en un período: devuelve el mínimo y el máximo con la hora ' +
         'en que ocurrieron, el promedio, el primer y el último valor, y cuántas muestras hubo. ' +
-        'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿cuál fue la temperatura máxima ayer?", ' +
-        '"¿ha subido la presión?", "¿cómo ha ido la vibración del apoyo 1?". Sirve a CUALQUIER ' +
-        'máquina: para una que no sea el tanque, pasa `sistema` con su id. IMPORTANTE: no todas ' +
-        'las señales tienen serie propia —en el tanque son cinco de ocho, y en vibraciones ' +
-        'veintitrés de veinticuatro—. Si pides una que no la tiene, la herramienta lo dirá y ' +
-        'tendrás que comunicarlo tal cual y ofrecer su valor actual.',
+        'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿la vibración del apoyo 1 ayer?". ' +
+        'Sirve a CUALQUIER máquina. No todas las señales tienen serie propia: si pides una que ' +
+        'no la tiene, la herramienta lo dice y hay que contarlo tal cual.',
       parameters: {
         type: 'object',
         properties: {
@@ -240,6 +237,10 @@ export const DEFINICIONES = [
               'igualmente y la herramienta te dará las alternativas. Si el usuario no dice ' +
               'período, omítelo y se usan las últimas 6 horas. NO lo conviertas tú a fechas: ' +
               'pásalo tal cual y el servidor lo resuelve.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -272,6 +273,10 @@ export const DEFINICIONES = [
               'de 2026 a las 11:16", "ayer a las 14:30", "2026-08-21 a las 11:16". No lo ' +
               'conviertas tú a fecha ni a UTC, y no le quites los minutos: pásalo tal cual.',
           },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+          },
         },
         required: ['senal', 'momento'],
       },
@@ -285,7 +290,7 @@ export const DEFINICIONES = [
         'Compara la MISMA señal en dos períodos y devuelve los dos resúmenes con su diferencia ya ' +
         'calculada. Sirve para "compara el nivel de esta hora con el de hace tres", "¿la ' +
         'temperatura de hoy contra la de ayer?", "¿ha mejorado la presión respecto a esta mañana?". ' +
-        'Sólo funciona con las cuatro señales que tienen historia.',
+        'Sólo con señales que tengan serie propia.',
       parameters: {
         type: 'object',
         properties: {
@@ -300,6 +305,10 @@ export const DEFINICIONES = [
           periodoB: {
             type: 'string',
             description: 'Segundo período, se compara contra el primero.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal', 'periodoA', 'periodoB'],
@@ -321,7 +330,7 @@ export const DEFINICIONES = [
         'eso está perfil_de_senal, que mide semanas. Si respondes "es un valor raro" o "está por ' +
         'encima de lo normal" apoyándote sólo en ésta, estás afirmando algo que no has ' +
         'consultado. ' +
-        'Sólo funciona con las cuatro señales que tienen historia. La proyección es un cálculo, ' +
+        'Sólo con señales que tengan serie propia. La proyección es un cálculo, ' +
         'no una certeza: cítala siempre con su rango.',
       parameters: {
         type: 'object',
@@ -331,6 +340,10 @@ export const DEFINICIONES = [
           horizonteMinutos: {
             type: 'number',
             description: 'Cuántos minutos hacia el futuro proyectar. Por defecto 60.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -348,7 +361,7 @@ export const DEFINICIONES = [
         'tener?", "¿había pasado antes?", y SIEMPRE antes de afirmar que algo es anómalo. ' +
         'IMPORTANTE: las bandas con las que el tablero dice "en banda" o "fuera de límite" son ' +
         'estimaciones NUESTRAS sin confirmar; esta herramienta mide lo que la instalación hace ' +
-        'de verdad, y avisa cuando las dos cosas no cuadran. Sólo las cuatro señales con historia.',
+        'de verdad, y avisa cuando las dos cosas no cuadran. Sólo señales con serie propia.',
       parameters: {
         type: 'object',
         properties: {
@@ -358,6 +371,10 @@ export const DEFINICIONES = [
             description:
               'Cuántos días de historia perfilar. Por defecto 14, máximo 90. Más días dan una ' +
               'idea más fiable de lo normal, pero tardan más en leerse.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -374,12 +391,11 @@ export const DEFINICIONES = [
         'atípicos de cada señal CON SU HORA y cuáles de ellos cayeron en el mismo instante. ' +
         'ÉSTA ES LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?", "¿qué ' +
         'pasó cuando cayó la presión?", "¿tiene que ver la tensión con el fallo del motor?". ' +
-        'Sólo funciona con las cuatro señales que tienen historia. Lo que devuelve es un INDICIO, ' +
+        'Sólo con señales que tengan serie propia. Lo que devuelve es un INDICIO, ' +
         'no una demostración de causa: dilo así al redactar. ' +
-        'SEÑALES DE ACTIVOS DISTINTOS DE LA MISMA MÁQUINA SÍ SE CRUZAN, y suele ser lo que hay ' +
-        'que hacer: el nivel del tanque y la presión de la red son activos distintos del MISMO ' +
-        'sistema, unidos por una tubería. No te niegues por eso. Si de verdad fueran de dos ' +
-        'máquinas distintas, esta herramienta lo detecta y te lo dice — no tienes que decidirlo tú.',
+        'Los activos de una MISMA máquina SÍ se cruzan —el nivel del tanque y la presión de la ' +
+        'red lo son— y no debes negarte por eso: si fueran de dos máquinas, la herramienta lo ' +
+        'detecta y te lo dice.',
       parameters: {
         type: 'object',
         properties: {
@@ -397,6 +413,10 @@ export const DEFINICIONES = [
               'un período que lo contenga con margen: "últimas 6 horas", "ayer", "2026-08-19". ' +
               'Igual que en historia_de_senal. Si no lo dice, omítelo.',
           },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+          },
         },
         required: ['senales'],
       },
@@ -409,12 +429,16 @@ export const DEFINICIONES = [
       description:
         'Genera un gráfico de la evolución de UNA señal historizada en un período, para ' +
         'acompañar la respuesta. Úsala cuando pidan "muéstrame", "un gráfico de", "dibuja" o ' +
-        'cuando una tendencia se explique mejor viéndola. Sólo las cuatro señales con historia.',
+        'cuando una tendencia se explique mejor viéndola. Sólo señales con serie propia.',
       parameters: {
         type: 'object',
         properties: {
           senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
           periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
+          sistema: {
+            type: 'string',
+            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+          },
         },
         required: ['senal'],
       },
@@ -441,7 +465,7 @@ export const DEFINICIONES = [
             items: { type: 'string' },
             description:
               'Nombres de señal en lenguaje llano, ej. ["nivel", "temperatura"]. Si se omite, entra ' +
-              'la instalación entera: las cuatro señales con historia como gráfico y las otras ' +
+              'la instalación entera: las que tienen serie como gráfico y las otras ' +
               'cuatro como tabla de valores actuales.',
           },
           periodo: {
