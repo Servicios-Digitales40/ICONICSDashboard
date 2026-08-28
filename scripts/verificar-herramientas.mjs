@@ -53,7 +53,7 @@ import {
   pointName,
 } from '../shared/eva/senales.js'
 import { PROVISIONALES } from '../shared/eva/umbrales.js'
-import { SISTEMAS, tieneHistoria } from '../shared/eva/sistemas.js'
+import { NO_COMPARTEN, SISTEMAS, mismoSistema, tieneHistoria } from '../shared/eva/sistemas.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/historia.js'
 
@@ -517,6 +517,71 @@ await checkAsync('el registro no deja dar de alta una máquina que calle sobre s
       `«${sistema.id}»: tieneHistoria no concuerda con su lista`,
     )
   }
+})
+
+/* ── Activos frente a sistemas ───────────────────────────────────────── */
+
+console.log('\n-- Activos frente a sistemas -------------------------------')
+
+await checkAsync('dos ACTIVOS de la misma máquina SÍ se correlacionan', async () => {
+  /*
+   * El caso que falló en pantalla. Preguntado por el nivel del tanque contra la
+   * presión de la red, el asistente se negó: «son sistemas separados». No lo
+   * son — son dos activos del MISMO PLC, unidos por una tubería, y «el nivel
+   * baja porque la presión está al mínimo» es justo la hipótesis que el
+   * historiador puede confirmar o desmentir.
+   *
+   * El modelo ni llegó a llamar a la herramienta: se negó desde el prompt. Por
+   * eso la regla dejó de vivir sólo ahí, y por eso esto se comprueba aquí.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('correlacionar_senales', {
+    senales: ['nivel del tanque', 'presión relativa'],
+    periodo: 'hoy',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.correlaciones.length, 1, 'un par, el que se pidió')
+  assert.match(r.correlaciones[0].entre, /Nivel del tanque y Presión relativa/)
+})
+
+check('las señales del tanque son de activos distintos y del MISMO sistema', () => {
+  // Es la premisa de la comprobación de arriba: si algún día `nivelTanque` y
+  // `presionRelativa` acabaran en sistemas distintos, aquélla pasaría a estar
+  // comprobando lo contrario de lo que cree.
+  const activos = new Set(['nivelTanque', 'presionRelativa'].map((k) => SENALES[k].activo))
+  assert.equal(activos.size, 2, 'tienen que ser activos DISTINTOS')
+
+  assert.equal(
+    mismoSistema(pointName('nivelTanque'), pointName('presionRelativa')), true,
+    'y del mismo sistema',
+  )
+})
+
+await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', async () => {
+  /*
+   * La otra mitad. `NO_COMPARTEN` vivía sólo en las instrucciones, y una regla
+   * que sólo vive ahí falla de las dos maneras: se salta cuando no debe y se
+   * aplica cuando no toca. Ahora la comprueba `correlacionar_senales`
+   * preguntando al registro — es el primer llamador de `mismoSistema`, que
+   * llevaba exportada sin uso desde que existe.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('correlacionar_senales', {
+    senales: ['nivel del tanque', 'vRMS_S1'],
+    periodo: 'hoy',
+  })
+
+  assert.equal(r.ok, false)
+  // Se identifica la otra máquina en vez de decir que la señal no existe.
+  assert.equal(r.sistema, 'vibraciones')
+})
+
+check('el aviso de sistemas separados declara su LÍMITE', () => {
+  // Una prohibición sin su límite se aplica de más, y aplicarse de más cuesta
+  // lo mismo que aplicarse de menos: una respuesta que no sirve.
+  assert.match(NO_COMPARTEN, /activos/i)
+  assert.match(NO_COMPARTEN, /misma máquina/i)
 })
 
 /* ── estado_del_sistema ──────────────────────────────────────────────── */

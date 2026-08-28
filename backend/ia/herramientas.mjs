@@ -116,6 +116,7 @@ import {
   SISTEMA,
   SISTEMAS,
   historizadasDe,
+  sistemaDePunto,
   resumenDeSistemas,
   sistemasDeSenal,
   tieneHistoria,
@@ -2188,6 +2189,33 @@ export function createHerramientas({
         if (!claves.includes(clave)) claves.push(clave)
       }
 
+      /*
+       * ── LA PROHIBICIÓN, APLICADA POR EL CÓDIGO Y NO POR EL PROMPT ──
+       *
+       * `NO_COMPARTEN` vivía sólo en las instrucciones, y una regla que sólo
+       * vive ahí falla de las dos maneras: se salta cuando no debe, y —lo que
+       * se vio en pantalla— se aplica cuando NO toca. Preguntado por el nivel
+       * del tanque contra la presión de la red, el modelo se negó diciendo que
+       * eran «sistemas separados». No lo son: son dos ACTIVOS de la misma
+       * máquina, el mismo PLC y la misma agua, unidos por una tubería. La
+       * correlación era legítima y la herramienta la hace sin problema — el
+       * modelo ni siquiera llegó a llamarla.
+       *
+       * Ahora la comprobación es de verdad: se pregunta al registro si las
+       * señales son de la misma máquina. El modelo ya no tiene que razonarlo, y
+       * si de verdad cruza dos instalaciones recibe un error que puede contar
+       * tal cual. Es además el primer llamador de `mismoSistema`, que llevaba
+       * exportada desde que existe el registro sin que nadie la usara.
+       */
+      const deSistemas = [...new Set(claves.map((k) => sistemaDePunto(pointName(k))?.id))]
+      if (deSistemas.length > 1) {
+        return fallo(
+          `Esas señales no son de la misma máquina: pertenecen a ${deSistemas.join(' y ')}. ` +
+            `${NO_COMPARTEN}`,
+          { sistemas: deSistemas }
+        )
+      }
+
       if (claves.length < 2) {
         return fallo('Las señales que has dado son la misma. Dime dos distintas para comparar.')
       }
@@ -3722,7 +3750,11 @@ export const DEFINICIONES = [
         'ÉSTA ES LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?", "¿qué ' +
         'pasó cuando cayó la presión?", "¿tiene que ver la tensión con el fallo del motor?". ' +
         'Sólo funciona con las cuatro señales que tienen historia. Lo que devuelve es un INDICIO, ' +
-        'no una demostración de causa: dilo así al redactar.',
+        'no una demostración de causa: dilo así al redactar. ' +
+        'SEÑALES DE ACTIVOS DISTINTOS DE LA MISMA MÁQUINA SÍ SE CRUZAN, y suele ser lo que hay ' +
+        'que hacer: el nivel del tanque y la presión de la red son activos distintos del MISMO ' +
+        'sistema, unidos por una tubería. No te niegues por eso. Si de verdad fueran de dos ' +
+        'máquinas distintas, esta herramienta lo detecta y te lo dice — no tienes que decidirlo tú.',
       parameters: {
         type: 'object',
         properties: {

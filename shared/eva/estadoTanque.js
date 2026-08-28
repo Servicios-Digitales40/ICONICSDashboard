@@ -215,9 +215,28 @@ export function resumenTanqueParaAsistente(estado, ctx = {}) {
       sinDato: r.sinDato,
     },
 
-    // Agrupadas como en la pantalla: cada activo responde una pregunta
-    // («¿hay agua?», «¿se está impulsando?»), y esa agrupación es NUESTRA
-    // porque el servidor no publica equipos bajo esta raíz.
+    /*
+     * Agrupadas como en la pantalla: cada activo responde una pregunta («¿hay
+     * agua?», «¿se está impulsando?»), y esa agrupación es NUESTRA porque el
+     * servidor no publica equipos bajo esta raíz.
+     *
+     * ── Y HAY QUE DECIR QUE SON LA MISMA MÁQUINA ───────────────────
+     *
+     * Porque leídos sueltos no lo parecen: «Tanque de almacenamiento» y «Red de
+     * distribución» suenan a dos instalaciones, y con la advertencia de que los
+     * SISTEMAS no se cruzan aún fresca, el modelo ató las dos cosas y se negó a
+     * correlacionar el nivel con la presión —que son el mismo PLC y están
+     * unidos por una tubería—.
+     *
+     * La frase va en la RESPUESTA y no sólo en el prompt, por el mismo motivo
+     * que el aviso de umbrales: una aclaración que sólo vive en las
+     * instrucciones se diluye a los tres turnos, y ésta tiene que acompañar a
+     * la lista que la provoca.
+     */
+    queSonLosActivos:
+      "Los cuatro activos son PARTES de esta misma máquina —el mismo PLC, la misma " +
+      "instalación—, agrupados así porque cada uno responde una pregunta distinta. " +
+      "Sus señales SÍ se pueden correlacionar entre sí.",
     activos: estado.grupos.map((g) => ({
       activo: g.label,
       responde: g.responde,

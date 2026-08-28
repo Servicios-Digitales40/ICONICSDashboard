@@ -309,7 +309,22 @@ export const NO_COMPARTEN =
   "propio PLC. No relaciones una señal de un sistema con una de otro —ni para explicar, " +
   "ni para correlacionar, ni para sacar una causa— salvo que alguien haya confirmado que " +
   "esos equipos están físicamente conectados. Dos sistemas con PLC distinto no comparten " +
-  "nada por estar en la misma planta.";
+  "nada por estar en la misma planta. " +
+  /*
+   * ── LA SEGUNDA MITAD, QUE FALTABA Y COSTÓ UNA RESPUESTA MALA ───────
+   *
+   * Sin ella, este aviso se sobregeneraliza. Preguntado por el nivel del tanque
+   * contra la presión de la red, el modelo se negó diciendo que eran «sistemas
+   * separados»: no lo son, son dos ACTIVOS del mismo PLC unidos por una
+   * tubería, y la correlación que se le pedía era exactamente la buena.
+   *
+   * Una prohibición sin su límite se aplica de más, y aplicarse de más aquí
+   * cuesta lo mismo que aplicarse de menos: una respuesta que no sirve.
+   */
+  "PERO dentro de una MISMA máquina sus activos SÍ se relacionan: son el mismo PLC y la " +
+  "misma instalación, y agrupar sus señales por activo es una comodidad de lectura, no una " +
+  "separación. Cruzar señales de activos distintos del mismo sistema es legítimo y a menudo " +
+  "es la respuesta.";
 
 /**
  * ¿Estas dos señales son del mismo sistema?
