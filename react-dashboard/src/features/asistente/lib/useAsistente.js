@@ -880,16 +880,42 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
  * de que ese número no se leyó de ninguna parte, se derivó.
  */
 export const ETIQUETA_HERRAMIENTA = {
-  estado_del_sistema: "Leyó las ocho señales en vivo de ICONICS",
+  /*
+   * ── POR QUÉ ESTE RÓTULO YA NO DICE «LAS OCHO SEÑALES» ──────────────
+   *
+   * Porque decía la cuenta de UNA máquina. Cuando `estado_del_sistema` pasó a
+   * servir a cualquiera de las dadas de alta, la misma línea aparecía dos veces
+   * en la traza —una por sistema— y las dos decían «las ocho señales en vivo»:
+   * cierto del tanque, falso del sistema de vibraciones, que pide 73 puntos.
+   *
+   * El número se fue y en su lugar aparece el SISTEMA, que lo pone
+   * `describirConsulta` desde el argumento que eligió el modelo. Es mejor
+   * cambio del que parece: la cuenta era un detalle, y de qué máquina se está
+   * hablando es lo único que esta línea no podía dejar de decir en una planta
+   * con más de una.
+   */
+  estado_del_sistema: "Leyó las señales en vivo de ICONICS",
+  sistemas_de_la_planta: "Consultó qué máquinas hay en la planta",
+  riesgos_activos: "Cruzó las señales en vivo contra las reglas del tablero",
+  pronostico_de_desgaste: "Contó horas de exposición sobre el historiador",
   historia_de_senal: "Leyó el historiador",
+  valor_en_momento: "Leyó el historiador en un instante concreto",
   comparar_periodos: "Comparó dos períodos del historiador",
   analisis_de_senal: "Calculó tendencia y anomalías sobre la serie",
   perfil_de_senal: "Midió qué es normal, sobre semanas de historial",
   correlacionar_senales: "Cruzó varias señales del historiador",
   grafico_de_senal: "Dibujó la serie del historiador",
+  generar_reporte: "Armó un informe con las series del historiador",
   consultar_documentacion: "Buscó en la documentación de planta",
   limites_del_manual: "Buscó un límite documentado en el manual",
   diagnostico: "Reunió estado + historia + correlación + manual en un dossier",
+  hechos_de_la_planta: "Leyó lo que se le ha enseñado sobre esta planta",
+  recordar_hecho: "Guardó un hecho nuevo sobre esta planta",
+  proponer_regla: "Dejó una propuesta de regla, para que alguien la revise",
+  /* La única que ESCRIBE en la instalación, y por eso se dice con ese verbo:
+     las demás leen, y confundir una lectura con una orden al PLC es el peor
+     malentendido que esta línea puede provocar. */
+  controlar_bomba: "ESCRIBIÓ en el PLC de la instalación",
 };
 
 /**
@@ -921,6 +947,27 @@ export function describirConsulta(nombre, argumentos) {
   const leer = (v) => (typeof v === "string" || typeof v === "number" ? String(v).trim() : "");
   const partes = [];
 
+  /*
+   * ── EL SISTEMA VA PRIMERO, Y ES LO MÁS IMPORTANTE DE ESTA LÍNEA ────
+   *
+   * Desde que las herramientas se parametrizan por máquina, «Leyó las señales
+   * en vivo de ICONICS» aparece una vez por sistema y sin esto las dos líneas
+   * son idénticas — el operador ve dos lecturas y no sabe de qué habla ninguna.
+   *
+   * Pero el motivo de fondo es otro y es más serio. `sistema` es obligatorio en
+   * el backend precisamente porque contestar de la máquina equivocada da cifras
+   * reales, unidades reales y ningún error: es el fallo que no se ve. Ésta es
+   * la única parte de la pantalla donde se ve — si alguien pregunta por las
+   * vibraciones y aquí pone `tanque`, la respuesta puede ser impecable y estar
+   * hablando de otra instalación.
+   *
+   * Se pinta el id CRUDO, tal y como lo mandó el modelo, por la misma razón que
+   * el resto de esta función: traducirlo a «Tanque y grupo de bombeo» taparía
+   * un id inventado, que es justo lo que hay que poder ver.
+   */
+  const sistema = leer(argumentos.sistema);
+  if (sistema) partes.push(sistema);
+
   const senal = leer(argumentos.senal);
   if (senal) partes.push(senal);
 
@@ -942,6 +989,11 @@ export function describirConsulta(nombre, argumentos) {
   // El síntoma de `diagnostico`, igual de literal y por el mismo motivo.
   const sintoma = leer(argumentos.sintoma);
   if (sintoma) partes.push(`«${sintoma}»`);
+
+  // La ventana del pronóstico: «30 días» no es lo mismo que «90», y el
+  // veredicto cambia con ella.
+  const dias = leer(argumentos.dias);
+  if (dias && nombre === "pronostico_de_desgaste") partes.push(`${dias} días`);
 
   if (nombre === "comparar_periodos") {
     const a = leer(argumentos.periodoA);
