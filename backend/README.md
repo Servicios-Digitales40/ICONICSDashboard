@@ -139,15 +139,20 @@ backend/
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Ensamblador: las que aún no se han repartido
+│   ├── herramientas.mjs   Ensamblador: contexto, familias y catálogo
 │   ├── definiciones.mjs   El ESQUEMA que lee el modelo, aparte del código
 │   ├── herramientas/      Una subcarpeta por FAMILIA de herramienta
-│   │   ├── lib/           Piezas compartidas que no dependen del `client`
+│   │   ├── lib/           Lo que comparten las familias
 │   │   │   ├── formato.mjs    Banda legible, reducción de serie, aviso de umbrales
 │   │   │   ├── limites.mjs    Cruce de lo medido con lo documentado
-│   │   │   └── respuesta.mjs  La forma del fallo de una herramienta
-│   │   ├── aprendizaje/   Hechos y propuestas (no toca ICONICS)
-│   │   └── documentacion/ Manuales y diagnóstico (sólo el índice BM25)
+│   │   │   ├── respuesta.mjs  La forma del fallo de una herramienta
+│   │   │   ├── maquina.mjs    Leer una máquina, resolver cuál, evaluar sus reglas
+│   │   │   └── historia.mjs   El trío recursivo del historiador
+│   │   ├── aprendizaje/   3 · hechos y propuestas (no toca ICONICS)
+│   │   ├── registro/      1 · qué máquinas hay (abre el catálogo)
+│   │   ├── maquina/       3 · el instante, y la única que ESCRIBE
+│   │   ├── historicos/    9 · todo lo que pregunta al pasado
+│   │   └── documentacion/ 3 · manuales y diagnóstico (índice BM25)
 │   ├── documentos.mjs     Índice BM25 sobre los PDF de planta
 │   ├── reporte.mjs        Composición del PDF (carga diferida)
 │   ├── cola.mjs           Una consulta a la vez
@@ -178,18 +183,29 @@ diecinueve descripciones en un solo archivo. Se está repartiendo por FAMILIAS
 —una subcarpeta por tipo— y el criterio del reparto no es temático sino de
 DEPENDENCIA: qué necesita cada grupo para funcionar.
 
-| Familia | Herramientas | Depende de |
+| Familia | Herramientas | Recibe |
 |---|---|---|
 | `aprendizaje/` | 3 | nada (sólo un JSON en `datos/`) |
+| `registro/` | 1 | nada |
+| `maquina/` | 3 | `client`, `readOnly`, ayudantes de máquina |
+| `historicos/` | 9 | `client`, `turnos`, `reportes`, ayudantes |
 | `documentacion/` | 3 | `indiceDocumentos` |
-| *(pendiente)* `maquina/` | 3 | `client` de ICONICS |
-| *(pendiente)* `historicos/` | 9 | `client` + el troceado del historiador |
-| `registro` | 1 | nada |
 
-Las que ya salieron son las que **no tocan el `client`**. Las doce restantes
-cuelgan del trío `leerUnTramo` ↔ `leerSerie` ↔ `leerSerieEnRango`, que es
-mutuamente recursivo y está atado al cliente y a la concurrencia: moverlas exige
-antes darles un contexto explícito, y eso es la fase con riesgo. Ver
+Más `herramientas/lib/`, con lo que comparten: `formato` (banda legible,
+reducción de serie, aviso de umbrales), `respuesta` (la forma del fallo),
+`limites` (cruce de lo medido con lo documentado), y los dos que sí necesitan
+contexto — `maquina` (leer una máquina, resolver cuál, evaluar sus reglas) e
+`historia` (el trío recursivo del historiador).
+
+**La firma de cada factoría es la documentación.** `aprendizaje/` y `registro/`
+no reciben nada, y eso dice que no tocan ICONICS; `historicos/` recibe cuatro
+cosas, y eso dice que es la de más superficie. El día que una familia necesite
+algo nuevo, la firma cambia y el cambio se ve en la revisión.
+
+`herramientas.mjs` queda como ensamblador: construye el contexto, se lo da a
+cada familia y junta lo que devuelven. Pasó de 4100 a 1123 líneas. Lo que
+todavía vive ahí —el índice de nombres de señal del tanque, el resolvedor de
+ventanas— está pendiente de una decisión que no está tomada: ver B3 en
 [`docs/BACKLOG-BACKEND.md`](../docs/BACKLOG-BACKEND.md).
 
 **El esquema vive aparte** (`ia/definiciones.mjs`). No es código que se ejecute:

@@ -25,44 +25,42 @@
 | `verificar-pronostico` | 18 |
 | `verificar-aprendizaje` | 13 |
 
-`herramientas.mjs`: **2844 líneas** (eran 4100). Repartidas hasta la Fase 2.
+`herramientas.mjs`: **1123 líneas** (eran 4100). Reparto **completo**: las 19
+herramientas viven en `backend/ia/herramientas/`, una subcarpeta por familia.
 
 ---
 
-## B1 · Terminar el reparto de herramientas — Fases 3 y 4
+## B1 · Reparto de herramientas — **COMPLETADO (28-08-2026)**
 
-**Estado.** Fases 0, 1 y 2 hechas: `lib/formato.mjs`, `lib/respuesta.mjs`,
-`lib/limites.mjs`, `aprendizaje/` y `documentacion/`. Faltan las doce
-herramientas que cuelgan del `client`.
+Las cinco fases están hechas. `herramientas.mjs` pasa de **4100 a 1123 líneas**
+y las diecinueve herramientas viven en `backend/ia/herramientas/`, una
+subcarpeta por familia:
 
-**Qué queda.** Medido sobre el árbol actual:
-
-| Familia | Herramientas | Líneas | Ata a |
+| Familia | Herramientas | Líneas | Recibe |
 |---|---|---|---|
-| `maquina/` | 3 | ~205 | `leerMaquina`, `resolverSistema`, `evaluarRiesgosDe` |
-| `historicos/` | 9 | ~1164 | `leerUnTramo` ↔ `leerSerie` ↔ `leerSerieEnRango` |
+| `aprendizaje/` | 3 | 211 | nada |
+| `registro/` | 1 | 48 | nada |
+| `maquina/` | 3 | 304 | `client`, `readOnly`, ayudantes de máquina |
+| `historicos/` | 9 | 1298 | `client`, `turnos`, `reportes`, ayudantes |
+| `documentacion/` | 3 | 515 | `indiceDocumentos` |
 
-**Fase 3 — el contexto explícito.** El trío de historia es mutuamente recursivo
-y depende de `client` y `historyConcurrencia`. Se mueve JUNTO, dentro de una
-factoría, para que su recursión siga compartiendo ámbito:
+Con `lib/` compartido: `formato`, `respuesta`, `limites`, `maquina`, `historia`.
 
-```js
-const ctx = { client, turnos, readOnly, historyConcurrencia, reportes }
-const historia = crearAyudantesDeHistoria(ctx)
-const maquina  = crearAyudantesDeMaquina(ctx)
-```
+**Lo que quedó pendiente de esta tarea** está ahora en B3 (el índice de nombres
+de señal, que sigue en el ensamblador porque su reparto depende de
+parametrizarlo por máquina) y en B7 (`diagnostico` como orquestador).
 
-Lo único que cambia es de dónde sale `client`: de una clausura implícita a un
-parámetro con nombre.
-
-**Fase 4 — mecánica una vez hecha la 3.** Las doce se van a sus carpetas
-recibiendo `{ ctx, historia, maquina }`. `herramientas.mjs` queda como
-ensamblador de ~200 líneas.
-
-**Riesgo.** Es la única fase del reparto con riesgo real. Mitigación: la prueba
-de paridad de `verificar-herramientas` detecta cualquier herramienta que se
-pierda, y el orden del catálogo está fijado entero — las dos cosas fallaron
-durante las Fases 0-2 y las dos veces tenían razón.
+> **Dos cosas que el reparto destapó, y que la suite atrapó:**
+>
+> - **La ruta del `import()` diferido de `reporte.mjs`.** Al mover
+>   `generar_reporte` a su familia, `await import('./reporte.mjs')` dejó de
+>   resolver. El error era el mensaje amable de «faltan las dependencias del
+>   backend», así que en producción se habría visto como un problema de
+>   instalación de `pdfkit`, no como una ruta rota.
+> - **`estado_del_sistema()` sin argumento.** `generar_reporte` lo llamaba sin
+>   `sistema`, que es obligatorio desde que las herramientas sirven a cualquier
+>   máquina. El reporte caía al respaldo «sin dato» **en silencio**: la tabla
+>   salía vacía sin decir por qué.
 
 ---
 
@@ -85,8 +83,9 @@ un error explícito en vez de un silencio. **No bloquea el alta.**
 
 **El arreglo de verdad.** Que cada entrada del registro declare su
 `riesgos(estado)` y el `switch` desaparezca. Depende de que los dos motores
-acepten la proyección común. Después de B1, este `switch` vivirá en un archivo
-de ~200 líneas junto a `leerMaquina`, y sustituirlo será un cambio local.
+acepten la proyección común. Con B1 hecho, este `switch` ya vive en
+`herramientas/lib/maquina.mjs` —156 líneas, junto a `leerMaquina`— así que
+sustituirlo es ahora un cambio local y visible.
 
 ---
 
@@ -111,8 +110,9 @@ error dice qué máquinas hay— pero sí una asimetría que se nota en la demo.
 
 **El arreglo.** Que `SINONIMOS` sea un campo del registro (`sinonimos: {...}`
 por máquina) y que `resolverSenal` delegue en `sistemasDeSenal` con el sistema
-como argumento. Es la fase que también saca `resolverSenal` de la clausura y
-cierra el ciclo de imports que hoy tiene `documentacion/`.
+como argumento. Es también lo que permitiría sacar `resolverSenal` del
+ensamblador: hoy `documentacion/` y `historicos/` lo importan de él, y ése es
+el último hilo que las ata al archivo grande.
 
 ---
 
@@ -216,11 +216,11 @@ histórico declarado) y comprueban que **no contesten en verde**.
 
 ## Orden sugerido
 
-1. **B1 Fase 3-4** — desbloquea B2 y B3, y es lo que más reduce el coste del alta
+1. ~~**B1**~~ — hecho el 28-08-2026
 2. **B3** — la asimetría que más se nota en una demo
 3. **B4** — deja de ser una limitación en cuanto haya una segunda máquina con histórico
 4. **B5** — decisión de una tarde, pero un verificador en rojo permanente no sirve
-5. **B2** — el rediseño de los motores de reglas, cuando B1 lo haya hecho local
+5. **B2** — el rediseño de los motores de reglas, ya local gracias a B1
 6. **B8** — la prueba del sondeo por máquina, antes de que haya tres
 
 **B6 y B7 no son tareas**: son fronteras que vigilar en la revisión de la #3.

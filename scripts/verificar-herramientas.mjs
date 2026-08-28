@@ -1885,13 +1885,27 @@ check('son diecinueve herramientas, y sólo una escribe en la PLANTA', () => {
     'recordar_hecho',
     'proponer_regla',
     'sistemas_de_la_planta',
+    /* ── EL ORDEN AHORA AGRUPA POR FAMILIA ──────────────────────────
+       Al repartir las herramientas en subcarpetas, este orden cambió: antes
+       `pronostico_de_desgaste` y `controlar_bomba` caían entre las de
+       históricos, y no por una razón escrita — era el orden en que se fueron
+       escribiendo.
+
+       Lo que sí está decidido y se conserva es lo de los extremos:
+       `sistemas_de_la_planta` abre, porque es la que el modelo tiene que
+       encontrar cuando no sabe de qué máquina le hablan, y las de manuales
+       cierran, porque son las que menos veces son la respuesta.
+
+       En medio, las de una MÁQUINA (su estado ahora, sus riesgos, encenderla)
+       van juntas y antes que las de HISTORIA. Es el orden en que se pregunta:
+       primero cómo está, después cómo ha estado. */
     'riesgos_activos',
-    'pronostico_de_desgaste',
     'estado_del_sistema',
+    'controlar_bomba',
+    'pronostico_de_desgaste',
     'historia_de_senal',
     'valor_en_momento',
     'comparar_periodos',
-    'controlar_bomba',
     'analisis_de_senal',
     'perfil_de_senal',
     'correlacionar_senales',
