@@ -382,6 +382,7 @@ node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 - [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué, y **cómo se da de alta una máquina**
 - [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md) — lo pendiente del backend, ordenado por lo que costaría la máquina #3
 - [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — lo pendiente del frontend, con las cifras medidas de duplicación
+- [`docs/MEJORAS-ASISTENTE.md`](docs/MEJORAS-ASISTENTE.md) — treinta mejoras para el asistente: veracidad, herramientas y capacidades
 - [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
 - [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
 - [`docs/PLAN-10-VISTA-SVG.md`](docs/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
