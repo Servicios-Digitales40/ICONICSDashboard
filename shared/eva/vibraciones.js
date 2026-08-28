@@ -714,8 +714,69 @@ export function parsePunto(nombre) {
 }
 
 /**
- * Ninguna señal de este catálogo tiene serie propia hoy. Existe como función
- * —y no como constante `false`— para que el día que se active el registro del
- * grupo el cambio sea de una línea y no una búsqueda por todo el módulo.
+ * ── LAS SERIES, DESDE EL 28-08-2026 ────────────────────────────────
+ *
+ * El grupo `DEMO 3` del Hyper Historian YA REGISTRA. Sondeado punto por punto
+ * contra el servidor real ese día: las doce medidas de los tres apoyos y las
+ * doce del variador devuelven serie con marcas de tiempo correctas.
+ *
+ * ── Y UNA NO ESTÁ, AUNQUE EL SERVIDOR DIGA QUE SÍ ──────────────────
+ *
+ * `aPeak_S1` devuelve **la serie de `aRMS_S1`**, muestra por muestra y con las
+ * mismas marcas de tiempo. No da error: contesta `ok` con datos plausibles de
+ * OTRA señal. Se comprobó cruzando las doce series entre sí, y es el único par
+ * que colisiona — `aPeak_S2` y `aPeak_S3` traen la suya.
+ *
+ * Es exactamente el fallo que el tanque ya tiene con tres de sus ocho señales,
+ * y el motivo de que esta lista sea una LISTA BLANCA y no `() => true`: lo que
+ * no está aquí no se puede pedir. Declarar las 24 porque «el grupo registra»
+ * habría hecho que el asistente contestara la aceleración eficaz del lado
+ * acople bajo el nombre «aceleración de pico», sin un solo error en el log.
+ *
+ * El día que se corrija en Workbench, se añade `aPeak_S1` y ya está.
  */
-export const esHistorizada = () => false;
+const CON_SERIE = new Set([
+  // Los tres apoyos, menos `aPeak_S1` (ver arriba).
+  "vRMS_S1", "aRMS_S1", "DKW_S1",
+  "vRMS_S2", "aRMS_S2", "aPeak_S2", "DKW_S2",
+  "vRMS_S3", "aRMS_S3", "aPeak_S3", "DKW_S3",
+  // El variador entero.
+  "velocidad", "frecuencia", "tensionSalida", "corriente", "par", "potencia",
+  "busCC", "fallo", "ultimoFallo", "aviso", "listo", "habilitado",
+]);
+
+/** ¿Esta clave tiene serie PROPIA verificada? Lista blanca: ver arriba. */
+export const esHistorizada = (clave) => CON_SERIE.has(clave);
+
+/** Las claves con serie propia, en orden estable. */
+export const historizadas = () => [...CON_SERIE];
+
+/**
+ * Clave de dominio → el punto por el que se pide su SERIE.
+ *
+ * ── POR QUÉ NO ES EL MISMO NOMBRE QUE EN VIVO ──────────────────────
+ *
+ * Porque esta máquina se lee del historiador por `hda:` con el grupo en el
+ * nombre —`hda:\Configuration\DEMO 3:vRMS_S1`— mientras que en vivo se lee
+ * por `ac:` con su carpeta de apoyo —`ac:TDCON/Motors/01/S1/vRMS_S1`—. En el
+ * tanque son el mismo nombre; aquí no.
+ *
+ * Ese «aquí no» es justo lo que obligó a que el nombre del punto histórico
+ * saliera del registro en vez de estar cableado: mientras hubo una sola
+ * máquina, `pointName()` del tanque servía para las dos cosas.
+ *
+ * El espacio de «DEMO 3» es literal: sin él ICONICS responde 500 y parece que
+ * el tag no existe. El tag va PELADO, sin la carpeta del apoyo — comprobado
+ * contra el servidor el 28-08-2026.
+ */
+export function puntoHistorico(clave) {
+  if (!CON_SERIE.has(clave)) return null;
+
+  const v = VARIADOR.find((x) => x.key === clave);
+  if (v) return `${GRUPO_HISTORIADOR}${v.tag}`;
+
+  const corte = clave.lastIndexOf("_");
+  const medida = MEDIDAS.find((m) => m.key === clave.slice(0, corte));
+  const canal = CANAL[clave.slice(corte + 1)];
+  return medida && canal ? `${GRUPO_HISTORIADOR}${medida.tag}_${canal.sufijo}` : null;
+}

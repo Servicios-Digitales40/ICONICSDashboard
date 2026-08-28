@@ -16,7 +16,7 @@
 
 | Verificador | Comprobaciones |
 |---|---|
-| `verificar-herramientas` | 110 |
+| `verificar-herramientas` | 114 |
 | `verificar-backend` | 73 |
 | `verificar-chat` | 44 |
 | `verificar-riesgos-vibracion` | 40 |
@@ -100,19 +100,31 @@ sustituirlo es ahora un cambio local y visible.
   con igualdad, contención literal y cobertura por palabras. **Sirve a todas
   las máquinas pero no tiene sinónimos.**
 
+`historia_de_senal` los une a mano desde el 28-08-2026
+(`resolverSenalDeSistema` en `historicos/index.mjs`): con `sistema` usa el
+registro, sin él el índice del tanque. Funciona y está documentado como
+transición, pero es un tercer sitio donde se decide lo mismo.
+
 **El síntoma.** Quien pregunta por «la bomba» o «el voltaje» acierta en el
 tanque —tiene sinónimos— y quien pregunta por un equivalente coloquial de
 vibraciones, no: `sistemasDeSenal("vibración del motor")` devuelve `[]`.
 
 **Qué cuesta el día de la #3.** La máquina nueva nace sin sinónimos y sus
-señales sólo se encuentran por su nombre técnico. No es un fallo silencioso —el
-error dice qué máquinas hay— pero sí una asimetría que se nota en la demo.
+señales sólo se encuentran por su nombre técnico o su etiqueta.
+
+**Y hay ocho herramientas que siguen sin `sistema`.** `analisis_de_senal`,
+`perfil_de_senal`, `correlacionar_senales`, `grafico_de_senal`,
+`generar_reporte`, `valor_en_momento` y `comparar_periodos` sólo sirven al
+tanque, aunque las demás máquinas ya tengan series que podrían alimentarlas.
+Añadir el argumento a cada una es mecánico —el patrón está en
+`historia_de_senal`— pero son ocho, y el arreglo bueno es que compartan un solo
+resolvedor en vez de repetirlo.
 
 **El arreglo.** Que `SINONIMOS` sea un campo del registro (`sinonimos: {...}`
-por máquina) y que `resolverSenal` delegue en `sistemasDeSenal` con el sistema
-como argumento. Es también lo que permitiría sacar `resolverSenal` del
-ensamblador: hoy `documentacion/` y `historicos/` lo importan de él, y ése es
-el último hilo que las ata al archivo grande.
+por máquina), que exista UN resolvedor por máquina, y que las ocho lo usen.
+Es también lo que permitiría sacar `resolverSenal` del ensamblador: hoy
+`documentacion/` e `historicos/` lo importan de él, y ése es el último hilo que
+las ata al archivo grande.
 
 ---
 
@@ -127,9 +139,13 @@ histórico ni mecanismos declarados, con la razón de dominio), después la de
 PARAMETRIZACIÓN (`id !== 'tanque'`), que es la que impide que una máquina con
 histórico entre a leer las señales del agua.
 
-**Qué cuesta el día de la #3.** Si declara `series` y `desgaste`, recibe un
-error explícito diciendo que la herramienta no está parametrizada. **Correcto
-pero limitante:** una máquina con histórico legítimo no puede tener pronóstico.
+**Qué cuesta HOY, y ya no es hipotético.** Vibraciones tiene series desde el
+28-08-2026. Le falta `desgaste` —sus mecanismos no están escritos— así que hoy
+la para la primera guarda, la de capacidad. El día que se declaren, la parará la
+segunda: **la máquina tendrá datos suficientes para un pronóstico y no podrá
+tenerlo** porque el cuerpo lee el catálogo del agua.
+
+Ha dejado de ser una limitación teórica: es la siguiente en el camino.
 
 **El arreglo.** Que `SENALES_PRONOSTICO` salga del registro (`series.pronostico`
 o derivarlo de `series.historizadas()`) y que la lectura de series use la ruta

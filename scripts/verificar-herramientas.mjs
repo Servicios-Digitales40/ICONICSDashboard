@@ -57,6 +57,7 @@ import {
   NO_COMPARTEN,
   SISTEMA,
   SISTEMAS,
+  historizadasDe,
   mismoSistema,
   sistemasDeSenal,
   tieneHistoria,
@@ -491,26 +492,39 @@ await checkAsync('una señal de OTRA máquina se identifica, no se declara inexi
    * Antes el mensaje era «sólo existen las ocho de la lista», cierto del tanque
    * y mentira de la planta: preguntado por la velocidad eficaz de un apoyo, el
    * asistente contestaba que esa señal no existe — y existe, en la otra máquina.
+   *
+   * Desde el 28-08-2026 vibraciones SÍ tiene historia, así que esta señal ya no
+   * se rechaza por falta de serie: se rechaza porque `historia_de_senal` sigue
+   * resolviendo nombres contra el catálogo del tanque y no acepta `sistema`
+   * (B3 del backlog). Lo que esta prueba fija es lo de siempre y lo que no ha
+   * cambiado: que el error DIGA de qué máquina es en vez de negar que exista.
    */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
   const r = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', periodo: 'hoy' })
 
   assert.equal(r.ok, false)
   assert.equal(r.sistema, 'vibraciones', 'tiene que decir DE QUÉ máquina es')
-  assert.equal(r.con_historia, false)
-  assert.match(r.error, /no tiene histórico utilizable/i)
+  assert.doesNotMatch(
+    r.error, /no existe|no hay ninguna señal/i,
+    'existe: está en la otra máquina, y el error no puede negarlo',
+  )
 })
 
-await checkAsync('una máquina SIN historia se niega a pronosticar, y dice por qué', async () => {
-  // El punto 3 del alta: sin histórico no hay exposición acumulada que contar,
-  // y sin mecanismos declarados no se sabe a qué avería llevaría. Inventar una
-  // tendencia sobre el instante es la respuesta que más convence y más daño hace.
+await checkAsync('una máquina sin MECANISMOS no pronostica, aunque tenga historia', async () => {
+  /*
+   * El punto 3 del alta, ahora por su otra mitad. Vibraciones ya tiene series
+   * (28-08-2026), pero un pronóstico necesita DOS cosas: histórico del que
+   * contar horas Y mecanismos de desgaste declarados que digan a qué avería
+   * lleva cada condición. Sigue sin los segundos (`desgaste: null`), así que
+   * sigue negándose — y ahora la negativa prueba algo distinto: que tener
+   * datos no basta para afirmar una tendencia.
+   */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
   const r = await h.ejecutar('pronostico_de_desgaste', { sistema: 'vibraciones' })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no tiene pronóstico de desgaste/i)
-  assert.equal(r.con_historia, false)
+  assert.equal(tieneHistoria('vibraciones'), true, 'historia SÍ tiene; mecanismos no')
 })
 
 await checkAsync('el registro no deja dar de alta una máquina que calle sobre su historia', () => {
@@ -752,6 +766,84 @@ await checkAsync('a una señal de otra máquina se le ofrece una herramienta que
     r.error, /vuelve a llamar indicando ese sistema/i,
     'esa instrucción mandaba a una puerta que no existe',
   )
+})
+
+await checkAsync('la historia de OTRA máquina se puede pedir, diciendo cuál', async () => {
+  /*
+   * Desde el 28-08-2026 el grupo `DEMO 3` registra, y `historia_de_senal`
+   * acepta `sistema`. Lo que se fija aquí no es que devuelva datos —el cliente
+   * falso no simula historia de vibraciones— sino que la señal se RESUELVA
+   * contra el catálogo de su máquina en vez de rebotar por no ser del tanque.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', {
+    senal: 'vRMS_S1', periodo: 'hoy', sistema: 'vibraciones',
+  })
+
+  assert.doesNotMatch(
+    r.error ?? '', /no es una señal del tanque|OTRA MÁQUINA/i,
+    'con `sistema` no puede rebotar por no ser del tanque',
+  )
+  assert.doesNotMatch(r.error ?? '', /no tiene serie histórica propia/i, 'vRMS_S1 SÍ la tiene')
+})
+
+await checkAsync('aPeak_S1 se rechaza: el historiador devuelve ahí la serie de aRMS_S1', async () => {
+  /*
+   * ── LA EXCEPCIÓN QUE JUSTIFICA LA LISTA BLANCA ─────────────────
+   *
+   * Sondeado el 28-08-2026: `aPeak_S1` contesta `ok` con datos plausibles, y
+   * son los de `aRMS_S1` — muestra por muestra, con las mismas marcas de
+   * tiempo. Se comprobó cruzando las doce series de los apoyos entre sí y es
+   * el único par que colisiona.
+   *
+   * Es el mismo fallo que el tanque tiene con tres de sus ocho señales, y el
+   * motivo de que `historizadas` sea una lista blanca y no «todas las del
+   * catálogo». Sin esta guarda el asistente contestaría la aceleración eficaz
+   * bajo el nombre «aceleración de pico», sin un solo error en el log.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', {
+    senal: 'aPeak_S1', periodo: 'hoy', sistema: 'vibraciones',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene serie histórica propia/i)
+  assert.equal(historizadasDe('vibraciones').includes('aPeak_S1'), false)
+  // Y sus dos hermanas SÍ están: la exclusión es de una, no de la familia.
+  assert.equal(historizadasDe('vibraciones').includes('aPeak_S2'), true)
+  assert.equal(historizadasDe('vibraciones').includes('aPeak_S3'), true)
+})
+
+await checkAsync('cada máquina nombra su punto del historiador a su manera', () => {
+  /*
+   * El tanque pide por `ac:` —el mismo nombre que en vivo— y vibraciones por
+   * `hda:` con el grupo delante. Mientras hubo una sola máquina con historia,
+   * `pointName()` del tanque valía para las dos cosas y estaba cableado en
+   * `lib/historia.mjs`; ahora sale del registro.
+   */
+  for (const sistema of SISTEMAS) {
+    const claves = sistema.series.historizadas()
+    if (!claves.length) continue
+    for (const clave of claves) {
+      const punto = sistema.series.punto(clave)
+      assert.ok(punto, `«${sistema.id}»: ${clave} no sabe cómo se pide su serie`)
+    }
+    // Lo que NO tiene serie no tiene punto: la puerta es la lista, no el nombre.
+    assert.equal(SISTEMA.vibraciones.series.punto('aPeak_S1'), null)
+  }
+})
+
+await checkAsync('una señal ambigua dentro de una máquina se pregunta, no se elige', async () => {
+  // «velocidad eficaz» son los tres apoyos. Elegir uno es como se contesta
+  // correctamente sobre el punto de medida equivocado.
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', {
+    senal: 'velocidad eficaz', periodo: 'hoy', sistema: 'vibraciones',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no identifica UNA señal/i)
+  assert.equal(r.claves.length, 3)
 })
 
 await checkAsync('el registro no acepta una máquina que no declare su comportamiento', () => {

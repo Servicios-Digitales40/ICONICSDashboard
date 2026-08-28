@@ -45,7 +45,23 @@ import {
   intervaloHMS,
   normalizar,
 } from '../../../../shared/eva/historia.js'
-import { esHistorizada, pointName } from '../../../../shared/eva/senales.js'
+/*
+ * ── EL PUNTO Y LA GUARDA SALEN DEL REGISTRO ────────────────────────
+ *
+ * Este archivo importaba `pointName` y `esHistorizada` del catálogo del TANQUE,
+ * fijos. Funcionó mientras el tanque fue la única máquina con historia.
+ *
+ * Desde el 28-08-2026 vibraciones también registra, y nombra su punto
+ * histórico de otra forma: `hda:\Configuration\DEMO 3:vRMS_S1` frente al
+ * `ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE` del tanque, que es el mismo nombre
+ * que en vivo. Con el catálogo del tanque cableado aquí, pedir la serie de una
+ * clave de vibraciones daba `pointName(clave) === null`.
+ *
+ * Ahora los dos salen de la entrada del sistema (`series.punto` y
+ * `series.historizadas`), así que la máquina que se dé de alta mañana declara
+ * los suyos y este archivo no se entera.
+ */
+import { SISTEMA } from '../../../../shared/eva/sistemas.js'
 
 /**
  * Los ayudantes de historia, atados a un cliente y a un tope de concurrencia.
@@ -55,8 +71,20 @@ import { esHistorizada, pointName } from '../../../../shared/eva/senales.js'
  * @param {number} ctx.historyConcurrencia  tramos simultáneos como mucho
  */
 export function crearAyudantesDeHistoria({ client, historyConcurrencia }) {
+  /*
+   * El sistema por defecto es el tanque, y es la ÚNICA concesión de este
+   * archivo: las nueve herramientas de históricos siguen resolviendo nombres
+   * contra su catálogo (ver B3 del backlog), así que exigirles el argumento
+   * sería pedirles algo que todavía no saben. Quien sí lo sabe —el asistente,
+   * cuando el modelo dice de qué máquina habla— lo pasa.
+   *
+   * No es el defecto peligroso que se evita en `estado_del_sistema`: allí un
+   * defecto contestaba de la máquina equivocada con datos reales; aquí una
+   * clave que no es del tanque no existe en su catálogo y la guarda la para.
+   */
+  const deSistema = (sistemaId) => SISTEMA[sistemaId] ?? SISTEMA.tanque
 
-async function leerUnTramo(clave, ventana, tramoPlanificado) {
+async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque') {
   const segundos = (ventana.fin - ventana.inicio) / 1000
   // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
   // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
@@ -70,12 +98,13 @@ async function leerUnTramo(clave, ventana, tramoPlanificado) {
   const segundosPorPunto = tramoPlanificado?.segundosPorPunto ?? segundos / puntos
 
   const r = await client.readHistory({
-    // Con `ac:`, el mismo nombre que en vivo. `hda:\Configuration\…` responde
-    // 500 para este árbol: ver `shared/eva/historia.js`.
-    pointName: pointName(clave),
+    // Cómo se nombra el punto en el historiador lo dice la máquina: el tanque
+    // usa `ac:` —el mismo nombre que en vivo— y vibraciones `hda:` con su
+    // grupo delante. Ver `series.punto` en `shared/eva/sistemas.js`.
+    pointName: deSistema(sistemaId).series.punto(clave),
     startDate: ventana.inicio.toISOString(),
     endDate: ventana.fin.toISOString(),
-    aggregate: AGREGADO,
+    aggregate: deSistema(sistemaId).series.agregado ?? AGREGADO,
     interval,
   })
 
@@ -133,20 +162,20 @@ async function leerUnTramo(clave, ventana, tramoPlanificado) {
  * que ya hacía `leerSerieEnRango()`, y fusionar los tramos aquí para que
  * los cuatro llamadores no tengan que saber que la ventana se troceó.
  */
-async function leerSerie(clave, ventana) {
-  if (!esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
+async function leerSerie(clave, ventana, sistemaId = 'tanque') {
+  if (!deSistema(sistemaId).esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
 
   const { tramos } = planificar({ inicio: ventana.inicio, fin: ventana.fin, puntosPorTramo: 96 })
 
   // Un solo tramo: la ventana ya es corta, la llamada de siempre sin
   // recomponer nada — mismo `interval` que si `planificar()` no existiera.
-  if (tramos.length === 1) return leerUnTramo(clave, ventana)
+  if (tramos.length === 1) return leerUnTramo(clave, ventana, undefined, sistemaId)
 
   // Concurrencia ACOTADA (Plan 15 Fase 3): mismo criterio que
   // `leerSerieEnRango()`, y por el mismo motivo — más tramos con la Fase 1
   // debajo pueden ser más páginas HTTP por tramo.
   const tareas = tramos.map(
-    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo)
+    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo, sistemaId)
   )
   const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
 
@@ -197,12 +226,12 @@ async function leerSerie(clave, ventana) {
  * días, perder uno no cambia la respuesta, y abortar por él dejaría al
  * operador sin perfil por un hueco del historiador.
  */
-async function leerHistoriaLarga(clave, dias) {
+async function leerHistoriaLarga(clave, dias, sistemaId = 'tanque') {
   const ahora = new Date()
   const { muestras, diasLeidos } = await leerSerieEnRango(clave, {
     inicio: new Date(ahora.getTime() - dias * 86400000),
     fin: ahora,
-  })
+  }, sistemaId)
   return { muestras, diasLeidos }
 }
 
@@ -225,7 +254,7 @@ async function leerHistoriaLarga(clave, dias) {
  * una aproximación deliberada: la alternativa (pedir cada día suelto para
  * contar fino) es exactamente el problema que esta unificación resuelve.
  */
-async function leerSerieEnRango(clave, { inicio, fin }) {
+async function leerSerieEnRango(clave, { inicio, fin }, sistemaId = 'tanque') {
   const muestras = []
   let diasLeidos = 0
   const diasTotal = Math.max(1, Math.ceil((fin - inicio) / 86400000))
@@ -245,7 +274,7 @@ async function leerSerieEnRango(clave, { inicio, fin }) {
   // trocearlo (con otro `puntosPorTramo` distinto) en vez de pedirlo tal
   // cual.
   const tareas = tramos.map(
-    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo)
+    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo, sistemaId)
   )
 
   const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)

@@ -111,6 +111,7 @@ import {
   esHistorizada as esHistorizadaTanque,
   historizadas as historizadasTanque,
   parsePointName,
+  pointName,
 } from "./senales.js";
 import { valorDePunto } from "./simulador.js";
 import { estadoDelTanque, resumenTanqueParaAsistente } from "./estadoTanque.js";
@@ -124,7 +125,9 @@ import {
   RAIZ_VIB,
   VARIADOR as VARIADOR_VIB,
   esHistorizada as esHistorizadaVibracion,
+  historizadas as historizadasVibracion,
   parsePunto,
+  puntoHistorico as puntoHistoricoVibracion,
   todosLosPuntos as todosLosPuntosVibracion,
 } from "./vibraciones.js";
 import { valorVibracionEn } from "./simuladorVibraciones.js";
@@ -170,6 +173,10 @@ export const SISTEMAS = [
       historizadas: historizadasTanque,
       ruta: "ac:",
       agregado: "Average",
+      /* En el tanque el punto histórico se pide con el MISMO nombre que en
+         vivo. En vibraciones no, y por eso esto es un campo del registro y no
+         una función importada por quien lee. Ver `puntoHistorico` allí. */
+      punto: pointName,
       nota:
         "Cinco de las ocho señales tienen serie propia verificada. A las otras tres el " +
         "historiador les devuelve la serie de la temperatura del tanque, sin dar error.",
@@ -240,21 +247,30 @@ export const SISTEMAS = [
     },
     esHistorizada: esHistorizadaVibracion,
     /*
-     * SIN SERIES, y declarado como tal en vez de omitido.
+     * ── CON SERIES DESDE EL 28-08-2026 ─────────────────────────────
      *
-     * `historizadas` devuelve una lista vacía, así que `tieneHistoria()` dice
-     * que no y las herramientas de historia se niegan citando `nota` en vez de
-     * contestar con datos de otra máquina o con una serie inventada. La ruta
-     * queda apuntada para el día que el grupo `DEMO 3` deje de moverse: ahí sí
-     * es `hda:` y no `ac:`, al revés que en el tanque.
+     * El grupo `DEMO 3` registra. Veintitrés de las veinticuatro claves tienen
+     * serie propia verificada punto por punto contra el servidor.
+     *
+     * La que falta es `aPeak_S1`, que devuelve la serie de `aRMS_S1` sin dar
+     * error — el mismo fallo que el tanque tiene con tres de sus ocho. Por eso
+     * `historizadas` es una lista blanca de `vibraciones.js` y no `() => true`.
+     *
+     * Y por eso la RUTA importa: esta máquina se lee por `hda:` con el grupo
+     * en el nombre, al revés que el tanque, que se lee por `ac:` con el mismo
+     * nombre que en vivo. Son dos mecánicas distintas y cada una es de su
+     * máquina — ver la cabecera de `series` en la entrada del tanque.
      */
     series: {
-      historizadas: () => [],
+      historizadas: historizadasVibracion,
       ruta: GRUPO_HISTORIADOR,
       agregado: "Average",
+      punto: puntoHistoricoVibracion,
       nota:
-        "El historiador empezó a guardar estos tags el 26-08-2026 y la configuración " +
-        "todavía se estaba moviendo. NO se usan sus series: sólo el instante.",
+        "Veintitrés de las veinticuatro señales tienen serie propia verificada desde el " +
+        "28-08-2026. La excepción es la aceleración de pico del lado acople (aPeak_S1): el " +
+        "historiador devuelve ahí la serie de la aceleración eficaz del mismo apoyo, sin dar " +
+        "error, así que NO se puede pedir.",
     },
     /* Sin mecanismos de desgaste: sin historia no hay exposición acumulada
        que contar, y un pronóstico sobre el instante sería adivinación. */
@@ -274,13 +290,22 @@ export const SISTEMAS = [
      * común (`estadoMaquina.js`) esta máquina hereda las que no dependen de
      * tener histórico, y las que sí se niegan solas citando `series.nota`.
      */
-    herramientas: ["estado_del_sistema", "riesgos_activos"],
+    /* `historia_de_senal` se suma el 28-08-2026, cuando el grupo del historiador
+       empezó a registrar. Las demás de historia —análisis, perfil, correlación,
+       gráfico, reporte— siguen resolviendo nombres contra el catálogo del
+       tanque y todavía no aceptan `sistema`: ver B3 del backlog. */
+    herramientas: ["estado_del_sistema", "riesgos_activos", "historia_de_senal"],
     historia:
-      "El historiador empezó a guardar estos tags el 26-08-2026 y la configuración " +
-      "todavía se estaba moviendo. NO se usan sus series: sólo el instante.",
+      "Veintitrés de las veinticuatro señales tienen serie propia desde el 28-08-2026. La " +
+      "excepción es aPeak_S1, que devuelve la serie de aRMS_S1 sin dar error.",
     limitaciones: [
-      "NO hay histórico utilizable: no se puede afirmar ninguna tendencia («lleva " +
-        "subiendo», «cada vez peor») ni poner plazo a una avería.",
+      "La aceleración de pico del lado acople (aPeak_S1) NO tiene serie propia: el " +
+        "historiador devuelve ahí la de la aceleración eficaz del mismo apoyo. No se puede " +
+        "hablar de su evolución, aunque las de los otros dos apoyos sí.",
+      "El histórico empezó el 26-08-2026: no hay nada anterior, y las primeras horas se " +
+        "grabaron mientras la configuración todavía se movía.",
+      "Sin mecanismos de desgaste declarados no hay pronóstico: se puede describir cómo ha " +
+        "evolucionado una medida, pero NO poner plazo a una avería.",
       "El diagnóstico de rodamientos (BPFO, BPFI, FTF) está apagado en los tres apoyos: " +
         "el módulo no los vigila, así que un rodamiento picándose sólo se verá cuando ya " +
         "haya movido el valor eficaz.",
@@ -588,6 +613,18 @@ function validarRegistro() {
     }
     if (!s.raices.length) throw new Error(`sistemas.js: «${s.id}» no declara ninguna raíz`);
     if (!s.puntos().length) throw new Error(`sistemas.js: «${s.id}» no declara ningún punto`);
+    /*
+     * `series.punto` es obligatorio desde que las dos máquinas nombran su punto
+     * histórico distinto: el tanque con el mismo nombre que en vivo, vibraciones
+     * por `hda:` con el grupo delante. Una máquina que no lo declare no puede
+     * pedir su serie, y el fallo aparecería tarde y en forma de «no hay datos».
+     */
+    if (typeof s.series.punto !== "function") {
+      throw new Error(
+        `sistemas.js: «${s.id}» no declara series.punto — cómo se nombra su punto en el ` +
+          "historiador. Puede ser el mismo nombre que en vivo, pero hay que decirlo.",
+      );
+    }
     if (!s.series.nota) {
       throw new Error(
         `sistemas.js: «${s.id}» no dice qué se puede pedir de su historia. Una máquina sin ` +

@@ -78,6 +78,7 @@ import {
   NO_COMPARTEN,
   SISTEMA,
   sistemaDePunto,
+  sistemasDeSenal,
   tieneHistoria,
 } from '../../../../shared/eva/sistemas.js'
 import { resolverInstante } from '../../../../shared/periodo.js'
@@ -109,6 +110,81 @@ import {
   segundosDeHora,
   senalDesconocida,
 } from '../../herramientas.mjs'
+
+/**
+ * Una señal pedida por su nombre → su clave, dentro de la máquina que toque.
+ *
+ * ── POR QUÉ EXISTE ESTA FUNCIÓN ────────────────────────────────────
+ *
+ * Porque hay dos catálogos y sólo uno tiene resolvedor con sinónimos. El del
+ * tanque acepta «la bomba», «el voltaje» o «cuánta agua»; el de las demás
+ * máquinas se resuelve por el registro, con la clave o la etiqueta.
+ *
+ * Sin `sistema` se resuelve contra el TANQUE, exactamente como antes: ninguna
+ * llamada existente cambia. Con `sistema`, contra el catálogo de esa máquina.
+ *
+ * Es una solución de transición y conviene que se note: lo bueno es un solo
+ * índice de nombres, por máquina, con los sinónimos de cada una (B3 del
+ * backlog). Mientras eso no exista, esto es lo que permite que el asistente
+ * pregunte por la historia de las vibraciones sin inventarse un segundo índice.
+ *
+ * Devuelve `{ ok: true, clave, meta, sistemaId, historizada, conSerie }` o el
+ * `fallo()` que corresponda — con la lista de máquinas si el id no existe.
+ */
+function resolverSenalDeSistema(senal, sistemaId) {
+  const id = sistemaId ? String(sistemaId).trim() : 'tanque'
+  const s = SISTEMA[id]
+  if (!s) {
+    return fallo(`No hay ningún sistema llamado "${sistemaId}" en esta planta.`, {
+      sistemas: Object.keys(SISTEMA),
+    })
+  }
+
+  /* El tanque conserva su índice con sinónimos: es el que sabe que «la bomba»
+     es la carga del motor. Para las demás máquinas se busca en el registro. */
+  if (id === 'tanque') {
+    const clave = resolverSenal(senal)
+    if (!clave) return senalDesconocida(senal, { paraHistoria: true })
+    return {
+      ok: true,
+      clave,
+      meta: senalInfo(clave),
+      sistemaId: id,
+      historizada: esHistorizada(clave),
+      conSerie: historizadas().map((k) => SENALES[k].label),
+    }
+  }
+
+  const encontrados = sistemasDeSenal(senal).filter((x) => x.sistema === id)
+  if (!encontrados.length) {
+    return fallo(
+      `«${senal}» no es una señal de «${s.nombre}». Sus señales se llaman como las enseña ` +
+        `estado_del_sistema(sistema="${id}").`,
+      { sistema: id }
+    )
+  }
+  if (encontrados.length > 1) {
+    /* El mismo criterio que en el resto del proyecto: elegir una es como se
+       contesta correctamente sobre el punto de medida equivocado. */
+    return fallo(
+      `«${senal}» no identifica UNA señal de «${s.nombre}»: encaja con ${encontrados.length} ` +
+        `(${encontrados.map((x) => s.etiquetaDe(x.clave) ?? x.clave).join('; ')}). Pregunta cuál.`,
+      { sistema: id, claves: encontrados.map((x) => x.clave) }
+    )
+  }
+
+  const { clave } = encontrados[0]
+  return {
+    ok: true,
+    clave,
+    /* La forma que espera el cuerpo de la herramienta: rótulo y unidad. La
+       unidad sale del catálogo de la máquina, no del registro. */
+    meta: { label: s.etiquetaDe(clave) ?? clave, unidad: '' },
+    sistemaId: id,
+    historizada: s.esHistorizada(clave),
+    conSerie: s.series.historizadas().map((k) => s.etiquetaDe(k) ?? k),
+  }
+}
 
 /**
  * Las nueve herramientas de historia.
@@ -285,26 +361,37 @@ export function crearHerramientasDeHistoricos({
      * es sobre una sola magnitud. Si hicieran falta dos, la segunda pregunta
      * las trae — y el modelo tiene una consulta por turno de todos modos.
      */
-    async historia_de_senal({ senal, periodo } = {}) {
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
+    async historia_de_senal({ senal, periodo, sistema } = {}) {
+      /*
+       * ── DOS CAMINOS, PORQUE HAY DOS CATÁLOGOS ──────────────────────
+       *
+       * El del tanque tiene índice de nombres con sinónimos («la bomba», «el
+       * voltaje»); el de las demás máquinas se resuelve por el registro. Son
+       * dos resolvedores distintos y unificarlos es B3 del backlog.
+       *
+       * Mientras tanto, `sistema` elige cuál se usa. Sin argumento se sigue
+       * resolviendo contra el tanque, que es lo que hacía siempre: ninguna
+       * llamada existente cambia de comportamiento.
+       */
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
 
-      const meta = senalInfo(clave)
+      const { clave, meta, sistemaId, historizada, conSerie } = resuelto
 
       /*
        * La guarda, ANTES de la red. Ver la cabecera del archivo.
        *
-       * El error nombra las cuatro que sí tienen serie y explica el motivo real
+       * El error nombra las que sí tienen serie y explica el motivo real
        * —el tag no está coleccionado— para que el modelo pueda ofrecer el valor
        * en vivo en su lugar en vez de quedarse en «no puedo».
        */
-      if (!esHistorizada(clave)) {
+      if (!historizada) {
         return fallo(
           `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
             `Pedírsela devolvería la curva de otra señal —la temperatura del tanque— sin avisar, ` +
             `así que no se pide. Sí se puede dar su valor actual con estado_del_sistema.`,
           {
-            senalesConHistoria: historizadas().map(k => SENALES[k].label),
+            senalesConHistoria: conSerie,
             senalPedida: meta.label,
           }
         )
@@ -313,7 +400,7 @@ export function crearHerramientasDeHistoricos({
       const v = resolverVentana(periodo, { turnos })
       if (v.error) return fallo(v.error)
 
-      const serie = await leerSerie(clave, v)
+      const serie = await leerSerie(clave, v, sistemaId)
       if (!serie.ok) {
         // 502 y 504 los pone el puente: significan que no se llegó al servidor.
         // Decir entonces «no hay datos» manda a revisar el Data Historian

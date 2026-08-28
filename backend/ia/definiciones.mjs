@@ -215,10 +215,11 @@ export const DEFINICIONES = [
         'Cómo ha evolucionado UNA señal en un período: devuelve el mínimo y el máximo con la hora ' +
         'en que ocurrieron, el promedio, el primer y el último valor, y cuántas muestras hubo. ' +
         'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿cuál fue la temperatura máxima ayer?", ' +
-        '"¿ha subido la presión?". IMPORTANTE: sólo cuatro de las ocho señales tienen serie propia ' +
-        '—nivel del tanque, temperatura del tanque, caudal instantáneo y presión relativa—; la ' +
-        'lista con esa marca ya la tienes en tus instrucciones. Si pides otra, la herramienta lo ' +
-        'dirá y tendrás que comunicarlo tal cual y ofrecer su valor actual.',
+        '"¿ha subido la presión?", "¿cómo ha ido la vibración del apoyo 1?". Sirve a CUALQUIER ' +
+        'máquina: para una que no sea el tanque, pasa `sistema` con su id. IMPORTANTE: no todas ' +
+        'las señales tienen serie propia —en el tanque son cinco de ocho, y en vibraciones ' +
+        'veintitrés de veinticuatro—. Si pides una que no la tiene, la herramienta lo dirá y ' +
+        'tendrás que comunicarlo tal cual y ofrecer su valor actual.',
       parameters: {
         type: 'object',
         properties: {
