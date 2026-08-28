@@ -38,12 +38,18 @@
  */
 import {
   CANALES,
+  CRESTA_GOLPETEO,
+  CRESTA_IMPOSIBLE,
   LIMITES_ISO,
+  ORDEN_BAJA_FRECUENCIA,
   QC_NOMINAL,
   RPM_BORDE_ISO,
   RPM_MINIMA_ISO,
   RPM_MINIMA_MODULO,
   VIGILANCIAS,
+  factorDeCresta,
+  frecuenciaEquivalente,
+  ordenEquivalente,
 } from "./vibraciones.js";
 
 /** ¿Hay número utilizable? Una calidad mala llega como `null` o `undefined`. */
@@ -438,6 +444,104 @@ export const REGLAS = [
     norma: null,
   },
 
+  /* ── Diagnóstico sin espectro ────────────────────────────────── */
+  {
+    /*
+     * ── UNA CRESTA DE 1,00 NO ES UNA MÁQUINA, ES UNA MEDIDA ROTA ──
+     *
+     * El pico de una señal no puede ser igual a su valor eficaz: sólo pasa si
+     * la señal es de amplitud constante, y una vibración nunca lo es. El suelo
+     * teórico es 1,41 —una senoidal pura—, y una máquina real da entre 3 y 5.
+     *
+     * Medido cinco veces seguidas contra este servidor: el aPico del lado
+     * acople valía EXACTAMENTE lo mismo que su aRMS, dígito a dígito. Ese canal
+     * no está midiendo el pico; está copiando el eficaz.
+     *
+     * Y es crítico, aunque no sea una avería de la máquina, porque deja ciego
+     * al único indicador que ve golpeteo — justo en el apoyo del lado acople,
+     * que es el que más sufre.
+     */
+    id: "pico-no-medido",
+    titulo: "El pico de aceleración no se está midiendo en este apoyo",
+    ambito: "canal",
+    necesita: ["aPeak", "aRMS"],
+    exigeNorma: false,
+    nivel: "critico",
+    cuando: (d) => {
+      const cresta = factorDeCresta(d.aPeak, d.aRMS);
+      return cresta !== null && cresta < CRESTA_IMPOSIBLE;
+    },
+    evidencia: (d) =>
+      `El pico vale ${fmt(d.aPeak, 3)} m/s² y el eficaz ${fmt(d.aRMS, 3)}: un factor de ` +
+      `cresta de ${fmt(factorDeCresta(d.aPeak, d.aRMS), 2)}, cuando el mínimo físico de ` +
+      `cualquier vibración real es 1,41.`,
+    consecuencia:
+      "No es una avería de la máquina: es la medida. Y deja sin efecto el factor de cresta, " +
+      "que es el indicador que detecta los impactos de un rodamiento picado antes de que el " +
+      "valor eficaz se mueva. Este apoyo pierde su aviso más temprano.",
+    accion:
+      "Revisar la configuración del pico de aceleración de este canal en el servidor web del " +
+      "módulo, y comprobar que no está copiando el valor eficaz.",
+    norma: null,
+  },
+  {
+    id: "golpeteo",
+    titulo: "El apoyo está recibiendo impactos repetidos",
+    ambito: "canal",
+    necesita: ["aPeak", "aRMS"],
+    exigeNorma: false,
+    nivel: "atencion",
+    cuando: (d) => {
+      const cresta = factorDeCresta(d.aPeak, d.aRMS);
+      return cresta !== null && cresta >= CRESTA_IMPOSIBLE && cresta > CRESTA_GOLPETEO;
+    },
+    evidencia: (d) =>
+      `Factor de cresta ${fmt(factorDeCresta(d.aPeak, d.aRMS), 2)} —pico ${fmt(d.aPeak, 3)} ` +
+      `sobre eficaz ${fmt(d.aRMS, 3)} m/s²—. Una máquina sana ronda 3 a 5.`,
+    consecuencia:
+      "Una cresta alta significa golpes secos y repetidos, no vibración de banda ancha. Es lo " +
+      "que produce un rodamiento picado cada vez que un elemento rodante pasa por el defecto, " +
+      "y también una holgura que permite que algo golpee. Sube antes que el valor eficaz.",
+    accion:
+      "Encender la vigilancia de envolvente de este apoyo: es la que distingue un rodamiento " +
+      "picado de una holgura, y el golpeteo solo dice que hay impactos, no de dónde vienen.",
+    norma: null,
+  },
+  {
+    id: "energia-de-baja-frecuencia",
+    titulo: "La energía de vibración está en la frecuencia de giro",
+    ambito: "canal",
+    necesita: ["vRMS", "aRMS"],
+    exigeNorma: false,
+    nivel: "atencion",
+    /*
+     * El caso contrario al golpeteo. Con la energía concentrada cerca de 1× o
+     * 2× la velocidad de giro, el sospechoso no es el rodamiento: es el
+     * equilibrado o la alineación. Se pide velocidad porque sin ella no hay
+     * «órdenes» que comparar, sólo hercios sueltos.
+     */
+    evaluable: (d) =>
+      Number.isFinite(d.velocidadEje)
+        ? { ok: true }
+        : { ok: false, porque: "Sin la velocidad del eje no se puede saber a cuántos órdenes está la energía." },
+    cuando: (d) => {
+      const orden = ordenEquivalente(d.vRMS, d.aRMS, d.velocidadEje);
+      return orden !== null && orden < ORDEN_BAJA_FRECUENCIA;
+    },
+    evidencia: (d) =>
+      `La energía se concentra hacia ${fmt(frecuenciaEquivalente(d.vRMS, d.aRMS), 0)} Hz, que a ` +
+      `${fmt(d.velocidadEje, 0)} rpm son ${fmt(ordenEquivalente(d.vRMS, d.aRMS, d.velocidadEje), 1)} ` +
+      `veces la velocidad de giro.`,
+    consecuencia:
+      "Tan cerca de la velocidad de giro, el sospechoso no es el rodamiento: a 1× se ve el " +
+      "desequilibrio y a 2× la desalineación. Ambos se corrigen, y dejarlos castiga los " +
+      "rodamientos y el acoplamiento sin que ellos sean la causa.",
+    accion:
+      "Comprobar equilibrado del rotor y alineación del acoplamiento antes de tocar nada del " +
+      "rodamiento.",
+    norma: null,
+  },
+
   /* ── El servidor de alarmas de ICONICS ───────────────────────── */
   {
     id: "alarmas-activas",
@@ -684,7 +788,17 @@ export function evaluarRiesgosVibracion(estado) {
   for (const regla of REGLAS) {
     const objetivos =
       regla.ambito === "canal"
-        ? CANALES.map((c) => ({ canal: c, datos: canales[c.id] ?? {} }))
+        ? /*
+           * La velocidad viaja CON los datos del canal, aunque sea de la
+           * máquina: las reglas que hablan de «órdenes» son de apoyo, no de
+           * máquina, y sin el régimen no pueden convertir hercios en múltiplos
+           * de giro. Se llama `velocidadEje` y no `velocidad` para que se vea
+           * que viene de fuera del canal.
+           */
+          CANALES.map((c) => ({
+            canal: c,
+            datos: { ...(canales[c.id] ?? {}), velocidadEje: velocidad },
+          }))
         : [{ canal: null, datos: datosMaquina }];
 
     for (const { canal, datos } of objetivos) {

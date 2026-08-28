@@ -313,6 +313,75 @@ export const CALIDADES = [
 export const QC_NOMINAL = 1;
 
 /**
+ * ── DOS DIAGNÓSTICOS SIN ESPECTRO ──────────────────────────────────
+ *
+ * A ICONICS sólo llegan escalares: el FFT se queda dentro del módulo. Con
+ * números sueltos se puede DETECTAR que algo va peor, pero no diagnosticar
+ * qué es… salvo que se crucen entre sí. Estas dos funciones son ese cruce, y
+ * son lo único que hay hasta que se enciendan las vigilancias de envolvente.
+ *
+ * No sustituyen a un espectro. Contestan la primera bifurcación de cualquier
+ * diagnóstico —¿golpea o no?, ¿la energía está abajo o arriba?— y con eso ya
+ * se descartan familias enteras de avería.
+ */
+
+/**
+ * Factor de cresta: cuántas veces el pico supera al valor eficaz.
+ *
+ * Es el detector de GOLPETEO. Una vibración general reparte su energía y da
+ * una cresta baja; un rodamiento picado produce un impacto cada vez que un
+ * elemento pasa por el defecto, y esos picos suben la cresta sin mover apenas
+ * el eficaz. Por eso ve el daño antes que el propio aRMS.
+ *
+ *   ~1,41  una senoidal pura. Es el SUELO teórico de cualquier señal con
+ *          componente alterna: por debajo, la medida está mal.
+ *   3 – 5  máquina sana, vibración de banda ancha
+ *   > 6    impactos repetidos
+ */
+export function factorDeCresta(aPeak, aRMS) {
+  if (!Number.isFinite(aPeak) || !Number.isFinite(aRMS) || aRMS <= 0) return null;
+  return aPeak / aRMS;
+}
+
+/** Por debajo de esto la cresta es imposible, y lo que falla es la medida. */
+export const CRESTA_IMPOSIBLE = 1.4;
+
+/** Desde aquí hay impactos repetidos, no vibración de banda ancha. */
+export const CRESTA_GOLPETEO = 6;
+
+/**
+ * Frecuencia equivalente: dónde está el centro de gravedad de la energía.
+ *
+ * Para una señal dominada por una frecuencia se cumple `a = 2·π·f·v`. Despejar
+ * `f` de la aceleración y la velocidad eficaces da la frecuencia a la que
+ * habría que poner TODA la energía para producir esas dos medidas. No es un
+ * espectro —no dice qué picos hay—, pero sí en qué zona vive el problema, y
+ * eso descarta familias enteras:
+ *
+ *   1×      desequilibrio
+ *   2×      desalineación
+ *   3-10×   frecuencias de defecto de rodamiento
+ *   > 10×   desgaste avanzado, holguras, roce o resonancia
+ *
+ * `vRMS` va en mm/s y `aRMS` en m/s², que es como los publica el módulo: el
+ * factor 1000 de la conversión está dentro, y no fuera donde se olvida.
+ */
+export function frecuenciaEquivalente(vRMS, aRMS) {
+  if (!Number.isFinite(vRMS) || !Number.isFinite(aRMS) || vRMS <= 0) return null;
+  return aRMS / (2 * Math.PI * (vRMS / 1000));
+}
+
+/** La misma frecuencia, en múltiplos de la velocidad de giro. */
+export function ordenEquivalente(vRMS, aRMS, rpm) {
+  const f = frecuenciaEquivalente(vRMS, aRMS);
+  if (f === null || !Number.isFinite(rpm) || rpm <= 0) return null;
+  return f / (rpm / 60);
+}
+
+/** Por debajo de este orden, la energía es de giro: desequilibrio o alineación. */
+export const ORDEN_BAJA_FRECUENCIA = 3;
+
+/**
  * ── EL SERVIDOR DE ALARMAS, QUE NO ES LO MISMO QUE `Alarma_Sn` ─────
  *
  * `Alarma_Sn` y `Warning_Sn` son dos booleanos que el PLC publica por canal.

@@ -43,6 +43,9 @@ import {
   CONTADORES_ALARMA,
   decodificarVigilancia,
   esHistorizada,
+  factorDeCresta,
+  frecuenciaEquivalente,
+  ordenEquivalente,
   LIMITES_ISO,
   RPM_MINIMA_ISO,
   MEDIDAS,
@@ -655,6 +658,120 @@ check('sin lectura de los contadores no se inventa ninguna alarma', () => {
   const res = evaluarRiesgosVibracion(estado({ alarmas: {} }))
   assert.ok(!buscar(res, 'alarmas-activas'))
   assert.ok(!buscar(res, 'alarmas-sin-reconocer'))
+})
+
+console.log(`\n${c.negrita}── Diagnóstico sin espectro ─────────────────────────────────${c.reset}`)
+
+check('una cresta imposible se denuncia como MEDIDA rota, no como avería', () => {
+  /*
+   * Es el caso real: medido cinco veces seguidas, el aPico del lado acople
+   * valía EXACTAMENTE lo mismo que su aRMS, dígito a dígito. El pico de una
+   * señal no puede igualar a su eficaz —sólo pasa con amplitud constante, y
+   * una vibración nunca lo es—, así que el canal no está midiendo el pico.
+   *
+   * Y es crítico aunque la máquina esté perfecta: deja ciego al único
+   * indicador que ve golpeteo, justo en el apoyo que más sufre.
+   */
+  const res = evaluarRiesgosVibracion(estado({ canales: { S1: { aRMS: 1.766, aPeak: 1.766 } } }))
+  const r = buscar(res, 'pico-no-medido', 'S1')
+
+  assert.ok(r, 'tiene que salir')
+  assert.equal(r.nivel, 'critico')
+  assert.match(r.evidencia, /1\.00/, 'con la cresta calculada')
+  assert.match(r.consecuencia, /no es una aver[íi]a de la m[áa]quina/i,
+    'y dejando claro que el problema es la medida')
+  assert.ok(!buscar(res, 'golpeteo', 'S1'), 'una cresta imposible NO es golpeteo')
+})
+
+check('una cresta alta se llama golpeteo, no avería de rodamiento', () => {
+  /*
+   * Una cresta de 9,86 dice que hay IMPACTOS. No dice de qué: un rodamiento
+   * picado y una holgura que permite golpear dan la misma firma. Afirmar
+   * «rodamiento dañado» aquí sería saltarse el paso que falta.
+   */
+  const res = evaluarRiesgosVibracion(estado({ canales: { S2: { aRMS: 0.380, aPeak: 3.744 } } }))
+  const r = buscar(res, 'golpeteo', 'S2')
+
+  assert.ok(r)
+  assert.equal(r.nivel, 'atencion')
+  assert.match(r.evidencia, /9\.8[0-9]/, 'la cresta medida')
+  assert.match(r.consecuencia, /holgura/i, 'la holgura da la misma firma y hay que decirlo')
+  assert.match(r.accion, /envolvente/i, 'y mandar a la vigilancia que sí distingue')
+})
+
+check('una cresta de máquina sana no dispara nada', () => {
+  /* Entre 3 y 5 es lo normal en vibración de banda ancha. */
+  const res = evaluarRiesgosVibracion(estado({ canales: { S3: { aRMS: 1.0, aPeak: 4.0 } } }))
+  assert.ok(!buscar(res, 'golpeteo', 'S3'))
+  assert.ok(!buscar(res, 'pico-no-medido', 'S3'))
+})
+
+check('la energía cerca de la velocidad de giro apunta a equilibrado, no a rodamiento', () => {
+  /*
+   * `a = 2·pi·f·v` para una señal dominada por una frecuencia. Con vRMS 5 mm/s
+   * y aRMS 0.35 m/s² la energía sale hacia 11 Hz; a 604 rpm el eje gira a
+   * 10,07 Hz, así que es ~1× — desequilibrio, no rodamiento.
+   */
+  const res = evaluarRiesgosVibracion(estado({
+    canales: { S1: { vRMS: 5.0, aRMS: 0.35 } },
+    variador: { velocidad: 604 },
+  }))
+  const r = buscar(res, 'energia-de-baja-frecuencia', 'S1')
+
+  assert.ok(r, 'tiene que salir')
+  assert.match(r.evidencia, /veces la velocidad de giro/)
+  assert.match(r.consecuencia, /desequilibrio|desalineaci[óo]n/i)
+  assert.match(r.accion, /equilibrad|alineaci/i, 'y mandar ahí antes que al rodamiento')
+})
+
+check('la energía en alta frecuencia NO dispara la regla de baja', () => {
+  /*
+   * El caso real: 0,22 mm/s con 1,77 m/s² pone la energía hacia 1280 Hz, que a
+   * 604 rpm son 127×. Nada que ver con el equilibrado, y decirlo sería mandar
+   * a revisar lo que no es.
+   */
+  const res = evaluarRiesgosVibracion(estado({
+    canales: { S1: { vRMS: 0.22, aRMS: 1.766 } },
+    variador: { velocidad: 604 },
+  }))
+  assert.ok(!buscar(res, 'energia-de-baja-frecuencia', 'S1'))
+})
+
+check('sin velocidad no se convierte a órdenes: se declara no evaluable', () => {
+  /*
+   * En hercios sueltos la frecuencia equivalente no dice nada: 200 Hz son 20×
+   * a 600 rpm y 3× a 4000. Sin el régimen, la regla no puede opinar — y tiene
+   * que constar que no opinó, no callarse.
+   */
+  const res = evaluarRiesgosVibracion(estado({
+    canales: { S1: { vRMS: 5.0, aRMS: 0.35 } },
+    variador: { velocidad: null },
+  }))
+  assert.ok(!buscar(res, 'energia-de-baja-frecuencia', 'S1'))
+  const ne = noEvaluable(res, 'energia-de-baja-frecuencia', 'S1')
+  assert.ok(ne, 'tiene que constar como no evaluada')
+  assert.match(ne.porque, /velocidad/i)
+})
+
+check('las cuentas de cresta y frecuencia equivalente son las de la física', () => {
+  /*
+   * Se comprueban contra valores calculados a mano, no contra lo que devuelva
+   * la función: si alguien cambia el factor 1000 de mm/s a m/s, esto se cae —
+   * y ese error no se vería en pantalla, sólo desplazaría el diagnóstico mil
+   * veces de sitio.
+   */
+  assert.equal(factorDeCresta(4.0, 1.0), 4)
+  assert.equal(factorDeCresta(1.0, 0), null, 'sin eficaz no hay cresta')
+  assert.equal(factorDeCresta(null, 1.0), null)
+
+  /* a = 2·pi·f·v  →  con v = 1 mm/s y f = 100 Hz, a = 0,628 m/s² */
+  const a = 2 * Math.PI * 100 * 0.001
+  assert.ok(Math.abs(frecuenciaEquivalente(1.0, a) - 100) < 0.01,
+    `dio ${frecuenciaEquivalente(1.0, a)}`)
+
+  /* A 600 rpm el eje gira a 10 Hz, así que 100 Hz son 10 órdenes. */
+  assert.ok(Math.abs(ordenEquivalente(1.0, a, 600) - 10) < 0.01)
+  assert.equal(ordenEquivalente(1.0, a, 0), null, 'sin velocidad no hay orden')
 })
 
 /* ── Resumen ─────────────────────────────────────────────────────────── */
