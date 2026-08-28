@@ -274,9 +274,26 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
           [...new Set(riesgos.noEvaluables.map((x) => x.titulo))].slice(0, 4).join("; "),
 
     puntos_sin_lectura: sinLectura,
+    /*
+     * ── ESTE AVISO DECÍA «SIN HISTÓRICO UTILIZABLE» ────────────────
+     *
+     * Y dejó de ser verdad el 28-08-2026, cuando el grupo DEMO 3 empezó a
+     * registrar. La frase se quedó, y el efecto fue peor que el de un dato
+     * viejo: el modelo la leía DENTRO del resultado de la herramienta —donde
+     * los avisos pesan más que las instrucciones— y se negaba a dar una
+     * media que el historiador tenía. Preguntado por el promedio de la
+     * velocidad eficaz de ayer, contestó que no podía.
+     *
+     * Lo que sí sigue siendo cierto es lo otro: sin mecanismos de desgaste
+     * declarados no hay pronóstico. Se puede contar cómo ha evolucionado una
+     * medida; no se puede poner plazo a una avería. Esa mitad se conserva,
+     * porque es la que evita la respuesta que más convence y más daño hace.
+     */
     aviso:
       "OTRA MÁQUINA, no el tanque: no relaciones estas vibraciones con su caudal, presión " +
-      "ni nivel. Sin histórico utilizable: no afirmes tendencias ni pongas plazo a una avería." +
+      "ni nivel. SÍ hay histórico de sus medidas, banderas y variador: se puede consultar con " +
+      "historia_de_senal(sistema=\"vibraciones\"). Lo que NO se puede es poner plazo a una " +
+      "avería: esta máquina no tiene mecanismos de desgaste declarados." +
       (sinLectura > 0
         ? ` Ahora mismo ${sinLectura} de ${estado.puntosPedidos} puntos no entregan lectura: eso no ` +
           "es una máquina tranquila, es una máquina callada."

@@ -144,7 +144,36 @@ function resolverSenalDeSistema(senal, sistemaId) {
      es la carga del motor. Para las demás máquinas se busca en el registro. */
   if (id === 'tanque') {
     const clave = resolverSenal(senal)
-    if (!clave) return senalDesconocida(senal, { paraHistoria: true })
+
+    /*
+     * ── SI EL NOMBRE YA DICE DE QUÉ MÁQUINA ES, NO SE PIDE OTRA VEZ ──
+     *
+     * Sin `sistema` se resuelve contra el tanque, y una señal de otra máquina
+     * caía en `senalDesconocida`, que devuelve «vuelve a llamar añadiendo
+     * sistema="vibraciones"». La instrucción es correcta y el modelo de 4B
+     * **no la sigue**: medido tres veces con la misma pregunta —el promedio de
+     * ayer de la velocidad eficaz del lado acople— reintentó con otro nombre,
+     * consultó otras herramientas y acabó contestando que no podía dar un dato
+     * que el historiador tenía.
+     *
+     * Que un modelo pequeño no encadene bien no es algo que se arregle
+     * escribiendo mejor el error: se arregla no necesitando el reintento.
+     * `«Velocidad eficaz · Lado acople»` sólo existe en una máquina, así que
+     * pedir el id además del nombre es ceremonia — la respuesta es la misma.
+     *
+     * Sólo cuando es INEQUÍVOCA. Si el nombre encaja en varias máquinas o en
+     * varias señales de una, se sigue preguntando: elegir por quien pregunta
+     * es cómo se contesta correctamente sobre la instalación equivocada, y eso
+     * no cambia porque el modelo sea pequeño.
+     */
+    if (!clave) {
+      const enOtras = sistemasDeSenal(senal)
+      if (enOtras.length === 1 && enOtras[0].sistema !== 'tanque') {
+        return resolverSenalDeSistema(senal, enOtras[0].sistema)
+      }
+      return senalDesconocida(senal, { paraHistoria: true })
+    }
+
     return {
       ok: true,
       clave,

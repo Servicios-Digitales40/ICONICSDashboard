@@ -616,14 +616,38 @@ export function senalDesconocida(texto, { paraHistoria = false } = {}) {
      * error, y se gastaban turnos en un bucle del que la instrucción era la
      * causa.
      *
-     * Se le dice lo que SÍ puede llamar. `estado_del_sistema` da el valor de
-     * ahora de esa máquina, que es lo que casi siempre se estaba pidiendo.
+     * Se le dice lo que SÍ puede llamar, y eso CAMBIÓ el 28-08-2026:
+     * `historia_de_senal` ya acepta `sistema`, así que para una señal de otra
+     * máquina que tenga serie la salida es repetir la MISMA llamada con el id,
+     * no rendirse y pedir el valor de ahora.
+     *
+     * Mandarlo a `estado_del_sistema` cuando la serie existe cuesta la
+     * respuesta entera: preguntado por el promedio de ayer de la velocidad
+     * eficaz, el modelo leyó «esta herramienta sólo sirve al tanque»,
+     * consultó el estado en vivo y contestó que no podía dar el promedio —de
+     * un dato que el historiador tenía—.
+     *
+     * Por eso se distinguen los dos casos: con serie se reintenta, sin serie
+     * se ofrece el instante.
      */
+    /* `tieneHistoria` es de la MÁQUINA; `esHistorizada` es de la SEÑAL. Hacen
+       falta las dos: vibraciones tiene serie para 40 de sus 73 puntos, así que
+       preguntar por la máquina dice «sí» incluso de una señal que no la tiene
+       —`aPeak_S1`— y el reintento se estrellaría contra la guarda de dentro. */
+    if (!paraHistoria || (tieneHistoria(sistema) && s.esHistorizada(clave))) {
+      return fallo(
+        `«${texto}» no es una señal del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
+          `OTRA MÁQUINA. Vuelve a llamar a ESTA MISMA herramienta añadiendo ` +
+          `sistema="${sistema}".`,
+        { sistema, clave, con_historia: true }
+      )
+    }
+
     return fallo(
       `«${texto}» no es una señal del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
-        `OTRA MÁQUINA. Esta herramienta sólo sirve al tanque. Para esa señal usa ` +
-        `estado_del_sistema(sistema="${sistema}"), que da su valor de ahora.`,
-      { sistema, clave }
+        `OTRA MÁQUINA, y esa máquina no tiene serie para esta señal. ${s.series.nota} ` +
+        `Puedes dar su valor de AHORA con estado_del_sistema(sistema="${sistema}").`,
+      { sistema, clave, con_historia: false }
     )
   }
 
