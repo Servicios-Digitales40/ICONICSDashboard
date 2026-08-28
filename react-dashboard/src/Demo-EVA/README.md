@@ -1,7 +1,24 @@
-# Demo EVA · Sistemas de agua industrial
+# Demo EVA · Las máquinas de la planta
 
-La aplicación, sobre `ac:TDCON/DEMO/SENSORES/`, un árbol **real** del servidor
-ICONICS. Cuatro subvistas: Planta, Máquina 3D, Maqueta 3D y Assets.
+La aplicación, sobre árboles **reales** del servidor ICONICS. Nació sobre uno
+—`ac:TDCON/DEMO/SENSORES/`, la estación de llenado— y hoy sirve **dos máquinas**
+en secciones separadas del sidebar, con una tercera prevista:
+
+| Sección | Máquina | Árbol | Vistas |
+|---|---|---|---|
+| Estación de llenado | Tanque y grupo de bombeo (`PLC_1`) | `ac:TDCON/DEMO/SENSORES/` | 5 |
+| Vibraciones | Motor WEG + SIPLUS CMS (`PLC_2`) | `ac:TDCON/Motors/01/` y `ae:` | 5 |
+| General | — | — | 4 |
+
+**Van en secciones aparte a propósito, y no es cosmético.** Son instalaciones
+separadas: otro motor, otro variador, otro PLC. Mezclar sus pantallas invita a
+leerlas juntas, y la primera correlación que alguien saque entre el caudal del
+tanque y la vibración de la otra une dos máquinas que no comparten ni un
+tornillo. La misma regla la defiende el registro en
+[`shared/eva/sistemas.js`](../../../shared/eva/sistemas.js).
+
+Quién manda sobre qué máquinas existen no es este módulo: es ese registro. Aquí
+sólo se pintan.
 
 La **Maqueta 3D** reproduce el skid real, a partir de un dibujo del equipo que
 está en [`react-dashboard/img/`](../../img/). Hubo brevemente una quinta vista
@@ -111,7 +128,13 @@ lib/        derivaciones y formato, sin React salvo donde se indique
 
 components/ los tiles 2D, con la forma de «Planta · v2»
 three-d/    los modelos, su contrato de comportamiento y el layout
-views/      las cuatro subvistas
+views/      las vistas, hoy una familia por máquina
+
+            Cada máquina duplica hoy sus cinco vistas (Inicio, Gráficas,
+            Riesgos, Controles y 3D). Es la deuda mayor del frontend y está
+            anotada como F1 en `docs/BACKLOG-FRONTEND.md`: la forma común de
+            `estadoMaquina.js` ya existe, así que la pieza que faltaba para
+            parametrizarlas está puesta desde el backend.
 ```
 
 Las pruebas viven en [`src/test/demo-eva/`](../test/demo-eva/), espejando este

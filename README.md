@@ -1,23 +1,42 @@
-# Demo EVA — Sistemas de agua industrial
+# Demo EVA — Las máquinas de la planta
 
-Tablero que muestra el estado de una instalación de agua industrial leyendo sus
-señales de un servidor **ICONICS** (AssetWorX y Hyper Historian).
+Tablero que muestra el estado de las máquinas de una planta leyendo sus señales
+de un servidor **ICONICS** (AssetWorX y Hyper Historian).
+
+Nació sobre una instalación de agua industrial y hoy sirve **dos máquinas** en
+secciones separadas, con el registro preparado para las que vengan.
 
 El proyecto son dos piezas: un backend puente en Node que resuelve la
 autenticación contra ICONICS, y un frontend en React que consume ese backend.
 
 ## Qué hace
 
-Ocho señales, todas bajo `ac:TDCON/DEMO/SENSORES/`, presentadas de cuatro
-formas:
+**Dos máquinas, en secciones separadas del sidebar.** Son instalaciones
+distintas —otro motor, otro variador, otro PLC— y por eso no comparten pantalla:
+mezclarlas invitaría a leerlas juntas, y una correlación entre el caudal de una
+y la vibración de la otra uniría dos equipos que no se tocan.
 
-- **Planta** — el estado del sistema derivado de sus señales, con la serie
-  histórica de las que el historiador entrega.
-- **Máquina 3D** — el grupo de bombeo, que se comporta según ese estado.
-- **Maqueta 3D** — la instalación en miniatura; el nivel del tanque es el dato
-  en vivo.
-- **Assets** — los ocho puntos con su valor y su calidad en crudo, navegando el
-  árbol de AssetWorX.
+**Estación de llenado** — ocho señales bajo `ac:TDCON/DEMO/SENSORES/`, cinco de
+ellas con serie histórica verificada:
+
+- **Inicio** — qué está pasando ahora, en una pantalla que se explica sola.
+- **Gráficas** — las ocho señales, con la historia que el historiador entrega.
+- **Riesgos** — qué puede pasar si la instalación sigue como está.
+- **Controles** — encender y apagar la bomba.
+- **Vista 3D** — la instalación en miniatura; el nivel del tanque es dato vivo.
+
+**Sistema de vibraciones** — motor WEG con módulo SIPLUS CMS, 73 puntos bajo
+`ac:TDCON/Motors/01/` y `ae:`. Mismas cinco vistas, **sin histórico utilizable**:
+sólo el instante, y las herramientas de tendencia se niegan a inventarlo.
+
+**General** — Alarmas, Assets (los puntos con su valor y calidad en crudo,
+navegando el árbol de AssetWorX) y Predicción (beta).
+
+Quién manda sobre qué máquinas existen es un solo archivo:
+[`shared/eva/sistemas.js`](shared/eva/sistemas.js). Dar de alta una es añadir
+una entrada ahí y su catálogo — el asistente, el simulador y el transporte falso
+se enteran solos. El procedimiento completo está en
+[`shared/README.md`](shared/README.md).
 - **Asistente** — un chat que responde en lenguaje natural consultando ICONICS
   de verdad, con un modelo que corre en el propio servidor. Opcional: sin
   `IA_BASE` no aparece.
@@ -36,14 +55,15 @@ formas:
 .
 ├── backend/            Servidor puente hacia ICONICS (Node, sin dependencias)
 │   ├── http/             Mecánica HTTP: router, respuestas, estáticos
-│   ├── ia/               Asistente: herramientas y bucle de conversación
+│   ├── ia/               Asistente: herramientas (por familias) y conversación
 │   ├── iconics/          Autenticación OIDC, cliente REST y validación
 │   └── routes/           Traducción HTTP ↔ cliente
 ├── react-dashboard/    Frontend React + Vite
-│   └── src/Demo-EVA/     Todo lo que sabe de la instalación de agua
-├── shared/             Dominio que usan los dos: señales, estado y umbrales
-├── scripts/            Utilidades de verificación
-└── docs/               Planes de la demo y del simulador
+│   └── src/Demo-EVA/     Todo lo que sabe de las máquinas de la planta
+├── shared/             Dominio que usan los dos: el registro de sistemas,
+│                       los catálogos de señales, el estado y los umbrales
+├── scripts/            Verificadores y sondas contra el servidor real
+└── docs/               Planes, y los backlogs de backend y frontend
 ```
 
 `shared/` existe porque el backend y el frontend necesitan las mismas reglas de
@@ -349,11 +369,19 @@ Tras compilar:
 node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 ```
 
+> **Aviso (28-ago-2026).** `verificar-bundle` **falla hoy**: `vendor` ocupa
+> 161.84 KB sobre un techo de 90 KB. Está medido que es anterior a los cambios
+> recientes —mismo tamaño byte a byte contra HEAD sin ellos— y anotado como B5
+> y F5 en los backlogs. Se dice aquí porque un verificador en rojo permanente
+> deja de leerse, y entonces no avisa el día que diga algo nuevo.
+
 ## Documentación
 
 - [`backend/README.md`](backend/README.md) — arquitectura del puente y referencia de la API
 - [`react-dashboard/README.md`](react-dashboard/README.md) — arquitectura del frontend
-- [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué
+- [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué, y **cómo se da de alta una máquina**
+- [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md) — lo pendiente del backend, ordenado por lo que costaría la máquina #3
+- [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — lo pendiente del frontend, con las cifras medidas de duplicación
 - [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
 - [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
 - [`docs/PLAN-10-VISTA-SVG.md`](docs/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta

@@ -135,15 +135,31 @@ backend/
 ├── iconics/             Todo lo que sabe de ICONICS
 │   ├── authenticator.mjs  Flujo OIDC + PKCE, caché y refresco del token
 │   ├── client.mjs         Operaciones contra la API REST
+│   ├── fakeClient.mjs     ICONICS de mentira, recorriendo el registro de sistemas
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Las 19 que el modelo puede invocar
+│   ├── herramientas.mjs   Ensamblador: las que aún no se han repartido
+│   ├── definiciones.mjs   El ESQUEMA que lee el modelo, aparte del código
+│   ├── herramientas/      Una subcarpeta por FAMILIA de herramienta
+│   │   ├── lib/           Piezas compartidas que no dependen del `client`
+│   │   │   ├── formato.mjs    Banda legible, reducción de serie, aviso de umbrales
+│   │   │   ├── limites.mjs    Cruce de lo medido con lo documentado
+│   │   │   └── respuesta.mjs  La forma del fallo de una herramienta
+│   │   ├── aprendizaje/   Hechos y propuestas (no toca ICONICS)
+│   │   └── documentacion/ Manuales y diagnóstico (sólo el índice BM25)
+│   ├── documentos.mjs     Índice BM25 sobre los PDF de planta
+│   ├── reporte.mjs        Composición del PDF (carga diferida)
+│   ├── cola.mjs           Una consulta a la vez
+│   ├── voz.mjs            Whisper
 │   └── chat.mjs           El bucle de dos pasadas contra llama-server
 │
 └── routes/              Traducción HTTP ↔ cliente
     ├── iconicsRoutes.mjs
     ├── chatRoutes.mjs
+    ├── controlRoutes.mjs
+    ├── reportesRoutes.mjs
+    ├── vozRoutes.mjs
     └── systemRoutes.mjs
 ```
 
@@ -154,6 +170,40 @@ no sabe qué es una respuesta HTTP; `http/` no sabe qué es un punto de ICONICS.
 `ia/` importa además de [`shared/`](../shared/README.md), en la raíz del
 repositorio: las reglas del historiador y el catálogo de tags son las mismas
 que usa el frontend, y tenerlas dos veces las haría divergir.
+
+## Las herramientas del asistente, por familias
+
+`ia/herramientas.mjs` llegó a tener 4100 líneas: diecinueve herramientas y sus
+diecinueve descripciones en un solo archivo. Se está repartiendo por FAMILIAS
+—una subcarpeta por tipo— y el criterio del reparto no es temático sino de
+DEPENDENCIA: qué necesita cada grupo para funcionar.
+
+| Familia | Herramientas | Depende de |
+|---|---|---|
+| `aprendizaje/` | 3 | nada (sólo un JSON en `datos/`) |
+| `documentacion/` | 3 | `indiceDocumentos` |
+| *(pendiente)* `maquina/` | 3 | `client` de ICONICS |
+| *(pendiente)* `historicos/` | 9 | `client` + el troceado del historiador |
+| `registro` | 1 | nada |
+
+Las que ya salieron son las que **no tocan el `client`**. Las doce restantes
+cuelgan del trío `leerUnTramo` ↔ `leerSerie` ↔ `leerSerieEnRango`, que es
+mutuamente recursivo y está atado al cliente y a la concurrencia: moverlas exige
+antes darles un contexto explícito, y eso es la fase con riesgo. Ver
+[`docs/BACKLOG-BACKEND.md`](../docs/BACKLOG-BACKEND.md).
+
+**El esquema vive aparte** (`ia/definiciones.mjs`). No es código que se ejecute:
+es texto dirigido a un modelo de lenguaje, y se edita por otros motivos —una
+descripción se reescribe porque el modelo eligió mal la herramienta, no porque
+la función tuviera un fallo—.
+
+**La invariante que ata las dos mitades.** Toda definición anunciada tiene que
+tener implementación, y al revés: una herramienta declarada y no implementada
+es una llamada que falla en mitad de una conversación, y una implementada y no
+declarada es trabajo que el modelo no sabe que puede pedir. Lo comprueba
+`verificar-herramientas`, y por eso separar los archivos no afloja nada. Fija
+además el ORDEN del catálogo, que no es cosmético: es lo primero que lee el
+modelo.
 
 ## Endpoints
 
@@ -327,10 +377,14 @@ en vez de un 404 que se confunde con una ruta mal escrita.
 ## Verificación
 
 ```bash
-node scripts/verificar-backend.mjs        # 73 · el contrato HTTP
-node scripts/verificar-herramientas.mjs   # 98 · las herramientas del asistente
-node scripts/verificar-chat.mjs           # 42 · el bucle de conversación
-node scripts/verificar-transporte-falso.mjs # 21 · ICONICS_FAKE, las dos máquinas
+node scripts/verificar-backend.mjs           #  73 · el contrato HTTP
+node scripts/verificar-herramientas.mjs      # 110 · las herramientas del asistente
+node scripts/verificar-chat.mjs              #  44 · el bucle de conversación
+node scripts/verificar-transporte-falso.mjs  #  21 · ICONICS_FAKE, todas las máquinas
+node scripts/verificar-riesgos.mjs           #  30 · las reglas del tanque
+node scripts/verificar-riesgos-vibracion.mjs #  40 · las reglas de vibraciones
+node scripts/verificar-pronostico.mjs        #  18 · el desgaste acumulado
+node scripts/verificar-aprendizaje.mjs       #  13 · ninguna propuesta se aplica sola
 ```
 
 El primero levanta un ICONICS falso —flujo OIDC incluido— y comprueba que cada
@@ -339,7 +393,9 @@ endpoint devuelve la forma exacta que consume el frontend.
 Los otros dos existen porque una respuesta real del asistente tarda entre 30 y
 90 segundos: una capa que solo se pudiera probar esperando eso no se probaría
 nunca. `verificar-herramientas` las ejecuta contra un cliente de
-mentira; `verificar-chat` levanta un **llama-server falso** al que se le dicta
+mentira —y desde el reparto por familias comprueba además que lo que se le
+anuncia al modelo y lo que se puede ejecutar sigan siendo lo MISMO, que es la
+red que hace seguro mover una familia de archivo—; `verificar-chat` levanta un **llama-server falso** al que se le dicta
 qué contestar, lo que permite provocar en milisegundos casos que con el modelo
 de verdad no se pueden provocar a voluntad —el principal: que conteste de
 memoria, sin llamar a ninguna herramienta—.
@@ -349,6 +405,12 @@ Ninguno necesita red, ni configuración, ni GPU, ni el backend levantado.
 Contra el servidor real, con el backend en marcha:
 
 ```bash
-node scripts/verificar-catalogo.mjs    # los 147 puntos del catálogo existen
-node scripts/verificar-historia.mjs    # el historiador entrega muestras
+node scripts/verificar-antiguedad-historico.mjs  # desde cuándo hay historia de verdad
+node scripts/comprobar-historia-vibraciones.mjs  # si el grupo DEMO 3 ya registra
+node scripts/comprobar-historial-alarmas.mjs     # qué contesta el servidor de alarmas
+node scripts/sondear-paginacion-historico.mjs    # cómo pagina de verdad readHistory
 ```
+
+Éstos no forman parte de ningún flujo automático: se invocan a mano cuando hay
+que decidir algo sobre el servidor real, y su salida es la evidencia que se cita
+en los planes de `docs/`.

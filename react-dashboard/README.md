@@ -128,12 +128,12 @@ src/
 │   ├── layout/               Sidebar, Topbar, cinta de origen
 │   └── routes/               Registro ÚNICO de rutas (routes.jsx) + URL
 │
-├── Demo-EVA/                 TODO lo que sabe de la instalación de agua
-│   ├── data/                 Fuente, simulador, historia y hooks
+├── Demo-EVA/                 TODO lo que sabe de las máquinas de la planta
+│   ├── data/                 Transportes, simuladores, historia y hooks
 │   ├── domain/               Reexports de @shared/eva/
 │   ├── components/           Tiles y primitivas visuales de la sección
 │   ├── three-d/              Modelos y comportamiento 3D de la instalación
-│   └── views/                Las cuatro vistas (rutas)
+│   └── views/                Las 14 vistas (rutas), hoy una familia por máquina
 │
 ├── lib/                      Infraestructura compartida, sin dominio
 │   ├── iconics/              Motor de polling, transporte real, caos, cliente HTTP
@@ -237,7 +237,7 @@ esos datos.
   recarga, así que una pantalla en blanco se queda en blanco hasta que alguien
   sube a verla.
 
-- **La pila 3D no se paga al arrancar.** Las cuatro vistas se registran con
+- **La pila 3D no se paga al arrancar.** Todas las vistas se registran con
   `lazy()`, y `../scripts/verificar-bundle.mjs` comprueba sobre el `dist` que
   `three` sigue en su propio trozo diferido. Hay que ejecutarlo tras cada build.
 

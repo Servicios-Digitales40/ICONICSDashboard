@@ -154,10 +154,33 @@ todavía no tiene series.
 > válida, pero el silencio no, porque se lee como que sí lo tiene. Es el punto 3
 > del alta, puesto en el código.
 
-Y hay dos pruebas que la cubren **el día que se añada**, sin que nadie se
-acuerde de ir a escribirlas: `src/test/demo-eva/sistemas.test.js` y el bloque
-«Todas las máquinas del registro» de `scripts/verificar-transporte-falso.mjs`
-recorren `SISTEMAS` en bucle en vez de nombrar instalaciones.
+### Lo que ya está probado del alta
+
+Dos tipos de prueba, y hacen cosas distintas:
+
+**Las que recorren `SISTEMAS` en bucle** cubren la máquina nueva el día que se
+añada, sin que nadie se acuerde de ir a escribirlas:
+`src/test/demo-eva/sistemas.test.js`, `estado-maquina.test.js` y el bloque
+«Todas las máquinas del registro» de `scripts/verificar-transporte-falso.mjs`.
+Ninguna nombra una instalación.
+
+**Las que dan de alta una máquina FICTICIA** cubren el momento anterior: qué
+pasa mientras la máquina está a medio enchufar.
+`scripts/verificar-herramientas.mjs` registra dos —una sin motor de reglas y
+otra con histórico declarado— y comprueba lo único que de verdad importa de
+ellas: **que no contesten en verde**. Una máquina a medias tiene que fallar de
+forma visible, nunca contestar «sin riesgos» de algo que nadie ha mirado.
+
+Esa distinción salió de un fallo real: las pruebas en bucle no podían encontrar
+el problema, porque las dos máquinas dadas de alta ya funcionan. Lo que había
+que probar era la que todavía no.
+
+> **Un detalle del registro que conviene saber.** `SISTEMA` (el mapa por id) se
+> construye con `Object.fromEntries` en el import: es una INSTANTÁNEA de
+> `SISTEMAS`. En producción da igual —el registro es estático y las dos
+> estructuras nacen a la vez— pero significa que **dar de alta una máquina en
+> caliente no está soportado**: hay que declararla en el módulo, no inyectarla
+> después.
 
 > **Generalizar el código no es unificar el dato.** El registro hace más fácil
 > escribir `SISTEMAS.flatMap(s => s.puntos())` y pedir un solo lote con todas
