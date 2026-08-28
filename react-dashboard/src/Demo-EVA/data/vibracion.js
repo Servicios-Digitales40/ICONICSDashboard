@@ -41,8 +41,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { TRANSPORTES, useDataSource } from "@/lib/datasource";
-import { fetchIconicsBatch } from "@/lib/iconics";
+import { useDataSource } from "@/lib/datasource";
 import { isGoodQuality } from "@shared/quality.js";
 
 import { createSistemaVibraciones } from "@shared/eva/sistemaVibraciones.js";
@@ -89,33 +88,34 @@ function valorDe(entrada) {
  * sondeo. Normalizar aquí —y no repartir un `if` por el cuerpo del hook— es lo
  * que deja `leer()` sin saber de dónde vienen los datos.
  *
- * `error` sólo viaja por el camino real: es el mensaje del puente, y la
- * pantalla lo pinta en su cinta roja. El simulador no tiene puente que falle;
- * lo que sí puede es lanzar —`chaos.errorPeticion`—, y eso lo recoge el
+ * ── LA NORMALIZACIÓN DEL LOTE REAL ESTABA ESCRITA DOS VECES ────────
+ *
+ * Este archivo tenía su propio recorrido de la respuesta del puente: desenvolver
+ * `{ ok, payload }`, saltarse los puntos ausentes y leer `value`/`Value` y
+ * `quality`/`Quality` en sus dos grafías. `createRealTransport().read()` hace
+ * exactamente eso, y es el que usa el resto de la aplicación.
+ *
+ * Dos copias de la misma normalización no fallan a la vez: divergen. Y el
+ * síntoma de que divergieran no habría sido un error, sino esta máquina leyendo
+ * una forma de payload que la otra ya sabe leer — es decir, puntos sin dato en
+ * una pantalla y con dato en otra, contra el mismo servidor.
+ *
+ * Ahora los dos orígenes salen de `transporteDe`, que es el único sitio que
+ * construye transportes. Lo que este archivo conserva es lo que de verdad es
+ * suyo: envolver el resultado en `{ ok, error }`, porque la pantalla pinta el
+ * mensaje del puente en su cinta roja.
+ *
+ * `error` sólo viaja por el camino real: el simulador no tiene puente que
+ * falle; lo que sí puede es lanzar —`chaos.errorPeticion`—, y eso lo recoge el
  * `catch` de `leer()`, igual que recogería un `fetch` caído.
  */
 function crearLector(transporte) {
-  if (transporte === TRANSPORTES.SIMULADO) {
-    /* La física la pone el registro de sistemas; aquí sólo se dice qué máquina
-       es. Una máquina nueva cambia la cadena y nada más. */
-    const simulado = transporteDe("vibraciones", transporte);
-    return async (puntos) => ({ ok: true, mapa: await simulado.read(puntos) });
-  }
+  /* La física la pone el registro de sistemas; aquí sólo se dice qué máquina
+     es. Una máquina nueva cambia la cadena y nada más. */
+  const fuente = transporteDe("vibraciones", transporte);
 
   return async (puntos) => {
-    const res = await fetchIconicsBatch(puntos);
-    if (!res?.ok) return { ok: false, error: res?.error ?? "Sin respuesta del servidor." };
-
-    const mapa = new Map();
-    for (const [nombre, entrada] of Object.entries(res.payload ?? {})) {
-      // Punto ausente de la respuesta: para el hook eso es un hueco, y un
-      // hueco es la falta de entrada en el mapa.
-      if (!entrada?.ok || !entrada.payload) continue;
-      const p = entrada.payload;
-      /* `??` y no `||`: un `value` de 0 es un valor. La forma del payload de
-         ICONICS varía según el tipo de punto, de ahí las dos grafías. */
-      mapa.set(nombre, { value: p.value ?? p.Value, quality: p.quality ?? p.Quality });
-    }
+    const mapa = await fuente.read(puntos);
     return { ok: true, mapa };
   };
 }

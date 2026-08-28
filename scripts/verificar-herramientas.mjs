@@ -53,7 +53,14 @@ import {
   pointName,
 } from '../shared/eva/senales.js'
 import { PROVISIONALES } from '../shared/eva/umbrales.js'
-import { NO_COMPARTEN, SISTEMAS, mismoSistema, tieneHistoria } from '../shared/eva/sistemas.js'
+import {
+  NO_COMPARTEN,
+  SISTEMA,
+  SISTEMAS,
+  mismoSistema,
+  sistemasDeSenal,
+  tieneHistoria,
+} from '../shared/eva/sistemas.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/historia.js'
 
@@ -516,6 +523,253 @@ await checkAsync('el registro no deja dar de alta una máquina que calle sobre s
       tieneHistoria(sistema.id), sistema.series.historizadas().length > 0,
       `«${sistema.id}»: tieneHistoria no concuerda con su lista`,
     )
+  }
+})
+
+/* ── LA MÁQUINA #3, ANTES DE QUE EXISTA ──────────────────────────────── */
+
+console.log('\n-- Dar de alta una máquina nueva ---------------------------')
+
+/*
+ * ── POR QUÉ ESTE BLOQUE AÑADE UNA MÁQUINA EN VEZ DE RECORRER LAS DOS ──
+ *
+ * Los bucles `for (const sistema of SISTEMAS)` de más arriba prueban lo que
+ * está dado de alta, y eso deja fuera la afirmación central del registro: que
+ * dar de alta una máquina es añadir una entrada y que el resto se entera solo.
+ *
+ * Esa afirmación no se puede comprobar con las máquinas que ya funcionan —las
+ * dos tienen motor de reglas, catálogo y herramientas escritas—, porque lo que
+ * hay que ver es qué pasa con la que todavía NO tiene nada de eso. El
+ * comentario de `verificar-transporte-falso` decía que la #3 «queda cubierta el
+ * día que se añada»: eso cubre después del alta, y el fallo caro ocurre durante.
+ *
+ * Así que aquí se registra una máquina mínima de mentira y se comprueba lo
+ * único que de verdad importa de ella: que **no conteste en verde**. Una
+ * máquina a medio dar de alta tiene que fallar de forma visible, nunca
+ * contestar «sin riesgos» de algo que nadie ha mirado.
+ *
+ * La entrada se quita del registro al terminar, con `finally`: este script
+ * comparte el módulo con el resto de bloques y una máquina fantasma dejada
+ * dentro cambiaría los recuentos de los que vienen después.
+ *
+ * ── UN DETALLE QUE ESTA PRUEBA DESTAPÓ ─────────────────────────────
+ *
+ * `SISTEMA` (el mapa por id) se construye con `Object.fromEntries` en el
+ * import, así que es una INSTANTÁNEA: empujar a `SISTEMAS` no lo actualiza, y
+ * `resolverSistema` —que busca por el mapa— contestaba «no hay ningún sistema
+ * llamado "prensa"» sobre una entrada que sí estaba en la lista.
+ *
+ * En producción no es un fallo: el registro es estático y las dos estructuras
+ * nacen a la vez. Pero deja dicho que dar de alta una máquina EN CALIENTE no
+ * está soportado — hay que declararla en el módulo, no inyectarla— y por eso
+ * el alta de prueba toca las dos a mano en vez de fingir que basta con una.
+ */
+const altaDePrueba = (entrada) => {
+  SISTEMAS.push(entrada)
+  SISTEMA[entrada.id] = entrada
+}
+const bajaDePrueba = (entrada) => {
+  SISTEMAS.splice(SISTEMAS.indexOf(entrada), 1)
+  delete SISTEMA[entrada.id]
+}
+await checkAsync('una máquina a medio dar de alta NO contesta «sin riesgos»', async () => {
+  const RAIZ_3 = 'ac:TDCON/DEMO3/PRENSA/'
+  const maquina3 = {
+    id: 'prensa',
+    nombre: 'Prensa hidráulica',
+    maquina: 'Prensa de prueba, para verificar el alta',
+    plc: 'PLC_9 · ua:DEMO9',
+    raices: [RAIZ_3],
+    puntos: () => [`${RAIZ_3}PRESION`],
+    parse: (n) => (n.startsWith(RAIZ_3) ? { tipo: 'senal', clave: 'presion', canal: null } : null),
+    modelo: (n) => (n.startsWith(RAIZ_3) ? 120 : undefined),
+    estado: () => ({ senales: [], sinLectura: [], puntosPedidos: 1, dominio: {} }),
+    resumen: () => ({ resumen: 'prensa de prueba' }),
+    claves: () => ['presion'],
+    etiquetaDe: () => 'Presión de prensa',
+    esHistorizada: () => false,
+    series: { historizadas: () => [], ruta: 'hda:', agregado: 'Average', nota: 'Sin histórico.' },
+    desgaste: null,
+    cadenciaMs: 5_000,
+    mide: ['presión del circuito'],
+    herramientas: ['estado_del_sistema', 'riesgos_activos'],
+    historia: 'Sin histórico.',
+    limitaciones: ['Máquina de prueba.'],
+  }
+
+  altaDePrueba(maquina3)
+  try {
+    const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+    const r = await h.ejecutar('riesgos_activos', { sistema: 'prensa' })
+
+    /*
+     * Lo que fallaba: `evaluarRiesgosDe` no tiene rama para esta máquina, su
+     * `default` devolvía `evaluadas: 0`, y con eso la respuesta salía `ok: true`
+     * con `riesgos: []` y —lo grave— `sin_comprobar: "ninguna: se pudieron
+     * evaluar todas las reglas"`. El número decía la verdad en el JSON y la
+     * frase decía lo contrario en prosa, que es lo que lee el modelo.
+     */
+    assert.equal(r.ok, false, 'una máquina sin motor de reglas NO puede contestar ok')
+    assert.match(r.error, /no tiene motor de reglas/i)
+    assert.equal(r.reglas_evaluadas, 0)
+    assert.doesNotMatch(
+      JSON.stringify(r), /se pudieron evaluar todas las reglas/i,
+      'no puede afirmar que se evaluó todo cuando no se evaluó nada',
+    )
+  } finally {
+    bajaDePrueba(maquina3)
+  }
+})
+
+await checkAsync('una máquina nueva NO hereda el pronóstico del tanque', async () => {
+  /*
+   * El cuerpo de `pronostico_de_desgaste` está escrito contra el catálogo del
+   * tanque. Mientras lo esté, una máquina que declare histórico y mecanismos
+   * pasaría la guarda de capacidad y leería las señales del AGUA: un pronóstico
+   * con cifras reales sobre la instalación equivocada.
+   *
+   * Por eso esta máquina de prueba SÍ declara las dos cosas — es el caso que la
+   * guarda de capacidad, por sí sola, dejaba pasar.
+   */
+  const RAIZ_4 = 'ac:TDCON/DEMO4/HORNO/'
+  const maquina4 = {
+    id: 'horno',
+    nombre: 'Horno de recocido',
+    maquina: 'Horno de prueba, con histórico declarado',
+    plc: 'PLC_8 · ua:DEMO8',
+    raices: [RAIZ_4],
+    puntos: () => [`${RAIZ_4}TEMP`],
+    parse: (n) => (n.startsWith(RAIZ_4) ? { tipo: 'senal', clave: 'temp', canal: null } : null),
+    modelo: (n) => (n.startsWith(RAIZ_4) ? 800 : undefined),
+    estado: () => ({ senales: [], sinLectura: [], puntosPedidos: 1, dominio: {} }),
+    resumen: () => ({ resumen: 'horno de prueba' }),
+    claves: () => ['temp'],
+    etiquetaDe: () => 'Temperatura de horno',
+    esHistorizada: () => true,
+    series: {
+      historizadas: () => ['temp'], ruta: 'ac:', agregado: 'Average', nota: 'Con histórico.',
+    },
+    desgaste: [{ id: 'fatiga', titulo: 'Fatiga térmica' }],
+    cadenciaMs: 5_000,
+    mide: ['temperatura'],
+    herramientas: ['estado_del_sistema'],
+    historia: 'Con histórico.',
+    limitaciones: ['Máquina de prueba.'],
+  }
+
+  altaDePrueba(maquina4)
+  try {
+    const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+    const r = await h.ejecutar('pronostico_de_desgaste', { sistema: 'horno' })
+
+    assert.equal(r.ok, false, 'no puede pronosticar una máquina cuyo catálogo no usa')
+    assert.match(r.error, /escrito contra el catálogo del tanque/i)
+    // Y sobre todo: que no se haya colado ninguna señal del agua en la respuesta.
+    assert.doesNotMatch(JSON.stringify(r), /nivelTanque|temperaturaTanque|presionRelativa/i)
+  } finally {
+    bajaDePrueba(maquina4)
+  }
+})
+
+await checkAsync('una señal de otra máquina se reconoce sin escribir su etiqueta exacta', () => {
+  /*
+   * `sistemasDeSenal` sólo comparaba con `===`, y las etiquetas de esta planta
+   * son compuestas: «Velocidad eficaz · Lado acople». Nadie escribe eso. Con
+   * «velocidad eficaz» devolvía lista VACÍA, y quien llama —`senalDesconocida`—
+   * caía al último mensaje, que hablaba sólo del tanque: «no hay ninguna señal
+   * llamada así, sólo existen las ocho de la lista».
+   *
+   * Es decir: preguntando por una señal que SÍ existe, en la máquina de al
+   * lado, el asistente contestaba que no existe en la planta.
+   */
+  assert.equal(sistemasDeSenal('velocidad eficaz').length, 3, 'son los tres apoyos, no cero')
+  assert.ok(
+    sistemasDeSenal('velocidad eficaz').every((x) => x.sistema === 'vibraciones'),
+    'las tres son de la máquina de vibraciones',
+  )
+  // La etiqueta exacta sigue resolviendo a UNA, y gana sobre la contención.
+  assert.deepEqual(
+    sistemasDeSenal('Velocidad eficaz · Lado acople'),
+    [{ sistema: 'vibraciones', clave: 'vRMS_S1' }],
+  )
+  // Y el nombre del punto de medida basta para desambiguar sin más ayuda.
+  assert.deepEqual(
+    sistemasDeSenal('velocidad eficaz del lado libre'),
+    [{ sistema: 'vibraciones', clave: 'vRMS_S3' }],
+  )
+})
+
+await checkAsync('«velocidad» a secas no se resuelve como «velocidad eficaz»', () => {
+  /*
+   * La trampa del catálogo de vibraciones: «Velocidad» (rpm del variador) es
+   * subcadena de «Velocidad eficaz» (mm/s de un acelerómetro). Son dos señales,
+   * dos unidades y dos sitios de la máquina.
+   *
+   * Al reconocer nombres parciales, una frase larga podía encajar SÓLO con la
+   * corta y devolver un único resultado — que se lee como certeza. Se prefiere
+   * el encaje más específico, así que la frase que nombra la eficaz no puede
+   * acabar en la del variador.
+   */
+  const eficaz = sistemasDeSenal('velocidad eficaz').map((x) => x.clave)
+  assert.ok(!eficaz.includes('velocidad'), 'la del variador no puede colarse aquí')
+
+  const variador = sistemasDeSenal('velocidad del variador')
+  assert.deepEqual(variador, [{ sistema: 'vibraciones', clave: 'velocidad' }])
+})
+
+await checkAsync('un nombre que no existe en NINGUNA máquina no cita sólo el tanque', async () => {
+  /*
+   * El último mensaje de `senalDesconocida` decía «en el sistema del tanque
+   * sólo existen las ocho de la lista, y no hay más puntos bajo ac:…». Cierto
+   * del tanque y falso de la planta, y es el camino por el que se sale cuando
+   * el nombre no se reconoce en ninguna parte — justo cuando menos se puede
+   * afirmar que la lista de una máquina es la lista que importa.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'zumbido del compresor', periodo: 'hoy' })
+
+  assert.equal(r.ok, false)
+  assert.doesNotMatch(r.error, /sólo existen las ocho/i, 'ya no puede hablar sólo del tanque')
+  assert.match(r.error, /ninguna máquina/i)
+  // El error nombra todas las máquinas en las que se buscó, no una.
+  for (const s of SISTEMAS) assert.ok(r.error.includes(s.nombre), `falta «${s.nombre}»`)
+})
+
+await checkAsync('a una señal de otra máquina se le ofrece una herramienta que existe', async () => {
+  /*
+   * El mensaje decía «vuelve a llamar indicando ese sistema», pero de las
+   * diecinueve herramientas sólo TRES aceptan `sistema`, y ninguna de las ocho
+   * de señal que pasan por aquí. El modelo obedecía, reintentaba con un
+   * argumento que la herramienta ignora, y volvía a caer en el mismo error.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', periodo: 'hoy' })
+
+  assert.equal(r.ok, false)
+  assert.equal(r.sistema, 'vibraciones')
+  assert.match(r.error, /estado_del_sistema/, 'tiene que ofrecer una herramienta que sí existe')
+  assert.doesNotMatch(
+    r.error, /vuelve a llamar indicando ese sistema/i,
+    'esa instrucción mandaba a una puerta que no existe',
+  )
+})
+
+await checkAsync('el registro no acepta una máquina que no declare su comportamiento', () => {
+  /*
+   * `validarRegistro()` corre en el import y no se puede volver a llamar desde
+   * fuera, así que lo que se fija aquí es su CRITERIO: los campos que hacen
+   * ejecutable a una entrada están todos declarados en las dadas de alta. Si
+   * alguien añade una máquina copiando otra y se deja `parse` o `modelo`, el
+   * proceso no arranca — y esta comprobación dice cuáles son esos campos.
+   */
+  const obligatorios = ['raices', 'puntos', 'parse', 'modelo', 'estado', 'resumen', 'claves', 'series']
+  for (const sistema of SISTEMAS) {
+    for (const campo of obligatorios) {
+      assert.ok(
+        sistema[campo] !== undefined && sistema[campo] !== null,
+        `«${sistema.id}» no declara «${campo}», y el registro tendría que haberlo impedido`,
+      )
+    }
   }
 })
 

@@ -27,6 +27,7 @@ import {
   mismoSistema,
   parsePuntoDeSistema,
   sistemaDePunto,
+  sistemasDeSenal,
   valorSimuladoDe,
 } from "@shared/eva/sistemas.js";
 
@@ -161,5 +162,81 @@ describe("el registro se puede recorrer sin conocer las máquinas", () => {
   it("los índices por id cuadran con la lista", () => {
     expect(SISTEMA_IDS).toEqual(SISTEMAS.map((s) => s.id));
     for (const s of SISTEMAS) expect(SISTEMA[s.id]).toBe(s);
+  });
+});
+
+/**
+ * ── RECONOCER UN NOMBRE DE SEÑAL, EN CUALQUIER MÁQUINA ─────────────
+ *
+ * `sistemasDeSenal` es la única puerta por la que el asistente averigua a qué
+ * máquina pertenece un nombre que no es del tanque. Comparaba con `===`, y las
+ * etiquetas de esta planta son compuestas —«Velocidad eficaz · Lado acople»—,
+ * así que nadie las escribe enteras: con «velocidad eficaz» devolvía lista
+ * vacía y el asistente contestaba que esa señal no existe EN LA PLANTA,
+ * existiendo en la máquina de al lado.
+ *
+ * Estas pruebas fijan las dos mitades del arreglo, que tiran en direcciones
+ * contrarias y por eso se prueban juntas: reconocer MÁS nombres, sin empezar a
+ * ELEGIR por nadie.
+ */
+describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta", () => {
+  it("un nombre parcial encuentra la señal, y en su máquina", () => {
+    const r = sistemasDeSenal("velocidad eficaz");
+
+    expect(r.length).toBeGreaterThan(0);
+    expect(r.every((x) => x.sistema === "vibraciones")).toBe(true);
+  });
+
+  it("la etiqueta exacta gana sobre la coincidencia parcial", () => {
+    // Quien acierta el nombre entero recibe UNA señal, no la familia: la
+    // igualdad se resuelve antes y no compite con la contención.
+    expect(sistemasDeSenal("Velocidad eficaz · Lado acople")).toEqual([
+      { sistema: "vibraciones", clave: "vRMS_S1" },
+    ]);
+  });
+
+  it("«velocidad» a secas no se confunde con «velocidad eficaz»", () => {
+    /*
+     * La trampa del catálogo: «Velocidad» (rpm, del variador) es subcadena de
+     * «Velocidad eficaz» (mm/s, de un acelerómetro). Son dos señales distintas
+     * en dos sitios distintos de la máquina, y colapsarlas daría una respuesta
+     * con unidad real y señal cambiada.
+     */
+    const eficaz = sistemasDeSenal("velocidad eficaz").map((x) => x.clave);
+    expect(eficaz).not.toContain("velocidad");
+
+    expect(sistemasDeSenal("velocidad del variador")).toEqual([
+      { sistema: "vibraciones", clave: "velocidad" },
+    ]);
+  });
+
+  it("un nombre ambiguo devuelve TODOS los candidatos, no el primero", () => {
+    /*
+     * La regla que no cambia: reconocer más nombres no es elegir por quien
+     * pregunta. «Velocidad eficaz» sin decir el apoyo son tres señales de tres
+     * puntos de medida, y quien llama tiene que preguntar cuál — devolver la
+     * primera es como se contesta correctamente sobre el apoyo equivocado.
+     */
+    const r = sistemasDeSenal("velocidad eficaz");
+    expect(r.length).toBe(3);
+    expect(new Set(r.map((x) => x.clave)).size).toBe(3);
+  });
+
+  it("un nombre que no existe en ninguna máquina no inventa una", () => {
+    expect(sistemasDeSenal("zumbido del compresor")).toEqual([]);
+    expect(sistemasDeSenal("")).toEqual([]);
+    // Y un fragmento demasiado corto tampoco dispara dentro de otra palabra.
+    expect(sistemasDeSenal("S1")).toEqual([]);
+  });
+
+  it("cada máquina resuelve sus propias claves, sin pisarse", () => {
+    // En bucle y sin nombrar máquinas: la que se dé de alta mañana tiene que
+    // poder resolver sus claves igual, y NO aparecer en las de las demás.
+    for (const sistema of SISTEMAS) {
+      for (const clave of sistema.claves()) {
+        const r = sistemasDeSenal(clave);
+        expect(r.some((x) => x.sistema === sistema.id && x.clave === clave)).toBe(true);
+      }
+    }
   });
 });

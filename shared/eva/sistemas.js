@@ -422,26 +422,149 @@ export function historizadasDe(sistemaId) {
  *
  * Se compara contra la clave y contra la etiqueta, sin acentos ni mayúsculas,
  * porque quien pregunta escribe «velocidad eficaz» y no `vRMS_S1`.
+ *
+ * ── POR QUÉ LA IGUALDAD EXACTA NO BASTABA ──────────────────────────
+ *
+ * Porque nadie escribe la etiqueta entera. Las de esta planta son compuestas
+ * —«Velocidad eficaz · Lado acople»— y quien pregunta dice «velocidad eficaz»
+ * o «la vibración del motor». Comparando sólo con `===`, TODAS esas frases
+ * devolvían lista vacía, y quien llama (`senalDesconocida`) las mandaba al
+ * mensaje del tanque: «no hay ninguna señal llamada así, sólo existen las
+ * ocho de la lista». Falso, y sobre la máquina equivocada — el mismo error
+ * que esta función se escribió para evitar, por la puerta de al lado.
+ *
+ * Así que hay dos pasadas, y el orden importa:
+ *
+ *   1. IGUALDAD sobre clave o etiqueta. Si alguien acierta el nombre exacto,
+ *      eso manda y no compite con nada.
+ *   2. CONTENCIÓN, sólo si la primera no encontró nada en NINGUNA máquina.
+ *
+ * La segunda pasada es el mismo respaldo que `resolverSenal` ya aplicaba en el
+ * backend para el tanque —umbral de 4 caracteres, para que «vdf» o «S1» no
+ * disparen dentro de otra palabra—, que estaba escrito para una sola máquina.
+ * Aquí sirve a todas.
+ *
+ * ── LO QUE SIGUE SIN HACERSE: ELEGIR ───────────────────────────────
+ *
+ * La contención AMPLÍA lo que se reconoce, nunca lo que se decide. Si «eficaz»
+ * encaja en tres claves, salen las tres y quien llama pregunta; si encajan en
+ * dos máquinas, salen las dos. La regla de esta función no cambia —devolver
+ * todo lo que reclama el nombre y no elegir— porque elegir es como se contesta
+ * correctamente sobre la instalación equivocada.
  */
 const normalizar = (t) =>
   String(t ?? "")
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
     .trim();
+
+/** Umbral de la contención: por debajo, un fragmento encaja en cualquier parte. */
+const MIN_CONTENCION = 4;
+
+/**
+ * Cuánto de un nombre está DICHO dentro de una frase, aunque no seguido.
+ *
+ * ── POR QUÉ NO BASTA CON `includes` ────────────────────────────────
+ *
+ * Porque las etiquetas de esta planta llevan su punto de medida pegado
+ * —«Velocidad eficaz · Lado acople»— y quien pregunta intercala palabras:
+ * «la velocidad eficaz del apoyo 1 ahora mismo». Ahí la etiqueta larga no
+ * encaja en NINGÚN sentido: ni la frase la contiene entera, ni ella contiene
+ * la frase. El único encaje literal que quedaba era «Velocidad» —la del
+ * variador, en rpm— y la función devolvía esa, sola y en singular.
+ *
+ * Ese es el peor resultado posible: una lista de un elemento se lee como
+ * certeza, y la respuesta sale con cifras reales, unidad real y la señal
+ * cambiada. Preferimos varios candidatos y una pregunta.
+ *
+ * Se cuentan las palabras del nombre presentes en la frase, y se devuelve el
+ * peso de las que encajaron —no cuántas—, para que compita en la misma escala
+ * que `includes`, que mide caracteres. Un nombre a medias vale menos que uno
+ * entero, y así «Velocidad eficaz · Lado acople» (dos palabras dichas) gana a
+ * «Velocidad» (una), que es justo el desempate que faltaba.
+ *
+ * Exige que TODAS las palabras largas del nombre estén dichas. Con «velocidad»
+ * suelta no se activa: «Lado» y «acople» no aparecen, y entonces esa frase no
+ * apunta a un apoyo concreto — que es la verdad, y por eso salen los tres.
+ */
+function cubiertoPorPalabras(nombre, frase) {
+  const palabras = nombre.split(/[^a-z0-9]+/i).filter((p) => p.length >= MIN_CONTENCION);
+  if (palabras.length < 2) return 0;
+
+  let peso = 0;
+  for (const p of palabras) {
+    if (!frase.includes(p)) return 0;
+    peso += p.length;
+  }
+  return peso;
+}
 
 export function sistemasDeSenal(texto) {
   const q = normalizar(texto);
   if (!q) return [];
 
-  const encontrados = [];
+  const exactos = [];
   for (const sistema of SISTEMAS) {
-    const clave = sistema.claves().find(
-      (k) => normalizar(k) === q || normalizar(sistema.etiquetaDe(k)) === q,
-    );
-    if (clave) encontrados.push({ sistema: sistema.id, clave });
+    for (const k of sistema.claves()) {
+      if (normalizar(k) === q || normalizar(sistema.etiquetaDe(k)) === q) {
+        exactos.push({ sistema: sistema.id, clave: k });
+      }
+    }
   }
-  return encontrados;
+  if (exactos.length) return exactos;
+
+  /*
+   * Contención en los DOS sentidos, y no es simetría gratuita:
+   *
+   *   · la frase contiene el nombre → «la velocidad eficaz del apoyo 1 ahora»
+   *   · el nombre contiene la frase → «velocidad eficaz» dentro de
+   *     «Velocidad eficaz · Lado acople», que es el caso que fallaba
+   *
+   * El umbral se aplica al lado corto, que es el que puede ser un fragmento.
+   *
+   * Se anota CUÁNTO encajó, y eso decide la ronda siguiente.
+   */
+  const contenidos = [];
+  for (const sistema of SISTEMAS) {
+    for (const k of sistema.claves()) {
+      const candidatos = [normalizar(sistema.etiquetaDe(k)), normalizar(k)].filter(Boolean);
+      let largo = 0;
+      for (const n of candidatos) {
+        const encaja =
+          (n.length >= MIN_CONTENCION && q.includes(n)) ||
+          (q.length >= MIN_CONTENCION && n.includes(q));
+        if (encaja) largo = Math.max(largo, Math.min(n.length, q.length));
+        else largo = Math.max(largo, cubiertoPorPalabras(n, q));
+      }
+      if (largo > 0) contenidos.push({ sistema: sistema.id, clave: k, largo });
+    }
+  }
+
+  /*
+   * ── SÓLO EL ENCAJE MÁS LARGO, Y POR QUÉ ES UNA SALVAGUARDA ─────────
+   *
+   * «Velocidad» (rpm del variador) está CONTENIDA en «velocidad eficaz»
+   * (mm/s de un acelerómetro). Son dos señales distintas, de dos unidades
+   * distintas, y una es subcadena de la otra.
+   *
+   * Sin este corte, «la velocidad eficaz del apoyo 1 ahora mismo» encajaba
+   * sólo con `velocidad` —la etiqueta larga no cabe entera en la frase, la
+   * corta sí— y devolvía UN resultado, en singular y equivocado. Quien llama
+   * no tiene forma de saber que eso fue un acierto parcial: una lista de un
+   * elemento se lee como certeza, y la respuesta habría salido con cifras
+   * reales, unidad real y la señal cambiada.
+   *
+   * Quedándose con los encajes más largos, esa frase resuelve a las medidas
+   * eficaces y `velocidad` sale de la lista por corta. Y cuando el empate es
+   * legítimo —«velocidad eficaz» encaja igual de bien en los tres apoyos—
+   * salen los tres, que es lo que hace que quien llama pregunte.
+   */
+  if (!contenidos.length) return [];
+  const mejor = Math.max(...contenidos.map((c) => c.largo));
+  return contenidos
+    .filter((c) => c.largo === mejor)
+    .map(({ sistema, clave }) => ({ sistema, clave }));
 }
 
 /**

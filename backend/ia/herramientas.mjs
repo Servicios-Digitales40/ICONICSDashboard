@@ -115,6 +115,7 @@ import {
   NO_COMPARTEN,
   SISTEMA,
   SISTEMAS,
+  SISTEMA_IDS,
   historizadasDe,
   sistemaDePunto,
   resumenDeSistemas,
@@ -136,6 +137,16 @@ import { TIPOS, isoLocal, resolverInstante, resolverPeriodo } from '../../shared
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+/*
+ * El esquema que lee el modelo vive aparte (`definiciones.mjs`): es texto
+ * dirigido a un modelo de lenguaje, no código que se ejecute, y se edita por
+ * otros motivos que la implementación. Se REEXPORTA desde aquí porque
+ * `chat.mjs` y los verificadores llevan importándolo de este módulo desde que
+ * existe, y mover un archivo no es motivo para tocarlos.
+ */
+import { DEFINICIONES } from './definiciones.mjs'
+
+export { DEFINICIONES }
 
 /**
  * Ventana máxima que se puede pedir de una vez, en horas. Noventa días
@@ -550,27 +561,88 @@ function senalDesconocida(texto, { paraHistoria = false } = {}) {
       )
     }
 
+    /*
+     * ── NO SE MANDA A UNA PUERTA QUE NO EXISTE ─────────────────────
+     *
+     * Este mensaje decía «vuelve a llamar indicando ese sistema». Sólo TRES
+     * de las diecinueve herramientas aceptan `sistema` —`estado_del_sistema`,
+     * `riesgos_activos` y `pronostico_de_desgaste`—, y ninguna de las ocho de
+     * señal que pasan por aquí lo hace. El modelo obedecía, repetía la llamada
+     * con un argumento que la herramienta ignora, volvía a caer en este mismo
+     * error, y se gastaban turnos en un bucle del que la instrucción era la
+     * causa.
+     *
+     * Se le dice lo que SÍ puede llamar. `estado_del_sistema` da el valor de
+     * ahora de esa máquina, que es lo que casi siempre se estaba pidiendo.
+     */
     return fallo(
-      `«${texto}» no es del sistema del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
-        'OTRA MÁQUINA. Vuelve a llamar indicando ese sistema.',
+      `«${texto}» no es una señal del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
+        `OTRA MÁQUINA. Esta herramienta sólo sirve al tanque. Para esa señal usa ` +
+        `estado_del_sistema(sistema="${sistema}"), que da su valor de ahora.`,
       { sistema, clave }
     )
   }
 
   if (enOtras.length > 1) {
-    /* Dos máquinas reclaman el mismo nombre. Elegir una sería contestar
-       correctamente sobre la instalación equivocada. */
+    /*
+     * ── DOS AMBIGÜEDADES DISTINTAS, Y NO SE ARREGLAN IGUAL ─────────
+     *
+     * Este mensaje sólo contemplaba una: dos MÁQUINAS que reclaman el mismo
+     * nombre. Pero desde que el registro reconoce nombres parciales —«velocidad
+     * eficaz» encaja en los tres apoyos de la misma máquina— la ambigüedad
+     * frecuente es la de DENTRO de un sistema, y decirle al modelo «pregunta de
+     * qué sistema se trata» ante tres claves de la misma máquina le pide
+     * desambiguar por el eje equivocado: contestaría «del sistema de
+     * vibraciones» y seguiría sin saber de qué apoyo.
+     *
+     * Se distinguen, porque la pregunta que hay que hacerle al operador es
+     * distinta en cada caso.
+     */
+    const maquinas = [...new Set(enOtras.map((x) => x.sistema))]
+
+    if (maquinas.length > 1) {
+      return fallo(
+        `«${texto}» existe en más de un sistema (${maquinas.join(', ')}), y no son la misma ` +
+          'máquina. Pregunta de cuál se trata antes de contestar.',
+        { sistemas: enOtras }
+      )
+    }
+
+    const s = SISTEMA[maquinas[0]]
     return fallo(
-      `«${texto}» existe en más de un sistema (${enOtras.map((x) => x.sistema).join(', ')}), y no ` +
-        'son la misma máquina. Pregunta de cuál se trata antes de contestar.',
-      { sistemas: enOtras }
+      `«${texto}» no identifica UNA señal de «${s.nombre}»: encaja con ${enOtras.length} ` +
+        `(${enOtras.map((x) => s.etiquetaDe(x.clave) ?? x.clave).join('; ')}). Pregunta cuál de ` +
+        'ellas antes de contestar: son puntos de medida distintos y sus valores no son el mismo.',
+      { sistema: s.id, claves: enOtras.map((x) => x.clave) }
     )
   }
 
+  /*
+   * ── EL ÚLTIMO MENSAJE TAMBIÉN HABLABA SÓLO DEL TANQUE ──────────────
+   *
+   * Decía «sólo existen las ocho de la lista, y no hay más puntos bajo
+   * ac:TDCON/DEMO/SENSORES/». Las dos mitades son ciertas del tanque y falsas
+   * de la planta, y este es el camino por el que se sale cuando el nombre no
+   * se reconoce en NINGUNA máquina — justo cuando menos se puede afirmar que
+   * la única lista que importa es la de una.
+   *
+   * Se arregló la rama de «es de otra máquina» y se dejó ésta con la frase
+   * vieja. El síntoma es peor aquí: allí el modelo recibía el sistema correcto
+   * y reintentaba; aquí recibe un catálogo de ocho señales y concluye que la
+   * planta tiene ocho.
+   *
+   * Ahora el error dice de qué máquinas se ha buscado y cuántas señales tiene
+   * cada una, y el catálogo del tanque viaja aparte y nombrado como suyo.
+   */
   return fallo(
-    `No hay ninguna señal llamada "${texto}" en esta planta. En el sistema del tanque sólo ` +
-      `existen las ocho de la lista, y no hay más puntos bajo ${RAIZ}.`,
-    { senales: catalogoBreve() }
+    `No hay ninguna señal llamada "${texto}" en ninguna máquina de esta planta. Se ha buscado en ` +
+      SISTEMAS.map((s) => `«${s.nombre}» (${s.claves().length} señales)`).join(' y ') +
+      '. Comprueba el nombre, o pide los sistemas con sistemas_de_la_planta.',
+    /* `senales` sigue siendo el catálogo del tanque y conserva su nombre: es
+       lo que ya leen las herramientas y las pruebas, y renombrarlo no arregla
+       nada que el texto del error no arregle. Lo que faltaba era decir que hay
+       más máquinas, y eso entra al lado. */
+    { senales: catalogoBreve(), sistemas: SISTEMA_IDS }
   )
 }
 
@@ -867,9 +939,20 @@ export function createHerramientas({
    * dos motores de reglas contra la forma común.
    *
    * Eso es trabajo real y no está hecho, así que se dice en vez de fingirlo.
-   * Mientras tanto, la máquina que se dé de alta añade su línea aquí; una que
-   * no la añada sale sin riesgos y con `evaluadas: 0`, que es visible en la
-   * respuesta y no un silencio.
+   * Mientras tanto, la máquina que se dé de alta añade su línea aquí.
+   *
+   * ── Y LA QUE NO LA AÑADA NO SALE EN VERDE ──────────────────────────
+   *
+   * Durante un tiempo se dijo aquí que `evaluadas: 0` era «visible en la
+   * respuesta y no un silencio». No lo era: quien llama construía con eso un
+   * `ok: true` que además afirmaba «ninguna: se pudieron evaluar todas las
+   * reglas». El número estaba en el JSON y la frase decía lo contrario, y la
+   * frase es lo que lee un modelo de lenguaje.
+   *
+   * El `default` sigue existiendo —una máquina sin motor es un estado válido
+   * mientras se escribe el suyo—, pero ahora `riesgos_activos` lo convierte
+   * en un fallo explícito. Este `default` NO es la salvaguarda; es la señal
+   * que la salvaguarda lee.
    */
   function evaluarRiesgosDe(sistema, estado) {
     switch (sistema.id) {
@@ -1411,6 +1494,35 @@ export function createHerramientas({
       const r = evaluarRiesgosDe(elegido.sistema, estado)
       const mudos = estado.sinLectura.length
 
+      /*
+       * ── SIN MOTOR DE REGLAS SE FALLA, NO SE CONTESTA EN VERDE ──────
+       *
+       * `evaluarRiesgosDe` tiene un `default` para la máquina que todavía no
+       * ha enchufado el suyo, y devuelve `{ activos: [], noEvaluables: [],
+       * evaluadas: 0 }`. Con eso, esta respuesta salía `ok: true`, con la
+       * lista de riesgos vacía y —lo peor— `sin_comprobar: "ninguna: se
+       * pudieron evaluar todas las reglas"`, que es FALSO: no se evaluó
+       * ninguna. La salvaguarda del `aviso` tampoco entraba, porque pide
+       * `noEvaluables.length > 0` y ahí está vacío.
+       *
+       * El `evaluadas: 0` es visible para quien lea el JSON; el modelo lee la
+       * frase en prosa, que afirma lo contrario. Es el mismo fallo que el
+       * registro existe para impedir —una máquina que contesta y no dice
+       * nada— un piso más arriba: aquí no sale `value: null` con calidad
+       * buena, sale «sin riesgos» con la afirmación de que se pudo mirar todo.
+       *
+       * Fallar cuesta un turno y es corregible; una máquina en verde que nadie
+       * evaluó se cree, y no se corrige nunca.
+       */
+      if (r.evaluadas === 0) {
+        return fallo(
+          `«${elegido.sistema.nombre}» no tiene motor de reglas de riesgo enchufado, así que NO ` +
+            'se ha evaluado ninguna. NO digas que no tiene riesgos: nadie ha mirado. Puedes dar ' +
+            `su estado de AHORA con estado_del_sistema(sistema="${elegido.sistema.id}").`,
+          { sistema: elegido.sistema.id, reglas_evaluadas: 0 }
+        )
+      }
+
       return {
         ok: true,
         sistema: elegido.sistema.nombre,
@@ -1472,6 +1584,16 @@ export function createHerramientas({
       const elegido = resolverSistema(sistema)
       if (!elegido.ok) return elegido
 
+      /*
+       * El orden de las dos guardas importa, y es éste a propósito.
+       *
+       * Primero se contesta por CAPACIDAD —«esta máquina no tiene histórico ni
+       * mecanismos»—, que es la razón de dominio y la que le sirve a quien
+       * pregunta. La de abajo es una limitación NUESTRA, del código sin
+       * parametrizar, y sólo se alcanza cuando la máquina sí podría tener
+       * pronóstico. Al revés, una máquina sin histórico recibiría una excusa
+       * de implementación en vez de la verdad sobre sus datos.
+       */
       if (!elegido.sistema.desgaste || !tieneHistoria(elegido.sistema.id)) {
         return fallo(
           `«${elegido.sistema.nombre}» no tiene pronóstico de desgaste. ${elegido.sistema.series.nota} ` +
@@ -1479,6 +1601,35 @@ export function createHerramientas({
             'se sabe a qué avería llevaría. Puedes dar su estado de AHORA con ' +
             `estado_del_sistema(sistema="${elegido.sistema.id}"), pero no afirmes ninguna tendencia.`,
           { sistema: elegido.sistema.id, con_historia: tieneHistoria(elegido.sistema.id) }
+        )
+      }
+
+      /*
+       * ── Y EL CUERPO DE ABAJO ES DEL TANQUE, LITERALMENTE ───────────
+       *
+       * `SENALES_PRONOSTICO` son claves del tanque; `esHistorizada` y
+       * `leerSerieEnRango` vienen de `senales.js` e `historia.js`, que son su
+       * catálogo y su historiador. Nada de eso mira `elegido`.
+       *
+       * Hoy no se nota porque la guarda de arriba sólo deja pasar al tanque:
+       * es la única máquina con `desgaste` e histórico. Pero esa guarda mide
+       * CAPACIDAD, no parametrización, y el día que la máquina #3 declare sus
+       * mecanismos y sus series la pasaría legítimamente — y entraría aquí a
+       * leer las señales del agua. Cifras reales, unidades reales, y un
+       * pronóstico sobre la instalación equivocada.
+       *
+       * Esta segunda guarda es la que dice la verdad: mientras el cuerpo no
+       * esté parametrizado, esta herramienta sirve al tanque y a nadie más.
+       * No se borra al generalizarlo; se cae sola cuando `SENALES_PRONOSTICO`
+       * salga del registro, porque entonces dejará de haber un `id` que citar.
+       */
+      if (elegido.sistema.id !== 'tanque') {
+        return fallo(
+          `El pronóstico de desgaste todavía está escrito contra el catálogo del tanque, así que ` +
+            `NO puede servir a «${elegido.sistema.nombre}» aunque declare histórico. Contestar ` +
+            'con estas señales sería hablar de otra máquina. Da su estado de AHORA con ' +
+            `estado_del_sistema(sistema="${elegido.sistema.id}").`,
+          { sistema: elegido.sistema.id, motivo: 'herramienta no parametrizada' }
         )
       }
 
@@ -3431,527 +3582,3 @@ function compararConLimites(estado, historiasOk, documentacionOk) {
   return excesos.slice(0, 6)
 }
 
-/**
- * Esquema que se le manda a llama-server en cada petición.
- *
- * Las descripciones son parte del programa: es lo único que el modelo lee para
- * decidir. Dicen explícitamente que sólo cuatro señales tienen historia, porque
- * el fallo más caro es que pida la de otra y el servidor le conteste con la
- * curva equivocada **sin dar error**.
- */
-export const DEFINICIONES = [
-  {
-    type: 'function',
-    function: {
-      name: 'hechos_de_la_planta',
-      description:
-        'Lo que YA se sabe confirmado de esta instalación: datos que alguien verificó y que no se ' +
-        'deducen del servidor —cuántos sensores hay, cómo se llama un grupo, qué tensión ' +
-        'nominal aplica—. Consúltala antes de suponer un detalle de la instalación. Cada hecho ' +
-        'trae su ORIGEN: cítalo cuando lo uses.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sistema: {
-            type: 'string',
-            description: 'Id del sistema para filtrar (por ejemplo "tanque" o "vibraciones"). Omítelo para verlos todos.',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'recordar_hecho',
-      description:
-        'Guarda un dato que EL USUARIO acaba de confirmarte, para las siguientes ' +
-        'conversaciones. Para "el sensor S3 es de 100 mV/g", "la tensión es de 208". Sólo lo ' +
-        'que una PERSONA afirma: lo que deduzcas tú no es un hecho. Necesita `origen` —quién lo ' +
-        'dijo y cuándo—; sin eso no se guarda.',
-      parameters: {
-        type: 'object',
-        properties: {
-          hecho: { type: 'string', description: 'El dato, en una frase clara y completa.' },
-          sistema: { type: 'string', description: 'Id del sistema al que pertenece, si aplica.' },
-          origen: {
-            type: 'string',
-            description: 'Quién lo confirmó y cuándo. Por ejemplo "Confirmado por el usuario el 2026-08-26".',
-          },
-        },
-        required: ['hecho', 'origen'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'proponer_regla',
-      description:
-        'Deja ANOTADA una regla de riesgo que crees que faltaría, para que una persona la ' +
-        'revise. NO crea la regla ni hace que el sistema vigile eso. Úsala cuando veas en los ' +
-        'datos un patrón peligroso del que nadie avisa. La evidencia tiene que llevar CIFRAS. ' +
-        'Al usarla di que la has anotado para revisión y que ejecute ' +
-        '`node scripts/revisar-propuestas.mjs`; NUNCA digas que has creado una regla ni que el ' +
-        'sistema ya avisa de eso.',
-      parameters: {
-        type: 'object',
-        properties: {
-          titulo: { type: 'string', description: 'Qué pasa, en una línea.' },
-          sistema: { type: 'string', description: 'Id del sistema al que aplicaría.' },
-          severidad: {
-            type: 'string',
-            enum: ['critico', 'atencion', 'informativo'],
-            description: 'critico si puede romper algo, atencion si conviene mirarlo, informativo si sólo cambia el contexto.',
-          },
-          condicion: { type: 'string', description: 'Cuándo debería dispararse, en palabras: qué señales y con qué valores.' },
-          senales: { type: 'array', items: { type: 'string' }, description: 'Claves de las señales que necesita.' },
-          evidencia: { type: 'string', description: 'Los datos observados que la motivan, CON CIFRAS y con el período del que salen.' },
-          consecuencia: { type: 'string', description: 'A qué avería llevaría, y por qué mecanismo físico.' },
-          accion: { type: 'string', description: 'Qué convendría revisar.' },
-        },
-        required: ['titulo', 'severidad', 'condicion', 'senales', 'evidencia', 'consecuencia'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'sistemas_de_la_planta',
-      description:
-        'Qué sistemas hay en esta planta, qué mide cada uno y qué NO se puede afirmar de él. ' +
-        'Llámala cuando no sepas a qué sistema se refiere la pregunta, o para "¿qué puedes ' +
-        'ver?". Cada sistema es una instalación SEPARADA, con su propio PLC: no relaciones una ' +
-        'señal de uno con una de otro. Es barata y no toca el servidor de planta.',
-      parameters: { type: 'object', properties: {}, required: [] },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'riesgos_activos',
-      description:
-        'Qué PUEDE pasar en UN sistema si sigue así: cruza varias señales a la vez y devuelve ' +
-        'las combinaciones peligrosas, con su evidencia medida, la hipótesis y qué revisar. ' +
-        'Para "¿hay algún riesgo?", "¿es peligroso que siga así?". Distinta de ' +
-        'estado_del_sistema: aquélla dice cómo está cada señal AHORA; ésta, qué combinaciones ' +
-        'son peligrosas aunque cada señal esté en banda. Trae `sin_comprobar`: si no está ' +
-        'vacío, NO digas que no hay riesgos — di que hay cosas que no se pudieron mirar. No es ' +
-        'el panel de alarmas de ICONICS. Hay que decir DE QUÉ SISTEMA: si no lo sabes, llama ' +
-        'antes a sistemas_de_la_planta.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sistema: { type: 'string', description: 'Id del sistema. Los ids salen de sistemas_de_la_planta.' },
-        },
-        required: ['sistema'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'pronostico_de_desgaste',
-      description:
-        'Cuánta EXPOSICIÓN a condiciones que desgastan ha acumulado una máquina: horas estimadas ' +
-        'en cada condición y a qué avería lleva. Para "¿se está desgastando algo?", "¿hay que ' +
-        'hacer mantenimiento?". Las horas son ESTIMADAS de la fracción de muestras, no contadas. ' +
-        'NO estimes cuántos meses o años tardará en averiarse nada. Sólo la puede servir una ' +
-        'máquina con histórico: si no lo tiene, la herramienta lo dice y hay que comunicarlo tal ' +
-        'cual en vez de improvisar una tendencia.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sistema: {
-            type: 'string',
-            description: 'Id del sistema. Por omisión "tanque", el único con histórico hoy.',
-          },
-          dias: {
-            type: 'number',
-            description: 'Días hacia atrás a considerar. Entre 1 y 90; por omisión 30.',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'estado_del_sistema',
-      description:
-        'Estado de UNA máquina ahora mismo, de una sola vez: sus señales con valor, unidad, ' +
-        'estado y banda de límites, agrupadas, y cuántas están en banda, en aviso, fuera de ' +
-        'límite o sin dato. Úsala para "¿cómo va?", "¿está bombeando?", "¿qué nivel tiene el ' +
-        'tanque?", "¿cómo están las vibraciones?", "¿los rodamientos están bien?" y para ' +
-        'CUALQUIER pregunta sobre el momento actual. NO la llames varias veces para la misma ' +
-        'máquina: lo devuelve todo junto. HAY QUE DECIR DE QUÉ SISTEMA — son instalaciones ' +
-        'SEPARADAS, con su propio PLC, y contestar del otro sería contestar de otra máquina. ' +
-        'Si no sabes el id, llama antes a sistemas_de_la_planta.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sistema: { type: 'string', description: 'Id del sistema. Los ids salen de sistemas_de_la_planta.' },
-        },
-        required: ['sistema'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'historia_de_senal',
-      description:
-        'Cómo ha evolucionado UNA señal en un período: devuelve el mínimo y el máximo con la hora ' +
-        'en que ocurrieron, el promedio, el primer y el último valor, y cuántas muestras hubo. ' +
-        'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿cuál fue la temperatura máxima ayer?", ' +
-        '"¿ha subido la presión?". IMPORTANTE: sólo cuatro de las ocho señales tienen serie propia ' +
-        '—nivel del tanque, temperatura del tanque, caudal instantáneo y presión relativa—; la ' +
-        'lista con esa marca ya la tienes en tus instrucciones. Si pides otra, la herramienta lo ' +
-        'dirá y tendrás que comunicarlo tal cual y ofrecer su valor actual.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: {
-            type: 'string',
-            description:
-              'Nombre de la señal, tal y como lo diga el usuario: "nivel del tanque", "nivel", ' +
-              '"temperatura", "caudal", "presión", "carga del motor", "tensión", "eficiencia". ' +
-              'No lo traduzcas a una clave técnica: pásalo tal cual y el servidor lo resuelve.',
-          },
-          periodo: {
-            type: 'string',
-            description:
-              'El período, en lenguaje llano. Lo habitual aquí es relativo a ahora: "última hora", ' +
-              '"últimas 6 horas", "últimos 30 minutos", "esta hora". También vale calendario: ' +
-              '"hoy", "ayer", "2026-07-20", "ayer a las 12", "últimos 3 días", "la última semana", ' +
-              '"el último mes". MÁXIMO 90 días: un año entero no cabe, y si lo piden llama ' +
-              'igualmente y la herramienta te dará las alternativas. Si el usuario no dice ' +
-              'período, omítelo y se usan las últimas 6 horas. NO lo conviertas tú a fechas: ' +
-              'pásalo tal cual y el servidor lo resuelve.',
-          },
-        },
-        required: ['senal'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'valor_en_momento',
-      description:
-        'Cuánto marcaba UNA señal en UN momento concreto, con minutos. Úsala cuando pregunten por ' +
-        'un instante y no por un tramo: "¿cuál era el nivel del tanque el 21 de agosto a las ' +
-        '11:16?", "¿qué presión había ayer a las 14:30?". Para "¿cómo ha ido X esta mañana?" o ' +
-        '"¿cuál fue el máximo de ayer?" usa historia_de_senal, que resume un período. Mismas ' +
-        'cuatro señales con serie propia que historia_de_senal.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: {
-            type: 'string',
-            description:
-              'Nombre de la señal, tal y como lo diga el usuario. Igual que en historia_de_senal: ' +
-              'pásalo tal cual y el servidor lo resuelve.',
-          },
-          momento: {
-            type: 'string',
-            description:
-              'El momento exacto, en lenguaje llano y CON los minutos si los dice: "21 de agosto ' +
-              'de 2026 a las 11:16", "ayer a las 14:30", "2026-08-21 a las 11:16". No lo ' +
-              'conviertas tú a fecha ni a UTC, y no le quites los minutos: pásalo tal cual.',
-          },
-        },
-        required: ['senal', 'momento'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'comparar_periodos',
-      description:
-        'Compara la MISMA señal en dos períodos y devuelve los dos resúmenes con su diferencia ya ' +
-        'calculada. Sirve para "compara el nivel de esta hora con el de hace tres", "¿la ' +
-        'temperatura de hoy contra la de ayer?", "¿ha mejorado la presión respecto a esta mañana?". ' +
-        'Sólo funciona con las cuatro señales que tienen historia.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: {
-            type: 'string',
-            description: 'Nombre de la señal, en lenguaje llano. Mismas formas que en historia_de_senal.',
-          },
-          periodoA: {
-            type: 'string',
-            description: 'Primer período. Es la referencia. Mismas formas que en historia_de_senal.',
-          },
-          periodoB: {
-            type: 'string',
-            description: 'Segundo período, se compara contra el primero.',
-          },
-        },
-        required: ['senal', 'periodoA', 'periodoB'],
-      },
-    },
-  },
-
-    {
-    type: 'function',
-    function: {
-      name: 'analisis_de_senal',
-      description:
-        'Análisis estadístico de UNA señal historizada: media, mediana, desviación, tendencia ' +
-        '(subiendo/bajando/estable con un ajuste de 0 a 100), una proyección a futuro con su ' +
-        'margen de error, y las muestras anómalas si las hay. Úsala para "¿va a seguir subiendo ' +
-        'el nivel?", "¿cómo se está comportando la presión?". ' +
-        'NO la uses para saber si un valor es NORMAL o RARO: esta herramienta sólo mira el ' +
-        'período que le pides (unas horas), y con eso no se puede saber qué es habitual. Para ' +
-        'eso está perfil_de_senal, que mide semanas. Si respondes "es un valor raro" o "está por ' +
-        'encima de lo normal" apoyándote sólo en ésta, estás afirmando algo que no has ' +
-        'consultado. ' +
-        'Sólo funciona con las cuatro señales que tienen historia. La proyección es un cálculo, ' +
-        'no una certeza: cítala siempre con su rango.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
-          periodo: { type: 'string', description: 'Período sobre el que calcular. Igual que en historia_de_senal.' },
-          horizonteMinutos: {
-            type: 'number',
-            description: 'Cuántos minutos hacia el futuro proyectar. Por defecto 60.',
-          },
-        },
-        required: ['senal'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'perfil_de_senal',
-      description:
-        'Qué es NORMAL para una señal, medido sobre semanas de historia real: dónde ha vivido, ' +
-        'cuánto ha variado, sus percentiles, y en qué punto de esa distribución cae el valor de ' +
-        'ahora. Úsala para "¿es normal este valor?", "¿esto es raro?", "¿qué presión suele ' +
-        'tener?", "¿había pasado antes?", y SIEMPRE antes de afirmar que algo es anómalo. ' +
-        'IMPORTANTE: las bandas con las que el tablero dice "en banda" o "fuera de límite" son ' +
-        'estimaciones NUESTRAS sin confirmar; esta herramienta mide lo que la instalación hace ' +
-        'de verdad, y avisa cuando las dos cosas no cuadran. Sólo las cuatro señales con historia.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
-          dias: {
-            type: 'number',
-            description:
-              'Cuántos días de historia perfilar. Por defecto 14, máximo 90. Más días dan una ' +
-              'idea más fiable de lo normal, pero tardan más en leerse.',
-          },
-        },
-        required: ['senal'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'correlacionar_senales',
-      description:
-        'Compara DOS O MÁS señales sobre la misma ventana de tiempo y devuelve, para cada par, si ' +
-        'se movieron juntas (coeficiente de -1 a 1 y su lectura en palabras), más los valores ' +
-        'atípicos de cada señal CON SU HORA y cuáles de ellos cayeron en el mismo instante. ' +
-        'ÉSTA ES LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?", "¿qué ' +
-        'pasó cuando cayó la presión?", "¿tiene que ver la tensión con el fallo del motor?". ' +
-        'Sólo funciona con las cuatro señales que tienen historia. Lo que devuelve es un INDICIO, ' +
-        'no una demostración de causa: dilo así al redactar. ' +
-        'SEÑALES DE ACTIVOS DISTINTOS DE LA MISMA MÁQUINA SÍ SE CRUZAN, y suele ser lo que hay ' +
-        'que hacer: el nivel del tanque y la presión de la red son activos distintos del MISMO ' +
-        'sistema, unidos por una tubería. No te niegues por eso. Si de verdad fueran de dos ' +
-        'máquinas distintas, esta herramienta lo detecta y te lo dice — no tienes que decidirlo tú.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senales: {
-            type: 'array',
-            items: { type: 'string' },
-            description:
-              'Las señales a comparar, en lenguaje llano, de dos a cuatro: por ejemplo ' +
-              '["presión", "caudal"]. Mismas formas de nombrarlas que en historia_de_senal.',
-          },
-          periodo: {
-            type: 'string',
-            description:
-              'La ventana en la que mirar. Si el usuario menciona cuándo ocurrió el fallo, pon ' +
-              'un período que lo contenga con margen: "últimas 6 horas", "ayer", "2026-08-19". ' +
-              'Igual que en historia_de_senal. Si no lo dice, omítelo.',
-          },
-        },
-        required: ['senales'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'grafico_de_senal',
-      description:
-        'Genera un gráfico de la evolución de UNA señal historizada en un período, para ' +
-        'acompañar la respuesta. Úsala cuando pidan "muéstrame", "un gráfico de", "dibuja" o ' +
-        'cuando una tendencia se explique mejor viéndola. Sólo las cuatro señales con historia.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
-          periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
-        },
-        required: ['senal'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'generar_reporte',
-      description:
-        'Genera un PDF descargable de la instalación: un gráfico por cada señal con historia que ' +
-        'se pida (o las cuatro, si no se nombra ninguna) más una tabla con el valor actual de las ' +
-        'que no tienen serie. Úsala para "genera un reporte", "quiero un PDF de esta semana", ' +
-        '"expórtame los datos del tanque". El período admite hasta unos 90 días, igual que ' +
-        'historia_de_senal, porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
-        'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta. Cada gráfico del PDF ' +
-        'YA lleva su propia interpretación de la tendencia, escrita por el sistema — no hace falta ' +
-        'pedirla aparte.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senales: {
-            type: 'array',
-            items: { type: 'string' },
-            description:
-              'Nombres de señal en lenguaje llano, ej. ["nivel", "temperatura"]. Si se omite, entra ' +
-              'la instalación entera: las cuatro señales con historia como gráfico y las otras ' +
-              'cuatro como tabla de valores actuales.',
-          },
-          periodo: {
-            type: 'string',
-            description:
-              'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, hasta ' +
-              '~90 días. Si se omite, las últimas 6 horas.',
-          },
-          explicacion: {
-            type: 'string',
-            description:
-              'OPCIONAL — casi nunca hace falta, porque el PDF YA trae interpretación automática de ' +
-              'cada gráfico. Sólo rellénalo si YA sabes la tendencia de la señal principal por algo ' +
-              'que consultaste antes en esta conversación: entonces sí puedes resumirla aquí en una ' +
-              'frase. Nunca hagas una consulta aparte sólo para rellenar esto, y nunca dejes de ' +
-              'llamar a generar_reporte por intentarlo.',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'consultar_documentacion',
-      description:
-        'Busca en la documentación de planta (manuales, procedimientos) y devuelve los fragmentos ' +
-        'más parecidos a la pregunta, citables por archivo. Úsala para "¿cómo se arranca la bomba?", ' +
-        '"procedimiento de mantenimiento", "especificaciones de la válvula".',
-      parameters: {
-        type: 'object',
-        properties: {
-          pregunta: {
-            type: 'string',
-            description: 'Qué quieres consultar en la documentación, en lenguaje llano.',
-          },
-        },
-        required: ['pregunta'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'limites_del_manual',
-      description:
-        'Busca en la documentación de planta un límite documentado de UNA señal (máximo, mínimo, ' +
-        'rango admisible) y lo devuelve como número con su unidad y de qué documento y página ' +
-        'sale, en vez de un párrafo para interpretar. Úsala cuando necesites comparar una lectura ' +
-        'contra lo que dice el manual: "¿150 V es demasiado?", "¿cuál es la presión máxima según ' +
-        'el manual?". Son CANDIDATOS encontrados por patrón, no lecturas garantizadas: puede haber ' +
-        'más de uno y puede que ninguno sea el correcto.',
-      parameters: {
-        type: 'object',
-        properties: {
-          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
-        },
-        required: ['senal'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'diagnostico',
-      description:
-        'Herramienta COMPUESTA para diagnosticar una avería o un síntoma: en una sola llamada ' +
-        'reúne el estado actual, la historia con fecha de los extremos, la correlación entre las ' +
-        'señales implicadas y los límites que documenta el manual, y calcula el exceso sobre esos ' +
-        'límites ya con su fecha. ÚSALA SIEMPRE que te pregunten por qué falló algo, qué causó un ' +
-        'problema, o te cuenten un síntoma ("se paró la bomba tras un pico de tensión", "el ' +
-        'caudal está siendo demasiado alto") — es la primera y normalmente ÚNICA llamada que hace ' +
-        'falta para eso, en vez de encadenar estado_del_sistema, historia_de_senal, ' +
-        'correlacionar_senales y limites_del_manual una por una. Nombra en el síntoma las señales ' +
-        'de las que hables si las conoces: si no nombras ninguna, se miran las cuatro que tienen ' +
-        'historia. El resultado separa lo MEDIDO de lo DOCUMENTADO; la hipótesis que los junte es ' +
-        'tuya, y tienes que decir cuál es cuál.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sintoma: {
-            type: 'string',
-            description:
-              'El síntoma o la pregunta de diagnóstico, con tus propias palabras y nombrando las ' +
-              'señales que el usuario haya mencionado: "caudal abundante y presión alta tras una ' +
-              'subida de tensión progresiva", "la bomba se paró después de un pico de 200 V".',
-          },
-          periodo: {
-            type: 'string',
-            description:
-              'En qué ventana buscar, si el usuario lo dice: "últimas 6 horas", "ayer", ' +
-              '"2026-08-19". Igual que en historia_de_senal. Si no lo dice, omítelo.',
-          },
-        },
-        required: ['sintoma'],
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'controlar_bomba',
-      description:
-        'Enciende o apaga la bomba de la instalación. Úsala cuando te pidan explícitamente ' +
-        'encender, apagar, arrancar o parar la bomba. Antes de encenderla se comprueba el nivel ' +
-        'del tanque; si está por encima del umbral de aviso, la herramienta se niega a encenderla ' +
-        'para no desbordarlo y te lo explica — comunícaselo al usuario tal cual, no lo intentes de ' +
-        'otra forma. Si el servidor está en modo solo lectura también se niega, y hay que decírselo ' +
-        'al usuario con el motivo.',
-      parameters: {
-        type: 'object',
-        properties: {
-          encender: {
-            type: 'boolean',
-            description: 'true para encender la bomba, false para apagarla.',
-          },
-        },
-        required: ['encender'],
-      },
-    },
-  },
-]
