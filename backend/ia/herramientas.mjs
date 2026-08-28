@@ -95,7 +95,7 @@ import {
   senalInfo,
 } from '../../shared/eva/senales.js'
 import { ACTIVOS } from '../../shared/eva/activos.js'
-import { PROVISIONALES, UMBRALES } from '../../shared/eva/umbrales.js'
+import { UMBRALES } from '../../shared/eva/umbrales.js'
 import { toBooleano } from '../../shared/eva/sistema.js'
 import {
   AGREGADO,
@@ -145,6 +145,18 @@ import { dirname, join } from 'node:path'
  * existe, y mover un archivo no es motivo para tocarlos.
  */
 import { DEFINICIONES } from './definiciones.mjs'
+/*
+ * Las piezas de presentación que no dependen de nada (Fase 0 del reparto):
+ * ni del `client`, ni de la configuración, ni de estado. Ver la cabecera de
+ * `herramientas/lib/formato.mjs`.
+ */
+import { avisoDeUmbrales, bandaLegible, downsamplear } from './herramientas/lib/formato.mjs'
+import { fallo } from './herramientas/lib/respuesta.mjs'
+/* Fase 1 del reparto: las tres herramientas del almacén de lo aprendido. No
+   reciben nada —no tocan el `client`— y por eso salen antes que las demás. */
+import { crearHerramientasDeAprendizaje } from './herramientas/aprendizaje/index.mjs'
+/* Fase 2: las tres que leen los manuales. Sólo necesitan `indiceDocumentos`. */
+import { crearHerramientasDeDocumentacion } from './herramientas/documentacion/index.mjs'
 
 export { DEFINICIONES }
 
@@ -329,10 +341,6 @@ function agruparPorRegla(activos) {
   }))
 }
 
-function fallo(error, extra = {}) {
-  return { ok: false, error, ...extra }
-}
-
 /**
  * Tendencia de una serie, en palabras que el modelo pueda citar sin restar.
  *
@@ -392,7 +400,7 @@ function describirTendencia(tendencia, unidad = '') {
 /* ── Resolver el nombre de una señal ─────────────────────────────────── */
 
 /** Quita acentos y unifica separadores para poder comparar nombres escritos a mano. */
-function normalizarTexto(texto) {
+export function normalizarTexto(texto) {
   return String(texto ?? '')
     .normalize('NFD')
     // Escrito con escapes y no con acentos literales: son caracteres
@@ -502,7 +510,7 @@ export function resolverSenal(texto) {
  * como «caudal abundante por sobretensión progresiva» nombra DOS señales a
  * propósito, y `diagnostico` necesita las dos, no ninguna.
  */
-function senalesMencionadas(texto) {
+export function senalesMencionadas(texto) {
   const t = normalizarTexto(texto)
   const claves = new Set()
   for (const [nombre, key] of INDICE_SENALES) {
@@ -545,7 +553,7 @@ function catalogoBreve() {
  * Es una sola función y arregla las ocho herramientas a la vez, que es la
  * ventaja de que todas resuelvan el nombre por el mismo sitio.
  */
-function senalDesconocida(texto, { paraHistoria = false } = {}) {
+export function senalDesconocida(texto, { paraHistoria = false } = {}) {
   const enOtras = sistemasDeSenal(texto)
 
   if (enOtras.length === 1) {
@@ -1172,262 +1180,27 @@ export function createHerramientas({
     return { muestras, diasLeidos: Math.min(diasLeidos, diasTotal), diasTotal }
   }
 
-  /**
-   * Reduce una serie a como mucho `max` puntos, promediando por grupos.
-   *
-   * Sólo para el DIBUJO de `generar_reporte` (Plan 14 Fase 5): el SVG de
-   * `renderizarGraficoSerie` tiene 640 px de ancho fijo y fue pensado para
-   * las ventanas cortas del resto de herramientas (como mucho ~100 puntos,
-   * el tope del historiador por petición). Un reporte de varios días junta
-   * muchas de esas peticiones, y sin reducir el trazo se convierte en un
-   * bloque sólido ilegible. Promediar por grupo (y no descartar puntos sin
-   * más) conserva la forma de la curva; los extremos EXACTOS para el
-   * resumen numérico siguen viniendo de la serie completa, sin pasar por
-   * aquí.
-   */
-  function downsamplear(muestras, max) {
-    if (muestras.length <= max) return muestras
-
-    const factor = Math.ceil(muestras.length / max)
-    const resultado = []
-    for (let i = 0; i < muestras.length; i += factor) {
-      const grupo = muestras.slice(i, i + factor)
-      const suma = grupo.reduce((acc, m) => acc + m.valor, 0)
-      resultado.push({ t: grupo[Math.floor(grupo.length / 2)].t, valor: suma / grupo.length })
-    }
-    return resultado
-  }
-
-  /* ── Presentación de una señal ─────────────────────────────────────── */
-
-  /**
-   * Una señal evaluada → lo que el modelo puede citar.
-   *
-   * ── POR QUÉ VIAJA LA BANDA Y NO SOLO EL ESTADO ─────────────────────
-   *
-   * Porque «en aviso» sin el número del umbral no es accionable: el operador
-   * no sabe si está rozando el límite o muy pasado. Y porque el modelo tiene
-   * prohibido hacer aritmética, así que si no le damos la banda no puede
-   * decir cuánto margen queda — lo estimaría, que es exactamente lo que no
-   * queremos.
-   *
-   * `unidad` es `null` cuando el servidor no la declara, y entonces viaja
-   * `nota` diciéndolo. Es la diferencia entre «el caudal es 12,4» y «el caudal
-   * es 12,4 l/s»: lo segundo nadie nos ha dicho que sea verdad.
-   */
-  /**
-   * La banda en palabras que el modelo pueda copiar sin restar nada.
-   *
-   * `null` en un extremo significa **sin límite por ese lado**, no cero: una
-   * eficiencia energética no es peor por ser alta. Escribirlo como «sin límite»
-   * y no omitirlo evita que el modelo rellene el hueco con un 0 inventado.
-   */
-  function bandaLegible(u) {
-    const lado = (v) => (v === null || v === undefined ? 'sin límite' : v)
-    return {
-      limiteInferior: lado(u.min),
-      avisoInferior: lado(u.avisoMin),
-      avisoSuperior: lado(u.avisoMax),
-      limiteSuperior: lado(u.max),
-    }
-  }
-
-  /**
-   * El aviso de procedencia de los umbrales, cuando toca.
-   *
-   * Va en el RESULTADO y no en el prompt del sistema por el mismo motivo por
-   * el que iba el aviso de OEE imposible: una advertencia que sólo vive en las
-   * instrucciones se diluye a los tres turnos de conversación, y ésta tiene que
-   * acompañar a cada cifra que se compare contra una banda.
-   */
-  const avisoDeUmbrales = () =>
-    PROVISIONALES
-      ? {
-        /*
-         * La clave es `aviso` y no `avisoUmbrales`, y no es cosmético: es el
-         * campo que `chat.mjs` vigila para añadir la advertencia detrás cuando
-         * el modelo no la cuenta. Con cualquier otro nombre la red de
-         * seguridad no se entera, y medido con el 4B eso pasa: contestó «el
-         * nivel está fuera de límite» sin decir de quién era el límite.
-         */
-        aviso:
-            'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
-            'sistema de agua genérico, no rangos confirmados por quien opera esta instalación, y ' +
-            'el servidor no publica alarmas para este árbol. El estado de cada señal es un ' +
-            'cálculo del tablero, no un dato de ICONICS.',
-      }
-      : {}
 
   /*
    * Las señales del pronóstico: sólo las que tienen serie PROPIA verificada.
    * `cargaMotor` no está y no puede estar — el historiador devuelve ahí la
    * curva de la temperatura del tanque sin dar error.
    */
-  /**
-   * ── EL ALMACÉN DE LO APRENDIDO ────────────────────────────────────
-   *
-   * Un JSON en `datos/`, al lado de los reportes. Se lee entero en cada
-   * llamada y no se cachea: son unos kilobytes, y una caché aquí haría que dos
-   * conversaciones simultáneas se pisaran los hechos que acaban de guardar.
-   */
-  /*
-   * Ruta FIJA, no derivada de la de reportes. Derivarla con un `..` dependía de
-   * si `reportesDir` venía como `datos` o como `datos/reportes`, y el archivo
-   * acabó en la raíz del repositorio mientras `revisar-propuestas.mjs` lo
-   * buscaba en `datos/`: el asistente guardaba y el revisor no veía nada, sin
-   * un solo error por ningún lado. Las dos puntas usan esta misma constante.
-   */
-  const RUTA_APRENDIZAJE = join('datos', 'aprendizaje.json')
-
-  async function leerAprendizaje() {
-    try {
-      return normalizarAlmacen(JSON.parse(await readFile(RUTA_APRENDIZAJE, 'utf8')))
-    } catch {
-      /* Que no exista es lo normal la primera vez, y un archivo corrupto no
-         puede tumbar el asistente entero: se parte de vacío y los hechos de
-         fábrica siguen ahí, que viven en el código. */
-      return { ...APRENDIZAJE_VACIO, hechos: [], propuestas: [] }
-    }
-  }
-
-  async function guardarAprendizaje(almacen) {
-    try {
-      await mkdir(dirname(RUTA_APRENDIZAJE), { recursive: true })
-      await writeFile(RUTA_APRENDIZAJE, JSON.stringify(almacen, null, 2), 'utf8')
-      return { ok: true }
-    } catch (e) {
-      return { ok: false, error: e?.message ?? String(e) }
-    }
-  }
-
   const SENALES_PRONOSTICO = [
     'nivelTanque', 'temperaturaTanque', 'presionRelativa', 'tensionLinea', 'flujoInstantaneo',
   ]
 
   const herramientas = {
-    /**
-     * ── LO QUE YA SE SABE DE ESTA PLANTA ──────────────────────────────
+    /*
+     * ── LAS FAMILIAS QUE YA VIVEN FUERA ────────────────────────────
      *
-     * El modelo no recuerda nada entre conversaciones. Esto es lo más parecido
-     * a que recuerde: los hechos que alguien confirmó alguna vez, entregados
-     * cada vez que hacen falta.
-     *
-     * Son cosas que costaron días de averiguar y que NO se deducen mirando el
-     * servidor —que hay tres sensores y no dos, que el grupo del historiador
-     * lleva un espacio en el nombre—. Sin esto, cada conversación las vuelve a
-     * suponer, y suponerlas mal es gratis.
+     * Cada familia repartida devuelve su propio `{ nombre: fn }` y se mezcla
+     * aquí. El orden no importa —`ejecutar` busca por nombre— pero el reparto
+     * sí: una familia que se mueva y no se mezcle desaparece del catálogo, y
+     * `verificar-herramientas` lo detecta en el acto, porque compara lo que se
+     * le anuncia al modelo contra lo que se puede ejecutar.
      */
-    async hechos_de_la_planta({ sistema = null } = {}) {
-      const almacen = await leerAprendizaje()
-      const todos = hechosVigentes(almacen)
-      const hechos = sistema ? todos.filter((h) => h.sistema === sistema || h.sistema === null) : todos
-
-      return {
-        ok: true,
-        cuantos: hechos.length,
-        hechos: hechos.map((h) => ({
-          sobre: h.sistema ?? 'toda la planta',
-          hecho: h.hecho,
-          /* El origen viaja siempre: «lo confirmó quien opera la instalación»
-             y «lo dedujo el modelo» no valen lo mismo, y leídos en la misma
-             lista sin esta línea serían indistinguibles. */
-          origen: h.origen,
-        })),
-        propuestas_pendientes: pendientes(almacen).length,
-      }
-    },
-
-    /**
-     * ── APRENDER ALGO NUEVO, CUANDO UNA PERSONA LO CONFIRMA ───────────
-     *
-     * Sólo se llama cuando el usuario AFIRMA un dato de la instalación. No
-     * para guardar lo que el modelo deduzca: para eso está `proponer_regla`,
-     * que pasa por revisión.
-     *
-     * La diferencia importa dentro de un mes, cuando alguien lea la lista y no
-     * pueda distinguir un dato de planta de una conjetura bien redactada.
-     */
-    async recordar_hecho({ hecho, sistema = null, origen = null } = {}) {
-      const texto = String(hecho ?? '').trim()
-      if (texto.length < 10) {
-        return fallo('Un hecho tiene que decir algo concreto sobre la instalación.')
-      }
-      if (!origen) {
-        return fallo(
-          'Falta el origen: quién lo confirmó y cuándo. Sin eso no se puede guardar, porque ' +
-          'dentro de un mes nadie sabrá si lo dijo quien opera la planta o lo dedujo el asistente.'
-        )
-      }
-
-      const almacen = await leerAprendizaje()
-      const nuevo = crearHecho({ hecho: texto, sistema, origen }, new Date())
-      almacen.hechos.push(nuevo)
-      const guardado = await guardarAprendizaje(almacen)
-      if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
-
-      return {
-        ok: true,
-        guardado: nuevo.hecho,
-        sobre: nuevo.sistema ?? 'toda la planta',
-        total_hechos: hechosVigentes(almacen).length,
-        aviso:
-          'Queda guardado, y estará disponible en las siguientes conversaciones. ' +
-          'Se ha anotado junto con su origen, para que más adelante se sepa quién lo confirmó.',
-      }
-    },
-
-    /**
-     * ── PROPONER UNA REGLA, QUE NO ES LO MISMO QUE CREARLA ────────────
-     *
-     * Esto NO añade una regla al sistema. Deja una propuesta esperando a que
-     * una persona la revise.
-     *
-     * Y es deliberado. Estas reglas deciden si una pantalla de planta dice
-     * «riesgo de derrame»: una inventada que salta sin motivo se desactiva a
-     * la semana y se lleva por delante la credibilidad de las que sí valen.
-     * Contra este mismo servidor, el modelo local dijo tres veces seguidas
-     * «velocidad eficaz 1,13 mm/s» leyendo la ACELERACIÓN. Quien confunde un
-     * campo no firma el criterio con el que se para una bomba.
-     *
-     * Lo que sí aporta, y es mucho: mirar semanas de datos, ver un patrón que
-     * a nadie se le había ocurrido, y dejarlo redactado con su evidencia para
-     * que alguien lo juzgue en treinta segundos.
-     */
-    async proponer_regla(datos = {}) {
-      const v = validarPropuesta(datos)
-      if (!v.ok) {
-        return fallo(
-          `A la propuesta le faltan campos: ${v.faltan.join(', ')}. La evidencia tiene que ` +
-          'llevar las cifras que la sostienen, no sólo la idea: sin ellas, quien la revise ' +
-          'tendría que ir a buscar los datos él mismo y la propuesta no le ahorra nada.',
-          { faltan: v.faltan }
-        )
-      }
-
-      const almacen = await leerAprendizaje()
-      const p = crearPropuesta(datos, new Date())
-      almacen.propuestas.push(p)
-      const guardado = await guardarAprendizaje(almacen)
-      if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
-
-      return {
-        ok: true,
-        id: p.id,
-        estado: p.estado,
-        titulo: p.titulo,
-        pendientes_de_revisar: pendientes(almacen).length,
-        /*
-         * `aviso` lo cita el modelo LITERAL en su respuesta —se comprobó—, así
-         * que va escrito para quien lo lee. Las instrucciones al modelo viven
-         * en las reglas de `chat.mjs`, no aquí: una frase como «dile al
-         * usuario que…» acaba impresa en pantalla tal cual.
-         */
-        aviso:
-          'Esto queda ANOTADO como propuesta y no vigila nada todavía: ninguna regla se ' +
-          'aplica sin que una persona la revise. Para revisarla: ' +
-          '`node scripts/revisar-propuestas.mjs`',
-      }
-    },
+    ...crearHerramientasDeAprendizaje(),
 
     /**
      * ── QUÉ SISTEMAS HAY EN ESTA PLANTA ───────────────────────────────
@@ -2848,304 +2621,18 @@ export function createHerramientas({
       }
     },
 
-    /**
-     * Busca en la documentación de planta.
+    /*
+     * Las de documentación van AL FINAL, que es donde estaban.
      *
-     * ── POR QUÉ VIAJA LA RELEVANCIA ────────────────────────────────────
+     * El orden del catálogo no es cosmético: es lo primero que lee el modelo y
+     * `verificar-herramientas` lo fija entero. Las de sistemas abren porque son
+     * las que tiene que encontrar cuando no sabe de qué máquina le hablan, y
+     * las de manuales cierran porque son las que menos veces son la respuesta.
      *
-     * Porque BM25 SIEMPRE devuelve algo si alguna palabra coincide, y ese algo
-     * puede no responder la pregunta. Sin el número, el modelo trata igual el
-     * fragmento que encaja exactamente y el que sólo comparte la palabra
-     * «presión» con un manual entero sobre presión. Con él —y con la
-     * instrucción de abajo— puede decir que no lo encontró, que es la respuesta
-     * correcta cuando no está documentado.
+     * Al repartir por familias, el orden es lo primero que se rompe: basta con
+     * mezclar un grupo donde no iba. Aquí se respeta el que había.
      */
-    async consultar_documentacion({ pregunta } = {}) {
-      if (!indiceDocumentos) {
-        return fallo(
-          'Este servidor no tiene documentación de planta cargada (falta la variable ' +
-            'IA_DOCS_DIR). No puedo consultar manuales: dilo así y no contestes de memoria.'
-        )
-      }
-      if (!pregunta || !pregunta.trim()) {
-        return fallo('Necesito saber sobre qué quieres consultar en la documentación.')
-      }
-
-      const resultados = await indiceDocumentos.buscar(pregunta, { top: 3 })
-
-      if (!resultados.length) {
-        const estado = indiceDocumentos.estado()
-        // Qué documentos SÍ hay viaja en el error a propósito: «no lo encontré»
-        // a secas deja al operador sin saber si el manual no está cargado o si
-        // está y no lo dice. Son dos problemas con arreglos distintos.
-        return fallo(
-          'No he encontrado nada sobre eso en la documentación cargada. Puede que no esté ' +
-            'documentado, o que el manual lo llame de otra forma.',
-          {
-            documentosDisponibles: estado.documentos.map(d => d.archivo),
-            ...(estado.ilegibles.length ? { noSePudieronLeer: estado.ilegibles } : {}),
-          }
-        )
-      }
-
-      return {
-        ok: true,
-        fragmentos: resultados.map(r => ({
-          documento: r.archivo,
-          pagina: r.pagina,
-          texto: r.texto,
-          relevancia: +r.score.toFixed(2),
-        })),
-        /*
-         * `comoRedactar` y NO `aviso`, y la diferencia importa.
-         *
-         * `aviso` es el campo que `chat.mjs` vigila para PEGARLO detrás de la
-         * respuesta cuando el modelo no lo cuenta. Ese mecanismo existe para
-         * las advertencias que el operador tiene que leer sí o sí —que los
-         * umbrales son estimaciones nuestras—, y aquí no aplica: esto es una
-         * instrucción de estilo para el modelo.
-         *
-         * Con la clave `aviso` se veía en pantalla, literal, debajo de una
-         * respuesta correcta: «Cita el documento y la página… La relevancia va
-         * de 0 a 1…». Al operador eso no le dice nada y le hace desconfiar de
-         * la respuesta. Cualquier clave que no sea `aviso` la lee el modelo y
-         * no la copia nadie.
-         */
-        comoRedactar:
-          'Cita el documento y la página de donde viene cada dato. La relevancia va de 0 a 1: ' +
-          'por debajo de 0,4 el fragmento probablemente no responde la pregunta, y entonces di ' +
-          'que no lo has encontrado en vez de completarlo con conocimiento general. Estos ' +
-          'fragmentos son del manual, NO son mediciones de la instalación.',
-      }
-    },
-
-    /**
-     * Candidatos a límite documentado de UNA señal, extraídos por patrón.
-     *
-     * ── PARA QUÉ EXISTE, Y QUÉ PROBLEMA REAL RESUELVE ──────────────────
-     *
-     * `consultar_documentacion` devuelve texto libre y dice «lee esto y cita
-     * lo que haga falta» — y leer un párrafo técnico para decidir si un
-     * número es un límite es justo la tarea de comprensión en la que un
-     * modelo de 4B falla más. Convierte el escenario «un pico de 200 V
-     * contra un máximo de 150 V documentado» en una lectura estructurada
-     * —`{ valor: 150, unidad: 'v', palabraLimite: 'maximo' }`— en vez de una
-     * tarea de razonamiento sobre prosa.
-     *
-     * Reutiliza el ÍNDICE que ya construyó `consultar_documentacion` (BM25
-     * sobre `shared/eva` no, sobre `ia/documentos.mjs`): no hay un segundo
-     * índice ni un segundo parseo de los PDF, sólo una consulta distinta —
-     * sesgada hacia palabras de límite— y un filtrado por patrón encima de
-     * los fragmentos que ya devuelve.
-     */
-    async limites_del_manual({ senal } = {}) {
-      if (!indiceDocumentos) {
-        return fallo(
-          'Este servidor no tiene documentación de planta cargada (falta la variable ' +
-            'IA_DOCS_DIR). No puedo consultar límites del manual: dilo así y no contestes de memoria.'
-        )
-      }
-
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-      const meta = senalInfo(clave)
-
-      // Se sesga la consulta hacia palabras de límite además del nombre de la
-      // señal: BM25 es léxico, así que sin estas palabras en la consulta
-      // puntuaría igual una página que sólo menciona la señal de pasada.
-      const consulta = `${meta.label} maximo minimo limite admisible no debe exceder rango`
-      const resultados = await indiceDocumentos.buscar(consulta, { top: 5 })
-
-      if (!resultados.length) {
-        const estado = indiceDocumentos.estado()
-        return fallo(
-          `No he encontrado nada sobre ${meta.label} en la documentación cargada.`,
-          {
-            documentosDisponibles: estado.documentos.map(d => d.archivo),
-            ...(estado.ilegibles.length ? { noSePudieronLeer: estado.ilegibles } : {}),
-          }
-        )
-      }
-
-      const anclas = anclaDeSenal(clave)
-      const candidatos = []
-      for (const r of resultados) {
-        for (const c of extraerCandidatosLimite(r.texto, anclas)) {
-          candidatos.push({ ...c, documento: r.archivo, pagina: r.pagina, relevancia: +r.score.toFixed(2) })
-        }
-      }
-
-      if (!candidatos.length) {
-        return fallo(
-          `Encontré páginas sobre ${meta.label} en la documentación, pero ninguna tiene un número ` +
-            `junto a una palabra de límite (máximo, mínimo, no debe exceder, rango admisible). ` +
-            `Puede que el límite esté escrito de otra forma; consultar_documentacion busca en ` +
-            `texto libre y puede encontrarlo igual.`,
-          { paginasRevisadas: resultados.map(r => ({ documento: r.archivo, pagina: r.pagina })) }
-        )
-      }
-
-      return {
-        ok: true,
-        senal: meta.label,
-        unidadDeclaradaEnICONICS: meta.unidad || null,
-        // Seis, mismo tope que las coincidencias de correlacionar_senales: de
-        // sobra para que el modelo elija entre candidatos que no cuadran, sin
-        // llenarle el contexto de repeticiones del mismo dato.
-        candidatos: candidatos.slice(0, 6),
-        comoRedactar:
-          'Éstos son CANDIDATOS a límite, encontrados por patrón (número junto a una palabra como ' +
-          '"máximo" o "no debe exceder"), no una lectura garantizada del significado: el número y ' +
-          'la palabra pueden pertenecer a frases distintas de la misma página. Cita siempre el ' +
-          'documento y la página. Si hay varios candidatos que no cuadran entre sí, dilo en vez de ' +
-          'elegir uno a tu criterio. La unidad del manual puede no coincidir con la que declara ' +
-          'ICONICS: compáralas antes de dar el límite por bueno.',
-      }
-    },
-
-    /**
-     * Dossier de diagnóstico: una llamada que hace estado + historia con
-     * fecha de los extremos + correlación entre señales + límites del manual
-     * de las señales que el síntoma menciona.
-     *
-     * ── EL CRITERIO QUE YA GOBIERNA EL ARCHIVO, LLEVADO AL LÍMITE ──────
-     *
-     * El modelo elige QUÉ preguntar; el backend sabe CÓMO. Un diagnóstico
-     * real —«¿por qué se paró la bomba tras un pico de tensión?»— necesita
-     * cuatro o cinco consultas encadenadas y cruzar sus resultados de
-     * cabeza: qué señales tocan el síntoma, cuándo fue su extremo, si se
-     * movieron juntas, y si el manual documenta un límite que ese extremo
-     * cruzó. Encadenarlas es exactamente el trabajo en el que un modelo
-     * pequeño se pierde — cada ronda cuesta 30-90 s, y `IA_MAX_PASOS` las
-     * limita a 2-4 de todos modos. Aquí se hacen TODAS en una sola llamada,
-     * en paralelo, y se entregan ya ordenadas.
-     *
-     * ── EL EXCESO SOBRE LÍMITE, YA CALCULADO Y FECHADO ─────────────────
-     *
-     * Es la pieza que de verdad ahorra razonamiento: si el manual dice
-     * «máximo 150 V» y la historia de la tensión marcó un pico de 203 V a
-     * las 14:32, la resta (53 V, a esa hora) la hace este archivo, no el
-     * modelo — que tiene prohibido hacer aritmética en todo lo demás, y aquí
-     * no iba a ser la excepción. Ver `compararConLimites`.
-     *
-     * ── LO MEDIDO, SEPARADO DE LO DOCUMENTADO ──────────────────────────
-     *
-     * `medido` sale de ICONICS: el estado, la historia con sus fechas, la
-     * correlación. `documentacion` sale de los manuales, con `comoRedactar`
-     * de `limites_del_manual` repetido para que la advertencia de que son
-     * candidatos y no lecturas garantizadas viaje pegada a ellos y no se
-     * pierda al resumir el dossier. El modelo narra sobre las dos, pero
-     * nunca las mezcla: eso es lo que pide `chat.mjs` al distinguir MEDIDO de
-     * HIPÓTESIS al redactar un diagnóstico.
-     */
-    async diagnostico({ sintoma, periodo } = {}) {
-      if (!sintoma || !sintoma.trim()) {
-        return fallo(
-          'Necesito una descripción del síntoma o la avería a diagnosticar: qué pasó, y si lo ' +
-            'sabes, cuándo.'
-        )
-      }
-
-      const mencionadas = senalesMencionadas(sintoma)
-      // Sin ninguna señal nombrada en el síntoma, se parte de las cuatro que
-      // tienen historia: son las únicas sobre las que se puede medir una
-      // tendencia o una correlación, así que no hay nada que ganar
-      // adivinando entre las otras cuatro sin ningún indicio textual.
-      const claves = (mencionadas.length ? mencionadas : historizadas()).slice(0, 4)
-      const historiadas = claves.filter(esHistorizada)
-
-      const [estado, historias, correlacion, documentacion] = await Promise.all([
-        herramientas.estado_del_sistema(),
-
-        Promise.all(historiadas.map(async k => ({
-          clave: k,
-          resultado: await herramientas.historia_de_senal({ senal: SENALES[k].label, periodo }),
-        }))),
-
-        // La correlación exige DOS señales con historia; con una o ninguna no
-        // se pide, y se dice el motivo en vez de dejar el hueco sin explicar.
-        historiadas.length >= 2
-          ? herramientas.correlacionar_senales({
-            senales: historiadas.map(k => SENALES[k].label), periodo,
-          })
-          : Promise.resolve(null),
-
-        indiceDocumentos
-          ? Promise.all(claves.map(async k => ({
-            clave: k,
-            resultado: await herramientas.limites_del_manual({ senal: SENALES[k].label }),
-          })))
-          : Promise.resolve(null),
-      ])
-
-      const historiasOk = historias.filter(h => h.resultado.ok)
-      const documentacionOk = (documentacion ?? []).filter(d => d.resultado.ok)
-
-      return {
-        ok: true,
-        sintoma,
-        senalesConsideradas: claves.map(k => SENALES[k].label),
-        ...(mencionadas.length === 0
-          ? {
-            nota:
-                'El síntoma no nombraba ninguna señal por su nombre, así que se han mirado las ' +
-                'cuatro que tienen historia: nivel del tanque, temperatura del tanque, caudal y ' +
-                'presión.',
-          }
-          : {}),
-
-        medido: {
-          estadoAhora: estado.ok
-            ? {
-              estadoGeneral: estado.estadoGeneral,
-              enReposo: estado.enReposo,
-              leidoA: estado.leidoA,
-              ...(estado.queSignificaReposo ? { queSignificaReposo: estado.queSignificaReposo } : {}),
-            }
-            : { error: estado.error },
-
-          historia: historiasOk.map(h => ({ senal: SENALES[h.clave].label, ...h.resultado })),
-          ...(historias.length > historiasOk.length
-            ? {
-              historiaSinDatos: historias
-                .filter(h => !h.resultado.ok)
-                .map(h => ({ senal: SENALES[h.clave].label, motivo: h.resultado.error ?? h.resultado.motivo })),
-            }
-            : {}),
-
-          correlacion: correlacion
-            ? (correlacion.ok ? correlacion : { error: correlacion.error })
-            : `No se pidió correlación: hacen falta al menos dos señales con historia entre las ` +
-              `consideradas, y sólo hay ${historiadas.length}.`,
-        },
-
-        documentacion: documentacion
-          ? {
-            porSenal: documentacionOk.map(d => ({ senal: SENALES[d.clave].label, ...d.resultado })),
-            ...(documentacionOk.length
-              ? {
-                comoRedactar:
-                    'Los candidatos de "documentacion" son eso, candidatos por patrón, no lecturas ' +
-                    'garantizadas: cítalos con su documento y página, y compara su unidad con la ' +
-                    'que usa ICONICS antes de darlos por buenos.',
-              }
-              : {}),
-          }
-          : 'Este servidor no tiene documentación de planta cargada (falta IA_DOCS_DIR).',
-
-        // El cálculo que de verdad ahorra razonamiento: ver la cabecera.
-        excesosSobreLimite: compararConLimites(estado, historiasOk, documentacionOk),
-
-        comoRedactar:
-          'Separa SIEMPRE lo MEDIDO (estadoAhora, historia, correlacion — viene de ICONICS) de lo ' +
-          'DOCUMENTADO (documentacion — viene del manual, son candidatos) y de tu HIPÓTESIS — lo ' +
-          'que tú concluyes juntando las dos cosas. No las mezcles en la misma frase sin decir cuál ' +
-          'es cuál. Si "excesosSobreLimite" trae algo, es el dato más fuerte que tienes: una ' +
-          'medición real que superó un límite documentado, en una fecha concreta. Si los datos no ' +
-          'permiten explicar el síntoma, dilo — una causa inventada que suena razonable manda a ' +
-          'alguien a revisar el equipo equivocado. Correlación no es causa.',
-      }
-    },
+    ...crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas: () => herramientas }),
   }
 
   /**
@@ -3327,30 +2814,6 @@ function resta(b, a) {
 /* ── Extracción de límites de la documentación (Plan 14 §4) ─────────── */
 
 /**
- * Palabras con las que un manual anuncia un límite. Con acento Y sin él —el
- * fragmento que se busca es el texto CRUDO del documento, con sus acentos
- * intactos, así que un patrón sin `[áa]`/`[íi]` no encuentra «máximo» ni
- * «mínimo», que son justo las dos palabras más comunes en un manual técnico
- * en español. Cubren tanto la forma directa («máximo 150 V») como la
- * perifrástica («no debe exceder los 150 V»).
- */
-const PALABRAS_LIMITE =
-  /\b(m[áa]xim[oa]s?|m[íi]nim[oa]s?|no debe exceder|no super(?:ar|e|a)|l[íi]mite|rango admisible|admisible|hasta)\b/g
-
-/**
- * Número seguido, opcionalmente, de una unidad de las que aparecen en hojas
- * de datos industriales. La unidad es opcional a propósito: «el límite es
- * 40» sin unidad al lado sigue siendo un candidato, y descartarlo perdería
- * justo el caso en que el manual da el número en una frase y la unidad en
- * el título de la tabla.
- */
-const NUMERO_UNIDAD =
-  /(\d+(?:[.,]\d+)?)\s*(v|voltios?|bar(?:es)?|mbar|psi|°c|celsius|%|kw|hz|amperios?|l\/s|m3\/h|rpm)?\b/i
-
-/** Cuántos caracteres a cada lado de la palabra de límite se miran buscando un número. */
-const VENTANA_CANDIDATO = 40
-
-/**
  * Trocea un fragmento en «oraciones»: tramos entre un punto o un salto de
  * línea (los dos cuentan, porque un título de sección —«Tensión de línea»—
  * no lleva punto y sólo el salto de línea lo separa del párrafo que sigue).
@@ -3363,7 +2826,7 @@ const VENTANA_CANDIDATO = 40
  * del 45 %», que es más larga que eso; 130 mete de lleno el «máximo» del
  * párrafo vecino. Las oraciones se adaptan solas al tamaño real de cada una.
  */
-function trocearEnOraciones(texto) {
+export function trocearEnOraciones(texto) {
   const limites = [0]
   const re = /[.\n]/g
   let m
@@ -3377,208 +2840,5 @@ function trocearEnOraciones(texto) {
   return oraciones
 }
 
-/**
- * La palabra ancla de una señal, para `extraerCandidatosLimite`: SÓLO la
- * primera palabra distintiva de su rótulo («carga» de «Carga de trabajo del
- * motor», «tensión» de «Tensión de línea»), no el rótulo entero ni sus
- * sinónimos.
- *
- * ── POR QUÉ UNA SOLA, Y POR QUÉ NO LOS SINÓNIMOS ───────────────────
- *
- * Se probó con todas las palabras del rótulo más `SINONIMOS[clave]`, y falló
- * por generosa: «motor» aparece en la frase de casi cualquier señal —«con el
- * motor encendido o apagado» describe la condición de la temperatura, no un
- * límite de la carga— así que un ancla tan común dejaba pasar el «25 °C» de
- * la temperatura como si fuera un límite de la carga del motor. La primera
- * palabra del rótulo es la más distintiva de las que tiene cada señal
- * («carga», «tensión», «caudal», «presión»…) y ninguna se repite entre
- * señales del catálogo.
- */
-function anclaDeSenal(clave) {
-  const [primera] = normalizarTexto(SENALES[clave].label).split(' ').filter(p => p.length >= 4)
-  return primera ? [primera] : []
-}
 
-/**
- * Candidatos a límite dentro de UN fragmento del índice de documentación.
- *
- * ── QUÉ RESUELVE Y QUÉ NO ────────────────────────────────────────────
- *
- * Convierte «la presión de descarga no debe exceder los 8 bar» en un dato
- * estructurado —`{ valor: 8, unidad: 'bar', palabraLimite: 'no debe exceder' }`—
- * en vez de dejar que el modelo lea el párrafo y decida de memoria si ese
- * número es un límite o una medida cualquiera, que es la tarea de lectura en
- * la que un modelo de 4B falla más.
- *
- * NO valida que el número y la palabra de límite hablen de lo mismo: es un
- * patrón léxico —número cerca de una palabra de límite—, no una lectura del
- * significado. Dos frases seguidas, una con un número y la siguiente con
- * «máximo» de otra magnitud, producen un candidato que no es tal. Por eso
- * `limites_del_manual` los llama CANDIDATOS y no límites confirmados, y se lo
- * dice al modelo explícitamente en `comoRedactar`.
- *
- * ── LAS ANCLAS, Y POR QUÉ HACEN FALTA ──────────────────────────────
- *
- * Un fragmento de 900 caracteres puede hablar de VARIAS señales seguidas —una
- * hoja de datos compacta las mete todas en la misma página—, y sin más
- * comprobación un límite de la tensión se cuela como candidato de la
- * temperatura sólo por estar en el mismo fragmento. `anclas` trae la palabra
- * ancla de la señal (`anclaDeSenal`): un candidato sólo cuenta si aparece en
- * la oración de la palabra de límite, o en la de al lado —ver
- * `trocearEnOraciones`—, no en cualquier parte del fragmento. Medido con un
- * manual de dos páginas: sin esto, pedir el límite de la tensión devolvía
- * también el máximo de carga del motor de la página siguiente.
- */
-function extraerCandidatosLimite(texto, anclas = []) {
-  const candidatos = []
-  const vistos = new Set()
-  const oraciones = anclas.length ? trocearEnOraciones(texto) : []
-  const re = new RegExp(PALABRAS_LIMITE.source, 'gi')
-  let m
-
-  while ((m = re.exec(texto)) !== null) {
-    const desde = Math.max(0, m.index - VENTANA_CANDIDATO)
-    const hasta = Math.min(texto.length, re.lastIndex + VENTANA_CANDIDATO)
-    const ventana = texto.slice(desde, hasta)
-
-    if (anclas.length) {
-      const i = oraciones.findIndex(o => m.index >= o.inicio && m.index < o.fin)
-      const desdeOracion = oraciones[Math.max(0, i - 1)]?.inicio ?? 0
-      const hastaOracion = oraciones[Math.min(oraciones.length - 1, i + 1)]?.fin ?? texto.length
-      const ventanaAncla = normalizarTexto(texto.slice(desdeOracion, hastaOracion))
-      if (!anclas.some(a => ventanaAncla.includes(a))) continue
-    }
-
-    /*
-     * El número MÁS CERCANO a la palabra de límite, no el primero de la
-     * ventana. La ventana mira a los dos lados de la palabra —«132 V. La
-     * tensión no debe exceder los 150 V» tiene un número ANTES y otro
-     * DESPUÉS de «no debe exceder»— y quedarse con el primero en orden de
-     * lectura habría emparejado el 132 (que pertenece a la frase anterior)
-     * con esta palabra en vez del 150 que de verdad la acompaña.
-     */
-    const inicioEnVentana = m.index - desde
-    const finEnVentana = re.lastIndex - desde
-    const numRe = new RegExp(NUMERO_UNIDAD.source, 'gi')
-    let numero = null
-    let distanciaMinima = Infinity
-    let nm
-    while ((nm = numRe.exec(ventana)) !== null) {
-      const centro = (nm.index + numRe.lastIndex) / 2
-      const distancia = centro < inicioEnVentana
-        ? inicioEnVentana - centro
-        : Math.max(0, centro - finEnVentana)
-      if (distancia < distanciaMinima) {
-        distanciaMinima = distancia
-        numero = nm
-      }
-    }
-    if (!numero) continue
-
-    const valor = Number(numero[1].replace(',', '.'))
-    if (!Number.isFinite(valor)) continue
-
-    const unidad = numero[2] ? numero[2].toLowerCase() : null
-    const palabraLimite = m[0].toLowerCase()
-
-    // Mismo valor y misma palabra ya visto en este fragmento: el manual suele
-    // repetir la cifra en el cuerpo y en una tabla de la misma página, y
-    // duplicarlo no añade un candidato distinto.
-    const clave = `${valor}|${unidad ?? ''}|${palabraLimite}`
-    if (vistos.has(clave)) continue
-    vistos.add(clave)
-
-    candidatos.push({ valor, unidad, palabraLimite, contexto: ventana.trim() })
-  }
-
-  return candidatos
-}
-
-/**
- * El exceso medido sobre un límite documentado, con fecha — la pieza que
- * `diagnostico` calcula para no dejarle esa resta al modelo. Ver su cabecera.
- *
- * Cruza los CANDIDATOS de `limites_del_manual` con dos fuentes de medida
- * distintas, según la señal tenga historia o no:
- *
- *  - **Con historia** (`historiasOk`): el extremo con su hora, de
- *    `resumirSerie`. Es la fuente preferida, porque data el momento exacto.
- *  - **Sin historia** (tres de las ocho, `estado.leidoA`): el valor de la
- *    lectura en vivo. Es el único dato que existe para ellas —«el pico de
- *    200 V» de la tensión de línea no se puede leer del historiador porque
- *    no tiene serie propia (Plan 14 §0.4)—, así que sin esto `diagnostico`
- *    no podría decir nada del escenario que motivó esta fase.
- *
- * No exige que la unidad coincida —el manual y el catálogo de ICONICS a
- * veces no usan la misma— pero lo dice en el resultado (`unidadesCoinciden`)
- * en vez de fingir que casan, para que el modelo lo cite con la cautela
- * debida.
- *
- * SÓLO se calcula el exceso para las palabras SIN AMBIGÜEDAD de dirección:
- * «máximo» y «no debe exceder» son candidato a MÁXIMO, «mínimo» a MÍNIMO.
- * Las demás —«límite», «rango admisible», «admisible», «hasta»— quedan
- * FUERA del cálculo a propósito: «rango admisible de 100 V a 132 V» captura
- * el 100, que es el SUELO del rango, y tratarlo como techo diría que 121 V
- * excede un «máximo» de 100 que en realidad es el mínimo del mismo rango.
- * Esas palabras siguen viajando en `documentacion.candidatos` para que el
- * modelo las lea, sólo no alimentan la resta automática.
- */
-function compararConLimites(estado, historiasOk, documentacionOk) {
-  const candidatosPorClave = new Map(documentacionOk.map(d => [d.clave, d.resultado.candidatos ?? []]))
-  const historiaPorClave = new Map(historiasOk.map(h => [h.clave, h.resultado]))
-  const senalesActuales = estado?.ok
-    ? new Map(estado.activos.flatMap(a => a.senales).map(s => [s.clave, s]))
-    : new Map()
-
-  const registrar = (excesos, { senal, valor, unidad, cuando, fuente, c }) => {
-    const esMinimo = /^m[íi]nim/.test(c.palabraLimite)
-    const esMaximo = /^m[áa]xim/.test(c.palabraLimite) || c.palabraLimite === 'no debe exceder'
-    if (!esMinimo && !esMaximo) return
-    const unidadesCoinciden = Boolean(c.unidad && unidad && c.unidad === String(unidad).toLowerCase())
-    if (typeof valor !== 'number') return
-
-    if (esMaximo && valor > c.valor) {
-      excesos.push({
-        senal, tipo: 'por encima del máximo documentado', fuente,
-        medido: valor, cuando, limiteDocumentado: c.valor,
-        exceso: +(valor - c.valor).toFixed(2),
-        unidadMedida: unidad, unidadDocumento: c.unidad, unidadesCoinciden,
-        documento: c.documento, pagina: c.pagina,
-      })
-    }
-    if (esMinimo && valor < c.valor) {
-      excesos.push({
-        senal, tipo: 'por debajo del mínimo documentado', fuente,
-        medido: valor, cuando, limiteDocumentado: c.valor,
-        exceso: +(c.valor - valor).toFixed(2),
-        unidadMedida: unidad, unidadDocumento: c.unidad, unidadesCoinciden,
-        documento: c.documento, pagina: c.pagina,
-      })
-    }
-  }
-
-  const excesos = []
-  for (const [clave, candidatos] of candidatosPorClave) {
-    if (!candidatos.length) continue
-
-    const historia = historiaPorClave.get(clave)
-    for (const c of candidatos) {
-      if (historia) {
-        registrar(excesos, { senal: historia.senal, valor: historia.maximo, unidad: historia.unidad, cuando: historia.maximoEn, fuente: 'historiador', c })
-        registrar(excesos, { senal: historia.senal, valor: historia.minimo, unidad: historia.unidad, cuando: historia.minimoEn, fuente: 'historiador', c })
-        continue
-      }
-
-      // Sin historia: se compara el valor ACTUAL, con la hora de la lectura
-      // en vivo en vez de una fecha del historiador.
-      const actual = senalesActuales.get(clave)
-      if (!actual) continue
-      registrar(excesos, { senal: actual.senal, valor: actual.valor, unidad: actual.unidad, cuando: estado.leidoA, fuente: 'lectura en vivo', c })
-    }
-  }
-
-  // Mismo tope que las coincidencias de correlacionar_senales: seis bastan
-  // para ver que hay un patrón sin llenar el contexto de repeticiones.
-  return excesos.slice(0, 6)
-}
 
