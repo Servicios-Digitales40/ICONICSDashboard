@@ -156,6 +156,13 @@ export const SISTEMAS = [
     /** Claves de esta máquina, para resolver un nombre de señal. */
     claves: () => SENAL_KEYS,
     etiquetaDe: (clave) => SENALES[clave]?.label ?? null,
+    /* Las cuatro formas que ya trae el catálogo. Los SINÓNIMOS de persona
+       —«la bomba», «el voltaje»— siguen en el índice de `herramientas.mjs`
+       mientras esa tabla no suba al registro (B3 del backlog). */
+    aliasDe: (clave) => {
+      const s = SENALES[clave];
+      return s ? [clave, s.tag, s.label, s.corto].filter(Boolean) : [];
+    },
     esHistorizada: esHistorizadaTanque,
     /*
      * ── LA MECÁNICA DEL HISTORIADOR ES DE CADA MÁQUINA ─────────────
@@ -249,6 +256,48 @@ export const SISTEMAS = [
       ]),
       ...VARIADOR_VIB.map((v) => v.key),
     ],
+    /*
+     * ── LOS OTROS NOMBRES CON LOS QUE SE PIDE UNA SEÑAL ────────────
+     *
+     * La etiqueta de `DKW_S1` es «Valor característico de daño · Lado acople»,
+     * y nadie pregunta así. Se pregunta «el DKW del sensor 1» — con el nombre
+     * CORTO de la medida, que el catálogo declara y el registro no exponía, y
+     * con «sensor N» en vez del rótulo del apoyo.
+     *
+     * Sin estos alias, «DKW» resolvía a CERO señales: la etiqueta no contiene
+     * esas tres letras por ningún lado, y la clave sí las contiene pero la
+     * contención exige cuatro caracteres —el umbral que impide que «S1» o
+     * «kpi» disparen dentro de otra palabra—. El resultado era que el
+     * asistente afirmaba que la señal no existe, teniendo su serie.
+     *
+     * `aliasDe` es parte del contrato del registro: la máquina que se dé de
+     * alta declara cómo la nombra la gente, no sólo cómo la rotula la pantalla.
+     */
+    aliasDe: (clave) => {
+      const v = VARIADOR_VIB.find((x) => x.key === clave);
+      if (v) return [v.key, v.label];
+
+      const corte = clave.lastIndexOf("_");
+      const base = clave.slice(0, corte);
+      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
+      if (!c) return [];
+
+      const f =
+        MEDIDAS_VIB.find((x) => x.key === base) ??
+        BANDERAS_VIB.find((x) => x.key === base) ??
+        CALIDADES_VIB.find((x) => x.key === base);
+      if (!f) return [];
+
+      /* El apoyo se nombra de tres formas: su id (`S1`), su rótulo («Lado
+         acople») y «sensor 1», que es como lo dice quien mira la máquina y
+         cuenta los acelerómetros. Las tres se cruzan con el nombre corto y con
+         el largo de la medida. */
+      const numero = c.sufijo.replace(/\D/g, "");
+      const apoyos = [c.id, c.label, `sensor ${numero}`, `apoyo ${numero}`];
+      const nombres = [f.corto, f.label].filter(Boolean);
+
+      return nombres.flatMap((nom) => apoyos.map((ap) => `${nom} ${ap}`));
+    },
     etiquetaDe: (clave) => {
       const v = VARIADOR_VIB.find((x) => x.key === clave);
       if (v) return v.label;
@@ -512,6 +561,9 @@ const normalizar = (t) =>
 /** Umbral de la contención: por debajo, un fragmento encaja en cualquier parte. */
 const MIN_CONTENCION = 4;
 
+/** Marca «este encaje no fue por contención directa»: no desempata por prefijo. */
+const SIN_PREFIJO = -1;
+
 /**
  * Cuánto de un nombre está DICHO dentro de una frase, aunque no seguido.
  *
@@ -539,12 +591,33 @@ const MIN_CONTENCION = 4;
  * apunta a un apoyo concreto — que es la verdad, y por eso salen los tres.
  */
 function cubiertoPorPalabras(nombre, frase) {
-  const palabras = nombre.split(/[^a-z0-9]+/i).filter((p) => p.length >= MIN_CONTENCION);
+  const palabras = nombre.split(/[^a-z0-9]+/i).filter(Boolean);
   if (palabras.length < 2) return 0;
 
+  /*
+   * ── LAS PALABRAS CORTAS CUENTAN, PERO ENTERAS ──────────────────────
+   *
+   * Antes se descartaban las de menos de cuatro letras, y eso dejaba fuera
+   * justo los nombres que la gente usa: «DKW sensor 1» son tres palabras y
+   * DOS de ellas —`dkw` y `1`— no llegaban al umbral. El alias entero se
+   * ignoraba y «el DKW del sensor 1» resolvía a CERO señales, teniendo serie.
+   *
+   * La razón del umbral era buena —que «S1» o «kpi» no disparen dentro de
+   * otra palabra— así que se conserva por otro camino: las cortas tienen que
+   * aparecer como PALABRA COMPLETA en la frase, no como fragmento. «dkw»
+   * encaja en «el dkw del sensor 1» y no en «bdkwx»; «1» encaja en «sensor 1»
+   * y no dentro de «601 rpm».
+   *
+   * Las largas siguen valiendo por contención simple: son específicas de por
+   * sí y exigirles palabra completa rompería «vibracion» contra «vibraciones».
+   */
   let peso = 0;
   for (const p of palabras) {
-    if (!frase.includes(p)) return 0;
+    const encaja =
+      p.length >= MIN_CONTENCION
+        ? frase.includes(p)
+        : new RegExp(`(^|[^a-z0-9])${p}([^a-z0-9]|$)`, "i").test(frase);
+    if (!encaja) return 0;
     peso += p.length;
   }
   return peso;
@@ -554,10 +627,17 @@ export function sistemasDeSenal(texto) {
   const q = normalizar(texto);
   if (!q) return [];
 
+  /* Todos los nombres por los que se puede pedir una señal: su clave, su
+     etiqueta y los alias que declare su máquina. Ver `aliasDe`. */
+  const nombresDe = (sistema, k) =>
+    [k, sistema.etiquetaDe(k), ...(sistema.aliasDe?.(k) ?? [])]
+      .map(normalizar)
+      .filter(Boolean);
+
   const exactos = [];
   for (const sistema of SISTEMAS) {
     for (const k of sistema.claves()) {
-      if (normalizar(k) === q || normalizar(sistema.etiquetaDe(k)) === q) {
+      if (nombresDe(sistema, k).includes(q)) {
         exactos.push({ sistema: sistema.id, clave: k });
       }
     }
@@ -578,13 +658,18 @@ export function sistemasDeSenal(texto) {
   const contenidos = [];
   for (const sistema of SISTEMAS) {
     for (const k of sistema.claves()) {
-      const candidatos = [normalizar(sistema.etiquetaDe(k)), normalizar(k)].filter(Boolean);
+      const candidatos = nombresDe(sistema, k);
       let largo = 0;
       let sobra = Infinity;
       for (const n of candidatos) {
+        /* Mismo criterio que en `cubiertoPorPalabras`: lo corto vale, pero
+           como palabra entera. Sin esto «DKW» —tres letras— no encajaba en
+           «DKW_S1» y la señal salía como inexistente teniendo serie. */
+        const comoPalabra = (aguja, pajar) =>
+          new RegExp(`(^|[^a-z0-9])${aguja}([^a-z0-9]|$)`, "i").test(pajar);
         const encaja =
-          (n.length >= MIN_CONTENCION && q.includes(n)) ||
-          (q.length >= MIN_CONTENCION && n.includes(q));
+          (n.length >= MIN_CONTENCION ? q.includes(n) : comoPalabra(n, q)) ||
+          (q.length >= MIN_CONTENCION ? n.includes(q) : comoPalabra(q, n));
         const puntos = encaja
           ? Math.min(n.length, q.length)
           : cubiertoPorPalabras(n, q);
@@ -592,7 +677,32 @@ export function sistemasDeSenal(texto) {
            desempate: es lo que separa «Velocidad eficaz · Lado acople» de
            «Confianza de la velocidad eficaz · Lado acople», y lo que NO separa
            a los tres apoyos entre sí —su diferencia va detrás—. */
-        const prefijo = n.includes(q) ? n.indexOf(q) : 0;
+        /*
+         * El prefijo sólo desempata cuando el nombre CONTIENE la consulta
+         * entera: ahí mide lo que el nombre añade por delante y separa
+         * «Velocidad eficaz…» de «Confianza de la velocidad eficaz…».
+         *
+         * Cuando el encaje fue por palabras sueltas no significa nada, y
+         * usarlo elige al azar: preguntado por «S1» a secas —que nombra el
+         * apoyo y ninguna medida— ganaba `DKW_S1` sólo por tener el nombre
+         * más corto. Son diez señales de ese apoyo y hay que preguntar cuál.
+         */
+        /*
+         * El prefijo mide lo que el nombre pone ANTES de lo preguntado, y sólo
+         * dice algo cuando lo preguntado es el nombre de la señal: ahí separa
+         * «Velocidad eficaz · Lado acople» de «Confianza de la velocidad
+         * eficaz · Lado acople».
+         *
+         * Si la consulta es sólo el APOYO —«S1», «sensor 1»— lo que queda
+         * delante es el nombre de la medida, y elegir el más corto es elegir
+         * al azar: `DKW_S1` ganaba a `vRMS_S1` por tener tres letras en vez de
+         * cuatro. Son diez señales de ese apoyo y hay que preguntar cuál.
+         *
+         * Se detecta por el final: si el nombre TERMINA en lo preguntado, lo
+         * de delante es la señal misma y no un calificador.
+         */
+        const soloElFinal = n.includes(q) && n.endsWith(q) && n.length > q.length;
+        const prefijo = n.includes(q) && !soloElFinal ? n.indexOf(q) : SIN_PREFIJO;
         if (puntos > largo) {
           largo = puntos;
           sobra = prefijo;
@@ -645,8 +755,15 @@ export function sistemasDeSenal(texto) {
    * que los tres siguen saliendo. Preguntado sin decir el apoyo, quien llama
    * tiene que preguntar cuál; ésa es la regla que no se toca.
    */
-  const ajuste = Math.min(...empatados.map((c) => c.sobra));
-  return empatados
+  /* Si NINGUNO encajó por contención directa, el prefijo no dice nada y no se
+     desempata: salen todos y quien llama pregunta. */
+  const conPrefijo = empatados.filter((c) => c.sobra !== SIN_PREFIJO);
+  if (!conPrefijo.length) {
+    return empatados.map(({ sistema, clave }) => ({ sistema, clave }));
+  }
+
+  const ajuste = Math.min(...conPrefijo.map((c) => c.sobra));
+  return conPrefijo
     .filter((c) => c.sobra === ajuste)
     .map(({ sistema, clave }) => ({ sistema, clave }));
 }

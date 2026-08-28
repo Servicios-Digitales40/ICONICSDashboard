@@ -225,8 +225,41 @@ describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta
   it("un nombre que no existe en ninguna máquina no inventa una", () => {
     expect(sistemasDeSenal("zumbido del compresor")).toEqual([]);
     expect(sistemasDeSenal("")).toEqual([]);
-    // Y un fragmento demasiado corto tampoco dispara dentro de otra palabra.
-    expect(sistemasDeSenal("S1")).toEqual([]);
+    // Un fragmento no dispara DENTRO de otra palabra: «601 rpm» lleva un «1»
+    // pegado a otras cifras y no puede resolver al apoyo 1.
+    expect(sistemasDeSenal("601 rpm")).toEqual([]);
+  });
+
+  it("un nombre corto vale, pero como palabra entera", () => {
+    /*
+     * «DKW» son tres letras y el umbral de contención exige cuatro, así que
+     * se descartaba: preguntado por «el DKW del sensor 1», el asistente
+     * contestó que esa señal NO EXISTE, teniendo su serie en el historiador.
+     *
+     * Las cortas cuentan ahora, pero tienen que aparecer como palabra
+     * completa. Eso conserva la razón del umbral —que «S1» no dispare dentro
+     * de otra palabra— sin perder los nombres que la gente usa de verdad.
+     */
+    const dkw = sistemasDeSenal("DKW");
+    expect(dkw.length).toBe(3);
+    expect(dkw.every((x) => x.clave.startsWith("DKW_"))).toBe(true);
+
+    // Y con el apoyo dicho, una sola.
+    expect(sistemasDeSenal("DKW del Sensor 1")).toEqual([
+      { sistema: "vibraciones", clave: "DKW_S1" },
+    ]);
+  });
+
+  it("nombrar sólo el APOYO no elige una medida por él", () => {
+    /*
+     * «S1» y «sensor 1» nombran el punto de medida, no la señal: hay diez
+     * señales en ese apoyo. Antes salía una sola —`DKW_S1`— porque el
+     * desempate por prefijo medía el largo del nombre de la medida y ganaba
+     * la más corta. Eso es elegir al azar y presentarlo como certeza.
+     */
+    const porApoyo = sistemasDeSenal("sensor 1");
+    expect(porApoyo.length).toBeGreaterThan(1);
+    expect(porApoyo.every((x) => x.clave.endsWith("_S1"))).toBe(true);
   });
 
   it("cada máquina resuelve sus propias claves, sin pisarse", () => {

@@ -779,6 +779,48 @@ await checkAsync('una señal SIN serie sí manda al instante, y una ambigua se p
   assert.equal(ambigua.claves.length, 3)
 })
 
+await checkAsync('un nombre corto como «DKW» encuentra su señal', async () => {
+  /*
+   * ── EL CASO QUE FALLÓ EN PANTALLA ──────────────────────────────
+   *
+   * «Como se comportó la variable DKW del Sensor 1 en vibraciones el día de
+   * ayer» → «No existe el nombre DKW». Existe, y tiene serie.
+   *
+   * Dos causas, las dos en la resolución de nombres:
+   *
+   *  · «DKW» son TRES letras y la contención exigía cuatro, así que el nombre
+   *    corto de la medida no llegaba a compararse. La etiqueta —«Valor
+   *    característico de daño»— no contiene esas letras por ningún lado.
+   *  · El registro sólo miraba la clave y la etiqueta. El catálogo declara
+   *    `corto: "DKW"` desde siempre y nadie lo exponía, y «sensor 1» no era
+   *    nombre de nada: el apoyo se rotula «Lado acople».
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'DKW del Sensor 1', periodo: 'ayer' })
+
+  assert.doesNotMatch(r.error ?? '', /no hay ninguna señal/i, 'DKW_S1 existe y tiene serie')
+  assert.doesNotMatch(r.error ?? '', /no es una señal del tanque/i)
+})
+
+await checkAsync('el nombre corto solo, sin apoyo, devuelve los tres', () => {
+  // Reconocer más nombres no puede convertirse en elegir por quien pregunta.
+  const dkw = sistemasDeSenal('DKW')
+  assert.equal(dkw.length, 3)
+  assert.equal(dkw.every((x) => x.clave.startsWith('DKW_')), true)
+
+  // Y nombrar sólo el APOYO tampoco elige una medida: son diez señales suyas.
+  const apoyo = sistemasDeSenal('sensor 1')
+  assert.ok(apoyo.length > 1, 'el apoyo no identifica UNA señal')
+  assert.equal(apoyo.every((x) => x.clave.endsWith('_S1')), true)
+})
+
+await checkAsync('lo corto no dispara dentro de otra palabra', () => {
+  /* La razón del umbral de cuatro caracteres sigue viva: se conserva
+     exigiendo palabra completa en vez de descartando lo corto. */
+  assert.deepEqual(sistemasDeSenal('601 rpm'), [])
+  assert.deepEqual(sistemasDeSenal('zumbido del compresor'), [])
+})
+
 await checkAsync('el registro no acepta una máquina que no declare su comportamiento', () => {
   /*
    * `validarRegistro()` corre en el import y no se puede volver a llamar desde
