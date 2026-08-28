@@ -102,6 +102,7 @@ data/       la frontera con la red
   hooks.js        useSistemaAgua(), useSerieHistorica()
   vibracion.js    la OTRA máquina: su propio sondeo en lote, sin `EvaProvider`
   simuladorVibracion.js  esa máquina sin red: sólo `read()`, no hay historia
+  transportes.js  clase de transporte → transporte, para CUALQUIER máquina
 
 lib/        derivaciones y formato, sin React salvo donde se indique
   buffer.js   búfer rodante de muestras vivas de la sesión

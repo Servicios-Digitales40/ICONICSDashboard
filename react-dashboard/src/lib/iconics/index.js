@@ -38,7 +38,13 @@ export { useIconicsPoint } from "./useIconicsPoint.js";
  */
 export { useAlarmCount } from "./useAlarmCount.js";
 
-export { QUALITY_GOOD, isGoodQuality } from "@shared/quality.js";
+export { QUALITY_GOOD, QUALITY_SIN_DATO, isGoodQuality } from "@shared/quality.js";
 export { createPollingEngine } from "./pollingEngine.js";
 export { TRANSPORTES, createRealTransport, esTransporteFalso, transporteInicial } from "./transport.js";
 export { CAOS_SUAVE, CAOS_ALTO, SIN_CAOS, presetCaos } from "./caos.js";
+
+/**
+ * La mecánica de un transporte falso, sin instalación: cada máquina le inyecta
+ * su física y se ahorra repetir latencia, huecos, calidad mala y no finitos.
+ */
+export { createTransporteSimulado } from "./transporteSimulado.js";

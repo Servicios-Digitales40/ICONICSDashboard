@@ -33,10 +33,16 @@ desplegar.
 | `quality.js` | Qué código de calidad OPC cuenta como bueno. Un valor malo es un hueco, nunca un cero |
 | `periodo.js` | De «julio 2026» o «ayer a las 12» a un rango concreto. Lo usa el asistente |
 
-### `eva/` · el sistema de agua industrial
+### `eva/` · las máquinas de la planta
 
-El dominio de la instalación: `ac:TDCON/DEMO/SENSORES/`, ocho señales planas.
+Hay **dos instalaciones**, separadas a propósito, y un registro que las declara.
 Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
+
+| Archivo | Qué contiene |
+|---|---|
+| `eva/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `esHistorizada()` |
+
+**El tanque** — `ac:TDCON/DEMO/SENSORES/`, ocho señales planas:
 
 | Archivo | Qué contiene |
 |---|---|
@@ -46,8 +52,23 @@ Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 | `eva/activos.js` | Los 4 activos, derivados del campo `activo` de las señales |
 | `eva/sistema.js` | `createSistema()`: saneamiento y evaluación en la frontera |
 | `eva/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
+| `eva/riesgos.js` | Las 10 reglas de riesgo de esta instalación |
+| `eva/simulador.js` | Su física: `valorEn(clave, ms)` y `valorDePunto(punto, ms)` |
 
-Estos seis vivían en `react-dashboard/src/Demo-EVA/domain/` y subieron aquí
+**El sistema de vibraciones** — `ac:TDCON/Motors/01/` más `ae:/DEMO VIBRACIONES`,
+73 puntos sobre tres apoyos:
+
+| Archivo | Qué contiene |
+|---|---|
+| `eva/vibraciones.js` | Catálogo compuesto: canales × medidas, banderas, vigilancias, confianzas, variador y contadores de alarma. Incluye las erratas del servidor, respetadas |
+| `eva/riesgosVibracion.js` | Las 18 reglas sobre los tres apoyos, con ISO 10816-1 Clase I |
+| `eva/simuladorVibraciones.js` | Su física: `valorVibracionEn(punto, ms)` |
+
+Los dos catálogos **no se unifican**, y no es pendiente de nadie: son dos formas
+de datos, no dos versiones de la misma. Lo que sí se comparte es el PUERTO que
+ambos implementan, y eso es lo que declara `sistemas.js`.
+
+Los del tanque vivían en `react-dashboard/src/Demo-EVA/domain/` y subieron aquí
 cuando el asistente pasó a responder sobre esta instalación. Es literalmente el
 caso que abre este documento: las herramientas de `backend/ia/` necesitan
 exactamente las mismas reglas que las vistas, y había que elegir entre duplicar
@@ -70,6 +91,47 @@ conserve su regla de importar siempre como `@/Demo-EVA/…`.
 > `domain/{machine,estado,history}.js`. Se fue entero con la transición al
 > modelo de agua. Lo único que se conservó de ese bloque es el saneamiento de
 > valores, que no sabía de máquinas y hoy es `valores.js`.
+
+## Cómo se añade una máquina
+
+Éste es el objetivo del registro, y la razón de que exista. Antes, dar de alta
+una máquina obligaba a tocar doce sitios, y el que más dolía era
+`backend/iconics/fakeClient.mjs`: una rama nueva en cinco funciones. El fallo
+que eso produce **ya ha ocurrido dos veces** — la máquina nueva no está en las
+ramas, cae en la de «punto de escritura» y sale con `value: null` y calidad
+BUENA. La pantalla no ve un fallo; ve una máquina que contesta y no dice nada.
+
+Hoy son **cinco pasos**, y ninguno toca el transporte:
+
+1. **Su catálogo** — `shared/eva/prensa.js`. Los tags, con sus irregularidades
+   del servidor respetadas, y un `parsePunto` que sea el inverso exacto por
+   construcción. Es el único archivo con nombres de tag de esa máquina.
+2. **Su física** — `shared/eva/simuladorPrensa.js`, una función pura
+   `(punto, ms) → valor | null | undefined`. Sin `Math.random()`: lo aleatorio
+   es del transporte, no de la señal.
+3. **Sus reglas** — `shared/eva/riesgosPrensa.js`, si la máquina va a tener
+   pantalla de riesgos.
+4. **Una entrada en `sistemas.js`** que enchufe los tres, con sus `raices`, su
+   `cadenciaMs` y sus `limitaciones`.
+5. **Sus vistas y su ruta**, más el hook de lectura — que para el origen
+   simulado es una línea: `transporteDe("prensa", clase)`.
+
+Lo que **no** hay que tocar: el transporte falso del backend, el transporte
+simulado del frontend, el interruptor de origen, su cinta de aviso, el
+remontaje al conmutar, ni el asistente — que descubre la máquina nueva solo, con
+sus limitaciones, en cuanto está en el registro.
+
+Y hay dos pruebas que la cubren **el día que se añada**, sin que nadie se
+acuerde de ir a escribirlas: `src/test/demo-eva/sistemas.test.js` y el bloque
+«Todas las máquinas del registro» de `scripts/verificar-transporte-falso.mjs`
+recorren `SISTEMAS` en bucle en vez de nombrar instalaciones.
+
+> **Generalizar el código no es unificar el dato.** El registro hace más fácil
+> escribir `SISTEMAS.flatMap(s => s.puntos())` y pedir un solo lote con todas
+> las máquinas — y eso es exactamente lo que no debe pasar: dos instalaciones
+> con PLC distinto no comparten nada por estar en la misma planta. Un motor de
+> sondeo **por sistema**, y la identidad del sistema viajando pegada al punto
+> (`parsePuntoDeSistema`). La cabecera de `eva/sistemas.js` lo explica largo.
 
 ## Reglas
 

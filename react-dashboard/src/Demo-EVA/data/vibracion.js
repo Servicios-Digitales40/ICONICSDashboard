@@ -42,10 +42,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { TRANSPORTES, useDataSource } from "@/lib/datasource";
-import { fetchIconicsBatch, presetCaos } from "@/lib/iconics";
+import { fetchIconicsBatch } from "@/lib/iconics";
 import { isGoodQuality } from "@shared/quality.js";
 
-import { createTransporteVibracion } from "./simuladorVibracion.js";
+import { transporteDe } from "./transportes.js";
 
 import {
   BANDERAS,
@@ -110,7 +110,9 @@ function valorDe(entrada) {
  */
 function crearLector(transporte) {
   if (transporte === TRANSPORTES.SIMULADO) {
-    const simulado = createTransporteVibracion({ chaos: presetCaos() });
+    /* La física la pone el registro de sistemas; aquí sólo se dice qué máquina
+       es. Una máquina nueva cambia la cadena y nada más. */
+    const simulado = transporteDe("vibraciones", transporte);
     return async (puntos) => ({ ok: true, mapa: await simulado.read(puntos) });
   }
 

@@ -9,29 +9,28 @@
  * exactamente el fallo que el Plan 9 arregló para el tanque y que aquí se
  * repetía por haber nacido después.
  *
- * ── POR QUÉ ES OTRO TRANSPORTE Y NO UNA RAMA DEL DE EVA ────────────
+ * ── QUÉ APORTA ESTE ARCHIVO, QUE SON DOS LÍNEAS ────────────────────
  *
- * Porque `createTransporteEva` sirve el árbol del tanque: su `read` empieza
- * por `parsePointName`, que sólo conoce las ocho señales de `senales.js`, y su
- * `readSerie` está construido sobre la lista de historizadas de esa
- * instalación. Meter aquí las vibraciones exigiría que ese archivo importara
- * el catálogo de la otra máquina — el cruce que `vibraciones.js` pide no hacer.
+ * Casi nada, y ésa es la idea. Desde que la mecánica del transporte se
+ * generalizó, aquí sólo se juntan las dos piezas de ESTA máquina:
  *
- * No hay `readSerie`, y no es un olvido: **ninguna señal de este catálogo está
- * historizada** (`esHistorizada` devuelve `false` en `vibraciones.js`, con su
- * porqué). Un simulador que sirviera series enseñaría a la pantalla una
- * instalación que no existe y se rompería al volver a datos reales.
+ *   la física   `@shared/eva/simuladorVibraciones.js`, compartida con el
+ *               transporte falso del backend — dos programas sirviendo el
+ *               mismo reloj de pared tienen que ver la misma máquina.
+ *   la mecánica `lib/iconics/transporteSimulado.js`, que no conoce ninguna
+ *               instalación: latencia, huecos, calidad mala y no finitos.
  *
- * ── QUÉ ES SUYO Y QUÉ NO ───────────────────────────────────────────
+ * Una máquina nueva escribe su física y repite estas doce líneas. Eso es todo
+ * lo que cuesta hoy tener origen simulado.
  *
- * La FÍSICA es de `@shared/eva/simuladorVibraciones.js`, que la comparte con el
- * transporte falso del backend: dos programas sirviendo el mismo reloj de pared
- * tienen que ver la misma máquina. Aquí queda el TRANSPORTE — la firma `read`,
- * la latencia, el caos y cómo se traduce «este punto no entrega valor» a lo que
- * el servidor real haría con él.
+ * ── NO HAY `readSerie`, Y NO ES UN OLVIDO ──────────────────────────
+ *
+ * **Ninguna señal de este catálogo está historizada** (`esHistorizada` devuelve
+ * `false` en `vibraciones.js`, con su porqué). Un simulador que sirviera series
+ * enseñaría a la pantalla una instalación que no existe y se rompería al volver
+ * a datos reales.
  */
-import { QUALITY_GOOD } from "@shared/quality.js";
-import { CAOS_SUAVE } from "@/lib/iconics";
+import { CAOS_SUAVE, createTransporteSimulado } from "@/lib/iconics";
 import { valorVibracionEn } from "@shared/eva/simuladorVibraciones.js";
 
 export {
@@ -42,23 +41,6 @@ export {
   faseCicloVib,
   valorVibracionEn,
 } from "@shared/eva/simuladorVibraciones.js";
-
-/** Calidad OPC "uncertain": lo que más se parece a un dato bueno sin serlo. */
-const QUALITY_UNCERTAIN = 64;
-
-/**
- * Calidad que el servidor real devuelve para estos puntos cuando se apagan:
- * `0x08000000`, y **sin campo `value`**. Está medida, no supuesta — es la que
- * se vio el 26-08-2026 cuando quince de veintiún puntos dejaron de entregar.
- *
- * Se reproduce con esa forma exacta a propósito. El fallo peligroso de esta
- * pantalla no es el hueco: es que alguien escriba `?? 0` sobre un punto sin
- * `value` y convierta «no contesta» en «vibración nula, todo perfecto». Si el
- * simulador sirviera un cero con calidad mala, ese fallo nunca se vería aquí.
- */
-const QUALITY_SIN_DATO = 0x08000000;
-
-const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Transporte simulado para el árbol de vibraciones.
@@ -72,50 +54,11 @@ export function createTransporteVibracion({
   ahora = () => Date.now(),
   rnd = Math.random,
 } = {}) {
-  async function read(pointNames) {
-    if (chaos.latenciaMs > 0) await espera(chaos.latenciaMs);
-
-    // Fallo de la petición entera, como un servidor caído o un token caducado.
-    if (rnd() < chaos.errorPeticion) {
-      throw new Error("simulador de vibraciones: fallo simulado de la petición");
-    }
-
-    const t = ahora();
-    const salida = new Map();
-
-    for (const name of pointNames) {
-      const valor = valorVibracionEn(name, t);
-
-      // Punto de otro árbol: se ignora en silencio, igual que hace el servidor
-      // real con lo que no tiene. Para el motor eso es un hueco, que es lo que es.
-      if (valor === undefined) continue;
-
-      // Punto ausente de la respuesta: no es un error, es un hueco silencioso.
-      if (rnd() < chaos.ausente) continue;
-
-      /* El punto existe y no entrega valor. Se sirve como lo sirve el
-         servidor: calidad de «sin dato» y `value` ausente, no un cero. */
-      if (valor === null) {
-        salida.set(name, { quality: QUALITY_SIN_DATO });
-        continue;
-      }
-
-      let value = valor;
-      let quality = QUALITY_GOOD;
-
-      if (rnd() < chaos.malaCalidad) {
-        // Mala calidad que llega con un cero, igual que hace ICONICS.
-        quality = QUALITY_UNCERTAIN;
-        value = 0;
-      } else if (typeof value === "number" && rnd() < chaos.noFinito) {
-        value = rnd() < 0.5 ? Infinity : NaN;
-      }
-
-      salida.set(name, { value, quality });
-    }
-
-    return salida;
-  }
-
-  return { read };
+  return createTransporteSimulado({
+    modelo: valorVibracionEn,
+    chaos,
+    ahora,
+    rnd,
+    etiqueta: "simulador de vibraciones",
+  });
 }

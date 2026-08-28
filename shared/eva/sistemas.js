@@ -30,6 +30,59 @@
  * Es lo que el asistente tiene que decir en voz alta al contestar sobre ese
  * sistema. Un dato que no existe y un dato que vale cero se ven igual en una
  * respuesta bien redactada, y la diferencia importa.
+ *
+ * ── ADEMÁS DE DESCRIBIR, AHORA SIRVE ───────────────────────────────
+ *
+ * Durante un tiempo este registro fue sólo metadatos para el asistente, y todo
+ * lo ejecutable —qué puntos sondear, cómo se parsea uno, de dónde sale su valor
+ * simulado— vivía repartido en `if`s por el frontend y por el transporte falso
+ * del backend. Cada máquina nueva añadía una rama a cinco funciones de
+ * `fakeClient.mjs`, y el fallo que eso produce ya se ha visto DOS veces en este
+ * proyecto: un simulador que sólo conoce un árbol deja la máquina nueva
+ * respondiendo `value: null` con calidad BUENA. La pantalla no ve un fallo; ve
+ * una máquina que contesta y no dice nada.
+ *
+ * Por eso cada entrada declara ahora también su COMPORTAMIENTO:
+ *
+ *   raices          prefijos de sus puntos. PLURAL: un sistema puede ocupar más
+ *                   de un espacio de nombres (ver la nota de `raices` abajo)
+ *   puntos()        todos sus puntos, para registrarlos de una vez
+ *   parse(nombre)   nombre → identidad dentro del sistema, o `null`
+ *   modelo(n, ms)   valor simulado de un punto. Ver el contrato abajo
+ *   esHistorizada() ¿se puede pedir la serie de esta clave sin mentir?
+ *   cadenciaMs      cada cuánto se relee esta máquina
+ *
+ * Con eso, dar de alta un sistema es escribir su catálogo, su física y sus
+ * reglas, y añadir una entrada aquí. El transporte falso, el simulado y el
+ * asistente lo descubren solos.
+ *
+ * ── EL CONTRATO DE `modelo` ────────────────────────────────────────
+ *
+ *   modelo(nombreDePunto, ms) → valor | null | undefined
+ *
+ *   `undefined`  el punto no es de este sistema
+ *   `null`       es de este sistema y AHORA MISMO no entrega valor
+ *   otra cosa    el valor
+ *
+ * Las dos primeras no son lo mismo y no pueden colapsarse. «No es mío» hace
+ * que el transporte deje el punto fuera de la respuesta; «no entrega» hace que
+ * lo sirva con calidad de sin-dato y **sin `value`**, que es lo que hace el
+ * servidor de verdad. Colapsarlas devuelve el fallo de arriba.
+ *
+ * ── ESTE REGISTRO NO ES UNA PUERTA PARA CRUZAR SISTEMAS ────────────
+ *
+ * Es la advertencia más importante del archivo, y va aquí porque generalizar
+ * hace la infracción MÁS fácil, no menos. En cuanto existe
+ * `SISTEMAS.flatMap(s => s.puntos())`, alguien pedirá un solo lote con las dos
+ * máquinas y las meterá en el mismo búfer — que es exactamente lo que la
+ * cabecera de `Demo-EVA/data/vibracion.js` explica que no debe pasar.
+ *
+ * Dos reglas, y no son negociables:
+ *
+ *   · Un motor de sondeo POR SISTEMA. La unificación es del código, nunca del
+ *     lote.
+ *   · La identidad del sistema viaja PEGADA al punto (`parsePuntoDeSistema`),
+ *     no se deduce después mirando el nombre.
  */
 
 /**
@@ -40,19 +93,50 @@
  *   maquina       qué equipo es, cuando se sabe
  *   plc           de dónde vienen sus datos. DOS SISTEMAS CON PLC DISTINTO
  *                 SON MÁQUINAS DISTINTAS
- *   raiz          prefijo de sus puntos en ICONICS
+ *   raices        prefijos de sus puntos en ICONICS (uno o varios)
  *   mide          qué señales tiene, en lenguaje de persona
  *   herramientas  qué puede llamar el asistente para este sistema
  *   historia      qué se puede pedir del pasado, y qué no
  *   limitaciones  lo que hay que confesar al contestar sobre él
+ *
+ * Y su comportamiento (ver la cabecera):
+ *
+ *   puntos, parse, modelo, esHistorizada, cadenciaMs
  */
+import {
+  TODOS_LOS_PUNTOS,
+  RAIZ,
+  esHistorizada as esHistorizadaTanque,
+  parsePointName,
+} from "./senales.js";
+import { valorDePunto } from "./simulador.js";
+import {
+  AREA_ALARMAS,
+  RAIZ_VIB,
+  esHistorizada as esHistorizadaVibracion,
+  parsePunto,
+  todosLosPuntos as todosLosPuntosVibracion,
+} from "./vibraciones.js";
+import { valorVibracionEn } from "./simuladorVibraciones.js";
+
 export const SISTEMAS = [
   {
     id: "tanque",
     nombre: "Tanque y grupo de bombeo",
     maquina: "Tanque de almacenamiento, bomba, red de distribución y su suministro",
     plc: "PLC_1 · ua:DEMO2",
-    raiz: "ac:TDCON/DEMO/SENSORES/",
+    raices: [RAIZ],
+    puntos: () => TODOS_LOS_PUNTOS,
+    /* `parse` devuelve la clave de dominio envuelta, para que las dos máquinas
+       tengan la MISMA forma de identidad aunque una la tenga plana y la otra
+       necesite tipo, familia y canal. */
+    parse: (nombre) => {
+      const clave = parsePointName(nombre);
+      return clave === null ? null : { tipo: "senal", clave, canal: null };
+    },
+    modelo: valorDePunto,
+    esHistorizada: esHistorizadaTanque,
+    cadenciaMs: 3_000,
     mide: [
       "nivel y temperatura del tanque",
       "caudal instantáneo y presión relativa de la red",
@@ -83,7 +167,24 @@ export const SISTEMAS = [
     nombre: "Sistema de vibraciones",
     maquina: "Motor WEG W22 143/5T, 2 HP (1,5 kW), 2 polos, con SIPLUS CMS 1200 SM 1281",
     plc: "PLC_2 · ua:DEMO3",
-    raiz: "ac:TDCON/Motors/01/",
+    /*
+     * DOS raíces, y por eso el campo es plural.
+     *
+     * Los contadores de alarma de esta máquina no son puntos de activo: son de
+     * AlarmWorX y viven en `ae:`, otro espacio de nombres. Con una sola raíz
+     * `ac:TDCON/Motors/01/`, `sistemaDePunto` devolvía `null` para los cuatro
+     * —comprobado— y `mismoSistema` contestaba «no sé» sobre dos puntos de la
+     * MISMA máquina. No rompía nada porque nadie llamaba a esas funciones
+     * todavía; era un fallo esperando a su primer usuario.
+     */
+    raices: [RAIZ_VIB, AREA_ALARMAS],
+    puntos: todosLosPuntosVibracion,
+    parse: parsePunto,
+    modelo: valorVibracionEn,
+    esHistorizada: esHistorizadaVibracion,
+    /* Más lenta que el tanque: el SM 1281 publica cada pocos segundos y no
+       tiene sentido pedirle más de lo que produce. */
+    cadenciaMs: 5_000,
     mide: [
       "velocidad eficaz, aceleración eficaz, pico y valor de daño en TRES apoyos",
       "estado de las vigilancias del módulo, incluidas las frecuencias de defecto de rodamiento",
@@ -141,10 +242,55 @@ export function mismoSistema(puntoA, puntoB) {
   return a.id === b.id;
 }
 
-/** A qué sistema pertenece un punto de ICONICS, o `null`. */
+/**
+ * A qué sistema pertenece un punto de ICONICS, o `null`.
+ *
+ * Mira TODAS las raíces de cada sistema, no una. Con una sola, los cuatro
+ * contadores de alarma de vibraciones —que viven en `ae:` y no en `ac:`—
+ * quedaban fuera del registro: su propia máquina no los reconocía.
+ */
 export function sistemaDePunto(punto) {
   if (typeof punto !== "string") return null;
-  return SISTEMAS.find((s) => punto.startsWith(s.raiz)) ?? null;
+  return SISTEMAS.find((s) => s.raices.some((r) => punto.startsWith(r))) ?? null;
+}
+
+/**
+ * Punto → `{ sistema, tipo, clave, canal }`, o `null` si no es de nadie.
+ *
+ * ── POR QUÉ LA IDENTIDAD DEL SISTEMA VIAJA PEGADA ──────────────────
+ *
+ * Porque la alternativa es deducirla después, y «después» es donde se pierde.
+ * Un valor suelto en un búfer no dice de qué máquina es; en cuanto dos sistemas
+ * comparten código, la única defensa contra cruzarlos es que su procedencia sea
+ * un campo del dato y no algo que haya que volver a mirar.
+ *
+ * Se prueba primero la raíz —barato, y descarta la mayoría— y sólo después se
+ * pide al catálogo del sistema que reconozca el punto. Que la raíz encaje no
+ * basta: un tag borrado en el servidor sigue empezando por la raíz correcta, y
+ * tiene que verse como dato ausente y nunca como otra señal.
+ */
+export function parsePuntoDeSistema(punto) {
+  const sistema = sistemaDePunto(punto);
+  if (!sistema) return null;
+
+  const detalle = sistema.parse(punto);
+  return detalle === null ? null : { sistema: sistema.id, ...detalle };
+}
+
+/**
+ * El valor simulado de un punto, venga de la máquina que venga.
+ *
+ * Es la función que permite que UN transporte falso sirva la planta entera, y
+ * la que hace que añadir una máquina no toque ni el backend ni el frontend:
+ * basta con que su entrada del registro traiga `modelo`.
+ *
+ * Devuelve `undefined` para un punto que no es de ningún sistema — el mismo
+ * contrato que cada `modelo` (ver la cabecera), para que quien la llame no
+ * tenga que distinguir «no hay sistema» de «el sistema no lo conoce». Las dos
+ * cosas significan lo mismo para un transporte: no es mío.
+ */
+export function valorSimuladoDe(punto, ms) {
+  return sistemaDePunto(punto)?.modelo(punto, ms);
 }
 
 /** Resumen del registro, para que el asistente pueda enumerarlos. */

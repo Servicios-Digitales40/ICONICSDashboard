@@ -25,6 +25,32 @@ export const QUALITY_GOOD = 192;
 /** OPC-UA StatusCode Good: lo que devuelve la REST API de FrameWorX. */
 export const QUALITY_GOOD_UA = 0;
 
+/** OPC-UA malo: bit alto puesto. Lo que sirve el servidor con un fallo duro. */
+export const QUALITY_BAD_UA = 0x80000000;
+
+/**
+ * "Uncertain": lo que más se parece a un dato bueno sin serlo. Los simuladores
+ * la usan para el caos de calidad, acompañada de un cero — que es como llega
+ * de ICONICS y por lo que la calidad se filtra en la frontera.
+ */
+export const QUALITY_UNCERTAIN = 64;
+
+/**
+ * Calidad de un punto que **existe y ha dejado de entregar**: `0x08000000`, y
+ * el servidor la manda **sin campo `value`**.
+ *
+ * Está MEDIDA, no supuesta: es la que devolvieron quince de veintiún puntos del
+ * sistema de vibraciones el 26-08-2026 a las 13:10:31, cuando se paró el
+ * variador. Vive aquí —y no en cada simulador— porque es un hecho del servidor,
+ * no de una instalación, y porque estuvo repetida a mano en tres archivos.
+ *
+ * La forma importa tanto como el número. `isGoodQuality` la rechaza, así que un
+ * lector correcto la convierte en «sin dato»; lo que esta constante protege es
+ * que nadie la sirva como un cero con calidad mala, porque entonces un `?? 0`
+ * río abajo convertiría «no contesta» en «vibración nula, todo perfecto».
+ */
+export const QUALITY_SIN_DATO = 0x08000000;
+
 /**
  * Acepta el good de ambas convenciones; cualquier otra calidad presente
  * (uncertain, bad) se rechaza.

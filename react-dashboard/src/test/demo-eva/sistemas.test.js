@@ -1,0 +1,165 @@
+/**
+ * sistemas.test.js
+ * ------------------------------------------------------------------
+ * El registro de sistemas como PUERTO: que toda máquina dada de alta cumpla el
+ * mismo contrato, y que dar de alta la siguiente no exija tocar nada más.
+ *
+ * ── POR QUÉ ESTAS PRUEBAS Y NO OTRAS ───────────────────────────────
+ *
+ * Porque el registro es ahora la pieza de la que cuelgan el transporte falso
+ * del backend, el simulado del frontend y el asistente. Una entrada mal
+ * declarada no da error: da una máquina que no aparece por ningún lado, o —peor—
+ * una que contesta `null` con calidad buena, que es el fallo que este proyecto
+ * ya ha cometido DOS veces.
+ *
+ * Se recorren `SISTEMAS` en bucle a propósito, sin nombrar ninguno: así la
+ * máquina que se dé de alta mañana queda cubierta el día que se añada, sin que
+ * nadie se acuerde de venir aquí. Es el único sitio del proyecto donde iterar
+ * todos los sistemas está bien — y aun así **nunca se mezclan sus puntos**: lo
+ * que se comprueba abajo es justamente que no se solapan.
+ */
+import { describe, expect, it } from "vitest";
+
+import {
+  SISTEMAS,
+  SISTEMA,
+  SISTEMA_IDS,
+  mismoSistema,
+  parsePuntoDeSistema,
+  sistemaDePunto,
+  valorSimuladoDe,
+} from "@shared/eva/sistemas.js";
+
+/** Reloj fijo: ninguna prueba puede depender de cuándo se ejecute. */
+const T0 = Date.UTC(2026, 7, 27, 9, 0, 0);
+
+describe("cada sistema cumple el contrato del puerto", () => {
+  it.each(SISTEMAS.map((s) => [s.id, s]))("«%s» declara su comportamiento", (id, sistema) => {
+    // Los seis campos ejecutables. Sin ellos la entrada es documentación, y el
+    // transporte falso la trataría como «punto que no existe».
+    expect(Array.isArray(sistema.raices)).toBe(true);
+    expect(sistema.raices.length).toBeGreaterThan(0);
+    expect(typeof sistema.puntos).toBe("function");
+    expect(typeof sistema.parse).toBe("function");
+    expect(typeof sistema.modelo).toBe("function");
+    expect(typeof sistema.esHistorizada).toBe("function");
+    expect(Number.isFinite(sistema.cadenciaMs)).toBe(true);
+  });
+
+  it.each(SISTEMAS.map((s) => [s.id, s]))(
+    "«%s»: todos sus puntos caen bajo alguna de sus raíces",
+    (id, sistema) => {
+      /*
+       * Es lo que hace que `sistemaDePunto` funcione, y el fallo que tuvo el
+       * registro durante un tiempo: los contadores de alarma de vibraciones
+       * viven en `ae:` y la entrada declaraba una sola raíz en `ac:`, así que
+       * su propia máquina no los reconocía.
+       */
+      const huerfanos = sistema
+        .puntos()
+        .filter((p) => !sistema.raices.some((r) => p.startsWith(r)));
+      expect(huerfanos).toEqual([]);
+    },
+  );
+
+  it.each(SISTEMAS.map((s) => [s.id, s]))(
+    "«%s»: todos sus puntos tienen modelo y se parsean",
+    (id, sistema) => {
+      /*
+       * `undefined` significa «no es de este árbol». Un punto propio que caiga
+       * ahí se vería en pantalla como un tag mudo, indistinguible de una
+       * máquina apagada: el fallo del simulador se leería como un fallo de la
+       * planta.
+       */
+      const puntos = sistema.puntos();
+      expect(puntos.length).toBeGreaterThan(0);
+
+      const sinModelo = puntos.filter((p) => sistema.modelo(p, T0) === undefined);
+      const sinParse = puntos.filter((p) => sistema.parse(p) === null);
+
+      expect(sinModelo).toEqual([]);
+      expect(sinParse).toEqual([]);
+    },
+  );
+
+  it.each(SISTEMAS.map((s) => [s.id, s]))(
+    "«%s»: su modelo NO reconoce puntos de las demás máquinas",
+    (id, sistema) => {
+      // El contrato de `modelo` sólo sirve si cada uno dice que no a lo ajeno.
+      // Si dos modelos reclamaran el mismo punto, `valorSimuladoDe` serviría el
+      // del primero del registro y nadie se enteraría.
+      const ajenos = SISTEMAS.filter((o) => o.id !== id).flatMap((o) => o.puntos());
+      const reclamados = ajenos.filter((p) => sistema.modelo(p, T0) !== undefined);
+      expect(reclamados).toEqual([]);
+    },
+  );
+});
+
+describe("los sistemas no se solapan", () => {
+  it("ningún punto pertenece a dos máquinas", () => {
+    const vistos = new Map();
+    for (const s of SISTEMAS) {
+      for (const p of s.puntos()) {
+        expect(vistos.has(p)).toBe(false);
+        vistos.set(p, s.id);
+      }
+    }
+  });
+
+  it("cada punto se resuelve a SU sistema, y a ninguno más", () => {
+    for (const s of SISTEMAS) {
+      for (const p of s.puntos()) {
+        expect(sistemaDePunto(p)?.id).toBe(s.id);
+        expect(parsePuntoDeSistema(p)?.sistema).toBe(s.id);
+      }
+    }
+  });
+
+  it("un punto ajeno no es de nadie", () => {
+    // Y `undefined`, no `null`: es el mismo contrato que cada `modelo`, para
+    // que un transporte no tenga que distinguir «no hay sistema» de «el
+    // sistema no lo conoce». Las dos cosas significan «no es mío».
+    expect(sistemaDePunto("ac:OTRA/PLANTA/X")).toBeNull();
+    expect(parsePuntoDeSistema("ac:OTRA/PLANTA/X")).toBeNull();
+    expect(valorSimuladoDe("ac:OTRA/PLANTA/X", T0)).toBeUndefined();
+  });
+
+  it("`mismoSistema` responde sobre dos puntos de la MISMA máquina", () => {
+    /*
+     * Es la regresión que motivó pasar `raiz` a `raices`. Un contador de alarma
+     * y una medida de vibración son de la misma máquina, y el registro
+     * contestaba `null` —«no sé»— porque el contador vivía en un espacio de
+     * nombres que la entrada no declaraba.
+     */
+    for (const s of SISTEMAS) {
+      const puntos = s.puntos();
+      expect(mismoSistema(puntos[0], puntos[puntos.length - 1])).toBe(true);
+    }
+  });
+
+  it("`mismoSistema` dice que NO entre máquinas distintas", () => {
+    // La salvaguarda de todo esto: dos instalaciones con PLC distinto no se
+    // correlacionan. Con un solo sistema dado de alta la comprobación no
+    // aplica, y decirlo es mejor que fingir que se comprobó.
+    if (SISTEMAS.length < 2) return;
+    expect(mismoSistema(SISTEMAS[0].puntos()[0], SISTEMAS[1].puntos()[0])).toBe(false);
+  });
+});
+
+describe("el registro se puede recorrer sin conocer las máquinas", () => {
+  it("`valorSimuladoDe` sirve cualquier punto de cualquier sistema", () => {
+    // Es la función de la que cuelga el transporte falso del backend. Si
+    // fallara para una máquina, esa máquina volvería a caer en la rama de
+    // «punto de escritura» y saldría con `value: null` y calidad BUENA.
+    for (const s of SISTEMAS) {
+      for (const p of s.puntos()) {
+        expect(valorSimuladoDe(p, T0)).not.toBeUndefined();
+      }
+    }
+  });
+
+  it("los índices por id cuadran con la lista", () => {
+    expect(SISTEMA_IDS).toEqual(SISTEMAS.map((s) => s.id));
+    for (const s of SISTEMAS) expect(SISTEMA[s.id]).toBe(s);
+  });
+});

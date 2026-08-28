@@ -38,8 +38,9 @@ import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/senales.js'
 import { valorEn } from '../shared/eva/simulador.js'
-import { RAIZ_VIB, puntoVariador, todosLosPuntos as todosLosPuntosVib } from '../shared/eva/vibraciones.js'
+import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones.js'
 import { valorVibracionEn } from '../shared/eva/simuladorVibraciones.js'
+import { SISTEMAS } from '../shared/eva/sistemas.js'
 import { isGoodQuality } from '../shared/quality.js'
 
 const c = {
@@ -126,39 +127,61 @@ await checkAsync('un punto ajeno al árbol no rompe el lote: llega como hueco', 
   assert.equal(r.payload['ac:OTRO/ARBOL/X'].payload.value, null)
 })
 
-/* ── El árbol de vibraciones ──────────────────────────────────────────── */
+/* ── Todas las máquinas del registro ─────────────────────── */
 
-console.log('\n── El árbol de vibraciones ──────────────────────────────────')
+console.log('\n── Todas las máquinas del registro ────────────────────')
 
-await checkAsync('los setenta y tres puntos de la otra máquina se sirven, no caen en la rama de escritura', async () => {
-  /*
-   * Es el fallo que motivó extender este transporte: los puntos de vibración
-   * no eran del catálogo del tanque, así que caían en la rama de «punto de
-   * escritura» y salían con `value: null` y calidad BUENA. La pantalla no veía
-   * un fallo — veía una máquina que contesta y no dice nada, que es la peor de
-   * las respuestas posibles.
-   */
-  const cliente = sinCaos()
-  const puntos = todosLosPuntosVib()
-  assert.equal(puntos.length, 73, 'el catálogo cambió de tamaño; revisa si es a propósito')
+/*
+ * Este bloque se escribe RECORRIENDO `shared/eva/sistemas.js`, no nombrando
+ * máquinas. La que se dé de alta mañana queda comprobada el día que se añada,
+ * sin que nadie se acuerde de venir aquí — que es exactamente lo que falló las
+ * dos veces anteriores.
+ */
+for (const sistema of SISTEMAS) {
+  await checkAsync(`«${sistema.id}»: sus puntos se sirven, no caen en la rama de escritura`, async () => {
+    /*
+     * El fallo que esto protege: un punto que el transporte falso no reconoce
+     * cae en la rama de «punto de escritura» y sale con `value: null` y calidad
+     * BUENA. La pantalla no ve un fallo — ve una máquina que contesta y no dice
+     * nada, que es la peor de las respuestas posibles.
+     */
+    const cliente = sinCaos()
+    const puntos = sistema.puntos()
+    assert.equal(puntos.length > 0, true, 'el sistema no declara ningún punto')
 
-  const r = await cliente.readPoints(puntos)
-  assert.equal(r.ok, true)
+    const r = await cliente.readPoints(puntos)
+    assert.equal(r.ok, true)
 
-  const buenos = puntos.filter(p => isGoodQuality(r.payload[p]?.payload?.quality))
-  assert.equal(
-    buenos.length > puntos.length / 2, true,
-    `sólo ${buenos.length} de ${puntos.length} puntos con calidad buena`,
-  )
-})
+    const buenos = puntos.filter(p => isGoodQuality(r.payload[p]?.payload?.quality))
+    assert.equal(
+      buenos.length > puntos.length / 2, true,
+      `sólo ${buenos.length} de ${puntos.length} puntos con calidad buena`,
+    )
+  })
 
-await checkAsync('la vibración sale del MISMO modelo que sirve el simulador del frontend', async () => {
-  const t = 1_700_000_000_000
-  const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
-  const punto = puntoVariador('velocidad')
+  await checkAsync(`«${sistema.id}»: el valor sale del MISMO modelo que sirve el frontend`, async () => {
+    const t = 1_700_000_000_000
+    const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
 
-  const r = await cliente.readPoint(punto)
-  assert.equal(r.payload.value, valorVibracionEn(punto, t))
+    // Un punto con valor en ese instante: el primero que no esté callado.
+    const punto = sistema.puntos().find(p => sistema.modelo(p, t) !== null)
+    assert.equal(Boolean(punto), true, 'ningún punto entrega valor en ese instante')
+
+    const r = await cliente.readPoint(punto)
+    assert.equal(r.payload.value, sistema.modelo(punto, t))
+  })
+}
+
+await checkAsync('ningún punto pertenece a dos máquinas', async () => {
+  // Si dos catálogos reclamaran el mismo punto, `valorSimuladoDe` serviría el
+  // del primero del registro y nadie se enteraría.
+  const vistos = new Map()
+  for (const sistema of SISTEMAS) {
+    for (const p of sistema.puntos()) {
+      assert.equal(vistos.has(p), false, `«${p}» está en ${vistos.get(p)} y en ${sistema.id}`)
+      vistos.set(p, sistema.id)
+    }
+  }
 })
 
 await checkAsync('un punto que no entrega llega SIN `value`, no como un cero', async () => {

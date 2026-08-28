@@ -43,24 +43,31 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 
 import { TRANSPORTES, useDataSource } from "@/lib/datasource";
-import { createRealTransport, presetCaos } from "@/lib/iconics";
+import { presetCaos } from "@/lib/iconics";
 import { createEvaSource } from "./evaSource.js";
 import { createTransporteEva } from "./simulador.js";
+import { transporteDe } from "./transportes.js";
 
 const Ctx = createContext(null);
 
 /**
  * El transporte de esta sección para un origen dado.
  *
- * El simulado es el de Demo EVA; el real es el compartido, que ya sabe hablar
- * con el puente y no distingue de qué árbol son los puntos. El grado de caos
- * sale de `VITE_ICONICS_CHAOS`, que es un ajuste del entorno y no de la
- * instalación: cualquier simulador que se añada debe degradar igual.
+ * Es `transporteDe("tanque", …)` —la misma función que usa cualquier otra
+ * máquina— **salvo en el origen simulado**, donde esta sección necesita algo
+ * que las demás no tienen: `readSerie()`, el sustituto del historiador. Por eso
+ * aquí se construye `createTransporteEva`, que es ese `read` genérico más su
+ * historia.
+ *
+ * El día que otra máquina tenga serie propia, esta rama es la que hay que
+ * mirar: o el registro declara también un `serie`, o cada sección sigue
+ * poniendo la suya. Con un solo ejemplo no hay forma de saber cuál de las dos
+ * es la buena, así que no se decide todavía.
  */
-const transporteDe = (clase) =>
+const transporteDeLaSeccion = (clase) =>
   clase === TRANSPORTES.SIMULADO
     ? createTransporteEva({ chaos: presetCaos() })
-    : createRealTransport();
+    : transporteDe("tanque", clase);
 
 export function EvaProvider({ children }) {
   /*
@@ -73,7 +80,7 @@ export function EvaProvider({ children }) {
   // La fuente se crea una sola vez por transporte. Recrearla en cada render
   // abriría un motor de polling nuevo cada vez.
   const source = useMemo(
-    () => createEvaSource({ transport: transporteDe(transporte) }),
+    () => createEvaSource({ transport: transporteDeLaSeccion(transporte) }),
     [transporte]
   );
 

@@ -36,24 +36,25 @@
  *    importa de ahí porque es un módulo de React; se repite el NÚMERO, no el
  *    código.
  *
- * ── LAS DOS MÁQUINAS ─────────────────────────────────────────────────
+ * ── ESTE ARCHIVO NO SABE CUÁNTAS MÁQUINAS HAY ────────────────────────
  *
- * Sirve DOS árboles, y con dos modelos físicos separados:
+ * Y es deliberado. Quien lo sabe es `shared/eva/sistemas.js`; aquí se pregunta
+ * al registro por el valor de un punto (`valorSimuladoDe`) y por las ramas que
+ * enumerar (`SISTEMAS`), sin nombrar ninguna instalación.
  *
- *   ac:TDCON/DEMO/SENSORES/…   el tanque      → `shared/eva/simulador.js`
- *   ac:TDCON/Motors/01/…       vibraciones    → `shared/eva/simuladorVibraciones.js`
- *   ae:/DEMO VIBRACIONES=…     sus contadores → idem
+ * Antes eran `if`s por máquina repartidos por cinco funciones —`readPoint`,
+ * `readPoints`, `browse`, `search`, `readHistory`—, y el fallo que eso produce
+ * ya se ha visto DOS veces en este proyecto: la máquina que nace después no
+ * está en las ramas, cae en la de «punto de escritura» y sale con
+ * `value: null` y calidad BUENA. La pantalla no ve un fallo — ve una máquina
+ * que contesta y no dice nada. Con tres máquinas serían quince ramas y la
+ * tercera lo habría repetido.
  *
- * El segundo se añadió después: hasta entonces, `ICONICS_FAKE=true` dejaba los
- * veintiún puntos de vibración cayendo en la rama de «punto de escritura» —se
- * respondían con `value: null` y calidad BUENA—, que es la peor de las
- * respuestas posibles: la pantalla no veía un fallo, veía una máquina que
- * contesta y no dice nada.
- *
- * Los dos árboles se resuelven por separado y no se mezclan nunca en la misma
- * función. Son dos instalaciones sin un punto en común, y la cabecera de
- * `shared/eva/vibraciones.js` explica largo por qué cruzarlas sería un error de
- * fondo y no de estilo.
+ * Lo que NO cambia es que las máquinas siguen sin mezclarse: `browse` enumera
+ * la rama pedida y no la unión, cada punto se resuelve contra el sistema al que
+ * pertenece, y `sistemas.js` lleva su propia advertencia sobre por qué cruzar
+ * dos instalaciones sería un error de fondo y no de estilo. Generalizar el
+ * código no es unificar el dato.
  *
  * ── LO QUE NO HACE ───────────────────────────────────────────────────
  *
@@ -63,20 +64,11 @@
  * una prueba manual. Quien quiera ensayar un ICONICS caído para esto ya tiene
  * `client: null` o desenchufar `ICONICS_API_BASE` sin `ICONICS_FAKE`.
  */
-import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, parsePointName } from '../../shared/eva/senales.js'
+import { esHistorizada, parsePointName } from '../../shared/eva/senales.js'
 import { MAX_PUNTOS } from '../../shared/eva/historia.js'
-import { mediaDelTramo, valorEn } from '../../shared/eva/simulador.js'
-import { RAIZ_VIB, todosLosPuntos as todosLosPuntosVib } from '../../shared/eva/vibraciones.js'
-import { valorVibracionEn } from '../../shared/eva/simuladorVibraciones.js'
-import { QUALITY_GOOD_UA } from '../../shared/quality.js'
-
-/**
- * Calidad OPC-UA mala: bit alto puesto. La REST API de FrameWorX es la
- * convención que sigue este cliente falso, no la OPC-DA de `192` — es la que
- * `isGoodQuality()` y `herramientas.mjs` esperan del servidor real. Ver
- * `shared/quality.js`.
- */
-const QUALITY_BAD_UA = 0x80000000
+import { mediaDelTramo } from '../../shared/eva/simulador.js'
+import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/sistemas.js'
+import { QUALITY_BAD_UA, QUALITY_GOOD_UA, QUALITY_SIN_DATO } from '../../shared/quality.js'
 
 /**
  * Probabilidades de caos, calcadas de `CAOS_SUAVE` en
@@ -87,24 +79,25 @@ const QUALITY_BAD_UA = 0x80000000
 const CAOS = { malaCalidad: 0.02, ausente: 0.01 }
 
 /**
- * Calidad con la que el servidor real sirve un punto de vibración que ha
- * dejado de entregar: `0x08000000`, y **sin campo `value`**. Está medida —es
- * la que se vio el 26-08-2026 cuando quince de veintiún puntos se apagaron a
- * la vez—, y se reproduce con esa forma exacta y no como un cero con calidad
- * mala. El fallo que esto protege es un `?? 0` río abajo convirtiendo «no
- * contesta» en «vibración nula, todo perfecto».
- */
-const QUALITY_SIN_DATO = 0x08000000
-
-/**
- * Lectura falsa de un punto del árbol de VIBRACIONES, o `null` si el punto no
- * es de ese árbol —y entonces le toca a otra rama de `readPoint`—.
+ * Lectura falsa de un punto de CUALQUIER máquina dada de alta, o `null` si no
+ * es de ninguna —y entonces le toca a la rama de punto de escritura—.
  *
- * `valorVibracionEn` distingue tres cosas y aquí se traducen las tres: punto
+ * ── POR QUÉ ESTO LO DECIDE EL REGISTRO Y NO UN `if` ────────────────
+ *
+ * Porque antes eran `if`s, uno por máquina, repetidos en cinco funciones de
+ * este archivo. Con dos máquinas ya se había visto fallar dos veces: la que
+ * nacía después caía en la rama de escritura y salía con `value: null` y
+ * calidad BUENA, así que la pantalla no veía un fallo — veía una máquina que
+ * contesta y no dice nada. Con quince ramas, la tercera lo habría repetido.
+ *
+ * Ahora el que sabe qué máquinas hay es `shared/eva/sistemas.js`, y este
+ * archivo no se entera de cuántas son.
+ *
+ * `valorSimuladoDe` distingue tres cosas y aquí se traducen las tres: punto
  * ajeno (`undefined`), punto propio que ahora no entrega (`null`) y valor.
  */
-function lecturaVibracion(name, t, rnd) {
-  const valor = valorVibracionEn(name, t)
+function lecturaSimulada(name, t, rnd) {
+  const valor = valorSimuladoDe(name, t)
   if (valor === undefined) return null
   if (valor === null) return { pointName: name, quality: QUALITY_SIN_DATO }
   if (rnd() < CAOS.malaCalidad) return { pointName: name, value: 0, quality: QUALITY_BAD_UA }
@@ -182,23 +175,13 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
   async function readPoint(name) {
     if (!name) return { ok: false, status: 400, error: 'pointName is required.' }
 
-    const clave = parsePointName(name)
-    if (clave) {
+    const lectura = lecturaSimulada(name, ahora(), rnd)
+    if (lectura) {
       if (rnd() < CAOS.ausente) return { ok: false, status: 404, error: 'Point not found.' }
-      const bad = rnd() < CAOS.malaCalidad
-      return {
-        ok: true, status: 200, pointName: name,
-        payload: { value: bad ? 0 : valorEn(clave, ahora()), quality: bad ? QUALITY_BAD_UA : QUALITY_GOOD_UA },
-      }
+      return { ok: true, status: 200, pointName: name, payload: lectura }
     }
 
-    const vib = lecturaVibracion(name, ahora(), rnd)
-    if (vib) {
-      if (rnd() < CAOS.ausente) return { ok: false, status: 404, error: 'Point not found.' }
-      return { ok: true, status: 200, pointName: name, payload: vib }
-    }
-
-    // Fuera de los dos catálogos: es un punto de escritura (`CONTROL`) o uno
+    // Fuera de todos los catálogos: es un punto de escritura (`CONTROL`) o uno
     // que no existe. Los dos se sirven igual — lo último escrito, o `null` si
     // nunca se escribió — porque el servidor real tampoco distingue las dos
     // cosas en una lectura sencilla.
@@ -213,35 +196,15 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     const byPointName = {}
 
     for (const name of pointNames) {
-      const clave = parsePointName(name)
-
       // Un punto ausente de la respuesta es un hueco, no un error — igual que
       // hace `read()` del simulador del frontend con `chaos.ausente`.
       if (rnd() < CAOS.ausente) continue
 
-      if (clave) {
-        const bad = rnd() < CAOS.malaCalidad
-        byPointName[name] = {
-          ok: true, status: 200,
-          payload: {
-            pointName: name,
-            value: bad ? 0 : valorEn(clave, t),
-            quality: bad ? QUALITY_BAD_UA : QUALITY_GOOD_UA,
-          },
-        }
-        continue
-      }
-
-      const vib = lecturaVibracion(name, t, rnd)
-      if (vib) {
-        byPointName[name] = { ok: true, status: 200, payload: vib }
-        continue
-      }
-
-      // Fuera de los dos catálogos: punto de escritura, o inexistente.
+      const lectura = lecturaSimulada(name, t, rnd)
       byPointName[name] = {
         ok: true, status: 200,
-        payload: { pointName: name, value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
+        // Fuera de todos los catálogos: punto de escritura, o inexistente.
+        payload: lectura ?? { pointName: name, value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
       }
     }
 
@@ -278,15 +241,20 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     const clave = parsePointName(nombrePunto)
     if (!clave) {
       /*
-       * Un punto de VIBRACIONES tampoco tiene serie aquí, y el error dice por
-       * qué: el grupo `DEMO 3` del Hyper Historian está definido pero no
-       * entrega —HTTP 500 en sus 119 tags el 25-08-2026, y `esHistorizada`
-       * sigue en `false` en `shared/eva/vibraciones.js` hasta que la
+       * El punto puede ser de OTRA máquina dada de alta, y entonces el error
+       * dice por qué. El caso vivo es vibraciones: el grupo `DEMO 3` del Hyper
+       * Historian está definido pero no entrega —HTTP 500 en sus 119 tags el
+       * 25-08-2026, y su `esHistorizada` sigue en `false` hasta que la
        * configuración deje de moverse—. Servir aquí una serie inventada
-       * enseñaría al asistente a pedir tendencias de esta máquina, que es
-       * exactamente lo que ese archivo prohíbe afirmar todavía.
+       * enseñaría al asistente a pedir tendencias de una máquina que todavía
+       * no las tiene.
+       *
+       * Se pregunta al REGISTRO y no a un catálogo concreto: una máquina nueva
+       * sin historia entra sola en este camino, y el día que alguna la tenga,
+       * `esHistorizada` de su entrada será lo único que haya que mirar.
        */
-      if (valorVibracionEn(nombrePunto, ahora()) !== undefined) {
+      const otro = sistemaDePunto(nombrePunto)
+      if (otro?.parse(nombrePunto)) {
         return {
           ok: false, status: 500,
           error: 'ICONICS History request failed: point is not being collected.',
@@ -360,25 +328,25 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
 
   /**
    * Enumerar el árbol devuelve los puntos de LA rama pedida, no la unión de
-   * las dos. Es lo que hace el servidor —`ac:TDCON/DEMO/SENSORES/` y
-   * `ac:TDCON/Motors/01/` son ramas hermanas— y también lo que evita que quien
-   * explore el tanque se encuentre acelerómetros de otra máquina en la lista.
-   * Sin ruta, se enumeran las dos: es la raíz.
+   * todas. Es lo que hace el servidor —las raíces de cada máquina son ramas
+   * hermanas— y también lo que evita que quien explore el tanque se encuentre
+   * acelerómetros de otra máquina en la lista. Sin ruta, se enumeran todas:
+   * es la raíz.
    */
   async function browse(path) {
     const p = path ?? ''
     const puntos = []
-    if (!p || RAIZ.startsWith(p) || p.startsWith(RAIZ)) puntos.push(...TODOS_LOS_PUNTOS)
-    if (!p || RAIZ_VIB.startsWith(p) || p.startsWith(RAIZ_VIB)) puntos.push(...todosLosPuntosVib())
+    for (const sistema of SISTEMAS) {
+      const tocado = !p || sistema.raices.some(r => r.startsWith(p) || p.startsWith(r))
+      if (tocado) puntos.push(...sistema.puntos())
+    }
     return { ok: true, status: 200, payload: puntos }
   }
 
   async function search(text) {
     const q = String(text ?? '').toLowerCase()
-    return {
-      ok: true, status: 200,
-      payload: [...TODOS_LOS_PUNTOS, ...todosLosPuntosVib()].filter(p => p.toLowerCase().includes(q)),
-    }
+    const todos = SISTEMAS.flatMap(s => s.puntos())
+    return { ok: true, status: 200, payload: todos.filter(p => p.toLowerCase().includes(q)) }
   }
 
   async function readUserInfo() {

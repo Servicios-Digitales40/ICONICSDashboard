@@ -34,6 +34,8 @@
  * sobrecalentamiento, caída de tensión y sobrecarga.
  */
 
+import { parsePointName } from './senales.js'
+
 const TAU = Math.PI * 2
 const frac = x => x - Math.floor(x)
 
@@ -227,6 +229,36 @@ export function valorEn(clave, ms) {
     default:
       return null
   }
+}
+
+/**
+ * El valor de un PUNTO, no de una clave de dominio. Pura.
+ *
+ * ── POR QUÉ EXISTE ESTA ENVOLTURA DE TRES LÍNEAS ───────────────────
+ *
+ * Porque es la firma que comparten todas las máquinas, y sin ella no había
+ * ninguna. `valorEn` habla en claves (`nivelTanque`) porque es lo natural para
+ * el tanque; el modelo del sistema de vibraciones habla en NOMBRES DE PUNTO,
+ * porque sus 73 puntos no tienen una clave plana que los identifique — hacen
+ * falta tipo, familia y canal.
+ *
+ * Un transporte simulado que quiera servir a las dos no puede elegir: necesita
+ * la misma firma en las dos. Ésta es esa firma, y es el contrato que declara
+ * cada sistema en `sistemas.js`:
+ *
+ *   modelo(nombreDePunto, ms) → valor | null | undefined
+ *
+ *   `undefined`  el punto no es de este árbol
+ *   `null`       es de este árbol y ahora mismo no entrega valor
+ *   otra cosa    el valor
+ *
+ * El tanque nunca devuelve `null`: sus ocho señales entregan siempre. Que el
+ * caso exista igual no es ceremonia — es lo que permite que el mismo
+ * transporte sirva a una máquina que sí se calla, como la de vibraciones.
+ */
+export function valorDePunto(nombre, ms) {
+  const clave = parsePointName(nombre)
+  return clave === null ? undefined : valorEn(clave, ms)
 }
 
 /** Cuántas submuestras se promedian por punto de la rejilla histórica. */

@@ -6,6 +6,19 @@
  * `readSerie()` que sustituye al historiador, y con eso el interruptor de origen
  * del Topbar sirve también esta sección. Ver docs/PLAN-9-SIMULADOR-EVA.md.
  *
+ * ── QUÉ QUEDA AQUÍ DESPUÉS DE GENERALIZAR EL TRANSPORTE ────────────
+ *
+ * El `read()` ya no se escribe aquí: la mecánica —latencia, huecos, calidad
+ * mala, no finitos, el `Map` de salida— es de `lib/iconics/transporteSimulado.js`,
+ * que no conoce ninguna instalación y recibe la física por parámetro. Lo que
+ * este archivo aporta a esa lectura es una sola línea: `modelo: valorDePunto`.
+ *
+ * Lo que NO se pudo generalizar es `readSerie()`, y no por falta de ganas: el
+ * historiador de esta instalación tiene reglas suyas —qué señales tienen serie
+ * propia, cómo se resuelve un rango, dónde recorta— que la máquina de
+ * vibraciones directamente no tiene, porque no tiene historia. Generalizar eso
+ * con un solo ejemplo sería inventarse el contrato de la segunda.
+ *
  * ── POR QUÉ VIVE AQUÍ Y NO EN `lib/iconics/` ───────────────────────
  *
  * Porque `lib/` es infraestructura compartida y no debe conocer ninguna
@@ -38,19 +51,15 @@
  * ahí la aleatoriedad es el punto: un hueco es un suceso pasajero, no una
  * propiedad de la línea de tiempo.
  */
-import { QUALITY_GOOD } from "@shared/quality.js";
-import { CAOS_SUAVE } from "@/lib/iconics";
+import { CAOS_SUAVE, createTransporteSimulado } from "@/lib/iconics";
 import {
-  CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorEn,
+  CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorDePunto, valorEn,
 } from "@shared/eva/simulador.js";
 
-import { esHistorizada, parsePointName, senalInfo } from "../domain/senales.js";
+import { esHistorizada, senalInfo } from "../domain/senales.js";
 import { MAX_PUNTOS, SIN_SERIE, VENTANA } from "./historia.js";
 
 export { CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorEn };
-
-/** Calidad OPC "uncertain": lo que más se parece a un dato bueno sin serlo. */
-const QUALITY_UNCERTAIN = 64;
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -68,47 +77,20 @@ export function createTransporteEva({
   rnd = Math.random,
 } = {}) {
   /**
-   * Lectura en lote, con la misma firma que el transporte real.
+   * Lectura en lote: la mecánica es de `createTransporteSimulado` y lo único
+   * que pone esta sección es su física.
    *
-   * Un punto que no sea de este árbol se ignora en silencio, igual que hace
-   * el transporte real con los que el servidor no tiene: para el motor eso es un
+   * Un punto que no sea de este árbol se ignora en silencio, igual que hace el
+   * transporte real con los que el servidor no tiene: para el motor eso es un
    * hueco, que es exactamente lo que es.
    */
-  async function read(pointNames) {
-    if (chaos.latenciaMs > 0) await espera(chaos.latenciaMs);
-
-    // Fallo de la petición entera, como un servidor caído o un token caducado.
-    // Debe disparar el backoff del motor.
-    if (rnd() < chaos.errorPeticion) {
-      throw new Error("simulador EVA: fallo simulado de la petición");
-    }
-
-    const t = ahora();
-    const salida = new Map();
-
-    for (const name of pointNames) {
-      const clave = parsePointName(name);
-      if (!clave) continue;
-
-      // Punto ausente de la respuesta: no es un error, es un hueco silencioso.
-      if (rnd() < chaos.ausente) continue;
-
-      let value = valorEn(clave, t);
-      let quality = QUALITY_GOOD;
-
-      if (rnd() < chaos.malaCalidad) {
-        // Mala calidad que llega con un cero, igual que hace ICONICS.
-        quality = QUALITY_UNCERTAIN;
-        value = 0;
-      } else if (typeof value === "number" && rnd() < chaos.noFinito) {
-        value = rnd() < 0.5 ? Infinity : NaN;
-      }
-
-      salida.set(name, { value, quality });
-    }
-
-    return salida;
-  }
+  const { read } = createTransporteSimulado({
+    modelo: valorDePunto,
+    chaos,
+    ahora,
+    rnd,
+    etiqueta: "simulador EVA",
+  });
 
   /**
    * `{ horas, puntos }` (relativo a `ahora()`) o `{ inicio, fin }` (rango
