@@ -89,6 +89,15 @@ fallo, porque un simulador que no ejercita nada pasaría inadvertido.
 motor de polling anterior **se detiene de verdad** y el árbol de datos se
 remonta, para que no queden valores del origen anterior en pantalla.
 
+**El origen simulado cubre las DOS máquinas.** El tanque lo sirve
+`Demo-EVA/data/simulador.js`; el sistema de vibraciones,
+`Demo-EVA/data/simuladorVibracion.js`. Son dos archivos porque son dos
+instalaciones sin un punto en común — la misma razón por la que tienen catálogos
+y reglas separados. Durante un tiempo sólo existía el primero y `useVibracion`
+salía a la red pasara lo que pasara: con «Simulado» puesto, esa sección se
+quedaba entera muda. Lo cubre `test/demo-eva/vibraciones-simulada.test.jsx`, que
+monta las vistas con `fetch` cortado.
+
 ### Por qué «Simulado» se anuncia tan insistentemente
 
 Los valores del transporte falso son plausibles a propósito: el nivel del tanque

@@ -76,8 +76,19 @@ describe("las dos pantallas de «Riesgos» comparten layout", () => {
     // hace que se busque en el mismo sitio en las dos máquinas.
     montar(RiesgosVibracionEva);
 
-    // Con el origen simulado la máquina de vibraciones no entrega lecturas,
-    // así que hay reglas sin comprobar y la sección tiene que aparecer.
+    /*
+     * Se comprueba en el primer render, antes de que llegue ninguna lectura:
+     * sin datos, TODAS las reglas que necesitan un número están sin comprobar y
+     * la sección tiene que estar.
+     *
+     * Antes esta prueba decía «con el origen simulado la máquina de vibraciones
+     * no entrega lecturas», y era cierto — el hook salía a la red aunque el
+     * origen fuera simulado, así que la sección se quedaba muda para siempre.
+     * Desde `simuladorVibracion.js` ya no: el motor simulado se para dos
+     * minutos de cada diez y sólo entonces vuelve a haber reglas sin comprobar.
+     * Colgar la aserción de ese momento la haría depender del reloj, así que se
+     * ancla en el estado inicial, que es el que no depende de nada.
+     */
     expect(await screen.findByText(/Sin comprobar/i)).toBeTruthy();
   });
 

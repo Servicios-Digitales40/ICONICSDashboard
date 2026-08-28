@@ -36,6 +36,25 @@
  *    importa de ahí porque es un módulo de React; se repite el NÚMERO, no el
  *    código.
  *
+ * ── LAS DOS MÁQUINAS ─────────────────────────────────────────────────
+ *
+ * Sirve DOS árboles, y con dos modelos físicos separados:
+ *
+ *   ac:TDCON/DEMO/SENSORES/…   el tanque      → `shared/eva/simulador.js`
+ *   ac:TDCON/Motors/01/…       vibraciones    → `shared/eva/simuladorVibraciones.js`
+ *   ae:/DEMO VIBRACIONES=…     sus contadores → idem
+ *
+ * El segundo se añadió después: hasta entonces, `ICONICS_FAKE=true` dejaba los
+ * veintiún puntos de vibración cayendo en la rama de «punto de escritura» —se
+ * respondían con `value: null` y calidad BUENA—, que es la peor de las
+ * respuestas posibles: la pantalla no veía un fallo, veía una máquina que
+ * contesta y no dice nada.
+ *
+ * Los dos árboles se resuelven por separado y no se mezclan nunca en la misma
+ * función. Son dos instalaciones sin un punto en común, y la cabecera de
+ * `shared/eva/vibraciones.js` explica largo por qué cruzarlas sería un error de
+ * fondo y no de estilo.
+ *
  * ── LO QUE NO HACE ───────────────────────────────────────────────────
  *
  * No simula latencia de red ni fallos de petición: el chat ya tiene su propia
@@ -47,6 +66,8 @@
 import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, parsePointName } from '../../shared/eva/senales.js'
 import { MAX_PUNTOS } from '../../shared/eva/historia.js'
 import { mediaDelTramo, valorEn } from '../../shared/eva/simulador.js'
+import { RAIZ_VIB, todosLosPuntos as todosLosPuntosVib } from '../../shared/eva/vibraciones.js'
+import { valorVibracionEn } from '../../shared/eva/simuladorVibraciones.js'
 import { QUALITY_GOOD_UA } from '../../shared/quality.js'
 
 /**
@@ -64,6 +85,31 @@ const QUALITY_BAD_UA = 0x80000000
  * resuelve, y son cuatro constantes, no una librería.
  */
 const CAOS = { malaCalidad: 0.02, ausente: 0.01 }
+
+/**
+ * Calidad con la que el servidor real sirve un punto de vibración que ha
+ * dejado de entregar: `0x08000000`, y **sin campo `value`**. Está medida —es
+ * la que se vio el 26-08-2026 cuando quince de veintiún puntos se apagaron a
+ * la vez—, y se reproduce con esa forma exacta y no como un cero con calidad
+ * mala. El fallo que esto protege es un `?? 0` río abajo convirtiendo «no
+ * contesta» en «vibración nula, todo perfecto».
+ */
+const QUALITY_SIN_DATO = 0x08000000
+
+/**
+ * Lectura falsa de un punto del árbol de VIBRACIONES, o `null` si el punto no
+ * es de ese árbol —y entonces le toca a otra rama de `readPoint`—.
+ *
+ * `valorVibracionEn` distingue tres cosas y aquí se traducen las tres: punto
+ * ajeno (`undefined`), punto propio que ahora no entrega (`null`) y valor.
+ */
+function lecturaVibracion(name, t, rnd) {
+  const valor = valorVibracionEn(name, t)
+  if (valor === undefined) return null
+  if (valor === null) return { pointName: name, quality: QUALITY_SIN_DATO }
+  if (rnd() < CAOS.malaCalidad) return { pointName: name, value: 0, quality: QUALITY_BAD_UA }
+  return { pointName: name, value: valor, quality: QUALITY_GOOD_UA }
+}
 
 /**
  * Señales que el historiador cruza con `temperaturaTanque` en el servidor
@@ -146,10 +192,16 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
       }
     }
 
-    // Fuera del catálogo: es un punto de escritura (`CONTROL`) o uno que no
-    // existe. Los dos se sirven igual — lo último escrito, o `null` si nunca
-    // se escribió — porque el servidor real tampoco distingue las dos cosas
-    // en una lectura sencilla.
+    const vib = lecturaVibracion(name, ahora(), rnd)
+    if (vib) {
+      if (rnd() < CAOS.ausente) return { ok: false, status: 404, error: 'Point not found.' }
+      return { ok: true, status: 200, pointName: name, payload: vib }
+    }
+
+    // Fuera de los dos catálogos: es un punto de escritura (`CONTROL`) o uno
+    // que no existe. Los dos se sirven igual — lo último escrito, o `null` si
+    // nunca se escribió — porque el servidor real tampoco distingue las dos
+    // cosas en una lectura sencilla.
     return {
       ok: true, status: 200, pointName: name,
       payload: { value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
@@ -177,11 +229,19 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
             quality: bad ? QUALITY_BAD_UA : QUALITY_GOOD_UA,
           },
         }
-      } else {
-        byPointName[name] = {
-          ok: true, status: 200,
-          payload: { pointName: name, value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
-        }
+        continue
+      }
+
+      const vib = lecturaVibracion(name, t, rnd)
+      if (vib) {
+        byPointName[name] = { ok: true, status: 200, payload: vib }
+        continue
+      }
+
+      // Fuera de los dos catálogos: punto de escritura, o inexistente.
+      byPointName[name] = {
+        ok: true, status: 200,
+        payload: { pointName: name, value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
       }
     }
 
@@ -217,6 +277,21 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
   async function readHistory({ pointName: nombrePunto, startDate, endDate, interval }) {
     const clave = parsePointName(nombrePunto)
     if (!clave) {
+      /*
+       * Un punto de VIBRACIONES tampoco tiene serie aquí, y el error dice por
+       * qué: el grupo `DEMO 3` del Hyper Historian está definido pero no
+       * entrega —HTTP 500 en sus 119 tags el 25-08-2026, y `esHistorizada`
+       * sigue en `false` en `shared/eva/vibraciones.js` hasta que la
+       * configuración deje de moverse—. Servir aquí una serie inventada
+       * enseñaría al asistente a pedir tendencias de esta máquina, que es
+       * exactamente lo que ese archivo prohíbe afirmar todavía.
+       */
+      if (valorVibracionEn(nombrePunto, ahora()) !== undefined) {
+        return {
+          ok: false, status: 500,
+          error: 'ICONICS History request failed: point is not being collected.',
+        }
+      }
       return { ok: false, status: 500, error: 'ICONICS History request failed: unknown point.' }
     }
 
@@ -283,16 +358,26 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     return { ok: true, status: 200, result: { acknowledged: eventIds.length } }
   }
 
+  /**
+   * Enumerar el árbol devuelve los puntos de LA rama pedida, no la unión de
+   * las dos. Es lo que hace el servidor —`ac:TDCON/DEMO/SENSORES/` y
+   * `ac:TDCON/Motors/01/` son ramas hermanas— y también lo que evita que quien
+   * explore el tanque se encuentre acelerómetros de otra máquina en la lista.
+   * Sin ruta, se enumeran las dos: es la raíz.
+   */
   async function browse(path) {
-    const bajoRaiz = !path || RAIZ.startsWith(path) || path.startsWith(RAIZ)
-    return { ok: true, status: 200, payload: bajoRaiz ? TODOS_LOS_PUNTOS : [] }
+    const p = path ?? ''
+    const puntos = []
+    if (!p || RAIZ.startsWith(p) || p.startsWith(RAIZ)) puntos.push(...TODOS_LOS_PUNTOS)
+    if (!p || RAIZ_VIB.startsWith(p) || p.startsWith(RAIZ_VIB)) puntos.push(...todosLosPuntosVib())
+    return { ok: true, status: 200, payload: puntos }
   }
 
   async function search(text) {
     const q = String(text ?? '').toLowerCase()
     return {
       ok: true, status: 200,
-      payload: TODOS_LOS_PUNTOS.filter(p => p.toLowerCase().includes(q)),
+      payload: [...TODOS_LOS_PUNTOS, ...todosLosPuntosVib()].filter(p => p.toLowerCase().includes(q)),
     }
   }
 

@@ -36,7 +36,7 @@ plantilla comentada de todas las variables está en
 | `ICONICS_PASSWORD` | *(vacío)* | Su contraseña. |
 | `ICONICS_POINT_NAME` | *(vacío)* | Punto que leen `/api/iconics/data` y `/api/context` cuando no se indica otro. |
 | `ICONICS_READ_ONLY` | **`true`** | Deshabilita escritura y *ack* de alarmas. Ver abajo. |
-| `ICONICS_FAKE` | `false` | Transporte simulado (Plan 14 §7.1): sirve las ocho señales sin `ICONICS_API_BASE` ni red. Ver `backend/iconics/fakeClient.mjs`. **Nunca en producción.** |
+| `ICONICS_FAKE` | `false` | Transporte simulado (Plan 14 §7.1): sirve las dos máquinas —las ocho señales del tanque y los 73 puntos del sistema de vibraciones con sus contadores de alarma— sin `ICONICS_API_BASE` ni red. Ver `backend/iconics/fakeClient.mjs`. **Nunca en producción.** |
 
 **Servidor**
 

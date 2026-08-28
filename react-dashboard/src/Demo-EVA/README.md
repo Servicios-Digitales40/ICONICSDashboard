@@ -100,6 +100,8 @@ data/       la frontera con la red
   simulador.js    la instalación entera sin red: `read()` y `readSerie()`
   EvaProvider.jsx el único sitio que crea una fuente
   hooks.js        useSistemaAgua(), useSerieHistorica()
+  vibracion.js    la OTRA máquina: su propio sondeo en lote, sin `EvaProvider`
+  simuladorVibracion.js  esa máquina sin red: sólo `read()`, no hay historia
 
 lib/        derivaciones y formato, sin React salvo donde se indique
   buffer.js   búfer rodante de muestras vivas de la sesión
@@ -153,6 +155,21 @@ un simulador allí tendría que importar el catálogo de señales para saber qu�
 generar, invirtiendo la dependencia. Hubo un tiempo en que el único simulador
 era el del tablero anterior, que generaba otros puntos, y pulsar «Simulado»
 dejaba esta sección entera sin dato.
+
+**Y hay DOS simuladores, uno por máquina.**
+[`data/simuladorVibracion.js`](data/simuladorVibracion.js) sirve el sistema de
+vibraciones, y es un archivo aparte por lo mismo que lo son su catálogo y sus
+reglas: son dos instalaciones sin un punto en común. La física de cada una vive
+en `@shared/eva/simulador.js` y `@shared/eva/simuladorVibraciones.js`, y las
+comparte con el transporte falso del backend (`ICONICS_FAKE=true`), para que los
+dos programas sirviendo el mismo instante enseñen lo mismo.
+
+El de vibraciones **no tiene `readSerie()`**: ninguna señal de ese catálogo está
+historizada todavía, y servir series inventadas enseñaría a la pantalla una
+máquina que no existe. Lo que sí reproduce es el apagón medido el 26-08-2026 —al
+pararse el variador se van los `vRMS` y sobreviven la aceleración y el pico—,
+porque de ahí sale la mitad de la pantalla que declara lo que NO se pudo
+comprobar.
 
 **Dos bucles de animación en toda la sección**:
 el destello de la baliza en crítico, y el giro del impulsor cuando la bomba

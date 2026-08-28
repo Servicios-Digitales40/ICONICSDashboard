@@ -305,6 +305,23 @@ export function decodificarVigilancia(valor) {
 }
 
 /**
+ * `indice` → la cadena base64 que publicaría el módulo, o `null` si ese estado
+ * no existe. Inverso exacto de `decodificarVigilancia`.
+ *
+ * Existe para el SIMULADOR (`simuladorVibraciones.js`), que tiene que servir
+ * estos estados por el mismo hueco por el que llegan los del servidor. Vive
+ * aquí y no allí porque el base64 y la longitud del arreglo son parte de cómo
+ * el módulo escribe este dato, igual que los nombres de tag: si mañana el
+ * arreglo tuviera cinco posiciones, el que se entera es este archivo, y las
+ * dos direcciones cambiarían juntas.
+ */
+export function codificarVigilancia(indice) {
+  if (!VIGILANCIA.some((v) => v.indice === indice)) return null;
+  const bytes = VIGILANCIA.map((v) => (v.indice === indice ? 1 : 0));
+  return btoa(String.fromCharCode(...bytes));
+}
+
+/**
  * ── QUÉ VIGILA EL MÓDULO, ADEMÁS DE LOS NÚMEROS ────────────────────
  *
  * Tres grupos, y el tercero es el que de verdad diagnostica rodamientos.

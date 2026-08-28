@@ -36,8 +36,11 @@ import { createServer } from 'node:http'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/senales.js'
+import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/senales.js'
 import { valorEn } from '../shared/eva/simulador.js'
+import { RAIZ_VIB, puntoVariador, todosLosPuntos as todosLosPuntosVib } from '../shared/eva/vibraciones.js'
+import { valorVibracionEn } from '../shared/eva/simuladorVibraciones.js'
+import { isGoodQuality } from '../shared/quality.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -121,6 +124,89 @@ await checkAsync('un punto ajeno al árbol no rompe el lote: llega como hueco', 
   // No es del catálogo, así que se sirve como punto de escritura: `null` si
   // nunca se escribió — nunca un error que tumbe el lote entero.
   assert.equal(r.payload['ac:OTRO/ARBOL/X'].payload.value, null)
+})
+
+/* ── El árbol de vibraciones ──────────────────────────────────────────── */
+
+console.log('\n── El árbol de vibraciones ──────────────────────────────────')
+
+await checkAsync('los setenta y tres puntos de la otra máquina se sirven, no caen en la rama de escritura', async () => {
+  /*
+   * Es el fallo que motivó extender este transporte: los puntos de vibración
+   * no eran del catálogo del tanque, así que caían en la rama de «punto de
+   * escritura» y salían con `value: null` y calidad BUENA. La pantalla no veía
+   * un fallo — veía una máquina que contesta y no dice nada, que es la peor de
+   * las respuestas posibles.
+   */
+  const cliente = sinCaos()
+  const puntos = todosLosPuntosVib()
+  assert.equal(puntos.length, 73, 'el catálogo cambió de tamaño; revisa si es a propósito')
+
+  const r = await cliente.readPoints(puntos)
+  assert.equal(r.ok, true)
+
+  const buenos = puntos.filter(p => isGoodQuality(r.payload[p]?.payload?.quality))
+  assert.equal(
+    buenos.length > puntos.length / 2, true,
+    `sólo ${buenos.length} de ${puntos.length} puntos con calidad buena`,
+  )
+})
+
+await checkAsync('la vibración sale del MISMO modelo que sirve el simulador del frontend', async () => {
+  const t = 1_700_000_000_000
+  const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
+  const punto = puntoVariador('velocidad')
+
+  const r = await cliente.readPoint(punto)
+  assert.equal(r.payload.value, valorVibracionEn(punto, t))
+})
+
+await checkAsync('un punto que no entrega llega SIN `value`, no como un cero', async () => {
+  /*
+   * La forma medida en el servidor real: calidad `0x08000000` y ningún campo
+   * `value`. Un cero con calidad mala se leería río abajo, con un `?? 0`
+   * descuidado, como «vibración nula, todo perfecto».
+   *
+   * Se busca un instante con el motor parado —ahí el variador deja de
+   * publicar— en vez de fijar uno a mano: la fase del ciclo depende del origen
+   * del reloj, y clavar un milisegundo lo ataría a que nadie cambie el periodo.
+   */
+  const punto = puntoVariador('velocidad')
+  let t = 1_700_000_000_000
+  for (let i = 0; i < 200 && valorVibracionEn(punto, t) !== null; i++) t += 5_000
+  assert.equal(valorVibracionEn(punto, t), null, 'no se encontró ningún instante con el motor parado')
+
+  const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
+  const r = await cliente.readPoint(punto)
+
+  assert.equal(r.ok, true)
+  assert.equal('value' in r.payload, false, 'un punto sin dato no debe traer `value`')
+  assert.equal(isGoodQuality(r.payload.quality), false)
+})
+
+await checkAsync('el árbol del tanque y el de vibraciones no se mezclan al enumerar', async () => {
+  const cliente = sinCaos()
+
+  const tanque = await cliente.browse(RAIZ)
+  assert.equal(tanque.payload.some(p => p.startsWith(RAIZ_VIB)), false, 'el tanque trajo acelerómetros')
+
+  const vib = await cliente.browse(RAIZ_VIB)
+  assert.equal(vib.payload.some(p => p.startsWith(RAIZ)), false, 'las vibraciones trajeron el tanque')
+  assert.equal(vib.payload.length > 0, true, 'la rama de vibraciones salió vacía')
+})
+
+await checkAsync('pedir la HISTORIA de un punto de vibración falla, como falla el grupo DEMO 3', async () => {
+  // `esHistorizada` sigue en `false` en todo ese catálogo. Servir aquí una
+  // serie inventada enseñaría al asistente a afirmar tendencias de esta
+  // máquina, que es justo lo que ese archivo prohíbe todavía.
+  const cliente = sinCaos()
+  const r = await cliente.readHistory({
+    pointName: puntoVariador('velocidad'),
+    startDate: new Date(1_700_000_000_000 - 3_600_000).toISOString(),
+    endDate: new Date(1_700_000_000_000).toISOString(),
+    interval: '00:15:00',
+  })
+  assert.equal(r.ok, false)
 })
 
 /* ── El historiador ───────────────────────────────────────────────────── */
