@@ -2029,7 +2029,7 @@ await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acot
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son diecinueve herramientas, y sólo una escribe en la PLANTA', () => {
+check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -2045,6 +2045,7 @@ check('son diecinueve herramientas, y sólo una escribe en la PLANTA', () => {
     /* Las tres de aprendizaje escriben, pero en un JSON nuestro: ninguna toca
        el servidor de planta. La única que sí lo toca sigue siendo una. */
     'hechos_de_la_planta',
+    'registrar_intervencion',
     'recordar_hecho',
     'proponer_regla',
     'sistemas_de_la_planta',

@@ -52,7 +52,7 @@
 export const ESTADOS = ["pendiente", "aprobada", "rechazada", "aplicada"];
 
 /** Forma vacía del almacén, para cuando el archivo aún no existe. */
-export const VACIO = { version: 1, hechos: [], propuestas: [] };
+export const VACIO = { version: 1, hechos: [], propuestas: [], intervenciones: [] };
 
 /**
  * ── HECHOS QUE VIENEN DE FÁBRICA ───────────────────────────────────
@@ -122,11 +122,56 @@ export const HECHOS_INICIALES = [
 export function normalizarAlmacen(bruto) {
   const hechos = Array.isArray(bruto?.hechos) ? bruto.hechos : [];
   const propuestas = Array.isArray(bruto?.propuestas) ? bruto.propuestas : [];
+  const intervenciones = Array.isArray(bruto?.intervenciones) ? bruto.intervenciones : [];
   return {
     version: 1,
     hechos: hechos.filter((h) => h && typeof h.hecho === "string"),
     propuestas: propuestas.filter((p) => p && typeof p.titulo === "string"),
+    intervenciones: intervenciones.filter((i) => i && typeof i.sintoma === "string"),
   };
+}
+
+/**
+ * ── LA BITÁCORA: QUÉ SE HIZO, NO QUÉ ES LA INSTALACIÓN ─────────────
+ *
+ * Un HECHO describe cómo es la planta: «el sensor S3 es de 100 mV/g». Una
+ * INTERVENCIÓN describe qué le pasó y qué se hizo: «el pico del lado acople
+ * copiaba el eficaz; se cambió tal cosa en el servidor web y quedó».
+ *
+ * Son cosas distintas y por eso no comparten lista. Un hecho es permanente
+ * hasta que alguien lo corrija; una intervención está fechada y no se corrige
+ * nunca —lo que pasó, pasó—, y su valor está justo en poder leerla dentro de
+ * seis meses cuando el mismo síntoma vuelva.
+ *
+ * Es lo que en una planta se llama historial de mantenimiento, y es lo primero
+ * que se pierde cuando la persona que arregló algo se va o simplemente lo
+ * olvida. La única forma de que no se pierda es que anotarlo cueste una frase
+ * dicha en voz alta.
+ *
+ * `resuelto` puede ser `false` a propósito: un intento que NO funcionó vale
+ * tanto como uno que sí. Ahorra repetirlo.
+ */
+export function crearIntervencion(datos, ahora = new Date()) {
+  return {
+    id: `interv-${ahora.getTime().toString(36)}`,
+    fecha: ahora.toISOString(),
+    sistema: datos.sistema ?? null,
+    sintoma: String(datos.sintoma),
+    causa: datos.causa ? String(datos.causa) : null,
+    solucion: String(datos.solucion),
+    /* Por defecto se da por resuelta: quien lo cuenta suele contarlo porque
+       funcionó. Un intento fallido hay que declararlo, y por eso la
+       herramienta lo pregunta. */
+    resuelto: datos.resuelto !== false,
+    origen: datos.origen ?? "el usuario",
+  };
+}
+
+/** Las intervenciones, de la más reciente a la más antigua. */
+export function intervencionesRecientes(almacen, cuantas = 10) {
+  return [...(almacen?.intervenciones ?? [])]
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+    .slice(0, cuantas);
 }
 
 /**
