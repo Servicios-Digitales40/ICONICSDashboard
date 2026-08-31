@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Activity,
   AlertCircle,
@@ -182,19 +183,34 @@ export default function PrediccionBeta() {
   const [hoursBefore, setHoursBefore] = useState(48);
   const [data, setData] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [health, setHealth] = useState({ state: "checking", data: null });
 
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchPredictionHealth({ signal: controller.signal })
-      .then((response) => setHealth({ state: "ok", data: response }))
-      .catch((e) => {
-        if (e.name !== "AbortError") setHealth({ state: "error", data: null });
-      });
-    return () => controller.abort();
-  }, []);
+  /*
+   * La comprobación de salud al montar era un `useEffect` con su propio
+   * `AbortController` a mano — es exactamente lo que `useQuery` hace por
+   * defecto: cancela sola al desmontar, y `queryFn` recibe el `signal` listo
+   * para pasárselo a `fetchPredictionHealth`. `retry: false` sale del
+   * `QueryClient` global (`lib/queryClient.js`): un solo intento, igual que
+   * el `.catch()` de antes.
+   */
+  const health = useQuery({
+    queryKey: ["prediction-health"],
+    queryFn: ({ signal }) => fetchPredictionHealth({ signal }),
+  });
+
+  /*
+   * `consultar()` puede ADEMÁS declarar la conexión recuperada o caída sin
+   * esperar a que se repita la comprobación de arriba: si la consulta de
+   * evento respondió, el backend está disponible, y si falló con una razón
+   * de red, no lo está. Forzar el estado de la query de salud (en vez de
+   * reintentarla) sería más código para el mismo resultado, así que el
+   * criterio queda en esta única variable, calculada más abajo.
+   */
+  const [saludForzada, setSaludForzada] = useState(null);
+  const healthState = saludForzada ?? (health.isLoading ? "checking" : health.isError ? "error" : "ok");
+
+  const consulta = useMutation({ mutationFn: fetchEventHistory });
+  const loading = consulta.isPending;
 
   const timeline = data?.timeline ?? [];
   const selected = selectedIndex == null ? null : timeline[selectedIndex] ?? null;
@@ -222,7 +238,7 @@ export default function PrediccionBeta() {
     return Number.isInteger(n) && n >= 1 && n <= HORAS_MAX;
   }
 
-  async function consultar(event) {
+  function consultar(event) {
     event?.preventDefault?.();
     setError("");
 
@@ -231,23 +247,25 @@ export default function PrediccionBeta() {
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await fetchEventHistory({ eventId, hoursBefore });
-      setData(response);
-      // Se empieza por la hora más lejana para que la lectura visual avance
-      // naturalmente hacia el evento. El usuario puede mover el selector o
-      // hacer clic en la gráfica para ver cualquier punto.
-      setSelectedIndex(0);
-      setHealth((prev) => ({ ...prev, state: "ok" }));
-    } catch (e) {
-      setData(null);
-      setSelectedIndex(null);
-      setError(e.message || "No se pudo consultar el backend predictivo.");
-      setHealth({ state: "error", data: null });
-    } finally {
-      setLoading(false);
-    }
+    consulta.mutate(
+      { eventId, hoursBefore },
+      {
+        onSuccess: (response) => {
+          setData(response);
+          // Se empieza por la hora más lejana para que la lectura visual avance
+          // naturalmente hacia el evento. El usuario puede mover el selector o
+          // hacer clic en la gráfica para ver cualquier punto.
+          setSelectedIndex(0);
+          setSaludForzada("ok");
+        },
+        onError: (e) => {
+          setData(null);
+          setSelectedIndex(null);
+          setError(e.message || "No se pudo consultar el backend predictivo.");
+          setSaludForzada("error");
+        },
+      }
+    );
   }
 
   function selectFromChart(state) {
@@ -317,12 +335,12 @@ export default function PrediccionBeta() {
                   padding: "5px 8px",
                   fontSize: 10.5,
                   fontWeight: 700,
-                  background: health.state === "ok" ? t.successSoft : health.state === "checking" ? t.hover : t.coralSoft,
-                  color: health.state === "ok" ? t.success : health.state === "checking" ? t.textFaint : t.coral,
+                  background: healthState === "ok" ? t.successSoft : healthState === "checking" ? t.hover : t.coralSoft,
+                  color: healthState === "ok" ? t.success : healthState === "checking" ? t.textFaint : t.coral,
                 }}
               >
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
-                {health.state === "ok" ? "Disponible" : health.state === "checking" ? "Comprobando" : "Sin conexión"}
+                {healthState === "ok" ? "Disponible" : healthState === "checking" ? "Comprobando" : "Sin conexión"}
               </span>
             </div>
             <div style={{ marginTop: 8, fontFamily: MONO, fontSize: 10.5, color: t.textFaint, overflowWrap: "anywhere" }}>

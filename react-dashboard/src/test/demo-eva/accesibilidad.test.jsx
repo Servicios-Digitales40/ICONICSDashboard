@@ -26,6 +26,7 @@
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
@@ -56,20 +57,29 @@ afterEach(() => {
  * contra un escenario que la aplicación real no produce nunca.
  */
 function montarComoLaApp(vista) {
+  // `QueryClient` nuevo en cada montaje, no el singleton de `lib/queryClient.js`:
+  // este arnés remonta varias vistas dentro del mismo archivo (el bucle de
+  // `DetalleActivo`, por ejemplo), y compartir caché entre montajes serviría
+  // datos de un test en otro. `AssetsEva` es hoy la única vista de esta lista
+  // que pasa por TanStack Query (`ExploradorAssets.jsx`).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
   return render(
-    <ThemeProvider>
-      <DataSourceProvider>
-        <EvaProvider>
-          <header>
-            <h1>Título de la página</h1>
-          </header>
-          <nav aria-label="Navegación principal">
-            <a href="/x">Un enlace</a>
-          </nav>
-          <main>{vista}</main>
-        </EvaProvider>
-      </DataSourceProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <DataSourceProvider>
+          <EvaProvider>
+            <header>
+              <h1>Título de la página</h1>
+            </header>
+            <nav aria-label="Navegación principal">
+              <a href="/x">Un enlace</a>
+            </nav>
+            <main>{vista}</main>
+          </EvaProvider>
+        </DataSourceProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

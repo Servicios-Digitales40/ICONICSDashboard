@@ -20,8 +20,17 @@
  *
  * La extracción no cambia ni una línea de comportamiento de la vista de
  * Resonac: `raiz` por defecto es `ac:`, que es lo que tenía escrito.
+ *
+ * ── POR QUÉ TANSTACK QUERY Y NO EL MOTOR DE POLLING ────────────────
+ *
+ * Los tres fetches de este archivo (raíces, hijos al expandir, propiedades
+ * del nodo seleccionado) son consultas PUNTUALES —una clave, un resultado—,
+ * no las ~140 señales agrupadas que agrupa `pollingEngine.js` en una sola
+ * petición. Query reemplaza aquí el `useState`+`useEffect` a mano de antes;
+ * no toca el sondeo del resto del tablero.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Box, Boxes, ChevronDown, ChevronRight, Gauge, Radio, RefreshCw } from "lucide-react";
 
 import { AlertBanner, Button, Panel } from "@/components/ui/index.js";
@@ -62,34 +71,32 @@ const isSystem = (node) => (node.shortName ?? "").startsWith(".");
 function AssetNode({ node, depth, selectedPath, onSelect }) {
   const { theme: t } = useTheme();
   const [open, setOpen] = useState(false);
-  const [children, setChildren] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
   const folder = isFolder(node);
   const selected = selectedPath === node.pointName;
 
-  async function loadChildren() {
-    setLoading(true);
-    setError(null);
-    try {
+  /*
+   * `enabled: folder && open` es el equivalente declarativo de la carga
+   * perezosa que antes disparaba `handleClick`: no se pide nada hasta que el
+   * nodo se expande, y Query cachea por `pointName` — volver a cerrar y abrir
+   * la misma carpeta no repite la petición.
+   */
+  const {
+    data: children,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ["iconics-browse", node.pointName],
+    queryFn: async () => {
       const res = await browseIconics(node.pointName);
-      const kids = (res.payload ?? []).filter((n) => !isSystem(n));
-      setChildren(kids);
-    } catch (err) {
-      setError(err.message);
-      setChildren([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+      return (res.payload ?? []).filter((n) => !isSystem(n));
+    },
+    enabled: folder && open,
+  });
 
-  async function handleClick() {
+  function handleClick() {
     onSelect(node);
-    if (!folder) return;
-    const next = !open;
-    setOpen(next);
-    if (next && children === null) await loadChildren();
+    if (folder) setOpen((prev) => !prev);
   }
 
   return (
@@ -125,7 +132,7 @@ function AssetNode({ node, depth, selectedPath, onSelect }) {
       </div>
 
       {error && (
-        <div style={{ paddingLeft: 8 + (depth + 1) * 15, fontSize: 11, color: t.coral }}>{error}</div>
+        <div style={{ paddingLeft: 8 + (depth + 1) * 15, fontSize: 11, color: t.coral }}>{error.message}</div>
       )}
 
       {folder && open && children && (
@@ -144,86 +151,91 @@ function AssetNode({ node, depth, selectedPath, onSelect }) {
   );
 }
 
+/**
+ * Propiedades en vivo de un nodo, para `AssetProperties`.
+ *
+ * Función aparte y no un closure dentro del componente: no depende de nada
+ * de React, así que puede vivir a nivel de módulo y `queryFn` la referencia
+ * tal cual.
+ */
+async function cargarPropiedadesDeAsset(path, node) {
+  // Una hoja (punto de valor directo, p. ej. "ac:today") se lee tal cual; de
+  // un asset o carpeta (pointName con "/") se leen propiedades e hijos.
+  if (!path.endsWith("/")) {
+    const res = await fetchIconicsPoint(path);
+    const p = res?.payload ?? {};
+    return {
+      children: [],
+      props: [{
+        name: node.shortName ?? path.split("/").pop(),
+        pointName: path,
+        value: p.value ?? p.Value,
+        quality: p.quality ?? p.Quality,
+        timestamp: p.timestamp ?? p.Timestamp,
+      }],
+    };
+  }
+
+  // 1. Nombres de los puntos de propiedad y de los equipos hijos.
+  const [pointNamesRes, childRes] = await Promise.all([
+    fetchIconicsPoint(`${path}.PropertyPointNames`),
+    fetchIconicsPoint(`${path}.ChildEquipmentNames`),
+  ]);
+  const pointNames = pointNamesRes?.payload?.value ?? [];
+  const childNames = childRes?.payload?.value ?? [];
+  const children = Array.isArray(childNames) ? childNames : [];
+
+  // 2. Valores en vivo de cada propiedad (batch).
+  if (!Array.isArray(pointNames) || pointNames.length === 0) {
+    return { children, props: [] };
+  }
+
+  const batch = await fetchIconicsBatch(pointNames);
+  const map = batch?.payload ?? {};
+  const props = pointNames.map((pn) => {
+    const entry = map[pn];
+    const p = entry?.payload ?? {};
+    return {
+      name: pn.split("/").pop(),
+      pointName: pn,
+      value: p.value ?? p.Value,
+      quality: p.quality ?? p.Quality,
+      timestamp: p.timestamp ?? p.Timestamp,
+    };
+  });
+  return { children, props };
+}
+
 /* Panel derecho: propiedades en vivo del asset seleccionado. */
 function AssetProperties({ node, intervalMs = 5000 }) {
   const { theme: t } = useTheme();
-  const [props, setProps] = useState([]);
-  const [children, setChildren] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const mounted = useRef(true);
-
   const path = node?.pointName;
 
-  const load = useCallback(async () => {
-    if (!path) return;
-    try {
-      // Una hoja (punto de valor directo, p. ej. "ac:today") se lee tal cual;
-      // de un asset o carpeta (pointName con "/") se leen propiedades e hijos.
-      if (!path.endsWith("/")) {
-        const res = await fetchIconicsPoint(path);
-        const p = res?.payload ?? {};
-        if (!mounted.current) return;
-        setChildren([]);
-        setProps([{
-          name: node.shortName ?? path.split("/").pop(),
-          pointName: path,
-          value: p.value ?? p.Value,
-          quality: p.quality ?? p.Quality,
-          timestamp: p.timestamp ?? p.Timestamp,
-        }]);
-        setError(null);
-        setLastUpdated(new Date());
-        return;
-      }
+  /*
+   * `refetchInterval` es el reemplazo directo del `setInterval(load, …)` de
+   * antes: sigue siendo un sondeo de UN nodo, no las ~140 señales del
+   * tablero, así que no tiene nada que ver con `pollingEngine`. Al cambiar de
+   * nodo, la `queryKey` cambia con `path` y Query limpia el dato anterior de
+   * inmediato —mismo criterio que ya usa `useSerieHistorica` en Demo EVA: no
+   * enseñar, ni un instante, las propiedades del nodo anterior bajo el
+   * nombre del nuevo.
+   */
+  const {
+    data,
+    isLoading: loading,
+    error,
+    dataUpdatedAt,
+    refetch,
+  } = useQuery({
+    queryKey: ["iconics-asset-properties", path],
+    queryFn: () => cargarPropiedadesDeAsset(path, node),
+    enabled: Boolean(path),
+    refetchInterval: intervalMs,
+  });
 
-      // 1. Nombres de los puntos de propiedad y de los equipos hijos.
-      const [pointNamesRes, childRes] = await Promise.all([
-        fetchIconicsPoint(`${path}.PropertyPointNames`),
-        fetchIconicsPoint(`${path}.ChildEquipmentNames`),
-      ]);
-      const pointNames = pointNamesRes?.payload?.value ?? [];
-      const childNames = childRes?.payload?.value ?? [];
-      if (!mounted.current) return;
-      setChildren(Array.isArray(childNames) ? childNames : []);
-
-      // 2. Valores en vivo de cada propiedad (batch).
-      if (Array.isArray(pointNames) && pointNames.length > 0) {
-        const batch = await fetchIconicsBatch(pointNames);
-        const map = batch?.payload ?? {};
-        const list = pointNames.map((pn) => {
-          const entry = map[pn];
-          const p = entry?.payload ?? {};
-          return {
-            name: pn.split("/").pop(),
-            pointName: pn,
-            value: p.value ?? p.Value,
-            quality: p.quality ?? p.Quality,
-            timestamp: p.timestamp ?? p.Timestamp,
-          };
-        });
-        if (mounted.current) setProps(list);
-      } else if (mounted.current) {
-        setProps([]);
-      }
-      if (mounted.current) { setError(null); setLastUpdated(new Date()); }
-    } catch (err) {
-      if (mounted.current) setError(err.message);
-    } finally {
-      if (mounted.current) setLoading(false);
-    }
-  }, [path, node]);
-
-  useEffect(() => {
-    mounted.current = true;
-    setLoading(true);
-    setProps([]);
-    setChildren([]);
-    load();
-    const id = setInterval(load, intervalMs);
-    return () => { mounted.current = false; clearInterval(id); };
-  }, [load, intervalMs]);
+  const props = data?.props ?? [];
+  const children = data?.children ?? [];
+  const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt) : null;
 
   if (!node) {
     return (
@@ -243,10 +255,10 @@ function AssetProperties({ node, intervalMs = 5000 }) {
             {node.pointName}
           </div>
         </div>
-        <Button variant="icon" onClick={load} loading={loading}><RefreshCw size={14} /></Button>
+        <Button variant="icon" onClick={() => refetch()} loading={loading}><RefreshCw size={14} /></Button>
       </div>
 
-      {error && <AlertBanner type="error" title="Error al leer el asset" message={error} />}
+      {error && <AlertBanner type="error" title="Error al leer el asset" message={error.message} />}
 
       {children.length > 0 && (
         <div style={{ marginBottom: 14, fontSize: 12, color: t.textSoft }}>
@@ -324,30 +336,27 @@ function AssetProperties({ node, intervalMs = 5000 }) {
  */
 export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de assets", acciones = null }) {
   const { theme: t } = useTheme();
-  const [roots, setRoots] = useState(null);
-  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
 
+  // La raíz cambia cuando el consumidor la cambia (Demo EVA ofrece subir al
+  // árbol completo): la `queryKey` de abajo ya vuelve a pedir el árbol sola,
+  // pero el nodo SELECCIONADO es estado propio de este componente y hay que
+  // soltarlo a mano, o quedaría el de un árbol que ya no se está mostrando.
   useEffect(() => {
-    let alive = true;
-    // La raíz cambia cuando el consumidor la cambia (Demo EVA ofrece subir al
-    // árbol completo), así que hay que soltar lo anterior o quedaría el nodo
-    // seleccionado de un árbol que ya no se está mostrando.
-    setRoots(null);
-    setError(null);
     setSelected(null);
-
-    (async () => {
-      try {
-        const res = await browseIconics(raiz);
-        if (alive) setRoots((res.payload ?? []).filter((n) => !isSystem(n)));
-      } catch (err) {
-        if (alive) setError(err.message);
-      }
-    })();
-
-    return () => { alive = false; };
   }, [raiz]);
+
+  const {
+    data: roots,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["iconics-browse-root", raiz],
+    queryFn: async () => {
+      const res = await browseIconics(raiz);
+      return (res.payload ?? []).filter((n) => !isSystem(n));
+    },
+  });
 
   return (
     <>
@@ -355,8 +364,8 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de asset
       <div className="eva-explorador-grid">
         <Panel title={titulo} code={raiz} right={acciones}>
           {error ? (
-            <AlertBanner type="error" title="No se pudo cargar el árbol" message={error} />
-          ) : roots === null ? (
+            <AlertBanner type="error" title="No se pudo cargar el árbol" message={error.message} />
+          ) : isLoading ? (
             <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>cargando árbol…</div>
           ) : roots.length === 0 ? (
             <div style={{ fontSize: 12.5, color: t.textFaint }}>No hay assets bajo esta raíz.</div>

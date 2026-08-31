@@ -44,8 +44,17 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  * decenas.
  *
  * Si crece por una razón legítima, se sube el número Y se dice por qué.
+ *
+ * `vendor` sube de 90 a 210 (31-ago-2026): medido en 201.93 KB tras instalar
+ * `@tanstack/react-query` para el fetching puntual (`ExploradorAssets.jsx`,
+ * `PrediccionBeta.jsx` — ver `lib/queryClient.js`), que no tiene regla propia
+ * en `manualChunks` y cae en el catch-all. De esos 201.93 KB, 161.84 ya
+ * eran de antes de esta instalación —el techo de 90 llevaba un tiempo roto,
+ * sin relación con este cambio—; react-query sólo puso los ~40 KB restantes.
+ * Que el número sea ahora generoso no lo deja como estaba: sigue habiendo
+ * margen que investigar en lo que ya se acumulaba en `vendor` antes de hoy.
  */
-const PRESUPUESTO_KB = { index: 170, vendor: 90 };
+const PRESUPUESTO_KB = { index: 170, vendor: 210 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [

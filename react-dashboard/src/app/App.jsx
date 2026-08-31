@@ -13,8 +13,10 @@
  * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
 import { lazy, Suspense, useState } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
+import { queryClient } from "@/lib/queryClient.js";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { Sidebar, Topbar, DataSourceBanner, EstadoMaquinaBanner } from "./layout/index.js";
@@ -47,27 +49,35 @@ export default function App() {
        una excepción ahí y una pantalla en blanco en la pared de la planta.
        La de dentro, por página, es la que se usa a diario. */
     <ErrorBoundary>
-      <ThemeProvider>
-        {/* DataSourceProvider es el ÚNICO sitio de la app que sabe si los
-            datos vienen de ICONICS o del modo demo. Va por dentro del tema
-            —no lo necesita, pero el banner de demo sí— y por fuera del
-            Shell, para que el cambio de modo remonte todas las vistas. */}
-        <DataSourceProvider>
-          {/* EvaProvider por encima del Shell, no por vista (Plan 16): toda la
-              app es Demo EVA desde que se retiró el tablero de Resonac, así
-              que un solo motor de sondeo alcanza para las ocho señales Y para
-              EstadoMaquinaBanner, que cruza las pestañas de la estación de
-              llenado sin volver a montar su propia fuente. Ver la cabecera de
-              `Demo-EVA/data/EvaProvider.jsx`. */}
-          <EvaProvider>
-            <ToastProvider>
-              <ModalProvider>
-                <Shell />
-              </ModalProvider>
-            </ToastProvider>
-          </EvaProvider>
-        </DataSourceProvider>
-      </ThemeProvider>
+      {/* QueryClientProvider no depende de nada de lo de abajo —ni tema ni
+          origen de datos— y todo lo de abajo puede necesitarlo, así que va
+          en la posición más externa. Es sólo para el fetching PUNTUAL
+          (el árbol de assets, la consulta al backend predictivo): el sondeo
+          en vivo del tablero sigue siendo `EvaProvider` + `pollingEngine`,
+          sin relación con esto. Ver la cabecera de `lib/queryClient.js`. */}
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          {/* DataSourceProvider es el ÚNICO sitio de la app que sabe si los
+              datos vienen de ICONICS o del modo demo. Va por dentro del tema
+              —no lo necesita, pero el banner de demo sí— y por fuera del
+              Shell, para que el cambio de modo remonte todas las vistas. */}
+          <DataSourceProvider>
+            {/* EvaProvider por encima del Shell, no por vista (Plan 16): toda la
+                app es Demo EVA desde que se retiró el tablero de Resonac, así
+                que un solo motor de sondeo alcanza para las ocho señales Y para
+                EstadoMaquinaBanner, que cruza las pestañas de la estación de
+                llenado sin volver a montar su propia fuente. Ver la cabecera de
+                `Demo-EVA/data/EvaProvider.jsx`. */}
+            <EvaProvider>
+              <ToastProvider>
+                <ModalProvider>
+                  <Shell />
+                </ModalProvider>
+              </ToastProvider>
+            </EvaProvider>
+          </DataSourceProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }
