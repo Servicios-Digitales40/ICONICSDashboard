@@ -39,7 +39,7 @@ export function registerVozRoutes(router, { config, voz }) {
     })
   })
 
-  router.post('/api/voz', async ({ request, response }) => {
+  router.post('/api/voz', async ({ request, response, url }) => {
     if (!config.ia.whisper.isConfigured) {
       return sendError(
         response, 503,
@@ -74,7 +74,12 @@ export function registerVozRoutes(router, { config, voz }) {
     })
 
     try {
-      const resultado = await voz.transcribir(audio, { signal: abortador.signal })
+      /* Qué sistema se está mirando, para elegir el vocabulario que Whisper
+         necesita oír bien. Un id desconocido no es un error: cae al contexto
+         general, que es peor transcripción pero nunca un fallo. */
+      const sistema = url?.searchParams?.get('sistema') ?? null
+
+      const resultado = await voz.transcribir(audio, { signal: abortador.signal, sistema })
 
       if (!resultado.ok) {
         // 422 y no 500: el audio llegó y se procesó, pero no dio texto

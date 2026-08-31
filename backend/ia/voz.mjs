@@ -26,6 +26,7 @@
  * Este módulo, por tanto, no interpreta el audio: lo reenvía tal cual.
  */
 import { logger } from '../logger.mjs'
+import { SISTEMA } from '../../shared/eva/sistemas.js'
 
 /**
  * Frase que se le da a Whisper como contexto inicial.
@@ -39,8 +40,44 @@ import { logger } from '../logger.mjs'
  * Se mantiene CORTA a propósito. El prompt gasta contexto del propio modelo de
  * audio, y una lista larga de tags empeora la transcripción de todo lo demás.
  */
-const CONTEXTO = 'Sistema de agua industrial: tanque, bomba, caudal, presión, ' +
-  'temperatura, tensión de línea, variador, ICONICS, Cerabar.'
+/**
+ * Lo que se le dice a Whisper cuando NO se sabe qué sistema se está mirando.
+ *
+ * No puede quedarse en «planta industrial» a secas: la primera versión de este
+ * cambio lo dejó así y el dictado empeoró en el caso más común —una petición
+ * sin `?sistema=`, que es la que hace cualquier cliente antiguo—. Perder
+ * vocabulario al añadir la posibilidad de elegirlo habría sido un retroceso
+ * disfrazado de mejora.
+ *
+ * Lleva las palabras que comparten TODAS las máquinas de esta planta. Las
+ * propias de cada una las añade `contextoDe`.
+ */
+const CONTEXTO_GENERAL =
+  'Planta industrial vigilada con ICONICS: motor, variador, bomba, caudal, ' +
+  'presión, temperatura, alarma, Cerabar.'
+
+/**
+ * El vocabulario del SISTEMA por el que se está preguntando.
+ *
+ * ── POR QUÉ NO ES UNA LISTA ÚNICA ──────────────────────────────────
+ *
+ * Porque el prompt gasta contexto del propio modelo de audio, y una lista
+ * larga empeora la transcripción de todo lo demás. Con dos sistemas ya no
+ * cabían los dos vocabularios sin pasarse, y con cinco plantas no cabrá
+ * ninguno.
+ *
+ * Y no es sólo cuestión de tamaño: son máquinas distintas y suenan distinto.
+ * Preguntando por vibraciones con el vocabulario del agua delante, «lado
+ * acople» y «rodamiento» salían deformados — y una pregunta deformada hace
+ * que el asistente conteste sobre otra cosa, que es peor que no entenderla.
+ *
+ * Cada sistema declara el suyo en `shared/eva/sistemas.js`. Dar de alta una
+ * máquina nueva es añadir su `vocabulario` ahí; este archivo no cambia.
+ */
+function contextoDe(sistemaId) {
+  const s = SISTEMA[sistemaId]
+  return s?.vocabulario ? `${CONTEXTO_GENERAL} ${s.vocabulario}.` : CONTEXTO_GENERAL
+}
 
 export function createVoz({ config }) {
   const { base, idioma, timeoutMs } = config.ia.whisper
@@ -51,9 +88,10 @@ export function createVoz({ config }) {
    * @param {Buffer} audio      WAV PCM de 16 kHz, mono
    * @param {object} [opciones]
    * @param {AbortSignal} [opciones.signal]
+   * @param {string} [opciones.sistema]  id de `sistemas.js`, para el vocabulario
    * @returns {Promise<{ ok: true, texto: string } | { ok: false, error: string }>}
    */
-  async function transcribir(audio, { signal } = {}) {
+  async function transcribir(audio, { signal, sistema = null } = {}) {
     if (!base) {
       return {
         ok: false,
@@ -87,7 +125,7 @@ export function createVoz({ config }) {
     formulario.append('file', new Blob([audio], { type: 'audio/wav' }), 'audio.wav')
     formulario.append('response_format', 'json')
     formulario.append('language', idioma)
-    formulario.append('prompt', CONTEXTO)
+    formulario.append('prompt', contextoDe(sistema))
     // Sin marcas de tiempo: lo que se quiere es la frase para meterla en el
     // cuadro de texto, y los `[00:00:00.000 --> ...]` habría que quitarlos
     // después con una expresión regular que se rompería con cualquier cambio

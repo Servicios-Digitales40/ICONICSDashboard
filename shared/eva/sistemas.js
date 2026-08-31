@@ -199,6 +199,19 @@ export const SISTEMAS = [
       "carga del motor y modo del variador",
       "tensión de línea y eficiencia energética",
     ],
+    /*
+     * Las palabras que Whisper tiene que oír bien EN ESTE SISTEMA. Ver
+     * `vocabularioDe` al final del archivo: sin ellas delante, el modelo de
+     * audio escribe el vocabulario de planta como le suena —«Cerabar» salía
+     * como «cera bar»— y la pregunta llega deformada al asistente.
+     */
+    vocabulario:
+      "tanque, bomba, caudal, presión, nivel, temperatura, tensión de línea, " +
+      "variador, derrame, marcha en seco, cavitación, Cerabar",
+    /* Qué pantallas hablan de este sistema. Lo usa el dictado para elegir el
+       vocabulario, y vive aquí porque «qué pantallas son mías» es una
+       propiedad del sistema, no de la interfaz. */
+    rutas: ["eva-inicio", "eva-planta", "eva-riesgos", "eva-3d", "eva-alarmas", "eva-assets"],
     herramientas: [
       "estado_del_sistema",
       "historia_de_senal",
@@ -355,6 +368,17 @@ export const SISTEMAS = [
       "velocidad, frecuencia, par y fallo de su propio variador",
       "contadores del área de alarmas de ICONICS",
     ],
+    /*
+     * El del tanque no vale aquí: son máquinas distintas y suenan distinto.
+     * Preguntando por vibraciones con el vocabulario del agua delante, «lado
+     * acople» y «rodamiento» salían deformados — que es justo lo que hace que
+     * el asistente conteste sobre otra cosa.
+     */
+    vocabulario:
+      "vibración, rodamiento, lado acople, lado libre, apoyo, velocidad eficaz, " +
+      "aceleración eficaz, valor de daño, DKW, aRMS, vRMS, envolvente, espectro, " +
+      "BPFO, BPFI, factor de cresta, variador, milímetros por segundo",
+    rutas: ["eva-vibraciones"],
     /*
      * Eran una sola —`estado_de_vibraciones`— porque cada herramienta estaba
      * escrita contra la forma de dominio del tanque. Desde que hay una forma
@@ -811,6 +835,24 @@ function validarRegistro() {
 }
 
 validarRegistro();
+
+/**
+ * A qué sistema pertenece una pantalla.
+ *
+ * Se le pasa el hash de la ruta —`#/eva-vibraciones`— y devuelve el id del
+ * sistema, o `null` si no lo reconoce. Quien llama decide qué hacer con el
+ * `null`: en el dictado significa «usa el contexto general», que transcribe
+ * algo peor pero nunca falla.
+ *
+ * El `null` es deliberado y no un `"tanque"` de consuelo: una pantalla nueva
+ * que nadie haya declarado se vería obligada a heredar el vocabulario del
+ * agua, y entonces el error —dictado deformado— no apuntaría a su causa.
+ */
+export function sistemaDeRuta(hash) {
+  const ruta = String(hash ?? "").replace(/^#?\/?/, "").split(/[?/]/)[0];
+  if (!ruta) return null;
+  return SISTEMAS.find((s) => s.rutas?.includes(ruta))?.id ?? null;
+}
 
 /** Resumen del registro, para que el asistente pueda enumerarlos. */
 export function resumenDeSistemas() {
