@@ -114,10 +114,16 @@ describe("el sidebar que sale del registro", () => {
     // este servidor en absoluto, sino otro backend con el conjunto MetroPT-3.
     // Colgarla de una de las dos estaciones afirmaría que sus curvas son de esa
     // máquina, y no lo son de ninguna de las dos.
+    //
+    // `eva-alarmas` no sale en esta lista: se ocultó del sidebar el
+    // 2026-08-31 (temporal, ver la cabecera de su entrada en `routes.jsx`)
+    // para cortar el sondeo de `/api/iconics/alarms` que el botón del Topbar
+    // hacía en toda la aplicación. Sigue en ROUTES —comprobado en el test de
+    // arriba—, sólo sin `nav`, mismo criterio que `eva-detalle`.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.label).toBe("General");
     expect(general.children.map((c) => c.id)).toEqual([
-      "eva-alarmas", "eva-assets", "eva-prediccion",
+      "eva-assets", "eva-prediccion",
     ]);
   });
 

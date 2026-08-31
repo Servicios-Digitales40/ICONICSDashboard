@@ -7,6 +7,14 @@
  * El conteo en sí (`useAlarmCount`) ya está probado en
  * `test/lib/iconics/use-alarm-count.test.jsx`; aquí sólo el cableado: qué se
  * pinta con cada valor, y que `onAbrirAlarmas` se dispare al pulsar.
+ *
+ * ── EN PAUSA (2026-08-31, TEMPORAL) ─────────────────────────────────
+ *
+ * El botón que esta suite prueba está comentado en `Topbar.jsx`: la vista de
+ * Alarmas se ocultó del sidebar (`routes.jsx`, entrada `eva-alarmas`) para
+ * cortar el sondeo de `/api/iconics/alarms` que este botón hacía cada 30s en
+ * TODAS las pantallas. `describe.skip` y no borrado: en cuanto se descomente
+ * el botón, quitar el `.skip` deja la cobertura como estaba.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,7 +47,7 @@ const montar = (onAbrirAlarmas = () => {}) =>
     </ThemeProvider>
   );
 
-describe("Topbar: el badge de eventos recientes", () => {
+describe.skip("Topbar: el badge de eventos recientes", () => {
   it("con eventos en la última hora, el número se ve", async () => {
     stubAlarmas([{ eventId: "e1" }, { eventId: "e2" }, { eventId: "e3" }]);
     montar();

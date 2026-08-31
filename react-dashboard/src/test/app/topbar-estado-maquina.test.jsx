@@ -98,10 +98,12 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     expect(SECCION_DE_PAGINA["eva-planta"]).toBe("sec-llenado");
     expect(SECCION_DE_PAGINA["eva-vibraciones"]).toBe("sec-vibraciones");
     expect(SECCION_DE_PAGINA["eva-riesgos-vibracion"]).toBe("sec-vibraciones");
-    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-general");
 
-    // `eva-detalle` no está en el sidebar: sin `nav` no tiene sección, y el
-    // indicador tampoco debe darla por supuesta.
+    // `eva-alarmas` y `eva-detalle` no están en el sidebar —la primera desde
+    // el 2026-08-31, temporalmente (ver `routes.jsx`)— y las dos comparten el
+    // mismo motivo aquí: sin `nav` no tienen sección, y el indicador tampoco
+    // debe dársela por supuesta.
+    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBeNull();
     expect(SECCION_DE_PAGINA["eva-detalle"]).toBeNull();
   });
 });

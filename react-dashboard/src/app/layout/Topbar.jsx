@@ -2,10 +2,9 @@
  * Barra superior fija: título de la página actual, buscador, notificaciones e
  * interruptores de origen de datos y de tema.
  */
-import { Search, Bell, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
+import { Search, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
-import { useAlarmCount } from "@/lib/iconics";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { PAGE_META, SECCION_DE_PAGINA } from "../routes/index.js";
 import { Input } from "@/components/ui/Input.jsx";
@@ -97,10 +96,6 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
    */
   const esDeLlenado = SECCION_DE_PAGINA[page] === "sec-llenado";
   const esCajon = useMediaQuery(UMBRAL_CAJON);
-  // `null` mientras no se sabe, o si /api/iconics/alarms falló — ver la
-  // cabecera de `useAlarmCount.js`. No se muestra badge en ninguno de los
-  // dos casos: un 0 falso sería peor que ningún número.
-  const alarmas1h = useAlarmCount();
 
   /* El indicador de origen es el mismo con y sin interruptor; lo que cambia es
      si además es pulsable. Se comparte el estilo para que no puedan derivar. */
@@ -164,15 +159,16 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
           <Input icon={<Search size={14} />} placeholder="Buscar…" />
         </div> */}
 
-        {/* Contador de eventos (Plan 13, F1/Fase 9). Rotulado como "eventos
-            recientes" y no "alarmas activas": es un historial, no un
-            semáforo en vivo — ver la cabecera de `Demo-EVA/data/alarmas.js`.
-            Sin badge cuando `alarmas1h` es `null` (sin dato aún, o falló la
-            lectura) o 0 (nada que contar). En `accent` y no `coral`: la
-            *Regla del Color con Significado* reserva coral para una señal EN
-            ese estado ahora mismo, y este número es historial de la última
-            hora, no necesariamente vigente — azul es justo la excepción de la
-            regla, "lo accionable, no lo saludable". */}
+        {/* Contador de eventos, OCULTO temporalmente (2026-08-31): la vista
+            de Alarmas se ocultó del sidebar (ver `routes.jsx`, entrada
+            `eva-alarmas`) y este botón era la otra puerta hacia ella —
+            además de sondear `/api/iconics/alarms` cada 30s en TODAS las
+            pantallas, no sólo estando en Alarmas, así que dejar el botón
+            (aunque sin destino) habría seguido generando esas peticiones.
+            Para restaurar: descomentar, y volver a importar `Bell` de
+            lucide-react y `useAlarmCount` de `@/lib/iconics` arriba, con
+            `const alarmas1h = useAlarmCount();` antes del `return`.
+
         <HoverTip label={alarmas1h ? `${alarmas1h} evento${alarmas1h === 1 ? "" : "s"} en la última hora · ver alarmas` : "Ver alarmas"}>
           <button
             onClick={onAbrirAlarmas}
@@ -193,7 +189,7 @@ export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
               </span>
             )}
           </button>
-        </HoverTip>
+        </HoverTip> */}
 
 {/* Para restaurar este botón hay que volver a montar <DataProvider> (hoy
             archivado en _deprecated/providers/) y recuperar aquí el

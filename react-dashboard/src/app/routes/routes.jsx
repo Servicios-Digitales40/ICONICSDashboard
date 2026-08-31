@@ -50,7 +50,7 @@
  */
 import { lazy } from "react";
 import {
-  Bell, Box, Boxes, BrainCircuit, Cog, Droplets, Factory, Home, LayoutDashboard, Power,
+  Box, Boxes, BrainCircuit, Cog, Droplets, Factory, Home, LayoutDashboard, Power,
   ShieldAlert, Waves,
 } from "lucide-react";
 
@@ -222,11 +222,22 @@ export const ROUTES = [
     // Historial, no un semáforo de alarmas activas — ver la cabecera de
     // `data/alarmas.js`. `GET /api/iconics/alarms` es lo único que hay hoy:
     // el evento "activo ahora" necesitaría otra llamada al servidor.
+    //
+    // ── OCULTA DEL SIDEBAR (2026-08-31, TEMPORAL) ──────────────────────
+    //
+    // Sin `nav` para que no aparezca en el sidebar ni sea navegable desde
+    // ahí. El botón del Topbar que también llevaba aquí está comentado en
+    // `Topbar.jsx` por el mismo motivo — ese botón sondeaba el conteo de
+    // alarmas cada 30s en TODAS las pantallas, no sólo en ésta, así que
+    // ocultar sólo esta entrada no habría bastado para cortar las peticiones.
+    //
+    // Para reactivar: restaurar `nav: { label: "Alarmas", icon: <Bell size={17}
+    // />, group: "sec-general" }` aquí (reimportando `Bell` de lucide-react
+    // arriba) y descomentar el bloque del botón en `Topbar.jsx`.
     id: "eva-alarmas",
     component: lazy(() => import("@/Demo-EVA/views/AlarmasEva.jsx")),
     title: "Alarmas",
     sub: "Historial de eventos de la instalación",
-    nav: { label: "Alarmas", icon: <Bell size={17} />, group: "sec-general" },
   },
 
   {
