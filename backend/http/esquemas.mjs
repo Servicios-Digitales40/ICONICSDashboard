@@ -265,33 +265,54 @@ export const ReporteQuerySchema = z.object({
 })
 
 /**
+ * Los mensajes escritos a mano en los esquemas ya son frases completas —y
+ * varios nombran su propio campo, como «Invalid pointName parameter.»—, así
+ * que se devuelven TAL CUAL: anteponerles la ruta daría «pointName: Invalid
+ * pointName parameter.», y además rompería a los guiones de `scripts/`, que
+ * comparan la cadena entera.
+ *
+ * Sólo se antepone el campo a los que genera Zod por su cuenta, que dicen qué
+ * esperaban pero no dónde: «Invalid input», «Expected string».
+ */
+function formatearMensaje(ruta, mensaje) {
+  const esMensajeDeZod = /^(Required|Invalid input|Invalid option|Expected |Too big|Too small|Unrecognized)/.test(
+    mensaje
+  )
+  if (!esMensajeDeZod || !ruta) return mensaje
+  return `${ruta}: ${mensaje}`
+}
+
+/**
  * Traduce un fallo de Zod al texto que ya devolvía la validación a mano.
  *
  * Se toma el primer problema y no todos: la API respondía un solo mensaje por
  * error, los clientes lo pintan tal cual en un aviso, y una lista de cinco
  * problemas en un `alert` no ayuda a nadie. El resto viaja en `detalles` para
  * quien lo quiera.
+ *
+ * Sirve para un `ZodError` de verdad —el que lanza `esquema.parse()` fuera de
+ * una ruta, como en las pruebas de este archivo—. Para el que arma Fastify al
+ * validar una ruta contra un `schema` (que no es un `ZodError`, es un array
+ * con otra forma), ver `primerMensajeDeValidacion`.
  */
 export function primerMensaje(error) {
   const problema = error?.issues?.[0]
   if (!problema) return 'Cuerpo de la petición inválido.'
+  return formatearMensaje(problema.path?.join('.') ?? '', problema.message)
+}
 
-  const ruta = problema.path?.join('.') ?? ''
-
-  /*
-   * Los mensajes escritos a mano en los esquemas ya son frases completas —y
-   * varios nombran su propio campo, como «Invalid pointName parameter.»—, así
-   * que se devuelven TAL CUAL: anteponerles la ruta daría «pointName: Invalid
-   * pointName parameter.», y además rompería a los guiones de `scripts/`, que
-   * comparan la cadena entera.
-   *
-   * Sólo se antepone el campo a los que genera Zod por su cuenta, que dicen
-   * qué esperaban pero no dónde: «Invalid input», «Expected string».
-   */
-  const esMensajeDeZod = /^(Required|Invalid input|Invalid option|Expected |Too big|Too small|Unrecognized)/.test(
-    problema.message
-  )
-
-  if (!esMensajeDeZod || !ruta) return problema.message
-  return `${ruta}: ${problema.message}`
+/**
+ * Lo mismo que `primerMensaje`, pero para el array que deja Fastify en
+ * `error.validation` cuando una ruta rechaza `request.query` o
+ * `request.body` contra su `schema` de Zod (ver `app.mjs`,
+ * `setValidatorCompiler`). No es un `ZodError`: `fastify-type-provider-zod`
+ * traduce cada `issue` de Zod a la forma que usa Fastify —`instancePath` en
+ * vez de `path`—, pero conserva el `message` de Zod tal cual, así que el
+ * mismo criterio de cuándo anteponer el campo vale igual.
+ */
+export function primerMensajeDeValidacion(erroresDeValidacion) {
+  const problema = erroresDeValidacion?.[0]
+  if (!problema) return 'Cuerpo de la petición inválido.'
+  const ruta = (problema.instancePath ?? '').replace(/^\//, '').split('/').filter(Boolean).join('.')
+  return formatearMensaje(ruta, problema.message)
 }

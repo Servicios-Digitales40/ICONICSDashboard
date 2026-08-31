@@ -21,6 +21,9 @@
  */
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
+import fastifySwagger from '@fastify/swagger'
+import fastifySwaggerUi from '@fastify/swagger-ui'
+import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod'
 import { createChat } from './ia/chat.mjs'
 import { createCola } from './ia/cola.mjs'
 import { createIndiceDocumentos } from './ia/documentos.mjs'
@@ -105,6 +108,21 @@ export async function createApp(config) {
       querystringParser: cadena => Object.fromEntries(new URLSearchParams(cadena)),
     },
   })
+
+  /*
+   * Los esquemas de las rutas (más abajo, en `routes/`) son objetos de Zod,
+   * no JSON Schema: estos dos compiladores son lo que le enseña a Fastify a
+   * validar y serializar contra ellos. Van antes de registrar cualquier ruta
+   * porque cada ruta se compila con el compilador vigente EN EL MOMENTO de
+   * registrarse, no con el que esté puesto después.
+   *
+   * Antes esta validación corría a mano en un `preHandler` (`http/validar.mjs`,
+   * ya eliminado); ahora la hace Fastify en su propio paso de validación, lo
+   * que además es lo que deja que `@fastify/swagger` lea el `schema` de cada
+   * ruta y documente parámetros y cuerpo sin que nadie los transcriba a mano.
+   */
+  fastify.setValidatorCompiler(validatorCompiler)
+  fastify.setSerializerCompiler(serializerCompiler)
 
   /* ── Dependencias ──────────────────────────────────────────────── */
 
@@ -201,6 +219,33 @@ export async function createApp(config) {
   await fastify.register(seguridadPlugin, { config })
   await fastify.register(erroresPlugin)
   await fastify.register(autenticacionPlugin, { config })
+
+  /*
+   * Documentación de la API en `/docs`, sólo fuera de producción — igual que
+   * el HSTS de `seguridadPlugin` se decide por `config.isProduction`. Un
+   * puente en planta no necesita anunciar su mapa de rutas al mundo; en
+   * desarrollo es donde se consulta.
+   *
+   * `transform: jsonSchemaTransform` es lo que traduce el `schema` de Zod de
+   * cada ruta (declarado en `routes/`) al JSON Schema que espera el documento
+   * OpenAPI: parámetros, cuerpo y sus reglas salen solos, sin transcribirlos
+   * a mano ni mantenerlos sincronizados con `http/esquemas.mjs`.
+   */
+  if (!config.isProduction) {
+    await fastify.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: 'ICONICS Dashboard API',
+          description: 'Puente HTTP entre el tablero EVA y el servidor ICONICS.',
+          version: config.version,
+        },
+      },
+      transform: jsonSchemaTransform,
+    })
+    await fastify.register(fastifySwaggerUi, {
+      routePrefix: '/docs',
+    })
+  }
 
   /**
    * Una línea por respuesta, sólo cuando merece la pena.

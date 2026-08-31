@@ -40,7 +40,6 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esquemas.mjs'
-import { validarCuerpo } from '../http/validar.mjs'
 
 export function registerChatRoutes(fastify, { config, chat, cola }) {
 
@@ -88,7 +87,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
        * `http/plugins/autenticacion.mjs`.
        */
       onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
-      preHandler: validarCuerpo(CambiarModeloSchema),
+      schema: { body: CambiarModeloSchema },
     },
     async (request, reply) => {
       if (!config.ia.isConfigured) {
@@ -135,7 +134,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
 
   fastify.post(
     '/api/chat',
-    { preHandler: validarCuerpo(ChatSchema) },
+    { schema: { body: ChatSchema } },
     async (request, reply) => {
       if (!config.ia.isConfigured) {
         request.log.warn(
@@ -274,7 +273,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
    */
   fastify.post(
     '/api/chat/exportar',
-    { preHandler: validarCuerpo(ExportarChatSchema) },
+    { schema: { body: ExportarChatSchema } },
     async (request, reply) => {
       const { historial: turnos } = request.body
 

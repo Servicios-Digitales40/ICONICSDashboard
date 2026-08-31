@@ -6,9 +6,12 @@
  * vive en `iconics/client.mjs`.
  *
  * La validación ya no se escribe a mano en cada handler: vive en
- * `http/esquemas.mjs` y se declara en la ruta. Los nombres de punto siguen
- * pasando por la lista blanca de `iconics/validation.mjs`, que es donde está
- * documentada la sintaxis real del servidor.
+ * `http/esquemas.mjs` y se declara en el `schema` de la ruta, que Fastify
+ * valida por su cuenta contra el esquema de Zod (ver `app.mjs`,
+ * `setValidatorCompiler`) — es también de ahí de donde `@fastify/swagger`
+ * saca la documentación de parámetros y cuerpo en `/docs`. Los nombres de
+ * punto siguen pasando por la lista blanca de `iconics/validation.mjs`, que es
+ * donde está documentada la sintaxis real del servidor.
  */
 import {
   AcknowledgeAlarmsSchema,
@@ -21,7 +24,6 @@ import {
   WriteBatchSchema,
   WritePointSchema,
 } from '../http/esquemas.mjs'
-import { validarConsulta, validarCuerpo } from '../http/validar.mjs'
 import { isSafePointName, parsePointList } from '../iconics/validation.mjs'
 import { planificar } from '../../shared/eva/rango.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
@@ -69,11 +71,20 @@ export function registerIconicsRoutes(fastify, { config, client }) {
    * Las guardas de autenticación se declaran aquí, en un solo sitio, para que
    * ninguna ruta de escritura pueda quedarse sin ellas por olvido cuando se
    * active `AUTH_HABILITADA`.
+   *
+   * La guarda de solo lectura va en `onRequest` y no en `preHandler` a
+   * propósito: Fastify valida el `schema` ANTES de `preHandler`, así que un
+   * `preHandler` respondería 400 (cuerpo inválido) antes de que se llegara a
+   * comprobar el modo solo lectura, y el 403 —que es la respuesta correcta
+   * cuando el puente no escribe, tenga el cuerpo la forma que tenga— nunca se
+   * vería. `onRequest` corre antes de la validación, así que conserva el
+   * mismo orden que tenía cuando las dos comprobaciones eran `preHandler`.
    */
   function escritura(esquema) {
     return {
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
-      preHandler: [
+      onRequest: [
+        fastify.autenticar,
+        fastify.exigirRol('operador'),
         async (request, reply) => {
           if (!readOnly) return
           request.log.warn(
@@ -87,8 +98,8 @@ export function registerIconicsRoutes(fastify, { config, client }) {
               'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.',
           })
         },
-        validarCuerpo(esquema),
       ],
+      schema: { body: esquema },
     }
   }
 
@@ -96,7 +107,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/data',
-    { preHandler: validarConsulta(PointNameQuerySchema) },
+    { schema: { querystring: PointNameQuerySchema } },
     async (request, reply) => {
       const pointName = request.query.pointName ?? defaultPointName
       const result = await client.readPoint(pointName)
@@ -127,7 +138,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/history',
-    { preHandler: validarConsulta(HistoryQuerySchema) },
+    { schema: { querystring: HistoryQuerySchema } },
     async (request, reply) => {
       const { pointName, startDate, endDate, aggregate, interval } = request.query
       return responder(
@@ -166,7 +177,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
    */
   fastify.post(
     '/api/iconics/history/batch',
-    { preHandler: validarCuerpo(HistoryBatchSchema) },
+    { schema: { body: HistoryBatchSchema } },
     async (request, reply) => {
       const { points: puntos, startDate: inicio, endDate: fin, aggregate } = request.body
 
@@ -271,13 +282,13 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/browse',
-    { preHandler: validarConsulta(BrowseQuerySchema) },
+    { schema: { querystring: BrowseQuerySchema } },
     async (request, reply) => responder(reply, await client.browse(request.query.path))
   )
 
   fastify.get(
     '/api/iconics/points',
-    { preHandler: validarConsulta(SearchQuerySchema) },
+    { schema: { querystring: SearchQuerySchema } },
     async (request, reply) => responder(reply, await client.search(request.query.query))
   )
 
@@ -318,7 +329,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/alarms',
-    { preHandler: validarConsulta(AlarmsQuerySchema) },
+    { schema: { querystring: AlarmsQuerySchema } },
     async (request, reply) => {
       const { pointName } = request.query
       const hours = Math.min(request.query.hours, maxAlarmHours)

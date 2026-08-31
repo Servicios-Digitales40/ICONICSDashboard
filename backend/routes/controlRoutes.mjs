@@ -7,7 +7,6 @@
  * lectura, nivel de tanque) ni su relectura de confirmación tras escribir.
  */
 import { ControlBombaSchema } from '../http/esquemas.mjs'
-import { validarCuerpo } from '../http/validar.mjs'
 
 export function registerControlRoutes(fastify, { config, herramientas }) {
   fastify.post(
@@ -21,7 +20,7 @@ export function registerControlRoutes(fastify, { config, herramientas }) {
        * `http/plugins/autenticacion.mjs`.
        */
       onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
-      preHandler: validarCuerpo(ControlBombaSchema),
+      schema: { body: ControlBombaSchema },
     },
     async (request, reply) => {
       const { encender } = request.body

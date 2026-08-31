@@ -17,7 +17,7 @@
  */
 import fp from 'fastify-plugin'
 import { ZodError } from 'zod'
-import { primerMensaje } from '../esquemas.mjs'
+import { primerMensaje, primerMensajeDeValidacion } from '../esquemas.mjs'
 
 async function erroresPlugin(fastify) {
   /*
@@ -34,11 +34,22 @@ async function erroresPlugin(fastify) {
      * no lo es —llenaría el log de ruido en cuanto alguien pruebe la API a
      * mano— pero sí como aviso con el detalle, que es lo que hace falta cuando
      * un cliente legítimo empieza a mandar algo mal.
+     *
+     * `error?.validation` es el caso normal ahora: cada ruta valida su
+     * `query`/`body` contra un esquema de Zod declarado en su `schema` (ver
+     * `app.mjs`, `setValidatorCompiler`), y Fastify llega aquí con el array de
+     * `fastify-type-provider-zod` en vez de con un `ZodError` — no se usa
+     * `error.message`, que trae el formato genérico de Fastify («querystring/
+     * pointName must be...»), porque cambiaría el texto que ya comparan el
+     * frontend y los guiones de `scripts/`. `ZodError` de verdad ya no debería
+     * llegar por esta vía —lo lanza `.parse()`, y ninguna ruta lo llama ya
+     * directamente—, pero se conserva el caso por si un módulo interno valida
+     * algo fuera del ciclo de Fastify.
      */
     if (error instanceof ZodError || error?.validation) {
       const mensaje = error instanceof ZodError
         ? primerMensaje(error)
-        : (error.message ?? 'Petición inválida.')
+        : primerMensajeDeValidacion(error.validation)
 
       request.log.warn(
         {

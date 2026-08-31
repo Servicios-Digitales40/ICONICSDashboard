@@ -14,12 +14,11 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ReporteQuerySchema } from '../http/esquemas.mjs'
-import { validarConsulta } from '../http/validar.mjs'
 
 export function registerReportesRoutes(fastify, { config }) {
   fastify.get(
     '/api/reportes',
-    { preHandler: validarConsulta(ReporteQuerySchema) },
+    { schema: { querystring: ReporteQuerySchema } },
     async (request, reply) => {
       const { id } = request.query
       const ruta = join(config.reportes.dir, `${id}.pdf`)

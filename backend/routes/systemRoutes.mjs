@@ -2,7 +2,6 @@
  * Rutas propias del puente: salud y contexto de cabecera.
  */
 import { PointNameQuerySchema } from '../http/esquemas.mjs'
-import { validarConsulta } from '../http/validar.mjs'
 
 /**
  * Tres estados, no dos, porque son tres situaciones con tres arreglos
@@ -87,7 +86,7 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
 
   fastify.get(
     '/api/context',
-    { preHandler: validarConsulta(PointNameQuerySchema) },
+    { schema: { querystring: PointNameQuerySchema } },
     async request => {
       const pointName = request.query.pointName ?? config.iconics.defaultPointName
 
