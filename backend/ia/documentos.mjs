@@ -662,13 +662,21 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
       indice = fragmentos
       cargado = true
 
-      logger.info('Índice de documentación cargado', {
-        carpeta,
-        archivos: soportados.length,
-        fragmentos: indice.length,
-        ilegibles: ilegibles.length,
-        modo: usaEmbeddings ? 'embeddings + BM25' : 'BM25',
-      })
+      logger.info(
+        `Documentación indexada: ${soportados.length} archivo(s) → ${indice.length} fragmentos ` +
+          `(${usaEmbeddings ? 'embeddings + BM25' : 'sólo BM25'})` +
+          (ilegibles.length
+            ? `. ${ilegibles.length} archivo(s) sin texto extraíble: ${ilegibles.join(', ')} ` +
+              '— suelen ser PDF escaneados, que son imágenes y necesitarían OCR'
+            : ''),
+        {
+          carpeta,
+          archivos: soportados.length,
+          fragmentos: indice.length,
+          ilegibles: ilegibles.length,
+          modo: usaEmbeddings ? 'embeddings + BM25' : 'BM25',
+        }
+      )
     })().finally(() => { cargando = null })
 
     return cargando

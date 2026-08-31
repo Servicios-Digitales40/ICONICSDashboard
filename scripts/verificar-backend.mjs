@@ -258,9 +258,9 @@ const config = loadConfig({
 
 /** Levanta una app con el entorno indicado y devuelve su URL base. */
 async function mount(env) {
-  const server = createServer(createApp(loadConfig({ ...baseEnv, ...env })))
-  await new Promise(r => server.listen(0, '127.0.0.1', r))
-  return { base: `http://127.0.0.1:${server.address().port}`, server }
+  const server = await createApp(loadConfig({ ...baseEnv, ...env }))
+  await server.listen({ port: 0, host: '127.0.0.1' })
+  return { base: `http://127.0.0.1:${server.server.address().port}`, server }
 }
 
 /** `fetch` + parseo tolerante contra una base arbitraria. */
@@ -278,9 +278,9 @@ const postJson = payload => ({
   body: JSON.stringify(payload),
 })
 
-const app = createServer(createApp(config))
-await new Promise(r => app.listen(0, '127.0.0.1', r))
-const base = `http://127.0.0.1:${app.address().port}`
+const app = await createApp(config)
+await app.listen({ port: 0, host: '127.0.0.1' })
+const base = `http://127.0.0.1:${app.server.address().port}`
 
 const get = async (path, init) => {
   const res = await fetch(`${base}${path}`, init)
@@ -595,9 +595,9 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
 })
 {
   loginCount = 0
-  const cold = createServer(createApp(config))
-  await new Promise(r => cold.listen(0, '127.0.0.1', r))
-  const coldBase = `http://127.0.0.1:${cold.address().port}`
+  const cold = await createApp(config)
+  await cold.listen({ port: 0, host: '127.0.0.1' })
+  const coldBase = `http://127.0.0.1:${cold.server.address().port}`
 
   // 20 peticiones simultáneas contra un backend sin token todavía.
   const responses = await Promise.all(
@@ -609,7 +609,7 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
     assert.ok(responses.every(r => r.ok === true), 'todas deben resolverse bien')
     assert.equal(loginCount, 1, `logins=${loginCount} (antes: uno por petición)`)
   })
-  cold.close()
+  await cold.close()
 }
 
 // C. Método no permitido → 405 y no caída al SPA
@@ -659,7 +659,7 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
 //    normaliza los ".." antes de enviarlos y no probaría nada.
 {
   const raw = await new Promise(resolve => {
-    const socket = connect(app.address().port, '127.0.0.1', () => {
+    const socket = connect(app.server.address().port, '127.0.0.1', () => {
       socket.write('GET /assets/../../../.env.local HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n')
     })
     let data = ''
@@ -674,9 +674,9 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
 
 console.log('\n── Sin ICONICS configurado ─────────────────────────────────')
 {
-  const bare = createServer(createApp(loadConfig({ LOG_LEVEL: 'ERROR' })))
-  await new Promise(r => bare.listen(0, '127.0.0.1', r))
-  const bareBase = `http://127.0.0.1:${bare.address().port}`
+  const bare = await createApp(loadConfig({ LOG_LEVEL: 'ERROR' }))
+  await bare.listen({ port: 0, host: '127.0.0.1' })
+  const bareBase = `http://127.0.0.1:${bare.server.address().port}`
 
   const alarms = await fetch(`${bareBase}/api/iconics/alarms`)
   const alarmsBody = await alarms.json()
@@ -690,7 +690,7 @@ console.log('\n── Sin ICONICS configurado ───────────�
     assert.equal(health.status, 'error')
     assert.equal(health.reason, 'ICONICS_API_BASE not configured')
   })
-  bare.close()
+  await bare.close()
 }
 
 console.log('\n── Endurecimiento · modo solo lectura (B.1) ────────────────')
@@ -724,7 +724,7 @@ console.log('\n── Endurecimiento · modo solo lectura (B.1) ─────�
   check('ICONICS_READ_ONLY con un valor que no es booleano no arranca', () => {
     assert.throws(() => loadConfig({ ICONICS_READ_ONLY: 'flase' }), /"true" o "false"/)
   })
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Endurecimiento · CORS (B.2) ─────────────────────────────')
@@ -747,7 +747,7 @@ console.log('\n── Endurecimiento · CORS (B.2) ─────────�
   check('sin CORS_ORIGINS (el defecto) no se autoriza ningún origen', () => {
     assert.equal(r.headers.get('access-control-allow-origin'), null)
   })
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Endurecimiento · timeout de salida (B.3) ────────────────')
@@ -767,7 +767,7 @@ console.log(`   el corte tiene que quedar registrado)${c.reset}`)
   check('UPSTREAM_TIMEOUT_MS inválido no arranca', () => {
     assert.throws(() => loadConfig({ UPSTREAM_TIMEOUT_MS: 'pronto' }), /entero >= 1/)
   })
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Endurecimiento · salud partida (B.4) ────────────────────')
@@ -796,15 +796,22 @@ console.log('\n── Endurecimiento · salud partida (B.4) ──────�
   check('/api/health/ready informa del modo solo lectura', () => {
     assert.equal(ready.body.readOnly, false, 'esta instancia arrancó con escritura')
   })
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Endurecimiento · límite de peticiones (B.5) ─────────────')
 {
   const { base: limitado, server } = await mount({ RATE_LIMIT_MAX: '3', RATE_LIMIT_WINDOW_MS: '60000' })
 
+  /*
+   * Se sondea `/api/context` y no `/api/health/live`: las sondas de salud
+   * quedan FUERA del límite a propósito (`config: { rateLimit: false }` en
+   * `routes/systemRoutes.mjs`). Un orquestador las llama cada pocos segundos
+   * para siempre, y gastarles cuota significaría que un reinicio del
+   * contenedor arranca con la sonda ya cortada.
+   */
   const respuestas = []
-  for (let i = 0; i < 5; i++) respuestas.push(await call(limitado, '/api/health/live'))
+  for (let i = 0; i < 5; i++) respuestas.push(await call(limitado, '/api/context'))
 
   check('pasado el tope, la API responde 429 con Retry-After', () => {
     assert.deepEqual(respuestas.map(r => r.status), [200, 200, 200, 429, 429])
@@ -816,7 +823,7 @@ console.log('\n── Endurecimiento · límite de peticiones (B.5) ────
   check('el límite no alcanza a los estáticos de la SPA', () => {
     assert.notEqual(estatico.status, 429)
   })
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Endurecimiento · caché de lote (B.7) ────────────────────')
@@ -839,7 +846,7 @@ console.log('\n── Endurecimiento · caché de lote (B.7) ──────�
     assert.equal(otroOrden.body.ok, true)
     assert.equal(batchCount, 1, `llamadas upstream=${batchCount}`)
   })
-  server.close()
+  await server.close()
 
   const { base: sinCache, server: server2 } = await mount({ BATCH_CACHE_TTL_MS: '0' })
   batchCount = 0
@@ -876,7 +883,7 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
     assert.match(descarga.headers.get('content-disposition') ?? '', /^attachment; filename="reporte-/)
   })
 
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Exportar la conversación a PDF ──────────────────────────')
@@ -916,7 +923,7 @@ console.log('\n── Exportar la conversación a PDF ────────�
     assert.equal(descarga.headers.get('content-type'), 'application/pdf')
   })
 
-  server.close()
+  await server.close()
 }
 
 console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1) ──')
@@ -932,7 +939,7 @@ console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1
     assert.equal(r.body.truncada, true)
     assert.match(r.body.motivoCorte, /tope de 3 páginas/)
   })
-  server.close()
+  await server.close()
 }
 {
   // Con páginas de 60 ms y un plazo de 130 ms, caben dos páginas completas
@@ -947,7 +954,7 @@ console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1
     assert.equal(r.body.truncada, true)
     assert.match(r.body.motivoCorte, /plazo de 130 ms/)
   })
-  server.close()
+  await server.close()
 }
 {
   const r = await call(base, '/api/iconics/history?pointName=historia-falla-pagina-2&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
@@ -1042,7 +1049,7 @@ check('fuera de producción arranca, pero queda marcado para avisarlo', () => {
   assert.equal(loadConfig({}).tlsVerificationDisabled, false)
 })
 
-app.close()
+await app.close()
 fake.close()
 
 console.log()

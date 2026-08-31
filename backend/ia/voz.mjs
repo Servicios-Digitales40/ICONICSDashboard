@@ -129,12 +129,12 @@ export function createVoz({ config }) {
     const cuerpo = await respuesta.json().catch(() => null)
     const texto = limpiar(cuerpo?.text ?? '')
 
-    logger.info('Audio transcrito', {
-      bytes: audio.length,
-      segundos: duracionWav(audio),
-      caracteres: texto.length,
-      duracionMs: Date.now() - empezado,
-    })
+    const segundos = duracionWav(audio)
+    logger.debug(
+      `whisper-server transcribió ${segundos} s de audio en ${Date.now() - empezado} ms ` +
+        `(${texto.length} caracteres)`,
+      { bytes: audio.length, segundos, caracteres: texto.length, duracionMs: Date.now() - empezado }
+    )
 
     if (!texto) {
       return {

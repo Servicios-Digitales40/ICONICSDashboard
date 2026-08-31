@@ -97,19 +97,16 @@ const whisperBase = `http://127.0.0.1:${whisper.address().port}`
 
 /* ── La app, contra el whisper falso ─────────────────────────────────── */
 
-function levantar(extra = {}) {
+async function levantar(extra = {}) {
   const config = loadConfig({ LOG_LEVEL: 'ERROR', ...extra })
-  const servidor = createServer(createApp(config))
-  return new Promise(resolve => {
-    servidor.listen(0, '127.0.0.1', () => {
-      resolve({
-        servidor,
-        base: `http://127.0.0.1:${servidor.address().port}`,
-        config,
-        cerrar: () => new Promise(r => servidor.close(r)),
-      })
-    })
-  })
+  const servidor = await createApp(config)
+  await servidor.listen({ port: 0, host: '127.0.0.1' })
+  return {
+    servidor,
+    base: `http://127.0.0.1:${servidor.server.address().port}`,
+    config,
+    cerrar: () => servidor.close(),
+  }
 }
 
 /** Un WAV mínimo pero VÁLIDO: cabecera canónica y unas muestras de silencio. */

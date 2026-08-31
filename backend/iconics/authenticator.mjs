@@ -51,7 +51,7 @@ function decodeHtmlAmpersands(value) {
   return value?.replace(/&amp;/g, '&')
 }
 
-async function postForm(url, fields, { cookies } = {}) {
+async function postForm(url, fields, { cookies, timeoutMs } = {}) {
   return fetch(url, {
     method: 'POST',
     headers: {
@@ -60,14 +60,26 @@ async function postForm(url, fields, { cookies } = {}) {
     },
     body: new URLSearchParams(fields),
     redirect: 'manual',
+    ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   })
 }
 
 /**
  * Recorre el flujo completo de login y devuelve la respuesta de tokens.
  * Cada paso está separado para que el error diga en cuál se rompió.
+ *
+ * ── POR QUÉ CADA PASO LLEVA CORTE ──────────────────────────────────
+ *
+ * Los cinco saltos de este flujo salían SIN timeout. Un ICONICS que acepta la
+ * conexión y no contesta —el modo de fallo de un servidor saturado, no el de
+ * uno caído— dejaba el login colgado para siempre, y con él TODA petición que
+ * necesitara token: el puente se quedaba mudo sin una sola línea en el log
+ * que lo explicara. `client.mjs` ya se protegía de eso en sus llamadas; aquí
+ * faltaba, y es peor, porque esto corre antes que cualquier lectura.
+ *
+ * @param {number} timeoutMs Corte por salto, no para el flujo entero.
  */
-async function performInteractiveLogin(config) {
+async function performInteractiveLogin(config, timeoutMs) {
   const { endpoints, clientId, scope, username, password, origin } = config
   const pkce = createPkcePair()
 
@@ -82,6 +94,7 @@ async function performInteractiveLogin(config) {
   })
   const authorizeResponse = await fetch(`${endpoints.authorize}?${authorizeParams}`, {
     redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
   })
 
   const loginPageLocation = authorizeResponse.headers.get('location')
@@ -93,6 +106,7 @@ async function performInteractiveLogin(config) {
   const loginPageResponse = await fetch(toAbsoluteUrl(origin, loginPageLocation), {
     headers: { Cookie: collectCookies([authorizeResponse]) },
     redirect: 'manual',
+    signal: AbortSignal.timeout(timeoutMs),
   })
   const loginHtml = await loginPageResponse.text()
   const csrfToken = extractHiddenField(loginHtml, '__RequestVerificationToken')
@@ -112,7 +126,7 @@ async function performInteractiveLogin(config) {
       __RequestVerificationToken: csrfToken,
       button: 'login',
     },
-    { cookies: collectCookies([authorizeResponse, loginPageResponse]) }
+    { cookies: collectCookies([authorizeResponse, loginPageResponse]), timeoutMs }
   )
 
   if (loginResponse.status !== HTTP_FOUND) {
@@ -127,6 +141,7 @@ async function performInteractiveLogin(config) {
     {
       headers: { Cookie: collectCookies([authorizeResponse, loginPageResponse, loginResponse]) },
       redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
     }
   )
 
@@ -137,17 +152,21 @@ async function performInteractiveLogin(config) {
 
   // 5. Canje del código por tokens. El `Location` se normaliza a absoluto
   //    igual que los anteriores: `new URL()` sobre uno relativo lanza.
-  return exchange(endpoints.token, {
-    grant_type: 'authorization_code',
-    client_id: clientId,
-    code: new URL(toAbsoluteUrl(origin, codeLocation)).searchParams.get('code'),
-    redirect_uri: endpoints.redirectUri,
-    code_verifier: pkce.verifier,
-  })
+  return exchange(
+    endpoints.token,
+    {
+      grant_type: 'authorization_code',
+      client_id: clientId,
+      code: new URL(toAbsoluteUrl(origin, codeLocation)).searchParams.get('code'),
+      redirect_uri: endpoints.redirectUri,
+      code_verifier: pkce.verifier,
+    },
+    timeoutMs
+  )
 }
 
-async function exchange(tokenEndpoint, fields) {
-  const response = await postForm(tokenEndpoint, fields)
+async function exchange(tokenEndpoint, fields, timeoutMs) {
+  const response = await postForm(tokenEndpoint, fields, { timeoutMs })
 
   if (!response.ok) {
     const detail = await response.text()
@@ -169,6 +188,12 @@ export function createAuthenticator(config) {
 
   const skewMs = config.limits.tokenExpirySkewSeconds * 1000
   const iconics = config.iconics
+  /*
+   * El MISMO corte que usan las llamadas de datos (`UPSTREAM_TIMEOUT_MS`): si
+   * el servidor de planta es lento, lo es para todo, y tener dos números que
+   * ajustar por separado invita a que uno se quede corto sin que se note.
+   */
+  const timeoutMs = config.limits.upstreamTimeoutMs
 
   function hasValidToken() {
     return Boolean(accessToken) && Date.now() < expiresAtMs
@@ -178,7 +203,19 @@ export function createAuthenticator(config) {
     accessToken = tokens.access_token
     if (tokens.refresh_token) refreshToken = tokens.refresh_token
     expiresAtMs = Date.now() + tokens.expires_in * 1000 - skewMs
-    logger.info('ICONICS OIDC token obtained', { expiresIn: tokens.expires_in })
+    /*
+     * `debug` y no `info`: con la vida por defecto del token esto se repite
+     * cada pocos minutos para siempre, y en marcha normal no dice nada que no
+     * se sepa. Lo que sí importa —que la renovación FALLE— se registra abajo
+     * como aviso.
+     *
+     * El token no viaja en los metadatos ni podría: `logger.mjs` redacta
+     * `access_token` y `refresh_token` pase lo que pase.
+     */
+    logger.debug(
+      `Token de ICONICS renovado, válido ${Math.round(tokens.expires_in / 60)} min`,
+      { validoSegundos: tokens.expires_in, usuario: iconics.username || null }
+    )
   }
 
   /**
@@ -190,20 +227,29 @@ export function createAuthenticator(config) {
     if (refreshToken) {
       try {
         storeTokens(
-          await exchange(iconics.endpoints.token, {
-            grant_type: 'refresh_token',
-            client_id: iconics.clientId,
-            refresh_token: refreshToken,
-          })
+          await exchange(
+            iconics.endpoints.token,
+            {
+              grant_type: 'refresh_token',
+              client_id: iconics.clientId,
+              refresh_token: refreshToken,
+            },
+            timeoutMs
+          )
         )
         return
       } catch (error) {
-        logger.warn('Token refresh failed, performing full login', { reason: error.message })
+        logger.warn(
+          `La renovación del token de ICONICS falló (${error.message}); se reintenta con un ` +
+            'login completo. Si se repite en cada petición, el servidor está rechazando el ' +
+            'refresh token y conviene revisar la sesión del usuario en ICONICS.',
+          { motivo: error.message, usuario: iconics.username || null }
+        )
         refreshToken = ''
       }
     }
 
-    storeTokens(await performInteractiveLogin(iconics))
+    storeTokens(await performInteractiveLogin(iconics, timeoutMs))
   }
 
   async function getAccessToken() {
@@ -231,7 +277,19 @@ export function createAuthenticator(config) {
       const token = await getAccessToken()
       return token ? { Authorization: `Bearer ${token}` } : {}
     } catch (error) {
-      logger.error('Failed to obtain ICONICS token', { err: error })
+      /*
+       * Se sigue sin token a propósito: la llamada sale sin `Authorization` y
+       * ICONICS responde 401, que es un diagnóstico más útil que un 502
+       * genérico del puente. El mensaje lo dice para que quien lea el log no
+       * crea que el puente se lo tragó.
+       */
+      logger.error(
+        `No se pudo obtener un token de ICONICS para ${iconics.username || 'el usuario configurado'}: ` +
+          `${error?.message ?? error}. Las peticiones saldrán SIN autenticar y ICONICS ` +
+          'responderá 401. Revisa ICONICS_USERNAME / ICONICS_PASSWORD y que ese usuario ' +
+          'siga habilitado en el servidor de planta.',
+        { err: error, usuario: iconics.username || null, endpoint: iconics.endpoints?.token }
+      )
       return {}
     }
   }

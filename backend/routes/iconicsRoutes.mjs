@@ -4,22 +4,27 @@
  * Cada handler hace tres cosas y sólo tres: valida la entrada, llama al
  * cliente y traduce el sobre a una respuesta HTTP. Nada de `fetch` aquí — eso
  * vive en `iconics/client.mjs`.
+ *
+ * La validación ya no se escribe a mano en cada handler: vive en
+ * `http/esquemas.mjs` y se declara en la ruta. Los nombres de punto siguen
+ * pasando por la lista blanca de `iconics/validation.mjs`, que es donde está
+ * documentada la sintaxis real del servidor.
  */
-import { readJsonBody, RequestBodyError } from '../http/requestBody.mjs'
-import { sendError, sendJson } from '../http/responses.mjs'
-import { isSafeHistoryArgument, isSafePointName, parsePointList } from '../iconics/validation.mjs'
+import {
+  AcknowledgeAlarmsSchema,
+  AlarmsQuerySchema,
+  BrowseQuerySchema,
+  HistoryBatchSchema,
+  HistoryQuerySchema,
+  PointNameQuerySchema,
+  SearchQuerySchema,
+  WriteBatchSchema,
+  WritePointSchema,
+} from '../http/esquemas.mjs'
+import { validarConsulta, validarCuerpo } from '../http/validar.mjs'
+import { isSafePointName, parsePointList } from '../iconics/validation.mjs'
 import { planificar } from '../../shared/eva/rango.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
-
-/**
- * Series que se admiten en una sola llamada a `/history/batch`.
- *
- * Cinco son las del pronóstico, que es el consumidor que motivó la ruta; ocho,
- * el catálogo entero del sistema del tanque. Diez deja margen sin dejarlo
- * abierto: cada señal multiplica los tramos, y una lista sin techo convierte
- * una petición en cientos de lecturas al historiador.
- */
-const MAX_SERIES_BATCH = 10
 
 /**
  * Puntos por tramo cuando se trocea una ventana larga.
@@ -39,20 +44,20 @@ function formatLocalTimestamp(date) {
   return `${day} ${time}`
 }
 
-/**
- * El sobre del cliente ya trae su propio `status`; en el camino feliz se
- * responde 200 porque `status` puede ser cualquier 2xx del servidor.
- */
-function sendResult(response, result) {
-  sendJson(response, result.ok ? 200 : result.status, result)
-}
-
-export function registerIconicsRoutes(router, { config, client }) {
+export function registerIconicsRoutes(fastify, { config, client }) {
   const { defaultPointName, readOnly } = config.iconics
-  const { maxRequestBodyBytes, maxAlarmHours, historyConcurrencia } = config.limits
+  const { maxAlarmHours, historyConcurrencia } = config.limits
 
   /**
-   * Envuelve una ruta que modifica algo en ICONICS.
+   * El sobre del cliente ya trae su propio `status`; en el camino feliz se
+   * responde 200 porque `status` puede ser cualquier 2xx del servidor.
+   */
+  function responder(reply, result) {
+    return reply.code(result.ok ? 200 : result.status).send(result)
+  }
+
+  /**
+   * Opciones de una ruta que modifica algo en ICONICS.
    *
    * Con `ICONICS_READ_ONLY` la ruta se registra igual y responde 403. Podría
    * no registrarse, pero entonces no habría ruta y la petición caería al
@@ -60,83 +65,77 @@ export function registerIconicsRoutes(router, { config, client }) {
    * `index.html` con un **200**, que es lo peor de los dos mundos —el cliente
    * no escribe nada y cree que sí—. Un 403 que nombra la variable dice qué
    * pasa y dónde se cambia.
-   */
-  function whenWritable(handler) {
-    if (!readOnly) return handler
-
-    return ({ response }) =>
-      sendError(
-        response,
-        403,
-        'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.'
-      )
-  }
-
-  /**
-   * Lee el cuerpo JSON. Si es inválido responde el error y devuelve `null`,
-   * para que el handler corte con un `if (!body) return`.
    *
-   * Cualquier otro fallo se deja propagar hasta la frontera de errores de
-   * `app.mjs`: aquí sólo se traducen los que tienen una respuesta pensada.
+   * Las guardas de autenticación se declaran aquí, en un solo sitio, para que
+   * ninguna ruta de escritura pueda quedarse sin ellas por olvido cuando se
+   * active `AUTH_HABILITADA`.
    */
-  async function parseBody(request, response) {
-    try {
-      return await readJsonBody(request, maxRequestBodyBytes)
-    } catch (error) {
-      if (!(error instanceof RequestBodyError)) throw error
-      sendError(response, error.statusCode, error.message)
-      return null
+  function escritura(esquema) {
+    return {
+      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      preHandler: [
+        async (request, reply) => {
+          if (!readOnly) return
+          request.log.warn(
+            { ruta: request.url, ip: request.ip },
+            `Escritura rechazada en ${request.url}: el puente está en modo solo lectura ` +
+              '(arranca con ICONICS_READ_ONLY=false para habilitarla).'
+          )
+          return reply.code(403).send({
+            ok: false,
+            error:
+              'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.',
+          })
+        },
+        validarCuerpo(esquema),
+      ],
     }
   }
 
   /* ── Lectura ──────────────────────────────────────────────────────── */
 
-  router.get('/api/iconics/data', async ({ response, url }) => {
-    const pointName = url.searchParams.get('pointName') ?? defaultPointName
-
-    if (pointName && !isSafePointName(pointName)) {
-      return sendError(response, 400, 'Invalid pointName parameter.')
+  fastify.get(
+    '/api/iconics/data',
+    { preHandler: validarConsulta(PointNameQuerySchema) },
+    async (request, reply) => {
+      const pointName = request.query.pointName ?? defaultPointName
+      const result = await client.readPoint(pointName)
+      return reply.code(result.status).send(result)
     }
+  )
 
-    const result = await client.readPoint(pointName)
-    sendJson(response, result.status, result)
-  })
-
-  router.get('/api/iconics/data/batch', async ({ response, url }) => {
-    const points = parsePointList(url.searchParams.get('points') ?? '')
+  /*
+   * `points` es una lista separada por comas, no un array: se mantiene así
+   * porque es el contrato que ya usa el frontend. La lista se trocea y se
+   * valida elemento a elemento — `parsePointList` descarta los huecos que deja
+   * una coma de más.
+   */
+  fastify.get('/api/iconics/data/batch', async (request, reply) => {
+    const points = parsePointList(request.query.points ?? '')
 
     if (points.length === 0) {
-      return sendError(response, 400, 'points parameter is required (comma-separated list).')
+      return reply
+        .code(400)
+        .send({ ok: false, error: 'points parameter is required (comma-separated list).' })
     }
     if (!points.every(isSafePointName)) {
-      return sendError(response, 400, 'One or more point names are invalid.')
+      return reply.code(400).send({ ok: false, error: 'One or more point names are invalid.' })
     }
 
-    sendResult(response, await client.readPoints(points))
+    return responder(reply, await client.readPoints(points))
   })
 
-  router.get('/api/iconics/history', async ({ response, url }) => {
-    const pointName = url.searchParams.get('pointName') ?? ''
-    const range = {
-      startDate: url.searchParams.get('startDate') ?? '',
-      endDate: url.searchParams.get('endDate') ?? '',
-      aggregate: url.searchParams.get('aggregate') ?? '',
-      interval: url.searchParams.get('interval') ?? '',
+  fastify.get(
+    '/api/iconics/history',
+    { preHandler: validarConsulta(HistoryQuerySchema) },
+    async (request, reply) => {
+      const { pointName, startDate, endDate, aggregate, interval } = request.query
+      return responder(
+        reply,
+        await client.readHistory({ pointName, startDate, endDate, aggregate, interval })
+      )
     }
-
-    if (!isSafePointName(pointName)) {
-      return sendError(response, 400, 'pointName is required and must be valid.')
-    }
-
-    const invalid = Object.entries(range).find(
-      ([, value]) => value && !isSafeHistoryArgument(value)
-    )
-    if (invalid) {
-      return sendError(response, 400, `Invalid ${invalid[0]} parameter.`)
-    }
-
-    sendResult(response, await client.readHistory({ pointName, ...range }))
-  })
+  )
 
   /**
    * ── VARIAS SERIES DE UNA VEZ, TROCEADAS AQUÍ ───────────────────────
@@ -145,9 +144,9 @@ export function registerIconicsRoutes(router, { config, client }) {
    * de una ventana larga vivía entero en el navegador: cada tramo salía como
    * una petición HTTP propia. Cinco señales por diez tramos de una ventana
    * de 30 días eran CINCUENTA peticiones para pintar una pantalla, contra
-   * las cuatro que gasta «Planta» — y el limitador de `app.mjs` corta en 300
-   * por minuto y por IP, así que quien abría esa vista un par de veces se
-   * llevaba un 429 que luego pagaba el siguiente en preguntar.
+   * las cuatro que gasta «Planta» — y el limitador corta en 300 por minuto y
+   * por IP, así que quien abría esa vista un par de veces se llevaba un 429
+   * que luego pagaba el siguiente en preguntar.
    *
    * Aquí el cliente pide LA VENTANA, no los tramos: el plan se calcula con
    * el mismo `planificar()` que usaban los dos lados, las lecturas salen con
@@ -163,209 +162,193 @@ export function registerIconicsRoutes(router, { config, client }) {
    * partiría la lista en dos puntos que no existen. En un cuerpo JSON cada
    * nombre es un elemento y no hay nada que reparsear.
    *
-   * No modifica nada: es una lectura con cuerpo, y por eso NO pasa por
-   * `whenWritable`.
+   * No modifica nada: es una lectura con cuerpo, y por eso NO usa `escritura()`.
    */
-  router.post('/api/iconics/history/batch', async ({ request, response }) => {
-    let cuerpo
-    try {
-      cuerpo = await readJsonBody(request, maxRequestBodyBytes)
-    } catch (error) {
-      if (error instanceof RequestBodyError) return sendError(response, error.statusCode, error.message)
-      throw error
-    }
+  fastify.post(
+    '/api/iconics/history/batch',
+    { preHandler: validarCuerpo(HistoryBatchSchema) },
+    async (request, reply) => {
+      const { points: puntos, startDate: inicio, endDate: fin, aggregate } = request.body
 
-    const puntos = Array.isArray(cuerpo?.points) ? cuerpo.points : []
-    if (puntos.length === 0) {
-      return sendError(response, 400, 'points must be a non-empty array of point names.')
-    }
-    if (puntos.length > MAX_SERIES_BATCH) {
-      return sendError(response, 400, `No more than ${MAX_SERIES_BATCH} points per request.`)
-    }
-    if (!puntos.every(isSafePointName)) {
-      return sendError(response, 400, 'One or more point names are invalid.')
-    }
+      /*
+       * El MISMO plan para todas las señales: comparten ventana, así que
+       * comparten tramos. Calcularlo una vez y no por señal es lo que garantiza
+       * que las series vuelvan sobre la misma rejilla — que es la premisa de
+       * `unir()` en el frontend.
+       */
+      const { tramos, segundosPorPunto } = planificar({
+        inicio, fin, puntosPorTramo: PUNTOS_POR_TRAMO,
+      })
 
-    const inicio = new Date(cuerpo?.startDate)
-    const fin = new Date(cuerpo?.endDate)
-    if (Number.isNaN(inicio.getTime()) || Number.isNaN(fin.getTime())) {
-      return sendError(response, 400, 'startDate and endDate must be valid dates.')
-    }
-    if (fin <= inicio) {
-      return sendError(response, 400, 'endDate must be after startDate.')
-    }
-
-    const aggregate = String(cuerpo?.aggregate ?? '')
-    if (aggregate && !isSafeHistoryArgument(aggregate)) {
-      return sendError(response, 400, 'Invalid aggregate parameter.')
-    }
-
-    /*
-     * El MISMO plan para todas las señales: comparten ventana, así que
-     * comparten tramos. Calcularlo una vez y no por señal es lo que garantiza
-     * que las series vuelvan sobre la misma rejilla — que es la premisa de
-     * `unir()` en el frontend.
-     */
-    const { tramos, segundosPorPunto } = planificar({
-      inicio, fin, puntosPorTramo: PUNTOS_POR_TRAMO,
-    })
-
-    /*
-     * Las tareas son señal x tramo, todas en la MISMA cola: acotar por señal
-     * dejaría la concurrencia real multiplicada por el número de señales,
-     * que es justo lo que se venía a limitar.
-     */
-    const tareas = []
-    for (const pointName of puntos) {
-      for (const tramo of tramos) {
-        tareas.push(async () => ({
-          pointName,
-          resultado: await client.readHistory({
+      /*
+       * Las tareas son señal x tramo, todas en la MISMA cola: acotar por señal
+       * dejaría la concurrencia real multiplicada por el número de señales,
+       * que es justo lo que se venía a limitar.
+       */
+      const tareas = []
+      for (const pointName of puntos) {
+        for (const tramo of tramos) {
+          tareas.push(async () => ({
             pointName,
-            startDate: tramo.desde.toISOString(),
-            endDate: tramo.hasta.toISOString(),
-            aggregate,
-            interval: tramo.interval,
-          }),
-        }))
+            resultado: await client.readHistory({
+              pointName,
+              startDate: tramo.desde.toISOString(),
+              endDate: tramo.hasta.toISOString(),
+              aggregate,
+              interval: tramo.interval,
+            }),
+          }))
+        }
+      }
+
+      const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+
+      /*
+       * Un tramo que falla NO invalida su serie: mismo criterio que ya seguían
+       * el frontend y el asistente —perder un día de diez no cambia la forma de
+       * la curva, y abortar dejaría la gráfica vacía por un hueco del
+       * historiador—. Lo que sí viaja es CUÁNTOS tramos respondieron, para que
+       * quien lo pinte pueda declarar la cobertura en vez de suponerla.
+       */
+      const series = Object.fromEntries(
+        puntos.map(pointName => [
+          pointName,
+          { data: [], hasMore: false, tramos: tramos.length, tramosConDato: 0, tramosFallidos: 0 },
+        ])
+      )
+
+      for (const { pointName, resultado } of resultados) {
+        const serie = series[pointName]
+        if (!resultado?.ok) { serie.tramosFallidos += 1; continue }
+        const trozo = resultado.data ?? []
+        if (trozo.length) serie.tramosConDato += 1
+        if (resultado.hasMore) serie.hasMore = true
+        serie.data.push(...trozo)
+      }
+
+      /*
+       * El orden importa: la gráfica y el CSV recorren la serie tal cual llega,
+       * y la cola acotada no garantiza que los tramos terminen en orden.
+       * Ordenar aquí evita que cada consumidor tenga que acordarse.
+       */
+      for (const serie of Object.values(series)) {
+        serie.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      }
+
+      /*
+       * Una serie entera sin un solo tramo bueno es un hueco que el frontend
+       * pintará como una gráfica vacía sin explicación. Se registra aquí, que
+       * es donde se sabe cuántos tramos se pidieron y cuántos fallaron.
+       */
+      const vacias = Object.entries(series).filter(([, s]) => s.tramosConDato === 0)
+      if (vacias.length) {
+        request.log.warn(
+          {
+            senales: vacias.map(([nombre]) => nombre),
+            tramosPorSenal: tramos.length,
+            ventana: { desde: inicio.toISOString(), hasta: fin.toISOString() },
+          },
+          `El historiador no devolvió ningún dato para ${vacias.length} de ${puntos.length} señales ` +
+            `en la ventana pedida. Suele significar que esas señales no están historizadas o que la ` +
+            `ventana es anterior a su primer registro.`
+        )
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        payload: {
+          series,
+          ventana: {
+            startDate: inicio.toISOString(),
+            endDate: fin.toISOString(),
+            segundosPorPunto,
+          },
+        },
       }
     }
+  )
 
-    const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
+  fastify.get(
+    '/api/iconics/browse',
+    { preHandler: validarConsulta(BrowseQuerySchema) },
+    async (request, reply) => responder(reply, await client.browse(request.query.path))
+  )
 
-    /*
-     * Un tramo que falla NO invalida su serie: mismo criterio que ya seguían
-     * el frontend y el asistente —perder un día de diez no cambia la forma de
-     * la curva, y abortar dejaría la gráfica vacía por un hueco del
-     * historiador—. Lo que sí viaja es CUÁNTOS tramos respondieron, para que
-     * quien lo pinte pueda declarar la cobertura en vez de suponerla.
-     */
-    const series = Object.fromEntries(
-      puntos.map(pointName => [pointName, { data: [], hasMore: false, tramos: tramos.length, tramosConDato: 0, tramosFallidos: 0 }])
-    )
+  fastify.get(
+    '/api/iconics/points',
+    { preHandler: validarConsulta(SearchQuerySchema) },
+    async (request, reply) => responder(reply, await client.search(request.query.query))
+  )
 
-    for (const { pointName, resultado } of resultados) {
-      const serie = series[pointName]
-      if (!resultado?.ok) { serie.tramosFallidos += 1; continue }
-      const trozo = resultado.data ?? []
-      if (trozo.length) serie.tramosConDato += 1
-      if (resultado.hasMore) serie.hasMore = true
-      serie.data.push(...trozo)
-    }
-
-    /*
-     * El orden importa: la gráfica y el CSV recorren la serie tal cual llega,
-     * y la cola acotada no garantiza que los tramos terminen en orden.
-     * Ordenar aquí evita que cada consumidor tenga que acordarse.
-     */
-    for (const serie of Object.values(series)) {
-      serie.data.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-    }
-
-    sendJson(response, 200, {
-      ok: true,
-      status: 200,
-      payload: {
-        series,
-        ventana: { startDate: inicio.toISOString(), endDate: fin.toISOString(), segundosPorPunto },
-      },
-    })
-  })
-
-  router.get('/api/iconics/browse', async ({ response, url }) => {
-    const path = url.searchParams.get('path') ?? ''
-
-    if (path && !isSafePointName(path)) {
-      return sendError(response, 400, 'Invalid path parameter.')
-    }
-
-    sendResult(response, await client.browse(path))
-  })
-
-  router.get('/api/iconics/points', async ({ response, url }) => {
-    const query = url.searchParams.get('query') ?? ''
-
-    if (query && !isSafePointName(query)) {
-      return sendError(response, 400, 'Invalid query parameter.')
-    }
-
-    sendResult(response, await client.search(query))
-  })
-
-  router.get('/api/iconics/userinfo', async ({ response }) => {
-    sendResult(response, await client.readUserInfo())
-  })
+  fastify.get('/api/iconics/userinfo', async (request, reply) =>
+    responder(reply, await client.readUserInfo())
+  )
 
   /* ── Escritura ────────────────────────────────────────────────────── */
 
-  router.post('/api/iconics/write', whenWritable(async ({ request, response }) => {
-    const body = await parseBody(request, response)
-    if (!body) return
+  fastify.post('/api/iconics/write', escritura(WritePointSchema), async (request, reply) => {
+    const { pointName, value } = request.body
 
-    const { pointName, value } = body
-    if (!pointName || !isSafePointName(String(pointName))) {
-      return sendError(response, 400, 'pointName is required and must be valid.')
-    }
-    if (value === undefined || value === null) {
-      return sendError(response, 400, 'value is required.')
-    }
+    request.log.info(
+      { pointName, valor: value, ip: request.ip, usuario: request.usuario?.id },
+      `Escritura sobre la planta: ${pointName} = ${value} (petición de ${request.ip})`
+    )
 
-    sendResult(response, await client.writePoint(pointName, value))
-  }))
+    return responder(reply, await client.writePoint(pointName, value))
+  })
 
-  router.post('/api/iconics/write/batch', whenWritable(async ({ request, response }) => {
-    const body = await parseBody(request, response)
-    if (!body) return
+  fastify.post('/api/iconics/write/batch', escritura(WriteBatchSchema), async (request, reply) => {
+    const { items } = request.body
 
-    const { items } = body
-    if (!Array.isArray(items) || items.length === 0) {
-      return sendError(response, 400, 'items array is required ([{ pointName, value }]).')
-    }
+    request.log.info(
+      {
+        puntos: items.map(i => i.pointName),
+        cantidad: items.length,
+        ip: request.ip,
+        usuario: request.usuario?.id,
+      },
+      `Escritura múltiple sobre la planta: ${items.length} puntos (petición de ${request.ip})`
+    )
 
-    for (const item of items) {
-      if (!item?.pointName || !isSafePointName(String(item.pointName))) {
-        return sendError(response, 400, `Invalid pointName: ${item?.pointName}`)
-      }
-      if (item.value === undefined || item.value === null) {
-        return sendError(response, 400, `value is required for ${item.pointName}`)
-      }
-    }
-
-    sendResult(response, await client.writePoints(items))
-  }))
+    return responder(reply, await client.writePoints(items))
+  })
 
   /* ── Alarmas ──────────────────────────────────────────────────────── */
 
-  router.get('/api/iconics/alarms', async ({ response, url }) => {
-    const pointName = url.searchParams.get('pointName') ?? ''
-    const hours = Math.min(Number(url.searchParams.get('hours') ?? '1') || 1, maxAlarmHours)
+  fastify.get(
+    '/api/iconics/alarms',
+    { preHandler: validarConsulta(AlarmsQuerySchema) },
+    async (request, reply) => {
+      const { pointName } = request.query
+      const hours = Math.min(request.query.hours, maxAlarmHours)
 
-    if (pointName && !isSafePointName(pointName)) {
-      return sendError(response, 400, 'Invalid pointName parameter.')
+      const end = new Date()
+      const start = new Date(end.getTime() - hours * 60 * 60 * 1000)
+
+      return responder(
+        reply,
+        await client.readAlarmHistory({
+          pointName,
+          startDate: formatLocalTimestamp(start),
+          endDate: formatLocalTimestamp(end),
+        })
+      )
     }
+  )
 
-    const end = new Date()
-    const start = new Date(end.getTime() - hours * 60 * 60 * 1000)
+  fastify.put(
+    '/api/iconics/alarms/acknowledge',
+    escritura(AcknowledgeAlarmsSchema),
+    async (request, reply) => {
+      const { eventIds, comment } = request.body
 
-    sendResult(
-      response,
-      await client.readAlarmHistory({
-        pointName,
-        startDate: formatLocalTimestamp(start),
-        endDate: formatLocalTimestamp(end),
-      })
-    )
-  })
+      request.log.info(
+        { eventos: eventIds.length, ip: request.ip, usuario: request.usuario?.id },
+        `Reconocimiento de ${eventIds.length} alarma(s) (petición de ${request.ip})`
+      )
 
-  router.put('/api/iconics/alarms/acknowledge', whenWritable(async ({ request, response }) => {
-    const body = await parseBody(request, response)
-    if (!body) return
-
-    const { eventIds, comment } = body
-    if (!Array.isArray(eventIds) || eventIds.length === 0) {
-      return sendError(response, 400, 'eventIds array is required.')
+      return responder(reply, await client.acknowledgeAlarms(eventIds, comment))
     }
-
-    sendResult(response, await client.acknowledgeAlarms(eventIds, comment ?? ''))
-  }))
+  )
 }

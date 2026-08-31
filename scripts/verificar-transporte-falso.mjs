@@ -376,9 +376,9 @@ await checkAsync('ICONICS_FAKE=true funciona SIN ICONICS_API_BASE', async () => 
   })
   assert.equal(config.iconics.isConfigured, true, 'fake tiene que bastar para "configurado"')
 
-  const server = createServer(createApp(config))
-  await new Promise(r => server.listen(0, '127.0.0.1', r))
-  const base = `http://127.0.0.1:${server.address().port}`
+  const server = await createApp(config)
+  await server.listen({ port: 0, host: '127.0.0.1' })
+  const base = `http://127.0.0.1:${server.server.address().port}`
 
   try {
     const puntos = TODOS_LOS_PUNTOS.join(',')
@@ -388,7 +388,7 @@ await checkAsync('ICONICS_FAKE=true funciona SIN ICONICS_API_BASE', async () => 
     assert.equal(res.status, 200)
     assert.equal(Object.keys(body.payload ?? body).length > 0, true, 'la respuesta llegó vacía')
   } finally {
-    server.close()
+    await server.close()
   }
 })
 

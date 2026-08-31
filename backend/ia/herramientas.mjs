@@ -1023,10 +1023,10 @@ export function createHerramientas({
 /**
  * Purga perezosa de reportes viejos (Plan 14 Fase 5).
  *
- * Mismo criterio que `pruneBatchCache` en `iconics/client.mjs` y `prune` en
- * `http/rateLimit.mjs`: se dispara en la propia operación —aquí, antes de
- * escribir el siguiente PDF— y no con un `setInterval`. Un directorio que no
- * existe todavía no es un error: no hay nada que purgar.
+ * Mismo criterio que `pruneBatchCache` en `iconics/client.mjs`: se dispara en
+ * la propia operación —aquí, antes de escribir el siguiente PDF— y no con un
+ * `setInterval`. Un directorio que no existe todavía no es un error: no hay
+ * nada que purgar.
  */
 export async function purgarReportesViejos(dir, maxDias) {
   let nombres

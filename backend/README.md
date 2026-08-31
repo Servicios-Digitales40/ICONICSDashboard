@@ -122,15 +122,15 @@ backend/
 ├── server.mjs           Arranque: configura, monta y escucha
 ├── app.mjs              Ensamblado: dependencias, rutas, frontera de errores
 ├── config.mjs           Única lectura de process.env, validada
-├── logger.mjs           Log estructurado (texto en TTY, JSON fuera)
+├── logger.mjs           Log sobre pino (texto en TTY, JSON fuera, secretos redactados)
 │
 ├── http/                Mecánica HTTP, sin nada de ICONICS
-│   ├── router.mjs       Tabla método + ruta
-│   ├── responses.mjs    JSON, texto, error
-│   ├── cors.mjs         Lista de orígenes autorizados
-│   ├── rateLimit.mjs    Contador por cliente
-│   ├── requestBody.mjs  Lectura de cuerpo JSON con límite de tamaño
-│   └── staticFiles.mjs  Estáticos del build y respaldo de la SPA
+│   ├── esquemas.mjs     Los cuerpos y consultas que acepta la API (Zod)
+│   ├── validar.mjs      Puente entre los esquemas y las rutas
+│   └── plugins/
+│       ├── seguridad.mjs      Cabeceras, CORS y límite de peticiones
+│       ├── errores.mjs        Forma única de las respuestas de error
+│       └── autenticacion.mjs  Guardas de usuario (preparadas, sin activar)
 │
 ├── iconics/             Todo lo que sabe de ICONICS
 │   ├── authenticator.mjs  Flujo OIDC + PKCE, caché y refresco del token
@@ -170,7 +170,20 @@ backend/
 
 Las dependencias apuntan en un solo sentido —`routes` → `ia` → `iconics` →
 `http`— y ningún módulo de abajo conoce a los de arriba. `iconics/client.mjs`
-no sabe qué es una respuesta HTTP; `http/` no sabe qué es un punto de ICONICS.
+no sabe qué es una respuesta HTTP.
+
+La excepción es `http/esquemas.mjs`, que sí importa
+`iconics/validation.mjs`: los nombres de punto se validan con la lista blanca
+de la sintaxis real del servidor, y duplicar ese patrón en dos sitios lo haría
+divergir.
+
+El servidor es **Fastify**. Lo que antes eran seis módulos escritos a mano
+—router, CORS, límite, lectura de cuerpo, estáticos y respuestas— lo cubren
+ahora `@fastify/cors`, `@fastify/rate-limit`, `@fastify/static` y
+`@fastify/helmet`, que además añade las cabeceras de seguridad que el puente
+no enviaba. El razonamiento de aquellos módulos no se perdió: vive en los
+comentarios de `http/plugins/seguridad.mjs`, que explica por qué cada opción
+está como está.
 
 `ia/` importa además de [`shared/`](../shared/README.md), en la raíz del
 repositorio: las reglas del historiador y el catálogo de tags son las mismas
@@ -391,6 +404,25 @@ en vez de un 404 que se confunde con una ruta mal escrita.
   sondeo, así que ningún dato llega más viejo de lo que ya llegaba.
 
 ## Verificación
+
+### Pruebas unitarias
+
+```bash
+cd backend && npm test          # 118 · configuración, esquemas, logger y rutas
+```
+
+Corren en segundos, sin red y sin puertos: montan la app entera con
+`app.inject()` de Fastify y le inyectan peticiones en memoria, contra el
+transporte simulado (`ICONICS_FAKE`).
+
+Cubren sobre todo lo que rompe una instalación y lo que ya se rompió una vez:
+los defectos seguros de `config.mjs` (solo lectura, CORS cerrado), las
+cabeceras de seguridad, el 413 del dictado —que tiene que LLEGAR al cliente en
+vez de cortarle la conexión—, el flujo SSE del asistente, que es lo más frágil
+del backend, y que ninguna llamada saliente hacia ICONICS se quede sin corte
+por tiempo.
+
+### Verificación de contrato, contra servicios falsos
 
 ```bash
 node scripts/verificar-backend.mjs           #  73 · el contrato HTTP

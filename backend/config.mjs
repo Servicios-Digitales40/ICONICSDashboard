@@ -593,5 +593,20 @@ export function loadConfig(env = process.env) {
         'HISTORY_CONCURRENCIA', env.HISTORY_CONCURRENCIA, DEFAULTS.historyConcurrencia, 1
       ),
     }),
+
+    /**
+     * Autenticación de usuarios (todavía no implementada).
+     *
+     * Apagada por defecto, como todo lo que aún no existe. Con `true` el
+     * servidor NO arranca a propósito: ver `http/plugins/autenticacion.mjs`.
+     * Un servidor que acepta la variable y sigue sirviendo sin pedir nada es
+     * peor que uno que se niega, porque quien la puso creería estar protegido.
+     *
+     * No confundir con la sesión OIDC contra ICONICS (`iconics.canAuthenticate`):
+     * aquella es de máquina, esta es de persona.
+     */
+    auth: Object.freeze({
+      habilitada: readBoolean('AUTH_HABILITADA', env.AUTH_HABILITADA, false),
+    }),
   })
 }

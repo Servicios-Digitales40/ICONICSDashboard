@@ -910,7 +910,16 @@ export function createChat({ config, herramientas }) {
         // se leyó nada. Enseñarla al operador como una línea más de procedencia
         // diría que el dato se consultó dos veces, que es falso.
         if (!paraElModelo?.yaConsultado) {
-          logger.info('Herramienta ejecutada', { nombre, ok: paraElModelo?.ok, paso })
+          /*
+           * `debug`: son varias por consulta y el resumen del turno ya viaja
+           * en la línea de `chatRoutes.mjs`, que dice cuántas se usaron. Aquí
+           * lo que hace falta al depurar es CUÁL y si le fue bien.
+           */
+          logger.debug(
+            `Herramienta "${nombre}" ejecutada en el paso ${paso}: ` +
+              `${paraElModelo?.ok ? 'con resultado' : `falló (${paraElModelo?.error ?? 'sin motivo'})`}`,
+            { herramienta: nombre, ok: paraElModelo?.ok, paso }
+          )
           ejecutadas.push(nombre)
           resultados.push({ nombre, resultado: paraElModelo })
         } else {

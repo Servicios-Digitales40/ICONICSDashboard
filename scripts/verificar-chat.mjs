@@ -840,9 +840,9 @@ console.log('\n── La ruta /api/chat ─────────────�
 const baseEnv = { PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist' }
 
 async function montar(env) {
-  const server = createServer(createApp(loadConfig({ ...baseEnv, ...env })))
-  await new Promise(r => server.listen(0, '127.0.0.1', r))
-  return { base: `http://127.0.0.1:${server.address().port}`, server }
+  const server = await createApp(loadConfig({ ...baseEnv, ...env }))
+  await server.listen({ port: 0, host: '127.0.0.1' })
+  return { base: `http://127.0.0.1:${server.server.address().port}`, server }
 }
 
 await check('sin IA_BASE el chat responde 503 y NO cae al index.html', async () => {
@@ -860,7 +860,7 @@ await check('sin IA_BASE el chat responde 503 y NO cae al index.html', async () 
   const cuerpo = await res.json()
   assert.match(cuerpo.error, /IA_BASE/)
 
-  server.close()
+  await server.close()
 })
 
 await check('con IA_BASE el estado dice que está habilitado', async () => {
@@ -868,7 +868,7 @@ await check('con IA_BASE el estado dice que está habilitado', async () => {
   const estado = await fetch(`${base}/api/chat`).then(r => r.json())
   assert.equal(estado.habilitado, true)
   assert.equal(estado.ocupado, false)
-  server.close()
+  await server.close()
 })
 
 await check('una pregunta vacía se rechaza con 400', async () => {
@@ -879,7 +879,7 @@ await check('una pregunta vacía se rechaza con 400', async () => {
     body: JSON.stringify({ pregunta: '   ' }),
   })
   assert.equal(res.status, 400)
-  server.close()
+  await server.close()
 })
 
 await check('la respuesta es un flujo SSE con sus eventos', async () => {
@@ -906,7 +906,7 @@ await check('la respuesta es un flujo SSE con sus eventos', async () => {
   assert.ok(eventos.some(e => e.tipo === 'texto'), 'falta el texto')
   assert.ok(eventos.at(-1).tipo === 'fin', 'el último evento debe ser fin')
 
-  server.close()
+  await server.close()
 })
 
 await check('dos preguntas a la vez: la segunda ESPERA turno, no recibe un error', async () => {
@@ -949,7 +949,7 @@ await check('dos preguntas a la vez: la segunda ESPERA turno, no recibe un error
   assert.equal(eventos.at(-1).tipo, 'fin')
 
   await (await primera).text()
-  server.close()
+  await server.close()
 })
 
 await check('las consultas encoladas se atienden DE UNA EN UNA', async () => {
@@ -983,7 +983,7 @@ await check('las consultas encoladas se atienden DE UNA EN UNA', async () => {
     maximoSimultaneasAlModelo, 1,
     `hubo ${maximoSimultaneasAlModelo} peticiones al modelo a la vez`
   )
-  server.close()
+  await server.close()
 })
 
 await check('tras terminar, la siguiente pasa sin esperar', async () => {
@@ -1006,7 +1006,7 @@ await check('tras terminar, la siguiente pasa sin esperar', async () => {
   const estado = await fetch(`${base}/api/chat`).then(r => r.json())
   assert.equal(estado.ocupado, false, 'el hueco debe quedar libre')
 
-  server.close()
+  await server.close()
 })
 
 await check('cancelar aborta también la llamada al modelo', async () => {
@@ -1034,7 +1034,7 @@ await check('cancelar aborta también la llamada al modelo', async () => {
   const estado = await fetch(`${base}/api/chat`).then(r => r.json())
   assert.equal(estado.ocupado, false, 'cancelar debe liberar el hueco de inmediato')
 
-  server.close()
+  await server.close()
 })
 
 /* ── Cierre ──────────────────────────────────────────────────────────── */
