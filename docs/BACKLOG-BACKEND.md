@@ -6,7 +6,13 @@
 > alta de la **máquina #3**, no por lo que parece más grave leyéndolo.
 
 > **Cómo leer esto.** Cada entrada dice qué pasa HOY, qué se rompe cuando llegue
-> la #3 y qué tamaño real tiene el arreglo. Lo medido va como medido; lo que es
+> la #3 y qué tamaño real tiene el arreglo.
+
+> **Lo específico del asistente vive aparte**, en
+> [`MEJORAS-ASISTENTE.md`](MEJORAS-ASISTENTE.md): treinta mejoras de veracidad,
+> herramientas y capacidades. Este backlog es del backend como sistema; aquél,
+> de lo que el modelo puede preguntar y de cuánto se puede confiar en lo que
+> contesta. Lo medido va como medido; lo que es
 > una estimación, lo dice. Nada aquí es un deseo: todo sale de código que está
 > en el árbol y de pruebas que se ejecutaron.
 
