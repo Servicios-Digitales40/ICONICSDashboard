@@ -55,7 +55,9 @@ async function seguridadPlugin(fastify, { config }) {
         // `unsafe-inline` en estilos: Vite inyecta el CSS crítico en línea y
         // los componentes usan `style=`. Quitarlo dejaría el tablero sin
         // formato. En scripts NO se admite, que es donde importa.
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        // `fonts.googleapis.com` porque `index.css` importa Plus Jakarta
+        // Sans, Inter e IBM Plex Mono de Google Fonts.
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         scriptSrc: ["'self'"],
         // `blob:` es para los workers y las texturas de la vista 3D; `data:`
         // para los SVG en línea del plano de planta.
@@ -64,7 +66,9 @@ async function seguridadPlugin(fastify, { config }) {
         // El tablero habla con su propio origen y nada más. Si algún día el
         // frontend llama directamente a otro servicio, va aquí y se ve.
         connectSrc: ["'self'"],
-        fontSrc: ["'self'", 'data:'],
+        // `fonts.gstatic.com` sirve los archivos .woff2 que referencia el CSS
+        // de `fonts.googleapis.com` de arriba.
+        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
