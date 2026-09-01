@@ -152,16 +152,29 @@ describe("selector de rango: el calendario personalizado", () => {
     const aplicar = await waitFor(() => screen.getByRole("button", { name: "Aplicar" }));
     expect(aplicar.disabled).toBe(true);
 
-    // Dos días distintos del mes visible (hoy y dos días antes), evitando
-    // los bordes del mes para no cruzar a una celda vacía.
+    // Dos días distintos y no futuros, dentro de un mismo mes visible.
+    //
+    // Cerca del día 1-3 del mes, «hoy menos unos días» cae en el mes
+    // ANTERIOR, y el número de día que produce (28-31) es grande — coincide
+    // con la comprobación `> 3` aunque esa fecha no esté en el mes que el
+    // calendario tiene abierto. El calendario sólo pinta el mes visible, así
+    // que el clic caía sobre el mismo NÚMERO de día pero de ESTE mes (un día
+    // futuro, deshabilitado) y no hacía nada: «fin» nunca se completaba y
+    // «Aplicar» se quedaba deshabilitado para siempre.
+    //
+    // Si hoy no da margen dentro de su propio mes, se retrocede uno con «Mes
+    // anterior»: ahí ningún día es futuro y sobran candidatos.
     const hoy = new Date();
-    const diaValido = (delta) => {
-      const d = new Date(hoy);
-      d.setDate(d.getDate() - delta);
-      return d.getDate() > 3 ? d : null; // se salta si cae cerca del inicio de mes
-    };
-    const diaFin = diaValido(0) ?? hoy;
-    const diaInicio = diaValido(2) ?? hoy;
+    let diaInicio, diaFin;
+    if (hoy.getDate() > 3) {
+      diaFin = hoy;
+      diaInicio = new Date(hoy);
+      diaInicio.setDate(diaInicio.getDate() - 2);
+    } else {
+      fireEvent.click(screen.getByRole("button", { name: "Mes anterior" }));
+      diaInicio = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 10);
+      diaFin = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 15);
+    }
 
     fireEvent.click(screen.getByRole("button", { name: String(diaInicio.getDate()) }));
     fireEvent.click(screen.getByRole("button", { name: String(diaFin.getDate()) }));
