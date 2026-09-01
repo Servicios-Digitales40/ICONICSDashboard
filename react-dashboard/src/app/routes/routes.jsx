@@ -50,8 +50,8 @@
  */
 import { lazy } from "react";
 import {
-  Box, Boxes, BrainCircuit, Cog, Droplets, Factory, Home, LayoutDashboard, Power,
-  ShieldAlert, Waves,
+  Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, Home, LayoutDashboard,
+  Power, ShieldAlert, Waves,
 } from "lucide-react";
 
 /**
@@ -86,6 +86,11 @@ export const NAV_GROUPS = {
   "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
   "sec-vibraciones": { label: "Estación de vibraciones", icon: <Waves size={17} /> },
   "sec-general": { label: "General", icon: <Boxes size={17} /> },
+  // El origen de conocimiento del asistente, no una máquina: qué manuales
+  // alimentan su búsqueda documental. Sección aparte por el mismo motivo que
+  // separa las otras dos — no es de ninguna instalación concreta, y menos
+  // aún de las dos que ya tiene la planta.
+  "sec-rag": { label: "RAG", icon: <Database size={17} /> },
 };
 
 /*
@@ -281,6 +286,23 @@ export const ROUTES = [
     title: "Predicción (Beta)",
     sub: "Reproducción histórica MetroPT-3 · consulta del backend predictivo V4.4",
     nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-general" },
+  },
+
+  /*
+   * ── RAG: EL CONOCIMIENTO DEL ASISTENTE, NO UNA MÁQUINA ─────────────
+   *
+   * Sección propia y no una pestaña más de «General»: lo que hay aquí no
+   * describe ninguna instalación de la planta, describe de dónde saca el
+   * asistente lo que sabe fuera de lo que mide ICONICS. Ver la cabecera de
+   * `Demo-EVA/views/DocumentacionRag.jsx` para el porqué de cada decisión de
+   * la vista.
+   */
+  {
+    id: "rag-documentacion",
+    component: lazy(() => import("@/Demo-EVA/views/DocumentacionRag.jsx")),
+    title: "Documentación",
+    sub: "Los manuales que alimentan el índice del asistente, y qué sabe extraer de cada uno",
+    nav: { label: "Documentación", icon: <FileText size={17} />, group: "sec-rag" },
   },
 
   {

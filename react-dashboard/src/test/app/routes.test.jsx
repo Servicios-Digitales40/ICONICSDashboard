@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las catorce vistas, agrupadas por SISTEMA", () => {
+  it("son las quince vistas, agrupadas por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -60,6 +60,10 @@ describe("superficie de la aplicación", () => {
       // MetroPT-3, que son compresores de metro. Va aquí justamente para no
       // afirmar que sus curvas son del tanque ni del motor de vibraciones.
       "eva-prediccion",
+      // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
+      // de ninguna máquina, por eso tiene su propia sección y no cuelga de
+      // «General».
+      "rag-documentacion",
       // Sin `nav`.
       "eva-detalle",
     ]);
@@ -84,7 +88,7 @@ describe("superficie de la aplicación", () => {
 });
 
 describe("el sidebar que sale del registro", () => {
-  it("las tres secciones salen del registro, con sus vistas dentro", () => {
+  it("las cuatro secciones salen del registro, con sus vistas dentro", () => {
     // `buildNav` LANZA si una ruta referencia un grupo que no está declarado en
     // NAV_GROUPS, y ese fallo sólo aparece al importar el registro. Comprobarlo
     // aquí lo convierte en un fallo de la suite y no en una pantalla en blanco.
@@ -92,6 +96,7 @@ describe("el sidebar que sale del registro", () => {
       "sec-llenado",
       "sec-vibraciones",
       "sec-general",
+      "sec-rag",
     ]);
 
     const llenado = NAV.find((n) => n.group === "sec-llenado");
@@ -125,6 +130,14 @@ describe("el sidebar que sale del registro", () => {
     expect(general.children.map((c) => c.id)).toEqual([
       "eva-assets", "eva-prediccion",
     ]);
+
+    // RAG es su propia sección por el mismo motivo que las otras tres NO se
+    // mezclan entre sí: lo que hay aquí no describe una instalación de la
+    // planta, describe de dónde saca el asistente lo que sabe fuera de lo
+    // que mide ICONICS.
+    const rag = NAV.find((n) => n.group === "sec-rag");
+    expect(rag.label).toBe("RAG");
+    expect(rag.children.map((c) => c.id)).toEqual(["rag-documentacion"]);
   });
 
   it("cada sistema tiene su propio «Riesgos», y no se mezclan", () => {
