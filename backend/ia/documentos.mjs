@@ -30,9 +30,10 @@
  * quien pregunta suele usarlo también. Si hay `IA_EMBEDDING_BASE`, se usan
  * embeddings y BM25 pasa a ser el desempate.
  */
-import { readFile, readdir, stat } from 'node:fs/promises'
-import { join, extname, basename } from 'node:path'
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
+import { join, extname, basename, dirname } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
+import { createHash } from 'node:crypto'
 import { logger } from '../logger.mjs'
 
 /**
@@ -62,6 +63,92 @@ const MS_ENTRE_COMPROBACIONES = 10000
 
 /** Tope de archivo, en bytes. Un PDF de 200 MB no es documentación de consulta. */
 const MAX_BYTES = 40 * 1024 * 1024
+
+/**
+ * ── PLAN 16 FASE 0: POR QUÉ HACÍA FALTA ESTO ────────────────────────
+ *
+ * `recargar()` volvía a embeber TODOS los fragmentos, de uno en uno, cada vez
+ * que la carpeta cambiaba — un manual de 200 páginas son unos 600 fragmentos,
+ * o sea 600 llamadas HTTP secuenciales, y añadir un manual nuevo repetía las
+ * de los que ya estaban. Aceptable mientras la carpeta se llenaba a mano antes
+ * de arrancar el backend; no en cuanto exista un botón «Subir manual» — eso
+ * convertiría la subida en una pantalla congelada varios minutos.
+ *
+ * Dos mejoras, independientes entre sí:
+ *
+ *  1. CACHÉ PERSISTENTE, por hash del contenido del fragmento. Un fragmento
+ *     que ya se embebió en un proceso anterior no vuelve a costar una llamada
+ *     HTTP, sobreviva o no el backend a un reinicio.
+ *  2. INDEXADO INCREMENTAL, por archivo. Un archivo cuya huella (tamaño +
+ *     fecha) no cambió no se vuelve a leer ni a trocear: sus fragmentos —con
+ *     sus términos de BM25 y su vector— se reutilizan tal cual.
+ *
+ * Juntas: archivo nuevo → sólo SUS fragmentos pasan por la extracción y el
+ * embedding. Los demás ni se tocan.
+ */
+
+/**
+ * Cuántos fragmentos van en cada llamada al servidor de embeddings.
+ *
+ * Deliberadamente conservador. El endpoint es compatible con OpenAI y acepta
+ * `input` como lista, así que un lote más grande son menos llamadas HTTP — pero
+ * el contexto del modelo de embeddings es un presupuesto compartido entre
+ * TODOS los textos del lote, y no hay forma de saber desde aquí cuánto le
+ * queda configurado. Si un lote se pasa, la llamada falla entera y
+ * `asegurarVectores` reintenta ESE lote fragmento a fragmento — más lento,
+ * pero nunca pierde un vector por el tamaño del lote.
+ */
+const TAMANO_LOTE = 16
+
+/**
+ * Dónde vive la caché de embeddings entre reinicios del backend.
+ *
+ * En `datos/`, junto a los reportes y lo aprendido: es estado que el backend
+ * genera en marcha, no código, y por eso está en `.gitignore` (ver la cabecera
+ * de ese archivo). Perderla no es grave — se reconstruye sola, fragmento a
+ * fragmento, en el primer arranque— pero conservarla es lo que hace que un
+ * `pm2 restart` no vuelva a pagar el embedding de una documentación que no
+ * cambió.
+ */
+const RUTA_CACHE_EMBEDDINGS = join('datos', 'embeddings-cache.json')
+
+/** Huella de un fragmento, para la caché. El texto es la clave: si dos
+ *  fragmentos —de archivos distintos, o de versiones distintas del mismo
+ *  archivo— dicen lo mismo, comparten vector y comparten caché. */
+function hashDeFragmento(texto) {
+  return createHash('sha256').update(texto).digest('hex')
+}
+
+/**
+ * Lee la caché de disco. Cualquier fallo —no existe, JSON roto— se trata como
+ * caché vacía: es un acelerador, no una fuente de verdad, así que perderla
+ * nunca debe impedir arrancar.
+ *
+ * Recibe la ruta en vez de leer `RUTA_CACHE_EMBEDDINGS` directamente para que
+ * `scripts/verificar-documentos.mjs` pueda apuntar a un archivo temporal: sin
+ * esto, cada corrida de las pruebas leería y escribiría sobre la caché real
+ * de `datos/`, y dos pruebas sobre el mismo texto de sonda se contaminarían
+ * entre sí.
+ */
+async function leerCacheEmbeddings(ruta) {
+  try {
+    const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+    return {
+      modelo: typeof bruto?.modelo === 'string' ? bruto.modelo : null,
+      vectores: bruto?.vectores && typeof bruto.vectores === 'object' ? bruto.vectores : {},
+    }
+  } catch {
+    return { modelo: null, vectores: {} }
+  }
+}
+
+/** Guarda la caché. Un fallo de disco se avisa y no interrumpe la indexación:
+ *  los vectores ya están en memoria y la búsqueda funciona igual; sólo se
+ *  perderían al reiniciar. */
+async function guardarCacheEmbeddings(ruta, cache) {
+  await mkdir(dirname(ruta), { recursive: true })
+  await writeFile(ruta, JSON.stringify(cache), 'utf8')
+}
 
 /* ── Extracción de texto ─────────────────────────────────────────────── */
 
@@ -501,8 +588,16 @@ function coseno(a, b) {
  * @param {string} opciones.carpeta         de dónde se leen los documentos
  * @param {string} [opciones.embeddingBase] servidor de embeddings; vacío = sólo BM25
  * @param {string} [opciones.embeddingModelo]
+ * @param {string} [opciones.rutaCache]     dónde persiste la caché de embeddings entre
+ *                                          reinicios. Por defecto `datos/embeddings-cache.json`;
+ *                                          las pruebas la sustituyen por un archivo temporal.
  */
-export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingModelo = 'local' }) {
+export function createIndiceDocumentos({
+  carpeta,
+  embeddingBase = '',
+  embeddingModelo = 'local',
+  rutaCache = RUTA_CACHE_EMBEDDINGS,
+}) {
   let indice = []
   let cargando = null
   let cargado = false
@@ -513,9 +608,30 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
   /** Archivos que se encontraron pero no se pudieron leer, para poder decirlo. */
   let ilegibles = []
 
+  /**
+   * Lo ya procesado, por archivo: `archivo → { huella, fragmentos }`.
+   *
+   * Es la mitad del indexado incremental (la otra es la caché de embeddings
+   * en disco). Con esto, un archivo cuya huella no cambió entre dos
+   * `recargar()` no se vuelve a leer, trocear NI calcular sus términos de
+   * BM25 — se reutiliza la entrada tal cual, vector incluido si ya lo tenía.
+   */
+  let archivosProcesados = new Map()
+
+  /** Caché de embeddings en disco, cargada una sola vez y mantenida en
+   *  memoria mientras el proceso vive. Ver `leerCacheEmbeddings`. */
+  let cacheEmbeddings = { modelo: null, vectores: {} }
+  let cacheEmbeddingsCargada = false
+
+  /** Progreso del embebido en curso, para `estado()`. Vacío fuera de una
+   *  recarga que tenga fragmentos pendientes de vector. */
+  let progreso = { total: 0, hechos: 0 }
+
   const usaEmbeddings = Boolean(embeddingBase)
 
-  async function embeber(texto) {
+  /** Un solo texto. Lo usa la consulta de búsqueda —siempre es una— y el
+   *  reintento fragmento a fragmento cuando un lote falla entero. */
+  async function embeberUno(texto) {
     const respuesta = await fetch(`${embeddingBase}/v1/embeddings`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -525,6 +641,89 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
     if (!respuesta.ok) throw new Error(`El servidor de embeddings respondió ${respuesta.status}`)
     const cuerpo = await respuesta.json()
     return cuerpo?.data?.[0]?.embedding ?? null
+  }
+
+  /**
+   * Varios textos en una sola llamada. `TAMANO_LOTE` fragmentos cuestan una
+   * petición HTTP en vez de `TAMANO_LOTE` peticiones — la mejora que existe
+   * para que indexar un manual nuevo no se sienta como una petición por
+   * párrafo.
+   *
+   * Cada elemento de la respuesta trae su `index` de vuelta: no se puede
+   * asumir que `data[i]` responde a `textos[i]` sólo por la posición, así que
+   * se reordena contra ese índice. Si el servidor no lo manda (no todos los
+   * compatibles con OpenAI lo hacen), se cae a la posición tal cual.
+   */
+  async function embeberLote(textos) {
+    const respuesta = await fetch(`${embeddingBase}/v1/embeddings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: embeddingModelo, input: textos }),
+      signal: AbortSignal.timeout(60000),
+    })
+    if (!respuesta.ok) throw new Error(`El servidor de embeddings respondió ${respuesta.status}`)
+    const cuerpo = await respuesta.json()
+    const datos = Array.isArray(cuerpo?.data) ? cuerpo.data : []
+    return textos.map((_, i) => (datos.find(d => d.index === i) ?? datos[i])?.embedding ?? null)
+  }
+
+  /**
+   * Rellena `.vector` de cada fragmento que lo necesite, con tres niveles de
+   * ahorro antes de tocar la red:
+   *
+   *   1. Ya lo tiene en memoria (fragmento reutilizado de un archivo sin
+   *      cambios) — no cuesta nada.
+   *   2. Está en la caché de disco (mismo texto, embebido en un proceso
+   *      anterior) — no cuesta red.
+   *   3. Hay que pedirlo. Se pide POR LOTES, y si un lote falla entero se
+   *      reintenta ese lote fragmento a fragmento: un solo texto raro no debe
+   *      tirar el embedding de los otros quince que iban con él.
+   */
+  async function asegurarVectores(fragmentos, cache) {
+    const pendientes = []
+    for (const f of fragmentos) {
+      if (f.vector) continue
+      const cacheado = cache.vectores[f.hash]
+      if (cacheado) { f.vector = cacheado; continue }
+      pendientes.push(f)
+    }
+    if (!pendientes.length) return
+
+    progreso = { total: pendientes.length, hechos: 0 }
+
+    for (let i = 0; i < pendientes.length; i += TAMANO_LOTE) {
+      const lote = pendientes.slice(i, i + TAMANO_LOTE)
+      let vectores
+
+      try {
+        vectores = await embeberLote(lote.map(f => f.texto))
+      } catch (error) {
+        logger.warn('El embedding por lotes falló; se reintenta fragmento a fragmento', {
+          fragmentos: lote.length, error: error.message,
+        })
+        vectores = []
+        for (const f of lote) {
+          vectores.push(
+            await embeberUno(f.texto).catch(error2 => {
+              // Degradar y no descartar: BM25 sigue encontrando este
+              // fragmento aunque no tenga vector. Perder media documentación
+              // porque el servidor de embeddings se cayó a media carga sería
+              // peor que buscar sólo por texto en ese fragmento.
+              logger.warn('No se pudo generar el embedding de un fragmento', {
+                archivo: f.archivo, error: error2.message,
+              })
+              return null
+            })
+          )
+        }
+      }
+
+      lote.forEach((f, idx) => {
+        const v = vectores[idx]
+        if (v) { f.vector = v; cache.vectores[f.hash] = v }
+      })
+      progreso.hechos += lote.length
+    }
   }
 
   /** Lee un archivo y devuelve sus «páginas» de texto. Un `.txt` es una sola. */
@@ -587,16 +786,24 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
    * no avisa en absoluto. Un `readdir` con `stat` cuesta milisegundos y es la
    * misma respuesta en todas partes.
    */
-  async function huellaDeLaCarpeta() {
+  /** El mapa `archivo → "tamaño:fecha"` en el que se apoyan tanto la huella
+   *  de toda la carpeta (`asegurarAlDia`) como el indexado incremental
+   *  (`recargar`, comparando entrada por entrada contra `archivosProcesados`). */
+  async function huellasPorArchivo() {
     const archivos = await readdir(carpeta).catch(() => [])
     const soportados = archivos.filter(a => SOPORTADAS.has(extname(a).toLowerCase())).sort()
 
-    const partes = []
+    const mapa = new Map()
     for (const archivo of soportados) {
       const info = await stat(join(carpeta, archivo)).catch(() => null)
-      if (info) partes.push(`${archivo}:${info.size}:${info.mtimeMs}`)
+      if (info) mapa.set(archivo, `${info.size}:${info.mtimeMs}`)
     }
-    return partes.join('|')
+    return mapa
+  }
+
+  async function huellaDeLaCarpeta() {
+    const mapa = await huellasPorArchivo()
+    return [...mapa].map(([archivo, h]) => `${archivo}:${h}`).join('|')
   }
 
   async function recargar() {
@@ -604,80 +811,114 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
 
     cargando = (async () => {
       ilegibles = []
-      // La huella se toma ANTES de leer, no después: si alguien copia un
+
+      if (usaEmbeddings && !cacheEmbeddingsCargada) {
+        cacheEmbeddings = await leerCacheEmbeddings(rutaCache)
+        // Vectores de OTRO modelo no sirven — dos modelos no comparten
+        // espacio semántico, y mezclarlos daría un coseno sin sentido en vez
+        // de un error. Cambiar de modelo empieza la caché de cero.
+        if (cacheEmbeddings.modelo !== embeddingModelo) {
+          cacheEmbeddings = { modelo: embeddingModelo, vectores: {} }
+        }
+        cacheEmbeddingsCargada = true
+      }
+
+      // Las huellas se toman ANTES de leer, no después: si alguien copia un
       // archivo mientras se está indexando, con la huella posterior el cambio
       // se daría por recogido y ese archivo no entraría hasta el siguiente.
-      huella = await huellaDeLaCarpeta()
+      const mapaHuellas = await huellasPorArchivo()
+      huella = [...mapaHuellas].map(([archivo, h]) => `${archivo}:${h}`).join('|')
 
-      const archivos = await readdir(carpeta).catch(error => {
-        logger.warn('No se pudo leer la carpeta de documentación', { carpeta, error: error.message })
-        return []
-      })
+      const archivosNuevos = new Map()
+      const pendientesEmbeber = []
+      let reutilizados = 0
 
-      const soportados = archivos.filter(a => SOPORTADAS.has(extname(a).toLowerCase()))
-      const fragmentos = []
+      for (const [archivo, h] of mapaHuellas) {
+        const previo = archivosProcesados.get(archivo)
+        if (previo && previo.huella === h) {
+          // Sin cambios: se reutiliza la entrada entera —fragmentos, términos
+          // de BM25 y vector si ya lo tenía— sin volver a leer ni trocear.
+          archivosNuevos.set(archivo, previo)
+          reutilizados++
+          continue
+        }
 
-      for (const archivo of soportados) {
         const ruta = join(carpeta, archivo)
         try {
           const info = await stat(ruta)
           if (info.size > MAX_BYTES) {
             ilegibles.push({ archivo, motivo: `pasa de ${Math.round(MAX_BYTES / 1048576)} MB` })
+            // No se cachea: sin entrada en `archivosNuevos`, la próxima
+            // recarga lo vuelve a intentar solo — es un `stat`, no un `readFile`,
+            // así que reintentarlo siempre es barato.
             continue
           }
 
           const paginas = await leerDocumento(ruta, archivo)
+          const fragmentos = []
           paginas.forEach((pagina, i) => {
             fragmentos.push(...trocear(pagina, basename(archivo), i + 1))
           })
+
+          // Los términos se precalculan UNA vez por fragmento nuevo.
+          // Recalcularlos en cada búsqueda multiplicaría por el número de
+          // fragmentos el coste de una consulta que tiene que contestar en
+          // milisegundos.
+          for (const f of fragmentos) {
+            f.terminos = terminos(f.texto)
+            f.frecuencias = new Map()
+            for (const t of f.terminos) f.frecuencias.set(t, (f.frecuencias.get(t) ?? 0) + 1)
+            f.hash = hashDeFragmento(f.texto)
+          }
+
+          // Un archivo sin fragmentos (ilegible, o vacío de verdad) tampoco
+          // se cachea. `leerDocumento` ya anotó el motivo en `ilegibles`
+          // arriba si aplica; dejarlo fuera de `archivosProcesados` hace que
+          // se reintente en la próxima recarga —por si el manual se
+          // reemplaza por una versión legible— en vez de desaparecer de
+          // `ilegibles` en cuanto OTRO archivo dispare la siguiente recarga.
+          if (fragmentos.length) {
+            archivosNuevos.set(archivo, { huella: h, fragmentos })
+            if (usaEmbeddings) pendientesEmbeber.push(...fragmentos)
+          }
         } catch (error) {
           ilegibles.push({ archivo, motivo: error.message })
         }
       }
 
-      // Los términos se precalculan UNA vez al cargar. Recalcularlos en cada
-      // búsqueda multiplicaría por el número de fragmentos el coste de una
-      // consulta que tiene que contestar en milisegundos.
-      for (const f of fragmentos) {
-        f.terminos = terminos(f.texto)
-        f.frecuencias = new Map()
-        for (const t of f.terminos) f.frecuencias.set(t, (f.frecuencias.get(t) ?? 0) + 1)
-      }
-
-      if (usaEmbeddings) {
-        for (const f of fragmentos) {
-          try {
-            f.vector = await embeber(f.texto)
-          } catch (error) {
-            // Un embedding que falla no descarta el fragmento: BM25 lo sigue
-            // encontrando. Degradar es mejor que perder media documentación
-            // porque el segundo servidor se reinició a media carga.
-            logger.warn('No se pudo generar el embedding de un fragmento', {
-              archivo: f.archivo, error: error.message,
-            })
-          }
-        }
-      }
-
-      indice = fragmentos
+      archivosProcesados = archivosNuevos
+      indice = [...archivosProcesados.values()].flatMap(e => e.fragmentos)
       cargado = true
 
+      if (usaEmbeddings && pendientesEmbeber.length) {
+        await asegurarVectores(pendientesEmbeber, cacheEmbeddings)
+        await guardarCacheEmbeddings(rutaCache, cacheEmbeddings).catch(error => {
+          // La caché en memoria ya está al día — sólo se pierde si el
+          // proceso reinicia antes de que alguien arregle el disco.
+          logger.warn('No se pudo guardar la caché de embeddings en disco', { error: error.message })
+        })
+      }
+
       logger.info(
-        `Documentación indexada: ${soportados.length} archivo(s) → ${indice.length} fragmentos ` +
-          `(${usaEmbeddings ? 'embeddings + BM25' : 'sólo BM25'})` +
+        `Documentación indexada: ${archivosProcesados.size} archivo(s) (${reutilizados} sin ` +
+          `cambios) → ${indice.length} fragmentos (${usaEmbeddings ? 'embeddings + BM25' : 'sólo BM25'})` +
           (ilegibles.length
-            ? `. ${ilegibles.length} archivo(s) sin texto extraíble: ${ilegibles.join(', ')} ` +
+            ? `. ${ilegibles.length} archivo(s) sin texto extraíble: ${ilegibles.map(i => i.archivo).join(', ')} ` +
               '— suelen ser PDF escaneados, que son imágenes y necesitarían OCR'
             : ''),
         {
           carpeta,
-          archivos: soportados.length,
+          archivos: archivosProcesados.size,
+          reutilizados,
           fragmentos: indice.length,
           ilegibles: ilegibles.length,
           modo: usaEmbeddings ? 'embeddings + BM25' : 'BM25',
         }
       )
-    })().finally(() => { cargando = null })
+    })().finally(() => {
+      cargando = null
+      progreso = { total: 0, hechos: 0 }
+    })
 
     return cargando
   }
@@ -728,7 +969,7 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
     let puntuados = lexico.map(f => ({ ...f, score: f.score / maximo }))
 
     if (usaEmbeddings) {
-      const vectorPregunta = await embeber(pregunta).catch(error => {
+      const vectorPregunta = await embeberUno(pregunta).catch(error => {
         logger.warn('Embedding de la pregunta falló; se busca sólo con BM25', {
           error: error.message,
         })
@@ -770,6 +1011,16 @@ export function createIndiceDocumentos({ carpeta, embeddingBase = '', embeddingM
       modo: usaEmbeddings ? 'embeddings + BM25' : 'BM25',
       documentos: [...porArchivo].map(([archivo, fragmentos]) => ({ archivo, fragmentos })),
       ilegibles,
+      /*
+       * Pensado para una vista que enseñe el progreso de la indexación (Plan
+       * 16, la sección de Documentación): `indexando` dice si hay una
+       * `recargar()` en curso ahora mismo, y `progreso` cuántos fragmentos de
+       * los que le faltaban vector ya lo tienen. Fuera de una indexación con
+       * embeddings pendientes, `progreso` es `null` — no un `{0,0}` que
+       * parecería «cero de cero» en vez de «no aplica».
+       */
+      indexando: cargando !== null,
+      progreso: cargando !== null && progreso.total > 0 ? { ...progreso } : null,
     }
   }
 
