@@ -44,6 +44,7 @@ import cuerpoCrudoPlugin from './http/plugins/cuerpoCrudo.mjs'
 import erroresPlugin from './http/plugins/errores.mjs'
 import seguridadPlugin from './http/plugins/seguridad.mjs'
 import { logger } from './logger.mjs'
+import { registerCasosRoutes } from './routes/casosRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
@@ -354,6 +355,7 @@ export async function createApp(config) {
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
+    registerCasosRoutes(instancia)
   })
 
   /* ── Frontend ──────────────────────────────────────────────────── */

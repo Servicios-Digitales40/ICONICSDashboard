@@ -80,14 +80,46 @@ export async function leerAprendizaje(ruta = RUTA_APRENDIZAJE) {
   }
 }
 
-async function guardarAprendizaje(almacen) {
+/** `ruta` opcional por el mismo motivo que en `leerAprendizaje`: sólo las
+ *  pruebas la usan, para no escribir sobre el `aprendizaje.json` de verdad. */
+async function guardarAprendizaje(almacen, ruta = RUTA_APRENDIZAJE) {
   try {
-    await mkdir(dirname(RUTA_APRENDIZAJE), { recursive: true })
-    await writeFile(RUTA_APRENDIZAJE, JSON.stringify(almacen, null, 2), 'utf8')
+    await mkdir(dirname(ruta), { recursive: true })
+    await writeFile(ruta, JSON.stringify(almacen, null, 2), 'utf8')
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e?.message ?? String(e) }
   }
+}
+
+/**
+ * ── EL CIERRE DE DIAGNÓSTICO (PLAN 16 FASE 5) ─────────────────────
+ *
+ * `POST /api/casos` llama a esto, no escribe el archivo por su cuenta.
+ * `guardarAprendizaje` queda privada de este módulo a propósito —ver la
+ * cabecera del archivo sobre por qué `leerAprendizaje` sí se exportó, y por
+ * qué eso no significa abrir también la escritura—: cada puerta de
+ * escritura tiene su propia función con nombre (`registrar_intervencion`,
+ * `recordar_hecho`, `proponer_regla`, y ahora ésta), no un `guardar()`
+ * genérico que cualquier código nuevo pueda invocar con cualquier cosa.
+ *
+ * Es una `crearIntervencion` más rica, ver su cabecera en
+ * `shared/eva/aprendizaje.js`, pero la validación de mínimos —sintoma y
+ * solucion con contenido de verdad— vive en el esquema Zod de
+ * `casosRoutes.mjs`, no aquí: esta función confía en su llamador, igual
+ * que `crearIntervencion` confía en el suyo. Repetir la validación en las
+ * dos capas sólo interesa si un día ganan un tercer llamador.
+ *
+ * `ruta` es el mismo mecanismo de siempre para las pruebas: ver
+ * `RUTA_APRENDIZAJE` arriba.
+ */
+export async function registrarCaso(datos, { ruta = RUTA_APRENDIZAJE } = {}) {
+  const almacen = await leerAprendizaje(ruta)
+  const nueva = crearIntervencion(datos, new Date())
+  almacen.intervenciones.push(nueva)
+  const guardado = await guardarAprendizaje(almacen, ruta)
+  if (!guardado.ok) return { ok: false, error: `No se pudo guardar: ${guardado.error}` }
+  return { ok: true, caso: nueva }
 }
 
 /**

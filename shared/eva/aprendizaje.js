@@ -150,6 +150,30 @@ export function normalizarAlmacen(bruto) {
  *
  * `resuelto` puede ser `false` a propósito: un intento que NO funcionó vale
  * tanto como uno que sí. Ahorra repetirlo.
+ *
+ * ── LOS CAMPOS DE PLAN 16 FASE 5, Y POR QUÉ SON OPCIONALES ─────────
+ *
+ * `disparador`, `muestraSensores`, `diagnostico`, `causaReal`, `resultado` y
+ * `diagnosticoCorrecto` extienden el esquema —ver §4 del plan— para el
+ * CIERRE DE DIAGNÓSTICO: la persona que acaba de intervenir sobre un riesgo
+ * concreto, con la muestra de sensores y la causa propuesta ya puestas por
+ * el sistema, confirma o corrige la causa REAL y cómo terminó.
+ *
+ * Por voz o chat (`registrar_intervencion`) nunca llegan: nadie dicta una
+ * muestra de sensores ni el desglose de un diagnóstico. Por eso son
+ * opcionales y no un segundo esquema — «las dos puertas escriben en el
+ * mismo sitio» (Plan 16 §5, Fase 5): la puerta rápida rellena lo de
+ * siempre, la puerta del cierre rellena además lo nuevo, y las dos
+ * conviven en la misma `intervenciones[]` sin que `normalizarAlmacen`, ni
+ * `textoDeRecuperacion`, ni `hechos_de_la_planta` necesiten saber cuál usó
+ * cada una.
+ *
+ * `solucion` sigue siendo el texto plano de siempre y NO el objeto
+ * `{accion, texto}` del jsonc de §4: cambiar su forma habría roto todo lo
+ * que ya lo lee como cadena —`textoDeRecuperacion`, `hechos_de_la_planta`,
+ * cada intervención ya guardada—. `causaReal` cubre lo que ese objeto
+ * aportaba de más (un `tipo` estructurado, pensado para apuntar al `id` de
+ * una causa de `causas.js`) sin tocar un campo que ya funciona.
  */
 export function crearIntervencion(datos, ahora = new Date()) {
   return {
@@ -174,6 +198,16 @@ export function crearIntervencion(datos, ahora = new Date()) {
        herramienta lo pregunta. */
     resuelto: datos.resuelto !== false,
     origen: datos.origen ?? "el usuario",
+    // Cada uno viaja sólo si llegó: un `null` a secas se confundiría con
+    // «se preguntó y no había», cuando lo cierto es que ni se preguntó.
+    ...(datos.disparador ? { disparador: { ...datos.disparador } } : {}),
+    ...(datos.muestraSensores ? { muestraSensores: { ...datos.muestraSensores } } : {}),
+    ...(datos.diagnostico ? { diagnostico: { ...datos.diagnostico } } : {}),
+    ...(datos.causaReal ? { causaReal: { ...datos.causaReal } } : {}),
+    ...(datos.resultado ? { resultado: { ...datos.resultado } } : {}),
+    ...(typeof datos.diagnosticoCorrecto === "boolean"
+      ? { diagnosticoCorrecto: datos.diagnosticoCorrecto }
+      : {}),
   };
 }
 

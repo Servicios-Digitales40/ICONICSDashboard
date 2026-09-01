@@ -29,6 +29,7 @@
  */
 import { z } from 'zod'
 import { isSafeHistoryArgument, isSafePointName } from '../iconics/validation.mjs'
+import { SISTEMA_IDS } from '../../shared/eva/sistemas.js'
 
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
 export const MAX_PREGUNTA = 2000
@@ -292,6 +293,73 @@ export const ReemplazarManualQuerySchema = z.object({
  *  forma que las otras dos rutas de escritura de este grupo. */
 export const ArchivarManualQuerySchema = z.object({
   id: IdManualSchema,
+})
+
+/* ── Casos (Plan 16 Fase 5) ───────────────────────────────────────── */
+
+/** El síntoma o la solución tienen que decir algo, no una frase vacía —
+ *  mismo mínimo que ya exige `registrar_intervencion` por voz y chat, para
+ *  que las dos puertas midan la calidad de una intervención con la misma
+ *  vara (ver la cabecera de `crearHerramientasDeAprendizaje`). */
+const TextoDeCasoSchema = (campo) =>
+  z.string().trim().min(8, `Hacen falta las dos mitades: QUÉ pasaba y QUÉ se hizo, con detalle — "${campo}" es demasiado corto.`)
+
+const DisparadorCasoSchema = z.object({
+  tipo: z.enum(['riesgo', 'peticion']),
+  riesgoId: z.string().optional(),
+  severidad: z.string().optional(),
+})
+
+const CitaManualSchema = z.object({
+  archivo: z.string(),
+  pagina: z.number(),
+})
+
+const DiagnosticoPropuestoSchema = z.object({
+  propuesta: z.string().optional(),
+  respaldo: z.enum(['alto', 'medio', 'bajo']).optional(),
+  fuentes: z.array(z.string()).optional(),
+  manualCitado: z.array(CitaManualSchema).optional(),
+})
+
+const CausaRealSchema = z.object({
+  componente: z.string().optional(),
+  tipo: z.string().optional(),
+})
+
+const ResultadoCasoSchema = z.object({
+  riesgoDesaparecio: z.boolean().optional(),
+  observaciones: z.string().optional(),
+})
+
+/**
+ * `POST /api/casos` — el cierre de un diagnóstico (Plan 16 Fase 5, UI A).
+ *
+ * `sintoma`/`causa`/`solucion`/`resuelto`/`sistema`/`origen` son el mismo
+ * esquema que ya rellena `registrar_intervencion`; el resto es la parte
+ * nueva de §4 del plan, y sólo la rellena esta puerta —ver la cabecera de
+ * `crearIntervencion` en `shared/eva/aprendizaje.js` para por qué son
+ * opcionales y no un segundo esquema.
+ *
+ * `muestraSensores` es un volcado tal cual de lo que ya leyó el tablero: no
+ * hay lista fija de claves que validar aquí sin duplicar `senales.js` para
+ * dos sistemas con catálogos distintos, y esta ruta no necesita saber qué
+ * significa cada una — sólo guardarla junto al resto del caso.
+ */
+export const CrearCasoSchema = z.object({
+  sistema: z.enum(SISTEMA_IDS).nullish(),
+  sintoma: TextoDeCasoSchema('sintoma'),
+  causa: z.string().trim().min(1).optional(),
+  solucion: TextoDeCasoSchema('solucion'),
+  resuelto: z.boolean().optional(),
+  origen: z.string().trim().min(1).optional(),
+
+  disparador: DisparadorCasoSchema.optional(),
+  muestraSensores: z.record(z.string(), z.unknown()).optional(),
+  diagnostico: DiagnosticoPropuestoSchema.optional(),
+  causaReal: CausaRealSchema.optional(),
+  resultado: ResultadoCasoSchema.optional(),
+  diagnosticoCorrecto: z.boolean().optional(),
 })
 
 /**

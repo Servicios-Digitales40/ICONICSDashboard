@@ -182,9 +182,53 @@
 >
 > Con esto, las tres fuentes del diagnóstico —datos en vivo, manuales, casos
 > previos— existen, están puntuadas, y el modelo puede por fin llamarlas y
-> narrarlas en el orden que el código decidió. Sigue la **Fase 5** (cierre de
-> caso: `POST /api/casos` desde el formulario, y `registrar_intervencion`
-> rellenando el mismo esquema).
+> narrarlas en el orden que el código decidió.
+>
+> **Fase 5 (backend) completada** — `crearIntervencion()`
+> (`shared/eva/aprendizaje.js`) gana seis campos opcionales del `Caso` de §4
+> (`disparador`, `muestraSensores`, `diagnostico`, `causaReal`, `resultado`,
+> `diagnosticoCorrecto`), sólo si llegan — nunca `null` de relleno. `solucion`
+> sigue siendo el texto plano de siempre y NO el objeto `{accion, texto}` del
+> jsonc de §4: cambiarlo habría roto todo lo que ya lo lee como cadena
+> (`textoDeRecuperacion`, `hechos_de_la_planta`, cada intervención ya
+> guardada). `causaReal.tipo` cubre lo que ese objeto aportaba de más —un
+> puntero estructurado, pensado para el `id` de una causa de `causas.js`—
+> sin tocar un campo que ya funciona.
+>
+> `registrarCaso()`, nueva en `herramientas/aprendizaje/index.mjs`, es la
+> única puerta de escritura para el cierre — `guardarAprendizaje` sigue sin
+> exportarse: cada escritor tiene su función con nombre
+> (`registrar_intervencion`, `recordar_hecho`, `proponer_regla`, y ahora
+> ésta), no un `guardar()` genérico. `POST /api/casos`
+> (`backend/routes/casosRoutes.mjs`) la llama tras validar con
+> `CrearCasoSchema` (`http/esquemas.mjs`): mismo mínimo de 8 caracteres en
+> `sintoma`/`solucion` que ya exige `registrar_intervencion`, `sistema`
+> contra los ids reales de `sistemas.js`, `muestraSensores` sin lista fija
+> de claves —tanque y vibraciones miden cosas distintas, y esta ruta no
+> necesita saberlo—. Sin guarda de escritura propia: es la misma clase de
+> escritura en un JSON nuestro que ya hacía `registrar_intervencion` sin
+> pedir `ICONICS_READ_ONLY` ni una bandera nueva, sólo autenticación y el
+> rol `operador`.
+>
+> **`datos/aprendizaje.json` no tiene variable de entorno que lo reubique, a
+> propósito** —`datos/` es lo que el backend necesita para sí mismo, no
+> contenido que alguien vaya a mover, a diferencia de `IA_DOCS_DIR` o
+> `IA_REPORTES_DIR`—, así que `backend/test/rutas/casos.test.mjs` sólo
+> prueba el contrato HTTP (validación, 400) sin escribir nunca de verdad; la
+> escritura real se prueba en el nuevo `scripts/verificar-casos-cierre.mjs`
+> (5/5) contra una `ruta` temporal explícita, igual que
+> `verificar-casos.mjs` prueba `casos.mjs`: un cierre rico se guarda
+> completo, uno simple sale exactamente como el de voz, los dos conviven en
+> el mismo archivo sin romper `intervencionesRecientes` ni
+> `textoDeRecuperacion`, y `casos.mjs` sigue indexando y encontrando un caso
+> rico. Sin regresiones: 148/148 vitest (+12 en `esquemas.test.mjs` y
+> `casos.test.mjs`), 122/122 `verificar-herramientas.mjs`, 73/73
+> `verificar-backend.mjs`, 8/8 `verificar-casos.mjs`.
+>
+> **Pendiente: UI A** (cierre de diagnóstico, sidebar/frontend) — el
+> formulario que llama a `POST /api/casos` con lo que el sistema ya sabe
+> pre-rellenado. Backend y contrato HTTP ya existen y están probados; falta
+> la pantalla.
 
 ---
 
