@@ -6,10 +6,23 @@
 > perderse. Hoy el RAG sólo lee manuales, y la bitácora de intervenciones se
 > devuelve por fecha, no por parecido.
 
-> **ESTADO (1-sep-2026)** — Plan aprobado, sin implementar. Las cuatro
-> decisiones de arquitectura están tomadas (§2) y la semilla de causas
-> candidatas se derivó de lo ya declarado, con lo que el plan perdió su única
-> dependencia externa (§3).
+> **ESTADO (1-sep-2026)** — Plan aprobado. Las cuatro decisiones de
+> arquitectura están tomadas (§2) y la semilla de causas candidatas se derivó
+> de lo ya declarado, con lo que el plan perdió su única dependencia externa
+> (§3).
+>
+> **Fase 0 completada** — `backend/ia/documentos.mjs` ya no re-embebe todo en
+> cada recarga: caché persistente por hash de fragmento en
+> `datos/embeddings-cache.json` (invalidada si cambia el modelo), indexado
+> incremental por archivo (uno sin cambios no se relee ni retrocea), y
+> embebido por lotes de 16 con reintento uno-a-uno si el lote falla. Nuevo
+> `scripts/verificar-documentos.mjs` (10/10) contra un servidor de embeddings
+> de mentira que cuenta peticiones. Sin regresiones: 73/73 en
+> `verificar-backend.mjs`, 116/116 en `verificar-herramientas.mjs`.
+>
+> Sigue la **Fase 1** (manuales asociados a su sistema, con subir/reemplazar/
+> archivar) — es la que necesita la UI de Documentación para tener algo que
+> mostrar más allá del estado del índice.
 
 ---
 
