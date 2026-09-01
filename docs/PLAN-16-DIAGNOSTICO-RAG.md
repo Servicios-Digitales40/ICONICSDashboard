@@ -37,9 +37,25 @@
 > regresiones: 136/136 en vitest, 10/10 en `verificar-documentos.mjs`,
 > 116/116 en `verificar-herramientas.mjs`, 73/73 en `verificar-backend.mjs`.
 >
-> Sigue la **Fase 2** (índice de casos, Fuente #3) o, si se prefiere ver algo
-> primero, la **UI de Documentación** ya tiene API completa sobre la que
-> construirse.
+> **UI de Documentación completada** — sección de sidebar «RAG» nueva, vista
+> `Demo-EVA/views/DocumentacionRag.jsx`. Cada manual se presenta por lo que el
+> índice sacó de él (fragmentos, o el motivo si no sacó ninguno), no por su
+> nombre de archivo a secas — el fallo que documenta la cabecera de
+> `documentos.mjs`: el asistente diciendo «no lo he encontrado» sobre un
+> manual que sí estaba en la carpeta. Arrastrar-y-soltar para subir, reemplazo
+> y archivado por fila, sondeo cada 2 s mientras el índice se pone al día
+> tras una subida. `npm run build` limpio con su propio chunk diferido, sin
+> tocar el presupuesto del arranque. Nuevo
+> `test/demo-eva/documentacion-rag.test.jsx`, y `routes.test.jsx` actualizado
+> —tenía el conteo de secciones y vistas fijo a mano, que es justo el tipo de
+> fallo silencioso para el que existe—. 502/512 en la suite de frontend (10
+> skips intencionales), sin regresiones. Sin captura de pantalla contra un
+> backend real: el puerto de desarrollo ya tenía una instancia corriendo con
+> su `.env.local` real, y forzar otra ahí habría competido por el puerto o
+> escrito sobre la carpeta de documentación de verdad.
+>
+> Sigue la **Fase 2** (índice de casos, Fuente #3) — la Fuente #1 (datos) y la
+> #2 (manuales, con su UI) ya están completas.
 
 ---
 
