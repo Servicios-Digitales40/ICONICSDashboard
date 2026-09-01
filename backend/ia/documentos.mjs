@@ -35,6 +35,7 @@ import { join, extname, basename, dirname } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
 import { createHash } from 'node:crypto'
 import { logger } from '../logger.mjs'
+import { EXTENSIONES_MANUAL } from '../../shared/eva/manuales.js'
 
 /**
  * Tamaño de fragmento, en caracteres.
@@ -48,8 +49,15 @@ const TAMANO_FRAGMENTO = 900
 /** Solape entre fragmentos, para que una frase partida en dos aparezca entera en uno. */
 const SOLAPE = 150
 
-/** Extensiones que se saben leer. El resto se ignoran en silencio. */
-const SOPORTADAS = new Set(['.txt', '.md', '.csv', '.log', '.pdf', '.docx'])
+/**
+ * Extensiones que se saben leer. El resto se ignoran en silencio.
+ *
+ * Declaradas en `shared/eva/manuales.js` y no aquí: la ruta de subida (Plan
+ * 16 Fase 1) necesita la MISMA lista para rechazar de entrada un archivo que
+ * el índice no sabría leer. Dos listas con la misma intención es la forma en
+ * que una acaba aceptando algo que la otra rechaza.
+ */
+const SOPORTADAS = new Set(EXTENSIONES_MANUAL)
 
 /**
  * Cada cuánto se mira si la carpeta cambió, en milisegundos.
@@ -61,8 +69,15 @@ const SOPORTADAS = new Set(['.txt', '.md', '.csv', '.log', '.pdf', '.docx'])
  */
 const MS_ENTRE_COMPROBACIONES = 10000
 
-/** Tope de archivo, en bytes. Un PDF de 200 MB no es documentación de consulta. */
-const MAX_BYTES = 40 * 1024 * 1024
+/**
+ * Tope de archivo, en bytes. Un PDF de 200 MB no es documentación de consulta.
+ *
+ * Exportado para que la ruta de subida (Plan 16 Fase 1) rechace un archivo
+ * demasiado grande ANTES de escribirlo a disco, con el mismo número que
+ * usaría el índice para descartarlo después — sin esto, se podría subir un
+ * archivo que la carga acepta y el índice nunca llega a leer.
+ */
+export const MAX_BYTES = 40 * 1024 * 1024
 
 /**
  * ── PLAN 16 FASE 0: POR QUÉ HACÍA FALTA ESTO ────────────────────────

@@ -476,6 +476,23 @@ export function loadConfig(env = process.env) {
       embeddingModelo: env.IA_EMBEDDING_MODELO || 'local',
 
       /**
+       * ¿Se puede subir un manual nuevo desde el tablero (Plan 16 Fase 1)?
+       *
+       * **Apagado por defecto, y el defecto importa.** `ICONICS_READ_ONLY` NO
+       * cubre esto: protege escrituras contra el PLC, no escrituras en el
+       * disco de este backend, que es de lo que se trata aquí. Sin su propia
+       * bandera, subir manuales quedaría habilitado por accidente en
+       * cualquier instalación que ya tenga `ICONICS_READ_ONLY=false` para
+       * otra cosa —controlar la bomba, por ejemplo— aunque nadie haya
+       * decidido que este servidor deba aceptar archivos de nadie.
+       *
+       * Con `IA_DOCS_DIR` vacío da igual lo que valga esto: sin carpeta de
+       * documentación no hay dónde subir nada, y la ruta lo dice así en vez
+       * de escribir en un directorio que no existe.
+       */
+      ragUploadEnabled: readBoolean('RAG_UPLOAD_ENABLED', env.RAG_UPLOAD_ENABLED, false),
+
+      /**
        * Cuántas herramientas puede encadenar el modelo para una sola pregunta.
        *
        * Antes era una fija y no era configurable, porque el bucle sólo daba dos

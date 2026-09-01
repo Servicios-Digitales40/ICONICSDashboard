@@ -20,9 +20,26 @@
 > de mentira que cuenta peticiones. Sin regresiones: 73/73 en
 > `verificar-backend.mjs`, 116/116 en `verificar-herramientas.mjs`.
 >
-> Sigue la **Fase 1** (manuales asociados a su sistema, con subir/reemplazar/
-> archivar) — es la que necesita la UI de Documentación para tener algo que
-> mostrar más allá del estado del índice.
+> **Fase 1 completada** — `POST/PUT/PATCH /api/rag/documentos` (subir,
+> reemplazar, archivar; sin DELETE) y `GET` para listar, con
+> `RAG_UPLOAD_ENABLED` apagado por defecto (`ICONICS_READ_ONLY` no cubre
+> escrituras en disco). El manifiesto vive en `<IA_DOCS_DIR>/.manifiesto.json`
+> —dentro de la carpeta, no en `datos/` como decía la primera versión de este
+> plan: así viaja con la carpeta que describe, y una instalación con otro
+> `IA_DOCS_DIR` no hereda manifiestos de otra— y `archivar` MUEVE el archivo a
+> `.manifiesto.json`/`.archivados/`, ambos fuera de lo que `documentos.mjs`
+> indexa, sin borrar nada. Nombre de archivo saneado contra recorrido de
+> rutas y colisiones. De camino, se centralizó el parser de cuerpo en bruto
+> (`http/plugins/cuerpoCrudo.mjs`): `/api/voz` ya registraba uno para bytes, y
+> una segunda ruta registrando el mismo content-type tumbaba el arranque
+> entero por duplicado — ahora se registra una sola vez y cada ruta pone su
+> propio `bodyLimit`. Nuevo `backend/test/rutas/rag.test.mjs` (18/18). Sin
+> regresiones: 136/136 en vitest, 10/10 en `verificar-documentos.mjs`,
+> 116/116 en `verificar-herramientas.mjs`, 73/73 en `verificar-backend.mjs`.
+>
+> Sigue la **Fase 2** (índice de casos, Fuente #3) o, si se prefiere ver algo
+> primero, la **UI de Documentación** ya tiene API completa sobre la que
+> construirse.
 
 ---
 
@@ -311,21 +328,45 @@ Bloquea la UI de carga. Sin esto, subir un manual congela la indexación.
 - **Indexado incremental**: un archivo nuevo procesa sólo ese archivo.
 - `GET /api/rag/estado` con progreso real.
 
-### Fase 1 · Los manuales, asociados a su máquina
+### Fase 1 · Los manuales, asociados a su máquina — completada
 
-- Manifiesto `datos/documentos.json`:
-  `{archivo, sistema, titulo, version, estado, subidoPor, fecha}`.
-- La recuperación **prioriza el manual del sistema en cuestión**. El manual del
-  motor no contesta preguntas del tanque.
-- `POST /api/rag/documentos` (subir) · `PUT` (reemplazar) · `PATCH` (archivar).
-  **No hay DELETE** — criterio de `routes.jsx`: un botón «Eliminar» no debe
-  existir en un tablero de planta.
-- Seguridad: allowlist de extensión, tope de tamaño, nombre saneado contra
-  *path traversal*.
+- Manifiesto `<IA_DOCS_DIR>/.manifiesto.json` (dentro de la carpeta, no en
+  `datos/` — ver el porqué en el ESTADO de arriba):
+  `{id, archivo, sistema, titulo, version, estado, subidoPor, fecha}`. Forma y
+  validación en `shared/eva/manuales.js`; disco en `backend/ia/manuales.mjs`.
+- `GET /api/rag/documentos` — el manifiesto fusionado con `indiceDocumentos.estado()`:
+  cada manual trae sus fragmentos indexados y, si el índice no pudo leerlo, el
+  motivo — la misma información que hoy sólo se ve en un log.
+- `POST` (subir) · `PUT ?id=` (reemplazar, sube `version`) · `PATCH ?id=`
+  (archivar: MUEVE el archivo a `.archivados/`, nunca lo borra — criterio de
+  `routes.jsx`, un botón «Eliminar» no debe existir en un tablero de planta).
+  **No hay DELETE.**
+- Seguridad: allowlist de extensión (la misma `EXTENSIONES_MANUAL` que ya sabe
+  leer el índice — una sola lista, no dos que puedan irse a destiempo), tope
+  de tamaño (`MAX_BYTES`, exportado de `documentos.mjs`), nombre saneado a su
+  `basename()` contra recorrido de rutas, con sufijo automático si colisiona
+  con uno que ya existe.
+- Subir/reemplazar/archivar disparan un `recargar()` de fondo del índice, sin
+  esperarlo — para que no haga falta aguantar los `MS_ENTRE_COMPROBACIONES` de
+  Fase 0 a que el cambio se refleje.
+- **Sin implementar todavía: priorizar por `sistema` al buscar.** El manifiesto
+  ya asocia cada archivo con su sistema, pero `documentos.mjs` sigue buscando
+  sobre TODOS los fragmentos por igual. No hace falta tocar su ranking para
+  esto: un futuro `diagnostico.mjs` (Fase 3) puede cruzar sus resultados con
+  `gestorManuales.listar()` y filtrar o pesar por sistema en el punto de
+  llamada, sin que el índice necesite saber que el concepto existe.
 
 > **Necesita su propia bandera.** `ICONICS_READ_ONLY` **no cubre esto**:
 > protege escrituras al PLC, no al disco del backend. La subida necesita
 > `RAG_UPLOAD_ENABLED`, apagada por defecto.
+>
+> **Efecto colateral arreglado de camino:** `/api/voz` ya registraba un parser
+> de cuerpo en bruto para `application/octet-stream`; registrar uno igual
+> aquí tumbaba el arranque por duplicado, porque los content-type parsers de
+> Fastify no se pueden sombrear en un hijo — heredan una COPIA de los del
+> padre. Se centralizó en `http/plugins/cuerpoCrudo.mjs`, registrado una sola
+> vez; cada ruta pone su propio `bodyLimit` (voz sigue en 6 MB, manuales en
+> los `MAX_BYTES` de siempre).
 
 ### Fase 2 · El índice de casos · Fuente #3
 

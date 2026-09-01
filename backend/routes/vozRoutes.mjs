@@ -26,11 +26,13 @@
 /**
  * El audio llega como bytes, no como JSON.
  *
- * Se registra un parser propio para `application/octet-stream` en lugar de
- * leer el flujo a mano: el cuerpo llega ya como `Buffer` y el tope pasa a ser
- * del servidor. Ojo: ese tope corta el socket, así que el 413 que llega al
- * cliente lo escribe la guarda de `Content-Length` de la ruta, no esto — ver
- * su comentario.
+ * El cuerpo se parsea a `Buffer` con el parser compartido de
+ * `http/plugins/cuerpoCrudo.mjs` —registrado una sola vez para toda la app,
+ * ver su cabecera— así que aquí sólo hace falta poner el tope de ESTA ruta:
+ * `bodyLimit` abajo, que Fastify prefiere sobre el techo genérico del parser.
+ * Ojo: ese tope corta el socket, así que el 413 que llega al cliente lo
+ * escribe la guarda de `Content-Length` de la ruta, no el parser — ver su
+ * comentario.
  *
  * El límite es mucho mayor que el de JSON a propósito: un minuto de voz en
  * WAV de 16 kHz son casi 2 MB, y el tope de JSON (1 MB) rechazaría media frase.
@@ -40,17 +42,7 @@
  * reemplazo—, y el audio llegaría corrupto **sin dar ningún error**, con el
  * síntoma de una transcripción vacía o de ruido.
  */
-function registrarParserDeAudio(fastify, maxAudioBytes) {
-  fastify.addContentTypeParser(
-    ['application/octet-stream', 'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/webm'],
-    { parseAs: 'buffer', bodyLimit: maxAudioBytes },
-    (request, cuerpo, hecho) => hecho(null, cuerpo)
-  )
-}
-
 export function registerVozRoutes(fastify, { config, voz }) {
-  registrarParserDeAudio(fastify, config.limits.maxAudioBytes)
-
   fastify.get('/api/voz', async () => ({
     ok: true,
     habilitado: config.ia.whisper.isConfigured,

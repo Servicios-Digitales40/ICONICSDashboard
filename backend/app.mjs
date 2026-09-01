@@ -15,8 +15,12 @@
  *      también los errores y los estáticos.
  *   2. Errores — antes de las rutas, para que capture lo que ellas lancen.
  *   3. Autenticación — antes de las rutas, que declaran sus guardas.
- *   4. Rutas de API.
- *   5. Estáticos y respaldo de la SPA — al final, porque es el comodín: lo que
+ *   4. El parser de cuerpo en bruto (`cuerpoCrudo.mjs`) — antes de las rutas
+ *      que lo necesitan (voz, manuales), y UNA sola vez: es lo que impide que
+ *      dos rutas en archivos distintos se peleen por registrar el mismo
+ *      content-type. Ver la cabecera de ese archivo.
+ *   5. Rutas de API.
+ *   6. Estáticos y respaldo de la SPA — al final, porque es el comodín: lo que
  *      no casó con ninguna ruta de API es una ruta del navegador.
  */
 import Fastify from 'fastify'
@@ -27,18 +31,21 @@ import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fast
 import { createChat } from './ia/chat.mjs'
 import { createCola } from './ia/cola.mjs'
 import { createIndiceDocumentos } from './ia/documentos.mjs'
+import { createGestorManuales } from './ia/manuales.mjs'
 import { createHerramientas } from './ia/herramientas.mjs'
 import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
 import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import autenticacionPlugin from './http/plugins/autenticacion.mjs'
+import cuerpoCrudoPlugin from './http/plugins/cuerpoCrudo.mjs'
 import erroresPlugin from './http/plugins/errores.mjs'
 import seguridadPlugin from './http/plugins/seguridad.mjs'
 import { logger } from './logger.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
+import { registerRagRoutes } from './routes/ragRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
 import { registerVozRoutes } from './routes/vozRoutes.mjs'
@@ -171,6 +178,15 @@ export async function createApp(config) {
     })
     : null
 
+  // El catálogo de manuales (Plan 16 Fase 1): existe con la misma condición
+  // que el índice —sin `IA_DOCS_DIR` no hay dónde escribir nada— y le pasa el
+  // índice para poder disparar una reindexación de fondo justo después de
+  // subir, reemplazar o archivar, en vez de esperar a la próxima comprobación
+  // periódica de `documentos.mjs`.
+  const gestorManuales = config.ia.docsDir
+    ? createGestorManuales({ carpeta: config.ia.docsDir, indiceDocumentos })
+    : null
+
   // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
   // `controlar_bomba` escribe, y necesita la misma puerta que usa
   // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
@@ -219,6 +235,7 @@ export async function createApp(config) {
   await fastify.register(seguridadPlugin, { config })
   await fastify.register(erroresPlugin)
   await fastify.register(autenticacionPlugin, { config })
+  await fastify.register(cuerpoCrudoPlugin)
 
   /*
    * Documentación de la API en `/docs`, sólo fuera de producción — igual que
@@ -315,6 +332,7 @@ export async function createApp(config) {
     registerChatRoutes(instancia, { config, chat, cola })
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
+    registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
   })
 
   /* ── Frontend ──────────────────────────────────────────────────── */

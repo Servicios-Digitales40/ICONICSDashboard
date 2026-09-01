@@ -264,6 +264,36 @@ export const ReporteQuerySchema = z.object({
   id: z.string().regex(/^[0-9a-f-]{36}$/i, 'Parámetro "id" inválido.'),
 })
 
+/** El mismo patrón que `ReporteQuerySchema.id` — los ids de manual también son
+ *  UUID de `randomUUID()` — para las dos rutas de manuales que identifican
+ *  una entrada existente en vez de crear una. */
+const IdManualSchema = z.string().regex(/^[0-9a-f-]{36}$/i, 'Parámetro "id" inválido.')
+
+/**
+ * `POST /api/rag/documentos`. El cuerpo son los BYTES del archivo —no JSON,
+ * igual que `/api/voz`—, así que su metadato viaja por query string.
+ * `nombre` es obligatorio porque el cuerpo en bruto no lleva un nombre de
+ * archivo consigo, a diferencia de un `multipart/form-data`.
+ */
+export const SubirManualQuerySchema = z.object({
+  nombre: z.string().min(1, 'Falta el parámetro "nombre" (el nombre del archivo).'),
+  sistema: z.string().optional(),
+  titulo: z.string().optional(),
+})
+
+/** `PUT /api/rag/documentos` — reemplaza el contenido de un manual existente.
+ *  El cuerpo son los bytes nuevos; qué entrada sustituyen va en `id`. */
+export const ReemplazarManualQuerySchema = z.object({
+  id: IdManualSchema,
+})
+
+/** `PATCH /api/rag/documentos` — archiva una entrada. Sin cuerpo que mandar
+ *  aparte del propio id, así que también va por query string: la misma
+ *  forma que las otras dos rutas de escritura de este grupo. */
+export const ArchivarManualQuerySchema = z.object({
+  id: IdManualSchema,
+})
+
 /**
  * Los mensajes escritos a mano en los esquemas ya son frases completas —y
  * varios nombran su propio campo, como «Invalid pointName parameter.»—, así
