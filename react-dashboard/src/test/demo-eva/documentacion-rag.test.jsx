@@ -12,6 +12,7 @@
  * cero fragmentos a secas, y archivar no dispara sin el segundo clic de
  * confirmación.
  */
+import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -172,5 +173,64 @@ describe("RAG · Documentación — el catálogo", () => {
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([, o]) => o?.method === "PATCH")).toBe(true)
     );
+  });
+});
+
+describe("RAG · Documentación — el montaje doble de StrictMode", () => {
+  /**
+   * Reproduce el fallo real: bajo `<StrictMode>` (el mismo que envuelve la
+   * app en `main.jsx`), React monta el efecto, lo limpia y lo vuelve a
+   * montar. La primera petición se aborta de verdad; la segunda es la que
+   * trae los datos. Un `fetch` que ignora `signal` no reproduce nada — hay
+   * que rechazar como el `fetch` real cuando se aborta.
+   */
+  function fetchQueRespetaAbort(cuerpo) {
+    return vi.fn((_url, opciones) => {
+      const signal = opciones?.signal;
+      return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+        /*
+         * El `setTimeout` —no una promesa resuelta al instante— es lo que
+         * hace que el fallo se reproduzca. El abort de la primera petición
+         * rechaza en un microtask; con la segunda resolviendo también al
+         * instante, React 18 agrupa las dos actualizaciones de estado en un
+         * solo commit y el estado intermedio roto —`cargando:false`,
+         * `datos:null`— nunca llega a pintarse. Con un macrotask de por
+         * medio, React sí comete ese estado intermedio aparte, igual que
+         * ocurre con la latencia real de una petición HTTP de verdad.
+         */
+        setTimeout(() => {
+          resolve({
+            ok: true,
+            status: 200,
+            text: () => Promise.resolve(JSON.stringify(cuerpo)),
+          });
+        }, 10);
+      });
+    });
+  }
+
+  it("la petición abortada del primer montaje no deja `datos` en null sin loading ni error", async () => {
+    globalThis.fetch = fetchQueRespetaAbort(BASE_RESPUESTA);
+
+    render(
+      <StrictMode>
+        <ThemeProvider>
+          <DocumentacionRag />
+        </ThemeProvider>
+      </StrictMode>
+    );
+
+    // La vista tiene que acabar mostrando el contenido real -nunca una
+    // pantalla en blanco ni lanzar sobre `datos` en null- una vez que la
+    // segunda petición (la que no se abortó) resuelve.
+    await waitFor(() => expect(screen.getByText(/Arrastra un manual/i)).toBeTruthy());
+    expect(screen.queryByText(/No se pudo mostrar/i)).toBeNull();
   });
 });

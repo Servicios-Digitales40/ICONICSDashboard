@@ -324,13 +324,28 @@ export default function DocumentacionRag() {
   const sistemasPorId = new Map(sistemas.map((s) => [s.id, s.nombre]));
 
   const cargar = useCallback(async (signal) => {
+    /*
+     * `setCargando(false)` NO va en un `finally` a propósito.
+     *
+     * StrictMode monta dos veces en desarrollo: la primera petición se
+     * aborta de inmediato y la segunda es la que de verdad trae los datos.
+     * Con `finally`, el abort de la primera apagaba `cargando` en cuanto su
+     * promesa rechazaba —antes de que la segunda hubiera terminado— y el
+     * componente se quedaba un instante con `cargando: false`, `datos: null`
+     * y `errorCarga: null` a la vez: la combinación que ninguno de los `if`
+     * de más abajo contempla, y `!datos.configurado` explotaba sobre `null`.
+     *
+     * Una petición abortada fue SUPERADA por otra más nueva; no le
+     * corresponde tocar ningún estado, ni siquiera para decir que terminó.
+     */
     try {
       const respuesta = await listarManuales({ signal });
       setDatos(respuesta);
       setErrorCarga(null);
+      setCargando(false);
     } catch (e) {
-      if (e.name !== "AbortError") setErrorCarga(e.message);
-    } finally {
+      if (e.name === "AbortError") return;
+      setErrorCarga(e.message);
       setCargando(false);
     }
   }, []);
@@ -408,6 +423,11 @@ export default function DocumentacionRag() {
       </>
     );
   }
+
+  // Red de seguridad: no debería llegarse aquí con `datos` vacío —`cargando`
+  // o `errorCarga` ya lo habrían cubierto arriba—, pero preferir un parpadeo
+  // de nada a un `TypeError` sobre `null` si algún día deja de ser cierto.
+  if (!datos) return null;
 
   if (!datos.configurado) {
     return (
