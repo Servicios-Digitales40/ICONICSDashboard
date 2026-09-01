@@ -50,7 +50,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$whisper = 'C:\Users\USER\Desktop\whisper.cpp'
+$whisper = 'C:\Users\USER\Desktop\IA\whisper.cpp'
 $exe     = Join-Path $whisper 'bin\Release\whisper-server.exe'
 
 if (-not $Modelo) { $Modelo = Join-Path $whisper 'models\ggml-small.bin' }

@@ -42,12 +42,12 @@
 [CmdletBinding()]
 param(
   [switch] $Local,
-  [string] $Presets = 'C:\Users\USER\Desktop\llama-b9940-bin-win-cuda-12.4-x64\model.ini'
+  [string] $Presets = 'C:\Users\USER\Desktop\IA\llama-b9940-bin-win-cuda-12.4-x64\model.ini'
 )
 
 $ErrorActionPreference = 'Stop'
 
-$llamaDir = 'C:\Users\USER\Desktop\llama-b9940-bin-win-cuda-12.4-x64'
+$llamaDir = 'C:\Users\USER\Desktop\IA\llama-b9940-bin-win-cuda-12.4-x64'
 $llamaExe = Join-Path $llamaDir 'llama-server.exe'
 $raiz     = Split-Path -Parent $PSScriptRoot
 
