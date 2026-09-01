@@ -47,7 +47,7 @@ import { TarjetaRiesgo } from "../components/riesgoVibracion.jsx";
 import { useVibracion } from "../data/vibracion.js";
 import { evaluarRiesgosVibracion } from "../domain/riesgosVibracion.js";
 
-function RiesgosVibracionEva() {
+function RiesgosVibracionEva({ onNavigate }) {
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -117,7 +117,7 @@ function RiesgosVibracionEva() {
           }}
         >
           {res.activos.map((r) => (
-            <TarjetaRiesgo key={`${r.id}-${r.canal ?? "maquina"}`} riesgo={r} t={t} />
+            <TarjetaRiesgo key={`${r.id}-${r.canal ?? "maquina"}`} riesgo={r} t={t} onNavigate={onNavigate} />
           ))}
         </div>
       ) : (

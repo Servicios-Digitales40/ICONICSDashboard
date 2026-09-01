@@ -15,7 +15,7 @@
  * Unificarlas obligaría a una tarjeta con campos opcionales que se lee peor
  * que las dos por separado.
  */
-import { AlertTriangle, Info, MessageSquareText } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Info, MessageSquareText } from "lucide-react";
 
 import { pedirAlAsistente } from "@/features/asistente";
 
@@ -62,7 +62,7 @@ export function Campo({ t, rotulo, destacado = false, children }) {
 }
 
 /** Una tarjeta de riesgo. Evidencia primero: el hecho antes que la deducción. */
-export function TarjetaRiesgo({ riesgo, t }) {
+export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
   const nivel = nivelInfo(riesgo.nivel);
   const { Icono } = nivel;
 
@@ -132,19 +132,42 @@ export function TarjetaRiesgo({ riesgo, t }) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => pedirAlAsistente(preguntaSobreRiesgoVibracion(riesgo))}
-        style={{
-          display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start",
-          padding: "8px 14px", borderRadius: 8, cursor: "pointer",
-          border: `1px solid ${t.border}`, background: t.hover,
-          color: t.text, fontSize: 13, fontWeight: 600,
-        }}
-      >
-        <MessageSquareText size={15} />
-        Preguntarle a Tdconcito
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => pedirAlAsistente(preguntaSobreRiesgoVibracion(riesgo))}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+            border: `1px solid ${t.border}`, background: t.hover,
+            color: t.text, fontSize: 13, fontWeight: 600,
+          }}
+        >
+          <MessageSquareText size={15} />
+          Preguntarle a Tdconcito
+        </button>
+
+        {/* Plan 16 Fase 5 (UI A) — mismo criterio que la tarjeta del tanque
+            en `RiesgosEva.jsx`. `canalLabel` viaja en los parámetros porque
+            SÍ sobrevive el viaje por la URL —es texto—, y sin él, si el
+            riesgo ya dejó de estar activo para cuando se abre el
+            formulario, no habría forma de saber de qué apoyo se hablaba. */}
+        <button
+          type="button"
+          onClick={() => onNavigate?.("cierre-diagnostico", {
+            sistema: "vibraciones", riesgoId: riesgo.id, canalLabel: riesgo.canalLabel ?? "",
+          })}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+            border: `1px solid ${t.accent}`, background: t.accentSoft,
+            color: t.accent, fontSize: 13, fontWeight: 600,
+          }}
+        >
+          <ClipboardCheck size={15} />
+          Cerrar diagnóstico
+        </button>
+      </div>
     </article>
   );
 }

@@ -29,7 +29,7 @@
  */
 import { useMemo, useState } from "react";
 import {
-  AlertTriangle, CheckCircle2, HelpCircle, Info, MessageSquareText,
+  AlertTriangle, CheckCircle2, ClipboardCheck, HelpCircle, Info, MessageSquareText,
   TrendingDown, TrendingUp, Minus,
 } from "lucide-react";
 
@@ -125,7 +125,7 @@ const severidadInfo = (key) => SEVERIDADES[key] ?? SEVERIDADES.informativo;
  * porque la cifra es el hecho y lo demás es deducción nuestra. Invertirlo haría
  * que la hipótesis llegara con la autoridad de un dato.
  */
-function TarjetaRiesgo({ riesgo, t }) {
+function TarjetaRiesgo({ riesgo, t, onNavigate }) {
   const sev = severidadInfo(riesgo.severidad);
   const { Icono } = sev;
 
@@ -171,19 +171,41 @@ function TarjetaRiesgo({ riesgo, t }) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => pedirAlAsistente(preguntaSobreRiesgo(riesgo))}
-        style={{
-          display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start",
-          padding: "8px 14px", borderRadius: 8, cursor: "pointer",
-          border: `1px solid ${t.border}`, background: t.hover,
-          color: t.text, fontSize: 13, fontWeight: 600,
-        }}
-      >
-        <MessageSquareText size={15} />
-        Preguntarle a Tdconcito
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={() => pedirAlAsistente(preguntaSobreRiesgo(riesgo))}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+            border: `1px solid ${t.border}`, background: t.hover,
+            color: t.text, fontSize: 13, fontWeight: 600,
+          }}
+        >
+          <MessageSquareText size={15} />
+          Preguntarle a Tdconcito
+        </button>
+
+        {/*
+         * Plan 16 Fase 5 (UI A): el técnico que ya intervino sobre ESTE
+         * riesgo cierra el caso sin escribir de más — la pantalla llega con
+         * el riesgo y la muestra de sensores ya puestos, ver la cabecera de
+         * `CierreDiagnostico.jsx`.
+         */}
+        <button
+          type="button"
+          onClick={() => onNavigate?.("cierre-diagnostico", { sistema: "tanque", riesgoId: riesgo.id })}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+            border: `1px solid ${t.accent}`, background: t.accentSoft,
+            color: t.accent, fontSize: 13, fontWeight: 600,
+          }}
+        >
+          <ClipboardCheck size={15} />
+          Cerrar diagnóstico
+        </button>
+      </div>
     </article>
   );
 }
@@ -310,7 +332,7 @@ function TarjetaPronostico({ p, t }) {
 
 /* ── La vista ──────────────────────────────────────────────────────── */
 
-function RiesgosEva() {
+function RiesgosEva({ onNavigate }) {
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
   const { theme: t } = useTheme();
 
@@ -401,7 +423,7 @@ function RiesgosEva() {
             }}
           >
             {activos.map((r) => (
-              <TarjetaRiesgo key={r.id} riesgo={r} t={t} />
+              <TarjetaRiesgo key={r.id} riesgo={r} t={t} onNavigate={onNavigate} />
             ))}
           </div>
         ) : (

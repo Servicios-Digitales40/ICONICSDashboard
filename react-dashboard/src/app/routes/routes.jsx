@@ -316,4 +316,16 @@ export const ROUTES = [
     title: "Detalle de activo",
     sub: "Cada variable, con su valor y su histórico completo",
   },
+
+  {
+    // Sin `nav`, mismo criterio que `eva-detalle`: se llega con el botón
+    // «Cerrar diagnóstico» de una tarjeta de riesgo (Riesgos, del tanque o
+    // de vibraciones), con `?sistema=&riesgoId=` ya puestos — nunca en frío
+    // desde el sidebar, porque sin un riesgo concreto no hay nada que
+    // cerrar. Plan 16 Fase 5, UI A.
+    id: "cierre-diagnostico",
+    component: lazy(() => import("@/Demo-EVA/views/CierreDiagnostico.jsx")),
+    title: "Cerrar diagnóstico",
+    sub: "Confirma o corrige la causa de un riesgo ya intervenido",
+  },
 ];

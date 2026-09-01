@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las quince vistas, agrupadas por SISTEMA", () => {
+  it("son las dieciséis vistas, agrupadas por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -64,8 +64,10 @@ describe("superficie de la aplicación", () => {
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
       // «General».
       "rag-documentacion",
-      // Sin `nav`.
+      // Sin `nav`: destinos de detalle, no pantallas a las que se llegue en
+      // frío desde el sidebar.
       "eva-detalle",
+      "cierre-diagnostico",
     ]);
   });
 

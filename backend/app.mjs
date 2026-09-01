@@ -47,6 +47,7 @@ import { logger } from './logger.mjs'
 import { registerCasosRoutes } from './routes/casosRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
+import { registerDiagnosticoRoutes } from './routes/diagnosticoRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerRagRoutes } from './routes/ragRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
@@ -356,6 +357,7 @@ export async function createApp(config) {
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
     registerCasosRoutes(instancia)
+    registerDiagnosticoRoutes(instancia, { motorDiagnostico })
   })
 
   /* ── Frontend ──────────────────────────────────────────────────── */

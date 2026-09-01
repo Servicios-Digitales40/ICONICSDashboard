@@ -225,10 +225,62 @@
 > `casos.test.mjs`), 122/122 `verificar-herramientas.mjs`, 73/73
 > `verificar-backend.mjs`, 8/8 `verificar-casos.mjs`.
 >
-> **Pendiente: UI A** (cierre de diagnóstico, sidebar/frontend) — el
-> formulario que llama a `POST /api/casos` con lo que el sistema ya sabe
-> pre-rellenado. Backend y contrato HTTP ya existen y están probados; falta
-> la pantalla.
+> **Fase 5 (UI A) completada** — `GET /api/diagnostico?sistema=&riesgoId=`
+> (`backend/routes/diagnosticoRoutes.mjs`), nueva: envuelve LITERALMENTE el
+> mismo `motorDiagnostico.diagnosticar()` que narra `diagnosticar_falla` en
+> el chat, para que la pantalla de cierre pueda pre-rellenar la causa
+> propuesta sin pasar por una conversación con el modelo — el técnico no
+> está ahí para charlar. Sin guarda: es lectura, mismo criterio que
+> `GET /api/rag/documentos`. Probada contra el motor real (5/5,
+> `diagnostico.test.mjs`): a diferencia de `/api/casos`, nunca escribe, así
+> que no hay archivo que proteger.
+>
+> `CierreDiagnostico.jsx` (`Demo-EVA/views/`), sin `nav` —se llega con el
+> botón «Cerrar diagnóstico» de una tarjeta de riesgo, nunca del sidebar en
+> frío, mismo criterio que `eva-detalle`—: dos zonas separadas por
+> autoridad, igual que `riesgos.js` separa evidencia de hipótesis. Arriba,
+> hundida (`t.page`, no `t.panel`) y en monoespaciado: el riesgo, la
+> muestra de sensores en vivo, y las causas candidatas de
+> `GET /api/diagnostico` — nada editable. Abajo, elevada (`Panel`): el
+> momento focal es «Causa encontrada» — un selector de las candidatas más
+> «Otra causa» con texto libre, ya con la primera (más respaldo)
+> pre-elegida— y no un «¿diagnóstico correcto? Sí/No», que no existe en
+> ninguna parte de la pantalla: `diagnosticoCorrecto` se calcula solo,
+> comparando la causa elegida con la primera de la lista. «No funcionó» es
+> un botón con el mismo peso visual que «Funcionó», no un estado de error.
+>
+> El título/qué-revisar de un riesgo salen de `REGLAS` (la declaración
+> estática, siempre presente) y no de `evaluarRiesgos()`: un riesgo que la
+> propia intervención ya resolvió puede haber DESAPARECIDO de los activos
+> —el resultado correcto de haberlo arreglado—, y sólo la evidencia medida
+> (la cifra) necesita que siga activo ahora mismo; su ausencia se explica
+> en pantalla, no se esconde. En vibraciones, el mismo `riesgoId` puede
+> estar activo en varios apoyos a la vez, así que `canalLabel` viaja en los
+> parámetros de navegación —es texto, sobrevive el viaje por la URL, a
+> diferencia de la muestra de sensores— para no coger el apoyo equivocado.
+>
+> Botón «Cerrar diagnóstico» añadido junto a «Preguntarle a Tdconcito» en
+> las tarjetas de riesgo del tanque y de vibraciones
+> (`RiesgosEva.jsx`/`riesgoVibracion.jsx`), navegando con
+> `{sistema, riesgoId}` (y `canalLabel` en vibraciones).
+>
+> Nuevo `src/test/demo-eva/cierre-diagnostico.test.jsx` (5/5): el título
+> aparece aunque el riesgo no esté activo en el simulador, las causas de
+> `/api/diagnostico` se pintan y preseleccionan, «Otra causa» habilita el
+> campo libre y manda `causaReal.tipo` con lo escrito,
+> `diagnosticoCorrecto` sale `false` al elegir una causa distinta de la
+> propuesta y `true` al confirmarla, «No funcionó» manda `resuelto:false`
+> sin bloquear el envío. `routes.test.jsx` actualizado a dieciséis vistas.
+> Sin regresiones: 508/518 frontend (10 skips intencionales, igual que
+> antes), 153/153 backend vitest, 122/122 `verificar-herramientas.mjs`,
+> 73/73 `verificar-backend.mjs`.
+>
+> Con esto, el ciclo completo del plan queda cerrado: datos en vivo,
+> manuales y casos previos se cruzan y puntúan (Fases 0-3), el modelo los
+> narra sin reordenarlos (Fase 4), y una persona puede confirmar o corregir
+> la causa real y dejarlo escrito para la próxima vez (Fase 5) — por voz,
+> por chat, o desde el formulario, las tres puertas escriben en el mismo
+> sitio.
 
 ---
 
