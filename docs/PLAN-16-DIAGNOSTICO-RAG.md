@@ -90,10 +90,54 @@
 > sería una tubería que no lleva a ningún sitio. Se conecta cuando exista quien
 > lo llame.
 >
+> **Fase 3 completada** — `shared/eva/causas.js`: 25 causas candidatas
+> transcritas de lo ya declarado, sobre 11 riesgos (8 del tanque en
+> `riesgos.js · accion`/`consecuencia`, 3 de vibraciones en
+> `riesgosVibracion.js · consecuencia`). Más de la estimación de 15-18 del
+> plan porque la estimación era aproximada y no había motivo para dejar
+> riesgos con causa evidente sin transcribir. `esfuerzo-sin-resultado` toma
+> su `componente` de `pronostico.js · MECANISMOS` —comparte el mismo `id` en
+> los dos catálogos, la única correspondencia literal entre ellos— por ser
+> más preciso que `consecuencia` a secas. Deliberadamente fuera: los riesgos
+> puramente informativos o sobre el estado de la instrumentación (no de la
+> máquina), y `vigilancia-en-aviso`, cuya propia `evidencia` ya nombra el
+> defecto de rodamiento concreto (BPFO/BPFI/FTF) en el momento, sin falta de
+> una lista estática aparte. Las causas del tanque heredan `PROVISIONALES` de
+> `umbrales.js` en vivo; las de vibración por vibración alta NO —están detrás
+> de ISO 10816-1, una norma, no una estimación—, y `asimetria-entre-apoyos`
+> sí es provisional pero por un motivo distinto e independiente: no hay norma
+> detrás, es convención de mantenimiento.
+>
+> `backend/ia/diagnostico.mjs`: junta las tres fuentes y puntúa, aritmética
+> pura —`datos 0…3 + manual 0…2 + casos 0…2 − 1×fallidos`, bandas ALTO≥5 con
+> ≥2 fuentes / MEDIO 3-4 / BAJO≤2—. `datos` es compartido por todas las
+> causas de un mismo riesgo a propósito: es la misma evidencia física, y
+> puntuarlas distinto sería inventar una distinción que los sensores no dan
+> (ver «Lo que la semilla no puede dar» en §3). Usa `necesita.length` de la
+> regla activa como proxy de cuántas señales corroboran el riesgo, con un
+> suelo en 1 —nunca 0— porque un riesgo activo siempre tiene algo detrás,
+> aunque la regla declare `necesita: []` y evalúe dinámicamente (caso de
+> `asimetria-entre-apoyos`, que compara canales). `manual`/`casos` convierten
+> el score normalizado 0-1 de `buscar()`/`buscarCasosSimilares()` en puntos
+> con el mismo par de umbrales para las dos fuentes. Sin `riesgoId` que
+> encaje con el `sistema` pedido, o con un `sistema` desconocido, se rechaza
+> en vez de adivinar. Un riesgo sin causas transcritas no devuelve `[]` en
+> silencio: `huerfano: true` lo dice.
+>
+> Nuevo `scripts/verificar-diagnostico.mjs` (8/8): determinismo exacto (JSON
+> idéntico en dos llamadas), ningún riesgo de `REGLAS` —tanque ni
+> vibraciones— se queda sin causas y sin decirlo, aislamiento de `sistema`
+> duro, los casos previos nunca llevan solos a ALTO, un `resuelto:false`
+> resta de verdad, y el manual desempata entre causas que comparten
+> evidencia. No usa red ni disco: `indiceDocumentos`/`indiceCasos` son dobles
+> de prueba sobre la misma interfaz (`buscar`/`buscarCasosSimilares`) que
+> exponen los módulos reales. `diagnostico.mjs` **no está conectado a
+> ninguna herramienta todavía** — igual que `casos.mjs`, espera a la
+> herramienta `diagnosticar_falla` de la Fase 4.
+>
 > Con esto, las tres fuentes del diagnóstico —datos en vivo, manuales, casos
-> previos— existen y tienen sus pruebas. Sigue la **Fase 3** (causas
-> candidatas derivadas y puntuación) o, en paralelo, la **Fase 4** ya sabría
-> qué llamar en cuanto la Fase 3 le dé una lista que narrar.
+> previos— existen, están puntuadas y tienen sus pruebas. Sigue la
+> **Fase 4** (el modelo narra la lista ya ordenada, sin reordenarla).
 
 ---
 
