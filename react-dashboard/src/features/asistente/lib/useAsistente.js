@@ -21,6 +21,7 @@ import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
+import { sistemaDeRuta } from "@shared/eva/sistemas.js";
 
 /**
  * Mensaje del asistente aún vacío, al que se le van pegando los deltas.
@@ -464,7 +465,25 @@ export function useDictado() {
     setTranscribiendo(true);
     setError(null);
     try {
-      const respuesta = await fetch(`${API_BASE}/api/voz`, {
+      /*
+       * Se le dice a Whisper QUÉ SISTEMA se está mirando, y con eso elige el
+       * vocabulario que tiene que oír bien.
+       *
+       * Sin esto, el dictado usaba siempre las palabras del tanque: preguntar
+       * por vibraciones devolvía «lado acople» y «rodamiento» deformados, y
+       * una pregunta deformada hace que el asistente conteste sobre otra cosa
+       * — que es peor que no entenderla, porque no se nota.
+       *
+       * Se lee del hash y no de un estado propio: la pantalla activa ya está
+       * ahí, y duplicarla en el asistente sería una segunda fuente de verdad
+       * que puede quedarse atrás al navegar.
+       */
+      const sistema = sistemaDeRuta(window.location.hash);
+      const destino = sistema
+        ? `${API_BASE}/api/voz?sistema=${encodeURIComponent(sistema)}`
+        : `${API_BASE}/api/voz`;
+
+      const respuesta = await fetch(destino, {
         method: "POST",
         headers: { "Content-Type": "audio/wav" },
         body: wav,

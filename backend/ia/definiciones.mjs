@@ -55,7 +55,9 @@ export const DEFINICIONES = [
         'Lo que YA se sabe confirmado de esta instalación: datos que alguien verificó y que no se ' +
         'deducen del servidor —cuántos sensores hay, cómo se llama un grupo, qué tensión ' +
         'nominal aplica—. Consúltala antes de suponer un detalle de la instalación. Cada hecho ' +
-        'trae su ORIGEN: cítalo cuando lo uses.',
+        'trae su ORIGEN: cítalo cuando lo uses. Devuelve TAMBIÉN la bitácora de intervenciones: ' +
+        'qué ha fallado antes y cómo se resolvió. Úsala para "¿cómo arreglé esto la última ' +
+        'vez?", "¿esto ya había pasado?", "¿qué se hizo con el aPico?".',
       parameters: {
         type: 'object',
         properties: {
@@ -71,12 +73,48 @@ export const DEFINICIONES = [
   {
     type: 'function',
     function: {
+      name: 'registrar_intervencion',
+      description:
+        'Anota en la bitácora algo que SE HIZO en la instalación: qué fallaba y qué se hizo ' +
+        'para arreglarlo. LLÁMALA SIEMPRE que el usuario cuente que ha resuelto, arreglado, ' +
+        'cambiado, ajustado o configurado algo — «ya quedó», «lo resolví», «ya lo arreglé», ' +
+        '«cambié la histéresis», «ya configuré los rodamientos», «lo dejé andando». No le ' +
+        'preguntes si quiere que lo guardes: guárdalo y díselo. Sirve para que dentro de seis ' +
+        'meses, cuando el mismo síntoma vuelva, se pueda leer cómo se resolvió — es lo primero ' +
+        'que se pierde en una planta. Si el intento NO funcionó, ponlo igual con resuelto=false: ' +
+        'saber lo que no sirvió ahorra repetirlo.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sintoma: {
+            type: 'string',
+            description: 'Qué pasaba, con lo que se vio. Por ejemplo "el pico de aceleración de S1 valía lo mismo que el eficaz".',
+          },
+          solucion: {
+            type: 'string',
+            description: 'Qué se hizo exactamente. Cuanto más concreto, más sirve dentro de seis meses.',
+          },
+          causa: { type: 'string', description: 'Por qué pasaba, si se llegó a saber.' },
+          sistema: { type: 'string', description: 'Id del sistema: "tanque" o "vibraciones".' },
+          resuelto: {
+            type: 'boolean',
+            description: 'false si se intentó y NO funcionó. Por omisión true.',
+          },
+        },
+        required: ['sintoma', 'solucion'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'recordar_hecho',
       description:
-        'Guarda un dato que EL USUARIO acaba de confirmarte, para las siguientes ' +
-        'conversaciones. Para "el sensor S3 es de 100 mV/g", "la tensión es de 208". Sólo lo ' +
-        'que una PERSONA afirma: lo que deduzcas tú no es un hecho. Necesita `origen` —quién lo ' +
-        'dijo y cuándo—; sin eso no se guarda.',
+        'Guarda un DATO de cómo ES la instalación: "el sensor S3 es de 100 mV/g", "la tensión ' +
+        'es de 208", "el rodamiento intermedio es un 6206". Sólo lo que una PERSONA afirma. ' +
+        'NO la uses para algo que se HIZO o se ARREGLÓ —«ya quedó», «lo resolví», «cambié la ' +
+        'histéresis»—: eso va en registrar_intervencion, que guarda además qué fallaba y si ' +
+        'funcionó. Un dato es permanente; una reparación está fechada.',
       parameters: {
         type: 'object',
         properties: {
@@ -128,6 +166,9 @@ export const DEFINICIONES = [
       name: 'sistemas_de_la_planta',
       description:
         'Qué sistemas hay en esta planta, qué mide cada uno y qué NO se puede afirmar de él. ' +
+        'NO tiene los datos confirmados de la instalación ni la bitácora de lo que se ha ' +
+        'arreglado: para «¿qué se hizo con esto?», «¿ya había pasado?» o «¿qué sabes de la ' +
+        'planta?» la herramienta es hechos_de_la_planta. ' +
         'Llámala cuando no sepas a qué sistema se refiere la pregunta, o para "¿qué puedes ' +
         'ver?". Cada sistema es una instalación SEPARADA, con su propio PLC: no relaciones una ' +
         'señal de uno con una de otro. Es barata y no toca el servidor de planta.',

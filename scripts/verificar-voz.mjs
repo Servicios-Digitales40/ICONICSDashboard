@@ -128,8 +128,8 @@ function wavDePrueba(muestras = 1600) {
   return buffer
 }
 
-const enviar = (base, cuerpo) =>
-  fetch(`${base}/api/voz`, {
+const enviar = (base, cuerpo, sistema = null) =>
+  fetch(`${base}/api/voz${sistema ? `?sistema=${encodeURIComponent(sistema)}` : ''}`, {
     method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: cuerpo,
   })
 
@@ -173,6 +173,48 @@ await check('se le manda el idioma configurado y el vocabulario de la planta', a
     ultimoFormulario.prompt ?? '', /Cerabar|caudal/,
     'el prompt lleva los nombres propios que Whisper no acierta solo'
   )
+})
+
+await check('el vocabulario cambia con el SISTEMA que se está mirando', async () => {
+  /*
+   * Whisper escribe lo que oye guiándose por el prompt, y el prompt gasta
+   * contexto suyo: una lista con el vocabulario de todas las máquinas de la
+   * planta empeora la transcripción de todo lo demás. Por eso cada sistema
+   * declara el suyo en `shared/eva/sistemas.js` y aquí se elige uno.
+   *
+   * Y no es sólo tamaño: preguntando por vibraciones con las palabras del agua
+   * delante, «lado acople» y «rodamiento» salían deformados. Una pregunta
+   * deformada hace que el asistente conteste sobre otra cosa — peor que no
+   * entenderla, porque no se nota.
+   */
+  respuestaWhisper = { text: 'hola' }
+
+  await enviar(app.base, wavDePrueba(), 'vibraciones')
+  const vib = ultimoFormulario.prompt ?? ''
+  assert.match(vib, /rodamiento/, 'en vibraciones tiene que oír «rodamiento»')
+  assert.match(vib, /acople/)
+
+  await enviar(app.base, wavDePrueba(), 'tanque')
+  const tanque = ultimoFormulario.prompt ?? ''
+  assert.match(tanque, /tanque|derrame/, 'y en el tanque, las suyas')
+  assert.ok(!tanque.includes('rodamiento'),
+    'sin mezclarlas: el vocabulario de la otra máquina estorba')
+})
+
+await check('un sistema que no existe NO deja el dictado sin vocabulario', async () => {
+  /*
+   * El caso de un cliente antiguo que no manda `?sistema=`, o de una pantalla
+   * nueva sin declarar. Cae al contexto general, que lleva las palabras
+   * comunes a toda la planta.
+   *
+   * Se comprueba porque la primera versión de este cambio dejó el contexto
+   * general en «planta industrial» a secas, y el dictado EMPEORÓ justo en el
+   * caso más común. Perder vocabulario al añadir la posibilidad de elegirlo
+   * es un retroceso disfrazado de mejora.
+   */
+  respuestaWhisper = { text: 'hola' }
+  await enviar(app.base, wavDePrueba(), 'sistema-que-no-existe')
+  assert.match(ultimoFormulario.prompt ?? '', /motor|bomba|Cerabar/)
 })
 
 console.log('\n── Lo que no puede llegar al operador ──────────────────────')

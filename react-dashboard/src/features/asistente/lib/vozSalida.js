@@ -459,26 +459,85 @@ export function callar() {
 /**
  * Prepara un texto para que suene bien dicho.
  *
- * El asistente ya escribe en texto llano —se le prohíbe el markdown en las
- * instrucciones— así que aquí sólo quedan las cosas que se ven bien y se oyen
- * mal:
+ * ── EL MARKDOWN SE QUITA AQUÍ, NO SE LE PIDE AL MODELO ─────────────
  *
- *  - Los símbolos que la voz deletrea o se salta. El «⚠» del aviso se lee como
- *    nada en unas voces y como «símbolo de advertencia» en otras; decir la
- *    palabra «Atención» es lo que se quería.
- *  - Las viñetas de las líneas, que se leen como «punto medio».
- *  - Las unidades pegadas al número. «62%» sale como «sesenta y dos» a secas en
- *    varias voces de SAPI, y perder la unidad en una lectura de proceso es
- *    exactamente el error que este asistente no puede cometer.
+ * Esta función asumía que el asistente escribe en texto llano porque las
+ * instrucciones se lo piden. **No lo hace.** Medido contra el servidor real,
+ * cada respuesta venía así:
+ *
+ *     **Respuesta directa:**
+ *     *   **No hay vigilancia activa:** El diagnóstico está apagado.
+ *
+ * Y en modo llamada la voz lo lee literal: «asterisco asterisco Respuesta
+ * directa dos puntos asterisco asterisco». Una respuesta correcta convertida
+ * en algo que no se entiende.
+ *
+ * Pedirle al modelo que no use markdown es una instrucción más que puede
+ * ignorar —y la ignora—. Quitarlo aquí no depende de que obedezca: el texto
+ * pasa por esta función siempre, escriba lo que escriba. La regla general de
+ * este proyecto, otra vez: lo que puede hacer el código no se le encarga al
+ * modelo.
+ *
+ * ── LO DEMÁS QUE SE VE BIEN Y SE OYE MAL ───────────────────────────
+ *
+ *  - El «⚠» se lee como nada en unas voces y como «símbolo de advertencia» en
+ *    otras; decir la palabra «Atención» es lo que se quería.
+ *  - Las unidades pegadas al número. «62%» sale como «sesenta y dos» a secas
+ *    en varias voces de SAPI, y perder la unidad en una lectura de proceso es
+ *    exactamente el error que este asistente no puede cometer. Por eso también
+ *    se dicen `mm/s` y `m/s²`, que son las de vibración.
  */
 function paraLeer(texto) {
   return String(texto ?? '')
+    /* Tablas: las barras se leen como «barra vertical». La fila se convierte
+       en una frase con pausas, y la línea de guiones que separa la cabecera
+       se va entera porque no dice nada al oído. */
+    .replace(/^\s*\|?[\s:|-]*-[\s:|-]*\|[\s:|-]*$/gm, '')
+    .replace(/^\s*\|(.+)\|\s*$/gm, (_, fila) => `${fila.split('|').map((c) => c.trim()).filter(Boolean).join(', ')}. `)
+    /* Encabezados y citas. */
+    .replace(/^\s*#{1,6}\s*/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    /* Negrita, cursiva y tachado. Los delimitadores se DELETREAN. */
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    /* La cursiva de un solo carácter sólo cuando NO está pegada a una letra:
+       así `m/s²` y los nombres con guion bajo —`vRMS_S1`, `SPEED_BMS`— no se
+       parten, que son justo los que aparecen en estas respuestas. */
+    .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1$2')
+    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, '$1$2')
+    /* Código: las comillas invertidas se leen como «acento grave». */
+    .replace(/```[a-zA-Z]*\n?/g, '')
+    .replace(/`([^`]*)`/g, '$1')
+    /* Enlaces: se dice el texto, nunca la dirección. */
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    /* Viñetas y numeración, con la sangría que el modelo les pone delante. */
+    .replace(/^\s*[-*·•+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
     .replace(/⚠\s*/g, 'Atención: ')
-    .replace(/^[·•\-*]\s*/gm, '')
+    /* La raya larga separa incisos; leída suena a «raya». Una coma hace la
+       misma pausa y no se pronuncia.
+       El inciso suele venir PEGADO por un lado —así— y por eso no se exige
+       espacio a ambos lados. Lo que sí se respeta es el rango numérico «3–5»:
+       ahí la raya significa «a», no un inciso, y una coma lo estropearía. */
+    .replace(/(?<!\d)\s*[—–]\s*(?!\d)/g, ', ')
+    /* Unidades pegadas al número. */
     .replace(/(\d)\s*%/g, '$1 por ciento')
     .replace(/(\d)\s*°C/g, '$1 grados')
+    .replace(/(\d)\s*mm\/s\b/g, '$1 milímetros por segundo')
+    .replace(/(\d)\s*m\/s²/g, '$1 metros por segundo al cuadrado')
+    .replace(/(\d)\s*rpm\b/gi, '$1 revoluciones por minuto')
+    .replace(/(\d)\s*Hz\b/g, '$1 hercios')
     // Una hora como «14:32» se lee dígito a dígito en algunas voces.
     .replace(/\b(\d{1,2}):(\d{2})(?::\d{2})?\b/g, '$1 $2')
+    /* Red de seguridad: cualquier marca que haya sobrevivido a lo anterior
+       —un asterisco suelto, una barra de tabla mal cerrada— se va antes de
+       llegar a la voz. Sin esto, un solo `*` desparejado basta para que la
+       frase entera suene mal. */
+    .replace(/[*_`#|~]/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim()
 }

@@ -119,6 +119,109 @@ check('una respuesta normal sobrevive intacta', () => {
   assert.equal(paraLeer(original), original)
 })
 
+console.log('\n── El markdown no se deletrea ──────────────────────────────')
+
+check('la negrita no se lee como «asterisco asterisco»', () => {
+  /*
+   * ESTE es el fallo que motivó todo lo demás. Las instrucciones le prohíben
+   * el markdown al modelo y lo escribe igual: medido contra el servidor real,
+   * cada respuesta empezaba por «**Respuesta directa:**». En modo llamada la
+   * voz lo decía literal, y una respuesta correcta se volvía ininteligible.
+   *
+   * Se quita AQUÍ y no pidiéndoselo al modelo, porque una instrucción se puede
+   * ignorar —y la ignoraba— y esta función se ejecuta siempre.
+   */
+  const leido = paraLeer('**Respuesta directa:** No puedo decirte si están bien.')
+  assert.ok(!leido.includes('*'), `quedaron asteriscos: ${leido}`)
+  assert.match(leido, /^Respuesta directa: No puedo/)
+})
+
+check('la viñeta con sangría del modelo tampoco', () => {
+  /* El modelo las escribe con tres espacios: «*   **texto:**». La regla
+     anterior sólo miraba el principio de línea sin sangría. */
+  const leido = paraLeer('*   **No hay vigilancia activa:** El diagnóstico está APAGADO.')
+  assert.ok(!leido.includes('*'), `quedaron asteriscos: ${leido}`)
+  assert.match(leido, /^No hay vigilancia activa: El diagnóstico/)
+})
+
+check('las comillas invertidas no se leen como «acento grave»', () => {
+  const leido = paraLeer('El `vRMS_S1` vale 0.361.')
+  assert.ok(!leido.includes('`'))
+  assert.match(leido, /vRMS.S1 vale/)
+})
+
+check('de un enlace se dice el texto, nunca la dirección', () => {
+  /* Leer «hache te te pe dos puntos barra barra localhost» en voz alta es
+     ruido puro: nadie va a teclear una URL de oído. */
+  const leido = paraLeer('Ver [la pantalla](http://localhost:5173/#/eva) para el detalle.')
+  assert.match(leido, /Ver la pantalla para el detalle/)
+  assert.ok(!leido.includes('http'))
+  assert.ok(!leido.includes('['))
+})
+
+check('una tabla se convierte en frases, no en barras', () => {
+  const leido = paraLeer('| Apoyo | vRMS |\n|---|---|\n| Lado acople | 0.361 |')
+  assert.ok(!leido.includes('|'), `quedaron barras: ${leido}`)
+  assert.ok(!leido.includes('---'), 'la línea separadora no se dice')
+  assert.match(leido, /Apoyo, vRMS/)
+  assert.match(leido, /Lado acople, 0\.361/)
+})
+
+check('los encabezados pierden las almohadillas', () => {
+  const leido = paraLeer('### Conclusión\nEl motor gira sin carga.')
+  assert.ok(!leido.includes('#'))
+  assert.match(leido, /^Conclusión/)
+})
+
+check('no queda NINGUNA marca suelta, pase lo que pase', () => {
+  /*
+   * La red de seguridad. Un asterisco desparejado o una tabla mal cerrada
+   * bastan para que la voz meta una palabra que nadie escribió, y no hay forma
+   * de prever todas las maneras en que un modelo puede romper su propio
+   * formato. Lo que sí se puede es garantizar que ninguna marca llega a la voz.
+   */
+  for (const roto of [
+    'Esto es **negrita sin cerrar y sigue',
+    'Una tabla | mal | cerrada',
+    'Un `código sin cerrar',
+    'Mezcla ** de _ todo # junto | ~',
+  ]) {
+    const leido = paraLeer(roto)
+    assert.ok(!/[*_`#|~]/.test(leido), `«${roto}» dejó marcas: ${leido}`)
+  }
+})
+
+console.log('\n── Las unidades de vibración se dicen enteras ──────────────')
+
+check('mm/s y m/s² se pronuncian', () => {
+  /*
+   * Perder la unidad en una lectura de proceso es el error que este asistente
+   * no puede cometer, y en vibración es peor que en el resto: 0,36 mm/s es una
+   * máquina como nueva y 0,36 m/s² es otra magnitud distinta. Dichas a secas
+   * suenan igual.
+   */
+  assert.match(paraLeer('vale 0.361 mm/s'), /0\.361 milímetros por segundo/)
+  assert.match(paraLeer('el aRMS 2.971 m/s²'), /2\.971 metros por segundo al cuadrado/)
+})
+
+check('rpm y Hz también', () => {
+  assert.match(paraLeer('gira a 604 rpm'), /604 revoluciones por minuto/)
+  assert.match(paraLeer('el variador a 20.15 Hz'), /20\.15 hercios/)
+})
+
+check('la raya de un inciso se vuelve pausa, y el rango numérico se respeta', () => {
+  /*
+   * «—» leída suena a «raya». Una coma hace la misma pausa y no se pronuncia.
+   * Pero en «3–5» la raya significa «a», no un inciso: convertirla en coma
+   * diría «tres, cinco», que es otra cosa.
+   */
+  const inciso = paraLeer('gira a 604 rpm —sin carga— con el variador a 20 Hz.')
+  assert.ok(!inciso.includes('—'), `quedó la raya: ${inciso}`)
+  assert.match(inciso, /, sin carga, /)
+
+  assert.match(paraLeer('Una máquina sana ronda 3–5 de cresta.'), /3–5/)
+})
+
 /* ── El ciclo del manos libres ───────────────────────────────────────── */
 
 console.log('\n── El ciclo escucha → pregunta → habla → escucha ────────────')

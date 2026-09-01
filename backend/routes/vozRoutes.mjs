@@ -133,8 +133,13 @@ export function registerVozRoutes(fastify, { config, voz }) {
 
       const empezado = Date.now()
 
+      /* Qué sistema se está mirando, para elegir el vocabulario que Whisper
+         necesita oír bien. Un id desconocido no es un error: cae al contexto
+         general, que es peor transcripción pero nunca un fallo. */
+      const sistema = request.query?.sistema ?? null
+
       try {
-        const resultado = await voz.transcribir(audio, { signal: abortador.signal })
+        const resultado = await voz.transcribir(audio, { signal: abortador.signal, sistema })
 
         if (!resultado.ok) {
           /*

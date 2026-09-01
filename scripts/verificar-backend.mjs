@@ -942,17 +942,31 @@ console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1
   await server.close()
 }
 {
-  // Con páginas de 60 ms y un plazo de 130 ms, caben dos páginas completas
-  // (120 ms) pero no una tercera: el corte debe ser por TIEMPO, no porque
-  // `HISTORY_MAX_PAGINAS` (holgado a propósito) lo haya impedido antes.
-  const { base: lento, server } = await mount({ HISTORY_MAX_MS: '130', HISTORY_MAX_PAGINAS: '50' })
+  /*
+   * Con páginas de 60 ms y un plazo de 420 ms caben seis, pero no las
+   * cincuenta: el corte debe ser por TIEMPO, no porque `HISTORY_MAX_PAGINAS`
+   * (holgado a propósito) lo haya impedido antes.
+   *
+   * ── POR QUÉ EL PLAZO ES TAN HOLGADO ───────────────────────────────
+   *
+   * Estuvo en 130 ms —dos páginas de 60 con 10 ms de margen— y fallaba SIEMPRE
+   * en máquinas normales: entre levantar el servidor de prueba, la ida y vuelta
+   * HTTP y el parseo, esos 10 ms se gastan antes de la segunda página, y la
+   * comprobación cortaba en una.
+   *
+   * Lo que se quiere probar es que el corte llega por plazo y no por número de
+   * páginas, y para eso da igual que sean dos o seis. Un margen ajustado no
+   * probaba nada más y convertía la suite entera en algo que falla siempre —que
+   * es la forma más rápida de que nadie vuelva a mirarla.
+   */
+  const { base: lento, server } = await mount({ HISTORY_MAX_MS: '420', HISTORY_MAX_PAGINAS: '50' })
 
   const r = await call(lento, '/api/iconics/history?pointName=historia-lenta&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
   check('un servidor lento se corta por HISTORY_MAX_MS antes de agotar las páginas', () => {
     assert.equal(r.body.ok, true)
     assert.ok(r.body.paginas >= 2 && r.body.paginas < 50, `paginas=${r.body.paginas}`)
     assert.equal(r.body.truncada, true)
-    assert.match(r.body.motivoCorte, /plazo de 130 ms/)
+    assert.match(r.body.motivoCorte, /plazo de 420 ms/)
   })
   await server.close()
 }

@@ -35,6 +35,8 @@ import {
   normalizarAlmacen,
   pendientes,
   validarPropuesta,
+  crearIntervencion,
+  intervencionesRecientes,
 } from '../../../../shared/eva/aprendizaje.js'
 import { fallo } from '../lib/respuesta.mjs'
 
@@ -112,7 +114,71 @@ async function guardarAprendizaje(almacen) {
              lista sin esta línea serían indistinguibles. */
           origen: h.origen,
         })),
+        /*
+         * La bitácora viaja CON los hechos y no en su propia herramienta.
+         *
+         * «¿Cómo arreglé esto la última vez?» es la pregunta que la justifica,
+         * y el modelo pequeño elige mal entre herramientas parecidas: pedirle
+         * que acierte entre `hechos_de_la_planta` y otra de intervenciones era
+         * regalarle una forma más de equivocarse. Aquí llegan las dos cosas
+         * con la llamada que ya hace bien.
+         */
+        intervenciones: intervencionesRecientes(almacen, 8).map((i) => ({
+          cuando: i.fecha.slice(0, 10),
+          sobre: i.sistema ?? 'toda la planta',
+          sintoma: i.sintoma,
+          causa: i.causa ?? undefined,
+          que_se_hizo: i.solucion,
+          /* Un intento que NO funcionó vale tanto como uno que sí: ahorra
+             repetirlo. Por eso se dice, en vez de listar sólo los buenos. */
+          funciono: i.resuelto,
+        })),
         propuestas_pendientes: pendientes(almacen).length,
+      }
+    },
+
+    /**
+     * ── LA BITÁCORA: LO QUE SE HIZO, PARA DENTRO DE SEIS MESES ────────
+     *
+     * Un HECHO dice cómo es la planta. Esto dice qué le pasó y qué se hizo, y
+     * son cosas distintas: un hecho se corrige cuando cambia, una intervención
+     * está fechada y no se corrige nunca.
+     *
+     * Su valor entero está en poder leerla cuando el mismo síntoma vuelva. Es
+     * lo primero que se pierde en una planta —quien lo arregló se va, o
+     * simplemente lo olvida— y la única forma de que no se pierda es que
+     * anotarlo cueste una frase dicha en voz alta.
+     *
+     * `origen` NO es obligatorio aquí, al revés que en `recordar_hecho`. Ahí
+     * distingue un dato de planta de una conjetura y por eso se exige; aquí lo
+     * está contando quien lo hizo, y un campo de más era una razón más para
+     * que el modelo pequeño no llegara a llamar a la herramienta.
+     */
+    async registrar_intervencion({ sintoma, solucion, causa = null, sistema = null, resuelto = true, origen = null } = {}) {
+      const s = String(sintoma ?? '').trim()
+      const q = String(solucion ?? '').trim()
+      if (s.length < 8 || q.length < 8) {
+        return fallo(
+          'Hacen falta las dos mitades: QUÉ pasaba y QUÉ se hizo. Una sola no sirve dentro de ' +
+          'seis meses, que es cuando esto se lee.'
+        )
+      }
+
+      const almacen = await leerAprendizaje()
+      const nueva = crearIntervencion({ sintoma: s, solucion: q, causa, sistema, resuelto, origen }, new Date())
+      almacen.intervenciones.push(nueva)
+      const guardado = await guardarAprendizaje(almacen)
+      if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+
+      return {
+        ok: true,
+        anotado: nueva.sintoma,
+        que_se_hizo: nueva.solucion,
+        funciono: nueva.resuelto,
+        total_en_bitacora: almacen.intervenciones.length,
+        aviso:
+          'Queda en la bitácora con su fecha. La próxima vez que se pregunte por este síntoma ' +
+          'aparecerá junto a los datos de la instalación.',
       }
     },
 
@@ -130,6 +196,52 @@ async function guardarAprendizaje(almacen) {
       const texto = String(hecho ?? '').trim()
       if (texto.length < 10) {
         return fallo('Un hecho tiene que decir algo concreto sobre la instalación.')
+      }
+
+      /*
+       * ── LA ELECCIÓN EQUIVOCADA TAMBIÉN TIENE QUE FUNCIONAR ──────────
+       *
+       * El modelo local elige mal entre estas dos herramientas. Medido: se le
+       * contó «ya resolví la falla del pico de S1, lo arreglé cambiando la
+       * configuración» y llamó a `recordar_hecho` en vez de a
+       * `registrar_intervencion`, dos veces seguidas, con las descripciones
+       * diciendo explícitamente cuál era cuál.
+       *
+       * Refinar las descripciones no sirvió, y no iba a servir: con un modelo
+       * pequeño, cada herramienta parecida es una forma más de equivocarse.
+       * Así que la reparación se guarda IGUAL, en la bitácora, aunque haya
+       * entrado por la puerta de al lado.
+       *
+       * Las palabras son las que usa quien lo cuenta —«ya quedó», «lo
+       * resolví»—, no una lista de sinónimos exhaustiva: si alguna se escapa
+       * se guarda como hecho, que es peor pero no se pierde.
+       */
+      /* El modelo REESCRIBE lo que le dicen antes de guardarlo: a quien dijo
+         «ya resolví la falla» le anotó «la falla está resuelta». Por eso las
+         raíces cubren también el participio —`resuelt`, `arreglad`—, que es la
+         forma en que el modelo lo redacta, no la que usa quien lo cuenta. */
+      const esReparacion =
+        /(resolv|resuelt|arregl|repar|correg|cambi|ajust|configur|solucion|sustitu|reemplaz)/i.test(texto) ||
+        /ya (qued|est)/i.test(texto)
+      if (esReparacion) {
+        const almacen = await leerAprendizaje()
+        const nueva = crearIntervencion(
+          { sintoma: texto, solucion: texto, sistema, origen: origen ?? 'el usuario' },
+          new Date(),
+        )
+        almacen.intervenciones.push(nueva)
+        const guardado = await guardarAprendizaje(almacen)
+        if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+        return {
+          ok: true,
+          anotado: texto,
+          donde: 'bitácora de intervenciones',
+          total_en_bitacora: almacen.intervenciones.length,
+          aviso:
+            'Esto describe algo que se HIZO, así que va a la bitácora con su fecha y no a la ' +
+            'lista de datos de la instalación. La próxima vez que se pregunte por este síntoma ' +
+            'aparecerá. Dile al usuario que queda anotado en la bitácora.',
+        }
       }
       if (!origen) {
         return fallo(
