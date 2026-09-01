@@ -2025,11 +2025,110 @@ await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acot
   assert.ok(pico < llamadas, `pico=${pico}, llamadas=${llamadas}: deberían lanzarse en más de una tanda`)
 })
 
+/* ── diagnosticar_falla (Plan 16 Fase 4) ─────────────────────────────── */
+
+console.log('\n── diagnosticar_falla ───────────────────────────────────────')
+
+/** Un `motorDiagnostico` de mentira: contesta lo que se le prepare, sin tocar ninguna fuente real. */
+function motorDiagnosticoFalso(respuestaPorRiesgo) {
+  return {
+    async diagnosticar({ sistema, riesgoId }) {
+      const r = respuestaPorRiesgo[riesgoId]
+      if (!r) throw new TypeError(`"${riesgoId}" no es un riesgo de "${sistema}" — no hay nada que diagnosticar.`)
+      return r
+    },
+  }
+}
+
+await checkAsync('sin motorDiagnostico montado, se niega y no propone nada de memoria', async () => {
+  const r = await createHerramientas({ client: clienteFalso() })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /motor de diagn[oó]stico/i)
+})
+
+await checkAsync('sin `sistema`, se pide en vez de adivinar', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({})
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { riesgoId: 'bomba-sin-salida' })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /sistema/i)
+})
+
+await checkAsync('sin `riesgoId`, se pide y se remite a riesgos_activos', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({})
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque' })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /riesgos_activos/i)
+})
+
+await checkAsync('un riesgoId que no encaja con el sistema no tumba la conversación', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({})
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'vibracion-en-alarma' })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /riesgos_activos\(sistema="tanque"\)/, 'tiene que decir dónde sacar el id correcto')
+})
+
+await checkAsync('un riesgo sin causas transcritas lo dice, no una lista vacía sin más', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'obstruccion': { sistema: 'tanque', riesgoId: 'obstruccion', huerfano: true, causas: [] },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'obstruccion' })
+  assert.equal(r.ok, true)
+  assert.deepEqual(r.causas, [])
+  assert.match(r.aviso, /no inventes/i)
+})
+
+await checkAsync('las causas llegan en el orden que da el motor, con instrucción de no reordenar', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'bomba-sin-salida': {
+      sistema: 'tanque',
+      riesgoId: 'bomba-sin-salida',
+      huerfano: false,
+      causas: [
+        {
+          id: 'valvula-impulsion-cerrada', titulo: 'Válvula cerrada', componente: 'Válvula de impulsión',
+          origen: 'riesgos.js', provisional: true,
+          respaldo: { datos: 3, manual: 2, casos: 2, total: 7 }, banda: 'alto',
+          manualCitado: [{ archivo: 'bomba.pdf', pagina: 4 }],
+          casosCitados: [{ id: 'i1', fecha: '2026-01-01', resuelto: true }],
+        },
+        {
+          id: 'sin-recirculacion-minima', titulo: 'Sin recirculación', componente: 'Línea de recirculación',
+          origen: 'riesgos.js', provisional: true,
+          respaldo: { datos: 3, manual: 0, casos: 0, total: 3 }, banda: 'medio',
+          manualCitado: [], casosCitados: [],
+        },
+      ],
+    },
+  })
+
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.causas.length, 2)
+  // El orden es el que dio el motor — la primera es la de más respaldo — y
+  // no se reordena aquí por ningún criterio propio.
+  assert.equal(r.causas[0].id, 'valvula-impulsion-cerrada')
+  assert.equal(r.causas[1].id, 'sin-recirculacion-minima')
+  assert.match(r.comoRedactar, /sin reordenarlas/i)
+  assert.match(r.comoRedactar, /origen/i)
+  assert.match(r.comoRedactar, /caso/i)
+  // `manualCitado`/`casosCitados` vacíos no viajan: no hay nada que citar.
+  assert.equal('manualCitado' in r.causas[1], false)
+  assert.equal('casosCitados' in r.causas[1], false)
+  assert.equal(r.causas[0].manualCitado[0].archivo, 'bomba.pdf')
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
+check('son veintiuna herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -2078,6 +2177,10 @@ check('son veinte herramientas, y sólo una escribe en la PLANTA', () => {
     'consultar_documentacion',
     'limites_del_manual',
     'diagnostico',
+    /* Plan 16 Fase 4: `diagnosticar_falla` cierra el catálogo, junto a las
+       de documentación — es, igual que ellas, de las que menos veces es la
+       respuesta: sólo cuando ya hay un `riesgoId` concreto sobre la mesa. */
+    'diagnosticar_falla',
   ])
 
   /*

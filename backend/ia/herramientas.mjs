@@ -193,6 +193,9 @@ import { crearAyudantesDeHistoria } from './herramientas/lib/historia.mjs'
 import { crearHerramientasDeRegistro } from './herramientas/registro/index.mjs'
 import { crearHerramientasDeMaquina } from './herramientas/maquina/index.mjs'
 import { crearHerramientasDeHistoricos } from './herramientas/historicos/index.mjs'
+/* Plan 16 Fase 4: una sola herramienta, `diagnosticar_falla`. Sólo necesita
+   `motorDiagnostico` (`ia/diagnostico.mjs`) — no toca el `client`. */
+import { crearHerramientasDeDiagnostico } from './herramientas/diagnostico/index.mjs'
 
 export { DEFINICIONES }
 
@@ -359,6 +362,15 @@ export function agruparPorRegla(activos) {
       continue
     }
     porId.set(x.id, {
+      /*
+       * Plan 16 Fase 4: sin este `id` el modelo no tiene forma de pasarle un
+       * riesgo concreto a `diagnosticar_falla(sistema, riesgoId)` — tendría
+       * que adivinarlo del título en prosa, y eso es justo lo que este
+       * proyecto evita en todas partes. El `id` es estable (clave de
+       * `REGLAS`), así que citarlo no es un dato más: es el enganche con la
+       * Fuente #1 del diagnóstico.
+       */
+      id: x.id,
       titulo: x.titulo,
       severidad: x.nivel ?? x.severidad,
       apoyos: [x.canalLabel ?? 'toda la máquina'],
@@ -888,6 +900,11 @@ export function createHerramientas({
   turnos = {},
   readOnly = true,
   indiceDocumentos = null,
+  // El motor de diagnóstico (Plan 16 Fase 3): junta datos + manual + casos y
+  // puntúa. `null` por defecto porque no todas las pruebas lo montan —igual
+  // que `indiceDocumentos`—, y `diagnosticar_falla` se niega explícitamente
+  // sin él, en vez de fallar a medias.
+  motorDiagnostico = null,
   // Carpeta y purga de los PDF de `generar_reporte` (Plan 14 Fase 5). Mismo
   // criterio que `indiceDocumentos`: un objeto de configuración, no variables
   // de entorno leídas aquí — eso lo hace `config.mjs`.
@@ -972,6 +989,14 @@ export function createHerramientas({
      * mezclar un grupo donde no iba. Aquí se respeta el que había.
      */
     ...crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas: () => herramientas }),
+
+    /*
+     * `diagnosticar_falla` va al final, junto a las de documentación: es,
+     * igual que ellas, de las que menos veces es la respuesta —sólo cuando
+     * ya hay un `riesgoId` concreto sobre la mesa—, y el orden del catálogo
+     * no es cosmético (ver el comentario de arriba).
+     */
+    ...crearHerramientasDeDiagnostico({ motorDiagnostico }),
   }
 
   /**

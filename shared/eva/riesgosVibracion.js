@@ -785,6 +785,12 @@ export function preguntaSobreRiesgoVibracion(riesgo) {
     `Evidencia medida: ${riesgo.evidencia}\n` +
     `Hipótesis: ${riesgo.consecuencia}\n` +
     (riesgo.norma ? `Criterio: ${riesgo.norma}\n` : "") +
+    // Plan 16 Fase 4: mismo criterio que preguntaSobreRiesgo del tanque —
+    // el `id` va literal para que el modelo llame a diagnosticar_falla con
+    // los dos argumentos ya resueltos, en vez de adivinar el riesgoId de un
+    // título en prosa.
+    `\nUsa diagnosticar_falla(sistema="vibraciones", riesgoId="${riesgo.id}") para ver las ` +
+    `causas candidatas, ya cruzadas con el manual y con casos previos resueltos.\n` +
     `\nExplícame qué comprobaría un técnico de mantenimiento, en qué orden y ` +
     `por qué. NO estimes cuántos meses o años tardará en averiarse: este ` +
     `sistema no tiene histórico registrado, sólo lecturas del momento, así ` +

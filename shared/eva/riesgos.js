@@ -399,8 +399,14 @@ export function preguntaSobreRiesgo(riesgo) {
   return [
     `En la instalación se ha detectado esta situación: "${riesgo.titulo}".`,
     `Lo medido es: ${riesgo.evidencia}`,
-    "Consulta los datos de la planta y explícame por qué puede estar pasando,",
-    "qué señales lo confirmarían y qué conviene revisar.",
+    // Plan 16 Fase 4: el `id` va literal en la pregunta para que el modelo
+    // no tenga que adivinarlo — llama a diagnosticar_falla con el nombre
+    // exacto de la herramienta y los dos argumentos ya resueltos, en vez de
+    // esperar a que un modelo pequeño infiera el riesgoId de un título en
+    // prosa.
+    `Usa diagnosticar_falla(sistema="tanque", riesgoId="${riesgo.id}") para ver las causas`,
+    "candidatas, ya cruzadas con el manual y con casos previos resueltos, en vez de razonarlo",
+    "de memoria.",
     "Separa claramente lo que midas de lo que sea hipótesis.",
   ].join(" ");
 }

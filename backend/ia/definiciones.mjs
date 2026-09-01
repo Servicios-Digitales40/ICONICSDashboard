@@ -187,7 +187,10 @@ export const DEFINICIONES = [
         'son peligrosas aunque cada señal esté en banda. Trae `sin_comprobar`: si no está ' +
         'vacío, NO digas que no hay riesgos — di que hay cosas que no se pudieron mirar. No es ' +
         'el panel de alarmas de ICONICS. Hay que decir DE QUÉ SISTEMA: si no lo sabes, llama ' +
-        'antes a sistemas_de_la_planta.',
+        'antes a sistemas_de_la_planta. Cada riesgo trae su `id`: para explicar CUÁL es la causa ' +
+        'más probable de uno concreto —no sólo qué podría pasar— pásaselo a ' +
+        'diagnosticar_falla(sistema, riesgoId), que cruza los datos con el manual y con casos ' +
+        'previos ya resueltos y te da una lista de causas puntuada.',
       parameters: {
         type: 'object',
         properties: {
@@ -584,7 +587,10 @@ export const DEFINICIONES = [
         'correlacionar_senales y limites_del_manual una por una. Nombra en el síntoma las señales ' +
         'de las que hables si las conoces: si no nombras ninguna, se miran las cuatro que tienen ' +
         'historia. El resultado separa lo MEDIDO de lo DOCUMENTADO; la hipótesis que los junte es ' +
-        'tuya, y tienes que decir cuál es cuál.',
+        'tuya, y tienes que decir cuál es cuál. Si el síntoma es en realidad un riesgo YA activo ' +
+        'con `id` conocido —de riesgos_activos, o de una pregunta que lo cita— usa mejor ' +
+        'diagnosticar_falla: da una lista de causas ya puntuada y ordenada, cruzando también los ' +
+        'casos previos resueltos, que esta herramienta no consulta.',
       parameters: {
         type: 'object',
         properties: {
@@ -603,6 +609,37 @@ export const DEFINICIONES = [
           },
         },
         required: ['sintoma'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'diagnosticar_falla',
+      description:
+        'La causa más probable de UN riesgo YA activo, con su `id` —de riesgos_activos, de ' +
+        'estado_del_sistema, o de una pregunta que ya lo menciona—: cruza los datos que dispararon ' +
+        'el riesgo, lo que dice el manual de planta y los casos previos resueltos con el MISMO ' +
+        'síntoma, y devuelve las causas candidatas YA ORDENADAS de más a menos respaldada, cada ' +
+        'una con su banda ALTO/MEDIO/BAJO y de qué fuentes viene ese respaldo. NARRA LA LISTA EN ' +
+        'EL ORDEN EN QUE LLEGA, SIN REORDENARLA — el orden ya es la puntuación, y reordenarla por ' +
+        'tu cuenta deshace el trabajo de cruzar las tres fuentes. Cita el `origen` de cada causa ' +
+        '(de qué manual o regla sale) y di explícitamente cuándo un caso previo la respalda o la ' +
+        'descarta. Distinta de diagnostico: aquélla arma un dossier libre a partir de un síntoma ' +
+        'en prosa; ésta puntúa las causas de un riesgo concreto y ya identificado, con casos ' +
+        'previos incluidos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sistema: { type: 'string', description: 'Id del sistema. Los ids salen de sistemas_de_la_planta.' },
+          riesgoId: {
+            type: 'string',
+            description:
+              'El `id` del riesgo activo a diagnosticar, tal cual lo trae riesgos_activos o ' +
+              'estado_del_sistema — no el título en prosa.',
+          },
+        },
+        required: ['sistema', 'riesgoId'],
       },
     },
   },

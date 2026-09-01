@@ -120,6 +120,14 @@ const ESTADO_POR_HERRAMIENTA = {
   consultar_documentacion: ESTADOS.documentacion,
   limites_del_manual: ESTADOS.documentacion,
   diagnostico: ESTADOS.diagnosticando,
+  /*
+   * Plan 16 Fase 4: sin esta entrada caía en el defecto
+   * `ESTADOS.consultando` = «Consultando ICONICS…», y `diagnosticar_falla`
+   * no toca ICONICS — cruza el manual con los casos previos. Mismo estado
+   * que `diagnostico`: las dos son composiciones de varias fuentes, no una
+   * lectura sola.
+   */
+  diagnosticar_falla: ESTADOS.diagnosticando,
   controlar_bomba: ESTADOS.controlando,
 }
 

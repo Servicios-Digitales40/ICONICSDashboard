@@ -31,6 +31,8 @@ import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fast
 import { createChat } from './ia/chat.mjs'
 import { createCola } from './ia/cola.mjs'
 import { createIndiceDocumentos } from './ia/documentos.mjs'
+import { createIndiceCasos } from './ia/casos.mjs'
+import { createMotorDiagnostico } from './ia/diagnostico.mjs'
 import { createGestorManuales } from './ia/manuales.mjs'
 import { createHerramientas } from './ia/herramientas.mjs'
 import { createVoz } from './ia/voz.mjs'
@@ -187,6 +189,24 @@ export async function createApp(config) {
     ? createGestorManuales({ carpeta: config.ia.docsDir, indiceDocumentos })
     : null
 
+  // El índice de casos (Plan 16 Fase 2, Fuente #3 del diagnóstico): a
+  // diferencia de `indiceDocumentos`, no depende de ninguna carpeta
+  // configurable — lee `datos/aprendizaje.json`, que existe siempre, aunque
+  // esté vacío la primera vez—, así que se construye sin condición. Los
+  // embeddings siguen siendo opcionales: sin `IA_EMBEDDING_BASE` cae a BM25
+  // solo, igual que `indiceDocumentos`.
+  const indiceCasos = createIndiceCasos({
+    embeddingBase: config.ia.embeddingBase,
+    embeddingModelo: config.ia.embeddingModelo,
+  })
+
+  // El motor de diagnóstico (Plan 16 Fase 3): junta datos + manual + casos.
+  // Se construye siempre, aunque `indiceDocumentos` sea `null` — el respaldo
+  // del manual sale en 0 sin él, no es motivo para negar todo el
+  // diagnóstico, igual que `limites_del_manual` no le impide funcionar a
+  // `diagnostico`.
+  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos })
+
   // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
   // `controlar_bomba` escribe, y necesita la misma puerta que usa
   // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
@@ -195,6 +215,7 @@ export async function createApp(config) {
     turnos: config.ia.turnos,
     readOnly: config.iconics.readOnly,
     indiceDocumentos,
+    motorDiagnostico,
     reportes: config.reportes,
     historyConcurrencia: config.limits.historyConcurrencia,
   })

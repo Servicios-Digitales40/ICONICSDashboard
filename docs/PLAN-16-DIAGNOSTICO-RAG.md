@@ -135,9 +135,56 @@
 > ninguna herramienta todavía** — igual que `casos.mjs`, espera a la
 > herramienta `diagnosticar_falla` de la Fase 4.
 >
+> **Fase 4 completada** — herramienta `diagnosticar_falla({ sistema, riesgoId })`,
+> su propia familia (`herramientas/diagnostico/index.mjs`), envuelve
+> `motorDiagnostico.diagnosticar()` y traduce sus dos formas de "no hay nada
+> que decir" a lo que ya usan las demás herramientas: sin `motorDiagnostico`
+> montado, `fallo(...)`; un `riesgoId` que no encaja con el `sistema`, el
+> `TypeError` del motor traducido a `fallo(...)` con la pista de dónde sacar
+> el id correcto (`riesgos_activos(sistema=...)`); un riesgo `huerfano`
+> (sin causas transcritas), `ok:true` con aviso explícito de que NO hay que
+> inventar una causa para rellenar el hueco. La instrucción de no reordenar
+> —§2·1 del plan, "el código puntúa, el modelo redacta"— vive en
+> `comoRedactar`, el mismo campo que ya usan `diagnostico` y
+> `consultar_documentacion` para instrucciones de estilo que el modelo debe
+> seguir por iniciativa propia, no en `aviso` (que `chat.mjs` fuerza a
+> repetir si el modelo lo omite): no es un descargo de responsabilidad, es
+> una instrucción de redacción.
+>
+> `app.mjs` ahora construye `indiceCasos` (sin condición — a diferencia de
+> `indiceDocumentos`, no depende de ninguna carpeta configurable) y
+> `motorDiagnostico`, y los dos quedan conectados: la Fuente #3 deja de ser
+> una tubería sin salida. `agruparPorRegla()` (`herramientas.mjs`) ahora
+> expone el `id` de cada riesgo en `riesgos_activos`/`estado_del_sistema` —
+> sin él el modelo no tenía forma de pasarle un riesgo concreto a
+> `diagnosticar_falla` sin adivinarlo de un título en prosa. `chat.mjs` gana
+> una entrada en `ESTADO_POR_HERRAMIENTA`: sin ella, la barra de progreso
+> decía «Consultando ICONICS…» mientras corría una herramienta que no lo
+> toca.
+>
+> `preguntaSobreRiesgo()`/`preguntaSobreRiesgoVibracion()` —el puente
+> riesgo → asistente que ya usa el botón "Preguntar al asistente" de
+> `RiesgosEva.jsx`/`riesgoVibracion.jsx`— llevan ahora la llamada exacta a
+> `diagnosticar_falla(sistema, riesgoId)` con el `id` real del riesgo ya
+> puesto, en vez de esperar a que el modelo lo infiera de un título: mismo
+> criterio que el resto del proyecto con un modelo local pequeño, decirle
+> literalmente qué llamar en vez de confiar en que lo deduzca.
+>
+> Nuevas pruebas en `scripts/verificar-herramientas.mjs` (+6, 122/122
+> total): sin motor montado se niega, sin `sistema`/`riesgoId` se piden, un
+> `riesgoId` que no encaja no tumba la conversación, un riesgo huérfano lo
+> dice sin inventar, y las causas llegan en el orden del motor con la
+> instrucción de no reordenar. El catálogo pasa de veinte herramientas a
+> veintiuna. Sin regresiones: 136/136 vitest, 73/73
+> `verificar-backend.mjs`, 8/8 `verificar-diagnostico.mjs`, 8/8
+> `verificar-casos.mjs`, 30/30 `verificar-riesgos.mjs`, 40/40
+> `verificar-riesgos-vibracion.mjs`.
+>
 > Con esto, las tres fuentes del diagnóstico —datos en vivo, manuales, casos
-> previos— existen, están puntuadas y tienen sus pruebas. Sigue la
-> **Fase 4** (el modelo narra la lista ya ordenada, sin reordenarla).
+> previos— existen, están puntuadas, y el modelo puede por fin llamarlas y
+> narrarlas en el orden que el código decidió. Sigue la **Fase 5** (cierre de
+> caso: `POST /api/casos` desde el formulario, y `registrar_intervencion`
+> rellenando el mismo esquema).
 
 ---
 
