@@ -114,10 +114,31 @@ const DEFAULTS = {
    * audio no suba de paso el de todos los POST de la API.
    */
   maxAudioBytes: 6 * 1024 * 1024,
-  /** Carpeta de salida de los PDF de `generar_reporte` (Plan 14 Fase 5). */
-  reportesDir: join('datos', 'reportes'),
+  /**
+   * Carpeta de salida de los PDF de `generar_reporte` (Plan 14 Fase 5).
+   *
+   * Dentro de `Documentos/`, no de `datos/` (Plan 16): `datos/` es para lo que
+   * el backend necesita para sí mismo entre reinicios —caché, aprendizaje— y
+   * un reporte es lo contrario, algo que alguien pidió para llevárselo. Las
+   * dos carpetas conviven bajo `Documentos/` con la exportación de chat, que
+   * es el mismo tipo de PDF por otro camino: ver `DEFAULTS.backlogChatDir`.
+   */
+  reportesDir: join('Documentos', 'Reportes'),
   /** Antigüedad, en días, a partir de la cual un reporte se purga solo. */
   reportesMaxDias: 30,
+  /**
+   * Carpeta de salida de los PDF que exporta el botón «Exportar PDF» del
+   * chat (`POST /api/chat/exportar`).
+   *
+   * Hasta el Plan 16 compartía carpeta con `generar_reporte` —los dos
+   * escribían en `reportesDir`, distinguidos sólo por el UUID del nombre—, lo
+   * que mezclaba dos cosas de origen distinto bajo un mismo rótulo: uno es
+   * TRABAJO del asistente sobre una pregunta de datos, el otro es un REGISTRO
+   * de lo que se habló. `GET /api/reportes` sigue siendo la única ruta de
+   * descarga para los dos —ver `reportesRoutes.mjs`—, y sigue siendo seguro
+   * porque el UUID del nombre no puede repetirse entre las dos carpetas.
+   */
+  backlogChatDir: join('Documentos', 'BacklogChat'),
 }
 
 /*
@@ -294,6 +315,21 @@ function readDocsDir(rawValue) {
  */
 function readReportesDir(rawValue) {
   const relativeOrAbsolute = rawValue || DEFAULTS.reportesDir
+  return normalize(
+    isAbsolute(relativeOrAbsolute) ? relativeOrAbsolute : join(PROJECT_ROOT, relativeOrAbsolute)
+  )
+}
+
+/**
+ * Carpeta de salida de los PDF de exportación de chat. Mismo criterio que
+ * `readReportesDir` —vacío no es «desactivado», sólo cae al valor por
+ * defecto— y a propósito NO reutiliza esa función: son dos configuraciones
+ * que hoy comparten forma pero describen carpetas distintas, y una futura
+ * diferencia entre ellas (otro `maxDias`, por ejemplo) no debe obligar a
+ * separarlas retroactivamente.
+ */
+function readBacklogChatDir(rawValue) {
+  const relativeOrAbsolute = rawValue || DEFAULTS.backlogChatDir
   return normalize(
     isAbsolute(relativeOrAbsolute) ? relativeOrAbsolute : join(PROJECT_ROOT, relativeOrAbsolute)
   )
@@ -563,6 +599,17 @@ export function loadConfig(env = process.env) {
     reportes: Object.freeze({
       dir: readReportesDir(env.IA_REPORTES_DIR),
       maxDias: readInteger('IA_REPORTES_MAX_DIAS', env.IA_REPORTES_MAX_DIAS, DEFAULTS.reportesMaxDias, 1),
+    }),
+
+    /**
+     * PDF de exportación de chat (Plan 16), separado de `reportes` desde que
+     * dejaron de compartir carpeta. Sin `maxDias`: a diferencia de un reporte
+     * de datos, una conversación exportada es una decisión explícita de
+     * alguien de guardarla, y purgarla sola por antigüedad se llevaría por
+     * delante justo lo que se pidió conservar.
+     */
+    backlogChat: Object.freeze({
+      dir: readBacklogChatDir(env.IA_BACKLOG_CHAT_DIR),
     }),
 
     /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */

@@ -267,9 +267,11 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
    *
    * JSON simple, sin streaming (a diferencia de `POST /api/chat`): esto no
    * llama al modelo, sólo compone un documento con turnos que el cliente ya
-   * tiene. Mismo directorio y mismo mecanismo de descarga que los reportes
-   * de `generar_reporte` (`backend/ia/reporte.mjs`, `GET /api/reportes`):
-   * no hace falta un endpoint de descarga nuevo.
+   * tiene. Escribe en `config.backlogChat.dir` —no en `config.reportes.dir`,
+   * que es de `generar_reporte` (Plan 16 separó las dos carpetas: una es
+   * trabajo del asistente, la otra un registro de lo hablado)— pero
+   * `GET /api/reportes` sigue siendo la única ruta de descarga para las dos:
+   * no hace falta un endpoint nuevo, sólo mirar en el sitio que toque.
    */
   fastify.post(
     '/api/chat/exportar',
@@ -277,11 +279,11 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
     async (request, reply) => {
       const { historial: turnos } = request.body
 
-      if (!config.reportes?.dir) {
+      if (!config.backlogChat?.dir) {
         request.log.warn(
-          { variable: 'REPORTES_DIR' },
-          'Se pidió exportar una conversación pero REPORTES_DIR no está configurado: no hay dónde ' +
-            'escribir el PDF.'
+          { variable: 'IA_BACKLOG_CHAT_DIR' },
+          'Se pidió exportar una conversación pero IA_BACKLOG_CHAT_DIR no está configurado: no hay ' +
+            'dónde escribir el PDF.'
         )
         return reply.code(503).send({
           ok: false,
@@ -315,8 +317,8 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
       })
 
       const id = randomUUID()
-      await mkdir(config.reportes.dir, { recursive: true })
-      await writeFile(join(config.reportes.dir, `${id}.pdf`), pdf)
+      await mkdir(config.backlogChat.dir, { recursive: true })
+      await writeFile(join(config.backlogChat.dir, `${id}.pdf`), pdf)
 
       request.log.info(
         { turnos: turnos.length, id, bytes: pdf.length },

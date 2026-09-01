@@ -18,6 +18,15 @@ import { loadConfig } from '../config.mjs'
  */
 export async function montarApp(extra = {}) {
   const reportesDir = await mkdtemp(join(tmpdir(), 'iconics-test-'))
+  /*
+   * Carpeta APARTE, y no la misma `reportesDir` reutilizada — desde que Plan
+   * 16 separó `generar_reporte` (config.reportes.dir) de la exportación de
+   * chat (config.backlogChat.dir), compartir una sola carpeta en las pruebas
+   * escondería un fallo real: `GET /api/reportes` probando dos carpetas que
+   * en realidad fueran la misma no demostraría que la segunda búsqueda
+   * funciona, sólo que la primera encontró el archivo.
+   */
+  const backlogChatDir = await mkdtemp(join(tmpdir(), 'iconics-test-chat-'))
 
   const config = loadConfig({
     ICONICS_FAKE: 'true',
@@ -30,13 +39,18 @@ export async function montarApp(extra = {}) {
      */
     LOG_LEVEL: 'silent',
     STATIC_DIR: reportesDir,
-    REPORTES_DIR: reportesDir,
+    // La clave del entorno es `IA_REPORTES_DIR` —lee `config.mjs`—, no
+    // `REPORTES_DIR` a secas: con el nombre equivocado esto no hacía NADA, y
+    // las pruebas que creían tener una carpeta temporal aislada escribían
+    // sobre el `Documentos/Reportes` de verdad de quien las corriera.
+    IA_REPORTES_DIR: reportesDir,
+    IA_BACKLOG_CHAT_DIR: backlogChatDir,
     ...extra,
   })
 
   const app = await createApp(config)
   await app.ready()
-  return { app, config, reportesDir }
+  return { app, config, reportesDir, backlogChatDir }
 }
 
 /** El cuerpo JSON de una respuesta de `inject()`. */

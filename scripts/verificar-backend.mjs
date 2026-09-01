@@ -888,8 +888,13 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
 
 console.log('\n── Exportar la conversación a PDF ──────────────────────────')
 {
-  const reportesDir = await mkdtemp(join(tmpdir(), 'iconics-conversacion-pdf-'))
-  const { base: exportarBase, server } = await mount({ IA_REPORTES_DIR: reportesDir })
+  // IA_BACKLOG_CHAT_DIR, no IA_REPORTES_DIR: desde Plan 16 la exportación de
+  // chat escribe en su propia carpeta, separada de la de `generar_reporte`.
+  // Con la variable equivocada esto seguiría "funcionando" en apariencia
+  // -cae al valor por defecto de config.reportes.dir- pero escribiendo sobre
+  // el Documentos/Reportes de verdad del repo en vez de esta carpeta temporal.
+  const backlogChatDir = await mkdtemp(join(tmpdir(), 'iconics-conversacion-pdf-'))
+  const { base: exportarBase, server } = await mount({ IA_BACKLOG_CHAT_DIR: backlogChatDir })
 
   const sinHistorial = await call(exportarBase, '/api/chat/exportar', postJson({}))
   check('sin historial → 400', () => {

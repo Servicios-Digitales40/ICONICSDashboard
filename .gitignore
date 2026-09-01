@@ -2,8 +2,18 @@ node_modules/
 dist/
 build/
 
-# Reportes PDF generados por el asistente (Plan 14 Fase 5): datos, no codigo.
-Reportes/
+# PDF que este backend GENERA (Plan 14 Fase 5, Plan 16): reportes de
+# generar_reporte y exportaciones de chat, cada uno en su propia subcarpeta
+# (ver IA_REPORTES_DIR e IA_BACKLOG_CHAT_DIR en .env.example). Datos, no
+# codigo.
+Documentos/
+
+# Manuales de planta que alimentan el RAG del asistente (Plan 16), subidos
+# desde el tablero o dejados a mano (ver IA_DOCS_DIR en .env.example). No es
+# codigo de este repositorio: es documentacion de UNA instalacion concreta,
+# y puede llevar informacion que no corresponde subir a un repositorio
+# compartido.
+Documentacion/
 
 # Paquetes de release: se generan desde el codigo, no se versionan.
 # Para distribuirlos, sube el .zip como asset de un GitHub Release.
