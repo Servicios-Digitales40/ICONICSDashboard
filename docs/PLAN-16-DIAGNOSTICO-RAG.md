@@ -54,8 +54,46 @@
 > su `.env.local` real, y forzar otra ahí habría competido por el puerto o
 > escrito sobre la carpeta de documentación de verdad.
 >
-> Sigue la **Fase 2** (índice de casos, Fuente #3) — la Fuente #1 (datos) y la
-> #2 (manuales, con su UI) ya están completas.
+> **Fase 2 completada** — `backend/ia/casos.mjs` indexa `intervenciones[]` de
+> `datos/aprendizaje.json` (lo que ya rellena `registrar_intervencion` por voz
+> y chat, sin almacén nuevo) y `buscarCasosSimilares({ sistema, texto, top })`
+> las encuentra por parecido: mismo híbrido BM25 + embeddings 60/40 que los
+> manuales, y `sistema` es un parámetro **obligatorio** —ni siquiera con
+> valor por defecto `null`— para que un caso de otro sistema no pueda colarse
+> por omisión.
+>
+> De camino, se extrajeron a compartido dos piezas que `documentos.mjs` tenía
+> como propias y que `casos.mjs` necesitaba igual: el motor de embeddings
+> (`backend/ia/embeddings.mjs` — caché por hash, lotes de 16, reintento
+> uno a uno) y la puntuación BM25 (`backend/ia/bm25.mjs`). `documentos.mjs`
+> quedó ~200 líneas más corto usando las dos, sin cambiar su comportamiento
+> (10/10 en `verificar-documentos.mjs` sin tocar).
+>
+> Un caso es incremental "gratis": a diferencia de un archivo, una
+> intervención no se edita nunca —«lo que pasó, pasó»—, así que basta con su
+> `id` para saber que sigue siendo válida tal cual, sin huella de tamaño+fecha.
+> Eso destapó un bug real y ajeno a este plan: `crearIntervencion` generaba el
+> id sólo con el milisegundo, así que dos intervenciones creadas en la misma
+> prueba (o dos conversaciones a la vez) podían compartir id y la segunda
+> pisaba a la primera en el índice sin ningún error — arreglado con un sufijo
+> aleatorio en `shared/eva/aprendizaje.js`.
+>
+> Nuevo `scripts/verificar-casos.mjs` (8/8): aislamiento entre sistemas
+> aunque el texto sea idéntico, BM25 encontrando una referencia de componente
+> que un embedding de mentira no distingue, `resuelto:false` siguiendo
+> siendo encontrable, indexado incremental, caché persistente entre
+> reinicios. Sin regresiones: 343 comprobaciones en total entre las cinco
+> suites de backend afectadas.
+>
+> `casos.mjs` **no está conectado a `app.mjs` todavía** — a propósito. Sin un
+> consumidor real (la herramienta `diagnosticar_falla` de la Fase 4), cablearlo
+> sería una tubería que no lleva a ningún sitio. Se conecta cuando exista quien
+> lo llame.
+>
+> Con esto, las tres fuentes del diagnóstico —datos en vivo, manuales, casos
+> previos— existen y tienen sus pruebas. Sigue la **Fase 3** (causas
+> candidatas derivadas y puntuación) o, en paralelo, la **Fase 4** ya sabría
+> qué llamar en cuanto la Fase 3 le dé una lista que narrar.
 
 ---
 
@@ -384,15 +422,21 @@ Bloquea la UI de carga. Sin esto, subir un manual congela la indexación.
 > vez; cada ruta pone su propio `bodyLimit` (voz sigue en 6 MB, manuales en
 > los `MAX_BYTES` de siempre).
 
-### Fase 2 · El índice de casos · Fuente #3
+### Fase 2 · El índice de casos · Fuente #3 — completada
 
-- `shared/eva/casos.js`: esquema, validación y construcción del texto de
-  recuperación.
-- `backend/ia/casos.mjs`: índice vectorial con el **mismo** servidor de
-  embeddings y el mismo híbrido 0,6/0,4. Incremental por naturaleza — un caso
-  nuevo se embebe sólo él.
-- `buscarCasosSimilares({ sistema, riesgoId, texto, top })`, con filtro duro
-  por sistema.
+- `shared/eva/casos.js`: sólo `textoDeRecuperacion(intervencion)`. No define
+  un tipo nuevo — un «caso» ES una `intervencion` de `aprendizaje.js` vista
+  desde la búsqueda; el esquema ya existía desde antes de este plan.
+- `backend/ia/casos.mjs`: índice vectorial sobre `datos/aprendizaje.json`, con
+  el **mismo** servidor de embeddings y el mismo híbrido 0,6/0,4 —ahora en
+  `embeddings.mjs`/`bm25.mjs`, compartidos con `documentos.mjs`—. Incremental
+  por el `id` de la intervención, sin huella: una intervención no se edita
+  nunca.
+- `buscarCasosSimilares({ sistema, texto, top })`, con filtro duro por
+  sistema —`sistema` es obligatorio, ni `null` por defecto—. **Sin
+  `riesgoId`**: la intervención de hoy no lo guarda (`disparador.riesgoId` es
+  del `Caso` enriquecido de §4, que espera a la Fase 5); filtrar por él tendrá
+  que esperar a que exista el campo.
 
 ### Fase 3 · Causas candidatas y puntuación
 

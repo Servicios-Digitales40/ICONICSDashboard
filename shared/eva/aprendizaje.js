@@ -153,7 +153,17 @@ export function normalizarAlmacen(bruto) {
  */
 export function crearIntervencion(datos, ahora = new Date()) {
   return {
-    id: `interv-${ahora.getTime().toString(36)}`,
+    /*
+     * El sufijo aleatorio no es cosmético: sin él, dos intervenciones
+     * creadas en el MISMO milisegundo comparten id —medido, ocurre al
+     * registrar dos casos de sonda seguidos en una prueba, y nada impide
+     * que ocurra en producción con dos conversaciones a la vez—. Plan 16
+     * Fase 2 empezó a usar `id` como clave de un `Map` en `casos.mjs`: con
+     * el id repetido, la segunda intervención pisaba a la primera en
+     * silencio, sin ningún error, y esa primera desaparecía del índice de
+     * casos aunque siguiera intacta en `aprendizaje.json`.
+     */
+    id: `interv-${ahora.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     fecha: ahora.toISOString(),
     sistema: datos.sistema ?? null,
     sintoma: String(datos.sintoma),

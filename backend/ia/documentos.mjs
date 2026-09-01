@@ -30,12 +30,19 @@
  * quien pregunta suele usarlo también. Si hay `IA_EMBEDDING_BASE`, se usan
  * embeddings y BM25 pasa a ser el desempate.
  */
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
-import { join, extname, basename, dirname } from 'node:path'
+import { readFile, readdir, stat } from 'node:fs/promises'
+import { join, extname, basename } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
-import { createHash } from 'node:crypto'
 import { logger } from '../logger.mjs'
 import { EXTENSIONES_MANUAL } from '../../shared/eva/manuales.js'
+import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
+import {
+  coseno,
+  crearMotorEmbeddings,
+  guardarCacheEmbeddings,
+  hashDeTexto,
+  leerCacheEmbeddings,
+} from './embeddings.mjs'
 
 /**
  * Tamaño de fragmento, en caracteres.
@@ -91,29 +98,19 @@ export const MAX_BYTES = 40 * 1024 * 1024
  *
  * Dos mejoras, independientes entre sí:
  *
- *  1. CACHÉ PERSISTENTE, por hash del contenido del fragmento. Un fragmento
- *     que ya se embebió en un proceso anterior no vuelve a costar una llamada
- *     HTTP, sobreviva o no el backend a un reinicio.
- *  2. INDEXADO INCREMENTAL, por archivo. Un archivo cuya huella (tamaño +
- *     fecha) no cambió no se vuelve a leer ni a trocear: sus fragmentos —con
- *     sus términos de BM25 y su vector— se reutilizan tal cual.
+ *  1. CACHÉ PERSISTENTE, por hash del contenido del fragmento — el motor
+ *     genérico de `embeddings.mjs`, que desde la Fase 2 comparte con
+ *     `casos.mjs`. Un fragmento que ya se embebió en un proceso anterior no
+ *     vuelve a costar una llamada HTTP, sobreviva o no el backend a un
+ *     reinicio.
+ *  2. INDEXADO INCREMENTAL, por archivo, que sí es específico de este índice.
+ *     Un archivo cuya huella (tamaño + fecha) no cambió no se vuelve a leer
+ *     ni a trocear: sus fragmentos —con sus términos de BM25 y su vector— se
+ *     reutilizan tal cual.
  *
  * Juntas: archivo nuevo → sólo SUS fragmentos pasan por la extracción y el
  * embedding. Los demás ni se tocan.
  */
-
-/**
- * Cuántos fragmentos van en cada llamada al servidor de embeddings.
- *
- * Deliberadamente conservador. El endpoint es compatible con OpenAI y acepta
- * `input` como lista, así que un lote más grande son menos llamadas HTTP — pero
- * el contexto del modelo de embeddings es un presupuesto compartido entre
- * TODOS los textos del lote, y no hay forma de saber desde aquí cuánto le
- * queda configurado. Si un lote se pasa, la llamada falla entera y
- * `asegurarVectores` reintenta ESE lote fragmento a fragmento — más lento,
- * pero nunca pierde un vector por el tamaño del lote.
- */
-const TAMANO_LOTE = 16
 
 /**
  * Dónde vive la caché de embeddings entre reinicios del backend.
@@ -124,46 +121,13 @@ const TAMANO_LOTE = 16
  * fragmento, en el primer arranque— pero conservarla es lo que hace que un
  * `pm2 restart` no vuelva a pagar el embedding de una documentación que no
  * cambió.
+ *
+ * Archivo propio, distinto del de `casos.mjs`: comparten el motor de
+ * `embeddings.mjs`, no el archivo de caché — mezclar vectores de fragmentos
+ * de manual con vectores de intervenciones en un solo JSON no aportaría nada
+ * y complicaría inspeccionar cada caché por separado.
  */
 const RUTA_CACHE_EMBEDDINGS = join('datos', 'embeddings-cache.json')
-
-/** Huella de un fragmento, para la caché. El texto es la clave: si dos
- *  fragmentos —de archivos distintos, o de versiones distintas del mismo
- *  archivo— dicen lo mismo, comparten vector y comparten caché. */
-function hashDeFragmento(texto) {
-  return createHash('sha256').update(texto).digest('hex')
-}
-
-/**
- * Lee la caché de disco. Cualquier fallo —no existe, JSON roto— se trata como
- * caché vacía: es un acelerador, no una fuente de verdad, así que perderla
- * nunca debe impedir arrancar.
- *
- * Recibe la ruta en vez de leer `RUTA_CACHE_EMBEDDINGS` directamente para que
- * `scripts/verificar-documentos.mjs` pueda apuntar a un archivo temporal: sin
- * esto, cada corrida de las pruebas leería y escribiría sobre la caché real
- * de `datos/`, y dos pruebas sobre el mismo texto de sonda se contaminarían
- * entre sí.
- */
-async function leerCacheEmbeddings(ruta) {
-  try {
-    const bruto = JSON.parse(await readFile(ruta, 'utf8'))
-    return {
-      modelo: typeof bruto?.modelo === 'string' ? bruto.modelo : null,
-      vectores: bruto?.vectores && typeof bruto.vectores === 'object' ? bruto.vectores : {},
-    }
-  } catch {
-    return { modelo: null, vectores: {} }
-  }
-}
-
-/** Guarda la caché. Un fallo de disco se avisa y no interrumpe la indexación:
- *  los vectores ya están en memoria y la búsqueda funciona igual; sólo se
- *  perderían al reiniciar. */
-async function guardarCacheEmbeddings(ruta, cache) {
-  await mkdir(dirname(ruta), { recursive: true })
-  await writeFile(ruta, JSON.stringify(cache), 'utf8')
-}
 
 /* ── Extracción de texto ─────────────────────────────────────────────── */
 
@@ -514,87 +478,7 @@ function trocear(texto, archivo, pagina) {
   return trozos
 }
 
-/* ── Búsqueda léxica (BM25) ──────────────────────────────────────────── */
 
-/**
- * Palabras que aparecen en casi toda frase en español y no discriminan nada.
- *
- * BM25 ya las penaliza por frecuencia, pero quitarlas de la CONSULTA además
- * evita que «¿cómo se calibra el sensor de presión?» gaste su peso en «cómo» y
- * «se» cuando lo que importa es «calibra», «sensor» y «presión».
- */
-const VACIAS = new Set([
-  'a', 'al', 'algo', 'ante', 'como', 'con', 'cual', 'cuando', 'cuanto', 'de', 'del', 'desde',
-  'donde', 'dos', 'el', 'ella', 'ellos', 'en', 'entre', 'era', 'es', 'esa', 'ese', 'eso', 'esta',
-  'este', 'esto', 'ha', 'hace', 'hasta', 'hay', 'la', 'las', 'le', 'lo', 'los', 'mas', 'me', 'mi',
-  'muy', 'no', 'nos', 'o', 'para', 'pero', 'por', 'que', 'se', 'ser', 'si', 'sin', 'sobre', 'son',
-  'su', 'sus', 'te', 'tiene', 'todo', 'un', 'una', 'uno', 'y', 'ya',
-])
-
-/** Texto → lista de términos comparables: sin acentos, sin signos, sin vacías. */
-function terminos(texto) {
-  return String(texto ?? '')
-    .normalize('NFD')
-    // Escrito con escapes y no con acentos literales: son caracteres
-    // combinantes, invisibles al abrir el archivo. Mismo motivo y misma forma
-    // que en `shared/periodo.js` y en `herramientas.mjs`.
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(t => t.length >= 3 && !VACIAS.has(t))
-}
-
-/** Constantes clásicas de BM25. No hay motivo para tocarlas. */
-const BM25_K1 = 1.5
-const BM25_B = 0.75
-
-/**
- * Puntúa cada fragmento contra la consulta.
- *
- * BM25 y no un simple recuento de coincidencias porque las dos correcciones
- * que aporta importan aquí: una palabra que sale en TODOS los fragmentos
- * («presión», en un manual de un transmisor de presión) no debe puntuar, y un
- * fragmento largo no debe ganar sólo por ser largo.
- */
-function puntuarBm25(fragmentos, consulta) {
-  const q = terminos(consulta)
-  if (!q.length) return []
-
-  const N = fragmentos.length
-  const largoMedio = fragmentos.reduce((s, f) => s + f.terminos.length, 0) / N || 1
-
-  // En cuántos fragmentos aparece cada término de la consulta.
-  const df = new Map()
-  for (const t of new Set(q)) {
-    df.set(t, fragmentos.filter(f => f.frecuencias.has(t)).length)
-  }
-
-  return fragmentos.map(f => {
-    let score = 0
-    for (const t of q) {
-      const tf = f.frecuencias.get(t) ?? 0
-      if (!tf) continue
-      const n = df.get(t) ?? 0
-      const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5))
-      const norma = 1 - BM25_B + BM25_B * (f.terminos.length / largoMedio)
-      score += idf * ((tf * (BM25_K1 + 1)) / (tf + BM25_K1 * norma))
-    }
-    return { ...f, score }
-  })
-}
-
-/* ── Búsqueda semántica (opcional) ───────────────────────────────────── */
-
-function coseno(a, b) {
-  let dot = 0, na = 0, nb = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    na += a[i] * a[i]
-    nb += b[i] * b[i]
-  }
-  const denom = Math.sqrt(na) * Math.sqrt(nb)
-  return denom < 1e-9 ? 0 : dot / denom
-}
 
 /* ── El índice ───────────────────────────────────────────────────────── */
 
@@ -638,108 +522,12 @@ export function createIndiceDocumentos({
   let cacheEmbeddings = { modelo: null, vectores: {} }
   let cacheEmbeddingsCargada = false
 
-  /** Progreso del embebido en curso, para `estado()`. Vacío fuera de una
-   *  recarga que tenga fragmentos pendientes de vector. */
-  let progreso = { total: 0, hechos: 0 }
-
   const usaEmbeddings = Boolean(embeddingBase)
 
-  /** Un solo texto. Lo usa la consulta de búsqueda —siempre es una— y el
-   *  reintento fragmento a fragmento cuando un lote falla entero. */
-  async function embeberUno(texto) {
-    const respuesta = await fetch(`${embeddingBase}/v1/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: embeddingModelo, input: texto }),
-      signal: AbortSignal.timeout(30000),
-    })
-    if (!respuesta.ok) throw new Error(`El servidor de embeddings respondió ${respuesta.status}`)
-    const cuerpo = await respuesta.json()
-    return cuerpo?.data?.[0]?.embedding ?? null
-  }
-
-  /**
-   * Varios textos en una sola llamada. `TAMANO_LOTE` fragmentos cuestan una
-   * petición HTTP en vez de `TAMANO_LOTE` peticiones — la mejora que existe
-   * para que indexar un manual nuevo no se sienta como una petición por
-   * párrafo.
-   *
-   * Cada elemento de la respuesta trae su `index` de vuelta: no se puede
-   * asumir que `data[i]` responde a `textos[i]` sólo por la posición, así que
-   * se reordena contra ese índice. Si el servidor no lo manda (no todos los
-   * compatibles con OpenAI lo hacen), se cae a la posición tal cual.
-   */
-  async function embeberLote(textos) {
-    const respuesta = await fetch(`${embeddingBase}/v1/embeddings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: embeddingModelo, input: textos }),
-      signal: AbortSignal.timeout(60000),
-    })
-    if (!respuesta.ok) throw new Error(`El servidor de embeddings respondió ${respuesta.status}`)
-    const cuerpo = await respuesta.json()
-    const datos = Array.isArray(cuerpo?.data) ? cuerpo.data : []
-    return textos.map((_, i) => (datos.find(d => d.index === i) ?? datos[i])?.embedding ?? null)
-  }
-
-  /**
-   * Rellena `.vector` de cada fragmento que lo necesite, con tres niveles de
-   * ahorro antes de tocar la red:
-   *
-   *   1. Ya lo tiene en memoria (fragmento reutilizado de un archivo sin
-   *      cambios) — no cuesta nada.
-   *   2. Está en la caché de disco (mismo texto, embebido en un proceso
-   *      anterior) — no cuesta red.
-   *   3. Hay que pedirlo. Se pide POR LOTES, y si un lote falla entero se
-   *      reintenta ese lote fragmento a fragmento: un solo texto raro no debe
-   *      tirar el embedding de los otros quince que iban con él.
-   */
-  async function asegurarVectores(fragmentos, cache) {
-    const pendientes = []
-    for (const f of fragmentos) {
-      if (f.vector) continue
-      const cacheado = cache.vectores[f.hash]
-      if (cacheado) { f.vector = cacheado; continue }
-      pendientes.push(f)
-    }
-    if (!pendientes.length) return
-
-    progreso = { total: pendientes.length, hechos: 0 }
-
-    for (let i = 0; i < pendientes.length; i += TAMANO_LOTE) {
-      const lote = pendientes.slice(i, i + TAMANO_LOTE)
-      let vectores
-
-      try {
-        vectores = await embeberLote(lote.map(f => f.texto))
-      } catch (error) {
-        logger.warn('El embedding por lotes falló; se reintenta fragmento a fragmento', {
-          fragmentos: lote.length, error: error.message,
-        })
-        vectores = []
-        for (const f of lote) {
-          vectores.push(
-            await embeberUno(f.texto).catch(error2 => {
-              // Degradar y no descartar: BM25 sigue encontrando este
-              // fragmento aunque no tenga vector. Perder media documentación
-              // porque el servidor de embeddings se cayó a media carga sería
-              // peor que buscar sólo por texto en ese fragmento.
-              logger.warn('No se pudo generar el embedding de un fragmento', {
-                archivo: f.archivo, error: error2.message,
-              })
-              return null
-            })
-          )
-        }
-      }
-
-      lote.forEach((f, idx) => {
-        const v = vectores[idx]
-        if (v) { f.vector = v; cache.vectores[f.hash] = v }
-      })
-      progreso.hechos += lote.length
-    }
-  }
+  /** El motor de embeddings —llamar al servidor por lotes, con caché
+   *  persistente— es compartido con `casos.mjs` (Fase 2). Ver la cabecera de
+   *  `embeddings.mjs` para por qué se extrajo de aquí. */
+  const motor = crearMotorEmbeddings({ embeddingBase, embeddingModelo })
 
   /** Lee un archivo y devuelve sus «páginas» de texto. Un `.txt` es una sola. */
   async function leerDocumento(ruta, archivo) {
@@ -880,10 +668,8 @@ export function createIndiceDocumentos({
           // fragmentos el coste de una consulta que tiene que contestar en
           // milisegundos.
           for (const f of fragmentos) {
-            f.terminos = terminos(f.texto)
-            f.frecuencias = new Map()
-            for (const t of f.terminos) f.frecuencias.set(t, (f.frecuencias.get(t) ?? 0) + 1)
-            f.hash = hashDeFragmento(f.texto)
+            Object.assign(f, indexarTerminos(f.texto))
+            f.hash = hashDeTexto(f.texto)
           }
 
           // Un archivo sin fragmentos (ilegible, o vacío de verdad) tampoco
@@ -906,7 +692,7 @@ export function createIndiceDocumentos({
       cargado = true
 
       if (usaEmbeddings && pendientesEmbeber.length) {
-        await asegurarVectores(pendientesEmbeber, cacheEmbeddings)
+        await motor.asegurarVectores(pendientesEmbeber, cacheEmbeddings)
         await guardarCacheEmbeddings(rutaCache, cacheEmbeddings).catch(error => {
           // La caché en memoria ya está al día — sólo se pierde si el
           // proceso reinicia antes de que alguien arregle el disco.
@@ -932,7 +718,6 @@ export function createIndiceDocumentos({
       )
     })().finally(() => {
       cargando = null
-      progreso = { total: 0, hechos: 0 }
     })
 
     return cargando
@@ -984,7 +769,7 @@ export function createIndiceDocumentos({
     let puntuados = lexico.map(f => ({ ...f, score: f.score / maximo }))
 
     if (usaEmbeddings) {
-      const vectorPregunta = await embeberUno(pregunta).catch(error => {
+      const vectorPregunta = await motor.embeberUno(pregunta).catch(error => {
         logger.warn('Embedding de la pregunta falló; se busca sólo con BM25', {
           error: error.message,
         })
@@ -1035,7 +820,7 @@ export function createIndiceDocumentos({
        * parecería «cero de cero» en vez de «no aplica».
        */
       indexando: cargando !== null,
-      progreso: cargando !== null && progreso.total > 0 ? { ...progreso } : null,
+      progreso: cargando !== null ? motor.progresoActual() : null,
     }
   }
 

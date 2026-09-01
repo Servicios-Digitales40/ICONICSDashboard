@@ -38,25 +38,24 @@
  *   node scripts/revisar-propuestas.mjs rechazar prop-x "por qué"
  *   node scripts/revisar-propuestas.mjs aplicada prop-x cuando ya es código
  */
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
-import { normalizarAlmacen, pendientes, VACIO } from '../shared/eva/aprendizaje.js'
+import { pendientes } from '../shared/eva/aprendizaje.js'
+// Misma ruta y mismo lector que usan las herramientas del asistente y
+// `casos.mjs` (Plan 16) — no una copia propia. Duplicar la ruta fue lo que
+// una vez dejó al asistente guardando en un sitio y a este script mirando
+// en otro, sin un solo error por ningún lado. Ver la cabecera de
+// `backend/ia/herramientas/aprendizaje/index.mjs`.
+import { RUTA_APRENDIZAJE, leerAprendizaje } from '../backend/ia/herramientas/aprendizaje/index.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', ambar: '\x1b[33m',
   gris: '\x1b[90m', negrita: '\x1b[1m', reset: '\x1b[0m',
 }
 
-const RUTA = join('datos', 'aprendizaje.json')
-
-async function leer() {
-  try {
-    return normalizarAlmacen(JSON.parse(await readFile(RUTA, 'utf8')))
-  } catch {
-    return { ...VACIO, hechos: [], propuestas: [] }
-  }
-}
+const RUTA = RUTA_APRENDIZAJE
+const leer = leerAprendizaje
 
 async function guardar(almacen) {
   await mkdir(dirname(RUTA), { recursive: true })

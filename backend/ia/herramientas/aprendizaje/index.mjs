@@ -41,32 +41,37 @@ import {
 import { fallo } from '../lib/respuesta.mjs'
 
 /**
- * Las tres herramientas de aprendizaje.
- *
- * No recibe nada a propósito: ver la cabecera. Devuelve el mismo objeto
- * `{ nombre: fn }` que el ensamblador mezcla con el de las demás familias.
- */
-export function crearHerramientasDeAprendizaje() {
-
-/**
  * ── EL ALMACÉN DE LO APRENDIDO ────────────────────────────────────
  *
  * Un JSON en `datos/`, al lado de los reportes. Se lee entero en cada
  * llamada y no se cachea: son unos kilobytes, y una caché aquí haría que dos
  * conversaciones simultáneas se pisaran los hechos que acaban de guardar.
+ *
+ * A NIVEL DE MÓDULO y exportada —no dentro de `crearHerramientasDeAprendizaje`
+ * como antes— porque desde Plan 16 hay una TERCERA punta que necesita leer
+ * este archivo: `backend/ia/casos.mjs`, el índice de la Fuente #3 del
+ * diagnóstico. Con la constante escondida dentro de una función, la única
+ * forma de que `casos.mjs` supiera dónde está el archivo habría sido
+ * escribir la ruta una vez más — que es EXACTAMENTE el fallo que el
+ * comentario de abajo ya describe haber costado una vez.
  */
 /*
  * Ruta FIJA, no derivada de la de reportes. Derivarla con un `..` dependía de
  * si `reportesDir` venía como `datos` o como `datos/reportes`, y el archivo
  * acabó en la raíz del repositorio mientras `revisar-propuestas.mjs` lo
  * buscaba en `datos/`: el asistente guardaba y el revisor no veía nada, sin
- * un solo error por ningún lado. Las dos puntas usan esta misma constante.
+ * un solo error por ningún lado. Todas las puntas usan esta misma constante.
  */
-const RUTA_APRENDIZAJE = join('datos', 'aprendizaje.json')
+export const RUTA_APRENDIZAJE = join('datos', 'aprendizaje.json')
 
-async function leerAprendizaje() {
+/**
+ * `ruta` es opcional —por defecto `RUTA_APRENDIZAJE`— para que
+ * `backend/ia/casos.mjs` y sus pruebas puedan apuntar a un almacén propio sin
+ * tocar el de verdad, mismo criterio que `rutaCache` en `documentos.mjs`.
+ */
+export async function leerAprendizaje(ruta = RUTA_APRENDIZAJE) {
   try {
-    return normalizarAlmacen(JSON.parse(await readFile(RUTA_APRENDIZAJE, 'utf8')))
+    return normalizarAlmacen(JSON.parse(await readFile(ruta, 'utf8')))
   } catch {
     /* Que no exista es lo normal la primera vez, y un archivo corrupto no
        puede tumbar el asistente entero: se parte de vacío y los hechos de
@@ -85,6 +90,13 @@ async function guardarAprendizaje(almacen) {
   }
 }
 
+/**
+ * Las tres herramientas de aprendizaje.
+ *
+ * No recibe nada a propósito: ver la cabecera. Devuelve el mismo objeto
+ * `{ nombre: fn }` que el ensamblador mezcla con el de las demás familias.
+ */
+export function crearHerramientasDeAprendizaje() {
   return {
     /**
      * ── LO QUE YA SE SABE DE ESTA PLANTA ──────────────────────────────
