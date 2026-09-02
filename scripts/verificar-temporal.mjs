@@ -230,6 +230,49 @@ await check('dos señales que coinciden: puntos=2, dos entradas en evidenciaAFav
   assert.equal(r.evidenciaAFavor.length, 2)
 })
 
+console.log('\n── Una ventana que arranca en cero se calla (F7c) ────────────')
+
+await check('un arranque desde ~0 no es una tendencia con confianza infinita', async () => {
+  /*
+   * Medido contra ICONICS real el 02-09-2026: el caudal instantáneo daba
+   * cambios relativos de hasta 2,2 MILLONES en ventanas de 1 h, porque el
+   * cambio relativo divide por el valor de partida y con la bomba parada
+   * ese valor es ~0. Hoy no muerde —la única firma declarada es sobre
+   * temperatura, que nunca parte de cero— pero el día que alguien declare
+   * una sobre caudal, CADA arranque de bomba sería una tendencia con la
+   * máxima confianza posible. La salida correcta es el silencio.
+   */
+  const historia = historiaFalsa({
+    caudalDesdeParada: { datos: serieLineal(0.000001, 18, 1) },
+  })
+  const evaluador = createEvaluadorTemporal({ historia })
+
+  const r = await evaluador.evaluar(
+    [{ senal: 'caudalDesdeParada', direccion: 'sube', ventanaH: 1 }],
+    'tanque'
+  )
+
+  assert.equal(r.puntos, 0, 'un arranque desde cero se contó como tendencia')
+  assert.deepEqual(r.evidenciaAFavor, [], 'no debería haber evidencia a favor')
+})
+
+await check('una señal que arranca en un valor normal sigue midiéndose igual', async () => {
+  // El guardián no puede apagar el término entero: la misma subida, desde
+  // una base razonable, tiene que seguir contando.
+  const historia = historiaFalsa({
+    caudalConBase: { datos: serieLineal(10, 18, 1) },
+  })
+  const evaluador = createEvaluadorTemporal({ historia })
+
+  const r = await evaluador.evaluar(
+    [{ senal: 'caudalConBase', direccion: 'sube', ventanaH: 1 }],
+    'tanque'
+  )
+
+  assert.equal(r.puntos, 1, 'el guardián apagó una tendencia legítima')
+})
+
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {

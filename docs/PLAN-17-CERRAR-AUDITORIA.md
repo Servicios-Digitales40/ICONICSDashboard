@@ -743,7 +743,7 @@ qué necesita cada una están en §10.
 
 | # | Entrega | Por qué espera |
 |---|---|---|
-| 11 | **F7c** · umbrales de las firmas temporales | La física del simulador sirve para escribir el módulo, no para fijar una pendiente |
+| 11 | **F7c** · umbrales de las firmas temporales | **Hecha el 02-09-2026.** ICONICS sí respondía: lo que fallaba era correr el verificador sin `--env-file`, y un `curl` sin `-k` contra un certificado autofirmado. Medidas 36 ventanas de 1 h reales: `UMBRAL_CAMBIO_RELATIVO` 0,05 **se queda**, ahora corroborado (~4x sobre el ruido de temperatura, p50 0,0094 · max 0,0131). Dos hallazgos de la medición: 27 de 36 ventanas no llegan a 3 puntos —el término sólo opina del pasado inmediato— y una ventana que arranca en ~0 daba cambios relativos de 2,2 millones; se añadió `BASE_MINIMA_RELATIVA` |
 | 12 | **Comprobación de narración** | Que el modelo obedezca la instrucción de conflicto de F4 exige llama-server. Es lo único que necesita el servidor IA en todo el plan |
 
 **Sin dependencias humanas.** Ninguna fase espera a que nadie declare nada:

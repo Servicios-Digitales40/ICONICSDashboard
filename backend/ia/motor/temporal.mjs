@@ -47,13 +47,58 @@ const PUNTOS_MINIMOS = 3
 
 /**
  * Cambio mínimo, como fracción del valor de PARTIDA de la ventana, para
- * contar como tendencia real y no como ruido de sensor. PROVISIONAL: 0,05
- * (5 %) es una suposición razonada —el mismo criterio de honestidad que
- * `UMBRAL_BM25_*`—, no una medida contra ruido real de estos sensores en
- * concreto. Se recalibra cuando haya series reales largas que mirar (F7c
- * del plan, cuando haya ICONICS real).
+ * contar como tendencia real y no como ruido de sensor.
+ *
+ * ── MEDIDO CONTRA ICONICS REAL (02-09-2026), F7c ────────────────────
+ *
+ * 36 ventanas de 1 h —la que declara la única `firmaTemporal` de
+ * `causas.js`— leídas como las lee este módulo, no agregadas: resolución
+ * real de 15 min, 4 puntos por ventana.
+ *
+ *   temperaturaTanque  n=9  p50 0,0094 · p75 0,0115 · p90 0,0131 · max 0,0131
+ *   nivelTanque        n=9  p50 0,0145 · p75 0,0203 · p90 0,0451 · max 0,0451
+ *   tensionLinea       n=9  p50 0,0199 · p75 0,0310 · p90 0,0712 · max 0,0712
+ *
+ * 0,05 **se queda**, y ahora por una razón medida: está ~4x por encima del
+ * ruido de `temperaturaTanque` en operación tranquila, y por encima de
+ * TODAS las ventanas observadas, así que el ruido no lo cruza. Deja de ser
+ * una suposición y pasa a estar corroborado — pero no se declara cerrado:
+ * n=9 de un solo tramo tranquilo dice que no habrá falsos positivos, no
+ * dice que no se pierda una tendencia real lenta. Para eso hace falta ver
+ * un episodio de verdad.
+ *
+ * Un dato operativo que salió de la misma medida: **27 de las 36 ventanas
+ * no llegaban a `PUNTOS_MINIMOS`**. El historiador sólo guarda densidad de
+ * 15 min en las horas recientes; más atrás, una ventana de 1 h no junta
+ * tres puntos y `tendenciaDe` devuelve `null`. Es el comportamiento
+ * correcto —silencio, no una dirección inventada— pero significa que el
+ * cuarto término sólo opina sobre el pasado inmediato.
  */
 const UMBRAL_CAMBIO_RELATIVO = 0.05
+
+/**
+ * Cuán pequeño puede ser el valor de PARTIDA, frente al mayor de la
+ * ventana, antes de que el cambio relativo deje de significar nada.
+ *
+ * ── POR QUÉ EXISTE: MEDIDO, NO IMAGINADO ────────────────────────────
+ *
+ * `cambioRelativo` divide por el valor inicial. Si ese valor es ~0 —una
+ * bomba parada, un caudal en reposo— la división explota: medido contra
+ * ICONICS real el 02-09-2026, `flujoInstantaneo` dio cambios relativos de
+ * hasta **2,2 millones** en ventanas de 1 h. El `Math.max(..., 1e-6)` de
+ * abajo evita el infinito, no el disparate.
+ *
+ * Hoy no muerde: la única `firmaTemporal` declarada es sobre
+ * `temperaturaTanque`, que nunca parte de cero. Muerde el día que alguien
+ * declare una sobre caudal o presión — y entonces CADA arranque de bomba
+ * sería una «tendencia» con la máxima confianza posible, que es el peor
+ * falso positivo imaginable para este término.
+ *
+ * La salida correcta es el silencio, no un número enorme: si la ventana
+ * arranca prácticamente en cero, no hay una fracción del inicio que
+ * signifique algo, y este módulo ya sabe decir «sin tendencia clara».
+ */
+const BASE_MINIMA_RELATIVA = 0.01
 
 const TOPE_PUNTOS = 2
 
@@ -94,7 +139,17 @@ function tendenciaDe(datos) {
 
   const horas = (datos[datos.length - 1].t.getTime() - datos[0].t.getTime()) / 3600000
   const cambioTotal = m * horas
-  const base = Math.max(Math.abs(datos[0].valor), 1e-6)
+
+  /*
+   * Una ventana que arranca prácticamente en cero no tiene un «inicio»
+   * contra el que medir una fracción — ver `BASE_MINIMA_RELATIVA`. Se calla
+   * en vez de devolver un cambio relativo astronómico.
+   */
+  const mayor = Math.max(...datos.map(d => Math.abs(d.valor)))
+  const base = Math.abs(datos[0].valor)
+  if (mayor > 0 && base < mayor * BASE_MINIMA_RELATIVA) return null
+  if (base === 0) return null
+
   const cambioRelativo = cambioTotal / base
 
   if (Math.abs(cambioRelativo) < UMBRAL_CAMBIO_RELATIVO) return null

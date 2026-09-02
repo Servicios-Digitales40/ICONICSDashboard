@@ -238,9 +238,16 @@ node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve 
 ```bash
 node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad de la última muestra
 ```
-> Fuera de la red de planta falla siempre, con un timeout contra `bms-server`.
-> Eso **no** es una regresión: estaba listado junto a los que sí corren sin
-> red, y confundirlo con un verificador roto cuesta media hora.
+> **Sin `--env-file` falla siempre**, con «Falta ICONICS_API_BASE en
+> .env.local». Es la causa habitual de verlo en rojo dentro de una tanda de
+> `verificar-*`, y no es una regresión — estaba listado junto a los que sí
+> corren sin red. Con `--env-file` y red a planta pasa: medido el
+> 02-09-2026, historia contigua desde el 18-08.
+>
+> Ojo al diagnosticarlo desde fuera: `bms-server` usa **certificado
+> autofirmado**, así que un `curl` sin `-k` devuelve 000 y parece que no hay
+> servidor. Lo hay. Node lo acepta por `NODE_TLS_REJECT_UNAUTHORIZED=0` en
+> `.env.local` — que por eso mismo no arranca con `NODE_ENV=production`.
 
 **Instrumento de medida** (necesita el servidor de embeddings, `:8081` — no
 ICONICS):
