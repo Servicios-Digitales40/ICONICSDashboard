@@ -4,7 +4,7 @@
  *
  * ── POR QUÉ HACE FALTA UN RELOJ, Y NO BASTA CON EL SONDEO ────────────
  *
- * `frescuraDe()` (`data/estadoDelDato.js`) necesita saber cuánto tiempo ha
+ * `frescuraDe()` (`data/comunes/estadoDelDato.js`) necesita saber cuánto tiempo ha
  * pasado desde la última lectura, y eso puede cambiar SIN que llegue ninguna
  * lectura nueva — es exactamente el caso que le importa: el puente se cae y
  * ningún ciclo de sondeo vuelve a disparar un repintado. Sin un reloj propio,

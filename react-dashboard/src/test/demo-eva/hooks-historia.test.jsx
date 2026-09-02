@@ -23,9 +23,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import { useSeriesHistoricas } from "@/Demo-EVA/data/hooks.js";
-import { rangoAyer, rangoSemana } from "@/Demo-EVA/data/historia.js";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
+import { useSeriesHistoricas } from "@/Demo-EVA/data/comunes/hooks.js";
+import { rangoAyer, rangoSemana } from "@/Demo-EVA/data/tanque/historia.js";
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");

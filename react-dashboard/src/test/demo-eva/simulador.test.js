@@ -30,8 +30,8 @@ import {
   enMarcha,
   mediaDelTramo,
   valorEn,
-} from "@/Demo-EVA/data/simulador.js";
-import { SIN_SERIE } from "@/Demo-EVA/data/historia.js";
+} from "@/Demo-EVA/data/tanque/simulador.js";
+import { SIN_SERIE } from "@/Demo-EVA/data/tanque/historia.js";
 import {
   SENALES,
   SENAL_KEYS,

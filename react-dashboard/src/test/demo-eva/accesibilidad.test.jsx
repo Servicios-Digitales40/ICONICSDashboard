@@ -32,7 +32,7 @@ import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { auditarAccesibilidad } from "../a11y.js";
 
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import InicioTanque from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
 import PlantaTanque from "@/Demo-EVA/views/tanque/PlantaTanque.jsx";
 import AssetsEva from "@/Demo-EVA/views/comunes/AssetsEva.jsx";

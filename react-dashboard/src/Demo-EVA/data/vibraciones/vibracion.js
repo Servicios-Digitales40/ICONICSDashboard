@@ -46,9 +46,9 @@ import { isGoodQuality } from "@shared/quality.js";
 
 import { createSistemaVibraciones } from "@shared/eva/sistemaVibraciones.js";
 
-import { transporteDe } from "./transportes.js";
+import { transporteDe } from "../comunes/transportes.js";
 
-import { todosLosPuntos } from "../domain/vibraciones.js";
+import { todosLosPuntos } from "../../domain/vibraciones.js";
 
 /** Cada cuánto se relee. El SM 1281 publica cada pocos segundos. */
 const CADENCIA_MS = 5000;

@@ -44,7 +44,7 @@ import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
 import { TarjetaRiesgo } from "../../components/riesgoVibracion.jsx";
-import { useVibracion } from "../../data/vibracion.js";
+import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 function RiesgosVibracion({ onNavigate }) {

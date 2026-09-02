@@ -85,7 +85,7 @@ describe("StatSenal (BandaSenales): la cifra se sustituye por su edad al congela
   });
 });
 
-/** La forma que `useDetalleActivo` añade sobre la señal base (`data/detalleActivo.js`). */
+/** La forma que `useDetalleActivo` añade sobre la señal base (`data/tanque/detalleActivo.js`). */
 const variableDe = (senal) => ({
   ...senal, historiaReal: [], historiaCargando: false, historiaEnVivo: true, bufferVivo: [], deltaBuffer: null,
 });

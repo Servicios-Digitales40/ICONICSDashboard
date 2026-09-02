@@ -23,7 +23,7 @@
  * sólo interpreta lo que ya existe.
  *
  * `motivo` y `error` son los que ya devuelve `useSerieHistorica()` /
- * `useSeriesHistoricas()` (`data/hooks.js`): `motivo` cuando la señal no
+ * `useSeriesHistoricas()` (`data/comunes/hooks.js`): `motivo` cuando la señal no
  * tiene serie propia (`SIN_SERIE` de `shared/eva/historia.js`), `error`
  * cuando falló la petición. `estadoHistorial()` sólo les pone nombre.
  */

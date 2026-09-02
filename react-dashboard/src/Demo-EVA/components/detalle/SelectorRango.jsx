@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Radio } from "lucide-react";
 
 import { MONO } from "../base.jsx";
-import { useEvaSource } from "../../data/EvaProvider.jsx";
+import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
 
 /**
  * `vivo` no lleva calculadora de rango: no le pide nada al historiador, así

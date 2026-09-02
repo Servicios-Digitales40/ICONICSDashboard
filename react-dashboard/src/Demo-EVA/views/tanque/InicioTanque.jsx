@@ -61,7 +61,7 @@ import { ArrowRight, Boxes, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../../data/hooks.js";
+import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { useEnVista } from "@/lib/motion.js";
 import { Cifra, MONO, SANS, Spark, UltimaLectura } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";

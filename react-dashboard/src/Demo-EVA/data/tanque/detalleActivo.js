@@ -18,10 +18,10 @@
  */
 import { useMemo } from "react";
 
-import { useSeriesHistoricas, useSistemaAgua } from "./hooks.js";
-import { useEvaSource } from "./EvaProvider.jsx";
+import { useSeriesHistoricas, useSistemaAgua } from "../comunes/hooks.js";
+import { useEvaSource } from "../comunes/EvaProvider.jsx";
 import { VENTANA } from "./historia.js";
-import { delta } from "../lib/modelo.js";
+import { delta } from "../../lib/modelo.js";
 
 /** Muestras vivas que se pintan en «Tiempo real»: a 3 s por ciclo, ~5 min. */
 const PUNTOS_VIVO = 100;

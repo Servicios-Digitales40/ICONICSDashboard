@@ -30,7 +30,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import RiesgosTanque from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
 import RiesgosVibracion from "@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx";
 

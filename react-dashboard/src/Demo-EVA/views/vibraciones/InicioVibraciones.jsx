@@ -41,7 +41,7 @@ import { useEnVista } from "@/lib/motion.js";
 
 import { Cifra, MONO, SANS, UltimaLectura } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
-import { useVibracion } from "../../data/vibracion.js";
+import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
 

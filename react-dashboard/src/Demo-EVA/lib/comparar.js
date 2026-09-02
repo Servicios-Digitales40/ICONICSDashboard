@@ -2,7 +2,7 @@
  * Cruzar varias señales históricas en una sola rejilla de filas, para
  * dibujarlas sobre el mismo eje X.
  *
- * ── POR QUÉ NO BASTA `unir()` DE `data/hooks.js` ─────────────────────
+ * ── POR QUÉ NO BASTA `unir()` DE `data/comunes/hooks.js` ─────────────────────
  *
  * `unir()` agrupa por marca de tiempo EXACTA (mismo milisegundo). Funciona
  * porque el simulador calcula el cierre de cada tramo a partir del RANGO,

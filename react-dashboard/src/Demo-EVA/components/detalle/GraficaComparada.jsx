@@ -26,7 +26,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 
 import { Card, MONO, PuntoEstado } from "../base.jsx";
 import { TooltipHistoria } from "./piezas.jsx";
-import { useSeriesHistoricas } from "../../data/hooks.js";
+import { useSeriesHistoricas } from "../../data/comunes/hooks.js";
 import { SENALES, historizadas } from "../../domain/senales.js";
 import { combinarPorTolerancia, normalizarAEscala } from "../../lib/comparar.js";
 

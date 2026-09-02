@@ -4,7 +4,7 @@
  * ------------------------------------------------------------------
  * Plan 13, Fase 9: el hook detrás del badge del Topbar. Sólo el número —el
  * filtrado por activo y la etiqueta de cada evento son de
- * `Demo-EVA/data/alarmas.js`, ya cubierto en `alarmas.test.js`.
+ * `Demo-EVA/data/comunes/alarmas.js`, ya cubierto en `alarmas.test.js`.
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";

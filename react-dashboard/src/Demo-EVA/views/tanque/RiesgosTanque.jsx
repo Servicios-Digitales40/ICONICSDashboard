@@ -37,8 +37,8 @@ import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { pedirAlAsistente } from "@/features/asistente";
 import { useTheme } from "@/theme";
 
-import { useSeriesHistoricas, useSistemaAgua } from "../../data/hooks.js";
-import { MAX_PUNTOS } from "../../data/historia.js";
+import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
+import { MAX_PUNTOS } from "../../data/tanque/historia.js";
 import { evaluarPronostico, preguntaSobrePronostico } from "../../domain/pronostico.js";
 import { evaluarRiesgos, preguntaSobreRiesgo } from "../../domain/riesgos.js";
 import { PROVISIONALES } from "../../domain/umbrales.js";
@@ -350,7 +350,7 @@ function RiesgosTanque({ onNavigate }) {
    * ── POR QUÉ NO SE PIDE SOLO AL ENTRAR ──────────────────────────────
    *
    * Porque cuesta, y quien abre «Riesgos» no ha pedido esto. El troceado del
-   * historiador vive en el navegador (`data/historia.js`), así que cada tramo
+   * historiador vive en el navegador (`data/tanque/historia.js`), así que cada tramo
    * es una petición a /api: cinco señales por diez tramos son CINCUENTA para
    * una ventana de 30 días, contra las cuatro que gasta «Planta» entera. Con
    * el límite del puente en 300/min, un par de cambios de período y una

@@ -2,7 +2,7 @@
  * Cuántos eventos hay en la última hora, para el contador del Topbar.
  *
  * Deliberadamente delgado: sólo el número, sin el punto ni el mensaje de cada
- * evento — eso es dominio de Demo EVA (`Demo-EVA/data/alarmas.js`) y el Topbar
+ * evento — eso es dominio de Demo EVA (`Demo-EVA/data/comunes/alarmas.js`) y el Topbar
  * vive por fuera de cualquier sección, así que no puede depender de un
  * catálogo de puntos concreto.
  *

@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * `conConcurrenciaAcotada` (Plan 15 Fase 3): el tope de tramos simultáneos
  * que comparten `backend/ia/conversacion/herramientas.mjs` (`leerSerieEnRango`) y
- * `Demo-EVA/data/historia.js` (lectura por tramos de `leerSerie`).
+ * `Demo-EVA/data/tanque/historia.js` (lectura por tramos de `leerSerie`).
  *
  * Antes de esta función, un rango largo lanzaba TODOS sus tramos a la vez
  * con `Promise.all` — un trimestre son ~90 peticiones simultáneas contra el

@@ -21,8 +21,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { createEvaSource } from "@/Demo-EVA/data/evaSource.js";
-import { SIN_SERIE } from "@/Demo-EVA/data/historia.js";
+import { createEvaSource } from "@/Demo-EVA/data/comunes/evaSource.js";
+import { SIN_SERIE } from "@/Demo-EVA/data/tanque/historia.js";
 import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "@/Demo-EVA/domain/senales.js";
 import { createBufferRodante } from "@/Demo-EVA/lib/buffer.js";
 import { createSistema } from "@/Demo-EVA/domain/sistema.js";
@@ -186,7 +186,7 @@ describe("quién lee el pasado lo decide la fuente", () => {
 
   it("sin `readSerie` cae en el lector del historiador, que respeta `historizado`", async () => {
     // El transporte real no trae serie: el histórico de este árbol no se pide
-    // como el de Resonac y vive en `data/historia.js`. Se comprueba con una
+    // como el de Resonac y vive en `data/tanque/historia.js`. Se comprueba con una
     // señal NO historizada, que se rechaza por catálogo antes de tocar la red.
     const source = createEvaSource({ transport: transporteFalso(EN_MARCHA), intervalMs: 60_000 });
 

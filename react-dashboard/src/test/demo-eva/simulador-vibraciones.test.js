@@ -33,7 +33,7 @@ import {
   createTransporteVibracion,
   enMarchaVib,
   valorVibracionEn,
-} from "@/Demo-EVA/data/simuladorVibracion.js";
+} from "@/Demo-EVA/data/vibraciones/simuladorVibracion.js";
 import {
   CALIDADES,
   CANALES,

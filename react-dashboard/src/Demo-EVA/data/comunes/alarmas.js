@@ -18,7 +18,7 @@
  * VACÍA en silencio, que es peor que enseñarla sin filtrar.
  */
 import { fetchIconicsAlarms } from "@/lib/iconics";
-import { SENALES, SENAL_KEYS, pointName } from "../domain/senales.js";
+import { SENALES, SENAL_KEYS, pointName } from "../../domain/senales.js";
 
 /** Nombres de campo que ICONICS podría usar para el punto de origen del evento. */
 const CAMPOS_PUNTO = ["pointName", "PointName", "tag", "Tag", "point", "Point"];

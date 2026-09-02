@@ -17,7 +17,7 @@ import {
   estadoHistorial,
   frescuraDe,
   presentarValor,
-} from "@/Demo-EVA/data/estadoDelDato.js";
+} from "@/Demo-EVA/data/comunes/estadoDelDato.js";
 
 describe("frescuraDe: el valor en vivo", () => {
   const ahora = new Date("2026-08-21T12:00:00Z");

@@ -34,7 +34,7 @@ export { useIconicsPoint } from "./useIconicsPoint.js";
 /**
  * Sólo el conteo de eventos de la última hora, para el badge del Topbar. Ver
  * la cabecera de `useAlarmCount.js` para por qué no vive junto al resto del
- * dominio de alarmas (`Demo-EVA/data/alarmas.js`).
+ * dominio de alarmas (`Demo-EVA/data/comunes/alarmas.js`).
  */
 export { useAlarmCount } from "./useAlarmCount.js";
 

@@ -17,7 +17,7 @@
  *
  * ── DE DÓNDE SALE ──────────────────────────────────────────────────
  *
- * De dos copias. `Demo-EVA/data/simulador.js` y `data/simuladorVibracion.js`
+ * De dos copias. `Demo-EVA/data/tanque/simulador.js` y `data/vibraciones/simuladorVibracion.js`
  * tenían el mismo cuerpo con una línea distinta: cómo se pedía el valor. Con
  * dos máquinas eso era tolerable; con la tercera, el patrón que ya ha fallado
  * dos veces en este proyecto —un simulador que sólo conoce un árbol— vuelve a

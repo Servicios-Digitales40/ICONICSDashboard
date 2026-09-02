@@ -50,8 +50,8 @@ import { useTheme } from "@/theme";
 import { SISTEMA } from "@shared/eva/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
-import { useSistemaAgua } from "../../data/hooks.js";
-import { useVibracion } from "../../data/vibracion.js";
+import { useSistemaAgua } from "../../data/comunes/hooks.js";
+import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgos, REGLAS as REGLAS_TANQUE } from "../../domain/riesgos.js";
 import { evaluarRiesgosVibracion, REGLAS as REGLAS_VIBRACION } from "../../domain/riesgosVibracion.js";
 

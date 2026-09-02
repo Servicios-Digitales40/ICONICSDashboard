@@ -2,7 +2,7 @@
  * Frontera con la red: el servidor real.
  *
  * Aquí queda solo lo que toca la red o el entorno del navegador. Quién elige
- * entre este transporte y el simulado es `Demo-EVA/data/EvaProvider.jsx`, que
+ * entre este transporte y el simulado es `Demo-EVA/data/comunes/EvaProvider.jsx`, que
  * es donde vive la sección con datos; este archivo se limita a decir con qué
  * transporte ARRANCA el build (`VITE_ICONICS_FAKE`) y a construir el real.
  *
@@ -10,7 +10,7 @@
  *
  * `readHistory`, `readDay` y `readDailyOee` leían las series del OEE de una
  * máquina de Resonac, y se fueron con esa sección. La historia de Demo EVA la
- * pide `Demo-EVA/data/historia.js` a `fetchIconicsHistory` directamente,
+ * pide `Demo-EVA/data/tanque/historia.js` a `fetchIconicsHistory` directamente,
  * porque sus señales son puntos sueltos y no un juego de tags por máquina.
  *
  * También se fue `createFakeTransport`, el simulador de Resonac. Los grados de

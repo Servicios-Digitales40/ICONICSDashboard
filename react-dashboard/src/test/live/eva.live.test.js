@@ -38,9 +38,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createRealTransport } from "@/lib/iconics/transport.js";
-import { createEvaSource } from "@/Demo-EVA/data/evaSource.js";
+import { createEvaSource } from "@/Demo-EVA/data/comunes/evaSource.js";
 import { SENAL_KEYS, esHistorizada, historizadas, pointName } from "@/Demo-EVA/domain/senales.js";
-import { leerSerie } from "@/Demo-EVA/data/historia.js";
+import { leerSerie } from "@/Demo-EVA/data/tanque/historia.js";
 
 const ESPERA_MS = 20000;
 const vivo = process.env.LIVE === "1";

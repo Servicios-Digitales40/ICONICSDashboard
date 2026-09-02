@@ -9,7 +9,7 @@ import { useTheme } from "@/theme";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { NAV } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/index.js";
-import { useSistemaAgua } from "@/Demo-EVA/data/hooks.js";
+import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
 import { estadoColor } from "@/Demo-EVA/components/paleta.js";
 import { RAIZ } from "@shared/eva/senales.js";
 

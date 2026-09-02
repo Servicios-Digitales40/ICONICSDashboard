@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import CierreDiagnostico from "@/Demo-EVA/views/comunes/CierreDiagnostico.jsx";
 
 const DIAGNOSTICO_RESPUESTA = {

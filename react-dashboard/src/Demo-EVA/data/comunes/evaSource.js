@@ -27,10 +27,10 @@
  */
 import { createPollingEngine } from "@/lib/iconics";
 
-import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "../domain/senales.js";
-import { createSistema } from "../domain/sistema.js";
-import { createBufferRodante } from "../lib/buffer.js";
-import { leerSerie as leerDelHistoriador, leerSeries as leerVariasDelHistoriador } from "./historia.js";
+import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "../../domain/senales.js";
+import { createSistema } from "../../domain/sistema.js";
+import { createBufferRodante } from "../../lib/buffer.js";
+import { leerSerie as leerDelHistoriador, leerSeries as leerVariasDelHistoriador } from "../tanque/historia.js";
 
 export const CADENCIA_MS = 3_000;
 

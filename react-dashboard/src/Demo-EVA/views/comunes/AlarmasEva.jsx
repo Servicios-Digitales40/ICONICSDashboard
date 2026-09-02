@@ -1,6 +1,6 @@
 /**
  * Vista «Alarmas» — el HISTORIAL de eventos de la instalación, no un
- * semáforo de alarmas activas. Ver la cabecera de `data/alarmas.js` para
+ * semáforo de alarmas activas. Ver la cabecera de `data/comunes/alarmas.js` para
  * por qué esa distinción no es un matiz: prometer un semáforo en vivo con
  * un historial detrás sería el tipo de mentira que este tablero evita en
  * todo lo demás.
@@ -18,8 +18,8 @@ import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { fetchHealth, acknowledgeIconicsAlarms } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 
-import { estadoHistorial, HISTORIAL } from "../../data/estadoDelDato.js";
-import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../../data/alarmas.js";
+import { estadoHistorial, HISTORIAL } from "../../data/comunes/estadoDelDato.js";
+import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../../data/comunes/alarmas.js";
 import { ACTIVOS, ACTIVO_IDS } from "../../domain/activos.js";
 import { MONO } from "../../components/base.jsx";
 

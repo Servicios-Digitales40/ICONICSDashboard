@@ -24,7 +24,7 @@
  *
  * ── ESTE ES EL LECTOR REAL, Y HAY OTRO ─────────────────────────────
  *
- * Con el origen «Simulado» la serie no sale de aquí sino de `data/simulador.js`,
+ * Con el origen «Simulado» la serie no sale de aquí sino de `data/tanque/simulador.js`,
  * que trae su propio `readSerie`. Quién de los dos lee lo decide `evaSource.js`
  * a partir del transporte, y nadie más: las vistas piden `source.leerSerie()` sin
  * saber cuál está detrás.
@@ -46,7 +46,7 @@ import {
 } from "@shared/eva/historia.js";
 import { planificar } from "@shared/eva/rango.js";
 
-import { esHistorizada, pointName, senalInfo } from "../domain/senales.js";
+import { esHistorizada, pointName, senalInfo } from "../../domain/senales.js";
 
 export { MAX_PUNTOS, SIN_SERIE, VENTANA, intervaloHMS, normalizar };
 

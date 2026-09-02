@@ -21,9 +21,9 @@ import { FileSpreadsheet } from "lucide-react";
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useEvaSource } from "../../data/EvaProvider.jsx";
-import { useDetalleActivo } from "../../data/detalleActivo.js";
-import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/historia.js";
+import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
+import { useDetalleActivo } from "../../data/tanque/detalleActivo.js";
+import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/tanque/historia.js";
 import { ACTIVO_IDS, activoInfo } from "../../domain/activos.js";
 import { estadoInfo } from "../../domain/estado.js";
 import { historizadas, senalInfo } from "../../domain/senales.js";
@@ -38,7 +38,7 @@ import { armarLibro, descargarLibro, nombreArchivoGeneral } from "../../lib/expo
 /**
  * Con qué función se calcula el rango de cada acceso rápido contra el
  * historiador. «Tiempo real» no está aquí a propósito: no le pide nada al
- * historiador, lee del búfer en vivo (ver `data/detalleActivo.js`).
+ * historiador, lee del búfer en vivo (ver `data/tanque/detalleActivo.js`).
  */
 const PRESETS_RANGO = { ayer: rangoAyer, semana: rangoSemana };
 const PRESETS_VALIDOS = ["vivo", "ayer", "semana", "personalizado"];

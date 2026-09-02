@@ -17,7 +17,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { queryClient } from "@/lib/queryClient.js";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { Sidebar, Topbar, DataSourceBanner, EstadoMaquinaBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
@@ -67,7 +67,7 @@ export default function App() {
                 que un solo motor de sondeo alcanza para las ocho señales Y para
                 EstadoMaquinaBanner, que cruza las pestañas de la estación de
                 llenado sin volver a montar su propia fuente. Ver la cabecera de
-                `Demo-EVA/data/EvaProvider.jsx`. */}
+                `Demo-EVA/data/comunes/EvaProvider.jsx`. */}
             <EvaProvider>
               <ToastProvider>
                 <ModalProvider>

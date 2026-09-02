@@ -25,8 +25,8 @@ import { LayoutGrid } from "lucide-react";
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSeriesHistoricas, useSistemaAgua } from "../../data/hooks.js";
-import { VENTANA } from "../../data/historia.js";
+import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
+import { VENTANA } from "../../data/tanque/historia.js";
 import { DERIVADO } from "../../domain/estado.js";
 import { esHistorizada, historizadas } from "../../domain/senales.js";
 import { PROVISIONALES } from "../../domain/umbrales.js";

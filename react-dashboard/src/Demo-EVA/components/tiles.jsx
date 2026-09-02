@@ -38,7 +38,7 @@ import { navegarConMorph, useCountUp, useMounted, usePrefersReducedMotion } from
 
 import { estadoInfo } from "../domain/estado.js";
 import { UMBRALES } from "../domain/umbrales.js";
-import { FRESCURA, HISTORIAL, estadoHistorial, presentarValor } from "../data/estadoDelDato.js";
+import { FRESCURA, HISTORIAL, estadoHistorial, presentarValor } from "../data/comunes/estadoDelDato.js";
 import { fmtCifra, fmtSenal, fmtVentana, formateadorDe, pctDeEscala } from "../lib/formato.js";
 import { delta } from "../lib/modelo.js";
 import { Card, Cifra, Delta, ESCALA, MONO, PuntoEstado, Spark } from "./base.jsx";

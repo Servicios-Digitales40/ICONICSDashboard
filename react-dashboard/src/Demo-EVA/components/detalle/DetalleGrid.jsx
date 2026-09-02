@@ -9,7 +9,7 @@
  */
 import { Card, Cifra, Delta, MONO } from "../base.jsx";
 import { fmtNum } from "@/lib/format.js";
-import { FRESCURA, presentarValor } from "../../data/estadoDelDato.js";
+import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
 import {
   BandaValor, EstadoBooleano, GraficaAusente, GraficaBufer, GraficaHistoria, InsigniaOrigen,
 } from "./piezas.jsx";
@@ -21,7 +21,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
   const tieneBufer = senal.bufferVivo.length >= 2;
 
   // La cifra grande es SIEMPRE la lectura en vivo, esté la gráfica de abajo
-  // mirando "Ayer" o lo que sea: ver la cabecera de `data/detalleActivo.js`.
+  // mirando "Ayer" o lo que sea: ver la cabecera de `data/tanque/detalleActivo.js`.
   const { atenuado, texto: textoCongelado, frescura } = presentarValor({
     receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: null,
   });

@@ -2,7 +2,7 @@
  * rango.test.js
  * ------------------------------------------------------------------
  * `planificar()`/`tramosDe()` de `@shared/eva/rango.js` (Plan 15 Fase 2): LA
- * regla de troceado, única para el frontend (`Demo-EVA/data/historia.js`) y
+ * regla de troceado, única para el frontend (`Demo-EVA/data/tanque/historia.js`) y
  * el backend (`ia/conversacion/herramientas.mjs`), que antes vivía duplicada con valores
  * distintos en cada uno.
  *

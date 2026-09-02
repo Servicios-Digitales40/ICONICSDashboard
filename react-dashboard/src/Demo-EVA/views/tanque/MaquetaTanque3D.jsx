@@ -34,7 +34,7 @@ import { usePrefersReducedMotion } from "@/lib/motion.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../../data/hooks.js";
+import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { ESTADOS_ORDEN, estadoInfo } from "../../domain/estado.js";
 import { PuntoEstado } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";

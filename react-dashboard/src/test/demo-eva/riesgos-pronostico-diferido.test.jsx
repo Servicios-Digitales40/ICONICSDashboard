@@ -6,7 +6,7 @@
  *
  * ── QUÉ PROTEGE, Y POR QUÉ MERECE UNA PRUEBA PROPIA ────────────────
  *
- * El troceado del historiador vive en el navegador (`data/historia.js`), así
+ * El troceado del historiador vive en el navegador (`data/tanque/historia.js`), así
  * que cada tramo es una petición a `/api`. Cinco señales por diez tramos son
  * CINCUENTA peticiones para una ventana de 30 días — contra las cuatro que
  * gasta «Planta» entera—, y el puente corta en 300 por minuto. Con el
@@ -27,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import RiesgosTanque from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
 
 /*

@@ -21,7 +21,7 @@
  * El simulador que había antes generaba los puntos del tablero de Resonac, no
  * los de este árbol: durante un tiempo, pulsar «Simulado» dejó la sección
  * **entera sin dato**. Desde el Plan 9 el simulador es suyo
- * (`data/simulador.js`) y sirve las ocho señales y su historia.
+ * (`data/tanque/simulador.js`) y sirve las ocho señales y su historia.
  *
  * Lo que NO cambia es de quién depende la decisión: el origen sigue saliendo de
  * `useDataSource()`, así que el interruptor del Topbar, su cinta de aviso y el
@@ -45,7 +45,7 @@ import { createContext, useContext, useEffect, useMemo } from "react";
 import { TRANSPORTES, useDataSource } from "@/lib/datasource";
 import { presetCaos } from "@/lib/iconics";
 import { createEvaSource } from "./evaSource.js";
-import { createTransporteEva } from "./simulador.js";
+import { createTransporteEva } from "../tanque/simulador.js";
 import { transporteDe } from "./transportes.js";
 
 const Ctx = createContext(null);

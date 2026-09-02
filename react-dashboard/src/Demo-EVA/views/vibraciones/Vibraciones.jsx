@@ -43,7 +43,7 @@ import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
-import { useVibracion } from "../../data/vibracion.js";
+import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import {
   AREA_ALARMAS, CANALES, CONTADORES_ALARMA, LIMITES_ISO, MEDIDAS, VIGILANCIAS,

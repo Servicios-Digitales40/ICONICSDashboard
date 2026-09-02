@@ -15,7 +15,7 @@ import { hasValue } from "@shared/valores.js";
 import { bandaColor } from "../paleta.js";
 import { MONO, PuntoEstado } from "../base.jsx";
 import { estadoInfo } from "../../domain/estado.js";
-import { HISTORIAL, estadoHistorial } from "../../data/estadoDelDato.js";
+import { HISTORIAL, estadoHistorial } from "../../data/comunes/estadoDelDato.js";
 import { PROVISIONALES, UMBRALES } from "../../domain/umbrales.js";
 import { datosACSV, descargarCSV, descargarPNG, nombreArchivo } from "../../lib/exportar.js";
 

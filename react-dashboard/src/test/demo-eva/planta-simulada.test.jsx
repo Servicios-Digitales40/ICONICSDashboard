@@ -29,7 +29,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
+import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import PlantaTanque from "@/Demo-EVA/views/tanque/PlantaTanque.jsx";
 
 /** Cualquier salida a la red es un fallo de esta prueba, no un caso a doblar. */
@@ -86,7 +86,7 @@ describe("Demo EVA en modo simulado", () => {
   it("el histórico lo sirve el simulador, no una petición que falla en silencio", async () => {
     /*
      * El histórico no pasa por el transporte en modo real —vive en
-     * `data/historia.js`— así que es la pieza que más fácil se queda atada al
+     * `data/tanque/historia.js`— así que es la pieza que más fácil se queda atada al
      * servidor, y la que se quedaba: `useSeriesHistoricas` traga el fallo de red
      * (`.catch(() => ({ datos: [] }))`) para que una gráfica caída no tumbe la
      * página. El rótulo desaparecería igual con la petición reventando.

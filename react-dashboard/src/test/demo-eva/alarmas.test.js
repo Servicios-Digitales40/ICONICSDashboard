@@ -3,11 +3,11 @@
  * ------------------------------------------------------------------
  * Plan 13, Fase 9 (F1): el historial de alarmas y el filtro por activo,
  * probado sin dar por hecho un campo que no está confirmado — ver la
- * cabecera de `data/alarmas.js`.
+ * cabecera de `data/comunes/alarmas.js`.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "@/Demo-EVA/data/alarmas.js";
+import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "@/Demo-EVA/data/comunes/alarmas.js";
 
 afterEach(() => vi.unstubAllGlobals());
 

@@ -6,7 +6,7 @@
  * `useDataSource()` publica la clase —servidor real o simulador— y nadie más en
  * la aplicación decide eso. Pero construir la instancia exigía saber QUÉ
  * simulador toca, y eso estaba escrito dos veces: una en `EvaProvider` y otra
- * en `data/vibracion.js`, cada una con su `if` y su factoría. Una máquina nueva
+ * en `data/vibraciones/vibracion.js`, cada una con su `if` y su factoría. Una máquina nueva
  * escribía el tercero.
  *
  * Aquí se escribe una vez. La física sale del registro de sistemas, así que dar

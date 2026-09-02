@@ -22,7 +22,7 @@ import { Power, PowerOff } from "lucide-react";
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../../data/hooks.js";
+import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { fmtSenal } from "../../lib/formato.js";
 import { UltimaLectura } from "../../components/base.jsx";
 

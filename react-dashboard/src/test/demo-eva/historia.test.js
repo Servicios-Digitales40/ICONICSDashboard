@@ -22,7 +22,7 @@ import {
   rangoAyer,
   rangoPersonalizado,
   rangoSemana,
-} from "@/Demo-EVA/data/historia.js";
+} from "@/Demo-EVA/data/tanque/historia.js";
 
 describe("los accesos rápidos contra el historiador son aritmética de calendario, no de red", () => {
   it("«Ayer» es el día completo anterior, sin tocar hoy", () => {

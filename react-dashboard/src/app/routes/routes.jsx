@@ -225,7 +225,7 @@ export const ROUTES = [
 
   {
     // Historial, no un semáforo de alarmas activas — ver la cabecera de
-    // `data/alarmas.js`. `GET /api/iconics/alarms` es lo único que hay hoy:
+    // `data/comunes/alarmas.js`. `GET /api/iconics/alarms` es lo único que hay hoy:
     // el evento "activo ahora" necesitaría otra llamada al servidor.
     //
     // ── OCULTA DEL SIDEBAR (2026-08-31, TEMPORAL) ──────────────────────

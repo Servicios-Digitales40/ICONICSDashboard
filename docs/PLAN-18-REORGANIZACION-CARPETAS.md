@@ -189,6 +189,9 @@ porque no bloquea nada de lo anterior y no es urgente.
       Las ediciones se hicieron con Node y no con `sed -i`: casi todo el
       frontend está en CRLF y `sed` sobre Git Bash lo normaliza a LF, que es
       lo que ensució `client.mjs` en F1.
-- [ ] F3 — `Demo-EVA/data/`
+- [x] F3 — `Demo-EVA/data/` — 11 archivos a tanque/ (3), vibraciones/ (2) y
+      comunes/ (6), sin renombrar. Lo delicado no eran los consumidores sino
+      los imports ENTRE ellos: seis archivos se importaban por `./hermano`, y
+      la mitad de esos hermanos cayó en otra subcarpeta. 511 pruebas y build.
 - [ ] F4 — `shared/eva/`
 - [ ] F5 — `react-dashboard/src/lib/`

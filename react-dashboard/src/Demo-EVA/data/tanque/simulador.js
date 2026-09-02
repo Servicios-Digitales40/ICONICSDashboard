@@ -56,7 +56,7 @@ import {
   CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorDePunto, valorEn,
 } from "@shared/eva/simulador.js";
 
-import { esHistorizada, senalInfo } from "../domain/senales.js";
+import { esHistorizada, senalInfo } from "../../domain/senales.js";
 import { MAX_PUNTOS, SIN_SERIE, VENTANA } from "./historia.js";
 
 export { CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorEn };
@@ -97,7 +97,7 @@ export function createTransporteEva({
    * absoluto, los presets del selector o el calendario personalizado) → el
    * cierre y el paso de la rejilla que arma `readSerie`.
    *
-   * Repite la misma distinción que `resolverRango` de `data/historia.js` —el
+   * Repite la misma distinción que `resolverRango` de `data/tanque/historia.js` —el
    * lector real—: sin ella, un rango absoluto se destructuraría en
    * `{horas: undefined, puntos: undefined}` y el simulador serviría siempre
    * la ventana de 6 h por defecto, **en silencio**, mientras el historiador
@@ -118,7 +118,7 @@ export function createTransporteEva({
   /**
    * Serie histórica, en el lugar del historiador.
    *
-   * **Repite la guarda de `data/historia.js` a propósito.** Cuatro de las ocho
+   * **Repite la guarda de `data/tanque/historia.js` a propósito.** Cuatro de las ocho
    * señales no tienen serie propia en el servidor real, y la interfaz está
    * construida sobre ese hecho: la banda de KPIs son las cuatro historizadas y la
    * carga del motor se alimenta del búfer de sesión porque no puede pedir serie.

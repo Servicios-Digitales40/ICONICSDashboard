@@ -76,7 +76,7 @@ const montar = (Vista) =>
 /**
  * La sección de vibraciones NO cuelga de `EvaProvider`: `useVibracion` monta su
  * propio sondeo porque es otra máquina, con otro PLC (ver la cabecera de
- * `data/vibracion.js`). Que aquí no haya que envolverla en ese provider no es
+ * `data/vibraciones/vibracion.js`). Que aquí no haya que envolverla en ese provider no es
  * un descuido de la prueba — es la separación entre las dos instalaciones,
  * puesta por escrito.
  */

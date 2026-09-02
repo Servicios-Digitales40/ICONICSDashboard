@@ -15,9 +15,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { SISTEMA_VACIO } from "../domain/sistema.js";
-import { SENAL_KEYS } from "../domain/senales.js";
-import { VENTANA } from "./historia.js";
+import { SISTEMA_VACIO } from "../../domain/sistema.js";
+import { SENAL_KEYS } from "../../domain/senales.js";
+import { VENTANA } from "../tanque/historia.js";
 import { useEvaSource } from "./EvaProvider.jsx";
 
 const INICIAL = { sistema: SISTEMA_VACIO, loading: true, error: null, lastUpdated: null };
@@ -86,7 +86,7 @@ function claveRango(rango) {
  * sea un instante, sería mentir sobre el dato.
  *
  * `motivo` es un texto cuando la señal **no tiene serie propia en el
- * historiador** (ver `data/historia.js`). No es un error y no debe pintarse
+ * historiador** (ver `data/tanque/historia.js`). No es un error y no debe pintarse
  * como tal: es un hecho de la instalación que la tarjeta tiene que explicar.
  */
 export function useSerieHistorica(clave, rango = VENTANA) {
@@ -207,7 +207,7 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
      * tantas peticiones HTTP como tramos: cinco señales por diez tramos eran
      * CINCUENTA para pintar una pantalla, y el puente corta en 300 por minuto
      * y por IP. Ahora `leerSeries` pide la ventana entera y trocea el
-     * servidor. Ver `data/historia.js` y la ruta `/api/iconics/history/batch`.
+     * servidor. Ver `data/tanque/historia.js` y la ruta `/api/iconics/history/batch`.
      */
     source
       .leerSeries(lista, rango)
