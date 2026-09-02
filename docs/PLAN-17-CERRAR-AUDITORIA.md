@@ -117,6 +117,48 @@
 > 497 + 1 nuevo — corría en 2 archivos fallidos por la dependencia
 > faltante, no por código), `npm run build` limpio, 15/15 diagnóstico,
 > 12/12 casos, 7/7 casos-cierre, 124/124 herramientas, 10/10 documentos.
+>
+> **Fase 3a completada, con una reserva que hay que leer.**
+> `documentos.mjs`/`casos.mjs` devuelven `scoreCrudo` (BM25 sin normalizar)
+> y, con embeddings, `coseno` sueltos — el `score` mezclado sigue
+> ordenando, sin tocar; `puntosDeScore` corta sobre lo absoluto:
+> `UMBRAL_COSENO_*` (0,55/0,20, los de siempre) con embeddings,
+> `UMBRAL_BM25_*` sin ellos.
+>
+> **La reserva:** no hay un solo PDF real en esta copia de trabajo contra
+> el que calibrar `UMBRAL_BM25_*` —`Documentos/` sólo tiene `Reportes/`—,
+> así que salieron de un experimento con un corpus SINTÉTICO (cuatro
+> párrafos de manual escritos a mano sobre causas reales de `causas.js`,
+> ampliado a ~45 fragmentos con ruido para aproximar la escala medida en
+> la auditoría). El experimento reveló algo que el plan original no
+> preveía: **el score crudo de BM25 no es invariante al tamaño del
+> corpus** —su `idf` crece con el número de documentos para un término
+> raro—, así que un umbral fijo aquí se descalibra según crezca
+> `Documentacion/`, a diferencia del corte por coseno (F3b), que sí es
+> estable. `UMBRAL_BM25_FUERTE=8`/`UMBRAL_BM25_DEBIL=2` son una suposición
+> razonada, no una medida — quedan explícitamente marcados así en el
+> código, y **F7a sigue siendo obligatoria**, no un ajuste fino, antes de
+> declarar cerrado el modo BM25 de C11.
+>
+> **G7 (aislamiento documental)**: el manifiesto YA tenía `sistema` por
+> archivo desde el Plan 16 Fase 1 —`documentos.mjs` simplemente nunca lo
+> leía—. `NOMBRE_MANIFIESTO` se movió a `shared/eva/manuales.js` (evita un
+> ciclo: `manuales.mjs` ya importa `MAX_BYTES` de `documentos.mjs`).
+> `buscar()` gana `sistema` opcional, refrescado en cada `recargar()` —
+> independiente de la huella de contenido, para que reasignar un manual
+> en el manifiesto no exija tocar el archivo—; sin manifiesto en la
+> carpeta, nada se excluye (compatibilidad con instalaciones sin catálogo).
+> `respaldoDelManual` propaga el `sistema` que ya tenía `diagnosticar()`.
+>
+> **G8 (dedupe)**: por hash de CONTENIDO del fragmento —ya se calculaba—,
+> antes de recortar a `top`, para que un duplicado no le robe el sitio a
+> un resultado distinto.
+>
+> Diez comprobaciones nuevas en `scripts/verificar-documentos.mjs` (16/16,
+> antes 10): aislamiento por sistema (4), dedupe (2), más los reordenos
+> de la suite existente. Sin regresiones: 153/153 vitest backend, 509/509
+> vitest frontend, 15/15 diagnóstico, 12/12 casos, 7/7 casos-cierre,
+> 124/124 herramientas.
 
 ---
 
@@ -620,7 +662,7 @@ De la matriz de 36 capacidades de la auditoría:
 | C28 | Feedback → pipeline | Parcial · **Crítica** | Implementado (F2) |
 | C17 | Validación de `sistema` | Incorrecto · Alta | Implementado (F0) |
 | C07 | Análisis temporal | Parcial · Alta | Implementado (F6) |
-| C12 | Document RAG | Implementado con reservas · Alta | Sin reservas (F3) |
+| C12 | Document RAG | Implementado con reservas · Alta | G7+G8 sin reservas (F3a); corte BM25 **provisional** hasta F7a — sin corpus real que calibrar en esta copia |
 | C30 | Conflicto entre fuentes | No implementado · Alta | Implementado (F4) |
 | C31 | Trazabilidad | Parcial · Alta | Implementado (F5) |
 | C29 | Calidad de casos | No implementado · Media | Implementado (F2 — `resuelto` recupera su papel) |

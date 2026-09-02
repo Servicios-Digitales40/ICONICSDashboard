@@ -38,30 +38,24 @@ import { logger } from '../logger.mjs'
 import {
   crearManual,
   EXTENSIONES_MANUAL,
+  NOMBRE_MANIFIESTO,
   normalizarManifiesto,
   sistemaValido,
   VACIO as MANIFIESTO_VACIO,
 } from '../../shared/eva/manuales.js'
 import { MAX_BYTES } from './documentos.mjs'
 
-/**
- * El nombre del manifiesto, DENTRO de `carpeta` — a diferencia de
- * `RUTA_APRENDIZAJE` en `herramientas/aprendizaje/index.mjs`, que es una ruta
- * fija en `datos/` porque sólo hay un almacén de aprendizaje por instalación.
- * Aquí puede haber tantas `carpeta` como instalaciones de este backend se
- * levanten a la vez con distinto `IA_DOCS_DIR` —cada suite de pruebas monta
- * la suya—, y un manifiesto en `datos/` compartido por todas mezclaría los
- * manuales de una carpeta con los de otra sin que nada lo avisara: el
- * primer síntoma sería una prueba que ve manuales que ella no subió.
- *
- * Vive DENTRO de `carpeta` en vez de al lado, así que va y viene con ella:
- * apuntar `IA_DOCS_DIR` a otro sitio no arrastra manifiestos de una
- * instalación anterior. Empieza por punto por la misma razón que
- * `.archivados` — fuera de `SOPORTADAS`, fuera de un explorador de archivos
- * normal— y `.json` no es ninguna extensión que el índice reconozca, así que
- * tampoco hace falta un caso especial para que `documentos.mjs` lo ignore.
+/*
+ * `NOMBRE_MANIFIESTO` vive en `shared/eva/manuales.js` —no aquí— desde el
+ * Plan 17 Fase 3a: `documentos.mjs` también necesita leerlo (para aislar el
+ * RAG documental por sistema, G7) y no puede importarlo de este archivo sin
+ * crear un ciclo, porque este archivo ya importa `MAX_BYTES` DE
+ * `documentos.mjs`. Sigue siendo DENTRO de `carpeta` —a diferencia de
+ * `RUTA_APRENDIZAJE`, que es fija en `datos/`—: puede haber tantas
+ * `carpeta` como instalaciones se levanten a la vez con distinto
+ * `IA_DOCS_DIR`, y un manifiesto compartido mezclaría los manuales de una
+ * con los de otra sin que nada lo avisara.
  */
-const NOMBRE_MANIFIESTO = '.manifiesto.json'
 
 /** La subcarpeta donde `archivar` mueve un manual. Ver la cabecera. */
 const CARPETA_ARCHIVADOS = '.archivados'

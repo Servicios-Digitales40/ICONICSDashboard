@@ -35,6 +35,19 @@ import { SISTEMAS } from "./sistemas.js";
 export const EXTENSIONES_MANUAL = Object.freeze([".txt", ".md", ".csv", ".log", ".pdf", ".docx"]);
 
 /**
+ * El nombre del manifiesto, DENTRO de la carpeta de manuales — nunca en
+ * `datos/`, ver la cabecera de `backend/ia/manuales.mjs`.
+ *
+ * Vive aquí, en `shared/`, y no en `backend/ia/manuales.mjs` —que es quien
+ * lee y escribe el archivo— porque `backend/ia/documentos.mjs` (Plan 17
+ * Fase 3a, G7) también necesita saberlo, para leer qué `sistema` tiene cada
+ * manual y aislar el RAG documental igual que `casos.mjs` ya aísla el de
+ * casos. `documentos.mjs` no puede importarlo de `manuales.mjs` sin crear un
+ * ciclo: `manuales.mjs` ya importa `MAX_BYTES` de `documentos.mjs`.
+ */
+export const NOMBRE_MANIFIESTO = ".manifiesto.json";
+
+/**
  * `activo` se indexa y aparece en las respuestas del asistente. `archivado`
  * sigue en disco —Fase 1 no borra nada, ver la cabecera de
  * `backend/ia/manuales.mjs`— pero se mueve fuera de la carpeta que lee el

@@ -277,10 +277,15 @@ export function createIndiceCasos({
     const lexico = puntuarBm25(delSistema, texto)
     if (!lexico.length) return []
 
-    // Normalizado a 0-1 contra el mejor de ESTA consulta: el score crudo de
-    // BM25 no tiene techo fijo y no se puede comparar con el coseno.
+    /*
+     * Normalizado a 0-1 contra el mejor de ESTA consulta, para el RANKING.
+     * `scoreCrudo` se conserva aparte (Plan 17 Fase 3, G2) — mismo motivo
+     * que en `documentos.mjs`: dividir por el máximo garantiza un 1,00 al
+     * mejor resultado de CUALQUIER consulta, y es lo que hacía que
+     * `manual`/`casos` casi nunca bajaran de 2 puntos en `diagnostico.mjs`.
+     */
     const maximo = Math.max(...lexico.map(c => c.score), 1e-9)
-    let puntuados = lexico.map(c => ({ ...c, score: c.score / maximo }))
+    let puntuados = lexico.map(c => ({ ...c, scoreCrudo: c.score, score: c.score / maximo }))
 
     if (usaEmbeddings) {
       const vectorConsulta = await motor.embeberUno(texto).catch(error => {
@@ -291,10 +296,14 @@ export function createIndiceCasos({
       })
 
       if (vectorConsulta) {
-        puntuados = puntuados.map(c => ({
-          ...c,
-          score: c.vector ? 0.6 * coseno(vectorConsulta, c.vector) + 0.4 * c.score : c.score,
-        }))
+        // `coseno` suelto, mismo criterio que `documentos.mjs`: es la
+        // magnitud absoluta que corta `puntosDeScore`, el mezclado `score`
+        // sigue siendo sólo para el orden.
+        puntuados = puntuados.map(c => {
+          if (!c.vector) return c
+          const cosenoValor = coseno(vectorConsulta, c.vector)
+          return { ...c, coseno: cosenoValor, score: 0.6 * cosenoValor + 0.4 * c.score }
+        })
       }
     }
 
@@ -306,7 +315,10 @@ export function createIndiceCasos({
   }
 
   function formatearResultado(caso) {
-    return { ...caso.intervencion, score: caso.score }
+    return {
+      ...caso.intervencion, score: caso.score, scoreCrudo: caso.scoreCrudo,
+      ...(caso.coseno !== undefined ? { coseno: caso.coseno } : {}),
+    }
   }
 
   /** Qué hay indexado, para poder decírselo sin adivinar — mismo criterio que

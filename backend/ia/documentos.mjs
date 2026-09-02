@@ -34,7 +34,7 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
 import { logger } from '../logger.mjs'
-import { EXTENSIONES_MANUAL } from '../../shared/eva/manuales.js'
+import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../shared/eva/manuales.js'
 import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
 import {
   coseno,
@@ -508,6 +508,19 @@ export function createIndiceDocumentos({
   let ilegibles = []
 
   /**
+   * `archivo → sistema` del manifiesto (Plan 17 Fase 3a, G7), refrescado en
+   * CADA `recargar()` — independiente de la huella de contenido de cada
+   * archivo. A propósito: reasignar un manual a otro sistema en el
+   * manifiesto no debe exigir tocar el archivo para que el aislamiento
+   * surta efecto, y si se leyera sólo al crear el fragmento, quedaría con
+   * el `sistema` de la primera vez que se indexó hasta que el archivo
+   * cambiara de huella. `null`/ausente = "toda la planta", igual que en
+   * `shared/eva/manuales.js·sistemaValido` — incluye la carpeta que nunca
+   * pasó por `manuales.mjs` (archivos puestos a mano, sin manifiesto).
+   */
+  let mapaSistemas = new Map()
+
+  /**
    * Lo ya procesado, por archivo: `archivo → { huella, fragmentos }`.
    *
    * Es la mitad del indexado incremental (la otra es la caché de embeddings
@@ -624,6 +637,20 @@ export function createIndiceDocumentos({
           cacheEmbeddings = { modelo: embeddingModelo, vectores: {} }
         }
         cacheEmbeddingsCargada = true
+      }
+
+      // Refrescado siempre, no sólo la primera vez: ver la cabecera de
+      // `mapaSistemas` arriba. Un manifiesto ausente o roto es la carpeta
+      // sin catálogo —archivos puestos a mano—, no un error: se trata como
+      // "todo sin sistema asignado", igual que hace `leerAprendizaje` con
+      // un almacén que todavía no existe.
+      try {
+        const manifiesto = normalizarManifiesto(
+          JSON.parse(await readFile(join(carpeta, NOMBRE_MANIFIESTO), 'utf8'))
+        )
+        mapaSistemas = new Map(manifiesto.manuales.map(m => [m.archivo, m.sistema ?? null]))
+      } catch {
+        mapaSistemas = new Map()
       }
 
       // Las huellas se toman ANTES de leer, no después: si alguien copia un
@@ -755,18 +782,45 @@ export function createIndiceDocumentos({
    * fragmento con relevancia baja es información que el modelo debe tratar con
    * cautela, y ocultárselo le invita a citarlo con la misma seguridad que uno
    * que encaja exactamente.
+   *
+   * `sistema` es OPCIONAL, al revés que en `casos.mjs` (Plan 17 Fase 3a,
+   * G7): un manual de la carpeta puede no tener catálogo —ni manifiesto, ni
+   * `sistema` asignado dentro de él— y eso es "toda la planta", no un
+   * error. Filtro ANTES de puntuar, mismo criterio que `casos.mjs`: un
+   * fragmento de OTRO sistema no entra ni siquiera a competir, así que no
+   * hay puntuación que pueda colarlo. Es la asimetría que la auditoría del
+   * 01-09-2026 midió entre las dos fuentes —`casos.mjs` protegía el cruce
+   * entre sistemas y este archivo no— con el mismo mecanismo que ya usaba
+   * el otro lado.
    */
-  async function buscar(pregunta, { top = 3 } = {}) {
+  async function buscar(pregunta, { top = 3, sistema } = {}) {
     await asegurarAlDia()
     if (!indice.length) return []
 
-    const lexico = puntuarBm25(indice, pregunta)
+    const delSistema = sistema === undefined
+      ? indice
+      : indice.filter(f => {
+        const sistemaDelArchivo = mapaSistemas.get(f.archivo) ?? null
+        return sistemaDelArchivo === null || sistemaDelArchivo === sistema
+      })
+    if (!delSistema.length) return []
+
+    const lexico = puntuarBm25(delSistema, pregunta)
     if (!lexico.length) return []
 
-    // Normalizado a 0-1 contra el mejor de esta consulta: el score crudo de
-    // BM25 no tiene techo fijo y no se puede comparar con el coseno.
+    /*
+     * Normalizado a 0-1 contra el mejor de ESTA consulta, para el RANKING
+     * —el orden entre resultados— y para poder mezclarlo con el coseno más
+     * abajo: el score crudo de BM25 no tiene techo fijo. `scoreCrudo` se
+     * conserva aparte (Plan 17 Fase 3, G2): dividir por el máximo garantiza
+     * que el mejor fragmento de CUALQUIER consulta saque 1,00, aunque el
+     * encaje sea flojo — bueno para ordenar, malo para decidir cuántos
+     * PUNTOS vale ese encaje. `diagnostico.mjs · puntosDeScore` corta sobre
+     * `scoreCrudo`/`coseno` (absolutos), nunca sobre este `score`
+     * normalizado (relativo a la consulta).
+     */
     const maximo = Math.max(...lexico.map(f => f.score), 1e-9)
-    let puntuados = lexico.map(f => ({ ...f, score: f.score / maximo }))
+    let puntuados = lexico.map(f => ({ ...f, scoreCrudo: f.score, score: f.score / maximo }))
 
     if (usaEmbeddings) {
       const vectorPregunta = await motor.embeberUno(pregunta).catch(error => {
@@ -778,7 +832,10 @@ export function createIndiceDocumentos({
 
       if (vectorPregunta) {
         /*
-         * Mezcla 60/40 a favor de lo semántico.
+         * Mezcla 60/40 a favor de lo semántico, PARA EL RANKING — no se
+         * toca (Plan 17, decisión 2). El coseno se guarda también SUELTO
+         * en `coseno`: es la magnitud absoluta que `puntosDeScore` corta
+         * cuando hay embeddings, en vez del `score` mezclado.
          *
          * Los dos aportan cosas distintas y ninguno gana solo: el coseno
          * encuentra «cómo se pone a cero» cuando el manual dice «ajuste del
@@ -786,15 +843,35 @@ export function createIndiceDocumentos({
          * —«PMP63B», «F270»— que un embedding disuelve porque no significan
          * nada semánticamente.
          */
-        puntuados = puntuados.map(f => ({
-          ...f,
-          score: f.vector ? 0.6 * coseno(vectorPregunta, f.vector) + 0.4 * f.score : f.score,
-        }))
+        puntuados = puntuados.map(f => {
+          if (!f.vector) return f
+          const cosenoValor = coseno(vectorPregunta, f.vector)
+          return { ...f, coseno: cosenoValor, score: 0.6 * cosenoValor + 0.4 * f.score }
+        })
       }
     }
 
-    return puntuados
+    /*
+     * Dedupe por CONTENIDO, Plan 17 Fase 3a (G8) — antes de recortar a
+     * `top`, para que un duplicado no le robe el sitio a un resultado de
+     * verdad distinto. Dos PDF con nombre distinto y el mismo contenido
+     * byte a byte —medido en la auditoría del 01-09-2026, dos pares en
+     * `Documentacion/`— producían fragmentos con el mismo `hash` (ya se
+     * calculaba, ver su comentario más abajo) y `manualCitado` presentaba
+     * las dos referencias como si fueran confirmaciones independientes. Se
+     * conserva el de mayor `score` —el orden ya viene puesto por el
+     * `.sort` de arriba— y se descartan sus duplicados exactos.
+     */
+    const vistos = new Set()
+    const sinDuplicados = puntuados
       .sort((a, b) => b.score - a.score)
+      .filter(f => {
+        if (vistos.has(f.hash)) return false
+        vistos.add(f.hash)
+        return true
+      })
+
+    return sinDuplicados
       .slice(0, top)
       .filter(f => f.score > 0)
       // `hash` viaja desde aquí (Plan 17 Fase 5, G10): es el hash del
@@ -805,7 +882,13 @@ export function createIndiceDocumentos({
       // de aviso si el PDF cambia: si el hash guardado en una cita antigua
       // no coincide con el de hoy, ese `{archivo, pagina}` ya no es el
       // mismo contenido.
-      .map(({ archivo, pagina, texto, score, hash }) => ({ archivo, pagina, texto, score, hash }))
+      .map(({ archivo, pagina, texto, score, hash, scoreCrudo, coseno }) => ({
+        archivo, pagina, texto, score, hash, scoreCrudo,
+        // `coseno` sólo viaja cuando hubo embeddings de verdad para este
+        // fragmento (`f.vector` presente arriba) — su AUSENCIA es la señal
+        // que usa `puntosDeScore` para saber qué corte aplicar.
+        ...(coseno !== undefined ? { coseno } : {}),
+      }))
   }
 
   /** Qué hay indexado, para poder decírselo al usuario sin adivinar. */

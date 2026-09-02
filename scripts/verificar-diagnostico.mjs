@@ -57,13 +57,18 @@ async function check(nombre, fn) {
 
 /* ── dobles de prueba ─────────────────────────────────────────────────── */
 
-/** Un `indiceDocumentos` de mentira: score fijo por causa, según su `id`. */
-function manualFalso(scorePorCausa = {}) {
+/**
+ * Un `indiceDocumentos` de mentira: `scoreCrudo` fijo por causa, según su
+ * `id`. Es `scoreCrudo` —no `score`— a propósito, Plan 17 Fase 3a (G2):
+ * `puntosDeScore` corta sobre la magnitud absoluta, y el `score`
+ * normalizado (que este doble ni siquiera necesita simular) sólo ordena.
+ */
+function manualFalso(scoreCrudoPorCausa = {}) {
   return {
     async buscar(consulta) {
-      for (const [pista, score] of Object.entries(scorePorCausa)) {
+      for (const [pista, scoreCrudo] of Object.entries(scoreCrudoPorCausa)) {
         if (consulta.includes(pista)) {
-          return [{ archivo: 'manual-de-prueba.pdf', pagina: 1, texto: consulta, score }]
+          return [{ archivo: 'manual-de-prueba.pdf', pagina: 1, texto: consulta, scoreCrudo }]
         }
       }
       return []
@@ -87,9 +92,9 @@ const SIN_FUENTES = createMotorDiagnostico({})
 console.log('\n── Mismas entradas, misma salida ─────────────────────────────')
 
 await check('dos llamadas idénticas devuelven exactamente el mismo CONTENIDO', async () => {
-  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 0.8 })
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
   const indiceCasos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
   ])
   const motor = createMotorDiagnostico({ indiceDocumentos, indiceCasos })
 
@@ -163,8 +168,8 @@ await check('casos fuertes sin manual, con el mínimo de datos, no pasan de MEDI
   // agua-caliente: `necesita` de 1 señal → datos = 1. Con 2 casos fuertes y
   // sin manual: total = 1 + 0 + 2 = 3 → MEDIO, nunca ALTO sin más respaldo.
   const casos = [
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
   ]
   const motor = createMotorDiagnostico({ indiceCasos: casosFalsos(casos) })
   const resultado = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
@@ -189,8 +194,8 @@ console.log('\n── Casos sin `disparador` pesan menos que los confirmados ─
 
 await check('dos casos CONFIRMADOS del mismo riesgo llegan al tope de 2, como antes', async () => {
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -202,8 +207,8 @@ await check('dos casos SIN `disparador` (voz/chat) topan en 1, nunca llegan a 2'
   // que estos no dicen de qué riesgo eran, como cualquier intervención
   // registrada por voz. Sin la Fase 1, esto puntuaba 2 igual que arriba.
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -212,8 +217,8 @@ await check('dos casos SIN `disparador` (voz/chat) topan en 1, nunca llegan a 2'
 
 await check('un confirmado + uno sin `disparador` siguen sin superar el tope de 2', async () => {
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -304,10 +309,10 @@ console.log('\n── Un caso que NO funcionó resta ─────────
 
 await check('un caso `resuelto:false` baja el total en vez de sumarlo', async () => {
   const casosOk = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
   ])
   const casosMal = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: false, score: 0.9 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: false, scoreCrudo: 10 },
   ])
 
   const conOk = await createMotorDiagnostico({ indiceCasos: casosOk }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
@@ -324,7 +329,7 @@ console.log('\n── El manual desempata causas que comparten evidencia ──�
 await check('la causa que el manual nombra queda primera, aunque los datos empaten', async () => {
   const candidatas = causasDe('bomba-sin-salida')
   const objetivo = candidatas[1] // "sin-recirculacion-minima"
-  const indiceDocumentos = manualFalso({ [objetivo.titulo]: 0.9 })
+  const indiceDocumentos = manualFalso({ [objetivo.titulo]: 10 })
 
   const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
     sistema: 'tanque', riesgoId: 'bomba-sin-salida',

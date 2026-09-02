@@ -363,6 +363,98 @@ await check('`indexando` es true mientras se embebe y false al terminar', async 
   assert.equal(indice.estado().progreso, null)
 })
 
+console.log('\n── El aislamiento por sistema no es opcional (Plan 17 G7) ────')
+
+await check('un manual de OTRO sistema no aparece, aunque el texto encaje perfecto', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'tanque.txt'), textoLargo('valvula de impulsion agarrotada', 2))
+  await writeFile(join(dir, 'vibraciones.txt'), textoLargo('valvula de impulsion agarrotada', 2))
+  await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
+    version: 1,
+    manuales: [
+      { id: 'm1', archivo: 'tanque.txt', sistema: 'tanque' },
+      { id: 'm2', archivo: 'vibraciones.txt', sistema: 'vibraciones' },
+    ],
+  }))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const resultados = await indice.buscar('valvula de impulsion agarrotada', { sistema: 'tanque' })
+
+  assert.ok(resultados.length > 0, 'debía encontrar el manual del tanque')
+  assert.ok(resultados.every(f => f.archivo === 'tanque.txt'), 'se coló un manual de otro sistema')
+})
+
+await check('un manual SIN sistema asignado responde a los dos (toda la planta)', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'general.txt'), textoLargo('procedimiento de arranque general', 2))
+  await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
+    version: 1,
+    manuales: [{ id: 'm1', archivo: 'general.txt', sistema: null }],
+  }))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const paraTanque = await indice.buscar('procedimiento de arranque general', { sistema: 'tanque' })
+  const paraVibraciones = await indice.buscar('procedimiento de arranque general', { sistema: 'vibraciones' })
+
+  assert.ok(paraTanque.length > 0, 'un manual sin sistema debía respaldar al tanque también')
+  assert.ok(paraVibraciones.length > 0, 'y a vibraciones también')
+})
+
+await check('sin manifiesto en la carpeta, nada se excluye (compatibilidad con lo que ya había)', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'sin-catalogar.txt'), textoLargo('procedimiento sin catalogar', 2))
+  // Sin `.manifiesto.json`: archivos puestos a mano, de antes de que
+  // existiera el catálogo (Plan 16 Fase 1).
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const resultados = await indice.buscar('procedimiento sin catalogar', { sistema: 'tanque' })
+
+  assert.ok(resultados.length > 0, 'un manual sin manifiesto no debía quedar invisible')
+})
+
+await check('sin pedir `sistema` en la búsqueda, el comportamiento es el de siempre', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'vibraciones.txt'), textoLargo('valvula de impulsion agarrotada', 2))
+  await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
+    version: 1,
+    manuales: [{ id: 'm1', archivo: 'vibraciones.txt', sistema: 'vibraciones' }],
+  }))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const resultados = await indice.buscar('valvula de impulsion agarrotada')
+
+  assert.ok(resultados.length > 0, 'sin sistema pedido no debía excluirse nada')
+})
+
+console.log('\n── Los duplicados no inflan la cita (Plan 17 G8) ─────────────')
+
+await check('dos archivos con el CONTENIDO idéntico no duplican el fragmento citado', async () => {
+  const dir = await carpetaNueva()
+  const texto = textoLargo('anexo de limites de proteccion', 1)
+  // Dos nombres, mismo contenido byte a byte — el escenario medido en la
+  // auditoría del 01-09-2026: dos PDF con nombres distintos, mismo hash.
+  await writeFile(join(dir, 'Anexo_Limites_Proteccion.txt'), texto)
+  await writeFile(join(dir, 'Anexo_Limites_Proteccion-2.txt'), texto)
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const resultados = await indice.buscar('anexo de limites de proteccion', { top: 10 })
+
+  const hashes = resultados.map(f => f.hash)
+  assert.equal(new Set(hashes).size, hashes.length, 'dos fragmentos con el mismo hash no debían convivir en el resultado')
+})
+
+await check('dos archivos con contenido DISTINTO no se deduplican por error', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'a.txt'), textoLargo('contenido de a', 1))
+  await writeFile(join(dir, 'b.txt'), textoLargo('contenido de b', 1))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const resultados = await indice.buscar('contenido', { top: 10 })
+
+  const archivos = new Set(resultados.map(f => f.archivo))
+  assert.equal(archivos.size, 2, 'dos archivos con contenido distinto debían seguir siendo dos resultados')
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 embServer.close()

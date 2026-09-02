@@ -33,11 +33,13 @@
  *
  * ── "MANUAL 0…2" Y "CASOS 0…2 / −1": LOS UMBRALES SON UNA DECISIÓN ──
  *
- * `buscar()` y `buscarCasosSimilares()` devuelven un score normalizado 0-1
- * (mezcla 0,6 coseno / 0,4 BM25, o BM25 solo). Convertirlo en 0/1/2 exige un
- * corte, y no hay un corte "correcto": aquí se usa el mismo criterio en las
- * dos fuentes —`UMBRAL_FUERTE`/`UMBRAL_DEBIL`— para que "manual" y "casos"
- * hablen el mismo idioma. Si en producción resulta que el corte es
+ * `buscar()` y `buscarCasosSimilares()` devuelven, además del `score`
+ * mezclado que ordena (0,6 coseno / 0,4 BM25, o BM25 solo), la magnitud
+ * ABSOLUTA por separado —`coseno` o `scoreCrudo`, según haya embeddings—.
+ * Convertirla en 0/1/2 exige un corte, y no hay un corte "correcto": aquí
+ * se usa el mismo criterio en las dos fuentes —`UMBRAL_COSENO_*`/
+ * `UMBRAL_BM25_*`, ver `puntosDeScore` más abajo— para que "manual" y
+ * "casos" hablen el mismo idioma. Si en producción resulta que el corte es
  * demasiado fino o demasiado grueso, se ajusta aquí, en un solo sitio: no
  * hace falta tocar `documentos.mjs` ni `casos.mjs`.
  */
@@ -51,14 +53,69 @@ const REGLAS_POR_SISTEMA = {
   vibraciones: REGLAS_VIBRACION,
 }
 
-/** Score de recuperación (0-1) → puntos de respaldo (0, 1 ó 2). */
-const UMBRAL_FUERTE = 0.55
-const UMBRAL_DEBIL = 0.2
+/**
+ * ── EL CORTE ES SOBRE MAGNITUD ABSOLUTA, NO SOBRE EL RANKING (PLAN 17 §G2) ──
+ *
+ * `indiceDocumentos.buscar()`/`indiceCasos.buscarCasosSimilares()` devuelven
+ * un `score` normalizado a 0-1 CONTRA EL MEJOR DE ESA CONSULTA —es lo que
+ * hace falta para el RANKING, mezclando BM25 y coseno—, pero usarlo también
+ * para decidir PUNTOS era el defecto medido en la auditoría del 01-09-2026:
+ * dividir por el máximo garantiza que el mejor resultado de CUALQUIER
+ * consulta saque 1,00, aunque el encaje sea flojo. Tres causas de tanque
+ * probadas sacaron `manual: 2` siempre, incluso con el índice de casos
+ * vacío — un término que vale lo mismo para todos no desempata nada.
+ *
+ * El corte pasa a hacerse sobre una magnitud ABSOLUTA, distinta según haya
+ * embeddings o no:
+ *
+ *  - Con embeddings: el `coseno` suelto (Plan 17 Fase 3b) — es
+ *    verdaderamente absoluto, no depende de cuántos documentos haya
+ *    indexados. `UMBRAL_COSENO_*` son los mismos 0,55/0,20 de siempre:
+ *    documentados como razonables por el proyecto, y siguen `PROVISIONAL:
+ *    true` hasta que se midan contra un servidor de embeddings real —F3b,
+ *    no hecha todavía—.
+ *  - Sin embeddings: el `scoreCrudo` de BM25 (Plan 17 Fase 3a).
+ *    `UMBRAL_BM25_*` son **PROVISIONAL, con una reserva más fuerte que la
+ *    de arriba**: no hay un solo PDF real en esta copia de trabajo contra
+ *    el que calibrar (`Documentos/` sólo tiene `Reportes/`), así que se
+ *    derivaron de un corpus SINTÉTICO —cuatro párrafos de manual escritos a
+ *    mano sobre causas reales de `causas.js`, más ruido hasta ~45
+ *    fragmentos para aproximar la escala que midió la auditoría—. Y hay un
+ *    motivo por el que esto importa más de lo que parece: el score CRUDO de
+ *    BM25 **no es invariante al tamaño del corpus** —su término `idf` crece
+ *    con el número de documentos para un término raro—, así que un umbral
+ *    fijo aquí se descalibra según crezca `Documentacion/`, algo que NO le
+ *    pasa al corte por coseno. `F7a` (recalibrar contra la distribución
+ *    real) no es opcional para este par de umbrales: es la única forma de
+ *    que dejen de ser una suposición razonada y pasen a ser una medida.
+ */
+const UMBRAL_COSENO_FUERTE = 0.55
+const UMBRAL_COSENO_DEBIL = 0.2
+const UMBRAL_BM25_FUERTE = 8
+const UMBRAL_BM25_DEBIL = 2
 
-function puntosDeScore(score) {
-  if (score >= UMBRAL_FUERTE) return 2
-  if (score >= UMBRAL_DEBIL) return 1
+/**
+ * @param {{coseno?: number, scoreCrudo?: number}} [resultado] de `buscar()`/
+ *   `buscarCasosSimilares()` — `undefined` cuenta como "sin respaldo".
+ */
+function puntosDeScore(resultado) {
+  if (!resultado) return 0
+  if (resultado.coseno !== undefined) {
+    if (resultado.coseno >= UMBRAL_COSENO_FUERTE) return 2
+    if (resultado.coseno >= UMBRAL_COSENO_DEBIL) return 1
+    return 0
+  }
+  const crudo = resultado.scoreCrudo ?? 0
+  if (crudo >= UMBRAL_BM25_FUERTE) return 2
+  if (crudo >= UMBRAL_BM25_DEBIL) return 1
   return 0
+}
+
+/** "Fuerte" para lo que en `respaldoDeCasos` decide si un caso encontrado
+ *  por texto entra siquiera a competir — mismo corte que el de 2 puntos,
+ *  para que "manual" y "casos" seleccionen con el mismo criterio. */
+function esFuerte(resultado) {
+  return puntosDeScore(resultado) >= 2
 }
 
 function reglaDe(sistema, riesgoId) {
@@ -79,14 +136,20 @@ function datosDe(regla) {
  * Cuánto respalda el manual a UNA causa: se busca con su título y sus
  * términos —no con el síntoma del riesgo entero, que traería fragmentos
  * genéricos del riesgo y no de la causa concreta—.
+ *
+ * `sistema` se propaga a `buscar()` (Plan 17 Fase 3a, G7): sin él, un
+ * manual de vibraciones podía respaldar una causa del tanque, la misma
+ * asimetría que `casos.mjs` ya no tiene desde el Plan 16.
  */
-async function respaldoDelManual(indiceDocumentos, causa) {
+async function respaldoDelManual(indiceDocumentos, sistema, causa) {
   if (!indiceDocumentos) return { puntos: 0, fragmentos: [] }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
-    const fragmentos = await indiceDocumentos.buscar(consulta, { top: 2 })
-    const mejor = fragmentos[0]?.score ?? 0
-    return { puntos: puntosDeScore(mejor), fragmentos }
+    const fragmentos = await indiceDocumentos.buscar(consulta, { top: 2, sistema })
+    // El objeto entero, no sólo `.score`: `puntosDeScore` decide sobre
+    // `coseno`/`scoreCrudo` (absolutos), no sobre el `score` normalizado
+    // que sólo sirve para ordenar — ver la cabecera de este archivo.
+    return { puntos: puntosDeScore(fragmentos[0]), fragmentos }
   } catch (error) {
     logger.warn('Búsqueda en manuales falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id,
@@ -148,7 +211,7 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
     const idsExactos = new Set([...confirmados, ...refutados].map(c => c.id))
 
     // La proxy de texto, sólo para lo que no tiene emparejamiento exacto.
-    const porTexto = encontrados.filter(c => !idsExactos.has(c.id) && c.score >= UMBRAL_FUERTE)
+    const porTexto = encontrados.filter(c => !idsExactos.has(c.id) && esFuerte(c))
     const confirmaElRiesgo = c => c.disparador?.riesgoId === riesgoId
     const fuertesTexto = porTexto.filter(confirmaElRiesgo)
     const debilesTexto = porTexto.filter(c => !confirmaElRiesgo(c))
@@ -233,7 +296,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
 
     const causas = await Promise.all(candidatas.map(async causa => {
       const [manual, casos] = await Promise.all([
-        respaldoDelManual(indiceDocumentos, causa),
+        respaldoDelManual(indiceDocumentos, sistema, causa),
         respaldoDeCasos(indiceCasos, sistema, riesgoId, causa),
       ])
       const total = datos + manual.puntos + casos.puntos
