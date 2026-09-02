@@ -167,6 +167,51 @@ await check('casos fuertes sin manual, con el mínimo de datos, no pasan de MEDI
   }
 })
 
+console.log('\n── Casos sin `disparador` pesan menos que los confirmados ────')
+
+/*
+ * `casos.mjs` ya EXCLUYE los casos de otro riesgo antes de que este módulo
+ * los vea (probado con el índice real en `verificar-casos.mjs`); lo que se
+ * comprueba aquí es lo que le toca a ESTE módulo, Plan 17 Fase 1 (G1): un
+ * caso confirmado del mismo riesgo (`disparador.riesgoId` coincide) pesa
+ * más que uno que llegó por parecido de texto sin decir de qué riesgo era
+ * —el caso normal para todo lo registrado por voz o chat, que nunca trae
+ * `disparador`—.
+ */
+
+await check('dos casos CONFIRMADOS del mismo riesgo llegan al tope de 2, como antes', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+
+  assert.equal(resultado.causas[0].respaldo.casos, 2)
+})
+
+await check('dos casos SIN `disparador` (voz/chat) topan en 1, nunca llegan a 2', async () => {
+  // Mismo texto, mismos scores que el caso anterior — la única diferencia es
+  // que estos no dicen de qué riesgo eran, como cualquier intervención
+  // registrada por voz. Sin la Fase 1, esto puntuaba 2 igual que arriba.
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9 },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+
+  assert.equal(resultado.causas[0].respaldo.casos, 1, 'sin disparador, dos casos no debían pesar como si confirmaran')
+})
+
+await check('un confirmado + uno sin `disparador` siguen sin superar el tope de 2', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0.9 },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+
+  assert.equal(resultado.causas[0].respaldo.casos, 2, 'el confirmado + el débil debían completar el tope, no superarlo')
+})
+
 console.log('\n── Un caso que NO funcionó resta ─────────────────────────────')
 
 await check('un caso `resuelto:false` baja el total en vez de sumarlo', async () => {

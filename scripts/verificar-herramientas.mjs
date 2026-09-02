@@ -2124,6 +2124,49 @@ await checkAsync('las causas llegan en el orden que da el motor, con instrucció
   assert.equal(r.causas[0].manualCitado[0].archivo, 'bomba.pdf')
 })
 
+/* ── registrar_intervencion: la puerta de voz/chat ───────────────────── */
+
+console.log('\n── registrar_intervencion ──────────────────────────────────')
+
+await checkAsync('un `sistema` inventado se rechaza con la lista de válidos, no escribe', async () => {
+  /*
+   * Plan 17 Fase 0 (G4). Antes de este cambio, `POST /api/casos` validaba
+   * `sistema` con `z.enum(SISTEMA_IDS)` y esta puerta aceptaba cualquier
+   * cadena — dos puertas al mismo almacén, dos reglas. Como el filtro de
+   * `casos.mjs` compara `sistema` por igualdad exacta y va ANTES de
+   * puntuar, un id inválido no fallaba aquí y hacía el caso invisible para
+   * siempre allá, sin error, sin aviso.
+   *
+   * No se llama con datos reales que lleguen a `leerAprendizaje`/
+   * `guardarAprendizaje`: la validación corta antes, así que esta
+   * comprobación no toca `datos/aprendizaje.json` de verdad.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('registrar_intervencion', {
+    sintoma: 'La bomba no arranca',
+    solucion: 'Se revisó el contactor',
+    sistema: 'grupo de bombeo',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /grupo de bombeo/)
+  assert.match(r.error, /tanque/)
+  assert.match(r.error, /vibraciones/)
+})
+
+await checkAsync('sin `sistema` (toda la planta) no se rechaza por la validación', async () => {
+  // `null` es "toda la planta", un valor válido — no debe confundirse con un
+  // id desconocido. Se comprueba que la validación lo deja pasar sin llegar
+  // a afirmar nada sobre el guardado (que sí toca disco).
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('registrar_intervencion', {
+    sintoma: 'x'.repeat(3),
+    solucion: 'y'.repeat(3),
+  })
+
+  // Falla por longitud mínima (síntoma/solución cortos), NUNCA por `sistema`.
+  assert.equal(r.ok, false)
+  assert.doesNotMatch(r.error, /sistema conocido/)
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')

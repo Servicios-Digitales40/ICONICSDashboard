@@ -98,24 +98,53 @@ async function respaldoDelManual(indiceDocumentos, causa) {
 
 /**
  * Cuánto respaldan los casos previos a UNA causa. `buscarCasosSimilares` ya
- * filtra por sistema —no hay filtro que repetir aquí—. Un caso "apunta a
- * esta causa" cuando su texto de recuperación es lo bastante parecido al
- * título de la causa: es la mejor proxy disponible hoy, porque
+ * filtra por sistema Y por riesgo —no hay filtro que repetir aquí—. Un caso
+ * "apunta a esta causa" cuando su texto de recuperación es lo bastante
+ * parecido al título de la causa: es la mejor proxy disponible hoy, porque
  * `Intervencion.causa` es texto libre sin un id de causa estructurado —ver
  * "Lo que la semilla no puede dar" en el plan; ese campo estructurado
  * (`causaReal.tipo`) es del `Caso` enriquecido de la Fase 5, no de hoy—.
+ *
+ * ── DOS NIVELES DE PESO, PLAN 17 FASE 1 (G1) ────────────────────────
+ *
+ * `indiceCasos.buscarCasosSimilares` ya EXCLUYÓ los casos de otro riesgo
+ * (con `disparador.riesgoId` distinto); lo que queda aquí es distinguir dos
+ * niveles de confianza en lo que SÍ llega:
+ *
+ *  - `disparador.riesgoId === riesgoId`: confirma este riesgo tal cual.
+ *    Peso completo — el tope de 2 de siempre.
+ *  - Sin `disparador` (casos de voz/chat, que nunca lo traen): no se sabe si
+ *    era este riesgo. Peso reducido — tope de 1, nunca 2, para que UNA
+ *    fuente sin confirmar no pueda por sí sola pesar como si lo confirmara.
+ *
+ * Los dos topes se combinan sin superar el tope global de 2 —"casos 0…2"
+ * sigue siendo la promesa del módulo—: con evidencia fuerte, la débil puede
+ * ayudar a completar el 2; sin evidencia fuerte, la débil sola nunca pasa
+ * de 1. La resta por fallidos no distingue nivel: un intento fallido —de
+ * cualquiera de los dos— sigue sin tope, es la asimetría que ya defendía
+ * este módulo antes de este plan.
  */
-async function respaldoDeCasos(indiceCasos, sistema, causa) {
+async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
   if (!indiceCasos) return { puntos: 0, casos: [] }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
-    const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, texto: consulta, top: 5 })
+    const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, riesgoId, texto: consulta, top: 5 })
     const relevantes = encontrados.filter(c => c.score >= UMBRAL_FUERTE)
-    const funcionaron = relevantes.filter(c => c.resuelto !== false)
+
+    const confirmaElRiesgo = c => c.disparador?.riesgoId === riesgoId
+    const fuertes = relevantes.filter(confirmaElRiesgo)
+    const debiles = relevantes.filter(c => !confirmaElRiesgo(c))
+
+    const funcionaronFuertes = fuertes.filter(c => c.resuelto !== false)
+    const funcionaronDebiles = debiles.filter(c => c.resuelto !== false)
     const fallaron = relevantes.filter(c => c.resuelto === false)
-    // Tope en 2 para los que funcionaron —"casos 0…2" del plan—; la resta
-    // por los que fallaron no tiene tope: cada intento fallido cuenta.
-    const puntos = Math.min(funcionaron.length, 2) - fallaron.length
+
+    const positivos = Math.min(
+      Math.min(funcionaronFuertes.length, 2) + Math.min(funcionaronDebiles.length, 1),
+      2
+    )
+    const puntos = positivos - fallaron.length
+
     return { puntos, casos: relevantes }
   } catch (error) {
     logger.warn('Búsqueda en casos falló durante un diagnóstico; se cuenta como sin respaldo', {
@@ -166,7 +195,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
     const causas = await Promise.all(candidatas.map(async causa => {
       const [manual, casos] = await Promise.all([
         respaldoDelManual(indiceDocumentos, causa),
-        respaldoDeCasos(indiceCasos, sistema, causa),
+        respaldoDeCasos(indiceCasos, sistema, riesgoId, causa),
       ])
       const total = datos + manual.puntos + casos.puntos
       const fuentesActivas = [datos > 0, manual.puntos > 0, casos.puntos > 0].filter(Boolean).length

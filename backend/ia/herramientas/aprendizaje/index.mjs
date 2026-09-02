@@ -38,6 +38,7 @@ import {
   crearIntervencion,
   intervencionesRecientes,
 } from '../../../../shared/eva/aprendizaje.js'
+import { SISTEMA_IDS } from '../../../../shared/eva/sistemas.js'
 import { fallo } from '../lib/respuesta.mjs'
 
 /**
@@ -205,6 +206,24 @@ export function crearHerramientasDeAprendizaje() {
         return fallo(
           'Hacen falta las dos mitades: QUÉ pasaba y QUÉ se hizo. Una sola no sirve dentro de ' +
           'seis meses, que es cuando esto se lee.'
+        )
+      }
+
+      /*
+       * Plan 17 Fase 0 (G4): esta puerta aceptaba `sistema` como texto
+       * libre, mientras que `POST /api/casos` ya lo validaba con
+       * `z.enum(SISTEMA_IDS)`. La diferencia no era cosmética: el filtro de
+       * `casos.mjs` compara `sistema` por igualdad exacta y va ANTES de
+       * puntuar, así que un id inválido no fallaba aquí y hacía el caso
+       * invisible para siempre allá — medido en la auditoría del
+       * 01-09-2026, 2 de 5 intervenciones reales con
+       * `sistema: "grupo de bombeo"`, un id que no existe. `null` sigue
+       * siendo válido: es "toda la planta", no un error.
+       */
+      if (sistema !== null && !SISTEMA_IDS.includes(sistema)) {
+        return fallo(
+          `"${sistema}" no es un sistema conocido. Usa uno de: ${SISTEMA_IDS.join(', ')} — ` +
+          'o no lo digas, si es de toda la planta.'
         )
       }
 

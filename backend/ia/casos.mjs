@@ -33,6 +33,34 @@
  * Filtrar ANTES del ranking, no ordenarlo entero y cortar después, es lo que
  * garantiza que un caso de otro sistema ni se calcula: no hay puntuación que
  * pueda colarlo por error.
+ *
+ * ── EL AISLAMIENTO POR RIESGO, PLAN 17 FASE 1 (G1) ──────────────────
+ *
+ * `sistema` protegía el cruce entre MÁQUINAS y dejaba abierto el cruce entre
+ * RIESGOS de la misma máquina: la auditoría del 01-09-2026 midió un
+ * diagnóstico de `derrame` citando dos casos de `sobrepresion` como
+ * respaldo, porque los dos son del `tanque` y el texto se parecía lo
+ * bastante. `disparador.riesgoId` se guarda desde la Fase 5 del Plan 16 y no
+ * se consultaba.
+ *
+ * `riesgoId` es OPCIONAL —al revés que `sistema`— porque `registrar_
+ * intervencion` (la puerta de voz/chat) nunca lo rellena: sólo lo trae un
+ * cierre completo (`POST /api/casos`). Un caso sin `disparador` no es un
+ * caso de OTRO riesgo, es un caso del que no se sabe. Filtrar tan duro como
+ * `sistema` condenaría a todos los casos de voz a la invisibilidad — el
+ * mismo fallo que la Fase 0 le cerró a `registrar_intervencion`, con otro
+ * disfraz.
+ *
+ * Por eso el filtro aquí es de DOS niveles, no de uno:
+ *   - `disparador.riesgoId` DISTINTO del pedido → EXCLUIDO, igual de duro
+ *     que `sistema`. Es la parte que corrige la auditoría.
+ *   - Sin `disparador` (o sin `riesgoId` dentro) → se queda. No se sabe de
+ *     qué riesgo era, y "no se sabe" no es "es de otro".
+ * El tercer nivel —pesar MENOS un caso sin `disparador`— no es cosa de este
+ * módulo: `buscarCasosSimilares` sólo excluye y puntúa por parecido: quien
+ * decide cuántos PUNTOS vale cada nivel es `diagnostico.mjs·respaldoDeCasos`,
+ * que ya recibe el objeto completo de la intervención (con o sin
+ * `disparador`) en cada resultado.
  */
 import { join } from 'node:path'
 import { logger } from '../logger.mjs'
@@ -206,6 +234,14 @@ export function createIndiceCasos({
    * —que sí es válido, y encuentra los casos que tampoco pertenecen a un
    * sistema concreto—, nunca por omisión.
    *
+   * `riesgoId` es OPCIONAL —ver la cabecera del archivo, Plan 17 Fase 1—:
+   * sin él, el comportamiento es el de siempre (útil para "¿nos ha pasado
+   * algo parecido?" sobre toda la planta). Con él, se excluye —ANTES de
+   * puntuar, mismo criterio que `sistema`— cualquier caso cuyo
+   * `disparador.riesgoId` sea de OTRO riesgo. Un caso sin `disparador` no se
+   * excluye: no se sabe de qué riesgo era, y eso no es lo mismo que saber
+   * que es de otro.
+   *
    * Mismo híbrido que `documentos.mjs`: BM25 siempre —es lo que encuentra
    * «VF-02» o «K14» tal cual, que un embedding disuelve en un vector
    * parecido a cualquier otra referencia de componente— y, si hay servidor
@@ -213,7 +249,7 @@ export function createIndiceCasos({
    * encuentra «se quedaba pegada» cuando el caso antiguo dice «no cerraba
    * del todo».
    */
-  async function buscarCasosSimilares({ sistema, texto, top = 3 } = {}) {
+  async function buscarCasosSimilares({ sistema, riesgoId, texto, top = 3 } = {}) {
     if (sistema === undefined) {
       throw new TypeError('buscarCasosSimilares necesita "sistema" explícito (o null para toda la planta).')
     }
@@ -223,9 +259,19 @@ export function createIndiceCasos({
 
     // El filtro de sistema va ANTES de puntuar — ver la cabecera del
     // archivo. Un caso de otro sistema no entra ni siquiera a competir.
-    const delSistema = [...casosProcesados.values()].filter(
+    let delSistema = [...casosProcesados.values()].filter(
       c => c.intervencion.sistema === sistema
     )
+
+    // El filtro de riesgo, mismo criterio: ANTES de puntuar. Sólo EXCLUYE lo
+    // que sabe que es de otro riesgo; lo que no lo dice, se queda.
+    if (riesgoId !== undefined) {
+      delSistema = delSistema.filter(c => {
+        const riesgoDelCaso = c.intervencion.disparador?.riesgoId
+        return riesgoDelCaso === undefined || riesgoDelCaso === riesgoId
+      })
+    }
+
     if (!delSistema.length) return []
 
     const lexico = puntuarBm25(delSistema, texto)

@@ -171,6 +171,63 @@ await check('un caso de vibraciones NUNCA aparece al buscar en tanque, aunque se
   assert.ok(resultados.every(r => r.sistema === 'tanque'), 'se coló un caso de otro sistema')
 })
 
+console.log('\n── El aislamiento por riesgo (Plan 17 Fase 1, G1) ────────────')
+
+await check('un caso de OTRO riesgo se excluye aunque sea del mismo sistema y el texto encaje', async () => {
+  // Reproduce el escenario medido en la auditoría del 01-09-2026: un caso
+  // guardado bajo `sobrepresion` no puede respaldar un diagnóstico de
+  // `derrame`, aunque los dos sean del tanque y el texto se parezca.
+  const ruta = await almacenNuevo()
+  await agregarIntervencion(ruta, {
+    ...CASO_TANQUE,
+    disparador: { riesgoId: 'sobrepresion' },
+  })
+
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  const resultados = await indice.buscarCasosSimilares({
+    sistema: 'tanque', riesgoId: 'derrame', texto: CASO_TANQUE.sintoma,
+  })
+
+  assert.deepEqual(resultados, [], 'un caso de sobrepresion no debía respaldar derrame')
+})
+
+await check('un caso del MISMO riesgo se sigue encontrando', async () => {
+  const ruta = await almacenNuevo()
+  await agregarIntervencion(ruta, {
+    ...CASO_TANQUE,
+    disparador: { riesgoId: 'bomba-sin-salida' },
+  })
+
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  const resultados = await indice.buscarCasosSimilares({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', texto: CASO_TANQUE.sintoma,
+  })
+
+  assert.equal(resultados.length, 1)
+})
+
+await check('un caso SIN `disparador` (voz/chat) no se excluye: "no se sabe" no es "es de otro"', async () => {
+  const ruta = await almacenNuevo()
+  await agregarIntervencion(ruta, CASO_TANQUE) // sin disparador, como registrar_intervencion
+
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  const resultados = await indice.buscarCasosSimilares({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', texto: CASO_TANQUE.sintoma,
+  })
+
+  assert.equal(resultados.length, 1, 'un caso sin disparador debía seguir siendo candidato')
+})
+
+await check('sin `riesgoId` en la búsqueda, el comportamiento es el de siempre (toda la planta)', async () => {
+  const ruta = await almacenNuevo()
+  await agregarIntervencion(ruta, { ...CASO_TANQUE, disparador: { riesgoId: 'sobrepresion' } })
+
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  const resultados = await indice.buscarCasosSimilares({ sistema: 'tanque', texto: CASO_TANQUE.sintoma })
+
+  assert.equal(resultados.length, 1, 'sin riesgoId no debía excluirse nada por disparador')
+})
+
 console.log('\n── BM25 encuentra lo que el embedding no distingue ──────────')
 
 await check('una referencia de componente exacta gana aunque el resto del texto sea parecido', async () => {
