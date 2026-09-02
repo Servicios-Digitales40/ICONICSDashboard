@@ -88,16 +88,22 @@ regla.
 │   └── src/
 │       ├── Demo-EVA/           Todo lo que sabe de las dos máquinas de planta
 │       │   ├── domain/            Puertas (re-export) hacia shared/eva/ — ver §4.2
-│       │   ├── data/               Lectura de red específica de esta instalación
-│       │   ├── components/, views/  Presentación
+│       │   ├── data/               Lectura de red, por máquina: tanque/, vibraciones/, comunes/
+│       │   ├── views/              Presentación, por máquina: tanque/, vibraciones/, comunes/
+│       │   ├── components/         Piezas de presentación de esta demo
 │       │   └── three-d/            Maqueta 3D
 │       ├── components/          Kit de UI genérico (no sabe de ICONICS ni de Demo EVA)
 │       ├── features/             Módulos verticales (asistente, three-d genérico, data)
-│       ├── lib/                  Clientes HTTP e infraestructura de frontend
+│       ├── lib/                  Infraestructura de frontend
+│       │   └── api/                Clientes HTTP (apiBase, casosApi, predictionApi, ragApi)
 │       ├── theme/                 Tokens de tema (claro/oscuro/Mitsubishi Electric)
 │       └── test/                  vitest: por área, espejo de src/
 ├── shared/                 Dominio puro que usan LOS DOS programas (§2.6, §2.7)
 │   └── eva/                  Las dos instalaciones — ver shared/README.md para el mapa completo
+│       ├── tanque/             Su catálogo, física, reglas y proyección
+│       ├── vibraciones/        Lo mismo, para la otra máquina
+│       └── comun/              Lo que ninguna posee sola: el registro, la forma
+│                               común, umbrales, historia, aprendizaje, casos
 ├── scripts/                Verificadores (`verificar-*.mjs`) y sondas contra ICONICS real
 └── docs/                   Planes (`PLAN-N-*.md`) y backlogs (`BACKLOG-*.md`)
 ```
@@ -225,8 +231,16 @@ node scripts/verificar-pronostico.mjs                 # desgaste acumulado
 node scripts/verificar-voz.mjs                          # dictado (whisper falso)
 node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
 node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
-node scripts/verificar-antiguedad-historico.mjs              # edad de la última muestra
 ```
+
+**Sonda contra el servidor REAL** (no vale el ICONICS falso: necesita red a
+planta y `--env-file`):
+```bash
+node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad de la última muestra
+```
+> Fuera de la red de planta falla siempre, con un timeout contra `bms-server`.
+> Eso **no** es una regresión: estaba listado más arriba junto a los que sí
+> corren sin red, y confundirlo con un verificador roto cuesta media hora.
 
 **Tras compilar el frontend:**
 ```bash
