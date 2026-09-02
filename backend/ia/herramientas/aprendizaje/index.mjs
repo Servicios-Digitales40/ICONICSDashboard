@@ -1,15 +1,17 @@
 /**
  * backend/ia/herramientas/aprendizaje/index.mjs
  * ------------------------------------------------------------------
- * Las tres herramientas de lo APRENDIDO: consultar los hechos confirmados de
- * la planta, anotar uno nuevo y proponer una regla de vigilancia.
+ * Las cuatro herramientas de lo APRENDIDO: consultar los hechos confirmados
+ * de la planta, anotar una intervención, cerrar un diagnóstico ya narrado
+ * con su causa real, y proponer una regla de vigilancia.
  *
  * ── POR QUÉ SALEN JUNTAS Y POR QUÉ SALEN PRONTO ────────────────────
  *
- * Porque forman un grupo cerrado: las tres —y sólo ellas— hablan con el
+ * Porque forman un grupo cerrado: las cuatro —y sólo ellas— hablan con el
  * almacén JSON de `datos/aprendizaje.json`, y ninguna toca el `client` de
  * ICONICS. No leen el servidor, no piden series y no evalúan reglas; su
- * materia prima es un archivo.
+ * materia prima es un archivo (y, para `cerrar_diagnostico`, también
+ * `shared/eva/causas.js` — una función pura, no un servidor).
  *
  * Eso las hace de las primeras del reparto (Fase 1). Esta factoría no recibe
  * `client`, ni `turnos`, ni concurrencia: no recibe nada. Si algún día una de
@@ -23,6 +25,24 @@
  * nada hasta que una persona la revisa con `scripts/revisar-propuestas.mjs`.
  * Ninguna de las dos activa nada por su cuenta, y sus avisos lo dicen en el
  * texto que el modelo cita literal.
+ *
+ * ── `cerrar_diagnostico`, PLAN 17 (FASE DE PARIDAD CON EL CIERRE) ──
+ *
+ * Hasta esta fase, el chat sólo podía ESCUCHAR una corrección
+ * (`registrar_intervencion` guarda `causa` como texto libre); nunca podía
+ * REGISTRARLA con la fuerza que el motor necesita para aprender de ella —
+ * eso vivía sólo en `POST /api/casos`, la puerta que usa
+ * `CierreDiagnostico.jsx`, con sus campos estructurados
+ * (`causaReal.tipo`, `diagnostico.propuesta`, `diagnosticoCorrecto`,
+ * `disparador.riesgoId`). `cerrar_diagnostico` le da al chat la misma
+ * capacidad, con la misma validación dura que ya protege esa puerta: un
+ * `causaId` que no está entre las candidatas del riesgo se RECHAZA, no se
+ * adivina — mismo criterio que ya usa `registrar_intervencion` con
+ * `sistema`. La alternativa —dejar que el modelo escriba `causaReal.tipo`
+ * en texto libre desde el chat— habría reintroducido la proxy de texto que
+ * el Plan 17 (Fase 2, G3) se pasó una fase entera evitando, con el
+ * agravante de que un id mal mapeado por un modelo local no falla ruidoso:
+ * corrompe en silencio la señal de la que depende toda esa fase.
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -39,6 +59,7 @@ import {
   intervencionesRecientes,
 } from '../../../../shared/eva/aprendizaje.js'
 import { SISTEMA_IDS } from '../../../../shared/eva/sistemas.js'
+import { causasDe } from '../../../../shared/eva/causas.js'
 import { fallo } from '../lib/respuesta.mjs'
 
 /**
@@ -242,6 +263,120 @@ export function crearHerramientasDeAprendizaje() {
         aviso:
           'Queda en la bitácora con su fecha. La próxima vez que se pregunte por este síntoma ' +
           'aparecerá junto a los datos de la instalación.',
+      }
+    },
+
+    /**
+     * ── CERRAR UN DIAGNÓSTICO YA NARRADO, CON SU CAUSA REAL ───────────
+     *
+     * La contraparte de `CierreDiagnostico.jsx · POST /api/casos` para el
+     * chat: registra qué causa resultó ser la real, con el mismo id
+     * estructurado que usa el emparejamiento exacto de
+     * `backend/ia/diagnostico.mjs · respaldoDeCasos` (Plan 17 Fase 2, G3),
+     * no como una frase que haya que adivinar la próxima vez.
+     *
+     * SÓLO se llama después de que el técnico confirme o corrija,
+     * explícitamente, la causa de un riesgo que `diagnosticar_falla` ya
+     * narró — nunca antes, nunca para especular. Lo dice la descripción de
+     * la herramienta, que es lo único que el modelo lee para decidir
+     * cuándo llamarla.
+     *
+     * `causaId` se valida contra `causasDe(riesgoId)` — el MISMO catálogo
+     * que ya usó `diagnosticar_falla` para proponer candidatas, así que un
+     * id que el modelo entendió mal (o inventó) se rechaza aquí, con la
+     * lista de los válidos, en vez de guardarse silenciosamente. Es el
+     * mismo criterio de validación dura que `sistema` ya tiene arriba: un
+     * dato mal formado no se adivina, se devuelve para corregir.
+     */
+    async cerrar_diagnostico({
+      sistema, riesgoId, causaId = null, causaLibre = null, propuesta = null,
+      componente = null, solucion, resuelto = true,
+    } = {}) {
+      if (!sistema || !SISTEMA_IDS.includes(sistema)) {
+        return fallo(`"${sistema}" no es un sistema conocido. Usa uno de: ${SISTEMA_IDS.join(', ')}.`)
+      }
+      if (!riesgoId) {
+        return fallo(
+          'Hace falta el `riesgoId` del diagnóstico que se cierra — el mismo que le pasaste a ' +
+          'diagnosticar_falla.'
+        )
+      }
+      const q = String(solucion ?? '').trim()
+      if (q.length < 8) {
+        return fallo(
+          'Hace falta describir QUÉ se hizo, con detalle — es lo que sirve dentro de seis meses.'
+        )
+      }
+
+      const candidatas = causasDe(riesgoId)
+      if (!candidatas) {
+        return fallo(
+          `"${riesgoId}" no tiene causas candidatas transcritas — no hay contra qué validar la ` +
+          'causa real. Usa registrar_intervencion para dejar constancia en texto libre.'
+        )
+      }
+
+      let causaRealTipo = null
+      if (causaId) {
+        const candidata = candidatas.find((c) => c.id === causaId)
+        if (!candidata) {
+          return fallo(
+            `"${causaId}" no es una causa candidata de "${riesgoId}". Usa uno de: ` +
+            `${candidatas.map((c) => c.id).join(', ')} — o, si la causa real no estaba en esa ` +
+            'lista, descríbela en `causaLibre` en vez de `causaId`.'
+          )
+        }
+        causaRealTipo = candidata.id
+      } else if (causaLibre) {
+        // Mismo criterio que "Otra causa" en CierreDiagnostico.jsx: el texto
+        // libre viaja en `causaReal.tipo` tal cual, sin fingir que es un id
+        // del catálogo — no compite con `causasDe()`, no hay contra qué
+        // validarlo.
+        causaRealTipo = String(causaLibre).trim()
+      } else {
+        return fallo(
+          'Hace falta `causaId` (si la causa real estaba entre las que propuso diagnosticar_falla) ' +
+          'o `causaLibre` (si no lo estaba).'
+        )
+      }
+
+      if (propuesta && !candidatas.some((c) => c.id === propuesta)) {
+        return fallo(
+          `"${propuesta}" tampoco es una causa candidata de "${riesgoId}". Usa uno de: ` +
+          `${candidatas.map((c) => c.id).join(', ')}.`
+        )
+      }
+
+      const almacen = await leerAprendizaje()
+      const nueva = crearIntervencion({
+        sistema,
+        sintoma: `Cierre de diagnóstico — ${riesgoId}.`,
+        solucion: q,
+        causa: causaRealTipo,
+        resuelto,
+        disparador: { tipo: 'riesgo', riesgoId },
+        causaReal: { tipo: causaRealTipo, ...(componente ? { componente } : {}) },
+        // Sólo se afirma `diagnosticoCorrecto` cuando hay `propuesta` con
+        // que compararla — mismo criterio, literal, que
+        // `CierreDiagnostico.jsx`: "no hay acierto que evaluar sin
+        // propuesta". Sin ella, el campo ni se manda.
+        ...(propuesta
+          ? { diagnostico: { propuesta }, diagnosticoCorrecto: causaRealTipo === propuesta }
+          : {}),
+      }, new Date())
+      almacen.intervenciones.push(nueva)
+      const guardado = await guardarAprendizaje(almacen)
+      if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+
+      return {
+        ok: true,
+        riesgoId,
+        causa_real: causaRealTipo,
+        ...(propuesta ? { diagnostico_correcto: causaRealTipo === propuesta } : {}),
+        aviso:
+          'Queda en la bitácora con el id exacto de la causa. La próxima vez que este mismo ' +
+          'riesgo se diagnostique, esta corrección cuenta de verdad — no como una frase que hay ' +
+          'que adivinar. Dile al técnico que quedó registrado, con qué causa real.',
       }
     },
 

@@ -108,6 +108,66 @@ export const DEFINICIONES = [
   {
     type: 'function',
     function: {
+      name: 'cerrar_diagnostico',
+      description:
+        'Registra la causa REAL de un riesgo que diagnosticar_falla YA narró, con el mismo `id` ' +
+        'que esa herramienta usó para las candidatas — así la próxima vez que este riesgo se ' +
+        'dispare, esta corrección cuenta de verdad, con id exacto, no como una frase suelta. ' +
+        'LLÁMALA SÓLO cuando el técnico confirme o corrija, explícitamente y después de haber ' +
+        'intervenido, cuál fue la causa real — nunca antes, nunca para especular sobre una causa ' +
+        'todavía no comprobada. No le preguntes si quiere que lo guardes: si te lo está contando, ' +
+        'guárdalo y díselo. Si la causa real es una de las que diagnosticar_falla propuso, pásala ' +
+        'en `causaId` con el MISMO id (no el título, no una paráfrasis) — si dices el id ' +
+        'equivocado, la herramienta te lo rechaza y te da la lista de los válidos, así que puedes ' +
+        'corregir. Si la causa real NO estaba en esa lista, descríbela en `causaLibre` en vez de ' +
+        '`causaId`.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sistema: { type: 'string', description: 'Id del sistema: "tanque" o "vibraciones".' },
+          riesgoId: {
+            type: 'string',
+            description: 'El `id` del riesgo — el mismo que le pasaste a diagnosticar_falla.',
+          },
+          causaId: {
+            type: 'string',
+            description:
+              'El `id` EXACTO de la causa real, tomado de la lista que devolvió ' +
+              'diagnosticar_falla para este riesgo. No pongas el título, pon el id.',
+          },
+          causaLibre: {
+            type: 'string',
+            description:
+              'La causa real, en tus palabras, SÓLO si no estaba entre las candidatas de ' +
+              'diagnosticar_falla. No la uses junto con `causaId`: una de las dos, no las dos.',
+          },
+          propuesta: {
+            type: 'string',
+            description:
+              'El `id` de la causa que diagnosticar_falla propuso PRIMERO (la de más respaldo). ' +
+              'Pásalo si lo sabes: así queda registrado si el sistema acertó o no. Si no lo ' +
+              'sabes, no lo pongas — no se puede afirmar un acierto sin decir contra qué se compara.',
+          },
+          componente: {
+            type: 'string',
+            description: 'El componente físico concreto, si se llegó a identificar.',
+          },
+          solucion: {
+            type: 'string',
+            description: 'Qué se hizo exactamente. Cuanto más concreto, más sirve dentro de seis meses.',
+          },
+          resuelto: {
+            type: 'boolean',
+            description: 'false si se intentó y NO funcionó. Por omisión true.',
+          },
+        },
+        required: ['sistema', 'riesgoId', 'solucion'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'recordar_hecho',
       description:
         'Guarda un DATO de cómo ES la instalación: "el sensor S3 es de 100 mV/g", "la tensión ' +

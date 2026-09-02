@@ -125,7 +125,11 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           '`conflicto` es `true`, dos causas distintas están respaldadas cada una por una fuente ' +
           'distinta (datos, manual o casos): DILO explícitamente — "el manual apunta a X, pero el ' +
           'histórico apunta a Y" — y NO elijas un ganador por tu cuenta ni lo suavices como si las ' +
-          'fuentes coincidieran. Enseñar el desacuerdo es el trabajo aquí, no resolverlo.',
+          'fuentes coincidieran. Enseñar el desacuerdo es el trabajo aquí, no resolverlo. ' +
+          'Más adelante en la conversación, cuando el técnico cuente qué encontró o qué hizo para ' +
+          'resolver ESTE riesgo —no antes, y no lo fuerces si sigue hablando de otra cosa—, usa ' +
+          'cerrar_diagnostico (no registrar_intervencion) con este mismo `riesgoId`: si la causa ' +
+          'real coincide con una de las de arriba, pásala por su `id`, no por el título.',
       }
     },
   }

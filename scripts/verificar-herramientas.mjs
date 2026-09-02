@@ -2169,11 +2169,111 @@ await checkAsync('sin `sistema` (toda la planta) no se rechaza por la validació
   assert.doesNotMatch(r.error, /sistema conocido/)
 })
 
+console.log('\n── cerrar_diagnostico ───────────────────────────────────────')
+
+await checkAsync('un `causaId` que no es candidata del riesgo se rechaza con la lista de válidos', async () => {
+  // No toca disco: la validación de causaId corta antes de leer/guardar.
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', causaId: 'un-id-inventado', solucion: 'Se revisó todo.',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /un-id-inventado/)
+  assert.match(r.error, /valvula-impulsion-cerrada/)
+  assert.match(r.error, /sin-recirculacion-minima/)
+})
+
+await checkAsync('un `riesgoId` sin causas transcritas se rechaza y remite a registrar_intervencion', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+    // `variador-en-manual` es huérfano a propósito — mismo riesgo que usa
+    // verificar-diagnostico.mjs para probar `huerfano: true`.
+    sistema: 'tanque', riesgoId: 'variador-en-manual', causaId: 'x', solucion: 'Se revisó todo.',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /registrar_intervencion/)
+})
+
+await checkAsync('sin `causaId` ni `causaLibre`, se pide uno de los dos', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', solucion: 'Se revisó todo.',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /causaId.*causaLibre|causaLibre.*causaId/)
+})
+
+await checkAsync('una `propuesta` que no es candidata también se rechaza', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+    causaId: 'valvula-impulsion-cerrada', propuesta: 'algo-que-no-existe', solucion: 'Se revisó todo.',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /algo-que-no-existe/)
+})
+
+await checkAsync(
+  'un cierre completo, real: se guarda con id exacto y luego se ENCUENTRA por ese id, no por texto',
+  async () => {
+    /*
+     * Único test de este archivo que toca disco de verdad, y a propósito:
+     * `crearHerramientasDeAprendizaje()` no acepta una `ruta` propia —es
+     * deliberado, ver la cabecera de `herramientas/aprendizaje/index.mjs`—,
+     * así que verificar el camino de ÉXITO completo (no sólo el rechazo)
+     * exige escribir donde la herramienta de verdad escribe. Se aísla con
+     * un directorio de trabajo temporal, nunca con el `datos/` real.
+     */
+    const cwdOriginal = process.cwd()
+    const dirTemporal = await mkdtemp(join(tmpdir(), 'verificar-cerrar-diagnostico-'))
+    process.chdir(dirTemporal)
+    try {
+      const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+        sistema: 'tanque',
+        riesgoId: 'bomba-sin-salida',
+        causaId: 'sin-recirculacion-minima',
+        propuesta: 'valvula-impulsion-cerrada', // lo que el sistema había propuesto primero
+        solucion: 'Se abrió la línea de recirculación mínima, estaba obstruida.',
+      })
+
+      assert.equal(r.ok, true, r.error)
+      assert.equal(r.causa_real, 'sin-recirculacion-minima')
+      // El sistema propuso OTRA causa primero: diagnosticoCorrecto debe
+      // decir que no, no quedarse sin decidir.
+      assert.equal(r.diagnostico_correcto, false)
+
+      const bruto = JSON.parse(await readFile(join('datos', 'aprendizaje.json'), 'utf8'))
+      assert.equal(bruto.intervenciones.length, 1)
+      const guardado = bruto.intervenciones[0]
+      assert.equal(guardado.causaReal.tipo, 'sin-recirculacion-minima')
+      assert.equal(guardado.diagnostico.propuesta, 'valvula-impulsion-cerrada')
+      assert.equal(guardado.diagnosticoCorrecto, false)
+      assert.equal(guardado.disparador.riesgoId, 'bomba-sin-salida')
+
+      // Y lo que de verdad importa: el motor de diagnóstico REAL, sin
+      // dobles, encuentra esta corrección por id exacto — no por parecido
+      // de texto — y la usa para confirmar/refutar la causa que corresponde.
+      const { createIndiceCasos } = await import('../backend/ia/casos.mjs')
+      const { createMotorDiagnostico } = await import('../backend/ia/diagnostico.mjs')
+      const indiceCasos = createIndiceCasos({})
+      const motor = createMotorDiagnostico({ indiceCasos })
+      const resultado = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+      const confirmada = resultado.causas.find((c) => c.id === 'sin-recirculacion-minima')
+      const refutada = resultado.causas.find((c) => c.id === 'valvula-impulsion-cerrada')
+      assert.ok(confirmada.respaldo.casos > 0, 'la causa confirmada por cerrar_diagnostico debía sumar')
+      assert.ok(refutada.respaldo.casos < 0, 'la causa que el sistema propuso mal debía restar')
+    } finally {
+      process.chdir(cwdOriginal)
+    }
+  }
+)
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son veintiuna herramientas, y sólo una escribe en la PLANTA', () => {
+check('son veintidós herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -2186,10 +2286,15 @@ check('son veintiuna herramientas, y sólo una escribe en la PLANTA', () => {
        del cambio: las herramientas se parametrizan por sistema en vez de
        multiplicarse por máquina, porque veinte descripciones parecidas hacen
        que un modelo local elija peor cuál llamar. */
-    /* Las tres de aprendizaje escriben, pero en un JSON nuestro: ninguna toca
-       el servidor de planta. La única que sí lo toca sigue siendo una. */
+    /* Las cuatro de aprendizaje escriben, pero en un JSON nuestro: ninguna
+       toca el servidor de planta. La única que sí lo toca sigue siendo una.
+       `cerrar_diagnostico` (Plan 17) es la contraparte de chat de
+       `POST /api/casos`: va justo después de `registrar_intervencion` —
+       misma familia, mismo almacén, la diferencia es que ésta valida
+       `causaId` contra `causasDe(riesgoId)` en vez de aceptar texto libre. */
     'hechos_de_la_planta',
     'registrar_intervencion',
+    'cerrar_diagnostico',
     'recordar_hecho',
     'proponer_regla',
     'sistemas_de_la_planta',
