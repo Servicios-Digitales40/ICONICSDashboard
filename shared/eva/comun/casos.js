@@ -71,7 +71,7 @@ export function textoDeRecuperacion(intervencion) {
     // El desmentido: sólo cuando hay algo que desmentir, es decir, cuando
     // hubo una propuesta del sistema Y una causa real confirmada distinta.
     // `causaReal.tipo` nombra la causa real con el mismo vocabulario que
-    // `causa.titulo` en `shared/eva/causas.js` — es lo que hace que la
+    // `causa.titulo` en `shared/eva/comun/causas.js` — es lo que hace que la
     // búsqueda por el título de la causa REAL también encuentre este caso.
     intervencion.causaReal?.tipo && intervencion.diagnostico?.propuesta
       ? `El sistema propuso "${intervencion.diagnostico.propuesta}"; la causa real fue "${intervencion.causaReal.tipo}".`

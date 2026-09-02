@@ -13,11 +13,11 @@
  * dos construir — nada más del backend se entera de la diferencia.
  *
  * La física —cómo se mueve cada señal— es la MISMA función pura que usa el
- * simulador del frontend: `shared/eva/simulador.js`. Lo que es propio de AQUÍ
+ * simulador del frontend: `shared/eva/tanque/simulador.js`. Lo que es propio de AQUÍ
  * es reproducir el comportamiento del SERVIDOR, no sólo el de la señal:
  *
  *  - **Las tres señales que devuelven la serie de OTRA.** Medido contra el
- *    servidor real (ver cabecera de `shared/eva/historia.js`): pedir la
+ *    servidor real (ver cabecera de `shared/eva/comun/historia.js`): pedir la
  *    historia de `cargaMotor`, `tensionLinea` o `eficienciaEnergetica`
  *    responde `ok: true` con la serie de `temperaturaTanque`, sin dar error.
  *    Un transporte falso que sólo sirviera datos buenos enseñaría un asistente
@@ -38,7 +38,7 @@
  *
  * ── ESTE ARCHIVO NO SABE CUÁNTAS MÁQUINAS HAY ────────────────────────
  *
- * Y es deliberado. Quien lo sabe es `shared/eva/sistemas.js`; aquí se pregunta
+ * Y es deliberado. Quien lo sabe es `shared/eva/comun/sistemas.js`; aquí se pregunta
  * al registro por el valor de un punto (`valorSimuladoDe`) y por las ramas que
  * enumerar (`SISTEMAS`), sin nombrar ninguna instalación.
  *
@@ -64,10 +64,10 @@
  * una prueba manual. Quien quiera ensayar un ICONICS caído para esto ya tiene
  * `client: null` o desenchufar `ICONICS_API_BASE` sin `ICONICS_FAKE`.
  */
-import { esHistorizada, parsePointName } from '../../shared/eva/senales.js'
-import { MAX_PUNTOS } from '../../shared/eva/historia.js'
-import { mediaDelTramo } from '../../shared/eva/simulador.js'
-import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/sistemas.js'
+import { esHistorizada, parsePointName } from '../../shared/eva/tanque/senales.js'
+import { MAX_PUNTOS } from '../../shared/eva/comun/historia.js'
+import { mediaDelTramo } from '../../shared/eva/tanque/simulador.js'
+import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/comun/sistemas.js'
 import { QUALITY_BAD_UA, QUALITY_GOOD_UA, QUALITY_SIN_DATO } from '../../shared/quality.js'
 
 /**
@@ -90,7 +90,7 @@ const CAOS = { malaCalidad: 0.02, ausente: 0.01 }
  * calidad BUENA, así que la pantalla no veía un fallo — veía una máquina que
  * contesta y no dice nada. Con quince ramas, la tercera lo habría repetido.
  *
- * Ahora el que sabe qué máquinas hay es `shared/eva/sistemas.js`, y este
+ * Ahora el que sabe qué máquinas hay es `shared/eva/comun/sistemas.js`, y este
  * archivo no se entera de cuántas son.
  *
  * `valorSimuladoDe` distingue tres cosas y aquí se traducen las tres: punto
@@ -229,7 +229,7 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
    * serie de una clave SIN historia propia sirve la de `temperaturaTanque`
    * (ver cabecera del archivo). No hay guarda aquí a propósito — la guarda
    * vive en `herramientas.mjs` (`esHistorizada`, comprobada ANTES de salir a
-   * la red) y en `shared/eva/historia.js`; este transporte imita al servidor,
+   * la red) y en `shared/eva/comun/historia.js`; este transporte imita al servidor,
    * que tampoco la tiene.
    *
    * Sigue páginas sucesivas (`paginaDe`) con el MISMO contrato y el MISMO

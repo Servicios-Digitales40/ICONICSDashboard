@@ -52,7 +52,7 @@
  * `evaluarRiesgos` la devuelve explícita en `provisional` para que la pantalla
  * la confiese. Cuando lleguen los umbrales reales, esto se vuelve fiable solo.
  */
-import { REPOSO, UMBRALES } from "./umbrales.js";
+import { REPOSO, UMBRALES } from "../comun/umbrales.js";
 
 /* ── Utilidades de lectura ─────────────────────────────────────────── */
 

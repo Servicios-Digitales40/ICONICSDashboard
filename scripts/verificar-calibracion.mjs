@@ -49,7 +49,7 @@ import { join } from 'node:path'
 import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
 import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
-import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/aprendizaje.js'
+import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/comun/aprendizaje.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', ambar: '\x1b[33m', gris: '\x1b[90m',
@@ -73,7 +73,7 @@ async function check(nombre, fn) {
 const raiz = await mkdtemp(join(tmpdir(), 'verificar-calibracion-'))
 
 /** Párrafos de manual SINTÉTICOS —ver la cabecera— sobre causas reales de
- *  `shared/eva/causas.js`, lo bastante largos y específicos para que BM25
+ *  `shared/eva/comun/causas.js`, lo bastante largos y específicos para que BM25
  *  los distinga de verdad. */
 const MANUAL_VALVULA_IMPULSION = `La válvula de impulsión VF-02 debe permanecer completamente
   abierta durante el funcionamiento normal de la bomba. Si la válvula de impulsión queda

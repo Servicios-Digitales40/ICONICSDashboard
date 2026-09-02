@@ -28,9 +28,9 @@
  * como las otras dos: escribir en el PLC de una máquina que no se ha modelado
  * no es una capacidad que se herede, es un accidente que se provoca.
  */
-import { SISTEMA } from '../../../../shared/eva/sistemas.js'
-import { UMBRALES } from '../../../../shared/eva/umbrales.js'
-import { toBooleano } from '../../../../shared/eva/sistema.js'
+import { SISTEMA } from '../../../../shared/eva/comun/sistemas.js'
+import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
+import { toBooleano } from '../../../../shared/eva/tanque/sistema.js'
 import { fallo } from '../lib/respuesta.mjs'
 /*
  * `agruparPorRegla` sigue en `herramientas.mjs`: la usan también las de
@@ -38,7 +38,7 @@ import { fallo } from '../lib/respuesta.mjs'
  * ensamblador se quede sólo con lo que ensambla.
  */
 import { agruparPorRegla, horaLocal, redondear } from '../../conversacion/herramientas.mjs'
-import { RAIZ } from '../../../../shared/eva/senales.js'
+import { RAIZ } from '../../../../shared/eva/tanque/senales.js'
 
 /** Punto de control de la bomba: no es una señal del catálogo, así que vive aparte. */
 const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`

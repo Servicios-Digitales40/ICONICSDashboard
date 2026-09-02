@@ -25,7 +25,7 @@
  * ── LO QUE ESTE SCRIPT NO HACE ─────────────────────────────────────
  *
  * Aprobar una propuesta **no la convierte en regla**. Marca la decisión, y
- * quien la aprueba escribe la regla en `shared/eva/riesgos.js` con su prueba
+ * quien la aprueba escribe la regla en `shared/eva/tanque/riesgos.js` con su prueba
  * en `scripts/verificar-riesgos.mjs`. Ese último paso es a mano a propósito:
  * una regla sin prueba es una regla que nadie ha comprobado que dispare cuando
  * debe y calle cuando no.
@@ -41,7 +41,7 @@
 import { writeFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
-import { pendientes } from '../shared/eva/aprendizaje.js'
+import { pendientes } from '../shared/eva/comun/aprendizaje.js'
 // Misma ruta y mismo lector que usan las herramientas del asistente y
 // `casos.mjs` (Plan 16) — no una copia propia. Duplicar la ruta fue lo que
 // una vez dejó al asistente guardando en un sitio y a este script mirando
@@ -98,7 +98,7 @@ if (['aprobar', 'rechazar', 'aplicada'].includes(accion)) {
   if (p.estado === 'aprobada') {
     console.log(`\n${c.ambar}${c.negrita}Aprobada — pero todavía NO vigila nada.${c.reset}`)
     console.log('Falta escribirla como regla, y ese paso es a mano a propósito:')
-    console.log(`  ${c.gris}1.${c.reset} añádela a shared/eva/riesgos.js`)
+    console.log(`  ${c.gris}1.${c.reset} añádela a shared/eva/tanque/riesgos.js`)
     console.log(`  ${c.gris}2.${c.reset} escribe su prueba en scripts/verificar-riesgos.mjs —incluida`)
     console.log(`     la de que NO salta cuando no debe, que es la mitad que se olvida—`)
     console.log(`  ${c.gris}3.${c.reset} node scripts/revisar-propuestas.mjs aplicada ${p.id}`)

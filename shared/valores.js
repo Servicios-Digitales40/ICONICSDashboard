@@ -10,7 +10,7 @@
  *    una división suya desborda. Un solo NaN contaminaría el resumen entero
  *    del sistema, así que se corta aquí y no en las vistas.
  *
- * Lo consumen los dos lados: `shared/eva/sistema.js` al construir el modelo, y
+ * Lo consumen los dos lados: `shared/eva/tanque/sistema.js` al construir el modelo, y
  * el frontend antes de formatear. Vive suelto en `shared/` —y no dentro de
  * `eva/`— porque no sabe nada de la instalación: son reglas sobre valores.
  */

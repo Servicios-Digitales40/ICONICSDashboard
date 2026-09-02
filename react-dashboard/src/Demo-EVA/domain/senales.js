@@ -3,7 +3,7 @@
  *
  * ── ESTE ARCHIVO SE MUDÓ, Y AQUÍ QUEDA LA PUERTA ───────────────────
  *
- * El contenido vive ahora en [`@shared/eva/senales.js`](../../../../shared/eva/senales.js).
+ * El contenido vive ahora en [`@shared/eva/tanque/senales.js`](../../../../shared/eva/tanque/senales.js).
  * Se movió cuando el asistente pasó a responder sobre esta instalación: sus
  * herramientas —`backend/ia/conversacion/herramientas.mjs`— necesitan los MISMOS ocho tags y
  * la MISMA marca de `historizado` que estas vistas, y `shared/README.md` es
@@ -26,4 +26,4 @@
  * convención por un traslado que no le cambia nada. `lib/domain/index.js` hace
  * exactamente esto mismo con el dominio de Resonac, y por el mismo motivo.
  */
-export * from "@shared/eva/senales.js";
+export * from "@shared/eva/tanque/senales.js";

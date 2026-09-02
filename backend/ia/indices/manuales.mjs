@@ -42,11 +42,11 @@ import {
   normalizarManifiesto,
   sistemaValido,
   VACIO as MANIFIESTO_VACIO,
-} from '../../../shared/eva/manuales.js'
+} from '../../../shared/eva/comun/manuales.js'
 import { MAX_BYTES } from './documentos.mjs'
 
 /*
- * `NOMBRE_MANIFIESTO` vive en `shared/eva/manuales.js` —no aquí— desde el
+ * `NOMBRE_MANIFIESTO` vive en `shared/eva/comun/manuales.js` —no aquí— desde el
  * Plan 17 Fase 3a: `documentos.mjs` también necesita leerlo (para aislar el
  * RAG documental por sistema, G7) y no puede importarlo de este archivo sin
  * crear un ciclo, porque este archivo ya importa `MAX_BYTES` DE

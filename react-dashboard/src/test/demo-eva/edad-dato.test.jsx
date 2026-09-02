@@ -9,7 +9,7 @@
  * que ya tiene su propia suite en `estado-dato.test.js`.
  *
  * Se prueba contra los componentes exportados con datos de mentira
- * construidos con el `createSenal` REAL (`@shared/eva/sistema.js`), no con
+ * construidos con el `createSenal` REAL (`@shared/eva/tanque/sistema.js`), no con
  * un objeto a mano: así la forma de la señal no se puede desincronizar del
  * contrato real sin que las pruebas de `estado-dato.test.js` u otras ya lo
  * noten primero. Mismo criterio que ya usa `grafica-historia.test.jsx` para

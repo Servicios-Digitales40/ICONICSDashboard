@@ -42,7 +42,7 @@
  */
 import { writeFile } from 'node:fs/promises'
 
-import { SISTEMA_IDS } from '../shared/eva/sistemas.js'
+import { SISTEMA_IDS } from '../shared/eva/comun/sistemas.js'
 import { RUTA_APRENDIZAJE, leerAprendizaje } from '../backend/ia/herramientas/aprendizaje/index.mjs'
 
 const c = {

@@ -22,10 +22,10 @@
  */
 import { ACTIVOS, ACTIVO_IDS } from "./activos.js";
 import { DERIVADO, estadoInfo } from "./estado.js";
-import { estadoComun, senalComun } from "./estadoMaquina.js";
+import { estadoComun, senalComun } from "../comun/estadoMaquina.js";
 import { RAIZ, SENALES, TODOS_LOS_PUNTOS, pointName } from "./senales.js";
 import { createSistema } from "./sistema.js";
-import { PROVISIONALES, UMBRALES } from "./umbrales.js";
+import { PROVISIONALES, UMBRALES } from "../comun/umbrales.js";
 
 /** A qué activo pertenece cada señal, para el campo `grupo`. */
 const grupoDe = (clave) => SENALES[clave]?.activo ?? null;

@@ -28,7 +28,7 @@
  * carga del motor en el tanque. `false` afirmaría que está en marcha, y eso no
  * se sabe.
  */
-import { estadoComun, senalComun } from "./estadoMaquina.js";
+import { estadoComun, senalComun } from "../comun/estadoMaquina.js";
 import { createSistemaVibraciones } from "./sistemaVibraciones.js";
 import {
   CANAL,

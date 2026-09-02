@@ -112,10 +112,10 @@ import {
   historizadas as historizadasTanque,
   parsePointName,
   pointName,
-} from "./senales.js";
-import { valorDePunto } from "./simulador.js";
-import { estadoDelTanque, resumenTanqueParaAsistente } from "./estadoTanque.js";
-import { estadoDeVibraciones, resumenVibracionesParaAsistente } from "./estadoVibraciones.js";
+} from "../tanque/senales.js";
+import { valorDePunto } from "../tanque/simulador.js";
+import { estadoDelTanque, resumenTanqueParaAsistente } from "../tanque/estadoTanque.js";
+import { estadoDeVibraciones, resumenVibracionesParaAsistente } from "../vibraciones/estadoVibraciones.js";
 import { MECANISMOS } from "./pronostico.js";
 import {
   AREA_ALARMAS,
@@ -131,8 +131,8 @@ import {
   parsePunto,
   puntoHistorico as puntoHistoricoVibracion,
   todosLosPuntos as todosLosPuntosVibracion,
-} from "./vibraciones.js";
-import { valorVibracionEn } from "./simuladorVibraciones.js";
+} from "../vibraciones/vibraciones.js";
+import { valorVibracionEn } from "../vibraciones/simuladorVibraciones.js";
 
 export const SISTEMAS = [
   {

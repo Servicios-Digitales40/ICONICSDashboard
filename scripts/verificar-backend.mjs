@@ -52,7 +52,7 @@ let batchCount = 0
  * Estado simulado del punto de control de la bomba y del nivel del tanque,
  * para el bloque de `POST /api/control/bomba` más abajo. `nivelTanque`
  * controla si `controlar_bomba` deja pasar el encendido (< 90, el
- * `avisoMax` de `shared/eva/umbrales.js`); `controlValor` es lo que
+ * `avisoMax` de `shared/eva/comun/umbrales.js`); `controlValor` es lo que
  * devuelve la RELECTURA tras escribir en `SENSORES/CONTROL` — normalmente
  * el mismo valor que se escribió, salvo que `controlIgnoraEscritura` esté
  * activo, que simula un punto cuya escritura no tiene efecto real.

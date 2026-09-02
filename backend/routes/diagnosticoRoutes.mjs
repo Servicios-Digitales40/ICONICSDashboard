@@ -18,7 +18,7 @@
  * llevan.
  */
 import { z } from 'zod'
-import { SISTEMA_IDS } from '../../shared/eva/sistemas.js'
+import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
 
 const DiagnosticoQuerySchema = z.object({
   sistema: z.enum(SISTEMA_IDS, { error: 'Falta o no reconozco "sistema".' }),

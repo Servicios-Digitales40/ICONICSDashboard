@@ -26,8 +26,8 @@ import assert from 'node:assert/strict'
 
 import {
   evaluarPronostico, MECANISMOS, preguntaSobrePronostico,
-} from '../shared/eva/pronostico.js'
-import { REPOSO, UMBRALES } from '../shared/eva/umbrales.js'
+} from '../shared/eva/comun/pronostico.js'
+import { REPOSO, UMBRALES } from '../shared/eva/comun/umbrales.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -303,7 +303,7 @@ function lim(key, cual) { return UMBRALES[key]?.[cual] ?? null }
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa shared/eva/pronostico.js.${c.reset}`)
+  console.log(`${c.gris}Revisa shared/eva/comun/pronostico.js.${c.reset}`)
   process.exit(1)
 }
 

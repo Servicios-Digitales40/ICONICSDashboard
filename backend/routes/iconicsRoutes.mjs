@@ -25,7 +25,7 @@ import {
   WritePointSchema,
 } from '../http/esquemas.mjs'
 import { isSafePointName, parsePointList } from '../iconics/validation.mjs'
-import { planificar } from '../../shared/eva/rango.js'
+import { planificar } from '../../shared/eva/comun/rango.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
 
 /**

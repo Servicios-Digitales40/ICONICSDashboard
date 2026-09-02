@@ -51,8 +51,8 @@ import {
   esHistorizada,
   historizadas,
   pointName,
-} from '../shared/eva/senales.js'
-import { PROVISIONALES } from '../shared/eva/umbrales.js'
+} from '../shared/eva/tanque/senales.js'
+import { PROVISIONALES } from '../shared/eva/comun/umbrales.js'
 import {
   NO_COMPARTEN,
   SISTEMA,
@@ -61,9 +61,9 @@ import {
   mismoSistema,
   sistemasDeSenal,
   tieneHistoria,
-} from '../shared/eva/sistemas.js'
+} from '../shared/eva/comun/sistemas.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
-import { MAX_PUNTOS, resumirSerie } from '../shared/eva/historia.js'
+import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',

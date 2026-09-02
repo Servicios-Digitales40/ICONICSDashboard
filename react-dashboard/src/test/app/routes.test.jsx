@@ -147,7 +147,7 @@ describe("el sidebar que sale del registro", () => {
     // `riesgos.js` evalúa el tanque —nivel, presión, caudal— y
     // `riesgosVibracion.js` un motor con acelerómetros. Una sola pantalla con
     // las dos listas invitaría a buscar entre ellas una relación que no
-    // existe, que es el error que `shared/eva/sistemas.js` evita al asistente.
+    // existe, que es el error que `shared/eva/comun/sistemas.js` evita al asistente.
     const conRiesgos = NAV.flatMap((s) =>
       (s.children ?? []).filter((c) => c.label === "Riesgos").map((c) => [s.group, c.id])
     );

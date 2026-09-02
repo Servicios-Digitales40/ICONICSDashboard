@@ -14,7 +14,7 @@
  * que lo disparó, la muestra de sensores, la causa que se propuso y su
  * respaldo, la causa REAL que confirmó el técnico y cómo terminó — la
  * parte opcional de `crearIntervencion` (ver su cabecera en
- * `shared/eva/aprendizaje.js`).
+ * `shared/eva/comun/aprendizaje.js`).
  *
  * ── SIN GUARDA DE ESCRITURA PROPIA, A PROPÓSITO ─────────────────────
  *

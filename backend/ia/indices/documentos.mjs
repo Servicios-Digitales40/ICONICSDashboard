@@ -34,7 +34,7 @@ import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
 import { logger } from '../../logger.mjs'
-import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../../shared/eva/manuales.js'
+import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../../shared/eva/comun/manuales.js'
 import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
 import {
   coseno,
@@ -59,7 +59,7 @@ const SOLAPE = 150
 /**
  * Extensiones que se saben leer. El resto se ignoran en silencio.
  *
- * Declaradas en `shared/eva/manuales.js` y no aquí: la ruta de subida (Plan
+ * Declaradas en `shared/eva/comun/manuales.js` y no aquí: la ruta de subida (Plan
  * 16 Fase 1) necesita la MISMA lista para rechazar de entrada un archivo que
  * el índice no sabría leer. Dos listas con la misma intención es la forma en
  * que una acaba aceptando algo que la otra rechaza.
@@ -515,7 +515,7 @@ export function createIndiceDocumentos({
    * surta efecto, y si se leyera sólo al crear el fragmento, quedaría con
    * el `sistema` de la primera vez que se indexó hasta que el archivo
    * cambiara de huella. `null`/ausente = "toda la planta", igual que en
-   * `shared/eva/manuales.js·sistemaValido` — incluye la carpeta que nunca
+   * `shared/eva/comun/manuales.js·sistemaValido` — incluye la carpeta que nunca
    * pasó por `manuales.mjs` (archivos puestos a mano, sin manifiesto).
    */
   let mapaSistemas = new Map()

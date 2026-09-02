@@ -21,9 +21,9 @@
  * (`evaluarRiesgosDe`). Las tres herramientas de la familia `maquina/` llaman a
  * las tres en ese orden.
  */
-import { SISTEMA, SISTEMAS } from '../../../../shared/eva/sistemas.js'
-import { evaluarRiesgos } from '../../../../shared/eva/riesgos.js'
-import { evaluarRiesgosVibracion } from '../../../../shared/eva/riesgosVibracion.js'
+import { SISTEMA, SISTEMAS } from '../../../../shared/eva/comun/sistemas.js'
+import { evaluarRiesgos } from '../../../../shared/eva/tanque/riesgos.js'
+import { evaluarRiesgosVibracion } from '../../../../shared/eva/vibraciones/riesgosVibracion.js'
 import { isGoodQuality } from '../../../../shared/quality.js'
 import { fallo } from './respuesta.mjs'
 

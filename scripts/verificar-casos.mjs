@@ -34,7 +34,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
-import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/aprendizaje.js'
+import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/comun/aprendizaje.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',

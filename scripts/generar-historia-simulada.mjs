@@ -43,7 +43,7 @@
  *
  * ── LA FÍSICA: CALIBRADA CONTRA DATOS REALES, NO EL SIMULADOR DE DEMO ──
  *
- * `shared/eva/simulador.js` existe, pero está calibrado para verse VIVO en
+ * `shared/eva/tanque/simulador.js` existe, pero está calibrado para verse VIVO en
  * una demo (ciclos de 6 min, jornada de 4 h) — no representa un patrón real
  * de operación. Este script usa su propio modelo, calibrado contra
  * estadísticas reales leídas del historiador (min/max/avg de los últimos
@@ -62,8 +62,8 @@
  */
 import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { historizadas, pointName, senalInfo } from '../shared/eva/senales.js'
-import { UMBRALES } from '../shared/eva/umbrales.js'
+import { historizadas, pointName, senalInfo } from '../shared/eva/tanque/senales.js'
+import { UMBRALES } from '../shared/eva/comun/umbrales.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -116,7 +116,7 @@ const authenticator = createAuthenticator(config)
 /* ── El modelo físico: calibrado contra el historiador real ─────────
  *
  * Rangos medidos el 26-08-2026 sobre los últimos 6 días de datos reales
- * (ver la conversación), y las bandas de `shared/eva/umbrales.js` como
+ * (ver la conversación), y las bandas de `shared/eva/comun/umbrales.js` como
  * referencia de qué es "normal" para cada señal. La bomba cicla dentro de
  * la ventana laboral —ciclos de ~25 min: 18 min de marcha, 7 de paro—, y
  * queda en reposo fuera de ella.
@@ -139,7 +139,7 @@ function ruido(amplitud, rnd) {
 /**
  * Valor de cada señal en un instante dado. `enJornada` decide si la bomba
  * puede estar en marcha; fuera de la ventana laboral todo queda en reposo,
- * igual que hace `shared/eva/simulador.js` con `enMarcha`.
+ * igual que hace `shared/eva/tanque/simulador.js` con `enMarcha`.
  */
 function valorSimulado(clave, { enJornada, minutoJornada, progresoSemana, rnd }) {
   const marcha = enJornada && enMarcha(minutoJornada)

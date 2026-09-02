@@ -36,7 +36,7 @@ import {
   evaluarRiesgosVibracion,
   preguntaSobreRiesgoVibracion,
   REGLAS,
-} from '../shared/eva/riesgosVibracion.js'
+} from '../shared/eva/vibraciones/riesgosVibracion.js'
 import {
   AREA_ALARMAS,
   CANALES,
@@ -55,7 +55,7 @@ import {
   todosLosPuntos,
   VIGILANCIA,
   VIGILANCIAS,
-} from '../shared/eva/vibraciones.js'
+} from '../shared/eva/vibraciones/vibraciones.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -690,7 +690,7 @@ console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa shared/eva/riesgosVibracion.js.${c.reset}`)
+  console.log(`${c.gris}Revisa shared/eva/vibraciones/riesgosVibracion.js.${c.reset}`)
   process.exit(1)
 }
 console.log(

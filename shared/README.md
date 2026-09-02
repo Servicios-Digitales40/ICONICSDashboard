@@ -40,41 +40,41 @@ Ver [`docs/PLAN-8-DEMO-EVA.md`](../docs/PLAN-8-DEMO-EVA.md).
 
 | Archivo | Qué contiene |
 |---|---|
-| `eva/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `estado()`, `resumen()`, `series`, `desgaste` |
-| `eva/estadoMaquina.js` | **La forma común.** Cómo cuenta cualquier máquina cómo está: señales, grupos, recuento y —lo que más importa— los puntos que NO contestaron |
+| `eva/comun/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `estado()`, `resumen()`, `series`, `desgaste` |
+| `eva/comun/estadoMaquina.js` | **La forma común.** Cómo cuenta cualquier máquina cómo está: señales, grupos, recuento y —lo que más importa— los puntos que NO contestaron |
 
 **El tanque** — `ac:TDCON/DEMO/SENSORES/`, ocho señales planas:
 
 | Archivo | Qué contiene |
 |---|---|
-| `eva/senales.js` | Contrato con ICONICS: las 8 señales, sus tags y **cuáles tienen serie propia** |
-| `eva/umbrales.js` | Las bandas y su declaración de procedencia (`PROVISIONALES`) |
-| `eva/estado.js` | Los 5 estados DERIVADOS y su agregación |
-| `eva/activos.js` | Los 4 activos, derivados del campo `activo` de las señales |
-| `eva/sistema.js` | `createSistema()`: saneamiento y evaluación en la frontera |
-| `eva/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
-| `eva/riesgos.js` | Las 10 reglas de riesgo de esta instalación |
-| `eva/simulador.js` | Su física: `valorEn(clave, ms)` y `valorDePunto(punto, ms)` |
-| `eva/pronostico.js` | Sus 5 mecanismos de desgaste acumulado |
-| `eva/estadoTanque.js` | Su proyección a la forma común, y cómo se narra al asistente |
+| `eva/tanque/senales.js` | Contrato con ICONICS: las 8 señales, sus tags y **cuáles tienen serie propia** |
+| `eva/comun/umbrales.js` | Las bandas y su declaración de procedencia (`PROVISIONALES`) |
+| `eva/tanque/estado.js` | Los 5 estados DERIVADOS y su agregación |
+| `eva/tanque/activos.js` | Los 4 activos, derivados del campo `activo` de las señales |
+| `eva/tanque/sistema.js` | `createSistema()`: saneamiento y evaluación en la frontera |
+| `eva/comun/historia.js` | Mecánica del historiador de este árbol: `ac:` y no `hda:`, `Average` y no `Interpolative`, y el resumen de una serie |
+| `eva/tanque/riesgos.js` | Las 10 reglas de riesgo de esta instalación |
+| `eva/tanque/simulador.js` | Su física: `valorEn(clave, ms)` y `valorDePunto(punto, ms)` |
+| `eva/comun/pronostico.js` | Sus 5 mecanismos de desgaste acumulado |
+| `eva/tanque/estadoTanque.js` | Su proyección a la forma común, y cómo se narra al asistente |
 
 **El sistema de vibraciones** — `ac:TDCON/Motors/01/` más `ae:/DEMO VIBRACIONES`,
 73 puntos sobre tres apoyos:
 
 | Archivo | Qué contiene |
 |---|---|
-| `eva/vibraciones.js` | Catálogo compuesto: canales × medidas, banderas, vigilancias, confianzas, variador y contadores de alarma. Incluye las erratas del servidor, respetadas |
-| `eva/riesgosVibracion.js` | Las 18 reglas sobre los tres apoyos, con ISO 10816-1 Clase I |
-| `eva/simuladorVibraciones.js` | Su física: `valorVibracionEn(punto, ms)` |
-| `eva/sistemaVibraciones.js` | De puntos sueltos a `{ canales, variador, alarmas }` — el recorrido que antes estaba escrito dos veces |
-| `eva/estadoVibraciones.js` | Su proyección a la forma común, y su narración (la frase viene hecha: ver su cabecera) |
+| `eva/vibraciones/vibraciones.js` | Catálogo compuesto: canales × medidas, banderas, vigilancias, confianzas, variador y contadores de alarma. Incluye las erratas del servidor, respetadas |
+| `eva/vibraciones/riesgosVibracion.js` | Las 18 reglas sobre los tres apoyos, con ISO 10816-1 Clase I |
+| `eva/vibraciones/simuladorVibraciones.js` | Su física: `valorVibracionEn(punto, ms)` |
+| `eva/vibraciones/sistemaVibraciones.js` | De puntos sueltos a `{ canales, variador, alarmas }` — el recorrido que antes estaba escrito dos veces |
+| `eva/vibraciones/estadoVibraciones.js` | Su proyección a la forma común, y su narración (la frase viene hecha: ver su cabecera) |
 
 Los dos catálogos **no se unifican**, y no es pendiente de nadie: son dos formas
 de datos, no dos versiones de la misma. Lo que sí se comparte es el PUERTO que
-ambos implementan, y eso es lo que declara `sistemas.js`.
+ambos implementan, y eso es lo que declara `comun/sistemas.js`.
 
 Lo que sí se unificó es **cómo se cuentan hacia afuera**. Cada máquina proyecta
-su dominio a la forma de `estadoMaquina.js`, y sobre esa forma se escriben una
+su dominio a la forma de `comun/estadoMaquina.js`, y sobre esa forma se escriben una
 sola vez el asistente, los informes y —cuando llegue— la predicción de fallos.
 El dominio de cada una sigue intacto y viaja en `estado.dominio`, que es lo que
 esperan sus motores de reglas.
@@ -123,20 +123,20 @@ BUENA. La pantalla no ve un fallo; ve una máquina que contesta y no dice nada.
 
 Hoy son **seis pasos**, y ninguno toca el transporte ni el asistente:
 
-1. **Su catálogo** — `shared/eva/prensa.js`. Los tags, con sus irregularidades
+1. **Su catálogo** — `shared/eva/prensa/prensa.js`. Los tags, con sus irregularidades
    del servidor respetadas, y un `parsePunto` que sea el inverso exacto por
    construcción. Es el único archivo con nombres de tag de esa máquina.
-2. **Su física** — `shared/eva/simuladorPrensa.js`, una función pura
+2. **Su física** — `shared/eva/prensa/simuladorPrensa.js`, una función pura
    `(punto, ms) → valor | null | undefined`. Sin `Math.random()`: lo aleatorio
    es del transporte, no de la señal.
-3. **Su proyección** — `shared/eva/estadoPrensa.js`, que la lleva a la forma de
-   `estadoMaquina.js` y declara cómo se narra al asistente. Aquí se decide una
+3. **Su proyección** — `shared/eva/prensa/estadoPrensa.js`, que la lleva a la forma de
+   `comun/estadoMaquina.js` y declara cómo se narra al asistente. Aquí se decide una
    cosa que hay que decidir mirando la máquina y no copiando la de al lado: si
    los campos sueltos bastan (como el tanque) o si la frase tiene que venir
    hecha desde el código (como vibraciones, y está medido por qué).
-4. **Sus reglas** — `shared/eva/riesgosPrensa.js`, si va a tener pantalla de
+4. **Sus reglas** — `shared/eva/prensa/riesgosPrensa.js`, si va a tener pantalla de
    riesgos, más su línea en `evaluarRiesgosDe` de `herramientas.mjs`.
-5. **Una entrada en `sistemas.js`** que enchufe todo lo anterior, con sus
+5. **Una entrada en `comun/sistemas.js`** que enchufe todo lo anterior, con sus
    `raices`, su `cadenciaMs`, sus `series` y sus `limitaciones`.
 6. **Sus vistas y su ruta**, más el hook de lectura — que para el origen
    simulado es una línea: `transporteDe("prensa", clase)`.
@@ -148,7 +148,7 @@ remontaje al conmutar, ni las herramientas del asistente — `estado_del_sistema
 registro, y las de historia se niegan solas citando `series.nota` si la nueva
 todavía no tiene series.
 
-> **Lo que el registro te obliga a declarar, y por qué.** `sistemas.js` valida
+> **Lo que el registro te obliga a declarar, y por qué.** `comun/sistemas.js` valida
 > al cargarse y **lanza** si falta algo — el proceso no arranca. Entre lo
 > obligatorio está `series.nota`: una máquina sin histórico es perfectamente
 > válida, pero el silencio no, porque se lee como que sí lo tiene. Es el punto 3
@@ -187,7 +187,7 @@ que probar era la que todavía no.
 > las máquinas — y eso es exactamente lo que no debe pasar: dos instalaciones
 > con PLC distinto no comparten nada por estar en la misma planta. Un motor de
 > sondeo **por sistema**, y la identidad del sistema viajando pegada al punto
-> (`parsePuntoDeSistema`). La cabecera de `eva/sistemas.js` lo explica largo.
+> (`parsePuntoDeSistema`). La cabecera de `eva/comun/sistemas.js` lo explica largo.
 
 ## Reglas
 
@@ -204,8 +204,8 @@ arranque.
 
 | Desde | Forma |
 |---|---|
-| `backend/` | `import { SENALES } from '../shared/eva/senales.js'` |
-| `react-dashboard/` | `import { SENALES } from '@shared/eva/senales.js'` |
+| `backend/` | `import { SENALES } from '../shared/eva/tanque/senales.js'` |
+| `react-dashboard/` | `import { SENALES } from '@shared/eva/tanque/senales.js'` |
 
 El alias `@shared` está declarado en `vite.config.js` y en `jsconfig.json`, y hay
 que tocarlos a la vez. Es el segundo alias del frontend y la excepción a su regla

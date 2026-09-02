@@ -30,7 +30,7 @@ import {
   normalizarAlmacen,
   pendientes,
   validarPropuesta,
-} from '../shared/eva/aprendizaje.js'
+} from '../shared/eva/comun/aprendizaje.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -206,7 +206,7 @@ console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa shared/eva/aprendizaje.js.${c.reset}`)
+  console.log(`${c.gris}Revisa shared/eva/comun/aprendizaje.js.${c.reset}`)
   process.exit(1)
 }
 console.log(

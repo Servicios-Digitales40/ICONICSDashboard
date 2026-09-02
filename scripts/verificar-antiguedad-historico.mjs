@@ -53,7 +53,7 @@
  *   node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs nivelTanque temperaturaTanque
  *
  * Sin argumentos, recorre las señales de `historizadas()`. Un argumento es
- * la `key` del catálogo (`shared/eva/senales.js`), no el nombre del tag.
+ * la `key` del catálogo (`shared/eva/tanque/senales.js`), no el nombre del tag.
  *
  * Habla con el servidor ICONICS real de `.env.local` — no monta la app, no
  * necesita el backend levantado, pero SÍ necesita ICONICS_FAKE=false (o sin
@@ -65,8 +65,8 @@ import { loadConfig } from '../backend/config.mjs'
 import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { createIconicsClient } from '../backend/iconics/client.mjs'
 import { logger } from '../backend/logger.mjs'
-import { intervaloHMS } from '../shared/eva/historia.js'
-import { esHistorizada, historizadas, pointName, senalInfo } from '../shared/eva/senales.js'
+import { intervaloHMS } from '../shared/eva/comun/historia.js'
+import { esHistorizada, historizadas, pointName, senalInfo } from '../shared/eva/tanque/senales.js'
 import { isGoodQuality } from '../shared/quality.js'
 
 // Un sondeo por tramo: la traza INFO de cada llamada (`iconics/client.mjs`)
@@ -115,7 +115,7 @@ function tieneDatoReal(resultado) {
 /**
  * Un sondeo de `readHistory` con un intervalo FIJO de una hora — SIEMPRE con
  * `aggregate: 'Average'`, nunca crudo. Ver la nota 3 de la cabecera de
- * `shared/eva/historia.js`: sin agregar, un rango sin dato real no vuelve
+ * `shared/eva/comun/historia.js`: sin agregar, un rango sin dato real no vuelve
  * `data: []` — vuelve la muestra LÍMITE de todo el historiador, sin
  * importar cuán lejos esté del rango pedido (medido: pedir el 14-ago, el
  * 17-ago o el año 2020 sin agregar devolvió siempre la misma muestra del

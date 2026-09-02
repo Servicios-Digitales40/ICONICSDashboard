@@ -77,7 +77,7 @@ responde hoy sobre el sistema de agua de `ac:TDCON/DEMO/SENSORES/`, donde el
 problema no es el mismo: a tres de
 las ocho señales el historiador les devuelve **la serie de otra**, sin dar
 error. Eso no se arregla marcando una casilla, y no puede quedar en manos de una
-variable de entorno mal escrita. Vive como hecho medido en `shared/eva/senales.js`
+variable de entorno mal escrita. Vive como hecho medido en `shared/eva/tanque/senales.js`
 (campo `historizado`); ver la cabecera de `backend/ia/conversacion/herramientas.mjs`.
 
 `IA_TIMEOUT_MS` es una variable aparte y no `UPSTREAM_TIMEOUT_MS` porque son
@@ -333,7 +333,7 @@ El resto del registro son lecturas; `POST /write` en crudo no es alcanzable
 desde el chat ni con la instrucción más astuta. Dos guardas protegen esa única
 escritura: `ICONICS_READ_ONLY` (la misma que gobierna `/api/iconics/write`) y,
 sólo al encender, el nivel del tanque — por encima del aviso superior de
-`shared/eva/umbrales.js`, la herramienta se niega antes de escribir para no
+`shared/eva/comun/umbrales.js`, la herramienta se niega antes de escribir para no
 arriesgar un desbordamiento.
 
 ### Del propio puente

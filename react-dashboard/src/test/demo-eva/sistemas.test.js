@@ -29,7 +29,7 @@ import {
   sistemaDePunto,
   sistemasDeSenal,
   valorSimuladoDe,
-} from "@shared/eva/sistemas.js";
+} from "@shared/eva/comun/sistemas.js";
 
 /** Reloj fijo: ninguna prueba puede depender de cuándo se ejecute. */
 const T0 = Date.UTC(2026, 7, 27, 9, 0, 0);

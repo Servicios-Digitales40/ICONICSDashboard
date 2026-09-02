@@ -4,7 +4,7 @@
  *
  * Las reglas —qué agregado se pide, cómo se escribe un intervalo, qué muestra
  * se tira y por qué sólo cuatro señales tienen serie— viven en
- * [`@shared/eva/historia.js`](../../../../shared/eva/historia.js). Se mudaron
+ * [`@shared/eva/comun/historia.js`](../../../../shared/eva/comun/historia.js). Se mudaron
  * allí cuando el asistente pasó a responder sobre esta instalación: sus
  * herramientas leen el mismo historiador desde Node y tienen que repetir la
  * guarda de `historizado` **exactamente igual**, o contestarían la curva de la
@@ -43,8 +43,8 @@ import {
   VENTANA,
   intervaloHMS,
   normalizar,
-} from "@shared/eva/historia.js";
-import { planificar } from "@shared/eva/rango.js";
+} from "@shared/eva/comun/historia.js";
+import { planificar } from "@shared/eva/comun/rango.js";
 
 import { esHistorizada, pointName, senalInfo } from "../../domain/senales.js";
 
@@ -171,7 +171,7 @@ export async function leerSerie(clave, rango = VENTANA) {
  * ── POR QUÉ EL TROCEADO YA NO VIVE AQUÍ (Plan 15 Fase 2) ───────────
  *
  * `trocear()` se mudó a `planificar()`/`tramosDe()` en
- * `@shared/eva/rango.js`: era la MISMA regla que `leerSerieEnRango()`
+ * `@shared/eva/comun/rango.js`: era la MISMA regla que `leerSerieEnRango()`
  * repetía en `backend/ia/conversacion/herramientas.mjs` con un valor distinto (ahí
  * siempre 1 día por tramo, aquí escalonado) — dos copias de "cómo trocear un
  * rango largo" son dos oportunidades de que la gráfica, el asistente y el
@@ -309,7 +309,7 @@ function cobertura(tramos, indicesConDato) {
  * Los accesos rápidos del selector de rango contra el historiador: contra
  * el reloj de pared de quien mira la pantalla, no contra una regla del
  * protocolo del historiador — por eso viven aquí y no en
- * `@shared/eva/historia.js`. Un asistente que corriera en el backend, en
+ * `@shared/eva/comun/historia.js`. Un asistente que corriera en el backend, en
  * otro huso horario, no debería heredar esta noción de «ayer».
  *
  * («Hoy» no está aquí: es «Tiempo real» en la UI, y ese lee del búfer en

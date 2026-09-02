@@ -12,7 +12,7 @@ import { createPollingEngine } from "@/lib/iconics/pollingEngine.js";
 import { QUALITY_GOOD } from "@shared/quality.js";
 import { CAOS_ALTO, SIN_CAOS } from "@/lib/iconics/caos.js";
 import { createTransporteEva } from "@/Demo-EVA/data/tanque/simulador.js";
-import { pointName } from "@shared/eva/senales.js";
+import { pointName } from "@shared/eva/tanque/senales.js";
 
 /* Dos puntos cualesquiera. Los del motor no tienen que existir en ninguna
    parte —para él son cadenas— salvo en el bloque del simulador, que sí los

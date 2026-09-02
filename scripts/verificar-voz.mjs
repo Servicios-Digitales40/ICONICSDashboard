@@ -180,7 +180,7 @@ await check('el vocabulario cambia con el SISTEMA que se está mirando', async (
    * Whisper escribe lo que oye guiándose por el prompt, y el prompt gasta
    * contexto suyo: una lista con el vocabulario de todas las máquinas de la
    * planta empeora la transcripción de todo lo demás. Por eso cada sistema
-   * declara el suyo en `shared/eva/sistemas.js` y aquí se elige uno.
+   * declara el suyo en `shared/eva/comun/sistemas.js` y aquí se elige uno.
    *
    * Y no es sólo tamaño: preguntando por vibraciones con las palabras del agua
    * delante, «lado acople» y «rodamiento» salían deformados. Una pregunta

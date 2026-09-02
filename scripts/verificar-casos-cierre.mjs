@@ -42,8 +42,8 @@ import {
   VACIO as APRENDIZAJE_VACIO,
   crearIntervencion,
   intervencionesRecientes,
-} from '../shared/eva/aprendizaje.js'
-import { textoDeRecuperacion } from '../shared/eva/casos.js'
+} from '../shared/eva/comun/aprendizaje.js'
+import { textoDeRecuperacion } from '../shared/eva/comun/casos.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',

@@ -20,7 +20,7 @@
  *  - Que una escritura se pueda releer, que es lo que `controlar_bomba`
  *    necesita para confirmar que su orden tuvo efecto.
  *  - Que la física es la MISMA que sirve el simulador del frontend: los dos
- *    leen `shared/eva/simulador.js`, así que un instante fijo da el mismo
+ *    leen `shared/eva/tanque/simulador.js`, así que un instante fijo da el mismo
  *    valor en los dos lados.
  *
  * ── USO ────────────────────────────────────────────────────────────
@@ -36,11 +36,11 @@ import { createServer } from 'node:http'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/senales.js'
-import { valorEn } from '../shared/eva/simulador.js'
-import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones.js'
-import { valorVibracionEn } from '../shared/eva/simuladorVibraciones.js'
-import { SISTEMAS } from '../shared/eva/sistemas.js'
+import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/tanque/senales.js'
+import { valorEn } from '../shared/eva/tanque/simulador.js'
+import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones/vibraciones.js'
+import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+import { SISTEMAS } from '../shared/eva/comun/sistemas.js'
 import { isGoodQuality } from '../shared/quality.js'
 
 const c = {
@@ -132,7 +132,7 @@ await checkAsync('un punto ajeno al árbol no rompe el lote: llega como hueco', 
 console.log('\n── Todas las máquinas del registro ────────────────────')
 
 /*
- * Este bloque se escribe RECORRIENDO `shared/eva/sistemas.js`, no nombrando
+ * Este bloque se escribe RECORRIENDO `shared/eva/comun/sistemas.js`, no nombrando
  * máquinas. La que se dé de alta mañana queda comprobada el día que se añada,
  * sin que nadie se acuerde de venir aquí — que es exactamente lo que falló las
  * dos veces anteriores.
@@ -404,7 +404,7 @@ console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/iconics/fakeClient.mjs y shared/eva/simulador.js.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/iconics/fakeClient.mjs y shared/eva/tanque/simulador.js.${c.reset}`)
   process.exit(1)
 }
 

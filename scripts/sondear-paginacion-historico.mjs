@@ -34,7 +34,7 @@
 import { loadConfig } from '../backend/config.mjs'
 import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { logger } from '../backend/logger.mjs'
-import { esHistorizada, historizadas, pointName } from '../shared/eva/senales.js'
+import { esHistorizada, historizadas, pointName } from '../shared/eva/tanque/senales.js'
 import { isGoodQuality } from '../shared/quality.js'
 
 logger.setLevel('WARN')

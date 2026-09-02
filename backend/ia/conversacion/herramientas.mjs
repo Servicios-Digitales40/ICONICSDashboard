@@ -59,7 +59,7 @@
  * `Average` y no `Interpolative`, hay tope de 100 muestras por petición, y
  * **tres de las ocho señales devuelven la serie de otra**— y un modelo de 4B
  * las inventa con aplomo. Están medidas en `docs/PLAN-8-DEMO-EVA.md` y
- * resueltas en `shared/eva/historia.js`.
+ * resueltas en `shared/eva/comun/historia.js`.
  *
  * Aquí el modelo elige QUÉ preguntar; el CÓMO lo sabe este archivo.
  *
@@ -73,12 +73,12 @@
  * al 41 % cuando eso son grados centígrados de un tanque.
  *
  * Por eso `historia_de_senal` rechaza por catálogo **antes de salir a la red**,
- * y por eso la marca vive en `shared/eva/senales.js` y no en cada consulta.
+ * y por eso la marca vive en `shared/eva/tanque/senales.js` y no en cada consulta.
  *
  * ── EL ESTADO ES NUESTRO, Y SE DICE ────────────────────────────────
  *
  * El servidor no publica estado para este árbol. Los cinco estados salen de
- * comparar cada señal contra los umbrales de `shared/eva/umbrales.js`, que son
+ * comparar cada señal contra los umbrales de `shared/eva/comun/umbrales.js`, que son
  * **nuestros y siguen sin confirmar**. Las respuestas lo llevan escrito
  * (`avisoUmbrales`) mientras `PROVISIONALES` esté en `true`, igual que la vista
  * de Planta pinta su aviso. Un asistente que afirmara «está fuera de límite»
@@ -119,7 +119,7 @@ import {
   regresionLineal,
   proyectar,
   detectarAnomalias,
-} from '../../../shared/eva/estadistica.js'
+} from '../../../shared/eva/comun/estadistica.js'
 import {
   RAIZ,
   SENALES,
@@ -128,9 +128,9 @@ import {
   historizadas,
   pointName,
   senalInfo,
-} from '../../../shared/eva/senales.js'
-import { ACTIVOS } from '../../../shared/eva/activos.js'
-import { UMBRALES } from '../../../shared/eva/umbrales.js'
+} from '../../../shared/eva/tanque/senales.js'
+import { ACTIVOS } from '../../../shared/eva/tanque/activos.js'
+import { UMBRALES } from '../../../shared/eva/comun/umbrales.js'
 import {
   AGREGADO,
   MAX_PUNTOS,
@@ -140,7 +140,7 @@ import {
   normalizar,
   horaLocal as horaLocalDe,
   resumirSerie,
-} from '../../../shared/eva/historia.js'
+} from '../../../shared/eva/comun/historia.js'
 import {
   NO_COMPARTEN,
   SISTEMA,
@@ -151,7 +151,7 @@ import {
   resumenDeSistemas,
   sistemasDeSenal,
   tieneHistoria,
-} from '../../../shared/eva/sistemas.js'
+} from '../../../shared/eva/comun/sistemas.js'
 import {
   VACIO as APRENDIZAJE_VACIO,
   crearHecho,
@@ -160,7 +160,7 @@ import {
   normalizarAlmacen,
   pendientes,
   validarPropuesta,
-} from '../../../shared/eva/aprendizaje.js'
+} from '../../../shared/eva/comun/aprendizaje.js'
 import { isoLocal, resolverPeriodo } from '../../../shared/periodo.js'
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'

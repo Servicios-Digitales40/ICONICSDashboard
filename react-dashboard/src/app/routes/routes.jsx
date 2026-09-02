@@ -76,7 +76,7 @@ export const DEFAULT_ROUTE = "eva-inicio";
  * cabeza de quien ya la sabía: «Riesgos» y «Vibraciones» salían seguidas y
  * nada decía que hablaban de instalaciones distintas. La primera persona que
  * cruzara el caudal de una con la vibración de la otra estaría uniendo dos
- * máquinas que no se tocan — el mismo error que `shared/eva/sistemas.js`
+ * máquinas que no se tocan — el mismo error que `shared/eva/comun/sistemas.js`
  * existe para evitarle al asistente.
  *
  * «General» agrupa lo que es del SERVIDOR y no de una máquina: el historial

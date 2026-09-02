@@ -88,7 +88,7 @@ Se ve al abrir el archivo, en vez de estar escondido en un glob de
 
 **Alias para cruzar, relativo dentro de `test/`.** Una prueba importa su
 sujeto igual que lo haría la aplicación (`@/Demo-EVA/data/hooks.js`, o
-`@shared/eva/senales.js` para lo que vive en `shared/`), así que la ruta
+`@shared/eva/tanque/senales.js` para lo que vive en `shared/`), así que la ruta
 no cambia si la prueba se mueve.
 
 Que el sujeto esté en `shared/` no saca la prueba de aquí: la suite entera

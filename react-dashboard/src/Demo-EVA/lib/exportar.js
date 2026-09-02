@@ -20,13 +20,13 @@
  *
  * `DetalleActivo` guarda el preset elegido (`"ayer"`, `{horas,puntos}`…),
  * pero lo que hay DENTRO del archivo es la serie que de verdad llegó, y el
- * historiador ajusta el intervalo real al pedirla (`shared/eva/historia.js`).
+ * historiador ajusta el intervalo real al pedirla (`shared/eva/comun/historia.js`).
  * Nombrar el archivo con el primer y el último instante de `datos` describe
  * exactamente lo que contiene, no lo que se preguntó — la diferencia importa
  * el día que el historiador devuelva menos de lo pedido y nadie lo note
  * porque el nombre seguía diciendo el rango original.
  */
-import { AGREGADO } from "@shared/eva/historia.js";
+import { AGREGADO } from "@shared/eva/comun/historia.js";
 
 /** "Presión del tanque" → "presion-del-tanque". Sin acentos: un nombre de archivo no debe depender de que el sistema operativo los soporte bien. */
 function slug(texto) {
@@ -75,7 +75,7 @@ function celdaCSV(valor) {
  * lea igual que en la propia gráfica— y el valor, con la unidad en la
  * cabecera si el tag la declara.
  *
- * No lleva columna de calidad: `normalizar()` (`shared/eva/historia.js`) ya
+ * No lleva columna de calidad: `normalizar()` (`shared/eva/comun/historia.js`) ya
  * descarta la muestra de mala calidad antes de que llegue aquí — no hay un
  * dato de calidad que exportar, sólo huecos que ya no están en el arreglo.
  */

@@ -25,7 +25,7 @@
  * Este módulo es la frontera: lo que está aquí se puede llamar desde cualquier
  * sitio, incluido un test, sin montar nada.
  */
-import { PROVISIONALES } from '../../../../shared/eva/umbrales.js'
+import { PROVISIONALES } from '../../../../shared/eva/comun/umbrales.js'
 
 /**
  * Reduce una serie a como mucho `max` puntos, promediando por grupos.

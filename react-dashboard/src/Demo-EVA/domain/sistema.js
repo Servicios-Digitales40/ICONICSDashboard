@@ -1,7 +1,7 @@
 /**
  * La forma `Sistema`: el único vocabulario que conocen las vistas de Demo EVA.
  *
- * El contenido vive en [`@shared/eva/sistema.js`](../../../../shared/eva/sistema.js);
+ * El contenido vive en [`@shared/eva/tanque/sistema.js`](../../../../shared/eva/tanque/sistema.js);
  * aquí queda la puerta. El motivo del traslado está en `./senales.js`.
  *
  * De los cinco archivos del dominio éste es el que más se gana compartiendo:
@@ -15,4 +15,4 @@
  * `@/lib/domain/index.js` —que es frontend y el backend no puede alcanzar—.
  * Son los mismos saneadores.
  */
-export * from "@shared/eva/sistema.js";
+export * from "@shared/eva/tanque/sistema.js";

@@ -151,7 +151,7 @@ const DEFAULTS = {
  * tres de las ocho señales el historiador les devuelve **la serie de otra**,
  * y eso no se arregla marcando una casilla ni se puede permitir que lo
  * desactive una variable de entorno mal escrita. Vive como hecho medido en
- * `shared/eva/senales.js` (campo `historizado`). Ver `backend/ia/conversacion/herramientas.mjs`.
+ * `shared/eva/tanque/senales.js` (campo `historizado`). Ver `backend/ia/conversacion/herramientas.mjs`.
  */
 
 /** Cliente OIDC que ICONICS 11.x trae dado de alta de fábrica. */
@@ -420,7 +420,7 @@ export function loadConfig(env = process.env) {
       readOnly: readBoolean('ICONICS_READ_ONLY', env.ICONICS_READ_ONLY, true),
       /**
        * Transporte simulado (Plan 14 §7.1): sirve las ocho señales de
-       * `shared/eva/simulador.js` sin salir a la red, con la MISMA firma que
+       * `shared/eva/tanque/simulador.js` sin salir a la red, con la MISMA firma que
        * `iconics/client.mjs`. Pensado para trabajar en el asistente, el
        * historiador y el resto del backend sin depender de que el servidor
        * de planta esté alcanzable — que es justo lo que bloqueaba antes las

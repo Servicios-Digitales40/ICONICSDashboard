@@ -44,7 +44,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataSource } from "@/lib/datasource";
 import { isGoodQuality } from "@shared/quality.js";
 
-import { createSistemaVibraciones } from "@shared/eva/sistemaVibraciones.js";
+import { createSistemaVibraciones } from "@shared/eva/vibraciones/sistemaVibraciones.js";
 
 import { transporteDe } from "../comunes/transportes.js";
 
@@ -158,7 +158,7 @@ export function useVibracion() {
 
       /*
        * El recorrido del catálogo —tres canales por cinco familias, más el
-       * variador y los contadores— vive en `@shared/eva/sistemaVibraciones.js`
+       * variador y los contadores— vive en `@shared/eva/vibraciones/sistemaVibraciones.js`
        * y no aquí. Estaba escrito a mano en este archivo y OTRA VEZ en
        * `backend/ia/conversacion/herramientas.mjs`: dos copias del mismo recorrido sobre el
        * mismo catálogo, y el síntoma de que divergieran no habría sido un

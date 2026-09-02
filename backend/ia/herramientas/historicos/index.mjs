@@ -52,8 +52,8 @@ import {
   estadisticasBasicas,
   proyectar,
   regresionLineal,
-} from '../../../../shared/eva/estadistica.js'
-import { renderizarGraficoSerie } from '../../../../shared/eva/graficos.js'
+} from '../../../../shared/eva/comun/estadistica.js'
+import { renderizarGraficoSerie } from '../../../../shared/eva/comun/graficos.js'
 import {
   MAX_PUNTOS,
   SIN_SERIE,
@@ -63,7 +63,7 @@ import {
   horaLocal as horaLocalDe,
   normalizar,
   resumirSerie,
-} from '../../../../shared/eva/historia.js'
+} from '../../../../shared/eva/comun/historia.js'
 import {
   SENALES,
   SENAL_KEYS,
@@ -71,16 +71,16 @@ import {
   historizadas,
   pointName,
   senalInfo,
-} from '../../../../shared/eva/senales.js'
-import { UMBRALES } from '../../../../shared/eva/umbrales.js'
-import { evaluarPronostico } from '../../../../shared/eva/pronostico.js'
+} from '../../../../shared/eva/tanque/senales.js'
+import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
+import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
 import {
   NO_COMPARTEN,
   SISTEMA,
   sistemaDePunto,
   sistemasDeSenal,
   tieneHistoria,
-} from '../../../../shared/eva/sistemas.js'
+} from '../../../../shared/eva/comun/sistemas.js'
 import { resolverInstante } from '../../../../shared/periodo.js'
 
 import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
@@ -715,7 +715,7 @@ export function crearHerramientasDeHistoricos({
      * ── EL PROBLEMA QUE RESUELVE ───────────────────────────────────────
      *
      * Las demás herramientas juzgan contra `UMBRALES`, que son suposiciones
-     * nuestras y siguen sin confirmar (ver `shared/eva/umbrales.js`). Medido
+     * nuestras y siguen sin confirmar (ver `shared/eva/comun/umbrales.js`). Medido
      * contra la instalación real en agosto de 2026, esas suposiciones no se
      * parecen a esta planta: la banda de la temperatura es veinte veces más
      * ancha que su variación real, la del caudal está en una escala diez veces

@@ -32,7 +32,7 @@
  * Lee `ac:TDCON/DEMO/SENSORES/CONTROL` directamente — el mismo punto que
  * escribe `controlar_bomba` (`backend/ia/conversacion/herramientas.mjs`) y confirma tras
  * cada accionamiento. No es una de las ocho señales de
- * `shared/eva/senales.js` (vive aparte a propósito, ver la cabecera de
+ * `shared/eva/tanque/senales.js` (vive aparte a propósito, ver la cabecera de
  * `ControlesTanque.jsx`), así que no pasa por `useSistemaAgua`: se sondea suelto
  * con `useIconicsPoint`, igual que hace `IconicsLiveCard` para cualquier
  * punto fuera del catálogo.
@@ -48,7 +48,7 @@ import { Power, PowerOff, AlertTriangle } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useIconicsPoint } from "@/lib/iconics";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
-import { RAIZ } from "@shared/eva/senales.js";
+import { RAIZ } from "@shared/eva/tanque/senales.js";
 
 const TAG_CONTROL = `${RAIZ}CONTROL`;
 

@@ -14,7 +14,7 @@
  * Casi nada, y ésa es la idea. Desde que la mecánica del transporte se
  * generalizó, aquí sólo se juntan las dos piezas de ESTA máquina:
  *
- *   la física   `@shared/eva/simuladorVibraciones.js`, compartida con el
+ *   la física   `@shared/eva/vibraciones/simuladorVibraciones.js`, compartida con el
  *               transporte falso del backend — dos programas sirviendo el
  *               mismo reloj de pared tienen que ver la misma máquina.
  *   la mecánica `lib/iconics/transporteSimulado.js`, que no conoce ninguna
@@ -31,7 +31,7 @@
  * a datos reales.
  */
 import { CAOS_SUAVE, createTransporteSimulado } from "@/lib/iconics";
-import { valorVibracionEn } from "@shared/eva/simuladorVibraciones.js";
+import { valorVibracionEn } from "@shared/eva/vibraciones/simuladorVibraciones.js";
 
 export {
   CICLO_VIB_MS,
@@ -40,7 +40,7 @@ export {
   eventoVibDe,
   faseCicloVib,
   valorVibracionEn,
-} from "@shared/eva/simuladorVibraciones.js";
+} from "@shared/eva/vibraciones/simuladorVibraciones.js";
 
 /**
  * Transporte simulado para el árbol de vibraciones.

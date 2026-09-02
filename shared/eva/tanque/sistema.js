@@ -23,12 +23,12 @@
  * evaluación de las otras: invertirlo dejaría media instalación evaluada contra
  * sus bandas de marcha mientras la bomba está parada.
  */
-import { hasValue, toNumber } from "../valores.js";
+import { hasValue, toNumber } from "../../valores.js";
 
 import { SENALES, SENAL_KEYS } from "./senales.js";
 import { ACTIVO_IDS, ACTIVOS } from "./activos.js";
 import { ESTADOS_ORDEN, enReposo, estadoDeSenal, peor } from "./estado.js";
-import { bandaDe, margenConsumido } from "./umbrales.js";
+import { bandaDe, margenConsumido } from "../comun/umbrales.js";
 
 /**
  * Booleano utilizable o `null`.

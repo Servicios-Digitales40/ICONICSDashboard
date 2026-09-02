@@ -15,7 +15,7 @@ separadas: otro motor, otro variador, otro PLC. Mezclar sus pantallas invita a
 leerlas juntas, y la primera correlación que alguien saque entre el caudal del
 tanque y la vibración de la otra une dos máquinas que no comparten ni un
 tornillo. La misma regla la defiende el registro en
-[`shared/eva/sistemas.js`](../../../shared/eva/sistemas.js).
+[`shared/eva/comun/sistemas.js`](../../../shared/eva/comun/sistemas.js).
 
 Quién manda sobre qué máquinas existen no es este módulo: es ese registro. Aquí
 sólo se pintan.
@@ -113,7 +113,7 @@ domain/     cinco reexports de una línea · el contenido vive en @shared/eva/
 
 data/       la frontera con la red
   evaSource.js    un motor de polling, un lote, 3 s · elige quién lee el pasado
-  historia.js     el `fetch` · las reglas están en @shared/eva/historia.js
+  historia.js     el `fetch` · las reglas están en @shared/eva/comun/historia.js
   simulador.js    la instalación entera sin red: `read()` y `readSerie()`
   EvaProvider.jsx el único sitio que crea una fuente
   hooks.js        useSistemaAgua(), useSerieHistorica()
@@ -184,7 +184,7 @@ dejaba esta sección entera sin dato.
 [`data/simuladorVibracion.js`](data/simuladorVibracion.js) sirve el sistema de
 vibraciones, y es un archivo aparte por lo mismo que lo son su catálogo y sus
 reglas: son dos instalaciones sin un punto en común. La física de cada una vive
-en `@shared/eva/simulador.js` y `@shared/eva/simuladorVibraciones.js`, y las
+en `@shared/eva/tanque/simulador.js` y `@shared/eva/vibraciones/simuladorVibraciones.js`, y las
 comparte con el transporte falso del backend (`ICONICS_FAKE=true`), para que los
 dos programas sirviendo el mismo instante enseñen lo mismo.
 

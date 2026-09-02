@@ -11,7 +11,7 @@ import { NAV } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/index.js";
 import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
 import { estadoColor } from "@/Demo-EVA/components/paleta.js";
-import { RAIZ } from "@shared/eva/senales.js";
+import { RAIZ } from "@shared/eva/tanque/senales.js";
 
 /**
  * Raíz de instalación para el pie de la barra, sin el tramo de puntos
@@ -330,7 +330,7 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           detrás de este tablero (PRODUCT.md), así que un nombre y un "Plan
           Pro" de mentira prometerían una cuenta que no existe. En su lugar,
           la raíz real del servidor que está leyendo: el mismo hecho que
-          `shared/eva/senales.js` ya trata como la única fuente de verdad
+          `shared/eva/tanque/senales.js` ya trata como la única fuente de verdad
           para "qué instalación es esta". */}
       <div style={{ padding: collapsed ? "12px 10px" : "12px 14px", borderTop: `1px solid ${t.border}` }}>
         <MaybeTip collapsed={collapsed} label={`Instalación: ${RAIZ_INSTALACION}`}>

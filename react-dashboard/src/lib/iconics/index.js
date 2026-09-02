@@ -6,7 +6,7 @@
  * pasa por aquí; no hay ningún `fetch(` fuera de `apiClient.js`.
  *
  * Este barril no sabe qué instalación se está mirando. El catálogo de puntos de
- * Demo EVA vive en `@shared/eva/senales.js`, y antes se reexportaba desde aquí
+ * Demo EVA vive en `@shared/eva/tanque/senales.js`, y antes se reexportaba desde aquí
  * el de Resonac (`tagCatalog.js`), que era lo que ataba la red a una planta
  * concreta.
  */

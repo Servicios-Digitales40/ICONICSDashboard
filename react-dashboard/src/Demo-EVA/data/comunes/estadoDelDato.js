@@ -9,7 +9,7 @@
  * ── LO QUE ESTO NO HACE ──────────────────────────────────────────────
  *
  * No decide si un VALOR está en banda, en aviso o crítico — eso es
- * `bandaDe()` en `shared/eva/umbrales.js`, y no se toca aquí. Esto contesta
+ * `bandaDe()` en `shared/eva/comun/umbrales.js`, y no se toca aquí. Esto contesta
  * una pregunta distinta y anterior: si hay que fiarse del valor que sea que
  * `bandaDe()` reciba. Un `98 %` "en banda" leído hace diez minutos no está en
  * banda: está viejo, y eso hay que decirlo antes que su color.
@@ -18,13 +18,13 @@
  *
  * `receivedAt` y `stale` ya los calcula el motor de sondeo
  * (`lib/iconics/pollingEngine.js`, `staleAfterCycles`) y ya viajan en cada
- * señal (`shared/eva/sistema.js` → `createSenal`). Hasta ahora nada en
+ * señal (`shared/eva/tanque/sistema.js` → `createSenal`). Hasta ahora nada en
  * pantalla los leía: el sondeo los calculaba y se perdían. `frescuraDe()`
  * sólo interpreta lo que ya existe.
  *
  * `motivo` y `error` son los que ya devuelve `useSerieHistorica()` /
  * `useSeriesHistoricas()` (`data/comunes/hooks.js`): `motivo` cuando la señal no
- * tiene serie propia (`SIN_SERIE` de `shared/eva/historia.js`), `error`
+ * tiene serie propia (`SIN_SERIE` de `shared/eva/comun/historia.js`), `error`
  * cuando falló la petición. `estadoHistorial()` sólo les pone nombre.
  */
 import { fmtAntiguedad } from "@/lib/format.js";

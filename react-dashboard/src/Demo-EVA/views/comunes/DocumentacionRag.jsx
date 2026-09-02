@@ -26,7 +26,7 @@ import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { archivarManual, listarManuales, reemplazarManual, subirManual } from "@/lib/ragApi.js";
 import { useTheme } from "@/theme";
-import { resumenDeSistemas } from "@shared/eva/sistemas.js";
+import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 

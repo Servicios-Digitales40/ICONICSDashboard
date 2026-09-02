@@ -120,7 +120,7 @@ const errores = res.filter((r) => r.estado === 'error').length
 console.log()
 if (conDatos === res.length) {
   console.log(`${c.verde}${c.negrita}Registra. Los ${conDatos} puntos devuelven serie.${c.reset}`)
-  console.log('Ya se puede poner `historizado` en shared/eva/vibraciones.js y')
+  console.log('Ya se puede poner `historizado` en shared/eva/vibraciones/vibraciones.js y')
   console.log('escribir el pronóstico de rodamientos sobre tendencia real.')
 } else if (errores === res.length) {
   console.log(`${c.rojo}${c.negrita}Sigue sin registrar: los ${errores} puntos dan error.${c.reset}`)

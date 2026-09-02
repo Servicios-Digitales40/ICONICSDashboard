@@ -345,7 +345,7 @@ export function GraficaAusente({ t, alto = 150, mensaje, compacta }) {
  *
  * El texto describe `senal.banda`, no `senal.estado`: son dos cosas
  * distintas a propósito (ver la cabecera de `createSenal` en
- * `shared/eva/sistema.js`) — una señal `en reposo` puede seguir fuera de
+ * `shared/eva/tanque/sistema.js`) — una señal `en reposo` puede seguir fuera de
  * banda, y la marca de este componente ya usa `bandaColor(senal.banda)`
  * para el color. Etiquetarla con `senal.estado` la haría decir «En reposo»
  * junto a una marca coral: dos verdades distintas contradiciéndose en la

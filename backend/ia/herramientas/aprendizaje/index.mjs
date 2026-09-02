@@ -11,7 +11,7 @@
  * almacén JSON de `datos/aprendizaje.json`, y ninguna toca el `client` de
  * ICONICS. No leen el servidor, no piden series y no evalúan reglas; su
  * materia prima es un archivo (y, para `cerrar_diagnostico`, también
- * `shared/eva/causas.js` — una función pura, no un servidor).
+ * `shared/eva/comun/causas.js` — una función pura, no un servidor).
  *
  * Eso las hace de las primeras del reparto (Fase 1). Esta factoría no recibe
  * `client`, ni `turnos`, ni concurrencia: no recibe nada. Si algún día una de
@@ -57,9 +57,9 @@ import {
   validarPropuesta,
   crearIntervencion,
   intervencionesRecientes,
-} from '../../../../shared/eva/aprendizaje.js'
-import { SISTEMA_IDS } from '../../../../shared/eva/sistemas.js'
-import { causasDe } from '../../../../shared/eva/causas.js'
+} from '../../../../shared/eva/comun/aprendizaje.js'
+import { SISTEMA_IDS } from '../../../../shared/eva/comun/sistemas.js'
+import { causasDe } from '../../../../shared/eva/comun/causas.js'
 import { fallo } from '../lib/respuesta.mjs'
 
 /**
@@ -126,7 +126,7 @@ async function guardarAprendizaje(almacen, ruta = RUTA_APRENDIZAJE) {
  * genérico que cualquier código nuevo pueda invocar con cualquier cosa.
  *
  * Es una `crearIntervencion` más rica, ver su cabecera en
- * `shared/eva/aprendizaje.js`, pero la validación de mínimos —sintoma y
+ * `shared/eva/comun/aprendizaje.js`, pero la validación de mínimos —sintoma y
  * solucion con contenido de verdad— vive en el esquema Zod de
  * `casosRoutes.mjs`, no aquí: esta función confía en su llamador, igual
  * que `crearIntervencion` confía en el suyo. Repetir la validación en las

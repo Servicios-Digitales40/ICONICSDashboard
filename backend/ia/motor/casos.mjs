@@ -15,7 +15,7 @@
  * ── POR QUÉ ES INCREMENTAL "GRATIS", A DIFERENCIA DE `documentos.mjs` ──
  *
  * Una intervención, una vez guardada, no se edita — «lo que pasó, pasó» (ver
- * la cabecera de `intervenciones` en `shared/eva/aprendizaje.js`). Eso quita
+ * la cabecera de `intervenciones` en `shared/eva/comun/aprendizaje.js`). Eso quita
  * de encima la mitad del problema que resolvió la Fase 0 para los manuales:
  * allí un ARCHIVO puede cambiar de contenido sin cambiar de nombre, y hacía
  * falta una huella (tamaño + fecha) para saberlo. Aquí basta con el `id`: si
@@ -64,7 +64,7 @@
  */
 import { join } from 'node:path'
 import { logger } from '../../logger.mjs'
-import { textoDeRecuperacion } from '../../../shared/eva/casos.js'
+import { textoDeRecuperacion } from '../../../shared/eva/comun/casos.js'
 import { leerAprendizaje } from '../herramientas/aprendizaje/index.mjs'
 import { indexarTerminos, puntuarBm25 } from '../indices/bm25.mjs'
 import {

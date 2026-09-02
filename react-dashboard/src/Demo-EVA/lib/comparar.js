@@ -15,7 +15,7 @@
  *
  * ── LA MISMA IDEA QUE YA USA EL ASISTENTE, TRAÍDA AQUÍ ───────────────
  *
- * `alinearSeries()` (`shared/eva/estadistica.js`) es la que emplea
+ * `alinearSeries()` (`shared/eva/comun/estadistica.js`) es la que emplea
  * `correlacionar_senales` en el backend, con una tolerancia derivada de la
  * ventana — la mitad de la distancia esperada entre muestras. Aquí la
  * tolerancia se deriva de los DATOS que de verdad llegaron (la mediana de
@@ -31,7 +31,7 @@
  * las dos derivaciones —de la ventana pedida allí, de los datos recibidos
  * aquí— resuelven el mismo problema con información distinta.
  */
-import { alinearSeries } from "@shared/eva/estadistica.js";
+import { alinearSeries } from "@shared/eva/comun/estadistica.js";
 
 /** Mitad de la separación mediana entre muestras consecutivas — mismo criterio que el backend, aplicado a los datos recibidos. */
 function toleranciaDe(datos) {

@@ -15,7 +15,7 @@
  * El caso que lo motivó: el servidor calcula divisiones sin proteger el
  * denominador, así que con el sistema recién arrancado devuelve `Infinity` de
  * verdad. Estas tres funciones son lo único que impide que eso llegue al
- * modelo. Ver `shared/eva/sistema.js`, que las usa al construir cada señal.
+ * modelo. Ver `shared/eva/tanque/sistema.js`, que las usa al construir cada señal.
  */
 import { describe, expect, it } from "vitest";
 import { hasValue, toNumber, toText } from "@shared/valores.js";

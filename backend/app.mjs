@@ -150,7 +150,7 @@ export async function createApp(config) {
       'Sirviendo datos SIMULADOS: ningún valor de este servidor viene de la planta',
       {
         variable: 'ICONICS_FAKE=true',
-        efecto: 'las ocho señales las genera shared/eva/simulador.js',
+        efecto: 'las ocho señales las genera shared/eva/tanque/simulador.js',
         arreglo: 'quita ICONICS_FAKE del entorno para volver a leer de ICONICS',
       }
     )

@@ -34,7 +34,7 @@
  * nivel del tanque o la tensión de línea se siguen evaluando con el sistema
  * parado, que es cuando más importan.
  */
-import { REPOSO, bandaDe } from "./umbrales.js";
+import { REPOSO, bandaDe } from "../comun/umbrales.js";
 import { SENALES } from "./senales.js";
 
 /**

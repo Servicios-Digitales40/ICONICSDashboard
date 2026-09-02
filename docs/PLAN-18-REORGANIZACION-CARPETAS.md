@@ -193,5 +193,15 @@ porque no bloquea nada de lo anterior y no es urgente.
       comunes/ (6), sin renombrar. Lo delicado no eran los consumidores sino
       los imports ENTRE ellos: seis archivos se importaban por `./hermano`, y
       la mitad de esos hermanos cayó en otra subcarpeta. 511 pruebas y build.
-- [ ] F4 — `shared/eva/`
+- [x] F4 — `shared/eva/` — 24 archivos a tanque/ (7), vibraciones/ (5) y
+      comun/ (12). Bateria completa en verde: 153 backend + 511 frontend +
+      build + los 18 verificadores (el unico rojo, `antiguedad-historico`, es
+      una sonda contra el servidor real de planta, inalcanzable desde aqui).
+      Actualizado tambien el mapa de `shared/README.md`, cuya tabla usa la
+      forma corta `eva/X.js` y no la cazaba la reescritura de rutas.
+      **Observacion:** `umbrales.js`, `historia.js` y `pronostico.js` van a
+      `comun/` por el plan, pero el README los describe como del tanque
+      («*sus* 5 mecanismos de desgaste»). Tienen consumidores de las dos
+      maquinas, asi que `comun/` se sostiene, pero la prosa habria que
+      revisarla.
 - [ ] F5 — `react-dashboard/src/lib/`

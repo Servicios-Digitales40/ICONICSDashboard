@@ -21,7 +21,7 @@ import { API_BASE } from "@/lib/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
-import { sistemaDeRuta } from "@shared/eva/sistemas.js";
+import { sistemaDeRuta } from "@shared/eva/comun/sistemas.js";
 
 /**
  * Mensaje del asistente aún vacío, al que se le van pegando los deltas.

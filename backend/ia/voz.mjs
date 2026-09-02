@@ -26,7 +26,7 @@
  * Este módulo, por tanto, no interpreta el audio: lo reenvía tal cual.
  */
 import { logger } from '../logger.mjs'
-import { SISTEMA } from '../../shared/eva/sistemas.js'
+import { SISTEMA } from '../../shared/eva/comun/sistemas.js'
 
 /**
  * Frase que se le da a Whisper como contexto inicial.
@@ -71,7 +71,7 @@ const CONTEXTO_GENERAL =
  * acople» y «rodamiento» salían deformados — y una pregunta deformada hace
  * que el asistente conteste sobre otra cosa, que es peor que no entenderla.
  *
- * Cada sistema declara el suyo en `shared/eva/sistemas.js`. Dar de alta una
+ * Cada sistema declara el suyo en `shared/eva/comun/sistemas.js`. Dar de alta una
  * máquina nueva es añadir su `vocabulario` ahí; este archivo no cambia.
  */
 function contextoDe(sistemaId) {

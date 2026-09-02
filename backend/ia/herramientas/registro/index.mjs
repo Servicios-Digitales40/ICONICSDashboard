@@ -7,7 +7,7 @@
  *
  * Porque no es una herramienta sobre una máquina: es la que las ENUMERA, y el
  * asistente no puede saber de antemano cuántas hay. Hoy dos, mañana las que se
- * den de alta en `shared/eva/sistemas.js`.
+ * den de alta en `shared/eva/comun/sistemas.js`.
  *
  * Existe sobre todo por el error que evita. Sin ella, preguntado por algo de un
  * sistema que no conoce, el modelo llamaría a la herramienta del otro y
@@ -18,7 +18,7 @@
  * No recibe nada. Lee el registro y ya está — igual que `aprendizaje/`, su
  * firma vacía es el dato de que no depende de ICONICS.
  */
-import { NO_COMPARTEN, SISTEMAS, resumenDeSistemas } from '../../../../shared/eva/sistemas.js'
+import { NO_COMPARTEN, SISTEMAS, resumenDeSistemas } from '../../../../shared/eva/comun/sistemas.js'
 
 /** La herramienta que enumera las máquinas de la planta. */
 export function crearHerramientasDeRegistro() {
@@ -27,7 +27,7 @@ export function crearHerramientasDeRegistro() {
      * ── QUÉ SISTEMAS HAY EN ESTA PLANTA ───────────────────────────────
      *
      * El asistente no puede saber de antemano cuántos hay: hoy dos, mañana
-     * los que se den de alta en `shared/eva/sistemas.js`. Esta herramienta es
+     * los que se den de alta en `shared/eva/comun/sistemas.js`. Esta herramienta es
      * como los descubre, con lo que cada uno mide, qué herramientas lo cubren
      * y —lo que importa— qué NO se puede afirmar de él.
      *

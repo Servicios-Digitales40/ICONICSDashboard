@@ -47,7 +47,7 @@ import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { obtenerDiagnostico, registrarCaso } from "@/lib/casosApi.js";
 import { useTheme } from "@/theme";
-import { SISTEMA } from "@shared/eva/sistemas.js";
+import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";

@@ -27,9 +27,9 @@
  */
 import assert from 'node:assert/strict'
 
-import { createSistema } from '../shared/eva/sistema.js'
-import { evaluarRiesgos, preguntaSobreRiesgo, REGLAS } from '../shared/eva/riesgos.js'
-import { REPOSO, UMBRALES } from '../shared/eva/umbrales.js'
+import { createSistema } from '../shared/eva/tanque/sistema.js'
+import { evaluarRiesgos, preguntaSobreRiesgo, REGLAS } from '../shared/eva/tanque/riesgos.js'
+import { REPOSO, UMBRALES } from '../shared/eva/comun/umbrales.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -401,7 +401,7 @@ check('sin la lectura de caudal se declara no evaluable, no silencio', () => {
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa shared/eva/riesgos.js.${c.reset}`)
+  console.log(`${c.gris}Revisa shared/eva/tanque/riesgos.js.${c.reset}`)
   process.exit(1)
 }
 

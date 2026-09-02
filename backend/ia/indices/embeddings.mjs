@@ -11,7 +11,7 @@
  * persistente por hash, el mismo reintento fragmento a fragmento cuando un
  * lote falla. Copiar las ~90 líneas de esa lógica a un segundo archivo
  * habría sido la clase de duplicación que este proyecto ya ha pagado antes
- * —ver `EXTENSIONES_MANUAL` en `shared/eva/manuales.js`, o `RUTA_APRENDIZAJE`
+ * —ver `EXTENSIONES_MANUAL` en `shared/eva/comun/manuales.js`, o `RUTA_APRENDIZAJE`
  * en `herramientas/aprendizaje/index.mjs`— así que se extrajo en cuanto
  * apareció el segundo consumidor real, no antes.
  *

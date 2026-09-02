@@ -1,7 +1,7 @@
 /**
  * Riesgos por combinación de señales.
  *
- * El contenido vive en [`@shared/eva/riesgos.js`](../../../../shared/eva/riesgos.js);
+ * El contenido vive en [`@shared/eva/tanque/riesgos.js`](../../../../shared/eva/tanque/riesgos.js);
  * aquí queda la puerta, igual que con `estado.js` y `sistema.js`. El motivo del
  * traslado está en `./senales.js`.
  *
@@ -10,4 +10,4 @@
  * estimaciones. Quien las pinte tiene que rotularlo — `evaluarRiesgos()`
  * devuelve `provisional` precisamente para eso.
  */
-export * from "@shared/eva/riesgos.js";
+export * from "@shared/eva/tanque/riesgos.js";

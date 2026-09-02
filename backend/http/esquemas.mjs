@@ -29,7 +29,7 @@
  */
 import { z } from 'zod'
 import { isSafeHistoryArgument, isSafePointName } from '../iconics/validation.mjs'
-import { SISTEMA_IDS } from '../../shared/eva/sistemas.js'
+import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
 
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
 export const MAX_PREGUNTA = 2000
@@ -388,7 +388,7 @@ const ResultadoCasoSchema = z.object({
  * `sintoma`/`causa`/`solucion`/`resuelto`/`sistema`/`origen` son el mismo
  * esquema que ya rellena `registrar_intervencion`; el resto es la parte
  * nueva de §4 del plan, y sólo la rellena esta puerta —ver la cabecera de
- * `crearIntervencion` en `shared/eva/aprendizaje.js` para por qué son
+ * `crearIntervencion` en `shared/eva/comun/aprendizaje.js` para por qué son
  * opcionales y no un segundo esquema.
  *
  * `muestraSensores` es un volcado tal cual de lo que ya leyó el tablero: no

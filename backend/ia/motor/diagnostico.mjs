@@ -43,9 +43,9 @@
  * demasiado fino o demasiado grueso, se ajusta aquí, en un solo sitio: no
  * hace falta tocar `documentos.mjs` ni `casos.mjs`.
  */
-import { causasDe } from '../../../shared/eva/causas.js'
-import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/riesgos.js'
-import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/riesgosVibracion.js'
+import { causasDe } from '../../../shared/eva/comun/causas.js'
+import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
+import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
 import { logger } from '../../logger.mjs'
 
 const REGLAS_POR_SISTEMA = {
@@ -388,7 +388,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
      * de este archivo. Dos llamadas idénticas siguen dando exactamente las
      * mismas `causas`; sólo el id de evento cambia entre una y otra, porque
      * es lo único que ES distinto: un momento distinto. Mismo generador que
-     * `crearIntervencion` (`shared/eva/aprendizaje.js`) por la misma razón:
+     * `crearIntervencion` (`shared/eva/comun/aprendizaje.js`) por la misma razón:
      * dos eventos en el mismo milisegundo no pueden compartir id.
      */
     const diagnosticEventId = `diag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

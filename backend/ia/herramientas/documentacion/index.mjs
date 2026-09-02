@@ -28,7 +28,7 @@
  * de un manual que no ha leído se lo inventa con total aplomo, y eso en una
  * planta es peor que no contestar.
  */
-import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../shared/eva/senales.js'
+import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../shared/eva/tanque/senales.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
 /*

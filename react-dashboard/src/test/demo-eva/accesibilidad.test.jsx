@@ -121,7 +121,7 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
   });
 });
 
-/** Los `corto` de `shared/eva/estado.js`: nunca colisionan con un nombre de señal. */
+/** Los `corto` de `shared/eva/tanque/estado.js`: nunca colisionan con un nombre de señal. */
 const CORTO_ESTADO = /En banda|Aviso|Fuera|Sin dato|Reposo/;
 
 describe("el color de banda no es su único portador (Plan 13, F6)", () => {

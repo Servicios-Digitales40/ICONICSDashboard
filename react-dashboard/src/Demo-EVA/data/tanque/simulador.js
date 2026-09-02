@@ -28,7 +28,7 @@
  * Lo que sí es compartido —la firma `read` y los presets de caos— vive en
  * `lib/iconics/`; lo que sabe de agua, aquí.
  *
- * ── EL MODELO FÍSICO VIVE EN `shared/eva/simulador.js` ─────────────
+ * ── EL MODELO FÍSICO VIVE EN `shared/eva/tanque/simulador.js` ─────────────
  *
  * `valorEn`, `mediaDelTramo`, `enMarcha`, `faseCiclo` y `eventoDe` son la
  * MISMA función pura que usa el transporte falso del backend
@@ -36,7 +36,7 @@
  * de pared tienen que ver la misma instalación, y repetirla a mano en los dos
  * lados es exactamente el tipo de duplicado que un día diverge en silencio.
  * Este archivo se queda con el TRANSPORTE —cómo se sirve, con qué caos, con
- * qué firma— y `shared/eva/simulador.js` con la señal.
+ * qué firma— y `shared/eva/tanque/simulador.js` con la señal.
  *
  * No hay `Math.random()` en ninguna señal: es pura. Tres propiedades salen
  * gratis de ahí y las tres importan:
@@ -54,7 +54,7 @@
 import { CAOS_SUAVE, createTransporteSimulado } from "@/lib/iconics";
 import {
   CICLO_MS, JORNADA_MS, enMarcha, eventoDe, faseCiclo, mediaDelTramo, valorDePunto, valorEn,
-} from "@shared/eva/simulador.js";
+} from "@shared/eva/tanque/simulador.js";
 
 import { esHistorizada, senalInfo } from "../../domain/senales.js";
 import { MAX_PUNTOS, SIN_SERIE, VENTANA } from "./historia.js";

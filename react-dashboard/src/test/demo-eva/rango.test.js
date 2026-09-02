@@ -1,7 +1,7 @@
 /**
  * rango.test.js
  * ------------------------------------------------------------------
- * `planificar()`/`tramosDe()` de `@shared/eva/rango.js` (Plan 15 Fase 2): LA
+ * `planificar()`/`tramosDe()` de `@shared/eva/comun/rango.js` (Plan 15 Fase 2): LA
  * regla de troceado, única para el frontend (`Demo-EVA/data/tanque/historia.js`) y
  * el backend (`ia/conversacion/herramientas.mjs`), que antes vivía duplicada con valores
  * distintos en cada uno.
@@ -11,7 +11,7 @@
  * tramo— sin red y sin mockear nada: es JavaScript puro.
  */
 import { describe, expect, it } from "vitest";
-import { planificar, tramosDe } from "@shared/eva/rango.js";
+import { planificar, tramosDe } from "@shared/eva/comun/rango.js";
 
 describe("tramosDe · el tamaño de cada tramo escalona con lo largo del rango", () => {
   it("un rango de un día o menos no se trocea", () => {

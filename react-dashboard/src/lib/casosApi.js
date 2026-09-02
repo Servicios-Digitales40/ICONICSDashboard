@@ -38,7 +38,7 @@ export async function obtenerDiagnostico({ sistema, riesgoId, signal }) {
 }
 
 /** Cierra un caso: lo que el sistema ya sabía más lo que confirmó o
- *  corrigió la persona. Ver `shared/eva/aprendizaje.js` (`crearIntervencion`)
+ *  corrigió la persona. Ver `shared/eva/comun/aprendizaje.js` (`crearIntervencion`)
  *  para la forma completa de `datos`. */
 export async function registrarCaso(datos, { signal } = {}) {
   const response = await fetch(`${API_BASE}/api/casos`, {

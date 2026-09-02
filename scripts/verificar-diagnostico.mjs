@@ -32,9 +32,9 @@
 import assert from 'node:assert/strict'
 
 import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
-import { causasDe } from '../shared/eva/causas.js'
-import { REGLAS as REGLAS_TANQUE } from '../shared/eva/riesgos.js'
-import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/riesgosVibracion.js'
+import { causasDe } from '../shared/eva/comun/causas.js'
+import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
+import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -473,7 +473,7 @@ console.log('\n── El término temporal entra en el total y la evidencia ─�
 
 await check('sólo la causa con `firmaTemporal` consulta al evaluador — la otra queda en 0', async () => {
   // De las dos causas de bomba-sin-salida, sólo sin-recirculacion-minima
-  // declara firmaTemporal (shared/eva/causas.js) — el doble siempre
+  // declara firmaTemporal (shared/eva/comun/causas.js) — el doble siempre
   // "encuentra" tendencia, y aun así valvula-impulsion-cerrada debe quedar
   // en temporal:0, porque `respaldoTemporal` ni la llama sin firma.
   const evaluadorTemporal = evaluadorTemporalFalso({
@@ -528,7 +528,7 @@ await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin ev
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/motor/diagnostico.mjs o shared/eva/causas.js.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/motor/diagnostico.mjs o shared/eva/comun/causas.js.${c.reset}`)
   process.exit(1)
 }
 

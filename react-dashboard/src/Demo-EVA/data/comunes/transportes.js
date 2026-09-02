@@ -26,13 +26,13 @@
  * ── LO QUE ESTE ARCHIVO NO HACE ────────────────────────────────────
  *
  * No monta motores de sondeo ni junta lotes. Cada sistema sondea POR SU CUENTA
- * —esa regla vive en `shared/eva/sistemas.js` y es la que impide que dos
+ * —esa regla vive en `shared/eva/comun/sistemas.js` y es la que impide que dos
  * instalaciones acaben en el mismo búfer—. Aquí sólo se construye el transporte
  * que ese sondeo usará.
  */
 import { TRANSPORTES } from "@/lib/datasource";
 import { createRealTransport, createTransporteSimulado, presetCaos } from "@/lib/iconics";
-import { SISTEMA } from "@shared/eva/sistemas.js";
+import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 
 /**
  * El transporte de un sistema para una clase dada.
@@ -44,7 +44,7 @@ import { SISTEMA } from "@shared/eva/sistemas.js";
  * El grado de caos sale de `VITE_ICONICS_CHAOS`, que es un ajuste del ENTORNO y
  * no de la instalación: cualquier máquina que se añada degrada igual.
  *
- * @param {string} sistemaId  id en `shared/eva/sistemas.js`
+ * @param {string} sistemaId  id en `shared/eva/comun/sistemas.js`
  * @param {string} clase      `TRANSPORTES.REAL` | `TRANSPORTES.SIMULADO`
  */
 export function transporteDe(sistemaId, clase) {

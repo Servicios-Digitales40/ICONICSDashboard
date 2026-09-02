@@ -25,7 +25,7 @@
  *   · 100 muestras por petición es un tope DURO del servidor. Se pagina con
  *     `X-ICO-CONTINUATION`, que sí funciona — lo hace `client.readHistory`.
  *   · Un rango de varios días hay que trocearlo, y el troceado es UNA regla
- *     (`shared/eva/rango.js`), la misma que usa el frontend.
+ *     (`shared/eva/comun/rango.js`), la misma que usa el frontend.
  *   · Pedir la serie de una señal NO historizada no da error: el servidor
  *     devuelve la curva de otra. Por eso la puerta es `series.historizadas` del
  *     registro y no una comprobación de aquí.
@@ -37,14 +37,14 @@
  * servidor de planta. Viene de `config.limits`, no se lee del entorno aquí.
  */
 import { conConcurrenciaAcotada } from '../../../../shared/concurrencia.js'
-import { planificar } from '../../../../shared/eva/rango.js'
+import { planificar } from '../../../../shared/eva/comun/rango.js'
 import {
   AGREGADO,
   MAX_PUNTOS,
   SIN_SERIE,
   intervaloHMS,
   normalizar,
-} from '../../../../shared/eva/historia.js'
+} from '../../../../shared/eva/comun/historia.js'
 /*
  * ── EL PUNTO Y LA GUARDA SALEN DEL REGISTRO ────────────────────────
  *
@@ -61,7 +61,7 @@ import {
  * `series.historizadas`), así que la máquina que se dé de alta mañana declara
  * los suyos y este archivo no se entera.
  */
-import { SISTEMA } from '../../../../shared/eva/sistemas.js'
+import { SISTEMA } from '../../../../shared/eva/comun/sistemas.js'
 
 /**
  * Los ayudantes de historia, atados a un cliente y a un tope de concurrencia.
@@ -100,7 +100,7 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
   const r = await client.readHistory({
     // Cómo se nombra el punto en el historiador lo dice la máquina: el tanque
     // usa `ac:` —el mismo nombre que en vivo— y vibraciones `hda:` con su
-    // grupo delante. Ver `series.punto` en `shared/eva/sistemas.js`.
+    // grupo delante. Ver `series.punto` en `shared/eva/comun/sistemas.js`.
     pointName: deSistema(sistemaId).series.punto(clave),
     startDate: ventana.inicio.toISOString(),
     endDate: ventana.fin.toISOString(),
@@ -240,7 +240,7 @@ async function leerHistoriaLarga(clave, dias, sistemaId = 'tanque') {
  * atrás desde ahora". La usa `generar_reporte` (Plan 14 Fase 5), que puede
  * pedir cualquier ventana, no sólo la que termina en el presente.
  *
- * El troceado en tramos es `planificar()` de `@shared/eva/rango.js` (Plan
+ * El troceado en tramos es `planificar()` de `@shared/eva/comun/rango.js` (Plan
  * 15 Fase 2) — la MISMA regla escalonada que usa el frontend, en vez de la
  * de "siempre 1 día por tramo" que tenía este archivo antes: menos tramos
  * en rangos largos son menos peticiones HTTP, y con la Fase 1

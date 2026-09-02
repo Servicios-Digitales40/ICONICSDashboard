@@ -7,7 +7,7 @@
  * sigue así*, que es la que hace que alguien se levante de la silla antes de
  * que suene una alarma.
  *
- * El cruce lo hace `@shared/eva/riesgos.js` en código determinista. Aquí sólo
+ * El cruce lo hace `@shared/eva/tanque/riesgos.js` en código determinista. Aquí sólo
  * se pinta: esta vista no decide nada sobre la instalación.
  *
  * ── LAS TRES ZONAS, Y POR QUÉ SON TRES ─────────────────────────────
