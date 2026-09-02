@@ -221,17 +221,17 @@ async def vigilar(ip, cada=2):
     print()
     print(f"  Leyendo cada {cada} s. Ctrl+C para parar.")
     print()
-    print(f"  {'hora':<10}", end="")
-    for apoyo in APOYOS:
-        print(f"{apoyo:<26}", end="")
-    print()
 
     try:
         while True:
-            linea = [f"  {__import__('time').strftime('%H:%M:%S'):<10}"]
+            print(f"  {__import__('time').strftime('%H:%M:%S')}")
             for apoyo, base in APOYOS.items():
                 trozos = []
-                for nombre, off, _u in MEDIDAS[:2]:  # vRMS y aRMS caben en la fila
+                # Las CUATRO medidas. Antes eran `MEDIDAS[:2]` para que la
+                # fila quedara estrecha, y ese recorte escondía el DKW y el
+                # pico —justo los dos que dicen si un rodamiento golpea—.
+                # Una tabla más ancha es peor que perder la mitad del dato.
+                for nombre, off, unidad in MEDIDAS:
                     try:
                         v = await cliente.get_node(f"ns=4;i={base + off}").read_value()
                     except Exception:
@@ -241,10 +241,10 @@ async def vigilar(ip, cada=2):
                     # uno congelado.
                     cambio = clave in previo and previo[clave] != v
                     previo[clave] = v
-                    txt = "  ---" if v is None else f"{v:.3f}"
-                    trozos.append(f"{'*' if cambio else ' '}{txt:>9}")
-                linea.append("".join(trozos) + "  ")
-            print("".join(linea))
+                    txt = "---" if v is None else f"{v:.3f}"
+                    trozos.append(f"{'*' if cambio else ' '}{nombre} {txt:>9} {unidad:<5}")
+                print(f"     {apoyo:<18}{''.join(trozos)}")
+            print()
             await asyncio.sleep(cada)
     except KeyboardInterrupt:
         print()
