@@ -10,7 +10,7 @@
  * Recorrer los tres canales × cinco familias, decodificar las vigilancias,
  * juntar el variador y los contadores de alarma — eso estaba a mano en
  * `Demo-EVA/data/vibracion.js` (frontend) y otra vez en
- * `backend/ia/herramientas.mjs`. Dos copias del mismo recorrido sobre el mismo
+ * `backend/ia/conversacion/herramientas.mjs`. Dos copias del mismo recorrido sobre el mismo
  * catálogo, y el síntoma de que divergieran no sería un error: sería el chat
  * contestando sobre un apoyo con los datos de otro, con marcas de tiempo
  * correctas y sin una línea en el log.

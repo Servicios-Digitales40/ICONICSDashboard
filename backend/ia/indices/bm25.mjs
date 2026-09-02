@@ -1,6 +1,9 @@
 /**
- * Búsqueda léxica BM25, compartida entre `documentos.mjs` (fragmentos de
- * manual) y `casos.mjs` (texto de recuperación de una intervención, Fase 2).
+ * Búsqueda léxica BM25, compartida entre `documentos.mjs` —vecino, en esta
+ * misma carpeta— y `../motor/casos.mjs` (texto de recuperación de una
+ * intervención, Fase 2). Que uno de los dos consumidores viva en `motor/` y
+ * el otro aquí no cambia nada: este archivo no sabe qué es un fragmento ni
+ * una intervención, y por eso puede servir a los dos.
  *
  * Extraído en cuanto apareció el segundo consumidor real — mismo criterio
  * que `embeddings.mjs`, ver su cabecera. Nada aquí sabe qué es un

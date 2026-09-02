@@ -29,7 +29,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { createChat } from '../backend/ia/chat.mjs'
+import { createChat } from '../backend/ia/conversacion/chat.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -1045,7 +1045,7 @@ console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/chat.mjs y backend/routes/chatRoutes.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/conversacion/chat.mjs y backend/routes/chatRoutes.mjs.${c.reset}`)
   process.exit(1)
 }
 

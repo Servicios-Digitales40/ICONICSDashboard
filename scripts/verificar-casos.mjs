@@ -33,7 +33,7 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createIndiceCasos } from '../backend/ia/casos.mjs'
+import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/aprendizaje.js'
 
 const c = {
@@ -328,7 +328,7 @@ await rm(raiz, { recursive: true, force: true })
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/casos.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/motor/casos.mjs.${c.reset}`)
   process.exit(1)
 }
 

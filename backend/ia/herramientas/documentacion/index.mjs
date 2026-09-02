@@ -8,7 +8,7 @@
  * ── QUÉ LAS HACE UNA FAMILIA ───────────────────────────────────────
  *
  * Que las tres dependen de UNA sola cosa —`indiceDocumentos`, el índice BM25
- * que construye `ia/documentos.mjs`— y de nada más de la clausura. No tocan el
+ * que construye `ia/indices/documentos.mjs`— y de nada más de la clausura. No tocan el
  * `client` de ICONICS: los datos medidos que necesita `diagnostico` no los
  * pide él, se los pasa el ensamblador ya leídos.
  *
@@ -44,7 +44,7 @@ import {
   senalDesconocida,
   senalesMencionadas,
   trocearEnOraciones,
-} from '../../herramientas.mjs'
+} from '../../conversacion/herramientas.mjs'
 
 /**
  * Palabras con las que un manual anuncia un límite. Con acento Y sin él —el
@@ -208,7 +208,7 @@ function extraerCandidatosLimite(texto, anclas = []) {
  * herramientas de otras familias, no es del todo independiente.
  *
  * @param {object} args
- * @param {object|null} args.indiceDocumentos  índice BM25 de `ia/documentos.mjs`
+ * @param {object|null} args.indiceDocumentos  índice BM25 de `ia/indices/documentos.mjs`
  * @param {() => object} args.dameHerramientas  el catálogo ya ensamblado
  */
 export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas }) {
@@ -298,7 +298,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
      * tarea de razonamiento sobre prosa.
      *
      * Reutiliza el ÍNDICE que ya construyó `consultar_documentacion` (BM25
-     * sobre `shared/eva` no, sobre `ia/documentos.mjs`): no hay un segundo
+     * sobre `shared/eva` no, sobre `ia/indices/documentos.mjs`): no hay un segundo
      * índice ni un segundo parseo de los PDF, sólo una consulta distinta —
      * sesgada hacia palabras de límite— y un filtrado por patrón encima de
      * los fragmentos que ya devuelve.

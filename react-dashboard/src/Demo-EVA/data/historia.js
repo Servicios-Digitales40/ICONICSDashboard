@@ -123,7 +123,7 @@ export async function leerSerie(clave, rango = VENTANA) {
 
   /*
    * Varios tramos: con concurrencia ACOTADA, no todos a la vez (Plan 15 Fase
-   * 3) — mismo motivo que `leerSerieEnRango()` en `backend/ia/herramientas.mjs`:
+   * 3) — mismo motivo que `leerSerieEnRango()` en `backend/ia/conversacion/herramientas.mjs`:
    * un trimestre son ~90 tramos, y con la Fase 1 (el backend siguiendo
    * `X-ICO-CONTINUATION`) cada petición HTTP de este frontend puede disparar
    * varias páginas por debajo. Un tramo que falle no invalida el resto —se
@@ -172,7 +172,7 @@ export async function leerSerie(clave, rango = VENTANA) {
  *
  * `trocear()` se mudó a `planificar()`/`tramosDe()` en
  * `@shared/eva/rango.js`: era la MISMA regla que `leerSerieEnRango()`
- * repetía en `backend/ia/herramientas.mjs` con un valor distinto (ahí
+ * repetía en `backend/ia/conversacion/herramientas.mjs` con un valor distinto (ahí
  * siempre 1 día por tramo, aquí escalonado) — dos copias de "cómo trocear un
  * rango largo" son dos oportunidades de que la gráfica, el asistente y el
  * script de antigüedad no lean el mismo histórico ante el mismo rango. Ver

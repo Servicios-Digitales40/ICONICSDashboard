@@ -18,7 +18,7 @@
  * `.gitignore` y no existe—. Las seis comprobaciones de abajo corren contra
  * un corpus SINTÉTICO: párrafos de manual escritos a mano (mismo criterio
  * que el experimento de calibración de `UMBRAL_BM25_*` en
- * `backend/ia/diagnostico.mjs`, Plan 17 Fase 3a) y casos construidos con
+ * `backend/ia/motor/diagnostico.mjs`, Plan 17 Fase 3a) y casos construidos con
  * `crearIntervencion` real. Prueban que el MECANISMO funciona —el filtro por
  * sistema, el emparejamiento exacto, el dedupe—, no que los umbrales estén
  * calibrados para la planta real: eso exige `Documentacion/` con manuales de
@@ -46,9 +46,9 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createIndiceDocumentos } from '../backend/ia/documentos.mjs'
-import { createIndiceCasos } from '../backend/ia/casos.mjs'
-import { createMotorDiagnostico } from '../backend/ia/diagnostico.mjs'
+import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
+import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
+import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
 import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/aprendizaje.js'
 
 const c = {
@@ -93,7 +93,7 @@ async function carpetaNueva() {
 /**
  * Ruido para acercar el corpus a la escala que midió la auditoría
  * (~44 fragmentos) — sin él, `UMBRAL_BM25_*` (calibrados contra un corpus de
- * ese tamaño, ver `backend/ia/diagnostico.mjs`) no separan nada: medido, un
+ * ese tamaño, ver `backend/ia/motor/diagnostico.mjs`) no separan nada: medido, un
  * corpus de sólo 2 archivos deja el `scoreCrudo` de un match genuino en
  * ~4,2-4,6, por debajo de `UMBRAL_BM25_FUERTE=8`, y las dos causas empatan
  * en el nivel "débil" en vez de discriminar. El `idf` de BM25 no es
@@ -314,7 +314,7 @@ console.log(`cabecera de este archivo y PLAN-17 §7·10.${c.reset}`)
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/diagnostico.mjs, documentos.mjs o casos.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/motor/diagnostico.mjs, documentos.mjs o casos.mjs.${c.reset}`)
   process.exit(1)
 }
 

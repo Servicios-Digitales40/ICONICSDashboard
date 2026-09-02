@@ -33,8 +33,8 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
 import { inflateSync, inflateRawSync } from 'node:zlib'
-import { logger } from '../logger.mjs'
-import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../shared/eva/manuales.js'
+import { logger } from '../../logger.mjs'
+import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../../shared/eva/manuales.js'
 import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
 import {
   coseno,

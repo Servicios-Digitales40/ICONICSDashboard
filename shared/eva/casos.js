@@ -35,7 +35,7 @@ import { SISTEMAS } from "./sistemas.js";
  *
  * ── EL DESMENTIDO, PLAN 17 FASE 2 (G3) ──────────────────────────────
  *
- * `backend/ia/diagnostico.mjs · respaldoDeCasos` ya empareja por el id
+ * `backend/ia/motor/diagnostico.mjs · respaldoDeCasos` ya empareja por el id
  * estructurado (`causaReal.tipo`, `diagnostico.propuesta` +
  * `diagnosticoCorrecto`) cuando existe, y ESO no depende de este texto. Lo
  * que sí depende de este texto es que el caso llegue a aparecer entre los

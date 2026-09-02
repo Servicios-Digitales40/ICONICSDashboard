@@ -2,7 +2,7 @@
  * El catálogo de manuales de planta: qué archivos hay, de qué sistema, en qué
  * versión y si siguen activos. Plan 16 Fase 1.
  *
- * ── EN QUÉ SE DIFERENCIA DE `backend/ia/documentos.mjs` ────────────
+ * ── EN QUÉ SE DIFERENCIA DE `backend/ia/indices/documentos.mjs` ────────────
  *
  * Ese archivo es el ÍNDICE: lee lo que hay en la carpeta y construye BM25 +
  * embeddings sobre ello, sin saber nada de quién subió qué ni de qué máquina
@@ -13,7 +13,7 @@
  *
  * Vive en `shared/` y no en `backend/` porque su forma —qué campos tiene un
  * manual, qué estados admite, qué hace válido un `sistema`— es una regla de
- * negocio, no E/S: `backend/ia/manuales.mjs` es quien lee y escribe el
+ * negocio, no E/S: `backend/ia/indices/manuales.mjs` es quien lee y escribe el
  * manifiesto en disco, apoyándose en las funciones puras de aquí. Mismo
  * reparto que `aprendizaje.js` (forma) y `herramientas/aprendizaje/index.mjs`
  * (disco).
@@ -36,10 +36,10 @@ export const EXTENSIONES_MANUAL = Object.freeze([".txt", ".md", ".csv", ".log", 
 
 /**
  * El nombre del manifiesto, DENTRO de la carpeta de manuales — nunca en
- * `datos/`, ver la cabecera de `backend/ia/manuales.mjs`.
+ * `datos/`, ver la cabecera de `backend/ia/indices/manuales.mjs`.
  *
- * Vive aquí, en `shared/`, y no en `backend/ia/manuales.mjs` —que es quien
- * lee y escribe el archivo— porque `backend/ia/documentos.mjs` (Plan 17
+ * Vive aquí, en `shared/`, y no en `backend/ia/indices/manuales.mjs` —que es quien
+ * lee y escribe el archivo— porque `backend/ia/indices/documentos.mjs` (Plan 17
  * Fase 3a, G7) también necesita saberlo, para leer qué `sistema` tiene cada
  * manual y aislar el RAG documental igual que `casos.mjs` ya aísla el de
  * casos. `documentos.mjs` no puede importarlo de `manuales.mjs` sin crear un
@@ -50,7 +50,7 @@ export const NOMBRE_MANIFIESTO = ".manifiesto.json";
 /**
  * `activo` se indexa y aparece en las respuestas del asistente. `archivado`
  * sigue en disco —Fase 1 no borra nada, ver la cabecera de
- * `backend/ia/manuales.mjs`— pero se mueve fuera de la carpeta que lee el
+ * `backend/ia/indices/manuales.mjs`— pero se mueve fuera de la carpeta que lee el
  * índice, así que deja de contestar preguntas sin perder el archivo.
  */
 export const ESTADOS_MANUAL = Object.freeze(["activo", "archivado"]);
@@ -77,7 +77,7 @@ export function sistemaValido(id) {
  * Una entrada nueva del manifiesto.
  *
  * `version` empieza en 1 y sólo sube con `reemplazar` (Fase 1, en
- * `backend/ia/manuales.mjs`) — nunca se reescribe entera, para que «versión 3»
+ * `backend/ia/indices/manuales.mjs`) — nunca se reescribe entera, para que «versión 3»
  * siga significando lo mismo delante de un técnico que pregunta «¿esto es el
  * manual más reciente?».
  */

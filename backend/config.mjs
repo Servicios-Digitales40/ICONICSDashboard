@@ -41,7 +41,7 @@ const DEFAULTS = {
    */
   maxHistoryMs: 20000,
   /**
-   * Cuántos tramos de `leerSerieEnRango()` (`ia/herramientas.mjs`) se piden a
+   * Cuántos tramos de `leerSerieEnRango()` (`ia/conversacion/herramientas.mjs`) se piden a
    * la vez (Plan 15 Fase 3). Antes de esto un rango de 30 días eran 30
    * peticiones simultáneas contra el historiador, y con la Fase 1 cada una
    * puede ser hasta `maxHistoryPaginas` peticiones HTTP por debajo — sin este
@@ -151,7 +151,7 @@ const DEFAULTS = {
  * tres de las ocho señales el historiador les devuelve **la serie de otra**,
  * y eso no se arregla marcando una casilla ni se puede permitir que lo
  * desactive una variable de entorno mal escrita. Vive como hecho medido en
- * `shared/eva/senales.js` (campo `historizado`). Ver `backend/ia/herramientas.mjs`.
+ * `shared/eva/senales.js` (campo `historizado`). Ver `backend/ia/conversacion/herramientas.mjs`.
  */
 
 /** Cliente OIDC que ICONICS 11.x trae dado de alta de fábrica. */

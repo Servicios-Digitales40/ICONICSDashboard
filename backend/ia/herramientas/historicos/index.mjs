@@ -109,7 +109,7 @@ import {
   resta,
   segundosDeHora,
   senalDesconocida,
-} from '../../herramientas.mjs'
+} from '../../conversacion/herramientas.mjs'
 
 /**
  * Una señal pedida por su nombre → su clave, dentro de la máquina que toque.

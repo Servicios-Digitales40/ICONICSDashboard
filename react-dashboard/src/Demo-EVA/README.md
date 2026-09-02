@@ -145,7 +145,7 @@ Las pruebas viven en [`src/test/demo-eva/`](../test/demo-eva/), espejando este
 Los cinco archivos de `domain/` —y las reglas del historiador que estaban en
 `data/historia.js`— subieron a [`shared/eva/`](../../../shared/eva/) cuando **el
 asistente pasó a responder sobre esta instalación**. Sus herramientas
-(`backend/ia/herramientas.mjs`) leen los mismos ocho tags, aplican los mismos
+(`backend/ia/conversacion/herramientas.mjs`) leen los mismos ocho tags, aplican los mismos
 umbrales y repiten la misma guarda de `historizado`; `shared/README.md` explica
 por qué el backend no puede importar de `react-dashboard/src` ni conformarse con
 una copia.

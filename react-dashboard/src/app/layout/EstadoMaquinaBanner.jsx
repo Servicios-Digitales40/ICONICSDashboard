@@ -30,7 +30,7 @@
  * ── QUÉ TAG LEE, Y POR QUÉ NO ES UNA SEÑAL DEL CATÁLOGO ────────────
  *
  * Lee `ac:TDCON/DEMO/SENSORES/CONTROL` directamente — el mismo punto que
- * escribe `controlar_bomba` (`backend/ia/herramientas.mjs`) y confirma tras
+ * escribe `controlar_bomba` (`backend/ia/conversacion/herramientas.mjs`) y confirma tras
  * cada accionamiento. No es una de las ocho señales de
  * `shared/eva/senales.js` (vive aparte a propósito, ver la cabecera de
  * `ControlesEva.jsx`), así que no pasa por `useSistemaAgua`: se sondea suelto

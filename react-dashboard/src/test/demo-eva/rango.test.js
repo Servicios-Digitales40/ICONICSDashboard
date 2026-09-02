@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * `planificar()`/`tramosDe()` de `@shared/eva/rango.js` (Plan 15 Fase 2): LA
  * regla de troceado, única para el frontend (`Demo-EVA/data/historia.js`) y
- * el backend (`ia/herramientas.mjs`), que antes vivía duplicada con valores
+ * el backend (`ia/conversacion/herramientas.mjs`), que antes vivía duplicada con valores
  * distintos en cada uno.
  *
  * Lo que se fija aquí es la aritmética de calendario —tamaño de tramo según

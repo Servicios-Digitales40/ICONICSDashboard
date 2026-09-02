@@ -320,7 +320,7 @@ export function createIconicsClient(config, authenticator) {
    * en crudo y en agregado— así que no hace falta simular la profundidad
    * troceando el rango en varias llamadas HTTP distintas desde quien
    * consulta: se resuelve aquí, una vez, para las tres capas que hoy lo
-   * repiten (`Demo-EVA/data/historia.js`, `ia/herramientas.mjs`, y el propio
+   * repiten (`Demo-EVA/data/historia.js`, `ia/conversacion/herramientas.mjs`, y el propio
    * script de sondeo).
    *
    * El bucle corta por lo primero que se cumpla de `maxHistoryPaginas`,

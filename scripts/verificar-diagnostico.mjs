@@ -31,7 +31,7 @@
  */
 import assert from 'node:assert/strict'
 
-import { createMotorDiagnostico } from '../backend/ia/diagnostico.mjs'
+import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
 import { causasDe } from '../shared/eva/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/riesgosVibracion.js'
@@ -528,7 +528,7 @@ await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin ev
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/diagnostico.mjs o shared/eva/causas.js.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/motor/diagnostico.mjs o shared/eva/causas.js.${c.reset}`)
   process.exit(1)
 }
 

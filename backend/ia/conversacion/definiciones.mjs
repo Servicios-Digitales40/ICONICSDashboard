@@ -1,5 +1,5 @@
 /**
- * backend/ia/definiciones.mjs
+ * backend/ia/conversacion/definiciones.mjs
  * ------------------------------------------------------------------
  * El ESQUEMA de las herramientas: lo único que el modelo lee para decidir a
  * cuál llamar y con qué argumentos.

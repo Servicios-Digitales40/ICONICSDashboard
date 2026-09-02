@@ -5,7 +5,7 @@
  *
  * El contenido vive ahora en [`@shared/eva/senales.js`](../../../../shared/eva/senales.js).
  * Se movió cuando el asistente pasó a responder sobre esta instalación: sus
- * herramientas —`backend/ia/herramientas.mjs`— necesitan los MISMOS ocho tags y
+ * herramientas —`backend/ia/conversacion/herramientas.mjs`— necesitan los MISMOS ocho tags y
  * la MISMA marca de `historizado` que estas vistas, y `shared/README.md` es
  * explícito en las dos mitades de por qué no vale ninguna de las dos salidas
  * fáciles:

@@ -6,7 +6,7 @@
  *   PUT    /api/rag/documentos?id=                     reemplaza el contenido de uno existente
  *   PATCH  /api/rag/documentos?id=                     lo archiva
  *
- * No hay DELETE. Ver la cabecera de `backend/ia/manuales.mjs`.
+ * No hay DELETE. Ver la cabecera de `backend/ia/indices/manuales.mjs`.
  *
  * ── POR QUÉ EL CUERPO DE SUBIR/REEMPLAZAR SON BYTES, NO JSON ────────
  *
@@ -34,7 +34,7 @@ import {
   ReemplazarManualQuerySchema,
   SubirManualQuerySchema,
 } from '../http/esquemas.mjs'
-import { MAX_BYTES } from '../ia/documentos.mjs'
+import { MAX_BYTES } from '../ia/indices/documentos.mjs'
 
 /**
  * Guarda de `Content-Length` ANTES de leer el cuerpo, para que un archivo

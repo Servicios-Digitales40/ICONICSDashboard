@@ -34,7 +34,7 @@ import { sistemaDeRuta } from "@shared/eva/sistemas.js";
  * respuesta salió del manual cuando también había leído dos series.
  *
  * `adjuntos` son los gráficos, que llegan por su propio evento y nunca pasan
- * por el modelo. Ver `separarAdjuntos` en `backend/ia/chat.mjs`.
+ * por el modelo. Ver `separarAdjuntos` en `backend/ia/conversacion/chat.mjs`.
  */
 const nuevoTurno = () => ({
   rol: "asistente",

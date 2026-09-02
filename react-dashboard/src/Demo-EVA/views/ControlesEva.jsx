@@ -4,7 +4,7 @@
  *
  * El endpoint (`POST /api/control/bomba`, `backend/routes/controlRoutes.mjs`)
  * llama a la MISMA herramienta que usa el chat (`controlar_bomba` en
- * `backend/ia/herramientas.mjs`), así que esta pantalla hereda gratis sus dos
+ * `backend/ia/conversacion/herramientas.mjs`), así que esta pantalla hereda gratis sus dos
  * guardas —modo solo lectura, nivel de tanque alto— y su confirmación por
  * relectura. El nivel del tanque que se ve aquí es el mismo dato
  * (`useSistemaAgua`) que esa guarda del backend está mirando en el momento de

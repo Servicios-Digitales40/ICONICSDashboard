@@ -6,7 +6,7 @@
  *   Dónde                                          Regla ANTES
  *   ---------------------------------------------  ----------------------------------
  *   Demo-EVA/data/historia.js → trocear()           escalones: 1d/≤14, 3d/≤60, 7d/≤180, 30d después — 96 puntos por tramo
- *   backend/ia/herramientas.mjs → leerSerieEnRango() siempre 1 día por tramo — min(100, segundos/900) puntos
+ *   backend/ia/conversacion/herramientas.mjs → leerSerieEnRango() siempre 1 día por tramo — min(100, segundos/900) puntos
  *   scripts/verificar-antiguedad-historico.mjs       3 días por tramo fijo, intervalo 1h fijo — no arma serie, sólo busca un borde
  *
  * Que la misma pregunta ("¿cómo trocear este rango?") tuviera tres

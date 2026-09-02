@@ -160,7 +160,7 @@ export function useVibracion() {
        * El recorrido del catálogo —tres canales por cinco familias, más el
        * variador y los contadores— vive en `@shared/eva/sistemaVibraciones.js`
        * y no aquí. Estaba escrito a mano en este archivo y OTRA VEZ en
-       * `backend/ia/herramientas.mjs`: dos copias del mismo recorrido sobre el
+       * `backend/ia/conversacion/herramientas.mjs`: dos copias del mismo recorrido sobre el
        * mismo catálogo, y el síntoma de que divergieran no habría sido un
        * error, sino el chat contestando sobre un apoyo con los datos de otro.
        */

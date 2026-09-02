@@ -5,7 +5,7 @@
  * Aquí no hay `fetch`. Este archivo dice qué agregado se pide, cómo se escribe
  * un intervalo, qué muestra se tira y cómo se reduce una serie a las cuatro
  * cifras que se pueden citar. Quién sale a buscarla es cosa de cada programa:
- * `Demo-EVA/data/historia.js` en el navegador, `backend/ia/herramientas.mjs`
+ * `Demo-EVA/data/historia.js` en el navegador, `backend/ia/conversacion/herramientas.mjs`
  * en el puente, y `Demo-EVA/data/simulador.js` sin salir a ningún sitio.
  *
  * ── LAS DOS REGLAS QUE NO SE PUEDEN PERDER AL CRUZAR ───────────────

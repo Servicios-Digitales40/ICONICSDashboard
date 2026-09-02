@@ -63,17 +63,17 @@
  * `disparador`) en cada resultado.
  */
 import { join } from 'node:path'
-import { logger } from '../logger.mjs'
-import { textoDeRecuperacion } from '../../shared/eva/casos.js'
-import { leerAprendizaje } from './herramientas/aprendizaje/index.mjs'
-import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
+import { logger } from '../../logger.mjs'
+import { textoDeRecuperacion } from '../../../shared/eva/casos.js'
+import { leerAprendizaje } from '../herramientas/aprendizaje/index.mjs'
+import { indexarTerminos, puntuarBm25 } from '../indices/bm25.mjs'
 import {
   coseno,
   crearMotorEmbeddings,
   guardarCacheEmbeddings,
   hashDeTexto,
   leerCacheEmbeddings,
-} from './embeddings.mjs'
+} from '../indices/embeddings.mjs'
 
 /**
  * Cada cuánto se mira si hay intervenciones nuevas en el almacén, en

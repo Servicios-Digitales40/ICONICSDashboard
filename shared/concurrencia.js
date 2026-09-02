@@ -3,7 +3,7 @@
  *
  * ── PARA QUÉ (Plan 15 Fase 3) ───────────────────────────────────────
  *
- * `leerSerieEnRango()` (`backend/ia/herramientas.mjs`) y la lectura por
+ * `leerSerieEnRango()` (`backend/ia/conversacion/herramientas.mjs`) y la lectura por
  * tramos de `Demo-EVA/data/historia.js` lanzaban TODO el rango a la vez con
  * `Promise.all`: un trimestre a un día por tramo son 90 peticiones
  * simultáneas contra el historiador de la planta, y con la Fase 1 del Plan

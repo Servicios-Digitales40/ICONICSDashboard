@@ -42,7 +42,7 @@ import {
   createHerramientas,
   resolverSenal,
   resolverVentana,
-} from '../backend/ia/herramientas.mjs'
+} from '../backend/ia/conversacion/herramientas.mjs'
 import {
   RAIZ,
   SENALES,
@@ -2253,8 +2253,8 @@ await checkAsync(
       // Y lo que de verdad importa: el motor de diagnóstico REAL, sin
       // dobles, encuentra esta corrección por id exacto — no por parecido
       // de texto — y la usa para confirmar/refutar la causa que corresponde.
-      const { createIndiceCasos } = await import('../backend/ia/casos.mjs')
-      const { createMotorDiagnostico } = await import('../backend/ia/diagnostico.mjs')
+      const { createIndiceCasos } = await import('../backend/ia/motor/casos.mjs')
+      const { createMotorDiagnostico } = await import('../backend/ia/motor/diagnostico.mjs')
       const indiceCasos = createIndiceCasos({})
       const motor = createMotorDiagnostico({ indiceCasos })
       const resultado = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
@@ -2496,7 +2496,7 @@ console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/herramientas.mjs y shared/eva/.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/conversacion/herramientas.mjs y shared/eva/.${c.reset}`)
   process.exit(1)
 }
 

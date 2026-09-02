@@ -26,7 +26,7 @@
  * volvió, no a lo que se pidió.
  *
  * La duplicación de la FÓRMULA de tolerancia con
- * `backend/ia/herramientas.mjs` es deliberada y no un descuido: tocar el
+ * `backend/ia/conversacion/herramientas.mjs` es deliberada y no un descuido: tocar el
  * archivo del asistente está fuera del alcance de un plan de frontend, y
  * las dos derivaciones —de la ventana pedida allí, de los datos recibidos
  * aquí— resuelven el mismo problema con información distinta.

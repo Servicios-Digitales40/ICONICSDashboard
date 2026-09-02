@@ -22,7 +22,7 @@
  * sabe cuándo reintentar, y lo natural es que vuelva a pulsar y vuelva a
  * chocar.
  *
- * Ahora se encola (`ia/cola.mjs`). El flujo SSE se abre de inmediato y el que
+ * Ahora se encola (`ia/conversacion/cola.mjs`). El flujo SSE se abre de inmediato y el que
  * espera recibe su puesto en la fila —«hay 2 consultas por delante»— y luego su
  * respuesta, sola, cuando le toca. El 503 se reserva para cuando la fila es tan
  * larga que esperar dejaría de tener sentido.

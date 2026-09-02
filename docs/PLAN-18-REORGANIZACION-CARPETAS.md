@@ -172,7 +172,14 @@ porque no bloquea nada de lo anterior y no es urgente.
 ## 9. Estado
 
 - [x] F0 — CLAUDE.md creado
-- [ ] F1 — `backend/ia/`
+- [x] F1 — `backend/ia/` — 153 pruebas de backend + 11 verificadores (360
+      comprobaciones) en verde. Además de los imports, se actualizaron las
+      referencias de ruta en comentarios de `backend/`, `shared/`, `scripts/`
+      y `react-dashboard/src/` (CLAUDE.md §4.1), el árbol de `backend/README.md`
+      —que ya estaba desactualizado antes de esta fase: le faltaban seis
+      archivos y la familia `diagnostico/`— y §2.3 y §3 de `CLAUDE.md`.
+      Los `docs/PLAN-11/12/15` se dejaron intactos a propósito: son registro
+      fechado, no guía de navegación.
 - [ ] F2 — `Demo-EVA/views/`
 - [ ] F3 — `Demo-EVA/data/`
 - [ ] F4 — `shared/eva/`

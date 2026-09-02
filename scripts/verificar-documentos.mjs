@@ -39,7 +39,7 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { createIndiceDocumentos } from '../backend/ia/documentos.mjs'
+import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -61,7 +61,7 @@ async function check(nombre, fn) {
 }
 
 /*
- * `TAMANO_LOTE` de `backend/ia/documentos.mjs` no se exporta —es un detalle
+ * `TAMANO_LOTE` de `backend/ia/indices/documentos.mjs` no se exporta —es un detalle
  * de implementación—, así que se duplica aquí para poder predecir cuántas
  * peticiones debería costar embeber N fragmentos nuevos. Si cambia allí,
  * cambia aquí.
@@ -463,7 +463,7 @@ await rm(raiz, { recursive: true, force: true })
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/documentos.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/indices/documentos.mjs.${c.reset}`)
   process.exit(1)
 }
 

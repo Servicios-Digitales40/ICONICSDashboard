@@ -38,7 +38,7 @@
  * principio: el cambio se mide como fracción del valor de partida
  * (`UMBRAL_CAMBIO_RELATIVO`), no como unidades por hora.
  */
-import { logger } from '../logger.mjs'
+import { logger } from '../../logger.mjs'
 
 /** Puntos mínimos para que una pendiente signifique algo — con menos, una
  *  serie es dos números y una línea recta entre ellos no es una tendencia,

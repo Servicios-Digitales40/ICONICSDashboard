@@ -43,10 +43,10 @@
  * demasiado fino o demasiado grueso, se ajusta aquí, en un solo sitio: no
  * hace falta tocar `documentos.mjs` ni `casos.mjs`.
  */
-import { causasDe } from '../../shared/eva/causas.js'
-import { REGLAS as REGLAS_TANQUE } from '../../shared/eva/riesgos.js'
-import { REGLAS as REGLAS_VIBRACION } from '../../shared/eva/riesgosVibracion.js'
-import { logger } from '../logger.mjs'
+import { causasDe } from '../../../shared/eva/causas.js'
+import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/riesgos.js'
+import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/riesgosVibracion.js'
+import { logger } from '../../logger.mjs'
 
 const REGLAS_POR_SISTEMA = {
   tanque: REGLAS_TANQUE,

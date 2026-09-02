@@ -27,10 +27,10 @@ regla.
    versionado). Los "índices" de búsqueda son cachés JSON, no un motor
    externo.
 3. **El código puntúa, el modelo redacta.** El motor de diagnóstico
-   (`backend/ia/diagnostico.mjs` y lo que se mueva a `backend/ia/motor/`) es
-   determinista y nunca lo toca el LLM. El modelo narra un resultado ya
-   calculado; jamás decide una banda, un orden o una causa por su cuenta.
-   Ver la cabecera de ese archivo antes de tocarlo.
+   (`backend/ia/motor/`) es determinista y nunca lo toca el LLM. El modelo
+   narra un resultado ya calculado; jamás decide una banda, un orden o una
+   causa por su cuenta. Ver la cabecera de `motor/diagnostico.mjs` antes de
+   tocarlo.
 4. **La ausencia de dato nunca se disfraza de cero.** Un valor que no llegó,
    que tiene mala calidad OPC, o un tramo del historiador sin muestra, se
    representa como hueco (`sinDato`, `motivo`, `cobertura`) y se cuenta
@@ -74,8 +74,13 @@ regla.
 ├── DESIGN.md              Sistema de diseño (color, tipografía, componentes)
 ├── backend/               Servidor puente hacia ICONICS (Node, Fastify)
 │   ├── http/                Mecánica HTTP: router, esquemas Zod, plugins
-│   ├── ia/                  Asistente: índices, motor de diagnóstico, conversación, herramientas
-│   │   └── herramientas/      Una carpeta por FAMILIA de herramienta del modelo
+│   ├── ia/                  Asistente
+│   │   ├── indices/           Búsqueda: bm25, documentos, embeddings, manuales
+│   │   ├── motor/             Diagnóstico determinista: diagnostico, casos, temporal
+│   │   ├── conversacion/      Bucle del modelo: chat, cola, definiciones, herramientas
+│   │   ├── herramientas/      Una carpeta por FAMILIA de herramienta del modelo
+│   │   ├── reporte.mjs        PDF de la conversación (import diferido)
+│   │   └── voz.mjs            Dictado (whisper)
 │   ├── iconics/              Autenticación OIDC, cliente REST, transporte falso
 │   ├── routes/                Traducción HTTP ↔ cliente (una por dominio)
 │   └── test/                  vitest: contratos HTTP, esquemas, config

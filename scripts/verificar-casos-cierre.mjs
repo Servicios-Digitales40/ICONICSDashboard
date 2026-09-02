@@ -37,7 +37,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { registrarCaso } from '../backend/ia/herramientas/aprendizaje/index.mjs'
-import { createIndiceCasos } from '../backend/ia/casos.mjs'
+import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import {
   VACIO as APRENDIZAJE_VACIO,
   crearIntervencion,

@@ -54,7 +54,7 @@ import { PROVISIONALES } from "./umbrales.js";
  * Azúcar para no repetir `provisional`/`origen` en cada causa del tanque.
  *
  * `firmaTemporal` es OPCIONAL (Plan 17 Fase 6, G5): una causa sin ella saca
- * `temporal: 0` y no se penaliza —ver `backend/ia/temporal.mjs`—. Cuando se
+ * `temporal: 0` y no se penaliza —ver `backend/ia/motor/temporal.mjs`—. Cuando se
  * declara, es la MISMA regla de transcripción del resto del archivo: sale
  * de una frase que YA ESTABA escrita en `riesgos.js`, no de una relación
  * física inventada aquí.

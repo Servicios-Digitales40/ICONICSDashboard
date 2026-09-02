@@ -29,7 +29,7 @@
  * que la pregunta de una pantalla vale más que la de otra necesita saber quién
  * pregunta, y aquí no hay sesiones.
  */
-import { logger } from '../logger.mjs'
+import { logger } from '../../logger.mjs'
 
 export function createCola({ maxEnEspera = 8 } = {}) {
   /**

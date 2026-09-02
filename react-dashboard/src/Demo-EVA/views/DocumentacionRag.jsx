@@ -4,7 +4,7 @@
  *
  * ── LA PREGUNTA QUE ESTA VISTA CONTESTA NO ES «QUÉ ARCHIVOS HAY» ────
  *
- * Es «¿qué sabe el asistente?». `backend/ia/documentos.mjs` ya distingue un
+ * Es «¿qué sabe el asistente?». `backend/ia/indices/documentos.mjs` ya distingue un
  * manual indexado de uno que entró y no se pudo leer —un PDF escaneado, sin
  * una palabra extraíble—, y hasta ahora esa distinción sólo se veía en un
  * log que nadie mira. El síntoma es el peor posible: el asistente contesta

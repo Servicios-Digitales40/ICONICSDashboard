@@ -26,7 +26,7 @@
  */
 import assert from 'node:assert/strict'
 
-import { createEvaluadorTemporal } from '../backend/ia/temporal.mjs'
+import { createEvaluadorTemporal } from '../backend/ia/motor/temporal.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -235,7 +235,7 @@ await check('dos señales que coinciden: puntos=2, dos entradas en evidenciaAFav
 if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
-  console.log(`${c.gris}Revisa backend/ia/temporal.mjs.${c.reset}`)
+  console.log(`${c.gris}Revisa backend/ia/motor/temporal.mjs.${c.reset}`)
   process.exit(1)
 }
 

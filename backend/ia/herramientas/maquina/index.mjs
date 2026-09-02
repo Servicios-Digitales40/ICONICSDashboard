@@ -37,7 +37,7 @@ import { fallo } from '../lib/respuesta.mjs'
  * históricos, y sacarla es parte de la limpieza que queda cuando el
  * ensamblador se quede sólo con lo que ensambla.
  */
-import { agruparPorRegla, horaLocal, redondear } from '../../herramientas.mjs'
+import { agruparPorRegla, horaLocal, redondear } from '../../conversacion/herramientas.mjs'
 import { RAIZ } from '../../../../shared/eva/senales.js'
 
 /** Punto de control de la bomba: no es una señal del catálogo, así que vive aparte. */

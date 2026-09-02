@@ -71,7 +71,7 @@ import { fallo } from '../lib/respuesta.mjs'
  *
  * A NIVEL DE MÓDULO y exportada —no dentro de `crearHerramientasDeAprendizaje`
  * como antes— porque desde Plan 16 hay una TERCERA punta que necesita leer
- * este archivo: `backend/ia/casos.mjs`, el índice de la Fuente #3 del
+ * este archivo: `backend/ia/motor/casos.mjs`, el índice de la Fuente #3 del
  * diagnóstico. Con la constante escondida dentro de una función, la única
  * forma de que `casos.mjs` supiera dónde está el archivo habría sido
  * escribir la ruta una vez más — que es EXACTAMENTE el fallo que el
@@ -88,7 +88,7 @@ export const RUTA_APRENDIZAJE = join('datos', 'aprendizaje.json')
 
 /**
  * `ruta` es opcional —por defecto `RUTA_APRENDIZAJE`— para que
- * `backend/ia/casos.mjs` y sus pruebas puedan apuntar a un almacén propio sin
+ * `backend/ia/motor/casos.mjs` y sus pruebas puedan apuntar a un almacén propio sin
  * tocar el de verdad, mismo criterio que `rutaCache` en `documentos.mjs`.
  */
 export async function leerAprendizaje(ruta = RUTA_APRENDIZAJE) {
@@ -272,7 +272,7 @@ export function crearHerramientasDeAprendizaje() {
      * La contraparte de `CierreDiagnostico.jsx · POST /api/casos` para el
      * chat: registra qué causa resultó ser la real, con el mismo id
      * estructurado que usa el emparejamiento exacto de
-     * `backend/ia/diagnostico.mjs · respaldoDeCasos` (Plan 17 Fase 2, G3),
+     * `backend/ia/motor/diagnostico.mjs · respaldoDeCasos` (Plan 17 Fase 2, G3),
      * no como una frase que haya que adivinar la próxima vez.
      *
      * SÓLO se llama después de que el técnico confirme o corrija,

@@ -3,7 +3,7 @@
  *
  * ── LO QUE ESTE MÓDULO NO HACE ──────────────────────────────────────
  *
- * No indexa. `backend/ia/documentos.mjs` lee `carpeta` a ciegas y construye
+ * No indexa. `backend/ia/indices/documentos.mjs` lee `carpeta` a ciegas y construye
  * BM25/embeddings sobre lo que encuentra; este módulo sólo decide QUÉ hay en
  * esa carpeta y de dónde salió. Subir un manual lo deja ahí escrito y deja que
  * el índice —que ya vigila la carpeta cada `MS_ENTRE_COMPROBACIONES`— lo
@@ -34,7 +34,7 @@
 import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { logger } from '../logger.mjs'
+import { logger } from '../../logger.mjs'
 import {
   crearManual,
   EXTENSIONES_MANUAL,
@@ -42,7 +42,7 @@ import {
   normalizarManifiesto,
   sistemaValido,
   VACIO as MANIFIESTO_VACIO,
-} from '../../shared/eva/manuales.js'
+} from '../../../shared/eva/manuales.js'
 import { MAX_BYTES } from './documentos.mjs'
 
 /*

@@ -26,7 +26,7 @@
  * el mismo aplomo que si las hubiera usado. Es el fallo más peligroso del
  * sistema porque parece que funciona.
  */
-import { logger } from '../logger.mjs'
+import { logger } from '../../logger.mjs'
 
 /**
  * Tokens extra que se le dan a la primera pasada para pensar.

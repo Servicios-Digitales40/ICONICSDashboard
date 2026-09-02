@@ -28,14 +28,14 @@ import fastifyStatic from '@fastify/static'
 import fastifySwagger from '@fastify/swagger'
 import fastifySwaggerUi from '@fastify/swagger-ui'
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod'
-import { createChat } from './ia/chat.mjs'
-import { createCola } from './ia/cola.mjs'
-import { createIndiceDocumentos } from './ia/documentos.mjs'
-import { createIndiceCasos } from './ia/casos.mjs'
-import { createMotorDiagnostico } from './ia/diagnostico.mjs'
-import { createGestorManuales } from './ia/manuales.mjs'
-import { createEvaluadorTemporal } from './ia/temporal.mjs'
-import { createHerramientas } from './ia/herramientas.mjs'
+import { createChat } from './ia/conversacion/chat.mjs'
+import { createCola } from './ia/conversacion/cola.mjs'
+import { createIndiceDocumentos } from './ia/indices/documentos.mjs'
+import { createIndiceCasos } from './ia/motor/casos.mjs'
+import { createMotorDiagnostico } from './ia/motor/diagnostico.mjs'
+import { createGestorManuales } from './ia/indices/manuales.mjs'
+import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
+import { createHerramientas } from './ia/conversacion/herramientas.mjs'
 import { crearAyudantesDeHistoria } from './ia/herramientas/lib/historia.mjs'
 import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
@@ -239,7 +239,7 @@ export async function createApp(config) {
 
   // Las consultas se atienden de una en una, pero NINGUNA se rechaza por eso:
   // el que llega segundo espera su turno con el flujo abierto y sabiendo
-  // cuántos tiene delante. Ver la cabecera de `ia/cola.mjs`.
+  // cuántos tiene delante. Ver la cabecera de `ia/conversacion/cola.mjs`.
   const cola = createCola()
 
   // El dictado se monta siempre, igual que el chat: sin `IA_WHISPER_BASE` sus

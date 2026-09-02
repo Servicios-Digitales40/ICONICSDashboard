@@ -119,7 +119,7 @@ import {
   regresionLineal,
   proyectar,
   detectarAnomalias,
-} from '../../shared/eva/estadistica.js'
+} from '../../../shared/eva/estadistica.js'
 import {
   RAIZ,
   SENALES,
@@ -128,9 +128,9 @@ import {
   historizadas,
   pointName,
   senalInfo,
-} from '../../shared/eva/senales.js'
-import { ACTIVOS } from '../../shared/eva/activos.js'
-import { UMBRALES } from '../../shared/eva/umbrales.js'
+} from '../../../shared/eva/senales.js'
+import { ACTIVOS } from '../../../shared/eva/activos.js'
+import { UMBRALES } from '../../../shared/eva/umbrales.js'
 import {
   AGREGADO,
   MAX_PUNTOS,
@@ -140,7 +140,7 @@ import {
   normalizar,
   horaLocal as horaLocalDe,
   resumirSerie,
-} from '../../shared/eva/historia.js'
+} from '../../../shared/eva/historia.js'
 import {
   NO_COMPARTEN,
   SISTEMA,
@@ -151,7 +151,7 @@ import {
   resumenDeSistemas,
   sistemasDeSenal,
   tieneHistoria,
-} from '../../shared/eva/sistemas.js'
+} from '../../../shared/eva/sistemas.js'
 import {
   VACIO as APRENDIZAJE_VACIO,
   crearHecho,
@@ -160,8 +160,8 @@ import {
   normalizarAlmacen,
   pendientes,
   validarPropuesta,
-} from '../../shared/eva/aprendizaje.js'
-import { isoLocal, resolverPeriodo } from '../../shared/periodo.js'
+} from '../../../shared/eva/aprendizaje.js'
+import { isoLocal, resolverPeriodo } from '../../../shared/periodo.js'
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 /*
@@ -177,25 +177,25 @@ import { DEFINICIONES } from './definiciones.mjs'
  * ni del `client`, ni de la configuración, ni de estado. Ver la cabecera de
  * `herramientas/lib/formato.mjs`.
  */
-import { fallo } from './herramientas/lib/respuesta.mjs'
+import { fallo } from '../herramientas/lib/respuesta.mjs'
 /* Fase 1 del reparto: las tres herramientas del almacén de lo aprendido. No
    reciben nada —no tocan el `client`— y por eso salen antes que las demás. */
-import { crearHerramientasDeAprendizaje } from './herramientas/aprendizaje/index.mjs'
+import { crearHerramientasDeAprendizaje } from '../herramientas/aprendizaje/index.mjs'
 /* Fase 2: las tres que leen los manuales. Sólo necesitan `indiceDocumentos`. */
-import { crearHerramientasDeDocumentacion } from './herramientas/documentacion/index.mjs'
+import { crearHerramientasDeDocumentacion } from '../herramientas/documentacion/index.mjs'
 /*
  * Fase 3: los ayudantes que SÍ dependen del cliente de ICONICS. Salen de la
  * clausura recibiendo un contexto con nombre en vez de cerrarse sobre ella.
  */
-import { crearAyudantesDeMaquina } from './herramientas/lib/maquina.mjs'
-import { crearAyudantesDeHistoria } from './herramientas/lib/historia.mjs'
+import { crearAyudantesDeMaquina } from '../herramientas/lib/maquina.mjs'
+import { crearAyudantesDeHistoria } from '../herramientas/lib/historia.mjs'
 /* Fase 4: las familias que ya reciben el contexto en vez de cerrarse sobre él. */
-import { crearHerramientasDeRegistro } from './herramientas/registro/index.mjs'
-import { crearHerramientasDeMaquina } from './herramientas/maquina/index.mjs'
-import { crearHerramientasDeHistoricos } from './herramientas/historicos/index.mjs'
+import { crearHerramientasDeRegistro } from '../herramientas/registro/index.mjs'
+import { crearHerramientasDeMaquina } from '../herramientas/maquina/index.mjs'
+import { crearHerramientasDeHistoricos } from '../herramientas/historicos/index.mjs'
 /* Plan 16 Fase 4: una sola herramienta, `diagnosticar_falla`. Sólo necesita
-   `motorDiagnostico` (`ia/diagnostico.mjs`) — no toca el `client`. */
-import { crearHerramientasDeDiagnostico } from './herramientas/diagnostico/index.mjs'
+   `motorDiagnostico` (`ia/motor/diagnostico.mjs`) — no toca el `client`. */
+import { crearHerramientasDeDiagnostico } from '../herramientas/diagnostico/index.mjs'
 
 export { DEFINICIONES }
 

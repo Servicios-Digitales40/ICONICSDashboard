@@ -78,7 +78,7 @@ problema no es el mismo: a tres de
 las ocho señales el historiador les devuelve **la serie de otra**, sin dar
 error. Eso no se arregla marcando una casilla, y no puede quedar en manos de una
 variable de entorno mal escrita. Vive como hecho medido en `shared/eva/senales.js`
-(campo `historizado`); ver la cabecera de `backend/ia/herramientas.mjs`.
+(campo `historizado`); ver la cabecera de `backend/ia/conversacion/herramientas.mjs`.
 
 `IA_TIMEOUT_MS` es una variable aparte y no `UPSTREAM_TIMEOUT_MS` porque son
 dos escalas distintas: 15 s es holgado para ICONICS y ridículo para un modelo
@@ -139,8 +139,20 @@ backend/
 │   └── validation.mjs     Lista blanca de nombres de punto y fechas
 │
 ├── ia/                  El asistente (Plan 6)
-│   ├── herramientas.mjs   Ensamblador: contexto, familias y catálogo
-│   ├── definiciones.mjs   El ESQUEMA que lee el modelo, aparte del código
+│   ├── indices/           Búsqueda: lo que sabe encontrar un texto
+│   │   ├── bm25.mjs           Búsqueda léxica, compartida por los dos índices
+│   │   ├── embeddings.mjs     Motor de vectores + caché por hash de contenido
+│   │   ├── documentos.mjs     Índice sobre los PDF de planta (BM25 + embeddings)
+│   │   └── manuales.mjs       Alta y baja de manuales; no indexa, sólo gestiona
+│   ├── motor/             Diagnóstico determinista — el LLM no lo toca
+│   │   ├── diagnostico.mjs    Cruza las cuatro fuentes y puntúa las causas
+│   │   ├── casos.mjs          Índice de casos previos (Fuente #3)
+│   │   └── temporal.mjs       El cuarto término: tendencia (Plan 17 F6)
+│   ├── conversacion/      El bucle del modelo
+│   │   ├── chat.mjs           Las dos pasadas contra llama-server
+│   │   ├── cola.mjs           Una consulta a la vez
+│   │   ├── definiciones.mjs   El ESQUEMA que lee el modelo, aparte del código
+│   │   └── herramientas.mjs   Ensamblador: contexto, familias y catálogo
 │   ├── herramientas/      Una subcarpeta por FAMILIA de herramienta
 │   │   ├── lib/           Lo que comparten las familias
 │   │   │   ├── formato.mjs    Banda legible, reducción de serie, aviso de umbrales
@@ -148,16 +160,14 @@ backend/
 │   │   │   ├── respuesta.mjs  La forma del fallo de una herramienta
 │   │   │   ├── maquina.mjs    Leer una máquina, resolver cuál, evaluar sus reglas
 │   │   │   └── historia.mjs   El trío recursivo del historiador
-│   │   ├── aprendizaje/   3 · hechos y propuestas (no toca ICONICS)
+│   │   ├── aprendizaje/   5 · hechos, propuestas y bitácora (no toca ICONICS)
 │   │   ├── registro/      1 · qué máquinas hay (abre el catálogo)
 │   │   ├── maquina/       3 · el instante, y la única que ESCRIBE
 │   │   ├── historicos/    9 · todo lo que pregunta al pasado
-│   │   └── documentacion/ 3 · manuales y diagnóstico (índice BM25)
-│   ├── documentos.mjs     Índice BM25 sobre los PDF de planta
+│   │   ├── documentacion/ 3 · manuales y dossier de síntoma
+│   │   └── diagnostico/   1 · diagnosticar_falla, sobre el motor
 │   ├── reporte.mjs        Composición del PDF (carga diferida)
-│   ├── cola.mjs           Una consulta a la vez
-│   ├── voz.mjs            Whisper
-│   └── chat.mjs           El bucle de dos pasadas contra llama-server
+│   └── voz.mjs            Whisper
 │
 └── routes/              Traducción HTTP ↔ cliente
     ├── iconicsRoutes.mjs
@@ -191,7 +201,7 @@ que usa el frontend, y tenerlas dos veces las haría divergir.
 
 ## Las herramientas del asistente, por familias
 
-`ia/herramientas.mjs` llegó a tener 4100 líneas: diecinueve herramientas y sus
+`ia/conversacion/herramientas.mjs` llegó a tener 4100 líneas: diecinueve herramientas y sus
 diecinueve descripciones en un solo archivo. Se está repartiendo por FAMILIAS
 —una subcarpeta por tipo— y el criterio del reparto no es temático sino de
 DEPENDENCIA: qué necesita cada grupo para funcionar.
@@ -221,7 +231,7 @@ todavía vive ahí —el índice de nombres de señal del tanque, el resolvedor 
 ventanas— está pendiente de una decisión que no está tomada: ver B3 en
 [`docs/BACKLOG-BACKEND.md`](../docs/BACKLOG-BACKEND.md).
 
-**El esquema vive aparte** (`ia/definiciones.mjs`). No es código que se ejecute:
+**El esquema vive aparte** (`ia/conversacion/definiciones.mjs`). No es código que se ejecute:
 es texto dirigido a un modelo de lenguaje, y se edita por otros motivos —una
 descripción se reescribe porque el modelo eligió mal la herramienta, no porque
 la función tuviera un fallo—.
@@ -310,7 +320,7 @@ operador vuelve a pulsar y deja dos preguntas compitiendo por la misma GPU.
 
 Una consulta en curso ya no rechaza a la siguiente. Se atiende de una en una
 —llama-server corre con `--parallel 1`, y dos preguntas simultáneas tardan el
-doble las dos— pero la segunda se **encola** (`ia/cola.mjs`): su flujo SSE se
+doble las dos— pero la segunda se **encola** (`ia/conversacion/cola.mjs`): su flujo SSE se
 abre en el acto y recibe `{ tipo: 'cola', porDelante }` con su puesto, que se
 reemite cada vez que alguien de delante termina.
 

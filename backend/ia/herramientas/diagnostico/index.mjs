@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * Una única herramienta: `diagnosticar_falla`. Plan 16 Fase 4 — el momento
  * en que el modelo por fin tiene algo que llamar con la lista que puntúa
- * `backend/ia/diagnostico.mjs`.
+ * `backend/ia/motor/diagnostico.mjs`.
  *
  * ── POR QUÉ ES SU PROPIA FAMILIA, DE UNA SOLA HERRAMIENTA ──────────
  *
@@ -27,13 +27,13 @@ import { fallo } from '../lib/respuesta.mjs'
 
 /**
  * @param {object} args
- * @param {{diagnosticar: Function}|null} args.motorDiagnostico  de `ia/diagnostico.mjs`
+ * @param {{diagnosticar: Function}|null} args.motorDiagnostico  de `ia/motor/diagnostico.mjs`
  */
 export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
   return {
     /**
      * La causa más probable de un riesgo YA activo, con las tres fuentes
-     * cruzadas y puntuadas. Ver la cabecera de `ia/diagnostico.mjs` para la
+     * cruzadas y puntuadas. Ver la cabecera de `ia/motor/diagnostico.mjs` para la
      * aritmética exacta.
      */
     async diagnosticar_falla({ sistema, riesgoId } = {}) {
