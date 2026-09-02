@@ -232,10 +232,17 @@ node scripts/verificar-antiguedad-historico.mjs              # edad de la últim
 ```bash
 node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
 ```
-> Este verificador está en rojo conocido desde el 28-ago-2026 (161.84 KB sobre
-> un techo de 90 KB, medido como preexistente). Ver `docs/BACKLOG-FRONTEND.md`
-> F5. No se ignora: se corrige aparte, no se deja fallando en silencio ni se
-> sube el techo para callarlo.
+> **Hoy pasa** (medido el 02-09-2026: `index` 92,21 KB sobre 170,
+> `vendor` 203,26 KB sobre 210). Este documento decía que seguía en rojo
+> —«161,84 KB sobre un techo de 90»—; eso describía a `vendor`, y dejó de
+> ser cierto el 31-ago-2026, un día antes de escribirse esta línea.
+>
+> El techo de `vendor` se subió entonces de 90 a 210 KB al instalar TanStack
+> Query, con la medición y el motivo en la cabecera del propio guion. Roza la
+> regla de «no se sube el techo para callarlo», así que conviene saberlo:
+> quedó documentado y razonado, no escondido, pero `vendor` va hoy a 203 de
+> 210 y el margen es de 7 KB. Ver `docs/BACKLOG-FRONTEND.md` F5, que sigue
+> describiendo la situación anterior.
 
 **Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
 `verificar-herramientas.mjs` y el verificador específico de lo que tocó
