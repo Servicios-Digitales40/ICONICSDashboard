@@ -728,7 +728,7 @@ qué necesita cada una están en §10.
 | 3 | **F2** · el feedback vuelve | El dato más caro del sistema empieza a servir para algo. Emparejamiento por id exacto: tampoco necesita embeddings |
 | 4 | **F5** · trazabilidad | **Adelantada.** Los extractos, el `chunkId` y el hash del PDF salen del índice y del disco. Antes iba la 7.ª por valor; es de las que menos depende de nada |
 | 5 | **F3a** · manifiesto, dedupe y corte BM25 | Con F1 y F2 hechas ya hay dos términos que discriminan; éste añade el tercero en el modo que se puede medir hoy |
-| 6 | **F7a** · recalibrar bandas en modo BM25 | **Bloqueada por datos.** Herramienta escrita y probada (`verificar-calibracion.mjs`), `bandaDe` sin tocar — no hay `Documentacion/` real que medir en esta copia |
+| 6 | **F7a** · recalibrar bandas en modo BM25 | **Hecha el 02-09-2026.** El bloqueo era falso: `IA_DOCS_DIR` apunta a `Documentacion/`, que sí tenía manuales — la nota miraba `Documentos/`. Medido con `scripts/medir-calibracion.mjs`; `UMBRAL_BM25_FUERTE` 8 → 6 |
 | 7 | **F4** · evidencia y conflicto | Convierte «datos 2, manual 2, casos 2» en algo que una persona puede juzgar. **Completa sin ningún servidor**: `valoresSensores` es opcional y hoy ningún llamador real lo trae (ver la Fase 4 en el registro de cambios) |
 | 8 | **F6** · término temporal | **Completa.** `firmaTemporal`, `temporal.mjs`, wireado en `app.mjs`. Umbral relativo marcado provisional; `bandaDe` sin recalibrar (F7c) |
 
@@ -736,8 +736,8 @@ qué necesita cada una están en §10.
 
 | # | Entrega | Por qué espera |
 |---|---|---|
-| 9 | **F3b** · corte sobre coseno | Es la magnitud absoluta buena y la que usa producción. Escrita en F3a, calibrada aquí |
-| 10 | **F7b** · recalibrar en modo embeddings + BM25 | El modo real. Hasta aquí, C11 no se puede declarar cerrada |
+| 9 | **F3b** · corte sobre coseno | **Hecha el 02-09-2026**, contra el :8081 real. Los cortes viejos (0,55/0,20) repartían 2:4% · 1:96% · 0:0% — `manual` valía 1 casi siempre, el defecto de la auditoría con el signo cambiado. Ahora 0,46/0,36 → 2:12% · 1:64% · 0:24% |
+| 10 | **F7b** · recalibrar en modo embeddings + BM25 | **Medida el 02-09-2026, pero C11 SIGUE ABIERTA.** El corpus medible son 2 documentos ÚNICOS y 44 fragmentos: alcanza para ver la forma de la distribución y corregir un corte demostrablemente malo, no para llamarlo calibración de producción. Los umbrales siguen `PROVISIONAL`, y la regla de §4·F3b es que con eso C11 no se cierra |
 
 ### Tramo 3 · Cuando vuelva ICONICS real
 

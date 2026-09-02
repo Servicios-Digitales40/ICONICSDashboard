@@ -70,28 +70,56 @@ const REGLAS_POR_SISTEMA = {
  *
  *  - Con embeddings: el `coseno` suelto (Plan 17 Fase 3b) — es
  *    verdaderamente absoluto, no depende de cuántos documentos haya
- *    indexados. `UMBRAL_COSENO_*` son los mismos 0,55/0,20 de siempre:
- *    documentados como razonables por el proyecto, y siguen `PROVISIONAL:
- *    true` hasta que se midan contra un servidor de embeddings real —F3b,
- *    no hecha todavía—.
- *  - Sin embeddings: el `scoreCrudo` de BM25 (Plan 17 Fase 3a).
- *    `UMBRAL_BM25_*` son **PROVISIONAL, con una reserva más fuerte que la
- *    de arriba**: no hay un solo PDF real en esta copia de trabajo contra
- *    el que calibrar (`Documentos/` sólo tiene `Reportes/`), así que se
- *    derivaron de un corpus SINTÉTICO —cuatro párrafos de manual escritos a
- *    mano sobre causas reales de `causas.js`, más ruido hasta ~45
- *    fragmentos para aproximar la escala que midió la auditoría—. Y hay un
- *    motivo por el que esto importa más de lo que parece: el score CRUDO de
- *    BM25 **no es invariante al tamaño del corpus** —su término `idf` crece
- *    con el número de documentos para un término raro—, así que un umbral
- *    fijo aquí se descalibra según crezca `Documentacion/`, algo que NO le
- *    pasa al corte por coseno. `F7a` (recalibrar contra la distribución
- *    real) no es opcional para este par de umbrales: es la única forma de
- *    que dejen de ser una suposición razonada y pasen a ser una medida.
+ *    indexados.
+ *  - Sin embeddings: el `scoreCrudo` de BM25 (Plan 17 Fase 3a). El score
+ *    CRUDO de BM25 **no es invariante al tamaño del corpus** —su término
+ *    `idf` crece con el número de documentos para un término raro—, así que
+ *    este par se descalibra según crezca `Documentacion/`, algo que NO le
+ *    pasa al corte por coseno.
+ *
+ * ── LOS CUATRO NÚMEROS ESTÁN MEDIDOS (02-09-2026) ───────────────────
+ *
+ * Antes eran una suposición razonada; ahora salen de correr
+ * `scripts/medir-calibracion.mjs` contra el corpus real de
+ * `Documentacion/`, la bitácora real y el servidor de embeddings real.
+ * n = 25 causas de `causas.js`, las de los dos sistemas.
+ *
+ *   coseno del mejor fragmento : min 0,291 · p25 0,361 · mediana 0,408
+ *                                p75 0,430 · max 0,568
+ *   BM25 crudo                 : min 0,00 · p25 0,00 · mediana 2,81
+ *                                p75 5,52 · max 8,86
+ *
+ * Los cortes VIEJOS de coseno (0,55/0,20) repartían **2:4% · 1:96% · 0:0%**
+ * — es decir, `manual` valía 1 casi siempre. Exactamente el mismo defecto
+ * que midió la auditoría (un término que no desempata), con el signo
+ * cambiado: antes constante 2, ahora constante 1. Los nuevos reparten
+ * **2:12% · 1:64% · 0:24%**.
+ *
+ * `UMBRAL_COSENO_DEBIL` en 0,36 es el p25 medido, y no es un percentil
+ * elegido por bonito: en este corpus el cuartil bajo son precisamente las
+ * causas de VIBRACIÓN casando contra un manual de bombas —no hay manual de
+ * vibraciones—, o sea ruido. El corte las manda a 0, que es lo correcto.
+ *
+ * ── LO QUE SIGUE SIN ESTAR CERRADO, Y HAY QUE DECIRLO ───────────────
+ *
+ * Siguen marcados PROVISIONAL, y con ellos **C11 sigue abierta**. La regla
+ * del Plan 17 §4·F3b es explícita: mientras el umbral esté provisional,
+ * nadie puede decir que C11 está cerrada. Lo medido son 2 documentos
+ * ÚNICOS (4 archivos, dos pares byte a byte idénticos) y 44 fragmentos.
+ * Eso alcanza para ver la FORMA de la distribución y para corregir un corte
+ * que estaba demostrablemente mal; no alcanza para llamarlo calibración de
+ * producción. Cuando la planta cargue sus manuales de verdad hay que
+ * repetir la medida — y el guion ya está escrito para eso.
+ *
+ * Un apunte del propio dato: en este corpus **BM25 discrimina mejor que el
+ * coseno**, porque devuelve 0,00 limpio para las causas de vibración
+ * mientras el coseno les da 0,29-0,44. Es lo que se espera de un corpus sin
+ * el vocabulario del dominio, y es la razón por la que el modo degradado no
+ * es sólo un plan B.
  */
-const UMBRAL_COSENO_FUERTE = 0.55
-const UMBRAL_COSENO_DEBIL = 0.2
-const UMBRAL_BM25_FUERTE = 8
+const UMBRAL_COSENO_FUERTE = 0.46
+const UMBRAL_COSENO_DEBIL = 0.36
+const UMBRAL_BM25_FUERTE = 6
 const UMBRAL_BM25_DEBIL = 2
 
 /**

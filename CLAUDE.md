@@ -233,14 +233,26 @@ node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
 node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
 ```
 
-**Sonda contra el servidor REAL** (no vale el ICONICS falso: necesita red a
-planta y `--env-file`):
+**Sonda contra ICONICS REAL** (no vale el falso: necesita red a planta y
+`--env-file`):
 ```bash
 node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad de la última muestra
 ```
 > Fuera de la red de planta falla siempre, con un timeout contra `bms-server`.
-> Eso **no** es una regresión: estaba listado más arriba junto a los que sí
-> corren sin red, y confundirlo con un verificador roto cuesta media hora.
+> Eso **no** es una regresión: estaba listado junto a los que sí corren sin
+> red, y confundirlo con un verificador roto cuesta media hora.
+
+**Instrumento de medida** (necesita el servidor de embeddings, `:8081` — no
+ICONICS):
+```bash
+node --env-file=.env.local scripts/medir-calibracion.mjs   # distribución real de coseno y BM25
+```
+> No afirma nada, **mide**: de su salida salen los `UMBRAL_*` de
+> `ia/motor/diagnostico.mjs`. No es un verificador y no devuelve código de
+> error — no lo metas en una tanda de `verificar-*`. Su hermano sí lo es:
+> `verificar-calibracion.mjs` prueba el MECANISMO sin servidores, sobre un
+> corpus sintético. Separarlos es lo que impide poner un umbral a ojo y
+> después escribir la prueba que lo confirme.
 
 **Tras compilar el frontend:**
 ```bash
