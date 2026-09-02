@@ -31,7 +31,7 @@ import {
   fetchEventHistory,
   fetchPredictionHealth,
   PREDICTION_API_BASE,
-} from "@/lib/predictionApi.js";
+} from "@/lib/api/predictionApi.js";
 import { useTheme } from "@/theme";
 import { MONO, SANS } from "../../components/base.jsx";
 

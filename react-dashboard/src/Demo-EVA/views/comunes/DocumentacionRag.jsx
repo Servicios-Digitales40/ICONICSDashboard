@@ -24,7 +24,7 @@ import { ArchiveRestore, FileUp, RefreshCw, Upload, X } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
-import { archivarManual, listarManuales, reemplazarManual, subirManual } from "@/lib/ragApi.js";
+import { archivarManual, listarManuales, reemplazarManual, subirManual } from "@/lib/api/ragApi.js";
 import { useTheme } from "@/theme";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 

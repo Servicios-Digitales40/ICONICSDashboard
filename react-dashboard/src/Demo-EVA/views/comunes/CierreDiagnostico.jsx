@@ -45,7 +45,7 @@ import { CheckCircle2, ChevronLeft, ClipboardCheck, Loader2, XCircle } from "luc
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
-import { obtenerDiagnostico, registrarCaso } from "@/lib/casosApi.js";
+import { obtenerDiagnostico, registrarCaso } from "@/lib/api/casosApi.js";
 import { useTheme } from "@/theme";
 import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 

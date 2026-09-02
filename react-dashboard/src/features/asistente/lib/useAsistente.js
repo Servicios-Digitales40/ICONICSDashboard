@@ -17,7 +17,7 @@
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE } from "@/lib/apiBase";
+import { API_BASE } from "@/lib/api/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";

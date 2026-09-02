@@ -3,9 +3,9 @@
  *
  * Las rutas son relativas al origen de la página en los dos despliegues: en
  * planta porque el backend sirve el bundle, y en desarrollo porque el dev
- * server reenvía /api al backend. Ver `lib/apiBase.js`.
+ * server reenvía /api al backend. Ver `lib/api/apiBase.js`.
  */
-import { API_BASE } from "@/lib/apiBase";
+import { API_BASE } from "@/lib/api/apiBase";
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE}${path}`);

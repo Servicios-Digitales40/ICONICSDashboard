@@ -204,4 +204,7 @@ porque no bloquea nada de lo anterior y no es urgente.
       («*sus* 5 mecanismos de desgaste»). Tienen consumidores de las dos
       maquinas, asi que `comun/` se sostiene, pero la prosa habria que
       revisarla.
-- [ ] F5 — `react-dashboard/src/lib/`
+- [x] F5 — `react-dashboard/src/lib/` — los 4 clientes HTTP a `lib/api/`.
+      Trivial: los unicos imports internos (`./apiBase.js` desde casosApi y
+      ragApi) apuntan a un archivo que va a la misma carpeta. 6+/6- en 9
+      archivos, 511 pruebas y build.
