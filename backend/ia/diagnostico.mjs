@@ -198,6 +198,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
    * @param {{sistema: string, riesgoId: string}} entrada
    * @returns {Promise<{
    *   sistema: string, riesgoId: string,
+   *   diagnosticEventId: string,  // uno por CADA llamada, ver la cabecera del archivo
    *   huerfano: boolean,          // true si el riesgo no tiene causas transcritas
    *   causas: object[],           // ordenadas, la más respaldada primero
    * }>}
@@ -209,12 +210,23 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
       throw new TypeError(`"${riesgoId}" no es un riesgo de "${sistema}" — no hay nada que diagnosticar.`)
     }
 
+    /*
+     * Plan 17 Fase 5 (G10): identifica ESTE momento de pedir el diagnóstico,
+     * no el contenido — no rompe el determinismo del que habla la cabecera
+     * de este archivo. Dos llamadas idénticas siguen dando exactamente las
+     * mismas `causas`; sólo el id de evento cambia entre una y otra, porque
+     * es lo único que ES distinto: un momento distinto. Mismo generador que
+     * `crearIntervencion` (`shared/eva/aprendizaje.js`) por la misma razón:
+     * dos eventos en el mismo milisegundo no pueden compartir id.
+     */
+    const diagnosticEventId = `diag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+
     const candidatas = causasDe(riesgoId)
     if (!candidatas) {
       // Ningún riesgo activo se queda callado: si no hay causas transcritas
       // todavía, el diagnóstico lo DICE, no devuelve una lista vacía sin más
       // explicación que un caller distraído confunda con "sin sospechosos".
-      return { sistema, riesgoId, huerfano: true, causas: [] }
+      return { sistema, riesgoId, diagnosticEventId, huerfano: true, causas: [] }
     }
 
     const datos = datosDe(regla)
@@ -235,8 +247,18 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
         provisional: causa.provisional,
         respaldo: { datos, manual: manual.puntos, casos: casos.puntos, total },
         banda: bandaDe(total, fuentesActivas),
-        manualCitado: manual.fragmentos.map(({ archivo, pagina }) => ({ archivo, pagina })),
-        casosCitados: casos.casos.map(({ id, fecha, resuelto }) => ({ id, fecha, resuelto })),
+        // `texto`/`hash` y `resumen` — Plan 17 Fase 5 (G10): antes sólo
+        // viajaba la referencia (qué documento, qué página; qué id, qué
+        // fecha). Nadie podía verificar una cita sin salir del sistema —y,
+        // como midió la auditoría del 01-09-2026 (§9.2/H1), cuando alguien
+        // por fin va a mirar, a veces el respaldo resulta ser de otro
+        // riesgo—. `hash` es el del CONTENIDO del fragmento, no del PDF
+        // entero: distingue el trozo exacto cuando una página se parte en
+        // varios, y avisa si el PDF cambió desde que se citó.
+        manualCitado: manual.fragmentos.map(({ archivo, pagina, texto, hash }) => ({ archivo, pagina, texto, hash })),
+        casosCitados: casos.casos.map(({ id, fecha, resuelto, sintoma, causa }) => ({
+          id, fecha, resuelto, resumen: causa ?? sintoma,
+        })),
       }
     }))
 
@@ -246,7 +268,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
     // veces"—.
     causas.sort((a, b) => b.respaldo.total - a.respaldo.total)
 
-    return { sistema, riesgoId, huerfano: false, causas }
+    return { sistema, riesgoId, diagnosticEventId, huerfano: false, causas }
   }
 
   return { diagnosticar }

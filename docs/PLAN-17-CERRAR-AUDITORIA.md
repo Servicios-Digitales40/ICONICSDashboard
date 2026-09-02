@@ -85,6 +85,38 @@
 > `scripts/verificar-diagnostico.mjs` (15/15, antes 11) y
 > `scripts/verificar-casos-cierre.mjs` (7/7, antes 5). Sin regresiones:
 > 153/153 vitest, 124/124 herramientas, 12/12 casos, 10/10 documentos.
+>
+> **Fase 5 completada** (adelantada del 7.º al 4.º lugar del orden offline,
+> §7 tramo 1 — no depende de ningún servidor). `manualCitado` deja de
+> recortar `texto`/`hash` que `documentos.mjs · buscar()` ya calculaba y
+> tiraba: el `hash` es del CONTENIDO del fragmento —no del PDF entero—, así
+> que identifica el trozo exacto cuando una página se parte en varios y
+> avisa si el PDF cambió desde que se citó, sin abrir el archivo.
+> `casosCitados` gana `resumen` (la causa, o el síntoma si no hay causa) —
+> antes sólo `{id, fecha, resuelto}`, sin poder saber por qué se citó sin
+> ir a `aprendizaje.json`. `diagnosticar()` emite `diagnosticEventId`, uno
+> por LLAMADA —no por causa—; no rompe el determinismo (el test lo separa
+> del contenido y comprueba las dos cosas: los ids difieren, el resto es
+> idéntico). El motor ahora expone el top-N con banda+respaldo listo para
+> persistir, no sólo la ganadora.
+>
+> `CitaManualSchema`/`DiagnosticoPropuestoSchema` (`backend/http/
+> esquemas.mjs`) ganan `texto`/`hash` opcionales y un `CitaCasoSchema` +
+> `diagnosticEventId` + `candidatas` nuevos — sin esto, Zod los habría
+> descartado en silencio al guardar un cierre (comportamiento por defecto:
+> "strip"), y lo persistido habría perdido justo lo que esta fase añade.
+> `CierreDiagnostico.jsx` reenvía `casosCitados`, `diagnosticEventId` y el
+> top-N completo (`causasCandidatas.map(...)`) al cerrar — antes sólo
+> mandaba `manualCitado` de la ganadora. Nuevo test de frontend que
+> comprueba los tres campos llegan al `POST /api/casos` (6/6 en
+> `cierre-diagnostico.test.jsx`, antes 5).
+>
+> Instalado también `react-dashboard/node_modules` (faltaba
+> `@tanstack/react-query`, mismo síntoma que el backend en §10). Sin
+> regresiones: 153/153 vitest backend, **509/509 vitest frontend** (antes
+> 497 + 1 nuevo — corría en 2 archivos fallidos por la dependencia
+> faltante, no por código), `npm run build` limpio, 15/15 diagnóstico,
+> 12/12 casos, 7/7 casos-cierre, 124/124 herramientas, 10/10 documentos.
 
 ---
 

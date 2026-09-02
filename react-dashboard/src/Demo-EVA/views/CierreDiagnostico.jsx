@@ -375,6 +375,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   }, [sistemaId, riesgoId]);
 
   const causasCandidatas = diagnostico.data?.causas ?? [];
+  const diagnosticEventId = diagnostico.data?.diagnosticEventId ?? null;
 
   /* ── Lo que aporta la persona ────────────────────────────────────────── */
 
@@ -422,6 +423,20 @@ export default function CierreDiagnostico({ params, onNavigate }) {
               propuesta: propuestaSistema.id,
               respaldo: propuestaSistema.banda,
               manualCitado: propuestaSistema.manualCitado ?? [],
+              // Plan 17 Fase 5 (G10): antes se perdía al cerrar el caso —
+              // "qué casos se citaron" era irrecuperable pasado el momento
+              // del diagnóstico. `casosCitados` ya trae el resumen, no sólo
+              // el id.
+              casosCitados: propuestaSistema.casosCitados ?? [],
+              // Correlaciona este cierre con el momento exacto en que se
+              // pidió el diagnóstico, aunque el contenido sea determinista.
+              ...(diagnosticEventId ? { diagnosticEventId } : {}),
+              // El top-N completo con sus puntuaciones, no sólo la
+              // ganadora: antes de esta fase, un diagnóstico con varias
+              // candidatas cercanas sólo dejaba rastro de la primera.
+              candidatas: causasCandidatas.map((c) => ({
+                id: c.id, banda: c.banda, respaldo: c.respaldo,
+              })),
             },
           }
           : {}),
@@ -440,8 +455,8 @@ export default function CierreDiagnostico({ params, onNavigate }) {
       setEnviando(false);
     }
   }, [
-    sistemaId, riesgoId, definicion, activo, params, causasCandidatas, causaId, causaLibre, componenteLibre,
-    causaSeleccionada, solucion, resuelto, observaciones, muestraSensores,
+    sistemaId, riesgoId, definicion, activo, params, causasCandidatas, diagnosticEventId, causaId, causaLibre,
+    componenteLibre, causaSeleccionada, solucion, resuelto, observaciones, muestraSensores,
   ]);
 
   if (!riesgoId) {

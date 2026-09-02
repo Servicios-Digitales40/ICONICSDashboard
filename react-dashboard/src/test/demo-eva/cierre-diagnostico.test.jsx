@@ -26,6 +26,7 @@ const DIAGNOSTICO_RESPUESTA = {
   ok: true,
   sistema: "tanque",
   riesgoId: "bomba-sin-salida",
+  diagnosticEventId: "diag-test-0001",
   huerfano: false,
   causas: [
     {
@@ -36,7 +37,9 @@ const DIAGNOSTICO_RESPUESTA = {
       respaldo: { datos: 3, manual: 0, casos: 0, total: 3 },
       origen: "riesgos.js · accion",
       manualCitado: [],
-      casosCitados: [],
+      casosCitados: [
+        { id: "interv-anterior", fecha: "2026-01-01", resuelto: true, resumen: "La válvula estaba agarrotada." },
+      ],
     },
     {
       id: "sin-recirculacion-minima",
@@ -150,6 +153,33 @@ describe("CierreDiagnostico", () => {
     // No coincide con la propuesta del sistema (el primer id de la lista):
     // diagnosticoCorrecto tiene que decir que no, no quedarse sin decidir.
     expect(cuerpo.diagnosticoCorrecto).toBe(false);
+  });
+
+  it("el cierre manda casosCitados, diagnosticEventId y el top-N completo (Plan 17 Fase 5)", async () => {
+    const { fetchMock } = montar({ sistema: "tanque", riesgoId: "bomba-sin-salida" });
+    await screen.findAllByText(/Sin línea de recirculación mínima/i);
+
+    fireEvent.change(screen.getByPlaceholderText(/Se liberó la válvula/i), {
+      target: { value: "Se liberó la válvula de impulsión." },
+    });
+    fireEvent.click(screen.getByText("Cerrar caso"));
+
+    await waitFor(() => expect(screen.getByText(/Caso registrado/i)).toBeTruthy());
+
+    const llamadaCasos = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/casos"));
+    const cuerpo = JSON.parse(llamadaCasos[1].body);
+
+    // Antes de esta fase, esto se perdía al cerrar el caso: "qué casos se
+    // citaron" era irrecuperable pasado el momento del diagnóstico.
+    expect(cuerpo.diagnostico.casosCitados).toEqual([
+      { id: "interv-anterior", fecha: "2026-01-01", resuelto: true, resumen: "La válvula estaba agarrotada." },
+    ]);
+    expect(cuerpo.diagnostico.diagnosticEventId).toBe("diag-test-0001");
+    // El top-N completo, no sólo la ganadora: las DOS causas del fixture.
+    expect(cuerpo.diagnostico.candidatas).toEqual([
+      { id: "valvula-impulsion-cerrada", banda: "alto", respaldo: { datos: 3, manual: 0, casos: 0, total: 3 } },
+      { id: "sin-recirculacion-minima", banda: "bajo", respaldo: { datos: 3, manual: 0, casos: 0, total: 3 } },
+    ]);
   });
 
   it("«No funcionó» viaja como resuelto:false, sin bloquear el envío", async () => {

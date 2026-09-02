@@ -86,7 +86,7 @@ const SIN_FUENTES = createMotorDiagnostico({})
 
 console.log('\n── Mismas entradas, misma salida ─────────────────────────────')
 
-await check('dos llamadas idénticas devuelven exactamente el mismo JSON', async () => {
+await check('dos llamadas idénticas devuelven exactamente el mismo CONTENIDO', async () => {
   const indiceDocumentos = manualFalso({ 'impulsión cerrada': 0.8 })
   const indiceCasos = casosFalsos([
     { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0.9 },
@@ -95,7 +95,15 @@ await check('dos llamadas idénticas devuelven exactamente el mismo JSON', async
 
   const a = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
   const b = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
-  assert.deepEqual(a, b)
+
+  // `diagnosticEventId` (Plan 17 Fase 5) identifica el MOMENTO de pedir el
+  // diagnóstico, no su contenido — es lo único que puede, y debe, cambiar
+  // entre dos llamadas idénticas. Todo lo demás sigue siendo exactamente
+  // igual: es la propiedad que justifica que puntúe el código y no el modelo.
+  assert.notEqual(a.diagnosticEventId, b.diagnosticEventId, 'dos llamadas debían tener eventos distintos')
+  const { diagnosticEventId: _a, ...contenidoA } = a
+  const { diagnosticEventId: _b, ...contenidoB } = b
+  assert.deepEqual(contenidoA, contenidoB)
 })
 
 /* ── Ningún riesgo activo queda huérfano ────────────────────────────────── */

@@ -797,7 +797,15 @@ export function createIndiceDocumentos({
       .sort((a, b) => b.score - a.score)
       .slice(0, top)
       .filter(f => f.score > 0)
-      .map(({ archivo, pagina, texto, score }) => ({ archivo, pagina, texto, score }))
+      // `hash` viaja desde aquí (Plan 17 Fase 5, G10): es el hash del
+      // CONTENIDO de este fragmento en concreto —ya se calculaba para la
+      // caché de embeddings, `hashDeTexto` en la indexación—, no del PDF
+      // entero. Hace de identidad del trozo exacto cuando una página se
+      // parte en varios fragmentos (`trocear`, TAMANO_FRAGMENTO+SOLAPE), y
+      // de aviso si el PDF cambia: si el hash guardado en una cita antigua
+      // no coincide con el de hoy, ese `{archivo, pagina}` ya no es el
+      // mismo contenido.
+      .map(({ archivo, pagina, texto, score, hash }) => ({ archivo, pagina, texto, score, hash }))
   }
 
   /** Qué hay indexado, para poder decírselo al usuario sin adivinar. */

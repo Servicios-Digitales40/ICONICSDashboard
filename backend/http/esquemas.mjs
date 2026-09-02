@@ -310,9 +310,51 @@ const DisparadorCasoSchema = z.object({
   severidad: z.string().optional(),
 })
 
+/*
+ * Plan 17 Fase 5 (G10): `texto` y `hash` son opcionales y NO retroactivos —
+ * un cierre guardado antes de esta fase no los tiene, y eso es correcto,
+ * no un error de validación. `hash` es el del CONTENIDO del fragmento —ya
+ * se calculaba para la caché de embeddings de `documentos.mjs`—, no del
+ * PDF entero: identifica el trozo exacto (una página puede partirse en
+ * varios) y avisa si el PDF cambió desde que se citó, sin tener que volver
+ * a abrirlo.
+ */
 const CitaManualSchema = z.object({
   archivo: z.string(),
   pagina: z.number(),
+  texto: z.string().optional(),
+  hash: z.string().optional(),
+})
+
+/** Igual que `CitaManualSchema` pero para un caso previo citado: antes ni
+ *  siquiera se guardaba (`DiagnosticoPropuestoSchema` no tenía este campo),
+ *  así que "qué casos se citaron" era irrecuperable pasado el momento del
+ *  diagnóstico — ver §29/§30 de la auditoría del 01-09-2026. `resumen` es
+ *  la causa (o el síntoma, si no hay causa) del caso citado, en texto, para
+ *  no tener que ir a buscarlo en `aprendizaje.json` para saber por qué se
+ *  citó. */
+const CitaCasoSchema = z.object({
+  id: z.string(),
+  fecha: z.string().optional(),
+  resuelto: z.boolean().optional(),
+  resumen: z.string().optional(),
+})
+
+const RespaldoCausaSchema = z.object({
+  datos: z.number(),
+  manual: z.number(),
+  casos: z.number(),
+  total: z.number(),
+})
+
+/** Una candidata del top-N, tal como la devuelve `motorDiagnostico.diagnosticar()`
+ *  — no sólo la primera. Plan 17 Fase 5: antes el cierre sólo guardaba
+ *  `propuesta`/`respaldo` de la GANADORA; sin las demás, un diagnóstico no
+ *  se puede reconstruir, sólo auditar a medias. */
+const CandidataSchema = z.object({
+  id: z.string(),
+  banda: z.enum(['alto', 'medio', 'bajo']),
+  respaldo: RespaldoCausaSchema,
 })
 
 const DiagnosticoPropuestoSchema = z.object({
@@ -320,6 +362,14 @@ const DiagnosticoPropuestoSchema = z.object({
   respaldo: z.enum(['alto', 'medio', 'bajo']).optional(),
   fuentes: z.array(z.string()).optional(),
   manualCitado: z.array(CitaManualSchema).optional(),
+  // Plan 17 Fase 5 (G10): antes se perdía por completo al cerrar el caso.
+  casosCitados: z.array(CitaCasoSchema).optional(),
+  // Un id por CADA vez que se pidió el diagnóstico —no por causa—, para
+  // poder correlacionar "qué vio el técnico" con los logs del servidor si
+  // hace falta investigar algo. Lo genera `motorDiagnostico.diagnosticar()`.
+  diagnosticEventId: z.string().optional(),
+  // El top-N completo con sus puntuaciones, no sólo la primera candidata.
+  candidatas: z.array(CandidataSchema).optional(),
 })
 
 const CausaRealSchema = z.object({
