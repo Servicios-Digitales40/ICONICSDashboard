@@ -37,12 +37,12 @@ import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { pedirAlAsistente } from "@/features/asistente";
 import { useTheme } from "@/theme";
 
-import { useSeriesHistoricas, useSistemaAgua } from "../data/hooks.js";
-import { MAX_PUNTOS } from "../data/historia.js";
-import { evaluarPronostico, preguntaSobrePronostico } from "../domain/pronostico.js";
-import { evaluarRiesgos, preguntaSobreRiesgo } from "../domain/riesgos.js";
-import { PROVISIONALES } from "../domain/umbrales.js";
-import { UltimaLectura } from "../components/base.jsx";
+import { useSeriesHistoricas, useSistemaAgua } from "../../data/hooks.js";
+import { MAX_PUNTOS } from "../../data/historia.js";
+import { evaluarPronostico, preguntaSobrePronostico } from "../../domain/pronostico.js";
+import { evaluarRiesgos, preguntaSobreRiesgo } from "../../domain/riesgos.js";
+import { PROVISIONALES } from "../../domain/umbrales.js";
+import { UltimaLectura } from "../../components/base.jsx";
 
 /* ── El pronóstico ─────────────────────────────────────────────────── */
 
@@ -332,7 +332,7 @@ function TarjetaPronostico({ p, t }) {
 
 /* ── La vista ──────────────────────────────────────────────────────── */
 
-function RiesgosEva({ onNavigate }) {
+function RiesgosTanque({ onNavigate }) {
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
   const { theme: t } = useTheme();
 
@@ -647,4 +647,4 @@ function RiesgosEva({ onNavigate }) {
  * tiene de dónde leer. Envolver aquí otra vez sólo abriría un segundo motor
  * de sondeo. Mismo patrón que las otras vistas de la carpeta.
  */
-export default RiesgosEva;
+export default RiesgosTanque;

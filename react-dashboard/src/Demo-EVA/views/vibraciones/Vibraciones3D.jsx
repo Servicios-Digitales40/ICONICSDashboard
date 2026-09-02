@@ -38,9 +38,9 @@ import { Box, Waves } from "lucide-react";
 import { AlertBanner } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { CANALES } from "../domain/vibraciones.js";
+import { CANALES } from "../../domain/vibraciones.js";
 
-function VibracionesEva3D({ onNavigate }) {
+function Vibraciones3D({ onNavigate }) {
   const { theme: t } = useTheme();
 
   return (
@@ -109,4 +109,4 @@ function VibracionesEva3D({ onNavigate }) {
   );
 }
 
-export default VibracionesEva3D;
+export default Vibraciones3D;

@@ -230,7 +230,7 @@ button {
 /* Relleno del área de contenido, bajo el Topbar.
    Vive aquí porque lo lleva CADA vista, no una en particular — el mismo
    criterio que ya reparte `.blob`, `.page-fade` y el resto del cromado del
-   Shell. Por debajo de 720px (el mismo punto en el que `PlantaEva` renuncia
+   Shell. Por debajo de 720px (el mismo punto en el que `PlantaTanque` renuncia
    a su rejilla, ver ese archivo) el padding lateral de 32px es una fracción
    demasiado grande de un viewport que ya va sobrado de estrecho. */
 .eva-page-shell {

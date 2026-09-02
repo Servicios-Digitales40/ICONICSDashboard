@@ -22,9 +22,9 @@ import { Power, PowerOff } from "lucide-react";
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../data/hooks.js";
-import { fmtSenal } from "../lib/formato.js";
-import { UltimaLectura } from "../components/base.jsx";
+import { useSistemaAgua } from "../../data/hooks.js";
+import { fmtSenal } from "../../lib/formato.js";
+import { UltimaLectura } from "../../components/base.jsx";
 
 const VENTANA_CONFIRMACION_MS = 4000;
 
@@ -71,7 +71,7 @@ function BotonAccion({ accion, pendiente, cargando, onPedir, t }) {
   );
 }
 
-function ControlesEva() {
+function ControlesTanque() {
   const { theme: t } = useTheme();
   const { sistema, lastUpdated } = useSistemaAgua();
 
@@ -142,4 +142,4 @@ function ControlesEva() {
   );
 }
 
-export default ControlesEva;
+export default ControlesTanque;

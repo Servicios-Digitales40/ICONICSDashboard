@@ -13,7 +13,7 @@
  * La estación de llenado tiene su «Controles» funcionando, y no es un botón:
  * hereda del backend el modo solo lectura, el corte por nivel de tanque alto
  * y la confirmación por relectura, más una confirmación de dos pasos en el
- * propio botón. Ver `ControlesEva.jsx` y `backend/routes/controlRoutes.mjs`.
+ * propio botón. Ver `ControlesTanque.jsx` y `backend/routes/controlRoutes.mjs`.
  * Nada de eso existe todavía para esta máquina.
  *
  * ── QUÉ HACE FALTA PARA CONSTRUIRLA ────────────────────────────────

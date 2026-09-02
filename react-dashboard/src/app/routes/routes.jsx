@@ -117,7 +117,7 @@ export const NAV_GROUPS = {
 export const ROUTES = [
   {
     id: "eva-inicio",
-    component: lazy(() => import("@/Demo-EVA/views/InicioEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/InicioTanque.jsx")),
     title: "Inicio",
     sub: "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/",
     nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-llenado" },
@@ -125,7 +125,7 @@ export const ROUTES = [
 
   {
     id: "eva-planta",
-    component: lazy(() => import("@/Demo-EVA/views/PlantaEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/PlantaTanque.jsx")),
     title: "Gráficas",
     sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
     nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
@@ -135,7 +135,7 @@ export const ROUTES = [
     // Va justo detrás de «Planta» a propósito: contesta la pregunta siguiente.
     // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
     id: "eva-riesgos",
-    component: lazy(() => import("@/Demo-EVA/views/RiesgosEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/RiesgosTanque.jsx")),
     title: "Riesgos",
     sub: "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros",
     nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-llenado" },
@@ -145,7 +145,7 @@ export const ROUTES = [
     // Detrás de las dos de diagnóstico, pero ANTES de las 3D: es una acción
     // operativa de primer nivel (encender/apagar la bomba), no un diagnóstico.
     id: "eva-controles",
-    component: lazy(() => import("@/Demo-EVA/views/ControlesEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/ControlesTanque.jsx")),
     title: "Controles",
     sub: "Encendido y apagado directo de la bomba de la instalación",
     nav: { label: "Controles", icon: <Power size={17} />, group: "sec-llenado" },
@@ -153,7 +153,7 @@ export const ROUTES = [
 
   {
     id: "eva-maqueta",
-    component: lazy(() => import("@/Demo-EVA/views/MaquetaEva3D.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/MaquetaTanque3D.jsx")),
     title: "Vista 3D",
     sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
     nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-llenado" },
@@ -170,7 +170,7 @@ export const ROUTES = [
    */
   {
     id: "vib-inicio",
-    component: lazy(() => import("@/Demo-EVA/views/InicioVibraciones.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
     title: "Inicio · Vibraciones",
     sub: "Sistema de vibraciones · qué contesta la máquina ahora mismo",
     nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-vibraciones" },
@@ -183,7 +183,7 @@ export const ROUTES = [
     // de este sistema no se usa el histórico (ver `sistemas.js`): lo que se ve
     // son las medidas del instante, con su escala y su banda de norma.
     id: "eva-vibraciones",
-    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
     title: "Gráficas · Vibraciones",
     sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
     nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
@@ -194,7 +194,7 @@ export const ROUTES = [
     // esta pantalla ESCRIBIRÁ en el PLC. Un botón que parezca operativo y no
     // lo sea es peor que no tener pantalla, así que no hay ninguno.
     id: "vib-controles",
-    component: lazy(() => import("@/Demo-EVA/views/ControlesVibraciones.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/ControlesVibraciones.jsx")),
     title: "Controles · Vibraciones",
     sub: "Encendido y apagado del sistema de vibraciones · todavía sin construir",
     nav: { label: "Controles", icon: <Power size={17} />, group: "sec-vibraciones" },
@@ -206,7 +206,7 @@ export const ROUTES = [
     // acelerómetros. Las dos listas juntas serían la invitación a buscar una
     // relación entre ellas que no existe.
     id: "eva-riesgos-vibracion",
-    component: lazy(() => import("@/Demo-EVA/views/RiesgosVibracionEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
     title: "Riesgos · Vibraciones",
     sub: "Qué se deduce del estado mecánico · evidencia separada de la hipótesis",
     nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-vibraciones" },
@@ -217,7 +217,7 @@ export const ROUTES = [
     // decidido y el contenido no. Ver la cabecera de la vista para por qué no
     // hay una escena provisional mientras tanto.
     id: "vib-3d",
-    component: lazy(() => import("@/Demo-EVA/views/VibracionesEva3D.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
     title: "Vista 3D · Vibraciones",
     sub: "Gemelo digital del sistema de vibraciones · todavía sin construir",
     nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-vibraciones" },
@@ -240,7 +240,7 @@ export const ROUTES = [
     // />, group: "sec-general" }` aquí (reimportando `Bell` de lucide-react
     // arriba) y descomentar el bloque del botón en `Topbar.jsx`.
     id: "eva-alarmas",
-    component: lazy(() => import("@/Demo-EVA/views/AlarmasEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
     title: "Alarmas",
     sub: "Historial de eventos de la instalación",
   },
@@ -250,7 +250,7 @@ export const ROUTES = [
     // diagnostica un «falta un dato en el panel», navegando el árbol de
     // AssetWorX y leyendo la propiedad en vivo.
     id: "eva-assets",
-    component: lazy(() => import("@/Demo-EVA/views/AssetsEva.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/comunes/AssetsEva.jsx")),
     title: "Assets",
     sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
     nav: { label: "Assets", icon: <Boxes size={17} />, group: "sec-general" },
@@ -282,7 +282,7 @@ export const ROUTES = [
      * variable apunta al mismo host del tablero en el puerto 8000.
      */
     id: "eva-prediccion",
-    component: lazy(() => import("@/Demo-EVA/views/PrediccionBeta.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/comunes/PrediccionBeta.jsx")),
     title: "Predicción (Beta)",
     sub: "Reproducción histórica MetroPT-3 · consulta del backend predictivo V4.4",
     nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-general" },
@@ -294,12 +294,12 @@ export const ROUTES = [
    * Sección propia y no una pestaña más de «General»: lo que hay aquí no
    * describe ninguna instalación de la planta, describe de dónde saca el
    * asistente lo que sabe fuera de lo que mide ICONICS. Ver la cabecera de
-   * `Demo-EVA/views/DocumentacionRag.jsx` para el porqué de cada decisión de
+   * `Demo-EVA/views/comunes/DocumentacionRag.jsx` para el porqué de cada decisión de
    * la vista.
    */
   {
     id: "rag-documentacion",
-    component: lazy(() => import("@/Demo-EVA/views/DocumentacionRag.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
     title: "Documentación",
     sub: "Los manuales que alimentan el índice del asistente, y qué sabe extraer de cada uno",
     nav: { label: "Documentación", icon: <FileText size={17} />, group: "sec-rag" },
@@ -312,7 +312,7 @@ export const ROUTES = [
     // con `?activo=` en la URL. Genérica para los cuatro activos: ver
     // `domain/activos.js`.
     id: "eva-detalle",
-    component: lazy(() => import("@/Demo-EVA/views/DetalleActivo.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/tanque/DetalleActivo.jsx")),
     title: "Detalle de activo",
     sub: "Cada variable, con su valor y su histórico completo",
   },
@@ -324,7 +324,7 @@ export const ROUTES = [
     // desde el sidebar, porque sin un riesgo concreto no hay nada que
     // cerrar. Plan 16 Fase 5, UI A.
     id: "cierre-diagnostico",
-    component: lazy(() => import("@/Demo-EVA/views/CierreDiagnostico.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/comunes/CierreDiagnostico.jsx")),
     title: "Cerrar diagnóstico",
     sub: "Confirma o corrige la causa de un riesgo ya intervenido",
   },

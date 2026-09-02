@@ -21,19 +21,19 @@ import { FileSpreadsheet } from "lucide-react";
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useEvaSource } from "../data/EvaProvider.jsx";
-import { useDetalleActivo } from "../data/detalleActivo.js";
-import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../data/historia.js";
-import { ACTIVO_IDS, activoInfo } from "../domain/activos.js";
-import { estadoInfo } from "../domain/estado.js";
-import { historizadas, senalInfo } from "../domain/senales.js";
-import { useAhora } from "../lib/useAhora.js";
-import { UltimaLectura, PuntoEstado } from "../components/base.jsx";
-import { estadoColor } from "../components/paleta.js";
-import { DetalleGrid } from "../components/detalle/DetalleGrid.jsx";
-import { GraficaComparada } from "../components/detalle/GraficaComparada.jsx";
-import { SelectorRango } from "../components/detalle/SelectorRango.jsx";
-import { armarLibro, descargarLibro, nombreArchivoGeneral } from "../lib/exportarExcel.js";
+import { useEvaSource } from "../../data/EvaProvider.jsx";
+import { useDetalleActivo } from "../../data/detalleActivo.js";
+import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/historia.js";
+import { ACTIVO_IDS, activoInfo } from "../../domain/activos.js";
+import { estadoInfo } from "../../domain/estado.js";
+import { historizadas, senalInfo } from "../../domain/senales.js";
+import { useAhora } from "../../lib/useAhora.js";
+import { UltimaLectura, PuntoEstado } from "../../components/base.jsx";
+import { estadoColor } from "../../components/paleta.js";
+import { DetalleGrid } from "../../components/detalle/DetalleGrid.jsx";
+import { GraficaComparada } from "../../components/detalle/GraficaComparada.jsx";
+import { SelectorRango } from "../../components/detalle/SelectorRango.jsx";
+import { armarLibro, descargarLibro, nombreArchivoGeneral } from "../../lib/exportarExcel.js";
 
 /**
  * Con qué función se calcula el rango de cada acceso rápido contra el

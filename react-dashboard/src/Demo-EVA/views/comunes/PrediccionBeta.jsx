@@ -33,7 +33,7 @@ import {
   PREDICTION_API_BASE,
 } from "@/lib/predictionApi.js";
 import { useTheme } from "@/theme";
-import { MONO, SANS } from "../components/base.jsx";
+import { MONO, SANS } from "../../components/base.jsx";
 
 const EVENTOS = [1, 2, 3, 4];
 const HORAS_MAX = 168;

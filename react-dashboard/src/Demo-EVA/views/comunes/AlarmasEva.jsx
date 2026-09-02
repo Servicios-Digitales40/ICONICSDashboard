@@ -18,10 +18,10 @@ import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { fetchHealth, acknowledgeIconicsAlarms } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 
-import { estadoHistorial, HISTORIAL } from "../data/estadoDelDato.js";
-import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../data/alarmas.js";
-import { ACTIVOS, ACTIVO_IDS } from "../domain/activos.js";
-import { MONO } from "../components/base.jsx";
+import { estadoHistorial, HISTORIAL } from "../../data/estadoDelDato.js";
+import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../../data/alarmas.js";
+import { ACTIVOS, ACTIVO_IDS } from "../../domain/activos.js";
+import { MONO } from "../../components/base.jsx";
 
 const VENTANAS = [
   { horas: 1, label: "Última hora" },

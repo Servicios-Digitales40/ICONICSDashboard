@@ -13,7 +13,7 @@
  *
  * ── MISMO DATO, MISMA GEOMETRÍA, SIN RIESGO NUEVO ──────────────────
  *
- * Es el mismo ensamblaje que `MaquetaEva3D` —bastidor, depósito, tuberías,
+ * Es el mismo ensamblaje que `MaquetaTanque3D` —bastidor, depósito, tuberías,
  * los cuatro activos con su descriptor de estado—, así que el nivel del
  * tanque que se ve aquí ES el mismo `SNIVEL_TANQUE` en vivo que en la vista
  * completa: el North Star del sistema ("el 3D y los números son la misma

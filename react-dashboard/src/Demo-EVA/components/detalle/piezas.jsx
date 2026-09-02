@@ -1,6 +1,6 @@
 /**
  * Átomos de la vista Detalle de activo (`components/detalle/DetalleGrid.jsx`,
- * consumida por `views/DetalleActivo.jsx`): cómo se pinta un histórico real,
+ * consumida por `views/tanque/DetalleActivo.jsx`): cómo se pinta un histórico real,
  * un búfer de sesión, o su ausencia. Separados del layout porque de tres
  * acomodos comparados en vivo se quedó uno, pero la verdad sobre el origen
  * del dato es la misma independientemente de cuál hubiera ganado.

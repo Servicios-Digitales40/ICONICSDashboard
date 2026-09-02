@@ -34,16 +34,16 @@ import { usePrefersReducedMotion } from "@/lib/motion.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../data/hooks.js";
-import { ESTADOS_ORDEN, estadoInfo } from "../domain/estado.js";
-import { PuntoEstado } from "../components/base.jsx";
-import { estadoColor } from "../components/paleta.js";
-import ActivoEnMaqueta from "../three-d/components/ActivoEnMaqueta.jsx";
-import BastidorModel from "../three-d/components/BastidorModel.jsx";
-import DepositoModel from "../three-d/components/DepositoModel.jsx";
-import Tuberias from "../three-d/components/Tuberias.jsx";
-import { DEPOSITO, RADIO_PISO, posicionDe, tramos } from "../three-d/lib/layout.js";
-import { frameloopDe, rpmDe } from "../three-d/lib/comportamiento.js";
+import { useSistemaAgua } from "../../data/hooks.js";
+import { ESTADOS_ORDEN, estadoInfo } from "../../domain/estado.js";
+import { PuntoEstado } from "../../components/base.jsx";
+import { estadoColor } from "../../components/paleta.js";
+import ActivoEnMaqueta from "../../three-d/components/ActivoEnMaqueta.jsx";
+import BastidorModel from "../../three-d/components/BastidorModel.jsx";
+import DepositoModel from "../../three-d/components/DepositoModel.jsx";
+import Tuberias from "../../three-d/components/Tuberias.jsx";
+import { DEPOSITO, RADIO_PISO, posicionDe, tramos } from "../../three-d/lib/layout.js";
+import { frameloopDe, rpmDe } from "../../three-d/lib/comportamiento.js";
 
 /*
  * Los tres encuadres, rehechos cuando la instalación pasó de estar repartida
@@ -118,11 +118,11 @@ function ResumenActivo({ activo, t, dark }) {
   );
 }
 
-function MaquetaEva3D({ params, onNavigate }) {
+function MaquetaTanque3D({ params, onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, loading, error } = useSistemaAgua();
   const reduce = usePrefersReducedMotion();
-  // Mismo umbral que `EquipoEva3D` y que la columna única de `PlantaEva`.
+  // Mismo umbral que `EquipoEva3D` y que la columna única de `PlantaTanque`.
   const angosto = useMediaQuery("(max-width: 720px)");
 
   const [señalado, setSeñalado] = useState(null);
@@ -261,4 +261,4 @@ function MaquetaEva3D({ params, onNavigate }) {
   );
 }
 
-export default MaquetaEva3D;
+export default MaquetaTanque3D;

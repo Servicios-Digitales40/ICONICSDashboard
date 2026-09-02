@@ -180,7 +180,15 @@ porque no bloquea nada de lo anterior y no es urgente.
       archivos y la familia `diagnostico/`— y §2.3 y §3 de `CLAUDE.md`.
       Los `docs/PLAN-11/12/15` se dejaron intactos a propósito: son registro
       fechado, no guía de navegación.
-- [ ] F2 — `Demo-EVA/views/`
+- [x] F2 — `Demo-EVA/views/` — 16 vistas a `tanque/` (6), `vibraciones/` (5) y
+      `comunes/` (5), con 8 renombrados de archivo Y de identificador de
+      componente: un archivo `RiesgosTanque.jsx` que exportara `RiesgosEva`
+      habría sido peor que no renombrar. 511 pruebas de frontend, `vite build`
+      y las 16 rutas `lazy` comprobadas una a una contra el disco (un `lazy`
+      mal escrito no lo detectan las pruebas, sólo falla al navegar).
+      Las ediciones se hicieron con Node y no con `sed -i`: casi todo el
+      frontend está en CRLF y `sed` sobre Git Bash lo normaliza a LF, que es
+      lo que ensució `client.mjs` en F1.
 - [ ] F3 — `Demo-EVA/data/`
 - [ ] F4 — `shared/eva/`
 - [ ] F5 — `react-dashboard/src/lib/`

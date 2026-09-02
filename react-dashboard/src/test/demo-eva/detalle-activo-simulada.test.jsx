@@ -2,7 +2,7 @@
 /**
  * detalle-activo-simulada.test.jsx
  * ------------------------------------------------------------------
- * La vista «Detalle de activo» (`views/DetalleActivo.jsx`), con el origen
+ * La vista «Detalle de activo» (`views/tanque/DetalleActivo.jsx`), con el origen
  * **Simulado**, para los cuatro activos.
  *
  * Mismo criterio que `planta-simulada.test.jsx`: montar la vista real sobre
@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import DetalleActivo from "@/Demo-EVA/views/DetalleActivo.jsx";
+import DetalleActivo from "@/Demo-EVA/views/tanque/DetalleActivo.jsx";
 
 function cortarLaRed() {
   const trampa = vi.fn(() => {

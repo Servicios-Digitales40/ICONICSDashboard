@@ -9,7 +9,7 @@
  * duplicadas habría sido dejar dos tarjetas que se parecen hoy y divergen en
  * cuanto alguien toque una.
  *
- * NO son las piezas de los riesgos del TANQUE, que viven en `RiesgosEva.jsx`
+ * NO son las piezas de los riesgos del TANQUE, que viven en `RiesgosTanque.jsx`
  * y tienen otra forma: un riesgo de vibración cuelga de un APOYO —de ahí
  * `canalLabel`— y cita una norma, y ninguna de las dos cosas existe allí.
  * Unificarlas obligaría a una tarjeta con campos opcionales que se lee peor
@@ -148,7 +148,7 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
         </button>
 
         {/* Plan 16 Fase 5 (UI A) — mismo criterio que la tarjeta del tanque
-            en `RiesgosEva.jsx`. `canalLabel` viaja en los parámetros porque
+            en `RiesgosTanque.jsx`. `canalLabel` viaja en los parámetros porque
             SÍ sobrevive el viaje por la URL —es texto—, y sin él, si el
             riesgo ya dejó de estar activo para cuando se abre el
             formulario, no habría forma de saber de qué apoyo se hablaba. */}

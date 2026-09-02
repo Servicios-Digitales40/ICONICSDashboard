@@ -28,7 +28,7 @@ import { archivarManual, listarManuales, reemplazarManual, subirManual } from "@
 import { useTheme } from "@/theme";
 import { resumenDeSistemas } from "@shared/eva/sistemas.js";
 
-import { MONO, SANS } from "../components/base.jsx";
+import { MONO, SANS } from "../../components/base.jsx";
 
 /** Cada cuántos ms se vuelve a preguntar mientras hay algo indexándose. Lo
  *  bastante rápido para que se sienta en vivo, lo bastante espaciado para no

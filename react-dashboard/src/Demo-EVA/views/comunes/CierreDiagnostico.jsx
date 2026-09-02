@@ -5,7 +5,7 @@
  *
  * El técnico que ACABA de intervenir sobre un riesgo, con prisa, quizá en
  * tablet. Se llega con el botón «Cerrar diagnóstico» de una tarjeta de
- * riesgo (`RiesgosEva.jsx` / `riesgoVibracion.jsx`), nunca del sidebar en
+ * riesgo (`RiesgosTanque.jsx` / `riesgoVibracion.jsx`), nunca del sidebar en
  * frío — por eso esta ruta no tiene `nav` en `routes.jsx`, igual que
  * `eva-detalle`.
  *
@@ -49,11 +49,11 @@ import { obtenerDiagnostico, registrarCaso } from "@/lib/casosApi.js";
 import { useTheme } from "@/theme";
 import { SISTEMA } from "@shared/eva/sistemas.js";
 
-import { MONO, SANS } from "../components/base.jsx";
-import { useSistemaAgua } from "../data/hooks.js";
-import { useVibracion } from "../data/vibracion.js";
-import { evaluarRiesgos, REGLAS as REGLAS_TANQUE } from "../domain/riesgos.js";
-import { evaluarRiesgosVibracion, REGLAS as REGLAS_VIBRACION } from "../domain/riesgosVibracion.js";
+import { MONO, SANS } from "../../components/base.jsx";
+import { useSistemaAgua } from "../../data/hooks.js";
+import { useVibracion } from "../../data/vibracion.js";
+import { evaluarRiesgos, REGLAS as REGLAS_TANQUE } from "../../domain/riesgos.js";
+import { evaluarRiesgosVibracion, REGLAS as REGLAS_VIBRACION } from "../../domain/riesgosVibracion.js";
 
 const BANDA_INFO = {
   alto: { label: "ALTO", token: "coral" },

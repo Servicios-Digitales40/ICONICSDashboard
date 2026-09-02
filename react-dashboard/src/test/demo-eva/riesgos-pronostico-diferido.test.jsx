@@ -28,7 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import RiesgosEva from "@/Demo-EVA/views/RiesgosEva.jsx";
+import RiesgosTanque from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
 
 /*
  * El origen va SIMULADO, igual que en `controles.test.jsx`: el simulador no
@@ -51,7 +51,7 @@ const montar = () =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <RiesgosEva />
+          <RiesgosTanque />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>

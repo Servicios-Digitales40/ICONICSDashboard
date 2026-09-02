@@ -2,7 +2,7 @@
 /**
  * controles.test.jsx
  * ------------------------------------------------------------------
- * La vista «Controles» (`views/ControlesEva.jsx`): confirmación de dos
+ * La vista «Controles» (`views/tanque/ControlesTanque.jsx`): confirmación de dos
  * pasos en el propio botón, y el mapeo de la respuesta del backend a un
  * mensaje de éxito/error.
  *
@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import ControlesEva from "@/Demo-EVA/views/ControlesEva.jsx";
+import ControlesTanque from "@/Demo-EVA/views/tanque/ControlesTanque.jsx";
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");
@@ -36,7 +36,7 @@ const montar = () =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <ControlesEva />
+          <ControlesTanque />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>

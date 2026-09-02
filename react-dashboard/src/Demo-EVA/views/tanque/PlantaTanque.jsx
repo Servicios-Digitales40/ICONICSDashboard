@@ -25,18 +25,18 @@ import { LayoutGrid } from "lucide-react";
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSeriesHistoricas, useSistemaAgua } from "../data/hooks.js";
-import { VENTANA } from "../data/historia.js";
-import { DERIVADO } from "../domain/estado.js";
-import { esHistorizada, historizadas } from "../domain/senales.js";
-import { PROVISIONALES } from "../domain/umbrales.js";
-import { buildModeloEva } from "../lib/modelo.js";
-import { useAhora } from "../lib/useAhora.js";
-import { UltimaLectura } from "../components/base.jsx";
+import { useSeriesHistoricas, useSistemaAgua } from "../../data/hooks.js";
+import { VENTANA } from "../../data/historia.js";
+import { DERIVADO } from "../../domain/estado.js";
+import { esHistorizada, historizadas } from "../../domain/senales.js";
+import { PROVISIONALES } from "../../domain/umbrales.js";
+import { buildModeloEva } from "../../lib/modelo.js";
+import { useAhora } from "../../lib/useAhora.js";
+import { UltimaLectura } from "../../components/base.jsx";
 import {
   BandaSenales, EstadoSenales, FranjaAtencion, HeroeNivel,
   MargenesConsumidos, RecorridoSistema, RejillaActivos, TendenciaSenales,
-} from "../components/tiles.jsx";
+} from "../../components/tiles.jsx";
 
 /* ==================================================================
  * REJILLA DE 12 COLUMNAS Y RITMO BINARIO
@@ -111,7 +111,7 @@ function NotaProcedencia({ t }) {
   );
 }
 
-function PlantaEva({ onNavigate }) {
+function PlantaTanque({ onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, series, ventana, loading, error, lastUpdated } = useSistemaAgua();
   // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
@@ -247,4 +247,4 @@ function PlantaEva({ onNavigate }) {
   );
 }
 
-export default PlantaEva;
+export default PlantaTanque;

@@ -3,7 +3,7 @@
  *
  * ── POR QUÉ ES UNA PANTALLA APARTE DE «RIESGOS» ────────────────────
  *
- * Porque el otro «Riesgos» es de OTRA MÁQUINA. `RiesgosEva.jsx` evalúa el
+ * Porque el otro «Riesgos» es de OTRA MÁQUINA. `RiesgosTanque.jsx` evalúa el
  * tanque —nivel, presión, caudal, carga del motor— con reglas que cruzan
  * señales de esa instalación, y nada de eso existe aquí: este motor no tiene
  * tanque ni caudal, y el suyo no tiene acelerómetros.
@@ -42,12 +42,12 @@ import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { UltimaLectura } from "../components/base.jsx";
-import { TarjetaRiesgo } from "../components/riesgoVibracion.jsx";
-import { useVibracion } from "../data/vibracion.js";
-import { evaluarRiesgosVibracion } from "../domain/riesgosVibracion.js";
+import { UltimaLectura } from "../../components/base.jsx";
+import { TarjetaRiesgo } from "../../components/riesgoVibracion.jsx";
+import { useVibracion } from "../../data/vibracion.js";
+import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
-function RiesgosVibracionEva({ onNavigate }) {
+function RiesgosVibracion({ onNavigate }) {
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -192,4 +192,4 @@ function RiesgosVibracionEva({ onNavigate }) {
   );
 }
 
-export default RiesgosVibracionEva;
+export default RiesgosVibracion;

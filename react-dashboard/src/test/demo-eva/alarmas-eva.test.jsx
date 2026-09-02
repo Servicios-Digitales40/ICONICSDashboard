@@ -21,7 +21,7 @@ const { fetchIconicsAlarms, fetchHealth, acknowledgeIconicsAlarms } = vi.hoisted
 
 vi.mock("@/lib/iconics", () => ({ fetchIconicsAlarms, fetchHealth, acknowledgeIconicsAlarms }));
 
-import AlarmasEva from "@/Demo-EVA/views/AlarmasEva.jsx";
+import AlarmasEva from "@/Demo-EVA/views/comunes/AlarmasEva.jsx";
 
 afterEach(() => {
   cleanup();

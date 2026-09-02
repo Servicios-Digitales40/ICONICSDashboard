@@ -993,7 +993,7 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
   }));
   const col = bandaColor(t, dark, senal.banda);
   const fmt = formateadorDe(senal);
-  // `TendenciaSenales` sólo se monta cuando `PlantaEva` ya terminó de cargar
+  // `TendenciaSenales` sólo se monta cuando `PlantaTanque` ya terminó de cargar
   // el historiador (ver su "Leyendo el historiador…"), así que aquí no hay
   // estado de carga que distinguir: sólo si sobrevivió un fallo de red.
   const sinConexion = estadoHistorial({ error, datos: filas, minimo: 2 }) === HISTORIAL.SIN_CONEXION;

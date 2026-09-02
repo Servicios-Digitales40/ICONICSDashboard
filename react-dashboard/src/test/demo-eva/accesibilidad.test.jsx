@@ -4,7 +4,7 @@
  * ------------------------------------------------------------------
  * Plan 13, Fase 1 (F6): el arnés (`test/a11y.js`) aplicado a las cuatro
  * vistas que llegaban a esta fase sin un solo atributo `aria-`
- * (`InicioEva`, `PlantaEva`, `AssetsEva`, `DetalleActivo`), más los dos
+ * (`InicioTanque`, `PlantaTanque`, `AssetsEva`, `DetalleActivo`), más los dos
  * landmarks que ahora completan el layout de toda la aplicación
  * (`App.jsx` → `<main>`, `Topbar.jsx` → `<header>`; `<aside>`/`<nav>` de
  * `Sidebar.jsx` ya existían).
@@ -33,10 +33,10 @@ import { DataSourceProvider } from "@/lib/datasource";
 import { auditarAccesibilidad } from "../a11y.js";
 
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import InicioEva from "@/Demo-EVA/views/InicioEva.jsx";
-import PlantaEva from "@/Demo-EVA/views/PlantaEva.jsx";
-import AssetsEva from "@/Demo-EVA/views/AssetsEva.jsx";
-import DetalleActivo from "@/Demo-EVA/views/DetalleActivo.jsx";
+import InicioTanque from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
+import PlantaTanque from "@/Demo-EVA/views/tanque/PlantaTanque.jsx";
+import AssetsEva from "@/Demo-EVA/views/comunes/AssetsEva.jsx";
+import DetalleActivo from "@/Demo-EVA/views/tanque/DetalleActivo.jsx";
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");
@@ -84,14 +84,14 @@ function montarComoLaApp(vista) {
 }
 
 describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => {
-  it("InicioEva no tiene violaciones graves", async () => {
-    montarComoLaApp(<InicioEva onNavigate={() => {}} />);
+  it("InicioTanque no tiene violaciones graves", async () => {
+    montarComoLaApp(<InicioTanque onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
     await auditarAccesibilidad();
   });
 
-  it("PlantaEva no tiene violaciones graves", async () => {
-    montarComoLaApp(<PlantaEva onNavigate={() => {}} />);
+  it("PlantaTanque no tiene violaciones graves", async () => {
+    montarComoLaApp(<PlantaTanque onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
     await auditarAccesibilidad();
   });
@@ -126,9 +126,9 @@ const CORTO_ESTADO = /En banda|Aviso|Fuera|Sin dato|Reposo/;
 
 describe("el color de banda no es su único portador (Plan 13, F6)", () => {
   it("BarraBanda: el corto del estado aparece junto a la marca, en Planta", async () => {
-    // Sólo Planta usa StatSenal/Medidor (BarraBanda); InicioEva es la
+    // Sólo Planta usa StatSenal/Medidor (BarraBanda); InicioTanque es la
     // landing y no repite las tarjetas de señal.
-    montarComoLaApp(<PlantaEva onNavigate={() => {}} />);
+    montarComoLaApp(<PlantaTanque onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0));
   });
 
@@ -140,7 +140,7 @@ describe("el color de banda no es su único portador (Plan 13, F6)", () => {
 
 describe("landmarks: el juego completo, no sólo el que faltaba", () => {
   it("main + header + nav aparecen exactamente una vez cada uno", async () => {
-    montarComoLaApp(<InicioEva onNavigate={() => {}} />);
+    montarComoLaApp(<InicioTanque onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
 
     expect(document.querySelectorAll("main").length).toBe(1);

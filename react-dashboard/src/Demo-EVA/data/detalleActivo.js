@@ -1,8 +1,8 @@
 /**
  * Datos de un activo para su vista de detalle: cada señal, con su valor
  * evaluado, el histórico REAL del historiador cuando lo tiene, y el búfer de
- * sesión en vivo cuando no —el mismo criterio que ya aplican `PlantaEva` y
- * `RejillaActivos`, aquí compuesto una sola vez para `views/DetalleActivo.jsx`.
+ * sesión en vivo cuando no —el mismo criterio que ya aplican `PlantaTanque` y
+ * `RejillaActivos`, aquí compuesto una sola vez para `views/tanque/DetalleActivo.jsx`.
  *
  * Nunca inventa una serie: `historiaReal` es `null` cuando la señal no está
  * marcada `historizado` en el catálogo (ver `domain/senales.js`), y quien

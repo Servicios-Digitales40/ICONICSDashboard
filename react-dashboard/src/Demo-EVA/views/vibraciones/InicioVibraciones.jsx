@@ -39,16 +39,16 @@ import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 import { useEnVista } from "@/lib/motion.js";
 
-import { Cifra, MONO, SANS, UltimaLectura } from "../components/base.jsx";
-import { estadoColor } from "../components/paleta.js";
-import { useVibracion } from "../data/vibracion.js";
-import { evaluarRiesgosVibracion } from "../domain/riesgosVibracion.js";
-import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../domain/vibraciones.js";
+import { Cifra, MONO, SANS, UltimaLectura } from "../../components/base.jsx";
+import { estadoColor } from "../../components/paleta.js";
+import { useVibracion } from "../../data/vibracion.js";
+import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
+import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
 
 /* ── Rejilla ───────────────────────────────────────────────────────── */
 
 /*
- * Las mismas clases que `InicioEva`, con las de la maqueta fuera: aquí no hay
+ * Las mismas clases que `InicioTanque`, con las de la maqueta fuera: aquí no hay
  * escena 3D que colocar, así que el hero no tiene de qué apartar el texto y
  * mantiene su centrado en cualquier ancho.
  */
@@ -76,7 +76,7 @@ const REJILLA = `
 .vib-inicio-hero__badge { justify-content: center; }
 
 /* El trazo de los tres apoyos, por debajo del texto — mismo z-index que
-   .eva-inicio-hero__flujo de InicioEva.
+   .eva-inicio-hero__flujo de InicioTanque.
    Ocupa sólo la franja INFERIOR y no la mitad de abajo: a media altura, uno
    de sus tres nodos caía justo detrás del CTA primario, y un círculo asomando
    por los bordes de un botón se lee como un defecto de pintado, no como
@@ -108,7 +108,7 @@ const REJILLA = `
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-/* Mismas reglas de tarjeta que .eva-tarjeta-vista de InicioEva: el borde y
+/* Mismas reglas de tarjeta que .eva-tarjeta-vista de InicioTanque: el borde y
    la sombra viajan como variables para que el :hover de esta hoja pueda
    ganarles: un color inline no cedería nunca. */
 .vib-tarjeta-vista {
@@ -172,7 +172,7 @@ const REJILLA = `
 
 /**
  * Cada tarjeta lleva un dato REAL de su vista, no sólo un icono: el mismo
- * criterio que `VISTAS` en `InicioEva` —una tarjeta que sólo promete se lee
+ * criterio que `VISTAS` en `InicioTanque` —una tarjeta que sólo promete se lee
  * como un menú, y el menú ya está en el sidebar—.
  *
  * `dato()` devuelve `null` cuando no hay lectura con la que responder, y la
@@ -254,7 +254,7 @@ const NODOS_PIPELINE = [
  */
 function CifraEnVivo({ contestan, total, hayLectura, error, t }) {
   if (error) {
-    // Mismo tratamiento que en `InicioEva`: coral porque ES un error de
+    // Mismo tratamiento que en `InicioTanque`: coral porque ES un error de
     // lectura, y sin latido —ese vocabulario lo reserva `tiles.jsx` para una
     // señal fuera de banda, y prestárselo a un corte de red confundiría dos
     // alarmas de gravedad distinta—.
@@ -331,7 +331,7 @@ function TrazoApoyos({ contestan, total, t }) {
   );
 }
 
-/** Una tarjeta de la rejilla. Misma forma que `TarjetaVista` de `InicioEva`. */
+/** Una tarjeta de la rejilla. Misma forma que `TarjetaVista` de `InicioTanque`. */
 function TarjetaVista({ vista, contexto, dark, onNavigate, t, delay }) {
   const { Icono } = vista;
   const dato = vista.dato(contexto);
@@ -386,7 +386,7 @@ function ComoFunciona({ t, lastUpdated }) {
 
   return (
     // El `paddingBottom` aleja la fila del botón flotante del asistente, que
-    // vive en esa esquina: mismo remedio vertical que en `InicioEva`, donde
+    // vive en esa esquina: mismo remedio vertical que en `InicioTanque`, donde
     // reservar ANCHO rompía el título de algún nodo cada vez.
     <section ref={ref} style={{ paddingBottom: 70 }}>
       <SectionLabel sub="El camino que hace cada número antes de llegar a esta pantalla">

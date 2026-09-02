@@ -2,7 +2,7 @@
 /**
  * inicio-simulada.test.jsx
  * ------------------------------------------------------------------
- * La landing «Inicio» (`views/InicioEva.jsx`), con el origen **Simulado**:
+ * La landing «Inicio» (`views/tanque/InicioTanque.jsx`), con el origen **Simulado**:
  * mismo criterio que el resto de las pruebas `*-simulada` — montar la vista
  * real sobre el provider real, sin red, y comprobar lo que de verdad importa
  * para la puerta de la demo: que la cifra en vivo llega, que las cuatro
@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import InicioEva from "@/Demo-EVA/views/InicioEva.jsx";
+import InicioTanque from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
 
 function cortarLaRed() {
   const trampa = vi.fn(() => {
@@ -41,7 +41,7 @@ const montar = (onNavigate = () => {}) =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <InicioEva onNavigate={onNavigate} />
+          <InicioTanque onNavigate={onNavigate} />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>

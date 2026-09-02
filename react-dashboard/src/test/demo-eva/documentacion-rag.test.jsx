@@ -2,7 +2,7 @@
 /**
  * documentacion-rag.test.jsx
  * ------------------------------------------------------------------
- * La vista «RAG · Documentación» (`views/DocumentacionRag.jsx`, Plan 16
+ * La vista «RAG · Documentación» (`views/comunes/DocumentacionRag.jsx`, Plan 16
  * Fase 1/2), montada de verdad sobre un `fetch` de mentira que contesta lo
  * que cada prueba necesita — no hay origen simulado para esto, es una vista
  * nueva sin dominio EVA detrás.
@@ -17,7 +17,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
-import DocumentacionRag from "@/Demo-EVA/views/DocumentacionRag.jsx";
+import DocumentacionRag from "@/Demo-EVA/views/comunes/DocumentacionRag.jsx";
 
 afterEach(() => {
   cleanup();

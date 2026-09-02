@@ -2,7 +2,7 @@
  * Selector de rango de tiempo del historiador (Plan 11): «Tiempo real» —el
  * búfer de esta sesión, repintándose solo— más Ayer y Hace una semana
  * contra el historiador, y un calendario personalizado. Vive en la
- * cabecera de `views/DetalleActivo.jsx` y gobierna TODAS las tarjetas
+ * cabecera de `views/tanque/DetalleActivo.jsx` y gobierna TODAS las tarjetas
  * historizadas de la pestaña activa a la vez, no una por gráfica — mismo
  * criterio que ya usa `useSeriesHistoricas` para traerlas juntas.
  *

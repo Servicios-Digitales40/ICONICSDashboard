@@ -219,7 +219,7 @@ export const THEMES = {
 
 /**
  * `heroAgua` — EXCEPCIÓN DELIBERADA a "todo color sale de un token
- * semántico o de `viz`", exclusiva del hero de Inicio (`InicioEva.jsx`).
+ * semántico o de `viz`", exclusiva del hero de Inicio (`InicioTanque.jsx`).
  *
  * No es un semántico (no significa "estado", como `success` o `coral`) ni es
  * `viz` (no distingue series de datos): es un tinte de escena, el mismo

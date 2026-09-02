@@ -2,7 +2,7 @@
 /**
  * detalle-exportar.test.jsx
  * ------------------------------------------------------------------
- * El botón «Exportar todo» de `views/DetalleActivo.jsx`: exporta las cinco
+ * El botón «Exportar todo» de `views/tanque/DetalleActivo.jsx`: exporta las cinco
  * señales historizadas del catálogo completo —no las del activo/pestaña
  * abierta—, con el rango ya elegido en la vista.
  *
@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import DetalleActivo from "@/Demo-EVA/views/DetalleActivo.jsx";
+import DetalleActivo from "@/Demo-EVA/views/tanque/DetalleActivo.jsx";
 import { historizadas } from "@/Demo-EVA/domain/senales.js";
 import * as exportarExcel from "@/Demo-EVA/lib/exportarExcel.js";
 

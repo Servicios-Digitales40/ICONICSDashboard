@@ -61,12 +61,12 @@ import { ArrowRight, Boxes, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { useSistemaAgua } from "../data/hooks.js";
+import { useSistemaAgua } from "../../data/hooks.js";
 import { useEnVista } from "@/lib/motion.js";
-import { Cifra, MONO, SANS, Spark, UltimaLectura } from "../components/base.jsx";
-import { estadoColor } from "../components/paleta.js";
-import { fmtSenal } from "../lib/formato.js";
-import MaquetaHero from "../three-d/components/MaquetaHero.jsx";
+import { Cifra, MONO, SANS, Spark, UltimaLectura } from "../../components/base.jsx";
+import { estadoColor } from "../../components/paleta.js";
+import { fmtSenal } from "../../lib/formato.js";
+import MaquetaHero from "../../three-d/components/MaquetaHero.jsx";
 
 const REJILLA = `
 .eva-inicio { display: flex; flex-direction: column; gap: 32px; }
@@ -347,7 +347,7 @@ const REJILLA = `
   .eva-inicio-pipeline__paso { flex-direction: column; align-items: stretch; }
   .eva-inicio-pipeline__enlace { display: none; }
   /* Sin margen extra aquí: el padding-bottom de la <section> (ComoFunciona,
-     InicioEva.jsx) ya reserva el hueco del botón en TODOS los anchos, este
+     InicioTanque.jsx) ya reserva el hueco del botón en TODOS los anchos, este
      incluido — duplicarlo en el último .paso sólo alejaría "Este tablero"
      del botón el doble de lo necesario. */
 }
@@ -513,7 +513,7 @@ function CifraEnVivo({ sistema, loading, error, t, serieNivel }) {
  *
  * `hayCaudal = !sistema.enReposo` y no un umbral sobre el valor crudo,
  * porque el flujo residual en reposo (~0.12) no es cero limpio — mismo
- * criterio que ya usan `Tuberias`/`MaquetaEva3D` para esta misma pregunta.
+ * criterio que ya usan `Tuberias`/`MaquetaTanque3D` para esta misma pregunta.
  */
 function TrazoFlujo({ hayCaudal, t }) {
   const color = hayCaudal ? t.success : t.textFaint;
@@ -709,7 +709,7 @@ function ComoFunciona({ t, lastUpdated }) {
   );
 }
 
-function InicioEva({ onNavigate }) {
+function InicioTanque({ onNavigate }) {
   const { theme: t, dark } = useTheme();
   const { sistema, loading, error, lastUpdated, series } = useSistemaAgua();
   // Mismo criterio que dentro de `CifraEnVivo`: sin la primera lectura, "ahora
@@ -803,4 +803,4 @@ function InicioEva({ onNavigate }) {
   );
 }
 
-export default InicioEva;
+export default InicioTanque;

@@ -24,7 +24,7 @@ const RAIZ_INSTALACION = RAIZ.replace(/\/?SENSORES\/?$/, "");
 /**
  * Estado de "Planta" para el punto de la barra: mismo criterio y mismos
  * tres estados que ya usa la tarjeta de Planta en el Inicio
- * (`InicioEva.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más que
+ * (`InicioTanque.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más que
  * varios en aviso, y sin lectura no hay punto que pintar. Vive aquí y no
  * como import compartido porque son cuatro líneas y las dos vistas ya
  * evalúan `sistema.resumen` de formas ligeramente distintas (aquí no hace
@@ -66,8 +66,8 @@ function MarcaEstacion({ size = 18 }) {
 /**
  * Umbral por debajo del cual la barra deja de caber junto al contenido.
  *
- * Coincide con el punto en el que `PlantaEva` ya renuncia a su rejilla de
- * bandas (ver `PlantaEva.jsx`, `@media (max-width: 1280px)`): a partir de ahí
+ * Coincide con el punto en el que `PlantaTanque` ya renuncia a su rejilla de
+ * bandas (ver `PlantaTanque.jsx`, `@media (max-width: 1280px)`): a partir de ahí
  * el contenido es esencialmente una columna, así que los 246 px fijos de la
  * barra dejan de ser un lujo y pasan a ser el ancho que le falta a esa
  * columna. Por debajo de esto la barra se convierte en un cajón superpuesto,

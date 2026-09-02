@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import DetalleActivo from "@/Demo-EVA/views/DetalleActivo.jsx";
+import DetalleActivo from "@/Demo-EVA/views/tanque/DetalleActivo.jsx";
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");

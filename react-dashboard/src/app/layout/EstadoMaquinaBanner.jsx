@@ -20,7 +20,7 @@
  *
  * ── POR QUÉ HACE FALTA, SI YA HAY UN INDICADOR EN CONTROLES ────────
  *
- * `ControlesEva` ya sabe encender y apagar la bomba, pero su confirmación
+ * `ControlesTanque` ya sabe encender y apagar la bomba, pero su confirmación
  * («Bomba encendida») desaparece con el resultado de la acción — no dice
  * nada de si, media hora después, sigue encendida o alguien la apagó desde
  * otro lado. Sin un estado permanente, la única forma de saberlo era mirar
@@ -33,7 +33,7 @@
  * escribe `controlar_bomba` (`backend/ia/conversacion/herramientas.mjs`) y confirma tras
  * cada accionamiento. No es una de las ocho señales de
  * `shared/eva/senales.js` (vive aparte a propósito, ver la cabecera de
- * `ControlesEva.jsx`), así que no pasa por `useSistemaAgua`: se sondea suelto
+ * `ControlesTanque.jsx`), así que no pasa por `useSistemaAgua`: se sondea suelto
  * con `useIconicsPoint`, igual que hace `IconicsLiveCard` para cualquier
  * punto fuera del catálogo.
  *

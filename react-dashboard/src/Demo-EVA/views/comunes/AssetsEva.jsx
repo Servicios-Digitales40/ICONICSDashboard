@@ -30,7 +30,7 @@ import { ExploradorAssets, RAIZ_ASSETS } from "@/components/assets/ExploradorAss
 import { SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-import { RAIZ } from "../domain/senales.js";
+import { RAIZ } from "../../domain/senales.js";
 
 export default function AssetsEva() {
   const { theme: t } = useTheme();

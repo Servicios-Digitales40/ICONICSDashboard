@@ -31,8 +31,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { EvaProvider } from "@/Demo-EVA/data/EvaProvider.jsx";
-import RiesgosEva from "@/Demo-EVA/views/RiesgosEva.jsx";
-import RiesgosVibracionEva from "@/Demo-EVA/views/RiesgosVibracionEva.jsx";
+import RiesgosTanque from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
+import RiesgosVibracion from "@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx";
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");
@@ -61,12 +61,12 @@ describe("las dos pantallas de «Riesgos» comparten layout", () => {
     // El rótulo es lo primero que se lee de la pantalla. Con «N riesgos
     // activos» en una y «Situaciones detectadas» en la otra, la misma
     // pregunta parecería dos preguntas distintas.
-    montar(RiesgosEva);
+    montar(RiesgosTanque);
     expect(await screen.findByText(/Situaciones detectadas/i)).toBeTruthy();
 
     cleanup();
 
-    montar(RiesgosVibracionEva);
+    montar(RiesgosVibracion);
     expect(await screen.findByText(/Situaciones detectadas/i)).toBeTruthy();
   });
 
@@ -74,7 +74,7 @@ describe("las dos pantallas de «Riesgos» comparten layout", () => {
     // «Sin comprobar» es la sección que distingue una pantalla en verde de
     // una pantalla ciega. Que exista en las dos —y se llame igual— es lo que
     // hace que se busque en el mismo sitio en las dos máquinas.
-    montar(RiesgosVibracionEva);
+    montar(RiesgosVibracion);
 
     /*
      * Se comprueba en el primer render, antes de que llegue ninguna lectura:
@@ -97,7 +97,7 @@ describe("las dos pantallas de «Riesgos» comparten layout", () => {
     // primero y la hipótesis después. Es la separación que impide que una
     // suposición se lea con la autoridad de un dato, y vale para las dos
     // máquinas por igual.
-    const { container } = montar(RiesgosVibracionEva);
+    const { container } = montar(RiesgosVibracion);
     await screen.findByText(/Situaciones detectadas/i);
 
     const rotulos = [...container.querySelectorAll("div")]

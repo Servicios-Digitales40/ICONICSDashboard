@@ -140,7 +140,7 @@ const UMBRAL_ANCLA = 48;
  * `--eva-asis-retic` es la única propiedad de color que el `<style>` no
  * puede leer directamente: el fondo de retícula vive en una regla CSS
  * estática, pero el matiz cambia con el tema. Se resuelve como en
- * `InicioEva.jsx` (`--tv-border`/`--tv-shadow`): la variable viaja inline,
+ * `InicioTanque.jsx` (`--tv-border`/`--tv-shadow`): la variable viaja inline,
  * por instancia, y la hoja de estilos sólo la consume con `var()`.
  */
 const ESTILOS = `

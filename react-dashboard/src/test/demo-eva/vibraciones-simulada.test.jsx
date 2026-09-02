@@ -38,8 +38,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
-import VibracionesEva from "@/Demo-EVA/views/VibracionesEva.jsx";
-import RiesgosVibracionEva from "@/Demo-EVA/views/RiesgosVibracionEva.jsx";
+import Vibraciones from "@/Demo-EVA/views/vibraciones/Vibraciones.jsx";
+import RiesgosVibracion from "@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx";
 
 /** Cualquier salida a la red es un fallo de esta prueba, no un caso a doblar. */
 function cortarLaRed() {
@@ -85,7 +85,7 @@ describe("el sistema de vibraciones en modo simulado", () => {
   it("los tres apoyos entregan lectura, sin tocar la red", async () => {
     const fetchTrampa = cortarLaRed();
 
-    const { container } = montar(VibracionesEva);
+    const { container } = montar(Vibraciones);
 
     // Las tres tarjetas de apoyo son los tres `<article>` de la vista. Un
     // apoyo sin lectura pinta guiones en sus cuatro medidas; con el simulador
@@ -113,7 +113,7 @@ describe("el sistema de vibraciones en modo simulado", () => {
      */
     cortarLaRed();
 
-    const { container } = montar(VibracionesEva);
+    const { container } = montar(Vibraciones);
 
     // Primero se espera a que haya lectura: antes de la primera respuesta la
     // cinta tampoco está —`loading` la mantiene apagada— y comprobarlo
@@ -129,7 +129,7 @@ describe("el sistema de vibraciones en modo simulado", () => {
   it("«Riesgos» evalúa reglas de verdad en vez de declararlas todas sin comprobar", async () => {
     const fetchTrampa = cortarLaRed();
 
-    montar(RiesgosVibracionEva);
+    montar(RiesgosVibracion);
 
     /*
      * Con la sección muda, `evaluarRiesgosVibracion` no podía evaluar ninguna
