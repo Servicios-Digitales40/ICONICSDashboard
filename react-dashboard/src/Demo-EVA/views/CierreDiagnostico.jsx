@@ -135,27 +135,67 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
           </div>
         )}
         {!diagnostico.loading && !diagnostico.error && diagnostico.data?.causas?.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/*
+              Plan 17 Fase 4 (G9): las fuentes se suman en un número, pero
+              un desacuerdo entre ellas —el manual apunta a una causa, el
+              histórico a otra— es información que vale la pena enseñar, no
+              esconder detrás de la suma. El sistema no elige un ganador
+              aquí tampoco.
+            */}
+            {diagnostico.data.conflicto && (
+              <AlertBanner
+                type="warning"
+                title="Las fuentes no coinciden"
+                message="El manual y los casos anteriores respaldan causas distintas. Revisa la evidencia de cada una antes de elegir — el sistema no ha resuelto el desacuerdo por ti."
+              />
+            )}
             {diagnostico.data.causas.map((c, i) => {
               const banda = BANDA_INFO[c.banda] ?? BANDA_INFO.bajo;
+              const tieneEvidencia = (c.evidenciaAFavor?.length > 0) || (c.evidenciaEnContra?.length > 0);
               return (
-                <div key={c.id} style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12.5 }}>
-                  <span
-                    style={{
-                      fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
-                      color: t[banda.token], background: `${t[banda.token]}22`, flexShrink: 0,
-                    }}
-                  >
-                    {banda.label}
-                  </span>
-                  <span style={{ color: t.text }}>
-                    {i === 0 && <strong>{c.titulo} </strong>}
-                    {i !== 0 && c.titulo}
-                    {i === 0 && <span style={{ color: t.textFaint }}> — propuesta por el sistema</span>}
-                  </span>
-                  <span style={{ color: t.textFaint, marginLeft: "auto", whiteSpace: "nowrap" }}>
-                    datos {c.respaldo.datos} · manual {c.respaldo.manual} · casos {c.respaldo.casos}
-                  </span>
+                <div key={c.id} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, fontSize: 12.5 }}>
+                    <span
+                      style={{
+                        fontSize: 10, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
+                        color: t[banda.token], background: `${t[banda.token]}22`, flexShrink: 0,
+                      }}
+                    >
+                      {banda.label}
+                    </span>
+                    <span style={{ color: t.text }}>
+                      {i === 0 && <strong>{c.titulo} </strong>}
+                      {i !== 0 && c.titulo}
+                      {i === 0 && <span style={{ color: t.textFaint }}> — propuesta por el sistema</span>}
+                    </span>
+                    <span style={{ color: t.textFaint, marginLeft: "auto", whiteSpace: "nowrap" }}>
+                      datos {c.respaldo.datos} · manual {c.respaldo.manual} · casos {c.respaldo.casos}
+                    </span>
+                  </div>
+                  {/*
+                    Frases, no sólo el entero de arriba (Plan 17 Fase 4,
+                    G6): "datos 2, manual 2, casos 2" no dice QUÉ dice cada
+                    fuente. La evidencia EN CONTRA es tan visible como la
+                    de a favor — no es un descargo, es parte de por qué la
+                    causa quedó donde quedó.
+                  */}
+                  {tieneEvidencia && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 46 }}>
+                      {c.evidenciaAFavor?.map((e, j) => (
+                        <div key={`favor-${j}`} style={{ fontSize: 11.5, color: t.textSoft }}>
+                          <span style={{ color: t.success }}>+</span> [{e.fuente}] {e.texto}
+                          {e.referencia && <span style={{ color: t.textFaint }}> — {e.referencia}</span>}
+                        </div>
+                      ))}
+                      {c.evidenciaEnContra?.map((e, j) => (
+                        <div key={`contra-${j}`} style={{ fontSize: 11.5, color: t.coral }}>
+                          <span>−</span> [{e.fuente}] {e.texto}
+                          {e.referencia && <span style={{ color: t.textFaint }}> — {e.referencia}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

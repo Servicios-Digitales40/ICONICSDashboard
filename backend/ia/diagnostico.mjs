@@ -199,7 +199,7 @@ async function respaldoDelManual(indiceDocumentos, sistema, causa) {
  * señal negativa, de la fuente que sea, cuenta entera.
  */
 async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
-  if (!indiceCasos) return { puntos: 0, casos: [] }
+  if (!indiceCasos) return { puntos: 0, casos: [], confirmados: [], refutados: [] }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
     const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, riesgoId, texto: consulta, top: 5 })
@@ -235,13 +235,16 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
       porTexto.filter(c => c.resuelto === false).length
     const puntos = positivos - fallaronPorResuelto - refutados.length
 
-    return { puntos, casos: [...confirmados, ...refutados, ...porTexto] }
+    // `confirmados`/`refutados` viajan aparte —no sólo dentro de `casos`—
+    // para que quien arme `evidenciaAFavor`/`evidenciaEnContra` (Plan 17
+    // Fase 4, G6) sepa cuáles son cuáles sin tener que re-derivarlo.
+    return { puntos, casos: [...confirmados, ...refutados, ...porTexto], confirmados, refutados }
   } catch (error) {
     logger.warn('Búsqueda en casos falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id,
       error: error.message,
     })
-    return { puntos: 0, casos: [] }
+    return { puntos: 0, casos: [], confirmados: [], refutados: [] }
   }
 }
 
@@ -268,21 +271,75 @@ function bandaDe(total, fuentesActivas) {
 }
 
 /**
+ * Orden fijo para desempatar cuando dos fuentes respaldan por igual a la
+ * misma causa — no cambia CUÁL fuente "gana" el desempate según el día.
+ *
+ * `datos` NO entra aquí, a propósito: es la MISMA cifra para todas las
+ * causas de un mismo riesgo —"misma evidencia física", ver la cabecera del
+ * archivo—, así que nunca puede ser lo que distingue el respaldo de la
+ * causa 1ª del de la 2ª. Contarla igual que a `manual`/`casos` para decidir
+ * la fuente dominante enmascararía un desacuerdo real entre esas dos: con
+ * `datos=3` compartido y `manual=2`/`casos=0` en la 1ª causa contra
+ * `manual=0`/`casos=1` en la 2ª, `datos` "ganaría" en las dos —por ser el
+ * número más alto de ambas— y el conflicto entre manual y casos, que es el
+ * que sí importa, quedaría invisible.
+ */
+const ORDEN_FUENTES_CONFLICTO = ['manual', 'casos']
+
+/** La fuente —de las que SÍ varían por causa— que MÁS respalda a una causa,
+ *  o `null` si ninguna aporta nada —"nadie respalda esto" no es una fuente
+ *  con la que otra pueda entrar en conflicto—. */
+function fuenteDominante(respaldo) {
+  let mejor = null
+  for (const fuente of ORDEN_FUENTES_CONFLICTO) {
+    if (respaldo[fuente] > 0 && (mejor === null || respaldo[fuente] > respaldo[mejor])) mejor = fuente
+  }
+  return mejor
+}
+
+/**
+ * ── EL CONFLICTO SE ENSEÑA, NO SE RESUELVE (PLAN 17 §DECISIÓN 5, G9) ──
+ *
+ * Hasta este plan, sensores → A / manual → B / historial → C se sumaban en
+ * un número: un desacuerdo entre fuentes era matemáticamente indistinguible
+ * de un acuerdo. `respaldo` ya viene desglosado por fuente desde que existe
+ * este módulo (Plan 16 Fase 3); lo único que faltaba era MIRAR si la fuente
+ * que más pesa en la 1ª causa es la misma que en la 2ª. El sistema no
+ * seguirá eligiendo un ganador aquí tampoco: sólo lo dice, para que el
+ * modelo lo narre y la UI lo muestre, en vez de fingir que todo apunta al
+ * mismo sitio.
+ */
+function hayConflicto(causas) {
+  if (causas.length < 2) return false
+  const primera = fuenteDominante(causas[0].respaldo)
+  const segunda = fuenteDominante(causas[1].respaldo)
+  return primera !== null && segunda !== null && primera !== segunda
+}
+
+/**
  * @param {object} deps
  * @param {{buscar: Function}} [deps.indiceDocumentos] de `documentos.mjs`
  * @param {{buscarCasosSimilares: Function}} [deps.indiceCasos] de `casos.mjs`
  */
 export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
   /**
-   * @param {{sistema: string, riesgoId: string}} entrada
+   * @param {{sistema: string, riesgoId: string, valoresSensores?: object}} entrada
+   *   `valoresSensores` es OPCIONAL (Plan 17 Fase 4, G6): el objeto `v` que
+   *   `regla.cuando(v, ctx)`/`regla.evidencia(v)` esperan, con las lecturas
+   *   YA leídas por quien llama. Este motor no lee sensores por su cuenta —
+   *   ver la cabecera del archivo, "recibe el riesgoId de un riesgo YA
+   *   activo"—, así que sin este dato no hay frase de `datos` que citar en
+   *   `evidenciaAFavor`, y esa fuente simplemente no aporta ninguna entrada
+   *   (el PUNTO de `datos` no depende de esto, sólo su frase).
    * @returns {Promise<{
    *   sistema: string, riesgoId: string,
    *   diagnosticEventId: string,  // uno por CADA llamada, ver la cabecera del archivo
    *   huerfano: boolean,          // true si el riesgo no tiene causas transcritas
+   *   conflicto: boolean,         // Fase 4, G9: la 1ª y la 2ª causa las respalda una fuente distinta
    *   causas: object[],           // ordenadas, la más respaldada primero
    * }>}
    */
-  async function diagnosticar({ sistema, riesgoId }) {
+  async function diagnosticar({ sistema, riesgoId, valoresSensores } = {}) {
     if (!riesgoId) throw new TypeError('diagnosticar necesita "riesgoId".')
     const regla = reglaDe(sistema, riesgoId)
     if (!regla) {
@@ -305,10 +362,26 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
       // Ningún riesgo activo se queda callado: si no hay causas transcritas
       // todavía, el diagnóstico lo DICE, no devuelve una lista vacía sin más
       // explicación que un caller distraído confunda con "sin sospechosos".
-      return { sistema, riesgoId, diagnosticEventId, huerfano: true, causas: [] }
+      return { sistema, riesgoId, diagnosticEventId, huerfano: true, conflicto: false, causas: [] }
     }
 
     const datos = datosDe(regla)
+
+    // La frase de `datos`, con cifras — Plan 17 Fase 4 (G6). Sólo existe si
+    // quien llama trajo `valoresSensores`: ver el JSDoc de `diagnosticar`.
+    // Compartida por todas las causas del riesgo, igual que el ENTERO
+    // `datos` ya lo era —misma evidencia física para todas, ver la cabecera
+    // del archivo—.
+    let evidenciaDatos = null
+    if (valoresSensores) {
+      try {
+        evidenciaDatos = regla.evidencia(valoresSensores)
+      } catch (error) {
+        logger.warn('regla.evidencia(valoresSensores) falló; se omite la frase de datos', {
+          riesgoId, error: error.message,
+        })
+      }
+    }
 
     const causas = await Promise.all(candidatas.map(async causa => {
       const [manual, casos] = await Promise.all([
@@ -318,6 +391,46 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
       const total = datos + manual.puntos + casos.puntos
       const fuentesActivas = [datos > 0, manual.puntos > 0, casos.puntos > 0].filter(Boolean).length
 
+      /*
+       * Evidencia en FRASES, no sólo el entero de `respaldo` — Plan 17
+       * Fase 4 (G6). La §11 del encargo original la declara obligatoria;
+       * `respaldo: {datos, manual, casos, total}` es exactamente el
+       * "score=7" que esa sección declara insuficiente por sí solo.
+       *
+       * EN CONTRA es nuevo de verdad: hasta este plan, los tres términos
+       * sólo podían SUMAR (salvo `resuelto:false`, que ya restaba). Un
+       * caso refutado por id (Fase 2, G3) es la primera evidencia que
+       * puede pesar EN CONTRA de una causa concreta con una frase, no sólo
+       * con un punto menos en un total.
+       */
+      const evidenciaAFavor = []
+      const evidenciaEnContra = []
+
+      if (evidenciaDatos && datos > 0) {
+        evidenciaAFavor.push({ fuente: 'datos', texto: evidenciaDatos, referencia: null })
+      }
+      if (manual.puntos > 0 && manual.fragmentos[0]) {
+        const mejor = manual.fragmentos[0]
+        evidenciaAFavor.push({
+          fuente: 'manual', texto: mejor.texto, referencia: `${mejor.archivo} p.${mejor.pagina}`,
+        })
+      }
+      for (const confirmado of casos.confirmados) {
+        evidenciaAFavor.push({
+          fuente: 'casos',
+          texto: confirmado.causa ?? confirmado.sintoma,
+          referencia: confirmado.id,
+        })
+      }
+      for (const refutado of casos.refutados) {
+        evidenciaEnContra.push({
+          fuente: 'casos',
+          texto: `Un técnico descartó esta causa en un cierre anterior — la causa real fue ` +
+            `"${refutado.causaReal?.tipo ?? 'otra'}".`,
+          referencia: refutado.id,
+        })
+      }
+
       return {
         id: causa.id,
         titulo: causa.titulo,
@@ -326,6 +439,8 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
         provisional: causa.provisional,
         respaldo: { datos, manual: manual.puntos, casos: casos.puntos, total },
         banda: bandaDe(total, fuentesActivas),
+        evidenciaAFavor,
+        evidenciaEnContra,
         // `texto`/`hash` y `resumen` — Plan 17 Fase 5 (G10): antes sólo
         // viajaba la referencia (qué documento, qué página; qué id, qué
         // fecha). Nadie podía verificar una cita sin salir del sistema —y,
@@ -347,7 +462,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
     // veces"—.
     causas.sort((a, b) => b.respaldo.total - a.respaldo.total)
 
-    return { sistema, riesgoId, diagnosticEventId, huerfano: false, causas }
+    return { sistema, riesgoId, diagnosticEventId, huerfano: false, conflicto: hayConflicto(causas), causas }
   }
 
   return { diagnosticar }

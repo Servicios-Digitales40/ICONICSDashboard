@@ -185,6 +185,41 @@
 > 7/7 en `scripts/verificar-calibracion.mjs`. Sin regresiones: 153/153
 > vitest backend, 15/15 diagnóstico, 12/12 casos, 7/7 casos-cierre, 124/124
 > herramientas, 16/16 documentos.
+>
+> **Fase 4 completada** — `evidenciaAFavor[]`/`evidenciaEnContra[]` por
+> causa (`{fuente, texto, referencia}`): `manual` con el extracto del
+> fragmento; `casos` confirmados a favor, refutados en contra (por primera
+> vez algo puede pesar EN CONTRA con una frase, no sólo restar un punto);
+> `datos` sólo cuando quien llama trae `valoresSensores` —opcional, porque
+> el motor no lee sensores por su cuenta (ver su propia cabecera) y ni
+> `diagnosticar_falla` ni `GET /api/diagnostico` tienen hoy acceso a
+> lecturas en vivo; el PUNTO de `datos` no depende de esto, sólo la frase—.
+>
+> `conflicto: true|false` a nivel de diagnóstico: la fuente que más
+> respalda la 1ª causa frente a la que más respalda la 2ª. **Hallazgo de
+> implementación que no estaba en el plan**: `datos` quedó DELIBERADAMENTE
+> fuera de esa comparación — es la misma cifra para todas las causas de un
+> riesgo por diseño, así que nunca puede ser lo que las distingue; incluirla
+> hacía que "datos" ganara casi siempre por ser el número más alto y
+> enmascarara el desacuerdo real entre `manual` y `casos`, que es el que
+> importa. Detectado por un test que fallaba con la intención correcta y una
+> asunción equivocada.
+>
+> `diagnosticar_falla` propaga los tres campos nuevos (sólo cuando no están
+> vacíos, mismo criterio que `manualCitado`/`casosCitados`) y `comoRedactar`
+> gana la instrucción de citar `evidenciaEnContra` con la misma seguridad
+> que la de a favor, y de **enseñar** un `conflicto: true` en vez de elegir
+> un ganador o suavizarlo. `CierreDiagnostico.jsx` —primer cambio de
+> frontend del plan— muestra las dos listas bajo cada causa y un
+> `AlertBanner` de aviso cuando hay conflicto; aditivo, nada de lo que ya
+> se veía desaparece.
+>
+> Nueve comprobaciones nuevas en `scripts/verificar-diagnostico.mjs`
+> (24/24, antes 15) y dos en `cierre-diagnostico.test.jsx` (8/8, antes 6).
+> Sin regresiones: 153/153 vitest backend, 511/511 vitest frontend, `npm
+> run build` limpio, 12/12 casos, 7/7 casos-cierre, 124/124 herramientas
+> (fixture de prueba actualizado con los campos nuevos), 16/16 documentos,
+> 7/7 calibración.
 
 ---
 
@@ -644,7 +679,7 @@ qué necesita cada una están en §10.
 | 4 | **F5** · trazabilidad | **Adelantada.** Los extractos, el `chunkId` y el hash del PDF salen del índice y del disco. Antes iba la 7.ª por valor; es de las que menos depende de nada |
 | 5 | **F3a** · manifiesto, dedupe y corte BM25 | Con F1 y F2 hechas ya hay dos términos que discriminan; éste añade el tercero en el modo que se puede medir hoy |
 | 6 | **F7a** · recalibrar bandas en modo BM25 | **Bloqueada por datos.** Herramienta escrita y probada (`verificar-calibracion.mjs`), `bandaDe` sin tocar — no hay `Documentacion/` real que medir en esta copia |
-| 7 | **F4** · evidencia y conflicto | Convierte «datos 2, manual 2, casos 2» en algo que una persona puede juzgar. Necesita valores de señal: `ICONICS_FAKE=true` |
+| 7 | **F4** · evidencia y conflicto | Convierte «datos 2, manual 2, casos 2» en algo que una persona puede juzgar. **Completa sin ningún servidor**: `valoresSensores` es opcional y hoy ningún llamador real lo trae (ver la Fase 4 en el registro de cambios) |
 | 8 | **F6** · término temporal, la estructura | `firmaTemporal`, `temporal.mjs` y el cuarto término, contra `readHistory` del transporte falso. Los umbrales quedan provisionales |
 
 ### Tramo 2 · Cuando vuelva el servidor de embeddings
@@ -757,7 +792,7 @@ del transporte falso.
 | **F5** · trazabilidad | **Completa** | — |
 | **F3a** · manifiesto + dedupe + corte BM25 | **Completa** | — |
 | **F7a** · bandas en modo BM25 | Herramienta completa, medición **bloqueada** | Sin servidor: falta un `Documentacion/` real, no un servidor |
-| **F4** · evidencia + conflicto | Sí, con `ICONICS_FAKE=true` | Que el modelo obedezca la instrucción nueva de `comoRedactar` |
+| **F4** · evidencia + conflicto | **Completa, sin ningún servidor** | Que el modelo obedezca la instrucción nueva de `comoRedactar` — lo único de F4 que de verdad pide llama-server |
 | **F6** · término temporal | Estructura y módulo sí | Los umbrales de las firmas: la física del simulador no fija una pendiente |
 | **F3b** · corte sobre coseno | **No** | Servidor de embeddings |
 | **F7b** · bandas en modo producción | **No** | Servidor de embeddings |

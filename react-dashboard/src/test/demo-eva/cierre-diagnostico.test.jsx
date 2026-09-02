@@ -73,10 +73,10 @@ afterEach(() => {
   delete globalThis.fetch;
 });
 
-function montar(params, { casoRespuesta } = {}) {
+function montar(params, { casoRespuesta, diagnosticoRespuesta } = {}) {
   const fetchMock = vi.fn((url, opciones = {}) => {
     const u = String(url);
-    if (u.includes("/api/diagnostico")) return respuestaJson(DIAGNOSTICO_RESPUESTA);
+    if (u.includes("/api/diagnostico")) return respuestaJson(diagnosticoRespuesta ?? DIAGNOSTICO_RESPUESTA);
     if (u.includes("/api/casos") && opciones.method === "POST") {
       return respuestaJson(casoRespuesta ?? { ok: true, caso: { id: "interv-x" } }, casoRespuesta?.ok === false ? 400 : 201);
     }
@@ -153,6 +153,38 @@ describe("CierreDiagnostico", () => {
     // No coincide con la propuesta del sistema (el primer id de la lista):
     // diagnosticoCorrecto tiene que decir que no, no quedarse sin decidir.
     expect(cuerpo.diagnosticoCorrecto).toBe(false);
+  });
+
+  it("muestra la evidencia a favor/en contra y el aviso de conflicto (Plan 17 Fase 4)", async () => {
+    const respuestaConConflicto = {
+      ...DIAGNOSTICO_RESPUESTA,
+      conflicto: true,
+      causas: [
+        {
+          ...DIAGNOSTICO_RESPUESTA.causas[0],
+          evidenciaAFavor: [
+            { fuente: "manual", texto: "La válvula debe permanecer abierta.", referencia: "bomba.pdf p.4" },
+          ],
+          evidenciaEnContra: [
+            { fuente: "casos", texto: "Un técnico descartó esta causa.", referencia: "interv-x" },
+          ],
+        },
+        DIAGNOSTICO_RESPUESTA.causas[1],
+      ],
+    };
+    montar({ sistema: "tanque", riesgoId: "bomba-sin-salida" }, { diagnosticoRespuesta: respuestaConConflicto });
+    await screen.findAllByText(/Sin línea de recirculación mínima/i);
+
+    expect(screen.getByText(/Las fuentes no coinciden/i)).toBeTruthy();
+    expect(screen.getByText(/La válvula debe permanecer abierta/i)).toBeTruthy();
+    expect(screen.getByText(/Un técnico descartó esta causa/i)).toBeTruthy();
+  });
+
+  it("sin conflicto ni evidencia, no se muestra ninguno de los dos añadidos de la Fase 4", async () => {
+    montar({ sistema: "tanque", riesgoId: "bomba-sin-salida" });
+    await screen.findAllByText(/Sin línea de recirculación mínima/i);
+
+    expect(screen.queryByText(/Las fuentes no coinciden/i)).toBeNull();
   });
 
   it("el cierre manda casosCitados, diagnosticEventId y el top-N completo (Plan 17 Fase 5)", async () => {

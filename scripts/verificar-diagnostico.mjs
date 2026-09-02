@@ -339,6 +339,123 @@ await check('la causa que el manual nombra queda primera, aunque los datos empat
   assert.ok(resultado.causas[0].respaldo.manual > resultado.causas[1].respaldo.manual)
 })
 
+/* ── Evidencia en frases, Plan 17 Fase 4 (G6) ───────────────────────── */
+
+console.log('\n── La evidencia son frases, no sólo el entero (G6) ────────────')
+
+await check('el manual con respaldo aporta una frase en `evidenciaAFavor`, con su cita', async () => {
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
+  const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const causa = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+  const entrada = causa.evidenciaAFavor.find(e => e.fuente === 'manual')
+  assert.ok(entrada, 'debía haber una entrada de manual en evidenciaAFavor')
+  assert.match(entrada.referencia, /manual-de-prueba\.pdf/)
+})
+
+await check('un caso CONFIRMADO aporta una frase en `evidenciaAFavor`', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      causa: 'La válvula quedó agarrotada.', causaReal: { tipo: 'valvula-impulsion-cerrada' } },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const causa = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+  const entrada = causa.evidenciaAFavor.find(e => e.fuente === 'casos')
+  assert.ok(entrada, 'debía haber una entrada de casos en evidenciaAFavor')
+  assert.equal(entrada.referencia, 'c1')
+  assert.match(entrada.texto, /agarrotada/)
+})
+
+await check('un caso REFUTADO aporta una frase en `evidenciaEnContra`, no sólo resta un punto', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'valvula-impulsion-cerrada' },
+      causaReal: { tipo: 'sin-recirculacion-minima' }, diagnosticoCorrecto: false },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const causa = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+  assert.equal(causa.evidenciaAFavor.length, 0)
+  assert.equal(causa.evidenciaEnContra.length, 1)
+  assert.equal(causa.evidenciaEnContra[0].referencia, 'c1')
+  assert.match(causa.evidenciaEnContra[0].texto, /sin-recirculacion-minima/)
+})
+
+await check('sin `valoresSensores`, no hay frase de `datos` — pero el PUNTO de datos no cambia', async () => {
+  const sinValores = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  const conValores = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+    valoresSensores: { flujoInstantaneo: 0.01, presionRelativa: 4.2, cargaMotor: 78 },
+  })
+
+  const causaSin = sinValores.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+  const causaCon = conValores.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+
+  assert.equal(causaSin.evidenciaAFavor.some(e => e.fuente === 'datos'), false)
+  assert.equal(causaCon.evidenciaAFavor.some(e => e.fuente === 'datos'), true)
+  assert.match(causaCon.evidenciaAFavor.find(e => e.fuente === 'datos').texto, /78/)
+  // El respaldo numérico —lo que decide la banda— es el mismo con o sin la
+  // frase: `valoresSensores` sólo añade texto, nunca cambia un punto.
+  assert.equal(causaSin.respaldo.datos, causaCon.respaldo.datos)
+  assert.equal(causaSin.banda, causaCon.banda)
+})
+
+await check('sin ningún respaldo, evidenciaAFavor/EnContra son arrays vacíos, nunca `undefined`', async () => {
+  const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  for (const causa of resultado.causas) {
+    assert.deepEqual(causa.evidenciaAFavor, [])
+    assert.deepEqual(causa.evidenciaEnContra, [])
+  }
+})
+
+/* ── El conflicto se enseña, Plan 17 Fase 4 (G9) ────────────────────── */
+
+console.log('\n── El conflicto entre fuentes se enseña, no se resuelve (G9) ──')
+
+await check('cuando el manual respalda a la 1ª y los casos a la 2ª, `conflicto: true`', async () => {
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
+  const indiceCasos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      causaReal: { tipo: 'sin-recirculacion-minima' } },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceDocumentos, indiceCasos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  // El manual respalda valvula-impulsion-cerrada; el caso confirmado
+  // respalda sin-recirculacion-minima — dos fuentes, dos causas distintas.
+  assert.equal(resultado.conflicto, true)
+})
+
+await check('cuando la misma fuente respalda a las dos, no hay conflicto que enseñar', async () => {
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10, 'recirculación mínima': 10 })
+  const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  assert.equal(resultado.conflicto, false)
+})
+
+await check('con una sola causa candidata, no hay con qué entrar en conflicto', async () => {
+  // `derrame` sólo tiene una causa transcrita (`corte-nivel-alto-no-actua`).
+  const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'derrame' })
+  assert.equal(resultado.causas.length, 1)
+  assert.equal(resultado.conflicto, false)
+})
+
+await check('un riesgo huérfano no tiene conflicto (ni causas que comparar)', async () => {
+  const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'variador-en-manual' })
+  assert.equal(resultado.huerfano, true)
+  assert.equal(resultado.conflicto, false)
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {

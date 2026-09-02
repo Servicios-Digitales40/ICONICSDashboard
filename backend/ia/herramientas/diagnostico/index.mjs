@@ -85,6 +85,9 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
         ok: true,
         sistema: resultado.sistema,
         riesgoId: resultado.riesgoId,
+        // Plan 17 Fase 4 (G9): sólo viaja cuando es `true` — igual que
+        // `manualCitado`/`casosCitados` vacíos, "nada que decir" no se dice.
+        ...(resultado.conflicto ? { conflicto: true } : {}),
         causas: resultado.causas.map(c => ({
           id: c.id,
           titulo: c.titulo,
@@ -95,6 +98,9 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           ...(c.provisional ? { provisional: true } : {}),
           ...(c.manualCitado.length ? { manualCitado: c.manualCitado } : {}),
           ...(c.casosCitados.length ? { casosCitados: c.casosCitados } : {}),
+          // Plan 17 Fase 4 (G6): frases, no sólo el entero de `respaldo`.
+          ...(c.evidenciaAFavor.length ? { evidenciaAFavor: c.evidenciaAFavor } : {}),
+          ...(c.evidenciaEnContra.length ? { evidenciaEnContra: c.evidenciaEnContra } : {}),
         })),
         /*
          * Plan 16 §2·1: "el código puntúa, el modelo redacta". Esta frase es
@@ -113,7 +119,13 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           'no está resuelto) es la frase que hace valioso este cruce; una lista de causas sin ' +
           'mencionar los casos previos que la respaldan pierde la mitad del punto de llamarla. Si ' +
           'alguna causa trae `provisional: true`, dilo: el respaldo de datos se apoya en un umbral ' +
-          'que todavía es una estimación nuestra, no un rango confirmado.',
+          'que todavía es una estimación nuestra, no un rango confirmado. Si una causa trae ' +
+          '`evidenciaEnContra`, dilo también, con la misma seguridad que la evidencia a favor — no ' +
+          'es un descargo de responsabilidad, es parte de por qué esa causa quedó donde quedó. Si ' +
+          '`conflicto` es `true`, dos causas distintas están respaldadas cada una por una fuente ' +
+          'distinta (datos, manual o casos): DILO explícitamente — "el manual apunta a X, pero el ' +
+          'histórico apunta a Y" — y NO elijas un ganador por tu cuenta ni lo suavices como si las ' +
+          'fuentes coincidieran. Enseñar el desacuerdo es el trabajo aquí, no resolverlo.',
       }
     },
   }
