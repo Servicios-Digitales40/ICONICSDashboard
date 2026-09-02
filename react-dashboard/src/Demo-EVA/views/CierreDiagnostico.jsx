@@ -171,6 +171,7 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
                     </span>
                     <span style={{ color: t.textFaint, marginLeft: "auto", whiteSpace: "nowrap" }}>
                       datos {c.respaldo.datos} · manual {c.respaldo.manual} · casos {c.respaldo.casos}
+                      {typeof c.respaldo.temporal === "number" && <> · temporal {c.respaldo.temporal}</>}
                     </span>
                   </div>
                   {/*

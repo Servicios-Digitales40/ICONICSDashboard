@@ -249,6 +249,28 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
 }
 
 /**
+ * Cuánto respalda la TENDENCIA reciente a UNA causa — Plan 17 Fase 6 (G5),
+ * el cuarto término. Sin `evaluadorTemporal` montado, o sin `firmaTemporal`
+ * declarada en la causa, sale en 0 sin más: es la fuente MENOS presente de
+ * las cuatro —opcional en dos sentidos, servidor y declaración—, así que su
+ * ausencia no puede ser un error, sólo silencio. Ver `backend/ia/
+ * temporal.mjs` para la aritmética.
+ */
+async function respaldoTemporal(evaluadorTemporal, sistema, causa) {
+  if (!evaluadorTemporal || !causa.firmaTemporal) {
+    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
+  }
+  try {
+    return await evaluadorTemporal.evaluar(causa.firmaTemporal, sistema)
+  } catch (error) {
+    logger.warn('El evaluador temporal falló durante un diagnóstico; se cuenta como sin respaldo', {
+      causa: causa.id, error: error.message,
+    })
+    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
+  }
+}
+
+/**
  * ── SIN RECALIBRAR TODAVÍA — PLAN 17 FASE 7a, BLOQUEADA POR FALTA DE DATOS ──
  *
  * Los cortes `>=5`/`>=3` son los de siempre, de antes de este plan. La Fase
@@ -263,6 +285,12 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
  * `scripts/verificar-calibracion.mjs` deja escrita y probada la herramienta
  * que hace la medición en cuanto haya `Documentacion/` real; lo que falta es
  * el disco, no el código.
+ *
+ * La Fase 6 (G5) añadió un cuarto término —`temporal`, 0..2— y con él el
+ * máximo teórico sube de 7 a 9. Sigue sin tocarse por el mismo motivo:
+ * recalibrar contra el máximo nuevo sin datos reales sería la misma
+ * suposición con un número distinto. Es la F7c del plan, y necesita
+ * ICONICS real además de manuales/casos reales — nada de eso existe aquí.
  */
 function bandaDe(total, fuentesActivas) {
   if (total >= 5 && fuentesActivas >= 2) return 'alto'
@@ -283,8 +311,13 @@ function bandaDe(total, fuentesActivas) {
  * `manual=0`/`casos=1` en la 2ª, `datos` "ganaría" en las dos —por ser el
  * número más alto de ambas— y el conflicto entre manual y casos, que es el
  * que sí importa, quedaría invisible.
+ *
+ * `temporal` (Plan 17 Fase 6) SÍ entra: a diferencia de `datos`, es propio
+ * de cada causa —dos causas del mismo riesgo pueden tener firmas
+ * temporales distintas, o una tenerla y la otra no—, así que puede
+ * legítimamente ser la fuente que distingue una causa de otra.
  */
-const ORDEN_FUENTES_CONFLICTO = ['manual', 'casos']
+const ORDEN_FUENTES_CONFLICTO = ['manual', 'casos', 'temporal']
 
 /** La fuente —de las que SÍ varían por causa— que MÁS respalda a una causa,
  *  o `null` si ninguna aporta nada —"nadie respalda esto" no es una fuente
@@ -320,8 +353,11 @@ function hayConflicto(causas) {
  * @param {object} deps
  * @param {{buscar: Function}} [deps.indiceDocumentos] de `documentos.mjs`
  * @param {{buscarCasosSimilares: Function}} [deps.indiceCasos] de `casos.mjs`
+ * @param {{evaluar: Function}} [deps.evaluadorTemporal] de `temporal.mjs`
+ *   (Plan 17 Fase 6) — opcional, igual que los otros dos: sin él, `temporal`
+ *   sale en 0 para toda causa, aunque declare `firmaTemporal`.
  */
-export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
+export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal } = {}) {
   /**
    * @param {{sistema: string, riesgoId: string, valoresSensores?: object}} entrada
    *   `valoresSensores` es OPCIONAL (Plan 17 Fase 4, G6): el objeto `v` que
@@ -384,12 +420,14 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
     }
 
     const causas = await Promise.all(candidatas.map(async causa => {
-      const [manual, casos] = await Promise.all([
+      const [manual, casos, temporal] = await Promise.all([
         respaldoDelManual(indiceDocumentos, sistema, causa),
         respaldoDeCasos(indiceCasos, sistema, riesgoId, causa),
+        respaldoTemporal(evaluadorTemporal, sistema, causa),
       ])
-      const total = datos + manual.puntos + casos.puntos
-      const fuentesActivas = [datos > 0, manual.puntos > 0, casos.puntos > 0].filter(Boolean).length
+      const total = datos + manual.puntos + casos.puntos + temporal.puntos
+      const fuentesActivas =
+        [datos > 0, manual.puntos > 0, casos.puntos > 0, temporal.puntos > 0].filter(Boolean).length
 
       /*
        * Evidencia en FRASES, no sólo el entero de `respaldo` — Plan 17
@@ -430,6 +468,12 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
           referencia: refutado.id,
         })
       }
+      // `temporal` (Plan 17 Fase 6, G5): frases YA construidas por
+      // `temporal.mjs`, sólo hay que concatenarlas — el cuarto término es el
+      // que de verdad discrimina entre causas del mismo riesgo, ver la
+      // cabecera de ese archivo.
+      evidenciaAFavor.push(...temporal.evidenciaAFavor)
+      evidenciaEnContra.push(...temporal.evidenciaEnContra)
 
       return {
         id: causa.id,
@@ -437,7 +481,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
         componente: causa.componente,
         origen: causa.origen,
         provisional: causa.provisional,
-        respaldo: { datos, manual: manual.puntos, casos: casos.puntos, total },
+        respaldo: { datos, manual: manual.puntos, casos: casos.puntos, temporal: temporal.puntos, total },
         banda: bandaDe(total, fuentesActivas),
         evidenciaAFavor,
         evidenciaEnContra,

@@ -220,6 +220,56 @@
 > run build` limpio, 12/12 casos, 7/7 casos-cierre, 124/124 herramientas
 > (fixture de prueba actualizado con los campos nuevos), 16/16 documentos,
 > 7/7 calibración.
+>
+> **Fase 6 completada — la última del tramo offline (§7).** Nuevo
+> `backend/ia/temporal.mjs`: pendiente por mínimos cuadrados sobre la serie
+> de `crearAyudantesDeHistoria().leerSerie` —el MISMO ayudante que ya usan
+> `historia_de_senal`/`correlacionar_senales`, sin cliente propio—, umbral
+> de ruido RELATIVO al valor de partida (`UMBRAL_CAMBIO_RELATIVO = 0.05`,
+> marcado `PROVISIONAL` por el mismo motivo que `UMBRAL_BM25_*`: evita
+> desde el diseño el error de un corte absoluto entre señales de escalas
+> distintas, en vez de descubrirlo tarde como pasó con BM25 en la Fase 3a).
+> `shared/eva/causas.js` gana `firmaTemporal` opcional en `causaTanque()`;
+> una causa (`sin-recirculacion-minima`) la declara,
+> **transcrita** de la propia `consecuencia` de la regla `bomba-sin-salida`
+> en `riesgos.js` ("la temperatura del líquido atrapado puede subir
+> rápidamente") — no inventada, mismo criterio que el resto del archivo.
+>
+> `createMotorDiagnostico` gana `evaluadorTemporal` opcional; el cuarto
+> término entra en `total`, en `fuentesActivas` y en
+> `evidenciaAFavor`/`evidenciaEnContra`. `hayConflicto` (Fase 4, G9) suma
+> `temporal` a la comparación de dominancia —a diferencia de `datos`, sí
+> varía por causa—. `bandaDe` sigue sin recalibrar (F7c, necesita ICONICS
+> real además de manuales/casos reales — nada de eso existe aquí); el
+> máximo teórico sube de 7 a 9 y queda documentado en el propio código.
+>
+> Wireado en `app.mjs`: `crearAyudantesDeHistoria({client,
+> historyConcurrencia})` se construye ahora también fuera de
+> `createHerramientas()` —sin estado compartido que duplicar, es una
+> envoltura sin memoria propia sobre `client`— para que
+> `motorDiagnostico` (que se monta antes que las herramientas) tenga su
+> propio `leerSerie`. `diagnosticar_falla`/`GET /api/diagnostico` heredan
+> el término automáticamente sin cambio propio: leen `resultado.causas`
+> tal cual lo da el motor. `CierreDiagnostico.jsx` añade "· temporal N" a
+> la línea de respaldo cuando el campo está presente.
+>
+> Nuevo `scripts/verificar-temporal.mjs` (9/9): a favor cuando coincide, en
+> contra CON FRASE cuando la tendencia real es la opuesta a la declarada
+> —no en silencio—, silencio (ni a favor ni en contra) con serie plana,
+> pocos puntos o `leerSerie` fallido, y la prueba explícita de que el
+> mismo delta absoluto cuenta distinto según la escala de partida. Cuatro
+> comprobaciones de integración nuevas en `verificar-diagnostico.mjs`
+> (28/28, antes 24): sólo la causa CON firma consulta al evaluador, el
+> término suma al total, ausencia de evaluador no rompe nada, un
+> evaluador que lanza tampoco. Sin regresiones: 153/153 vitest backend,
+> 511/511 vitest frontend, `npm run build` limpio, 12/12 casos, 7/7
+> casos-cierre, 124/124 herramientas, 16/16 documentos, 7/7 calibración.
+>
+> **Con esto se completa el tramo 1 del orden offline (§7): las ocho
+> entregas que no dependen de ningún servidor.** Quedan F3b/F7b (servidor
+> de embeddings) y F7c (ICONICS real + manuales/casos reales) — los tres
+> bloqueados por falta de infraestructura o de datos en esta copia de
+> trabajo, no por trabajo pendiente de diseño o código.
 
 ---
 
@@ -680,7 +730,7 @@ qué necesita cada una están en §10.
 | 5 | **F3a** · manifiesto, dedupe y corte BM25 | Con F1 y F2 hechas ya hay dos términos que discriminan; éste añade el tercero en el modo que se puede medir hoy |
 | 6 | **F7a** · recalibrar bandas en modo BM25 | **Bloqueada por datos.** Herramienta escrita y probada (`verificar-calibracion.mjs`), `bandaDe` sin tocar — no hay `Documentacion/` real que medir en esta copia |
 | 7 | **F4** · evidencia y conflicto | Convierte «datos 2, manual 2, casos 2» en algo que una persona puede juzgar. **Completa sin ningún servidor**: `valoresSensores` es opcional y hoy ningún llamador real lo trae (ver la Fase 4 en el registro de cambios) |
-| 8 | **F6** · término temporal, la estructura | `firmaTemporal`, `temporal.mjs` y el cuarto término, contra `readHistory` del transporte falso. Los umbrales quedan provisionales |
+| 8 | **F6** · término temporal | **Completa.** `firmaTemporal`, `temporal.mjs`, wireado en `app.mjs`. Umbral relativo marcado provisional; `bandaDe` sin recalibrar (F7c) |
 
 ### Tramo 2 · Cuando vuelva el servidor de embeddings
 
@@ -722,7 +772,7 @@ De la matriz de 36 capacidades de la auditoría:
 | C27 | Casos con diagnóstico incorrecto | Parcial · **Crítica** | Implementado (F2) |
 | C28 | Feedback → pipeline | Parcial · **Crítica** | Implementado (F2) |
 | C17 | Validación de `sistema` | Incorrecto · Alta | Implementado (F0) |
-| C07 | Análisis temporal | Parcial · Alta | Implementado (F6) |
+| C07 | Análisis temporal | Parcial · Alta | Implementado (F6) — umbral provisional, `bandaDe` sin recalibrar (F7c) |
 | C12 | Document RAG | Implementado con reservas · Alta | G7+G8 sin reservas (F3a); corte BM25 **provisional** hasta F7a — sin corpus real que calibrar en esta copia |
 | C30 | Conflicto entre fuentes | No implementado · Alta | Implementado (F4) |
 | C31 | Trazabilidad | Parcial · Alta | Implementado (F5) |
@@ -793,7 +843,7 @@ del transporte falso.
 | **F3a** · manifiesto + dedupe + corte BM25 | **Completa** | — |
 | **F7a** · bandas en modo BM25 | Herramienta completa, medición **bloqueada** | Sin servidor: falta un `Documentacion/` real, no un servidor |
 | **F4** · evidencia + conflicto | **Completa, sin ningún servidor** | Que el modelo obedezca la instrucción nueva de `comoRedactar` — lo único de F4 que de verdad pide llama-server |
-| **F6** · término temporal | Estructura y módulo sí | Los umbrales de las firmas: la física del simulador no fija una pendiente |
+| **F6** · término temporal | **Completa** | F7c: recalibrar `bandaDe` con el cuarto término, contra series reales |
 | **F3b** · corte sobre coseno | **No** | Servidor de embeddings |
 | **F7b** · bandas en modo producción | **No** | Servidor de embeddings |
 

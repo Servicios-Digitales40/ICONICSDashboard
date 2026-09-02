@@ -50,8 +50,16 @@
  */
 import { PROVISIONALES } from "./umbrales.js";
 
-/** Azúcar para no repetir `provisional`/`origen` en cada causa del tanque. */
-function causaTanque({ id, titulo, componente, terminosManual, riesgoId }) {
+/**
+ * Azúcar para no repetir `provisional`/`origen` en cada causa del tanque.
+ *
+ * `firmaTemporal` es OPCIONAL (Plan 17 Fase 6, G5): una causa sin ella saca
+ * `temporal: 0` y no se penaliza —ver `backend/ia/temporal.mjs`—. Cuando se
+ * declara, es la MISMA regla de transcripción del resto del archivo: sale
+ * de una frase que YA ESTABA escrita en `riesgos.js`, no de una relación
+ * física inventada aquí.
+ */
+function causaTanque({ id, titulo, componente, terminosManual, riesgoId, firmaTemporal }) {
   return {
     id,
     titulo,
@@ -59,6 +67,7 @@ function causaTanque({ id, titulo, componente, terminosManual, riesgoId }) {
     terminosManual,
     origen: `riesgos.js · accion (${riesgoId})`,
     provisional: PROVISIONALES,
+    ...(firmaTemporal ? { firmaTemporal } : {}),
   };
 }
 
@@ -178,6 +187,17 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Línea de recirculación",
       terminosManual: ["recirculacion", "caudal minimo", "by-pass"],
       riesgoId: "bomba-sin-salida",
+      /*
+       * Transcrita, no inventada: la propia `consecuencia` de la regla
+       * `bomba-sin-salida` en `riesgos.js` dice «la temperatura del líquido
+       * atrapado en la bomba puede subir rápidamente» — es el mecanismo
+       * PROPIO de esta causa (sin salida de calor, el líquido se calienta
+       * con el tiempo), y no el de `valvula-impulsion-cerrada` (una válvula
+       * cerrada es un cambio de estado, no una tendencia). Es exactamente
+       * la fuente que discrimina entre las dos causas del mismo riesgo que
+       * `datos` —misma evidencia física para las dos— no puede dar.
+       */
+      firmaTemporal: [{ senal: "temperaturaTanque", direccion: "sube", ventanaH: 1 }],
     }),
   ],
 

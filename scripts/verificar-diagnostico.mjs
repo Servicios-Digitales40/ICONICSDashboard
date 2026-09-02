@@ -85,6 +85,17 @@ function casosFalsos(casos = []) {
   }
 }
 
+/**
+ * Un `evaluadorTemporal` de mentira: devuelve SIEMPRE la misma respuesta
+ * configurada, sin mirar la firma —el motor sólo lo invoca cuando la causa
+ * declaró `firmaTemporal` (ver `respaldoTemporal` en `diagnostico.mjs`), así
+ * que una causa SIN firma queda en 0 pase lo que pase aquí; eso ya prueba
+ * el filtro sin que el doble tenga que distinguir de qué causa se trata.
+ */
+function evaluadorTemporalFalso(respuesta) {
+  return { async evaluar() { return respuesta } }
+}
+
 const SIN_FUENTES = createMotorDiagnostico({})
 
 /* ── Determinismo ─────────────────────────────────────────────────────── */
@@ -454,6 +465,62 @@ await check('un riesgo huérfano no tiene conflicto (ni causas que comparar)', a
   const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'variador-en-manual' })
   assert.equal(resultado.huerfano, true)
   assert.equal(resultado.conflicto, false)
+})
+
+/* ── El cuarto término, Plan 17 Fase 6 (G5) ─────────────────────────── */
+
+console.log('\n── El término temporal entra en el total y la evidencia ───────')
+
+await check('sólo la causa con `firmaTemporal` consulta al evaluador — la otra queda en 0', async () => {
+  // De las dos causas de bomba-sin-salida, sólo sin-recirculacion-minima
+  // declara firmaTemporal (shared/eva/causas.js) — el doble siempre
+  // "encuentra" tendencia, y aun así valvula-impulsion-cerrada debe quedar
+  // en temporal:0, porque `respaldoTemporal` ni la llama sin firma.
+  const evaluadorTemporal = evaluadorTemporalFalso({
+    puntos: 2,
+    evidenciaAFavor: [{ fuente: 'temporal', texto: 'subió', referencia: 'temperaturaTanque' }],
+    evidenciaEnContra: [],
+  })
+  const resultado = await createMotorDiagnostico({ evaluadorTemporal }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const conFirma = resultado.causas.find(cc => cc.id === 'sin-recirculacion-minima')
+  const sinFirma = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+
+  assert.equal(conFirma.respaldo.temporal, 2)
+  assert.equal(sinFirma.respaldo.temporal, 0)
+})
+
+await check('`temporal` suma al total y cuenta como fuente activa', async () => {
+  const evaluadorTemporal = evaluadorTemporalFalso({
+    puntos: 2, evidenciaAFavor: [{ fuente: 'temporal', texto: 'x', referencia: 'y' }], evidenciaEnContra: [],
+  })
+  const sinTemporal = await createMotorDiagnostico({}).diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  const conTemporal = await createMotorDiagnostico({ evaluadorTemporal }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const antes = sinTemporal.causas.find(cc => cc.id === 'sin-recirculacion-minima')
+  const despues = conTemporal.causas.find(cc => cc.id === 'sin-recirculacion-minima')
+
+  assert.equal(despues.respaldo.total, antes.respaldo.total + 2)
+  assert.equal(despues.evidenciaAFavor.some(e => e.fuente === 'temporal'), true)
+})
+
+await check('sin `evaluadorTemporal` montado, `temporal` sale en 0 sin lanzar', async () => {
+  const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  for (const causa of resultado.causas) assert.equal(causa.respaldo.temporal, 0)
+})
+
+await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin evidencia', async () => {
+  const evaluadorTemporal = { async evaluar() { throw new Error('El historiador no contesta') } }
+  const resultado = await createMotorDiagnostico({ evaluadorTemporal }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+  const conFirma = resultado.causas.find(cc => cc.id === 'sin-recirculacion-minima')
+  assert.equal(conFirma.respaldo.temporal, 0)
+  assert.equal(conFirma.evidenciaAFavor.length, 0)
 })
 
 /* ── Resultado ───────────────────────────────────────────────────────── */

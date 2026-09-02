@@ -34,7 +34,9 @@ import { createIndiceDocumentos } from './ia/documentos.mjs'
 import { createIndiceCasos } from './ia/casos.mjs'
 import { createMotorDiagnostico } from './ia/diagnostico.mjs'
 import { createGestorManuales } from './ia/manuales.mjs'
+import { createEvaluadorTemporal } from './ia/temporal.mjs'
 import { createHerramientas } from './ia/herramientas.mjs'
+import { crearAyudantesDeHistoria } from './ia/herramientas/lib/historia.mjs'
 import { createVoz } from './ia/voz.mjs'
 import { createAuthenticator } from './iconics/authenticator.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
@@ -202,12 +204,24 @@ export async function createApp(config) {
     embeddingModelo: config.ia.embeddingModelo,
   })
 
-  // El motor de diagnóstico (Plan 16 Fase 3): junta datos + manual + casos.
-  // Se construye siempre, aunque `indiceDocumentos` sea `null` — el respaldo
-  // del manual sale en 0 sin él, no es motivo para negar todo el
-  // diagnóstico, igual que `limites_del_manual` no le impide funcionar a
-  // `diagnostico`.
-  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos })
+  // El cuarto término (Plan 17 Fase 6, G5): mismo ayudante de históricos que
+  // ya usan `historia_de_senal`/`correlacionar_senales` dentro de
+  // `createHerramientas()` —se construye SUELTO aquí también porque
+  // `motorDiagnostico` se monta antes que las herramientas, no porque
+  // comparta estado con la instancia de ahí abajo; `crearAyudantesDeHistoria`
+  // es sólo una envoltura sin memoria propia sobre `client`, así que
+  // construirla dos veces no duplica nada que importe—.
+  const { leerSerie } = crearAyudantesDeHistoria({
+    client, historyConcurrencia: config.limits.historyConcurrencia,
+  })
+  const evaluadorTemporal = createEvaluadorTemporal({ historia: { leerSerie } })
+
+  // El motor de diagnóstico (Plan 16 Fase 3, + Fase 6 del Plan 17): junta
+  // datos + manual + casos + temporal. Se construye siempre, aunque
+  // `indiceDocumentos` sea `null` — el respaldo del manual sale en 0 sin él,
+  // no es motivo para negar todo el diagnóstico, igual que
+  // `limites_del_manual` no le impide funcionar a `diagnostico`.
+  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal })
 
   // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
   // `controlar_bomba` escribe, y necesita la misma puerta que usa
