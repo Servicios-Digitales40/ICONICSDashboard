@@ -245,6 +245,22 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
   }
 }
 
+/**
+ * ── SIN RECALIBRAR TODAVÍA — PLAN 17 FASE 7a, BLOQUEADA POR FALTA DE DATOS ──
+ *
+ * Los cortes `>=5`/`>=3` son los de siempre, de antes de este plan. La Fase
+ * 3a (G2/G7/G8) cambió cómo se calculan `manual` y `casos` — ya no
+ * "casi siempre 2" ni cruzados entre riesgos —, y el plan pedía recalibrar
+ * estos cortes "contra la salida real del motor sobre los manuales y los
+ * casos que haya en disco ese día". No hay disco que mirar: esta copia de
+ * trabajo no tiene ni un PDF real (`Documentos/` sólo tiene `Reportes/`) ni
+ * un `datos/aprendizaje.json` (gitignored, no existe). Cambiar estos números
+ * sin esa medición sería sustituir una suposición por otra, no calibrar —
+ * exactamente el defecto que este plan vino a corregir, con otros dígitos.
+ * `scripts/verificar-calibracion.mjs` deja escrita y probada la herramienta
+ * que hace la medición en cuanto haya `Documentacion/` real; lo que falta es
+ * el disco, no el código.
+ */
 function bandaDe(total, fuentesActivas) {
   if (total >= 5 && fuentesActivas >= 2) return 'alto'
   if (total >= 3) return 'medio'

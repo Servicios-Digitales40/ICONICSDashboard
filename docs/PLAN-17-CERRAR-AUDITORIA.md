@@ -159,6 +159,32 @@
 > de la suite existente. Sin regresiones: 153/153 vitest backend, 509/509
 > vitest frontend, 15/15 diagnóstico, 12/12 casos, 7/7 casos-cierre,
 > 124/124 herramientas.
+>
+> **F7a: bloqueada por falta de datos, NO completada.** El usuario decidió
+> explícitamente (2026-09-02) no recalibrar `bandaDe`/`UMBRAL_*` sin
+> medición real: se escribió `scripts/verificar-calibracion.mjs` —las seis
+> comprobaciones del §5, contra el motor real completo
+> (`createIndiceDocumentos` + `createIndiceCasos` + `createMotorDiagnostico`,
+> sin dobles), corriendo hoy contra un corpus SINTÉTICO por falta de
+> `Documentacion/` real— y **no se tocó ni un número** en `bandaDe` ni en
+> `UMBRAL_BM25_*`/`UMBRAL_COSENO_*`. `diagnostico.mjs · bandaDe` queda con
+> un comentario explícito de por qué sigue sin recalibrar.
+>
+> De camino salió un hallazgo que no estaba en el plan original: el primer
+> diseño del check 1 («dos causas no empatan en `manual`») estaba mal
+> planteado — con manual DEDICADO Y GENUINO para las dos causas, empatar en
+> `manual: 2` es correcto, no el fallo H2 (que era tocar el techo SIN
+> encaje real). Corregido para comparar una causa CON manual dedicado
+> contra una SIN ninguno, que es lo que H2 medía de verdad. De paso quedó
+> demostrada empíricamente la sensibilidad de BM25 al tamaño del corpus que
+> ya advertía la Fase 3a: con sólo 2 documentos, un match genuino
+> (`scoreCrudo` 4,2-4,6) no llegaba a `UMBRAL_BM25_FUERTE=8` —calibrado a
+> escala de ~45—, y sólo se separó al ampliar el corpus de prueba a esa
+> misma escala.
+>
+> 7/7 en `scripts/verificar-calibracion.mjs`. Sin regresiones: 153/153
+> vitest backend, 15/15 diagnóstico, 12/12 casos, 7/7 casos-cierre, 124/124
+> herramientas, 16/16 documentos.
 
 ---
 
@@ -617,7 +643,7 @@ qué necesita cada una están en §10.
 | 3 | **F2** · el feedback vuelve | El dato más caro del sistema empieza a servir para algo. Emparejamiento por id exacto: tampoco necesita embeddings |
 | 4 | **F5** · trazabilidad | **Adelantada.** Los extractos, el `chunkId` y el hash del PDF salen del índice y del disco. Antes iba la 7.ª por valor; es de las que menos depende de nada |
 | 5 | **F3a** · manifiesto, dedupe y corte BM25 | Con F1 y F2 hechas ya hay dos términos que discriminan; éste añade el tercero en el modo que se puede medir hoy |
-| 6 | **F7a** · recalibrar bandas en modo BM25 | En cuanto los tres términos son reales, los cortes hay que rehacerlos. Deja coherente el modo degradado, que hoy no lo está |
+| 6 | **F7a** · recalibrar bandas en modo BM25 | **Bloqueada por datos.** Herramienta escrita y probada (`verificar-calibracion.mjs`), `bandaDe` sin tocar — no hay `Documentacion/` real que medir en esta copia |
 | 7 | **F4** · evidencia y conflicto | Convierte «datos 2, manual 2, casos 2» en algo que una persona puede juzgar. Necesita valores de señal: `ICONICS_FAKE=true` |
 | 8 | **F6** · término temporal, la estructura | `firmaTemporal`, `temporal.mjs` y el cuarto término, contra `readHistory` del transporte falso. Los umbrales quedan provisionales |
 
@@ -730,7 +756,7 @@ del transporte falso.
 | **F2** · feedback estructurado | **Completa** | — |
 | **F5** · trazabilidad | **Completa** | — |
 | **F3a** · manifiesto + dedupe + corte BM25 | **Completa** | — |
-| **F7a** · bandas en modo BM25 | **Completa** | — |
+| **F7a** · bandas en modo BM25 | Herramienta completa, medición **bloqueada** | Sin servidor: falta un `Documentacion/` real, no un servidor |
 | **F4** · evidencia + conflicto | Sí, con `ICONICS_FAKE=true` | Que el modelo obedezca la instrucción nueva de `comoRedactar` |
 | **F6** · término temporal | Estructura y módulo sí | Los umbrales de las firmas: la física del simulador no fija una pendiente |
 | **F3b** · corte sobre coseno | **No** | Servidor de embeddings |
