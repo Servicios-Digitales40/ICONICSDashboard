@@ -47,6 +47,7 @@ PLC. No se cruzan sus señales.
 
     python scripts/plc_opcua.py                      los dos, resumen
     python scripts/plc_opcua.py --arbol 192.168.0.5  recorrer sus nodos
+    python scripts/plc_opcua.py --vivo 192.168.0.5   valores en tiempo real
     python scripts/plc_opcua.py --leer 192.168.0.5 'ns=3;s="DB".Var'
 """
 import asyncio
@@ -59,7 +60,15 @@ PLCS = {
     "192.168.0.5": "PLC_2 · sistema de vibraciones",
 }
 
-TIEMPO_ESPERA = 8
+"""Segundos de espera al conectar.
+
+Estaba en 8 y se quedaba corto: medido el 02-09-2026, con el puerto 4840
+abierto y el PLC respondiendo a ping, el saludo de OPC UA no llegaba a
+tiempo y el script decía «sin respuesta» sobre un equipo que estaba
+perfectamente. Un plazo corto convierte una red lenta en un diagnóstico
+equivocado, que es peor que esperar unos segundos más.
+"""
+TIEMPO_ESPERA = 20
 
 
 async def conectar(ip):
@@ -159,6 +168,91 @@ async def leer(ip, nodo_id):
         await cliente.disconnect()
 
 
+# Los nodos de cada apoyo. Van de 92 en 92 —S1 en 458, S2 en 550, S3 en
+# 642— y se enumeraron con `--arbol`; se dejan escritos porque el patrón se
+# rompe en cuanto alguien recompile el programa del PLC, y entonces esta
+# tabla es lo que hay que corregir en vez de una fórmula que mentiría.
+APOYOS = {
+    "S1 lado acople": 458,
+    "S2 intermedio": 550,
+    "S3 lado libre": 642,
+}
+
+# Desplazamiento de cada medida respecto al primer nodo del apoyo, que es
+# el del nombre del equipo.
+MEDIDAS = [("vRMS", 1, "mm/s"), ("aRMS", 2, "m/s²"), ("DKW", 3, ""), ("Peak", 4, "m/s²")]
+
+
+async def vigilar(ip, cada=2):
+    """Los valores refrescándose, hasta que se corte con Ctrl+C.
+
+    ── POR QUÉ ESTO Y NO REPETIR EL BARRIDO ──────────────────────────
+
+    Porque una lectura suelta no dice si un número está vivo. Todo salía
+    en 0.0 y esa cifra significa dos cosas muy distintas —la máquina
+    parada, o el módulo publicando sin medir— que sólo se distinguen
+    mirando si se MUEVE cuando la máquina arranca.
+
+    Por eso se marca lo que cambia: es la diferencia entre un cero que
+    respira y uno congelado.
+
+    ── POR QUÉ INSISTE EN VEZ DE RENDIRSE ────────────────────────────
+
+    Porque el uso normal de esto es dejarlo puesto ANTES de arrancar la
+    máquina, para ver los números despertar. Rendirse al primer intento
+    fallido es justo lo contrario de lo que hace falta.
+
+    Y estos PLC conectan de forma intermitente: medido el 02-09-2026, con
+    el puerto 4840 ABIERTO y el equipo respondiendo a ping, el saludo de
+    OPC UA tardaba más de los 8 segundos de `TIEMPO_ESPERA` y el script
+    salía diciendo «sin respuesta». El comando estaba bien; lo que estaba
+    mal era darse por vencido a la primera.
+    """
+    cliente = None
+    intento = 0
+    while cliente is None:
+        intento += 1
+        if intento > 1:
+            print(f"  reintentando ({intento})…")
+            await asyncio.sleep(3)
+        cliente = await conectar(ip)
+
+    previo = {}
+    print()
+    print(f"  Leyendo cada {cada} s. Ctrl+C para parar.")
+    print()
+    print(f"  {'hora':<10}", end="")
+    for apoyo in APOYOS:
+        print(f"{apoyo:<26}", end="")
+    print()
+
+    try:
+        while True:
+            linea = [f"  {__import__('time').strftime('%H:%M:%S'):<10}"]
+            for apoyo, base in APOYOS.items():
+                trozos = []
+                for nombre, off, _u in MEDIDAS[:2]:  # vRMS y aRMS caben en la fila
+                    try:
+                        v = await cliente.get_node(f"ns=4;i={base + off}").read_value()
+                    except Exception:
+                        v = None
+                    clave = f"{apoyo}.{nombre}"
+                    # El asterisco es lo único que distingue un cero vivo de
+                    # uno congelado.
+                    cambio = clave in previo and previo[clave] != v
+                    previo[clave] = v
+                    txt = "  ---" if v is None else f"{v:.3f}"
+                    trozos.append(f"{'*' if cambio else ' '}{txt:>9}")
+                linea.append("".join(trozos) + "  ")
+            print("".join(linea))
+            await asyncio.sleep(cada)
+    except KeyboardInterrupt:
+        print()
+        print("  (parado)")
+    finally:
+        await cliente.disconnect()
+
+
 async def main():
     args = sys.argv[1:]
 
@@ -167,11 +261,17 @@ async def main():
             await resumen(ip, etiqueta)
         print("\nPara ver los nodos de uno:")
         print("  python scripts/plc_opcua.py --arbol 192.168.0.5")
+        print("  python scripts/plc_opcua.py --vivo  192.168.0.5")
         return
 
     if args[0] == "--arbol":
         ip = args[1] if len(args) > 1 else "192.168.0.1"
         await arbol(ip, args[2] if len(args) > 2 else None)
+        return
+
+    if args[0] == "--vivo":
+        ip = args[1] if len(args) > 1 else "192.168.0.5"
+        await vigilar(ip, float(args[2]) if len(args) > 2 else 2)
         return
 
     if args[0] == "--leer":
