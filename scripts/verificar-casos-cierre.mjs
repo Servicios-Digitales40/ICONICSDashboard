@@ -166,6 +166,38 @@ await check('un caso registrado por `crearIntervencion` (voz) y uno por `registr
   assert.equal(ids.size, 2, 'los dos casos deben tener ids distintos')
 })
 
+console.log('\n── El desmentido en el texto de recuperación (Fase 2, G3) ────')
+
+await check('un cierre con propuesta y causa real distintas lleva las dos en el texto', async () => {
+  // Reproduce lo medido en la auditoría: sin esta frase, un caso cuya
+  // `causa` en prosa sólo nombra la causa REAL —nunca la que el sistema
+  // propuso y que resultó ser incorrecta— podía no aparecer al buscar por
+  // el título de esa causa propuesta, que es precisamente el caso que hace
+  // falta encontrar para poder refutarla.
+  const nueva = crearIntervencion({
+    sistema: 'tanque',
+    sintoma: 'Sobrepresión en la red.',
+    causa: 'La válvula de alivio no estaba actuando.', // no menciona el variador
+    solucion: 'Se cambió la válvula de alivio.',
+    diagnostico: { propuesta: 'consigna-variador-alta' },
+    causaReal: { tipo: 'valvula-alivio-no-actua' },
+    diagnosticoCorrecto: false,
+  })
+
+  const texto = textoDeRecuperacion(nueva)
+  assert.match(texto, /consigna-variador-alta/)
+  assert.match(texto, /valvula-alivio-no-actua/)
+})
+
+await check('sin `diagnostico.propuesta`/`causaReal.tipo`, no hay frase de desmentido que añadir', async () => {
+  const nueva = crearIntervencion({
+    sistema: 'tanque', sintoma: 'Algo raro.', solucion: 'Se revisó.',
+  })
+
+  const texto = textoDeRecuperacion(nueva)
+  assert.doesNotMatch(texto, /propuso/i)
+})
+
 console.log('\n── `casos.mjs` sigue indexando un caso rico ──────────────────')
 
 await check('un caso con campos de Fase 5 se indexa y se encuentra igual que uno simple', async () => {

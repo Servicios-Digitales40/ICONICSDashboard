@@ -32,6 +32,25 @@ import { SISTEMAS } from "./sistemas.js";
  * El sistema va primero y en un idioma que el propio texto ya usa —«Sistema
  * de vibraciones», no el id `"vibraciones"` a secas— porque el modelo de
  * embeddings entiende palabras, no claves de un registro.
+ *
+ * ── EL DESMENTIDO, PLAN 17 FASE 2 (G3) ──────────────────────────────
+ *
+ * `backend/ia/diagnostico.mjs · respaldoDeCasos` ya empareja por el id
+ * estructurado (`causaReal.tipo`, `diagnostico.propuesta` +
+ * `diagnosticoCorrecto`) cuando existe, y ESO no depende de este texto. Lo
+ * que sí depende de este texto es que el caso llegue a aparecer entre los
+ * candidatos de `buscarCasosSimilares` para empezar: la búsqueda puntúa por
+ * parecido léxico/semántico con el título de la causa, y un cierre cuya
+ * `causa` en prosa no menciona la causa PROPUESTA —sólo la real— podía
+ * quedar fuera de la búsqueda que evalúa esa causa propuesta, precisamente
+ * el caso que hace falta encontrar para poder refutarla.
+ *
+ * Medido en la auditoría del 01-09-2026: un caso con
+ * `diagnostico.propuesta: "consigna-variador-alta"` y
+ * `causaReal.tipo: "valvula-alivio-no-actua"` sólo mencionaba, en su
+ * `causa` de texto libre, la válvula — nunca el variador. Sin esas dos
+ * frases aquí, la causa refutada no baja de banda: el caso que la refuta
+ * ni se encuentra al buscar por su título.
  */
 export function textoDeRecuperacion(intervencion) {
   const sistema = SISTEMAS.find((s) => s.id === intervencion.sistema);
@@ -49,6 +68,14 @@ export function textoDeRecuperacion(intervencion) {
      * el propio embedding no tiene forma de distinguir los dos casos.
      */
     intervencion.resuelto === false ? "Este intento NO funcionó." : "El intento funcionó.",
+    // El desmentido: sólo cuando hay algo que desmentir, es decir, cuando
+    // hubo una propuesta del sistema Y una causa real confirmada distinta.
+    // `causaReal.tipo` nombra la causa real con el mismo vocabulario que
+    // `causa.titulo` en `shared/eva/causas.js` — es lo que hace que la
+    // búsqueda por el título de la causa REAL también encuentre este caso.
+    intervencion.causaReal?.tipo && intervencion.diagnostico?.propuesta
+      ? `El sistema propuso "${intervencion.diagnostico.propuesta}"; la causa real fue "${intervencion.causaReal.tipo}".`
+      : null,
   ];
 
   return partes.filter(Boolean).join(" ");

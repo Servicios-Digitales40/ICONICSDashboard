@@ -61,6 +61,30 @@
 > `scripts/verificar-casos.mjs` (12/12, antes 8) y
 > `scripts/verificar-diagnostico.mjs` (11/11, antes 8). Sin regresiones:
 > 153/153 vitest, 124/124 herramientas, 5/5 casos-cierre, 10/10 documentos.
+>
+> **Fase 2 completada** — `respaldoDeCasos` (`backend/ia/diagnostico.mjs`)
+> empareja por id ANTES de caer a texto: `causaReal.tipo === causa.id`
+> confirma —sin depender del score, un id no compite por parecido—, y
+> `diagnostico.propuesta === causa.id` con `diagnosticoCorrecto === false`
+> refuta, sin tope, sea cual sea `resuelto`. La proxy de texto de la Fase 0
+> del Plan 16 sólo se usa ya para lo que no trae esos campos —el histórico
+> de antes de la Fase 5 y todo lo que no diferencia por id—. `textoDeRecu
+> peracion` (`shared/eva/casos.js`) añade «El sistema propuso X; la causa
+> real fue Y» cuando ambos campos existen, para que el caso se pueda
+> ENCONTRAR al buscar por el título de cualquiera de las dos causas —el
+> emparejamiento exacto no sirve de nada si el caso ni siquiera aparece
+> entre los candidatos que devuelve `buscarCasosSimilares`—. La caché de
+> embeddings de casos no necesitó versionarse a mano: ya está indexada por
+> hash del CONTENIDO del texto (`cache.vectores[item.hash]`,
+> `backend/ia/embeddings.mjs`), así que un texto de recuperación distinto
+> produce un hash distinto y un fallo de caché limpio por sí solo — el
+> riesgo que anotaba el plan ya estaba resuelto por el diseño existente.
+> Nueve comprobaciones nuevas reproducen el escenario medido en la
+> auditoría —`consigna-variador-alta` refutada dos veces baja de banda
+> ella sola (MEDIO → BAJO), sin tocar ninguna otra causa— repartidas entre
+> `scripts/verificar-diagnostico.mjs` (15/15, antes 11) y
+> `scripts/verificar-casos-cierre.mjs` (7/7, antes 5). Sin regresiones:
+> 153/153 vitest, 124/124 herramientas, 12/12 casos, 10/10 documentos.
 
 ---
 

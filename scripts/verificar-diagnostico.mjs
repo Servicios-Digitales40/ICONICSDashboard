@@ -212,6 +212,86 @@ await check('un confirmado + uno sin `disparador` siguen sin superar el tope de 
   assert.equal(resultado.causas[0].respaldo.casos, 2, 'el confirmado + el débil debían completar el tope, no superarlo')
 })
 
+console.log('\n── El emparejamiento exacto por id (Plan 17 Fase 2, G3) ──────')
+
+/*
+ * `causaReal.tipo`/`diagnostico.propuesta` son ids estructurados de la Fase
+ * 5 del Plan 16: no compiten por parecido de texto, así que estos casos de
+ * prueba llevan `score: 0` a propósito —por debajo de CUALQUIER umbral—
+ * para demostrar que el emparejamiento exacto no depende del score.
+ */
+
+await check('`causaReal.tipo` confirma la causa aunque el score de texto sea 0', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      causaReal: { tipo: 'aporte-termico-externo' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0,
+      causaReal: { tipo: 'aporte-termico-externo' } },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+  const causa = resultado.causas.find(c => c.id === 'aporte-termico-externo')
+
+  assert.equal(causa.respaldo.casos, 2, 'dos confirmaciones exactas debían llegar al tope, sin depender del score')
+})
+
+await check('`diagnostico.propuesta` + `diagnosticoCorrecto:false` refuta la causa, aunque `resuelto:true`', async () => {
+  // El técnico dijo que la avería se arregló (resuelto:true) PERO que la
+  // causa propuesta no era la correcta (diagnosticoCorrecto:false) — son dos
+  // preguntas distintas, y la que importa aquí es la segunda.
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'aporte-termico-externo' }, diagnosticoCorrecto: false },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+  const causa = resultado.causas.find(c => c.id === 'aporte-termico-externo')
+
+  assert.equal(causa.respaldo.casos, -1, 'una refutación exacta debía restar, aunque el intento se diera por resuelto')
+})
+
+await check('una causa refutada DOS VECES baja de banda ella sola — el escenario medido en la auditoría', async () => {
+  // Reproduce lo medido el 01-09-2026: `consigna-variador-alta` fue
+  // refutada en dos cierres distintos y seguía saliendo en banda ALTO
+  // porque nada restaba por `diagnosticoCorrecto:false`. bomba-sin-salida
+  // tiene `necesita` de 3 señales → datos=3; sin casos ni manual, total=3
+  // (MEDIO, una sola fuente). Dos refutaciones deben bajarlo a BAJO.
+  const sinCasos = await createMotorDiagnostico({}).diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  const causaSinCasos = sinCasos.causas.find(c => c.id === 'valvula-impulsion-cerrada')
+  assert.equal(causaSinCasos.respaldo.total, 3)
+  assert.equal(causaSinCasos.banda, 'medio')
+
+  const casosRefutando = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'valvula-impulsion-cerrada' }, diagnosticoCorrecto: false },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'valvula-impulsion-cerrada' }, diagnosticoCorrecto: false },
+  ])
+  const conRefutaciones = await createMotorDiagnostico({ indiceCasos: casosRefutando }).diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  const causaRefutada = conRefutaciones.causas.find(c => c.id === 'valvula-impulsion-cerrada')
+
+  assert.equal(causaRefutada.respaldo.casos, -2)
+  assert.equal(causaRefutada.respaldo.total, 1)
+  assert.notEqual(causaRefutada.banda, 'medio', 'dos refutaciones debían bajarla de banda, sola')
+  assert.equal(causaRefutada.banda, 'bajo')
+})
+
+await check('confirmación exacta y refutación de OTRA causa no se mezclan', async () => {
+  // Un mismo lote de casos puede confirmar una causa Y refutar otra del
+  // mismo riesgo a la vez — son juicios independientes, uno por causa.
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      causaReal: { tipo: 'aporte-termico-externo' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'falta-renovacion-de-agua' }, diagnosticoCorrecto: false },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+
+  const confirmada = resultado.causas.find(c => c.id === 'aporte-termico-externo')
+  const refutada = resultado.causas.find(c => c.id === 'falta-renovacion-de-agua')
+
+  assert.equal(confirmada.respaldo.casos, 1)
+  assert.equal(refutada.respaldo.casos, -1)
+})
+
 console.log('\n── Un caso que NO funcionó resta ─────────────────────────────')
 
 await check('un caso `resuelto:false` baja el total en vez de sumarlo', async () => {

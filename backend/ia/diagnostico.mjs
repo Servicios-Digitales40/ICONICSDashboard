@@ -98,54 +98,81 @@ async function respaldoDelManual(indiceDocumentos, causa) {
 
 /**
  * Cuánto respaldan los casos previos a UNA causa. `buscarCasosSimilares` ya
- * filtra por sistema Y por riesgo —no hay filtro que repetir aquí—. Un caso
- * "apunta a esta causa" cuando su texto de recuperación es lo bastante
- * parecido al título de la causa: es la mejor proxy disponible hoy, porque
- * `Intervencion.causa` es texto libre sin un id de causa estructurado —ver
- * "Lo que la semilla no puede dar" en el plan; ese campo estructurado
- * (`causaReal.tipo`) es del `Caso` enriquecido de la Fase 5, no de hoy—.
+ * filtra por sistema Y por riesgo —no hay filtro que repetir aquí—.
  *
- * ── DOS NIVELES DE PESO, PLAN 17 FASE 1 (G1) ────────────────────────
+ * ── EMPAREJAMIENTO EXACTO PRIMERO, PLAN 17 FASE 2 (G3) ──────────────
  *
- * `indiceCasos.buscarCasosSimilares` ya EXCLUYÓ los casos de otro riesgo
- * (con `disparador.riesgoId` distinto); lo que queda aquí es distinguir dos
- * niveles de confianza en lo que SÍ llega:
+ * Antes de nada, se mira si el caso trae el id estructurado de la Fase 5 del
+ * Plan 16: `causaReal.tipo === causa.id` CONFIRMA esta causa tal cual —no
+ * "se parece", ES esta causa, porque un técnico lo escribió—; `diagnostico.
+ * propuesta === causa.id` con `diagnosticoCorrecto === false` la REFUTA —el
+ * sistema propuso esta causa y un técnico dijo, con el campo estructurado
+ * que existe para decirlo, que no era—. Ninguna de las dos depende del
+ * score de texto: un id no compite por parecido.
  *
- *  - `disparador.riesgoId === riesgoId`: confirma este riesgo tal cual.
- *    Peso completo — el tope de 2 de siempre.
- *  - Sin `disparador` (casos de voz/chat, que nunca lo traen): no se sabe si
- *    era este riesgo. Peso reducido — tope de 1, nunca 2, para que UNA
- *    fuente sin confirmar no pueda por sí sola pesar como si lo confirmara.
+ * Sólo lo que NO trae esos campos —todo lo registrado por voz o chat, y el
+ * histórico de antes de la Fase 5— cae a la proxy de texto de siempre: "el
+ * texto de recuperación se parece lo bastante al título de la causa". Es la
+ * proxy que `diagnostico.mjs` llevaba meses llamando "la mejor disponible
+ * hoy" en su cabecera — deja de serlo en cuanto hay un id que mirar en su
+ * lugar, y se queda como red de seguridad para cuando no lo hay.
  *
- * Los dos topes se combinan sin superar el tope global de 2 —"casos 0…2"
- * sigue siendo la promesa del módulo—: con evidencia fuerte, la débil puede
- * ayudar a completar el 2; sin evidencia fuerte, la débil sola nunca pasa
- * de 1. La resta por fallidos no distingue nivel: un intento fallido —de
- * cualquiera de los dos— sigue sin tope, es la asimetría que ya defendía
- * este módulo antes de este plan.
+ * Medido en la auditoría del 01-09-2026: `consigna-variador-alta` fue
+ * refutada DOS VECES (dos cierres con `diagnostico.propuesta` igual a esa
+ * causa y `diagnosticoCorrecto:false`) y seguía saliendo en banda ALTO,
+ * porque `resuelto` —"se arregló"— no es `diagnosticoCorrecto` —"acertamos"—
+ * y el emparejamiento por texto no siempre encontraba el caso que la
+ * refutaba. Con el emparejamiento exacto, una causa refutada resta, no sólo
+ * dice "no confirmada".
+ *
+ * ── DOS NIVELES DE PESO EN LA PROXY DE TEXTO, PLAN 17 FASE 1 (G1) ───
+ *
+ * Para lo que SÍ cae a texto —sin campos estructurados—, sigue el filtro de
+ * la Fase 1: `disparador.riesgoId === riesgoId` pesa completo (tope 2); sin
+ * `disparador` pesa reducido (tope 1, nunca 2). Los dos topes —el exacto y
+ * el de texto— se combinan sin superar el tope global de 2: "casos 0…2"
+ * sigue siendo la promesa del módulo. La resta —fallidos por `resuelto` o
+ * refutados por `diagnosticoCorrecto`— no tiene tope en ningún caso: cada
+ * señal negativa, de la fuente que sea, cuenta entera.
  */
 async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
   if (!indiceCasos) return { puntos: 0, casos: [] }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
     const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, riesgoId, texto: consulta, top: 5 })
-    const relevantes = encontrados.filter(c => c.score >= UMBRAL_FUERTE)
 
+    const confirmados = encontrados.filter(c => c.causaReal?.tipo === causa.id)
+    const refutados = encontrados.filter(
+      c => c.diagnostico?.propuesta === causa.id && c.diagnosticoCorrecto === false
+    )
+    const idsExactos = new Set([...confirmados, ...refutados].map(c => c.id))
+
+    // La proxy de texto, sólo para lo que no tiene emparejamiento exacto.
+    const porTexto = encontrados.filter(c => !idsExactos.has(c.id) && c.score >= UMBRAL_FUERTE)
     const confirmaElRiesgo = c => c.disparador?.riesgoId === riesgoId
-    const fuertes = relevantes.filter(confirmaElRiesgo)
-    const debiles = relevantes.filter(c => !confirmaElRiesgo(c))
+    const fuertesTexto = porTexto.filter(confirmaElRiesgo)
+    const debilesTexto = porTexto.filter(c => !confirmaElRiesgo(c))
 
-    const funcionaronFuertes = fuertes.filter(c => c.resuelto !== false)
-    const funcionaronDebiles = debiles.filter(c => c.resuelto !== false)
-    const fallaron = relevantes.filter(c => c.resuelto === false)
+    const funcionaronFuertes =
+      confirmados.filter(c => c.resuelto !== false).length +
+      fuertesTexto.filter(c => c.resuelto !== false).length
+    const funcionaronDebiles = debilesTexto.filter(c => c.resuelto !== false).length
 
     const positivos = Math.min(
-      Math.min(funcionaronFuertes.length, 2) + Math.min(funcionaronDebiles.length, 1),
+      Math.min(funcionaronFuertes, 2) + Math.min(funcionaronDebiles, 1),
       2
     )
-    const puntos = positivos - fallaron.length
 
-    return { puntos, casos: relevantes }
+    // Dos motivos de resta, independientes y ambos sin tope: un intento que
+    // no funcionó (`resuelto:false`, de cualquier nivel) y una causa
+    // refutada por id (`diagnosticoCorrecto:false` sobre ESTA causa
+    // propuesta) — un mismo caso puede aportar los dos si además falló.
+    const fallaronPorResuelto =
+      confirmados.filter(c => c.resuelto === false).length +
+      porTexto.filter(c => c.resuelto === false).length
+    const puntos = positivos - fallaronPorResuelto - refutados.length
+
+    return { puntos, casos: [...confirmados, ...refutados, ...porTexto] }
   } catch (error) {
     logger.warn('Búsqueda en casos falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id,
