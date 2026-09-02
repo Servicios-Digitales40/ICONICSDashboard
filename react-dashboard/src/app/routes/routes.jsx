@@ -51,7 +51,7 @@
 import { lazy } from "react";
 import {
   Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, Home, LayoutDashboard,
-  Power, ShieldAlert, Waves,
+  NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
 /**
@@ -297,6 +297,21 @@ export const ROUTES = [
    * `Demo-EVA/views/comunes/DocumentacionRag.jsx` para el porqué de cada decisión de
    * la vista.
    */
+  {
+    /*
+     * Va ANTES de «Documentación» a propósito. Las dos son fuentes de
+     * conocimiento del asistente, pero ésta es la única que se llena SOLA
+     * —cada cierre de diagnóstico, cada reparación contada por voz— y por
+     * tanto la única que puede degradarse sin que nadie haga nada. Un
+     * manual malo lo subió alguien; un caso basura aparece solo.
+     */
+    id: "rag-casos",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
+    title: "Casos previos",
+    sub: "La bitácora de intervenciones que respalda los diagnósticos, y qué de ella sigue contando",
+    nav: { label: "Casos previos", icon: <NotebookPen size={17} />, group: "sec-rag" },
+  },
+
   {
     id: "rag-documentacion",
     component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),

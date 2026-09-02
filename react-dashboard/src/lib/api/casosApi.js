@@ -1,11 +1,13 @@
 /**
- * Cliente del cierre de diagnóstico — `/api/diagnostico` y `/api/casos`
- * (Plan 16 Fase 5).
+ * Cliente de la bitácora de casos — `/api/diagnostico` y `/api/casos`.
  *
- * Las dos rutas conviven en un archivo porque las usa UNA sola pantalla,
- * `CierreDiagnostico.jsx`, en el mismo orden en que aparecen aquí: primero
- * se lee la propuesta del sistema, después se manda lo que confirmó o
- * corrigió la persona. Mismo criterio de `parseResponse` que `ragApi.js`.
+ * Nació para UNA pantalla, `CierreDiagnostico.jsx` (Plan 16 Fase 5): leer la
+ * propuesta del sistema y mandar lo que confirmó o corrigió la persona. Hoy
+ * lo comparte con `CasosRag.jsx`, la pantalla de revisión, que usa las dos
+ * de abajo. Siguen juntas porque son el mismo recurso —la bitácora— visto
+ * en dos momentos: cuando se escribe y cuando se repasa.
+ *
+ * Mismo criterio de `parseResponse` que `ragApi.js`.
  */
 import { API_BASE } from "./apiBase.js";
 
@@ -45,6 +47,29 @@ export async function registrarCaso(datos, { signal } = {}) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(datos),
+    signal,
+  });
+  return parseResponse(response);
+}
+
+/** La bitácora entera, de la más reciente atrás, **incluidas las
+ *  archivadas**: la pantalla de revisión necesita enseñar precisamente lo
+ *  que el diagnóstico ya no mira, para poder devolverlo. */
+export async function listarCasos({ signal } = {}) {
+  const response = await fetch(`${API_BASE}/api/casos`, { signal });
+  return parseResponse(response);
+}
+
+/**
+ * Archiva un caso, o lo devuelve. No borra: ver `estaArchivada` en
+ * `@shared/eva/comun/aprendizaje.js` para por qué la baja es ésta y no un
+ * `DELETE` — es el mismo criterio con el que se archiva un manual.
+ */
+export async function archivarCaso({ id, archivado, signal }) {
+  const response = await fetch(`${API_BASE}/api/casos/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archivado }),
     signal,
   });
   return parseResponse(response);

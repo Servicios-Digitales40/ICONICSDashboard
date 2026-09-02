@@ -336,6 +336,34 @@ sólo al encender, el nivel del tanque — por encima del aviso superior de
 `shared/eva/comun/umbrales.js`, la herramienta se niega antes de escribir para no
 arriesgar un desbordamiento.
 
+### La bitácora de casos
+
+Lo que el asistente recuerda de intervenciones anteriores — la Fuente #3 del
+diagnóstico. La escribe el cierre de un riesgo (`CierreDiagnostico.jsx`) o la
+herramienta `registrar_intervencion` por voz y chat; la revisa `CasosRag.jsx`.
+
+| Ruta | Cuerpo | Respuesta |
+|---|---|---|
+| `GET /api/casos` | — | `{ ok, total, casos: Intervencion[] }` |
+| `POST /api/casos` | `CrearCasoSchema` | `{ ok, caso }` · 201 |
+| `PATCH /api/casos/:id` | `{ archivado: boolean }` | `{ ok, caso }` · 404 si no existe |
+| `GET /api/diagnostico?sistema=&riesgoId=` | — | `{ ok, sistema, riesgoId, huerfano, causas }` |
+
+**No hay `DELETE`, y es una decisión, no un olvido.** Un caso se ARCHIVA:
+deja de alimentar el diagnóstico —el índice de `ia/motor/casos.mjs` no lo
+mira— pero su texto y su fecha siguen intactos en `datos/aprendizaje.json`, y
+`archivado: false` lo devuelve. Es el mismo criterio con el que se archiva un
+manual (`PATCH /api/rag/documentos`) y el que pide «lo que pasó, pasó» en
+`shared/eva/comun/aprendizaje.js`.
+
+El `GET` devuelve **también** las archivadas, porque la pantalla de revisión
+necesita enseñar precisamente lo que el diagnóstico ya no mira para poder
+devolverlo. Todo lo demás que lee la bitácora —incluido lo que ve el
+modelo— las excluye.
+
+Las dos escrituras piden rol `operador`; el `GET` no, como el resto de rutas
+de sólo lectura.
+
 ### Del propio puente
 
 | Ruta | Respuesta |

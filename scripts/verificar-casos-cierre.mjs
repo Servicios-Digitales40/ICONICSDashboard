@@ -36,7 +36,7 @@ import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { registrarCaso } from '../backend/ia/herramientas/aprendizaje/index.mjs'
+import { archivarCaso, registrarCaso } from '../backend/ia/herramientas/aprendizaje/index.mjs'
 import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import {
   VACIO as APRENDIZAJE_VACIO,
@@ -210,6 +210,74 @@ await check('un caso con campos de Fase 5 se indexa y se encuentra igual que uno
   assert.ok(resultados.length > 0, 'debía encontrar el caso rico')
   assert.equal(resultados[0].causa, CIERRE_RICO.causa)
 })
+
+console.log('\n── Archivar y devolver, contra un archivo de verdad ──────────')
+
+await check('archivar marca el registro sin tocar nada de lo que se contó', async () => {
+  const ruta = join(raiz, `archivar-${Math.random().toString(36).slice(2)}.json`)
+  await writeFile(ruta, JSON.stringify({ version: 1, hechos: [], propuestas: [], intervenciones: [] }), 'utf8')
+
+  const alta = await registrarCaso({ ...CIERRE_RICO }, { ruta })
+  assert.equal(alta.ok, true)
+
+  const r = await archivarCaso(alta.caso.id, { archivado: true, ruta })
+  assert.equal(r.ok, true)
+  assert.equal(r.encontrado, true)
+
+  const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+  assert.equal(bruto.intervenciones.length, 1, 'archivar no debe quitar el registro del archivo')
+
+  const guardado = bruto.intervenciones[0]
+  assert.equal(guardado.archivado, true)
+  // Lo que se contó queda exactamente igual: archivar no es editar.
+  assert.equal(guardado.sintoma, alta.caso.sintoma)
+  assert.equal(guardado.solucion, alta.caso.solucion)
+  assert.equal(guardado.fecha, alta.caso.fecha)
+  assert.deepEqual(guardado.causaReal, alta.caso.causaReal)
+})
+
+await check('devolver BORRA el campo en vez de dejar `archivado: false`', async () => {
+  /*
+   * Para que una intervención que nunca se archivó y una que se archivó y se
+   * devolvió queden idénticas en disco. Dos formas de decir lo mismo obligan
+   * después a comparar contra las dos, y una de las dos se acaba olvidando.
+   */
+  const ruta = join(raiz, `devolver-${Math.random().toString(36).slice(2)}.json`)
+  await writeFile(ruta, JSON.stringify({ version: 1, hechos: [], propuestas: [], intervenciones: [] }), 'utf8')
+
+  const alta = await registrarCaso({ ...CIERRE_RICO }, { ruta })
+  await archivarCaso(alta.caso.id, { archivado: true, ruta })
+  await archivarCaso(alta.caso.id, { archivado: false, ruta })
+
+  const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+  assert.ok(!('archivado' in bruto.intervenciones[0]), 'quedó un `archivado: false` en disco')
+})
+
+await check('un id que no existe no es un error, es `encontrado: false`', async () => {
+  const ruta = join(raiz, `inexistente-${Math.random().toString(36).slice(2)}.json`)
+  await writeFile(ruta, JSON.stringify({ version: 1, hechos: [], propuestas: [], intervenciones: [] }), 'utf8')
+
+  const r = await archivarCaso('interv-no-existe', { archivado: true, ruta })
+  assert.equal(r.ok, true)
+  assert.equal(r.encontrado, false)
+  assert.equal(r.caso, null)
+})
+
+await check('una archivada no llega al modelo por `hechos_de_la_planta`', async () => {
+  // `intervencionesRecientes` es lo que se le entrega al modelo. Archivar un
+  // caso por ruidoso y que el asistente siguiera citándolo sería archivarlo
+  // a medias.
+  const ruta = join(raiz, `modelo-${Math.random().toString(36).slice(2)}.json`)
+  await writeFile(ruta, JSON.stringify({ version: 1, hechos: [], propuestas: [], intervenciones: [] }), 'utf8')
+
+  const alta = await registrarCaso({ ...CIERRE_RICO }, { ruta })
+  await archivarCaso(alta.caso.id, { archivado: true, ruta })
+
+  const almacen = JSON.parse(await readFile(ruta, 'utf8'))
+  assert.deepEqual(intervencionesRecientes(almacen, 10), [], 'el modelo seguiría viendo la archivada')
+  assert.equal(intervencionesRecientes(almacen, 10, { incluirArchivadas: true }).length, 1)
+})
+
 
 /* ── Resultado ───────────────────────────────────────────────────────── */
 

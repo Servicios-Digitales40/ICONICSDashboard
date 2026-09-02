@@ -145,6 +145,66 @@ export async function registrarCaso(datos, { ruta = RUTA_APRENDIZAJE } = {}) {
 }
 
 /**
+ * ── LA BITÁCORA ENTERA, PARA REVISARLA ────────────────────────────
+ *
+ * `GET /api/casos` llama a esto. Devuelve TODAS las intervenciones, de la
+ * más reciente a la más antigua, sin recortar: quien abre la pantalla de
+ * revisión quiere ver lo que hay, no una muestra. Son unos kilobytes de
+ * JSON y no crecen rápido —una intervención por avería atendida—, así que
+ * paginar aquí sería resolver un problema que esta instalación no tiene.
+ *
+ * Distinto de `hechos_de_la_planta`, que sí recorta a 8: aquello entra en
+ * el contexto de un modelo con ventana escasa, esto entra en una tabla.
+ */
+export async function listarCasos({ ruta = RUTA_APRENDIZAJE } = {}) {
+  const almacen = await leerAprendizaje(ruta)
+  return intervencionesRecientes(almacen, almacen.intervenciones.length, { incluirArchivadas: true })
+}
+
+/**
+ * ── ARCHIVAR Y DEVOLVER UNA INTERVENCIÓN ──────────────────────────
+ *
+ * `PATCH /api/casos/:id` llama a esto. El porqué de que la baja sea
+ * archivar y no borrar está en `estaArchivada`, en
+ * `shared/eva/comun/aprendizaje.js` — resumido: la regla «lo que pasó,
+ * pasó» sigue en pie, y retirar un caso de lo que alimenta el diagnóstico
+ * no es lo mismo que reescribir la historia.
+ *
+ * ── POR QUÉ NO ES UNA EXCEPCIÓN A «NO SE EDITA» ──────────────────
+ *
+ * Porque no toca ni un campo de lo que se contó: `sintoma`, `causa`,
+ * `solucion`, `fecha` y `resuelto` quedan exactamente como se escribieron.
+ * `archivado` no es parte del relato, es una marca sobre él. Un lector que
+ * quiera saber qué pasó aquel día lee lo mismo que antes; lo único que
+ * cambia es si el índice lo cuenta.
+ *
+ * Una función con nombre, y no un `guardar()` genérico, por el criterio de
+ * la cabecera del archivo: cada puerta de escritura tiene la suya.
+ *
+ * Devuelve `encontrado: false` en vez de un error cuando el id no está: que
+ * alguien archive dos veces desde dos pestañas no es un fallo del servidor,
+ * y la ruta lo traduce a un 404 con su propia frase.
+ */
+export async function archivarCaso(id, { archivado = true, ruta = RUTA_APRENDIZAJE } = {}) {
+  const almacen = await leerAprendizaje(ruta)
+  const caso = almacen.intervenciones.find((i) => i.id === id)
+  if (!caso) return { ok: true, encontrado: false, caso: null }
+
+  /*
+   * Devolver una intervención BORRA el campo en vez de dejar
+   * `archivado: false`. Así una que nunca se archivó y una que se archivó y
+   * se devolvió quedan idénticas en disco — no hay dos formas de decir lo
+   * mismo, que es lo que obliga después a comparar contra las dos.
+   */
+  if (archivado) caso.archivado = true
+  else delete caso.archivado
+
+  const guardado = await guardarAprendizaje(almacen, ruta)
+  if (!guardado.ok) return { ok: false, error: `No se pudo guardar: ${guardado.error}` }
+  return { ok: true, encontrado: true, caso }
+}
+
+/**
  * Las tres herramientas de aprendizaje.
  *
  * No recibe nada a propósito: ver la cabecera. Devuelve el mismo objeto

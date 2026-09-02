@@ -211,9 +211,53 @@ export function crearIntervencion(datos, ahora = new Date()) {
   };
 }
 
-/** Las intervenciones, de la más reciente a la más antigua. */
-export function intervencionesRecientes(almacen, cuantas = 10) {
-  return [...(almacen?.intervenciones ?? [])]
+/**
+ * ── ARCHIVAR: LA ÚNICA BAJA QUE EXISTE ────────────────────────────
+ *
+ * Una intervención no se edita y no se borra: «lo que pasó, pasó». Pero sí
+ * puede RETIRARSE de lo que alimenta el diagnóstico, que es otra cosa.
+ *
+ * Hace falta porque la bitácora se llena por voz y por chat, y ahí entra
+ * ruido: la auditoría del 01-09-2026 midió 2 de 5 registros que decían
+ * literalmente «La bomba falla / Por investigarse». Un caso basura no es
+ * inocuo —`buscarCasosSimilares` lo recupera y `respaldoDeCasos` lo cuenta
+ * como respaldo de una causa—, así que dejarlo dentro degrada diagnósticos
+ * reales.
+ *
+ * Archivar y no borrar es el mismo criterio que ya aplica la otra fuente de
+ * conocimiento del asistente, los manuales: ver «NO HAY BOTÓN ELIMINAR» en
+ * la cabecera de `DocumentacionRag.jsx`. El registro sigue en el archivo,
+ * con su fecha y su texto intactos, y se puede devolver. Lo que cambia es
+ * si el índice lo mira.
+ *
+ * Es un campo OPCIONAL y no un `archivado: false` por defecto: una
+ * intervención de siempre no tiene el campo, y `estaArchivada` trata su
+ * ausencia como «no archivada» sin necesidad de migrar nada.
+ */
+export function estaArchivada(intervencion) {
+  return intervencion?.archivado === true;
+}
+
+/** Las que SÍ alimentan el diagnóstico. La usa el índice de casos. */
+export function intervencionesVigentes(intervenciones) {
+  return (intervenciones ?? []).filter((i) => !estaArchivada(i));
+}
+
+/**
+ * Las intervenciones, de la más reciente a la más antigua.
+ *
+ * Las archivadas quedan FUERA por defecto, y ése es el defecto correcto: el
+ * llamador de siempre es `hechos_de_la_planta`, que mete estas frases en el
+ * contexto del modelo. Archivar un caso por ruidoso y que el asistente
+ * siguiera citándolo sería archivarlo a medias.
+ *
+ * `incluirArchivadas` lo pide sólo la pantalla de revisión, que necesita
+ * enseñar precisamente lo que el resto no ve para poder devolverlo.
+ */
+export function intervencionesRecientes(almacen, cuantas = 10, { incluirArchivadas = false } = {}) {
+  const todas = almacen?.intervenciones ?? [];
+  const base = incluirArchivadas ? [...todas] : intervencionesVigentes(todas);
+  return base
     .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
     .slice(0, cuantas);
 }

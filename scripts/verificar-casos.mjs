@@ -320,6 +320,106 @@ await check('total, modo e indexando reflejan la realidad', async () => {
   assert.equal(conEmbeddings.estado().modo, 'embeddings + BM25')
 })
 
+console.log('\n── Archivar retira del índice sin borrar del archivo ─────────')
+
+/**
+ * La regresión que abrió `PATCH /api/casos/:id`.
+ *
+ * `asegurarAlDia` comparaba el RECUENTO de intervenciones, y era correcto
+ * mientras la bitácora sólo apilara. Archivar es el peor caso posible para
+ * esa comprobación: no cambia la longitud NI los ids, así que el recuento
+ * no veía absolutamente nada y el índice seguía sirviendo un caso ya
+ * retirado hasta el siguiente reinicio, sin un solo error por ningún lado.
+ *
+ * No hace falta esperar los 10 s de `MS_ENTRE_COMPROBACIONES`:
+ * `ultimaComprobacion` arranca en 0, así que la PRIMERA búsqueda después de
+ * cargar sí entra a comprobar. Es justo el momento en que se manifiesta.
+ */
+async function marcarArchivada(ruta, id, archivado) {
+  const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+  for (const i of bruto.intervenciones) {
+    if (i.id !== id) continue
+    if (archivado) i.archivado = true
+    else delete i.archivado
+  }
+  await writeFile(ruta, JSON.stringify(bruto), 'utf8')
+}
+
+await check('una intervención archivada deja de encontrarse', async () => {
+  const ruta = await almacenNuevo()
+  const caso = await agregarIntervencion(ruta, CASO_TANQUE)
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  await indice.recargar()
+  assert.equal(indice.estado().total, 1)
+
+  await marcarArchivada(ruta, caso.id, true)
+
+  const hallados = await indice.buscarCasosSimilares({
+    sistema: 'tanque', texto: 'válvula de impulsión agarrotada',
+  })
+  assert.deepEqual(hallados, [], 'el caso archivado sigue respaldando diagnósticos')
+  assert.equal(indice.estado().total, 0)
+})
+
+await check('archivar no cambia la longitud, y aun así el índice lo ve', async () => {
+  const ruta = await almacenNuevo()
+  const caso = await agregarIntervencion(ruta, CASO_TANQUE)
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  await indice.recargar()
+
+  await marcarArchivada(ruta, caso.id, true)
+
+  // La condición que hacía ciega a la comprobación por recuento: mismo
+  // número de registros antes y después. Si esta afirmación deja de ser
+  // cierta, la prueba ya no prueba lo que dice probar.
+  const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+  assert.equal(bruto.intervenciones.length, 1, 'la prueba sólo vale si la longitud no cambió')
+
+  /*
+   * La comprobación va DESPUÉS de una búsqueda, no antes: `estado()` sólo
+   * informa de lo que hay en memoria y no dispara `asegurarAlDia()`. Quien
+   * refresca el índice es la búsqueda, así que es ahí donde se manifiesta
+   * —o no— que la huella detectó el archivado.
+   */
+  await indice.buscarCasosSimilares({ sistema: 'tanque', texto: 'lo que sea' })
+  assert.equal(indice.estado().total, 0, 'el índice no detectó el archivado')
+})
+
+await check('devolver una intervención la vuelve a poner en el índice', async () => {
+  const ruta = await almacenNuevo()
+  const caso = await agregarIntervencion(ruta, CASO_TANQUE)
+  const indice = createIndiceCasos({ rutaAprendizaje: ruta })
+  await indice.recargar()
+
+  await marcarArchivada(ruta, caso.id, true)
+  await indice.recargar()
+  assert.equal(indice.estado().total, 0)
+
+  await marcarArchivada(ruta, caso.id, false)
+  const devueltos = await indice.buscarCasosSimilares({
+    sistema: 'tanque', texto: 'válvula de impulsión agarrotada',
+  })
+  assert.equal(devueltos.length, 1, 'archivar y devolver no es reversible')
+  assert.equal(devueltos[0].id, caso.id)
+})
+
+await check('el texto de la intervención archivada queda intacto en disco', async () => {
+  // Archivar no es editar: `sintoma`, `causa`, `solucion` y `fecha` siguen
+  // siendo exactamente lo que se escribió. Es lo que separa esta baja de
+  // reescribir la historia — ver `estaArchivada` en `aprendizaje.js`.
+  const ruta = await almacenNuevo()
+  const caso = await agregarIntervencion(ruta, CASO_TANQUE)
+  await marcarArchivada(ruta, caso.id, true)
+
+  const bruto = JSON.parse(await readFile(ruta, 'utf8'))
+  const guardado = bruto.intervenciones.find(i => i.id === caso.id)
+  assert.equal(guardado.sintoma, CASO_TANQUE.sintoma)
+  assert.equal(guardado.causa, CASO_TANQUE.causa)
+  assert.equal(guardado.solucion, CASO_TANQUE.solucion)
+  assert.equal(guardado.fecha, caso.fecha)
+  assert.equal(guardado.archivado, true)
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 embServer.close()

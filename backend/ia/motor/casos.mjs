@@ -65,6 +65,7 @@
 import { join } from 'node:path'
 import { logger } from '../../logger.mjs'
 import { textoDeRecuperacion } from '../../../shared/eva/comun/casos.js'
+import { intervencionesVigentes } from '../../../shared/eva/comun/aprendizaje.js'
 import { leerAprendizaje } from '../herramientas/aprendizaje/index.mjs'
 import { indexarTerminos, puntuarBm25 } from '../indices/bm25.mjs'
 import {
@@ -124,13 +125,41 @@ export function createIndiceCasos({
   let cacheEmbeddings = { modelo: null, vectores: {} }
   let cacheEmbeddingsCargada = false
 
-  /** Cuántas intervenciones había la última vez que se miró — el atajo
-   *  barato para "¿hay algo nuevo?" antes de reprocesar nada. No basta por sí
-   *  solo como huella perfecta —sólo se APILAN intervenciones, nunca se
-   *  borran, así que un cambio de longitud SIEMPRE significa "hay una o más
-   *  nuevas"— pero es exactamente lo que hace falta para ese caso, con un
-   *  coste de comparación de un número. */
-  let ultimoRecuento = -1
+  /**
+   * Huella de QUÉ intervenciones había la última vez: el hash de sus ids en
+   * orden.
+   *
+   * ── POR QUÉ NO BASTA EL RECUENTO, DESDE QUE SE PUEDE ARCHIVAR ─────
+   *
+   * Esto era `ultimoRecuento`, un número, y era correcto mientras la
+   * bitácora sólo APILARA: sin bajas, un cambio de longitud significa
+   * siempre «hay una o más nuevas». `PATCH /api/casos/:id` rompió esa
+   * invariante de la peor forma posible: archivar **no cambia la longitud
+   * en absoluto**, así que el recuento no veía nada y el índice seguía
+   * sirviendo el caso archivado hasta el siguiente reinicio. En silencio:
+   * la búsqueda contestaba igual, sólo que con lo que ya se había retirado.
+   *
+   * El hash detecta las cuatro cosas —alta, archivado, devolución y
+   * sustitución— y no cuesta prácticamente nada: `asegurarAlDia` ya lee y
+   * parsea el archivo entero para poder contarlo, así que el número nunca
+   * ahorró esa E/S. Lo único que se añade es recorrer una lista que ya está
+   * en memoria.
+   */
+  let huellaDeIds = null
+
+  /**
+   * Los ids, en orden, más si están archivados. El orden cuenta a propósito:
+   * reordenar el archivo a mano también es un cambio que el índice debería
+   * ver.
+   *
+   * El `#a` no es adorno: **archivar no cambia ni la longitud ni los ids**.
+   * Una huella hecha sólo de ids sería tan ciega a un archivado como el
+   * recuento lo era a un borrado, y por la misma razón. Es la trampa de este
+   * módulo, y ha mordido una vez ya.
+   */
+  function huellaDe(intervenciones) {
+    return hashDeTexto(intervenciones.map(i => (i.archivado ? `${i.id}#a` : i.id)).join('|'))
+  }
 
   async function leerIntervenciones() {
     const almacen = await leerAprendizaje(rutaAprendizaje)
@@ -153,12 +182,16 @@ export function createIndiceCasos({
       }
 
       const intervenciones = await leerIntervenciones()
-      ultimoRecuento = intervenciones.length
+      // La huella se calcula sobre TODAS —incluidas las archivadas—, porque
+      // archivar es justo el cambio que hay que detectar. Lo que se indexa,
+      // en cambio, son sólo las vigentes.
+      huellaDeIds = huellaDe(intervenciones)
+      const vigentes = intervencionesVigentes(intervenciones)
 
       const nuevoMapa = new Map()
       const pendientesEmbeber = []
 
-      for (const intervencion of intervenciones) {
+      for (const intervencion of vigentes) {
         const previo = casosProcesados.get(intervencion.id)
         if (previo) {
           nuevoMapa.set(intervencion.id, previo)
@@ -207,7 +240,7 @@ export function createIndiceCasos({
 
   /**
    * Se asegura de que el índice refleja lo que hay AHORA en el almacén. Igual
-   * que `asegurarAlDia` en `documentos.mjs`: comprobar el recuento es barato
+   * que `asegurarAlDia` en `documentos.mjs`: comprobar la huella es barato
    * —un `readFile` de un JSON de unos kilobytes—, así que se limita a cada
    * `MS_ENTRE_COMPROBACIONES` y no a cada pregunta.
    */
@@ -219,7 +252,7 @@ export function createIndiceCasos({
     ultimaComprobacion = ahora
 
     const intervenciones = await leerIntervenciones()
-    if (intervenciones.length === ultimoRecuento) return
+    if (huellaDe(intervenciones) === huellaDeIds) return
 
     return recargar()
   }

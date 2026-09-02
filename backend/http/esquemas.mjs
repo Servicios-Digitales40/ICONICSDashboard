@@ -413,6 +413,32 @@ export const CrearCasoSchema = z.object({
 })
 
 /**
+ * `PATCH /api/casos/:id` — archivar una intervención, o devolverla.
+ *
+ * El `id` sólo se valida como «no vacío», no contra la forma que genera
+ * `crearIntervencion` (`interv-<base36>-<4 al azar>`): un id con otra forma
+ * no es una petición malformada, es un id que no existe, y eso ya lo
+ * contesta la ruta con un 404 y su propia frase. Atarlo aquí a una
+ * expresión regular obligaría a tocar este archivo el día que cambie el
+ * generador, para no ganar nada — el almacén es quien sabe qué ids tiene.
+ */
+export const CasoPorIdParamsSchema = z.object({
+  id: z.string().trim().min(1, 'Falta el `id` del caso.'),
+})
+
+/**
+ * `archivado` es OBLIGATORIO y no un booleano con defecto `true`: la misma
+ * ruta archiva y devuelve, así que un cuerpo vacío no tendría una lectura
+ * obvia. Que el cliente diga siempre en qué dirección va evita que un
+ * `fetch` a medio escribir archive algo por omisión.
+ */
+export const ArchivarCasoSchema = z.object({
+  archivado: z.boolean({
+    error: 'Falta `archivado` (true para archivar, false para devolver).',
+  }),
+})
+
+/**
  * Los mensajes escritos a mano en los esquemas ya son frases completas —y
  * varios nombran su propio campo, como «Invalid pointName parameter.»—, así
  * que se devuelven TAL CUAL: anteponerles la ruta daría «pointName: Invalid

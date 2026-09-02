@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las dieciséis vistas, agrupadas por SISTEMA", () => {
+  it("son las diecisiete vistas, agrupadas por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -63,6 +63,10 @@ describe("superficie de la aplicación", () => {
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
       // «General».
+      // Son sus DOS fuentes. Los casos van primero porque son la única
+      // que se llena sola: cada cierre de diagnóstico, cada reparación
+      // contada por voz.
+      "rag-casos",
       "rag-documentacion",
       // Sin `nav`: destinos de detalle, no pantallas a las que se llegue en
       // frío desde el sidebar.
@@ -139,7 +143,7 @@ describe("el sidebar que sale del registro", () => {
     // que mide ICONICS.
     const rag = NAV.find((n) => n.group === "sec-rag");
     expect(rag.label).toBe("RAG");
-    expect(rag.children.map((c) => c.id)).toEqual(["rag-documentacion"]);
+    expect(rag.children.map((c) => c.id)).toEqual(["rag-casos", "rag-documentacion"]);
   });
 
   it("cada sistema tiene su propio «Riesgos», y no se mezclan", () => {

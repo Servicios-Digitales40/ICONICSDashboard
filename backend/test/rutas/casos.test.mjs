@@ -83,3 +83,55 @@ describe('POST /api/casos', () => {
     expect(r.statusCode).toBe(400)
   })
 })
+
+describe('GET /api/casos', () => {
+  it('devuelve la bitácora con su recuento, sin exigir autenticación', async () => {
+    // Lectura, como `GET /api/rag/documentos`. No se afirma NADA sobre el
+    // contenido: esta prueba corre contra el `datos/aprendizaje.json` real
+    // de quien la ejecuta —ver la cabecera— y atarla a un caso concreto la
+    // haría fallar en otra máquina por un motivo que no es un defecto.
+    const { app } = conRegistro(await montarApp())
+    const r = await app.inject({ method: 'GET', url: '/api/casos' })
+
+    expect(r.statusCode).toBe(200)
+    const cuerpo = json(r)
+    expect(cuerpo.ok).toBe(true)
+    expect(Array.isArray(cuerpo.casos)).toBe(true)
+    expect(cuerpo.total).toBe(cuerpo.casos.length)
+  })
+})
+
+describe('PATCH /api/casos/:id', () => {
+  /*
+   * Ninguna de estas llega a ESCRIBIR, y eso es deliberado: dos se cortan en
+   * el esquema y la tercera se corta en «no existe», antes de guardar. Un
+   * archivado válido tocaría el archivo real de quien corra las pruebas —el
+   * mismo motivo por el que aquí tampoco hay un POST válido—. El camino
+   * completo, contra una `ruta` temporal, vive en `scripts/verificar-casos.mjs`.
+   */
+  function patchCaso(app, id, body) {
+    return app.inject({ method: 'PATCH', url: `/api/casos/${id}`, payload: body })
+  }
+
+  it('sin `archivado` → 400: la misma ruta archiva y devuelve, hay que decir cuál', async () => {
+    const { app } = conRegistro(await montarApp())
+    const r = await patchCaso(app, 'interv-loquesea', {})
+    expect(r.statusCode).toBe(400)
+  })
+
+  it('`archivado` que no es booleano → 400', async () => {
+    const { app } = conRegistro(await montarApp())
+    const r = await patchCaso(app, 'interv-loquesea', { archivado: 'sí' })
+    expect(r.statusCode).toBe(400)
+  })
+
+  it('un id que no existe → 404, no un 500 ni un silencio', async () => {
+    // Que alguien archive dos veces desde dos pestañas no es un fallo del
+    // servidor. Se contesta 404 y se dice qué id no se encontró.
+    const { app } = conRegistro(await montarApp())
+    const r = await patchCaso(app, 'interv-no-existe-jamas-0000', { archivado: true })
+
+    expect(r.statusCode).toBe(404)
+    expect(json(r).error).toContain('interv-no-existe-jamas-0000')
+  })
+})
