@@ -59,11 +59,27 @@ function Estadistica({ label, valor, tono, t }) {
 
 /* ── Una fila del catálogo ────────────────────────────────────────────── */
 
-function estadoDeFila(manual) {
+/**
+ * ── «INDEXANDO» ERA UNA MENTIRA CÓMODA ─────────────────────────────
+ *
+ * Esto decía `if (!manual.fragmentos) return "indexando"`, y `!0` es
+ * `true`: un manual con CERO fragmentos se quedaba en «indexando» para
+ * siempre, aunque el índice hubiera terminado hacía horas. Medido el
+ * 03-09-2026 con un manifiesto que apuntaba a un archivo movido a
+ * `.archivados/`: la fila prometía un trabajo en curso que nadie estaba
+ * haciendo.
+ *
+ * Ahora se mira el estado REAL del índice (`indexando`, que la ruta ya
+ * devolvía y esta función ignoraba). Cero fragmentos con el índice parado
+ * no es «espera», es «este archivo no está en la carpeta» — que es
+ * accionable, y lo otro no.
+ */
+function estadoDeFila(manual, indexando) {
   if (manual.estado === "archivado") return { texto: "archivado", tipo: "mute" };
   if (manual.motivoIlegible) return { texto: "no se pudo leer", tipo: "bad" };
-  if (!manual.fragmentos) return { texto: "indexando", tipo: "wait" };
-  return { texto: "indexado", tipo: "ok" };
+  if (manual.fragmentos > 0) return { texto: "indexado", tipo: "ok" };
+  if (indexando) return { texto: "indexando", tipo: "wait" };
+  return { texto: "falta el archivo", tipo: "bad" };
 }
 
 const CHIP_COLOR = {
@@ -88,10 +104,10 @@ function Chip({ tipo, children, t }) {
   );
 }
 
-function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, onArchivar, ocupado }) {
+function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, onArchivar, ocupado, indexando }) {
   const [confirmando, setConfirmando] = useState(false);
   const inputRef = useRef(null);
-  const estado = estadoDeFila(manual);
+  const estado = estadoDeFila(manual, indexando);
   const activo = manual.estado === "activo";
   const nombreSistema = manual.sistema ? sistemasPorId.get(manual.sistema) ?? manual.sistema : "toda la planta";
 
@@ -500,6 +516,7 @@ export default function DocumentacionRag() {
               onReemplazar={manejarReemplazo}
               onArchivar={manejarArchivado}
               ocupado={idOcupado === manual.id}
+              indexando={datos.indexando}
             />
           ))
         )}

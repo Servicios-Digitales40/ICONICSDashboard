@@ -31,7 +31,7 @@
  * o espacio. Sin esto, un nombre como `../../../fuera-de-la-carpeta.txt`
  * escribiría fuera de `carpeta` sin que nada lo impidiera.
  */
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { logger } from '../../logger.mjs'
@@ -136,10 +136,67 @@ export function createGestorManuales({
     })
   }
 
+  /**
+   * El catálogo, con los archivos DEJADOS A MANO en la carpeta adoptados.
+   *
+   * ── EL DIVORCIO QUE ESTO CIERRA ────────────────────────────────────
+   *
+   * Esto devolvía el manifiesto tal cual. Pero el manifiesto sólo lo escribe
+   * `subir()`, y el ÍNDICE no lo mira: `documentos.mjs` lee la carpeta a
+   * ciegas. Así que copiar un PDF a `Documentacion/` —que es lo que hace
+   * cualquiera que tenga cuatro manuales y un explorador de archivos— lo
+   * dejaba **indexado y buscable, pero invisible en la pantalla**.
+   *
+   * Medido el 03-09-2026: seis PDF en la carpeta, 1016 fragmentos indexados,
+   * y la vista enseñando dos documentos y cero fragmentos. El asistente
+   * contestaba citando manuales que la pantalla juraba que no existían.
+   *
+   * ── POR QUÉ ADOPTAR Y NO SÓLO AVISAR ──────────────────────────────
+   *
+   * Porque el índice ya los está usando. Un aviso del tipo «hay archivos sin
+   * registrar» dejaría a la pantalla mintiendo igual, sólo que con una nota
+   * al pie. Adoptarlos los hace de primera clase: se ven, se les puede
+   * asignar sistema, y se pueden archivar como cualquier otro.
+   *
+   * La adopción se PERSISTE, no se calcula al vuelo: si sólo se fusionara en
+   * memoria, cada `listar()` inventaría un `id` nuevo y el botón de archivar
+   * apuntaría a un manual distinto en cada refresco.
+   *
+   * `sistema: null` —toda la planta— es lo único honesto para un archivo del
+   * que no sabemos nada: nadie declaró a qué máquina pertenece. Se puede
+   * corregir después desde la pantalla, y conviene hacerlo (ver G7).
+   */
   async function listar() {
     const manifiesto = await leerManifiesto(rutaManifiesto)
+    const registrados = new Set(manifiesto.manuales.map(m => m.archivo))
+
+    let enCarpeta = []
+    try {
+      enCarpeta = (await readdir(carpeta)).filter(
+        f => EXTENSIONES_VALIDAS.has(extname(f).toLowerCase())
+      )
+    } catch {
+      // Sin carpeta no hay nada que adoptar; el manifiesto sigue valiendo.
+      return manifiesto.manuales
+    }
+
+    const huerfanos = enCarpeta.filter(f => !registrados.has(f))
+    if (!huerfanos.length) return manifiesto.manuales
+
+    const adoptados = huerfanos.map(archivo =>
+      crearManual({ id: randomUUID(), archivo, sistema: null, titulo: null, subidoPor: 'la carpeta' })
+    )
+    manifiesto.manuales.push(...adoptados)
+    await guardarManifiesto(rutaManifiesto, manifiesto)
+
+    logger.info(
+      `Adoptados ${adoptados.length} manual(es) que estaban en la carpeta sin registrar`,
+      { archivos: adoptados.map(m => m.archivo) }
+    )
+
     return manifiesto.manuales
   }
+
 
   /**
    * Da de alta un manual nuevo: lo escribe en `carpeta` y añade su entrada al
