@@ -68,16 +68,54 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
       }
 
       if (resultado.huerfano) {
+        /*
+         * ── DOS CAMPOS, PORQUE HABLAN CON DOS PERSONAS DISTINTAS ──────
+         *
+         * Esto era UN solo `aviso` que mezclaba lo que el técnico tiene que
+         * leer con lo que el modelo tiene que hacer («Dilo así: no inventes
+         * una causa…», más los nombres internos de otras herramientas). Un
+         * modelo que recibe prosa la copia: medido el 03-09-2026, la
+         * respuesta al técnico terminaba con la instrucción entera, tuteo
+         * incluido. Una fuga de prompt en la pantalla de planta.
+         *
+         * El resto de esta herramienta ya separaba las dos cosas —los datos
+         * por un lado, `comoRedactar` por otro— y esta rama era la única que
+         * no lo hacía. Ahora sigue el mismo patrón.
+         */
         return {
           ok: true,
           sistema,
           riesgoId,
           causas: [],
+          /*
+           * Para el TÉCNICO. Sin tuteo al modelo, sin nombres de
+           * herramientas, y sin afirmar cuál de los dos motivos es: hay
+           * riesgos deliberadamente sin causas —los informativos y los de
+           * estado de la instrumentación, ver la cabecera de `causas.js`— y
+           * podría haber uno al que sencillamente le falten. Decir cuál sin
+           * mirarlo sería inventar.
+           */
           aviso:
-            'Este riesgo todavía no tiene causas candidatas transcritas en el sistema — no es ' +
-            'que no las tenga, es que nadie las ha cargado todavía. Dilo así: no inventes una ' +
-            'causa para rellenar el hueco. Puedes seguir con diagnostico(sintoma=...) para un ' +
-            'dossier de datos y manual sobre el síntoma en prosa, o con consultar_documentacion.',
+            'Este riesgo no tiene causas candidatas cargadas en el sistema. Puede ser ' +
+            'deliberado —los riesgos informativos y los que describen el estado de la ' +
+            'instrumentación no tienen una causa oculta debajo: el propio riesgo ya dice lo ' +
+            'que pasa— o puede que nadie las haya transcrito todavía.',
+          /*
+           * Para el MODELO. La segunda frase existe por un error medido: sin
+           * ella, el modelo explicó la ausencia diciendo «el sistema no ha
+           * cargado casos resueltos para este escenario». Es falso y además
+           * es accionable en la dirección equivocada — deja al técnico
+           * pensando que registrando casos esto empezará a funcionar, cuando
+           * lo que faltaría es declarar causas.
+           */
+          comoRedactar:
+            'Traslada el aviso con tus palabras y NO inventes una causa para rellenar el ' +
+            'hueco. No atribuyas la ausencia a que falten casos previos ni a que falte ' +
+            'documentación: no tiene que ver con eso, es que este riesgo no tiene causas ' +
+            'candidatas declaradas. Si el técnico quiere seguir, tú puedes llamar a ' +
+            'diagnostico(sintoma=...) para un dossier de datos y manual sobre el síntoma, o a ' +
+            'consultar_documentacion — hazlo tú, no se lo pidas a él, y no menciones los ' +
+            'nombres de las herramientas en tu respuesta.',
         }
       }
 

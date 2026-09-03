@@ -2079,7 +2079,44 @@ await checkAsync('un riesgo sin causas transcritas lo dice, no una lista vacía 
     .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'obstruccion' })
   assert.equal(r.ok, true)
   assert.deepEqual(r.causas, [])
-  assert.match(r.aviso, /no inventes/i)
+  assert.match(r.aviso, /no tiene causas candidatas/i)
+})
+
+await checkAsync('lo que lee el TÉCNICO y lo que obedece el MODELO van separados', async () => {
+  /*
+   * La fuga medida el 03-09-2026. `aviso` y la instrucción al modelo eran
+   * un solo campo, y el modelo hace lo que hace un modelo con la prosa que
+   * recibe: copiarla. La respuesta al técnico terminaba con «Dilo así: no
+   * inventes una causa para rellenar el hueco. Puedes seguir con
+   * diagnostico(sintoma=...)» — el tuteo al modelo y los nombres internos
+   * de las herramientas, delante del operador.
+   *
+   * Esta comprobación no mira si el modelo obedece —eso no es
+   * determinista, va en `medir-narracion.mjs`—: mira que no le demos el
+   * material para filtrarlo.
+   */
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'obstruccion': { sistema: 'tanque', riesgoId: 'obstruccion', huerfano: true, causas: [] },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'obstruccion' })
+
+  // El aviso es para leerlo: sin órdenes al modelo y sin nombres de herramienta.
+  assert.doesNotMatch(r.aviso, /no inventes|dilo así|dilo asi/i, 'el aviso lleva una orden dirigida al modelo')
+  assert.doesNotMatch(r.aviso, /diagnostico\(|consultar_documentacion|riesgos_activos/i,
+    'el aviso nombra herramientas internas')
+
+  // La instrucción existe, pero en su propio campo.
+  assert.ok(r.comoRedactar, 'falta `comoRedactar`: la instrucción tiene que ir en su campo')
+  assert.match(r.comoRedactar, /no inventes/i)
+
+  /*
+   * Y la frase que corrige el error concreto que cometió el modelo: explicó
+   * la ausencia diciendo «el sistema no ha cargado casos resueltos para
+   * este escenario». Es falso, y deja al técnico creyendo que registrando
+   * casos esto se arregla.
+   */
+  assert.match(r.comoRedactar, /casos previos/i, 'falta la guarda contra atribuirlo a los casos')
 })
 
 await checkAsync('las causas llegan en el orden que da el motor, con instrucción de no reordenar', async () => {
