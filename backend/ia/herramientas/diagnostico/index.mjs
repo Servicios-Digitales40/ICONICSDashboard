@@ -155,7 +155,31 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           'página. Si `casosCitados` trae algo, dilo explícitamente — "un caso anterior con este ' +
           'mismo síntoma tuvo esta causa" (o "se intentó y no funcionó" si alguno de esos casos ' +
           'no está resuelto) es la frase que hace valioso este cruce; una lista de causas sin ' +
-          'mencionar los casos previos que la respaldan pierde la mitad del punto de llamarla. Si ' +
+          'mencionar los casos previos que la respaldan pierde la mitad del punto de llamarla. ' +
+          /*
+           * ── LA CONTRAPARTIDA, QUE FALTABA ────────────────────────────
+           *
+           * Medido el 03-09-2026 sobre `sobrepresion`: el motor devolvió
+           * `casos: 0` y ningún `casosCitados` en las dos causas —la
+           * bitácora estaba archivada entera— y el modelo escribió «3 casos
+           * previos» en las DOS. Un número inventado, dos veces, en un
+           * diagnóstico.
+           *
+           * No fue por falta de dato: `respaldo.casos` iba a 0 en el mismo
+           * objeto. Fue por la frase de arriba, que dice que no mencionar
+           * casos «pierde la mitad del punto» y no tenía ningún «y si no
+           * hay, no los menciones». Un modelo de 4B lee esa presión y
+           * rellena el hueco. Y `casosCitados` se OMITE cuando está vacío
+           * —«nada que decir no se dice»—, así que ni siquiera veía una
+           * lista vacía que le recordara la ausencia.
+           *
+           * Esto es la misma clase de defecto que el `aviso` que hablaba
+           * con el modelo: una instrucción escrita mirando sólo el caso en
+           * que hay algo que contar.
+           */
+          'Si NO viene `casosCitados`, es que no hay ningún caso previo para esa causa: no los ' +
+          'menciones, no des un número y no digas que los hay. `respaldo.casos` en 0 significa ' +
+          'exactamente eso. Inventar un caso que nadie registró es peor que no citar ninguno. Si ' +
           'alguna causa trae `provisional: true`, dilo: el respaldo de datos se apoya en un umbral ' +
           'que todavía es una estimación nuestra, no un rango confirmado. Si una causa trae ' +
           '`evidenciaEnContra`, dilo también, con la misma seguridad que la evidencia a favor — no ' +

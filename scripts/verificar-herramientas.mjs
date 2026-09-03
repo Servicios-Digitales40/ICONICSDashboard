@@ -2119,6 +2119,45 @@ await checkAsync('lo que lee el TÉCNICO y lo que obedece el MODELO van separado
   assert.match(r.comoRedactar, /casos previos/i, 'falta la guarda contra atribuirlo a los casos')
 })
 
+await checkAsync('sin casos previos, se le PROHIBE mencionarlos — no basta con no ofrecerlos', async () => {
+  /*
+   * Medido el 03-09-2026 sobre `sobrepresion`: el motor devolvió `casos: 0`
+   * y ningún `casosCitados` en las dos causas, y el modelo escribió «3 casos
+   * previos» en las DOS. Un número inventado, dos veces, en un diagnóstico.
+   *
+   * No fue por falta de dato —`respaldo.casos` iba a 0 en el mismo objeto—
+   * sino por la frase que dice que no mencionar casos «pierde la mitad del
+   * punto» y no tenía contrapartida. Un modelo pequeño lee esa presión y
+   * rellena el hueco.
+   *
+   * Esta comprobación mira que la prohibición esté escrita. Si obedece o no
+   * es otra cosa y no es determinista: eso se mide aparte.
+   */
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'sobrepresion': {
+      sistema: 'tanque', riesgoId: 'sobrepresion', huerfano: false, conflicto: false,
+      causas: [{
+        id: 'valvula-alivio-no-actua', titulo: 'La válvula de alivio no está actuando',
+        componente: 'Válvula de alivio', banda: 'medio',
+        respaldo: { datos: 2, manual: 1, casos: 0, temporal: 0, total: 3 },
+        origen: 'riesgos.js', manualCitado: [{ archivo: 'm.pdf', pagina: 1 }],
+        casosCitados: [], evidenciaAFavor: [], evidenciaEnContra: [],
+      }],
+    },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'sobrepresion' })
+
+  // Sin casos, el campo ni viaja: "nada que decir no se dice".
+  assert.equal(r.causas[0].casosCitados, undefined)
+  assert.equal(r.causas[0].respaldo.casos, 0)
+
+  // Y por eso la instrucción tiene que decirlo con todas las letras.
+  assert.match(r.comoRedactar, /no los menciones/i, 'falta la prohibición de mencionar casos que no hay')
+  assert.match(r.comoRedactar, /no des un número|no des un numero/i, 'falta la prohibición de dar un número')
+})
+
+
 await checkAsync('las causas llegan en el orden que da el motor, con instrucción de no reordenar', async () => {
   const motorDiagnostico = motorDiagnosticoFalso({
     'bomba-sin-salida': {
