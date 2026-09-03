@@ -249,10 +249,11 @@ node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad d
 > servidor. Lo hay. Node lo acepta por `NODE_TLS_REJECT_UNAUTHORIZED=0` en
 > `.env.local` — que por eso mismo no arranca con `NODE_ENV=production`.
 
-**Instrumento de medida** (necesita el servidor de embeddings, `:8081` — no
-ICONICS):
+**Instrumentos de medida** (necesitan los servidores de IA: `:8081` para la
+calibración, `:8080` para la narración — ninguno necesita ICONICS):
 ```bash
 node --env-file=.env.local scripts/medir-calibracion.mjs   # distribución real de coseno y BM25
+node --env-file=.env.local scripts/medir-narracion.mjs     # ¿obedece el modelo la instrucción de conflicto?
 ```
 > No afirma nada, **mide**: de su salida salen los `UMBRAL_*` de
 > `ia/motor/diagnostico.mjs`. No es un verificador y no devuelve código de
