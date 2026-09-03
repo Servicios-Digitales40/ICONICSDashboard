@@ -31,7 +31,17 @@
  */
 import assert from 'node:assert/strict'
 
-import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
+import {
+  UMBRAL_BM25_FUERTE,
+  UMBRAL_BM25_DEBIL,
+  createMotorDiagnostico,
+} from '../backend/ia/motor/diagnostico.mjs'
+
+/** Un encaje FUERTE y uno DÉBIL, derivados del corte vigente en vez de
+ *  escritos a mano: lo que este guion prueba es la aritmética, y un número
+ *  literal aquí se pondría rojo en cada recalibración sin que nada falle. */
+const FUERTE = UMBRAL_BM25_FUERTE + 1
+const DEBIL = UMBRAL_BM25_DEBIL + 0.5
 import { causasDe } from '../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
@@ -103,9 +113,9 @@ const SIN_FUENTES = createMotorDiagnostico({})
 console.log('\n── Mismas entradas, misma salida ─────────────────────────────')
 
 await check('dos llamadas idénticas devuelven exactamente el mismo CONTENIDO', async () => {
-  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
   const indiceCasos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE },
   ])
   const motor = createMotorDiagnostico({ indiceDocumentos, indiceCasos })
 
@@ -179,8 +189,8 @@ await check('casos fuertes sin manual, con el mínimo de datos, no pasan de MEDI
   // agua-caliente: `necesita` de 1 señal → datos = 1. Con 2 casos fuertes y
   // sin manual: total = 1 + 0 + 2 = 3 → MEDIO, nunca ALTO sin más respaldo.
   const casos = [
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: FUERTE },
   ]
   const motor = createMotorDiagnostico({ indiceCasos: casosFalsos(casos) })
   const resultado = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
@@ -205,8 +215,8 @@ console.log('\n── Casos sin `disparador` pesan menos que los confirmados ─
 
 await check('dos casos CONFIRMADOS del mismo riesgo llegan al tope de 2, como antes', async () => {
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: FUERTE, disparador: { riesgoId: 'agua-caliente' } },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -218,8 +228,8 @@ await check('dos casos SIN `disparador` (voz/chat) topan en 1, nunca llegan a 2'
   // que estos no dicen de qué riesgo eran, como cualquier intervención
   // registrada por voz. Sin la Fase 1, esto puntuaba 2 igual que arriba.
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: FUERTE },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -228,8 +238,8 @@ await check('dos casos SIN `disparador` (voz/chat) topan en 1, nunca llegan a 2'
 
 await check('un confirmado + uno sin `disparador` siguen sin superar el tope de 2', async () => {
   const casos = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10, disparador: { riesgoId: 'agua-caliente' } },
-    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE, disparador: { riesgoId: 'agua-caliente' } },
+    { id: 'c2', sistema: 'tanque', fecha: '2026-01-02', resuelto: true, scoreCrudo: FUERTE },
   ])
   const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
 
@@ -320,10 +330,10 @@ console.log('\n── Un caso que NO funcionó resta ─────────
 
 await check('un caso `resuelto:false` baja el total en vez de sumarlo', async () => {
   const casosOk = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, scoreCrudo: FUERTE },
   ])
   const casosMal = casosFalsos([
-    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: false, scoreCrudo: 10 },
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: false, scoreCrudo: FUERTE },
   ])
 
   const conOk = await createMotorDiagnostico({ indiceCasos: casosOk }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
@@ -340,7 +350,7 @@ console.log('\n── El manual desempata causas que comparten evidencia ──�
 await check('la causa que el manual nombra queda primera, aunque los datos empaten', async () => {
   const candidatas = causasDe('bomba-sin-salida')
   const objetivo = candidatas[1] // "sin-recirculacion-minima"
-  const indiceDocumentos = manualFalso({ [objetivo.titulo]: 10 })
+  const indiceDocumentos = manualFalso({ [objetivo.titulo]: FUERTE })
 
   const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
     sistema: 'tanque', riesgoId: 'bomba-sin-salida',
@@ -355,7 +365,7 @@ await check('la causa que el manual nombra queda primera, aunque los datos empat
 console.log('\n── La evidencia son frases, no sólo el entero (G6) ────────────')
 
 await check('el manual con respaldo aporta una frase en `evidenciaAFavor`, con su cita', async () => {
-  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
   const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
     sistema: 'tanque', riesgoId: 'bomba-sin-salida',
   })
@@ -431,7 +441,7 @@ await check('sin ningún respaldo, evidenciaAFavor/EnContra son arrays vacíos, 
 console.log('\n── El conflicto entre fuentes se enseña, no se resuelve (G9) ──')
 
 await check('cuando el manual respalda a la 1ª y los casos a la 2ª, `conflicto: true`', async () => {
-  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10 })
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
   const indiceCasos = casosFalsos([
     { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
       causaReal: { tipo: 'sin-recirculacion-minima' } },
@@ -446,7 +456,7 @@ await check('cuando el manual respalda a la 1ª y los casos a la 2ª, `conflicto
 })
 
 await check('cuando la misma fuente respalda a las dos, no hay conflicto que enseñar', async () => {
-  const indiceDocumentos = manualFalso({ 'impulsión cerrada': 10, 'recirculación mínima': 10 })
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE, 'recirculación mínima': FUERTE })
   const resultado = await createMotorDiagnostico({ indiceDocumentos }).diagnosticar({
     sistema: 'tanque', riesgoId: 'bomba-sin-salida',
   })

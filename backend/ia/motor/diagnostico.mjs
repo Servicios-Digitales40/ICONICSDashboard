@@ -77,50 +77,70 @@ const REGLAS_POR_SISTEMA = {
  *    este par se descalibra según crezca `Documentacion/`, algo que NO le
  *    pasa al corte por coseno.
  *
- * ── LOS CUATRO NÚMEROS ESTÁN MEDIDOS (02-09-2026) ───────────────────
+ * ── LOS CUATRO NÚMEROS ESTÁN MEDIDOS, Y DOS VECES ───────────────────
  *
- * Antes eran una suposición razonada; ahora salen de correr
- * `scripts/medir-calibracion.mjs` contra el corpus real de
- * `Documentacion/`, la bitácora real y el servidor de embeddings real.
- * n = 25 causas de `causas.js`, las de los dos sistemas.
+ * Con `scripts/medir-calibracion.mjs` contra el corpus real, la bitácora
+ * real y el servidor de embeddings real. n = 25 causas de `causas.js`, las
+ * de los dos sistemas. La segunda medida es la que vale, pero las dos
+ * juntas dicen algo que ninguna diría sola:
  *
- *   coseno del mejor fragmento : min 0,291 · p25 0,361 · mediana 0,408
- *                                p75 0,430 · max 0,568
- *   BM25 crudo                 : min 0,00 · p25 0,00 · mediana 2,81
- *                                p75 5,52 · max 8,86
+ *                        02-09-2026            03-09-2026
+ *                        84 fragmentos         1016 fragmentos
+ *                        (2 docs útiles)       (6 docs, manuales de verdad)
+ *   coseno   mediana     0,408                 0,429
+ *            p25/p75     0,361 / 0,430         0,396 / 0,486
+ *   BM25     mediana     2,81                  16,29
+ *            p25/p75     0,00 / 5,52           14,57 / 19,21
  *
- * Los cortes VIEJOS de coseno (0,55/0,20) repartían **2:4% · 1:96% · 0:0%**
- * — es decir, `manual` valía 1 casi siempre. Exactamente el mismo defecto
- * que midió la auditoría (un término que no desempata), con el signo
- * cambiado: antes constante 2, ahora constante 1. Los nuevos reparten
- * **2:12% · 1:64% · 0:24%**.
+ * ── LO QUE ESA TABLA DEMUESTRA ──────────────────────────────────────
  *
- * `UMBRAL_COSENO_DEBIL` en 0,36 es el p25 medido, y no es un percentil
- * elegido por bonito: en este corpus el cuartil bajo son precisamente las
- * causas de VIBRACIÓN casando contra un manual de bombas —no hay manual de
- * vibraciones—, o sea ruido. El corte las manda a 0, que es lo correcto.
+ * El corpus creció **12 veces** entre las dos medidas. El coseno se movió
+ * un 5 %; el BM25 crudo, un 580 %. Es exactamente lo que este archivo venía
+ * afirmando sobre el `idf` —que crece con el número de documentos— pero
+ * hasta hoy era un razonamiento, no un dato. Ahora está medido, y tiene dos
+ * consecuencias prácticas:
  *
- * ── LO QUE SIGUE SIN ESTAR CERRADO, Y HAY QUE DECIRLO ───────────────
+ *  1. **El corte por coseno es estable.** 0,46/0,36 reparte 2:32% · 1:52% ·
+ *     0:16% hoy, y repartía 2:12% · 1:64% · 0:24% con un corpus doce veces
+ *     menor. Sobrevivió al cambio sin tocarlo. Por eso **deja de estar
+ *     marcado PROVISIONAL**: está medido dos veces, sobre corpus distintos,
+ *     y aguanta.
+ *  2. **El corte por BM25 crudo NO es estable, y no puede serlo.** Con los
+ *     valores de ayer (8/2) hoy el 100 % de las causas sacaría `manual: 2`
+ *     — la constante que la auditoría vino a matar, resucitada por añadir
+ *     manuales. Se sube a 19/14,5 (el p75 y el p25 de HOY), y eso reparte
+ *     2:24% · 1:52% · 0:24%.
  *
- * Siguen marcados PROVISIONAL, y con ellos **C11 sigue abierta**. La regla
- * del Plan 17 §4·F3b es explícita: mientras el umbral esté provisional,
- * nadie puede decir que C11 está cerrada. Lo medido son 2 documentos
- * ÚNICOS (4 archivos, dos pares byte a byte idénticos) y 44 fragmentos.
- * Eso alcanza para ver la FORMA de la distribución y para corregir un corte
- * que estaba demostrablemente mal; no alcanza para llamarlo calibración de
- * producción. Cuando la planta cargue sus manuales de verdad hay que
- * repetir la medida — y el guion ya está escrito para eso.
+ * `UMBRAL_BM25_*` sigue PROVISIONAL, y no por falta de medida: **por
+ * naturaleza**. Es un umbral absoluto sobre una magnitud que depende del
+ * tamaño del corpus, así que se descalibra solo cada vez que alguien sube
+ * un manual. Quien añada documentación tiene que volver a correr
+ * `medir-calibracion.mjs` y ajustar este par. El de coseno no lo necesita.
  *
- * Un apunte del propio dato: en este corpus **BM25 discrimina mejor que el
- * coseno**, porque devuelve 0,00 limpio para las causas de vibración
- * mientras el coseno les da 0,29-0,44. Es lo que se espera de un corpus sin
- * el vocabulario del dominio, y es la razón por la que el modo degradado no
- * es sólo un plan B.
+ * Y por eso el modo con embeddings no es un lujo: es el único de los dos
+ * cuyo corte no caduca.
+ *
+ * ── C11 (SCORING REPRODUCIBLE) SE PUEDE CERRAR, CON UNA RESERVA ─────
+ *
+ * La regla del Plan 17 §4·F3b era «mientras el umbral esté provisional,
+ * nadie puede decir que C11 está cerrada». El corte que usa producción —el
+ * coseno— ya no lo está. C11 queda cerrada **para el modo de embeddings**,
+ * que es el que corre. El modo degradado (BM25 solo, cuando el :8081 no
+ * responde) sigue con un corte que caduca, y eso hay que saberlo: en ese
+ * modo el término `manual` es menos de fiar, no porque esté mal calibrado
+ * hoy, sino porque no puede quedarse calibrado.
  */
-const UMBRAL_COSENO_FUERTE = 0.46
-const UMBRAL_COSENO_DEBIL = 0.36
-const UMBRAL_BM25_FUERTE = 6
-const UMBRAL_BM25_DEBIL = 2
+/*
+ * EXPORTADOS para que `verificar-diagnostico.mjs` construya sus dobles a
+ * partir de ellos y no de un número escrito a mano. Ese guion prueba la
+ * ARITMÉTICA, no la calibración: su doble quiere decir «un encaje fuerte»,
+ * y si eso vive como un `10` literal, cada recalibración del corpus lo pone
+ * en rojo sin que nada esté roto. Ver `medir-calibracion.mjs`.
+ */
+export const UMBRAL_COSENO_FUERTE = 0.46
+export const UMBRAL_COSENO_DEBIL = 0.36
+export const UMBRAL_BM25_FUERTE = 19
+export const UMBRAL_BM25_DEBIL = 14.5
 
 /**
  * @param {{coseno?: number, scoreCrudo?: number}} [resultado] de `buscar()`/

@@ -132,6 +132,93 @@ const RUTA_CACHE_EMBEDDINGS = join('datos', 'embeddings-cache.json')
 /* ── Extracción de texto ─────────────────────────────────────────────── */
 
 /**
+ * El lector de PDF de verdad: `pdfjs-dist`, el motor de Firefox.
+ *
+ * ── POR QUÉ UNA DEPENDENCIA, DESPUÉS DE HABERLA DESCARTADO ─────────
+ *
+ * Porque la alternativa medida no funcionaba con manuales reales — ver la
+ * cabecera de `extraerTextoPdfCasero`, más abajo, con las cifras. Un índice
+ * documental que no sabe leer el manual del variador que usa la planta no
+ * es un índice documental.
+ *
+ * ── IMPORT DIFERIDO, COMO `reporte.mjs` CON PDFKIT ─────────────────
+ *
+ * `pdfjs` es grande y sólo hace falta cuando entra un `.pdf`. Una
+ * instalación que sólo tenga `.txt` y `.md` en su carpeta no debería pagar
+ * su carga al arrancar. Se importa la primera vez que se lee un PDF y se
+ * guarda; a partir de ahí es gratis.
+ *
+ * ── NÚMEROS DE PÁGINA DE VERDAD ────────────────────────────────────
+ *
+ * Devuelve `{pagina, texto}`, no un array de textos. El lector viejo hacía
+ * `if (texto.length > 40) paginas.push(texto)` y el llamador citaba con
+ * `i + 1`: una página vacía o casi vacía **desplazaba la numeración de
+ * todas las siguientes**, y la cita apuntaba a la página equivocada. Con un
+ * PDF de dos páginas no se nota; con el manual de 332 del V20, una portada
+ * y dos páginas legales de por medio mueven cada cita tres páginas.
+ */
+let pdfjs = null
+let rutaFuentesEstandar = null
+
+async function extraerTextoPdf(buffer) {
+  if (!pdfjs) {
+    pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    /*
+     * Las 14 fuentes estándar del PDF (Helvetica, Times…) no viajan dentro
+     * del archivo: el lector tiene que traerlas. `pdfjs` las trae en su
+     * paquete, pero por defecto las busca en una URL de navegador y aquí no
+     * hay navegador. Sin esto, cada página suelta un aviso y las fuentes no
+     * embebidas se descodifican peor.
+     */
+    const url = await import('node:url')
+    rutaFuentesEstandar = url.pathToFileURL(
+      join(process.cwd(), 'backend', 'node_modules', 'pdfjs-dist', 'standard_fonts') + '/'
+    ).href
+  }
+
+  /*
+   * La TAREA se guarda aparte del documento: en pdfjs 6 quien se destruye es
+   * la tarea de carga, no el documento (`doc.destroy` no existe, y llamarlo
+   * hacía caer todos los PDF al lector de respaldo — sin romper nada
+   * visible, sólo devolviendo el texto pobre de antes).
+   */
+  const tarea = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    standardFontDataUrl: rutaFuentesEstandar,
+    // Sin fuentes del sistema ni `eval`: aquí sólo se quiere el texto, y las
+    // dos cosas son superficie de riesgo sobre un archivo que alguien subió.
+    useSystemFonts: false,
+    isEvalSupported: false,
+  })
+  const doc = await tarea.promise
+
+  const paginas = []
+  try {
+    for (let n = 1; n <= doc.numPages; n++) {
+      const pagina = await doc.getPage(n)
+      const contenido = await pagina.getTextContent()
+      /*
+       * `items` son trozos posicionados, no líneas: unirlos sin separador
+       * pega palabras de columnas distintas («PZDPKW»), que es justo lo que
+       * ensuciaba la extracción vieja. Un espacio entre ítems, y después el
+       * colapso de espacios repetidos, deja algo que BM25 puede tokenizar.
+       */
+      const texto = contenido.items
+        .map((i) => i.str ?? '')
+        .join(' ')
+        .replace(/[ \t]+/g, ' ')
+        .trim()
+      if (texto) paginas.push({ pagina: n, texto })
+      pagina.cleanup()
+    }
+  } finally {
+    await tarea.destroy()
+  }
+  return paginas
+}
+
+
+/**
  * Saca el texto de un PDF sin dependencias.
  *
  * ── HASTA DÓNDE LLEGA ESTO ─────────────────────────────────────────
@@ -150,12 +237,37 @@ const RUTA_CACHE_EMBEDDINGS = join('datos', 'embeddings-cache.json')
  *  - **Fuentes con codificación propia** (subconjuntos sin `ToUnicode`), donde
  *    los códigos no son ASCII y salen caracteres sin sentido.
  *
- * La alternativa era `pdf-parse` o `pdfjs-dist`. Se descartó por lo mismo que
- * `chartjs-node-canvas`: este backend arranca sin instalar nada, y esa
- * propiedad vale más que cubrir el PDF escaneado, que de todos modos
- * necesitaría OCR aparte.
+ * ── POR QUÉ YA NO SE USA, Y QUÉ COSTÓ AVERIGUARLO ──────────────────
+ *
+ * Esta función **quedó como respaldo**: la extracción real la hace ahora
+ * `pdfjs-dist`. La decisión anterior —«se descartó `pdf-parse` o
+ * `pdfjs-dist` porque este backend arranca sin instalar nada»— era
+ * razonable mientras los únicos PDF fueran los dos generados a medida de
+ * `Documentacion/`. Dejó de serlo el 03-09-2026, cuando entraron manuales
+ * de fabricante de verdad y se midió lo que este código sacaba de ellos:
+ *
+ *   ISO 20816-3   9 páginas · 39 fuentes · 0 imágenes  →  9 fragmentos,
+ *                 y los NUEVE eran la misma cabecera de página. El cuerpo
+ *                 de la norma vive en flujos que este lector no abre.
+ *   Siemens V20   332 páginas · 37 233 operadores de texto  →  46 fragmentos
+ *                 de ~50 caracteres, trozos de tabla pegados.
+ *   Endress+H.    742 operadores de texto  →  2 fragmentos.
+ *
+ * Con `pdfjs-dist`, los mismos archivos dan 31 512, 639 100 y 16 451
+ * caracteres. No era que los PDF fueran malos: era que este extractor sólo
+ * sabe leer los fáciles.
+ *
+ * Y el fallo no era silencioso a medias, era peor: los nueve fragmentos de
+ * cabecera del ISO **se recuperaban** en una búsqueda sobre vibraciones, así
+ * que `manualCitado` habría enseñado «ISO 20816-3, páginas 1 y 2» como
+ * respaldo de una causa. Una cita que parece evidencia y no lo es — el
+ * defecto exacto que la auditoría del 01-09-2026 vino a cerrar.
+ *
+ * Se conserva y no se borra porque cubre un caso que `pdfjs` no: un PDF
+ * cuyos flujos estén sin comprimir o con una estructura que haga fallar al
+ * lector entero. Es el plan B, no el plan.
  */
-function extraerTextoPdf(buffer) {
+function extraerTextoPdfCasero(buffer) {
   const paginas = []
 
   /*
@@ -548,8 +660,25 @@ export function createIndiceDocumentos({
 
     if (ext === '.pdf') {
       const buffer = await readFile(ruta)
-      const paginas = extraerTextoPdf(buffer)
-      const buenas = paginas.filter(pareceTexto)
+
+      /*
+       * `pdfjs` primero; el lector casero como respaldo. No es cinturón y
+       * tirantes: un PDF con la estructura rota hace fallar a `pdfjs`
+       * entero, y el casero —que va a la bruta buscando flujos— a veces
+       * saca algo de esos. Quedarse sin nada por no intentarlo sería peor
+       * que un texto parcial, que al menos `pareceTexto` puede juzgar.
+       */
+      let paginas = []
+      try {
+        paginas = await extraerTextoPdf(buffer)
+      } catch (error) {
+        logger.warn('pdfjs no pudo abrir un PDF; se prueba con el lector de respaldo', {
+          archivo, error: error.message,
+        })
+        paginas = extraerTextoPdfCasero(buffer).map((texto, i) => ({ pagina: i + 1, texto }))
+      }
+
+      const buenas = paginas.filter(p => pareceTexto(p.texto))
 
       if (!buenas.length) {
         // Se distingue el PDF escaneado del que no supimos descodificar: el
@@ -567,8 +696,8 @@ export function createIndiceDocumentos({
     }
 
     if (ext === '.docx') {
-      const paginas = extraerTextoDocx(await readFile(ruta))
-      const buenas = paginas.filter(pareceTexto)
+      const paginas = extraerTextoDocx(await readFile(ruta)).map((texto, i) => ({ pagina: i + 1, texto }))
+      const buenas = paginas.filter(p => pareceTexto(p.texto))
 
       if (!buenas.length) {
         ilegibles.push({
@@ -581,7 +710,8 @@ export function createIndiceDocumentos({
     }
 
     const contenido = await readFile(ruta, 'utf8')
-    return contenido ? [contenido] : []
+    // Un .txt no tiene páginas: se cita como página 1, que es lo honesto.
+    return contenido ? [{ pagina: 1, texto: contenido }] : []
   }
 
   /**
@@ -686,8 +816,10 @@ export function createIndiceDocumentos({
 
           const paginas = await leerDocumento(ruta, archivo)
           const fragmentos = []
-          paginas.forEach((pagina, i) => {
-            fragmentos.push(...trocear(pagina, basename(archivo), i + 1))
+          // `p.pagina` es el número REAL, no el índice del array — ver la
+          // cabecera de `extraerTextoPdf` sobre por qué eso importa.
+          paginas.forEach((p) => {
+            fragmentos.push(...trocear(p.texto, basename(archivo), p.pagina))
           })
 
           // Los términos se precalculan UNA vez por fragmento nuevo.

@@ -767,7 +767,7 @@ De la matriz de 36 capacidades de la auditoría:
 | ID | Capacidad | Antes | Después |
 |---|---|---|---|
 | C10 | Evidencia a favor/en contra | No implementado · **Crítica** | Implementado (F4) |
-| C11 | Scoring reproducible | Incorrecto · **Crítica** | Implementado (F3a+F7a en modo BM25; **cerrada sólo con F3b+F7b**) |
+| C11 | Scoring reproducible | Incorrecto · **Crítica** | **CERRADA (03-09-2026)** para el modo de embeddings, que es el de producción: el corte por coseno (0,46/0,36) está medido dos veces sobre corpus de 84 y 1016 fragmentos y aguanta los dos — deja de ser PROVISIONAL. El corte por BM25 crudo sigue provisional **por naturaleza**, no por falta de medida: depende del tamaño del corpus y hay que rehacerlo cada vez que se suba documentación |
 | C15 | Aislamiento por riesgo | No implementado · **Crítica** | Implementado (F1) |
 | C27 | Casos con diagnóstico incorrecto | Parcial · **Crítica** | Implementado (F2) |
 | C28 | Feedback → pipeline | Parcial · **Crítica** | Implementado (F2) |

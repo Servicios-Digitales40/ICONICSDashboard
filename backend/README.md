@@ -1,8 +1,13 @@
 # Backend puente hacia ICONICS
 
-Servidor Node **sin dependencias** que hace dos cosas: resuelve la
-autenticación contra ICONICS y expone su API REST al frontend en una forma que
-el navegador puede consumir.
+Servidor Node que hace dos cosas: resuelve la autenticación contra ICONICS y
+expone su API REST al frontend en una forma que el navegador puede consumir.
+
+> Este README decía «sin dependencias». Dejó de ser cierto hace tiempo
+> —Fastify, Zod, pino, pdfkit— y del todo el 03-09-2026, cuando entró
+> `pdfjs-dist`: el lector de PDF escrito a mano sacaba nueve cabeceras de
+> página de una norma ISO de nueve páginas, y cuarenta y seis fragmentos rotos
+> de un manual de 332. Ver la cabecera de `ia/indices/documentos.mjs`.
 
 Existe porque el navegador no puede hablar con ICONICS directamente. La API de
 FrameWorX exige OIDC con *Authorization Code + PKCE* —un flujo pensado para un
