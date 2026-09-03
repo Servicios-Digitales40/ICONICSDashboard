@@ -265,6 +265,7 @@ node scripts/verificar-pronostico.mjs                 # desgaste acumulado
 node scripts/verificar-voz.mjs                          # dictado (whisper falso)
 node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
 node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
+node scripts/verificar-modulos.mjs                         # los dos módulos no cruzan fuentes (§4.7)
 ```
 
 **Sonda contra ICONICS REAL** (no vale el falso: necesita red a planta y
