@@ -1,3 +1,21 @@
+/**
+ * Reproducción histórica de un evento del compresor, contra el backend
+ * predictivo. La única pantalla de este módulo que hoy trae dato real.
+ *
+ * ── POR QUÉ VIVE AQUÍ Y NO EN `Demo-EVA/` ───────────────────────────
+ *
+ * Hasta el 03-09-2026 estaba en `Demo-EVA/views/comunes/`, la carpeta que
+ * `CLAUDE.md` §3 define como «todo lo que sabe de las dos máquinas de
+ * planta». Esta pantalla no sabe de ninguna de las dos: consulta OTRO
+ * backend, con el histórico de un compresor real que no leemos por ICONICS.
+ *
+ * Esa mudanza no es de orden. `CLAUDE.md` §2.1 permite una segunda fuente de
+ * datos sólo si el módulo que la usa está separado y no mezcla su dato con el
+ * de planta. Mientras el archivo viviera dentro de `Demo-EVA/`, esa
+ * separación era una intención, no una estructura.
+ *
+ * Ver `docs/PLAN-19-MODULARIZACION.md` F2.
+ */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -31,9 +49,18 @@ import {
   fetchEventHistory,
   fetchPredictionHealth,
   PREDICTION_API_BASE,
-} from "@/lib/api/predictionApi.js";
+} from "../data/predictionApi.js";
 import { useTheme } from "@/theme";
-import { MONO, SANS } from "../../components/base.jsx";
+/*
+ * DEUDA CONOCIDA: `MONO`/`SANS` son tipografía de toda la aplicación, pero
+ * viven en `Demo-EVA/components/base.jsx` por razones históricas — hasta el
+ * punto de que el kit genérico (`components/ui/Panel.jsx`) también las importa
+ * de ahí. Es el único hilo que queda entre este módulo y Demo-EVA, y es de
+ * presentación, no de datos: no cruza ninguna fuente. Su sitio natural es
+ * `@/theme`, y moverlas toca quince archivos, así que va por su cuenta
+ * (docs/BACKLOG-FRONTEND.md).
+ */
+import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 
 const EVENTOS = [1, 2, 3, 4];
 const HORAS_MAX = 168;
@@ -177,7 +204,7 @@ function EmptyState({ t }) {
   );
 }
 
-export default function PrediccionBeta() {
+export default function EventosCompresor() {
   const { theme: t } = useTheme();
   const [eventId, setEventId] = useState(1);
   const [hoursBefore, setHoursBefore] = useState(48);

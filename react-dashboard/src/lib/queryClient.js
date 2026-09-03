@@ -7,7 +7,7 @@
  * por ciclo, algo que Query no hace entre claves distintas — sustituirlo
  * aquí sería reconstruir esa misma lógica peor. Este cliente es para lo
  * demás: el árbol de assets (`ExploradorAssets.jsx`) y la consulta al
- * backend predictivo (`PrediccionBeta.jsx`).
+ * backend predictivo (`modulos/prediccion/views/EventosCompresor.jsx`).
  *
  * `retry: false` porque ninguno de los fetches que reemplaza reintentaba
  * antes: los mensajes de error ya salen claros de `apiClient.js`, y

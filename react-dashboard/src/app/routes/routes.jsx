@@ -303,11 +303,61 @@ export const ROUTES = [
      *
      * Su dirección se configura con `VITE_PREDICTION_API_BASE`.
      */
-    id: "eva-prediccion",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/PrediccionBeta.jsx")),
-    title: "Predicción (Beta)",
-    sub: "Histórico del compresor · consulta del backend predictivo V4.4",
+    id: "pred-inicio",
+    component: lazy(() => import("@/modulos/prediccion/views/InicioCompresor.jsx")),
+    title: "Compresor",
+    sub: "Estado del módulo · qué máquina es y de dónde viene su dato",
+    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-prediccion" },
+  },
+  {
+    id: "pred-eventos",
+    component: lazy(() => import("@/modulos/prediccion/views/EventosCompresor.jsx")),
+    title: "Eventos (Beta)",
+    sub: "Reproducción histórica de un evento · backend predictivo V4.4",
     nav: { label: "Eventos (Beta)", icon: <BrainCircuit size={17} />, group: "sec-prediccion" },
+  },
+
+  /*
+   * ── LAS CUATRO PANTALLAS PENDIENTES ────────────────────────────────
+   *
+   * Existen, se abren y no enseñan ningún dato: dicen qué van a enseñar y qué
+   * falta exactamente para poder construirlas. No es un hueco esperando a
+   * rellenarse con datos de ejemplo — ver la cabecera de
+   * `modulos/prediccion/components/PantallaPendiente.jsx` para por qué un
+   * placeholder con curvas plausibles sería peor que ninguna pantalla.
+   *
+   * Están registradas desde ya, y no ocultas tras una bandera, porque la
+   * estructura del módulo ES la entrega de esta fase: enseña el alcance
+   * acordado y deja ver, de un vistazo, cuánto falta. Las cuatro se desbloquean
+   * con el contrato de la API (docs/PLAN-19-MODULARIZACION.md §9.1).
+   */
+  {
+    id: "pred-variables",
+    component: lazy(() => import("@/modulos/prediccion/views/VariablesCompresor.jsx")),
+    title: "Variables del compresor",
+    sub: "Qué mide esta máquina · pendiente del inventario del histórico",
+    nav: { label: "Variables", icon: <Boxes size={17} />, group: "sec-prediccion" },
+  },
+  {
+    id: "pred-historico",
+    component: lazy(() => import("@/modulos/prediccion/views/HistoricoCompresor.jsx")),
+    title: "Histórico del compresor",
+    sub: "Evolución de una variable entre dos fechas · pendiente de endpoint",
+    nav: { label: "Histórico", icon: <LayoutDashboard size={17} />, group: "sec-prediccion" },
+  },
+  {
+    id: "pred-correlacion",
+    component: lazy(() => import("@/modulos/prediccion/views/CorrelacionCompresor.jsx")),
+    title: "Correlación entre variables",
+    sub: "Si dos variables se movieron juntas · pendiente de endpoint",
+    nav: { label: "Correlación", icon: <Cog size={17} />, group: "sec-prediccion" },
+  },
+  {
+    id: "pred-pronostico",
+    component: lazy(() => import("@/modulos/prediccion/views/PronosticoCompresor.jsx")),
+    title: "Pronóstico",
+    sub: "Cómo se comportará una variable · pendiente del error validado del modelo",
+    nav: { label: "Pronóstico", icon: <Factory size={17} />, group: "sec-prediccion" },
   },
 
   /*

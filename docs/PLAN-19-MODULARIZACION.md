@@ -101,10 +101,28 @@ react-dashboard/src/
 ├── Demo-EVA/                       ← se queda donde está, es Monitoreo
 └── modulos/
     └── prediccion/
-        ├── README.md                 qué es, de dónde vienen sus datos, qué no hace
-        ├── views/PrediccionBeta.jsx   (desde Demo-EVA/views/comunes/)
-        └── data/predictionApi.js      (desde lib/api/)
+        ├── README.md                     qué es, de dónde viene su dato, qué no hace
+        ├── data/predictionApi.js          (desde lib/api/)
+        ├── components/
+        │   └── PantallaPendiente.jsx       el placeholder honesto
+        └── views/
+            ├── InicioCompresor.jsx          dato real: salud del backend y limitaciones
+            ├── EventosCompresor.jsx         dato real (era PrediccionBeta.jsx)
+            ├── VariablesCompresor.jsx       pendiente
+            ├── HistoricoCompresor.jsx       pendiente
+            ├── CorrelacionCompresor.jsx     pendiente
+            └── PronosticoCompresor.jsx      pendiente
 ```
+
+Los nombres llevan el sufijo `Compresor` por CLAUDE.md §4.4 —el archivo se
+distingue por MÁQUINA— y porque `PrediccionBeta` nombraba la fase del proyecto,
+no lo que la pantalla enseña. Los ids de ruta pasan de `eva-prediccion` a
+`pred-*`: el prefijo `eva-` es de Demo-EVA, que es justo de lo que se separa.
+
+**Las cuatro pantallas pendientes no dibujan datos de ejemplo.** Dicen qué
+enseñarán y qué falta exactamente para construirlas. Un placeholder con curvas
+plausibles en un tablero de planta no se lee como un boceto, se lee como una
+medida — es §2.5 del CLAUDE.md, y aplica también a lo que todavía no existe.
 
 **Por qué `Demo-EVA/` no se renombra a `modulos/monitoreo/`**: PLAN-18 acaba de
 mover esa carpeta entera y todo el repo apunta ahí. Renombrarla otra vez es

@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las diecisiete vistas, agrupadas por SISTEMA", () => {
+  it("son las veintidós vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -60,7 +60,18 @@ describe("superficie de la aplicación", () => {
       // histórico sirve otro backend. No entra por ICONICS, así que no puede
       // colgar de ninguna de las dos estaciones ni de «General», que significa
       // «del servidor ICONICS, no de una máquina». Ver CLAUDE.md §4.7.
-      "eva-prediccion",
+      //
+      // Las cuatro últimas son pantallas PENDIENTES: se abren y dicen qué
+      // falta para construirlas, sin dibujar un solo dato de ejemplo. Están
+      // registradas y no escondidas tras una bandera a propósito — la
+      // estructura del módulo es lo que se entregó en el Plan 19 F2, y un
+      // sidebar que la enseña dice de un vistazo cuánto falta.
+      "pred-inicio",
+      "pred-eventos",
+      "pred-variables",
+      "pred-historico",
+      "pred-correlacion",
+      "pred-pronostico",
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
       // «General».
@@ -138,7 +149,7 @@ describe("el sidebar que sale del registro", () => {
 
     /*
      * Predicción ya NO cuelga de «General». Esta comprobación es la que
-     * impide que vuelva: si alguien devuelve `eva-prediccion` a esa sección,
+     * impide que vuelva: si alguien devuelve una ruta `pred-*` a esa sección,
      * las dos expectativas de arriba y de abajo fallan a la vez.
      *
      * No es una preferencia de orden. «General» significa «del servidor
@@ -148,7 +159,14 @@ describe("el sidebar que sale del registro", () => {
      */
     const prediccion = NAV.find((n) => n.group === "sec-prediccion");
     expect(prediccion.label).toBe("Predicción");
-    expect(prediccion.children.map((c) => c.id)).toEqual(["eva-prediccion"]);
+    expect(prediccion.children.map((c) => c.id)).toEqual([
+      "pred-inicio",
+      "pred-eventos",
+      "pred-variables",
+      "pred-historico",
+      "pred-correlacion",
+      "pred-pronostico",
+    ]);
 
     // RAG es su propia sección por el mismo motivo que las otras tres NO se
     // mezclan entre sí: lo que hay aquí no describe una instalación de la

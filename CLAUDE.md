@@ -104,10 +104,12 @@ regla.
 │       │   ├── views/              Presentación, por máquina: tanque/, vibraciones/, comunes/
 │       │   ├── components/         Piezas de presentación de esta demo
 │       │   └── three-d/            Maqueta 3D
+│       ├── modulos/             Módulos que NO se sirven de ICONICS — ver §4.7
+│       │   └── prediccion/         El compresor, por API externa (data/, views/, components/)
 │       ├── components/          Kit de UI genérico (no sabe de ICONICS ni de Demo EVA)
 │       ├── features/             Módulos verticales (asistente, three-d genérico, data)
 │       ├── lib/                  Infraestructura de frontend
-│       │   └── api/                Clientes HTTP (apiBase, casosApi, predictionApi, ragApi)
+│       │   └── api/                Clientes HTTP de planta (apiBase, casosApi, ragApi)
 │       ├── theme/                 Tokens de tema (claro/oscuro/Mitsubishi Electric)
 │       └── test/                  vitest: por área, espejo de src/
 ├── shared/                 Dominio puro que usan LOS DOS programas (§2.6, §2.7)
