@@ -18,10 +18,22 @@ Estas decisiones ya se tomaron. No se reabren por conveniencia de una tarea
 puntual — si una tarea choca con una de estas, la tarea se replantea, no la
 regla.
 
-1. **ICONICS FrameWorX es la única fuente de datos y la única fuente de
-   verdad.** No hay MQTT, no hay OPC-UA en el camino de datos (`scripts/plc_opcua.py`
-   es un guion suelto, no está conectado a nada), no hay Node-RED, no hay
-   event bus. Todo dato de sensor entra por `backend/iconics/client.mjs`.
+1. **ICONICS FrameWorX es la única fuente de datos de sensores DE PLANTA, y
+   la única fuente de verdad sobre ellos.** No hay MQTT, no hay OPC-UA en el
+   camino de datos (`scripts/plc_opcua.py` es un guion suelto, no está
+   conectado a nada), no hay Node-RED, no hay event bus. Todo dato de sensor
+   de planta entra por `backend/iconics/client.mjs`.
+
+   **La acotación «de planta» es del 03-09-2026 y tiene dueño**
+   ([`docs/PLAN-19-MODULARIZACION.md`](docs/PLAN-19-MODULARIZACION.md) §0.1):
+   el módulo de Predicción consume un compresor real por una API externa, no
+   por ICONICS. La regla no se relaja, se acota — un módulo con otra fuente
+   **la declara en `shared/modulos.js` y nunca mezcla su dato con el de
+   planta** en el mismo registro, el mismo lote de lectura ni la misma
+   herramienta del asistente. Es la misma prohibición que ya separa tanque de
+   vibraciones (`NO_COMPARTEN` en `shared/eva/comun/sistemas.js`), un nivel
+   más arriba: allí impide cruzar dos máquinas con distinto PLC, aquí impide
+   cruzar dos módulos con distinta fuente.
 2. **No hay base de datos ni vector DB.** La persistencia es JSON en
    `backend/datos/` (embeddings-cache) y `datos/aprendizaje.json` (no
    versionado). Los "índices" de búsqueda son cachés JSON, no un motor
@@ -196,6 +208,26 @@ información ahí y sólo la repite.
 Comentarios, mensajes de error y texto de cara al técnico van en español.
 Un mensaje de `fallo(...)` dice qué falta y cómo resolverlo (qué llamar antes,
 qué variable falta), nunca un genérico "algo salió mal".
+
+### 4.7 Módulo y sistema no son lo mismo
+
+Dos palabras que se parecen y no se pueden intercambiar:
+
+- **Sistema** — una máquina de planta leída por ICONICS. Hoy `tanque` y
+  `vibraciones`. Se declaran en `shared/eva/comun/sistemas.js`, que **no es
+  una lista de nombres sino código ejecutable**: cada entrada trae `raices`,
+  `puntos()`, `parse()`, `modelo()`, `esHistorizada()` y `cadenciaMs`, todo
+  ello dando por hecho que hay tags de ICONICS detrás.
+- **Módulo** — una agrupación de más arriba, definida por **su fuente de
+  datos**. Hoy `monitoreo` (los dos sistemas de arriba, por ICONICS) y
+  `prediccion` (un compresor real, por API externa). Se declaran en
+  `shared/modulos.js`.
+
+De ahí sale una regla concreta: **una máquina que no se lee por ICONICS no
+entra en `SISTEMAS`.** Meterla obligaría a que cada una de esas funciones
+tuviera una rama «ésta no es de ICONICS», que es exactamente el `if` repetido
+en cinco archivos que ese registro existe para evitar. Ver
+[`docs/PLAN-19-MODULARIZACION.md`](docs/PLAN-19-MODULARIZACION.md) §0.2.
 
 ## 5. Pruebas — qué existe y cuándo correrlas
 

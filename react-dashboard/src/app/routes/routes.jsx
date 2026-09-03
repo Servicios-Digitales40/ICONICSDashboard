@@ -86,6 +86,23 @@ export const NAV_GROUPS = {
   "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
   "sec-vibraciones": { label: "Estación de vibraciones", icon: <Waves size={17} /> },
   "sec-general": { label: "General", icon: <Boxes size={17} /> },
+  /*
+   * ── PREDICCIÓN NO ES UNA SECCIÓN MÁS: ES OTRO MÓDULO ───────────────
+   *
+   * Las tres secciones de arriba son el módulo de Monitoreo y Diagnóstico:
+   * dos máquinas de planta y lo que es del servidor que las sirve. Todo eso
+   * entra por ICONICS.
+   *
+   * Ésta no. Es un compresor REAL cuyo histórico vive en otro backend
+   * (Django), y la separación no es de presentación: es la frontera entre
+   * módulos que `CLAUDE.md` §2.1 y §4.7 declaran, y que existe para que
+   * nadie cruce dos fuentes de datos distintas. Colgarla de «General»
+   * —donde estuvo hasta el 03-09-2026— la archivaba junto a Alarmas y
+   * Assets, que sí son de este servidor.
+   *
+   * Ver `docs/PLAN-19-MODULARIZACION.md` F1.
+   */
+  "sec-prediccion": { label: "Predicción", icon: <BrainCircuit size={17} /> },
   // El origen de conocimiento del asistente, no una máquina: qué manuales
   // alimentan su búsqueda documental. Sección aparte por el mismo motivo que
   // separa las otras dos — no es de ninguna instalación concreta, y menos
@@ -258,18 +275,24 @@ export const ROUTES = [
 
   {
     /*
-     * ── POR QUÉ ESTA VISTA VA EN «GENERAL» Y NO EN UNA MÁQUINA ─────────
+     * ── POR QUÉ ESTA VISTA TIENE SECCIÓN PROPIA ────────────────────────
      *
-     * Porque no habla de ninguna de las dos. Las otras pantallas de este
-     * registro leen el servidor ICONICS de ESTA planta; ésta consulta OTRO
-     * backend —Django, en el puerto 8000— que reproduce el conjunto de datos
-     * público MetroPT-3, que son compresores de metro.
+     * Porque no habla de ninguna de las dos máquinas de planta. Las otras
+     * pantallas de este registro leen el servidor ICONICS de ESTA planta;
+     * ésta consulta OTRO backend —Django, en el puerto 8000— que sirve el
+     * histórico de un compresor real.
      *
      * Colgarla de «Estación de llenado» o de «Estación de vibraciones» diría
      * que sus curvas son de ese tanque o de ese motor, y no lo son. Ése es
      * justo el cruce que la partición del sidebar existe para impedir, y aquí
      * sería peor que entre las dos máquinas de la planta: al menos ésas
      * comparten servidor.
+     *
+     * Hasta el 03-09-2026 colgaba de «General», que era el sitio menos malo
+     * cuando esto era una prueba suelta. Dejó de serlo en cuanto pasó a ser
+     * un módulo con su propia fuente de datos: «General» significa «del
+     * servidor ICONICS, no de una máquina concreta», y esto no es ni lo uno
+     * ni lo otro. Ver `docs/PLAN-19-MODULARIZACION.md`.
      *
      * ── POR QUÉ «BETA» VA EN EL RÓTULO ─────────────────────────────────
      *
@@ -278,14 +301,13 @@ export const ROUTES = [
      * resto del tablero no tiene esa dependencia. El rótulo lo dice antes de
      * que alguien lo descubra con una pantalla vacía.
      *
-     * Su dirección se configura con `VITE_PREDICTION_API_BASE`; sin esa
-     * variable apunta al mismo host del tablero en el puerto 8000.
+     * Su dirección se configura con `VITE_PREDICTION_API_BASE`.
      */
     id: "eva-prediccion",
     component: lazy(() => import("@/Demo-EVA/views/comunes/PrediccionBeta.jsx")),
     title: "Predicción (Beta)",
-    sub: "Reproducción histórica MetroPT-3 · consulta del backend predictivo V4.4",
-    nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-general" },
+    sub: "Histórico del compresor · consulta del backend predictivo V4.4",
+    nav: { label: "Eventos (Beta)", icon: <BrainCircuit size={17} />, group: "sec-prediccion" },
   },
 
   /*

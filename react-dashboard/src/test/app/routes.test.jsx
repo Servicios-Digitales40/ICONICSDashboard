@@ -56,9 +56,10 @@ describe("superficie de la aplicación", () => {
       // General — del servidor, no de una máquina: valen para las dos.
       "eva-alarmas",
       "eva-assets",
-      // Ni siquiera es de este servidor: consulta otro backend con el conjunto
-      // MetroPT-3, que son compresores de metro. Va aquí justamente para no
-      // afirmar que sus curvas son del tanque ni del motor de vibraciones.
+      // Predicción — OTRO MÓDULO, no una sección más: un compresor real cuyo
+      // histórico sirve otro backend. No entra por ICONICS, así que no puede
+      // colgar de ninguna de las dos estaciones ni de «General», que significa
+      // «del servidor ICONICS, no de una máquina». Ver CLAUDE.md §4.7.
       "eva-prediccion",
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
@@ -94,14 +95,19 @@ describe("superficie de la aplicación", () => {
 });
 
 describe("el sidebar que sale del registro", () => {
-  it("las cuatro secciones salen del registro, con sus vistas dentro", () => {
+  it("las cinco secciones salen del registro, con sus vistas dentro", () => {
     // `buildNav` LANZA si una ruta referencia un grupo que no está declarado en
     // NAV_GROUPS, y ese fallo sólo aparece al importar el registro. Comprobarlo
     // aquí lo convierte en un fallo de la suite y no en una pantalla en blanco.
+    //
+    // `sec-prediccion` es la quinta desde el 03-09-2026, y no es cosmética:
+    // marca la frontera entre los dos MÓDULOS (CLAUDE.md §4.7). Las cuatro
+    // primeras se sirven de ICONICS; esa quinta, no.
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
       "sec-llenado",
       "sec-vibraciones",
       "sec-general",
+      "sec-prediccion",
       "sec-rag",
     ]);
 
@@ -121,11 +127,6 @@ describe("el sidebar que sale del registro", () => {
     // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
     // dentro de un sistema, estaría diciendo que sus eventos son sólo de ése.
     //
-    // «Predicción (Beta)» está aquí por una razón más fuerte todavía: no lee
-    // este servidor en absoluto, sino otro backend con el conjunto MetroPT-3.
-    // Colgarla de una de las dos estaciones afirmaría que sus curvas son de esa
-    // máquina, y no lo son de ninguna de las dos.
-    //
     // `eva-alarmas` no sale en esta lista: se ocultó del sidebar el
     // 2026-08-31 (temporal, ver la cabecera de su entrada en `routes.jsx`)
     // para cortar el sondeo de `/api/iconics/alarms` que el botón del Topbar
@@ -133,9 +134,21 @@ describe("el sidebar que sale del registro", () => {
     // arriba—, sólo sin `nav`, mismo criterio que `eva-detalle`.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.label).toBe("General");
-    expect(general.children.map((c) => c.id)).toEqual([
-      "eva-assets", "eva-prediccion",
-    ]);
+    expect(general.children.map((c) => c.id)).toEqual(["eva-assets"]);
+
+    /*
+     * Predicción ya NO cuelga de «General». Esta comprobación es la que
+     * impide que vuelva: si alguien devuelve `eva-prediccion` a esa sección,
+     * las dos expectativas de arriba y de abajo fallan a la vez.
+     *
+     * No es una preferencia de orden. «General» significa «del servidor
+     * ICONICS, no de una máquina concreta», y este módulo no lee ese
+     * servidor en absoluto — es un compresor real servido por otro backend.
+     * Mezclarlo ahí es el mismo cruce de fuentes que CLAUDE.md §2.1 prohíbe.
+     */
+    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
+    expect(prediccion.label).toBe("Predicción");
+    expect(prediccion.children.map((c) => c.id)).toEqual(["eva-prediccion"]);
 
     // RAG es su propia sección por el mismo motivo que las otras tres NO se
     // mezclan entre sí: lo que hay aquí no describe una instalación de la
