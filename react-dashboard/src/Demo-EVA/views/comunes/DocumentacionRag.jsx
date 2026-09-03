@@ -69,16 +69,19 @@ function Estadistica({ label, valor, tono, t }) {
  * `.archivados/`: la fila prometía un trabajo en curso que nadie estaba
  * haciendo.
  *
- * Ahora se mira el estado REAL del índice (`indexando`, que la ruta ya
- * devolvía y esta función ignoraba). Cero fragmentos con el índice parado
- * no es «espera», es «este archivo no está en la carpeta» — que es
- * accionable, y lo otro no.
+ * Ahora se mira el estado REAL del índice. Y son TRES estados, no dos: el
+ * índice se carga perezosamente, así que «cero fragmentos» puede querer
+ * decir dos cosas muy distintas —que la carpeta aún no se ha leído, o que
+ * se leyó y este archivo no estaba— y sólo la segunda es un problema.
+ * Confundirlas fue el primer intento de arreglar esto, y pintaba de rojo
+ * seis manuales sanos.
  */
-function estadoDeFila(manual, indexando) {
+function estadoDeFila(manual, { indexando, cargado }) {
   if (manual.estado === "archivado") return { texto: "archivado", tipo: "mute" };
   if (manual.motivoIlegible) return { texto: "no se pudo leer", tipo: "bad" };
   if (manual.fragmentos > 0) return { texto: "indexado", tipo: "ok" };
   if (indexando) return { texto: "indexando", tipo: "wait" };
+  if (!cargado) return { texto: "sin leer aún", tipo: "wait" };
   return { texto: "falta el archivo", tipo: "bad" };
 }
 
@@ -104,10 +107,10 @@ function Chip({ tipo, children, t }) {
   );
 }
 
-function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, onArchivar, ocupado, indexando }) {
+function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, onArchivar, ocupado, indice }) {
   const [confirmando, setConfirmando] = useState(false);
   const inputRef = useRef(null);
-  const estado = estadoDeFila(manual, indexando);
+  const estado = estadoDeFila(manual, indice);
   const activo = manual.estado === "activo";
   const nombreSistema = manual.sistema ? sistemasPorId.get(manual.sistema) ?? manual.sistema : "toda la planta";
 
@@ -516,7 +519,7 @@ export default function DocumentacionRag() {
               onReemplazar={manejarReemplazo}
               onArchivar={manejarArchivado}
               ocupado={idOcupado === manual.id}
-              indexando={datos.indexando}
+              indice={{ indexando: datos.indexando, cargado: datos.cargado }}
             />
           ))
         )}

@@ -80,6 +80,35 @@ function negarSiNoSePuedeEscribir(config, gestorManuales, reply) {
 export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorManuales }) {
   fastify.get('/api/rag/documentos', async () => {
     const manuales = gestorManuales ? await gestorManuales.listar() : []
+
+    /*
+     * ── LA PANTALLA QUE MIRA EL ÍNDICE TIENE QUE PROVOCARLO ────────────
+     *
+     * El índice se carga PEREZOSAMENTE: `app.mjs` no lo construye al
+     * arrancar —«el primer `buscar()` la dispara»— porque indexar una
+     * carpeta grande retrasaría el arranque del puente, y el puente sirve
+     * pantallas de planta que no dependen del asistente. Eso está bien.
+     *
+     * Lo que estaba mal es que esta ruta sólo llamaba a `estado()`, que
+     * informa de lo que hay EN MEMORIA. Con el servidor recién arrancado eso
+     * es cero, así que la pantalla que existe para contestar «¿qué sabe el
+     * asistente?» contestaba «nada» hasta que alguien, por otro camino, le
+     * hiciera una pregunta que buscara en los manuales. Medido el
+     * 03-09-2026: seis manuales en disco, 1016 fragmentos que el índice sacó
+     * sin problema al pedírselo a mano, y la pantalla en blanco.
+     *
+     * Se dispara la carga y NO se espera. El `await` bloquearía la respuesta
+     * los segundos que tarde embeber la carpeta entera; en su lugar la
+     * respuesta sale ya con `indexando: true`, y la vista —que ya sondea
+     * cada 2 s mientras eso sea cierto— enseña el progreso y se actualiza
+     * sola. Es justo para lo que se escribió ese sondeo.
+     */
+    if (indiceDocumentos && !indiceDocumentos.estado().cargado) {
+      indiceDocumentos.recargar().catch(error => {
+        fastify.log.warn({ err: error }, 'La carga del índice de documentación falló')
+      })
+    }
+
     const estadoIndice = indiceDocumentos?.estado() ?? null
 
     // Los fragmentos y el motivo de ilegible salen del ÍNDICE, no del
@@ -95,6 +124,10 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
       cargaHabilitada: config.ia.ragUploadEnabled,
       modo: estadoIndice?.modo ?? null,
       indexando: estadoIndice?.indexando ?? false,
+      // Para que la vista distinga «todavía no se ha leído la carpeta» de
+      // «se leyó y este archivo no estaba»: sin esto, las dos salen como 0
+      // fragmentos y sólo una es un problema.
+      cargado: estadoIndice?.cargado ?? false,
       progreso: estadoIndice?.progreso ?? null,
       manuales: manuales.map(m => ({
         ...m,
