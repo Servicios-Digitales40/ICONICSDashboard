@@ -29,6 +29,10 @@
  * planta es peor que no contestar.
  */
 import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../shared/eva/tanque/senales.js'
+/* `sistemaValido` conoce los sistemas declarados y acepta vacío como «toda la
+ * planta»; es el mismo validador que usa el manifiesto de manuales, para que
+ * el asistente y la pantalla midan «sistema válido» con la misma vara. */
+import { sistemaValido } from '../../../../shared/eva/comun/manuales.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
 /*
@@ -225,7 +229,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
      * instrucción de abajo— puede decir que no lo encontró, que es la respuesta
      * correcta cuando no está documentado.
      */
-    async consultar_documentacion({ pregunta } = {}) {
+    async consultar_documentacion({ pregunta, sistema } = {}) {
       if (!indiceDocumentos) {
         return fallo(
           'Este servidor no tiene documentación de planta cargada (falta la variable ' +
@@ -235,8 +239,31 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       if (!pregunta || !pregunta.trim()) {
         return fallo('Necesito saber sobre qué quieres consultar en la documentación.')
       }
+      /*
+       * ── EL AISLAMIENTO POR MÁQUINA, POR FIN ALCANZABLE ────────────────
+       *
+       * `buscar()` sabe filtrar por sistema desde el Plan 17 Fase 3a (G7): un
+       * manual asignado a una máquina sólo compite en ESA máquina, y uno sin
+       * asignar compite siempre. Pero esta herramienta nunca le pasaba
+       * `sistema`, así que el filtro era inalcanzable desde la conversación —
+       * el motor de diagnóstico lo usaba y el técnico preguntando, no.
+       *
+       * Sigue siendo OPCIONAL, y omitirlo mantiene el comportamiento de
+       * siempre. Una pregunta general («¿cada cuánto se revisan las
+       * protecciones?») no tiene por qué ser de una máquina, y forzar a
+       * elegir una escondería el manual de planta que la contesta.
+       */
+      if (sistema && !sistemaValido(sistema)) {
+        return fallo(
+          `"${sistema}" no es un sistema de esta planta. Los ids salen de ` +
+            `sistemas_de_la_planta; omite el parámetro para buscar en toda la documentación.`
+        )
+      }
 
-      const resultados = await indiceDocumentos.buscar(pregunta, { top: 3 })
+      const resultados = await indiceDocumentos.buscar(pregunta, {
+        top: 3,
+        ...(sistema ? { sistema } : {}),
+      })
 
       if (!resultados.length) {
         const estado = indiceDocumentos.estado()
@@ -245,8 +272,20 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
         // está y no lo dice. Son dos problemas con arreglos distintos.
         return fallo(
           'No he encontrado nada sobre eso en la documentación cargada. Puede que no esté ' +
-            'documentado, o que el manual lo llame de otra forma.',
+            'documentado, o que el manual lo llame de otra forma.' +
+            /*
+             * Si la búsqueda iba acotada, decirlo: sin esta frase, «no lo
+             * encontré» tapa un tercer motivo —está documentado, pero en un
+             * manual asignado a la otra máquina— que tiene un arreglo
+             * distinto a los otros dos.
+             */
+            (sistema
+              ? ` Ojo: he buscado SÓLO en la documentación de "${sistema}" y en la que vale ` +
+                `para toda la planta. Si crees que está en un manual de otra máquina, ` +
+                `vuelve a preguntar sin acotar el sistema.`
+              : ''),
           {
+            ...(sistema ? { busquedaAcotadaA: sistema } : {}),
             documentosDisponibles: estado.documentos.map(d => d.archivo),
             ...(estado.ilegibles.length ? { noSePudieronLeer: estado.ilegibles } : {}),
           }
@@ -319,7 +358,24 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       // señal: BM25 es léxico, así que sin estas palabras en la consulta
       // puntuaría igual una página que sólo menciona la señal de pasada.
       const consulta = `${meta.label} maximo minimo limite admisible no debe exceder rango`
-      const resultados = await indiceDocumentos.buscar(consulta, { top: 5 })
+      /*
+       * ── EL SISTEMA NO SE PREGUNTA AQUÍ: SE SABE ─────────────────────
+       *
+       * Esta herramienta resuelve el nombre de la señal con `resolverSenal`,
+       * que es el índice de nombres DEL TANQUE —ver la nota de los imports de
+       * este archivo—, y `senalInfo` sale de `tanque/senales.js`. O sea: si
+       * llegamos hasta aquí, la señal es del tanque, necesariamente.
+       *
+       * Así que acotar la búsqueda es gratis y no depende de que el modelo
+       * acierte a pasar un parámetro. Un límite de vibración no puede
+       * respaldar una señal de agua, y hasta hoy podía: los nueve manuales
+       * estaban sin asignar y competían todos contra todo.
+       *
+       * OJO al parametrizar la resolución de señales por máquina (la fase
+       * pendiente que menciona la cabecera): en ese momento este `'tanque'`
+       * deja de ser cierto y hay que derivarlo de la señal resuelta.
+       */
+      const resultados = await indiceDocumentos.buscar(consulta, { top: 5, sistema: 'tanque' })
 
       if (!resultados.length) {
         const estado = indiceDocumentos.estado()

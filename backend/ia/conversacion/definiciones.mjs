@@ -598,14 +598,24 @@ export const DEFINICIONES = [
       name: 'consultar_documentacion',
       description:
         'Busca en la documentación de planta (manuales, procedimientos) y devuelve los fragmentos ' +
-        'más parecidos a la pregunta, citables por archivo. Úsala para "¿cómo se arranca la bomba?", ' +
-        '"procedimiento de mantenimiento", "especificaciones de la válvula".',
+        'más parecidos a la pregunta, citables por archivo y página. Úsala para "¿cómo se arranca ' +
+        'la bomba?", "procedimiento de mantenimiento", "especificaciones de la válvula". Si la ' +
+        'pregunta es claramente sobre UNA máquina, pasa su `sistema`: así no compiten los manuales ' +
+        'de la otra. Si es general de la planta, o no estás seguro, NO lo pases — acotar de más ' +
+        'esconde el manual que la contesta.',
       parameters: {
         type: 'object',
         properties: {
           pregunta: {
             type: 'string',
             description: 'Qué quieres consultar en la documentación, en lenguaje llano.',
+          },
+          sistema: {
+            type: 'string',
+            description:
+              'OPCIONAL. Id del sistema al que se acota la búsqueda, de sistemas_de_la_planta. ' +
+              'Los manuales sin máquina asignada ("toda la planta") entran igual. Omítelo para ' +
+              'buscar en toda la documentación.',
           },
         },
         required: ['pregunta'],

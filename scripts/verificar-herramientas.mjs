@@ -202,15 +202,30 @@ function clienteFalso({
  * prueba BM25 —eso es cosa de `documentos.mjs`— sino que `limites_del_manual`
  * y `diagnostico` extraen y componen bien lo que el índice les da.
  */
+/**
+ * Doble del índice de documentación.
+ *
+ * `ultimaBusqueda` guarda las opciones de la última llamada a `buscar()`, y
+ * existe por una razón concreta: el aislamiento por máquina (Plan 17 F3a, G7)
+ * vive DENTRO de `buscar()`, así que un doble que devuelva fragmentos sin
+ * mirar el filtro no puede distinguir «la herramienta acotó» de «la
+ * herramienta no acotó». Medido el 03-09-2026: `consultar_documentacion` y
+ * `limites_del_manual` llevaban desde entonces sin pasar `sistema` nunca, y
+ * ninguna prueba lo notó porque ninguna miraba lo que se pasaba.
+ */
 function indiceDocumentosFalso(fragmentos) {
-  return {
-    async buscar(_consulta, { top = 3 } = {}) {
+  const doble = {
+    ultimaBusqueda: null,
+    async buscar(_consulta, opciones = {}) {
+      const { top = 3 } = opciones
+      doble.ultimaBusqueda = opciones
       return fragmentos.slice(0, top)
     },
     estado() {
       return { cargado: true, carpeta: 'x', modo: 'BM25', documentos: [], ilegibles: [] }
     },
   }
+  return doble
 }
 
 console.log(`\n${c.negrita}Herramientas del asistente · sistema de agua${c.reset}`)
@@ -1447,6 +1462,81 @@ await checkAsync('una página sobre la señal sin ningún patrón de límite lo 
 
   assert.equal(r.ok, false)
   assert.match(r.error, /ning[uú]na tiene un n[uú]mero/i)
+})
+
+/* ── El aislamiento por máquina, alcanzable desde la conversación ────── */
+
+await checkAsync('consultar_documentacion acota la búsqueda cuando le pasan un sistema', async () => {
+  /*
+   * `buscar()` sabe filtrar por sistema desde el Plan 17 F3a (G7), pero esta
+   * herramienta nunca le pasaba el parámetro: el motor de diagnóstico usaba
+   * el aislamiento y el técnico preguntando, no. Medido el 03-09-2026.
+   */
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'M.pdf', pagina: 1, score: 0.9, texto: 'Procedimiento de arranque.' },
+  ])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('consultar_documentacion', { pregunta: '¿cómo se arranca?', sistema: 'vibraciones' })
+
+  assert.equal(r.ok, true)
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, 'vibraciones',
+    'la herramienta no propagó el sistema a buscar()')
+})
+
+await checkAsync('sin sistema, consultar_documentacion NO acota', async () => {
+  /*
+   * Omitirlo tiene que seguir buscando en todo. Una pregunta general de
+   * planta no es de ninguna máquina, y acotar de más escondería el manual
+   * que la contesta — por eso el parámetro es opcional y no obligatorio.
+   */
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'M.pdf', pagina: 1, score: 0.9, texto: 'Revisión de protecciones.' },
+  ])
+  await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('consultar_documentacion', { pregunta: '¿cada cuánto se revisan las protecciones?' })
+
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, undefined,
+    'acotó una búsqueda que nadie pidió acotar')
+})
+
+await checkAsync('un sistema que no existe se rechaza con la pista de dónde sacarlo', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('consultar_documentacion', { pregunta: 'algo', sistema: 'compresor' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /sistemas_de_la_planta/)
+  assert.equal(indiceDocumentos.ultimaBusqueda, null, 'buscó igual con un sistema inválido')
+})
+
+await checkAsync('no encontrar nada CON sistema dice que la búsqueda iba acotada', async () => {
+  /*
+   * Sin esta frase, «no lo encontré» tapa un tercer motivo —está
+   * documentado, pero en un manual de la otra máquina— cuyo arreglo es
+   * distinto a los otros dos.
+   */
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos: indiceDocumentosFalso([]) })
+    .ejecutar('consultar_documentacion', { pregunta: 'algo', sistema: 'tanque' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /s[oó]lo en la documentaci[oó]n de "tanque"/i)
+  assert.equal(r.busquedaAcotadaA, 'tanque')
+})
+
+await checkAsync('limites_del_manual acota al tanque sin que nadie se lo pida', async () => {
+  /*
+   * Esta herramienta resuelve nombres con el índice DEL TANQUE, así que si
+   * llega a buscar, la señal es del tanque necesariamente. Acotar es gratis
+   * y no depende de que el modelo acierte a pasar un parámetro: un límite de
+   * vibración no puede respaldar una señal de agua.
+   */
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'M.pdf', pagina: 1, score: 0.8, texto: 'La presión relativa no debe exceder 5.8 psi.' },
+  ])
+  await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'presión' })
+
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, 'tanque')
 })
 
 await checkAsync('«máximo» y «mínimo» CON acento se reconocen, no sólo sin él', async () => {

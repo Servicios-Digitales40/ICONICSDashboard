@@ -301,5 +301,61 @@ export function createGestorManuales({
     return { ok: true, manual: entrada }
   }
 
-  return { listar, subir, reemplazar, archivar }
+  /**
+   * Reasigna un manual a una máquina — o a «toda la planta» con `null`.
+   *
+   * ── POR QUÉ ESTO IMPORTA MÁS DE LO QUE PARECE ───────────────────────
+   *
+   * Porque el aislamiento por sistema del índice (Plan 17 Fase 3a, G7) ya
+   * está construido y bien: en `documentos.mjs·buscar()`, un fragmento cuyo
+   * archivo tiene `sistema` asignado sólo compite cuando se busca en ESE
+   * sistema, y uno sin asignar compite siempre.
+   *
+   * Lo que faltaba era la forma de asignarlo. Medido el 03-09-2026: los
+   * NUEVE manuales del manifiesto estaban en «toda la planta», así que el
+   * filtro no filtraba nada y un diagnóstico de vibraciones podía respaldarse
+   * en el manual de la bomba. El mecanismo llevaba semanas montado y sin
+   * nadie que pudiera usarlo.
+   *
+   * ── POR QUÉ NO HACE FALTA REINDEXAR DE VERDAD ───────────────────────
+   *
+   * `recargar()` relee el manifiesto y rehace `mapaSistemas` SIEMPRE, antes
+   * de mirar ninguna huella, y luego reutiliza entera la entrada de cada
+   * archivo cuya huella no cambió —fragmentos, términos de BM25 y vector—.
+   * Así que esto cuesta una lectura de manifiesto y un `stat` por archivo:
+   * nada se vuelve a trocear ni a embeber. Es la razón por la que aquella
+   * cabecera decía que reasignar «no debe exigir tocar el archivo».
+   *
+   * Un manual ARCHIVADO se puede reasignar igual. No sirve de nada mientras
+   * siga archivado —está fuera de lo que el índice recorre— pero negarlo
+   * añadiría un caso especial para impedir algo inofensivo, y dejaría el dato
+   * mal puesto el día que alguien lo devuelva.
+   */
+  async function asignarSistema({ id, sistema }) {
+    const manifiesto = await leerManifiesto(rutaManifiesto)
+    const entrada = manifiesto.manuales.find(m => m.id === id)
+    if (!entrada) return { ok: false, error: `No hay ningún manual con id "${id}".` }
+
+    // `null`, `undefined` y `''` significan lo mismo aquí —toda la planta— y
+    // `sistemaValido` los acepta a propósito; ver su cabecera.
+    const destino = sistema || null
+    if (!sistemaValido(destino)) {
+      return {
+        ok: false,
+        error:
+          `"${sistema}" no es un sistema de esta planta. Usa el id de uno de los que ` +
+          `declara sistemas_de_la_planta, o deja el campo vacío para "toda la planta".`,
+      }
+    }
+
+    if ((entrada.sistema ?? null) === destino) return { ok: true, manual: entrada }
+
+    entrada.sistema = destino
+    await guardarManifiesto(rutaManifiesto, manifiesto)
+
+    reindexarDeFondo()
+    return { ok: true, manual: entrada }
+  }
+
+  return { listar, subir, reemplazar, archivar, asignarSistema }
 }

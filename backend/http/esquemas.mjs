@@ -288,11 +288,29 @@ export const ReemplazarManualQuerySchema = z.object({
   id: IdManualSchema,
 })
 
-/** `PATCH /api/rag/documentos` — archiva una entrada. Sin cuerpo que mandar
- *  aparte del propio id, así que también va por query string: la misma
- *  forma que las otras dos rutas de escritura de este grupo. */
+/**
+ * `PATCH /api/rag/documentos` — archiva una entrada, o la reasigna a otra
+ * máquina. Sin cuerpo que mandar aparte del id, así que va por query string:
+ * la misma forma que las otras dos rutas de escritura de este grupo.
+ *
+ * ── POR QUÉ `accion` EXPLÍCITA Y NO DEDUCIDA ────────────────────────
+ *
+ * Lo fácil habría sido «si viene `sistema`, reasigna; si no, archiva». Pero
+ * entonces el significado de la petición dependería de qué parámetros
+ * casualmente lleve, y `sistema` tiene un valor legítimo VACÍO —«toda la
+ * planta»— que es indistinguible de no mandarlo. Con esa regla, reasignar un
+ * manual a toda la planta lo archivaría.
+ *
+ * `accion` por defecto es `archivar`, así que las llamadas que ya existían
+ * siguen significando lo mismo.
+ */
 export const ArchivarManualQuerySchema = z.object({
   id: IdManualSchema,
+  accion: z.enum(['archivar', 'asignar']).optional().default('archivar'),
+  /* Vacío es un valor con significado: «toda la planta». Por eso no lleva
+   * `.min(1)` — la validación de que el id existe la hace `sistemaValido`,
+   * que es quien conoce los sistemas declarados. */
+  sistema: z.string().optional(),
 })
 
 /* ── Casos (Plan 16 Fase 5) ───────────────────────────────────────── */

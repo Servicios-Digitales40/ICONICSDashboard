@@ -4,7 +4,12 @@
  *   GET    /api/rag/documentos                        qué hay, con su estado de indexación
  *   POST   /api/rag/documentos?nombre=&sistema=&titulo=  sube uno nuevo
  *   PUT    /api/rag/documentos?id=                     reemplaza el contenido de uno existente
- *   PATCH  /api/rag/documentos?id=                     lo archiva
+ *   PATCH  /api/rag/documentos?id=[&accion=]            lo archiva, o lo reasigna
+ *
+ * `accion` es `archivar` por defecto; con `accion=asignar&sistema=` cambia la
+ * máquina a la que pertenece el manual (vacío = toda la planta). Que la acción
+ * sea explícita y no se deduzca de los parámetros presentes tiene su porqué en
+ * `ArchivarManualQuerySchema` (`http/esquemas.mjs`).
  *
  * No hay DELETE. Ver la cabecera de `backend/ia/indices/manuales.mjs`.
  *
@@ -218,17 +223,29 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
     async (request, reply) => {
       if (negarSiNoSePuedeEscribir(config, gestorManuales, reply)) return
 
-      const resultado = await gestorManuales.archivar({ id: request.query.id })
+      const { id, accion, sistema } = request.query
+
+      const resultado =
+        accion === 'asignar'
+          ? await gestorManuales.asignarSistema({ id, sistema })
+          : await gestorManuales.archivar({ id })
 
       if (!resultado.ok) {
         const noExiste = /No hay ningún manual/.test(resultado.error)
         return reply.code(noExiste ? 404 : 400).send({ ok: false, error: resultado.error })
       }
 
-      request.log.info(
-        { id: resultado.manual.id, usuario: request.usuario?.id },
-        `Manual archivado: ${resultado.manual.archivo}`
-      )
+      if (accion === 'asignar') {
+        request.log.info(
+          { id: resultado.manual.id, sistema: resultado.manual.sistema, usuario: request.usuario?.id },
+          `Manual reasignado: ${resultado.manual.archivo} → ${resultado.manual.sistema ?? 'toda la planta'}`
+        )
+      } else {
+        request.log.info(
+          { id: resultado.manual.id, usuario: request.usuario?.id },
+          `Manual archivado: ${resultado.manual.archivo}`
+        )
+      }
 
       return { ok: true, manual: resultado.manual }
     }

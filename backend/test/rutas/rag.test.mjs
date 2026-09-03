@@ -244,6 +244,80 @@ describe('PATCH /api/rag/documentos', () => {
     expect(archivados).toContain('manual.txt')
   })
 
+  it('accion=asignar cambia la máquina del manual, sin archivarlo', async () => {
+    /*
+     * El filtro por sistema de `documentos.mjs·buscar()` estaba montado desde
+     * el Plan 17 F3a (G7) y no había forma de asignar nada: medido el
+     * 03-09-2026, los nueve manuales del manifiesto estaban en «toda la
+     * planta», así que el filtro no filtraba y un diagnóstico de vibraciones
+     * podía respaldarse en el manual de la bomba.
+     */
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido'))
+    expect(subida.manual.sistema).toBeNull()
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=vibraciones`,
+    })
+
+    expect(r.statusCode).toBe(200)
+    expect(json(r).manual.sistema).toBe('vibraciones')
+    // Lo que la `accion` explícita protege: asignar no puede archivar.
+    expect(json(r).manual.estado).toBe('activo')
+
+    const listado = json(await app.inject({ method: 'GET', url: '/api/rag/documentos' }))
+    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('vibraciones')
+  })
+
+  it('asignar con `sistema` vacío devuelve el manual a toda la planta', async () => {
+    /*
+     * Vacío es un valor CON significado, y es justo el que rompería un diseño
+     * que dedujera la acción de los parámetros presentes: sin `accion`
+     * explícita, «reasignar a toda la planta» sería indistinguible de
+     * «archivar». Ver la cabecera de `ArchivarManualQuerySchema`.
+     */
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido', { sistema: 'tanque' }))
+    expect(subida.manual.sistema).toBe('tanque')
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=`,
+    })
+
+    expect(r.statusCode).toBe(200)
+    expect(json(r).manual.sistema).toBeNull()
+    expect(json(r).manual.estado).toBe('activo')
+  })
+
+  it('asignar a un sistema que no existe da 400 y no toca el manual', async () => {
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido', { sistema: 'tanque' }))
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=compresor`,
+    })
+
+    expect(r.statusCode).toBe(400)
+
+    const listado = json(await app.inject({ method: 'GET', url: '/api/rag/documentos' }))
+    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('tanque')
+  })
+
+  it('sin `accion`, el PATCH sigue archivando como siempre', async () => {
+    // Compatibilidad: `accion` por defecto es `archivar`, así que las llamadas
+    // que ya existían —incluida la del frontend— siguen significando lo mismo.
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido'))
+
+    const r = await app.inject({ method: 'PATCH', url: `/api/rag/documentos?id=${subida.manual.id}` })
+
+    expect(r.statusCode).toBe(200)
+    expect(json(r).manual.estado).toBe('archivado')
+  })
+
   it('un manual archivado ya no aparece con fragmentos en el listado', async () => {
     const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
     const subida = json(await subir(app, 'manual.txt', 'contenido'))
