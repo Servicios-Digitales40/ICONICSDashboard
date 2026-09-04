@@ -7,7 +7,7 @@ build/
 # (ver IA_REPORTES_DIR e IA_BACKLOG_CHAT_DIR en .env.example). Datos, no
 # codigo.
 Documentos/
-
+Reportes/
 # Manuales de planta que alimentan el RAG del asistente (Plan 16), subidos
 # desde el tablero o dejados a mano (ver IA_DOCS_DIR en .env.example). No es
 # codigo de este repositorio: es documentacion de UNA instalacion concreta,
