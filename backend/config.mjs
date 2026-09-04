@@ -231,6 +231,28 @@ function readCorsOrigins(rawValue) {
 }
 
 /**
+ * `FRAME_ANCESTORS` NO puede reusar `readCorsOrigins`: ahí un `*` literal es
+ * inofensivo porque se compara por igualdad exacta contra un `Origin` real,
+ * que un navegador nunca manda como el string "*". Aquí la lista se inyecta
+ * TAL CUAL en la CSP como `frame-ancestors <lista>`, donde `*` es sintaxis de
+ * comodín de verdad — dejarlo pasar abriría exactamente el agujero que
+ * CLAUDE.md §2.9 prohíbe para CORS, sólo que en la puerta de enfrente. Se
+ * falla ruidoso en vez de filtrarlo en silencio: la misma regla que
+ * `ICONICS_API_BASE` inválido.
+ */
+function readFrameAncestors(rawValue) {
+  const origenes = readCorsOrigins(rawValue)
+  const comodin = origenes.find(o => o.includes('*'))
+  if (comodin) {
+    throw new Error(
+      `FRAME_ANCESTORS no admite comodines (recibido: "${comodin}"). ` +
+      'Lista los orígenes exactos, separados por comas — igual que CORS_ORIGINS.'
+    )
+  }
+  return origenes
+}
+
+/**
  * `NODE_TLS_REJECT_UNAUTHORIZED=0` desactiva la verificación de certificados
  * del proceso ENTERO, no sólo de las llamadas a ICONICS. Es la mitigación
  * documentada como R-13 y el descuido más fácil de cometer: basta con que el
@@ -398,6 +420,17 @@ export function loadConfig(env = process.env) {
     tlsVerificationDisabled: checkTlsVerification(env, isProduction),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
     /**
+     * Orígenes autorizados a EMPOTRAR esta aplicación en un `<iframe>` propio
+     * (`frame-ancestors` de la CSP). Vacío por defecto —nadie puede
+     * enmarcarnos—, con el mismo formato y la misma lectura que
+     * `CORS_ORIGINS`: es la misma clase de decisión, "quién puede montarse
+     * encima de esta app", sólo que una es para peticiones y la otra para
+     * ventanas. Existe porque un panel HMI de ICONICS (AnyGlass/GraphWorX)
+     * puede querer mostrar el asistente como una pantalla más de su propio
+     * proyecto, empotrada en un iframe — ver docs/PLAN-20-ASISTENTE.md.
+     */
+    frameAncestors: readFrameAncestors(env.FRAME_ANCESTORS),
+    /**
      * Detrás de un proxy inverso, `socket.remoteAddress` es el proxy para
      * TODOS los clientes: sin esto el limitador contaría a la planta entera
      * como una sola IP. Se activa a propósito y sólo cuando hay un proxy
@@ -446,6 +479,19 @@ export function loadConfig(env = process.env) {
       clientId: OIDC_CLIENT_ID,
       scope: OIDC_SCOPE,
       endpoints: Object.freeze(buildEndpoints(origin, apiBase)),
+      /**
+       * SSO silencioso (Plan 20, HMI embebido): la `redirect_uri` que recibe
+       * el `code` cuando el navegador YA tiene sesión de ICONICS (porque
+       * entró por su HMI nativo — AnyGlass/GraphWorX) y esta app vive
+       * empotrada ahí en un `<iframe>`. VACÍO por defecto y la función entera
+       * queda apagada sin él: la URL tiene que coincidir EXACTA con una de
+       * las registradas a mano en ICONICS (Workbench → Security → Global
+       * Settings → Web Login → "In-house application Relying Party Redirect
+       * URIs"), y una que no coincida no falla aquí — falla en ICONICS, con
+       * un error que no dice qué backend lo pidió. Mejor no ofrecer el
+       * intento que ofrecerlo roto.
+       */
+      ssoRedirectUri: env.SSO_REDIRECT_URI || null,
     }),
 
     /**

@@ -7,10 +7,14 @@ las cabeceras de cada archivo y en `docs/`; aquí sólo el resumen accionable.
 
 ## 1. Qué es esto
 
-Puente Node hacia ICONICS FrameWorX + un dashboard React (Demo EVA) que
-enseña dos instalaciones de planta (un sistema de agua y un sistema de
-vibraciones) y un asistente de IA que responde sobre ellas. Detalle de
-producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
+Puente Node hacia ICONICS FrameWorX y **una sola pantalla**: la conversación
+con el asistente. El técnico entra con su usuario y contraseña de ICONICS —no
+los de un `.env`— y a partir de ahí pregunta; todo lo que la aplicación sabe
+hacer se pide hablando. No hay sidebar, router de páginas, 3D ni gráficas de
+tablero: eso vivía en la rama `Moises6` (el tablero de OEE / Demo EVA) y se
+borró aquí en el [Plan 20](docs/PLAN-20-ASISTENTE.md), que es la referencia
+completa de por qué y de qué sobrevivió. Detalle de producto en
+[`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 
 ## 2. No negociables (arquitectura)
 
@@ -64,17 +68,29 @@ regla.
    al revés.
 8. **`ICONICS_FAKE=true` nunca en producción.** Es el transporte simulado para
    desarrollo sin red — ver `backend/iconics/fakeClient.mjs`.
-9. **Sin comodín en CORS.** `CORS_ORIGINS` compara por igualdad exacta; no
-   existe `*`.
+9. **Sin comodín en CORS ni en `frame-ancestors`.** `CORS_ORIGINS` compara
+   por igualdad exacta; no existe `*`. `FRAME_ANCESTORS` (quién puede
+   empotrarnos en un `<iframe>` — por ejemplo un HMI nativo de ICONICS,
+   AnyGlass/GraphWorX) es más estricta todavía: ahí el comodín SÍ funcionaría
+   de verdad si se dejara pasar —es sintaxis real de la CSP, no una
+   comparación de igualdad—, así que el arranque falla si lo detecta en vez
+   de filtrarlo en silencio. Ver `backend/http/plugins/seguridad.mjs`.
 10. **La agrupación en 4 activos (Tanque, Bombeo, Distribución, Eléctrico) es
     NUESTRA, no del servidor.** Bajo `ac:TDCON/DEMO/SENSORES/` no hay equipos,
     sólo señales sueltas. Si el servidor publica equipos de verdad algún día,
     se sustituye `shared/eva/activos.js` y ninguna vista se entera — pero
     hasta entonces, ese archivo es la única fuente de esa agrupación.
-11. **Autenticación existe como decorador sin exigir nada todavía**
-    (`backend/http/plugins/autenticacion.mjs`, `AUTH_HABILITADA=false`). No se
-    activa como efecto colateral de otra tarea — es su propio plan (ver G11 en
-    `docs/PLAN-17-CERRAR-AUDITORIA.md`).
+11. **La sesión es obligatoria: no hay decorador vacío ni interruptor.** No
+    existe `AUTH_HABILITADA` — el técnico entra con **su usuario y contraseña
+    de ICONICS**, y sin esa sesión no hay token con el que leer nada. Toda
+    ruta de `/api/` salvo `/api/health*` y `POST /api/sesion` declara
+    `onRequest: [fastify.autenticar]`. Ver
+    [`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md) §4.
+12. **Una sola vista.** No se añade una ruta de página. Lo que haya que
+    enseñar se enseña dentro del chat o en un cajón del chat (Assets,
+    Manuales, Casos — §4.4 más abajo). Un `router` con dos entradas es el
+    primer paso para volver a tener veintidós, y este proyecto ya hizo ese
+    camino una vez.
 
 ## 3. Estructura del repo
 
@@ -85,34 +101,35 @@ regla.
 ├── PRODUCT.md             Qué es esto para quién
 ├── DESIGN.md              Sistema de diseño (color, tipografía, componentes)
 ├── backend/               Servidor puente hacia ICONICS (Node, Fastify)
-│   ├── http/                Mecánica HTTP: router, esquemas Zod, plugins
-│   ├── ia/                  Asistente
+│   ├── http/plugins/         autenticacion.mjs (sesión de persona), seguridad, errores
+│   ├── ia/                  Asistente. Íntegro desde el Plan 20: no lo tocó el borrado
 │   │   ├── indices/           Búsqueda: bm25, documentos, embeddings, manuales
 │   │   ├── motor/             Diagnóstico determinista: diagnostico, casos, temporal
 │   │   ├── conversacion/      Bucle del modelo: chat, cola, definiciones, herramientas
-│   │   ├── herramientas/      Una carpeta por FAMILIA de herramienta del modelo
+│   │   ├── herramientas/      Una carpeta por FAMILIA de herramienta del modelo (22, en 6)
 │   │   ├── reporte.mjs        PDF de la conversación (import diferido)
 │   │   └── voz.mjs            Dictado (whisper)
-│   ├── iconics/              Autenticación OIDC, cliente REST, transporte falso
-│   ├── routes/                Traducción HTTP ↔ cliente (una por dominio)
-│   └── test/                  vitest: contratos HTTP, esquemas, config
-├── react-dashboard/        Frontend React + Vite
+│   ├── iconics/              Autenticación OIDC+PKCE, cliente REST, transporte falso
+│   ├── sesiones/registro.mjs  El registro de sesiones de persona — ver §2.11
+│   ├── routes/                sesionRoutes + una por dominio (chat, iconics, rag, casos,
+│   │                          control, diagnostico, reportes, voz, system)
+│   └── test/                  vitest: contratos HTTP, esquemas, config, sesión
+├── react-dashboard/        Frontend React + Vite. Sin router: dos pantallas por estado
+│   │                       de sesión (§2.11, §2.12)
 │   └── src/
-│       ├── Demo-EVA/           Todo lo que sabe de las dos máquinas de planta
-│       │   ├── domain/            Puertas (re-export) hacia shared/eva/ — ver §4.2
-│       │   ├── data/               Lectura de red, por máquina: tanque/, vibraciones/, comunes/
-│       │   ├── views/              Presentación, por máquina: tanque/, vibraciones/, comunes/
-│       │   ├── components/         Piezas de presentación de esta demo
-│       │   └── three-d/            Maqueta 3D
-│       ├── modulos/             Módulos que NO se sirven de ICONICS — ver §4.7
-│       │   └── prediccion/         El compresor, por API externa (data/, views/, components/)
-│       ├── components/          Kit de UI genérico (no sabe de ICONICS ni de Demo EVA)
-│       ├── features/             Módulos verticales (asistente, three-d genérico, data)
-│       ├── lib/                  Infraestructura de frontend
-│       │   └── api/                Clientes HTTP de planta (apiBase, casosApi, ragApi)
+│       ├── app/App.jsx         Login | Asistente, según GET /api/sesion
+│       ├── auth/                SesionProvider.jsx, Login.jsx
+│       ├── features/asistente/  el corazón — pantalla completa, con sus tres cajones
+│       │   └── cajones/            Assets, Manuales, Casos — ver docs/PLAN-20-ASISTENTE.md §5.5
+│       ├── components/
+│       │   ├── ui/                 Button, Input, Panel, AlertBanner, SectionLabel…
+│       │   └── assets/ExploradorAssets.jsx   montado en el cajón «Assets»
+│       ├── lib/
+│       │   ├── api/                pedir.js (la única puerta a fetch) + apiBase/casosApi/ragApi
+│       │   └── iconics/            apiClient + index (browse/points/data), para el cajón Assets
 │       ├── theme/                 Tokens de tema (claro/oscuro/Mitsubishi Electric)
-│       └── test/                  vitest: por área, espejo de src/
-├── shared/                 Dominio puro que usan LOS DOS programas (§2.6, §2.7)
+│       └── test/                  vitest: app/, auth/, dominio/, features/, lib/
+├── shared/                 Dominio puro. ÍNTEGRO desde el Plan 20 — no se le tocó una línea
 │   └── eva/                  Las dos instalaciones — ver shared/README.md para el mapa completo
 │       ├── tanque/             Su catálogo, física, reglas y proyección
 │       ├── vibraciones/        Lo mismo, para la otra máquina
@@ -122,10 +139,15 @@ regla.
 └── docs/                   Planes (`PLAN-N-*.md`) y backlogs (`BACKLOG-*.md`)
 ```
 
+> **De dónde salió esta forma.** Hasta el 03-09-2026 el repo era un tablero de
+> 22 rutas (Demo EVA: tanque, vibraciones, alarmas, assets, predicción, RAG) con
+> sidebar, 3D y gráficas. La rama `Asistente` lo destiló a una sola vista —el
+> chat— conservando `backend/ia/` y `shared/` byte a byte. La rama del tablero
+> sigue viva en `Moises6`. Razón, alcance y las cinco fases ejecutadas están en
+> [`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md); no se repiten aquí.
+
 Mapas detallados con el porqué de cada archivo: [`shared/README.md`](shared/README.md)
-(dominio), [`backend/README.md`](backend/README.md) (servidor),
-[`react-dashboard/src/Demo-EVA/README.md`](react-dashboard/src/Demo-EVA/README.md)
-(frontend de planta).
+(dominio), [`backend/README.md`](backend/README.md) (servidor).
 
 ## 4. Convenciones
 
@@ -152,9 +174,9 @@ que ninguna.
 ### 4.2 El patrón "puerta" al mover un archivo
 
 Cuando un archivo se traslada pero algo externo sigue importando la ruta
-vieja por conveniencia (p. ej. `react-dashboard/src/Demo-EVA/domain/*.js`
-después de que su contenido se movió a `shared/eva/`), la ruta vieja se deja
-como una puerta de una línea:
+vieja por conveniencia, la ruta vieja se deja como una puerta de una línea
+(el ejemplo histórico, `Demo-EVA/domain/*.js` reexportando `shared/eva/`, se
+borró con el tablero en el Plan 20 — el patrón sigue vigente igual):
 
 ```js
 /**
@@ -171,33 +193,26 @@ copia es una divergencia esperando a pasar.
 
 ### 4.3 Separación por capa, no por tipo de archivo
 
-- **Dominio** (`shared/`, `Demo-EVA/domain/` como puerta): reglas de negocio,
-  puro, se prueba en Node sin red ni DOM.
-- **Transporte/datos** (`Demo-EVA/data/`, `backend/ia/indices/`): sabe hacer
-  `fetch` o leer el historiador; no decide reglas de negocio, las importa del
-  dominio.
-- **Presentación** (`components/`, `views/`): sabe de React y de colores; no
-  decide bandas ni umbrales, los pide al dominio ya resueltos.
+- **Dominio** (`shared/`): reglas de negocio, puro, se prueba en Node sin red
+  ni DOM.
+- **Transporte/datos** (`backend/ia/indices/`, `lib/api/`, `lib/iconics/`):
+  sabe hacer `fetch` o leer el historiador; no decide reglas de negocio, las
+  importa del dominio.
+- **Presentación** (`components/`, `features/asistente/`): sabe de React y de
+  colores; no decide bandas ni umbrales, los pide al dominio ya resueltos.
 
 Una vista que calcula una banda de riesgo con su propio `if` está rompiendo
 esta capa — la banda se pide a `shared/eva/`, no se recalcula.
 
-### 4.4 Nomenclatura por máquina
+### 4.4 No hay nomenclatura de vista por máquina
 
-Con dos instalaciones (tanque, vibraciones) más lo transversal, el nombre de
-archivo/vista se distingue por **máquina**, no por el nombre de la demo:
-
-- `tanque/` — `InicioTanque`, `PlantaTanque`, `RiesgosTanque`, `ControlesTanque`,
-  `MaquetaTanque3D`, `DetalleActivo` (ya es exclusivo del tanque por
-  contenido, no necesita el sufijo).
-- `vibraciones/` — `InicioVibraciones`, `RiesgosVibracion`, `Vibraciones`,
-  `Vibraciones3D`, `ControlesVibraciones`.
-- `comunes/` — lo que no pertenece a una sola máquina (el explorador de
-  Assets, Alarmas, Cierre de diagnóstico, Documentación, Predicción). Aquí
-  "Eva" en el nombre no es ruido porque no hay máquina que distinguir.
-
-El sufijo "Eva" se elimina cuando la carpeta ya dice la máquina; no aporta
-información ahí y sólo la repite.
+Hasta el Plan 20 había una convención de nombres por máquina (`InicioTanque`,
+`RiesgosVibracion`…) porque había nueve vistas por instalación. Con una sola
+pantalla no aplica: la distinción por máquina vive donde tiene que vivir, en
+`shared/eva/{tanque,vibraciones}/`, y el frontend ya no tiene vistas que
+nombrar por instalación. Los tres cajones (`features/asistente/cajones/`) se
+nombran por lo que muestran —Assets, Manuales, Casos—, no por máquina, porque
+ninguno pertenece a una sola.
 
 ### 4.5 Alias de import
 
@@ -225,6 +240,16 @@ Dos palabras que se parecen y no se pueden intercambiar:
   `prediccion` (un compresor real, por API externa). Se declaran en
   `shared/modulos.js`.
 
+> **En la rama `Asistente` sigue habiendo dos módulos, no uno.** El
+> [Plan 20](docs/PLAN-20-ASISTENTE.md) borró la vista de Predicción del
+> frontend por estar fuera de alcance (otra fuente de datos), pero
+> `shared/modulos.js` es dominio compartido y el plan no lo tocó: sigue
+> declarando `prediccion`, con la limitación explícita de que el asistente
+> todavía no la alcanza. `scripts/verificar-modulos.mjs` sigue vivo y en
+> verde por esto mismo — comprueba la separación entre los dos módulos, no
+> sólo entre los dos sistemas de ICONICS. Si un backend nuevo llega a
+> consultar el compresor, la regla de abajo ya está puesta.
+
 De ahí sale una regla concreta: **una máquina que no se lee por ICONICS no
 entra en `SISTEMAS`.** Meterla obligaría a que cada una de esas funciones
 tuviera una rama «ésta no es de ICONICS», que es exactamente el `if` repetido
@@ -237,36 +262,45 @@ Antes de dar una tarea por terminada, corre lo que toque de esta lista.
 
 **Frontend** (`react-dashboard/`):
 ```bash
-npm test              # vitest — dominio, componentes, hooks
-npm run design:detect  # impeccable — antipatrones de diseño/CSS
-npm run build           # confirma que el bundle sigue compilando
+npm test               # vitest — 19 archivos, dominio + auth + asistente + cajones
+npm run design:detect   # impeccable — antipatrones de diseño/CSS
+npm run build            # confirma que el bundle sigue compilando
 ```
+> Tras el [Plan 20](docs/PLAN-20-ASISTENTE.md), `design:detect` da **un**
+> aviso *advisory* (`codex-grid-background` sobre el trazo de la respuesta) y
+> está documentado como excepción deliberada en la cabecera de
+> `Asistente.jsx` — no es una regresión pendiente de arreglar.
 
 **Backend** (`backend/`):
 ```bash
-npm test               # vitest — contratos HTTP (esquemas Zod), config, logger
+npm test               # vitest — 12 archivos, contratos HTTP, sesión, config, logger
 ```
 
 **Verificadores de extremo a extremo** (`scripts/`, sin red real — levantan un
 ICONICS y un llama-server falsos):
 ```bash
 node scripts/verificar-backend.mjs          # contrato HTTP completo
-node scripts/verificar-herramientas.mjs      # cada herramienta del asistente
+node scripts/verificar-herramientas.mjs      # las 22 herramientas del asistente
 node scripts/verificar-chat.mjs               # el bucle de conversación
 node scripts/verificar-diagnostico.mjs        # el motor: las 4 fuentes y su puntuación
 node scripts/verificar-documentos.mjs          # índice de manuales / BM25
 node scripts/verificar-casos.mjs                # índice de casos previos
-node scripts/verificar-casos-cierre.mjs          # cierre de diagnóstico (form y chat)
+node scripts/verificar-casos-cierre.mjs          # cierre de diagnóstico — sólo por chat
 node scripts/verificar-temporal.mjs               # la 4ª fuente (tendencia)
 node scripts/verificar-calibracion.mjs             # sensibilidad de umbrales al tamaño de corpus
 node scripts/verificar-riesgos.mjs                  # reglas de riesgo del tanque
 node scripts/verificar-riesgos-vibracion.mjs         # reglas de riesgo de vibraciones
 node scripts/verificar-pronostico.mjs                 # desgaste acumulado
+node scripts/verificar-aprendizaje.mjs                 # hechos, intervenciones y propuestas
 node scripts/verificar-voz.mjs                          # dictado (whisper falso)
 node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
 node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
 node scripts/verificar-modulos.mjs                         # los dos módulos no cruzan fuentes (§4.7)
+node scripts/verificar-sesion.mjs                            # login nativo, extremo a extremo (§2.11)
 ```
+> `verificar-modulos.mjs` sigue en la lista a propósito: `shared/modulos.js`
+> sigue declarando dos módulos aunque la vista de Predicción ya no exista en
+> esta rama — ver la nota de §4.7.
 
 **Sonda contra ICONICS REAL** (no vale el falso: necesita red a planta y
 `--env-file`):
@@ -299,19 +333,22 @@ node --env-file=.env.local scripts/medir-narracion.mjs     # ¿obedece el modelo
 
 **Tras compilar el frontend:**
 ```bash
-node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
+node scripts/verificar-bundle.mjs   # la pila 3D/recharts/xlsx no ha vuelto; techos de arranque
 ```
-> **Hoy pasa** (medido el 02-09-2026: `index` 92,21 KB sobre 170,
-> `vendor` 203,26 KB sobre 210). Este documento decía que seguía en rojo
-> —«161,84 KB sobre un techo de 90»—; eso describía a `vendor`, y dejó de
-> ser cierto el 31-ago-2026, un día antes de escribirse esta línea.
+> **Remedido el 04-09-2026, al cerrar la Fase 5 del Plan 20**: `index`
+> 98,88 KB sobre un techo de 110, `vendor` 125,18 KB sobre un techo de 140.
+> `three`, `@react-three/*`, `recharts` y `xlsx` se desinstalaron en la F3 —
+> `vendor` cayó un 46 % (de 203 a 109 KB en esa medición intermedia) — así que
+> el guion ya no vigila «¿está diferido?» sino **«¿ha vuelto?»**: falla si
+> encuentra el rastro de cualquiera de las tres en el código emitido, esté
+> diferido o no.
 >
-> El techo de `vendor` se subió entonces de 90 a 210 KB al instalar TanStack
-> Query, con la medición y el motivo en la cabecera del propio guion. Roza la
-> regla de «no se sube el techo para callarlo», así que conviene saberlo:
-> quedó documentado y razonado, no escondido, pero `vendor` va hoy a 203 de
-> 210 y el margen es de 7 KB. Ver `docs/BACKLOG-FRONTEND.md` F5, que sigue
-> describiendo la situación anterior.
+> Los techos subieron de 102/126 (medidos en la F3, contra una app
+> **incompleta**: sin login y sin cajones) a 110/140 al terminar la F5, por
+> razones legítimas y medidas: `index` +10 KB por el login, la sesión y el
+> armazón de tres estados; `vendor` +16 KB porque los cajones usan `useQuery`.
+> Los tres cajones (Assets, Manuales, Casos) no cuentan en ninguno de los dos:
+> viajan en `chunk`s propios, diferidos con `lazy()`.
 
 **Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
 `verificar-herramientas.mjs` y el verificador específico de lo que tocó
@@ -344,4 +381,5 @@ verificadores de ambas instalaciones si el archivo es común a las dos.
 - [`shared/README.md`](shared/README.md) — mapa completo del dominio compartido
 - [`backend/README.md`](backend/README.md) — variables de entorno del servidor
 - [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md), [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — deuda conocida y priorizada
-- [`docs/PLAN-17-CERRAR-AUDITORIA.md`](docs/PLAN-17-CERRAR-AUDITORIA.md) — última auditoría de arquitectura completa
+- [`docs/PLAN-17-CERRAR-AUDITORIA.md`](docs/PLAN-17-CERRAR-AUDITORIA.md) — última auditoría de arquitectura completa (previa al Plan 20)
+- [`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md) — la rama `Asistente`: por qué es una rama y no un proyecto nuevo, el login nativo, el inventario de borrado, las siete fases ejecutadas (la última, el SSO silencioso para vivir embebido en el HMI de ICONICS)

@@ -6,7 +6,7 @@
  * exactamente como faltaban.
  */
 import { afterAll, describe, expect, it } from 'vitest'
-import { json, montarApp } from '../ayudas.mjs'
+import { json, montarApp, montarAppSinSesion } from '../ayudas.mjs'
 
 const { app } = await montarApp()
 afterAll(() => app.close())
@@ -49,6 +49,68 @@ describe('cabeceras de seguridad', () => {
     expect(respuesta.headers['content-security-policy']).toMatch(
       /style-src[^;]*'unsafe-inline'/
     )
+  })
+})
+
+describe('FRAME_ANCESTORS', () => {
+  it('con la lista vacía, sigue en frame-ancestors \'none\' y X-Frame-Options DENY', async () => {
+    const respuesta = await app.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).toMatch(/frame-ancestors 'none'/)
+    expect(respuesta.headers['x-frame-options']).toBe('DENY')
+  })
+
+  it('declarado, se sustituye \'none\' por \'self\' + los orígenes exactos', async () => {
+    const { app: conFrame } = await montarApp({ FRAME_ANCESTORS: 'https://bms-server' })
+    const respuesta = await conFrame.inject({ method: 'GET', url: '/api/health/live' })
+    const csp = respuesta.headers['content-security-policy']
+    expect(csp).toMatch(/frame-ancestors 'self' https:\/\/bms-server/)
+    expect(csp).not.toMatch(/frame-ancestors 'none'/)
+    await conFrame.close()
+  })
+
+  it('con la lista vacía, NO añade \'self\': sin SSO silencioso que ofrecer, no hay motivo', async () => {
+    // 'self' sólo tiene sentido para el iframe oculto de /auth/silencioso, que
+    // no existe sin FRAME_ANCESTORS. Añadirlo siempre sería relajar la CSP sin
+    // que nada lo necesite.
+    const respuesta = await app.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).not.toMatch(/frame-ancestors[^;]*'self'/)
+  })
+
+  it('nunca acepta el comodín: el arranque falla, no lo filtra en silencio', async () => {
+    // A diferencia de CORS_ORIGINS (donde un '*' es inofensivo por comparar
+    // por igualdad exacta), aquí la lista se inyecta TAL CUAL en la CSP:
+    // "frame-ancestors *" es un comodín de verdad y dejaría enmarcar la app
+    // desde cualquier sitio. Se falla ruidoso al arrancar, como con
+    // ICONICS_API_BASE inválido.
+    await expect(montarApp({ FRAME_ANCESTORS: '*' })).rejects.toThrow(/FRAME_ANCESTORS/)
+  })
+
+  it('con SSO_REDIRECT_URI y un ICONICS real, frame-src permite abrir el iframe oculto hacia ICONICS', async () => {
+    const { app: conSso } = await montarAppSinSesion({
+      FRAME_ANCESTORS: 'https://bms-server',
+      SSO_REDIRECT_URI: 'http://localhost:3001/auth/silencioso',
+      ICONICS_FAKE: 'false',
+      ICONICS_API_BASE: 'https://bms-server/fwxapi/rest/v1',
+    })
+    const respuesta = await conSso.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).toMatch(/frame-src 'self' https:\/\/bms-server/)
+    await conSso.close()
+  })
+
+  it('sin SSO_REDIRECT_URI, no hay frame-src propio: default-src ya prohíbe todo iframe saliente', async () => {
+    const respuesta = await app.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).not.toMatch(/frame-src/)
+  })
+
+  it('con orígenes declarados, X-Frame-Options se retira en vez de mentir con ALLOW-FROM', async () => {
+    // Ningún navegador moderno respeta ALLOW-FROM (Chrome nunca lo
+    // implementó): dejarlo puesto no protegería nada y daría la falsa
+    // impresión de una segunda barrera. La CSP de arriba es la que de verdad
+    // se aplica.
+    const { app: conFrame } = await montarApp({ FRAME_ANCESTORS: 'https://bms-server' })
+    const respuesta = await conFrame.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['x-frame-options']).toBeUndefined()
+    await conFrame.close()
   })
 })
 

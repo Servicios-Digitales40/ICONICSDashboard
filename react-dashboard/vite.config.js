@@ -43,6 +43,20 @@ function versionDelBuild() {
 export default defineConfig({
   plugins: [react()],
 
+  /*
+   * Vacío por defecto ("/"): el bundle vive en la raíz del origen que lo
+   * sirve, que es el caso normal (el backend sirve su propio "dist/").
+   *
+   * `VITE_BASE_PATH` existe para el caso contrario y deliberado: montar el
+   * Asistente bajo una SUBRUTA de un sitio que ya sirve OTRA cosa en la raíz
+   * — el HMI nativo de ICONICS, con un proxy inverso de IIS reenviando
+   * `/asistente/*` hacia este backend (ver docs/PLAN-20-ASISTENTE.md, SSO
+   * silencioso). Sin esto, el HTML compilado referenciaría `/assets/...` en
+   * vez de `/asistente/assets/...`, y el navegador pediría esos archivos a
+   * la raíz del dominio de ICONICS en vez de a nuestro proxy.
+   */
+  base: process.env.VITE_BASE_PATH || "/",
+
   define: {
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(versionDelBuild()),
   },

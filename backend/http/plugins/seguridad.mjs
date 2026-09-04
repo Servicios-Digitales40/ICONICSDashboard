@@ -11,6 +11,16 @@
  * agujero que el `Access-Control-Allow-Origin: *` que ya se quitó de
  * `cors.mjs`, y se tapa igual: negando por defecto.
  *
+ * ── `FRAME_ANCESTORS`, LA EXCEPCIÓN DELIBERADA ─────────────────────
+ *
+ * Vacío por defecto — nadie puede enmarcarnos, igual que `CORS_ORIGINS`
+ * vacío significa que nadie más puede llamar a la API. Un HMI nativo de
+ * ICONICS (AnyGlass/GraphWorX) puede querer mostrar el asistente como una
+ * pantalla más de su propio proyecto, dentro de un `<iframe>`; para eso se
+ * lista su origen exacto en `FRAME_ANCESTORS` (mismo formato que
+ * `CORS_ORIGINS`), nunca un comodín. Con la lista vacía, `frame-ancestors`
+ * sigue siendo `'none'` y `X-Frame-Options` sigue siendo `DENY`.
+ *
  * ── CORS ───────────────────────────────────────────────────────────
  *
  * La lista sigue **vacía por defecto**, que era la decisión importante del
@@ -43,6 +53,32 @@ import rateLimit from '@fastify/rate-limit'
 async function seguridadPlugin(fastify, { config }) {
   /* ── Cabeceras ──────────────────────────────────────────────────── */
 
+  /*
+   * `'self'` se añade a propósito cuando hay orígenes declarados, y no antes:
+   * el SSO silencioso (`/auth/silencioso`) abre un iframe OCULTO dentro de
+   * nuestra propia página para hablar con ICONICS — y esa página, a su vez,
+   * ya vive dentro del iframe del HMI. `frame-ancestors` exige que TODOS los
+   * ancestros de la cadena estén permitidos, no sólo el inmediato, así que
+   * sin `'self'` el propio iframe oculto se bloquearía a sí mismo. Con la
+   * lista vacía (nadie puede enmarcarnos en absoluto) no hace falta ni tiene
+   * sentido: no hay SSO silencioso que ofrecer sin `FRAME_ANCESTORS`.
+   */
+  const frameAncestors = config.frameAncestors.length
+    ? ["'self'", ...config.frameAncestors]
+    : ["'none'"]
+
+  /*
+   * `frame-ancestors` (arriba) dice quién puede enmarcarnos A NOSOTROS;
+   * `frame-src` dice a dónde SÍ podemos apuntar un `<iframe>` propio, y por
+   * defecto `default-src 'self'` lo prohíbe todo salvo el propio origen. El
+   * SSO silencioso necesita lo contrario de la restricción de arriba: abre
+   * un iframe OCULTO hacia el `authorize` de ICONICS. Sin `SSO_REDIRECT_URI`
+   * no hay iframe que abrir, así que no se relaja nada.
+   */
+  const frameSrc = config.iconics.ssoRedirectUri && config.iconics.origin
+    ? ["'self'", config.iconics.origin]
+    : undefined
+
   await fastify.register(helmet, {
     /*
      * La CSP se declara a mano porque la de helmet por defecto rompe el
@@ -70,9 +106,23 @@ async function seguridadPlugin(fastify, { config }) {
         // de `fonts.googleapis.com` de arriba.
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
+        frameAncestors,
+        ...(frameSrc ? { frameSrc } : {}),
         baseUri: ["'self'"],
         formAction: ["'self'"],
+        /*
+         * Helmet la activa por defecto, y en desarrollo eso ROMPE el SSO
+         * silencioso: reescribe en silencio el `http://localhost:.../auth/
+         * silencioso` del iframe oculto a `https://`, y como este backend en
+         * desarrollo sólo habla HTTP, esa versión ya no coincide con `'self'`
+         * —sensible al esquema— y `frame-src` la bloquea. Confirmado a mano
+         * el 04-09-2026: el error de consola nombraba `https://localhost:3001/`,
+         * con "s", nunca pedido por este código. Ver el aviso oficial de
+         * Helmet sobre esta misma trampa en desarrollo (su propio README).
+         * En producción, detrás de HTTPS de verdad, no hace falta reescribir
+         * nada — todo ya sale por HTTPS.
+         */
+        upgradeInsecureRequests: config.isProduction ? [] : null,
       },
     },
     /*
@@ -91,13 +141,17 @@ async function seguridadPlugin(fastify, { config }) {
      */
     crossOriginEmbedderPolicy: false,
     /*
-     * `DENY` y no el `SAMEORIGIN` que trae helmet por defecto: el tablero no
-     * se empotra a sí mismo en ningún sitio, así que no hay nada que permitir.
-     * Es la versión heredada de `frame-ancestors 'none'` de la CSP, para los
-     * navegadores que no la aplican; dejarla más laxa que la CSP haría que la
-     * protección dependiera de cuál de las dos lea el navegador.
+     * `DENY` mientras `FRAME_ANCESTORS` esté vacío: es la versión heredada de
+     * `frame-ancestors 'none'`, para los navegadores que no leen la CSP.
+     *
+     * Con `FRAME_ANCESTORS` configurado se desactiva en vez de intentar
+     * `ALLOW-FROM`: ningún navegador moderno lo respeta (Chrome nunca lo
+     * implementó), así que dejarlo puesto no protegería nada y sólo daría la
+     * falsa impresión de una segunda barrera. La única cabecera que un
+     * navegador de hoy aplica de verdad es la CSP de arriba — que es,
+     * precisamente, la que bloqueó el framing antes de esta variable.
      */
-    frameguard: { action: 'deny' },
+    frameguard: config.frameAncestors.length ? false : { action: 'deny' },
   })
 
   /* ── CORS ───────────────────────────────────────────────────────── */

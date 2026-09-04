@@ -90,6 +90,25 @@ export async function montarApp(extra = {}) {
 }
 
 /**
+ * Como `montarApp`, pero SIN abrir sesión de prueba.
+ *
+ * `montarApp` inicia sesión con el transporte falso porque las once pruebas
+ * de rutas la necesitan puesta. Pero eso exige `ICONICS_FAKE=true` — sin
+ * transporte falso, `abrirSesion` intentaría un login real contra
+ * `ICONICS_API_BASE` con credenciales de mentira y fallaría con 401 antes de
+ * que la prueba llegara a lo que quería comprobar. Existe para las rutas que
+ * se prueban precisamente SIN sesión —el SSO silencioso construye su URL
+ * antes de que exista una— y para cualquier config que no sea el transporte
+ * falso por defecto.
+ */
+export async function montarAppSinSesion(extra = {}) {
+  const config = loadConfig({ LOG_LEVEL: 'silent', ...extra })
+  const servidor = await createApp(config)
+  await servidor.ready()
+  return { app: servidor, config }
+}
+
+/**
  * Envuelve la app para que cada `inject()` viaje con la cookie de sesión.
  *
  * Respeta lo que el llamante ya haya puesto: si trae `headers.cookie` —aunque

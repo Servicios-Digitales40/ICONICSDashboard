@@ -1,8 +1,12 @@
 # Plan 20 — La rama `Asistente`: una sola vista, el mismo motor
 
-> Estado: **plan aprobado, sin ejecutar**. Rama creada desde `Moises6` el
-> 03-09-2026. Cada fase se prueba y se comitea antes de pasar a la siguiente
-> (CLAUDE.md §6).
+> Estado: **ejecutado por completo — F1 a F7, todas HECHAS.** Rama creada
+> desde `Moises6` el 03-09-2026. F1–F6 cerradas el 04-09-2026; F7 (SSO
+> silencioso, el Asistente embebido en el HMI nativo) se sumó el mismo día, a
+> partir de una necesidad real de despliegue. Cada fase se probó y se
+> comiteó antes de pasar a la siguiente (CLAUDE.md §6). Lo que sigue
+> pendiente, fuera de este plan, está en §8 (riesgos declarados) y en el
+> Anexo A (Plan 21).
 
 ## §0 La decisión: rama, no proyecto nuevo
 
@@ -1104,15 +1108,322 @@ de una preferencia visual.
 **Verde:** `asistente.test.jsx`, `manosLibres.test.jsx`, las tres nuevas de
 cajón, `npm run design:detect`.
 
-### F6 · Documentación y presupuestos
-`CLAUDE.md` de esta rama: §2.11 reescrita, §2.12 nueva, §3 con el árbol real,
-§5 con la lista de pruebas que quedan. `README.md`: arranque sin
-`ICONICS_USERNAME`/`PASSWORD` y el requisito de HTTPS (§8.4).
-`.env.example` recortado, con `SESION_TTL_MINUTOS` y `SESION_MAX`. Techos
-nuevos y **medidos** en `verificar-bundle.mjs`. (`PRODUCT.md` y `DESIGN.md` ya
-se reescribieron en F4.5 — tenían que estar listos antes de diseñar.)
-**Verde:** `npm run design:detect`, `verificar-bundle.mjs`, la tanda completa
-de `verificar-*`.
+### F6 · Documentación y presupuestos — **HECHA**
+
+> Ejecutada el 04-09-2026. Sin cambios de código: sólo `CLAUDE.md`,
+> `README.md` y `.env.example`, más el remedido del bundle. Verde de punta a
+> punta antes de tocar un archivo: backend 185/185, frontend 182/182,
+> `design:detect` con su único aviso *advisory* ya conocido, y los 19
+> verificadores de extremo a extremo (incluido `verificar-sesion.mjs`) en
+> verde.
+>
+> `CLAUDE.md`: §2.11 reescrita (no hay `AUTH_HABILITADA`, la sesión es
+> obligatoria), §2.12 nueva (una sola vista), §3 con el árbol real de
+> `backend/sesiones/`, `auth/`, `features/asistente/cajones/`, §4.4 reescrita
+> (ya no hay nomenclatura de vista por máquina) y §5 con la lista de
+> verificadores vigente. `README.md`: arranque sin `ICONICS_USERNAME`/
+> `PASSWORD`, el requisito de HTTPS en producción (§8.4) y qué es cada uno de
+> los tres cajones. `.env.example`: `SESION_TTL_MINUTOS` y `SESION_MAX`
+> añadidas; `AUTH_HABILITADA` retirada; `ICONICS_USERNAME`/`PASSWORD`
+> reclasificadas como sólo-para-`ICONICS_FAKE`-y-verificadores; el bloque de
+> `VITE_ICONICS_FAKE`/`VITE_ENABLE_SIMULATOR`/`VITE_ICONICS_CHAOS`/
+> `VITE_PREDICTION_*` retirado por no tener ya ningún consumidor en el
+> frontend (confirmado por `grep`, no supuesto).
+>
+> **Remedición del bundle** (`npm run build` + `verificar-bundle.mjs`):
+> `index` 98,88 KB / `vendor` 125,18 KB, idéntico byte a byte a lo medido al
+> cerrar la F5. Los techos (110/140) no se tocaron porque la medición no
+> cambió — la Fase 5 fue la última que tocó código de frontend.
+>
+> #### Lo que la F6 encontró y no estaba en el plan
+>
+> 1. **`§4.7` no se pudo retirar «por vacío», porque no está vacía.** El plan
+>    original asumía que borrar la vista de Predicción dejaba
+>    `shared/modulos.js` con un solo módulo. Es falso:
+>    `node scripts/verificar-modulos.mjs` sigue midiendo **dos** módulos
+>    (`monitoreo` y `prediccion`) porque `shared/` es dominio compartido y el
+>    Plan 20 no le tocó una línea — sólo borró la vista que lo consumía. La
+>    sección se reescribió para decir esto, no para fingir que la regla
+>    desapareció.
+> 2. **`/api/context` (`DEFAULT_USUARIO` y compañía) quedó huérfana.** Servía
+>    de contexto de cabecera «mientras no haya sesión real» — y ahora la hay.
+>    Ningún consumidor del frontend de esta rama la llama ya (sólo queda una
+>    mención en un comentario de `persistencia.js`). No se borró la ruta ni
+>    la variable: es un cambio de comportamiento del backend, y el Plan 20 no
+>    tocaba `systemRoutes.mjs` en la F6. Queda anotado en `.env.example` en
+>    vez de escondido, y es candidato a una fase de limpieza aparte.
+> 3. **La cabecera de `persistencia.js`** («aquí no hay sesión de usuario»)
+>    quedó desactualizada por la F1/F4 y no se corrigió aquí — es código, no
+>    documentación de repo, y está fuera del alcance declarado de esta fase.
+
+### F7 · SSO silencioso — el Asistente embebido en el HMI nativo — **HECHA**
+
+> Ejecutada el 04-09-2026, contra un servidor ICONICS real (`bms-server`, la
+> misma máquina), a partir de una necesidad real: el proyecto GraphWorX
+> **TDCON** tiene un botón «Asistente» que abre esta aplicación en un
+> `<iframe>` dentro de su propia pantalla. El Plan 20 hasta la F6 daba por
+> sentado que el técnico vería una pantalla de login propia (§4); esta fase
+> descubre, probando contra ICONICS de verdad, que **eso no hace falta**: si
+> el técnico ya entró a ICONICS, el iframe puede entrar solo.
+>
+> No hay pruebas automatizadas nuevas de extremo a extremo con ICONICS real
+> —la infraestructura para simular un servidor de identidad OIDC completo con
+> sesión de navegador no existe en este repo, y montarla sólo para esto no
+> se justificó (§F7.5)—. Lo que sí hay: 209 pruebas de backend, 196 de
+> frontend, y una verificación manual completa contra un servidor real,
+> documentada abajo paso a paso.
+
+#### F7.1 Tres intentos, y por qué sólo el tercero funciona
+
+La pregunta parece simple —«que el iframe lea la cookie de sesión que
+AnyGlass ya puso»— y por eso vale la pena dejar escritos los dos caminos que
+no sirvieron, porque los dos son la respuesta obvia y los dos fallan por
+motivos de navegador que no se ven hasta que se prueban:
+
+1. **El Asistente en `http://localhost:3001`, tal cual estaba.** Falla
+   siempre con `error=login_required`, aunque el técnico esté logueado.
+   Motivo: la cookie de sesión de ICONICS es de `https://bms-server`, y las
+   reglas de cookies "de mismo sitio" (`SameSite`) exigen que **toda la
+   cadena de iframes** sea del mismo sitio — no sólo el más externo. La
+   cadena real es TDCON (`bms-server`) → el Asistente (`localhost:3001`) → el
+   iframe oculto del SSO (`bms-server` otra vez): el salto por
+   `localhost:3001` en medio rompe la cadena, y el navegador no manda la
+   cookie al tercer salto por mucho que el primero y el tercero coincidan.
+2. **El Asistente en `https://bms-server:8299`** (un sitio IIS nuevo, mismo
+   dominio, puerto distinto). Esto **sí** arregla la cookie —`SameSite`
+   compara dominio y esquema, no puerto—, pero rompe algo distinto: AnyGlass
+   sirve su propia página con **su propia CSP**, `frame-src 'self'`, y
+   `'self'` sí compara el **origen completo, puerto incluido**. TDCON no
+   puede embeber un origen que no sea exactamente el suyo, así que el
+   navegador bloquea el iframe del botón «Asistente» antes de que llegue a
+   cargar nada nuestro.
+3. **El Asistente en `https://bms-server/asistente/`** (mismo dominio, mismo
+   puerto 443, subruta nueva vía proxy inverso de IIS). Cumple las dos reglas
+   a la vez: mismo sitio para la cookie, mismo origen exacto para el
+   `frame-src` de AnyGlass. Es el único de los tres que funciona, y es la
+   arquitectura final.
+
+#### F7.2 Arquitectura final
+
+```
+Navegador
+ └─ https://<host>/AnyGlass/PubDisplay/...        proyecto TDCON (ICONICS)
+     └─ <iframe src="https://<host>/asistente/">   el Asistente
+         └─ <iframe oculto, prompt=none>           hacia el authorize de ICONICS
+```
+
+```
+IIS (Default Web Site, puerto 443, el que ya sirve ICONICS)
+ └─ Aplicación "/asistente"  (ARR + URL Rewrite, propia, sin tocar el resto)
+     └─ proxy inverso → http://127.0.0.1:3001/{R:1}   (el backend Node de siempre)
+```
+
+Nada del backend sabe que vive detrás de una subruta — Fastify sigue
+registrando sus rutas en `/`, tal como antes. Lo único consciente de la
+subruta es:
+
+- **El frontend compilado**, con `VITE_BASE_PATH=/asistente/` (Vite reescribe
+  todas las rutas de `assets/` del HTML) y `VITE_API_BASE=/asistente` (para
+  que sus propias llamadas a `/api/...` también pasen por el proxy). Ver
+  `vite.config.js` y `lib/api/apiBase.js`.
+- **`SSO_REDIRECT_URI`**, que tiene que incluir la subruta:
+  `https://<host>/asistente/auth/silencioso`.
+- **La página `/auth/silencioso`**, que carga su script con una ruta
+  **relativa** (`silencioso.js`, no `/auth/silencioso.js`) — precisamente
+  para no tener que saber en qué subruta vive. Ver la cabecera de
+  `routes/sesionRoutes.mjs`.
+
+#### F7.3 Runbook — montar esto en un servidor ICONICS nuevo
+
+Generalizado: sustituye `<host>` por el nombre del servidor ICONICS
+(`bms-server` en las pruebas) y `<puerto>` si el backend no corre en el 3001
+de costumbre.
+
+**1 · Confirmar los prerrequisitos de IIS**
+
+```powershell
+Import-Module WebAdministration
+Get-WebGlobalModule | Where-Object Name -match "Rewrite|Routing|ARR"
+Get-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter 'system.webServer/proxy' -Name enabled
+```
+
+Hacen falta **URL Rewrite** y **Application Request Routing** instalados
+(son gratis, de Microsoft — se instalan aparte si faltan), y `enabled: True`
+en la propiedad de proxy de ARR — el módulo puede estar instalado con la
+función de proxy apagada por defecto.
+
+**2 · Crear la aplicación IIS `/asistente`**
+
+Bajo el sitio que ya sirve ICONICS (`Default Web Site` en las pruebas — el
+que tenga el binding `https://<host>`), **sin tocarlo**:
+
+```powershell
+New-Item -Path "C:\inetpub\asistente" -ItemType Directory -Force
+New-WebApplication -Site "Default Web Site" -Name "asistente" `
+  -PhysicalPath "C:\inetpub\asistente" -ApplicationPool "DefaultAppPool"
+```
+
+Y su `web.config`, la única pieza que hace el proxy inverso:
+
+```powershell
+@'
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <rule name="ProxyHaciaAsistente" stopProcessing="true">
+          <match url="(.*)" />
+          <action type="Rewrite" url="http://127.0.0.1:3001/{R:1}" />
+        </rule>
+      </rules>
+    </rewrite>
+  </system.webServer>
+</configuration>
+'@ | Set-Content -Path "C:\inetpub\asistente\web.config" -Encoding UTF8
+```
+
+> Si `Start-Website`/la app no arranca con `0x800700B7` ("ya existe"): es un
+> estado atascado del namespace de IIS/WAS, no un conflicto real de puerto
+> —confirmado el 04-09-2026: `Get-NetTCPConnection` y `netsh http show
+> urlacl` no mostraban nada usando el puerto—. `iisreset` lo destraba. Corta
+> el tráfico de TODO IIS unos segundos: avisar antes si hay alguien más
+> usando ICONICS en ese momento.
+
+**3 · Compilar el frontend para la subruta**
+
+```powershell
+.\scripts\dev.ps1 -BasePath /asistente/
+```
+
+o, para un build de producción sin los dos procesos de desarrollo:
+
+```bash
+VITE_BASE_PATH=/asistente/ VITE_API_BASE=/asistente npm run build   # dentro de react-dashboard/
+```
+
+> **No compiles con el `dev.ps1` normal (sin `-BasePath`) después de esto.**
+> Sobreescribe el `dist` con rutas de raíz otra vez, y el Asistente empotrado
+> vuelve a dar 404 en todos sus `assets/` — confirmado el 04-09-2026, fue la
+> causa de una regresión a mitad de esta misma fase.
+
+**4 · Configurar el backend**
+
+En `.env.local` (o el `.env` de producción que corresponda):
+
+```
+ICONICS_API_BASE=https://<host>/fwxapi/rest/v1
+FRAME_ANCESTORS=https://<host>
+SSO_REDIRECT_URI=https://<host>/asistente/auth/silencioso
+```
+
+`ICONICS_API_BASE` tiene que apuntar al **mismo origen** donde el técnico
+entra a ICONICS de verdad — no una alternativa como `localhost` que
+técnicamente llegue al mismo servidor: para el navegador son sitios
+distintos, y §F7.1 (intento 1) es la razón completa. Arranca (o reinicia) el
+backend después de tocar esto — las variables de entorno sólo se leen al
+arrancar.
+
+**5 · En ICONICS Workbench: `Security → Global Settings → Web Login`**
+
+- Agrega una línea en **"In-house application Relying Party Redirect
+  URIs"**: `https://<host>/asistente/auth/silencioso`.
+- Activa **"In-house applications use web login"**. Sin esto, el diálogo de
+  login nativo de GraphWorX (`Login/Logout Dialog`) usa un sistema de
+  seguridad **distinto** al servidor de identidad OIDC que el SSO silencioso
+  lee, y el Asistente nunca ve el usuario correcto — es la causa exacta de
+  «el Asistente sigue mostrando a otra persona» que se midió el 04-09-2026.
+  Trae dos condiciones documentadas por ICONICS que hay que aceptar:
+  - Desactivar **"Allow simultaneous login"** en la pestaña *General* de
+    Global Settings.
+  - Los **Critical Points** y **Critical Alarms** quedan inaccesibles para
+    quien entró por Web Login.
+
+**6 · En el proyecto GraphWorX (TDCON o el que corresponda)**
+
+El botón/objeto que abre el Asistente tiene que apuntar a
+`https://<host>/asistente/` — no a `http://localhost:3001` ni a ningún otro
+origen. Es un cambio dentro del proyecto GraphWorX, no de este repo.
+
+**7 · Verificar**
+
+Antes de probar en el navegador, un `curl` desde el propio servidor confirma
+la mitad del camino sin depender de una sesión real:
+
+```bash
+curl -sk "https://<host>/asistente/api/sesion/silenciosa/iniciar"
+# {"habilitado":true,"url":"https://<host>/fwxserverweb/...prompt=none...","verificador":"..."}
+```
+
+`habilitado:false` con `SSO_REDIRECT_URI` puesta significa que el backend no
+recogió la variable — revisa el paso 4. Con `habilitado:true`, entra a
+ICONICS por el HMI nativo y abre el botón «Asistente»: debería entrar
+directo, sin pedir usuario y contraseña.
+
+#### F7.4 Cierre de sesión: sondeo, no aviso
+
+El documento de descubrimiento OIDC de ICONICS (`.../.well-known/openid-
+configuration`) no anuncia `frontchannel_logout_supported` ni
+`check_session_iframe` — comprobado a mano el 04-09-2026 contra un servidor
+real. No hay forma de que ICONICS **avise** cuando el técnico cierra sesión
+ahí, así que `SesionProvider.jsx` **pregunta**: cada `15 s` (
+`INTERVALO_COMPROBACION_SESION_MS`), repite el mismo truco del iframe oculto
+con `prompt=none`.
+
+Esa misma pregunta también **reconcilia identidad**, no sólo vida: si otro
+técnico cerró sesión y entró sin que la sesión de este puente llegara a
+caducar de por medio, el sondeo lo detecta y adopta al usuario nuevo —
+borrando la conversación del anterior, igual que un «Salir» explícito.
+`POST /api/sesion/silenciosa` en el backend evita duplicar sesiones en el
+caso normal (misma persona, sondeo tras sondeo): sólo cierra la vieja y abre
+una nueva cuando el usuario identificado realmente cambió.
+
+Sólo un `login_required` **explícito** cierra la sesión del Asistente. Un
+timeout o un error de red no — expulsaría al técnico por un parpadeo de la
+red, no por haber cerrado sesión de verdad.
+
+> El intervalo bajó de 60 s a 15 s el mismo 04-09-2026, a pedido: 60 s se
+> sentía lento probando cambios de usuario a mano. Es un único número al
+> principio de `SesionProvider.jsx`; subirlo reduce tráfico contra ICONICS,
+> bajarlo reduce el desfase entre cambiar de usuario y que el Asistente lo
+> refleje.
+
+#### F7.5 Lo que esta fase no prueba con automatización, y por qué
+
+`backend/test/rutas/sesion-silenciosa.test.mjs` prueba la forma de las rutas
+—qué pasa con `ICONICS_FAKE=true`, sin `SSO_REDIRECT_URI`, con un código que
+ICONICS rechaza— pero **no** el camino feliz completo (un código real,
+canjeado, con un `UserInfo` que devuelve un usuario). Simularlo exigiría un
+servidor OIDC falso con sesión de navegador y cookies `SameSite`, que no
+existe en este repo — `scripts/verificar-backend.mjs` tiene un ICONICS falso
+con el flujo OIDC de **contraseña**, pero no el de **cookie de navegador +
+`prompt=none`** que el SSO silencioso necesita. Construirlo es candidato a
+trabajo futuro si esta función crece; por ahora la cobertura es la prueba
+manual documentada en §F7.3, repetida el 04-09-2026 contra `bms-server` con
+tres usuarios reales (`MyUser`, `Gustavo`, `Moises`) hasta ver el
+comportamiento correcto en los tres.
+
+#### F7.6 Riesgos y huecos declarados
+
+1. **La contraseña del apartado §8.1 nunca aplica a estas sesiones.** Una
+   sesión nacida de SSO silencioso no tiene contraseña que guardar —nadie la
+   escribió—, así que si el `refresh_token` falla algún día, `authenticate()`
+   falla limpio en vez de intentar un login que no puede rehacer (ver la
+   guarda añadida en `authenticator.mjs`). El técnico simplemente entra otra
+   vez, y el intento silencioso lo hace solo.
+2. **El sondeo de 15 s es tráfico constante contra el servidor de identidad
+   de ICONICS**, por cada Asistente abierto. A escala de unos pocos técnicos
+   es irrelevante; con decenas de sesiones simultáneas convendría revisar el
+   número.
+3. **`Login/Logout Dialog` y el login OIDC real son dos sistemas.** Queda
+   escrito aquí porque no es obvio y costó una tarde de pruebas descubrirlo:
+   activar "In-house applications use web login" los une, pero es una
+   decisión de todo el servidor ICONICS, no sólo del Asistente — afecta a
+   cualquier otra aplicación GENESIS64 que use ese mismo diálogo.
+4. **El certificado del binding de `/asistente` se reutiliza del binding
+   `:443` existente** (mismo hash, vía `netsh http add sslcert`). Si ese
+   certificado se rota a mano en el futuro, el binding nuevo no se entera
+   solo — hay que repetir el `netsh` con el hash nuevo.
 
 ---
 

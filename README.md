@@ -1,96 +1,82 @@
-# Demo EVA — Las máquinas de la planta
+# Asistente — el puente hacia ICONICS que se pregunta
 
-Tablero que muestra el estado de las máquinas de una planta leyendo sus señales
-de un servidor **ICONICS** (AssetWorX y Hyper Historian).
+Una sola pantalla: la conversación. El técnico entra con **su usuario y
+contraseña de ICONICS** y a partir de ahí pregunta en lenguaje natural sobre
+las máquinas de la planta — el valor de una señal ahora mismo, su historia,
+qué dice el manual, por qué se disparó un riesgo, y puede pedir una
+intervención o encender la bomba si su cuenta tiene permiso.
 
-Nació sobre una instalación de agua industrial y hoy sirve **dos máquinas** en
-secciones separadas, con el registro preparado para las que vengan.
+No hay tablero, sidebar ni gráficas de planta: esta rama (`Asistente`) las
+borró a propósito. El motivo completo, el inventario de lo que se fue y de lo
+que se quedó, y las siete fases con las que se hizo —incluida cómo vivir
+embebido dentro del HMI nativo de ICONICS sin pedir un segundo login—, están
+en
+[`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md). Si buscas el
+tablero de 22 vistas (Demo EVA, con 3D y gráficas), vive en la rama
+`Moises6`.
 
 El proyecto son dos piezas: un backend puente en Node que resuelve la
-autenticación contra ICONICS, y un frontend en React que consume ese backend.
+autenticación OIDC+PKCE contra ICONICS por persona, y un frontend en React
+que consume ese backend. Detalle de producto en [`PRODUCT.md`](PRODUCT.md),
+no negociables de arquitectura en [`CLAUDE.md`](CLAUDE.md).
 
-## Qué hace
+## Qué sabe hacer
 
-**Dos máquinas, en secciones separadas del sidebar.** Son instalaciones
-distintas —otro motor, otro variador, otro PLC— y por eso no comparten pantalla:
-mezclarlas invitaría a leerlas juntas, y una correlación entre el caudal de una
-y la vibración de la otra uniría dos equipos que no se tocan.
+Veintidós herramientas, agrupadas en seis familias
+(`backend/ia/herramientas/`):
 
-**Estación de llenado** — ocho señales bajo `ac:TDCON/DEMO/SENSORES/`, cinco de
-ellas con serie histórica verificada:
+| Familia | Para qué |
+|---|---|
+| **registro** | Qué máquinas hay y qué limita a cada una |
+| **maquina** | El instante — estado, riesgos activos, y la única que **escribe**: `controlar_bomba` |
+| **historicos** | Todo lo que pregunta al pasado: historia, comparativas, correlaciones, gráficas, pronóstico de desgaste, reportes |
+| **documentacion** | Los manuales de planta, y el cruce de lo medido contra sus límites |
+| **diagnostico** | Las causas posibles, ordenadas por las 4 fuentes (dato en vivo, manual, casos previos, tendencia), y su cierre |
+| **aprendizaje** | Lo que alguien verificó (`recordar_hecho`, `registrar_intervencion`) y lo que se propone aprender (`proponer_regla`) |
 
-- **Inicio** — qué está pasando ahora, en una pantalla que se explica sola.
-- **Gráficas** — las ocho señales, con la historia que el historiador entrega.
-- **Riesgos** — qué puede pasar si la instalación sigue como está.
-- **Controles** — encender y apagar la bomba.
-- **Vista 3D** — la instalación en miniatura; el nivel del tanque es dato vivo.
+El modelo puede **encadenar hasta tres** herramientas para una misma
+pregunta (`IA_MAX_PASOS`), que es lo que hace posible «¿por qué falló esto?»
+— necesita el estado, la historia de la señal sospechosa y a veces el manual.
 
-**Sistema de vibraciones** — motor WEG con módulo SIPLUS CMS, 73 puntos bajo
-`ac:TDCON/Motors/01/` y `ae:`. Mismas cinco vistas, **sin histórico utilizable**:
-sólo el instante, y las herramientas de tendencia se niegan a inventarlo.
+Tres reglas del diseño, por si sorprenden en pantalla:
 
-**General** — Alarmas, Assets (los puntos con su valor y calidad en crudo,
-navegando el árbol de AssetWorX) y Predicción (beta).
+- **Toda cifra viene de una consulta**, y debajo de cada respuesta se dice de
+  dónde salió, una línea por consulta. Si el modelo contesta con números sin
+  haber consultado nada, el puente no deja salir la respuesta.
+- **El código puntúa, el modelo redacta.** El motor de diagnóstico
+  (`backend/ia/motor/`) es determinista; el modelo nunca decide una banda,
+  un orden o una causa por su cuenta.
+- **Una consulta a la vez, y nadie recibe un error por llegar el segundo.**
+  Con un `llama-server` sirviendo un modelo, dos personas preguntando a la
+  vez se encolan; quien llega después ve cuántos tiene por delante.
 
-Quién manda sobre qué máquinas existen es un solo archivo:
-[`shared/eva/sistemas.js`](shared/eva/sistemas.js). Dar de alta una es añadir
-una entrada ahí y su catálogo — el asistente, el simulador y el transporte falso
-se enteran solos. El procedimiento completo está en
-[`shared/README.md`](shared/README.md).
-- **Asistente** — un chat que responde en lenguaje natural consultando ICONICS
-  de verdad, con un modelo que corre en el propio servidor. Opcional: sin
-  `IA_BASE` no aparece.
-
-> **De dónde viene esto.** Hasta agosto de 2026 la aplicación era un tablero de
-> **OEE** sobre las diez máquinas de Resonac —siete líneas y tres
-> rectificadoras—, y la demo de agua era una sección más. La transición invirtió
-> los papeles y el tablero de OEE se retiró entero: sus vistas, su modelo de
-> planta, su catálogo de tags, su simulador y sus doce propuestas de diseño. Lo
-> que sobrevivió es lo que nunca supo de máquinas: el puente HTTP, el motor de
-> sondeo, el explorador de assets y las primitivas 3D.
-
-## Estructura
-
-```
-.
-├── backend/            Servidor puente hacia ICONICS (Node, sin dependencias)
-│   ├── http/             Mecánica HTTP: router, respuestas, estáticos
-│   ├── ia/               Asistente: herramientas (por familias) y conversación
-│   ├── iconics/          Autenticación OIDC, cliente REST y validación
-│   └── routes/           Traducción HTTP ↔ cliente
-├── react-dashboard/    Frontend React + Vite
-│   └── src/Demo-EVA/     Todo lo que sabe de las máquinas de la planta
-├── shared/             Dominio que usan los dos: el registro de sistemas,
-│                       los catálogos de señales, el estado y los umbrales
-├── scripts/            Verificadores y sondas contra el servidor real
-└── docs/               Planes, y los backlogs de backend y frontend
-```
-
-`shared/` existe porque el backend y el frontend necesitan las mismas reglas de
-negocio —qué señales hay, cómo se nombra un punto, cuándo una medida está fuera
-de banda— y duplicarlas las haría divergir. Ver
-[`shared/README.md`](shared/README.md).
+Además: dictado y manos libres, exportar la conversación a PDF, adjuntar
+texto a una pregunta, y persistencia del hilo entre recargas — sobrevive
+incluso a que la sesión caduque a mitad de una respuesta.
 
 ## Requisitos
 
 - Node.js 18 o superior
 - Acceso a un servidor ICONICS con la API REST de FrameWorX habilitada
+- Una cuenta de ICONICS por cada persona que vaya a usar el asistente — no
+  hay credenciales de servicio compartidas para el uso normal
 
 ## Puesta en marcha
 
-Las credenciales van en un archivo `.env.local` en la raíz, que **no se
-versiona**. La plantilla comentada de todas las variables está en
+La configuración del **servidor** va en un archivo `.env.local` en la raíz,
+que **no se versiona**. La plantilla comentada de todas las variables está en
 [`.env.example`](.env.example):
 
 ```
 ICONICS_API_BASE=https://tu-servidor/fwxapi/rest/v1
-ICONICS_USERNAME=usuario
-ICONICS_PASSWORD=contraseña
-ICONICS_POINT_NAME=punto por defecto para /api/iconics/data
-
-# Sólo para desarrollo:
-ICONICS_READ_ONLY=false              # la escritura está deshabilitada por defecto
 ```
+
+**No hace falta `ICONICS_USERNAME` ni `ICONICS_PASSWORD`.** El login es de
+cada técnico, no del proceso: entra por la pantalla de login con su propia
+cuenta de ICONICS. Esas dos variables sólo se leen en dos caminos que sí
+necesitan una identidad de máquina —`ICONICS_FAKE=true` para desarrollar sin
+red, y los `scripts/verificar-*.mjs`— y se documentan como tales en
+`.env.example`.
 
 `CORS_ORIGINS` se queda vacío: en los dos despliegues la API cuelga del mismo
 origen que la página. En planta porque el backend sirve el bundle, y en
@@ -111,8 +97,11 @@ npm install
 npm run dev                                       # Vite, normalmente en :5173
 ```
 
-El resto de variables —puerto, nivel de log, directorio de estáticos— están en
-[`backend/README.md`](backend/README.md).
+Abre `http://localhost:5173`, entra con tu usuario y contraseña de ICONICS, y
+pregunta.
+
+El resto de variables —puerto, nivel de log, directorio de estáticos— están
+en [`backend/README.md`](backend/README.md).
 
 ### Desde otro equipo de la red
 
@@ -150,19 +139,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\exponer-en-red.ps1
 ```
 
 Mejor la IP concreta que el rango (`10.10.0.0/16`): es la diferencia entre «ese
-equipo puede entrar» y «cualquiera de esa red puede entrar», y aquí no hay
-contraseña que respalde lo segundo.
+equipo puede entrar» y «cualquiera de esa red puede entrar».
 
-> ⚠️ Esto no pone autenticación delante del tablero: quien alcance el puerto
-> entra, y el backend habla con ICONICS con una sesión privilegiada. Vale para
-> una red de planta o de laboratorio; no para una Wi-Fi compartida con
-> desconocidos. Deja `ICONICS_READ_ONLY` sin tocar y al menos nadie podrá
-> escribir en la planta.
+> Quien alcance el puerto llega a la pantalla de login, no directo al
+> asistente: sin sesión de ICONICS válida, `/api/` responde 401. Eso sí
+> significa que cualquiera con la cuenta de ICONICS de otra persona entra
+> como ella — el control de acceso es el mismo que el de ICONICS, no uno
+> nuevo.
 
 ### En producción
 
-Un solo proceso: el backend sirve el frontend compilado desde el mismo origen,
-así que no hace falta ni segundo servidor ni CORS.
+Un solo proceso: el backend sirve el frontend compilado desde el mismo
+origen, así que no hace falta segundo servidor ni CORS.
 
 ```bash
 cd react-dashboard && npm run build    # genera react-dashboard/dist
@@ -171,176 +159,121 @@ cd .. && node --env-file=.env.production backend/server.mjs
 
 Sin ese build, el backend responde 503 diciendo que falta compilar.
 
-> ⚠️ **`shared/` tiene que viajar en la release.** El backend importa de ahí el
-> catálogo de señales y las reglas del historiador. Un paquete que lleve solo
-> `backend/` y `dist/` arranca y falla en el primer `import`.
+> ⚠️ **`shared/` tiene que viajar en la release.** El backend importa de ahí
+> el catálogo de señales y las reglas del historiador. Un paquete que lleve
+> sólo `backend/` y `dist/` arranca y falla en el primer `import`.
+
+> ⚠️ **HTTPS es obligatorio en producción, no opcional.** La cookie de sesión
+> se emite con `Secure` en cuanto `NODE_ENV=production`, y un navegador
+> descarta una cookie `Secure` sobre HTTP: el login parecería aceptar las
+> credenciales y la siguiente petición volvería a dar 401. `backend/server.mjs`
+> no termina TLS por sí mismo: sirve el puente detrás de un proxy inverso que sí
+> lo haga. En desarrollo (`NODE_ENV` distinto de `production`) la cookie no
+> lleva `Secure` y HTTP local funciona sin más.
 
 El build se estampa solo con el `git describe` del árbol, y esa versión se ve
-en el Topbar y en `/api/health`. En producción **no** deben aparecer
-`VITE_ICONICS_FAKE`, `VITE_ENABLE_SIMULATOR` ni `NODE_TLS_REJECT_UNAUTHORIZED`:
-las dos primeras se hornean en el bundle, y la última impide el arranque con
-`NODE_ENV=production`.
+en `/api/health`. En producción **no** debe aparecer
+`NODE_TLS_REJECT_UNAUTHORIZED`: impide el arranque con `NODE_ENV=production`
+a propósito.
 
-Tras cada build hay que ejecutar [`scripts/verificar-bundle.mjs`](scripts/verificar-bundle.mjs),
-que comprueba que la pila 3D no se ha colado en el arranque.
+Tras cada build hay que ejecutar
+[`scripts/verificar-bundle.mjs`](scripts/verificar-bundle.mjs), que comprueba
+que la pila 3D, `recharts` y `xlsx` —desinstaladas en el Plan 20— no han
+vuelto a colarse en el arranque.
 
-## Orígenes de datos
+## La sesión
 
-Hay **dos**, y los dos se ven igual de plausibles en pantalla. El indicador del
-Topbar dice cuál está activo, y el que no es real lleva además una cinta de
-aviso permanente.
+El login es el de cada técnico contra ICONICS (OIDC + PKCE), no una
+identidad de máquina. Consecuencias directas:
 
-| Origen | De dónde salen los datos | Cómo se activa |
-|---|---|---|
-| En vivo | Servidor ICONICS | Por defecto |
-| Simulado | Transporte falso, sin red | `VITE_ICONICS_FAKE=true` al arrancar, o el botón del Topbar si se compiló con `VITE_ENABLE_SIMULATOR=true` |
+- **La escritura sobre la planta la autoriza ICONICS, no este puente.**
+  `controlar_bomba` y `POST /api/iconics/write` salen con el token de quien
+  preguntó: un técnico sin permiso de escritura en ICONICS recibe un 403 del
+  servidor de planta, no del puente. `ICONICS_READ_ONLY` sigue existiendo
+  como segunda puerta, del lado del servidor.
+- **Cerrar sesión borra la conversación; que la sesión caduque sola, no.**
+  Caducar (por inactividad, `SESION_TTL_MINUTOS`) devuelve al login
+  conservando el hilo — es lo normal en planta: preguntar, ir a mirar la
+  máquina, volver. Salir explícitamente sí lo borra, porque en un equipo
+  compartido el siguiente turno no debería heredar lo que preguntó el
+  anterior.
+- **La sesión vive en memoria del proceso, no en una base de datos.**
+  Reiniciar el backend obliga a todo el mundo a volver a entrar — es
+  correcto y esperable en una aplicación de planta. `SESION_MAX` acota
+  cuántas sesiones conviven a la vez.
 
-El simulador sirve para desarrollar sin servidor **y** para enseñar la
-aplicación. Pasa por el motor de polling igual que el servidor real, así que
-ejercita la calidad OPC, los reintentos y la marca de dato rancio; lo único que
-cambia es de dónde salen los bytes. Vive en
-[`Demo-EVA/data/simulador.js`](react-dashboard/src/Demo-EVA/data/simulador.js) e
-incluye serie histórica. Ver [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md).
+### Sin login, cuando vive dentro de ICONICS
 
-### Banderas de compilación
+Si el Asistente se empotra en un `<iframe>` del HMI nativo de ICONICS
+(AnyGlass/GraphWorX) y el técnico ya entró ahí, **no hace falta un segundo
+login**: con `SSO_REDIRECT_URI` configurada, un iframe oculto le pregunta a
+ICONICS con `prompt=none` si ya hay sesión, y entra solo. Requiere montar el
+Asistente bajo el **mismo origen** que ICONICS (vía un proxy inverso de IIS,
+por ejemplo `https://<host>/asistente/`) — el paso a paso completo, con los
+motivos de cada requisito, está en
+[`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md) §F7.
 
-| Variable | Qué hace | Por defecto |
-|---|---|---|
-| `VITE_ICONICS_FAKE` | Arranca en el simulador | real |
-| `VITE_ENABLE_SIMULATOR` | Añade el **botón** para cambiar de origen en caliente | apagada |
-| `VITE_ICONICS_CHAOS` | `none` · `soft` · `high` — cuántos fallos inyecta el simulador | `soft` |
+Detalle de diseño, riesgos declarados y por qué se hizo así:
+[`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md) §4, §8 y §F7.
 
-Todas se resuelven en **build**, así que un bundle compilado sin ellas va al
-backend real y no trae interruptor — que es lo que debe llegar a un monitor de
-planta.
+## Los tres cajones
 
-Para una demostración con público, `VITE_ICONICS_CHAOS=none` apaga la
-aleatoriedad del simulador: sin huecos, sin calidad mala y sin latencia.
+Un panel lateral, no una segunda pantalla — se abre desde la barra del chat,
+se cierra con Escape, y ninguno tiene URL propia:
 
-## El asistente
+- **Assets** — el árbol de AssetWorX con el valor y la calidad en crudo de
+  cada punto. Seleccionar uno lo manda al chat como contexto.
+- **Manuales** — subir, reemplazar y archivar los PDF que alimentan el índice
+  documental que usa `consultar_documentacion`.
+- **Casos** — la bitácora de intervenciones: filtrar por activos/archivados,
+  buscar y archivar. Un caso archivado deja de alimentar el diagnóstico pero
+  nunca se borra.
 
-Un chat, disponible desde cualquier pantalla, que responde preguntas en
-lenguaje natural consultando ICONICS. «¿Cuánto ha bajado el nivel del tanque
-desde ayer?» se convierte en una lectura real del historiador, no en una cifra
-recitada por el modelo.
+## Documentación de planta (RAG)
 
-Es **opcional y está apagado por defecto**. Se enciende apuntando `IA_BASE` a
-un llama-server local:
+`IA_DOCS_DIR` apunta a una carpeta con manuales. Se leen `.txt`, `.md`,
+`.csv`, `.log` y `.pdf` — el texto se extrae con el `zlib` de Node, sin
+dependencias, lo que cubre los PDF generados por Word o InDesign. Un PDF
+**escaneado** es una imagen: el índice lo detecta y lo dice, en vez de
+indexar basura.
+
+La búsqueda es BM25 (léxica, sin servidor) y, si `IA_EMBEDDING_BASE` apunta a
+un segundo llama-server con `--embedding`, se mezcla con búsqueda semántica.
+
+## El modelo de lenguaje
+
+Apagado por defecto: sin `IA_BASE`, el asistente lo dice y no se rompe. Se
+enciende apuntando a un `llama-server` local:
 
 ```bash
 llama-server.exe -m <modelo>.gguf --jinja --host 127.0.0.1 --port 8080 -c 4096 -ngl 99 --parallel 1
 ```
 
-Dos cosas de esa línea no son opcionales. **`--jinja`** activa la plantilla de
-chat del modelo: sin ella no ve las herramientas y contesta de memoria, que es
-el modo de fallo más peligroso porque parece que funciona. Y **`127.0.0.1`**,
-porque llama-server no tiene autenticación de ninguna clase.
+Dos cosas de esa línea no son opcionales. **`--jinja`** activa la plantilla
+de chat del modelo: sin ella no ve las herramientas y contesta de memoria,
+que es el modo de fallo más peligroso porque parece que funciona. Y
+**`127.0.0.1`**, porque `llama-server` no tiene autenticación de ninguna
+clase.
 
-Tres reglas del diseño, por si sorprenden en pantalla:
+## Voz
 
-- **Toda cifra viene de una consulta.** Debajo de cada respuesta se dice de
-  dónde salió el dato, una línea por consulta. Si el modelo contesta con
-  números sin haber consultado nada, el puente **no** deja salir la respuesta.
-- **Una consulta a la vez, pero nadie recibe un error por llegar el segundo.**
-  Se atiende de una en una porque dos a la vez se reparten la GPU y tardan el
-  doble las dos; quien llega después espera en la cola viendo cuántos tiene
-  por delante, y luego recibe su respuesta entera.
-- **Sólo algunas señales tienen historia.** A tres de las ocho el historiador
-  les devuelve la serie de otra sin dar error, así que la marca vive como hecho
-  medido en `shared/eva/senales.js` (campo `historizado`). Preguntar por el
-  pasado de una que no la tiene devuelve «no tengo ese dato», nunca un cero.
-
-### Qué sabe hacer
-
-Nueve herramientas, y el modelo puede **encadenar hasta tres** para una misma
-pregunta (`IA_MAX_PASOS`). Ese encadenado es lo que hace posible la pregunta
-que más importa —«¿por qué falló esto?»—, que necesita el estado, la historia
-de la señal sospechosa y a veces el manual: tres lecturas, no una.
-
-| Herramienta | Para qué |
-|---|---|
-| `estado_del_sistema` | Las ocho señales ahora mismo, de una sola lectura |
-| `historia_de_senal` | Cómo evolucionó una señal en un período |
-| `comparar_periodos` | La misma señal en dos períodos, con la diferencia ya calculada |
-| `analisis_de_senal` | Media, tendencia, proyección y valores atípicos |
-| `perfil_de_senal` | Qué es **normal**, medido sobre semanas de historial real |
-| `correlacionar_senales` | Varias señales cruzadas: la herramienta del **diagnóstico** |
-| `grafico_de_senal` | Dibuja la serie y la manda a la pantalla |
-| `consultar_documentacion` | Busca en los manuales de planta y cita archivo y página |
-| `controlar_bomba` | **La única que escribe:** enciende o apaga la bomba |
-
-Al diagnosticar, las instrucciones le obligan a separar **lo medido** de **la
-hipótesis**, y a decir que correlación no es causa.
-
-Las ocho primeras sólo leen. `controlar_bomba` es la excepción y está sujeta a
-dos guardas antes de tocar nada —`ICONICS_READ_ONLY`, y el nivel del tanque al
-encender— más una relectura del punto después, porque un `ok` del servidor no
-demuestra que la bomba haya arrancado. Ver
-[`backend/README.md`](backend/README.md#asistente).
-
-### Los umbrales están sin confirmar, y eso limita todo
-
-`shared/eva/umbrales.js` son **estimaciones nuestras** para un sistema de agua
-genérico (`PROVISIONALES = true`). Medidos contra el servidor real en agosto de
-2026, no se parecen a esta instalación:
-
-| Señal | Banda declarada | Medido en 14 días |
-|---|---|---|
-| Nivel del tanque | crítico > 95 % | máximo real **100 %**, mediana 50 % |
-| Temperatura | 4–45 °C | varía sólo 22,9–25,1 °C |
-| Caudal | aviso hasta 45 | máximo real **4,4**, con valores negativos |
-| Presión relativa | crítico < 0,5 | **el 91 % de las lecturas cae por debajo** |
-
-Mientras eso siga así, «en banda» y «fuera de límite» no informan de nada. Por
-eso existe `perfil_de_senal`: mide qué hace la instalación de verdad en vez de
-compararla contra números inventados, y **avisa sola** cuando la banda y la
-realidad no cuadran. Las instrucciones del asistente le prohíben responder «esto
-es raro» apoyándose en la banda.
-
-Arreglarlo de raíz no es código: es confirmar los rangos reales con quien opera
-la instalación, corregir la tabla y poner `PROVISIONALES` en `false`. Una causa inventada que
-suena razonable manda a alguien a revisar el equipo equivocado.
-
-### Documentación de planta
-
-`IA_DOCS_DIR` apunta a una carpeta con manuales. Se leen `.txt`, `.md`, `.csv`,
-`.log` y **`.pdf`** — el texto se extrae con el `zlib` de Node, sin
-dependencias, lo que cubre los PDF generados por Word o InDesign. Un PDF
-**escaneado** es una imagen: el índice lo detecta y lo dice, en vez de indexar
-basura.
-
-La búsqueda es BM25 (léxica, sin servidor). En manuales técnicos acierta porque
-quien pregunta usa el vocabulario del manual. Con `IA_EMBEDDING_BASE` apuntando
-a un segundo llama-server con `--embedding` se mezcla con búsqueda semántica.
-
-### Voz
-
-Opcional y también apagado por defecto. Necesita un tercer proceso,
-`whisper-server`, que hay un atajo para arrancar:
+Opcional y apagado por defecto. Necesita un tercer proceso, `whisper-server`,
+con un atajo para arrancarlo:
 
 ```powershell
 .\scripts\whisper.ps1
 ```
 
-Se apunta con `IA_WHISPER_BASE=http://127.0.0.1:8082` y aparecen dos botones en
-la barra del asistente:
+Se apunta con `IA_WHISPER_BASE=http://127.0.0.1:8082` y aparecen dos botones
+en la barra del asistente: **micrófono** (dicta la pregunta, que se revisa
+antes de enviar) y **teléfono** (manos libres: escucha, pregunta, contesta en
+voz alta y vuelve a escuchar, sin confirmar — es una llamada, no un chat con
+un botón de más).
 
-- **Micrófono** — dicta la pregunta. El texto va al cuadro de entrada para que
-  se revise antes de enviar: Whisper se equivoca con el ruido de planta y con
-  los nombres de tag, y una consulta lanzada sobre una frase mal oída gasta un
-  minuto de GPU respondiendo a algo que nadie preguntó.
-- **Teléfono** — manos libres. Escucha, pregunta, lee la respuesta en voz alta
-  y vuelve a escuchar, sin tocar el teclado. Aquí sí se envía sin confirmar:
-  pedir confirmación convertiría el manos libres en un manos-ocupadas.
-
-Dos cosas que **no** hacen falta: **ffmpeg**, porque el audio se convierte a WAV
-de 16 kHz en el navegador con la Web Audio API; y ningún modelo de voz para
-hablar, porque se usa el sintetizador del sistema (SAPI en Windows), que
-funciona sin red y no ocupa VRAM — el recurso escaso cuando ya compiten el
-modelo de lenguaje y el de audio.
-
-Los binarios de whisper.cpp **no hace falta compilarlos**: las releases
-oficiales traen `whisper-blas-bin-x64.zip`, que se descomprime y funciona.
+No hace falta ffmpeg (el audio se convierte a WAV en el navegador) ni un
+modelo de voz para hablar (se usa el sintetizador del sistema — SAPI en
+Windows). Los binarios de whisper.cpp no hace falta compilarlos: las
+releases oficiales traen `whisper-blas-bin-x64.zip`.
 
 ## Pruebas
 
@@ -348,44 +281,42 @@ Frontend:
 
 ```bash
 cd react-dashboard
+npm test               # vitest
+npm run design:detect   # impeccable — antipatrones de diseño/CSS
+```
+
+Backend:
+
+```bash
+cd backend
 npm test
 ```
 
-Backend, sin necesidad de servidor ni configuración —levantan un ICONICS falso
-y un llama-server falso, y comprueban que cada pieza devuelve la forma que
-espera la siguiente:
+Verificadores de extremo a extremo, sin red ni servidores reales (levantan un
+ICONICS y un llama-server falsos):
 
 ```bash
-node scripts/verificar-backend.mjs        # el contrato HTTP
-node scripts/verificar-herramientas.mjs   # las herramientas del asistente
-node scripts/verificar-chat.mjs           # el bucle de conversación
-node scripts/verificar-voz.mjs            # el dictado (con un whisper falso)
-node scripts/verificar-manos-libres.mjs   # cómo suena una respuesta, y el ciclo
+node scripts/verificar-backend.mjs
+node scripts/verificar-herramientas.mjs
+node scripts/verificar-chat.mjs
+node scripts/verificar-sesion.mjs         # el login nativo, de punta a punta
 ```
+
+La lista completa, con qué prueba cada uno y cuándo correrlo, está en
+[`CLAUDE.md`](CLAUDE.md) §5.
 
 Tras compilar:
 
 ```bash
-node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
+node scripts/verificar-bundle.mjs
 ```
-
-> **Aviso (28-ago-2026).** `verificar-bundle` **falla hoy**: `vendor` ocupa
-> 161.84 KB sobre un techo de 90 KB. Está medido que es anterior a los cambios
-> recientes —mismo tamaño byte a byte contra HEAD sin ellos— y anotado como B5
-> y F5 en los backlogs. Se dice aquí porque un verificador en rojo permanente
-> deja de leerse, y entonces no avisa el día que diga algo nuevo.
 
 ## Documentación
 
+- [`CLAUDE.md`](CLAUDE.md) — no negociables de arquitectura, estructura del repo, pruebas
+- [`PRODUCT.md`](PRODUCT.md) — producto, usuarios, posicionamiento
+- [`DESIGN.md`](DESIGN.md) — el sistema visual: color, tipografía, los tres estados de la pantalla
 - [`backend/README.md`](backend/README.md) — arquitectura del puente y referencia de la API
-- [`react-dashboard/README.md`](react-dashboard/README.md) — arquitectura del frontend
-- [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué, y **cómo se da de alta una máquina**
-- [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md) — lo pendiente del backend, ordenado por lo que costaría la máquina #3
-- [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — lo pendiente del frontend, con las cifras medidas de duplicación
-- [`docs/MEJORAS-ASISTENTE.md`](docs/MEJORAS-ASISTENTE.md) — treinta mejoras para el asistente: veracidad, herramientas y capacidades
-- [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
-- [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
-- [`docs/PLAN-10-VISTA-SVG.md`](docs/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
-- [`docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md`](docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md) — el selector de rango del historiador
-- [`docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md`](docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md) — cómo se juntaron las dos ramas
-- [`DESIGN.md`](DESIGN.md) — el sistema visual del tablero
+- [`shared/README.md`](shared/README.md) — qué vive en `shared/` y por qué
+- [`docs/PLAN-20-ASISTENTE.md`](docs/PLAN-20-ASISTENTE.md) — por qué esta rama es lo que es
+- [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md), [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — deuda conocida y priorizada

@@ -32,13 +32,57 @@
  * antifalsificación aparte.
  */
 import { z } from 'zod'
-import { probarCredenciales } from '../iconics/authenticator.mjs'
+import {
+  construirUrlSsoSilencioso,
+  intercambiarCodigoSilencioso,
+  obtenerUsuarioDelToken,
+  probarCredenciales,
+} from '../iconics/authenticator.mjs'
 import { COOKIE_SESION } from '../http/plugins/autenticacion.mjs'
 
 const CredencialesSchema = z.object({
   usuario: z.string().min(1, 'Falta el usuario de ICONICS.'),
   contrasena: z.string().min(1, 'Falta la contraseña.'),
 })
+
+const CodigoSsoSchema = z.object({
+  code: z.string().min(1, 'Falta el código de autorización.'),
+  verificador: z.string().min(1, 'Falta el verificador PKCE.'),
+})
+
+/*
+ * `/auth/silencioso`: la página a la que ICONICS redirige el iframe OCULTO
+ * del SSO silencioso. Nadie la ve nunca — ni cuenta como una segunda vista a
+ * efectos de §2.12: no es un destino al que alguien navegue, es el buzón
+ * técnico donde aterriza un `code` de un solo uso. Dos archivos porque la CSP
+ * de este mismo backend (`scriptSrc: ["'self'"]`, sin `unsafe-inline`)
+ * prohíbe un `<script>` en línea — la misma regla que protege al asistente
+ * protege también a su propio buzón de SSO.
+ *
+ * `src="silencioso.js"` es RELATIVA a propósito, no `/auth/silencioso.js`.
+ * Este backend puede vivir detrás de un proxy inverso bajo una subruta —
+ * `/asistente/` cuando el Asistente se empotra en el HMI de ICONICS, para
+ * que la cookie de sesión sea del mismo sitio (ver
+ * docs/PLAN-20-ASISTENTE.md)—, y una ruta absoluta ignoraría esa subruta:
+ * el navegador pediría `/auth/silencioso.js` en la RAÍZ del dominio, fuera
+ * del proxy, y ese 404 rompía el SSO silencioso en silencio. Confirmado a
+ * mano el 04-09-2026.
+ */
+const PAGINA_SSO_SILENCIOSO_HTML =
+  '<!doctype html><html><head><meta charset="utf-8"><title>Iniciando sesión…</title></head>' +
+  '<body><script src="silencioso.js"></script></body></html>'
+
+const PAGINA_SSO_SILENCIOSO_JS = `
+  var params = new URLSearchParams(window.location.search);
+  var mensaje = {
+    tipo: 'sso-silencioso',
+    code: params.get('code'),
+    error: params.get('error'),
+  };
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(mensaje, window.location.origin);
+  }
+`
 
 /**
  * Opciones de la cookie de sesión.
@@ -142,6 +186,123 @@ export function registerSesionRoutes(fastify, { config, registro }) {
          * buenas y volver a intentarlo más tarde puede funcionar. Un 401 aquí
          * mandaría al técnico a revisar una contraseña que está bien.
          */
+        if (error instanceof RangeError) {
+          request.log.error({ usuario, motivo: error.message }, error.message)
+          return reply.code(503).send({ ok: false, error: error.message })
+        }
+        throw error
+      }
+    }
+  )
+
+  /*
+   * ── SSO SILENCIOSO (HMI EMBEBIDO) ──────────────────────────────────
+   *
+   * Cuando el asistente vive dentro de un `<iframe>` en el HMI nativo de
+   * ICONICS, el navegador ya trae la cookie de sesión de ICONICS puesta —el
+   * técnico entró una vez, por la pantalla de ICONICS. Estas tres rutas son
+   * la vía para no volver a pedírsela. Ver la cabecera de
+   * `iconics/authenticator.mjs`.
+   */
+
+  // El buzón del iframe oculto. Sin sesión (`fastify.autenticar`) a
+  // propósito: es anterior a que exista una.
+  fastify.get('/auth/silencioso', async (request, reply) => {
+    reply.type('text/html').send(PAGINA_SSO_SILENCIOSO_HTML)
+  })
+  fastify.get('/auth/silencioso.js', async (request, reply) => {
+    reply.type('application/javascript').send(PAGINA_SSO_SILENCIOSO_JS)
+  })
+
+  /**
+   * De dónde saca el frontend la URL a abrir en su iframe oculto.
+   *
+   * `habilitado: false` con `ICONICS_FAKE=true` o sin `SSO_REDIRECT_URI`
+   * configurada: son las mismas dos condiciones que ya rigen el resto del
+   * login — un servidor sin la pieza montada lo dice, no ofrece un intento
+   * que va a fallar.
+   */
+  fastify.get('/api/sesion/silenciosa/iniciar', async (request, reply) => {
+    if (config.iconics.fake) return { habilitado: false }
+
+    const intento = construirUrlSsoSilencioso(config)
+    if (!intento) return { habilitado: false }
+
+    return { habilitado: true, url: intento.url, verificador: intento.verificador }
+  })
+
+  /**
+   * Canjea el código que trajo el iframe oculto y abre sesión — el
+   * equivalente de `POST /api/sesion` para este camino. Igual que aquél,
+   * valida contra ICONICS ANTES de crear la sesión.
+   */
+  fastify.post(
+    '/api/sesion/silenciosa',
+    { schema: { body: CodigoSsoSchema } },
+    async (request, reply) => {
+      if (config.iconics.fake || !config.iconics.ssoRedirectUri) {
+        return reply.code(501).send({
+          ok: false,
+          error: 'El SSO silencioso no está configurado en este servidor.',
+        })
+      }
+
+      const { code, verificador } = request.body
+
+      let tokens
+      try {
+        tokens = await intercambiarCodigoSilencioso(config, { code, codeVerifier: verificador })
+      } catch (error) {
+        request.log.warn({ ip: request.ip, motivo: error.message }, `SSO silencioso rechazado: ${error.message}`)
+        return reply.code(401).send({ ok: false, error: 'ICONICS rechazó el inicio de sesión único.' })
+      }
+
+      let usuario
+      try {
+        usuario = await obtenerUsuarioDelToken(config, tokens.access_token)
+      } catch (error) {
+        request.log.error({ motivo: error.message }, `SSO silencioso: ${error.message}`)
+        return reply.code(502).send({
+          ok: false,
+          error: 'No se pudo identificar al usuario autenticado en ICONICS.',
+        })
+      }
+
+      /*
+       * ── RECONCILIACIÓN, NO SIEMPRE UNA SESIÓN NUEVA ────────────────────
+       *
+       * Esta ruta no la llama sólo el login inicial: el frontend la vuelve a
+       * llamar cada minuto (`SesionProvider.jsx`, sondeo de SLO por
+       * sondeo) para saber si la sesión de ICONICS sigue viva — y, con
+       * "In-house applications use web login" activo, un código nuevo no
+       * significa necesariamente una persona nueva.
+       *
+       * Si la cookie que ya trae la petición resuelve a una sesión de la
+       * MISMA persona, no se crea una sesión duplicada — sólo se confirma.
+       * Crear una cada minuto no sería un error grosero, pero sí una fuga
+       * lenta de sesiones y cookies reescritas sin motivo.
+       *
+       * Si resuelve a una sesión de OTRA persona —el caso que este mismo
+       * cambio existe para cubrir: alguien cerró sesión en ICONICS y otro
+       * técnico entró, sin que la sesión de ESTE puente llegara a caducar de
+       * por medio—, esa sesión vieja se cierra antes de abrir la nueva: dos
+       * identidades no pueden compartir la misma pila de ICONICS a la vez.
+       */
+      const sesionActual = registro.resolver(request.cookies?.[COOKIE_SESION])
+      if (sesionActual && sesionActual.usuario === usuario) {
+        return reply.send({ ok: true, usuario, sinCambios: true })
+      }
+      if (sesionActual) registro.cerrar(request.cookies[COOKIE_SESION])
+
+      try {
+        // `contrasena: null` — nadie la escribió. Ver la guarda en
+        // `authenticator.mjs#authenticate` para lo que eso implica el día
+        // que el refresh token falle.
+        const sesion = registro.crear({ usuario, contrasena: null, tokens })
+        return reply
+          .setCookie(COOKIE_SESION, sesion.id, opcionesDeCookie(config))
+          .send({ ok: true, usuario, expiraEn: new Date(sesion.expiraEn).toISOString() })
+      } catch (error) {
         if (error instanceof RangeError) {
           request.log.error({ usuario, motivo: error.message }, error.message)
           return reply.code(503).send({ ok: false, error: error.message })

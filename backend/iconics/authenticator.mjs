@@ -36,6 +36,18 @@
  * puede hablar con el puente**; éste, **cómo el puente habla con ICONICS**.
  * Desde el Plan 20 la respuesta a los dos sale de las mismas credenciales,
  * pero siguen siendo dos preguntas.
+ *
+ * ── UNA SEGUNDA VÍA, SIN FORMULARIO (HMI EMBEBIDO) ──────────────────
+ *
+ * `construirUrlSsoSilencioso`, `intercambiarCodigoSilencioso` y
+ * `obtenerUsuarioDelToken` son un segundo camino de entrada, para cuando el
+ * asistente vive empotrado como `<iframe>` dentro del HMI nativo de ICONICS:
+ * ahí el navegador ya trae la cookie de sesión de ICONICS puesta, y `POST
+ * /api/sesion/silenciosa` la aprovecha en vez de pedir usuario y contraseña
+ * otra vez. Sus sesiones NO guardan contraseña — ver la guarda en
+ * `authenticate()` más abajo — así que si el `refresh_token` algún día falla,
+ * no pueden rehacer un login completo por su cuenta: fallan limpio y el
+ * técnico vuelve a entrar (el intento silencioso lo intenta de nuevo solo).
  */
 import crypto from 'node:crypto'
 import { logger } from '../logger.mjs'
@@ -207,6 +219,93 @@ async function exchange(tokenEndpoint, fields, timeoutMs) {
 }
 
 /**
+ * Arma la URL de un intento de SSO silencioso (`prompt=none`) y el
+ * verificador PKCE que hace falta para canjear el código si vuelve uno.
+ *
+ * ── QUÉ ES ESTO Y DE DÓNDE SALE ─────────────────────────────────────
+ *
+ * Cuando el asistente vive empotrado en un `<iframe>` dentro del HMI nativo
+ * de ICONICS (AnyGlass/GraphWorX), el navegador YA tiene la cookie de sesión
+ * de ICONICS puesta — el técnico entró una vez, por la pantalla de ICONICS.
+ * `prompt=none` le pregunta al mismo servidor de identidad «¿ya hay sesión?»
+ * sin mostrar ningún formulario: si la cookie está, responde con un código
+ * de un solo uso; si no, con `error=login_required`. Confirmado a mano contra
+ * este servidor el 04-09-2026 — no es un comportamiento documentado por
+ * ICONICS, es observado.
+ *
+ * El frontend abre esta URL en un iframe OCULTO (no el que ve el técnico) y
+ * espera la respuesta por `postMessage` desde `/auth/silencioso` — ver
+ * `routes/sesionRoutes.mjs`.
+ *
+ * @returns {{url: string, verificador: string}|null} `null` si
+ *   `SSO_REDIRECT_URI` no está configurada: sin ella no hay a dónde volver
+ *   con el código, y ofrecer el intento igual sólo cambiaría un login por un
+ *   error de ICONICS más confuso.
+ */
+export function construirUrlSsoSilencioso(config) {
+  const { endpoints, clientId, scope, ssoRedirectUri } = config.iconics
+  if (!ssoRedirectUri) return null
+
+  const pkce = createPkcePair()
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: ssoRedirectUri,
+    response_type: 'code',
+    scope,
+    prompt: 'none',
+    code_challenge: pkce.challenge,
+    code_challenge_method: 'S256',
+  })
+  return { url: `${endpoints.authorize}?${params}`, verificador: pkce.verifier }
+}
+
+/**
+ * Canjea el código de un SSO silencioso por tokens. Es el mismo canje que el
+ * paso 5 de `performInteractiveLogin` — la diferencia es que aquí el código
+ * lo trajo el NAVEGADOR (via el iframe oculto), no nuestro propio scraping
+ * del formulario de login.
+ */
+export async function intercambiarCodigoSilencioso(config, { code, codeVerifier }) {
+  const { endpoints, clientId, ssoRedirectUri } = config.iconics
+  return exchange(
+    endpoints.token,
+    {
+      grant_type: 'authorization_code',
+      client_id: clientId,
+      code,
+      redirect_uri: ssoRedirectUri,
+      code_verifier: codeVerifier,
+    },
+    config.limits.upstreamTimeoutMs
+  )
+}
+
+/**
+ * Quién es el dueño de un token, para el SSO silencioso: a diferencia del
+ * login por formulario, aquí nadie escribió un usuario a mano.
+ *
+ * @throws {Error} si ICONICS rechaza el token o no devuelve un nombre
+ *   reconocible — se prueban `userName`/`username`/`name` porque la forma
+ *   exacta de `UserInfo` no está documentada públicamente y esto es más
+ *   barato que asumir un único campo y romper en silencio el día que cambie.
+ */
+export async function obtenerUsuarioDelToken(config, accessToken) {
+  const response = await fetch(config.iconics.endpoints.userInfo, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(config.limits.upstreamTimeoutMs),
+  })
+  if (!response.ok) {
+    throw new Error(`ICONICS UserInfo respondió ${response.status} identificando al usuario del SSO silencioso.`)
+  }
+  const payload = await response.json()
+  const usuario = payload?.userName || payload?.username || payload?.name
+  if (!usuario) {
+    throw new Error('ICONICS UserInfo no devolvió un nombre de usuario reconocible.')
+  }
+  return usuario
+}
+
+/**
  * Prueba unas credenciales contra ICONICS y devuelve sus tokens, SIN crear
  * autenticador ni guardar nada.
  *
@@ -321,6 +420,23 @@ export function createAuthenticator(config, credenciales, tokensIniciales = null
         )
         refreshToken = ''
       }
+    }
+
+    /*
+     * Una sesión nacida de SSO silencioso (§ más arriba) no tiene contraseña:
+     * nadie la escribió, `POST /api/sesion/silenciosa` sólo trajo un código de
+     * un solo uso. Si el refresh falla, la única salida normal —rehacer el
+     * login completo con usuario y contraseña— no existe aquí. Fallar con un
+     * mensaje claro es preferible a mandar `Password: undefined` a ICONICS y
+     * que el rechazo llegue disfrazado de «credenciales incorrectas»: el
+     * técnico simplemente tiene que volver a entrar, y el intento de SSO
+     * silencioso lo intentará de nuevo solo en cuanto lo haga.
+     */
+    if (!credenciales?.contrasena) {
+      throw new Error(
+        `La sesión de ${credenciales?.usuario || 'este técnico'} vino de un SSO silencioso y no ` +
+          'guarda contraseña: no se puede rehacer el login. Hace falta volver a entrar.'
+      )
     }
 
     storeTokens(await performInteractiveLogin(iconics, credenciales, timeoutMs))

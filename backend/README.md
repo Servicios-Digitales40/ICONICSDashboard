@@ -36,12 +36,14 @@ plantilla comentada de todas las variables está en
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `ICONICS_API_BASE` | *(vacío)* | Base de la API REST, p. ej. `https://servidor/fwxapi/rest/v1`. Sin ella la API responde 500. |
-| `ICONICS_USERNAME` | *(vacío)* | Usuario del login OIDC. |
-| `ICONICS_PASSWORD` | *(vacío)* | Su contraseña. |
+| `ICONICS_API_BASE` | *(vacío)* | Base de la API REST, p. ej. `https://servidor/fwxapi/rest/v1`. Sin ella la API responde 500. Su **origen** (esquema+host, sin la ruta) es también de dónde sale el `authorize` del SSO silencioso — ver `SSO_REDIRECT_URI` más abajo. |
+| `ICONICS_USERNAME` / `ICONICS_PASSWORD` | *(vacío)* | Desde el Plan 20, el login normal NO las usa — cada técnico entra con su propia cuenta (`POST /api/sesion`). Sólo las leen `ICONICS_FAKE=true` y los `scripts/verificar-*.mjs`, que necesitan una identidad sin persona detrás. |
 | `ICONICS_POINT_NAME` | *(vacío)* | Punto que leen `/api/iconics/data` y `/api/context` cuando no se indica otro. |
 | `ICONICS_READ_ONLY` | **`true`** | Deshabilita escritura y *ack* de alarmas. Ver abajo. |
 | `ICONICS_FAKE` | `false` | Transporte simulado (Plan 14 §7.1): sirve las dos máquinas —las ocho señales del tanque y los 73 puntos del sistema de vibraciones con sus contadores de alarma— sin `ICONICS_API_BASE` ni red. Ver `backend/iconics/fakeClient.mjs`. **Nunca en producción.** |
+| `SESION_TTL_MINUTOS` | `60` | Inactividad tras la cual una sesión de persona caduca. |
+| `SESION_MAX` | `32` | Sesiones de persona vivas a la vez. Sobre el tope, `POST /api/sesion` responde 503. |
+| `SSO_REDIRECT_URI` | *(vacío)* | Habilita el SSO silencioso: el Asistente entra sin pedir usuario y contraseña cuando vive empotrado como `<iframe>` en el HMI nativo de ICONICS (AnyGlass/GraphWorX) y el navegador ya trae la cookie de sesión de ICONICS puesta. Tiene que ser una URL de ESTE backend, registrada a mano en ICONICS (Workbench → Security → Global Settings → Web Login → "In-house application Relying Party Redirect URIs"), y del MISMO origen que `ICONICS_API_BASE` — ver `docs/PLAN-20-ASISTENTE.md` §F7 para el porqué exacto y el paso a paso completo de montaje. |
 
 **Servidor**
 
@@ -59,6 +61,7 @@ plantilla comentada de todas las variables está en
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `CORS_ORIGINS` | *(vacío)* | Orígenes autorizados, separados por comas, con esquema y puerto. Vacío = ninguno, y normalmente no hace falta: en desarrollo el dev server reenvía `/api` aquí, así que para el navegador es el mismo origen. **No existe el comodín `*`**: la comparación es por igualdad exacta, y ponerlo autoriza a un origen llamado literalmente «\*». |
+| `FRAME_ANCESTORS` | *(vacío)* | Orígenes autorizados a empotrar esta app en un `<iframe>` propio (`frame-ancestors` de la CSP), separados por comas. Vacío = nadie, igual que `CORS_ORIGINS`. Pensado para un HMI nativo de ICONICS (AnyGlass/GraphWorX) que muestre el asistente dentro de su propio proyecto. **Aquí el comodín `*` sí es peligroso de verdad** —se inyecta tal cual en la CSP, donde es sintaxis real de «cualquiera»— así que el arranque falla si lo detecta, en vez de dejarlo pasar. |
 | `TRUST_PROXY` | `false` | Leer la IP del cliente de `X-Forwarded-For`. Sólo con proxy inverso delante. |
 | `RATE_LIMIT_MAX` | `300` | Peticiones a `/api/` por ventana y cliente. |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | La ventana. |

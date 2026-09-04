@@ -44,11 +44,27 @@
   sin este parametro, :3001 puede quedarse enseñando un build de una sesion
   anterior sin que nada lo avise.
 
+.PARAMETER BasePath
+  Compila el frontend para vivir bajo una SUBRUTA, no en la raiz del origen
+  que lo sirve -por ejemplo "/asistente/", cuando IIS reenvia esa subruta de
+  bms-server hacia este backend para el SSO silencioso del HMI de ICONICS
+  (docs/PLAN-20-ASISTENTE.md). Pone VITE_BASE_PATH y VITE_API_BASE SOLO para
+  el paso de `npm run build`; sin este parametro compila en la raiz, como
+  siempre.
+
+  OJO: sin `-BasePath`, este script vuelve a compilar en la raiz aunque el
+  `dist` de antes estuviera hecho para una subruta -es lo que este parametro
+  existe para evitar que se te olvide un dia que estes probando eso.
+
 .EXAMPLE
   .\scripts\dev.ps1
 
 .EXAMPLE
   .\scripts\dev.ps1 -SinBuild
+
+.EXAMPLE
+  # Recompila para vivir bajo /asistente/ (proxy inverso de IIS)
+  .\scripts\dev.ps1 -BasePath /asistente/
 
 .EXAMPLE
   # Si responde "la ejecucion de scripts esta deshabilitada en este sistema":
@@ -59,7 +75,8 @@
 [CmdletBinding()]
 param(
   [switch]$SinPrototipos,
-  [switch]$SinBuild
+  [switch]$SinBuild,
+  [string]$BasePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,14 +99,31 @@ if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
 # salida solo llega a $LASTEXITCODE, nunca lanza por si mismo.
 if (-not $SinBuild) {
   Write-Host ''
-  Write-Host '  compilando el frontend (npm run build)...' -ForegroundColor DarkGray
+  if ($BasePath) {
+    Write-Host "  compilando el frontend para vivir bajo '$BasePath' (npm run build)..." -ForegroundColor DarkGray
+  } else {
+    Write-Host '  compilando el frontend (npm run build)...' -ForegroundColor DarkGray
+  }
   Push-Location $frontend
   try {
+    if ($BasePath) {
+      # Solo para ESTE paso: VITE_BASE_PATH mueve todas las rutas de assets
+      # del HTML a la subruta, y VITE_API_BASE hace lo mismo para las
+      # llamadas a /api/... del propio frontend (ver lib/api/apiBase.js).
+      # Las dos, o ninguna -mezclar una subruta de assets con /api en la raiz
+      # deja la mitad de las peticiones fuera del proxy inverso de IIS.
+      $env:VITE_BASE_PATH = $BasePath
+      $env:VITE_API_BASE = $BasePath.TrimEnd('/')
+    }
     npm run build
     if ($LASTEXITCODE -ne 0) {
       throw "npm run build fallo (codigo $LASTEXITCODE). Revisa el error de arriba; -SinBuild lo salta si ya tienes un dist valido."
     }
   } finally {
+    if ($BasePath) {
+      Remove-Item Env:\VITE_BASE_PATH -ErrorAction SilentlyContinue
+      Remove-Item Env:\VITE_API_BASE -ErrorAction SilentlyContinue
+    }
     Pop-Location
   }
   Write-Host '  build listo' -ForegroundColor DarkGray
@@ -112,7 +146,11 @@ $banderas = if ($SinPrototipos) { '' } else {
 Start-Ventana 'ICONICS · vite :5173' $frontend "$banderas npm run dev"
 
 Write-Host ''
-Write-Host '  backend   http://localhost:3001   (build de planta, sin prototipos)' -ForegroundColor DarkGray
+if ($BasePath) {
+  Write-Host "  backend   http://localhost:3001$BasePath   (compilado para vivir bajo '$BasePath' — no abre en la raiz)" -ForegroundColor DarkGray
+} else {
+  Write-Host '  backend   http://localhost:3001   (build de planta, sin prototipos)' -ForegroundColor DarkGray
+}
 Write-Host '  frontend  http://localhost:5173   <- abre esta' -ForegroundColor Cyan
 if (-not $SinPrototipos) {
   Write-Host '            con Planta v2, Sandbox y las 12 propuestas' -ForegroundColor DarkGray
