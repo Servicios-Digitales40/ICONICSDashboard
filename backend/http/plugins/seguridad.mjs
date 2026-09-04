@@ -11,6 +11,12 @@
  * agujero que el `Access-Control-Allow-Origin: *` que ya se quitó de
  * `cors.mjs`, y se tapa igual: negando por defecto.
  *
+ * El defecto sigue siendo negar todo framing (`frame-ancestors 'none'` +
+ * `X-Frame-Options: DENY`). Un integrador que necesita empotrar el tablero
+ * en su propio portal declara su origen exacto en `FRAME_ANCESTORS` — nunca
+ * un comodín, mismo esquema que `CORS_ORIGINS`. Ver `readFrameAncestors` en
+ * `config.mjs`.
+ *
  * ── CORS ───────────────────────────────────────────────────────────
  *
  * La lista sigue **vacía por defecto**, que era la decisión importante del
@@ -43,6 +49,10 @@ import rateLimit from '@fastify/rate-limit'
 async function seguridadPlugin(fastify, { config }) {
   /* ── Cabeceras ──────────────────────────────────────────────────── */
 
+  const frameAncestors = config.frameAncestors.length > 0
+    ? config.frameAncestors
+    : ["'none'"]
+
   await fastify.register(helmet, {
     /*
      * La CSP se declara a mano porque la de helmet por defecto rompe el
@@ -70,7 +80,9 @@ async function seguridadPlugin(fastify, { config }) {
         // de `fonts.googleapis.com` de arriba.
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
         objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
+        // `'none'` salvo que `FRAME_ANCESTORS` declare un origen exacto: ver
+        // el porqué en la cabecera de `readFrameAncestors` en `config.mjs`.
+        frameAncestors,
         baseUri: ["'self'"],
         formAction: ["'self'"],
       },
@@ -91,13 +103,14 @@ async function seguridadPlugin(fastify, { config }) {
      */
     crossOriginEmbedderPolicy: false,
     /*
-     * `DENY` y no el `SAMEORIGIN` que trae helmet por defecto: el tablero no
-     * se empotra a sí mismo en ningún sitio, así que no hay nada que permitir.
-     * Es la versión heredada de `frame-ancestors 'none'` de la CSP, para los
-     * navegadores que no la aplican; dejarla más laxa que la CSP haría que la
-     * protección dependiera de cuál de las dos lea el navegador.
+     * `DENY` mientras `FRAME_ANCESTORS` esté vacío: es la versión heredada de
+     * `frame-ancestors 'none'` para los navegadores que no leen CSP. Con
+     * `FRAME_ANCESTORS` declarado se desactiva del todo en vez de mandar
+     * `ALLOW-FROM` — la cabecera admite un solo origen y la ignoran los
+     * navegadores modernos, así que dejarla activa sólo daría una falsa
+     * sensación de protección; el permiso real lo da `frame-ancestors`.
      */
-    frameguard: { action: 'deny' },
+    frameguard: config.frameAncestors.length > 0 ? false : { action: 'deny' },
   })
 
   /* ── CORS ───────────────────────────────────────────────────────── */

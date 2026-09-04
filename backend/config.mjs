@@ -227,6 +227,26 @@ function readCorsOrigins(rawValue) {
 }
 
 /**
+ * Orígenes autorizados a embeber el tablero en un `<iframe>`.
+ *
+ * Vacío por defecto, y ese defecto es el que importa: sin ninguno declarado,
+ * `seguridad.mjs` manda `frame-ancestors 'none'` y `X-Frame-Options: DENY` —
+ * el tablero mantiene sesión privilegiada contra ICONICS, así que dejarlo
+ * embeber en cualquier página de forma abierta expondría al operador a
+ * clickjacking sobre la planta real. Un integrador concreto (p. ej. un
+ * portal que compone varios paneles) se declara aquí por origen exacto,
+ * igual que `CORS_ORIGINS`: no existe el comodín `*`.
+ */
+function readFrameAncestors(rawValue) {
+  return Object.freeze(
+    (rawValue ?? '')
+      .split(',')
+      .map(origin => origin.trim().replace(/\/+$/, ''))
+      .filter(Boolean)
+  )
+}
+
+/**
  * `NODE_TLS_REJECT_UNAUTHORIZED=0` desactiva la verificación de certificados
  * del proceso ENTERO, no sólo de las llamadas a ICONICS. Es la mitigación
  * documentada como R-13 y el descuido más fácil de cometer: basta con que el
@@ -393,6 +413,7 @@ export function loadConfig(env = process.env) {
     version: env.APP_VERSION || 'dev',
     tlsVerificationDisabled: checkTlsVerification(env, isProduction),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
+    frameAncestors: readFrameAncestors(env.FRAME_ANCESTORS),
     /**
      * Detrás de un proxy inverso, `socket.remoteAddress` es el proxy para
      * TODOS los clientes: sin esto el limitador contaría a la planta entera

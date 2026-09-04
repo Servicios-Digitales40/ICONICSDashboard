@@ -50,6 +50,21 @@ describe('cabeceras de seguridad', () => {
       /style-src[^;]*'unsafe-inline'/
     )
   })
+
+  it('permite el framing sólo desde el origen declarado en FRAME_ANCESTORS', async () => {
+    const { app: conFrame } = await montarApp({ FRAME_ANCESTORS: 'https://localhost:3001' })
+
+    const respuesta = await conFrame.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).toMatch(
+      /frame-ancestors https:\/\/localhost:3001/
+    )
+    // `X-Frame-Options` sólo admite un origen y ya no lo respetan los
+    // navegadores modernos: con FRAME_ANCESTORS declarado se desactiva del
+    // todo para no dar una falsa sensación de protección.
+    expect(respuesta.headers['x-frame-options']).toBeUndefined()
+
+    await conFrame.close()
+  })
 })
 
 describe('CORS', () => {
