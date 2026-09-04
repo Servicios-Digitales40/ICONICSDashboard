@@ -313,3 +313,154 @@ export const CAUSAS_POR_RIESGO = {
 export function causasDe(riesgoId) {
   return CAUSAS_POR_RIESGO[riesgoId] ?? null;
 }
+
+/**
+ * POR QUÉ un riesgo no tiene causas: la cabecera de este archivo, en código.
+ *
+ * ── EL PROBLEMA QUE ESTO CIERRA ─────────────────────────────────────
+ *
+ * `causasDe()` devuelve `null` en dos situaciones que no se parecen en nada:
+ *
+ *   · el riesgo NO TIENE causas debajo, y es correcto que no las tenga
+ *   · el riesgo SÍ las tendría, pero nadie las ha transcrito todavía
+ *
+ * La cabecera de este archivo distingue las dos desde el primer día, pero en
+ * prosa: el código no podía leerla, así que `diagnosticar_falla` contestaba
+ * «puede ser deliberado, o puede que nadie las haya transcrito» y dejaba al
+ * técnico sin saber si el sistema está bien o incompleto.
+ *
+ * Con un riesgo de diez eso era tolerable. Medido el 03-09-2026 dejó de
+ * serlo: en el tanque falta 1 de 10, pero en vibraciones faltan 15 de 18, así
+ * que la respuesta ambigua pasó a ser la MAYORITARIA de esa máquina.
+ *
+ * ── TRES CLASES, NO UNA ─────────────────────────────────────────────
+ *
+ * Son las mismas que la cabecera ya nombraba, y se distinguen porque lo que
+ * el técnico tiene que hacer con cada una es distinto:
+ *
+ *   informativo     el riesgo sólo informa de un modo de operación
+ *   instrumentacion habla del estado de la MEDIDA, no de la máquina
+ *   rango-medida    la lectura cae fuera de donde la norma o el módulo saben
+ *                   juzgar; no es una avería, es que no se puede opinar
+ *
+ * ── `PENDIENTES` NO ES UNA LISTA DE VERGÜENZA ───────────────────────
+ *
+ * Es la otra mitad, y tiene que existir para que el verificador pueda exigir
+ * que TODO riesgo sin causas esté clasificado en una de las dos. Sin ella,
+ * añadir un riesgo y olvidarse de sus causas no lo nota nadie — que es
+ * exactamente como llegaron aquí estos dos.
+ */
+export const SIN_CAUSAS_DELIBERADO = {
+  "variador-en-manual": {
+    clase: "informativo",
+    motivo:
+      "El riesgo sólo informa de que el variador está en modo manual: no hay una avería " +
+      "debajo que diagnosticar, el propio modo es el hecho.",
+  },
+
+  /* Estado de la INSTRUMENTACIÓN, no de la máquina. */
+  "variador-en-fallo": {
+    clase: "instrumentacion",
+    motivo:
+      "El variador ya declara su propio fallo, y su código lo identifica: no hay causas " +
+      "candidatas que puntuar debajo, hay un código que buscar en el manual del variador.",
+  },
+  "sensor-con-desviacion": {
+    clase: "instrumentacion",
+    motivo: "Habla del estado del sensor, no de la máquina que mide.",
+  },
+  "confianza-de-medida-baja": {
+    clase: "instrumentacion",
+    motivo: "El módulo desconfía de su propia medida: lo que falla es la medida, no la máquina.",
+  },
+  "alarmas-activas": {
+    clase: "instrumentacion",
+    motivo:
+      "Es un contador del área de alarmas del servidor. Cuál alarma se disparó no se puede " +
+      "saber desde aquí, así que no hay causa que proponer.",
+  },
+  "alarmas-sin-reconocer": {
+    clase: "instrumentacion",
+    motivo: "Igual que el anterior: un contador, y además de gestión, no de máquina.",
+  },
+  "dkw-sin-referencia": {
+    clase: "instrumentacion",
+    motivo: "El valor de daño no tiene referencia aprendida todavía: falta calibración, no hay avería.",
+  },
+  "rodamientos-sin-vigilar": {
+    clase: "instrumentacion",
+    motivo:
+      "El diagnóstico de rodamientos está apagado en el módulo. El riesgo dice justamente que " +
+      "no se está vigilando; proponer causas de rodamiento sería fingir que sí.",
+  },
+  "medida-sin-vigilar": {
+    clase: "instrumentacion",
+    motivo: "Hay medidas que se publican y nadie vigila: es un hueco de configuración.",
+  },
+  "vigilancia-en-aviso": {
+    clase: "instrumentacion",
+    motivo:
+      "Ya dice QUÉ vigilancia concreta se disparó en su propia evidencia, con el nombre del " +
+      "defecto que declara VIGILANCIAS. Una lista de causas aparte sería repetirlo peor.",
+  },
+
+  /* Fuera del rango en el que alguien puede juzgar la lectura. */
+  "velocidad-fuera-de-norma": {
+    clase: "rango-medida",
+    motivo:
+      "La máquina gira fuera de la banda donde ISO 10816 sabe juzgar: no es una avería, es que " +
+      "el veredicto no aplica.",
+  },
+  "velocidad-en-el-borde-de-la-banda": {
+    clase: "rango-medida",
+    motivo: "Misma razón, en el borde: la lectura llega recortada y hay que decirlo, no diagnosticarla.",
+  },
+  "por-debajo-del-minimo-del-modulo": {
+    clase: "rango-medida",
+    motivo: "Por debajo de lo que el propio módulo puede medir.",
+  },
+  "medida-en-vacio": {
+    clase: "rango-medida",
+    motivo:
+      "La máquina gira sin carga: la medida es válida pero no representa el servicio, así que " +
+      "no hay avería que atribuir.",
+  },
+};
+
+/**
+ * Riesgos que SÍ deberían tener causas y todavía no las tienen.
+ *
+ * Los dos que hay salieron de comparar la cabecera de este archivo con las
+ * reglas reales el 03-09-2026: la cabecera enumeraba catorce huérfanos
+ * deliberados y las reglas tenían dieciséis. Éstos son los dos que nadie
+ * había clasificado — no por una decisión, sino porque no había forma de
+ * notarlo.
+ */
+export const SIN_CAUSAS_PENDIENTE = {
+  "alarma-del-modulo": {
+    motivo:
+      "El módulo levanta su alarma por vibración alta, así que debajo hay las mismas causas " +
+      "mecánicas que `vibracion-en-alarma`. Falta transcribirlas desde su regla.",
+  },
+  "aviso-del-modulo": {
+    motivo: "Lo mismo que `alarma-del-modulo`, un escalón antes.",
+  },
+};
+
+/**
+ * Por qué este riesgo no tiene causas, o `null` si nadie lo ha clasificado.
+ *
+ * `deliberado: false` NO es un error del sistema: es «esto debería tener
+ * causas y no las tiene». Se dice tal cual, porque un técnico que lee «no hay
+ * causas» merece saber si es que no las hay o es que faltan — el arreglo de
+ * cada caso es distinto y uno de los dos es trabajo nuestro.
+ */
+export function porQueSinCausas(riesgoId) {
+  const deliberado = SIN_CAUSAS_DELIBERADO[riesgoId];
+  if (deliberado) return { deliberado: true, ...deliberado };
+
+  const pendiente = SIN_CAUSAS_PENDIENTE[riesgoId];
+  if (pendiente) return { deliberado: false, clase: "pendiente", ...pendiente };
+
+  return null;
+}

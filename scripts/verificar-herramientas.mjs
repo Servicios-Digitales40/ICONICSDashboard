@@ -2218,6 +2218,57 @@ await checkAsync('un riesgo sin causas transcritas lo dice, no una lista vacía 
   assert.match(r.aviso, /no tiene causas candidatas/i)
 })
 
+await checkAsync('un huérfano DELIBERADO dice por qué, y no suena a carencia', async () => {
+  /*
+   * Hasta el 03-09-2026 el aviso era una disyuntiva: «puede ser deliberado …
+   * o puede que nadie las haya transcrito todavía». La distinción existía en
+   * la cabecera de `causas.js`, en prosa, y el código no podía leerla.
+   *
+   * En el tanque era 1 huérfano de 10 y se toleraba. En vibraciones son 15 de
+   * 18: la respuesta ambigua pasó a ser la MAYORITARIA de esa máquina, y deja
+   * al técnico sin saber si el sistema está bien o incompleto.
+   */
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'variador-en-manual': {
+      sistema: 'tanque', riesgoId: 'variador-en-manual', huerfano: true, causas: [],
+      sinCausas: { deliberado: true, clase: 'informativo', motivo: 'El riesgo sólo informa del modo.' },
+    },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'variador-en-manual' })
+
+  assert.equal(r.sinCausas.deliberado, true)
+  assert.match(r.aviso, /es correcto que no las tenga/i)
+  assert.match(r.aviso, /El riesgo sólo informa del modo/)
+  // Y al modelo se le prohíbe presentarlo como algo que falta por cargar.
+  assert.match(r.comoRedactar, /NO lo presentes como una carencia/i)
+})
+
+await checkAsync('un huérfano PENDIENTE admite que la pieza falta', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'alarma-del-modulo': {
+      sistema: 'vibraciones', riesgoId: 'alarma-del-modulo', huerfano: true, causas: [],
+      sinCausas: { deliberado: false, clase: 'pendiente', motivo: 'Falta transcribirlas desde su regla.' },
+    },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'vibraciones', riesgoId: 'alarma-del-modulo' })
+
+  assert.equal(r.sinCausas.deliberado, false)
+  assert.match(r.aviso, /S[IÍ] deber[ií]a tener causas/i)
+  assert.match(r.aviso, /pieza que nos falta/i)
+
+  /*
+   * Y la sugerencia tiene que ser de SU máquina. El dossier compuesto se
+   * acotó al tanque el 03-09-2026, así que ofrecérselo para un riesgo de
+   * vibraciones mandaría al modelo contra una negativa — y la mayoría de los
+   * huérfanos son justamente de esa máquina.
+   */
+  assert.doesNotMatch(r.comoRedactar, /diagnostico\(sintoma/,
+    'le ofrece al modelo el dossier del tanque para un riesgo de vibraciones')
+  assert.match(r.comoRedactar, /estado_del_sistema/)
+})
+
 await checkAsync('lo que lee el TÉCNICO y lo que obedece el MODELO van separados', async () => {
   /*
    * La fuga medida el 03-09-2026. `aviso` y la instrucción al modelo eran
