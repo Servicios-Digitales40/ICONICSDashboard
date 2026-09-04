@@ -869,6 +869,128 @@ Se reescriben:
   los tres temas siguen. Lo que se va es el vocabulario de tablero —tiles,
   sparks, banners de estado, la retícula de nueve vistas.
 
+### F5 · El brief de diseño (`impeccable shape`) — **PENDIENTE DE CONFIRMAR**
+
+> Producido el 04-09-2026 siguiendo `reference/shape.md` del skill `impeccable`,
+> con `context.mjs` cargando el `PRODUCT.md` y `DESIGN.md` que la F4.5 dejó al
+> día. Ronda de descubrimiento respondida por el autor. `shape` no escribe
+> código: esto es el contrato que la implementación tiene que cumplir.
+
+#### 1 · Trabajo y audiencia
+
+Un técnico de mantenimiento **delante de la máquina**, con una avería concreta
+y las manos ocupadas o sucias. Llega con una pregunta, no a navegar. Modo
+**Operate**: el éxito es completar una tarea, no admirar una pantalla.
+
+Segundo público, ocasional y decisivo: quien sube manuales y poda la bitácora.
+No necesita otra interfaz, necesita que los cajones existan.
+
+#### 2 · Resultado y prueba
+
+Que la respuesta llegue **con su evidencia a la vista**: qué herramienta se
+usó, sobre qué señal y con qué ventana de tiempo. Es lo que distingue esto de
+un chat que recita de memoria, y es el posicionamiento del producto, no un
+adorno de confianza.
+
+#### 3 · La dirección elegida
+
+**Mundo visual: el establecido.** No se abre concepto nuevo. Los tokens, los
+tres temas, las dos tipografías, los dos radios y el vocabulario de sombras de
+`DESIGN.md` se respetan enteros. Lo que estaba materialmente abierto era la
+**composición**, y es lo único que este brief decide.
+
+**Tesis estructural: la pantalla tiene tres estados, no un layout.**
+
+1. **Lectura** (el defecto). Una columna central de medida legible; los lados en
+   calma. Es el estado en el que se lee un párrafo largo y se comprueba su
+   evidencia.
+2. **Cajón abierto.** Un panel entra desde la derecha **por encima** de la
+   columna. Escape lo cierra y se vuelve exactamente a donde se estaba, con el
+   hilo intacto. No son pestañas y no tienen URL.
+3. **Manos libres.** La pantalla **se convierte en la llamada**: la columna
+   cede, queda un indicador grande de en qué va —escuchando / pensando /
+   hablando— y la transcripción se construye debajo. Salir devuelve al estado 1
+   sin perder nada.
+
+> **Por qué tres estados y no un botón grande.** La ronda de descubrimiento
+> eligió a la vez «columna centrada en calma» y «voz como modo primario», que
+> tiran en direcciones opuestas si la voz se resuelve como un control más
+> compitiendo por el margen. No lo es: el propio código ya dice que el manos
+> libres «es una llamada, no un walkie». Una llamada no es un botón en una
+> barra, es un estado del aparato. Así la columna se queda tan callada como se
+> pidió y la voz obtiene todo el peso, sin que ninguna de las dos ceda.
+
+**Momento focal:** la llegada de la respuesta. El trazo se dibuja mientras el
+texto llega, el estado se cuenta en palabras con sus segundos, y al terminar
+aparecen las citas de origen. Todo lo demás de la pantalla existe para que ese
+momento se lea bien.
+
+#### 4 · Alcance y fronteras
+
+**Se toca:** el armazón de `Asistente.jsx` (de lanzador flotante a aplicación),
+el estado vacío, la cabecera —que absorbe `BarraSesion`—, la presentación de
+los tres cajones y el estado de manos libres.
+
+**No se toca, y no es negociable** (sale de una restricción real, no de gusto):
+
+- El trazo derivado de los caracteres **que de verdad han llegado**. Nunca una
+  onda que se mueva sola.
+- El estado dicho con palabras y el contador de segundos.
+- Que cancelar **no** se cuente como fallo.
+- El botón de repetir un turno que acabó en nada.
+- Las citas de origen bajo cada respuesta.
+- La persistencia del hilo, y que **caducar la sesión no lo borre**.
+
+**Anti-objetivos declarados:** ningún segundo destino navegable; los cajones no
+se convierten en pestañas; ni avatar, ni menú de ajustes, ni «crear cuenta»;
+ninguna librería de gráficas vuelve a entrar.
+
+#### 5 · Estado vacío: seis ejemplos, uno por familia
+
+Hay veintidós herramientas y el técnico no puede adivinarlas. Se enseñan seis,
+elegidas para que cada una revele una familia distinta —no las seis más
+vistosas—:
+
+| Ejemplo | Qué revela |
+|---|---|
+| «¿Cómo está el tanque ahora mismo?» | el instante |
+| «¿Cuánto subió la temperatura esta semana?» | el histórico |
+| «¿Qué dice el manual sobre la presión máxima?» | los manuales |
+| «¿Por qué se disparó el riesgo de cavitación?» | el diagnóstico por cuatro fuentes |
+| «Ya cambié la histéresis, apúntalo» | que se le puede **dictar** una intervención |
+| «Hazme un reporte de este turno» | que produce un documento |
+
+El quinto es el que más trabajo hace: es el único que enseña que el asistente
+**recibe** conocimiento además de darlo, y esa es la vía por la que la bitácora
+se llena.
+
+#### 6 · Rangos y estados que el diseño tiene que aguantar
+
+- **Espera de 30 a 90 s**, con hasta tres pasos de herramienta encadenados.
+- **Hilo de 0 a cientos de turnos**; respuestas de una línea o de veinte.
+- **Cola**: otra persona preguntando, con «tienes N delante».
+- **Sin `IA_BASE`** (503): el asistente existe y lo dice; no se rompe.
+- **Sin `IA_WHISPER_BASE`**: el micrófono **no aparece**, no aparece inerte.
+- **Sesión caducada** en mitad de un turno: al login, con el hilo a salvo.
+- **Cajón de Assets**: árbol perezoso, de cero a miles de nodos.
+- **Cajones vacíos**: sin manuales y sin casos es el primer día de una
+  instalación, no un error.
+
+#### 7 · Restricciones y decisiones que quien implemente NO puede inventar
+
+- **Accesibilidad**: con dos pantallas, un defecto está en el 50 % de la
+  aplicación. `axe` sin violaciones graves, foco visible, y el estado de la
+  espera anunciado a lector de pantalla (`aria-live`), no sólo pintado.
+- **`prefers-reduced-motion`** apaga el trazo y las entradas. El trazo es
+  información, así que su alternativa es el texto de estado, que ya existe.
+- **La paleta del SVG del servidor** (`shared/eva/comun/graficos.js`) sigue
+  desalineada y siempre clara. Es deuda declarada en `DESIGN.md`: **arreglarla
+  exige decidir si el tema viaja en la petición**, y esa decisión no se toma
+  dentro de un componente.
+- **`BarraSesion` se absorbe** en la cabecera y su archivo desaparece.
+- La densidad no baja de lo que fija `DESIGN.md`: cuerpo de 13 px, radios de 16
+  y 9, un solo azul, sin cuarto nivel de tinta.
+
 ### F5 · El asistente pasa a ser la aplicación
 
 **Método: `/impeccable shape` primero, código después.** No se improvisa la
