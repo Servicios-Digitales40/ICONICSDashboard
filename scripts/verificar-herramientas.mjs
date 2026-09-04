@@ -1608,6 +1608,52 @@ await checkAsync('sin síntoma no hay nada que diagnosticar', async () => {
   assert.equal(r.ok, false)
 })
 
+await checkAsync('el dossier trae el ESTADO de verdad, no un error escondido dentro', async () => {
+  /*
+   * La regresión que esto fija, medida el 03-09-2026 en las DOS máquinas.
+   *
+   * `diagnostico` llamaba a `estado_del_sistema()` SIN argumentos. Cuando
+   * entró la segunda máquina, esa herramienta pasó a exigir `sistema`, y este
+   * llamador interno se quedó sin actualizar: `estadoAhora` devolvía
+   * `{error: "Falta decir de qué sistema..."}` en TODOS los diagnósticos,
+   * incluidos los del tanque, que es la máquina para la que se escribió.
+   *
+   * Nada lo delataba: el dossier seguía saliendo con `ok: true`, así que el
+   * fallo viajaba dentro de una respuesta que se declaraba correcta. Es la
+   * pata que la descripción de la herramienta promete PRIMERO — «reúne el
+   * estado actual, la historia…» — y llevaba semanas vacía.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
+    sintoma: 'la bomba se paró tras un pico de tensión',
+  })
+
+  assert.equal(r.ok, true)
+  assert.ok(!r.medido.estadoAhora.error,
+    `estadoAhora llegó con un error dentro: ${r.medido.estadoAhora.error}`)
+  assert.ok(r.medido.estadoAhora.estadoGeneral,
+    'estadoAhora no trae `estadoGeneral`: el dossier no está mirando el estado')
+})
+
+await checkAsync('un síntoma de OTRA máquina se niega y dice a dónde ir', async () => {
+  /*
+   * El dossier sólo sabe armar el del tanque —`senalesMencionadas`, `SENALES`
+   * e `historizadas()` son su catálogo— y antes contestaba `ok: true` igual.
+   * Medido con «el apoyo S2 vibra más tras un cambio de carga»: devolvía
+   * `senalesConsideradas: ["Carga de trabajo del motor"]`, una señal del
+   * TANQUE pescada por la palabra «carga», y un dossier vacío. Un síntoma de
+   * una máquina contestado con el catálogo de la otra.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
+    sintoma: 'el apoyo S2 vibra más tras un cambio de carga',
+    sistema: 'vibraciones',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /s[oó]lo cubre "tanque"/i)
+  // Negarse sin decir a dónde ir dejaría al técnico en el mismo sitio.
+  assert.match(r.error, /diagnosticar_falla/)
+})
+
 await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se dice por qué', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
     sintoma: 'algo va mal, no sé qué',
