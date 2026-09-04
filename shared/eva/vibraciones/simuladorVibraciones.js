@@ -153,12 +153,30 @@ const EVENTO_HASTA = 0.7
  * `rodamiento` va a S3 y no a S1 por un motivo que no es estético: `DKW_S1` no
  * entrega valor (ver cabecera), así que una degradación en S1 no podría
  * enseñar cómo sube el valor de daño ni cómo cae su confianza — que son dos
- * tercios de lo que un rodamiento picado se ve venir. S3 sí tiene rodamiento
- * de catálogo (`6204 ZZ`) y sí publica DKW.
+ * tercios de lo que un rodamiento picado se ve venir. S3 sí publica DKW.
  *
- * `sensorSuelto` va a S2, que es el único de los tres sin rodamiento conocido:
- * si algo va a estar mal montado, que sea donde no se pueda confundir con un
- * diagnóstico de rodamiento.
+ * ── ESTE PÁRRAFO DECÍA ALGO MÁS, Y ERA FALSO (04-09-2026) ──────────
+ *
+ * Decía además que S3 «sí tiene rodamiento de catálogo (`6204 ZZ`)», y que S2
+ * era «el único de los tres sin rodamiento conocido». Las dos frases se
+ * cayeron a la vez cuando el levantamiento de campo situó S2 y S3 sobre las
+ * chumaceras del tren de rotor y no sobre el motor: el 6204 era el rodamiento
+ * del lado ventilador del WEG, una pieza que S3 no está midiendo. Ver la
+ * cabecera de `vibraciones.js`.
+ *
+ * Hoy **ni S2 ni S3 tienen rodamiento identificado**, así que el reparto ya no
+ * se puede justificar por ahí. Lo que queda en pie:
+ *
+ *   `rodamiento`    → S3, por el DKW, que es la mitad que sí seguía siendo
+ *                     cierta. Que el rodamiento sea desconocido no impide
+ *                     simular su degradación: el evento mueve aRMS, aPeak y
+ *                     DKW, ninguno de los cuales necesita la geometría de la
+ *                     pieza. Lo que no se puede es calcular su BPFO — y el
+ *                     simulador nunca lo hizo.
+ *   `sensorSuelto`  → S2, por separación y no por catálogo: tiene que caer en
+ *                     un apoyo distinto del que lleva el evento de rodamiento
+ *                     para que los dos no se solapen y se puedan leer por
+ *                     separado en la pantalla.
  */
 const CANAL_DEL_EVENTO = { rodamiento: 'S3', sensorSuelto: 'S2' }
 

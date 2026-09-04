@@ -56,17 +56,25 @@
  *      sensores de vibración.**
  *
  *   2. EL SISTEMA DE VIBRACIONES — PLC_2, `ua:DEMO3`, con un SIPLUS CMS 1200
- *      SM 1281 y los sensores S1/S2. Es OTRA máquina, con OTRO motor y OTRO
- *      variador. Sus tags viven bajo `ServerInterfaces → BMS_1 → Variables
- *      CMS` y hoy **no están publicados en AssetWorX**.
+ *      SM 1281. Es OTRA máquina, con OTRO motor y OTRO variador.
  *
- *      Lo confirmado de esa máquina, que hace falta para configurar el
- *      SM 1281 y para poner umbrales que signifiquen algo:
+ *      **Esta nota se escribió antes de que ese sistema existiera en el
+ *      código, y ya no es su fuente.** Hoy lo describe entero
+ *      `shared/eva/vibraciones/vibraciones.js`, que además la corrige en dos
+ *      puntos: los sensores son TRES y no dos (S1/S2/S3), y sus tags sí están
+ *      publicados en AssetWorX bajo `ac:TDCON/Motors/01/`.
+ *
+ *      Se conserva el resto porque lo que este párrafo hace falta que siga
+ *      diciendo es lo de abajo —por qué las vibraciones no cuelgan del activo
+ *      «bombeo»—, no el inventario de la otra máquina:
  *
  *        motor        WEG W22 143/5T, 2 HP (1,5 kW), **2 polos** → 3475 rpm
  *                     a plena carga; con variador, la velocidad varía y las
  *                     frecuencias de defecto varían con ella.
- *        rodamientos  6205 ZZ (lado acople) y 6204 ZZ (lado ventilador)
+ *        rodamientos  6205 ZZ en el lado acople del motor. El que aquí se
+ *                     daba por «6204 ZZ (lado ventilador)» describía una pieza
+ *                     que ningún canal está midiendo; el porqué está en la
+ *                     cabecera de `vibraciones.js`.
  *        norma        1,5 kW está MUY por debajo de los 15 kW de ISO 10816-3.
  *                     La tabla que aplica es **ISO 10816-1 Clase I**:
  *                     0,71 / 1,8 / 4,5 mm/s. Usar la de 10816-3 pondría el
