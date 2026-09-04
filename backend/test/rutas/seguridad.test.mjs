@@ -144,19 +144,35 @@ describe('modo solo lectura', () => {
   })
 })
 
-describe('autenticación (todavía apagada)', () => {
-  it('deja pasar y marca al peticionario como anónimo', async () => {
-    // Mientras `AUTH_HABILITADA` sea falso, las guardas declaradas en las
-    // rutas no deben estorbar.
-    const respuesta = await app.inject({ method: 'GET', url: '/api/health/live' })
-    expect(respuesta.statusCode).toBe(200)
+describe('autenticación', () => {
+  /*
+   * Las dos pruebas que había aquí describían el mundo anterior —una guarda
+   * que dejaba pasar a todos, y un `AUTH_HABILITADA=true` que impedía
+   * arrancar— y desaparecieron con él (Plan 20 Fase 1). El grueso de la
+   * autenticación se prueba en `sesion.test.mjs`; lo que queda aquí es la
+   * frontera con la SEGURIDAD de transporte, que es de lo que va este archivo.
+   */
+  it('las sondas de salud quedan fuera de la guarda', async () => {
+    for (const url of ['/api/health/live', '/api/health', '/api/health/ready']) {
+      const respuesta = await app.inject({ method: 'GET', url, headers: { cookie: '' } })
+      expect(respuesta.statusCode, `${url} debería responder sin sesión`).toBe(200)
+    }
   })
 
-  it('el servidor NO arranca si se pide autenticación sin implementarla', async () => {
+  it('la cookie de sesión es httpOnly y SameSite=Strict', async () => {
     /*
-     * Puerta deliberada: dejarlo pasar con un aviso significaría que alguien
-     * pide autenticación, ve el servidor levantar, y cree que está protegido.
+     * `httpOnly` es lo único que impide que un XSS en la página del asistente
+     * se lleve la sesión, y esta aplicación renderiza markdown escrito por un
+     * modelo de lenguaje. `SameSite=Strict` es lo que cubre el CSRF que la
+     * cookie introduce. Si alguien las quita, esto lo dice.
      */
-    await expect(montarApp({ AUTH_HABILITADA: 'true' })).rejects.toThrow(/no está implementada/)
+    const respuesta = await app.inject({
+      method: 'POST',
+      url: '/api/sesion',
+      payload: { usuario: 'quien.sea', contrasena: 'lo-que-sea' },
+    })
+    const puesta = [respuesta.headers['set-cookie']].flat().join(';')
+    expect(puesta).toMatch(/HttpOnly/i)
+    expect(puesta).toMatch(/SameSite=Strict/i)
   })
 })

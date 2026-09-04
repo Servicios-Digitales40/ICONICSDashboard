@@ -20,6 +20,10 @@ const DEFAULT_STATIC_DIR = join('react-dashboard', 'dist')
 const DEFAULTS = {
   port: 3001,
   logLevel: 'INFO',
+  /** Inactividad, en minutos, tras la cual una sesión de persona muere. */
+  sesionTtlMinutos: 60,
+  /** Sesiones de persona vivas a la vez. Ver `config.sesion.maximo`. */
+  sesionMax: 32,
   /** Cuerpo máximo aceptado en POST/PUT. Evita que un cliente agote la RAM. */
   maxRequestBodyBytes: 1024 * 1024,
   /** `X-ICO-MAX-ITEM-COUNT` para historia y alarmas. */
@@ -659,18 +663,43 @@ export function loadConfig(env = process.env) {
     }),
 
     /**
-     * Autenticación de usuarios (todavía no implementada).
+     * Sesiones de persona (Plan 20 Fase 1).
      *
-     * Apagada por defecto, como todo lo que aún no existe. Con `true` el
-     * servidor NO arranca a propósito: ver `http/plugins/autenticacion.mjs`.
-     * Un servidor que acepta la variable y sigue sirviendo sin pedir nada es
-     * peor que uno que se niega, porque quien la puso creería estar protegido.
+     * ── NO HAY `AUTH_HABILITADA`, Y ES DELIBERADO ──────────────────────
      *
-     * No confundir con la sesión OIDC contra ICONICS (`iconics.canAuthenticate`):
-     * aquella es de máquina, esta es de persona.
+     * Hasta el 03-09-2026 aquí vivía un interruptor que encendía una
+     * autenticación que no existía. Ahora existe y **no se puede apagar**: el
+     * técnico entra con su usuario de ICONICS, y sin esas credenciales no hay
+     * token con el que leer la planta. Una petición sin sesión no es "una
+     * petición sin autenticar", es una que no podría hacer nada. Ver
+     * `http/plugins/autenticacion.mjs`.
+     *
+     * Los dos números de abajo acotan lo que una sesión cuesta: cada una
+     * mantiene en memoria unas credenciales, unos tokens y una pila de objetos
+     * hacia ICONICS.
      */
-    auth: Object.freeze({
-      habilitada: readBoolean('AUTH_HABILITADA', env.AUTH_HABILITADA, false),
+    sesion: Object.freeze({
+      /**
+       * Inactividad tras la cual una sesión muere, en minutos.
+       *
+       * Cuenta desde el ÚLTIMO USO, no desde el login: quien lleva dos horas
+       * preguntando no debe caerse por un tope de una. Lo que este número
+       * persigue es la sesión de quien cerró el navegador y se fue — y con
+       * ella, su contraseña en memoria del proceso.
+       */
+      ttlMs: readInteger(
+        'SESION_TTL_MINUTOS', env.SESION_TTL_MINUTOS, DEFAULTS.sesionTtlMinutos, 1
+      ) * 60_000,
+      /**
+       * Sesiones vivas simultáneas.
+       *
+       * Sin tope, llamar a `POST /api/sesion` en bucle con credenciales
+       * válidas agota la memoria del puente — y el puente sirve el asistente
+       * entero. 32 es holgado para una planta y sigue siendo un número que
+       * cabe en memoria sin pensarlo; se sube a propósito si hace falta, no
+       * por accidente.
+       */
+      maximo: readInteger('SESION_MAX', env.SESION_MAX, DEFAULTS.sesionMax, 1),
     }),
   })
 }

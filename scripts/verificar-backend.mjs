@@ -40,6 +40,7 @@ import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createApp } from '../backend/app.mjs'
+import { abrirSesionHttp } from './lib/sesionHttp.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
 let loginCount = 0
@@ -260,12 +261,41 @@ const config = loadConfig({
 async function mount(env) {
   const server = await createApp(loadConfig({ ...baseEnv, ...env }))
   await server.listen({ port: 0, host: '127.0.0.1' })
-  return { base: `http://127.0.0.1:${server.server.address().port}`, server }
+  const base = `http://127.0.0.1:${server.server.address().port}`
+  await entrar(base)
+  return { base, server }
 }
 
-/** `fetch` + parseo tolerante contra una base arbitraria. */
-async function call(baseUrl, path, init) {
-  const res = await fetch(`${baseUrl}${path}`, init)
+/**
+ * La cookie de sesión de cada servidor levantado, por su URL base.
+ *
+ * ── POR QUÉ UN MAPA Y NO UN ARGUMENTO MÁS ──────────────────────────
+ *
+ * Este guion levanta CATORCE puentes distintos —uno por cada configuración que
+ * quiere demostrar— y les hace treinta y una llamadas. Desde el Plan 20 cada
+ * uno necesita su propia sesión, y pasarla a mano por parámetro habría sido
+ * cuarenta y cinco sitios donde olvidarla; el síntoma de olvidarla es un 401
+ * que no significa nada de lo que este archivo comprueba.
+ *
+ * Con el mapa, entrar es parte de levantar (`mount`/`entrar`) y `call` la
+ * encuentra sola por la base a la que va dirigida.
+ */
+const sesionesPorBase = new Map()
+
+/** Abre sesión contra un puente ya levantado y la recuerda para `call`. */
+async function entrar(baseUrl) {
+  const { cookie } = await abrirSesionHttp(baseUrl, 'u', 'p')
+  sesionesPorBase.set(baseUrl, cookie)
+  return cookie
+}
+
+/** `fetch` + parseo tolerante contra una base arbitraria, con su sesión. */
+async function call(baseUrl, path, init = {}) {
+  const cookie = sesionesPorBase.get(baseUrl)
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: { ...init.headers, ...(cookie ? { cookie } : {}) },
+  })
   const text = await res.text()
   let body
   try { body = JSON.parse(text) } catch { body = text }
@@ -282,13 +312,20 @@ const app = await createApp(config)
 await app.listen({ port: 0, host: '127.0.0.1' })
 const base = `http://127.0.0.1:${app.server.address().port}`
 
-const get = async (path, init) => {
-  const res = await fetch(`${base}${path}`, init)
-  const text = await res.text()
-  let body
-  try { body = JSON.parse(text) } catch { body = text }
-  return { status: res.status, body, headers: res.headers }
-}
+/*
+ * ── ESTE LOGIN ES, DE PASO, LA ÚNICA COBERTURA DEL FLUJO OIDC ──────
+ *
+ * `u`/`p` son las credenciales que exige el ICONICS falso de arriba, que
+ * implementa los cinco saltos de verdad: autorización con PKCE, página de
+ * login con su CSRF, envío de credenciales, segunda autorización ya con sesión
+ * y canje del código por tokens. Entrar aquí NO es un atajo: recorre entero
+ * `performInteractiveLogin`, que el resto de guiones se saltan con
+ * `ICONICS_FAKE=true` y que si no sólo se ejercería contra planta real.
+ */
+await entrar(base)
+
+/** `call` contra el puente principal. Era una copia; ahora delega. */
+const get = (path, init) => call(base, path, init)
 
 /* Mismos colores que el resto de scripts de verificación. */
 const c = {
@@ -556,11 +593,18 @@ console.log('\n── Contrato de la API ─────────────
 // 10. Salud
 {
   const r = await get('/api/health')
-  check('GET /api/health → ok con servidor accesible y token válido', () => {
+  check('GET /api/health → ok con servidor accesible, y cuenta sesiones', () => {
     assert.equal(r.body.status, 'ok')
     assert.equal(r.body.iconicsReachable, true)
-    assert.equal(r.body.tokenValid, true)
     assert.equal(typeof r.body.uptimeSeconds, 'number')
+    /*
+     * `tokenValid` se retiró en el Plan 20: con una sesión por persona no hay
+     * UN token cuya validez publicar, y cero sesiones es un estado legítimo
+     * —nadie ha entrado aún— y no una avería. `sesionesActivas` ocupa su
+     * sitio. Ver la cabecera de `backend/routes/systemRoutes.mjs`.
+     */
+    assert.equal('tokenValid' in r.body, false)
+    assert.equal(r.body.sesionesActivas >= 1, true, 'este guion tiene su sesión abierta')
   })
 }
 
@@ -594,20 +638,38 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
   assert.equal(loginCount, 1, `logins=${loginCount}`)
 })
 {
+  /*
+   * ── QUÉ COMPRUEBA ESTO DESPUÉS DEL PLAN 20 ────────────────────────
+   *
+   * Antes: veinte peticiones simultáneas contra un puente SIN token todavía
+   * tenían que compartir un solo flujo OIDC en vez de arrancar veinte. Ese
+   * "frío" ya no existe — el login ocurre al abrir sesión, no en la primera
+   * lectura.
+   *
+   * Lo que sí sigue siendo caro equivocarse, y es lo que se mide ahora: que
+   * entrar cueste UN flujo y no dos. `probarCredenciales` valida las
+   * credenciales y sus tokens se le pasan al autenticador de la sesión
+   * (`tokensIniciales`); si alguien quita ese reaprovechamiento, cada login
+   * costaría dos recorridos de cinco saltos contra el servidor de seguridad y
+   * nada fallaría — sólo iría al doble de lento.
+   */
   loginCount = 0
   const cold = await createApp(config)
   await cold.listen({ port: 0, host: '127.0.0.1' })
   const coldBase = `http://127.0.0.1:${cold.server.address().port}`
 
-  // 20 peticiones simultáneas contra un backend sin token todavía.
+  await entrar(coldBase)
+  const loginsAlEntrar = loginCount
+
+  // Veinte peticiones simultáneas con la sesión ya abierta.
   const responses = await Promise.all(
-    Array.from({ length: 20 }, (_, i) =>
-      fetch(`${coldBase}/api/iconics/data?pointName=ac:p${i}`).then(r => r.json())
-    )
+    Array.from({ length: 20 }, (_, i) => call(coldBase, `/api/iconics/data?pointName=ac:p${i}`))
   )
-  check('20 peticiones concurrentes en frío → un solo flujo OIDC', () => {
-    assert.ok(responses.every(r => r.ok === true), 'todas deben resolverse bien')
-    assert.equal(loginCount, 1, `logins=${loginCount} (antes: uno por petición)`)
+
+  check('entrar cuesta UN flujo OIDC, y las lecturas posteriores ninguno', () => {
+    assert.ok(responses.every(r => r.body.ok === true), 'todas deben resolverse bien')
+    assert.equal(loginsAlEntrar, 1, `logins al entrar=${loginsAlEntrar} (los tokens del login se reaprovechan)`)
+    assert.equal(loginCount, 1, `logins totales=${loginCount} (20 lecturas no deben re-loguear)`)
   })
   await cold.close()
 }
@@ -678,11 +740,35 @@ console.log('\n── Sin ICONICS configurado ───────────�
   await bare.listen({ port: 0, host: '127.0.0.1' })
   const bareBase = `http://127.0.0.1:${bare.server.address().port}`
 
+  /*
+   * ── EL FALLO SE ADELANTÓ AL LOGIN, Y ES MEJOR ASÍ ─────────────────
+   *
+   * Antes esta comprobación pedía `/api/iconics/alarms` y exigía un 500 limpio
+   * en vez de una petición colgada. Sin `ICONICS_API_BASE` no hay servidor de
+   * seguridad al que pedir tokens, así que ahora **no se puede ni entrar**: el
+   * puente lo dice en el login, que es donde el técnico está mirando, en vez
+   * de dejarle pasar y darle un 500 en la primera consulta.
+   *
+   * Lo que se conserva es la propiedad que motivó la comprobación: que NO se
+   * cuelga. Por eso va con corte de tiempo.
+   */
+  const login = await Promise.race([
+    fetch(`${bareBase}/api/sesion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario: 'u', contrasena: 'p' }),
+    }),
+    new Promise((_, rechaza) =>
+      setTimeout(() => rechaza(new Error('el login se colgó')), 5000).unref()
+    ),
+  ])
+  check('sin API_BASE no se puede entrar, y se dice sin colgarse', () => {
+    assert.equal(login.status, 401)
+  })
+
   const alarms = await fetch(`${bareBase}/api/iconics/alarms`)
-  const alarmsBody = await alarms.json()
-  check('alarms sin API_BASE → 500 limpio (antes: petición colgada)', () => {
-    assert.equal(alarms.status, 500)
-    assert.equal(alarmsBody.error, 'ICONICS_API_BASE is not configured.')
+  check('y una ruta de datos responde 401, no un 500 ni un silencio', () => {
+    assert.equal(alarms.status, 401)
   })
 
   const health = await (await fetch(`${bareBase}/api/health`)).json()

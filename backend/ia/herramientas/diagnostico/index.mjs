@@ -29,7 +29,7 @@ import { fallo } from '../lib/respuesta.mjs'
  * @param {object} args
  * @param {{diagnosticar: Function}|null} args.motorDiagnostico  de `ia/motor/diagnostico.mjs`
  */
-export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
+export function crearHerramientasDeDiagnostico({ motorDiagnostico, evaluadorTemporal = null }) {
   return {
     /**
      * La causa más probable de un riesgo YA activo, con las tres fuentes
@@ -55,7 +55,7 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
 
       let resultado
       try {
-        resultado = await motorDiagnostico.diagnosticar({ sistema, riesgoId })
+        resultado = await motorDiagnostico.diagnosticar({ sistema, riesgoId, evaluadorTemporal })
       } catch (error) {
         // reglaDe() lanza TypeError ante un sistema desconocido o un riesgoId
         // que no pertenece a ese sistema: es un error de quien llama, no del

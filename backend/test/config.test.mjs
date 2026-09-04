@@ -31,8 +31,16 @@ describe('loadConfig — defectos seguros', () => {
     expect(loadConfig(BASE).ia.whisper.isConfigured).toBe(false)
   })
 
-  it('deja la autenticación de usuarios apagada', () => {
-    expect(loadConfig(BASE).auth.habilitada).toBe(false)
+  /*
+   * Ya no hay `auth.habilitada`: la autenticación de personas dejó de ser un
+   * interruptor (Plan 20 Fase 1). Lo que sí se comprueba es que sus dos topes
+   * traigan defecto, porque un TTL o un máximo indefinidos harían que el
+   * registro de sesiones caducara todo al instante o nunca.
+   */
+  it('trae defectos para las sesiones de persona', () => {
+    const { sesion } = loadConfig(BASE)
+    expect(sesion.ttlMs).toBe(60 * 60_000)
+    expect(sesion.maximo).toBe(32)
   })
 
   it('no confía en X-Forwarded-For salvo que se declare un proxy', () => {

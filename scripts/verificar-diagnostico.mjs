@@ -491,8 +491,11 @@ await check('sólo la causa con `firmaTemporal` consulta al evaluador — la otr
     evidenciaAFavor: [{ fuente: 'temporal', texto: 'subió', referencia: 'temperaturaTanque' }],
     evidenciaEnContra: [],
   })
-  const resultado = await createMotorDiagnostico({ evaluadorTemporal }).diagnosticar({
-    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  // El evaluador viaja en la LLAMADA, no en la construcción (Plan 20 Fase 1):
+  // el motor es singleton y el evaluador lee ICONICS con el token de una
+  // sesión concreta. Ver la cabecera de `ia/motor/diagnostico.mjs`.
+  const resultado = await createMotorDiagnostico({}).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', evaluadorTemporal,
   })
 
   const conFirma = resultado.causas.find(cc => cc.id === 'sin-recirculacion-minima')
@@ -507,8 +510,8 @@ await check('`temporal` suma al total y cuenta como fuente activa', async () => 
     puntos: 2, evidenciaAFavor: [{ fuente: 'temporal', texto: 'x', referencia: 'y' }], evidenciaEnContra: [],
   })
   const sinTemporal = await createMotorDiagnostico({}).diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
-  const conTemporal = await createMotorDiagnostico({ evaluadorTemporal }).diagnosticar({
-    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  const conTemporal = await createMotorDiagnostico({}).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', evaluadorTemporal,
   })
 
   const antes = sinTemporal.causas.find(cc => cc.id === 'sin-recirculacion-minima')

@@ -401,11 +401,19 @@ function hayConflicto(causas) {
  * @param {object} deps
  * @param {{buscar: Function}} [deps.indiceDocumentos] de `documentos.mjs`
  * @param {{buscarCasosSimilares: Function}} [deps.indiceCasos] de `casos.mjs`
- * @param {{evaluar: Function}} [deps.evaluadorTemporal] de `temporal.mjs`
- *   (Plan 17 Fase 6) — opcional, igual que los otros dos: sin él, `temporal`
- *   sale en 0 para toda causa, aunque declare `firmaTemporal`.
+ *
+ * ── POR QUÉ EL EVALUADOR TEMPORAL NO ESTÁ AQUÍ (PLAN 20 FASE 1) ────
+ *
+ * Porque es el único de los tres que LEE ICONICS, y desde el login nativo cada
+ * persona lee con su propio token. Este motor es singleton —los índices y la
+ * aritmética no dependen de quién pregunta— así que un evaluador capturado en
+ * su construcción sería el de la primera sesión que se abrió, usado para
+ * siempre y para todos. No daría error: daría respuestas de otro usuario.
+ *
+ * Por eso viaja en `diagnosticar()`, no aquí. `indiceDocumentos` e
+ * `indiceCasos` sí se quedan: leen del disco de este proceso, no de la planta.
  */
-export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal } = {}) {
+export function createMotorDiagnostico({ indiceDocumentos, indiceCasos } = {}) {
   /**
    * @param {{sistema: string, riesgoId: string, valoresSensores?: object}} entrada
    *   `valoresSensores` es OPCIONAL (Plan 17 Fase 4, G6): el objeto `v` que
@@ -415,6 +423,10 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
    *   activo"—, así que sin este dato no hay frase de `datos` que citar en
    *   `evidenciaAFavor`, y esa fuente simplemente no aporta ninguna entrada
    *   (el PUNTO de `datos` no depende de esto, sólo su frase).
+ * @param {{evaluar: Function}} [entrada.evaluadorTemporal] de `temporal.mjs`
+ *   (Plan 17 Fase 6), el de la SESIÓN que pregunta — ver la cabecera de la
+ *   factoría. Opcional: sin él `temporal` sale en 0 para toda causa, aunque
+ *   declare `firmaTemporal`.
    * @returns {Promise<{
    *   sistema: string, riesgoId: string,
    *   diagnosticEventId: string,  // uno por CADA llamada, ver la cabecera del archivo
@@ -423,7 +435,7 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
    *   causas: object[],           // ordenadas, la más respaldada primero
    * }>}
    */
-  async function diagnosticar({ sistema, riesgoId, valoresSensores } = {}) {
+  async function diagnosticar({ sistema, riesgoId, valoresSensores, evaluadorTemporal } = {}) {
     if (!riesgoId) throw new TypeError('diagnosticar necesita "riesgoId".')
     const regla = reglaDe(sistema, riesgoId)
     if (!regla) {

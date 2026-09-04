@@ -34,11 +34,13 @@ import { createIndiceDocumentos } from './ia/indices/documentos.mjs'
 import { createIndiceCasos } from './ia/motor/casos.mjs'
 import { createMotorDiagnostico } from './ia/motor/diagnostico.mjs'
 import { createGestorManuales } from './ia/indices/manuales.mjs'
-import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
 import { createHerramientas } from './ia/conversacion/herramientas.mjs'
 import { crearAyudantesDeHistoria } from './ia/herramientas/lib/historia.mjs'
+import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
 import { createVoz } from './ia/voz.mjs'
+import fastifyCookie from '@fastify/cookie'
 import { createAuthenticator } from './iconics/authenticator.mjs'
+import { crearRegistroDeSesiones } from './sesiones/registro.mjs'
 import { createIconicsClient } from './iconics/client.mjs'
 import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import autenticacionPlugin from './http/plugins/autenticacion.mjs'
@@ -53,6 +55,7 @@ import { registerDiagnosticoRoutes } from './routes/diagnosticoRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerRagRoutes } from './routes/ragRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
+import { registerSesionRoutes } from './routes/sesionRoutes.mjs'
 import { registerSystemRoutes } from './routes/systemRoutes.mjs'
 import { registerVozRoutes } from './routes/vozRoutes.mjs'
 
@@ -139,7 +142,23 @@ export async function createApp(config) {
 
   /* ── Dependencias ──────────────────────────────────────────────── */
 
-  const authenticator = createAuthenticator(config)
+  /*
+   * ── QUÉ ES SINGLETON Y QUÉ ES POR SESIÓN (PLAN 20 FASE 1) ──────────
+   *
+   * Ésta es la decisión de diseño de la fase, y equivocarla no da síntoma.
+   *
+   * POR SESIÓN va todo lo que lee ICONICS con el token de una persona:
+   * `authenticator`, `client`, `herramientas`, `chat`. Se construye en
+   * `crearPila()`, abajo, y muere con la sesión.
+   *
+   * SINGLETON va lo que no depende de quién pregunta: los índices, el motor de
+   * diagnóstico, la cola y la voz. Duplicarlos por usuario sería caro sin
+   * ganar nada — trocear y embeber los PDF cuesta segundos, y todo el mundo
+   * lee los mismos manuales.
+   *
+   * La trampa que esto esquiva está en `crearPila()`. Léela antes de mover
+   * nada de un grupo al otro.
+   */
 
   // `ICONICS_FAKE=true` (Plan 14 §7.1): el resto del backend —rutas, chat,
   // herramientas— no se entera de cuál de los dos corre, porque los dos
@@ -155,10 +174,6 @@ export async function createApp(config) {
       }
     )
   }
-
-  const client = config.iconics.fake
-    ? createFakeIconicsClient({ limits: config.limits })
-    : createIconicsClient(config, authenticator)
 
   // El asistente se monta siempre, pero sin `IA_BASE` sus rutas responden
   // 503 diciendo qué falta. Montarlo solo cuando está configurado dejaría
@@ -204,38 +219,100 @@ export async function createApp(config) {
     embeddingModelo: config.ia.embeddingModelo,
   })
 
-  // El cuarto término (Plan 17 Fase 6, G5): mismo ayudante de históricos que
-  // ya usan `historia_de_senal`/`correlacionar_senales` dentro de
-  // `createHerramientas()` —se construye SUELTO aquí también porque
-  // `motorDiagnostico` se monta antes que las herramientas, no porque
-  // comparta estado con la instancia de ahí abajo; `crearAyudantesDeHistoria`
-  // es sólo una envoltura sin memoria propia sobre `client`, así que
-  // construirla dos veces no duplica nada que importe—.
-  const { leerSerie } = crearAyudantesDeHistoria({
-    client, historyConcurrencia: config.limits.historyConcurrencia,
-  })
-  const evaluadorTemporal = createEvaluadorTemporal({ historia: { leerSerie } })
-
   // El motor de diagnóstico (Plan 16 Fase 3, + Fase 6 del Plan 17): junta
   // datos + manual + casos + temporal. Se construye siempre, aunque
   // `indiceDocumentos` sea `null` — el respaldo del manual sale en 0 sin él,
   // no es motivo para negar todo el diagnóstico, igual que
   // `limites_del_manual` no le impide funcionar a `diagnostico`.
-  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal })
+  //
+  // Ya NO recibe `evaluadorTemporal`: lo recibe `diagnosticar()` en cada
+  // llamada, con el de la sesión que pregunta. Ver `crearPila()`.
+  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos })
 
-  // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
-  // `controlar_bomba` escribe, y necesita la misma puerta que usa
-  // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
-  const herramientas = createHerramientas({
-    client,
-    turnos: config.ia.turnos,
-    readOnly: config.iconics.readOnly,
-    indiceDocumentos,
-    motorDiagnostico,
-    reportes: config.reportes,
-    historyConcurrencia: config.limits.historyConcurrencia,
+  /**
+   * Todo lo que una persona necesita para hablar con ICONICS con SU token.
+   *
+   * ── LA TRAMPA QUE ESTA FUNCIÓN EXISTE PARA EVITAR ──────────────────
+   *
+   * `motorDiagnostico` es singleton y hasta ahora recibía un `evaluadorTemporal`
+   * construido UNA vez sobre el `client` global. Con el cliente por sesión, eso
+   * habría dejado el motor leyendo el historiador con el token de **la primera
+   * persona que entró**, para siempre y sin un solo síntoma: el diagnóstico
+   * seguiría contestando, con datos de otro usuario.
+   *
+   * Por eso el cuarto término se construye AQUÍ, con el `client` de esta
+   * sesión, y viaja hasta `diagnosticar()` como argumento. `createHerramientas`
+   * ya montaba sus propios ayudantes de historia sobre el mismo cliente, así
+   * que además desaparece la construcción suelta que `app.mjs` hacía antes —
+   * una duplicación que su comentario admitía y que ahora sería un fallo.
+   *
+   * @param {{usuario: string, contrasena: string}} credenciales del login.
+   * @param {object|null} tokens Los que ya trajo `probarCredenciales`.
+   */
+  function crearPila(credenciales, tokens) {
+    const client = config.iconics.fake
+      ? createFakeIconicsClient({ limits: config.limits })
+      : createIconicsClient(config, createAuthenticator(config, credenciales, tokens))
+
+    /*
+     * El cuarto término del diagnóstico (Plan 17 Fase 6, G5), montado sobre el
+     * cliente DE ESTA SESIÓN. `crearAyudantesDeHistoria` es una envoltura sin
+     * memoria propia, así que que las herramientas construyan la suya por
+     * dentro no duplica ningún estado: lo que importa es que las dos salgan
+     * del mismo `client`, y aquí eso está garantizado por construcción.
+     */
+    const { leerSerie } = crearAyudantesDeHistoria({
+      client, historyConcurrencia: config.limits.historyConcurrencia,
+    })
+    const evaluadorTemporal = createEvaluadorTemporal({ historia: { leerSerie } })
+
+    // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
+    // `controlar_bomba` escribe, y necesita la misma puerta que usa
+    // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
+    const herramientas = createHerramientas({
+      client,
+      turnos: config.ia.turnos,
+      readOnly: config.iconics.readOnly,
+      indiceDocumentos,
+      motorDiagnostico,
+      evaluadorTemporal,
+      reportes: config.reportes,
+      historyConcurrencia: config.limits.historyConcurrencia,
+    })
+
+    return {
+      client,
+      herramientas,
+      evaluadorTemporal,
+      chat: createChat({ config, herramientas }),
+    }
+  }
+
+  const registro = crearRegistroDeSesiones({
+    crearPila,
+    ttlMs: config.sesion.ttlMs,
+    maximo: config.sesion.maximo,
   })
-  const chat = createChat({ config, herramientas })
+
+  /*
+   * Sin esto, un `SIGTERM` dejaría las pilas de las sesiones vivas sin soltar.
+   * Va como hook y no en `server.mjs` para que también corra en las pruebas,
+   * que montan y tiran la app decenas de veces por archivo.
+   */
+  fastify.addHook('onClose', async () => registro.cerrarTodas())
+
+  /*
+   * El cliente SIN token de `/api/health`.
+   *
+   * La salud del puente no puede depender de que alguien haya iniciado sesión:
+   * el monitor que la consulta no tiene credenciales y no debe tenerlas. Un
+   * autenticador sin credenciales devuelve cabeceras vacías a propósito, así
+   * que este cliente comprueba ALCANZABILIDAD y nada más. Por eso `tokenValid`
+   * desapareció de la respuesta: ya no hay *un* token, hay uno por sesión.
+   */
+  const clienteDeSalud = config.iconics.fake
+    ? createFakeIconicsClient({ limits: config.limits })
+    : createIconicsClient(config, createAuthenticator(config, null))
 
   // Las consultas se atienden de una en una, pero NINGUNA se rechaza por eso:
   // el que llega segundo espera su turno con el flujo abierto y sabiendo
@@ -271,7 +348,13 @@ export async function createApp(config) {
 
   await fastify.register(seguridadPlugin, { config })
   await fastify.register(erroresPlugin)
-  await fastify.register(autenticacionPlugin, { config })
+  /*
+   * El parser de cookies va ANTES de la guarda: `fastify.autenticar` lee
+   * `request.cookies`, que sin este plugin es `undefined` — y la guarda
+   * respondería 401 a todo el mundo, incluida una sesión perfectamente válida.
+   */
+  await fastify.register(fastifyCookie)
+  await fastify.register(autenticacionPlugin, { registro })
   await fastify.register(cuerpoCrudoPlugin)
 
   /*
@@ -362,11 +445,25 @@ export async function createApp(config) {
     metodosPorRuta.set(opciones.url, yaVistos)
   })
 
+  /*
+   * ── QUÉ RECIBE CADA GRUPO DE RUTAS, Y POR QUÉ ──────────────────────
+   *
+   * Las que hablan con ICONICS ya NO reciben `client`, `herramientas` ni
+   * `chat`: los sacan de `request.sesion.pila`, que es la de quien preguntó.
+   * Que no aparezcan aquí es la garantía estructural de que ninguna ruta puede
+   * leer la planta con el token de otra persona — no hay ninguna instancia
+   * global que pudiera usar por descuido.
+   *
+   * Las que sólo tocan índices, casos o manuales (`rag`, `casos`) siguen
+   * recibiendo sus singletons: no dependen de quién pregunta. Lo que ganan es
+   * la guarda de sesión, que declaran ellas mismas.
+   */
   await fastify.register(async instancia => {
-    registerSystemRoutes(instancia, { config, client, authenticator, startedAt })
-    registerIconicsRoutes(instancia, { config, client })
-    registerControlRoutes(instancia, { config, herramientas })
-    registerChatRoutes(instancia, { config, chat, cola })
+    registerSesionRoutes(instancia, { config, registro })
+    registerSystemRoutes(instancia, { config, client: clienteDeSalud, registro, startedAt })
+    registerIconicsRoutes(instancia, { config })
+    registerControlRoutes(instancia, { config })
+    registerChatRoutes(instancia, { config, cola })
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })

@@ -53,10 +53,22 @@ const NIVELES_VALIDOS = new Set(['debug', 'info', 'warn', 'error', 'silent'])
  * `censor` deja rastro a propósito: ver `[redactado]` dice que el campo
  * existía y se ocultó; borrarlo haría creer que nunca estuvo.
  */
-const CAMPOS_SECRETOS = [
+export const CAMPOS_SECRETOS = [
   'password',
   '*.password',
   '*.*.password',
+  /*
+   * `contrasena` es el nombre EN ESPAÑOL con el que la contraseña viaja desde
+   * el login nativo (Plan 20 Fase 1): `{ usuario, contrasena }` es la forma
+   * que reciben `POST /api/sesion`, `probarCredenciales` y el registro de
+   * sesiones. `password` no la cubre —son claves distintas— y ese objeto pasa
+   * por sitios donde alguien podría loguearlo entero al depurar. Es la única
+   * credencial de persona que este proceso maneja: se redacta por su nombre
+   * real, no por el que tenía en la versión anterior.
+   */
+  'contrasena',
+  '*.contrasena',
+  '*.*.contrasena',
   'token',
   '*.token',
   '*.*.token',
@@ -70,6 +82,15 @@ const CAMPOS_SECRETOS = [
   'headers.cookie',
   '*.headers.authorization',
   '*.headers.cookie',
+  /*
+   * La cookie de RESPUESTA lleva el id de sesión recién creado. `headers.cookie`
+   * sólo cubre la de la petición; sin esto, un volcado de la respuesta del
+   * login dejaría la llave de la sesión escrita en el log.
+   */
+  'set-cookie',
+  '*.set-cookie',
+  'headers.set-cookie',
+  '*.headers.set-cookie',
 ]
 
 /**

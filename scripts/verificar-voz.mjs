@@ -33,6 +33,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createApp } from '../backend/app.mjs'
+import { abrirSesionHttp } from './lib/sesionHttp.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
 const c = {
@@ -97,16 +98,20 @@ const whisperBase = `http://127.0.0.1:${whisper.address().port}`
 
 /* ── La app, contra el whisper falso ─────────────────────────────────── */
 
+/*
+ * `ICONICS_FAKE` no estaba: este guion no lee un punto, falsea whisper-server.
+ * Hace falta desde el Plan 20 porque para hablar con `/api/voz` hay que
+ * ENTRAR, y el login contra un ICONICS inexistente fallaría en el primer
+ * salto. No debilita nada de lo que aquí se comprueba.
+ */
 async function levantar(extra = {}) {
-  const config = loadConfig({ LOG_LEVEL: 'ERROR', ...extra })
+  const config = loadConfig({ LOG_LEVEL: 'ERROR', ICONICS_FAKE: 'true', ...extra })
   const servidor = await createApp(config)
   await servidor.listen({ port: 0, host: '127.0.0.1' })
-  return {
-    servidor,
-    base: `http://127.0.0.1:${servidor.server.address().port}`,
-    config,
-    cerrar: () => servidor.close(),
-  }
+  const base = `http://127.0.0.1:${servidor.server.address().port}`
+  const { cookie } = await abrirSesionHttp(base)
+
+  return { servidor, base, cookie, config, cerrar: () => servidor.close() }
 }
 
 /** Un WAV mínimo pero VÁLIDO: cabecera canónica y unas muestras de silencio. */
@@ -128,9 +133,15 @@ function wavDePrueba(muestras = 1600) {
   return buffer
 }
 
-const enviar = (base, cuerpo, sistema = null) =>
-  fetch(`${base}/api/voz${sistema ? `?sistema=${encodeURIComponent(sistema)}` : ''}`, {
-    method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: cuerpo,
+/** El estado del dictado. Con cookie, igual que el envío. */
+const estadoDeVoz = app =>
+  fetch(`${app.base}/api/voz`, { headers: { cookie: app.cookie } })
+
+const enviar = (app, cuerpo, sistema = null) =>
+  fetch(`${app.base}/api/voz${sistema ? `?sistema=${encodeURIComponent(sistema)}` : ''}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'audio/wav', cookie: app.cookie },
+    body: cuerpo,
   })
 
 console.log(`\n${c.negrita}Dictado por voz${c.reset}`)
@@ -140,7 +151,7 @@ const app = await levantar({ IA_WHISPER_BASE: whisperBase, IA_WHISPER_IDIOMA: 'e
 console.log('\n── El camino feliz ─────────────────────────────────────────')
 
 await check('GET /api/voz anuncia el dictado, su idioma y el tope', async () => {
-  const r = await (await fetch(`${app.base}/api/voz`)).json()
+  const r = await (await estadoDeVoz(app)).json()
   assert.equal(r.habilitado, true)
   assert.equal(r.idioma, 'es')
   // El tope viaja para que el frontend pueda cortar la grabación ANTES de
@@ -150,7 +161,7 @@ await check('GET /api/voz anuncia el dictado, su idioma y el tope', async () => 
 
 await check('un WAV se transcribe y devuelve el texto', async () => {
   respuestaWhisper = { text: ' ¿qué nivel tiene el tanque? ' }
-  const r = await enviar(app.base, wavDePrueba())
+  const r = await enviar(app, wavDePrueba())
   assert.equal(r.status, 200)
   const cuerpo = await r.json()
   assert.equal(cuerpo.texto, '¿qué nivel tiene el tanque?', 'y se entrega recortado')
@@ -158,7 +169,7 @@ await check('un WAV se transcribe y devuelve el texto', async () => {
 
 await check('el audio llega íntegro a whisper, no convertido a texto', async () => {
   respuestaWhisper = { text: 'hola' }
-  await enviar(app.base, wavDePrueba())
+  await enviar(app, wavDePrueba())
   assert.ok(ultimoFormulario.tieneArchivo, 'tiene que ir como archivo del multipart')
   // Es la comprobación que protege contra volver a leer el cuerpo con
   // `readJsonBody`: pasar un WAV por UTF-8 destroza los bytes sin dar error.
@@ -167,7 +178,7 @@ await check('el audio llega íntegro a whisper, no convertido a texto', async ()
 
 await check('se le manda el idioma configurado y el vocabulario de la planta', async () => {
   respuestaWhisper = { text: 'hola' }
-  await enviar(app.base, wavDePrueba())
+  await enviar(app, wavDePrueba())
   assert.equal(ultimoFormulario.idioma, 'es', 'el idioma es fijo, no auto: ver config.mjs')
   assert.match(
     ultimoFormulario.prompt ?? '', /Cerabar|caudal/,
@@ -189,12 +200,12 @@ await check('el vocabulario cambia con el SISTEMA que se está mirando', async (
    */
   respuestaWhisper = { text: 'hola' }
 
-  await enviar(app.base, wavDePrueba(), 'vibraciones')
+  await enviar(app, wavDePrueba(), 'vibraciones')
   const vib = ultimoFormulario.prompt ?? ''
   assert.match(vib, /rodamiento/, 'en vibraciones tiene que oír «rodamiento»')
   assert.match(vib, /acople/)
 
-  await enviar(app.base, wavDePrueba(), 'tanque')
+  await enviar(app, wavDePrueba(), 'tanque')
   const tanque = ultimoFormulario.prompt ?? ''
   assert.match(tanque, /tanque|derrame/, 'y en el tanque, las suyas')
   assert.ok(!tanque.includes('rodamiento'),
@@ -213,7 +224,7 @@ await check('un sistema que no existe NO deja el dictado sin vocabulario', async
    * es un retroceso disfrazado de mejora.
    */
   respuestaWhisper = { text: 'hola' }
-  await enviar(app.base, wavDePrueba(), 'sistema-que-no-existe')
+  await enviar(app, wavDePrueba(), 'sistema-que-no-existe')
   assert.match(ultimoFormulario.prompt ?? '', /motor|bomba|Cerabar/)
 })
 
@@ -223,13 +234,13 @@ await check('las anotaciones del transcriptor se quitan', async () => {
   // Whisper marca así lo que oye y no es habla. En un chat eso no es texto que
   // nadie quisiera decir, y si llega al cuadro de pregunta se envía al modelo.
   respuestaWhisper = { text: '[BLANK_AUDIO] la presión de la red (música de fondo)' }
-  const cuerpo = await (await enviar(app.base, wavDePrueba())).json()
+  const cuerpo = await (await enviar(app, wavDePrueba())).json()
   assert.equal(cuerpo.texto, 'la presión de la red')
 })
 
 await check('un audio del que no se entiende nada se dice, no se devuelve vacío', async () => {
   respuestaWhisper = { text: '  [BLANK_AUDIO]  ' }
-  const r = await enviar(app.base, wavDePrueba())
+  const r = await enviar(app, wavDePrueba())
   // 422 y no 200 con cadena vacía: el frontend tiene que poder distinguir
   // «no se oyó nada» de «se oyó el silencio», y sólo el primero se avisa.
   assert.equal(r.status, 422)
@@ -240,7 +251,7 @@ console.log('\n── Los rechazos, y que digan qué pasa ───────�
 
 await check('lo que no es un WAV se rechaza AQUÍ, sin molestar a whisper', async () => {
   ultimoFormulario = null
-  const r = await enviar(app.base, Buffer.from('esto es un webm sin convertir, o casi'))
+  const r = await enviar(app, Buffer.from('esto es un webm sin convertir, o casi'))
   assert.equal(r.status, 422)
   assert.match((await r.json()).error, /WAV/i, 'y el error dice qué faltaba')
   // Lo importante: NO se llamó a whisper. Su respuesta a un formato que no
@@ -249,7 +260,7 @@ await check('lo que no es un WAV se rechaza AQUÍ, sin molestar a whisper', asyn
 })
 
 await check('un cuerpo vacío da 400', async () => {
-  assert.equal((await enviar(app.base, Buffer.alloc(0))).status, 400)
+  assert.equal((await enviar(app, Buffer.alloc(0))).status, 400)
 })
 
 await check('pasarse del tope da un 413 QUE LLEGA al cliente', async () => {
@@ -260,14 +271,14 @@ await check('pasarse del tope da un 413 QUE LLEGA al cliente', async () => {
    * conexión y llegaba `UND_ERR_SOCKET` en vez del 413. Ahora se pausa la
    * lectura, se escribe el 413 y sólo después se corta.
    */
-  const r = await enviar(app.base, Buffer.alloc(app.config.limits.maxAudioBytes + 4096))
+  const r = await enviar(app, Buffer.alloc(app.config.limits.maxAudioBytes + 4096))
   assert.equal(r.status, 413)
   assert.match((await r.json()).error, /supera el límite/i)
 })
 
 await check('whisper-server roto se cuenta, no se disfraza de transcripción', async () => {
   respuestaWhisper = { status: 500 }
-  const r = await enviar(app.base, wavDePrueba())
+  const r = await enviar(app, wavDePrueba())
   assert.equal(r.status, 422)
   assert.match((await r.json()).error, /respondió 500/)
   respuestaWhisper = { text: 'ok' }
@@ -278,13 +289,13 @@ console.log('\n── Sin configurar, el dictado no existe ───────
 const sinWhisper = await levantar()
 
 await check('GET dice que no está habilitado', async () => {
-  const r = await (await fetch(`${sinWhisper.base}/api/voz`)).json()
+  const r = await (await estadoDeVoz(sinWhisper)).json()
   assert.equal(r.habilitado, false)
   assert.equal(r.idioma, null)
 })
 
 await check('POST da 503 y NO cae al index.html de la SPA', async () => {
-  const r = await enviar(sinWhisper.base, wavDePrueba())
+  const r = await enviar(sinWhisper, wavDePrueba())
   assert.equal(r.status, 503, 'un 200 con HTML dentro sería indistinguible de funcionar')
   assert.match((await r.json()).error, /IA_WHISPER_BASE/, 'y dice qué variable falta')
 })

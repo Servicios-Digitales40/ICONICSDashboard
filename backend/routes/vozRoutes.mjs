@@ -43,7 +43,7 @@
  * síntoma de una transcripción vacía o de ruido.
  */
 export function registerVozRoutes(fastify, { config, voz }) {
-  fastify.get('/api/voz', async () => ({
+  fastify.get('/api/voz', { onRequest: [fastify.autenticar] }, async () => ({
     ok: true,
     habilitado: config.ia.whisper.isConfigured,
     idioma: config.ia.whisper.isConfigured ? config.ia.whisper.idioma : null,
@@ -78,7 +78,7 @@ export function registerVozRoutes(fastify, { config, voz }) {
        * caso vuelve a cortarse el socket — pero eso ya no es un usuario
        * legítimo con un audio largo.
        */
-      onRequest: async (request, reply) => {
+      onRequest: [fastify.autenticar, async (request, reply) => {
         const declarado = Number(request.headers['content-length'] ?? 0)
         if (declarado > config.limits.maxAudioBytes) {
           const mb = Math.round(config.limits.maxAudioBytes / 1024 / 1024)
@@ -92,7 +92,7 @@ export function registerVozRoutes(fastify, { config, voz }) {
             error: `El audio supera el límite de ${mb} MB.`,
           })
         }
-      },
+      }],
     },
     async (request, reply) => {
       if (!config.ia.whisper.isConfigured) {

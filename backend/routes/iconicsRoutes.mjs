@@ -46,7 +46,18 @@ function formatLocalTimestamp(date) {
   return `${day} ${time}`
 }
 
-export function registerIconicsRoutes(fastify, { config, client }) {
+/**
+ * El cliente de ICONICS de quien hizo la petición (Plan 20 Fase 1).
+ *
+ * Antes este archivo recibía un `client` único por argumento. Ahora cada
+ * lectura sale con el token de la persona que la pidió, así que el cliente se
+ * saca de la sesión — y por eso TODAS las rutas de aquí declaran
+ * `fastify.autenticar`: sin sesión no hay cliente, y sin cliente no hay nada
+ * que leer.
+ */
+const clienteDe = request => request.sesion.pila.client
+
+export function registerIconicsRoutes(fastify, { config }) {
   const { defaultPointName, readOnly } = config.iconics
   const { maxAlarmHours, historyConcurrencia } = config.limits
 
@@ -69,8 +80,9 @@ export function registerIconicsRoutes(fastify, { config, client }) {
    * pasa y dónde se cambia.
    *
    * Las guardas de autenticación se declaran aquí, en un solo sitio, para que
-   * ninguna ruta de escritura pueda quedarse sin ellas por olvido cuando se
-   * active `AUTH_HABILITADA`.
+   * ninguna ruta de escritura pueda quedarse sin ellas por olvido. Desde el
+   * Plan 20 no son opcionales: la escritura sale con el token de la persona,
+   * así que ICONICS aplica además SUS permisos sobre ese usuario.
    *
    * La guarda de solo lectura va en `onRequest` y no en `preHandler` a
    * propósito: Fastify valida el `schema` ANTES de `preHandler`, así que un
@@ -107,10 +119,10 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/data',
-    { schema: { querystring: PointNameQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: PointNameQuerySchema } },
     async (request, reply) => {
       const pointName = request.query.pointName ?? defaultPointName
-      const result = await client.readPoint(pointName)
+      const result = await clienteDe(request).readPoint(pointName)
       return reply.code(result.status).send(result)
     }
   )
@@ -121,7 +133,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
    * valida elemento a elemento — `parsePointList` descarta los huecos que deja
    * una coma de más.
    */
-  fastify.get('/api/iconics/data/batch', async (request, reply) => {
+  fastify.get('/api/iconics/data/batch', { onRequest: [fastify.autenticar] }, async (request, reply) => {
     const points = parsePointList(request.query.points ?? '')
 
     if (points.length === 0) {
@@ -133,17 +145,17 @@ export function registerIconicsRoutes(fastify, { config, client }) {
       return reply.code(400).send({ ok: false, error: 'One or more point names are invalid.' })
     }
 
-    return responder(reply, await client.readPoints(points))
+    return responder(reply, await clienteDe(request).readPoints(points))
   })
 
   fastify.get(
     '/api/iconics/history',
-    { schema: { querystring: HistoryQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: HistoryQuerySchema } },
     async (request, reply) => {
       const { pointName, startDate, endDate, aggregate, interval } = request.query
       return responder(
         reply,
-        await client.readHistory({ pointName, startDate, endDate, aggregate, interval })
+        await clienteDe(request).readHistory({ pointName, startDate, endDate, aggregate, interval })
       )
     }
   )
@@ -177,8 +189,9 @@ export function registerIconicsRoutes(fastify, { config, client }) {
    */
   fastify.post(
     '/api/iconics/history/batch',
-    { schema: { body: HistoryBatchSchema } },
+    { onRequest: [fastify.autenticar], schema: { body: HistoryBatchSchema } },
     async (request, reply) => {
+      const client = clienteDe(request)
       const { points: puntos, startDate: inicio, endDate: fin, aggregate } = request.body
 
       /*
@@ -282,18 +295,18 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
   fastify.get(
     '/api/iconics/browse',
-    { schema: { querystring: BrowseQuerySchema } },
-    async (request, reply) => responder(reply, await client.browse(request.query.path))
+    { onRequest: [fastify.autenticar], schema: { querystring: BrowseQuerySchema } },
+    async (request, reply) => responder(reply, await clienteDe(request).browse(request.query.path))
   )
 
   fastify.get(
     '/api/iconics/points',
-    { schema: { querystring: SearchQuerySchema } },
-    async (request, reply) => responder(reply, await client.search(request.query.query))
+    { onRequest: [fastify.autenticar], schema: { querystring: SearchQuerySchema } },
+    async (request, reply) => responder(reply, await clienteDe(request).search(request.query.query))
   )
 
-  fastify.get('/api/iconics/userinfo', async (request, reply) =>
-    responder(reply, await client.readUserInfo())
+  fastify.get('/api/iconics/userinfo', { onRequest: [fastify.autenticar] }, async (request, reply) =>
+    responder(reply, await clienteDe(request).readUserInfo())
   )
 
   /* ── Escritura ────────────────────────────────────────────────────── */
@@ -306,7 +319,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
       `Escritura sobre la planta: ${pointName} = ${value} (petición de ${request.ip})`
     )
 
-    return responder(reply, await client.writePoint(pointName, value))
+    return responder(reply, await clienteDe(request).writePoint(pointName, value))
   })
 
   fastify.post('/api/iconics/write/batch', escritura(WriteBatchSchema), async (request, reply) => {
@@ -322,14 +335,14 @@ export function registerIconicsRoutes(fastify, { config, client }) {
       `Escritura múltiple sobre la planta: ${items.length} puntos (petición de ${request.ip})`
     )
 
-    return responder(reply, await client.writePoints(items))
+    return responder(reply, await clienteDe(request).writePoints(items))
   })
 
   /* ── Alarmas ──────────────────────────────────────────────────────── */
 
   fastify.get(
     '/api/iconics/alarms',
-    { schema: { querystring: AlarmsQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: AlarmsQuerySchema } },
     async (request, reply) => {
       const { pointName } = request.query
       const hours = Math.min(request.query.hours, maxAlarmHours)
@@ -339,7 +352,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
 
       return responder(
         reply,
-        await client.readAlarmHistory({
+        await clienteDe(request).readAlarmHistory({
           pointName,
           startDate: formatLocalTimestamp(start),
           endDate: formatLocalTimestamp(end),
@@ -359,7 +372,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
         `Reconocimiento de ${eventIds.length} alarma(s) (petición de ${request.ip})`
       )
 
-      return responder(reply, await client.acknowledgeAlarms(eventIds, comment))
+      return responder(reply, await clienteDe(request).acknowledgeAlarms(eventIds, comment))
     }
   )
 }

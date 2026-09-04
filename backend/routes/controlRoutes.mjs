@@ -8,25 +8,26 @@
  */
 import { ControlBombaSchema } from '../http/esquemas.mjs'
 
-export function registerControlRoutes(fastify, { config, herramientas }) {
+export function registerControlRoutes(fastify, { config }) {
   fastify.post(
     '/api/control/bomba',
     {
       /*
-       * Accionar una bomba es la operación de más consecuencia de toda la API.
-       * Declara ya las dos guardas que hará falta el día que haya usuarios:
-       * estar autenticado y tener el rol que puede escribir sobre la planta.
-       * Mientras `AUTH_HABILITADA` sea falso las dos dejan pasar. Ver
-       * `http/plugins/autenticacion.mjs`.
+       * Accionar una bomba es la operación de más consecuencia de toda la API,
+       * y desde el Plan 20 la orden sale con el token de quien la pide: si ese
+       * usuario no tiene permiso de escritura en ICONICS, el 403 lo da el
+       * servidor de planta. Aquí sólo se exige que haya alguien identificado
+       * detrás — ver `http/plugins/autenticacion.mjs` sobre por qué no hay un
+       * rol local que mantener aparte.
        */
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      onRequest: [fastify.autenticar],
       schema: { body: ControlBombaSchema },
     },
     async (request, reply) => {
       const { encender } = request.body
       const accionPedida = encender ? 'encender' : 'apagar'
 
-      const resultado = await herramientas.ejecutar('controlar_bomba', { encender })
+      const resultado = await request.sesion.pila.herramientas.ejecutar('controlar_bomba', { encender })
 
       if (!resultado.ok) {
         const esSoloLectura = /ICONICS_READ_ONLY/.test(resultado.error ?? '')

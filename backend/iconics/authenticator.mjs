@@ -7,9 +7,35 @@
  * login, se envían las credenciales, se cambia el código por tokens y se
  * refresca antes de que caduquen.
  *
- * El estado (tokens, caducidad) vive en el cierre de la factoría y no en
- * variables de módulo: así dos configuraciones distintas —producción y una
- * prueba— pueden coexistir sin pisarse los tokens.
+ * ── DE QUIÉN ES ESTA SESIÓN (PLAN 20 FASE 1) ───────────────────────
+ *
+ * Hasta el 03-09-2026 este archivo abría el flujo con `ICONICS_USERNAME` y
+ * `ICONICS_PASSWORD` del entorno: **una identidad de máquina**, una sola para
+ * todo el proceso, y esta cabecera decía que era "de máquina, no de persona".
+ * Ya no.
+ *
+ * En la rama `Asistente` las credenciales llegan **por argumento**, desde el
+ * formulario de login (`routes/sesionRoutes.mjs`), y hay un autenticador por
+ * sesión abierta. El cambio no es cosmético y tiene dos consecuencias que
+ * conviene tener presentes al leer el resto del archivo:
+ *
+ *  1. Toda lectura de planta sale con el token de **la persona que preguntó**,
+ *     así que ICONICS aplica sus propios permisos. Un técnico sin permiso de
+ *     escritura recibe un 403 del servidor de planta, no del puente.
+ *  2. El estado (tokens, caducidad) ya vivía en el cierre de la factoría y no
+ *     en variables de módulo. Eso, que antes sólo servía para que producción y
+ *     una prueba coexistieran, es ahora **lo que impide que dos sesiones se
+ *     pisen los tokens**. Es la razón de que este cambio saliera barato: no
+ *     hubo que mover estado, sólo dejar de leerlo del entorno.
+ *
+ * `config.iconics.username/password` siguen existiendo en `config.mjs`, pero
+ * este archivo ya no los mira: los usan el transporte falso y los
+ * verificadores, que necesitan una identidad sin humano delante.
+ *
+ * No confundir con `http/plugins/autenticacion.mjs`: aquél decide **quién
+ * puede hablar con el puente**; éste, **cómo el puente habla con ICONICS**.
+ * Desde el Plan 20 la respuesta a los dos sale de las mismas credenciales,
+ * pero siguen siendo dos preguntas.
  */
 import crypto from 'node:crypto'
 import { logger } from '../logger.mjs'
@@ -77,10 +103,14 @@ async function postForm(url, fields, { cookies, timeoutMs } = {}) {
  * que lo explicara. `client.mjs` ya se protegía de eso en sus llamadas; aquí
  * faltaba, y es peor, porque esto corre antes que cualquier lectura.
  *
+ * @param {object} iconics `config.iconics`: a qué servidor y con qué cliente.
+ * @param {{usuario: string, contrasena: string}} credenciales De quién es la
+ *   sesión. Llegan por argumento y no del entorno — ver la cabecera.
  * @param {number} timeoutMs Corte por salto, no para el flujo entero.
  */
-async function performInteractiveLogin(config, timeoutMs) {
-  const { endpoints, clientId, scope, username, password, origin } = config
+async function performInteractiveLogin(iconics, credenciales, timeoutMs) {
+  const { endpoints, clientId, scope, origin } = iconics
+  const { usuario: username, contrasena: password } = credenciales
   const pkce = createPkcePair()
 
   // 1. Petición de autorización: responde con un redirect a la página de login.
@@ -131,7 +161,8 @@ async function performInteractiveLogin(config, timeoutMs) {
 
   if (loginResponse.status !== HTTP_FOUND) {
     throw new Error(
-      `ICONICS login failed (status ${loginResponse.status}). Check ICONICS_USERNAME and ICONICS_PASSWORD.`
+      `ICONICS rechazó las credenciales de "${username}" (estado ${loginResponse.status}). ` +
+        'Revisa el usuario y la contraseña, y que ese usuario siga habilitado en el servidor de planta.'
     )
   }
 
@@ -175,7 +206,42 @@ async function exchange(tokenEndpoint, fields, timeoutMs) {
   return response.json()
 }
 
-export function createAuthenticator(config) {
+/**
+ * Prueba unas credenciales contra ICONICS y devuelve sus tokens, SIN crear
+ * autenticador ni guardar nada.
+ *
+ * ── POR QUÉ EXISTE SEPARADA DE `createAuthenticator` ───────────────
+ *
+ * Porque `POST /api/sesion` tiene que poder contestar «usuario o contraseña
+ * incorrectos» ANTES de crear la sesión. Sin esto, el login aceptaría
+ * cualquier cosa, guardaría una sesión con credenciales malas, y el rechazo
+ * aparecería más tarde y disfrazado: un 401 de ICONICS en mitad de la primera
+ * pregunta al asistente, que quien lo ve interpreta como «el servidor de
+ * planta está caído», no como «me equivoqué de contraseña».
+ *
+ * Es el mismo flujo de cinco saltos que usa el autenticador; lo que cambia es
+ * que aquí los tokens se devuelven y ahí se guardan.
+ *
+ * @throws {Error} si ICONICS rechaza, con el motivo del salto que falló.
+ */
+export async function probarCredenciales(config, credenciales) {
+  return performInteractiveLogin(
+    config.iconics, credenciales, config.limits.upstreamTimeoutMs
+  )
+}
+
+/**
+ * @param {object} config La configuración completa del backend.
+ * @param {{usuario: string, contrasena: string}} credenciales De quién es esta
+ *   sesión. Obligatorias: sin ellas no hay flujo OIDC que recorrer, y un
+ *   autenticador que no puede autenticar sólo sirve para fallar más tarde y
+ *   más lejos de la causa.
+ * @param {object} [tokensIniciales] Los que ya devolvió `probarCredenciales`,
+ *   para no repetir el flujo de cinco saltos que se acaba de recorrer. Es una
+ *   optimización con efecto visible: sin ella, entrar al sistema costaría dos
+ *   logins completos contra el servidor de seguridad en lugar de uno.
+ */
+export function createAuthenticator(config, credenciales, tokensIniciales = null) {
   let accessToken = ''
   let refreshToken = ''
   let expiresAtMs = 0
@@ -214,9 +280,17 @@ export function createAuthenticator(config) {
      */
     logger.debug(
       `Token de ICONICS renovado, válido ${Math.round(tokens.expires_in / 60)} min`,
-      { validoSegundos: tokens.expires_in, usuario: iconics.username || null }
+      { validoSegundos: tokens.expires_in, usuario: credenciales?.usuario || null }
     )
   }
+
+  /*
+   * Los tokens que `probarCredenciales` acaba de traer al validar el login.
+   * Sin esto, entrar al sistema costaría DOS flujos completos de cinco saltos
+   * contra el servidor de seguridad: uno para comprobar la contraseña y otro
+   * para la primera lectura de planta.
+   */
+  if (tokensIniciales?.access_token) storeTokens(tokensIniciales)
 
   /**
    * Renueva con el refresh token si lo hay y, si el servidor lo rechaza,
@@ -243,18 +317,24 @@ export function createAuthenticator(config) {
           `La renovación del token de ICONICS falló (${error.message}); se reintenta con un ` +
             'login completo. Si se repite en cada petición, el servidor está rechazando el ' +
             'refresh token y conviene revisar la sesión del usuario en ICONICS.',
-          { motivo: error.message, usuario: iconics.username || null }
+          { motivo: error.message, usuario: credenciales?.usuario || null }
         )
         refreshToken = ''
       }
     }
 
-    storeTokens(await performInteractiveLogin(iconics, timeoutMs))
+    storeTokens(await performInteractiveLogin(iconics, credenciales, timeoutMs))
   }
 
   async function getAccessToken() {
     if (hasValidToken()) return accessToken
-    if (!iconics.canAuthenticate) return ''
+    /*
+     * Sin servidor al que hablar no hay token posible. Antes esto miraba
+     * `canAuthenticate`, que exigía además ICONICS_USERNAME/PASSWORD en el
+     * entorno; ahora las credenciales las trae la sesión, así que lo único que
+     * queda por comprobar es que haya un `origin` configurado.
+     */
+    if (!iconics.origin || !credenciales?.usuario) return ''
 
     // Comparte el intento en vuelo entre todos los que llegan a la vez.
     pendingAuthentication ??= authenticate().finally(() => {
@@ -284,11 +364,10 @@ export function createAuthenticator(config) {
        * crea que el puente se lo tragó.
        */
       logger.error(
-        `No se pudo obtener un token de ICONICS para ${iconics.username || 'el usuario configurado'}: ` +
+        `No se pudo obtener un token de ICONICS para ${credenciales?.usuario || 'el usuario de la sesión'}: ` +
           `${error?.message ?? error}. Las peticiones saldrán SIN autenticar y ICONICS ` +
-          'responderá 401. Revisa ICONICS_USERNAME / ICONICS_PASSWORD y que ese usuario ' +
-          'siga habilitado en el servidor de planta.',
-        { err: error, usuario: iconics.username || null, endpoint: iconics.endpoints?.token }
+          'responderá 401. Revisa que ese usuario siga habilitado en el servidor de planta.',
+        { err: error, usuario: credenciales?.usuario || null, endpoint: iconics.endpoints?.token }
       )
       return {}
     }

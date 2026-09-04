@@ -7,6 +7,7 @@
  * que impide escribirlos en el log de planta es acordarse de no hacerlo.
  */
 import { describe, expect, it } from 'vitest'
+import { CAMPOS_SECRETOS } from '../logger.mjs'
 import { PassThrough } from 'node:stream'
 import pino from 'pino'
 
@@ -26,18 +27,15 @@ async function capturar(escribir) {
 
   const instancia = pino(
     {
-      redact: {
-        paths: [
-          'password', '*.password', '*.*.password',
-          'token', '*.token', '*.*.token',
-          'access_token', '*.access_token',
-          'refresh_token', '*.refresh_token',
-          'authorization', '*.authorization',
-          'headers.authorization', 'headers.cookie',
-          '*.headers.authorization', '*.headers.cookie',
-        ],
-        censor: '[redactado]',
-      },
+      /*
+       * La lista se IMPORTA de `logger.mjs` en vez de transcribirse.
+       *
+       * Estaba copiada aquí, y una copia no guarda nada: el día que alguien
+       * quitara un campo del logger de verdad, estas pruebas seguirían en
+       * verde redactando su propia lista. Es el mismo fallo que
+       * `shared/README.md` describe para el dominio, en miniatura.
+       */
+      redact: { paths: CAMPOS_SECRETOS, censor: '[redactado]' },
       base: undefined,
     },
     flujo
@@ -92,6 +90,44 @@ describe('redacción de secretos', () => {
      */
     const salida = await capturar(log => log.info({ password: 'x' }, 'prueba'))
     expect(salida).toContain('[redactado]')
+  })
+})
+
+describe('la credencial del login nativo (Plan 20 Fase 1)', () => {
+  /*
+   * La contraseña del técnico vive en memoria del proceso mientras su sesión
+   * está abierta —es inevitable: ICONICS obliga a rehacer el login completo
+   * cuando rechaza un refresh token—. Está declarado como hueco conocido en
+   * `docs/PLAN-20-ASISTENTE.md` §8.1, y lo que SÍ depende de nosotros es que
+   * no acabe además escrita en un archivo de log.
+   */
+  it('oculta `contrasena`, que es el nombre con el que viaja de verdad', async () => {
+    const salida = await capturar(log =>
+      log.info({ usuario: 'ana.tecnica', contrasena: 'la-de-ana-en-planta' }, 'login')
+    )
+    expect(salida).not.toContain('la-de-ana-en-planta')
+    expect(salida).toContain('[redactado]')
+    // El usuario SÍ se conserva: sin él, el log no sirve para ver una ráfaga
+    // de intentos fallidos, que es justo para lo que se registra.
+    expect(salida).toContain('ana.tecnica')
+  })
+
+  it('oculta `contrasena` anidada en el objeto de credenciales', async () => {
+    const salida = await capturar(log =>
+      log.error({ credenciales: { usuario: 'ana', contrasena: 'anidada-y-secreta' } }, 'fallo')
+    )
+    expect(salida).not.toContain('anidada-y-secreta')
+  })
+
+  it('oculta la cookie de sesión de la respuesta del login', async () => {
+    /*
+     * Lleva el id de sesión recién creado: quien lo lea del log entra como esa
+     * persona hasta que caduque.
+     */
+    const salida = await capturar(log =>
+      log.info({ headers: { 'set-cookie': 'sesion=LLAVE-DE-LA-SESION; HttpOnly' } }, 'respuesta')
+    )
+    expect(salida).not.toContain('LLAVE-DE-LA-SESION')
   })
 })
 

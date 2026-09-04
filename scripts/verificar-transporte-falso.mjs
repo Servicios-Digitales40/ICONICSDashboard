@@ -35,6 +35,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
+import { abrirSesionHttp } from './lib/sesionHttp.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/tanque/senales.js'
 import { valorEn } from '../shared/eva/tanque/simulador.js'
@@ -381,8 +382,11 @@ await checkAsync('ICONICS_FAKE=true funciona SIN ICONICS_API_BASE', async () => 
   const base = `http://127.0.0.1:${server.server.address().port}`
 
   try {
+    // La API exige sesión desde el Plan 20; con el transporte falso el login
+    // acepta cualquier credencial. Ver `lib/sesionHttp.mjs`.
+    const { pedir } = await abrirSesionHttp(base)
     const puntos = TODOS_LOS_PUNTOS.join(',')
-    const res = await fetch(`${base}/api/iconics/data/batch?points=${encodeURIComponent(puntos)}`)
+    const res = await pedir(`/api/iconics/data/batch?points=${encodeURIComponent(puntos)}`)
     const body = await res.json()
 
     assert.equal(res.status, 200)

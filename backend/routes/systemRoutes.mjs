@@ -4,17 +4,34 @@
 import { PointNameQuerySchema } from '../http/esquemas.mjs'
 
 /**
- * Tres estados, no dos, porque son tres situaciones con tres arreglos
- * distintos: `ok` todo bien; `degraded` se llega al servidor pero no hay token
- * válido (credenciales o permisos); `error` no se llega (red, servicio caído
- * o `ICONICS_API_BASE` sin configurar).
+ * Dos estados, no tres — y `tokenValid` desapareció de la respuesta.
+ *
+ * ── QUÉ CAMBIÓ Y POR QUÉ (PLAN 20 FASE 1) ──────────────────────────
+ *
+ * Antes había un `degraded`: «se llega al servidor pero no hay token válido».
+ * Eso tenía sentido cuando el puente mantenía UNA sesión de máquina cuyas
+ * credenciales estaban en el `.env`, porque entonces «no hay token» era un
+ * defecto de configuración del servidor y la salud podía informarlo.
+ *
+ * Con el login nativo no hay *un* token: hay uno por persona conectada, y
+ * puede haber cero legítimamente —nadie ha entrado todavía, a las 6 de la
+ * mañana— sin que el puente tenga nada malo. Publicar `degraded` en ese caso
+ * haría que el orquestador marcara como enfermo un servidor sano, que es peor
+ * que no informar.
+ *
+ * Lo que la salud sí puede decir, y sigue diciendo, es si **se alcanza** el
+ * servidor de planta. Para eso `app.mjs` le pasa un cliente sin credenciales.
+ * `sesionesActivas` ocupa el hueco informativo que deja `tokenValid`: dice si
+ * hay alguien trabajando, que es lo que de verdad se quiere saber al mirar.
+ *
+ * **Aviso para quien lea guiones antiguos:** `tokenValid` ya no viaja en la
+ * respuesta de `/api/health`.
  */
-function resolveStatus({ reachable, tokenValid }) {
-  if (!reachable) return 'error'
-  return tokenValid ? 'ok' : 'degraded'
+function resolveStatus({ reachable }) {
+  return reachable ? 'ok' : 'error'
 }
 
-export function registerSystemRoutes(fastify, { config, client, authenticator, startedAt }) {
+export function registerSystemRoutes(fastify, { config, client, registro, startedAt }) {
   const uptimeSeconds = () => Math.floor((Date.now() - startedAt) / 1000)
 
   /**
@@ -43,8 +60,7 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
    */
   async function readiness(request) {
     const connectivity = await client.ping()
-    const tokenValid = authenticator.hasValidToken()
-    const status = resolveStatus({ reachable: connectivity.reachable, tokenValid })
+    const status = resolveStatus({ reachable: connectivity.reachable })
 
     /*
      * Un estado que no es `ok` se registra con el motivo y con el arreglo. Es
@@ -57,19 +73,13 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
         `El puente NO alcanza a ICONICS (${config.iconics.apiBase || 'ICONICS_API_BASE sin configurar'}): ` +
           `${connectivity.reason ?? 'sin detalle'}. Revisa que el servidor de planta responda y que la ruta sea la correcta.`
       )
-    } else if (status === 'degraded') {
-      request.log.warn(
-        { estado: status, usuario: config.iconics.username || null },
-        'Se alcanza ICONICS pero NO hay token válido: las lecturas saldrán sin autenticar. ' +
-          'Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.'
-      )
     }
 
     return {
       status,
       version: config.version,
       iconicsReachable: connectivity.reachable,
-      tokenValid,
+      sesionesActivas: registro.activas(),
       readOnly: config.iconics.readOnly,
       uptimeSeconds: uptimeSeconds(),
       timestamp: new Date().toISOString(),
@@ -77,22 +87,26 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
     }
   }
 
-  // `/api/health` se mantiene como estaba —con `status`, `iconicsReachable` y
-  // `tokenValid`— porque ya hay documentación y guiones que la usan; `ready`
-  // es el nombre que dice lo que hace. Son la misma ruta con dos nombres, no
-  // dos comportamientos.
+  // `/api/health` y `/api/health/ready` son la misma ruta con dos nombres, no
+  // dos comportamientos: la primera porque ya hay documentación y guiones que
+  // la usan, la segunda porque es el nombre que dice lo que hace.
   fastify.get('/api/health', { config: { rateLimit: false } }, readiness)
   fastify.get('/api/health/ready', { config: { rateLimit: false } }, readiness)
 
   fastify.get(
     '/api/context',
-    { schema: { querystring: PointNameQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: PointNameQuerySchema } },
     async request => {
       const pointName = request.query.pointName ?? config.iconics.defaultPointName
 
+      /*
+       * El cliente de la SESIÓN, no el de salud: esto lee un punto de verdad
+       * y tiene que salir con el token de quien pregunta. El de salud va sin
+       * credenciales a propósito y aquí devolvería un 401 de ICONICS.
+       */
       return {
         context: config.context,
-        iconics: pointName ? await client.readPoint(pointName) : null,
+        iconics: pointName ? await request.sesion.pila.client.readPoint(pointName) : null,
       }
     }
   )

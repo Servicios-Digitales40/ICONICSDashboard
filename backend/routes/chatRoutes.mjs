@@ -41,12 +41,24 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esquemas.mjs'
 
-export function registerChatRoutes(fastify, { config, chat, cola }) {
+/**
+ * El asistente de quien pregunta (Plan 20 Fase 1).
+ *
+ * Cada sesión tiene su propio `chat`, porque las herramientas que ese chat
+ * invoca leen ICONICS con el token de esa persona. La `cola`, en cambio, es
+ * del SERVIDOR y sigue siendo única: con un `llama-server` sirviendo un
+ * modelo, dos personas preguntando a la vez se encolan igual que antes lo
+ * hacían dos pantallas — y ahora el «cuántos tienes delante» que ya sabía
+ * decir significa algo de verdad.
+ */
+const chatDe = request => request.sesion.pila.chat
 
-  fastify.get('/api/chat', async () => ({
+export function registerChatRoutes(fastify, { config, cola }) {
+
+  fastify.get('/api/chat', { onRequest: [fastify.autenticar] }, async request => ({
     ok: true,
     habilitado: config.ia.isConfigured,
-    modelo: config.ia.isConfigured ? chat.modeloActivo() : null,
+    modelo: config.ia.isConfigured ? chatDe(request).modeloActivo() : null,
     /*
      * El catálogo elegible. Vacío significa «no ofrezcas selector», que es lo
      * correcto en una instalación con un solo modelo: un desplegable de una
@@ -82,9 +94,9 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
     '/api/chat/modelo',
     {
       /*
-       * Cambiar el modelo afecta a todas las pantallas de la planta, así que
-       * el día que haya usuarios no debería poder hacerlo cualquiera. Ver
-       * `http/plugins/autenticacion.mjs`.
+       * Cambiar el modelo afecta a TODAS las sesiones, no sólo a la de quien
+       * lo pide: el `llama-server` es uno. Por eso sigue exigiendo sesión y
+       * sigue devolviendo 409 si hay una consulta en marcha.
        */
       onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
       schema: { body: CambiarModeloSchema },
@@ -116,7 +128,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
 
       const { modelo } = request.body
 
-      if (!chat.usarModelo(modelo)) {
+      if (!chatDe(request).usarModelo(modelo)) {
         return reply.code(400).send({
           ok: false,
           error: `"${modelo}" no está en los modelos de este servidor: ${config.ia.modelos.join(', ')}.`,
@@ -128,13 +140,13 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         `Modelo del asistente cambiado a "${modelo}" para todas las pantallas (petición de ${request.ip})`
       )
 
-      return { ok: true, modelo: chat.modeloActivo() }
+      return { ok: true, modelo: chatDe(request).modeloActivo() }
     }
   )
 
   fastify.post(
     '/api/chat',
-    { schema: { body: ChatSchema } },
+    { onRequest: [fastify.autenticar], schema: { body: ChatSchema } },
     async (request, reply) => {
       if (!config.ia.isConfigured) {
         request.log.warn(
@@ -214,7 +226,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
               emitir({ tipo: 'cola', porDelante })
             }
           },
-          ejecutar: () => chat.responder({
+          ejecutar: () => chatDe(request).responder({
             pregunta,
             historial,
             signal: abortador.signal,
@@ -249,9 +261,12 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
           )
         } else {
           request.log.error(
-            { pregunta, err: error, duracionMs, iaBase: config.ia.base, modelo: chat.modeloActivo() },
+            {
+              pregunta, err: error, duracionMs, iaBase: config.ia.base,
+              modelo: chatDe(request).modeloActivo(), usuario: request.usuario?.id,
+            },
             `La consulta al asistente falló tras ${(duracionMs / 1000).toFixed(1)} s: ` +
-              `${error?.message ?? error}. Modelo "${chat.modeloActivo()}" en ${config.ia.base}.`
+              `${error?.message ?? error}. Modelo "${chatDe(request).modeloActivo()}" en ${config.ia.base}.`
           )
           emitir({ tipo: 'error', mensaje: mensajeDeFallo(error, config.ia.timeoutMs) })
         }
@@ -275,7 +290,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
    */
   fastify.post(
     '/api/chat/exportar',
-    { schema: { body: ExportarChatSchema } },
+    { onRequest: [fastify.autenticar], schema: { body: ExportarChatSchema } },
     async (request, reply) => {
       const { historial: turnos } = request.body
 

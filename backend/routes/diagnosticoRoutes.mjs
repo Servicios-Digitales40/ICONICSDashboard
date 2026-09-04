@@ -28,7 +28,7 @@ const DiagnosticoQuerySchema = z.object({
 export function registerDiagnosticoRoutes(fastify, { motorDiagnostico }) {
   fastify.get(
     '/api/diagnostico',
-    { schema: { querystring: DiagnosticoQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: DiagnosticoQuerySchema } },
     async (request, reply) => {
       if (!motorDiagnostico) {
         return reply.code(503).send({
@@ -38,7 +38,15 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico }) {
       }
 
       try {
-        const resultado = await motorDiagnostico.diagnosticar(request.query)
+        /*
+         * El cuarto término (tendencia) LEE el historiador, así que tiene que
+         * hacerlo con el token de quien pregunta. El motor es singleton y no
+         * puede tener uno propio: ver la cabecera de `ia/motor/diagnostico.mjs`.
+         */
+        const resultado = await motorDiagnostico.diagnosticar({
+          ...request.query,
+          evaluadorTemporal: request.sesion.pila.evaluadorTemporal,
+        })
         return { ok: true, ...resultado }
       } catch (error) {
         // `diagnosticar()` lanza TypeError ante un riesgoId que no encaja

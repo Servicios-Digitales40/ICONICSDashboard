@@ -905,6 +905,11 @@ export function createHerramientas({
   // que `indiceDocumentos`—, y `diagnosticar_falla` se niega explícitamente
   // sin él, en vez de fallar a medias.
   motorDiagnostico = null,
+  // El cuarto término del diagnóstico, montado sobre el MISMO `client` que
+  // recibe esta factoría (Plan 20 Fase 1). No se construye aquí porque
+  // `/api/diagnostico` también lo necesita y hacerlo dos veces sobre dos
+  // clientes distintos es justo el fallo que ese plan describe.
+  evaluadorTemporal = null,
   // Carpeta y purga de los PDF de `generar_reporte` (Plan 14 Fase 5). Mismo
   // criterio que `indiceDocumentos`: un objeto de configuración, no variables
   // de entorno leídas aquí — eso lo hace `config.mjs`.
@@ -996,7 +1001,7 @@ export function createHerramientas({
      * ya hay un `riesgoId` concreto sobre la mesa—, y el orden del catálogo
      * no es cosmético (ver el comentario de arriba).
      */
-    ...crearHerramientasDeDiagnostico({ motorDiagnostico }),
+    ...crearHerramientasDeDiagnostico({ motorDiagnostico, evaluadorTemporal }),
   }
 
   /**

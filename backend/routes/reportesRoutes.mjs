@@ -45,7 +45,7 @@ async function localizarPdf(carpetas, id) {
 export function registerReportesRoutes(fastify, { config }) {
   fastify.get(
     '/api/reportes',
-    { schema: { querystring: ReporteQuerySchema } },
+    { onRequest: [fastify.autenticar], schema: { querystring: ReporteQuerySchema } },
     async (request, reply) => {
       const { id } = request.query
       const carpetas = [config.reportes.dir, config.backlogChat?.dir]

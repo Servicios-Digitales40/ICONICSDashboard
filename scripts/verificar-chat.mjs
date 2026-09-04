@@ -28,6 +28,7 @@
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createApp } from '../backend/app.mjs'
+import { abrirSesionHttp } from './lib/sesionHttp.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { createChat } from '../backend/ia/conversacion/chat.mjs'
 
@@ -837,21 +838,40 @@ await check('un 500 del modelo se propaga con su código', async () => {
 
 console.log('\n── La ruta /api/chat ───────────────────────────────────────')
 
-const baseEnv = { PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist' }
+/*
+ * `ICONICS_FAKE` no estaba antes porque este guion no lee ni un punto: falsea
+ * llama-server y comprueba la ruta del chat. Desde el Plan 20 hace falta igual,
+ * porque para hablar con la ruta hay que ENTRAR, y el login contra un ICONICS
+ * que no existe fallaría en el primer salto. No debilita nada de lo que este
+ * archivo comprueba.
+ */
+const baseEnv = {
+  PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist', ICONICS_FAKE: 'true',
+}
 
+/**
+ * Levanta la app y ENTRA.
+ *
+ * Devuelve `pedir(ruta, opciones)` además de `base`: desde el Plan 20 toda
+ * ruta de `/api/` exige sesión, y que el ayudante de montaje sea también el
+ * que abre la sesión es lo que impide que una comprobación nueva se escriba
+ * con `fetch` pelado y falle con un 401 que nadie sabe interpretar.
+ */
 async function montar(env) {
   const server = await createApp(loadConfig({ ...baseEnv, ...env }))
   await server.listen({ port: 0, host: '127.0.0.1' })
-  return { base: `http://127.0.0.1:${server.server.address().port}`, server }
+  const base = `http://127.0.0.1:${server.server.address().port}`
+  const { pedir } = await abrirSesionHttp(base)
+  return { base, server, pedir }
 }
 
 await check('sin IA_BASE el chat responde 503 y NO cae al index.html', async () => {
-  const { base, server } = await montar({})
+  const { server, pedir } = await montar({})
 
-  const estado = await fetch(`${base}/api/chat`).then(r => r.json())
+  const estado = await pedir(`/api/chat`).then(r => r.json())
   assert.equal(estado.habilitado, false)
 
-  const res = await fetch(`${base}/api/chat`, {
+  const res = await pedir(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pregunta: 'hola' }),
@@ -864,16 +884,16 @@ await check('sin IA_BASE el chat responde 503 y NO cae al index.html', async () 
 })
 
 await check('con IA_BASE el estado dice que está habilitado', async () => {
-  const { base, server } = await montar({ IA_BASE: llamaBase })
-  const estado = await fetch(`${base}/api/chat`).then(r => r.json())
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
+  const estado = await pedir(`/api/chat`).then(r => r.json())
   assert.equal(estado.habilitado, true)
   assert.equal(estado.ocupado, false)
   await server.close()
 })
 
 await check('una pregunta vacía se rechaza con 400', async () => {
-  const { base, server } = await montar({ IA_BASE: llamaBase })
-  const res = await fetch(`${base}/api/chat`, {
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
+  const res = await pedir(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pregunta: '   ' }),
@@ -887,9 +907,9 @@ await check('la respuesta es un flujo SSE con sus eventos', async () => {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Hay 10 máquinas.',
   }
-  const { base, server } = await montar({ IA_BASE: llamaBase })
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
 
-  const res = await fetch(`${base}/api/chat`, {
+  const res = await pedir(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pregunta: '¿qué máquinas hay?' }),
@@ -920,17 +940,17 @@ await check('dos preguntas a la vez: la segunda ESPERA turno, no recibe un error
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
-  const { base, server } = await montar({ IA_BASE: llamaBase })
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
 
-  const pedir = () => fetch(`${base}/api/chat`, {
+  const preguntar = () => pedir(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pregunta: 'hola' }),
   })
 
-  const primera = pedir()
+  const primera = preguntar()
   await new Promise(r => setTimeout(r, 100))
-  const segunda = await pedir()
+  const segunda = await preguntar()
 
   assert.equal(segunda.status, 200, 'la segunda no puede recibir un error')
 
@@ -969,10 +989,10 @@ await check('las consultas encoladas se atienden DE UNA EN UNA', async () => {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
-  const { base, server } = await montar({ IA_BASE: llamaBase })
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
 
   await Promise.all([0, 1, 2].map(() =>
-    fetch(`${base}/api/chat`, {
+    pedir(`/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pregunta: 'hola' }),
@@ -991,10 +1011,10 @@ await check('tras terminar, la siguiente pasa sin esperar', async () => {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
-  const { base, server } = await montar({ IA_BASE: llamaBase })
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
 
   for (let i = 0; i < 2; i++) {
-    const res = await fetch(`${base}/api/chat`, {
+    const res = await pedir(`/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pregunta: 'hola' }),
@@ -1003,7 +1023,7 @@ await check('tras terminar, la siguiente pasa sin esperar', async () => {
     await res.text()
   }
 
-  const estado = await fetch(`${base}/api/chat`).then(r => r.json())
+  const estado = await pedir(`/api/chat`).then(r => r.json())
   assert.equal(estado.ocupado, false, 'el hueco debe quedar libre')
 
   await server.close()
@@ -1015,10 +1035,10 @@ await check('cancelar aborta también la llamada al modelo', async () => {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
     texto: 'Listo.',
   }
-  const { base, server } = await montar({ IA_BASE: llamaBase })
+  const { server, pedir } = await montar({ IA_BASE: llamaBase })
 
   const abortador = new AbortController()
-  const peticion = fetch(`${base}/api/chat`, {
+  const peticion = pedir(`/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pregunta: 'hola' }),
@@ -1031,7 +1051,7 @@ await check('cancelar aborta también la llamada al modelo', async () => {
 
   // El hueco tiene que liberarse sin esperar a que el modelo acabe sus 3 s.
   await new Promise(r => setTimeout(r, 250))
-  const estado = await fetch(`${base}/api/chat`).then(r => r.json())
+  const estado = await pedir(`/api/chat`).then(r => r.json())
   assert.equal(estado.ocupado, false, 'cancelar debe liberar el hueco de inmediato')
 
   await server.close()
