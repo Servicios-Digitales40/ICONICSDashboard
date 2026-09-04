@@ -82,24 +82,38 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
          * por un lado, `comoRedactar` por otro— y esta rama era la única que
          * no lo hacía. Ahora sigue el mismo patrón.
          */
+        /*
+         * ── ANTES ERA UNA DISYUNTIVA; AHORA SE SABE CUÁL ES ───────────
+         *
+         * Este aviso decía «puede ser deliberado … o puede que nadie las
+         * haya transcrito todavía», y no era pereza: la distinción vivía en
+         * la cabecera de `causas.js`, en prosa, y el código no podía leerla.
+         *
+         * Con un huérfano de diez pasaba desapercibido. Medido el
+         * 03-09-2026, en vibraciones son 15 de 18: la respuesta ambigua era
+         * la MAYORITARIA de esa máquina, y dejaba al técnico sin saber si el
+         * sistema está bien o incompleto. `porQueSinCausas` lo resuelve.
+         */
+        const sinCausas = resultado.sinCausas ?? { deliberado: false, clase: 'sin-clasificar' }
+
+        const aviso = sinCausas.deliberado
+          ? `Este riesgo no tiene causas candidatas, y es correcto que no las tenga: ` +
+            `${sinCausas.motivo}`
+          : sinCausas.clase === 'pendiente'
+            ? `Este riesgo SÍ debería tener causas candidatas y todavía no las tiene: ` +
+              `${sinCausas.motivo} Es una pieza que nos falta, no una característica del riesgo.`
+            : 'Este riesgo no tiene causas candidatas cargadas, y nadie ha dejado escrito si es ' +
+              'deliberado o si faltan por transcribir. Conviene revisarlo.'
+
         return {
           ok: true,
           sistema,
           riesgoId,
           causas: [],
-          /*
-           * Para el TÉCNICO. Sin tuteo al modelo, sin nombres de
-           * herramientas, y sin afirmar cuál de los dos motivos es: hay
-           * riesgos deliberadamente sin causas —los informativos y los de
-           * estado de la instrumentación, ver la cabecera de `causas.js`— y
-           * podría haber uno al que sencillamente le falten. Decir cuál sin
-           * mirarlo sería inventar.
-           */
-          aviso:
-            'Este riesgo no tiene causas candidatas cargadas en el sistema. Puede ser ' +
-            'deliberado —los riesgos informativos y los que describen el estado de la ' +
-            'instrumentación no tienen una causa oculta debajo: el propio riesgo ya dice lo ' +
-            'que pasa— o puede que nadie las haya transcrito todavía.',
+          // Para el TÉCNICO: sin tuteo al modelo y sin nombres de herramientas.
+          aviso,
+          // Para que quien integre pueda ramificar sin analizar la prosa.
+          sinCausas,
           /*
            * Para el MODELO. La segunda frase existe por un error medido: sin
            * ella, el modelo explicó la ausencia diciendo «el sistema no ha
@@ -112,10 +126,26 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
             'Traslada el aviso con tus palabras y NO inventes una causa para rellenar el ' +
             'hueco. No atribuyas la ausencia a que falten casos previos ni a que falte ' +
             'documentación: no tiene que ver con eso, es que este riesgo no tiene causas ' +
-            'candidatas declaradas. Si el técnico quiere seguir, tú puedes llamar a ' +
-            'diagnostico(sintoma=...) para un dossier de datos y manual sobre el síntoma, o a ' +
-            'consultar_documentacion — hazlo tú, no se lo pidas a él, y no menciones los ' +
-            'nombres de las herramientas en tu respuesta.',
+            'candidatas declaradas. ' +
+            (sinCausas.deliberado
+              ? 'Y NO lo presentes como una carencia del sistema: el aviso explica por qué este ' +
+                'riesgo concreto no tiene nada debajo que diagnosticar. Decir "todavía no está ' +
+                'cargado" sería falso. '
+              : 'Aquí sí es una pieza que nos falta: dilo, sin dramatizarlo y sin prometer ' +
+                'cuándo estará. ') +
+            /*
+             * La sugerencia depende de la MÁQUINA desde que el dossier
+             * compuesto se acotó al tanque: ofrecérselo para un riesgo de
+             * vibraciones mandaría al modelo contra una negativa, y la
+             * mayoría de los huérfanos son justamente de esa máquina.
+             */
+            (sistema === 'tanque'
+              ? 'Si el técnico quiere seguir, tú puedes llamar a diagnostico(sintoma=...) para un ' +
+                'dossier de datos y manual sobre el síntoma, o a consultar_documentacion'
+              : 'Si el técnico quiere seguir, tú puedes llamar a estado_del_sistema e ' +
+                'historia_de_senal para esa máquina, o a consultar_documentacion acotada a ella') +
+            ' — hazlo tú, no se lo pidas a él, y no menciones los nombres de las herramientas ' +
+            'en tu respuesta.',
         }
       }
 

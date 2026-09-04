@@ -647,10 +647,14 @@ export const DEFINICIONES = [
     function: {
       name: 'diagnostico',
       description:
-        'Herramienta COMPUESTA para diagnosticar una avería o un síntoma: en una sola llamada ' +
+        'Herramienta COMPUESTA para diagnosticar una avería o un síntoma DEL TANQUE Y SU GRUPO DE ' +
+        'BOMBEO: en una sola llamada ' +
         'reúne el estado actual, la historia con fecha de los extremos, la correlación entre las ' +
         'señales implicadas y los límites que documenta el manual, y calcula el exceso sobre esos ' +
-        'límites ya con su fecha. ÚSALA SIEMPRE que te pregunten por qué falló algo, qué causó un ' +
+        'límites ya con su fecha. SÓLO sirve para esa máquina: su catálogo de señales es el del ' +
+        'tanque. Si el síntoma es del sistema de vibraciones, NO la llames — usa diagnosticar_falla ' +
+        'con el id de un riesgo activo, o estado_del_sistema e historia_de_senal por separado. ' +
+        'Para el tanque, ÚSALA SIEMPRE que te pregunten por qué falló algo, qué causó un ' +
         'problema, o te cuenten un síntoma ("se paró la bomba tras un pico de tensión", "el ' +
         'caudal está siendo demasiado alto") — es la primera y normalmente ÚNICA llamada que hace ' +
         'falta para eso, en vez de encadenar estado_del_sistema, historia_de_senal, ' +

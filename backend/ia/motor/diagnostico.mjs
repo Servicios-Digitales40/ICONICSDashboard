@@ -43,7 +43,7 @@
  * demasiado fino o demasiado grueso, se ajusta aquí, en un solo sitio: no
  * hace falta tocar `documentos.mjs` ni `casos.mjs`.
  */
-import { causasDe } from '../../../shared/eva/comun/causas.js'
+import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
 import { logger } from '../../logger.mjs'
@@ -446,7 +446,31 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
       // Ningún riesgo activo se queda callado: si no hay causas transcritas
       // todavía, el diagnóstico lo DICE, no devuelve una lista vacía sin más
       // explicación que un caller distraído confunda con "sin sospechosos".
-      return { sistema, riesgoId, diagnosticEventId, huerfano: true, conflicto: false, causas: [] }
+      const porQue = porQueSinCausas(riesgoId)
+      return {
+        sistema, riesgoId, diagnosticEventId,
+        huerfano: true,
+        conflicto: false,
+        causas: [],
+        /*
+         * DOS situaciones distintas detrás del mismo `null` de `causasDe()`:
+         * un riesgo que NO TIENE causas debajo —y es correcto— y uno que sí
+         * las tendría pero nadie las ha transcrito. Ver la cabecera de
+         * `porQueSinCausas` en `causas.js`.
+         *
+         * Sin esto, la herramienta tenía que decir «puede ser deliberado o
+         * puede que falten» y dejar al técnico sin saber si el sistema está
+         * bien o incompleto. En el tanque era 1 de 10 y se toleraba; en
+         * vibraciones son 15 de 18, así que esa ambigüedad era la respuesta
+         * mayoritaria de la máquina.
+         *
+         * `sin-clasificar` es el tercer caso, y no debería darse: el
+         * verificador exige que todo riesgo sin causas esté en una de las dos
+         * listas. Se contempla igual porque una regla nueva puede llegar
+         * antes que su clasificación, y entonces esto es lo honesto.
+         */
+        sinCausas: porQue ?? { deliberado: false, clase: 'sin-clasificar', motivo: null },
+      }
     }
 
     const datos = datosDe(regla)

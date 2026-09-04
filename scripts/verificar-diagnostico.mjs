@@ -42,7 +42,7 @@ import {
  *  literal aquí se pondría rojo en cada recalibración sin que nada falle. */
 const FUERTE = UMBRAL_BM25_FUERTE + 1
 const DEBIL = UMBRAL_BM25_DEBIL + 0.5
-import { causasDe } from '../shared/eva/comun/causas.js'
+import { causasDe, porQueSinCausas, SIN_CAUSAS_DELIBERADO, SIN_CAUSAS_PENDIENTE } from '../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
 
@@ -531,6 +531,109 @@ await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin ev
   const conFirma = resultado.causas.find(cc => cc.id === 'sin-recirculacion-minima')
   assert.equal(conFirma.respaldo.temporal, 0)
   assert.equal(conFirma.evidenciaAFavor.length, 0)
+})
+
+/* ── Por qué un riesgo no tiene causas (Plan 20) ──────────────────────── */
+
+console.log('\n── El huérfano deliberado y el huérfano por transcribir ─────')
+
+await check('todo riesgo SIN causas está clasificado, en una lista o en la otra', () => {
+  /*
+   * La comprobación que impide que esto vuelva a pasar.
+   *
+   * La cabecera de `causas.js` enumeraba desde el primer día qué riesgos se
+   * dejaban fuera y por qué, pero en prosa: nadie podía comprobarla, y al
+   * cruzarla con las reglas reales el 03-09-2026 aparecieron DOS huérfanos
+   * que no estaban en esa lista —`alarma-del-modulo` y `aviso-del-modulo`—.
+   * No por una decisión: porque no había forma de notarlo.
+   *
+   * Ahora una regla nueva sin causas obliga a decidir: o se declara por qué
+   * no las necesita, o se admite que faltan.
+   */
+  const sinClasificar = []
+  for (const [sistema, reglas] of [['tanque', REGLAS_TANQUE], ['vibraciones', REGLAS_VIBRACION]]) {
+    for (const regla of reglas) {
+      if (causasDe(regla.id)) continue
+      if (!porQueSinCausas(regla.id)) sinClasificar.push(`${sistema}/${regla.id}`)
+    }
+  }
+  assert.deepEqual(
+    sinClasificar, [],
+    `sin clasificar: ${sinClasificar.join(', ')} — decláralos en SIN_CAUSAS_DELIBERADO ` +
+      `(con su motivo) o en SIN_CAUSAS_PENDIENTE`
+  )
+})
+
+await check('nadie se clasifica en las dos listas a la vez', () => {
+  // Estar en las dos sería decir «no las necesita» y «le faltan» del mismo
+  // riesgo. `porQueSinCausas` daría preferencia a la primera y la
+  // contradicción quedaría enterrada.
+  const enAmbas = Object.keys(SIN_CAUSAS_DELIBERADO).filter(id => id in SIN_CAUSAS_PENDIENTE)
+  assert.deepEqual(enAmbas, [], `declarados a la vez deliberados y pendientes: ${enAmbas.join(', ')}`)
+})
+
+await check('ninguna lista clasifica un riesgo que SÍ tiene causas', () => {
+  // Un riesgo con causas transcritas no es huérfano de nada. Tenerlo aquí
+  // sería una entrada muerta que nadie volvería a mirar.
+  const sobran = [...Object.keys(SIN_CAUSAS_DELIBERADO), ...Object.keys(SIN_CAUSAS_PENDIENTE)]
+    .filter(id => causasDe(id))
+  assert.deepEqual(sobran, [], `clasificados como sin causas pero las tienen: ${sobran.join(', ')}`)
+})
+
+await check('todo motivo declarado dice algo, y de una clase conocida', () => {
+  const CLASES = new Set(['informativo', 'instrumentacion', 'rango-medida'])
+  for (const [id, entrada] of Object.entries(SIN_CAUSAS_DELIBERADO)) {
+    assert.ok(entrada.motivo && entrada.motivo.length > 30, `«${id}» no explica por qué`)
+    assert.ok(CLASES.has(entrada.clase), `«${id}» tiene la clase desconocida "${entrada.clase}"`)
+  }
+  for (const [id, entrada] of Object.entries(SIN_CAUSAS_PENDIENTE)) {
+    assert.ok(entrada.motivo && entrada.motivo.length > 30, `«${id}» no explica qué falta`)
+  }
+})
+
+await check('`variador-en-fallo` tiene causas transcritas del manual del V20', () => {
+  /*
+   * Salió de `SIN_CAUSAS_DELIBERADO` el 04-09-2026. El argumento para
+   * excluirlo era bueno —«su código ya identifica el fallo, hay un código que
+   * buscar en el manual»— y dependía de una pieza que nadie había
+   * construido: la máquina publica `ultimoFallo` y ninguna herramienta lo
+   * lee. El riesgo se quedaba sin causas Y sin lectura del código.
+   *
+   * Las cinco familias salen de la tabla «Lista de códigos de fallo» del
+   * manual de servicio del SINAMICS V20, p. 272. Transcripción, no autoría —
+   * la misma regla que el resto del archivo.
+   */
+  const causas = causasDe('variador-en-fallo')
+  assert.ok(causas && causas.length >= 4, 'se quedó sin causas candidatas')
+
+  for (const causa of causas) {
+    assert.match(causa.origen, /V20/, `«${causa.id}» no dice de qué manual sale`)
+    // Todas provisionales: son la FAMILIA probable, no el fallo concreto. El
+    // día que se lea `ultimoFallo`, el código exacto gana a esta lista.
+    assert.equal(causa.provisional, true, `«${causa.id}» debería ser provisional`)
+    assert.ok(
+      causa.terminosManual.some(t => /^F\d+$/.test(t)),
+      `«${causa.id}» no lleva ningún código de fallo entre sus términos de búsqueda`
+    )
+  }
+
+  // La que conecta con ESTA máquina: el manual describe la vigilancia de
+  // carga como la que detecta fallos mecánicos en la cadena cinemática.
+  assert.ok(causas.some(c => c.id === 'disparo-de-vigilancia-de-carga'))
+})
+
+await check('porQueSinCausas distingue las dos, y no inventa una tercera', () => {
+  const deliberado = porQueSinCausas('variador-en-manual')
+  assert.equal(deliberado.deliberado, true)
+  assert.equal(deliberado.clase, 'informativo')
+
+  const pendiente = porQueSinCausas('alarma-del-modulo')
+  assert.equal(pendiente.deliberado, false)
+  assert.equal(pendiente.clase, 'pendiente')
+
+  // Un riesgo que no existe no se clasifica: `null`, para que quien llame
+  // pueda decir «nadie lo ha mirado» en vez de afirmar una de las dos.
+  assert.equal(porQueSinCausas('no-existe-este-riesgo'), null)
 })
 
 /* ── Resultado ───────────────────────────────────────────────────────── */

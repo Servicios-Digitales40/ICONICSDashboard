@@ -35,6 +35,17 @@ import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../sha
 import { sistemaValido } from '../../../../shared/eva/comun/manuales.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
+
+/**
+ * La única máquina que el dossier compuesto sabe armar.
+ *
+ * No es una preferencia: `senalesMencionadas`, `SENALES` e `historizadas()`
+ * son el catálogo del tanque, así que ese es el alcance real de la
+ * herramienta. Está aquí como constante, y no repartido por el archivo, para
+ * que el día que la resolución de nombres se parametrice por máquina se vea
+ * de un vistazo qué hay que tocar.
+ */
+const SISTEMA_DEL_DOSSIER = 'tanque'
 /*
  * `resolverSenal` y `senalesMencionadas` viven todavía en `herramientas.mjs`:
  * son el índice de nombres del tanque, con sus sinónimos, y sacarlos es parte
@@ -459,11 +470,36 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
      * nunca las mezcla: eso es lo que pide `chat.mjs` al distinguir MEDIDO de
      * HIPÓTESIS al redactar un diagnóstico.
      */
-    async diagnostico({ sintoma, periodo } = {}) {
+    async diagnostico({ sintoma, periodo, sistema = SISTEMA_DEL_DOSSIER } = {}) {
       if (!sintoma || !sintoma.trim()) {
         return fallo(
           'Necesito una descripción del síntoma o la avería a diagnosticar: qué pasó, y si lo ' +
             'sabes, cuándo.'
+        )
+      }
+      /*
+       * ── ESTA HERRAMIENTA SÓLO CUBRE EL TANQUE, Y AHORA LO DICE ────────
+       *
+       * Todo lo que usa para armar el dossier es del tanque: `senalesMencionadas`
+       * y `SENALES` son su catálogo, e `historizadas()` sus cinco series. Nunca
+       * pudo servir a vibraciones.
+       *
+       * Lo que hacía hasta el 03-09-2026 era peor que negarse: contestaba
+       * `ok: true` igual. Medido con «El apoyo S2 vibra más tras un cambio de
+       * carga», devolvía `senalesConsideradas: ["Carga de trabajo del motor"]`
+       * —una señal del TANQUE, pescada por la palabra «carga»— y un dossier
+       * vacío. Un síntoma de una máquina contestado con el catálogo de la otra.
+       *
+       * Negarse y decir a dónde ir es la respuesta correcta mientras la
+       * resolución de nombres siga sin parametrizar por máquina (ver la nota de
+       * los imports de este archivo).
+       */
+      if (sistema !== SISTEMA_DEL_DOSSIER) {
+        return fallo(
+          `El dossier compuesto sólo cubre "${SISTEMA_DEL_DOSSIER}" hoy: su catálogo de señales ` +
+            `es el de esa máquina. Para "${sistema}", usa diagnosticar_falla con el id de un ` +
+            `riesgo activo —da causas ya puntuadas—, o pide estado_del_sistema, ` +
+            `historia_de_senal y consultar_documentacion por separado con ese sistema.`
         )
       }
 
@@ -476,7 +512,24 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       const historiadas = claves.filter(esHistorizada)
 
       const [estado, historias, correlacion, documentacion] = await Promise.all([
-        dameHerramientas().estado_del_sistema(),
+        /*
+         * ── EL `sistema` QUE FALTABA ──────────────────────────────────
+         *
+         * Esto llamaba a `estado_del_sistema()` SIN argumentos. Cuando entró
+         * la segunda máquina, esa herramienta pasó a exigir `sistema` —«cada
+         * uno es una instalación separada, contestar del otro sería contestar
+         * de otra máquina»— y este llamador interno se quedó sin actualizar.
+         *
+         * Resultado, medido el 03-09-2026 y en las DOS máquinas: `estadoAhora`
+         * devolvía `{error: "Falta decir de qué sistema..."}` en todos los
+         * diagnósticos, y `excesosSobreLimite` —que compara el estado contra
+         * los límites— se quedaba sin la mitad de su materia prima. Nada lo
+         * delataba porque el dossier seguía saliendo con `ok: true`.
+         *
+         * Es la pata que la descripción de esta herramienta promete primero:
+         * «reúne el estado actual, la historia…».
+         */
+        dameHerramientas().estado_del_sistema({ sistema }),
 
         Promise.all(historiadas.map(async k => ({
           clave: k,

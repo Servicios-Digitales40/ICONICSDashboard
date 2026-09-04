@@ -1608,6 +1608,52 @@ await checkAsync('sin síntoma no hay nada que diagnosticar', async () => {
   assert.equal(r.ok, false)
 })
 
+await checkAsync('el dossier trae el ESTADO de verdad, no un error escondido dentro', async () => {
+  /*
+   * La regresión que esto fija, medida el 03-09-2026 en las DOS máquinas.
+   *
+   * `diagnostico` llamaba a `estado_del_sistema()` SIN argumentos. Cuando
+   * entró la segunda máquina, esa herramienta pasó a exigir `sistema`, y este
+   * llamador interno se quedó sin actualizar: `estadoAhora` devolvía
+   * `{error: "Falta decir de qué sistema..."}` en TODOS los diagnósticos,
+   * incluidos los del tanque, que es la máquina para la que se escribió.
+   *
+   * Nada lo delataba: el dossier seguía saliendo con `ok: true`, así que el
+   * fallo viajaba dentro de una respuesta que se declaraba correcta. Es la
+   * pata que la descripción de la herramienta promete PRIMERO — «reúne el
+   * estado actual, la historia…» — y llevaba semanas vacía.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
+    sintoma: 'la bomba se paró tras un pico de tensión',
+  })
+
+  assert.equal(r.ok, true)
+  assert.ok(!r.medido.estadoAhora.error,
+    `estadoAhora llegó con un error dentro: ${r.medido.estadoAhora.error}`)
+  assert.ok(r.medido.estadoAhora.estadoGeneral,
+    'estadoAhora no trae `estadoGeneral`: el dossier no está mirando el estado')
+})
+
+await checkAsync('un síntoma de OTRA máquina se niega y dice a dónde ir', async () => {
+  /*
+   * El dossier sólo sabe armar el del tanque —`senalesMencionadas`, `SENALES`
+   * e `historizadas()` son su catálogo— y antes contestaba `ok: true` igual.
+   * Medido con «el apoyo S2 vibra más tras un cambio de carga»: devolvía
+   * `senalesConsideradas: ["Carga de trabajo del motor"]`, una señal del
+   * TANQUE pescada por la palabra «carga», y un dossier vacío. Un síntoma de
+   * una máquina contestado con el catálogo de la otra.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
+    sintoma: 'el apoyo S2 vibra más tras un cambio de carga',
+    sistema: 'vibraciones',
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /s[oó]lo cubre "tanque"/i)
+  // Negarse sin decir a dónde ir dejaría al técnico en el mismo sitio.
+  assert.match(r.error, /diagnosticar_falla/)
+})
+
 await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se dice por qué', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
     sintoma: 'algo va mal, no sé qué',
@@ -2170,6 +2216,57 @@ await checkAsync('un riesgo sin causas transcritas lo dice, no una lista vacía 
   assert.equal(r.ok, true)
   assert.deepEqual(r.causas, [])
   assert.match(r.aviso, /no tiene causas candidatas/i)
+})
+
+await checkAsync('un huérfano DELIBERADO dice por qué, y no suena a carencia', async () => {
+  /*
+   * Hasta el 03-09-2026 el aviso era una disyuntiva: «puede ser deliberado …
+   * o puede que nadie las haya transcrito todavía». La distinción existía en
+   * la cabecera de `causas.js`, en prosa, y el código no podía leerla.
+   *
+   * En el tanque era 1 huérfano de 10 y se toleraba. En vibraciones son 15 de
+   * 18: la respuesta ambigua pasó a ser la MAYORITARIA de esa máquina, y deja
+   * al técnico sin saber si el sistema está bien o incompleto.
+   */
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'variador-en-manual': {
+      sistema: 'tanque', riesgoId: 'variador-en-manual', huerfano: true, causas: [],
+      sinCausas: { deliberado: true, clase: 'informativo', motivo: 'El riesgo sólo informa del modo.' },
+    },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'tanque', riesgoId: 'variador-en-manual' })
+
+  assert.equal(r.sinCausas.deliberado, true)
+  assert.match(r.aviso, /es correcto que no las tenga/i)
+  assert.match(r.aviso, /El riesgo sólo informa del modo/)
+  // Y al modelo se le prohíbe presentarlo como algo que falta por cargar.
+  assert.match(r.comoRedactar, /NO lo presentes como una carencia/i)
+})
+
+await checkAsync('un huérfano PENDIENTE admite que la pieza falta', async () => {
+  const motorDiagnostico = motorDiagnosticoFalso({
+    'alarma-del-modulo': {
+      sistema: 'vibraciones', riesgoId: 'alarma-del-modulo', huerfano: true, causas: [],
+      sinCausas: { deliberado: false, clase: 'pendiente', motivo: 'Falta transcribirlas desde su regla.' },
+    },
+  })
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: 'vibraciones', riesgoId: 'alarma-del-modulo' })
+
+  assert.equal(r.sinCausas.deliberado, false)
+  assert.match(r.aviso, /S[IÍ] deber[ií]a tener causas/i)
+  assert.match(r.aviso, /pieza que nos falta/i)
+
+  /*
+   * Y la sugerencia tiene que ser de SU máquina. El dossier compuesto se
+   * acotó al tanque el 03-09-2026, así que ofrecérselo para un riesgo de
+   * vibraciones mandaría al modelo contra una negativa — y la mayoría de los
+   * huérfanos son justamente de esa máquina.
+   */
+  assert.doesNotMatch(r.comoRedactar, /diagnostico\(sintoma/,
+    'le ofrece al modelo el dossier del tanque para un riesgo de vibraciones')
+  assert.match(r.comoRedactar, /estado_del_sistema/)
 })
 
 await checkAsync('lo que lee el TÉCNICO y lo que obedece el MODELO van separados', async () => {
