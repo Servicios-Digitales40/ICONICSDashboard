@@ -141,9 +141,67 @@ describe("RAG · Documentación — el catálogo", () => {
     montarCon(CON_MANUALES);
 
     await waitFor(() => expect(screen.getByText("Manual archivado")).toBeTruthy());
+
+    /*
+     * Se busca el número DENTRO de su estadística, no suelto en la página.
+     *
+     * `getByText("2")` bastaba mientras «Manuales» fuera la única cifra que
+     * valía 2. Al añadirse «Sin asignar» dejó de serlo y la prueba reventó
+     * por ambigüedad —no por un fallo—, que es justo la señal de que estaba
+     * comprobando «hay un 2 en alguna parte» y no «hay dos manuales activos».
+     */
+    // El valor de una estadística es el elemento que sigue a su etiqueta.
+    const valorDe = (label) => screen.getByText(label).nextElementSibling.textContent;
+
     // Dos activos (indexado + roto), el archivado queda fuera del recuento.
-    expect(screen.getByText("2")).toBeTruthy();
+    expect(valorDe("Documentos")).toBe("2");
     expect(screen.getByText("archivado")).toBeTruthy();
+
+    // Y ninguno de los dos activos tiene máquina asignada en este fixture:
+    // el contador que empuja a revisarlos los ve, y no cuenta el archivado.
+    expect(valorDe("Sin asignar")).toBe("2");
+  });
+
+  it("asignar una máquina manda `accion=asignar`, no un archivado", async () => {
+    /*
+     * La trampa que esta prueba fija. Archivar y asignar comparten verbo y
+     * ruta (PATCH sobre la misma entrada), y `sistema` vacío es un valor CON
+     * significado —«toda la planta»—, así que un backend que dedujera la
+     * acción de los parámetros presentes archivaría el manual al devolverlo
+     * a toda la planta. Por eso la acción viaja explícita, y por eso se
+     * comprueba aquí la URL entera y no sólo que hubo un PATCH.
+     *
+     * El fondo: medido el 03-09-2026, los nueve manuales del manifiesto
+     * estaban sin asignar, así que el filtro por sistema del índice no
+     * filtraba nada y un diagnóstico de vibraciones podía respaldarse en el
+     * manual de la bomba. Esta es la pantalla que lo arregla.
+     */
+    const fetchMock = vi.fn((url, opciones) => {
+      if (opciones?.method === "PATCH") {
+        return respuestaJson({ ok: true, manual: { ...CON_MANUALES.manuales[0], sistema: "vibraciones" } });
+      }
+      return respuestaJson(CON_MANUALES);
+    });
+    globalThis.fetch = fetchMock;
+
+    render(
+      <ThemeProvider>
+        <DocumentacionRag />
+      </ThemeProvider>
+    );
+
+    await waitFor(() => expect(screen.getByText("Manual indexado")).toBeTruthy());
+
+    const selector = screen.getAllByTitle("A qué máquina pertenece este manual")[0];
+    fireEvent.change(selector, { target: { value: "vibraciones" } });
+
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(([, o]) => o?.method === "PATCH");
+      expect(patch).toBeTruthy();
+      expect(patch[0]).toContain("accion=asignar");
+      expect(patch[0]).toContain("sistema=vibraciones");
+      expect(patch[0]).toContain("id=11111111-1111-1111-1111-111111111111");
+    });
   });
 
   it("archivar exige un segundo clic de confirmación", async () => {

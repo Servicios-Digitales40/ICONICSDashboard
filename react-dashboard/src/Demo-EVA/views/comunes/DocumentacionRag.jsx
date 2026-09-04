@@ -24,7 +24,13 @@ import { ArchiveRestore, FileUp, RefreshCw, Upload, X } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
-import { archivarManual, listarManuales, reemplazarManual, subirManual } from "@/lib/api/ragApi.js";
+import {
+  archivarManual,
+  asignarSistemaManual,
+  listarManuales,
+  reemplazarManual,
+  subirManual,
+} from "@/lib/api/ragApi.js";
 import { useTheme } from "@/theme";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 
@@ -107,12 +113,16 @@ function Chip({ tipo, children, t }) {
   );
 }
 
-function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, onArchivar, ocupado, indice }) {
+function FilaManual({
+  manual, t, sistemas, sistemasPorId, cargaHabilitada,
+  onReemplazar, onArchivar, onAsignar, ocupado, indice,
+}) {
   const [confirmando, setConfirmando] = useState(false);
   const inputRef = useRef(null);
   const estado = estadoDeFila(manual, indice);
   const activo = manual.estado === "activo";
   const nombreSistema = manual.sistema ? sistemasPorId.get(manual.sistema) ?? manual.sistema : "toda la planta";
+  const sinAsignar = activo && !manual.sistema;
 
   return (
     <div
@@ -126,11 +136,51 @@ function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, o
           {manual.titulo}
         </div>
         <div style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, marginTop: 2 }}>
-          {manual.archivo} · {nombreSistema}
+          {manual.archivo}
           {manual.version > 1 ? ` · v${manual.version}` : ""}
         </div>
         {estado.tipo === "bad" && manual.motivoIlegible && (
           <div style={{ fontSize: 11.5, color: t.coral, marginTop: 3 }}>{manual.motivoIlegible}</div>
+        )}
+      </div>
+
+      {/*
+       * ── LA MÁQUINA, EDITABLE ────────────────────────────────────────
+       *
+       * Era texto fijo al lado del nombre del archivo, y no había forma de
+       * cambiarlo desde ninguna parte: medido el 03-09-2026, los nueve
+       * manuales estaban en «toda la planta», así que el filtro por sistema
+       * del índice —montado desde el Plan 17 F3a— no filtraba nada y un
+       * diagnóstico de vibraciones podía respaldarse en el manual de la bomba.
+       *
+       * «Toda la planta» se queda como opción de primera clase y no como el
+       * hueco de arriba de la lista: un anexo de límites aplica de verdad a
+       * las dos máquinas, y esos manuales compiten SIEMPRE. Por eso lo que se
+       * resalta no es «vacío», es «sin asignar» — que es otra cosa: nadie ha
+       * decidido todavía.
+       */}
+      <div style={{ width: 170, flexShrink: 0 }}>
+        {cargaHabilitada && activo ? (
+          <select
+            value={manual.sistema ?? ""}
+            disabled={ocupado}
+            onChange={(e) => onAsignar(manual.id, e.target.value)}
+            title="A qué máquina pertenece este manual"
+            style={{
+              ...fieldStyle(t),
+              height: 30,
+              fontSize: 12,
+              padding: "0 8px",
+              ...(sinAsignar ? { borderColor: t.amber, color: t.amber } : {}),
+            }}
+          >
+            <option value="">Toda la planta</option>
+            {sistemas.map((s) => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ fontFamily: MONO, fontSize: 11.5, color: t.textFaint }}>{nombreSistema}</span>
         )}
       </div>
 
@@ -338,6 +388,8 @@ export default function DocumentacionRag() {
   const [subiendo, setSubiendo] = useState(false);
   const [errorSubida, setErrorSubida] = useState(null);
   const [idOcupado, setIdOcupado] = useState(null);
+  /** `""` = todos · `"sin-asignar"` · `"planta"` · el id de un sistema. */
+  const [filtroSistema, setFiltroSistema] = useState("");
 
   const sistemas = resumenDeSistemas();
   const sistemasPorId = new Map(sistemas.map((s) => [s.id, s.nombre]));
@@ -409,6 +461,24 @@ export default function DocumentacionRag() {
     }
   }
 
+  /*
+   * Reasignar dispara una recarga como el resto de escrituras, y por un
+   * motivo que no es cosmético: el backend rehace su mapa `archivo → sistema`
+   * en el mismo `recargar()` del índice, así que el número de fragmentos y el
+   * estado que se ven aquí son los de después del cambio, no los de antes.
+   */
+  async function manejarAsignacion(id, sistema) {
+    setIdOcupado(id);
+    try {
+      await asignarSistemaManual({ id, sistema });
+      await cargar();
+    } catch (e) {
+      setErrorCarga(e.message);
+    } finally {
+      setIdOcupado(null);
+    }
+  }
+
   async function manejarArchivado(id) {
     setIdOcupado(id);
     try {
@@ -467,6 +537,28 @@ export default function DocumentacionRag() {
   const sinLeer = activos.filter((m) => m.motivoIlegible).length;
   const totalFragmentos = activos.reduce((s, m) => s + (m.fragmentos ?? 0), 0);
 
+  /*
+   * «Sin asignar» cuenta sólo los ACTIVOS: un manual archivado está fuera de
+   * lo que el índice recorre, así que su máquina da igual y contarlo aquí
+   * inflaría un número que existe para ser bajado a cero.
+   *
+   * Y «sin asignar» no es lo mismo que «toda la planta», aunque en disco sean
+   * el mismo `null`. La diferencia es de intención: uno es una decisión
+   * —este anexo vale para las dos máquinas— y el otro es que nadie ha mirado
+   * todavía. Sin poder distinguirlos en el dato, se distinguen en el flujo:
+   * el contador empuja a revisarlos, y quien decida «toda la planta» lo deja
+   * como está. Es lo más honesto que se puede hacer sin inventar un tercer
+   * valor que el backend no tiene.
+   */
+  const sinAsignar = activos.filter((m) => !m.sistema).length;
+
+  const manualesVisibles = datos.manuales.filter((m) => {
+    if (!filtroSistema) return true;
+    if (filtroSistema === "sin-asignar") return m.estado === "activo" && !m.sistema;
+    if (filtroSistema === "planta") return !m.sistema;
+    return m.sistema === filtroSistema;
+  });
+
   return (
     <>
       <SectionLabel sub="Qué manuales alimentan el índice del asistente, y qué sabe extraer de cada uno">
@@ -500,24 +592,83 @@ export default function DocumentacionRag() {
             t={t}
           />
           <Estadistica label="Sin leer" valor={sinLeer} tono={sinLeer ? t.coral : t.text} t={t} />
+          {/*
+           * En ámbar y no en rojo: un manual sin asignar no está roto, y
+           * puede que «toda la planta» sea la respuesta correcta para él.
+           * Lo que sí es cierto es que compite en las búsquedas de las DOS
+           * máquinas, y eso merece una mirada — el 03-09-2026 los nueve
+           * estaban así y un diagnóstico de vibraciones podía respaldarse en
+           * el manual de la bomba.
+           */}
+          <Estadistica
+            label="Sin asignar"
+            valor={sinAsignar}
+            tono={sinAsignar ? t.amber : t.success}
+            t={t}
+          />
         </div>
       </Panel>
 
-      <Panel title="Manuales" style={{ marginTop: 16 }}>
+      <Panel
+        title="Manuales"
+        style={{ marginTop: 16 }}
+        right={
+          /*
+           * ── UN FILTRO, NO UNA PANTALLA POR MÁQUINA ────────────────────
+           *
+           * Se valoró partir esta vista en una por máquina y se descartó, por
+           * cuatro razones que están en `docs/` pero que conviene recordar
+           * aquí, que es donde alguien tendría la tentación:
+           *
+           *  1. «Toda la planta» es una categoría REAL, no un valor sin
+           *     poner: esos manuales compiten en las dos máquinas. En una
+           *     pantalla por máquina aparecerían en las dos, y archivarlos
+           *     desde una los archivaría en la otra.
+           *  2. El índice es UNO y su estado es global (`indexando`,
+           *     `progreso`, `cargado`). Dos pantallas enseñarían la misma
+           *     barra de progreso sugiriendo dos corpus, y no puede haberlos:
+           *     BM25 no es invariante al tamaño del corpus y los umbrales
+           *     están calibrados contra éste.
+           *  3. Alta, reemplazo y archivado son un solo flujo sobre una
+           *     carpeta y un manifiesto. Duplicar la UI duplica dónde
+           *     arreglar cada fallo.
+           *  4. Sólo desde una lista completa se ve «cuántos van sin
+           *     asignar» y se arregla de una pasada.
+           */
+          <select
+            value={filtroSistema}
+            onChange={(e) => setFiltroSistema(e.target.value)}
+            style={{ ...fieldStyle(t), height: 30, fontSize: 12, padding: "0 8px", width: 190 }}
+          >
+            <option value="">Todos los manuales</option>
+            <option value="sin-asignar">Sin asignar ({sinAsignar})</option>
+            <option value="planta">Sólo toda la planta</option>
+            {sistemas.map((s) => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+        }
+      >
         {datos.manuales.length === 0 ? (
           <div style={{ fontSize: 13, color: t.textFaint, padding: "8px 0" }}>
             Todavía no hay ningún manual cargado.
           </div>
+        ) : manualesVisibles.length === 0 ? (
+          <div style={{ fontSize: 13, color: t.textFaint, padding: "8px 0" }}>
+            Ningún manual encaja con ese filtro.
+          </div>
         ) : (
-          datos.manuales.map((manual) => (
+          manualesVisibles.map((manual) => (
             <FilaManual
               key={manual.id}
               manual={manual}
               t={t}
+              sistemas={sistemas}
               sistemasPorId={sistemasPorId}
               cargaHabilitada={datos.cargaHabilitada}
               onReemplazar={manejarReemplazo}
               onArchivar={manejarArchivado}
+              onAsignar={manejarAsignacion}
               ocupado={idOcupado === manual.id}
               indice={{ indexando: datos.indexando, cargado: datos.cargado }}
             />

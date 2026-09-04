@@ -83,3 +83,24 @@ export async function archivarManual({ id, signal }) {
   });
   return parseResponse(response);
 }
+
+/**
+ * Reasigna el manual a una máquina, o a toda la planta con `sistema` vacío.
+ *
+ * Comparte verbo y ruta con `archivarManual` —las dos son PATCH sobre la
+ * misma entrada— y por eso la acción viaja explícita: `sistema` vacío es un
+ * valor CON significado, así que «si viene sistema, reasigna» habría hecho que
+ * devolver un manual a toda la planta lo archivara. Ver la cabecera de
+ * `ArchivarManualQuerySchema` en el backend.
+ *
+ * Reasignar cambia qué manuales compiten al preguntar por una máquina: uno sin
+ * asignar entra siempre, uno asignado sólo en la suya.
+ */
+export async function asignarSistemaManual({ id, sistema, signal }) {
+  const params = new URLSearchParams({ id, accion: "asignar", sistema: sistema ?? "" });
+  const response = await fetch(`${API_BASE}/api/rag/documentos?${params}`, {
+    method: "PATCH",
+    signal,
+  });
+  return parseResponse(response);
+}
