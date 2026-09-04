@@ -1,30 +1,32 @@
 /**
  * verificar-bundle.mjs
  * ------------------------------------------------------------------
- * ¿Se está colando la pila 3D en el arranque?
+ * Sigue siendo pequeno el arranque, y sigue fuera lo que se echo?
  *
- * ── POR QUÉ ESTE SCRIPT ────────────────────────────────────────────
+ * -- QUE VIGILABA ANTES, Y POR QUE AHORA ES OTRA COSA ---------------
  *
- * `three` + r3f + drei pesan del orden del bundle entero de planta. Que eso no
- * lo pague quien abre «Planta» depende de dos cosas que fallan en silencio:
+ * Vigilaba que la pila 3D no se colara en el trozo de arranque. Con
+ * `three` + r3f + drei instalados eso fallaba en silencio de dos maneras --un
+ * import estatico que anulaba un `lazy()`, o un paquete nuevo del arbol de
+ * drei que caia en el catch-all `vendor`-- y el sintoma era que la pantalla
+ * de Planta tardaba el doble en abrir sin que nada se rompiera.
  *
- *  1. Las vistas 3D se cargan con `lazy()`. Un import estático desde
- *     cualquier archivo del arranque —un barril, una constante compartida—
- *     las trae al trozo principal y la aplicación sigue funcionando igual.
- *  2. `manualChunks` reparte por PAQUETE, no por quién lo usa. Un paquete
- *     nuevo en el árbol de drei que no esté en `PAQUETES_3D` cae en el
- *     catch-all `vendor`, que SÍ es de carga inmediata.
+ * La Fase 3 del Plan 20 desinstalo `three`, `@react-three/*`, `recharts` y
+ * `xlsx`. Asi que la pregunta cambia: ya no es «esta diferido?» sino
+ * **«ha vuelto?»**, que es una guarda mas fuerte. Un `npm install three`
+ * hecho por costumbre, o un componente copiado de la rama del tablero, es
+ * exactamente el modo de fallo que este archivo existe para hacer ruidoso.
  *
- * En los dos casos el síntoma es el mismo: nada se rompe y la pantalla de
- * planta tarda el doble en arrancar. Este script lo convierte en un fallo
- * ruidoso.
+ * Y el presupuesto de tamano deja de ser decorativo: medido contra un
+ * arranque de 89 + 110 KB, un techo de 170 + 210 no detectaria ni que se
+ * duplicara la aplicacion entera.
  *
- * ── CÓMO SE USA ────────────────────────────────────────────────────
+ * -- COMO SE USA ---------------------------------------------------
  *
- *     cd react-dashboard && npm run build      # build de planta
+ *     cd react-dashboard && npm run build
  *     node ../scripts/verificar-bundle.mjs
  *
- * Sin argumentos comprueba `react-dashboard/dist`. Devuelve 0 si todo está en
+ * Sin argumentos comprueba `react-dashboard/dist`. Devuelve 0 si todo esta en
  * su sitio y 1 con el detalle si no.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -35,33 +37,33 @@ const AQUI = dirname(fileURLToPath(import.meta.url));
 const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dist"));
 
 /**
- * Presupuesto del arranque de planta, en KB.
+ * Presupuesto del arranque, en KB.
  *
- * Es el tamaño medido antes de instalar la pila 3D (11-ago-2026) con un margen
- * del 10 % para el crecimiento normal de la aplicación. No es una métrica de
- * vanidad: es lo que detecta que `three` ha entrado por la puerta de atrás,
- * porque cualquier fuga de esa pila mueve la cifra en cientos de KB, no en
- * decenas.
+ * **Medido el 04-09-2026**, tras la Fase 3 del Plan 20: `index` 88.87 KB y
+ * `vendor` 109.53 KB. Los techos son eso con un margen del 15 % para el
+ * crecimiento normal -- la Fase 4 trae el login y la Fase 5 rehace el
+ * asistente, asi que el margen tiene destino conocido.
  *
- * Si crece por una razón legítima, se sube el número Y se dice por qué.
- *
- * `vendor` sube de 90 a 210 (31-ago-2026): medido en 201.93 KB tras instalar
- * `@tanstack/react-query` para el fetching puntual (`ExploradorAssets.jsx`,
- * `PrediccionBeta.jsx` — ver `lib/queryClient.js`), que no tiene regla propia
- * en `manualChunks` y cae en el catch-all. De esos 201.93 KB, 161.84 ya
- * eran de antes de esta instalación —el techo de 90 llevaba un tiempo roto,
- * sin relación con este cambio—; react-query sólo puso los ~40 KB restantes.
- * Que el número sea ahora generoso no lo deja como estaba: sigue habiendo
- * margen que investigar en lo que ya se acumulaba en `vendor` antes de hoy.
+ * Venian de 170 y 210, que eran los del tablero de planta con su pila 3D. No
+ * bajarlos habria dejado un guion que no guarda nada: con el arranque a la
+ * mitad del techo, se podria duplicar la aplicacion entera sin que protestara.
+ * La regla de siempre sigue en pie -- si crece por una razon legitima, se sube
+ * el numero Y se dice por que.
  */
-const PRESUPUESTO_KB = { index: 170, vendor: 210 };
+const PRESUPUESTO_KB = { index: 102, vendor: 126 };
 
-/** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
-const HUELLAS_3D = [
-  "THREE.WebGLRenderer",
-  "BufferGeometry",
-  "PerspectiveCamera",
-  "@react-three/fiber",
+/**
+ * Librerias que se echaron en la Fase 3 y no deben volver a entrar.
+ *
+ * Se busca por RASTRO en el codigo emitido y no en `package.json`: una
+ * dependencia puede llegar de rebote --transitiva de otra, o copiada dentro de
+ * un componente-- sin figurar como directa. Cada entrada es una cadena que
+ * solo puede estar ahi si la libreria esta.
+ */
+const DESTERRADAS = [
+  ["la pila 3D", ["THREE.WebGLRenderer", "PerspectiveCamera", "@react-three/fiber"]],
+  ["recharts", ["CartesianGrid", "recharts"]],
+  ["xlsx", ["SheetJS"]],
 ];
 
 const kb = (bytes) => +(bytes / 1024).toFixed(2);
@@ -112,17 +114,22 @@ const arranque = trozosDeArranque();
 
 console.log(`Build: ${DIST}\n`);
 
-/* 1 · Ningún trozo de arranque puede contener la pila 3D. ------------ */
+/* 1 · Nada de lo desterrado puede haber vuelto, ni siquiera diferido. */
 for (const a of archivos) {
-  if (!arranque.has(a.nombre)) continue;
-  const código = readFileSync(a.ruta, "utf8");
-  const huella = HUELLAS_3D.find((h) => código.includes(h));
-  if (huella) {
+  const codigo = readFileSync(a.ruta, "utf8");
+  for (const [nombre, huellas] of DESTERRADAS) {
+    const huella = huellas.find((h) => codigo.includes(h));
+    if (!huella) continue;
     fallos.push(
-      `${a.nombre} es de carga inmediata y contiene la pila 3D (rastro: «${huella}»).\n` +
-      `    Alguien importa una vista 3D de forma estática, o falta un paquete en PAQUETES_3D de vite.config.js.`
+      `${a.nombre} contiene ${nombre} (rastro: \u00ab${huella}\u00bb).\n` +
+      `    La Fase 3 del Plan 20 la desinstal\u00f3: esta aplicaci\u00f3n es una sola vista, sin 3D\n` +
+      `    ni gr\u00e1ficas. Si vuelve a hacer falta, se decide en su propio commit y se quita\n` +
+      `    de DESTERRADAS en scripts/verificar-bundle.mjs.`
     );
   }
+}
+if (!fallos.length) {
+  console.log(`  \u2714 sin rastro de ${DESTERRADAS.map(([n]) => n).join(", ")}`);
 }
 
 /* 2 · Los trozos del arranque no se salen del presupuesto. ----------- */
@@ -130,57 +137,31 @@ for (const [prefijo, techo] of Object.entries(PRESUPUESTO_KB)) {
   const candidatos = archivos.filter((x) => x.nombre.startsWith(`${prefijo}-`));
 
   /*
-   * Más de un trozo con el mismo prefijo hace ambigua la medición, y el modo
-   * de fallo es silencioso: se mediría el primero que apareciera y el techo
-   * dejaría de comprobar nada. Pasó al diferir el asistente con `lazy()`
-   * importando su barril `index.js`, que produjo un segundo `index-*.js` de
-   * 7 KB — y este guion lo dio por bueno frente al techo de 170.
-   *
-   * Se arregla en el origen (importando el componente y no el barril), pero
-   * la comprobación se queda: es más barato que volver a descubrirlo.
+   * M\u00e1s de un trozo con el mismo prefijo hace ambigua la medici\u00f3n, y el modo
+   * de fallo es silencioso: se medir\u00eda el primero que apareciera y el techo
+   * dejar\u00eda de comprobar nada. Pas\u00f3 al diferir el asistente con `lazy()`
+   * importando su barril, que produjo un segundo `index-*.js` de 7 KB -- y
+   * este guion lo dio por bueno frente al techo de 170.
    */
   if (candidatos.length > 1) {
     fallos.push(
-      `Hay ${candidatos.length} trozos que empiezan por «${prefijo}-»: ` +
+      `Hay ${candidatos.length} trozos que empiezan por \u00ab${prefijo}-\u00bb: ` +
       `${candidatos.map((x) => x.nombre).join(", ")}.\n` +
-      `    No se puede saber cuál es el del arranque. Importa el componente concreto ` +
-      `en vez de un barril \`index.js\` en el \`lazy()\` que lo generó.`
+      `    No se puede saber cu\u00e1l es el del arranque. Importa el componente concreto ` +
+      `en vez de un barril en el lazy() que lo gener\u00f3.`
     );
     continue;
   }
 
   const a = candidatos[0];
-  if (!a) continue;
+  if (!a) {
+    fallos.push(`No hay ning\u00fan trozo \u00ab${prefijo}-\u00bb en el build: cambi\u00f3 el reparto de vite.config.js.`);
+    continue;
+  }
   const tam = kb(a.bytes);
   const ok = tam <= techo;
-  console.log(`  ${ok ? "✔" : "✖"} ${prefijo.padEnd(8)} ${String(tam).padStart(8)} KB  (techo ${techo} KB)`);
+  console.log(`  ${ok ? "\u2714" : "\u2716"} ${prefijo.padEnd(8)} ${String(tam).padStart(8)} KB  (techo ${techo} KB)`);
   if (!ok) fallos.push(`${a.nombre} ocupa ${tam} KB y el techo son ${techo} KB.`);
-}
-
-/* 3 · Si hay trozo `three`, tiene que estar FUERA del arranque. ------ */
-const three = archivos.find((x) => x.nombre.startsWith("three-"));
-if (three) {
-  const diferido = !arranque.has(three.nombre);
-  console.log(`  ${diferido ? "✔" : "✖"} three    ${String(kb(three.bytes)).padStart(8)} KB  (${diferido ? "diferido" : "EN EL ARRANQUE"})`);
-  if (!diferido) fallos.push(`${three.nombre} se descarga en el arranque; debería cargarse sólo al abrir una vista 3D.`);
-} else {
-  console.log("  · sin trozo `three` (build sin las vistas 3D — normal en el build de planta)");
-}
-
-/*
- * 4 · Igual que `three`, pero para `xlsx` — sólo lo usa el botón «Exportar
- * todo» de la vista Detalle (`Demo-EVA/lib/exportarExcel.js`), que ya es
- * `lazy()`. Sin la regla de `vite.config.js` que le da chunk propio, caería
- * en el catch-all de "vendor", que SÍ es de carga inmediata — sería el mismo
- * modo de fallo silencioso que ya cubre el bloque de arriba.
- */
-const xlsx = archivos.find((x) => x.nombre.startsWith("xlsx-"));
-if (xlsx) {
-  const diferido = !arranque.has(xlsx.nombre);
-  console.log(`  ${diferido ? "✔" : "✖"} xlsx     ${String(kb(xlsx.bytes)).padStart(8)} KB  (${diferido ? "diferido" : "EN EL ARRANQUE"})`);
-  if (!diferido) fallos.push(`${xlsx.nombre} se descarga en el arranque; debería cargarse sólo al exportar desde Detalle.`);
-} else {
-  console.log("  · sin trozo `xlsx` (build sin la vista Detalle — no debería pasar en el build de planta)");
 }
 
 console.log();
@@ -189,4 +170,4 @@ if (fallos.length) {
   fallos.forEach((f, i) => console.error(`  ${i + 1}. ${f}\n`));
   process.exit(1);
 }
-console.log("✔ El arranque no paga la pila 3D.");
+console.log("✔ El arranque es el de una sola vista.");

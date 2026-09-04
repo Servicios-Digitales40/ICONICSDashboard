@@ -10,12 +10,6 @@
  *  - className: clases extra además de `panel-card`, para reglas que necesitan
  *    CSS real (por ejemplo `order` dentro de una media query)
  *  - delay: retraso de entrada explícito, en segundos. Ver la nota de abajo.
- *  - bare: omite el encabezado propio de Panel Y su envoltorio de padding
- *    interno, dejando `children` crudo dentro del contenedor. Existe para que
- *    una variante con encabezado propio (radio distinto, sin borde bajo el
- *    título, alturas iguales en rejilla — ver `Demo-EVA/components/base.jsx`
- *    `Card`) pueda reusar el fondo/borde/sombra/animación de aquí en vez de
- *    duplicarlos.
  *  - onClick: opcional; hace clicable el contenedor completo.
  */
 import { useMemo } from "react";
@@ -31,7 +25,19 @@ import { useTheme } from "@/theme";
 // contador, que se conserva por defecto para el resto de la app.
 let panelIndex = 0;
 
-export function Panel({ title, code, children, right, style, noPad, className, delay: delayProp, bare, onClick }) {
+/*
+ * ── `bare` SE FUE CON SU ÚNICO CONSUMIDOR (PLAN 20 FASE 3) ─────────
+ *
+ * Omitía el encabezado y el padding para que la `Card` del tablero de planta
+ * —encabezado propio, radio distinto, alturas iguales en rejilla— reusara el
+ * fondo, el borde, la sombra y la animación de aquí. Esa `Card` se borró con
+ * las vistas, y ningún cajón del asistente pasa la prop.
+ *
+ * Se quita en vez de dejarla: una rama muerta dentro de la primitiva más usada
+ * de la aplicación es una bifurcación que hay que leer y descartar cada vez
+ * que alguien viene a tocar este archivo, y que nada prueba.
+ */
+export function Panel({ title, code, children, right, style, noPad, className, delay: delayProp, onClick }) {
   const { theme: t } = useTheme();
   const delayAuto = useMemo(() => {
     panelIndex += 1;
@@ -55,10 +61,7 @@ export function Panel({ title, code, children, right, style, noPad, className, d
         ...style,
       }}
     >
-      {bare ? (
-        children
-      ) : (
-        <>
+      <>
           {(title || right) && (
             <div
               style={{
@@ -83,8 +86,7 @@ export function Panel({ title, code, children, right, style, noPad, className, d
             </div>
           )}
           <div style={{ padding: noPad ? "0 20px 20px" : 0 }}>{children}</div>
-        </>
-      )}
+      </>
     </div>
   );
 }

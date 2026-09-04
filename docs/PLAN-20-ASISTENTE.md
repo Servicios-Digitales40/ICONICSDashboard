@@ -106,7 +106,7 @@ de ellas.
 | Cajones | 0 | **3** (Assets, Manuales, Casos) |
 | Entradas de sidebar | 20 en 5 grupos | **0** (no hay sidebar) |
 | Archivos `.jsx` de vista | 26 | **2** |
-| Archivos de prueba (frontend) | 53 | **26** (§7.4) |
+| Archivos de prueba (frontend) | 53 | **17** (§7.4) |
 
 #### Las 22 que se van, una por una
 
@@ -684,7 +684,68 @@ escrituras registran `usuario`. `exigirRol` documentado sin uso.
 **Verde:** `logger.test.mjs`, `rutas/seguridad.test.mjs`,
 `verificar-backend.mjs`.
 
-### F3 · Borrado del frontend
+### F3 · Borrado del frontend — **HECHA**
+
+> Ejecutada el 04-09-2026. Frontend: **17 archivos / 172 pruebas** en verde,
+> `npm run build` compilando, `verificar-bundle` en verde con techos nuevos y
+> medidos. Backend intacto: 185 pruebas y sus verificadores siguen pasando, que
+> es lo que demuestra que el borrado no tocó el motor.
+>
+> **Medición del bundle:** `index` 88.87 KB (era 92.21) y **`vendor` 109.53 KB,
+> que venía de 203.26** — cayó el 46 % al salir `three`, `recharts` y `xlsx`.
+>
+> #### Lo que la F3 corrigió del propio plan
+>
+> 1. **Cuatro de las «8 pruebas a mover» no eran de dominio.** `simulador`,
+>    `simulador-vibraciones`, `estado-dato` e `historia` probaban código de
+>    `Demo-EVA/data/` —transportes simulados del frontend, presentación de
+>    frescura, lectura de red del historiador—, no `shared/`. Se borran con las
+>    vistas. **Sobreviven cuatro, no ocho**, y esas cuatro sí prueban `shared/`
+>    y siguen en verde con la carpeta `Demo-EVA/` entera borrada, que es el
+>    resultado que valida §0.
+> 2. **La suite queda en 17 archivos, no 26.** La aritmética del plan
+>    (53 − 33 + 6) contaba altas de las Fases 4 y 5, que todavía no existen.
+> 3. **Los cajones se mudaron ANTES de borrar**, no en la F5. Sus dos pruebas
+>    montaban el componente, no una ruta, así que el traslado no tocó una sola
+>    aserción — y así ninguna quedó sin sujeto entre fases.
+>
+> #### Código muerto que el borrado destapó, y que no estaba en el plan
+>
+> - **`vite.config.js` y `verificar-bundle.mjs` giraban enteros alrededor de la
+>   pila 3D.** Una lista de veinte paquetes, un `esDe3D()`, tres reglas de
+>   reparto y dos comprobaciones de «está diferido». Sin `three` instalado, eso
+>   era el mapa de un edificio demolido. El verificador cambia de pregunta:
+>   ya no es «¿está diferido?» sino **«¿ha vuelto?»**, que es una guarda más
+>   fuerte, y los techos bajan de 170/210 a 102/126 — dejarlos habría permitido
+>   duplicar la aplicación entera sin que protestara.
+> - **`Tabs`, `Avatar`, `HoverTip`, `motion.js`, `viewport.js`, `format.js`**:
+>   cero consumidores tras el borrado. Un barril `export *` los mantenía
+>   nombrables, así que no eran código muerto inerte sino una invitación a
+>   construir con piezas que nadie mantiene ni prueba.
+> - **La prop `bare` de `Panel`**, cuyo único consumidor era la `Card` del
+>   tablero. Una rama muerta dentro de la primitiva más usada de la aplicación
+>   es una bifurcación que hay que leer y descartar cada vez que alguien abre
+>   el archivo.
+> - **El barril `lib/iconics/index.js` pasó de once exportaciones a cuatro.**
+>   Lo consume un solo archivo: el explorador de Assets. Es la medida de cuánta
+>   red hacía el tablero y cuánta hace un asistente.
+>
+> #### Dos hallazgos sobre las propias guardas
+>
+> - **`design:detect` da tres avisos y los tres son falsos positivos.** Dos
+>   `broken-image` que señalan un `<img>` de EJEMPLO dentro de una cabecera, no
+>   el real (que tiene `src` y `alt`); y un `codex-grid-background` sobre la
+>   retícula del osciloscopio, que es justo la excepción que la propia regla
+>   nombra —«reserve grid overlays for actual measurement surfaces»— y que la
+>   F5 tiene orden de preservar. Se revisa de nuevo en la F5, sin cambiar nada
+>   por ahora.
+> - **La guarda de §2.12 hubo que enseñarla a ignorar comentarios.** Acusaba a
+>   `App.jsx` por explicar que ya no hay `lazy()`, y a `lib/motion.js` por
+>   mencionar de dónde venía un helper. En un proyecto que documenta a fondo lo
+>   que se fue, una guarda que busca sobre el texto crudo acusa precisamente a
+>   las cabeceras que cuentan que eso se fue.
+
+### F3 (original) · Borrado del frontend
 Todo §5.1 de una vez. `App.jsx` queda montando `<Asistente />` sin router. Se
 retiran las cinco dependencias. Se borran las pruebas de §7.4.
 **Verde:** `npm run build` compila; `npm test` pasa con lo que queda.

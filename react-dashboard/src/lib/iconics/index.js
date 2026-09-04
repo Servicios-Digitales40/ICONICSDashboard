@@ -1,50 +1,22 @@
 /**
  * API pública del cliente ICONICS.
  *
- * Es infraestructura compartida, no de un feature: la consumen `features/data`,
- * el explorador de assets y la sección Demo EVA. Toda la E/S de red de la app
- * pasa por aquí; no hay ningún `fetch(` fuera de `apiClient.js`.
+ * ── QUÉ QUEDA, TRAS LA FASE 3 DEL PLAN 20 ──────────────────────────
  *
- * Este barril no sabe qué instalación se está mirando. El catálogo de puntos de
- * Demo EVA vive en `@shared/eva/tanque/senales.js`, y antes se reexportaba desde aquí
- * el de Resonac (`tagCatalog.js`), que era lo que ataba la red a una planta
- * concreta.
+ * Tres funciones y el juicio de calidad. Este barril exportaba además el motor
+ * de sondeo, el transporte real y el simulado, los grados de caos, el hook de
+ * un punto suelto y el del conteo de alarmas: todo eso servía al tablero de
+ * planta —diez pantallas leyendo ~140 señales en vivo— y se fue con él.
+ *
+ * Lo que sobrevive lo consume **un solo sitio**: el explorador de assets
+ * (`components/assets/ExploradorAssets.jsx`), que navega el árbol de AssetWorX
+ * y lee la propiedad seleccionada. El asistente no aparece aquí y no debe:
+ * él no lee ICONICS desde el navegador, se lo pide al backend, que además es
+ * quien sabe las cuatro reglas no obvias del historiador.
+ *
+ * Que este archivo haya encogido a cuatro líneas es la medida de cuánta red
+ * hacía el tablero y cuánta hace un asistente.
  */
-export {
-  fetchIconicsPoint,
-  fetchIconicsBatch,
-  fetchIconicsHistory,
-  fetchIconicsHistoryBatch,
-  fetchIconicsAlarms,
-  acknowledgeIconicsAlarms,
-  fetchHealth,
-  browseIconics,
-  writeIconicsPoint,
-  writeIconicsBatch,
-} from "./apiClient.js";
-
-/**
- * `useIconicsPoint` abre un `setInterval` por componente. Sirve para leer un
- * punto suelto (`features/data`), pero no para pintar una instalación entera:
- * ocho tarjetas serían ocho temporizadores y ocho peticiones por ciclo. Para
- * eso está el motor de polling, que agrupa todo en una sola petición.
- */
-export { useIconicsPoint } from "./useIconicsPoint.js";
-
-/**
- * Sólo el conteo de eventos de la última hora, para el badge del Topbar. Ver
- * la cabecera de `useAlarmCount.js` para por qué no vive junto al resto del
- * dominio de alarmas (`Demo-EVA/data/comunes/alarmas.js`).
- */
-export { useAlarmCount } from "./useAlarmCount.js";
+export { browseIconics, fetchIconicsBatch, fetchIconicsPoint } from "./apiClient.js";
 
 export { QUALITY_GOOD, QUALITY_SIN_DATO, isGoodQuality } from "@shared/quality.js";
-export { createPollingEngine } from "./pollingEngine.js";
-export { TRANSPORTES, createRealTransport, esTransporteFalso, transporteInicial } from "./transport.js";
-export { CAOS_SUAVE, CAOS_ALTO, SIN_CAOS, presetCaos } from "./caos.js";
-
-/**
- * La mecánica de un transporte falso, sin instalación: cada máquina le inyecta
- * su física y se ahorra repetir latencia, huecos, calidad mala y no finitos.
- */
-export { createTransporteSimulado } from "./transporteSimulado.js";

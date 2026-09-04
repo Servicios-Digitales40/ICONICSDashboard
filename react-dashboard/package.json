@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Tablero del sistema de agua industrial (Demo EVA): las señales de ac:TDCON/DEMO/SENSORES/ leídas de ICONICS, en 2D y en 3D, con un asistente de lenguaje natural opcional.",
+  "description": "Asistente de IA sobre los datos de ICONICS: una sola vista, el chat, con sus cajones de Assets, Manuales y Casos.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,17 +14,12 @@
     "design:detect:json": "npx -y impeccable@3 detect --json src index.html"
   },
   "dependencies": {
-    "@react-three/drei": "^9.122.0",
-    "@react-three/fiber": "^8.18.0",
     "@tanstack/react-query": "^5.102.8",
     "dompurify": "^3.4.14",
     "lucide-react": "^0.383.0",
     "marked": "^18.0.10",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "recharts": "^2.12.7",
-    "three": "^0.170.0",
-    "xlsx": "^0.18.5"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",

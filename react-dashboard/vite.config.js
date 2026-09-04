@@ -24,64 +24,6 @@ function versionDelBuild() {
   }
 }
 
-/**
- * El cierre de dependencias de la pila 3D (three + r3f + drei), para apartarlo
- * en su propio trozo.
- *
- * ── POR QUÉ HACE FALTA LA LISTA ENTERA Y NO BASTA `three` ──────────
- *
- * Las dos vistas 3D se cargan con `lazy()`, así que su código no viaja en el
- * arranque. Pero `manualChunks` reparte por PAQUETE, no por quién lo usa: el
- * catch-all `return "vendor"` de abajo se lleva todo lo que no reconozca, y
- * "vendor" SÍ es de carga inmediata. Sin esta lista, las dependencias
- * transitivas de drei —`zustand`, `react-reconciler`, `three-stdlib`,
- * `troika-*`…— acabarían en el trozo que descarga la pantalla de Planta,
- * y el `lazy()` no serviría de nada.
- *
- * `react-reconciler` es el ejemplo de por qué la regla de React de abajo no lo
- * salva: su patrón exige `react/` y ahí pone `react-reconciler/`.
- *
- * ── CÓMO SE REGENERA ───────────────────────────────────────────────
- *
- * Es el listado de paquetes que añadió la instalación de la pila 3D, menos los
- * de tipos y los de herramientas (no entran en el bundle):
- *
- *     git diff package-lock.json | grep -E '^\+\s+"node_modules/'
- *
- * La comprobación de verdad no es esta lista sino el `dist`: si al añadir algo
- * a 3D crecen `index` o `vendor`, es que un paquete nuevo se coló por el
- * catch-all. Ver `scripts/verificar-bundle.mjs`.
- */
-const PAQUETES_3D = [
-  "three", "three-stdlib", "three-mesh-bvh", "@react-three", "@react-spring",
-  "@use-gesture", "@monogrid", "@mediapipe", "@dimforge", "@tweenjs",
-  "camera-controls", "maath", "meshline", "meshoptimizer", "potpack",
-  "troika-three-text", "troika-three-utils", "troika-worker-utils",
-  "webgl-constants", "webgl-sdf-generator", "glsl-noise", "draco3d",
-  "detect-gpu", "stats-gl", "stats.js", "hls.js", "fflate",
-  "zustand", "react-reconciler", "react-use-measure", "react-composer",
-  "its-fine", "suspend-react", "tunnel-rat", "use-sync-external-store",
-  "utility-types", "is-promise", "promise-worker-transferable", "lie",
-  "immediate", "buffer", "base64-js", "ieee754",
-];
-
-/**
- * ¿El módulo pertenece a la pila 3D?
- *
- * Se extrae el nombre de paquete COMPLETO que sigue a `node_modules/` y se
- * compara por igualdad, no con `includes`, para que `three` no capture un
- * futuro `three-cualquier-cosa` que no tenga nada que ver.
- *
- * Los paquetes con ámbito valen por su ámbito entero: en la lista basta poner
- * `@react-three` para que entren `fiber` y `drei`.
- */
-function esDe3D(id) {
-  const m = id.replace(/\\/g, "/").match(/node_modules\/((?:@[^/]+\/)?[^/]+)/);
-  if (!m) return false;
-  const [ambito] = m[1].split("/");
-  return PAQUETES_3D.includes(m[1]) || (m[1].startsWith("@") && PAQUETES_3D.includes(ambito));
-}
-
 // Configuración mínima de Vite: el plugin de React para JSX/Fast Refresh,
 // más dos alias: "@" -> src/ y "@shared" -> ../shared/.
 //
@@ -156,53 +98,40 @@ export default defineConfig({
 
   build: {
     /*
-     * Un solo archivo de 755 KB significa que cambiar una etiqueta obliga a
-     * la pantalla a descargarse recharts otra vez. Separando las librerías
-     * —que cambian cuando se actualizan, o sea casi nunca— del código de la
-     * aplicación, un despliegue normal sólo invalida la parte pequeña.
+     * Separar las librerías del código de la aplicación: cambiar una etiqueta
+     * no debe obligar al navegador a descargarse React otra vez. Un despliegue
+     * normal sólo invalida la parte pequeña.
      *
-     * No reduce el peso del PRIMER arranque: recharts entra igual porque lo
-     * usa la vista de Planta, que es la ruta por defecto. Lo que mejora es
-     * cada arranque posterior a un despliegue, que en un wallboard es el
-     * caso que se repite.
+     * ── QUÉ SE FUE EN LA FASE 3 DEL PLAN 20 ────────────────────────────
+     *
+     * Tres reglas de reparto y una lista de veinte paquetes. `three` apartaba
+     * la pila 3D —del orden de 840 KB entre three, r3f y drei— para que la
+     * pantalla de Planta no la pagara al arrancar; `charts` hacía lo propio
+     * con recharts y d3; `xlsx`, con el exportador a Excel del detalle.
+     *
+     * Ninguna de esas librerías sigue instalada, así que las reglas ya no
+     * separaban nada: eran el mapa de un edificio demolido. Lo que queda es lo
+     * único que esta aplicación carga, y por eso el reparto vuelve a caber en
+     * tres líneas.
      */
     rollupOptions: {
       output: {
         /*
          * Se reparte por la RUTA del módulo y no por una lista de nombres de
          * paquete: listar `react-dom` no captura `react-dom/client`, que es lo
-         * que importa `main.jsx`, y el resultado era un chunk de React vacío
-         * con React entero dentro del de gráficas.
+         * que importa `main.jsx`, y el resultado era un trozo de React vacío
+         * con React entero dentro de otro.
          */
         manualChunks(id) {
           /*
-           * El ayudante de precarga de Vite (`__vitePreload`), que es lo que
-           * ejecuta cada `import()` diferido.
-           *
-           * No vive en node_modules, así que sin esta línea cae en el
-           * `return` de abajo y lo coloca Rollup — que lo metió DENTRO del
-           * trozo `three`. El efecto era silencioso y grave: el trozo de
-           * entrada importaba el ayudante, con él los 840 KB de la pila 3D, y
-           * el `index.html` acababa con un `modulepreload` de three. Las dos
-           * vistas 3D seguían siendo diferidas y aun así la pantalla de
-           * Planta descargaba three.js en el arranque.
-           *
-           * Va a `vendor`, que es de carga inmediata igualmente.
+           * El ayudante de precarga de Vite (`__vitePreload`) no vive en
+           * `node_modules`, así que sin esta línea lo coloca Rollup donde le
+           * parece. Va a `vendor`, que es de carga inmediata igualmente.
            */
           if (id.includes("vite/preload-helper")) return "vendor";
 
           if (!id.includes("node_modules")) return;
-          if (esDe3D(id)) return "three";
-          if (/[\\/]node_modules[\\/](recharts|d3-|victory|decimal)/.test(id)) return "charts";
-          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react";
-          // `xlsx` sólo lo usa `Demo-EVA/lib/exportarExcel.js`, importado desde
-          // la vista Detalle, que ya es `lazy()` (ver ROUTES en routes.jsx).
-          // Sin esta regla cae en el catch-all de "vendor" — que SÍ es de
-          // carga inmediata — igual que le pasaría a la pila 3D sin la lista
-          // de arriba. Chunk propio y no "charts"/"vendor": así el arranque
-          // no paga por una librería que sólo entra en juego al pulsar
-          // "Exportar todo" en Detalle.
-          if (/[\\/]node_modules[\\/]xlsx[\\/]/.test(id)) return "xlsx";
+          if (/[\/]node_modules[\/](react|react-dom|scheduler)[\/]/.test(id)) return "react";
           return "vendor";
         },
       },
