@@ -11,10 +11,15 @@
  * Lo que cambia es lo que cada pieza DICE, y hay tres diferencias que no son
  * de estilo:
  *
- *  1. NO HAY MAQUETA 3D DE FONDO. La de allí es la instalación real; aquí no
- *     existe modelo del motor, y poner uno genérico girando detrás de
- *     lecturas reales lo convertiría en «la máquina» para quien lo mire. El
- *     hero se sostiene con el gradiente y su trazo, sin fingir una escena.
+ *  1. EL FONDO DEL HERO ES OTRA MÁQUINA, PERO YA ES UNA MÁQUINA. Hasta el
+ *     04-09-2026 este hero no llevaba escena, y el motivo escrito aquí era
+ *     bueno: «aquí no existe modelo del motor, y poner uno genérico girando
+ *     detrás de lecturas reales lo convertiría en la máquina para quien lo
+ *     mire». Dejó de aplicar cuando el levantamiento de campo dio la
+ *     geometría real del tren de rotor, así que el fondo ya no finge nada:
+ *     es el mismo ensamblaje de `Vibraciones3D`, con los tres apoyos en su
+ *     estado en vivo y el eje girando a `SPEED_BMS`. Ver `RotorHero`, que
+ *     explica por qué se balancea en vez de dar la vuelta como la del tanque.
  *
  *  2. LA CIFRA NO ES LA MISMA PREGUNTA. Allí cuenta señales con lectura sobre
  *     ocho; aquí, puntos que contestan sobre los 73 que se piden. No es un
@@ -32,7 +37,7 @@
  */
 import { useMemo } from "react";
 import {
-  ArrowRight, Cpu, Gauge, LayoutDashboard, Monitor, Radio, Server, ShieldAlert, WifiOff,
+  ArrowRight, Box, Cpu, Gauge, LayoutDashboard, Monitor, Radio, Server, ShieldAlert, WifiOff,
 } from "lucide-react";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
@@ -44,13 +49,16 @@ import { estadoColor } from "../../components/paleta.js";
 import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
+import RotorHero from "../../three-d/components/RotorHero.jsx";
+import { rpmEjeDe } from "../../three-d/lib/rotor.js";
 
 /* ── Rejilla ───────────────────────────────────────────────────────── */
 
 /*
- * Las mismas clases que `InicioTanque`, con las de la maqueta fuera: aquí no hay
- * escena 3D que colocar, así que el hero no tiene de qué apartar el texto y
- * mantiene su centrado en cualquier ancho.
+ * Las mismas clases que `InicioTanque`, ahora incluidas las de la maqueta:
+ * desde que este hero tiene escena (ver la cabecera), el texto sí tiene de qué
+ * apartarse y se desplaza a la mitad izquierda a partir de 900px, igual que
+ * allí.
  */
 const REJILLA = `
 .vib-inicio { display: flex; flex-direction: column; gap: 32px; }
@@ -72,11 +80,36 @@ const REJILLA = `
   .vib-inicio-hero__badge { justify-content: flex-start; }
 }
 
+/* La escena vive por detrás de todo, blobs incluidos: son dos capas del
+   mismo fondo y no dos cosas compitiendo. Mismo criterio que
+   .eva-inicio-hero__maqueta, con dos números distintos y por un motivo:
+   arranca en el 38% y no en el 34% porque este banco es una máquina EN LÍNEA
+   —larga y baja— y su silueta llega mucho más a los lados que el skid
+   compacto del tanque; dejarle el 66% del ancho la metía por debajo de la
+   cifra. El mask desvanece su borde izquierdo para que el corte contra el
+   texto no se lea como un rectángulo. */
+.vib-inicio-hero__maqueta {
+  position: absolute;
+  inset: 0 0 0 38%;
+  z-index: 0;
+  opacity: 0.6;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 28%);
+}
+
 .vib-inicio-hero__cifra-num { font-size: 104px; }
 .vib-inicio-hero__badge { justify-content: center; }
 
-/* El trazo de los tres apoyos, por debajo del texto — mismo z-index que
-   .eva-inicio-hero__flujo de InicioTanque.
+/* El trazo de los tres apoyos. Desde que el hero tiene escena 3D ya no es
+   el fondo de siempre sino el RESPALDO de cuando no hay WebGL (ver
+   RotorHero.jsx), así que casi nunca se ve — pero cuando se ve es lo único
+   que hay, y por eso conserva su sitio y su regla de posición intactos.
+
+   Ojo al editar esta hoja: vive dentro de una plantilla de JS, así que una
+   comilla invertida aquí rompe el archivo entero.
+
+   Por debajo del texto — mismo z-index que .eva-inicio-hero__flujo de
+   InicioTanque.
    Ocupa sólo la franja INFERIOR y no la mitad de abajo: a media altura, uno
    de sus tres nodos caía justo detrás del CTA primario, y un círculo asomando
    por los bordes de un botón se lee como un defecto de pintado, no como
@@ -90,9 +123,12 @@ const REJILLA = `
 }
 
 /* Por debajo de 900px el hero vuelve a centrarse y el texto ocupa el ancho
-   entero: no queda mitad derecha que darle al trazo sin cruzarlo. */
+   entero: no queda mitad derecha que darle ni a la escena ni al trazo sin
+   cruzarlos. Se retiran los dos — y la escena además deja de montar su
+   Canvas, que es el ahorro que de verdad importa en un portátil. */
 @media (max-width: 899px) {
   .vib-inicio-hero__trazo { display: none; }
+  .vib-inicio-hero__maqueta { display: none; }
 }
 
 .vib-inicio-hero__frase {
@@ -204,6 +240,23 @@ const VISTAS = [
     },
   },
   {
+    id: "vib-3d",
+    label: "Vista 3D",
+    frase: "Dónde está montada cada sonda en el tren de rotor, y en qué dirección mide.",
+    Icono: Box,
+    /*
+     * El régimen del eje, que es la señal cuyo giro anima esa escena — el
+     * mismo criterio que la tarjeta «Máquina 3D» del tanque, que enseña la
+     * carga del motor por la misma razón.
+     *
+     * Sin lectura devuelve `null` y la tarjeta se queda sin su línea, en vez
+     * de escribir un cero: en esta máquina «no contesta» es el caso
+     * frecuente, y un «0 rpm» inventado diría que está parada.
+     */
+    dato: ({ giro }) =>
+      giro.medido ? { texto: `${Math.round(giro.real)} rpm`, estado: giro.real > 0 ? "nominal" : "sin_dato" } : null,
+  },
+  {
     id: "vib-controles",
     label: "Controles",
     frase: "El encendido y apagado de esta máquina. Todavía sin construir.",
@@ -225,11 +278,17 @@ const VISTAS = [
  * activos en AssetWorX, por eso se leen con `hda:` y por nombre.
  *
  * Se nombra el modelo del módulo porque está confirmado, igual que allí se
- * nombra ICONICS. Los acelerómetros van sin marca: lo único verificado de
- * ellos es su sensibilidad (100,05 / 99 / 100 mV/g), no su fabricante.
+ * nombra ICONICS.
+ *
+ * Los acelerómetros iban sin marca —«lo único verificado de ellos es su
+ * sensibilidad, no su fabricante»— hasta que el levantamiento de campo del
+ * 02-09-2026 los identificó: Hansford Sensors HS-100100020. El modelo llega
+ * marcado como PARCIAL (el encuadre de la foto pudo cortar un carácter), así
+ * que aquí se nombra la MARCA, que sí es firme, y el modelo exacto se queda
+ * en `ACELEROMETRO` para quien vaya a pedir una hoja de datos con él.
  */
 const NODOS_PIPELINE = [
-  { id: "acelerometros", Icono: Gauge, titulo: "Acelerómetros", detalle: "Tres, uno por apoyo, con su sensibilidad propia en mV/g" },
+  { id: "acelerometros", Icono: Gauge, titulo: "Acelerómetros Hansford", detalle: "Tres, uno por apoyo, con su sensibilidad propia en mV/g" },
   { id: "modulo", Icono: Cpu, titulo: "SIPLUS CMS 1281", detalle: "Calcula vRMS, aceleración y daño a partir de la señal cruda" },
   { id: "plc", Icono: Server, titulo: "PLC_2 · ua:DEMO3", detalle: "Publica lo que el módulo calculó, más su propio variador" },
   { id: "historiador", Icono: Radio, titulo: "Hyper Historian", detalle: "Grupo «DEMO 3» — sin publicar como activos en AssetWorX" },
@@ -477,7 +536,9 @@ function InicioVibraciones({ onNavigate }) {
     ).length;
   }, [canales]);
 
-  const contexto = { res, peor, contestan, total };
+  const giro = useMemo(() => rpmEjeDe(variador), [variador]);
+
+  const contexto = { res, peor, contestan, total, giro };
 
   return (
     <>
@@ -497,7 +558,18 @@ function InicioVibraciones({ onNavigate }) {
           <div className="blob" style={{ width: 340, height: 340, background: t.blob1, top: -160, left: -80 }} />
           <div className="blob" style={{ width: 280, height: 280, background: t.blob2, bottom: -140, right: -60, animationDelay: "-6s" }} />
 
-          <TrazoApoyos contestan={contestan} total={total} t={t} />
+          {/*
+            La escena real, con el trazo detrás por si no hay WebGL. Los dos
+            ocupan la misma franja y nunca se ven a la vez: `RotorHero`
+            devuelve el respaldo en lugar de montarse cuando no puede pintar.
+          */}
+          <div className="vib-inicio-hero__maqueta">
+            <RotorHero
+              canales={canales}
+              variador={variador}
+              respaldo={<TrazoApoyos contestan={contestan} total={total} t={t} />}
+            />
+          </div>
 
           <div style={{ position: "relative", zIndex: 1 }}>
             {!error && (
