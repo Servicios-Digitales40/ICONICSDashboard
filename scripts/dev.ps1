@@ -49,22 +49,28 @@
   que lo sirve -por ejemplo "/asistente/", cuando IIS reenvia esa subruta de
   bms-server hacia este backend para el SSO silencioso del HMI de ICONICS
   (docs/PLAN-20-ASISTENTE.md). Pone VITE_BASE_PATH y VITE_API_BASE SOLO para
-  el paso de `npm run build`; sin este parametro compila en la raiz, como
-  siempre.
+  el paso de `npm run build`.
 
-  OJO: sin `-BasePath`, este script vuelve a compilar en la raiz aunque el
-  `dist` de antes estuviera hecho para una subruta -es lo que este parametro
-  existe para evitar que se te olvide un dia que estes probando eso.
+  Por defecto "/asistente/": ESTE equipo esta configurado como el proxy
+  inverso de IIS para el HMI de ICONICS (docs/PLAN-20-ASISTENTE.md §F7), asi
+  que compilar en la raiz seria el caso raro aqui, no el normal -y era,
+  ademas, la causa exacta de una regresion real el 04-09-2026: se corrio
+  `dev.ps1` sin el parametro, sobreescribiendo un `dist` que si estaba bien
+  compilado.
+
+  Para compilar en la raiz de verdad -probando el Asistente suelto, sin
+  IIS por delante-, pasa "/": `.\scripts\dev.ps1 -BasePath /`.
 
 .EXAMPLE
+  # Compila para /asistente/ (el caso normal en este equipo)
   .\scripts\dev.ps1
 
 .EXAMPLE
   .\scripts\dev.ps1 -SinBuild
 
 .EXAMPLE
-  # Recompila para vivir bajo /asistente/ (proxy inverso de IIS)
-  .\scripts\dev.ps1 -BasePath /asistente/
+  # Compila en la raiz -sin IIS por delante-, para probar el Asistente suelto
+  .\scripts\dev.ps1 -BasePath /
 
 .EXAMPLE
   # Si responde "la ejecucion de scripts esta deshabilitada en este sistema":
@@ -76,7 +82,7 @@
 param(
   [switch]$SinPrototipos,
   [switch]$SinBuild,
-  [string]$BasePath
+  [string]$BasePath = '/asistente/'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -99,14 +105,14 @@ if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
 # salida solo llega a $LASTEXITCODE, nunca lanza por si mismo.
 if (-not $SinBuild) {
   Write-Host ''
-  if ($BasePath) {
+  if ($BasePath -and $BasePath -ne '/') {
     Write-Host "  compilando el frontend para vivir bajo '$BasePath' (npm run build)..." -ForegroundColor DarkGray
   } else {
-    Write-Host '  compilando el frontend (npm run build)...' -ForegroundColor DarkGray
+    Write-Host '  compilando el frontend en la raiz (npm run build)...' -ForegroundColor DarkGray
   }
   Push-Location $frontend
   try {
-    if ($BasePath) {
+    if ($BasePath -and $BasePath -ne '/') {
       # Solo para ESTE paso: VITE_BASE_PATH mueve todas las rutas de assets
       # del HTML a la subruta, y VITE_API_BASE hace lo mismo para las
       # llamadas a /api/... del propio frontend (ver lib/api/apiBase.js).
@@ -146,8 +152,9 @@ $banderas = if ($SinPrototipos) { '' } else {
 Start-Ventana 'ICONICS · vite :5173' $frontend "$banderas npm run dev"
 
 Write-Host ''
-if ($BasePath) {
-  Write-Host "  backend   http://localhost:3001$BasePath   (compilado para vivir bajo '$BasePath' — no abre en la raiz)" -ForegroundColor DarkGray
+if ($BasePath -and $BasePath -ne '/') {
+  Write-Host "  backend   :3001   compilado para vivir bajo '$BasePath' — NO abre suelto en localhost:3001$BasePath" -ForegroundColor DarkGray
+  Write-Host "            hace falta el proxy inverso de IIS por delante (docs/PLAN-20-ASISTENTE.md §F7)" -ForegroundColor DarkGray
 } else {
   Write-Host '  backend   http://localhost:3001   (build de planta, sin prototipos)' -ForegroundColor DarkGray
 }
