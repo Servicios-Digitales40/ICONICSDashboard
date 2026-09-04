@@ -15,12 +15,10 @@
  * ── POR QUÉ NO TODOS LOS RIESGOS ESTÁN AQUÍ ─────────────────────────
  *
  * Un riesgo entra si su `accion`/`consecuencia` NOMBRA algo que pueda fallar
- * — «revisar la válvula de alivio» es una causa candidata; «atender el fallo
- * del variador» no lo es, porque el fallo YA ESTÁ identificado por el propio
- * riesgo y no hay nada más que diagnosticar debajo. Quedan fuera a propósito
- * los riesgos puramente informativos (`variador-en-manual`) y los que son
- * sobre el estado de la instrumentación, no de la máquina
- * (`variador-en-fallo`, `sensor-con-desviacion`, `confianza-de-medida-baja`,
+ * — «revisar la válvula de alivio» es una causa candidata. Quedan fuera a
+ * propósito los riesgos puramente informativos (`variador-en-manual`) y los
+ * que son sobre el estado de la instrumentación, no de la máquina
+ * (`sensor-con-desviacion`, `confianza-de-medida-baja`,
  * `alarmas-activas`, `alarmas-sin-reconocer`, `dkw-sin-referencia`,
  * `rodamientos-sin-vigilar`, `medida-sin-vigilar`, `vigilancia-en-aviso` —
  * ésta última ya dice QUÉ vigilancia concreta se disparó en su propia
@@ -32,6 +30,12 @@
  *
  * `diagnostico.mjs` no falla ante un riesgo sin entrada aquí: lo dice, en vez
  * de callarse. Ver `causasDe()` al final del archivo.
+ *
+ * Y desde el 04-09-2026 esa lista de exclusiones ya no vive sólo en este
+ * párrafo: está en `SIN_CAUSAS_DELIBERADO`, con el motivo de cada una, y un
+ * verificador exige que TODO riesgo sin causas esté clasificado ahí o en
+ * `SIN_CAUSAS_PENDIENTE`. Mientras fue prosa, dos huérfanos se colaron sin
+ * que nadie pudiera notarlo.
  *
  * ── DOS CLASES DE «PROVISIONAL», Y NO SE CONFUNDEN ──────────────────
  *
@@ -105,11 +109,104 @@ function causasVibracionAlta(riesgoId) {
 }
 
 /**
+ * Las familias de disparo del variador V20, TRANSCRITAS de su manual.
+ *
+ * ── DE DÓNDE SALE CADA UNA ──────────────────────────────────────────
+ *
+ * De la tabla «Lista de códigos de fallo» del manual de servicio del
+ * SINAMICS V20 (A5E31842763, 02/2013), página 272 y siguientes, que trae tres
+ * columnas: Fallo, Causa y Remedio. Cada entrada de aquí agrupa los códigos
+ * de una misma familia y copia SU causa — no hay nada inventado, igual que en
+ * el resto de este archivo.
+ *
+ * Ese manual es el que se acaba de asignar al sistema de vibraciones, así que
+ * el término de búsqueda de cada causa cae dentro del documento correcto y
+ * `manualCitado` sale con su página real.
+ *
+ * ── LA OBJECIÓN, DICHA EN VOZ ALTA ──────────────────────────────────
+ *
+ * La cabecera de este archivo argumentaba que `variador-en-fallo` no debía
+ * tener causas: «el fallo YA ESTÁ identificado por el propio riesgo». El
+ * argumento es bueno y depende de una pieza que NO EXISTE — que alguien lea
+ * el código de fallo y lo busque en el manual.
+ *
+ * El variador sí lo publica: la máquina expone `ultimoFallo`, y el propio
+ * manual documenta `r0947` como «último código de fallo», con historial de
+ * ocho disparos. Pero ninguna herramienta lo lee hoy, así que el riesgo se
+ * quedaba sin causas Y sin lectura del código: lo peor de las dos opciones.
+ *
+ * Estas candidatas son el puente mientras eso llegue. Cuando una herramienta
+ * lea `ultimoFallo`, el código exacto DEBE ganar a esta lista — una familia
+ * puntuada por parecido al manual no compite con un código que el equipo
+ * declara. Ese día, esto se sustituye por la búsqueda del código; no se
+ * suman.
+ *
+ * Por eso van todas con `provisional: true`: no es que el umbral esté sin
+ * confirmar —aquí no hay umbral—, es que son la familia probable y no el
+ * fallo concreto, y el técnico tiene que saber que puede mirar el código.
+ */
+function causasVariadorEnFallo() {
+  const origen = "manual SINAMICS V20 · Lista de códigos de fallo (p. 272)";
+  return [
+    {
+      id: "sobrecorriente-o-cortocircuito",
+      titulo: "Sobrecorriente en la salida (F1): cortocircuito, defecto a tierra o motor mal parametrizado",
+      componente: "Variador V20 / cable de motor",
+      terminosManual: ["sobrecorriente", "cortocircuito", "defectos a tierra", "F1"],
+      origen,
+      provisional: true,
+    },
+    {
+      id: "sobretension-de-bus",
+      titulo: "Sobretensión del circuito intermedio (F2): deceleración demasiado rápida o red alta",
+      componente: "Variador V20 / circuito intermedio DC",
+      terminosManual: ["sobretension", "tension de la interconexion de DC", "deceleracion", "F2"],
+      origen,
+      provisional: true,
+    },
+    {
+      id: "subtension-de-alimentacion",
+      titulo: "Subtensión de alimentación (F3): caída o corte breve de la red",
+      componente: "Acometida eléctrica",
+      terminosManual: ["subtension", "alimentacion", "red", "F3"],
+      origen,
+      provisional: true,
+    },
+    {
+      id: "sobretemperatura",
+      titulo: "Sobretemperatura del variador o del motor (F4, F5, F11): ventilación o ciclo de carga",
+      componente: "Variador V20 / motor",
+      terminosManual: ["sobretemperatura", "sobrecalentamiento del motor", "ventilacion", "F4"],
+      origen,
+      provisional: true,
+    },
+    {
+      /*
+       * La que más habla con ESTA máquina. El manual describe la vigilancia
+       * de carga (P2181) como la que «vigila fallos mecánicos en la cadena
+       * cinemática, p. ej., correas defectuosas» y detecta «estados que
+       * producen sobrecargas, p. ej., bloqueos». En una bancada rotativa
+       * vigilada por vibración, ese disparo y una vibración alta suelen ser
+       * el mismo problema visto por dos instrumentos.
+       */
+      id: "disparo-de-vigilancia-de-carga",
+      titulo: "Disparo de la vigilancia de carga (F452): fallo mecánico en la cadena cinemática o bloqueo",
+      componente: "Transmisión / acoplamiento",
+      terminosManual: ["vigilancia de carga", "cadena cinematica", "correas", "bloqueo", "F452"],
+      origen,
+      provisional: true,
+    },
+  ];
+}
+
+/**
  * Causas candidatas, por id de riesgo. Un riesgo que no aparece aquí no
  * tiene causas declaradas — `causasDe()` lo dice explícitamente, nunca lo
  * calla ni lo confunde con una lista vacía por descuido.
  */
 export const CAUSAS_POR_RIESGO = {
+  "variador-en-fallo": causasVariadorEnFallo(),
+
   /* ── Tanque ───────────────────────────────────────────────────────── */
 
   derrame: [
@@ -358,13 +455,13 @@ export const SIN_CAUSAS_DELIBERADO = {
       "debajo que diagnosticar, el propio modo es el hecho.",
   },
 
-  /* Estado de la INSTRUMENTACIÓN, no de la máquina. */
-  "variador-en-fallo": {
-    clase: "instrumentacion",
-    motivo:
-      "El variador ya declara su propio fallo, y su código lo identifica: no hay causas " +
-      "candidatas que puntuar debajo, hay un código que buscar en el manual del variador.",
-  },
+  /*
+   * Estado de la INSTRUMENTACIÓN, no de la máquina.
+   *
+   * `variador-en-fallo` estuvo aquí y salió el 04-09-2026: ver la cabecera de
+   * `causasVariadorEnFallo`. El argumento para excluirlo —«su código ya lo
+   * identifica»— dependía de una pieza que nadie había construido.
+   */
   "sensor-con-desviacion": {
     clase: "instrumentacion",
     motivo: "Habla del estado del sensor, no de la máquina que mide.",

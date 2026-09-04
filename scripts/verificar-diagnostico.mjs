@@ -591,6 +591,37 @@ await check('todo motivo declarado dice algo, y de una clase conocida', () => {
   }
 })
 
+await check('`variador-en-fallo` tiene causas transcritas del manual del V20', () => {
+  /*
+   * Salió de `SIN_CAUSAS_DELIBERADO` el 04-09-2026. El argumento para
+   * excluirlo era bueno —«su código ya identifica el fallo, hay un código que
+   * buscar en el manual»— y dependía de una pieza que nadie había
+   * construido: la máquina publica `ultimoFallo` y ninguna herramienta lo
+   * lee. El riesgo se quedaba sin causas Y sin lectura del código.
+   *
+   * Las cinco familias salen de la tabla «Lista de códigos de fallo» del
+   * manual de servicio del SINAMICS V20, p. 272. Transcripción, no autoría —
+   * la misma regla que el resto del archivo.
+   */
+  const causas = causasDe('variador-en-fallo')
+  assert.ok(causas && causas.length >= 4, 'se quedó sin causas candidatas')
+
+  for (const causa of causas) {
+    assert.match(causa.origen, /V20/, `«${causa.id}» no dice de qué manual sale`)
+    // Todas provisionales: son la FAMILIA probable, no el fallo concreto. El
+    // día que se lea `ultimoFallo`, el código exacto gana a esta lista.
+    assert.equal(causa.provisional, true, `«${causa.id}» debería ser provisional`)
+    assert.ok(
+      causa.terminosManual.some(t => /^F\d+$/.test(t)),
+      `«${causa.id}» no lleva ningún código de fallo entre sus términos de búsqueda`
+    )
+  }
+
+  // La que conecta con ESTA máquina: el manual describe la vigilancia de
+  // carga como la que detecta fallos mecánicos en la cadena cinemática.
+  assert.ok(causas.some(c => c.id === 'disparo-de-vigilancia-de-carga'))
+})
+
 await check('porQueSinCausas distingue las dos, y no inventa una tercera', () => {
   const deliberado = porQueSinCausas('variador-en-manual')
   assert.equal(deliberado.deliberado, true)
