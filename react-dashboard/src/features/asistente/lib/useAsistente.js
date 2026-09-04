@@ -17,7 +17,7 @@
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE } from "@/lib/api/apiBase";
+import { pedir } from "@/lib/api/pedir.js";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
@@ -132,7 +132,7 @@ export function useAsistente() {
   useEffect(() => {
     let cancelado = false;
 
-    fetch(`${API_BASE}/api/chat`)
+    pedir("/api/chat")
       .then((r) => r.json())
       .then((r) => {
         if (cancelado) return;
@@ -166,7 +166,7 @@ export function useAsistente() {
 
       setErrorModelo(null);
       try {
-        const respuesta = await fetch(`${API_BASE}/api/chat/modelo`, {
+        const respuesta = await pedir("/api/chat/modelo", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ modelo: nombre }),
@@ -224,7 +224,7 @@ export function useAsistente() {
       setEstado("Enviando…");
 
       try {
-        const respuesta = await fetch(`${API_BASE}/api/chat`, {
+        const respuesta = await pedir("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pregunta, historial }),
@@ -450,7 +450,7 @@ export function useDictado() {
       return;
     }
 
-    fetch(`${API_BASE}/api/voz`)
+    pedir("/api/voz")
       .then((r) => r.json())
       .then((r) => { if (!cancelado) setDisponible(Boolean(r?.habilitado)); })
       // Un backend sin esta ruta responde con el index.html; eso es «no hay
@@ -480,10 +480,10 @@ export function useDictado() {
        */
       const sistema = sistemaDeRuta(window.location.hash);
       const destino = sistema
-        ? `${API_BASE}/api/voz?sistema=${encodeURIComponent(sistema)}`
-        : `${API_BASE}/api/voz`;
+        ? `/api/voz?sistema=${encodeURIComponent(sistema)}`
+        : "/api/voz";
 
-      const respuesta = await fetch(destino, {
+      const respuesta = await pedir(destino, {
         method: "POST",
         headers: { "Content-Type": "audio/wav" },
         body: wav,

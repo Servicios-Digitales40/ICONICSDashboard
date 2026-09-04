@@ -1,6 +1,9 @@
 /**
  * Cliente del catálogo de manuales — `/api/rag/documentos` (Plan 16 Fase 1).
  *
+ * Es el camino por el que entra al asistente todo el conocimiento que no mide
+ * ICONICS. Lo consume el cajón «Manuales» (capacidad 7 del encargo).
+ *
  * ── POR QUÉ SUBIR/REEMPLAZAR NO MANDAN JSON ─────────────────────────
  *
  * El backend espera los BYTES del archivo tal cual en el cuerpo —igual que
@@ -9,34 +12,21 @@
  * pasarlo directo como `body` de `fetch` ya manda exactamente eso; lo que no
  * cabe en el cuerpo —el nombre original, el sistema, el título— viaja en la
  * query string, que es donde `ragRoutes.mjs` lo espera.
+ *
+ * ── QUÉ SE FUE DE AQUÍ (PLAN 20 FASE 4) ────────────────────────────
+ *
+ * Un `parseResponse` propio, copiado literal en `casosApi.js`. Ver la cabecera
+ * de aquél: la capa que interpreta errores de la API vive ahora en `pedir.js`,
+ * una sola vez, que es también donde se decide qué 401 expulsa al login y cuál
+ * es sólo una falta de permisos.
  */
-import { API_BASE } from "./apiBase.js";
-
-async function parseResponse(response) {
-  const raw = await response.text();
-  let data = null;
-
-  if (raw) {
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      throw new Error(`El servidor respondió ${response.status}, pero no devolvió JSON válido.`);
-    }
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
-  }
-
-  return data;
-}
+import { pedirJson } from "./pedir.js";
 
 /** Qué hay en el catálogo, fusionado con el estado del índice: fragmentos por
  *  manual, si algo se está indexando ahora mismo, y si la carga de nuevos
  *  manuales está habilitada en este servidor. */
 export async function listarManuales({ signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/rag/documentos`, { signal });
-  return parseResponse(response);
+  return pedirJson("/api/rag/documentos", { signal });
 }
 
 function query({ nombre, sistema, titulo }) {
@@ -51,8 +41,8 @@ function query({ nombre, sistema, titulo }) {
  *  navegador; `sistema` es el id del registro de `sistemas.js`, o `null`
  *  para «toda la planta». */
 export async function subirManual({ archivo, sistema, titulo, signal }) {
-  const response = await fetch(
-    `${API_BASE}/api/rag/documentos?${query({ nombre: archivo.name, sistema, titulo })}`,
+  return pedirJson(
+    `/api/rag/documentos?${query({ nombre: archivo.name, sistema, titulo })}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
@@ -60,26 +50,23 @@ export async function subirManual({ archivo, sistema, titulo, signal }) {
       signal,
     }
   );
-  return parseResponse(response);
 }
 
 /** Sustituye el contenido de un manual ya dado de alta. Mismo archivo,
  *  versión nueva. */
 export async function reemplazarManual({ id, archivo, signal }) {
-  const response = await fetch(`${API_BASE}/api/rag/documentos?id=${encodeURIComponent(id)}`, {
+  return pedirJson(`/api/rag/documentos?id=${encodeURIComponent(id)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/octet-stream" },
     body: archivo,
     signal,
   });
-  return parseResponse(response);
 }
 
 /** Archiva: el manual deja de indexarse, pero el archivo no se borra. */
 export async function archivarManual({ id, signal }) {
-  const response = await fetch(`${API_BASE}/api/rag/documentos?id=${encodeURIComponent(id)}`, {
+  return pedirJson(`/api/rag/documentos?id=${encodeURIComponent(id)}`, {
     method: "PATCH",
     signal,
   });
-  return parseResponse(response);
 }

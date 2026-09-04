@@ -75,6 +75,7 @@ import {
   Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
+import { pedir } from "@/lib/api/pedir.js";
 import {
   ETIQUETA_HERRAMIENTA, describirConsulta, useAsistente, useDictado, useManosLibres,
 } from "../lib/useAsistente.js";
@@ -479,7 +480,14 @@ export function Asistente() {
       const historial = mensajes
         .filter((m) => m.texto?.trim())
         .map((m) => ({ rol: m.rol, texto: m.texto }));
-      const r = await fetch("/api/chat/exportar", {
+      /*
+       * Por `pedir` como todo lo demas (Plan 20 Fase 4). Esta llamada era la
+       * unica de la aplicacion que escribia la ruta a pelo, sin `API_BASE`:
+       * con `VITE_API_BASE` apuntando a otro backend, exportar era lo unico
+       * que seguia hablando con el origen de la pagina. No daba error, daba un
+       * PDF que venia del servidor equivocado.
+       */
+      const r = await pedir("/api/chat/exportar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ historial }),

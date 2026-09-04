@@ -750,7 +750,69 @@ Todo §5.1 de una vez. `App.jsx` queda montando `<Asistente />` sin router. Se
 retiran las cinco dependencias. Se borran las pruebas de §7.4.
 **Verde:** `npm run build` compila; `npm test` pasa con lo que queda.
 
-### F4 · Login en la UI
+### F4 · Login en la UI — **HECHA**
+
+> Ejecutada el 04-09-2026. Frontend: **19 archivos / 179 pruebas** en verde.
+>
+> #### La decisión de fondo: una sola puerta a la API
+>
+> Había **diecisiete `fetch` repartidos en cinco archivos**, y la sesión añade
+> dos obligaciones a cada uno: mandar la cookie e interpretar el 401. Hacerlo
+> sitio por sitio eran diecisiete oportunidades de olvidarlo, y el olvido no da
+> un fallo ruidoso — da una pantalla que no carga y un error genérico donde
+> debería haber un formulario de login.
+>
+> Nace `lib/api/pedir.js` y **hoy no queda un solo `fetch` fuera de él**. Trajo
+> tres cosas que no estaban en el plan:
+>
+> - **Un defecto latente reparado de paso.** `Asistente.jsx` pedía
+>   `fetch("/api/chat/exportar")` **sin `API_BASE`**: era la única llamada de la
+>   aplicación que escribía la ruta a pelo. Con `VITE_API_BASE` apuntando a otro
+>   backend, exportar seguía hablando con el origen de la página. No daba error;
+>   daba un PDF del servidor equivocado.
+> - **`parseResponse` estaba copiado literal** en `casosApi.js` y `ragApi.js`.
+>   La capa que interpreta errores de la API no puede estar en dos sitios: con
+>   la sesión de por medio habría además dos lugares donde acertar a distinguir
+>   un 401 de caducidad de uno de permisos.
+> - **`credentials: "include"` no es opcional.** En planta la API es del mismo
+>   origen y el defecto bastaría; con `VITE_API_BASE` apuntando fuera, la
+>   petición pasa a ser cruzada y el defecto omite la cookie — el login
+>   funcionaría y la pantalla siguiente daría 401.
+>
+> #### La distinción que sostiene todo
+>
+> **Sólo un 401 con `motivo: "sesion"` expulsa.** El 401 que devuelve ICONICS
+> cuando alguien pide un punto sobre el que no tiene permiso NO puede cerrar la
+> sesión: sería perder una conversación de minuto y medio por consultar un dato
+> prohibido. Los dos extremos del cable están probados —que se distinga, en
+> `apiClient.test.js`; que el aviso se recoja, en `sesion-caducada.test.jsx`—.
+>
+> #### Caducar y salir son dos caminos, no uno
+>
+> - **Caducar** devuelve al login y **conserva la conversación**. Es lo normal
+>   en planta: preguntar, ir a mirar la máquina, volver.
+> - **Salir** la borra. En un equipo compartido, quien pulsa «Salir» no espera
+>   que el siguiente turno lea lo que preguntó.
+>
+> #### Código muerto que la fase destapó
+>
+> `apiClient.js` exportaba **diez funciones y sólo tres tenían consumidor**. Las
+> otras siete —historia, historia en lote, escritura, escritura en lote,
+> alarmas, reconocimiento de alarmas y salud— murieron con el tablero. Peor: su
+> archivo de prueba cubría **exclusivamente** funciones muertas y pasaba en
+> verde, que es peor que no tenerlo porque da confianza sobre nada. Reescrito
+> sobre las tres vivas más las dos garantías nuevas de la sesión.
+>
+> #### Un hueco funcional que había que tapar aquí
+>
+> `SesionProvider` sabía salir y **nada en la interfaz podía llamarlo**. En un
+> equipo compartido eso no es incomodidad: es que el turno siguiente hereda la
+> sesión del anterior, con sus permisos de escritura sobre la planta. Se añade
+> `auth/BarraSesion.jsx`, mínima y declarada como provisional — la Fase 5 la
+> absorbe en la cabecera del chat. Va **fuera** de la frontera de errores: si el
+> chat revienta, salir tiene que seguir funcionando.
+
+### F4 (original) · Login en la UI
 `auth/SesionProvider.jsx` + `auth/Login.jsx`. `App.jsx` decide entre login y
 asistente según `GET /api/sesion`. Los clientes de `lib/api/` mandan
 `credentials: 'include'` y, ante un 401 con `motivo:'sesion'`, disparan la
@@ -758,7 +820,34 @@ vuelta al login **sin borrar el hilo de la conversación**
 (`features/asistente/lib/persistencia.js` ya lo guarda).
 **Verde:** pruebas nuevas de §7.3.
 
-### F4.5 · `PRODUCT.md` y `DESIGN.md`, ANTES de diseñar
+### F4.5 · `PRODUCT.md` y `DESIGN.md`, ANTES de diseñar — **HECHA**
+
+> Ejecutada el 04-09-2026, junto con la F4.
+>
+> `PRODUCT.md` cambia de usuario: ya no es un prospecto en demostración mirando
+> un tablero, sino **un técnico delante del equipo con una avería y las manos
+> ocupadas**. De ahí sale la restricción que gobierna el diseño y que antes no
+> figuraba: una respuesta tarda entre 30 y 90 segundos.
+>
+> `DESIGN.md` cambia de estrella polar. «El Gemelo Digital» —la instalación
+> existiendo dos veces, como geometría y como número— se apagó con las vistas
+> 3D. La nueva es **«el instrumento que contesta»**, y de ella se derivan las
+> reglas de la espera y del trazo. La sección «Navigation» se sustituye por
+> «Cajones», con la regla de que no son pestañas ni tienen URL.
+>
+> **Deuda encontrada al revisar la paleta, anotada en `DESIGN.md`:** el gráfico
+> que devuelve `grafico_de_senal` lleva sus colores escritos a mano en
+> `shared/eva/comun/graficos.js`, y (a) su azul `#2563eb` no es el azul de marca
+> `#3654E0` —son parecidos, que es lo peor: no se lee como una decisión— y (b)
+> siempre es claro, así que con el tema oscuro aparece una lámina blanca en
+> mitad de una conversación oscura. No se arregla aquí porque el SVG lo genera
+> el backend y la corrección tiene que decidir si el tema viaja en la petición.
+> Es trabajo de la Fase 5.
+>
+> La paleta `viz` se queda **sin ningún consumidor** al irse las gráficas del
+> tablero. No se borra: es la referencia con la que hay que alinear ese SVG.
+
+### F4.5 (original) · `PRODUCT.md` y `DESIGN.md`, ANTES de diseñar
 
 Fase corta y de sólo documentación, y va aquí por una razón mecánica que
 descoloca el orden natural: **`/impeccable shape` arranca ejecutando

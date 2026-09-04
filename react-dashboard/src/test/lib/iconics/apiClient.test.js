@@ -1,108 +1,143 @@
 /**
  * apiClient.test.js
  * ------------------------------------------------------------------
- * Plan 13, Fase 9 (F1): las tres funciones nuevas del cliente —
- * `fetchIconicsAlarms`, `acknowledgeIconicsAlarms`, `fetchHealth`—, que
- * hasta ahora no tenían ni un contrato comprobado: `apiClient.js` entero
- * llegaba a esta fase sin una sola prueba.
+ * El contrato con el puente: qué URL se arma, qué se espera de vuelta y qué
+ * pasa cuando contesta mal.
  *
- * Se mockea `fetch` global: lo que importa aquí es que cada función arme la
- * URL y el verbo correctos y respete el contrato de error del resto del
- * archivo (`ok: false` o HTTP no-2xx → excepción), no la red real.
+ * ── POR QUÉ ESTE ARCHIVO CAMBIÓ DE SUJETO (PLAN 20 FASES 3 Y 4) ────
+ *
+ * Cubría `fetchIconicsAlarms`, `acknowledgeIconicsAlarms` y `fetchHealth`:
+ * las tres únicas de `apiClient.js` que probaba, y **las tres murieron con sus
+ * consumidores** —la vista de Alarmas y el banner de estado del layout—. Una
+ * suite en verde midiendo código que la aplicación no ejecuta es peor que no
+ * tenerla: da confianza sobre nada.
+ *
+ * Ahora cubre las tres que quedan, que son exactamente las que usa el cajón de
+ * Assets, más las dos garantías que la Fase 4 añadió a TODA petición:
+ *
+ *  - que la cookie de sesión viaje (`credentials: "include"`), y
+ *  - que un 401 de caducidad se distinga de un 401 de permisos.
+ *
+ * Se mockea `fetch` global: lo que importa es que cada función arme bien su
+ * petición e interprete bien la respuesta, no que la red funcione.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { acknowledgeIconicsAlarms, fetchHealth, fetchIconicsAlarms } from "@/lib/iconics/apiClient.js";
+import { browseIconics, fetchIconicsBatch, fetchIconicsPoint } from "@/lib/iconics/apiClient.js";
+import { ErrorDeSesion, alCaducarSesion } from "@/lib/api/pedir.js";
+
+function responde(cuerpo, { status = 200 } = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.resolve(cuerpo),
+    text: () => Promise.resolve(JSON.stringify(cuerpo)),
+    clone() {
+      return this;
+    },
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(responde({ ok: true, payload: {} }))));
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
-function mockFetch(status, body) {
-  const llamada = vi.fn(async () => ({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  }));
-  vi.stubGlobal("fetch", llamada);
-  return llamada;
-}
+/** La URL de la última llamada, sin repetir el índice mágico en cada prueba. */
+const urlPedida = () => fetch.mock.calls.at(-1)[0];
+const opcionesPedidas = () => fetch.mock.calls.at(-1)[1];
 
-describe("fetchIconicsAlarms", () => {
-  it("pide /api/iconics/alarms con las horas pedidas, sin pointName si no se da", async () => {
-    const llamada = mockFetch(200, { alarms: [{ eventId: "e1", startDate: "2026-08-20 10:00:00" }] });
-    const r = await fetchIconicsAlarms(undefined, 6);
-
-    const url = new URL(llamada.mock.calls[0][0], "http://x");
-    expect(url.pathname).toBe("/api/iconics/alarms");
-    expect(url.searchParams.get("hours")).toBe("6");
-    expect(url.searchParams.has("pointName")).toBe(false);
-    expect(r.alarms).toHaveLength(1);
+describe("las tres lecturas del cajón de Assets", () => {
+  it("fetchIconicsPoint codifica el nombre del punto", async () => {
+    await fetchIconicsPoint("ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE");
+    expect(urlPedida()).toContain("/api/iconics/data?pointName=ac%3ATDCON");
   });
 
-  it("con pointName, lo añade a la query", async () => {
-    const llamada = mockFetch(200, { alarms: [] });
-    await fetchIconicsAlarms("ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE", 1);
-
-    const url = new URL(llamada.mock.calls[0][0], "http://x");
-    expect(url.searchParams.get("pointName")).toBe("ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE");
+  it("fetchIconicsPoint sin nombre no manda una query vacía", async () => {
+    /*
+     * Sin punto, el backend usa `ICONICS_POINT_NAME`. Mandar `?pointName=`
+     * sería pedir explícitamente el punto vacío, que es otra cosa.
+     */
+    await fetchIconicsPoint();
+    expect(urlPedida()).toMatch(/\/api\/iconics\/data$/);
   });
 
-  it("sin horas explícitas, pide 1 — la misma hora por defecto que ya documenta el backend", async () => {
-    const llamada = mockFetch(200, { alarms: [] });
-    await fetchIconicsAlarms();
-    const url = new URL(llamada.mock.calls[0][0], "http://x");
-    expect(url.searchParams.get("hours")).toBe("1");
+  it("fetchIconicsBatch manda los puntos separados por coma y codificados", async () => {
+    await fetchIconicsBatch(["ac:uno", "ac:dos"]);
+    expect(urlPedida()).toContain("points=ac%3Auno,ac%3Ados");
   });
 
-  it("un ok:false del servidor se propaga como excepción, con el motivo si lo trae", async () => {
-    mockFetch(200, { ok: false, error: "ICONICS_API_BASE is not configured." });
-    await expect(fetchIconicsAlarms()).rejects.toThrow("ICONICS_API_BASE is not configured.");
+  it("browseIconics sin ruta pide las raíces", async () => {
+    await browseIconics();
+    expect(urlPedida()).toMatch(/\/api\/iconics\/browse$/);
   });
 
-  it("un 500 sin ok:false también se propaga, con un mensaje genérico si no trae error", async () => {
-    mockFetch(500, {});
-    await expect(fetchIconicsAlarms()).rejects.toThrow(/Error 500/);
+  it("browseIconics con ruta la codifica", async () => {
+    await browseIconics("ac:TDCON/DEMO/");
+    expect(urlPedida()).toContain("browse?path=ac%3ATDCON%2FDEMO%2F");
   });
 });
 
-describe("acknowledgeIconicsAlarms", () => {
-  it("llama con PUT, y manda eventIds + comment en el cuerpo", async () => {
-    const llamada = mockFetch(200, { ok: true, result: { acknowledged: 1 } });
-    const r = await acknowledgeIconicsAlarms(["e1", "e2"], "revisado en turno");
-
-    const [url, opciones] = llamada.mock.calls[0];
-    expect(String(url)).toContain("/api/iconics/alarms/acknowledge");
-    expect(opciones.method).toBe("PUT");
-    expect(JSON.parse(opciones.body)).toEqual({ eventIds: ["e1", "e2"], comment: "revisado en turno" });
-    expect(r.result.acknowledged).toBe(1);
+describe("el contrato de error", () => {
+  it("un ok:false con 200 se propaga como excepción, con el motivo del servidor", async () => {
+    /*
+     * El puente responde 200 con `ok:false` cuando ICONICS contesta pero mal.
+     * Tratarlo como éxito metería un `undefined` en la pantalla sin decir nada.
+     */
+    fetch.mockResolvedValueOnce(responde({ ok: false, error: "El punto no existe." }));
+    await expect(fetchIconicsPoint("ac:fantasma")).rejects.toThrow("El punto no existe.");
   });
 
-  it("sin comment, manda cadena vacía — no undefined, que rompería JSON.stringify en el servidor", async () => {
-    const llamada = mockFetch(200, { ok: true, result: {} });
-    await acknowledgeIconicsAlarms(["e1"]);
-    expect(JSON.parse(llamada.mock.calls[0][1].body).comment).toBe("");
-  });
-
-  it("un 403 (modo solo lectura) se propaga como excepción, no como un ok:false silencioso", async () => {
-    mockFetch(403, { ok: false, error: "El servidor está en modo solo lectura (ICONICS_READ_ONLY=true)." });
-    await expect(acknowledgeIconicsAlarms(["e1"])).rejects.toThrow(/solo lectura/);
+  it("un 500 sin `error` se propaga con un mensaje que nombra la ruta", async () => {
+    fetch.mockResolvedValueOnce(responde({}, { status: 500 }));
+    await expect(fetchIconicsPoint("ac:x")).rejects.toThrow(/\/api\/iconics\/data/);
   });
 });
 
-describe("fetchHealth", () => {
-  it("lee /api/health y devuelve el cuerpo tal cual, incluido readOnly", async () => {
-    mockFetch(200, { status: "ok", readOnly: true, iconicsReachable: true, tokenValid: true });
-    const r = await fetchHealth();
-    expect(r.readOnly).toBe(true);
+describe("la sesión viaja en cada petición (Plan 20 Fase 4)", () => {
+  it("siempre con credentials: include", async () => {
+    /*
+     * En planta la API es del mismo origen y el defecto ya mandaría la cookie.
+     * Con `VITE_API_BASE` apuntando a otro servidor la petición pasa a ser
+     * cruzada y el defecto la omite: el login funcionaría y la pantalla
+     * siguiente daría 401.
+     */
+    await browseIconics();
+    expect(opcionesPedidas()).toMatchObject({ credentials: "include" });
   });
 
-  it("no exige un campo ok explícito: /api/health nunca lo trae, y no debe fallar por eso", async () => {
-    // Confirmado en el propio backend (routes/systemRoutes.mjs): la
-    // respuesta de /api/health no tiene `ok`, sólo `status`. Si getJson()
-    // exigiera `ok === true` en vez de sólo comprobar que no sea `false`,
-    // esta llamada fallaría siempre y ninguna vista de salud funcionaría.
-    mockFetch(200, { status: "ok", readOnly: false });
-    await expect(fetchHealth()).resolves.toMatchObject({ readOnly: false });
+  it("un 401 de caducidad avisa a quien escucha y lanza ErrorDeSesion", async () => {
+    const avisado = vi.fn();
+    const baja = alCaducarSesion(avisado);
+
+    fetch.mockResolvedValueOnce(
+      responde({ ok: false, motivo: "sesion", error: "Tu sesión ha caducado." }, { status: 401 })
+    );
+
+    await expect(browseIconics()).rejects.toBeInstanceOf(ErrorDeSesion);
+    expect(avisado).toHaveBeenCalledOnce();
+    baja();
+  });
+
+  it("un 401 SIN motivo de sesión no expulsa a nadie", async () => {
+    /*
+     * Es el que devuelve ICONICS cuando el usuario no tiene permiso sobre un
+     * punto. Uniformarlo con el de caducidad haría que pedir un dato prohibido
+     * cerrara la sesión y borrara la conversación en curso.
+     */
+    const avisado = vi.fn();
+    const baja = alCaducarSesion(avisado);
+
+    fetch.mockResolvedValueOnce(
+      responde({ ok: false, error: "No tienes permiso sobre ese punto." }, { status: 401 })
+    );
+
+    await expect(browseIconics()).rejects.not.toBeInstanceOf(ErrorDeSesion);
+    expect(avisado).not.toHaveBeenCalled();
+    baja();
   });
 });

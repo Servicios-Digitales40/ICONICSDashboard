@@ -121,39 +121,47 @@ components:
     padding: "20px 22px 24px"
 ---
 
-# Design System: Demo EVA
+# Design System: Asistente de planta
 
 ## Overview
 
-**Creative North Star: "El Gemelo Digital"**
+**Creative North Star: "El instrumento que contesta"**
 
-La instalación de agua existe dos veces: como geometría en las vistas 3D y como
-número en las tablas y las series. El sistema visual entero está construido
-sobre la idea de que ambas son **la misma verdad vista de dos formas**, nunca
-dos aplicaciones cosidas. Un valor que sube en la gráfica es el mismo que llena
-el tanque de la maqueta, y el diseño debe hacer evidente ese parentesco: los
-mismos colores semánticos gobiernan el 3D y el 2D, y una lectura fuera de banda
-se ve coral en los dos sitios.
+Antes esta aplicación era un gemelo digital: la instalación existía dos veces,
+como geometría en las vistas 3D y como número en las series, y el sistema visual
+entero servía para hacer evidente ese parentesco. Esa estrella se apagó con las
+veintidós pantallas (Plan 20 Fase 3).
 
-La personalidad es instrumental y contenida. El fondo es un gris-azulado casi
-blanco (`page`) sobre el que flotan superficies blancas de esquina generosa; el
-color aparece poco y siempre significa algo. La densidad es media-alta —cuerpo
-de 13px, padding de 9/16— porque el escenario real es un portátil o un monitor
-de escritorio a distancia de lectura, no una pantalla de pared. El modo oscuro
-no es el claro invertido: es una segunda selección hecha contra su propio fondo,
-con la marca de color aclarada para sobrevivir sobre `#0B0E16`.
+Lo que queda es **una conversación con un instrumento de medida**. No un chat
+genérico con una capa de producto encima: un aparato que consulta la planta
+delante de ti y enseña de dónde sacó cada cifra. De ahí sale todo lo demás.
 
-El movimiento es de entrada y de respuesta, nunca decorativo: los paneles suben
-al aparecer en cascada corta y se levantan 2px cuando el cursor los toca. Todo
-ello se apaga bajo `prefers-reduced-motion`.
+La restricción que manda no es estética, es física: **una respuesta tarda entre
+30 y 90 segundos.** Un minuto y medio mirando una pantalla es tiempo suficiente
+para dudar de si el botón llegó a pulsarse. Por eso el estado se dice con
+palabras («Consultando ICONICS…») y con los segundos que lleva, siempre se
+puede cancelar, cancelar se cuenta en gris y no como fallo, y un turno que acaba
+en nada se repite con un botón en vez de reescribiendo la pregunta.
+
+El trazo que se dibuja mientras el texto llega **es identidad estructural, no
+decoración**: se deriva de los caracteres que de verdad han llegado, nunca de
+una onda que se mueve sola. Un instrumento que finge una señal deja de ser un
+instrumento. Toma el color de `t.accent`, así que brilla en el color que cada
+tema llama «su señal» en vez de tener un cuarto mundo visual propio.
+
+La personalidad sigue siendo instrumental y contenida: fondo gris-azulado casi
+blanco, superficies blancas de esquina generosa, el color aparece poco y
+siempre significa algo. Lo que cambia es la densidad de la mirada — antes se
+barrían ocho tarjetas de un vistazo; ahora se lee un texto largo y se comprueba
+su evidencia. La medida de línea importa más que la retícula.
 
 **Key Characteristics:**
 
 - Superficie blanca sobre fondo gris-azulado; la jerarquía nace del tono, no del peso.
 - Un solo azul de marca, casi siempre en gradiente de 135°, reservado a lo accionable.
-- Tres tipografías con trabajos disjuntos: geométrica para títulos, neogrotesca para texto, monoespaciada para identificadores de máquina.
+- Dos tipografías con trabajos disjuntos: neogrotesca para prosa, monoespaciada para todo lo que sea una MEDIDA (valor, unidad, marca de tiempo, nombre de punto).
 - Esquinas de dos tamaños: 16px para contenedores, 9px para controles.
-- Dos paletas separadas por función: la de interfaz y la de datos (`viz`).
+- La espera es un elemento de diseño de primer orden, no un estado de excepción.
 
 ## Colors
 
@@ -317,11 +325,24 @@ No hay líneas dobles, ni esquinas cortadas, ni bordes de más de 1px.
 - **Focus:** anillo de 3px en `accent-soft` más borde en `accent`. Vive en la clase `.field` porque una pseudo-clase no puede leer el estado de React.
 - **Error / Success:** el borde pasa a Coral o Verde y aparece un icono de 14px a la derecha; el mensaje de error va debajo, 11.5px en Coral.
 
-### Navigation
+### Cajones
 
-- Sidebar sobre Superficie con ítems de 13px. El activo se marca con fondo `accent-soft` y texto `accent`; el hover no activo usa `--color-hover` desde CSS.
-- Los grupos (`NAV_GROUPS`) se pliegan bajo una cabecera con icono; el grupo aparece en la posición de su primer hijo.
-- Iconos de lucide-react a 17px, alineados por su caja, no por su trazo.
+No hay navegación. Sidebar, grupos plegables (`NAV_GROUPS`) y barra superior se
+fueron con las veintidós pantallas: **esta aplicación tiene una sola vista** y
+un segundo destino navegable sería el primer paso para volver a tenerlas.
+
+Lo que haya que enseñar aparte se enseña en un **cajón**: un panel lateral
+dentro de la misma vista, que se abre desde la barra del chat y se cierra con
+Escape. Son tres —Assets, Manuales y Casos— y comparten reglas:
+
+- **No son pestañas.** Un cajón se abre sobre la conversación, no la sustituye:
+  al cerrarlo se vuelve exactamente a donde se estaba, con el hilo intacto.
+  Convertirlos en pestañas sería recrear la navegación por la puerta de atrás.
+- **No tienen URL.** No se puede enlazar a un cajón ni llegar a él recargando.
+- **Existen por lo que ALIMENTAN**, no por lo que enseñan: Assets diagnostica un
+  dato que falta, Manuales es el único camino por el que entra conocimiento
+  externo, y Casos es la única fuente que se llena sola y por tanto la única
+  que puede degradarse sin que nadie haga nada.
 
 ### SectionLabel
 
@@ -338,16 +359,31 @@ separa dos bloques dentro de una vista sin recurrir a una línea horizontal.
 - **Do** usar 16px de radio para lo que contiene y 9px para lo que se pulsa.
 - **Do** poner en IBM Plex Mono todo identificador que venga del servidor.
 - **Do** declarar el `@media` junto al layout que gobierna, con el porqué del ancho.
-- **Do** dejar sin unidad los valores cuyo tag no la declara: cuatro de las ocho señales no tienen unidad y el diseño debe verse bien sin sufijo.
+- **Do** dejar sin unidad los valores cuyo tag no la declara: varias señales no la tienen y el diseño debe verse bien sin sufijo.
 - **Do** revalidar contraste y daltonismo al tocar la paleta `viz`, empezando por la separación ámbar/verde.
 - **Do** apagar toda animación bajo `prefers-reduced-motion`, incluidos los `animation-delay`.
 
 ### Don't:
 
-- **Don't** usar un color de `viz` en un botón, un borde o un texto, ni un token de interfaz como relleno de gráfica.
+- **Don't** usar un color de `viz` en un botón, un borde o un texto, ni un token de interfaz como relleno de gráfica. **`viz` se ha quedado sin consumidor** al irse las gráficas del tablero: se conserva como referencia porque el asistente SÍ enseña gráficos —los dibuja el servidor en `shared/eva/comun/graficos.js`— y esa paleta hay que alinearla (ver la nota de abajo).
 - **Don't** pintar de verde, ámbar o coral nada que no esté en ese estado.
 - **Don't** derivar el tema oscuro del claro por fórmula; cada valor se elige contra su fondo.
 - **Don't** pasar de 16px en ningún texto ni introducir un cuarto nivel de tinta.
 - **Don't** añadir un radio intermedio (10px, 12px) ni un borde de más de 1px.
 - **Don't** elevar más de 3px en hover, ni poner sombra a un elemento que no sea tarjeta, botón primario o campo con foco.
 - **Don't** ofrecer una escritura sin condicionarla a `readOnly` de `/api/health`. Esto dejó de decir «el backend es de solo lectura» con `controlar_bomba` (el asistente) y el *ack* de alarmas (Plan 13, Fase 9): la escritura ya existe, pero sigue la misma norma de fondo — va siempre detrás de la confirmación del servidor y se anuncia antes de ejecutarse, porque un botón que puede fallar es peor que su ausencia.
+
+## Deuda conocida: el gráfico que dibuja el servidor
+
+`grafico_de_senal` devuelve un SVG que el chat enseña dentro de un `<img>`, y
+sus colores están escritos a mano en `shared/eva/comun/graficos.js`
+(`serie: '#2563eb'`, `fondo: '#ffffff'`). Dos consecuencias medibles:
+
+1. **El azul no es el azul de la marca.** `#2563eb` contra `t.accent` `#3654E0`.
+   Son parecidos, que es lo peor: no se lee como una decisión.
+2. **El gráfico siempre es claro.** Con el tema oscuro, una lámina blanca
+   aparece en mitad de una conversación oscura.
+
+No se arregla aquí porque el SVG lo genera el backend y la corrección tiene
+que decidir si el tema viaja en la petición o si el gráfico se pinta con
+`currentColor`. Queda anotado para la Fase 5.
