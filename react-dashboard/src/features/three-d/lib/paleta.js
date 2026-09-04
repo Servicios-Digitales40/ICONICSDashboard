@@ -55,6 +55,20 @@ export function construirPaleta(theme, dark) {
     // porque conviene que se distinga del resto del inoxidable: es la pieza que
     // explica de dónde sale el número que mueve el líquido de la columna.
     sensor: dark ? "#4CC7DF" : "#2C9EBC",
+    // ── El banco de rotor (`Vibraciones3D`) ────────────────────────
+    //
+    // Van aquí por lo mismo que `deposito` y `valvula`: son el color REAL del
+    // equipo, no un token de interfaz, y por eso no siguen al acento — un tema
+    // con el acento rojo no debe repintar de rojo un motor que es azul.
+    //
+    // El motor WEG y las dos chumaceras comparten azul porque lo comparten en
+    // el banco de verdad. No las separa el color sino la silueta, que es el
+    // canal que sobrevive a la distancia y al daltonismo.
+    motorAzul: dark ? "#2C5FA8" : "#245089",
+    // El perfil de aluminio ranurado de la bancada. Más claro y más frío que
+    // `metal`, que es el acero del eje: si salieran del mismo color, el eje se
+    // perdería contra la base justo cuando gira, que es cuando informa.
+    aluminio: dark ? "#7E8798" : "#C2C8D2",
     carcasaOscura: dark ? "#5A6478" : "#8892A6",
     metal: dark ? "#C7CEDC" : "#9AA3B4",
     goma: dark ? "#2A3140" : "#3C4353",

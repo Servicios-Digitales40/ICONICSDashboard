@@ -230,13 +230,14 @@ export const ROUTES = [
   },
 
   {
-    // Todavía sin construir, y en el sidebar a propósito: el sitio está
-    // decidido y el contenido no. Ver la cabecera de la vista para por qué no
-    // hay una escena provisional mientras tanto.
+    // Estuvo en el sidebar vacía a propósito —el sitio decidido y el contenido
+    // no— hasta el 04-09-2026, cuando el levantamiento de campo dio la
+    // geometría real del tren de rotor. La cabecera de la vista cuenta qué
+    // desbloqueó exactamente, y por qué antes no valía una escena provisional.
     id: "vib-3d",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
     title: "Vista 3D · Vibraciones",
-    sub: "Gemelo digital del sistema de vibraciones · todavía sin construir",
+    sub: "Banco de rotor · dónde mide cada sonda, y en qué dirección",
     nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-vibraciones" },
   },
 
