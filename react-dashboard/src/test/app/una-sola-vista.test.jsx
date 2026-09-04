@@ -98,7 +98,13 @@ describe("§2.12 — una sola vista", () => {
   it("App.jsx monta el asistente y nada más", () => {
     const app = sinComentarios(readFileSync(join(SRC, "app", "App.jsx"), "utf8"));
 
-    expect(app).toMatch(/<Asistente\s*\/>/);
+    /*
+     * Se comprueba que se MONTA, no cómo: desde la Fase 5 recibe `usuario` y
+     * `salir` por props —`features/asistente/` no sabe que existe la
+     * autenticación— y una expresión que exigiera `<Asistente />` a secas
+     * fallaría por un cambio de cableado que no tiene nada que ver con §2.12.
+     */
+    expect(app).toMatch(/<Asistente[\s/>]/);
     /*
      * `lazy(` era el mecanismo con el que se cargaba cada vista bajo demanda.
      * Sin destinos no hay nada que cargar bajo demanda, así que su vuelta

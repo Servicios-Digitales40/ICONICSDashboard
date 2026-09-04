@@ -61,6 +61,65 @@ button {
   --grad-accent: linear-gradient(135deg, #c40001 0%, #ff5454 100%);
 }
 
+/*
+ * ── LO QUE DIBUJA EL NAVEGADOR TAMBIÉN ES DISEÑO ───────────────────
+ *
+ * La selección de texto, el cursor de escritura y la barra de desplazamiento
+ * salen de fábrica con los colores del sistema operativo, que no pertenecen a
+ * ningún sistema de diseño. En una aplicación de una sola vista con un texto
+ * largo en el centro, las tres se ven CONSTANTEMENTE: seleccionar una cifra
+ * para copiarla es el gesto más repetido de esta pantalla, y hasta ahora
+ * pintaba un azul de Windows encima de la respuesta.
+ *
+ * Se tematizan aquí y no en JS porque son pseudo-elementos: React no los
+ * alcanza. (`impeccable`, craft floor: es lo que más se salta y lo que más
+ * barato distingue una página construida de una ensamblada.)
+ */
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+input,
+textarea {
+  caret-color: var(--color-accent);
+}
+
+/*
+ * La barra de desplazamiento del hilo. Fina y del color del borde: es una
+ * conversación larga y la barra está a la vista todo el rato, así que compite
+ * con el texto si lleva el gris del sistema.
+ *
+ * `scrollbar-width`/`scrollbar-color` es el estándar (Firefox y Chrome
+ * modernos); las reglas `::-webkit-` cubren los WebKit que aún no lo
+ * implementan. Se declaran las dos: en planta hay navegadores viejos.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+  background-clip: padding-box;
+}
+
 /* Utilidades que dependen de las variables de arriba */
 .field:focus {
   outline: none;

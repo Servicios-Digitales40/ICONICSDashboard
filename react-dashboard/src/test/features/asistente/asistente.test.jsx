@@ -125,16 +125,23 @@ function backend({ habilitado, eventos = [], fallo }) {
  * secuencia real de teclas, solo el efecto de enviar.
  */
 async function preguntar(texto = "¿OEE de la Línea 1?") {
-  // Solo hay que abrirlo la primera vez; en las siguientes ya está abierto y
-  // el botón flotante no existe.
-  if (!screen.queryByRole("dialog")) {
-    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
-  }
-  fireEvent.change(screen.getByLabelText("Escribe tu pregunta"), { target: { value: texto } });
+  /*
+   * Ya no hay que abrir nada: desde la Fase 5 del Plan 20 el asistente ES la
+   * pantalla, no un panel que se despliega desde un botón flotante. Se espera
+   * al campo, que sólo aparece cuando el servidor ha dicho que hay modelo.
+   */
+  const campo = await screen.findByLabelText("Escribe tu pregunta");
+  fireEvent.change(campo, { target: { value: texto } });
   fireEvent.click(screen.getByLabelText("Enviar la pregunta"));
 }
 
 describe("cuándo existe el asistente", () => {
+  /*
+   * Sigue decidiendo el servidor, y sigue importando: sin `IA_BASE` esta
+   * aplicación no tiene NADA que enseñar —es una sola vista y esa vista es el
+   * chat—, así que pintar un campo de preguntas inerte sería prometer algo que
+   * el backend no puede cumplir.
+   */
   it("sin modelo configurado en el servidor, no se pinta nada", async () => {
     backend({ habilitado: false });
     montar();
@@ -142,28 +149,70 @@ describe("cuándo existe el asistente", () => {
     // Se espera a que la comprobación termine para no confundir «aún no
     // sabemos» con «no hay».
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
+    expect(screen.queryByLabelText("Escribe tu pregunta")).toBeNull();
   });
 
-  it("si el backend no conoce la ruta, tampoco: el tablero sigue igual", async () => {
+  it("si el backend no conoce la ruta, tampoco", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("404"));
     montar();
 
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-    expect(screen.queryByLabelText("Abrir Tdconcito")).toBeNull();
+    expect(screen.queryByLabelText("Escribe tu pregunta")).toBeNull();
   });
 
-  it("con modelo configurado aparece el botón, y abre el panel", async () => {
+  it("con modelo configurado, la pantalla ES la conversación", async () => {
     backend({ habilitado: true });
     montar();
 
-    // El nombre accesible sale de `NOMBRE` en `Asistente.jsx`, que es lo que
-    // hace que el rótulo visible y el que anuncia un lector de pantalla no
-    // puedan separarse. Fue «Asistente de planta», luego «Asistente de la
-    // instalación», y hoy es «Tdconcito».
-    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
-    expect(screen.getByRole("dialog", { name: "Tdconcito" })).toBeTruthy();
-    expect(screen.getByLabelText("Escribe tu pregunta")).toBeTruthy();
+    /*
+     * No hay botón que pulsar ni diálogo que abrir. El campo está ahí desde el
+     * primer fotograma útil, que es la diferencia entre un panel y una
+     * aplicación.
+     */
+    expect(await screen.findByLabelText("Escribe tu pregunta")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("los seis ejemplos se ofrecen antes de la primera pregunta", async () => {
+    /*
+     * Detrás hay veintidós herramientas y el técnico no puede adivinarlas. El
+     * quinto es el que más trabajo hace: es el único que enseña que al
+     * asistente se le puede CONTAR algo, no sólo preguntarle.
+     */
+    backend({ habilitado: true });
+    montar();
+
+    await screen.findByLabelText("Escribe tu pregunta");
+    expect(screen.getByText("Ya cambié la histéresis, apúntalo")).toBeTruthy();
+    expect(screen.getByText("¿Por qué se disparó el riesgo de cavitación?")).toBeTruthy();
+  });
+
+  it("la cabecera enseña quién está dentro y cómo salir", async () => {
+    backend({ habilitado: true });
+    const salir = vi.fn();
+    render(
+      <ThemeProvider>
+        <Asistente usuario="ana.tecnica" salir={salir} />
+      </ThemeProvider>
+    );
+
+    await screen.findByLabelText("Escribe tu pregunta");
+    expect(screen.getByText("ana.tecnica")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Cerrar sesión"));
+    expect(salir).toHaveBeenCalledOnce();
+  });
+
+  it("sin usuario, la cabecera no finge uno anónimo", async () => {
+    /*
+     * `features/asistente/` no sabe que existe la autenticación: recibe el
+     * usuario por props. Sin él no pinta el bloque — no inventa un «invitado».
+     */
+    backend({ habilitado: true });
+    montar();
+
+    await screen.findByLabelText("Escribe tu pregunta");
+    expect(screen.queryByLabelText("Cerrar sesión")).toBeNull();
   });
 });
 
@@ -403,7 +452,16 @@ describe("cuando la espera se tuerce", () => {
     await waitFor(() => expect(screen.getByText(/61,9/)).toBeTruthy());
   });
 
-  it("si la respuesta llega con el panel cerrado, el botón lo avisa", async () => {
+  it("si la respuesta llega con un cajón tapando el hilo, el cajón lo avisa", async () => {
+    /*
+     * El panel ya no se cierra —es la aplicación— pero el problema sobrevive
+     * con otro disfraz: consultar un manual mientras se espera es exactamente
+     * lo que alguien hace durante minuto y medio de espera, y sin aviso la
+     * respuesta se queda ahí sin que nadie la lea.
+     *
+     * El cajón NO se cierra solo al llegar: eso sería arrancarle de las manos
+     * a alguien lo que estaba leyendo. Ofrece el camino de vuelta.
+     */
     const enCurso = flujoAbierto();
     backendPorTurnos([enCurso.respuesta]);
     montar();
@@ -411,14 +469,16 @@ describe("cuando la espera se tuerce", () => {
     await preguntar();
     await waitFor(() => expect(screen.getByText("Cancelar")).toBeTruthy());
 
-    // Cerrar y volver al tablero durante minuto y medio de espera es lo
-    // natural; sin aviso, la respuesta se queda ahí sin que nadie la lea.
-    fireEvent.click(screen.getByLabelText("Cerrar Tdconcito"));
+    fireEvent.click(screen.getByLabelText("Manuales (panel lateral)"));
+    expect(screen.getByRole("dialog", { name: "Manuales" })).toBeTruthy();
+
     enCurso.emitir({ tipo: "texto", delta: "62,4 %." });
     enCurso.emitir({ tipo: "fin", herramienta: "historia_de_senal", bloqueada: false });
     enCurso.cerrar();
 
-    expect(await screen.findByLabelText(/La respuesta está lista/)).toBeTruthy();
+    const volver = await screen.findByText("Respuesta lista");
+    fireEvent.click(volver);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
@@ -433,28 +493,27 @@ describe("los ejemplos", () => {
       ],
     });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+    await screen.findByLabelText("Escribe tu pregunta");
 
     // Parece un botón de preguntar: pedir un segundo gesto para lo que ya se
     // había pulsado sobra.
-    fireEvent.click(screen.getByText("¿Cómo va la instalación ahora mismo?"));
+    fireEvent.click(screen.getByText("¿Cómo está el tanque ahora mismo?"));
 
     await waitFor(() => expect(enviados.length).toBe(1));
-    expect(enviados[0].pregunta).toBe("¿Cómo va la instalación ahora mismo?");
+    expect(enviados[0].pregunta).toBe("¿Cómo está el tanque ahora mismo?");
     await waitFor(() => expect(screen.getByText(/58 %/)).toBeTruthy());
   });
 
   it("no tira lo que estuvieras escribiendo", async () => {
     backend({ habilitado: true, eventos: [{ tipo: "fin", herramienta: null, bloqueada: false }] });
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
 
-    const campo = screen.getByLabelText("Escribe tu pregunta");
+    const campo = await screen.findByLabelText("Escribe tu pregunta");
     fireEvent.change(campo, { target: { value: "¿qué presión tiene la re" } });
-    fireEvent.click(screen.getByText("¿Qué nivel tiene el tanque?"));
+    fireEvent.click(screen.getByText("¿Cuánto subió la temperatura esta semana?"));
 
     await waitFor(() => expect(enviados.length).toBe(1));
-    expect(enviados[0].pregunta).toBe("¿Qué nivel tiene el tanque?");
+    expect(enviados[0].pregunta).toBe("¿Cuánto subió la temperatura esta semana?");
     // La pregunta que va es la del ejemplo, pero tirar lo que alguien estaba
     // escribiendo no es asunto de un botón de ayuda.
     expect(campo.value).toBe("¿qué presión tiene la re");
@@ -497,7 +556,7 @@ describe("el selector de modelo", () => {
     return { espia, puestos };
   }
 
-  const abrir = async () => fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+  const abrir = async () => { await screen.findByLabelText("Escribe tu pregunta"); };
   const selector = () => screen.queryByLabelText(/Modelo de IA/);
 
   it("con un solo modelo servido no se ofrece ninguna elección", async () => {
@@ -613,7 +672,7 @@ describe("exportar la conversación a PDF", () => {
   it("está deshabilitado sin mensajes", async () => {
     backendConExportar();
     montar();
-    fireEvent.click(await screen.findByLabelText("Abrir Tdconcito"));
+    await screen.findByLabelText("Escribe tu pregunta");
 
     expect(screen.getByLabelText("Exportar la conversación a PDF").disabled).toBe(true);
   });

@@ -42,7 +42,6 @@ import { queryClient } from "@/lib/queryClient.js";
 import { Asistente } from "@/features/asistente";
 import { ESTADO, SesionProvider, useSesion } from "@/auth/SesionProvider.jsx";
 import Login from "@/auth/Login.jsx";
-import BarraSesion from "@/auth/BarraSesion.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 
@@ -60,7 +59,7 @@ function Comprobando() {
 }
 
 function Aplicacion() {
-  const { estado } = useSesion();
+  const { estado, usuario, salir } = useSesion();
 
   if (estado === ESTADO.comprobando) return <Comprobando />;
   if (estado === ESTADO.fuera) return <Login />;
@@ -70,24 +69,13 @@ function Aplicacion() {
       <ToastProvider>
         <ModalProvider>
           {/*
-            * Fuera de la frontera de errores a propósito: si el asistente
-            * revienta, salir de la sesión tiene que seguir funcionando. Es la
-            * única acción que no puede depender de que el chat esté sano —en un
-            * equipo compartido de planta, quedarse dentro sin poder salir es
-            * peor que una pantalla rota.
-            *
-            * Provisional: la Fase 5 la absorbe en la cabecera del chat.
-            */}
-          <BarraSesion />
-
-          {/*
             * La frontera envuelve al asistente y no al revés: si el chat
             * revienta, lo que tiene que quedar en pie es algo que diga qué
             * pasó. Ponerla por fuera de los providers dejaría la pantalla de
             * error sin tema y sin poder pintarse.
             */}
           <ErrorBoundary>
-            <Asistente />
+            <Asistente usuario={usuario} salir={salir} />
           </ErrorBoundary>
           <Modal />
         </ModalProvider>

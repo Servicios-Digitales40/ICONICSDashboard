@@ -68,10 +68,10 @@
  * osciloscopio "brilla" en el color que cada tema llama su señal, y no hay
  * un cuarto mundo visual que mantener aparte de los otros tres.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, FileDown, FileText, Loader2, Maximize2,
-  Mic, Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
+  ArrowDown, Ban, Bot, Boxes, Check, Copy, FileDown, FileText, Loader2, LogOut,
+  Mic, NotebookPen, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
   Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
@@ -82,6 +82,29 @@ import {
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 import { markdownSeguro } from "../lib/markdown.js";
 import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
+/*
+ * ── LOS TRES CAJONES SE CARGAN AL ABRIRSE ──────────────────────────
+ *
+ * Estáticos costaban 24 KB del trozo de arranque, y `scripts/verificar-bundle.mjs`
+ * lo cazó al pasar de 102 a 126 KB. No es una cifra abstracta: quien entra a
+ * hacer UNA pregunta —que es el caso normal— descargaba el árbol de AssetWorX,
+ * el gestor de manuales, el de casos y las tres consultas de TanStack Query
+ * antes de poder escribir.
+ *
+ * Diferirlos no los convierte en rutas: siguen sin URL, sin poder enlazarse y
+ * sin sobrevivir a una recarga. `lazy()` aquí es reparto de descarga, no
+ * navegación — que es la distinción que §2.12 protege.
+ *
+ * Se importa el ARCHIVO de cada uno y no un barril: un `lazy()` sobre un
+ * `index.js` hace que Rollup nombre el trozo por su módulo de entrada y genere
+ * un segundo `index-*.js`, que es justo lo que dejó de medir el presupuesto de
+ * arranque la última vez que pasó.
+ */
+const ExploradorAssets = lazy(() =>
+  import("@/components/assets/ExploradorAssets.jsx").then((m) => ({ default: m.ExploradorAssets }))
+);
+const CajonManuales = lazy(() => import("../cajones/Manuales.jsx"));
+const CajonCasos = lazy(() => import("../cajones/Casos.jsx"));
 
 const MONO = "'IBM Plex Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
@@ -123,12 +146,54 @@ const SANS = "'Plus Jakarta Sans', sans-serif";
  */
 export const NOMBRE = "Tdconcito";
 
-const SUGERENCIAS = [
-  "¿Cómo va la instalación ahora mismo?",
-  "¿Qué nivel tiene el tanque?",
-  "¿Cómo ha ido la temperatura estas últimas horas?",
-  "Compara la presión de esta hora con la de hace seis horas",
+/**
+ * Los seis ejemplos del estado vacío — uno por FAMILIA de capacidad.
+ *
+ * ── POR QUÉ SEIS, Y POR QUÉ ÉSTOS ──────────────────────────────────
+ *
+ * Detrás hay veintidós herramientas y el técnico no puede adivinarlas. Seis es
+ * lo que se lee de un vistazo sin convertirse en un menú, y van elegidos para
+ * que cada uno revele una familia distinta — no los seis más vistosos, que
+ * enseñarían cuatro veces lo mismo.
+ *
+ * El quinto es el que más trabajo hace: es el único que enseña que a este
+ * asistente se le puede **contar** algo, no sólo preguntarle. Esa es la vía por
+ * la que se llena la bitácora de casos, que es la Fuente #3 del diagnóstico y
+ * la única que se alimenta sola. Sin él, nadie descubriría que existe.
+ */
+const EJEMPLOS = [
+  { texto: "¿Cómo está el tanque ahora mismo?", revela: "el instante" },
+  { texto: "¿Cuánto subió la temperatura esta semana?", revela: "el histórico" },
+  { texto: "¿Qué dice el manual sobre la presión máxima?", revela: "los manuales" },
+  { texto: "¿Por qué se disparó el riesgo de cavitación?", revela: "el diagnóstico" },
+  { texto: "Ya cambié la histéresis, apúntalo", revela: "contarle lo que hiciste" },
+  { texto: "Hazme un reporte de este turno", revela: "un documento" },
 ];
+
+/**
+ * Los tres cajones.
+ *
+ * ── UN REGISTRO, Y NO ES UN ENRUTADOR ──────────────────────────────
+ *
+ * Se parece a la lista de rutas que esta aplicación borró, y la diferencia
+ * importa: un cajón no es un destino. No tiene URL, no se puede enlazar, no
+ * sobrevive a una recarga, y al cerrarlo se vuelve exactamente a donde se
+ * estaba con el hilo intacto. Es contenido de la única vista, no otra vista.
+ *
+ * Están aquí los tres juntos porque comparten el mismo porqué: cada uno
+ * ALIMENTA al asistente. Assets es con lo que se diagnostica un dato que falta;
+ * Manuales, el único camino por el que entra conocimiento externo; Casos, la
+ * única fuente que se llena sola y por tanto la única que puede degradarse sin
+ * que nadie haga nada.
+ */
+const CAJONES = [
+  { id: "assets", label: "Assets", Icono: Boxes },
+  { id: "manuales", label: "Manuales", Icono: FileText },
+  { id: "casos", label: "Casos", Icono: NotebookPen },
+];
+
+/** Sólo el texto, para el marcador de posición que rota en el campo. */
+const SUGERENCIAS = EJEMPLOS.map((e) => e.texto);
 
 /**
  * A cuántos píxeles del final se considera que el hilo sigue «pegado» abajo.
@@ -138,18 +203,30 @@ const SUGERENCIAS = [
 const UMBRAL_ANCLA = 48;
 
 /*
- * `--eva-asis-retic` es la única propiedad de color que el `<style>` no
- * puede leer directamente: el fondo de retícula vive en una regla CSS
- * estática, pero el matiz cambia con el tema. Se resuelve como en
- * `InicioTanque.jsx` (`--tv-border`/`--tv-shadow`): la variable viaja inline,
- * por instancia, y la hoja de estilos sólo la consume con `var()`.
+ * ── LA RETÍCULA SE REPLEGÓ AL TRAZO (PLAN 20 FASE 5) ───────────────
+ *
+ * Era el fondo del panel entero, y ahí tenía sentido: un recuadro de esquina
+ * con retícula y un trazo encima se lee como un instrumento. Al pasar el
+ * asistente a ocupar la pantalla, esa misma retícula cubría los 1920 px de la
+ * aplicación — y una cuadrícula que no mide nada, extendida a toda una
+ * pantalla, deja de ser un instrumento y pasa a ser papel pintado. Lo señaló
+ * el detector de `impeccable` y tiene razón: su propia regla reserva las
+ * retículas para superficies donde de verdad se mide.
+ *
+ * Así que ahora sólo va detrás del trazo, que es lo único de esta interfaz que
+ * SÍ es una medida: se dibuja con los caracteres que de verdad han llegado. La
+ * identidad no se pierde, se concentra donde significa algo.
+ *
+ * `--eva-asis-retic` es la única propiedad de color que el `<style>` no puede
+ * leer directamente: la regla es estática pero el matiz cambia con el tema, así
+ * que la variable viaja inline y la hoja sólo la consume con `var()`.
  */
 const ESTILOS = `
 .eva-asis-reticula {
   background-image:
     linear-gradient(var(--eva-asis-retic) 1px, transparent 1px),
     linear-gradient(90deg, var(--eva-asis-retic) 1px, transparent 1px);
-  background-size: 20px 20px;
+  background-size: 7px 7px;
 }
 .eva-asis-boton { transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
 .eva-asis-boton:active:not(:disabled) { transform: translateY(1px) scale(0.96); }
@@ -163,9 +240,10 @@ const ESTILOS = `
 }
 .eva-asis-punto { animation: evaAsisPunto 2.4s ease-in-out infinite; }
 
-/* Maximizar cambia el ancla de posicionado (esquina fija ↔ centrado): animar
-   width/height interpolaría layout. Se anima transform+opacity en su lugar,
-   disparado por el remontaje que fuerza la key en <section>. */
+/* La entrada del cajón. Antes animaba el paso de esquina a centrado del panel
+   maximizado, que ya no existe; ahora es lo único que entra en esta pantalla y
+   por eso se queda: un panel que aparece de golpe encima del texto no deja ver
+   de dónde salió. */
 @keyframes evaAsisEntrada {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
@@ -286,18 +364,50 @@ function useTrazo(mensajes) {
 function PantallaTrazo({ ocupado, mensajes, t }) {
   const d = useTrazo(mensajes);
   return (
+    <span
+      className="eva-asis-reticula"
+      aria-hidden="true"
+      style={{
+        "--eva-asis-retic": `${t.accent}1A`,
+        flexShrink: 0, display: "grid", placeItems: "center",
+        width: 104, height: 28, borderRadius: 7,
+        border: `1px solid ${t.border}`,
+        background: t.hover,
+        overflow: "hidden",
+      }}
+    >
     <svg width={90} height={20} viewBox="0 0 280 28" style={{ flexShrink: 0, overflow: "visible" }} aria-hidden="true">
       <path d={d} fill="none" stroke={t.accent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
         opacity={ocupado ? 0.95 : 0.35} className={ocupado ? "eva-asis-trazo" : ""}
         style={{ filter: `drop-shadow(0 0 3px ${t.accent})` }} />
     </svg>
+    </span>
   );
 }
 
-export function Asistente() {
+/**
+ * @param {string} [usuario] Quién está dentro, para la cabecera.
+ * @param {() => void} [salir] Cerrar sesión.
+ *
+ * ── POR QUÉ LLEGAN POR PROPS Y NO DE `useSesion()` ─────────────────
+ *
+ * Porque `features/asistente/` no tiene por qué saber que existe la
+ * autenticación. Consumir el contexto de sesión aquí ataría el asistente a
+ * `auth/`, y con él sus siete archivos de prueba, que tendrían que montar un
+ * proveedor de sesión para comprobar cómo se pinta una respuesta.
+ *
+ * Quien sí conoce las dos cosas es `app/App.jsx`, que es exactamente su
+ * trabajo. Sin ellos la cabecera no pinta ese bloque — no falla ni finge un
+ * usuario anónimo.
+ */
+export function Asistente({ usuario = null, salir = null }) {
   const { theme: t } = useTheme();
-  const [abierto, setAbierto] = useState(false);
-  const [maximizado, setMaximizado] = useState(false);
+  /*
+   * Qué cajón está abierto, o `null`. Uno solo a la vez: dos paneles laterales
+   * simultáneos serían una segunda columna de navegación, que es lo que §2.12
+   * existe para impedir.
+   */
+  const [cajon, setCajon] = useState(null);
   const [borrador, setBorrador] = useState("");
   const [ejemplo, setEjemplo] = useState(0);
   const [anclado, setAnclado] = useState(true);
@@ -338,7 +448,13 @@ export function Asistente() {
    * segundo.
    */
   useEffect(() => { if (anclado) finRef.current?.scrollIntoView({ block: "end" }); }, [mensajes, estado, anclado]);
-  useEffect(() => { if (abierto) campoRef.current?.focus(); }, [abierto, maximizado]);
+  /*
+   * El campo toma el foco al arrancar y al cerrarse un cajón: la aplicación
+   * ES el campo de preguntas, así que llegar y poder teclear sin pulsar nada
+   * es el comportamiento correcto. Al abrir un cajón NO se roba el foco de
+   * vuelta — dentro hay un árbol que se navega con el teclado.
+   */
+  useEffect(() => { if (!cajon) campoRef.current?.focus(); }, [cajon]);
 
   /*
    * Los segundos que lleva la consulta en curso. Con una espera de 30 a 90 s,
@@ -354,31 +470,32 @@ export function Asistente() {
   }, [ocupado]);
 
   /*
-   * La respuesta llegó con el panel cerrado: se marca el botón flotante.
+   * La respuesta llegó con un cajón tapando la conversación.
    *
-   * La consulta sigue viva aunque se cierre el panel —el hilo no se desmonta—
-   * y esa es justo la trampa: sin este aviso, quien cierra para volver al
-   * tablero mientras espera no se entera nunca de que ya hay respuesta.
+   * Antes esto marcaba el botón flotante cuando el panel estaba cerrado. El
+   * panel ya no se cierra —es la aplicación— pero el problema sobrevive con
+   * otro disfraz: consultar un manual mientras se espera es exactamente lo que
+   * alguien hace durante minuto y medio, y sin aviso la respuesta se queda ahí
+   * sin que nadie la lea.
    */
   useEffect(() => {
-    if (ocupadoPrevio.current && !ocupado && !abierto) setSinLeer(true);
+    if (ocupadoPrevio.current && !ocupado && cajon) setSinLeer(true);
     ocupadoPrevio.current = ocupado;
-  }, [ocupado, abierto]);
+  }, [ocupado, cajon]);
 
-  useEffect(() => { if (abierto) setSinLeer(false); }, [abierto]);
-
-  // Escape restaura el panel maximizado, y si ya estaba en su tamaño de
-  // esquina, cierra — lo que espera cualquiera de un panel flotante.
+  /*
+   * Escape cierra el cajón abierto y devuelve el foco al campo.
+   *
+   * Ya no cierra nada más: esta aplicación no tiene un panel del que salir,
+   * es la aplicación. Escape sobre la conversación no hace nada a propósito —
+   * un atajo que a veces vacía la pantalla y a veces no es peor que ninguno.
+   */
   useEffect(() => {
-    if (!abierto) return;
-    const alPulsar = (e) => {
-      if (e.key !== "Escape") return;
-      if (maximizado) setMaximizado(false);
-      else setAbierto(false);
-    };
+    if (!cajon) return;
+    const alPulsar = (e) => { if (e.key === "Escape") cerrarCajon(); };
     window.addEventListener("keydown", alPulsar);
     return () => window.removeEventListener("keydown", alPulsar);
-  }, [abierto, maximizado]);
+  }, [cajon]);
 
   /**
    * Preguntas que llegan desde otra pantalla (ver `lib/preguntaExterna.js`).
@@ -396,7 +513,8 @@ export function Asistente() {
     const alPedir = (e) => {
       const texto = String(e?.detail?.texto ?? "").trim();
       if (!texto) return;
-      setAbierto(true);
+      // Un cajón abierto taparía la respuesta que se acaba de pedir.
+      setCajon(null);
       if (ocupado) return;
       setAnclado(true);
       preguntar(texto);
@@ -502,112 +620,63 @@ export function Asistente() {
     }
   };
 
-  if (!abierto) {
-    return (
-      <button
-        type="button" onClick={() => setAbierto(true)}
-        aria-label={sinLeer ? `Abrir ${NOMBRE}. La respuesta está lista.` : `Abrir ${NOMBRE}`}
-        className="eva-asis-boton"
-        style={{
-          position: "fixed", right: 24, bottom: 24, zIndex: 60,
-          width: 54, height: 54, borderRadius: "50%", border: "none", cursor: "pointer",
-          background: t.gradAccent, color: "#FFFFFF", boxShadow: t.shadowHover,
-          display: "grid", placeItems: "center",
-        }}
-      >
-        <Bot size={22} />
-        {/* El punto vive en blanco sobre el degradado de marca: es el único
-            color que se lee limpio encima de un acento saturado en los tres
-            temas (azul, azul oscuro y rojo Mitsubishi). */}
-        <span aria-hidden="true" className="eva-asis-punto" style={{ position: "absolute", bottom: 9, width: 5, height: 5, borderRadius: "50%", background: "#FFFFFF", boxShadow: "0 0 6px 1px rgba(255,255,255,0.85)" }} />
-        {sinLeer && (
-          <span aria-hidden="true" style={{ position: "absolute", top: 3, right: 3, width: 13, height: 13, borderRadius: "50%", background: t.coral, border: `2.5px solid ${t.page}` }} />
-        )}
-      </button>
-    );
-  }
-
-  const grande = maximizado;
+  const cerrarCajon = () => {
+    setCajon(null);
+    setSinLeer(false);
+  };
 
   return (
     <>
       <style>{ESTILOS}</style>
 
-      {grande && (
-        <div aria-hidden="true" onClick={() => setMaximizado(false)} style={{ position: "fixed", inset: 0, zIndex: 59, background: t.overlay, backdropFilter: "blur(2px)" }} />
-      )}
-
-      <section
-        key={grande ? "grande" : "chico"}
-        role="dialog" aria-label={NOMBRE}
-        className="eva-asis-reticula eva-asis-entrada"
+      {/*
+        * ── LA APLICACIÓN, NO UN PANEL (PLAN 20 FASE 5) ────────────────────
+        *
+        * Hasta aquí esto era un botón flotante que abría un recuadro de
+        * esquina, con un modo maximizado por encima. Los tres estados —cerrado,
+        * esquina, grande— existían porque el chat convivía con veintidós
+        * pantallas y tenía que apartarse de ellas.
+        *
+        * Ya no hay nada de lo que apartarse. La pantalla es la conversación, y
+        * los estados que quedan son otros tres, ninguno de los cuales es un
+        * tamaño: LECTURA (esto), CAJÓN abierto encima, y MANOS LIBRES tomando
+        * la pantalla entera. Ver el brief en `docs/PLAN-20-ASISTENTE.md` §F5.
+        */}
+      <div
         style={{
-          position: "fixed", zIndex: 60,
-          "--eva-asis-retic": `${t.accent}0F`,
-          ...(grande
-            ? { inset: 0, margin: "auto", width: "min(920px, 92vw)", height: "min(760px, 88vh)" }
-            : { right: 24, bottom: 24, width: "min(420px, calc(100vw - 48px))", height: "min(560px, calc(100vh - 48px))" }),
+          position: "fixed", inset: 0,
           display: "flex", flexDirection: "column",
-          background: `radial-gradient(120% 130% at 50% 0%, ${t.panel} 0%, ${t.page} 65%)`,
-          border: `1px solid ${t.border}`, borderRadius: 16,
-          boxShadow: t.shadowHover, overflow: "hidden",
+          background: `radial-gradient(120% 90% at 50% 0%, ${t.panel} 0%, ${t.page} 60%)`,
         }}
       >
-        <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderBottom: `1px solid ${t.border}` }}>
-          <Bot size={17} color={t.accent} />
-          <strong style={{ fontSize: 13.5, color: t.text, fontFamily: SANS }}>{NOMBRE}</strong>
-          <SelectorModelo
-            modelo={modelo} modelos={modelos} elegir={elegirModelo}
-            error={errorModelo} ocupado={ocupado} t={t}
-          />
-          <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
+        <Cabecera
+          t={t} usuario={usuario} salir={salir}
+          modelo={modelo} modelos={modelos} elegirModelo={elegirModelo}
+          errorModelo={errorModelo} ocupado={ocupado} mensajes={mensajes}
+          exportando={exportando} exportarPdf={exportarPdf} limpiar={limpiar}
+          cajon={cajon} abrirCajon={setCajon}
+        />
 
-          <button
-            type="button"
-            onClick={exportarPdf}
-            disabled={ocupado || !mensajes.length || exportando}
-            aria-label="Exportar la conversación a PDF"
-            title="Exportar PDF"
-            className="eva-asis-boton"
-            style={botonIcono(t, ocupado || !mensajes.length || exportando)}
-          >
-            {exportando ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}
-          </button>
-          <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
-            <Trash2 size={15} />
-          </button>
-          <button type="button" onClick={() => setMaximizado((m) => !m)} aria-label={grande ? "Restaurar tamaño" : "Maximizar"} title={grande ? "Restaurar" : "Maximizar"} className="eva-asis-boton" style={botonIcono(t, false)}>
-            {grande ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-          </button>
-          <button type="button" onClick={() => setAbierto(false)} aria-label={`Cerrar ${NOMBRE}`} className="eva-asis-boton" style={botonIcono(t, false)}>
-            <X size={16} />
-          </button>
-        </header>
+        {/* Los dos avisos que no interrumpen: el modelo anterior sigue
+            sirviendo, y la conversación sigue en pantalla. `role="status"`. */}
+        {errorModelo && <AvisoBarra t={t} texto={errorModelo} />}
+        {errorExportar && <AvisoBarra t={t} texto={`No se pudo exportar la conversación: ${errorExportar}`} />}
 
-        {/* El servidor rechazó el cambio de modelo —hay una consulta en curso,
-            o el nombre no está en su catálogo—. Se enseña el motivo tal cual lo
-            manda el backend: los dos casos se arreglan de formas distintas y un
-            «no se pudo» genérico no dice cuál es. `role="status"` y no `alert`
-            porque no interrumpe nada: el modelo anterior sigue sirviendo. */}
-        {errorModelo && (
-          <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
-            {errorModelo}
-          </div>
-        )}
-
-        {errorExportar && (
-          <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
-            No se pudo exportar la conversación: {errorExportar}
-          </div>
-        )}
-
-        {/* El envoltorio existe para poder colgar el botón de «ir al final»
-            encima del hilo: dentro del contenedor con scroll se desplazaría
-            junto al texto, que es justo lo contrario de lo que hace falta. */}
-        <div style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
+        <main style={{ position: "relative", flex: 1, minHeight: 0, display: "flex" }}>
           <div
             ref={hiloRef} onScroll={alDesplazar}
-            style={{ flex: 1, overflowY: "auto", padding: grande ? "20px max(14px, calc(50% - 340px))" : 14, display: "grid", gap: 12, alignContent: "start" }}
+            style={{
+              flex: 1, overflowY: "auto",
+              /*
+               * La columna de lectura. `68ch` sobre el texto de las respuestas
+               * (ver `Turno`) es lo que fija la medida; este ancho le deja aire
+               * a los lados y sitio a las burbujas del usuario, alineadas a la
+               * derecha. En una pantalla de 1920 los lados quedan en calma a
+               * propósito: no hay nada que meter ahí que no compita con leer.
+               */
+              padding: "28px max(16px, calc(50% - 380px)) 20px",
+              display: "grid", gap: 14, alignContent: "start",
+            }}
           >
             {!mensajes.length && <Bienvenida t={t} ocupado={ocupado} onPreguntar={preguntarEjemplo} />}
 
@@ -640,12 +709,167 @@ export function Asistente() {
               <ArrowDown size={13} /> Ir al final
             </button>
           )}
-        </div>
+        </main>
 
+        <Redactor
+          t={t}
+          enviar={enviar} borrador={borrador} setBorrador={setBorrador}
+          ocupado={ocupado} cancelar={cancelar}
+          campoRef={campoRef} archivoRef={archivoRef}
+          adjunto={adjunto} quitar={quitar} cargar={cargar} errorAdjunto={errorAdjunto}
+          dictado={dictado} manosLibres={manosLibres}
+          anadirAlBorrador={anadirAlBorrador}
+          ejemplo={SUGERENCIAS[ejemplo]}
+        />
+      </div>
+
+      {cajon && (
+        <PanelCajon t={t} cual={cajon} cerrar={cerrarCajon} respuestaLista={sinLeer} />
+      )}
+
+      {manosLibres.activo && (
+        <PantallaLlamada t={t} manosLibres={manosLibres} mensajes={mensajes} estado={estado} />
+      )}
+    </>
+  );
+}
+
+/* ── Piezas del armazón ─────────────────────────────────────────────── */
+
+/**
+ * La cabecera: quién eres, con qué modelo, y las tres acciones sobre el hilo.
+ *
+ * ── ABSORBE LA BARRA DE SESIÓN DE LA FASE 4 ────────────────────────
+ *
+ * `auth/BarraSesion.jsx` existía provisionalmente para que hubiera forma de
+ * salir. Su sitio era éste desde el principio: en una aplicación de una sola
+ * vista, la identidad y la salida van en la única cabecera que hay, no en una
+ * franja aparte que sólo dice eso.
+ *
+ * ── EL ORDEN NO ES CASUAL ──────────────────────────────────────────
+ *
+ * A la izquierda lo que identifica (el asistente, su modelo, su pulso); a la
+ * derecha lo que actúa, y de menos a más consecuencia: cajones, exportar,
+ * borrar, salir. Borrar el hilo va pegado a salir porque las dos son las
+ * únicas que destruyen algo.
+ */
+function Cabecera({
+  t, usuario, salir, modelo, modelos, elegirModelo, errorModelo, ocupado,
+  mensajes, exportando, exportarPdf, limpiar, cajon, abrirCajon,
+}) {
+  const sinHilo = ocupado || !mensajes.length;
+
+  return (
+    <header
+      style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "10px 16px", borderBottom: `1px solid ${t.border}`,
+        background: t.panel,
+      }}
+    >
+      <Bot size={17} color={t.accent} aria-hidden="true" />
+      <strong style={{ fontSize: 13.5, color: t.text, fontFamily: SANS }}>{NOMBRE}</strong>
+
+      <SelectorModelo
+        modelo={modelo} modelos={modelos} elegir={elegirModelo}
+        error={errorModelo} ocupado={ocupado} t={t}
+      />
+      <PantallaTrazo ocupado={ocupado} mensajes={mensajes} t={t} />
+
+      <div style={{ flex: 1 }} />
+
+      {CAJONES.map(({ id, label, Icono }) => (
+        <button
+          key={id} type="button"
+          onClick={() => abrirCajon(cajon === id ? null : id)}
+          aria-pressed={cajon === id}
+          aria-label={`${label} (panel lateral)`}
+          title={label}
+          className="eva-asis-boton"
+          style={{
+            ...botonIcono(t, false),
+            ...(cajon === id ? { background: t.accentSoft, color: t.accent } : null),
+          }}
+        >
+          <Icono size={15} />
+        </button>
+      ))}
+
+      <span aria-hidden="true" style={{ width: 1, height: 18, background: t.border, margin: "0 4px" }} />
+
+      <button
+        type="button" onClick={exportarPdf} disabled={sinHilo || exportando}
+        aria-label="Exportar la conversación a PDF" title="Exportar PDF"
+        className="eva-asis-boton" style={botonIcono(t, sinHilo || exportando)}
+      >
+        {exportando ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}
+      </button>
+      <button
+        type="button" onClick={limpiar} disabled={sinHilo}
+        aria-label="Borrar la conversación" title="Borrar"
+        className="eva-asis-boton" style={botonIcono(t, sinHilo)}
+      >
+        <Trash2 size={15} />
+      </button>
+
+      {usuario && (
+        <>
+          <span style={{ fontFamily: MONO, fontSize: 11.5, color: t.textFaint, marginLeft: 4 }}>
+            {usuario}
+          </span>
+          <button
+            type="button" onClick={salir}
+            aria-label="Cerrar sesión" title="Cerrar sesión"
+            className="eva-asis-boton" style={botonIcono(t, false)}
+          >
+            <LogOut size={15} />
+          </button>
+        </>
+      )}
+    </header>
+  );
+}
+
+/** Un aviso de barra que NO interrumpe: lo de debajo sigue funcionando. */
+function AvisoBarra({ t, texto }) {
+  return (
+    <div role="status" style={{ padding: "7px 16px", fontSize: 11.5, color: t.coral, fontFamily: MONO, lineHeight: 1.45, borderBottom: `1px solid ${t.border}` }}>
+      {texto}
+    </div>
+  );
+}
+
+/**
+ * El redactor: adjuntar, dictar, llamar, escribir y enviar.
+ *
+ * ── POR QUÉ ES UNA PIEZA APARTE ────────────────────────────────────
+ *
+ * Porque es lo único de esta pantalla que no cambia nunca de sitio. La
+ * conversación se llena, los cajones entran y salen, el manos libres toma la
+ * pantalla — y el redactor sigue abajo, en el mismo píxel. En una aplicación
+ * de una sola vista ése es el ancla, y separarlo del armazón evita que se
+ * arrastre en el próximo cambio de composición.
+ *
+ * ── LOS BOTONES QUE NO APARECEN ────────────────────────────────────
+ *
+ * El micrófono sólo existe si el servidor tiene whisper Y el navegador puede
+ * grabar; el manos libres exige además que el navegador sepa hablar. No se
+ * pintan inertes: un botón que siempre falla es peor que su ausencia, y en una
+ * planta nadie va a averiguar que le falta una variable de entorno mirando un
+ * icono gris.
+ */
+function Redactor({
+  t, enviar, borrador, setBorrador, ocupado, cancelar, campoRef, archivoRef,
+  adjunto, quitar, cargar, errorAdjunto, dictado, manosLibres, anadirAlBorrador,
+  ejemplo,
+}) {
+  return (
+    <div style={{ borderTop: `1px solid ${t.border}`, background: t.panel }}>
+      <div style={{ padding: "0 max(16px, calc(50% - 380px))" }}>
         {adjunto && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 0 0" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: MONO, color: t.textSoft, background: t.hover, border: `1px solid ${t.border}`, borderRadius: 8, padding: "4px 8px" }}>
-              <FileText size={12} />
+              <FileText size={12} aria-hidden="true" />
               {adjunto.nombre}{adjunto.truncado && " (recortado)"}
               <button type="button" onClick={quitar} aria-label="Quitar el adjunto" style={{ background: "none", border: "none", color: t.textFaint, cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}>
                 <X size={12} />
@@ -653,24 +877,26 @@ export function Asistente() {
             </span>
           </div>
         )}
+
         {errorAdjunto && (
-          <div style={{ padding: "6px 12px 0", fontSize: 11, color: t.coral, fontFamily: MONO }}>{errorAdjunto}</div>
+          <div role="status" style={{ padding: "8px 0 0", fontSize: 11, color: t.coral, fontFamily: MONO }}>{errorAdjunto}</div>
         )}
 
         {/* El fallo del dictado se cuenta aquí y NO como un turno del hilo: no
             llegó a haber pregunta, así que meterlo en la conversación la
             ensuciaría con algo que nadie llegó a preguntar. */}
         {dictado.error && (
-          <div style={{ padding: "6px 12px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
+          <div role="status" style={{ padding: "8px 0 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
             {dictado.error}
           </div>
         )}
 
-        <form onSubmit={enviar} style={{ display: "flex", gap: 8, padding: 12, borderTop: `1px solid ${t.border}` }}>
+        <form onSubmit={enviar} style={{ display: "flex", gap: 8, padding: "12px 0 16px" }}>
           <input
             ref={archivoRef} type="file" accept=".txt,.csv,.md" style={{ display: "none" }}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) cargar(f); e.target.value = ""; }}
           />
+
           {/* En manos libres no hay envío desde este formulario: un adjunto
               puesto ahí se quedaría colgado sin viajar con ninguna pregunta. */}
           <button
@@ -682,16 +908,11 @@ export function Asistente() {
             <Paperclip size={16} />
           </button>
 
-          {/* El micrófono sólo aparece si el servidor tiene whisper Y el
-              navegador puede grabar. Un botón que siempre falla es peor que
-              no tenerlo. Y desaparece durante el manos libres: ahí el turno
-              lo abre y lo cierra el otro botón. */}
           {dictado.disponible && !ocupado && !manosLibres.activo && (
             <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} />
           )}
 
-          {/* El manos libres exige además que el navegador sepa hablar. */}
-          {manosLibres.disponible && (
+          {manosLibres.disponible && !manosLibres.activo && (
             <BotonManosLibres t={t} manosLibres={manosLibres} />
           )}
 
@@ -699,17 +920,12 @@ export function Asistente() {
             ref={campoRef}
             value={borrador}
             onChange={(e) => setBorrador(e.target.value)}
-            placeholder={
-              manosLibres.activo
-                ? FASE_MANOS_LIBRES[manosLibres.fase]
-                : dictado.grabando ? "Te escucho…"
-                : ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]
-            }
+            placeholder={dictado.grabando ? "Te escucho…" : ocupado ? "Esperando respuesta…" : ejemplo}
             disabled={ocupado || manosLibres.activo}
             aria-label="Escribe tu pregunta"
             style={{
               flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
-              border: `1px solid ${dictado.grabando || manosLibres.activo ? t.coral : t.border}`,
+              border: `1px solid ${dictado.grabando ? t.coral : t.border}`,
               background: t.hover, color: t.text,
               fontFamily: "'Inter', sans-serif",
             }}
@@ -729,8 +945,216 @@ export function Asistente() {
             </button>
           )}
         </form>
-      </section>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Un cajón: el panel lateral que entra por la derecha.
+ *
+ * ── POR QUÉ ENCIMA Y NO PARTIENDO LA PANTALLA ──────────────────────
+ *
+ * Porque un panel fijo que empuja la conversación la estrecha para siempre, y
+ * la conversación es lo que se ha venido a leer. Encima, el cajón se abre
+ * cuando hace falta y desaparece cuando no, y la columna de lectura recupera
+ * su medida entera.
+ *
+ * ── LA RESPUESTA QUE LLEGA CON EL CAJÓN ABIERTO ────────────────────
+ *
+ * Consultar un manual mientras se espera es exactamente lo que alguien hace
+ * durante minuto y medio. Si la respuesta llega entonces, el cajón lo dice y
+ * ofrece el camino de vuelta — sin cerrarse solo, que sería arrancarle a
+ * alguien de las manos lo que estaba leyendo.
+ */
+function PanelCajon({ t, cual, cerrar, respuestaLista }) {
+  const { label } = CAJONES.find((c) => c.id === cual) ?? {};
+
+  return (
+    <>
+      <div
+        aria-hidden="true" onClick={cerrar}
+        style={{ position: "fixed", inset: 0, zIndex: 59, background: t.overlay }}
+      />
+      <aside
+        role="dialog" aria-label={label}
+        className="eva-asis-cajon"
+        style={{
+          position: "fixed", zIndex: 60, top: 0, right: 0, bottom: 0,
+          width: "min(560px, 100vw)",
+          display: "flex", flexDirection: "column",
+          background: t.page,
+          borderLeft: `1px solid ${t.border}`,
+          boxShadow: t.shadowHover,
+        }}
+      >
+        <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${t.border}`, background: t.panel }}>
+          <strong style={{ fontSize: 13.5, color: t.text, fontFamily: SANS }}>{label}</strong>
+          <div style={{ flex: 1 }} />
+
+          {respuestaLista && (
+            <button
+              type="button" onClick={cerrar}
+              className="eva-asis-boton"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                fontSize: 12, fontWeight: 600, fontFamily: SANS,
+                padding: "5px 10px", borderRadius: 9,
+                border: `1px solid ${t.accent}`, background: t.accentSoft, color: t.accent,
+                cursor: "pointer",
+              }}
+            >
+              <ArrowDown size={13} aria-hidden="true" />
+              Respuesta lista
+            </button>
+          )}
+
+          <button
+            type="button" onClick={cerrar}
+            aria-label={`Cerrar ${label}`} title="Cerrar (Esc)"
+            className="eva-asis-boton" style={botonIcono(t, false)}
+          >
+            <X size={16} />
+          </button>
+        </header>
+
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 16 }}>
+          {/*
+            * El respaldo dice QUÉ se está trayendo, no «cargando…». Son
+            * milisegundos en red local, pero en una planta con wifi flojo el
+            * primer clic puede tardar, y un texto genérico no distingue «está
+            * llegando» de «se colgó».
+            */}
+          <Suspense
+            fallback={
+              <p style={{ margin: 0, fontSize: 12.5, color: t.textFaint, fontFamily: MONO }}>
+                Abriendo {label?.toLowerCase()}…
+              </p>
+            }
+          >
+            {cual === "assets" && <ExploradorAssets />}
+            {cual === "manuales" && <CajonManuales />}
+            {cual === "casos" && <CajonCasos />}
+          </Suspense>
+        </div>
+      </aside>
     </>
+  );
+}
+
+/**
+ * El manos libres, cuando está activo: la pantalla ES la llamada.
+ *
+ * ── POR QUÉ TOMA LA PANTALLA Y NO ES UN BOTÓN QUE PARPADEA ─────────
+ *
+ * Porque es una llamada, no un walkie — lo dice ya la cabecera de
+ * `BotonManosLibres`, y una llamada no es un control en una barra: es un
+ * estado del aparato. Quien lo usa está a un metro de la pantalla, con las
+ * manos en la máquina, y lo único que necesita ver desde ahí es EN QUÉ VA:
+ * si le escucha, si está pensando o si está hablando.
+ *
+ * De ahí que el indicador sea grande y esté solo. Un panel con el mismo
+ * tamaño de letra que el resto obligaría a acercarse, que es justo lo que este
+ * modo existe para evitar.
+ *
+ * La conversación sigue debajo, en pequeño, porque el turno anterior es el
+ * contexto de lo que se acaba de oír. No se puede desplazar ni escribir aquí:
+ * para eso se cuelga.
+ */
+function PantallaLlamada({ t, manosLibres, mensajes, estado }) {
+  const { fase, apagar, cerrarTurno, nivel } = manosLibres;
+  const ultimo = mensajes.filter((m) => m.rol === "asistente").at(-1);
+
+  const escuchando = fase === "escuchando";
+  const escala = 1 + Math.min((nivel ?? 0) * 6, 0.9);
+
+  return (
+    <div
+      role="dialog" aria-label="Manos libres"
+      style={{
+        position: "fixed", inset: 0, zIndex: 70,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 28, padding: 32,
+        background: `radial-gradient(90% 70% at 50% 40%, ${t.panel} 0%, ${t.page} 70%)`,
+        fontFamily: SANS,
+      }}
+    >
+      {/*
+        * El anillo crece con la voz. No es adorno: en un modo sin teclado y sin
+        * texto es la única prueba de que el micrófono capta algo. Sin él,
+        * alguien que hable con el micrófono silenciado por el sistema espera
+        * una respuesta que no va a llegar y no tiene forma de saber por qué.
+        */}
+      <div style={{ position: "relative", display: "grid", placeItems: "center", width: 132, height: 132 }}>
+        {escuchando && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute", width: 132, height: 132, borderRadius: "50%",
+              border: `2px solid ${t.coral}`, opacity: 0.55,
+              transform: `scale(${escala})`, transition: "transform 90ms linear",
+            }}
+          />
+        )}
+        <span
+          aria-hidden="true"
+          style={{
+            width: 96, height: 96, borderRadius: "50%", display: "grid", placeItems: "center",
+            background: escuchando ? t.coralSoft : t.accentSoft,
+            color: escuchando ? t.coral : t.accent,
+          }}
+        >
+          {escuchando ? <Mic size={34} /> : <Bot size={34} />}
+        </span>
+      </div>
+
+      {/*
+        * El texto grande es el estado, y va con `aria-live`: en este modo la
+        * pantalla puede no estar mirándose, así que el cambio de fase tiene que
+        * poder oírse igual que se ve.
+        */}
+      <p
+        aria-live="polite"
+        style={{ margin: 0, fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: t.text, textAlign: "center", maxWidth: "22ch", lineHeight: 1.35 }}
+      >
+        {FASE_MANOS_LIBRES[fase] ?? estado ?? "Manos libres"}
+      </p>
+
+      {ultimo?.texto && (
+        <p style={{ margin: 0, maxWidth: "60ch", fontSize: 13.5, lineHeight: 1.6, color: t.textSoft, textAlign: "center" }}>
+          {ultimo.texto}
+        </p>
+      )}
+
+      <div style={{ display: "flex", gap: 12 }}>
+        {escuchando && (
+          <button
+            type="button" onClick={cerrarTurno}
+            className="eva-asis-boton"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "12px 20px", borderRadius: 9, fontSize: 14, fontWeight: 600, fontFamily: SANS,
+              border: `1px solid ${t.border}`, background: t.panel, color: t.text, cursor: "pointer",
+            }}
+          >
+            He terminado
+          </button>
+        )}
+        <button
+          type="button" onClick={apagar}
+          className="eva-asis-boton"
+          aria-label="Colgar el manos libres"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "12px 20px", borderRadius: 9, fontSize: 14, fontWeight: 600, fontFamily: SANS,
+            border: "none", background: t.coral, color: "#FFFFFF", cursor: "pointer",
+          }}
+        >
+          <PhoneOff size={16} aria-hidden="true" />
+          Colgar
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -897,35 +1321,82 @@ function BotonManosLibres({ t, manosLibres }) {
  */
 function Bienvenida({ t, ocupado, onPreguntar }) {
   return (
-    <div style={{ fontSize: 12.5, color: t.textSoft, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
-      Pregunta por el estado del sistema de agua o por cómo ha evolucionado una
-      de sus señales.
-      <div style={{ marginTop: 8, color: t.textFaint }}>
-        Las respuestas salen de ICONICS, no de la memoria del modelo. Sólo cuatro
-        de las ocho señales tienen historia —nivel, temperatura, caudal y
-        presión—; si preguntas por el pasado de otra, te lo dirá en vez de
-        inventarlo. Los límites con los que se juzga cada valor son estimaciones
-        nuestras, no rangos confirmados de la instalación.
-      </div>
+    <div style={{ fontFamily: SANS, maxWidth: "68ch" }}>
+      <h1 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 650, letterSpacing: "-0.02em", color: t.text }}>
+        Pregunta por la planta.
+      </h1>
+
+      <p style={{ margin: "0 0 6px", fontSize: 13.5, lineHeight: 1.6, color: t.textSoft }}>
+        Las respuestas salen de ICONICS en el momento de preguntar, no de la
+        memoria del modelo. Debajo de cada una verás con qué se consultó.
+      </p>
+
+      {/*
+        * Las dos advertencias van aquí y no en una nota al pie porque cambian
+        * cómo se lee TODA respuesta posterior, y quien las lea después de
+        * creerse una cifra ya se la creyó.
+        */}
+      <p style={{ margin: "0 0 22px", fontSize: 12.5, lineHeight: 1.6, color: t.textFaint }}>
+        No todas las señales tienen histórico: si preguntas por el pasado de una
+        que no lo tiene, te lo dirá en vez de inventarlo. Y los límites con los
+        que se juzga cada valor son estimaciones nuestras, no rangos confirmados
+        de la instalación.
+      </p>
 
       <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />
     </div>
   );
 }
 
-/** Los ejemplos. Pulsar uno manda esa pregunta tal cual. */
+/**
+ * Los ejemplos. Pulsar uno manda esa pregunta tal cual.
+ *
+ * Van como botones y no como prosa porque son, literalmente, las cosas que
+ * este asistente sabe hacer: leídos se olvidan, pulsados se aprenden.
+ *
+ * Cada uno lleva debajo qué revela. No es una etiqueta decorativa: seis frases
+ * sueltas parecen seis preguntas de ejemplo, y con el rótulo se leen como seis
+ * TIPOS de pregunta — que es lo que de verdad se está enseñando.
+ */
 function Sugerencias({ t, ocupado, onPreguntar }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-      {SUGERENCIAS.map((s) => (
-        <button
-          key={s} type="button" onClick={() => onPreguntar(s)} disabled={ocupado}
-          className="eva-asis-boton" style={estiloChip(t, ocupado)}
-        >
-          {s}
-        </button>
+    <ul
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+        gap: 8,
+        margin: 0,
+        padding: 0,
+        listStyle: "none",
+      }}
+    >
+      {EJEMPLOS.map(({ texto, revela }) => (
+        <li key={texto}>
+          <button
+            type="button"
+            onClick={() => onPreguntar(texto)}
+            disabled={ocupado}
+            className="eva-asis-boton eva-asis-ejemplo"
+            style={{
+              width: "100%",
+              textAlign: "left",
+              display: "grid",
+              gap: 3,
+              padding: "11px 13px",
+              borderRadius: 9,
+              border: `1px solid ${t.border}`,
+              background: t.panel,
+              cursor: ocupado ? "default" : "pointer",
+              opacity: ocupado ? 0.55 : 1,
+              fontFamily: SANS,
+            }}
+          >
+            <span style={{ fontSize: 13, lineHeight: 1.4, color: t.text }}>{texto}</span>
+            <span style={{ fontSize: 11, color: t.textFaint }}>{revela}</span>
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -962,7 +1433,16 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
   const adjuntos = mensaje.error ? [] : (mensaje.adjuntos ?? []);
 
   return (
-    <div style={{ maxWidth: "92%" }}>
+    /*
+     * `68ch` y no un porcentaje. Un 92 % de la columna son unos 97 caracteres
+     * por línea, y el ojo pierde el renglón a partir de ~75: al volver del
+     * final de una línea larga aterriza una línea más abajo. En un párrafo de
+     * diagnóstico de diez líneas eso pasa varias veces.
+     *
+     * Es lo único de esta pantalla donde la medida importa de verdad: las
+     * burbujas del usuario son cortas y los rótulos son de una línea.
+     */
+    <div style={{ maxWidth: "68ch" }}>
       {hayBurbuja && (
         mensaje.texto ? (
           <div
@@ -1056,15 +1536,15 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
 /**
  * Un gráfico que acompaña la respuesta.
  *
- * ── POR QUÉ UN `<img>` CON DATA URI Y NO EL SVG EN LÍNEA ───────────
+ * ── POR QUÉ UNA IMAGEN CON DATA URI Y NO EL SVG EN LÍNEA ───────────
  *
  * Porque el SVG lo genera el servidor y meterlo en el DOM con
  * `dangerouslySetInnerHTML` haría que cualquier cosa que acabara dentro de esa
  * cadena se ejecutara en la página. Hoy el contenido viene sólo del catálogo de
  * señales y del historiador, pero la ruta es la misma por la que viajan los
  * rótulos, y una etiqueta de señal la cambia quien configure el servidor
- * ICONICS. Dentro de un `<img>` el SVG se pinta igual y no ejecuta nada:
- * el navegador lo trata como imagen, no como documento.
+ * ICONICS. Dentro de una etiqueta de imagen el SVG se pinta igual y no ejecuta
+ * nada: el navegador lo trata como imagen, no como documento.
  *
  * `encodeURIComponent` y no base64: pesa menos, se lee al depurar, y evita el
  * viaje por `btoa`, que además rompe con los acentos de los rótulos.

@@ -39,18 +39,31 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
 /**
  * Presupuesto del arranque, en KB.
  *
- * **Medido el 04-09-2026**, tras la Fase 3 del Plan 20: `index` 88.87 KB y
- * `vendor` 109.53 KB. Los techos son eso con un margen del 15 % para el
- * crecimiento normal -- la Fase 4 trae el login y la Fase 5 rehace el
- * asistente, asi que el margen tiene destino conocido.
+ * **Remedido el 04-09-2026, al terminar la Fase 5**: `index` 98,88 KB y
+ * `vendor` 125,18 KB. Los techos son eso con un ~12 % de margen.
  *
- * Venian de 170 y 210, que eran los del tablero de planta con su pila 3D. No
- * bajarlos habria dejado un guion que no guarda nada: con el arranque a la
- * mitad del techo, se podria duplicar la aplicacion entera sin que protestara.
- * La regla de siempre sigue en pie -- si crece por una razon legitima, se sube
- * el numero Y se dice por que.
+ * ── POR QUE SUBEN RESPECTO A LA FASE 3, Y POR QUE NO ES TAPAR NADA ──
+ *
+ * Los anteriores (102 / 126) se midieron contra una aplicacion **incompleta**:
+ * la Fase 3 habia borrado el tablero pero todavia no existian ni el login ni
+ * los cajones. Medir el techo contra media aplicacion y despues subirlo al
+ * acabarla no es relajar la regla, es cerrar una medicion que se tomo pronto.
+ *
+ * Lo que crecio, y su motivo:
+ *
+ *  - `index` +10 KB: el login, el proveedor de sesion, la unica puerta a la
+ *    API y el armazon de la pantalla completa con sus tres estados.
+ *  - `vendor` +16 KB: los cajones usan `useQuery`, que arrastra mas superficie
+ *    de TanStack Query que el `QueryClient` pelado que habia antes.
+ *
+ * Los tres cajones NO cuentan aqui: van en sus propios trozos, diferidos, y
+ * eso es precisamente lo que este guion cazo — estaticos ponian `index` en
+ * 126,58 KB y quien entra a hacer una sola pregunta los pagaba enteros.
+ *
+ * La regla de siempre sigue en pie: si crece por una razon legitima, se sube
+ * el numero Y se dice por que. Si crece sin motivo, esto lo dice.
  */
-const PRESUPUESTO_KB = { index: 102, vendor: 126 };
+const PRESUPUESTO_KB = { index: 110, vendor: 140 };
 
 /**
  * Librerias que se echaron en la Fase 3 y no deben volver a entrar.

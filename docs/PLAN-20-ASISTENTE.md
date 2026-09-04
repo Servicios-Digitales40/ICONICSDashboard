@@ -869,7 +869,7 @@ Se reescriben:
   los tres temas siguen. Lo que se va es el vocabulario de tablero —tiles,
   sparks, banners de estado, la retícula de nueve vistas.
 
-### F5 · El brief de diseño (`impeccable shape`) — **PENDIENTE DE CONFIRMAR**
+### F5 · El brief de diseño (`impeccable shape`) — **CONFIRMADO**
 
 > Producido el 04-09-2026 siguiendo `reference/shape.md` del skill `impeccable`,
 > con `context.mjs` cargando el `PRODUCT.md` y `DESIGN.md` que la F4.5 dejó al
@@ -991,7 +991,79 @@ se llena.
 - La densidad no baja de lo que fija `DESIGN.md`: cuerpo de 13 px, radios de 16
   y 9, un solo azul, sin cuarto nivel de tinta.
 
-### F5 · El asistente pasa a ser la aplicación
+### F5 · El asistente pasa a ser la aplicación — **HECHA**
+
+> Ejecutada el 04-09-2026 contra el brief de arriba. Frontend **19 archivos /
+> 182 pruebas**; backend intacto. `detect.mjs` baja de 3 avisos a 1, y el que
+> queda es defendible.
+>
+> #### Lo entregado
+>
+> `Asistente.jsx` deja de ser un lanzador flotante con panel de esquina y modo
+> maximizado. Los tres estados que tenía eran **tamaños**, y existían porque el
+> chat convivía con veintidós pantallas de las que apartarse. Los tres que
+> tiene ahora son de **naturaleza**: lectura, cajón encima, y el manos libres
+> tomando la pantalla.
+>
+> La cabecera absorbió `auth/BarraSesion.jsx`, que desaparece — su sitio era ése
+> desde el principio.
+>
+> #### Un cambio de arquitectura que el brief no anticipó
+>
+> `Asistente` iba a leer el usuario de `useSesion()`. Eso ataba
+> `features/asistente/` a `auth/`, y con él **sus siete archivos de prueba**,
+> que habrían tenido que montar un proveedor de sesión para comprobar cómo se
+> pinta una respuesta. Se corrigió a props: quien conoce las dos cosas es
+> `app/App.jsx`, que es exactamente su trabajo. Sin `usuario`, la cabecera no
+> pinta ese bloque — no inventa un «invitado».
+>
+> #### Lo que las guardas cazaron, y que no habría visto a ojo
+>
+> 1. **La retícula pasó de instrumento a papel pintado.** Era el fondo del
+>    panel, y ahí se leía como un aparato de medida. A pantalla completa cubría
+>    1920 px de cuadrícula que no mide nada — que es literalmente lo que la
+>    regla `codex-grid-background` describe. **Se replegó al trazo**: ahora sólo
+>    va detrás de lo único de esta interfaz que sí es una medida. La identidad
+>    no se pierde, se concentra donde significa algo.
+> 2. **Los tres cajones viajaban en el arranque.** `verificar-bundle` lo cazó:
+>    `index` saltó de 98,88 a **126,58 KB**. Quien entra a hacer una sola
+>    pregunta —el caso normal— descargaba el árbol de AssetWorX, los dos
+>    gestores y las consultas de TanStack Query antes de poder escribir.
+>    Diferidos con `lazy()`, que aquí es reparto de descarga y no navegación:
+>    siguen sin URL y sin sobrevivir a una recarga.
+> 3. **La medida de la respuesta era de 97 caracteres por línea** (`maxWidth:
+>    92%`). El ojo pierde el renglón a partir de ~75: al volver del final de una
+>    línea larga aterriza una línea más abajo, y en un párrafo de diagnóstico de
+>    diez líneas eso pasa varias veces. A `68ch`.
+> 4. **Las superficies que dibuja el navegador no estaban tematizadas.**
+>    Selección, cursor de escritura y barra de desplazamiento salían con los
+>    colores del sistema operativo. En una sola vista con un texto largo en el
+>    centro se ven constantemente — seleccionar una cifra para copiarla es el
+>    gesto más repetido de esta pantalla, y pintaba un azul de Windows encima de
+>    la respuesta.
+>
+> #### El aviso que queda, y por qué se queda
+>
+> `codex-grid-background`, severidad *advisory*, ahora sobre la caja de 104×28
+> del trazo. Es exactamente la excepción que la propia regla nombra —«reserve
+> grid overlays for actual measurement surfaces»— y el brief tenía orden de
+> preservar el trazo. Se queda, documentado en el código.
+>
+> #### Los techos del bundle, remedidos
+>
+> De 102/126 a **110/140**, sobre 98,88 y 125,18 medidos. No es taparlo: los
+> anteriores se midieron en la F3 contra una aplicación **incompleta**, sin
+> login y sin cajones. `index` creció 10 KB por el login, la sesión y el armazón
+> de tres estados; `vendor` 16 KB porque los cajones usan `useQuery`, que
+> arrastra más superficie de TanStack Query que el `QueryClient` pelado.
+>
+> #### Lo que sigue pendiente para la F6
+>
+> La deuda del SVG del servidor (§F4.5): su azul no es el de marca y siempre es
+> claro. Sigue sin tocarse porque exige decidir si el tema viaja en la petición,
+> y eso no se decide dentro de un componente.
+
+### F5 (original) · El asistente pasa a ser la aplicación
 
 **Método: `/impeccable shape` primero, código después.** No se improvisa la
 pantalla. El encargo de esta rama es de **modo Operate** —el visitante
