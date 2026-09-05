@@ -164,11 +164,31 @@ function clienteFalso({
      */
     control,
 
+    /*
+     * Desde el Plan 21 F5 el cliente real RELEE lo escrito y adjunta
+     * `confirmacion` / `confirmada` (ver `confirmarEscrituras` en
+     * `iconics/client.mjs`). Este falso tiene que hacer lo mismo, y no por
+     * cortesía: `controlar_bomba` decide con esos campos, así que un falso que
+     * no los diera haría fallar la orden SIEMPRE — que es exactamente lo que
+     * pasó al introducir F5, y lo que estas dos comprobaciones atraparon.
+     *
+     * La relectura se apunta en `lecturasSueltas` igual que la del cliente
+     * real, porque es lo que una de ellas comprueba: que se relee de verdad.
+     */
     async writePoint(punto, valor) {
       escrituras.push({ punto, valor })
       if (!aceptaEscritura) return { ok: false, error: 'punto de solo lectura' }
       if (escrituraTomaEfecto) control.valor = valor
-      return { ok: true }
+
+      lecturasSueltas.push(punto)
+      const leido = control.valor
+      const coincide = leido === valor
+
+      return {
+        ok: true,
+        confirmacion: { pointName: punto, pedido: valor, leido, coincide },
+        confirmada: coincide,
+      }
     },
 
     async readPoint(punto) {

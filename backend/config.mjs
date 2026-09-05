@@ -68,6 +68,27 @@ const DEFAULTS = {
   /** Se renueva el token con este margen para no usarlo ya caducado en vuelo. */
   tokenExpirySkewSeconds: 60,
   /**
+   * Relectura de confirmación tras una escritura: cuántas veces y cada cuánto.
+   *
+   * ── ESTÁN MEDIDOS, NO ELEGIDOS ─────────────────────────────────────
+   *
+   * Vienen de `controlar_bomba`, que fue el primero en necesitarlos y los
+   * ajustó contra el tag real. El servidor puede responder `ok: true` a una
+   * escritura sin que el punto haya cambiado todavía: `CONTROL` es una fuente
+   * en tiempo real que ICONICS escanea cada ~1 s, y ese ciclo tiene jitter
+   * (cola de escaneo, latencia al PLC).
+   *
+   * Con 3 intentos de 700 ms —1,4 s de margen— se vieron falsos rechazos en
+   * los que la bomba SÍ llegaba a encenderse, sólo que después de que la
+   * guarda ya había dado la escritura por perdida. Cinco intentos de 800 ms
+   * (3,2 s) cubren el jitter sin alargar de más la respuesta normal.
+   *
+   * Reconfirmarlos contra el PLC es del Plan 26: hasta entonces son lo mejor
+   * que se ha medido, y se mueven aquí para que haya UN número y no dos.
+   */
+  writeConfirmIntentos: 5,
+  writeConfirmEsperaMs: 800,
+  /**
    * Vida de la caché de lecturas en lote.
    *
    * El sondeo del frontend agrupa muy bien DENTRO de un navegador, pero son
@@ -740,6 +761,18 @@ export function loadConfig(env = process.env) {
       maxAlarmHours: DEFAULTS.maxAlarmHours,
       healthTimeoutMs: DEFAULTS.healthTimeoutMs,
       tokenExpirySkewSeconds: DEFAULTS.tokenExpirySkewSeconds,
+      /*
+       * Ajustables por entorno, y por el mismo criterio que los cuatro de
+       * abajo: dependen de cómo se comporte ESTA planta —el `Scan rate` del
+       * tag y la latencia al PLC— y no tiene sentido que obliguen a tocar
+       * código. Los defectos son los medidos; ver `DEFAULTS`.
+       */
+      writeConfirmIntentos: readInteger(
+        'WRITE_CONFIRM_INTENTOS', env.WRITE_CONFIRM_INTENTOS, DEFAULTS.writeConfirmIntentos, 1
+      ),
+      writeConfirmEsperaMs: readInteger(
+        'WRITE_CONFIRM_ESPERA_MS', env.WRITE_CONFIRM_ESPERA_MS, DEFAULTS.writeConfirmEsperaMs
+      ),
 
       /*
        * Los cuatro siguientes se pueden ajustar por entorno. Son los que

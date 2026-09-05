@@ -43,23 +43,24 @@ import { RAIZ } from '../../../../shared/eva/tanque/senales.js'
 /** Punto de control de la bomba: no es una señal del catálogo, así que vive aparte. */
 const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`
 
-/**
- * Veces que se relee `CONTROL` tras escribir, y espera entre cada una.
+/*
+ * ── LA RELECTURA DE CONFIRMACIÓN SE MUDÓ AL CLIENTE (Plan 21 F5) ────
  *
- * El tag escanea cada ~1 s (su `Scan rate` en el servidor), pero ese ciclo
- * tiene jitter (cola de escaneo, latencia de red al PLC/OPC): con 3 intentos
- * de 700 ms (1,4 s de margen total) se vieron falsos rechazos en los que la
- * bomba sí llegaba a encenderse, solo que después de que el guard ya había
- * dado la escritura por perdida. Cinco intentos con 800 ms (3,2 s de margen)
- * cubren ese jitter sin alargar demasiado la respuesta en el caso normal.
+ * Aquí vivían `INTENTOS_RELECTURA_CONTROL`, `ESPERA_RELECTURA_CONTROL_MS`, un
+ * `esperar()` y el bucle que los usaba. Fueron lo primero que necesitó
+ * confirmar una escritura, y por eso se midieron aquí — pero el problema no es
+ * de la bomba: es de CUALQUIER escritura, porque un `ok: true` del servidor
+ * dice que aceptó la petición y no que el PLC tomara el valor.
+ *
+ * Desde F5 lo hace `client.writePoint()`, que devuelve `confirmacion` con lo
+ * pedido, lo leído y si coinciden. Los números viajaron con su medición a
+ * `writeConfirmIntentos` en `config.mjs`.
+ *
+ * Lo que se queda aquí es lo que SÍ es de la bomba: las dos guardas (solo
+ * lectura, nivel de tanque) y la decisión de que una escritura sin confirmar
+ * sea un error. El cliente informa; quién lo trata como fallo depende de la
+ * consecuencia, y una bomba que se cree encendida y no lo está la tiene.
  */
-const INTENTOS_RELECTURA_CONTROL = 5
-const ESPERA_RELECTURA_CONTROL_MS = 800
-
-/** Pausa async simple, para esperar entre reintentos de relectura. */
-function esperar(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
 
 /**
  * Las tres herramientas de máquina.
@@ -264,26 +265,19 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
       }
 
       /*
-       * El servidor puede responder `ok: true` a la escritura sin que el punto
-       * cambie de verdad todavía. `CONTROL` es una fuente en tiempo real que el
-       * motor de ICONICS escanea cada ~1 s (ver `Scan rate` del tag), así que
-       * una relectura inmediata puede devolver el valor anterior aunque la
-       * escritura sí vaya a tomar efecto en el siguiente ciclo. Se reintenta
-       * unas pocas veces con una espera corta antes de dar la escritura por
-       * sin efecto — confirmar sólo porque la petición HTTP no dio error sería
-       * prestarle al servidor una ejecución que no ha demostrado.
+       * `writePoint` ya releyó el punto y trae el veredicto: confirmar una
+       * escritura sólo porque la petición HTTP no dio error sería prestarle al
+       * servidor una ejecución que no ha demostrado. El porqué, los reintentos
+       * y de dónde salen sus números están en `confirmarEscrituras`
+       * (`iconics/client.mjs`) y en `writeConfirmIntentos` (`config.mjs`).
+       *
+       * Lo que decide AQUÍ es qué hacer con un «no coincide»: para la bomba es
+       * un error, porque una bomba que se cree encendida y no lo está manda a
+       * alguien a buscar la avería al sitio equivocado.
        */
-      let valorLeido = null
-      let relecturaOk = false
-      for (let intento = 0; intento < INTENTOS_RELECTURA_CONTROL; intento++) {
-        if (intento > 0) await esperar(ESPERA_RELECTURA_CONTROL_MS)
-        const relectura = await client.readPoint(TAG_CONTROL_BOMBA)
-        relecturaOk = Boolean(relectura?.ok)
-        valorLeido = toBooleano(relectura?.payload?.value ?? relectura?.payload?.Value ?? null)
-        if (relecturaOk && valorLeido === encender) break
-      }
+      const valorLeido = toBooleano(r.confirmacion?.leido ?? null)
 
-      if (!relecturaOk || valorLeido === null || valorLeido !== encender) {
+      if (!r.confirmada || valorLeido !== encender) {
         return fallo(
           `Mandé la orden de ${encender ? 'encender' : 'apagar'} la bomba y el servidor la aceptó, ` +
             `pero al releer ${TAG_CONTROL_BOMBA} sigue valiendo ${valorLeido ?? 'sin dato'} en vez de ` +

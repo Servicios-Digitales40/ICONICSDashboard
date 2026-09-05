@@ -71,6 +71,7 @@ export function createIconicsClient(config, authenticator) {
     maxUpstreamItems, healthTimeoutMs, upstreamTimeoutMs, batchCacheTtlMs,
     maxHistoryPaginas, maxHistoryMs,
     historyCacheTtlMs, historyCacheMax, historyCacheMargenMs,
+    writeConfirmIntentos, writeConfirmEsperaMs,
   } = config.limits
 
   /**
@@ -607,12 +608,118 @@ export function createIconicsClient(config, authenticator) {
 
   /* ── Escritura ────────────────────────────────────────────────────── */
 
+  /** Pausa entre relecturas de confirmación. */
+  const esperar = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+  /**
+   * ¿Es lo leído el mismo valor que se escribió?
+   *
+   * ── POR QUÉ NO BASTA `===` ─────────────────────────────────────────
+   *
+   * Porque el valor no vuelve como se mandó. Se escribe el booleano `true` y
+   * ICONICS puede devolverlo como `"True"`, como `1` o como `true`, según el
+   * tipo del tag y de por dónde salga la lectura. Comparar con `===` daría
+   * «no coincide» sobre una escritura que sí entró, que es peor que no
+   * comprobar: enseñaría a desconfiar de la confirmación.
+   *
+   * Se compara por VALOR y no por forma, y sólo entre las tres formas que este
+   * servidor usa. Cualquier otra cosa se compara tal cual.
+   */
+  function mismoValor(escrito, leido) {
+    if (escrito === leido) return true
+    if (escrito === null || escrito === undefined) return false
+    if (leido === null || leido === undefined) return false
+
+    const aBooleano = v => {
+      if (typeof v === 'boolean') return v
+      if (typeof v === 'number') return v !== 0
+      if (typeof v === 'string') {
+        const t = v.trim().toLowerCase()
+        if (t === 'true' || t === '1') return true
+        if (t === 'false' || t === '0') return false
+      }
+      return null
+    }
+
+    if (typeof escrito === 'boolean') {
+      const l = aBooleano(leido)
+      return l !== null && l === escrito
+    }
+
+    if (typeof escrito === 'number' || typeof leido === 'number') {
+      const a = Number(escrito)
+      const b = Number(leido)
+      if (Number.isFinite(a) && Number.isFinite(b)) return a === b
+    }
+
+    return String(escrito) === String(leido)
+  }
+
+  /** El valor de una lectura, en las dos grafías con que llega. */
+  function valorLeido(lectura) {
+    return lectura?.payload?.value ?? lectura?.payload?.Value ?? null
+  }
+
+  /**
+   * Relee lo escrito y dice si de verdad entró.
+   *
+   * ── POR QUÉ ESTO NO PUEDE DARSE POR SUPUESTO ───────────────────────
+   *
+   * Un `ok: true` del servidor dice que ACEPTÓ la petición, no que el PLC haya
+   * tomado el valor. Se comprobó contra el tag real de esta demo: primero
+   * configurado como «Static value» —aceptaba la escritura y seguía leyendo
+   * `true` siempre— y luego como fuente en tiempo real con escaneo cada ~1 s,
+   * donde una relectura inmediata puede traer el valor de antes del ciclo.
+   *
+   * Por eso se reintenta con espera: ver `writeConfirmIntentos` en
+   * `config.mjs`, donde están los números y de dónde salen.
+   *
+   * ── LA CONFIRMACIÓN INFORMA, NO DECIDE ─────────────────────────────
+   *
+   * Una escritura que el servidor aceptó y que no se pudo confirmar sigue
+   * devolviendo `ok: true`, con `confirmacion` diciendo que no coincide. La
+   * decisión de tratarlo como fallo es de quien llama, porque depende de la
+   * consecuencia: `controlar_bomba` lo convierte en un 409 —una bomba que se
+   * cree encendida y no lo está es un problema— y la vista de Data se limita a
+   * enseñarlo.
+   *
+   * Convertirlo aquí en `ok: false` habría cambiado el contrato de
+   * `/api/iconics/write` sin que nadie lo pidiera.
+   */
+  async function confirmarEscrituras(items) {
+    const confirmacion = []
+
+    for (let intento = 0; intento < writeConfirmIntentos; intento++) {
+      if (intento > 0) await esperar(writeConfirmEsperaMs)
+
+      confirmacion.length = 0
+      let todasCoinciden = true
+
+      for (const { pointName, value } of items) {
+        const lectura = await readPoint(pointName)
+        const leido = lectura?.ok ? valorLeido(lectura) : null
+        const coincide = Boolean(lectura?.ok) && mismoValor(value, leido)
+        if (!coincide) todasCoinciden = false
+        confirmacion.push({ pointName, pedido: value, leido, coincide })
+      }
+
+      if (todasCoinciden) return { confirmacion, intentos: intento + 1 }
+    }
+
+    return { confirmacion, intentos: writeConfirmIntentos }
+  }
+
   /**
    * Envío común a `POST /Data/Write`, que atiende tanto una escritura suelta
    * como un lote: para el servidor las dos son la misma lista de `WriteItem`.
    * Lo único que cambia es cómo se traza y cómo se presenta el resultado.
+   *
+   * `confirmar` releé lo escrito y adjunta `confirmacion`. Va encendido por
+   * defecto: dar por buena una escritura porque la petición HTTP no dio error
+   * es la diferencia entre «se apagó» y «se mandó apagar», y el defecto tiene
+   * que ser el que no promete de más.
    */
-  async function sendWrite(items, trace) {
+  async function sendWrite(items, trace, { confirmar = true } = {}) {
     if (!isConfigured) return NOT_CONFIGURED
 
     const result = await request({
@@ -623,37 +730,70 @@ export function createIconicsClient(config, authenticator) {
     })
 
     if (!result.ok) return result
-    return {
+
+    const sobre = {
       ok: true,
       status: 200,
       results: Array.isArray(result.payload) ? result.payload : [result.payload],
     }
+
+    if (!confirmar) return sobre
+
+    const { confirmacion, intentos } = await confirmarEscrituras(items)
+    const sinConfirmar = confirmacion.filter(c => !c.coincide)
+
+    if (sinConfirmar.length) {
+      /*
+       * Se registra SIEMPRE, aunque el sobre siga siendo `ok`. Es la línea que
+       * se busca cuando alguien dice que dio la orden y no pasó nada, y sin
+       * ella el único rastro sería un 200 en el log de accesos.
+       */
+      logger.warn(
+        {
+          puntos: sinConfirmar.map(c => c.pointName),
+          detalle: sinConfirmar,
+          intentos,
+        },
+        `El servidor aceptó la escritura de ${sinConfirmar.length} punto(s) pero la relectura NO ` +
+          `lo confirma tras ${intentos} intento(s). La escritura puede no haber tenido efecto ` +
+          'sobre la instalación: revisa la configuración de esos puntos en ICONICS antes de ' +
+          'reintentarla tal cual.'
+      )
+    }
+
+    return { ...sobre, confirmacion, confirmada: sinConfirmar.length === 0, intentos }
   }
 
   /**
    * Escribe un punto. Sirve además para disparar los Data Manipulators de
    * GridWorX, escribiendo `true` en su punto `.@@Execute`.
    */
-  async function writePoint(pointName, value) {
+  async function writePoint(pointName, value, opciones) {
     const result = await sendWrite([{ pointName, value }], {
       failure: 'ICONICS write request failed.',
       event: `la escritura de ${pointName}`,
       describir: ms => `Escrito ${pointName} = ${value} en ${ms} ms`,
       meta: { pointName, valor: value },
-    })
+    }, opciones)
 
     if (!result.ok) return result
-    return { ok: true, status: 200, result: result.results[0] }
+    return {
+      ok: true,
+      status: 200,
+      result: result.results[0],
+      confirmacion: result.confirmacion?.[0] ?? null,
+      confirmada: result.confirmada,
+    }
   }
 
-  function writePoints(items) {
+  function writePoints(items, opciones) {
     return sendWrite(items, {
       failure: 'ICONICS batch write request failed.',
       event: `la escritura de ${items.length} puntos`,
       describir: ms =>
         `Escritos ${items.length} puntos en ${ms} ms (${resumirNombres(items.map(i => i.pointName))})`,
       meta: { puntos: items.length, nombres: items.map(i => i.pointName) },
-    })
+    }, opciones)
   }
 
   /* ── Alarmas ──────────────────────────────────────────────────────── */

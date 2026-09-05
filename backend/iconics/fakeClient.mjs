@@ -211,9 +211,29 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     return { ok: true, status: 200, payload: byPointName }
   }
 
+  /**
+   * `confirmacion` y `confirmada` acompañan a toda escritura desde el Plan 21
+   * F5, y este transporte tiene que darlos o miente sobre el contrato.
+   *
+   * Aquí siempre coinciden: el falso guarda lo escrito y lo devuelve al releer,
+   * así que la escritura SIEMPRE tiene efecto. Es lo correcto para un
+   * simulador —no hay PLC que pueda ignorarla— y hay que saberlo al leer una
+   * prueba: el camino de «aceptada pero sin efecto» sólo se ejercita contra el
+   * ICONICS falso de `verificar-backend.mjs`, que sí puede fingirlo.
+   */
+  function confirmacionDe(name, value) {
+    return { pointName: name, pedido: value, leido: value, coincide: true }
+  }
+
   async function writePoint(name, value) {
     escritos.set(name, value)
-    return { ok: true, status: 200, result: { pointName: name, ok: true } }
+    return {
+      ok: true,
+      status: 200,
+      result: { pointName: name, ok: true },
+      confirmacion: confirmacionDe(name, value),
+      confirmada: true,
+    }
   }
 
   async function writePoints(items) {
@@ -221,6 +241,8 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     return {
       ok: true, status: 200,
       results: items.map(({ pointName: name }) => ({ pointName: name, ok: true })),
+      confirmacion: items.map(({ pointName: name, value }) => confirmacionDe(name, value)),
+      confirmada: true,
     }
   }
 
