@@ -21,7 +21,7 @@
  *  - Filtro por calidad en la frontera (ver quality.js): un valor de mala
  *    calidad es ausencia de dato, no un cero.
  */
-import { isGoodQuality } from "@shared/quality.js";
+import { isGoodQuality, motivoDeCalidad } from "@shared/quality.js";
 
 /** Adaptador de visibilidad. Fuera del navegador se comporta como «siempre visible». */
 function visibilidadDelNavegador() {
@@ -146,7 +146,13 @@ export function createPollingEngine({
           // hueco puntual no parpadee en pantalla.
           const previo = values.get(name);
           if (previo) previo.misses += 1;
-          else values.set(name, { value: null, quality: null, ok: false, receivedAt: null, misses: 1 });
+          else {
+            // Sin `motivo`: el punto no vino, así que no hay calidad que
+            // interpretar. Es ausencia, y de eso ya habla `stale`.
+            values.set(name, {
+              value: null, quality: null, motivo: null, ok: false, receivedAt: null, misses: 1,
+            })
+          }
           continue;
         }
 
@@ -170,6 +176,18 @@ export function createPollingEngine({
         values.set(name, {
           value: ok ? bruto.value ?? null : null,
           quality: bruto.quality ?? null,
+          /*
+           * POR QUÉ no vale, no sólo QUE no vale (Plan 21 F3). Un sensor
+           * desconectado, un módulo que desconfía de su medida y un punto que
+           * dejó de entregar se arreglan en tres sitios distintos, y con un
+           * booleano los tres se ven igual en pantalla.
+           *
+           * Cuando la calidad es buena pero no vino `value`, el motivo es
+           * `null` y el valor también: el punto contestó y no dijo nada. Ese
+           * caso lo cuenta la forma común como `sinDato` sin motivo de
+           * calidad, que es exactamente lo que es.
+           */
+          motivo: motivoDeCalidad(bruto.quality),
           ok,
           receivedAt: ahora,
           misses: 0,
@@ -291,13 +309,22 @@ export function createPollingEngine({
    * `stale` es cierto cuando lleva `staleAfterCycles` ciclos sin noticias.
    */
   function get(name) {
+    if (!values.has(name)) {
+      return { value: null, ok: false, stale: true, receivedAt: null, motivo: null };
+    }
     const v = values.get(name);
-    if (!v) return { value: null, ok: false, stale: true, receivedAt: null };
     return {
       value: v.ok ? v.value : null,
       ok: v.ok,
       stale: v.misses >= staleAfterCycles,
       receivedAt: v.receivedAt,
+      /*
+       * El motivo acompaña al hueco hasta arriba. `null` cuando la lectura es
+       * buena, y también cuando el punto simplemente no vino en la respuesta
+       * —ahí no hay calidad que interpretar, hay ausencia—, que es lo que
+       * `stale` ya cuenta.
+       */
+      motivo: v.motivo ?? null,
     };
   }
 

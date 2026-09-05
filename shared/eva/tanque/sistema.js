@@ -61,7 +61,20 @@ function sanear(key, raw) {
  * la única forma de que «Manual»/«Automático» se escriba en un sitio y no en
  * cada tarjeta que lo pinte.
  */
-export function createSenal({ key, valor = null, receivedAt = null, stale = false, reposo = false }) {
+export function createSenal({
+  key,
+  valor = null,
+  receivedAt = null,
+  stale = false,
+  reposo = false,
+  /*
+   * Por qué NO hay valor, cuando no lo hay (Plan 21 F3). `null` significa dos
+   * cosas distintas y las dos son legítimas: que la lectura es buena, o que el
+   * punto no vino y por tanto no hay calidad que interpretar. Lo que ya no
+   * puede pasar es que haya un hueco por mala calidad y nadie sepa cuál.
+   */
+  motivo = null,
+}) {
   const meta = SENALES[key];
   if (!meta) return null;
 
@@ -77,6 +90,9 @@ export function createSenal({ key, valor = null, receivedAt = null, stale = fals
     // señal en `reposo` puede estar fuera de banda, y la tarjeta lo explica.
     banda: meta.tipo === "booleano" ? null : bandaDe(key, v),
     margen: meta.tipo === "booleano" ? null : margenConsumido(key, v),
+    /* Sólo cuando de verdad falta el valor: un motivo junto a una medición
+       buena sería ruido, y peor, invitaría a leerlo como una advertencia. */
+    motivo: v === null ? motivo : null,
     receivedAt,
     stale,
   };
@@ -108,8 +124,9 @@ const repartoPorEstado = (senales) =>
 /**
  * Punto de entrada único.
  *
- * `lecturas` es `{ [clave]: { value, receivedAt, stale } }`, tal como lo entrega
- * el motor de polling: valor ya filtrado por calidad, o `null`.
+ * `lecturas` es `{ [clave]: { value, receivedAt, stale, motivo } }`, tal como lo
+ * entrega el motor de polling: valor ya filtrado por calidad, o `null`, y —desde
+ * el Plan 21 F3— POR QUÉ es `null` cuando lo es.
  */
 export function createSistema(lecturas = {}) {
   const crudos = Object.fromEntries(
@@ -125,6 +142,7 @@ export function createSistema(lecturas = {}) {
       valor: crudos[key],
       receivedAt: lecturas[key]?.receivedAt ?? null,
       stale: lecturas[key]?.stale ?? false,
+      motivo: lecturas[key]?.motivo ?? null,
       reposo,
     });
   }

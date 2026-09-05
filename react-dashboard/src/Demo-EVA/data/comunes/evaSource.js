@@ -101,7 +101,7 @@ export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
     const lecturas = {};
     for (const key of SENAL_KEYS) {
       const l = motor.get(pointName(key));
-      lecturas[key] = { value: l.value, receivedAt: l.receivedAt, stale: l.stale };
+      lecturas[key] = { value: l.value, receivedAt: l.receivedAt, stale: l.stale, motivo: l.motivo };
     }
 
     const sistema = createSistema(lecturas);

@@ -61,6 +61,14 @@
  *             `50.09765625`— y un modelo de lenguaje lo cita tal cual. Trece
  *             decimales sugieren una exactitud que el sensor no tiene
  *   historia  ¿se puede pedir su serie sin mentir? Ver `series` del registro
+ *   motivo    POR QUÉ no hay valor, cuando no lo hay: `{ codigo, texto }` de
+ *             `shared/quality.js`, o `null`. NO es lo mismo que `nota` —esa es
+ *             un hecho permanente de la señal, sacado del catálogo; esto es
+ *             una circunstancia de ESTA lectura— y por eso son dos campos.
+ *             Añadido en el Plan 21 F3: hasta entonces, un sensor
+ *             desconectado, un módulo que desconfía de su medida y un punto
+ *             que dejó de entregar llegaban aquí como el mismo hueco, y se
+ *             arreglan en tres sitios distintos
  */
 export function senalComun({
   clave,
@@ -74,11 +82,15 @@ export function senalComun({
   tag = null,
   banda = null,
   nota = null,
+  motivo = null,
   decimales = 1,
   historia = false,
 }) {
   return {
     clave, label, valor, unidad, estado, texto, canal, grupo, tag, banda, nota,
+    /* Sólo acompaña a un hueco: un motivo junto a una medición buena sería
+       ruido, y peor, invitaría a leerlo como una advertencia. */
+    motivo: valor === null || valor === undefined ? motivo : null,
     decimales, historia,
   };
 }

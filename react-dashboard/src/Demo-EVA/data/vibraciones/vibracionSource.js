@@ -114,6 +114,27 @@ export function createVibracionSource({ transport, intervalMs = CADENCIA_MS } = 
       if (recibido && (!lastUpdated || recibido > lastUpdated)) lastUpdated = recibido;
     }
 
+    /*
+     * ── POR QUÉ NO ENTREGA CADA PUNTO MUDO (Plan 21 F3) ────────────────
+     *
+     * `sinDato` es una lista de NOMBRES: dice cuáles no entregaron y no por
+     * qué. Aquí se enriquece con el motivo que el motor guardó de la calidad,
+     * porque este archivo es el que conoce el transporte y el dominio no tiene
+     * por qué.
+     *
+     * El reparto es lo que hace útil la cifra: «43 de 73 mudos» no dice nada
+     * accionable, y «43 mudos, los 43 porque el punto dejó de entregar» apunta
+     * a la máquina; si fueran 43 con calidad mala, apuntaría al cableado.
+     * Ver `motivoDeCalidad` en `shared/quality.js`.
+     */
+    const porMotivo = {};
+    const detalleSinDato = sinDato.map((punto) => {
+      const motivo = motor.get(punto).motivo;
+      const codigo = motivo?.codigo ?? "sin_lectura";
+      porMotivo[codigo] = (porMotivo[codigo] ?? 0) + 1;
+      return { punto, motivo };
+    });
+
     const stats = motor.stats();
     const conDato = lastUpdated !== null;
 
@@ -127,7 +148,13 @@ export function createVibracionSource({ transport, intervalMs = CADENCIA_MS } = 
       loading: !conDato && !stats.ultimoError,
       error: conDato ? null : stats.ultimoError ?? null,
       lastUpdated,
+      /* Se mantiene como lista de NOMBRES: es lo que las cuatro vistas
+         consumen, y casi todas sólo miran su longitud. El porqué viaja al
+         lado, en `detalleSinDato` y `sinDatoPorMotivo`, para que añadirlo no
+         obligue a tocar ninguna. */
       puntosSinDato: sinDato,
+      detalleSinDato,
+      sinDatoPorMotivo: porMotivo,
       puntosPedidos,
     };
   }

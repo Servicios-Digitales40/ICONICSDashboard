@@ -69,6 +69,8 @@ export function estadoDelTanque(valorDe, sistemaRegistro, leidoA = null) {
          que separa un umbral medido de una estimación nuestra. */
       banda: UMBRALES[x.key] ?? null,
       nota: SENALES[x.key]?.nota ?? null,
+      /* Por qué falta el dato, cuando falta. Ver `motivo` en `senalComun`. */
+      motivo: x.motivo ?? null,
       decimales: x.decimales,
       historia: x.historizado,
     });
