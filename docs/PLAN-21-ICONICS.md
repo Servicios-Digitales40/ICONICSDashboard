@@ -51,17 +51,21 @@ este plan cierra en ocho sitios.
 y `vibracion.js`. Cambiar la cadencia de una máquina exige acordarse de dos
 sitios, y el que se olvida no da error.
 
-**Qué se hace.** Las dos vistas leen `SISTEMA[id].cadenciaMs`. Se amplía el
-registro con lo que hoy es conocimiento tribal y hace falta para F2:
+**Qué se hace.** Las dos vistas leen `SISTEMA[id].cadenciaMs`. El campo llevaba
+declarado desde que existe el registro y no lo leía nadie.
 
-```
-cadenciaMs       cada cuánto se relee (ya existe, ahora se USA)
-puntosPorLote    cuántos admite ese árbol en una llamada
-```
+**Lo que NO se hace, y por qué.** El plan proponía añadir además
+`puntosPorLote`, «cuántos puntos admite ese árbol en una llamada». Se retira:
+**ese número no lo ha medido nadie.** Hoy las dos máquinas caben de sobra en un
+lote —ocho puntos el tanque, veintiuno vibraciones— y el tope real del servidor
+se descubre midiéndolo, no declarándolo. Ponerlo ahora sería inventar un dato
+del servidor, que es justo lo que §2.5 prohíbe. El motor sigue con su
+`maxBatch` por defecto y el campo entra el día que el Plan 26 lo mida.
 
-**Cómo se prueba.** `verificar-catalogo.mjs` gana una comprobación: todo sistema
-declara cadencia y tamaño de lote, y son números con sentido. Y una prueba de
-frontend que falla si una vista vuelve a cablear su cadencia.
+**Cómo se prueba.** `verificar-catalogo.mjs` gana una comprobación —todo sistema
+declara cadencia y está en un rango utilizable— y una prueba de frontend que
+falla si una vista vuelve a cablear un número distinto del que declara el
+registro. Comprobado que falla de verdad.
 
 ## F2 · Un solo motor de sondeo (COD-05)
 

@@ -206,6 +206,36 @@ check('toda clave con serie declarada es una clave del sistema', () => {
   }
 })
 
+/* ── 3b. El comportamiento declarado, y que alguien lo lea ────────── */
+
+check('cada sistema declara su cadencia, y es un número con sentido', () => {
+  /*
+   * `cadenciaMs` lleva declarado desde que existe el registro y hasta el Plan
+   * 21 F1 no lo leía nadie: el tanque repetía su 3_000 en `evaSource.js` y
+   * vibraciones su 5_000 en `vibracion.js`. Tres fuentes para el mismo número,
+   * y el que se olvidara de una de ellas seguiría sondeando al ritmo viejo sin
+   * que nada lo dijera.
+   *
+   * Los topes no son gusto: por debajo de un segundo se sondea más rápido de lo
+   * que el servidor publica —y por debajo de `batchCacheTtlMs` (2 s) ni
+   * siquiera se trae dato nuevo, sólo el cacheado—; por encima de un minuto,
+   * una pantalla de planta enseña algo que pasó hace demasiado.
+   */
+  for (const sistema of SISTEMAS) {
+    assert.equal(
+      typeof sistema.cadenciaMs,
+      'number',
+      `"${sistema.id}" no declara cadenciaMs. Sin ella, la vista que lo pinte tendrá que ` +
+        'cablear un número, que es justo lo que este campo existe para evitar.'
+    )
+    assert.ok(
+      sistema.cadenciaMs >= 1000 && sistema.cadenciaMs <= 60_000,
+      `"${sistema.id}" declara cadenciaMs=${sistema.cadenciaMs}, fuera del rango razonable ` +
+        '(1 s a 60 s).'
+    )
+  }
+})
+
 /* ── 4. El catálogo se puede nombrar ──────────────────────────────── */
 
 check('cada clave tiene etiqueta y alias', () => {

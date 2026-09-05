@@ -26,13 +26,28 @@
  * cacheado.
  */
 import { createPollingEngine } from "@/lib/iconics";
+import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 
 import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "../../domain/senales.js";
 import { createSistema } from "../../domain/sistema.js";
 import { createBufferRodante } from "../../lib/buffer.js";
 import { leerSerie as leerDelHistoriador, leerSeries as leerVariasDelHistoriador } from "../tanque/historia.js";
 
-export const CADENCIA_MS = 3_000;
+/**
+ * Cada cuánto se relee el tanque. **Sale del registro, no de aquí.**
+ *
+ * ── POR QUÉ DEJÓ DE SER UN NÚMERO ──────────────────────────────────
+ *
+ * Porque eran tres. `shared/eva/comun/sistemas.js` declara `cadenciaMs: 3_000`
+ * para el tanque desde que existe el registro, y este archivo repetía el mismo
+ * 3_000 cableado; `vibracion.js` hacía lo propio con su 5_000. Nadie leía el
+ * campo del registro salvo una prueba que sólo comprobaba que fuera un número.
+ *
+ * El fallo que eso produce no es que el tablero vaya mal hoy: es que cambiar la
+ * cadencia de una máquina exige acordarse de dos sitios, y el que se olvida NO
+ * da error — sigue sondeando al ritmo viejo y nada lo dice.
+ */
+export const CADENCIA_MS = SISTEMA.tanque.cadenciaMs;
 
 export function createEvaSource({ transport, intervalMs = CADENCIA_MS } = {}) {
   if (!transport?.read) {

@@ -44,14 +44,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataSource } from "@/lib/datasource";
 import { isGoodQuality } from "@shared/quality.js";
 
+import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 import { createSistemaVibraciones } from "@shared/eva/vibraciones/sistemaVibraciones.js";
 
 import { transporteDe } from "../comunes/transportes.js";
 
 import { todosLosPuntos } from "../../domain/vibraciones.js";
 
-/** Cada cuánto se relee. El SM 1281 publica cada pocos segundos. */
-const CADENCIA_MS = 5000;
+/**
+ * Cada cuánto se relee. El SM 1281 publica cada pocos segundos, y ese número
+ * **lo declara el registro** — aquí sólo se lee.
+ *
+ * Ver la nota de `CADENCIA_MS` en `data/comunes/evaSource.js`: el mismo valor
+ * estaba escrito dos veces, en `sistemas.js` y aquí, y el campo del registro no
+ * lo leía nadie.
+ */
+const CADENCIA_MS = SISTEMA.vibraciones.cadenciaMs;
 
 const VACIO = {
   canales: {},
