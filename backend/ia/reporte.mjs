@@ -49,7 +49,7 @@ const ALTO_BLOQUE_GRAFICO = RESERVA_TITULO + ALTO_GRAFICO + RESERVA_RESUMEN + RE
  * @param {string} datos.instalacion
  * @param {string} datos.periodo Etiqueta ya resuelta, ej. "los últimos 8 días".
  * @param {string} datos.generadoEl Fecha/hora local, legible.
- * @param {{titulo: string, unidad: string|null, svg: string, resumen: object|null, tendencia: object|null, interpretacion: string|null, nota: string|null}[]} datos.graficos
+ * @param {{titulo: string, unidad: string|null, svg: string, resumen: object|null, tendencia: object|null, interpretacion: string|null, cobertura: object|null, nota: string|null}[]} datos.graficos
  * @param {{senal: string, valor: number|string|null, unidad: string|null, estado: string}[]} datos.tablaActual
  * @param {string[]} datos.notas
  * @param {string|null} [datos.explicacion] Comentario del MODELO, aparte de `interpretacion`.
@@ -128,6 +128,20 @@ export async function componerReportePdf({
         `Mínimo ${r.minimo}${unidad} · Máximo ${r.maximo}${unidad} · Promedio ${r.promedio}${unidad} ` +
           `· ${r.muestras} muestras`
       )
+      /*
+       * La cobertura va JUNTO al promedio y no en una nota al pie, porque es
+       * lo que dice si ese promedio se puede leer como el del período. Un
+       * rango de diez días con cinco vacíos da un promedio real de cinco días
+       * presentado como el de diez.
+       */
+      if (grafico.cobertura && !grafico.cobertura.completa) {
+        doc.fillColor('#9A6410').text(
+          `Sólo ${grafico.cobertura.diasLeidos} de los ${grafico.cobertura.diasTotal} días del ` +
+            'rango tienen registro en el historiador: estas cifras son de esos días, no del ' +
+            'período entero.'
+        )
+        doc.fillColor('#555')
+      }
       if (grafico.interpretacion) doc.text(grafico.interpretacion)
     } else if (grafico.nota) {
       doc.text(grafico.nota)

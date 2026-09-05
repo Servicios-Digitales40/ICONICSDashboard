@@ -1350,6 +1350,22 @@ export function crearHerramientasDeHistoricos({
               svg,
               resumen: resumirSerie(muestras, meta.decimales),
               tendencia,
+              /*
+               * ── CUÁNTO DEL RANGO TRAÍA DATO (Plan 21 F7) ─────────────
+               *
+               * `leerSerieEnRango` ya devolvía `diasLeidos` y `diasTotal` y
+               * este bloque los tiraba: el PDF salía con «Promedio X sobre N
+               * muestras» y ni una palabra de que la mitad del rango estuviera
+               * vacía. Es el peor sitio para callarlo — un PDF sale del
+               * edificio, se reenvía y se lee meses después sin nadie que
+               * pueda matizarlo.
+               *
+               * Un promedio de la semana sobre el 60 % de los días es un
+               * número distinto, y hasta ahora se veía igual.
+               */
+              cobertura: diasTotal
+                ? { diasLeidos, diasTotal, completa: diasLeidos >= diasTotal }
+                : null,
               // La explicación GARANTIZADA del PDF — ver la cabecera de
               // `generar_reporte`. No depende de que el modelo la pida.
               interpretacion: describirTendencia(tendencia, meta.unidad),

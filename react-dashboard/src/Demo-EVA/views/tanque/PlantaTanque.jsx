@@ -114,7 +114,12 @@ function PlantaTanque({ onNavigate }) {
   // paneles de cierre leen todos de aquí. Pedirlas por componente serían tres
   // rondas de cuatro peticiones para dibujar exactamente los mismos puntos.
   const claves = useMemo(historizadas, []);
-  const { porClave, metaPorClave, loading: cargandoHistoria } = useSeriesHistoricas(claves, VENTANA);
+  /* `cobertura` se descartaba al desestructurar: el hook la traía desde que el
+     troceado vive en el servidor, y la gráfica dibujaba un rango a medias como
+     si estuviera entero. Ver `TendenciaSenales` (Plan 21 F7). */
+  const {
+    porClave, metaPorClave, cobertura: coberturaHistoria, loading: cargandoHistoria,
+  } = useSeriesHistoricas(claves, VENTANA);
 
   const m = useMemo(() => buildModeloEva(sistema), [sistema]);
 
@@ -226,7 +231,8 @@ function PlantaTanque({ onNavigate }) {
               </p>
             ) : (
               <TendenciaSenales
-                senales={m.destacadas} porClave={porClave} metaPorClave={metaPorClave} horas={VENTANA.horas}
+                senales={m.destacadas} porClave={porClave} metaPorClave={metaPorClave}
+                cobertura={coberturaHistoria} horas={VENTANA.horas}
                 t={t} dark={dark} delay={0.45}
               />
             )}

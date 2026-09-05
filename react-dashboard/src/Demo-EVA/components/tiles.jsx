@@ -1031,7 +1031,34 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
   );
 }
 
-export function TendenciaSenales({ senales, porClave, metaPorClave, horas, t, dark, delay = 0 }) {
+/**
+ * ── LA COBERTURA SE DECLARA AQUÍ, EN LA CABECERA (Plan 21 F7) ──────
+ *
+ * Y no por panel: la cobertura es del RANGO, no de cada señal. Las cuatro se
+ * piden sobre los mismos tramos, así que repetir la misma pastilla en cada
+ * cuadro diría cuatro veces lo mismo y parecería que son cuatro huecos
+ * distintos.
+ *
+ * Sin esto, un rango con la mitad de los tramos vacíos se dibuja como una
+ * curva continua entre los que sí tienen muestras, y se lee como si la señal
+ * hubiera evolucionado así — cuando lo que hubo fue silencio. `useSeriesHistoricas`
+ * traía el dato desde que existe el troceado en el servidor, y esta vista lo
+ * descartaba al desestructurar.
+ *
+ * ── LO QUE NO SE PINTA, Y POR QUÉ NO ───────────────────────────────
+ *
+ * Una banda sombreada sobre el tramo que faltó. Sería lo mejor, y hoy no se
+ * puede decir la verdad con ella: la cobertura que viaja son CUENTAS
+ * —`tramos`, `tramosConDato`— y no dice CUÁLES fallaron. Sombrear un tramo
+ * elegido a ojo sería inventar dónde estuvo el hueco (§2.5). Para hacerlo hay
+ * que subir primero qué tramos concretos vinieron vacíos, que es un cambio en
+ * la respuesta del puente y no en esta vista.
+ */
+export function TendenciaSenales({
+  senales, porClave, metaPorClave, cobertura, horas, t, dark, delay = 0,
+}) {
+  const incompleta = cobertura && cobertura.completa === false;
+
   return (
     <Card
       t={t} delay={delay}
@@ -1039,8 +1066,26 @@ export function TendenciaSenales({ senales, porClave, metaPorClave, horas, t, da
       code={`últimas ${horas} h · del Data Historian`}
       right={
         <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: t.textSoft }}>
-          <Droplets size={13} color={t.accent} />
-          escala propia en cada panel
+          {incompleta ? (
+            <span
+              title={
+                `Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango ` +
+                "tienen registro en el historiador. Las curvas unen los que sí lo tienen: los " +
+                "huecos no son valores, son silencio."
+              }
+              style={{
+                padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 600,
+                background: t.amberSoft, color: t.amber,
+              }}
+            >
+              {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
+            </span>
+          ) : (
+            <>
+              <Droplets size={13} color={t.accent} />
+              escala propia en cada panel
+            </>
+          )}
         </span>
       }
     >

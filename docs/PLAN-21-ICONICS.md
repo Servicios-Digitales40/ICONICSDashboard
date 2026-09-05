@@ -160,12 +160,28 @@ series devuelve `tramos`, `tramosConDato` y `tramosFallidos`. Excelente. Pero
 `useSerieHistorica` guarda `cobertura` y no todas las gráficas la pintan, y el
 asistente no la recibe como campo estructurado.
 
-**Qué se hace.** Cerrar la cadena: cobertura obligatoria en el sobre, obligatoria
-en el resultado de herramienta, y **visible en la gráfica** como banda sombreada
-sobre el tramo que no se pudo leer.
+**Qué se hace.** Cerrar los dos sitios donde el dato existía y se tiraba:
+
+- **El PDF de `generar_reporte`.** `leerSerieEnRango` ya devolvía `diasLeidos` y
+  `diasTotal`, y el bloque que compone cada gráfico los descartaba: el reporte
+  salía con «Promedio X sobre N muestras» y ni una palabra de que medio rango
+  estuviera vacío. Es el peor sitio para callarlo — un PDF sale del edificio, se
+  reenvía y se lee meses después sin nadie que pueda matizarlo.
+- **La vista de Gráficas.** `useSeriesHistoricas` trae `cobertura` desde que el
+  troceado vive en el servidor, y `PlantaTanque` la descartaba al
+  desestructurar.
 
 «El promedio de la semana» sobre el 60 % de las muestras es un número distinto, y
-hoy se ve igual.
+hasta ahora se veía igual.
+
+**Lo que NO se hace, y por qué.** La banda sombreada sobre el tramo que faltó.
+Sería lo mejor y **hoy no se puede dibujar con la verdad**: la cobertura que
+viaja son CUENTAS —`tramos`, `tramosConDato`— y no dice CUÁLES tramos vinieron
+vacíos. Sombrear uno elegido a ojo sería inventar dónde estuvo el hueco (§2.5).
+
+Hacerlo bien exige que la respuesta del puente lleve qué tramos concretos
+fallaron, que es un cambio en `/api/iconics/history/batch` y no en la vista.
+Queda anotado en la cabecera de `TendenciaSenales` y en su prueba.
 
 ## F8 · El manual no puede dar órdenes (SEG-04)
 
