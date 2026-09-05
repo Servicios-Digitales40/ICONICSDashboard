@@ -70,6 +70,7 @@ export function createIconicsClient(config, authenticator) {
   const {
     maxUpstreamItems, healthTimeoutMs, upstreamTimeoutMs, batchCacheTtlMs,
     maxHistoryPaginas, maxHistoryMs,
+    historyCacheTtlMs, historyCacheMax, historyCacheMargenMs,
   } = config.limits
 
   /**
@@ -303,10 +304,15 @@ export function createIconicsClient(config, authenticator) {
     return promise
   }
 
-  /**
-   * Serie histórica del Hyper Historian.
+  /* ── Serie histórica del Hyper Historian ──────────────────────────
    *
-   * Normaliza las dos formas en que el servidor la devuelve —envuelta en
+   * Son DOS funciones desde el Plan 20 F6, y la separación es la que hace
+   * legible la caché: `readHistory` decide si hace falta salir al servidor y
+   * `leerHistoriaDelServidor` sale. Todo lo que sigue —la paginación, el
+   * presupuesto, la normalización de las dos formas de respuesta— es de la
+   * segunda; lo de la primera está en su propio comentario, justo debajo.
+   *
+   * Normaliza las dos formas en que el servidor devuelve la serie —envuelta en
    * `historicalSamples` o como muestras sueltas— a una sola lista
    * `{ timestamp, value, quality }`, para que el frontend no tenga que
    * conocer ambas.
@@ -333,7 +339,97 @@ export function createIconicsClient(config, authenticator) {
    * las dos cosas pasó, para quien lo necesite sin romper a quien sólo mira
    * `hasMore`.
    */
-  async function readHistory({ pointName, startDate, endDate, aggregate, interval }) {
+  /**
+   * Caché de tramos históricos YA CERRADOS.
+   *
+   * ── QUÉ SE CACHEA, Y QUÉ NO ────────────────────────────────────────
+   *
+   * Sólo lo que no puede cambiar. Un tramo cuyo `endDate` pasó hace más de
+   * `historyCacheMargenMs` es inmutable por definición: nadie escribe una
+   * muestra con fecha de ayer. Lo que toca «ahora» NO entra, porque el
+   * historiador escribe con retraso y cachear el borde congelaría un hueco que
+   * se iba a llenar solo.
+   *
+   * Tampoco entra una lectura TRUNCADA. Si el presupuesto de páginas o de
+   * tiempo cortó la serie, guardarla sería fijar un recorte accidental —el de
+   * un momento en que el servidor iba lento— durante toda la vida de la
+   * entrada, y las gráficas siguientes heredarían esa cobertura sin motivo.
+   * Un fallo tampoco: el siguiente en pedirlo tiene derecho a que se intente
+   * otra vez.
+   *
+   * ── POR QUÉ AQUÍ Y NO EN LA RUTA ───────────────────────────────────
+   *
+   * Porque `POST /api/iconics/history/batch` trocea la ventana y llama a esta
+   * misma función una vez por (señal × tramo). Cacheando aquí, los dos caminos
+   * —el tramo suelto y la ventana troceada— comparten entradas: la pantalla de
+   * «Gráficas» de la segunda pestaña no vuelve a pedir ni un tramo.
+   *
+   * Se guarda la PROMESA, igual que en `batchCache` y por el mismo motivo: dos
+   * pantallas que abren la misma vista a la vez esperan a la misma llamada en
+   * vez de arrancar cada una la suya.
+   */
+  const historyCache = new Map()
+
+  function historyKey({ pointName, startDate, endDate, aggregate, interval }) {
+    return [pointName, startDate, endDate, aggregate ?? '', interval ?? ''].join('|')
+  }
+
+  /** ¿Es un tramo que ya no puede cambiar? Ver `historyCacheMargenMs`. */
+  function tramoCerrado(endDate) {
+    if (!endDate) return false
+    const fin = new Date(endDate).getTime()
+    if (!Number.isFinite(fin)) return false
+    return fin < Date.now() - historyCacheMargenMs
+  }
+
+  /**
+   * Deja la caché por debajo del tope, tirando primero lo caducado y, si no
+   * basta, lo más viejo.
+   *
+   * `Map` conserva el orden de inserción, así que «lo más viejo» es lo primero
+   * que devuelve el iterador — no hace falta guardar marcas de uso ni ordenar
+   * nada. No es una LRU: no es lo mismo, y aquí no importa, porque todo lo que
+   * hay dentro vale lo mismo (un tramo que ya no cambia) y lo que se busca es
+   * un techo de memoria, no una tasa de acierto óptima.
+   */
+  function podarHistoryCache(ahora) {
+    for (const [clave, entrada] of historyCache) {
+      if (entrada.expiraEn <= ahora) historyCache.delete(clave)
+    }
+    while (historyCache.size >= historyCacheMax) {
+      const primera = historyCache.keys().next()
+      if (primera.done) break
+      historyCache.delete(primera.value)
+    }
+  }
+
+  async function readHistory(opciones) {
+    if (!isConfigured) return NOT_CONFIGURED
+
+    if (historyCacheTtlMs <= 0 || !tramoCerrado(opciones.endDate)) {
+      return leerHistoriaDelServidor(opciones)
+    }
+
+    const ahora = Date.now()
+    const clave = historyKey(opciones)
+    const cacheada = historyCache.get(clave)
+    if (cacheada && cacheada.expiraEn > ahora) return cacheada.promesa
+
+    const promesa = leerHistoriaDelServidor(opciones)
+    podarHistoryCache(ahora)
+    historyCache.set(clave, { expiraEn: ahora + historyCacheTtlMs, promesa })
+
+    promesa
+      .then(resultado => {
+        // Ver la cabecera: ni los fallos ni las series truncadas se guardan.
+        if (!resultado?.ok || resultado.truncada) historyCache.delete(clave)
+      })
+      .catch(() => historyCache.delete(clave))
+
+    return promesa
+  }
+
+  async function leerHistoriaDelServidor({ pointName, startDate, endDate, aggregate, interval }) {
     if (!isConfigured) return NOT_CONFIGURED
 
     const inicio = Date.now()

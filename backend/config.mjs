@@ -77,6 +77,39 @@ const DEFAULTS = {
    * añade retraso perceptible al dato.
    */
   batchCacheTtlMs: 2000,
+  /**
+   * Vida de la caché de historia YA CERRADA, y su tope de entradas.
+   *
+   * Un tramo del historiador cuyo `endDate` ya pasó es inmutable por
+   * definición: nadie va a escribir una muestra con fecha de ayer. Y sin
+   * embargo cada pantalla que abre «Gráficas» lo volvía a pedir entero, con su
+   * paginación de hasta `maxHistoryPaginas` peticiones HTTP por señal —y
+   * `POST /api/iconics/history/batch` lo multiplica por señales y por tramos.
+   *
+   * Diez minutos no es un compromiso con la frescura, porque no hay ninguna
+   * que perder: es cuánto se le presta memoria a un tramo antes de olvidarlo.
+   * Lo que decide la frescura es el margen de abajo, no esto.
+   */
+  historyCacheTtlMs: 600000,
+  /**
+   * Cuántos tramos se guardan a la vez. Cada entrada son las muestras de una
+   * (punto, ventana, agregado): con el troceado del frontend, una pantalla de
+   * cinco señales sobre treinta días son unas cincuenta. 300 deja sitio a
+   * varias pantallas distintas sin que la memoria del puente dependa de
+   * cuántas ventanas raras haya pedido alguien.
+   */
+  historyCacheMax: 300,
+  /**
+   * Cuánto tiene que haber pasado el `endDate` para considerar el tramo
+   * cerrado.
+   *
+   * NO es un margen de cortesía: el historiador escribe con retraso —la
+   * muestra de hace treinta segundos puede no estar todavía— así que cachear
+   * una ventana que llega hasta «ahora» congelaría un hueco que se iba a
+   * llenar solo. Con dos minutos, lo que entra en la caché ya no puede
+   * cambiar.
+   */
+  historyCacheMargenMs: 120000,
   /** Ventana y tope del limitador por IP. */
   rateLimitWindowMs: 60000,
   rateLimitMax: 300,
@@ -721,6 +754,16 @@ export function loadConfig(env = process.env) {
       /** 0 desactiva la caché de lote. */
       batchCacheTtlMs: readInteger(
         'BATCH_CACHE_TTL_MS', env.BATCH_CACHE_TTL_MS, DEFAULTS.batchCacheTtlMs
+      ),
+      /** 0 desactiva la caché de historia cerrada. */
+      historyCacheTtlMs: readInteger(
+        'HISTORY_CACHE_TTL_MS', env.HISTORY_CACHE_TTL_MS, DEFAULTS.historyCacheTtlMs
+      ),
+      historyCacheMax: readInteger(
+        'HISTORY_CACHE_MAX', env.HISTORY_CACHE_MAX, DEFAULTS.historyCacheMax
+      ),
+      historyCacheMargenMs: readInteger(
+        'HISTORY_CACHE_MARGEN_MS', env.HISTORY_CACHE_MARGEN_MS, DEFAULTS.historyCacheMargenMs
       ),
       rateLimitWindowMs: readInteger(
         'RATE_LIMIT_WINDOW_MS', env.RATE_LIMIT_WINDOW_MS, DEFAULTS.rateLimitWindowMs, 1
