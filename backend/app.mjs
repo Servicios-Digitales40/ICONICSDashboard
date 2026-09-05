@@ -415,7 +415,7 @@ export async function createApp(config) {
       return instancia.autenticar(request, reply)
     })
 
-    registerSystemRoutes(instancia, { config, client, authenticator, startedAt })
+    registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, indiceDocumentos })
     registerIconicsRoutes(instancia, { config, client })
     registerControlRoutes(instancia, { config, herramientas })
     registerChatRoutes(instancia, { config, chat, cola })

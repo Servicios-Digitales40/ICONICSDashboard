@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las veintidós vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las veintitrés vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -54,8 +54,11 @@ describe("superficie de la aplicación", () => {
       "eva-riesgos-vibracion",
       "vib-3d",
       // General — del servidor, no de una máquina: valen para las dos.
+      // `salud-sistema` es la más «del servidor» de todas: no habla de ninguna
+      // instalación, habla del PUENTE (Plan 20 F10).
       "eva-alarmas",
       "eva-assets",
+      "salud-sistema",
       // Predicción — OTRO MÓDULO, no una sección más: un compresor real cuyo
       // histórico sirve otro backend. No entra por ICONICS, así que no puede
       // colgar de ninguna de las dos estaciones ni de «General», que significa
@@ -145,7 +148,7 @@ describe("el sidebar que sale del registro", () => {
     // arriba—, sólo sin `nav`, mismo criterio que `eva-detalle`.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.label).toBe("General");
-    expect(general.children.map((c) => c.id)).toEqual(["eva-assets"]);
+    expect(general.children.map((c) => c.id)).toEqual(["eva-assets", "salud-sistema"]);
 
     /*
      * Predicción ya NO cuelga de «General». Esta comprobación es la que

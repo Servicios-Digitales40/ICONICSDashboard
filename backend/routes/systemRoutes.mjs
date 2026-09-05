@@ -14,7 +14,31 @@ function resolveStatus({ reachable, tokenValid }) {
   return tokenValid ? 'ok' : 'degraded'
 }
 
-export function registerSystemRoutes(fastify, { config, client, authenticator, startedAt }) {
+/**
+ * Cómo está un servicio que este puente necesita, en tres estados y con la
+ * variable que falta cuando falta.
+ *
+ * ── POR QUÉ «NO CONFIGURADO» ES UN ESTADO Y NO UN ERROR ────────────
+ *
+ * Porque una instalación mínima —sin asistente, sin dictado, sin manuales— es
+ * legítima y permanente, no una avería a medio arreglar. Pintarla en rojo
+ * enseñaría a ignorar el rojo. Lo que sí hace falta es que la pantalla pueda
+ * decir QUÉ variable lo encendería, que es la única información accionable.
+ */
+function servicio({ nombre, configurado, variable, ok = true, detalle = null, extra = {} }) {
+  return {
+    nombre,
+    estado: !configurado ? 'no_configurado' : ok ? 'ok' : 'error',
+    ...(configurado ? {} : { variable }),
+    ...(detalle ? { detalle } : {}),
+    ...extra,
+  }
+}
+
+export function registerSystemRoutes(
+  fastify,
+  { config, client, authenticator, startedAt, chat, cola, indiceDocumentos }
+) {
   const uptimeSeconds = () => Math.floor((Date.now() - startedAt) / 1000)
 
   /**
@@ -65,6 +89,8 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
       )
     }
 
+    const indice = indiceDocumentos?.estado() ?? null
+
     return {
       status,
       version: config.version,
@@ -74,6 +100,80 @@ export function registerSystemRoutes(fastify, { config, client, authenticator, s
       uptimeSeconds: uptimeSeconds(),
       timestamp: new Date().toISOString(),
       ...(connectivity.reason ? { reason: connectivity.reason } : {}),
+
+      /*
+       * ── EL ESTADO DE LOS DEMÁS SERVICIOS (Plan 20 F10) ─────────────
+       *
+       * Los campos de arriba se mantienen tal cual porque hay guiones y
+       * documentación que los usan; esto se AÑADE, no los sustituye.
+       *
+       * Lo que sigue es lo que hoy hay que averiguar leyendo logs por SSH
+       * cuando alguien dice que «va raro»: si el asistente está montado y qué
+       * modelo tiene puesto, si hay cola, si el índice de manuales llegó a
+       * cargarse, y —el más importante de todos— si este puente está sirviendo
+       * DATOS INVENTADOS.
+       */
+      servicios: {
+        /*
+         * `ICONICS_FAKE` primero y con nombre propio. Es el estado en el que
+         * NINGÚN dato es real, y la cabecera de `config.mjs` ya dice que el
+         * arranque debería anunciarlo bien alto: aquí también, porque una
+         * pantalla de planta con datos simulados y sin avisar es peor que una
+         * pantalla apagada.
+         */
+        datos: {
+          nombre: 'Origen de datos',
+          estado: config.iconics.fake ? 'simulado' : 'ok',
+          detalle: config.iconics.fake
+            ? 'ICONICS_FAKE=true: los valores los genera el simulador. NINGÚN dato es real.'
+            : `Lecturas reales de ${config.iconics.origin || 'ICONICS'}.`,
+          soloLectura: config.iconics.readOnly,
+        },
+        asistente: servicio({
+          nombre: 'Asistente',
+          configurado: config.ia.isConfigured,
+          variable: 'IA_BASE',
+          detalle: config.ia.isConfigured ? null : 'El chat responde 503 y el tablero funciona igual.',
+          extra: config.ia.isConfigured
+            ? {
+              modelo: chat?.modeloActivo?.() ?? null,
+              modelosDisponibles: config.ia.modelos,
+              maxPasos: config.ia.maxPasos,
+              cola: cola?.estado?.() ?? null,
+            }
+            : {},
+        }),
+        dictado: servicio({
+          nombre: 'Dictado por voz',
+          configurado: config.ia.whisper.isConfigured,
+          variable: 'IA_WHISPER_BASE',
+          extra: config.ia.whisper.isConfigured ? { idioma: config.ia.whisper.idioma } : {},
+        }),
+        documentacion: servicio({
+          nombre: 'Manuales de planta',
+          configurado: Boolean(indice),
+          variable: 'IA_DOCS_DIR',
+          extra: indice
+            ? {
+              cargado: indice.cargado,
+              indexando: indice.indexando,
+              modo: indice.modo,
+              documentos: indice.documentos.length,
+              fragmentos: indice.documentos.reduce((n, d) => n + d.fragmentos, 0),
+              ilegibles: indice.ilegibles?.length ?? 0,
+              /*
+               * `cargado: false` NO es un error: el índice se construye
+               * perezosamente para no retrasar el arranque del puente, que
+               * sirve pantallas que no dependen del asistente. Decirlo aquí
+               * evita que la vista lo pinte en rojo.
+               */
+              detalle: indice.cargado
+                ? null
+                : 'El índice se carga a la primera búsqueda; todavía no se ha pedido ninguna.',
+            }
+            : {},
+        }),
+      },
     }
   }
 

@@ -50,7 +50,7 @@
  */
 import { lazy } from "react";
 import {
-  Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, Home, LayoutDashboard,
+  Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, LayoutDashboard,
   NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
@@ -272,6 +272,29 @@ export const ROUTES = [
     title: "Assets",
     sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
     nav: { label: "Assets", icon: <Boxes size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ VA EN «GENERAL» Y NO EN UNA MÁQUINA ────────────────────
+     *
+     * Porque no habla de ninguna: habla del PUENTE. Es el mismo criterio por
+     * el que aquí están Assets y Alarmas — «del servidor, no de una máquina
+     * concreta».
+     *
+     * ── Y POR QUÉ ES UNA VISTA Y NO UN ICONITO EN LA BARRA ─────────────
+     *
+     * Porque lo que hace falta cuando algo va raro no cabe en un semáforo:
+     * qué servicios hay montados, cuál falta, con qué variable se enciende,
+     * qué modelo tiene puesto el asistente, y —lo primero de todo— si este
+     * puente está sirviendo datos SIMULADOS. Hasta ahora ese primer paso era
+     * entrar por SSH a leer logs.
+     */
+    id: "salud-sistema",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/SaludSistema.jsx")),
+    title: "Salud del sistema",
+    sub: "Qué servicios necesita este tablero y cuáles están en pie",
+    nav: { label: "Salud", icon: <HeartPulse size={17} />, group: "sec-general" },
   },
 
   {
