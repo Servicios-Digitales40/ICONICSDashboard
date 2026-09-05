@@ -40,8 +40,8 @@ Tres cosas distintas, y sólo la primera bloquea:
 | # | Plan | ¿Necesita planta? |
 |---|---|---|
 | 20 | Andamiaje: lo que hace verificable el resto | no · **hecho** |
-| 21 | ICONICS: el registro despacha de verdad | no |
-| 22 | Seguridad | no |
+| 21 | ICONICS: el registro despacha de verdad | no · **hecho** |
+| 22 | Seguridad | no · [escrito](PLAN-22-SEGURIDAD.md) |
 | 23 | Asistente | no (necesita GPU) |
 | 24 | Usabilidad | no |
 | 25 | Layout y funcionalidad nueva | no |
