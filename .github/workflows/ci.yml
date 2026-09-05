@@ -1,0 +1,110 @@
+# Integración continua.
+#
+# ── POR QUÉ EXISTE ────────────────────────────────────────────────────
+#
+# `CLAUDE.md` §5 tiene una regla de oro: un cambio que toca `backend/ia/` corre
+# como mínimo `verificar-herramientas.mjs`, y un cambio en `shared/eva/` corre
+# los verificadores de las dos instalaciones. Hasta hoy esa regla era disciplina
+# personal, y la disciplina personal falla justo el día que hay prisa — que es
+# el día en que más falta hace.
+#
+# Los veinte `verificar-*.mjs` levantan un ICONICS y un llama-server falsos: ya
+# estaban hechos para correr sin red, sólo que nadie los ejecutaba solo.
+#
+# ── POR QUÉ CUATRO TRABAJOS Y NO UNO ──────────────────────────────────
+#
+# Para que el rojo diga DÓNDE. Un solo trabajo que corre linter, dos suites y
+# diecisiete verificadores contesta «falló CI», y hay que abrir el registro para
+# saber si fue un tipo mal escrito o una regla de riesgo. Cuatro trabajos
+# contestan «falló el linter» sin abrir nada, y además corren a la vez.
+#
+# ── LO QUE ESTE FLUJO NO PUEDE COMPROBAR ──────────────────────────────
+#
+# Nada que necesite la red de planta ni una GPU: la sonda contra el historiador
+# real (`verificar-antiguedad-historico.mjs`) y los instrumentos `medir-*`, que
+# necesitan llama-server. La lista con su motivo vive en
+# `scripts/verificar-todo.mjs`, no aquí, para que no haya dos inventarios.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la tanda anterior: en una rama
+# activa, la penúltima tanda ya no le importa a nadie y ocupa runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Linter y tipos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: Comprobación de tipos sobre shared/
+        run: npm run types
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+
+  frontend:
+    name: Tablero
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: react-dashboard/package-lock.json
+      - run: npm ci
+        working-directory: react-dashboard
+      - run: npm test
+        working-directory: react-dashboard
+      - name: Compilar
+        run: npm run build
+        working-directory: react-dashboard
+      # Sólo tiene sentido con `dist/` recién hecho: comprueba que la pila 3D no
+      # viaja en el chunk de arranque. Por eso vive aquí y no en la tanda de
+      # verificadores, que corre sin compilar.
+      - name: El presupuesto del bundle
+        run: node scripts/verificar-bundle.mjs
+
+  verificadores:
+    name: Verificadores sin red
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      # Los verificadores importan `backend/app.mjs` y sus rutas, así que
+      # necesitan las dependencias del servidor. NO necesitan las del tablero:
+      # ninguno monta React.
+      - run: npm ci
+        working-directory: backend
+      - run: node scripts/verificar-todo.mjs
