@@ -51,6 +51,27 @@ describe('cabeceras de seguridad', () => {
     )
   })
 
+  it('no deja llamar a ningún otro origen si no se declara ninguno', async () => {
+    const respuesta = await app.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).toMatch(/connect-src 'self'(;|$)/)
+  })
+
+  it('deja llamar al origen declarado en CONNECT_ORIGINS', async () => {
+    /*
+     * El módulo de Predicción llama desde el navegador a su Django en otra
+     * máquina. Sin esto, el navegador bloqueaba ese `fetch` y sin error en la
+     * página: el módulo aparecía caído sin decir por qué.
+     */
+    const { app: conConnect } = await montarApp({ CONNECT_ORIGINS: 'http://10.10.17.13:8000' })
+
+    const respuesta = await conConnect.inject({ method: 'GET', url: '/api/health/live' })
+    expect(respuesta.headers['content-security-policy']).toMatch(
+      /connect-src 'self' http:\/\/10\.10\.17\.13:8000/
+    )
+
+    await conConnect.close()
+  })
+
   it('permite el framing sólo desde el origen declarado en FRAME_ANCESTORS', async () => {
     const { app: conFrame } = await montarApp({ FRAME_ANCESTORS: 'https://localhost:3001' })
 

@@ -17,6 +17,14 @@
  * un comodín, mismo esquema que `CORS_ORIGINS`. Ver `readFrameAncestors` en
  * `config.mjs`.
  *
+ * ── `connect-src` Y EL MÓDULO QUE NO FUNCIONABA ────────────────────
+ *
+ * `connect-src 'self'` fue correcto mientras el tablero sólo hablara con su
+ * puente. El módulo de Predicción (Plan 19) llama desde el navegador a un
+ * Django en otra máquina, así que servido desde aquí ese `fetch` se bloqueaba
+ * —y sin error en la página—: el módulo aparecía caído. `CONNECT_ORIGINS` lo
+ * declara por origen exacto, con el mismo criterio de siempre.
+ *
  * ── CORS ───────────────────────────────────────────────────────────
  *
  * La lista sigue **vacía por defecto**, que era la decisión importante del
@@ -53,6 +61,37 @@ async function seguridadPlugin(fastify, { config }) {
     ? config.frameAncestors
     : ["'none'"]
 
+  /*
+   * A dónde puede llamar el tablero desde el navegador. `'self'` siempre —el
+   * puente— más lo que declare `CONNECT_ORIGINS`, que hoy es el backend
+   * predictivo del módulo de Predicción (ver `readConnectOrigins` en
+   * `config.mjs`). Con la variable vacía queda exactamente como estaba.
+   */
+  const connectSrc = ["'self'", ...config.connectOrigins]
+
+  /*
+   * Un origen `http:` declarado en un puente que sirve por HTTPS es contenido
+   * mixto: el navegador lo bloquea AUNQUE la CSP lo permita, y en la pantalla
+   * se ve igual que si la CSP siguiera cerrada — el módulo aparece caído sin
+   * decir por qué, que es justo el fallo que `CONNECT_ORIGINS` viene a
+   * resolver. Se avisa al arrancar porque es el único momento en que alguien
+   * está mirando.
+   *
+   * Se detecta por `isProduction` y no por si hay TLS montado, porque el
+   * puente no sabe si tiene un proxy inverso con HTTPS delante — que es el
+   * despliegue normal en planta.
+   */
+  const inseguros = config.connectOrigins.filter(o => o.startsWith('http://'))
+  if (config.isProduction && inseguros.length > 0) {
+    fastify.log.warn(
+      { origenes: inseguros },
+      `CONNECT_ORIGINS declara ${inseguros.length} origen(es) por http:// (${inseguros.join(', ')}). ` +
+        'Si este puente se sirve por HTTPS, el navegador los bloqueará por contenido mixto ' +
+        'aunque la CSP los permita, y la pantalla que los use aparecerá caída sin explicación. ' +
+        'Sirve ese servicio por HTTPS, o pásalo por el puente como se hace con ICONICS.'
+    )
+  }
+
   await fastify.register(helmet, {
     /*
      * La CSP se declara a mano porque la de helmet por defecto rompe el
@@ -73,9 +112,11 @@ async function seguridadPlugin(fastify, { config }) {
         // para los SVG en línea del plano de planta.
         imgSrc: ["'self'", 'data:', 'blob:'],
         workerSrc: ["'self'", 'blob:'],
-        // El tablero habla con su propio origen y nada más. Si algún día el
-        // frontend llama directamente a otro servicio, va aquí y se ve.
-        connectSrc: ["'self'"],
+        // `'self'` más lo que declare `CONNECT_ORIGINS`. Ese «algún día» que
+        // anunciaba este comentario llegó con el módulo de Predicción, y
+        // llegó sin que nadie tocara esta línea: el `fetch` salía bloqueado
+        // por el navegador y en silencio. Ahora el origen se declara y se ve.
+        connectSrc,
         // `fonts.gstatic.com` sirve los archivos .woff2 que referencia el CSS
         // de `fonts.googleapis.com` de arriba.
         fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],

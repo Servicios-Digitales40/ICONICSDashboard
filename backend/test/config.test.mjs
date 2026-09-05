@@ -102,6 +102,32 @@ describe('loadConfig — CORS', () => {
   })
 })
 
+describe('loadConfig — CONNECT_ORIGINS', () => {
+  it('está vacío si nadie lo declara, y la CSP se queda como estaba', () => {
+    expect(loadConfig(BASE).connectOrigins).toEqual([])
+  })
+
+  it('admite varios orígenes exactos y les quita la barra final', () => {
+    const config = loadConfig({
+      ...BASE,
+      CONNECT_ORIGINS: 'http://10.10.17.13:8000/, https://otro.local',
+    })
+    expect(config.connectOrigins).toEqual(['http://10.10.17.13:8000', 'https://otro.local'])
+  })
+
+  it('rechaza el comodín, que aquí no existe igual que en CORS', () => {
+    expect(() => loadConfig({ ...BASE, CONNECT_ORIGINS: '*' })).toThrow(/no es un origen/)
+  })
+
+  it('rechaza un origen con ruta: en la cabecera no significa lo que parece', () => {
+    // `connect-src http://x:8000/api/` NO limita a esa ruta de la forma que
+    // quien lo escribe espera, y colarlo deja la cabecera diciendo otra cosa.
+    expect(() =>
+      loadConfig({ ...BASE, CONNECT_ORIGINS: 'http://10.10.17.13:8000/api/v1' })
+    ).toThrow(/lleva algo más que el origen/)
+  })
+})
+
 describe('loadConfig — el objeto es inmutable', () => {
   it('no deja modificar la configuración después de cargarla', () => {
     const config = loadConfig(BASE)

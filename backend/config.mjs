@@ -247,6 +247,63 @@ function readFrameAncestors(rawValue) {
 }
 
 /**
+ * Orígenes a los que el TABLERO puede llamar desde el navegador, además del
+ * suyo.
+ *
+ * ── EL FALLO QUE ESTO ARREGLA ──────────────────────────────────────
+ *
+ * `seguridad.mjs` fijaba `connect-src 'self'` y nada más, lo cual era correcto
+ * mientras el tablero sólo hablara con su propio puente. Dejó de serlo con el
+ * módulo de Predicción (Plan 19), que llama desde el navegador a un Django en
+ * otra máquina: servido por el puente, ese `fetch` **lo bloquea el navegador y
+ * sin error visible en la página** — el módulo aparece caído sin decir por qué.
+ *
+ * Vacío por defecto y por orígenes exactos, mismo criterio que `CORS_ORIGINS`
+ * (§2.9) y `FRAME_ANCESTORS`: **no existe el comodín**. Una instalación que no
+ * declara nada se comporta exactamente como antes.
+ *
+ * ── POR QUÉ ESTO NO ES LA SOLUCIÓN DEFINITIVA ──────────────────────
+ *
+ * Porque la buena es que el puente haga de proxy, como hace con ICONICS: así
+ * el navegador sigue hablando con un solo origen y ni la dirección de Django
+ * ni su clave viajan al cliente. Eso es `PLAN-19` F4 y sigue **bloqueado**
+ * hasta saber si Django es alcanzable desde el servidor del puente y no sólo
+ * desde la red del navegador. Mientras tanto, esto desbloquea el módulo sin
+ * abrir la CSP a cualquiera — que era la otra salida fácil y la mala.
+ *
+ * Se valida que cada entrada sea un origen de verdad (`esquema://host[:puerto]`
+ * y nada más): una ruta o un comodín colado aquí no da error de arranque, se
+ * cuela en la cabecera y la deja inservible en algunos navegadores.
+ */
+function readConnectOrigins(rawValue) {
+  const crudos = (rawValue ?? '')
+    .split(',')
+    .map(origen => origen.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+
+  const validos = []
+  for (const crudo of crudos) {
+    let url
+    try {
+      url = new URL(crudo)
+    } catch {
+      throw new Error(
+        `CONNECT_ORIGINS contiene "${crudo}", que no es un origen. Se espera algo como ` +
+          'http://10.10.17.13:8000 — esquema, host y puerto, sin ruta y sin comodines.'
+      )
+    }
+    if (url.origin !== crudo || url.origin === 'null') {
+      throw new Error(
+        `CONNECT_ORIGINS contiene "${crudo}", que lleva algo más que el origen ` +
+          `(se interpretaría como "${url.origin}"). Declara sólo esquema://host:puerto.`
+      )
+    }
+    validos.push(url.origin)
+  }
+  return Object.freeze(validos)
+}
+
+/**
  * `NODE_TLS_REJECT_UNAUTHORIZED=0` desactiva la verificación de certificados
  * del proceso ENTERO, no sólo de las llamadas a ICONICS. Es la mitigación
  * documentada como R-13 y el descuido más fácil de cometer: basta con que el
@@ -414,6 +471,7 @@ export function loadConfig(env = process.env) {
     tlsVerificationDisabled: checkTlsVerification(env, isProduction),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
     frameAncestors: readFrameAncestors(env.FRAME_ANCESTORS),
+    connectOrigins: readConnectOrigins(env.CONNECT_ORIGINS),
     /**
      * Detrás de un proxy inverso, `socket.remoteAddress` es el proxy para
      * TODOS los clientes: sin esto el limitador contaría a la planta entera
