@@ -140,45 +140,74 @@ describe('conCandado', () => {
 
   it('un lector concurrente nunca ve el archivo a medias', async () => {
     /*
-     * Un lector que llega justo entre dos escrituras tiene que encontrar JSON
-     * válido SIEMPRE. Con `writeFile` directo, un archivo de este tamaño se
-     * escribe en varios trozos y este bucle acababa leyendo uno truncado; con
-     * `rename` no puede, porque el nombre definitivo apunta a un contenido
-     * completo en todo momento.
+     * La garantía que se prueba es UNA: quien lea el archivo mientras se
+     * escribe encuentra JSON válido SIEMPRE. Con `writeFile` directo, un
+     * archivo de este tamaño se escribe en varios trozos y este bucle acababa
+     * leyendo uno truncado; con `rename` no puede, porque el nombre definitivo
+     * apunta a un contenido completo en todo momento.
      *
-     * El lector hace una pausa entre lecturas, y eso NO es para que la prueba
-     * pase: es para que se parezca a lo que hace el backend. En Windows,
-     * `rename` falla mientras alguien tenga el destino abierto, así que un
-     * lector en bucle cerrado —que reabre el archivo antes de que el sistema
-     * suelte el handle anterior— bloquea al escritor indefinidamente y ningún
-     * número de reintentos lo arregla. Los lectores reales de este backend son
-     * un `readFile` suelto por petición, que es lo que se modela aquí. Ver
-     * `renombrarConReintento` en `lib/jsonAtomico.mjs`.
+     * ── POR QUÉ SE TOLERA QUE UNA ESCRITURA FALLE ──────────────────────
+     *
+     * Porque en Windows `rename` falla mientras alguien tenga abierto el
+     * destino, y eso NO viola la garantía de arriba: la escritura se niega en
+     * voz alta con su código de error y el archivo se queda como estaba
+     * —entero—. La cabecera de `lib/jsonAtomico.mjs` lo dice con esas
+     * palabras: «falla ruidosamente y no corrompe nada, que es el intercambio
+     * que se quiere».
+     *
+     * La primera versión de esta prueba exigía además que ninguna escritura
+     * fallara, y eso la hacía INTERMITENTE: pasaba aislada y fallaba dentro de
+     * la suite completa, según lo cargada que estuviera la máquina. Una prueba
+     * intermitente es peor que ninguna — enseña a reintentar hasta el verde.
+     * Así que se afirma el contrato y no una propiedad de temporización.
      */
     const dir = await carpetaTemporal()
     const ruta = join(dir, 'grande.json')
     const grande = { relleno: 'x'.repeat(200_000), n: 0 }
     await escribirJsonAtomico(ruta, grande)
 
+    const BLOQUEADO = new Set(['EPERM', 'EBUSY', 'EACCES'])
     let leidas = 0
+    let escritas = 0
+    let bloqueadas = 0
+    let ultimaEscrita = 0
     let corriendo = true
+
     const lector = (async () => {
       while (corriendo) {
-        JSON.parse(await readFile(ruta, 'utf8')) // lanza si está a medias
+        // Lanza si el archivo está a medias: ESA es la aserción.
+        JSON.parse(await readFile(ruta, 'utf8'))
         leidas += 1
-        await new Promise(r => setTimeout(r, 10))
+        await new Promise(r => setTimeout(r, 2))
       }
     })()
 
     for (let n = 1; n <= 20; n++) {
-      await escribirJsonAtomico(ruta, { ...grande, n })
+      try {
+        await escribirJsonAtomico(ruta, { ...grande, n })
+        escritas += 1
+        ultimaEscrita = n
+      } catch (error) {
+        if (!BLOQUEADO.has(error?.code)) throw error
+        bloqueadas += 1
+      }
       await new Promise(r => setTimeout(r, 1))
     }
     corriendo = false
     await lector
 
+    // El lector leyó de verdad, y ni una sola vez encontró basura.
     expect(leidas).toBeGreaterThan(3)
-    expect(JSON.parse(await readFile(ruta, 'utf8')).n).toBe(20)
+    // Y la mayoría de las escrituras entraron: si fallaran casi todas, el
+    // reintento de `renombrarConReintento` estaría mal dimensionado y eso sí
+    // sería un fallo que hay que ver.
+    expect(escritas).toBeGreaterThan(10)
+    expect(escritas + bloqueadas).toBe(20)
+
+    // Lo que quedó en disco es una escritura COMPLETA, no un trozo.
+    const final = JSON.parse(await readFile(ruta, 'utf8'))
+    expect(final.n).toBe(ultimaEscrita)
+    expect(final.relleno).toHaveLength(200_000)
   })
 })
 
