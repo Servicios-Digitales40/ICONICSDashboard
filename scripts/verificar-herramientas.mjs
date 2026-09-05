@@ -57,7 +57,6 @@ import {
   NO_COMPARTEN,
   SISTEMA,
   SISTEMAS,
-  historizadasDe,
   mismoSistema,
   sistemasDeSenal,
   tieneHistoria,

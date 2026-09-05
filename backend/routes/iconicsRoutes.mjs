@@ -178,7 +178,7 @@ export function registerIconicsRoutes(fastify, { config, client }) {
   fastify.post(
     '/api/iconics/history/batch',
     { schema: { body: HistoryBatchSchema } },
-    async (request, reply) => {
+    async request => {
       const { points: puntos, startDate: inicio, endDate: fin, aggregate } = request.body
 
       /*

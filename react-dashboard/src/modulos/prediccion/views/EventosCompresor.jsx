@@ -24,11 +24,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  Cpu,
   Database,
   Gauge,
   Search,
-  Server,
   ShieldCheck,
   TimerReset,
 } from "lucide-react";

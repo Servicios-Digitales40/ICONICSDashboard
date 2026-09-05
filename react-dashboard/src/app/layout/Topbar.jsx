@@ -1,15 +1,17 @@
 /**
- * Barra superior fija: título de la página actual, buscador, notificaciones e
- * interruptores de origen de datos y de tema.
+ * Barra superior fija: título de la página actual e interruptores de origen de
+ * datos y de tema.
+ *
+ * El buscador y el avatar que anunciaba la cabecera anterior no existen: se
+ * importaban `Input` y `Avatar` sin llegar a montarlos. Los quitó el linter el
+ * 04-09-2026 (Plan 20 F1) junto con la frase que los prometía.
  */
-import { Search, Sun, Moon, Zap, Shuffle, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
+import { Sun, Moon, Zap, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { PAGE_META, SECCION_DE_PAGINA } from "../routes/index.js";
-import { Input } from "@/components/ui/Input.jsx";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
-import { Avatar } from "@/components/ui/Avatar.jsx";
 import { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
@@ -72,7 +74,7 @@ function VersionBuild({ t }) {
   );
 }
 
-export function Topbar({ page, onAbrirMenu, onAbrirAlarmas, muro = false }) {
+export function Topbar({ page, onAbrirMenu, muro = false }) {
   const { theme: t, modo, toggleTheme } = useTheme();
   const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();

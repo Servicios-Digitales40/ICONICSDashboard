@@ -19,7 +19,7 @@ import { DataSourceProvider } from "@/lib/datasource";
 import { queryClient } from "@/lib/queryClient.js";
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
-import { Sidebar, Topbar, DataSourceBanner, EstadoMaquinaBanner } from "./layout/index.js";
+import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { leerModoMuro, useRotacionMuro } from "./modoMuro.js";

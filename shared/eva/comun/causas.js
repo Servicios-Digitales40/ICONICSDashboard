@@ -63,7 +63,7 @@ import { PROVISIONALES } from "./umbrales.js";
  * de una frase que YA ESTABA escrita en `riesgos.js`, no de una relación
  * física inventada aquí.
  */
-function causaTanque({ id, titulo, componente, terminosManual, riesgoId, firmaTemporal }) {
+function causaTanque({ id, titulo, componente, terminosManual, riesgoId, firmaTemporal = null }) {
   return {
     id,
     titulo,

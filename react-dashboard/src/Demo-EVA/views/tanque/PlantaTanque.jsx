@@ -27,9 +27,7 @@ import { useTheme } from "@/theme";
 
 import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
 import { VENTANA } from "../../data/tanque/historia.js";
-import { DERIVADO } from "../../domain/estado.js";
 import { esHistorizada, historizadas } from "../../domain/senales.js";
-import { PROVISIONALES } from "../../domain/umbrales.js";
 import { buildModeloEva } from "../../lib/modelo.js";
 import { useAhora } from "../../lib/useAhora.js";
 import { UltimaLectura } from "../../components/base.jsx";
@@ -91,25 +89,19 @@ const REJILLA = `
  * de la pantalla. Esconderlo sería dejar que la demo prometa una evaluación que
  * la instalación no publica.
  */
-function NotaProcedencia({ t }) {
-  if (!DERIVADO && !PROVISIONALES) return null;
-
-  return (
-    <p
-      style={{
-        margin: 0, padding: "8px 14px", borderRadius: 10,
-        background: t.hover, border: `1px solid ${t.border}`,
-        fontSize: 11.5, color: t.textSoft, lineHeight: 1.55,
-      }}
-    >
-      <strong style={{ color: t.text }}>Estados derivados.</strong> ICONICS no publica
-      un estado ni alarmas para <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11 }}>ac:TDCON/DEMO/SENSORES/</code>:
-      los colores de esta pantalla salen de comparar cada señal contra umbrales
-      locales{PROVISIONALES ? ", todavía sin confirmar contra la instalación real" : ""}.
-      Los valores son del servidor; las bandas, nuestras.
-    </p>
-  );
-}
+/*
+ * Aquí vivía `NotaProcedencia`, la nota de pie que explicaba que los colores
+ * de esta pantalla salen de umbrales NUESTROS y no de ICONICS. Su llamada
+ * llevaba tiempo comentada en el JSX de abajo, así que el componente estaba
+ * declarado y nunca montado; lo encontró el linter el 04-09-2026 (Plan 20
+ * F1) y se retira con su llamada.
+ *
+ * Lo que decía NO se ha perdido: el aviso de procedencia de los umbrales
+ * viaja hoy en el resultado de cada herramienta del asistente
+ * (`avisoUmbrales`) y la propuesta de devolverlo a la pantalla es USO-03 de
+ * la auditoría del 04-09-2026 — un panel de procedencia por valor, no una
+ * nota suelta en una vista.
+ */
 
 function PlantaTanque({ onNavigate }) {
   const { theme: t, dark } = useTheme();
@@ -171,9 +163,7 @@ function PlantaTanque({ onNavigate }) {
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            {/* <NotaProcedencia t={t} /> */}
-          </div>
+          <div style={{ flex: 1, minWidth: 220 }} />
           <UltimaLectura fecha={lastUpdated} t={t} />
           <Button variant="primary" icon={<LayoutGrid size={14} />} onClick={() => onNavigate?.("eva-detalle")}>
             Detalle

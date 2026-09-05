@@ -225,7 +225,6 @@ export function descargarPNG(svg, nombre, opciones) {
     canvas.height = img.height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      // eslint-disable-next-line no-console
       console.error("No se pudo exportar el PNG: este navegador no da contexto 2D de canvas.");
       return;
     }
@@ -235,7 +234,6 @@ export function descargarPNG(svg, nombre, opciones) {
     }, "image/png");
   };
   img.onerror = () => {
-    // eslint-disable-next-line no-console
     console.error("No se pudo exportar el PNG: la gráfica no se pudo rasterizar.");
   };
   img.src = url;

@@ -111,56 +111,32 @@
  * llama a `writePoint`, así que ninguna instrucción astuta metida en el chat
  * puede alcanzar una escritura que no sea ésta.
  */
-import {
-  alinearSeries,
-  correlacionPearson,
-  describirCorrelacion,
-  estadisticasBasicas,
-  regresionLineal,
-  proyectar,
-  detectarAnomalias,
-} from '../../../shared/eva/comun/estadistica.js'
-import {
-  RAIZ,
-  SENALES,
-  SENAL_KEYS,
-  esHistorizada,
-  historizadas,
-  pointName,
-  senalInfo,
-} from '../../../shared/eva/tanque/senales.js'
+/*
+ * ── ESTOS IMPORTS SE QUEDARON CORTOS A PROPÓSITO ────────────────────
+ *
+ * Hasta el reparto de herramientas (B1 del backlog, 28-08-2026) este archivo
+ * tenía 4 100 líneas y traía de `shared/` casi todo lo que hay: las siete
+ * funciones de estadística, los siete nombres del catálogo del tanque, los
+ * ocho de historia, los nueve del registro y los siete de aprendizaje.
+ *
+ * Al mudarse las diecinueve herramientas a `backend/ia/herramientas/`, los
+ * usos se fueron con ellas y los imports se quedaron: veintinueve nombres
+ * traídos y nunca leídos, que es la clase de resto que no rompe nada y
+ * confunde a quien lee el archivo para saber de qué depende. Los encontró el
+ * linter el 04-09-2026 (Plan 20 F1) y aquí quedan sólo los que se usan.
+ */
+import { regresionLineal } from '../../../shared/eva/comun/estadistica.js'
+import { SENALES, SENAL_KEYS } from '../../../shared/eva/tanque/senales.js'
 import { ACTIVOS } from '../../../shared/eva/tanque/activos.js'
 import { UMBRALES } from '../../../shared/eva/comun/umbrales.js'
+import { VENTANA } from '../../../shared/eva/comun/historia.js'
 import {
-  AGREGADO,
-  MAX_PUNTOS,
-  SIN_SERIE,
-  VENTANA,
-  intervaloHMS,
-  normalizar,
-  horaLocal as horaLocalDe,
-  resumirSerie,
-} from '../../../shared/eva/comun/historia.js'
-import {
-  NO_COMPARTEN,
   SISTEMA,
   SISTEMAS,
   SISTEMA_IDS,
-  historizadasDe,
-  sistemaDePunto,
-  resumenDeSistemas,
   sistemasDeSenal,
   tieneHistoria,
 } from '../../../shared/eva/comun/sistemas.js'
-import {
-  VACIO as APRENDIZAJE_VACIO,
-  crearHecho,
-  crearPropuesta,
-  hechosVigentes,
-  normalizarAlmacen,
-  pendientes,
-  validarPropuesta,
-} from '../../../shared/eva/comun/aprendizaje.js'
 import { isoLocal, resolverPeriodo } from '../../../shared/periodo.js'
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -932,7 +908,7 @@ export function createHerramientas({
    * cambio, y ninguna prueba hubo que tocarla.
    */
   const { leerMaquina, resolverSistema, evaluarRiesgosDe } = crearAyudantesDeMaquina({ client })
-  const { leerUnTramo, leerSerie, leerHistoriaLarga, leerSerieEnRango } =
+  const { leerSerie, leerHistoriaLarga, leerSerieEnRango } =
     crearAyudantesDeHistoria({ client, historyConcurrencia })
 
 

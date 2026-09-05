@@ -64,7 +64,6 @@ export default function EscrituraView() {
   const [saving, setSaving] = useState(false);
 
   const set = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
-  const previewPoint = buildExecutePoint(form);
 
   function validate() {
     const e = {};

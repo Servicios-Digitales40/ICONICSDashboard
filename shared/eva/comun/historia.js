@@ -265,7 +265,9 @@ function cobertura(conDato, ventana) {
   if (!ventana?.inicio || !ventana?.fin || !ventana?.segundosPorPunto) return {};
 
   const total = Math.round(
-    (new Date(ventana.fin) - new Date(ventana.inicio)) / 1000 / ventana.segundosPorPunto
+    (new Date(ventana.fin).getTime() - new Date(ventana.inicio).getTime()) /
+      1000 /
+      ventana.segundosPorPunto
   );
   if (!Number.isFinite(total) || total <= 0) return {};
 

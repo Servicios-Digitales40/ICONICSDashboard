@@ -33,7 +33,6 @@ import assert from 'node:assert/strict'
 
 import {
   UMBRAL_BM25_FUERTE,
-  UMBRAL_BM25_DEBIL,
   createMotorDiagnostico,
 } from '../backend/ia/motor/diagnostico.mjs'
 
@@ -41,7 +40,6 @@ import {
  *  escritos a mano: lo que este guion prueba es la aritmética, y un número
  *  literal aquí se pondría rojo en cada recalibración sin que nada falle. */
 const FUERTE = UMBRAL_BM25_FUERTE + 1
-const DEBIL = UMBRAL_BM25_DEBIL + 0.5
 import { causasDe, porQueSinCausas, SIN_CAUSAS_DELIBERADO, SIN_CAUSAS_PENDIENTE } from '../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'

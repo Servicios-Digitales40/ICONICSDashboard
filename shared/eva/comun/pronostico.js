@@ -227,13 +227,13 @@ function impulsandoEn(fila) {
  * @param {object[]} filas    `[{ t, nivelTanque, presionRelativa, … }]`, la
  *                            rejilla que devuelve `useSeriesHistoricas`
  * @param {number}   horasVentana  ancho del período pedido, para estimar horas
- * @returns {{
- *   activos: object[],       mecanismos con exposición, los graves primero
- *   sinExposicion: object[], evaluados y limpios
- *   noEvaluables: object[],  sin los datos que necesitan, y qué faltó
- *   muestras: number,        filas con marca de tiempo utilizable
- *   provisional: boolean
- * }}
+ * @returns {{activos: object[], sinExposicion: object[], noEvaluables: object[], muestras: number, provisional: boolean}}
+ *
+ *   `activos` — mecanismos con exposición, los graves primero.
+ *   `sinExposicion` — evaluados y limpios.
+ *   `noEvaluables` — sin los datos que necesitan, y qué faltó.
+ *   `muestras` — filas con marca de tiempo utilizable.
+ *   `provisional` — si los umbrales usados son estimaciones nuestras.
  */
 export function evaluarPronostico(filas, horasVentana) {
   const rejilla = Array.isArray(filas) ? filas : [];

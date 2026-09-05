@@ -39,8 +39,6 @@
  * valor es sólo el último recurso para cuando no hay ninguna en español y hay
  * que dejar que el sistema decida.
  */
-const IDIOMA_POR_DEFECTO = 'es'
-
 /**
  * Velocidad. Un poco por encima de la normal.
  *

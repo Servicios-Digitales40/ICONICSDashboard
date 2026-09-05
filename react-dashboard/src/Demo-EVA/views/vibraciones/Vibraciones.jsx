@@ -35,9 +35,7 @@
  *                         que lo apagado sólo se ve si se enseña aparte.
  */
 import { Fragment, useMemo } from "react";
-import {
-  Activity, BellRing, HelpCircle, WifiOff,
-} from "lucide-react";
+import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";

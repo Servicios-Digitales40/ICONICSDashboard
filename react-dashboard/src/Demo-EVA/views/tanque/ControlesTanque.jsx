@@ -47,7 +47,7 @@ function EstadoTanque({ sistema, lastUpdated, t }) {
   );
 }
 
-function BotonAccion({ accion, pendiente, cargando, onPedir, t }) {
+function BotonAccion({ accion, pendiente, cargando, onPedir }) {
   const esEncender = accion === "encender";
   const confirmando = pendiente === accion;
   const otroPendiente = pendiente && pendiente !== accion;

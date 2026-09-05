@@ -1,0 +1,20 @@
+{
+  "name": "iconics-dashboard",
+  "private": true,
+  "type": "module",
+  "description": "Puente Node hacia ICONICS FrameWorX y su tablero React. Este package.json de la raiz NO empaqueta nada: existe para las herramientas que miran el arbol ENTERO (linter, comprobacion de tipos, tanda de verificadores), que no pueden vivir dentro de backend/ ni de react-dashboard/ porque cruzan las dos.",
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "types": "tsc -p jsconfig.json",
+    "verificar": "node scripts/verificar-todo.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "typescript": "^5.9.3"
+  }
+}

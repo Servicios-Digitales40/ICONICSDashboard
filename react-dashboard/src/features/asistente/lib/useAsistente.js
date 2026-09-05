@@ -872,7 +872,6 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     return () => { cancelado = true; };
     // `escuchar` y `apagar` quedan fuera a propósito: cambian de identidad en
     // cada render y reiniciarían el efecto a media respuesta. Ver `escucharRef`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activo, ocupado, ultimaRespuesta]);
 
   return {

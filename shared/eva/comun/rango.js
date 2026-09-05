@@ -74,7 +74,7 @@ export function tramosDe(inicio, fin) {
   for (let t = inicio.getTime(); t < fin.getTime(); t += msPorTramo) {
     const desde = new Date(t);
     const hasta = new Date(Math.min(t + msPorTramo, fin.getTime()));
-    tramos.push({ desde, hasta, dias: Math.max(1, Math.round((hasta - desde) / 86_400_000)) });
+    tramos.push({ desde, hasta, dias: Math.max(1, Math.round((hasta.getTime() - desde.getTime()) / 86_400_000)) });
   }
   return tramos;
 }

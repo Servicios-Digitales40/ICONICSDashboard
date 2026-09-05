@@ -1,0 +1,43 @@
+{
+  "//": [
+    "Comprobacion de tipos SOBRE JAVASCRIPT, sin TypeScript.",
+    "",
+    "No se compila nada: `noEmit` esta puesto y el proyecto sigue siendo JS. Lo",
+    "unico que hace este archivo es dejar que `tsc` lea el JSDoc que las",
+    "cabeceras de shared/ ya escriben y avise cuando el codigo y el comentario",
+    "dejan de coincidir.",
+    "",
+    "POR QUE SOLO shared/: es la capa donde un campo mal escrito NO falla.",
+    "`senal.valorr` no lanza, devuelve undefined, y undefined recorre el",
+    "dominio hasta pintarse como un hueco -- que en este proyecto es un estado",
+    "legitimo y esperado. Es decir: el fallo se disfraza justo de lo que el",
+    "proyecto usa para decir la verdad. En backend/ y en el tablero un campo mal",
+    "escrito revienta en la primera prueba o en la primera pantalla.",
+    "",
+    "`strict` esta APAGADO a proposito. Con el encendido, `tsc` pide anotar",
+    "cada parametro de cada funcion del dominio y eso son cientos de avisos que",
+    "no describen ningun fallo: seria el linter con cuatrocientos avisos que",
+    "eslint.config.js explica que no se quiere. Lo que queda encendido es lo que",
+    "atrapa errores de verdad sin pedir anotaciones nuevas."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    }
+  },
+  "include": ["shared/**/*.js", "tipos-globales.d.ts"],
+  "exclude": ["node_modules", "**/node_modules"]
+}

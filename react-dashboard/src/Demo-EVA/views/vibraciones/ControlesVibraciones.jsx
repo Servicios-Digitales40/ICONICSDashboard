@@ -33,32 +33,15 @@ import { Power, Waves } from "lucide-react";
 import { AlertBanner } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
 
-/**
- * Lo que falta, dicho en la pantalla y no sólo en el código.
- *
- * Va escrito aquí porque un «próximamente» a secas deja creer que lo único
- * que falta es dibujar el botón, y lo que falta es todo lo que hay detrás.
+/*
+ * Aquí vivía una constante `PENDIENTE` con los tres puntos de arriba en
+ * forma de tarjetas, para enseñarlos EN la pantalla y no sólo en el código.
+ * Se dejó de renderizar en algún momento y quedó declarada sin usar; la
+ * encontró el linter el 04-09-2026 (Plan 20 F1). Su contenido era palabra
+ * por palabra el de «QUÉ HACE FALTA PARA CONSTRUIRLA» de la cabecera, así
+ * que al borrarla no se pierde nada: cuando se construya la vista, el texto
+ * está justo arriba.
  */
-const PENDIENTE = [
-  {
-    titulo: "El tag de escritura, comprobado",
-    porque:
-      "Este PLC no es el de la estación de llenado y sus puntos de control viven en otro " +
-      "árbol. Hasta que una escritura de prueba responda, no hay nada que un botón pueda mandar.",
-  },
-  {
-    titulo: "Las guardas de ESTA máquina",
-    porque:
-      "Las del tanque no sirven: cortar por nivel alto no significa nada en un motor con " +
-      "acelerómetros. Lo que lo protege es otra cosa, y decidir qué es el trabajo de verdad.",
-  },
-  {
-    titulo: "Relectura de confirmación",
-    porque:
-      "Dar por buena una escritura porque el servidor contestó 200 es la diferencia entre " +
-      "«se apagó» y «se mandó apagar». La estación de llenado ya relee; aquí haría falta igual.",
-  },
-];
 
 function ControlesVibraciones({ onNavigate }) {
   const { theme: t } = useTheme();

@@ -64,7 +64,7 @@ function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
   );
 }
 
-export function GraficaComparada({ rango, t, dark, delay = 0 }) {
+export function GraficaComparada({ rango, t, delay = 0 }) {
   const [seleccion, setSeleccion] = useState(["nivelTanque", "presionRelativa"]);
   const [normalizar, setNormalizar] = useState(false);
 
@@ -96,7 +96,6 @@ export function GraficaComparada({ rango, t, dark, delay = 0 }) {
       })
     : filas;
 
-  const [claveIzquierda, claveDerecha] = seleccion;
   const huboError = seleccion.some((k) => metaPorClave?.[k]?.error);
 
   return (

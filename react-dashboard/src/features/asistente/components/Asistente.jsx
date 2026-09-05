@@ -1184,7 +1184,7 @@ function copiarAlPortapapeles(texto) {
   });
 }
 
-function Nota({ t, color, fondo, icono, children }) {
+function Nota({ color, fondo, icono, children }) {
   return (
     <div
       style={{

@@ -54,7 +54,7 @@ const COLOR = {
  * @param {object|null} [opciones.banda]   umbrales, en el formato de `bandaLegible()`
  * @returns {string} el SVG entero
  */
-export function renderizarGraficoSerie(datos, { titulo, unidad, banda } = {}) {
+export function renderizarGraficoSerie(datos, { titulo, unidad, banda }) {
   const puntos = (datos ?? []).filter(d => typeof d.valor === 'number' && Number.isFinite(d.valor))
   if (puntos.length < 2) {
     throw new Error('Hacen falta al menos dos muestras válidas para dibujar una serie.')

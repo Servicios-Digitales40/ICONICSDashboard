@@ -328,12 +328,12 @@ const PESO = { critico: 0, atencion: 1, informativo: 2 };
  * porque falta la lectura del nivel es peor que una pantalla que lo admite.
  *
  * @param {object} sistema  el que devuelve `createSistema()`
- * @returns {{
- *   activos: object[],        reglas que se cumplen ahora, las graves primero
- *   noEvaluables: object[],   reglas sin las lecturas que necesitan
- *   evaluadas: number,        cuántas sí se pudieron comprobar
- *   provisional: boolean,     si los umbrales usados son estimaciones nuestras
- * }}
+ * @returns {{activos: object[], noEvaluables: object[], evaluadas: number, provisional: boolean}}
+ *
+ *   `activos` — reglas que se cumplen ahora, las graves primero.
+ *   `noEvaluables` — reglas sin las lecturas que necesitan.
+ *   `evaluadas` — cuántas sí se pudieron comprobar.
+ *   `provisional` — si los umbrales usados son estimaciones nuestras.
  */
 export function evaluarRiesgos(sistema) {
   const ctx = { impulsando: impulsando(sistema) };

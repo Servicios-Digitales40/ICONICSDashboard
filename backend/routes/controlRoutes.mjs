@@ -8,7 +8,7 @@
  */
 import { ControlBombaSchema } from '../http/esquemas.mjs'
 
-export function registerControlRoutes(fastify, { config, herramientas }) {
+export function registerControlRoutes(fastify, { herramientas }) {
   fastify.post(
     '/api/control/bomba',
     {

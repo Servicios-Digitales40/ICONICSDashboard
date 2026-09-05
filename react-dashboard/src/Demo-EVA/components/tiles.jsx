@@ -892,7 +892,7 @@ function CapaRecorrido({ activos, t, dark, listo, delay }) {
  * es lo que da el tooltip por nodo y por tramo reutilizando el componente que
  * ya usa el resto de la vista, sin duplicar su lógica de mostrar/ocultar.
  */
-function CapaHover({ activos, t }) {
+function CapaHover({ activos }) {
   const zonaNodo = (id) => ({
     left: `${(RECORRIDO_X[id] / RECORRIDO_ANCHO) * 100}%`,
     top: `${((RECORRIDO_Y[id] - RECORRIDO_ALTO_NODO / 2) / RECORRIDO_ALTO) * 100}%`,

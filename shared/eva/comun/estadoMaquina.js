@@ -114,6 +114,12 @@ export function contar(senales) {
  * @param {string} [args.estadoGeneral]
  * @param {boolean|null} [args.enReposo]  `null` = esta máquina no tiene reposo
  * @param {string[]} [args.sinLectura]    puntos que no entregaron
+ * @param {number|null} [args.puntosPedidos] cuántos se pidieron. Con
+ *   `sinLectura` es lo que permite decir «faltan 15 de 21» en vez de sólo
+ *   «faltan 15»: sin el denominador, una máquina muda y una con un hueco
+ *   pequeño se leen igual
+ * @param {Date|string|null} [args.leidoA]  cuándo se leyó. `null` cuando la
+ *   máquina no entregó nada y no hay instante que declarar
  * @param {object} [args.extra]      lo que sólo tiene sentido en esta máquina
  */
 export function estadoComun({

@@ -77,7 +77,6 @@ import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
 import {
   NO_COMPARTEN,
   SISTEMA,
-  sistemaDePunto,
   sistemasDeSenal,
   tieneHistoria,
 } from '../../../../shared/eva/comun/sistemas.js'
@@ -528,7 +527,7 @@ export function crearHerramientasDeHistoricos({
     async valor_en_momento({ senal, momento, sistema } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
-      const { clave, meta, sistemaId, historizada } = resuelto
+      const { clave, meta, historizada } = resuelto
 
       // La misma guarda de catálogo que el resto, y por el mismo motivo: sin
       // ella el servidor devuelve la curva de otra señal sin dar error.
