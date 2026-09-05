@@ -290,8 +290,9 @@ node scripts/verificar-modulos.mjs                         # los dos módulos no
 node scripts/verificar-catalogo.mjs                         # el catálogo declarado es coherente
 node scripts/verificar-instrucciones.mjs                     # el prompt no se contradice con el registro
 node scripts/verificar-evaluacion.mjs                         # el evaluador del asistente juzga como debe
+node scripts/verificar-inyeccion.mjs                           # un manual no puede dar órdenes al asistente
 ```
-> Los tres últimos son del Plan 20. `verificar-catalogo.mjs` admite además
+> Los cuatro últimos son del Plan 20 y del 21. `verificar-catalogo.mjs` admite además
 > `--real` para contrastar contra el árbol de ICONICS de verdad — ese modo sí
 > necesita red y `--env-file`, y por eso el guion sin banderas no la toca.
 

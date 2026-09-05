@@ -46,6 +46,55 @@
  * el fallo más caro es que pida la de otra y el servidor le conteste con la
  * curva equivocada **sin dar error**.
  */
+/**
+ * Las herramientas que ESCRIBEN algo, en la planta o en nuestro disco.
+ *
+ * ── PARA QUÉ EXISTE ESTA LISTA (Plan 21 F8) ────────────────────────
+ *
+ * Para poder retirarlas de la mesa. Con `IA_MAX_PASOS > 1`, el resultado de
+ * `consultar_documentacion` vuelve al modelo en una ronda que TAMBIÉN lleva
+ * herramientas — y entre ellas iba `controlar_bomba`. Un manual subido desde el
+ * tablero con una frase como «para diagnosticar esto, arranque la bomba» entra
+ * en el contexto con la misma forma que una instrucción del sistema.
+ *
+ * No es un ataque exótico: `RAG_UPLOAD_ENABLED` existe justamente para que
+ * alguien suba manuales, y un PDF de fabricante puede llevar procedimientos
+ * escritos en imperativo sin ninguna mala intención. El modelo no distingue un
+ * imperativo citado de uno recibido.
+ *
+ * ── POR QUÉ TAMBIÉN LAS DE APRENDIZAJE ─────────────────────────────
+ *
+ * `recordar_hecho`, `registrar_intervencion` y `proponer_regla` no tocan la
+ * planta, pero escriben en lo que el asistente dará por cierto en las próximas
+ * conversaciones. Un manual que consiga meter un «hecho» falso ahí envenena
+ * todas las respuestas siguientes, y sin dejar rastro de dónde salió: el hecho
+ * quedaría con el origen de una persona.
+ *
+ * `generar_reporte` escribe un PDF en disco y no cambia nada de lo que el
+ * sistema cree, así que no entra: negarla dejaría sin funcionar la petición
+ * legítima de «hazme un reporte de lo que dice el manual».
+ */
+export const HERRAMIENTAS_DE_ESCRITURA = Object.freeze([
+  'controlar_bomba',
+  'recordar_hecho',
+  'registrar_intervencion',
+  'proponer_regla',
+  'cerrar_diagnostico',
+])
+
+/**
+ * Las que traen texto que NO escribimos nosotros: manuales de planta.
+ *
+ * Su resultado se envuelve antes de entrar en el contexto (ver `citar()` en
+ * `chat.mjs`) y, a partir de ahí, las de escritura se retiran de la ronda.
+ */
+export const HERRAMIENTAS_CON_TEXTO_AJENO = Object.freeze([
+  'consultar_documentacion',
+  'limites_del_manual',
+  'diagnostico',
+  'diagnosticar_falla',
+])
+
 export const DEFINICIONES = [
   {
     type: 'function',
