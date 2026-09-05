@@ -53,6 +53,9 @@ export async function abrirSesionHttp(base, usuario = 'verificador', contrasena 
     .map(entrada => entrada.split(';')[0])
     .join('; ')
 
+  // Libera la respuesta de login antes de cerrar o reutilizar el servidor de prueba.
+  await respuesta.arrayBuffer()
+
   return {
     cookie,
     pedir: (ruta, opciones = {}) =>

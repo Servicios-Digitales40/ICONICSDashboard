@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 16 · Diagnóstico de fallas con tres fuentes
 
 > **Objetivo.** Que ante una condición anómala el tablero proponga una causa

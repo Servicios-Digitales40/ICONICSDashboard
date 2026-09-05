@@ -1,41 +1,7 @@
 /**
- * backend/ia/conversacion/definiciones.mjs
- * ------------------------------------------------------------------
- * El ESQUEMA de las herramientas: lo único que el modelo lee para decidir a
- * cuál llamar y con qué argumentos.
- *
- * ── POR QUÉ VIVE EN SU PROPIO ARCHIVO ──────────────────────────────
- *
- * Porque no es código que se ejecute: es texto dirigido a un modelo de
- * lenguaje, y se edita por motivos distintos y en momentos distintos que la
- * implementación. Una descripción se reescribe porque el modelo eligió mal la
- * herramienta —un problema de redacción—, no porque la función tuviera un
- * fallo.
- *
- * Estaba al final de `herramientas.mjs`, que pasaba de las 4000 líneas. No
- * dependía de nada de allí: `DEFINICIONES` es una constante de nivel superior,
- * sin acceso a la clausura de `createHerramientas` —ni a `client`, ni a
- * `leerSerie`— y por eso es la parte que se puede separar sin tocar ninguna
- * herramienta. Es una división mecánica, y a propósito: el archivo grande se
- * parte por donde no hay riesgo, no por donde haría falta un rediseño.
- *
- * ── LO QUE SIGUE UNIDO, Y NO POR PEREZA ────────────────────────────
- *
- * Las diecinueve implementaciones comparten una clausura con una docena de
- * ayudantes —`leerMaquina`, `leerSerie`, `leerSerieEnRango`, `resolverSistema`—
- * construidos alrededor del `client` de ICONICS que recibe la factoría.
- * Repartirlas por familias exige antes sacar esos ayudantes, y eso es un
- * rediseño con riesgo real sobre la capa que el asistente usa entera. Queda
- * pendiente y dicho, en vez de hecho a medias.
- *
- * ── LA INVARIANTE QUE ATA ESTE ARCHIVO CON EL OTRO ─────────────────
- *
- * Toda definición anunciada aquí tiene que tener implementación allí, y al
- * revés: una herramienta declarada y no implementada es una llamada que falla
- * en mitad de una conversación, y una implementada y no declarada es trabajo
- * que el modelo no sabe que puede pedir. Lo comprueba
- * `scripts/verificar-herramientas.mjs`, y por eso separar los dos archivos no
- * afloja nada.
+ * Esquemas de las 22 herramientas que recibe el modelo.
+ * Las implementaciones viven en ../herramientas/, agrupadas en seis familias.
+ * verificar-herramientas.mjs comprueba que definición e implementación coincidan.
  */
 
 /**

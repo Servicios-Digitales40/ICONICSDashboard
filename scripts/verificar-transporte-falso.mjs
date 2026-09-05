@@ -32,7 +32,7 @@
  * Código de salida: 0 si todo se cumple, 1 si algo falla.
  */
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
+
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
 import { abrirSesionHttp } from './lib/sesionHttp.mjs'

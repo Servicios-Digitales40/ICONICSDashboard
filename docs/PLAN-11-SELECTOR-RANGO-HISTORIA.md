@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 11 · Selector de rango de tiempo en el historiador
 
 > **Objetivo.** Que cada subvista de detalle (`DetalleActivo`, pestañas

@@ -20,7 +20,7 @@
  *    equivoca al teclear tiene que poder reintentar sin recargar.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 import { SesionProvider } from "@/auth/SesionProvider.jsx";

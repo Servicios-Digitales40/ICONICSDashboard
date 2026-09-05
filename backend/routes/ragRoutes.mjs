@@ -141,7 +141,7 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
     '/api/rag/documentos',
     {
       bodyLimit: MAX_BYTES,
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador'), rechazarSiExcede(MAX_BYTES)],
+      onRequest: [fastify.autenticar, rechazarSiExcede(MAX_BYTES)],
       schema: { querystring: SubirManualQuerySchema },
     },
     async (request, reply) => {
@@ -178,7 +178,7 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
     '/api/rag/documentos',
     {
       bodyLimit: MAX_BYTES,
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador'), rechazarSiExcede(MAX_BYTES)],
+      onRequest: [fastify.autenticar, rechazarSiExcede(MAX_BYTES)],
       schema: { querystring: ReemplazarManualQuerySchema },
     },
     async (request, reply) => {
@@ -212,7 +212,7 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
   fastify.patch(
     '/api/rag/documentos',
     {
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      onRequest: [fastify.autenticar],
       schema: { querystring: ArchivarManualQuerySchema },
     },
     async (request, reply) => {

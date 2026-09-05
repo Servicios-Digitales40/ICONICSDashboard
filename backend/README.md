@@ -1,510 +1,125 @@
-# Backend puente hacia ICONICS
+# Backend del asistente ICONICS
 
-Servidor Node que hace dos cosas: resuelve la autenticación contra ICONICS y
-expone su API REST al frontend en una forma que el navegador puede consumir.
+Servidor Node.js / Fastify que autentica personas, consulta ICONICS y coordina
+las herramientas del asistente, los documentos, la voz y los reportes.
 
-> Este README decía «sin dependencias». Dejó de ser cierto hace tiempo
-> —Fastify, Zod, pino, pdfkit— y del todo el 03-09-2026, cuando entró
-> `pdfjs-dist`: el lector de PDF escrito a mano sacaba nueve cabeceras de
-> página de una norma ISO de nueve páginas, y cuarenta y seis fragmentos rotos
-> de un manual de 332. Ver la cabecera de `ia/indices/documentos.mjs`.
+## Arranque
 
-Existe porque el navegador no puede hablar con ICONICS directamente. La API de
-FrameWorX exige OIDC con *Authorization Code + PKCE* —un flujo pensado para un
-humano rellenando un formulario de login— y no habilita CORS. Meter esas
-credenciales en un bundle de React sería, además, publicarlas.
+Instala las dependencias con `npm --prefix backend install` desde la raíz.
+Usa el entorno indicado en el [README principal](../README.md) y arranca desde
+esa misma raíz:
 
-```
-navegador ──► backend puente ──► ICONICS (FrameWorX REST + Hyper Historian)
-              · login OIDC
-              · caché del token
-              · validación de entrada
-              · normalización de respuestas
+```powershell
+node --env-file=.env.local backend/server.mjs
 ```
 
-## Puesta en marcha
-
-```bash
-node --env-file=.env.local backend/server.mjs      # escucha en :3001
-```
-
-El `.env.local` vive en la raíz del repositorio y **no se versiona**. La
-plantilla comentada de todas las variables está en
-[`.env.example`](../.env.example), que sí.
-
-**ICONICS**
-
-| Variable | Por defecto | Para qué |
-|---|---|---|
-| `ICONICS_API_BASE` | *(vacío)* | Base de la API REST, p. ej. `https://servidor/fwxapi/rest/v1`. Sin ella la API responde 500. Su **origen** (esquema+host, sin la ruta) es también de dónde sale el `authorize` del SSO silencioso — ver `SSO_REDIRECT_URI` más abajo. |
-| `ICONICS_USERNAME` / `ICONICS_PASSWORD` | *(vacío)* | Desde el Plan 20, el login normal NO las usa — cada técnico entra con su propia cuenta (`POST /api/sesion`). Sólo las leen `ICONICS_FAKE=true` y los `scripts/verificar-*.mjs`, que necesitan una identidad sin persona detrás. |
-| `ICONICS_POINT_NAME` | *(vacío)* | Punto que leen `/api/iconics/data` y `/api/context` cuando no se indica otro. |
-| `ICONICS_READ_ONLY` | **`true`** | Deshabilita escritura y *ack* de alarmas. Ver abajo. |
-| `ICONICS_FAKE` | `false` | Transporte simulado (Plan 14 §7.1): sirve las dos máquinas —las ocho señales del tanque y los 73 puntos del sistema de vibraciones con sus contadores de alarma— sin `ICONICS_API_BASE` ni red. Ver `backend/iconics/fakeClient.mjs`. **Nunca en producción.** |
-| `SESION_TTL_MINUTOS` | `60` | Inactividad tras la cual una sesión de persona caduca. |
-| `SESION_MAX` | `32` | Sesiones de persona vivas a la vez. Sobre el tope, `POST /api/sesion` responde 503. |
-| `SSO_REDIRECT_URI` | *(vacío)* | Habilita el SSO silencioso: el Asistente entra sin pedir usuario y contraseña cuando vive empotrado como `<iframe>` en el HMI nativo de ICONICS (AnyGlass/GraphWorX) y el navegador ya trae la cookie de sesión de ICONICS puesta. Tiene que ser una URL de ESTE backend, registrada a mano en ICONICS (Workbench → Security → Global Settings → Web Login → "In-house application Relying Party Redirect URIs"), y del MISMO origen que `ICONICS_API_BASE` — ver `docs/PLAN-20-ASISTENTE.md` §F7 para el porqué exacto y el paso a paso completo de montaje. |
-
-**Servidor**
-
-| Variable | Por defecto | Para qué |
-|---|---|---|
-| `PORT` | `3001` | Puerto de escucha. |
-| `LOG_LEVEL` | `INFO` | `INFO`, `WARN` o `ERROR`. |
-| `STATIC_DIR` | `react-dashboard/dist` | Build del frontend que se sirve. Relativo a la raíz o absoluto. |
-| `APP_VERSION` | `dev` | Qué build corre. Aparece en `/api/health`. |
-| `NODE_ENV` | *(vacío)* | Con `production` se endurecen las comprobaciones de arranque. |
-| `DEFAULT_USUARIO`, `DEFAULT_LINEA`, `DEFAULT_EQUIPO`, `DEFAULT_TURNO`, `DEFAULT_RENDIMIENTO` | ver `config.mjs` | Contexto de cabecera que devuelve `/api/context`. |
-
-**Red y límites**
-
-| Variable | Por defecto | Para qué |
-|---|---|---|
-| `CORS_ORIGINS` | *(vacío)* | Orígenes autorizados, separados por comas, con esquema y puerto. Vacío = ninguno, y normalmente no hace falta: en desarrollo el dev server reenvía `/api` aquí, así que para el navegador es el mismo origen. **No existe el comodín `*`**: la comparación es por igualdad exacta, y ponerlo autoriza a un origen llamado literalmente «\*». |
-| `FRAME_ANCESTORS` | *(vacío)* | Orígenes autorizados a empotrar esta app en un `<iframe>` propio (`frame-ancestors` de la CSP), separados por comas. Vacío = nadie, igual que `CORS_ORIGINS`. Pensado para un HMI nativo de ICONICS (AnyGlass/GraphWorX) que muestre el asistente dentro de su propio proyecto. **Aquí el comodín `*` sí es peligroso de verdad** —se inyecta tal cual en la CSP, donde es sintaxis real de «cualquiera»— así que el arranque falla si lo detecta, en vez de dejarlo pasar. |
-| `TRUST_PROXY` | `false` | Leer la IP del cliente de `X-Forwarded-For`. Sólo con proxy inverso delante. |
-| `RATE_LIMIT_MAX` | `300` | Peticiones a `/api/` por ventana y cliente. |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | La ventana. |
-| `UPSTREAM_TIMEOUT_MS` | `15000` | Corte de cualquier llamada hacia ICONICS. |
-| `BATCH_CACHE_TTL_MS` | `2000` | Vida de la caché de lecturas en lote. `0` la desactiva. |
-
-**Asistente** (Plan 6)
-
-| Variable | Por defecto | Para qué |
-|---|---|---|
-| `IA_BASE` | *(vacío)* | Base de llama-server. Vacío = **sin asistente**: `/api/chat` responde 503 y el frontend no lo pinta. |
-| `IA_TIMEOUT_MS` | `180000` | Corte de la llamada al modelo. Ver abajo por qué no reutiliza `UPSTREAM_TIMEOUT_MS`. |
-| `IA_MAX_TOKENS` | `512` | Tope de la respuesta. |
-| `IA_MODELO` | `local` | Nombre informativo; llama-server sirve un solo modelo. |
-| `IA_TURNOS` | *(vacío)* | `manana=6-14,tarde=14-22,noche=22-6`. Vacío = preguntar por un turno responde que no está configurado, en vez de inventarse el horario. |
-
-`IA_MAQUINAS_CON_HISTORIA` **ya no existe**. Venía del tablero de OEE, donde
-declaraba qué máquinas tenían tags «Is Collected», y allí era configurable con
-razón: eso cambia marcando una casilla en el Data Historian. El asistente
-responde hoy sobre el sistema de agua de `ac:TDCON/DEMO/SENSORES/`, donde el
-problema no es el mismo: a tres de
-las ocho señales el historiador les devuelve **la serie de otra**, sin dar
-error. Eso no se arregla marcando una casilla, y no puede quedar en manos de una
-variable de entorno mal escrita. Vive como hecho medido en `shared/eva/tanque/senales.js`
-(campo `historizado`); ver la cabecera de `backend/ia/conversacion/herramientas.mjs`.
-
-`IA_TIMEOUT_MS` es una variable aparte y no `UPSTREAM_TIMEOUT_MS` porque son
-dos escalas distintas: 15 s es holgado para ICONICS y ridículo para un modelo
-de 9B que corre parcialmente en CPU. Compartirlas cortaría **todas** las
-respuestas del asistente por sistema, y el síntoma —un timeout siempre—
-apuntaría al modelo en vez de a la configuración.
-
-> ⚠️ **llama-server hay que arrancarlo con `--jinja`.** Sin esa bandera el
-> modelo no ve las herramientas y contesta de memoria, con una cifra inventada
-> y el mismo aplomo que si la hubiera consultado. El puente lo detecta —una
-> respuesta con cifras y sin herramienta no sale— pero el arreglo está en la
-> línea de arranque. Y `--host 127.0.0.1`, nunca `0.0.0.0`: llama-server no
-> lleva autenticación de ninguna clase.
-
-Si `ICONICS_API_BASE` no es una URL válida, `PORT` no es un puerto, o un
-booleano no es `true`/`false`, el servidor **no arranca** y dice cuál está mal.
-Es deliberado: una configuración rota que arranca a medias se diagnostica mucho
-peor.
-
-### Las dos que hay que mirar antes de desplegar
-
-**`ICONICS_READ_ONLY` vale `true` si nadie dice lo contrario.** El puente
-mantiene una sesión OIDC privilegiada, así que una instalación sin configurar
-no debe poder escribir en la planta. Con el modo activo, `POST /write`,
-`POST /write/batch` y `PUT /alarms/acknowledge` responden **403 nombrando la
-variable** — se registran igual y no se limitan a no existir, porque una ruta
-inexistente caería al respaldo de la SPA y devolvería el `index.html` con un
-200: el cliente no escribiría nada y creería que sí.
-
-**`NODE_TLS_REJECT_UNAUTHORIZED=0` no arranca en producción.** Desactiva la
-verificación de certificados de *todo* el proceso. Los certificados
-autofirmados de ICONICS lo hacen necesario en desarrollo —y allí el arranque lo
-avisa por el log—, pero con `NODE_ENV=production` la carga de configuración
-falla a propósito. En el servidor lo correcto es instalar la CA de ICONICS y
-apuntar `NODE_EXTRA_CA_CERTS` a ella.
+El script `npm start` de esta carpeta también existe, pero cambia el directorio
+de trabajo: los archivos de aprendizaje y cachés con rutas relativas pueden
+terminar en otra ubicación. Mantén un único directorio de trabajo por despliegue.
+Los directorios de estáticos y reportes se resuelven desde la raíz del proyecto.
 
 ## Estructura
 
-```
-backend/
-├── server.mjs           Arranque: configura, monta y escucha
-├── app.mjs              Ensamblado: dependencias, rutas, frontera de errores
-├── config.mjs           Única lectura de process.env, validada
-├── logger.mjs           Log sobre pino (texto en TTY, JSON fuera, secretos redactados)
-│
-├── http/                Mecánica HTTP, sin nada de ICONICS
-│   ├── esquemas.mjs     Los cuerpos y consultas que acepta la API (Zod)
-│   ├── validar.mjs      Puente entre los esquemas y las rutas
-│   └── plugins/
-│       ├── seguridad.mjs      Cabeceras, CORS y límite de peticiones
-│       ├── errores.mjs        Forma única de las respuestas de error
-│       └── autenticacion.mjs  Guardas de usuario (preparadas, sin activar)
-│
-├── iconics/             Todo lo que sabe de ICONICS
-│   ├── authenticator.mjs  Flujo OIDC + PKCE, caché y refresco del token
-│   ├── client.mjs         Operaciones contra la API REST
-│   ├── fakeClient.mjs     ICONICS de mentira, recorriendo el registro de sistemas
-│   └── validation.mjs     Lista blanca de nombres de punto y fechas
-│
-├── ia/                  El asistente (Plan 6)
-│   ├── indices/           Búsqueda: lo que sabe encontrar un texto
-│   │   ├── bm25.mjs           Búsqueda léxica, compartida por los dos índices
-│   │   ├── embeddings.mjs     Motor de vectores + caché por hash de contenido
-│   │   ├── documentos.mjs     Índice sobre los PDF de planta (BM25 + embeddings)
-│   │   └── manuales.mjs       Alta y baja de manuales; no indexa, sólo gestiona
-│   ├── motor/             Diagnóstico determinista — el LLM no lo toca
-│   │   ├── diagnostico.mjs    Cruza las cuatro fuentes y puntúa las causas
-│   │   ├── casos.mjs          Índice de casos previos (Fuente #3)
-│   │   └── temporal.mjs       El cuarto término: tendencia (Plan 17 F6)
-│   ├── conversacion/      El bucle del modelo
-│   │   ├── chat.mjs           Las dos pasadas contra llama-server
-│   │   ├── cola.mjs           Una consulta a la vez
-│   │   ├── definiciones.mjs   El ESQUEMA que lee el modelo, aparte del código
-│   │   └── herramientas.mjs   Ensamblador: contexto, familias y catálogo
-│   ├── herramientas/      Una subcarpeta por FAMILIA de herramienta
-│   │   ├── lib/           Lo que comparten las familias
-│   │   │   ├── formato.mjs    Banda legible, reducción de serie, aviso de umbrales
-│   │   │   ├── limites.mjs    Cruce de lo medido con lo documentado
-│   │   │   ├── respuesta.mjs  La forma del fallo de una herramienta
-│   │   │   ├── maquina.mjs    Leer una máquina, resolver cuál, evaluar sus reglas
-│   │   │   └── historia.mjs   El trío recursivo del historiador
-│   │   ├── aprendizaje/   5 · hechos, propuestas y bitácora (no toca ICONICS)
-│   │   ├── registro/      1 · qué máquinas hay (abre el catálogo)
-│   │   ├── maquina/       3 · el instante, y la única que ESCRIBE
-│   │   ├── historicos/    9 · todo lo que pregunta al pasado
-│   │   ├── documentacion/ 3 · manuales y dossier de síntoma
-│   │   └── diagnostico/   1 · diagnosticar_falla, sobre el motor
-│   ├── reporte.mjs        Composición del PDF (carga diferida)
-│   └── voz.mjs            Whisper
-│
-└── routes/              Traducción HTTP ↔ cliente
-    ├── iconicsRoutes.mjs
-    ├── chatRoutes.mjs
-    ├── controlRoutes.mjs
-    ├── reportesRoutes.mjs
-    ├── vozRoutes.mjs
-    └── systemRoutes.mjs
-```
-
-Las dependencias apuntan en un solo sentido —`routes` → `ia` → `iconics` →
-`http`— y ningún módulo de abajo conoce a los de arriba. `iconics/client.mjs`
-no sabe qué es una respuesta HTTP.
-
-La excepción es `http/esquemas.mjs`, que sí importa
-`iconics/validation.mjs`: los nombres de punto se validan con la lista blanca
-de la sintaxis real del servidor, y duplicar ese patrón en dos sitios lo haría
-divergir.
-
-El servidor es **Fastify**. Lo que antes eran seis módulos escritos a mano
-—router, CORS, límite, lectura de cuerpo, estáticos y respuestas— lo cubren
-ahora `@fastify/cors`, `@fastify/rate-limit`, `@fastify/static` y
-`@fastify/helmet`, que además añade las cabeceras de seguridad que el puente
-no enviaba. El razonamiento de aquellos módulos no se perdió: vive en los
-comentarios de `http/plugins/seguridad.mjs`, que explica por qué cada opción
-está como está.
-
-`ia/` importa además de [`shared/`](../shared/README.md), en la raíz del
-repositorio: las reglas del historiador y el catálogo de tags son las mismas
-que usa el frontend, y tenerlas dos veces las haría divergir.
-
-## Las herramientas del asistente, por familias
-
-`ia/conversacion/herramientas.mjs` llegó a tener 4100 líneas: diecinueve herramientas y sus
-diecinueve descripciones en un solo archivo. Se está repartiendo por FAMILIAS
-—una subcarpeta por tipo— y el criterio del reparto no es temático sino de
-DEPENDENCIA: qué necesita cada grupo para funcionar.
-
-| Familia | Herramientas | Recibe |
-|---|---|---|
-| `aprendizaje/` | 3 | nada (sólo un JSON en `datos/`) |
-| `registro/` | 1 | nada |
-| `maquina/` | 3 | `client`, `readOnly`, ayudantes de máquina |
-| `historicos/` | 9 | `client`, `turnos`, `reportes`, ayudantes |
-| `documentacion/` | 3 | `indiceDocumentos` |
-
-Más `herramientas/lib/`, con lo que comparten: `formato` (banda legible,
-reducción de serie, aviso de umbrales), `respuesta` (la forma del fallo),
-`limites` (cruce de lo medido con lo documentado), y los dos que sí necesitan
-contexto — `maquina` (leer una máquina, resolver cuál, evaluar sus reglas) e
-`historia` (el trío recursivo del historiador).
-
-**La firma de cada factoría es la documentación.** `aprendizaje/` y `registro/`
-no reciben nada, y eso dice que no tocan ICONICS; `historicos/` recibe cuatro
-cosas, y eso dice que es la de más superficie. El día que una familia necesite
-algo nuevo, la firma cambia y el cambio se ve en la revisión.
-
-`herramientas.mjs` queda como ensamblador: construye el contexto, se lo da a
-cada familia y junta lo que devuelven. Pasó de 4100 a 1123 líneas. Lo que
-todavía vive ahí —el índice de nombres de señal del tanque, el resolvedor de
-ventanas— está pendiente de una decisión que no está tomada: ver B3 en
-[`docs/BACKLOG-BACKEND.md`](../docs/BACKLOG-BACKEND.md).
-
-**El esquema vive aparte** (`ia/conversacion/definiciones.mjs`). No es código que se ejecute:
-es texto dirigido a un modelo de lenguaje, y se edita por otros motivos —una
-descripción se reescribe porque el modelo eligió mal la herramienta, no porque
-la función tuviera un fallo—.
-
-**La invariante que ata las dos mitades.** Toda definición anunciada tiene que
-tener implementación, y al revés: una herramienta declarada y no implementada
-es una llamada que falla en mitad de una conversación, y una implementada y no
-declarada es trabajo que el modelo no sabe que puede pedir. Lo comprueba
-`verificar-herramientas`, y por eso separar los archivos no afloja nada. Fija
-además el ORDEN del catálogo, que no es cosmético: es lo primero que lee el
-modelo.
-
-## Endpoints
-
-Todos devuelven JSON con una marca `ok`. El cliente decide mirando `ok`, no
-sólo el código HTTP, porque un error del servidor ICONICS llega con **su**
-código y su cuerpo, sin enmascarar.
-
-### Lectura
-
-| Ruta | Respuesta |
+| Ubicación | Responsabilidad |
 |---|---|
-| `GET /api/iconics/data?pointName=` | `{ ok, payload: { value, quality, timestamp }, pointName }` |
-| `GET /api/iconics/data/batch?points=a,b,c` | `{ ok, payload: { [pointName]: { ok, payload } } }` |
-| `GET /api/iconics/history?pointName=&startDate=&endDate=&aggregate=&interval=` | `{ ok, data: [{ timestamp, value, quality }], hasMore }` |
-| `GET /api/iconics/browse?path=` | `{ ok, payload: BrowseResult[] }` |
-| `GET /api/iconics/points?query=` | `{ ok, payload: BrowseResult[] }` |
-| `GET /api/iconics/userinfo` | `{ ok, payload }` |
+| `server.mjs` | Arranque y escucha. |
+| `app.mjs` | Dependencias, plugins, sesiones, rutas y estáticos. |
+| `config.mjs` | Lectura y validación de configuración. |
+| `http/esquemas.mjs` | Contratos Zod de solicitudes. |
+| `http/plugins/` | Sesión, seguridad, errores y cuerpos binarios. |
+| `sesiones/registro.mjs` | Sesiones de usuario en memoria. |
+| `iconics/` | OIDC + PKCE, cliente REST, validación y transporte simulado. |
+| `ia/conversacion/` | Cola, bucle del modelo, definiciones y ensamblado de herramientas. |
+| `ia/herramientas/` | Registro, máquina, históricos, documentación, diagnóstico y aprendizaje. |
+| `ia/indices/` | BM25, embeddings, extracción y gestión de manuales. |
+| `ia/motor/` | Diagnóstico determinista, casos anteriores y tendencia. |
+| `ia/reporte.mjs`, `ia/voz.mjs` | PDF de conversación y transcripción. |
+| `routes/` | Contratos HTTP por dominio. |
+| `test/` | Pruebas Vitest con Fastify inject. |
 
-El lote existe porque el motor de sondeo del frontend agrupa en **una** llamada
-todos los tags que las vistas montadas necesitan. Devuelve un mapa, no una
-lista, para que el poller reparta cada valor sin buscar.
+## Configuración
 
-La historia se normaliza: ICONICS la envuelve en `historicalSamples` o la
-entrega suelta según el caso, y el frontend no tiene por qué conocer ambas
-formas. `hasMore` avisa de que la respuesta se truncó (100 muestras por
-llamada); con `aggregate` e `interval` el servidor agrega y el volumen baja.
+La plantilla completa y comentada está en [.env.example](../.env.example).
+Los valores efectivos y su validación están en [config.mjs](config.mjs).
 
-### Escritura
-
-| Ruta | Cuerpo | Respuesta |
-|---|---|---|
-| `POST /api/iconics/write` | `{ pointName, value }` | `{ ok, result: WriteResult }` |
-| `POST /api/iconics/write/batch` | `{ items: [{ pointName, value }] }` | `{ ok, results: WriteResult[] }` |
-
-Las dos responden **403** mientras `ICONICS_READ_ONLY` valga `true`, que es su
-valor por defecto.
-
-### Alarmas
-
-| Ruta | Cuerpo | Respuesta |
-|---|---|---|
-| `GET /api/iconics/alarms?pointName=&hours=` | — | `{ ok, alarms: [] }` (máx. 48 h) |
-| `PUT /api/iconics/alarms/acknowledge` | `{ eventIds, comment }` | `{ ok, result }` |
-
-### Asistente
-
-| Ruta | Cuerpo | Respuesta |
-|---|---|---|
-| `GET /api/chat` | — | `{ ok, habilitado, modelo, ocupado }` |
-| `POST /api/chat` | `{ pregunta, historial? }` | Flujo **SSE** de eventos (ver abajo) |
-
-`historial` son los turnos anteriores (`{ rol, texto }`), para que «¿y el día
-anterior?» signifique algo. Va el **texto** y nunca el resultado de las
-herramientas: devolverle el JSON de consultas pasadas invita al modelo a citar
-la cifra del turno anterior como si fuera la de este. El recorte —cuatro
-intercambios— lo aplica el servidor, no el cliente.
-
-`GET` existe para que el frontend sepa si pintar el asistente sin necesidad de
-una bandera de compilación: el mismo `dist` sirve a una planta con modelo y a
-otra sin él.
-
-`POST` responde `text/event-stream`, no un JSON al final. Con el modelo que
-corre en el servidor una respuesta tarda **entre 30 y 90 segundos**, y un
-`fetch` mudo durante minuto y medio es indistinguible de uno colgado: el
-operador vuelve a pulsar y deja dos preguntas compitiendo por la misma GPU.
-
-| Evento | Cuándo |
+| Variables | Función y valores por defecto relevantes |
 |---|---|
-| `{ tipo: 'estado', valor }` | Cambia el paso: pensando → consultando → redactando |
-| `{ tipo: 'cola', porDelante }` | Cuántas consultas hay por delante mientras espera turno |
-| `{ tipo: 'herramienta', nombre, argumentos }` | El modelo decidió qué consultar |
-| `{ tipo: 'texto', delta }` | Un trozo de la respuesta |
-| `{ tipo: 'fin', herramienta, bloqueada, duracionMs }` | Terminó |
-| `{ tipo: 'error', mensaje }` | Falló, con el motivo accionable |
+| `ICONICS_API_BASE` | Base absoluta de FrameWorX REST. |
+| `ICONICS_POINT_NAME` | Punto por defecto de las rutas de lectura/contexto compatibles. |
+| `ICONICS_USERNAME`, `ICONICS_PASSWORD` | Identidad auxiliar para scripts; no sustituyen el login individual. |
+| `ICONICS_READ_ONLY` | `true`: impide escrituras de planta y reconocimiento de alarmas. |
+| `ICONICS_FAKE` | `false`: activar sólo para simulación de desarrollo. |
+| `PORT`, `STATIC_DIR` | `3001`, `react-dashboard/dist`. |
+| `NODE_ENV`, `APP_VERSION`, `LOG_LEVEL` | Modo de despliegue, versión explícita (`dev`) y nivel (`INFO`). |
+| `CORS_ORIGINS`, `FRAME_ANCESTORS` | Listas de orígenes exactos; vacías por defecto. |
+| `TRUST_PROXY` | `false`; activar sólo con proxy de confianza. |
+| `SESION_TTL_MINUTOS`, `SESION_MAX` | 60 minutos de inactividad, 32 sesiones. |
+| `SSO_REDIRECT_URI` | Retorno configurado del flujo OIDC silencioso. |
+| `UPSTREAM_TIMEOUT_MS`, `BATCH_CACHE_TTL_MS` | 15000 ms por llamada a ICONICS; 2000 ms de caché de lote. |
+| `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS` | 300 solicitudes por ventana de 60000 ms. |
+| `HISTORY_MAX_PAGINAS`, `HISTORY_MAX_MS`, `HISTORY_CONCURRENCIA` | 20 páginas, 20000 ms totales, 6 tramos concurrentes. |
+| `IA_BASE`, `IA_MODELO`, `IA_MODELOS` | Servidor de chat y nombres de modelo; IA apagada sin base. |
+| `IA_TIMEOUT_MS`, `IA_MAX_TOKENS`, `IA_MAX_PASOS` | 180000 ms, 512 tokens y 3 rondas. |
+| `IA_TURNOS` | Horarios explícitos; vacío no inventa turnos. |
+| `IA_DOCS_DIR`, `RAG_UPLOAD_ENABLED` | Carpeta documental y permiso de modificar manuales (`false`). |
+| `IA_EMBEDDING_BASE`, `IA_EMBEDDING_MODELO` | Búsqueda semántica opcional; modelo `local`. |
+| `IA_WHISPER_BASE`, `IA_WHISPER_IDIOMA`, `IA_WHISPER_TIMEOUT_MS` | Transcripción opcional; español y 60000 ms. |
+| `IA_REPORTES_DIR`, `IA_REPORTES_MAX_DIAS` | `Documentos/Reportes`, purga perezosa a los 30 días. |
+| `IA_BACKLOG_CHAT_DIR` | `Documentos/BacklogChat`; exportaciones sin purga automática por antigüedad. |
+| `DEFAULT_USUARIO`, `DEFAULT_LINEA`, `DEFAULT_EQUIPO`, `DEFAULT_TURNO`, `DEFAULT_RENDIMIENTO` | Metadatos heredados de `/api/context`; no son lecturas ni identidad autenticada. |
 
-Una consulta en curso ya no rechaza a la siguiente. Se atiende de una en una
-—llama-server corre con `--parallel 1`, y dos preguntas simultáneas tardan el
-doble las dos— pero la segunda se **encola** (`ia/conversacion/cola.mjs`): su flujo SSE se
-abre en el acto y recibe `{ tipo: 'cola', porDelante }` con su puesto, que se
-reemite cada vez que alguien de delante termina.
+## API
 
-Códigos que no son 200: **503** sin `IA_BASE` o con la cola llena (tope de 8 en
-espera), **400** si la pregunta está vacía o pasa de 2000 caracteres.
+En desarrollo, `/docs` ofrece Swagger UI con los esquemas registrados.
+No se publica esa interfaz en producción. Los métodos y cuerpos definitivos
+están en `routes/` y `http/esquemas.mjs`.
 
-**El asistente sólo puede escribir una cosa: encender o apagar la bomba**, con
-la herramienta `controlar_bomba`, que escribe en `ac:TDCON/DEMO/SENSORES/CONTROL`.
-El resto del registro son lecturas; `POST /write` en crudo no es alcanzable
-desde el chat ni con la instrucción más astuta. Dos guardas protegen esa única
-escritura: `ICONICS_READ_ONLY` (la misma que gobierna `/api/iconics/write`) y,
-sólo al encender, el nivel del tanque — por encima del aviso superior de
-`shared/eva/comun/umbrales.js`, la herramienta se niega antes de escribir para no
-arriesgar un desbordamiento.
-
-### La bitácora de casos
-
-Lo que el asistente recuerda de intervenciones anteriores — la Fuente #3 del
-diagnóstico. La escribe el cierre de un riesgo (`CierreDiagnostico.jsx`) o la
-herramienta `registrar_intervencion` por voz y chat; la revisa `CasosRag.jsx`.
-
-| Ruta | Cuerpo | Respuesta |
-|---|---|---|
-| `GET /api/casos` | — | `{ ok, total, casos: Intervencion[] }` |
-| `POST /api/casos` | `CrearCasoSchema` | `{ ok, caso }` · 201 |
-| `PATCH /api/casos/:id` | `{ archivado: boolean }` | `{ ok, caso }` · 404 si no existe |
-| `GET /api/diagnostico?sistema=&riesgoId=` | — | `{ ok, sistema, riesgoId, huerfano, causas }` |
-
-**No hay `DELETE`, y es una decisión, no un olvido.** Un caso se ARCHIVA:
-deja de alimentar el diagnóstico —el índice de `ia/motor/casos.mjs` no lo
-mira— pero su texto y su fecha siguen intactos en `datos/aprendizaje.json`, y
-`archivado: false` lo devuelve. Es el mismo criterio con el que se archiva un
-manual (`PATCH /api/rag/documentos`) y el que pide «lo que pasó, pasó» en
-`shared/eva/comun/aprendizaje.js`.
-
-El `GET` devuelve **también** las archivadas, porque la pantalla de revisión
-necesita enseñar precisamente lo que el diagnóstico ya no mira para poder
-devolverlo. Todo lo demás que lee la bitácora —incluido lo que ve el
-modelo— las excluye.
-
-Las dos escrituras piden rol `operador`; el `GET` no, como el resto de rutas
-de sólo lectura.
-
-### Del propio puente
-
-| Ruta | Respuesta |
+| Familia | Rutas |
 |---|---|
-| `GET /api/health/live` | `{ status: 'ok', version, uptimeSeconds, timestamp }` |
-| `GET /api/health` · `GET /api/health/ready` | `{ status, version, iconicsReachable, tokenValid, readOnly, uptimeSeconds, timestamp, reason? }` |
-| `GET /api/context` | `{ context, iconics }` |
+| Salud | `GET /api/health/live`, `GET /api/health`, `GET /api/health/ready`. |
+| Sesión | `GET/POST/DELETE /api/sesion`; intercambio silencioso bajo `/api/sesion/silenciosa/*` y retorno `/auth/silencioso`. |
+| Contexto compatible | `GET /api/context`, con sesión. |
+| Lecturas | `GET /api/iconics/data`, `GET /api/iconics/data/batch`. |
+| Historia | `GET /api/iconics/history`, `POST /api/iconics/history/batch`. |
+| Exploración | `GET /api/iconics/browse`, `GET /api/iconics/points`, `GET /api/iconics/userinfo`. |
+| Escrituras | `POST /api/iconics/write`, `POST /api/iconics/write/batch`. |
+| Alarmas | `GET /api/iconics/alarms`, `PUT /api/iconics/alarms/acknowledge`. |
+| Chat | `GET/POST /api/chat`, `PUT /api/chat/modelo`, `POST /api/chat/exportar`. |
+| Documentos | `GET/POST/PUT /api/rag/documentos` y operaciones de archivo definidas en ragRoutes. |
+| Casos | Consulta, alta y archivo bajo `/api/casos`. |
+| Diagnóstico, control y reportes | Véanse diagnosticoRoutes, controlRoutes y reportesRoutes. |
+| Voz | `GET/POST /api/voz`. |
 
-Son dos preguntas distintas y por eso son dos rutas. **`live`** dice si el
-proceso respira y no consulta nada: es la sonda del orquestador, que corre cada
-pocos segundos para siempre. **`ready`** —el nombre nuevo de `/api/health`, que
-se mantiene— sí llama a ICONICS, y es la que mira el monitor. Sondear la
-segunda cada 10 s serían 8 640 pings diarios contra el servidor de planta sólo
-para saber si Node está vivo, y además reiniciaría el contenedor por una avería
-que no es suya.
+`live` sólo informa de que el proceso está vivo. `health` y `ready`
+consultan conectividad con ICONICS: el campo status es `ok` o `error`,
+y se informa de sesiones activas. No hay un token global ni estado degraded.
 
-`status` tiene tres valores porque son tres averías distintas:
+Una ruta industrial implementada no garantiza que el servidor conectado tenga
+el dato disponible. En particular, el catálogo de vibraciones declara limitaciones
+para alarmas individuales, historia y vigilancias.
 
-| Valor | Significa | Dónde mirar |
-|---|---|---|
-| `ok` | Se llega al servidor y hay token válido | — |
-| `degraded` | Se llega, pero no hay token | Credenciales o permisos del usuario |
-| `error` | No se llega | Red, servicio caído o `ICONICS_API_BASE` sin configurar |
+## Seguridad y comportamiento
 
-Cualquier otra ruta sirve el frontend compilado: los archivos reales de
-`/assets/` tal cual, y todo lo demás el `index.html`, para que el enrutador del
-navegador resuelva. Si no hay build, responde 503 diciendo que falta compilar
-en vez de un 404 que se confunde con una ruta mal escrita.
+Cada sesión construye su cliente ICONICS con el token de esa persona.
+No hay roles locales ni una identidad privilegiada común. Los endpoints de negocio
+exigen sesión; las escrituras de planta respetan además el modo de solo lectura,
+y las modificaciones documentales su interruptor específico.
 
-## Cómo está pensado
+La aplicación impone límites de cuerpo, tiempo y concurrencia; valida nombres
+de puntos y esquemas. Los logs redactan secretos. Producción exige HTTPS delante
+del servidor para la cookie Secure y rechaza desactivar la verificación TLS.
+Para una CA privada, configura `NODE_EXTRA_CA_CERTS`.
 
-- **Una sola llamada saliente.** Todo lo que sale hacia ICONICS pasa por
-  `request()` en `client.mjs`: autenticación, parseo, error y traza ocurren una
-  vez y en un sitio. Antes cada operación repetía ese bloque, y cada copia
-  podía divergir —de hecho divergían.
+El chat transmite eventos SSE y comparte una cola de inferencia. Sin `IA_BASE`,
+la consulta de estado informa que está deshabilitado y el intento de conversar
+explica la configuración faltante; la interfaz del asistente sigue existiendo.
 
-- **La configuración se lee una vez y se valida.** `process.env` se toca sólo
-  en `config.mjs`. Eso permite montar la app entera con una configuración de
-  prueba, que es exactamente lo que hace `scripts/verificar-backend.mjs`.
+## Documentos, conocimiento y pruebas
 
-- **Un login, no uno por petición.** El token se cachea y se refresca con
-  margen, y los intentos simultáneos comparten el mismo flujo en vuelo: veinte
-  peticiones en frío disparan **un** login, no veinte.
+PDF.js extrae PDF con un lector de respaldo; DOCX y formatos de texto también
+están admitidos. No hay OCR. BM25 funciona sin embeddings. Los manuales
+archivados no alimentan el índice y los casos archivados no alimentan el diagnóstico.
 
-- **Lista blanca, no lista negra.** Todo parámetro que acabe en una petición a
-  ICONICS pasa por `validation.mjs`. El patrón admite lo que un nombre de punto
-  real necesita —incluidos los parámetros de los Data Manipulators y el espacio
-  `$info:` de diagnóstico de licencia— y rechaza lo demás.
-
-- **Ninguna petición se queda colgada.** `app.mjs` envuelve el manejador
-  completo: una excepción imprevista es un 500 registrado, no un socket abierto
-  esperando a que el cliente se canse.
-
-- **Los errores del servidor no se enmascaran.** Un 500 de ICONICS llega como
-  500 con su cuerpo dentro de `payload`. Convertirlo en un 502 genérico
-  borraría justo el dato que explica el fallo. Con una excepción deliberada: el
-  corte por timeout se distingue como **504**, porque "tardó demasiado" y "no
-  se pudo conectar" se arreglan en sitios distintos.
-
-- **Ninguna llamada saliente puede colgarse.** `request()` lleva
-  `AbortSignal.timeout`, y como toda salida pasa por ahí, las cubre todas. El
-  modo de fallo de un servidor saturado no es rechazar la conexión: es
-  aceptarla y no contestar, y sin corte eso acumulaba sockets hasta tumbar el
-  puente.
-
-- **El defecto es el seguro.** `ICONICS_READ_ONLY` y `CORS_ORIGINS` valen lo
-  restrictivo si nadie los toca, y lo permisivo se pide a propósito. Es la
-  lección que el frontend ya había aprendido con `VITE_ICONICS_FAKE`: un
-  defecto cómodo se convierte en el estado permanente de las instalaciones que
-  nadie revisó.
-
-- **Una lectura para todas las pantallas.** El motor de sondeo agrupa muy bien
-  dentro de un navegador, pero eso es por cada pantalla encendida, y todas
-  piden los mismos tags. La caché de `readPoints()` colapsa esa ráfaga en una
-  sola llamada; su ventana es un orden de magnitud menor que la cadencia de
-  sondeo, así que ningún dato llega más viejo de lo que ya llegaba.
-
-## Verificación
-
-### Pruebas unitarias
-
-```bash
-cd backend && npm test          # 118 · configuración, esquemas, logger y rutas
-```
-
-Corren en segundos, sin red y sin puertos: montan la app entera con
-`app.inject()` de Fastify y le inyectan peticiones en memoria, contra el
-transporte simulado (`ICONICS_FAKE`).
-
-Cubren sobre todo lo que rompe una instalación y lo que ya se rompió una vez:
-los defectos seguros de `config.mjs` (solo lectura, CORS cerrado), las
-cabeceras de seguridad, el 413 del dictado —que tiene que LLEGAR al cliente en
-vez de cortarle la conexión—, el flujo SSE del asistente, que es lo más frágil
-del backend, y que ninguna llamada saliente hacia ICONICS se quede sin corte
-por tiempo.
-
-### Verificación de contrato, contra servicios falsos
-
-```bash
-node scripts/verificar-backend.mjs           #  73 · el contrato HTTP
-node scripts/verificar-herramientas.mjs      # 110 · las herramientas del asistente
-node scripts/verificar-chat.mjs              #  44 · el bucle de conversación
-node scripts/verificar-transporte-falso.mjs  #  21 · ICONICS_FAKE, todas las máquinas
-node scripts/verificar-riesgos.mjs           #  30 · las reglas del tanque
-node scripts/verificar-riesgos-vibracion.mjs #  40 · las reglas de vibraciones
-node scripts/verificar-pronostico.mjs        #  18 · el desgaste acumulado
-node scripts/verificar-aprendizaje.mjs       #  13 · ninguna propuesta se aplica sola
-```
-
-El primero levanta un ICONICS falso —flujo OIDC incluido— y comprueba que cada
-endpoint devuelve la forma exacta que consume el frontend.
-
-Los otros dos existen porque una respuesta real del asistente tarda entre 30 y
-90 segundos: una capa que solo se pudiera probar esperando eso no se probaría
-nunca. `verificar-herramientas` las ejecuta contra un cliente de
-mentira —y desde el reparto por familias comprueba además que lo que se le
-anuncia al modelo y lo que se puede ejecutar sigan siendo lo MISMO, que es la
-red que hace seguro mover una familia de archivo—; `verificar-chat` levanta un **llama-server falso** al que se le dicta
-qué contestar, lo que permite provocar en milisegundos casos que con el modelo
-de verdad no se pueden provocar a voluntad —el principal: que conteste de
-memoria, sin llamar a ninguna herramienta—.
-
-Ninguno necesita red, ni configuración, ni GPU, ni el backend levantado.
-
-Contra el servidor real, con el backend en marcha:
-
-```bash
-node scripts/verificar-antiguedad-historico.mjs  # desde cuándo hay historia de verdad
-node scripts/comprobar-historia-vibraciones.mjs  # si el grupo DEMO 3 ya registra
-node scripts/comprobar-historial-alarmas.mjs     # qué contesta el servidor de alarmas
-node scripts/sondear-paginacion-historico.mjs    # cómo pagina de verdad readHistory
-```
-
-Éstos no forman parte de ningún flujo automático: se invocan a mano cuando hay
-que decidir algo sobre el servidor real, y su salida es la evidencia que se cita
-en los planes de `docs/`.
+Ejecuta `npm --prefix backend test` desde la raíz. Las pruebas montan Fastify
+en memoria y no requieren planta. Los verificadores con servidores simulados,
+sondas reales y medidas de IA se distinguen en [docs/README.md](../docs/README.md).

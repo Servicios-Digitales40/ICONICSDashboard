@@ -1,35 +1,8 @@
 // @vitest-environment jsdom
 /**
- * accesibilidad.test.jsx
- * ------------------------------------------------------------------
- * El arnés de `test/a11y.js` aplicado a lo que queda de interfaz.
- *
- * ── POR QUÉ ESTE ARCHIVO SUSTITUYE AL DE `demo-eva/` ───────────────
- *
- * Aquél auditaba `InicioTanque`, `PlantaTanque`, `AssetsEva` y
- * `DetalleActivo`, más los landmarks del layout (`<header>` del Topbar,
- * `<aside>`/`<nav>` del Sidebar). Ninguno de los seis existe ya: la Fase 3 del
- * Plan 20 borró las vistas de planta y el layout entero.
- *
- * Reapuntarlo importa más que antes, no menos. Con veintidós pantallas, un
- * fallo de accesibilidad en una era un fallo en una; con dos, cualquier
- * defecto está en el 50 % de la aplicación y lo ve todo el mundo, todo el
- * rato.
- *
- * ── QUÉ CUBRE HOY Y QUÉ FALTA ──────────────────────────────────────
- *
- * Hoy: los dos cajones que la Fase 3 conservó. El asistente en pantalla
- * completa y el login todavía no —el primero se rehace en la Fase 5 y el
- * segundo no existe hasta la Fase 4—, y auditarlos ahora sería auditar algo
- * que va a cambiar entero. Se añaden ahí, y está anotado en el plan.
- *
- * ── QUÉ PUEDE Y QUÉ NO PUEDE FALLAR AQUÍ ───────────────────────────
- *
- * `auditarAccesibilidad()` sólo falla por violaciones GRAVES —nombres
- * accesibles, ARIA inválido, alternativas de imagen; ver la cabecera de
- * `test/a11y.js`—. El contraste de color y el comportamiento real de
- * `:focus-visible` no son observables en jsdom, que no renderiza: ésos se ven
- * en la revisión en pantalla de la Fase 5 (`impeccable audit`).
+ * Audita los paneles de Casos y Manuales con axe-core.
+ * Esta suite cubre violaciones graves; no sustituye una revisión visual
+ * de contraste ni la comprobación de teclado en un navegador real.
  */
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

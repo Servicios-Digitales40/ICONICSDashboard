@@ -93,37 +93,11 @@ function assets() {
   }
 }
 
-/** Los trozos que descarga el navegador ANTES de que nadie navegue. */
-function trozosDeArranque() {
-  const html = readFileSync(join(DIST, "index.html"), "utf8");
-  const entrada = [...html.matchAll(/(?:src|href)="\/assets\/([^"]+\.js)"/g)].map((m) => m[1]);
 
-  // El HTML sólo enlaza la entrada; sus importaciones estáticas viajan igual.
-  // Se resuelven leyendo los `import` del propio archivo, que Vite deja como
-  // rutas literales a /assets/.
-  const vistos = new Set();
-  const pendientes = [...entrada];
-
-  while (pendientes.length) {
-    const f = pendientes.pop();
-    if (vistos.has(f)) continue;
-    vistos.add(f);
-
-    let código;
-    try { código = readFileSync(join(DIST, "assets", f), "utf8"); } catch { continue; }
-
-    // `import "./x.js"` / `from"./x.js"` — estáticos. Los dinámicos van con
-    // `import(` y ésos son justamente los que NO cuentan.
-    for (const m of código.matchAll(/(?:^|[;\s}])(?:import|export)\s*(?:[^"';]*?from\s*)?["']\.\/([^"']+\.js)["']/g)) {
-      pendientes.push(m[1]);
-    }
-  }
-  return vistos;
-}
 
 const fallos = [];
 const archivos = assets();
-const arranque = trozosDeArranque();
+
 
 console.log(`Build: ${DIST}\n`);
 

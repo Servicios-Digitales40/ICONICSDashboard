@@ -98,7 +98,7 @@ export function registerChatRoutes(fastify, { config, cola }) {
        * lo pide: el `llama-server` es uno. Por eso sigue exigiendo sesión y
        * sigue devolviendo 409 si hay una consulta en marcha.
        */
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      onRequest: [fastify.autenticar],
       schema: { body: CambiarModeloSchema },
     },
     async (request, reply) => {

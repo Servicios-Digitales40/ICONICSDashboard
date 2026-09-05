@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 10 · Vista SVG · Construida, comparada y retirada
 
 > ⚠️ **DOCUMENTO HISTÓRICO (18-ago-2026).** La «Vista SVG» que este plan

@@ -1,40 +1,7 @@
 /**
- * Punto de composición de la aplicación.
- *
- * ── UNA SOLA VISTA (PLAN 20 FASE 3) ────────────────────────────────
- *
- * Este archivo tenía un `Shell` con sidebar, topbar, dos banners de estado, un
- * modo muro que rotaba pantallas solo, y un registro de **veintidós rutas** que
- * decidía cuál pintar. Ya no hay ninguna: la rama `Asistente` es el chat y nada
- * más, y lo que haya que enseñar se enseña dentro de él o en uno de sus cajones
- * (`features/asistente/cajones/`).
- *
- * De ahí que no haya `useState('page')`, ni `lazy()` por vista, ni `Suspense`
- * de navegación. No es que se hayan simplificado: es que sin destinos no hay
- * nada que resolver. La invariante está en `docs/PLAN-20-ASISTENTE.md` §2.12 y
- * la guarda `test/app/una-sola-vista.test.jsx`, porque un router con dos
- * entradas es el primer paso para volver a tener nueve — y este proyecto ya
- * hizo ese camino una vez.
- *
- * ── LO ÚNICO QUE SE DECIDE AQUÍ (PLAN 20 FASE 4) ───────────────────
- *
- * Login o asistente. Y no son dos rutas: son dos estados de la misma
- * aplicación, sin URL propia. Quien no ha entrado no puede llegar a ninguna
- * parte —el backend le respondería 401 a todo— así que no hay nada que
- * enrutar.
- *
- * El tercer estado, `comprobando`, existe porque la cookie de sesión es
- * `httpOnly` y JavaScript no puede leerla: hay que preguntarle al servidor.
- * Pintar el login mientras tanto y sustituirlo medio segundo después es el
- * parpadeo que hace que una aplicación parezca rota nada más abrirla.
- *
- * ── EL ORDEN DE LOS PROVIDERS SIGUE SIENDO FUNCIONAL ───────────────
- *
- * Se deja visible aquí, y no escondido tras un `<AppProviders>`, por el mismo
- * motivo de siempre: un provider que consuma el hook de otro tiene que ir por
- * dentro. `SesionProvider` va DENTRO de `ThemeProvider` porque el login se
- * pinta con el tema, y FUERA de todo lo que hace peticiones, porque es quien
- * recoge el aviso de que la sesión caducó.
+ * Compone el tema y la sesión; muestra la comprobación, el login o el asistente.
+ * Los providers de consultas, avisos y modales se montan dentro de la sesión.
+ * ErrorBoundary permite informar de un fallo de renderizado del asistente.
  */
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "@/theme";

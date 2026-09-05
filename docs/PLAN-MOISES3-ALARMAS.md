@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan de Alarmas — rama Moises3
 
 Plan de trabajo separado del [`PLAN-MOISES3-UI-UX.md`](./PLAN-MOISES3-UI-UX.md)

@@ -1,34 +1,7 @@
 /**
- * Índice de la documentación de planta: manuales, hojas de datos,
- * procedimientos.
- *
- * El modelo NUNCA recibe un documento entero. Recibe fragmentos citables, con
- * el nombre del archivo y la página de donde salen, y las instrucciones le
- * obligan a citar la fuente. Es la diferencia entre «el Cerabar PMP63B admite
- * hasta 40 bar» —verificable— y la misma frase dicha de memoria por un modelo
- * de 4B, que suena igual y puede ser falsa.
- *
- * ── POR QUÉ VIVE AQUÍ Y NO EN `shared/` ────────────────────────────
- *
- * Estuvo en `shared/eva/documentos.mjs`, y no podía funcionar: lee del disco
- * con `node:fs` —cosa que el frontend no puede hacer— e importaba
- * `../logger.mjs`, que desde `shared/` apunta a un archivo que no existe. El
- * criterio de `shared/` es «reglas de negocio que backend y frontend necesitan
- * iguales»; un índice de archivos no es eso.
- *
- * ── DOS MODOS DE BÚSQUEDA, Y EL POR DEFECTO ES EL LÉXICO ───────────
- *
- * Con embeddings la búsqueda entiende sinónimos, pero exige un SEGUNDO
- * servidor: llama-server sirve un modelo a la vez, y el que atiende el chat no
- * puede además generar embeddings (y si se le piden, los devuelve de un modelo
- * generativo, que para esto son malos). Montar ese segundo servidor es una
- * decisión de instalación, no algo que deba dar por supuesto el código.
- *
- * Por eso el modo por defecto es BM25 —búsqueda léxica clásica, cero
- * dependencias, cero servidores— que en documentación técnica funciona
- * sorprendentemente bien: los manuales usan el vocabulario exacto del dominio y
- * quien pregunta suele usarlo también. Si hay `IA_EMBEDDING_BASE`, se usan
- * embeddings y BM25 pasa a ser el desempate.
+ * Índice documental con fragmentos citables por archivo y página.
+ * Extrae PDF con PDF.js y un lector de respaldo; no incluye OCR.
+ * BM25 funciona sin servicios adicionales; embeddings añade búsqueda híbrida.
  */
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
@@ -219,53 +192,8 @@ async function extraerTextoPdf(buffer) {
 
 
 /**
- * Saca el texto de un PDF sin dependencias.
- *
- * ── HASTA DÓNDE LLEGA ESTO ─────────────────────────────────────────
- *
- * Un PDF no guarda texto: guarda instrucciones de dibujo dentro de flujos
- * comprimidos. Esto los descomprime con `zlib` —que Node trae— y recoge los
- * operadores de texto (`Tj`, `TJ`, `'`, `"`). Cubre el caso normal: manuales
- * generados por Word, InDesign o FrameMaker, que es de donde salen las hojas
- * de datos de los fabricantes.
- *
- * **No** cubre dos casos, y los dos se detectan y se avisan en vez de devolver
- * basura:
- *
- *  - **PDF escaneado.** Son imágenes; no hay texto que extraer. Haría falta
- *    OCR, que sí es una dependencia grande.
- *  - **Fuentes con codificación propia** (subconjuntos sin `ToUnicode`), donde
- *    los códigos no son ASCII y salen caracteres sin sentido.
- *
- * ── POR QUÉ YA NO SE USA, Y QUÉ COSTÓ AVERIGUARLO ──────────────────
- *
- * Esta función **quedó como respaldo**: la extracción real la hace ahora
- * `pdfjs-dist`. La decisión anterior —«se descartó `pdf-parse` o
- * `pdfjs-dist` porque este backend arranca sin instalar nada»— era
- * razonable mientras los únicos PDF fueran los dos generados a medida de
- * `Documentacion/`. Dejó de serlo el 03-09-2026, cuando entraron manuales
- * de fabricante de verdad y se midió lo que este código sacaba de ellos:
- *
- *   ISO 20816-3   9 páginas · 39 fuentes · 0 imágenes  →  9 fragmentos,
- *                 y los NUEVE eran la misma cabecera de página. El cuerpo
- *                 de la norma vive en flujos que este lector no abre.
- *   Siemens V20   332 páginas · 37 233 operadores de texto  →  46 fragmentos
- *                 de ~50 caracteres, trozos de tabla pegados.
- *   Endress+H.    742 operadores de texto  →  2 fragmentos.
- *
- * Con `pdfjs-dist`, los mismos archivos dan 31 512, 639 100 y 16 451
- * caracteres. No era que los PDF fueran malos: era que este extractor sólo
- * sabe leer los fáciles.
- *
- * Y el fallo no era silencioso a medias, era peor: los nueve fragmentos de
- * cabecera del ISO **se recuperaban** en una búsqueda sobre vibraciones, así
- * que `manualCitado` habría enseñado «ISO 20816-3, páginas 1 y 2» como
- * respaldo de una causa. Una cita que parece evidencia y no lo es — el
- * defecto exacto que la auditoría del 01-09-2026 vino a cerrar.
- *
- * Se conserva y no se borra porque cubre un caso que `pdfjs` no: un PDF
- * cuyos flujos estén sin comprimir o con una estructura que haga fallar al
- * lector entero. Es el plan B, no el plan.
+ * Lector PDF de respaldo para estructuras incompletas que PDF.js rechaza.
+ * Extrae texto de streams con zlib; no sustituye al lector principal ni hace OCR.
  */
 function extraerTextoPdfCasero(buffer) {
   const paginas = []

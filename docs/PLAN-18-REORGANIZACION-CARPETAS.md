@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # PLAN-18 — Reorganización de carpetas
 
 ## 0. Por qué

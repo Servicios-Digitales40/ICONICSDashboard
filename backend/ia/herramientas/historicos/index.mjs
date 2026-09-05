@@ -74,13 +74,7 @@ import {
 } from '../../../../shared/eva/tanque/senales.js'
 import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
 import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
-import {
-  NO_COMPARTEN,
-  SISTEMA,
-  sistemaDePunto,
-  sistemasDeSenal,
-  tieneHistoria,
-} from '../../../../shared/eva/comun/sistemas.js'
+import { NO_COMPARTEN, SISTEMA, sistemasDeSenal, tieneHistoria } from '../../../../shared/eva/comun/sistemas.js'
 import { resolverInstante } from '../../../../shared/periodo.js'
 
 import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'

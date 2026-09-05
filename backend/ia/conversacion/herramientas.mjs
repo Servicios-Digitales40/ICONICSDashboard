@@ -1,166 +1,20 @@
 /**
- * El ENSAMBLADOR de las herramientas que el modelo puede invocar.
+ * Ensambla las seis familias de herramientas con el cliente de la sesión.
+ * Conserva los resolvedores compartidos de señales, periodos y presentación.
  *
- * ── QUÉ HACE HOY ESTE ARCHIVO ──────────────────────────────────────
- *
- * Construir el contexto —el cliente de ICONICS, los turnos, la carpeta de
- * reportes, el tope de concurrencia—, dárselo a cada FAMILIA y juntar lo que
- * devuelven en un solo catálogo. Las diecinueve implementaciones viven en
- * `herramientas/`, una subcarpeta por familia:
- *
- *   aprendizaje/    3 · hechos y propuestas. No toca ICONICS
- *   registro/       1 · qué máquinas hay. Abre el catálogo a propósito
- *   maquina/        3 · el instante de una máquina, y la única que ESCRIBE
- *   historicos/     9 · todo lo que pregunta al pasado
- *   documentacion/  3 · los manuales, y el diagnóstico que los cruza
- *
- * Llegó a tener 4100 líneas. El reparto no es temático sino de DEPENDENCIA:
- * cada familia recibe exactamente lo que necesita, y su firma lo declara.
- * `aprendizaje/` y `registro/` no reciben nada, y esa firma vacía es el dato.
- *
- * ── LO QUE TODAVÍA VIVE AQUÍ, Y POR QUÉ ────────────────────────────
- *
- * El índice de nombres de señal del tanque (`resolverSenal`, sus sinónimos,
- * `senalDesconocida`), el resolvedor de ventanas de tiempo y las piezas de
- * estadística redactada. No es que no tengan sitio: es que su sitio depende de
- * una decisión que no está tomada —el índice de nombres tiene que pasar a ser
- * por máquina, y hoy sólo conoce una—. Ver B3 en `docs/BACKLOG-BACKEND.md`.
- *
- * Mientras tanto las familias los importan de aquí. El ciclo de imports lo
- * resuelve ESM sin problema, y la alternativa era un segundo índice de
- * nombres: exactamente el fallo que este proyecto ya arregló una vez.
- *
- * ── EL ORDEN DEL CATÁLOGO NO ES COSMÉTICO ──────────────────────────
- *
- * Es lo primero que lee el modelo. `sistemas_de_la_planta` abre, porque es la
- * que tiene que encontrar cuando no sabe de qué máquina le hablan; las de
- * manuales cierran, porque son las que menos veces son la respuesta. En medio,
- * las de una máquina antes que las de historia: primero cómo está, después
- * cómo ha estado. Lo fija entero `scripts/verificar-herramientas.mjs`.
- *
- * ── QUÉ CAMBIÓ EN AGOSTO DE 2026, Y POR QUÉ NO FUE UN RENOMBRADO ───
- *
- * Este archivo consultaba OEE, disponibilidad, rendimiento, calidad y
- * contadores de pieza de las diez máquinas de Resonac. Nada de eso existe en
- * el árbol de la demo: bajo esa raíz hay **ocho magnitudes planas de una sola
- * instalación**, sin tag `Estado`, sin alarmas configuradas y sin producción
- * (Plan 8 §1.1 y §1.4). No es el mismo dominio con otros nombres — es otra
- * forma de datos, y por eso las herramientas son otras y no las de antes con
- * las etiquetas cambiadas.
- *
- * Lo que **no** cambió es el criterio, que es lo que hacía útiles a las
- * anteriores:
- *
- * ── SON DE DOMINIO Y NO LA API REST EN CRUDO ───────────────────────
- *
- * La alternativa era dejar que el modelo construyera la llamada al
- * historiador. Aquí hay cuatro reglas no obvias que hay que acertar a la vez
- * —el punto histórico se nombra con `ac:` y no con `hda:`, el agregado es
- * `Average` y no `Interpolative`, hay tope de 100 muestras por petición, y
- * **tres de las ocho señales devuelven la serie de otra**— y un modelo de 4B
- * las inventa con aplomo. Están medidas en `docs/PLAN-8-DEMO-EVA.md` y
- * resueltas en `shared/eva/comun/historia.js`.
- *
- * Aquí el modelo elige QUÉ preguntar; el CÓMO lo sabe este archivo.
- *
- * ── LA GUARDA QUE JUSTIFICA TODO EL ARCHIVO ────────────────────────
- *
- * A `CARGA_TRABAJO_MOTOR`, `KPIEFICIENCIA_ENERGETICA` e
- * `INDICE_DESVIACION_VOLTAJE` el Data Historian les devuelve la curva de
- * `STEMPERATURA_TANQUE`. **No da error**: responde `ok: true`, con marcas de
- * tiempo correctas y valores plausibles. Un asistente que pidiera la serie sin
- * comprobarlo no fallaría, contestaría — y diría que la carga del motor llegó
- * al 41 % cuando eso son grados centígrados de un tanque.
- *
- * Por eso `historia_de_senal` rechaza por catálogo **antes de salir a la red**,
- * y por eso la marca vive en `shared/eva/tanque/senales.js` y no en cada consulta.
- *
- * ── EL ESTADO ES NUESTRO, Y SE DICE ────────────────────────────────
- *
- * El servidor no publica estado para este árbol. Los cinco estados salen de
- * comparar cada señal contra los umbrales de `shared/eva/comun/umbrales.js`, que son
- * **nuestros y siguen sin confirmar**. Las respuestas lo llevan escrito
- * (`avisoUmbrales`) mientras `PROVISIONALES` esté en `true`, igual que la vista
- * de Planta pinta su aviso. Un asistente que afirmara «está fuera de límite»
- * sin decir de quién es el límite estaría prestando al servidor una autoridad
- * que no nos ha dado.
- *
- * ── LA ÚNICA ESCRITURA, Y CON GUARDA PROPIA ─────────────────────────
- *
- * `controlar_bomba` es la única función del catálogo que llama a
- * `client.writePoint`. Dos puertas la protegen, en este orden:
- *
- *  1. `ICONICS_READ_ONLY` (server-side, la misma que usa `/api/iconics/write`):
- *     con el puente en solo lectura la herramienta ni intenta escribir.
- *  2. El nivel del tanque: encender la bomba con el tanque ya por encima del
- *     aviso superior de `UMBRALES.nivelTanque` se rechaza aquí, ANTES de
- *     escribir, para que una instrucción del chat no pueda desbordarlo.
- *
- * Hay una tercera comprobación DESPUÉS de escribir: un `writePoint` que
- * responde `ok: true` no demuestra que el punto haya cambiado. Se comprobó
- * contra el tag real de esta demo primero configurado como «Static value»
- * —aceptaba la escritura y seguía leyendo `true` siempre— y luego como fuente
- * en tiempo real con escaneo cada ~1 s, donde una relectura inmediata puede
- * traer el valor de antes del ciclo. `controlar_bomba` relee el mismo punto
- * tras escribir, con un par de reintentos cortos para dar tiempo al escaneo,
- * y sólo confirma el encendido o apagado si la relectura coincide; si no, lo
- * dice como lo que es, una escritura sin efecto confirmado, y no como una
- * orden cumplida.
- *
- * El resto del catálogo sigue siendo de solo lectura: ninguna otra función
- * llama a `writePoint`, así que ninguna instrucción astuta metida en el chat
- * puede alcanzar una escritura que no sea ésta.
+ * El catálogo decide qué señales tienen historia válida antes de consultar
+ * el servidor: algunos tags devuelven la serie de otra señal sin dar error.
+ * Los estados derivados declaran si sus umbrales son provisionales.
+ * El control de bomba comprueba solo lectura, nivel y relectura de la orden;
+ * ICONICS aplica los permisos del usuario que inició sesión.
  */
-import {
-  alinearSeries,
-  correlacionPearson,
-  describirCorrelacion,
-  estadisticasBasicas,
-  regresionLineal,
-  proyectar,
-  detectarAnomalias,
-} from '../../../shared/eva/comun/estadistica.js'
-import {
-  RAIZ,
-  SENALES,
-  SENAL_KEYS,
-  esHistorizada,
-  historizadas,
-  pointName,
-  senalInfo,
-} from '../../../shared/eva/tanque/senales.js'
+import { regresionLineal } from '../../../shared/eva/comun/estadistica.js'
+import { SENALES, SENAL_KEYS } from '../../../shared/eva/tanque/senales.js'
 import { ACTIVOS } from '../../../shared/eva/tanque/activos.js'
 import { UMBRALES } from '../../../shared/eva/comun/umbrales.js'
-import {
-  AGREGADO,
-  MAX_PUNTOS,
-  SIN_SERIE,
-  VENTANA,
-  intervaloHMS,
-  normalizar,
-  horaLocal as horaLocalDe,
-  resumirSerie,
-} from '../../../shared/eva/comun/historia.js'
-import {
-  NO_COMPARTEN,
-  SISTEMA,
-  SISTEMAS,
-  SISTEMA_IDS,
-  historizadasDe,
-  sistemaDePunto,
-  resumenDeSistemas,
-  sistemasDeSenal,
-  tieneHistoria,
-} from '../../../shared/eva/comun/sistemas.js'
-import {
-  VACIO as APRENDIZAJE_VACIO,
-  crearHecho,
-  crearPropuesta,
-  hechosVigentes,
-  normalizarAlmacen,
-  pendientes,
-  validarPropuesta,
-} from '../../../shared/eva/comun/aprendizaje.js'
+import { VENTANA } from '../../../shared/eva/comun/historia.js'
+import { SISTEMA, SISTEMAS, SISTEMA_IDS, sistemasDeSenal, tieneHistoria } from '../../../shared/eva/comun/sistemas.js'
+
 import { isoLocal, resolverPeriodo } from '../../../shared/periodo.js'
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -178,23 +32,28 @@ import { DEFINICIONES } from './definiciones.mjs'
  * `herramientas/lib/formato.mjs`.
  */
 import { fallo } from '../herramientas/lib/respuesta.mjs'
-/* Fase 1 del reparto: las tres herramientas del almacén de lo aprendido. No
-   reciben nada —no tocan el `client`— y por eso salen antes que las demás. */
+/**
+ * Familia de aprendizaje: persiste hechos y casos sin leer ICONICS.
+ */
 import { crearHerramientasDeAprendizaje } from '../herramientas/aprendizaje/index.mjs'
-/* Fase 2: las tres que leen los manuales. Sólo necesitan `indiceDocumentos`. */
+/**
+ * Herramientas documentales respaldadas por el índice de manuales.
+ */
 import { crearHerramientasDeDocumentacion } from '../herramientas/documentacion/index.mjs'
-/*
- * Fase 3: los ayudantes que SÍ dependen del cliente de ICONICS. Salen de la
- * clausura recibiendo un contexto con nombre en vez de cerrarse sobre ella.
+/**
+ * Ayudantes de lectura que reciben el cliente de la sesión.
  */
 import { crearAyudantesDeMaquina } from '../herramientas/lib/maquina.mjs'
 import { crearAyudantesDeHistoria } from '../herramientas/lib/historia.mjs'
-/* Fase 4: las familias que ya reciben el contexto en vez de cerrarse sobre él. */
+/**
+ * Familias de estado e historia con sus dependencias explícitas.
+ */
 import { crearHerramientasDeRegistro } from '../herramientas/registro/index.mjs'
 import { crearHerramientasDeMaquina } from '../herramientas/maquina/index.mjs'
 import { crearHerramientasDeHistoricos } from '../herramientas/historicos/index.mjs'
-/* Plan 16 Fase 4: una sola herramienta, `diagnosticar_falla`. Sólo necesita
-   `motorDiagnostico` (`ia/motor/diagnostico.mjs`) — no toca el `client`. */
+/**
+ * Familias de estado e historia con sus dependencias explícitas.
+ */
 import { crearHerramientasDeDiagnostico } from '../herramientas/diagnostico/index.mjs'
 
 export { DEFINICIONES }
@@ -362,14 +221,9 @@ export function agruparPorRegla(activos) {
       continue
     }
     porId.set(x.id, {
-      /*
-       * Plan 16 Fase 4: sin este `id` el modelo no tiene forma de pasarle un
-       * riesgo concreto a `diagnosticar_falla(sistema, riesgoId)` — tendría
-       * que adivinarlo del título en prosa, y eso es justo lo que este
-       * proyecto evita en todas partes. El `id` es estable (clave de
-       * `REGLAS`), así que citarlo no es un dato más: es el enganche con la
-       * Fuente #1 del diagnóstico.
-       */
+      /**
+ * Familias de estado e historia con sus dependencias explícitas.
+ */
       id: x.id,
       titulo: x.titulo,
       severidad: x.nivel ?? x.severidad,
@@ -617,31 +471,10 @@ export function senalDesconocida(texto, { paraHistoria = false } = {}) {
       )
     }
 
-    /*
-     * ── NO SE MANDA A UNA PUERTA QUE NO EXISTE ─────────────────────
-     *
-     * Este mensaje decía «vuelve a llamar indicando ese sistema». Sólo TRES
-     * de las diecinueve herramientas aceptan `sistema` —`estado_del_sistema`,
-     * `riesgos_activos` y `pronostico_de_desgaste`—, y ninguna de las ocho de
-     * señal que pasan por aquí lo hace. El modelo obedecía, repetía la llamada
-     * con un argumento que la herramienta ignora, volvía a caer en este mismo
-     * error, y se gastaban turnos en un bucle del que la instrucción era la
-     * causa.
-     *
-     * Se le dice lo que SÍ puede llamar, y eso CAMBIÓ el 28-08-2026:
-     * `historia_de_senal` ya acepta `sistema`, así que para una señal de otra
-     * máquina que tenga serie la salida es repetir la MISMA llamada con el id,
-     * no rendirse y pedir el valor de ahora.
-     *
-     * Mandarlo a `estado_del_sistema` cuando la serie existe cuesta la
-     * respuesta entera: preguntado por el promedio de ayer de la velocidad
-     * eficaz, el modelo leyó «esta herramienta sólo sirve al tanque»,
-     * consultó el estado en vivo y contestó que no podía dar el promedio —de
-     * un dato que el historiador tenía—.
-     *
-     * Por eso se distinguen los dos casos: con serie se reintenta, sin serie
-     * se ofrece el instante.
-     */
+    /**
+ * Resuelve ambigüedades entre señales y sistemas antes de consultar;
+ * las herramientas no comparten necesariamente la misma cobertura.
+ */
     /* `tieneHistoria` es de la MÁQUINA; `esHistorizada` es de la SEÑAL. Hacen
        falta las dos: vibraciones tiene serie para 40 de sus 73 puntos, así que
        preguntar por la máquina dice «sí» incluso de una señal que no la tiene

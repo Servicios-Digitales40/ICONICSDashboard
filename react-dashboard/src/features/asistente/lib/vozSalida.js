@@ -24,22 +24,7 @@
  * segundos de audio; esperar a tenerla entera cuesta poco y se entiende.
  */
 
-/**
- * Idioma que se pide si NO hay ninguna voz en español instalada.
- *
- * ── POR QUÉ NO SE FIJA 'es-ES' Y YA ────────────────────────────────
- *
- * Porque fijarlo dejó el asistente MUDO en la máquina de planta. Windows trae
- * voces de español de MÉXICO —Sabina, Raúl, todas `es-MX`— y ninguna `es-ES`.
- * Al pedir un locale sin voz instalada, Chrome no lanza ningún error: no suena
- * nada. Es el peor modo de fallo posible, porque no deja rastro en ninguna
- * parte.
- *
- * Ahora el idioma se toma de la VOZ que se haya elegido, sea la que sea. Este
- * valor es sólo el último recurso para cuando no hay ninguna en español y hay
- * que dejar que el sistema decida.
- */
-const IDIOMA_POR_DEFECTO = 'es'
+
 
 /**
  * Velocidad. Un poco por encima de la normal.

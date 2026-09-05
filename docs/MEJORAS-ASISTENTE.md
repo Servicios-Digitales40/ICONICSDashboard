@@ -1,3 +1,5 @@
+> **Propuestas históricas.** Este documento conserva el análisis de su fecha; sus prioridades y estados no se asumen vigentes. El estado actual está en [el índice documental](README.md) y en el código. Las vistas del antiguo dashboard ya no forman parte de esta rama.
+
 # Mejoras propuestas · Asistente de IA
 
 > **Qué es esto.** Treinta mejoras para el asistente, agrupadas en tres ejes:

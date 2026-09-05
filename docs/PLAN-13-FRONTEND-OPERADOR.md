@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 13 · Nueve mejoras de frontend: que el operador pueda fiarse de lo que ve
 
 > **Objetivo.** Cerrar F1–F9 de la auditoría del 20-ago-2026. Son nueve cambios

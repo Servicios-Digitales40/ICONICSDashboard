@@ -3,7 +3,7 @@
  * ------------------------------------------------------------------
  * Un solo ayudante: auditar un árbol ya renderizado con axe-core y fallar si
  * aparece una violación grave. Se importa a propósito — no vive en
- * `test/setup.js` — porque no es un relleno de entorno como `ResizeObserver`:
+ * los rellenos de entorno:
  * es una aserción, y una vista sin `import { auditarAccesibilidad }` sigue
  * siendo una vista sin comprobar, no una que pasa por descuido.
  *

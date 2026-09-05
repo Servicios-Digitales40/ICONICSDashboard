@@ -1,86 +1,23 @@
 <#
 .SYNOPSIS
-  Levanta el entorno de desarrollo completo: backend puente + dev server de Vite.
-
+  Compila y arranca el backend y Vite en terminales independientes.
 .DESCRIPTION
-  Son dos procesos y no uno, y cada uno abre su propia ventana para que sus
-  logs no se mezclen y Ctrl+C corte solo el que quieres cortar.
-
-  ── LA PARTE QUE CONFUNDE: HAY QUE ABRIR :5173, NO :3001 ──────────────
-
-  Los dos puertos sirven la aplicacion, pero NO la misma aplicacion:
-
-    :3001  el backend sirve `react-dashboard/dist`, el build compilado. Es lo
-           que corre en planta. Las 12 propuestas de diseno y «Planta · v2» NO
-           estan ahi, porque VITE_ENABLE_PROTOTYPES es una bandera de
-           COMPILACION: Vite la pliega a un literal y la rama entera
-           desaparece del bundle. Ver react-dashboard/src/lib/flags.js.
-
-           El script compila `dist` antes de arrancar (`npm run build`), asi
-           que :3001 siempre enseña el build de HOY y no uno de hace tres
-           dias. Es un paso mas de arranque -unos segundos-, saltable con
-           -SinBuild si ya compilaste y solo quieres reiniciar rapido.
-
-    :5173  el dev server de Vite, que lee las banderas al arrancar. Aqui si
-           salen los prototipos, y ademas hay recarga en caliente.
-
-  El backend sigue haciendo falta con :5173: es quien habla con ICONICS. El
-  dev server le reenvia /api (`server.proxy` en vite.config.js), asi que para
-  el navegador todo cuelga del mismo origen y no hay CORS que configurar.
-
-  ── DESDE OTRO EQUIPO DE LA RED ───────────────────────────────────────
-
-  Los dos procesos escuchan en todas las interfaces, asi que basta abrir
-  http://<ip-de-esta-maquina>:5173 . Si no responde y el ping si, es el
-  Firewall de Windows: scripts/exponer-en-red.ps1, como administrador.
-
-.PARAMETER SinPrototipos
-  Arranca Vite sin las banderas de superficie, para ver la aplicacion tal y
-  como la vera la planta pero con recarga en caliente.
-
+  El backend sirve dist en :3001; Vite ofrece recarga en caliente en :5173
+  y reenvia /api al backend. La simulacion se configura con ICONICS_FAKE
+  en .env.local. No hay prototipos ni selector de simulacion del frontend.
 .PARAMETER SinBuild
-  Se salta el `npm run build` y arranca con el `dist` que ya hubiera. Para
-  cuando acabas de compilar y solo quieres reiniciar los dos procesos rapido;
-  sin este parametro, :3001 puede quedarse enseñando un build de una sesion
-  anterior sin que nada lo avise.
-
+  Reutiliza el dist existente sin compilar.
 .PARAMETER BasePath
-  Compila el frontend para vivir bajo una SUBRUTA, no en la raiz del origen
-  que lo sirve -por ejemplo "/asistente/", cuando IIS reenvia esa subruta de
-  bms-server hacia este backend para el SSO silencioso del HMI de ICONICS
-  (docs/PLAN-20-ASISTENTE.md). Pone VITE_BASE_PATH y VITE_API_BASE SOLO para
-  el paso de `npm run build`.
-
-  Por defecto "/asistente/": ESTE equipo esta configurado como el proxy
-  inverso de IIS para el HMI de ICONICS (docs/PLAN-20-ASISTENTE.md §F7), asi
-  que compilar en la raiz seria el caso raro aqui, no el normal -y era,
-  ademas, la causa exacta de una regresion real el 04-09-2026: se corrio
-  `dev.ps1` sin el parametro, sobreescribiendo un `dist` que si estaba bien
-  compilado.
-
-  Para compilar en la raiz de verdad -probando el Asistente suelto, sin
-  IIS por delante-, pasa "/": `.\scripts\dev.ps1 -BasePath /`.
-
+  Subruta para el build. El valor local por defecto es /asistente/ para IIS.
+  Usa / para servir directamente desde localhost:3001. El build configura
+  VITE_BASE_PATH y VITE_API_BASE juntos; Vite de desarrollo usa la raiz.
 .EXAMPLE
-  # Compila para /asistente/ (el caso normal en este equipo)
-  .\scripts\dev.ps1
-
+  .\scripts\dev.ps1 -BasePath /
 .EXAMPLE
   .\scripts\dev.ps1 -SinBuild
-
-.EXAMPLE
-  # Compila en la raiz -sin IIS por delante-, para probar el Asistente suelto
-  .\scripts\dev.ps1 -BasePath /
-
-.EXAMPLE
-  # Si responde "la ejecucion de scripts esta deshabilitada en este sistema":
-  # Windows PowerShell 5.1 viene en Restricted de fabrica, y su politica es
-  # independiente de la de PowerShell 7. El Bypass afecta solo a esta llamada.
-  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 #>
 [CmdletBinding()]
 param(
-  [switch]$SinPrototipos,
   [switch]$SinBuild,
   [string]$BasePath = '/asistente/'
 )
@@ -92,7 +29,7 @@ $envFile = Join-Path $raiz '.env.local'
 $frontend = Join-Path $raiz 'react-dashboard'
 
 if (-not (Test-Path $envFile)) {
-  throw "No existe $envFile. Copia .env.example y rellena las credenciales de ICONICS."
+  throw "No existe $envFile. Copia .env.example y configura la URL de ICONICS y los servicios necesarios."
 }
 if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
   throw "Faltan las dependencias del frontend. Ejecuta: cd react-dashboard; npm install"
@@ -146,22 +83,17 @@ function Start-Ventana([string]$titulo, [string]$directorio, [string]$comando) {
 Start-Ventana 'ICONICS · backend :3001' $raiz `
   "node --env-file=.env.local backend/server.mjs"
 
-$banderas = if ($SinPrototipos) { '' } else {
-  "`$env:VITE_ENABLE_SIMULATOR='true'; `$env:VITE_ENABLE_PROTOTYPES='true'; "
-}
-Start-Ventana 'ICONICS · vite :5173' $frontend "$banderas npm run dev"
+Start-Ventana 'ICONICS · vite :5173' $frontend 'npm run dev'
 
 Write-Host ''
 if ($BasePath -and $BasePath -ne '/') {
   Write-Host "  backend   :3001   compilado para vivir bajo '$BasePath' — NO abre suelto en localhost:3001$BasePath" -ForegroundColor DarkGray
   Write-Host "            hace falta el proxy inverso de IIS por delante (docs/PLAN-20-ASISTENTE.md §F7)" -ForegroundColor DarkGray
 } else {
-  Write-Host '  backend   http://localhost:3001   (build de planta, sin prototipos)' -ForegroundColor DarkGray
+  Write-Host '  backend   http://localhost:3001   (build compilado)' -ForegroundColor DarkGray
 }
 Write-Host '  frontend  http://localhost:5173   <- abre esta' -ForegroundColor Cyan
-if (-not $SinPrototipos) {
-  Write-Host '            con Planta v2, Sandbox y las 12 propuestas' -ForegroundColor DarkGray
-}
+
 
 # Las mismas URLs para el resto de la red. Se listan aqui y no solo en la
 # ventana de Vite porque son las que hay que repartir, y quien arranca el

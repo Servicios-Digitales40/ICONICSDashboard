@@ -372,8 +372,8 @@ export async function createApp(config) {
     await fastify.register(fastifySwagger, {
       openapi: {
         info: {
-          title: 'ICONICS Dashboard API',
-          description: 'Puente HTTP entre el tablero EVA y el servidor ICONICS.',
+          title: 'Asistente ICONICS API',
+          description: 'API del asistente de mantenimiento conectado a ICONICS.',
           version: config.version,
         },
       },

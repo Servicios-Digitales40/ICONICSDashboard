@@ -67,7 +67,7 @@ export function registerCasosRoutes(fastify) {
   fastify.patch(
     '/api/casos/:id',
     {
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      onRequest: [fastify.autenticar],
       schema: { params: CasoPorIdParamsSchema, body: ArchivarCasoSchema },
     },
     async (request, reply) => {
@@ -96,7 +96,7 @@ export function registerCasosRoutes(fastify) {
   fastify.post(
     '/api/casos',
     {
-      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      onRequest: [fastify.autenticar],
       schema: { body: CrearCasoSchema },
     },
     async (request, reply) => {

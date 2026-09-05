@@ -1744,11 +1744,3 @@ const botonBajar = (t) => ({
   border: `1px solid ${t.border}`, background: t.panel, color: t.textSoft,
   boxShadow: t.shadow, cursor: "pointer", fontFamily: "'Inter', sans-serif",
 });
-
-const estiloChip = (t, deshabilitado) => ({
-  fontSize: 11.5, lineHeight: 1.4, textAlign: "left",
-  padding: "5px 10px", borderRadius: 999,
-  border: `1px solid ${t.border}`, background: "transparent", color: t.textSoft,
-  cursor: deshabilitado ? "default" : "pointer", opacity: deshabilitado ? 0.4 : 1,
-  fontFamily: "'Inter', sans-serif",
-});

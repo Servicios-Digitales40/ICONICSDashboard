@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 17 · Cerrar la auditoría del diagnóstico
 
 > **Objetivo.** Que la banda que ve el técnico signifique lo que dice

@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan 15 · Historia profunda: paginación real del historiador
 
 > **Objetivo.** Que cualquier período que el servidor guarde se pueda leer

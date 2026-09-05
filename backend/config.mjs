@@ -603,18 +603,6 @@ export function loadConfig(env = process.env) {
        */
       turnos: Object.freeze(leerTurnos(env.IA_TURNOS)),
 
-      /*
-       * Aquí vivió un segundo bloque `embeddings` / `docsPlantaDir` que leía
-       * `process.env` directamente. Se retiró por dos motivos:
-       *
-       *  - Era código muerto: nadie lo leía. La documentación la configuran
-       *    `docsDir` y `embeddingBase`, unas líneas más arriba.
-       *  - Saltarse el parámetro `env` rompe la propiedad que da sentido a este
-       *    archivo: `loadConfig({ ... })` deja de poder montar el servidor con
-       *    una configuración de prueba, porque parte de la config seguiría
-       *    leyendo el entorno real de la máquina. Ver la cabecera.
-       */
-
       /**
        * Dictado y notas de voz, contra `whisper-server`.
        *
@@ -662,7 +650,7 @@ export function loadConfig(env = process.env) {
       dir: readBacklogChatDir(env.IA_BACKLOG_CHAT_DIR),
     }),
 
-    /** Contexto de cabecera que sirve `/api/context` mientras no haya sesión real. */
+    /** Metadatos configurables de la ruta autenticada `/api/context`; no son mediciones. */
     context: Object.freeze({
       usuario: env.DEFAULT_USUARIO ?? 'Operador',
       linea: env.DEFAULT_LINEA ?? 'Linea 1',

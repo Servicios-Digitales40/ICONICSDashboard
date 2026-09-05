@@ -1,3 +1,5 @@
+> **Documento histórico.** Describe el alcance y las decisiones de su fecha, incluidas rutas y archivos posteriormente retirados. Para instalación, capacidades y estructura actuales consulta [el índice documental](README.md).
+
 # Plan de mejoras UI/UX — rama Moises3
 
 Plan de trabajo temporal para la segunda entrega de la demo. Se va llenando

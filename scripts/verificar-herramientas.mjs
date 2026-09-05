@@ -53,15 +53,7 @@ import {
   pointName,
 } from '../shared/eva/tanque/senales.js'
 import { PROVISIONALES } from '../shared/eva/comun/umbrales.js'
-import {
-  NO_COMPARTEN,
-  SISTEMA,
-  SISTEMAS,
-  historizadasDe,
-  mismoSistema,
-  sistemasDeSenal,
-  tieneHistoria,
-} from '../shared/eva/comun/sistemas.js'
+import { NO_COMPARTEN, SISTEMA, SISTEMAS, mismoSistema, sistemasDeSenal, tieneHistoria } from '../shared/eva/comun/sistemas.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 

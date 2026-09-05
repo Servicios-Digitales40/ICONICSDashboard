@@ -1,6 +1,6 @@
 ---
-name: Demo EVA
-description: Tablero de una instalación de agua industrial que lee sus señales de ICONICS en 2D y en 3D.
+name: Asistente ICONICS
+description: Asistente de mantenimiento con conversación y paneles de Assets, Manuales y Casos.
 colors:
   page: "#F5F6FA"
   surface: "#FFFFFF"

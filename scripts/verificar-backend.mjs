@@ -257,6 +257,15 @@ const config = loadConfig({
   CORS_ORIGINS: 'http://localhost:5173',
 })
 
+/** Tras consumir las respuestas, cierra las conexiones del servidor de prueba.
+ * Evita que keep-alive prolongue el cierre entre escenarios HTTP independientes.
+ */
+async function cerrarServidorDePrueba(server) {
+  const cierre = server.close()
+  server.server.closeAllConnections()
+  await cierre
+}
+
 /** Levanta una app con el entorno indicado y devuelve su URL base. */
 async function mount(env) {
   const server = await createApp(loadConfig({ ...baseEnv, ...env }))
@@ -810,7 +819,7 @@ console.log('\n── Endurecimiento · modo solo lectura (B.1) ─────�
   check('ICONICS_READ_ONLY con un valor que no es booleano no arranca', () => {
     assert.throws(() => loadConfig({ ICONICS_READ_ONLY: 'flase' }), /"true" o "false"/)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Endurecimiento · CORS (B.2) ─────────────────────────────')
@@ -833,7 +842,7 @@ console.log('\n── Endurecimiento · CORS (B.2) ─────────�
   check('sin CORS_ORIGINS (el defecto) no se autoriza ningún origen', () => {
     assert.equal(r.headers.get('access-control-allow-origin'), null)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Endurecimiento · timeout de salida (B.3) ────────────────')
@@ -853,7 +862,7 @@ console.log(`   el corte tiene que quedar registrado)${c.reset}`)
   check('UPSTREAM_TIMEOUT_MS inválido no arranca', () => {
     assert.throws(() => loadConfig({ UPSTREAM_TIMEOUT_MS: 'pronto' }), /entero >= 1/)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Endurecimiento · salud partida (B.4) ────────────────────')
@@ -882,7 +891,7 @@ console.log('\n── Endurecimiento · salud partida (B.4) ──────�
   check('/api/health/ready informa del modo solo lectura', () => {
     assert.equal(ready.body.readOnly, false, 'esta instancia arrancó con escritura')
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Endurecimiento · límite de peticiones (B.5) ─────────────')
@@ -909,7 +918,7 @@ console.log('\n── Endurecimiento · límite de peticiones (B.5) ────
   check('el límite no alcanza a los estáticos de la SPA', () => {
     assert.notEqual(estatico.status, 429)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Endurecimiento · caché de lote (B.7) ────────────────────')
@@ -932,7 +941,7 @@ console.log('\n── Endurecimiento · caché de lote (B.7) ──────�
     assert.equal(otroOrden.body.ok, true)
     assert.equal(batchCount, 1, `llamadas upstream=${batchCount}`)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 
   const { base: sinCache, server: server2 } = await mount({ BATCH_CACHE_TTL_MS: '0' })
   batchCount = 0
@@ -969,7 +978,7 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
     assert.match(descarga.headers.get('content-disposition') ?? '', /^attachment; filename="reporte-/)
   })
 
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Exportar la conversación a PDF ──────────────────────────')
@@ -1014,7 +1023,7 @@ console.log('\n── Exportar la conversación a PDF ────────�
     assert.equal(descarga.headers.get('content-type'), 'application/pdf')
   })
 
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 
 console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1) ──')
@@ -1030,7 +1039,7 @@ console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1
     assert.equal(r.body.truncada, true)
     assert.match(r.body.motivoCorte, /tope de 3 páginas/)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 {
   /*
@@ -1059,7 +1068,7 @@ console.log('\n── Historia profunda: presupuesto de páginas (Plan 15 Fase 1
     assert.equal(r.body.truncada, true)
     assert.match(r.body.motivoCorte, /plazo de 420 ms/)
   })
-  await server.close()
+  await cerrarServidorDePrueba(server)
 }
 {
   const r = await call(base, '/api/iconics/history?pointName=historia-falla-pagina-2&startDate=2026-08-01T00:00:00Z&endDate=2026-08-02T00:00:00Z&interval=00:15:00')
@@ -1123,7 +1132,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.match(sinEfecto.body.error, /no ha tenido efecto real/)
   })
   controlIgnoraEscritura = false
-  controlServer.close()
+  await cerrarServidorDePrueba(controlServer)
 
   const { base: soloLectura, server: soloLecturaServer } = await mount({ ICONICS_READ_ONLY: 'true' })
   const bloqueado = await call(soloLectura, '/api/control/bomba', postJson({ encender: true }))
@@ -1131,7 +1140,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.equal(bloqueado.status, 403)
     assert.match(bloqueado.body.error, /ICONICS_READ_ONLY/)
   })
-  soloLecturaServer.close()
+  await cerrarServidorDePrueba(soloLecturaServer)
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')
@@ -1154,7 +1163,7 @@ check('fuera de producción arranca, pero queda marcado para avisarlo', () => {
   assert.equal(loadConfig({}).tlsVerificationDisabled, false)
 })
 
-await app.close()
+await cerrarServidorDePrueba(app)
 fake.close()
 
 console.log()

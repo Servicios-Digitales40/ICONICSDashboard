@@ -96,7 +96,6 @@ export function registerIconicsRoutes(fastify, { config }) {
     return {
       onRequest: [
         fastify.autenticar,
-        fastify.exigirRol('operador'),
         async (request, reply) => {
           if (!readOnly) return
           request.log.warn(

@@ -20,7 +20,7 @@ los diagnósticos sigan valiendo. Es un uso ocasional pero decisivo — la calid
 de las respuestas depende de él.
 
 El prospecto en demostración comercial dejó de ser el usuario principal cuando
-esta rama nació. Sigue existiendo la demo, pero el producto ya no se diseña
+esta rama nació. Los antecedentes de la demo se conservan, pero el producto ya no se diseña
 para que alguien lo mire: se diseña para que alguien lo use con una avería
 delante.
 
@@ -59,7 +59,7 @@ evidencia detrás de cada respuesta en vez de pedir confianza.
 
 - Se usa en **portátil o tablet junto a la máquina**, y en monitor de
   escritorio. La sesión es corta y con una pregunta concreta detrás.
-- **Una respuesta tarda entre 30 y 90 segundos.** Es la restricción que manda
+- **Como referencia de uso, una respuesta puede tardar entre 30 y 90 segundos según el modelo y el equipo.** Es la restricción que manda
   sobre la interfaz entera: el estado se dice con palabras y con los segundos
   que lleva, siempre se puede cancelar, y un turno que acaba en nada se puede
   repetir sin volver a teclear la pregunta.
