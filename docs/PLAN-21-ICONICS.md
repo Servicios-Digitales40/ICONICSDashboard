@@ -220,3 +220,54 @@ tocar en F3.
 | 6 | F6 · Relojes a UTC | `backend/`, `shared/periodo.js` |
 | 7 | F7 · Cobertura hasta la gráfica | sobre, herramienta y gráfica |
 | 8 | F8 · El manual no da órdenes | `backend/ia/conversacion/` |
+
+---
+
+## Resultado (05-09-2026)
+
+Las ocho fases están hechas, cada una con su commit y su suite en verde. Ningún
+punto necesitó la planta, como decía §0.
+
+| Antes | Después |
+|---|---|
+| 207 pruebas de backend | 220 |
+| 553 pruebas de frontend | 570 |
+| 19 verificadores | 21 |
+| 2 motores de sondeo | 1, con un lote por máquina |
+| cadencia en 3 sitios | en el registro |
+
+**Lo que salió al hacerlo, y no estaba en el plan:**
+
+- **El motor de sondeo devolvía `undefined`** —no `null`— para la calidad
+  ACEPTABLE sin campo `value`, que es como el servidor sirvió quince de
+  veintiún puntos el 26-08-2026. No estaba vivo porque `createSistema` hace
+  `?? null` al entrar, pero eso deja la garantía en el consumidor y no en la
+  frontera.
+- **Una regresión mía en F2**: `loading` salía de `stats.ultimaLectura`, que
+  dura lo que el proceso, así que volver a entrar en la sección encendía «La
+  máquina no está contestando» sobre una máquina sana. Lo destapó la suite al
+  correr dos pruebas seguidas, que es lo que hace un operador al navegar.
+- **Dos transportes falsos sin el contrato de F5**, y uno —`ICONICS_FAKE`— sin
+  ninguna prueba que lo cubriera. Habría hecho fallar la orden de la bomba
+  siempre en modo simulado.
+- **`_procedencia` en F8**: el guion bajo es el contrato de `separarAdjuntos`
+  para «esto va a la pantalla», así que la marca de cita se quitaba del mensaje
+  justo antes de llegar al modelo.
+- **Una prueba intermitente del Plan 20** que afirmaba temporización en vez de
+  contrato. Corregida y verificada con las dos suites a la vez.
+
+## Lo que queda abierto
+
+1. **La banda sombreada de F7.** La cobertura que viaja son cuentas y no dice
+   qué tramos vinieron vacíos. Hacerlo exige que
+   `/api/iconics/history/batch` lo diga.
+2. **`puntosPorLote` en el registro** (F1). Nadie ha medido cuántos admite el
+   árbol de cada máquina.
+3. **Los reintentos de confirmación** (F5) son los medidos contra el tag de la
+   bomba. Reconfirmarlos contra el PLC es del Plan 26.
+4. **La conversión real de zona horaria** (F6). Se declara y se avisa; convertir
+   exige saber contra qué reloj fecha el historiador.
+
+Los cuatro están en el código donde tocan, y los tres últimos ya figuran en la
+lista de la sesión con planta de
+[`HOJA-DE-RUTA-60-MEJORAS.md`](HOJA-DE-RUTA-60-MEJORAS.md).
