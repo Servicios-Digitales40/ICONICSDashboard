@@ -101,11 +101,15 @@
  * contra el tag real de esta demo primero configurado como «Static value»
  * —aceptaba la escritura y seguía leyendo `true` siempre— y luego como fuente
  * en tiempo real con escaneo cada ~1 s, donde una relectura inmediata puede
- * traer el valor de antes del ciclo. `controlar_bomba` relee el mismo punto
- * tras escribir, con un par de reintentos cortos para dar tiempo al escaneo,
- * y sólo confirma el encendido o apagado si la relectura coincide; si no, lo
- * dice como lo que es, una escritura sin efecto confirmado, y no como una
- * orden cumplida.
+ * traer el valor de antes del ciclo.
+ *
+ * Esa relectura la hacía `controlar_bomba` con su propio bucle; desde el Plan
+ * 21 F5 la hace el CLIENTE para toda escritura (`confirmarEscrituras` en
+ * `iconics/client.mjs`) y devuelve `confirmacion` con lo pedido, lo leído y si
+ * coinciden. Lo que sigue siendo de la bomba es la DECISIÓN: el cliente
+ * informa, y aquí un «no coincide» se convierte en error, porque una bomba que
+ * se cree encendida y no lo está manda a alguien a buscar la avería al sitio
+ * equivocado.
  *
  * El resto del catálogo sigue siendo de solo lectura: ninguna otra función
  * llama a `writePoint`, así que ninguna instrucción astuta metida en el chat
@@ -857,6 +861,29 @@ function ventanaDeHoras(n, ahora, etiqueta) {
 }
 
 /** `YYYY-MM-DD` + hora → `Date` en la zona local del servidor. */
+/**
+ * `YYYY-MM-DD` + hora → `Date`.
+ *
+ * ── LA CADENA NO LLEVA ZONA, Y ESO SIGNIFICA ALGO ──────────────────
+ *
+ * `new Date("2026-09-04T12:00:00")` —sin `Z` ni desfase— lo interpreta
+ * JavaScript en la hora local DEL PROCESO. Así que «ayer a las 12» son las
+ * doce del reloj del PUENTE, no las de la planta, y de ahí sale a UTC hacia el
+ * historiador.
+ *
+ * Mientras las dos zonas coincidan da igual, y hoy coinciden. Lo que faltaba
+ * era que estuviera dicho: si el puente se despliega en un contenedor en UTC y
+ * la planta está en `America/Mexico_City`, esta línea corre la ventana seis
+ * horas y devuelve datos REALES del momento equivocado — indistinguible de la
+ * respuesta correcta.
+ *
+ * Desde el Plan 21 F6 la zona de la planta se declara (`PLANTA_TZ`), el
+ * arranque avisa si no coincide con la del puente y `/api/health` publica las
+ * dos. Convertir de verdad —interpretar «las 12» en la zona de la planta—
+ * exige saber contra qué reloj fecha el historiador, y eso se mide con la
+ * planta delante (Plan 26): cambiarlo a ciegas movería todas las ventanas por
+ * una suposición.
+ */
 function fecha(iso, hora) {
   return new Date(`${iso}T${String(hora).padStart(2, '0')}:00:00`)
 }

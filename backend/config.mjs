@@ -358,6 +358,57 @@ function readConnectOrigins(rawValue) {
 }
 
 /**
+ * La zona horaria en la que está la PLANTA, y la del propio puente.
+ *
+ * ── QUÉ AMBIGÜEDAD RESUELVE (Plan 21 F6) ───────────────────────────
+ *
+ * Cuando alguien pregunta por «ayer a las 12», la cadena es:
+ *
+ *   resolverPeriodo("ayer a las 12")  →  { diaDesde: "2026-09-04", horaDesde: 12 }
+ *   fecha("2026-09-04", 12)           →  new Date("2026-09-04T12:00:00")
+ *
+ * Esa última cadena **no lleva sufijo de zona**, así que JavaScript la
+ * interpreta en la hora local DEL PROCESO — la del servidor donde corre el
+ * puente— y de ahí sale a UTC hacia el historiador. Es decir: «las 12» son las
+ * doce del puente, no las de la planta.
+ *
+ * Mientras las dos coincidan da igual, y hoy coinciden. Lo que no había era
+ * forma de SABERLO: si un día el puente se despliega en un contenedor en UTC y
+ * la planta está en `America/Mexico_City`, «ayer a las 12» pediría una ventana
+ * corrida seis horas y devolvería datos reales del momento equivocado — que es
+ * indistinguible de la respuesta correcta, que es el fallo que este proyecto
+ * más persigue.
+ *
+ * ── LO QUE ESTO HACE, Y LO QUE NO ──────────────────────────────────
+ *
+ * HACE: declarar la zona de la planta, y avisar al arrancar si no coincide con
+ * la del puente. La ambigüedad deja de ser silenciosa.
+ *
+ * NO HACE: convertir. Interpretar «las 12» en la zona de la planta en vez de
+ * en la del proceso es un cambio de comportamiento que no se puede validar sin
+ * la planta delante —hay que ver contra qué reloj fecha el historiador— y eso
+ * es del Plan 26. Cambiarlo a ciegas sería mover todas las ventanas por una
+ * suposición.
+ *
+ * El defecto es la zona del propio servidor, y ESO ES UNA SUPOSICIÓN, no una
+ * medición: significa «doy por hecho que el puente está donde la planta»,
+ * que es lo que pasa hoy.
+ */
+function readZonaHoraria(rawValue, nombre) {
+  const zona = rawValue || Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  try {
+    new Intl.DateTimeFormat('es', { timeZone: zona })
+  } catch {
+    throw new Error(
+      `${nombre} contiene "${zona}", que no es una zona horaria IANA válida. ` +
+        'Se espera algo como America/Mexico_City o Europe/Madrid.'
+    )
+  }
+  return zona
+}
+
+/**
  * `NODE_TLS_REJECT_UNAUTHORIZED=0` desactiva la verificación de certificados
  * del proceso ENTERO, no sólo de las llamadas a ICONICS. Es la mitigación
  * documentada como R-13 y el descuido más fácil de cometer: basta con que el
@@ -526,6 +577,19 @@ export function loadConfig(env = process.env) {
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
     frameAncestors: readFrameAncestors(env.FRAME_ANCESTORS),
     connectOrigins: readConnectOrigins(env.CONNECT_ORIGINS),
+
+    /**
+     * Los dos relojes que hay en juego. Ver `readZonaHoraria`.
+     *
+     * `servidor` no se configura: es la del proceso, y se publica para que
+     * `/api/health` pueda enseñarla al lado de la declarada.
+     */
+    relojes: Object.freeze({
+      servidor: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      planta: readZonaHoraria(env.PLANTA_TZ, 'PLANTA_TZ'),
+      /** ¿Se declaró, o se está dando por hecho que coinciden? */
+      plantaDeclarada: Boolean(env.PLANTA_TZ),
+    }),
     /**
      * Detrás de un proxy inverso, `socket.remoteAddress` es el proxy para
      * TODOS los clientes: sin esto el limitador contaría a la planta entera

@@ -272,6 +272,30 @@ export async function createApp(config) {
     opciones.config = { ...opciones.config, rateLimit: false }
   })
 
+  /*
+   * ── LOS DOS RELOJES (Plan 21 F6) ───────────────────────────────────
+   *
+   * «Ayer a las 12» se resuelve en la hora local DEL PROCESO (ver
+   * `readZonaHoraria` en `config.mjs`). Si el puente no está en la zona de la
+   * planta, esa ventana sale corrida y devuelve datos reales del momento
+   * equivocado — indistinguible de la respuesta correcta.
+   *
+   * No se corrige aquí, se DICE: corregirlo exige saber contra qué reloj fecha
+   * el historiador, y eso se mide con la planta delante (Plan 26).
+   */
+  if (config.relojes.servidor !== config.relojes.planta) {
+    logger.warn(
+      {
+        servidor: config.relojes.servidor,
+        planta: config.relojes.planta,
+      },
+      `Este puente corre en ${config.relojes.servidor} y la planta está declarada en ` +
+        `${config.relojes.planta}. Las preguntas por hora —«ayer a las 12»— se resuelven ` +
+        'contra el reloj DEL PUENTE, así que las ventanas saldrán corridas. Hasta que se ' +
+        'mida el desfase contra el historiador, despliega el puente en la zona de la planta.'
+    )
+  }
+
   await fastify.register(seguridadPlugin, { config })
   await fastify.register(erroresPlugin)
   await fastify.register(autenticacionPlugin, { config })

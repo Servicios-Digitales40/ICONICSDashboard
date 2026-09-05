@@ -43,6 +43,68 @@ describe('GET /api/health — los campos de siempre', () => {
   })
 })
 
+describe('GET /api/health — los dos relojes (Plan 21 F6)', () => {
+  it('publica la zona del puente y la declarada para la planta', async () => {
+    const { app } = await montarApp({ PLANTA_TZ: 'America/Mexico_City' })
+    const { relojes } = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(relojes.planta).toBe('America/Mexico_City')
+    expect(typeof relojes.servidor).toBe('string')
+    expect(relojes.plantaDeclarada).toBe(true)
+
+    await app.close()
+  })
+
+  it('sin declarar, dice que se está DANDO POR HECHO que coinciden', async () => {
+    /*
+     * `plantaDeclarada: false` es el dato: no es que la planta esté en la zona
+     * del servidor, es que nadie lo ha dicho y se está suponiendo. Con
+     * `coinciden: true` a secas eso se leería como una comprobación.
+     */
+    const { app } = await montarApp()
+    const { relojes } = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(relojes.plantaDeclarada).toBe(false)
+    expect(relojes.planta).toBe(relojes.servidor)
+    expect(relojes.coinciden).toBe(true)
+
+    await app.close()
+  })
+
+  it('avisa cuando el puente NO está en la zona de la planta', async () => {
+    // La ventana de «ayer a las 12» se resuelve contra el reloj del puente, así
+    // que con dos zonas distintas sale corrida y devuelve datos reales del
+    // momento equivocado.
+    const zonaAjena = Intl.DateTimeFormat().resolvedOptions().timeZone === 'UTC'
+      ? 'America/Mexico_City'
+      : 'UTC'
+    const { app } = await montarApp({ PLANTA_TZ: zonaAjena })
+    const { relojes } = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(relojes.coinciden).toBe(false)
+
+    await app.close()
+  })
+
+  it('el desfase con el historiador es `null`, y eso NO es cero', async () => {
+    /*
+     * Cero afirmaría que los relojes están sincronizados. `null` dice que no se
+     * ha medido, y medirlo necesita la planta delante (Plan 26). Es §2.5
+     * aplicada a un número.
+     */
+    const { app } = await montarApp()
+    const { relojes } = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(relojes.desfaseConHistorianMs).toBeNull()
+
+    await app.close()
+  })
+
+  it('una zona horaria inventada impide arrancar', async () => {
+    await expect(montarApp({ PLANTA_TZ: 'Marte/Olympus' })).rejects.toThrow(/zona horaria/i)
+  })
+})
+
 describe('GET /api/health — los servicios (Plan 20 F10)', () => {
   it('declara los cuatro servicios', async () => {
     const { app } = await montarApp()

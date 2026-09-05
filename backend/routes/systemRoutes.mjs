@@ -113,6 +113,27 @@ export function registerSystemRoutes(
        * cargarse, y —el más importante de todos— si este puente está sirviendo
        * DATOS INVENTADOS.
        */
+      /*
+       * Los dos relojes en juego, y el hueco del desfase (Plan 21 F6). Es lo
+       * primero que hay que mirar cuando una ventana horaria trae datos del
+       * momento equivocado, y hasta ahora no se podía ver desde fuera.
+       */
+      relojes: {
+        servidor: config.relojes.servidor,
+        planta: config.relojes.planta,
+        /* `false` significa «nadie lo declaró, se da por hecho que coinciden». */
+        plantaDeclarada: config.relojes.plantaDeclarada,
+        coinciden: config.relojes.servidor === config.relojes.planta,
+        ahora: new Date().toISOString(),
+        /*
+         * Cuánto se separa el reloj del puente del del historiador. `null` NO
+         * es cero: es que no se ha medido, y medirlo necesita la planta
+         * (Plan 26). Ponerlo a 0 aquí sería afirmar que están sincronizados
+         * sin haberlo comprobado — §2.5.
+         */
+        desfaseConHistorianMs: null,
+      },
+
       servicios: {
         /*
          * `ICONICS_FAKE` primero y con nombre propio. Es el estado en el que
