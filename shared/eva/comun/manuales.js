@@ -56,7 +56,21 @@ export const NOMBRE_MANIFIESTO = ".manifiesto.json";
 export const ESTADOS_MANUAL = Object.freeze(["activo", "archivado"]);
 
 /** Forma vacía del manifiesto, para cuando el archivo aún no existe. */
-export const VACIO = Object.freeze({ version: 1, manuales: [] });
+export const VACIO = Object.freeze({ version: 1, manuales: Object.freeze([]) });
+
+/**
+ * Un manifiesto en blanco NUEVO.
+ *
+ * `Object.freeze` es superficial: `{ ...VACIO }` seguía compartiendo el
+ * arreglo `manuales`, así que un `push` sobre el manifiesto "vacío" que
+ * devuelve `leerManifiesto()` cuando el archivo no existe habría quedado
+ * pegado al módulo. Congelado también el arreglo, eso lanza; y quien necesite
+ * uno editable llama aquí. Mismo motivo, y misma historia, que en
+ * `aprendizaje.js`.
+ */
+export function manifiestoVacio() {
+  return { version: 1, manuales: [] };
+}
 
 /**
  * ¿Es éste el id de un sistema declarado en el registro, o el valor

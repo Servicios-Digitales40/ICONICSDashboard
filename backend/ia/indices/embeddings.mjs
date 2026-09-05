@@ -20,8 +20,9 @@
  * lista de intervenciones en `casos.mjs`). Este módulo sólo sabe convertir
  * texto en vectores, con caché, sin saber de dónde salió ese texto.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+import { conCandado, escribirAtomico } from '../../lib/jsonAtomico.mjs'
 import { createHash } from 'node:crypto'
 import { logger } from '../../logger.mjs'
 
@@ -71,8 +72,18 @@ export async function leerCacheEmbeddings(ruta) {
  *  los vectores ya están en memoria y la búsqueda funciona igual; sólo se
  *  perderían al reiniciar. */
 export async function guardarCacheEmbeddings(ruta, cache) {
-  await mkdir(dirname(ruta), { recursive: true })
-  await writeFile(ruta, JSON.stringify(cache), 'utf8')
+  /*
+   * Sin indentar, a diferencia del resto de almacenes: son megabytes de
+   * números que nadie abre a mano, y los dos espacios por nivel casi doblan
+   * el archivo.
+   *
+   * Atómica y con candado como los demás (Plan 20 F3): una caché truncada por
+   * un corte no da error al arrancar —`leerCacheEmbeddings` cae a vacío a
+   * propósito, es un acelerador y no una fuente de verdad— pero cuesta una
+   * reindexación entera contra el servidor de embeddings, que es justo lo que
+   * la caché existe para no repetir.
+   */
+  await conCandado(ruta, () => escribirAtomico(ruta, JSON.stringify(cache)))
 }
 
 /** Similitud coseno entre dos vectores del mismo tamaño. `0` si alguno es

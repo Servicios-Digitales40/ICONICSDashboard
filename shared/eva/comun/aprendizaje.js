@@ -51,8 +51,33 @@
 /** Estados por los que pasa una propuesta. */
 export const ESTADOS = ["pendiente", "aprobada", "rechazada", "aplicada"];
 
-/** Forma vacía del almacén, para cuando el archivo aún no existe. */
-export const VACIO = { version: 1, hechos: [], propuestas: [], intervenciones: [] };
+/**
+ * Forma vacía del almacén, para cuando el archivo aún no existe.
+ *
+ * ── ES UNA PLANTILLA, NO UNA INSTANCIA ─────────────────────────────
+ *
+ * Y por eso va congelado, arreglos incluidos. Antes no lo estaba, y
+ * `leerAprendizaje()` devolvía `{ ...VACIO, hechos: [], propuestas: [] }` al
+ * encontrarse el archivo corrupto o inexistente: el `...` copia la
+ * referencia, así que `intervenciones` —añadido después, cuando ya nadie
+ * miraba esa línea— era EL MISMO ARREGLO en cada llamada. Un `push` sobre un
+ * almacén "vacío" quedaba pegado al módulo, y el siguiente que leyera un
+ * archivo que no existe encontraría la intervención del anterior.
+ *
+ * Congelado, ese `push` lanza en vez de colarse. Quien necesite un almacén
+ * en blanco usa `almacenVacio()`, que construye uno de verdad.
+ */
+export const VACIO = Object.freeze({
+  version: 1,
+  hechos: Object.freeze([]),
+  propuestas: Object.freeze([]),
+  intervenciones: Object.freeze([]),
+});
+
+/** Un almacén en blanco NUEVO, con sus propios arreglos. Ver `VACIO`. */
+export function almacenVacio() {
+  return { version: 1, hechos: [], propuestas: [], intervenciones: [] };
+}
 
 /**
  * ── HECHOS QUE VIENEN DE FÁBRICA ───────────────────────────────────

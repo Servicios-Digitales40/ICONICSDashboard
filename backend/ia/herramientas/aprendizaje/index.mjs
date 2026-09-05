@@ -44,11 +44,13 @@
  * agravante de que un id mal mapeado por un modelo local no falla ruidoso:
  * corrompe en silencio la señal de la que depende toda esa fase.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+
+import { conCandado, escribirJsonAtomico } from '../../../lib/jsonAtomico.mjs'
+import { join } from 'node:path'
 
 import {
-  VACIO as APRENDIZAJE_VACIO,
+  almacenVacio,
   crearHecho,
   crearPropuesta,
   hechosVigentes,
@@ -98,7 +100,7 @@ export async function leerAprendizaje(ruta = RUTA_APRENDIZAJE) {
     /* Que no exista es lo normal la primera vez, y un archivo corrupto no
        puede tumbar el asistente entero: se parte de vacío y los hechos de
        fábrica siguen ahí, que viven en el código. */
-    return { ...APRENDIZAJE_VACIO, hechos: [], propuestas: [] }
+    return almacenVacio()
   }
 }
 
@@ -106,12 +108,50 @@ export async function leerAprendizaje(ruta = RUTA_APRENDIZAJE) {
  *  pruebas la usan, para no escribir sobre el `aprendizaje.json` de verdad. */
 async function guardarAprendizaje(almacen, ruta = RUTA_APRENDIZAJE) {
   try {
-    await mkdir(dirname(ruta), { recursive: true })
-    await writeFile(ruta, JSON.stringify(almacen, null, 2), 'utf8')
+    await escribirJsonAtomico(ruta, almacen)
     return { ok: true }
   } catch (e) {
     return { ok: false, error: e?.message ?? String(e) }
   }
+}
+
+/**
+ * Lee el almacén, deja que quien llama lo modifique, y lo guarda. Todo dentro
+ * del mismo candado.
+ *
+ * ── POR QUÉ NO BASTA CON QUE LA ESCRITURA SEA ATÓMICA ──────────────
+ *
+ * Las seis puertas de escritura de este archivo hacían lo mismo: leer el
+ * almacén entero, empujar una entrada al arreglo, y volver a escribirlo. Dos
+ * de esas secuencias a la vez —el asistente anotando una intervención mientras
+ * el cierre de diagnóstico guarda su caso, que es un escenario perfectamente
+ * normal con dos pantallas abiertas— leen las DOS el mismo estado de partida,
+ * y la segunda escritura pisa a la primera.
+ *
+ * No hay error en ningún lado. La intervención simplemente no está, y quien la
+ * dictó vio «queda anotado en la bitácora» en la pantalla. Es el fallo que
+ * este proyecto persigue en los datos de planta —afirmar algo que no es— sólo
+ * que aquí lo comete el propio backend.
+ *
+ * La escritura atómica no lo arregla: protege de un archivo A MEDIAS, no de
+ * dos escrituras completas que se solapan. Hace falta que leer y escribir sean
+ * un solo turno, y eso es `conCandado`.
+ *
+ * La modificación recibe el almacén RECIÉN leído dentro del candado, nunca uno
+ * traído de fuera: pasarle uno leído antes devolvería el mismo problema por la
+ * puerta de atrás.
+ *
+ * @param {(almacen: object) => void} modificar
+ * @param {string} [ruta]
+ * @returns {Promise<{ok: boolean, error?: string, almacen: object}>}
+ */
+async function modificarAprendizaje(modificar, ruta = RUTA_APRENDIZAJE) {
+  return conCandado(ruta, async () => {
+    const almacen = await leerAprendizaje(ruta)
+    modificar(almacen)
+    const guardado = await guardarAprendizaje(almacen, ruta)
+    return { ...guardado, almacen }
+  })
 }
 
 /**
@@ -136,10 +176,8 @@ async function guardarAprendizaje(almacen, ruta = RUTA_APRENDIZAJE) {
  * `RUTA_APRENDIZAJE` arriba.
  */
 export async function registrarCaso(datos, { ruta = RUTA_APRENDIZAJE } = {}) {
-  const almacen = await leerAprendizaje(ruta)
   const nueva = crearIntervencion(datos, new Date())
-  almacen.intervenciones.push(nueva)
-  const guardado = await guardarAprendizaje(almacen, ruta)
+  const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva), ruta)
   if (!guardado.ok) return { ok: false, error: `No se pudo guardar: ${guardado.error}` }
   return { ok: true, caso: nueva }
 }
@@ -186,20 +224,27 @@ export async function listarCasos({ ruta = RUTA_APRENDIZAJE } = {}) {
  * y la ruta lo traduce a un 404 con su propia frase.
  */
 export async function archivarCaso(id, { archivado = true, ruta = RUTA_APRENDIZAJE } = {}) {
-  const almacen = await leerAprendizaje(ruta)
-  const caso = almacen.intervenciones.find((i) => i.id === id)
-  if (!caso) return { ok: true, encontrado: false, caso: null }
-
   /*
-   * Devolver una intervención BORRA el campo en vez de dejar
-   * `archivado: false`. Así una que nunca se archivó y una que se archivó y
-   * se devolvió quedan idénticas en disco — no hay dos formas de decir lo
-   * mismo, que es lo que obliga después a comparar contra las dos.
+   * Buscar el caso va DENTRO de la modificación, no antes: el objeto que se
+   * marca tiene que ser el del almacén que se va a escribir. Buscarlo en una
+   * lectura anterior marcaría un objeto que la escritura ya no contiene.
    */
-  if (archivado) caso.archivado = true
-  else delete caso.archivado
+  let caso = null
+  const guardado = await modificarAprendizaje(almacen => {
+    caso = almacen.intervenciones.find((i) => i.id === id) ?? null
+    if (!caso) return
 
-  const guardado = await guardarAprendizaje(almacen, ruta)
+    /*
+     * Devolver una intervención BORRA el campo en vez de dejar
+     * `archivado: false`. Así una que nunca se archivó y una que se archivó y
+     * se devolvió quedan idénticas en disco — no hay dos formas de decir lo
+     * mismo, que es lo que obliga después a comparar contra las dos.
+     */
+    if (archivado) caso.archivado = true
+    else delete caso.archivado
+  }, ruta)
+
+  if (!caso) return { ok: true, encontrado: false, caso: null }
   if (!guardado.ok) return { ok: false, error: `No se pudo guardar: ${guardado.error}` }
   return { ok: true, encontrado: true, caso }
 }
@@ -308,11 +353,10 @@ export function crearHerramientasDeAprendizaje() {
         )
       }
 
-      const almacen = await leerAprendizaje()
       const nueva = crearIntervencion({ sintoma: s, solucion: q, causa, sistema, resuelto, origen }, new Date())
-      almacen.intervenciones.push(nueva)
-      const guardado = await guardarAprendizaje(almacen)
+      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+      const almacen = guardado.almacen
 
       return {
         ok: true,
@@ -407,7 +451,6 @@ export function crearHerramientasDeAprendizaje() {
         )
       }
 
-      const almacen = await leerAprendizaje()
       const nueva = crearIntervencion({
         sistema,
         sintoma: `Cierre de diagnóstico — ${riesgoId}.`,
@@ -424,8 +467,7 @@ export function crearHerramientasDeAprendizaje() {
           ? { diagnostico: { propuesta }, diagnosticoCorrecto: causaRealTipo === propuesta }
           : {}),
       }, new Date())
-      almacen.intervenciones.push(nueva)
-      const guardado = await guardarAprendizaje(almacen)
+      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
 
       return {
@@ -482,14 +524,13 @@ export function crearHerramientasDeAprendizaje() {
         /(resolv|resuelt|arregl|repar|correg|cambi|ajust|configur|solucion|sustitu|reemplaz)/i.test(texto) ||
         /ya (qued|est)/i.test(texto)
       if (esReparacion) {
-        const almacen = await leerAprendizaje()
         const nueva = crearIntervencion(
           { sintoma: texto, solucion: texto, sistema, origen: origen ?? 'el usuario' },
           new Date(),
         )
-        almacen.intervenciones.push(nueva)
-        const guardado = await guardarAprendizaje(almacen)
+        const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
         if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+        const almacen = guardado.almacen
         return {
           ok: true,
           anotado: texto,
@@ -508,11 +549,10 @@ export function crearHerramientasDeAprendizaje() {
         )
       }
 
-      const almacen = await leerAprendizaje()
       const nuevo = crearHecho({ hecho: texto, sistema, origen }, new Date())
-      almacen.hechos.push(nuevo)
-      const guardado = await guardarAprendizaje(almacen)
+      const guardado = await modificarAprendizaje(a => a.hechos.push(nuevo))
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+      const almacen = guardado.almacen
 
       return {
         ok: true,
@@ -553,11 +593,10 @@ export function crearHerramientasDeAprendizaje() {
         )
       }
 
-      const almacen = await leerAprendizaje()
       const p = crearPropuesta(datos, new Date())
-      almacen.propuestas.push(p)
-      const guardado = await guardarAprendizaje(almacen)
+      const guardado = await modificarAprendizaje(a => a.propuestas.push(p))
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
+      const almacen = guardado.almacen
 
       return {
         ok: true,

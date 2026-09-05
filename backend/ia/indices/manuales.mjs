@@ -31,8 +31,10 @@
  * o espacio. Sin esto, un nombre como `../../../fuera-de-la-carpeta.txt`
  * escribiría fuera de `carpeta` sin que nada lo impidiera.
  */
-import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join } from 'node:path'
+import { mkdir, readdir, readFile, rename, stat } from 'node:fs/promises'
+
+import { conCandado, escribirAtomico, escribirJsonAtomico } from '../../lib/jsonAtomico.mjs'
+import { basename, extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { logger } from '../../logger.mjs'
 import {
@@ -41,7 +43,7 @@ import {
   NOMBRE_MANIFIESTO,
   normalizarManifiesto,
   sistemaValido,
-  VACIO as MANIFIESTO_VACIO,
+  manifiestoVacio,
 } from '../../../shared/eva/comun/manuales.js'
 import { MAX_BYTES } from './documentos.mjs'
 
@@ -66,13 +68,12 @@ async function leerManifiesto(ruta) {
   try {
     return normalizarManifiesto(JSON.parse(await readFile(ruta, 'utf8')))
   } catch {
-    return { ...MANIFIESTO_VACIO }
+    return manifiestoVacio()
   }
 }
 
 async function guardarManifiesto(ruta, manifiesto) {
-  await mkdir(dirname(ruta), { recursive: true })
-  await writeFile(ruta, JSON.stringify(manifiesto, null, 2), 'utf8')
+  await escribirJsonAtomico(ruta, manifiesto)
 }
 
 /**
@@ -223,7 +224,7 @@ export function createGestorManuales({
 
     await mkdir(carpeta, { recursive: true })
     const nombreFinal = await nombreDisponible(carpeta, nombreSaneado)
-    await writeFile(join(carpeta, nombreFinal), bytes)
+    await escribirAtomico(join(carpeta, nombreFinal), bytes)
 
     const manifiesto = await leerManifiesto(rutaManifiesto)
     const entrada = crearManual({
@@ -258,7 +259,14 @@ export function createGestorManuales({
       return { ok: false, error: 'Este manual está archivado; no se puede reemplazar. Sube una entrada nueva.' }
     }
 
-    await writeFile(join(carpeta, entrada.archivo), bytes)
+    /*
+     * Atómica (Plan 20 F3): `reemplazar` escribe ENCIMA de un manual que ya
+     * estaba y del que ya se depende. Un corte a mitad dejaba un PDF truncado
+     * donde antes había uno bueno, y el índice lo habría vuelto a trocear con
+     * lo que quedara. Con el temporal y el `rename`, o entra la revisión nueva
+     * entera o se queda la anterior entera.
+     */
+    await escribirAtomico(join(carpeta, entrada.archivo), bytes)
 
     entrada.version += 1
     entrada.subidoPor = subidoPor
@@ -357,5 +365,36 @@ export function createGestorManuales({
     return { ok: true, manual: entrada }
   }
 
-  return { listar, subir, reemplazar, archivar, asignarSistema }
+  /**
+   * Las cuatro operaciones que MODIFICAN el manifiesto, serializadas.
+   *
+   * ── POR QUÉ AQUÍ Y NO DENTRO DE CADA UNA ────────────────────────────
+   *
+   * Porque las cuatro tienen la misma forma —leer el manifiesto entero,
+   * cambiarle una entrada, volver a escribirlo— y esa forma tiene una carrera
+   * con nombre: dos peticiones a la vez leen el MISMO estado de partida y la
+   * segunda escritura pisa a la primera. No es hipotético con esta API: la
+   * pantalla de Documentación permite asignar máquina a varios manuales
+   * seguidos, y cada asignación es una petición propia.
+   *
+   * Envolverlas aquí, en un sitio, es lo que impide que la quinta operación
+   * que alguien añada se olvide del candado: la lista de lo que se serializa
+   * es esta línea, y quien añada una función tiene que decidir en qué mitad
+   * del objeto la pone.
+   *
+   * `listar` queda fuera aunque puede escribir —adopta los archivos que
+   * encuentra sin registrar— porque serializarla haría que la pantalla de
+   * Documentación, que sondea cada 2 s mientras se indexa, se pusiera en cola
+   * detrás de una subida en curso. La adopción es idempotente: lo peor que
+   * puede pasar es que un archivo huérfano se adopte en el sondeo siguiente.
+   */
+  const serializada = fn => (...args) => conCandado(rutaManifiesto, () => fn(...args))
+
+  return {
+    listar,
+    subir: serializada(subir),
+    reemplazar: serializada(reemplazar),
+    archivar: serializada(archivar),
+    asignarSistema: serializada(asignarSistema),
+  }
 }
