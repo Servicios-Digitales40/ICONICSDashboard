@@ -78,7 +78,16 @@ export function registerVozRoutes(fastify, { config, voz }) {
        * caso vuelve a cortarse el socket — pero eso ya no es un usuario
        * legítimo con un audio largo.
        */
-      onRequest: async (request, reply) => {
+      onRequest: [
+        /*
+         * El rol se exige aquí y no sólo la sesión: transcribir ocupa
+         * `whisper-server` durante segundos por petición, y es la única ruta de
+         * este backend que acepta megabytes de un cliente sin que eso sea una
+         * escritura sobre la planta. Mientras `AUTH_HABILITADA` sea falso deja
+         * pasar, igual que en el control de la bomba.
+         */
+        fastify.exigirRol('operador'),
+        async (request, reply) => {
         const declarado = Number(request.headers['content-length'] ?? 0)
         if (declarado > config.limits.maxAudioBytes) {
           const mb = Math.round(config.limits.maxAudioBytes / 1024 / 1024)
@@ -92,7 +101,8 @@ export function registerVozRoutes(fastify, { config, voz }) {
             error: `El audio supera el límite de ${mb} MB.`,
           })
         }
-      },
+        },
+      ],
     },
     async (request, reply) => {
       if (!config.ia.whisper.isConfigured) {

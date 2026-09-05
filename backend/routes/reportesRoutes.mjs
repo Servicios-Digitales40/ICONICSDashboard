@@ -45,7 +45,19 @@ async function localizarPdf(carpetas, id) {
 export function registerReportesRoutes(fastify, { config }) {
   fastify.get(
     '/api/reportes',
-    { schema: { querystring: ReporteQuerySchema } },
+    {
+      /*
+       * Esto no lee la planta: ENTREGA un documento ya generado, con cifras de
+       * proceso dentro y con lo que se habló en una conversación. Es la única
+       * ruta de sólo lectura de este backend que devuelve algo que alguien
+       * compuso, así que lleva el rol declarado igual que las escrituras.
+       *
+       * La guarda de sesión no está aquí: la pone el ámbito, en `app.mjs`, para
+       * las treinta y tres rutas a la vez. Ver su comentario.
+       */
+      onRequest: [fastify.exigirRol('operador')],
+      schema: { querystring: ReporteQuerySchema },
+    },
     async (request, reply) => {
       const { id } = request.query
       const carpetas = [config.reportes.dir, config.backlogChat?.dir]

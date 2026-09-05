@@ -362,7 +362,59 @@ export async function createApp(config) {
     metodosPorRuta.set(opciones.url, yaVistos)
   })
 
+  /*
+   * El mismo inventario, publicado.
+   *
+   * Lo usa `test/rutas/guardas.test.mjs` para recorrer TODAS las rutas de la
+   * API y comprobar que ninguna se queda sin la guarda de autenticación. Sin
+   * publicarlo, esa prueba tendría que llevar su propia lista de rutas — y una
+   * lista de rutas escrita a mano en una prueba es exactamente el segundo
+   * inventario que la guarda de ámbito viene a eliminar.
+   */
+  fastify.decorate('inventarioApi', () =>
+    [...metodosPorRuta].map(([url, metodos]) => ({ url, metodos: [...metodos] }))
+  )
+
   await fastify.register(async instancia => {
+    /*
+     * ── LA GUARDA DE AUTENTICACIÓN, EN EL ÁMBITO Y NO RUTA POR RUTA ──
+     *
+     * `http/plugins/autenticacion.mjs` existe porque el trabajo caro no es
+     * validar un token, es decidir QUÉ RUTAS la exigen, y esa decisión se toma
+     * peor a posteriori. La forma en que estaba —cada ruta declarando
+     * `onRequest: [fastify.autenticar]`— cumplía eso a medias: la llevaban las
+     * escrituras, y no la llevaban `/api/voz`, `/api/reportes`,
+     * `/api/diagnostico`, `GET /api/rag/documentos` ni ninguna lectura de
+     * `/api/iconics/*`. Trece rutas de treinta y tres.
+     *
+     * Y el modo de fallo de una lista así es el mismo que el de `global: false`
+     * en el limitador: olvidarla en la ruta número treinta y cuatro no rompe
+     * nada visible. Simplemente esa ruta queda abierta el día que se active
+     * `AUTH_HABILITADA`, y para descubrirlo hay que auditar las treinta y
+     * cuatro.
+     *
+     * Aquí la guarda es del ÁMBITO: cubre todo lo que se registre dentro,
+     * incluido lo que se registre mañana. `request.usuario` queda relleno
+     * SIEMPRE —hoy como el operador anónimo, ver el plugin—, así que ningún
+     * `request.usuario?.id` de los que ya hay en los logs puede salir vacío
+     * según por qué ruta se entró.
+     *
+     * Lo que NO se mueve aquí es `exigirRol`: eso sí es criterio por ruta —leer
+     * el tablero lo puede hacer cualquiera en la red de planta; accionar una
+     * bomba, no— y se declara donde está la consecuencia.
+     */
+    instancia.addHook('onRequest', async (request, reply) => {
+      /*
+       * Las sondas de salud quedan fuera, y por el mismo motivo por el que ya
+       * están fuera del limitador: las llama el orquestador cada pocos
+       * segundos, sin sesión y sin nadie delante. Exigirles token convertiría
+       * un despliegue con autenticación activada en un contenedor que se
+       * reinicia solo porque su propia sonda responde 401.
+       */
+      if (request.url.startsWith('/api/health')) return
+      return instancia.autenticar(request, reply)
+    })
+
     registerSystemRoutes(instancia, { config, client, authenticator, startedAt })
     registerIconicsRoutes(instancia, { config, client })
     registerControlRoutes(instancia, { config, herramientas })

@@ -10,11 +10,25 @@
  * ── POR QUÉ EXISTE AHORA SI NO SE USA ──────────────────────────────
  *
  * Porque el trabajo caro de añadir autenticación no es validar un token: es
- * decidir QUÉ RUTAS la exigen, y esa decisión se toma peor a posteriori. Al
- * declararla ruta por ruta desde ya, la lista queda escrita mientras el
- * criterio está fresco, se revisa en una sola lectura de `app.mjs`, y el día
- * que se active no hay que auditar treinta y tres rutas de golpe para
- * descubrir cuáles quedaron abiertas por olvido.
+ * decidir QUÉ RUTAS la exigen, y esa decisión se toma peor a posteriori.
+ *
+ * ── Y POR QUÉ LA GUARDA YA NO VA RUTA POR RUTA ─────────────────────
+ *
+ * Aquí ponía que la lista se declaraba en cada ruta «mientras el criterio está
+ * fresco». Se midió el 04-09-2026: la llevaban trece de treinta y tres. No la
+ * llevaban `/api/voz`, `/api/reportes`, `/api/diagnostico`,
+ * `GET /api/rag/documentos` ni ninguna lectura de `/api/iconics/*`.
+ *
+ * El motivo es el mismo que hace falta `global: true` en el limitador:
+ * olvidarla no rompe nada visible. La ruta funciona, sus pruebas pasan, y el
+ * hueco sólo aparece el día que se active `AUTH_HABILITADA` — que es el día en
+ * que menos se quiere descubrir.
+ *
+ * Así que `autenticar` la aplica ahora el ÁMBITO donde se registran las rutas
+ * de API, con una excepción declarada para las sondas de salud, y hay una
+ * prueba (`test/rutas/guardas.test.mjs`) que recorre el inventario real de
+ * rutas y falla si alguna queda fuera. Lo que sí sigue siendo decisión por
+ * ruta es `exigirRol`, que es donde de verdad hay criterio.
  *
  * El precio de tenerlo hoy es una función que devuelve `next()`. El precio de
  * no tenerlo es una migración con prisa el día que haga falta.

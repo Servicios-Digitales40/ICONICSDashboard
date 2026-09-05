@@ -13,9 +13,14 @@
  * conversación con el modelo — el técnico no está ahí para charlar, está
  * ahí para cerrar un caso.
  *
- * Sin guarda de autenticación, igual que `GET /api/rag/documentos`: es
- * lectura, no escritura, y las rutas de sólo lectura de este backend no la
- * llevan.
+ * La guarda de autenticación ya NO se declara aquí, y no porque se haya
+ * quitado: desde el Plan 20 F5 la pone el ámbito donde se registran las rutas
+ * de API (`app.mjs`), para las treinta y tres a la vez. Esta cabecera decía
+ * que las rutas de sólo lectura no la llevaban — y ese criterio, aplicado ruta
+ * por ruta, dejó veinte sin guarda de las que nadie llevaba la cuenta.
+ *
+ * Lo que sigue sin llevar esta ruta es `exigirRol`: leer un diagnóstico ya
+ * calculado no acciona nada.
  */
 import { z } from 'zod'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
