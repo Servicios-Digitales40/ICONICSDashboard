@@ -76,6 +76,13 @@ regla.
     activa como efecto colateral de otra tarea — es su propio plan (ver G11 en
     `docs/PLAN-17-CERRAR-AUDITORIA.md`).
 
+    Desde el Plan 20 F5 la guarda `autenticar` **la aplica el ámbito** donde se
+    registran las rutas de API (`app.mjs`), no cada ruta: la llevaban trece de
+    treinta y tres, y olvidarla en la siguiente no rompía nada visible.
+    `exigirRol` sí sigue declarándose ruta por ruta, que es donde hay criterio.
+    `test/rutas/guardas.test.mjs` recorre el inventario real y falla si alguna
+    queda fuera.
+
 ## 3. Estructura del repo
 
 ```
@@ -91,8 +98,10 @@ regla.
 │   │   ├── motor/             Diagnóstico determinista: diagnostico, casos, temporal
 │   │   ├── conversacion/      Bucle del modelo: chat, cola, definiciones, herramientas
 │   │   ├── herramientas/      Una carpeta por FAMILIA de herramienta del modelo
+│   │   ├── evaluacion/        Banco de casos y juez del asistente (Plan 20 F9)
 │   │   ├── reporte.mjs        PDF de la conversación (import diferido)
 │   │   └── voz.mjs            Dictado (whisper)
+│   ├── lib/                  Escritura atómica de JSON y candado por ruta (Plan 20 F3)
 │   ├── iconics/              Autenticación OIDC, cliente REST, transporte falso
 │   ├── routes/                Traducción HTTP ↔ cliente (una por dominio)
 │   └── test/                  vitest: contratos HTTP, esquemas, config
@@ -235,6 +244,18 @@ en cinco archivos que ese registro existe para evitar. Ver
 
 Antes de dar una tarea por terminada, corre lo que toque de esta lista.
 
+**En la raíz** (Plan 20 F1 y F2 — miran el árbol entero):
+```bash
+npm run lint       # ESLint: fallos reales + la frontera de shared/ (§2.7)
+npm run types      # tsc sobre shared/ con checkJs; no compila nada
+npm run verificar  # la tanda completa de verificar-* que corre sin red
+```
+> Las tres corren también en CI (`.github/workflows/ci.yml`) en cuatro trabajos
+> paralelos, para que el rojo diga DÓNDE sin abrir el registro. `npm run
+> verificar` **descubre** la carpeta `scripts/` en vez de llevar una lista: un
+> verificador nuevo entra en la tanda por existir, y lo único enumerado es lo
+> que se excluye, con su motivo.
+
 **Frontend** (`react-dashboard/`):
 ```bash
 npm test              # vitest — dominio, componentes, hooks
@@ -266,7 +287,13 @@ node scripts/verificar-voz.mjs                          # dictado (whisper falso
 node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
 node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
 node scripts/verificar-modulos.mjs                         # los dos módulos no cruzan fuentes (§4.7)
+node scripts/verificar-catalogo.mjs                         # el catálogo declarado es coherente
+node scripts/verificar-instrucciones.mjs                     # el prompt no se contradice con el registro
+node scripts/verificar-evaluacion.mjs                         # el evaluador del asistente juzga como debe
 ```
+> Los tres últimos son del Plan 20. `verificar-catalogo.mjs` admite además
+> `--real` para contrastar contra el árbol de ICONICS de verdad — ese modo sí
+> necesita red y `--env-file`, y por eso el guion sin banderas no la toca.
 
 **Sonda contra ICONICS REAL** (no vale el falso: necesita red a planta y
 `--env-file`):
@@ -289,6 +316,7 @@ calibración, `:8080` para la narración — ninguno necesita ICONICS):
 ```bash
 node --env-file=.env.local scripts/medir-calibracion.mjs   # distribución real de coseno y BM25
 node --env-file=.env.local scripts/medir-narracion.mjs     # ¿obedece el modelo la instrucción de conflicto?
+node --env-file=.env.local scripts/medir-asistente.mjs    # el banco de 20 casos contra el modelo real
 ```
 > No afirma nada, **mide**: de su salida salen los `UMBRAL_*` de
 > `ia/motor/diagnostico.mjs`. No es un verificador y no devuelve código de

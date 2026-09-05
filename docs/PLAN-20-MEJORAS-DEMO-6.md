@@ -270,3 +270,59 @@ Un commit por fase, probado antes de pasar a la siguiente (`CLAUDE.md` §6).
 | 8 | F8 · Verificador de catálogo | `scripts/` |
 | 9 | F9 · Banco de evaluación | `backend/ia/evaluacion/`, `scripts/` |
 | 10 | F10 · Panel de salud | `systemRoutes`, `views/comunes/` |
+
+---
+
+## Resultado (04-09-2026)
+
+Las diez fases están hechas, cada una con su commit y su suite en verde.
+
+| Antes | Después |
+|---|---|
+| sin linter ni tipos | `npm run lint` y `npm run types`, los dos en verde |
+| sin CI | 4 trabajos, 20 verificadores descubiertos |
+| 162 pruebas de backend | 196 |
+| 544 pruebas de frontend | 550 |
+| 17 verificadores | 20 |
+| 22 vistas | 23 |
+
+**Lo que encontró el andamiaje al entrar**, y que no estaba en el plan porque
+no se sabía:
+
+- **29 nombres importados y nunca usados** en `ia/conversacion/herramientas.mjs`
+  — restos del reparto de agosto.
+- **29 desajustes entre el JSDoc y el código** en `shared/`. El que importa:
+  `estadoComun()` recibe `puntosPedidos` y `leidoA` desde agosto y su bloque
+  `@param` no los mencionaba; son justo los dos campos que permiten decir
+  «faltan 15 de 21» en vez de «faltan 15».
+- **`leerAprendizaje()` compartía el arreglo `intervenciones`** con la constante
+  `VACIO` del módulo. Un almacén «vacío» arrastraba las intervenciones del
+  anterior. Lo destapó una prueba de F3 que fallaba por un motivo distinto del
+  que se estaba probando.
+- **`rename` falla en Windows** mientras alguien tenga abierto el destino, y el
+  puente corre en Windows. Salió en la primera ejecución de las pruebas de F3.
+- **Dos reglas «10.», «11.», «12.», «13.» y «14.»** en el prompt del sistema, y
+  dos afirmaciones falsas sobre el catálogo que el propio catálogo desmentía en
+  el mismo mensaje.
+
+## Lo que queda abierto, y dónde está escrito
+
+Nada de esto se ha escondido: cada punto está en el código que lo tiene.
+
+1. **La auditoría de cifras no corre contra el modelo real.** El flujo SSE lleva
+   qué herramienta se llamó y con qué argumentos, pero no su resultado — va al
+   modelo, no a la pantalla, y es deliberado. En `medir-asistente.mjs` la
+   auditoría queda desactivada en vez de aplicarse a medias, con el porqué y las
+   dos salidas escritos en su cabecera. La buena: que el guion reejecute las
+   herramientas con esos argumentos, sin tocar el camino de producción.
+2. **`CONNECT_ORIGINS` no es la solución definitiva de Predicción.** Desbloquea
+   el módulo; el proxy por el puente sigue siendo `PLAN-19` F4 y sigue bloqueado
+   por la misma pregunta de red.
+3. **`AUTH_HABILITADA` sigue en falso.** F5 cerró la lista de rutas, que era el
+   trabajo caro. La implementación es SEG-01 de la auditoría y su propio plan.
+4. **El candado de `jsonAtomico` es por proceso.** Dos puentes sobre el mismo
+   `datos/` seguirían pisándose. No ocurre hoy —un puente por instalación— y el
+   día que ocurra la respuesta no es un candado más listo, es dejar de guardar
+   estado compartido en un JSON.
+5. **`vendor` va a 206,85 KB de un techo de 210.** No lo tocó este plan y el
+   margen se estrechó un poco. Es COD-07 de la auditoría.
