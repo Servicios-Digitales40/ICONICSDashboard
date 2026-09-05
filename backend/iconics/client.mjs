@@ -250,58 +250,135 @@ export function createIconicsClient(config, authenticator) {
   }
 
   /**
-   * Caché muy corta de las lecturas en lote.
+   * Caché muy corta de las lecturas en vivo, POR PUNTO.
    *
    * El motor de sondeo agrupa muy bien DENTRO de un navegador —una petición
    * por ciclo con la unión de los tags que las vistas montadas necesitan—,
-   * pero eso es por CADA pantalla encendida, y todas piden lo mismo. Con diez
-   * wallboards en planta, ICONICS recibía diez veces la misma consulta cada
-   * quince segundos.
+   * pero eso es por CADA pantalla encendida, y todas piden casi lo mismo. Con
+   * diez wallboards en planta, ICONICS recibía diez veces la misma consulta.
    *
-   * Se guarda la PROMESA y no el resultado: así las peticiones que llegan
-   * mientras la llamada está en vuelo esperan a esa misma llamada en vez de
-   * arrancar la suya. Es el mismo patrón que `pendingAuthentication` en el
-   * autenticador, y por la misma razón.
+   * ── POR QUÉ DEJÓ DE INDEXARSE POR CONJUNTO (Plan 21 F4) ────────────
+   *
+   * Porque la clave era el conjunto ENTERO de puntos, ordenado y unido. Eso
+   * hace que dos lecturas compartan caché **sólo si piden exactamente lo
+   * mismo**: la pantalla del tanque (8 puntos) y la de vibraciones (73) no
+   * comparten nada, lo cual está bien porque no se solapan — pero tampoco
+   * comparten nada dos vistas de la MISMA máquina que se solapen en el 90 %,
+   * ni la vista completa con la que sólo mira un activo.
+   *
+   * Y empeora con el catálogo: el número de conjuntos distintos que se pueden
+   * pedir crece con las combinaciones de vistas montadas, no con el número de
+   * puntos. Cada vista nueva multiplica las claves posibles; cada punto nuevo
+   * sólo suma una.
+   *
+   * Indexando por punto, el coste deja de depender de cómo se agrupen las
+   * vistas: se pide a ICONICS lo que falte, agrupado en UNA llamada, y lo que
+   * ya está fresco no se vuelve a pedir aunque venga en otro conjunto.
+   *
+   * ── LO QUE NO CAMBIA ───────────────────────────────────────────────
+   *
+   * El sobre que se devuelve, punto por punto. Si el lote que hacía falta
+   * falla, se devuelve ESE fallo tal cual —y no una respuesta parcial— porque
+   * es lo que hoy ve el frontend y lo que `/api/iconics/data/batch` traduce a
+   * un código HTTP. Una lectura a medias que se presentara como buena sería
+   * justo la clase de mentira que este proyecto persigue.
+   *
+   * Se guarda la PROMESA del lote y no su resultado: así las peticiones que
+   * llegan mientras la llamada está en vuelo esperan a esa misma llamada en
+   * vez de arrancar la suya. Es el mismo patrón que `pendingAuthentication` en
+   * el autenticador, y por la misma razón.
    *
    * La ventana (2 s) es un orden de magnitud menor que la cadencia de sondeo,
    * así que ningún dato llega más viejo de lo que ya llegaba. Una escritura
    * puede leerse desactualizada durante esos 2 s; no se invalida por punto
    * porque el único escritor es la vista de Data, que no está en producción.
    */
-  const batchCache = new Map()
+  const puntoCache = new Map()
 
-  /** Ordenada: el mismo conjunto de puntos en otro orden es la misma lectura. */
-  function batchKey(pointNames) {
-    return [...pointNames].sort().join(' ')
+  function podarPuntoCache(ahora) {
+    for (const [punto, entrada] of puntoCache) {
+      if (entrada.expiraEn <= ahora) puntoCache.delete(punto)
+    }
   }
 
-  function pruneBatchCache(now) {
-    for (const [key, entry] of batchCache) {
-      if (entry.expiresAt <= now) batchCache.delete(key)
+  /** Quita del caché los puntos de un lote que falló, sin tocar los de otro. */
+  function olvidar(puntos, lote) {
+    for (const punto of puntos) {
+      if (puntoCache.get(punto)?.lote === lote) puntoCache.delete(punto)
     }
+  }
+
+  /**
+   * Compone la respuesta a partir de las entradas ya resueltas.
+   *
+   * Recibe las entradas CAPTURADAS antes de esperar a nada: si se releyeran
+   * del mapa después del `await`, un lote que falló entre medias las habría
+   * borrado y esta función devolvería un `ok: true` sin esos puntos — es decir,
+   * una lectura incompleta presentada como buena.
+   */
+  async function componer(entradas) {
+    const lotes = new Set()
+    for (const [, entrada] of entradas) if (entrada) lotes.add(entrada.lote)
+
+    const resultados = await Promise.all([...lotes])
+
+    /*
+     * Si CUALQUIERA de los lotes implicados falló, falla la lectura entera. Es
+     * el comportamiento de siempre y se conserva a propósito: quien pide ocho
+     * señales y recibe seis sin saberlo pinta una pantalla con dos huecos que
+     * parecen datos ausentes de la planta, cuando lo que pasó es que el puente
+     * no pudo leer.
+     */
+    const fallo = resultados.find(resultado => !resultado?.ok)
+    if (fallo) return fallo
+
+    const porLote = new Map()
+    for (let i = 0; i < resultados.length; i++) porLote.set([...lotes][i], resultados[i])
+
+    const byPointName = {}
+    for (const [punto, entrada] of entradas) {
+      if (!entrada) continue
+      const item = porLote.get(entrada.lote)?.payload?.[punto]
+      // Un punto que el servidor no devolvió se omite, igual que antes: para
+      // el motor de sondeo eso es un hueco, que es lo que es.
+      if (item) byPointName[punto] = item
+    }
+
+    return { ok: true, status: 200, payload: byPointName }
   }
 
   function readPoints(pointNames) {
     if (!isConfigured) return Promise.resolve(NOT_CONFIGURED)
     if (batchCacheTtlMs <= 0) return fetchPoints(pointNames)
 
-    const now = Date.now()
-    const key = batchKey(pointNames)
-    const cached = batchCache.get(key)
-    if (cached && cached.expiresAt > now) return cached.promise
+    const ahora = Date.now()
+    podarPuntoCache(ahora)
 
-    const promise = fetchPoints(pointNames)
-    batchCache.set(key, { expiresAt: now + batchCacheTtlMs, promise })
+    const faltantes = pointNames.filter(punto => {
+      const entrada = puntoCache.get(punto)
+      return !(entrada && entrada.expiraEn > ahora)
+    })
 
-    // Un fallo no se cachea: mantener 2 s el error de una caída momentánea
-    // retrasaría la recuperación de todas las pantallas a la vez, y el
-    // siguiente ciclo de sondeo llega enseguida de todos modos.
-    promise
-      .then(result => { if (!result?.ok) batchCache.delete(key) })
-      .catch(() => batchCache.delete(key))
+    if (faltantes.length) {
+      // UNA sola llamada con todo lo que falte, venga de donde venga: es lo
+      // que hace que trocear las vistas no multiplique las peticiones.
+      const lote = fetchPoints(faltantes)
+      const expiraEn = ahora + batchCacheTtlMs
+      for (const punto of faltantes) puntoCache.set(punto, { expiraEn, lote })
 
-    pruneBatchCache(now)
-    return promise
+      /*
+       * Un fallo no se cachea: mantener 2 s el error de una caída momentánea
+       * retrasaría la recuperación de todas las pantallas a la vez, y el
+       * siguiente ciclo de sondeo llega enseguida de todos modos.
+       */
+      lote.then(
+        resultado => { if (!resultado?.ok) olvidar(faltantes, lote) },
+        () => olvidar(faltantes, lote)
+      )
+    }
+
+    // Capturado AHORA, antes de esperar: ver la cabecera de `componer`.
+    return componer(pointNames.map(punto => [punto, puntoCache.get(punto)]))
   }
 
   /* ── Serie histórica del Hyper Historian ──────────────────────────
