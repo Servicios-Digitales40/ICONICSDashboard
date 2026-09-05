@@ -8,6 +8,11 @@
 
 > **Rama.** `Mejoras-Demo-6.0`, salida de `Moises6` en `d4119b7`.
 
+> **Los otros cincuenta** están ordenados en
+> [`HOJA-DE-RUTA-60-MEJORAS.md`](HOJA-DE-RUTA-60-MEJORAS.md), con una regla que
+> sale de la experiencia de este plan: **ningún plan intermedio depende de que
+> la planta esté alcanzable.** Todo lo que necesita red real se agrupa al final.
+
 ---
 
 ## 0 · El criterio de orden
