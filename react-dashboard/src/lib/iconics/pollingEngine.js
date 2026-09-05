@@ -150,10 +150,25 @@ export function createPollingEngine({
           continue;
         }
 
-        // La calidad se filtra aquí, en la frontera.
+        /*
+         * La calidad se filtra aquí, en la frontera.
+         *
+         * `?? null` y no `bruto.value` a secas: hay DOS formas de no tener
+         * dato y las dos tienen que salir como `null` (§2.4). La segunda es la
+         * traicionera —calidad ACEPTABLE y sin campo `value`, que es como el
+         * servidor real sirvió quince de veintiún puntos el 26-08-2026— y sin
+         * esto salía de aquí como `undefined`.
+         *
+         * No era un fallo vivo mientras el único consumidor era el tanque:
+         * `createSistema` hace `?? null` al entrar. Pero eso deja la garantía
+         * en el consumidor y no en la frontera, y el segundo consumidor
+         * —vibraciones, desde el Plan 21 F2— la habría heredado sin saberlo.
+         * Un `undefined` que llegue a un `?? 0` río abajo se convierte en
+         * «vibración nula, todo perfecto».
+         */
         const ok = isGoodQuality(bruto.quality);
         values.set(name, {
-          value: ok ? bruto.value : null,
+          value: ok ? bruto.value ?? null : null,
           quality: bruto.quality ?? null,
           ok,
           receivedAt: ahora,
