@@ -129,9 +129,14 @@ export function registerVozRoutes(fastify, { config, voz }) {
          necesita oír bien. Un id desconocido no es un error: cae al contexto
          general, que es peor transcripción pero nunca un fallo. */
       const sistema = request.query?.sistema ?? null
+      const vocabulario = String(request.query?.vocabulario ?? '')
+        .replace(/[^\p{L}\p{N} .,_/+-]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 240)
 
       try {
-        const resultado = await voz.transcribir(audio, { signal: abortador.signal, sistema })
+        const resultado = await voz.transcribir(audio, { signal: abortador.signal, sistema, vocabulario })
 
         if (!resultado.ok) {
           /*

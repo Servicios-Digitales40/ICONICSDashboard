@@ -31,12 +31,13 @@
  */
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Box, Boxes, ChevronDown, ChevronRight, Gauge, Radio, RefreshCw } from "lucide-react";
+import { Activity, BookOpen, Box, Boxes, ChevronDown, ChevronRight, Gauge, History, Radio, RefreshCw, Star } from "lucide-react";
 
 import { AlertBanner, Button, Panel } from "@/components/ui/index.js";
 import { browseIconics, fetchIconicsBatch, fetchIconicsPoint } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 import { isGoodQuality } from "@shared/quality.js";
+import { pedirAlAsistente } from "@/features/asistente/lib/preguntaExterna.js";
 
 /** Raíz del espacio de nombres de AssetWorX. */
 export const RAIZ_ASSETS = "ac:";
@@ -207,7 +208,7 @@ async function cargarPropiedadesDeAsset(path, node) {
 }
 
 /* Panel derecho: propiedades en vivo del asset seleccionado. */
-function AssetProperties({ node, intervalMs = 5000 }) {
+function AssetProperties({ node, intervalMs = 5000, favoritos, alternarFavorito }) {
   const { theme: t } = useTheme();
   const path = node?.pointName;
 
@@ -255,7 +256,16 @@ function AssetProperties({ node, intervalMs = 5000 }) {
             {node.pointName}
           </div>
         </div>
-        <Button variant="icon" onClick={() => refetch()} loading={loading}><RefreshCw size={14} /></Button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <Button variant="icon" title={favoritos.includes(node.pointName) ? "Quitar de favoritos" : "Añadir a favoritos"} onClick={() => alternarFavorito(node.pointName)}><Star size={14} fill={favoritos.includes(node.pointName) ? "currentColor" : "none"} /></Button>
+          <Button variant="icon" onClick={() => refetch()} loading={loading}><RefreshCw size={14} /></Button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+        <AccionAsset icono={<Activity size={13} />} texto="Consultar estado" onClick={() => pedirAlAsistente(`Consulta el estado actual del asset ${node.pointName}, con calidad y marca de tiempo.`)} t={t} />
+        <AccionAsset icono={<History size={13} />} texto="Ver histórico" onClick={() => pedirAlAsistente(`Muéstrame el histórico disponible del asset ${node.pointName} durante las últimas 6 horas.`)} t={t} />
+        <AccionAsset icono={<BookOpen size={13} />} texto="Buscar límites" onClick={() => pedirAlAsistente(`Busca en los manuales los límites y recomendaciones aplicables al asset ${node.pointName}.`)} t={t} />
       </div>
 
       {error && <AlertBanner type="error" title="Error al leer el asset" message={error.message} />}
@@ -273,6 +283,8 @@ function AssetProperties({ node, intervalMs = 5000 }) {
           {props.map((p) => {
             const good = isGoodQuality(p.quality);
             const tieneCodigo = p.quality !== undefined && p.quality !== null;
+            const antiguedad = antiguedadDe(p.timestamp);
+            const antigua = antiguedad.segundos !== null && antiguedad.segundos > intervalMs / 1000 * 3;
             return (
               <div key={p.pointName} style={{ minWidth: 0, padding: "10px 12px", borderRadius: 10, background: t.hover, border: `1px solid ${t.border}` }}>
                 {/* Encabezado: nombre + calidad. Punto + etiqueta + código crudo, nunca
@@ -280,7 +292,10 @@ function AssetProperties({ node, intervalMs = 5000 }) {
                     codifica sólo con un tono). El código es el valor que devuelve
                     ICONICS tal cual — ver shared/quality.js para las dos convenciones. */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: t.text, minWidth: 0, wordBreak: "break-word" }}>{p.name}</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, color: t.text, minWidth: 0, wordBreak: "break-word" }}>
+                    <button type="button" onClick={() => alternarFavorito(p.pointName)} title={favoritos.includes(p.pointName) ? "Quitar señal de favoritos" : "Añadir señal a favoritos"} style={{ display: "grid", placeItems: "center", padding: 0, border: 0, background: "transparent", color: favoritos.includes(p.pointName) ? t.amber : t.textFaint, cursor: "pointer" }}><Star size={12} fill={favoritos.includes(p.pointName) ? "currentColor" : "none"} /></button>
+                    {p.name}
+                  </span>
                   <span
                     style={{
                       display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0,
@@ -310,7 +325,7 @@ function AssetProperties({ node, intervalMs = 5000 }) {
                 >
                   {String(p.value ?? "—")}
                 </div>
-                {p.timestamp && <div style={{ marginTop: 4, fontSize: 10.5, color: t.textFaint }}>{p.timestamp}</div>}
+                {p.timestamp && <div style={{ marginTop: 4, fontSize: 10.5, color: antigua ? t.amber : t.textFaint }}>{p.timestamp} · {antiguedad.texto}</div>}
               </div>
             );
           })}
@@ -326,6 +341,20 @@ function AssetProperties({ node, intervalMs = 5000 }) {
   );
 }
 
+function AccionAsset({ icono, texto, onClick, t }) {
+  return <button type="button" onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 9px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.hover, color: t.textSoft, cursor: "pointer", fontSize: 11.5, fontWeight: 600 }}>{icono}{texto}</button>;
+}
+
+function antiguedadDe(timestamp) {
+  const ms = Date.parse(timestamp);
+  if (!Number.isFinite(ms)) return { segundos: null, texto: "hora no interpretable" };
+  const segundos = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (segundos < 5) return { segundos, texto: "ahora" };
+  if (segundos < 60) return { segundos, texto: `hace ${segundos} s` };
+  const minutos = Math.round(segundos / 60);
+  return { segundos, texto: `hace ${minutos} min` };
+}
+
 /**
  * El explorador completo, en dos columnas.
  *
@@ -337,6 +366,13 @@ function AssetProperties({ node, intervalMs = 5000 }) {
 export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de assets", acciones = null }) {
   const { theme: t } = useTheme();
   const [selected, setSelected] = useState(null);
+  const [favoritos, setFavoritos] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("tdconcito:assets-favoritos") ?? "[]"); } catch { return []; }
+  });
+  const alternarFavorito = (pointName) => setFavoritos((actuales) => actuales.includes(pointName) ? actuales.filter((p) => p !== pointName) : [...actuales, pointName]);
+  useEffect(() => {
+    try { localStorage.setItem("tdconcito:assets-favoritos", JSON.stringify(favoritos)); } catch { /* preferencia opcional */ }
+  }, [favoritos]);
 
   // La raíz cambia cuando el consumidor la cambia (Demo EVA ofrece subir al
   // árbol completo): la `queryKey` de abajo ya vuelve a pedir el árbol sola,
@@ -379,7 +415,8 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de asset
         </Panel>
 
         <Panel title="Propiedades">
-          <AssetProperties node={selected} />
+          {favoritos.length > 0 && <div style={{ marginBottom: 10, color: t.textFaint, fontSize: 10.5 }}>Favoritos: {favoritos.length}</div>}
+          <AssetProperties node={selected} favoritos={favoritos} alternarFavorito={alternarFavorito} />
         </Panel>
       </div>
     </>

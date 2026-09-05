@@ -68,11 +68,11 @@
  * osciloscopio "brilla" en el color que cada tema llama su señal, y no hay
  * un cuarto mundo visual que mantener aparte de los otros tres.
  */
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, Ban, Bot, Boxes, Check, Copy, FileDown, FileText, Loader2, LogOut,
-  Mic, NotebookPen, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
-  Trash2, TriangleAlert, X,
+  Mic, NotebookPen, Paperclip, Pencil, PhoneCall, PhoneOff, RotateCw, Send, Square,
+  Star, Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { useTheme } from "@/theme";
 import { pedir } from "@/lib/api/pedir.js";
@@ -82,6 +82,7 @@ import {
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 import { markdownSeguro } from "../lib/markdown.js";
 import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
+import { idDeMensaje, resumirRespuesta, usePreferenciaLocal } from "../lib/usabilidad.js";
 /*
  * ── LOS TRES CAJONES SE CARGAN AL ABRIRSE ──────────────────────────
  *
@@ -105,9 +106,13 @@ const ExploradorAssets = lazy(() =>
 );
 const CajonManuales = lazy(() => import("../cajones/Manuales.jsx"));
 const CajonCasos = lazy(() => import("../cajones/Casos.jsx"));
+const ControlesUsabilidad = lazy(() => import("./MejorasUsabilidad.jsx"));
+const ComparacionMarcados = lazy(() => import("./MejorasUsabilidad.jsx").then((m) => ({ default: m.ComparacionMarcados })));
+const AccionesSugeridas = lazy(() => import("./MejorasUsabilidad.jsx").then((m) => ({ default: m.AccionesSugeridas })));
 
 const MONO = "'IBM Plex Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
+const diaDe = (fecha) => fecha ? new Date(fecha).toDateString() : "guardado";
 
 /**
  * Los ejemplos que se ofrecen: uno por herramienta, para que se vea de un
@@ -269,6 +274,14 @@ const ESTILOS = `
 .eva-asis-markdown code { font-family: 'IBM Plex Mono', monospace; font-size: 0.9em; background: rgba(127,127,127,0.16); padding: 1px 4px; border-radius: 4px; }
 .eva-asis-markdown pre { overflow-x: auto; margin: 4px 0; }
 .eva-asis-markdown blockquote { margin: 4px 0; padding-left: 8px; border-left: 2px solid currentColor; opacity: 0.85; }
+.eva-asis-tactil .eva-asis-boton { min-width: 44px; min-height: 44px; }
+.eva-asis-tactil .eva-asis-utilidad { font-size: 13px !important; padding: 8px 11px !important; }
+.eva-asis-tactil input, .eva-asis-tactil select { min-height: 44px; font-size: 16px !important; }
+@media (max-width: 720px) {
+  .eva-asis-utilidad { font-size: 0 !important; gap: 0 !important; }
+  .eva-asis-utilidad svg { width: 16px; height: 16px; }
+  .eva-asis-guia-grid, .eva-asis-comparacion { grid-template-columns: 1fr !important; }
+}
 `;
 
 /**
@@ -408,7 +421,13 @@ export function Asistente({ usuario = null, salir = null }) {
    * existe para impedir.
    */
   const [cajon, setCajon] = useState(null);
-  const [borrador, setBorrador] = useState("");
+  const [borrador, setBorrador] = usePreferenciaLocal("tdconcito:borrador", "");
+  const [modoTactil, setModoTactil] = usePreferenciaLocal("tdconcito:modo-tactil", false);
+  const [marcados, setMarcados] = usePreferenciaLocal("tdconcito:marcados", []);
+  const [vocabulario, setVocabulario] = usePreferenciaLocal("tdconcito:vocabulario", "");
+  const [panelUtilidad, setPanelUtilidad] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [soloMarcados, setSoloMarcados] = useState(false);
   const [ejemplo, setEjemplo] = useState(0);
   const [anclado, setAnclado] = useState(true);
   const [sinLeer, setSinLeer] = useState(false);
@@ -428,7 +447,7 @@ export function Asistente({ usuario = null, salir = null }) {
   const archivoRef = useRef(null);
   const ocupadoPrevio = useRef(false);
 
-  const dictado = useDictado();
+  const dictado = useDictado({ vocabulario });
 
   // El manos libres necesita el ÚLTIMO turno del asistente para leerlo en voz
   // alta cuando esté completo. Se le pasa el mensaje entero y no sólo el texto
@@ -438,6 +457,7 @@ export function Asistente({ usuario = null, salir = null }) {
     preguntar,
     ocupado,
     ultimaRespuesta: mensajes.at(-1)?.rol === "asistente" ? mensajes.at(-1) : null,
+    vocabulario,
   });
 
   /*
@@ -581,6 +601,15 @@ export function Asistente({ usuario = null, salir = null }) {
   };
 
   const irAlFinal = () => { setAnclado(true); finRef.current?.scrollIntoView({ block: "end" }); };
+  const irATurno = (indice) => {
+    document.getElementById(`turno-${indice}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPanelUtilidad(null);
+  };
+  const alternarMarcado = (mensaje, indice) => {
+    const id = idDeMensaje(mensaje, indice);
+    setMarcados((actuales) => actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id]);
+  };
+  const alternarPanel = (nombre) => setPanelUtilidad((actual) => actual === nombre ? null : nombre);
 
   /**
    * Exporta la conversación completa a PDF (`POST /api/chat/exportar`,
@@ -643,6 +672,14 @@ export function Asistente({ usuario = null, salir = null }) {
         * la pantalla entera. Ver el brief en `docs/PLAN-20-ASISTENTE.md` §F5.
         */}
       <div
+        className={modoTactil ? "eva-asis-tactil" : ""}
+        onKeyDown={(e) => {
+          const escribiendo = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target?.tagName);
+          if (e.ctrlKey && e.key.toLowerCase() === "k") { e.preventDefault(); alternarPanel("buscar"); }
+          else if (e.ctrlKey && e.key === "Enter" && borrador.trim() && !ocupado) { e.preventDefault(); enviar(); }
+          else if (e.key === "/" && !escribiendo) { e.preventDefault(); campoRef.current?.focus(); }
+          else if (e.key === "?" && !escribiendo) { e.preventDefault(); alternarPanel("atajos"); }
+        }}
         style={{
           position: "fixed", inset: 0,
           display: "flex", flexDirection: "column",
@@ -656,6 +693,17 @@ export function Asistente({ usuario = null, salir = null }) {
           exportando={exportando} exportarPdf={exportarPdf} limpiar={limpiar}
           cajon={cajon} abrirCajon={setCajon}
         />
+
+        <Suspense fallback={<div style={{ height: 35, borderBottom: `1px solid ${t.border}`, background: t.page }} aria-hidden="true" />}>
+          <ControlesUsabilidad
+            t={t} modoTactil={modoTactil} setModoTactil={setModoTactil}
+            panel={panelUtilidad} alternarPanel={alternarPanel} cerrarPanel={() => setPanelUtilidad(null)}
+            mensajes={mensajes} marcados={marcados} busqueda={busqueda} setBusqueda={setBusqueda}
+            soloMarcados={soloMarcados} setSoloMarcados={setSoloMarcados} irA={irATurno}
+            preparar={(texto) => { setBorrador(texto); campoRef.current?.focus(); }}
+            vocabulario={vocabulario} setVocabulario={setVocabulario}
+          />
+        </Suspense>
 
         {/* Los dos avisos que no interrumpen: el modelo anterior sigue
             sirviendo, y la conversación sigue en pantalla. `role="status"`. */}
@@ -680,14 +728,28 @@ export function Asistente({ usuario = null, salir = null }) {
           >
             {!mensajes.length && <Bienvenida t={t} ocupado={ocupado} onPreguntar={preguntarEjemplo} />}
 
+            <Suspense fallback={null}><ComparacionMarcados t={t} mensajes={mensajes} marcados={marcados} irA={irATurno} /></Suspense>
+
             {mensajes.map((m, i) => (
-              <Turno
-                key={i} mensaje={m} t={t}
+              <Fragment key={m.id ?? i}>
+                {(i === 0 || diaDe(m.creadoEn) !== diaDe(mensajes[i - 1]?.creadoEn)) && (
+                  <div role="separator" style={{ display: "flex", alignItems: "center", gap: 8, color: t.textFaint, font: `11px ${MONO}` }}>
+                    <span style={{ flex: 1, height: 1, background: t.border }} />
+                    {m.creadoEn ? new Date(m.creadoEn).toLocaleDateString([], { dateStyle: "medium" }) : "Conversación guardada"}
+                    <span style={{ flex: 1, height: 1, background: t.border }} />
+                  </div>
+                )}
+                <Turno
+                  mensaje={m} indice={i} t={t}
                 // Solo el último turno se puede repetir: ver `reintentar()`.
                 puedeReintentar={i === mensajes.length - 1 && !ocupado && Boolean(m.error || m.cancelado)}
                 onReintentar={() => { setAnclado(true); reintentar(); }}
                 ocupado={ocupado} onPreguntar={preguntarEjemplo}
-              />
+                onEditar={(texto) => { setBorrador(texto); campoRef.current?.focus(); }}
+                marcado={marcados.includes(idDeMensaje(m, i))}
+                onMarcar={() => alternarMarcado(m, i)}
+                />
+              </Fragment>
             ))}
 
             {estado && (
@@ -1062,10 +1124,10 @@ function PanelCajon({ t, cual, cerrar, respuestaLista }) {
  * para eso se cuelga.
  */
 function PantallaLlamada({ t, manosLibres, mensajes, estado }) {
-  const { fase, apagar, cerrarTurno, nivel } = manosLibres;
+  const { fase, apagar, cerrarTurno, nivel, preguntaPendiente, enviarPendiente, corregirPendiente, cancelarPendiente } = manosLibres;
   const ultimo = mensajes.filter((m) => m.rol === "asistente").at(-1);
 
-  const escuchando = fase === "escuchando";
+  const escuchando = fase === "escuchando" || fase === "confirmando";
   const escala = 1 + Math.min((nivel ?? 0) * 6, 0.9);
 
   return (
@@ -1120,6 +1182,12 @@ function PantallaLlamada({ t, manosLibres, mensajes, estado }) {
         {FASE_MANOS_LIBRES[fase] ?? estado ?? "Manos libres"}
       </p>
 
+      {preguntaPendiente && (
+        <div style={{ maxWidth: "60ch", padding: "12px 16px", borderRadius: 12, border: `1px solid ${t.accent}`, background: t.accentSoft, color: t.text, textAlign: "center", fontSize: 14, lineHeight: 1.55 }}>
+          “{preguntaPendiente}”
+        </div>
+      )}
+
       {ultimo?.texto && (
         <p style={{ margin: 0, maxWidth: "60ch", fontSize: 13.5, lineHeight: 1.6, color: t.textSoft, textAlign: "center" }}>
           {ultimo.texto}
@@ -1127,7 +1195,7 @@ function PantallaLlamada({ t, manosLibres, mensajes, estado }) {
       )}
 
       <div style={{ display: "flex", gap: 12 }}>
-        {escuchando && (
+        {fase === "escuchando" && (
           <button
             type="button" onClick={cerrarTurno}
             className="eva-asis-boton"
@@ -1139,6 +1207,13 @@ function PantallaLlamada({ t, manosLibres, mensajes, estado }) {
           >
             He terminado
           </button>
+        )}
+        {fase === "confirmando" && preguntaPendiente && (
+          <>
+            <button type="button" onClick={enviarPendiente} className="eva-asis-boton" style={{ padding: "12px 18px", borderRadius: 9, border: 0, background: t.gradAccent, color: "#fff", fontWeight: 700, cursor: "pointer" }}>Enviar</button>
+            <button type="button" onClick={corregirPendiente} className="eva-asis-boton" style={{ padding: "12px 18px", borderRadius: 9, border: `1px solid ${t.border}`, background: t.panel, color: t.text, fontWeight: 600, cursor: "pointer" }}>Corregir</button>
+            <button type="button" onClick={cancelarPendiente} className="eva-asis-boton" style={{ padding: "12px 18px", borderRadius: 9, border: `1px solid ${t.border}`, background: t.panel, color: t.textSoft, fontWeight: 600, cursor: "pointer" }}>Cancelar pregunta</button>
+          </>
         )}
         <button
           type="button" onClick={apagar}
@@ -1219,7 +1294,8 @@ function BotonMicrofono({ t, dictado, onTexto }) {
  */
 const FASE_MANOS_LIBRES = {
   parado: "Manos libres listo",
-  escuchando: "Te escucho… se envía solo cuando dejes de hablar",
+  escuchando: "Te escucho… termino cuando dejes de hablar",
+  confirmando: "Di enviar, corregir o cancelar",
   pensando: "Entendiendo lo que has dicho…",
   hablando: "Contestando en voz alta…",
 };
@@ -1400,10 +1476,13 @@ function Sugerencias({ t, ocupado, onPreguntar }) {
   );
 }
 
-function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar }) {
+function Turno({ mensaje, indice, t, puedeReintentar, onReintentar, ocupado, onPreguntar, onEditar, marcado, onMarcar }) {
+  const [detalle, setDetalle] = useState(false);
+  const extensa = mensaje.rol === "asistente" && String(mensaje.texto ?? "").length > 260;
+
   if (mensaje.rol === "usuario") {
     return (
-      <div style={{ justifySelf: "end", maxWidth: "85%" }}>
+      <div id={`turno-${indice}`} style={{ justifySelf: "end", maxWidth: "85%" }}>
         <div
           style={{
             background: t.accentSoft, color: t.text, fontSize: 13, lineHeight: 1.55,
@@ -1411,6 +1490,10 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
           }}
         >
           {mensaje.texto}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 4, marginTop: 3 }}>
+          <button type="button" onClick={() => onEditar(mensaje.texto)} className="eva-asis-boton" title="Editar y volver a preguntar" style={{ ...botonIcono(t, ocupado), padding: 4 }} disabled={ocupado}><Pencil size={12} /></button>
+          <button type="button" onClick={onMarcar} className="eva-asis-boton" title={marcado ? "Quitar marcador" : "Marcar turno"} style={{ ...botonIcono(t, false), padding: 4, color: marcado ? t.amber : t.textFaint }}><Star size={12} fill={marcado ? "currentColor" : "none"} /></button>
         </div>
       </div>
     );
@@ -1442,20 +1525,31 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
      * Es lo único de esta pantalla donde la medida importa de verdad: las
      * burbujas del usuario son cortas y los rótulos son de una línea.
      */
-    <div style={{ maxWidth: "68ch" }}>
+    <div id={`turno-${indice}`} style={{ maxWidth: "68ch" }}>
       {hayBurbuja && (
         mensaje.texto ? (
-          <div
-            className="eva-asis-markdown"
-            style={{
-              background: t.hover, color: t.text, fontSize: 13, lineHeight: 1.6,
-              padding: "10px 12px", borderRadius: "10px 10px 10px 2px",
-              borderLeft: `2px solid ${t.accent}`,
-            }}
-            // El HTML ya pasó por DOMPurify en `markdownSeguro`: ver ese
-            // archivo para por qué el saneado no es opcional aquí.
-            dangerouslySetInnerHTML={{ __html: markdownSeguro(mensaje.texto) }}
-          />
+          <div style={{ background: t.hover, color: t.text, padding: "10px 12px", borderRadius: "10px 10px 10px 2px", borderLeft: `2px solid ${t.accent}` }}>
+            {extensa && !detalle && (
+              <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+                <strong style={{ display: "block", marginBottom: 3, fontFamily: SANS }}>En breve</strong>
+                {resumirRespuesta(mensaje.texto)}
+              </div>
+            )}
+            {(!extensa || detalle) && (
+              <div
+                className="eva-asis-markdown"
+                style={{ fontSize: 13, lineHeight: 1.6 }}
+                // El HTML ya pasó por DOMPurify en `markdownSeguro`: ver ese
+                // archivo para por qué el saneado no es opcional aquí.
+                dangerouslySetInnerHTML={{ __html: markdownSeguro(mensaje.texto) }}
+              />
+            )}
+            {extensa && (
+              <button type="button" onClick={() => setDetalle((v) => !v)} className="eva-asis-boton" style={{ marginTop: 7, padding: 0, border: 0, background: "transparent", color: t.accent, cursor: "pointer", font: `600 11.5px ${SANS}` }}>
+                {detalle ? "Ver resumen" : "Ver respuesta completa"}
+              </button>
+            )}
+          </div>
         ) : (
           <div
             style={{
@@ -1506,18 +1600,29 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
         </button>
       )}
 
+      {!ocupado && mensaje.texto && !mensaje.error && !mensaje.cancelado && (
+        <Suspense fallback={null}><AccionesSugeridas t={t} mensaje={mensaje} onPreguntar={onPreguntar} /></Suspense>
+      )}
+
       {(consultas.length > 0 || mensaje.texto) && (
         <div style={{ marginTop: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45, fontFamily: MONO }}>
-            {consultas.map((consulta, i) => (
-              <div key={i}>
-                {[
-                  ETIQUETA_HERRAMIENTA[consulta.nombre] ?? consulta.nombre,
-                  ...describirConsulta(consulta.nombre, consulta.argumentos),
-                ].join(" · ")}
-              </div>
-            ))}
-          </div>
+          <details style={{ flex: 1, minWidth: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.45, fontFamily: MONO }}>
+            <summary style={{ cursor: "pointer", userSelect: "none" }}>
+              Evidencia y procedencia{consultas.length ? ` · ${consultas.length} consulta(s)` : ""}
+            </summary>
+            <div style={{ marginTop: 4 }}>
+              {consultas.map((consulta, i) => (
+                <div key={i}>
+                  {[
+                    ETIQUETA_HERRAMIENTA[consulta.nombre] ?? consulta.nombre,
+                    ...describirConsulta(consulta.nombre, consulta.argumentos),
+                  ].join(" · ")}
+                </div>
+              ))}
+              {mensaje.actualizadoEn && <div>Consulta completada · {new Date(mensaje.actualizadoEn).toLocaleString()}</div>}
+            </div>
+          </details>
+          <button type="button" onClick={onMarcar} className="eva-asis-boton" aria-label={marcado ? "Quitar marcador" : "Marcar hallazgo"} title={marcado ? "Quitar marcador" : "Marcar hallazgo"} style={{ ...botonIcono(t, false), color: marcado ? t.amber : t.textFaint, flexShrink: 0, padding: 4 }}><Star size={13} fill={marcado ? "currentColor" : "none"} /></button>
           {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
         </div>
       )}

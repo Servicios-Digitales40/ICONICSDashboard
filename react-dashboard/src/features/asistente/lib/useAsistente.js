@@ -36,9 +36,13 @@ import { sistemaDeRuta } from "@shared/eva/comun/sistemas.js";
  * `adjuntos` son los gráficos, que llegan por su propio evento y nunca pasan
  * por el modelo. Ver `separarAdjuntos` en `backend/ia/conversacion/chat.mjs`.
  */
+const idTurno = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
 const nuevoTurno = () => ({
+  id: idTurno(),
   rol: "asistente",
   texto: "",
+  creadoEn: new Date().toISOString(),
   consultas: [],
   adjuntos: [],
   bloqueada: false,
@@ -207,7 +211,7 @@ export function useAsistente() {
     abortador.current = null;
     setOcupado(false);
     setEstado(null);
-    actualizarUltimo(() => ({ cancelado: true }));
+    actualizarUltimo(() => ({ cancelado: true, actualizadoEn: new Date().toISOString() }));
   }, [actualizarUltimo]);
 
   /**
@@ -276,15 +280,16 @@ export function useAsistente() {
               bloqueada: Boolean(fin.bloqueada),
               sinRespuesta: Boolean(fin.sinRedactar) && !fin.herramientas?.length,
             })),
-          onError: (mensaje) => actualizarUltimo(() => ({ error: mensaje })),
+          onError: (mensaje) => actualizarUltimo(() => ({ error: mensaje, actualizadoEn: new Date().toISOString() })),
         });
       } catch (error) {
         // Abortar es una decisión del usuario, no un fallo que reportar.
         if (error?.name !== "AbortError" && vivo.current) {
-          actualizarUltimo(() => ({ error: error.message }));
+          actualizarUltimo(() => ({ error: error.message, actualizadoEn: new Date().toISOString() }));
         }
       } finally {
         if (vivo.current) {
+          actualizarUltimo(() => ({ actualizadoEn: new Date().toISOString() }));
           setOcupado(false);
           setEstado(null);
         }
@@ -307,7 +312,9 @@ export function useAsistente() {
       // El hilo se toma ANTES de añadir el turno nuevo, que aún está vacío.
       const historial = historialParaEnviar(mensajes);
 
-      setMensajes((previos) => [...previos, { rol: "usuario", texto: limpia }, nuevoTurno()]);
+      setMensajes((previos) => [...previos, {
+        id: idTurno(), rol: "usuario", texto: limpia, creadoEn: new Date().toISOString(),
+      }, nuevoTurno()]);
       correr(limpia, historial);
     },
     [ocupado, mensajes, correr]
@@ -421,7 +428,7 @@ async function leerFlujo(respuesta, manejadores) {
  * lo mete en el cuadro de entrada para que el usuario lo revise. Ver la
  * cabecera de `backend/routes/vozRoutes.mjs`.
  */
-export function useDictado() {
+export function useDictado({ vocabulario = "" } = {}) {
   const [disponible, setDisponible] = useState(null);   // null = comprobando
   const [grabando, setGrabando] = useState(false);
   const [transcribiendo, setTranscribiendo] = useState(false);
@@ -480,8 +487,8 @@ export function useDictado() {
        */
       const sistema = sistemaDeRuta(window.location.hash);
       const destino = sistema
-        ? `/api/voz?sistema=${encodeURIComponent(sistema)}`
-        : "/api/voz";
+        ? `/api/voz?sistema=${encodeURIComponent(sistema)}${vocabulario ? `&vocabulario=${encodeURIComponent(vocabulario)}` : ""}`
+        : `/api/voz${vocabulario ? `?vocabulario=${encodeURIComponent(vocabulario)}` : ""}`;
 
       const respuesta = await pedir(destino, {
         method: "POST",
@@ -499,7 +506,7 @@ export function useDictado() {
     } finally {
       if (vivo.current) setTranscribiendo(false);
     }
-  }, []);
+  }, [vocabulario]);
 
   const empezar = useCallback(async (opciones) => {
     setError(null);
@@ -585,12 +592,10 @@ export function useDictado() {
  *
  * ── LAS TRES REGLAS QUE LO HACEN USABLE ────────────────────────────
  *
- * 1. **Se envía sin confirmar.** Es la diferencia con el dictado normal, donde
- *    el texto va al cuadro para revisarlo. Aquí no hay cuadro que mirar: pedir
- *    confirmación convertiría el manos libres en un manos-ocupadas. El precio
- *    es real —una frase mal oída gasta una consulta— y se paga a cambio de que
- *    la función sirva para algo. Lo que se entendió se dice en pantalla, así
- *    que el malentendido se ve.
+ * 1. **La pregunta se confirma con la voz.** Después de transcribir, lee lo que
+ *    entendió y acepta «enviar», «corregir» o «cancelar». Así un nombre de tag
+ *    mal oído no gasta una consulta larga ni termina preguntando por otro equipo;
+ *    los mismos tres controles quedan grandes en pantalla como respaldo táctil.
  *
  * 2. **Se para solo al terminar el ciclo si el usuario lo apagó.** Cada paso
  *    comprueba `activoRef` antes de encadenar el siguiente. Sin eso, apagar el
@@ -617,15 +622,16 @@ export function useDictado() {
  */
 const MAX_TURNOS_VACIOS = 3;
 
-export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
+export function useManosLibres({ preguntar, ocupado, ultimaRespuesta, vocabulario = "" }) {
   const [activo, setActivo] = useState(false);
-  const [fase, setFase] = useState("parado");   // parado | escuchando | pensando | hablando
+  const [fase, setFase] = useState("parado");   // parado | escuchando | confirmando | pensando | hablando
+  const [preguntaPendiente, setPreguntaPendiente] = useState("");
   /** Nivel del micrófono, 0 a 1. Es la prueba visible de que te está oyendo. */
   const [nivel, setNivel] = useState(0);
   /** Fallo de la VOZ, que se arregla en otro sitio que el del micrófono. */
   const [errorVoz, setErrorVoz] = useState(null);
 
-  const dictado = useDictado();
+  const dictado = useDictado({ vocabulario });
   const vivoEnLlamada = useRef(true);
   const activoRef = useRef(false);
   const yaLeido = useRef(null);
@@ -633,6 +639,13 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
   const cerrandoTurno = useRef(false);
   /** Turnos seguidos sin entender nada. Ver `MAX_TURNOS_VACIOS`. */
   const vacios = useRef(0);
+  const faseRef = useRef("parado");
+  const preguntaPendienteRef = useRef("");
+  const cambiarFase = useCallback((valor) => { faseRef.current = valor; setFase(valor); }, []);
+  const guardarPreguntaPendiente = useCallback((texto) => {
+    preguntaPendienteRef.current = texto;
+    setPreguntaPendiente(texto);
+  }, []);
 
   const disponible = dictado.disponible === true && puedeHablar();
 
@@ -691,11 +704,12 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     activoRef.current = false;
     cerrandoTurno.current = false;
     setActivo(false);
-    setFase("parado");
+    cambiarFase("parado");
+    guardarPreguntaPendiente("");
     setNivel(0);
     callar();
     dictado.cancelar();
-  }, [dictado]);
+  }, [dictado, cambiarFase, guardarPreguntaPendiente]);
 
   /*
    * Desmontar con el modo encendido dejaría el micrófono abierto y la voz
@@ -741,16 +755,29 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     if (!activoRef.current) return;
 
     cerrandoTurno.current = false;
-    setFase("escuchando");
+    cambiarFase("escuchando");
     setNivel(0);
 
     await dictado.empezar({
       alNivel: (v) => vivoEnLlamada.current && setNivel(v),
       alDetectarSilencio: () => cerrarTurnoRef.current?.(),
     });
-  }, [dictado]);
+  }, [dictado, cambiarFase]);
 
   escucharRef.current = escuchar;
+
+  const escucharConfirmacion = useCallback(async () => {
+    if (!activoRef.current) return;
+    cerrandoTurno.current = false;
+    cambiarFase("confirmando");
+    setNivel(0);
+    await dictado.empezar({
+      alNivel: (v) => vivoEnLlamada.current && setNivel(v),
+      alDetectarSilencio: () => cerrarTurnoRef.current?.(),
+    });
+  }, [dictado, cambiarFase]);
+  const escucharConfirmacionRef = useRef(null);
+  escucharConfirmacionRef.current = escucharConfirmacion;
 
   /**
    * Cierra el turno de habla y manda lo que se haya entendido.
@@ -764,7 +791,8 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     if (!activoRef.current || cerrandoTurno.current) return;
     cerrandoTurno.current = true;
 
-    setFase("pensando");
+    const confirmando = faseRef.current === "confirmando";
+    cambiarFase("pensando");
     setNivel(0);
     const texto = await dictado.detener();
 
@@ -794,8 +822,40 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     }
 
     vacios.current = 0;
-    preguntar(texto);
-  }, [dictado, preguntar, escuchar]);
+
+    if (confirmando) {
+      const orden = texto.toLocaleLowerCase("es").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (/\b(enviar|envia|confirmar|confirma|si)\b/.test(orden)) {
+        const pregunta = preguntaPendienteRef.current;
+        guardarPreguntaPendiente("");
+        preguntar(pregunta);
+        return;
+      }
+      if (/\b(corregir|corrige|repetir|repito)\b/.test(orden)) {
+        guardarPreguntaPendiente("");
+        cambiarFase("hablando");
+        await hablar("De acuerdo. Repite la pregunta completa.");
+        if (activoRef.current) escucharRef.current?.();
+        return;
+      }
+      if (/\b(cancelar|cancela|no)\b/.test(orden)) {
+        guardarPreguntaPendiente("");
+        cambiarFase("hablando");
+        await hablar("Pregunta cancelada.");
+        if (activoRef.current) escucharRef.current?.();
+        return;
+      }
+      cambiarFase("hablando");
+      await hablar("No entendí la orden. Di enviar, corregir o cancelar.");
+      if (activoRef.current) escucharConfirmacionRef.current?.();
+      return;
+    }
+
+    guardarPreguntaPendiente(texto);
+    cambiarFase("hablando");
+    await hablar(`Entendí: ${texto}. Di enviar, corregir o cancelar.`);
+    if (activoRef.current) escucharConfirmacionRef.current?.();
+  }, [dictado, preguntar, escuchar, cambiarFase, guardarPreguntaPendiente]);
 
   // Por referencia, para que el detector de silencio —que se registra al
   // arrancar la grabación— llame siempre a la versión actual.
@@ -854,7 +914,7 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     if (ultimaRespuesta.error || ultimaRespuesta.cancelado) {
       activoRef.current = false;
       setActivo(false);
-      setFase("parado");
+      cambiarFase("parado");
       callar();
       return;
     }
@@ -863,7 +923,7 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     let cancelado = false;
 
     (async () => {
-      setFase("hablando");
+      cambiarFase("hablando");
       await hablar(texto);
       if (cancelado || !activoRef.current) return;
       escucharRef.current?.();
@@ -873,13 +933,39 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     // `escuchar` y `apagar` quedan fuera a propósito: cambian de identidad en
     // cada render y reiniciarían el efecto a media respuesta. Ver `escucharRef`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo, ocupado, ultimaRespuesta]);
+  }, [activo, ocupado, ultimaRespuesta, cambiarFase]);
+
+  const enviarPendiente = useCallback(() => {
+    const pregunta = preguntaPendienteRef.current;
+    if (!pregunta) return;
+    dictado.cancelar();
+    guardarPreguntaPendiente("");
+    cambiarFase("pensando");
+    preguntar(pregunta);
+  }, [dictado, guardarPreguntaPendiente, cambiarFase, preguntar]);
+
+  const corregirPendiente = useCallback(async () => {
+    dictado.cancelar();
+    guardarPreguntaPendiente("");
+    cambiarFase("hablando");
+    await hablar("Repite la pregunta completa.");
+    if (activoRef.current) escucharRef.current?.();
+  }, [dictado, guardarPreguntaPendiente, cambiarFase]);
+
+  const cancelarPendiente = useCallback(async () => {
+    dictado.cancelar();
+    guardarPreguntaPendiente("");
+    cambiarFase("hablando");
+    await hablar("Pregunta cancelada.");
+    if (activoRef.current) escucharRef.current?.();
+  }, [dictado, guardarPreguntaPendiente, cambiarFase]);
 
   return {
     disponible,
     activo,
     fase,
     nivel,
+    preguntaPendiente,
     transcribiendo: dictado.transcribiendo,
     // El fallo del micrófono y el de la voz son distintos y se arreglan en
     // sitios distintos, así que se cuentan por separado.
@@ -887,6 +973,9 @@ export function useManosLibres({ preguntar, ocupado, ultimaRespuesta }) {
     encender,
     apagar,
     cerrarTurno,
+    enviarPendiente,
+    corregirPendiente,
+    cancelarPendiente,
   };
 }
 

@@ -232,7 +232,7 @@ function FilaManual({ manual, t, sistemasPorId, cargaHabilitada, onReemplazar, o
 
 /* ── La zona de carga ─────────────────────────────────────────────────── */
 
-function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
+function ZonaCarga({ t, sistemas, subiendo, error, onSubir, progreso, indexando, ultimaSubida }) {
   const [arrastrando, setArrastrando] = useState(false);
   const [pendiente, setPendiente] = useState(null); // File
   const [sistema, setSistema] = useState("");
@@ -297,6 +297,13 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
           <Button variant="secondary" onClick={cancelar} disabled={subiendo}>Cancelar</Button>
         </div>
 
+        {subiendo && (
+          <div role="status" style={{ marginTop: 10 }}>
+            <div style={{ height: 5, overflow: "hidden", borderRadius: 99, background: t.border }}><div className="eva-manual-progreso" style={{ width: "65%", height: "100%", borderRadius: 99, background: t.gradAccent }} /></div>
+            <div style={{ marginTop: 5, fontFamily: MONO, fontSize: 11, color: t.textSoft }}>Subiendo archivo y registrando metadatos…</div>
+          </div>
+        )}
+
         {error && <div style={{ marginTop: 10 }}><AlertBanner type="error" title="No se pudo subir" message={error} /></div>}
       </div>
     );
@@ -334,6 +341,13 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
         {EXTENSIONES_ADMITIDAS.join(" · ")}
       </div>
       {error && <div style={{ marginTop: 12, textAlign: "left" }}><AlertBanner type="error" title="No se pudo subir" message={error} /></div>}
+      {indexando && (
+        <div role="status" style={{ marginTop: 12, textAlign: "left", color: t.textSoft, fontFamily: MONO, fontSize: 11 }}>
+          {progreso ? `Indexando contenido: ${progreso.hechos} de ${progreso.total} fragmentos` : "Leyendo e indexando el contenido…"}
+          <div style={{ height: 5, marginTop: 5, overflow: "hidden", borderRadius: 99, background: t.border }}><div style={{ width: progreso ? `${Math.round(progreso.hechos / Math.max(1, progreso.total) * 100)}%` : "45%", height: "100%", background: t.gradAccent }} /></div>
+        </div>
+      )}
+      {ultimaSubida && !indexando && <div role="status" style={{ marginTop: 12, color: t.success, fontFamily: MONO, fontSize: 11 }}>Listo: {ultimaSubida.titulo || ultimaSubida.archivo} quedó registrado e indexado.</div>}
     </div>
   );
 }
@@ -347,6 +361,7 @@ export default function CajonManuales() {
   const [errorCarga, setErrorCarga] = useState(null);
   const [subiendo, setSubiendo] = useState(false);
   const [errorSubida, setErrorSubida] = useState(null);
+  const [ultimaSubida, setUltimaSubida] = useState(null);
   const [idOcupado, setIdOcupado] = useState(null);
 
   const sistemas = resumenDeSistemas();
@@ -398,7 +413,8 @@ export default function CajonManuales() {
     setSubiendo(true);
     setErrorSubida(null);
     try {
-      await subirManual({ archivo, sistema, titulo });
+      const resultado = await subirManual({ archivo, sistema, titulo });
+      setUltimaSubida(resultado.manual ?? { archivo: archivo.name, titulo });
       await cargar();
     } catch (e) {
       setErrorSubida(e.message);
@@ -537,7 +553,7 @@ export default function CajonManuales() {
 
       <div style={{ marginTop: 16 }}>
         {datos.cargaHabilitada ? (
-          <ZonaCarga t={t} sistemas={sistemas} subiendo={subiendo} error={errorSubida} onSubir={manejarSubida} />
+          <ZonaCarga t={t} sistemas={sistemas} subiendo={subiendo} error={errorSubida} onSubir={manejarSubida} progreso={datos.progreso} indexando={datos.indexando} ultimaSubida={ultimaSubida} />
         ) : (
           <AlertBanner
             type="warning"
