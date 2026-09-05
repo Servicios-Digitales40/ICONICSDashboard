@@ -23,6 +23,9 @@
  *   6. Estáticos y respaldo de la SPA — al final, porque es el comodín: lo que
  *      no casó con ninguna ruta de API es una ruta del navegador.
  */
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import fastifySwagger from '@fastify/swagger'
@@ -525,6 +528,46 @@ export async function createApp(config) {
     const pathname = request.url.split('?')[0]
     if (esRutaDeAsset(pathname)) {
       return reply.code(404).send({ ok: false, error: 'Archivo no encontrado.' })
+    }
+
+    /*
+     * ── SIN BUILD, UN 503 QUE LO DICE ──────────────────────────────────
+     *
+     * `sendFile('index.html')` sobre un `dist/` que no existe devuelve un
+     * `404 Not Found` en texto plano: ni dice qué falta, ni se distingue de
+     * una ruta que de verdad no existe. Quien abre el tablero ve una página en
+     * blanco y no tiene por dónde empezar.
+     *
+     * Es una regresión de la migración a `@fastify/static`: el
+     * `http/staticFiles.mjs` anterior sí devolvía un 503 explicándolo, y ese
+     * contrato seguía escrito en `verificar-backend.mjs` sin que nadie lo
+     * ejecutara — la rama sólo salta cuando NO hay build, y quien corría el
+     * verificador siempre tenía uno compilado. Lo destapó la primera tanda de
+     * CI (Plan 20 F2), que arranca de un `git clone` limpio.
+     *
+     * 503 y no 404 porque no es «esta ruta no existe», es «este servidor no
+     * está entero todavía»: `CLAUDE.md` §2.5 — un servidor sin una pieza
+     * montada se niega y explica qué falta.
+     *
+     * La comprobación va aquí y no al arrancar a propósito: en desarrollo el
+     * bundle lo sirve Vite y `dist/` puede aparecer en cualquier momento sin
+     * reiniciar el puente. Cuesta un `existsSync` en una ruta que, por
+     * definición, ya es un fallo de búsqueda.
+     */
+    if (!existsSync(join(config.staticDir, 'index.html'))) {
+      request.log.warn(
+        { staticDir: config.staticDir, ruta: pathname },
+        `Frontend build not found en ${config.staticDir}: se pidió ${pathname} y no hay bundle ` +
+          'que servir. Compila con `npm run build` en react-dashboard/, o apunta STATIC_DIR ' +
+          'al build si está en otro sitio.'
+      )
+      return reply.code(503).send({
+        ok: false,
+        error:
+          `Frontend build not found. El servidor no encuentra el bundle del tablero en ` +
+          `"${config.staticDir}". Compílalo con \`npm run build\` dentro de react-dashboard/, ` +
+          'o apunta STATIC_DIR a donde esté. La API sigue funcionando.',
+      })
     }
 
     return reply.sendFile('index.html')

@@ -650,7 +650,19 @@ check('token cacheado: un único login para todas las peticiones previas', () =>
         assert.match(String(r.body), /<!doctype html>|<html/i)
       } else {
         assert.equal(r.status, 503)
-        assert.match(String(r.body), /Frontend build not found/)
+        /*
+         * `call()` parsea el cuerpo como JSON cuando puede, y el 503 viaja en
+         * el sobre `{ ok:false, error }` que usa el resto de esta API — así
+         * que `String(r.body)` daba «[object Object]» y esta aserción no
+         * miraba nada. El `index.html` de la otra rama sí es texto, y por eso
+         * allí funcionaba.
+         *
+         * Se serializa antes de comparar en vez de exigir texto plano: el
+         * sobre JSON es el contrato de la casa, y el frontend lo lee con
+         * `payload?.error` como el de cualquier otro fallo.
+         */
+        const texto = typeof r.body === 'string' ? r.body : JSON.stringify(r.body)
+        assert.match(texto, /Frontend build not found/)
       }
     }
   )
