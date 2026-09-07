@@ -490,7 +490,7 @@ export async function createApp(config) {
     })
 
     registerAuthRoutes(instancia, { config })
-    registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, indiceDocumentos })
+    registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, voz, indiceDocumentos })
     registerIconicsRoutes(instancia, { config, client })
     registerControlRoutes(instancia, { config, herramientas, diario })
     registerChatRoutes(instancia, { config, chat, cola })

@@ -12,6 +12,7 @@
  * se llama su fallo.
  */
 import { logger } from '../logger.mjs'
+import { isGoodQuality } from '../../shared/quality.js'
 
 const JSON_CONTENT_TYPE = 'application/json'
 const NOT_CONFIGURED = Object.freeze({
@@ -216,6 +217,61 @@ export function createIconicsClient(config, authenticator) {
   }
 
   /**
+   * Cómo fue la última lectura en vivo que salió de verdad al servidor.
+   *
+   * ── QUÉ PROBLEMA RESUELVE ESTO ─────────────────────────────────────
+   *
+   * `ping()` demuestra que `/echo` contesta, y con eso `/api/health` decía que
+   * el origen de datos «funciona». Pero un servidor que contesta y no entrega
+   * un solo valor da exactamente la misma respuesta a `ping()` que uno sano —y
+   * eso pasó: la pantalla de salud se quedó en verde mientras la planta no
+   * mandaba datos. Contestar no es lo mismo que entregar.
+   *
+   * Aquí se apunta lo que sólo se sabe al leer de verdad: cuándo fue la última
+   * lectura, cuántos puntos trajeron valor y cuántos con calidad aceptable.
+   *
+   * ── `null` NO ES CERO ──────────────────────────────────────────────
+   *
+   * `instante: null` significa «todavía nadie ha pedido una lectura», que es
+   * el estado normal de un puente recién arrancado con ninguna pantalla
+   * abierta. Es una situación distinta de «hace once minutos que no llega un
+   * valor», y confundirlas pintaría de rojo un arranque sano (§2.4).
+   */
+  let ultimaLectura = null
+  let ultimoFalloDeLectura = null
+
+  /** Lo que `/api/health` necesita para poder decir la verdad sobre los datos. */
+  function estadoLecturas() {
+    return { ultima: ultimaLectura, ultimoFallo: ultimoFalloDeLectura }
+  }
+
+  /**
+   * Apunta el resultado de una lectura en lote.
+   *
+   * Cuenta sobre los puntos PEDIDOS y no sobre los devueltos: un punto que el
+   * servidor omite es justo el caso que hay que ver, y contando sólo lo que
+   * llegó saldría 8 de 8 con la mitad de las señales ausentes.
+   */
+  function apuntarLectura(pointNames, byPointName) {
+    let conValor = 0
+    let conCalidadBuena = 0
+
+    for (const punto of pointNames) {
+      const dato = byPointName[punto]?.payload
+      if (!dato) continue
+      if (dato.value !== undefined && dato.value !== null) conValor++
+      if (isGoodQuality(dato.quality)) conCalidadBuena++
+    }
+
+    ultimaLectura = {
+      instante: new Date().toISOString(),
+      puntosPedidos: pointNames.length,
+      conValor,
+      conCalidadBuena,
+    }
+  }
+
+  /**
    * Lee muchos puntos en una sola llamada (`POST /Data`).
    * Devuelve un mapa indexado por `pointName`, que es la forma que espera el
    * motor de sondeo del frontend.
@@ -239,7 +295,13 @@ export function createIconicsClient(config, authenticator) {
       meta: { senales: pointNames.length, puntos: pointNames },
     })
 
-    if (!result.ok) return result
+    if (!result.ok) {
+      ultimoFalloDeLectura = {
+        instante: new Date().toISOString(),
+        motivo: result.error ?? `HTTP ${result.status}`,
+      }
+      return result
+    }
 
     const byPointName = {}
     if (Array.isArray(result.payload)) {
@@ -247,6 +309,8 @@ export function createIconicsClient(config, authenticator) {
         byPointName[item.pointName] = { ok: true, status: 200, payload: item }
       }
     }
+
+    apuntarLectura(pointNames, byPointName)
     return { ok: true, status: 200, payload: byPointName }
   }
 
@@ -862,6 +926,7 @@ export function createIconicsClient(config, authenticator) {
   return {
     acknowledgeAlarms,
     browse,
+    estadoLecturas,
     ping,
     readAlarmHistory,
     readHistory,

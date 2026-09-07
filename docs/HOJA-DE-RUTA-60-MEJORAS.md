@@ -130,6 +130,25 @@ captura, para que la auditoría de cifras corra también contra el modelo real.
 Va después del 21 porque `USO-01` y `USO-03` pintan lo que `ICO-04` e `ICO-09`
 ponen en el dominio.
 
+> **Antecedente de `USO-01`, encontrado en planta el 07-09-2026.** El panel de
+> salud (Plan 20 F10) daba el asistente y el dictado por **Funcionando** con
+> los dos servicios caídos: `servicio()` equiparaba «configurado» con
+> «funcionando» —su parámetro `ok` tenía valor por defecto `true` y nadie lo
+> pasaba nunca— así que **no se contactaba a ninguno**. Y la tarjeta de datos
+> ignoraba `connectivity`, que ya estaba calculada en la misma función.
+>
+> Arreglado fuera de plan: estado `no_responde`, comprobación real de
+> llama-server y whisper en paralelo, y telemetría de la última lectura
+> (`client.estadoLecturas()`) para poder distinguir «el servidor contesta» de
+> «llegan valores». Eso último es **media implementación de `COD-08`**
+> (telemetría del sondeo, Plan 26): lo que hay cuenta puntos con valor y con
+> calidad de la última lectura; lo que falta de COD-08 es la serie en el
+> tiempo, no el dato puntual.
+>
+> Es también el aviso para `USO-01`: la frescura no se pinta a partir de que
+> un servicio esté declarado. Lo que se enseñe tiene que venir de haber
+> preguntado.
+
 ### Plan 25 · Layout y funcionalidad nueva
 
 `NUE-01` vista de Turno · `NUE-02` línea de tiempo por máquina ·

@@ -30,7 +30,7 @@
  * y Casos viven ahí (ver `CLAUDE.md` §4.4).
  */
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, CheckCircle2, FlaskConical, MinusCircle, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, FlaskConical, MinusCircle, RefreshCw, XCircle } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fetchHealth } from "@/lib/iconics/apiClient.js";
@@ -55,6 +55,16 @@ function aspectoDe(estado, t) {
       return { color: t.amber, fondo: t.amberSoft, Icono: FlaskConical, texto: "Simulado" };
     case "degraded":
       return { color: t.amber, fondo: t.amberSoft, Icono: AlertTriangle, texto: "Degradado" };
+    case "no_responde":
+      /*
+       * Rojo, y con texto propio. «No responde» y «Con problemas» no son lo
+       * mismo: el primero se arregla levantando ese servicio y el segundo hay
+       * que investigarlo. Antes este estado no existía y estos servicios se
+       * pintaban en VERDE —bastaba con tener su variable de entorno puesta—,
+       * así que el panel daba por funcionando un llama-server caído mientras
+       * el chat, en la misma pantalla, decía que no podía contactarlo.
+       */
+      return { color: t.coral, fondo: t.coralSoft, Icono: XCircle, texto: "No responde" };
     case "no_configurado":
       return { color: t.textFaint, fondo: t.hover, Icono: MinusCircle, texto: "No configurado" };
     default:

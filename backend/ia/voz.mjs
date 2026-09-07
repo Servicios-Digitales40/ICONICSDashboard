@@ -184,7 +184,40 @@ export function createVoz({ config }) {
     return { ok: true, texto }
   }
 
-  return { transcribir, habilitado: Boolean(base) }
+  /**
+   * ¿Está whisper-server ahí AHORA? Mismo motivo que `chat.comprobar()`: tener
+   * `IA_WHISPER_BASE` declarada no es tenerlo levantado, y la pantalla de
+   * salud daba lo primero por lo segundo.
+   *
+   * ── POR QUÉ SE ACEPTA CUALQUIER RESPUESTA HTTP ─────────────────────
+   *
+   * `whisper-server` no publica una ruta de salud: la raíz devuelve su página
+   * de demostración y `/inference` sólo entiende un POST con audio. Lo que se
+   * comprueba aquí es que HAY alguien escuchando en ese puerto y contesta
+   * HTTP — un 404 de whisper-server demuestra eso igual de bien que un 200, y
+   * exigir un 200 nos ataría a que no cambie su página de inicio.
+   *
+   * Lo que NO se hace es mandarle un audio de prueba: costaría una
+   * transcripción entera por cada refresco de la pantalla de salud.
+   */
+  async function comprobar({ msMaximo = 4000 } = {}) {
+    if (!base) return { configurado: false, responde: false, motivo: null }
+
+    try {
+      await fetch(base, { signal: AbortSignal.timeout(msMaximo) })
+      return { configurado: true, responde: true, motivo: null }
+    } catch (error) {
+      return {
+        configurado: true,
+        responde: false,
+        motivo: error?.name === 'TimeoutError'
+          ? `no respondió en ${msMaximo} ms`
+          : (error?.cause?.code ?? error?.message ?? 'no se pudo contactar'),
+      }
+    }
+  }
+
+  return { transcribir, comprobar, habilitado: Boolean(base) }
 }
 
 /**

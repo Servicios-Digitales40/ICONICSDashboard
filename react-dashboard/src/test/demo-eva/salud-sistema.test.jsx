@@ -176,3 +176,91 @@ describe("Salud del sistema", () => {
     expect(screen.getByText(/el problema no es de una vista/)).toBeTruthy();
   });
 });
+
+/**
+ * ── EL FALLO QUE ESTE BLOQUE VIGILA (07-09-2026) ───────────────────
+ *
+ * El panel pintaba «Funcionando» en verde para el asistente y el dictado con
+ * los dos servicios caídos, porque el backend equiparaba «configurado» con
+ * «funcionando» y nunca los contactaba. La causa estaba allí y se arregló
+ * allí; lo que se comprueba aquí es que esta vista sabe pintar el estado nuevo
+ * en vez de caer en su rama por defecto.
+ */
+describe("Salud del sistema — «no responde» se ve distinto de «funcionando»", () => {
+  it("un servicio caído no se pinta en verde ni dice Funcionando", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ...SANO,
+        servicios: {
+          ...SANO.servicios,
+          asistente: {
+            nombre: "Asistente",
+            estado: "no_responde",
+            detalle: "No responde: ECONNREFUSED.",
+          },
+        },
+      }),
+    }));
+
+    montar();
+
+    expect(await screen.findByText("No responde")).toBeTruthy();
+    // Y el motivo, que es lo accionable: dice si no hay nadie escuchando o si
+    // contestó un error.
+    expect(screen.getByText(/ECONNREFUSED/)).toBeTruthy();
+  });
+
+  it("no lo confunde con «no configurado», que no es una avería", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ...SANO,
+        servicios: {
+          ...SANO.servicios,
+          asistente: { nombre: "Asistente", estado: "no_responde", detalle: "No responde." },
+          dictado: { nombre: "Dictado por voz", estado: "no_configurado", variable: "IA_WHISPER_BASE" },
+        },
+      }),
+    }));
+
+    montar();
+
+    // Uno está apagado a propósito y el otro está roto. Si los dos salieran
+    // igual, la pantalla no ayudaría a decidir cuál hay que ir a levantar.
+    expect(await screen.findByText("No responde")).toBeTruthy();
+    expect(screen.getByText("No configurado")).toBeTruthy();
+  });
+
+  it("el origen de datos dice cuándo llegó el último valor", async () => {
+    // Contestar no es entregar: un servidor que responde y no manda datos daba
+    // exactamente el mismo verde que uno sano.
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ...SANO,
+        servicios: {
+          ...SANO.servicios,
+          datos: {
+            nombre: "Origen de datos",
+            estado: "error",
+            detalle:
+              "Se alcanza https://planta.local y el token es válido, pero la última lectura " +
+              "(hace 640 s) no trajo NI UN valor de los 81 puntos pedidos.",
+            soloLectura: true,
+            ultimaLectura: {
+              instante: "2026-09-04T09:49:20.000Z",
+              puntosPedidos: 81,
+              conValor: 0,
+              conCalidadBuena: 0,
+            },
+          },
+        },
+      }),
+    }));
+
+    montar();
+
+    expect(await screen.findByText(/no trajo NI UN valor/)).toBeTruthy();
+  });
+});

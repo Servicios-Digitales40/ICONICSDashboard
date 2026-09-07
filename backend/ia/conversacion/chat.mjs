@@ -1296,9 +1296,49 @@ export function createChat({ config, herramientas }) {
     return true
   }
 
+  /**
+   * ¿Está llama-server ahí AHORA?
+   *
+   * ── POR QUÉ HACE FALTA PREGUNTARLO ─────────────────────────────────
+   *
+   * Porque hasta hoy `/api/health` daba el asistente por «funcionando» sólo
+   * con que `IA_BASE` estuviera declarada. Tener la variable puesta y tener el
+   * servidor levantado son dos cosas distintas, y la pantalla de salud decía
+   * la primera mientras el operador veía «No se puede contactar con
+   * llama-server» en el chat, en la misma sesión. Una pantalla de diagnóstico
+   * que se contradice con la pantalla que diagnostica es peor que no tenerla.
+   *
+   * `GET /v1/models` y no una consulta de verdad: es la ruta más barata que
+   * demuestra que el proceso responde, no ocupa la GPU y no se cuela en la
+   * cola por delante de nadie.
+   *
+   * El corte es corto a propósito y NO reutiliza `IA_TIMEOUT_MS` (que son
+   * minutos, para generar): aquí se pregunta «¿estás?», y un servidor que
+   * tarda cinco segundos en contestar a eso está caído a efectos prácticos.
+   */
+  async function comprobar({ msMaximo = 4000 } = {}) {
+    if (!base) return { configurado: false, responde: false, motivo: null }
+
+    try {
+      const r = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(msMaximo) })
+      return r.ok
+        ? { configurado: true, responde: true, motivo: null }
+        : { configurado: true, responde: false, motivo: `respondió HTTP ${r.status}` }
+    } catch (error) {
+      return {
+        configurado: true,
+        responde: false,
+        motivo: error?.name === 'TimeoutError'
+          ? `no respondió en ${msMaximo} ms`
+          : (error?.cause?.code ?? error?.message ?? 'no se pudo contactar'),
+      }
+    }
+  }
+
   return {
     responder,
     usarModelo,
+    comprobar,
     /** Para `GET /api/chat`, que dice cuál está activo AHORA. */
     modeloActivo: () => modelo,
   }

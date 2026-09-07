@@ -15,8 +15,7 @@ function resolveStatus({ reachable, tokenValid }) {
 }
 
 /**
- * Cómo está un servicio que este puente necesita, en tres estados y con la
- * variable que falta cuando falta.
+ * Cómo está un servicio que este puente necesita.
  *
  * ── POR QUÉ «NO CONFIGURADO» ES UN ESTADO Y NO UN ERROR ────────────
  *
@@ -24,20 +23,147 @@ function resolveStatus({ reachable, tokenValid }) {
  * legítima y permanente, no una avería a medio arreglar. Pintarla en rojo
  * enseñaría a ignorar el rojo. Lo que sí hace falta es que la pantalla pueda
  * decir QUÉ variable lo encendería, que es la única información accionable.
+ *
+ * ── EL FALLO QUE ESTA FUNCIÓN TUVO, Y QUE HAY QUE NO REPETIR ───────
+ *
+ * Esto decía `ok = true` como valor por defecto **y ningún llamador pasaba
+ * `ok` nunca**. Así que el ternario se reducía a `configurado ? 'ok' :
+ * 'no_configurado'`: el parámetro estaba muerto y la pantalla no decía
+ * «funciona», decía «tiene su variable de entorno puesta».
+ *
+ * Se vio en planta el 07-09-2026: el panel daba el asistente y el dictado por
+ * FUNCIONANDO mientras el chat, en la misma pantalla, contestaba «No se puede
+ * contactar con llama-server». Comprobado después: los dos servicios estaban
+ * caídos y ninguno se había contactado jamás desde aquí.
+ *
+ * Por eso `responde` ya no tiene valor por defecto: es obligatorio. Un
+ * servicio nuevo que se añada a este panel no compila —bueno, no pasa la
+ * prueba— sin decir cómo se comprueba que está vivo, que es justo la pregunta
+ * que nadie se hizo la primera vez.
+ *
+ * `no_responde` es un estado propio y no `error`: son dos cosas distintas.
+ * «Está configurado y no contesta» se arregla levantando ese servicio; un
+ * error sería que contesta mal.
  */
-function servicio({ nombre, configurado, variable, ok = true, detalle = null, extra = {} }) {
+function servicio({ nombre, configurado, variable, responde, motivo = null, detalle = null, extra = {} }) {
+  if (!configurado) {
+    return { nombre, estado: 'no_configurado', variable, ...(detalle ? { detalle } : {}), ...extra }
+  }
+
   return {
     nombre,
-    estado: !configurado ? 'no_configurado' : ok ? 'ok' : 'error',
-    ...(configurado ? {} : { variable }),
-    ...(detalle ? { detalle } : {}),
+    estado: responde ? 'ok' : 'no_responde',
+    ...(responde ? {} : { detalle: motivo ? `No responde: ${motivo}.` : 'No responde.' }),
+    ...(responde && detalle ? { detalle } : {}),
     ...extra,
+  }
+}
+
+/**
+ * Qué contar del origen de datos, que es el único servicio con dos preguntas.
+ *
+ * ── CONTESTAR NO ES ENTREGAR ───────────────────────────────────────
+ *
+ * `ping()` demuestra que `/echo` responde. Con eso solo, esta tarjeta estuvo
+ * en verde mientras la planta no mandaba un solo valor — que es el caso que
+ * abrió esta revisión. Así que se miran las dos cosas por separado:
+ *
+ *  1. ¿Se alcanza el servidor y el token vale? Eso ya lo sabía la ruta y se
+ *     tiraba: se calculaba para el `status` global y no llegaba aquí.
+ *  2. ¿Llegan valores? Lo dice la telemetría de la última lectura real
+ *     (`client.estadoLecturas()`, añadida a los dos transportes).
+ *
+ * ── `null` NO ES CERO, OTRA VEZ ────────────────────────────────────
+ *
+ * «Todavía nadie ha pedido una lectura» es el estado normal de un puente
+ * recién arrancado sin ninguna pantalla abierta, y NO es una avería: se dice
+ * con esas palabras en vez de pintarlo en rojo. Distinto de «hace once
+ * minutos que no llega un valor», que sí lo es.
+ */
+function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, ahora }) {
+  const base = {
+    nombre: 'Origen de datos',
+    soloLectura: config.iconics.readOnly,
+    ultimaLectura: lecturas?.ultima ?? null,
+  }
+
+  if (config.iconics.fake) {
+    return {
+      ...base,
+      estado: 'simulado',
+      detalle: 'ICONICS_FAKE=true: los valores los genera el simulador. NINGÚN dato es real.',
+    }
+  }
+
+  const donde = config.iconics.origin || 'ICONICS'
+
+  if (!connectivity.reachable) {
+    return {
+      ...base,
+      estado: 'error',
+      detalle: `No se alcanza ${donde}${connectivity.reason ? `: ${connectivity.reason}` : '.'}`,
+    }
+  }
+
+  if (!tokenValid) {
+    return {
+      ...base,
+      estado: 'degraded',
+      detalle: `Se alcanza ${donde} pero no hay token válido: las lecturas saldrían sin autenticar. ` +
+        'Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.',
+    }
+  }
+
+  const ultima = lecturas?.ultima ?? null
+
+  if (!ultima) {
+    return {
+      ...base,
+      estado: 'ok',
+      detalle: `Se alcanza ${donde} y el token es válido. Todavía no se ha pedido ninguna lectura ` +
+        'en vivo desde que arrancó el puente.',
+    }
+  }
+
+  const segundos = Math.round((ahora - new Date(ultima.instante).getTime()) / 1000)
+  /* «de los 1 puntos pedidos» se lee mal, y esta frase la lee un técnico. */
+  const pedidos = ultima.puntosPedidos === 1 ? '1 punto pedido' : `${ultima.puntosPedidos} puntos pedidos`
+
+  /*
+   * El caso que motivó todo esto: el servidor contesta y no entrega valores.
+   * Ninguna cifra de aquí es un umbral inventado — cero de los pedidos es
+   * cero, sin margen que discutir.
+   */
+  if (ultima.conValor === 0) {
+    return {
+      ...base,
+      estado: 'error',
+      detalle: `Se alcanza ${donde} y el token es válido, pero la última lectura (hace ${segundos} s) ` +
+        `no trajo NI UN valor de ${pedidos}.`,
+    }
+  }
+
+  if (ultima.conValor < ultima.puntosPedidos || ultima.conCalidadBuena < ultima.puntosPedidos) {
+    return {
+      ...base,
+      estado: 'degraded',
+      detalle: `Lecturas reales de ${donde}, pero incompletas: de ${pedidos} hace ${segundos} s, ` +
+        `${ultima.conValor} trajeron valor y ${ultima.conCalidadBuena} ` +
+        'con calidad aceptable.',
+    }
+  }
+
+  return {
+    ...base,
+    estado: 'ok',
+    detalle: `Lecturas reales de ${donde}. La última, hace ${segundos} s: ` +
+      `${ultima.conValor}/${ultima.puntosPedidos} puntos con valor y calidad buena.`,
   }
 }
 
 export function registerSystemRoutes(
   fastify,
-  { config, client, authenticator, startedAt, chat, cola, indiceDocumentos }
+  { config, client, authenticator, startedAt, chat, cola, voz, indiceDocumentos }
 ) {
   const uptimeSeconds = () => Math.floor((Date.now() - startedAt) / 1000)
 
@@ -66,7 +192,24 @@ export function registerSystemRoutes(
    * mira el monitor y la que se abre cuando alguien dice "no carga".
    */
   async function readiness(request) {
-    const connectivity = await client.ping()
+    /*
+     * Las tres comprobaciones EN PARALELO, y no una detrás de otra.
+     *
+     * Cada una tiene su propio corte de unos segundos, así que en serie una
+     * pantalla de salud con los tres servicios caídos tardaría la suma —doce o
+     * quince segundos— y parecería colgada justo cuando alguien la abre porque
+     * algo va mal. En paralelo tarda lo que el más lento.
+     *
+     * `/api/health/live` sigue sin preguntar nada a nadie: es la sonda del
+     * orquestador y ésa no puede pagar tres llamadas salientes cada diez
+     * segundos. Ver su comentario.
+     */
+    const [connectivity, asistente, dictado] = await Promise.all([
+      client.ping(),
+      chat?.comprobar?.() ?? Promise.resolve({ configurado: false, responde: false, motivo: null }),
+      voz?.comprobar?.() ?? Promise.resolve({ configurado: false, responde: false, motivo: null }),
+    ])
+
     const tokenValid = authenticator.hasValidToken()
     const status = resolveStatus({ reachable: connectivity.reachable, tokenValid })
 
@@ -142,18 +285,19 @@ export function registerSystemRoutes(
          * pantalla de planta con datos simulados y sin avisar es peor que una
          * pantalla apagada.
          */
-        datos: {
-          nombre: 'Origen de datos',
-          estado: config.iconics.fake ? 'simulado' : 'ok',
-          detalle: config.iconics.fake
-            ? 'ICONICS_FAKE=true: los valores los genera el simulador. NINGÚN dato es real.'
-            : `Lecturas reales de ${config.iconics.origin || 'ICONICS'}.`,
-          soloLectura: config.iconics.readOnly,
-        },
+        datos: estadoDeLosDatos({
+          config,
+          connectivity,
+          tokenValid,
+          lecturas: client.estadoLecturas?.() ?? null,
+          ahora: Date.now(),
+        }),
         asistente: servicio({
           nombre: 'Asistente',
           configurado: config.ia.isConfigured,
           variable: 'IA_BASE',
+          responde: asistente.responde,
+          motivo: asistente.motivo,
           detalle: config.ia.isConfigured ? null : 'El chat responde 503 y el tablero funciona igual.',
           extra: config.ia.isConfigured
             ? {
@@ -168,12 +312,22 @@ export function registerSystemRoutes(
           nombre: 'Dictado por voz',
           configurado: config.ia.whisper.isConfigured,
           variable: 'IA_WHISPER_BASE',
+          responde: dictado.responde,
+          motivo: dictado.motivo,
           extra: config.ia.whisper.isConfigured ? { idioma: config.ia.whisper.idioma } : {},
         }),
         documentacion: servicio({
           nombre: 'Manuales de planta',
           configurado: Boolean(indice),
           variable: 'IA_DOCS_DIR',
+          /*
+           * Éste no se contacta con nadie: es un índice en memoria de este
+           * mismo proceso, así que «responde» es tanto como «existe». La
+           * pregunta interesante —si llegó a cargarse— va en `cargado`, y NO
+           * es un fallo: se construye a la primera búsqueda para no retrasar
+           * el arranque.
+           */
+          responde: true,
           extra: indice
             ? {
               cargado: indice.cargado,

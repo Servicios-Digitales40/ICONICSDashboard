@@ -68,7 +68,7 @@ import { esHistorizada, parsePointName } from '../../shared/eva/tanque/senales.j
 import { MAX_PUNTOS } from '../../shared/eva/comun/historia.js'
 import { mediaDelTramo } from '../../shared/eva/tanque/simulador.js'
 import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/comun/sistemas.js'
-import { QUALITY_BAD_UA, QUALITY_GOOD_UA, QUALITY_SIN_DATO } from '../../shared/quality.js'
+import { QUALITY_BAD_UA, QUALITY_GOOD_UA, QUALITY_SIN_DATO, isGoodQuality } from '../../shared/quality.js'
 
 /**
  * Probabilidades de caos, calcadas de `CAOS_SUAVE` en
@@ -208,6 +208,14 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
       }
     }
 
+    /*
+     * El falso también apunta su telemetría de lecturas. No es adorno: la
+     * pantalla de salud la usa para decir cuándo llegó el último valor, y si
+     * aquí faltara, en `ICONICS_FAKE` esa tarjeta diría «nunca se ha leído»
+     * mientras el tablero se llena de datos. El transporte falso tiene que
+     * cumplir la misma firma que el real, incluida ésta.
+     */
+    apuntarLectura(pointNames, byPointName)
     return { ok: true, status: 200, payload: byPointName }
   }
 
@@ -379,8 +387,34 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
     return { reachable: true, httpStatus: 200 }
   }
 
+  /** La misma telemetría que el cliente real. Ver `readPoints`, aquí arriba. */
+  let ultimaLectura = null
+
+  function apuntarLectura(pointNames, byPointName) {
+    let conValor = 0
+    let conCalidadBuena = 0
+
+    for (const punto of pointNames) {
+      const dato = byPointName[punto]?.payload
+      if (!dato) continue
+      if (dato.value !== undefined && dato.value !== null) conValor++
+      if (isGoodQuality(dato.quality)) conCalidadBuena++
+    }
+
+    ultimaLectura = {
+      instante: new Date().toISOString(),
+      puntosPedidos: pointNames.length,
+      conValor,
+      conCalidadBuena,
+    }
+  }
+
+  function estadoLecturas() {
+    return { ultima: ultimaLectura, ultimoFallo: null }
+  }
+
   return {
-    acknowledgeAlarms, browse, ping, readAlarmHistory, readHistory,
+    acknowledgeAlarms, browse, estadoLecturas, ping, readAlarmHistory, readHistory,
     readPoint, readPoints, readUserInfo, search, writePoint, writePoints,
   }
 }
