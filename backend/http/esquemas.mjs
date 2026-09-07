@@ -281,6 +281,22 @@ export const ReporteQuerySchema = z.object({
    * siquiera llega a construirse como ruta.
    */
   id: z.string().regex(/^[0-9a-f-]{36}$/i, 'Parámetro "id" inválido.'),
+
+  /*
+   * La firma del enlace (Plan 22 F7 · SEG-09). Los tres son OPCIONALES aquí y
+   * no obligatorios, y la diferencia importa: quien decide si hacen falta es
+   * la ruta, según haya secreto configurado o no. Exigirlos en el esquema
+   * devolvería un 400 «parámetro inválido» —que suena a error de quien llama—
+   * donde la respuesta correcta es un 403 o un 410 que explican QUÉ pasa con
+   * ese enlace concreto. Ver `RECHAZOS` en `routes/reportesRoutes.mjs`.
+   *
+   * `expira` viaja como cadena porque en una query string todo lo es; la ruta
+   * lo convierte al verificar. Se acota a dígitos para que un valor absurdo no
+   * llegue a `Number()`.
+   */
+  expira: z.string().regex(/^\d{1,12}$/, 'Parámetro "expira" inválido.').optional(),
+  firma: z.string().regex(/^[0-9a-f]{64}$/i, 'Parámetro "firma" inválido.').optional(),
+  u: z.string().max(120).optional(),
 })
 
 /** El mismo patrón que `ReporteQuerySchema.id` — los ids de manual también son

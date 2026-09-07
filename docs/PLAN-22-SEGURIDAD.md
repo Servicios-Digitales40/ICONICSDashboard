@@ -506,6 +506,52 @@ período de gracia o no — y lo dice en el mensaje del 410, no sólo en el cód
 error que dice **que caducó** y no un 404 genérico, y que la firma de un id no
 sirve para otro.
 
+### HECHO (07-09-2026)
+
+`backend/lib/enlacesFirmados.mjs` (HMAC-SHA256 sobre `id|expira|usuario`) y 9
+comprobaciones en `test/rutas/reportes.test.mjs`. 275 → **284** pruebas de
+backend.
+
+**HMAC y no una lista de enlaces vigentes**: esa lista sería estado compartido
+que hay que escribir al emitir y leer al descargar, o sea una base de datos por
+la puerta de atrás (§2.2). El precio es que un enlace emitido no se puede
+revocar antes de tiempo, y por eso el plazo es de 24 h y no de 30 días.
+
+**Se firma en la SALIDA de la ruta, no en `generar_reporte`.** La herramienta
+corre dentro del bucle del modelo y no sabe quién hizo la pregunta; la ruta sí,
+porque tiene `request.usuario`. Firmar en la frontera —reescribiendo la `url`
+del adjunto al pasar por `emitir`— deja las 22 herramientas sin enterarse de
+que existe una firma, que es donde tiene que quedarse ese detalle. Sin esto
+habría que plumar el usuario por `chat.responder` y el bucle de herramientas
+entero.
+
+**El usuario viaja en la firma aunque hoy todos sean `anonimo`.** Es la misma
+razón por la que `request.usuario` se rellena siempre desde el Plan 20 F5: el
+día que se encienda F6, un enlace de Ana deja de servirle a Juan sin tocar una
+línea. Si el campo no estuviera, ese día habría que cambiar el formato y todos
+los enlaces vigentes se caerían a la vez.
+
+**El período de gracia: NO lo hay**, y el mensaje del 403 lo dice con esas
+palabras —que era la otra mitad de lo que pedía el plan, no basta con que esté
+en el código—. Un plazo de gracia sobre una guarda es la guarda apagada con
+pasos de más, y el coste está acotado: los reportes se purgan a los 30 días y
+volver a pedir uno es una frase al asistente.
+
+Dos decisiones de detalle, cada una con su prueba:
+
+- **La firma se comprueba antes de mirar el disco.** Al revés, un enlace
+  inventado sobre un id inexistente daría 404 y sobre uno real daría 403: por
+  diferencia se pueden enumerar los ids que existen.
+- **Un enlace válido de un PDF ya purgado sigue dando 404.** La firma autoriza
+  a PEDIR, no promete que el archivo esté; son dos respuestas distintas y
+  tienen que seguir siéndolo.
+
+Sin `REPORTES_SECRETO` no se firma nada y todo se comporta como antes de esta
+fase, con un aviso de arranque. No se genera un secreto al vuelo por lo mismo
+que en F6: uno aleatorio por arranque invalidaría en cada reinicio los enlaces
+que el asistente ya entregó, y el fallo sería intermitente y nadie lo
+relacionaría con esto.
+
 ---
 
 ## Orden de ejecución

@@ -203,6 +203,8 @@ const DEFAULTS = {
    * es el mismo tipo de PDF por otro camino: ver `DEFAULTS.backlogChatDir`.
    */
   reportesDir: join('Documentos', 'Reportes'),
+  /** Vida de un enlace de descarga firmado, en minutos. El porqué, en `config.reportes`. */
+  reportesEnlaceMinutos: 1440,
   /** Antigüedad, en días, a partir de la cual un reporte se purga solo. */
   reportesMaxDias: 30,
   /**
@@ -964,6 +966,33 @@ export function loadConfig(env = process.env) {
     reportes: Object.freeze({
       dir: readReportesDir(env.IA_REPORTES_DIR),
       maxDias: readInteger('IA_REPORTES_MAX_DIAS', env.IA_REPORTES_MAX_DIAS, DEFAULTS.reportesMaxDias, 1),
+      /**
+       * Con qué se firman los enlaces de descarga (Plan 22 F7 · SEG-09).
+       *
+       * Cae en `AUTH_SECRETO` si no se declara uno propio: con la sesión
+       * encendida ya hay un secreto en el despliegue, y obligar a inventar un
+       * segundo sólo garantiza que alguien deje el segundo vacío.
+       *
+       * **Vacío significa enlaces SIN firmar**, que es el comportamiento
+       * anterior a esta fase. No se genera uno al vuelo a propósito: un
+       * secreto aleatorio por arranque invalidaría en cada reinicio todos los
+       * enlaces que el asistente ya entregó, y el fallo sería intermitente y
+       * nadie lo relacionaría con esto. El arranque lo avisa
+       * (`server.mjs`).
+       */
+      firmaSecreto: (env.REPORTES_SECRETO ?? env.AUTH_SECRETO ?? '').trim(),
+      /**
+       * Cuánto vale un enlace, en minutos.
+       *
+       * 24 h: quien recibe el enlace en una conversación tiene que poder
+       * abrirlo después de comer o al día siguiente, y a la vez un informe
+       * reenviado por chat no puede seguir descargándose meses después —que es
+       * justo lo que esta fase viene a cerrar—. El PDF sigue en disco lo que
+       * dure la purga (`maxDias`); lo que caduca es el permiso para pedirlo.
+       */
+      enlaceMinutos: readInteger(
+        'REPORTES_ENLACE_MINUTOS', env.REPORTES_ENLACE_MINUTOS, DEFAULTS.reportesEnlaceMinutos, 1
+      ),
     }),
 
     /**

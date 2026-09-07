@@ -40,6 +40,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esquemas.mjs'
+import { firmarEnlace } from '../lib/enlacesFirmados.mjs'
 
 export function registerChatRoutes(fastify, { config, chat, cola }) {
 
@@ -186,9 +187,22 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         'X-Accel-Buffering': 'no',
       })
 
+      /*
+       * ── DÓNDE SE FIRMA UN ENLACE DE DESCARGA (Plan 22 F7 · SEG-09) ──
+       *
+       * Aquí, en la salida, y no en `generar_reporte`. La herramienta corre
+       * dentro del bucle del modelo y no sabe —ni tiene por qué— quién hizo la
+       * pregunta; esta ruta sí, porque tiene `request.usuario`. Firmar en la
+       * frontera deja las 22 herramientas sin enterarse de que existe una
+       * firma, que es donde tiene que quedarse ese detalle.
+       *
+       * El adjunto viaja como `{ tipo: 'adjunto', adjunto: { url, ... } }` —ver
+       * `separarAdjuntos` en `chat.mjs`, y el comentario sobre por qué va
+       * anidado—, así que se reescribe su `url` al pasar.
+       */
       const emitir = evento => {
         if (raw.writableEnded) return
-        raw.write(`data: ${JSON.stringify(evento)}\n\n`)
+        raw.write(`data: ${JSON.stringify(firmarSiEsDescarga(evento, config, request))}\n\n`)
       }
 
       const empezado = Date.now()
@@ -325,9 +339,50 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         `Conversación de ${turnos.length} turnos exportada a PDF (${Math.round(pdf.length / 1024)} kB, id ${id})`
       )
 
-      return { ok: true, url: `/api/reportes?id=${id}` }
+      return { ok: true, url: enlaceDeDescarga(id, config, request) }
     }
   )
+}
+
+/**
+ * La URL de descarga de un PDF, firmada si hay con qué (Plan 22 F7).
+ *
+ * Sin `firmaSecreto` devuelve la de siempre, sin firma: es el comportamiento
+ * anterior a esta fase, y el arranque ya avisa de que los enlaces no caducan.
+ * No se genera un secreto al vuelo — ver `config.reportes`.
+ */
+function enlaceDeDescarga(id, config, request) {
+  const { firmaSecreto, enlaceMinutos } = config.reportes
+  if (!firmaSecreto) return `/api/reportes?id=${id}`
+
+  return firmarEnlace({
+    id,
+    // `anonimo` mientras la autenticación esté apagada, y el enlace queda atado
+    // a él — que no ata nada, pero el día que se encienda ata sin tocar esto.
+    usuario: request.usuario?.id ?? 'anonimo',
+    minutos: enlaceMinutos,
+    secreto: firmaSecreto,
+  })
+}
+
+/**
+ * Firma la URL de un adjunto de descarga que va camino de la pantalla.
+ *
+ * Toca sólo los adjuntos con `url` de `/api/reportes`: un adjunto de gráfico
+ * lleva un SVG y ninguna URL que firmar, y el resto de eventos del flujo
+ * pasan tal cual.
+ */
+function firmarSiEsDescarga(evento, config, request) {
+  const url = evento?.adjunto?.url
+  if (evento?.tipo !== 'adjunto' || typeof url !== 'string') return evento
+
+  const id = url.match(/^\/api\/reportes\?id=([0-9a-f-]{36})$/i)?.[1]
+  if (!id) return evento
+
+  return {
+    ...evento,
+    adjunto: { ...evento.adjunto, url: enlaceDeDescarga(id, config, request) },
+  }
 }
 
 /**

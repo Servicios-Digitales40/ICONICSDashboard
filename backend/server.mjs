@@ -86,6 +86,18 @@ function avisarDeLaConfiguracion(config) {
     logger.info('Confiando en una CA propia además de las del sistema', { ca: config.extraCaCerts })
   }
 
+  if (!config.reportes.firmaSecreto) {
+    logger.warn(
+      'Los enlaces de descarga de reportes NO caducan ni van firmados: cualquiera que tenga la ' +
+        'URL puede descargar ese PDF mientras el archivo exista, y un informe reenviado por chat ' +
+        'sigue sirviendo meses después',
+      {
+        variable: 'REPORTES_SECRETO',
+        arreglo: 'declara REPORTES_SECRETO (o AUTH_SECRETO, que se reutiliza) para firmarlos',
+      }
+    )
+  }
+
   if (config.corsOrigins.length === 0) {
     logger.debug(
       'CORS cerrado: sólo el frontend servido por este mismo puerto puede llamar a la API',

@@ -105,6 +105,28 @@ base de datos por la puerta de atrás (`CLAUDE.md` §2.2); el día que haga falt
 la respuesta es la federación con el IdP de ICONICS — que ya la tiene, y es el
 Plan 26.
 
+**Enlaces de descarga firmados** (Plan 22 F7 · SEG-09)
+
+`GET /api/reportes?id=<uuid>` servía cualquier PDF sin caducidad: un informe
+reenviado por chat seguía descargable meses después por cualquiera que tuviera
+la URL. Con un secreto declarado, el enlace lleva su fecha de caducidad y una
+firma HMAC, y va atado a quien lo pidió — hoy `anonimo` para todos, y el día
+que se encienda `AUTH_HABILITADA` empieza a distinguir sin tocar código.
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `REPORTES_SECRETO` | *(cae en `AUTH_SECRETO`)* | Con qué se firman. **Vacío = enlaces sin firmar**, el comportamiento anterior; el arranque lo avisa. No se genera uno al vuelo a propósito: uno aleatorio por arranque invalidaría en cada reinicio los enlaces que el asistente ya entregó. |
+| `REPORTES_ENLACE_MINUTOS` | `1440` (24 h) | Vida del enlace. Cubre abrirlo después de comer o al día siguiente. El PDF sigue en disco lo que dure `IA_REPORTES_MAX_DIAS`; lo que caduca es el permiso para pedirlo. |
+
+**No hay período de gracia**: al declarar el secreto, los enlaces antiguos —sin
+firmar— dejan de servir, y el 403 lo dice con esas palabras. Un plazo de gracia
+sobre una guarda es la guarda apagada con pasos de más, y el coste está acotado:
+volver a pedir un reporte es una frase al asistente.
+
+Los tres rechazos son distintos a propósito: **410** si caducó (y el mensaje
+dice que caducó, no que no exista), **403** si falta la firma o no es válida, y
+**404** —el de siempre— si el enlace vale pero el PDF ya se purgó.
+
 **Diario de accionamientos** (Plan 22 F3 · SEG-08)
 
 Cada orden a la bomba —cumplida o rechazada— se anota en un JSONL que
