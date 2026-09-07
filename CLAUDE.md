@@ -291,6 +291,7 @@ node scripts/verificar-catalogo.mjs                         # el catálogo decla
 node scripts/verificar-instrucciones.mjs                     # el prompt no se contradice con el registro
 node scripts/verificar-evaluacion.mjs                         # el evaluador del asistente juzga como debe
 node scripts/verificar-inyeccion.mjs                           # un manual no puede dar órdenes al asistente
+node scripts/verificar-tls.mjs                                  # una CA propia basta, sin apagar la verificación
 ```
 > Los cuatro últimos son del Plan 20 y del 21. `verificar-catalogo.mjs` admite además
 > `--real` para contrastar contra el árbol de ICONICS de verdad — ese modo sí

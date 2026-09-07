@@ -353,6 +353,41 @@ probado a mano y entra como verificador.
 **Lo que queda para el Plan 26.** Que el certificado REAL de `bms-server` se
 acepte. Es otra afirmación y necesita la planta.
 
+### HECHO (07-09-2026)
+
+`scripts/verificar-tls.mjs`, 7 comprobaciones, y entró solo en la tanda —21 →
+**22** verificadores— porque `verificar-todo.mjs` descubre la carpeta (Plan 20
+F2). Fabrica un autofirmado con `openssl`, levanta un HTTPS en loopback y lanza
+procesos hijo: sin CA declarado sale `DEPTH_ZERO_SELF_SIGNED_CERT`, con él sale
+200. **Tiene que ser un verificador y no un `.test.mjs`**: `NODE_EXTRA_CA_CERTS`
+la lee Node al arrancar el proceso, así que ponerla en `process.env` a mitad de
+una prueba no hace absolutamente nada.
+
+La tercera comprobación es la que hace útiles a las dos primeras: declarar la CA
+de OTRO certificado no cuela. Sin ella, «con CA funciona» podría ser cierto por
+haber apagado la verificación por otro lado y la prueba no lo notaría.
+
+Sin `openssl` en el PATH el verificador lo dice y **sale con 0**: no puede
+afirmar nada, pero tampoco es una regresión del código, y hacerlo fallar
+convertiría la tanda en roja por una herramienta que falta.
+
+**Lo que Node no hace, y por eso hay comprobación de arranque**: si
+`NODE_EXTRA_CA_CERTS` apunta a un archivo que no existe o no es un PEM, lo
+**ignora en silencio**. El síntoma llega mucho después, disfrazado de fallo de
+red contra ICONICS, y lleva a buscar en el sitio equivocado. Ahora el arranque
+falla con el motivo — y si el archivo es DER, con la orden de `openssl` que lo
+convierte.
+
+El aviso de los dos a la vez es su propia línea, aparte del que ya existía: el
+viejo dice que la verificación está apagada, y quien acaba de declarar una CA lo
+lee pensando que ya no le aplica. `caDeclaradaYVerificacionApagada` está en
+`config.mjs` con sus cuatro pruebas.
+
+`backend/README.md` lleva las dos órdenes de `openssl` para exportar el
+certificado de `bms-server` —incluida la conversión desde el `.cer` binario que
+sale del navegador en Windows—, que es el paso que de verdad bloquea a quien lo
+intenta. 240 → **244** pruebas de backend.
+
 ## F6 · Autenticación de usuarios, sesión local (SEG-01, primera mitad)
 
 **Hoy.** `AUTH_HABILITADA=false`. Cualquiera con acceso de red al puerto lee

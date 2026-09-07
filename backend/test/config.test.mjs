@@ -9,7 +9,7 @@
  * variables mal puestas, que son lo único que ve quien arranca el servidor.
  */
 import { describe, expect, it } from 'vitest'
-import { loadConfig } from '../config.mjs'
+import { caDeclaradaYVerificacionApagada, loadConfig } from '../config.mjs'
 
 /** Lo mínimo para que `loadConfig` no falle por otra cosa. */
 const BASE = { ICONICS_API_BASE: 'https://planta.local/api' }
@@ -133,5 +133,39 @@ describe('loadConfig — el objeto es inmutable', () => {
     const config = loadConfig(BASE)
     // `Object.freeze` en modo módulo (estricto) lanza al asignar.
     expect(() => { config.iconics.readOnly = false }).toThrow()
+  })
+})
+
+describe('la CA propia y el interruptor que la anula (Plan 22 F5 · SEG-06)', () => {
+  /*
+   * `verificar-tls.mjs` prueba que el mecanismo FUNCIONA contra un HTTPS
+   * autofirmado de verdad —eso necesita procesos hijo y no cabe en vitest—.
+   * Aquí se prueba la otra mitad: que declarar las dos cosas a la vez se
+   * detecte. Es el caso en que alguien hizo el trabajo de exportar el
+   * certificado, cree que cerró el agujero, y no lo cerró.
+   */
+  it('con CA declarada y verificación apagada, avisa', () => {
+    expect(caDeclaradaYVerificacionApagada({
+      extraCaCerts: '/ruta/ca.pem',
+      tlsVerificationDisabled: true,
+    })).toBe(true)
+  })
+
+  it('con CA declarada y verificación activa, no hay nada que avisar', () => {
+    expect(caDeclaradaYVerificacionApagada({
+      extraCaCerts: '/ruta/ca.pem',
+      tlsVerificationDisabled: false,
+    })).toBe(false)
+  })
+
+  it('sin CA, el aviso es el otro: el de la verificación apagada a secas', () => {
+    expect(caDeclaradaYVerificacionApagada({
+      extraCaCerts: '',
+      tlsVerificationDisabled: true,
+    })).toBe(false)
+  })
+
+  it('sin la variable no se inventa ninguna CA', () => {
+    expect(loadConfig(BASE).extraCaCerts).toBe('')
   })
 })

@@ -7,7 +7,7 @@
  *   node --env-file=.env.local backend/server.mjs
  */
 import { createApp } from './app.mjs'
-import { loadConfig } from './config.mjs'
+import { caDeclaradaYVerificacionApagada, loadConfig } from './config.mjs'
 import { logger } from './logger.mjs'
 
 const SHUTDOWN_SIGNALS = ['SIGINT', 'SIGTERM']
@@ -63,6 +63,27 @@ function avisarDeLaConfiguracion(config) {
         arreglo: 'instala la CA de ICONICS y usa NODE_EXTRA_CA_CERTS en su lugar',
       }
     )
+  }
+
+  /*
+   * Los dos a la vez (Plan 22 F5 · SEG-06). Es el único caso en el que alguien
+   * ha hecho el trabajo —exportar el certificado, declararlo— y no ha servido
+   * de nada, así que es el que más merece un aviso propio: el de arriba dice
+   * que la verificación está apagada, pero quien acaba de declarar una CA lo
+   * leerá pensando que ya no le aplica.
+   */
+  if (caDeclaradaYVerificacionApagada(config)) {
+    logger.warn(
+      'NODE_EXTRA_CA_CERTS está declarado y NO sirve de nada: con ' +
+        'NODE_TLS_REJECT_UNAUTHORIZED=0 se sigue aceptando CUALQUIER certificado, no sólo el de ' +
+        'esa CA. El agujero sigue abierto y con aspecto de estar cerrado.',
+      {
+        ca: config.extraCaCerts,
+        arreglo: 'quita NODE_TLS_REJECT_UNAUTHORIZED=0 y comprueba que la conexión sigue yendo',
+      }
+    )
+  } else if (config.extraCaCerts) {
+    logger.info('Confiando en una CA propia además de las del sistema', { ca: config.extraCaCerts })
   }
 
   if (config.corsOrigins.length === 0) {

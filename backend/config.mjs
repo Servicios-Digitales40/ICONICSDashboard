@@ -7,6 +7,7 @@
  * falle *aquí* —con un mensaje que dice qué variable está mal— en vez de
  * reventar más tarde con un `TypeError: Invalid URL` sin contexto.
  */
+import { readFileSync } from 'node:fs'
 import { isAbsolute, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { leerTurnos } from '../shared/periodo.js'
@@ -453,6 +454,69 @@ function checkTlsVerification(env, isProduction) {
 }
 
 /**
+ * `NODE_EXTRA_CA_CERTS`: confiar en UNA CA concreta en vez de en ninguna.
+ *
+ * ── QUÉ APORTA ESTA FUNCIÓN, SI LA VARIABLE LA LEE NODE ────────────
+ *
+ * La variable es un mecanismo del propio Node y funciona con el `fetch` global
+ * sin tocar el cliente — verificado en el Plan 22 F5 contra un HTTPS
+ * autofirmado en loopback. Lo que Node NO hace es quejarse: si el archivo no
+ * existe, no se puede leer o no es un certificado, **lo ignora y sigue**. El
+ * síntoma llega mucho más tarde y disfrazado —una llamada a ICONICS que falla
+ * por certificado— y lleva a buscar el fallo en el sitio equivocado.
+ *
+ * Así que se valida aquí, al arrancar, que es cuando alguien está mirando: que
+ * el archivo esté, se lea, y contenga al menos un bloque `BEGIN CERTIFICATE`.
+ * No se valida la cadena ni la fecha: eso lo hace TLS en la primera llamada, y
+ * fingir aquí una comprobación criptográfica sería prometer más de lo que se
+ * cumple.
+ *
+ * Lanza siempre, también fuera de producción. Un CA declarado y no cargado es
+ * la peor de las tres situaciones posibles: quien lo declaró cree que ya no
+ * necesita `NODE_TLS_REJECT_UNAUTHORIZED=0`, y no es verdad.
+ */
+function readExtraCaCerts(rawValue) {
+  if (!rawValue) return ''
+
+  const ruta = normalize(isAbsolute(rawValue) ? rawValue : join(PROJECT_ROOT, rawValue))
+
+  let contenido
+  try {
+    contenido = readFileSync(ruta, 'utf8')
+  } catch (error) {
+    throw new Error(
+      `NODE_EXTRA_CA_CERTS apunta a "${ruta}" y no se puede leer (${error.code ?? error.message}). ` +
+        'Node lo ignoraría EN SILENCIO y las llamadas por HTTPS seguirían fallando por ' +
+        'certificado, sin decir que la causa es este archivo. Corrige la ruta o quita la variable.'
+    )
+  }
+
+  if (!contenido.includes('-----BEGIN CERTIFICATE-----')) {
+    throw new Error(
+      `NODE_EXTRA_CA_CERTS apunta a "${ruta}", que existe pero no es un certificado en PEM: ` +
+        'no contiene ningún bloque "-----BEGIN CERTIFICATE-----". Si exportaste el certificado ' +
+        'en DER (.cer/.crt binario), conviértelo con: ' +
+        'openssl x509 -inform der -in cert.cer -out cert.pem'
+    )
+  }
+
+  return ruta
+}
+
+/**
+ * Los dos a la vez: un CA declarado Y la verificación apagada.
+ *
+ * Es el fallo que esta fase existe para evitar, y no da ningún síntoma: quien
+ * añade `NODE_EXTRA_CA_CERTS` da por hecho que ya cerró el agujero, pero
+ * mientras `NODE_TLS_REJECT_UNAUTHORIZED=0` siga puesto **se acepta cualquier
+ * certificado igual**, no sólo el de esa CA. El trabajo está hecho y no sirve
+ * de nada.
+ */
+export function caDeclaradaYVerificacionApagada(config) {
+  return Boolean(config.extraCaCerts) && config.tlsVerificationDisabled
+}
+
+/**
  * Base de llama-server, sin barra final. Vacío significa «sin asistente», no
  * es un error: es el estado por defecto de una instalación normal.
  */
@@ -608,6 +672,11 @@ export function loadConfig(env = process.env) {
      */
     version: env.APP_VERSION || 'dev',
     tlsVerificationDisabled: checkTlsVerification(env, isProduction),
+    /**
+     * La CA propia declarada, ya validada (Plan 22 F5 · SEG-06). Cadena vacía
+     * = no hay ninguna, que es el defecto. Ver `readExtraCaCerts`.
+     */
+    extraCaCerts: readExtraCaCerts(env.NODE_EXTRA_CA_CERTS),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
     frameAncestors: readFrameAncestors(env.FRAME_ANCESTORS),
     connectOrigins: readConnectOrigins(env.CONNECT_ORIGINS),

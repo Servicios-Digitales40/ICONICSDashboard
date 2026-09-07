@@ -131,11 +131,49 @@ inexistente caería al respaldo de la SPA y devolvería el `index.html` con un
 200: el cliente no escribiría nada y creería que sí.
 
 **`NODE_TLS_REJECT_UNAUTHORIZED=0` no arranca en producción.** Desactiva la
-verificación de certificados de *todo* el proceso. Los certificados
-autofirmados de ICONICS lo hacen necesario en desarrollo —y allí el arranque lo
-avisa por el log—, pero con `NODE_ENV=production` la carga de configuración
-falla a propósito. En el servidor lo correcto es instalar la CA de ICONICS y
-apuntar `NODE_EXTRA_CA_CERTS` a ella.
+verificación de certificados de *todo* el proceso: no sólo de las llamadas a
+ICONICS, también de las del servidor de IA, el backend predictivo y cualquier
+llamada futura. Los certificados autofirmados de ICONICS lo hacen necesario en
+desarrollo —y allí el arranque lo avisa por el log—, pero con
+`NODE_ENV=production` la carga de configuración falla a propósito.
+
+### Confiar en el certificado de planta sin apagar nada (`NODE_EXTRA_CA_CERTS`)
+
+Lo correcto en el servidor es confiar en **ese** certificado en vez de en
+ninguno. Es un mecanismo del propio Node y funciona con el `fetch` global sin
+tocar el cliente — comprobado en el Plan 22 F5 contra un HTTPS autofirmado en
+loopback, y lo comprueba en cada tanda `scripts/verificar-tls.mjs`.
+
+El paso que bloquea a quien lo intenta es **sacar el certificado**, así que:
+
+```bash
+# 1. Exportarlo del servidor, en PEM. `-servername` importa si comparte IP.
+openssl s_client -showcerts -connect bms-server:443 -servername bms-server </dev/null \
+  | openssl x509 -outform PEM > bms-server.pem
+
+# 2. Comprobar que es el que se espera antes de confiar en él.
+openssl x509 -in bms-server.pem -noout -subject -issuer -dates -fingerprint
+```
+
+En Windows, exportándolo desde el navegador se obtiene un `.cer` **binario**
+(DER), que Node no lee. Se convierte:
+
+```bash
+openssl x509 -inform der -in bms-server.cer -out bms-server.pem
+```
+
+Después, `NODE_EXTRA_CA_CERTS=/ruta/bms-server.pem` y **quitar
+`NODE_TLS_REJECT_UNAUTHORIZED=0`**. Los dos a la vez no cierran nada: se sigue
+aceptando cualquier certificado, y el arranque lo dice con esas palabras porque
+es el único caso en que alguien hizo el trabajo y no le sirvió de nada.
+
+> El arranque **falla** si `NODE_EXTRA_CA_CERTS` apunta a un archivo que no
+> existe o que no es un PEM. Es deliberado: Node lo ignoraría en silencio, y el
+> síntoma llegaría mucho más tarde disfrazado de fallo de red.
+>
+> Lo que este proyecto **todavía no ha comprobado** es que el certificado real
+> de `bms-server` se acepte por esta vía — eso necesita la planta y es del
+> Plan 26.
 
 ## Estructura
 
