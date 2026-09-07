@@ -71,10 +71,18 @@ regla.
     sólo señales sueltas. Si el servidor publica equipos de verdad algún día,
     se sustituye `shared/eva/activos.js` y ninguna vista se entera — pero
     hasta entonces, ese archivo es la única fuente de esa agrupación.
-11. **Autenticación existe como decorador sin exigir nada todavía**
-    (`backend/http/plugins/autenticacion.mjs`, `AUTH_HABILITADA=false`). No se
-    activa como efecto colateral de otra tarea — es su propio plan (ver G11 en
-    `docs/PLAN-17-CERRAR-AUDITORIA.md`).
+11. **La autenticación está implementada y APAGADA**
+    (`backend/http/plugins/autenticacion.mjs`, `AUTH_HABILITADA=false`). Desde
+    el Plan 22 F6 ya no es un decorador vacío: hay JWT, censo de usuarios,
+    roles y caducidad, todo probado con el interruptor encendido en la suite.
+
+    Sigue apagada porque **el tablero todavía no sabe pedir un token** —
+    pantalla de acceso y renovación son del Plan 25. No se enciende como efecto
+    colateral de otra tarea, y conviene no confundir «probado» con «protegiendo
+    algo»: hoy no protege nada, a propósito.
+
+    Lo mismo vale para `REPORTES_SECRETO` (F7): sin él los enlaces de descarga
+    no caducan, y el arranque lo avisa.
 
     Desde el Plan 20 F5 la guarda `autenticar` **la aplica el ámbito** donde se
     registran las rutas de API (`app.mjs`), no cada ruta: la llevaban trece de
@@ -101,7 +109,8 @@ regla.
 │   │   ├── evaluacion/        Banco de casos y juez del asistente (Plan 20 F9)
 │   │   ├── reporte.mjs        PDF de la conversación (import diferido)
 │   │   └── voz.mjs            Dictado (whisper)
-│   ├── lib/                  Escritura atómica de JSON y candado por ruta (Plan 20 F3)
+│   ├── lib/                  Escritura atómica y candado (Plan 20 F3), diario de
+│   │                          accionamientos y enlaces firmados (Plan 22 F3, F7)
 │   ├── iconics/              Autenticación OIDC, cliente REST, transporte falso
 │   ├── routes/                Traducción HTTP ↔ cliente (una por dominio)
 │   └── test/                  vitest: contratos HTTP, esquemas, config

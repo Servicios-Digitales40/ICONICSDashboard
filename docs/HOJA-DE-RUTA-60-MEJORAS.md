@@ -4,7 +4,7 @@
 > propuestas en seis frentes). El Plan 20 ejecutó las diez primeras; esto ordena
 > las cincuenta que quedan.
 
-> **Estado.** Plan 20 **hecho** en `Mejoras-Demo-6.0`. Planes 21 a 26,
+> **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`. Planes 23 a 26,
 > pendientes.
 
 ---
@@ -41,7 +41,7 @@ Tres cosas distintas, y sólo la primera bloquea:
 |---|---|---|
 | 20 | Andamiaje: lo que hace verificable el resto | no · **hecho** |
 | 21 | ICONICS: el registro despacha de verdad | no · **hecho** |
-| 22 | Seguridad | no · [escrito](PLAN-22-SEGURIDAD.md) |
+| 22 | Seguridad | no · **hecho** |
 | 23 | Asistente | no (necesita GPU) |
 | 24 | Usabilidad | no |
 | 25 | Layout y funcionalidad nueva | no |
@@ -96,6 +96,14 @@ Así que SEG-01 se parte:
 `SEG-06` (dejar de apagar la verificación TLS del proceso entero) se parte
 igual: el soporte de `NODE_EXTRA_CA_CERTS` y la comprobación de arranque van en
 el 22; probar que el certificado de `bms-server` se acepta, en el 26.
+
+> **Hecho el 07-09-2026**, las siete fases, sin tocar la planta. Ver el
+> §Resultado de [`PLAN-22-SEGURIDAD.md`](PLAN-22-SEGURIDAD.md). Dos cosas que
+> conviene saber desde aquí: **el alivio de bundle que este plan atribuía a
+> `SEG-05` no existía** —los 276 KB de `xlsx` ya iban en un trozo diferido, así
+> que COD-07 sigue necesitando su margen en otro sitio—, y **lo entregado en
+> SEG-01 y SEG-09 está probado y apagado**: `AUTH_HABILITADA` y
+> `REPORTES_SECRETO` son decisiones de despliegue y no se encienden solas.
 
 ### Plan 23 · Asistente
 

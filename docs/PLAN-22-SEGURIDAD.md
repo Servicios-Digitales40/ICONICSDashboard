@@ -568,9 +568,62 @@ Un commit por fase, probado antes de pasar a la siguiente (`CLAUDE.md` §6).
 | 6 | F6 · Sesión local | `http/plugins/autenticacion.mjs`, `config` |
 | 7 | F7 · Enlaces firmados | `reportesRoutes`, `herramientas/historicos` |
 
-## Lo que quedará abierto al cerrarlo
+## Resultado (07-09-2026)
 
-1. **La federación OIDC** (F6, segunda mitad) — Plan 26.
-2. **El certificado real de `bms-server`** (F5) — Plan 26.
-3. **La pantalla de acceso del tablero** (F6, alcance) — Plan 25, salvo que se
-   decida lo contrario antes de empezar F6.
+Las siete fases están hechas, cada una con su commit y su suite en verde.
+Ningún punto necesitó la planta, como decía §0.2 — que era una comprobación y
+no una estimación, y salió bien.
+
+| Antes | Después |
+|---|---|
+| 220 pruebas de backend | 284 |
+| 570 pruebas de frontend | 580 |
+| 21 verificadores | 22 |
+| `xlsx` con avisos altos | fuera, y un verificador impide que vuelva |
+| el parseo de PDF en el hilo de planta | en un hilo aparte, con firma y topes |
+| una orden a la bomba sólo en el log | también en un diario que sobrevive al reinicio |
+| un cubo de peticiones para todo | tres familias |
+| TLS apagado en todo el proceso | una CA propia basta, y se comprueba |
+| `AUTH_HABILITADA` sin implementación | JWT completo, probado, y el interruptor a mano |
+| enlaces de reporte eternos | firmados y con caducidad |
+
+**Lo que salió al hacerlo, y no estaba en el plan:**
+
+- **F1 · el alivio de bundle no existía donde el plan lo ponía.** Los 276 KB de
+  `xlsx` ya viajaban en un trozo diferido, así que el arranque nunca los pagó.
+  COD-07 sigue necesitando sus 3 KB en otro sitio.
+- **F2 · recortar no puede significar descartar.** Un `.docx` es una sola
+  página: tirar la que se pasa del tope dejaba el documento en cero páginas y
+  el índice lo leía como «no se pudo extraer nada» — lo contrario de lo que
+  pasa.
+- **F2 · un aviso de recorte tiene que sobrevivir a la caché**, o desaparece en
+  cuanto otro archivo dispara una recarga. Es el mismo fallo que `ilegibles` ya
+  tuvo una vez.
+- **F3 · faltaba media tubería del Plan 21 F5.** `valorLeido` y `coinciden` se
+  producían y no llegaban a la ruta; `writePoint` perdía `intentos`.
+- **F4 · la primera clasificación de familias estaba mal, y lo dijo una prueba
+  vieja.** `iconics.test.mjs` esperaba un 429 en `userinfo` y dejó de llegar.
+- **F6 · `guardas.test.mjs` hizo exactamente su trabajo**: falló nombrando
+  `POST /api/auth/login` como ruta sin guarda, obligando a declarar la
+  excepción con su motivo en vez de que apareciera por descuido.
+
+Las dos últimas son el argumento entero del Plan 20: las pruebas que se
+escribieron entonces para vigilar decisiones, no comportamiento, son las que
+han encontrado los errores de éste.
+
+## Lo que queda abierto
+
+1. **La federación OIDC** (F6, segunda mitad) — Plan 26. El emisor de los
+   tokens somos nosotros; sustituirlo por el IdP de ICONICS es cambiar quién
+   firma, no el modelo.
+2. **El certificado real de `bms-server`** (F5) — Plan 26. El mecanismo está
+   probado contra un autofirmado en loopback; que ESE certificado se acepte es
+   otra afirmación y necesita la planta.
+3. **La pantalla de acceso del tablero** (F6) — Plan 25. Confirmada la opción 1
+   antes de empezar: el backend está listo y `AUTH_HABILITADA` se entrega en
+   `false` porque el tablero todavía no sabe pedir un token.
+4. **Encender `AUTH_HABILITADA` y `REPORTES_SECRETO` en producción.** Los dos
+   son decisiones de despliegue, con sus variables documentadas en
+   `backend/README.md`, y ninguno se enciende solo. Hasta que se enciendan, lo
+   entregado en F6 y F7 está probado y **no está protegiendo nada** — conviene
+   no confundir las dos cosas.
