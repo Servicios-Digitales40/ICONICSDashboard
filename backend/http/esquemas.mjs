@@ -159,6 +159,24 @@ export const CambiarModeloSchema = z.object({
   modelo: z.string().trim().min(1, 'Falta el modelo.'),
 })
 
+/* ── Sesión de usuario (Plan 22 F6) ───────────────────────────────── */
+
+/**
+ * El cuerpo de `POST /api/auth/login`.
+ *
+ * Sin tope de longitud en la clave a propósito: `scrypt` cuesta lo mismo con
+ * 8 caracteres que con 200, y rechazar una contraseña larga es empujar a usar
+ * una corta. El tope de verdad lo pone `bodyLimit` del servidor.
+ *
+ * La clave NO se recorta con `trim()`, a diferencia del usuario: un espacio al
+ * final es parte de la contraseña de quien la eligió así, y quitarlo dejaría a
+ * esa persona sin poder entrar con la clave que escribió.
+ */
+export const LoginSchema = z.object({
+  usuario: z.string().trim().min(1, 'Falta el usuario.'),
+  clave: z.string().min(1, 'Falta la contraseña.'),
+})
+
 /* ── Control de planta ────────────────────────────────────────────── */
 
 export const ControlBombaSchema = z.object({

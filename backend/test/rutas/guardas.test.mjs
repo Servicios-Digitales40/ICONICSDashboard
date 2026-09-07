@@ -26,8 +26,19 @@
 import { describe, expect, it } from 'vitest'
 import { montarApp } from '../ayudas.mjs'
 
-/** Las que quedan fuera a propósito, con el motivo. Ver el hook en `app.mjs`. */
-const SIN_GUARDA = [/^\/api\/health/]
+/**
+ * Las que quedan fuera a propósito, con el motivo. Ver el hook en `app.mjs`.
+ *
+ *  · `/api/health*` — las llama el orquestador cada pocos segundos, sin sesión
+ *    y sin nadie delante. Exigirles token convertiría un despliegue con
+ *    autenticación activada en un contenedor que se reinicia solo porque su
+ *    propia sonda responde 401.
+ *  · `POST /api/auth/login` (Plan 22 F6) — exigir una sesión para pedir una
+ *    sesión no lo puede cumplir nadie. Sólo el login: `/api/auth/renovar` y
+ *    `/api/auth/yo` parten de una que ya existe y SÍ pasan por la guarda, y
+ *    esta lista es tan estrecha a propósito.
+ */
+const SIN_GUARDA = [/^\/api\/health/, /^\/api\/auth\/login$/]
 
 /**
  * Un cuerpo cualquiera para los métodos que lo llevan.

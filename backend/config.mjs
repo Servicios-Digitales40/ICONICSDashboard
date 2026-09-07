@@ -14,6 +14,7 @@ import { leerTurnos } from '../shared/periodo.js'
 // Las cifras del diario viven donde se aplican (`lib/diario.mjs`), con su
 // razonamiento; aquí sólo se declaran ajustables por entorno.
 import { DIAS_RETENCION, MAX_BYTES_DIARIO, RUTA_DIARIO } from './lib/diario.mjs'
+import { leerUsuarios } from './http/usuarios.mjs'
 
 const BACKEND_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = normalize(join(BACKEND_DIR, '..'))
@@ -156,6 +157,8 @@ const DEFAULTS = {
    */
   rateLimitMaxLecturas: 1200,
   rateLimitMaxIa: 20,
+  /** Vida de un token de sesión, en minutos. El porqué, en `config.auth`. */
+  authMinutos: 720,
   /**
    * Corte de la llamada al modelo de lenguaje.
    *
@@ -504,6 +507,67 @@ function readExtraCaCerts(rawValue) {
 }
 
 /**
+ * Longitud mínima del secreto que firma los tokens.
+ *
+ * 32 caracteres. No es una cifra ritual: un secreto corto se puede recuperar a
+ * fuerza bruta de un solo token capturado, y con él se firma la sesión de
+ * cualquiera —incluido el rol que acciona la bomba—. Aquí no hay contraseña
+ * que reintentar despacio; el atacante prueba en su máquina, sin límite.
+ */
+const MINIMO_SECRETO = 32
+
+/**
+ * El secreto de firma. Sólo se exige con la autenticación encendida.
+ *
+ * ── POR QUÉ NO SE GENERA UNO SI FALTA ──────────────────────────────
+ *
+ * Sería lo cómodo y es exactamente lo que no se puede hacer: un secreto
+ * aleatorio por arranque invalida todas las sesiones en cada reinicio —el
+ * wallboard aparece deslogueado cada `pm2 restart`— y con dos procesos detrás
+ * de un balanceador, el token que firma uno no lo acepta el otro. El fallo
+ * sería intermitente y nadie lo relacionaría con esto.
+ */
+function readSecretoAuth(rawValue, habilitada) {
+  const secreto = (rawValue ?? '').trim()
+  if (!habilitada) return secreto
+
+  if (!secreto) {
+    throw new Error(
+      'AUTH_HABILITADA=true exige AUTH_SECRETO: es la clave con la que se firman los tokens de ' +
+        `sesión. Genera uno con: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))" ` +
+        'y guárdalo fuera del repositorio.'
+    )
+  }
+  if (secreto.length < MINIMO_SECRETO) {
+    throw new Error(
+      `AUTH_SECRETO tiene ${secreto.length} caracteres y el mínimo son ${MINIMO_SECRETO}. Con un ` +
+        'secreto corto, quien capture un solo token puede recuperarlo por fuerza bruta en su ' +
+        'propia máquina y firmar la sesión de cualquiera, con cualquier rol.'
+    )
+  }
+  return secreto
+}
+
+/**
+ * El censo. Parsear y validar es de `http/usuarios.mjs`; aquí sólo se decide
+ * que sin él no se arranca con la autenticación encendida — un servidor que
+ * exige sesión y no tiene a nadie a quien dársela no deja entrar a nadie, y el
+ * síntoma («mis credenciales no funcionan») no apunta a la causa.
+ */
+function readUsuariosAuth(rawValue, habilitada) {
+  const usuarios = leerUsuarios(rawValue)
+  if (!habilitada) return usuarios
+
+  if (usuarios.size === 0) {
+    throw new Error(
+      'AUTH_HABILITADA=true pero AUTH_USUARIOS está vacío: nadie podría entrar al tablero. ' +
+        'Genera la entrada de un usuario con: node scripts/hash-clave.mjs <id> <roles>'
+    )
+  }
+  return usuarios
+}
+
+/**
  * Los dos a la vez: un CA declarado Y la verificación apagada.
  *
  * Es el fallo que esta fase existe para evitar, y no da ningún síntoma: quien
@@ -659,6 +723,7 @@ export function loadConfig(env = process.env) {
   const isProduction = env.NODE_ENV === 'production'
   const iconicsFake = readBoolean('ICONICS_FAKE', env.ICONICS_FAKE, false)
   const modelos = readModelos(env)
+  const authHabilitada = readBoolean('AUTH_HABILITADA', env.AUTH_HABILITADA, false)
 
   return Object.freeze({
     port: readPort(env.PORT),
@@ -1024,8 +1089,32 @@ export function loadConfig(env = process.env) {
      * No confundir con la sesión OIDC contra ICONICS (`iconics.canAuthenticate`):
      * aquella es de máquina, esta es de persona.
      */
+    /**
+     * Sesión de PERSONA sobre el tablero (Plan 22 F6 · SEG-01, primera mitad).
+     *
+     * No confundir con `iconics.*`, que es la sesión de MÁQUINA del puente
+     * contra el servidor de planta. Son dos cosas distintas que el nombre
+     * confunde fácil; ver la cabecera de `http/plugins/autenticacion.mjs`.
+     *
+     * Todo esto sólo se exige cuando `habilitada` es `true`. Con el defecto
+     * —apagada— ni el secreto ni el censo hacen falta, y el tablero funciona
+     * como siempre: `readSecretoAuth` y `readUsuariosAuth` sólo se quejan si
+     * alguien encendió el interruptor.
+     */
     auth: Object.freeze({
-      habilitada: readBoolean('AUTH_HABILITADA', env.AUTH_HABILITADA, false),
+      habilitada: authHabilitada,
+      secreto: readSecretoAuth(env.AUTH_SECRETO, authHabilitada),
+      usuarios: readUsuariosAuth(env.AUTH_USUARIOS, authHabilitada),
+      /**
+       * Cuánto vive un token, en minutos.
+       *
+       * 12 h cubre un turno de planta con su relevo. Más corto obligaría a
+       * volver a entrar a mitad de turno —en un wallboard sin teclado, eso es
+       * una pantalla muerta— y más largo convierte un token robado en una
+       * llave de varios días. Cuando el tablero sepa renovar solo (Plan 25) se
+       * puede bajar.
+       */
+      minutos: readInteger('AUTH_MINUTOS', env.AUTH_MINUTOS, DEFAULTS.authMinutos, 1),
     }),
   })
 }

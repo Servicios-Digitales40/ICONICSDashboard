@@ -50,6 +50,7 @@ import erroresPlugin from './http/plugins/errores.mjs'
 import seguridadPlugin, { familiaDeRuta } from './http/plugins/seguridad.mjs'
 import { crearDiario } from './lib/diario.mjs'
 import { logger } from './logger.mjs'
+import { registerAuthRoutes } from './routes/authRoutes.mjs'
 import { registerCasosRoutes } from './routes/casosRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
@@ -477,9 +478,18 @@ export async function createApp(config) {
        * reinicia solo porque su propia sonda responde 401.
        */
       if (request.url.startsWith('/api/health')) return
+
+      /*
+       * Y el login, por lo obvio y por eso mismo fácil de olvidar: exigir una
+       * sesión para pedir una sesión no lo puede cumplir nadie. Sólo `login`
+       * —`renovar` y `yo` parten de una que ya existe y sí pasan por aquí.
+       */
+      if (request.url.startsWith('/api/auth/login')) return
+
       return instancia.autenticar(request, reply)
     })
 
+    registerAuthRoutes(instancia, { config })
     registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, indiceDocumentos })
     registerIconicsRoutes(instancia, { config, client })
     registerControlRoutes(instancia, { config, herramientas, diario })

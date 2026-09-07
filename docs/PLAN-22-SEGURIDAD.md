@@ -439,6 +439,52 @@ con 403 y no con 404, que diría que la ruta no existe; y que las sondas de salu
 siguen fuera, porque un despliegue autenticado no puede reiniciarse solo porque
 su propia sonda responda 401.
 
+### HECHO (07-09-2026), con la opción 1
+
+`@fastify/jwt` con emisor propio. Tres rutas —`login`, `renovar`, `yo`—, el
+censo en `http/usuarios.mjs`, y `AUTH_HABILITADA` **entregada en `false`**.
+244 → **275** pruebas de backend: 18 en `test/rutas/autenticacion.test.mjs`, que
+enciende el interruptor entero, y 13 del censo.
+
+**El censo va en el entorno y no en una tabla** porque está destinado a
+desaparecer: el Plan 26 lo sustituye por el IdP de ICONICS, y montar ahora un
+CRUD de usuarios con su pantalla sería construir para tirar. Tampoco un JSON en
+`datos/`: ahí vive lo que el backend GENERA; un censo de personas es
+configuración de despliegue.
+
+`scrypt` de `node:crypto` para las contraseñas —una dependencia menos— con sal
+por usuario. Y `scripts/hash-clave.mjs`, sin el cual `AUTH_USUARIOS` sería una
+variable que nadie puede rellenar: mismo criterio que documentar cómo exportar
+el certificado en F5, la pieza que bloquea no es la difícil, es la que nadie
+escribió. Pide la clave sin eco y también la lee de una tubería, porque un
+argumento de línea de órdenes queda en el historial y lo ve un `ps`.
+
+**Tres decisiones que no estaban en el plan:**
+
+1. **No hay logout.** Un JWT vale hasta que caduca; una ruta que dijera
+   `ok: true` sin invalidar nada daría a entender lo contrario. Revocar de
+   verdad exige una lista de tokens revocados releída en cada petición — una
+   base de datos por la puerta de atrás (§2.2). El día que haga falta, la
+   respuesta es la federación, que ya la tiene.
+2. **La renovación relee los roles del censo, no los copia del token.** Si los
+   copiara, un token viejo se prolongaría a sí mismo con permisos ya retirados,
+   indefinidamente, mientras siguiera renovando. Tiene su prueba.
+3. **El login verifica un hash de mentira contra un usuario inexistente.** Sin
+   eso, «usuario que no existe» contesta en un milisegundo y «existe con clave
+   mala» tarda los ~100 ms de `scrypt`: la diferencia se mide desde fuera y
+   convierte el login en un buscador de nombres de usuario válidos.
+
+**Y una prueba vieja hizo su trabajo.** `guardas.test.mjs` falló nombrando
+`POST /api/auth/login` como ruta sin guarda, que es exactamente para lo que se
+escribió en el Plan 20 F5: obligar a que toda excepción se declare con su
+motivo en vez de aparecer por descuido. La excepción es sólo el login —
+`renovar` y `yo` parten de una sesión que ya existe y sí pasan por la guarda.
+
+`seguridad.test.mjs` tenía una prueba que exigía que arrancar con
+`AUTH_HABILITADA=true` fallara «porque no está implementada». Ya no es cierto:
+ahora falla porque falta `AUTH_SECRETO`. La puerta se mantiene y el motivo se
+corrigió.
+
 ## F7 · Enlaces de reporte firmados (SEG-09)
 
 **Hoy.** `GET /api/reportes?id=<uuid>` sirve cualquier PDF de las dos carpetas.

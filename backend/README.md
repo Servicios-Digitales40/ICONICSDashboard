@@ -68,6 +68,43 @@ plantilla comentada de todas las variables está en
 | `UPSTREAM_TIMEOUT_MS` | `15000` | Corte de cualquier llamada hacia ICONICS. |
 | `BATCH_CACHE_TTL_MS` | `2000` | Vida de la caché de lecturas en lote. `0` la desactiva. |
 
+**Sesión de usuario** (Plan 22 F6 · SEG-01)
+
+Quién está mirando el tablero. **No confundir con `ICONICS_USERNAME`**, que es
+la sesión de *máquina* del puente contra el servidor de planta: son dos cosas
+distintas que el nombre confunde fácil.
+
+**Viene apagada, y eso es la entrega.** El backend está completo y probado, pero
+encender `AUTH_HABILITADA=true` hace que las treinta y tres rutas exijan token y
+**el tablero todavía no sabe pedirlo** — pantalla de acceso, guardado del token
+y renovación son trabajo de frontend (Plan 25). Encenderlo hoy deja el tablero
+inservible.
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `AUTH_HABILITADA` | `false` | El interruptor. Con `true`, las tres siguientes se vuelven obligatorias y el arranque falla si faltan. |
+| `AUTH_SECRETO` | *(vacío)* | Clave con la que se firman los tokens. **Mínimo 32 caracteres**: con uno corto, quien capture un solo token lo recupera por fuerza bruta en su máquina y firma la sesión de cualquiera. |
+| `AUTH_USUARIOS` | *(vacío)* | El censo: `id:roles:hash` separados por `;`, roles por comas. Genera cada entrada con `node scripts/hash-clave.mjs <id> <roles>`. |
+| `AUTH_MINUTOS` | `720` (12 h) | Vida de un token. Cubre un turno con su relevo; más corto obliga a volver a entrar a mitad de turno —en un wallboard sin teclado, una pantalla muerta—. |
+
+```bash
+# Un secreto, y la entrada de una persona:
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+node scripts/hash-clave.mjs ana supervisor,operador   # pide la clave sin eco
+```
+
+La contraseña **nunca** se guarda: lo que viaja en `AUTH_USUARIOS` es un
+derivado de `scrypt` con sal por usuario. `scrypt` y no bcrypt porque lo trae
+`node:crypto` — una dependencia menos en un puente que se actualiza poco.
+
+Rutas: `POST /api/auth/login` (fuera de la guarda, por lo obvio),
+`POST /api/auth/renovar` y `GET /api/auth/yo`. **No hay logout**: un JWT vale
+hasta que caduca, y una ruta que dijera `ok: true` sin invalidar nada daría a
+entender lo contrario. Revocar de verdad exige estado compartido, o sea una
+base de datos por la puerta de atrás (`CLAUDE.md` §2.2); el día que haga falta,
+la respuesta es la federación con el IdP de ICONICS — que ya la tiene, y es el
+Plan 26.
+
 **Diario de accionamientos** (Plan 22 F3 · SEG-08)
 
 Cada orden a la bomba —cumplida o rechazada— se anota en un JSONL que
@@ -431,6 +468,9 @@ de sólo lectura.
 | `GET /api/health/live` | `{ status: 'ok', version, uptimeSeconds, timestamp }` |
 | `GET /api/health` · `GET /api/health/ready` | `{ status, version, iconicsReachable, tokenValid, readOnly, uptimeSeconds, timestamp, reason? }` |
 | `GET /api/context` | `{ context, iconics }` |
+| `POST /api/auth/login` | `{ ok, token, expiraEnMinutos, usuario }` · 401 con el mismo mensaje tanto si falla el usuario como la clave · 503 con `AUTH_HABILITADA=false` |
+| `POST /api/auth/renovar` | `{ ok, token, expiraEnMinutos, usuario }` — los roles se releen del censo, no se copian del token |
+| `GET /api/auth/yo` | `{ ok, usuario: { id, roles, autenticado }, habilitada }` |
 
 Son dos preguntas distintas y por eso son dos rutas. **`live`** dice si el
 proceso respira y no consulta nada: es la sonda del orquestador, que corre cada

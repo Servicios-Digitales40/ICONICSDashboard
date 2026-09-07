@@ -189,12 +189,18 @@ describe('autenticación (todavía apagada)', () => {
     expect(respuesta.statusCode).toBe(200)
   })
 
-  it('el servidor NO arranca si se pide autenticación sin implementarla', async () => {
+  it('el servidor NO arranca si se pide autenticación a medias', async () => {
     /*
      * Puerta deliberada: dejarlo pasar con un aviso significaría que alguien
      * pide autenticación, ve el servidor levantar, y cree que está protegido.
+     *
+     * Hasta el Plan 22 F6 el motivo era que no había implementación ninguna.
+     * Ahora la hay, y la puerta se mantiene por lo que FALTA: sin
+     * `AUTH_SECRETO` no se puede firmar nada. Lo que se comprueba sigue siendo
+     * lo mismo —que no levante a medias— y el detalle de cada exigencia está
+     * en `autenticacion.test.mjs`, que enciende el interruptor entero.
      */
-    await expect(montarApp({ AUTH_HABILITADA: 'true' })).rejects.toThrow(/no está implementada/)
+    await expect(montarApp({ AUTH_HABILITADA: 'true' })).rejects.toThrow(/AUTH_SECRETO/)
   })
 })
 
