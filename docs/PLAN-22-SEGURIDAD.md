@@ -169,7 +169,7 @@ La extracción entera —`pdfjs`, el lector casero, el de `.docx` y sus
 ayudantes— se mudó a `backend/ia/indices/extraccion.worker.mjs` **sin tocar una
 línea de su lógica**, con `extraccion.mjs` de puerta: firma antes de arrancar
 el hilo, topes dentro, reloj fuera (un hilo colgado no se mide a sí mismo).
-Efecto lateral que interesa a COD-04: `documentos.mjs` pasa de **1051 a 706
+Efecto lateral que interesa a COD-04: `documentos.mjs` pasa de **1051 a 749
 líneas** y sale de la lista de archivos de más de mil.
 
 La prueba del bucle de eventos fabrica un `.docx` de 20 000 párrafos —0,18 MB
