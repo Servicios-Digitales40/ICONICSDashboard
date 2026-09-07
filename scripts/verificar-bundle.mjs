@@ -168,19 +168,31 @@ if (three) {
 }
 
 /*
- * 4 · Igual que `three`, pero para `xlsx` — sólo lo usa el botón «Exportar
- * todo» de la vista Detalle (`Demo-EVA/lib/exportarExcel.js`), que ya es
- * `lazy()`. Sin la regla de `vite.config.js` que le da chunk propio, caería
- * en el catch-all de "vendor", que SÍ es de carga inmediata — sería el mismo
- * modo de fallo silencioso que ya cubre el bloque de arriba.
+ * 4 · Que `xlsx` NO vuelva. Aquí había un bloque hermano del de `three` que
+ * vigilaba que el trozo de SheetJS siguiera diferido; desde el Plan 22 F1 la
+ * dependencia ya no existe —el «Exportar todo» de Detalle escribe un CSV, ver
+ * `Demo-EVA/lib/exportarTodo.js`— y su regla en `manualChunks` se retiró con
+ * ella.
+ *
+ * La comprobación se invierte en vez de borrarse: sin regla propia, un `xlsx`
+ * reinstalado por cualquier motivo caería en el catch-all de `vendor`, que SÍ
+ * es de carga inmediata, y sumaría ~276 KB al arranque sin romper nada
+ * visible. Es el mismo modo de fallo silencioso del bloque de arriba, con el
+ * paquete del que ya sabemos que lo provoca.
  */
-const xlsx = archivos.find((x) => x.nombre.startsWith("xlsx-"));
-if (xlsx) {
-  const diferido = !arranque.has(xlsx.nombre);
-  console.log(`  ${diferido ? "✔" : "✖"} xlsx     ${String(kb(xlsx.bytes)).padStart(8)} KB  (${diferido ? "diferido" : "EN EL ARRANQUE"})`);
-  if (!diferido) fallos.push(`${xlsx.nombre} se descarga en el arranque; debería cargarse sólo al exportar desde Detalle.`);
+const HUELLAS_XLSX = [/["'`]xlsx["'`]/, /SheetJS/];
+const xlsxEnAlgunTrozo = archivos.find((a) => {
+  const código = readFileSync(a.ruta, "utf8");
+  return HUELLAS_XLSX.some((h) => h.test(código));
+});
+if (xlsxEnAlgunTrozo) {
+  console.log(`  ✖ xlsx     ha vuelto, dentro de ${xlsxEnAlgunTrozo.nombre}`);
+  fallos.push(
+    `${xlsxEnAlgunTrozo.nombre} contiene rastros de \`xlsx\`, que el Plan 22 F1 (SEG-05) retiró. ` +
+      "Sin su regla en `manualChunks` cae en `vendor`, que es de carga inmediata."
+  );
 } else {
-  console.log("  · sin trozo `xlsx` (build sin la vista Detalle — no debería pasar en el build de planta)");
+  console.log("  ✔ xlsx     fuera del árbol (Plan 22 F1)");
 }
 
 console.log();

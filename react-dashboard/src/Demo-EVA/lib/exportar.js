@@ -38,8 +38,17 @@ function slug(texto) {
     .replace(/^-+|-+$/g, "");
 }
 
-/** 2026-08-19T14:32 (hora LOCAL) → "2026-08-19T14-32": los ":" no son válidos en un nombre de archivo de Windows. */
-function fechaArchivo(d) {
+/**
+ * 2026-08-19T14:32 (hora LOCAL) → "2026-08-19T14-32": los ":" no son válidos
+ * en un nombre de archivo de Windows.
+ *
+ * Exportada porque `exportarTodo.js` nombra su archivo con la misma regla:
+ * hasta el Plan 22 F1 esta función estaba copiada allí palabra por palabra
+ * —dos ficheros con el mismo formato de fecha y ninguna prueba que notara si
+ * uno de los dos cambiaba—, que es justo la divergencia que CLAUDE.md §4.2
+ * describe.
+ */
+export function fechaArchivo(d) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}-${pad(d.getMinutes())}`;
 }
@@ -64,7 +73,7 @@ export function nombreArchivo(senal, datos, extension) {
 }
 
 /** Envuelve en comillas sólo si hace falta — un CSV con comillas de más en cada celda es más difícil de leer a ojo. */
-function celdaCSV(valor) {
+export function celdaCSV(valor) {
   const texto = String(valor);
   return /[",\r\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
 }
@@ -80,7 +89,7 @@ function celdaCSV(valor) {
  * dato de calidad que exportar, sólo huecos que ya no están en el arreglo.
  */
 /** Fin de línea de CSV: Windows/Excel lo esperan así. */
-const CRLF = "\r\n";
+export const CRLF = "\r\n";
 
 export function datosACSV(senal, datos, cobertura = null) {
   const cabecera = ["instante_iso", "hora_local", senal.unidad ? `valor (${senal.unidad})` : "valor"];
@@ -108,19 +117,28 @@ export function datosACSV(senal, datos, cobertura = null) {
  *
  * Va como `#` para que Excel y pandas la traten como comentario o como una
  * fila suelta, nunca como parte de la cabecera.
+ *
+ * `etiqueta` es para el CSV general (`exportarTodo.js`), donde conviven cinco
+ * señales y cada una tiene SU cobertura: sin el nombre delante, cinco notas
+ * seguidas no se pueden atribuir a nada. En el CSV de una sola gráfica no hay
+ * ambigüedad que resolver y por eso el valor por defecto es no ponerla.
+ *
+ * @param {{tramos:number, tramosConDato:number, completa:boolean, desde:Date|null, hasta:Date|null}|null} cobertura
+ * @param {string|null} [etiqueta]
  */
-function notaDeCobertura(cobertura) {
+export function notaDeCobertura(cobertura, etiqueta = null) {
   if (!cobertura || cobertura.completa) return null;
 
   const { tramos, tramosConDato, desde, hasta } = cobertura;
   const sinDato = tramos - tramosConDato;
+  const quien = etiqueta ? `${etiqueta}: ` : "";
   const cuando =
     desde && hasta
       ? ` Los datos van del ${desde.toLocaleDateString("es-MX")} al ${hasta.toLocaleDateString("es-MX")}.`
       : "";
 
   return celdaCSV(
-    `# ${sinDato} de los ${tramos} tramos del rango pedido no tienen registro en el historiador.${cuando}`
+    `# ${quien}${sinDato} de los ${tramos} tramos del rango pedido no tienen registro en el historiador.${cuando}`
   );
 }
 

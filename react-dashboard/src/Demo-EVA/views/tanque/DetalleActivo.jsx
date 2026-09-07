@@ -33,7 +33,8 @@ import { estadoColor } from "../../components/paleta.js";
 import { DetalleGrid } from "../../components/detalle/DetalleGrid.jsx";
 import { GraficaComparada } from "../../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../../components/detalle/SelectorRango.jsx";
-import { armarLibro, descargarLibro, nombreArchivoGeneral } from "../../lib/exportarExcel.js";
+import { descargarCSV } from "../../lib/exportar.js";
+import { armarCSVGeneral, nombreArchivoGeneral } from "../../lib/exportarTodo.js";
 
 /**
  * Con qué función se calcula el rango de cada acceso rápido contra el
@@ -182,22 +183,27 @@ function DetalleActivo({ params, onNavigate }) {
   }
 
   /**
-   * El .xlsx de TODAS las señales historizadas del catálogo (hoy cinco),
+   * El CSV de TODAS las señales historizadas del catálogo (hoy cinco),
    * con el rango de fechas ya elegido en esta vista — no las señales del
    * activo/pestaña actual: mismo criterio de alcance transversal que
    * `GraficaComparada`, que vive fuera del `tabpanel` por el mismo motivo.
+   *
+   * `cobertura` y `motivo` viajan junto a los datos hasta el archivo: son lo
+   * que distingue «la planta estuvo parada» de «la consulta se quedó corta»
+   * cuando alguien abra el CSV dentro de seis meses. Ver `lib/exportarTodo.js`
+   * sobre por qué esto dejó de ser un .xlsx (Plan 22 F1).
    */
   async function exportarTodo() {
     setExportandoTodo(true);
     try {
       const claves = historizadas();
-      const hojas = await Promise.all(
+      const series = await Promise.all(
         claves.map(async (clave) => {
-          const { datos } = await source.leerSerie(clave, rango);
-          return { senal: senalInfo(clave), datos };
+          const { datos, cobertura, motivo } = await source.leerSerie(clave, rango);
+          return { senal: senalInfo(clave), datos, cobertura, motivo };
         })
       );
-      descargarLibro(armarLibro(hojas), nombreArchivoGeneral(rango));
+      descargarCSV(nombreArchivoGeneral(rango), armarCSVGeneral(series));
     } finally {
       setExportandoTodo(false);
     }

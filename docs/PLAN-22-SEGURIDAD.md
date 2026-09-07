@@ -108,6 +108,33 @@ elegida, comprobando lo que de verdad importa: que el archivo lleva las mismas
 columnas, que un hueco sale como hueco y **no como cero**, y que la cobertura
 del rango viaja en el archivo (Plan 21 F7).
 
+### HECHO (07-09-2026) — con una corrección al párrafo de arriba
+
+Elegida la opción 1: **un solo CSV en formato largo**, con una columna `senal`
+porque las cinco series no comparten rejilla de instantes y alinearlas sería
+inventar dato. `Demo-EVA/lib/exportarExcel.js` → `exportarTodo.js`; la descarga
+la hace el `descargarCSV` que ya existía. 580 pruebas de frontend en verde.
+
+Dos cosas que el archivo desmiente, y el archivo tiene razón (CLAUDE.md §0):
+
+1. **El alivio de bundle no existe donde este párrafo lo pone.** Los 276 KB de
+   `xlsx` ya viajaban en un **trozo propio y diferido** —`manualChunks` tenía
+   una regla justo para eso—, así que el arranque nunca los pagó: medido tras
+   el cambio, `vendor` sigue en 206,85 KB e `index` en 97,5. Lo que se ahorra
+   es la descarga de quien pulsa «Exportar todo». **COD-07 sigue necesitando
+   sus 3 KB de margen en otro sitio.**
+2. **El .xlsx escondía un hueco.** Una señal sin muestras dejaba una hoja con
+   su cabecera; en formato largo desaparecería del archivo sin dejar rastro. El
+   CSV emite una nota `#` que la nombra y, si `leerSerie` dio `motivo`, lo dice
+   —«no historizada» no es lo mismo que «el historiador no devolvió nada»—. Y
+   la **cobertura por señal** viaja ahora hasta el archivo: el libro de Excel
+   la tiraba, teniéndola delante desde el Plan 21 F7.
+
+`scripts/verificar-bundle.mjs` invierte su comprobación en vez de perderla: sin
+la regla de `manualChunks`, un `xlsx` reinstalado caería en el catch-all de
+`vendor` —que sí es de carga inmediata— y sumaría los 276 KB al arranque sin
+romper nada visible. Ahora el verificador falla si vuelve.
+
 ## F2 · El parseo de subidas, fuera del bucle de eventos (SEG-10)
 
 **Hoy.** `indices/documentos.mjs` extrae texto de PDF con `pdfjs-dist` y de DOCX
@@ -255,6 +282,9 @@ razón real de que §2.11 diga que la autenticación «es su propio plan».
 Se elige la 1 porque deja el Plan 22 cerrable y no mezcla dos oficios en una
 fase. **Si se prefiere la 2, se decide antes de empezar F6** — a mitad ya no,
 porque cambia el reparto de las fases siguientes.
+
+> **Confirmado el 07-09-2026, antes de empezar F1**: se mantiene la opción 1.
+> La pantalla de acceso del tablero queda en el Plan 25.
 
 **Cómo se prueba.** Con `AUTH_HABILITADA=true` en las pruebas: que sin token las
 rutas responden 401 y con token válido pasan; que un token caducado se
