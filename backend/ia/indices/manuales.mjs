@@ -46,6 +46,7 @@ import {
   manifiestoVacio,
 } from '../../../shared/eva/comun/manuales.js'
 import { MAX_BYTES } from './documentos.mjs'
+import { firmaCorrecta, motivoFirma } from './extraccion.mjs'
 
 /*
  * `NOMBRE_MANIFIESTO` vive en `shared/eva/comun/manuales.js` —no aquí— desde el
@@ -218,6 +219,15 @@ export function createGestorManuales({
     if (bytes.length > MAX_BYTES) {
       return { ok: false, error: `El archivo pasa de ${Math.round(MAX_BYTES / 1048576)} MB.` }
     }
+    /*
+     * La firma, no la extensión (Plan 22 F2 · SEG-10). Aquí se rechaza ANTES
+     * de escribir a disco por el mismo motivo que el tamaño: un archivo que el
+     * índice nunca va a poder leer no tiene por qué quedarse ocupando sitio y
+     * saliendo en la lista de manuales como si fuera uno más.
+     */
+    if (!firmaCorrecta(ext, bytes)) {
+      return { ok: false, error: `El archivo ${motivoFirma(ext)}.` }
+    }
     if (!sistemaValido(sistema)) {
       return { ok: false, error: `"${sistema}" no es un sistema de la planta declarado.` }
     }
@@ -257,6 +267,16 @@ export function createGestorManuales({
     if (!entrada) return { ok: false, error: `No hay ningún manual con id "${id}".` }
     if (entrada.estado === 'archivado') {
       return { ok: false, error: 'Este manual está archivado; no se puede reemplazar. Sube una entrada nueva.' }
+    }
+
+    /*
+     * La firma se comprueba contra la extensión del archivo QUE YA ESTÁ: una
+     * revisión conserva el nombre en disco, así que reemplazar un `.pdf` por
+     * un ZIP dejaría un archivo cuyo nombre miente. Y aquí importa más que en
+     * `subir`, porque esto pisa un manual bueno del que ya se depende.
+     */
+    if (!firmaCorrecta(extname(entrada.archivo).toLowerCase(), bytes)) {
+      return { ok: false, error: `El archivo ${motivoFirma(extname(entrada.archivo).toLowerCase())}.` }
     }
 
     /*

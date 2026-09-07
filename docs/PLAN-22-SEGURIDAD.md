@@ -160,6 +160,53 @@ así que las tres guardas se prueban ahí sin añadir un solo archivo al árbol.
 añade una que mida que el bucle **sigue respondiendo** durante una extracción
 larga, que es la afirmación de la fase.
 
+### HECHO (07-09-2026)
+
+Las tres guardas, más dos cosas que salieron al hacerlo. 16 → **24**
+comprobaciones en `verificar-documentos.mjs`; 220 pruebas de backend en verde.
+
+La extracción entera —`pdfjs`, el lector casero, el de `.docx` y sus
+ayudantes— se mudó a `backend/ia/indices/extraccion.worker.mjs` **sin tocar una
+línea de su lógica**, con `extraccion.mjs` de puerta: firma antes de arrancar
+el hilo, topes dentro, reloj fuera (un hilo colgado no se mide a sí mismo).
+Efecto lateral que interesa a COD-04: `documentos.mjs` pasa de **1051 a 706
+líneas** y sale de la lista de archivos de más de mil.
+
+La prueba del bucle de eventos fabrica un `.docx` de 20 000 párrafos —0,18 MB
+en disco, ~15 MB de XML inflado, 226 ms de CPU medidos— y cuenta latidos de un
+`setInterval` mientras se indexa. Antes de esta fase, ese cuarto de segundo no
+atendía nada. Es la distinción que `MAX_BYTES` por sí solo no podía hacer: lo
+caro no es leer el archivo, es procesarlo.
+
+**Lo que no estaba en el plan:**
+
+1. **Recortar no puede significar descartar.** El primer recorte por
+   caracteres tiraba la página que se pasaba del tope. Un `.docx` es UNA sola
+   página, así que un documento demasiado largo salía con cero páginas y el
+   índice lo leía como «no se pudo extraer nada» — ilegible, cuando lo que
+   pasa es exactamente lo contrario. Ahora corta el texto y el documento entra
+   recortado, que es lo que es.
+2. **Un aviso de recorte tiene que sobrevivir a la caché.** Un archivo
+   recortado SÍ se cachea —lo que entró es bueno— así que en la siguiente
+   `recargar()` no vuelve a pasar por la extracción. Anotar el aviso allí lo
+   habría hecho desaparecer en cuanto otro archivo disparara una recarga: el
+   mismo fallo que `ilegibles` ya tuvo una vez, y que su prueba vigila desde
+   entonces. El motivo viaja en la entrada de la caché y `parciales` se
+   reconstruye de ahí.
+
+`parciales` es lista propia en `estado()`, no una variante de `ilegibles`: el
+arreglo es distinto —convertir el archivo en un caso, decidir si lo que faltó
+importaba en el otro— y mezclarlos obligaría a leer el texto del motivo para
+saber cuál es cuál. La pantalla de Documentación aún no la pinta; eso es del
+Plan 24 (`USO-04`, errores accionables), y hasta entonces sale en el registro
+de arranque, que es donde alguien la busca hoy.
+
+La firma se comprueba también **al subir** (`manuales.mjs`), por el mismo
+motivo que el tamaño: un archivo que el índice nunca podrá leer no tiene por
+qué ocupar disco y salir en la lista de manuales como si fuera uno más. En
+`reemplazar` se contrasta contra la extensión del archivo que ya está, que es
+la que se conserva.
+
 ## F3 · Diario de accionamientos sobre planta (SEG-08)
 
 **Hoy.** `controlRoutes.mjs` registra la acción con IP y usuario en pino, y su

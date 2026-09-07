@@ -27,6 +27,19 @@
  *    que tiene que encontrar: el refactor de Fase 0 no toca `buscar()`, pero
  *    toca todo lo que la alimenta.
  *
+ * ── Y DESDE EL PLAN 22 F2 (SEG-10) ─────────────────────────────────
+ *
+ *  - Que sea la FIRMA del archivo y no su extensión la que decide qué parser
+ *    corre: un `.pdf` que no empieza por `%PDF-` no llega a `pdfjs`.
+ *  - Que un documento que pasa de los topes entre RECORTADO —no ilegible, que
+ *    es lo contrario— y lo declare en `parciales`, incluso después de una
+ *    recarga que él no disparó.
+ *  - Que una extracción que no termina se corte por tiempo en vez de dejar un
+ *    hilo vivo para siempre.
+ *  - Y la afirmación de la fase: que **el bucle de eventos sigue atendiendo**
+ *    mientras se extrae un documento pesado. Antes no lo hacía, y el síntoma
+ *    era el tablero entero congelado mientras alguien subía un manual.
+ *
  * ── USO ────────────────────────────────────────────────────────────
  *
  *   node scripts/verificar-documentos.mjs
@@ -37,6 +50,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
+import { deflateRawSync } from 'node:zlib'
 import { join } from 'node:path'
 
 import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
@@ -139,6 +153,45 @@ function textoLargo(etiqueta, parrafos) {
  *  como «no contiene texto extraíble» — el mismo camino que un escaneo real,
  *  sin necesitar un PDF real para probarlo. */
 const PDF_BASURA = '%PDF-1.4\nesto no tiene ni stream ni endstream\n%%EOF'
+
+/**
+ * Un `.docx` de verdad, fabricado aquí (Plan 22 F2).
+ *
+ * ── POR QUÉ SE FABRICA Y NO SE GUARDA UNO EN EL ÁRBOL ──────────────
+ *
+ * Porque las tres guardas de esta fase se prueban con el TAMAÑO del
+ * documento, y un archivo de siete megas en el repositorio para probar un
+ * tope no lo justifica nadie. Además, generarlo deja escrito qué se está
+ * probando: un ZIP con una única entrada `word/document.xml`, que es
+ * exactamente lo que `extraerTextoDocx` busca por dentro.
+ *
+ * Es la cabecera local de un ZIP tal como la lee ese extractor: firma
+ * `PK\x03\x04`, método 8 (deflate), tamaños en su sitio y el nombre a
+ * continuación. Nada de directorio central: el lector no lo mira, y añadirlo
+ * sería fabricar un ZIP más completo que el que el código necesita.
+ */
+function docxDeMentira(texto) {
+  const xml = `<w:document><w:body>${texto
+    .split('\n\n')
+    .map(p => `<w:p><w:r><w:t>${p}</w:t></w:r></w:p>`)
+    .join('')}</w:body></w:document>`
+
+  const nombre = Buffer.from('word/document.xml', 'latin1')
+  const datos = deflateRawSync(Buffer.from(xml, 'utf8'))
+
+  const cabecera = Buffer.alloc(30)
+  cabecera.write('PK\x03\x04', 0, 'latin1')
+  cabecera.writeUInt16LE(20, 4)              // versión mínima
+  cabecera.writeUInt16LE(0, 6)               // sin banderas
+  cabecera.writeUInt16LE(8, 8)               // método: deflate
+  cabecera.writeUInt32LE(0, 14)              // CRC — el lector no lo comprueba
+  cabecera.writeUInt32LE(datos.length, 18)   // tamaño comprimido
+  cabecera.writeUInt32LE(xml.length, 22)     // tamaño original
+  cabecera.writeUInt16LE(nombre.length, 26)
+  cabecera.writeUInt16LE(0, 28)              // sin campo extra
+
+  return Buffer.concat([cabecera, nombre, datos])
+}
 
 console.log('\n── Lo básico sigue funcionando ──────────────────────────────')
 
@@ -455,6 +508,143 @@ await check('dos archivos con contenido DISTINTO no se deduplican por error', as
   assert.equal(archivos.size, 2, 'dos archivos con contenido distinto debían seguir siendo dos resultados')
 })
 
+
+console.log('\n── Un binario no se abre en el hilo de planta (Plan 22 F2) ───')
+
+await check('un `.pdf` que no empieza por %PDF- se rechaza por la FIRMA, sin llegar a pdfjs', async () => {
+  const dir = await carpetaNueva()
+  // Un ZIP renombrado: la extensión dice PDF, los bytes dicen otra cosa.
+  await writeFile(join(dir, 'disfrazado.pdf'), Buffer.from([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]))
+
+  const indice = createIndiceDocumentos({ carpeta: dir })
+  await indice.recargar()
+
+  const [ilegible] = indice.estado().ilegibles
+  assert.equal(ilegible?.archivo, 'disfrazado.pdf')
+  assert.match(ilegible.motivo, /no es un PDF de verdad/)
+  // El motivo importa: si dijera «no contiene texto extraíble» sería que el
+  // archivo llegó a pdfjs igualmente y la firma no está haciendo nada.
+  assert.doesNotMatch(ilegible.motivo, /escaneo|ToUnicode/)
+})
+
+await check('un `.docx` que no es un ZIP se rechaza igual, por su propia firma', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'falso.docx'), 'esto es texto plano con nombre de Word')
+
+  const indice = createIndiceDocumentos({ carpeta: dir })
+  await indice.recargar()
+
+  assert.match(indice.estado().ilegibles[0]?.motivo ?? '', /no es un DOCX de verdad/)
+})
+
+await check('un PDF de VERDAD sigue pasando la firma y su camino no cambia', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'roto.pdf'), PDF_BASURA)
+
+  const indice = createIndiceDocumentos({ carpeta: dir })
+  await indice.recargar()
+
+  // Empieza por `%PDF-`, así que la firma no lo para: cae donde caía antes,
+  // en el lector, y con el motivo de siempre.
+  assert.match(indice.estado().ilegibles[0]?.motivo ?? '', /escaneo|ToUnicode/)
+})
+
+await check('un `.txt` no necesita firma: la ausencia de regla no es un rechazo', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'nota.txt'), textoLargo('sin firma ninguna', 2))
+
+  const indice = createIndiceDocumentos({ carpeta: dir })
+  const resultados = await indice.buscar('sin firma ninguna')
+
+  assert.ok(resultados.length > 0, 'un .txt normal dejó de indexarse')
+  assert.equal(indice.estado().ilegibles.length, 0)
+})
+
+await check('la extracción que no termina se corta por tiempo, y lo dice', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'eterno.pdf'), PDF_BASURA)
+
+  // `msMaximo: 0` dispara el reloj en el tick siguiente, antes de que el hilo
+  // llegue siquiera a cargar sus módulos. Se prueba el MECANISMO del corte,
+  // no cuánto tarda un PDF concreto — que sería afirmar temporización.
+  const indice = createIndiceDocumentos({ carpeta: dir, topes: { msMaximo: 0 } })
+  await indice.recargar()
+
+  assert.match(indice.estado().ilegibles[0]?.motivo ?? '', /se cortó/)
+})
+
+await check('un documento que pasa del tope entra RECORTADO, no ilegible, y lo declara', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'enorme.docx'), docxDeMentira(textoLargo('procedimiento extenso', 60)))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, topes: { maxCaracteres: 2000 } })
+  await indice.recargar()
+
+  const estado = indice.estado()
+  assert.equal(estado.ilegibles.length, 0, 'un archivo con DEMASIADO texto no es un archivo ilegible')
+  assert.equal(estado.parciales.length, 1)
+  assert.match(estado.parciales[0].motivo, /se cortó al pasar de/)
+
+  // Y lo que entró se busca: recortar no es descartar.
+  assert.ok((await indice.buscar('procedimiento extenso')).length > 0)
+})
+
+await check('el aviso de recorte sobrevive a una recarga que dispara OTRO archivo', async () => {
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'enorme.docx'), docxDeMentira(textoLargo('capitulo largo', 60)))
+  await writeFile(join(dir, 'normal.txt'), 'primera versión')
+
+  const indice = createIndiceDocumentos({ carpeta: dir, topes: { maxCaracteres: 2000 } })
+  await indice.recargar()
+  assert.equal(indice.estado().parciales.length, 1)
+
+  // El recortado no se toca; el otro sí. Como el recortado SÍ se cachea
+  // —tiene fragmentos buenos—, no vuelve a pasar por la extracción: si el
+  // aviso se hubiera anotado allí, aquí ya habría desaparecido.
+  await writeFile(join(dir, 'normal.txt'), 'segunda versión, distinta')
+  await indice.recargar()
+
+  assert.equal(indice.estado().parciales.length, 1, 'el aviso de recorte se perdió al recargar por otro archivo')
+  assert.equal(indice.estado().parciales[0].archivo, 'enorme.docx')
+})
+
+await check('el bucle de eventos sigue contestando mientras se extrae', async () => {
+  const dir = await carpetaNueva()
+  /*
+   * Veinte mil párrafos: unos 15 MB de XML inflado, que inflar y limpiar
+   * cuesta ~200 ms de CPU (medido el 07-09-2026: 226 ms). En el hilo
+   * principal —donde esto corría antes del Plan 22 F2— ese cuarto de segundo
+   * no atendía NADA: ni un temporizador, ni una lectura de planta, ni una
+   * pantalla.
+   *
+   * El archivo pesa 0,18 MB en disco porque el texto es repetitivo y deflate
+   * lo aplasta. Lo que cuesta no es leerlo, es procesarlo — que es justo la
+   * distinción que `MAX_BYTES` por sí solo no podía hacer.
+   */
+  await writeFile(join(dir, 'pesado.docx'), docxDeMentira(textoLargo('parrafo de relleno', 20_000)))
+
+  let latidos = 0
+  const pulso = setInterval(() => { latidos += 1 }, 10)
+
+  const indice = createIndiceDocumentos({ carpeta: dir, topes: { maxCaracteres: 50_000 } })
+  const t0 = Date.now()
+  await indice.recargar()
+  const duracion = Date.now() - t0
+  clearInterval(pulso)
+
+  /*
+   * La afirmación no es «tardó X» —eso sería temporización, y ya costó una
+   * prueba intermitente en el Plan 20— sino «mientras tardaba, este hilo
+   * seguía vivo». Un latido por cada 40 ms es la CUARTA parte de los que
+   * caben: sobra margen para una máquina cargada, y sigue siendo imposible
+   * de alcanzar si el hilo se bloquea, porque entonces son cero.
+   */
+  const esperados = Math.floor(duracion / 40)
+  assert.ok(
+    latidos >= esperados,
+    `el hilo principal se quedó sordo: ${latidos} latidos en ${duracion} ms (se esperaban ${esperados}+)`
+  )
+})
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 embServer.close()
