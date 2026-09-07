@@ -138,6 +138,24 @@ const DEFAULTS = {
   rateLimitWindowMs: 60000,
   rateLimitMax: 300,
   /**
+   * Los dos techos que se salen del tope general (Plan 22 F4 · SEG-07). El
+   * porqué de las familias está en `http/plugins/seguridad.mjs`; aquí, el
+   * porqué de las CIFRAS.
+   *
+   * `lecturas` — 1200 por minuto son 20 por segundo, muy por encima de lo que
+   * sondea un tablero abierto (`cadenciaMs` por sistema, en lotes) y aun así
+   * un techo: detrás de un proxy inverso, esa cuota la comparte toda la
+   * planta, así que tiene que caber más de un wallboard.
+   *
+   * `ia` — 20 por minuto. Cada petición ocupa la GPU y la cola las atiende de
+   * una en una, así que encolar más no las hace ir más rápido: sólo alarga la
+   * espera del siguiente. Un técnico preguntando a mano no llega ni de lejos;
+   * un bucle mal cerrado lo pasa en tres segundos, que es exactamente lo que
+   * se quiere cortar.
+   */
+  rateLimitMaxLecturas: 1200,
+  rateLimitMaxIa: 20,
+  /**
    * Corte de la llamada al modelo de lenguaje.
    *
    * Deliberadamente NO reutiliza `upstreamTimeoutMs`: son dos escalas
@@ -903,6 +921,18 @@ export function loadConfig(env = process.env) {
         'RATE_LIMIT_WINDOW_MS', env.RATE_LIMIT_WINDOW_MS, DEFAULTS.rateLimitWindowMs, 1
       ),
       rateLimitMax: readInteger('RATE_LIMIT_MAX', env.RATE_LIMIT_MAX, DEFAULTS.rateLimitMax, 1),
+      /**
+       * El techo por familia de ruta (Plan 22 F4). `normal` es el de siempre,
+       * para que `RATE_LIMIT_MAX` siga significando lo que significaba y una
+       * instalación que ya lo tenía ajustado no cambie de comportamiento.
+       */
+      rateLimitPorFamilia: Object.freeze({
+        normal: readInteger('RATE_LIMIT_MAX', env.RATE_LIMIT_MAX, DEFAULTS.rateLimitMax, 1),
+        lecturas: readInteger(
+          'RATE_LIMIT_MAX_LECTURAS', env.RATE_LIMIT_MAX_LECTURAS, DEFAULTS.rateLimitMaxLecturas, 1
+        ),
+        ia: readInteger('RATE_LIMIT_MAX_IA', env.RATE_LIMIT_MAX_IA, DEFAULTS.rateLimitMaxIa, 1),
+      }),
       maxHistoryPaginas: readInteger(
         'HISTORY_MAX_PAGINAS', env.HISTORY_MAX_PAGINAS, DEFAULTS.maxHistoryPaginas, 1
       ),

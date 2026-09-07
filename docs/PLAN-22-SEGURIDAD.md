@@ -293,6 +293,36 @@ en `systemRoutes.mjs`.
 de las lecturas, y al revés. Y que las de salud siguen contestando 200 con el
 límite a 2 — eso ya está probado desde el Plan 20 F10 y no puede romperse aquí.
 
+### HECHO (07-09-2026)
+
+Tres familias en `familiaDeRuta` (`http/plugins/seguridad.mjs`), repartidas
+desde el `onRoute` de `app.mjs` —donde ya vivía la decisión de alcance— y no
+ruta por ruta, por lo mismo que la guarda de autenticación es del ámbito: una
+ruta nueva hereda su techo por estar donde está. `RATE_LIMIT_MAX_LECTURAS`
+(1200) y `RATE_LIMIT_MAX_IA` (20) en `backend/README.md`; `RATE_LIMIT_MAX`
+sigue significando lo mismo que antes, para no cambiarle el comportamiento a
+quien ya lo tuviera ajustado.
+
+**La primera versión de la clasificación estaba mal, y lo dijo una prueba
+vieja.** Daba la cuota generosa a todo `/api/iconics/` menos las escrituras;
+`iconics.test.mjs` baja `RATE_LIMIT_MAX` a 3 y espera un 429 en `userinfo`, y
+dejó de llegar. La prueba tenía razón: la cuota generosa se justifica por dos
+cosas A LA VEZ —que la petición sea barata y que algo la repita solo— y de esa
+carpeta sólo `data` e `history` cumplen las dos. `browse`, `points`, `userinfo`
+y `alarms` van al servidor sin caché y las dispara alguien pulsando algo.
+Quedó acotada a las dos que un tablero sondea, con el porqué en la cabecera.
+
+El aviso del proxy sin declarar no puede ser una comprobación de arranque:
+hasta que no llega una petición no se sabe si hay un proxy delante. Se
+comprueba en la primera que trae `X-Forwarded-For` y se avisa **una vez** —
+repetirlo por petición es la forma segura de que nadie lo lea. La condición
+vive en `hayProxySinDeclarar` y el texto en `AVISO_PROXY`, aparte del gancho,
+para poder probar CUÁNDO se avisa y que el aviso dice qué se rompe (la cuota
+compartida por toda la planta, y la IP del proxy en el diario de F3) sin tener
+que capturar líneas de log.
+
+231 → **240** pruebas de backend.
+
 ## F5 · Dejar de apagar el TLS del proceso entero (SEG-06)
 
 **Hoy.** `NODE_TLS_REJECT_UNAUTHORIZED=0` en `.env.local`, porque `bms-server`

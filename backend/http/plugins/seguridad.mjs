@@ -48,11 +48,91 @@
  * Cubre sólo `/api/`. Los estáticos quedan fuera a propósito: abrir el tablero
  * son decenas de peticiones de archivos en un segundo, y contarlas gastaría la
  * cuota del cliente antes de que la primera vista llegue a pedir un dato.
+ *
+ * ── Y POR QUÉ UN CUBO ÚNICO NO VALÍA (Plan 22 F4 · SEG-07) ─────────
+ *
+ * Porque contaba por igual una lectura cacheada de 2 ms y una consulta al
+ * asistente que ocupa la GPU dos minutos. Con un solo techo hay que elegir: o
+ * es bajo —y un wallboard sondeando agota la cuota que necesitaba quien iba a
+ * preguntar— o es alto, y entonces no protege de lo caro. Son dos recursos
+ * distintos y necesitan dos cuentas distintas.
+ *
+ * Tres familias, en `familiaDeRuta`. La escritura sobre planta se queda
+ * deliberadamente en la del medio: es barata para el puente, pero no es una
+ * lectura y aflojarle el techo sería regalar algo que nadie pidió.
  */
 import fp from 'fastify-plugin'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
+
+/**
+ * ¿Hay un proxy inverso delante que el puente no sabe que existe?
+ *
+ * Es el segundo filo de SEG-07, y no se ve en el código: con
+ * `TRUST_PROXY=false`, `request.ip` es la del proxy para TODOS los clientes.
+ * La planta entera cuenta como una sola IP —se queda sin cuota a la vez— y el
+ * diario de accionamientos (F3) anota la IP del proxy en vez de la de quien
+ * pulsó el botón.
+ *
+ * Función aparte del gancho que la usa para poder probar la CONDICIÓN sin
+ * capturar líneas de log: lo que importa aquí es cuándo se avisa, no por qué
+ * canal sale el aviso.
+ */
+export function hayProxySinDeclarar(config, cabeceras = {}) {
+  return !config.trustProxy && Boolean(cabeceras['x-forwarded-for'])
+}
+
+/** El texto del aviso, aparte para que la prueba compruebe que dice qué hacer. */
+export const AVISO_PROXY =
+  'Llegan peticiones con X-Forwarded-For pero TRUST_PROXY=false: hay un proxy inverso ' +
+  'delante y el puente no lo sabe. Todos los clientes cuentan como una sola IP para el ' +
+  'límite de peticiones —la planta entera se queda sin cuota a la vez— y el diario de ' +
+  'accionamientos anota la IP del proxy en vez de la de quien pulsó el botón. ' +
+  'Arranca con TRUST_PROXY=true si ese proxy es de confianza.'
+
+/**
+ * A qué familia de límite pertenece una ruta.
+ *
+ * ── POR QUÉ POR PREFIJO Y NO RUTA POR RUTA ─────────────────────────
+ *
+ * Es la lección del Plan 20 F5, donde la guarda `autenticar` la llevaban trece
+ * de treinta y tres rutas porque cada una tenía que acordarse. Una ruta nueva
+ * bajo `/api/chat/` hereda el techo estricto por estar donde está, no porque
+ * alguien lo recuerde — y olvidar un límite no rompe nada visible, sólo deja
+ * un camino caro sin techo.
+ *
+ *  - `lecturas`: `data` e `history` de `/api/iconics/`. Son las DOS que un
+ *    tablero abierto sondea en bucle, y las dos van por la caché por punto
+ *    (Plan 21 F4): la que llega dentro del TTL cuesta milisegundos y no toca
+ *    la planta.
+ *  - `ia`: `/api/chat` y `/api/voz`. Cada petición ocupa la GPU, y la cola
+ *    (`ia/conversacion/cola.mjs`) las atiende de una en una: mil encoladas no
+ *    van más rápido, sólo hacen esperar más al que llegue detrás.
+ *  - `normal`: todo lo demás, con el techo de siempre.
+ *
+ * ── POR QUÉ NO TODO `/api/iconics/` ES «LECTURAS» ──────────────────
+ *
+ * Porque la cuota generosa se justifica por dos cosas A LA VEZ —que la
+ * petición sea barata y que algo la repita solo— y el resto de esa carpeta no
+ * cumple ninguna de las dos:
+ *
+ *  · `write` y `alarms/acknowledge` MUEVEN la instalación. Que para el puente
+ *    sean baratas no las hace merecedoras de un techo más alto.
+ *  · `browse`, `points`, `userinfo` y `alarms` van al servidor sin caché, y
+ *    ninguna se sondea: las dispara alguien pulsando algo. Con el techo normal
+ *    van sobradas.
+ *
+ * La primera versión de esta función daba la cuota generosa a todo
+ * `/api/iconics/` menos las escrituras, y lo destapó una prueba que ya
+ * existía: `iconics.test.mjs` baja `RATE_LIMIT_MAX` a 3 y espera un 429 en
+ * `userinfo`. Dejó de llegar. La prueba tenía razón.
+ */
+export function familiaDeRuta(url = '') {
+  if (url.startsWith('/api/chat') || url.startsWith('/api/voz')) return 'ia'
+  if (url.startsWith('/api/iconics/data') || url.startsWith('/api/iconics/history')) return 'lecturas'
+  return 'normal'
+}
 
 async function seguridadPlugin(fastify, { config }) {
   /* ── Cabeceras ──────────────────────────────────────────────────── */
@@ -187,6 +267,25 @@ async function seguridadPlugin(fastify, { config }) {
 
   /* ── Límite de peticiones ───────────────────────────────────────── */
 
+  /*
+   * El aviso del proxy sin declarar (ver `hayProxySinDeclarar`). No se puede
+   * comprobar al arrancar —hasta que no llega una petición no se sabe si hay
+   * un proxy delante— así que se comprueba en la primera que trae
+   * `X-Forwarded-For`, y se avisa UNA vez. Repetirlo por petición convertiría
+   * el aviso en ruido de log, que es la forma segura de que nadie lo lea.
+   */
+  let proxyAvisado = false
+  if (!config.trustProxy) {
+    fastify.addHook('onRequest', async request => {
+      if (proxyAvisado || !hayProxySinDeclarar(config, request.headers)) return
+      proxyAvisado = true
+      request.log.warn(
+        { xForwardedFor: request.headers['x-forwarded-for'], ip: request.ip },
+        AVISO_PROXY
+      )
+    })
+  }
+
   await fastify.register(rateLimit, {
     /*
      * Global, y las rutas que deben quedar fuera lo dicen con
@@ -222,11 +321,14 @@ async function seguridadPlugin(fastify, { config }) {
       return error
     },
     onExceeded: request => {
+      const familia = familiaDeRuta(request.url)
       request.log.warn(
-        { ruta: request.url, ip: request.ip, limite: config.limits.rateLimitMax },
-        `Límite de peticiones superado por ${request.ip} en ${request.url}: ` +
-          `más de ${config.limits.rateLimitMax} en ${Math.round(config.limits.rateLimitWindowMs / 1000)} s. ` +
-          'Suele ser una pestaña recargando en bucle o un sondeo mal cerrado en el frontend.'
+        { ruta: request.url, ip: request.ip, familia, limite: config.limits.rateLimitPorFamilia[familia] },
+        `Límite de peticiones (familia «${familia}») superado por ${request.ip} en ${request.url}: ` +
+          `más de ${config.limits.rateLimitPorFamilia[familia]} en ${Math.round(config.limits.rateLimitWindowMs / 1000)} s. ` +
+          (familia === 'ia'
+            ? 'Cada petición de esta familia ocupa la GPU: el techo es estricto a propósito.'
+            : 'Suele ser una pestaña recargando en bucle o un sondeo mal cerrado en el frontend.')
       )
     },
   })

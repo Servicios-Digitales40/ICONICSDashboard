@@ -47,7 +47,7 @@ import { createFakeIconicsClient } from './iconics/fakeClient.mjs'
 import autenticacionPlugin from './http/plugins/autenticacion.mjs'
 import cuerpoCrudoPlugin from './http/plugins/cuerpoCrudo.mjs'
 import erroresPlugin from './http/plugins/errores.mjs'
-import seguridadPlugin from './http/plugins/seguridad.mjs'
+import seguridadPlugin, { familiaDeRuta } from './http/plugins/seguridad.mjs'
 import { crearDiario } from './lib/diario.mjs'
 import { logger } from './logger.mjs'
 import { registerCasosRoutes } from './routes/casosRoutes.mjs'
@@ -279,10 +279,35 @@ export async function createApp(config) {
    * Los estáticos quedan fuera a propósito: abrir el tablero son decenas de
    * peticiones de archivos en un segundo, y contarlas gastaría la cuota del
    * cliente antes de que la primera vista llegue a pedir un dato.
+   *
+   * Desde el Plan 22 F4 el mismo gancho reparte además el techo POR FAMILIA
+   * —lecturas, IA, el resto— en vez de dejar que un cubo único cuente igual
+   * una lectura cacheada y una consulta que ocupa la GPU. Se hace aquí y no
+   * ruta por ruta por lo mismo que la guarda de autenticación es del ámbito
+   * (§2.11): una ruta nueva hereda su techo por estar donde está, no porque
+   * alguien se acuerde. Ver `familiaDeRuta` en `plugins/seguridad.mjs`.
    */
   fastify.addHook('onRoute', opciones => {
-    if (opciones.url?.startsWith('/api/')) return
-    opciones.config = { ...opciones.config, rateLimit: false }
+    if (!opciones.url?.startsWith('/api/')) {
+      opciones.config = { ...opciones.config, rateLimit: false }
+      return
+    }
+
+    /*
+     * Una ruta que ya se declaró fuera del límite —las sondas de salud— se
+     * respeta: `false` no es una familia, es una exención con su motivo
+     * escrito en `systemRoutes.mjs`, y pisarla aquí la metería de vuelta.
+     */
+    if (opciones.config?.rateLimit === false) return
+
+    const familia = familiaDeRuta(opciones.url)
+    opciones.config = {
+      ...opciones.config,
+      rateLimit: {
+        max: config.limits.rateLimitPorFamilia[familia],
+        timeWindow: config.limits.rateLimitWindowMs,
+      },
+    }
   })
 
   /*

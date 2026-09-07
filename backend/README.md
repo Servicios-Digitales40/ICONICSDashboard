@@ -61,8 +61,10 @@ plantilla comentada de todas las variables está en
 | `CORS_ORIGINS` | *(vacío)* | Orígenes autorizados, separados por comas, con esquema y puerto. Vacío = ninguno, y normalmente no hace falta: en desarrollo el dev server reenvía `/api` aquí, así que para el navegador es el mismo origen. **No existe el comodín `*`**: la comparación es por igualdad exacta, y ponerlo autoriza a un origen llamado literalmente «\*». |
 | `FRAME_ANCESTORS` | *(vacío)* | Orígenes autorizados a embeber el tablero en un `<iframe>` (`frame-ancestors` de la CSP), separados por comas, con esquema y puerto. Vacío = ninguno (`'none'`, y `X-Frame-Options: DENY` de refuerzo): el tablero mantiene sesión privilegiada contra ICONICS, así que permitir framing abierto expondría al operador a clickjacking sobre la planta real. **No existe el comodín `*`**, mismo motivo que `CORS_ORIGINS`. |
 | `TRUST_PROXY` | `false` | Leer la IP del cliente de `X-Forwarded-For`. Sólo con proxy inverso delante. |
-| `RATE_LIMIT_MAX` | `300` | Peticiones a `/api/` por ventana y cliente. |
-| `RATE_LIMIT_WINDOW_MS` | `60000` | La ventana. |
+| `RATE_LIMIT_MAX` | `300` | Peticiones a `/api/` por ventana y cliente, para la familia **normal**: todo lo que no sea lectura sondeada ni asistente. Incluye las escrituras sobre planta. |
+| `RATE_LIMIT_MAX_LECTURAS` | `1200` | Familia **lecturas**: `/api/iconics/data*` e `/api/iconics/history*`, que son las que sondea un tablero abierto y van por la caché por punto. |
+| `RATE_LIMIT_MAX_IA` | `20` | Familia **ia**: `/api/chat*` y `/api/voz`. Cada petición ocupa la GPU y la cola las atiende de una en una, así que encolar más no acelera nada. |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | La ventana, común a las tres familias. |
 | `UPSTREAM_TIMEOUT_MS` | `15000` | Corte de cualquier llamada hacia ICONICS. |
 | `BATCH_CACHE_TTL_MS` | `2000` | Vida de la caché de lecturas en lote. `0` la desactiva. |
 

@@ -7,6 +7,7 @@
  */
 import { afterAll, describe, expect, it } from 'vitest'
 import { json, montarApp } from '../ayudas.mjs'
+import { AVISO_PROXY, familiaDeRuta, hayProxySinDeclarar } from '../../http/plugins/seguridad.mjs'
 
 const { app } = await montarApp()
 afterAll(() => app.close())
@@ -194,5 +195,116 @@ describe('autenticación (todavía apagada)', () => {
      * pide autenticación, ve el servidor levantar, y cree que está protegido.
      */
     await expect(montarApp({ AUTH_HABILITADA: 'true' })).rejects.toThrow(/no está implementada/)
+  })
+})
+
+describe('límite de peticiones por familia (Plan 22 F4 · SEG-07)', () => {
+  it('clasifica cada ruta por lo que cuesta, no por dónde vive', () => {
+    /*
+     * Sólo `data` e `history` son «lecturas»: son las dos que un tablero
+     * abierto sondea en bucle y las dos van por caché. `userinfo`, `browse` y
+     * `alarms` van al servidor sin caché y las dispara alguien pulsando algo;
+     * `write` y `acknowledge` mueven la instalación. Ninguna de esas cinco
+     * merece la cuota generosa, aunque compartan carpeta con las que sí.
+     */
+    expect(familiaDeRuta('/api/iconics/data/batch')).toBe('lecturas')
+    expect(familiaDeRuta('/api/iconics/history')).toBe('lecturas')
+    expect(familiaDeRuta('/api/iconics/write')).toBe('normal')
+    expect(familiaDeRuta('/api/iconics/userinfo')).toBe('normal')
+    expect(familiaDeRuta('/api/iconics/browse')).toBe('normal')
+    expect(familiaDeRuta('/api/iconics/alarms')).toBe('normal')
+    expect(familiaDeRuta('/api/iconics/write/batch')).toBe('normal')
+    expect(familiaDeRuta('/api/iconics/alarms/acknowledge')).toBe('normal')
+    expect(familiaDeRuta('/api/chat')).toBe('ia')
+    expect(familiaDeRuta('/api/chat/exportar')).toBe('ia')
+    expect(familiaDeRuta('/api/voz')).toBe('ia')
+    expect(familiaDeRuta('/api/control/bomba')).toBe('normal')
+    expect(familiaDeRuta('/api/casos')).toBe('normal')
+  })
+
+  it('agotar la cuota del asistente no toca la de las lecturas', async () => {
+    /*
+     * Es la afirmación de la fase. Con un cubo único, un bucle contra el chat
+     * dejaba sin datos a la pantalla de planta del mismo operador — y al
+     * revés, un wallboard sondeando le gastaba la cuota a quien iba a
+     * preguntar.
+     */
+    const { app: limitada } = await montarApp({ RATE_LIMIT_MAX_IA: '2', RATE_LIMIT_MAX_LECTURAS: '50' })
+
+    for (let i = 0; i < 4; i++) {
+      await limitada.inject({ method: 'POST', url: '/api/chat', payload: { mensaje: 'hola' } })
+    }
+    const chatAgotado = await limitada.inject({ method: 'POST', url: '/api/chat', payload: { mensaje: 'hola' } })
+    expect(chatAgotado.statusCode).toBe(429)
+
+    const lectura = await limitada.inject({
+      method: 'GET',
+      url: '/api/iconics/data/batch?points=ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE',
+    })
+    expect(lectura.statusCode).not.toBe(429)
+
+    await limitada.close()
+  })
+
+  it('agotar la de las lecturas no toca la del asistente', async () => {
+    const { app: limitada } = await montarApp({ RATE_LIMIT_MAX_LECTURAS: '2', RATE_LIMIT_MAX_IA: '50' })
+
+    const url = '/api/iconics/data/batch?points=ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE'
+    for (let i = 0; i < 4; i++) await limitada.inject({ method: 'GET', url })
+    expect((await limitada.inject({ method: 'GET', url })).statusCode).toBe(429)
+
+    const chat = await limitada.inject({ method: 'POST', url: '/api/chat', payload: { mensaje: 'hola' } })
+    expect(chat.statusCode).not.toBe(429)
+
+    await limitada.close()
+  })
+
+  it('las sondas de salud siguen fuera aunque el techo esté a 2', async () => {
+    // Ya lo probaba `salud.test.mjs` con `RATE_LIMIT_MAX`; aquí se comprueba
+    // que el reparto por familia del Plan 22 F4 no las ha vuelto a meter
+    // dentro — la exención es `rateLimit: false`, que no es una familia.
+    const { app: limitada } = await montarApp({
+      RATE_LIMIT_MAX: '2', RATE_LIMIT_MAX_LECTURAS: '2', RATE_LIMIT_MAX_IA: '2',
+    })
+
+    for (let i = 0; i < 6; i++) {
+      expect((await limitada.inject({ method: 'GET', url: '/api/health/live' })).statusCode).toBe(200)
+    }
+
+    await limitada.close()
+  })
+})
+
+describe('el proxy inverso sin declarar (Plan 22 F4)', () => {
+  it('con TRUST_PROXY=false y X-Forwarded-For, avisa', () => {
+    expect(hayProxySinDeclarar({ trustProxy: false }, { 'x-forwarded-for': '10.0.0.7' })).toBe(true)
+  })
+
+  it('sin la cabecera no avisa: no hay proxy que declarar', () => {
+    expect(hayProxySinDeclarar({ trustProxy: false }, {})).toBe(false)
+  })
+
+  it('con TRUST_PROXY=true no avisa: el proxy ya está declarado', () => {
+    expect(hayProxySinDeclarar({ trustProxy: true }, { 'x-forwarded-for': '10.0.0.7' })).toBe(false)
+  })
+
+  it('el aviso dice qué está mal, qué se rompe y qué hacer', () => {
+    // Un aviso que sólo dice «revisa TRUST_PROXY» obliga a ir al código a
+    // averiguar qué se estropea si no se revisa (CLAUDE.md §4.6).
+    expect(AVISO_PROXY).toMatch(/una sola IP/)
+    expect(AVISO_PROXY).toMatch(/diario de accionamientos/)
+    expect(AVISO_PROXY).toMatch(/TRUST_PROXY=true/)
+  })
+
+  it('una petición con la cabecera sigue atendiéndose: el aviso no es un rechazo', async () => {
+    const { app: conProxy } = await montarApp({ TRUST_PROXY: 'false' })
+    const respuesta = await conProxy.inject({
+      method: 'GET',
+      url: '/api/health/live',
+      headers: { 'x-forwarded-for': '10.0.0.7' },
+    })
+
+    expect(respuesta.statusCode).toBe(200)
+    await conProxy.close()
   })
 })
