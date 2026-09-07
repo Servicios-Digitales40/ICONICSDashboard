@@ -292,6 +292,21 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
         ok: true,
         accion: encender ? 'encendida' : 'apagada',
         tag: TAG_CONTROL_BOMBA,
+        /*
+         * La confirmación viaja también en el éxito (Plan 22 F3). Aquí arriba
+         * ya se ha comprobado que coincide —si no, esto sería un `fallo`— así
+         * que para el modelo no añade nada. Para el DIARIO sí: «pedí true,
+         * releí true, coincide, en 2 intentos» es lo que distingue una orden
+         * que la instalación aceptó a la primera de una que costó reintentos,
+         * y eso es un síntoma que se lee meses después. Se produce desde el
+         * Plan 21 F5 y hasta hoy se tiraba.
+         */
+        confirmacion: {
+          pedido: encender,
+          leido: valorLeido,
+          coincide: true,
+          intentos: r.intentos ?? null,
+        },
       }
     },
   }

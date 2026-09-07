@@ -10,6 +10,9 @@
 import { isAbsolute, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { leerTurnos } from '../shared/periodo.js'
+// Las cifras del diario viven donde se aplican (`lib/diario.mjs`), con su
+// razonamiento; aquí sólo se declaran ajustables por entorno.
+import { DIAS_RETENCION, MAX_BYTES_DIARIO, RUTA_DIARIO } from './lib/diario.mjs'
 
 const BACKEND_DIR = fileURLToPath(new URL('.', import.meta.url))
 const PROJECT_ROOT = normalize(join(BACKEND_DIR, '..'))
@@ -503,6 +506,19 @@ function readReportesDir(rawValue) {
 }
 
 /**
+ * Ruta del diario de accionamientos. Mismo criterio que `readReportesDir`:
+ * vacío no es «desactivado» —un accionamiento sobre la planta se anota
+ * siempre— sino el valor por defecto, y una ruta relativa se resuelve contra
+ * la raíz del proyecto para que `.env.local` no lleve rutas de esta máquina.
+ */
+function readDiarioRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || RUTA_DIARIO
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
+/**
  * Carpeta de salida de los PDF de exportación de chat. Mismo criterio que
  * `readReportesDir` —vacío no es «desactivado», sólo cae al valor por
  * defecto— y a propósito NO reutiliza esa función: son dos configuraciones
@@ -796,6 +812,27 @@ export function loadConfig(env = process.env) {
     reportes: Object.freeze({
       dir: readReportesDir(env.IA_REPORTES_DIR),
       maxDias: readInteger('IA_REPORTES_MAX_DIAS', env.IA_REPORTES_MAX_DIAS, DEFAULTS.reportesMaxDias, 1),
+    }),
+
+    /**
+     * Diario de accionamientos sobre planta (Plan 22 F3 · SEG-08).
+     *
+     * `ruta` es el JSONL donde se anota cada orden a la bomba, cumplida o
+     * rechazada. Configurable porque en planta `datos/` puede estar en un
+     * volumen distinto del código, y porque los verificadores lo apuntan a un
+     * temporal para no escribir en el diario de verdad al probarlo.
+     *
+     * `maxBytes` y `dias` son el tope y la retención; el porqué de cada cifra
+     * está en `lib/diario.mjs`, que es donde se aplican. Aquí sólo se dice que
+     * son ajustables: una instalación que accione mucho más que la nuestra
+     * tiene derecho a otro tope sin tocar código.
+     */
+    diario: Object.freeze({
+      ruta: readDiarioRuta(env.DIARIO_ACCIONAMIENTOS),
+      maxBytes: readInteger(
+        'DIARIO_MAX_BYTES', env.DIARIO_MAX_BYTES, MAX_BYTES_DIARIO, 1024
+      ),
+      dias: readInteger('DIARIO_DIAS', env.DIARIO_DIAS, DIAS_RETENCION, 1),
     }),
 
     /**

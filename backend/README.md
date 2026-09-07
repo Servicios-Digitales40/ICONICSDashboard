@@ -66,6 +66,20 @@ plantilla comentada de todas las variables está en
 | `UPSTREAM_TIMEOUT_MS` | `15000` | Corte de cualquier llamada hacia ICONICS. |
 | `BATCH_CACHE_TTL_MS` | `2000` | Vida de la caché de lecturas en lote. `0` la desactiva. |
 
+**Diario de accionamientos** (Plan 22 F3 · SEG-08)
+
+Cada orden a la bomba —cumplida o rechazada— se anota en un JSONL que
+sobrevive al reinicio del proceso. No sustituye al log de pino: el log sirve
+para diagnosticar el servicio y rota; el diario contesta, meses después, por
+qué arrancó la bomba a las tres de la mañana. El porqué de cada cifra está en
+`backend/lib/diario.mjs`.
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `DIARIO_ACCIONAMIENTOS` | `datos/diario-accionamientos.jsonl` | Dónde se anota. Relativa a la raíz del proyecto o absoluta — en planta `datos/` puede estar en otro volumen. |
+| `DIARIO_MAX_BYTES` | `8388608` (8 MB) | Tope de tamaño. Al pasarlo se podan las entradas más viejas **y queda una línea diciendo cuántas y hasta cuándo llegaban**. |
+| `DIARIO_DIAS` | `730` (2 años) | Retención. La poda descarta primero por antigüedad y sólo después por tamaño. |
+
 **Asistente** (Plan 6)
 
 | Variable | Por defecto | Para qué |

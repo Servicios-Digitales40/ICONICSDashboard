@@ -783,6 +783,10 @@ export function createIconicsClient(config, authenticator) {
       result: result.results[0],
       confirmacion: result.confirmacion?.[0] ?? null,
       confirmada: result.confirmada,
+      // Cuántas relecturas costó (Plan 22 F3). `sendWrite` ya lo cuenta y este
+      // envoltorio lo perdía; el diario de accionamientos lo anota, porque una
+      // orden que necesita tres intentos hoy es la que fallará mañana.
+      intentos: result.intentos ?? null,
     }
   }
 

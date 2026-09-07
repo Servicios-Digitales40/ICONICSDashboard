@@ -36,7 +36,7 @@ import { createServer } from 'node:http'
 import assert from 'node:assert/strict'
 import { connect } from 'node:net'
 import { existsSync } from 'node:fs'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createApp } from '../backend/app.mjs'
@@ -1011,7 +1011,23 @@ console.log('\n── Control de la bomba (Controles) ────────�
   nivelTanque = 42
   controlValor = false
   controlIgnoraEscritura = false
-  const { base: controlBase, server: controlServer } = await mount({ ICONICS_READ_ONLY: 'false', BATCH_CACHE_TTL_MS: '0' })
+
+  // El diario (Plan 22 F3) va a un temporal: escribir en el de verdad al
+  // probarlo mezclaría accionamientos de mentira con los de la instalación,
+  // que es justo lo que un diario no puede permitirse.
+  const diarioDir = await mkdtemp(join(tmpdir(), 'iconics-diario-'))
+  const rutaDiario = join(diarioDir, 'diario.jsonl')
+  const leerDiario = async () =>
+    (await readFile(rutaDiario, 'utf8').catch(() => ''))
+      .split('\n')
+      .filter(Boolean)
+      .map(l => { try { return JSON.parse(l) } catch { return { tipo: 'ilegible' } } })
+
+  const { base: controlBase, server: controlServer } = await mount({
+    ICONICS_READ_ONLY: 'false',
+    BATCH_CACHE_TTL_MS: '0',
+    DIARIO_ACCIONAMIENTOS: rutaDiario,
+  })
 
   const sinEncender = await call(controlBase, '/api/control/bomba', postJson({}))
   check('sin "encender" → 400', () => {
@@ -1049,15 +1065,81 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.match(sinEfecto.body.error, /no ha tenido efecto real/)
   })
   controlIgnoraEscritura = false
+
+  /* ── El diario de accionamientos (Plan 22 F3 · SEG-08) ───────────── */
+
+  const anotado = await leerDiario()
+
+  check('cada accionamiento que llegó a la herramienta dejó su línea', () => {
+    // Cinco peticiones han llegado a `controlar_bomba`: encender, apagar,
+    // nivel alto, sin efecto... y NO la del cuerpo vacío, que Fastify rechaza
+    // en la validación del esquema antes de que la ruta corra. Que ésa no
+    // aparezca es correcto: no fue un accionamiento, fue una petición mal
+    // formada.
+    assert.equal(anotado.length, 4, `el diario tiene ${anotado.length} líneas: ${JSON.stringify(anotado)}`)
+    assert.ok(anotado.every(e => typeof e.instante === 'string'))
+  })
+
+  check('la orden cumplida anota el valor releído y si coincide, no sólo que se pidió', () => {
+    const cumplida = anotado.find(e => e.resultado === 'cumplida' && e.accion === 'encender')
+    assert.ok(cumplida, 'no hay línea de la orden cumplida')
+    assert.equal(cumplida.valorPedido, true)
+    assert.equal(cumplida.valorLeido, true)
+    assert.equal(cumplida.coinciden, true)
+    assert.match(cumplida.tag, /SENSORES\/CONTROL$/)
+    // La confirmación viene del Plan 21 F5; el diario sólo la persiste.
+    assert.ok(Number.isInteger(cumplida.intentos), 'no se anotó cuántas relecturas costó')
+  })
+
+  check('el RECHAZO por la guarda de nivel deja constancia, con su motivo', () => {
+    const rechazo = anotado.find(e => e.resultado === 'rechazada' && /tanque está al/.test(e.motivo ?? ''))
+    assert.ok(rechazo, 'la orden rechazada por nivel alto no dejó línea')
+    assert.equal(rechazo.accion, 'encender')
+    // Sin `valorLeido`: no hubo escritura que releer, y ponerle uno sería
+    // inventar que la hubo.
+    assert.equal(rechazo.valorLeido, undefined)
+  })
+
+  check('cada línea dice quién la pidió', () => {
+    assert.ok(anotado.every(e => typeof e.ip === 'string' && e.ip.length > 0))
+    // `usuario` es null mientras AUTH_HABILITADA sea false (F6). Que exista el
+    // campo, aunque sea nulo, es lo que hace que el día que haya sesión no
+    // haya que distinguir «no había usuario» de «esta línea es vieja».
+    assert.ok(anotado.every(e => 'usuario' in e))
+  })
+
   controlServer.close()
 
-  const { base: soloLectura, server: soloLecturaServer } = await mount({ ICONICS_READ_ONLY: 'true' })
+  const { base: soloLectura, server: soloLecturaServer } = await mount({
+    ICONICS_READ_ONLY: 'true',
+    DIARIO_ACCIONAMIENTOS: rutaDiario,
+  })
   const bloqueado = await call(soloLectura, '/api/control/bomba', postJson({ encender: true }))
   check('ICONICS_READ_ONLY=true → 403, menciona la causa', () => {
     assert.equal(bloqueado.status, 403)
     assert.match(bloqueado.body.error, /ICONICS_READ_ONLY/)
   })
+
+  // `check` es síncrono a propósito (ver su definición): lo que hay que leer
+  // del disco se lee ANTES, o una promesa rechazada dentro pasaría por buena.
+  const conBloqueo = await leerDiario()
+  check('el intento bloqueado por solo lectura también se anota', () => {
+    const ultima = conBloqueo.at(-1)
+    assert.equal(ultima.resultado, 'rechazada')
+    assert.match(ultima.motivo, /ICONICS_READ_ONLY/)
+  })
   soloLecturaServer.close()
+
+  // El caso del apagón entre el `appendFile` y el final de la línea. Es la
+  // propiedad por la que el diario es JSONL y no un array JSON: con un array,
+  // el archivo entero dejaría de parsearse.
+  await appendFile(rutaDiario, '{"instante":"2026-09-07T00:00:00.000Z","resu')
+  const trasElCorte = await leerDiario()
+  check('una línea a medias no se lleva por delante las anteriores', () => {
+    assert.ok(trasElCorte.length >= 5, 'se perdieron entradas por una línea cortada')
+    assert.equal(trasElCorte.at(-1).tipo, 'ilegible')
+    assert.equal(trasElCorte[0].resultado, 'cumplida', 'la primera entrada dejó de leerse')
+  })
 }
 
 console.log('\n── Configuración inválida ──────────────────────────────────')

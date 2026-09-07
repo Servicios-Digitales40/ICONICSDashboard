@@ -233,6 +233,40 @@ escritura rechazada por la guarda de nivel deja constancia del RECHAZO —que es
 tan interesante como la orden cumplida— y que el archivo sobrevive a un corte a
 mitad de escritura.
 
+### HECHO (07-09-2026)
+
+`backend/lib/diario.mjs`, JSONL en `datos/diario-accionamientos.jsonl`, con
+`DIARIO_ACCIONAMIENTOS`, `DIARIO_MAX_BYTES` y `DIARIO_DIAS` documentadas en
+`backend/README.md`. 73 → **79** comprobaciones en `verificar-backend.mjs`, y
+`backend/test/diario.test.mjs` con 11 más para la poda, que desde la ruta no se
+puede provocar sin treinta mil accionamientos.
+
+**JSONL y no un array JSON**, que es la decisión de forma: un array hay que
+reescribirlo entero para añadirle un elemento, así que cada orden a la bomba
+pagaría el coste del diario completo y un corte a mitad se llevaría todo lo
+anterior. Con una línea por entrada, un archivo con la última a medias sigue
+siendo legible hasta la penúltima — y eso es exactamente lo que comprueba la
+prueba del corte. `escribirAtomico` (Plan 20 F3) sí entra, pero sólo en la
+poda, que es la única operación que reescribe el archivo entero.
+
+**La poda se anota.** Cuando el tope muerde, en el sitio de lo que se fue queda
+una línea diciendo cuántas entradas eran y hasta cuándo llegaban. Un diario que
+adelgaza en silencio es peor que no tenerlo: quien lo lee cree tener el registro
+completo de un periodo del que le faltan las primeras horas.
+
+**Lo que faltaba del Plan 21 F5, y el plan daba por hecho que estaba.**
+`valorLeido` y `coinciden` sí se producían, pero no llegaban hasta aquí: el
+éxito de `controlar_bomba` devolvía sólo `{ok, accion, tag}` —la confirmación se
+comprobaba y se tiraba— y `writePoint` perdía `intentos`, que `sendWrite` ya
+contaba. Dos líneas en cada sitio. Cuántas relecturas costó una orden es un
+síntoma que se lee meses después: la que hoy necesita tres intentos es la que
+mañana falla.
+
+Y una nota sobre el recuento: son cuatro líneas para cinco peticiones. La del
+cuerpo vacío no aparece porque Fastify la rechaza en la validación del esquema
+antes de que la ruta corra — no fue un accionamiento, fue una petición mal
+formada, y anotarla habría sido ensuciar el diario con ruido de protocolo.
+
 ## F4 · Límites por familia, no un cubo único (SEG-07)
 
 **Hoy.** `rateLimitMax` global por IP cubre por igual una lectura cacheada de

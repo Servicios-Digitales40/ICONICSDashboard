@@ -48,6 +48,7 @@ import autenticacionPlugin from './http/plugins/autenticacion.mjs'
 import cuerpoCrudoPlugin from './http/plugins/cuerpoCrudo.mjs'
 import erroresPlugin from './http/plugins/errores.mjs'
 import seguridadPlugin from './http/plugins/seguridad.mjs'
+import { crearDiario } from './lib/diario.mjs'
 import { logger } from './logger.mjs'
 import { registerCasosRoutes } from './routes/casosRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
@@ -252,6 +253,18 @@ export async function createApp(config) {
   // una página HTML es una transcripción.
   const voz = createVoz({ config })
 
+  /*
+   * El diario de accionamientos (Plan 22 F3). Se construye SIEMPRE, también
+   * en solo lectura: un intento rechazado por `ICONICS_READ_ONLY` es
+   * exactamente una de las líneas que interesa tener — alguien pulsó el botón
+   * y el puente dijo que no.
+   */
+  const diario = crearDiario({
+    ruta: config.diario.ruta,
+    maxBytes: config.diario.maxBytes,
+    diasRetencion: config.diario.dias,
+  })
+
   /* ── Plugins ───────────────────────────────────────────────────── */
 
   /*
@@ -444,7 +457,7 @@ export async function createApp(config) {
 
     registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, indiceDocumentos })
     registerIconicsRoutes(instancia, { config, client })
-    registerControlRoutes(instancia, { config, herramientas })
+    registerControlRoutes(instancia, { config, herramientas, diario })
     registerChatRoutes(instancia, { config, chat, cola })
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
