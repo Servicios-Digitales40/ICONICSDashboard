@@ -1,0 +1,126 @@
+{
+  "sections": {
+    "sec-llenado": "Filling Station",
+    "sec-vibraciones": "Vibration Station",
+    "sec-general": "General",
+    "sec-prediccion": "Prediction",
+    "sec-rag": "RAG"
+  },
+  "routes": {
+    "eva-inicio": {
+      "title": "Overview",
+      "nav": "Overview",
+      "sub": "Industrial water system · live data from ac:TDCON/DEMO/SENSORES/"
+    },
+    "eva-planta": {
+      "title": "Trends",
+      "nav": "Trends",
+      "sub": "Industrial water system · the eight signals of ac:TDCON/DEMO/SENSORES/"
+    },
+    "eva-riesgos": {
+      "title": "Risks",
+      "nav": "Risks",
+      "sub": "What may happen given the current plant condition · limits estimated in-house"
+    },
+    "eva-controles": {
+      "title": "Controls",
+      "nav": "Controls",
+      "sub": "Direct start and stop of the plant pump"
+    },
+    "eva-maqueta": {
+      "title": "3D View",
+      "nav": "3D View",
+      "sub": "The plant in miniature · tank level is the live value"
+    },
+    "vib-inicio": {
+      "title": "Overview · Vibration",
+      "nav": "Overview",
+      "sub": "Vibration system · what the machine reports right now"
+    },
+    "eva-vibraciones": {
+      "title": "Trends · Vibration",
+      "nav": "Trends",
+      "sub": "Mechanical condition of the vibration system · snapshot only, no history"
+    },
+    "vib-controles": {
+      "title": "Controls · Vibration",
+      "nav": "Controls",
+      "sub": "Start and stop of the vibration system · not built yet"
+    },
+    "eva-riesgos-vibracion": {
+      "title": "Risks · Vibration",
+      "nav": "Risks",
+      "sub": "What the mechanical condition implies · evidence kept apart from the hypothesis"
+    },
+    "vib-3d": {
+      "title": "3D View · Vibration",
+      "nav": "3D View",
+      "sub": "Rotor test rig · where each probe measures, and in which direction"
+    },
+    "eva-alarmas": {
+      "title": "Alarms",
+      "nav": "Alarms",
+      "sub": "Plant event history"
+    },
+    "eva-assets": {
+      "title": "Assets",
+      "nav": "Assets",
+      "sub": "The eight demo points, with their raw value and quality"
+    },
+    "salud-sistema": {
+      "title": "System Health",
+      "nav": "Health",
+      "sub": "Which services this dashboard needs, and which are up"
+    },
+    "pred-inicio": {
+      "title": "Compressor",
+      "nav": "Overview",
+      "sub": "Module status · which machine it is and where its data comes from"
+    },
+    "pred-eventos": {
+      "title": "Events (Beta)",
+      "nav": "Events (Beta)",
+      "sub": "Historical replay of an event · predictive backend V4.4"
+    },
+    "pred-variables": {
+      "title": "Compressor Variables",
+      "nav": "Variables",
+      "sub": "What this machine measures · pending the historian inventory"
+    },
+    "pred-historico": {
+      "title": "Compressor History",
+      "nav": "History",
+      "sub": "Trend of a variable between two dates · pending endpoint"
+    },
+    "pred-correlacion": {
+      "title": "Variable Correlation",
+      "nav": "Correlation",
+      "sub": "Whether two variables moved together · pending endpoint"
+    },
+    "pred-pronostico": {
+      "title": "Forecast",
+      "nav": "Forecast",
+      "sub": "How a variable will behave · pending the model's validated error"
+    },
+    "rag-casos": {
+      "title": "Past Cases",
+      "nav": "Past Cases",
+      "sub": "The intervention log behind the diagnoses, and how much of it still counts"
+    },
+    "rag-documentacion": {
+      "title": "Documentation",
+      "nav": "Documentation",
+      "sub": "The manuals feeding the assistant's index, and what it can extract from each"
+    },
+    "eva-detalle": {
+      "title": "Asset Detail",
+      "nav": "Detail",
+      "sub": "Every variable, with its value and full history"
+    },
+    "cierre-diagnostico": {
+      "title": "Close Diagnosis",
+      "nav": "Diagnosis Closeout",
+      "sub": "Confirm or correct the cause of a risk already acted on"
+    }
+  }
+}

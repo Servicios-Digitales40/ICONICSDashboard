@@ -1,0 +1,30 @@
+{
+  "titles": {
+    "bridgeDown": "El puente no contesta",
+    "pumpCommandFailed": "No se pudo accionar la bomba",
+    "tableLoadFailed": "No se pudo cargar la tabla",
+    "caseCloseFailed": "No se pudo cerrar el caso",
+    "catalogQueryFailed": "No se pudo consultar el catálogo",
+    "alarmHistoryFailed": "No se pudo leer el historial de alarmas",
+    "moduleReadFailed": "No se pudo leer el módulo",
+    "waterSystemReadFailed": "No se pudo leer el sistema de agua",
+    "logbookReadFailed": "No se pudo leer la bitácora",
+    "plantReadFailed": "No se pudo leer la instalación",
+    "uploadFailed": "No se pudo subir"
+  },
+  "codes": {
+    "ERROR_CONNECTION_FAILED": "No fue posible conectarse al servidor.",
+    "ERROR_TIMEOUT": "El servidor no respondió a tiempo.",
+    "ERROR_UNAUTHORIZED": "No tienes permiso para hacer esto.",
+    "ERROR_FORBIDDEN": "Esta acción requiere un rol que tu usuario no tiene.",
+    "ERROR_NOT_FOUND": "No se encontró lo que se pidió.",
+    "ERROR_RATE_LIMITED": "Demasiadas peticiones. Inténtalo de nuevo en unos segundos.",
+    "ERROR_SERVER": "El servidor falló al atender la petición.",
+    "ERROR_READ_ONLY": "El puente está en modo solo lectura y no puede escribir en la instalación.",
+    "ERROR_UNKNOWN": "Ocurrió un fallo que no supimos clasificar."
+  },
+  "hints": {
+    "bridgeDown": "{{detalle}}. Si esta pantalla no carga, el problema no es de una vista: es el propio puente el que no está en pie.",
+    "technicalDetail": "Detalle técnico: {{detalle}}"
+  }
+}

@@ -60,7 +60,23 @@ const PAQUETES_3D = [
   "webgl-constants", "webgl-sdf-generator", "glsl-noise", "draco3d",
   "detect-gpu", "stats-gl", "stats.js", "hls.js", "fflate",
   "zustand", "react-reconciler", "react-use-measure", "react-composer",
-  "its-fine", "suspend-react", "tunnel-rat", "use-sync-external-store",
+  "its-fine", "suspend-react", "tunnel-rat",
+  /*
+   * `use-sync-external-store` ESTUVO aquí y se retiró el 08-09-2026, al
+   * instalar i18n. No es de la pila 3D: es un shim genérico de React que
+   * llegó por zustand, y ponerlo aquí sólo era cierto mientras zustand fuera
+   * su único consumidor.
+   *
+   * En cuanto `react-i18next` —que también lo usa— entró en `vendor`, quedó
+   * un ciclo `vendor → three → vendor`, y Rollup respondió precargando el
+   * trozo `three` ENTERO en el arranque: 827 KB de pila 3D en la primera
+   * pantalla de planta, sin que nadie hubiera importado una vista 3D.
+   *
+   * Lo destapó `scripts/verificar-bundle.mjs`, que existe exactamente para
+   * eso. La lección para el siguiente que edite esta lista: un paquete
+   * genérico que hoy sólo usa la pila 3D no ES de la pila 3D, y meterlo aquí
+   * convierte cualquier dependencia futura suya en una fuga del arranque.
+   */
   "utility-types", "is-promise", "promise-worker-transferable", "lie",
   "immediate", "buffer", "base64-js", "ieee754",
 ];

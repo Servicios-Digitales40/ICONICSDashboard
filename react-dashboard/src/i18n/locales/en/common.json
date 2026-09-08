@@ -1,0 +1,45 @@
+{
+  "actions": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "accept": "OK",
+    "confirm": "Confirm",
+    "search": "Search",
+    "filter": "Filter",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "export": "Export",
+    "exportAll": "Export All",
+    "download": "Download",
+    "open": "Open",
+    "back": "Back",
+    "send": "Send",
+    "copy": "Copy",
+    "select": "Select"
+  },
+  "state": {
+    "loading": "Loading…",
+    "empty": "No data",
+    "noResults": "No results",
+    "unknown": "Unknown",
+    "notAvailable": "Not available",
+    "provisional": "provisional",
+    "derived": "derived"
+  },
+  "units": {
+    "percentSuffix": "%"
+  },
+  "language": {
+    "label": "Language",
+    "change": "Change language",
+    "current": "Current language: {{language}}"
+  },
+  "time": {
+    "updatedAt": "Updated {{time}}",
+    "lastReading": "Last reading",
+    "range": "From {{from}} to {{to}}"
+  }
+}

@@ -17,10 +17,19 @@ export const PAGES = Object.fromEntries(ROUTES.map((r) => [r.id, r.component]));
 /** Ids navegables. Lo consume `useNavegacion` para validar lo que llega en la URL. */
 export const ROUTE_IDS = ROUTES.map((r) => r.id);
 
-/** id de página → { title, sub }. Lo consume el Topbar. */
-export const PAGE_META = Object.fromEntries(
-  ROUTES.map((r) => [r.id, { title: r.title, sub: r.sub }])
-);
+/**
+ * Los ids que el Topbar tiene que rotular.
+ *
+ * Antes esto era `PAGE_META`, un mapa `id → { title, sub }` con el texto en
+ * español dentro. El texto se fue a `navigation.json` de cada idioma, indexado
+ * por id (ver la cabecera de `routes.jsx`), así que lo único que queda por
+ * derivar es qué ids existen — y de eso ya se encarga `ROUTE_IDS`.
+ *
+ * Se conserva el nombre `PAGE_META` porque sigue contestando a la misma
+ * pregunta —«¿es esta una página conocida?»— y así el Topbar no cambia de
+ * import; lo que cambió es que ahora sólo dice que existe, no cómo se llama.
+ */
+export const PAGE_META = Object.fromEntries(ROUTES.map((r) => [r.id, { id: r.id }]));
 
 /**
  * id de página → id de su sección del sidebar (`sec-llenado`,

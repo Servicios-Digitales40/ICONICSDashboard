@@ -1,0 +1,126 @@
+{
+  "sections": {
+    "sec-llenado": "Estación de llenado",
+    "sec-vibraciones": "Estación de vibraciones",
+    "sec-general": "General",
+    "sec-prediccion": "Predicción",
+    "sec-rag": "RAG"
+  },
+  "routes": {
+    "eva-inicio": {
+      "title": "Inicio",
+      "nav": "Inicio",
+      "sub": "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/"
+    },
+    "eva-planta": {
+      "title": "Gráficas",
+      "nav": "Gráficas",
+      "sub": "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/"
+    },
+    "eva-riesgos": {
+      "title": "Riesgos",
+      "nav": "Riesgos",
+      "sub": "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros"
+    },
+    "eva-controles": {
+      "title": "Controles",
+      "nav": "Controles",
+      "sub": "Encendido y apagado directo de la bomba de la instalación"
+    },
+    "eva-maqueta": {
+      "title": "Vista 3D",
+      "nav": "Vista 3D",
+      "sub": "La instalación en miniatura · el nivel del tanque es el dato en vivo"
+    },
+    "vib-inicio": {
+      "title": "Inicio · Vibraciones",
+      "nav": "Inicio",
+      "sub": "Sistema de vibraciones · qué contesta la máquina ahora mismo"
+    },
+    "eva-vibraciones": {
+      "title": "Gráficas · Vibraciones",
+      "nav": "Gráficas",
+      "sub": "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico"
+    },
+    "vib-controles": {
+      "title": "Controles · Vibraciones",
+      "nav": "Controles",
+      "sub": "Encendido y apagado del sistema de vibraciones · todavía sin construir"
+    },
+    "eva-riesgos-vibracion": {
+      "title": "Riesgos · Vibraciones",
+      "nav": "Riesgos",
+      "sub": "Qué se deduce del estado mecánico · evidencia separada de la hipótesis"
+    },
+    "vib-3d": {
+      "title": "Vista 3D · Vibraciones",
+      "nav": "Vista 3D",
+      "sub": "Banco de rotor · dónde mide cada sonda, y en qué dirección"
+    },
+    "eva-alarmas": {
+      "title": "Alarmas",
+      "nav": "Alarmas",
+      "sub": "Historial de eventos de la instalación"
+    },
+    "eva-assets": {
+      "title": "Assets",
+      "nav": "Assets",
+      "sub": "Los ocho puntos de la demo, con su valor y su calidad en crudo"
+    },
+    "salud-sistema": {
+      "title": "Salud del sistema",
+      "nav": "Salud",
+      "sub": "Qué servicios necesita este tablero y cuáles están en pie"
+    },
+    "pred-inicio": {
+      "title": "Compresor",
+      "nav": "Inicio",
+      "sub": "Estado del módulo · qué máquina es y de dónde viene su dato"
+    },
+    "pred-eventos": {
+      "title": "Eventos (Beta)",
+      "nav": "Eventos (Beta)",
+      "sub": "Reproducción histórica de un evento · backend predictivo V4.4"
+    },
+    "pred-variables": {
+      "title": "Variables del compresor",
+      "nav": "Variables",
+      "sub": "Qué mide esta máquina · pendiente del inventario del histórico"
+    },
+    "pred-historico": {
+      "title": "Histórico del compresor",
+      "nav": "Histórico",
+      "sub": "Evolución de una variable entre dos fechas · pendiente de endpoint"
+    },
+    "pred-correlacion": {
+      "title": "Correlación entre variables",
+      "nav": "Correlación",
+      "sub": "Si dos variables se movieron juntas · pendiente de endpoint"
+    },
+    "pred-pronostico": {
+      "title": "Pronóstico",
+      "nav": "Pronóstico",
+      "sub": "Cómo se comportará una variable · pendiente del error validado del modelo"
+    },
+    "rag-casos": {
+      "title": "Casos previos",
+      "nav": "Casos previos",
+      "sub": "La bitácora de intervenciones que respalda los diagnósticos, y qué de ella sigue contando"
+    },
+    "rag-documentacion": {
+      "title": "Documentación",
+      "nav": "Documentación",
+      "sub": "Los manuales que alimentan el índice del asistente, y qué sabe extraer de cada uno"
+    },
+    "eva-detalle": {
+      "title": "Detalle de activo",
+      "nav": "Detalle",
+      "sub": "Cada variable, con su valor y su histórico completo"
+    },
+    "cierre-diagnostico": {
+      "title": "Cerrar diagnóstico",
+      "nav": "Cierre de diagnóstico",
+      "sub": "Confirma o corrige la causa de un riesgo ya intervenido"
+    }
+  }
+}

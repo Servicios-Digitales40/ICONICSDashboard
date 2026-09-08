@@ -7,12 +7,14 @@
  * 04-09-2026 (Plan 20 F1) junto con la frase que los prometía.
  */
 import { Sun, Moon, Zap, FlaskConical, Radio, Wifi, Menu } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/theme";
 import { useDataSource } from "@/lib/datasource";
 import { useMediaQuery } from "@/lib/viewport.js";
-import { PAGE_META, SECCION_DE_PAGINA } from "../routes/index.js";
+import { SECCION_DE_PAGINA } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";
+import { LanguageSelector } from "@/i18n/LanguageSelector.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
 const UMBRAL_CAJON = "(max-width: 900px)";
@@ -43,9 +45,9 @@ const ICONO_ORIGEN = { real: Wifi, simulado: Radio };
  * reproducirla.
  */
 const MODO_TEMA = {
-  light: { Icono: Sun, etiqueta: "Claro" },
-  dark: { Icono: Moon, etiqueta: "Oscuro" },
-  mitsubishi: { Icono: Zap, etiqueta: "Mitsubishi Electric" },
+  light: { Icono: Sun, clave: "light" },
+  dark: { Icono: Moon, clave: "dark" },
+  mitsubishi: { Icono: Zap, clave: "mitsubishi" },
 };
 
 /**
@@ -58,12 +60,13 @@ const MODO_TEMA = {
  * herramientas, que es lo que lo diferencia de mirarlo en la consola.
  */
 function VersionBuild({ t }) {
+  const { t: traducir } = useTranslation("layout");
   const version = import.meta.env.VITE_APP_VERSION;
   if (!version) return null;
 
   return (
     <span
-      title={`Build ${version}`}
+      title={traducir("build.tip", { version })}
       style={{
         fontSize: 11, fontFamily: "'IBM Plex Mono', monospace",
         color: t.textFaint, opacity: 0.65, letterSpacing: 0.2,
@@ -76,10 +79,12 @@ function VersionBuild({ t }) {
 
 export function Topbar({ page, onAbrirMenu, muro = false }) {
   const { theme: t, modo, toggleTheme } = useTheme();
-  const { Icono: IconoTema, etiqueta: etiquetaTema } = MODO_TEMA[modo];
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["layout", "navigation"]);
+  const { Icono: IconoTema, clave: claveTema } = MODO_TEMA[modo];
+  const etiquetaTema = traducir(`layout:theme.${claveTema}`);
   const { esSimulado, alternarTransporte, origen, conmutable } = useDataSource();
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
-  const meta = PAGE_META[page];
   /*
    * El indicador de encendido lee un tag del TANQUE
    * (`ac:TDCON/DEMO/SENSORES/CONTROL`), así que sólo tiene algo que decir en
@@ -128,7 +133,7 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
         {esCajon && !muro && (
           <button
             onClick={onAbrirMenu}
-            aria-label="Abrir el menú de navegación"
+            aria-label={traducir("layout:menu.open")}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               width: 34, height: 34, borderRadius: 9, border: `1px solid ${t.border}`,
@@ -140,14 +145,14 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
         )}
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{meta.title}</h1>
+            <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{traducir(`navigation:routes.${page}.title`)}</h1>
             {/* Permanente entre las pestañas de SU máquina — a diferencia de los
                 controles de la derecha, no se oculta en modo muro: es
                 información de estado, no algo que un wallboard sin teclado
                 necesite pulsar. */}
             {esDeLlenado && <EstadoMaquinaBanner />}
           </div>
-          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{meta.sub}</p>
+          <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{traducir(`navigation:routes.${page}.sub`)}</p>
         </div>
       </div>
 
@@ -226,11 +231,11 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
             se queda, porque distinguir el servidor real del simulador sigue
             importando; lo que desaparece es la posibilidad de pulsarlo. */}
         {conmutable ? (
-          <HoverTip label={esSimulado ? "Volver a datos de ICONICS" : `${origen.descripcion} · pulsa para usar el simulador`}>
+          <HoverTip label={esSimulado ? traducir("layout:source.toReal") : traducir("layout:source.toSimulator", { origen: origen.descripcion })}>
             <button
               onClick={alternarTransporte}
               aria-pressed={esSimulado}
-              aria-label={`Origen de datos: ${origen.descripcion}`}
+              aria-label={traducir("layout:source.aria", { origen: origen.descripcion })}
               style={{ ...estiloOrigen, cursor: "pointer" }}
             >
               <IconoOrigen size={13} strokeWidth={2.5} />
@@ -246,10 +251,15 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
           </HoverTip>
         )}
 
-        <HoverTip label={`Tema: ${etiquetaTema} · pulsa para cambiar`}>
+        {/* El idioma va junto al tema porque son la misma clase de ajuste:
+            preferencias de quien mira la pantalla, no estado de la planta.
+            Como el resto de controles, desaparece en modo muro. */}
+        <LanguageSelector />
+
+        <HoverTip label={traducir("layout:theme.tip", { tema: etiquetaTema })}>
           <button
             onClick={toggleTheme}
-            aria-label={`Tema: ${etiquetaTema}. Pulsa para cambiar de tema.`}
+            aria-label={traducir("layout:theme.aria", { tema: etiquetaTema })}
             style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", background: t.accentSoft, border: "none", cursor: "pointer" }}
           >
             <IconoTema size={15} color={t.accent} />

@@ -1,0 +1,29 @@
+{
+  "signals": {
+    "nivelTanque": { "label": "Tank Level", "corto": "Level" },
+    "temperaturaTanque": { "label": "Tank Temperature", "corto": "Temperature" },
+    "cargaMotor": { "label": "Motor Load", "corto": "Motor Load" },
+    "modoVdf": { "label": "VFD Mode", "corto": "VFD Mode" },
+    "flujoInstantaneo": { "label": "Instantaneous Flow Rate", "corto": "Flow" },
+    "presionRelativa": { "label": "Gauge Pressure", "corto": "Pressure" },
+    "tensionLinea": { "label": "Line Voltage", "corto": "Voltage" },
+    "eficienciaEnergetica": { "label": "Energy Efficiency", "corto": "Efficiency" }
+  },
+  "quality": {
+    "title": "OPC Quality",
+    "good": "Good",
+    "uncertain": "Uncertain",
+    "bad": "Bad",
+    "noData": "No Data"
+  },
+  "freshness": {
+    "justNow": "just now",
+    "secondsAgo_one": "{{count}} second ago",
+    "secondsAgo_other": "{{count}} seconds ago",
+    "minutesAgo_one": "{{count}} minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "{{count}} hour ago",
+    "hoursAgo_other": "{{count}} hours ago",
+    "never": "no reading yet"
+  }
+}

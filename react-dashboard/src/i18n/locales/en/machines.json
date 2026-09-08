@@ -1,0 +1,19 @@
+{
+  "status": {
+    "critico": { "label": "Out of Limits", "corto": "Out" },
+    "atencion": { "label": "Warning", "corto": "Warning" },
+    "sin_dato": { "label": "No Data", "corto": "No Data" },
+    "reposo": { "label": "Idle", "corto": "Idle" },
+    "nominal": { "label": "In Range", "corto": "In Range" }
+  },
+  "assets": {
+    "tanque": { "label": "Storage Tank", "corto": "Tank" },
+    "bombeo": { "label": "Pump Set", "corto": "Pumping" },
+    "distribucion": { "label": "Distribution Network", "corto": "Distribution" },
+    "electrico": { "label": "Electrical Supply", "corto": "Electrical" }
+  },
+  "systems": {
+    "tanque": "Industrial Water System",
+    "vibraciones": "Vibration System"
+  }
+}

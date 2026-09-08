@@ -8,12 +8,27 @@
  *   {
  *     id:        string   — clave de navegación, única
  *     component: Comp     — el componente de página
- *     title:     string   — encabezado del Topbar
- *     sub:       string   — subtítulo del Topbar
- *     nav?:      { label, icon, group? }
+ *     nav?:      { icon, group? }
  *   }
  *
  * Sin `nav`, la ruta existe pero no aparece en el sidebar.
+ *
+ * ── DÓNDE ESTÁ EL TEXTO ────────────────────────────────────────────
+ *
+ * Aquí ya no. El encabezado, el subtítulo y la etiqueta del sidebar viven en
+ * `i18n/locales/<idioma>/navigation.json`, indexados por ESTE `id`:
+ *
+ *   "eva-inicio": { "title": …, "nav": …, "sub": … }
+ *
+ * Así que añadir una ruta son dos ediciones y no una: la entrada aquí y su
+ * bloque en los dos idiomas. Se eligió así en vez de dejar el español aquí
+ * como respaldo porque tenerlo en dos sitios es una divergencia esperando a
+ * pasar (CLAUDE.md §4.2) — y olvidar el bloque no pasa desapercibido:
+ * `scripts/verificar-i18n.mjs` recorre este registro y falla nombrando la
+ * ruta a la que le falta texto.
+ *
+ * El `id` es la clave y NO se traduce: lo usan la navegación, el estado de la
+ * URL y `SECCION_DE_PAGINA`.
  *
  * El orden de este array es el orden del sidebar. Las rutas con `group` se
  * agrupan bajo su cabecera, y el grupo aparece en la posición de su primer
@@ -83,9 +98,9 @@ export const DEFAULT_ROUTE = "eva-inicio";
  * de alarmas y el navegador de puntos valen para las dos.
  */
 export const NAV_GROUPS = {
-  "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
-  "sec-vibraciones": { label: "Estación de vibraciones", icon: <Waves size={17} /> },
-  "sec-general": { label: "General", icon: <Boxes size={17} /> },
+  "sec-llenado": { icon: <Droplets size={17} /> },
+  "sec-vibraciones": { icon: <Waves size={17} /> },
+  "sec-general": { icon: <Boxes size={17} /> },
   /*
    * ── PREDICCIÓN NO ES UNA SECCIÓN MÁS: ES OTRO MÓDULO ───────────────
    *
@@ -102,12 +117,12 @@ export const NAV_GROUPS = {
    *
    * Ver `docs/PLAN-19-MODULARIZACION.md` F1.
    */
-  "sec-prediccion": { label: "Predicción", icon: <BrainCircuit size={17} /> },
+  "sec-prediccion": { icon: <BrainCircuit size={17} /> },
   // El origen de conocimiento del asistente, no una máquina: qué manuales
   // alimentan su búsqueda documental. Sección aparte por el mismo motivo que
   // separa las otras dos — no es de ninguna instalación concreta, y menos
   // aún de las dos que ya tiene la planta.
-  "sec-rag": { label: "RAG", icon: <Database size={17} /> },
+  "sec-rag": { icon: <Database size={17} /> },
 };
 
 /*
@@ -135,17 +150,13 @@ export const ROUTES = [
   {
     id: "eva-inicio",
     component: lazy(() => import("@/Demo-EVA/views/tanque/InicioTanque.jsx")),
-    title: "Inicio",
-    sub: "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/",
-    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-llenado" },
+    nav: { icon: <Home size={17} />, group: "sec-llenado" },
   },
 
   {
     id: "eva-planta",
     component: lazy(() => import("@/Demo-EVA/views/tanque/PlantaTanque.jsx")),
-    title: "Gráficas",
-    sub: "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/",
-    nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
+    nav: { icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -153,9 +164,7 @@ export const ROUTES = [
     // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
     id: "eva-riesgos",
     component: lazy(() => import("@/Demo-EVA/views/tanque/RiesgosTanque.jsx")),
-    title: "Riesgos",
-    sub: "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros",
-    nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-llenado" },
+    nav: { icon: <ShieldAlert size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -163,17 +172,13 @@ export const ROUTES = [
     // operativa de primer nivel (encender/apagar la bomba), no un diagnóstico.
     id: "eva-controles",
     component: lazy(() => import("@/Demo-EVA/views/tanque/ControlesTanque.jsx")),
-    title: "Controles",
-    sub: "Encendido y apagado directo de la bomba de la instalación",
-    nav: { label: "Controles", icon: <Power size={17} />, group: "sec-llenado" },
+    nav: { icon: <Power size={17} />, group: "sec-llenado" },
   },
 
   {
     id: "eva-maqueta",
     component: lazy(() => import("@/Demo-EVA/views/tanque/MaquetaTanque3D.jsx")),
-    title: "Vista 3D",
-    sub: "La instalación en miniatura · el nivel del tanque es el dato en vivo",
-    nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-llenado" },
+    nav: { icon: <Box size={17} />, group: "sec-llenado" },
   },
 
   /*
@@ -188,9 +193,7 @@ export const ROUTES = [
   {
     id: "vib-inicio",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
-    title: "Inicio · Vibraciones",
-    sub: "Sistema de vibraciones · qué contesta la máquina ahora mismo",
-    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <Home size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -201,9 +204,7 @@ export const ROUTES = [
     // son las medidas del instante, con su escala y su banda de norma.
     id: "eva-vibraciones",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
-    title: "Gráficas · Vibraciones",
-    sub: "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico",
-    nav: { label: "Gráficas", icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -212,9 +213,7 @@ export const ROUTES = [
     // lo sea es peor que no tener pantalla, así que no hay ninguno.
     id: "vib-controles",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/ControlesVibraciones.jsx")),
-    title: "Controles · Vibraciones",
-    sub: "Encendido y apagado del sistema de vibraciones · todavía sin construir",
-    nav: { label: "Controles", icon: <Power size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <Power size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -224,9 +223,7 @@ export const ROUTES = [
     // relación entre ellas que no existe.
     id: "eva-riesgos-vibracion",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
-    title: "Riesgos · Vibraciones",
-    sub: "Qué se deduce del estado mecánico · evidencia separada de la hipótesis",
-    nav: { label: "Riesgos", icon: <ShieldAlert size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <ShieldAlert size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -236,9 +233,7 @@ export const ROUTES = [
     // desbloqueó exactamente, y por qué antes no valía una escena provisional.
     id: "vib-3d",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
-    title: "Vista 3D · Vibraciones",
-    sub: "Banco de rotor · dónde mide cada sonda, y en qué dirección",
-    nav: { label: "Vista 3D", icon: <Box size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <Box size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -254,13 +249,11 @@ export const ROUTES = [
     // alarmas cada 30s en TODAS las pantallas, no sólo en ésta, así que
     // ocultar sólo esta entrada no habría bastado para cortar las peticiones.
     //
-    // Para reactivar: restaurar `nav: { label: "Alarmas", icon: <Bell size={17}
+    // Para reactivar: restaurar `nav: { icon: <Bell size={17}
     // />, group: "sec-general" }` aquí (reimportando `Bell` de lucide-react
     // arriba) y descomentar el bloque del botón en `Topbar.jsx`.
     id: "eva-alarmas",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
-    title: "Alarmas",
-    sub: "Historial de eventos de la instalación",
   },
 
   {
@@ -269,9 +262,7 @@ export const ROUTES = [
     // AssetWorX y leyendo la propiedad en vivo.
     id: "eva-assets",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AssetsEva.jsx")),
-    title: "Assets",
-    sub: "Los ocho puntos de la demo, con su valor y su calidad en crudo",
-    nav: { label: "Assets", icon: <Boxes size={17} />, group: "sec-general" },
+    nav: { icon: <Boxes size={17} />, group: "sec-general" },
   },
 
   {
@@ -292,9 +283,7 @@ export const ROUTES = [
      */
     id: "salud-sistema",
     component: lazy(() => import("@/Demo-EVA/views/comunes/SaludSistema.jsx")),
-    title: "Salud del sistema",
-    sub: "Qué servicios necesita este tablero y cuáles están en pie",
-    nav: { label: "Salud", icon: <HeartPulse size={17} />, group: "sec-general" },
+    nav: { icon: <HeartPulse size={17} />, group: "sec-general" },
   },
 
   {
@@ -329,16 +318,12 @@ export const ROUTES = [
      */
     id: "pred-inicio",
     component: lazy(() => import("@/modulos/prediccion/views/InicioCompresor.jsx")),
-    title: "Compresor",
-    sub: "Estado del módulo · qué máquina es y de dónde viene su dato",
-    nav: { label: "Inicio", icon: <Home size={17} />, group: "sec-prediccion" },
+    nav: { icon: <Home size={17} />, group: "sec-prediccion" },
   },
   {
     id: "pred-eventos",
     component: lazy(() => import("@/modulos/prediccion/views/EventosCompresor.jsx")),
-    title: "Eventos (Beta)",
-    sub: "Reproducción histórica de un evento · backend predictivo V4.4",
-    nav: { label: "Eventos (Beta)", icon: <BrainCircuit size={17} />, group: "sec-prediccion" },
+    nav: { icon: <BrainCircuit size={17} />, group: "sec-prediccion" },
   },
 
   /*
@@ -358,30 +343,22 @@ export const ROUTES = [
   {
     id: "pred-variables",
     component: lazy(() => import("@/modulos/prediccion/views/VariablesCompresor.jsx")),
-    title: "Variables del compresor",
-    sub: "Qué mide esta máquina · pendiente del inventario del histórico",
-    nav: { label: "Variables", icon: <Boxes size={17} />, group: "sec-prediccion" },
+    nav: { icon: <Boxes size={17} />, group: "sec-prediccion" },
   },
   {
     id: "pred-historico",
     component: lazy(() => import("@/modulos/prediccion/views/HistoricoCompresor.jsx")),
-    title: "Histórico del compresor",
-    sub: "Evolución de una variable entre dos fechas · pendiente de endpoint",
-    nav: { label: "Histórico", icon: <LayoutDashboard size={17} />, group: "sec-prediccion" },
+    nav: { icon: <LayoutDashboard size={17} />, group: "sec-prediccion" },
   },
   {
     id: "pred-correlacion",
     component: lazy(() => import("@/modulos/prediccion/views/CorrelacionCompresor.jsx")),
-    title: "Correlación entre variables",
-    sub: "Si dos variables se movieron juntas · pendiente de endpoint",
-    nav: { label: "Correlación", icon: <Cog size={17} />, group: "sec-prediccion" },
+    nav: { icon: <Cog size={17} />, group: "sec-prediccion" },
   },
   {
     id: "pred-pronostico",
     component: lazy(() => import("@/modulos/prediccion/views/PronosticoCompresor.jsx")),
-    title: "Pronóstico",
-    sub: "Cómo se comportará una variable · pendiente del error validado del modelo",
-    nav: { label: "Pronóstico", icon: <Factory size={17} />, group: "sec-prediccion" },
+    nav: { icon: <Factory size={17} />, group: "sec-prediccion" },
   },
 
   /*
@@ -403,17 +380,13 @@ export const ROUTES = [
      */
     id: "rag-casos",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
-    title: "Casos previos",
-    sub: "La bitácora de intervenciones que respalda los diagnósticos, y qué de ella sigue contando",
-    nav: { label: "Casos previos", icon: <NotebookPen size={17} />, group: "sec-rag" },
+    nav: { icon: <NotebookPen size={17} />, group: "sec-rag" },
   },
 
   {
     id: "rag-documentacion",
     component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
-    title: "Documentación",
-    sub: "Los manuales que alimentan el índice del asistente, y qué sabe extraer de cada uno",
-    nav: { label: "Documentación", icon: <FileText size={17} />, group: "sec-rag" },
+    nav: { icon: <FileText size={17} />, group: "sec-rag" },
   },
 
   {
@@ -424,8 +397,6 @@ export const ROUTES = [
     // `domain/activos.js`.
     id: "eva-detalle",
     component: lazy(() => import("@/Demo-EVA/views/tanque/DetalleActivo.jsx")),
-    title: "Detalle de activo",
-    sub: "Cada variable, con su valor y su histórico completo",
   },
 
   {
@@ -436,7 +407,5 @@ export const ROUTES = [
     // cerrar. Plan 16 Fase 5, UI A.
     id: "cierre-diagnostico",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CierreDiagnostico.jsx")),
-    title: "Cerrar diagnóstico",
-    sub: "Confirma o corrige la causa de un riesgo ya intervenido",
   },
 ];

@@ -1,0 +1,30 @@
+{
+  "theme": {
+    "tip": "Theme: {{tema}} · click to change",
+    "aria": "Theme: {{tema}}. Click to change theme.",
+    "light": "Light",
+    "dark": "Dark",
+    "mitsubishi": "Mitsubishi Electric"
+  },
+  "menu": {
+    "open": "Open the navigation menu",
+    "close": "Close the navigation menu"
+  },
+  "source": {
+    "aria": "Data source: {{origen}}",
+    "toSimulator": "{{origen}} · click to use the simulator",
+    "toReal": "Switch back to ICONICS data"
+  },
+  "build": {
+    "tip": "Build {{version}}"
+  },
+  "sidebar": {
+    "closeMenu": "Close menu",
+    "mainNav": "Main navigation",
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar",
+    "expandAria": "Expand the sidebar",
+    "collapseAria": "Collapse the sidebar",
+    "plantRoot": "Plant: {{raiz}}"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "status": {
+    "critico": { "label": "Fuera de límite", "corto": "Fuera" },
+    "atencion": { "label": "En aviso", "corto": "Aviso" },
+    "sin_dato": { "label": "Sin dato", "corto": "Sin dato" },
+    "reposo": { "label": "En reposo", "corto": "Reposo" },
+    "nominal": { "label": "En banda", "corto": "En banda" }
+  },
+  "assets": {
+    "tanque": { "label": "Tanque de almacenamiento", "corto": "Tanque" },
+    "bombeo": { "label": "Grupo de bombeo", "corto": "Bombeo" },
+    "distribucion": { "label": "Red de distribución", "corto": "Distribución" },
+    "electrico": { "label": "Suministro eléctrico", "corto": "Eléctrico" }
+  },
+  "systems": {
+    "tanque": "Sistema de agua industrial",
+    "vibraciones": "Sistema de vibraciones"
+  }
+}

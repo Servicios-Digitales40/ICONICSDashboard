@@ -1,0 +1,30 @@
+{
+  "titles": {
+    "bridgeDown": "The bridge is not responding",
+    "pumpCommandFailed": "Unable to operate the pump",
+    "tableLoadFailed": "Unable to load the table",
+    "caseCloseFailed": "Unable to close the case",
+    "catalogQueryFailed": "Unable to query the catalog",
+    "alarmHistoryFailed": "Unable to read the alarm history",
+    "moduleReadFailed": "Unable to read the module",
+    "waterSystemReadFailed": "Unable to read the water system",
+    "logbookReadFailed": "Unable to read the logbook",
+    "plantReadFailed": "Unable to read the plant",
+    "uploadFailed": "Upload failed"
+  },
+  "codes": {
+    "ERROR_CONNECTION_FAILED": "Unable to connect to the server.",
+    "ERROR_TIMEOUT": "The server did not respond in time.",
+    "ERROR_UNAUTHORIZED": "You are not signed in to do this.",
+    "ERROR_FORBIDDEN": "This action requires a role your user does not have.",
+    "ERROR_NOT_FOUND": "The requested item was not found.",
+    "ERROR_RATE_LIMITED": "Too many requests. Try again in a few seconds.",
+    "ERROR_SERVER": "The server failed while handling the request.",
+    "ERROR_READ_ONLY": "The bridge is in read-only mode and cannot write to the plant.",
+    "ERROR_UNKNOWN": "An unclassified failure occurred."
+  },
+  "hints": {
+    "bridgeDown": "{{detalle}}. If this screen does not load, the problem is not one view: the bridge itself is down.",
+    "technicalDetail": "Technical detail: {{detalle}}"
+  }
+}

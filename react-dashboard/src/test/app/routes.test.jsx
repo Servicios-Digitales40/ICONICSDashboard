@@ -125,14 +125,12 @@ describe("el sidebar que sale del registro", () => {
       "sec-rag",
     ]);
 
-    const llenado = NAV.find((n) => n.group === "sec-llenado");
-    expect(llenado.label).toBe("Estación de llenado");
+    const llenado = NAV.find((n) => n.group === "sec-llenado");
     expect(llenado.children.map((c) => c.id)).toEqual([
       "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta",
     ]);
 
-    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
-    expect(vibraciones.label).toBe("Estación de vibraciones");
+    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
       "vib-inicio", "eva-vibraciones", "vib-controles",
       "eva-riesgos-vibracion", "vib-3d",
@@ -146,8 +144,7 @@ describe("el sidebar que sale del registro", () => {
     // para cortar el sondeo de `/api/iconics/alarms` que el botón del Topbar
     // hacía en toda la aplicación. Sigue en ROUTES —comprobado en el test de
     // arriba—, sólo sin `nav`, mismo criterio que `eva-detalle`.
-    const general = NAV.find((n) => n.group === "sec-general");
-    expect(general.label).toBe("General");
+    const general = NAV.find((n) => n.group === "sec-general");
     expect(general.children.map((c) => c.id)).toEqual(["eva-assets", "salud-sistema"]);
 
     /*
@@ -160,8 +157,7 @@ describe("el sidebar que sale del registro", () => {
      * servidor en absoluto — es un compresor real servido por otro backend.
      * Mezclarlo ahí es el mismo cruce de fuentes que CLAUDE.md §2.1 prohíbe.
      */
-    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
-    expect(prediccion.label).toBe("Predicción");
+    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
     expect(prediccion.children.map((c) => c.id)).toEqual([
       "pred-inicio",
       "pred-eventos",
@@ -175,8 +171,7 @@ describe("el sidebar que sale del registro", () => {
     // mezclan entre sí: lo que hay aquí no describe una instalación de la
     // planta, describe de dónde saca el asistente lo que sabe fuera de lo
     // que mide ICONICS.
-    const rag = NAV.find((n) => n.group === "sec-rag");
-    expect(rag.label).toBe("RAG");
+    const rag = NAV.find((n) => n.group === "sec-rag");
     expect(rag.children.map((c) => c.id)).toEqual(["rag-casos", "rag-documentacion"]);
   });
 
@@ -187,7 +182,7 @@ describe("el sidebar que sale del registro", () => {
     // las dos listas invitaría a buscar entre ellas una relación que no
     // existe, que es el error que `shared/eva/comun/sistemas.js` evita al asistente.
     const conRiesgos = NAV.flatMap((s) =>
-      (s.children ?? []).filter((c) => c.label === "Riesgos").map((c) => [s.group, c.id])
+      (s.children ?? []).filter((c) => /riesgos/.test(c.id)).map((c) => [s.group, c.id])
     );
     expect(conRiesgos).toEqual([
       ["sec-llenado", "eva-riesgos"],

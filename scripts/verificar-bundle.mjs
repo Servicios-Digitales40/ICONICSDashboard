@@ -53,8 +53,37 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  * sin relación con este cambio—; react-query sólo puso los ~40 KB restantes.
  * Que el número sea ahora generoso no lo deja como estaba: sigue habiendo
  * margen que investigar en lo que ya se acumulaba en `vendor` antes de hoy.
+ *
+ * ── `vendor` sube de 210 a 270 (08-09-2026), por i18n ──────────────
+ *
+ * Medido: 206.85 KB antes, **264.01 KB** después de `i18next` +
+ * `react-i18next` + `i18next-browser-languagedetector`. Son **+57,16 KB**, y
+ * el reparto es ~40 de i18next, ~15 de react-i18next y ~2 del detector; los
+ * doce namespaces de los dos idiomas juntos no llegan a 10 KB de JSON.
+ *
+ * Se sube en vez de trocearlo, y conviene saber por qué: i18n es del ARRANQUE.
+ * La primera pantalla ya necesita sus textos, así que darle trozo propio —como
+ * tenía `xlsx`— no quitaría un solo byte del camino crítico; sólo movería el
+ * número a una casilla que este guion no mira, que es la versión elegante de
+ * subir el techo para callarlo.
+ *
+ * Lo que este número NO es: una autorización para seguir engordando. `vendor`
+ * lleva dos subidas en nueve días y ya pesa más que el resto del arranque
+ * junto. `COD-07` (presupuesto de bundle, Plan 26) tiene ahora bastante más
+ * trabajo del que tenía, y su punto de partida es preguntarse qué hacen ahí
+ * los 161,84 KB que ya estaban antes de react-query.
+ *
+ * ── Y UNA TRAMPA QUE ESTA SUBIDA CASI ESCONDE ──────────────────────
+ *
+ * Al instalar i18n, este mismo guion destapó algo peor que 57 KB: la pila 3D
+ * ENTERA —827 KB— se coló en el arranque. `react-i18next` depende de
+ * `use-sync-external-store`, que estaba en `PAQUETES_3D` de `vite.config.js`
+ * porque hasta entonces sólo lo usaba zustand; eso creó un ciclo
+ * `vendor → three → vendor` y Rollup precargó los dos. Se arregló sacándolo de
+ * esa lista. Sin la comprobación de abajo, la subida del techo habría sido lo
+ * único visible y el problema de verdad habría pasado desapercibido.
  */
-const PRESUPUESTO_KB = { index: 170, vendor: 210 };
+const PRESUPUESTO_KB = { index: 170, vendor: 270 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [

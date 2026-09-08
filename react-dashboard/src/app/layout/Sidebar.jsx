@@ -5,7 +5,9 @@
  */
 import { useEffect, useState } from "react";
 import { ChevronDown, PanelLeftClose, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/theme";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { NAV } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/index.js";
@@ -80,17 +82,28 @@ function MaybeTip({ collapsed, label, children }) {
   return collapsed ? <HoverTip label={label}>{children}</HoverTip> : children;
 }
 
-/** Texto que acompaña al punto de estado, para el tooltip y el `title` — el color nunca va solo (DESIGN.md). */
-const ESTADO_TEXTO = {
-  critico: "fuera de límite",
-  atencion: "en aviso",
-  nominal: "en banda",
-};
-
-/** Botón de navegación reutilizable (página simple o hijo de un grupo). */
+/**
+ * Botón de navegación reutilizable (página simple o hijo de un grupo).
+ *
+ * ── DE DÓNDE SALE EL TEXTO ─────────────────────────────────────────
+ *
+ * De `navigation:routes.<id>.nav`, y el estado de
+ * `machines:status.<key>.label` a través de `useDominio`. Antes había aquí un
+ * `ESTADO_TEXTO` con «fuera de límite», «en aviso» y «en banda» escritos a
+ * mano: era una TERCERA copia del vocabulario que ya declara
+ * `shared/eva/tanque/estado.js`, y bastaba con que alguien cambiara una banda
+ * allí para que el sidebar siguiera diciendo lo de antes. Ahora sale del
+ * mismo sitio que el resto de la aplicación.
+ *
+ * El punto de color nunca va solo: el texto lo acompaña en el tooltip y en el
+ * `title` (DESIGN.md), y eso no cambia — sólo cambia quién escribe el texto.
+ */
 function NavButton({ item, active, onNavigate, t, dark, indent = false, collapsed = false, estado = null }) {
-  const etiquetaEstado = estado && ESTADO_TEXTO[estado];
-  const etiqueta = etiquetaEstado ? `${item.label} — ${etiquetaEstado}` : item.label;
+  const { t: traducir } = useTranslation("navigation");
+  const { estado: textoDeEstado } = useDominio();
+
+  const nombre = traducir(`routes.${item.id}.nav`);
+  const etiqueta = estado ? `${nombre} — ${textoDeEstado(estado).toLowerCase()}` : nombre;
 
   return (
     <MaybeTip collapsed={collapsed} label={etiqueta}>
@@ -125,7 +138,7 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
             />
           )}
         </span>
-        {!collapsed && item.label}
+        {!collapsed && nombre}
         {!collapsed && active && <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: t.gradAccent }} />}
       </button>
     </MaybeTip>
@@ -134,6 +147,8 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
 
 /** Grupo desplegable: cabecera que colapsa/expande sus hijos. */
 function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSidebar }) {
+  const { t: traducir } = useTranslation("navigation");
+  const nombre = traducir(`sections.${item.group}`);
   const childActive = item.children.some((c) => c.id === page);
 
   /*
@@ -169,7 +184,7 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <MaybeTip collapsed={collapsed} label={item.label}>
+      <MaybeTip collapsed={collapsed} label={nombre}>
         <button
           className="nav-item"
           onClick={() => {
@@ -192,7 +207,7 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
           <span style={{ display: "flex", color: childActive ? t.accent : t.textFaint }}>{item.icon}</span>
           {!collapsed && (
             <>
-              {item.label}
+              {nombre}
               <ChevronDown
                 size={15}
                 style={{ marginLeft: "auto", color: t.textFaint, transition: "transform 200ms ease", transform: open ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -223,6 +238,8 @@ const STORAGE_KEY = "sidebar:collapsed";
  */
 export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon }) {
   const { theme: t, dark } = useTheme();
+  /* `traducirBarra` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducirBarra } = useTranslation("layout");
   const esCajon = useMediaQuery(UMBRAL_CAJON);
   // Fuente compartida por `EvaProvider` (App.jsx envuelve el Shell entero con
   // él) — mismo hook que usa cada vista, así que el punto de "Planta" no abre
@@ -293,11 +310,11 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
             </div>
             {esCajon && (
               <span style={{ marginLeft: "auto", display: "flex" }}>
-                <HoverTip label="Cerrar menú">
+                <HoverTip label={traducirBarra("sidebar.closeMenu")}>
                   <button
                     className="nav-item"
                     onClick={onCerrarCajon}
-                    aria-label="Cerrar el menú de navegación"
+                    aria-label={traducirBarra("menu.close")}
                     style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 6, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: t.textFaint }}
                   >
                     <X size={18} />
@@ -311,7 +328,7 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
 
       {/* Navegación */}
       <nav
-        aria-label="Navegación principal"
+        aria-label={traducirBarra("sidebar.mainNav")}
         style={{ padding: collapsed ? "8px 10px" : "8px 14px", display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto", overflowX: "hidden" }}
       >
         {NAV.map((item) =>
@@ -333,7 +350,7 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           `shared/eva/tanque/senales.js` ya trata como la única fuente de verdad
           para "qué instalación es esta". */}
       <div style={{ padding: collapsed ? "12px 10px" : "12px 14px", borderTop: `1px solid ${t.border}` }}>
-        <MaybeTip collapsed={collapsed} label={`Instalación: ${RAIZ_INSTALACION}`}>
+        <MaybeTip collapsed={collapsed} label={traducirBarra("sidebar.plantRoot", { raiz: RAIZ_INSTALACION })}>
           <div
             style={{
               display: "flex", alignItems: "center", gap: 10,
@@ -385,10 +402,10 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           cajón móvil (69/70), que además nunca coincide con este botón
           porque `esCajon` lo oculta. */}
       {!esCajon && (
-        <HoverTip label={collapsed ? "Expandir barra" : "Colapsar barra"} style={{ position: "fixed", top: 30, left: collapsed ? 72 : 246, zIndex: 31, transition: "left 220ms ease" }}>
+        <HoverTip label={traducirBarra(collapsed ? "sidebar.expand" : "sidebar.collapse")} style={{ position: "fixed", top: 30, left: collapsed ? 72 : 246, zIndex: 31, transition: "left 220ms ease" }}>
           <button
             onClick={() => setCollapsedPref((c) => !c)}
-            aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
+            aria-label={traducirBarra(collapsed ? "sidebar.expandAria" : "sidebar.collapseAria")}
             aria-expanded={!collapsed}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
