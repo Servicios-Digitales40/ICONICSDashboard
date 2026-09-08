@@ -547,10 +547,35 @@ function reglaNumerada(texto, indice) {
  * hay que confesar de ella. Ver `inventarioDeLaPlanta` para por qué esa
  * separación tuvo que existir.
  */
-export function instrucciones(catalogo, maxPasos) {
+/**
+ * ── EL IDIOMA DE LA RESPUESTA (i18n, 08-09-2026) ───────────────────
+ *
+ * `idioma` es el que tiene puesto el tablero de quien pregunta, y llega desde
+ * la ruta (`POST /api/chat`). El modelo contesta EN ESE IDIOMA.
+ *
+ * No se traduce lo que el modelo devuelve: pedirle que escriba en inglés da un
+ * inglés mucho mejor que pasar por un traductor una respuesta ya redactada en
+ * español, y además una traducción a posteriori tocaría cifras y nombres de
+ * tag — que es justo lo que no puede cambiar.
+ *
+ * Lo que NO cambia con el idioma es nada de lo que hay debajo: las
+ * herramientas, los nombres de punto, los códigos y las cifras son los mismos.
+ * El modelo narra un resultado ya calculado (CLAUDE.md §2.3) y el idioma sólo
+ * decide en qué lengua lo narra.
+ *
+ * Los manuales que cita el RAG siguen en el idioma en que estén escritos: la
+ * lengua de la interfaz y la del documento recuperado son cosas distintas, y
+ * la cita tiene que poder contrastarse con el papel.
+ */
+const IDIOMAS_DEL_MODELO = {
+  es: 'Respondes en español, con frases cortas.',
+  en: 'You answer in English, in short sentences.',
+};
+
+export function instrucciones(catalogo, maxPasos, idioma = 'es') {
   return [
     'Te llamas Tdconcito. Eres el asistente de un tablero que vigila VARIOS SISTEMAS de una',
-    'planta industrial. Respondes en español, con frases cortas.',
+    `planta industrial. ${IDIOMAS_DEL_MODELO[idioma] ?? IDIOMAS_DEL_MODELO.es}`,
     '',
     'LOS SISTEMAS SON INSTALACIONES SEPARADAS, Y ESTO ES LO MÁS IMPORTANTE QUE VAS A LEER:',
     '',
@@ -945,8 +970,9 @@ export function createChat({ config, herramientas }) {
    * @param {object[]} [opciones.historial]  turnos anteriores `{ rol, texto }`
    * @param {AbortSignal} [opciones.signal]  cancelación del usuario
    * @param {(evento: object) => void} opciones.onEvento
+   * @param {string} [opciones.idioma]  en qué idioma contesta el modelo (i18n)
    */
-  async function responder({ pregunta, historial = [], signal, onEvento }) {
+  async function responder({ pregunta, historial = [], signal, onEvento, idioma = "es" }) {
     // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
     // información fija y barata, y tenerla delante evita que el modelo gaste
     // su única llamada en pedir lo que ya tiene.
@@ -966,7 +992,7 @@ export function createChat({ config, herramientas }) {
     const previos = historialAMensajes(historial)
 
     const messages = [
-      { role: 'system', content: instrucciones(catalogo, maxPasos) },
+      { role: 'system', content: instrucciones(catalogo, maxPasos, idioma) },
       ...previos,
       { role: 'user', content: pregunta },
     ]

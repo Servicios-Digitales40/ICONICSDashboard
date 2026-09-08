@@ -17,6 +17,7 @@
  * pantalla queda muerta minuto y medio y el operador vuelve a pulsar.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { API_BASE } from "@/lib/api/apiBase";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
@@ -77,6 +78,21 @@ function historialParaEnviar(mensajes) {
 }
 
 export function useAsistente() {
+  /*
+   * ── EL IDIOMA VIAJA CON LA PREGUNTA (i18n) ─────────────────────────
+   *
+   * El modelo contesta en el idioma del tablero, así que el tablero se lo
+   * tiene que decir: es lo único que el backend no puede saber por su cuenta.
+   * No se detecta del texto de la pregunta — alguien con la interfaz en
+   * inglés puede escribir «¿qué nivel tiene el tanque?» y espera la
+   * respuesta en inglés, que es el idioma en el que está trabajando.
+   *
+   * `resolvedLanguage` y no `language`: con `es-MX` detectado del navegador,
+   * `language` vale «es-MX» y el backend sólo admite «es» o «en».
+   */
+  const { i18n } = useTranslation();
+  const idioma = i18n.resolvedLanguage ?? i18n.language;
+
   const [disponible, setDisponible] = useState(null);   // null = comprobando
   /*
    * El hilo arranca de lo GUARDADO, con el inicializador perezoso de
@@ -227,7 +243,7 @@ export function useAsistente() {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta, historial }),
+          body: JSON.stringify({ pregunta, historial, idioma }),
           signal: control.signal,
         });
 
@@ -296,7 +312,7 @@ export function useAsistente() {
         if (abortador.current === control) abortador.current = null;
       }
     },
-    [actualizarUltimo]
+    [actualizarUltimo, idioma]
   );
 
   const preguntar = useCallback(

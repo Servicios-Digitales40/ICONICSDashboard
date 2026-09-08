@@ -195,6 +195,38 @@ check('ninguna regla se queda sin texto', () => {
   }
 })
 
+check('el prompt cambia de idioma, y SOLO el idioma (i18n)', () => {
+  /*
+   * El modelo contesta en el idioma del tablero (§35 del encargo de i18n): se
+   * le PIDE que escriba en inglés en vez de traducir después lo que escribió
+   * en español. Traducir a posteriori daría peor inglés y, peor todavía,
+   * tocaría cifras y nombres de tag — que es lo único que no puede cambiar.
+   *
+   * Por eso esta comprobación mira las dos caras: que la instrucción de
+   * idioma cambie, y que NADA de lo que sostiene la respuesta lo haga.
+   */
+  const es = instrucciones(CATALOGO, 3, 'es').replace(/\s+/g, ' ')
+  const en = instrucciones(CATALOGO, 3, 'en').replace(/\s+/g, ' ')
+
+  assert.ok(es.includes('Respondes en español'), 'el prompt en español perdió su instrucción de idioma')
+  assert.ok(en.includes('You answer in English'), 'el prompt en inglés no le pide contestar en inglés')
+  assert.ok(!en.includes('Respondes en español'), 'el prompt en inglés sigue pidiendo español: se contradice')
+
+  // Un idioma que no servimos cae en español y no deja al modelo sin instrucción.
+  assert.ok(instrucciones(CATALOGO, 3, 'de').includes('Respondes en español'))
+
+  /*
+   * Y lo importante: el RESTO del prompt es idéntico. Las reglas de
+   * separación entre sistemas, el catálogo de señales y el tope de pasos no
+   * pueden depender del idioma — si alguna se tradujera, un tablero en inglés
+   * estaría corriendo con otras reglas de negocio.
+   */
+  const sinIdioma = (texto) => texto
+    .replace('Respondes en español, con frases cortas.', '«IDIOMA»')
+    .replace('You answer in English, in short sentences.', '«IDIOMA»')
+  assert.equal(sinIdioma(es), sinIdioma(en), 'el prompt cambia algo más que el idioma')
+})
+
 if (fallos) {
   console.log(`\n${c.rojo}${c.negrita}${fallos} comprobación(es) fallaron${c.reset}\n`)
   process.exit(1)

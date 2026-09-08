@@ -120,6 +120,20 @@ export const ChatSchema = z.object({
    * misma tolerancia que tenía el `Array.isArray()` anterior, ahora explícita.
    */
   historial: z.array(TurnoSchema).max(MAX_TURNOS).catch([]).default([]),
+  /*
+   * En qué idioma tiene que contestar el modelo (i18n, 08-09-2026).
+   *
+   * Lo manda el tablero con el idioma que el operador tiene puesto. No se
+   * detecta aquí a partir de la pregunta: alguien con la interfaz en inglés
+   * puede escribir «¿qué nivel tiene el tanque?» y espera la respuesta en
+   * inglés, que es el idioma en el que está trabajando.
+   *
+   * `catch("es")` y no `default` a secas: un cliente viejo que no lo mande, o
+   * uno que mande un idioma que no servimos, recibe español —el defecto del
+   * producto— en vez de un 400. Una pregunta válida no puede rechazarse por
+   * un campo de presentación.
+   */
+  idioma: z.enum(['es', 'en']).catch('es').default('es'),
 })
 
 /**

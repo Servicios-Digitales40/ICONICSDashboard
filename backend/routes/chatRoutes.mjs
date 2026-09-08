@@ -149,7 +149,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         })
       }
 
-      const { pregunta, historial } = request.body
+      const { pregunta, historial, idioma } = request.body
 
       /* ── A partir de aquí la respuesta es un flujo ─────────────────── */
 
@@ -233,6 +233,12 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
             historial,
             signal: abortador.signal,
             onEvento: emitir,
+            /*
+             * El idioma que tiene puesto el tablero de quien pregunta. El
+             * modelo contesta en él; nada de lo que hay debajo cambia. Ver
+             * `instrucciones()` en `ia/conversacion/chat.mjs`.
+             */
+            idioma,
           }),
         })
 
