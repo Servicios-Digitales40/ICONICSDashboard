@@ -30,15 +30,17 @@
 import { Html } from "@react-three/drei";
 import { X } from "lucide-react";
 
+import { useTranslation } from "react-i18next";
+
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
-import { estadoInfo } from "../../domain/estado.js";
 import { fmtSenal } from "../../lib/formato.js";
 import { estadoColor } from "../../components/paleta.js";
 
 /** Una señal dentro de la ficha: punto de estado, nombre, valor y banda. */
 function FilaSenal({ senal, t, dark }) {
-  const info = estadoInfo(senal.estado);
+  const { estado: estadoTexto, senal: senalTexto } = useDominio();
   const reposo = senal.estado === "reposo";
 
   return (
@@ -50,7 +52,7 @@ function FilaSenal({ senal, t, dark }) {
         }}
       />
       <span style={{ fontSize: 11, color: t.textSoft, flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {senal.corto}
+        {senalTexto(senal.key, "corto")}
       </span>
       <span
         style={{
@@ -61,18 +63,20 @@ function FilaSenal({ senal, t, dark }) {
         {fmtSenal(senal)}
       </span>
       <span style={{ fontSize: 9.5, color: t.textFaint, width: 46, textAlign: "right", flexShrink: 0 }}>
-        {info.corto}
+        {estadoTexto(senal.estado, "corto")}
       </span>
     </div>
   );
 }
 
 export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("common");
+  const { estado: estadoTexto, activo: activoTexto, senal: senalTexto } = useDominio();
   // `dark` se lee y se pasa: la ficha es DOM sobre el canvas, así que hereda el
   // tema como cualquier tarjeta. Fijarlo a claro dejaría los puntos de estado
   // con la paleta equivocada justo en modo oscuro, que es el de un wallboard.
   const { theme: t, dark } = useTheme();
-  const info = estadoInfo(activo.estado);
   const color = estadoColor(dark, activo.estado);
 
   return (
@@ -100,12 +104,16 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{activo.label}</div>
-            <div style={{ fontSize: 10.5, color: t.textFaint }}>{info.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>
+              {activoTexto(activo.id)}
+            </div>
+            <div style={{ fontSize: 10.5, color: t.textFaint }}>
+              {estadoTexto(activo.estado)}
+            </div>
           </div>
           <button
             onClick={onCerrar}
-            aria-label="Cerrar"
+            aria-label={traducir("common:actions.close")}
             style={{
               background: "transparent", border: "none", cursor: "pointer",
               color: t.textFaint, padding: 2, display: "flex", flexShrink: 0,
@@ -135,7 +143,7 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
             key={`nota-${s.key}`}
             style={{ margin: "6px 0 0", fontSize: 10, lineHeight: 1.45, color: t.textFaint }}
           >
-            {s.corto}: {s.nota}
+            {senalTexto(s.key, "corto")}: {s.nota}
           </p>
         ))}
 
@@ -158,6 +166,7 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
 
 /** Etiqueta ligera al señalar, sin abrir la ficha. */
 export function EtiquetaActivo({ activo, altura = 2.2 }) {
+  const { activo: activoTexto } = useDominio();
   const { theme: t } = useTheme();
 
   return (
@@ -176,7 +185,7 @@ export function EtiquetaActivo({ activo, altura = 2.2 }) {
           fontSize: 11, fontWeight: 600, color: t.text, fontFamily: "'Inter', sans-serif",
         }}
       >
-        {activo.corto}
+        {activoTexto(activo.id, "corto")}
       </div>
     </Html>
   );

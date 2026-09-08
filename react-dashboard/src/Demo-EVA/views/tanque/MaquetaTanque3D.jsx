@@ -25,17 +25,21 @@
  * canvas.
  */
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import Encuadre from "@/features/three-d/components/Encuadre.jsx";
 import Escena from "@/features/three-d/components/Escena.jsx";
 import Piso from "@/features/three-d/components/Piso.jsx";
+import { Enfasis } from "@/i18n";
+import { useDominio } from "@/i18n/useDominio.js";
 import { usePrefersReducedMotion } from "@/lib/motion.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { useTheme } from "@/theme";
 
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
-import { ESTADOS_ORDEN, estadoInfo } from "../../domain/estado.js";
+import { RAIZ } from "../../domain/senales.js";
+import { ESTADOS_ORDEN } from "../../domain/estado.js";
 import { PuntoEstado } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
 import ActivoEnMaqueta from "../../three-d/components/ActivoEnMaqueta.jsx";
@@ -52,14 +56,21 @@ import { frameloopDe, rpmDe } from "../../three-d/lib/comportamiento.js";
  * pequeño y descentrado. El objetivo apunta a media altura del bastidor, que es
  * donde está la bandeja.
  */
+/*
+ * Los tres encuadres de cámara. El rótulo NO está aquí: sale de
+ * `machines:model3d.view.<id>` por la propia clave, igual que el estado de un
+ * servicio o la severidad de un riesgo. Aquí se decide DÓNDE se pone la
+ * cámara, que es lo único de esta tabla que no cambia con el idioma.
+ */
 const ENCUADRES = {
-  isometrica: { etiqueta: "Isométrica", posicion: [6.2, 5.2, 7.6], objetivo: [-0.1, 2.1, 0] },
-  superior: { etiqueta: "Superior", posicion: [0.01, 10, 0.01], objetivo: [-0.1, 1.4, 0] },
-  frontal: { etiqueta: "Frontal", posicion: [-0.1, 2.9, 9.2], objetivo: [-0.1, 2.1, 0] },
+  isometrica: { posicion: [6.2, 5.2, 7.6], objetivo: [-0.1, 2.1, 0] },
+  superior: { posicion: [0.01, 10, 0.01], objetivo: [-0.1, 1.4, 0] },
+  frontal: { posicion: [-0.1, 2.9, 9.2], objetivo: [-0.1, 2.1, 0] },
 };
 
 /** Leyenda de estados, sólo con los que hay ahora mismo en la instalación. */
 function Leyenda({ activos, t, dark }) {
+  const { estado: estadoTexto } = useDominio();
   const presentes = useMemo(() => {
     const cuenta = new Map();
     for (const a of activos) cuenta.set(a.estado, (cuenta.get(a.estado) ?? 0) + 1);
@@ -74,7 +85,7 @@ function Leyenda({ activos, t, dark }) {
         return (
           <span key={e} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: t.textSoft }}>
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}66` }} />
-            {estadoInfo(e).label}
+            {estadoTexto(e)}
             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: t.text }}>{n}</span>
           </span>
         );
@@ -99,8 +110,8 @@ function Leyenda({ activos, t, dark }) {
  * el mismo commit que el resto de la vista.
  */
 function ResumenActivo({ activo, t, dark }) {
+  const { estado: estadoTexto, activo: activoTexto } = useDominio();
   if (!activo) return null;
-  const info = estadoInfo(activo.estado);
 
   return (
     <div
@@ -112,13 +123,20 @@ function ResumenActivo({ activo, t, dark }) {
       }}
     >
       <PuntoEstado color={estadoColor(dark, activo.estado)} size={7} />
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>{activo.corto}</span>
-      <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>{info.corto}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>
+        {activoTexto(activo.id, "corto")}
+      </span>
+      <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>
+        {estadoTexto(activo.estado, "corto")}
+      </span>
     </div>
   );
 }
 
 function MaquetaTanque3D({ params, onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
+  const { sistema: nombreSistema } = useDominio();
   const { theme: t, dark } = useTheme();
   const { sistema, loading, error } = useSistemaAgua();
   const reduce = usePrefersReducedMotion();
@@ -164,14 +182,22 @@ function MaquetaTanque3D({ params, onNavigate }) {
 
   return (
     <>
-      <SectionLabel sub="Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide">
-        Vista 3D · Sistema de agua
+      <SectionLabel sub={traducir("machines:model3d.sub")}>
+        {traducir("machines:model3d.title", { sistema: nombreSistema("tanque") })}
       </SectionLabel>
 
-      {error && <AlertBanner type="error" title="No se pudo leer la instalación" message={error} />}
+      {error && (
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.plantReadFailed")}
+          message={error}
+        />
+      )}
 
       {loading && !sistema.resumen.medidas && (
-        <p style={{ textAlign: "center", fontSize: 13, opacity: 0.7 }}>Leyendo señales…</p>
+        <p style={{ textAlign: "center", fontSize: 13, opacity: 0.7 }}>
+          {traducir("machines:model3d.loading")}
+        </p>
       )}
 
       <ResumenActivo activo={activoSeleccionado} t={t} dark={dark} />
@@ -243,7 +269,7 @@ function MaquetaTanque3D({ params, onNavigate }) {
                 fontFamily: "'Inter', sans-serif",
               }}
             >
-              {ENCUADRES[id].etiqueta}
+              {traducir(`machines:model3d.view.${id}`)}
             </button>
           ))}
         </div>
@@ -252,10 +278,7 @@ function MaquetaTanque3D({ params, onNavigate }) {
       {/* La misma nota de procedencia que la vista de Planta, en una línea: los
           colores de las balizas son nuestros, no del servidor. */}
       <p style={{ marginTop: 14, fontSize: 11, color: t.textFaint, lineHeight: 1.6 }}>
-        Los colores de estado salen de umbrales locales; ICONICS no publica un
-        estado para <code style={{ fontFamily: "'IBM Plex Mono', monospace" }}>ac:TDCON/DEMO/SENSORES/</code>.
-        La disposición sale de un dibujo del equipo real, con cotas tomadas a
-        ojo sobre una perspectiva: es la del skid, no la de un plano acotado.
+        <Enfasis>{traducir("machines:model3d.provenance", { raiz: RAIZ })}</Enfasis>
       </p>
     </>
   );

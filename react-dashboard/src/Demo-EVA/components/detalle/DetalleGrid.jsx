@@ -9,6 +9,8 @@
  */
 import { useTranslation } from "react-i18next";
 
+import { useDominio } from "@/i18n/useDominio.js";
+
 import { Card, Cifra, Delta, MONO } from "../base.jsx";
 import { fmtNum } from "@/lib/format.js";
 import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
@@ -21,6 +23,7 @@ const VALOR_GRANDE = { fontFamily: MONO, fontSize: 30, fontWeight: 700, lineHeig
 function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
+  const { senal: senalTexto } = useDominio();
   const esBooleano = senal.tipo === "booleano";
   const tieneBufer = senal.bufferVivo.length >= 2;
 
@@ -35,7 +38,9 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
     <Card t={t} delay={delay} style={{ padding: "18px 20px 20px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>{senal.label}</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>
+            {senalTexto(senal.key)}
+          </div>
           <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.textFaint, marginTop: 2 }}>{senal.tag}</div>
         </div>
         {senal.historizado && <InsigniaOrigen real={!senal.historiaEnVivo} t={t} />}

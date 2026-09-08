@@ -23,6 +23,8 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { useDominio } from "@/i18n/useDominio.js";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, MONO, PuntoEstado } from "../base.jsx";
@@ -41,7 +43,7 @@ const MAX_SIN_NORMALIZAR = 2;
 const MAX_NORMALIZADO = 4;
 
 function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
-  const meta = SENALES[clave];
+  const { senal: senalTexto } = useDominio();
   return (
     <button
       type="button"
@@ -60,7 +62,7 @@ function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
       }}
     >
       {activa && <PuntoEstado color={color} size={7} />}
-      {meta.corto}
+      {senalTexto(clave, "corto")}
     </button>
   );
 }
@@ -68,6 +70,7 @@ function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
 export function GraficaComparada({ rango, t, delay = 0 }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
+  const { senal: senalTexto } = useDominio();
   const [seleccion, setSeleccion] = useState(["nivelTanque", "presionRelativa"]);
   const [normalizar, setNormalizar] = useState(false);
 
@@ -155,7 +158,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
             {seleccion.map((clave, i) => (
               <span key={clave} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <PuntoEstado color={colorDeSerie(t, i)} size={7} />
-                {SENALES[clave].corto}
+                {senalTexto(clave, "corto")}
                 {!normalizar && (i === 0 ? " · eje izquierdo" : " · eje derecho")}
               </span>
             ))}
@@ -188,7 +191,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
                 <Area
                   key={clave}
                   yAxisId={normalizar ? "unica" : i === 0 ? "izq" : "der"}
-                  type="monotone" dataKey={clave} name={SENALES[clave].corto}
+                  type="monotone" dataKey={clave} name={senalTexto(clave, "corto")}
                   stroke={colorDeSerie(t, i)} fill={colorDeSerie(t, i)} fillOpacity={0.08}
                   strokeWidth={2} isAnimationActive={false} dot={false} connectNulls={false}
                 />

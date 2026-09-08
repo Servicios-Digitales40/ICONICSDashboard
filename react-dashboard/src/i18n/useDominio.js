@@ -40,9 +40,18 @@ import { estadoInfo } from "@shared/eva/tanque/estado.js";
 import { senalInfo } from "@shared/eva/tanque/senales.js";
 import { activoInfo } from "@shared/eva/tanque/activos.js";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
+import { CANALES, MEDIDAS, VIGILANCIAS } from "@shared/eva/vibraciones/vibraciones.js";
 
 /**
- * Traduce el vocabulario del dominio: estados, señales y activos.
+ * Traduce el vocabulario del dominio de LAS DOS máquinas.
+ *
+ * Del tanque: estados, señales y activos. Del sistema de vibraciones: apoyos,
+ * magnitudes medidas, vigilancias del módulo y zonas ISO. Y el nombre de cada
+ * máquina, que hasta ahora salía en español dentro del tablero en inglés.
+ *
+ * Son dos catálogos separados y siguen separados —cruzarlos es justo lo que
+ * `NO_COMPARTEN` impide (CLAUDE.md §2.1)—; lo único que comparten es el
+ * mecanismo de traducirlos, que es esto.
  *
  * Devuelve funciones y no cadenas para que el componente pida sólo lo que
  * pinta, y para que todas cuelguen del mismo `t` —o sea, del mismo idioma— en
@@ -120,7 +129,70 @@ export function useDominio() {
     [sistema]
   );
 
-  return { estado, senal, activo, sistema, sistemas };
+  /* ── El vocabulario de la OTRA máquina ───────────────────────────── */
+
+  /**
+   * El nombre de un apoyo: S1 «Lado acople», S2 «Rodamiento intermedio»…
+   *
+   * El ID (S1, S2, S3) NO se traduce y no pasa por aquí: es el sufijo del tag
+   * en el servidor, y quien conozca la instalación lo reconoce por él. Lo que
+   * se traduce es la descripción de dónde está montada la sonda.
+   */
+  const canal = useCallback(
+    (id) => {
+      const info = CANALES.find((c) => c.id === id);
+      return t(`machines:vibration.channels.${id}`, { defaultValue: info?.label ?? id });
+    },
+    [t]
+  );
+
+  /**
+   * El nombre de una magnitud medida. `corto` es la abreviatura —vRMS, aRMS—,
+   * que en la práctica es la misma en los dos idiomas porque es notación, no
+   * palabra; existe como clave igualmente para que quepa cambiarla sin tocar
+   * código si alguna vez hace falta.
+   */
+  const medida = useCallback(
+    (key, variante = "label") => {
+      const info = MEDIDAS.find((m) => m.key === key);
+      return t(`machines:vibration.measures.${key}.${variante}`, {
+        defaultValue: info?.[variante] ?? info?.label ?? key,
+      });
+    },
+    [t]
+  );
+
+  /** Qué vigila el módulo en un canal: umbral, espectro o defecto de rodamiento. */
+  const vigilancia = useCallback(
+    (key) => {
+      const info = VIGILANCIAS.find((v) => v.key === key);
+      return t(`machines:vibration.watches.${key}`, { defaultValue: info?.label ?? key });
+    },
+    [t]
+  );
+
+  /** El estado de una vigilancia: apagada, en orden, en aviso, en alarma. */
+  const estadoVigilancia = useCallback(
+    (id, porDefecto = "") => t(`machines:vibration.watchState.${id}`, { defaultValue: porDefecto }),
+    [t]
+  );
+
+  /**
+   * La zona ISO 10816-1 de una velocidad eficaz.
+   *
+   * La LETRA (A, B, C, D) es de la norma y no cambia con el idioma — igual que
+   * un código de alarma—; lo que se traduce es su lectura («como nueva»,
+   * «insatisfactoria»).
+   */
+  const zonaIso = useCallback(
+    (zona, porDefecto = "") => t(`machines:vibration.isoZone.${zona}`, { defaultValue: porDefecto }),
+    [t]
+  );
+
+  return {
+    estado, senal, activo, sistema, sistemas,
+    canal, medida, vigilancia, estadoVigilancia, zonaIso,
+  };
 }
 
 /**

@@ -27,7 +27,6 @@ import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
 import { useDetalleActivo } from "../../data/tanque/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/tanque/historia.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
-import { estadoInfo } from "../../domain/estado.js";
 import { historizadas, senalInfo } from "../../domain/senales.js";
 import { useAhora } from "../../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../../components/base.jsx";
@@ -94,13 +93,15 @@ function leerRangoDeUrl(params) {
 }
 
 function CabeceraActivo({ activo, dark, t, lastUpdated }) {
-  const info = estadoInfo(activo.estado);
+  const { estado: estadoTexto, activo: activoTexto } = useDominio();
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <PuntoEstado color={estadoColor(dark, activo.estado)} size={10} />
         <div>
-          <div style={{ fontSize: 13, color: t.textSoft }}>{activo.pregunta}</div>
+          <div style={{ fontSize: 13, color: t.textSoft }}>
+            {activoTexto(activo.id, "pregunta")}
+          </div>
         </div>
         <span
           style={{
@@ -108,7 +109,7 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
             background: t.hover, color: t.textSoft, marginLeft: 4,
           }}
         >
-          {info.label}
+          {estadoTexto(activo.estado)}
         </span>
       </div>
       <UltimaLectura fecha={lastUpdated} t={t} />
@@ -232,7 +233,11 @@ function DetalleActivo({ params, onNavigate }) {
     return <AlertBanner type="error" title="Activo desconocido" message={`No existe un activo con id «${activoId}».`} />;
   }
 
-  const pestañas = activos.map((a) => ({ key: a.id, label: a.corto, color: estadoColor(dark, a.estado) }));
+  const pestañas = activos.map((a) => ({
+    key: a.id,
+    label: activoTexto(a.id, "corto"),
+    color: estadoColor(dark, a.estado),
+  }));
 
   // Sólo tiene sentido un selector de rango si hay al menos una gráfica que
   // consulte el historiador. Bombeo y Eléctrico no tienen ninguna señal con

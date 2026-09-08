@@ -159,7 +159,101 @@
     "connecting": "connecting to the vibration module…",
     "otherMachineNote": "This is <b>a different machine</b>: its own motor, its own VFD and its own PLC. And this system does not use the historian yet: what you see is the present instant, with no trends.",
     "seeRisks": "See the risks now",
-    "nobodyWatching": "Nobody is watching the bearings"
+    "nobodyWatching": "Nobody is watching the bearings",
+    "channels": {
+      "S1": "Drive end",
+      "S2": "Intermediate bearing",
+      "S3": "Non-drive end"
+    },
+    "measures": {
+      "vRMS": {
+        "label": "RMS velocity",
+        "corto": "vRMS"
+      },
+      "aRMS": {
+        "label": "RMS acceleration",
+        "corto": "aRMS"
+      },
+      "aPeak": {
+        "label": "Peak acceleration",
+        "corto": "aPeak"
+      },
+      "DKW": {
+        "label": "Damage characteristic value",
+        "corto": "DKW"
+      }
+    },
+    "watches": {
+      "monVRMS": "RMS velocity against its threshold",
+      "monARMS": "RMS acceleration against its threshold",
+      "monDKW": "Damage value against its baseline",
+      "monEspectroA": "Acceleration spectrum",
+      "monEspectroV": "Velocity spectrum",
+      "bpfo": "Ball pass frequency, outer race (BPFO)",
+      "bpfi": "Ball pass frequency, inner race (BPFI)",
+      "bsf": "Ball spin frequency (BSF)",
+      "ftf": "Fundamental train frequency (FTF)"
+    },
+    "watchState": {
+      "apagado": "Not watched",
+      "ok": "Watched and in order",
+      "aviso": "Warning",
+      "alarma": "Alarm"
+    },
+    "isoZone": {
+      "A": "zone A · as new",
+      "B": "zone B · acceptable",
+      "C": "zone C · unsatisfactory",
+      "D": "zone D · damage"
+    },
+    "sensitivity": "Sensitivity {{valor}} mV/g",
+    "bearing": "bearing {{modelo}}",
+    "model3d": {
+      "title": "3D View · Rotor rig",
+      "sub": "The rotor train with its three probes · the shaft turns at the speed the VFD publishes",
+      "silent": "{{mudos}} of {{total}} points are returning no reading right now. The bearings drawn as wireframe are not quiet: they are silent, and the shaft stands still because the VFD is not publishing its speed, not because the machine is known to be stopped.",
+      "axesTip": "Draws the axis each probe measures, and the two it does not",
+      "axesButton": "Measurement axes",
+      "framing": "View",
+      "trainTitle": "The rotor train",
+      "trainSub": "In the order the rotation passes through them · click a bearing with a probe for its readings",
+      "seeMeasurements": "See the readings from the three bearings",
+      "speed": {
+        "title": "Shaft speed",
+        "notPublished": "The VFD is not publishing the speed, so the shaft is drawn still. That does not mean the machine is stopped: it means it is not on record.",
+        "stopped": "The VFD publishes zero: the machine is stopped.",
+        "isoApplies": "Above the {{rpm}} rpm at which ISO 10816 starts to apply, so the RMS velocity verdict holds (warning {{aviso}} mm/s, alarm {{alarma}} mm/s).",
+        "isoBelow": "Below {{rpm}} rpm: the rotational frequency falls outside the band ISO 10816 measures, so the standard does not apply and the bearings come out without a criterion.",
+        "compressed": "The rotation in the scene is compressed: at a real 3,475 rpm a mesh spinning 60 times a second would look still, or backwards. It conveys that it turns and roughly how much, not the exact speed."
+      },
+      "axes": {
+        "title": "Only the vertical axis is measured",
+        "intro": "The three probes are mounted vertically, and only vertically. In the scene, the green arrow is what is measured; the two grey ones are the directions that are missing.",
+        "axial": "Without the <b>axial</b> one, a coupling misalignment may not show up: that is where it shows most.",
+        "radial": "Without the second <b>radial</b> one, unbalance and looseness look identical — what separates them is the ratio between the two.",
+        "standard": "{{norma}}, so this sampling does not comply with that standard.",
+        "isoStillValid": "The ISO 10816-1 Class I severity criterion on RMS velocity is used and does hold; what does not hold is presenting this as an assessment compliant with ISO 20816."
+      },
+      "missing": {
+        "title": "What the scene cannot draw",
+        "intro": "The rig is mounted on slotted profile: the pillow blocks and the disc move, so their spacing is not a constant of the machine. What is still to be measured:",
+        "spacing": "Distance between pillow blocks, and the disc position relative to them.",
+        "shaft": "Shaft diameter. Without it there is no critical speed to compute.",
+        "bearings": "Bearing model of the two pillow blocks. Without it there is no BPFO, BPFI, BSF or FTF.",
+        "onlyDimension": "The only dimension on record is the shaft’s {{cm}} cm, and it comes with a caveat: {{reserva}}. That is why the scene is at reading scale and not real scale — it cannot be measured on."
+      },
+      "view": {
+        "isometrica": "Isometric",
+        "lateral": "Side",
+        "superior": "Top",
+        "frontal": "Front"
+      }
+    },
+    "probe": {
+      "mounting": "{{fabricante}} {{modelo}} probe, {{sensibilidad}} mV/g, {{montaje}} mounting and vertical orientation.",
+      "bearingKnown": "Bearing {{modelo}}.",
+      "bearingUnknown": "Bearing not identified: without its reference BPFO, BPFI and FTF cannot be computed, so this bearing has no frequency-based bearing diagnosis."
+    }
   },
   "assetsView": {
     "title": "Assets · EVA Demo",
@@ -259,6 +353,11 @@
     "title": "3D View · {{sistema}}",
     "sub": "Hover an asset to see it, click it for its signals · each card sits where the instrument that measures it is",
     "loading": "Reading signals…",
-    "provenance": "Status colours come from local thresholds; ICONICS publishes no status for <b>{{raiz}}</b>. The layout comes from a drawing of the real equipment, with dimensions taken by eye off a perspective view: it is the skid’s, not a dimensioned plan."
+    "provenance": "Status colours come from local thresholds; ICONICS publishes no status for <b>{{raiz}}</b>. The layout comes from a drawing of the real equipment, with dimensions taken by eye off a perspective view: it is the skid’s, not a dimensioned plan.",
+    "view": {
+      "isometrica": "Isometric",
+      "superior": "Top",
+      "frontal": "Front"
+    }
   }
 }

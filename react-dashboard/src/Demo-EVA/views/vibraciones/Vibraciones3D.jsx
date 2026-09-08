@@ -48,9 +48,12 @@
  * ritmo nominal de reserva.
  */
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { LineChart, Ruler } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
+import { useDominio } from "@/i18n/useDominio.js";
 import Encuadre from "@/features/three-d/components/Encuadre.jsx";
 import Escena from "@/features/three-d/components/Escena.jsx";
 import Piso from "@/features/three-d/components/Piso.jsx";
@@ -62,7 +65,7 @@ import { useTheme } from "@/theme";
 import { PuntoEstado } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
 import { useVibracion } from "../../data/vibraciones/vibracion.js";
-import { ESTADOS_ORDEN, estadoInfo } from "../../domain/estado.js";
+import { ESTADOS_ORDEN } from "../../domain/estado.js";
 import {
   ACELEROMETRO,
   CANAL,
@@ -185,6 +188,7 @@ function ApoyoInstrumentado({ elemento, descriptor, ejes, seleccionado, onSelecc
 
 /** Leyenda de estados, con los que hay ahora mismo. Igual que en la maqueta. */
 function Leyenda({ estados, t, dark }) {
+  const { estado: estadoTexto } = useDominio();
   const presentes = useMemo(() => {
     const cuenta = new Map();
     for (const e of estados) cuenta.set(e, (cuenta.get(e) ?? 0) + 1);
@@ -201,7 +205,7 @@ function Leyenda({ estados, t, dark }) {
             style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: t.textSoft }}
           >
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}66` }} />
-            {estadoInfo(e).label}
+            {estadoTexto(e)}
             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontWeight: 700, color: t.text }}>{n}</span>
           </span>
         );
@@ -307,19 +311,26 @@ function TiraDelTren({ estadoPorCanal, seleccionado, onSeleccionar, t, dark }) {
 
 /** Las cuatro medidas del apoyo seleccionado. */
 function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const {
+    estado: estadoTexto, canal: canalTexto, medida: medidaTexto, zonaIso,
+  } = useDominio();
   const canal = CANAL[elemento.canal];
   const estado = estadoDeApoyo(datos, normaAplicable);
   const banda = bandaISO(datos?.vRMS, normaAplicable);
 
   return (
-    <Panel title={`${elemento.label} · ${canal.label}`} code={canal.equipo}>
+    <Panel title={`${elemento.label} · ${canalTexto(canal.id)}`} code={canal.equipo}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <PuntoEstado color={estadoColor(dark, estado)} size={8} />
         <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text }}>
-          {estadoInfo(estado).label}
+          {estadoTexto(estado)}
         </span>
         {banda && (
-          <span style={{ fontSize: 11.5, color: t.textFaint, marginLeft: "auto" }}>{banda.label}</span>
+          <span style={{ fontSize: 11.5, color: t.textFaint, marginLeft: "auto" }}>
+            {zonaIso(banda.zona, banda.label)}
+          </span>
         )}
       </div>
 
@@ -329,7 +340,7 @@ function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
           const hay = Number.isFinite(v);
           return (
             <div key={m.key}>
-              <div style={{ fontSize: 10.5, color: t.textFaint }}>{m.label}</div>
+              <div style={{ fontSize: 10.5, color: t.textFaint }}>{medidaTexto(m.key)}</div>
               <div
                 style={{
                   fontSize: 18, fontWeight: 800, marginTop: 2,
@@ -347,13 +358,20 @@ function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
         })}
       </div>
 
+      {/*
+        El fabricante, el modelo y la referencia del rodamiento son
+        identificadores de catálogo: van tal cual en los dos idiomas.
+      */}
       <p style={{ margin: "12px 0 0", fontSize: 12, color: t.textSoft }}>
-        Sonda {ACELEROMETRO.fabricante} {ACELEROMETRO.modelo}, {canal.sensibilidad} mV/g,{" "}
-        montaje {ACELEROMETRO.montaje} y orientación vertical. Rodamiento{" "}
-        {canal.rodamiento ?? "sin identificar"}
+        {traducir("vibration.probe.mounting", {
+          fabricante: ACELEROMETRO.fabricante,
+          modelo: ACELEROMETRO.modelo,
+          sensibilidad: canal.sensibilidad,
+          montaje: ACELEROMETRO.montaje,
+        })}{" "}
         {canal.rodamiento
-          ? "."
-          : ": sin su referencia no se pueden calcular BPFO, BPFI ni FTF, así que este apoyo no tiene diagnóstico de rodamiento por frecuencia."}
+          ? traducir("vibration.probe.bearingKnown", { modelo: canal.rodamiento })
+          : traducir("vibration.probe.bearingUnknown")}
       </p>
     </Panel>
   );
@@ -362,6 +380,8 @@ function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
 /* ── La vista ─────────────────────────────────────────────────────── */
 
 function Vibraciones3D({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t, dark } = useTheme();
   const reduce = usePrefersReducedMotion();
   const angosto = useMediaQuery("(max-width: 720px)");
@@ -414,22 +434,25 @@ function Vibraciones3D({ onNavigate }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <SectionLabel sub="El tren de rotor con sus tres sondas · el eje gira al régimen que publica el variador">
-        Vista 3D · Banco de rotor
+      <SectionLabel sub={traducir("machines:vibration.model3d.sub")}>
+        {traducir("machines:vibration.model3d.title")}
       </SectionLabel>
 
-      {error && <AlertBanner type="error" title="No se pudo leer el módulo" message={error} />}
+      {error && (
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.moduleReadFailed")}
+          message={error}
+        />
+      )}
 
       {casiTodoMudo && !loading && (
         <AlertBanner
           type="warning"
-          title="La máquina no está contestando"
-          message={
-            `${mudos} de ${totalPuntos} puntos no entregan lectura ahora mismo. ` +
-            "Los apoyos que se vean en malla de alambre no están tranquilos: están callados, " +
-            "y el eje se queda quieto porque el variador no está publicando su régimen, " +
-            "no porque conste que la máquina esté parada."
-          }
+          title={traducir("machines:vibration.silent.title")}
+          message={traducir("machines:vibration.model3d.silent", {
+            mudos, total: totalPuntos,
+          })}
         />
       )}
 
@@ -499,24 +522,26 @@ function Vibraciones3D({ onNavigate }) {
             activo={ejes}
             onClick={() => setEjes((v) => !v)}
             t={t}
-            titulo="Dibuja el eje que cada sonda mide y los dos que no"
+            titulo={traducir("machines:vibration.model3d.axesTip")}
           >
             <Ruler size={13} />
-            Ejes de medida
+            {traducir("machines:vibration.model3d.axesButton")}
           </BotonBarra>
 
-          <span style={{ fontSize: 11.5, color: t.textFaint, marginLeft: 4 }}>Encuadre</span>
-          {Object.entries(ENCUADRES).map(([id, e]) => (
+          <span style={{ fontSize: 11.5, color: t.textFaint, marginLeft: 4 }}>
+            {traducir("machines:vibration.model3d.framing")}
+          </span>
+          {Object.keys(ENCUADRES).map((id) => (
             <BotonBarra key={id} activo={encuadre.id === id} onClick={() => irA(id)} t={t}>
-              {e.etiqueta}
+              {traducir(`machines:vibration.model3d.view.${id}`)}
             </BotonBarra>
           ))}
         </div>
       </div>
 
       <div>
-        <SectionLabel sub="En el orden en que el giro las atraviesa · pulsa un apoyo con sonda para sus medidas">
-          El tren de rotor
+        <SectionLabel sub={traducir("machines:vibration.model3d.trainSub")}>
+          {traducir("machines:vibration.model3d.trainTitle")}
         </SectionLabel>
         <div style={{ marginTop: 12 }}>
           <TiraDelTren
@@ -540,7 +565,7 @@ function Vibraciones3D({ onNavigate }) {
       )}
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <Panel title="Régimen del eje">
+        <Panel title={traducir("machines:vibration.model3d.speed.title")}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span
               style={{
@@ -555,62 +580,60 @@ function Vibraciones3D({ onNavigate }) {
           </div>
           <p style={{ margin: "8px 0 0", fontSize: 12.5, color: t.textSoft }}>
             {!giro.medido
-              ? "El variador no está publicando la velocidad, así que el eje se dibuja quieto. Eso no significa que la máquina esté parada: significa que no consta."
+              ? traducir("machines:vibration.model3d.speed.notPublished")
               : giro.real <= 0
-                ? "El variador publica cero: la máquina está parada."
-                : normaAplicable
-                  ? `Por encima de las ${RPM_MINIMA_ISO} rpm en que ISO 10816 empieza a pronunciarse, así que el veredicto de la velocidad eficaz vale (aviso ${LIMITES_ISO.aviso} mm/s, alarma ${LIMITES_ISO.alarma} mm/s).`
-                  : `Por debajo de las ${RPM_MINIMA_ISO} rpm: la frecuencia de giro se sale de la banda que ISO 10816 mide, así que la norma no se pronuncia y los apoyos salen sin criterio.`}
+                ? traducir("machines:vibration.model3d.speed.stopped")
+                : traducir(
+                  normaAplicable
+                    ? "machines:vibration.model3d.speed.isoApplies"
+                    : "machines:vibration.model3d.speed.isoBelow",
+                  { rpm: RPM_MINIMA_ISO, aviso: LIMITES_ISO.aviso, alarma: LIMITES_ISO.alarma },
+                )}
           </p>
           <p style={{ margin: "8px 0 0", fontSize: 11.5, color: t.textFaint }}>
-            El giro de la escena está comprimido: a 3 475 rpm reales una malla girando
-            60 veces por segundo se vería quieta o al revés. Comunica que gira y cuánto,
-            no a qué velocidad exacta.
+            {traducir("machines:vibration.model3d.speed.compressed")}
           </p>
         </Panel>
 
-        <Panel title="Sólo se mide el eje vertical">
+        <Panel title={traducir("machines:vibration.model3d.axes.title")}>
           <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft }}>
-            Las tres sondas están montadas en vertical, y sólo en vertical. En la escena, la
-            flecha verde es lo que se mide; las dos grises son las direcciones que faltan.
+            {traducir("machines:vibration.model3d.axes.intro")}
           </p>
           <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 12.5, color: t.textSoft }}>
             <li style={{ marginBottom: 5 }}>
-              Sin la <strong>axial</strong>, una desalineación de acoplamiento puede no aparecer:
-              es donde más se manifiesta.
+              <Enfasis>{traducir("machines:vibration.model3d.axes.axial")}</Enfasis>
             </li>
             <li style={{ marginBottom: 5 }}>
-              Sin la segunda <strong>radial</strong>, un desequilibrio y una holgura se ven iguales
-              — lo que los separa es la relación entre las dos.
+              <Enfasis>{traducir("machines:vibration.model3d.axes.radial")}</Enfasis>
             </li>
-            <li>{EJES_MEDIDA.norma}, así que este muestreo no cumple esa norma.</li>
-          </ul>
-          <p style={{ margin: "10px 0 0", fontSize: 11.5, color: t.textFaint }}>
-            El criterio de severidad de ISO 10816-1 Clase I sobre la velocidad eficaz sí se usa
-            y sí vale; lo que no vale es presentar esto como una evaluación conforme a ISO 20816.
-          </p>
-        </Panel>
-
-        <Panel title="Lo que la escena no puede dibujar">
-          <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft }}>
-            El banco se monta sobre perfil ranurado: las chumaceras y el disco se mueven, así
-            que su separación no es una constante de la máquina. Lo que falta por medir:
-          </p>
-          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 12.5, color: t.textSoft }}>
-            <li style={{ marginBottom: 5 }}>
-              Distancia entre chumaceras y posición del disco respecto a ellas.
-            </li>
-            <li style={{ marginBottom: 5 }}>
-              Diámetro del eje. Sin él no hay velocidad crítica que calcular.
-            </li>
+            {/* El nombre de la norma es un identificador: no se traduce. */}
             <li>
-              Modelo de rodamiento de las dos chumaceras. Sin él no hay BPFO, BPFI, BSF ni FTF.
+              {traducir("machines:vibration.model3d.axes.standard", { norma: EJES_MEDIDA.norma })}
             </li>
           </ul>
           <p style={{ margin: "10px 0 0", fontSize: 11.5, color: t.textFaint }}>
-            La única cota que hay son los {EJE.longitudCm} cm del eje, y llega con reserva:{" "}
-            {EJE.ambiguo.toLowerCase()}. Por eso la escena está a escala de lectura y no a escala
-            real — no se puede medir sobre ella.
+            {traducir("machines:vibration.model3d.axes.isoStillValid")}
+          </p>
+        </Panel>
+
+        <Panel title={traducir("machines:vibration.model3d.missing.title")}>
+          <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft }}>
+            {traducir("machines:vibration.model3d.missing.intro")}
+          </p>
+          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 12.5, color: t.textSoft }}>
+            <li style={{ marginBottom: 5 }}>
+              {traducir("machines:vibration.model3d.missing.spacing")}
+            </li>
+            <li style={{ marginBottom: 5 }}>
+              {traducir("machines:vibration.model3d.missing.shaft")}
+            </li>
+            <li>{traducir("machines:vibration.model3d.missing.bearings")}</li>
+          </ul>
+          <p style={{ margin: "10px 0 0", fontSize: 11.5, color: t.textFaint }}>
+            {traducir("machines:vibration.model3d.missing.onlyDimension", {
+              cm: EJE.longitudCm,
+              reserva: EJE.ambiguo.toLowerCase(),
+            })}
           </p>
         </Panel>
       </div>
@@ -627,7 +650,7 @@ function Vibraciones3D({ onNavigate }) {
         }}
       >
         <LineChart size={15} />
-        Ver las medidas de los tres apoyos
+        {traducir("machines:vibration.model3d.seeMeasurements")}
       </button>
     </div>
   );

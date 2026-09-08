@@ -40,6 +40,7 @@ import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { Enfasis } from "@/i18n";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
@@ -78,6 +79,7 @@ const fmt = (v, dec) =>
 function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
+  const { canal: canalTexto, medida: medidaTexto, zonaIso } = useDominio();
   const banda = bandaISO(datos?.vRMS, normaAplicable);
 
   return (
@@ -90,11 +92,19 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
     >
       <header>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>
-          {canal.label}
+          {canalTexto(canal.id)}
         </h3>
+        {/*
+          El id del apoyo y el nombre del equipo son IDENTIFICADORES del
+          servidor —el sufijo del tag y el nombre en AssetWorX—: van tal cual
+          en los dos idiomas. El modelo de rodamiento («6205 ZZ») también: es
+          una referencia de catálogo, no una palabra.
+        */}
         <div style={{ fontSize: 11, color: t.textFaint, marginTop: 3 }}>
           {canal.id} · {canal.equipo}
-          {canal.rodamiento ? ` · rodamiento ${canal.rodamiento}` : ""}
+          {canal.rodamiento
+            ? ` · ${traducir("machines:vibration.bearing", { modelo: canal.rodamiento })}`
+            : ""}
         </div>
       </header>
 
@@ -106,7 +116,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
           return (
             <div key={m.key}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", color: t.textFaint }}>
-                {m.corto.toUpperCase()}
+                {medidaTexto(m.key, "corto").toUpperCase()}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, color, lineHeight: 1.2 }}>
                 {fmt(v, m.decimales)}
@@ -115,7 +125,9 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
                 </span>
               </div>
               {esVelocidad && banda && (
-                <div style={{ fontSize: 10, color: t[COLOR_ZONA[banda.zona]], marginTop: 2 }}>{banda.label}</div>
+                <div style={{ fontSize: 10, color: t[COLOR_ZONA[banda.zona]], marginTop: 2 }}>
+                  {zonaIso(banda.zona, banda.label)}
+                </div>
               )}
             </div>
           );
@@ -130,7 +142,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
       <div style={{ fontSize: 11, color: canal.sensibilidad === null ? t.amber : t.textFaint }}>
         {canal.sensibilidad === null
           ? traducir("machines:vibration.probeUnconfirmed")
-          : `Sensibilidad ${canal.sensibilidad} mV/g`}
+          : traducir("machines:vibration.sensitivity", { valor: canal.sensibilidad })}
       </div>
     </article>
   );
@@ -153,14 +165,25 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
 function TablaVigilancias({ canales, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
+  const { canal: canalTexto, vigilancia, estadoVigilancia } = useDominio();
   const color = (e) =>
     e === null ? t.textFaint
       : e.id === "ok" ? t.success
         : e.id === "apagado" ? t.amber
           : t.coral;
 
-  const simbolo = (e) =>
-    e === null ? traducir("machines:vibration.watch.none") : e.id === "ok" ? traducir("machines:vibration.watch.watched") : e.id === "apagado" ? traducir("machines:vibration.watch.off") : e.label;
+  /*
+   * El estado de una vigilancia. Los dos casos habituales tienen su propia
+   * palabra corta —«vigilado», «APAGADO»— porque en una celda de tabla no cabe
+   * «Vigilado y en orden»; los otros dos (aviso y alarma) sí van con el
+   * rótulo del catálogo, ahora traducido en vez de leído de `shared/`.
+   */
+  const simbolo = (e) => {
+    if (e === null) return traducir("machines:vibration.watch.none");
+    if (e.id === "ok") return traducir("machines:vibration.watch.watched");
+    if (e.id === "apagado") return traducir("machines:vibration.watch.off");
+    return estadoVigilancia(e.id, e.label);
+  };
 
   const grupos = [
     [traducir("machines:vibration.watch.threshold"), VIGILANCIAS.filter((v) => v.grupo === "umbral")],
@@ -187,7 +210,7 @@ function TablaVigilancias({ canales, t }) {
                   fontWeight: 700, fontSize: 10, letterSpacing: "0.06em",
                 }}
               >
-                {c.label.toUpperCase()}
+                {canalTexto(c.id).toUpperCase()}
               </th>
             ))}
           </tr>
@@ -208,7 +231,7 @@ function TablaVigilancias({ canales, t }) {
               </tr>
               {filas.map((v) => (
                 <tr key={v.key}>
-                  <td style={{ padding: "4px 8px", color: t.textSoft }}>{v.label}</td>
+                  <td style={{ padding: "4px 8px", color: t.textSoft }}>{vigilancia(v.key)}</td>
                   {CANALES.map((c) => {
                     const e = canales?.[c.id]?.vigilancias?.[v.key] ?? null;
                     return (
