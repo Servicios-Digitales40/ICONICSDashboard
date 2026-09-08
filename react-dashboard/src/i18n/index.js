@@ -247,4 +247,11 @@ i18n
     },
   });
 
+/*
+ * La negrita dentro de una frase traducida. Se reexporta desde aquí para que
+ * una vista sólo tenga que conocer `@/i18n`, y porque su cabecera explica por
+ * qué NO se usa `<Trans>`.
+ */
+export { Enfasis } from "./Enfasis.jsx";
+
 export default i18n;

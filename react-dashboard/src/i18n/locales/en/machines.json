@@ -84,10 +84,9 @@
     },
     "risks": {
       "title": "Vibration system risks",
-      "detected": "Conditions detected",
-      "checking": "Checking…",
-      "noneNow": "No risk conditions right now",
-      "cannotCheck": "None could be checked: there are no readings to evaluate."
+      "scope": "These rules evaluate the accelerometer-equipped motor: its own motor, its own VFD and its own PLC.",
+      "cannotCheck": "None could be checked: there are no readings to evaluate.",
+      "chartsHint": "The measurements behind these rules —the three bearings, their four quantities and which watches the module has enabled— are on the <b>{{pantalla}}</b> screen."
     },
     "pipeline": {
       "acelerometros": {

@@ -25,6 +25,7 @@
   },
   "hints": {
     "bridgeDown": "{{detalle}}. Si esta pantalla no carga, el problema no es de una vista: es el propio puente el que no está en pie.",
-    "technicalDetail": "Detalle técnico: {{detalle}}"
+    "technicalDetail": "Detalle técnico: {{detalle}}",
+    "staleBelow": "{{detalle}}. Lo que se ve abajo puede estar desactualizado."
   }
 }

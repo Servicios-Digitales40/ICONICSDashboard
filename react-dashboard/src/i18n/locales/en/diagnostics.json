@@ -1,1 +1,64 @@
-{}
+{
+  "severity": {
+    "critico": "Could cause damage",
+    "atencion": "Worth checking",
+    "informativo": "Worth bearing in mind"
+  },
+  "trend": {
+    "empeorando": "Worsening",
+    "mejorando": "Improving",
+    "estable": "Steady",
+    "sinDeterminar": "No trend"
+  },
+  "field": {
+    "measured": "Measured",
+    "mayHappen": "What could happen",
+    "toCheck": "What to check",
+    "whyDegrades": "Why it degrades",
+    "leadsTo": "What failure it leads to"
+  },
+  "action": {
+    "ask": "Ask Tdconcito",
+    "analyze": "Analyze with Tdconcito",
+    "closeCase": "Close diagnosis"
+  },
+  "criterion": "Criterion: {{norma}}",
+  "risks": {
+    "detected": "Conditions detected",
+    "detectedCount": "Conditions detected · {{n}}",
+    "checking": "Checking…",
+    "noneNow": "No risk conditions right now",
+    "rulesChecked_one": "{{count}} rule checked against the current readings.",
+    "rulesChecked_other": "{{count}} rules checked against the current readings.",
+    "unchecked": "Not checked · {{n}}",
+    "uncheckedNote": "These rules could not be evaluated because a reading is missing. It does not mean everything is fine: it means <b>we do not know</b>.",
+    "missing": "— missing {{falta}}"
+  },
+  "provisional": {
+    "title": "These warnings are computed against limits we estimated ourselves",
+    "message": "The server does not publish the thresholds these signals are checked against. Measured on the real plant, gauge pressure spends 92 % of the time below its «minimum», so a pressure warning from this screen may mean nothing. The <b>server's own alarms override this screen</b>: their limits were set by whoever knows the process."
+  },
+  "forecast": {
+    "title": "Accumulated wear",
+    "titleRange": "Accumulated wear · last {{periodo}}",
+    "idle": {
+      "body": "Accumulated wear is computed over <b>weeks of history</b>, not over the present instant: it means reading the historian for five signals and splitting the range, so it takes a few seconds. The risks above do not depend on this and are already evaluated.",
+      "button": "Compute wear over the last {{periodo}}"
+    },
+    "resolution": {
+      "title": "This measures what is sustained, at a resolution of {{resolucion}}",
+      "message": "Each sample is the <b>average</b> of its interval, so an episode shorter than {{resolucion}} is averaged away and does not show up here. A 0 % means «nothing sustained happened», never «nothing happened». Hours are <b>estimated</b> from the fraction of samples, not counted: this plant's historian has gaps. And «with the pump delivering» is reconstructed from flow rate, because motor load has no series of its own."
+    },
+    "loading": "Reading the historian…",
+    "ofTimeEvaluated": "of the time evaluated",
+    "hoursEstimated": " · ~{{horas}} h estimated",
+    "samples": "{{expuestas}} of {{muestras}} samples",
+    "whilePumping": " with the pump delivering",
+    "none": {
+      "title": "No sustained wear over {{periodo}}",
+      "detail_one": "{{count}} mechanism checked over {{muestras}} historian samples.",
+      "detail_other": "{{count}} mechanisms checked over {{muestras}} historian samples."
+    },
+    "unwatchedNote": "These wear mechanisms are <b>not being watched</b>, because the historian does not serve the signal they need. It is not that they do not happen: it is that nobody is counting them."
+  }
+}

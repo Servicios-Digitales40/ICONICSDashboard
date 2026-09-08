@@ -41,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
@@ -50,7 +51,7 @@ import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 function RiesgosVibracion({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
+  const { t: traducir } = useTranslation(["machines", "diagnostics", "navigation", "errors"]);
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -74,10 +75,7 @@ function RiesgosVibracion({ onNavigate }) {
       <AlertBanner
         type="info"
         title={traducir("machines:vibration.risks.title")}
-        message={
-          "Estas reglas evalúan el motor con acelerómetros: su propio motor, su propio " +
-          "variador y su propio PLC."
-        }
+        message={traducir("machines:vibration.risks.scope")}
       />
 
       {error && (
@@ -100,8 +98,8 @@ function RiesgosVibracion({ onNavigate }) {
         */}
         <SectionLabel>
           {res.activos.length > 0
-            ? `Situaciones detectadas · ${res.activos.length}`
-            : traducir("machines:vibration.risks.detected")}
+            ? traducir("diagnostics:risks.detectedCount", { n: res.activos.length })
+            : traducir("diagnostics:risks.detected")}
         </SectionLabel>
         <UltimaLectura fecha={lastUpdated} t={t} />
       </div>
@@ -134,11 +132,11 @@ function RiesgosVibracion({ onNavigate }) {
           <CheckCircle2 size={20} color={t.success} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
-              {loading ? traducir("machines:vibration.risks.checking") : traducir("machines:vibration.risks.noneNow")}
+              {loading ? traducir("diagnostics:risks.checking") : traducir("diagnostics:risks.noneNow")}
             </div>
             <div style={{ fontSize: 12, color: t.textSoft, marginTop: 2 }}>
               {res.evaluadas > 0
-                ? `${res.evaluadas} regla${res.evaluadas === 1 ? "" : "s"} comprobada${res.evaluadas === 1 ? "" : "s"} con las lecturas actuales.`
+                ? traducir("diagnostics:risks.rulesChecked", { count: res.evaluadas })
                 : traducir("machines:vibration.risks.cannotCheck")}
             </div>
           </div>
@@ -151,7 +149,9 @@ function RiesgosVibracion({ onNavigate }) {
       */}
       {res.noEvaluables.length > 0 && (
         <>
-          <SectionLabel>Sin comprobar · {res.noEvaluables.length}</SectionLabel>
+          <SectionLabel>
+            {traducir("diagnostics:risks.unchecked", { n: res.noEvaluables.length })}
+          </SectionLabel>
           <div
             style={{
               background: t.panel, border: `1px solid ${t.border}`,
@@ -181,9 +181,18 @@ function RiesgosVibracion({ onNavigate }) {
         </>
       )}
 
+      {/*
+        El nombre de la pantalla NO se escribe aquí: se toma del mismo sitio
+        que lo pinta el sidebar. Una frase que remite a «Gráficas» y un menú
+        que dice otra cosa es un error que sólo aparece al traducir, y así no
+        puede aparecer.
+      */}
       <p style={{ margin: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.6 }}>
-        Las medidas que sostienen estas reglas —los tres apoyos, sus cuatro magnitudes y qué
-        vigilancias tiene encendidas el módulo— están en la pantalla <strong>Gráficas</strong>.
+        <Enfasis>
+          {traducir("machines:vibration.risks.chartsHint", {
+            pantalla: traducir("navigation:routes.eva-vibraciones.nav"),
+          })}
+        </Enfasis>
       </p>
     </div>
   );

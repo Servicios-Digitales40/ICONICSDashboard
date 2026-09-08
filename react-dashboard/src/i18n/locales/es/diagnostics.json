@@ -1,1 +1,64 @@
-{}
+{
+  "severity": {
+    "critico": "Puede romper algo",
+    "atencion": "Conviene mirarlo",
+    "informativo": "Para tenerlo en cuenta"
+  },
+  "trend": {
+    "empeorando": "Empeorando",
+    "mejorando": "Mejorando",
+    "estable": "Estable",
+    "sinDeterminar": "Sin tendencia"
+  },
+  "field": {
+    "measured": "Medido",
+    "mayHappen": "Puede ocurrir",
+    "toCheck": "Qué revisar",
+    "whyDegrades": "Por qué degrada",
+    "leadsTo": "A qué avería lleva"
+  },
+  "action": {
+    "ask": "Preguntarle a Tdconcito",
+    "analyze": "Analizar con Tdconcito",
+    "closeCase": "Cerrar diagnóstico"
+  },
+  "criterion": "Criterio: {{norma}}",
+  "risks": {
+    "detected": "Situaciones detectadas",
+    "detectedCount": "Situaciones detectadas · {{n}}",
+    "checking": "Comprobando…",
+    "noneNow": "Ninguna situación de riesgo ahora mismo",
+    "rulesChecked_one": "{{count}} regla comprobada con las lecturas actuales.",
+    "rulesChecked_other": "{{count}} reglas comprobadas con las lecturas actuales.",
+    "unchecked": "Sin comprobar · {{n}}",
+    "uncheckedNote": "Estas reglas no se pudieron evaluar porque les falta una lectura. No significa que todo esté bien: significa que <b>no se sabe</b>.",
+    "missing": "— falta {{falta}}"
+  },
+  "provisional": {
+    "title": "Estos avisos se calculan con límites estimados por nosotros",
+    "message": "Los umbrales con los que se cruzan las señales no los publica el servidor. Medido contra la instalación real, la presión relativa pasa el 92 % del tiempo por debajo de su «mínimo», así que un aviso de presión de aquí puede no significar nada. Las <b>alarmas del servidor mandan sobre esta pantalla</b>: sus límites los puso quien conoce el proceso."
+  },
+  "forecast": {
+    "title": "Desgaste acumulado",
+    "titleRange": "Desgaste acumulado · últimos {{periodo}}",
+    "idle": {
+      "body": "El desgaste acumulado se calcula sobre <b>semanas de historia</b>, no sobre el instante: hay que leer el historiador de cinco señales y trocear el rango, así que tarda unos segundos. Los riesgos de arriba no dependen de esto y ya están evaluados.",
+      "button": "Calcular desgaste de los últimos {{periodo}}"
+    },
+    "resolution": {
+      "title": "Esto mide lo sostenido, con resolución de {{resolucion}}",
+      "message": "Cada muestra es la <b>media</b> de su intervalo, así que un episodio más corto que {{resolucion}} se promedia y no aparece aquí. Un 0 % significa «no hubo nada sostenido», nunca «no pasó nada». Las horas son <b>estimadas</b> a partir de la fracción de muestras, no contadas: el historiador de esta instalación tiene huecos. Y «con la bomba impulsando» se reconstruye del caudal, porque la carga del motor no tiene serie propia."
+    },
+    "loading": "Leyendo el historiador…",
+    "ofTimeEvaluated": "del tiempo evaluado",
+    "hoursEstimated": " · ~{{horas}} h estimadas",
+    "samples": "{{expuestas}} de {{muestras}} muestras",
+    "whilePumping": " con la bomba impulsando",
+    "none": {
+      "title": "Sin desgaste sostenido en {{periodo}}",
+      "detail_one": "{{count}} mecanismo comprobado sobre {{muestras}} muestras del historiador.",
+      "detail_other": "{{count}} mecanismos comprobados sobre {{muestras}} muestras del historiador."
+    },
+    "unwatchedNote": "Estos desgastes <b>no se están vigilando</b>, porque el historiador no sirve la señal que necesitan. No es que no ocurran: es que nadie los cuenta."
+  }
+}

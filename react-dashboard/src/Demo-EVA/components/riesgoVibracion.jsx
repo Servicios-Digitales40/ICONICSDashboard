@@ -16,6 +16,7 @@
  * que las dos por separado.
  */
 import { AlertTriangle, ClipboardCheck, Info, MessageSquareText } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { pedirAlAsistente } from "@/features/asistente";
 
@@ -27,11 +28,20 @@ import { preguntaSobreRiesgoVibracion } from "../domain/riesgosVibracion.js";
  * `informativo` usa el acento y no el ámbar a propósito: «la máquina gira sin
  * carga» no es un problema, es un hecho que cambia lo que significan las demás
  * medidas. Pintarlo de ámbar junto a un riesgo real enseña a ignorar el ámbar.
+ *
+ * ── POR QUÉ AQUÍ NO HAY TEXTO, SÓLO UNA CLAVE ──────────────────────
+ *
+ * Porque este mapa no es una función de componente y no puede llamar a un
+ * hook, pero sobre todo porque el rótulo de una severidad es EL MISMO en la
+ * tarjeta del tanque (`RiesgosTanque.jsx`), palabra por palabra. Escribirlo
+ * dos veces ya era una duplicación; traducirlo dos veces habría sido dos
+ * duplicaciones por idioma. Aquí se dice QUÉ nivel es —y de qué color—, y
+ * `diagnostics:severity` dice cómo se escribe.
  */
 export const NIVELES = {
-  critico: { label: "Puede romper algo", token: "coral", suave: "coralSoft", Icono: AlertTriangle },
-  atencion: { label: "Conviene mirarlo", token: "amber", suave: "amberSoft", Icono: AlertTriangle },
-  informativo: { label: "Para tenerlo en cuenta", token: "accent", suave: "accentSoft", Icono: Info },
+  critico: { clave: "critico", token: "coral", suave: "coralSoft", Icono: AlertTriangle },
+  atencion: { clave: "atencion", token: "amber", suave: "amberSoft", Icono: AlertTriangle },
+  informativo: { clave: "informativo", token: "accent", suave: "accentSoft", Icono: Info },
 };
 
 export const nivelInfo = (key) => NIVELES[key] ?? NIVELES.informativo;
@@ -63,6 +73,8 @@ export function Campo({ t, rotulo, destacado = false, children }) {
 
 /** Una tarjeta de riesgo. Evidencia primero: el hecho antes que la deducción. */
 export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("diagnostics");
   const nivel = nivelInfo(riesgo.nivel);
   const { Icono } = nivel;
 
@@ -89,7 +101,7 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
                 color: t[nivel.token], background: t[nivel.suave],
               }}
             >
-              {nivel.label}
+              {traducir(`severity.${nivel.clave}`)}
             </span>
             {riesgo.canalLabel && (
               <span
@@ -105,13 +117,13 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
         </div>
       </header>
 
-      <Campo t={t} rotulo="Medido" destacado>{riesgo.evidencia}</Campo>
-      <Campo t={t} rotulo="Puede ocurrir">{riesgo.consecuencia}</Campo>
-      <Campo t={t} rotulo="Qué revisar">{riesgo.accion}</Campo>
+      <Campo t={t} rotulo={traducir("field.measured")} destacado>{riesgo.evidencia}</Campo>
+      <Campo t={t} rotulo={traducir("field.mayHappen")}>{riesgo.consecuencia}</Campo>
+      <Campo t={t} rotulo={traducir("field.toCheck")}>{riesgo.accion}</Campo>
 
       {riesgo.norma && (
         <p style={{ margin: 0, fontSize: 11, color: t.textFaint, fontStyle: "italic" }}>
-          Criterio: {riesgo.norma}
+          {traducir("criterion", { norma: riesgo.norma })}
         </p>
       )}
 
@@ -144,7 +156,7 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
           }}
         >
           <MessageSquareText size={15} />
-          Preguntarle a Tdconcito
+          {traducir("action.ask")}
         </button>
 
         {/* Plan 16 Fase 5 (UI A) — mismo criterio que la tarjeta del tanque
@@ -165,7 +177,7 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
           }}
         >
           <ClipboardCheck size={15} />
-          Cerrar diagnóstico
+          {traducir("action.closeCase")}
         </button>
       </div>
     </article>

@@ -37,6 +37,10 @@
     "change": "Change language",
     "current": "Current language: {{language}}"
   },
+  "period": {
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
+  },
   "time": {
     "updatedAt": "Updated {{time}}",
     "lastReading": "Last reading",

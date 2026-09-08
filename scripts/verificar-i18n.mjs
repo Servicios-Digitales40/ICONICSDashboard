@@ -26,7 +26,12 @@
  *     inglés no, el inglés pierde el dato — y al revés, el inglés enseña
  *     `{{machine}}` literal. El orden puede cambiar entre idiomas (para eso se
  *     interpola), pero el CONJUNTO de variables no.
- *  4. **Toda ruta del registro tiene su texto.** `app/routes/routes.jsx` ya no
+ *  4. **El marcado coincide, y es sólo `<b>`.** Las frases que llevan énfasis
+ *     lo traen dentro del texto y lo pinta `Enfasis` (en su cabecera está por
+ *     qué no `<Trans>`). Si el español lo lleva y el inglés no, la frase
+ *     inglesa pierde en silencio la única palabra que quería destacar; si
+ *     sobra una etiqueta, no cierra, o no es `<b>`, se pinta literal.
+ *  5. **Toda ruta del registro tiene su texto.** `app/routes/routes.jsx` ya no
  *     lleva título ni subtítulo: los toma de `navigation.json` por su `id`.
  *     Añadir una ruta y olvidar su bloque deja el Topbar pintando
  *     `navigation:routes.lo-que-sea.title`, y esto lo caza antes.
@@ -201,7 +206,76 @@ check('cada clave interpola las MISMAS variables en todos los idiomas', () => {
   assert.ok(desajustes.length === 0, desajustes.slice(0, 8).join('\n'))
 })
 
-/* ── 5 · Toda ruta tiene su texto ────────────────────────────────────── */
+/* ── 5 · El marcado de `<Trans>` coincide ────────────────────────────── */
+
+console.log('\n── El énfasis de una frase sobrevive al cambio de idioma ────')
+
+/**
+ * Las etiquetas de marcado de una cadena, en orden de apertura.
+ *
+ * La única que `Enfasis` sabe pintar es `<b>`, y es a propósito: ver la
+ * cabecera de `react-dashboard/src/i18n/Enfasis.jsx`. Aquí se comprueban las
+ * tres formas de romperlo, cada una con su modo de fallo:
+ *
+ *   · **Se pierde** — un `<b>` en español que en inglés no está. No rompe
+ *     nada visible: la frase se pinta entera y sin negrita, y lo que se pierde
+ *     es la única palabra que el párrafo quería destacar («significa que NO SE
+ *     SABE») sin que nadie lo note.
+ *   · **No cierra** — un `<b>` suelto. `Enfasis` no encuentra su pareja, no
+ *     sustituye nada, y la etiqueta sale LITERAL en pantalla.
+ *   · **No es `<b>`** — un `<i>` o un `<br/>` que alguien escriba en un JSON.
+ *     Mismo final: texto literal en medio de la frase.
+ */
+function etiquetasDe(texto) {
+  return [...String(texto ?? '').matchAll(/<\/?([a-zA-Z][\w-]*)\s*\/?>/g)]
+    .map(m => m[0].replace(/\s+/g, ''))
+}
+
+check('cada clave lleva el MISMO marcado, y sólo <b>', () => {
+  const desajustes = []
+  const desbalanceadas = []
+  const desconocidas = []
+
+  for (const [ns, arbol] of Object.entries(arboles[REFERENCIA])) {
+    for (const clave of hojas(arbol)) {
+      const esperadas = etiquetasDe(valorEn(arbol, clave))
+
+      for (const idioma of idiomas) {
+        const suyo = valorEn(arboles[idioma]?.[ns] ?? {}, clave)
+        if (suyo === undefined) continue // ya lo cuenta la paridad de arriba
+        const suyas = etiquetasDe(suyo)
+
+        if (idioma !== REFERENCIA && esperadas.join('') !== suyas.join('')) {
+          desajustes.push(
+            `${ns}:${clave} → ${REFERENCIA} usa [${esperadas.join(' ') || '—'}] y ${idioma} usa [${suyas.join(' ') || '—'}]`
+          )
+        }
+
+        const rebeldes = suyas.filter(e => e !== '<b>' && e !== '</b>')
+        if (rebeldes.length) {
+          desconocidas.push(`${idioma}:${ns}:${clave} → ${[...new Set(rebeldes)].join(' ')}`)
+        }
+
+        /* Que abran y cierren: un `<b>` suelto se pinta tal cual. */
+        const abiertas = suyas.filter(e => e === '<b>').length
+        const cerradas = suyas.filter(e => e === '</b>').length
+        if (abiertas !== cerradas) {
+          desbalanceadas.push(`${idioma}:${ns}:${clave} → ${abiertas} abren, ${cerradas} cierran`)
+        }
+      }
+    }
+  }
+
+  const detalle = []
+  if (desajustes.length) detalle.push(desajustes.slice(0, 6).join('\n'))
+  if (desbalanceadas.length) detalle.push(desbalanceadas.slice(0, 6).join('\n'))
+  if (desconocidas.length) {
+    detalle.push('sólo <b> está permitido:\n' + desconocidas.slice(0, 6).join('\n'))
+  }
+  assert.ok(detalle.length === 0, detalle.join('\n'))
+})
+
+/* ── 6 · Toda ruta tiene su texto ────────────────────────────────────── */
 
 console.log('\n── Ninguna ruta se queda sin rótulo ─────────────────────────')
 

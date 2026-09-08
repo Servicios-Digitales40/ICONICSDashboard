@@ -28,6 +28,7 @@
  * La cabecera lo dice en pantalla, no sólo en este comentario.
  */
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangle, CheckCircle2, ClipboardCheck, HelpCircle, Info, MessageSquareText,
   TrendingDown, TrendingUp, Minus,
@@ -35,6 +36,7 @@ import {
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { pedirAlAsistente } from "@/features/asistente";
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 
 import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
@@ -77,12 +79,30 @@ const VACIO = [];
  * quien lea «0 horas» tiene que saber a partir de qué duración deja de contar.
  */
 const PERIODOS = [
-  { horas: 24 * 7, label: "7 días" },
-  { horas: 24 * 30, label: "30 días" },
-  { horas: 24 * 90, label: "90 días" },
-].map((p) => ({ ...p, puntos: MAX_PUNTOS, resolucion: p.horas / MAX_PUNTOS }));
+  { dias: 7 },
+  { dias: 30 },
+  { dias: 90 },
+].map((p) => {
+  const horas = p.dias * 24;
+  return { ...p, horas, puntos: MAX_PUNTOS, resolucion: horas / MAX_PUNTOS };
+});
 
-/** "1.7" → "1 h 42 min", que es como se lee un intervalo. */
+/**
+ * El rótulo de un período.
+ *
+ * Sale de `common:period.days` con su plural en vez de estar escrito en la
+ * tabla de arriba, porque en inglés «1 day / 7 days» no es el mismo sufijo que
+ * en español y porque el número lo pone el idioma, no nosotros.
+ */
+const etiquetaPeriodo = (traducir, p) => traducir("common:period.days", { count: p.dias });
+
+/**
+ * "1.7" → "1 h 42 min", que es como se lee un intervalo.
+ *
+ * `h` y `min` NO se traducen: son unidades, y una unidad no cambia con el
+ * idioma —igual que °C o bar—. Cambiarlas aquí sería empezar a convertir, que
+ * es justo lo que un cambio de idioma no debe hacer.
+ */
 function duracion(horas) {
   const h = Math.floor(horas);
   const min = Math.round((horas - h) * 60);
@@ -90,11 +110,12 @@ function duracion(horas) {
   return min === 0 ? `${h} h` : `${h} h ${min} min`;
 }
 
+/* Igual que `SEVERIDADES`: aquí el color y el icono, en `diagnostics` el texto. */
 const TENDENCIAS = {
-  empeorando: { label: "Empeorando", token: "coral", Icono: TrendingUp },
-  mejorando: { label: "Mejorando", token: "success", Icono: TrendingDown },
-  estable: { label: "Estable", token: "textSoft", Icono: Minus },
-  "sin determinar": { label: "Sin tendencia", token: "textFaint", Icono: Minus },
+  empeorando: { clave: "empeorando", token: "coral", Icono: TrendingUp },
+  mejorando: { clave: "mejorando", token: "success", Icono: TrendingDown },
+  estable: { clave: "estable", token: "textSoft", Icono: Minus },
+  "sin determinar": { clave: "sinDeterminar", token: "textFaint", Icono: Minus },
 };
 
 /* ── Vocabulario visual ────────────────────────────────────────────── */
@@ -106,11 +127,17 @@ const TENDENCIAS = {
  * Manual» no es un problema, es un hecho que cambia quién protege la
  * instalación. Pintarlo de ámbar junto a un riesgo real enseña a ignorar el
  * ámbar, que es exactamente lo que no se quiere en una pantalla de avisos.
+ *
+ * El ROTULO no está aquí, sólo la clave: es el mismo, palabra por palabra, que
+ * el de `NIVELES` en `components/riesgoVibracion.jsx`, y lo dice una sola vez
+ * `diagnostics:severity`. Lo que esta tabla decide —qué color y qué icono— sí
+ * es de esta pantalla; cómo se escribe «Puede romper algo» no lo era ya antes
+ * de traducirlo.
  */
 const SEVERIDADES = {
-  critico: { label: "Puede romper algo", token: "coral", suave: "coralSoft", Icono: AlertTriangle },
-  atencion: { label: "Conviene mirarlo", token: "amber", suave: "amberSoft", Icono: AlertTriangle },
-  informativo: { label: "Para tenerlo en cuenta", token: "accent", suave: "accentSoft", Icono: Info },
+  critico: { clave: "critico", token: "coral", suave: "coralSoft", Icono: AlertTriangle },
+  atencion: { clave: "atencion", token: "amber", suave: "amberSoft", Icono: AlertTriangle },
+  informativo: { clave: "informativo", token: "accent", suave: "accentSoft", Icono: Info },
 };
 
 const severidadInfo = (key) => SEVERIDADES[key] ?? SEVERIDADES.informativo;
@@ -126,6 +153,8 @@ const severidadInfo = (key) => SEVERIDADES[key] ?? SEVERIDADES.informativo;
  * que la hipótesis llegara con la autoridad de un dato.
  */
 function TarjetaRiesgo({ riesgo, t, onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("diagnostics");
   const sev = severidadInfo(riesgo.severidad);
   const { Icono } = sev;
 
@@ -156,14 +185,14 @@ function TarjetaRiesgo({ riesgo, t, onNavigate }) {
               fontSize: 11, fontWeight: 600, color: t[sev.token], background: t[sev.suave],
             }}
           >
-            {sev.label}
+            {traducir(`severity.${sev.clave}`)}
           </span>
         </div>
       </header>
 
-      <Campo t={t} rotulo="Medido" destacado>{riesgo.evidencia}</Campo>
-      <Campo t={t} rotulo="Puede ocurrir">{riesgo.consecuencia}</Campo>
-      <Campo t={t} rotulo="Qué revisar">{riesgo.accion}</Campo>
+      <Campo t={t} rotulo={traducir("field.measured")} destacado>{riesgo.evidencia}</Campo>
+      <Campo t={t} rotulo={traducir("field.mayHappen")}>{riesgo.consecuencia}</Campo>
+      <Campo t={t} rotulo={traducir("field.toCheck")}>{riesgo.accion}</Campo>
 
       {riesgo.nota && (
         <p style={{ margin: 0, fontSize: 11, color: t.textFaint, fontStyle: "italic" }}>
@@ -183,7 +212,7 @@ function TarjetaRiesgo({ riesgo, t, onNavigate }) {
           }}
         >
           <MessageSquareText size={15} />
-          Preguntarle a Tdconcito
+          {traducir("action.ask")}
         </button>
 
         {/*
@@ -203,7 +232,7 @@ function TarjetaRiesgo({ riesgo, t, onNavigate }) {
           }}
         >
           <ClipboardCheck size={15} />
-          Cerrar diagnóstico
+          {traducir("action.closeCase")}
         </button>
       </div>
     </article>
@@ -244,6 +273,8 @@ function Campo({ t, rotulo, destacado = false, children }) {
  * en un titular alarmista sobre un número que el lector todavía no ha visto.
  */
 function TarjetaPronostico({ p, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("diagnostics");
   const sev = severidadInfo(p.severidad);
   const tend = TENDENCIAS[p.tendencia] ?? TENDENCIAS["sin determinar"];
   const { Icono: IconoTend } = tend;
@@ -272,28 +303,31 @@ function TarjetaPronostico({ p, t }) {
           {(p.fraccion * 100).toFixed(1)} %
         </span>
         <span style={{ fontSize: 12.5, color: t.textSoft }}>
-          del tiempo evaluado
-          {p.horasEstimadas !== null && ` · ~${p.horasEstimadas} h estimadas`}
+          {traducir("forecast.ofTimeEvaluated")}
+          {p.horasEstimadas !== null
+            && traducir("forecast.hoursEstimated", { horas: p.horasEstimadas })}
         </span>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 12 }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: t[tend.token] }}>
           <IconoTend size={14} />
-          {tend.label}
+          {traducir(`trend.${tend.clave}`)}
         </span>
         <span style={{ color: t.textFaint }}>
-          {p.expuestas} de {p.muestras} muestras
-          {p.soloEnMarcha && " con la bomba impulsando"}
+          {traducir("forecast.samples", { expuestas: p.expuestas, muestras: p.muestras })}
+          {p.soloEnMarcha && traducir("forecast.whilePumping")}
         </span>
       </div>
 
-      <Campo t={t} rotulo="Por qué degrada">{p.mecanismo}</Campo>
-      <Campo t={t} rotulo="A qué avería lleva">{p.consecuencia}</Campo>
-      <Campo t={t} rotulo="Qué revisar">{p.accion}</Campo>
+      <Campo t={t} rotulo={traducir("field.whyDegrades")}>{p.mecanismo}</Campo>
+      <Campo t={t} rotulo={traducir("field.leadsTo")}>{p.consecuencia}</Campo>
+      <Campo t={t} rotulo={traducir("field.toCheck")}>{p.accion}</Campo>
 
       {p.norma && (
-        <p style={{ margin: 0, fontSize: 11, color: t.textFaint }}>Criterio: {p.norma}</p>
+        <p style={{ margin: 0, fontSize: 11, color: t.textFaint }}>
+          {traducir("criterion", { norma: p.norma })}
+        </p>
       )}
 
       {/*
@@ -324,7 +358,7 @@ function TarjetaPronostico({ p, t }) {
         }}
       >
         <MessageSquareText size={15} />
-        Analizar con Tdconcito
+        {traducir("action.analyze")}
       </button>
     </article>
   );
@@ -333,6 +367,8 @@ function TarjetaPronostico({ p, t }) {
 /* ── La vista ──────────────────────────────────────────────────────── */
 
 function RiesgosTanque({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["diagnostics", "common", "errors"]);
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
   const { theme: t } = useTheme();
 
@@ -386,15 +422,9 @@ function RiesgosTanque({ onNavigate }) {
       {PROVISIONALES && (
         <AlertBanner
           type="warning"
-          title="Estos avisos se calculan con límites estimados por nosotros"
+          title={traducir("diagnostics:provisional.title")}
           message={
-            <>
-              Los umbrales con los que se cruzan las señales no los publica el servidor. Medido
-              contra la instalación real, la presión relativa pasa el 92 % del tiempo por debajo
-              de su «mínimo», así que un aviso de presión de aquí puede no significar nada. Las{" "}
-              <strong>alarmas del servidor mandan sobre esta pantalla</strong>: sus límites los
-              puso quien conoce el proceso.
-            </>
+            <Enfasis>{traducir("diagnostics:provisional.message")}</Enfasis>
           }
         />
       )}
@@ -402,8 +432,8 @@ function RiesgosTanque({ onNavigate }) {
       {error && (
         <AlertBanner
           type="error"
-          title="No se pudo leer la instalación"
-          message={`${String(error)}. Lo que se ve abajo puede estar desactualizado.`}
+          title={traducir("errors:titles.plantReadFailed")}
+          message={traducir("errors:hints.staleBelow", { detalle: String(error) })}
         />
       )}
 
@@ -411,8 +441,8 @@ function RiesgosTanque({ onNavigate }) {
       <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <SectionLabel>
           {activos.length > 0
-            ? `Situaciones detectadas · ${activos.length}`
-            : "Situaciones detectadas"}
+            ? traducir("diagnostics:risks.detectedCount", { n: activos.length })
+            : traducir("diagnostics:risks.detected")}
         </SectionLabel>
 
         {activos.length > 0 ? (
@@ -442,11 +472,12 @@ function RiesgosTanque({ onNavigate }) {
             <CheckCircle2 size={20} color={t.success} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
-                {loading ? "Comprobando…" : "Ninguna situación de riesgo ahora mismo"}
+                {loading
+                  ? traducir("diagnostics:risks.checking")
+                  : traducir("diagnostics:risks.noneNow")}
               </div>
               <div style={{ fontSize: 12, color: t.textSoft, marginTop: 2 }}>
-                {evaluadas} regla{evaluadas === 1 ? "" : "s"} comprobada
-                {evaluadas === 1 ? "" : "s"} con las lecturas actuales.
+                {traducir("diagnostics:risks.rulesChecked", { count: evaluadas })}
               </div>
             </div>
           </div>
@@ -456,7 +487,9 @@ function RiesgosTanque({ onNavigate }) {
       {/* ── 2 · Lo que no se pudo mirar ──────────────────────────────── */}
       {noEvaluables.length > 0 && (
         <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <SectionLabel>Sin comprobar · {noEvaluables.length}</SectionLabel>
+          <SectionLabel>
+            {traducir("diagnostics:risks.unchecked", { n: noEvaluables.length })}
+          </SectionLabel>
           <div
             style={{
               background: t.panel, border: `1px solid ${t.border}`,
@@ -464,8 +497,7 @@ function RiesgosTanque({ onNavigate }) {
             }}
           >
             <p style={{ margin: "0 0 12px", fontSize: 12, color: t.textSoft, lineHeight: 1.5 }}>
-              Estas reglas no se pudieron evaluar porque les falta una lectura. No significa que
-              todo esté bien: significa que <strong>no se sabe</strong>.
+              <Enfasis>{traducir("diagnostics:risks.uncheckedNote")}</Enfasis>
             </p>
             <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
               {noEvaluables.map((n) => (
@@ -475,7 +507,9 @@ function RiesgosTanque({ onNavigate }) {
                 >
                   <HelpCircle size={15} color={t.textFaint} style={{ flexShrink: 0 }} />
                   <span style={{ color: t.text }}>{n.titulo}</span>
-                  <span style={{ color: t.textFaint }}>— falta {n.falta}</span>
+                  <span style={{ color: t.textFaint }}>
+                    {traducir("diagnostics:risks.missing", { falta: n.falta })}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -493,8 +527,10 @@ function RiesgosTanque({ onNavigate }) {
         >
           <SectionLabel>
             {pedirPronostico
-              ? `Desgaste acumulado · últimos ${periodo.label}`
-              : "Desgaste acumulado"}
+              ? traducir("diagnostics:forecast.titleRange", {
+                periodo: etiquetaPeriodo(traducir, periodo),
+              })
+              : traducir("diagnostics:forecast.title")}
           </SectionLabel>
           {/* Los períodos sólo tienen sentido cuando ya hay algo que reencuadrar. */}
           <div style={{ display: "flex", gap: 6 }} hidden={!pedirPronostico}>
@@ -512,7 +548,7 @@ function RiesgosTanque({ onNavigate }) {
                   color: p.horas === periodo.horas ? t.accent : t.textSoft,
                 }}
               >
-                {p.label}
+                {etiquetaPeriodo(traducir, p)}
               </button>
             ))}
           </div>
@@ -532,10 +568,7 @@ function RiesgosTanque({ onNavigate }) {
             }}
           >
             <p style={{ margin: 0, fontSize: 13, color: t.textSoft, maxWidth: "68ch" }}>
-              El desgaste acumulado se calcula sobre <strong>semanas de historia</strong>, no
-              sobre el instante: hay que leer el historiador de cinco señales y trocear el
-              rango, así que tarda unos segundos. Los riesgos de arriba no dependen de esto y
-              ya están evaluados.
+              <Enfasis>{traducir("diagnostics:forecast.idle.body")}</Enfasis>
             </p>
             <button
               type="button"
@@ -548,7 +581,9 @@ function RiesgosTanque({ onNavigate }) {
               }}
             >
               <TrendingUp size={15} />
-              Calcular desgaste de los últimos {periodo.label}
+              {traducir("diagnostics:forecast.idle.button", {
+                periodo: etiquetaPeriodo(traducir, periodo),
+              })}
             </button>
           </div>
         ) : (
@@ -561,21 +596,22 @@ function RiesgosTanque({ onNavigate }) {
          */}
         <AlertBanner
           type="info"
-          title={`Esto mide lo sostenido, con resolución de ${duracion(periodo.resolucion)}`}
+          title={traducir("diagnostics:forecast.resolution.title", {
+            resolucion: duracion(periodo.resolucion),
+          })}
           message={
-            <>
-              Cada muestra es la <strong>media</strong> de su intervalo, así que un episodio más
-              corto que {duracion(periodo.resolucion)} se promedia y no aparece aquí. Un 0 % significa
-              «no hubo nada sostenido», nunca «no pasó nada». Las horas son{" "}
-              <strong>estimadas</strong> a partir de la fracción de muestras, no contadas: el
-              historiador de esta instalación tiene huecos. Y «con la bomba impulsando» se
-              reconstruye del caudal, porque la carga del motor no tiene serie propia.
-            </>
+            <Enfasis>
+              {traducir("diagnostics:forecast.resolution.message", {
+                resolucion: duracion(periodo.resolucion),
+              })}
+            </Enfasis>
           }
         />
 
         {historia.loading && !historia.filas.length ? (
-          <div style={{ fontSize: 13, color: t.textSoft, padding: 8 }}>Leyendo el historiador…</div>
+          <div style={{ fontSize: 13, color: t.textSoft, padding: 8 }}>
+            {traducir("diagnostics:forecast.loading")}
+          </div>
         ) : pronostico.activos.length > 0 ? (
           <div
             style={{
@@ -597,13 +633,15 @@ function RiesgosTanque({ onNavigate }) {
             <CheckCircle2 size={20} color={t.success} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
-                Sin desgaste sostenido en {periodo.label}
+                {traducir("diagnostics:forecast.none.title", {
+                  periodo: etiquetaPeriodo(traducir, periodo),
+                })}
               </div>
               <div style={{ fontSize: 12, color: t.textSoft, marginTop: 2 }}>
-                {pronostico.sinExposicion.length} mecanismo
-                {pronostico.sinExposicion.length === 1 ? "" : "s"} comprobado
-                {pronostico.sinExposicion.length === 1 ? "" : "s"} sobre {pronostico.muestras} muestras
-                del historiador.
+                {traducir("diagnostics:forecast.none.detail", {
+                  count: pronostico.sinExposicion.length,
+                  muestras: pronostico.muestras,
+                })}
               </div>
             </div>
           </div>
@@ -617,15 +655,16 @@ function RiesgosTanque({ onNavigate }) {
             }}
           >
             <p style={{ margin: "0 0 12px", fontSize: 12, color: t.textSoft, lineHeight: 1.5 }}>
-              Estos desgastes <strong>no se están vigilando</strong>, porque el historiador no
-              sirve la señal que necesitan. No es que no ocurran: es que nadie los cuenta.
+              <Enfasis>{traducir("diagnostics:forecast.unwatchedNote")}</Enfasis>
             </p>
             <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 8 }}>
               {pronostico.noEvaluables.map((n) => (
                 <li key={n.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                   <HelpCircle size={15} color={t.textFaint} style={{ flexShrink: 0 }} />
                   <span style={{ color: t.text }}>{n.componente}</span>
-                  <span style={{ color: t.textFaint }}>— falta {n.falta}</span>
+                  <span style={{ color: t.textFaint }}>
+                    {traducir("diagnostics:risks.missing", { falta: n.falta })}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -648,3 +687,20 @@ function RiesgosTanque({ onNavigate }) {
  * de sondeo. Mismo patrón que las otras vistas de la carpeta.
  */
 export default RiesgosTanque;
+
+/*
+ * Las dos tarjetas se exportan SÓLO para poder probarlas. Ninguna otra
+ * pantalla las usa, y no deben usarlas: una tarjeta de riesgo del tanque
+ * tiene los campos del tanque.
+ *
+ * El motivo de abrirlas es que se pintan únicamente cuando la instalación va
+ * mal, y el transporte falso —el que usan las pruebas— entrega una
+ * instalación sana. Es decir: todo lo que hay dentro de estas dos funciones
+ * sólo se ejecutaba de verdad el día que hay un problema en planta, que es el
+ * peor día para descubrir que una llamada quedó mal escrita. Ya pasó una vez,
+ * en `AlarmasEva.jsx`, y la suite entera siguió en verde.
+ *
+ * Su hermana de vibraciones no necesita esto: vive en `components/` desde que
+ * la comparten dos pantallas, y por ahí ya se llegaba a ella.
+ */
+export { TarjetaRiesgo, TarjetaPronostico };

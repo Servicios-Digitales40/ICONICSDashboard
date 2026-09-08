@@ -84,10 +84,9 @@
     },
     "risks": {
       "title": "Riesgos del sistema de vibraciones",
-      "detected": "Situaciones detectadas",
-      "checking": "Comprobando…",
-      "noneNow": "Ninguna situación de riesgo ahora mismo",
-      "cannotCheck": "No se pudo comprobar ninguna: no hay lecturas con las que evaluar."
+      "scope": "Estas reglas evalúan el motor con acelerómetros: su propio motor, su propio variador y su propio PLC.",
+      "cannotCheck": "No se pudo comprobar ninguna: no hay lecturas con las que evaluar.",
+      "chartsHint": "Las medidas que sostienen estas reglas —los tres apoyos, sus cuatro magnitudes y qué vigilancias tiene encendidas el módulo— están en la pantalla <b>{{pantalla}}</b>."
     },
     "pipeline": {
       "acelerometros": {

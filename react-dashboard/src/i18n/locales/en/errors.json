@@ -25,6 +25,7 @@
   },
   "hints": {
     "bridgeDown": "{{detalle}}. If this screen does not load, the problem is not one view: the bridge itself is down.",
-    "technicalDetail": "Technical detail: {{detalle}}"
+    "technicalDetail": "Technical detail: {{detalle}}",
+    "staleBelow": "{{detalle}}. What you see below may be out of date."
   }
 }
