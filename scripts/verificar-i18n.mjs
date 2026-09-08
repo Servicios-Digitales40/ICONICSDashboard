@@ -98,12 +98,19 @@ const arboles = Object.fromEntries(
   })
 )
 
-/** Todas las claves HOJA de un objeto, en notación con puntos. */
+/**
+ * Todas las claves HOJA de un objeto, en notación con puntos.
+ *
+ * Los ARRAYS se recorren por índice y no se cuentan como una hoja sola. i18next
+ * los lee así —`suggestions.0`— y tratarlos como una clave única dejaba pasar
+ * que un idioma tuviera cuatro sugerencias y el otro tres: la paridad daba el
+ * visto bueno y en pantalla faltaba una.
+ */
 function hojas(objeto, prefijo = '') {
   const salida = []
   for (const [k, v] of Object.entries(objeto ?? {})) {
     const ruta = prefijo ? `${prefijo}.${k}` : k
-    if (v && typeof v === 'object' && !Array.isArray(v)) salida.push(...hojas(v, ruta))
+    if (v && typeof v === 'object') salida.push(...hojas(v, ruta))
     else salida.push(ruta)
   }
   return salida

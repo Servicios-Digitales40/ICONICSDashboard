@@ -1,0 +1,189 @@
+{
+  "home": {
+    "title": "Compressor",
+    "lead": "A real machine, with a history of real data, served by a backend of its own. It is the second module of the demo and the only one that does not read this plant’s ICONICS server.",
+    "service": {
+      "title": "Service status",
+      "sub": "The only thing this module can check on its own today",
+      "connection": "Connection",
+      "checking": "Checking…",
+      "up": "The prediction backend responds",
+      "down": "The prediction backend does not respond",
+      "whereItRuns": "Where it runs",
+      "ownMachine": "Its own machine, separate from the ICONICS server and from the AI one"
+    },
+    "limits": {
+      "title": "Limitations",
+      "sub": "What has to be said out loud before showing any curve from this module",
+      "items": [
+        "The data does NOT come from ICONICS: another backend serves it, on another machine. Nothing seen here can be cross-referenced with the tank or with the vibration system.",
+        "The history is fed from a spreadsheet whose exact contents are not yet inventoried: we do not know which variables it has, nor in what unit.",
+        "There is no live reading of this machine. Everything queried is the past.",
+        "The predictive model has no published validated error yet, so no projection can be quoted as reliable."
+      ]
+    }
+  },
+  "pending": {
+    "badge": "No data yet",
+    "willShow": "What it will show",
+    "stillNeeds": "What is missing to build it",
+    "noFakeData": "This screen deliberately draws no sample data: an invented curve on a plant dashboard reads as a measurement.",
+    "followedIn": "Tracked in <b>{{documento}}</b> {{fase}}.",
+    "historico": {
+      "titulo": "Compressor history",
+      "resumen": "How a variable moved between two dates, with its dated extremes — not the replay of an event, but the free query.",
+      "mostrara": [
+        "The curve of a variable over the requested period",
+        "Minimum and maximum, with the exact time they occurred",
+        "Stretches with no sample, declared as gaps and not drawn as zero",
+        "Comparison of the same variable between two periods"
+      ],
+      "necesita": [
+        "A free-series endpoint: which parameters it accepts and what format each sample has",
+        "The maximum window it allows, and whether it paginates",
+        "What it returns for a stretch with no data — it must be distinguishable from a real zero",
+        "How it signals a service failure, so it is never narrated as absence of data"
+      ]
+    },
+    "correlacion": {
+      "titulo": "Correlation between variables",
+      "resumen": "Whether two or more compressor variables moved together over the same window, with their coefficient and its reading in plain words.",
+      "mostrara": [
+        "The coefficient of each pair, from −1 to 1, and what it means in plain language",
+        "The window it was measured over, and how many samples support it",
+        "A warning when the window is too short to claim anything"
+      ],
+      "necesita": [
+        "Deciding who computes it: the API, or us over the series (Monitoring already has that code)",
+        "If the API computes it: which coefficient it uses and over what resampling",
+        "The free-series endpoint, if the computation happens on this side"
+      ]
+    },
+    "pronostico": {
+      "titulo": "Forecast",
+      "resumen": "How a compressor variable will behave over the coming days — always with its uncertainty alongside, never as a line on its own.",
+      "mostrara": [
+        "The projection of a variable to the requested horizon",
+        "Its margin of error, with the same visual weight as the curve itself",
+        "The model’s validated error, stated on the screen and not hidden",
+        "An explicit refusal when the requested horizon exceeds what the model supports"
+      ],
+      "necesita": [
+        "The forecast endpoint: which horizon it allows and what it returns per sample",
+        "The model’s validated error, published — without it no projection can be quoted",
+        "Which confidence interval it delivers, if any"
+      ]
+    },
+    "variables": {
+      "titulo": "Compressor variables",
+      "resumen": "What this machine measures, in what unit and over what range — the equivalent of the signal catalogue the plant machines already have.",
+      "mostrara": [
+        "Each variable with its readable name, its unit and its valid range",
+        "Which ones have a historical series and which only a loose value",
+        "From what date there is data, and whether the history is contiguous",
+        "What canNOT be claimed about each one, just as the two plant systems do"
+      ],
+      "necesita": [
+        "The inventory of the history: exactly which columns the spreadsheet feeding the API brings",
+        "The unit of each variable — without it, a number on screen means nothing",
+        "An endpoint listing the variables, or the list agreed in writing"
+      ]
+    }
+  },
+  "events": {
+    "query": {
+      "title": "Query a historical event",
+      "sub": "Pick one of the four documented events and how many preceding hours you want to replay. The backend will return one state per hour requested.",
+      "label": "Historical query",
+      "hoursHint": "From 1 to 168 hours. One record per hour is returned.",
+      "submit": "Query prediction",
+      "failed": "The prediction could not be queried"
+    },
+    "beta": {
+      "title": "Prediction (Beta)",
+      "sub": "Historical replay of the MetroPT-3 V4.4 model through POST requests"
+    },
+    "machineState": "Machine status",
+    "hourState": "Representative status for the hour",
+    "anomalyIndex": "Anomaly index",
+    "instantAlert": "Instant alert",
+    "activePolicy": "Active policy",
+    "noDeviations": "No deviations available for this point.",
+    "trend": {
+      "title": "How it evolved before the event",
+      "sub": "Each point is the most severe condition observed within that hour",
+      "instantWatch": "instant watch",
+      "clickHint": "Click the chart to inspect that hour.",
+      "relevantDeviation": "relevant deviation",
+      "persistentPolicy": "persistent policy active",
+      "pickHour": "Select an hour from the historical replay"
+    },
+    "technical": {
+      "title": "Technical information",
+      "sub": "Metadata and warnings delivered by the V4.4 backend",
+      "quality": "Quality and methodology"
+    },
+    "status": {
+      "ALERTA_PERSISTENTE": "Persistent alert",
+      "VIGILANCIA": "Watch",
+      "NORMAL": "Normal"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "form": {
+      "event": "Failure event",
+      "eventN": "Event {{n}}",
+      "eventsAvailable": "Documented events available: 1–4.",
+      "hoursBefore": "Hours before the event"
+    },
+    "panel": {
+      "pickQuery": "Pick a query",
+      "hoursBeforeEvent": "{{n}} h before the event",
+      "modelAndEvent": "Model and event",
+      "deviations": "Main deviations"
+    },
+    "row": {
+      "event": "Event",
+      "type": "Type",
+      "severity": "Severity",
+      "eventStart": "Event start",
+      "pointsReceived": "Points received",
+      "persistentPercentile": "Persistent percentile",
+      "requiredWindows": "Windows required",
+      "timeWindow": "Time window",
+      "dataQuality": "Data quality",
+      "observedWindows": "Windows observed",
+      "model": "Model",
+      "algorithm": "Algorithm",
+      "failureType": "Failure type",
+      "eventDate": "Event date",
+      "documentedEnd": "Documented end"
+    },
+    "kpi": {
+      "anomalyScale": "scale 0–100",
+      "rawScore": "Raw score",
+      "persistentAlert": "Persistent alert",
+      "persistentSub": "{{ventanas}} windows / {{horas}} h",
+      "instantThreshold": "threshold p{{valor}}",
+      "hoursRequested": "Hours requested",
+      "statesReturned": "{{n}} states returned",
+      "normalHours": "Normal hours",
+      "noPersistentAlert": "no persistent alert",
+      "watchHours": "Hours under watch",
+      "alertHours": "Hours in alert"
+    },
+    "chart": {
+      "xAxis": "Hours before the event",
+      "baseThreshold": "base persistence threshold",
+      "hoursBefore": "{{n}} h before",
+      "oneHourBefore": "1 h before",
+      "selectedAt": "{{estado}} · {{horas}} h before"
+    },
+    "deviation": {
+      "current": "current {{valor}} · baseline {{baseline}}",
+      "iqr": "{{valor}} IQR"
+    },
+    "gaps": "The query contains {{n}} hour(s) marked as GAP_HISTORICO. The backend keeps the last causal reading before them and does not fill in with future information.",
+    "rawJson": "See the backend’s full JSON response"
+  }
+}

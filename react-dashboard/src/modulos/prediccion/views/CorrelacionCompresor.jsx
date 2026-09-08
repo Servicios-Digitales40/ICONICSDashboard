@@ -11,24 +11,11 @@
  * señales de planta está PROHIBIDO (CLAUDE.md §2.1). No comparten instalación,
  * ni fuente, ni reloj. Esa guarda es la F6 del plan.
  */
+/* Carga el diccionario de este modulo. Ver `modulos/prediccion/i18n.js`. */
+import "../i18n.js";
+
 import { PantallaPendiente } from "../components/PantallaPendiente.jsx";
 
 export default function CorrelacionCompresor() {
-  return (
-    <PantallaPendiente
-      titulo="Correlación entre variables"
-      resumen="Si dos o más variables del compresor se movieron juntas en la misma ventana, con su coeficiente y su lectura en palabras."
-      mostrara={[
-        "El coeficiente de cada par, de −1 a 1, y qué significa en lenguaje llano",
-        "La ventana sobre la que se midió, y cuántas muestras la sostienen",
-        "Un aviso cuando la ventana es demasiado corta para afirmar nada",
-      ]}
-      necesita={[
-        "Decidir quién calcula: la API, o nosotros sobre las series (Monitoreo ya tiene ese código)",
-        "Si lo calcula la API: qué coeficiente usa y sobre qué remuestreo",
-        "El endpoint de serie libre, si el cálculo se hace de este lado",
-      ]}
-      fase="F4"
-    />
-  );
+  return <PantallaPendiente vista="correlacion" fase="F4" />;
 }

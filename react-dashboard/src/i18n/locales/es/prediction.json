@@ -1,0 +1,189 @@
+{
+  "home": {
+    "title": "Compresor",
+    "lead": "Una máquina real, con histórico de datos reales, servida por un backend propio. Es el segundo módulo de la demo y el único que no lee el servidor ICONICS de esta planta.",
+    "service": {
+      "title": "Estado del servicio",
+      "sub": "Lo único que este módulo puede comprobar hoy por sí mismo",
+      "connection": "Conexión",
+      "checking": "Consultando…",
+      "up": "El backend predictivo responde",
+      "down": "El backend predictivo no responde",
+      "whereItRuns": "Dónde corre",
+      "ownMachine": "Su propia máquina, distinta del servidor de ICONICS y del de IA"
+    },
+    "limits": {
+      "title": "Limitaciones",
+      "sub": "Lo que hay que decir en voz alta antes de enseñar cualquier curva de este módulo",
+      "items": [
+        "El dato NO viene de ICONICS: lo sirve otro backend, en otra máquina. Nada de lo que se ve aquí se puede cruzar con el tanque ni con el sistema de vibraciones.",
+        "El histórico se alimenta de una hoja de cálculo cuyo contenido exacto todavía no está inventariado: no sabemos aún qué variables hay ni con qué unidad.",
+        "No hay lectura en vivo de esta máquina. Todo lo que se consulta es pasado.",
+        "El modelo predictivo no tiene todavía un error validado publicado, así que ninguna proyección se puede citar como fiable."
+      ]
+    }
+  },
+  "pending": {
+    "badge": "Sin datos todavía",
+    "willShow": "Qué enseñará",
+    "stillNeeds": "Qué falta para construirla",
+    "noFakeData": "Esta pantalla no dibuja datos de ejemplo a propósito: una curva inventada en un tablero de planta se lee como una medida.",
+    "followedIn": "Se sigue en <b>{{documento}}</b> {{fase}}.",
+    "historico": {
+      "titulo": "Histórico del compresor",
+      "resumen": "La evolución de una variable entre dos fechas, con sus extremos fechados — no la reproducción de un evento, sino la consulta libre.",
+      "mostrara": [
+        "La curva de una variable en el periodo que se pida",
+        "Mínimo y máximo con la hora exacta en que ocurrieron",
+        "Los tramos sin muestra, declarados como hueco y no dibujados como cero",
+        "Comparación de la misma variable entre dos periodos"
+      ],
+      "necesita": [
+        "Un endpoint de serie libre: qué parámetros acepta y qué formato tiene cada muestra",
+        "La ventana máxima que admite y si pagina",
+        "Qué devuelve para un tramo sin dato — hay que poder distinguirlo de un cero real",
+        "Cómo señala un fallo del servicio, para no narrarlo nunca como ausencia de dato"
+      ]
+    },
+    "correlacion": {
+      "titulo": "Correlación entre variables",
+      "resumen": "Si dos o más variables del compresor se movieron juntas en la misma ventana, con su coeficiente y su lectura en palabras.",
+      "mostrara": [
+        "El coeficiente de cada par, de −1 a 1, y qué significa en lenguaje llano",
+        "La ventana sobre la que se midió, y cuántas muestras la sostienen",
+        "Un aviso cuando la ventana es demasiado corta para afirmar nada"
+      ],
+      "necesita": [
+        "Decidir quién calcula: la API, o nosotros sobre las series (Monitoreo ya tiene ese código)",
+        "Si lo calcula la API: qué coeficiente usa y sobre qué remuestreo",
+        "El endpoint de serie libre, si el cálculo se hace de este lado"
+      ]
+    },
+    "pronostico": {
+      "titulo": "Pronóstico",
+      "resumen": "Cómo se comportará una variable del compresor en los próximos días — siempre con su incertidumbre al lado, nunca como una línea sola.",
+      "mostrara": [
+        "La proyección de una variable al horizonte que se pida",
+        "Su margen de error, con el mismo peso visual que la propia curva",
+        "El error validado del modelo, dicho en la pantalla y no escondido",
+        "Una negativa explícita cuando el horizonte pedido excede lo que el modelo sostiene"
+      ],
+      "necesita": [
+        "El endpoint de pronóstico: qué horizonte admite y qué devuelve por muestra",
+        "El error validado del modelo, publicado — sin él no se puede citar ninguna proyección",
+        "Qué intervalo de confianza entrega, si entrega alguno"
+      ]
+    },
+    "variables": {
+      "titulo": "Variables del compresor",
+      "resumen": "Qué mide esta máquina, con qué unidad y en qué rango se mueve — el equivalente al catálogo de señales que las máquinas de planta ya tienen.",
+      "mostrara": [
+        "Cada variable con su nombre legible, su unidad y su rango válido",
+        "Cuáles tienen serie histórica y cuáles sólo valor suelto",
+        "Desde qué fecha hay dato, y si el histórico es contiguo",
+        "Lo que NO se puede afirmar de cada una, igual que hacen los dos sistemas de planta"
+      ],
+      "necesita": [
+        "El inventario del histórico: qué columnas trae exactamente la hoja de cálculo que alimenta la API",
+        "La unidad de cada variable — sin ella, un número en pantalla no significa nada",
+        "Un endpoint que liste las variables, o la lista acordada por escrito"
+      ]
+    }
+  },
+  "events": {
+    "query": {
+      "title": "Consulta un evento histórico",
+      "sub": "Selecciona uno de los cuatro eventos documentados y cuántas horas anteriores deseas reproducir. El backend devolverá un estado por cada hora solicitada.",
+      "label": "Consulta histórica",
+      "hoursHint": "De 1 a 168 horas. Se devuelve un registro por hora.",
+      "submit": "Consultar predicción",
+      "failed": "No se pudo consultar la predicción"
+    },
+    "beta": {
+      "title": "Predicción (Beta)",
+      "sub": "Reproducción histórica del modelo MetroPT-3 V4.4 mediante solicitudes POST"
+    },
+    "machineState": "Estado de la máquina",
+    "hourState": "Estado representativo de la hora",
+    "anomalyIndex": "Índice de anomalía",
+    "instantAlert": "Alerta instantánea",
+    "activePolicy": "Política activa",
+    "noDeviations": "Sin desviaciones disponibles para este punto.",
+    "trend": {
+      "title": "Evolución antes del evento",
+      "sub": "Cada punto representa la condición de mayor severidad observada dentro de esa hora",
+      "instantWatch": "vigilancia instantánea",
+      "clickHint": "Haz clic en la gráfica para inspeccionar esa hora.",
+      "relevantDeviation": "desviación relevante",
+      "persistentPolicy": "política persistente activa",
+      "pickHour": "Seleccionar hora de la reproducción histórica"
+    },
+    "technical": {
+      "title": "Información técnica",
+      "sub": "Metadatos y advertencias entregados por el backend V4.4",
+      "quality": "Calidad y metodología"
+    },
+    "status": {
+      "ALERTA_PERSISTENTE": "Alerta persistente",
+      "VIGILANCIA": "Vigilancia",
+      "NORMAL": "Normal"
+    },
+    "yes": "Sí",
+    "no": "No",
+    "form": {
+      "event": "Evento de falla",
+      "eventN": "Evento {{n}}",
+      "eventsAvailable": "Eventos documentados disponibles: 1–4.",
+      "hoursBefore": "Horas previas al evento"
+    },
+    "panel": {
+      "pickQuery": "Selecciona una consulta",
+      "hoursBeforeEvent": "{{n}} h antes del evento",
+      "modelAndEvent": "Modelo y evento",
+      "deviations": "Principales desviaciones"
+    },
+    "row": {
+      "event": "Evento",
+      "type": "Tipo",
+      "severity": "Severidad",
+      "eventStart": "Inicio del evento",
+      "pointsReceived": "Puntos recibidos",
+      "persistentPercentile": "Percentil persistente",
+      "requiredWindows": "Ventanas requeridas",
+      "timeWindow": "Ventana temporal",
+      "dataQuality": "Calidad de datos",
+      "observedWindows": "Ventanas observadas",
+      "model": "Modelo",
+      "algorithm": "Algoritmo",
+      "failureType": "Tipo de falla",
+      "eventDate": "Fecha del evento",
+      "documentedEnd": "Fin documentado"
+    },
+    "kpi": {
+      "anomalyScale": "escala 0–100",
+      "rawScore": "Score raw",
+      "persistentAlert": "Alerta persistente",
+      "persistentSub": "{{ventanas}} ventanas / {{horas}} h",
+      "instantThreshold": "umbral p{{valor}}",
+      "hoursRequested": "Horas solicitadas",
+      "statesReturned": "{{n}} estados devueltos",
+      "normalHours": "Horas normales",
+      "noPersistentAlert": "sin alerta persistente",
+      "watchHours": "Horas en vigilancia",
+      "alertHours": "Horas con alerta"
+    },
+    "chart": {
+      "xAxis": "Horas antes del evento",
+      "baseThreshold": "umbral base de persistencia",
+      "hoursBefore": "{{n}} h antes",
+      "oneHourBefore": "1 h antes",
+      "selectedAt": "{{estado}} · {{horas}} h antes"
+    },
+    "deviation": {
+      "current": "actual {{valor}} · baseline {{baseline}}",
+      "iqr": "{{valor}} IQR"
+    },
+    "gaps": "La consulta contiene {{n}} hora(s) marcadas como GAP_HISTORICO. El backend conserva el último dato causal previo y no rellena con información futura.",
+    "rawJson": "Ver respuesta JSON completa del backend"
+  }
+}

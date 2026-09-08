@@ -26,26 +26,49 @@
  * debe saber nada de eso. Si algún día un segundo módulo necesita lo mismo, se
  * sube entonces — con lo que los dos casos tengan de verdad en común.
  */
+import { useTranslation } from "react-i18next";
 import { FileQuestion } from "lucide-react";
 
 import { Panel } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 
+/** El plan donde se sigue cada una de estas pantallas. */
+const PLAN = "docs/PLAN-19-MODULARIZACION.md";
+
 /**
- * @param {object}   props
- * @param {string}   props.titulo      qué pantalla es
- * @param {string}   props.resumen     una frase: qué responderá cuando exista
- * @param {string[]} props.mostrara    lo que enseñará, en concreto
- * @param {string[]} props.necesita    qué falta para poder construirla
- * @param {string}   [props.fase]      la fase del plan que la desbloquea
+ * ── RECIBE UNA CLAVE, NO CUATRO LISTAS DE TEXTO ────────────────────
+ *
+ * Antes cada una de las cuatro pantallas le pasaba su título, su resumen y sus
+ * dos listas escritos en el propio archivo. Al traducir, eso habrían sido
+ * cuatro archivos de vista llenos de prosa en dos idiomas — y una vista cuyo
+ * cometido es decir «esto no existe todavía» no tiene por qué contener texto.
+ *
+ * Ahora pasa el ID de la pantalla y el texto sale de `prediction:pending.<id>`.
+ * Las cuatro vistas quedan en seis líneas y el contenido vive donde vive el
+ * resto del texto del tablero.
+ *
+ * @param {object} props
+ * @param {string} props.vista   id de la pantalla en `prediction:pending`
+ * @param {string} [props.fase]  la fase del plan que la desbloquea
  */
-export function PantallaPendiente({ titulo, resumen, mostrara, necesita, fase }) {
+export function PantallaPendiente({ vista, fase }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("prediction");
   const { theme: t } = useTheme();
 
-  const lista = (items, color) => (
+  const titulo = traducir(`pending.${vista}.titulo`);
+  const resumen = traducir(`pending.${vista}.resumen`);
+
+  /*
+   * `returnObjects` porque son listas: i18next las devuelve como arreglo, y
+   * `verificar-i18n.mjs` comprueba que las dos versiones tengan los MISMOS
+   * índices — así que una lista con un punto de menos en inglés no pasa.
+   */
+  const lista = (clave, color) => (
     <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-      {items.map((texto) => (
+      {traducir(`pending.${vista}.${clave}`, { returnObjects: true }).map((texto) => (
         <li key={texto} style={{ color, fontSize: 13.5, lineHeight: 1.55 }}>
           {texto}
         </li>
@@ -90,7 +113,7 @@ export function PantallaPendiente({ titulo, resumen, mostrara, necesita, fase })
                   padding: "2px 6px",
                 }}
               >
-                Sin datos todavía
+                {traducir("pending.badge")}
               </span>
             </div>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: t.textSoft }}>{resumen}</p>
@@ -99,17 +122,14 @@ export function PantallaPendiente({ titulo, resumen, mostrara, necesita, fase })
       </Panel>
 
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(19rem, 1fr))" }}>
-        <Panel title="Qué enseñará">{lista(mostrara, t.textSoft)}</Panel>
-        <Panel title="Qué falta para construirla">{lista(necesita, t.textSoft)}</Panel>
+        <Panel title={traducir("pending.willShow")}>{lista("mostrara", t.textSoft)}</Panel>
+        <Panel title={traducir("pending.stillNeeds")}>{lista("necesita", t.textSoft)}</Panel>
       </div>
 
       <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: t.textFaint }}>
-        Esta pantalla no dibuja datos de ejemplo a propósito: una curva inventada en un tablero de
-        planta se lee como una medida.{" "}
+        {traducir("pending.noFakeData")}{" "}
         {fase && (
-          <>
-            Se sigue en <span style={{ fontFamily: MONO }}>docs/PLAN-19-MODULARIZACION.md</span> {fase}.
-          </>
+          <Enfasis>{traducir("pending.followedIn", { documento: PLAN, fase })}</Enfasis>
         )}
       </p>
     </div>

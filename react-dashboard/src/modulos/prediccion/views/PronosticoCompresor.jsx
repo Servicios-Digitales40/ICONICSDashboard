@@ -18,26 +18,11 @@
  * la pantalla se quedaría enseñando una línea sin decir cuánto se puede fiar
  * nadie de ella.
  */
+/* Carga el diccionario de este modulo. Ver `modulos/prediccion/i18n.js`. */
+import "../i18n.js";
+
 import { PantallaPendiente } from "../components/PantallaPendiente.jsx";
 
 export default function PronosticoCompresor() {
-  return (
-    <PantallaPendiente
-      titulo="Pronóstico"
-      resumen="Cómo se comportará una variable del compresor en los próximos días — siempre con su incertidumbre al lado, nunca como una línea sola."
-      mostrara={[
-        "La proyección de una variable al horizonte que se pida",
-        "Su margen de error, con el mismo peso visual que la propia curva",
-        "El error validado del modelo, dicho en la pantalla y no escondido",
-        "Una negativa explícita cuando el horizonte pedido excede lo que el modelo sostiene",
-      ]}
-      necesita={[
-        "El endpoint de predicción: qué horizontes admite y qué devuelve",
-        "Qué forma tiene la incertidumbre: ¿intervalo de confianza, desviación, probabilidad de evento?",
-        "El error validado del modelo — la cifra concreta, sin ella no hay redacción honesta posible",
-        "Qué algoritmo es y sobre qué se entrenó, para poder decirlo cuando alguien pregunte",
-      ]}
-      fase="F7"
-    />
-  );
+  return <PantallaPendiente vista="pronostico" fase="F7" />;
 }

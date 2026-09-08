@@ -16,6 +16,9 @@
  *
  * Ver `docs/PLAN-19-MODULARIZACION.md` F2.
  */
+/* Carga el diccionario de este modulo. Ver `modulos/prediccion/i18n.js`. */
+import "../i18n.js";
+
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -41,8 +44,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { useTranslation } from "react-i18next";
+
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
+import { useFormato } from "@/i18n/formato.js";
 import {
   fetchEventHistory,
   fetchPredictionHealth,
@@ -63,14 +69,23 @@ import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 const EVENTOS = [1, 2, 3, 4];
 const HORAS_MAX = 168;
 
+/*
+ * El aspecto de un estado. Devuelve la CLAVE y no el rótulo: es una función
+ * pura y no puede llamar a un hook, igual que `aspectoDe` en Salud o
+ * `estadoDeFila` en Documentación. El estado lo decide aquí; cómo se escribe,
+ * `prediction:events.status`.
+ *
+ * Los IDS (`ALERTA_PERSISTENTE`, `VIGILANCIA`) los manda el backend V4.4 y no
+ * se traducen: son el contrato.
+ */
 function statusMeta(status, t) {
   if (status === "ALERTA_PERSISTENTE") {
-    return { label: "Alerta persistente", color: t.coral, bg: t.coralSoft, icon: <AlertCircle size={15} /> };
+    return { clave: "ALERTA_PERSISTENTE", color: t.coral, bg: t.coralSoft, icon: <AlertCircle size={15} /> };
   }
   if (status === "VIGILANCIA") {
-    return { label: "Vigilancia", color: t.amber, bg: t.amberSoft, icon: <AlertTriangle size={15} /> };
+    return { clave: "VIGILANCIA", color: t.amber, bg: t.amberSoft, icon: <AlertTriangle size={15} /> };
   }
-  return { label: "Normal", color: t.success, bg: t.successSoft, icon: <CheckCircle2 size={15} /> };
+  return { clave: "NORMAL", color: t.success, bg: t.successSoft, icon: <CheckCircle2 size={15} /> };
 }
 
 function formatNumber(value, digits = 2) {
@@ -78,15 +93,16 @@ function formatNumber(value, digits = 2) {
   return Number.isFinite(n) ? n.toFixed(digits) : "—";
 }
 
-function formatDate(value) {
+/*
+ * La fecha se formatea con el locale del idioma activo, no con `es-MX` fijo:
+ * un tablero en inglés enseñaba el mes en español. Recibe el formateador
+ * porque esto no es un componente y no puede pedirlo por su cuenta.
+ */
+function formatDate(value, fechaHora) {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function booleanLabel(value) {
-  return value ? "Sí" : "No";
+  return fechaHora(d);
 }
 
 function FieldLabel({ children, t }) {
@@ -176,6 +192,8 @@ function PredictionTooltip({ active, payload, label, t }) {
 }
 
 function EmptyState({ t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("prediction");
   return (
     <div style={{ minHeight: 430, display: "grid", placeItems: "center", textAlign: "center", padding: 30 }}>
       <div>
@@ -193,9 +211,11 @@ function EmptyState({ t }) {
         >
           <Activity size={25} />
         </div>
-        <h3 style={{ margin: 0, color: t.text, fontFamily: SANS, fontSize: 16 }}>Consulta un evento histórico</h3>
+        <h3 style={{ margin: 0, color: t.text, fontFamily: SANS, fontSize: 16 }}>
+          {traducir("events.query.title")}
+        </h3>
         <p style={{ maxWidth: 440, margin: "8px auto 0", color: t.textFaint, fontSize: 12.5, lineHeight: 1.6 }}>
-          Selecciona uno de los cuatro eventos documentados y cuántas horas anteriores deseas reproducir. El backend devolverá un estado por cada hora solicitada.
+          {traducir("events.query.sub")}
         </p>
       </div>
     </div>
@@ -203,7 +223,15 @@ function EmptyState({ t }) {
 }
 
 export default function EventosCompresor() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("prediction");
+  const { fechaHora } = useFormato();
   const { theme: t } = useTheme();
+
+  /** «Sí»/«No» del idioma activo. Antes era una función suelta en español. */
+  const booleanLabel = (valor) => traducir(valor ? "events.yes" : "events.no");
+  /** La fecha, ya con el locale puesto. */
+  const fecha = (valor) => formatDate(valor, fechaHora);
   const [eventId, setEventId] = useState(1);
   const [hoursBefore, setHoursBefore] = useState(48);
   const [data, setData] = useState(null);
@@ -300,36 +328,38 @@ export default function EventosCompresor() {
 
   return (
     <>
-      <SectionLabel sub="Reproducción histórica del modelo MetroPT-3 V4.4 mediante solicitudes POST">
-        Predicción (Beta)
+      <SectionLabel sub={traducir("events.beta.sub")}>
+        {traducir("events.beta.title")}
       </SectionLabel>
 
       {error && (
         <div style={{ marginBottom: 16 }}>
-          <AlertBanner type="error" title="No se pudo consultar la predicción" message={error} />
+          <AlertBanner type="error" title={traducir("events.query.failed")} message={error} />
         </div>
       )}
 
       <div className="prediction-beta-grid">
-        <Panel title="Consulta histórica" code="POST /api/v1/event-history/" delay={0}>
+        <Panel title={traducir("events.query.label")} code="POST /api/v1/event-history/" delay={0}>
           <form onSubmit={consultar}>
             <div style={{ display: "grid", gap: 15 }}>
               <div>
-                <FieldLabel t={t}>Evento de falla</FieldLabel>
+                <FieldLabel t={t}>{traducir("events.form.event")}</FieldLabel>
                 <select
                   value={eventId}
                   onChange={(e) => setEventId(Number(e.target.value))}
                   style={{ ...fieldStyle(t), height: 42, cursor: "pointer" }}
                 >
                   {EVENTOS.map((id) => (
-                    <option key={id} value={id}>Evento {id}</option>
+                    <option key={id} value={id}>{traducir("events.form.eventN", { n: id })}</option>
                   ))}
                 </select>
-                <div style={{ marginTop: 5, fontSize: 10.5, color: t.textFaint }}>Eventos documentados disponibles: 1–4.</div>
+                <div style={{ marginTop: 5, fontSize: 10.5, color: t.textFaint }}>
+                  {traducir("events.form.eventsAvailable")}
+                </div>
               </div>
 
               <div>
-                <FieldLabel t={t}>Horas previas al evento</FieldLabel>
+                <FieldLabel t={t}>{traducir("events.form.hoursBefore")}</FieldLabel>
                 <input
                   type="number"
                   min="1"
@@ -339,11 +369,13 @@ export default function EventosCompresor() {
                   onChange={(e) => setHoursBefore(e.target.value)}
                   style={{ ...fieldStyle(t), height: 42 }}
                 />
-                <div style={{ marginTop: 5, fontSize: 10.5, color: t.textFaint }}>De 1 a 168 horas. Se devuelve un registro por hora.</div>
+                <div style={{ marginTop: 5, fontSize: 10.5, color: t.textFaint }}>
+                  {traducir("events.query.hoursHint")}
+                </div>
               </div>
 
               <Button type="submit" icon={<Search size={14} />} loading={loading}>
-                Consultar predicción
+                {traducir("events.query.submit")}
               </Button>
             </div>
           </form>
@@ -375,16 +407,22 @@ export default function EventosCompresor() {
 
           {data && (
             <div style={{ marginTop: 18 }}>
-              <InfoRow label="Evento" value={`#${data.event?.event_id ?? eventId}`} t={t} />
-              <InfoRow label="Tipo" value={data.event?.failure_type ?? "—"} t={t} />
-              <InfoRow label="Severidad" value={data.event?.severity ?? "—"} t={t} />
-              <InfoRow label="Inicio del evento" value={formatDate(data.event?.event_timestamp)} t={t} />
-              <InfoRow label="Puntos recibidos" value={`${timeline.length} / ${data.request?.expected_points ?? hoursBefore}`} t={t} mono />
+              <InfoRow label={traducir("events.row.event")} value={`#${data.event?.event_id ?? eventId}`} t={t} />
+              <InfoRow label={traducir("events.row.type")} value={data.event?.failure_type ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.severity")} value={data.event?.severity ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.eventStart")} value={fecha(data.event?.event_timestamp)} t={t} />
+              <InfoRow label={traducir("events.row.pointsReceived")} value={`${timeline.length} / ${data.request?.expected_points ?? hoursBefore}`} t={t} mono />
             </div>
           )}
         </Panel>
 
-        <Panel title="Estado de la máquina" code={selected ? `${selected.hours_to_event} h antes del evento` : "Selecciona una consulta"} delay={0.06}>
+        <Panel
+          title={traducir("events.machineState")}
+          code={selected
+            ? traducir("events.panel.hoursBeforeEvent", { n: selected.hours_to_event })
+            : traducir("events.panel.pickQuery")}
+          delay={0.06}
+        >
           {!selected ? (
             <EmptyState t={t} />
           ) : (
@@ -400,12 +438,12 @@ export default function EventosCompresor() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: t.textFaint }}>Estado representativo de la hora</div>
+                  <div style={{ fontSize: 11, color: t.textFaint }}>{traducir("events.hourState")}</div>
                   <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, color: selectedMeta.color, fontSize: 18, fontWeight: 800, fontFamily: SANS }}>
                     {selectedMeta.icon}
-                    {selectedMeta.label}
+                    {traducir(`events.status.${selectedMeta.clave}`)}
                   </div>
-                  <div style={{ marginTop: 7, color: t.textFaint, fontSize: 11.5 }}>{formatDate(selected.timestamp)}</div>
+                  <div style={{ marginTop: 7, color: t.textFaint, fontSize: 11.5 }}>{fecha(selected.timestamp)}</div>
                 </div>
                 <div
                   style={{
@@ -423,24 +461,29 @@ export default function EventosCompresor() {
               </div>
 
               <div className="prediction-kpi-grid" style={{ marginTop: 16 }}>
-                <Kpi icon={<Gauge size={14} />} label="Índice de anomalía" value={`${formatNumber(selected.anomaly_index, 2)}`} sub="escala 0–100" t={t} color={selectedMeta.color} />
-                <Kpi icon={<Activity size={14} />} label="Score raw" value={formatNumber(selected.raw_anomaly_score, 6)} sub="Isolation Forest" t={t} />
-                <Kpi icon={<AlertTriangle size={14} />} label="Alerta instantánea" value={booleanLabel(selected.instant_alert)} sub={`umbral p${formatNumber(policy.instant_watch_threshold, 1)}`} t={t} color={selected.instant_alert ? t.amber : t.text} />
-                <Kpi icon={<ShieldCheck size={14} />} label="Alerta persistente" value={booleanLabel(selected.persistent_alert)} sub={`${policy.required_windows ?? 6} ventanas / ${policy.window_hours ?? 1} h`} t={t} color={selected.persistent_alert ? t.coral : t.text} />
+                {/* «Isolation Forest» es el nombre del algoritmo: no se traduce. */}
+                <Kpi icon={<Gauge size={14} />} label={traducir("events.anomalyIndex")} value={`${formatNumber(selected.anomaly_index, 2)}`} sub={traducir("events.kpi.anomalyScale")} t={t} color={selectedMeta.color} />
+                <Kpi icon={<Activity size={14} />} label={traducir("events.kpi.rawScore")} value={formatNumber(selected.raw_anomaly_score, 6)} sub="Isolation Forest" t={t} />
+                <Kpi icon={<AlertTriangle size={14} />} label={traducir("events.instantAlert")} value={booleanLabel(selected.instant_alert)} sub={traducir("events.kpi.instantThreshold", { valor: formatNumber(policy.instant_watch_threshold, 1) })} t={t} color={selected.instant_alert ? t.amber : t.text} />
+                <Kpi icon={<ShieldCheck size={14} />} label={traducir("events.kpi.persistentAlert")} value={booleanLabel(selected.persistent_alert)} sub={traducir("events.kpi.persistentSub", { ventanas: policy.required_windows ?? 6, horas: policy.window_hours ?? 1 })} t={t} color={selected.persistent_alert ? t.coral : t.text} />
               </div>
 
               <div className="prediction-detail-grid" style={{ marginTop: 18 }}>
                 <div>
-                  <h4 style={{ margin: "0 0 8px", fontSize: 12.5, color: t.text, fontFamily: SANS }}>Política activa</h4>
-                  <InfoRow label="Percentil persistente" value={`p${formatNumber(policy.percentile_threshold, 1)}`} t={t} mono />
-                  <InfoRow label="Ventanas requeridas" value={policy.required_windows ?? "—"} t={t} mono />
-                  <InfoRow label="Ventana temporal" value={`${policy.window_hours ?? "—"} h`} t={t} mono />
-                  <InfoRow label="Calidad de datos" value={selected.data_quality ?? "—"} t={t} />
-                  <InfoRow label="Ventanas observadas" value={selected.observed_windows_10m ?? "—"} t={t} mono />
+                  <h4 style={{ margin: "0 0 8px", fontSize: 12.5, color: t.text, fontFamily: SANS }}>
+                    {traducir("events.activePolicy")}
+                  </h4>
+                  <InfoRow label={traducir("events.row.persistentPercentile")} value={`p${formatNumber(policy.percentile_threshold, 1)}`} t={t} mono />
+                  <InfoRow label={traducir("events.row.requiredWindows")} value={policy.required_windows ?? "—"} t={t} mono />
+                  <InfoRow label={traducir("events.row.timeWindow")} value={`${policy.window_hours ?? "—"} h`} t={t} mono />
+                  <InfoRow label={traducir("events.row.dataQuality")} value={selected.data_quality ?? "—"} t={t} />
+                  <InfoRow label={traducir("events.row.observedWindows")} value={selected.observed_windows_10m ?? "—"} t={t} mono />
                 </div>
 
                 <div>
-                  <h4 style={{ margin: "0 0 8px", fontSize: 12.5, color: t.text, fontFamily: SANS }}>Principales desviaciones</h4>
+                  <h4 style={{ margin: "0 0 8px", fontSize: 12.5, color: t.text, fontFamily: SANS }}>
+                    {traducir("events.panel.deviations")}
+                  </h4>
                   <div style={{ display: "grid", gap: 8 }}>
                     {(selected.top_deviations ?? []).length ? (
                       selected.top_deviations.map((item, index) => (
@@ -460,16 +503,21 @@ export default function EventosCompresor() {
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 11.5, fontWeight: 700, color: t.text, overflow: "hidden", textOverflow: "ellipsis" }}>{item.sensor}</div>
                             <div style={{ marginTop: 3, fontSize: 10, color: t.textFaint }}>
-                              actual {formatNumber(item.value, 3)} · baseline {formatNumber(item.baseline_median, 3)}
+                              {traducir("events.deviation.current", {
+                                valor: formatNumber(item.value, 3),
+                                baseline: formatNumber(item.baseline_median, 3),
+                              })}
                             </div>
                           </div>
                           <span style={{ fontFamily: MONO, fontSize: 11.5, fontWeight: 750, color: t.accent }}>
-                            {formatNumber(item.deviation_iqr, 3)} IQR
+                            {traducir("events.deviation.iqr", { valor: formatNumber(item.deviation_iqr, 3) })}
                           </span>
                         </div>
                       ))
                     ) : (
-                      <div style={{ color: t.textFaint, fontSize: 11.5 }}>Sin desviaciones disponibles para este punto.</div>
+                      <div style={{ color: t.textFaint, fontSize: 11.5 }}>
+                        {traducir("events.noDeviations")}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -481,16 +529,16 @@ export default function EventosCompresor() {
 
       {data && (
         <>
-          <SectionLabel sub="Cada punto representa la condición de mayor severidad observada dentro de esa hora">
-            Evolución antes del evento
+          <SectionLabel sub={traducir("events.trend.sub")}>
+            {traducir("events.trend.title")}
           </SectionLabel>
 
           <Panel delay={0.12}>
             <div className="prediction-summary-grid">
-              <Kpi icon={<Clock3 size={14} />} label="Horas solicitadas" value={data.request?.hours_before ?? timeline.length} sub={`${timeline.length} estados devueltos`} t={t} />
-              <Kpi icon={<CheckCircle2 size={14} />} label="Horas normales" value={counts.normal} sub="sin alerta persistente" t={t} color={t.success} />
-              <Kpi icon={<AlertTriangle size={14} />} label="Horas en vigilancia" value={counts.watch} sub="desviación relevante" t={t} color={t.amber} />
-              <Kpi icon={<AlertCircle size={14} />} label="Horas con alerta" value={counts.persistent} sub="política persistente activa" t={t} color={t.coral} />
+              <Kpi icon={<Clock3 size={14} />} label={traducir("events.kpi.hoursRequested")} value={data.request?.hours_before ?? timeline.length} sub={traducir("events.kpi.statesReturned", { n: timeline.length })} t={t} />
+              <Kpi icon={<CheckCircle2 size={14} />} label={traducir("events.kpi.normalHours")} value={counts.normal} sub={traducir("events.kpi.noPersistentAlert")} t={t} color={t.success} />
+              <Kpi icon={<AlertTriangle size={14} />} label={traducir("events.kpi.watchHours")} value={counts.watch} sub={traducir("events.trend.relevantDeviation")} t={t} color={t.amber} />
+              <Kpi icon={<AlertCircle size={14} />} label={traducir("events.kpi.alertHours")} value={counts.persistent} sub={traducir("events.trend.persistentPolicy")} t={t} color={t.coral} />
             </div>
 
             <div style={{ height: 330, marginTop: 22 }}>
@@ -504,7 +552,7 @@ export default function EventosCompresor() {
                     tickLine={false}
                     axisLine={{ stroke: t.border }}
                     minTickGap={28}
-                    label={{ value: "Horas antes del evento", position: "insideBottom", offset: -4, fill: t.textFaint, fontSize: 10 }}
+                    label={{ value: traducir("events.chart.xAxis"), position: "insideBottom", offset: -4, fill: t.textFaint, fontSize: 10 }}
                   />
                   <YAxis
                     domain={[0, 100]}
@@ -531,19 +579,28 @@ export default function EventosCompresor() {
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 8, fontSize: 10.5, color: t.textFaint }}>
-              <span><strong style={{ color: t.amber }}>p{formatNumber(policy.percentile_threshold ?? 98.5, 1)}</strong> umbral base de persistencia</span>
-              <span><strong style={{ color: t.coral }}>p{formatNumber(policy.instant_watch_threshold ?? 99, 1)}</strong> vigilancia instantánea</span>
-              <span>Haz clic en la gráfica para inspeccionar esa hora.</span>
+              <span>
+                <strong style={{ color: t.amber }}>p{formatNumber(policy.percentile_threshold ?? 98.5, 1)}</strong>{" "}
+                {traducir("events.chart.baseThreshold")}
+              </span>
+              <span>
+                <strong style={{ color: t.coral }}>p{formatNumber(policy.instant_watch_threshold ?? 99, 1)}</strong>{" "}
+                {traducir("events.trend.instantWatch")}
+              </span>
+              <span>{traducir("events.trend.clickHint")}</span>
             </div>
 
             {timeline.length > 1 && (
               <div style={{ marginTop: 18, paddingTop: 16, borderTop: `1px solid ${t.border}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 7, fontSize: 11, color: t.textFaint }}>
-                  <span>{timeline[0]?.hours_to_event} h antes</span>
+                  <span>{traducir("events.chart.hoursBefore", { n: timeline[0]?.hours_to_event })}</span>
                   <span style={{ color: selectedMeta?.color ?? t.textSoft, fontWeight: 700 }}>
-                    {selectedMeta?.label ?? "—"} · {selected?.hours_to_event ?? "—"} h antes
+                    {traducir("events.chart.selectedAt", {
+                      estado: selectedMeta ? traducir(`events.status.${selectedMeta.clave}`) : "—",
+                      horas: selected?.hours_to_event ?? "—",
+                    })}
                   </span>
-                  <span>1 h antes</span>
+                  <span>{traducir("events.chart.oneHourBefore")}</span>
                 </div>
                 <input
                   type="range"
@@ -552,28 +609,28 @@ export default function EventosCompresor() {
                   value={selectedIndex ?? 0}
                   onChange={(e) => setSelectedIndex(Number(e.target.value))}
                   style={{ width: "100%", accentColor: t.accent }}
-                  aria-label="Seleccionar hora de la reproducción histórica"
+                  aria-label={traducir("events.trend.pickHour")}
                 />
               </div>
             )}
           </Panel>
 
-          <SectionLabel sub="Metadatos y advertencias entregados por el backend V4.4">
-            Información técnica
+          <SectionLabel sub={traducir("events.technical.sub")}>
+            {traducir("events.technical.title")}
           </SectionLabel>
 
           <div className="prediction-technical-grid">
-            <Panel title="Modelo y evento" delay={0.18}>
-              <InfoRow label="Modelo" value={data.model?.model_version ?? selected?.model_version ?? "—"} t={t} />
-              <InfoRow label="Algoritmo" value={data.model?.algorithm ?? "—"} t={t} />
-              <InfoRow label="Evento" value={`#${data.event?.event_id ?? "—"}`} t={t} mono />
-              <InfoRow label="Tipo de falla" value={data.event?.failure_type ?? "—"} t={t} />
-              <InfoRow label="Severidad" value={data.event?.severity ?? "—"} t={t} />
-              <InfoRow label="Fecha del evento" value={formatDate(data.event?.event_timestamp)} t={t} />
-              <InfoRow label="Fin documentado" value={formatDate(data.event?.event_end)} t={t} />
+            <Panel title={traducir("events.panel.modelAndEvent")} delay={0.18}>
+              <InfoRow label={traducir("events.row.model")} value={data.model?.model_version ?? selected?.model_version ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.algorithm")} value={data.model?.algorithm ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.event")} value={`#${data.event?.event_id ?? "—"}`} t={t} mono />
+              <InfoRow label={traducir("events.row.failureType")} value={data.event?.failure_type ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.severity")} value={data.event?.severity ?? "—"} t={t} />
+              <InfoRow label={traducir("events.row.eventDate")} value={fecha(data.event?.event_timestamp)} t={t} />
+              <InfoRow label={traducir("events.row.documentedEnd")} value={fecha(data.event?.event_end)} t={t} />
             </Panel>
 
-            <Panel title="Calidad y metodología" delay={0.22}>
+            <Panel title={traducir("events.technical.quality")} delay={0.22}>
               <div style={{ display: "grid", gap: 12 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
                   <Database size={16} color={t.accent} style={{ flexShrink: 0, marginTop: 2 }} />
@@ -587,7 +644,7 @@ export default function EventosCompresor() {
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
                     <TimerReset size={16} color={t.coral} style={{ flexShrink: 0, marginTop: 2 }} />
                     <p style={{ margin: 0, color: t.textSoft, fontSize: 11.5, lineHeight: 1.55 }}>
-                      La consulta contiene {counts.gaps} hora(s) marcadas como GAP_HISTORICO. El backend conserva el último dato causal previo y no rellena con información futura.
+                      {traducir("events.gaps", { n: counts.gaps })}
                     </p>
                   </div>
                 )}
@@ -597,7 +654,7 @@ export default function EventosCompresor() {
 
           <details style={{ marginTop: 16 }}>
             <summary style={{ cursor: "pointer", color: t.textSoft, fontSize: 11.5, fontWeight: 650 }}>
-              Ver respuesta JSON completa del backend
+              {traducir("events.rawJson")}
             </summary>
             <pre
               className="scrollbar-thin"

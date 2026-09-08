@@ -82,8 +82,39 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  * `vendor → three → vendor` y Rollup precargó los dos. Se arregló sacándolo de
  * esa lista. Sin la comprobación de abajo, la subida del techo habría sido lo
  * único visible y el problema de verdad habría pasado desapercibido.
+ *
+ * ── `index` sube de 170 a 200 (08-09-2026), por los DICCIONARIOS ───
+ *
+ * Ojo: esto no es la subida de `vendor` de arriba otra vez. Aquélla fue la
+ * LIBRERÍA de i18n; ésta es el TEXTO. Cuando se escribió el párrafo anterior
+ * los namespaces «no llegaban a 10 KB»; al terminar la migración son **103 KB
+ * de JSON** entre los dos idiomas, y ése es el precio real de traducir un
+ * tablero entero — no un descuido.
+ *
+ * Medido: `index` 92,21 KB antes de i18n → 183,17 KB con todos los
+ * diccionarios dentro. Antes de tocar el número se sacó lo que de verdad no es
+ * de arranque: `prediction.json` (17 KB, los dos idiomas) viaja ahora en el
+ * chunk de las vistas del módulo de Predicción, que ya se cargaban en diferido
+ * — ver `modulos/prediccion/i18n.js`. Con eso, **169,08 KB**.
+ *
+ * Y aun así se sube, porque 169,08 de 170 es menos de 1 KB de margen: el techo
+ * habría saltado con la siguiente frase que alguien tradujera, y un guion que
+ * se rompe por trabajo normal deja de leerse. 200 deja ~31 KB.
+ *
+ * ── LO QUE NO SE HIZO, Y ES LA SIGUIENTE PALANCA ───────────────────
+ *
+ * Cargar sólo el idioma activo. Hoy el arranque lleva español E inglés
+ * completos, y casi ninguna sesión usa los dos: diferir el que no está puesto
+ * quitaría ~40 KB del camino crítico, y el momento de bajarlo —cuando alguien
+ * pulsa el selector— es un clic deliberado donde un instante de espera no
+ * molesta. No se ha hecho aquí porque `fallbackLng` obliga a que el español
+ * esté SIEMPRE, así que el cambio tiene que esperar al chunk antes de
+ * `changeLanguage()` y eso merece hacerse con calma, no al final de una tanda.
+ *
+ * Queda anotado a propósito: la diferencia entre subir un techo y esconder un
+ * problema es decir cuál era la alternativa y por qué no se tomó todavía.
  */
-const PRESUPUESTO_KB = { index: 170, vendor: 270 };
+const PRESUPUESTO_KB = { index: 200, vendor: 270 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [

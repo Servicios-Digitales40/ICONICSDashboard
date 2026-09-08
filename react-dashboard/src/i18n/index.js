@@ -20,7 +20,7 @@
  *
  * Un tablero de planta arranca en una red que puede no tener salida, y una
  * pantalla que se queda sin sus textos porque no pudo bajar un JSON es peor
- * que una en un idioma que no era el preferido. Los catorce namespaces de los dos
+ * que una en un idioma que no era el preferido. Los catorce namespaces de arranque de los dos
  * idiomas pesan poco y viajan en el bundle.
  *
  * ── LA FUNCIÓN DE TRADUCIR SE LLAMA `traducir`, NO `t` ─────────────
@@ -106,6 +106,7 @@ export const NAMESPACES = Object.freeze([
   "errors",
   "assistant",
   "data",
+  "prediction",
 ]);
 
 const resources = {

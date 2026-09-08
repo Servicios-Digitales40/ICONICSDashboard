@@ -21,7 +21,11 @@
  * Monitoreo perdió el 03-09-2026 cuando el historiador devolvió un 500 y la
  * respuesta al técnico lo narró como si la señal no se historizara.
  */
+/* Carga el diccionario de este modulo. Ver `modulos/prediccion/i18n.js`. */
+import "../i18n.js";
+
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, CheckCircle2, Cpu, Server } from "lucide-react";
 
 import { Panel, SectionLabel } from "@/components/ui/index.js";
@@ -30,15 +34,16 @@ import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 
 import { fetchPredictionHealth, PREDICTION_API_BASE } from "../data/predictionApi.js";
 
-/** Lo que hay que confesar al hablar de este módulo. Ver la cabecera. */
-const LIMITACIONES = [
-  "El dato NO viene de ICONICS: lo sirve otro backend, en otra máquina. Nada de lo que se ve aquí se puede cruzar con el tanque ni con el sistema de vibraciones.",
-  "El histórico se alimenta de una hoja de cálculo cuyo contenido exacto todavía no está inventariado: no sabemos aún qué variables hay ni con qué unidad.",
-  "No hay lectura en vivo de esta máquina. Todo lo que se consulta es pasado.",
-  "El modelo predictivo no tiene todavía un error validado publicado, así que ninguna proyección se puede citar como fiable.",
-];
+
+/*
+ * Lo que hay que confesar al hablar de este módulo vive en
+ * `prediction:home.limits.items`. Ver la cabecera de este archivo para el
+ * porqué de que se diga en pantalla y no sólo en un comentario.
+ */
 
 export default function InicioCompresor() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("prediction");
   const { theme: t } = useTheme();
 
   const health = useQuery({
@@ -51,32 +56,31 @@ export default function InicioCompresor() {
 
   const colorEstado = cargando ? t.textFaint : responde ? t.success : t.coral;
   const fondoEstado = cargando ? t.hover : responde ? t.successSoft : t.coralSoft;
-  const textoEstado = cargando
-    ? "Consultando…"
-    : responde
-      ? "El backend predictivo responde"
-      : "El backend predictivo no responde";
+  const textoEstado = traducir(
+    cargando ? "home.service.checking"
+      : responde ? "home.service.up"
+        : "home.service.down",
+  );
 
   return (
     <div style={{ display: "grid", gap: 4, maxWidth: 920 }}>
       <Panel>
         <div style={{ display: "grid", gap: 10 }}>
           <h2 style={{ margin: 0, fontFamily: SANS, fontSize: 18, fontWeight: 700, color: t.text }}>
-            Compresor
+            {traducir("home.title")}
           </h2>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: t.textSoft }}>
-            Una máquina real, con histórico de datos reales, servida por un backend propio. Es el
-            segundo módulo de la demo y el único que no lee el servidor ICONICS de esta planta.
+            {traducir("home.lead")}
           </p>
         </div>
       </Panel>
 
-      <SectionLabel sub="Lo único que este módulo puede comprobar hoy por sí mismo">
-        Estado del servicio
+      <SectionLabel sub={traducir("home.service.sub")}>
+        {traducir("home.service.title")}
       </SectionLabel>
 
       <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(17rem, 1fr))" }}>
-        <Panel title="Conexión">
+        <Panel title={traducir("home.service.connection")}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{
@@ -103,7 +107,7 @@ export default function InicioCompresor() {
           </div>
         </Panel>
 
-        <Panel title="Dónde corre">
+        <Panel title={traducir("home.service.whereItRuns")}>
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Server size={15} color={t.textFaint} />
@@ -114,20 +118,20 @@ export default function InicioCompresor() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Cpu size={15} color={t.textFaint} />
               <span style={{ fontSize: 12.5, color: t.textSoft }}>
-                Su propia máquina, distinta del servidor de ICONICS y del de IA
+                {traducir("home.service.ownMachine")}
               </span>
             </div>
           </div>
         </Panel>
       </div>
 
-      <SectionLabel sub="Lo que hay que decir en voz alta antes de enseñar cualquier curva de este módulo">
-        Limitaciones
+      <SectionLabel sub={traducir("home.limits.sub")}>
+        {traducir("home.limits.title")}
       </SectionLabel>
 
       <Panel>
         <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 8 }}>
-          {LIMITACIONES.map((texto) => (
+          {traducir("home.limits.items", { returnObjects: true }).map((texto) => (
             <li key={texto} style={{ fontSize: 13.5, lineHeight: 1.55, color: t.textSoft }}>
               {texto}
             </li>
