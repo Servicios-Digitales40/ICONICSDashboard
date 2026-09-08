@@ -87,5 +87,94 @@
     "pick": "Selecciona un asset en el árbol para ver sus propiedades.",
     "loadingTree": "cargando árbol…",
     "emptyRoot": "No hay assets bajo esta raíz."
+  },
+  "suggestions": [
+    "¿Cómo va la instalación ahora mismo?",
+    "¿Qué nivel tiene el tanque?",
+    "¿Cómo ha ido la temperatura estas últimas horas?",
+    "Compara la presión de esta hora con la de hace seis horas"
+  ],
+  "model": {
+    "aria": "Modelo de IA (afecta a todas las pantallas)",
+    "busy": "No se puede cambiar el modelo con una consulta en curso",
+    "tip": "Modelo de IA. El cambio afecta a TODAS las pantallas y la primera respuesta tarda más mientras se carga."
+  },
+  "actions": {
+    "exportPdfAria": "Exportar la conversación a PDF",
+    "exportPdf": "Exportar PDF",
+    "clearAria": "Borrar la conversación",
+    "clear": "Borrar",
+    "restoreAria": "Restaurar tamaño",
+    "restore": "Restaurar",
+    "maximize": "Maximizar",
+    "closeAria": "Cerrar {{nombre}}",
+    "toEndAria": "Ir al final de la conversación",
+    "toEnd": "Ir al final",
+    "attachAria": "Adjuntar un documento de texto",
+    "attach": "Adjuntar .txt, .csv o .md",
+    "writeAria": "Escribe tu pregunta",
+    "retry": "Reintentar",
+    "copiedAria": "Respuesta copiada",
+    "copyAria": "Copiar la respuesta",
+    "copied": "Copiada",
+    "copy": "Copiar",
+    "downloadReport": "Descargar reporte"
+  },
+  "input": {
+    "listening": "Te escucho…",
+    "waiting": "Esperando respuesta…"
+  },
+  "voice": {
+    "transcribingAria": "Transcribiendo lo que has dicho",
+    "stopAria": "Parar de grabar y transcribir",
+    "stop": "Parar y transcribir",
+    "dictateAria": "Dictar la pregunta",
+    "dictate": "Dictar la pregunta",
+    "handsFree": "Manos libres: hablar y escuchar la respuesta",
+    "doneAria": "He terminado de hablar",
+    "doneTip": "Te escucho. Se envía solo al callarte, o pulsa para enviar ya.",
+    "hangUpAria": "Salir del manos libres",
+    "hangUp": "Colgar",
+    "phase": {
+      "parado": "Manos libres listo",
+      "escuchando": "Te escucho… se envía solo cuando dejes de hablar",
+      "pensando": "Entendiendo lo que has dicho…",
+      "hablando": "Contestando en voz alta…"
+    }
+  },
+  "welcome": {
+    "lead": "Pregunta por el estado del sistema de agua o por cómo ha evolucionado una de sus señales.",
+    "caveat": "Las respuestas salen de ICONICS, no de la memoria del modelo. Sólo cuatro de las ocho señales tienen historia —nivel, temperatura, caudal y presión—; si preguntas por el pasado de otra, te lo dirá en vez de inventarlo. Los límites con los que se juzga cada valor son estimaciones nuestras, no rangos confirmados de la instalación."
+  },
+  "notes": {
+    "cancelledPartial": "Cancelaste la consulta; la respuesta quedó a medias.",
+    "cancelled": "Cancelaste la consulta.",
+    "blocked": "Respuesta bloqueada: el modelo no consultó los datos de la planta.",
+    "copyFailed": "El navegador no dejó copiar."
+  },
+  "chart": {
+    "alt": "Evolución de {{titulo}}",
+    "altGeneric": "Gráfico de la señal"
+  },
+  "tools": {
+    "estado_del_sistema": "Leyó las señales en vivo de ICONICS",
+    "sistemas_de_la_planta": "Consultó qué máquinas hay en la planta",
+    "riesgos_activos": "Cruzó las señales en vivo contra las reglas del tablero",
+    "pronostico_de_desgaste": "Contó horas de exposición sobre el historiador",
+    "historia_de_senal": "Leyó el historiador",
+    "valor_en_momento": "Leyó el historiador en un instante concreto",
+    "comparar_periodos": "Comparó dos períodos del historiador",
+    "analisis_de_senal": "Calculó tendencia y anomalías sobre la serie",
+    "perfil_de_senal": "Midió qué es normal, sobre semanas de historial",
+    "correlacionar_senales": "Cruzó varias señales del historiador",
+    "grafico_de_senal": "Dibujó la serie del historiador",
+    "generar_reporte": "Armó un informe con las series del historiador",
+    "consultar_documentacion": "Buscó en la documentación de planta",
+    "limites_del_manual": "Buscó un límite documentado en el manual",
+    "diagnostico": "Reunió estado + historia + correlación + manual en un dossier",
+    "hechos_de_la_planta": "Leyó lo que se le ha enseñado sobre esta planta",
+    "recordar_hecho": "Guardó un hecho nuevo sobre esta planta",
+    "proponer_regla": "Dejó una propuesta de regla, para que alguien la revise",
+    "controlar_bomba": "ESCRIBIÓ en el PLC de la instalación"
   }
 }

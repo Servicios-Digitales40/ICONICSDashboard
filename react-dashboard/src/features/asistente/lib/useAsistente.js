@@ -928,28 +928,37 @@ export const ETIQUETA_HERRAMIENTA = {
    * hablando es lo único que esta línea no podía dejar de decir en una planta
    * con más de una.
    */
-  estado_del_sistema: "Leyó las señales en vivo de ICONICS",
-  sistemas_de_la_planta: "Consultó qué máquinas hay en la planta",
-  riesgos_activos: "Cruzó las señales en vivo contra las reglas del tablero",
-  pronostico_de_desgaste: "Contó horas de exposición sobre el historiador",
-  historia_de_senal: "Leyó el historiador",
-  valor_en_momento: "Leyó el historiador en un instante concreto",
-  comparar_periodos: "Comparó dos períodos del historiador",
-  analisis_de_senal: "Calculó tendencia y anomalías sobre la serie",
-  perfil_de_senal: "Midió qué es normal, sobre semanas de historial",
-  correlacionar_senales: "Cruzó varias señales del historiador",
-  grafico_de_senal: "Dibujó la serie del historiador",
-  generar_reporte: "Armó un informe con las series del historiador",
-  consultar_documentacion: "Buscó en la documentación de planta",
-  limites_del_manual: "Buscó un límite documentado en el manual",
-  diagnostico: "Reunió estado + historia + correlación + manual en un dossier",
-  hechos_de_la_planta: "Leyó lo que se le ha enseñado sobre esta planta",
-  recordar_hecho: "Guardó un hecho nuevo sobre esta planta",
-  proponer_regla: "Dejó una propuesta de regla, para que alguien la revise",
-  /* La única que ESCRIBE en la instalación, y por eso se dice con ese verbo:
-     las demás leen, y confundir una lectura con una orden al PLC es el peor
-     malentendido que esta línea puede provocar. */
-  controlar_bomba: "ESCRIBIÓ en el PLC de la instalación",
+  /*
+   * ── AQUÍ SÓLO ESTÁN LOS NOMBRES; EL ROTULO LO PONE `assistant:tools` ──
+   *
+   * Este archivo es un hook de datos y no pinta nada, así que no puede llamar
+   * a `useTranslation`. Lo que queda es la LISTA de herramientas cuyo paso por
+   * la traza se rotula, que es información de este módulo: si mañana el
+   * backend añade una, aquí se ve que falta.
+   *
+   * El rótulo de `controlar_bomba` merece cuidado en cualquier idioma: es la
+   * única que ESCRIBE en la instalación, y confundir una lectura con una orden
+   * al PLC es el peor malentendido que esa línea puede provocar.
+   */
+  estado_del_sistema: true,
+  sistemas_de_la_planta: true,
+  riesgos_activos: true,
+  pronostico_de_desgaste: true,
+  historia_de_senal: true,
+  valor_en_momento: true,
+  comparar_periodos: true,
+  analisis_de_senal: true,
+  perfil_de_senal: true,
+  correlacionar_senales: true,
+  grafico_de_senal: true,
+  generar_reporte: true,
+  consultar_documentacion: true,
+  limites_del_manual: true,
+  diagnostico: true,
+  hechos_de_la_planta: true,
+  recordar_hecho: true,
+  proponer_regla: true,
+  controlar_bomba: true,
 };
 
 /**

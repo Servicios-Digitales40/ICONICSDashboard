@@ -30,6 +30,7 @@
  * no toca el sondeo del resto del tablero.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Box, Boxes, ChevronDown, ChevronRight, Gauge, Radio, RefreshCw } from "lucide-react";
 
@@ -208,6 +209,8 @@ async function cargarPropiedadesDeAsset(path, node) {
 
 /* Panel derecho: propiedades en vivo del asset seleccionado. */
 function AssetProperties({ node, intervalMs = 5000 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "errors"]);
   const { theme: t } = useTheme();
   const path = node?.pointName;
 
@@ -241,7 +244,7 @@ function AssetProperties({ node, intervalMs = 5000 }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "60px 20px", textAlign: "center", color: t.textSoft }}>
         <Box size={30} strokeWidth={1.6} color={t.textFaint} />
-        <div style={{ fontSize: 13 }}>Selecciona un asset en el árbol para ver sus propiedades.</div>
+        <div style={{ fontSize: 13 }}>{traducir("assistant:explorer.pick")}</div>
       </div>
     );
   }
@@ -258,7 +261,13 @@ function AssetProperties({ node, intervalMs = 5000 }) {
         <Button variant="icon" onClick={() => refetch()} loading={loading}><RefreshCw size={14} /></Button>
       </div>
 
-      {error && <AlertBanner type="error" title="Error al leer el asset" message={error.message} />}
+      {error && (
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.assetReadFailed")}
+          message={error.message}
+        />
+      )}
 
       {children.length > 0 && (
         <div style={{ marginBottom: 14, fontSize: 12, color: t.textSoft }}>
@@ -334,7 +343,15 @@ function AssetProperties({ node, intervalMs = 5000 }) {
  * @param acciones  nodo opcional junto al título del árbol (p. ej. un botón
  *                  para cambiar de raíz). No lo decide este componente.
  */
-export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de assets", acciones = null }) {
+/*
+ * `titulo` ya no trae un texto por defecto escrito aquí: si el consumidor no
+ * pasa ninguno, se usa el del diccionario. Un valor por defecto en la firma no
+ * puede traducirse —se evalúa fuera de todo componente— y era el único texto
+ * de este archivo que se quedaba en español pasara lo que pasara.
+ */
+export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = null, acciones = null }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "errors"]);
   const { theme: t } = useTheme();
   const [selected, setSelected] = useState(null);
 
@@ -362,13 +379,21 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = "Árbol de asset
     <>
       <style>{REJILLA}</style>
       <div className="eva-explorador-grid">
-        <Panel title={titulo} code={raiz} right={acciones}>
+        <Panel title={titulo ?? traducir("assistant:explorer.title")} code={raiz} right={acciones}>
           {error ? (
-            <AlertBanner type="error" title="No se pudo cargar el árbol" message={error.message} />
+            <AlertBanner
+              type="error"
+              title={traducir("errors:titles.treeLoadFailed")}
+              message={error.message}
+            />
           ) : isLoading ? (
-            <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>cargando árbol…</div>
+            <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
+              {traducir("assistant:explorer.loadingTree")}
+            </div>
           ) : roots.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: t.textFaint }}>No hay assets bajo esta raíz.</div>
+            <div style={{ fontSize: 12.5, color: t.textFaint }}>
+              {traducir("assistant:explorer.emptyRoot")}
+            </div>
           ) : (
             <div style={{ maxHeight: 560, overflow: "auto" }}>
               {roots.map((node) => (

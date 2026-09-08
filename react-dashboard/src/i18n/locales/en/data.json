@@ -1,0 +1,8 @@
+{
+  "title": "Data",
+  "sub": "Reading and writing ICONICS points through the bridge backend",
+  "action": "Action",
+  "loadingClients": "loading clients…",
+  "deleteNote": "Note: after deleting, the <b>.@@Count</b> total may take a while to refresh (ICONICS caches it); use the reload button if the table does not add up straight away.",
+  "addNote": "Note: after adding, the <b>.@@Count</b> point may take a while to refresh (ICONICS caches it) and the new row appears in its sorted position, not at the end of the table."
+}

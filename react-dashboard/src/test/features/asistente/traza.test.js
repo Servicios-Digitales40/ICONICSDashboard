@@ -24,14 +24,34 @@
  * que la traza DIGA DE QUÉ MÁQUINA habla, que no ponga la cuenta de una sobre
  * las demás, y que lo que pintó sea lo que mandó el modelo y no una traducción
  * nuestra.
+ *
+ * ── LAS TRES INVARIANTES SE COMPRUEBAN EN LOS DOS IDIOMAS ──────────
+ *
+ * Desde que los rótulos viven en `assistant:tools`, `ETIQUETA_HERRAMIENTA` ya
+ * no guarda texto: guarda QUÉ herramientas se rotulan. El texto está en el
+ * diccionario, y ahí caben dos versiones de cada frase — así que las reglas
+ * que importan («ninguna cita una cuenta», «la que escribe dice que escribe»)
+ * hay que comprobarlas dos veces, no una.
+ *
+ * No es teórico: una traducción inglesa que dijera «Read the eight live
+ * signals» volvería a poner la cuenta del tanque sobre las demás máquinas, y
+ * antes de este cambio nada lo habría visto.
  */
 import { describe, expect, it } from "vitest";
 
+import i18n from "@/i18n";
+import { CODIGOS } from "@/i18n/idiomas.js";
 import { ETIQUETA_HERRAMIENTA, describirConsulta } from "@/features/asistente/lib/useAsistente.js";
+
+/** El rótulo de una herramienta en un idioma concreto, como lo pinta la vista. */
+const rotulo = (idioma, nombre) => i18n.getFixedT(idioma, "assistant")(`tools.${nombre}`);
 
 /** La línea tal y como la arma `Asistente.jsx`. */
 const linea = (nombre, argumentos) =>
-  [ETIQUETA_HERRAMIENTA[nombre] ?? nombre, ...describirConsulta(nombre, argumentos)].join(" · ");
+  [
+    ETIQUETA_HERRAMIENTA[nombre] ? rotulo(i18n.resolvedLanguage, nombre) : nombre,
+    ...describirConsulta(nombre, argumentos),
+  ].join(" · ");
 
 describe("la traza dice de qué máquina habla", () => {
   it("dos lecturas de sistemas distintos NO producen la misma línea", () => {
@@ -76,38 +96,53 @@ describe("la traza dice de qué máquina habla", () => {
 });
 
 describe("los rótulos no afirman la cuenta de una máquina sobre las demás", () => {
-  it("ningún rótulo cita un número de señales", () => {
+  const NOMBRES = Object.keys(ETIQUETA_HERRAMIENTA);
+
+  it.each(CODIGOS)("[%s] ningún rótulo cita un número de señales", (idioma) => {
     /*
      * «Las ocho señales» era cierto del tanque y falso del sistema de
      * vibraciones, que pide 73 puntos. Cualquier cifra en un rótulo compartido
      * vuelve a ser falsa en cuanto se dé de alta la máquina siguiente.
      */
-    for (const [nombre, etiqueta] of Object.entries(ETIQUETA_HERRAMIENTA)) {
-      expect(etiqueta, `«${nombre}» cita una cuenta que no vale para todas`).not.toMatch(
-        /\b(ocho|nueve|diez|\d+)\s+(señales|puntos|tags)/i,
-      );
+    for (const nombre of NOMBRES) {
+      expect(rotulo(idioma, nombre), `«${nombre}» cita una cuenta que no vale para todas`)
+        /*
+         * El adjetivo puede ir EN MEDIO, y en inglés casi siempre va: «las ocho
+         * señales» pero «the eight LIVE signals». Sin este hueco de hasta dos
+         * palabras, la versión inglesa del mismo error pasaba — comprobado.
+         */
+        .not.toMatch(/\b(ocho|nueve|diez|eight|nine|ten|\d+)(?:\s+\w+){0,2}\s+(señales|puntos|tags|signals|points)/i);
     }
   });
 
-  it("la única herramienta que escribe se anuncia como que escribe", () => {
-    // Confundir una lectura con una orden al PLC es el peor malentendido que
-    // esta línea puede provocar.
-    expect(ETIQUETA_HERRAMIENTA.controlar_bomba).toMatch(/escrib/i);
+  it.each(CODIGOS)("[%s] la única herramienta que escribe se anuncia como que escribe", (idioma) => {
+    /*
+     * Confundir una lectura con una orden al PLC es el peor malentendido que
+     * esta línea puede provocar, y el verbo tiene que decirlo en los dos
+     * idiomas: «ESCRIBIÓ» / «WROTE».
+     */
+    expect(rotulo(idioma, "controlar_bomba")).toMatch(/escrib|wrote|writes/i);
 
-    const lectoras = Object.entries(ETIQUETA_HERRAMIENTA).filter(
-      ([n]) => n !== "controlar_bomba" && !n.startsWith("recordar") && !n.startsWith("proponer"),
+    const lectoras = NOMBRES.filter(
+      (n) => n !== "controlar_bomba" && !n.startsWith("recordar") && !n.startsWith("proponer"),
     );
-    for (const [nombre, etiqueta] of lectoras) {
-      expect(etiqueta, `«${nombre}» no escribe en la planta`).not.toMatch(/ESCRIBIÓ en el PLC/);
+    for (const nombre of lectoras) {
+      expect(rotulo(idioma, nombre), `«${nombre}» no escribe en la planta`)
+        .not.toMatch(/en el PLC|to the plant PLC/i);
     }
   });
 
-  it("cada rótulo dice de dónde salió el dato, no qué hizo el modelo", () => {
-    // La distinción que permite creerse la respuesta: «leyó el historiador» es
-    // una procedencia verificable; «analizó» no dice de dónde vino nada.
-    for (const [nombre, etiqueta] of Object.entries(ETIQUETA_HERRAMIENTA)) {
-      expect(typeof etiqueta, nombre).toBe("string");
-      expect(etiqueta.length, nombre).toBeGreaterThan(0);
+  it.each(CODIGOS)("[%s] cada rótulo existe y no es su propia clave", (idioma) => {
+    /*
+     * Una clave sin traducir vuelve como `tools.diagnostico`, que en la traza
+     * se lee como si el modelo hubiera llamado a algo con ese nombre. La
+     * comprobación es que el rótulo NO contenga la clave.
+     */
+    for (const nombre of NOMBRES) {
+      const texto = rotulo(idioma, nombre);
+      expect(typeof texto, nombre).toBe("string");
+      expect(texto.length, nombre).toBeGreaterThan(0);
+      expect(texto, `«${nombre}» salió sin traducir`).not.toContain(`tools.${nombre}`);
     }
   });
 });

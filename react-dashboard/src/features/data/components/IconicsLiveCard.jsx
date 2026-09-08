@@ -7,6 +7,8 @@
  * presentacional.
  */
 import { RefreshCw, Radio } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
 import { useTheme } from "@/theme";
 import { useIconicsPoint } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
@@ -30,6 +32,8 @@ function normalize(payload) {
 const QUALITY_GOOD = new Set([0, 192, "Good", "good"]);
 
 export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("errors");
   const { theme: t } = useTheme();
   const { point, error, loading, lastUpdated, refresh } = useIconicsPoint(pointName, intervalMs);
   const data = normalize(point);
@@ -46,7 +50,7 @@ export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
       }
     >
       {error ? (
-        <AlertBanner type="error" title="No se pudo leer el punto" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.pointReadFailed")} message={error} />
       ) : !data && loading ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando dato…

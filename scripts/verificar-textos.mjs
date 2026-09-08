@@ -126,6 +126,26 @@ function pareceEspanol(texto) {
 /* ── Quitar comentarios sin romper las cadenas ───────────────────────── */
 
 /**
+ * Lo que puede haber justo ANTES de una barra que abre una expresión regular.
+ *
+ * Hace falta para no confundir `.replace(/'/g, "")` con el principio de una
+ * cadena. Sin esto, esa comilla dentro de la expresión metía al recorrido en
+ * estado «cadena» y se tragaba TODO lo que venía después —comentarios
+ * incluidos—, así que un comentario de JSX se colaba entero como si fuera texto
+ * de pantalla. Pasó de verdad en `EscrituraView.jsx`.
+ *
+ * (Este párrafo no escribe el comentario de JSX literal a propósito: cerraría
+ * ESTE bloque. El primer intento lo esquivó con un carácter invisible en
+ * medio, que el linter cazó al momento — con razón.)
+ *
+ * Después de un nombre, un número o un `)` una barra es una división; después
+ * de un operador o de una apertura, es una expresión regular.
+ */
+const ANTES_DE_REGEX = new Set([
+  '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '~', '^', '<', '>', 'return',
+])
+
+/**
  * Sustituye comentarios por espacios, conservando las posiciones para que el
  * número de línea del hallazgo siga siendo el de verdad.
  *
@@ -139,6 +159,8 @@ function sinComentarios(fuente) {
   let i = 0
   let estado = 'codigo' // codigo | linea | bloque | cadena | plantilla
   let comilla = ''
+  /** El último carácter significativo que se ha emitido. */
+  let anterior = ''
 
   while (i < fuente.length) {
     const a = fuente[i]
@@ -147,8 +169,24 @@ function sinComentarios(fuente) {
     if (estado === 'codigo') {
       if (a === '/' && b === '/') { estado = 'linea'; salida += '  '; i += 2; continue }
       if (a === '/' && b === '*') { estado = 'bloque'; salida += '  '; i += 2; continue }
+
+      /* Una expresión regular se copia entera y no se mira por dentro. */
+      if (a === '/' && ANTES_DE_REGEX.has(anterior)) {
+        let j = i + 1
+        while (j < fuente.length && fuente[j] !== '\n') {
+          if (fuente[j] === '\\') { j += 2; continue }
+          if (fuente[j] === '/') { j += 1; break }
+          j += 1
+        }
+        salida += fuente.slice(i, j)
+        anterior = '/'
+        i = j
+        continue
+      }
+
       if (a === '"' || a === "'") { estado = 'cadena'; comilla = a; salida += a; i += 1; continue }
       if (a === '`') { estado = 'plantilla'; salida += a; i += 1; continue }
+      if (a.trim()) anterior = a
       salida += a; i += 1; continue
     }
 

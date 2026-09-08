@@ -12,6 +12,9 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 import { useToast } from "@/app/providers";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
@@ -43,6 +46,8 @@ function chunk(arr, size) {
 }
 
 export default function EliminarView() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["data", "errors"]);
   const { theme: t } = useTheme();
   const { pushToast } = useToast();
   const [rows, setRows] = useState([]);
@@ -152,7 +157,7 @@ export default function EliminarView() {
       }
     >
       {error ? (
-        <AlertBanner type="error" title="No se pudo cargar la tabla" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.tableLoadFailed")} message={error} />
       ) : loading && rows.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando clientes…
@@ -166,7 +171,7 @@ export default function EliminarView() {
                 {COLUMNS.map((col) => (
                   <th key={col} style={thStyle}>{col}</th>
                 ))}
-                <th style={{ ...thStyle, textAlign: "center" }}>Acción</th>
+                <th style={{ ...thStyle, textAlign: "center" }}>{traducir("data:action")}</th>
               </tr>
             </thead>
             <tbody>
@@ -205,8 +210,7 @@ export default function EliminarView() {
       )}
 
       <p style={{ marginTop: 14, fontSize: 11.5, color: t.textFaint, lineHeight: 1.5 }}>
-        Nota: tras eliminar, el conteo <code>.@@Count</code> puede tardar en refrescar (ICONICS lo cachea);
-        usa el botón de recargar si la tabla no cuadra de inmediato.
+        <Enfasis>{traducir("data:deleteNote")}</Enfasis>
       </p>
     </Panel>
   );

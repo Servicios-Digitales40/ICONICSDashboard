@@ -10,6 +10,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Package } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
 import { useTheme } from "@/theme";
 import { fetchIconicsPoint, fetchIconicsBatch } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
@@ -18,6 +20,8 @@ const TABLE = "db:Northwind.Products";
 const COLUMN = "ProductName";
 
 export function IconicsProductsList() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("errors");
   const { theme: t } = useTheme();
   const [products, setProducts] = useState([]);
   const [count, setCount] = useState(null);
@@ -73,7 +77,7 @@ export function IconicsProductsList() {
       }
     >
       {error ? (
-        <AlertBanner type="error" title="No se pudieron listar los productos" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.productListFailed")} message={error} />
       ) : loading && products.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando productos…

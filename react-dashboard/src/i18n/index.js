@@ -20,7 +20,7 @@
  *
  * Un tablero de planta arranca en una red que puede no tener salida, y una
  * pantalla que se queda sin sus textos porque no pudo bajar un JSON es peor
- * que una en un idioma que no era el preferido. Los doce namespaces de los dos
+ * que una en un idioma que no era el preferido. Los catorce namespaces de los dos
  * idiomas pesan poco y viajan en el bundle.
  *
  * ── LA FUNCIÓN DE TRADUCIR SE LLAMA `traducir`, NO `t` ─────────────
@@ -65,6 +65,7 @@ import esSettings from "./locales/es/settings.json";
 import esValidation from "./locales/es/validation.json";
 import esErrors from "./locales/es/errors.json";
 import esAssistant from "./locales/es/assistant.json";
+import esData from "./locales/es/data.json";
 
 import enCommon from "./locales/en/common.json";
 import enNavigation from "./locales/en/navigation.json";
@@ -79,6 +80,7 @@ import enSettings from "./locales/en/settings.json";
 import enValidation from "./locales/en/validation.json";
 import enErrors from "./locales/en/errors.json";
 import enAssistant from "./locales/en/assistant.json";
+import enData from "./locales/en/data.json";
 
 /**
  * Los namespaces, por ÁREA del producto y no por pantalla.
@@ -103,6 +105,7 @@ export const NAMESPACES = Object.freeze([
   "validation",
   "errors",
   "assistant",
+  "data",
 ]);
 
 const resources = {
@@ -120,6 +123,7 @@ const resources = {
     validation: esValidation,
     errors: esErrors,
     assistant: esAssistant,
+    data: esData,
   },
   en: {
     common: enCommon,
@@ -135,6 +139,7 @@ const resources = {
     validation: enValidation,
     errors: enErrors,
     assistant: enAssistant,
+    data: enData,
   },
 };
 

@@ -87,5 +87,94 @@
     "pick": "Select an asset in the tree to see its properties.",
     "loadingTree": "loading tree…",
     "emptyRoot": "No assets under this root."
+  },
+  "suggestions": [
+    "How is the plant doing right now?",
+    "What is the tank level?",
+    "How has the temperature moved over the last few hours?",
+    "Compare this hour’s pressure with six hours ago"
+  ],
+  "model": {
+    "aria": "AI model (affects every screen)",
+    "busy": "The model cannot be changed while a query is running",
+    "tip": "AI model. The change affects EVERY screen, and the first answer takes longer while it loads."
+  },
+  "actions": {
+    "exportPdfAria": "Export the conversation to PDF",
+    "exportPdf": "Export PDF",
+    "clearAria": "Clear the conversation",
+    "clear": "Clear",
+    "restoreAria": "Restore size",
+    "restore": "Restore",
+    "maximize": "Maximise",
+    "closeAria": "Close {{nombre}}",
+    "toEndAria": "Go to the end of the conversation",
+    "toEnd": "Go to the end",
+    "attachAria": "Attach a text document",
+    "attach": "Attach .txt, .csv or .md",
+    "writeAria": "Type your question",
+    "retry": "Retry",
+    "copiedAria": "Answer copied",
+    "copyAria": "Copy the answer",
+    "copied": "Copied",
+    "copy": "Copy",
+    "downloadReport": "Download report"
+  },
+  "input": {
+    "listening": "Listening…",
+    "waiting": "Waiting for an answer…"
+  },
+  "voice": {
+    "transcribingAria": "Transcribing what you said",
+    "stopAria": "Stop recording and transcribe",
+    "stop": "Stop and transcribe",
+    "dictateAria": "Dictate the question",
+    "dictate": "Dictate the question",
+    "handsFree": "Hands-free: speak and hear the answer",
+    "doneAria": "I have finished speaking",
+    "doneTip": "Listening. It sends on its own when you stop, or press to send now.",
+    "hangUpAria": "Leave hands-free",
+    "hangUp": "Hang up",
+    "phase": {
+      "parado": "Hands-free ready",
+      "escuchando": "Listening… it sends on its own when you stop speaking",
+      "pensando": "Working out what you said…",
+      "hablando": "Answering out loud…"
+    }
+  },
+  "welcome": {
+    "lead": "Ask about the state of the water system, or how one of its signals has moved.",
+    "caveat": "The answers come from ICONICS, not from the model’s memory. Only four of the eight signals have history —level, temperature, flow rate and pressure—; if you ask about the past of another one, it will say so rather than invent it. The limits each value is judged against are our own estimates, not confirmed ranges from the plant."
+  },
+  "notes": {
+    "cancelledPartial": "You cancelled the query; the answer was left half-written.",
+    "cancelled": "You cancelled the query.",
+    "blocked": "Answer blocked: the model did not consult the plant data.",
+    "copyFailed": "The browser would not allow copying."
+  },
+  "chart": {
+    "alt": "Trend of {{titulo}}",
+    "altGeneric": "Signal chart"
+  },
+  "tools": {
+    "estado_del_sistema": "Read the live signals from ICONICS",
+    "sistemas_de_la_planta": "Looked up which machines exist in the plant",
+    "riesgos_activos": "Checked the live signals against the dashboard rules",
+    "pronostico_de_desgaste": "Counted exposure hours over the historian",
+    "historia_de_senal": "Read the historian",
+    "valor_en_momento": "Read the historian at a specific instant",
+    "comparar_periodos": "Compared two periods of the historian",
+    "analisis_de_senal": "Computed trend and anomalies over the series",
+    "perfil_de_senal": "Measured what is normal, over weeks of history",
+    "correlacionar_senales": "Cross-checked several signals from the historian",
+    "grafico_de_senal": "Plotted the series from the historian",
+    "generar_reporte": "Assembled a report from the historian series",
+    "consultar_documentacion": "Searched the plant documentation",
+    "limites_del_manual": "Looked up a documented limit in the manual",
+    "diagnostico": "Gathered state + history + correlation + manual into a dossier",
+    "hechos_de_la_planta": "Read what it has been taught about this plant",
+    "recordar_hecho": "Stored a new fact about this plant",
+    "proponer_regla": "Left a rule proposal for someone to review",
+    "controlar_bomba": "WROTE to the plant PLC"
   }
 }

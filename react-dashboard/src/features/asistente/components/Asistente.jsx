@@ -69,6 +69,7 @@
  * un cuarto mundo visual que mantener aparte de los otros tres.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowDown, Ban, Bot, Check, Copy, FileDown, FileText, Loader2, Maximize2,
   Mic, Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
@@ -122,12 +123,12 @@ const SANS = "'Plus Jakarta Sans', sans-serif";
  */
 export const NOMBRE = "Tdconcito";
 
-const SUGERENCIAS = [
-  "¿Cómo va la instalación ahora mismo?",
-  "¿Qué nivel tiene el tanque?",
-  "¿Cómo ha ido la temperatura estas últimas horas?",
-  "Compara la presión de esta hora con la de hace seis horas",
-];
+/*
+ * Cuántas sugerencias hay. El TEXTO vive en `assistant:suggestions`, que es un
+ * arreglo: aquí sólo hace falta saber cuántas para rotar entre ellas, y esa
+ * cuenta no cambia con el idioma.
+ */
+const SUGERENCIAS = 4;
 
 /**
  * A cuántos píxeles del final se considera que el hilo sigue «pegado» abajo.
@@ -216,6 +217,8 @@ const ESTILOS = `
  * es ruido que además promete una elección que no existe.
  */
 function SelectorModelo({ modelo, modelos, elegir, error, ocupado, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   if (!modelos || modelos.length < 2) return <span style={{ flex: 1 }} />;
 
   return (
@@ -224,13 +227,8 @@ function SelectorModelo({ modelo, modelos, elegir, error, ocupado, t }) {
         value={modelo ?? ""}
         onChange={(e) => elegir(e.target.value)}
         disabled={ocupado}
-        aria-label="Modelo de IA (afecta a todas las pantallas)"
-        title={
-          ocupado
-            ? "No se puede cambiar el modelo con una consulta en curso"
-            : "Modelo de IA. El cambio afecta a TODAS las pantallas y la primera " +
-              "respuesta tarda más mientras se carga."
-        }
+        aria-label={traducir("model.aria")}
+        title={traducir(ocupado ? "model.busy" : "model.tip")}
         style={{
           maxWidth: "100%", fontFamily: SANS, fontSize: 11,
           // `coral` es el color de error de la casa —«fuera de banda, error de
@@ -294,6 +292,8 @@ function PantallaTrazo({ ocupado, mensajes, t }) {
 }
 
 export function Asistente() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   const { theme: t } = useTheme();
   const [abierto, setAbierto] = useState(false);
   const [maximizado, setMaximizado] = useState(false);
@@ -420,7 +420,7 @@ export function Asistente() {
     if (!String(texto ?? "").trim() || ocupado) return false;
     preguntar(texto);
     setAnclado(true);
-    setEjemplo((i) => (i + 1) % SUGERENCIAS.length);
+    setEjemplo((i) => (i + 1) % SUGERENCIAS);
     return true;
   };
 
@@ -558,20 +558,20 @@ export function Asistente() {
             type="button"
             onClick={exportarPdf}
             disabled={ocupado || !mensajes.length || exportando}
-            aria-label="Exportar la conversación a PDF"
-            title="Exportar PDF"
+            aria-label={traducir("actions.exportPdfAria")}
+            title={traducir("actions.exportPdf")}
             className="eva-asis-boton"
             style={botonIcono(t, ocupado || !mensajes.length || exportando)}
           >
             {exportando ? <Loader2 size={15} className="spin" /> : <FileDown size={15} />}
           </button>
-          <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label="Borrar la conversación" title="Borrar" className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
+          <button type="button" onClick={limpiar} disabled={ocupado || !mensajes.length} aria-label={traducir("actions.clearAria")} title={traducir("actions.clear")} className="eva-asis-boton" style={botonIcono(t, ocupado || !mensajes.length)}>
             <Trash2 size={15} />
           </button>
-          <button type="button" onClick={() => setMaximizado((m) => !m)} aria-label={grande ? "Restaurar tamaño" : "Maximizar"} title={grande ? "Restaurar" : "Maximizar"} className="eva-asis-boton" style={botonIcono(t, false)}>
+          <button type="button" onClick={() => setMaximizado((m) => !m)} aria-label={traducir(grande ? "actions.restoreAria" : "actions.maximize")} title={traducir(grande ? "actions.restore" : "actions.maximize")} className="eva-asis-boton" style={botonIcono(t, false)}>
             {grande ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
-          <button type="button" onClick={() => setAbierto(false)} aria-label={`Cerrar ${NOMBRE}`} className="eva-asis-boton" style={botonIcono(t, false)}>
+          <button type="button" onClick={() => setAbierto(false)} aria-label={traducir("actions.closeAria", { nombre: NOMBRE })} className="eva-asis-boton" style={botonIcono(t, false)}>
             <X size={16} />
           </button>
         </header>
@@ -628,8 +628,8 @@ export function Asistente() {
           </div>
 
           {!anclado && Boolean(mensajes.length) && (
-            <button type="button" onClick={irAlFinal} aria-label="Ir al final de la conversación" className="eva-asis-boton" style={botonBajar(t)}>
-              <ArrowDown size={13} /> Ir al final
+            <button type="button" onClick={irAlFinal} aria-label={traducir("actions.toEndAria")} className="eva-asis-boton" style={botonBajar(t)}>
+              <ArrowDown size={13} /> {traducir("actions.toEnd")}
             </button>
           )}
         </div>
@@ -668,7 +668,7 @@ export function Asistente() {
           <button
             type="button" onClick={() => archivoRef.current?.click()}
             disabled={ocupado || manosLibres.activo}
-            aria-label="Adjuntar un documento de texto" title="Adjuntar .txt, .csv o .md"
+            aria-label={traducir("actions.attachAria")} title={traducir("actions.attach")}
             className="eva-asis-boton" style={botonIcono(t, ocupado || manosLibres.activo)}
           >
             <Paperclip size={16} />
@@ -694,11 +694,12 @@ export function Asistente() {
             placeholder={
               manosLibres.activo
                 ? FASE_MANOS_LIBRES[manosLibres.fase]
-                : dictado.grabando ? "Te escucho…"
-                : ocupado ? "Esperando respuesta…" : SUGERENCIAS[ejemplo]
+                : dictado.grabando ? traducir("input.listening")
+                : ocupado ? traducir("input.waiting")
+                : traducir(`suggestions.${ejemplo}`)
             }
             disabled={ocupado || manosLibres.activo}
-            aria-label="Escribe tu pregunta"
+            aria-label={traducir("actions.writeAria")}
             style={{
               flex: 1, minWidth: 0, fontSize: 13, padding: "9px 12px", borderRadius: 9,
               border: `1px solid ${dictado.grabando || manosLibres.activo ? t.coral : t.border}`,
@@ -745,13 +746,15 @@ export function Asistente() {
  * en responder a algo que nadie preguntó. Ver `backend/routes/vozRoutes.mjs`.
  */
 function BotonMicrofono({ t, dictado, onTexto }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   const { grabando, transcribiendo, empezar, detener } = dictado;
 
   if (transcribiendo) {
     return (
       <button
         type="button" disabled
-        aria-label="Transcribiendo lo que has dicho"
+        aria-label={traducir("voice.transcribingAria")}
         style={botonVoz(t, "transcribiendo")}
       >
         <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
@@ -768,8 +771,8 @@ function BotonMicrofono({ t, dictado, onTexto }) {
   return (
     <button
       type="button" onClick={alPulsar} className="eva-asis-boton"
-      aria-label={grabando ? "Parar de grabar y transcribir" : "Dictar la pregunta"}
-      title={grabando ? "Parar y transcribir" : "Dictar la pregunta"}
+      aria-label={traducir(grabando ? "voice.stopAria" : "voice.dictateAria")}
+      title={traducir(grabando ? "voice.stop" : "voice.dictate")}
       style={botonVoz(t, grabando ? "grabando" : "listo")}
     >
       {grabando ? <Square size={13} fill="currentColor" /> : <Mic size={16} />}
@@ -786,10 +789,11 @@ function BotonMicrofono({ t, dictado, onTexto }) {
  * habla encima de la respuesta.
  */
 const FASE_MANOS_LIBRES = {
-  parado: "Manos libres listo",
-  escuchando: "Te escucho… se envía solo cuando dejes de hablar",
-  pensando: "Entendiendo lo que has dicho…",
-  hablando: "Contestando en voz alta…",
+  /* Las cuatro fases. El texto sale de `assistant:voice.phase` por esta clave. */
+  parado: "parado",
+  escuchando: "escuchando",
+  pensando: "pensando",
+  hablando: "hablando",
 };
 
 /**
@@ -807,6 +811,8 @@ const FASE_MANOS_LIBRES = {
  * exactamente lo que este modo existe para evitar.
  */
 function BotonManosLibres({ t, manosLibres }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   const { activo, fase, encender, apagar, cerrarTurno, transcribiendo, nivel } = manosLibres;
 
   if (!activo) {
@@ -814,7 +820,7 @@ function BotonManosLibres({ t, manosLibres }) {
       <button
         type="button" onClick={encender} className="eva-asis-boton"
         aria-label={`Hablar con ${NOMBRE} en manos libres`}
-        title="Manos libres: hablar y escuchar la respuesta"
+        title={traducir("voice.handsFree")}
         style={botonVoz(t, "listo")}
       >
         <PhoneCall size={16} />
@@ -838,8 +844,8 @@ function BotonManosLibres({ t, manosLibres }) {
     return (
       <button
         type="button" onClick={cerrarTurno} className="eva-asis-boton"
-        aria-label="He terminado de hablar"
-        title="Te escucho. Se envía solo al callarte, o pulsa para enviar ya."
+        aria-label={traducir("voice.doneAria")}
+        title={traducir("voice.doneTip")}
         style={botonVoz(t, "grabando")}
       >
         <span
@@ -859,8 +865,8 @@ function BotonManosLibres({ t, manosLibres }) {
   return (
     <button
       type="button" onClick={apagar} className="eva-asis-boton"
-      aria-label="Salir del manos libres"
-      title="Colgar"
+      aria-label={traducir("voice.hangUpAria")}
+      title={traducir("voice.hangUp")}
       style={botonVoz(t, "grabando")}
     >
       {transcribiendo
@@ -888,16 +894,13 @@ function BotonManosLibres({ t, manosLibres }) {
  * cosas que este asistente sabe hacer: leídos se olvidan, pulsados se aprenden.
  */
 function Bienvenida({ t, ocupado, onPreguntar }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   return (
     <div style={{ fontSize: 12.5, color: t.textSoft, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
-      Pregunta por el estado del sistema de agua o por cómo ha evolucionado una
-      de sus señales.
+      {traducir("welcome.lead")}
       <div style={{ marginTop: 8, color: t.textFaint }}>
-        Las respuestas salen de ICONICS, no de la memoria del modelo. Sólo cuatro
-        de las ocho señales tienen historia —nivel, temperatura, caudal y
-        presión—; si preguntas por el pasado de otra, te lo dirá en vez de
-        inventarlo. Los límites con los que se juzga cada valor son estimaciones
-        nuestras, no rangos confirmados de la instalación.
+        {traducir("welcome.caveat")}
       </div>
 
       <Sugerencias t={t} ocupado={ocupado} onPreguntar={onPreguntar} />
@@ -907,11 +910,19 @@ function Bienvenida({ t, ocupado, onPreguntar }) {
 
 /** Los ejemplos. Pulsar uno manda esa pregunta tal cual. */
 function Sugerencias({ t, ocupado, onPreguntar }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
+
+  /*
+   * Se recorre por ÍNDICE y no por el texto: la pregunta que se manda es la
+   * del idioma activo, y la clave de React tiene que ser estable aunque el
+   * texto cambie a mitad de sesión.
+   */
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-      {SUGERENCIAS.map((s) => (
+      {Array.from({ length: SUGERENCIAS }, (_, i) => traducir(`suggestions.${i}`)).map((s, i) => (
         <button
-          key={s} type="button" onClick={() => onPreguntar(s)} disabled={ocupado}
+          key={i} type="button" onClick={() => onPreguntar(s)} disabled={ocupado}
           className="eva-asis-boton" style={estiloChip(t, ocupado)}
         >
           {s}
@@ -922,6 +933,8 @@ function Sugerencias({ t, ocupado, onPreguntar }) {
 }
 
 function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   if (mensaje.rol === "usuario") {
     return (
       <div style={{ justifySelf: "end", maxWidth: "85%" }}>
@@ -998,9 +1011,7 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
       {/* Cancelar es una decisión, no una avería: en gris y sin triángulo. */}
       {mensaje.cancelado && (
         <Nota t={t} color={t.textSoft} fondo={t.page} icono={<Ban size={12} />}>
-          {mensaje.texto
-            ? "Cancelaste la consulta; la respuesta quedó a medias."
-            : "Cancelaste la consulta."}
+          {traducir(mensaje.texto ? "notes.cancelledPartial" : "notes.cancelled")}
         </Nota>
       )}
 
@@ -1008,13 +1019,13 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
           más que el texto: casi siempre significa llama-server sin --jinja. */}
       {mensaje.bloqueada && (
         <Nota t={t} color={t.amber} fondo={t.amberSoft} icono={<TriangleAlert size={12} />}>
-          Respuesta bloqueada: el modelo no consultó los datos de la planta.
+          {traducir("notes.blocked")}
         </Nota>
       )}
 
       {puedeReintentar && (
         <button type="button" onClick={onReintentar} className="eva-asis-boton" style={botonReintentar(t)}>
-          <RotateCw size={12} /> Reintentar
+          <RotateCw size={12} /> {traducir("actions.retry")}
         </button>
       )}
 
@@ -1024,7 +1035,9 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
             {consultas.map((consulta, i) => (
               <div key={i}>
                 {[
-                  ETIQUETA_HERRAMIENTA[consulta.nombre] ?? consulta.nombre,
+                  ETIQUETA_HERRAMIENTA[consulta.nombre]
+                    ? traducir(`tools.${consulta.nombre}`)
+                    : consulta.nombre,
                   ...describirConsulta(consulta.nombre, consulta.argumentos),
                 ].join(" · ")}
               </div>
@@ -1074,13 +1087,17 @@ function AdjuntoVista({ t, adjunto }) {
 }
 
 function Grafico({ t, adjunto }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   if (adjunto?.formato !== "svg" || !adjunto.contenido) return null;
 
   return (
     <figure style={{ margin: "8px 0 0" }}>
       <img
         src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(adjunto.contenido)}`}
-        alt={adjunto.titulo ? `Evolución de ${adjunto.titulo}` : "Gráfico de la señal"}
+        alt={adjunto.titulo
+          ? traducir("chart.alt", { titulo: adjunto.titulo })
+          : traducir("chart.altGeneric")}
         style={{
           display: "block", width: "100%", height: "auto",
           borderRadius: 8, border: `1px solid ${t.border}`, background: "#fff",
@@ -1099,6 +1116,8 @@ function Grafico({ t, adjunto }) {
  * contenido ajeno inyectado en el DOM, sólo un enlace.
  */
 function ReporteDescarga({ t, adjunto }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   if (adjunto?.formato !== "pdf" || !adjunto.url) return null;
 
   return (
@@ -1113,7 +1132,7 @@ function ReporteDescarga({ t, adjunto }) {
       }}
     >
       <FileDown size={14} />
-      {adjunto.titulo || "Descargar reporte"}
+      {adjunto.titulo || traducir("actions.downloadReport")}
     </a>
   );
 }
@@ -1123,6 +1142,8 @@ function ReporteDescarga({ t, adjunto }) {
  * mano desde una burbuja es la forma más fácil de transcribirla mal.
  */
 function BotonCopiar({ t, texto }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
   const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
@@ -1144,8 +1165,8 @@ function BotonCopiar({ t, texto }) {
   return (
     <button
       type="button" onClick={copiar}
-      aria-label={copiado ? "Respuesta copiada" : "Copiar la respuesta"}
-      title={copiado ? "Copiada" : "Copiar"}
+      aria-label={traducir(copiado ? "actions.copiedAria" : "actions.copyAria")}
+      title={traducir(copiado ? "actions.copied" : "actions.copy")}
       className="eva-asis-boton"
       style={{
         ...botonIcono(t, false),

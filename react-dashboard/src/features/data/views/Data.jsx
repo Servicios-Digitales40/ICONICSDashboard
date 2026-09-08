@@ -6,6 +6,7 @@
  *   - Escritura: escribir valores hacia ICONICS.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BookOpen, PenLine, Trash2 } from "lucide-react";
 import { SectionLabel, Tabs } from "@/components/ui/index.js";
 import LecturaView from "./LecturaView.jsx";
@@ -19,11 +20,15 @@ const SUBVIEWS = [
 ];
 
 export default function Data() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("data");
   const [sub, setSub] = useState("lectura");
 
   return (
     <>
-      <SectionLabel sub="Lectura y escritura de puntos ICONICS a través del backend puente">Data</SectionLabel>
+      <SectionLabel sub={traducir("sub")}>
+        {traducir("title")}
+      </SectionLabel>
 
       <div style={{ marginBottom: 16 }}>
         <Tabs items={SUBVIEWS} value={sub} onChange={setSub} />

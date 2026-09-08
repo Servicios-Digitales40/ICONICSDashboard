@@ -12,6 +12,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
 import { useTheme } from "@/theme";
 import { fetchIconicsPoint, fetchIconicsBatch } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
@@ -54,6 +56,8 @@ function formatCell(column, value) {
 }
 
 export function IconicsProductsTable() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("errors");
   const { theme: t } = useTheme();
   const [rows, setRows] = useState([]);
   const [count, setCount] = useState(null);
@@ -139,7 +143,7 @@ export function IconicsProductsTable() {
       }
     >
       {error ? (
-        <AlertBanner type="error" title="No se pudo cargar la tabla" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.tableLoadFailed")} message={error} />
       ) : loading && rows.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando tabla…

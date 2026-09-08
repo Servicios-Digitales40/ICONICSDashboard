@@ -1,0 +1,8 @@
+{
+  "title": "Data",
+  "sub": "Lectura y escritura de puntos ICONICS a través del backend puente",
+  "action": "Acción",
+  "loadingClients": "cargando clientes…",
+  "deleteNote": "Nota: tras eliminar, el conteo <b>.@@Count</b> puede tardar en refrescar (ICONICS lo cachea); usa el botón de recargar si la tabla no cuadra de inmediato.",
+  "addNote": "Nota: tras agregar, el punto <b>.@@Count</b> puede tardar en refrescar (ICONICS lo cachea) y la fila nueva aparece en su posición ordenada, no al final de la tabla."
+}

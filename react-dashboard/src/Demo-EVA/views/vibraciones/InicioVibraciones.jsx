@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 import { useEnVista } from "@/lib/motion.js";
 
@@ -305,6 +306,8 @@ const NODOS_PIPELINE = [
  * sólo cuenta alarmas. Esta cifra es lo que las separa.
  */
 function CifraEnVivo({ contestan, total, hayLectura, error, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "common", "errors"]);
   if (error) {
     // Mismo tratamiento que en `InicioTanque`: coral porque ES un error de
     // lectura, y sin latido —ese vocabulario lo reserva `tiles.jsx` para una
@@ -314,10 +317,10 @@ function CifraEnVivo({ contestan, total, hayLectura, error, t }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "18px 0" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 600, color: t.coral }}>
           <WifiOff size={17} />
-          Sin conexión con el módulo por ahora
+          {traducir("errors:titles.noModuleConnection")}
         </span>
         <span style={{ fontSize: 12, color: t.textFaint }}>
-          Vuelve a intentarlo solo, cada pocos segundos
+          {traducir("common:state.retryingAlone")}
         </span>
       </div>
     );
@@ -583,21 +586,24 @@ function InicioVibraciones({ onNavigate }) {
             />
             {!error && (
               <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3, color: t.textSoft, marginTop: 8 }}>
-                {hayLectura ? "puntos que entregan lectura, ahora mismo" : "conectando con el módulo de vibraciones…"}
+                {traducir(hayLectura
+                  ? "machines:vibration.withReading"
+                  : "machines:vibration.connecting")}
               </div>
             )}
 
             <p className="vib-inicio-hero__frase" style={{ color: t.textSoft }}>
-              Ésta es <strong>otra máquina</strong>: su propio motor, su propio variador y su
-              propio PLC.  Y este sistema todavía no se usa el histórico: lo que se ve es el instante, sin tendencias.
+              <Enfasis>{traducir("machines:vibration.otherMachineNote")}</Enfasis>
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => onNavigate?.("eva-vibraciones")}>
-                Entrar a Gráficas
+                {traducir("dashboard:home.hero.enter", {
+                  pantalla: traducir("navigation:routes.eva-vibraciones.nav"),
+                })}
               </Button>
               <Button variant="ghost" icon={<ShieldAlert size={15} />} onClick={() => onNavigate?.("eva-riesgos-vibracion")}>
-                Ver los riesgos ahora
+                {traducir("machines:vibration.seeRisks")}
               </Button>
             </div>
           </div>
@@ -619,7 +625,7 @@ function InicioVibraciones({ onNavigate }) {
             <ShieldAlert size={17} color={t.amber} style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: t.text }}>
-                Nadie está vigilando los rodamientos
+                {traducir("machines:vibration.nobodyWatching")}
               </div>
               <p style={{ margin: "3px 0 0", fontSize: 12.5, color: t.textSoft, lineHeight: 1.55 }}>
                 En {sinVigilar} de los {CANALES.length} apoyos, las frecuencias de defecto
