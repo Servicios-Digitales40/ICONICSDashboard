@@ -1,1 +1,85 @@
-{}
+{
+  "rag": {
+    "docs": {
+      "state": {
+        "archivado": "archivado",
+        "ilegible": "no se pudo leer",
+        "indexado": "indexado",
+        "indexando": "indexando",
+        "sinLeer": "sin leer aún",
+        "faltaArchivo": "falta el archivo"
+      },
+      "stats": {
+        "documents": "Documentos",
+        "fragments": "Fragmentos",
+        "search": "Búsqueda",
+        "unread": "Sin leer",
+        "unassigned": "Sin asignar"
+      },
+      "fragments": "{{n}} fragmentos",
+      "wholePlant": "Toda la planta",
+      "systemTip": "A qué máquina pertenece este manual",
+      "replaceTip": "Reemplazar contenido",
+      "archiveTip": "Archivar (no borra el archivo)",
+      "panelTitle": "Manuales",
+      "filter": {
+        "all": "Todos los manuales",
+        "unassigned": "Sin asignar ({{n}})",
+        "onlyPlant": "Sólo toda la planta"
+      },
+      "empty": "Todavía no hay ningún manual cargado.",
+      "noMatch": "Ningún manual encaja con ese filtro.",
+      "upload": {
+        "title": "Título",
+        "titlePlaceholder": "Cómo se llamará este manual",
+        "system": "Sistema",
+        "dropzone": "Arrastra un manual aquí, o haz clic para elegirlo",
+        "submit": "Subir"
+      },
+      "notConfigured": {
+        "title": "Sin documentación configurada",
+        "message": "Este servidor no tiene una carpeta de documentación (falta IA_DOCS_DIR). Sin ella, el asistente no puede consultar manuales."
+      },
+      "uploadDisabled": {
+        "title": "La carga de manuales está desactivada",
+        "message": "Este servidor no acepta subir manuales desde el tablero (RAG_UPLOAD_ENABLED=false). Los archivos se pueden seguir dejando a mano en la carpeta de documentación."
+      }
+    },
+    "cases": {
+      "filter": {
+        "activos": "Activos",
+        "archivados": "Archivados",
+        "todos": "Todos"
+      },
+      "searchPlaceholder": "Buscar por síntoma, causa o riesgo…",
+      "loading": "Leyendo la bitácora…",
+      "empty": "Todavía no hay ninguna intervención registrada. Se llenan solas al cerrar un diagnóstico desde Riesgos, o contándole una reparación al asistente por voz o por chat.",
+      "noMatch": "Ningún caso encaja con este filtro.",
+      "footnote": "Archivar no borra: el caso queda en el archivo con su texto y su fecha intactos, y deja de contar como respaldo en los diagnósticos. Se puede devolver cuando se quiera.",
+      "chip": {
+        "archived": "Archivado",
+        "solved": "Resuelto",
+        "unsolved": "No resuelto",
+        "diagnosisRight": "Diagnóstico acertado",
+        "diagnosisCorrected": "Diagnóstico corregido"
+      },
+      "archive": "Archivar",
+      "restore": "Devolver",
+      "archiveTip": "Archivar: deja de alimentar el diagnóstico",
+      "restoreTip": "Devolver a la bitácora activa",
+      "archivedNotice": "Archivado. Deja de respaldar diagnósticos, pero sigue en el archivo.",
+      "restoredNotice": "Devuelto. Vuelve a contar como caso previo.",
+      "field": {
+        "recordedCause": "Causa registrada",
+        "solution": "Solución",
+        "confirmedCause": "Causa real confirmada",
+        "systemProposed": "Propuso el sistema",
+        "notes": "Observaciones",
+        "citedManual": "Manual citado",
+        "sensorSample": "Muestra de sensores en el momento del cierre"
+      },
+      "backing": "{{propuesta}} (respaldo {{respaldo}})",
+      "page": "{{archivo}} p.{{pagina}}"
+    }
+  }
+}

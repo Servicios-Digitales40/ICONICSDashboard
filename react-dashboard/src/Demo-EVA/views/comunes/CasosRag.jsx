@@ -42,25 +42,30 @@
  * semáforo borraría la única señal que mide si el motor acierta.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Archive, ArchiveRestore, RefreshCw, Search } from "lucide-react";
 
+import { useFormato } from "@/i18n/formato.js";
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { archivarCaso, listarCasos } from "@/lib/api/casosApi.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
-import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 
-const FILTROS = [
-  { id: "activos", label: "Activos" },
-  { id: "archivados", label: "Archivados" },
-  { id: "todos", label: "Todos" },
-];
+/*
+ * Los tres filtros, por su id. El rótulo NO está aquí: sale de
+ * `assistant:rag.cases.filter` por ese mismo id, igual que el estado de una
+ * fila sale de su clave. El id es lo que el código compara; el rótulo es lo
+ * que se lee, y son dos cosas distintas.
+ */
+const FILTROS = ["activos", "archivados", "todos"];
 
-function formatoFecha(iso) {
+/** `null` si la fecha no se puede leer; `useFormato` devuelve "" ahí. */
+function fechaValida(iso) {
   const fecha = new Date(iso);
-  return Number.isNaN(fecha.getTime()) ? "—" : fecha.toLocaleString("es-MX");
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
 /* ── Piezas ──────────────────────────────────────────────────────────── */
@@ -109,6 +114,9 @@ function Campo({ t, rotulo, children }) {
 }
 
 function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("assistant");
+  const { fechaHora } = useFormato();
   const [abierto, setAbierto] = useState(false);
   const archivado = caso.archivado === true;
 
@@ -142,19 +150,23 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
             {caso.sintoma}
           </div>
           <div style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, marginTop: 3 }}>
-            {formatoFecha(caso.fecha)} · {nombreDeSistema(caso.sistema)} · {caso.origen ?? "—"}
+            {fechaHora(fechaValida(caso.fecha)) || "—"} · {nombreDeSistema(caso.sistema)} · {caso.origen ?? "—"}
             {caso.disparador?.riesgoId ? ` · ${caso.disparador.riesgoId}` : ""}
           </div>
         </button>
 
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          {archivado && <Chip tono="neutro" t={t}>Archivado</Chip>}
+          {archivado && (
+            <Chip tono="neutro" t={t}>{traducir("rag.cases.chip.archived")}</Chip>
+          )}
           <Chip tono={caso.resuelto === false ? "mal" : "ok"} t={t}>
-            {caso.resuelto === false ? "No resuelto" : "Resuelto"}
+            {traducir(caso.resuelto === false ? "rag.cases.chip.unsolved" : "rag.cases.chip.solved")}
           </Chip>
           {tieneVeredicto && (
             <Chip tono={caso.diagnosticoCorrecto ? "ok" : "aviso"} t={t}>
-              {caso.diagnosticoCorrecto ? "Diagnóstico acertado" : "Diagnóstico corregido"}
+              {traducir(caso.diagnosticoCorrecto
+                ? "rag.cases.chip.diagnosisRight"
+                : "rag.cases.chip.diagnosisCorrected")}
             </Chip>
           )}
         </div>
@@ -163,7 +175,7 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
           type="button"
           disabled={ocupado}
           onClick={() => onArchivar(caso, !archivado)}
-          title={archivado ? "Devolver a la bitácora activa" : "Archivar: deja de alimentar el diagnóstico"}
+          title={traducir(archivado ? "rag.cases.restoreTip" : "rag.cases.archiveTip")}
           style={{
             display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
             padding: "6px 11px", borderRadius: 7, fontSize: 12, fontWeight: 600,
@@ -175,7 +187,7 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
           }}
         >
           {archivado ? <ArchiveRestore size={14} /> : <Archive size={14} />}
-          {archivado ? "Devolver" : "Archivar"}
+          {traducir(archivado ? "rag.cases.restore" : "rag.cases.archive")}
         </button>
       </div>
 
@@ -188,26 +200,39 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
             border: `1px solid ${t.border}`,
           }}
         >
-          <Campo t={t} rotulo="Causa registrada">{caso.causa}</Campo>
-          <Campo t={t} rotulo="Solución">{caso.solucion}</Campo>
-          <Campo t={t} rotulo="Causa real confirmada">
+          {/*
+            El CONTENIDO de estos campos —la causa, la solución, lo que
+            escribió el técnico— va tal cual y no se traduce: es texto de
+            planta, escrito por una persona, y traducirlo sería reescribir su
+            parte del expediente. Lo que se traduce es el rótulo.
+          */}
+          <Campo t={t} rotulo={traducir("rag.cases.field.recordedCause")}>{caso.causa}</Campo>
+          <Campo t={t} rotulo={traducir("rag.cases.field.solution")}>{caso.solucion}</Campo>
+          <Campo t={t} rotulo={traducir("rag.cases.field.confirmedCause")}>
             {caso.causaReal?.tipo}
             {caso.causaReal?.componente ? ` · ${caso.causaReal.componente}` : ""}
           </Campo>
-          <Campo t={t} rotulo="Propuso el sistema">
+          <Campo t={t} rotulo={traducir("rag.cases.field.systemProposed")}>
             {caso.diagnostico?.propuesta
-              ? `${caso.diagnostico.propuesta}${caso.diagnostico.respaldo ? ` (respaldo ${caso.diagnostico.respaldo})` : ""}`
+              ? (caso.diagnostico.respaldo
+                ? traducir("rag.cases.backing", {
+                  propuesta: caso.diagnostico.propuesta,
+                  respaldo: caso.diagnostico.respaldo,
+                })
+                : caso.diagnostico.propuesta)
               : null}
           </Campo>
-          <Campo t={t} rotulo="Observaciones">{caso.resultado?.observaciones}</Campo>
-          <Campo t={t} rotulo="Manual citado">
+          <Campo t={t} rotulo={traducir("rag.cases.field.notes")}>{caso.resultado?.observaciones}</Campo>
+          <Campo t={t} rotulo={traducir("rag.cases.field.citedManual")}>
             {caso.diagnostico?.manualCitado?.length
-              ? caso.diagnostico.manualCitado.map((m) => `${m.archivo} p.${m.pagina}`).join(" · ")
+              ? caso.diagnostico.manualCitado
+                .map((m) => traducir("rag.cases.page", { archivo: m.archivo, pagina: m.pagina }))
+                .join(" · ")
               : null}
           </Campo>
           {caso.muestraSensores && Object.keys(caso.muestraSensores).length > 0 && (
             <div style={{ gridColumn: "1 / -1" }}>
-              <Campo t={t} rotulo="Muestra de sensores en el momento del cierre">
+              <Campo t={t} rotulo={traducir("rag.cases.field.sensorSample")}>
                 <span style={{ fontFamily: MONO, fontSize: 11.5, color: t.textSoft }}>
                   {Object.entries(caso.muestraSensores)
                     .map(([k, v]) => `${k}=${typeof v === "number" ? v.toFixed(2) : String(v)}`)
@@ -228,6 +253,8 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
 /* ── Vista ───────────────────────────────────────────────────────────── */
 
 export default function CasosRag() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "navigation", "common", "errors"]);
   const { theme: t } = useTheme();
   const [estado, setEstado] = useState({ loading: true, error: null, casos: [] });
   const [filtro, setFiltro] = useState("activos");
@@ -235,10 +262,17 @@ export default function CasosRag() {
   const [ocupado, setOcupado] = useState(null);
   const [aviso, setAviso] = useState(null);
 
+  /*
+   * El nombre de la máquina se pide al puente del dominio y no a
+   * `resumenDeSistemas()`: el dominio lo declara en español —es `shared/`, y
+   * ahí no entra i18next (CLAUDE.md §2.7)—, así que leerlo directo dejaba
+   * «Sistema de vibraciones» dentro de un tablero en inglés.
+   */
+  const { sistema: nombreSistema } = useDominio();
   const sistemas = useMemo(() => {
-    const mapa = new Map(resumenDeSistemas().map((s) => [s.id, s.nombre]));
-    return (id) => (id ? mapa.get(id) ?? id : "toda la planta");
-  }, []);
+    const planta = traducir("assistant:rag.docs.wholePlant");
+    return (id) => (id ? nombreSistema(id) : planta);
+  }, [traducir, nombreSistema]);
 
   const cargar = useCallback(async (signal) => {
     setEstado((e) => ({ ...e, loading: true, error: null }));
@@ -268,18 +302,16 @@ export default function CasosRag() {
        * escenario real. Cuesta una petición sobre unos kilobytes.
        */
       await cargar();
-      setAviso(
-        archivado
-          ? "Archivado. Deja de respaldar diagnósticos, pero sigue en el archivo."
-          : "Devuelto. Vuelve a contar como caso previo."
-      );
+      setAviso(traducir(
+        archivado ? "assistant:rag.cases.archivedNotice" : "assistant:rag.cases.restoredNotice"
+      ));
     } catch (e) {
       setAviso(null);
       setEstado((s) => ({ ...s, error: e.message }));
     } finally {
       setOcupado(null);
     }
-  }, [cargar]);
+  }, [cargar, traducir]);
 
   const visibles = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
@@ -302,8 +334,14 @@ export default function CasosRag() {
 
   return (
     <>
-      <SectionLabel sub="Lo que el asistente recuerda de intervenciones anteriores, y qué de eso sigue contando">
-        Casos previos
+      {/*
+        El título y el subtítulo salen de `navigation`, que es de donde los
+        toma también el Topbar: eran dos sitios diciendo casi lo mismo con
+        palabras distintas y nada los ataba. Mismo criterio que la pantalla
+        hermana de manuales.
+      */}
+      <SectionLabel sub={traducir("navigation:routes.rag-casos.sub")}>
+        {traducir("navigation:routes.rag-casos.title")}
       </SectionLabel>
 
       <Panel style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -311,20 +349,20 @@ export default function CasosRag() {
           <div style={{ display: "flex", gap: 6 }}>
             {FILTROS.map((f) => (
               <button
-                key={f.id}
+                key={f}
                 type="button"
-                aria-pressed={filtro === f.id}
-                onClick={() => setFiltro(f.id)}
+                aria-pressed={filtro === f}
+                onClick={() => setFiltro(f)}
                 style={{
                   padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600,
                   fontFamily: SANS, cursor: "pointer",
-                  border: `1px solid ${filtro === f.id ? t.accent : t.border}`,
-                  background: filtro === f.id ? t.accentSoft : "transparent",
-                  color: filtro === f.id ? t.accent : t.textSoft,
+                  border: `1px solid ${filtro === f ? t.accent : t.border}`,
+                  background: filtro === f ? t.accentSoft : "transparent",
+                  color: filtro === f ? t.accent : t.textSoft,
                 }}
               >
-                {f.label}
-                {f.id === "activos" ? ` (${activos})` : f.id === "archivados" ? ` (${archivados})` : ""}
+                {traducir(`assistant:rag.cases.filter.${f}`)}
+                {f === "activos" ? ` (${activos})` : f === "archivados" ? ` (${archivados})` : ""}
               </button>
             ))}
           </div>
@@ -338,7 +376,7 @@ export default function CasosRag() {
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por síntoma, causa o riesgo…"
+              placeholder={traducir("assistant:rag.cases.searchPlaceholder")}
               style={{ ...fieldStyle(t), paddingLeft: 30, width: "100%" }}
             />
           </div>
@@ -355,15 +393,23 @@ export default function CasosRag() {
             }}
           >
             <RefreshCw size={14} />
-            Actualizar
+            {traducir("common:actions.refresh")}
           </button>
         </div>
 
         {aviso && <AlertBanner type="info" message={aviso} />}
-        {estado.error && <AlertBanner type="error" title="No se pudo leer la bitácora" message={estado.error} />}
+        {estado.error && (
+          <AlertBanner
+            type="error"
+            title={traducir("errors:titles.logbookReadFailed")}
+            message={estado.error}
+          />
+        )}
 
         {estado.loading && estado.casos.length === 0 ? (
-          <div style={{ fontSize: 13, color: t.textSoft, padding: "18px 0" }}>Leyendo la bitácora…</div>
+          <div style={{ fontSize: 13, color: t.textSoft, padding: "18px 0" }}>
+            {traducir("assistant:rag.cases.loading")}
+          </div>
         ) : visibles.length === 0 ? (
           <div
             style={{
@@ -371,9 +417,9 @@ export default function CasosRag() {
               fontSize: 13, color: t.textSoft, maxWidth: "68ch",
             }}
           >
-            {estado.casos.length === 0
-              ? "Todavía no hay ninguna intervención registrada. Se llenan solas al cerrar un diagnóstico desde Riesgos, o contándole una reparación al asistente por voz o por chat."
-              : "Ningún caso encaja con este filtro."}
+            {traducir(estado.casos.length === 0
+              ? "assistant:rag.cases.empty"
+              : "assistant:rag.cases.noMatch")}
           </div>
         ) : (
           <div>
@@ -391,8 +437,7 @@ export default function CasosRag() {
         )}
 
         <p style={{ margin: 0, fontSize: 12, color: t.textFaint, maxWidth: "72ch", lineHeight: 1.55 }}>
-          Archivar no borra: el caso queda en el archivo con su texto y su fecha intactos, y deja de
-          contar como respaldo en los diagnósticos. Se puede devolver cuando se quiera.
+          {traducir("assistant:rag.cases.footnote")}
         </p>
       </Panel>
     </>

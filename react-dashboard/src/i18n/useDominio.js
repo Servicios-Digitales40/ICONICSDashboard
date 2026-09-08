@@ -39,6 +39,7 @@ import { useTranslation } from "react-i18next";
 import { estadoInfo } from "@shared/eva/tanque/estado.js";
 import { senalInfo } from "@shared/eva/tanque/senales.js";
 import { activoInfo } from "@shared/eva/tanque/activos.js";
+import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 
 /**
  * Traduce el vocabulario del dominio: estados, señales y activos.
@@ -88,7 +89,38 @@ export function useDominio() {
     [t]
   );
 
-  return { estado, senal, activo };
+  /**
+   * El nombre de una MÁQUINA: «Sistema de agua industrial», «Vibration
+   * System».
+   *
+   * Lo declara `shared/eva/comun/sistemas.js` y lo pintaban dos pantallas
+   * leyéndolo de ahí directamente, así que el nombre de la máquina se quedaba
+   * en español dentro de un tablero en inglés — con las claves ya escritas en
+   * `machines:systems` y sin que nadie las llamara.
+   *
+   * `id` desconocido devuelve el propio id: es lo que hacía el código que
+   * esto sustituye, y un id crudo dice más que una cadena vacía cuando el
+   * manifiesto trae un sistema que ya no existe.
+   */
+  const sistema = useCallback(
+    (id) => {
+      if (!id) return "";
+      const info = resumenDeSistemas().find((s) => s.id === id);
+      return t(`machines:systems.${id}`, { defaultValue: info?.nombre ?? id });
+    },
+    [t]
+  );
+
+  /**
+   * Los sistemas declarados, con su nombre ya traducido. Es lo que necesita
+   * un `<select>`: la lista entera, no un nombre suelto.
+   */
+  const sistemas = useCallback(
+    () => resumenDeSistemas().map((s) => ({ id: s.id, nombre: sistema(s.id) })),
+    [sistema]
+  );
+
+  return { estado, senal, activo, sistema, sistemas };
 }
 
 /**

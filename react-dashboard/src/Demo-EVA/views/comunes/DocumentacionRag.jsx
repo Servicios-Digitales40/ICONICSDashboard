@@ -20,8 +20,10 @@
  * preguntas, sin perder el archivo— y es la única baja que existe.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ArchiveRestore, FileUp, RefreshCw, Upload, X } from "lucide-react";
 
+import { useFormato } from "@/i18n/formato.js";
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import {
@@ -31,8 +33,8 @@ import {
   reemplazarManual,
   subirManual,
 } from "@/lib/api/ragApi.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
-import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 
@@ -43,9 +45,30 @@ const MS_ENTRE_SONDEOS = 2000;
 
 const EXTENSIONES_ADMITIDAS = [".pdf", ".docx", ".txt", ".md", ".csv", ".log"];
 
-function formatoFecha(iso) {
+/** `null` si la fecha del manifiesto no se puede leer; `useFormato` da "" ahí. */
+function fechaValida(iso) {
   const fecha = new Date(iso);
-  return Number.isNaN(fecha.getTime()) ? "—" : fecha.toLocaleString("es-MX");
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+/**
+ * La cabecera de la vista, que se pintaba CUATRO veces —cargando, error, sin
+ * configurar y el caso normal— con el mismo par de frases copiado.
+ *
+ * El texto sale de `navigation`, que es de donde lo saca también el Topbar y
+ * el sidebar: eran tres sitios diciendo casi lo mismo con palabras distintas
+ * («Qué manuales alimentan…» aquí, «Los manuales que alimentan…» en la ruta),
+ * y ahora es uno. El «RAG · » se compone con el nombre de su sección, no
+ * escrito a mano, por el mismo motivo.
+ */
+function Cabecera() {
+  const { t: traducir } = useTranslation("navigation");
+  const seccion = traducir("sections.sec-rag");
+  return (
+    <SectionLabel sub={traducir("routes.rag-documentacion.sub")}>
+      {`${seccion} · ${traducir("routes.rag-documentacion.title")}`}
+    </SectionLabel>
+  );
 }
 
 /* ── Estadística de cabecera ─────────────────────────────────────────── */
@@ -81,14 +104,18 @@ function Estadistica({ label, valor, tono, t }) {
  * se leyó y este archivo no estaba— y sólo la segunda es un problema.
  * Confundirlas fue el primer intento de arreglar esto, y pintaba de rojo
  * seis manuales sanos.
+ *
+ * Devuelve la CLAVE del estado y no su texto: es una función pura, no puede
+ * llamar a un hook, y quien la escribe decide QUÉ estado es — cómo se escribe
+ * lo dice el diccionario. Mismo reparto que `aspectoDe` en «Salud».
  */
 function estadoDeFila(manual, { indexando, cargado }) {
-  if (manual.estado === "archivado") return { texto: "archivado", tipo: "mute" };
-  if (manual.motivoIlegible) return { texto: "no se pudo leer", tipo: "bad" };
-  if (manual.fragmentos > 0) return { texto: "indexado", tipo: "ok" };
-  if (indexando) return { texto: "indexando", tipo: "wait" };
-  if (!cargado) return { texto: "sin leer aún", tipo: "wait" };
-  return { texto: "falta el archivo", tipo: "bad" };
+  if (manual.estado === "archivado") return { clave: "archivado", tipo: "mute" };
+  if (manual.motivoIlegible) return { clave: "ilegible", tipo: "bad" };
+  if (manual.fragmentos > 0) return { clave: "indexado", tipo: "ok" };
+  if (indexando) return { clave: "indexando", tipo: "wait" };
+  if (!cargado) return { clave: "sinLeer", tipo: "wait" };
+  return { clave: "faltaArchivo", tipo: "bad" };
 }
 
 const CHIP_COLOR = {
@@ -117,11 +144,16 @@ function FilaManual({
   manual, t, sistemas, sistemasPorId, cargaHabilitada,
   onReemplazar, onArchivar, onAsignar, ocupado, indice,
 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "common"]);
+  const { fechaHora } = useFormato();
   const [confirmando, setConfirmando] = useState(false);
   const inputRef = useRef(null);
   const estado = estadoDeFila(manual, indice);
   const activo = manual.estado === "activo";
-  const nombreSistema = manual.sistema ? sistemasPorId.get(manual.sistema) ?? manual.sistema : "toda la planta";
+  const nombreSistema = manual.sistema
+    ? sistemasPorId.get(manual.sistema) ?? manual.sistema
+    : traducir("assistant:rag.docs.wholePlant");
   const sinAsignar = activo && !manual.sistema;
 
   return (
@@ -165,7 +197,7 @@ function FilaManual({
             value={manual.sistema ?? ""}
             disabled={ocupado}
             onChange={(e) => onAsignar(manual.id, e.target.value)}
-            title="A qué máquina pertenece este manual"
+            title={traducir("assistant:rag.docs.systemTip")}
             style={{
               ...fieldStyle(t),
               height: 30,
@@ -174,7 +206,7 @@ function FilaManual({
               ...(sinAsignar ? { borderColor: t.amber, color: t.amber } : {}),
             }}
           >
-            <option value="">Toda la planta</option>
+            <option value="">{traducir("assistant:rag.docs.wholePlant")}</option>
             {sistemas.map((s) => (
               <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
@@ -185,15 +217,26 @@ function FilaManual({
       </div>
 
       <div style={{ fontFamily: MONO, fontSize: 11.5, color: t.textSoft, width: 96, flexShrink: 0, textAlign: "right" }}>
-        {activo ? (estado.tipo === "wait" ? "…" : `${manual.fragmentos} fragmentos`) : "—"}
+        {activo
+          ? (estado.tipo === "wait"
+            ? "…"
+            : traducir("assistant:rag.docs.fragments", { n: manual.fragmentos }))
+          : "—"}
       </div>
 
       <div style={{ width: 128, flexShrink: 0 }}>
-        <Chip tipo={estado.tipo} t={t}>{estado.texto}</Chip>
+        <Chip tipo={estado.tipo} t={t}>
+          {traducir(`assistant:rag.docs.state.${estado.clave}`)}
+        </Chip>
       </div>
 
+      {/*
+        La fecha se formatea con el locale del idioma activo. Estaba fijada a
+        `es-MX`, así que un tablero en inglés enseñaba «3/9/2026, 14:05» con
+        el día delante del mes — que en inglés se lee como el 9 de marzo.
+      */}
       <div style={{ fontSize: 11, color: t.textFaint, width: 128, flexShrink: 0, textAlign: "right" }}>
-        {formatoFecha(manual.fecha)}
+        {fechaHora(fechaValida(manual.fecha)) || "—"}
       </div>
 
       {cargaHabilitada && activo && (
@@ -213,7 +256,7 @@ function FilaManual({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={ocupado}
-            title="Reemplazar contenido"
+            title={traducir("assistant:rag.docs.replaceTip")}
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
               width: 28, height: 28, borderRadius: 7, border: `1px solid ${t.border}`,
@@ -235,7 +278,7 @@ function FilaManual({
                   cursor: ocupado ? "default" : "pointer", height: 28,
                 }}
               >
-                Confirmar
+                {traducir("common:actions.confirm")}
               </button>
               <button
                 type="button"
@@ -254,7 +297,7 @@ function FilaManual({
               type="button"
               onClick={() => setConfirmando(true)}
               disabled={ocupado}
-              title="Archivar (no borra el archivo)"
+              title={traducir("assistant:rag.docs.archiveTip")}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center",
                 width: 28, height: 28, borderRadius: 7, border: `1px solid ${t.border}`,
@@ -273,6 +316,8 @@ function FilaManual({
 /* ── La zona de carga ─────────────────────────────────────────────────── */
 
 function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "common", "errors"]);
   const [arrastrando, setArrastrando] = useState(false);
   const [pendiente, setPendiente] = useState(null); // File
   const [sistema, setSistema] = useState("");
@@ -308,21 +353,21 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-              Título
+              {traducir("assistant:rag.docs.upload.title")}
             </label>
             <input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
               style={fieldStyle(t)}
-              placeholder="Cómo se llamará este manual"
+              placeholder={traducir("assistant:rag.docs.upload.titlePlaceholder")}
             />
           </div>
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-              Sistema
+              {traducir("assistant:rag.docs.upload.system")}
             </label>
             <select value={sistema} onChange={(e) => setSistema(e.target.value)} style={fieldStyle(t)}>
-              <option value="">Toda la planta</option>
+              <option value="">{traducir("assistant:rag.docs.wholePlant")}</option>
               {sistemas.map((s) => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
@@ -332,12 +377,18 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
 
         <div style={{ display: "flex", gap: 8 }}>
           <Button variant="primary" icon={<Upload size={14} />} loading={subiendo} onClick={confirmar}>
-            Subir
+            {traducir("assistant:rag.docs.upload.submit")}
           </Button>
-          <Button variant="secondary" onClick={cancelar} disabled={subiendo}>Cancelar</Button>
+          <Button variant="secondary" onClick={cancelar} disabled={subiendo}>
+            {traducir("common:actions.cancel")}
+          </Button>
         </div>
 
-        {error && <div style={{ marginTop: 10 }}><AlertBanner type="error" title="No se pudo subir" message={error} /></div>}
+        {error && (
+          <div style={{ marginTop: 10 }}>
+            <AlertBanner type="error" title={traducir("errors:titles.uploadFailed")} message={error} />
+          </div>
+        )}
       </div>
     );
   }
@@ -368,12 +419,17 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
       />
       <Upload size={20} color={t.textFaint} style={{ marginBottom: 8 }} />
       <div style={{ fontFamily: SANS, fontSize: 13, color: t.textSoft, marginBottom: 4 }}>
-        Arrastra un manual aquí, o haz clic para elegirlo
+        {traducir("assistant:rag.docs.upload.dropzone")}
       </div>
+      {/* Las extensiones son extensiones: no se traducen. */}
       <div style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint }}>
         {EXTENSIONES_ADMITIDAS.join(" · ")}
       </div>
-      {error && <div style={{ marginTop: 12, textAlign: "left" }}><AlertBanner type="error" title="No se pudo subir" message={error} /></div>}
+      {error && (
+        <div style={{ marginTop: 12, textAlign: "left" }}>
+          <AlertBanner type="error" title={traducir("errors:titles.uploadFailed")} message={error} />
+        </div>
+      )}
     </div>
   );
 }
@@ -381,6 +437,9 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
 /* ── La vista ──────────────────────────────────────────────────────────── */
 
 export default function DocumentacionRag() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["assistant", "common", "errors"]);
+  const { numero } = useFormato();
   const { theme: t } = useTheme();
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -391,7 +450,13 @@ export default function DocumentacionRag() {
   /** `""` = todos · `"sin-asignar"` · `"planta"` · el id de un sistema. */
   const [filtroSistema, setFiltroSistema] = useState("");
 
-  const sistemas = resumenDeSistemas();
+  /*
+   * Con el nombre ya traducido: `shared/` los declara en español y aquí se
+   * pintan en un `<select>` que debe hablar el idioma del resto de la
+   * pantalla. Ver `sistema()` en `useDominio`.
+   */
+  const { sistemas: sistemasTraducidos } = useDominio();
+  const sistemas = sistemasTraducidos();
   const sistemasPorId = new Map(sistemas.map((s) => [s.id, s.nombre]));
 
   const cargar = useCallback(async (signal) => {
@@ -494,10 +559,10 @@ export default function DocumentacionRag() {
   if (cargando) {
     return (
       <>
-        <SectionLabel sub="Qué manuales alimentan el índice del asistente, y qué sabe extraer de cada uno">
-          RAG · Documentación
-        </SectionLabel>
-        <Panel><div style={{ color: t.textFaint, fontSize: 13 }}>Cargando…</div></Panel>
+        <Cabecera />
+        <Panel>
+          <div style={{ color: t.textFaint, fontSize: 13 }}>{traducir("common:state.loading")}</div>
+        </Panel>
       </>
     );
   }
@@ -505,10 +570,12 @@ export default function DocumentacionRag() {
   if (errorCarga && !datos) {
     return (
       <>
-        <SectionLabel sub="Qué manuales alimentan el índice del asistente, y qué sabe extraer de cada uno">
-          RAG · Documentación
-        </SectionLabel>
-        <AlertBanner type="error" title="No se pudo consultar el catálogo" message={errorCarga} />
+        <Cabecera />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.catalogQueryFailed")}
+          message={errorCarga}
+        />
       </>
     );
   }
@@ -521,13 +588,11 @@ export default function DocumentacionRag() {
   if (!datos.configurado) {
     return (
       <>
-        <SectionLabel sub="Qué manuales alimentan el índice del asistente, y qué sabe extraer de cada uno">
-          RAG · Documentación
-        </SectionLabel>
+        <Cabecera />
         <AlertBanner
           type="info"
-          title="Sin documentación configurada"
-          message="Este servidor no tiene una carpeta de documentación (falta IA_DOCS_DIR). Sin ella, el asistente no puede consultar manuales."
+          title={traducir("assistant:rag.docs.notConfigured.title")}
+          message={traducir("assistant:rag.docs.notConfigured.message")}
         />
       </>
     );
@@ -561,16 +626,14 @@ export default function DocumentacionRag() {
 
   return (
     <>
-      <SectionLabel sub="Qué manuales alimentan el índice del asistente, y qué sabe extraer de cada uno">
-        RAG · Documentación
-      </SectionLabel>
+      <Cabecera />
 
       <Panel
         right={
           <button
             type="button"
             onClick={() => cargar()}
-            title="Actualizar"
+            title={traducir("common:actions.refresh")}
             style={{
               display: "flex", alignItems: "center", gap: 6, padding: "6px 11px", borderRadius: 9,
               border: `1px solid ${t.border}`, background: t.hover, color: t.textSoft,
@@ -578,20 +641,43 @@ export default function DocumentacionRag() {
             }}
           >
             <RefreshCw size={13} />
-            Actualizar
+            {traducir("common:actions.refresh")}
           </button>
         }
       >
         <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-          <Estadistica label="Documentos" valor={activos.length} t={t} />
-          <Estadistica label="Fragmentos" valor={totalFragmentos.toLocaleString("es-MX")} t={t} />
           <Estadistica
-            label="Búsqueda"
+            label={traducir("assistant:rag.docs.stats.documents")}
+            valor={activos.length}
+            t={t}
+          />
+          {/*
+           * El separador de millares es del IDIOMA: 1,234 en inglés y 1.234
+           * en español. Estaba fijado a `es-MX`, que en un tablero en inglés
+           * se lee como «uno coma doscientos treinta y cuatro».
+           */}
+          <Estadistica
+            label={traducir("assistant:rag.docs.stats.fragments")}
+            valor={numero(totalFragmentos, 0)}
+            t={t}
+          />
+          {/*
+           * «Embeddings + BM25» NO se traduce: son los nombres de los dos
+           * algoritmos de búsqueda, no una descripción. BM25 se llama BM25 en
+           * los dos idiomas, igual que un tag de ICONICS.
+           */}
+          <Estadistica
+            label={traducir("assistant:rag.docs.stats.search")}
             valor={datos.modo === "embeddings + BM25" ? "Embeddings + BM25" : "BM25"}
             tono={datos.modo === "embeddings + BM25" ? t.success : t.textSoft}
             t={t}
           />
-          <Estadistica label="Sin leer" valor={sinLeer} tono={sinLeer ? t.coral : t.text} t={t} />
+          <Estadistica
+            label={traducir("assistant:rag.docs.stats.unread")}
+            valor={sinLeer}
+            tono={sinLeer ? t.coral : t.text}
+            t={t}
+          />
           {/*
            * En ámbar y no en rojo: un manual sin asignar no está roto, y
            * puede que «toda la planta» sea la respuesta correcta para él.
@@ -601,7 +687,7 @@ export default function DocumentacionRag() {
            * el manual de la bomba.
            */}
           <Estadistica
-            label="Sin asignar"
+            label={traducir("assistant:rag.docs.stats.unassigned")}
             valor={sinAsignar}
             tono={sinAsignar ? t.amber : t.success}
             t={t}
@@ -610,7 +696,7 @@ export default function DocumentacionRag() {
       </Panel>
 
       <Panel
-        title="Manuales"
+        title={traducir("assistant:rag.docs.panelTitle")}
         style={{ marginTop: 16 }}
         right={
           /*
@@ -640,9 +726,11 @@ export default function DocumentacionRag() {
             onChange={(e) => setFiltroSistema(e.target.value)}
             style={{ ...fieldStyle(t), height: 30, fontSize: 12, padding: "0 8px", width: 190 }}
           >
-            <option value="">Todos los manuales</option>
-            <option value="sin-asignar">Sin asignar ({sinAsignar})</option>
-            <option value="planta">Sólo toda la planta</option>
+            <option value="">{traducir("assistant:rag.docs.filter.all")}</option>
+            <option value="sin-asignar">
+              {traducir("assistant:rag.docs.filter.unassigned", { n: sinAsignar })}
+            </option>
+            <option value="planta">{traducir("assistant:rag.docs.filter.onlyPlant")}</option>
             {sistemas.map((s) => (
               <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
@@ -651,11 +739,11 @@ export default function DocumentacionRag() {
       >
         {datos.manuales.length === 0 ? (
           <div style={{ fontSize: 13, color: t.textFaint, padding: "8px 0" }}>
-            Todavía no hay ningún manual cargado.
+            {traducir("assistant:rag.docs.empty")}
           </div>
         ) : manualesVisibles.length === 0 ? (
           <div style={{ fontSize: 13, color: t.textFaint, padding: "8px 0" }}>
-            Ningún manual encaja con ese filtro.
+            {traducir("assistant:rag.docs.noMatch")}
           </div>
         ) : (
           manualesVisibles.map((manual) => (
@@ -682,8 +770,8 @@ export default function DocumentacionRag() {
         ) : (
           <AlertBanner
             type="warning"
-            title="La carga de manuales está desactivada"
-            message="Este servidor no acepta subir manuales desde el tablero (RAG_UPLOAD_ENABLED=false). Los archivos se pueden seguir dejando a mano en la carpeta de documentación."
+            title={traducir("assistant:rag.docs.uploadDisabled.title")}
+            message={traducir("assistant:rag.docs.uploadDisabled.message")}
           />
         )}
       </div>

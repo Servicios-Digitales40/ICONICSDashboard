@@ -1,1 +1,85 @@
-{}
+{
+  "rag": {
+    "docs": {
+      "state": {
+        "archivado": "archived",
+        "ilegible": "could not be read",
+        "indexado": "indexed",
+        "indexando": "indexing",
+        "sinLeer": "not read yet",
+        "faltaArchivo": "file missing"
+      },
+      "stats": {
+        "documents": "Documents",
+        "fragments": "Fragments",
+        "search": "Search",
+        "unread": "Unread",
+        "unassigned": "Unassigned"
+      },
+      "fragments": "{{n}} fragments",
+      "wholePlant": "Whole plant",
+      "systemTip": "Which machine this manual belongs to",
+      "replaceTip": "Replace contents",
+      "archiveTip": "Archive (does not delete the file)",
+      "panelTitle": "Manuals",
+      "filter": {
+        "all": "All manuals",
+        "unassigned": "Unassigned ({{n}})",
+        "onlyPlant": "Whole plant only"
+      },
+      "empty": "No manual has been uploaded yet.",
+      "noMatch": "No manual matches that filter.",
+      "upload": {
+        "title": "Title",
+        "titlePlaceholder": "What this manual will be called",
+        "system": "System",
+        "dropzone": "Drag a manual here, or click to choose one",
+        "submit": "Upload"
+      },
+      "notConfigured": {
+        "title": "No documentation configured",
+        "message": "This server has no documentation folder (IA_DOCS_DIR is missing). Without one, the assistant cannot consult manuals."
+      },
+      "uploadDisabled": {
+        "title": "Manual upload is disabled",
+        "message": "This server does not accept manuals uploaded from the dashboard (RAG_UPLOAD_ENABLED=false). Files can still be dropped into the documentation folder by hand."
+      }
+    },
+    "cases": {
+      "filter": {
+        "activos": "Active",
+        "archivados": "Archived",
+        "todos": "All"
+      },
+      "searchPlaceholder": "Search by symptom, cause or risk…",
+      "loading": "Reading the logbook…",
+      "empty": "No intervention has been recorded yet. They fill themselves in when a diagnosis is closed from Risks, or when a repair is described to the assistant by voice or chat.",
+      "noMatch": "No case matches this filter.",
+      "footnote": "Archiving does not delete: the case stays on file with its text and date intact, and stops counting as backing in diagnoses. It can be restored at any time.",
+      "chip": {
+        "archived": "Archived",
+        "solved": "Solved",
+        "unsolved": "Not solved",
+        "diagnosisRight": "Diagnosis correct",
+        "diagnosisCorrected": "Diagnosis corrected"
+      },
+      "archive": "Archive",
+      "restore": "Restore",
+      "archiveTip": "Archive: stops feeding the diagnosis",
+      "restoreTip": "Return to the active logbook",
+      "archivedNotice": "Archived. It no longer backs diagnoses, but it stays on file.",
+      "restoredNotice": "Restored. It counts as a previous case again.",
+      "field": {
+        "recordedCause": "Recorded cause",
+        "solution": "Solution",
+        "confirmedCause": "Confirmed root cause",
+        "systemProposed": "The system proposed",
+        "notes": "Notes",
+        "citedManual": "Manual cited",
+        "sensorSample": "Sensor sample at the time of closing"
+      },
+      "backing": "{{propuesta}} (backing {{respaldo}})",
+      "page": "{{archivo}} p.{{pagina}}"
+    }
+  }
+}
