@@ -1,1 +1,43 @@
-{}
+{
+  "health": {
+    "sub": "Qué servicios necesita este tablero y cuáles están en pie ahora mismo.",
+    "loading": "Consultando el estado del puente…",
+    "services": "Servicios",
+    "refresh": "Volver a consultar",
+    "bridge": {
+      "name": "Puente hacia ICONICS",
+      "ok": "Se alcanza el servidor de planta y el token es válido.",
+      "degraded": "Se alcanza ICONICS pero NO hay token válido: las lecturas saldrán sin autenticar. Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.",
+      "unreachable": "No se alcanza ICONICS{{motivo}}."
+    },
+    "state": {
+      "ok": "Funcionando",
+      "simulado": "Simulado",
+      "degraded": "Degradado",
+      "noResponse": "No responde",
+      "notConfigured": "No configurado",
+      "problems": "Con problemas"
+    },
+    "fields": {
+      "write": "Escritura",
+      "reachable": "Alcanzable",
+      "token": "Token",
+      "model": "Modelo",
+      "maxSteps": "Pasos máx.",
+      "serving": "Atendiendo",
+      "queued": "En espera"
+    },
+    "values": {
+      "blocked": "bloqueada (solo lectura)",
+      "enabled": "habilitada",
+      "yes": "sí",
+      "no": "no",
+      "valid": "válido",
+      "invalid": "no válido",
+      "oneQuery": "una consulta",
+      "nothing": "nada"
+    },
+    "enabledWith": "Se activa con",
+    "inServerEnv": "en el entorno del servidor."
+  }
+}

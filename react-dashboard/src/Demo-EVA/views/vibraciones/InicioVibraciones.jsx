@@ -36,6 +36,7 @@
  *     sería contar una cadena que no es la suya.
  */
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowRight, Box, Cpu, Gauge, LayoutDashboard, Monitor, Radio, Server, ShieldAlert, WifiOff,
 } from "lucide-react";
@@ -218,31 +219,25 @@ const REJILLA = `
 const VISTAS = [
   {
     id: "eva-vibraciones",
-    label: "Gráficas",
-    frase: "Los tres apoyos, sus cuatro medidas y qué vigilancias tiene encendidas el módulo.",
     Icono: LayoutDashboard,
     dato: ({ peor }) =>
       peor
-        ? { texto: `ISO zona ${peor.zona}`, estado: peor.nivel === "critico" ? "critico" : peor.nivel === "atencion" ? "atencion" : "nominal" }
+        ? { clave: "isoZone", valores: { zona: peor.zona }, estado: peor.nivel === "critico" ? "critico" : peor.nivel === "atencion" ? "atencion" : "nominal" }
         : null,
   },
   {
     id: "eva-riesgos-vibracion",
-    label: "Riesgos",
-    frase: "Qué se deduce de esas medidas, con la evidencia separada de la hipótesis.",
     Icono: ShieldAlert,
     dato: ({ res }) => {
       if (!res.evaluadas && !res.activos.length) return null;
       if (res.activos.length > 0) {
-        return { texto: `${res.activos.length} situación${res.activos.length === 1 ? "" : "es"}`, estado: "critico" };
+        return { clave: "situations", valores: { count: res.activos.length }, estado: "critico" };
       }
-      return { texto: `${res.evaluadas} reglas en orden`, estado: "nominal" };
+      return { clave: "rulesOk", valores: { count: res.evaluadas }, estado: "nominal" };
     },
   },
   {
     id: "vib-3d",
-    label: "Vista 3D",
-    frase: "Dónde está montada cada sonda en el tren de rotor, y en qué dirección mide.",
     Icono: Box,
     /*
      * El régimen del eje, que es la señal cuyo giro anima esa escena — el
@@ -254,14 +249,12 @@ const VISTAS = [
      * frecuente, y un «0 rpm» inventado diría que está parada.
      */
     dato: ({ giro }) =>
-      giro.medido ? { texto: `${Math.round(giro.real)} rpm`, estado: giro.real > 0 ? "nominal" : "sin_dato" } : null,
+      giro.medido ? { clave: "rpm", valores: { valor: Math.round(giro.real) }, estado: giro.real > 0 ? "nominal" : "sin_dato" } : null,
   },
   {
     id: "vib-controles",
-    label: "Controles",
-    frase: "El encendido y apagado de esta máquina. Todavía sin construir.",
     Icono: Radio,
-    dato: () => ({ texto: "Pendiente", estado: "sin_dato" }),
+    dato: () => ({ clave: "pending", valores: {}, estado: "sin_dato" }),
   },
 ];
 
@@ -288,11 +281,11 @@ const VISTAS = [
  * en `ACELEROMETRO` para quien vaya a pedir una hoja de datos con él.
  */
 const NODOS_PIPELINE = [
-  { id: "acelerometros", Icono: Gauge, titulo: "Acelerómetros Hansford", detalle: "Tres, uno por apoyo, con su sensibilidad propia en mV/g" },
-  { id: "modulo", Icono: Cpu, titulo: "SIPLUS CMS 1281", detalle: "Calcula vRMS, aceleración y daño a partir de la señal cruda" },
-  { id: "plc", Icono: Server, titulo: "PLC_2 · ua:DEMO3", detalle: "Publica lo que el módulo calculó, más su propio variador" },
-  { id: "historiador", Icono: Radio, titulo: "Hyper Historian", detalle: "Grupo «DEMO 3» — sin publicar como activos en AssetWorX" },
-  { id: "tablero", Icono: Monitor, titulo: "Este tablero", detalle: "Lee los 73 puntos de una vez y pinta lo que contestaron" },
+  { id: "acelerometros", Icono: Gauge },
+  { id: "modulo", Icono: Cpu },
+  { id: "plc", Icono: Server },
+  { id: "historiador", Icono: Radio },
+  { id: "tablero", Icono: Monitor },
 ];
 
 /* ── Piezas ────────────────────────────────────────────────────────── */
@@ -392,6 +385,8 @@ function TrazoApoyos({ contestan, total, t }) {
 
 /** Una tarjeta de la rejilla. Misma forma que `TarjetaVista` de `InicioTanque`. */
 function TarjetaVista({ vista, contexto, dark, onNavigate, t, delay }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { Icono } = vista;
   const dato = vista.dato(contexto);
 
@@ -423,15 +418,15 @@ function TarjetaVista({ vista, contexto, dark, onNavigate, t, delay }) {
           <ArrowRight size={16} />
         </span>
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: SANS }}>{vista.label}</div>
-      <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>{vista.frase}</p>
+      <div style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: SANS }}>{traducir(`navigation:routes.${vista.id}.nav`)}</div>
+      <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>{traducir(`machines:vibration.views.${vista.id}.frase`)}</p>
 
       {dato && (
         <div className="vib-tarjeta-dato">
-          <span style={{ fontSize: 11.5, color: t.textFaint }}>Ahora mismo</span>
+          <span style={{ fontSize: 11.5, color: t.textFaint }}>{traducir("dashboard:home.views.now")}</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: t.text, fontFamily: MONO }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: estadoColor(dark, dato.estado) }} />
-            {dato.texto}
+            {traducir(`machines:vibration.counts.${dato.clave}`, dato.valores)}
           </span>
         </div>
       )}
@@ -441,6 +436,8 @@ function TarjetaVista({ vista, contexto, dark, onNavigate, t, delay }) {
 
 /** El pipeline, revelado al entrar en vista — igual que en la otra portada. */
 function ComoFunciona({ t, lastUpdated }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const [ref, visible] = useEnVista();
 
   return (
@@ -448,8 +445,8 @@ function ComoFunciona({ t, lastUpdated }) {
     // vive en esa esquina: mismo remedio vertical que en `InicioTanque`, donde
     // reservar ANCHO rompía el título de algún nodo cada vez.
     <section ref={ref} style={{ paddingBottom: 70 }}>
-      <SectionLabel sub="El camino que hace cada número antes de llegar a esta pantalla">
-        Cómo funciona
+      <SectionLabel sub={traducir("dashboard:home.pipeline.sub")}>
+        {traducir("dashboard:home.pipeline.title")}
       </SectionLabel>
 
       <div className={`vib-inicio-pipeline${visible ? " vib-inicio-pipeline--visible" : ""}`}>
@@ -460,8 +457,8 @@ function ComoFunciona({ t, lastUpdated }) {
                 <nodo.Icono size={19} />
               </span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: t.text, fontFamily: SANS }}>{nodo.titulo}</div>
-                <p style={{ margin: "3px 0 0", fontSize: 11.5, color: t.textSoft, lineHeight: 1.45 }}>{nodo.detalle}</p>
+                <div style={{ fontSize: 14, fontWeight: 700, color: t.text, fontFamily: SANS }}>{traducir(`machines:vibration.pipeline.${nodo.id}.titulo`)}</div>
+                <p style={{ margin: "3px 0 0", fontSize: 11.5, color: t.textSoft, lineHeight: 1.45 }}>{traducir(`machines:vibration.pipeline.${nodo.id}.detalle`)}</p>
               </div>
             </div>
 
@@ -488,6 +485,8 @@ function ComoFunciona({ t, lastUpdated }) {
 /* ── La vista ──────────────────────────────────────────────────────── */
 
 function InicioVibraciones({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t, dark } = useTheme();
   const { canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -633,8 +632,8 @@ function InicioVibraciones({ onNavigate }) {
           </div>
         )}
 
-        <SectionLabel sub="La misma máquina, tres lentes distintas">
-          Tres formas de verlo
+        <SectionLabel sub={traducir("machines:vibration.views.sub")}>
+          {traducir("machines:vibration.views.title")}
         </SectionLabel>
 
         <div className="vib-inicio-grid">

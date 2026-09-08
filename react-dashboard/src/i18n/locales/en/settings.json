@@ -1,1 +1,43 @@
-{}
+{
+  "health": {
+    "sub": "Which services this dashboard needs, and which are up right now.",
+    "loading": "Checking the bridge…",
+    "services": "Services",
+    "refresh": "Check again",
+    "bridge": {
+      "name": "ICONICS bridge",
+      "ok": "The plant server is reachable and the token is valid.",
+      "degraded": "ICONICS is reachable but there is NO valid token: reads will go out unauthenticated. Check ICONICS_USERNAME / ICONICS_PASSWORD and that user's permissions.",
+      "unreachable": "ICONICS is unreachable{{motivo}}."
+    },
+    "state": {
+      "ok": "Running",
+      "simulado": "Simulated",
+      "degraded": "Degraded",
+      "noResponse": "Not responding",
+      "notConfigured": "Not configured",
+      "problems": "Faulty"
+    },
+    "fields": {
+      "write": "Write access",
+      "reachable": "Reachable",
+      "token": "Token",
+      "model": "Model",
+      "maxSteps": "Max steps",
+      "serving": "Serving",
+      "queued": "Queued"
+    },
+    "values": {
+      "blocked": "blocked (read-only)",
+      "enabled": "enabled",
+      "yes": "yes",
+      "no": "no",
+      "valid": "valid",
+      "invalid": "invalid",
+      "oneQuery": "one query",
+      "nothing": "nothing"
+    },
+    "enabledWith": "Enabled with",
+    "inServerEnv": "in the server environment."
+  }
+}

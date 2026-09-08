@@ -37,6 +37,7 @@
  * no entregan lectura.
  */
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
@@ -48,6 +49,8 @@ import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 function RiesgosVibracion({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -70,7 +73,7 @@ function RiesgosVibracion({ onNavigate }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <AlertBanner
         type="info"
-        title="Riesgos del sistema de vibraciones"
+        title={traducir("machines:vibration.risks.title")}
         message={
           "Estas reglas evalúan el motor con acelerómetros: su propio motor, su propio " +
           "variador y su propio PLC."
@@ -78,20 +81,14 @@ function RiesgosVibracion({ onNavigate }) {
       />
 
       {error && (
-        <AlertBanner type="error" title="No se pudo leer el módulo" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.moduleReadFailed")} message={error} />
       )}
 
       {casiTodoMudo && !loading && (
         <AlertBanner
           type="warning"
-          title="La máquina no está contestando"
-          message={
-            `${mudos} de ${totalPuntos} puntos no entregan lectura ahora mismo. ` +
-            "Cuando el variador se apaga deja de publicar la velocidad, y sin velocidad " +
-            "el módulo no puede calcular la velocidad eficaz: se pierden todos los vRMS " +
-            "y sobreviven la aceleración y el pico, que se miden sin conocer el régimen. " +
-            "Lo que se vea abajo no describe una máquina tranquila: describe una máquina callada."
-          }
+          title={traducir("machines:vibration.silent.title")}
+          message={traducir("machines:vibration.silent.message", { mudos, total: totalPuntos })}
         />
       )}
 
@@ -104,7 +101,7 @@ function RiesgosVibracion({ onNavigate }) {
         <SectionLabel>
           {res.activos.length > 0
             ? `Situaciones detectadas · ${res.activos.length}`
-            : "Situaciones detectadas"}
+            : traducir("machines:vibration.risks.detected")}
         </SectionLabel>
         <UltimaLectura fecha={lastUpdated} t={t} />
       </div>
@@ -137,12 +134,12 @@ function RiesgosVibracion({ onNavigate }) {
           <CheckCircle2 size={20} color={t.success} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
-              {loading ? "Comprobando…" : "Ninguna situación de riesgo ahora mismo"}
+              {loading ? traducir("machines:vibration.risks.checking") : traducir("machines:vibration.risks.noneNow")}
             </div>
             <div style={{ fontSize: 12, color: t.textSoft, marginTop: 2 }}>
               {res.evaluadas > 0
                 ? `${res.evaluadas} regla${res.evaluadas === 1 ? "" : "s"} comprobada${res.evaluadas === 1 ? "" : "s"} con las lecturas actuales.`
-                : "No se pudo comprobar ninguna: no hay lecturas con las que evaluar."}
+                : traducir("machines:vibration.risks.cannotCheck")}
             </div>
           </div>
         </div>

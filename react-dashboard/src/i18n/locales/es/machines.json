@@ -60,5 +60,81 @@
       "title": "Esta vista todavía no está construida",
       "message": "Aquí vivirán el encendido y el apagado de esta máquina"
     }
+  },
+  "vibration": {
+    "silent": {
+      "title": "La máquina no está contestando",
+      "message": "{{mudos}} de {{total}} puntos no entregan lectura ahora mismo. Cuando el variador se apaga deja de publicar la velocidad, y sin velocidad el módulo no puede calcular la velocidad eficaz: se pierden todos los vRMS y sobreviven la aceleración y el pico, que se miden sin conocer el régimen. Lo que se vea abajo no describe una máquina tranquila: describe una máquina callada."
+    },
+    "otherMachine": {
+      "title": "Otra máquina, y sin histórico"
+    },
+    "probeUnconfirmed": "Sensibilidad de esta sonda sin confirmar — sus lecturas dependen de ella.",
+    "watch": {
+      "watched": "vigilado",
+      "off": "APAGADO",
+      "none": "—",
+      "threshold": "Contra su umbral",
+      "spectrum": "Forma del espectro",
+      "bearing": "Defectos de rodamiento"
+    },
+    "alarms": {
+      "fromIconics": "Estas alarmas las emite ICONICS, no esta pantalla, y mandan sobre lo que se concluya aquí. ",
+      "none": "Sin alarmas pendientes en el área. "
+    },
+    "risks": {
+      "title": "Riesgos del sistema de vibraciones",
+      "detected": "Situaciones detectadas",
+      "checking": "Comprobando…",
+      "noneNow": "Ninguna situación de riesgo ahora mismo",
+      "cannotCheck": "No se pudo comprobar ninguna: no hay lecturas con las que evaluar."
+    },
+    "pipeline": {
+      "acelerometros": {
+        "titulo": "Acelerómetros Hansford",
+        "detalle": "Tres, uno por apoyo, con su sensibilidad propia en mV/g"
+      },
+      "modulo": {
+        "titulo": "SIPLUS CMS 1281",
+        "detalle": "Calcula vRMS, aceleración y daño a partir de la señal cruda"
+      },
+      "plc": {
+        "titulo": "PLC_2 · ua:DEMO3",
+        "detalle": "Publica lo que el módulo calculó, más su propio variador"
+      },
+      "historiador": {
+        "titulo": "Hyper Historian",
+        "detalle": "Grupo «DEMO 3» — sin publicar como activos en AssetWorX"
+      },
+      "tablero": {
+        "titulo": "Este tablero",
+        "detalle": "Lee los 73 puntos de una vez y pinta lo que contestaron"
+      }
+    },
+    "views": {
+      "eva-vibraciones": {
+        "frase": "Los tres apoyos, sus cuatro medidas y qué vigilancias tiene encendidas el módulo."
+      },
+      "eva-riesgos-vibracion": {
+        "frase": "Qué se deduce de esas medidas, con la evidencia separada de la hipótesis."
+      },
+      "vib-3d": {
+        "frase": "Dónde está montada cada sonda en el tren de rotor, y en qué dirección mide."
+      },
+      "vib-controles": {
+        "frase": "El encendido y apagado de esta máquina. Todavía sin construir.",
+        "pending": "Pendiente"
+      },
+      "title": "Tres formas de verlo",
+      "sub": "La misma máquina, tres lentes distintas"
+    },
+    "counts": {
+      "isoZone": "ISO zona {{zona}}",
+      "situations_one": "{{count}} situación",
+      "situations_other": "{{count}} situaciones",
+      "rulesOk_one": "{{count}} regla en orden",
+      "rulesOk_other": "{{count}} reglas en orden",
+      "rpm": "{{valor}} rpm"
+    }
   }
 }

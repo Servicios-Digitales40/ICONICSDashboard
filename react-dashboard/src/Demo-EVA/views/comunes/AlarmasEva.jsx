@@ -12,6 +12,8 @@
  * que aparezca, y se calla si no aparece nada — nunca inventa un dato.
  */
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useDominio } from "@/i18n/useDominio.js";
 import { CheckCheck, RefreshCw } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
@@ -20,14 +22,14 @@ import { useTheme } from "@/theme";
 
 import { estadoHistorial, HISTORIAL } from "../../data/comunes/estadoDelDato.js";
 import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../../data/comunes/alarmas.js";
-import { ACTIVOS, ACTIVO_IDS } from "../../domain/activos.js";
+import { ACTIVO_IDS } from "../../domain/activos.js";
 import { MONO } from "../../components/base.jsx";
 
 const VENTANAS = [
-  { horas: 1, label: "Última hora" },
-  { horas: 6, label: "6 horas" },
-  { horas: 24, label: "24 horas" },
-  { horas: 48, label: "48 horas" },
+  { horas: 1, clave: "h1" },
+  { horas: 6, clave: "h6" },
+  { horas: 24, clave: "h24" },
+  { horas: 48, clave: "h48" },
 ];
 
 /** "2026-08-20 10:00:00" → algo legible. Si no parsea, se enseña tal cual llegó — nunca una fecha inventada. */
@@ -55,6 +57,10 @@ function ChipVentana({ activo, onClick, t, children }) {
 }
 
 export default function AlarmasEva() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["alarms", "errors"]);
+  /* Los nombres de activo salen del dominio, traducidos. Ver `useDominio`. */
+  const { activo } = useDominio();
   const { theme: t } = useTheme();
   const [horas, setHoras] = useState(1);
   const [activoFiltro, setActivoFiltro] = useState("");
@@ -125,7 +131,7 @@ export default function AlarmasEva() {
 
   return (
     <>
-      <SectionLabel sub="El historial de eventos de la instalación — no un semáforo de alarmas activas">
+      <SectionLabel sub={traducir("alarms:sub")}>
         Alarmas
       </SectionLabel>
 
@@ -133,7 +139,7 @@ export default function AlarmasEva() {
         <div style={{ display: "flex", gap: 6 }}>
           {VENTANAS.map((v) => (
             <ChipVentana key={v.horas} t={t} activo={horas === v.horas} onClick={() => setHoras(v.horas)}>
-              {v.label}
+              {traducir(`alarms:windows.${v.clave}`)}
             </ChipVentana>
           ))}
         </div>
@@ -144,7 +150,7 @@ export default function AlarmasEva() {
           </ChipVentana>
           {ACTIVO_IDS.map((id) => (
             <ChipVentana key={id} t={t} activo={activoFiltro === id} onClick={() => setActivoFiltro(id)}>
-              {ACTIVOS[id].corto}
+              {activo(id, "corto")}
             </ChipVentana>
           ))}
         </div>
@@ -167,12 +173,12 @@ export default function AlarmasEva() {
       </div>
 
       {estado === HISTORIAL.SIN_CONEXION ? (
-        <AlertBanner type="error" title="No se pudo leer el historial de alarmas" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.alarmHistoryFailed")} message={error} />
       ) : estado === HISTORIAL.CARGANDO ? (
         <p style={{ fontSize: 13, color: t.textFaint }}>Consultando el historial de alarmas…</p>
       ) : estado === HISTORIAL.SIN_DATO ? (
         <p style={{ fontSize: 13, color: t.textFaint }}>
-          Sin eventos en esta ventana{activoFiltro ? ` para ${ACTIVOS[activoFiltro].corto}` : ""}.
+          {activoFiltro ? traducir("alarms:emptyForAsset", { activo: activo(activoFiltro, "corto") }) : traducir("alarms:empty")}
         </p>
       ) : (
         <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: "hidden" }}>

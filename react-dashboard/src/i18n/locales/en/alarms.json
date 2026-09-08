@@ -1,1 +1,11 @@
-{}
+{
+  "sub": "The plant event history — not a live alarm panel",
+  "windows": {
+    "h1": "Last hour",
+    "h6": "6 hours",
+    "h24": "24 hours",
+    "h48": "48 hours"
+  },
+  "empty": "No events in this window.",
+  "emptyForAsset": "No events in this window for {{activo}}."
+}

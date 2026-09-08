@@ -60,5 +60,81 @@
       "title": "This screen has not been built yet",
       "message": "Start and stop for this machine will live here"
     }
+  },
+  "vibration": {
+    "silent": {
+      "title": "The machine is not responding",
+      "message": "{{mudos}} of {{total}} points are returning no reading right now. When the VFD stops, it stops publishing speed, and without speed the module cannot compute RMS velocity: every vRMS is lost, while acceleration and peak survive because they are measured without knowing the running speed. What you see below does not describe a quiet machine: it describes a silent one."
+    },
+    "otherMachine": {
+      "title": "A different machine, and no history"
+    },
+    "probeUnconfirmed": "This probe's sensitivity is unconfirmed — its readings depend on it.",
+    "watch": {
+      "watched": "watched",
+      "off": "OFF",
+      "none": "—",
+      "threshold": "Against its threshold",
+      "spectrum": "Spectrum shape",
+      "bearing": "Bearing defects"
+    },
+    "alarms": {
+      "fromIconics": "These alarms are raised by ICONICS, not by this screen, and they override whatever is concluded here. ",
+      "none": "No pending alarms in the area. "
+    },
+    "risks": {
+      "title": "Vibration system risks",
+      "detected": "Conditions detected",
+      "checking": "Checking…",
+      "noneNow": "No risk conditions right now",
+      "cannotCheck": "None could be checked: there are no readings to evaluate."
+    },
+    "pipeline": {
+      "acelerometros": {
+        "titulo": "Hansford accelerometers",
+        "detalle": "Three, one per bearing, each with its own sensitivity in mV/g"
+      },
+      "modulo": {
+        "titulo": "SIPLUS CMS 1281",
+        "detalle": "Computes vRMS, acceleration and damage from the raw signal"
+      },
+      "plc": {
+        "titulo": "PLC_2 · ua:DEMO3",
+        "detalle": "Publishes what the module computed, plus its own VFD"
+      },
+      "historiador": {
+        "titulo": "Hyper Historian",
+        "detalle": "Group «DEMO 3» — not published as assets in AssetWorX"
+      },
+      "tablero": {
+        "titulo": "This dashboard",
+        "detalle": "Reads all 73 points at once and draws what they returned"
+      }
+    },
+    "views": {
+      "eva-vibraciones": {
+        "frase": "The three bearings, their four measurements, and which watches the module has enabled."
+      },
+      "eva-riesgos-vibracion": {
+        "frase": "What those measurements imply, with the evidence kept apart from the hypothesis."
+      },
+      "vib-3d": {
+        "frase": "Where each probe is mounted on the rotor train, and in which direction it measures."
+      },
+      "vib-controles": {
+        "frase": "Start and stop for this machine. Not built yet.",
+        "pending": "Pending"
+      },
+      "title": "Three ways to look at it",
+      "sub": "The same machine, through three different lenses"
+    },
+    "counts": {
+      "isoZone": "ISO zone {{zona}}",
+      "situations_one": "{{count}} condition",
+      "situations_other": "{{count}} conditions",
+      "rulesOk_one": "{{count}} rule clear",
+      "rulesOk_other": "{{count}} rules clear",
+      "rpm": "{{valor}} rpm"
+    }
   }
 }

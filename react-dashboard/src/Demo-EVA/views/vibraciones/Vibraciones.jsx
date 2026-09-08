@@ -35,6 +35,7 @@
  *                         que lo apagado sólo se ve si se enseña aparte.
  */
 import { Fragment, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
@@ -74,6 +75,8 @@ const fmt = (v, dec) =>
  * está tan tranquila.
  */
 function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const banda = bandaISO(datos?.vRMS, normaAplicable);
 
   return (
@@ -125,7 +128,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
       */}
       <div style={{ fontSize: 11, color: canal.sensibilidad === null ? t.amber : t.textFaint }}>
         {canal.sensibilidad === null
-          ? "Sensibilidad de esta sonda sin confirmar — sus lecturas dependen de ella."
+          ? traducir("machines:vibration.probeUnconfirmed")
           : `Sensibilidad ${canal.sensibilidad} mV/g`}
       </div>
     </article>
@@ -147,6 +150,8 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
  * en los tres canales.
  */
 function TablaVigilancias({ canales, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const color = (e) =>
     e === null ? t.textFaint
       : e.id === "ok" ? t.success
@@ -154,12 +159,12 @@ function TablaVigilancias({ canales, t }) {
           : t.coral;
 
   const simbolo = (e) =>
-    e === null ? "—" : e.id === "ok" ? "vigilado" : e.id === "apagado" ? "APAGADO" : e.label;
+    e === null ? traducir("machines:vibration.watch.none") : e.id === "ok" ? traducir("machines:vibration.watch.watched") : e.id === "apagado" ? traducir("machines:vibration.watch.off") : e.label;
 
   const grupos = [
-    ["Contra su umbral", VIGILANCIAS.filter((v) => v.grupo === "umbral")],
-    ["Forma del espectro", VIGILANCIAS.filter((v) => v.grupo === "espectro")],
-    ["Defectos de rodamiento", VIGILANCIAS.filter((v) => v.grupo === "rodamiento")],
+    [traducir("machines:vibration.watch.threshold"), VIGILANCIAS.filter((v) => v.grupo === "umbral")],
+    [traducir("machines:vibration.watch.spectrum"), VIGILANCIAS.filter((v) => v.grupo === "espectro")],
+    [traducir("machines:vibration.watch.bearing"), VIGILANCIAS.filter((v) => v.grupo === "rodamiento")],
   ];
 
   return (
@@ -233,6 +238,8 @@ function TablaVigilancias({ canales, t }) {
  * el número parezca saber más de lo que sabe.
  */
 function PanelAlarmas({ alarmas, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const hayAlgo = CONTADORES_ALARMA.some((a) => (alarmas?.[a.key] ?? 0) > 0);
 
   return (
@@ -276,8 +283,8 @@ function PanelAlarmas({ alarmas, t }) {
 
       <p style={{ margin: 0, fontSize: 11, lineHeight: 1.5, color: t.textFaint }}>
         {hayAlgo
-          ? "Estas alarmas las emite ICONICS, no esta pantalla, y mandan sobre lo que se concluya aquí. "
-          : "Sin alarmas pendientes en el área. "}
+          ? traducir("machines:vibration.alarms.fromIconics")
+          : traducir("machines:vibration.alarms.none")}
         Se leen los contadores de <code>{AREA_ALARMAS}</code>: cuál de las 57 alarmas
         configuradas es cada una no se puede saber desde aquí — hay que abrir el visor
         de ICONICS.
@@ -289,6 +296,8 @@ function PanelAlarmas({ alarmas, t }) {
 /* ── Vista ─────────────────────────────────────────────────────────── */
 
 function Vibraciones() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
@@ -311,7 +320,7 @@ function Vibraciones() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <AlertBanner
         type="info"
-        title="Otra máquina, y sin histórico"
+        title={traducir("machines:vibration.otherMachine.title")}
         message={
           "Estos sensores están en el sistema de vibraciones, que tiene su propio motor, " +
           "su propio variador y su propio PLC. No comparte nada con el tanque. " +
@@ -322,20 +331,14 @@ function Vibraciones() {
       />
 
       {error && (
-        <AlertBanner type="error" title="No se pudo leer el módulo" message={error} />
+        <AlertBanner type="error" title={traducir("errors:titles.moduleReadFailed")} message={error} />
       )}
 
       {casiTodoMudo && !loading && (
         <AlertBanner
           type="warning"
-          title="La máquina no está contestando"
-          message={
-            `${mudos} de ${totalPuntos} puntos no entregan lectura ahora mismo. ` +
-            "Cuando el variador se apaga deja de publicar la velocidad, y sin velocidad " +
-            "el módulo no puede calcular la velocidad eficaz: se pierden todos los vRMS " +
-            "y sobreviven la aceleración y el pico, que se miden sin conocer el régimen. " +
-            "Lo que se vea abajo no describe una máquina tranquila: describe una máquina callada."
-          }
+          title={traducir("machines:vibration.silent.title")}
+          message={traducir("machines:vibration.silent.message", { mudos, total: totalPuntos })}
         />
       )}
 

@@ -30,6 +30,7 @@
  * y Casos viven ahí (ver `CLAUDE.md` §4.4).
  */
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Activity, AlertTriangle, CheckCircle2, FlaskConical, MinusCircle, RefreshCw, XCircle } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
@@ -50,11 +51,11 @@ const CADENCIA_MS = 10_000;
 function aspectoDe(estado, t) {
   switch (estado) {
     case "ok":
-      return { color: t.success, fondo: t.successSoft, Icono: CheckCircle2, texto: "Funcionando" };
+      return { color: t.success, fondo: t.successSoft, Icono: CheckCircle2, clave: "ok" };
     case "simulado":
-      return { color: t.amber, fondo: t.amberSoft, Icono: FlaskConical, texto: "Simulado" };
+      return { color: t.amber, fondo: t.amberSoft, Icono: FlaskConical, clave: "simulado" };
     case "degraded":
-      return { color: t.amber, fondo: t.amberSoft, Icono: AlertTriangle, texto: "Degradado" };
+      return { color: t.amber, fondo: t.amberSoft, Icono: AlertTriangle, clave: "degraded" };
     case "no_responde":
       /*
        * Rojo, y con texto propio. «No responde» y «Con problemas» no son lo
@@ -64,11 +65,11 @@ function aspectoDe(estado, t) {
        * así que el panel daba por funcionando un llama-server caído mientras
        * el chat, en la misma pantalla, decía que no podía contactarlo.
        */
-      return { color: t.coral, fondo: t.coralSoft, Icono: XCircle, texto: "No responde" };
+      return { color: t.coral, fondo: t.coralSoft, Icono: XCircle, clave: "noResponse" };
     case "no_configurado":
-      return { color: t.textFaint, fondo: t.hover, Icono: MinusCircle, texto: "No configurado" };
+      return { color: t.textFaint, fondo: t.hover, Icono: MinusCircle, clave: "notConfigured" };
     default:
-      return { color: t.coral, fondo: t.coralSoft, Icono: AlertTriangle, texto: "Con problemas" };
+      return { color: t.coral, fondo: t.coralSoft, Icono: AlertTriangle, clave: "problems" };
   }
 }
 
@@ -84,7 +85,10 @@ function Dato({ etiqueta, valor, t }) {
 }
 
 function FilaServicio({ servicio, t, children }) {
-  const { color, fondo, Icono, texto } = aspectoDe(servicio.estado, t);
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("settings");
+  const { color, fondo, Icono, clave } = aspectoDe(servicio.estado, t);
+  const texto = traducir(`health.state.${clave}`);
 
   return (
     <div
@@ -130,9 +134,9 @@ function FilaServicio({ servicio, t, children }) {
             que no está configurado, así que se enseña con su nombre exacto. */}
         {servicio.variable && (
           <p style={{ margin: 0, fontSize: 12, color: t.textFaint }}>
-            Se activa con{" "}
-            <code style={{ fontFamily: MONO, color: t.text }}>{servicio.variable}</code> en el
-            entorno del servidor.
+            {traducir("health.enabledWith")}{" "}
+            <code style={{ fontFamily: MONO, color: t.text }}>{servicio.variable}</code>{" "}
+            {traducir("health.inServerEnv")}
           </p>
         )}
 
@@ -146,6 +150,8 @@ function FilaServicio({ servicio, t, children }) {
 
 function SaludSistema() {
   const { theme: t } = useTheme();
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["settings", "errors"]);
   const [salud, setSalud] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -179,27 +185,26 @@ function SaludSistema() {
 
   /** El estado del puente contra ICONICS, en la misma forma que los demás. */
   const puente = salud && {
-    nombre: "Puente hacia ICONICS",
+    nombre: traducir("settings:health.bridge.name"),
     estado: salud.status === "ok" ? "ok" : salud.status,
     detalle:
       salud.status === "ok"
-        ? "Se alcanza el servidor de planta y el token es válido."
+        ? traducir("settings:health.bridge.ok")
         : salud.status === "degraded"
-          ? "Se alcanza ICONICS pero NO hay token válido: las lecturas saldrán sin autenticar. " +
-            "Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario."
-          : `No se alcanza ICONICS${salud.reason ? `: ${salud.reason}` : ""}.`,
+          ? traducir("settings:health.bridge.degraded")
+          : traducir("settings:health.bridge.unreachable", { motivo: salud.reason ? `: ${salud.reason}` : "" }),
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <SectionLabel sub="Qué servicios necesita este tablero y cuáles están en pie ahora mismo.">
+      <SectionLabel sub={traducir("settings:health.sub")}>
         Salud del sistema
       </SectionLabel>
 
       {error && (
         <AlertBanner
           type="error"
-          title="El puente no contesta"
+          title={traducir("errors:titles.bridgeDown")}
           message={
             `${error}. Si esta pantalla no carga, el problema no es de una vista: es el propio ` +
             "servidor. Comprueba que el backend esté arrancado y que se le llegue por red."
@@ -208,18 +213,18 @@ function SaludSistema() {
       )}
 
       {cargando && !salud && (
-        <p style={{ fontSize: 13, color: t.textFaint }}>Consultando el estado del puente…</p>
+        <p style={{ fontSize: 13, color: t.textFaint }}>{traducir("settings:health.loading")}</p>
       )}
 
       {salud && (
         <>
           <Panel
-            title="Servicios"
+            title={traducir("settings:health.services")}
             right={
               <button
                 type="button"
                 onClick={leer}
-                aria-label="Volver a consultar"
+                aria-label={traducir("settings:health.refresh")}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -242,8 +247,8 @@ function SaludSistema() {
             {servicios.datos && (
               <FilaServicio servicio={servicios.datos} t={t}>
                 <Dato
-                  etiqueta="Escritura"
-                  valor={servicios.datos.soloLectura ? "bloqueada (solo lectura)" : "habilitada"}
+                  etiqueta={traducir("settings:health.fields.write")}
+                  valor={traducir(servicios.datos.soloLectura ? "settings:health.values.blocked" : "settings:health.values.enabled")}
                   t={t}
                 />
               </FilaServicio>
@@ -251,23 +256,23 @@ function SaludSistema() {
 
             {puente && (
               <FilaServicio servicio={puente} t={t}>
-                <Dato etiqueta="Alcanzable" valor={salud.iconicsReachable ? "sí" : "no"} t={t} />
-                <Dato etiqueta="Token" valor={salud.tokenValid ? "válido" : "no válido"} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.reachable")} valor={traducir(salud.iconicsReachable ? "settings:health.values.yes" : "settings:health.values.no")} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.token")} valor={traducir(salud.tokenValid ? "settings:health.values.valid" : "settings:health.values.invalid")} t={t} />
               </FilaServicio>
             )}
 
             {asistente && (
               <FilaServicio servicio={asistente} t={t}>
-                <Dato etiqueta="Modelo" valor={asistente.modelo} t={t} />
-                <Dato etiqueta="Pasos máx." valor={asistente.maxPasos} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.model")} valor={asistente.modelo} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.maxSteps")} valor={asistente.maxPasos} t={t} />
                 {asistente.cola && (
                   <>
                     <Dato
-                      etiqueta="Atendiendo"
-                      valor={asistente.cola.atendiendo ? "una consulta" : "nada"}
+                      etiqueta={traducir("settings:health.fields.serving")}
+                      valor={traducir(asistente.cola.atendiendo ? "settings:health.values.oneQuery" : "settings:health.values.nothing")}
                       t={t}
                     />
-                    <Dato etiqueta="En espera" valor={asistente.cola.enEspera} t={t} />
+                    <Dato etiqueta={traducir("settings:health.fields.queued")} valor={asistente.cola.enEspera} t={t} />
                   </>
                 )}
               </FilaServicio>
