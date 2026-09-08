@@ -16,11 +16,14 @@
  * compilación. Ahora hay uno solo, y salir de él depende de si el build trae
  * el interruptor: con él, un botón; sin él, la instrucción de qué tocar.
  */
+import { useTranslation } from "react-i18next";
 import { Radio } from "lucide-react";
 import { useTheme } from "@/theme";
 import { TRANSPORTES, useDataSource } from "@/lib/datasource";
 
 export function DataSourceBanner() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("layout");
   const { theme: t } = useTheme();
   const { origen, conmutable, setTransporte } = useDataSource();
 
@@ -75,7 +78,7 @@ export function DataSourceBanner() {
         </button>
       ) : (
         <code style={{ fontSize: 11, opacity: 0.85, fontFamily: "'IBM Plex Mono', monospace" }}>
-          quita VITE_ICONICS_FAKE del entorno para conectar
+          {traducir("layout:source.unsetFake")}
         </code>
       )}
     </div>

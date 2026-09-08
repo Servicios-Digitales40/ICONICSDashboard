@@ -73,7 +73,8 @@
     "notBuilt": {
       "title": "This screen has not been built yet",
       "message": "Start and stop for this machine will live here"
-    }
+    },
+    "levelNote": "The same reading the server uses to decide whether the pump may start."
   },
   "vibration": {
     "silent": {
@@ -148,7 +149,17 @@
       "rulesOk_one": "{{count}} rule clear",
       "rulesOk_other": "{{count}} rules clear",
       "rpm": "{{valor}} rpm"
-    }
+    },
+    "alarmServer": "ICONICS alarm server",
+    "alarmCounters": "The counters of <b>{{area}}</b> are read: which of the 57 configured alarms each one is cannot be known from here — the ICONICS viewer has to be opened.",
+    "watchesTitle": "What the module watches",
+    "notBuiltTitle": "Start and stop for the vibration system",
+    "seeMeasurements": "See the machine measurements",
+    "withReading": "points delivering a reading, right now",
+    "connecting": "connecting to the vibration module…",
+    "otherMachineNote": "This is <b>a different machine</b>: its own motor, its own VFD and its own PLC. And this system does not use the historian yet: what you see is the present instant, with no trends.",
+    "seeRisks": "See the risks now",
+    "nobodyWatching": "Nobody is watching the bearings"
   },
   "assetsView": {
     "title": "Assets · EVA Demo",
@@ -168,7 +179,9 @@
     "noUnit": "This point declares no unit in ICONICS, so its tag ({{tag}}) is shown instead so it can be identified. Guessing a unit would mean inventing one.",
     "column": "Signal",
     "margin": "margin",
-    "band": "band"
+    "band": "band",
+    "historianSamples": "The historian has samples",
+    "rangeGroup": "Historian time range"
   },
   "water": {
     "title": "Water system status",
@@ -196,7 +209,8 @@
     },
     "vfdMode": {
       "label": "VFD mode"
-    }
+    },
+    "idleNote": "With the system stopped, flow rate, pressure, motor load and efficiency are not checked against their band: they are marked «idle»."
   },
   "margins": {
     "title": "Margin consumed per signal",
@@ -225,5 +239,26 @@
     "tipNoData": "Pump status: no data",
     "aria": "Machine status: {{estado}}",
     "readFailed": "Could not read {{tag}}: {{error}}"
+  },
+  "compare": {
+    "title": "Compare signals",
+    "code": "up to 4 signals, on the same timeline",
+    "normalize": "Normalise to % of scale",
+    "pickTwo": "Pick at least two signals to compare.",
+    "pickRange": "Pick a time range (not «Real time») in the selector above to compare signals.",
+    "historianFailed": "The historian could not be queried. Retry in a few seconds.",
+    "querying": "Querying the historian…",
+    "notEnough": "Not enough samples in this range."
+  },
+  "detail": {
+    "title": "Detail · {{activo}}",
+    "sub": "The machine in detail: every value with its full history — real where the historian has it, from this session’s buffer where it does not",
+    "compareSub": "The four signals with a history of their own, cross-plotted — the diagnostic question only the assistant answers today"
+  },
+  "model3d": {
+    "title": "3D View · {{sistema}}",
+    "sub": "Hover an asset to see it, click it for its signals · each card sits where the instrument that measures it is",
+    "loading": "Reading signals…",
+    "provenance": "Status colours come from local thresholds; ICONICS publishes no status for <b>{{raiz}}</b>. The layout comes from a drawing of the real equipment, with dimensions taken by eye off a perspective view: it is the skid’s, not a dimensioned plan."
   }
 }

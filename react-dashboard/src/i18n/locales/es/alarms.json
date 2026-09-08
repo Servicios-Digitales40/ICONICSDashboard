@@ -7,5 +7,7 @@
     "h48": "48 horas"
   },
   "empty": "Sin eventos en esta ventana.",
-  "emptyForAsset": "Sin eventos en esta ventana para {{activo}}."
+  "emptyForAsset": "Sin eventos en esta ventana para {{activo}}.",
+  "allAssets": "Todos los activos",
+  "loading": "Consultando el historial de alarmas…"
 }

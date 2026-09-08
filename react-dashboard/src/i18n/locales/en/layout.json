@@ -13,7 +13,8 @@
   "source": {
     "aria": "Data source: {{origen}}",
     "toSimulator": "{{origen}} · click to use the simulator",
-    "toReal": "Switch back to ICONICS data"
+    "toReal": "Switch back to ICONICS data",
+    "unsetFake": "remove VITE_ICONICS_FAKE from the environment to connect"
   },
   "build": {
     "tip": "Build {{version}}"
@@ -26,5 +27,6 @@
     "expandAria": "Expand the sidebar",
     "collapseAria": "Collapse the sidebar",
     "plantRoot": "Plant: {{raiz}}"
-  }
+  },
+  "plant": "Plant"
 }

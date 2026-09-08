@@ -41,13 +41,14 @@
  * mismo, y su ausencia se explica en pantalla, no se esconde.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CheckCircle2, ChevronLeft, ClipboardCheck, Loader2, XCircle } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { obtenerDiagnostico, registrarCaso } from "@/lib/api/casosApi.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
-import { SISTEMA } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
@@ -55,15 +56,37 @@ import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgos, REGLAS as REGLAS_TANQUE } from "../../domain/riesgos.js";
 import { evaluarRiesgosVibracion, REGLAS as REGLAS_VIBRACION } from "../../domain/riesgosVibracion.js";
 
+/*
+ * Cada banda con su color. El rótulo NO está aquí: sale de
+ * `maintenance:close.band` por la propia clave, igual que la severidad de un
+ * riesgo sale de `diagnostics:severity`. Aquí se decide de qué color, no cómo
+ * se escribe.
+ */
 const BANDA_INFO = {
-  alto: { label: "ALTO", token: "coral" },
-  medio: { label: "MEDIO", token: "amber" },
-  bajo: { label: "BAJO", token: "textFaint" },
+  alto: { clave: "alto", token: "coral" },
+  medio: { clave: "medio", token: "amber" },
+  bajo: { clave: "bajo", token: "textFaint" },
 };
 
 /** "Otra causa" no es un id real de `causas.js`: es la señal de que la
  *  persona escribió una causa que el sistema no tenía transcrita. */
 const OTRA_CAUSA = "__otra__";
+
+/**
+ * El título y el subtítulo de la pantalla, que se pintaban TRES veces —sin
+ * riesgo, caso cerrado y el caso normal— con las mismas dos frases copiadas.
+ *
+ * Recibe `traducir` por prop en vez de pedir el suyo: esta pieza es de esta
+ * vista y no tiene sentido fuera, así que un hook propio sólo sería un
+ * segundo sitio donde equivocarse de namespace.
+ */
+function Cabecera({ traducir }) {
+  return (
+    <SectionLabel sub={traducir("maintenance:close.sub")}>
+      {traducir("maintenance:close.title")}
+    </SectionLabel>
+  );
+}
 
 function Rotulo({ t, children }) {
   return (
@@ -76,6 +99,9 @@ function Rotulo({ t, children }) {
 /* ── Zona superior: lo que el sistema ya sabe, hundido y no editable ──── */
 
 function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, activo, muestraSensores, diagnostico }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("maintenance");
+
   return (
     <div
       style={{
@@ -88,25 +114,25 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
       }}
     >
       <div>
-        <Rotulo t={t}>{sistemaNombre} · riesgo</Rotulo>
+        <Rotulo t={t}>{traducir("close.system.riskOf", { sistema: sistemaNombre })}</Rotulo>
         <div style={{ fontSize: 15, fontWeight: 700, color: t.text, fontFamily: SANS }}>
-          {definicion?.titulo ?? "Riesgo"}
+          {definicion?.titulo ?? traducir("close.system.risk")}
           {canalLabel && <span style={{ fontWeight: 400, color: t.textSoft }}> — {canalLabel}</span>}
         </div>
         {evidencia ? (
           <div style={{ fontSize: 13, color: t.textSoft, marginTop: 4 }}>{evidencia}</div>
         ) : (
           <div style={{ fontSize: 12.5, color: t.textFaint, marginTop: 4, fontStyle: "italic" }}>
-            {activo === false
-              ? "Este riesgo ya no aparece activo ahora mismo — probablemente porque la intervención ya lo resolvió."
-              : "Sin evidencia medida disponible."}
+            {traducir(activo === false
+              ? "close.system.noLongerActive"
+              : "close.system.noEvidence")}
           </div>
         )}
       </div>
 
       {muestraSensores && Object.keys(muestraSensores).length > 0 && (
         <div>
-          <Rotulo t={t}>Muestra de sensores</Rotulo>
+          <Rotulo t={t}>{traducir("close.system.sensorSample")}</Rotulo>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 6 }}>
             {Object.entries(muestraSensores).map(([clave, valor]) => (
               <div key={clave} style={{ fontSize: 12.5, color: t.text }}>
@@ -119,10 +145,10 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
       )}
 
       <div>
-        <Rotulo t={t}>Diagnóstico calculado</Rotulo>
+        <Rotulo t={t}>{traducir("close.system.computed")}</Rotulo>
         {diagnostico.loading && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: t.textFaint }}>
-            <Loader2 size={13} className="spin" /> Cruzando datos, manual y casos previos…
+            <Loader2 size={13} className="spin" /> {traducir("close.system.crossing")}
           </div>
         )}
         {diagnostico.error && (
@@ -130,8 +156,7 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
         )}
         {!diagnostico.loading && !diagnostico.error && diagnostico.data?.huerfano && (
           <div style={{ fontSize: 12.5, color: t.textFaint, fontStyle: "italic" }}>
-            Todavía no hay causas candidatas transcritas para este riesgo. Puedes seguir cerrando
-            el caso describiendo la causa abajo, con tus propias palabras.
+            {traducir("close.system.orphan")}
           </div>
         )}
         {!diagnostico.loading && !diagnostico.error && diagnostico.data?.causas?.length > 0 && (
@@ -146,8 +171,8 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
             {diagnostico.data.conflicto && (
               <AlertBanner
                 type="warning"
-                title="Las fuentes no coinciden"
-                message="El manual y los casos anteriores respaldan causas distintas. Revisa la evidencia de cada una antes de elegir — el sistema no ha resuelto el desacuerdo por ti."
+                title={traducir("close.system.conflict.title")}
+                message={traducir("close.system.conflict.message")}
               />
             )}
             {diagnostico.data.causas.map((c, i) => {
@@ -162,16 +187,23 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
                         color: t[banda.token], background: `${t[banda.token]}22`, flexShrink: 0,
                       }}
                     >
-                      {banda.label}
+                      {traducir(`close.band.${banda.clave}`)}
                     </span>
                     <span style={{ color: t.text }}>
                       {i === 0 && <strong>{c.titulo} </strong>}
                       {i !== 0 && c.titulo}
-                      {i === 0 && <span style={{ color: t.textFaint }}> — propuesta por el sistema</span>}
+                      {i === 0 && (
+                        <span style={{ color: t.textFaint }}>{traducir("close.system.proposed")}</span>
+                      )}
                     </span>
                     <span style={{ color: t.textFaint, marginLeft: "auto", whiteSpace: "nowrap" }}>
-                      datos {c.respaldo.datos} · manual {c.respaldo.manual} · casos {c.respaldo.casos}
-                      {typeof c.respaldo.temporal === "number" && <> · temporal {c.respaldo.temporal}</>}
+                      {traducir("close.system.backing", {
+                        datos: c.respaldo.datos,
+                        manual: c.respaldo.manual,
+                        casos: c.respaldo.casos,
+                      })}
+                      {typeof c.respaldo.temporal === "number"
+                        && traducir("close.system.backingTemporal", { temporal: c.respaldo.temporal })}
                     </span>
                   </div>
                   {/*
@@ -213,8 +245,11 @@ function ZonaPersona({
   t, causas, causaId, setCausaId, causaLibre, setCausaLibre, componenteLibre, setComponenteLibre,
   solucion, setSolucion, resuelto, setResuelto, observaciones, setObservaciones,
 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("maintenance");
+
   return (
-    <Panel title="Causa encontrada" code="lo que confirmas o corriges tú">
+    <Panel title={traducir("close.person.title")} code={traducir("close.person.code")}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {causas.map((c, i) => (
@@ -231,7 +266,9 @@ function ZonaPersona({
             >
               {c.titulo}
               {i === 0 && (
-                <span style={{ marginLeft: 8, fontSize: 11, color: t.textFaint }}>(propuesta por el sistema)</span>
+                <span style={{ marginLeft: 8, fontSize: 11, color: t.textFaint }}>
+                  {traducir("close.person.proposedTag")}
+                </span>
               )}
             </button>
           ))}
@@ -245,7 +282,7 @@ function ZonaPersona({
               fontFamily: SANS, fontSize: 13, color: t.text,
             }}
           >
-            Otra causa
+            {traducir("close.person.otherCause")}
           </button>
         </div>
 
@@ -253,34 +290,44 @@ function ZonaPersona({
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-                Causa
+                {traducir("close.person.cause")}
               </label>
-              <input value={causaLibre} onChange={(e) => setCausaLibre(e.target.value)} style={fieldStyle(t)} placeholder="Qué falló de verdad" />
+              <input
+                value={causaLibre}
+                onChange={(e) => setCausaLibre(e.target.value)}
+                style={fieldStyle(t)}
+                placeholder={traducir("close.person.causePlaceholder")}
+              />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-                Componente (opcional)
+                {traducir("close.person.component")}
               </label>
-              <input value={componenteLibre} onChange={(e) => setComponenteLibre(e.target.value)} style={fieldStyle(t)} placeholder="Ej. VF-02" />
+              <input
+                value={componenteLibre}
+                onChange={(e) => setComponenteLibre(e.target.value)}
+                style={fieldStyle(t)}
+                placeholder={traducir("close.person.componentPlaceholder")}
+              />
             </div>
           </div>
         )}
 
         <div>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-            Qué se hizo
+            {traducir("close.person.whatWasDone")}
           </label>
           <textarea
             value={solucion}
             onChange={(e) => setSolucion(e.target.value)}
             style={{ ...fieldStyle(t), minHeight: 72, resize: "vertical", fontFamily: "'Inter', sans-serif" }}
-            placeholder="Se liberó la válvula de impulsión, agarrotada."
+            placeholder={traducir("close.person.whatWasDonePlaceholder")}
           />
         </div>
 
         <div>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 8 }}>
-            Resultado
+            {traducir("close.person.result")}
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <button
@@ -295,7 +342,7 @@ function ZonaPersona({
                 color: resuelto === true ? t.success : t.textSoft,
               }}
             >
-              <CheckCircle2 size={15} /> Funcionó
+              <CheckCircle2 size={15} /> {traducir("close.person.worked")}
             </button>
             <button
               type="button"
@@ -309,26 +356,25 @@ function ZonaPersona({
                 color: resuelto === false ? t.coral : t.textSoft,
               }}
             >
-              <XCircle size={15} /> No funcionó
+              <XCircle size={15} /> {traducir("close.person.didNotWork")}
             </button>
           </div>
           {resuelto === false && (
             <p style={{ margin: "8px 0 0", fontSize: 11.5, color: t.textFaint, lineHeight: 1.5 }}>
-              No pasa nada: queda anotado igual, para que nadie repita el mismo intento sin saber
-              que ya se probó.
+              {traducir("close.person.didNotWorkNote")}
             </p>
           )}
         </div>
 
         <div>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: t.textSoft, marginBottom: 4 }}>
-            Observaciones (opcional)
+            {traducir("close.person.notes")}
           </label>
           <textarea
             value={observaciones}
             onChange={(e) => setObservaciones(e.target.value)}
             style={{ ...fieldStyle(t), minHeight: 56, resize: "vertical", fontFamily: "'Inter', sans-serif" }}
-            placeholder="Cualquier detalle que valga la pena dejar escrito."
+            placeholder={traducir("close.person.notesPlaceholder")}
           />
         </div>
       </div>
@@ -339,9 +385,21 @@ function ZonaPersona({
 /* ── La vista ──────────────────────────────────────────────────────────── */
 
 export default function CierreDiagnostico({ params, onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["maintenance", "navigation", "common", "errors"]);
+  /* El nombre de la máquina, traducido: `shared/` lo declara en español. */
+  const { sistema: nombreSistema } = useDominio();
   const { theme: t } = useTheme();
   const sistemaId = params?.sistema === "vibraciones" ? "vibraciones" : "tanque";
   const riesgoId = params?.riesgoId ?? "";
+
+  /*
+   * La ruta a la que se vuelve, y su nombre. El botón dice el nombre de la
+   * pantalla destino tal y como lo pinta el sidebar, en vez de un «Riesgos»
+   * escrito aquí que puede dejar de coincidir.
+   */
+  const rutaRiesgos = sistemaId === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
+  const nombreRiesgos = traducir(`navigation:routes.${rutaRiesgos}.nav`);
 
   // Sólo se suscribe a la máquina que corresponde: un caso de vibraciones no
   // necesita sondear el tanque mientras se rellena este formulario, y
@@ -401,7 +459,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
 
   useEffect(() => {
     if (!riesgoId) {
-      setDiagnostico({ loading: false, error: "Falta el riesgo a diagnosticar.", data: null });
+      setDiagnostico({ loading: false, error: traducir("maintenance:close.missingRisk.error"), data: null });
       return undefined;
     }
     const control = new AbortController();
@@ -413,7 +471,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
         setDiagnostico({ loading: false, error: e.message, data: null });
       });
     return () => control.abort();
-  }, [sistemaId, riesgoId]);
+  }, [sistemaId, riesgoId, traducir]);
 
   const causasCandidatas = diagnostico.data?.causas ?? [];
   const diagnosticEventId = diagnostico.data?.diagnosticEventId ?? null;
@@ -446,7 +504,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
     setErrorEnvio(null);
     try {
       const canalLabel = activo?.canalLabel || params?.canalLabel || "";
-      const titulo = `${definicion?.titulo ?? "Riesgo"}${canalLabel ? ` — ${canalLabel}` : ""}`;
+      const titulo = `${definicion?.titulo ?? traducir("maintenance:close.system.risk")}${canalLabel ? ` — ${canalLabel}` : ""}`;
       const sintoma = activo?.evidencia ? `${titulo}. ${activo.evidencia}` : titulo;
       const propuestaSistema = causasCandidatas[0] ?? null;
 
@@ -497,14 +555,18 @@ export default function CierreDiagnostico({ params, onNavigate }) {
     }
   }, [
     sistemaId, riesgoId, definicion, activo, params, causasCandidatas, diagnosticEventId, causaId, causaLibre,
-    componenteLibre, causaSeleccionada, solucion, resuelto, observaciones, muestraSensores,
+    componenteLibre, causaSeleccionada, solucion, resuelto, observaciones, muestraSensores, traducir,
   ]);
 
   if (!riesgoId) {
     return (
       <>
-        <SectionLabel sub="Confirma o corrige la causa de un riesgo ya intervenido">Cerrar diagnóstico</SectionLabel>
-        <AlertBanner type="error" title="Falta el riesgo" message="Esta pantalla se abre desde la tarjeta de un riesgo, en Riesgos." />
+        <Cabecera traducir={traducir} />
+        <AlertBanner
+          type="error"
+          title={traducir("maintenance:close.missingRisk.title")}
+          message={traducir("maintenance:close.missingRisk.message")}
+        />
       </>
     );
   }
@@ -512,14 +574,16 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   if (cerrado) {
     return (
       <>
-        <SectionLabel sub="Confirma o corrige la causa de un riesgo ya intervenido">Cerrar diagnóstico</SectionLabel>
+        <Cabecera traducir={traducir} />
         <Panel>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <CheckCircle2 size={22} color={t.success} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>Caso registrado</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>
+                {traducir("maintenance:close.done.title")}
+              </div>
               <div style={{ fontSize: 12.5, color: t.textSoft, marginTop: 2 }}>
-                Queda en la bitácora. La próxima vez que vuelva este síntoma, aparecerá.
+                {traducir("maintenance:close.done.message")}
               </div>
             </div>
           </div>
@@ -527,9 +591,9 @@ export default function CierreDiagnostico({ params, onNavigate }) {
             <Button
               variant="secondary"
               icon={<ChevronLeft size={14} />}
-              onClick={() => onNavigate?.(sistemaId === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion")}
+              onClick={() => onNavigate?.(rutaRiesgos)}
             >
-              Volver a Riesgos
+              {traducir("maintenance:close.done.back", { pantalla: nombreRiesgos })}
             </Button>
           </div>
         </Panel>
@@ -539,12 +603,12 @@ export default function CierreDiagnostico({ params, onNavigate }) {
 
   return (
     <>
-      <SectionLabel sub="Confirma o corrige la causa de un riesgo ya intervenido">Cerrar diagnóstico</SectionLabel>
+      <Cabecera traducir={traducir} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <ZonaSistema
           t={t}
-          sistemaNombre={SISTEMA[sistemaId]?.nombre ?? sistemaId}
+          sistemaNombre={nombreSistema(sistemaId)}
           definicion={definicion}
           canalLabel={activo?.canalLabel || params?.canalLabel || ""}
           evidencia={activo?.evidencia ?? null}
@@ -570,17 +634,23 @@ export default function CierreDiagnostico({ params, onNavigate }) {
           setObservaciones={setObservaciones}
         />
 
-        {errorEnvio && <AlertBanner type="error" title="No se pudo cerrar el caso" message={errorEnvio} />}
+        {errorEnvio && (
+          <AlertBanner
+            type="error"
+            title={traducir("errors:titles.caseCloseFailed")}
+            message={errorEnvio}
+          />
+        )}
 
         <div style={{ display: "flex", gap: 8 }}>
           <Button variant="primary" icon={<ClipboardCheck size={14} />} loading={enviando} disabled={!puedeEnviar} onClick={enviar}>
-            Cerrar caso
+            {traducir("maintenance:close.submit")}
           </Button>
           <Button
             variant="secondary"
-            onClick={() => onNavigate?.(sistemaId === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion")}
+            onClick={() => onNavigate?.(rutaRiesgos)}
           >
-            Cancelar
+            {traducir("common:actions.cancel")}
           </Button>
         </div>
       </div>

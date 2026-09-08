@@ -13,7 +13,8 @@
   "source": {
     "aria": "Origen de datos: {{origen}}",
     "toSimulator": "{{origen}} · pulsa para usar el simulador",
-    "toReal": "Volver a datos de ICONICS"
+    "toReal": "Volver a datos de ICONICS",
+    "unsetFake": "quita VITE_ICONICS_FAKE del entorno para conectar"
   },
   "build": {
     "tip": "Build {{version}}"
@@ -26,5 +27,6 @@
     "expandAria": "Expandir barra lateral",
     "collapseAria": "Colapsar barra lateral",
     "plantRoot": "Instalación: {{raiz}}"
-  }
+  },
+  "plant": "Instalación"
 }

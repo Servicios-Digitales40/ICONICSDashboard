@@ -7,6 +7,8 @@
  * sparkline de 24) porque aquí la gráfica es el contenido, no un adorno junto
  * al número.
  */
+import { useTranslation } from "react-i18next";
+
 import { Card, Cifra, Delta, MONO } from "../base.jsx";
 import { fmtNum } from "@/lib/format.js";
 import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
@@ -17,6 +19,8 @@ import {
 const VALOR_GRANDE = { fontFamily: MONO, fontSize: 30, fontWeight: 700, lineHeight: 1 };
 
 function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const esBooleano = senal.tipo === "booleano";
   const tieneBufer = senal.bufferVivo.length >= 2;
 
@@ -44,7 +48,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
             {congelado ? (
               <span
-                title="El puente no ha vuelto a leer este punto recientemente."
+                title={traducir("machines:signal.stale")}
                 style={{ ...VALOR_GRANDE, fontSize: 17, color: t.textFaint }}
               >
                 {textoCongelado}
@@ -73,7 +77,6 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
               t={t}
               subirEsBueno={senal.subirEsBueno}
               decimales={senal.decimales}
-              unidad={senal.unidad ? ` ${senal.unidad}` : ""}
             />
           </div>
 

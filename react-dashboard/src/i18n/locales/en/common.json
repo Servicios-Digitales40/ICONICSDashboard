@@ -28,7 +28,8 @@
     "notAvailable": "Not available",
     "provisional": "provisional",
     "derived": "derived",
-    "noChange": "no change"
+    "noChange": "no change",
+    "retryingAlone": "It retries on its own, every few seconds"
   },
   "units": {
     "percentSuffix": "%"

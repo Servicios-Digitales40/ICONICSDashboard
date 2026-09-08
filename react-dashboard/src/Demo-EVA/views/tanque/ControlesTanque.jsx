@@ -41,7 +41,7 @@ function EstadoTanque({ sistema, lastUpdated, t }) {
         </span>
       </div>
       <p style={{ margin: "8px 0 0", fontSize: 12.5, color: t.textFaint }}>
-        Mismo dato que usa el servidor para decidir si puede encender la bomba.
+        {traducir("machines:controls.levelNote")}
       </p>
       <div style={{ marginTop: 10 }}>
         <UltimaLectura fecha={lastUpdated} t={t} />

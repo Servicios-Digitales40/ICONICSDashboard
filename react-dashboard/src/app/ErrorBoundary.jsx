@@ -21,6 +21,7 @@
  * la única de la aplicación, y por este motivo.
  */
 import { Component } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle } from "lucide-react";
 
 export class ErrorBoundary extends Component {
@@ -59,6 +60,13 @@ export class ErrorBoundary extends Component {
  * de tema, la pantalla de error fallaría también y volveríamos al blanco.
  */
 function PanelDeError({ error, etiqueta }) {
+  /*
+   * El hook va en esta pieza y no en `ErrorBoundary`: aquélla es una clase
+   * —tiene que serlo, `componentDidCatch` no existe en un componente de
+   * función— y una clase no puede llamar a un hook. Partirlas en dos ya era
+   * así antes de i18n; esto sólo lo aprovecha.
+   */
+  const { t: traducir } = useTranslation("errors");
   return (
     <div
       role="alert"
@@ -71,10 +79,12 @@ function PanelDeError({ error, etiqueta }) {
     >
       <AlertTriangle size={26} color="#C2410C" />
       <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#C2410C" }}>
-        {etiqueta ? `No se pudo mostrar «${etiqueta}»` : "No se pudo mostrar esta sección"}
+        {etiqueta
+          ? traducir("errors:titles.sectionRenderFailedNamed", { seccion: etiqueta })
+          : traducir("errors:titles.sectionRenderFailed")}
       </p>
       <p style={{ margin: 0, fontSize: 12.5, opacity: 0.75, maxWidth: 420 }}>
-        El resto del tablero sigue funcionando. Cambia de vista y vuelve para reintentar.
+        {traducir("errors:hints.restOfBoardWorks")}
       </p>
       <code style={{ fontSize: 11, fontFamily: "'IBM Plex Mono', monospace", opacity: 0.6, marginTop: 4 }}>
         {String(error?.message ?? error).slice(0, 160)}

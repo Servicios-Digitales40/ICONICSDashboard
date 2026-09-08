@@ -751,8 +751,7 @@ export function EstadoSenales({ sistema, t, dark, delay = 0 }) {
 
         {sistema.enReposo && (
           <p style={{ margin: "12px 0 0", fontSize: 11, color: t.textFaint, lineHeight: 1.5 }}>
-            Con el sistema parado, el caudal, la presión, la carga del motor y la
-            eficiencia no se evalúan contra su banda: se marcan «en reposo».
+            {traducir("signalsState.idleNote")}
           </p>
         )}
       </div>

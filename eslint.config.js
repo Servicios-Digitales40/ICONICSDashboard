@@ -285,6 +285,22 @@ export default [
        * se queda fuera a proposito: este archivo no vigila estilo.
        */
       'react/jsx-uses-vars': 'error',
+      /*
+       * Y su espejo: un componente USADO en JSX que no esta definido.
+       *
+       * `no-undef` no lo ve por el mismo motivo que la de arriba — para el
+       * analizador de ambitos, un `JSXIdentifier` no es una referencia—, asi
+       * que `<Enfasis>` sin su `import` compila, pasa el lint, pasa el build,
+       * y revienta con `Enfasis is not defined` la primera vez que alguien
+       * abre esa pantalla. Comprobado el 08-09-2026: se colo exactamente asi
+       * en `Vibraciones.jsx` durante la migracion a i18n, y no lo cazo ninguna
+       * de las puertas.
+       *
+       * Es el mismo modo de fallo del `activo(...)` sin cablear de
+       * `AlarmasEva.jsx`: no se ve hasta que se pinta la vista, y las pruebas
+       * no pintan todas las vistas.
+       */
+      'react/jsx-no-undef': 'error',
     },
   },
 

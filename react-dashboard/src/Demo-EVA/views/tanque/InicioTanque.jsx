@@ -458,10 +458,10 @@ function CifraEnVivo({ sistema, loading, error, t, serieNivel }) {
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "18px 0" }}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 600, color: t.coral }}>
           <WifiOff size={17} />
-          Sin conexión con el servidor por ahora
+          {traducir("errors:titles.noServerConnection")}
         </span>
         <span style={{ fontSize: 12, color: t.textFaint }}>
-          Vuelve a intentarlo solo, cada pocos segundos
+          {traducir("common:state.retryingAlone")}
         </span>
       </div>
     );

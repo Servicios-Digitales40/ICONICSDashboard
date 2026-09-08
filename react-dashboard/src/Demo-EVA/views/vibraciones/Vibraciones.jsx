@@ -39,6 +39,7 @@ import { useTranslation } from "react-i18next";
 import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
@@ -253,7 +254,7 @@ function PanelAlarmas({ alarmas, t }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <BellRing size={16} color={t.textFaint} />
         <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
-          Servidor de alarmas de ICONICS
+          {traducir("machines:vibration.alarmServer")}
         </span>
       </div>
 
@@ -285,9 +286,7 @@ function PanelAlarmas({ alarmas, t }) {
         {hayAlgo
           ? traducir("machines:vibration.alarms.fromIconics")
           : traducir("machines:vibration.alarms.none")}
-        Se leen los contadores de <code>{AREA_ALARMAS}</code>: cuál de las 57 alarmas
-        configuradas es cada una no se puede saber desde aquí — hay que abrir el visor
-        de ICONICS.
+        <Enfasis>{traducir("machines:vibration.alarmCounters", { area: AREA_ALARMAS })}</Enfasis>
       </p>
     </div>
   );
@@ -411,7 +410,7 @@ function Vibraciones() {
 
       <PanelAlarmas alarmas={alarmas} t={t} />
 
-      <SectionLabel>Qué vigila el módulo</SectionLabel>
+      <SectionLabel>{traducir("machines:vibration.watchesTitle")}</SectionLabel>
       <TablaVigilancias canales={canales} t={t} />
 
       {/*

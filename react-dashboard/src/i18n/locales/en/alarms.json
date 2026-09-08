@@ -7,5 +7,7 @@
     "h48": "48 hours"
   },
   "empty": "No events in this window.",
-  "emptyForAsset": "No events in this window for {{activo}}."
+  "emptyForAsset": "No events in this window for {{activo}}.",
+  "allAssets": "All assets",
+  "loading": "Querying the alarm history…"
 }

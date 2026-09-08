@@ -68,7 +68,7 @@ function ControlesVibraciones({ onNavigate }) {
       >
         <Power size={40} color={t.textFaint} strokeWidth={1.25} />
         <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>
-          Encendido y apagado del sistema de vibraciones
+          {traducir("machines:vibration.notBuiltTitle")}
         </div>
 
         <button
@@ -82,7 +82,7 @@ function ControlesVibraciones({ onNavigate }) {
           }}
         >
           <Waves size={15} />
-          Ver las medidas de la máquina
+          {traducir("machines:vibration.seeMeasurements")}
         </button>
       </div>
 

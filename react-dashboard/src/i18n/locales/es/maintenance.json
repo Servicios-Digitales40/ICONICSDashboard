@@ -1,1 +1,53 @@
-{}
+{
+  "close": {
+    "title": "Cerrar diagnóstico",
+    "sub": "Confirma o corrige la causa de un riesgo ya intervenido",
+    "band": { "alto": "ALTO", "medio": "MEDIO", "bajo": "BAJO" },
+    "system": {
+      "riskOf": "{{sistema}} · riesgo",
+      "risk": "Riesgo",
+      "noLongerActive": "Este riesgo ya no aparece activo ahora mismo — probablemente porque la intervención ya lo resolvió.",
+      "noEvidence": "Sin evidencia medida disponible.",
+      "sensorSample": "Muestra de sensores",
+      "computed": "Diagnóstico calculado",
+      "crossing": "Cruzando datos, manual y casos previos…",
+      "orphan": "Todavía no hay causas candidatas transcritas para este riesgo. Puedes seguir cerrando el caso describiendo la causa abajo, con tus propias palabras.",
+      "conflict": {
+        "title": "Las fuentes no coinciden",
+        "message": "El manual y los casos anteriores respaldan causas distintas. Revisa la evidencia de cada una antes de elegir — el sistema no ha resuelto el desacuerdo por ti."
+      },
+      "proposed": " — propuesta por el sistema",
+      "backing": "datos {{datos}} · manual {{manual}} · casos {{casos}}",
+      "backingTemporal": " · temporal {{temporal}}"
+    },
+    "person": {
+      "title": "Causa encontrada",
+      "code": "lo que confirmas o corriges tú",
+      "proposedTag": "(propuesta por el sistema)",
+      "otherCause": "Otra causa",
+      "cause": "Causa",
+      "causePlaceholder": "Qué falló de verdad",
+      "component": "Componente (opcional)",
+      "componentPlaceholder": "Ej. VF-02",
+      "whatWasDone": "Qué se hizo",
+      "whatWasDonePlaceholder": "Se liberó la válvula de impulsión, agarrotada.",
+      "result": "Resultado",
+      "worked": "Funcionó",
+      "didNotWork": "No funcionó",
+      "didNotWorkNote": "No pasa nada: queda anotado igual, para que nadie repita el mismo intento sin saber que ya se probó.",
+      "notes": "Observaciones (opcional)",
+      "notesPlaceholder": "Cualquier detalle que valga la pena dejar escrito."
+    },
+    "missingRisk": {
+      "title": "Falta el riesgo",
+      "message": "Esta pantalla se abre desde la tarjeta de un riesgo, en Riesgos.",
+      "error": "Falta el riesgo a diagnosticar."
+    },
+    "done": {
+      "title": "Caso registrado",
+      "message": "Queda en la bitácora. La próxima vez que vuelva este síntoma, aparecerá.",
+      "back": "Volver a {{pantalla}}"
+    },
+    "submit": "Cerrar caso"
+  }
+}

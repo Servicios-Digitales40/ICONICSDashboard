@@ -73,7 +73,8 @@
     "notBuilt": {
       "title": "Esta vista todavía no está construida",
       "message": "Aquí vivirán el encendido y el apagado de esta máquina"
-    }
+    },
+    "levelNote": "Mismo dato que usa el servidor para decidir si puede encender la bomba."
   },
   "vibration": {
     "silent": {
@@ -148,7 +149,17 @@
       "rulesOk_one": "{{count}} regla en orden",
       "rulesOk_other": "{{count}} reglas en orden",
       "rpm": "{{valor}} rpm"
-    }
+    },
+    "alarmServer": "Servidor de alarmas de ICONICS",
+    "alarmCounters": "Se leen los contadores de <b>{{area}}</b>: cuál de las 57 alarmas configuradas es cada una no se puede saber desde aquí — hay que abrir el visor de ICONICS.",
+    "watchesTitle": "Qué vigila el módulo",
+    "notBuiltTitle": "Encendido y apagado del sistema de vibraciones",
+    "seeMeasurements": "Ver las medidas de la máquina",
+    "withReading": "puntos que entregan lectura, ahora mismo",
+    "connecting": "conectando con el módulo de vibraciones…",
+    "otherMachineNote": "Ésta es <b>otra máquina</b>: su propio motor, su propio variador y su propio PLC. Y en este sistema todavía no se usa el histórico: lo que se ve es el instante, sin tendencias.",
+    "seeRisks": "Ver los riesgos ahora",
+    "nobodyWatching": "Nadie está vigilando los rodamientos"
   },
   "assetsView": {
     "title": "Assets · Demo EVA",
@@ -168,7 +179,9 @@
     "noUnit": "Este punto no declara unidad en ICONICS, así que se muestra su tag ({{tag}}) para poder identificarlo. Poner una unidad a ojo sería inventarla.",
     "column": "Señal",
     "margin": "margen",
-    "band": "banda"
+    "band": "banda",
+    "historianSamples": "Hay muestras del historiador",
+    "rangeGroup": "Rango de tiempo del historiador"
   },
   "water": {
     "title": "Estado del sistema de agua",
@@ -196,7 +209,8 @@
     },
     "vfdMode": {
       "label": "Modo del variador"
-    }
+    },
+    "idleNote": "Con el sistema parado, el caudal, la presión, la carga del motor y la eficiencia no se evalúan contra su banda: se marcan «en reposo»."
   },
   "margins": {
     "title": "Margen consumido por señal",
@@ -225,5 +239,26 @@
     "tipNoData": "Estado de la bomba: sin dato",
     "aria": "Estado de la máquina: {{estado}}",
     "readFailed": "No se pudo leer {{tag}}: {{error}}"
+  },
+  "compare": {
+    "title": "Comparar señales",
+    "code": "hasta 4 señales, sobre la misma línea de tiempo",
+    "normalize": "Normalizar a % de escala",
+    "pickTwo": "Elige al menos dos señales para comparar.",
+    "pickRange": "Elige un rango de tiempo (no «Tiempo real») en el selector de arriba para comparar señales.",
+    "historianFailed": "No se pudo consultar el historiador. Reintenta en unos segundos.",
+    "querying": "Consultando el historiador…",
+    "notEnough": "No hay muestras suficientes en este rango."
+  },
+  "detail": {
+    "title": "Detalle · {{activo}}",
+    "sub": "La máquina en detalle: cada valor con su histórico completo — real cuando el historiador lo tiene, del búfer de esta sesión cuando no",
+    "compareSub": "Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente"
+  },
+  "model3d": {
+    "title": "Vista 3D · {{sistema}}",
+    "sub": "Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide",
+    "loading": "Leyendo señales…",
+    "provenance": "Los colores de estado salen de umbrales locales; ICONICS no publica un estado para <b>{{raiz}}</b>. La disposición sale de un dibujo del equipo real, con cotas tomadas a ojo sobre una perspectiva: es la del skid, no la de un plano acotado."
   }
 }

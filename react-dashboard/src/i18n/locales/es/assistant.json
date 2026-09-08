@@ -81,5 +81,11 @@
       "backing": "{{propuesta}} (respaldo {{respaldo}})",
       "page": "{{archivo}} p.{{pagina}}"
     }
+  },
+  "explorer": {
+    "title": "Árbol de assets",
+    "pick": "Selecciona un asset en el árbol para ver sus propiedades.",
+    "loadingTree": "cargando árbol…",
+    "emptyRoot": "No hay assets bajo esta raíz."
   }
 }

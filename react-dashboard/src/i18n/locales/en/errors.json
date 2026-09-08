@@ -10,7 +10,15 @@
     "waterSystemReadFailed": "Unable to read the water system",
     "logbookReadFailed": "Unable to read the logbook",
     "plantReadFailed": "Unable to read the plant",
-    "uploadFailed": "Upload failed"
+    "uploadFailed": "Upload failed",
+    "sectionRenderFailed": "This section could not be shown",
+    "sectionRenderFailedNamed": "«{{seccion}}» could not be shown",
+    "assetReadFailed": "Error reading the asset",
+    "treeLoadFailed": "The tree could not be loaded",
+    "pointReadFailed": "The point could not be read",
+    "productListFailed": "The products could not be listed",
+    "noServerConnection": "No connection to the server right now",
+    "noModuleConnection": "No connection to the module right now"
   },
   "codes": {
     "ERROR_CONNECTION_FAILED": "Unable to connect to the server.",
@@ -26,6 +34,7 @@
   "hints": {
     "bridgeDown": "{{detalle}}. If this screen does not load, the problem is not one view: the bridge itself is down.",
     "technicalDetail": "Technical detail: {{detalle}}",
-    "staleBelow": "{{detalle}}. What you see below may be out of date."
+    "staleBelow": "{{detalle}}. What you see below may be out of date.",
+    "restOfBoardWorks": "The rest of the dashboard keeps working. Switch views and come back to retry."
   }
 }

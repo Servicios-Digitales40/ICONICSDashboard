@@ -22,6 +22,7 @@
  * ya comparten % (nivel y eficiencia, que ni siquiera están las dos aquí).
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, MONO, PuntoEstado } from "../base.jsx";
@@ -65,6 +66,8 @@ function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
 }
 
 export function GraficaComparada({ rango, t, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const [seleccion, setSeleccion] = useState(["nivelTanque", "presionRelativa"]);
   const [normalizar, setNormalizar] = useState(false);
 
@@ -101,8 +104,8 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
   return (
     <Card
       t={t} delay={delay} tono="detalle"
-      title="Comparar señales"
-      code="hasta 4 señales, sobre la misma línea de tiempo"
+      title={traducir("machines:compare.title")}
+      code={traducir("machines:compare.code")}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
         {CLAVES_COMPARABLES.map((clave) => (
@@ -123,24 +126,24 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
             checked={normalizar}
             onChange={(e) => setNormalizar(e.target.checked)}
           />
-          Normalizar a % de escala
+          {traducir("machines:compare.normalize")}
         </label>
       </div>
 
       {seleccion.length < 2 ? (
-        <MensajeComparacion t={t}>Elige al menos dos señales para comparar.</MensajeComparacion>
+        <MensajeComparacion t={t}>{traducir("machines:compare.pickTwo")}</MensajeComparacion>
       ) : !rango ? (
         <MensajeComparacion t={t}>
-          Elige un rango de tiempo (no «Tiempo real») en el selector de arriba para comparar señales.
+          {traducir("machines:compare.pickRange")}
         </MensajeComparacion>
       ) : huboError ? (
         <MensajeComparacion t={t} color={t.coral}>
-          No se pudo consultar el historiador. Reintenta en unos segundos.
+          {traducir("machines:compare.historianFailed")}
         </MensajeComparacion>
       ) : loading && filas.length === 0 ? (
-        <MensajeComparacion t={t}>Consultando el historiador…</MensajeComparacion>
+        <MensajeComparacion t={t}>{traducir("machines:compare.querying")}</MensajeComparacion>
       ) : filas.length < 2 ? (
-        <MensajeComparacion t={t}>No hay muestras suficientes en este rango.</MensajeComparacion>
+        <MensajeComparacion t={t}>{traducir("machines:compare.notEnough")}</MensajeComparacion>
       ) : (
         <>
           {/*

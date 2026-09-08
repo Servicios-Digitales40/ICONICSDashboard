@@ -16,15 +16,17 @@
  * el elegido.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FileSpreadsheet } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
 import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
 import { useDetalleActivo } from "../../data/tanque/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/tanque/historia.js";
-import { ACTIVO_IDS, activoInfo } from "../../domain/activos.js";
+import { ACTIVO_IDS } from "../../domain/activos.js";
 import { estadoInfo } from "../../domain/estado.js";
 import { historizadas, senalInfo } from "../../domain/senales.js";
 import { useAhora } from "../../lib/useAhora.js";
@@ -115,6 +117,10 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
 }
 
 function DetalleActivo({ params, onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
+  /* El nombre del activo, traducido: `shared/` lo declara en español. */
+  const { activo: activoTexto } = useDominio();
   const { theme: t, dark } = useTheme();
   const source = useEvaSource();
 
@@ -240,10 +246,16 @@ function DetalleActivo({ params, onNavigate }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {error && <AlertBanner type="error" title="No se pudo leer el sistema de agua" message={error} />}
+      {error && (
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.waterSystemReadFailed")}
+          message={error}
+        />
+      )}
 
-      <SectionLabel sub="La máquina en detalle: cada valor con su histórico completo — real cuando el historiador lo tiene, del búfer de esta sesión cuando no">
-        Detalle · {activoInfo(activoId)?.label}
+      <SectionLabel sub={traducir("machines:detail.sub")}>
+        {traducir("machines:detail.title", { activo: activoTexto(activoId) })}
       </SectionLabel>
 
       <Tabs
@@ -312,8 +324,8 @@ function DetalleActivo({ params, onNavigate }) {
        * DOS activos (Tanque y Distribución), así que esto no es contenido
        * de la pestaña actual — es visible sin importar cuál esté abierta.
        */}
-      <SectionLabel sub="Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente">
-        Comparar señales
+      <SectionLabel sub={traducir("machines:detail.compareSub")}>
+        {traducir("machines:compare.title")}
       </SectionLabel>
       <GraficaComparada rango={enVivo ? null : rango} t={t} dark={dark} />
     </div>

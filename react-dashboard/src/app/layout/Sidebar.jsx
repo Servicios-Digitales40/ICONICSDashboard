@@ -375,7 +375,9 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text, fontFamily: "'IBM Plex Mono', monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {RAIZ_INSTALACION}
                 </div>
-                <div style={{ fontSize: 11, color: t.textFaint, marginTop: 1 }}>Instalación</div>
+                <div style={{ fontSize: 11, color: t.textFaint, marginTop: 1 }}>
+                  {traducirBarra("plant")}
+                </div>
               </div>
             )}
           </div>

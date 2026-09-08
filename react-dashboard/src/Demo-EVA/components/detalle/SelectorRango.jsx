@@ -19,6 +19,7 @@
  * esta sección (`Spark`, `GraficaBufer` en `piezas.jsx`) ya se hace así.
  */
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Calendar, ChevronLeft, ChevronRight, Radio } from "lucide-react";
 
 import { MONO } from "../base.jsx";
@@ -119,6 +120,8 @@ function useDiasConDato(claveSonda, mesVisible, hoy) {
 
 /** El calendario de dos clics: día de inicio, día de fin, confirmar o cancelar. */
 function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const hoy = inicioDelDia(new Date());
   const [mesVisible, setMesVisible] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
   const [inicio, setInicio] = useState(null);
@@ -227,7 +230,9 @@ function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
         <span style={{ width: 4, height: 4, borderRadius: 999, background: t.accent, flexShrink: 0 }} />
-        <span style={{ fontSize: 10.5, color: t.textFaint, lineHeight: 1.4 }}>Hay muestras del historiador</span>
+        <span style={{ fontSize: 10.5, color: t.textFaint, lineHeight: 1.4 }}>
+          {traducir("machines:signal.historianSamples")}
+        </span>
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 10 }}>
@@ -264,6 +269,8 @@ function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
  *                       pintar en el calendario qué días tienen muestras reales
  */
 export function SelectorRango({ activo, onPreset, onPersonalizado, t, claveSonda }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const [abierto, setAbierto] = useState(false);
   const raiz = useRef(null);
 
@@ -293,7 +300,7 @@ export function SelectorRango({ activo, onPreset, onPersonalizado, t, claveSonda
     <div ref={raiz} style={{ position: "relative", display: "inline-flex" }}>
       <div
         role="group"
-        aria-label="Rango de tiempo del historiador"
+        aria-label={traducir("machines:signal.rangeGroup")}
         style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 12, background: t.hover, border: `1px solid ${t.border}` }}
       >
         {PRESETS.map((p) => (

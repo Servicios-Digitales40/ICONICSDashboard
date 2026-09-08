@@ -146,7 +146,7 @@ export default function AlarmasEva() {
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <ChipVentana t={t} activo={activoFiltro === ""} onClick={() => setActivoFiltro("")}>
-            Todos los activos
+            {traducir("alarms:allAssets")}
           </ChipVentana>
           {ACTIVO_IDS.map((id) => (
             <ChipVentana key={id} t={t} activo={activoFiltro === id} onClick={() => setActivoFiltro(id)}>
@@ -175,7 +175,7 @@ export default function AlarmasEva() {
       {estado === HISTORIAL.SIN_CONEXION ? (
         <AlertBanner type="error" title={traducir("errors:titles.alarmHistoryFailed")} message={error} />
       ) : estado === HISTORIAL.CARGANDO ? (
-        <p style={{ fontSize: 13, color: t.textFaint }}>Consultando el historial de alarmas…</p>
+        <p style={{ fontSize: 13, color: t.textFaint }}>{traducir("alarms:loading")}</p>
       ) : estado === HISTORIAL.SIN_DATO ? (
         <p style={{ fontSize: 13, color: t.textFaint }}>
           {activoFiltro ? traducir("alarms:emptyForAsset", { activo: activo(activoFiltro, "corto") }) : traducir("alarms:empty")}

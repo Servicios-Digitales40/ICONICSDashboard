@@ -81,5 +81,11 @@
       "backing": "{{propuesta}} (backing {{respaldo}})",
       "page": "{{archivo}} p.{{pagina}}"
     }
+  },
+  "explorer": {
+    "title": "Asset tree",
+    "pick": "Select an asset in the tree to see its properties.",
+    "loadingTree": "loading tree…",
+    "emptyRoot": "No assets under this root."
   }
 }
