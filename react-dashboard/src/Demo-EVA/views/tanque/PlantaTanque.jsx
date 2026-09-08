@@ -106,7 +106,7 @@ const REJILLA = `
 
 function PlantaTanque({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation(["machines", "errors"]);
+  const { t: traducir } = useTranslation(["machines", "navigation", "errors"]);
   const { theme: t, dark } = useTheme();
   const { sistema, series, ventana, loading, error, lastUpdated } = useSistemaAgua();
   // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
@@ -173,8 +173,9 @@ function PlantaTanque({ onNavigate }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220 }} />
           <UltimaLectura fecha={lastUpdated} t={t} />
+          {/* El rótulo del botón es el nombre de la ruta a la que lleva. */}
           <Button variant="primary" icon={<LayoutGrid size={14} />} onClick={() => onNavigate?.("eva-detalle")}>
-            Detalle
+            {traducir("navigation:routes.eva-detalle.nav")}
           </Button>
         </div>
 

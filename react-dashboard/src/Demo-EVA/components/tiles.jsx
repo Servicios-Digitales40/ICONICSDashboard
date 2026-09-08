@@ -30,19 +30,23 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ChevronRight, Droplets, Info } from "lucide-react";
 
+import { useTranslation } from "react-i18next";
+
 import { ChartTooltip } from "@/components/charts/index.js";
 import { HoverTip } from "@/components/ui/index.js";
+import { Enfasis } from "@/i18n";
+import { useDominio } from "@/i18n/useDominio.js";
+import { useFormato } from "@/i18n/formato.js";
 import { hasValue } from "@shared/valores.js";
 import { SIN_DATO, fmtNum } from "@/lib/format.js";
 import { navegarConMorph, useCountUp, useMounted, usePrefersReducedMotion } from "@/lib/motion.js";
 
-import { estadoInfo } from "../domain/estado.js";
 import { UMBRALES } from "../domain/umbrales.js";
 import { FRESCURA, HISTORIAL, estadoHistorial, presentarValor } from "../data/comunes/estadoDelDato.js";
 import { fmtCifra, fmtSenal, fmtVentana, formateadorDe, pctDeEscala } from "../lib/formato.js";
 import { delta } from "../lib/modelo.js";
 import { Card, Cifra, Delta, ESCALA, MONO, PuntoEstado, Spark } from "./base.jsx";
-import { TONO, bandaColor, estadoColor, estadoTextColor } from "./paleta.js";
+import { TONO, bandaColor, estadoColor } from "./paleta.js";
 
 /* ==================================================================
  * FRANJA DE ATENCIÓN
@@ -55,6 +59,11 @@ import { TONO, bandaColor, estadoColor, estadoTextColor } from "./paleta.js";
  * que llevar, y un botón que no lleva a ningún sitio es peor que un texto.
  */
 export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { estado: estadoTexto, senal: senalTexto } = useDominio();
+  const { locale } = useFormato();
+
   if (!atencion.length) return null;
 
   const critico = atencion.some((a) => a.severidad === "critico");
@@ -71,17 +80,16 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
     >
       <AlertTriangle className={critico ? "alerta-icono" : undefined} size={16} color={tono.texto} style={{ flexShrink: 0 }} />
       <span style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
-        <span style={{ ...ESCALA.etiqueta, color: tono.texto }}>Requiere atención</span>
-        <HoverTip
-          wide
-          label="Umbral que definimos nosotros, no una alarma de ICONICS: la señal salió de su banda cómoda. No hace falta ninguna acción sobre la instalación real."
-        >
+        <span style={{ ...ESCALA.etiqueta, color: tono.texto }}>
+          {traducir("attention.title")}
+        </span>
+        <HoverTip wide label={traducir("attention.tip")}>
           <Info
             size={13}
             color={tono.texto}
             tabIndex={0}
             role="img"
-            aria-label="Qué significa este aviso"
+            aria-label={traducir("attention.tipAria")}
             style={{ cursor: "help", opacity: 0.75 }}
           />
         </HoverTip>
@@ -90,8 +98,15 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
       {atencion.map((a) => (
         <span key={a.estado} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: t.textSoft }}>
+            {/*
+              El rótulo del estado va en minúscula porque va detrás de un
+              número —«2 fuera de límite»—, y se baja con `toLocaleLowerCase`
+              del locale activo y no con `toLowerCase()`: el segundo usa las
+              reglas del navegador, no las del texto, y en turco convierte la
+              «I» en «ı». Cuesta lo mismo hacerlo bien.
+            */}
             <strong style={{ color: t.text }}>{a.senales.length}</strong>{" "}
-            {estadoInfo(a.estado).label.toLowerCase()}
+            {estadoTexto(a.estado).toLocaleLowerCase(locale)}
           </span>
           {a.senales.map((s) => (
             <span
@@ -103,7 +118,7 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
               }}
             >
               <PuntoEstado color={estadoColor(dark, a.estado)} size={6} />
-              {s.corto}
+              {senalTexto(s.key, "corto")}
             </span>
           ))}
         </span>
@@ -124,6 +139,9 @@ export function FranjaAtencion({ atencion, t, dark, delay = 0 }) {
  * su activo, donde la ausencia de serie cabe explicada en una línea.
  */
 function StatSenal({ senal, serie, t, dark, delay, ahora }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "sensors"]);
+  const { senal: senalTexto } = useDominio();
   const valores = serie?.map((p) => p.valor) ?? [];
   const color = bandaColor(t, dark, senal.banda);
 
@@ -140,13 +158,13 @@ function StatSenal({ senal, serie, t, dark, delay, ahora }) {
 
   return (
     <Card t={t} delay={delay} style={{ padding: "14px 16px 15px", gap: 0 }}>
-      <div style={{ ...ESCALA.etiqueta, color: t.textFaint }}>{senal.label}</div>
+      <div style={{ ...ESCALA.etiqueta, color: t.textFaint }}>{senalTexto(senal.key)}</div>
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
         <div>
           {congelado ? (
             <span
-              title="El puente no ha vuelto a leer este punto recientemente."
+              title={traducir("machines:signal.stale")}
               style={{ ...ESCALA.kpi, fontSize: 15, color: t.textFaint, display: "block" }}
             >
               {textoCongelado}
@@ -160,15 +178,31 @@ function StatSenal({ senal, serie, t, dark, delay, ahora }) {
             />
           )}
           <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
+            {/*
+              La unidad se pinta AQUÍ y sólo aquí. Antes viajaba además dentro
+              del delta y salía dos veces: «▼ 6.4 V V».
+            */}
             <Delta
               valor={delta(valores)}
               t={t}
               subirEsBueno={senal.subirEsBueno}
               decimales={senal.decimales}
-              unidad={senal.unidad ? ` ${senal.unidad}` : ""}
             />
-            <span style={{ fontSize: 11, color: t.textFaint }}>
-              {senal.unidad || senal.tag.toLowerCase()}
+            {/*
+              Sin unidad declarada se enseña el TAG, en mayúscula y en mono
+              para que se lea como lo que es —un identificador de ICONICS, que
+              no se traduce— y no como una unidad. Antes salía en minúscula
+              («sflujo_instantaneo») justo donde va «°C», y parecía un fallo.
+
+              El caudal y la presión no declaran unidad a propósito: el tag no
+              dice si son l/s o m³/h, y elegir una sería inventarla (§2.5). El
+              `title` lo explica en vez de dejar la duda en pantalla.
+            */}
+            <span
+              title={senal.unidad ? undefined : traducir("machines:signal.noUnit", { tag: senal.tag })}
+              style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint }}
+            >
+              {senal.unidad || senal.tag}
             </span>
           </div>
         </div>
@@ -199,10 +233,10 @@ function StatSenal({ senal, serie, t, dark, delay, ahora }) {
  * quien no distinguía verde de ámbar no tenía ninguna otra pista.
  */
 export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
+  const { estado: estadoTexto } = useDominio();
   const listo = useMounted();
   const u = UMBRALES[senal.key];
   const sinDato = !hasValue(senal.valor);
-  const info = estadoInfo(senal.banda);
 
   const pctDe = (v) => (hasValue(v) ? pctDeEscala(senal, v) : null);
   const desde = pctDe(u?.avisoMin) ?? 0;
@@ -241,7 +275,7 @@ export function BarraBanda({ senal, t, dark, delay = 0, alto = 6 }) {
           {!sinDato && (
             <span style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: "'Inter', sans-serif" }}>
               <PuntoEstado color={bandaColor(t, dark, senal.banda)} size={5} />
-              {info.corto}
+              {estadoTexto(senal.banda, "corto")}
             </span>
           )}
           <span>{senal.escala.max}</span>
@@ -277,6 +311,9 @@ export function BandaSenales({ senales, series, t, dark, ahora, base = 0 }) {
  * aritmética que no existe sería peor que no prometer ninguna.
  */
 function ArcoNivel({ senal, t, dark }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { senal: senalTexto } = useDominio();
   const montado = useMounted();
   const sinDato = !hasValue(senal.valor);
   // El arco y la cifra tardan lo mismo (900/1000 ms) y arrancan a la vez, así
@@ -299,7 +336,9 @@ function ArcoNivel({ senal, t, dark }) {
     <div style={{ position: "relative", width: W, flexShrink: 0 }}>
       <svg
         width={W} height={104} viewBox={`0 0 ${W} 104`} style={{ display: "block" }} role="img"
-        aria-label={sinDato ? "Nivel del tanque sin medición" : `Nivel del tanque ${fmtNum(senal.valor, 1)} por ciento`}
+        aria-label={sinDato
+          ? traducir("water.arcNoReading", { senal: senalTexto("nivelTanque") })
+          : traducir("water.arcReading", { senal: senalTexto("nivelTanque"), valor: fmtNum(senal.valor, 1) })}
       >
         <path d={d} fill="none" stroke={t.border} strokeWidth={sw} strokeLinecap="round" />
         <path
@@ -330,7 +369,9 @@ function ArcoNivel({ senal, t, dark }) {
           {sinDato ? SIN_DATO : v.toFixed(1)}
           {!sinDato && <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: 0, marginLeft: 2 }}>%</span>}
         </div>
-        <div style={{ ...ESCALA.etiqueta, letterSpacing: 1.3, color: t.textFaint, marginTop: 5 }}>Nivel del tanque</div>
+        <div style={{ ...ESCALA.etiqueta, letterSpacing: 1.3, color: t.textFaint, marginTop: 5 }}>
+          {senalTexto("nivelTanque")}
+        </div>
       </div>
     </div>
   );
@@ -345,6 +386,7 @@ function ArcoNivel({ senal, t, dark }) {
  * permite que este componente no tenga que saber de cuál viene cada uno.
  */
 function Medidor({ senal, serie, t, dark, delay = 0 }) {
+  const { senal: senalTexto } = useDominio();
   const sinDato = !hasValue(senal.valor);
   const col = bandaColor(t, dark, senal.banda);
   const reposo = senal.estado === "reposo";
@@ -352,7 +394,7 @@ function Medidor({ senal, serie, t, dark, delay = 0 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: t.textSoft, width: 82, flexShrink: 0 }}>
-        {senal.corto}
+        {senalTexto(senal.key, "corto")}
       </span>
 
       <div style={{ flex: 1, minWidth: 52 }}>
@@ -379,18 +421,26 @@ function Medidor({ senal, serie, t, dark, delay = 0 }) {
  *                y quien las compone es la vista.
  */
 export function HeroeNivel({ nivel, apoyos, series, historia, t, dark, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+
   return (
     <Card
       t={t} tono="titular" delay={delay}
-      title="Estado del sistema de agua"
-      code={`banda cómoda ${UMBRALES.nivelTanque.avisoMin}–${UMBRALES.nivelTanque.avisoMax} % · marcada en el arco`}
+      title={traducir("water.title")}
+      code={traducir("water.code", {
+        min: UMBRALES.nivelTanque.avisoMin,
+        max: UMBRALES.nivelTanque.avisoMax,
+      })}
     >
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, flexWrap: "wrap", flex: 1, minHeight: 0 }}>
           <ArcoNivel senal={nivel} t={t} dark={dark} />
 
           <div style={{ flex: "1 1 236px", minWidth: 216, display: "flex", flexDirection: "column", gap: 7 }}>
-            <div style={{ ...ESCALA.etiqueta, color: t.textFaint, marginBottom: 3 }}>Qué lo está moviendo</div>
+            <div style={{ ...ESCALA.etiqueta, color: t.textFaint, marginBottom: 3 }}>
+              {traducir("water.driving")}
+            </div>
             {apoyos.map((s, i) => (
               <Medidor
                 key={s.key} senal={s} serie={series[s.key]}
@@ -409,19 +459,25 @@ export function HeroeNivel({ nivel, apoyos, series, historia, t, dark, delay = 0
 }
 
 function TendenciaNivel({ datos, senal, t, dark }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { senal: senalTexto } = useDominio();
+  /* La hora del eje, con el locale del idioma: estaba fijada a `es-MX`. */
+  const { hora } = useFormato();
+
   const filas = (datos ?? []).map((p) => ({
-    hora: p.t.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+    hora: hora(p.t),
     valor: p.valor,
   }));
 
   return (
     <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}` }}>
       <div style={{ ...ESCALA.etiqueta, color: t.textFaint, marginBottom: 2 }}>
-        Nivel · últimas horas, del historiador
+        {traducir("water.levelTrend")}
       </div>
       {filas.length < 2 ? (
         <p style={{ margin: "14px 0", fontSize: 11.5, color: t.textFaint, textAlign: "center" }}>
-          El historiador aún no tiene suficientes muestras de esta señal.
+          {traducir("water.notEnoughSamples")}
         </p>
       ) : (
         <ResponsiveContainer width="100%" height={92}>
@@ -432,7 +488,7 @@ function TendenciaNivel({ datos, senal, t, dark }) {
             {/* Sin animación de trazado: la tarjeta ya entra con su fundido, y
                 animar además el dato es movimiento por el movimiento. */}
             <Area
-              type="monotone" dataKey="valor" name={senal.corto}
+              type="monotone" dataKey="valor" name={senalTexto(senal.key, "corto")}
               stroke={bandaColor(t, dark, senal.banda)} strokeWidth={2}
               fill={bandaColor(t, dark, senal.banda)} fillOpacity={0.1}
               isAnimationActive={false} dot={false}
@@ -454,7 +510,9 @@ function TendenciaNivel({ datos, senal, t, dark }) {
  * texto. El color es refuerzo, no el canal de identidad.
  */
 function FilaSenal({ senal, serieViva, t, dark, ahora }) {
-  const info = estadoInfo(senal.estado);
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { estado: estadoTexto, senal: senalTexto } = useDominio();
   const col = estadoColor(dark, senal.estado);
   const reposo = senal.estado === "reposo";
 
@@ -471,7 +529,7 @@ function FilaSenal({ senal, serieViva, t, dark, ahora }) {
 
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {senal.corto}
+          {senalTexto(senal.key, "corto")}
         </div>
         {/* El nombre del tag va SIEMPRE a la vista: varios rótulos de esta demo
             son lectura nuestra (la «tensión de línea» se llama en el servidor
@@ -487,7 +545,7 @@ function FilaSenal({ senal, serieViva, t, dark, ahora }) {
       )}
 
       <span
-        title={atenuado ? "El puente no ha vuelto a leer este punto recientemente." : undefined}
+        title={atenuado ? traducir("signal.stale") : undefined}
         style={{
           ...ESCALA.dato, fontSize: atenuado ? 11 : 13,
           color: atenuado ? t.textFaint : reposo ? t.textFaint : t.text,
@@ -498,16 +556,16 @@ function FilaSenal({ senal, serieViva, t, dark, ahora }) {
       </span>
 
       <span style={{ fontSize: 9.5, color: t.textFaint, width: 52, textAlign: "right", flexShrink: 0 }}>
-        {info.corto}
+        {estadoTexto(senal.estado, "corto")}
       </span>
     </div>
   );
 }
 
 function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay = 0 }) {
+  const { estado: estadoTexto, activo: activoTexto } = useDominio();
   const reduce = usePrefersReducedMotion();
   const col = estadoColor(dark, activo.estado);
-  const info = estadoInfo(activo.estado);
   const critico = activo.estado === "critico";
   const alerta = TONO.critico(t);
 
@@ -531,7 +589,7 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay 
       role="button"
       tabIndex={0}
       className="metric-card"
-      title={`${activo.label} · ${info.label}`}
+      title={`${activoTexto(activo.id)} · ${estadoTexto(activo.estado)}`}
       onClick={ir}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(); }
@@ -560,12 +618,18 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay 
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 2 }}>
         <PuntoEstado color={col} size={7} />
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>{activo.corto}</span>
-        <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>{info.corto}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>
+          {activoTexto(activo.id, "corto")}
+        </span>
+        <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>
+          {estadoTexto(activo.estado, "corto")}
+        </span>
         <ChevronRight className="eva-chevron" size={13} color={t.textFaint} />
       </div>
 
-      <div style={{ fontSize: 10.5, color: t.textFaint, marginBottom: 4 }}>{activo.pregunta}</div>
+      <div style={{ fontSize: 10.5, color: t.textFaint, marginBottom: 4 }}>
+        {activoTexto(activo.id, "pregunta")}
+      </div>
 
       <div style={{ borderTop: `1px solid ${t.border}` }}>
         {activo.senales.map((s) => (
@@ -577,14 +641,17 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay 
 }
 
 export function RejillaActivos({ activos, seriesVivas, ventana, t, dark, onNavigate, ahora, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+
   return (
     <Card
       t={t} tono="navegacion" delay={delay}
-      title="Activos de la instalación"
-      code={`${activos.length} activos · agrupación propia, el servidor no publica equipos`}
+      title={traducir("assetGrid.title")}
+      code={traducir("assetGrid.code", { n: activos.length })}
       right={
         <span style={{ fontSize: 10.5, color: t.textFaint }}>
-          mini-series: {fmtVentana(ventana?.ventanaS)} en esta sesión
+          {traducir("assetGrid.window", { ventana: fmtVentana(ventana?.ventanaS) })}
         </span>
       }
     >
@@ -609,19 +676,27 @@ export function RejillaActivos({ activos, seriesVivas, ventana, t, dark, onNavig
  * sistema está impulsando y quién manda sobre el variador.
  */
 export function EstadoSenales({ sistema, t, dark, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { estado: estadoTexto } = useDominio();
   const listo = useMounted();
   const { porEstado } = sistema.resumen;
   const modo = sistema.senales.modoVdf;
 
   const cajas = [
     {
-      label: "Impulsión",
-      valor: sistema.enReposo ? "En reposo" : "En marcha",
-      sub: sistema.enReposo ? "caudal y motor a cero" : "hay caudal y carga",
+      label: traducir("signalsState.pumping.label"),
+      valor: traducir(sistema.enReposo ? "signalsState.pumping.idle" : "signalsState.pumping.running"),
+      sub: traducir(sistema.enReposo ? "signalsState.pumping.idleSub" : "signalsState.pumping.runningSub"),
       tono: sistema.enReposo ? "info" : "ok",
     },
     {
-      label: "Modo del variador",
+      label: traducir("signalsState.vfdMode.label"),
+      /*
+       * `modo.texto` es lo que CONTESTA el variador («Auto», «Manual»), no un
+       * rótulo nuestro: es un valor leído de la instalación y va tal cual, como
+       * el tag de debajo.
+       */
       valor: modo.texto ?? SIN_DATO,
       sub: modo.tag,
       tono: "info",
@@ -629,12 +704,19 @@ export function EstadoSenales({ sistema, t, dark, delay = 0 }) {
   ];
 
   return (
-    <Card t={t} delay={delay} title="Estado de las señales" code={`${sistema.resumen.totalSenales} señales · ${sistema.resumen.medidas} con lectura`}>
+    <Card
+      t={t} delay={delay}
+      title={traducir("signalsState.title")}
+      code={traducir("signalsState.code", {
+        total: sistema.resumen.totalSenales,
+        medidas: sistema.resumen.medidas,
+      })}
+    >
       <div style={{ display: "flex", gap: 3, height: 14, marginBottom: 12 }}>
         {porEstado.map((e, i) => (
           <div
             key={e.estado}
-            title={`${estadoInfo(e.estado).label}: ${e.valor}`}
+            title={`${estadoTexto(e.estado)}: ${e.valor}`}
             style={{
               flexGrow: listo ? e.valor : 0, flexBasis: 0, flexShrink: 1,
               background: estadoColor(dark, e.estado), borderRadius: 4,
@@ -648,7 +730,7 @@ export function EstadoSenales({ sistema, t, dark, delay = 0 }) {
         {porEstado.map((e) => (
           <span key={e.estado} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: t.textSoft }}>
             <PuntoEstado color={estadoColor(dark, e.estado)} />
-            {estadoInfo(e.estado).corto} <strong style={{ color: t.text }}>{e.valor}</strong>
+            {estadoTexto(e.estado, "corto")} <strong style={{ color: t.text }}>{e.valor}</strong>
           </span>
         ))}
       </div>
@@ -691,13 +773,16 @@ export function EstadoSenales({ sistema, t, dark, delay = 0 }) {
  * dónde cae cada etiqueta, y las columnas de cifras son ya la vista de tabla.
  */
 export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { estado: estadoTexto } = useDominio();
   const listo = useMounted();
 
   if (!margenes.length) {
     return (
-      <Card t={t} delay={delay} title="Margen consumido por señal">
+      <Card t={t} delay={delay} title={traducir("margins.title")}>
         <p style={{ margin: "18px 0", fontSize: 12.5, color: t.textFaint, textAlign: "center" }}>
-          Sin lecturas evaluables todavía.
+          {traducir("margins.empty")}
         </p>
       </Card>
     );
@@ -707,21 +792,25 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
 
   return (
     <Card
-      t={t} delay={delay} title="Margen consumido por señal"
-      code="0 % es el centro de la banda cómoda · 100 % es tocar el límite · señales en reposo no entran"
+      t={t} delay={delay} title={traducir("margins.title")}
+      code={traducir("margins.code")}
     >
+      {/*
+        Una sola clave con la frase entera y sus dos negritas dentro, en vez de
+        tres trozos cosidos: en inglés el orden no es el mismo y coser trozos
+        obliga a que lo sea.
+      */}
       <p style={{ margin: "0 0 14px", fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>
-        <strong style={{ color: t.text }}>{lider.nombre}</strong> es la señal más
-        cerca de su límite, con{" "}
-        <strong style={{ color: estadoTextColor(t, lider.estado) }}>{fmtNum(lider.valor, 0)} %</strong>{" "}
-        del margen consumido.
+        <Enfasis>
+          {traducir("margins.lead", { senal: lider.nombre, valor: fmtNum(lider.valor, 0) })}
+        </Enfasis>
       </p>
 
       <div style={{ display: "flex", gap: 10, ...ESCALA.etiqueta, color: t.textFaint, paddingBottom: 6, borderBottom: `1px solid ${t.border}`, marginBottom: 8 }}>
-        <span style={{ width: 84, flexShrink: 0 }}>Señal</span>
+        <span style={{ width: 84, flexShrink: 0 }}>{traducir("signal.column")}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ width: 46, textAlign: "right", flexShrink: 0 }}>margen</span>
-        <span style={{ width: 58, textAlign: "right", flexShrink: 0 }}>banda</span>
+        <span style={{ width: 46, textAlign: "right", flexShrink: 0 }}>{traducir("signal.margin")}</span>
+        <span style={{ width: 58, textAlign: "right", flexShrink: 0 }}>{traducir("signal.band")}</span>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -758,7 +847,7 @@ export function MargenesConsumidos({ margenes, t, dark, delay = 0 }) {
                 {fmtNum(f.valor, 0)}
               </span>
               <span style={{ width: 58, textAlign: "right", flexShrink: 0, fontSize: 10.5, color: t.textFaint }}>
-                {estadoInfo(f.estado).corto}
+                {estadoTexto(f.estado, "corto")}
               </span>
             </div>
           );
@@ -826,6 +915,7 @@ function curvaTramo(x1, y1, x2, y2) {
  * más código para el mismo resultado.
  */
 function CapaRecorrido({ activos, t, dark, listo, delay }) {
+  const { activo: activoTexto } = useDominio();
   return (
     <svg
       viewBox={`0 0 ${RECORRIDO_ANCHO} ${RECORRIDO_ALTO}`}
@@ -878,7 +968,7 @@ function CapaRecorrido({ activos, t, dark, listo, delay }) {
               fontSize={12} fontWeight={700} fill={t.text}
               fontFamily="'Inter', sans-serif"
             >
-              {activo.corto}
+              {activoTexto(activo.id, "corto")}
             </text>
           </g>
         );
@@ -893,6 +983,11 @@ function CapaRecorrido({ activos, t, dark, listo, delay }) {
  * ya usa el resto de la vista, sin duplicar su lógica de mostrar/ocultar.
  */
 function CapaHover({ activos }) {
+  const { estado: estadoTexto, activo: activoTexto } = useDominio();
+  const { locale } = useFormato();
+  /* Minúscula del locale activo, no del navegador. Ver `FranjaAtencion`. */
+  const enMinuscula = (texto) => texto.toLocaleLowerCase(locale);
+
   const zonaNodo = (id) => ({
     left: `${(RECORRIDO_X[id] / RECORRIDO_ANCHO) * 100}%`,
     top: `${((RECORRIDO_Y[id] - RECORRIDO_ALTO_NODO / 2) / RECORRIDO_ALTO) * 100}%`,
@@ -927,7 +1022,7 @@ function CapaHover({ activos }) {
           <HoverTip
             key={tr.id}
             wide
-            label={`${origen.corto} → ${destino.corto} · ${estadoInfo(origen.estado).label.toLowerCase()}`}
+            label={`${activoTexto(origen.id, "corto")} → ${activoTexto(destino.id, "corto")} · ${enMinuscula(estadoTexto(origen.estado))}`}
             style={{ position: "absolute", ...zonaTramo(tr) }}
           >
             <span style={{ display: "block", width: "100%", height: "100%" }} />
@@ -940,7 +1035,7 @@ function CapaHover({ activos }) {
           <HoverTip
             key={id}
             wide
-            label={`${activo.label} · ${estadoInfo(activo.estado).label.toLowerCase()}`}
+            label={`${activoTexto(activo.id)} · ${enMinuscula(estadoTexto(activo.estado))}`}
             style={{ position: "absolute", ...zonaNodo(id) }}
           >
             <span style={{ display: "block", width: "100%", height: "100%" }} />
@@ -952,13 +1047,15 @@ function CapaHover({ activos }) {
 }
 
 export function RecorridoSistema({ activos, t, dark, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const listo = useMounted();
   const porId = Object.fromEntries(activos.map((a) => [a.id, a]));
 
   return (
     <Card
-      t={t} delay={delay} title="Recorrido del sistema"
-      code="Topología del proceso, no una medición de flujo físico"
+      t={t} delay={delay} title={traducir("route.title")}
+      code={traducir("route.code")}
     >
       <div style={{ width: "100%", position: "relative", overflowX: "auto" }}>
         <CapaRecorrido activos={porId} t={t} dark={dark} listo={listo} delay={delay} />
@@ -987,8 +1084,14 @@ export function RecorridoSistema({ activos, t, dark, delay = 0 }) {
  * pregunta real («¿qué se movió a la vez?»), y cada uno conserva su escala.
  */
 function PanelTendencia({ senal, datos, error, t, dark }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+  const { senal: senalTexto } = useDominio();
+  /* La hora del eje, con el locale del idioma: estaba fijada a `es-MX`. */
+  const { hora } = useFormato();
+
   const filas = (datos ?? []).map((p) => ({
-    hora: p.t.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+    hora: hora(p.t),
     valor: p.valor,
   }));
   const col = bandaColor(t, dark, senal.banda);
@@ -1002,7 +1105,7 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
     <div style={{ minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
         <span style={{ ...ESCALA.etiqueta, color: t.textFaint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {senal.corto}
+          {senalTexto(senal.key, "corto")}
         </span>
         <span style={{ ...ESCALA.dato, fontSize: 12, color: col, fontVariantNumeric: "tabular-nums" }}>
           {fmt(senal.valor)}
@@ -1011,7 +1114,7 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
 
       {filas.length < 2 ? (
         <div style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: t.textFaint, textAlign: "center", border: `1px dashed ${t.border}`, borderRadius: 8, padding: "0 10px" }}>
-          {sinConexion ? "no se pudo consultar el historiador" : "sin muestras suficientes"}
+          {traducir(sinConexion ? "trends.noHistorian" : "trends.notEnough")}
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={116}>
@@ -1020,7 +1123,7 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
             <YAxis domain={["dataMin", "dataMax"]} tick={false} axisLine={false} tickLine={false} width={40} />
             <Tooltip content={<ChartTooltip />} />
             <Area
-              type="monotone" dataKey="valor" name={senal.corto}
+              type="monotone" dataKey="valor" name={senalTexto(senal.key, "corto")}
               stroke={col} strokeWidth={1.8} fill={col} fillOpacity={0.12}
               isAnimationActive={false} dot={false}
             />
@@ -1057,33 +1160,37 @@ function PanelTendencia({ senal, datos, error, t, dark }) {
 export function TendenciaSenales({
   senales, porClave, metaPorClave, cobertura, horas, t, dark, delay = 0,
 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const incompleta = cobertura && cobertura.completa === false;
 
   return (
     <Card
       t={t} delay={delay}
-      title="Las cuatro señales con historia propia"
-      code={`últimas ${horas} h · del Data Historian`}
+      title={traducir("trends.title")}
+      code={traducir("trends.code", { horas })}
       right={
         <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: t.textSoft }}>
           {incompleta ? (
             <span
-              title={
-                `Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango ` +
-                "tienen registro en el historiador. Las curvas unen los que sí lo tienen: los " +
-                "huecos no son valores, son silencio."
-              }
+              title={traducir("trends.partial", {
+                conDato: cobertura.tramosConDato,
+                tramos: cobertura.tramos,
+              })}
               style={{
                 padding: "2px 8px", borderRadius: 20, fontSize: 10.5, fontWeight: 600,
                 background: t.amberSoft, color: t.amber,
               }}
             >
-              {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
+              {traducir("trends.segments", {
+                conDato: cobertura.tramosConDato,
+                tramos: cobertura.tramos,
+              })}
             </span>
           ) : (
             <>
               <Droplets size={13} color={t.accent} />
-              escala propia en cada panel
+              {traducir("trends.ownScale")}
             </>
           )}
         </span>

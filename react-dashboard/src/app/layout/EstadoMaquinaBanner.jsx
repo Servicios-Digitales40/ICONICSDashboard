@@ -43,6 +43,7 @@
  * encendido no cambia con la urgencia de un valor analógico, y no vale la
  * pena una segunda cadencia sólo para este punto.
  */
+import { useTranslation } from "react-i18next";
 import { Power, PowerOff, AlertTriangle } from "lucide-react";
 
 import { useTheme } from "@/theme";
@@ -69,6 +70,8 @@ function normalizar(payload) {
 }
 
 export function EstadoMaquinaBanner() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "common"]);
   const { theme: t } = useTheme();
   const { point, error, loading } = useIconicsPoint(TAG_CONTROL, 5000);
   const dato = normalizar(point);
@@ -79,10 +82,16 @@ export function EstadoMaquinaBanner() {
   // dejar al operador sin saber, y un color equivocado sería peor que nada.
   if ((loading && !dato) || error || !dato || !dato.buena) {
     return (
-      <HoverTip label={error ? `No se pudo leer ${TAG_CONTROL}: ${error}` : "Estado de la bomba: sin dato"}>
+      <HoverTip
+        label={error
+          ? traducir("machines:machineState.readFailed", { tag: TAG_CONTROL, error })
+          : traducir("machines:machineState.tipNoData")}
+      >
         <span
           role="status"
-          aria-label="Estado de la máquina: sin dato"
+          aria-label={traducir("machines:machineState.aria", {
+            estado: traducir("machines:machineState.noData"),
+          })}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "5px 11px", borderRadius: 999,
@@ -91,7 +100,7 @@ export function EstadoMaquinaBanner() {
           }}
         >
           <AlertTriangle size={12} strokeWidth={2.5} />
-          Sin dato
+          {traducir("machines:machineState.noData")}
         </span>
       </HoverTip>
     );
@@ -102,11 +111,18 @@ export function EstadoMaquinaBanner() {
   const fondo = encendida ? t.successSoft ?? `${t.success}22` : t.hover;
   const Icono = encendida ? Power : PowerOff;
 
+  /*
+   * El mismo par de palabras sirve para la pastilla, para el tooltip y para el
+   * lector de pantalla, así que se resuelve UNA vez: tres `?:` con el mismo
+   * ternario dentro eran tres sitios donde cambiar «Encendida» y olvidar uno.
+   */
+  const estado = traducir(encendida ? "machines:machineState.on" : "machines:machineState.off");
+
   return (
-    <HoverTip label={`Máquina ${encendida ? "encendida" : "apagada"} · ${TAG_CONTROL}`}>
+    <HoverTip label={traducir("machines:machineState.tip", { estado, tag: TAG_CONTROL })}>
       <span
         role="status"
-        aria-label={`Estado de la máquina: ${encendida ? "encendida" : "apagada"}`}
+        aria-label={traducir("machines:machineState.aria", { estado })}
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "5px 11px", borderRadius: 999,
@@ -115,7 +131,7 @@ export function EstadoMaquinaBanner() {
         }}
       >
         <Icono size={12} strokeWidth={2.5} />
-        {encendida ? "Encendida" : "Apagada"}
+        {estado}
       </span>
     </HoverTip>
   );

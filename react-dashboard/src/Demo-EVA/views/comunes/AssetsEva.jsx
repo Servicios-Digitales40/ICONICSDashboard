@@ -43,13 +43,13 @@ export default function AssetsEva() {
 
   return (
     <>
-      <SectionLabel sub={traducir("machines:assets.sub")}>
-        {traducir("machines:assets.title")}
+      <SectionLabel sub={traducir("machines:assetsView.sub")}>
+        {traducir("machines:assetsView.title")}
       </SectionLabel>
 
       <ExploradorAssets
         raiz={raiz}
-        titulo={enDemo ? traducir("machines:assets.demoTree") : traducir("machines:assets.fullTree")}
+        titulo={enDemo ? traducir("machines:assetsView.demoTree") : traducir("machines:assetsView.fullTree")}
         acciones={
           <button
             onClick={() => setRaiz(enDemo ? RAIZ_ASSETS : RAIZ)}
@@ -61,7 +61,7 @@ export default function AssetsEva() {
             }}
           >
             {enDemo ? <FolderTree size={13} /> : <CornerLeftUp size={13} />}
-            {enDemo ? traducir("machines:assets.seeAll") : traducir("machines:assets.backToDemo")}
+            {enDemo ? traducir("machines:assetsView.seeAll") : traducir("machines:assetsView.backToDemo")}
           </button>
         }
       />

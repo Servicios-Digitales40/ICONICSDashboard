@@ -25,6 +25,7 @@
  * error, no una decisión.
  */
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Panel } from "@/components/ui/index.js";
 import { hasValue } from "@shared/valores.js";
@@ -148,10 +149,27 @@ export function Spark({ serie, color, t, w = 78, h = 24, delay = 0 }) {
  * dirección es buena** —lo bueno es quedarse en banda—, así que pintar la
  * flecha en verde o en coral afirmaría algo falso. Con `null` el delta va en
  * tono neutro y sólo informa del movimiento.
+ *
+ * ── POR QUÉ YA NO RECIBE `unidad` ──────────────────────────────────
+ *
+ * Porque la pintaba DOS VECES. Los dos únicos consumidores —`StatSenal` en
+ * `tiles.jsx` y `DetalleGrid`— ya enseñan la unidad en un `<span>` pegado al
+ * delta, y además se la pasaban aquí: una tensión de línea se leía
+ * «▼ 6.4 V V». Se veía en pantalla y llevaba ahí desde que existen las dos
+ * piezas.
+ *
+ * El parámetro se quita en vez de dejarlo sin usar: un parámetro muerto es lo
+ * que dejó la pantalla de Salud diciendo «Funcionando» sobre servicios que no
+ * contestaban.
  */
-export function Delta({ valor, t, subirEsBueno = true, unidad = "", decimales = 1 }) {
+export function Delta({ valor, t, subirEsBueno = true, decimales = 1 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("common");
+
   if (!hasValue(valor) || Math.abs(valor) < 10 ** -decimales / 2) {
-    return <span style={{ fontSize: 11, color: t.textFaint }}>sin cambio</span>;
+    return (
+      <span style={{ fontSize: 11, color: t.textFaint }}>{traducir("state.noChange")}</span>
+    );
   }
 
   const sube = valor > 0;
@@ -163,7 +181,7 @@ export function Delta({ valor, t, subirEsBueno = true, unidad = "", decimales = 
 
   return (
     <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: MONO }}>
-      {sube ? "▲" : "▼"} {Math.abs(valor).toFixed(decimales)}{unidad}
+      {sube ? "▲" : "▼"} {Math.abs(valor).toFixed(decimales)}
     </span>
   );
 }
@@ -198,8 +216,16 @@ export function PuntoEstado({ color, size = 8 }) {
   );
 }
 
-/** Texto relativo de una fecha ("hace 4 s"), que se refresca solo. */
+/**
+ * Texto relativo de una fecha ("hace 4 s"), que se refresca solo.
+ *
+ * Los tres tramos salen del diccionario y no de `Intl.RelativeTimeFormat`, que
+ * para 40 segundos dice «hace 40 segundos» y no cabe en una pastilla de 12 px.
+ * `s` y `min` son unidades: no se traducen, igual que °C o bar.
+ */
 function useTiempoRelativo(fecha) {
+  /* `traducir` y no `t`: en los consumidores `t` es el TEMA. Ver `@/i18n`. */
+  const { t: traducir } = useTranslation("common");
   const [, marcar] = useState(0);
 
   useEffect(() => {
@@ -210,9 +236,9 @@ function useTiempoRelativo(fecha) {
 
   if (!fecha) return null;
   const segundos = Math.max(0, Math.round((Date.now() - fecha.getTime()) / 1000));
-  if (segundos < 2) return "justo ahora";
-  if (segundos < 60) return `hace ${segundos} s`;
-  return `hace ${Math.round(segundos / 60)} min`;
+  if (segundos < 2) return traducir("time.justNow");
+  if (segundos < 60) return traducir("time.secondsAgo", { n: segundos });
+  return traducir("time.minutesAgo", { n: Math.round(segundos / 60) });
 }
 
 /**
@@ -236,6 +262,8 @@ function useTiempoRelativo(fecha) {
  * quedarse en el tamaño de metadato que le basta al resto del tablero.
  */
 export function UltimaLectura({ fecha, t, grande = false }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("common");
   const texto = useTiempoRelativo(fecha);
 
   // En el hero de Inicio (`grande`) esta pastilla es la señal de confianza
@@ -258,7 +286,7 @@ export function UltimaLectura({ fecha, t, grande = false }) {
         }}
       >
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.textFaint, opacity: 0.5, flexShrink: 0 }} />
-        Conectando…
+        {traducir("time.connecting")}
       </span>
     );
   }
@@ -275,7 +303,7 @@ export function UltimaLectura({ fecha, t, grande = false }) {
           style={{ position: "absolute", inset: -3, borderRadius: "50%", border: `1.5px solid ${t.success}` }}
         />
       </span>
-      {grande ? "En vivo" : `Última lectura: ${texto}`}
+      {grande ? traducir("time.live") : traducir("time.lastReadingAt", { cuando: texto })}
       {grande && <span style={{ opacity: 0.7, fontWeight: 500 }}>· {texto}</span>}
     </>
   );

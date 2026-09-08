@@ -27,7 +27,8 @@
     "unknown": "Desconocido",
     "notAvailable": "No disponible",
     "provisional": "provisional",
-    "derived": "derivado"
+    "derived": "derivado",
+    "noChange": "sin cambio"
   },
   "units": {
     "percentSuffix": "%"
@@ -44,6 +45,12 @@
   "time": {
     "updatedAt": "Actualizado {{time}}",
     "lastReading": "Última lectura",
-    "range": "Del {{from}} al {{to}}"
+    "range": "Del {{from}} al {{to}}",
+    "live": "En vivo",
+    "connecting": "Conectando…",
+    "justNow": "justo ahora",
+    "secondsAgo": "hace {{n}} s",
+    "minutesAgo": "hace {{n}} min",
+    "lastReadingAt": "Última lectura: {{cuando}}"
   }
 }

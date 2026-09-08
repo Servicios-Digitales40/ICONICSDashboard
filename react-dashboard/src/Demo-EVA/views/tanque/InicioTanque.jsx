@@ -717,7 +717,7 @@ function ComoFunciona({ t, lastUpdated }) {
 function InicioTanque({ onNavigate }) {
   const { theme: t, dark } = useTheme();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation("dashboard");
+  const { t: traducir } = useTranslation(["dashboard", "navigation"]);
 
   const { sistema, loading, error, lastUpdated, series } = useSistemaAgua();
   // Mismo criterio que dentro de `CifraEnVivo`: sin la primera lectura, "ahora
@@ -766,14 +766,12 @@ function InicioTanque({ onNavigate }) {
             <CifraEnVivo sistema={sistema} loading={loading} error={error} t={t} serieNivel={series.nivelTanque} />
             {!error && (
               <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: 0.3, color: t.textSoft, marginTop: 8 }}>
-                {listo ? "señales con lectura, ahora mismo" : "conectando con el servidor ICONICS…"}
+                {traducir(listo ? "dashboard:home.hero.withReading" : "dashboard:home.hero.connecting")}
               </div>
             )}
 
             <p className="eva-inicio-hero__frase" style={{ color: t.textSoft }}>
-              El dato es real: cada número de este tablero viene de una lectura contra un
-              servidor ICONICS de verdad, con su calidad y su marca de tiempo. La maqueta
-              de fondo es la misma instalación, con el mismo nivel de tanque en vivo.
+              {traducir("dashboard:home.hero.promise")}
             </p>
 
             {/* CTA dual: el primario es el camino operativo —quien va a usar el
@@ -782,11 +780,21 @@ function InicioTanque({ onNavigate }) {
                 Dos preguntas distintas, así que se resuelven con dos botones y
                 no con uno solo que tenga que servir a los dos visitantes. */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {/*
+                El nombre de cada pantalla se interpola desde `navigation`, que
+                es de donde lo saca el sidebar: un botón que promete «Gráficas»
+                y un menú que dice otra cosa es un error que sólo aparece al
+                traducir. Mismo criterio que el pie de «Riesgos · Vibraciones».
+              */}
               <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => onNavigate?.("eva-planta")}>
-                Entrar a Gráficas
+                {traducir("dashboard:home.hero.enter", {
+                  pantalla: traducir("navigation:routes.eva-planta.nav"),
+                })}
               </Button>
               <Button variant="ghost" icon={<Factory size={15} />} onClick={() => onNavigate?.("eva-maqueta")}>
-                Ver la Vista 3D en vivo
+                {traducir("dashboard:home.hero.see3d", {
+                  pantalla: traducir("navigation:routes.eva-maqueta.nav"),
+                })}
               </Button>
             </div>
           </div>

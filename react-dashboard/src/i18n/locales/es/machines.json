@@ -22,12 +22,26 @@
     }
   },
   "assets": {
-    "title": "Assets · Demo EVA",
-    "sub": "Los ocho puntos de la demo, con su valor y su calidad en crudo",
-    "demoTree": "Sensores de la demo",
-    "fullTree": "Árbol completo",
-    "seeAll": "Ver todo el árbol",
-    "backToDemo": "Volver a la demo"
+    "tanque": {
+      "label": "Tanque de almacenamiento",
+      "corto": "Tanque",
+      "pregunta": "¿Hay agua, y en qué condiciones?"
+    },
+    "bombeo": {
+      "label": "Grupo de bombeo",
+      "corto": "Bombeo",
+      "pregunta": "¿Se está impulsando, y quién manda?"
+    },
+    "distribucion": {
+      "label": "Red de distribución",
+      "corto": "Distribución",
+      "pregunta": "¿Sale agua, y con qué presión?"
+    },
+    "electrico": {
+      "label": "Suministro eléctrico",
+      "corto": "Eléctrico",
+      "pregunta": "¿Con qué calidad de energía?"
+    }
   },
   "systems": {
     "tanque": "Sistema de agua industrial",
@@ -135,5 +149,81 @@
       "rulesOk_other": "{{count}} reglas en orden",
       "rpm": "{{valor}} rpm"
     }
+  },
+  "assetsView": {
+    "title": "Assets · Demo EVA",
+    "sub": "Los ocho puntos de la demo, con su valor y su calidad en crudo",
+    "demoTree": "Sensores de la demo",
+    "fullTree": "Árbol completo",
+    "seeAll": "Ver todo el árbol",
+    "backToDemo": "Volver a la demo"
+  },
+  "attention": {
+    "title": "Requiere atención",
+    "tip": "Umbral que definimos nosotros, no una alarma de ICONICS: la señal salió de su banda cómoda. No hace falta ninguna acción sobre la instalación real.",
+    "tipAria": "Qué significa este aviso"
+  },
+  "signal": {
+    "stale": "El puente no ha vuelto a leer este punto recientemente.",
+    "noUnit": "Este punto no declara unidad en ICONICS, así que se muestra su tag ({{tag}}) para poder identificarlo. Poner una unidad a ojo sería inventarla.",
+    "column": "Señal",
+    "margin": "margen",
+    "band": "banda"
+  },
+  "water": {
+    "title": "Estado del sistema de agua",
+    "code": "banda cómoda {{min}}–{{max}} % · marcada en el arco",
+    "driving": "Qué lo está moviendo",
+    "levelTrend": "Nivel · últimas horas, del historiador",
+    "notEnoughSamples": "El historiador aún no tiene suficientes muestras de esta señal.",
+    "arcNoReading": "{{senal}} sin medición",
+    "arcReading": "{{senal}} {{valor}} por ciento"
+  },
+  "assetGrid": {
+    "title": "Activos de la instalación",
+    "code": "{{n}} activos · agrupación propia, el servidor no publica equipos",
+    "window": "mini-series: {{ventana}} en esta sesión"
+  },
+  "signalsState": {
+    "title": "Estado de las señales",
+    "code": "{{total}} señales · {{medidas}} con lectura",
+    "pumping": {
+      "label": "Impulsión",
+      "idle": "En reposo",
+      "running": "En marcha",
+      "idleSub": "caudal y motor a cero",
+      "runningSub": "hay caudal y carga"
+    },
+    "vfdMode": {
+      "label": "Modo del variador"
+    }
+  },
+  "margins": {
+    "title": "Margen consumido por señal",
+    "code": "0 % es el centro de la banda cómoda · 100 % es tocar el límite · señales en reposo no entran",
+    "empty": "Sin lecturas evaluables todavía.",
+    "lead": "<b>{{senal}}</b> es la señal más cerca de su límite, con <b>{{valor}} %</b> del margen consumido."
+  },
+  "route": {
+    "title": "Recorrido del sistema",
+    "code": "Topología del proceso, no una medición de flujo físico"
+  },
+  "trends": {
+    "title": "Las cuatro señales con historia propia",
+    "code": "últimas {{horas}} h · del Data Historian",
+    "noHistorian": "no se pudo consultar el historiador",
+    "notEnough": "sin muestras suficientes",
+    "partial": "Sólo {{conDato}} de los {{tramos}} tramos del rango tienen registro en el historiador. Las curvas unen los que sí lo tienen: los huecos no son valores, son silencio.",
+    "segments": "{{conDato}}/{{tramos}} tramos con dato",
+    "ownScale": "escala propia en cada panel"
+  },
+  "machineState": {
+    "on": "Encendida",
+    "off": "Apagada",
+    "noData": "Sin dato",
+    "tip": "Máquina {{estado}} · {{tag}}",
+    "tipNoData": "Estado de la bomba: sin dato",
+    "aria": "Estado de la máquina: {{estado}}",
+    "readFailed": "No se pudo leer {{tag}}: {{error}}"
   }
 }

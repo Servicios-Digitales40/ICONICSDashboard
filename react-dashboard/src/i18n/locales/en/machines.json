@@ -22,12 +22,26 @@
     }
   },
   "assets": {
-    "title": "Assets · EVA Demo",
-    "sub": "The eight demo points, with their raw value and quality",
-    "demoTree": "Demo sensors",
-    "fullTree": "Full tree",
-    "seeAll": "Browse the whole tree",
-    "backToDemo": "Back to the demo"
+    "tanque": {
+      "label": "Storage Tank",
+      "corto": "Tank",
+      "pregunta": "Is there water, and in what condition?"
+    },
+    "bombeo": {
+      "label": "Pump Set",
+      "corto": "Pumping",
+      "pregunta": "Is it delivering, and who is in control?"
+    },
+    "distribucion": {
+      "label": "Distribution Network",
+      "corto": "Distribution",
+      "pregunta": "Is water going out, and at what pressure?"
+    },
+    "electrico": {
+      "label": "Electrical Supply",
+      "corto": "Electrical",
+      "pregunta": "At what power quality?"
+    }
   },
   "systems": {
     "tanque": "Industrial Water System",
@@ -135,5 +149,81 @@
       "rulesOk_other": "{{count}} rules clear",
       "rpm": "{{valor}} rpm"
     }
+  },
+  "assetsView": {
+    "title": "Assets · EVA Demo",
+    "sub": "The eight demo points, with their raw value and quality",
+    "demoTree": "Demo sensors",
+    "fullTree": "Full tree",
+    "seeAll": "Browse the whole tree",
+    "backToDemo": "Back to the demo"
+  },
+  "attention": {
+    "title": "Needs attention",
+    "tip": "A threshold we set ourselves, not an ICONICS alarm: the signal left its comfortable band. No action on the real plant is required.",
+    "tipAria": "What this warning means"
+  },
+  "signal": {
+    "stale": "The bridge has not read this point again recently.",
+    "noUnit": "This point declares no unit in ICONICS, so its tag ({{tag}}) is shown instead so it can be identified. Guessing a unit would mean inventing one.",
+    "column": "Signal",
+    "margin": "margin",
+    "band": "band"
+  },
+  "water": {
+    "title": "Water system status",
+    "code": "comfortable band {{min}}–{{max}} % · marked on the arc",
+    "driving": "What is driving it",
+    "levelTrend": "Level · last few hours, from the historian",
+    "notEnoughSamples": "The historian does not have enough samples of this signal yet.",
+    "arcNoReading": "{{senal}} with no reading",
+    "arcReading": "{{senal}} {{valor}} percent"
+  },
+  "assetGrid": {
+    "title": "Plant assets",
+    "code": "{{n}} assets · our own grouping, the server publishes no equipment",
+    "window": "mini-series: {{ventana}} in this session"
+  },
+  "signalsState": {
+    "title": "Signal status",
+    "code": "{{total}} signals · {{medidas}} with a reading",
+    "pumping": {
+      "label": "Delivery",
+      "idle": "Idle",
+      "running": "Running",
+      "idleSub": "flow and motor at zero",
+      "runningSub": "there is flow and load"
+    },
+    "vfdMode": {
+      "label": "VFD mode"
+    }
+  },
+  "margins": {
+    "title": "Margin consumed per signal",
+    "code": "0 % is the centre of the comfortable band · 100 % is touching the limit · idle signals are excluded",
+    "empty": "No evaluable readings yet.",
+    "lead": "<b>{{senal}}</b> is the signal closest to its limit, at <b>{{valor}} %</b> of its margin consumed."
+  },
+  "route": {
+    "title": "System route",
+    "code": "Process topology, not a physical flow measurement"
+  },
+  "trends": {
+    "title": "The four signals with a history of their own",
+    "code": "last {{horas}} h · from the Data Historian",
+    "noHistorian": "the historian could not be queried",
+    "notEnough": "not enough samples",
+    "partial": "Only {{conDato}} of the {{tramos}} segments in the range have a record in the historian. The curves join the ones that do: the gaps are not values, they are silence.",
+    "segments": "{{conDato}}/{{tramos}} segments with data",
+    "ownScale": "each panel on its own scale"
+  },
+  "machineState": {
+    "on": "Running",
+    "off": "Stopped",
+    "noData": "No data",
+    "tip": "Machine {{estado}} · {{tag}}",
+    "tipNoData": "Pump status: no data",
+    "aria": "Machine status: {{estado}}",
+    "readFailed": "Could not read {{tag}}: {{error}}"
   }
 }

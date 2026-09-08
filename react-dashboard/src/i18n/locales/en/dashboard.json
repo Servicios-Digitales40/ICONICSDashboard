@@ -1,26 +1,52 @@
 {
   "home": {
     "hero": {
-      "sparkTitle": "Tank level, last few minutes — the figure itself has no series of its own"
+      "sparkTitle": "Tank level, last few minutes — the figure itself has no series of its own",
+      "withReading": "signals with a reading, right now",
+      "connecting": "connecting to the ICONICS server…",
+      "promise": "The data is real: every number on this dashboard comes from a reading against an actual ICONICS server, with its quality and its timestamp. The model in the background is that same plant, with the same live tank level.",
+      "enter": "Go to {{pantalla}}",
+      "see3d": "See the live {{pantalla}}"
     },
     "pipeline": {
       "title": "How it works",
       "sub": "The path every number takes before it reaches this screen",
       "nodes": {
-        "sensores": { "titulo": "Sensors", "detalle": "The eight physical points under ac:TDCON/​DEMO/​SENSORES/" },
-        "plc": { "titulo": "PLC", "detalle": "Reads the sensors and exposes their values over OPC" },
-        "iconics": { "titulo": "ICONICS", "detalle": "AssetWorX + Hyper Historian, on the real plant" },
-        "backend": { "titulo": "Demo server", "detalle": "Reads ICONICS and serves the eight points over an API" },
-        "tablero": { "titulo": "This dashboard", "detalle": "Draws what the server has just read, nothing more" }
+        "sensores": {
+          "titulo": "Sensors",
+          "detalle": "The eight physical points under ac:TDCON/​DEMO/​SENSORES/"
+        },
+        "plc": {
+          "titulo": "PLC",
+          "detalle": "Reads the sensors and exposes their values over OPC"
+        },
+        "iconics": {
+          "titulo": "ICONICS",
+          "detalle": "AssetWorX + Hyper Historian, on the real plant"
+        },
+        "backend": {
+          "titulo": "Demo server",
+          "detalle": "Reads ICONICS and serves the eight points over an API"
+        },
+        "tablero": {
+          "titulo": "This dashboard",
+          "detalle": "Draws what the server has just read, nothing more"
+        }
       }
     },
     "views": {
       "title": "Four ways to look at it",
       "sub": "The same plant, through four different lenses",
       "now": "Right now",
-      "eva-planta": { "frase": "The state of all eight signals, with their history." },
-      "eva-maqueta": { "frase": "The plant in miniature — tank level is the live value." },
-      "eva-assets": { "frase": "The eight demo points, with their raw value and quality." }
+      "eva-planta": {
+        "frase": "The state of all eight signals, with their history."
+      },
+      "eva-maqueta": {
+        "frase": "The plant in miniature — tank level is the live value."
+      },
+      "eva-assets": {
+        "frase": "The eight demo points, with their raw value and quality."
+      }
     },
     "counts": {
       "outOfLimits_one": "{{count}} out of limits",
