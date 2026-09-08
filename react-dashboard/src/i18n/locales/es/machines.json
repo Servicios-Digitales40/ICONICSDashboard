@@ -1,19 +1,64 @@
 {
   "status": {
-    "critico": { "label": "Fuera de límite", "corto": "Fuera" },
-    "atencion": { "label": "En aviso", "corto": "Aviso" },
-    "sin_dato": { "label": "Sin dato", "corto": "Sin dato" },
-    "reposo": { "label": "En reposo", "corto": "Reposo" },
-    "nominal": { "label": "En banda", "corto": "En banda" }
+    "critico": {
+      "label": "Fuera de límite",
+      "corto": "Fuera"
+    },
+    "atencion": {
+      "label": "En aviso",
+      "corto": "Aviso"
+    },
+    "sin_dato": {
+      "label": "Sin dato",
+      "corto": "Sin dato"
+    },
+    "reposo": {
+      "label": "En reposo",
+      "corto": "Reposo"
+    },
+    "nominal": {
+      "label": "En banda",
+      "corto": "En banda"
+    }
   },
   "assets": {
-    "tanque": { "label": "Tanque de almacenamiento", "corto": "Tanque" },
-    "bombeo": { "label": "Grupo de bombeo", "corto": "Bombeo" },
-    "distribucion": { "label": "Red de distribución", "corto": "Distribución" },
-    "electrico": { "label": "Suministro eléctrico", "corto": "Eléctrico" }
+    "title": "Assets · Demo EVA",
+    "sub": "Los ocho puntos de la demo, con su valor y su calidad en crudo",
+    "demoTree": "Sensores de la demo",
+    "fullTree": "Árbol completo",
+    "seeAll": "Ver todo el árbol",
+    "backToDemo": "Volver a la demo"
   },
   "systems": {
     "tanque": "Sistema de agua industrial",
     "vibraciones": "Sistema de vibraciones"
+  },
+  "plant": {
+    "loading": "Leyendo el sistema de agua…",
+    "highlighted": {
+      "title": "Señales destacadas",
+      "sub": "Las cuatro señales con historia propia, con su tendencia"
+    },
+    "trends": {
+      "title": "Tendencias",
+      "sub": "Las series del historiador, cada una con su propia escala"
+    }
+  },
+  "controls": {
+    "pump": {
+      "title": "Bomba",
+      "sub": "Escribe directamente sobre ac:TDCON/DEMO/SENSORES/CONTROL, con las mismas guardas que el asistente"
+    },
+    "turnOn": "Encender bomba",
+    "turnOff": "Apagar bomba",
+    "confirmOn": "¿Confirmar encendido?",
+    "confirmOff": "¿Confirmar apagado?",
+    "hint": "Un primer clic pide confirmación; el segundo, dentro de unos segundos, ejecuta la acción.",
+    "applied": "Acción aplicada",
+    "tankLevel": "Nivel del tanque",
+    "notBuilt": {
+      "title": "Esta vista todavía no está construida",
+      "message": "Aquí vivirán el encendido y el apagado de esta máquina"
+    }
   }
 }

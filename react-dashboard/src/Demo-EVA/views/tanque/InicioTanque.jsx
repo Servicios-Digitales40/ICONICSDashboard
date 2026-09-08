@@ -57,6 +57,7 @@
  * `accent`/`accentSoft`, los tokens de marca de siempre.
  */
 import { ArrowRight, Boxes, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -389,37 +390,35 @@ const REJILLA = `
 const VISTAS = [
   {
     id: "eva-planta",
-    label: "Gráficas",
-    frase: "El estado de las ocho señales, con su histórico.",
     Icono: LayoutDashboard,
     dato: (sistema) => {
       const { fueraDeLimite, enAviso, enBanda } = sistema.resumen;
       if (!sistema.resumen.medidas) return null;
-      if (fueraDeLimite > 0) return { texto: `${fueraDeLimite} fuera de límite`, estado: "critico" };
-      if (enAviso > 0) return { texto: `${enAviso} en aviso`, estado: "atencion" };
-      return { texto: `${enBanda} en banda`, estado: "nominal" };
+      if (fueraDeLimite > 0) return { clave: "outOfLimits", valores: { count: fueraDeLimite }, estado: "critico" };
+      if (enAviso > 0) return { clave: "warning", valores: { count: enAviso }, estado: "atencion" };
+      return { clave: "inRange", valores: { count: enBanda }, estado: "nominal" };
     },
   },
   {
     id: "eva-maqueta",
-    label: "Vista 3D",
-    frase: "La instalación en miniatura — el nivel del tanque es el dato en vivo.",
     Icono: Factory,
     dato: (sistema) => {
       const s = sistema.senales.nivelTanque;
       if (!s || s.estado === "sin_dato") return null;
-      return { texto: `Nivel ${fmtSenal(s)}`, estado: s.estado };
+      return { clave: "level", valores: { valor: fmtSenal(s) }, estado: s.estado };
     },
   },
   {
     id: "eva-assets",
-    label: "Assets",
-    frase: "Los ocho puntos de la demo, con su valor y su calidad en crudo.",
     Icono: Boxes,
     dato: (sistema) => {
       const { medidas, totalSenales } = sistema.resumen;
       if (!medidas) return null;
-      return { texto: `${medidas} / ${totalSenales} con lectura`, estado: medidas === totalSenales ? "nominal" : "atencion" };
+      return {
+        clave: "withReading",
+        valores: { medidas, total: totalSenales },
+        estado: medidas === totalSenales ? "nominal" : "atencion",
+      };
     },
   },
 ];
@@ -442,6 +441,8 @@ const VISTAS = [
  * igual que antes.
  */
 function CifraEnVivo({ sistema, loading, error, t, serieNivel }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("dashboard");
   const { medidas, totalSenales } = sistema.resumen;
   const listo = !loading || medidas > 0;
 
@@ -472,7 +473,7 @@ function CifraEnVivo({ sistema, loading, error, t, serieNivel }) {
         <div
           className="eva-inicio-hero__spark"
           aria-hidden="true"
-          title="Nivel del tanque, últimos minutos — la cifra en sí no tiene serie propia"
+          title={traducir("dashboard:home.hero.sparkTitle")}
         >
           <Spark serie={serieNivel} color={t.accent} t={t} w={200} h={64} />
         </div>
@@ -554,6 +555,8 @@ function TrazoFlujo({ hayCaudal, t }) {
 }
 
 function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["dashboard", "navigation"]);
   const { Icono } = vista;
   const dato = vista.dato(sistema);
   return (
@@ -591,15 +594,15 @@ function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
           <ArrowRight size={16} />
         </span>
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: SANS }}>{vista.label}</div>
-      <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>{vista.frase}</p>
+      <div style={{ fontSize: 16, fontWeight: 700, color: t.text, fontFamily: SANS }}>{traducir(`navigation:routes.${vista.id}.nav`)}</div>
+      <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft, lineHeight: 1.5 }}>{traducir(`dashboard:home.views.${vista.id}.frase`)}</p>
 
       {dato && (
         <div className="eva-tarjeta-dato">
-          <span style={{ fontSize: 11.5, color: t.textFaint }}>Ahora mismo</span>
+          <span style={{ fontSize: 11.5, color: t.textFaint }}>{traducir("dashboard:home.views.now")}</span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: t.text, fontFamily: MONO }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: estadoColor(dark, dato.estado) }} />
-            {dato.texto}
+            {traducir(`dashboard:home.counts.${dato.clave}`, dato.valores)}
           </span>
         </div>
       )}
@@ -641,11 +644,11 @@ function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
  * REJILLA), así que la fila sigue repartiendo el ancho sola.
  */
 const NODOS_PIPELINE = [
-  { id: "sensores", Icono: Gauge, titulo: "Sensores", detalle: "Los ocho puntos físicos de ac:TDCON/​DEMO/​SENSORES/" },
-  { id: "plc", Icono: Cpu, titulo: "PLC", detalle: "Lee los sensores y expone sus valores por OPC" },
-  { id: "iconics", Icono: Server, titulo: "ICONICS", detalle: "AssetWorX + Hyper Historian, en la instalación real" },
-  { id: "backend", Icono: Radio, titulo: "Servidor de la demo", detalle: "Lee ICONICS y sirve los ocho puntos por API" },
-  { id: "tablero", Icono: Monitor, titulo: "Este tablero", detalle: "Pinta lo que el servidor acaba de leer, nada más" },
+  { id: "sensores", Icono: Gauge },
+  { id: "plc", Icono: Cpu },
+  { id: "iconics", Icono: Server },
+  { id: "backend", Icono: Radio },
+  { id: "tablero", Icono: Monitor },
 ];
 
 /**
@@ -660,6 +663,8 @@ const NODOS_PIPELINE = [
  * porque la propuesta lo pedía en genérico.
  */
 function ComoFunciona({ t, lastUpdated }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("dashboard");
   const [ref, visible] = useEnVista();
 
   return (
@@ -675,8 +680,8 @@ function ComoFunciona({ t, lastUpdated }) {
     // TODA la fila del borde inferior donde vive el botón, igual que
     // `.eva-page-shell` ya hace globalmente para cada vista.
     <section ref={ref} style={{ paddingBottom: 70 }}>
-      <SectionLabel sub="El camino que hace cada número antes de llegar a esta pantalla">
-        Cómo funciona
+      <SectionLabel sub={traducir("dashboard:home.pipeline.sub")}>
+        {traducir("dashboard:home.pipeline.title")}
       </SectionLabel>
 
       <div className={`eva-inicio-pipeline${visible ? " eva-inicio-pipeline--visible" : ""}`}>
@@ -687,8 +692,8 @@ function ComoFunciona({ t, lastUpdated }) {
                 <nodo.Icono size={19} />
               </span>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: t.text, fontFamily: SANS }}>{nodo.titulo}</div>
-                <p style={{ margin: "3px 0 0", fontSize: 11.5, color: t.textSoft, lineHeight: 1.45 }}>{nodo.detalle}</p>
+                <div style={{ fontSize: 14, fontWeight: 700, color: t.text, fontFamily: SANS }}>{traducir(`dashboard:home.pipeline.nodes.${nodo.id}.titulo`)}</div>
+                <p style={{ margin: "3px 0 0", fontSize: 11.5, color: t.textSoft, lineHeight: 1.45 }}>{traducir(`dashboard:home.pipeline.nodes.${nodo.id}.detalle`)}</p>
               </div>
             </div>
 
@@ -711,6 +716,9 @@ function ComoFunciona({ t, lastUpdated }) {
 
 function InicioTanque({ onNavigate }) {
   const { theme: t, dark } = useTheme();
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("dashboard");
+
   const { sistema, loading, error, lastUpdated, series } = useSistemaAgua();
   // Mismo criterio que dentro de `CifraEnVivo`: sin la primera lectura, "ahora
   // mismo" hablaría de un conteo que todavía no llegó. La espera se convierte
@@ -784,8 +792,8 @@ function InicioTanque({ onNavigate }) {
           </div>
         </section>
 
-        <SectionLabel sub="La misma instalación, cuatro lentes distintas">
-          Cuatro formas de verlo
+        <SectionLabel sub={traducir("dashboard:home.views.sub")}>
+          {traducir("dashboard:home.views.title")}
         </SectionLabel>
 
         <div className="eva-inicio-grid">

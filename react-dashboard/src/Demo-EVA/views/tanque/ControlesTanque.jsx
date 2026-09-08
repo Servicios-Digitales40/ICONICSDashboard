@@ -17,6 +17,7 @@
  * la otra acción) cancela la pendiente.
  */
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Power, PowerOff } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
@@ -29,9 +30,11 @@ import { UltimaLectura } from "../../components/base.jsx";
 const VENTANA_CONFIRMACION_MS = 4000;
 
 function EstadoTanque({ sistema, lastUpdated, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const senal = sistema.senales?.nivelTanque;
   return (
-    <Panel title="Nivel del tanque" code="ac:TDCON/DEMO/SENSORES/NIVEL_TANQUE">
+    <Panel title={traducir("machines:controls.tankLevel")} code="ac:TDCON/DEMO/SENSORES/NIVEL_TANQUE">
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
         <span style={{ fontSize: 34, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           {fmtSenal(senal)}
@@ -48,6 +51,8 @@ function EstadoTanque({ sistema, lastUpdated, t }) {
 }
 
 function BotonAccion({ accion, pendiente, cargando, onPedir }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const esEncender = accion === "encender";
   const confirmando = pendiente === accion;
   const otroPendiente = pendiente && pendiente !== accion;
@@ -62,16 +67,18 @@ function BotonAccion({ accion, pendiente, cargando, onPedir }) {
     >
       {confirmando
         ? esEncender
-          ? "¿Confirmar encendido?"
-          : "¿Confirmar apagado?"
+          ? traducir("machines:controls.confirmOn")
+          : traducir("machines:controls.confirmOff")
         : esEncender
-          ? "Encender bomba"
-          : "Apagar bomba"}
+          ? traducir("machines:controls.turnOn")
+          : traducir("machines:controls.turnOff")}
     </Button>
   );
 }
 
 function ControlesTanque() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t } = useTheme();
   const { sistema, lastUpdated } = useSistemaAgua();
 
@@ -117,8 +124,8 @@ function ControlesTanque() {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <EstadoTanque sistema={sistema} lastUpdated={lastUpdated} t={t} />
 
-      <SectionLabel sub="Escribe directamente sobre ac:TDCON/DEMO/SENSORES/CONTROL, con las mismas guardas que el asistente">
-        Bomba
+      <SectionLabel sub={traducir("machines:controls.pump.sub")}>
+        {traducir("machines:controls.pump.title")}
       </SectionLabel>
 
       <Panel>
@@ -127,14 +134,14 @@ function ControlesTanque() {
           <BotonAccion accion="apagar" pendiente={pendiente} cargando={cargando} onPedir={pedirConfirmacion} t={t} />
         </div>
         <p style={{ margin: "12px 0 0", fontSize: 12, color: t.textFaint }}>
-          Un primer clic pide confirmación; el segundo, dentro de unos segundos, ejecuta la acción.
+          {traducir("machines:controls.hint")}
         </p>
       </Panel>
 
       {resultado && (
         <AlertBanner
           type={resultado.ok ? "success" : "error"}
-          title={resultado.ok ? "Acción aplicada" : "No se pudo accionar la bomba"}
+          title={resultado.ok ? traducir("machines:controls.applied") : traducir("errors:titles.pumpCommandFailed")}
           message={resultado.mensaje}
         />
       )}

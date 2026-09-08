@@ -24,6 +24,7 @@
  * la vista de Planta: aquí no hay nada derivado que advertir.
  */
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CornerLeftUp, FolderTree } from "lucide-react";
 
 import { ExploradorAssets, RAIZ_ASSETS } from "@/components/assets/ExploradorAssets.jsx";
@@ -33,6 +34,8 @@ import { useTheme } from "@/theme";
 import { RAIZ } from "../../domain/senales.js";
 
 export default function AssetsEva() {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t } = useTheme();
   const [raiz, setRaiz] = useState(RAIZ);
 
@@ -40,13 +43,13 @@ export default function AssetsEva() {
 
   return (
     <>
-      <SectionLabel sub="Los ocho puntos de la demo, con su valor y su calidad en crudo">
-        Assets · Demo EVA
+      <SectionLabel sub={traducir("machines:assets.sub")}>
+        {traducir("machines:assets.title")}
       </SectionLabel>
 
       <ExploradorAssets
         raiz={raiz}
-        titulo={enDemo ? "Sensores de la demo" : "Árbol completo"}
+        titulo={enDemo ? traducir("machines:assets.demoTree") : traducir("machines:assets.fullTree")}
         acciones={
           <button
             onClick={() => setRaiz(enDemo ? RAIZ_ASSETS : RAIZ)}
@@ -58,7 +61,7 @@ export default function AssetsEva() {
             }}
           >
             {enDemo ? <FolderTree size={13} /> : <CornerLeftUp size={13} />}
-            {enDemo ? "Ver todo el árbol" : "Volver a la demo"}
+            {enDemo ? traducir("machines:assets.seeAll") : traducir("machines:assets.backToDemo")}
           </button>
         }
       />

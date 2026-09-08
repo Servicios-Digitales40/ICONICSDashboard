@@ -29,6 +29,7 @@
  *     es la diferencia entre «se apagó» y «se mandó apagar».
  */
 import { Power, Waves } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { AlertBanner } from "@/components/ui/index.js";
 import { useTheme } from "@/theme";
@@ -44,15 +45,17 @@ import { useTheme } from "@/theme";
  */
 
 function ControlesVibraciones({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t } = useTheme();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <AlertBanner
         type="warning"
-        title="Esta vista todavía no está construida"
+        title={traducir("machines:controls.notBuilt.title")}
         message={
-          "Aquí vivirán el encendido y el apagado de esta máquina"
+          traducir("machines:controls.notBuilt.message")
         }
       />
 

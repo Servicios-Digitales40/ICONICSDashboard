@@ -20,6 +20,7 @@
  *   7. Tendencias   · las cuatro series del historiador, con escala propia
  */
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { LayoutGrid } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
@@ -104,6 +105,8 @@ const REJILLA = `
  */
 
 function PlantaTanque({ onNavigate }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t, dark } = useTheme();
   const { sistema, series, ventana, loading, error, lastUpdated } = useSistemaAgua();
   // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
@@ -155,7 +158,7 @@ function PlantaTanque({ onNavigate }) {
   );
 
   if (loading && !sistema.resumen.medidas) {
-    return <p style={{ fontSize: 13, opacity: 0.7 }}>Leyendo el sistema de agua…</p>;
+    return <p style={{ fontSize: 13, opacity: 0.7 }}>{traducir("machines:plant.loading")}</p>;
   }
 
   return (
@@ -164,7 +167,7 @@ function PlantaTanque({ onNavigate }) {
 
       <div className="eva-page">
         {error && (
-          <AlertBanner type="error" title="No se pudo leer el sistema de agua" message={error} />
+          <AlertBanner type="error" title={traducir("errors:titles.waterSystemReadFailed")} message={error} />
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
@@ -179,8 +182,8 @@ function PlantaTanque({ onNavigate }) {
         <FranjaAtencion atencion={m.atencion} t={t} dark={dark} delay={0} />
 
         {/* 2 · Las cuatro señales con serie propia, cada una con su tendencia. */}
-        <SectionLabel sub="Las cuatro señales con historia propia, con su tendencia">
-          Señales destacadas
+        <SectionLabel sub={traducir("machines:plant.highlighted.sub")}>
+          {traducir("machines:plant.highlighted.title")}
         </SectionLabel>
         <div className="eva-band">
           <BandaSenales senales={m.destacadas} series={porClave} t={t} dark={dark} ahora={ahora} base={0.05} />
@@ -220,8 +223,8 @@ function PlantaTanque({ onNavigate }) {
         </div>
 
         {/* 6 · Cierre: las cuatro series del historiador, con escala propia. */}
-        <SectionLabel sub="Las series del historiador, cada una con su propia escala">
-          Tendencias
+        <SectionLabel sub={traducir("machines:plant.trends.sub")}>
+          {traducir("machines:plant.trends.title")}
         </SectionLabel>
         <div className="eva-band">
           <div className="eva-full">

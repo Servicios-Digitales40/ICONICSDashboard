@@ -1,1 +1,36 @@
-{}
+{
+  "home": {
+    "hero": {
+      "sparkTitle": "Nivel del tanque, últimos minutos — la cifra en sí no tiene serie propia"
+    },
+    "pipeline": {
+      "title": "Cómo funciona",
+      "sub": "El camino que hace cada número antes de llegar a esta pantalla",
+      "nodes": {
+        "sensores": { "titulo": "Sensores", "detalle": "Los ocho puntos físicos de ac:TDCON/​DEMO/​SENSORES/" },
+        "plc": { "titulo": "PLC", "detalle": "Lee los sensores y expone sus valores por OPC" },
+        "iconics": { "titulo": "ICONICS", "detalle": "AssetWorX + Hyper Historian, en la instalación real" },
+        "backend": { "titulo": "Servidor de la demo", "detalle": "Lee ICONICS y sirve los ocho puntos por API" },
+        "tablero": { "titulo": "Este tablero", "detalle": "Pinta lo que el servidor acaba de leer, nada más" }
+      }
+    },
+    "views": {
+      "title": "Cuatro formas de verlo",
+      "sub": "La misma instalación, cuatro lentes distintas",
+      "now": "Ahora mismo",
+      "eva-planta": { "frase": "El estado de las ocho señales, con su histórico." },
+      "eva-maqueta": { "frase": "La instalación en miniatura — el nivel del tanque es el dato en vivo." },
+      "eva-assets": { "frase": "Los ocho puntos de la demo, con su valor y su calidad en crudo." }
+    },
+    "counts": {
+      "outOfLimits_one": "{{count}} fuera de límite",
+      "outOfLimits_other": "{{count}} fuera de límite",
+      "warning_one": "{{count}} en aviso",
+      "warning_other": "{{count}} en aviso",
+      "inRange_one": "{{count}} en banda",
+      "inRange_other": "{{count}} en banda",
+      "withReading": "{{medidas}} / {{total}} con lectura",
+      "level": "Nivel {{valor}}"
+    }
+  }
+}

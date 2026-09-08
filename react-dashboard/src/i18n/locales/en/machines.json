@@ -1,19 +1,64 @@
 {
   "status": {
-    "critico": { "label": "Out of Limits", "corto": "Out" },
-    "atencion": { "label": "Warning", "corto": "Warning" },
-    "sin_dato": { "label": "No Data", "corto": "No Data" },
-    "reposo": { "label": "Idle", "corto": "Idle" },
-    "nominal": { "label": "In Range", "corto": "In Range" }
+    "critico": {
+      "label": "Out of Limits",
+      "corto": "Out"
+    },
+    "atencion": {
+      "label": "Warning",
+      "corto": "Warning"
+    },
+    "sin_dato": {
+      "label": "No Data",
+      "corto": "No Data"
+    },
+    "reposo": {
+      "label": "Idle",
+      "corto": "Idle"
+    },
+    "nominal": {
+      "label": "In Range",
+      "corto": "In Range"
+    }
   },
   "assets": {
-    "tanque": { "label": "Storage Tank", "corto": "Tank" },
-    "bombeo": { "label": "Pump Set", "corto": "Pumping" },
-    "distribucion": { "label": "Distribution Network", "corto": "Distribution" },
-    "electrico": { "label": "Electrical Supply", "corto": "Electrical" }
+    "title": "Assets · EVA Demo",
+    "sub": "The eight demo points, with their raw value and quality",
+    "demoTree": "Demo sensors",
+    "fullTree": "Full tree",
+    "seeAll": "Browse the whole tree",
+    "backToDemo": "Back to the demo"
   },
   "systems": {
     "tanque": "Industrial Water System",
     "vibraciones": "Vibration System"
+  },
+  "plant": {
+    "loading": "Reading the water system…",
+    "highlighted": {
+      "title": "Key Signals",
+      "sub": "The four signals with a history of their own, and their trend"
+    },
+    "trends": {
+      "title": "Trends",
+      "sub": "The historian series, each on its own scale"
+    }
+  },
+  "controls": {
+    "pump": {
+      "title": "Pump",
+      "sub": "Writes straight to ac:TDCON/DEMO/SENSORES/CONTROL, with the same guards as the assistant"
+    },
+    "turnOn": "Start pump",
+    "turnOff": "Stop pump",
+    "confirmOn": "Confirm start?",
+    "confirmOff": "Confirm stop?",
+    "hint": "The first click asks for confirmation; the second, within a few seconds, runs the command.",
+    "applied": "Command applied",
+    "tankLevel": "Tank Level",
+    "notBuilt": {
+      "title": "This screen has not been built yet",
+      "message": "Start and stop for this machine will live here"
+    }
   }
 }

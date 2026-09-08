@@ -1,1 +1,36 @@
-{}
+{
+  "home": {
+    "hero": {
+      "sparkTitle": "Tank level, last few minutes — the figure itself has no series of its own"
+    },
+    "pipeline": {
+      "title": "How it works",
+      "sub": "The path every number takes before it reaches this screen",
+      "nodes": {
+        "sensores": { "titulo": "Sensors", "detalle": "The eight physical points under ac:TDCON/​DEMO/​SENSORES/" },
+        "plc": { "titulo": "PLC", "detalle": "Reads the sensors and exposes their values over OPC" },
+        "iconics": { "titulo": "ICONICS", "detalle": "AssetWorX + Hyper Historian, on the real plant" },
+        "backend": { "titulo": "Demo server", "detalle": "Reads ICONICS and serves the eight points over an API" },
+        "tablero": { "titulo": "This dashboard", "detalle": "Draws what the server has just read, nothing more" }
+      }
+    },
+    "views": {
+      "title": "Four ways to look at it",
+      "sub": "The same plant, through four different lenses",
+      "now": "Right now",
+      "eva-planta": { "frase": "The state of all eight signals, with their history." },
+      "eva-maqueta": { "frase": "The plant in miniature — tank level is the live value." },
+      "eva-assets": { "frase": "The eight demo points, with their raw value and quality." }
+    },
+    "counts": {
+      "outOfLimits_one": "{{count}} out of limits",
+      "outOfLimits_other": "{{count}} out of limits",
+      "warning_one": "{{count}} in warning",
+      "warning_other": "{{count}} in warning",
+      "inRange_one": "{{count}} in range",
+      "inRange_other": "{{count}} in range",
+      "withReading": "{{medidas}} / {{total}} reading",
+      "level": "Level {{valor}}"
+    }
+  }
+}
