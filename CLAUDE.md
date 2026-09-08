@@ -265,6 +265,19 @@ npm run verificar  # la tanda completa de verificar-* que corre sin red
 > verificador nuevo entra en la tanda por existir, y lo único enumerado es lo
 > que se excluye, con su motivo.
 
+**La versión de Node se declara en `.nvmrc` (hoy `24`), y en un solo sitio.**
+CI la lee con `node-version-file`; los tres `package.json` la repiten como
+`engines` para que instalar con otra mayor avise en el momento.
+
+No es ceremonia: el 07-09-2026 CI se cayó por esto sin que nadie tocara CI. Un
+`npm uninstall` desde una máquina con npm 11 reescribió
+`react-dashboard/package-lock.json` con el árbol que npm 11 considera correcto,
+y el CI de entonces —Node 22, o sea npm 10— calculó otro y se negó a instalar
+(«Missing: @esbuild/…@0.28.2 from lock file»). **Un lockfile lo escribe una
+versión de npm y lo consume otra**, y `npm ci` hace bien en no improvisar. Si
+alguna vez hay que cambiar de Node, se cambia `.nvmrc` y se regeneran los tres
+locks **con esa versión**, no con la que tenga a mano quien lo haga.
+
 **Frontend** (`react-dashboard/`):
 ```bash
 npm test              # vitest — dominio, componentes, hooks

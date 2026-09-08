@@ -18,12 +18,42 @@
 # saber si fue un tipo mal escrito o una regla de riesgo. Cuatro trabajos
 # contestan «falló el linter» sin abrir nada, y además corren a la vez.
 #
+# ── LA VERSIÓN DE NODE SE DECLARA EN `.nvmrc`, NO AQUÍ ────────────────
+#
+# Aquí ponía `node-version: '22'` escrito a mano en los cuatro trabajos, y la
+# máquina de desarrollo corría Node 24. Eso reventó CI el 07-09-2026, y el
+# modo de fallo merece quedar escrito porque no se ve venir:
+#
+# Un `npm uninstall` en la máquina de desarrollo (npm 11) reescribió
+# `react-dashboard/package-lock.json` con el árbol que npm 11 considera
+# correcto — quitando, entre otras cosas, las entradas anidadas de
+# `vitest/node_modules/@esbuild/*`. npm 10 (el que trae Node 22) calcula un
+# árbol distinto, así que al leer ese lockfile se negó:
+#
+#     npm error Missing: @esbuild/win32-x64@0.28.2 from lock file
+#
+# Nadie tocó nada de CI. Simplemente el lockfile lo ESCRIBE una versión de npm
+# y lo CONSUME otra, y `npm ci` —cuyo trabajo es justamente no improvisar— hace
+# lo correcto y falla. Los otros tres trabajos pasaron porque sus árboles son
+# lo bastante simples como para que las dos versiones coincidan: no es que
+# estuvieran a salvo, es que tuvieron suerte.
+#
+# Por eso el número vive en `.nvmrc` y estos cuatro trabajos lo LEEN. Uno solo
+# que se quede rezagado reproduce el fallo entero, y con el número repetido
+# cuatro veces eso es cuestión de tiempo. Los tres `package.json` declaran
+# además `engines`, para que instalar con otra mayor avise en el momento en vez
+# de dejar el aviso para el siguiente que empuje a CI.
+#
 # ── LO QUE ESTE FLUJO NO PUEDE COMPROBAR ──────────────────────────────
 #
 # Nada que necesite la red de planta ni una GPU: la sonda contra el historiador
 # real (`verificar-antiguedad-historico.mjs`) y los instrumentos `medir-*`, que
 # necesitan llama-server. La lista con su motivo vive en
 # `scripts/verificar-todo.mjs`, no aquí, para que no haya dos inventarios.
+#
+# Tampoco silencia el aviso de que `actions/checkout@v4` y `setup-node@v4`
+# apuntan a Node 20: siguen funcionando —el runner las fuerza a Node 24— y
+# subirlas de major es su propio cambio, no un efecto colateral de éste.
 name: CI
 
 on:
@@ -45,7 +75,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
@@ -61,7 +91,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
@@ -76,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: react-dashboard/package-lock.json
       - run: npm ci
@@ -99,7 +129,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: backend/package-lock.json
       # Los verificadores importan `backend/app.mjs` y sus rutas, así que

@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Puente Node hacia ICONICS FrameWorX y su tablero React. Este package.json de la raiz NO empaqueta nada: existe para las herramientas que miran el arbol ENTERO (linter, comprobacion de tipos, tanda de verificadores), que no pueden vivir dentro de backend/ ni de react-dashboard/ porque cruzan las dos.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

@@ -2,6 +2,9 @@
   "name": "iconics-backend",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node --env-file=../.env.local server.mjs",
     "test": "vitest run",

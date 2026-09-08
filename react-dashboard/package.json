@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Tablero del sistema de agua industrial (Demo EVA): las señales de ac:TDCON/DEMO/SENSORES/ leídas de ICONICS, en 2D y en 3D, con un asistente de lenguaje natural opcional.",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
