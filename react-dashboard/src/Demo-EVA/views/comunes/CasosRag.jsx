@@ -46,6 +46,7 @@ import { useTranslation } from "react-i18next";
 import { Archive, ArchiveRestore, RefreshCw, Search } from "lucide-react";
 
 import { useFormato } from "@/i18n/formato.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { archivarCaso, listarCasos } from "@/lib/api/casosApi.js";
@@ -253,6 +254,8 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
 /* ── Vista ───────────────────────────────────────────────────────────── */
 
 export default function CasosRag() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "navigation", "common", "errors"]);
   const { theme: t } = useTheme();
@@ -281,7 +284,12 @@ export default function CasosRag() {
       setEstado({ loading: false, error: null, casos: data.casos ?? [] });
     } catch (e) {
       if (e.name === "AbortError") return;
-      setEstado({ loading: false, error: e.message, casos: [] });
+      /*
+       * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
+       * `codigo` que manda el puente y con él la única forma de traducir el fallo.
+       * Quien lo pinta pasa por `useMensajeDeError`.
+       */
+      setEstado({ loading: false, error: e, casos: [] });
     }
   }, []);
 
@@ -307,7 +315,7 @@ export default function CasosRag() {
       ));
     } catch (e) {
       setAviso(null);
-      setEstado((s) => ({ ...s, error: e.message }));
+      setEstado((s) => ({ ...s, error: e }));
     } finally {
       setOcupado(null);
     }
@@ -402,7 +410,8 @@ export default function CasosRag() {
           <AlertBanner
             type="error"
             title={traducir("errors:titles.logbookReadFailed")}
-            message={estado.error}
+            message={mensajeDeError(estado.error).titulo}
+            detalle={mensajeDeError(estado.error).detalle}
           />
         )}
 

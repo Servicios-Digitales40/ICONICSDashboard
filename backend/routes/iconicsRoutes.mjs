@@ -27,6 +27,7 @@ import {
 import { isSafePointName, parsePointList } from '../iconics/validation.mjs'
 import { planificar } from '../../shared/eva/comun/rango.js'
 import { conConcurrenciaAcotada } from '../../shared/concurrencia.js'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 /**
  * Puntos por tramo cuando se trocea una ventana larga.
@@ -92,11 +93,10 @@ export function registerIconicsRoutes(fastify, { config, client }) {
             `Escritura rechazada en ${request.url}: el puente está en modo solo lectura ` +
               '(arranca con ICONICS_READ_ONLY=false para habilitarla).'
           )
-          return reply.code(403).send({
-            ok: false,
-            error:
-              'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.',
-          })
+          return responderError(
+            reply, 403, CODIGOS.ERROR_READ_ONLY,
+            'El puente está en modo solo lectura. Para habilitar la escritura, arranca con ICONICS_READ_ONLY=false.',
+          )
         },
       ],
       schema: { body: esquema },
@@ -127,10 +127,16 @@ export function registerIconicsRoutes(fastify, { config, client }) {
     if (points.length === 0) {
       return reply
         .code(400)
-        .send({ ok: false, error: 'points parameter is required (comma-separated list).' })
+        .send({
+          ok: false,
+          error: 'points parameter is required (comma-separated list).',
+          codigo: CODIGOS.ERROR_PUNTOS_REQUERIDOS,
+        })
     }
     if (!points.every(isSafePointName)) {
-      return reply.code(400).send({ ok: false, error: 'One or more point names are invalid.' })
+      return responderError(
+        reply, 400, CODIGOS.ERROR_PUNTOS_INVALIDOS, 'One or more point names are invalid.',
+      )
     }
 
     return responder(reply, await client.readPoints(points))

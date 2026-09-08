@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import Encuadre from "@/features/three-d/components/Encuadre.jsx";
 import Escena from "@/features/three-d/components/Escena.jsx";
 import Piso from "@/features/three-d/components/Piso.jsx";
@@ -134,6 +135,8 @@ function ResumenActivo({ activo, t, dark }) {
 }
 
 function MaquetaTanque3D({ params, onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "errors"]);
   const { sistema: nombreSistema } = useDominio();
@@ -190,7 +193,8 @@ function MaquetaTanque3D({ params, onNavigate }) {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.plantReadFailed")}
-          message={error}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
         />
       )}
 

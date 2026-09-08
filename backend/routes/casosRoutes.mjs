@@ -31,6 +31,7 @@
  */
 import { archivarCaso, listarCasos, registrarCaso } from '../ia/herramientas/aprendizaje/index.mjs'
 import { ArchivarCasoSchema, CasoPorIdParamsSchema, CrearCasoSchema } from '../http/esquemas.mjs'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 export function registerCasosRoutes(fastify) {
   /**
@@ -75,13 +76,13 @@ export function registerCasosRoutes(fastify) {
       const resultado = await archivarCaso(request.params.id, { archivado })
 
       if (!resultado.ok) {
-        return reply.code(500).send({ ok: false, error: resultado.error })
+        return responderError(reply, 500, CODIGOS.ERROR_BITACORA, resultado.error)
       }
       if (!resultado.encontrado) {
-        return reply.code(404).send({
-          ok: false,
-          error: `No hay ninguna intervención con id "${request.params.id}".`,
-        })
+        return responderError(
+          reply, 404, CODIGOS.ERROR_CASO_NO_ENCONTRADO,
+          `No hay ninguna intervención con id "${request.params.id}".`,
+        )
       }
 
       request.log.info(
@@ -109,7 +110,7 @@ export function registerCasosRoutes(fastify) {
       })
 
       if (!resultado.ok) {
-        return reply.code(500).send({ ok: false, error: resultado.error })
+        return responderError(reply, 500, CODIGOS.ERROR_BITACORA, resultado.error)
       }
 
       request.log.info(

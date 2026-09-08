@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_BASE } from "@/lib/api/apiBase";
+import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar } from "./persistencia.js";
@@ -190,7 +191,8 @@ export function useAsistente() {
 
         const cuerpo = await respuesta.json().catch(() => ({}));
         if (!respuesta.ok) {
-          throw new Error(cuerpo?.error ?? `El servidor respondió ${respuesta.status}.`);
+          /* Conserva el `codigo`: ver `lib/api/errorDelPuente.js`. */
+          throw errorDeRespuesta(cuerpo, respuesta.status);
         }
 
         if (vivo.current) setModelo(cuerpo?.modelo ?? nombre);
@@ -251,7 +253,7 @@ export function useAsistente() {
         // llegan como JSON con su motivo, y ese motivo se enseña tal cual.
         if (!respuesta.ok) {
           const cuerpo = await respuesta.json().catch(() => ({}));
-          throw new Error(cuerpo?.error ?? `El asistente respondió ${respuesta.status}.`);
+          throw errorDeRespuesta(cuerpo, respuesta.status);
         }
 
         await leerFlujo(respuesta, {
@@ -506,7 +508,7 @@ export function useDictado() {
       });
 
       const cuerpo = await respuesta.json().catch(() => ({}));
-      if (!respuesta.ok) throw new Error(cuerpo?.error ?? `El servidor respondió ${respuesta.status}.`);
+      if (!respuesta.ok) throw errorDeRespuesta(cuerpo, respuesta.status);
 
       return cuerpo?.texto ?? "";
     } catch (e) {

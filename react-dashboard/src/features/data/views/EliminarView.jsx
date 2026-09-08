@@ -15,6 +15,7 @@ import { RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Enfasis } from "@/i18n";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 import { useToast } from "@/app/providers";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
@@ -46,6 +47,8 @@ function chunk(arr, size) {
 }
 
 export default function EliminarView() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["data", "errors"]);
   const { theme: t } = useTheme();
@@ -157,7 +160,12 @@ export default function EliminarView() {
       }
     >
       {error ? (
-        <AlertBanner type="error" title={traducir("errors:titles.tableLoadFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.tableLoadFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       ) : loading && rows.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando clientes…

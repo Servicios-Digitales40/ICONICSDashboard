@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDominio } from "@/i18n/useDominio.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { CheckCheck, RefreshCw } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
@@ -57,6 +58,8 @@ function ChipVentana({ activo, onClick, t, children }) {
 }
 
 export default function AlarmasEva() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["alarms", "errors"]);
   /* Los nombres de activo salen del dominio, traducidos. Ver `useDominio`. */
@@ -79,7 +82,12 @@ export default function AlarmasEva() {
     try {
       setAlarmas(await leerAlarmas(horas));
     } catch (e) {
-      setError(e.message);
+      /*
+       * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
+       * `codigo` que manda el puente y con él la única forma de traducir el fallo.
+       * Quien lo pinta pasa por `useMensajeDeError`.
+       */
+      setError(e);
     } finally {
       setLoading(false);
     }
@@ -123,7 +131,7 @@ export default function AlarmasEva() {
       setSeleccion(new Set());
       await cargar();
     } catch (e) {
-      setError(e.message);
+      setError(e);
     } finally {
       setReconociendo(false);
     }
@@ -173,7 +181,12 @@ export default function AlarmasEva() {
       </div>
 
       {estado === HISTORIAL.SIN_CONEXION ? (
-        <AlertBanner type="error" title={traducir("errors:titles.alarmHistoryFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.alarmHistoryFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       ) : estado === HISTORIAL.CARGANDO ? (
         <p style={{ fontSize: 13, color: t.textFaint }}>{traducir("alarms:loading")}</p>
       ) : estado === HISTORIAL.SIN_DATO ? (

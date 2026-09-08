@@ -24,6 +24,7 @@
  */
 import { z } from 'zod'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 const DiagnosticoQuerySchema = z.object({
   sistema: z.enum(SISTEMA_IDS, { error: 'Falta o no reconozco "sistema".' }),
@@ -39,6 +40,7 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico }) {
         return reply.code(503).send({
           ok: false,
           error: 'Este servidor no tiene el motor de diagnóstico montado.',
+          codigo: CODIGOS.ERROR_MOTOR_SIN_MONTAR,
         })
       }
 
@@ -48,7 +50,7 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico }) {
       } catch (error) {
         // `diagnosticar()` lanza TypeError ante un riesgoId que no encaja
         // con el sistema — un error de quien llama, no del motor.
-        return reply.code(400).send({ ok: false, error: error.message })
+        return responderError(reply, 400, CODIGOS.ERROR_DIAGNOSTICO, error.message)
       }
     }
   )

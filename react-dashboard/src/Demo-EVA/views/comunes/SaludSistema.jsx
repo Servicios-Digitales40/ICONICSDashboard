@@ -167,7 +167,12 @@ function SaludSistema() {
        * `/api/health` no contesta, el puente no está en pie. Se dice con esas
        * palabras en vez de con un «error al cargar» genérico.
        */
-      setError(e.message);
+      /*
+       * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
+       * `codigo` que manda el puente y con él la única forma de traducir el fallo.
+       * Quien lo pinta pasa por `useMensajeDeError`.
+       */
+      setError(e);
     } finally {
       setCargando(false);
     }

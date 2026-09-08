@@ -123,6 +123,12 @@ export function useSerieHistorica(clave, rango = VENTANA) {
             cobertura: cobertura ?? null,
           })
       )
+      /*
+       * Se guarda el ERROR, no su `.message`. Desde que el puente manda un
+       * `codigo` con cada fallo, aplanarlo aquí lo perdía antes de que ninguna
+       * vista pudiera traducirlo — ver `lib/api/errorDelPuente.js`. Quien lo
+       * pinta pasa por `useMensajeDeError`.
+       */
       .catch(
         (err) =>
           vivo &&
@@ -130,7 +136,7 @@ export function useSerieHistorica(clave, rango = VENTANA) {
             datos: [],
             motivo: null,
             loading: false,
-            error: err.message,
+            error: err,
             hasMore: false,
             cobertura: null,
           })
@@ -233,12 +239,17 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
          * de red y un historiador sin muestras tienen que poder distinguirse
          * en la gráfica.
          */
+        /*
+         * En `metaPorClave` se queda el TEXTO: ahí sólo se usa para saber si
+         * hubo fallo (`metaPorClave[k]?.error` como booleano) y para depurar,
+         * no se pinta. El de arriba sí viaja entero, con su código.
+         */
         const metaPorClave = Object.fromEntries(
           lista.map((k) => [k, { motivo: null, error: err.message }])
         );
         setEstado({
           filas: [], porClave: {}, metaPorClave,
-          loading: false, error: err.message, hasMore: false, cobertura: null,
+          loading: false, error: err, hasMore: false, cobertura: null,
         });
       });
 

@@ -26,6 +26,7 @@ import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ReporteQuerySchema } from '../http/esquemas.mjs'
 import { esDelUsuario, verificarEnlace } from '../lib/enlacesFirmados.mjs'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 /** El primer archivo `<dir>/<id>.pdf` que exista, probando las carpetas en
  *  orden. `null` si ninguna lo tiene. */
@@ -59,28 +60,40 @@ async function localizarPdf(carpetas, id) {
  * pedir uno es una frase al asistente—. El mensaje lo dice, que era la otra
  * mitad de lo que pedía el plan: no basta con que esté en el código.
  */
+/*
+ * Los tres motivos por los que un enlace de descarga se rechaza.
+ *
+ * `estado` es el HTTP y `codigo` el del catalogo: hasta esta fase esta tabla
+ * llamaba `codigo` al HTTP, y al llegar el codigo de error de verdad las dos
+ * cosas habrian compartido nombre. Renombrar el HTTP a `estado` es lo que
+ * evita esa ambiguedad — y la prueba de «uno caducado da 410» fue justo la que
+ * cazó que esta entrada se habia quedado sin renombrar.
+ */
 const RECHAZOS = {
   caducado: {
-    codigo: 410,
+    estado: 410,
+    codigo: CODIGOS.ERROR_ENLACE_CADUCADO,
     error:
       'Este enlace de descarga ha caducado. El reporte puede seguir existiendo: pídele al ' +
       'asistente que te genere el enlace otra vez.',
   },
   sinFirma: {
-    codigo: 403,
+    estado: 403,
+    codigo: CODIGOS.ERROR_ENLACE_SIN_FIRMA,
     error:
       'Este enlace no lleva firma. Desde que los enlaces de descarga caducan, los antiguos —sin ' +
       'firmar— ya no sirven, y no hay período de gracia. Pídele al asistente que te genere uno nuevo.',
   },
   firma: {
-    codigo: 403,
+    estado: 403,
+    codigo: CODIGOS.ERROR_ENLACE_INVALIDO,
     error: 'La firma de este enlace no es válida. Pídele al asistente que te genere uno nuevo.',
   },
 }
 
 function responderAlRechazo(reply, motivo) {
-  const { codigo, error } = RECHAZOS[motivo] ?? RECHAZOS.firma
-  return reply.code(codigo).send({ ok: false, error })
+  const { estado, codigo, error } = RECHAZOS[motivo] ?? RECHAZOS.firma
+  return responderError(reply, estado, codigo, error)
 }
 
 export function registerReportesRoutes(fastify, { config }) {
@@ -137,6 +150,7 @@ export function registerReportesRoutes(fastify, { config }) {
           return reply.code(403).send({
             ok: false,
             error: 'Este enlace se emitió para otro usuario. Pídele al asistente que te genere el tuyo.',
+            codigo: CODIGOS.ERROR_ENLACE_DE_OTRO,
           })
         }
       }
@@ -160,7 +174,11 @@ export function registerReportesRoutes(fastify, { config }) {
         )
         return reply
           .code(404)
-          .send({ ok: false, error: 'Reporte no encontrado (puede haberse purgado por antigüedad).' })
+          .send({
+            ok: false,
+            error: 'Reporte no encontrado (puede haberse purgado por antigüedad).',
+            codigo: CODIGOS.ERROR_REPORTE_NO_ENCONTRADO,
+          })
       }
 
       return reply

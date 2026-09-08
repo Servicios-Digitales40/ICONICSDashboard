@@ -10,6 +10,7 @@
  * Mismo criterio de `parseResponse` que `ragApi.js`.
  */
 import { API_BASE } from "./apiBase.js";
+import { errorDeRespuesta } from "./errorDelPuente.js";
 
 async function parseResponse(response) {
   const raw = await response.text();
@@ -24,7 +25,8 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || `HTTP ${response.status}`);
+    /* Conserva el `codigo`: ver `lib/api/errorDelPuente.js`. */
+    throw errorDeRespuesta(data, response.status);
   }
 
   return data;

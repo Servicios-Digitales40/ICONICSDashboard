@@ -42,6 +42,8 @@
  * reemplazo—, y el audio llegaría corrupto **sin dar ningún error**, con el
  * síntoma de una transcripción vacía o de ruido.
  */
+import { CODIGOS, responderError } from '../http/codigos.mjs'
+
 export function registerVozRoutes(fastify, { config, voz }) {
   fastify.get('/api/voz', async () => ({
     ok: true,
@@ -99,6 +101,7 @@ export function registerVozRoutes(fastify, { config, voz }) {
           return reply.code(413).send({
             ok: false,
             error: `El audio supera el límite de ${mb} MB.`,
+            codigo: CODIGOS.ERROR_AUDIO_GRANDE,
           })
         }
         },
@@ -111,17 +114,18 @@ export function registerVozRoutes(fastify, { config, voz }) {
           'Se pidió una transcripción pero el dictado no está configurado: falta IA_WHISPER_BASE, ' +
             'que debe apuntar a whisper-server (p. ej. http://localhost:8081).'
         )
-        return reply.code(503).send({
-          ok: false,
-          error:
-            'El dictado por voz no está configurado en este servidor. Falta la variable ' +
-            'IA_WHISPER_BASE, que apunta a whisper-server.',
-        })
+        return responderError(
+          reply, 503, CODIGOS.ERROR_VOZ_SIN_CONFIGURAR,
+          'El dictado por voz no está configurado en este servidor. Falta la variable ' +
+          'IA_WHISPER_BASE, que apunta a whisper-server.',
+        )
       }
 
       const audio = request.body
       if (!Buffer.isBuffer(audio) || !audio.length) {
-        return reply.code(400).send({ ok: false, error: 'No ha llegado ningún audio.' })
+        return responderError(
+          reply, 400, CODIGOS.ERROR_SIN_AUDIO, 'No ha llegado ningún audio.',
+        )
       }
 
       // Si el cliente se va a mitad de la transcripción, se aborta también la
@@ -153,7 +157,7 @@ export function registerVozRoutes(fastify, { config, voz }) {
             { bytes: audio.length, ms: Date.now() - empezado, motivo: resultado.error },
             `Audio de ${Math.round(audio.length / 1024)} kB procesado sin texto aprovechable: ${resultado.error}`
           )
-          return reply.code(422).send({ ok: false, error: resultado.error })
+          return responderError(reply, 422, CODIGOS.ERROR_TRANSCRIPCION, resultado.error)
         }
 
         request.log.debug(
@@ -180,6 +184,7 @@ export function registerVozRoutes(fastify, { config, voz }) {
         return reply.code(502).send({
           ok: false,
           error: `No se pudo transcribir el audio: ${error?.message ?? error}`,
+          codigo: CODIGOS.ERROR_TRANSCRIPCION,
         })
       }
     }

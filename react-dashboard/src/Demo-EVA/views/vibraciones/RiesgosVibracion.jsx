@@ -41,6 +41,7 @@ import { useTranslation } from "react-i18next";
 import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 
@@ -50,6 +51,8 @@ import { useVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 function RiesgosVibracion({ onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "diagnostics", "navigation", "errors"]);
   const { theme: t } = useTheme();
@@ -79,7 +82,12 @@ function RiesgosVibracion({ onNavigate }) {
       />
 
       {error && (
-        <AlertBanner type="error" title={traducir("errors:titles.moduleReadFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.moduleReadFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       )}
 
       {casiTodoMudo && !loading && (

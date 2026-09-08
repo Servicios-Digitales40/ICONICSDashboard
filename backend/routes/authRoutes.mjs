@@ -26,6 +26,7 @@
  */
 import { LoginSchema } from '../http/esquemas.mjs'
 import { claveCoincide } from '../http/usuarios.mjs'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 export function registerAuthRoutes(fastify, { config }) {
   const habilitada = config.auth?.habilitada ?? false
@@ -40,11 +41,11 @@ export function registerAuthRoutes(fastify, { config }) {
          * mandaría a quien integra el tablero a buscar un error de despliegue.
          * Y `ok:false` con el nombre de la variable, como el resto del puente.
          */
-        return reply.code(503).send({
-          ok: false,
-          error: 'La autenticación de usuarios está desactivada en este servidor ' +
-            '(AUTH_HABILITADA=false). No hay sesión que iniciar.',
-        })
+        return responderError(
+          reply, 503, CODIGOS.ERROR_AUTH_DESACTIVADA,
+          'La autenticación de usuarios está desactivada en este servidor ' +
+          '(AUTH_HABILITADA=false). No hay sesión que iniciar.',
+        )
       }
 
       const { usuario: id, clave } = request.body
@@ -70,7 +71,9 @@ export function registerAuthRoutes(fastify, { config }) {
          * Un solo mensaje para los dos casos, aunque el log sí los distinga:
          * quien está fuera no tiene por qué saber si acertó el nombre.
          */
-        return reply.code(401).send({ ok: false, error: 'Usuario o contraseña incorrectos.' })
+        return responderError(
+          reply, 401, CODIGOS.ERROR_CREDENCIALES, 'Usuario o contraseña incorrectos.',
+        )
       }
 
       const token = fastify.jwt.sign({ sub: usuario.id, roles: [...usuario.roles] })
@@ -113,6 +116,7 @@ export function registerAuthRoutes(fastify, { config }) {
         return {
           ok: false,
           error: 'Tu usuario ya no existe en este servidor. Vuelve a entrar.',
+          codigo: CODIGOS.ERROR_USUARIO_DESCONOCIDO,
         }
       }
 

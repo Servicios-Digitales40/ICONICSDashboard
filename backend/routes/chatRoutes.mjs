@@ -41,6 +41,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esquemas.mjs'
 import { firmarEnlace } from '../lib/enlacesFirmados.mjs'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 export function registerChatRoutes(fastify, { config, chat, cola }) {
 
@@ -94,25 +95,27 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
       if (!config.ia.isConfigured) {
         return reply
           .code(503)
-          .send({ ok: false, error: 'El asistente no está configurado en este servidor.' })
+          .send({
+            ok: false,
+            error: 'El asistente no está configurado en este servidor.',
+            codigo: CODIGOS.ERROR_IA_SIN_CONFIGURAR,
+          })
       }
       if (!config.ia.modelos.length) {
-        return reply.code(409).send({
-          ok: false,
-          error:
-            'Este servidor sirve un solo modelo. Para poder elegir, arranca llama-server con ' +
-            '--models-preset y declara los nombres en IA_MODELOS.',
-        })
+        return responderError(
+          reply, 409, CODIGOS.ERROR_MODELO_UNICO,
+          'Este servidor sirve un solo modelo. Para poder elegir, arranca llama-server con ' +
+          '--models-preset y declara los nombres en IA_MODELOS.',
+        )
       }
 
       const { atendiendo, enEspera } = cola.estado()
       if (atendiendo || enEspera) {
-        return reply.code(409).send({
-          ok: false,
-          error:
-            'Hay una consulta en curso. El modelo se cambia para todas las pantallas, así que ' +
-            'espera a que termine e inténtalo otra vez.',
-        })
+        return responderError(
+          reply, 409, CODIGOS.ERROR_CONSULTA_EN_CURSO,
+          'Hay una consulta en curso. El modelo se cambia para todas las pantallas, así que ' +
+          'espera a que termine e inténtalo otra vez.',
+        )
       }
 
       const { modelo } = request.body
@@ -121,6 +124,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         return reply.code(400).send({
           ok: false,
           error: `"${modelo}" no está en los modelos de este servidor: ${config.ia.modelos.join(', ')}.`,
+          codigo: CODIGOS.ERROR_MODELO_DESCONOCIDO,
         })
       }
 
@@ -146,6 +150,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         return reply.code(503).send({
           ok: false,
           error: 'El asistente no está configurado en este servidor. Falta la variable IA_BASE.',
+          codigo: CODIGOS.ERROR_IA_SIN_CONFIGURAR,
         })
       }
 
@@ -308,6 +313,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         return reply.code(503).send({
           ok: false,
           error: 'La exportación de conversaciones no está configurada en este servidor.',
+          codigo: CODIGOS.ERROR_PDF_SIN_CONFIGURAR,
         })
       }
 
@@ -327,6 +333,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
           error:
             'La exportación a PDF no está disponible ahora mismo: falta instalar las dependencias ' +
             `del backend. (${error.message})`,
+          codigo: CODIGOS.ERROR_PDF_SIN_DEPENDENCIAS,
         })
       }
 

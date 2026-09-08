@@ -19,6 +19,7 @@
  */
 import { ControlBombaSchema } from '../http/esquemas.mjs'
 import { crearDiario } from '../lib/diario.mjs'
+import { CODIGOS } from '../http/codigos.mjs'
 
 export function registerControlRoutes(fastify, { herramientas, diario = crearDiario() }) {
   fastify.post(
@@ -74,6 +75,12 @@ export function registerControlRoutes(fastify, { herramientas, diario = crearDia
         return reply.code(status).send({
           ok: false,
           error: resultado.error ?? 'No se pudo accionar la bomba.',
+          /*
+           * El mismo código para la guarda y para el fallo de escritura: al
+           * operador le da igual cuál de las dos fue —la bomba no se accionó—,
+           * y el porqué concreto viaja en `error`.
+           */
+          codigo: CODIGOS.ERROR_ACCION_BOMBA,
         })
       }
 

@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import { FileSpreadsheet } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
@@ -118,6 +119,8 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
 }
 
 function DetalleActivo({ params, onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "errors"]);
   /* El nombre del activo, traducido: `shared/` lo declara en español. */
@@ -255,7 +258,8 @@ function DetalleActivo({ params, onNavigate }) {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.waterSystemReadFailed")}
-          message={error}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
         />
       )}
 

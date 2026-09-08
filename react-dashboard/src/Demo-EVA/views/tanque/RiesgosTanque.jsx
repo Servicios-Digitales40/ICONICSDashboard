@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { pedirAlAsistente } from "@/features/asistente";
 import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
@@ -367,6 +368,8 @@ function TarjetaPronostico({ p, t }) {
 /* ── La vista ──────────────────────────────────────────────────────── */
 
 function RiesgosTanque({ onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["diagnostics", "common", "errors"]);
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
@@ -433,7 +436,8 @@ function RiesgosTanque({ onNavigate }) {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.plantReadFailed")}
-          message={traducir("errors:hints.staleBelow", { detalle: String(error) })}
+          message={traducir("errors:hints.staleBelow", { detalle: mensajeDeError(error).titulo })}
+          detalle={mensajeDeError(error).detalle}
         />
       )}
 

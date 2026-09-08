@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { LayoutGrid } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
 import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
@@ -105,6 +106,8 @@ const REJILLA = `
  */
 
 function PlantaTanque({ onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "errors"]);
   const { theme: t, dark } = useTheme();
@@ -167,7 +170,12 @@ function PlantaTanque({ onNavigate }) {
 
       <div className="eva-page">
         {error && (
-          <AlertBanner type="error" title={traducir("errors:titles.waterSystemReadFailed")} message={error} />
+          <AlertBanner
+            type="error"
+            title={traducir("errors:titles.waterSystemReadFailed")}
+            message={mensajeDeError(error).titulo}
+            detalle={mensajeDeError(error).detalle}
+          />
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>

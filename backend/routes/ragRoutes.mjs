@@ -40,6 +40,7 @@ import {
   SubirManualQuerySchema,
 } from '../http/esquemas.mjs'
 import { MAX_BYTES } from '../ia/indices/documentos.mjs'
+import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 /**
  * Guarda de `Content-Length` ANTES de leer el cuerpo, para que un archivo
@@ -52,10 +53,9 @@ function rechazarSiExcede(maxBytes) {
     const declarado = Number(request.headers['content-length'] ?? 0)
     if (declarado > maxBytes) {
       const mb = Math.round(maxBytes / 1024 / 1024)
-      return reply.code(413).send({
-        ok: false,
-        error: `El archivo supera el límite de ${mb} MB.`,
-      })
+      return responderError(
+        reply, 413, CODIGOS.ERROR_ARCHIVO_GRANDE, `El archivo supera el límite de ${mb} MB.`,
+      )
     }
   }
 }
@@ -65,18 +65,17 @@ function rechazarSiExcede(maxBytes) {
  *  seguir; si no, ya envió la respuesta y quien llama debe devolver eso. */
 function negarSiNoSePuedeEscribir(config, gestorManuales, reply) {
   if (!gestorManuales) {
-    reply.code(503).send({
-      ok: false,
-      error: 'Este servidor no tiene documentación de planta configurada (falta IA_DOCS_DIR).',
-    })
+    responderError(
+      reply, 503, CODIGOS.ERROR_DOCS_SIN_CONFIGURAR,
+      'Este servidor no tiene documentación de planta configurada (falta IA_DOCS_DIR).',
+    )
     return true
   }
   if (!config.ia.ragUploadEnabled) {
-    reply.code(403).send({
-      ok: false,
-      error:
-        'La carga de manuales está desactivada en este servidor. Actívala con RAG_UPLOAD_ENABLED=true.',
-    })
+    responderError(
+      reply, 403, CODIGOS.ERROR_CARGA_DESACTIVADA,
+      'La carga de manuales está desactivada en este servidor. Actívala con RAG_UPLOAD_ENABLED=true.',
+    )
     return true
   }
   return false
@@ -154,7 +153,9 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
 
       const bytes = request.body
       if (!Buffer.isBuffer(bytes) || !bytes.length) {
-        return reply.code(400).send({ ok: false, error: 'No ha llegado ningún archivo.' })
+        return responderError(
+          reply, 400, CODIGOS.ERROR_SIN_ARCHIVO, 'No ha llegado ningún archivo.',
+        )
       }
 
       const { nombre, sistema, titulo } = request.query
@@ -167,7 +168,7 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
       })
 
       if (!resultado.ok) {
-        return reply.code(400).send({ ok: false, error: resultado.error })
+        return responderError(reply, 400, CODIGOS.ERROR_MANUAL, resultado.error)
       }
 
       request.log.info(
@@ -191,7 +192,9 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
 
       const bytes = request.body
       if (!Buffer.isBuffer(bytes) || !bytes.length) {
-        return reply.code(400).send({ ok: false, error: 'No ha llegado ningún archivo.' })
+        return responderError(
+          reply, 400, CODIGOS.ERROR_SIN_ARCHIVO, 'No ha llegado ningún archivo.',
+        )
       }
 
       const resultado = await gestorManuales.reemplazar({
@@ -202,7 +205,12 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
 
       if (!resultado.ok) {
         const noExiste = /No hay ningún manual/.test(resultado.error)
-        return reply.code(noExiste ? 404 : 400).send({ ok: false, error: resultado.error })
+        return responderError(
+          reply,
+          noExiste ? 404 : 400,
+          noExiste ? CODIGOS.ERROR_MANUAL_NO_ENCONTRADO : CODIGOS.ERROR_MANUAL,
+          resultado.error,
+        )
       }
 
       request.log.info(
@@ -232,7 +240,12 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
 
       if (!resultado.ok) {
         const noExiste = /No hay ningún manual/.test(resultado.error)
-        return reply.code(noExiste ? 404 : 400).send({ ok: false, error: resultado.error })
+        return responderError(
+          reply,
+          noExiste ? 404 : 400,
+          noExiste ? CODIGOS.ERROR_MANUAL_NO_ENCONTRADO : CODIGOS.ERROR_MANUAL,
+          resultado.error,
+        )
       }
 
       if (accion === 'asignar') {

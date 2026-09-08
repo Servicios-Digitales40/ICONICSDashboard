@@ -6,12 +6,17 @@
  * server reenvía /api al backend. Ver `lib/api/apiBase.js`.
  */
 import { API_BASE } from "@/lib/api/apiBase";
+import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 
 async function getJson(path) {
   const response = await fetch(`${API_BASE}${path}`);
   const payload = await response.json();
   if (!response.ok || payload?.ok === false) {
-    throw new Error(payload?.error ?? `Error ${response.status} al consultar ${path}`);
+    /*
+     * `errorDeRespuesta` y no `new Error`: conserva el `codigo` del puente,
+     * que es lo único que permite traducir el fallo. Ver su cabecera.
+     */
+    throw errorDeRespuesta(payload, response.status, `Error ${response.status} al consultar ${path}`);
   }
   return payload;
 }
@@ -108,7 +113,7 @@ async function enviarJson(metodo, path, body) {
   });
   const payload = await response.json();
   if (!response.ok || payload?.ok === false) {
-    throw new Error(payload?.error ?? `Error ${response.status} al consultar ${path}`);
+    throw errorDeRespuesta(payload, response.status, `Error ${response.status} al consultar ${path}`);
   }
   return payload;
 }

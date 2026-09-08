@@ -39,6 +39,7 @@ import { useTranslation } from "react-i18next";
 import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { Enfasis } from "@/i18n";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
@@ -318,6 +319,8 @@ function PanelAlarmas({ alarmas, t }) {
 /* ── Vista ─────────────────────────────────────────────────────────── */
 
 function Vibraciones() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t } = useTheme();
@@ -353,7 +356,12 @@ function Vibraciones() {
       />
 
       {error && (
-        <AlertBanner type="error" title={traducir("errors:titles.moduleReadFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.moduleReadFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       )}
 
       {casiTodoMudo && !loading && (

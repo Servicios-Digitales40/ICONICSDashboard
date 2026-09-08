@@ -314,6 +314,9 @@ node scripts/verificar-instrucciones.mjs                     # el prompt no se c
 node scripts/verificar-evaluacion.mjs                         # el evaluador del asistente juzga como debe
 node scripts/verificar-inyeccion.mjs                           # un manual no puede dar órdenes al asistente
 node scripts/verificar-tls.mjs                                  # una CA propia basta, sin apagar la verificación
+node scripts/verificar-i18n.mjs                                  # los dos idiomas dicen lo mismo, con el mismo marcado
+node scripts/verificar-textos.mjs                                 # no queda texto de pantalla en español fuera del diccionario
+node scripts/verificar-codigos.mjs                                 # cada código de error del puente se sabe decir en los dos idiomas
 ```
 > Los cuatro últimos son del Plan 20 y del 21. `verificar-catalogo.mjs` admite además
 > `--real` para contrastar contra el árbol de ICONICS de verdad — ese modo sí

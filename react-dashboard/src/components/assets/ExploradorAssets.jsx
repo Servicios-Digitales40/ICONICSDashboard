@@ -35,6 +35,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Box, Boxes, ChevronDown, ChevronRight, Gauge, Radio, RefreshCw } from "lucide-react";
 
 import { AlertBanner, Button, Panel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { browseIconics, fetchIconicsBatch, fetchIconicsPoint } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 import { isGoodQuality } from "@shared/quality.js";
@@ -209,6 +210,8 @@ async function cargarPropiedadesDeAsset(path, node) {
 
 /* Panel derecho: propiedades en vivo del asset seleccionado. */
 function AssetProperties({ node, intervalMs = 5000 }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "errors"]);
   const { theme: t } = useTheme();
@@ -265,7 +268,8 @@ function AssetProperties({ node, intervalMs = 5000 }) {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.assetReadFailed")}
-          message={error.message}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
         />
       )}
 
@@ -350,6 +354,8 @@ function AssetProperties({ node, intervalMs = 5000 }) {
  * de este archivo que se quedaba en español pasara lo que pasara.
  */
 export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = null, acciones = null }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "errors"]);
   const { theme: t } = useTheme();
@@ -384,7 +390,8 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = null, acciones =
             <AlertBanner
               type="error"
               title={traducir("errors:titles.treeLoadFailed")}
-              message={error.message}
+              message={mensajeDeError(error).titulo}
+              detalle={mensajeDeError(error).detalle}
             />
           ) : isLoading ? (
             <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>

@@ -45,6 +45,7 @@ import { useTranslation } from "react-i18next";
 import { CheckCircle2, ChevronLeft, ClipboardCheck, Loader2, XCircle } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { obtenerDiagnostico, registrarCaso } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
@@ -385,6 +386,8 @@ function ZonaPersona({
 /* ── La vista ──────────────────────────────────────────────────────────── */
 
 export default function CierreDiagnostico({ params, onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["maintenance", "navigation", "common", "errors"]);
   /* El nombre de la máquina, traducido: `shared/` lo declara en español. */
@@ -468,7 +471,12 @@ export default function CierreDiagnostico({ params, onNavigate }) {
       .then((data) => setDiagnostico({ loading: false, error: null, data }))
       .catch((e) => {
         if (e.name === "AbortError") return;
-        setDiagnostico({ loading: false, error: e.message, data: null });
+        /*
+         * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
+         * `codigo` que manda el puente y con él la única forma de traducir el fallo.
+         * Quien lo pinta pasa por `useMensajeDeError`.
+         */
+        setDiagnostico({ loading: false, error: e, data: null });
       });
     return () => control.abort();
   }, [sistemaId, riesgoId, traducir]);
@@ -549,7 +557,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
       });
       setCerrado(true);
     } catch (e) {
-      setErrorEnvio(e.message);
+      setErrorEnvio(e);
     } finally {
       setEnviando(false);
     }
@@ -638,7 +646,8 @@ export default function CierreDiagnostico({ params, onNavigate }) {
           <AlertBanner
             type="error"
             title={traducir("errors:titles.caseCloseFailed")}
-            message={errorEnvio}
+            message={mensajeDeError(errorEnvio).titulo}
+            detalle={mensajeDeError(errorEnvio).detalle}
           />
         )}
 

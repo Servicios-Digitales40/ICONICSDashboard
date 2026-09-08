@@ -47,6 +47,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { useFormato } from "@/i18n/formato.js";
 import {
@@ -223,6 +224,8 @@ function EmptyState({ t }) {
 }
 
 export default function EventosCompresor() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("prediction");
   const { fechaHora } = useFormato();
@@ -334,7 +337,12 @@ export default function EventosCompresor() {
 
       {error && (
         <div style={{ marginBottom: 16 }}>
-          <AlertBanner type="error" title={traducir("events.query.failed")} message={error} />
+          <AlertBanner
+            type="error"
+            title={traducir("events.query.failed")}
+            message={mensajeDeError(error).titulo}
+            detalle={mensajeDeError(error).detalle}
+          />
         </div>
       )}
 

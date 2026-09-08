@@ -24,6 +24,7 @@ import { useTranslation } from "react-i18next";
 import { ArchiveRestore, FileUp, RefreshCw, Upload, X } from "lucide-react";
 
 import { useFormato } from "@/i18n/formato.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import {
@@ -316,6 +317,8 @@ function FilaManual({
 /* ── La zona de carga ─────────────────────────────────────────────────── */
 
 function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "common", "errors"]);
   const [arrastrando, setArrastrando] = useState(false);
@@ -386,7 +389,12 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
 
         {error && (
           <div style={{ marginTop: 10 }}>
-            <AlertBanner type="error" title={traducir("errors:titles.uploadFailed")} message={error} />
+            <AlertBanner
+              type="error"
+              title={traducir("errors:titles.uploadFailed")}
+              message={mensajeDeError(error).titulo}
+              detalle={mensajeDeError(error).detalle}
+            />
           </div>
         )}
       </div>
@@ -427,7 +435,12 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
       </div>
       {error && (
         <div style={{ marginTop: 12, textAlign: "left" }}>
-          <AlertBanner type="error" title={traducir("errors:titles.uploadFailed")} message={error} />
+          <AlertBanner
+            type="error"
+            title={traducir("errors:titles.uploadFailed")}
+            message={mensajeDeError(error).titulo}
+            detalle={mensajeDeError(error).detalle}
+          />
         </div>
       )}
     </div>
@@ -437,6 +450,8 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
 /* ── La vista ──────────────────────────────────────────────────────────── */
 
 export default function DocumentacionRag() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "common", "errors"]);
   const { numero } = useFormato();
@@ -481,7 +496,12 @@ export default function DocumentacionRag() {
       setCargando(false);
     } catch (e) {
       if (e.name === "AbortError") return;
-      setErrorCarga(e.message);
+      /*
+       * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
+       * `codigo` que manda el puente y con él la única forma de traducir el fallo.
+       * Quien lo pinta pasa por `useMensajeDeError`.
+       */
+      setErrorCarga(e);
       setCargando(false);
     }
   }, []);
@@ -508,7 +528,7 @@ export default function DocumentacionRag() {
       await subirManual({ archivo, sistema, titulo });
       await cargar();
     } catch (e) {
-      setErrorSubida(e.message);
+      setErrorSubida(e);
     } finally {
       setSubiendo(false);
     }
@@ -520,7 +540,7 @@ export default function DocumentacionRag() {
       await reemplazarManual({ id, archivo });
       await cargar();
     } catch (e) {
-      setErrorCarga(e.message);
+      setErrorCarga(e);
     } finally {
       setIdOcupado(null);
     }
@@ -538,7 +558,7 @@ export default function DocumentacionRag() {
       await asignarSistemaManual({ id, sistema });
       await cargar();
     } catch (e) {
-      setErrorCarga(e.message);
+      setErrorCarga(e);
     } finally {
       setIdOcupado(null);
     }
@@ -550,7 +570,7 @@ export default function DocumentacionRag() {
       await archivarManual({ id });
       await cargar();
     } catch (e) {
-      setErrorCarga(e.message);
+      setErrorCarga(e);
     } finally {
       setIdOcupado(null);
     }
@@ -574,7 +594,8 @@ export default function DocumentacionRag() {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.catalogQueryFailed")}
-          message={errorCarga}
+          message={mensajeDeError(errorCarga).titulo}
+          detalle={mensajeDeError(errorCarga).detalle}
         />
       </>
     );

@@ -11,12 +11,19 @@
  * salían con una forma distinta a la de la API.
  *
  * Toda respuesta de error de esta API tiene la MISMA forma, `{ ok: false,
- * error }`, porque es la que el frontend sabe leer. Un 500 de Fastify con su
- * `{ statusCode, error, message }` nativo obligaría al cliente a distinguir
- * dos formas según quién falló.
+ * error, codigo }`, porque es la que el frontend sabe leer. Un 500 de Fastify
+ * con su `{ statusCode, error, message }` nativo obligaría al cliente a
+ * distinguir dos formas según quién falló.
+ *
+ * `codigo` es del Plan de códigos de error y lo declara `http/codigos.mjs`:
+ * `error` es prosa —en español, para `curl` y para el registro— y `codigo` es
+ * la identidad, que es lo que permite al tablero decir el fallo en el idioma
+ * que tenga puesto. Los cuatro casos de este archivo son los ÚNICOS errores
+ * que no nacen en una ruta, así que sus códigos se ponen aquí.
  */
 import fp from 'fastify-plugin'
 import { ZodError } from 'zod'
+import { CODIGOS } from '../codigos.mjs'
 import { primerMensaje, primerMensajeDeValidacion } from '../esquemas.mjs'
 
 async function erroresPlugin(fastify) {
@@ -60,7 +67,11 @@ async function erroresPlugin(fastify) {
         `Petición rechazada por validación en ${request.url}: ${mensaje}`
       )
 
-      return reply.code(400).send({ ok: false, error: mensaje })
+      return reply.code(400).send({
+        ok: false,
+        error: mensaje,
+        codigo: CODIGOS.ERROR_VALIDACION,
+      })
     }
 
     /*
@@ -78,6 +89,7 @@ async function erroresPlugin(fastify) {
       return reply.code(429).send({
         ok: false,
         error: error.message,
+        codigo: CODIGOS.ERROR_RATE_LIMITED,
         ...(error.reintentarEnSegundos
           ? { reintentarEnSegundos: error.reintentarEnSegundos }
           : {}),
@@ -111,6 +123,7 @@ async function erroresPlugin(fastify) {
         error: esJsonMalFormado && error.statusCode === 400
           ? 'Invalid JSON body.'
           : error.message,
+        codigo: CODIGOS.ERROR_CUERPO_INVALIDO,
       })
     }
 
@@ -153,7 +166,11 @@ async function erroresPlugin(fastify) {
       return
     }
 
-    reply.code(500).send({ ok: false, error: 'Internal server error.' })
+    reply.code(500).send({
+      ok: false,
+      error: 'Internal server error.',
+      codigo: CODIGOS.ERROR_SERVER,
+    })
   })
 }
 

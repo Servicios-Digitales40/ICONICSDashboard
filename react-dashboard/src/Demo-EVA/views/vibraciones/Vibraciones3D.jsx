@@ -52,6 +52,7 @@ import { useTranslation } from "react-i18next";
 import { LineChart, Ruler } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { Enfasis } from "@/i18n";
 import { useDominio } from "@/i18n/useDominio.js";
 import Encuadre from "@/features/three-d/components/Encuadre.jsx";
@@ -380,6 +381,8 @@ function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
 /* ── La vista ─────────────────────────────────────────────────────── */
 
 function Vibraciones3D({ onNavigate }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t, dark } = useTheme();
@@ -442,7 +445,8 @@ function Vibraciones3D({ onNavigate }) {
         <AlertBanner
           type="error"
           title={traducir("errors:titles.moduleReadFailed")}
-          message={error}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
         />
       )}
 

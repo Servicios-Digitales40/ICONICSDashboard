@@ -15,6 +15,7 @@ import { RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useTheme } from "@/theme";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { fetchIconicsPoint, fetchIconicsBatch } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
 
@@ -56,6 +57,8 @@ function formatCell(column, value) {
 }
 
 export function IconicsProductsTable() {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("errors");
   const { theme: t } = useTheme();
@@ -143,7 +146,12 @@ export function IconicsProductsTable() {
       }
     >
       {error ? (
-        <AlertBanner type="error" title={traducir("errors:titles.tableLoadFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.tableLoadFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       ) : loading && rows.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando tabla…

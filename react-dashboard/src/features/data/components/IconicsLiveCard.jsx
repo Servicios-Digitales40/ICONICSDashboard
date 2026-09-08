@@ -10,6 +10,7 @@ import { RefreshCw, Radio } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useTheme } from "@/theme";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useIconicsPoint } from "@/lib/iconics";
 import { Panel, Button, AlertBanner } from "@/components/ui/index.js";
 
@@ -32,6 +33,8 @@ function normalize(payload) {
 const QUALITY_GOOD = new Set([0, 192, "Good", "good"]);
 
 export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
+  /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
+  const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("errors");
   const { theme: t } = useTheme();
@@ -50,7 +53,12 @@ export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
       }
     >
       {error ? (
-        <AlertBanner type="error" title={traducir("errors:titles.pointReadFailed")} message={error} />
+        <AlertBanner
+          type="error"
+          title={traducir("errors:titles.pointReadFailed")}
+          message={mensajeDeError(error).titulo}
+          detalle={mensajeDeError(error).detalle}
+        />
       ) : !data && loading ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>
           cargando dato…

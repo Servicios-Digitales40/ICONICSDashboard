@@ -22,7 +22,8 @@ export function useIconicsPoint(pointName, intervalMs = 5000) {
       setLastUpdated(new Date());
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(err.message);
+      /* El error entero, con su `codigo`: ver `lib/api/errorDelPuente.js`. */
+      setError(err);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
