@@ -182,7 +182,7 @@ const herramientasFalsas = {
       }
     }
     if (nombre === 'controlar_bomba') {
-      return { ok: true, accion: 'encendida', tag: 'ac:TDCON/DEMO/SENSORES/CONTROL' }
+      return { ok: true, accion: 'encendida', tag: 'ac:TDCON/DEMO/SEGURIDAD/CONTROL' }
     }
     if (nombre === 'historia_de_senal') {
       return {

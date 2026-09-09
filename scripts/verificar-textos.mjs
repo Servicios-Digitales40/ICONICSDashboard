@@ -105,7 +105,7 @@ const PERDONADOS = new Map([
 
   /* Identificadores de ICONICS: no se traducen NUNCA (§ del encargo). */
   ['ac:TDCON/DEMO/SENSORES/', 'ruta de ICONICS'],
-  ['ac:TDCON/DEMO/SENSORES/CONTROL', 'tag de ICONICS'],
+  ['ac:TDCON/DEMO/SEGURIDAD/CONTROL', 'tag de ICONICS'],
 ])
 
 /* ── Detección de español ────────────────────────────────────────────── */

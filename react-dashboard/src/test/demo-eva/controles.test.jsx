@@ -64,7 +64,7 @@ describe("Controles — confirmación de dos pasos", () => {
   });
 
   it("el segundo clic, dentro de la ventana, sí llama a fetch con {encender:true}", async () => {
-    const fetchMock = mockFetch({ cuerpo: { ok: true, accion: "encendida", tag: "ac:TDCON/DEMO/SENSORES/CONTROL" } });
+    const fetchMock = mockFetch({ cuerpo: { ok: true, accion: "encendida", tag: "ac:TDCON/DEMO/SEGURIDAD/CONTROL" } });
     montar();
 
     const boton = screen.getByRole("button", { name: /Encender bomba/ });

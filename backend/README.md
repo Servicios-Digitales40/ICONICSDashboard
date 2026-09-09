@@ -447,7 +447,7 @@ Códigos que no son 200: **503** sin `IA_BASE` o con la cola llena (tope de 8 en
 espera), **400** si la pregunta está vacía o pasa de 2000 caracteres.
 
 **El asistente sólo puede escribir una cosa: encender o apagar la bomba**, con
-la herramienta `controlar_bomba`, que escribe en `ac:TDCON/DEMO/SENSORES/CONTROL`.
+la herramienta `controlar_bomba`, que escribe en `ac:TDCON/DEMO/SEGURIDAD/CONTROL`.
 El resto del registro son lecturas; `POST /write` en crudo no es alcanzable
 desde el chat ni con la instrucción más astuta. Dos guardas protegen esa única
 escritura: `ICONICS_READ_ONLY` (la misma que gobierna `/api/iconics/write`) y,

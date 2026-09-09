@@ -87,7 +87,7 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
   const IconoOrigen = ICONO_ORIGEN[origen.key] ?? FlaskConical;
   /*
    * El indicador de encendido lee un tag del TANQUE
-   * (`ac:TDCON/DEMO/SENSORES/CONTROL`), así que sólo tiene algo que decir en
+   * (`ac:TDCON/DEMO/SEGURIDAD/CONTROL`), así que sólo tiene algo que decir en
    * las pantallas de esa máquina. En una de vibraciones estaba enseñando el
    * estado de OTRA instalación junto al título, que es exactamente el cruce
    * que la separación en secciones existe para impedir — y el peor sitio para

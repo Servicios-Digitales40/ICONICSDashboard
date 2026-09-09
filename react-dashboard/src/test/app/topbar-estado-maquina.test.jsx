@@ -7,7 +7,7 @@
  *
  * ── QUÉ PROTEGE ────────────────────────────────────────────────────
  *
- * `EstadoMaquinaBanner` lee `ac:TDCON/DEMO/SENSORES/CONTROL`, que es el tag
+ * `EstadoMaquinaBanner` lee `ac:TDCON/DEMO/SEGURIDAD/CONTROL`, que es el tag
  * de la bomba del TANQUE. Nació cuando toda la aplicación era la estación de
  * llenado y «la máquina» no era ambiguo; desde que la planta se partió en dos
  * sistemas, el mismo indicador junto al título de una pantalla de vibraciones

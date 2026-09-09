@@ -62,7 +62,7 @@
   "controls": {
     "pump": {
       "title": "Pump",
-      "sub": "Writes straight to ac:TDCON/DEMO/SENSORES/CONTROL, with the same guards as the assistant"
+      "sub": "Writes straight to ac:TDCON/DEMO/SEGURIDAD/CONTROL, with the same guards as the assistant"
     },
     "turnOn": "Start pump",
     "turnOff": "Stop pump",

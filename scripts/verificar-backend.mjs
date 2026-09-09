@@ -53,7 +53,7 @@ let batchCount = 0
  * para el bloque de `POST /api/control/bomba` más abajo. `nivelTanque`
  * controla si `controlar_bomba` deja pasar el encendido (< 90, el
  * `avisoMax` de `shared/eva/comun/umbrales.js`); `controlValor` es lo que
- * devuelve la RELECTURA tras escribir en `SENSORES/CONTROL` — normalmente
+ * devuelve la RELECTURA tras escribir en `SEGURIDAD/CONTROL` — normalmente
  * el mismo valor que se escribió, salvo que `controlIgnoraEscritura` esté
  * activo, que simula un punto cuya escritura no tiene efecto real.
  */
@@ -132,7 +132,7 @@ const fake = createServer(async (req, res) => {
     if (pn === 'lento') {
       return void setTimeout(() => json(200, { pointName: pn, value: 1 }), 1500).unref()
     }
-    if (pn?.endsWith('SENSORES/CONTROL')) return json(200, { pointName: pn, value: controlValor, quality: 192 })
+    if (pn?.endsWith('SEGURIDAD/CONTROL')) return json(200, { pointName: pn, value: controlValor, quality: 192 })
     return json(200, { pointName: pn, value: 42, quality: 192 })
   }
   if (p === '/fwxapi/rest/v1/Data' && req.method === 'POST') {
@@ -156,7 +156,7 @@ const fake = createServer(async (req, res) => {
     const items = JSON.parse(body)
     assert.ok(Array.isArray(items), 'Write debe recibir un array')
     for (const item of items) {
-      if (item.pointName?.endsWith('SENSORES/CONTROL') && !controlIgnoraEscritura) {
+      if (item.pointName?.endsWith('SEGURIDAD/CONTROL') && !controlIgnoraEscritura) {
         controlValor = item.value
       }
     }
@@ -1040,7 +1040,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.equal(encendido.status, 200)
     assert.equal(encendido.body.ok, true)
     assert.equal(encendido.body.accion, 'encendida')
-    assert.match(encendido.body.tag, /SENSORES\/CONTROL$/)
+    assert.match(encendido.body.tag, /SEGURIDAD\/CONTROL$/)
   })
 
   const apagado = await call(controlBase, '/api/control/bomba', postJson({ encender: false }))
@@ -1086,7 +1086,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.equal(cumplida.valorPedido, true)
     assert.equal(cumplida.valorLeido, true)
     assert.equal(cumplida.coinciden, true)
-    assert.match(cumplida.tag, /SENSORES\/CONTROL$/)
+    assert.match(cumplida.tag, /SEGURIDAD\/CONTROL$/)
     // La confirmación viene del Plan 21 F5; el diario sólo la persiste.
     assert.ok(Number.isInteger(cumplida.intentos), 'no se anotó cuántas relecturas costó')
   })

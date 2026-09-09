@@ -62,7 +62,7 @@
   "controls": {
     "pump": {
       "title": "Bomba",
-      "sub": "Escribe directamente sobre ac:TDCON/DEMO/SENSORES/CONTROL, con las mismas guardas que el asistente"
+      "sub": "Escribe directamente sobre ac:TDCON/DEMO/SEGURIDAD/CONTROL, con las mismas guardas que el asistente"
     },
     "turnOn": "Encender bomba",
     "turnOff": "Apagar bomba",

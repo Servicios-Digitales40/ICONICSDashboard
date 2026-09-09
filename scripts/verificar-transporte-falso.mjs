@@ -343,7 +343,7 @@ console.log('\n── Escritura ────────────────
 
 await checkAsync('lo escrito se relee tal cual, que es lo que necesita controlar_bomba', async () => {
   const cliente = sinCaos()
-  const tag = 'ac:TDCON/DEMO/SENSORES/CONTROL'
+  const tag = 'ac:TDCON/DEMO/SEGURIDAD/CONTROL'
 
   const antes = await cliente.readPoint(tag)
   assert.equal(antes.payload.value, null, 'sin escribir nunca, no hay valor')

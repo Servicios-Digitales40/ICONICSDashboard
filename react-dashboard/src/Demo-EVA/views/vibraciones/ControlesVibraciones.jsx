@@ -19,7 +19,7 @@
  * ── QUÉ HACE FALTA PARA CONSTRUIRLA ────────────────────────────────
  *
  *   · El TAG de escritura de este PLC, y confirmar que acepta la orden. Los
- *     de la estación de llenado están bajo `ac:TDCON/DEMO/SENSORES/CONTROL`;
+ *     de la estación de llenado están bajo `ac:TDCON/DEMO/SEGURIDAD/CONTROL`;
  *     los de esta máquina viven en otro árbol y no están comprobados.
  *   · Sus GUARDAS, y son suyas: el corte por nivel de tanque no significa
  *     nada aquí. Lo que protege a un motor con acelerómetros es otra cosa

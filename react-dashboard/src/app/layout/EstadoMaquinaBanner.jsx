@@ -29,13 +29,20 @@
  *
  * ── QUÉ TAG LEE, Y POR QUÉ NO ES UNA SEÑAL DEL CATÁLOGO ────────────
  *
- * Lee `ac:TDCON/DEMO/SENSORES/CONTROL` directamente — el mismo punto que
- * escribe `controlar_bomba` (`backend/ia/conversacion/herramientas.mjs`) y confirma tras
- * cada accionamiento. No es una de las ocho señales de
+ * Lee `TAG_CONTROL` directamente — el mismo punto que escribe
+ * `controlar_bomba` (`backend/ia/herramientas/maquina/index.mjs`) y confirma
+ * tras cada accionamiento. No es una de las señales de
  * `shared/eva/tanque/senales.js` (vive aparte a propósito, ver la cabecera de
  * `ControlesTanque.jsx`), así que no pasa por `useSistemaAgua`: se sondea suelto
  * con `useIconicsPoint`, igual que hace `IconicsLiveCard` para cualquier
  * punto fuera del catálogo.
+ *
+ * **Se movió el 09-09-2026** (Plan 27): vivía en `ac:TDCON/DEMO/SENSORES/CONTROL`,
+ * y planta lo trasladó a `ac:TDCON/DEMO/SEGURIDAD/CONTROL`. La ruta vieja
+ * sigue contestando `ok: true` pero con calidad mala y sin `value` — este
+ * banner ya lo trataba como «sin dato» por el guardián de calidad de más
+ * abajo, así que la reubicación no mostró un valor falso: mostró «sin dato»
+ * hasta que se corrigió el tag.
  *
  * ── LA CADENCIA ──────────────────────────────────────────────────
  *
@@ -49,9 +56,8 @@ import { Power, PowerOff, AlertTriangle } from "lucide-react";
 import { useTheme } from "@/theme";
 import { useIconicsPoint } from "@/lib/iconics";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
-import { RAIZ } from "@shared/eva/tanque/senales.js";
 
-const TAG_CONTROL = `${RAIZ}CONTROL`;
+const TAG_CONTROL = "ac:TDCON/DEMO/SEGURIDAD/CONTROL";
 
 // La REST API de FrameWorX devuelve quality como StatusCode de OPC UA
 // (0 = Good); se acepta también la convención clásica de OPC DA (192) y sus

@@ -38,10 +38,20 @@ import { fallo } from '../lib/respuesta.mjs'
  * ensamblador se quede sólo con lo que ensambla.
  */
 import { agruparPorRegla, horaLocal, redondear } from '../../conversacion/herramientas.mjs'
-import { RAIZ } from '../../../../shared/eva/tanque/senales.js'
 
-/** Punto de control de la bomba: no es una señal del catálogo, así que vive aparte. */
-const TAG_CONTROL_BOMBA = `${RAIZ}CONTROL`
+/**
+ * Punto de control de la bomba: no es una señal del catálogo, así que vive
+ * aparte y no sale de `RAIZ` de `senales.js` (que ya no es una sola cadena,
+ * ver Plan 27 F1).
+ *
+ * **Se movió el 09-09-2026** (Plan 27): vivía en `SENSORES/CONTROL`, y planta
+ * lo trasladó a `SEGURIDAD/CONTROL`, junto al paro de emergencia — es el
+ * mando de mayor alcance del árbol, y ahí es donde corresponde. La ruta
+ * vieja sigue devolviendo `ok: true` con calidad mala (`2147483652`, no
+ * `value`) en vez de un error: es exactamente el punto fantasma que
+ * `shared/quality.js` existe para no dejar pasar como una lectura válida.
+ */
+const TAG_CONTROL_BOMBA = 'ac:TDCON/DEMO/SEGURIDAD/CONTROL'
 
 /*
  * ── LA RELECTURA DE CONFIRMACIÓN SE MUDÓ AL CLIENTE (Plan 21 F5) ────
@@ -211,7 +221,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
     },
 
     /**
-     * Enciende o apaga la bomba escribiendo en `ac:TDCON/DEMO/SENSORES/CONTROL`.
+     * Enciende o apaga la bomba escribiendo en `TAG_CONTROL_BOMBA`.
      *
      * La única función de este archivo que escribe. Dos guardas, en orden: ver
      * la cabecera del archivo. La del nivel sólo se aplica al ENCENDIDO — apagar
