@@ -31,6 +31,24 @@
  * declarado. Un punto renombrado en ICONICS aparece hoy como «sin dato»
  * permanente y hay que descubrirlo mirando la pantalla; esto lo dice por su
  * nombre, con el sobrante y el faltante en dos listas.
+ *
+ * ── POR QUÉ TAMBIÉN MIRA UN NIVEL ARRIBA (Plan 27 F0) ───────────────
+ *
+ * El 09-09-2026 planta publicó doce ramas nuevas bajo `ac:TDCON/DEMO/`,
+ * HERMANAS de la única raíz que el tanque declaraba
+ * (`ac:TDCON/DEMO/SENSORES/`), no hijas suyas. Antes de esta sección, este
+ * guion sólo veía los tres puntos que se habían movido fuera de esa raíz —
+ * el resto del árbol nuevo le era invisible por diseño, porque nunca lo
+ * pisaba. Es el mismo fallo silencioso que el resto del archivo ya vigila,
+ * un nivel más arriba: no un punto que cambia de nombre, sino UN SISTEMA
+ * ENTERO que crece al lado de donde este guion mira. Ver
+ * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.1.
+ *
+ * Por eso, además de recorrer cada raíz hacia abajo, se explora una vez el
+ * PADRE de cada raíz declarada y se listan sus ramas hijas que no
+ * corresponden a ninguna raíz conocida de `SISTEMAS`. No baja más: para ver
+ * el contenido de una rama hermana está `sondear-arbol.mjs`, que vuelca un
+ * árbol entero sin comparar nada. Esto sólo avisa de que existe.
  */
 import assert from 'node:assert/strict'
 
@@ -370,6 +388,46 @@ if (process.argv.includes('--real')) {
     }
     if (!faltan.length && !sobran.length) console.log(`    ${c.verde}coinciden${c.reset}`)
   }
+
+  /* ── Un nivel arriba: ¿hay ramas hermanas que ninguna raíz declara? ── */
+  console.log(`\n  ${c.negrita}Ramas hermanas de las raíces declaradas${c.reset}`)
+
+  /** El padre de una raíz: quitar la barra final y el último segmento. */
+  function padreDe(raiz) {
+    const sinBarra = raiz.replace(/\/$/, '')
+    const idx = sinBarra.lastIndexOf('/')
+    return idx < 0 ? null : sinBarra.slice(0, idx + 1)
+  }
+
+  const raicesConocidas = new Set(SISTEMAS.flatMap((s) => s.raices))
+  const padres = new Set(
+    SISTEMAS.flatMap((s) => s.raices).map(padreDe).filter(Boolean)
+  )
+
+  let algunaHermana = false
+  for (const padre of padres) {
+    const respuesta = await cliente.browse(padre)
+    if (!respuesta.ok) {
+      console.log(`    ${c.gris}! No se pudo explorar ${padre}: ${respuesta.error}${c.reset}`)
+      continue
+    }
+    const nodos = Array.isArray(respuesta.payload) ? respuesta.payload : []
+    const ramas = nodos
+      .map((nodo) => nodo.pointName ?? nodo.browsePointName)
+      .filter((punto) => punto?.endsWith('/'))
+    const hermanas = ramas.filter((rama) => !raicesConocidas.has(rama))
+
+    if (hermanas.length) {
+      algunaHermana = true
+      console.log(`    ${c.amarillo}${hermanas.length} bajo ${padre} que ninguna raíz declara:${c.reset}`)
+      for (const rama of hermanas) console.log(`      · ${rama}`)
+    }
+  }
+  if (!algunaHermana) console.log(`    ${c.verde}ninguna${c.reset}`)
+  console.log(
+    `    ${c.gris}No es un fallo por sí solo: puede ser un sistema nuevo sin catalogar. ` +
+    `Sondear su contenido con sondear-arbol.mjs antes de decidir.${c.reset}`
+  )
 } else {
   console.log(
     `\n${c.gris}Sin --real no se toca la red. Para contrastar con el servidor de planta:\n` +
