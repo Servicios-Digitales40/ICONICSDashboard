@@ -177,11 +177,14 @@ Dos consecuencias, y las dos importan más que el cambio de rama:
    208Y/120 en `senales.js`— y no como si el servidor lo hubiera dicho.
    Conviene además que entre en la próxima revisión del PDF, porque hoy el
    catálogo de variables no lo recoge.
-2. **No es una medida: es el mando de mayor alcance de todo el árbol.** Un
-   `START_STOP_VFD` arranca una bomba; `CONTROL` gobierna el proceso entero.
-   Que ahora viva en `SEGURIDAD/` lo dice bien —es la rama del paro de
-   emergencia—, y refuerza F7: de las variables escribibles, ésta es la que
-   **por ningún motivo** se expone antes de que la autenticación esté encendida.
+2. **No es una medida: es el mando de mayor alcance de todo el árbol, y ya se
+   escribe** — no desde este plan, desde antes. Un `START_STOP_VFD` arranca una
+   bomba; `CONTROL` gobierna el proceso entero, y `controlar_bomba` lleva
+   tiempo escribiéndolo, guardado por `ICONICS_READ_ONLY` y no por la
+   autenticación (que sigue apagada y no protege nada, §2.11). Que ahora viva
+   en `SEGURIDAD/` lo dice bien —es la rama del paro de emergencia—, y es la
+   razón de que F7 lo trate aparte: de las variables de este plan que SÍ son
+   nuevas, ninguna hereda esa escritura por arrastre.
 
 ### 1.3 Anomalías del servidor, que se declaran como son
 
@@ -239,6 +242,49 @@ Esto es dominio puro y va en `shared/` (§2.6, §2.7). Es también lo que impide
 que el plan degenere en «sesenta y seis tarjetas iguales», que sería la vista
 de Assets otra vez, con más ruido.
 
+### 2.1 ¿No convendría un catálogo de Assets del que todo se derive?
+
+Es la pregunta que hizo el usuario el 09-09-2026, a raíz de ver cuántos
+archivos tocó el bugfix de `CONTROL` (commit `4dcc12d`) para mover un solo
+punto. La respuesta corta es **sí, y ya es el plan** — pero merece decirse por
+qué ese bugfix no lo contradice, sino que señala exactamente dónde faltaba.
+
+`shared/eva/tanque/senales.js` **ya es** ese catálogo: una entrada por señal,
+con su `tag`, `label`, `unidad`, `decimales`, `tipo`, `activo` y ahora, con este
+plan, su `rama` (F1), su `naturaleza` (§2) y su nombre `hda:` cuando lo tenga
+(F6). Mover una señal declarada ahí es cambiar **una línea**, y
+`verificar-catalogo --real` (F0, ya en el repo) avisa solo si esa línea se
+queda desactualizada frente al servidor.
+
+**Lo que rompió el bugfix de hoy no pasó por ese catálogo — pasó por FUERA de
+él, a propósito.** `SEGURIDAD/CONTROL` (el mando maestro del proceso, §1.2) se
+diseñó como «vive aparte» porque no es una medida: no tiene escala, ni banda,
+ni umbral que evaluar, y `senales.js` sólo sabía describir señales de ese tipo.
+El resultado fue un `TAG_CONTROL_BOMBA` y un `TAG_CONTROL` escritos a mano en
+dos archivos de producción, sin ningún catálogo detrás — y cuando planta lo
+movió, arreglarlo fue un `grep` por el repositorio, no una línea.
+
+Esa es la lección real, y coincide con lo que el usuario pide: **la solución no
+es inventar un catálogo nuevo, es que ESTE catálogo deje de tener puntos que
+viven fuera de él por no encajar en su forma.** El campo `naturaleza` de §2 ya
+resuelve eso — un `mando` como `CONTROL` cabe en el mismo catálogo que un
+`medida` como el nivel, sólo que se evalúa distinto — así que F1 pasa a incluir
+también dar de alta `CONTROL` como una entrada más de `senales.js`
+(`naturaleza: "mando"`, sin `escala` ni `umbral`), y F7 cambia
+`TAG_CONTROL_BOMBA`/`TAG_CONTROL` para que lean su punto de `pointName("control")`
+en vez de llevarlo hardcodeado cada uno por su lado. La próxima vez que planta
+mueva ese punto, el cambio es una línea en el catálogo, y `verificar-catalogo
+--real` lo confirma solo.
+
+**Una cosa que un catálogo no puede prometer, y conviene decirlo para no
+generar una expectativa falsa: alguien sigue teniendo que escribir esa línea.**
+Nada de lo que hay aquí ni lo que pueda construirse detecta por sí solo que
+`SNIVEL_TANQUE` en la carpeta vieja y `NIVEL_TANQUE` en la nueva son la MISMA
+señal — eso es conocimiento de planta, no algo que se infiera del árbol. Lo que
+el catálogo sí puede prometer, y es lo que pide el usuario, es que ese cambio
+sea **un lugar, no varios**, y que el `--real` de F0 lo señale el mismo día que
+ocurre, en vez de descubrirse por una pantalla que deja de leer.
+
 ---
 
 ## 3 · Lo que queda por preguntar a planta
@@ -266,52 +312,75 @@ de conclusión.
 
 ---
 
-## 4 · ⛔ La historización se hizo en planta, y no se ha podido confirmar
+## 4 · ⛔ El diagnóstico anterior estaba mal enfocado: hacía falta el namespace `hda:`, no `ac:`
 
-El 09-09-2026 se historizaron las variables y se expusieron a la API. **Este
-plan no puede darlo por bueno todavía**, y conviene ser preciso sobre por qué,
-porque el motivo no es el trabajo hecho en planta.
+Las dos primeras versiones de esta sección decían que el historiador estaba
+caído, con `/History` devolviendo 500 de forma intermitente incluso en
+vibraciones. **Ese síntoma era real, pero la conclusión era la equivocada**: no
+se estaba preguntando mal el servidor, se estaba preguntando por el árbol
+equivocado.
 
-Tres sondeos contra `/History` a lo largo del día, con la lectura en vivo
-funcionando con normalidad en los tres (los sesenta y seis puntos responden con
-`quality: 0`):
+El 09-09-2026 el usuario aportó la pieza que faltaba: un ejemplo de cómo se lee
+un histórico de verdad, `hda:\Configuration\DEMO TANQUE\INSTRUMENTACION_PROCESO:NIVEL_TANQUE`,
+y la captura del árbol de Hyper Historian. **`/History` no habla el mismo
+namespace que `/Data` y `browse()`.** Las lecturas en vivo y la navegación de
+activos usan `ac:TDCON/DEMO/…` (AssetWorX); el historiador tiene su PROPIO
+árbol, `hda:\Configuration\DEMO TANQUE\…`, y es ahí donde hay que pedir la
+serie — no hay traducción automática de uno a otro para `/History`, y todos
+los sondeos de las dos versiones anteriores preguntaban por el nombre `ac:`.
+Es la misma pista que ya estaba escrita en la cabecera de `senales.js` desde
+agosto —`INDICE_DESVIACION_VOLTAJE` se historiza contra
+`hda:\Configuration\DEMO DANONE:Tension`— y que no se había generalizado a
+todo el árbol nuevo hasta ahora.
 
-| Cuándo | Qué contestó `/History` |
-|---|---|
-| 19:47Z, 25 puntos | HTTP 500 en **todos** |
-| Después de la historización, 25 puntos | HTTP 500 en **todos** |
-| Variantes sobre un punto | `average`, `Interpolative`, `Raw` y sin agregado: **`ok` con cero muestras**; al repetir, 500 otra vez |
-| Ventanas de 1 h, 6 h, 24 h, 7 d y 30 d | 500 en casi todas; la que contestó, cero muestras |
+**Confirmado por `browse()` el 09-09-2026**, el árbol `hda:` mira exactamente
+las mismas doce ramas que `ac:TDCON/DEMO/`, con los mismos nombres de carpeta:
 
-Dos hechos que, juntos, apuntan al servidor y no al árbol:
+```
+hda:\Configuration\DEMO TANQUE
+    ├─ INSTRUMENTACION_PROCESO       (NIVEL_TANQUE, TEMPERATURA_TANQUE,
+    │                                 FLUJO_INSTANTANEO, PRESION_RELATIVA)
+    ├─ MANDO_DEL_VARIADOR_VFD, SOLENOIDE_1, SOLENOIDE_2, BOMBA_DE_AIRE,
+    │  AUTOMATISMO_LLENADO_VACIADO, LECTURA_VARIADOR_MODBUS_RTU,
+    │  MEDIDOR_DE_ENERGIA, ALARMAS, ADVERTENCIAS_ESTADO_OPERACION,
+    │  CONTADORES_VARAIBLES_MAQUINA, SEGURIDAD
+    └─ (sueltos, en la raíz): Flujo Lmin, Presion mBar, Tension  ← ver abajo
+```
 
-1. **Falla igual en `ac:TDCON/Motors/01/S1/vRMS_S1`**, de la máquina de
-   vibraciones, que este plan no toca y que servía historia hasta ahora.
-2. **El fallo es intermitente.** La misma petición da 500 y, repetida, `ok` con
-   cero muestras. Un punto sin historizar no se comporta así: contesta de forma
-   estable, con o sin datos.
+**Con la ruta correcta, `/History` deja de dar 500.** Devuelve `ok: true` para
+los ocho puntos probados de `INSTRUMENTACION_PROCESO`, `MEDIDOR_DE_ENERGIA` y
+`SEGURIDAD`, en ventanas de 1 h a 30 días. Eso descarta que el servicio de
+historial esté caído — la conclusión de las dos versiones anteriores de esta
+sección era el diagnóstico equivocado.
 
-Es la misma situación que ya se diagnosticó en este proyecto días atrás, cuando
-FrameWorX devolvía 500 con cuerpo vacío en casi todos sus extremos: hoy `/Data`
-se ha recuperado y `/History` no.
+**Lo que `/History` no ha devuelto todavía, en ninguna ventana probada, es una
+sola muestra.** Ni las cuatro carpetas nuevas ni los tres puntos sueltos de la
+raíz (`Flujo Lmin`, `Presion mBar`, `Tension` — que por nombre y forma son el
+resto de la reubicación que ya afectó a `INDICE_DESVIACION_VOLTAJE` en agosto,
+del área `DEMO DANONE` renombrada a `DEMO TANQUE`) tienen ni una muestra en 1 h,
+6 h, 24 h, 7 días o 30 días. Y una ventana de sólo 15 minutos sobre un punto
+nuevo sí volvió a dar 500, con cualquier agregado — el mismo síntoma
+intermitente de siempre, ahora en un caso más estrecho.
 
-Consecuencia directa: **no se puede saber todavía qué puntos tienen serie
-propia**, que es exactamente el dato que `historizadas()` lleva un año
-protegiendo — la puerta que impide que una gráfica de «Carga del motor» pinte
-la curva de la temperatura del tanque con otro rótulo.
+**No se puede concluir todavía si esto es «la colección empezó hace muy poco y
+aún no hay nada que devolver» o «algo más sigue sin funcionar».** Lo primero
+es lo más probable dado que el usuario confirma haber historizado estas
+variables el mismo día; lo segundo no se descarta con lo medido hasta ahora
+para los tres puntos que deberían traer casi un mes de historia previa
+(`Flujo Lmin`, `Presion mBar`, `Tension`) si el renombrado de área conservó los
+datos archivados — y devuelven cero muestras igual que las carpetas
+recién creadas.
 
-**Por eso F6 sigue fuera del camino crítico y todo el catálogo nuevo se declara
-`historizado: false`.** No es desconfianza hacia lo que se hizo en planta: es
-que `historizado: true` es una afirmación medida, y hoy la medición no se puede
-tomar. En cuanto `/History` responda de forma estable, F6 lo comprueba punto
-por punto y el catálogo se corrige — con la sonda, que ya está escrita.
-
-> **Y hay que comprobarlo punto por punto, no en bloque.** Que `/History`
-> conteste no basta: en agosto de 2026 tres señales de este mismo árbol
-> devolvieron la serie de la temperatura del tanque, con marcas de tiempo
-> correctas y sin dar error. Por eso la sonda de F6 contrasta la última muestra
-> contra la lectura en vivo del mismo punto: si la serie es de otro tag, no se
-> parecen.
+**Por eso F6 sigue fuera del camino crítico, pero por un motivo distinto al que
+decía esta sección antes: ya no es «el servidor no contesta», es «contesta, y
+de momento no trae nada».** Todo el catálogo nuevo se sigue declarando
+`historizado: false` hasta que una consulta `hda:` devuelva al menos una
+muestra que se pueda contrastar contra la lectura en vivo del mismo punto —el
+mismo criterio de siempre: que `/History` conteste no basta, hay que comprobar
+que la serie es la SUYA, no la de otro tag (así se descubrió en agosto que tres
+señales devolvían la temperatura del tanque). La sonda que hizo este sondeo
+sale reforzada en F6: recorre `ac:` para el valor en vivo y `hda:` para la
+serie, y ahora sabe construir el segundo nombre a partir del primero.
 
 ---
 
@@ -341,17 +410,32 @@ Sin red no cambia nada, así que F0 entra en CI igual que hoy.
 
 `shared/eva/tanque/senales.js`:
 
-- `RAIZ` (cadena) → `RAMAS` (mapa de id de rama → prefijo). `RAIZ` se conserva
-  como puerta de una línea (§4.2) mientras haya quien la importe.
+- Se añade `RAMAS` (mapa de id de rama → prefijo), con las trece.
 - Cada entrada del catálogo declara su `rama`, y `pointName()` la compone.
 - `parsePointName()` deja de hacer un `startsWith(RAIZ)` único: resuelve contra
   las trece ramas. **Sigue devolviendo `null` ante lo desconocido** — un punto
   que no se reconoce es dato ausente, nunca una asignación a la señal
   equivocada.
 - `sistemas.js`: `raices: [RAIZ]` → las trece.
+- **`SEGURIDAD/CONTROL` entra al catálogo** (§2.1), con `naturaleza: "mando"`,
+  sin `escala` ni `umbral`. Es la señal que arregla lo que el bugfix de hoy
+  dejó pendiente: que deje de vivir hardcodeada fuera de `senales.js`.
 
-Nada de esto añade una sola variable todavía. Es la fase que hace posible el
-resto, y se prueba con las ocho de siempre.
+`RAIZ` **no desaparece, pero cambia lo que significa**: de la única raíz del
+sistema (`SENSORES/`, hoy con sólo 3 de las 66 variables) pasa a ser el prefijo
+común de las trece — `ac:TDCON/DEMO/`. No es un capricho: tres sitios lo
+importan hoy sólo para MOSTRARLO, nunca para resolver un punto —
+`AssetsEva.jsx` (el botón que salta al árbol de la demo en el explorador de
+Assets), `MaquetaTanque3D.jsx` (el pie de foto «datos de…» bajo la maqueta) y
+`estadoTanque.js` (el campo `raiz` del resumen que lee el asistente) — y para
+los tres, «la raíz de la instalación» es justo el `ac:TDCON/DEMO/` que ya
+calculaba `Sidebar.jsx` a mano (`RAIZ.replace(/\/?SENSORES\/?$/, "")`, ahora
+innecesario: ya no hay que quitarle nada). Es la única puerta de §4.2 real de
+esta fase: mismo nombre exportado, valor corregido, tres importadores que
+ganan precisión sin que se les toque una línea.
+
+Nada de esto añade una sola variable al catálogo. Es la fase que hace posible
+el resto, y se prueba con las nueve de siempre (las ocho más `CONTROL`).
 
 ### F2 · Los tres puntos rotos, y sólo ésos
 
@@ -434,46 +518,67 @@ Sigue siendo agrupación NUESTRA, por pregunta y no por sección del programa
 La pregunta del activo «Seguridad» tiene dos mitades porque la rama tiene dos
 puntos, y responden a cosas distintas: `CONTROL` dice si el proceso está
 habilitado, `PARO_DE_EMERGENCIA` si se puede arrancar. Con `CONTROL` en esta
-rama es el único activo del tablero que **enseña un mando** además de un
-estado — leído, nunca escrito (F7).
+rama es el único activo del tablero que enseña un mando además de un estado —
+y ya escribible desde antes de este plan, no por él (F7).
 
-### F6 · ⛔ La historia, cuando el historiador vuelva
+### F6 · ⛔ La historia, con el namespace `hda:` — cuando traiga muestras
 
-Bloqueada por §4, y **sólo por el servidor**: la historización ya se hizo en
-planta el 09-09-2026. Lo que falta es poder medirla.
+Bloqueada por §4, y ya no por el servidor: `/History` contesta contra
+`hda:\Configuration\DEMO TANQUE\…`, que es el árbol correcto (§4). Lo que falta
+es que traiga al menos una muestra que se pueda contrastar.
 
-Cuando `/History` responda de forma estable: recorrer punto por punto qué serie
-devuelve de verdad, contrastando la última muestra contra la lectura en vivo
-del mismo tag —que es como se descubrió en agosto que tres señales devolvían la
-temperatura del tanque sin dar error—, y sólo entonces poner
-`historizado: true` donde corresponda.
+Cada punto historizado del catálogo necesita, además de su `tag` bajo `ac:`,
+el nombre `hda:` de su serie — no se derivan el uno del otro por una regla fija
+(el ejemplo de agosto, `INDICE_DESVIACION_VOLTAJE` → `DEMO DANONE:Tension`, no
+sigue el patrón `carpeta\TAG` de los demás), así que es un campo más del
+catálogo, no un cálculo.
 
-La sonda ya está escrita y es la que produjo la tabla de §4; entra en
-`scripts/` junto a la de F0. El catálogo no se toca hasta que ella conteste:
-una serie declarada de oídas es peor que una gráfica que falta.
+Cuando una consulta `hda:` traiga muestras: recorrer punto por punto,
+contrastando la última contra la lectura en vivo del mismo tag —que es como se
+descubrió en agosto que tres señales devolvían la temperatura del tanque sin
+dar error—, y sólo entonces poner `historizado: true` donde corresponda.
 
-### F7 · ⛔ La escritura NO entra en este plan
+La sonda que produjo el inventario de §4 entra en `scripts/` junto a la de F0,
+ya con la doble consulta (`ac:` para el valor en vivo, `hda:` para la serie).
+El catálogo no se toca hasta que ella conteste con datos: una serie declarada
+de oídas es peor que una gráfica que falta.
 
-Veinte de las variables nuevas son escribibles: `START_STOP_VFD`, `MTTO_S1`,
-`SETPOINT_LLENANDO`, `ARRANQUE_PARO_VACIADO`… y `SEGURIDAD/CONTROL`, que
-enciende y apaga el proceso entero (§1.2).
+### F7 · ⛔ La escritura de las DIECINUEVE variables nuevas NO entra en este plan
+
+Diecinueve de las variables nuevas son escribibles: `START_STOP_VFD`,
+`MTTO_S1`, `SETPOINT_LLENANDO`, `ARRANQUE_PARO_VACIADO`…
+
+**`SEGURIDAD/CONTROL` no es una veinteava: ya se escribe hoy, desde antes de
+este plan**, y su corrección de tag (commit `4dcc12d`) fue un bugfix urgente,
+no parte de esta fase. `controlar_bomba` (herramienta del asistente) y el botón
+de «Controles» del tablero llevan tiempo escribiendo ese punto — corregido para
+que apunten a `SEGURIDAD/CONTROL` en vez de a la ruta que planta ya retiró.
+Vale la pena decir esto sin rodeos porque cambia el riesgo: no es una capacidad
+que este plan podría abrir, es una que YA estaba abierta y que un cambio de
+árbol dejó apuntando a un tag fantasma.
+
+Y su guarda no es la que se podría suponer. **No es `AUTH_HABILITADA`** —esa
+sigue apagada porque el tablero no sabe pedir un token (§2.11, Plan 25) y no
+protege nada hoy— **es `ICONICS_READ_ONLY`**, que en el entorno de desarrollo
+de este plan está en `false`: la escritura está activa ahora mismo. Confundir
+las dos guardas fue el error de la versión anterior de esta sección, que
+declaraba `CONTROL` como algo pendiente de exponer.
 
 El puente sabe escribir (`writePoint`, con confirmación por relectura, Plan 21
-F5) y sabe registrar quién lo hizo (diario de accionamientos, Plan 22 F3). Lo
-que **no** está encendido es la autenticación: `AUTH_HABILITADA=false`, porque
-el tablero todavía no sabe pedir un token (§2.11, Plan 25).
+F5) y sabe registrar quién lo hizo (diario de accionamientos, Plan 22 F3) — es
+la infraestructura que ya usa `controlar_bomba`. Lo que este plan sí decide es
+no EXTENDER esa superficie a las diecinueve variables nuevas: un tablero sin
+autenticación que además pudiera mover un set point de llenado o forzar un
+solenoide en un banco físico no es una función pendiente, **es un riesgo
+mayor** que el que ya existe con la bomba. Éstas se declaran `mando` y **se
+leen**; su escritura es un plan posterior, después del Plan 25, y con su propia
+conversación sobre quién puede hacer qué.
 
-Un tablero sin autenticación que pueda arrancar una bomba o mover un set point
-de llenado en un banco físico no es una función pendiente: **es un riesgo.**
-Este plan las declara `mando` y **las lee**; no expone ni un control de
-escritura. La escritura es un plan posterior, después del Plan 25, y con su
-propia conversación sobre quién puede hacer qué.
-
-Y dentro de esa conversación, `SEGURIDAD/CONTROL` no es una más de las veinte:
-es la de mayor alcance del árbol, y vive en la rama del paro de emergencia. Aun
-con la autenticación encendida, merece decidirse aparte —quién, con qué
-confirmación, y si el tablero debe poder hacerlo siquiera— en lugar de entrar
-por arrastre con el resto de los mandos.
+`SEGURIDAD/CONTROL` sigue siendo un caso aparte dentro de esa conversación
+futura: es el mando de mayor alcance del árbol —gobierna el proceso entero, no
+un equipo— y vive junto al paro de emergencia. Cuando llegue el Plan de
+autenticación, merece revisarse primero y con más cuidado que el resto, no
+heredar sus guardas por arrastre.
 
 ### F8 · Que el texto deje de decir «ocho»
 
