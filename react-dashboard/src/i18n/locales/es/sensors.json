@@ -38,6 +38,56 @@
       "label": "Eficiencia energética",
       "corto": "Eficiencia",
       "nota": "El historiador no publica serie propia de este tag."
+    },
+    "nivelAltoAlto": {
+      "label": "Nivel alto-alto",
+      "corto": "Nivel A-A",
+      "nota": "Nivel por encima del límite crítico superior. Riesgo de derrame."
+    },
+    "nivelAlto": {
+      "label": "Nivel alto",
+      "corto": "Nivel alto",
+      "nota": "Nivel por encima del límite de advertencia superior."
+    },
+    "nivelBajoBajo": {
+      "label": "Nivel bajo-bajo",
+      "corto": "Nivel B-B",
+      "nota": "Nivel por debajo del límite crítico inferior. Riesgo de marcha en seco de la bomba."
+    },
+    "nivelBajo": {
+      "label": "Nivel bajo",
+      "corto": "Nivel bajo",
+      "nota": "Nivel por debajo del límite de advertencia inferior."
+    },
+    "presionAlta": {
+      "label": "Presión alta",
+      "corto": "Presión alta",
+      "nota": "Presión de línea por encima del límite."
+    },
+    "faltaDePresion": {
+      "label": "Falta de presión",
+      "corto": "Sin presión",
+      "nota": "Presión ausente con bomba en marcha. Indica cebado perdido, succión obstruida o fuga."
+    },
+    "bajoFlujo": {
+      "label": "Bajo flujo",
+      "corto": "Bajo flujo",
+      "nota": "Caudal por debajo del mínimo con bomba en marcha."
+    },
+    "fallaVariador": {
+      "label": "Falla del variador",
+      "corto": "Falla VFD",
+      "nota": "Falla activa reportada por el variador."
+    },
+    "control": {
+      "label": "Mando del proceso",
+      "corto": "Control",
+      "nota": "Enciende y apaga el proceso. No está documentado en el DB del PLC."
+    },
+    "paroDeEmergencia": {
+      "label": "Paro de emergencia",
+      "corto": "Paro emerg.",
+      "nota": "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma."
     }
   },
   "quality": {

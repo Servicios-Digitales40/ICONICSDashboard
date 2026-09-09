@@ -64,7 +64,7 @@
  * una prueba manual. Quien quiera ensayar un ICONICS caído para esto ya tiene
  * `client: null` o desenchufar `ICONICS_API_BASE` sin `ICONICS_FAKE`.
  */
-import { esHistorizada, parsePointName } from '../../shared/eva/tanque/senales.js'
+import { SENALES, esHistorizada, parsePointName } from '../../shared/eva/tanque/senales.js'
 import { MAX_PUNTOS } from '../../shared/eva/comun/historia.js'
 import { mediaDelTramo } from '../../shared/eva/tanque/simulador.js'
 import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/comun/sistemas.js'
@@ -102,6 +102,20 @@ function lecturaSimulada(name, t, rnd) {
   if (valor === null) return { pointName: name, quality: QUALITY_SIN_DATO }
   if (rnd() < CAOS.malaCalidad) return { pointName: name, value: 0, quality: QUALITY_BAD_UA }
   return { pointName: name, value: valor, quality: QUALITY_GOOD_UA }
+}
+
+/**
+ * ¿Es un punto de MANDO (`naturaleza: "mando"` del catálogo, hoy sólo
+ * `CONTROL`, Plan 27 F3)? Estos no pasan por `lecturaSimulada`: no tienen
+ * física propia que simular —son una orden del operador, no una medida—, así
+ * que su lectura tiene que reflejar lo último ESCRITO, igual que hace este
+ * transporte con cualquier punto ajeno a todos los catálogos. Sin esta
+ * guarda, `CONTROL` entraría al catálogo (F3) con un valor simulado propio y
+ * `controlar_bomba` dejaría de poder confirmar sus propias escrituras contra
+ * el transporte falso — la relectura vería la física, nunca la orden.
+ */
+function esMando(name) {
+  return SENALES[parsePointName(name)]?.naturaleza === 'mando'
 }
 
 /**
@@ -175,16 +189,16 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
   async function readPoint(name) {
     if (!name) return { ok: false, status: 400, error: 'pointName is required.' }
 
-    const lectura = lecturaSimulada(name, ahora(), rnd)
+    const lectura = esMando(name) ? null : lecturaSimulada(name, ahora(), rnd)
     if (lectura) {
       if (rnd() < CAOS.ausente) return { ok: false, status: 404, error: 'Point not found.' }
       return { ok: true, status: 200, pointName: name, payload: lectura }
     }
 
-    // Fuera de todos los catálogos: es un punto de escritura (`CONTROL`) o uno
-    // que no existe. Los dos se sirven igual — lo último escrito, o `null` si
-    // nunca se escribió — porque el servidor real tampoco distingue las dos
-    // cosas en una lectura sencilla.
+    // Sin lectura simulada: un punto de mando (`esMando`), uno fuera de todos
+    // los catálogos, o uno que no existe. Los tres se sirven igual — lo
+    // último escrito, o `null` si nunca se escribió — porque el servidor real
+    // tampoco distingue estos casos en una lectura sencilla.
     return {
       ok: true, status: 200, pointName: name,
       payload: { value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
@@ -200,10 +214,11 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
       // hace `read()` del simulador del frontend con `chaos.ausente`.
       if (rnd() < CAOS.ausente) continue
 
-      const lectura = lecturaSimulada(name, t, rnd)
+      const lectura = esMando(name) ? null : lecturaSimulada(name, t, rnd)
       byPointName[name] = {
         ok: true, status: 200,
-        // Fuera de todos los catálogos: punto de escritura, o inexistente.
+        // Sin lectura simulada: punto de mando, fuera de todos los
+        // catálogos, o inexistente. Ver `esMando`.
         payload: lectura ?? { pointName: name, value: escritos.get(name) ?? null, quality: QUALITY_GOOD_UA },
       }
     }

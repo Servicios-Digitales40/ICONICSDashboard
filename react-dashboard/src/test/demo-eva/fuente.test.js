@@ -100,7 +100,7 @@ describe("la fuente registra y lee lo que debe", () => {
     const source = createEvaSource({ transport, intervalMs: 60_000 });
 
     const { baja } = await unaLectura(source);
-    expect(source.stats().referencias).toBe(8);
+    expect(source.stats().referencias).toBe(TODOS_LOS_PUNTOS.length);
 
     baja();
     expect(source.stats().referencias).toBe(0);
@@ -119,7 +119,7 @@ describe("la fuente registra y lee lo que debe", () => {
     await new Promise((r) => setTimeout(r, 400));
 
     expect(transport.read).toHaveBeenCalledTimes(1);
-    expect(source.stats().referencias).toBe(8);
+    expect(source.stats().referencias).toBe(TODOS_LOS_PUNTOS.length);
 
     a();
     b();

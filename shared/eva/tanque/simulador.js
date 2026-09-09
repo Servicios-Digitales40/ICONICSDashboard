@@ -34,6 +34,7 @@
  * sobrecalentamiento, caída de tensión y sobrecarga.
  */
 
+import { UMBRALES } from '../comun/umbrales.js'
 import { parsePointName } from './senales.js'
 
 const TAU = Math.PI * 2
@@ -226,6 +227,68 @@ export function valorEn(clave, ms) {
         : base
     }
 
+    /*
+     * ── PLAN 27 F3: LAS NUEVE SEÑALES NUEVAS ────────────────────────
+     *
+     * Las de alarma se derivan de la MISMA fórmula que ya calcula la medida
+     * de la que dependen —no se inventa una física aparte—, comparada contra
+     * el mismo umbral que usa la banda de esa medida (`umbrales.js`), para
+     * que el bit del PLC y la banda del tablero cuenten la misma historia en
+     * la demo. Que a veces no coincidan del todo (uno cruza antes que el
+     * otro) es fiel a lo que dice la limitación declarada en `sistemas.js`:
+     * son DOS fuentes, no una.
+     */
+    case 'nivelAltoAlto':
+      return valorEn('nivelTanque', ms) >= UMBRALES.nivelTanque.max
+    case 'nivelAlto':
+      return valorEn('nivelTanque', ms) >= UMBRALES.nivelTanque.avisoMax
+    case 'nivelBajoBajo':
+      return valorEn('nivelTanque', ms) <= UMBRALES.nivelTanque.min
+    case 'nivelBajo':
+      return valorEn('nivelTanque', ms) <= UMBRALES.nivelTanque.avisoMin
+    case 'presionAlta':
+      return valorEn('presionRelativa', ms) >= UMBRALES.presionRelativa.max
+    // `soloEnMarcha` en el catálogo ya oculta esta alarma en el paro
+    // (pasa a `reposo`); aquí sólo hace falta el cruce del umbral.
+    case 'faltaDePresion':
+      return valorEn('presionRelativa', ms) <= UMBRALES.presionRelativa.min
+    case 'bajoFlujo':
+      return valorEn('flujoInstantaneo', ms) <= UMBRALES.flujoInstantaneo.avisoMin
+
+    /* Ligada al mismo evento que ya sobrecarga el motor: una sobrecarga real
+       del motor es plausible que dispare también una falla del variador que
+       lo alimenta. */
+    case 'fallaVariador':
+      return ev?.nombre === 'sobrecarga'
+
+    /*
+     * `CONTROL` no tiene física propia que simular: es una ORDEN del operador
+     * (`naturaleza: "mando"`), no una medida. Lo que se ve AQUÍ sólo importa
+     * para el «modo simulado» del frontend (`Demo-EVA/data/tanque/simulador.js`,
+     * sin backend ni escritura de verdad), donde mostrar algo plausible —el
+     * mismo interruptor que ya rige el resto de la instalación,
+     * `enMarcha(ms)`— es mejor que un «sin dato» permanente en la tarjeta de
+     * Seguridad.
+     *
+     * El transporte falso del BACKEND (`ICONICS_FAKE=true`) NO pasa por aquí
+     * para este punto: `fakeClient.mjs` (`esMando`) lo intercepta antes y
+     * sirve lo último ESCRITO, que es lo que necesita `controlar_bomba` para
+     * confirmar su propia escritura por relectura. Si `esMando` no
+     * interceptara, la relectura vería esta física en vez de la orden que se
+     * acaba de escribir — por eso las dos rutas están deliberadamente
+     * separadas y no hay que fusionarlas.
+     */
+    case 'control':
+      return marcha
+
+    /* Polaridad sin confirmar (ver `nota` del catálogo): se simula en su
+       estado de reposo declarado por el PDF —TRUE, "sin emergencia"— y sin
+       ningún evento que lo cambie, porque inventar un paro de emergencia
+       simulado sería afirmar la misma polaridad que el catálogo confiesa no
+       tener confirmada. */
+    case 'paroDeEmergencia':
+      return true
+
     default:
       return null
   }
@@ -252,9 +315,10 @@ export function valorEn(clave, ms) {
  *   `null`       es de este árbol y ahora mismo no entrega valor
  *   otra cosa    el valor
  *
- * El tanque nunca devuelve `null`: sus ocho señales entregan siempre. Que el
- * caso exista igual no es ceremonia — es lo que permite que el mismo
- * transporte sirva a una máquina que sí se calla, como la de vibraciones.
+ * El tanque nunca devuelve `null`: sus señales entregan siempre (ocho hasta
+ * el Plan 27, diecisiete desde F3). Que el caso exista igual no es ceremonia
+ * — es lo que permite que el mismo transporte sirva a una máquina que sí se
+ * calla, como la de vibraciones.
  */
 export function valorDePunto(nombre, ms) {
   const clave = parsePointName(nombre)

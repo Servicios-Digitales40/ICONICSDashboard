@@ -96,12 +96,12 @@ check('expone las once operaciones de iconics/client.mjs', () => {
 
 console.log('\n── Lectura en vivo ──────────────────────────────────────────')
 
-await checkAsync('readPoints sirve las ocho señales, sin salir a ningún sitio', async () => {
+await checkAsync('readPoints sirve todas las señales declaradas, sin salir a ningún sitio', async () => {
   const cliente = sinCaos()
   const r = await cliente.readPoints(TODOS_LOS_PUNTOS)
 
   assert.equal(r.ok, true)
-  assert.equal(Object.keys(r.payload).length, 8)
+  assert.equal(Object.keys(r.payload).length, TODOS_LOS_PUNTOS.length)
   for (const p of TODOS_LOS_PUNTOS) {
     assert.equal(r.payload[p].ok, true, `${p} no vino`)
     assert.ok('value' in r.payload[p].payload)

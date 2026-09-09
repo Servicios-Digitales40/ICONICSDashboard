@@ -68,15 +68,16 @@ const montar = (onNavigate = () => {}) =>
   );
 
 describe("Demo EVA en modo simulado", () => {
-  it("pinta las ocho señales con lectura, sin tocar la red", async () => {
+  it("pinta todas las señales con lectura, sin tocar la red", async () => {
     const fetchTrampa = cortarLaRed();
 
     montar();
 
-    // «8 señales · 8 con lectura» es el rótulo de la tarjeta de estado. Si el
-    // simulador no conociera este árbol, serían 8 y 0.
+    // «18 señales · 18 con lectura» es el rótulo de la tarjeta de estado (las
+    // ocho de siempre más las diez del Plan 27 F3). Si el simulador no
+    // conociera el árbol entero, la segunda cifra sería menor que la primera.
     await waitFor(
-      () => expect(screen.getByText(/8 señales · 8 con lectura/)).toBeTruthy(),
+      () => expect(screen.getByText(/18 señales · 18 con lectura/)).toBeTruthy(),
       { timeout: 4_000 }
     );
 

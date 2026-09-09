@@ -1,27 +1,43 @@
 /**
- * Los cuatro activos del sistema de agua, y qué señal compone cada uno.
+ * Los activos del sistema de agua, y qué señal compone cada uno.
  *
  * ── POR QUÉ EXISTE ESTA CAPA ───────────────────────────────────────
  *
- * El servidor entrega **ocho números sueltos**: no hay equipos, ni carpetas, ni
- * `.ChildEquipmentNames` bajo `ac:TDCON/DEMO/SENSORES/`. Y la vista de planta
- * necesita «cosas» que enseñar y que se puedan pulsar, igual que la maqueta
- * necesita objetos que colocar en el suelo.
+ * Bajo `ac:TDCON/DEMO/` no hay equipos ni `.ChildEquipmentNames`: hasta el
+ * 09-09-2026 el servidor entregaba **ocho números sueltos**; desde entonces
+ * entrega sesenta y seis, repartidos en trece carpetas — pero esas carpetas
+ * son las SECCIONES del programa del PLC (`Lista-variables.pdf`), no equipos
+ * físicos, y agruparlas tal cual sería mostrar cómo está escrito el código,
+ * no qué hay en el banco. Ver `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.2.3.
+ * La vista de planta necesita «cosas» que enseñar y que se puedan pulsar,
+ * igual que la maqueta necesita objetos que colocar en el suelo.
  *
  * Así que la agrupación **es nuestra, no del servidor**, y conviene que quede
  * escrito aquí y no sólo en el plan. Es honesta porque no inventa ni un valor:
  * cada activo muestra exactamente las señales que lo componen, y si mañana el
- * servidor publica equipos de verdad se sustituye este archivo y ninguna vista
- * se entera. Es la misma promesa que hace hoy `features/three-d/lib/layout.js`
- * con las coordenadas inventadas de la maqueta.
+ * servidor publica EQUIPOS de verdad —no secciones de programa— se sustituye
+ * este archivo y ninguna vista se entera. Es la misma promesa que hace hoy
+ * `features/three-d/lib/layout.js` con las coordenadas inventadas de la
+ * maqueta.
  *
- * ── POR QUÉ CUATRO Y NO OCHO ───────────────────────────────────────
+ * ── POR QUÉ POR PREGUNTA, Y NO UNA TARJETA POR SEÑAL ────────────────
  *
- * Una tarjeta por señal daría ocho cajas idénticas sin jerarquía: la pantalla
- * volvería a ser la lista de tags que ya es la vista de Assets. Agrupando por
- * PREGUNTA —¿hay agua?, ¿se está impulsando?, ¿sale?, ¿con qué energía?— cada
- * tarjeta responde algo, y el orden de abajo es el del recorrido físico del
- * agua, que es como lo cuenta quien opera la instalación.
+ * Una tarjeta por señal daría sesenta y seis cajas idénticas sin jerarquía: la
+ * pantalla volvería a ser la lista de tags que ya es la vista de Assets.
+ * Agrupando por PREGUNTA —¿hay agua?, ¿se está impulsando?, ¿sale?, ¿con qué
+ * energía?— cada tarjeta responde algo, y el orden de abajo es el del
+ * recorrido físico del agua, que es como lo cuenta quien opera la instalación.
+ *
+ * Los dos activos nuevos que anticipa
+ * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` F5 —«Seguridad» y «Válvulas y
+ * aire»— entran cuando el plan llegue a esa fase, no antes: el Plan 27 F3
+ * dio de alta `CONTROL` y `PARO_DE_EMERGENCIA` (`SEGURIDAD/`) colgados
+ * PROVISIONALMENTE de `electrico` —el activo del armario, donde suele
+ * montarse un mando/paro real—, precisamente para no arrastrar el cambio de
+ * cuatro a seis activos a una fase que no lo pedía: ese quinto activo toca a
+ * la maqueta 3D, la accesibilidad y media docena de vistas más, y F5 es
+ * donde se paga ese coste de una vez, con las señales de las válvulas
+ * también listas.
  *
  * Aquí no hay iconos ni colores: esto es dominio, se prueba en node y no
  * importa React. La presentación vive en `components/`.

@@ -112,6 +112,19 @@ const EN_REPOSO = {
   PRESION_RELATIVA: 0.2,
   INDICE_DESVIACION_VOLTAJE: 122.1,
   KPIEFICIENCIA_ENERGETICA: 0,
+  // Plan 27 F3: las ocho alarmas del PLC, ninguna activa — es la instalación
+  // sana, igual que los siete valores de arriba. CONTROL apagado y el paro de
+  // emergencia en su reposo declarado por el PDF (TRUE = sin emergencia).
+  NIVEL_ALTO_ALTO: false,
+  NIVEL_ALTO: false,
+  NIVEL_BAJO_BAJO: false,
+  NIVEL_BAJO: false,
+  PRESION_ALTA: false,
+  FALTA_DE_PRESION: false,
+  DP_BAJO_FLUJO: false,
+  FALLA_VARIADOR_DE_FRECUENCIA: false,
+  CONTROL: false,
+  PARO_DE_EMERGENCIA: true,
 }
 
 /**
@@ -261,8 +274,8 @@ console.log(`\n${c.negrita}Herramientas del asistente · sistema de agua${c.rese
 
 console.log('\n── El catálogo ─────────────────────────────────────────────')
 
-check('los ocho puntos se nombran bajo la raíz de la demo', () => {
-  assert.equal(TODOS_LOS_PUNTOS.length, 8)
+check('todos los puntos se nombran bajo la raíz de la demo', () => {
+  assert.equal(TODOS_LOS_PUNTOS.length, SENAL_KEYS.length)
   for (const p of TODOS_LOS_PUNTOS) {
     assert.ok(p.startsWith(RAIZ), `"${p}" no cuelga de ${RAIZ}`)
   }
@@ -1077,13 +1090,13 @@ check('el aviso de sistemas separados declara su LÍMITE', () => {
 
 console.log('\n── estado_del_sistema ──────────────────────────────────────')
 
-await checkAsync('las ocho señales se leen en UNA sola llamada en lote', async () => {
+await checkAsync('todas las señales se leen en UNA sola llamada en lote', async () => {
   const client = clienteFalso()
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   assert.equal(r.ok, true)
-  assert.equal(client.lotes.length, 1, 'una petición, no ocho')
-  assert.equal(client.lotes[0].length, 8)
+  assert.equal(client.lotes.length, 1, 'una petición, no una por señal')
+  assert.equal(client.lotes[0].length, SENAL_KEYS.length)
 })
 
 await checkAsync('una instalación PARADA no es una instalación en alarma', async () => {
@@ -1403,7 +1416,7 @@ await checkAsync('una señal inventada devuelve el catálogo para corregirse sin
 
   assert.equal(r.ok, false)
   assert.equal(client.historial.length, 0, 'ni siquiera se pregunta')
-  assert.equal(r.senales.length, 8, 'y viaja la lista de las que sí existen')
+  assert.equal(r.senales.length, SENAL_KEYS.length, 'y viaja la lista de las que sí existen')
 })
 
 /* ── comparar_periodos ───────────────────────────────────────────────── */
@@ -1458,7 +1471,7 @@ await checkAsync('una señal que no existe se rechaza igual que en las demás he
   const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
     .ejecutar('limites_del_manual', { senal: 'el OEE' })
   assert.equal(r.ok, false)
-  assert.equal(r.senales.length, 8)
+  assert.equal(r.senales.length, SENAL_KEYS.length)
 })
 
 await checkAsync('un número junto a una palabra de límite es un candidato citable', async () => {
@@ -1842,6 +1855,11 @@ await checkAsync(
     ].sort())
     assert.deepEqual(r.senalesEnTabla.sort(), [
       'Carga de trabajo del motor', 'Eficiencia energética', 'Modo del variador',
+      // Plan 27 F3: las diez primeras variables nuevas, todas sin historia
+      // propia todavía (`historizado: false` hasta que F6 lo confirme).
+      'Nivel alto-alto', 'Nivel alto', 'Nivel bajo-bajo', 'Nivel bajo',
+      'Presión alta', 'Falta de presión', 'Bajo flujo', 'Falla del variador',
+      'Mando del proceso', 'Paro de emergencia',
     ].sort())
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo

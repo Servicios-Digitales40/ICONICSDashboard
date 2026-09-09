@@ -74,19 +74,19 @@ describe("el valor es función del reloj, no del azar", () => {
     }
   });
 
-  it("un ciclo sirve los ocho puntos con calidad buena", async () => {
+  it("un ciclo sirve todas las señales con calidad buena", async () => {
     const salida = await enT(T0).read(TODOS_LOS_PUNTOS);
 
     // Se comprueba con `isGoodQuality` y no contra un número: conviven dos
     // convenciones de calidad (OPC-DA 192 y OPC-UA 0) y el motor acepta las dos.
-    expect(salida.size).toBe(8);
+    expect(salida.size).toBe(TODOS_LOS_PUNTOS.length);
     for (const punto of TODOS_LOS_PUNTOS) {
       expect(isGoodQuality(salida.get(punto).quality), punto).toBe(true);
     }
 
-    // Y llega entero al dominio: ocho medidas, ninguna descartada.
+    // Y llega entero al dominio: todas medidas, ninguna descartada.
     const sistema = sistemaEn(T0);
-    expect(sistema.resumen.medidas).toBe(8);
+    expect(sistema.resumen.medidas).toBe(SENAL_KEYS.length);
   });
 
   it("ignora en silencio los puntos que no son de este árbol", async () => {

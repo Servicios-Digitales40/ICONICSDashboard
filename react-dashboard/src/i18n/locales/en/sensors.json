@@ -38,6 +38,56 @@
       "label": "Energy Efficiency",
       "corto": "Efficiency",
       "nota": "The historian does not publish a series of its own for this tag."
+    },
+    "nivelAltoAlto": {
+      "label": "High-High Level",
+      "corto": "Level H-H",
+      "nota": "Level above the critical upper limit. Overflow risk."
+    },
+    "nivelAlto": {
+      "label": "High Level",
+      "corto": "High Level",
+      "nota": "Level above the warning upper limit."
+    },
+    "nivelBajoBajo": {
+      "label": "Low-Low Level",
+      "corto": "Level L-L",
+      "nota": "Level below the critical lower limit. Risk of the pump running dry."
+    },
+    "nivelBajo": {
+      "label": "Low Level",
+      "corto": "Low Level",
+      "nota": "Level below the warning lower limit."
+    },
+    "presionAlta": {
+      "label": "High Pressure",
+      "corto": "High Pressure",
+      "nota": "Line pressure above the limit."
+    },
+    "faltaDePresion": {
+      "label": "Loss of Pressure",
+      "corto": "No Pressure",
+      "nota": "Pressure absent with the pump running. Indicates lost prime, obstructed suction, or a leak."
+    },
+    "bajoFlujo": {
+      "label": "Low Flow",
+      "corto": "Low Flow",
+      "nota": "Flow below the minimum with the pump running."
+    },
+    "fallaVariador": {
+      "label": "VFD Fault",
+      "corto": "VFD Fault",
+      "nota": "Active fault reported by the drive."
+    },
+    "control": {
+      "label": "Process Control",
+      "corto": "Control",
+      "nota": "Turns the process on and off. Not documented in the PLC's data block."
+    },
+    "paroDeEmergencia": {
+      "label": "Emergency Stop",
+      "corto": "E-Stop",
+      "nota": "State of the emergency-stop circuit. Polarity unconfirmed: not shown as an alarm."
     }
   },
   "quality": {

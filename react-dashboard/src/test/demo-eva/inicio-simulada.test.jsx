@@ -48,12 +48,13 @@ const montar = (onNavigate = () => {}) =>
   );
 
 describe("Inicio (landing) en modo simulado", () => {
-  it("llega a 8/8 señales con lectura, sin tocar la red", async () => {
+  it("llega a todas las señales con lectura, sin tocar la red", async () => {
     const fetchTrampa = cortarLaRed();
 
     montar();
 
-    await waitFor(() => expect(screen.getByText("/ 8")).toBeTruthy(), { timeout: 4_000 });
+    // 18: las ocho de siempre más las diez del Plan 27 F3.
+    await waitFor(() => expect(screen.getByText("/ 18")).toBeTruthy(), { timeout: 4_000 });
     expect(fetchTrampa).not.toHaveBeenCalled();
   });
 

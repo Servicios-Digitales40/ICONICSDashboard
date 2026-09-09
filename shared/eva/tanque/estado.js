@@ -104,13 +104,45 @@ export function enReposo(valores = {}) {
 /**
  * Estado de una señal concreta.
  *
- * `valor` llega ya saneado (número, booleano o `null`). Las booleanas no tienen
- * banda: con lectura son `nominal` y sin ella `sin_dato`, porque un modo de
- * operación no es ni bueno ni malo.
+ * `valor` llega ya saneado (número, booleano o `null`). Las booleanas SIN
+ * `naturaleza` declarada (`modoVdf`, y `PARO_DE_EMERGENCIA` desde el Plan 27
+ * F3) no tienen banda: con lectura son `nominal` y sin ella `sin_dato`, porque
+ * un modo de operación no es ni bueno ni malo — y porque en el caso de
+ * `PARO_DE_EMERGENCIA` la polaridad del bit está sin confirmar (ver su `nota`
+ * en el catálogo): dictaminar `critico` o `nominal` sobre un booleano cuyo
+ * significado no se conoce sería inventar, no leer.
+ *
+ * ── `naturaleza: "alarma"` ES DISTINTO, Y A PROPÓSITO (Plan 27 F3) ────
+ *
+ * Las ocho de `ALARMAS/` sí tienen una polaridad confirmada por el propio
+ * nombre del bit (`Lista-variables.pdf` §1.10): `true` es la condición mala.
+ * Tratarlas como boolean genérico las dejaría siempre en `nominal` —una
+ * alarma activa disfrazada de instalación sana—, así que aquí SÍ se juzga:
+ * `true` → `meta.estadoActivo` (`"critico"` si no se declara), `false` →
+ * `nominal`. `estadoActivo` distingue los pares de dos niveles del propio PLC
+ * (`NIVEL_ALTO` es aviso, `NIVEL_ALTO_ALTO` es crítico) sin inventar un umbral
+ * nuevo: es la misma distinción que ya hace el nombre del bit.
  */
 export function estadoDeSenal(key, valor, { reposo = false } = {}) {
   const meta = SENALES[key];
   if (!meta) return "sin_dato";
+
+  if (meta.naturaleza === "alarma") {
+    if (reposo && meta.soloEnMarcha) return "reposo";
+    if (valor === null || valor === undefined) return "sin_dato";
+    return valor ? meta.estadoActivo ?? "critico" : "nominal";
+  }
+
+  /*
+   * `naturaleza: "mando"` (`CONTROL`, Plan 27 F3): una orden o modo, no una
+   * condición que juzgar. Mismo criterio que el booleano genérico de abajo,
+   * separado aparte porque su significado —«hay orden» o «no hay»— no tiene
+   * nada que ver con la ausencia de banda de una medida, y conviene que el
+   * porqué quede junto al campo, no adivinado por omisión.
+   */
+  if (meta.naturaleza === "mando") {
+    return valor === null || valor === undefined ? "sin_dato" : "nominal";
+  }
 
   if (meta.tipo === "booleano") {
     return valor === null || valor === undefined ? "sin_dato" : "nominal";

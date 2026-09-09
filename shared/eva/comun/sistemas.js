@@ -205,6 +205,8 @@ export const SISTEMAS = [
       "caudal instantáneo y presión relativa de la red",
       "carga del motor y modo del variador",
       "tensión de línea y eficiencia energética",
+      // Plan 27 F3.
+      "las ocho alarmas del PLC, y si el proceso está habilitado",
     ],
     /*
      * Las palabras que Whisper tiene que oír bien EN ESTE SISTEMA. Ver
@@ -233,9 +235,21 @@ export const SISTEMAS = [
     limitaciones: [
       "Los límites con los que se evalúa cada señal son estimaciones nuestras para un " +
         "sistema de agua genérico, no rangos confirmados por quien opera la instalación.",
-      "El servidor no publica alarmas para este árbol: el estado de cada señal es un " +
-        "cálculo del tablero, no un dato de ICONICS.",
+      /*
+       * Plan 27 F3: desde el 09-09-2026 el servidor SÍ publica ocho bits de
+       * alarma del PLC (`ALARMAS/`). La frase anterior —«el servidor no
+       * publica alarmas»— dejó de ser cierta, y una limitación declarada que
+       * ya no aplica es peor que ninguna: el asistente la repetiría. Lo que
+       * sigue siendo cierto, y lo que hay que decir en su lugar, es que
+       * ahora hay DOS fuentes que no siempre van a coincidir.
+       */
+      "Además del bit de alarma que publica el PLC para ocho condiciones, el tablero " +
+        "sigue calculando su propia banda para cada señal contra umbrales nuestros. Las " +
+        "dos pueden no coincidir: los del PLC son los del programa, los del tablero son " +
+        "una estimación genérica. El desacuerdo es información de diagnóstico, no un " +
+        "error de ninguna de las dos.",
       "La correspondencia Automático/Manual del modo del variador no está confirmada.",
+      "La polaridad del paro de emergencia no está confirmada: no se pinta como alarma.",
     ],
   },
   {

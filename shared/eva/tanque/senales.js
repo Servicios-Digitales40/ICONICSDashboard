@@ -142,7 +142,8 @@ export const RAMAS = {
 };
 
 /**
- * Las ocho señales, en el orden en que se presentan.
+ * Las señales del sistema, en el orden en que se presentan: las ocho de
+ * siempre, más la primera cosecha de variables nuevas del Plan 27 F3.
  *
  * Forma de una señal:
  *
@@ -154,6 +155,17 @@ export const RAMAS = {
  *   unidad       texto que acompaña al valor; "" cuando no se sabe
  *   decimales    cifras significativas al formatear
  *   tipo         "real" | "booleano"
+ *   naturaleza   opcional; ausente = "medida" (comportamiento de siempre).
+ *                "alarma" y "mando" están implementados (Plan 27 F3, ver
+ *                `estadoDeSenal` en `./estado.js`); "estado", "consigna",
+ *                "contador", "crudo" y "sin_instrumento" están en el diseño
+ *                de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 pero ninguna
+ *                señal los usa todavía — entran cuando lo haga la fase que
+ *                los necesite (F4/F5), no antes.
+ *   estadoActivo sólo con `naturaleza: "alarma"`: qué estado reporta cuando
+ *                el bit está activo ("critico" si no se declara). Permite
+ *                que un par de dos niveles del propio PLC (`NIVEL_ALTO` /
+ *                `NIVEL_ALTO_ALTO`) se distinga sin inventar un umbral.
  *   activo       a qué activo pertenece (ver ./activos.js)
  *   historizado  ¿su serie del historiador es SUYA? Ver cabecera
  *   escala       { min, max } para geometría (barras, arcos, nivel 3D)
@@ -324,6 +336,235 @@ const CATALOGO = [
     subirEsBueno: true,
     soloEnMarcha: true,
     nota: "El historiador no publica serie propia de este tag.",
+  },
+
+  /*
+   * ── PLAN 27 F3: LOS PRIMEROS PUNTOS DEL DB DEL PLC ──────────────────
+   *
+   * Hasta aquí, las ocho señales de siempre. Lo que sigue es la primera
+   * cosecha de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`: las ocho alarmas de
+   * `ALARMAS/` (Lista-variables.pdf §1.10) y los dos puntos de `SEGURIDAD/`.
+   *
+   * Los ocho bits de alarma SÍ se evalúan como una condición —`naturaleza:
+   * "alarma"` en `estado.js` los juzga `critico`/`atencion` cuando están
+   * activos—, porque su polaridad es la que dice su propio nombre: `true` es
+   * la condición mala en las ocho, sin excepción, según el PDF. `CONTROL` es
+   * `naturaleza: "mando"`: una orden, no una condición. `PARO_DE_EMERGENCIA`
+   * NO lleva `naturaleza`: el PDF señala que su polaridad **no está
+   * confirmada** (podría ser lógica invertida), así que se trata como
+   * cualquier booleano sin banda —se informa, no se juzga— hasta que alguien
+   * la confirme contra el programa real.
+   */
+  {
+    key: "nivelAltoAlto",
+    rama: "alarmas",
+    tag: "NIVEL_ALTO_ALTO",
+    label: "Nivel alto-alto",
+    corto: "Nivel A-A",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Nivel por encima del límite crítico superior. Riesgo de derrame.",
+  },
+  {
+    key: "nivelAlto",
+    rama: "alarmas",
+    tag: "NIVEL_ALTO",
+    label: "Nivel alto",
+    corto: "Nivel alto",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "atencion",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Nivel por encima del límite de advertencia superior.",
+  },
+  {
+    key: "nivelBajoBajo",
+    rama: "alarmas",
+    tag: "NIVEL_BAJO_BAJO",
+    label: "Nivel bajo-bajo",
+    corto: "Nivel B-B",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Nivel por debajo del límite crítico inferior. Riesgo de marcha en seco de la bomba.",
+  },
+  {
+    key: "nivelBajo",
+    rama: "alarmas",
+    tag: "NIVEL_BAJO",
+    label: "Nivel bajo",
+    corto: "Nivel bajo",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "atencion",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Nivel por debajo del límite de advertencia inferior.",
+  },
+  {
+    key: "presionAlta",
+    rama: "alarmas",
+    tag: "PRESION_ALTA",
+    label: "Presión alta",
+    corto: "Presión alta",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "distribucion",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Presión de línea por encima del límite.",
+  },
+  {
+    key: "faltaDePresion",
+    rama: "alarmas",
+    tag: "FALTA_DE_PRESION",
+    label: "Falta de presión",
+    corto: "Sin presión",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "distribucion",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    // Sólo significa algo con la bomba en marcha: el PDF la define como
+    // "presión ausente CON BOMBA EN MARCHA". Parada la bomba, la ausencia de
+    // presión no es una avería, es lo esperable.
+    soloEnMarcha: true,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Presión ausente con bomba en marcha. Indica cebado perdido, succión obstruida o fuga.",
+  },
+  {
+    key: "bajoFlujo",
+    rama: "alarmas",
+    tag: "DP_BAJO_FLUJO",
+    label: "Bajo flujo",
+    corto: "Bajo flujo",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "distribucion",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    // Mismo motivo que faltaDePresion: el PDF la define "con bomba en marcha".
+    soloEnMarcha: true,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Caudal por debajo del mínimo con bomba en marcha.",
+  },
+  {
+    key: "fallaVariador",
+    rama: "alarmas",
+    tag: "FALLA_VARIADOR_DE_FRECUENCIA",
+    label: "Falla del variador",
+    corto: "Falla VFD",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "alarma",
+    estadoActivo: "critico",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activa", false: "Inactiva" },
+    nota: "Falla activa reportada por el variador.",
+  },
+  {
+    key: "control",
+    rama: "seguridad",
+    tag: "CONTROL",
+    label: "Mando del proceso",
+    corto: "Control",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    // Sin activo propio todavía: el quinto activo («Seguridad») es del Plan
+    // 27 F5, no de F3 — meterlo ya habría arrastrado la agrupación de la
+    // maqueta 3D, la accesibilidad y media docena de vistas más a un cambio
+    // que ese plan reserva para más adelante. Se cuelga de `electrico`
+    // porque el mando/paro de un proceso suele montarse junto al armario del
+    // suministro, y es donde ya vive `Modo del variador`.
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Encendido", false: "Apagado" },
+    // Aclarado por quien conoce la instalación el 09-09-2026: enciende y
+    // apaga el proceso. Es el mismo punto que escribe `controlar_bomba`
+    // (`backend/ia/herramientas/maquina/index.mjs`) y confirma
+    // `EstadoMaquinaBanner`. No figura en Lista-variables.pdf ni en el DB
+    // exportado — su significado se sabe por esa conversación, no por el
+    // servidor. Se movió de `SENSORES/` a `SEGURIDAD/` el mismo día.
+    nota: "Enciende y apaga el proceso. No está documentado en el DB del PLC.",
+  },
+  {
+    key: "paroDeEmergencia",
+    rama: "seguridad",
+    tag: "PARO_DE_EMERGENCIA",
+    label: "Paro de emergencia",
+    corto: "Paro emerg.",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    // Sin `naturaleza`: se trata como cualquier booleano sin banda (ver la
+    // cabecera de `estado.js`), porque su polaridad no está confirmada.
+    // Sin activo propio: ver la nota de `control`, aquí al lado — el quinto
+    // activo es del Plan 27 F5, no de F3.
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Activo", false: "Inactivo" },
+    // PDF §1.1: "Valor inicial TRUE sugiere lógica de contacto normalmente
+    // cerrado (TRUE = sin emergencia). Verificar la polaridad antes de
+    // usarla en lógica nueva." No verificado: no se pinta como alarma hasta
+    // que alguien lo confirme contra el programa real del PLC.
+    nota: "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma.",
   },
 ];
 

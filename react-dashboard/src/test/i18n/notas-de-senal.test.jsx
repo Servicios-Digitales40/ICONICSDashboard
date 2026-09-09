@@ -33,7 +33,11 @@ afterEach(async () => {
   await i18n.changeLanguage("es");
 });
 
-/** Las siete claves que declaran `nota` en el catálogo — no una lista a mano. */
+/**
+ * Las claves que declaran `nota` en el catálogo — no una lista a mano. Eran
+ * siete hasta el Plan 27; F3 sumó diez más (las ocho alarmas, `control` y
+ * `paroDeEmergencia`), todas con su nota también.
+ */
 const CON_NOTA = Object.values(SENALES).filter((s) => s.nota);
 
 describe("la nota de una señal se traduce, no sólo su nombre", () => {
@@ -44,7 +48,7 @@ describe("la nota de una señal se traduce, no sólo su nombre", () => {
     }
   });
 
-  it("[en] las siete notas tienen su traducción, distinta del español", async () => {
+  it("[en] todas las notas tienen su traducción, distinta del español", async () => {
     await i18n.changeLanguage("en");
     const { result } = renderHook(() => useDominio());
 
