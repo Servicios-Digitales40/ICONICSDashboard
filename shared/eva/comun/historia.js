@@ -19,6 +19,16 @@
  *    probadas. Por eso aquí el punto histórico se nombra con `pointName` y no
  *    hay un `historyPointName` aparte.
  *
+ *    **Esto necesita reconfirmarse (Plan 27 §4, F6, aún sin cerrar).** El
+ *    09-09-2026, con el árbol ya reorganizado, `ac:` volvió a dar 500 en
+ *    `/History` y `hda:\Configuration\DEMO TANQUE\…` —el nuevo nombre del
+ *    área, antes `DEMO DANONE`— respondió `ok: true` para los mismos puntos.
+ *    Puede que la afirmación de este párrafo siguiera siendo cierta contra el
+ *    árbol VIEJO y haya dejado de serlo con la reorganización, o que nunca lo
+ *    fuera y la medición de entonces se confundiera con el mismo 500
+ *    intermitente que hizo falta descartar ahora. No se toca el mecanismo
+ *    hasta que F6 lo remida con datos de verdad.
+ *
  * 2. **Sólo algunas señales tienen serie propia.** A las demás el historiador
  *    les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica hasta el último
  *    decimal, con dos agregados distintos— y no da error: responde `ok: true`

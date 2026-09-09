@@ -108,7 +108,7 @@ describe("leerSerie pide el intervalo correcto según el tipo de rango", () => {
     expect(fetchIconicsHistory.mock.calls).toHaveLength(7);
 
     const [punto, primero] = fetchIconicsHistory.mock.calls[0];
-    expect(punto).toBe("ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE");
+    expect(punto).toBe("ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE");
     expect(primero.startDate).toBe(inicio.toISOString());
     // Un día en 96 puntos: la misma rejilla de 15 min del resto del proyecto.
     expect(primero.interval).toBe("00:15:00");

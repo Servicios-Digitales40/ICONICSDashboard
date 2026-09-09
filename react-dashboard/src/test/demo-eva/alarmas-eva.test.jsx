@@ -30,8 +30,8 @@ afterEach(() => {
 
 const montar = () => render(<ThemeProvider><AlarmasEva /></ThemeProvider>);
 
-const EVENTO_NIVEL = { eventId: "e1", startDate: "2026-08-20 10:00:00", pointName: "ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE" };
-const EVENTO_CAUDAL = { eventId: "e2", startDate: "2026-08-20 09:00:00", pointName: "ac:TDCON/DEMO/SENSORES/SFLUJO_INSTANTANEO" };
+const EVENTO_NIVEL = { eventId: "e1", startDate: "2026-08-20 10:00:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE" };
+const EVENTO_CAUDAL = { eventId: "e2", startDate: "2026-08-20 09:00:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/FLUJO_INSTANTANEO" };
 
 describe("AlarmasEva: la lista, y lo que dice cuando está vacía o falla", () => {
   it("sin eventos en la ventana, lo dice — no una tabla vacía muda", async () => {

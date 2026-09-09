@@ -66,8 +66,10 @@
  * ── LA GUARDA QUE JUSTIFICA TODO EL ARCHIVO ────────────────────────
  *
  * A `CARGA_TRABAJO_MOTOR`, `KPIEFICIENCIA_ENERGETICA` e
- * `INDICE_DESVIACION_VOLTAJE` el Data Historian les devuelve la curva de
- * `STEMPERATURA_TANQUE`. **No da error**: responde `ok: true`, con marcas de
+ * `INDICE_DESVIACION_VOLTAJE` el Data Historian les devuelve la curva de la
+ * temperatura del tanque (`TEMPERATURA_TANQUE` desde el 09-09-2026; medido
+ * bajo su nombre anterior, `STEMPERATURA_TANQUE`, en Plan 8 §1.3). **No da
+ * error**: responde `ok: true`, con marcas de
  * tiempo correctas y valores plausibles. Un asistente que pidiera la serie sin
  * comprobarlo no fallaría, contestaría — y diría que la carga del motor llegó
  * al 41 % cuando eso son grados centígrados de un tanque.
@@ -492,7 +494,7 @@ function construirIndice() {
   for (const key of SENAL_KEYS) {
     const s = SENALES[key]
     registrar(key, key)          // nivelTanque
-    registrar(s.tag, key)        // SNIVEL_TANQUE
+    registrar(s.tag, key)        // NIVEL_TANQUE
     registrar(s.label, key)      // Nivel del tanque
     registrar(s.corto, key)      // Nivel
     for (const alias of SINONIMOS[key] ?? []) registrar(alias, key)

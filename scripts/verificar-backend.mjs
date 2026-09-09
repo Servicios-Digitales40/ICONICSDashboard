@@ -142,7 +142,9 @@ const fake = createServer(async (req, res) => {
     const { pointName } = JSON.parse(body)
     return json(200, pointName.map((n, i) => ({
       pointName: n,
-      value: n.endsWith('SENSORES/SNIVEL_TANQUE') ? nivelTanque : i,
+      // Plan 27 F2: nivelTanque se movió de SENSORES/ a
+      // INSTRUMENTACION_DE_PROCESO/ el 09-09-2026, con el nombre acortado.
+      value: n.endsWith('INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE') ? nivelTanque : i,
       quality: 192,
     })))
   }

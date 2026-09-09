@@ -164,8 +164,10 @@ export const RAMAS = {
 const CATALOGO = [
   {
     key: "nivelTanque",
-    rama: "sensores",
-    tag: "SNIVEL_TANQUE",
+    // Plan 27 F2: se movió Y se renombró (perdió la `S`) el 09-09-2026, de
+    // `SENSORES/SNIVEL_TANQUE` a `INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE`.
+    rama: "instrumentacionProceso",
+    tag: "NIVEL_TANQUE",
     label: "Nivel del tanque",
     corto: "Nivel",
     unidad: "%",
@@ -186,8 +188,11 @@ const CATALOGO = [
   },
   {
     key: "temperaturaTanque",
-    rama: "sensores",
-    tag: "STEMPERATURA_TANQUE",
+    // Plan 27 F2: se movió Y se renombró (perdió la `S`) el 09-09-2026, de
+    // `SENSORES/STEMPERATURA_TANQUE` a
+    // `INSTRUMENTACION_DE_PROCESO/TEMPERATURA_TANQUE`.
+    rama: "instrumentacionProceso",
+    tag: "TEMPERATURA_TANQUE",
     label: "Temperatura del tanque",
     corto: "Temperatura",
     unidad: "°C",
@@ -220,8 +225,10 @@ const CATALOGO = [
   },
   {
     key: "modoVdf",
-    rama: "sensores",
-    tag: "Modo AM VDF",
+    // Plan 27 F2: se movió Y se renombró (espacios → `_`) el 09-09-2026, de
+    // `SENSORES/Modo AM VDF` a `MANDO_DEL_VARIADOR_VFD/Modo_AM_VDF`.
+    rama: "mandoVariadorVfd",
+    tag: "Modo_AM_VDF",
     label: "Modo del variador",
     corto: "Modo VDF",
     unidad: "",
@@ -240,8 +247,11 @@ const CATALOGO = [
   },
   {
     key: "flujoInstantaneo",
-    rama: "sensores",
-    tag: "SFLUJO_INSTANTANEO",
+    // Plan 27 F2: se movió Y se renombró (perdió la `S`) el 09-09-2026, de
+    // `SENSORES/SFLUJO_INSTANTANEO` a
+    // `INSTRUMENTACION_DE_PROCESO/FLUJO_INSTANTANEO`.
+    rama: "instrumentacionProceso",
+    tag: "FLUJO_INSTANTANEO",
     label: "Caudal instantáneo",
     corto: "Caudal",
     // Sin unidad declarada: el tag no dice si son l/s o m³/h, y poner una de
@@ -258,8 +268,10 @@ const CATALOGO = [
   },
   {
     key: "presionRelativa",
-    rama: "sensores",
-    tag: "SPRESION_RELATIVA",
+    // Plan 27 F2: se movió el 09-09-2026, de `SENSORES/SPRESION_RELATIVA` a
+    // `INSTRUMENTACION_DE_PROCESO/PRESION_RELATIVA` (también perdió la `S`).
+    rama: "instrumentacionProceso",
+    tag: "PRESION_RELATIVA",
     label: "Presión relativa",
     corto: "Presión",
     unidad: "",
@@ -325,15 +337,17 @@ export const SENAL_KEYS = CATALOGO.map((s) => s.key);
 export const senalInfo = (key) => SENALES[key] ?? null;
 
 /**
- * Punto de tiempo real: `ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE`, compuesto de
- * la rama de la señal (`RAMAS[s.rama]`) y su `tag` — ya no de una raíz única
- * (Plan 27 F1: antes de la reorganización del 09-09-2026 las dos cosas
- * coincidían, porque sólo había una rama).
+ * Punto de tiempo real: `ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE`,
+ * compuesto de la rama de la señal (`RAMAS[s.rama]`) y su `tag` — ya no de una
+ * raíz única (Plan 27 F1: antes de la reorganización del 09-09-2026 las dos
+ * cosas coincidían, porque sólo había una rama).
  *
- * Ojo con `Modo AM VDF`: **lleva espacios**. Se comprobó contra el servidor que
- * el lote (`/api/iconics/data/batch`, separado por comas) y la validación del
- * puente lo aceptan tal cual, porque el cliente codifica cada punto por
- * separado. No hay que sanearlo aquí.
+ * El variador llevaba espacios en su nombre (`Modo AM VDF`) hasta que planta
+ * lo renombró el 09-09-2026 a `Modo_AM_VDF`, así que hoy ningún tag del
+ * catálogo los tiene — pero si vuelve a aparecer uno, el lote
+ * (`/api/iconics/data/batch`, separado por comas) y la validación del puente
+ * lo aceptan tal cual, porque el cliente codifica cada punto por separado. No
+ * hay que sanearlo aquí.
  */
 export function pointName(key) {
   const s = SENALES[key];

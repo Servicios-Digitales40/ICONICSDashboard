@@ -45,12 +45,12 @@ import {
 } from '../backend/ia/conversacion/herramientas.mjs'
 import {
   RAIZ,
-  RAMAS,
   SENALES,
   SENAL_KEYS,
   TODOS_LOS_PUNTOS,
   esHistorizada,
   historizadas,
+  parsePointName,
   pointName,
 } from '../shared/eva/tanque/senales.js'
 import { PROVISIONALES } from '../shared/eva/comun/umbrales.js'
@@ -104,12 +104,12 @@ async function checkAsync(nombre, fn) {
  * el estado en el que un tablero mal hecho abre en rojo permanente—.
  */
 const EN_REPOSO = {
-  SNIVEL_TANQUE: 62.5,
-  STEMPERATURA_TANQUE: 21.3,
+  NIVEL_TANQUE: 62.5,
+  TEMPERATURA_TANQUE: 21.3,
   CARGA_TRABAJO_MOTOR: 0,
-  'Modo AM VDF': false,
-  SFLUJO_INSTANTANEO: 0,
-  SPRESION_RELATIVA: 0.2,
+  'Modo_AM_VDF': false,
+  FLUJO_INSTANTANEO: 0,
+  PRESION_RELATIVA: 0.2,
   INDICE_DESVIACION_VOLTAJE: 122.1,
   KPIEFICIENCIA_ENERGETICA: 0,
 }
@@ -149,12 +149,13 @@ function clienteFalso({
       const payload = {}
       for (const p of puntos) {
         /*
-         * Las nueve señales de este archivo siguen bajo `SENSORES/`
-         * (Plan 27 F1-F2 no las ha reubicado todavía), así que el tag se
-         * saca de ahí y no de `RAIZ` — que desde F1 es el prefijo común a
-         * las trece ramas, y ya no coincide con ninguna rama en concreto.
+         * El tag sale de `parsePointName` + el catálogo, no de restar el
+         * prefijo de una rama fija: desde el Plan 27 cada señal vive en la
+         * suya, y una resta a ciegas se rompe en cuanto una señal se muda
+         * (pasó con las tres del F2 del 09-09-2026). Así el fixture no
+         * depende de en qué rama esté hoy cada una.
          */
-        const tag = p.slice(RAMAS.sensores.length)
+        const tag = SENALES[parsePointName(p)]?.tag ?? ''
         payload[p] = {
           ok: true,
           payload: { value: valores[tag], quality: calidad[tag] ?? 0 },
@@ -1104,7 +1105,7 @@ await checkAsync('una instalación PARADA no es una instalación en alarma', asy
 await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
   // Sin este filtro el asistente diría «el tanque está al 0 %» de una
   // instalación llena, que es la peor respuesta posible: parece un dato.
-  const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
+  const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
   const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
@@ -1134,7 +1135,7 @@ await checkAsync('el float crudo del PLC se redondea a los decimales del catálo
    * el sensor no tiene.
    */
   const client = clienteFalso({
-    valores: { ...EN_REPOSO, SNIVEL_TANQUE: 50.09765625, STEMPERATURA_TANQUE: 23.258464813232422 },
+    valores: { ...EN_REPOSO, NIVEL_TANQUE: 50.09765625, TEMPERATURA_TANQUE: 23.258464813232422 },
   })
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
@@ -1144,7 +1145,7 @@ await checkAsync('el float crudo del PLC se redondea a los decimales del catálo
 })
 
 await checkAsync('redondear no convierte un hueco ni un booleano en cero', async () => {
-  const client = clienteFalso({ calidad: { SNIVEL_TANQUE: 24 } })
+  const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
 
@@ -1229,7 +1230,7 @@ await checkAsync('pedir la historia de una señal NO historizada no llega a la r
    * La invariante cara de todo el archivo.
    *
    * El servidor NO da error: devuelve `ok: true`, con marcas de tiempo
-   * correctas, y la serie de `STEMPERATURA_TANQUE`. Así que no basta con
+   * correctas, y la serie de `TEMPERATURA_TANQUE`. Así que no basta con
    * comprobar que la herramienta falla — hay que comprobar que **no preguntó**.
    * Si algún día alguien mueve la guarda detrás de la llamada, esto se cae.
    */
@@ -2663,7 +2664,7 @@ await checkAsync('en modo solo lectura no escribe, y dice de quién es el límit
 })
 
 await checkAsync('con el tanque por encima del aviso se niega a encender', async () => {
-  const client = clienteFalso({ valores: { ...EN_REPOSO, SNIVEL_TANQUE: 97 } })
+  const client = clienteFalso({ valores: { ...EN_REPOSO, NIVEL_TANQUE: 97 } })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: true,
   })
@@ -2674,7 +2675,7 @@ await checkAsync('con el tanque por encima del aviso se niega a encender', async
 })
 
 await checkAsync('apagar NO mira el nivel: vaciar nunca desborda', async () => {
-  const client = clienteFalso({ valores: { ...EN_REPOSO, SNIVEL_TANQUE: 97 }, controlInicial: true })
+  const client = clienteFalso({ valores: { ...EN_REPOSO, NIVEL_TANQUE: 97 }, controlInicial: true })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: false,
   })

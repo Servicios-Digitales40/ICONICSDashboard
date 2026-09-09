@@ -122,11 +122,13 @@ describe("catálogo de señales", () => {
     }
   });
 
-  it("el punto del modo del variador conserva sus espacios", () => {
-    // El nombre real lleva espacios («Modo AM VDF») y el lote los admite porque
-    // el cliente codifica cada punto por separado. Sanearlos aquí rompería la
-    // lectura contra el servidor.
-    expect(pointName("modoVdf")).toBe("ac:TDCON/DEMO/SENSORES/Modo AM VDF");
+  it("el modo del variador vive en su rama, con el nombre que planta le dio el 09-09-2026", () => {
+    // Llevaba espacios («Modo AM VDF», bajo SENSORES/) hasta la reorganización
+    // del Plan 27: planta lo movió Y lo renombró a la vez, a
+    // MANDO_DEL_VARIADOR_VFD/Modo_AM_VDF. El lote seguiría admitiendo espacios
+    // si algún día reaparecen —el cliente codifica cada punto por separado, no
+    // hay que sanearlos aquí— pero hoy no los lleva.
+    expect(pointName("modoVdf")).toBe("ac:TDCON/DEMO/MANDO_DEL_VARIADOR_VFD/Modo_AM_VDF");
   });
 });
 

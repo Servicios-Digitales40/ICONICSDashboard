@@ -11,8 +11,8 @@ import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "@/Demo-EVA/data
 
 afterEach(() => vi.unstubAllGlobals());
 
-const EVENTO_NIVEL = { eventId: "e1", startDate: "2026-08-20 10:00:00", pointName: "ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE" };
-const EVENTO_CAUDAL = { eventId: "e2", startDate: "2026-08-20 10:05:00", pointName: "ac:TDCON/DEMO/SENSORES/SFLUJO_INSTANTANEO" };
+const EVENTO_NIVEL = { eventId: "e1", startDate: "2026-08-20 10:00:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE" };
+const EVENTO_CAUDAL = { eventId: "e2", startDate: "2026-08-20 10:05:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/FLUJO_INSTANTANEO" };
 const EVENTO_SIN_PUNTO = { eventId: "e3", startDate: "2026-08-20 10:10:00" };
 
 describe("perteneceAlActivo: el filtro, sin dar el campo del punto por garantizado", () => {
@@ -36,7 +36,7 @@ describe("perteneceAlActivo: el filtro, sin dar el campo del punto por garantiza
   });
 
   it("reconoce el punto aunque venga en PascalCase (PointName)", () => {
-    const evento = { eventId: "e4", PointName: "ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE" };
+    const evento = { eventId: "e4", PointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE" };
     expect(perteneceAlActivo(evento, "tanque")).toBe(true);
     expect(perteneceAlActivo(evento, "distribucion")).toBe(false);
   });

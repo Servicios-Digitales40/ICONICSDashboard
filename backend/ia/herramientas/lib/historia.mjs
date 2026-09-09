@@ -52,10 +52,16 @@ import {
  * fijos. Funcionó mientras el tanque fue la única máquina con historia.
  *
  * Desde el 28-08-2026 vibraciones también registra, y nombra su punto
- * histórico de otra forma: `hda:\Configuration\DEMO 3:vRMS_S1` frente al
- * `ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE` del tanque, que es el mismo nombre
- * que en vivo. Con el catálogo del tanque cableado aquí, pedir la serie de una
- * clave de vibraciones daba `pointName(clave) === null`.
+ * histórico de otra forma: `hda:\Configuration\DEMO 3:vRMS_S1`, distinto de
+ * su nombre en vivo. Con el catálogo del tanque cableado aquí, pedir la serie
+ * de una clave de vibraciones daba `pointName(clave) === null`.
+ *
+ * **Nota del 09-09-2026 (Plan 27 F6, aún sin cerrar):** el tanque también
+ * necesita un nombre `hda:` distinto del de vivo para su propia serie —lo que
+ * este párrafo daba por sentado que era «el mismo nombre» dejó de serlo—, y
+ * `series.punto` de `sistemas.js` sigue devolviendo el nombre `ac:` mientras
+ * eso no se corrija. Ver la cabecera de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`
+ * §4 y F6.
  *
  * Ahora los dos salen de la entrada del sistema (`series.punto` y
  * `series.historizadas`), así que la máquina que se dé de alta mañana declara
