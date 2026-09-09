@@ -100,7 +100,7 @@ function Rotulo({ t, children }) {
 
 /* ── Zona superior: lo que el sistema ya sabe, hundido y no editable ──── */
 
-function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, activo, muestraSensores, diagnostico }) {
+function ZonaSistema({ t, sistemaNombre, tituloRiesgo, canalLabel, evidencia, activo, muestraSensores, diagnostico }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("maintenance");
   /* El título de cada causa candidata. Ver la cabecera de `useProsa`. */
@@ -120,7 +120,7 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
       <div>
         <Rotulo t={t}>{traducir("close.system.riskOf", { sistema: sistemaNombre })}</Rotulo>
         <div style={{ fontSize: 15, fontWeight: 700, color: t.text, fontFamily: SANS }}>
-          {definicion?.titulo ?? traducir("close.system.risk")}
+          {tituloRiesgo ?? traducir("close.system.risk")}
           {canalLabel && <span style={{ fontWeight: 400, color: t.textSoft }}> — {canalLabel}</span>}
         </div>
         {evidencia ? (
@@ -396,7 +396,14 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["maintenance", "navigation", "common", "errors"]);
   /* El nombre de la máquina, traducido: `shared/` lo declara en español. */
-  const { sistema: nombreSistema } = useDominio();
+  const { sistema: nombreSistema, canal } = useDominio();
+  /*
+   * El riesgo del que se abrió el caso, en el idioma de la pantalla. Se
+   * traduce por catálogo porque son dos: las reglas del tanque y las de
+   * vibración las escriben dos evaluadores distintos. Ver `useProsa`.
+   */
+  const { riesgo: traducirRiesgo, riesgoVibracion: traducirRiesgoVibracion,
+    noEvaluable: tituloDeRegla, noEvaluableVibracion: tituloDeReglaVibracion } = useProsa();
   const { theme: t } = useTheme();
   const sistemaId = params?.sistema === "vibraciones" ? "vibraciones" : "tanque";
   const riesgoId = params?.riesgoId ?? "";
@@ -443,6 +450,18 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   const activo = sistemaId === "tanque"
     ? activosTanque.find((r) => r.id === riesgoId)
     : activosVibracion.find((r) => r.id === riesgoId && (!params?.canalLabel || r.canalLabel === params.canalLabel));
+
+  /*
+   * El mismo riesgo, ya dicho en el idioma de la pantalla. `definicion` y
+   * `activo` se quedan en español y no se sustituyen: de ellos salen la
+   * severidad y el título que se ARCHIVAN en la bitácora, y eso tiene que
+   * seguir siendo español para que el motor lo vuelva a encontrar después.
+   */
+  const tituloDelRiesgo = definicion
+    ? (sistemaId === "tanque" ? tituloDeRegla(definicion) : tituloDeReglaVibracion(definicion)).titulo
+    : null;
+  const riesgoTraducido =
+    sistemaId === "tanque" ? traducirRiesgo(activo) : traducirRiesgoVibracion(activo);
 
   const muestraSensores = useMemo(() => {
     if (sistemaId === "tanque") {
@@ -629,9 +648,14 @@ export default function CierreDiagnostico({ params, onNavigate }) {
         <ZonaSistema
           t={t}
           sistemaNombre={nombreSistema(sistemaId)}
-          definicion={definicion}
-          canalLabel={activo?.canalLabel || params?.canalLabel || ""}
-          evidencia={activo?.evidencia ?? null}
+          tituloRiesgo={tituloDelRiesgo}
+          /*
+            Cuando el riesgo ya no está activo sólo queda el rótulo que viajó
+            por la URL, que es español: no hay id del que sacar el nombre del
+            apoyo, y echarlo de menos sería peor que enseñarlo tal cual.
+          */
+          canalLabel={activo?.canal ? canal(activo.canal) : (params?.canalLabel || "")}
+          evidencia={riesgoTraducido?.evidencia ?? null}
           activo={Boolean(activo)}
           muestraSensores={muestraSensores}
           diagnostico={diagnostico}

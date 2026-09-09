@@ -103,7 +103,7 @@ const lim = (key, cual) => UMBRALES[key]?.[cual] ?? null;
  *   evidencia     (v) => string         — lo MEDIDO, con cifras
  *   consecuencia  qué PUEDE pasar si esto sigue        (hipótesis)
  *   accion        qué conviene mirar                    (nunca una maniobra)
- *   datos         (v) => object          — OPCIONAL; cifras que `evidencia`
+ *   datos         () => object           — OPCIONAL; cifras que `evidencia`
  *                                          cita y que no son una señal leída
  *
  * ── POR QUÉ EXISTE `datos` ──────────────────────────────────────────
@@ -407,8 +407,14 @@ export function evaluarRiesgos(sistema) {
        * lo que declare su `datos`. Va en crudo —sin formatear— porque el
        * separador decimal es del idioma y quien pinta ya sabe formatear por
        * las `decimales` que declara cada señal.
+       *
+       * `datos()` se llama SIN argumentos: las dos que existen devuelven
+       * umbrales del catálogo, y las lecturas ya están en `v`, que se acaba de
+       * volcar. Se le pasaban `(v, ctx)` «por si acaso» y eso dejaba
+       * `npm run types` en rojo —la firma declarada no los recibe—. Si alguna
+       * regla llegara a necesitarlos, se declara el parámetro y se le pasan.
        */
-      valores: { ...v, ...(regla.datos?.(v, ctx) ?? {}) },
+      valores: { ...v, ...(regla.datos?.() ?? {}) },
     });
   }
 

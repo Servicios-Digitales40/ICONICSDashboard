@@ -39,8 +39,8 @@ import { useTranslation } from "react-i18next";
 import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
-import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { Enfasis } from "@/i18n";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
@@ -346,13 +346,14 @@ function Vibraciones() {
       <AlertBanner
         type="info"
         title={traducir("machines:vibration.otherMachine.title")}
-        message={
-          "Estos sensores están en el sistema de vibraciones, que tiene su propio motor, " +
-          "su propio variador y su propio PLC. No comparte nada con el tanque. " +
-          "El historiador acaba de empezar a guardar estos tags, pero todavía no se " +
-          "usan sus series: aquí sólo se ve el instante, sin tendencias ni pronóstico " +
-          "de desgaste."
-        }
+        /*
+          La MISMA clave que pinta «Inicio · Vibraciones»: es el mismo aviso
+          sobre la misma máquina, y tenerlo dos veces escrito es tenerlo dos
+          veces que corregir. Aquí estuvo a mano en español hasta el
+          09-09-2026, y el verificador de textos no lo veía porque sólo miraba
+          `atributo="…"` y no `atributo={"…"}`; ahora mira los dos.
+        */
+        message={<Enfasis>{traducir("machines:vibration.otherMachineNote")}</Enfasis>}
       />
 
       {error && (

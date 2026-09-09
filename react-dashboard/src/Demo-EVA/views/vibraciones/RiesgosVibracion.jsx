@@ -41,7 +41,9 @@ import { useTranslation } from "react-i18next";
 import { CheckCircle2, HelpCircle, WifiOff } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
+import { useProsa } from "@/i18n/useProsa.js";
 import { Enfasis } from "@/i18n";
 import { useTheme } from "@/theme";
 
@@ -56,6 +58,24 @@ function RiesgosVibracion({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "diagnostics", "navigation", "errors"]);
   const { theme: t } = useTheme();
+  const { canal, lectura } = useDominio();
+  const { noEvaluableVibracion: tituloDeRegla } = useProsa();
+
+  /*
+   * Por qué una regla no se pudo mirar.
+   *
+   * `motivo` y no `porque`: el dominio manda los dos —la frase española, que es
+   * la que consume el backend, y el mismo hecho por claves— y aquí se prefiere
+   * el segundo, que es el único que se puede decir en el idioma activo. Es el
+   * mismo reparto que `falta` y `faltaClave` en los riesgos del tanque.
+   */
+  const motivoDe = (n) =>
+    n.motivo
+      ? traducir(`diagnostics:risks.reason.${n.motivo.clave}`, {
+        ...n.motivo,
+        faltan: (n.motivo.faltan ?? []).map(lectura).join(", "),
+      })
+      : n.porque;
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
 
@@ -176,12 +196,12 @@ function RiesgosVibracion({ onNavigate }) {
                 )}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
-                    {n.titulo}
-                    {n.canalLabel && (
-                      <span style={{ fontWeight: 400, color: t.textFaint }}> · {n.canalLabel}</span>
+                    {tituloDeRegla(n).titulo}
+                    {n.canal && (
+                      <span style={{ fontWeight: 400, color: t.textFaint }}> · {canal(n.canal)}</span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: t.textSoft }}>{n.porque}</div>
+                  <div style={{ fontSize: 12, color: t.textSoft }}>{motivoDe(n)}</div>
                 </div>
               </div>
             ))}

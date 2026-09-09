@@ -32,7 +32,13 @@
     "rulesChecked_other": "{{count}} reglas comprobadas con las lecturas actuales.",
     "unchecked": "Sin comprobar · {{n}}",
     "uncheckedNote": "Estas reglas no se pudieron evaluar porque les falta una lectura. No significa que todo esté bien: significa que <b>no se sabe</b>.",
-    "missing": "— falta {{falta}}"
+    "missing": "— falta {{falta}}",
+    "reason": {
+      "sinDato": "Sin dato de {{faltan}}.",
+      "pocosApoyos": "Sólo {{conDato}} de {{total}} apoyos entregan aceleración; hacen falta 3 para comparar.",
+      "sinVelocidad": "No se conoce la velocidad, así que no se sabe si ISO 10816 aplica.",
+      "bajoNorma": "A {{velocidad}} rpm la máquina está por debajo de las {{rpmMinima}} rpm desde las que ISO 10816 se pronuncia."
+    }
   },
   "provisional": {
     "title": "Estos avisos se calculan con límites estimados por nosotros",

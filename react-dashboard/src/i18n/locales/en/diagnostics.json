@@ -32,7 +32,13 @@
     "rulesChecked_other": "{{count}} rules checked against the current readings.",
     "unchecked": "Not checked · {{n}}",
     "uncheckedNote": "These rules could not be evaluated because a reading is missing. It does not mean everything is fine: it means <b>we do not know</b>.",
-    "missing": "— missing {{falta}}"
+    "missing": "— missing {{falta}}",
+    "reason": {
+      "sinDato": "No reading for {{faltan}}.",
+      "pocosApoyos": "Only {{conDato}} of {{total}} supports are delivering acceleration; 3 are needed to compare.",
+      "sinVelocidad": "The speed is not known, so there is no telling whether ISO 10816 applies.",
+      "bajoNorma": "At {{velocidad}} rpm the machine is below the {{rpmMinima}} rpm from which ISO 10816 will make a judgement."
+    }
   },
   "provisional": {
     "title": "These warnings are computed against limits we estimated ourselves",

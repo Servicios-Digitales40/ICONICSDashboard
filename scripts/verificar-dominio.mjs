@@ -56,6 +56,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
+import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
 import { CAUSAS_POR_RIESGO } from '../shared/eva/comun/causas.js'
 import { MECANISMOS } from '../shared/eva/comun/pronostico.js'
 
@@ -94,6 +95,7 @@ const ingles = JSON.parse(readFileSync(EN, 'utf8'))
  */
 const CAMPOS_POR_CATALOGO = {
   risks: ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota'],
+  vibrationRisks: ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota'],
   causes: ['titulo', 'componente'],
   mechanisms: ['titulo', 'componente', 'mecanismo', 'consecuencia', 'accion', 'confirmar'],
 }
@@ -105,21 +107,45 @@ function variablesDe(texto) {
 }
 
 /**
- * Los nombres que una regla puede ofrecer para interpolar.
+ * Los nombres que una entrada puede ofrecer para interpolar.
  *
- * Son las señales que declara necesitar más lo que emita su `datos()`. Se
- * llama a `datos()` con un objeto vacío porque las dos que existen hoy sólo
- * devuelven umbrales y no miran sus argumentos; si alguna llegara a mirarlos,
- * este `try` lo convierte en «no puedo comprobarlo» en vez de en una caída.
+ * Dos formas, y la diferencia importa:
+ *
+ *  · Si la regla declara `expone`, ése es su CONTRATO y se toma tal cual. Lo
+ *    hacen las de vibración, cuyas frases tienen trozos opcionales: llamar a su
+ *    `datos()` de muestra recorrería una sola rama y daría por inexistente la
+ *    mitad del vocabulario. El inglés que citara `{{sinReconocer}}` se marcaría
+ *    como error estando bien.
+ *  · Si no, se llama a `datos()` sin argumentos, que es su firma. Vale para
+ *    las del tanque: lo que devuelven son umbrales fijos del catálogo. El
+ *    `try` convierte cualquier sorpresa en «no puedo comprobarlo» en vez de en
+ *    una caída.
  */
 function nombresDisponibles(regla) {
   const nombres = new Set(regla.necesita ?? [])
+
+  if (regla.expone) {
+    for (const k of regla.expone) nombres.add(k)
+    return nombres
+  }
+
   try {
-    for (const k of Object.keys(regla.datos?.({}, {}) ?? {})) nombres.add(k)
+    for (const k of Object.keys(regla.datos?.() ?? {})) nombres.add(k)
   } catch {
     return null
   }
   return nombres
+}
+
+/**
+ * El campo de prosa al que pertenece una clave inglesa.
+ *
+ * `evidencia_conPotencia` es la misma frase que `evidencia` en su otra forma
+ * (i18next `context`), no un campo nuevo: se comprueba contra la misma regla y
+ * con las mismas variables disponibles.
+ */
+function campoBase(clave) {
+  return clave.split('_')[0]
 }
 
 /* ── Los catálogos que ya están migrados ─────────────────────────────── */
@@ -141,6 +167,7 @@ function causasUnicas() {
 
 const CATALOGOS = [
   { nombre: 'riesgos del tanque', bloque: 'risks', entradas: REGLAS_TANQUE },
+  { nombre: 'riesgos de vibración', bloque: 'vibrationRisks', entradas: REGLAS_VIBRACION },
   { nombre: 'causas candidatas', bloque: 'causes', entradas: causasUnicas() },
   { nombre: 'mecanismos de desgaste', bloque: 'mechanisms', entradas: MECANISMOS },
 ]
@@ -168,6 +195,21 @@ for (const { nombre, bloque, entradas } of CATALOGOS) {
         if (loTiene && !traducidoLoTiene) problemas.push(`«${regla.id}» sin «${campo}»`)
         if (!loTiene && traducidoLoTiene) problemas.push(`«${regla.id}» traduce «${campo}», que la regla no tiene`)
       }
+
+      /*
+       * Y las claves que el inglés trae de más. Una variante de contexto
+       * —`evidencia_conPotencia`— es legítima si su forma base existe: sin ella
+       * i18next no tiene a qué caer cuando el contexto no llega, y la frase
+       * saldría en español justo en el caso corriente.
+       */
+      for (const clave of Object.keys(traducido)) {
+        const base = campoBase(clave)
+        if (!CAMPOS.includes(base)) {
+          problemas.push(`«${regla.id}» traduce «${clave}», que no es un campo de prosa`)
+        } else if (clave !== base && typeof traducido[base] !== 'string') {
+          problemas.push(`«${regla.id}» tiene «${clave}» pero no «${base}», su forma sin contexto`)
+        }
+      }
     }
 
     assert.ok(
@@ -184,8 +226,8 @@ for (const { nombre, bloque, entradas } of CATALOGOS) {
       const disponibles = nombresDisponibles(regla)
       if (!disponibles) continue
 
-      for (const campo of CAMPOS) {
-        const texto = ingles[bloque]?.[regla.id]?.[campo]
+      for (const [campo, texto] of Object.entries(ingles[bloque]?.[regla.id] ?? {})) {
+        if (!CAMPOS.includes(campoBase(campo))) continue
         for (const variable of variablesDe(texto)) {
           if (!disponibles.has(variable)) {
             problemas.push(

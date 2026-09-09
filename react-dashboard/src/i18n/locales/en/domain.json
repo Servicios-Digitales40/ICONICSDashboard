@@ -209,5 +209,122 @@
       "consecuencia": "Accelerated wear of bearings and of the seal, and consumption with no useful work.",
       "accion": "Compare the real operating point against the pump's curve."
     }
+  },
+  "vibrationRisks": {
+    "velocidad-fuera-de-norma": {
+      "titulo": "The machine is turning too slowly to be judged against ISO 10816",
+      "evidencia": "The drive is delivering {{frecuencia}} Hz and the motor is turning at {{velocidad}} rpm, below the {{rpmMinima}} rpm from which the standard will make a judgement.",
+      "consecuencia": "RMS velocity readings come out LOW by construction: at this speed the running frequency falls outside the 10–1000 Hz band the standard measures, and the filter attenuates the unbalance component. A «within limits» here does not mean the machine is well; it means the standard has not spoken.",
+      "accion": "To assess against ISO, measure with the machine at its service speed. In the meantime, go by aRMS and by the comparison between supports, which do not depend on that band."
+    },
+    "velocidad-en-el-borde-de-la-banda": {
+      "titulo": "The machine is turning right at the lower edge of the measurement band",
+      "evidencia": "{{velocidad}} rpm is {{hz}} Hz of rotation, just above the 10 Hz at which the standard’s measurement band begins.",
+      "consecuencia": "The 10 Hz high-pass filter does not cut sharply: at its own corner frequency it attenuates by close to 30 %. The unbalance component, which weighs most in RMS velocity, comes in clipped. The ISO verdict still holds, but with less margin than the figure suggests.",
+      "accion": "If a reliable baseline measurement is wanted, take it with the machine at its service speed, where the band picks it up whole."
+    },
+    "por-debajo-del-minimo-del-modulo": {
+      "titulo": "The machine is turning below what the module can measure",
+      "evidencia": "{{velocidad}} rpm, below the {{rpmMinima}} rpm minimum of the SIPLUS CMS SM 1281.",
+      "consecuencia": "The module does not guarantee its measurements below that speed. What it is publishing right now is not comparable with anything.",
+      "accion": "Do not decide anything on these readings. Repeat at normal running speed."
+    },
+    "medida-en-vacio": {
+      "titulo": "The machine is turning off load",
+      "evidencia": "Drive torque is {{par}} %: the machine is turning, but it is not working.",
+      "evidencia_conPotencia": "Drive torque is {{par}} % and power {{potencia}} kW: the machine is turning, but it is not working.",
+      "consecuencia": "Off load, the vibrations that only show under load do not appear — misalignment forced by torque, clearances that close up, cavitation. A clean measurement here does not rule out a problem in service.",
+      "accion": "Take the baseline measurement with the machine in its normal working condition, not off load."
+    },
+    "vibracion-en-alarma": {
+      "titulo": "Vibration in the damage zone",
+      "evidencia": "RMS velocity {{vRMS}} mm/s, above the {{limite}} mm/s at which ISO 10816-1 Class I places zone D.",
+      "consecuencia": "Zone D is the damage zone: at this level the machine is deteriorating while it runs. The usual causes in this range are significant unbalance, misalignment or a loose baseplate.",
+      "accion": "Stop as soon as the process allows and check balancing, alignment and the fixing of the baseplate."
+    },
+    "vibracion-en-aviso": {
+      "titulo": "Vibration above the level for prolonged running",
+      "evidencia": "RMS velocity {{vRMS}} mm/s: zone C of ISO 10816-1 Class I (above {{limite}} mm/s).",
+      "consecuencia": "Zone C is «unsatisfactory»: the machine can carry on running, but not indefinitely. Leaving it there shortens the life of the bearings and of the coupling.",
+      "accion": "Schedule an intervention. There is no need to stop today."
+    },
+    "alarma-del-modulo": {
+      "titulo": "The vibration module has its alarm output on",
+      "evidencia": "The SM 1281 has raised its alarm output for this channel.",
+      "consecuencia": "The module has crossed one of its own thresholds for the configured delay time. It does not say WHICH: it may be velocity, acceleration or damage value.",
+      "accion": "Look in the module’s web server for the specific limit that has been exceeded, and contrast it with the measurements on this screen."
+    },
+    "aviso-del-modulo": {
+      "titulo": "The vibration module has its warning output on",
+      "evidencia": "The SM 1281 has raised its warning output for this channel.",
+      "consecuencia": "The warning threshold has been crossed, which is the one meant to warn before there is damage. This is the useful moment to act.",
+      "accion": "Find out which measurement in particular tripped it, before it rises further."
+    },
+    "dkw-sin-referencia": {
+      "titulo": "The damage value has no learned baseline",
+      "evidencia": "The server delivers no damage value for this channel: either the baseline has not been learned, or the channel is not in monitoring mode.",
+      "consecuencia": "The damage value is the measurement that catches a bearing starting to pit soonest — before velocity and before acceleration. With no baseline, that early warning does not exist for this support.",
+      "accion": "Leave the module in «RUN: Measure» with the machine healthy, then press «Apply» in the DKW configuration of its web server. Careful: if it is learned with an already damaged bearing, the damage ends up INSIDE the baseline and the watch starts out blind."
+    },
+    "sensor-con-desviacion": {
+      "titulo": "The sensor is reporting an offset",
+      "evidencia": "Offset declared by the module: {{offset}}.",
+      "consecuencia": "An offset other than zero points at the mounting or the wiring of the accelerometer — a loose base, insufficient tightening torque, IEPE supply at its limit — not at the machine. While it is there, every measurement on this channel carries the error.",
+      "accion": "Check the mounting of the probe and its cable before believing any other reading from this channel."
+    },
+    "variador-en-fallo": {
+      "titulo": "The drive of this machine is in fault",
+      "evidencia": "`FAULT_BMS` reads {{fallo}}.",
+      "evidencia_conUltimo": "`FAULT_BMS` reads {{fallo}} and the last fault on record was {{ultimoFallo}}.",
+      "consecuencia": "With the drive in fault, the published speed may not match what the shaft is doing, and every vibration assessment that depends on it is left hanging.",
+      "accion": "Deal with the drive fault before interpreting the vibrations."
+    },
+    "rodamientos-sin-vigilar": {
+      "titulo": "Bearing diagnosis is switched off",
+      "evidencia": "{{n}} of 3 bearing watches are not watching anything at this support: {{cuales}}.",
+      "consecuencia": "The module computes the envelope spectrum and knows the exact frequencies at which each bearing defect strikes. With that switched off, a bearing that is pitting will only show once it has risen enough to move the RMS value — and by then the damage is done.",
+      "accion": "Configure the bearing geometry in the channel: number of rolling elements, pitch diameter, element diameter and contact angle. Without those four figures the module cannot compute BPFO, BPFI or FTF, which is why it leaves them off."
+    },
+    "medida-sin-vigilar": {
+      "titulo": "Some measurements are published but not watched",
+      "evidencia": "Published, but nobody compares them against a limit: {{cuales}}.",
+      "consecuencia": "The value appears on screen and looks watched. It is not: if it rises, the module will raise neither warning nor alarm.",
+      "accion": "Set a threshold for that measurement in the channel, or accept that it is informative only."
+    },
+    "vigilancia-en-aviso": {
+      "titulo": "The module has a watch in warning or alarm",
+      "evidencia": "{{disparadas}}.",
+      "consecuencia": "The module has crossed one of its own criteria. Unlike the general alarm and warning flags, this one says WHICH watch in particular has tripped.",
+      "accion": "Look at that measurement in the module’s web server and contrast it with the other supports before touching anything.",
+      "nota": "The reading of this state is inferred, not confirmed against the SM 1281 manual."
+    },
+    "confianza-de-medida-baja": {
+      "titulo": "The module distrusts one of its own measurements",
+      "evidencia": "Below the {{nominal}} seen with the machine healthy: {{bajas}}.",
+      "consecuencia": "The module publishes a confidence figure alongside each measurement. When it drops, the number goes on being published just the same: it cannot be told from a good one by looking at it.",
+      "accion": "Check the mounting of the probe, and that the machine is above the module’s minimum running speed, before believing that measurement."
+    },
+    "alarmas-activas": {
+      "titulo": "The alarm server has active alarms in this area",
+      "evidencia": "{{total}} active alarm(s) in «DEMO VIBRACIONES».",
+      "evidencia_sinReconocer": "{{total}} active alarm(s) in «DEMO VIBRACIONES», {{sinReconocer}} unacknowledged.",
+      "evidencia_severidad": "{{total}} active alarm(s) in «DEMO VIBRACIONES». Highest severity {{severidad}}.",
+      "evidencia_ambos": "{{total}} active alarm(s) in «DEMO VIBRACIONES», {{sinReconocer}} unacknowledged. Highest severity {{severidad}}.",
+      "consecuencia": "These are the server’s alarms, not deductions made by this screen: somebody set their limits deliberately, and they override anything concluded here.",
+      "accion": "Open the ICONICS alarm viewer to see WHICH they are. This screen can only count them: the API does not expose the state alarm by alarm.",
+      "nota": "What is read is the area counter. Which of the 57 configured alarms has tripped cannot be known from here."
+    },
+    "alarmas-sin-reconocer": {
+      "titulo": "Alarms tripped and nobody acknowledged them",
+      "evidencia": "{{n}} alarm(s) in «DEMO VIBRACIONES» tripped and went back to normal without anybody acknowledging them.",
+      "consecuencia": "The machine is well NOW. But something took it out of band while nobody was looking, and with them unacknowledged there is no record that anyone checked what it was.",
+      "accion": "Review and acknowledge those alarms in the ICONICS viewer, so that the next one to appear can be told apart from the old ones."
+    },
+    "asimetria-entre-apoyos": {
+      "titulo": "One support vibrates far more than the others",
+      "evidencia": "{{canal}} measures {{valor}} m/s² of RMS acceleration, {{veces}} times what the rest of the supports on the same machine measure ({{referencia}} m/s² median).",
+      "consecuencia": "A large difference between supports on the same shaft is usually local: a bearing in poor condition, a loose base, or misalignment pulling on that side. If it were a whole-machine problem, they would all rise together.",
+      "accion": "Look at that support first: tightness of the fixing, condition of the bearing and alignment of the coupling at that end."
+    }
   }
 }

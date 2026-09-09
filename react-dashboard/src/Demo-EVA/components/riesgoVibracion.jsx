@@ -18,6 +18,9 @@
 import { AlertTriangle, ClipboardCheck, Info, MessageSquareText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { useDominio } from "@/i18n/useDominio.js";
+import { useProsa } from "@/i18n/useProsa.js";
+
 import { pedirAlAsistente } from "@/features/asistente";
 
 import { preguntaSobreRiesgoVibracion } from "../domain/riesgosVibracion.js";
@@ -72,9 +75,18 @@ export function Campo({ t, rotulo, destacado = false, children }) {
 }
 
 /** Una tarjeta de riesgo. Evidencia primero: el hecho antes que la deducción. */
-export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
+export function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("diagnostics");
+  /*
+   * La evidencia, la consecuencia y la acción las escribe
+   * `shared/eva/vibraciones/riesgosVibracion.js` en español, porque de ahí las
+   * lee también el backend para que el modelo las narre. Aquí se rehacen en el
+   * idioma activo con las mismas cifras. Ver la cabecera de `useProsa`.
+   */
+  const { riesgoVibracion } = useProsa();
+  const { canal } = useDominio();
+  const riesgo = riesgoVibracion(original);
   const nivel = nivelInfo(riesgo.nivel);
   const { Icono } = nivel;
 
@@ -103,14 +115,14 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
             >
               {traducir(`severity.${nivel.clave}`)}
             </span>
-            {riesgo.canalLabel && (
+            {riesgo.canal && (
               <span
                 style={{
                   padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 600,
                   color: t.textSoft, background: t.hover,
                 }}
               >
-                {riesgo.canalLabel}
+                {canal(riesgo.canal)}
               </span>
             )}
           </div>
@@ -147,7 +159,12 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => pedirAlAsistente(preguntaSobreRiesgoVibracion(riesgo))}
+          /*
+            Con el riesgo SIN traducir. El asistente conversa en español y su
+            motor busca en un corpus español; mandarle la frase traducida
+            rompería la coincidencia. Mismo criterio que la tarjeta del tanque.
+          */
+          onClick={() => pedirAlAsistente(preguntaSobreRiesgoVibracion(original))}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "8px 14px", borderRadius: 8, cursor: "pointer",
@@ -167,7 +184,7 @@ export function TarjetaRiesgo({ riesgo, t, onNavigate }) {
         <button
           type="button"
           onClick={() => onNavigate?.("cierre-diagnostico", {
-            sistema: "vibraciones", riesgoId: riesgo.id, canalLabel: riesgo.canalLabel ?? "",
+            sistema: "vibraciones", riesgoId: original.id, canalLabel: original.canalLabel ?? "",
           })}
           style={{
             display: "flex", alignItems: "center", gap: 8,

@@ -253,6 +253,15 @@
       "mounting": "{{fabricante}} {{modelo}} probe, {{sensibilidad}} mV/g, {{montaje}} mounting and vertical orientation.",
       "bearingKnown": "Bearing {{modelo}}.",
       "bearingUnknown": "Bearing not identified: without its reference BPFO, BPFI and FTF cannot be computed, so this bearing has no frequency-based bearing diagnosis."
+    },
+    "readings": {
+      "velocidad": "speed",
+      "par": "torque",
+      "fallo": "drive fault",
+      "vRMS": "RMS velocity",
+      "alarma": "module alarm",
+      "aviso": "module warning",
+      "offset": "sensor offset"
     }
   },
   "assetsView": {

@@ -40,7 +40,7 @@ import { estadoInfo } from "@shared/eva/tanque/estado.js";
 import { senalInfo } from "@shared/eva/tanque/senales.js";
 import { activoInfo } from "@shared/eva/tanque/activos.js";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
-import { CANALES, MEDIDAS, VIGILANCIAS } from "@shared/eva/vibraciones/vibraciones.js";
+import { CANALES, MEDIDAS, VARIADOR, VIGILANCIAS } from "@shared/eva/vibraciones/vibraciones.js";
 
 /**
  * Traduce el vocabulario del dominio de LAS DOS máquinas.
@@ -162,6 +162,23 @@ export function useDominio() {
     [t]
   );
 
+  /**
+   * El nombre de una lectura que una regla echó en falta.
+   *
+   * Busca en los dos catálogos donde puede estar —las medidas del canal y las
+   * variables del variador— porque una regla puede necesitar de cualquiera de
+   * los dos, y las que no están en ninguno (`alarma`, `aviso`, `offset` son banderas
+   * del módulo, no magnitudes) viven sólo en el diccionario. De ahí que aquí no
+   * haya `defaultValue` con etiqueta del dominio para todas: para tres no existe.
+   */
+  const lectura = useCallback(
+    (key) => {
+      const info = MEDIDAS.find((m) => m.key === key) ?? VARIADOR.find((v) => v.key === key);
+      return t(`machines:vibration.readings.${key}`, { defaultValue: info?.label ?? key });
+    },
+    [t]
+  );
+
   /** Qué vigila el módulo en un canal: umbral, espectro o defecto de rodamiento. */
   const vigilancia = useCallback(
     (key) => {
@@ -191,7 +208,7 @@ export function useDominio() {
 
   return {
     estado, senal, activo, sistema, sistemas,
-    canal, medida, vigilancia, estadoVigilancia, zonaIso,
+    canal, medida, lectura, vigilancia, estadoVigilancia, zonaIso,
   };
 }
 

@@ -40,7 +40,14 @@
  *
  *   · El contenido de un nodo JSX: `>Requiere atención<`.
  *   · Los atributos que pintan texto: title, label, placeholder, alt,
- *     aria-label, sub, message, tip.
+ *     aria-label, sub, message, tip — tanto `message="…"` como
+ *     `message={"…" + "…"}`.
+ *
+ * Lo segundo se añadió el 09-09-2026, y no de adorno: este guion daba el árbol
+ * por limpio teniendo delante un párrafo entero en español en
+ * `views/vibraciones/Vibraciones.jsx`, escrito como `message={ "…" + "…" }`. Un
+ * verificador que da un falso verde es peor que no tenerlo, porque además
+ * convence.
  *
  * NO mira comentarios —que van en español a propósito (CLAUDE.md §4.6)—, ni
  * los diccionarios, ni las pruebas, ni `shared/`, que es dominio y tiene su
@@ -227,8 +234,18 @@ const NODO_JSX = />([^<>{}"'`]+)</g
  */
 const HUELE_A_CODIGO = /=>|&&|\|\||\?\?|\?\.|;|\s\?\s|\s:\s\w|=\s/
 
-/** Los atributos que acaban en pantalla. */
+/** Los atributos que acaban en pantalla, escritos como cadena suelta. */
 const ATRIBUTO = /\b(title|label|placeholder|alt|aria-label|sub|message|tip|titulo|rotulo)\s*=\s*"([^"]+)"/g
+
+/**
+ * Los mismos, cuando el valor va en llaves: `message={"…" + "…"}`.
+ *
+ * Basta con cazar el PRIMER trozo de la concatenación. Si ése está en español
+ * el resto también, y lo que hace falta es señalar la línea, no reconstruir la
+ * frase entera.
+ */
+const ATRIBUTO_EN_LLAVES =
+  /\b(title|label|placeholder|alt|aria-label|sub|message|tip|titulo|rotulo)\s*=\s*\{\s*"([^"]+)"/g
 
 function hallazgosDe(fuente) {
   const limpio = sinComentarios(fuente)
@@ -245,6 +262,7 @@ function hallazgosDe(fuente) {
 
   for (const m of limpio.matchAll(NODO_JSX)) anotar(m.index, m[1])
   for (const m of limpio.matchAll(ATRIBUTO)) anotar(m.index, m[2])
+  for (const m of limpio.matchAll(ATRIBUTO_EN_LLAVES)) anotar(m.index, m[2])
 
   return encontrados
 }

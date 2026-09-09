@@ -253,6 +253,15 @@
       "mounting": "Sonda {{fabricante}} {{modelo}}, {{sensibilidad}} mV/g, montaje {{montaje}} y orientación vertical.",
       "bearingKnown": "Rodamiento {{modelo}}.",
       "bearingUnknown": "Rodamiento sin identificar: sin su referencia no se pueden calcular BPFO, BPFI ni FTF, así que este apoyo no tiene diagnóstico de rodamiento por frecuencia."
+    },
+    "readings": {
+      "velocidad": "velocidad",
+      "par": "par",
+      "fallo": "fallo del variador",
+      "vRMS": "velocidad eficaz",
+      "alarma": "alarma del módulo",
+      "aviso": "aviso del módulo",
+      "offset": "desviación del sensor"
     }
   },
   "assetsView": {
