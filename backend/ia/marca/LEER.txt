@@ -1,0 +1,16 @@
+CARPETA DE MARCA TDCON — imágenes para la portada y cabecera de los reportes PDF
+=================================================================================
+
+Guarda AQUÍ los tres archivos que enviaste, CON ESTOS NOMBRES EXACTOS
+(en minúsculas, .png o .jpg). El generador (backend/ia/reporte.mjs) los lee
+desde esta carpeta al armar el PDF.
+
+  portada-fondo.png   -> la página azul completa (fondo de la portada)
+  banner.png          -> el logo "TDCON III.0 / INNOVACION QUE IMPULSA..."
+                         IDEAL: sin el recuadro blanco (fondo transparente).
+                         Si sólo lo tienes con el recuadro blanco, guárdalo
+                         igual y lo resolvemos.
+  cintillo.png        -> la franja ancha (para la cabecera de cada página)
+
+Si un archivo no está, el reporte se genera igual pero sin esa pieza
+(no truena): la regla de la casa es "lo que falta se dice, no se finge".
