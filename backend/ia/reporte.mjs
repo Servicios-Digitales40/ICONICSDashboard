@@ -128,23 +128,6 @@ function generarFolio(fecha = new Date()) {
   return `TDCON-${ymd}-${cola}`
 }
 
-/**
- * Abre las imágenes de marca UNA sola vez en el documento y devuelve
- * referencias reutilizables.
- *
- * Pasar el mismo Buffer a `doc.image` en cada página NO lo deduplica: pdfkit
- * incrusta los bytes otra vez. El cintillo va en TODAS las páginas, así que un
- * reporte de varias hojas acababa pesando megas de más. `openImage` lo incrusta
- * una vez y cada `doc.image(ref, …)` reutiliza el mismo objeto.
- */
-function abrirMarca(doc, marca) {
-  return {
-    fondo: marca.fondo ? doc.openImage(marca.fondo) : null,
-    banner: marca.banner ? doc.openImage(marca.banner) : null,
-    cintillo: marca.cintillo ? doc.openImage(marca.cintillo) : null,
-  }
-}
-
 /* ── Piezas de marca reutilizadas por las dos portadas y páginas ──── */
 
 /**
@@ -354,7 +337,7 @@ export async function componerReportePdf({
 }) {
   const folioFinal = folio || generarFolio()
   const { doc, cerrado } = nuevoDocumento()
-  const marca = abrirMarca(doc, cargarMarca())
+  const marca = cargarMarca()
 
   sinPaginacion(doc, () => dibujarPortada(doc, marca, {
     titulo: 'REPORTE TÉCNICO',
@@ -478,7 +461,7 @@ export async function componerReportePdf({
 export async function componerConversacionPdf({ instalacion, generadoEl, turnos, folio }) {
   const folioFinal = folio || generarFolio()
   const { doc, cerrado } = nuevoDocumento()
-  const marca = abrirMarca(doc, cargarMarca())
+  const marca = cargarMarca()
 
   sinPaginacion(doc, () => dibujarPortada(doc, marca, {
     titulo: 'REPORTE DE CONVERSACIÓN',
