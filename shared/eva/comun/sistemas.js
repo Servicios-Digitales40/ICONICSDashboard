@@ -107,7 +107,7 @@ import {
   SENALES,
   SENAL_KEYS,
   TODOS_LOS_PUNTOS,
-  RAIZ,
+  RAMAS,
   esHistorizada as esHistorizadaTanque,
   historizadas as historizadasTanque,
   parsePointName,
@@ -140,7 +140,14 @@ export const SISTEMAS = [
     nombre: "Tanque y grupo de bombeo",
     maquina: "Tanque de almacenamiento, bomba, red de distribución y su suministro",
     plc: "PLC_1 · ua:DEMO2",
-    raices: [RAIZ],
+    /*
+     * Trece ramas, no una (Plan 27 F1): la reorganización del 09-09-2026
+     * dejó `SENSORES/` como una rama más, hermana de las doce que reproducen
+     * el DB del PLC. `verificar-catalogo --real` explora el padre de cada
+     * raíz declarada y avisa si aparece una catorceava sin que nadie la
+     * añada aquí (Plan 27 F0).
+     */
+    raices: Object.values(RAMAS),
     puntos: () => TODOS_LOS_PUNTOS,
     /* `parse` devuelve la clave de dominio envuelta, para que las dos máquinas
        tengan la MISMA forma de identidad aunque una la tenga plana y la otra

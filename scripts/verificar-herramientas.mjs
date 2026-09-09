@@ -45,6 +45,7 @@ import {
 } from '../backend/ia/conversacion/herramientas.mjs'
 import {
   RAIZ,
+  RAMAS,
   SENALES,
   SENAL_KEYS,
   TODOS_LOS_PUNTOS,
@@ -147,7 +148,13 @@ function clienteFalso({
       lotes.push(puntos)
       const payload = {}
       for (const p of puntos) {
-        const tag = p.slice(RAIZ.length)
+        /*
+         * Las nueve señales de este archivo siguen bajo `SENSORES/`
+         * (Plan 27 F1-F2 no las ha reubicado todavía), así que el tag se
+         * saca de ahí y no de `RAIZ` — que desde F1 es el prefijo común a
+         * las trece ramas, y ya no coincide con ninguna rama en concreto.
+         */
+        const tag = p.slice(RAMAS.sensores.length)
         payload[p] = {
           ok: true,
           payload: { value: valores[tag], quality: calidad[tag] ?? 0 },

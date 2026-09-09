@@ -268,13 +268,16 @@ Esa es la lección real, y coincide con lo que el usuario pide: **la solución n
 es inventar un catálogo nuevo, es que ESTE catálogo deje de tener puntos que
 viven fuera de él por no encajar en su forma.** El campo `naturaleza` de §2 ya
 resuelve eso — un `mando` como `CONTROL` cabe en el mismo catálogo que un
-`medida` como el nivel, sólo que se evalúa distinto — así que F1 pasa a incluir
-también dar de alta `CONTROL` como una entrada más de `senales.js`
-(`naturaleza: "mando"`, sin `escala` ni `umbral`), y F7 cambia
-`TAG_CONTROL_BOMBA`/`TAG_CONTROL` para que lean su punto de `pointName("control")`
-en vez de llevarlo hardcodeado cada uno por su lado. La próxima vez que planta
-mueva ese punto, el cambio es una línea en el catálogo, y `verificar-catalogo
---real` lo confirma solo.
+`medida` como el nivel, sólo que se evalúa distinto — así que **F3** (que ya
+era la fase que introduce `naturaleza` y da de alta los primeros puntos de
+`SEGURIDAD/`) pasa a incluir también `CONTROL` como una entrada más de
+`senales.js` (`naturaleza: "mando"`, sin `escala` ni `umbral`), y con él F7
+cambia `TAG_CONTROL_BOMBA`/`TAG_CONTROL` para que lean su punto de
+`pointName("control")` en vez de llevarlo hardcodeado cada uno por su lado. No
+antes de F3: darlo de alta ya en F1, sin que `createSenal()`/`estadoDeSenal()`
+sepan todavía de `naturaleza`, sería evaluarlo con las reglas de una medida que
+no es. La próxima vez que planta mueva ese punto, el cambio es una línea en el
+catálogo, y `verificar-catalogo --real` lo confirma solo.
 
 **Una cosa que un catálogo no puede prometer, y conviene decirlo para no
 generar una expectativa falsa: alguien sigue teniendo que escribir esa línea.**
@@ -417,9 +420,12 @@ Sin red no cambia nada, así que F0 entra en CI igual que hoy.
   que no se reconoce es dato ausente, nunca una asignación a la señal
   equivocada.
 - `sistemas.js`: `raices: [RAIZ]` → las trece.
-- **`SEGURIDAD/CONTROL` entra al catálogo** (§2.1), con `naturaleza: "mando"`,
-  sin `escala` ni `umbral`. Es la señal que arregla lo que el bugfix de hoy
-  dejó pendiente: que deje de vivir hardcodeada fuera de `senales.js`.
+
+`CONTROL` **no entra al catálogo en esta fase.** §2.1 explica por qué debe
+entrar —es la señal que cierra el hueco del bugfix de hoy—, pero meterlo ya
+significaría que `createSenal()`/`estadoDeSenal()` lo evaluaran como una señal
+de `naturaleza` desconocida, que es precisamente el mecanismo que F3 construye
+todavía. Entra ahí, como parte de esa primera cosecha, no antes.
 
 `RAIZ` **no desaparece, pero cambia lo que significa**: de la única raíz del
 sistema (`SENSORES/`, hoy con sólo 3 de las 66 variables) pasa a ser el prefijo
@@ -435,7 +441,7 @@ esta fase: mismo nombre exportado, valor corregido, tres importadores que
 ganan precisión sin que se les toque una línea.
 
 Nada de esto añade una sola variable al catálogo. Es la fase que hace posible
-el resto, y se prueba con las nueve de siempre (las ocho más `CONTROL`).
+el resto, y se prueba con las ocho de siempre.
 
 ### F2 · Los tres puntos rotos, y sólo ésos
 

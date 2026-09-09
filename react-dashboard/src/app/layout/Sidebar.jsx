@@ -16,12 +16,15 @@ import { estadoColor } from "@/Demo-EVA/components/paleta.js";
 import { RAIZ } from "@shared/eva/tanque/senales.js";
 
 /**
- * Raíz de instalación para el pie de la barra, sin el tramo de puntos
- * (`SENSORES/`): el pie identifica LA INSTALACIÓN, no el catálogo de
- * señales — el mismo recorte que ya hace el subtítulo del Topbar en
- * `routes.jsx` para "Assets" frente al de "Inicio"/"Planta".
+ * Raíz de instalación para el pie de la barra.
+ *
+ * Hasta el Plan 27, `RAIZ` apuntaba a `SENSORES/` —una rama del árbol, no la
+ * instalación— y este archivo le quitaba ese tramo a mano para no mostrar el
+ * catálogo de señales en vez de la planta. Desde F1, `RAIZ` ya ES el prefijo
+ * de la instalación (`ac:TDCON/DEMO/`), así que el recorte ya no hace falta:
+ * se deja el alias para no tocar el resto del archivo.
  */
-const RAIZ_INSTALACION = RAIZ.replace(/\/?SENSORES\/?$/, "");
+const RAIZ_INSTALACION = RAIZ;
 
 /**
  * Estado de "Planta" para el punto de la barra: mismo criterio y mismos
