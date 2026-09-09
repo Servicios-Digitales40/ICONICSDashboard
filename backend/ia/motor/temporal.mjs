@@ -203,14 +203,23 @@ export function createEvaluadorTemporal({ historia }) {
       const coincide = direccionReal === item.direccion
       const texto = `La señal "${item.senal}" ${NOMBRE_DIRECCION[direccionReal]} en las últimas ${item.ventanaH} h.`
 
+      /*
+       * `plantilla` es la MISMA frase por claves, para que el tablero pueda
+       * escribirla en su idioma. `texto` se queda porque es lo que consume el
+       * modelo, que narra en español o en inglés pero lee siempre esto. Ver
+       * la cabecera de `diagnostico.mjs`.
+       */
+      const plantilla = { clave: 'tendencia', senal: item.senal, direccion: direccionReal, ventanaH: item.ventanaH }
+
       if (coincide) {
         favorables++
-        evidenciaAFavor.push({ fuente: 'temporal', texto, referencia: item.senal })
+        evidenciaAFavor.push({ fuente: 'temporal', texto, referencia: item.senal, plantilla })
       } else {
         evidenciaEnContra.push({
           fuente: 'temporal',
           texto: `${texto} La firma de esta causa declaraba dirección "${item.direccion}".`,
           referencia: item.senal,
+          plantilla: { ...plantilla, clave: 'tendenciaContraria', declarada: item.direccion },
         })
       }
     }

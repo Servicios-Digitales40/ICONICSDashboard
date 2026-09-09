@@ -356,17 +356,23 @@ node --env-file=.env.local scripts/medir-asistente.mjs    # el banco de 20 casos
 ```bash
 node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
 ```
-> **Hoy pasa** (medido el 02-09-2026: `index` 92,21 KB sobre 170,
-> `vendor` 203,26 KB sobre 210). Este documento decía que seguía en rojo
-> —«161,84 KB sobre un techo de 90»—; eso describía a `vendor`, y dejó de
-> ser cierto el 31-ago-2026, un día antes de escribirse esta línea.
+> **Hoy pasa** (medido el 09-09-2026: `index` 195,43 KB sobre 300,
+> `vendor` 264,01 KB sobre 270).
 >
-> El techo de `vendor` se subió entonces de 90 a 210 KB al instalar TanStack
-> Query, con la medición y el motivo en la cabecera del propio guion. Roza la
-> regla de «no se sube el techo para callarlo», así que conviene saberlo:
-> quedó documentado y razonado, no escondido, pero `vendor` va hoy a 203 de
-> 210 y el margen es de 7 KB. Ver `docs/BACKLOG-FRONTEND.md` F5, que sigue
-> describiendo la situación anterior.
+> Los dos techos se han subido, y las tres subidas están razonadas con su
+> medición en la cabecera del propio guion. Conviene saberlo porque roza la
+> regla de «no se sube el techo para callarlo»:
+>
+> · `vendor` 90 → 210 (TanStack Query) → 270 (la librería de i18n).
+> · `index` 170 → 200 (los diccionarios, con `prediction.json` sacado antes
+>   del arranque) → **300 el 09-09-2026, y ésta por holgura, no por medición**:
+>   se pidió margen para el trabajo que viene.
+>
+> Lo que este guion protege de verdad —que la pila 3D no viaje en el arranque—
+> no depende de esos números sino de `HUELLAS_3D`, y ahí no se ha tocado nada.
+> La palanca pendiente sigue siendo cargar **sólo el idioma activo** (~40 KB
+> fuera del camino crítico); subir el techo no la cancela. Ver
+> `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo la situación anterior.
 
 **Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
 `verificar-herramientas.mjs` y el verificador específico de lo que tocó

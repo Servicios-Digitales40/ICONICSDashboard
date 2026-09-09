@@ -54,6 +54,46 @@ const REGLAS_POR_SISTEMA = {
 }
 
 /**
+ * Las frases de evidencia que ESCRIBE ESTE MOTOR, por su clave.
+ *
+ * ── POR QUÉ VIAJAN POR CLAVE Y NO SÓLO REDACTADAS ──────────────────
+ *
+ * Cada entrada de `evidenciaAFavor`/`evidenciaEnContra` lleva `texto` —la
+ * frase ya compuesta, en español— porque es lo que consume el modelo y lo que
+ * se archiva. Pero el tablero la PINTA, y un tablero en inglés no puede
+ * enseñar un párrafo en español: por eso las que redactamos nosotros llevan
+ * además `plantilla: { clave, ...valores }`, que la pantalla vuelve a componer
+ * en su idioma (`react-dashboard/src/i18n/useEvidencia.js`).
+ *
+ * ── LO QUE NO LLEVA PLANTILLA, Y NO ES UN OLVIDO ───────────────────
+ *
+ * Dos fuentes se quedan sin ella a propósito, porque su `texto` no es una
+ * plantilla nuestra sino CONTENIDO de alguien:
+ *
+ *   · `manual`  — un fragmento literal del manual. La cita tiene que poder
+ *                 contrastarse con el papel; traducirla la invalidaría.
+ *   · `casos` a favor — lo que escribió un técnico al cerrar un caso. Son sus
+ *                 palabras, y no se le reescriben.
+ *
+ * (`casos` EN CONTRA sí lleva plantilla: esa frase la redactamos nosotros
+ * alrededor del id de la causa, no la escribió nadie.)
+ *
+ * Esta lista existe para que `verificar-diagnostico.mjs` pueda comprobar que
+ * los dos diccionarios saben decir todas: una clave nueva sin su frase saldría
+ * en pantalla como la clave cruda, y eso no lo caza ninguna prueba de aquí.
+ */
+export const CLAVES_DE_EVIDENCIA = {
+  // La evidencia MEDIDA del riesgo. No la escribe este motor sino
+  // `shared/eva/`, así que su inglés vive en `domain.json` y lo vigila
+  // `verificar-dominio.mjs`, no el diccionario de la pantalla.
+  evidenciaDelRiesgo: 'domain',
+  // Éstas sí son frases nuestras, y viven en `diagnostics.json`.
+  causaDescartada: 'diagnostics',      // un cierre anterior descartó esta causa
+  tendencia: 'diagnostics',            // una señal de la firma se mueve como la causa declaraba
+  tendenciaContraria: 'diagnostics',   // ...y se mueve al revés
+}
+
+/**
  * ── EL CORTE ES SOBRE MAGNITUD ABSOLUTA, NO SOBRE EL RANKING (PLAN 17 §G2) ──
  *
  * `indiceDocumentos.buscar()`/`indiceCasos.buscarCasosSimilares()` devuelven
@@ -415,6 +455,13 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
    *   activo"—, así que sin este dato no hay frase de `datos` que citar en
    *   `evidenciaAFavor`, y esa fuente simplemente no aporta ninguna entrada
    *   (el PUNTO de `datos` no depende de esto, sólo su frase).
+   *
+   *   **Hoy no lo trae NADIE** (comprobado el 09-09-2026): la única entrada de
+   *   producción es `GET /api/diagnostico`, cuyo `DiagnosticoQuerySchema`
+   *   admite `sistema` y `riesgoId` y Zod descarta lo demás. O sea que la
+   *   frase de `datos` sólo existe hoy en `verificar-diagnostico.mjs`. Está
+   *   dicho aquí para que no se dé por ejercitada: el camino está escrito y
+   *   probado, pero nadie lo recorre todavía.
    * @returns {Promise<{
    *   sistema: string, riesgoId: string,
    *   diagnosticEventId: string,  // uno por CADA llamada, ver la cabecera del archivo
@@ -481,9 +528,21 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
     // `datos` ya lo era —misma evidencia física para todas, ver la cabecera
     // del archivo—.
     let evidenciaDatos = null
+    let valoresDeLaFrase = {}
     if (valoresSensores) {
       try {
         evidenciaDatos = regla.evidencia(valoresSensores)
+        /*
+         * CON QUÉ se compuso, para que la pantalla pueda rehacerla en otro
+         * idioma. Cada catálogo tiene su convención y aquí se respeta la suya:
+         * las del tanque llevan las lecturas en crudo más los umbrales que
+         * declare `datos()`; las de vibración, lo que devuelva `datos(d)`, ya
+         * formateado por la propia regla. Está explicado en las dos cabeceras
+         * y en `i18n/useProsa.js`.
+         */
+        valoresDeLaFrase = sistema === 'vibraciones'
+          ? (regla.datos?.(valoresSensores) ?? {})
+          : { ...valoresSensores, ...(regla.datos?.() ?? {}) }
       } catch (error) {
         logger.warn('regla.evidencia(valoresSensores) falló; se omite la frase de datos', {
           riesgoId, error: error.message,
@@ -517,7 +576,12 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
       const evidenciaEnContra = []
 
       if (evidenciaDatos && datos > 0) {
-        evidenciaAFavor.push({ fuente: 'datos', texto: evidenciaDatos, referencia: null })
+        evidenciaAFavor.push({
+          fuente: 'datos',
+          texto: evidenciaDatos,
+          referencia: null,
+          plantilla: { clave: 'evidenciaDelRiesgo', sistema, riesgoId, valores: valoresDeLaFrase },
+        })
       }
       if (manual.puntos > 0 && manual.fragmentos[0]) {
         const mejor = manual.fragmentos[0]
@@ -533,11 +597,18 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
         })
       }
       for (const refutado of casos.refutados) {
+        /*
+         * `causaReal.tipo` es un id de causa cuando el técnico eligió una de
+         * las candidatas, y TEXTO LIBRE cuando escribió la suya. Viaja tal
+         * cual y es la pantalla la que decide: si el id existe en el catálogo
+         * lo dice en su idioma, y si no, enseña lo que la persona escribió.
+         */
         evidenciaEnContra.push({
           fuente: 'casos',
           texto: `Un técnico descartó esta causa en un cierre anterior — la causa real fue ` +
             `"${refutado.causaReal?.tipo ?? 'otra'}".`,
           referencia: refutado.id,
+          plantilla: { clave: 'causaDescartada', causaReal: refutado.causaReal?.tipo ?? null },
         })
       }
       // `temporal` (Plan 17 Fase 6, G5): frases YA construidas por

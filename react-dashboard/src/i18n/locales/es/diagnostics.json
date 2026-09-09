@@ -66,5 +66,19 @@
       "detail_other": "{{count}} mecanismos comprobados sobre {{muestras}} muestras del historiador."
     },
     "unwatchedNote": "Estos desgastes <b>no se están vigilando</b>, porque el historiador no sirve la señal que necesitan. No es que no ocurran: es que nadie los cuenta."
+  },
+  "evidence": {
+    "source": {
+      "datos": "datos",
+      "manual": "manual",
+      "casos": "casos",
+      "temporal": "tendencia"
+    },
+    "causaDescartada": "Un técnico descartó esta causa en un cierre anterior — la causa real fue «{{causa}}».",
+    "causaDescartada_sinCausa": "Un técnico descartó esta causa en un cierre anterior.",
+    "tendencia_sube": "«{{senal}}» subió en las últimas {{ventanaH}} h.",
+    "tendencia_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h.",
+    "tendenciaContraria_sube": "«{{senal}}» subió en las últimas {{ventanaH}} h. La firma de esta causa la declaraba bajando.",
+    "tendenciaContraria_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h. La firma de esta causa la declaraba subiendo."
   }
 }

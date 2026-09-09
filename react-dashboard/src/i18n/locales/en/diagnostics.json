@@ -66,5 +66,19 @@
       "detail_other": "{{count}} mechanisms checked over {{muestras}} historian samples."
     },
     "unwatchedNote": "These wear mechanisms are <b>not being watched</b>, because the historian does not serve the signal they need. It is not that they do not happen: it is that nobody is counting them."
+  },
+  "evidence": {
+    "source": {
+      "datos": "data",
+      "manual": "manual",
+      "casos": "cases",
+      "temporal": "trend"
+    },
+    "causaDescartada": "A technician ruled this cause out in an earlier case — the actual cause was «{{causa}}».",
+    "causaDescartada_sinCausa": "A technician ruled this cause out in an earlier case.",
+    "tendencia_sube": "«{{senal}}» rose over the last {{ventanaH}} h.",
+    "tendencia_baja": "«{{senal}}» fell over the last {{ventanaH}} h.",
+    "tendenciaContraria_sube": "«{{senal}}» rose over the last {{ventanaH}} h. This cause’s signature declared it falling.",
+    "tendenciaContraria_baja": "«{{senal}}» fell over the last {{ventanaH}} h. This cause’s signature declared it rising."
   }
 }

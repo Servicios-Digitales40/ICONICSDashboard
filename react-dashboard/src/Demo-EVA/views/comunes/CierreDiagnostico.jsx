@@ -49,6 +49,7 @@ import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { obtenerDiagnostico, registrarCaso } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
+import { useEvidencia } from "@/i18n/useEvidencia.js";
 import { useProsa } from "@/i18n/useProsa.js";
 import { useTheme } from "@/theme";
 
@@ -105,6 +106,12 @@ function ZonaSistema({ t, sistemaNombre, tituloRiesgo, canalLabel, evidencia, ac
   const { t: traducir } = useTranslation("maintenance");
   /* El título de cada causa candidata. Ver la cabecera de `useProsa`. */
   const { causa: traducirCausa } = useProsa();
+  /*
+   * Y las frases con las que el motor respalda cada causa. Las redacta el
+   * backend en español —es lo que lee el modelo—; aquí se rehacen. Ver la
+   * cabecera de `useEvidencia`.
+   */
+  const { fuente: fuenteDeEvidencia, texto: textoDeEvidencia } = useEvidencia();
 
   return (
     <div
@@ -221,13 +228,15 @@ function ZonaSistema({ t, sistemaNombre, tituloRiesgo, canalLabel, evidencia, ac
                     <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingLeft: 46 }}>
                       {c.evidenciaAFavor?.map((e, j) => (
                         <div key={`favor-${j}`} style={{ fontSize: 11.5, color: t.textSoft }}>
-                          <span style={{ color: t.success }}>+</span> [{e.fuente}] {e.texto}
+                          <span style={{ color: t.success }}>+</span>{" "}
+                          [{fuenteDeEvidencia(e.fuente)}] {textoDeEvidencia(e)}
                           {e.referencia && <span style={{ color: t.textFaint }}> — {e.referencia}</span>}
                         </div>
                       ))}
                       {c.evidenciaEnContra?.map((e, j) => (
                         <div key={`contra-${j}`} style={{ fontSize: 11.5, color: t.coral }}>
-                          <span>−</span> [{e.fuente}] {e.texto}
+                          <span>−</span>{" "}
+                          [{fuenteDeEvidencia(e.fuente)}] {textoDeEvidencia(e)}
                           {e.referencia && <span style={{ color: t.textFaint }}> — {e.referencia}</span>}
                         </div>
                       ))}

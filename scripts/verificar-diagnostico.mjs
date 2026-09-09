@@ -30,8 +30,10 @@
  *   node scripts/verificar-diagnostico.mjs
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
 import {
+  CLAVES_DE_EVIDENCIA,
   UMBRAL_BM25_FUERTE,
   createMotorDiagnostico,
 } from '../backend/ia/motor/diagnostico.mjs'
@@ -424,6 +426,119 @@ await check('sin `valoresSensores`, no hay frase de `datos` — pero el PUNTO de
   // frase: `valoresSensores` sólo añade texto, nunca cambia un punto.
   assert.equal(causaSin.respaldo.datos, causaCon.respaldo.datos)
   assert.equal(causaSin.banda, causaCon.banda)
+})
+
+/* ── Que la evidencia se sepa decir en los dos idiomas ─────────────────── */
+
+/*
+ * ── POR QUÉ ESTO VIVE AQUÍ Y NO EN `verificar-i18n.mjs` ────────────
+ *
+ * Porque aquél compara los dos diccionarios entre sí, y estas frases no
+ * empiezan en un diccionario: las redacta este motor. Una plantilla nueva
+ * —`plantilla: { clave: 'loQueSea' }`— pasaría la paridad sin despeinarse y
+ * saldría en pantalla en español dentro de un tablero en inglés, que es
+ * exactamente el modo de fallo silencioso que ya obligó a escribir
+ * `verificar-textos.mjs` y `verificar-dominio.mjs`.
+ *
+ * Y al revés: una entrada que redactamos nosotros y se queda SIN `plantilla`
+ * tampoco rompe nada — se pinta el español y ya está—. Por eso se comprueban
+ * las dos direcciones.
+ */
+const DICCIONARIOS = Object.fromEntries(
+  ['es', 'en'].map(idioma => [
+    idioma,
+    JSON.parse(readFileSync(
+      new URL(`../react-dashboard/src/i18n/locales/${idioma}/diagnostics.json`, import.meta.url)
+    )),
+  ])
+)
+
+await check('cada clave de evidencia tiene su frase en los dos idiomas', () => {
+  const faltan = []
+
+  for (const [clave, donde] of Object.entries(CLAVES_DE_EVIDENCIA)) {
+    /*
+     * `domain` no se comprueba aquí: esa frase la escribe `shared/eva/` y su
+     * inglés lo vigila `verificar-dominio.mjs`, regla por regla. Comprobarla
+     * también aquí sería una segunda puerta sobre la misma cerradura.
+     */
+    if (donde !== 'diagnostics') continue
+
+    for (const idioma of ['es', 'en']) {
+      /*
+       * Vale con que exista UNA clave con esa base: `tendencia` se escribe
+       * como `tendencia_sube` y `tendencia_baja` —variantes de contexto de
+       * i18next— y no tiene forma sin contexto, porque una tendencia siempre
+       * va en una dirección o en la otra. Que las dos lenguas tengan LAS
+       * MISMAS variantes ya lo comprueba la paridad de `verificar-i18n.mjs`.
+       */
+      const hay = Object.keys(DICCIONARIOS[idioma].evidence ?? {})
+        .some(k => k === clave || k.startsWith(`${clave}_`))
+      if (!hay) faltan.push(`${idioma}: evidence.${clave}`)
+    }
+  }
+
+  assert.deepEqual(faltan, [], `sin frase: ${faltan.join(', ')}`)
+})
+
+await check('las cuatro fuentes tienen nombre en los dos idiomas', () => {
+  const faltan = []
+  for (const idioma of ['es', 'en']) {
+    for (const fuente of ['datos', 'manual', 'casos', 'temporal']) {
+      if (!DICCIONARIOS[idioma].evidence?.source?.[fuente]) faltan.push(`${idioma}: ${fuente}`)
+    }
+  }
+  assert.deepEqual(faltan, [], `sin nombre: ${faltan.join(', ')}`)
+})
+
+await check('la evidencia que redactamos nosotros lleva `plantilla`; la que es de otro, no', async () => {
+  const casos = casosFalsos([
+    { id: 'c1', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      diagnostico: { propuesta: 'valvula-impulsion-cerrada' },
+      causaReal: { tipo: 'sin-recirculacion-minima' }, diagnosticoCorrecto: false },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceCasos: casos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+    valoresSensores: { flujoInstantaneo: 0.01, presionRelativa: 4.2, cargaMotor: 78 },
+  })
+
+  const causa = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+
+  const datos = causa.evidenciaAFavor.find(e => e.fuente === 'datos')
+  assert.equal(datos.plantilla.clave, 'evidenciaDelRiesgo')
+  assert.equal(datos.plantilla.sistema, 'tanque')
+  assert.equal(datos.plantilla.riesgoId, 'bomba-sin-salida')
+  // Y con qué se compuso, para poder rehacerla con las mismas cifras.
+  assert.equal(datos.plantilla.valores.cargaMotor, 78)
+
+  const refutado = causa.evidenciaEnContra.find(e => e.fuente === 'casos')
+  assert.equal(refutado.plantilla.clave, 'causaDescartada')
+  assert.equal(refutado.plantilla.causaReal, 'sin-recirculacion-minima')
+})
+
+await check('lo que escribió OTRO no lleva plantilla: no se le reescribe', async () => {
+  /*
+   * Las dos fuentes cuyo texto no es una plantilla nuestra: el fragmento
+   * literal del manual —la cita tiene que poder contrastarse con el papel— y
+   * lo que un técnico escribió al cerrar un caso, que son sus palabras.
+   */
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
+  const indiceCasos = casosFalsos([
+    { id: 'c9', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      sintoma: 'La bomba no daba caudal', causa: 'Válvula agarrotada',
+      causaReal: { tipo: 'valvula-impulsion-cerrada' } },
+  ])
+  const resultado = await createMotorDiagnostico({ indiceDocumentos, indiceCasos }).diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida',
+  })
+
+  const causa = resultado.causas.find(cc => cc.id === 'valvula-impulsion-cerrada')
+  const ajenas = causa.evidenciaAFavor.filter(e => e.fuente === 'manual' || e.fuente === 'casos')
+
+  assert.ok(ajenas.length >= 2, 'debía haber una del manual y una de casos')
+  for (const e of ajenas) {
+    assert.equal(e.plantilla, undefined, `«${e.fuente}» no se traduce: su texto es de otro`)
+  }
 })
 
 await check('sin ningún respaldo, evidenciaAFavor/EnContra son arrays vacíos, nunca `undefined`', async () => {

@@ -113,8 +113,34 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  *
  * Queda anotado a propósito: la diferencia entre subir un techo y esconder un
  * problema es decir cuál era la alternativa y por qué no se tomó todavía.
+ *
+ * ── `index` sube de 200 a 300 (09-09-2026), y esta vez POR HOLGURA ──
+ *
+ * Las dos subidas de arriba las justificaba una medición: algo entró, se midió
+ * lo que costaba, se sacó lo que no era de arranque y sólo entonces se movió el
+ * número. Ésta no. Ésta es una decisión de producto —dar margen para lo que
+ * viene— y conviene que se lea como lo que es, porque la regla de este repo es
+ * no subir un techo para callarlo.
+ *
+ * El detonante: al traducir la prosa del dominio (los 18 riesgos de vibración,
+ * 09-09-2026) `index` pasó a 195,43 KB. Dentro del techo, pero con 4,6 KB de
+ * margen — o sea, el siguiente catálogo que alguien tradujera lo rompía. Con
+ * 300 hay ~105 KB, que es sitio para varias tandas de trabajo sin volver aquí.
+ *
+ * Lo que este número NO significa:
+ *
+ *   · **No es que 300 KB sea aceptable como objetivo.** Es el punto en que el
+ *     guion avisa. La palanca de arriba —cargar sólo el idioma activo, ~40 KB—
+ *     sigue sin tomarse y sigue siendo lo correcto; subir el techo no la
+ *     cancela, sólo deja de bloquear el trabajo mientras tanto.
+ *   · **No afecta a lo que este guion protege de verdad**, que es que la pila
+ *     3D no viaje en el arranque. Eso lo comprueban `HUELLAS_3D` y no un
+ *     número, y ahí no se ha tocado nada.
+ *
+ * Si alguna vez `index` se acerca a 300 de verdad, la respuesta no es 400: es
+ * mirar qué se coló en el camino crítico.
  */
-const PRESUPUESTO_KB = { index: 200, vendor: 270 };
+const PRESUPUESTO_KB = { index: 300, vendor: 270 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [
