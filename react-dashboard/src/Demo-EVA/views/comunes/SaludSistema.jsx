@@ -36,6 +36,7 @@ import { Activity, AlertTriangle, CheckCircle2, FlaskConical, MinusCircle, Refre
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fetchHealth } from "@/lib/iconics/apiClient.js";
 import { useFormato } from "@/i18n/formato.js";
+import { useSalud } from "@/i18n/useSalud.js";
 import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
@@ -155,6 +156,12 @@ function SaludSistema() {
   const { t: traducir } = useTranslation(["settings", "errors"]);
   /* La hora de la última consulta, en el formato del idioma activo. */
   const { hora } = useFormato();
+  /*
+   * El `detalle` de cada servicio lo redacta el backend en español —es lo
+   * que se lee al curlear la ruta o al mirar un log por SSH—; aquí se rehace
+   * en el idioma activo con `plantilla`. Ver la cabecera de `useSalud`.
+   */
+  const { detalleDeServicio, nombreDeServicio } = useSalud();
   const [salud, setSalud] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -187,9 +194,24 @@ function SaludSistema() {
     return () => clearInterval(id);
   }, [leer]);
 
+  /*
+   * `nombre` y `detalle` se sustituyen aquí, ANTES de que `FilaServicio` los
+   * pinte: es el único sitio que sabe tanto la clave con la que cuelga cada
+   * servicio de `salud.servicios` (para el nombre) como la `plantilla` que
+   * trae cada uno (para el detalle). `FilaServicio` sigue sin saber de i18n.
+   */
+  const traducirServicio = (clave, servicio) =>
+    servicio && {
+      ...servicio,
+      nombre: nombreDeServicio(clave, servicio.nombre),
+      detalle: detalleDeServicio(servicio),
+    };
+
   const servicios = salud?.servicios ?? {};
-  const asistente = servicios.asistente;
-  const documentacion = servicios.documentacion;
+  const datos = traducirServicio("datos", servicios.datos);
+  const asistente = traducirServicio("asistente", servicios.asistente);
+  const dictado = traducirServicio("dictado", servicios.dictado);
+  const documentacion = traducirServicio("documentacion", servicios.documentacion);
 
   /** El estado del puente contra ICONICS, en la misma forma que los demás. */
   const puente = salud && {
@@ -245,15 +267,15 @@ function SaludSistema() {
                 }}
               >
                 <RefreshCw size={13} />
-                Actualizar
+                {traducir("settings:health.refresh")}
               </button>
             }
           >
-            {servicios.datos && (
-              <FilaServicio servicio={servicios.datos} t={t}>
+            {datos && (
+              <FilaServicio servicio={datos} t={t}>
                 <Dato
                   etiqueta={traducir("settings:health.fields.write")}
-                  valor={traducir(servicios.datos.soloLectura ? "settings:health.values.blocked" : "settings:health.values.enabled")}
+                  valor={traducir(datos.soloLectura ? "settings:health.values.blocked" : "settings:health.values.enabled")}
                   t={t}
                 />
               </FilaServicio>
@@ -283,9 +305,9 @@ function SaludSistema() {
               </FilaServicio>
             )}
 
-            {servicios.dictado && (
-              <FilaServicio servicio={servicios.dictado} t={t}>
-                <Dato etiqueta={traducir("settings:health.fields.language")} valor={servicios.dictado.idioma} t={t} />
+            {dictado && (
+              <FilaServicio servicio={dictado} t={t}>
+                <Dato etiqueta={traducir("settings:health.fields.language")} valor={dictado.idioma} t={t} />
               </FilaServicio>
             )}
 

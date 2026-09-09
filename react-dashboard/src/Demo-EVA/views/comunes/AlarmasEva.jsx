@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDominio } from "@/i18n/useDominio.js";
+import { useFormato } from "@/i18n/formato.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { CheckCheck, RefreshCw } from "lucide-react";
 
@@ -34,10 +35,10 @@ const VENTANAS = [
 ];
 
 /** "2026-08-20 10:00:00" → algo legible. Si no parsea, se enseña tal cual llegó — nunca una fecha inventada. */
-function fechaLegible(startDate) {
+function fechaLegible(startDate, locale) {
   if (!startDate) return "—";
   const fecha = new Date(String(startDate).replace(" ", "T"));
-  return Number.isNaN(fecha.getTime()) ? startDate : fecha.toLocaleString("es-MX");
+  return Number.isNaN(fecha.getTime()) ? startDate : fecha.toLocaleString(locale);
 }
 
 function ChipVentana({ activo, onClick, t, children }) {
@@ -64,6 +65,7 @@ export default function AlarmasEva() {
   const { t: traducir } = useTranslation(["alarms", "errors"]);
   /* Los nombres de activo salen del dominio, traducidos. Ver `useDominio`. */
   const { activo } = useDominio();
+  const { locale } = useFormato();
   const { theme: t } = useTheme();
   const [horas, setHoras] = useState(1);
   const [activoFiltro, setActivoFiltro] = useState("");
@@ -214,7 +216,7 @@ export default function AlarmasEva() {
                   />
                 )}
                 <span style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, minWidth: 150 }}>
-                  {fechaLegible(a.startDate)}
+                  {fechaLegible(a.startDate, locale)}
                 </span>
                 <span style={{ minWidth: 90, color: t.textSoft }}>{punto ?? "—"}</span>
                 <span style={{ flex: 1, fontFamily: MONO, fontSize: 11, color: t.textFaint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

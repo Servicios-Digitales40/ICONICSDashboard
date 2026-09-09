@@ -22,6 +22,7 @@ import { FileSpreadsheet } from "lucide-react";
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useDominio } from "@/i18n/useDominio.js";
+import { useFormato } from "@/i18n/formato.js";
 import { useTheme } from "@/theme";
 
 import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
@@ -125,6 +126,7 @@ function DetalleActivo({ params, onNavigate }) {
   const { t: traducir } = useTranslation(["machines", "errors"]);
   /* El nombre del activo, traducido: `shared/` lo declara en español. */
   const { activo: activoTexto } = useDominio();
+  const { locale } = useFormato();
   const { theme: t, dark } = useTheme();
   const source = useEvaSource();
 
@@ -213,7 +215,7 @@ function DetalleActivo({ params, onNavigate }) {
           return { senal: senalInfo(clave), datos, cobertura, motivo };
         })
       );
-      descargarCSV(nombreArchivoGeneral(rango), armarCSVGeneral(series));
+      descargarCSV(nombreArchivoGeneral(rango), armarCSVGeneral(series, locale));
     } finally {
       setExportandoTodo(false);
     }

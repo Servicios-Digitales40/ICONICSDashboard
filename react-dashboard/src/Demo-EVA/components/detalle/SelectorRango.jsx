@@ -18,9 +18,11 @@
  * típica lo cumple sin trabajo extra encima, y el resto de la UI pequeña de
  * esta sección (`Spark`, `GraficaBufer` en `piezas.jsx`) ya se hace así.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Calendar, ChevronLeft, ChevronRight, Radio } from "lucide-react";
+
+import { useFormato } from "@/i18n/formato.js";
 
 import { MONO } from "../base.jsx";
 import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
@@ -38,7 +40,6 @@ const PRESETS = [
 ];
 
 const DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"];
-const FORMATO_MES = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
 
 function inicioDelDia(fecha) {
   const d = new Date(fecha);
@@ -122,6 +123,17 @@ function useDiasConDato(claveSonda, mesVisible, hoy) {
 function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
+  /*
+   * El nombre del mes se lee del idioma activo, y no de `es-MX` fijo: era el
+   * único trozo de esta pantalla que quedaba en español dentro de un
+   * calendario ya traducido. Memorizado porque construir un `Intl.DateTimeFormat`
+   * en cada render de cada celda es justo lo que `useFormato` existe para evitar.
+   */
+  const { locale } = useFormato();
+  const formatoMes = useMemo(
+    () => new Intl.DateTimeFormat(locale, { month: "long", year: "numeric" }),
+    [locale]
+  );
   const hoy = inicioDelDia(new Date());
   const [mesVisible, setMesVisible] = useState(() => new Date(hoy.getFullYear(), hoy.getMonth(), 1));
   const [inicio, setInicio] = useState(null);
@@ -166,7 +178,7 @@ function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
           <ChevronLeft size={15} />
         </button>
         <span style={{ fontSize: 13, fontWeight: 700, color: t.text, textTransform: "capitalize" }}>
-          {FORMATO_MES.format(mesVisible)}
+          {formatoMes.format(mesVisible)}
         </span>
         <button
           type="button"

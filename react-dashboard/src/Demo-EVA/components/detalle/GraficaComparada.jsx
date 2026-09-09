@@ -25,6 +25,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDominio } from "@/i18n/useDominio.js";
+import { useFormato } from "@/i18n/formato.js";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, MONO, PuntoEstado } from "../base.jsx";
@@ -71,6 +72,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   const { senal: senalTexto } = useDominio();
+  const { locale } = useFormato();
   const [seleccion, setSeleccion] = useState(["nivelTanque", "presionRelativa"]);
   const [normalizar, setNormalizar] = useState(false);
 
@@ -170,7 +172,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
               <XAxis
                 dataKey="ms" type="number" scale="time" domain={["dataMin", "dataMax"]}
                 tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false}
-                tickFormatter={(ms) => new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                tickFormatter={(ms) => new Date(ms).toLocaleString(locale, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
               />
               {/*
                 Mismo tooltip que la gráfica de detalle, y por la misma razón:

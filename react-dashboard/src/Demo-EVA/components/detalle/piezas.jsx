@@ -7,6 +7,8 @@
  */
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
+
+import { useFormato } from "@/i18n/formato.js";
 import { Area, AreaChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FileSpreadsheet, History, ImageDown, Radio } from "lucide-react";
 
@@ -45,15 +47,15 @@ export function InsigniaOrigen({ real, t }) {
 /** Menos de 36 h: se lee mejor por hora. Más: por hora sola no dice de qué día es. */
 const UMBRAL_MULTIDIA_MS = 36 * 3_600_000;
 
-function formatoTick(multiDia) {
+function formatoTick(multiDia, locale) {
   return (ms) =>
     multiDia
-      ? new Date(ms).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })
-      : new Date(ms).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+      ? new Date(ms).toLocaleDateString(locale, { day: "2-digit", month: "short" })
+      : new Date(ms).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatoTooltip(ms) {
-  return new Date(ms).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+function formatoTooltip(ms, locale) {
+  return new Date(ms).toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 /**
@@ -82,7 +84,13 @@ export function dominioY(escala) {
  * componente compartido con gráficas que sí le pasan una hora ya en texto.
  */
 export function TooltipHistoria(props) {
-  return <ChartTooltip {...props} label={typeof props.label === "number" ? formatoTooltip(props.label) : props.label} />;
+  const { locale } = useFormato();
+  return (
+    <ChartTooltip
+      {...props}
+      label={typeof props.label === "number" ? formatoTooltip(props.label, locale) : props.label}
+    />
+  );
 }
 
 /**
@@ -109,6 +117,7 @@ export function GraficaHistoria({
 }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
+  const { locale } = useFormato();
   const svgRef = useRef(null);
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
@@ -167,7 +176,7 @@ export function GraficaHistoria({
   const tituloExportado = `${senal.label ?? senal.corto}${senal.unidad ? ` (${senal.unidad})` : ""}`;
 
   const alExportarCSV = () =>
-    descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos, cobertura));
+    descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos, cobertura, locale));
   const alExportarPNG = () => {
     const svg = svgRef.current?.querySelector("svg");
     if (svg) descargarPNG(svg, nombreArchivo(senal, datos, "png"), { titulo: tituloExportado, fondo: t.panel });
@@ -179,7 +188,7 @@ export function GraficaHistoria({
         <AreaChart data={filas} margin={{ top: 6, right: 6, left: -28, bottom: 0 }}>
           <XAxis
             dataKey="t" type="number" scale="time" domain={["dataMin", "dataMax"]}
-            tickFormatter={formatoTick(multiDia)}
+            tickFormatter={formatoTick(multiDia, locale)}
             tick={{ fontSize: 10, fill: t.textFaint }} axisLine={false} tickLine={false} interval="preserveStartEnd"
           />
           <YAxis domain={dominioY(senal.escala)} tick={false} axisLine={false} tickLine={false} width={30} />

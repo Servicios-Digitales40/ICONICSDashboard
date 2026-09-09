@@ -87,20 +87,26 @@ export function celdaCSV(valor) {
  * No lleva columna de calidad: `normalizar()` (`shared/eva/comun/historia.js`) ya
  * descarta la muestra de mala calidad antes de que llegue aquí — no hay un
  * dato de calidad que exportar, sólo huecos que ya no están en el arreglo.
+ *
+ * `locale` es del idioma ACTIVO del tablero (`useFormato().locale`), no de
+ * `es-MX` fijo: quien exporta en inglés espera fechas en inglés. El valor por
+ * defecto sólo existe para no romper una llamada sin ese argumento —esta
+ * función es pura y no puede leer `i18n` por su cuenta—; quien la invoca
+ * desde una vista SIEMPRE pasa el suyo.
  */
 /** Fin de línea de CSV: Windows/Excel lo esperan así. */
 export const CRLF = "\r\n";
 
-export function datosACSV(senal, datos, cobertura = null) {
+export function datosACSV(senal, datos, cobertura = null, locale = "es-MX") {
   const cabecera = ["instante_iso", "hora_local", senal.unidad ? `valor (${senal.unidad})` : "valor"];
   const filas = (datos ?? []).map((p) => [
     p.t.toISOString(),
-    p.t.toLocaleString("es-MX"),
+    p.t.toLocaleString(locale),
     String(p.valor),
   ]);
 
   const cuerpo = [cabecera, ...filas].map((fila) => fila.map(celdaCSV).join(",")).join(CRLF);
-  const nota = notaDeCobertura(cobertura);
+  const nota = notaDeCobertura(cobertura, null, locale);
   return nota ? nota + CRLF + cuerpo : cuerpo;
 }
 
@@ -126,7 +132,7 @@ export function datosACSV(senal, datos, cobertura = null) {
  * @param {{tramos:number, tramosConDato:number, completa:boolean, desde:Date|null, hasta:Date|null}|null} cobertura
  * @param {string|null} [etiqueta]
  */
-export function notaDeCobertura(cobertura, etiqueta = null) {
+export function notaDeCobertura(cobertura, etiqueta = null, locale = "es-MX") {
   if (!cobertura || cobertura.completa) return null;
 
   const { tramos, tramosConDato, desde, hasta } = cobertura;
@@ -134,7 +140,7 @@ export function notaDeCobertura(cobertura, etiqueta = null) {
   const quien = etiqueta ? `${etiqueta}: ` : "";
   const cuando =
     desde && hasta
-      ? ` Los datos van del ${desde.toLocaleDateString("es-MX")} al ${hasta.toLocaleDateString("es-MX")}.`
+      ? ` Los datos van del ${desde.toLocaleDateString(locale)} al ${hasta.toLocaleDateString(locale)}.`
       : "";
 
   return celdaCSV(

@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { datosACSV, nombreArchivo, prepararSvgParaExportar } from "@/Demo-EVA/lib/exportar.js";
+import { datosACSV, nombreArchivo, notaDeCobertura, prepararSvgParaExportar } from "@/Demo-EVA/lib/exportar.js";
 
 const SENAL_NIVEL = { key: "nivelTanque", corto: "Nivel", unidad: "%" };
 const SENAL_SIN_UNIDAD = { key: "presionRelativa", corto: "Presión", unidad: "" };
@@ -65,6 +65,36 @@ describe("datosACSV: una fila por muestra, con procedencia y sin inventar calida
 
   it("sin datos, sólo queda la cabecera — no una fila vacía", () => {
     expect(datosACSV(SENAL_NIVEL, []).split("\r\n")).toHaveLength(1);
+  });
+
+  /*
+   * `locale` se añadió para que la hora local de la fila —y la fecha de la
+   * nota de cobertura— salgan en el idioma del tablero y no siempre en
+   * "es-MX", que era el valor fijo de antes. Sin argumento se sigue
+   * comportando como antes: "es-MX" es su valor por defecto.
+   */
+  it("sin locale, sigue formateando como es-MX (el valor por defecto)", () => {
+    const filas = datosACSV(SENAL_NIVEL, DOS_PUNTOS).split("\r\n").slice(1);
+    expect(filas[0]).toContain(DOS_PUNTOS[0].t.toLocaleString("es-MX"));
+  });
+
+  it("con locale en-US, la hora de la fila se escribe en inglés", () => {
+    const filas = datosACSV(SENAL_NIVEL, DOS_PUNTOS, null, "en-US").split("\r\n").slice(1);
+    expect(filas[0]).toContain(DOS_PUNTOS[0].t.toLocaleString("en-US"));
+    expect(filas[0]).not.toContain(DOS_PUNTOS[0].t.toLocaleString("es-MX"));
+  });
+});
+
+describe("notaDeCobertura: la fecha del comentario respeta el locale pedido", () => {
+  const COBERTURA = {
+    tramos: 10, tramosConDato: 6, completa: false,
+    desde: new Date("2026-08-19T00:00:00"), hasta: new Date("2026-08-24T00:00:00"),
+  };
+
+  it("con locale en-US, las fechas del rango van en inglés", () => {
+    const nota = notaDeCobertura(COBERTURA, null, "en-US");
+    expect(nota).toContain(COBERTURA.desde.toLocaleDateString("en-US"));
+    expect(nota).toContain(COBERTURA.hasta.toLocaleDateString("en-US"));
   });
 });
 

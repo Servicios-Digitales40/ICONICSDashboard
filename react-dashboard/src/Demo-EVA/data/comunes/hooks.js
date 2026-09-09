@@ -272,7 +272,7 @@ export function useSeriesHistoricas(claves, rango = VENTANA) {
  * las que falten en un instante quedan sin clave — que es lo que recharts pinta
  * como corte de línea, y no como una caída a cero.
  */
-export function unir(porClave) {
+export function unir(porClave, locale = "es-MX") {
   const filas = new Map();
 
   for (const [clave, datos] of Object.entries(porClave)) {
@@ -287,6 +287,6 @@ export function unir(porClave) {
     .sort((a, b) => a.ms - b.ms)
     .map((f) => ({
       ...f,
-      hora: f.t.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
+      hora: f.t.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
     }));
 }

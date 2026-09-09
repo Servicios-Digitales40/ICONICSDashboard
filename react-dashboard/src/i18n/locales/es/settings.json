@@ -52,6 +52,29 @@
     "title": "Salud del sistema",
     "server": "Este servidor",
     "loadFailed": "{{error}}. Si esta pantalla no carga, el problema no es de una vista: es el propio servidor. Comprueba que el backend esté arrancado y que se le llegue por red.",
-    "footer": "Se relee cada {{segundos}} s. Un servicio «no configurado» no es una avería: es una instalación que no lo tiene montado."
+    "footer": "Se relee cada {{segundos}} s. Un servicio «no configurado» no es una avería: es una instalación que no lo tiene montado.",
+    "name": {
+      "datos": "Origen de datos",
+      "asistente": "Asistente",
+      "dictado": "Dictado por voz",
+      "documentacion": "Manuales de planta"
+    },
+    "detail": {
+      "fake": "ICONICS_FAKE=true: los valores los genera el simulador. NINGÚN dato es real.",
+      "noReachable": "No se alcanza {{donde}}.",
+      "noReachable_conMotivo": "No se alcanza {{donde}}: {{motivo}}.",
+      "noToken": "Se alcanza {{donde}} pero no hay token válido: las lecturas saldrían sin autenticar. Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.",
+      "readFailed": "Se alcanza {{donde}} y el token es válido, pero la última lectura —hace {{desde}} s— FALLÓ: {{motivo}}. Contestar no es entregar.",
+      "neverRead": "Se alcanza {{donde}} y el token es válido. Todavía no se ha pedido ninguna lectura en vivo desde que arrancó el puente.",
+      "noValues_one": "Se alcanza {{donde}} y el token es válido, pero la última lectura (hace {{segundos}} s) no trajo NI UN valor de 1 punto pedido.",
+      "noValues_other": "Se alcanza {{donde}} y el token es válido, pero la última lectura (hace {{segundos}} s) no trajo NI UN valor de {{count}} puntos pedidos.",
+      "partial_one": "Lecturas reales de {{donde}}, pero incompletas: de 1 punto pedido hace {{segundos}} s, {{conValor}} trajeron valor y {{conCalidadBuena}} con calidad aceptable.",
+      "partial_other": "Lecturas reales de {{donde}}, pero incompletas: de {{count}} puntos pedidos hace {{segundos}} s, {{conValor}} trajeron valor y {{conCalidadBuena}} con calidad aceptable.",
+      "complete": "Lecturas reales de {{donde}}. La última, hace {{segundos}} s: {{conValor}}/{{puntosPedidos}} puntos con valor y calidad buena.",
+      "noResponse": "No responde.",
+      "noResponseWithReason": "No responde: {{motivo}}.",
+      "assistantNotConfigured": "El chat responde 503 y el tablero funciona igual.",
+      "docsNotLoadedYet": "El índice se carga a la primera búsqueda; todavía no se ha pedido ninguna."
+    }
   }
 }

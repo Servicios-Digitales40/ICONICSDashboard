@@ -52,6 +52,29 @@
     "title": "System health",
     "server": "This server",
     "loadFailed": "{{error}}. If this screen will not load, the problem is not one view: it is the server itself. Check that the backend is running and that it can be reached over the network.",
-    "footer": "Reread every {{segundos}} s. A «not configured» service is not a fault: it is an installation that does not have it."
+    "footer": "Reread every {{segundos}} s. A «not configured» service is not a fault: it is an installation that does not have it.",
+    "name": {
+      "datos": "Data source",
+      "asistente": "Assistant",
+      "dictado": "Voice dictation",
+      "documentacion": "Plant manuals"
+    },
+    "detail": {
+      "fake": "ICONICS_FAKE=true: the simulator generates every value. NO data is real.",
+      "noReachable": "{{donde}} is unreachable.",
+      "noReachable_conMotivo": "{{donde}} is unreachable: {{motivo}}.",
+      "noToken": "{{donde}} is reachable but there is no valid token: reads would go out unauthenticated. Check ICONICS_USERNAME / ICONICS_PASSWORD and that user’s permissions.",
+      "readFailed": "{{donde}} is reachable and the token is valid, but the last read —{{desde}} s ago— FAILED: {{motivo}}. Answering is not delivering.",
+      "neverRead": "{{donde}} is reachable and the token is valid. No live reading has been requested yet since the bridge started.",
+      "noValues_one": "{{donde}} is reachable and the token is valid, but the last read ({{segundos}} s ago) brought back NOT A SINGLE value out of the 1 point requested.",
+      "noValues_other": "{{donde}} is reachable and the token is valid, but the last read ({{segundos}} s ago) brought back NOT A SINGLE value out of the {{count}} points requested.",
+      "partial_one": "Real readings from {{donde}}, but incomplete: of the 1 point requested {{segundos}} s ago, {{conValor}} came back with a value and {{conCalidadBuena}} with acceptable quality.",
+      "partial_other": "Real readings from {{donde}}, but incomplete: of the {{count}} points requested {{segundos}} s ago, {{conValor}} came back with a value and {{conCalidadBuena}} with acceptable quality.",
+      "complete": "Real readings from {{donde}}. The last one, {{segundos}} s ago: {{conValor}}/{{puntosPedidos}} points with a value and good quality.",
+      "noResponse": "Not responding.",
+      "noResponseWithReason": "Not responding: {{motivo}}.",
+      "assistantNotConfigured": "The chat responds 503 and the dashboard works the same.",
+      "docsNotLoadedYet": "The index loads on the first search; none has been requested yet."
+    }
   }
 }

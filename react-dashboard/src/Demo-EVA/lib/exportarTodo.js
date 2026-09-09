@@ -96,7 +96,7 @@ function notaDeSerieVacia(senal, motivo) {
  *   motivo?: string|null,
  * }[]} series
  */
-export function armarCSVGeneral(series) {
+export function armarCSVGeneral(series, locale = "es-MX") {
   const lista = series ?? [];
 
   const notas = [];
@@ -107,7 +107,7 @@ export function armarCSVGeneral(series) {
 
     if (!muestras.length) notas.push(notaDeSerieVacia(senal, motivo ?? null));
     else {
-      const nota = notaDeCobertura(cobertura ?? null, senal.corto);
+      const nota = notaDeCobertura(cobertura ?? null, senal.corto, locale);
       if (nota) notas.push(nota);
     }
 
@@ -115,7 +115,7 @@ export function armarCSVGeneral(series) {
       filas.push([
         senal.corto,
         p.t.toISOString(),
-        p.t.toLocaleString("es-MX"),
+        p.t.toLocaleString(locale),
         String(p.valor),
         senal.unidad ?? "",
       ]);

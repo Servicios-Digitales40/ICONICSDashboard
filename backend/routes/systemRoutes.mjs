@@ -53,7 +53,20 @@ function servicio({ nombre, configurado, variable, responde, motivo = null, deta
   return {
     nombre,
     estado: responde ? 'ok' : 'no_responde',
-    ...(responde ? {} : { detalle: motivo ? `No responde: ${motivo}.` : 'No responde.' }),
+    /*
+     * `plantilla` es el mismo mecanismo que ya usa `useEvidencia.js` para la
+     * evidencia del motor de diagnóstico: el HECHO por claves, para que el
+     * tablero lo diga en su idioma, junto al español que compone este
+     * archivo —que sigue viajando en `detalle` porque es lo que se lee al
+     * curlear la ruta o al mirar un log por SSH, y porque es el
+     * `defaultValue` si una clave nueva llega sin su traducción—.
+     */
+    ...(responde
+      ? {}
+      : {
+        detalle: motivo ? `No responde: ${motivo}.` : 'No responde.',
+        plantilla: motivo ? { clave: 'noResponseWithReason', motivo } : { clave: 'noResponse' },
+      }),
     ...(responde && detalle ? { detalle } : {}),
     ...extra,
   }
@@ -95,6 +108,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       ...base,
       estado: 'simulado',
       detalle: 'ICONICS_FAKE=true: los valores los genera el simulador. NINGÚN dato es real.',
+      plantilla: { clave: 'fake' },
     }
   }
 
@@ -105,6 +119,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       ...base,
       estado: 'error',
       detalle: `No se alcanza ${donde}${connectivity.reason ? `: ${connectivity.reason}` : '.'}`,
+      plantilla: { clave: 'noReachable', donde, motivo: connectivity.reason ?? null },
     }
   }
 
@@ -114,6 +129,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       estado: 'degraded',
       detalle: `Se alcanza ${donde} pero no hay token válido: las lecturas saldrían sin autenticar. ` +
         'Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.',
+      plantilla: { clave: 'noToken', donde },
     }
   }
 
@@ -160,6 +176,11 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
          no escribir «…batch request failed.. Contestar no es entregar.» */
       detalle: `Se alcanza ${donde} y el token es válido, pero la última lectura —hace ${desde} s— ` +
         `FALLÓ: ${String(ultimoFallo.motivo).replace(/\.$/, '')}. Contestar no es entregar.`,
+      plantilla: {
+        clave: 'readFailed',
+        donde, desde,
+        motivo: String(ultimoFallo.motivo).replace(/\.$/, ''),
+      },
     }
   }
 
@@ -169,6 +190,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       estado: 'ok',
       detalle: `Se alcanza ${donde} y el token es válido. Todavía no se ha pedido ninguna lectura ` +
         'en vivo desde que arrancó el puente.',
+      plantilla: { clave: 'neverRead', donde },
     }
   }
 
@@ -187,6 +209,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       estado: 'error',
       detalle: `Se alcanza ${donde} y el token es válido, pero la última lectura (hace ${segundos} s) ` +
         `no trajo NI UN valor de ${pedidos}.`,
+      plantilla: { clave: 'noValues', donde, segundos, puntosPedidos: ultima.puntosPedidos },
     }
   }
 
@@ -197,6 +220,10 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
       detalle: `Lecturas reales de ${donde}, pero incompletas: de ${pedidos} hace ${segundos} s, ` +
         `${ultima.conValor} trajeron valor y ${ultima.conCalidadBuena} ` +
         'con calidad aceptable.',
+      plantilla: {
+        clave: 'partial', donde, segundos,
+        puntosPedidos: ultima.puntosPedidos, conValor: ultima.conValor, conCalidadBuena: ultima.conCalidadBuena,
+      },
     }
   }
 
@@ -205,6 +232,7 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
     estado: 'ok',
     detalle: `Lecturas reales de ${donde}. La última, hace ${segundos} s: ` +
       `${ultima.conValor}/${ultima.puntosPedidos} puntos con valor y calidad buena.`,
+    plantilla: { clave: 'complete', donde, segundos, conValor: ultima.conValor, puntosPedidos: ultima.puntosPedidos },
   }
 }
 
@@ -346,6 +374,7 @@ export function registerSystemRoutes(
           responde: asistente.responde,
           motivo: asistente.motivo,
           detalle: config.ia.isConfigured ? null : 'El chat responde 503 y el tablero funciona igual.',
+          plantilla: config.ia.isConfigured ? null : { clave: 'assistantNotConfigured' },
           extra: config.ia.isConfigured
             ? {
               modelo: chat?.modeloActivo?.() ?? null,
@@ -392,6 +421,7 @@ export function registerSystemRoutes(
               detalle: indice.cargado
                 ? null
                 : 'El índice se carga a la primera búsqueda; todavía no se ha pedido ninguna.',
+              plantilla: indice.cargado ? null : { clave: 'docsNotLoadedYet' },
             }
             : {},
         }),
