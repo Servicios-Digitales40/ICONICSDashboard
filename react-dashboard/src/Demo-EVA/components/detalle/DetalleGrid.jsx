@@ -114,7 +114,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
             </div>
           </>
         ) : (
-          <GraficaAusente t={t} alto={90} mensaje="Sin serie propia del historiador. En cuanto haya dos lecturas en esta sesión, aparecerá aquí." />
+          <GraficaAusente t={t} alto={90} mensaje={traducir("detail.noOwnSeries")} />
         )}
       </div>
 

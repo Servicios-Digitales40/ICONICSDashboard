@@ -244,7 +244,11 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
           </HoverTip>
         ) : (
           <HoverTip label={origen.descripcion}>
-            <span role="status" aria-label={`Origen de datos: ${origen.descripcion}`} style={estiloOrigen}>
+            <span
+              role="status"
+              aria-label={traducir("layout:source.aria", { origen: origen.descripcion })}
+              style={estiloOrigen}
+            >
               <IconoOrigen size={13} strokeWidth={2.5} />
               {origen.label}
             </span>

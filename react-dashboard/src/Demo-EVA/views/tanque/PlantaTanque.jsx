@@ -239,7 +239,7 @@ function PlantaTanque({ onNavigate }) {
           <div className="eva-full">
             {cargandoHistoria ? (
               <p style={{ fontSize: 12, color: t.textFaint, textAlign: "center", padding: "20px 0" }}>
-                Leyendo el historiador…
+                {traducir("machines:plant.loadingHistorian")}
               </p>
             ) : (
               <TendenciaSenales

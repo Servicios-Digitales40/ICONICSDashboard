@@ -35,6 +35,7 @@ import { Activity, AlertTriangle, CheckCircle2, FlaskConical, MinusCircle, Refre
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
 import { fetchHealth } from "@/lib/iconics/apiClient.js";
+import { useFormato } from "@/i18n/formato.js";
 import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
@@ -152,6 +153,8 @@ function SaludSistema() {
   const { theme: t } = useTheme();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["settings", "errors"]);
+  /* La hora de la última consulta, en el formato del idioma activo. */
+  const { hora } = useFormato();
   const [salud, setSalud] = useState(null);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -203,17 +206,14 @@ function SaludSistema() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <SectionLabel sub={traducir("settings:health.sub")}>
-        Salud del sistema
+        {traducir("settings:health.title")}
       </SectionLabel>
 
       {error && (
         <AlertBanner
           type="error"
           title={traducir("errors:titles.bridgeDown")}
-          message={
-            `${error}. Si esta pantalla no carga, el problema no es de una vista: es el propio ` +
-            "servidor. Comprueba que el backend esté arrancado y que se le llegue por red."
-          }
+          message={traducir("settings:health.loadFailed", { error })}
         />
       )}
 
@@ -285,33 +285,49 @@ function SaludSistema() {
 
             {servicios.dictado && (
               <FilaServicio servicio={servicios.dictado} t={t}>
-                <Dato etiqueta="Idioma" valor={servicios.dictado.idioma} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.language")} valor={servicios.dictado.idioma} t={t} />
               </FilaServicio>
             )}
 
             {documentacion && (
               <FilaServicio servicio={documentacion} t={t}>
-                <Dato etiqueta="Manuales" valor={documentacion.documentos} t={t} />
-                <Dato etiqueta="Fragmentos" valor={documentacion.fragmentos} t={t} />
-                <Dato etiqueta="Búsqueda" valor={documentacion.modo} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.manuals")} valor={documentacion.documentos} t={t} />
+                <Dato etiqueta={traducir("settings:health.fields.chunks")} valor={documentacion.fragmentos} t={t} />
+                {/*
+                  `modo` lo escribe el backend y dice «embeddings + BM25»: son
+                  los nombres de las dos técnicas, no palabras que traducir.
+                */}
+                <Dato etiqueta={traducir("settings:health.fields.search")} valor={documentacion.modo} t={t} />
                 {documentacion.ilegibles > 0 && (
-                  <Dato etiqueta="Ilegibles" valor={documentacion.ilegibles} t={t} />
+                  <Dato etiqueta={traducir("settings:health.fields.unreadable")} valor={documentacion.ilegibles} t={t} />
                 )}
-                {documentacion.indexando && <Dato etiqueta="Estado" valor="indexando…" t={t} />}
+                {documentacion.indexando && (
+                  <Dato
+                    etiqueta={traducir("settings:health.fields.status")}
+                    valor={traducir("settings:health.values.indexing")}
+                    t={t}
+                  />
+                )}
               </FilaServicio>
             )}
           </Panel>
 
-          <Panel title="Este servidor" style={{ marginTop: 14 }}>
+          <Panel title={traducir("settings:health.server")} style={{ marginTop: 14 }}>
             <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
               {/* La versión es lo primero que hace falta cuando alguien reporta
                   que un número está mal: saber si esa pantalla ya tiene el
                   arreglo. Ver `config.version`. */}
-              <Dato etiqueta="Versión" valor={salud.version} t={t} />
-              <Dato etiqueta="En marcha desde hace" valor={enPalabras(salud.uptimeSeconds)} t={t} />
+              <Dato etiqueta={traducir("settings:health.fields.version")} valor={salud.version} t={t} />
+              <Dato etiqueta={traducir("settings:health.fields.upFor")} valor={enPalabras(salud.uptimeSeconds)} t={t} />
+              {/*
+                La hora, por el formateador del idioma activo. Estaba fijada a
+                `toLocaleTimeString("es")`, así que un tablero en inglés pintaba
+                la hora en formato español — y eso no se ve como un error, se
+                lee como una hora.
+              */}
               <Dato
-                etiqueta="Última consulta"
-                valor={new Date(salud.timestamp).toLocaleTimeString("es")}
+                etiqueta={traducir("settings:health.fields.lastCheck")}
+                valor={hora(new Date(salud.timestamp))}
                 t={t}
               />
             </div>
@@ -328,8 +344,7 @@ function SaludSistema() {
             }}
           >
             <Activity size={12} />
-            Se relee cada {CADENCIA_MS / 1000} s. Un servicio «no configurado» no es una avería:
-            es una instalación que no lo tiene montado.
+            {traducir("settings:health.footer", { segundos: CADENCIA_MS / 1000 })}
           </p>
         </>
       )}

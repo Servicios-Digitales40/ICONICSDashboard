@@ -639,7 +639,7 @@ export function Asistente() {
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: MONO, color: t.textSoft, background: t.hover, border: `1px solid ${t.border}`, borderRadius: 8, padding: "4px 8px" }}>
               <FileText size={12} />
               {adjunto.nombre}{adjunto.truncado && " (recortado)"}
-              <button type="button" onClick={quitar} aria-label="Quitar el adjunto" style={{ background: "none", border: "none", color: t.textFaint, cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}>
+              <button type="button" onClick={quitar} aria-label={traducir("input.removeAttachmentAria")} style={{ background: "none", border: "none", color: t.textFaint, cursor: "pointer", display: "grid", placeItems: "center", padding: 0 }}>
                 <X size={12} />
               </button>
             </span>
@@ -714,7 +714,7 @@ export function Asistente() {
             </button>
           ) : (
             <button
-              type="submit" aria-label="Enviar la pregunta"
+              type="submit" aria-label={traducir("input.sendAria")}
               disabled={!borrador.trim()}
               className="eva-asis-boton" style={botonEnviar(t, !borrador.trim())}
             >
@@ -819,7 +819,7 @@ function BotonManosLibres({ t, manosLibres }) {
     return (
       <button
         type="button" onClick={encender} className="eva-asis-boton"
-        aria-label={`Hablar con ${NOMBRE} en manos libres`}
+        aria-label={traducir("voice.handsFreeAria", { nombre: NOMBRE })}
         title={traducir("voice.handsFree")}
         style={botonVoz(t, "listo")}
       >

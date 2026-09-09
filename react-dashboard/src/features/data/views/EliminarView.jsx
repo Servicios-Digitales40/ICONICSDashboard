@@ -151,8 +151,8 @@ export default function EliminarView() {
 
   return (
     <Panel
-      title="Eliminar clientes de ICONICS"
-      code={`${TABLE} · ${count ?? 0} filas · DeleteCustomer`}
+      title={traducir("data:deletePanel")}
+      code={`${TABLE} · ${traducir("data:rows", { count: count ?? 0 })} · DeleteCustomer`}
       right={
         <Button variant="icon" onClick={load} loading={loading}>
           <RefreshCw size={14} />

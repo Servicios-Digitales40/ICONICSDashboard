@@ -280,7 +280,9 @@ function AssetProperties({ node, intervalMs = 5000 }) {
       )}
 
       {props.length === 0 && !loading && !error ? (
-        <div style={{ fontSize: 12.5, color: t.textFaint }}>Este nodo no tiene propiedades directas (navega a un equipo hoja).</div>
+        <div style={{ fontSize: 12.5, color: t.textFaint }}>
+          {traducir("assistant:explorer.noDirectProperties")}
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {props.map((p) => {

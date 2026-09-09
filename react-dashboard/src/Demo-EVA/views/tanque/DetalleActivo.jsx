@@ -229,11 +229,17 @@ function DetalleActivo({ params, onNavigate }) {
   );
 
   if (loading && !activo?.senales?.some((s) => s.receivedAt)) {
-    return <p style={{ fontSize: 13, opacity: 0.7 }}>Leyendo el activo…</p>;
+    return <p style={{ fontSize: 13, opacity: 0.7 }}>{traducir("machines:detail.loadingAsset")}</p>;
   }
 
   if (!activo) {
-    return <AlertBanner type="error" title="Activo desconocido" message={`No existe un activo con id «${activoId}».`} />;
+    return (
+      <AlertBanner
+        type="error"
+        title={traducir("machines:detail.unknownTitle")}
+        message={traducir("machines:detail.unknownBody", { activoId })}
+      />
+    );
   }
 
   const pestañas = activos.map((a) => ({
@@ -297,7 +303,7 @@ function DetalleActivo({ params, onNavigate }) {
                   loading={exportandoTodo}
                   onClick={exportarTodo}
                 >
-                  Exportar todo
+                  {traducir("machines:detail.exportAll")}
                 </Button>
               )}
             </div>

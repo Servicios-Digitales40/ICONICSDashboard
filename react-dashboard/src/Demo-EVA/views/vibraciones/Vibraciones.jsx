@@ -374,7 +374,7 @@ function Vibraciones() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <SectionLabel>Los tres apoyos</SectionLabel>
+        <SectionLabel>{traducir("machines:vibration.threeSupports")}</SectionLabel>
         <UltimaLectura fecha={lastUpdated} t={t} />
       </div>
 

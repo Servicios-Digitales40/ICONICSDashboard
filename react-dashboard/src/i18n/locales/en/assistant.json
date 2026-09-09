@@ -86,7 +86,8 @@
     "title": "Asset tree",
     "pick": "Select an asset in the tree to see its properties.",
     "loadingTree": "loading tree…",
-    "emptyRoot": "No assets under this root."
+    "emptyRoot": "No assets under this root.",
+    "noDirectProperties": "This node has no properties of its own (browse down to a leaf device)."
   },
   "suggestions": [
     "How is the plant doing right now?",
@@ -122,7 +123,9 @@
   },
   "input": {
     "listening": "Listening…",
-    "waiting": "Waiting for an answer…"
+    "waiting": "Waiting for an answer…",
+    "removeAttachmentAria": "Remove the attachment",
+    "sendAria": "Send the question"
   },
   "voice": {
     "transcribingAria": "Transcribing what you said",
@@ -140,7 +143,8 @@
       "escuchando": "Listening… it sends on its own when you stop speaking",
       "pensando": "Working out what you said…",
       "hablando": "Answering out loud…"
-    }
+    },
+    "handsFreeAria": "Talk to {{nombre}} hands-free"
   },
   "welcome": {
     "lead": "Ask about the state of the water system, or how one of its signals has moved.",

@@ -25,14 +25,17 @@
  * Dos señales, y basta con una:
  *
  *   1. Lleva un carácter que el inglés no usa: á é í ó ú ñ ¿ ¡ «.
- *   2. Lleva DOS o más palabras de una lista corta de palabras españolas que
- *      no existen en inglés (de, la, que, para, con, una…). Dos y no una para
- *      no marcar «Data del» ni un identificador suelto.
+ *   2. Tiene más de una palabra y alguna es de una lista corta de palabras
+ *      españolas que no existen en inglés (de, la, que, para, con, una…).
  *
- * Es una heurística y no un analizador de idioma. Falla —conocido y aceptado—
- * con una frase corta en español sin tildes y sin partículas: «Sin datos» pasa.
- * A cambio no necesita un modelo ni una lista de 10.000 palabras, y coge el
- * 90 % de lo que se escapa, que es lo que hacía falta.
+ * Es una heurística y no un analizador de idioma. Sigue fallando —conocido y
+ * aceptado— con una palabra SUELTA en español sin tilde: «Actualizar» pasa, y
+ * no hay forma de cazarla sin una lista de verbos que se desactualizaría sola.
+ * A cambio no necesita un modelo ni una lista de 10.000 palabras.
+ *
+ * El listón estuvo en DOS partículas hasta el 09-09-2026, y ése fue el hueco
+ * por el que se coló «Salud del sistema»: una partícula, sin tildes, siendo el
+ * título de la pantalla.
  *
  * ── DÓNDE MIRA ─────────────────────────────────────────────────────
  *
@@ -124,10 +127,23 @@ const PARTICULAS = new Set([
   'al', 'es', 'en', 'ya', 'aun', 'aunque', 'sino', 'tambien', 'nada', 'algo',
 ])
 
+/**
+ * ── POR QUÉ BASTA UNA PARTÍCULA, Y NO DOS ──────────────────────────
+ *
+ * Pedía dos para no marcar «Data del» ni un identificador suelto. El precio
+ * resultó ser más caro que el problema: «Salud del sistema» —el título de una
+ * pantalla entera— y «Este servidor» llevan una sola y sin tilde, así que
+ * pasaban limpias. Las dos estuvieron en español dentro del tablero en inglés.
+ *
+ * Con una basta, siempre que la frase tenga MÁS DE UNA PALABRA: eso ya descarta
+ * el identificador suelto, que era el caso que preocupaba. Y «Data del» ahora
+ * se marca, que es lo correcto — es español a medias, no una excepción.
+ */
 function pareceEspanol(texto) {
   if (DIACRITICOS.test(texto)) return true
   const palabras = texto.toLowerCase().match(/[a-záéíóúñ]+/g) ?? []
-  return palabras.filter(p => PARTICULAS.has(p)).length >= 2
+  if (palabras.length < 2) return false
+  return palabras.some(p => PARTICULAS.has(p))
 }
 
 /* ── Quitar comentarios sin romper las cadenas ───────────────────────── */
@@ -234,18 +250,36 @@ const NODO_JSX = />([^<>{}"'`]+)</g
  */
 const HUELE_A_CODIGO = /=>|&&|\|\||\?\?|\?\.|;|\s\?\s|\s:\s\w|=\s/
 
-/** Los atributos que acaban en pantalla, escritos como cadena suelta. */
-const ATRIBUTO = /\b(title|label|placeholder|alt|aria-label|sub|message|tip|titulo|rotulo)\s*=\s*"([^"]+)"/g
+/**
+ * Los nombres de atributo que acaban en pantalla.
+ *
+ * Los cuatro últimos son de este proyecto y no del HTML: `<Dato etiqueta valor>`
+ * y `<Campo rotulo>` son las piezas con las que están escritas media docena de
+ * pantallas. Faltaban `etiqueta` y `valor`, y por ese hueco pasaron once
+ * rótulos en español de la pantalla de Salud —«Manuales», «Fragmentos»,
+ * «Versión», «Última consulta»— con este guion diciendo que el árbol estaba
+ * limpio.
+ */
+const NOMBRES =
+  'title|label|placeholder|alt|aria-label|sub|message|tip|titulo|rotulo|etiqueta|valor|mensaje'
+
+/** Escritos como cadena suelta: `title="…"`. */
+const ATRIBUTO = new RegExp('\\b(' + NOMBRES + ')\\s*=\\s*"([^"]+)"', 'g')
 
 /**
- * Los mismos, cuando el valor va en llaves: `message={"…" + "…"}`.
+ * Y en llaves, que es la otra mitad: `message={"…" + "…"}` y `message={`…`}`.
  *
- * Basta con cazar el PRIMER trozo de la concatenación. Si ése está en español
- * el resto también, y lo que hace falta es señalar la línea, no reconstruir la
- * frase entera.
+ * Basta con cazar el PRIMER trozo. Si ése está en español el resto también, y
+ * lo que hace falta es señalar la línea, no reconstruir la frase entera.
+ *
+ * La forma con acento grave se añadió después de la de comillas, y por el mismo
+ * motivo: el aviso de «no carga» de la pantalla de Salud estaba escrito
+ * `message={`${error}. Si esta pantalla…`}` y seguía sin verse.
  */
-const ATRIBUTO_EN_LLAVES =
-  /\b(title|label|placeholder|alt|aria-label|sub|message|tip|titulo|rotulo)\s*=\s*\{\s*"([^"]+)"/g
+const ATRIBUTO_EN_LLAVES = new RegExp(
+  '\\b(' + NOMBRES + ')\\s*=\\s*\\{\\s*(?:"([^"]+)"|`([^`]+)`)',
+  'g'
+)
 
 function hallazgosDe(fuente) {
   const limpio = sinComentarios(fuente)
@@ -262,7 +296,8 @@ function hallazgosDe(fuente) {
 
   for (const m of limpio.matchAll(NODO_JSX)) anotar(m.index, m[1])
   for (const m of limpio.matchAll(ATRIBUTO)) anotar(m.index, m[2])
-  for (const m of limpio.matchAll(ATRIBUTO_EN_LLAVES)) anotar(m.index, m[2])
+  /* Dos grupos: el de comillas o el de acento grave, según cuál casara. */
+  for (const m of limpio.matchAll(ATRIBUTO_EN_LLAVES)) anotar(m.index, m[2] ?? m[3])
 
   return encontrados
 }

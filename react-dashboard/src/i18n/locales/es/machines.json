@@ -56,7 +56,8 @@
     "trends": {
       "title": "Tendencias",
       "sub": "Las series del historiador, cada una con su propia escala"
-    }
+    },
+    "loadingHistorian": "Leyendo el historiador…"
   },
   "controls": {
     "pump": {
@@ -262,7 +263,8 @@
       "alarma": "alarma del módulo",
       "aviso": "aviso del módulo",
       "offset": "desviación del sensor"
-    }
+    },
+    "threeSupports": "Los tres apoyos"
   },
   "assetsView": {
     "title": "Assets · Demo EVA",
@@ -356,7 +358,16 @@
   "detail": {
     "title": "Detalle · {{activo}}",
     "sub": "La máquina en detalle: cada valor con su histórico completo — real cuando el historiador lo tiene, del búfer de esta sesión cuando no",
-    "compareSub": "Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente"
+    "compareSub": "Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente",
+    "loadingAsset": "Leyendo el activo…",
+    "unknownTitle": "Activo desconocido",
+    "unknownBody": "No existe un activo con id «{{activoId}}».",
+    "exportAll": "Exportar todo",
+    "partialCoverage": "Sólo {{conDato}} de los {{tramos}} tramos del rango tienen registro en el historiador.",
+    "downloadCsv": "Descargar {{senal}} como CSV",
+    "downloadImage": "Descargar {{senal}} como imagen",
+    "noSamplesYet": "Sin muestras todavía en esta sesión.",
+    "noOwnSeries": "Sin serie propia del historiador. En cuanto haya dos lecturas en esta sesión, aparecerá aquí."
   },
   "model3d": {
     "title": "Vista 3D · {{sistema}}",

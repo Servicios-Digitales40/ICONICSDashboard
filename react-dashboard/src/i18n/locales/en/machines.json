@@ -56,7 +56,8 @@
     "trends": {
       "title": "Trends",
       "sub": "The historian series, each on its own scale"
-    }
+    },
+    "loadingHistorian": "Reading the historian…"
   },
   "controls": {
     "pump": {
@@ -262,7 +263,8 @@
       "alarma": "module alarm",
       "aviso": "module warning",
       "offset": "sensor offset"
-    }
+    },
+    "threeSupports": "The three supports"
   },
   "assetsView": {
     "title": "Assets · EVA Demo",
@@ -356,7 +358,16 @@
   "detail": {
     "title": "Detail · {{activo}}",
     "sub": "The machine in detail: every value with its full history — real where the historian has it, from this session’s buffer where it does not",
-    "compareSub": "The four signals with a history of their own, cross-plotted — the diagnostic question only the assistant answers today"
+    "compareSub": "The four signals with a history of their own, cross-plotted — the diagnostic question only the assistant answers today",
+    "loadingAsset": "Reading the asset…",
+    "unknownTitle": "Unknown asset",
+    "unknownBody": "There is no asset with id «{{activoId}}».",
+    "exportAll": "Export all",
+    "partialCoverage": "Only {{conDato}} of the {{tramos}} intervals in the range have a record in the historian.",
+    "downloadCsv": "Download {{senal}} as CSV",
+    "downloadImage": "Download {{senal}} as an image",
+    "noSamplesYet": "No samples yet in this session.",
+    "noOwnSeries": "No series of its own in the historian. Once there are two readings in this session, it will appear here."
   },
   "model3d": {
     "title": "3D View · {{sistema}}",

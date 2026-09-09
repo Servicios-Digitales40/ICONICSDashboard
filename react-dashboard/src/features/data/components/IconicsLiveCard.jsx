@@ -36,7 +36,7 @@ export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
   /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation("errors");
+  const { t: traducir } = useTranslation(["data", "errors"]);
   const { theme: t } = useTheme();
   const { point, error, loading, lastUpdated, refresh } = useIconicsPoint(pointName, intervalMs);
   const data = normalize(point);
@@ -44,7 +44,7 @@ export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
 
   return (
     <Panel
-      title="Lectura ICONICS en vivo"
+      title={traducir("data:livePanel")}
       code={pointName}
       right={
         <Button variant="icon" onClick={refresh} loading={loading}>

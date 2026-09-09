@@ -4,5 +4,9 @@
   "action": "Acción",
   "loadingClients": "cargando clientes…",
   "deleteNote": "Nota: tras eliminar, el conteo <b>.@@Count</b> puede tardar en refrescar (ICONICS lo cachea); usa el botón de recargar si la tabla no cuadra de inmediato.",
-  "addNote": "Nota: tras agregar, el punto <b>.@@Count</b> puede tardar en refrescar (ICONICS lo cachea) y la fila nueva aparece en su posición ordenada, no al final de la tabla."
+  "addNote": "Nota: tras agregar, el punto <b>.@@Count</b> puede tardar en refrescar (ICONICS lo cachea) y la fila nueva aparece en su posición ordenada, no al final de la tabla.",
+  "livePanel": "Lectura ICONICS en vivo",
+  "productsPanel": "Tabla de productos ICONICS",
+  "deletePanel": "Eliminar clientes de ICONICS",
+  "rows": "{{count}} filas"
 }

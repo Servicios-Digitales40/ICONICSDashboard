@@ -25,7 +25,16 @@
       "model": "Modelo",
       "maxSteps": "Pasos máx.",
       "serving": "Atendiendo",
-      "queued": "En espera"
+      "queued": "En espera",
+      "language": "Idioma",
+      "manuals": "Manuales",
+      "chunks": "Fragmentos",
+      "search": "Búsqueda",
+      "unreadable": "Ilegibles",
+      "status": "Estado",
+      "version": "Versión",
+      "upFor": "En marcha desde hace",
+      "lastCheck": "Última consulta"
     },
     "values": {
       "blocked": "bloqueada (solo lectura)",
@@ -35,9 +44,14 @@
       "valid": "válido",
       "invalid": "no válido",
       "oneQuery": "una consulta",
-      "nothing": "nada"
+      "nothing": "nada",
+      "indexing": "indexando…"
     },
     "enabledWith": "Se activa con",
-    "inServerEnv": "en el entorno del servidor."
+    "inServerEnv": "en el entorno del servidor.",
+    "title": "Salud del sistema",
+    "server": "Este servidor",
+    "loadFailed": "{{error}}. Si esta pantalla no carga, el problema no es de una vista: es el propio servidor. Comprueba que el backend esté arrancado y que se le llegue por red.",
+    "footer": "Se relee cada {{segundos}} s. Un servicio «no configurado» no es una avería: es una instalación que no lo tiene montado."
   }
 }

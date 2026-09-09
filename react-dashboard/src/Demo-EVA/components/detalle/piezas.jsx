@@ -6,6 +6,7 @@
  * del dato es la misma independientemente de cuál hubiera ganado.
  */
 import { useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Area, AreaChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FileSpreadsheet, History, ImageDown, Radio } from "lucide-react";
 
@@ -106,6 +107,8 @@ export function TooltipHistoria(props) {
 export function GraficaHistoria({
   senal, datos, cargando, enVivo, error, cobertura = null, exportable = false, t, dark, alto = 150, delay = 0,
 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
   const svgRef = useRef(null);
   const filas = (datos ?? []).map((p) => ({ t: p.t.getTime(), valor: p.valor }));
   const col = bandaColor(t, dark, senal.banda);
@@ -115,7 +118,7 @@ export function GraficaHistoria({
     // al que preguntarle, así que "sin conexión" no aplica aquí — sólo
     // "todavía no ha llegado nada".
     if (filas.length < 2) {
-      return <GraficaAusente t={t} alto={alto} mensaje="Sin muestras todavía en esta sesión." />;
+      return <GraficaAusente t={t} alto={alto} mensaje={traducir("detail.noSamplesYet")} />;
     }
   } else {
     /*
@@ -234,7 +237,9 @@ export function GraficaHistoria({
            */}
           {cobertura && !cobertura.completa && (
             <span
-              title={`Sólo ${cobertura.tramosConDato} de los ${cobertura.tramos} tramos del rango tienen registro en el historiador.`}
+              title={traducir("detail.partialCoverage", {
+                conDato: cobertura.tramosConDato, tramos: cobertura.tramos,
+              })}
               style={avisoPastilla(t)}
             >
               {cobertura.tramosConDato}/{cobertura.tramos} tramos con dato
@@ -244,14 +249,16 @@ export function GraficaHistoria({
             <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
               <button
                 type="button" onClick={alExportarCSV}
-                title={`Descargar ${senal.corto} como CSV`} aria-label={`Descargar ${senal.corto} como CSV`}
+                title={traducir("detail.downloadCsv", { senal: senal.corto })}
+                aria-label={traducir("detail.downloadCsv", { senal: senal.corto })}
                 style={botonExportar(t)}
               >
                 <FileSpreadsheet size={12} />
               </button>
               <button
                 type="button" onClick={alExportarPNG}
-                title={`Descargar ${senal.corto} como imagen`} aria-label={`Descargar ${senal.corto} como imagen`}
+                title={traducir("detail.downloadImage", { senal: senal.corto })}
+                aria-label={traducir("detail.downloadImage", { senal: senal.corto })}
                 style={botonExportar(t)}
               >
                 <ImageDown size={12} />
@@ -287,8 +294,11 @@ const botonExportar = (t) => ({
  * — y de paso iguala el lenguaje de revelado con `GraficaHistoria`.
  */
 export function GraficaBufer({ senal, valores, t, dark, alto = 60, delay = 0 }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("machines");
+
   if (!valores || valores.length < 2) {
-    return <GraficaAusente t={t} alto={alto} mensaje="Sin muestras todavía en esta sesión." compacta />;
+    return <GraficaAusente t={t} alto={alto} mensaje={traducir("detail.noSamplesYet")} compacta />;
   }
 
   const col = bandaColor(t, dark, senal.banda);

@@ -25,7 +25,16 @@
       "model": "Model",
       "maxSteps": "Max steps",
       "serving": "Serving",
-      "queued": "Queued"
+      "queued": "Queued",
+      "language": "Language",
+      "manuals": "Manuals",
+      "chunks": "Chunks",
+      "search": "Search",
+      "unreadable": "Unreadable",
+      "status": "Status",
+      "version": "Version",
+      "upFor": "Up for",
+      "lastCheck": "Last check"
     },
     "values": {
       "blocked": "blocked (read-only)",
@@ -35,9 +44,14 @@
       "valid": "valid",
       "invalid": "invalid",
       "oneQuery": "one query",
-      "nothing": "nothing"
+      "nothing": "nothing",
+      "indexing": "indexing…"
     },
     "enabledWith": "Enabled with",
-    "inServerEnv": "in the server environment."
+    "inServerEnv": "in the server environment.",
+    "title": "System health",
+    "server": "This server",
+    "loadFailed": "{{error}}. If this screen will not load, the problem is not one view: it is the server itself. Check that the backend is running and that it can be reached over the network.",
+    "footer": "Reread every {{segundos}} s. A «not configured» service is not a fault: it is an installation that does not have it."
   }
 }

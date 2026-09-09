@@ -60,7 +60,7 @@ export function IconicsProductsTable() {
   /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation("errors");
+  const { t: traducir } = useTranslation(["data", "errors"]);
   const { theme: t } = useTheme();
   const [rows, setRows] = useState([]);
   const [count, setCount] = useState(null);
@@ -137,8 +137,8 @@ export function IconicsProductsTable() {
 
   return (
     <Panel
-      title="Tabla de productos ICONICS"
-      code={`${TABLE} · ${count ?? 0} filas`}
+      title={traducir("data:productsPanel")}
+      code={`${TABLE} · ${traducir("data:rows", { count: count ?? 0 })}`}
       right={
         <Button variant="icon" onClick={load} loading={loading}>
           <RefreshCw size={14} />
