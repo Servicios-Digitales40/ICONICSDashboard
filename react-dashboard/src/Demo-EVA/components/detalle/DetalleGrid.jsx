@@ -119,7 +119,9 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
       </div>
 
       {senal.nota && (
-        <p style={{ margin: "12px 0 0", fontSize: 10.5, color: t.textFaint, lineHeight: 1.5 }}>{senal.nota}</p>
+        <p style={{ margin: "12px 0 0", fontSize: 10.5, color: t.textFaint, lineHeight: 1.5 }}>
+          {senalTexto(senal.key, "nota")}
+        </p>
       )}
     </Card>
   );

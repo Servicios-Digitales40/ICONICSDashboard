@@ -1,13 +1,44 @@
 {
   "signals": {
-    "nivelTanque": { "label": "Nivel del tanque", "corto": "Nivel" },
-    "temperaturaTanque": { "label": "Temperatura del tanque", "corto": "Temperatura" },
-    "cargaMotor": { "label": "Carga de trabajo del motor", "corto": "Carga motor" },
-    "modoVdf": { "label": "Modo del variador", "corto": "Modo VDF" },
-    "flujoInstantaneo": { "label": "Caudal instantáneo", "corto": "Caudal" },
-    "presionRelativa": { "label": "Presión relativa", "corto": "Presión" },
-    "tensionLinea": { "label": "Tensión de línea", "corto": "Tensión" },
-    "eficienciaEnergetica": { "label": "Eficiencia energética", "corto": "Eficiencia" }
+    "nivelTanque": {
+      "label": "Nivel del tanque",
+      "corto": "Nivel",
+      "nota": "El sensor de nivel está sobre la columna de distribución, no sobre el depósito."
+    },
+    "temperaturaTanque": {
+      "label": "Temperatura del tanque",
+      "corto": "Temperatura"
+    },
+    "cargaMotor": {
+      "label": "Carga de trabajo del motor",
+      "corto": "Carga motor",
+      "nota": "El historiador no publica serie propia de este tag."
+    },
+    "modoVdf": {
+      "label": "Modo del variador",
+      "corto": "Modo VDF",
+      "nota": "Correspondencia Automático/Manual sin confirmar en el servidor."
+    },
+    "flujoInstantaneo": {
+      "label": "Caudal instantáneo",
+      "corto": "Caudal",
+      "nota": "Unidad no declarada en el servidor."
+    },
+    "presionRelativa": {
+      "label": "Presión relativa",
+      "corto": "Presión",
+      "nota": "Unidad no declarada en el servidor."
+    },
+    "tensionLinea": {
+      "label": "Tensión de línea",
+      "corto": "Tensión",
+      "nota": "El tag se llama «índice de desviación», pero entrega una tensión."
+    },
+    "eficienciaEnergetica": {
+      "label": "Eficiencia energética",
+      "corto": "Eficiencia",
+      "nota": "El historiador no publica serie propia de este tag."
+    }
   },
   "quality": {
     "title": "Calidad OPC",

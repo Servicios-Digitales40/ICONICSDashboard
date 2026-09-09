@@ -1,13 +1,44 @@
 {
   "signals": {
-    "nivelTanque": { "label": "Tank Level", "corto": "Level" },
-    "temperaturaTanque": { "label": "Tank Temperature", "corto": "Temperature" },
-    "cargaMotor": { "label": "Motor Load", "corto": "Motor Load" },
-    "modoVdf": { "label": "VFD Mode", "corto": "VFD Mode" },
-    "flujoInstantaneo": { "label": "Instantaneous Flow Rate", "corto": "Flow" },
-    "presionRelativa": { "label": "Gauge Pressure", "corto": "Pressure" },
-    "tensionLinea": { "label": "Line Voltage", "corto": "Voltage" },
-    "eficienciaEnergetica": { "label": "Energy Efficiency", "corto": "Efficiency" }
+    "nivelTanque": {
+      "label": "Tank Level",
+      "corto": "Level",
+      "nota": "The level sensor sits on top of the distribution column, not on the tank."
+    },
+    "temperaturaTanque": {
+      "label": "Tank Temperature",
+      "corto": "Temperature"
+    },
+    "cargaMotor": {
+      "label": "Motor Load",
+      "corto": "Motor Load",
+      "nota": "The historian does not publish a series of its own for this tag."
+    },
+    "modoVdf": {
+      "label": "VFD Mode",
+      "corto": "VFD Mode",
+      "nota": "Auto/Manual mapping not confirmed against the server."
+    },
+    "flujoInstantaneo": {
+      "label": "Instantaneous Flow Rate",
+      "corto": "Flow",
+      "nota": "Unit not declared on the server."
+    },
+    "presionRelativa": {
+      "label": "Gauge Pressure",
+      "corto": "Pressure",
+      "nota": "Unit not declared on the server."
+    },
+    "tensionLinea": {
+      "label": "Line Voltage",
+      "corto": "Voltage",
+      "nota": "The tag is named \"deviation index\", but it delivers a voltage."
+    },
+    "eficienciaEnergetica": {
+      "label": "Energy Efficiency",
+      "corto": "Efficiency",
+      "nota": "The historian does not publish a series of its own for this tag."
+    }
   },
   "quality": {
     "title": "OPC Quality",

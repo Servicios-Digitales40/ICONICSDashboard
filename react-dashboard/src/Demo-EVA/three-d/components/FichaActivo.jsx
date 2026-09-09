@@ -143,7 +143,7 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle 
             key={`nota-${s.key}`}
             style={{ margin: "6px 0 0", fontSize: 10, lineHeight: 1.45, color: t.textFaint }}
           >
-            {senalTexto(s.key, "corto")}: {s.nota}
+            {senalTexto(s.key, "corto")}: {senalTexto(s.key, "nota")}
           </p>
         ))}
 
