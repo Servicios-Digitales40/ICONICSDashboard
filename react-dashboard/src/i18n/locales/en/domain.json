@@ -1,0 +1,66 @@
+{
+  "risks": {
+    "derrame": {
+      "titulo": "Overflow risk",
+      "evidencia": "The tank is at {{nivelTanque}} % and the pump is still delivering (motor load {{cargaMotor}} %).",
+      "consecuencia": "If the pump does not stop, the level can reach the overflow and spill water into the bund.",
+      "accion": "Confirm that the high-level cut-out is working and that the control loop responds."
+    },
+    "marcha-en-seco": {
+      "titulo": "Dry-running risk",
+      "evidencia": "The tank is at {{nivelTanque}} % —below the {{minNivel}} % mark— and the pump is delivering (load {{cargaMotor}} %).",
+      "consecuencia": "Drawing with insufficient level causes cavitation and can destroy the mechanical seal and the bearings in a short time.",
+      "accion": "Check the actual level and the low-level protection before pumping any further."
+    },
+    "sobrepresion": {
+      "titulo": "Overpressure in the network",
+      "evidencia": "Gauge pressure {{presionRelativa}} with the pump delivering (load {{cargaMotor}} %).",
+      "consecuencia": "Holding the network above its service pressure punishes gaskets, seals and the weakest runs, and can cause a rupture.",
+      "accion": "Review the VFD setpoint and the state of the relief valve."
+    },
+    "obstruccion": {
+      "titulo": "Possible blockage downstream",
+      "evidencia": "High pressure ({{presionRelativa}}) with low flow ({{flujoInstantaneo}}) and the motor loaded to {{cargaMotor}} %.",
+      "consecuencia": "The pump is pushing against a resistance: consistent with a closed valve, a dirty filter or a blockage in the line. Working like this heats the pump and wastes energy.",
+      "accion": "Check the valves on the discharge line and the condition of the filters."
+    },
+    "bomba-sin-salida": {
+      "titulo": "The pump is running against a closed outlet",
+      "evidencia": "Flow {{flujoInstantaneo}} —practically nil— with pressure {{presionRelativa}} and the pump delivering (load {{cargaMotor}} %).",
+      "consecuencia": "With no flow there is no water to carry the heat away: all the shaft power stays inside the pump, heating the same trapped liquid. The mechanical seal and the impeller are damaged in minutes, not weeks, and the steam that forms can burst the volute.",
+      "accion": "Check whether the discharge valve is closed and whether there is a minimum recirculation line. Stop the pump rather than opening it suddenly: opening against a hot pump sends a water hammer into the network.",
+      "nota": "The «there is pressure» threshold is still an estimate of ours, not a figure from the plant."
+    },
+    "posible-fuga": {
+      "titulo": "Possible leak in the network",
+      "evidencia": "High flow ({{flujoInstantaneo}}) with low pressure ({{presionRelativa}}) and the pump delivering.",
+      "consecuencia": "Plenty of flow with no pressure is what you see when the network is open somewhere: consistent with a leak, a burst or an outlet left open.",
+      "accion": "Walk the network looking for an abnormal discharge and compare against the expected consumption."
+    },
+    "esfuerzo-sin-resultado": {
+      "titulo": "The motor is working and moving little",
+      "evidencia": "Motor load {{cargaMotor}} % moving a flow of {{flujoInstantaneo}}.",
+      "consecuencia": "High consumption with no hydraulic work in return. Consistent with a worn impeller, a blockage or a mechanical problem, and sustained it heats the motor.",
+      "accion": "Compare against the pump's usual operating point at that load."
+    },
+    "tension-fuera-con-motor": {
+      "titulo": "Supply out of tolerance with the motor under load",
+      "evidencia": "Line voltage {{tensionLinea}} V, outside the {{minTension}}–{{maxTension}} V range, with the motor at {{cargaMotor}} %.",
+      "consecuencia": "Feeding a loaded motor out of tolerance overheats the windings and shortens their life; below the minimum it also raises the current drawn.",
+      "accion": "Review the supply and the VFD protections."
+    },
+    "variador-en-manual": {
+      "titulo": "The VFD is in Manual",
+      "evidencia": "The VFD mode reads as Manual.",
+      "consecuencia": "In Manual the automatic systems that protect the plant may not act: control depends on whoever is operating.",
+      "accion": "Confirm that operating in Manual is intentional and that somebody is attending to it.",
+      "nota": "The Automatic/Manual correspondence is not confirmed on the server."
+    },
+    "agua-caliente": {
+      "titulo": "Water temperature high",
+      "evidencia": "The water in the tank is at {{temperaturaTanque}} °C.",
+      "consecuencia": "Above its service band the water loses its fitness for the process, and if it keeps rising the risk of cavitation at the suction increases.",
+      "accion": "Check the heat input and the turnover of the tank."
+    }
+  }
+}

@@ -66,6 +66,7 @@ import esValidation from "./locales/es/validation.json";
 import esErrors from "./locales/es/errors.json";
 import esAssistant from "./locales/es/assistant.json";
 import esData from "./locales/es/data.json";
+import esDomain from "./locales/es/domain.json";
 
 import enCommon from "./locales/en/common.json";
 import enNavigation from "./locales/en/navigation.json";
@@ -81,6 +82,7 @@ import enValidation from "./locales/en/validation.json";
 import enErrors from "./locales/en/errors.json";
 import enAssistant from "./locales/en/assistant.json";
 import enData from "./locales/en/data.json";
+import enDomain from "./locales/en/domain.json";
 
 /**
  * Los namespaces, por ÁREA del producto y no por pantalla.
@@ -107,6 +109,7 @@ export const NAMESPACES = Object.freeze([
   "assistant",
   "data",
   "prediction",
+  "domain",
 ]);
 
 const resources = {
@@ -125,6 +128,7 @@ const resources = {
     errors: esErrors,
     assistant: esAssistant,
     data: esData,
+    domain: esDomain,
   },
   en: {
     common: enCommon,
@@ -141,6 +145,7 @@ const resources = {
     errors: enErrors,
     assistant: enAssistant,
     data: enData,
+    domain: enDomain,
   },
 };
 

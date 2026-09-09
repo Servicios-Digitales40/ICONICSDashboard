@@ -38,6 +38,8 @@ import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { pedirAlAsistente } from "@/features/asistente";
 import { Enfasis } from "@/i18n";
+import { useDominio } from "@/i18n/useDominio.js";
+import { useProsa } from "@/i18n/useProsa.js";
 import { useTheme } from "@/theme";
 
 import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
@@ -153,9 +155,17 @@ const severidadInfo = (key) => SEVERIDADES[key] ?? SEVERIDADES.informativo;
  * porque la cifra es el hecho y lo demás es deducción nuestra. Invertirlo haría
  * que la hipótesis llegara con la autoridad de un dato.
  */
-function TarjetaRiesgo({ riesgo, t, onNavigate }) {
+function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("diagnostics");
+  /*
+   * La PROSA del riesgo —titular, evidencia medida, consecuencia y acción— la
+   * escribe `shared/eva/tanque/riesgos.js` en español, porque de ahí la lee
+   * también el backend. Aquí se rehace en el idioma activo con las MISMAS
+   * cifras. Ver la cabecera de `useProsa`.
+   */
+  const { riesgo: traducirRiesgo } = useProsa();
+  const riesgo = traducirRiesgo(original);
   const sev = severidadInfo(riesgo.severidad);
   const { Icono } = sev;
 
@@ -204,7 +214,13 @@ function TarjetaRiesgo({ riesgo, t, onNavigate }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => pedirAlAsistente(preguntaSobreRiesgo(riesgo))}
+          /*
+           * Se pregunta con el riesgo SIN traducir: la pregunta va al
+           * asistente, que ya responde en el idioma del tablero por su cuenta
+           * (`idioma` viaja en el cuerpo del POST). Mandarla traducida
+           * obligaría al modelo a reconocer un texto que su catálogo no tiene.
+           */
+          onClick={() => pedirAlAsistente(preguntaSobreRiesgo(original))}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "8px 14px", borderRadius: 8, cursor: "pointer",
@@ -224,7 +240,7 @@ function TarjetaRiesgo({ riesgo, t, onNavigate }) {
          */}
         <button
           type="button"
-          onClick={() => onNavigate?.("cierre-diagnostico", { sistema: "tanque", riesgoId: riesgo.id })}
+          onClick={() => onNavigate?.("cierre-diagnostico", { sistema: "tanque", riesgoId: original.id })}
           style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: "8px 14px", borderRadius: 8, cursor: "pointer",
@@ -372,6 +388,9 @@ function RiesgosTanque({ onNavigate }) {
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["diagnostics", "common", "errors"]);
+  /* El título de una regla sin evaluar, y el nombre de la señal que le faltó. */
+  const { noEvaluable: tituloDeRegla } = useProsa();
+  const { senal } = useDominio();
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
   const { theme: t } = useTheme();
 
@@ -510,9 +529,16 @@ function RiesgosTanque({ onNavigate }) {
                   style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}
                 >
                   <HelpCircle size={15} color={t.textFaint} style={{ flexShrink: 0 }} />
-                  <span style={{ color: t.text }}>{n.titulo}</span>
+                  <span style={{ color: t.text }}>{tituloDeRegla(n).titulo}</span>
+                  {/*
+                    `faltaClave` y no `falta`: el dominio manda las dos —la
+                    etiqueta española, que es la que consume el backend, y la
+                    clave de la señal para poder decirla en el idioma activo—.
+                  */}
                   <span style={{ color: t.textFaint }}>
-                    {traducir("diagnostics:risks.missing", { falta: n.falta })}
+                    {traducir("diagnostics:risks.missing", {
+                      falta: n.faltaClave ? senal(n.faltaClave) : n.falta,
+                    })}
                   </span>
                 </li>
               ))}

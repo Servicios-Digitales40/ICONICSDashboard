@@ -103,6 +103,22 @@ const lim = (key, cual) => UMBRALES[key]?.[cual] ?? null;
  *   evidencia     (v) => string         — lo MEDIDO, con cifras
  *   consecuencia  qué PUEDE pasar si esto sigue        (hipótesis)
  *   accion        qué conviene mirar                    (nunca una maniobra)
+ *   datos         (v) => object          — OPCIONAL; cifras que `evidencia`
+ *                                          cita y que no son una señal leída
+ *
+ * ── POR QUÉ EXISTE `datos` ──────────────────────────────────────────
+ *
+ * Porque `evidencia` devuelve la frase ya compuesta, en español, y el tablero
+ * necesita poder rehacerla en otro idioma con LAS MISMAS CIFRAS. Las señales
+ * ya viajan (`valores` en el resultado); lo que no viajaba es un umbral que la
+ * frase cite —«por debajo del 20 %»— porque no es una lectura.
+ *
+ * Sólo lo declaran las dos reglas que citan un umbral. El resto no lo necesita:
+ * sus cifras son las señales que ya leyó el evaluador.
+ *
+ * Esto NO traduce nada aquí. `shared/` sigue siendo dominio puro (§2.7) y sigue
+ * componiendo su frase en español, que es la que consume el backend para que el
+ * modelo la narre. Lo único que se añade es con qué se compuso.
  *
  * `v` es un objeto plano `{ clave: valor }` con las señales ya leídas, para que
  * la condición se lea como la frase que la describe.
@@ -133,6 +149,7 @@ export const REGLAS = [
     evidencia: (v) =>
       `El tanque está al ${v.nivelTanque.toFixed(1)} % —por debajo del ${lim("nivelTanque", "avisoMin")} %— ` +
       `y la bomba está impulsando (carga ${v.cargaMotor.toFixed(1)} %).`,
+    datos: () => ({ minNivel: lim("nivelTanque", "avisoMin") }),
     consecuencia:
       "Aspirar con nivel insuficiente provoca cavitación y puede destruir el sello mecánico " +
       "y los rodamientos en poco tiempo.",
@@ -275,6 +292,7 @@ export const REGLAS = [
       `Tensión de línea ${v.tensionLinea.toFixed(1)} V, fuera del rango ` +
       `${lim("tensionLinea", "min")}–${lim("tensionLinea", "max")} V, con el motor al ` +
       `${v.cargaMotor.toFixed(1)} %.`,
+    datos: () => ({ minTension: lim("tensionLinea", "min"), maxTension: lim("tensionLinea", "max") }),
     consecuencia:
       "Alimentar un motor en carga fuera de tolerancia sobrecalienta los devanados y acorta " +
       "su vida; por debajo del mínimo, además, sube la corriente absorbida.",
@@ -346,21 +364,31 @@ export function evaluarRiesgos(sistema) {
     // deja sin evaluar: preferimos decir «no lo sé» a suponer un valor.
     const v = {};
     let falta = null;
+    let faltaClave = null;
 
     for (const key of regla.necesita) {
       const meta = sistema?.senales?.[key];
       const valor = meta?.tipo === "booleano" ? bool(sistema, key) : num(sistema, key);
-      if (valor === null) { falta = meta?.label ?? key; break; }
+      if (valor === null) { falta = meta?.label ?? key; faltaClave = key; break; }
       v[key] = valor;
     }
 
     // Las reglas que hablan de la bomba en marcha necesitan además SABER si lo
     // está. `impulsando === null` es «no consta», y no se resuelve suponiendo.
     const necesitaMarcha = regla.necesita.includes("cargaMotor");
-    if (!falta && necesitaMarcha && ctx.impulsando === null) falta = "Carga de trabajo del motor";
+    if (!falta && necesitaMarcha && ctx.impulsando === null) {
+      falta = "Carga de trabajo del motor";
+      faltaClave = "cargaMotor";
+    }
 
     if (falta) {
-      noEvaluables.push({ id: regla.id, titulo: regla.titulo, falta });
+      /*
+       * `falta` es la ETIQUETA de la señal, en español, y así la consume el
+       * backend. `faltaClave` es la misma señal por su clave, para que el
+       * tablero pueda decirla en el idioma que tenga puesto — la etiqueta se
+       * traduce en `useDominio.senal()`, no aquí.
+       */
+      noEvaluables.push({ id: regla.id, titulo: regla.titulo, falta, faltaClave });
       continue;
     }
 
@@ -374,6 +402,13 @@ export function evaluarRiesgos(sistema) {
       consecuencia: regla.consecuencia,
       accion: regla.accion,
       nota: regla.nota ?? null,
+      /*
+       * CON QUÉ se compuso la evidencia: las señales que la regla leyó, más
+       * lo que declare su `datos`. Va en crudo —sin formatear— porque el
+       * separador decimal es del idioma y quien pinta ya sabe formatear por
+       * las `decimales` que declara cada señal.
+       */
+      valores: { ...v, ...(regla.datos?.(v, ctx) ?? {}) },
     });
   }
 

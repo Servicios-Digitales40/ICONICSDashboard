@@ -151,7 +151,42 @@ check('los mismos namespaces en todos los idiomas', () => {
 
 /* ── 2 · Las mismas claves dentro de cada namespace ──────────────────── */
 
+/**
+ * El ÚNICO namespace cuyo español no vive aquí, y por qué.
+ *
+ * `domain` traduce la PROSA del dominio: los títulos, la evidencia medida, la
+ * consecuencia y la acción de cada regla de riesgo, de cada causa y de cada
+ * mecanismo de desgaste. Ese texto lo escribe `shared/eva/` y lo consume
+ * también el BACKEND, que se lo pasa al modelo para que lo narre (ver
+ * `ia/conversacion/herramientas.mjs`). No es texto de interfaz que se pueda
+ * mudar a un JSON: es vocabulario del dominio con dos consumidores.
+ *
+ * Así que aquí sólo está el INGLÉS, y el español llega por `defaultValue`
+ * desde el propio dominio — ver `i18n/useProsa.js`. Copiarlo también al
+ * diccionario habría dejado dos originales del mismo párrafo en dos archivos
+ * que nadie edita a la vez, que es la divergencia que CLAUDE.md §2.6 existe
+ * para impedir.
+ *
+ * ── LO QUE SE PIERDE, Y QUIÉN LO CUBRE ─────────────────────────────
+ *
+ * Esta excepción apaga la comprobación de paridad para `domain`, y con ella la
+ * garantía de que a una regla no le falte su inglés. Eso NO se queda sin
+ * vigilar: lo cubre `scripts/verificar-dominio.mjs`, que recorre los ids de
+ * `shared/eva/` —la fuente de verdad, no un espejo— y falla si a alguno le
+ * falta su traducción. Es una comprobación MÁS fuerte que la paridad genérica,
+ * porque compara contra el dominio y no contra el otro idioma.
+ *
+ * Es la única excepción de este archivo. Si algún día hace falta una segunda,
+ * conviene sospechar del diseño antes que de la comprobación.
+ */
+const SIN_PARIDAD = new Set(['domain'])
+
 for (const ns of Object.keys(arboles[REFERENCIA]).sort()) {
+  if (SIN_PARIDAD.has(ns)) {
+    console.log(`  ${c.gris}·${c.reset} «${ns}»: sin paridad a propósito — su español vive en \`shared/eva/\`, lo comprueba \`verificar-dominio.mjs\`${c.reset}`)
+    continue
+  }
+
   check(`«${ns}»: mismas claves en los ${idiomas.length} idiomas`, () => {
     const referencia = hojas(arboles[REFERENCIA][ns]).sort()
 
@@ -177,6 +212,8 @@ check('ninguna clave tiene el texto vacío', () => {
   const vacias = []
   for (const idioma of idiomas) {
     for (const [ns, arbol] of Object.entries(arboles[idioma])) {
+      /* Ver `SIN_PARIDAD`: en `domain` el español está vacío a propósito. */
+      if (SIN_PARIDAD.has(ns)) continue
       for (const clave of hojas(arbol)) {
         const v = valorEn(arbol, clave)
         if (typeof v === 'string' && v.trim() === '') vacias.push(`${idioma}:${ns}:${clave}`)
