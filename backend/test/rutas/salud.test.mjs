@@ -15,6 +15,8 @@
  *      real y el único que la pantalla tiene que gritar.
  */
 import { describe, expect, it } from 'vitest'
+
+import { estadoDeLosDatos } from '../../routes/systemRoutes.mjs'
 import { createServer } from 'node:http'
 
 import { montarApp } from '../ayudas.mjs'
@@ -353,5 +355,107 @@ describe('salud — contestar no es entregar datos', () => {
     expect(typeof ultima.instante).toBe('string')
 
     await app.close()
+  })
+})
+
+describe('salud — una lectura que FALLÓ no es una lectura que nadie pidió', () => {
+  /*
+   * ── POR QUÉ ESTAS PRUEBAS SON UNITARIAS Y NO POR `inject()` ────────
+   *
+   * Porque para provocar el caso hace falta un ICONICS que se ALCANCE, con
+   * token válido, y que aun así rechace las lecturas. Con `ICONICS_FAKE` no
+   * falla nunca, y con una URL inalcanzable falla antes —`ping()` no llega— y
+   * la tarjeta sale por la rama de «no se alcanza», que no es ésta.
+   *
+   * Montar un ICONICS de mentira sólo para esto sería un servidor entero para
+   * comprobar tres `if`. Así que se prueba la función directamente: es pura,
+   * recibe todo lo que mira, y lo que se comprueba es su CRITERIO.
+   */
+  const CONFIG = { iconics: { fake: false, readOnly: false, origin: 'https://planta.local' } }
+  const ALCANZABLE = { reachable: true }
+
+  const tarjeta = lecturas =>
+    estadoDeLosDatos({
+      config: CONFIG,
+      connectivity: ALCANZABLE,
+      tokenValid: true,
+      lecturas,
+      ahora: Date.parse('2026-09-09T10:00:30Z'),
+    })
+
+  const FALLO = { instante: '2026-09-09T10:00:00Z', motivo: 'ICONICS batch request failed.' }
+  const BUENA = {
+    instante: '2026-09-09T10:00:00Z',
+    puntosPedidos: 8, conValor: 8, conCalidadBuena: 8,
+  }
+
+  it('sin ninguna lectura buena y con un fallo, es un ERROR — no «todavía nadie ha leído»', () => {
+    /*
+     * El caso medido el 09-09-2026: `fwxapi` devolvía 500 a todo y esta
+     * tarjeta decía, en verde, que aún no se había pedido ninguna lectura.
+     */
+    const datos = tarjeta({ ultima: null, ultimoFallo: FALLO })
+
+    expect(datos.estado).toBe('error')
+    expect(datos.detalle).toMatch(/FALLÓ/)
+    expect(datos.detalle).toContain('ICONICS batch request failed')
+    /* Y sin el punto doble: el motivo ya trae el suyo. */
+    expect(datos.detalle).not.toContain('failed..')
+    expect(datos.detalle).not.toMatch(/todavía no se ha pedido/i)
+    /* Y cuándo fue, para no tener que leer logs por SSH. */
+    expect(datos.detalle).toMatch(/hace 30 s/)
+    expect(datos.ultimoFallo).toEqual(FALLO)
+  })
+
+  it('un fallo POSTERIOR a una lectura buena manda: el origen se acaba de caer', () => {
+    const datos = tarjeta({
+      ultima: { ...BUENA, instante: '2026-09-09T09:59:00Z' },
+      ultimoFallo: FALLO,
+    })
+
+    expect(datos.estado).toBe('error')
+    expect(datos.detalle).toMatch(/FALLÓ/)
+  })
+
+  it('una lectura buena POSTERIOR a un fallo manda: el origen ya se recuperó', () => {
+    /*
+     * La regresión que más importa de las tres. `ultimoFallo` no se borra
+     * nunca, así que sin comparar instantes una avería de hace una hora
+     * pintaría de rojo para siempre un origen sano — y un rojo que no se apaga
+     * se aprende a ignorar igual de rápido que un verde que miente.
+     */
+    const datos = tarjeta({
+      ultima: BUENA,
+      ultimoFallo: { ...FALLO, instante: '2026-09-09T09:00:00Z' },
+    })
+
+    expect(datos.estado).toBe('ok')
+    expect(datos.detalle).toMatch(/8\/8/)
+    expect(datos.ultimoFallo).toBeUndefined()
+  })
+
+  it('sin fallo y sin lectura sigue siendo un arranque sano, no una avería', () => {
+    const datos = tarjeta({ ultima: null, ultimoFallo: null })
+
+    expect(datos.estado).toBe('ok')
+    expect(datos.detalle).toMatch(/todavía no se ha pedido/i)
+  })
+
+  it('si NO se alcanza el servidor, eso manda sobre el fallo de lectura', () => {
+    /*
+     * Son dos averías distintas con dos arreglos distintos, y la de red es la
+     * de fuera: decir «la lectura falló» cuando lo que pasa es que no hay
+     * servidor mandaría a mirar el sitio equivocado.
+     */
+    const datos = estadoDeLosDatos({
+      config: CONFIG,
+      connectivity: { reachable: false, reason: 'timeout' },
+      tokenValid: true,
+      lecturas: { ultima: null, ultimoFallo: FALLO },
+      ahora: Date.parse('2026-09-09T10:00:30Z'),
+    })
+
+    expect(datos.estado).toBe('error')
+    expect(datos.detalle).toMatch(/No se alcanza/)
   })
 })

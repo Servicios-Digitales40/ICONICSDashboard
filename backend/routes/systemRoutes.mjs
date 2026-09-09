@@ -70,7 +70,10 @@ function servicio({ nombre, configurado, variable, responde, motivo = null, deta
  *
  *  1. ¿Se alcanza el servidor y el token vale? Eso ya lo sabía la ruta y se
  *     tiraba: se calculaba para el `status` global y no llegaba aquí.
- *  2. ¿Llegan valores? Lo dice la telemetría de la última lectura real
+ *  2. ¿Falló lo último que se intentó leer? Es distinto de las otras dos, y
+ *     durante un tiempo fue el hueco por el que se escapaba una avería entera:
+ *     ver el comentario largo abajo.
+ *  3. ¿Llegan valores? Lo dice la telemetría de la última lectura real
  *     (`client.estadoLecturas()`, añadida a los dos transportes).
  *
  * ── `null` NO ES CERO, OTRA VEZ ────────────────────────────────────
@@ -80,7 +83,7 @@ function servicio({ nombre, configurado, variable, responde, motivo = null, deta
  * con esas palabras en vez de pintarlo en rojo. Distinto de «hace once
  * minutos que no llega un valor», que sí lo es.
  */
-function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, ahora }) {
+export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, ahora }) {
   const base = {
     nombre: 'Origen de datos',
     soloLectura: config.iconics.readOnly,
@@ -115,6 +118,50 @@ function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, ahora })
   }
 
   const ultima = lecturas?.ultima ?? null
+  const ultimoFallo = lecturas?.ultimoFallo ?? null
+
+  /*
+   * ── UNA LECTURA QUE FALLÓ NO ES UNA LECTURA QUE NADIE PIDIÓ ────────
+   *
+   * `client.estadoLecturas()` devuelve las dos cosas —la última lectura BUENA
+   * y el último fallo— y aquí sólo se miraba la primera. Con lo cual un
+   * servidor que rechaza TODAS las lecturas caía en la rama de abajo y esta
+   * tarjeta decía «todavía no se ha pedido ninguna lectura en vivo»: en verde,
+   * y describiendo un puente recién arrancado cuando lo que había era una
+   * avería en marcha.
+   *
+   * Medido el 09-09-2026 con la planta delante: el `fwxapi` de `bms-server`
+   * devolvía 500 con el cuerpo vacío a todo lo que no fuera `/echo` —incluso a
+   * `UserInfo` SIN token, que debería ser un 401—. El tablero enseñaba «Sin
+   * conexión con el servidor» y esta pantalla, `ok`. El dato para desmentirlo
+   * estaba en memoria y no se leía.
+   *
+   * Es la misma lección que ya escribió `servicio()` ahí arriba, en otra
+   * esquina: tener con qué comprobarlo no basta si nadie lo comprueba.
+   *
+   * ── POR QUÉ SE COMPARA, EN VEZ DE MIRAR SI HAY FALLO ───────────────
+   *
+   * Porque `ultimoFallo` no se borra nunca. Sin comparar contra la última
+   * lectura buena, una avería de hace una hora seguiría pintando de rojo un
+   * origen que ya se recuperó — y eso enseña a ignorar el rojo igual de rápido
+   * que un verde falso. Lo que importa es qué fue LO ÚLTIMO que pasó.
+   */
+  const falloEsLoUltimo =
+    Boolean(ultimoFallo) &&
+    (!ultima || Date.parse(ultimoFallo.instante) >= Date.parse(ultima.instante))
+
+  if (falloEsLoUltimo) {
+    const desde = Math.round((ahora - Date.parse(ultimoFallo.instante)) / 1000)
+    return {
+      ...base,
+      estado: 'error',
+      ultimoFallo,
+      /* El motivo viene del cliente y suele traer su punto; se le quita para
+         no escribir «…batch request failed.. Contestar no es entregar.» */
+      detalle: `Se alcanza ${donde} y el token es válido, pero la última lectura —hace ${desde} s— ` +
+        `FALLÓ: ${String(ultimoFallo.motivo).replace(/\.$/, '')}. Contestar no es entregar.`,
+    }
+  }
 
   if (!ultima) {
     return {
