@@ -56,6 +56,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
+import { CAUSAS_POR_RIESGO } from '../shared/eva/comun/causas.js'
+import { MECANISMOS } from '../shared/eva/comun/pronostico.js'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const EN = join(AQUI, '..', 'react-dashboard', 'src', 'i18n', 'locales', 'en', 'domain.json')
@@ -82,8 +84,19 @@ function check(nombre, fn) {
 
 const ingles = JSON.parse(readFileSync(EN, 'utf8'))
 
-/** Los campos de prosa de una regla, en el orden en que se leen en la tarjeta. */
-const CAMPOS = ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota']
+/**
+ * Los campos de PROSA de cada catálogo, en el orden en que se leen.
+ *
+ * Lo que NO está aquí también es una decisión: `terminosManual` de una causa
+ * son los términos con los que se busca en un corpus de manuales EN ESPAÑOL, y
+ * `norma` de un mecanismo es una referencia («ISO 10816-7»). Traducir
+ * cualquiera de los dos rompería algo en vez de mejorarlo.
+ */
+const CAMPOS_POR_CATALOGO = {
+  risks: ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota'],
+  causes: ['titulo', 'componente'],
+  mechanisms: ['titulo', 'componente', 'mecanismo', 'consecuencia', 'accion', 'confirmar'],
+}
 
 /** Las variables `{{asi}}` de una cadena. */
 function variablesDe(texto) {
@@ -111,16 +124,34 @@ function nombresDisponibles(regla) {
 
 /* ── Los catálogos que ya están migrados ─────────────────────────────── */
 
+/**
+ * Las causas, sin repetir.
+ *
+ * `CAUSAS_POR_RIESGO` las indexa por riesgo y la misma causa aparece en varios
+ * —«desequilibrio» sirve a `vibracion-en-alarma` y a `vibracion-en-aviso`—, así
+ * que se aplanan por id: lo que hay que traducir es cada causa una vez.
+ */
+function causasUnicas() {
+  const vistas = new Map()
+  for (const lista of Object.values(CAUSAS_POR_RIESGO)) {
+    for (const c of lista) if (!vistas.has(c.id)) vistas.set(c.id, c)
+  }
+  return [...vistas.values()]
+}
+
 const CATALOGOS = [
   { nombre: 'riesgos del tanque', bloque: 'risks', entradas: REGLAS_TANQUE },
+  { nombre: 'causas candidatas', bloque: 'causes', entradas: causasUnicas() },
+  { nombre: 'mecanismos de desgaste', bloque: 'mechanisms', entradas: MECANISMOS },
 ]
 
 console.log(`\n${c.negrita}Prosa del dominio${c.reset}: ${CATALOGOS.map(x => `${x.entradas.length} ${x.nombre}`).join(', ')}`)
 
 for (const { nombre, bloque, entradas } of CATALOGOS) {
+  const CAMPOS = CAMPOS_POR_CATALOGO[bloque]
   console.log(`\n── ${nombre} ──────────────────────────────────────────────`)
 
-  check(`cada regla tiene su bloque en inglés, con sus campos`, () => {
+  check(`«${bloque}»: cada entrada tiene su bloque en inglés, con sus campos`, () => {
     const problemas = []
 
     for (const regla of entradas) {
@@ -146,7 +177,7 @@ for (const { nombre, bloque, entradas } of CATALOGOS) {
     )
   })
 
-  check('las cifras que cita el inglés las ofrece la regla', () => {
+  check(`«${bloque}»: las cifras que cita el inglés las ofrece la entrada`, () => {
     const problemas = []
 
     for (const regla of entradas) {
@@ -169,7 +200,7 @@ for (const { nombre, bloque, entradas } of CATALOGOS) {
     assert.ok(problemas.length === 0, `${problemas.length} problema(s):\n${problemas.join('\n')}`)
   })
 
-  check('el inglés no traduce ids que no existen', () => {
+  check(`«${bloque}»: el inglés no traduce ids que no existen`, () => {
     const conocidos = new Set(entradas.map(r => r.id))
     const sobran = Object.keys(ingles[bloque] ?? {}).filter(id => !conocidos.has(id))
 

@@ -62,5 +62,152 @@
       "consecuencia": "Above its service band the water loses its fitness for the process, and if it keeps rising the risk of cavitation at the suction increases.",
       "accion": "Check the heat input and the turnover of the tank."
     }
+  },
+  "causes": {
+    "sobrecorriente-o-cortocircuito": {
+      "titulo": "Overcurrent at the output (F1): short circuit, earth fault or a badly parameterised motor",
+      "componente": "V20 drive / motor cable"
+    },
+    "sobretension-de-bus": {
+      "titulo": "DC link overvoltage (F2): deceleration too fast, or a high supply",
+      "componente": "V20 drive / DC link"
+    },
+    "subtension-de-alimentacion": {
+      "titulo": "Supply undervoltage (F3): a dip or a brief outage on the mains",
+      "componente": "Electrical supply"
+    },
+    "sobretemperatura": {
+      "titulo": "Drive or motor overtemperature (F4, F5, F11): ventilation or duty cycle",
+      "componente": "V20 drive / motor"
+    },
+    "disparo-de-vigilancia-de-carga": {
+      "titulo": "Load monitoring trip (F452): a mechanical fault in the drive train, or a seizure",
+      "componente": "Transmission / coupling"
+    },
+    "corte-nivel-alto-no-actua": {
+      "titulo": "The automatic high-level cut-out is not acting",
+      "componente": "High-level control loop"
+    },
+    "nivel-real-insuficiente": {
+      "titulo": "The actual tank level is insufficient",
+      "componente": "Water supply to the tank"
+    },
+    "proteccion-nivel-bajo-no-actua": {
+      "titulo": "The low-level protection is not acting",
+      "componente": "Low-level control loop"
+    },
+    "consigna-variador-alta": {
+      "titulo": "The VFD setpoint is above what it should be",
+      "componente": "Variable frequency drive"
+    },
+    "valvula-alivio-no-actua": {
+      "titulo": "The relief valve is not acting",
+      "componente": "Relief valve"
+    },
+    "valvula-impulsion-parcialmente-cerrada": {
+      "titulo": "Discharge line valve partially closed",
+      "componente": "Discharge valve"
+    },
+    "filtro-colmatado": {
+      "titulo": "Line filter clogged",
+      "componente": "Line filter"
+    },
+    "valvula-impulsion-cerrada": {
+      "titulo": "Discharge valve closed or seized",
+      "componente": "Discharge valve"
+    },
+    "sin-recirculacion-minima": {
+      "titulo": "No minimum recirculation line",
+      "componente": "Recirculation line"
+    },
+    "fuga-o-rotura-en-la-red": {
+      "titulo": "Leak, burst or an outlet left open in the network",
+      "componente": "Distribution network"
+    },
+    "impulsor-desgastado": {
+      "titulo": "Worn impeller",
+      "componente": "Pump impeller and bearings"
+    },
+    "obstruccion-interna-bomba": {
+      "titulo": "Internal blockage in the pump or the line",
+      "componente": "Pump / discharge line"
+    },
+    "problema-en-el-suministro": {
+      "titulo": "A problem in the electrical supply",
+      "componente": "Incoming supply"
+    },
+    "protecciones-variador-mal-ajustadas": {
+      "titulo": "VFD protections badly set",
+      "componente": "Variable frequency drive"
+    },
+    "aporte-termico-externo": {
+      "titulo": "External heat input to the tank",
+      "componente": "Environment / upstream process"
+    },
+    "falta-renovacion-de-agua": {
+      "titulo": "Not enough water turnover in the tank",
+      "componente": "Filling circuit"
+    },
+    "desequilibrio": {
+      "titulo": "Rotor unbalance",
+      "componente": "Rotor / coupling"
+    },
+    "desalineacion": {
+      "titulo": "Coupling misalignment",
+      "componente": "Motor-pump coupling"
+    },
+    "aflojamiento-anclaje": {
+      "titulo": "Loose anchoring or baseplate",
+      "componente": "Baseplate / anchor bolts"
+    },
+    "rodamiento-en-mal-estado": {
+      "titulo": "Bearing in poor condition at that support",
+      "componente": "Bearing of the indicated support"
+    },
+    "fijacion-floja-en-el-apoyo": {
+      "titulo": "Loose fixing at that support",
+      "componente": "Fixing bolts of the indicated support"
+    },
+    "desalineacion-localizada": {
+      "titulo": "Coupling misalignment pulling on that side",
+      "componente": "Coupling, on the side of the indicated support"
+    }
+  },
+  "mechanisms": {
+    "cavitacion-acumulada": {
+      "titulo": "Hours drawing with insufficient level",
+      "componente": "Mechanical seal and impeller of the pump",
+      "mecanismo": "With a low level, the pressure at the suction falls below the vapour pressure and bubbles form that implode against the impeller. Each implosion tears off a minute amount of material; the damage accumulates and does not undo itself.",
+      "consecuencia": "Impeller erosion, a progressive loss of flow at the same speed, and destruction of the mechanical seal — which is usually what fails first, and what forces the pump open.",
+      "accion": "Review the low-level stop setpoint and the reaction time of the loop."
+    },
+    "sobrepresion-sostenida": {
+      "titulo": "Hours with the network above its service pressure",
+      "componente": "Gaskets, seals and the weakest runs of the network",
+      "mecanismo": "The elastomers in gaskets and seals deform permanently under sustained pressure (compression set). It is not a failure from exceeding a limit once: it is fatigue proportional to the time accumulated above the design pressure.",
+      "consecuencia": "Leaks at gaskets, a progressive loss of tightness and, at worst, a run rupturing from fatigue.",
+      "accion": "Review the VFD setpoint and the setting of the relief valve."
+    },
+    "agua-caliente-sostenida": {
+      "titulo": "Hours with the water above its band",
+      "componente": "Pump suction and fitness of the water",
+      "mecanismo": "The hotter the water, the lower the pressure at which it boils, and the less suction margin the pump has left before it cavitates. Hot water does no damage on its own: it narrows the margin everything else works with.",
+      "consecuencia": "It raises the chance of cavitation at levels that used to be sufficient, and the water stops being fit for its process use.",
+      "accion": "Check the heat input and the turnover of the tank."
+    },
+    "tension-fuera-de-tolerancia": {
+      "titulo": "Hours with the supply out of tolerance",
+      "componente": "Motor windings and the drive DC link",
+      "mecanismo": "Below tolerance, the motor makes up the torque by drawing more current, and current heats the winding. Above it, the core saturates and iron losses rise. In both directions the result is the same variable: insulation temperature. The classic rule —Montsinger, taken up in IEC 60034-1— is that insulation life halves for every 10 K sustained above its class.",
+      "consecuencia": "Accelerated ageing of the stator insulation and of the capacitors in the drive DC link. Neither gives warning: they fail all at once, at the end.",
+      "accion": "Review the supply and the VFD protections."
+    },
+    "esfuerzo-sin-resultado": {
+      "titulo": "Hours moving little flow with the motor loaded",
+      "componente": "Pump impeller and bearings",
+      "mecanismo": "Working far from the best efficiency point loads the shaft asymmetrically: the radial force on the impeller grows and unloads entirely onto the bearings.",
+      "consecuencia": "Accelerated wear of bearings and of the seal, and consumption with no useful work.",
+      "accion": "Compare the real operating point against the pump's curve."
+    }
   }
 }

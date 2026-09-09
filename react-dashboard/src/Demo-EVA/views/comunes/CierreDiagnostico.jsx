@@ -49,6 +49,7 @@ import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { fieldStyle } from "@/components/ui/Input.jsx";
 import { obtenerDiagnostico, registrarCaso } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
+import { useProsa } from "@/i18n/useProsa.js";
 import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
@@ -102,6 +103,8 @@ function Rotulo({ t, children }) {
 function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, activo, muestraSensores, diagnostico }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("maintenance");
+  /* El título de cada causa candidata. Ver la cabecera de `useProsa`. */
+  const { causa: traducirCausa } = useProsa();
 
   return (
     <div
@@ -191,8 +194,8 @@ function ZonaSistema({ t, sistemaNombre, definicion, canalLabel, evidencia, acti
                       {traducir(`close.band.${banda.clave}`)}
                     </span>
                     <span style={{ color: t.text }}>
-                      {i === 0 && <strong>{c.titulo} </strong>}
-                      {i !== 0 && c.titulo}
+                      {i === 0 && <strong>{traducirCausa(c).titulo} </strong>}
+                      {i !== 0 && traducirCausa(c).titulo}
                       {i === 0 && (
                         <span style={{ color: t.textFaint }}>{traducir("close.system.proposed")}</span>
                       )}
@@ -248,6 +251,8 @@ function ZonaPersona({
 }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("maintenance");
+  /* El título de cada causa candidata. Ver la cabecera de `useProsa`. */
+  const { causa: traducirCausa } = useProsa();
 
   return (
     <Panel title={traducir("close.person.title")} code={traducir("close.person.code")}>
@@ -265,7 +270,7 @@ function ZonaPersona({
                 fontFamily: SANS, fontSize: 13, color: t.text,
               }}
             >
-              {c.titulo}
+              {traducirCausa(c).titulo}
               {i === 0 && (
                 <span style={{ marginLeft: 8, fontSize: 11, color: t.textFaint }}>
                   {traducir("close.person.proposedTag")}
@@ -519,6 +524,13 @@ export default function CierreDiagnostico({ params, onNavigate }) {
       await registrarCaso({
         sistema: sistemaId,
         sintoma,
+        /*
+         * El título SIN traducir. Lo que se guarda en la bitácora lo vuelve a
+         * leer el motor para respaldar causas futuras, y ese índice está
+         * construido sobre el corpus en español: guardar el título traducido
+         * rompería la coincidencia. Lo que ve la persona sí va traducido —es
+         * la pantalla—; lo que se archiva es el dato.
+         */
         causa: causaId === OTRA_CAUSA ? causaLibre.trim() : causaSeleccionada?.titulo,
         solucion: solucion.trim(),
         resuelto,

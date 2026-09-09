@@ -140,5 +140,50 @@ export function useProsa() {
     [t]
   );
 
-  return { riesgo, noEvaluable };
+  /**
+   * Una causa candidata del diagnóstico.
+   *
+   * Sólo se traducen `titulo` y `componente`. `terminosManual` NO se toca y
+   * no debe: son los términos con los que `documentos.mjs` busca en el corpus
+   * de manuales, que está en español — traducirlos rompería la búsqueda en vez
+   * de mejorarla. Lo mismo vale para `origen`, que es una referencia al
+   * archivo del que salió la causa.
+   */
+  const causa = useCallback(
+    (c) =>
+      c
+        ? {
+          ...c,
+          titulo: t(`causes.${c.id}.titulo`, { defaultValue: c.titulo }),
+          componente: t(`causes.${c.id}.componente`, { defaultValue: c.componente }),
+        }
+        : c,
+    [t]
+  );
+
+  /**
+   * Un mecanismo de desgaste del pronóstico.
+   *
+   * `norma` se queda fuera a propósito: «ISO 10816-7» o «NEMA MG-1 §12.44» son
+   * referencias, no texto — como un tag de ICONICS o un código de alarma.
+   */
+  const mecanismo = useCallback(
+    (m) =>
+      m
+        ? {
+          ...m,
+          titulo: t(`mechanisms.${m.id}.titulo`, { defaultValue: m.titulo }),
+          componente: t(`mechanisms.${m.id}.componente`, { defaultValue: m.componente }),
+          mecanismo: t(`mechanisms.${m.id}.mecanismo`, { defaultValue: m.mecanismo }),
+          consecuencia: t(`mechanisms.${m.id}.consecuencia`, { defaultValue: m.consecuencia }),
+          accion: t(`mechanisms.${m.id}.accion`, { defaultValue: m.accion }),
+          confirmar: m.confirmar
+            ? t(`mechanisms.${m.id}.confirmar`, { defaultValue: m.confirmar })
+            : m.confirmar,
+        }
+        : m,
+    [t]
+  );
+
+  return { riesgo, noEvaluable, causa, mecanismo };
 }

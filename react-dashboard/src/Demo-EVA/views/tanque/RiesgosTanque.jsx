@@ -289,9 +289,16 @@ function Campo({ t, rotulo, destacado = false, children }) {
  * final la consecuencia. Poner la consecuencia arriba convertiría la tarjeta
  * en un titular alarmista sobre un número que el lector todavía no ha visto.
  */
-function TarjetaPronostico({ p, t }) {
+function TarjetaPronostico({ p: original, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("diagnostics");
+  /*
+   * El mecanismo de desgaste —qué se está gastando, por qué y a qué avería
+   * lleva— lo escribe `shared/eva/comun/pronostico.js` en español, igual que
+   * los riesgos. Ver la cabecera de `useProsa`.
+   */
+  const { mecanismo: traducirMecanismo } = useProsa();
+  const p = traducirMecanismo(original);
   const sev = severidadInfo(p.severidad);
   const tend = TENDENCIAS[p.tendencia] ?? TENDENCIAS["sin determinar"];
   const { Icono: IconoTend } = tend;
@@ -366,7 +373,8 @@ function TarjetaPronostico({ p, t }) {
 
       <button
         type="button"
-        onClick={() => pedirAlAsistente(preguntaSobrePronostico(p))}
+        /* Con el mecanismo SIN traducir: ver el botón del riesgo. */
+        onClick={() => pedirAlAsistente(preguntaSobrePronostico(original))}
         style={{
           display: "flex", alignItems: "center", gap: 8, alignSelf: "flex-start",
           padding: "8px 14px", borderRadius: 8, cursor: "pointer",
@@ -389,7 +397,7 @@ function RiesgosTanque({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["diagnostics", "common", "errors"]);
   /* El título de una regla sin evaluar, y el nombre de la señal que le faltó. */
-  const { noEvaluable: tituloDeRegla } = useProsa();
+  const { noEvaluable: tituloDeRegla, mecanismo: traducirMecanismoSuelto } = useProsa();
   const { senal } = useDominio();
   const { sistema, loading, error, lastUpdated } = useSistemaAgua();
   const { theme: t } = useTheme();
@@ -691,7 +699,7 @@ function RiesgosTanque({ onNavigate }) {
               {pronostico.noEvaluables.map((n) => (
                 <li key={n.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                   <HelpCircle size={15} color={t.textFaint} style={{ flexShrink: 0 }} />
-                  <span style={{ color: t.text }}>{n.componente}</span>
+                  <span style={{ color: t.text }}>{traducirMecanismoSuelto(n).componente}</span>
                   <span style={{ color: t.textFaint }}>
                     {traducir("diagnostics:risks.missing", { falta: n.falta })}
                   </span>
