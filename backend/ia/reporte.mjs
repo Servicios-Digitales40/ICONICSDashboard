@@ -298,6 +298,38 @@ function colorEstado(estado = '') {
   return GRIS
 }
 
+/**
+ * Síntesis en una frase, CALCULADA EN CÓDIGO a partir de lo que ya trae el
+ * reporte — nunca depende de que el modelo escriba nada.
+ *
+ * Nació porque el "Resumen del asistente" sólo aparece si el modelo pasa
+ * `explicacion`, y el modelo pequeño a menudo no la escribe: el reporte salía
+ * sin una sola línea que lo resumiera. Esto garantiza que SIEMPRE haya un
+ * arranque legible, y además es honesto cuando el historiador está caído: dice
+ * cuántos gráficos se quedaron sin muestras en vez de callarlo.
+ */
+function sintesisAutomatica(tablaActual, graficos) {
+  const partes = []
+  if (tablaActual?.length) {
+    const fuera = tablaActual.filter((f) => /crit|alarm|daño|dano|aten|aviso|zona c|zona d/i.test(String(f.estado))).length
+    const sinDato = tablaActual.filter((f) => f.valor === null || f.valor === undefined || /sin dato/i.test(String(f.estado))).length
+    partes.push(
+      `${tablaActual.length} señal(es) con valor actual` +
+        (fuera ? `, ${fuera} fuera de banda` : ', todas en banda') +
+        (sinDato ? `, ${sinDato} sin dato` : '')
+    )
+  }
+  if (graficos?.length) {
+    const conSerie = graficos.filter((g) => g.svg).length
+    const sinSerie = graficos.length - conSerie
+    partes.push(
+      `${conSerie} de ${graficos.length} gráfico(s) con serie histórica` +
+        (sinSerie ? `; ${sinSerie} sin muestras en el período` : '')
+    )
+  }
+  return partes.length ? `${partes.join('. ')}.` : null
+}
+
 /* ── Andamio común de documento ───────────────────────────────────── */
 function nuevoDocumento() {
   const doc = new PDFDocument({
@@ -349,6 +381,14 @@ export async function componerReportePdf({
   }))
 
   doc.addPage() // primera página de contenido
+
+  // Síntesis SIEMPRE presente, hecha en código: no depende de que el modelo
+  // escriba nada. Ver `sintesisAutomatica`.
+  const sintesis = sintesisAutomatica(tablaActual, graficos)
+  if (sintesis) {
+    tituloSeccion(doc, 'Síntesis')
+    cajaResumen(doc, sintesis)
+  }
 
   // Comentario del MODELO, si lo hay — distinto de `interpretacion`, que pone
   // el propio backend en cada gráfico más abajo. Con su procedencia dicha,
