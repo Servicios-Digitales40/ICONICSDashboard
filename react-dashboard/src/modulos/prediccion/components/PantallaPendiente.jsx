@@ -35,7 +35,7 @@ import { useTheme } from "@/theme";
 import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 
 /** El plan donde se sigue cada una de estas pantallas. */
-const PLAN = "docs/PLAN-19-MODULARIZACION.md";
+const PLAN = "docs/por-completar/PLAN-19-MODULARIZACION.md";
 
 /**
  * ── RECIBE UNA CLAVE, NO CUATRO LISTAS DE TEXTO ────────────────────

@@ -8,7 +8,7 @@
  * entrega sesenta y seis, repartidos en trece carpetas — pero esas carpetas
  * son las SECCIONES del programa del PLC (`Lista-variables.pdf`), no equipos
  * físicos, y agruparlas tal cual sería mostrar cómo está escrito el código,
- * no qué hay en el banco. Ver `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.2.3.
+ * no qué hay en el banco. Ver `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.2.3.
  * La vista de planta necesita «cosas» que enseñar y que se puedan pulsar,
  * igual que la maqueta necesita objetos que colocar en el suelo.
  *
@@ -44,7 +44,7 @@
  * (`DP_ESTADO_VFD`, `FRECUENCIA_VFD`, `MTTO_VFD`, `RESET_FALLA_VFD`,
  * `START_STOP_VFD`) — encajarían en `bombeo`, que ya existe, pero ninguna
  * fase de F0 a F5 los pide explícitamente
- * (`docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §1, tabla de F5) y añadirlos aquí
+ * (`docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md` §1, tabla de F5) y añadirlos aquí
  * sería ensanchar el alcance sin que el plan lo haya decidido. Quedan
  * pendientes para cuando se revise esa rama.
  *

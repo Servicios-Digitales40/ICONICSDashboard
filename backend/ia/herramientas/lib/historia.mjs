@@ -19,7 +19,7 @@
  * ── LAS TRES TRAMPAS DEL HISTORIADOR QUE ESTE ARCHIVO CONOCE ───────
  *
  * Están explicadas en detalle en los comentarios de cada función y en
- * `docs/PLAN-15-HISTORIA-PROFUNDA.md`, pero conviene saber que existen antes de
+ * `docs/completados/PLAN-15-HISTORIA-PROFUNDA.md`, pero conviene saber que existen antes de
  * tocar nada aquí:
  *
  *   · 100 muestras por petición es un tope DURO del servidor. Se pagina con

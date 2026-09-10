@@ -1,5 +1,16 @@
 # PLAN-19 — Modularización: Monitoreo y Diagnóstico / Predicción
 
+> **ESTADO — PARCIALMENTE COMPLETADO, RESTO BLOQUEADO (revisado
+> 10-09-2026).** F1 (frontera conceptual), F2 (Predicción fuera de Demo-EVA)
+> y F3 (`shared/modulos.js`) ya están en el código — confirmado:
+> `sec-prediccion` en `routes.jsx`, `react-dashboard/src/modulos/prediccion/`
+> y `shared/modulos.js` existen. F6 (aislamiento) parece cubierta por
+> `scripts/verificar-modulos.mjs`, aunque con otro nombre que el propuesto
+> aquí — no confirmado al detalle. **F4, F5 y F7 siguen `⛔ bloqueadas`**: 
+> dependen del contrato de la API de Leonardo Carrasco (§9), información
+> que este documento declara no tener. Bloqueo real y bien declarado, no
+> trabajo olvidado.
+
 ## 0. Por qué
 
 Hoy el repo tiene **un** producto con dos máquinas. La demo va a tener **dos
@@ -330,7 +341,7 @@ fuera una tercera instalación nuestra.
 - **No mete el compresor en `SISTEMAS`.** Ver §0.2.
 - **No construye el modelo predictivo.** Se consume el de Leonardo.
 - **No activa la autenticación.** Sigue siendo su propio plan (G11 en
-  [`PLAN-17`](PLAN-17-CERRAR-AUDITORIA.md)).
+  [`PLAN-17`](../completados/PLAN-17-CERRAR-AUDITORIA.md)).
 - **No arregla los tres defectos medidos el 03-09-2026** (narración de un 500
   como ausencia de historial; metadato `herramientas` obsoleto; `analisis_de_senal`
   aceptando `DKW` sin apoyo). Son de Monitoreo y van por su cuenta — aunque F3

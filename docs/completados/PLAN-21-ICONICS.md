@@ -1,5 +1,10 @@
 # Plan 21 · ICONICS — que el registro despache de verdad
 
+> **ESTADO — PLAN COMPLETADO (05-09-2026).** Las ocho fases están hechas,
+> cada una con su commit y su suite en verde (ver «Resultado» más abajo). Lo
+> que queda abierto (banda sombreada de F7, `puntosPorLote`, reintentos
+> contra el PLC, zona horaria real) está remitido explícitamente al Plan 26.
+
 > **De dónde sale.** De la auditoría del 04-09-2026, frente ICONICS, más dos
 > puntos prestados: `COD-05` (un solo motor de sondeo) porque es la misma pieza,
 > y `SEG-04` (inyección vía manuales) porque su arreglo toca el bucle del

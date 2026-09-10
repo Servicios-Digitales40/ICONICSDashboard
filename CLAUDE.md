@@ -25,7 +25,7 @@ regla.
    de planta entra por `backend/iconics/client.mjs`.
 
    **La acotación «de planta» es del 03-09-2026 y tiene dueño**
-   ([`docs/PLAN-19-MODULARIZACION.md`](docs/PLAN-19-MODULARIZACION.md) §0.1):
+   ([`docs/por-completar/PLAN-19-MODULARIZACION.md`](docs/por-completar/PLAN-19-MODULARIZACION.md) §0.1):
    el módulo de Predicción consume un compresor real por una API externa, no
    por ICONICS. La regla no se relaja, se acota — un módulo con otra fuente
    **la declara en `shared/modulos.js` y nunca mezcla su dato con el de
@@ -247,7 +247,7 @@ De ahí sale una regla concreta: **una máquina que no se lee por ICONICS no
 entra en `SISTEMAS`.** Meterla obligaría a que cada una de esas funciones
 tuviera una rama «ésta no es de ICONICS», que es exactamente el `if` repetido
 en cinco archivos que ese registro existe para evitar. Ver
-[`docs/PLAN-19-MODULARIZACION.md`](docs/PLAN-19-MODULARIZACION.md) §0.2.
+[`docs/por-completar/PLAN-19-MODULARIZACION.md`](docs/por-completar/PLAN-19-MODULARIZACION.md) §0.2.
 
 ## 5. Pruebas — qué existe y cuándo correrlas
 
@@ -383,8 +383,9 @@ verificadores de ambas instalaciones si el archivo es común a las dos.
 ## 6. Flujo de trabajo con Claude Code
 
 - **Commit por fase.** Cuando un trabajo se divide en fases (planes
-  `docs/PLAN-N-*.md`), cada fase se prueba y se comitea antes de pasar a la
-  siguiente — nunca un commit gigante al final.
+  `docs/{completados,por-completar}/PLAN-N-*.md` — un plan se archiva en la
+  carpeta que corresponda a su estado, nunca se borra), cada fase se prueba y
+  se comitea antes de pasar a la siguiente — nunca un commit gigante al final.
 - **No se hace push sin pedirlo explícitamente en ese turno.** Un commit
   autorizado antes no autoriza el siguiente push.
 - **Gaps se documentan, no se ocultan.** Si algo queda bloqueado (falta un
@@ -394,7 +395,7 @@ verificadores de ambas instalaciones si el archivo es común a las dos.
 - **Antes de mover o renombrar algo que "parece" un duplicado**, confirma
   leyendo la cabecera — este proyecto usa el patrón puerta (§4.2)
   deliberadamente, y no todo lo que comparte nombre es lo mismo dos veces
-  (ver `docs/PLAN-17-CERRAR-AUDITORIA.md`, sección de auditoría de
+  (ver `docs/completados/PLAN-17-CERRAR-AUDITORIA.md`, sección de auditoría de
   duplicados).
 
 ## 7. Referencias
@@ -405,4 +406,4 @@ verificadores de ambas instalaciones si el archivo es común a las dos.
 - [`shared/README.md`](shared/README.md) — mapa completo del dominio compartido
 - [`backend/README.md`](backend/README.md) — variables de entorno del servidor
 - [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md), [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — deuda conocida y priorizada
-- [`docs/PLAN-17-CERRAR-AUDITORIA.md`](docs/PLAN-17-CERRAR-AUDITORIA.md) — última auditoría de arquitectura completa
+- [`docs/completados/PLAN-17-CERRAR-AUDITORIA.md`](docs/completados/PLAN-17-CERRAR-AUDITORIA.md) — última auditoría de arquitectura completa

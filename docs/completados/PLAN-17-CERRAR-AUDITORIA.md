@@ -1,5 +1,13 @@
 # Plan 17 · Cerrar la auditoría del diagnóstico
 
+> **ESTADO — COMPLETADO, CON REENVÍOS A OTROS PLANES YA CERRADOS (revisado
+> 10-09-2026).** El tramo offline está cerrado (§8, C11 CERRADA el
+> 03-09-2026 para el modo de producción). Lo único "fuera de alcance" (§9)
+> es G11 (autenticación del cierre), remitido explícitamente a un plan
+> aparte — que resultó ser el Plan 22, ya completado. No es un documento
+> cerrable en aislamiento (encadena a Plan 20/21/22), pero no tiene trabajo
+> propio pendiente.
+
 > **Objetivo.** Que la banda que ve el técnico signifique lo que dice
 > significar. Hoy el ciclo completo del Plan 16 existe y no está simulado
 > —recorrido de punta a punta con datos reales—, pero está **conectado y mal

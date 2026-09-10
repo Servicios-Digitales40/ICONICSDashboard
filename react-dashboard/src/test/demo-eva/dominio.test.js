@@ -12,7 +12,7 @@
  *  1. **Ninguna señal sin serie propia puede colarse como historizada.** Es la
  *     regla dura del módulo: el historiador devuelve la curva de la temperatura
  *     del tanque para tres tags que no son la temperatura, sin dar error. Ver
- *     `domain/senales.js` y `docs/PLAN-8-DEMO-EVA.md` §1.3.
+ *     `domain/senales.js` y `docs/por-completar/PLAN-8-DEMO-EVA.md` §1.3.
  *  2. **Un hueco nunca se convierte en cero ni en un estado tranquilizador.**
  *  3. **El reposo silencia sólo lo que debe.** Sin esta regla la demo abre en
  *     rojo permanente; con ella de más, taparía una avería real.

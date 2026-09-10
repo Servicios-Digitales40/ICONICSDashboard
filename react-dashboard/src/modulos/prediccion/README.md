@@ -54,7 +54,7 @@ una medida. Ver la cabecera de `components/PantallaPendiente.jsx`.
 
 ## Lo que falta saber
 
-El detalle está en [`docs/PLAN-19-MODULARIZACION.md`](../../../../docs/PLAN-19-MODULARIZACION.md) §9.
+El detalle está en [`docs/por-completar/PLAN-19-MODULARIZACION.md`](../../../../docs/por-completar/PLAN-19-MODULARIZACION.md) §9.
 Lo más urgente:
 
 1. **El contrato de la API.** Hoy sólo conocemos dos endpoints.

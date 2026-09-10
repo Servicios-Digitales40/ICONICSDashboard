@@ -42,7 +42,7 @@
  * pisaba. Es el mismo fallo silencioso que el resto del archivo ya vigila,
  * un nivel más arriba: no un punto que cambia de nombre, sino UN SISTEMA
  * ENTERO que crece al lado de donde este guion mira. Ver
- * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.1.
+ * `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md` §0.1.
  *
  * Por eso, además de recorrer cada raíz hacia abajo, se explora una vez el
  * PADRE de cada raíz declarada y se listan sus ramas hijas que no

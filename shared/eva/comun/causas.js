@@ -9,7 +9,7 @@
  * pasa, qué se mira primero» — este archivo sólo lo saca de una frase en
  * prosa y lo pone en una forma que `diagnostico.mjs` (Fase 4) pueda puntuar y
  * ordenar, sin haber entrevistado a nadie ni inventado nada que no estuviera
- * ya escrito. Ver docs/PLAN-16-DIAGNOSTICO-RAG.md §3 para la decisión
+ * ya escrito. Ver docs/completados/PLAN-16-DIAGNOSTICO-RAG.md §3 para la decisión
  * completa.
  *
  * ── POR QUÉ NO TODOS LOS RIESGOS ESTÁN AQUÍ ─────────────────────────

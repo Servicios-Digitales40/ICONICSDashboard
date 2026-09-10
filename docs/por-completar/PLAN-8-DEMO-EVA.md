@@ -1,5 +1,13 @@
 # Plan 8 · Demo EVA · Sistemas de Agua Industrial
 
+> **ESTADO — PARCIALMENTE ABIERTO (revisado 10-09-2026).** La reorganización
+> de código que describe este plan terminó, superada por el Plan 18. Pero su
+> reserva de fondo sigue vigente hoy: `PROVISIONALES` en
+> `shared/eva/comun/umbrales.js` sigue en `true` — los umbrales operativos y
+> las unidades de tres señales que este plan dejó "pendiente de confirmar
+> por el usuario" nunca se confirmaron. No es trabajo de código; es una
+> confirmación que sólo puede dar quien opera la instalación.
+
 > ⚠️ **DOCUMENTO HISTÓRICO (actualizado 18-ago-2026).** Este plan se escribió
 > cuando Demo EVA era una sección dentro del tablero de OEE de Resonac, así que
 > se lee entero en contraste con aquél. **La transición terminó**: el tablero de

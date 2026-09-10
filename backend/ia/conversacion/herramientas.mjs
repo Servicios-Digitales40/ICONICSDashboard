@@ -58,7 +58,7 @@
  * —el punto histórico se nombra con `ac:` y no con `hda:`, el agregado es
  * `Average` y no `Interpolative`, hay tope de 100 muestras por petición, y
  * **tres de las ocho señales devuelven la serie de otra**— y un modelo de 4B
- * las inventa con aplomo. Están medidas en `docs/PLAN-8-DEMO-EVA.md` y
+ * las inventa con aplomo. Están medidas en `docs/por-completar/PLAN-8-DEMO-EVA.md` y
  * resueltas en `shared/eva/comun/historia.js`.
  *
  * Aquí el modelo elige QUÉ preguntar; el CÓMO lo sabe este archivo.

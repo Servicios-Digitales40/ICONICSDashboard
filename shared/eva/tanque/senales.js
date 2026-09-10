@@ -12,7 +12,7 @@
  * Porque no hay nada que reutilizar. Aquel describe 10 máquinas × 14 tags con
  * `Estado`, OEE y contadores de pieza; aquí el servidor ofrece **ocho señales
  * planas de un solo sistema**, sin estado, sin OEE y sin producción. No es un
- * catálogo distinto: es otra forma de datos. Ver `docs/PLAN-8-DEMO-EVA.md` §1.
+ * catálogo distinto: es otra forma de datos. Ver `docs/por-completar/PLAN-8-DEMO-EVA.md` §1.
  *
  * ── EL CAMPO `historizado` NO ES UN DETALLE ────────────────────────
  *
@@ -121,7 +121,7 @@ export const RAIZ = "ac:TDCON/DEMO/";
  * cambia de nombre.
  *
  * `SENSORES/` es la única que no viene del DB del PLC (§1.1 de
- * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`): es la capa de KPIs que ICONICS ya
+ * `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md`): es la capa de KPIs que ICONICS ya
  * calculaba antes de la reorganización, y de ahí que sea la única que no
  * tiene una sección correspondiente en `Lista-variables.pdf`.
  */
@@ -161,7 +161,7 @@ export const RAMAS = {
  *                "mando"/"consigna"/"crudo" se informan sin juzgar,
  *                "estado" usa la tabla común `ESTADO_EQUIPO`). "contador" y
  *                "sin_instrumento" siguen en el diseño de
- *                `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 sin ninguna señal
+ *                `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 sin ninguna señal
  *                que los use todavía.
  *   estadoActivo sólo con `naturaleza: "alarma"`: qué estado reporta cuando
  *                el bit está activo ("critico" si no se declara). Permite
@@ -343,7 +343,7 @@ const CATALOGO = [
    * ── PLAN 27 F3: LOS PRIMEROS PUNTOS DEL DB DEL PLC ──────────────────
    *
    * Hasta aquí, las ocho señales de siempre. Lo que sigue es la primera
-   * cosecha de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`: las ocho alarmas de
+   * cosecha de `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md`: las ocho alarmas de
    * `ALARMAS/` (Lista-variables.pdf §1.10) y los dos puntos de `SEGURIDAD/`.
    *
    * Los ocho bits de alarma SÍ se evalúan como una condición —`naturaleza:
@@ -1301,7 +1301,7 @@ export const ALARMAS = SENAL_KEYS.filter((k) => SENALES[k].naturaleza === "alarm
  * 09-09-2026 lo rompió — `/History` contra `ac:TDCON/DEMO/…` da 500 para
  * doce de las trece ramas nuevas; sólo el árbol PROPIO del historiador,
  * `hda:\Configuration\DEMO TANQUE\…`, contesta (ver §4 de
- * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`). Mismo hecho que ya sabía
+ * `docs/completados/PLAN-27-VARIABLES-DEL-TANQUE.md`). Mismo hecho que ya sabía
  * `vibraciones.js` de su propia máquina desde el 27-08-2026 —`hda:` es el
  * ARCHIVO, `ac:` es el VALOR EN VIVO—, sólo que aquí tardó un mes más en
  * hacerse cierto porque hasta la reorganización el redirect vivía

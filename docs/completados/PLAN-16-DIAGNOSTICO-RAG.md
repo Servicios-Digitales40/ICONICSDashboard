@@ -1,5 +1,10 @@
 # Plan 16 · Diagnóstico de fallas con tres fuentes
 
+> **ESTADO — PLAN COMPLETADO.** Las siete etapas (F0–F5, UI A, UI B) están
+> completadas y verificadas, sin dependencias externas pendientes: "el ciclo
+> completo del plan queda cerrado" (ver el cierre más abajo). Sin ítem
+> pendiente propio de este plan.
+
 > **Objetivo.** Que ante una condición anómala el tablero proponga una causa
 > probable cruzando **datos en vivo**, **manuales** y **casos resueltos antes**,
 > y que cada intervención de un técnico deje memoria en la planta en vez de

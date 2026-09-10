@@ -1,5 +1,14 @@
 # Plan 12 · Integrar `Gustavo` sobre `Moises` en una rama intermedia
 
+> **ESTADO — PROBABLEMENTE COMPLETADO, SIN CONFIRMACIÓN DOCUMENTAL (revisado
+> 10-09-2026).** El merge automatizable está hecho y en verde. La prueba en
+> pantalla del §6 (servidor ICONICS + los tres procesos de IA) nunca se
+> marcó `[x]` en este documento ni se confirmó en ninguno posterior — pero
+> el proyecto siguió construyendo 15 planes más sobre esta misma base sin
+> que se reportara ningún problema de esa integración, lo que sugiere que
+> sí se verificó en su momento, sin dejar registro. No se marca como
+> cerrado sin esa confirmación explícita.
+
 > **Objetivo.** Juntar en una sola rama las dos líneas de trabajo que salieron
 > del mismo punto (`99a3809`, `demo-3`) sin tocar ninguna de las dos ramas
 > originales: la UI/tablero de `Moises` y el asistente de voz, cola y

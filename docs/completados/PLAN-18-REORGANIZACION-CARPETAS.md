@@ -1,5 +1,12 @@
 # PLAN-18 — Reorganización de carpetas
 
+> **ESTADO — PLAN COMPLETADO.** Las seis fases (F0–F5, §9) están hechas y
+> verificadas: 153 pruebas de backend + 511 de frontend + `vite build` +
+> los verificadores de la tanda, todo en verde en cada fase. Sin ítem
+> pendiente propio de este plan; la única observación abierta (la prosa de
+> `shared/README.md` sobre `umbrales.js`/`historia.js`/`pronostico.js` en
+> `comun/`) es cosmética y no bloquea nada.
+
 ## 0. Por qué
 
 Varias carpetas están planas (`backend/ia/`, `shared/eva/`,

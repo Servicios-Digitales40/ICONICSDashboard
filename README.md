@@ -200,7 +200,7 @@ aplicación. Pasa por el motor de polling igual que el servidor real, así que
 ejercita la calidad OPC, los reintentos y la marca de dato rancio; lo único que
 cambia es de dónde salen los bytes. Vive en
 [`Demo-EVA/data/simulador.js`](react-dashboard/src/Demo-EVA/data/simulador.js) e
-incluye serie histórica. Ver [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md).
+incluye serie histórica. Ver [`docs/completados/PLAN-9-SIMULADOR-EVA.md`](docs/completados/PLAN-9-SIMULADOR-EVA.md).
 
 ### Banderas de compilación
 
@@ -391,9 +391,9 @@ node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 - [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md) — lo pendiente del backend, ordenado por lo que costaría la máquina #3
 - [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — lo pendiente del frontend, con las cifras medidas de duplicación
 - [`docs/MEJORAS-ASISTENTE.md`](docs/MEJORAS-ASISTENTE.md) — treinta mejoras para el asistente: veracidad, herramientas y capacidades
-- [`docs/PLAN-8-DEMO-EVA.md`](docs/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
-- [`docs/PLAN-9-SIMULADOR-EVA.md`](docs/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
-- [`docs/PLAN-10-VISTA-SVG.md`](docs/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
-- [`docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md`](docs/PLAN-11-SELECTOR-RANGO-HISTORIA.md) — el selector de rango del historiador
-- [`docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md`](docs/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md) — cómo se juntaron las dos ramas
+- [`docs/por-completar/PLAN-8-DEMO-EVA.md`](docs/por-completar/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
+- [`docs/completados/PLAN-9-SIMULADOR-EVA.md`](docs/completados/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
+- [`docs/completados/PLAN-10-VISTA-SVG.md`](docs/completados/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
+- [`docs/completados/PLAN-11-SELECTOR-RANGO-HISTORIA.md`](docs/completados/PLAN-11-SELECTOR-RANGO-HISTORIA.md) — el selector de rango del historiador
+- [`docs/por-completar/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md`](docs/por-completar/PLAN-12-INTEGRACION-MOISES-GUSTAVO.md) — cómo se juntaron las dos ramas
 - [`DESIGN.md`](DESIGN.md) — el sistema visual del tablero

@@ -14,7 +14,7 @@
  * de planta. Mientras el archivo viviera dentro de `Demo-EVA/`, esa
  * separación era una intención, no una estructura.
  *
- * Ver `docs/PLAN-19-MODULARIZACION.md` F2.
+ * Ver `docs/por-completar/PLAN-19-MODULARIZACION.md` F2.
  */
 /* Carga el diccionario de este modulo. Ver `modulos/prediccion/i18n.js`. */
 import "../i18n.js";

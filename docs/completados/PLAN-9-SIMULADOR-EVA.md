@@ -1,5 +1,10 @@
 # Plan 9 · El simulador aprende Demo EVA
 
+> **ESTADO — PLAN COMPLETADO.** El simulador que este plan construye existe
+> y sirve la instalación de agua (hoy en `Demo-EVA/data/tanque/simulador.js`,
+> tras el Plan 18). Sin ítem pendiente propio de este plan; "Lo que este
+> plan NO hace" es una exclusión de alcance declarada, no trabajo abierto.
+
 > ⚠️ **DOCUMENTO HISTÓRICO (actualizado 18-ago-2026).** Este plan se escribió
 > cuando convivían dos simuladores. El de Resonac, `lib/iconics/fakeTransport.js`,
 > **ya no existe**: se retiró con su tablero en agosto de 2026, y con él

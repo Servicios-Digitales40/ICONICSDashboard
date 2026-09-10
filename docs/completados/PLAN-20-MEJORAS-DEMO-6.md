@@ -1,5 +1,10 @@
 # Plan 20 · Mejoras Demo 6.0 — las diez primeras
 
+> **ESTADO — PLAN COMPLETADO (04-09-2026).** Las diez fases están hechas,
+> cada una con su commit y su suite en verde (ver «Resultado» más abajo). Lo
+> que queda abierto es trabajo de otros planes ya identificado (Plan 19 F4,
+> el plan de autenticación, el techo de bundle), no de éste.
+
 > **De dónde sale.** De la auditoría de la rama `Moises6` del 04-09-2026, que
 > propuso sesenta mejoras repartidas en seis frentes (código, seguridad,
 > asistente, ICONICS, usabilidad, funcionalidad nueva). Esto ejecuta las diez

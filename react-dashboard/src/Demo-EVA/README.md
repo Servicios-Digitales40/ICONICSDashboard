@@ -24,7 +24,7 @@ La **Maqueta 3D** reproduce el skid real, a partir de un dibujo del equipo que
 está en [`react-dashboard/img/`](../../img/). Hubo brevemente una quinta vista
 que dibujaba esa misma instalación en SVG, para comparar los dos medios; se
 comparó y ganó la maqueta. El porqué, y lo que la comparación dejó en el
-código, está en [`docs/PLAN-10-VISTA-SVG.md`](../../../docs/PLAN-10-VISTA-SVG.md).
+código, está en [`docs/completados/PLAN-10-VISTA-SVG.md`](../../../docs/completados/PLAN-10-VISTA-SVG.md).
 
 Nació como una sección más dentro del tablero de OEE de Resonac; en agosto de
 2026 aquél se retiró y esto pasó a ser todo lo que hay. De ahí que el módulo
@@ -32,7 +32,7 @@ siga siendo una isla autocontenida: las convenciones de más abajo son las que
 lo mantuvieron separable, y ese aislamiento es lo que hizo barata la transición.
 
 El plan completo, con todo lo que se midió contra el servidor antes de escribir
-una línea, está en [`docs/PLAN-8-DEMO-EVA.md`](../../../docs/PLAN-8-DEMO-EVA.md).
+una línea, está en [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../../../docs/por-completar/PLAN-8-DEMO-EVA.md).
 
 ---
 
@@ -81,7 +81,7 @@ duro y la demo abriría en rojo permanente.
 El origen **Simulado** del Topbar sirve también este árbol desde
 [`data/simulador.js`](data/simulador.js): las ocho señales en vivo y la serie de
 las cuatro historizadas, sin red y sin backend. Ver
-[`docs/PLAN-9-SIMULADOR-EVA.md`](../../../docs/PLAN-9-SIMULADOR-EVA.md).
+[`docs/completados/PLAN-9-SIMULADOR-EVA.md`](../../../docs/completados/PLAN-9-SIMULADOR-EVA.md).
 
 ```bash
 VITE_ENABLE_SIMULATOR=true npm run dev   # el botón «Simulado» del Topbar

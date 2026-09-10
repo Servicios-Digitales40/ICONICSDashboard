@@ -26,7 +26,7 @@
  * Eso implica CORS, una API-key que viaja en el bundle si algún día se exige,
  * y dos superficies que explicar en vez de una. La alternativa —proxy por el
  * puente, como `backend/iconics/`— está planteada en
- * `docs/PLAN-19-MODULARIZACION.md` F4, y está BLOQUEADA hasta saber si Django
+ * `docs/por-completar/PLAN-19-MODULARIZACION.md` F4, y está BLOQUEADA hasta saber si Django
  * es alcanzable desde el servidor del puente y no sólo desde la red del
  * navegador. Mientras tanto esto se queda como está, dicho en voz alta.
  */

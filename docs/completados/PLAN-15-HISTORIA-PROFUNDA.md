@@ -1,5 +1,11 @@
 # Plan 15 · Historia profunda: paginación real del historiador
 
+> **ESTADO — PLAN COMPLETADO.** Fases 1-4 cumplen el objetivo del plan "de
+> punta a punta y verificado contra el servidor real" (ver la cita más
+> abajo). Fases 5-7 (caché de días cerrados, antigüedad como capacidad del
+> backend, progreso incremental) quedan como mejoras de usabilidad
+> explícitamente no bloqueantes — no forman parte del objetivo cerrado.
+
 > **Objetivo.** Que cualquier período que el servidor guarde se pueda leer
 > completo y con la resolución máxima que ese período permita —un día, un
 > trimestre o un año— en vez de la ventana de 7 días y la única página de 100

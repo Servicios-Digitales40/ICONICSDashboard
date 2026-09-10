@@ -115,7 +115,7 @@ export const NAV_GROUPS = {
    * —donde estuvo hasta el 03-09-2026— la archivaba junto a Alarmas y
    * Assets, que sí son de este servidor.
    *
-   * Ver `docs/PLAN-19-MODULARIZACION.md` F1.
+   * Ver `docs/por-completar/PLAN-19-MODULARIZACION.md` F1.
    */
   "sec-prediccion": { icon: <BrainCircuit size={17} /> },
   // El origen de conocimiento del asistente, no una máquina: qué manuales
@@ -127,7 +127,7 @@ export const NAV_GROUPS = {
 
 /*
  * La demo de SISTEMAS DE AGUA INDUSTRIAL, sobre `ac:TDCON/DEMO/SENSORES/`.
- * Todo su código vive en `src/Demo-EVA/`. Ver docs/PLAN-8-DEMO-EVA.md.
+ * Todo su código vive en `src/Demo-EVA/`. Ver docs/por-completar/PLAN-8-DEMO-EVA.md.
  *
  * ── POR QUÉ TODAS VAN CON `lazy()` ─────────────────────────────────
  *
@@ -307,7 +307,7 @@ export const ROUTES = [
      * cuando esto era una prueba suelta. Dejó de serlo en cuanto pasó a ser
      * un módulo con su propia fuente de datos: «General» significa «del
      * servidor ICONICS, no de una máquina concreta», y esto no es ni lo uno
-     * ni lo otro. Ver `docs/PLAN-19-MODULARIZACION.md`.
+     * ni lo otro. Ver `docs/por-completar/PLAN-19-MODULARIZACION.md`.
      *
      * ── POR QUÉ «BETA» VA EN EL RÓTULO ─────────────────────────────────
      *
@@ -340,7 +340,7 @@ export const ROUTES = [
    * Están registradas desde ya, y no ocultas tras una bandera, porque la
    * estructura del módulo ES la entrega de esta fase: enseña el alcance
    * acordado y deja ver, de un vistazo, cuánto falta. Las cuatro se desbloquean
-   * con el contrato de la API (docs/PLAN-19-MODULARIZACION.md §9.1).
+   * con el contrato de la API (docs/por-completar/PLAN-19-MODULARIZACION.md §9.1).
    */
   {
     id: "pred-variables",

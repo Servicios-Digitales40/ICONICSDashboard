@@ -1,5 +1,11 @@
 # Plan 22 · Seguridad
 
+> **ESTADO — PLAN COMPLETADO (07-09-2026).** Las siete fases están hechas,
+> cada una con su commit y su suite en verde (ver «Resultado» más abajo). Lo
+> que queda abierto (federación OIDC, certificado real, pantalla de acceso,
+> encender los flags en producción) está remitido a Plan 25/26 o es una
+> decisión de despliegue, no trabajo de diseño o código de este plan.
+
 > **De dónde sale.** De la auditoría de `Moises6` del 04-09-2026, frente
 > seguridad. De sus diez puntos **ya hay tres hechos**, así que este plan cubre
 > los siete que quedan.

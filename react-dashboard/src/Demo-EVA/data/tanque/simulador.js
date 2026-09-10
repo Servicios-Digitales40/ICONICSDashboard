@@ -4,7 +4,7 @@
  *
  * Cumple la misma firma que el transporte real —`read(pointNames)`— más un
  * `readSerie()` que sustituye al historiador, y con eso el interruptor de origen
- * del Topbar sirve también esta sección. Ver docs/PLAN-9-SIMULADOR-EVA.md.
+ * del Topbar sirve también esta sección. Ver docs/completados/PLAN-9-SIMULADOR-EVA.md.
  *
  * ── QUÉ QUEDA AQUÍ DESPUÉS DE GENERALIZAR EL TRANSPORTE ────────────
  *

@@ -1,5 +1,13 @@
 # Plan 13 · Nueve mejoras de frontend: que el operador pueda fiarse de lo que ve
 
+> **ESTADO — PROBABLEMENTE COMPLETADO, SIN CONFIRMACIÓN DOCUMENTAL (revisado
+> 10-09-2026).** Las nueve fases están completadas y verificadas por código.
+> La revisión en pantalla del §6 (servidor ICONICS real) nunca se marcó
+> `[x]` aquí ni se confirmó en un documento posterior — pero el proyecto
+> siguió construyendo sobre esta misma base (Planes 15 en adelante) sin
+> reportar ningún problema, lo que sugiere que sí se verificó sin dejar
+> registro. No se marca como cerrado sin esa confirmación explícita.
+
 > **Objetivo.** Cerrar F1–F9 de la auditoría del 20-ago-2026. Son nueve cambios
 > con un hilo común: hoy el tablero enseña cifras y colores sin decir **de
 > cuándo son**, **de dónde sale el color** ni **qué significa un hueco**, y sin
