@@ -59,11 +59,76 @@
  *
  * `--dry-run` calcula todo y lo reporta SIN escribir nada — para revisar el
  * plan antes de tocar el servidor real.
+ *
+ * `--todas` cambia de las 5 señales originales (`historizadas()`, por `ac:`)
+ * a las 52 del catálogo completo del Plan 27 (por `hda:`, con la traducción
+ * de rama→carpeta y los dos overrides de nombre — ver la cabecera de
+ * `hdaPointName` más abajo). Excluye a propósito `cargaMotor` y
+ * `eficienciaEnergetica`: no tienen serie propia, la comparten con
+ * `temperaturaTanque`.
  */
 import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { historizadas, pointName, senalInfo } from '../shared/eva/tanque/senales.js'
+import { historizadas, pointName, senalInfo, SENALES, SENAL_KEYS } from '../shared/eva/tanque/senales.js'
 import { UMBRALES } from '../shared/eva/comun/umbrales.js'
+import { valorEn } from '../shared/eva/tanque/simulador.js'
+
+/**
+ * ── `--todas`: las 52 señales del árbol actual (Plan 27), no sólo las 5
+ * originales, y por `hda:` en vez de `ac:` ────────────────────────────
+ *
+ * La reorganización del 09-09-2026 dejó DOCE ramas nuevas sin `Historical
+ * data source` configurado sobre su `ac:` — `/History` les da 500 (ver §4 de
+ * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`) y sólo su nombre `hda:` propio
+ * funciona. Esta tabla traduce rama → carpeta del árbol `hda:` (confirmado
+ * por `browse()` el 09-09-2026); `OVERRIDE_TAG_HDA` cubre los dos tags que
+ * el propio servidor escribe distinto de como los declaramos: un typo
+ * (`DP_EENERGIA_APARENTEL1`, doble E) y una diferencia de mayúsculas
+ * (`MODO_AM_VDF`).
+ *
+ * `cargaMotor` y `eficienciaEnergetica` (rama `sensores`) se EXCLUYEN a
+ * propósito: son las dos señales de las que la cabecera de `senales.js`
+ * documenta que el historiador devuelve la serie de `temperaturaTanque` —
+ * escribirles un histórico propio significaría escribir sobre esa serie
+ * ajena, o contra un `ac:` sin destino conocido. `tensionLinea` es la
+ * excepción de la excepción: su `Historical data source` SÍ está configurado,
+ * contra el punto suelto de la raíz `hda:...DEMO TANQUE:Tension` — confirmado
+ * el 09-09-2026 con datos reales de julio ya presentes ahí.
+ */
+const B = String.fromCharCode(92)
+const RAIZ_HDA = `hda:${B}Configuration${B}DEMO TANQUE${B}`
+const RAIZ_HDA_SUELTA = `hda:${B}Configuration${B}DEMO TANQUE:`
+
+const RAMA_A_CARPETA_HDA = {
+  instrumentacionProceso: 'INSTRUMENTACION_PROCESO',
+  seguridad: 'SEGURIDAD',
+  mandoVariadorVfd: 'MANDO_DEL_VARIADOR_VFD',
+  solenoide1Inferior: 'SOLENOIDE_1',
+  solenoide2Superior: 'SOLENOIDE_2',
+  bombaDeAire: 'BOMBA_DE_AIRE',
+  automatismoLlenadoVacio: 'AUTOMATISMO_LLENADO_VACIADO',
+  lecturaVariadorModbusRtu: 'LECTURA_VARIADOR_MODBUS_RTU',
+  medidorDeEnergia: 'MEDIDOR_DE_ENERGIA',
+  alarmas: 'ALARMAS',
+}
+
+const OVERRIDE_TAG_HDA = {
+  DP_ENERGIA_APARENTEL1: 'DP_EENERGIA_APARENTEL1',
+  Modo_AM_VDF: 'MODO_AM_VDF',
+}
+
+const EXCLUIDAS_TODAS = new Set(['cargaMotor', 'eficienciaEnergetica'])
+
+/** El nombre `hda:` de una señal, o `null` si se excluye a propósito. */
+function hdaPointName(clave) {
+  if (EXCLUIDAS_TODAS.has(clave)) return null
+  if (clave === 'tensionLinea') return `${RAIZ_HDA_SUELTA}Tension`
+  const info = SENALES[clave]
+  const carpeta = RAMA_A_CARPETA_HDA[info.rama]
+  if (!carpeta) return null
+  const tag = OVERRIDE_TAG_HDA[info.tag] ?? info.tag
+  return `${RAIZ_HDA}${carpeta}:${tag}`
+}
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -73,7 +138,7 @@ const c = {
 /* ── Argumentos ───────────────────────────────────────────────────── */
 
 function leerArgs(argv) {
-  const args = { intervaloMin: 5, horaInicio: 7, horaFin: 17, dryRun: false, limpiarAntes: true, zonaHorasUtc: 6 }
+  const args = { intervaloMin: 5, horaInicio: 7, horaFin: 17, dryRun: false, limpiarAntes: true, zonaHorasUtc: 6, todas: false, solo: null }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--desde') args.desde = argv[++i]
@@ -84,6 +149,10 @@ function leerArgs(argv) {
     else if (a === '--dry-run') args.dryRun = true
     else if (a === '--sin-limpiar') args.limpiarAntes = false
     else if (a === '--zona-horas-utc') args.zonaHorasUtc = Number(argv[++i])
+    else if (a === '--todas') args.todas = true
+    // Repetir sólo una clave concreta (--todas es implícito: usa hda: y valorEn) —
+    // para un reintento quirúrgico sin volver a tocar las señales que ya salieron bien.
+    else if (a === '--solo') { args.solo = argv[++i]; args.todas = true }
   }
   return args
 }
@@ -225,8 +294,14 @@ console.log(`Días laborables: ${dias.map(d => d.toISOString().slice(0, 10)).joi
 console.log(`Horario: ${args.horaInicio}:00–${args.horaFin}:00 (hora local, UTC-${args.zonaHorasUtc}) cada ${args.intervaloMin} min`)
 console.log(`Ciclo de bombeo simulado: ${CICLO_MARCHA_MIN} min marcha / ${CICLO_PARO_MIN} min paro`)
 
-const claves = historizadas()
-console.log(`Señales: ${claves.map(k => senalInfo(k).label).join(', ')}\n`)
+const claves = args.solo
+  ? [args.solo]
+  : args.todas ? SENAL_KEYS.filter(k => hdaPointName(k) !== null) : historizadas()
+if (args.todas) {
+  const excluidas = SENAL_KEYS.filter(k => hdaPointName(k) === null)
+  console.log(`${c.amarillo}Excluidas a propósito: ${excluidas.map(k => senalInfo(k).label).join(', ')}${c.reset}`)
+}
+console.log(`Señales: ${claves.map(k => senalInfo(k).label).join(', ')} (${claves.length})\n`)
 
 /** Plan por señal: [{ timestamp, value }]. */
 const planPorSenal = {}
@@ -247,9 +322,12 @@ for (let diaIdx = 0; diaIdx < dias.length; diaIdx++) {
     ts.setUTCMinutes(Math.round(horaUtc * 60))
 
     for (const clave of claves) {
-      const valor = valorSimulado(clave, { enJornada: true, minutoJornada: min, progresoSemana, rnd })
-      if (valor === null) continue
-      planPorSenal[clave].push({ timestamp: ts.toISOString(), value: Number(valor.toFixed(3)) })
+      const valor = args.todas
+        ? valorEn(clave, ts.getTime())
+        : valorSimulado(clave, { enJornada: true, minutoJornada: min, progresoSemana, rnd })
+      if (valor === null || valor === undefined) continue
+      const numero = typeof valor === 'boolean' ? (valor ? 1 : 0) : Number(valor)
+      planPorSenal[clave].push({ timestamp: ts.toISOString(), value: Number(numero.toFixed(3)) })
     }
   }
 }
@@ -304,7 +382,7 @@ async function deleteSamples(pn, timestamps) {
 }
 
 for (const clave of claves) {
-  const pn = pointName(clave)
+  const pn = args.todas ? hdaPointName(clave) : pointName(clave)
   const muestras = planPorSenal[clave]
   if (!muestras.length) continue
 
@@ -327,8 +405,22 @@ for (const clave of claves) {
       `\r${senalInfo(clave).label}: escribiendo ${Math.min(i + TAMANO_LOTE, muestras.length)}/${muestras.length}…`
     )
     try {
-      const resultado = await addSamples(pn, lote)
-      const ok = resultado.filter(r => r.success).length
+      let resultado = await addSamples(pn, lote)
+      let ok = resultado.filter(r => r.success).length
+      /*
+       * Medido el 09-09-2026 sobre `NIVEL_TANQUE`: un lote entero rechazado
+       * con "Bad - Entry Exists" pese a que el borrado previo del punto
+       * había respondido `ok` — contención transitoria del historiador (el
+       * punto es el más activo de todo el árbol, con colección en vivo cada
+       * pocos segundos). Un segundo `DeleteSamples` + reintento, ya sin esa
+       * contención, resuelve el lote sin intervención manual.
+       */
+      if (ok < lote.length) {
+        const timestampsLote = lote.map(m => m.timestamp)
+        await deleteSamples(pn, timestampsLote).catch(() => {})
+        resultado = await addSamples(pn, lote)
+        ok = resultado.filter(r => r.success).length
+      }
       escritas += ok
       fallidas += lote.length - ok
     } catch (e) {
