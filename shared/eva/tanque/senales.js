@@ -248,7 +248,7 @@ const CATALOGO = [
     decimales: 0,
     tipo: "booleano",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -368,7 +368,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -387,7 +387,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "atencion",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -406,7 +406,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -425,7 +425,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "atencion",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -444,7 +444,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "distribucion",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -463,7 +463,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "distribucion",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     // Sólo significa algo con la bomba en marcha: el PDF la define como
@@ -485,7 +485,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "distribucion",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     // Mismo motivo que faltaDePresion: el PDF la define "con bomba en marcha".
@@ -505,7 +505,7 @@ const CATALOGO = [
     naturaleza: "alarma",
     estadoActivo: "critico",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -527,7 +527,7 @@ const CATALOGO = [
     // a seis activos a una fase que no lo pedía — ver la cabecera de
     // `activos.js`.
     activo: "seguridad",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -553,7 +553,7 @@ const CATALOGO = [
     // cabecera de `estado.js`), porque su polaridad no está confirmada.
     // Plan 27 F5: activo propio («Seguridad») — ver la nota de `control`.
     activo: "seguridad",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -607,7 +607,7 @@ const CATALOGO = [
     decimales: 2,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -622,7 +622,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -637,7 +637,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     // Es un acumulador: sólo crece. Ni subir ni bajar es "bueno" o "malo" en
     // sí mismo, es el registro de lo consumido.
@@ -656,7 +656,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -672,7 +672,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -688,7 +688,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -703,7 +703,7 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -720,7 +720,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -740,7 +740,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -757,7 +757,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -774,7 +774,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -791,7 +791,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -808,7 +808,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     // Es un acumulador de parámetro fijo, no depende de si el motor impulsa
@@ -827,7 +827,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -844,7 +844,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -861,7 +861,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     // Parámetro fijo del variador, no una lectura de proceso: no depende de
@@ -880,7 +880,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "crudo",
     activo: "bombeo",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: true,
@@ -898,7 +898,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -916,7 +916,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -935,7 +935,7 @@ const CATALOGO = [
     // Sin `naturaleza`: es un modo de operación, no una orden puntual —mismo
     // trato que `modoVdf`, booleano genérico sin banda.
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -956,7 +956,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "consigna",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -973,7 +973,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "consigna",
     activo: "tanque",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1006,7 +1006,7 @@ const CATALOGO = [
     decimales: 0,
     tipo: "booleano",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1024,7 +1024,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1042,7 +1042,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1060,7 +1060,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "estado",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1078,7 +1078,7 @@ const CATALOGO = [
     decimales: 0,
     tipo: "booleano",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1096,7 +1096,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1114,7 +1114,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1132,7 +1132,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "estado",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1150,7 +1150,7 @@ const CATALOGO = [
     decimales: 0,
     tipo: "booleano",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1168,7 +1168,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1186,7 +1186,7 @@ const CATALOGO = [
     tipo: "booleano",
     naturaleza: "mando",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1204,7 +1204,7 @@ const CATALOGO = [
     tipo: "real",
     naturaleza: "estado",
     activo: "valvulasYAire",
-    historizado: false,
+    historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
@@ -1253,8 +1253,100 @@ export const TODOS_LOS_PUNTOS = SENAL_KEYS.map(pointName);
  */
 export const historizadas = () => SENAL_KEYS.filter((k) => SENALES[k].historizado);
 
+/**
+ * Las historizadas que además son MEDIDAS comparables entre sí: magnitudes
+ * reales sin `naturaleza` especial (una alarma, un mando, una consigna, un
+ * crudo sin escalar o un estado enumerado no son "una medida" en el sentido
+ * que necesita una banda de KPIs con sparkline, o un selector de "compara
+ * esta señal contra aquélla").
+ *
+ * Antes del Plan 27 F6 (10-09-2026) esto y `historizadas()` eran la misma
+ * lista —las cinco originales eran todas medidas—, así que nada la
+ * necesitaba. Historizar cuarenta y cinco señales más, la mayoría booleanas
+ * o crudas, separó las dos preguntas: «¿tiene serie propia?» ya no implica
+ * «¿es una cifra que tiene sentido comparar o graficar como KPI?». La UI que
+ * antes escribía `esHistorizada` para armar una banda de KPIs numérica
+ * —`Demo-EVA/lib/modelo.js`, `GraficaComparada.jsx`— tiene que preguntar
+ * esto, no aquello.
+ */
+export const historizadasMedidas = () =>
+  historizadas().filter((k) => SENALES[k].tipo === "real" && !SENALES[k].naturaleza);
+
 /** ¿Se puede pedir la serie de esta señal sin mentir? */
 export const esHistorizada = (key) => Boolean(SENALES[key]?.historizado);
+
+/**
+ * ── EL NOMBRE `hda:` DE LA SERIE, PORQUE YA NO ES EL MISMO QUE EL DE VIVO ──
+ * (Plan 27 F6, 10-09-2026)
+ *
+ * Hasta este commit `series.punto` de `sistemas.js` usaba `pointName` a
+ * secas: el punto histórico se pedía con el mismo nombre `ac:` que el de
+ * vivo, y así había sido desde el Plan 8. La reorganización del árbol del
+ * 09-09-2026 lo rompió — `/History` contra `ac:TDCON/DEMO/…` da 500 para
+ * doce de las trece ramas nuevas; sólo el árbol PROPIO del historiador,
+ * `hda:\Configuration\DEMO TANQUE\…`, contesta (ver §4 de
+ * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`). Mismo hecho que ya sabía
+ * `vibraciones.js` de su propia máquina desde el 27-08-2026 —`hda:` es el
+ * ARCHIVO, `ac:` es el VALOR EN VIVO—, sólo que aquí tardó un mes más en
+ * hacerse cierto porque hasta la reorganización el redirect vivía
+ * configurado en el propio activo del servidor.
+ *
+ * `RAMA_A_CARPETA_HDA` traduce rama → carpeta del árbol `hda:`, confirmado
+ * con `browse()` el 09-09-2026: LAS MISMAS trece carpetas, pero sin la
+ * partícula `_DE_`/`_INFERIOR`/`_SUPERIOR` que sí lleva `ac:` en cuatro de
+ * ellas. `OVERRIDE_TAG_HDA` cubre los dos tags que además el propio servidor
+ * escribe distinto de como se declaran aquí: un typo real de planta
+ * (`DP_EENERGIA_APARENTEL1`, doble E) y una diferencia de mayúsculas
+ * (`MODO_AM_VDF`) — confirmados los dos con `browse()`, no adivinados. No
+ * hay una regla que derive el uno del otro; por eso esto es tabla, no
+ * cálculo (tal como anticipaba el plan en su §F6).
+ *
+ * `cargaMotor` y `eficienciaEnergetica` quedan permanentemente fuera —por
+ * eso `historizado` sigue en `false` para ellas pese a estar en la rama
+ * `sensores` como `tensionLinea`—: son las dos de las que la cabecera de
+ * este archivo documenta que el historiador devuelve la serie de
+ * `temperaturaTanque`. `tensionLinea` es la excepción de la excepción: su
+ * `Historical data source` SÍ está configurado en el activo, contra el punto
+ * SUELTO de la raíz del árbol `hda:` (`Tension`, sin carpeta) — el mismo que
+ * ya se documentaba en agosto para `INDICE_DESVIACION_VOLTAJE`.
+ */
+const B = String.fromCharCode(92);
+const RAIZ_HDA = `hda:${B}Configuration${B}DEMO TANQUE${B}`;
+const RAIZ_HDA_SUELTA = `hda:${B}Configuration${B}DEMO TANQUE:`;
+
+const RAMA_A_CARPETA_HDA = {
+  instrumentacionProceso: "INSTRUMENTACION_PROCESO",
+  seguridad: "SEGURIDAD",
+  mandoVariadorVfd: "MANDO_DEL_VARIADOR_VFD",
+  solenoide1Inferior: "SOLENOIDE_1",
+  solenoide2Superior: "SOLENOIDE_2",
+  bombaDeAire: "BOMBA_DE_AIRE",
+  automatismoLlenadoVacio: "AUTOMATISMO_LLENADO_VACIADO",
+  lecturaVariadorModbusRtu: "LECTURA_VARIADOR_MODBUS_RTU",
+  medidorDeEnergia: "MEDIDOR_DE_ENERGIA",
+  alarmas: "ALARMAS",
+};
+
+const OVERRIDE_TAG_HDA = {
+  DP_ENERGIA_APARENTEL1: "DP_EENERGIA_APARENTEL1",
+  Modo_AM_VDF: "MODO_AM_VDF",
+};
+
+/**
+ * El nombre `hda:` de la serie de una señal — el que hay que pedir en
+ * `/History`, nunca el de `pointName()` salvo para `tensionLinea`. Devuelve
+ * `null` si la señal no tiene serie propia (`historizado: false`) o si su
+ * rama no tiene carpeta conocida en el árbol `hda:`.
+ */
+export function puntoHistorico(key) {
+  if (!esHistorizada(key)) return null;
+  if (key === "tensionLinea") return `${RAIZ_HDA_SUELTA}Tension`;
+  const s = SENALES[key];
+  const carpeta = RAMA_A_CARPETA_HDA[s.rama];
+  if (!carpeta) return null;
+  const tag = OVERRIDE_TAG_HDA[s.tag] ?? s.tag;
+  return `${RAIZ_HDA}${carpeta}:${tag}`;
+}
 
 /**
  * Nombre de punto COMPLETO → clave de dominio. Se construye una vez, contra
@@ -1276,4 +1368,23 @@ const DOMINIO_POR_PUNTO = Object.fromEntries(
 export function parsePointName(name) {
   if (typeof name !== "string") return null;
   return DOMINIO_POR_PUNTO[name] ?? null;
+}
+
+/**
+ * Inverso de `puntoHistorico` (Plan 27 F6). Se construye por separado de
+ * `DOMINIO_POR_PUNTO` porque el nombre histórico no es el mismo que el de
+ * vivo para casi ninguna señal desde la reorganización del 09-09-2026 —
+ * unificar las dos tablas confundiría un punto `ac:` con uno `hda:` que da
+ * la casualidad de que empieza distinto pero podría no hacerlo. Lo usa el
+ * transporte falso (`ICONICS_FAKE=true`) para reconocer contra qué señal
+ * está pidiendo historia una llamada real del código, no del catálogo.
+ */
+const DOMINIO_POR_PUNTO_HISTORICO = Object.fromEntries(
+  SENAL_KEYS.map((k) => [puntoHistorico(k), k]).filter(([punto]) => punto !== null)
+);
+
+/** Inverso de `puntoHistorico`. `null` ante cualquier nombre que no reconozca. */
+export function parsePuntoHistorico(name) {
+  if (typeof name !== "string") return null;
+  return DOMINIO_POR_PUNTO_HISTORICO[name] ?? null;
 }

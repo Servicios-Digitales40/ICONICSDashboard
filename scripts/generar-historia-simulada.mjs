@@ -61,74 +61,19 @@
  * plan antes de tocar el servidor real.
  *
  * `--todas` cambia de las 5 señales originales (`historizadas()`, por `ac:`)
- * a las 52 del catálogo completo del Plan 27 (por `hda:`, con la traducción
- * de rama→carpeta y los dos overrides de nombre — ver la cabecera de
- * `hdaPointName` más abajo). Excluye a propósito `cargaMotor` y
- * `eficienciaEnergetica`: no tienen serie propia, la comparten con
- * `temperaturaTanque`.
+ * a las 50 del catálogo completo del Plan 27 que ya tienen serie propia
+ * confirmada (F6, 10-09-2026) — por `hda:`, con el nombre que da
+ * `puntoHistorico()` del propio catálogo (`shared/eva/tanque/senales.js`):
+ * la tabla rama→carpeta y los dos overrides de nombre viven ahí, no aquí,
+ * porque el backend y el frontend necesitan exactamente la misma traducción
+ * para leer lo que este guion escribe (§2.6 de `CLAUDE.md`: el dominio
+ * compartido no se duplica).
  */
 import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { historizadas, pointName, senalInfo, SENALES, SENAL_KEYS } from '../shared/eva/tanque/senales.js'
+import { historizadas, pointName, senalInfo, puntoHistorico, SENAL_KEYS } from '../shared/eva/tanque/senales.js'
 import { UMBRALES } from '../shared/eva/comun/umbrales.js'
 import { valorEn } from '../shared/eva/tanque/simulador.js'
-
-/**
- * ── `--todas`: las 52 señales del árbol actual (Plan 27), no sólo las 5
- * originales, y por `hda:` en vez de `ac:` ────────────────────────────
- *
- * La reorganización del 09-09-2026 dejó DOCE ramas nuevas sin `Historical
- * data source` configurado sobre su `ac:` — `/History` les da 500 (ver §4 de
- * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`) y sólo su nombre `hda:` propio
- * funciona. Esta tabla traduce rama → carpeta del árbol `hda:` (confirmado
- * por `browse()` el 09-09-2026); `OVERRIDE_TAG_HDA` cubre los dos tags que
- * el propio servidor escribe distinto de como los declaramos: un typo
- * (`DP_EENERGIA_APARENTEL1`, doble E) y una diferencia de mayúsculas
- * (`MODO_AM_VDF`).
- *
- * `cargaMotor` y `eficienciaEnergetica` (rama `sensores`) se EXCLUYEN a
- * propósito: son las dos señales de las que la cabecera de `senales.js`
- * documenta que el historiador devuelve la serie de `temperaturaTanque` —
- * escribirles un histórico propio significaría escribir sobre esa serie
- * ajena, o contra un `ac:` sin destino conocido. `tensionLinea` es la
- * excepción de la excepción: su `Historical data source` SÍ está configurado,
- * contra el punto suelto de la raíz `hda:...DEMO TANQUE:Tension` — confirmado
- * el 09-09-2026 con datos reales de julio ya presentes ahí.
- */
-const B = String.fromCharCode(92)
-const RAIZ_HDA = `hda:${B}Configuration${B}DEMO TANQUE${B}`
-const RAIZ_HDA_SUELTA = `hda:${B}Configuration${B}DEMO TANQUE:`
-
-const RAMA_A_CARPETA_HDA = {
-  instrumentacionProceso: 'INSTRUMENTACION_PROCESO',
-  seguridad: 'SEGURIDAD',
-  mandoVariadorVfd: 'MANDO_DEL_VARIADOR_VFD',
-  solenoide1Inferior: 'SOLENOIDE_1',
-  solenoide2Superior: 'SOLENOIDE_2',
-  bombaDeAire: 'BOMBA_DE_AIRE',
-  automatismoLlenadoVacio: 'AUTOMATISMO_LLENADO_VACIADO',
-  lecturaVariadorModbusRtu: 'LECTURA_VARIADOR_MODBUS_RTU',
-  medidorDeEnergia: 'MEDIDOR_DE_ENERGIA',
-  alarmas: 'ALARMAS',
-}
-
-const OVERRIDE_TAG_HDA = {
-  DP_ENERGIA_APARENTEL1: 'DP_EENERGIA_APARENTEL1',
-  Modo_AM_VDF: 'MODO_AM_VDF',
-}
-
-const EXCLUIDAS_TODAS = new Set(['cargaMotor', 'eficienciaEnergetica'])
-
-/** El nombre `hda:` de una señal, o `null` si se excluye a propósito. */
-function hdaPointName(clave) {
-  if (EXCLUIDAS_TODAS.has(clave)) return null
-  if (clave === 'tensionLinea') return `${RAIZ_HDA_SUELTA}Tension`
-  const info = SENALES[clave]
-  const carpeta = RAMA_A_CARPETA_HDA[info.rama]
-  if (!carpeta) return null
-  const tag = OVERRIDE_TAG_HDA[info.tag] ?? info.tag
-  return `${RAIZ_HDA}${carpeta}:${tag}`
-}
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -296,9 +241,9 @@ console.log(`Ciclo de bombeo simulado: ${CICLO_MARCHA_MIN} min marcha / ${CICLO_
 
 const claves = args.solo
   ? [args.solo]
-  : args.todas ? SENAL_KEYS.filter(k => hdaPointName(k) !== null) : historizadas()
+  : args.todas ? SENAL_KEYS.filter(k => puntoHistorico(k) !== null) : historizadas()
 if (args.todas) {
-  const excluidas = SENAL_KEYS.filter(k => hdaPointName(k) === null)
+  const excluidas = SENAL_KEYS.filter(k => puntoHistorico(k) === null)
   console.log(`${c.amarillo}Excluidas a propósito: ${excluidas.map(k => senalInfo(k).label).join(', ')}${c.reset}`)
 }
 console.log(`Señales: ${claves.map(k => senalInfo(k).label).join(', ')} (${claves.length})\n`)
@@ -382,7 +327,7 @@ async function deleteSamples(pn, timestamps) {
 }
 
 for (const clave of claves) {
-  const pn = args.todas ? hdaPointName(clave) : pointName(clave)
+  const pn = args.todas ? puntoHistorico(clave) : pointName(clave)
   const muestras = planPorSenal[clave]
   if (!muestras.length) continue
 

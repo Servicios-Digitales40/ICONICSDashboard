@@ -3,11 +3,17 @@
  * hoy sólo puede contestar el asistente (`correlacionar_senales`), aquí
  * mirable directamente.
  *
- * Sólo hay CUATRO señales con serie propia en el historiador, y viven en DOS
- * activos distintos —Tanque (nivel, temperatura) y Distribución (caudal,
- * presión)—, así que esta pieza vive fuera de la rejilla por pestaña de
- * `DetalleActivo.jsx`: comparar nivel contra presión cruza justo la frontera
- * que las pestañas existen para trazar.
+ * Nació con CUATRO señales con serie propia en el historiador, dos activos
+ * —Tanque (nivel, temperatura) y Distribución (caudal, presión)—, así que
+ * esta pieza vive fuera de la rejilla por pestaña de `DetalleActivo.jsx`:
+ * comparar nivel contra presión cruza justo la frontera que las pestañas
+ * existen para trazar. El Plan 27 F6 (10-09-2026) historizó cuarenta y cinco
+ * señales más, pero la mayoría son booleanas (mandos, alarmas) o registros
+ * Modbus sin escalar (`naturaleza: "crudo"`) — comparar una alarma de 0/1
+ * contra un nivel en % no es una pregunta que esta pieza sepa contestar, así
+ * que `CLAVES_COMPARABLES` sigue acotada a magnitudes medidas de verdad:
+ * `tipo === "real"` y sin `naturaleza` declarada (ninguna de las especiales
+ * — alarma, mando, consigna, crudo, estado — es una medida).
  *
  * ── LOS DOS MODOS, Y POR QUÉ EL SEGUNDO EXISTE ───────────────────────
  *
@@ -17,9 +23,7 @@
  *
  * Normalizado a 0-100 % de su ESCALA declarada: hasta CUATRO a la vez, todas
  * en un solo eje. Existe porque nivel (%) y caudal (sin unidad declarada) no
- * se pueden comparar en valor absoluto de ninguna manera razonable — sin
- * esto, la única comparación posible sería entre las dos únicas señales que
- * ya comparten % (nivel y eficiencia, que ni siquiera están las dos aquí).
+ * se pueden comparar en valor absoluto de ninguna manera razonable.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,14 +35,19 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { Card, MONO, PuntoEstado } from "../base.jsx";
 import { TooltipHistoria } from "./piezas.jsx";
 import { useSeriesHistoricas } from "../../data/comunes/hooks.js";
-import { SENALES, historizadas } from "../../domain/senales.js";
+import { SENALES, historizadasMedidas } from "../../domain/senales.js";
 import { combinarPorTolerancia, normalizarAEscala } from "../../lib/comparar.js";
 
 /** Un color de la paleta de DATOS por señal, en el orden en que se seleccionó — nunca un token de interfaz (`t.accent`, `t.coral`…): ver DESIGN.md, "La Regla de las Dos Paletas". */
 const colorDeSerie = (t, i) => [t.viz.azul, t.viz.ambar, t.viz.verde, t.viz.violeta][i % 4];
 
-/** Las cuatro claves con serie propia, en el orden fijo del catálogo — el mismo orden en todas las visitas, para que "la primera seleccionada" sea predecible. */
-const CLAVES_COMPARABLES = historizadas();
+/**
+ * Las claves con serie propia Y comparables entre sí, en el orden fijo del
+ * catálogo — el mismo orden en todas las visitas, para que "la primera
+ * seleccionada" sea predecible. Ver la cabecera del archivo sobre por qué
+ * `historizadas()` a secas incluiría alarmas, mandos y registros crudos.
+ */
+const CLAVES_COMPARABLES = historizadasMedidas();
 
 const MAX_SIN_NORMALIZAR = 2;
 const MAX_NORMALIZADO = 4;

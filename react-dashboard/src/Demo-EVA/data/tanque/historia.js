@@ -46,7 +46,7 @@ import {
 } from "@shared/eva/comun/historia.js";
 import { planificar } from "@shared/eva/comun/rango.js";
 
-import { esHistorizada, pointName, senalInfo } from "../../domain/senales.js";
+import { esHistorizada, puntoHistorico, senalInfo } from "../../domain/senales.js";
 
 export { MAX_PUNTOS, SIN_SERIE, VENTANA, intervaloHMS, normalizar };
 
@@ -105,7 +105,7 @@ export async function leerSerie(clave, rango = VENTANA) {
   // calculando su propio `interval` en vez de usar el del tramo.
   if (tramos.length === 1) {
     const segundos = Math.max(1, (fin.getTime() - inicio.getTime()) / 1000);
-    const respuesta = await fetchIconicsHistory(pointName(clave), {
+    const respuesta = await fetchIconicsHistory(puntoHistorico(clave), {
       startDate: inicio.toISOString(),
       endDate: fin.toISOString(),
       aggregate: AGREGADO,
@@ -133,7 +133,7 @@ export async function leerSerie(clave, rango = VENTANA) {
    */
   const respuestas = await conConcurrenciaAcotada(
     tramos.map(({ desde, hasta, interval }) => () =>
-      fetchIconicsHistory(pointName(clave), {
+      fetchIconicsHistory(puntoHistorico(clave), {
         startDate: desde.toISOString(),
         endDate: hasta.toISOString(),
         aggregate: AGREGADO,
@@ -221,7 +221,7 @@ export async function leerSeries(claves, rango = VENTANA) {
 
   const { inicio, fin } = resolverRango(rango);
   const respuesta = await fetchIconicsHistoryBatch(
-    pedibles.map((clave) => pointName(clave)),
+    pedibles.map((clave) => puntoHistorico(clave)),
     { startDate: inicio.toISOString(), endDate: fin.toISOString(), aggregate: AGREGADO }
   );
 
@@ -237,7 +237,7 @@ export async function leerSeries(claves, rango = VENTANA) {
 
   const series = respuesta.payload?.series ?? {};
   for (const clave of pedibles) {
-    const serie = series[pointName(clave)];
+    const serie = series[puntoHistorico(clave)];
     const datos = normalizar(serie?.data);
     /*
      * La cobertura viene CONTADA por el servidor, que es quien troceó: los

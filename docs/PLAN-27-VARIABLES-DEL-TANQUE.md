@@ -592,27 +592,45 @@ habilitado, `PARO_DE_EMERGENCIA` si se puede arrancar. Con `CONTROL` en esta
 rama es el único activo del tablero que enseña un mando además de un estado —
 y ya escribible desde antes de este plan, no por él (F7).
 
-### F6 · ⛔ La historia, con el namespace `hda:` — cuando traiga muestras
+### F6 · ✅ La historia, con el namespace `hda:` — cerrado el 10-09-2026
 
-Bloqueada por §4, y ya no por el servidor: `/History` contesta contra
-`hda:\Configuration\DEMO TANQUE\…`, que es el árbol correcto (§4). Lo que falta
-es que traiga al menos una muestra que se pueda contrastar.
+Cincuenta de las cincuenta y dos señales del catálogo tienen hoy `historizado:
+true`, con su nombre `hda:` propio en `puntoHistorico()`
+(`shared/eva/tanque/senales.js`). Quedan fuera, a propósito y para siempre,
+`cargaMotor` y `eficienciaEnergetica`: el historiador les sigue devolviendo la
+serie de `temperaturaTanque`, el mismo cruce que documenta la cabecera de
+`senales.js` desde agosto.
 
-Cada punto historizado del catálogo necesita, además de su `tag` bajo `ac:`,
-el nombre `hda:` de su serie — no se derivan el uno del otro por una regla fija
-(el ejemplo de agosto, `INDICE_DESVIACION_VOLTAJE` → `DEMO DANONE:Tension`, no
-sigue el patrón `carpeta\TAG` de los demás), así que es un campo más del
-catálogo, no un cálculo.
+**La tabla rama→carpeta**, confirmada con `browse()` contra el servidor real:
+las trece carpetas son las mismas en `ac:` y en `hda:`, salvo que cuatro
+pierden la partícula `_DE_`/`_INFERIOR`/`_SUPERIOR` en `hda:`
+(`INSTRUMENTACION_PROCESO`, `SOLENOIDE_1`, `SOLENOIDE_2`,
+`AUTOMATISMO_LLENADO_VACIADO`). **Dos nombres no derivan por regla fija**, tal
+como anticipaba esta sección: `DP_ENERGIA_APARENTEL1` es
+`DP_EENERGIA_APARENTEL1` en el servidor (typo real de planta, doble E) y
+`Modo_AM_VDF` es `MODO_AM_VDF` (mayúsculas). Los dos se confirmaron con
+`browse()`, no se adivinaron.
 
-Cuando una consulta `hda:` traiga muestras: recorrer punto por punto,
-contrastando la última contra la lectura en vivo del mismo tag —que es como se
-descubrió en agosto que tres señales devolvían la temperatura del tanque sin
-dar error—, y sólo entonces poner `historizado: true` donde corresponda.
+**El transporte falso (`ICONICS_FAKE=true`) necesitó su propio ajuste**:
+`fakeClient.mjs` resolvía el histórico con `parsePointName` (sólo reconoce
+`ac:`), y con el histórico pidiéndose ya por `hda:` dejó de encontrar la
+clave. `parsePuntoHistorico()` es su espejo, y `readHistory` prueba los dos.
 
-La sonda que produjo el inventario de §4 entra en `scripts/` junto a la de F0,
-ya con la doble consulta (`ac:` para el valor en vivo, `hda:` para la serie).
-El catálogo no se toca hasta que ella conteste con datos: una serie declarada
-de oídas es peor que una gráfica que falta.
+**Un efecto colateral real, no un bug**: `historizadas()` pasó de cinco a
+cincuenta, y varias piezas de la UI —la banda de KPIs (`Demo-EVA/lib/modelo.js`),
+el selector de "comparar señales" (`GraficaComparada.jsx`)— asumían que
+"tiene serie propia" equivalía a "es una medida continua que tiene sentido
+graficar o normalizar a 0-100 %". Con alarmas y mandos booleanos historizados,
+esa asunción rompía con `TypeError: v.toFixed is not a function`. Se separó en
+`historizadasMedidas()` (`tipo: "real"` sin `naturaleza` especial): doce
+señales, la banda de KPIs y el comparador. El selector de rango de
+`DetalleActivo.jsx` no necesitó el mismo filtro — mostrar un rango de fechas
+para ver la historia de una alarma sigue siendo una pregunta razonable, y
+ahora "Bombeo" también la puede contestar.
+
+La sonda de julio (`scripts/generar-historia-simulada.mjs --todas`) ya
+escribió un mes completo contra las cincuenta con este mismo mapeo, antes de
+que el mapeo se moviera al catálogo — ver el hallazgo de julio en §4.2.
 
 ### F7 · ⛔ La escritura de las DIECINUEVE variables nuevas NO entra en este plan
 

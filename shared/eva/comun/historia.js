@@ -13,21 +13,17 @@
  * Están medidas contra el servidor real (Plan 8 §1.3) y son la razón de que
  * esto viva en `shared/` en vez de repetirse en los dos lados:
  *
- * 1. **El punto histórico se nombra con `ac:`, igual que el de tiempo real.**
- *    La sintaxis `hda:\Configuration\…` que usaba el catálogo del tablero
- *    anterior responde 500 para este árbol, con las dos variantes de barra
- *    probadas. Por eso aquí el punto histórico se nombra con `pointName` y no
- *    hay un `historyPointName` aparte.
- *
- *    **Esto necesita reconfirmarse (Plan 27 §4, F6, aún sin cerrar).** El
- *    09-09-2026, con el árbol ya reorganizado, `ac:` volvió a dar 500 en
- *    `/History` y `hda:\Configuration\DEMO TANQUE\…` —el nuevo nombre del
- *    área, antes `DEMO DANONE`— respondió `ok: true` para los mismos puntos.
- *    Puede que la afirmación de este párrafo siguiera siendo cierta contra el
- *    árbol VIEJO y haya dejado de serlo con la reorganización, o que nunca lo
- *    fuera y la medición de entonces se confundiera con el mismo 500
- *    intermitente que hizo falta descartar ahora. No se toca el mecanismo
- *    hasta que F6 lo remida con datos de verdad.
+ * 1. **El punto histórico NO se nombra igual que el de tiempo real** — al
+ *    revés de lo que decía esta nota hasta el 10-09-2026. Fue cierto mientras
+ *    el redirect del historiador vivió configurado en el propio activo del
+ *    servidor; la reorganización del árbol del 09-09-2026 lo rompió para doce
+ *    de las trece ramas del tanque: `ac:TDCON/DEMO/…` da 500 en `/History`, y
+ *    sólo el árbol PROPIO del historiador, `hda:\Configuration\DEMO
+ *    TANQUE\…`, contesta (Plan 27 §4, cerrado en F6). Por eso el nombre
+ *    histórico es un campo del registro (`series.punto` en `sistemas.js`) y
+ *    no un cálculo desde `pointName` — `puntoHistorico()` en
+ *    `tanque/senales.js` trae la tabla rama→carpeta, con los dos nombres que
+ *    no derivan por regla fija.
  *
  * 2. **Sólo algunas señales tienen serie propia.** A las demás el historiador
  *    les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica hasta el último
@@ -36,7 +32,10 @@
  *
  *    Cuáles son vive en el catálogo (`historizado`), no en este texto: la
  *    lista cambia según lo que se configure en el Data Historian. Eran cuatro
- *    hasta el 24-08-2026, cuando `tensionLinea` pasó a servir la suya.
+ *    hasta el 24-08-2026, cuando `tensionLinea` pasó a servir la suya, y
+ *    cincuenta de cincuenta y dos desde el 10-09-2026 (Plan 27 F6) — quedan
+ *    fuera `cargaMotor` y `eficienciaEnergetica`, que comparten la de
+ *    `temperaturaTanque`.
  *
  * La segunda es la que hace peligroso compartir este archivo a medias. Un
  * asistente que se olvidara de la guarda no fallaría: contestaría, con

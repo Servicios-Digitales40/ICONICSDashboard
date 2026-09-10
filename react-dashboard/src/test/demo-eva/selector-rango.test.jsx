@@ -7,9 +7,12 @@
  * la vista real sobre el origen Simulado, sin red.
  *
  * Lo que se protege:
- *  1. El control sólo aparece donde hay algo que rangear (Tanque,
- *     Distribución) — Bombeo y Eléctrico no tienen señales historizadas y no
- *     deben mostrarlo, igual que ya no muestran `GraficaHistoria`.
+ *  1. El control sólo aparece donde hay algo que rangear. Hasta el Plan 27
+ *     F6 (10-09-2026) eso dejaba fuera a Bombeo —sin ninguna señal
+ *     historizada—; hoy los seis activos tienen al menos una, así que el
+ *     selector aparece en todos y lo que queda por proteger es que la vista
+ *     no lleva ninguna lista de activos escrita a mano, sino que pregunta al
+ *     catálogo.
  *  2. Los cuatro accesos marcan el que está activo, y «Tiempo real» —el que
  *     arranca activo— lee del búfer en vivo, no del historiador: se nota en
  *     la insignia de origen de la tarjeta («Sesión actual» vs «Historiador»).
@@ -65,25 +68,16 @@ describe("selector de rango: dónde aparece", () => {
     expect(screen.getByRole("button", { name: "Hace una semana" })).toBeTruthy();
   });
 
-  it.each(["bombeo"])("«%s» (sin señales historizadas) no muestra el selector", async (activo) => {
+  /*
+   * «electrico» ya lo mostraba desde el 24-08-2026 (tensión de línea).
+   * «bombeo» era la última que no: cero señales historizadas hasta el Plan
+   * 27 F6, que le dio serie propia al modo del variador, sus alarmas y las
+   * diez lecturas Modbus. Nada de esto está escrito en la vista — el
+   * selector aparece solo porque el catálogo dice que hay algo que rangear.
+   */
+  it.each(["electrico", "bombeo"])("«%s» muestra el selector: tiene al menos una señal con serie", async (activo) => {
     cortarLaRed();
     montar({ activo });
-
-    await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy());
-    expect(screen.queryByRole("group", { name: /Rango de tiempo/i })).toBeNull();
-  });
-
-  /*
-   * «electrico» SÍ lo muestra desde el 24-08-2026.
-   *
-   * Estaba en la lista de arriba porque ninguna de sus señales tenía serie
-   * propia. Al historizarse la tensión de línea, el activo pasó a tener una —y
-   * el selector aparece solo, que es justo lo que se quería del catálogo: la
-   * vista no lleva ninguna lista escrita a mano.
-   */
-  it("«electrico» sí lo muestra: la tensión de línea ya tiene serie", async () => {
-    cortarLaRed();
-    montar({ activo: "electrico" });
 
     await waitFor(() => expect(screen.getByRole("group", { name: /Rango de tiempo/i })).toBeTruthy());
   });

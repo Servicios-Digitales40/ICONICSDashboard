@@ -64,7 +64,7 @@
  * una prueba manual. Quien quiera ensayar un ICONICS caído para esto ya tiene
  * `client: null` o desenchufar `ICONICS_API_BASE` sin `ICONICS_FAKE`.
  */
-import { SENALES, esHistorizada, parsePointName } from '../../shared/eva/tanque/senales.js'
+import { SENALES, esHistorizada, parsePointName, parsePuntoHistorico } from '../../shared/eva/tanque/senales.js'
 import { MAX_PUNTOS } from '../../shared/eva/comun/historia.js'
 import { mediaDelTramo } from '../../shared/eva/tanque/simulador.js'
 import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/comun/sistemas.js'
@@ -283,7 +283,14 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
    * Plan 15.
    */
   async function readHistory({ pointName: nombrePunto, startDate, endDate, interval }) {
-    const clave = parsePointName(nombrePunto)
+    /*
+     * Plan 27 F6 (10-09-2026): el histórico del tanque ya no se pide con el
+     * nombre en vivo — `puntoHistorico` construye un `hda:...` distinto para
+     * casi toda señal—, así que `parsePointName` (que sólo conoce `ac:`) deja
+     * de bastar. `parsePuntoHistorico` es su espejo para el nombre `hda:`.
+     * Vibraciones ya necesitaba lo mismo desde antes; el tanque se suma aquí.
+     */
+    const clave = parsePointName(nombrePunto) ?? parsePuntoHistorico(nombrePunto)
     if (!clave) {
       /*
        * El punto puede ser de OTRA máquina dada de alta, y entonces el error

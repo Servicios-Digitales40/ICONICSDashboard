@@ -35,7 +35,7 @@ import assert from 'node:assert/strict'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName } from '../shared/eva/tanque/senales.js'
+import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName, puntoHistorico, historizadas } from '../shared/eva/tanque/senales.js'
 import { valorEn } from '../shared/eva/tanque/simulador.js'
 import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones/vibraciones.js'
 import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
@@ -253,7 +253,36 @@ await checkAsync('las historizadas sirven SU PROPIA serie', async () => {
   }
 })
 
-await checkAsync('las tres SIN historia reciben la serie de la temperatura, como el servidor real', async () => {
+await checkAsync('el nombre hda: (Plan 27 F6) también se reconoce, no sólo el ac: de siempre', async () => {
+  /*
+   * El camino real desde el 10-09-2026: `sistemas.js` pide la historia con
+   * `puntoHistorico()`, no con `pointName()` — un `hda:...` distinto para
+   * casi toda señal. Si el transporte falso sólo supiera resolver `ac:`
+   * (como hasta este commit), esta prueba fallaría con "unknown point" pese
+   * a que el código de producción funciona, porque el fixture estaría
+   * probando un camino que nadie usa ya.
+   */
+  const cliente = sinCaos()
+  for (const clave of ['nivelTanque', 'modoVdf', 'corrienteL1', 'estadoS1']) {
+    assert.ok(esHistorizada(clave), `${clave} debería estar historizada`)
+    const nombreHda = puntoHistorico(clave)
+    assert.ok(nombreHda.startsWith('hda:'), `${clave}: ${nombreHda}`)
+    const r = await cliente.readHistory({
+      pointName: nombreHda,
+      startDate: new Date(1_700_000_000_000 - 3_600_000).toISOString(),
+      endDate: new Date(1_700_000_000_000).toISOString(),
+      interval: '00:15:00',
+    })
+    assert.equal(r.ok, true, `${clave} (${nombreHda}): ${r.error}`)
+    assert.ok(r.data.length > 0, `${clave} sin muestras`)
+  }
+})
+
+await checkAsync('cincuenta señales, no cinco: F6 cerró la mayoría del catálogo', async () => {
+  assert.equal(historizadas().length, 50)
+})
+
+await checkAsync('las dos SIN historia reciben la serie de la temperatura, como el servidor real', async () => {
   /*
    * Es la invariante cara de este archivo: no falla, y eso es justo lo que
    * hay que reproducir. `herramientas.mjs` nunca deja que esto se llame para

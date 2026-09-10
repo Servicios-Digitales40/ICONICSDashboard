@@ -89,19 +89,16 @@ describe("catálogo de señales", () => {
      * devuelve la serie de STEMPERATURA_TANQUE. Si alguien marca una de más,
      * la vista pintaría la curva de la temperatura con otro rótulo y nadie lo
      * notaría — que es justo lo que pasó con `tensionLinea` hasta que se le
-     * configuró su `Historical data source` el 24-08-2026.
+     * configuró su `Historical data source` el 24-08-2026, y con las otras
+     * cuarenta y cinco hasta que el Plan 27 F6 (10-09-2026) confirmó su serie
+     * propia por `hda:`.
      *
-     * La lista NO es un número fijo: es lo que esté verificado en el servidor.
-     * Al historizar otra señal se añade aquí y se quita de abajo.
+     * El NÚMERO no es fijo: es lo que esté verificado en el servidor. Al
+     * historizar otra señal crece aquí y se quita de la lista de abajo.
      */
-    expect(historizadas().sort()).toEqual(
-      [
-        "flujoInstantaneo", "nivelTanque", "presionRelativa", "temperaturaTanque",
-        "tensionLinea",
-      ].sort()
-    );
+    expect(historizadas().length).toBe(50);
 
-    for (const key of ["cargaMotor", "eficienciaEnergetica", "modoVdf"]) {
+    for (const key of ["cargaMotor", "eficienciaEnergetica"]) {
       expect(esHistorizada(key), `${key} NO tiene serie propia en el historiador`).toBe(false);
     }
   });

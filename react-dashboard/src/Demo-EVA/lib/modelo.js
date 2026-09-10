@@ -20,7 +20,7 @@
  * no publica ni piezas ni tiempos, y rellenarlos sería inventarlos.
  */
 import { pideAtencion } from "../domain/estado.js";
-import { esHistorizada } from "../domain/senales.js";
+import { historizadasMedidas } from "../domain/senales.js";
 
 /**
  * Señales que piden que alguien mire ahora, de peor a mejor y agrupadas por
@@ -46,16 +46,23 @@ export function atencion(sistema) {
 }
 
 /**
- * Las cuatro señales de la banda de KPIs: **exactamente las que tienen serie
- * propia en el historiador**.
+ * La banda de KPIs: las señales con serie propia en el historiador que
+ * ADEMÁS son una medida —nunca una alarma, un mando, una consigna, un crudo
+ * sin escalar o un estado enumerado, ver `historizadasMedidas`—.
  *
- * No es una elección estética. Un stat tile lleva sparkline por contrato, y las
- * otras cuatro señales sólo pueden ofrecer el búfer de sesión, que arranca
- * vacío. Poniendo arriba las historizadas, la banda tiene tendencia desde el
- * primer segundo y las demás viven en la tarjeta de su activo, donde la
- * ausencia de serie se puede explicar con una línea.
+ * No es una elección estética. Un stat tile lleva sparkline y `Cifra` con
+ * `.toFixed()` por contrato: son magnitudes continuas, no un 0/1. Eran
+ * CUATRO señales, y sólo esas, mientras `esHistorizada` e `historizadasMedidas`
+ * fueron la misma lista (hasta el Plan 27 F6, 10-09-2026) — historizar
+ * cuarenta y cinco señales más, la mayoría booleanas, separó las dos
+ * preguntas. Las que no entran aquí viven en la tarjeta de su activo, donde
+ * su propio estado (Manual/Automático, Abierto/Cerrado…) se lee mejor que en
+ * un sparkline.
  */
-export const destacadas = (sistema) => sistema.lista.filter((s) => esHistorizada(s.key));
+export const destacadas = (sistema) => {
+  const medidas = new Set(historizadasMedidas());
+  return sistema.lista.filter((s) => medidas.has(s.key));
+};
 
 /**
  * Márgenes consumidos, de mayor a menor. Es lo que sustituye al Pareto.

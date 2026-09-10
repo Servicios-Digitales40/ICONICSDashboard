@@ -52,6 +52,7 @@ import {
   historizadas,
   parsePointName,
   pointName,
+  puntoHistorico,
 } from '../shared/eva/tanque/senales.js'
 import { PROVISIONALES } from '../shared/eva/comun/umbrales.js'
 import {
@@ -320,32 +321,23 @@ check('todos los puntos se nombran bajo la raíz de la demo', () => {
   }
 })
 
-check('el punto histórico es el de TIEMPO REAL, con ac: y no con hda:', () => {
-  // Medido contra el servidor: `hda:\Configuration\…` responde 500 para este
-  // árbol. Es la diferencia con el catálogo de Resonac, y la que hace que estas
-  // herramientas no puedan reutilizar `historyPointName`.
-  const p = pointName('nivelTanque')
-  assert.ok(p.startsWith('ac:'), 'tiene que empezar por ac:')
-  assert.ok(!p.includes('hda:'), 'hda: responde 500 en este árbol')
+check('el punto de TIEMPO REAL y el HISTÓRICO ya no son el mismo nombre (Plan 27 F6)', () => {
+  // Cierto hasta el 09-09-2026: el redirect del historiador vivía configurado
+  // en el activo del servidor, y `ac:` servía para las dos cosas. La
+  // reorganización del árbol lo rompió para doce de las trece ramas —
+  // `/History` contra `ac:` da 500, y sólo `hda:...DEMO TANQUE\…` contesta.
+  const vivo = pointName('nivelTanque')
+  const historico = puntoHistorico('nivelTanque')
+  assert.ok(vivo.startsWith('ac:'), 'el punto en vivo sigue siendo ac:')
+  assert.ok(historico.startsWith('hda:'), 'el punto histórico ya es hda:')
+  assert.notEqual(vivo, historico)
 })
 
 check('sólo las señales verificadas están marcadas como historizadas', () => {
-  assert.deepEqual(historizadas().sort(), [
-    'flujoInstantaneo', 'nivelTanque', 'presionRelativa', 'temperaturaTanque',
-    'tensionLinea',
-  ])
-  /*
-   * Las que el servidor sigue resolviendo a la serie de la temperatura.
-   *
-   * `tensionLinea` salió de esta lista el 24-08-2026: se le configuró el
-   * `Historical data source` del activo —`hda:\Configuration\DEMO DANONE:Tension`—
-   * y desde entonces sirve SU serie. Comprobado contra el servidor real: su
-   * histórico da ~121 V donde antes daba ~23, que era la temperatura.
-   *
-   * Las otras dos siguen sin recolectarse. El día que se les configure el
-   * mismo campo, se marcan arriba y se quitan de aquí — la lista no es un
-   * número fijo, es lo que esté verificado.
-   */
+  // Plan 27 F6 (10-09-2026): cincuenta de las cincuenta y dos, contra las
+  // cinco de antes — quedan fuera las dos de las que el servidor sigue
+  // resolviendo a la serie de la temperatura.
+  assert.equal(historizadas().length, 50)
   for (const k of ['cargaMotor', 'eficienciaEnergetica']) {
     assert.equal(esHistorizada(k), false, `${k} NO puede estar historizada`)
   }
@@ -1313,12 +1305,15 @@ await checkAsync('pedir la historia de una señal NO historizada no llega a la r
   assert.equal(client.historial.length, 0, 'NINGUNA pudo salir a la red')
 })
 
-await checkAsync('el modo del variador tampoco tiene serie', async () => {
+await checkAsync('el modo del variador ya tiene serie (Plan 27 F6)', async () => {
+  // Hasta el 10-09-2026 era el ejemplo de señal SIN historia; F6 le confirmó
+  // la suya (`hda:...MANDO_DEL_VARIADOR_VFD:MODO_AM_VDF`). Las dos que
+  // quedan sin serie propia son `cargaMotor` y `eficienciaEnergetica`.
   const client = clienteFalso()
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'modo del variador' })
 
-  assert.equal(r.ok, false)
-  assert.equal(client.historial.length, 0)
+  assert.equal(r.ok, true, r.error)
+  assert.equal(client.historial.length, 1)
 })
 
 await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', async () => {
@@ -1332,10 +1327,11 @@ await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', 
 
   assert.equal(client.historial.length, 4)
   for (const llamada of client.historial) {
-    // `Average` y no `Interpolative`: las ocho señales son magnitudes
-    // instantáneas y ninguna es acumulativa.
+    // `Average` y no `Interpolative`: las señales de este catálogo son
+    // magnitudes instantáneas y ninguna es acumulativa.
     assert.equal(llamada.aggregate, 'Average')
-    assert.ok(llamada.pointName.startsWith('ac:'), 'con ac:, no con hda:')
+    // Plan 27 F6: el histórico se pide con hda:, no con el nombre en vivo.
+    assert.ok(llamada.pointName.startsWith('hda:'), 'con hda:, no con ac:')
     assert.match(llamada.interval, /^\d{2}:\d{2}:\d{2}$/, 'el intervalo va como HH:MM:SS')
   }
 })
@@ -1750,8 +1746,11 @@ await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se 
     sintoma: 'algo va mal, no sé qué',
   })
   assert.equal(r.ok, true)
+  // Las cuatro PRIMERAS del catálogo con serie propia, en su orden — no las
+  // cuatro originales del Plan 8: desde que `modoVdf` se historizó (Plan 27
+  // F6), entra ella y sale `presionRelativa`, que pasó al quinto puesto.
   assert.deepEqual(r.senalesConsideradas.sort(), [
-    'Caudal instantáneo', 'Nivel del tanque', 'Presión relativa', 'Temperatura del tanque',
+    'Caudal instantáneo', 'Modo del variador', 'Nivel del tanque', 'Temperatura del tanque',
   ].sort())
   assert.match(r.nota, /no nombraba ninguna señal/i)
 })
@@ -1899,20 +1898,15 @@ await checkAsync(
 
     assert.equal(r.ok, true)
     // El reparto sale del catálogo, no de una lista escrita aquí: al historizar
-    // una señal más, pasa sola de la tabla al gráfico.
+    // una señal más, pasa sola de la tabla al gráfico. Plan 27 F6 (10-09-2026):
+    // cincuenta de las cincuenta y dos ya tienen serie propia por `hda:` — sólo
+    // quedan en tabla las dos que comparten la de `temperaturaTanque`.
     assert.deepEqual(r.senalesConGrafico.sort(), [
-      'Caudal instantáneo', 'Nivel del tanque', 'Presión relativa', 'Temperatura del tanque',
-      'Tensión de línea',
-    ].sort())
-    assert.deepEqual(r.senalesEnTabla.sort(), [
-      'Carga de trabajo del motor', 'Eficiencia energética', 'Modo del variador',
-      // Plan 27 F3: las diez primeras variables nuevas, todas sin historia
-      // propia todavía (`historizado: false` hasta que F6 lo confirme).
+      'Nivel del tanque', 'Temperatura del tanque', 'Modo del variador',
+      'Caudal instantáneo', 'Presión relativa', 'Tensión de línea',
       'Nivel alto-alto', 'Nivel alto', 'Nivel bajo-bajo', 'Nivel bajo',
       'Presión alta', 'Falta de presión', 'Bajo flujo', 'Falla del variador',
       'Mando del proceso', 'Paro de emergencia',
-      // Plan 27 F4: las veintidós de energía, variador y automatismo — ninguna
-      // historizada todavía, mismo motivo.
       'Corriente de línea (L1)', 'Potencia reactiva (L1)',
       'Energía aparente acumulada (L1)', 'Tensión de línea (L1-N)',
       'Máximo histórico de tensión (L1-N)', 'Potencia activa (L1)',
@@ -1923,13 +1917,15 @@ await checkAsync(
       'Consigna de frecuencia leída del variador', 'Potencia nominal parametrizada',
       'Tensión de salida hacia el motor', 'Orden de llenado', 'Orden de vaciado',
       'Recirculación automática', 'Consigna de llenado', 'Consigna de vaciado',
-      // Plan 27 F5: las doce de las electroválvulas y la bomba de aire.
       'Modo de la electroválvula inferior', 'Orden de la electroválvula inferior',
       'Bloqueo de mantenimiento (S1)', 'Estado de la electroválvula inferior',
       'Modo de la electroválvula superior', 'Orden de la electroválvula superior',
       'Bloqueo de mantenimiento (S2)', 'Estado de la electroválvula superior',
       'Modo de la bomba de aire', 'Orden de la bomba de aire',
       'Bloqueo de mantenimiento (bomba de aire)', 'Estado de la bomba de aire',
+    ].sort())
+    assert.deepEqual(r.senalesEnTabla.sort(), [
+      'Carga de trabajo del motor', 'Eficiencia energética',
     ].sort())
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo

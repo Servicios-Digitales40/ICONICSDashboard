@@ -29,7 +29,7 @@ import { useTheme } from "@/theme";
 
 import { useSeriesHistoricas, useSistemaAgua } from "../../data/comunes/hooks.js";
 import { VENTANA } from "../../data/tanque/historia.js";
-import { esHistorizada, historizadas } from "../../domain/senales.js";
+import { esHistorizada, historizadasMedidas } from "../../domain/senales.js";
 import { buildModeloEva } from "../../lib/modelo.js";
 import { useAhora } from "../../lib/useAhora.js";
 import { UltimaLectura } from "../../components/base.jsx";
@@ -115,11 +115,17 @@ function PlantaTanque({ onNavigate }) {
   // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
   const ahora = useAhora();
 
-  // Las cuatro series del historiador se piden UNA vez y se reparten: los
+  // Las series del historiador se piden UNA vez y se reparten: los
   // sparklines de la banda de KPIs, la tendencia del héroe y los cuatro
   // paneles de cierre leen todos de aquí. Pedirlas por componente serían tres
-  // rondas de cuatro peticiones para dibujar exactamente los mismos puntos.
-  const claves = useMemo(historizadas, []);
+  // rondas de peticiones para dibujar exactamente los mismos puntos.
+  //
+  // `historizadasMedidas`, no `historizadas` a secas (Plan 27 F6): esta vista
+  // sólo dibuja magnitudes continuas —sparkline, tendencia, delta—, nunca una
+  // alarma o un mando. Pedir la serie de las otras cuarenta y cinco sería
+  // tráfico real contra el historiador para datos que ningún componente de
+  // aquí abajo llega a leer.
+  const claves = useMemo(historizadasMedidas, []);
   /* `cobertura` se descartaba al desestructurar: el hook la traía desde que el
      troceado vive en el servidor, y la gráfica dibujaba un rango a medias como
      si estuviera entero. Ver `TendenciaSenales` (Plan 21 F7). */

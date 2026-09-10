@@ -111,7 +111,7 @@ import {
   esHistorizada as esHistorizadaTanque,
   historizadas as historizadasTanque,
   parsePointName,
-  pointName,
+  puntoHistorico as puntoHistoricoTanque,
 } from "../tanque/senales.js";
 import { valorDePunto } from "../tanque/simulador.js";
 import { estadoDelTanque, resumenTanqueParaAsistente } from "../tanque/estadoTanque.js";
@@ -176,26 +176,32 @@ export const SISTEMAS = [
      *
      * Estaba dentro de `historia.js`, escrita para el tanque: `ac:` y no
      * `hda:`, `Average` y no `Interpolative`. Otra máquina puede necesitar
-     * otra combinación —vibraciones ya sabe que su sitio es `hda:` el día que
-     * registre—, y con una sola copia la segunda tendría que elegir entre
-     * mentir o tocar el archivo de la primera.
+     * otra combinación, y con una sola copia la segunda tendría que elegir
+     * entre mentir o tocar el archivo de la primera.
      *
-     * `historizadas` es la puerta, y no una lista informativa: a TRES de las
-     * ocho señales el historiador les devuelve la serie de la temperatura del
-     * tanque, con marcas de tiempo correctas y sin dar error. Lo que no está
-     * aquí no se puede pedir.
+     * **Corregido el 10-09-2026 (Plan 27 F6):** hasta este commit `punto`
+     * era `pointName` a secas —el mismo nombre que en vivo—, que fue cierto
+     * mientras el redirect del historiador vivía configurado en el activo
+     * del servidor. La reorganización del árbol del 09-09-2026 lo rompió
+     * para doce de las trece ramas: hoy el tanque necesita su PROPIO nombre
+     * `hda:`, igual que ya lo necesitaba vibraciones desde el 27-08-2026.
+     * Ver `puntoHistorico` en `tanque/senales.js` para la tabla rama→carpeta
+     * y los dos nombres que no derivan por regla fija.
+     *
+     * `historizadas` es la puerta, y no una lista informativa: a DOS de las
+     * cincuenta y dos señales el historiador les devuelve la serie de la
+     * temperatura del tanque, con marcas de tiempo correctas y sin dar
+     * error. Lo que no está aquí no se puede pedir.
      */
     series: {
       historizadas: historizadasTanque,
-      ruta: "ac:",
+      ruta: "hda:",
       agregado: "Average",
-      /* En el tanque el punto histórico se pide con el MISMO nombre que en
-         vivo. En vibraciones no, y por eso esto es un campo del registro y no
-         una función importada por quien lee. Ver `puntoHistorico` allí. */
-      punto: pointName,
+      punto: puntoHistoricoTanque,
       nota:
-        "Cinco de las ocho señales tienen serie propia verificada. A las otras tres el " +
-        "historiador les devuelve la serie de la temperatura del tanque, sin dar error.",
+        "Cincuenta de las cincuenta y dos señales tienen serie propia verificada por rama. A las " +
+        "otras dos (carga del motor, eficiencia energética) el historiador les devuelve la serie " +
+        "de la temperatura del tanque, sin dar error.",
     },
     /** Mecanismos de desgaste acumulado, para el pronóstico. */
     desgaste: MECANISMOS,
