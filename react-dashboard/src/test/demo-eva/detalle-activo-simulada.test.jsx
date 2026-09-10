@@ -61,6 +61,17 @@ describe("Detalle de activo en modo simulado", () => {
     }
   );
 
+  it("Tanque no repite sus alarmas como tarjeta (Plan 27): viven en Alarmas → En vivo", async () => {
+    cortarLaRed();
+    montar({ activo: "tanque" });
+
+    await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy(), { timeout: 4_000 });
+
+    for (const tag of ["NIVEL_ALTO_ALTO", "NIVEL_ALTO", "NIVEL_BAJO_BAJO", "NIVEL_BAJO"]) {
+      expect(screen.queryByText(tag)).toBeNull();
+    }
+  });
+
   it("Bombeo no afirma «Historiador»: ninguna de sus dos señales tiene serie propia", async () => {
     const fetchTrampa = cortarLaRed();
 

@@ -60,7 +60,7 @@
     "eva-alarmas": {
       "title": "Alarms",
       "nav": "Alarms",
-      "sub": "Plant event history"
+      "sub": "The event history, and the live state of the PLC alarms"
     },
     "eva-assets": {
       "title": "Assets",

@@ -128,12 +128,20 @@ export function createSenal({
 function createActivo(id, porClave) {
   const meta = ACTIVOS[id];
   const senales = meta.senales.map((k) => porClave[k]).filter(Boolean);
+  const alarmas = senales.filter((s) => s.naturaleza === "alarma");
 
   return {
     ...meta,
     senales,
     estado: peor(senales.map((s) => s.estado)),
     sinDato: senales.filter((s) => s.estado === "sin_dato").length,
+    /*
+     * Resumen aparte del `estado` de arriba (que ya es "el peor de todas"):
+     * la vista de Planta necesita saber CUÁNTAS alarmas hay y cuántas están
+     * activas para pintar un indicador, no sólo si el activo está en rojo
+     * por otra razón. Ver `ALARMAS` en `senales.js` para el criterio.
+     */
+    alarmas: { total: alarmas.length, activas: alarmas.filter((s) => s.valor === true).length },
   };
 }
 

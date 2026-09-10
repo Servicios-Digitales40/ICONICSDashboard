@@ -1276,6 +1276,17 @@ export const historizadasMedidas = () =>
 export const esHistorizada = (key) => Boolean(SENALES[key]?.historizado);
 
 /**
+ * Las ocho señales `naturaleza: "alarma"` del PLC (Plan 27 F3), en el orden
+ * del catálogo. Vive aquí y no se recalcula donde se necesita —la vista de
+ * Planta, la de Detalle, la pestaña «En vivo» de Alarmas— porque las tres
+ * necesitan exactamente el mismo criterio: si un componente decidiera con su
+ * propio filtro, una alarma nueva entraría en una vista y no en la otra sin
+ * que nadie lo note. Ver `estado.js` para por qué `naturaleza: "alarma"` se
+ * juzga distinto de un booleano genérico.
+ */
+export const ALARMAS = SENAL_KEYS.filter((k) => SENALES[k].naturaleza === "alarma");
+
+/**
  * ── EL NOMBRE `hda:` DE LA SERIE, PORQUE YA NO ES EL MISMO QUE EL DE VIVO ──
  * (Plan 27 F6, 10-09-2026)
  *

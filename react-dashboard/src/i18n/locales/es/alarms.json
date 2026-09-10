@@ -1,5 +1,9 @@
 {
-  "sub": "El historial de eventos de la instalación — no un semáforo de alarmas activas",
+  "sub": "El historial de eventos de la instalación, y el estado en vivo de las alarmas del PLC",
+  "tabs": {
+    "historial": "Historial",
+    "vivo": "En vivo"
+  },
   "windows": {
     "h1": "Última hora",
     "h6": "6 horas",
@@ -9,5 +13,12 @@
   "empty": "Sin eventos en esta ventana.",
   "emptyForAsset": "Sin eventos en esta ventana para {{activo}}.",
   "allAssets": "Todos los activos",
-  "loading": "Consultando el historial de alarmas…"
+  "loading": "Consultando el historial de alarmas…",
+  "vivo": {
+    "sub": "El estado ahora mismo de las ocho alarmas del PLC, agrupadas por activo — a diferencia del Historial, esto sí es un semáforo en vivo.",
+    "loading": "Leyendo el estado de la instalación…",
+    "sinAlarmas": "Sin alarmas activas",
+    "activas_one": "{{count}} alarma activa",
+    "activas_other": "{{count}} alarmas activas"
+  }
 }

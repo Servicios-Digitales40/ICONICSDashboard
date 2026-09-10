@@ -278,6 +278,26 @@ describe("construcción del sistema", () => {
     expect(sistema.estado).toBe("critico");
   });
 
+  it("cada activo cuenta sus propias alarmas, total y activas (Plan 27)", () => {
+    // El tanque tiene cuatro señales `naturaleza: "alarma"`: nivelAltoAlto,
+    // nivelAlto, nivelBajoBajo, nivelBajo. Se activa sólo la primera.
+    const sistema = createSistema({
+      ...REAL_EN_REPOSO,
+      nivelAltoAlto: { value: true },
+      nivelAlto: { value: false },
+    });
+    const tanque = sistema.activos.find((a) => a.id === "tanque");
+    expect(tanque.alarmas).toEqual({ total: 4, activas: 1 });
+
+    // Bombeo tiene una sola alarma (fallaVariador), y aquí no se activa.
+    const bombeo = sistema.activos.find((a) => a.id === "bombeo");
+    expect(bombeo.alarmas).toEqual({ total: 1, activas: 0 });
+
+    // Eléctrico no tiene ninguna señal de alarma en su catálogo.
+    const electrico = sistema.activos.find((a) => a.id === "electrico");
+    expect(electrico.alarmas).toEqual({ total: 0, activas: 0 });
+  });
+
   it("una lectura ausente no se cuenta como medida ni contamina el resto", () => {
     const sistema = createSistema({ ...REAL_EN_REPOSO, nivelTanque: { value: null } });
     expect(sistema.senales.nivelTanque.estado).toBe("sin_dato");

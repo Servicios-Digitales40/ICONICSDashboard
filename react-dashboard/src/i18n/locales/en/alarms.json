@@ -1,5 +1,9 @@
 {
-  "sub": "The plant event history — not a live alarm panel",
+  "sub": "The plant event history, and the live state of the PLC alarms",
+  "tabs": {
+    "historial": "History",
+    "vivo": "Live"
+  },
   "windows": {
     "h1": "Last hour",
     "h6": "6 hours",
@@ -9,5 +13,12 @@
   "empty": "No events in this window.",
   "emptyForAsset": "No events in this window for {{activo}}.",
   "allAssets": "All assets",
-  "loading": "Querying the alarm history…"
+  "loading": "Querying the alarm history…",
+  "vivo": {
+    "sub": "The state right now of the eight PLC alarms, grouped by asset — unlike History, this is genuinely a live panel.",
+    "loading": "Reading the plant state…",
+    "sinAlarmas": "No active alarms",
+    "activas_one": "{{count}} active alarm",
+    "activas_other": "{{count}} active alarms"
+  }
 }

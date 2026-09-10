@@ -166,15 +166,20 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
           <Input icon={<Search size={14} />} placeholder="Buscar…" />
         </div> */}
 
-        {/* Contador de eventos, OCULTO temporalmente (2026-08-31): la vista
-            de Alarmas se ocultó del sidebar (ver `routes.jsx`, entrada
-            `eva-alarmas`) y este botón era la otra puerta hacia ella —
-            además de sondear `/api/iconics/alarms` cada 30s en TODAS las
-            pantallas, no sólo estando en Alarmas, así que dejar el botón
-            (aunque sin destino) habría seguido generando esas peticiones.
-            Para restaurar: descomentar, y volver a importar `Bell` de
-            lucide-react y `useAlarmCount` de `@/lib/iconics` arriba, con
-            `const alarmas1h = useAlarmCount();` antes del `return`.
+        {/* Contador de eventos, OCULTO (2026-08-31, sigue así el 10-09-2026):
+            la vista de Alarmas VOLVIÓ al sidebar (Plan 27, `routes.jsx`,
+            entrada `eva-alarmas`), pero este botón no vuelve con ella. Sigue
+            sondeando `/api/iconics/alarms` cada 30s en TODAS las pantallas
+            —no sólo estando en Alarmas—, y sigue contando el HISTORIAL de
+            GENESIS64, que ahora es sólo media página: la pestaña nueva («En
+            vivo») lee las ocho alarmas del PLC del sistema ya cargado, sin
+            pedir nada aparte. Un contador aquí que tuviera sentido para las
+            dos pestañas leería `activo.alarmas.activas` del sistema en vivo
+            (mismo dato que ya usa `TarjetaActivo`), no `useAlarmCount()`.
+            Para restaurar ESTE botón tal cual: descomentar, y volver a
+            importar `Bell` de lucide-react y `useAlarmCount` de
+            `@/lib/iconics` arriba, con `const alarmas1h = useAlarmCount();`
+            antes del `return`.
 
         <HoverTip label={alarmas1h ? `${alarmas1h} evento${alarmas1h === 1 ? "" : "s"} en la última hora · ver alarmas` : "Ver alarmas"}>
           <button

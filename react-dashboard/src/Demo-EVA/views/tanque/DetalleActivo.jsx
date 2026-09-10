@@ -32,7 +32,7 @@ import { ACTIVO_IDS } from "../../domain/activos.js";
 import { historizadas, senalInfo } from "../../domain/senales.js";
 import { useAhora } from "../../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../../components/base.jsx";
-import { estadoColor } from "../../components/paleta.js";
+import { estadoColor, TONO } from "../../components/paleta.js";
 import { DetalleGrid } from "../../components/detalle/DetalleGrid.jsx";
 import { GraficaComparada } from "../../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../../components/detalle/SelectorRango.jsx";
@@ -94,8 +94,11 @@ function leerRangoDeUrl(params) {
   return { presetActivo: preset, rango: calculador ? calculador() : VENTANA, personalizado: null };
 }
 
-function CabeceraActivo({ activo, dark, t, lastUpdated }) {
+function CabeceraActivo({ activo, dark, t, lastUpdated, onNavigate }) {
+  const { t: traducir } = useTranslation("machines");
   const { estado: estadoTexto, activo: activoTexto } = useDominio();
+  const alarmasActivas = activo.alarmas?.activas ?? 0;
+  const alerta = TONO.critico(t);
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -113,6 +116,21 @@ function CabeceraActivo({ activo, dark, t, lastUpdated }) {
         >
           {estadoTexto(activo.estado)}
         </span>
+        {alarmasActivas > 0 && (
+          <button
+            type="button"
+            onClick={() => onNavigate?.("eva-alarmas", { tab: "vivo", activo: activo.id })}
+            title={traducir("assetGrid.alarmsActive", { count: alarmasActivas })}
+            style={{
+              display: "flex", alignItems: "center", gap: 3, padding: "1px 9px", borderRadius: 999,
+              fontSize: 11, fontWeight: 700, color: alerta.texto, background: alerta.fondo,
+              border: `1px solid ${alerta.borde}`, cursor: "pointer",
+              fontFamily: "'IBM Plex Mono', monospace",
+            }}
+          >
+            {alarmasActivas}
+          </button>
+        )}
       </div>
       <UltimaLectura fecha={lastUpdated} t={t} />
     </div>
@@ -281,7 +299,7 @@ function DetalleActivo({ params, onNavigate }) {
       />
 
       <div role="tabpanel" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <CabeceraActivo activo={activo} dark={dark} t={t} lastUpdated={lastUpdated} />
+        <CabeceraActivo activo={activo} dark={dark} t={t} lastUpdated={lastUpdated} onNavigate={onNavigate} />
 
         {tieneHistoriadas && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>

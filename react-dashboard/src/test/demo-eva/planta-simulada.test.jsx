@@ -85,6 +85,20 @@ describe("Demo EVA en modo simulado", () => {
     expect(fetchTrampa).not.toHaveBeenCalled();
   });
 
+  it("las alarmas de proceso no salen como fila de la rejilla (Plan 27)", async () => {
+    // Viven en su propia sección (Alarmas → En vivo) desde este plan; la
+    // rejilla de activos sólo tiene que dejar de repetirlas como tarjeta,
+    // sin importar si están activas o no ahora mismo.
+    cortarLaRed();
+    montar();
+
+    await waitFor(() => expect(screen.getByText(/52 señales · 52 con lectura/)).toBeTruthy());
+
+    for (const tag of ["NIVEL_ALTO_ALTO", "NIVEL_ALTO", "NIVEL_BAJO_BAJO", "NIVEL_BAJO", "FALLA_VARIADOR_DE_FRECUENCIA"]) {
+      expect(screen.queryByText(tag)).toBeNull();
+    }
+  });
+
   it("el histórico lo sirve el simulador, no una petición que falla en silencio", async () => {
     /*
      * El histórico no pasa por el transporte en modo real —vive en

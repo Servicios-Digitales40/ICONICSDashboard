@@ -300,7 +300,9 @@
   "assetGrid": {
     "title": "Activos de la instalación",
     "code": "{{n}} activos · agrupación propia, el servidor no publica equipos",
-    "window": "mini-series: {{ventana}} en esta sesión"
+    "window": "mini-series: {{ventana}} en esta sesión",
+    "alarmsActive_one": "{{count}} alarma activa — ver",
+    "alarmsActive_other": "{{count}} alarmas activas — ver"
   },
   "signalsState": {
     "title": "Estado de las señales",

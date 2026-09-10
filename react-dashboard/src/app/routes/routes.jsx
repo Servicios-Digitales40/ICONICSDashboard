@@ -65,7 +65,7 @@
  */
 import { lazy } from "react";
 import {
-  Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, LayoutDashboard,
+  Bell, Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, LayoutDashboard,
   NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
@@ -237,23 +237,25 @@ export const ROUTES = [
   },
 
   {
-    // Historial, no un semáforo de alarmas activas — ver la cabecera de
-    // `data/comunes/alarmas.js`. `GET /api/iconics/alarms` es lo único que hay hoy:
-    // el evento "activo ahora" necesitaría otra llamada al servidor.
+    // Reactivada el 10-09-2026 (Plan 27): dos pestañas, no una. «Historial»
+    // sigue siendo lo de siempre —`GET /api/iconics/alarms`, eventos de
+    // GENESIS64, nunca un semáforo—; «En vivo» es nueva, las ocho señales
+    // `naturaleza: "alarma"` del PLC, que no tienen nada que ver con esa
+    // fuente. Ver la cabecera de `AlarmasEva.jsx`.
     //
-    // ── OCULTA DEL SIDEBAR (2026-08-31, TEMPORAL) ──────────────────────
+    // ── ESTUVO OCULTA DEL SIDEBAR (2026-08-31 a 2026-09-10) ─────────────
     //
-    // Sin `nav` para que no aparezca en el sidebar ni sea navegable desde
-    // ahí. El botón del Topbar que también llevaba aquí está comentado en
-    // `Topbar.jsx` por el mismo motivo — ese botón sondeaba el conteo de
-    // alarmas cada 30s en TODAS las pantallas, no sólo en ésta, así que
-    // ocultar sólo esta entrada no habría bastado para cortar las peticiones.
-    //
-    // Para reactivar: restaurar `nav: { icon: <Bell size={17}
-    // />, group: "sec-general" }` aquí (reimportando `Bell` de lucide-react
-    // arriba) y descomentar el bloque del botón en `Topbar.jsx`.
+    // El botón de campana del Topbar sondeaba el conteo de eventos cada 30s
+    // en TODAS las pantallas, no sólo en ésta, así que ocultar sólo la
+    // entrada del menú no bastaba para cortar las peticiones — se quitaron
+    // los dos. El botón del Topbar SIGUE comentado a propósito: no se
+    // reactiva sólo porque la página vuelve al menú, sigue sondeando la
+    // fuente equivocada (el historial, no las ocho señales en vivo) y con el
+    // mismo coste. Si se quiere un contador ahí, que cuente
+    // `activo.alarmas.activas` del sistema en vivo, no `useAlarmCount()`.
     id: "eva-alarmas",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
+    nav: { icon: <Bell size={17} />, group: "sec-general" },
   },
 
   {

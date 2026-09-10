@@ -125,12 +125,12 @@ describe("el sidebar que sale del registro", () => {
       "sec-rag",
     ]);
 
-    const llenado = NAV.find((n) => n.group === "sec-llenado");
+    const llenado = NAV.find((n) => n.group === "sec-llenado");
     expect(llenado.children.map((c) => c.id)).toEqual([
       "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta",
     ]);
 
-    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
+    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
       "vib-inicio", "eva-vibraciones", "vib-controles",
       "eva-riesgos-vibracion", "vib-3d",
@@ -139,13 +139,13 @@ describe("el sidebar que sale del registro", () => {
     // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
     // dentro de un sistema, estaría diciendo que sus eventos son sólo de ése.
     //
-    // `eva-alarmas` no sale en esta lista: se ocultó del sidebar el
-    // 2026-08-31 (temporal, ver la cabecera de su entrada en `routes.jsx`)
-    // para cortar el sondeo de `/api/iconics/alarms` que el botón del Topbar
-    // hacía en toda la aplicación. Sigue en ROUTES —comprobado en el test de
-    // arriba—, sólo sin `nav`, mismo criterio que `eva-detalle`.
-    const general = NAV.find((n) => n.group === "sec-general");
-    expect(general.children.map((c) => c.id)).toEqual(["eva-assets", "salud-sistema"]);
+    // `eva-alarmas` volvió al sidebar el 10-09-2026 (Plan 27): dos
+    // pestañas, Historial (lo de siempre) y En vivo (las alarmas del PLC).
+    // Estuvo oculta del 2026-08-31 al 2026-09-10 para cortar el sondeo de
+    // `/api/iconics/alarms` que el botón del Topbar hacía en toda la
+    // aplicación — ese botón sigue sin volver, sólo la entrada del menú.
+    const general = NAV.find((n) => n.group === "sec-general");
+    expect(general.children.map((c) => c.id)).toEqual(["eva-alarmas", "eva-assets", "salud-sistema"]);
 
     /*
      * Predicción ya NO cuelga de «General». Esta comprobación es la que
@@ -157,7 +157,7 @@ describe("el sidebar que sale del registro", () => {
      * servidor en absoluto — es un compresor real servido por otro backend.
      * Mezclarlo ahí es el mismo cruce de fuentes que CLAUDE.md §2.1 prohíbe.
      */
-    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
+    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
     expect(prediccion.children.map((c) => c.id)).toEqual([
       "pred-inicio",
       "pred-eventos",
@@ -171,7 +171,7 @@ describe("el sidebar que sale del registro", () => {
     // mezclan entre sí: lo que hay aquí no describe una instalación de la
     // planta, describe de dónde saca el asistente lo que sabe fuera de lo
     // que mide ICONICS.
-    const rag = NAV.find((n) => n.group === "sec-rag");
+    const rag = NAV.find((n) => n.group === "sec-rag");
     expect(rag.children.map((c) => c.id)).toEqual(["rag-casos", "rag-documentacion"]);
   });
 

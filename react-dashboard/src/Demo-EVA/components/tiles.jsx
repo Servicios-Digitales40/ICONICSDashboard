@@ -12,13 +12,22 @@
  * Cada bloque ocupa el hueco de uno de allá, con la misma forma y otro
  * contenido. La columna de la derecha es la razón, y ninguna es estética:
  *
- *   FranjaAtencion   ← franja de atención  · aquí la enciende un umbral, no una
- *                                            alarma: ICONICS no publica alarmas
- *                                            para este árbol
- *   BandaSenales     ← banda de 4 KPIs     · las 4 señales con serie propia
+ *   FranjaAtencion   ← franja de atención  · la encienden umbrales estimados Y
+ *                                            las alarmas reales del PLC por
+ *                                            igual (Plan 27 F3): las dos dan
+ *                                            "crítico"/"atención" en `estado`,
+ *                                            y esta franja no distingue de
+ *                                            dónde viene. Las alarmas tienen
+ *                                            además su propia sección — ver
+ *                                            `TarjetaActivo`.
+ *   BandaSenales     ← banda de 4 KPIs     · las señales con serie propia Y
+ *                                            que son una medida (ver
+ *                                            `historizadasMedidas` en
+ *                                            `senales.js`), no toda historizada
  *   HeroeNivel       ← héroe OEE + gauges  · no hay OEE; el nivel del tanque es
  *                                            la magnitud de estado del sistema
- *   RejillaActivos   ← rejilla de máquinas · no hay máquinas: cuatro activos
+ *   RejillaActivos   ← rejilla de máquinas · no hay máquinas: los activos del
+ *                                            catálogo (`activos.js`)
  *   EstadoSenales    ← estado y paros      · no hay tiempos de paro
  *   MargenesConsumidos ← Pareto de rechazos · no hay rechazos
  *   TendenciaSenales ← producción por hora · no hay producción
@@ -563,11 +572,16 @@ function FilaSenal({ senal, serieViva, t, dark, ahora }) {
 }
 
 function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay = 0 }) {
+  const { t: traducir } = useTranslation("machines");
   const { estado: estadoTexto, activo: activoTexto } = useDominio();
   const reduce = usePrefersReducedMotion();
   const col = estadoColor(dark, activo.estado);
   const critico = activo.estado === "critico";
   const alerta = TONO.critico(t);
+  // Las de naturaleza "alarma" viven en su propia sección (Alarmas → En
+  // vivo, Plan 27): aquí sólo queda el indicador, no las ocho filas.
+  const senalesSinAlarmas = activo.senales.filter((s) => s.naturaleza !== "alarma");
+  const alarmasActivas = activo.alarmas?.activas ?? 0;
 
   const entrada = `fadeInUp 0.45s ease ${delay}s both`;
   const animacion = critico && !reduce
@@ -621,6 +635,27 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay 
         <span style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>
           {activoTexto(activo.id, "corto")}
         </span>
+        {alarmasActivas > 0 && (
+          // Un `<span>`, no un `<button>`: esta tarjeta entera ya es
+          // `role="button"` (navega a la Maqueta 3D al hacer clic en
+          // cualquier punto), y un control interactivo anidado dentro de
+          // otro es una violación grave de accesibilidad (axe-core,
+          // `nested-interactive`) — lo atrapó `accesibilidad.test.jsx`. El
+          // badge clicable de verdad vive en `CabeceraActivo` (Detalle), que
+          // no está anidado en nada. Aquí sólo informa; el clic en la
+          // tarjeta ya lleva a un sitio desde el que se llega a Alarmas.
+          <span
+            title={traducir("assetGrid.alarmsActive", { count: alarmasActivas })}
+            style={{
+              display: "flex", alignItems: "center", gap: 3, padding: "1px 7px", borderRadius: 999,
+              fontSize: 10, fontWeight: 700, color: alerta.texto ?? t.coral,
+              background: alerta.fondo, border: `1px solid ${alerta.borde}`,
+              fontFamily: "'IBM Plex Mono', monospace", marginLeft: 4,
+            }}
+          >
+            {alarmasActivas}
+          </span>
+        )}
         <span style={{ fontSize: 10, color: t.textFaint, marginLeft: "auto" }}>
           {estadoTexto(activo.estado, "corto")}
         </span>
@@ -632,7 +667,7 @@ function TarjetaActivo({ activo, seriesVivas, t, dark, onNavigate, ahora, delay 
       </div>
 
       <div style={{ borderTop: `1px solid ${t.border}` }}>
-        {activo.senales.map((s) => (
+        {senalesSinAlarmas.map((s) => (
           <FilaSenal key={s.key} senal={s} serieViva={seriesVivas[s.key]} t={t} dark={dark} ahora={ahora} />
         ))}
       </div>

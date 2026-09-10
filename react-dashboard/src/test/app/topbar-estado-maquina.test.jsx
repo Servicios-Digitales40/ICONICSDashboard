@@ -86,8 +86,13 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
   it("en las pantallas generales tampoco: Alarmas y Assets son de las dos", async () => {
     // Un indicador de «la máquina» junto al título de una pantalla que habla
     // de las dos elegiría una sin decirlo.
+    //
+    // El título por `role`, no `findByText`: desde que la página tiene dos
+    // pestañas (Plan 27), su subtítulo también dice «alarmas» en minúscula
+    // («…el estado en vivo de las alarmas del PLC»), y un texto suelto ya no
+    // basta para distinguir el `<h1>` del resto.
     montar("eva-alarmas");
-    await screen.findByText(/Alarmas/i);
+    await screen.findByRole("heading", { name: /Alarmas/i });
     expect(screen.queryByText(/Encendida|Apagada/i)).toBeNull();
   });
 
@@ -99,11 +104,12 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     expect(SECCION_DE_PAGINA["eva-vibraciones"]).toBe("sec-vibraciones");
     expect(SECCION_DE_PAGINA["eva-riesgos-vibracion"]).toBe("sec-vibraciones");
 
-    // `eva-alarmas` y `eva-detalle` no están en el sidebar —la primera desde
-    // el 2026-08-31, temporalmente (ver `routes.jsx`)— y las dos comparten el
-    // mismo motivo aquí: sin `nav` no tienen sección, y el indicador tampoco
-    // debe dársela por supuesta.
-    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBeNull();
+    // `eva-alarmas` volvió al sidebar el 10-09-2026 (Plan 27) bajo
+    // «sec-general» — sigue sin ser del tanque ni de vibraciones, así que el
+    // indicador sigue sin aparecer ahí (comprobado arriba). `eva-detalle` SÍ
+    // sigue sin `nav`, y por tanto sin sección: el indicador tampoco debe
+    // dársela por supuesta.
+    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-general");
     expect(SECCION_DE_PAGINA["eva-detalle"]).toBeNull();
   });
 });

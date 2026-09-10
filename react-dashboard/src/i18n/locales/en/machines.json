@@ -300,7 +300,9 @@
   "assetGrid": {
     "title": "Plant assets",
     "code": "{{n}} assets · our own grouping, the server publishes no equipment",
-    "window": "mini-series: {{ventana}} in this session"
+    "window": "mini-series: {{ventana}} in this session",
+    "alarmsActive_one": "{{count}} active alarm — view",
+    "alarmsActive_other": "{{count}} active alarms — view"
   },
   "signalsState": {
     "title": "Signal status",

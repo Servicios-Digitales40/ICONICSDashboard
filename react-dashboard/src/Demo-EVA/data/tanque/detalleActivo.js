@@ -61,7 +61,9 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
 
   const variables = useMemo(() => {
     if (!activo) return [];
-    return activo.senales.map((s) => {
+    // Las de naturaleza "alarma" viven en su propia sección (Alarmas → En
+    // vivo, Plan 27): esta pestaña ya no las repite como tarjeta.
+    return activo.senales.filter((s) => s.naturaleza !== "alarma").map((s) => {
       const bufferVivo = series[s.key] ?? [];
       const historiaEnVivo = s.historizado && enVivo;
       // El modo vivo no le pide nada al historiador, así que un motivo o un
