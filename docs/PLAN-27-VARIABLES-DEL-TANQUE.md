@@ -727,3 +727,33 @@ verificar` en la raíz, `npm test` en los dos paquetes):
 
 Y en cada una: `verificar-modulos.mjs`, que es el que garantiza que nada de
 esto cruza la frontera con Predicción.
+
+---
+
+## 8 · Plan cerrado (10-09-2026) — lo que queda anotado para cuando surja
+
+F0–F6 y F8 hechos; F7 cerrado por decisión, no por descuido (§ arriba: espera
+al Plan de autenticación). Además, sin abrir fase propia, esta sesión también
+sacó las alarmas de proceso de la rejilla a su propia sección (`Alarmas → En
+vivo`), a petición del usuario — no estaba en el alcance original del plan.
+
+Lo que queda fuera, sin que ninguna fase lo reclame, y sin bloquear nada:
+
+- **`MANDO_DEL_VARIADOR_VFD`, cinco puntos sin catalogar**: `DP_ESTADO_VFD`,
+  `FRECUENCIA_VFD`, `MTTO_VFD`, `RESET_FALLA_VFD`, `START_STOP_VFD`. Ya
+  documentado en la cabecera de `activos.js`.
+- **`ADVERTENCIA_ESTADO_DE_OPERACION`, tres puntos**:
+  `SOLENOIDE_INFERIOR_MANTENIMIENTO`, `SOLENOIDE_SUPERIOR_MANTENIMIENTO`,
+  `VFD_MANTENIMIENTO`. Ninguna fase de F0-F8 tocó esta rama.
+- **`CONTADORES_VARIABLES_DE_MAQUINA`, seis puntos** (no cuatro, como se
+  pensó en F6 — confirmado por `browse()` el 10-09-2026):
+  `CORRIENTE_FASE_1`, `CORRIENTE_FASE_2`, `HORAS_MARCHA`,
+  `NUMERO_DE_ARRANQUES`, y dos aparecidos sin que el catálogo se enterara:
+  **`PRESION_ASPIRACION`** y **`TEMPERATURA_DELDEVANADO`** — puede que planta
+  los añadiera después de F1, o que nunca tuvieran serie configurada hasta
+  ahora. No confirmado.
+
+Si algún día se catalogan, el patrón ya está resuelto en este mismo plan:
+`puntoHistorico()` para el nombre `hda:` (F6) y la tabla rama→carpeta de
+`senales.js` cubren estas tres ramas igual que las demás — no haría falta
+inventar mecanismo nuevo, sólo escribir las entradas.
