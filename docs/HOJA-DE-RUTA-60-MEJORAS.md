@@ -119,6 +119,16 @@ cada uno de estos se pueda demostrar en vez de opinar.
 `medir-asistente.mjs` reejecute las herramientas con los argumentos que ya
 captura, para que la auditoría de cifras corra también contra el modelo real.
 
+> **Escrito el 10-09-2026**, sin empezar. Las ocho investigaciones de la §0
+> de [`PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) están hechas
+> contra el código real (no supuestas), incluido un hallazgo colateral:
+> `controlar_bomba` no anota en el diario de accionamientos de SEG-08. `IA-09`
+> se fijó en cuatro de las siete candidatas de `MEJORAS-ASISTENTE.md`
+> (`tendencia_multiple`, `resumen_de_turno`, `buscar_evento`,
+> `comparar_maquinas`) — `estado_de_alarmas` quedó parcialmente cubierta por
+> el Plan 27, `espectro_de_vibracion` depende de habilitar hardware y
+> `exportar_datos` no tiene un fallo real detrás.
+
 ### Plan 24 · Usabilidad
 
 `USO-01` frescura obligatoria · `USO-02` estado en la URL ·

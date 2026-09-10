@@ -1,5 +1,19 @@
 # Mejoras propuestas · Asistente de IA
 
+> **Revisado el 10-09-2026 contra el código actual.** B4 (`estado_de_alarmas`)
+> quedó **parcialmente cubierta de forma indirecta**: el Plan 27 hizo que
+> `estado_del_sistema` ya exponga las alarmas reales del PLC dentro de su
+> resumen, aunque sigue sin existir una herramienta dedicada a consultar SÓLO
+> alarmas o su historial. El resto de B4-B10 y B1 siguen totalmente vigentes,
+> confirmado contra `backend/ia/conversacion/definiciones.mjs` (ninguno de los
+> nombres propuestos existe en las 22 herramientas de hoy) y contra
+> `backend/ia/herramientas/historicos/index.mjs` (`resolverSenalDeSistema`
+> sigue siendo el tercer resolvedor de nombres que B1 propone unificar). B6,
+> B7, B8 y B5 entran en
+> [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md)
+> F3, con su nombre final (`tendencia_multiple`, `resumen_de_turno`,
+> `buscar_evento`, `comparar_maquinas`).
+
 > **Qué es esto.** Treinta mejoras para el asistente, agrupadas en tres ejes:
 > **veracidad de los datos**, **expansión de herramientas** y **expansión de
 > capacidades**.
@@ -170,6 +184,12 @@ resolvía (tres letras, umbral de cuatro) y «velocidad eficaz» arrastraba su
 indicador de confianza. Cada uno se arregló en su sitio; el tercero saldrá del
 mismo hueco.
 
+> **Sigue vigente (revisado 10-09-2026):** `resolverSenalDeSistema`
+> (`backend/ia/herramientas/historicos/index.mjs`) sigue siendo el tercer
+> resolvedor, muy usado. Queda explícitamente FUERA del alcance del Plan 23
+> (§9): es un refactor con su propio riesgo que no conviene mezclar con las
+> ocho entregas de ese plan.
+
 ## B2 · Sinónimos por máquina
 
 **Hoy.** Solo el tanque los tiene. `sistemasDeSenal("vibración del motor")`
@@ -197,10 +217,19 @@ entrega valor—. Cuál alarma se disparó no se puede saber.
 **Qué cambia.** Leer el historial de eventos. Es la diferencia entre «hay 3
 alarmas activas» y «el nivel bajo saltó a las 14:32».
 
+> **PARCIALMENTE CUBIERTA (revisado 10-09-2026).** El Plan 27 historizó las 8
+> alarmas reales del PLC y `estado_del_sistema` ya las expone dentro de su
+> resumen — «hay 3 alarmas activas ahora» ya se puede contestar. Sigue sin
+> existir una herramienta dedicada a SÓLO alarmas o a su historial (el «saltó
+> a las 14:32» de arriba), así que esta mejora queda fuera del Plan 23 F3 por
+> impacto ya parcialmente logrado, no por descarte.
+
 ## B5 · `comparar_maquinas`
 
 Misma magnitud en dos máquinas, con la salvaguarda de no correlacionar PLCs
 distintos ya implementada en `correlacionar_senales`.
+
+> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.4.
 
 ## B6 · `tendencia_multiple`
 
@@ -209,15 +238,21 @@ que falló el 28-08-2026 agotó las rondas antes de contestar.
 
 **Qué cambia.** Una llamada, varias señales, un solo viaje.
 
+> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.1.
+
 ## B7 · `resumen_de_turno`
 
 Qué pasó en las últimas 8 h en una sola herramienta: rangos, alarmas, tiempo en
 marcha. Hoy son cuatro o cinco llamadas encadenadas.
 
+> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.2.
+
 ## B8 · `buscar_evento`
 
 «¿Cuándo fue la última vez que la presión bajó de X?» — hoy no hay forma de
 preguntarlo sin traerse la serie entera.
+
+> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.3.
 
 ## B9 · `espectro_de_vibracion`
 

@@ -1,0 +1,465 @@
+# Plan 23 · Asistente
+
+> **Objetivo.** Que el bucle del asistente deje de confiar a ciegas en lo que
+> el modelo manda, se defienda a sí mismo de repetir trabajo entre turnos, y
+> cubra las cuatro consultas que hoy exigen encadenar varias herramientas a
+> mano. Ocho entregas: `IA-02`, `IA-04`, `IA-05`, `IA-06`, `IA-07`, `IA-08`,
+> `IA-09`, `IA-10`.
+
+> **De dónde sale.** De `docs/HOJA-DE-RUTA-60-MEJORAS.md`, Plan 23. Ninguno de
+> sus puntos necesita red a la planta: sólo `llama-server`, que con
+> `ICONICS_FAKE=true` se puede tener sin GPU dedicada para el desarrollo
+> offline y con GPU real para medir contra el modelo (`medir-asistente.mjs`).
+
+> **Rama.** `Mejoras-Demo-6.0`, a continuación del Plan 22.
+
+> **ESTADO — SIN EMPEZAR (10-09-2026).** Este documento es el plan, no su
+> ejecución. Las ocho investigaciones de la §0 sí están hechas —contra el
+> código real, no supuestas— y son la base de cada fase.
+
+---
+
+## 0 · Lo que ya se investigó, y por qué cambia el plan
+
+Antes de escribir una fase se leyó el código real de `chat.mjs`,
+`definiciones.mjs`, `herramientas.mjs`, `medir-asistente.mjs` y `config.mjs`.
+Cinco hallazgos concretos, con archivo y línea, que fijan el alcance de abajo:
+
+1. **El bucle ya tiene una guarda anti-repetición, pero sólo dura el turno.**
+   `firmaDe()` + `firmasVistas` (`chat.mjs` líneas 749-772, 1042) evita
+   re-ejecutar una llamada idéntica DENTRO del mismo turno — le devuelve al
+   modelo una nota (`yaConsultado: true`) en vez de volver a golpear ICONICS.
+   Es exactamente el mecanismo que `IA-06` necesita extender más allá del
+   turno; no hay que inventarlo desde cero, hay que hacerlo sobrevivir.
+
+2. **El JSON Schema de las 22 herramientas es sólo para el modelo — nada lo
+   valida en el backend.** `definiciones.mjs` manda `parameters` a
+   llama-server como `tools` (`chat.mjs` líneas 903-905), pero
+   `herramientas.mjs` (`ejecutar()`, líneas 1032-1046) llama la función
+   directo con lo que el modelo mandó, sin verificar tipos ni campos
+   requeridos. Cada herramienta valida a mano lo que le importa —ejemplo,
+   `controlar_bomba` con `typeof encender !== 'boolean'`
+   (`herramientas/maquina/index.mjs` línea 231)— y **Zod ya existe en el
+   proyecto** para esto exacto: `ControlBombaSchema` en `http/esquemas.mjs`
+   valida el mismo campo `encender` para la ruta HTTP del botón físico, sin
+   que la herramienta del asistente lo reutilice. `IA-04` no introduce Zod,
+   destapa por qué dos caminos al mismo dato tienen dos calidades de
+   validación distintas.
+
+3. **No hay streaming de la primera pasada, y es a propósito, no un olvido.**
+   `pasadaConHerramientas()` (`chat.mjs` línea 905) fija `stream: false`
+   explícitamente; el comentario de cabecera (líneas 9-18) defiende que sea
+   así de «gruesa» para minimizar el número de llamadas al modelo. `IA-05` no
+   puede ser «activar streaming ahí» sin romper esa decisión — tiene que ser
+   un progreso que no dependa de leer tokens parciales de una respuesta que
+   sigue llegando entera.
+
+4. **La memoria de turno anterior es deliberadamente sólo texto.**
+   `historialAMensajes()` (línea 79-89) convierte los últimos 8 mensajes a
+   `user`/`assistant`, y el comentario (líneas 68-73) explica que los
+   RESULTADOS de herramientas de turnos previos nunca entran, para que el
+   modelo no mezcle cifras de un turno con la pregunta de otro. `IA-07`
+   («memoria del foco») tiene que respetar esa frontera: puede recordar DE
+   QUÉ se hablaba —qué señal, qué sistema— sin resucitar el dato viejo.
+
+5. **`controlar_bomba` no anota en el diario de accionamientos (SEG-08).**
+   `backend/lib/diario.mjs` sólo lo importa `controlRoutes.mjs` (el botón del
+   tablero); la herramienta del asistente en
+   `backend/ia/herramientas/maquina/index.mjs` no lo toca. Hoy una bomba
+   encendida por el chat no queda en el diario que existe justo para
+   responder «¿qué se le hizo a la instalación?» meses después. Es un hallazgo
+   colateral de investigar `IA-10`, y entra en su alcance porque es el mismo
+   patrón (una línea persistente, JSONL, con poda) aplicado a un hueco real.
+
+## 0.1 · El criterio de orden
+
+Offline y sin dependencias primero; lo que exige medir contra el modelo real,
+después; lo que más cambia el contrato de la herramienta, al final.
+
+```
+F0 IA-04 (validación)  →  F1 IA-06 (caché)  →  F2 IA-07 (foco)
+   →  F3 IA-09 (herramientas nuevas)  →  F4 IA-02 (auditoría real)
+   →  F5 IA-05 (progreso)  →  F6 IA-10 (registro)  →  F7 IA-08 (router)
+```
+
+- **F0 primero** porque valida lo que entra: si una llamada mal formada se
+  detecta antes de ejecutar la herramienta, todas las fases siguientes
+  trabajan sobre argumentos ya limpios.
+- **F1 y F2 antes que F3** porque las cuatro herramientas nuevas de F3 son
+  candidatas naturales a beneficiarse de la caché y del foco — construirlas
+  después evita que hereden el problema que F1/F2 resuelven.
+- **F4 (IA-02) necesita que F0-F3 ya estén cerradas**: auditar cifras contra
+  el modelo real con herramientas que todavía cambian de forma sería medir un
+  blanco móvil.
+- **F5 (progreso) y F6 (registro) son observabilidad pura**, sin relación de
+  dependencia entre sí ni con lo anterior — van después porque no bloquean
+  nada y no hay prisa en tenerlas antes que la validación o la caché.
+- **F7 (router de modelo) va al final** porque su mayor restricción de diseño
+  (§7) depende de cómo hayan quedado F1/F2: un router que cambia de modelo a
+  media conversación necesita saber qué de la memoria de foco/caché sobrevive
+  al cambio.
+
+## 0.2 · Cómo se comprueba cada fase
+
+Sin servidor de IA:
+```bash
+npm run lint && npm run types && npm run verificar
+node backend/... # el verificador específico de cada fase, listado abajo
+```
+
+Con `llama-server` (para F4, F5, F7 — las que se miden contra el modelo real):
+```bash
+node --env-file=.env.local scripts/medir-asistente.mjs
+```
+No es un verificador y no da código de error — mide. `IA-02` es precisamente
+la fase que le añade dientes a esta medición.
+
+---
+
+## 1 · F0 — `IA-04`: validar argumentos de herramienta con Zod
+
+**Qué hace hoy.** `herramientas.mjs` ejecuta `fn(argumentos)` con lo que el
+modelo mandó, tal cual venga del `JSON.parse` de `chat.mjs` (línea 1099-1112,
+que además cae a `{}` en silencio si el JSON viene roto). Cada herramienta
+valida lo suyo, a mano, con la calidad que a quien la escribió le pareció
+necesaria en ese momento.
+
+**Qué cambia.** Un esquema Zod por herramienta, colocado junto a su
+`DEFINICIONES` (mismo archivo o uno hermano — decidir al implementar si
+`definiciones.mjs` pasa a exportar también el esquema de validación, para que
+las dos formas del mismo contrato —la que lee el modelo y la que valida el
+backend— no puedan divergir por accidente). La validación corre en
+`ejecutar()`, antes de llamar a la función real:
+
+- Si falla, se devuelve un `fallo(...)` con el mismo formato que ya usan las
+  herramientas para errores de negocio — el modelo lo lee igual que
+  cualquier otro fallo, no como una excepción distinta.
+- `controlar_bomba` es el caso de prueba obligado: migrar su `typeof
+  encender !== 'boolean'` a un esquema Zod, y decidir si ese esquema se
+  DERIVA de `ControlBombaSchema` (`http/esquemas.mjs`) o si se declara aparte
+  a propósito — son dos entradas al mismo campo con consecuencias iguales
+  (escribe en la planta), y que compartan la validación es lo que evita que
+  una se endurezca y la otra se quede atrás.
+
+**Lo que NO resuelve.** No valida el *significado* de un argumento (que
+`sistema="tanque"` sea correcto para esa pregunta) — eso sigue siendo trabajo
+del resolvedor de nombres (`resolverSenal`, `resolverSistema`). Zod valida
+FORMA (tipos, campos requeridos, enums), no intención.
+
+**Pruebas.** Un caso por herramienta con argumento de tipo equivocado, uno con
+campo requerido ausente, uno válido — sobre las 22. Extiende
+`scripts/verificar-herramientas.mjs`.
+
+---
+
+## 2 · F1 — `IA-06`: caché entre turnos
+
+**Qué hace hoy.** `firmasVistas` (`chat.mjs` línea 1042) vive dentro de
+`responder()`: nace y muere con el turno. Preguntar dos veces «¿cómo está el
+tanque?» en la misma conversación relee ICONICS las dos veces.
+
+**Qué cambia.** La misma firma (`firmaDe()`, ya escrita) como clave de una
+caché con **tiempo de vida corto y explícito** — no eterno: un valor de
+ICONICS de hace cinco minutos citado como «ahora mismo» sería inventar
+frescura que no hay. El tiempo de vida depende de la naturaleza del dato:
+
+| Tipo de llamada | Vida sugerida | Por qué |
+|---|---|---|
+| `estado_del_sistema`, `riesgos_activos` | ~10-15 s | Tiempo real: caduca casi de inmediato |
+| `historia_de_senal`, `analisis_de_senal`, `perfil_de_senal` sobre un período YA CERRADO (p. ej. «ayer») | el resto de la conversación | El pasado no cambia |
+| `historia_de_senal` sobre un período que incluye «ahora» | igual que tiempo real | Sigue creciendo |
+| `sistemas_de_la_planta`, `limites_del_manual` | toda la sesión del proceso | No dependen de un instante |
+
+La caché vive por **conversación**, no por proceso: dos pestañas del tablero
+preguntando lo mismo no deben compartir caché, porque nada en el turno
+identifica hoy de qué conversación viene una llamada salvo el `historial` que
+manda el cliente — hay que decidir al implementar si se deriva un id de
+conversación (hash del primer turno, o un id que el frontend ya genere) para
+no filtrar caché entre usuarios distintos del mismo backend.
+
+**Lo que NO resuelve.** No cachea across-conversación (dos personas
+preguntando lo mismo a la vez no comparten caché) — eso sería un cambio de
+alcance mayor (caché compartida = superficie de fuga de datos entre sesiones)
+que este plan no abre.
+
+**Pruebas.** Dos preguntas idénticas en el mismo turno YA están cubiertas por
+`firmasVistas`; el caso nuevo es la misma pregunta en el TURNO SIGUIENTE de la
+misma conversación, con y sin que haya pasado el tiempo de vida.
+
+---
+
+## 3 · F2 — `IA-07`: memoria del foco
+
+**Qué hace hoy.** Nada. `historialAMensajes()` da al modelo el TEXTO de los
+turnos anteriores y una regla (`REGLAS`, línea 433-436) que le pide
+"resolver a qué señal y a qué momento se refieren" sin ayuda mecánica. Si el
+modelo lo resuelve mal, no hay red de seguridad.
+
+**Qué cambia.** Un campo de estado por conversación —no por turno— con la
+última señal y el último sistema mencionados explícitamente (por el usuario o
+citados por una llamada a herramienta exitosa). Se pasa como un hecho, no
+como una sugerencia:
+
+```
+"El turno anterior habló de: señal=nivelTanque, sistema=tanque.
+Si esta pregunta no nombra una señal ni un sistema, es MUY probable
+que se refiera a estos. Si el usuario dice «y la presión», resuelve
+la señal (presión) pero mantén el sistema (tanque) salvo que la nueva
+señal exista en otro."
+```
+
+Esto es prosa nueva en las instrucciones del turno (no en `REGLAS`
+permanentes — `REGLAS` es para lo que aplica siempre; el foco cambia cada
+turno), construida en `chat.mjs` a partir del ÚLTIMO resultado de herramienta
+exitoso del turno anterior — nunca su valor, sólo su identidad (qué señal, qué
+sistema), respetando el hallazgo §0.4: los resultados de turnos previos no
+resucitan.
+
+**Lo que NO resuelve.** No es una memoria semántica general ("de qué se ha
+hablado en toda la conversación") — es literalmente "cuál fue la última señal
+y el último sistema", lo mínimo que hace que "¿y ayer?" o "¿y la presión?"
+funcionen sin que el usuario repita el sustantivo completo cada vez.
+
+**Pruebas.** Conversación de 2 turnos: "¿cómo está el nivel del tanque?"
+seguido de "¿y hace tres horas?" sin nombrar la señal — la segunda llamada
+tiene que resolver a `nivelTanque`/`tanque` sin que el modelo tenga que
+adivinarlo solo del texto.
+
+---
+
+## 4 · F3 — `IA-09`: las cuatro herramientas nuevas
+
+**Decisión de alcance.** `docs/MEJORAS-ASISTENTE.md` (28-08-2026) propone
+siete candidatas (B4-B10); revisado contra el código de hoy, B4
+(`estado_de_alarmas`) quedó **parcialmente cubierta** de forma indirecta —
+`estado_del_sistema` ya expone las alarmas reales del PLC desde el Plan 27,
+aunque no hay una herramienta dedicada a SÓLO alarmas o a su historial. Las
+otras seis siguen totalmente vigentes. Este plan construye estas cuatro:
+
+### 4.1 · `tendencia_multiple`
+
+**Por qué primero.** Causó un fallo real y medido: una pregunta el
+28-08-2026 agotó las rondas de `IA_MAX_PASOS` (4×2) pidiendo varias señales
+una por una en vez de en un viaje. `historia_de_senal` sigue siendo de UNA
+señal (`definiciones.mjs` línea 351) — no cambió desde entonces.
+
+**Forma.** Mismo patrón que `correlacionar_senales` (que ya acepta un array
+`senales` de 2 a 4): un array de nombres, un período, devuelve el resumen de
+cada una por separado — a diferencia de `correlacionar_senales`, sin
+coeficiente ni cruce, porque la pregunta que la motiva es "¿cómo van estas
+tres?", no "¿se mueven juntas?".
+
+### 4.2 · `resumen_de_turno`
+
+**Por qué.** "Qué pasó en las últimas 8 h" hoy son 4-5 llamadas encadenadas:
+`estado_del_sistema` + `riesgos_activos` + `historia_de_senal` de cada señal
+relevante. Cada llamada de más es contexto gastado y una oportunidad de que
+el modelo se pierda a media cadena.
+
+**Forma.** Una herramienta que internamente llama a las piezas que ya existen
+(reutiliza `leerMaquina`, `evaluarRiesgosDe`, y el ayudante de historia) y
+devuelve un resumen ya compuesto: rango de cada señal con serie propia,
+riesgos que estuvieron activos, tiempo en marcha/reposo. Mismo patrón que
+`diagnostico` (herramienta compuesta que junta varias fuentes en una
+llamada) — no una fuente de datos nueva, una composición de las que ya hay.
+
+### 4.3 · `buscar_evento`
+
+**Por qué.** "¿Cuándo fue la última vez que la presión bajó de X?" no se
+puede preguntar hoy sin traerse la serie entera y que el MODELO la escanee —
+que es exactamente lo que las reglas de veracidad prohíben (el modelo no
+hace aritmética ni inspecciona series, cita lo que la herramienta ya calculó).
+
+**Forma.** Recibe señal, condición (`por debajo de`/`por encima de`/`igual
+a`), valor umbral, y un período de búsqueda; devuelve el primer/último
+instante en que se cumplió, con su valor exacto. Se apoya en el mismo
+ayudante de lectura de historia que `historia_de_senal`, agregando un
+recorrido de la serie ya traída en vez de un cálculo estadístico.
+
+### 4.4 · `comparar_maquinas`
+
+**Por qué.** Comparar la misma magnitud entre el tanque y vibraciones hoy no
+tiene atajo — hay que pedir el estado de cada máquina por separado y que el
+modelo compare a ojo, que es aritmética informal sobre dos fuentes distintas.
+
+**Forma.** Recibe una magnitud conceptual (p. ej. "temperatura", "corriente")
+y resuelve en CADA sistema la señal que corresponde (reutilizando el
+resolvedor de nombres de cada máquina), trae los dos valores/resúmenes y los
+presenta lado a lado — nunca los resta ni calcula una diferencia: eso sería
+inventar una magnitud que ninguna de las dos declaró comparable. La
+salvaguarda de `correlacionar_senales` contra cruzar PLCs distintos NO aplica
+aquí de la misma forma — comparar dos máquinas por magnitud es legítimo (dos
+temperaturas se pueden poner una junto a otra); correlacionarlas causalmente
+no lo es. La descripción de la herramienta tiene que decir esta distinción
+explícitamente, o el modelo la usará para inferir causalidad entre máquinas.
+
+**Lo que queda fuera de F3, anotado para después:** `espectro_de_vibracion`
+(B9) — depende de habilitar el módulo SM 1281, no sólo de código, así que no
+es una herramienta que este plan pueda completar por su cuenta — y
+`exportar_datos` (B10) — menor urgencia medida, sin un fallo real que lo
+empuje como a `tendencia_multiple`.
+
+**Pruebas.** Las cuatro entran a `scripts/verificar-herramientas.mjs` con el
+mismo rigor que las 22 existentes: casos de éxito, de señal no encontrada,
+de período sin datos. `verificar-instrucciones.mjs` tiene que seguir en
+verde con 26 herramientas en el registro.
+
+---
+
+## 5 · F4 — `IA-02`: auditar cifras tras redactar, contra el modelo real
+
+**Qué hace hoy.** `medir-asistente.mjs` documenta su propio hueco en dos
+comentarios (líneas 132-147, 172-181): el flujo SSE lleva qué herramienta se
+llamó y con qué argumentos, pero NO su resultado, así que la auditoría de
+cifras del guion se desactiva pasándole TODOS los números del texto como
+válidos (línea 183-186) — hoy no puede fallar nunca, lo cual anula de facto
+la comprobación de invención de cifras contra el modelo real.
+
+**Qué cambia.** Exactamente lo que el propio comentario recomienda: el guion
+reconstruye las herramientas con `createHerramientas` (mismo patrón que
+`scripts/verificar-herramientas.mjs`) y vuelve a llamar `ejecutar(nombre,
+argumentos)` con los argumentos YA capturados del flujo SSE — sin tocar el
+camino de producción, sin pedirle nada nuevo a `chat.mjs`. El resultado real
+se compara contra los números citados en el texto de la respuesta: cualquier
+cifra que no salga de ese resultado (ni de la lista de recuentos que ya
+perdona `contieneCifras`) es una invención y el caso falla.
+
+**Depende de F0-F3.** Auditar contra herramientas que todavía están
+cambiando de forma (nuevos esquemas Zod, caché, foco, cuatro herramientas
+nuevas) mediría un blanco en movimiento — por eso va después.
+
+**Pruebas.** No es un verificador (`medir-asistente.mjs` no da código de
+error, mide). El criterio de éxito es que el banco de 20 casos
+(`backend/ia/evaluacion/banco.mjs`) deje de tener el pase libre de cifras y
+el reporte muestre una tasa real de invención — sea cero, sea la que sea, por
+primera vez medida de verdad.
+
+---
+
+## 6 · F5 — `IA-05`: progreso durante la primera pasada
+
+**Qué hace hoy.** Entre el `{tipo:'estado', valor:'Pensando…'}` inicial y que
+el modelo devuelva su decisión de herramienta, no hay ningún evento
+intermedio — es una espera ciega de decenas de segundos. `pasadaConHerramientas`
+usa `stream: false` a propósito (§0.3), así que esto no se resuelve
+activando streaming ahí sin romper esa decisión.
+
+**Qué cambia.** Dos señales de progreso que NO dependen de leer tokens
+parciales de una respuesta que llama-server todavía no completó:
+
+1. **Un `{tipo:'estado'}` con tiempo transcurrido**, emitido a intervalos
+   fijos (p. ej. cada 5s) mientras se espera la respuesta de la pasada 1 —
+   no dice QUÉ está decidiendo el modelo (eso no se sabe hasta que termina),
+   dice que el proceso sigue vivo. Evita el mismo síntoma que
+   `chatRoutes.mjs` ya resuelve para la cola (¿cuántos delante?): que una
+   espera larga sin señal se lea como colgado.
+2. **Si `llama-server` expone alguna métrica de progreso por properties del
+   endpoint** (a confirmar contra la versión real del router — es la única
+   parte de esta fase que podría necesitar un chequeo contra el servidor de
+   IA antes de comprometerse a un diseño), usarla; si no, quedarse con el
+   punto 1 y decirlo en la cabecera de la implementación en vez de simular
+   un progreso que no se puede medir.
+
+**Pruebas.** `verificar-chat.mjs` ya tiene un llama-server falso con
+`retrasoMs` configurable — extenderlo para confirmar que el evento de
+progreso llega mientras la pasada 1 está en curso y no antes ni después.
+
+---
+
+## 7 · F6 — `IA-10`: registro por turno, y el hueco de `controlar_bomba`
+
+**Qué hace hoy.** `logger.debug`/`logger.warn` puntuales dentro de `chat.mjs`
+son para diagnóstico operativo (Pino, rotativo), no un registro estructurado
+y persistente por turno con fines de auditoría. El diario de accionamientos
+de SEG-08 (`backend/lib/diario.mjs`) es el patrón correcto —JSONL, poda por
+tamaño, retención por días— pero es de OTRO dominio (qué se le hizo a la
+planta) y sólo lo alimenta `controlRoutes.mjs`, el botón físico.
+
+**Qué cambia — dos piezas separadas:**
+
+1. **El hallazgo real (§0.5), primero y aparte del diseño nuevo:**
+   `controlar_bomba` no anota en `diario.mjs`. Esto se corrige llamando al
+   mismo diario desde `herramientas/maquina/index.mjs` tras una escritura
+   confirmada — mismo formato de entrada que ya usa `controlRoutes.mjs`, con
+   el origen marcado como "asistente" en vez de la IP/usuario del botón, para
+   que quien lea el diario meses después sepa por qué canal se accionó.
+2. **El registro de turno nuevo**, en su propio archivo JSONL
+   (`datos/diario-conversaciones.jsonl`, mismo directorio que
+   `datos/aprendizaje.json`): una línea por turno completo, con la pregunta,
+   qué herramientas se llamaron y con qué argumentos (no sus resultados
+   completos — eso duplicaría datos de planta en disco sin necesidad; basta
+   el nombre y los argumentos para poder reconstruir "qué se le preguntó al
+   asistente y por dónde fue a mirar"), y si terminó en error o bloqueo.
+
+**Por qué van juntas.** Es el mismo patrón de infraestructura (JSONL con
+poda) aplicado a dos huecos del mismo vecindario — separarlas en dos fases
+completas sería repetir la parte de diseño de "cómo se escribe un JSONL con
+poda" dos veces.
+
+**Pruebas.** Extiende el patrón de pruebas de `diario.mjs` (poda por tamaño,
+formato de línea) al archivo nuevo; una prueba de integración que confirme
+que `controlar_bomba` vía chat deja una línea en `diario-accionamientos.jsonl`
+igual que el botón físico.
+
+---
+
+## 8 · F7 — `IA-08`: router de modelo
+
+**La restricción que ya impone la arquitectura, antes de diseñar nada.** El
+modelo activo es HOY una variable de estado del SERVIDOR ENTERO
+(`usarModelo()`, `chat.mjs` líneas 1349-1360), deliberadamente global y no
+por sesión — el comentario de cabecera explica que el router de llama-server
+carga modelos bajo demanda sin VRAM para dos a la vez, y que dejar que cada
+pantalla elija el suyo forzaría recargas constantes. **Un router automático
+por pregunta chocaría de frente con esa decisión** si cambiara de modelo a
+media conversación: cada cambio sería una recarga de varios segundos, y dos
+pantallas preguntando cosas de distinta complejidad al mismo tiempo se
+pisarían la VRAM entre sí.
+
+**Qué cambia, dado esa restricción.** El router NO decide por pregunta
+individual — decide **una vez por conversación, en el primer turno**, y se
+queda fijo el resto de esa conversación (coherente con que el modelo activo
+ya es una variable de sesión larga, no de turno). La heurística de
+complejidad se basa en señales baratas de calcular sin invocar ningún
+modelo: longitud de la pregunta, si nombra una herramienta compuesta
+(`diagnostico`, `resumen_de_turno` de F3) versus una simple
+(`estado_del_sistema`), si el historial ya es largo. Modelos candidatos: los
+que ya declara `IA_MODELOS` (`config.mjs` línea 616-624) — el router elige
+ENTRE los ya configurados, no introduce un modelo nuevo.
+
+**Lo que NO resuelve.** No cambia de modelo a mitad de conversación aunque la
+pregunta 5 sea mucho más simple que la 1 — eso reabriría el problema de VRAM
+compartida que la arquitectura actual evita a propósito. Si en el futuro se
+quiere routing por turno, es un plan aparte que primero tiene que resolver
+la contención de VRAM entre pantallas (posiblemente parte de Plan 26,
+`COD-08` telemetría del sondeo, si esa telemetría revela que el patrón de uso
+real lo justifica).
+
+**Pruebas.** Casos sintéticos de pregunta corta/simple vs. larga/compuesta,
+confirmando que el router elige el modelo esperado de la lista de
+`IA_MODELOS` — sin necesitar `llama-server` real para esto, porque la
+heurística no invoca ningún modelo para decidir.
+
+---
+
+## 9 · Lo que este plan NO hace
+
+- **No construye `espectro_de_vibracion` ni `exportar_datos`** (B9/B10 de
+  `MEJORAS-ASISTENTE.md`) — quedan anotadas para cuando F3 de un plan
+  posterior las retome; B9 además depende de habilitar hardware, no sólo de
+  código.
+- **No unifica los tres resolvedores de nombre** (`B1` de
+  `MEJORAS-ASISTENTE.md`, confirmado vigente: `resolverSenal`,
+  `sistemasDeSenal`, `resolverSenalDeSistema` siguen siendo tres sitios
+  distintos). Es un refactor real con su propio riesgo — cualquiera de las
+  ocho fases de este plan podría tropezar con esos tres sitios y no arreglar
+  los tres a la vez sería peor que no tocarlos. Queda para un plan aparte, o
+  para cuando `IA-09`/F3 obligue a tocarlos por necesidad, no por limpieza.
+- **No hace routing de modelo por turno**, sólo por conversación (§8) — el
+  routing más fino requeriría resolver primero la contención de VRAM.
+- **No toca la caché entre CONVERSACIONES distintas** (§2) — sería compartir
+  estado entre sesiones de usuarios distintos, una superficie de fuga que
+  este plan no abre.
+- **No enciende `AUTH_HABILITADA` ni depende de que esté encendida** — todo
+  lo de aquí funciona igual con la autenticación apagada, porque ninguna
+  fase decide QUIÉN puede preguntar, sólo CÓMO se responde.

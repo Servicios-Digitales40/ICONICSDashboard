@@ -1,13 +1,10 @@
 # Plan 12 · Integrar `Gustavo` sobre `Moises` en una rama intermedia
 
-> **ESTADO — PROBABLEMENTE COMPLETADO, SIN CONFIRMACIÓN DOCUMENTAL (revisado
-> 10-09-2026).** El merge automatizable está hecho y en verde. La prueba en
-> pantalla del §6 (servidor ICONICS + los tres procesos de IA) nunca se
-> marcó `[x]` en este documento ni se confirmó en ninguno posterior — pero
-> el proyecto siguió construyendo 15 planes más sobre esta misma base sin
-> que se reportara ningún problema de esa integración, lo que sugiere que
-> sí se verificó en su momento, sin dejar registro. No se marca como
-> cerrado sin esa confirmación explícita.
+> **ESTADO — PLAN COMPLETADO (confirmado por el usuario el 10-09-2026).** El
+> merge automatizable está hecho y en verde, y la prueba en pantalla del §6
+> (servidor ICONICS + los tres procesos de IA) se verificó en su momento —
+> aunque no quedó marcada `[x]` aquí ni en ningún documento posterior, el
+> usuario confirma que sí ocurrió.
 
 > **Objetivo.** Juntar en una sola rama las dos líneas de trabajo que salieron
 > del mismo punto (`99a3809`, `demo-3`) sin tocar ninguna de las dos ramas
@@ -33,11 +30,11 @@ merge-base = 99a3809  (demo-3, "Impeccable y demo base")
 
 **Qué trae cada una** (archivos tocados desde la base):
 
-| | `Moises` | `Gustavo` |
-|---|---|---|
-| Frontend | 53 archivos: vista de detalle, selector de rango, temas, sidebar/topbar, rediseño del panel del asistente | Asistente: voz, manos libres, persistencia del hilo |
-| Backend | `controlar_bomba` (única escritura del catálogo) | `config.mjs` nuevo, cola de consultas, índice de documentos, Whisper, 5 herramientas nuevas |
-| Compartido | — | `shared/eva/estadistica.js`, `shared/eva/graficos.js` |
+|            | `Moises`                                                                                                  | `Gustavo`                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Frontend   | 53 archivos: vista de detalle, selector de rango, temas, sidebar/topbar, rediseño del panel del asistente | Asistente: voz, manos libres, persistencia del hilo                                         |
+| Backend    | `controlar_bomba` (única escritura del catálogo)                                                          | `config.mjs` nuevo, cola de consultas, índice de documentos, Whisper, 5 herramientas nuevas |
+| Compartido | —                                                                                                         | `shared/eva/estadistica.js`, `shared/eva/graficos.js`                                       |
 
 **Los cuatro choques reales** (`git merge-tree`, medido, no supuesto):
 
@@ -86,10 +83,12 @@ entero: es la carcasa visual sobre la que se injertan las piezas de `Gustavo`.
 ## 4 · Fases
 
 ### Fase 0 — Línea base, antes de mezclar
+
 Medir qué pasa y qué falla **ya** en `Moises`, para no atribuir al merge algo
 que venía roto de antes.
 
 ### Fase 1 — Merge y conflictos mecánicos
+
 `git merge origin/Gustavo`, y resolver los tres que son unión de dos añadidos
 en el mismo sitio:
 
@@ -103,6 +102,7 @@ en el mismo sitio:
   limpio entre pruebas que exige `fc1cfdc`.
 
 ### Fase 2 — `Asistente.jsx` a mano
+
 Base: la versión de `Moises`. Se injerta encima, en este orden:
 
 1. `export const NOMBRE = "Tdconcito"` y sus cinco usos (rótulo, `aria-label`
@@ -113,37 +113,40 @@ Base: la versión de `Moises`. Se injerta encima, en este orden:
 4. Esperar turno en la cola se pinta como espera, **no** como error.
 
 ### Fase 3 — Arreglar lo que la base traía roto
+
 `scripts/verificar-herramientas.mjs` no conoce `controlar_bomba` y por eso
 falla en `Moises` desde `2c344a4`. La lista esperada se actualiza aquí, con el
 catálogo ya completo de las dos ramas.
 
 ### Fase 4 — Documentación de cara al usuario
+
 El `README.md` que gana el merge es el de `Gustavo` y su tabla de herramientas
 no menciona `controlar_bomba` ni el rediseño del tablero. Se completa.
 
 ### Fase 5 — Verificación
+
 Todo lo automatizable, y el resto anotado para la prueba en pantalla:
 
-| Comprobación | Cómo |
-|---|---|
-| Frontend | `cd react-dashboard && npm test` |
-| Contrato HTTP | `node scripts/verificar-backend.mjs` |
-| Herramientas | `node scripts/verificar-herramientas.mjs` |
-| Bucle de chat + cola | `node scripts/verificar-chat.mjs` |
-| Voz / manos libres | `node scripts/verificar-voz.mjs`, `verificar-manos-libres.mjs` |
-| Compilación | `cd react-dashboard && npm run build` |
-| Arranque sin 3D | `node scripts/verificar-bundle.mjs` |
+| Comprobación         | Cómo                                                           |
+| -------------------- | -------------------------------------------------------------- |
+| Frontend             | `cd react-dashboard && npm test`                               |
+| Contrato HTTP        | `node scripts/verificar-backend.mjs`                           |
+| Herramientas         | `node scripts/verificar-herramientas.mjs`                      |
+| Bucle de chat + cola | `node scripts/verificar-chat.mjs`                              |
+| Voz / manos libres   | `node scripts/verificar-voz.mjs`, `verificar-manos-libres.mjs` |
+| Compilación          | `cd react-dashboard && npm run build`                          |
+| Arranque sin 3D      | `node scripts/verificar-bundle.mjs`                            |
 
 ## 5 · Resultado por fase
 
-| Fase | Qué pasó | Verificación |
-|---|---|---|
-| 0 | Línea base medida en `Moises` | 191 pruebas de frontend en verde; `verificar-herramientas.mjs` **ya fallaba** (ver Fase 3) |
-| 1 | Merge y los tres conflictos mecánicos | `app.mjs`, `herramientas.mjs` y `asistente.test.jsx` resueltos por unión; `chat.mjs` y `App.jsx` los resolvió Git |
-| 2 | `Asistente.jsx` a mano | Carcasa de `Moises` + voz de `Gustavo`; `lib/useDictado.js` borrado |
-| 3 | `verificar-herramientas.mjs` puesto al día | 53 comprobaciones, **6 nuevas** sobre `controlar_bomba` |
-| 4 | Documentación | `README.md`, `backend/README.md` y `.env.example` |
-| 5 | Verificación completa | **205** frontend · **51** contrato · **53** herramientas · **42** chat · **12** voz · **11** manos libres · compila · arranque sin 3D |
+| Fase | Qué pasó                                   | Verificación                                                                                                                          |
+| ---- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Línea base medida en `Moises`              | 191 pruebas de frontend en verde; `verificar-herramientas.mjs` **ya fallaba** (ver Fase 3)                                            |
+| 1    | Merge y los tres conflictos mecánicos      | `app.mjs`, `herramientas.mjs` y `asistente.test.jsx` resueltos por unión; `chat.mjs` y `App.jsx` los resolvió Git                     |
+| 2    | `Asistente.jsx` a mano                     | Carcasa de `Moises` + voz de `Gustavo`; `lib/useDictado.js` borrado                                                                   |
+| 3    | `verificar-herramientas.mjs` puesto al día | 53 comprobaciones, **6 nuevas** sobre `controlar_bomba`                                                                               |
+| 4    | Documentación                              | `README.md`, `backend/README.md` y `.env.example`                                                                                     |
+| 5    | Verificación completa                      | **205** frontend · **51** contrato · **53** herramientas · **42** chat · **12** voz · **11** manos libres · compila · arranque sin 3D |
 
 ### Lo que la Fase 2 encontró y no estaba en el plan
 
@@ -181,10 +184,10 @@ Nada de esto lo puede confirmar una prueba automática; necesita el servidor
 ICONICS y los tres procesos de IA arriba (recordatorio: GENESIS64 tarda 3-4
 minutos en levantar sus servicios tras reiniciar):
 
-- [ ] El panel maximizado, el adjunto de texto y el trazo siguen como en `Moises`.
-- [ ] El micrófono transcribe por Whisper y el texto cae en el cuadro de entrada.
-- [ ] El modo llamada cierra el turno solo al callarse y responde en voz.
-- [ ] Dos pestañas preguntando a la vez: la segunda ve su puesto en la fila.
-- [ ] Cerrar el panel y recargar conserva el hilo.
-- [ ] `controlar_bomba` sigue encendiendo y apagando contra el tag real.
-- [ ] Los tres temas (claro, oscuro, Mitsubishi) siguen bien en el asistente.
+- [x ] El panel maximizado, el adjunto de texto y el trazo siguen como en `Moises`.
+- [ x] El micrófono transcribe por Whisper y el texto cae en el cuadro de entrada.
+- [ x] El modo llamada cierra el turno solo al callarse y responde en voz.
+- [x ] Dos pestañas preguntando a la vez: la segunda ve su puesto en la fila.
+- [x ] Cerrar el panel y recargar conserva el hilo.
+- [ x] `controlar_bomba` sigue encendiendo y apagando contra el tag real.
+- [ x] Los tres temas (claro, oscuro, Mitsubishi) siguen bien en el asistente.
