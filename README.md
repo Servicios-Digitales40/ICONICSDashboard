@@ -228,13 +228,21 @@ Es **opcional y está apagado por defecto**. Se enciende apuntando `IA_BASE` a
 un llama-server local:
 
 ```bash
-llama-server.exe -m <modelo>.gguf --jinja --host 127.0.0.1 --port 8080 -c 4096 -ngl 99 --parallel 1
+llama-server.exe -m <modelo>.gguf --jinja --host 127.0.0.1 --port 8080 -c 24576 -ngl 99 --parallel 1
 ```
 
-Dos cosas de esa línea no son opcionales. **`--jinja`** activa la plantilla de
+Tres cosas de esa línea no son opcionales. **`--jinja`** activa la plantilla de
 chat del modelo: sin ella no ve las herramientas y contesta de memoria, que es
-el modo de fallo más peligroso porque parece que funciona. Y **`127.0.0.1`**,
-porque llama-server no tiene autenticación de ninguna clase.
+el modo de fallo más peligroso porque parece que funciona. **`127.0.0.1`**,
+porque llama-server no tiene autenticación de ninguna clase. Y **`-c 24576`**:
+las instrucciones del sistema más el esquema de las 22 herramientas ya pesan
+~10.800 tokens antes de que el modelo pida nada, y `estado_del_sistema` con
+varias señales fuera de banda a la vez puede sumar otros ~4.200 — con `-c
+4096` (la cifra de cuando el tanque tenía ocho señales) la primera llamada a
+`estado_del_sistema` desbordaba el contexto y llama-server la rechazaba en
+seco. Medido el 10-09-2026 tras el Plan 27 (52 señales catalogadas): peor caso
+~15.000 tokens sólo en la primera ronda; 24576 deja margen para el historial
+de la conversación y una segunda ronda de herramienta.
 
 Tres reglas del diseño, por si sorprenden en pantalla:
 

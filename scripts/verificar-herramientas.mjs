@@ -1210,11 +1210,18 @@ await checkAsync('redondear no convierte un hueco ni un booleano en cero', async
 })
 
 await checkAsync('la booleana se dice con su palabra, no con true/false', async () => {
+  // `modoVdf` es `nominal` (ni alarma ni reposo): desde el Plan 27
+  // (compactación del contexto, 10-09-2026) una señal nominal viaja con la
+  // forma mínima, pero `texto` —el propio valor legible— sigue presente
+  // aun ahí, no es parte de lo que se recorta.
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const modo = r.activos.flatMap(a => a.senales).find(s => s.clave === 'modoVdf')
 
   assert.equal(modo.texto, 'Automático')
-  assert.ok(modo.nota, 'y se confiesa que la correspondencia no está confirmada')
+
+  // La nota sí se recorta en una señal nominal: se comprueba directamente
+  // en el dominio, que es donde vive de verdad y no depende de este resumen.
+  assert.ok(SENALES.modoVdf.nota, 'y el catálogo confiesa que la correspondencia no está confirmada')
 })
 
 await checkAsync('el aviso de umbrales viaja en el campo QUE VIGILA la red de seguridad', async () => {
@@ -1252,16 +1259,25 @@ await checkAsync('la hora de lectura se da legible y en local, no en ISO', async
   assert.match(r.leidoA, /^\d{2}:\d{2}:\d{2}$/, `leidoA fue "${r.leidoA}"`)
 })
 
-await checkAsync('cada señal lleva su banda, para no obligar al modelo a restar', async () => {
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
+await checkAsync('la señal que pide atención lleva su banda, para no obligar al modelo a restar', async () => {
+  // Desde el Plan 27 (compactación del contexto, 10-09-2026) sólo las
+  // señales que piden algo —crítico, aviso, sin dato o reposo— llevan la
+  // banda completa; una `nominal` no la necesita porque el estado ya dice
+  // «En banda» y no hay nada que el modelo tenga que verificar restando. Se
+  // fuerza el nivel a aviso para seguir probando que, cuando SÍ hace falta,
+  // la banda entera viaja tal cual.
+  const client = clienteFalso({ valores: { ...EN_REPOSO, NIVEL_TANQUE: 20 } })
+  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
 
+  assert.equal(nivel.estado, 'En aviso')
   assert.deepEqual(nivel.banda, {
     limiteInferior: 15, avisoInferior: 25, avisoSuperior: 90, limiteSuperior: 95,
   })
 
   // `null` en un extremo es «sin límite», no cero. Leído como 0 marcaría en
-  // rojo media instalación.
+  // rojo media instalación. `cargaMotor` está en reposo en el fixture, y
+  // reposo también lleva detalle completo.
   const carga = r.activos.flatMap(a => a.senales).find(s => s.clave === 'cargaMotor')
   assert.equal(carga.banda.limiteInferior, 'sin límite')
 })

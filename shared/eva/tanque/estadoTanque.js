@@ -154,7 +154,7 @@ export const avisoDeUmbralesTanque = () =>
     }
     : {};
 
-/** Una señal en la forma que el modelo lee mejor. */
+/** Una señal en la forma que el modelo lee mejor: todos los campos. */
 function describir(s) {
   return {
     senal: s.label,
@@ -172,6 +172,44 @@ function describir(s) {
     ...(s.nota ? { nota: s.nota } : {}),
   };
 }
+
+/**
+ * Una señal SIN nada que pedir atención (`nominal`/`reposo`), en la forma
+ * mínima que basta para contarla: nombre, valor, unidad, estado.
+ *
+ * ── POR QUÉ EXISTE ESTA VERSIÓN, Y POR QUÉ SÓLO PARA ÉSTAS ─────────
+ *
+ * El catálogo pasó de 8 señales a 52 en el Plan 27 F1-F6, y `describir()` con
+ * banda + nota + historia por señal escaló con él: el resumen completo del
+ * tanque pesa ~4.300 tokens, que sumados a las instrucciones del sistema y al
+ * esquema de las herramientas (~10.800 juntos) ya no caben en el `-c 4096`
+ * que el README lleva recomendando desde que la máquina tenía ocho señales
+ * (Plan 27, hallazgo del 10-09-2026: una pregunta por el estado de planta
+ * devolvía «contexto excedido»).
+ *
+ * La banda, la nota y el aviso de reposo son exactamente lo que un modelo
+ * necesita para juzgar una señal que SÍ pide algo — y exactamente lo que
+ * sobra para contar una que no: una vez que el estado ya dice «En banda», el
+ * límite contra el que se comparó no cambia la respuesta a ninguna pregunta
+ * razonable. `critico`, `atencion`, `sin_dato` y `reposo` siguen usando
+ * `describir()` completo: las tres primeras pueden necesitarse para razonar
+ * una avería, y `reposo` lleva el porqué (`porQueReposo`) que evita que el
+ * modelo lea «Caudal: 0» y lo trate como un fallo — es justo el caso que la
+ * cabecera de este archivo dedica un apartado a no perder.
+ */
+function describirCompacto(s) {
+  return {
+    senal: s.label,
+    clave: s.clave,
+    valor: redondear(s.valor, s.decimales),
+    ...(s.texto ? { texto: s.texto } : {}),
+    unidad: s.unidad || null,
+    estado: estadoInfo(s.estado).label,
+  };
+}
+
+/** ¿Esta señal necesita su descripción completa, o basta la compacta? */
+const NECESITA_DETALLE = new Set(["critico", "atencion", "sin_dato", "reposo"]);
 
 /**
  * El estado del tanque, para el asistente.
@@ -248,7 +286,9 @@ export function resumenTanqueParaAsistente(estado, ctx = {}) {
           "nominal",
         ),
       ).label,
-      senales: estado.senales.filter((s) => s.grupo === g.id).map(describir),
+      senales: estado.senales
+        .filter((s) => s.grupo === g.id)
+        .map((s) => (NECESITA_DETALLE.has(s.estado) ? describir(s) : describirCompacto(s))),
     })),
 
     conHistoria: estado.senales.filter((s) => s.historia).map((s) => s.label),
