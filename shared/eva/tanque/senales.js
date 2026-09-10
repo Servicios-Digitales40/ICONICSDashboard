@@ -351,10 +351,11 @@ const CATALOGO = [
    * activos—, porque su polaridad es la que dice su propio nombre: `true` es
    * la condición mala en las ocho, sin excepción, según el PDF. `CONTROL` es
    * `naturaleza: "mando"`: una orden, no una condición. `PARO_DE_EMERGENCIA`
-   * NO lleva `naturaleza`: el PDF señala que su polaridad **no está
-   * confirmada** (podría ser lógica invertida), así que se trata como
-   * cualquier booleano sin banda —se informa, no se juzga— hasta que alguien
-   * la confirme contra el programa real.
+   * SÍ es `naturaleza: "alarma"`, con `invertida: true`: el PDF sugería lógica
+   * de contacto normalmente cerrado (`TRUE` = sin emergencia) y quien opera la
+   * instalación lo confirmó el 10-09-2026 contra el programa real. `estado.js`
+   * lee `invertida` antes de juzgar el bit, así que aquí no se niega el valor
+   * a mano — sería la misma inversión escrita dos veces, en dos archivos.
    */
   {
     key: "nivelAltoAlto",
@@ -549,20 +550,24 @@ const CATALOGO = [
     unidad: "",
     decimales: 0,
     tipo: "booleano",
-    // Sin `naturaleza`: se trata como cualquier booleano sin banda (ver la
-    // cabecera de `estado.js`), porque su polaridad no está confirmada.
+    naturaleza: "alarma",
+    // Lógica de contacto normalmente cerrado: `TRUE` es "sin emergencia",
+    // `FALSE` es la condición mala. `invertida: true` se lo dice a
+    // `estadoDeSenal()` antes de juzgar el bit — sin esto, la regla genérica
+    // de alarma («TRUE es la condición mala») leería exactamente al revés.
+    invertida: true,
+    estadoActivo: "critico",
     // Plan 27 F5: activo propio («Seguridad») — ver la nota de `control`.
     activo: "seguridad",
     historizado: true,
     escala: null,
     subirEsBueno: null,
     soloEnMarcha: false,
-    etiquetas: { true: "Activo", false: "Inactivo" },
+    etiquetas: { true: "Sin emergencia", false: "Emergencia activada" },
     // PDF §1.1: "Valor inicial TRUE sugiere lógica de contacto normalmente
-    // cerrado (TRUE = sin emergencia). Verificar la polaridad antes de
-    // usarla en lógica nueva." No verificado: no se pinta como alarma hasta
-    // que alguien lo confirme contra el programa real del PLC.
-    nota: "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma.",
+    // cerrado (TRUE = sin emergencia)." Confirmado el 10-09-2026 por quien
+    // opera la instalación, contra el programa real del PLC.
+    nota: "Lógica invertida confirmada: TRUE es SIN emergencia, FALSE es la emergencia activada.",
   },
 
   /*

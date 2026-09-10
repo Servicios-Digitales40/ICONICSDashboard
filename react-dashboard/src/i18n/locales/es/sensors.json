@@ -87,7 +87,7 @@
     "paroDeEmergencia": {
       "label": "Paro de emergencia",
       "corto": "Paro emerg.",
-      "nota": "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma."
+      "nota": "Lógica invertida confirmada: TRUE es SIN emergencia, FALSE es la emergencia activada."
     },
     "corrienteL1": {
       "label": "Corriente de línea (L1)",

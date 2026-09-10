@@ -15,7 +15,7 @@
   "allAssets": "All assets",
   "loading": "Querying the alarm history…",
   "vivo": {
-    "sub": "The state right now of the eight PLC alarms, grouped by asset — unlike History, this is genuinely a live panel.",
+    "sub": "The state right now of the PLC alarms, grouped by asset — unlike History, this is genuinely a live panel.",
     "loading": "Reading the plant state…",
     "sinAlarmas": "No active alarms",
     "activas_one": "{{count}} active alarm",

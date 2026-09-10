@@ -281,11 +281,9 @@ export function valorEn(clave, ms) {
     case 'control':
       return marcha
 
-    /* Polaridad sin confirmar (ver `nota` del catálogo): se simula en su
-       estado de reposo declarado por el PDF —TRUE, "sin emergencia"— y sin
-       ningún evento que lo cambie, porque inventar un paro de emergencia
-       simulado sería afirmar la misma polaridad que el catálogo confiesa no
-       tener confirmada. */
+    /* Lógica invertida confirmada (ver `nota` del catálogo): TRUE es "sin
+       emergencia". Se simula siempre en ese estado sano, sin ningún evento
+       que lo cambie — la demo no fabrica una emergencia. */
     case 'paroDeEmergencia':
       return true
 

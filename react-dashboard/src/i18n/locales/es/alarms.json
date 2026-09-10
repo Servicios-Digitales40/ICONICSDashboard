@@ -15,7 +15,7 @@
   "allAssets": "Todos los activos",
   "loading": "Consultando el historial de alarmas…",
   "vivo": {
-    "sub": "El estado ahora mismo de las ocho alarmas del PLC, agrupadas por activo — a diferencia del Historial, esto sí es un semáforo en vivo.",
+    "sub": "El estado ahora mismo de las alarmas del PLC, agrupadas por activo — a diferencia del Historial, esto sí es un semáforo en vivo.",
     "loading": "Leyendo el estado de la instalación…",
     "sinAlarmas": "Sin alarmas activas",
     "activas_one": "{{count}} alarma activa",

@@ -9,8 +9,8 @@
  * cabecera decía, con razón, que no era un semáforo en vivo: no había nada en
  * vivo que mostrar.
  *
- * «En vivo» es nueva (Plan 27, tras historizar las ocho alarmas del PLC en
- * F6): el estado AHORA MISMO de `naturaleza: "alarma"` en `senales.js`, leído
+ * «En vivo» es nueva (Plan 27, tras historizar las alarmas del PLC en F6):
+ * el estado AHORA MISMO de `naturaleza: "alarma"` en `senales.js`, leído
  * del mismo sistema que ya usa Planta (`useSistemaAgua`) — no pide nada
  * aparte al servidor. Es genuinamente un semáforo en vivo, pero de OTRA
  * fuente: un bit del PLC, no un evento configurado en el Alarm Server. Que

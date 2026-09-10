@@ -195,6 +195,20 @@ function describir(s) {
  * `describir()` completo: las tres primeras pueden necesitarse para razonar
  * una avería, y `reposo` lleva el porqué (`porQueReposo`) que evita que el
  * modelo lea «Caudal: 0» y lo trate como un fallo — es justo el caso que la
+ *
+ * ── Y CUALQUIER SEÑAL CON `nota`, SIN IMPORTAR SU ESTADO ────────────
+ *
+ * Hallazgo real del 10-09-2026, con el asistente en marcha contra la planta:
+ * `paroDeEmergencia` es `nominal` casi siempre (es un booleano sin
+ * `naturaleza`, ver `estado.js`), así que caía en esta versión compacta —y
+ * se perdía su `nota`: «Polaridad sin confirmar: no se pinta como alarma»,
+ * que es justo el aviso de que un `true` probablemente significa «SIN
+ * emergencia» y no lo contrario (PDF §1.1). Sin la nota, el modelo dijo «el
+ * paro de emergencia está activo» leyendo `true` como si la polaridad fuera
+ * obvia — el peor tipo de error posible en una señal de seguridad. Una
+ * `nota` no es texto de relleno: es la única forma que tiene el dominio de
+ * decirle al modelo «esto necesita un matiz», y comprimir por defecto según
+ * el estado la borraba sin mirar qué decía.
  * cabecera de este archivo dedica un apartado a no perder.
  */
 function describirCompacto(s) {
@@ -288,7 +302,9 @@ export function resumenTanqueParaAsistente(estado, ctx = {}) {
       ).label,
       senales: estado.senales
         .filter((s) => s.grupo === g.id)
-        .map((s) => (NECESITA_DETALLE.has(s.estado) ? describir(s) : describirCompacto(s))),
+        .map((s) =>
+          NECESITA_DETALLE.has(s.estado) || s.nota ? describir(s) : describirCompacto(s)
+        ),
     })),
 
     conHistoria: estado.senales.filter((s) => s.historia).map((s) => s.label),

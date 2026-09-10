@@ -113,23 +113,26 @@ export function enReposo(valores = {}) {
  * Estado de una señal concreta.
  *
  * `valor` llega ya saneado (número, booleano o `null`). Las booleanas SIN
- * `naturaleza` declarada (`modoVdf`, y `PARO_DE_EMERGENCIA` desde el Plan 27
- * F3) no tienen banda: con lectura son `nominal` y sin ella `sin_dato`, porque
- * un modo de operación no es ni bueno ni malo — y porque en el caso de
- * `PARO_DE_EMERGENCIA` la polaridad del bit está sin confirmar (ver su `nota`
- * en el catálogo): dictaminar `critico` o `nominal` sobre un booleano cuyo
- * significado no se conoce sería inventar, no leer.
+ * `naturaleza` declarada (`modoVdf`) no tienen banda: con lectura son
+ * `nominal` y sin ella `sin_dato`, porque un modo de operación no es ni bueno
+ * ni malo.
  *
  * ── `naturaleza: "alarma"` ES DISTINTO, Y A PROPÓSITO (Plan 27 F3) ────
  *
- * Las ocho de `ALARMAS/` sí tienen una polaridad confirmada por el propio
- * nombre del bit (`Lista-variables.pdf` §1.10): `true` es la condición mala.
+ * Las ocho de `ALARMAS/` tienen una polaridad confirmada por el propio nombre
+ * del bit (`Lista-variables.pdf` §1.10): `true` es la condición mala.
  * Tratarlas como boolean genérico las dejaría siempre en `nominal` —una
  * alarma activa disfrazada de instalación sana—, así que aquí SÍ se juzga:
  * `true` → `meta.estadoActivo` (`"critico"` si no se declara), `false` →
  * `nominal`. `estadoActivo` distingue los pares de dos niveles del propio PLC
  * (`NIVEL_ALTO` es aviso, `NIVEL_ALTO_ALTO` es crítico) sin inventar un umbral
  * nuevo: es la misma distinción que ya hace el nombre del bit.
+ *
+ * `PARO_DE_EMERGENCIA` es la única con `meta.invertida: true` (confirmado por
+ * quien opera la instalación el 10-09-2026, ver su `nota` en el catálogo):
+ * su `true` es la condición BUENA («sin emergencia»), así que se lee al
+ * revés de las otras siete antes de aplicar la misma regla — no se le pide
+ * al catálogo un segundo campo `naturaleza` sólo para esto.
  */
 export function estadoDeSenal(key, valor, { reposo = false } = {}) {
   const meta = SENALES[key];
@@ -138,7 +141,8 @@ export function estadoDeSenal(key, valor, { reposo = false } = {}) {
   if (meta.naturaleza === "alarma") {
     if (reposo && meta.soloEnMarcha) return "reposo";
     if (valor === null || valor === undefined) return "sin_dato";
-    return valor ? meta.estadoActivo ?? "critico" : "nominal";
+    const condicionMala = meta.invertida ? !valor : valor;
+    return condicionMala ? meta.estadoActivo ?? "critico" : "nominal";
   }
 
   /*

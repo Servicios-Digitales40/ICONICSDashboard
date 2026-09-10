@@ -172,7 +172,7 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
             sondeando `/api/iconics/alarms` cada 30s en TODAS las pantallas
             —no sólo estando en Alarmas—, y sigue contando el HISTORIAL de
             GENESIS64, que ahora es sólo media página: la pestaña nueva («En
-            vivo») lee las ocho alarmas del PLC del sistema ya cargado, sin
+            vivo») lee las alarmas del PLC del sistema ya cargado, sin
             pedir nada aparte. Un contador aquí que tuviera sentido para las
             dos pestañas leería `activo.alarmas.activas` del sistema en vivo
             (mismo dato que ya usa `TarjetaActivo`), no `useAlarmCount()`.

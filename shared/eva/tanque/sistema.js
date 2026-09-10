@@ -140,8 +140,18 @@ function createActivo(id, porClave) {
      * la vista de Planta necesita saber CUÁNTAS alarmas hay y cuántas están
      * activas para pintar un indicador, no sólo si el activo está en rojo
      * por otra razón. Ver `ALARMAS` en `senales.js` para el criterio.
+     *
+     * `s.estado === activo`, NO `s.valor === true`: `paroDeEmergencia` es
+     * `invertida` (confirmado el 10-09-2026, ver su `nota`) — su condición
+     * mala es `false`, no `true`. Comparar contra el `estado` ya calculado
+     * por `estadoDeSenal()` es correcto para cualquier polaridad, invertida
+     * o no; comparar el `valor` crudo asumía que las ocho alarmas del PLC
+     * comparten la misma polaridad, y desde esta señal ya no es cierto.
      */
-    alarmas: { total: alarmas.length, activas: alarmas.filter((s) => s.valor === true).length },
+    alarmas: {
+      total: alarmas.length,
+      activas: alarmas.filter((s) => s.estado === (s.estadoActivo ?? "critico")).length,
+    },
   };
 }
 

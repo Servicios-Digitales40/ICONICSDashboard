@@ -87,7 +87,7 @@
     "paroDeEmergencia": {
       "label": "Emergency Stop",
       "corto": "E-Stop",
-      "nota": "State of the emergency-stop circuit. Polarity unconfirmed: not shown as an alarm."
+      "nota": "Confirmed inverted logic: TRUE means NO emergency, FALSE means the emergency is active."
     },
     "corrienteL1": {
       "label": "Line Current (L1)",
