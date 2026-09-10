@@ -385,6 +385,71 @@ señales devolvían la temperatura del tanque). La sonda que hizo este sondeo
 sale reforzada en F6: recorre `ac:` para el valor en vivo y `hda:` para la
 serie, y ahora sabe construir el segundo nombre a partir del primero.
 
+### 4.1 · 09/10-09-2026 — Las trece ramas SÍ tienen serie propia, y julio ya estaba (parcialmente) ahí
+
+Dos sesiones después, con el árbol reorganizado ya un día más maduro, se repitió
+el sondeo por rama y cambió la conclusión de arriba en dos puntos:
+
+**Las doce ramas nuevas ya devuelven muestras reales**, no cero. Cada una
+—`INSTRUMENTACION_PROCESO`, `SOLENOIDE_1`, `SOLENOIDE_2`, `BOMBA_DE_AIRE`,
+`AUTOMATISMO_LLENADO_VACIADO`, `LECTURA_VARIADOR_MODBUS_RTU`,
+`MEDIDOR_DE_ENERGIA`, `ALARMAS`, `ADVERTENCIAS_ESTADO_OPERACION`,
+`CONTADORES_VARAIBLES_MAQUINA`, `SEGURIDAD`, `MANDO_DEL_VARIADOR_VFD`— tiene ya
+al menos una muestra reciente por punto. Pero ninguna era todavía una historia
+*contigua*: bloques de horas separados por huecos de medio día a un día
+completo, compatibles con una colección que se enciende y apaga, no con un
+fallo. Comprobado con `NIVEL_TANQUE` en detalle: tres tramos densos de ~6-7 h
+cada uno entre el 07-09 16:30 y el 10-09, y nada en absoluto antes de eso —hasta
+donde se sondeó, 96 h atrás.
+
+**Ese "nada antes" resultó ser incompleto, no falso.** El sondeo de `NIVEL_TANQUE`
+sólo miró 96 h hacia atrás; nunca llegó a julio. Sondeando los tres puntos
+sueltos de la raíz (`Flujo Lmin`, `Presion mBar`, `Tension` — el resto de la
+reubicación de `INDICE_DESVIACION_VOLTAJE`) con ventanas de meses sí apareció lo
+que el usuario recordaba: **historia real y contigua del 2026-07-01 al
+2026-08-07**, con un patrón de lunes a viernes (fin de semana sin muestra) y
+sólo ~11 de 24 horas activas por día — compatible con una instalación que sólo
+corría en horario de trabajo. Desde el 08-08 esos tres puntos están muertos.
+Son casi con toda seguridad los antecesores, con el nombre de área viejo
+(`DEMO DANONE`), de `flujoInstantaneo`, `presionRelativa` y `tensionLinea` —
+que hoy ya no leen de ahí.
+
+**Nombres `hda:` que no derivan del `ac:` por regla fija — confirmado con dos
+casos concretos**, no sólo en teoría: `DP_ENERGIA_APARENTEL1` (catálogo) es
+`DP_EENERGIA_APARENTEL1` en el servidor (typo, doble E), y `Modo_AM_VDF`
+(catálogo) es `MODO_AM_VDF` en mayúsculas. Los dos se confirmaron con
+`browse()` sobre la carpeta, no adivinando.
+
+### 4.2 · 10-09-2026 — Julio insertado a propósito en las 50 señales del árbol actual
+
+A petición del usuario, y con las dos correcciones de arriba ya mapeadas, se
+insertó un mes completo simulado (2026-07-01 a 2026-07-31, horario laboral
+07:00-17:00, cada 5 min) contra el servidor real, con
+`node scripts/generar-historia-simulada.mjs --todas` (ahora soporta ese modo,
+más `--solo <clave>` para repetir una sola señal). Usa la física ya calibrada
+de `shared/eva/tanque/simulador.js` —la misma que ve la demo en vivo— en vez de
+duplicar fórmulas, y escribe contra `hda:` con la tabla rama→carpeta de este
+archivo. Quedan fuera a propósito `cargaMotor` y `eficienciaEnergetica`: no
+tienen serie propia, comparten la de `temperaturaTanque` (§ cabecera de
+`senales.js`).
+
+49 de 50 señales escribieron sus 2.783 muestras a la primera. `nivelTanque`
+falló las 2.783 con `"Bad - Entry Exists"` — porque, a diferencia de las 49
+restantes, **ya tenía datos reales de julio de una campaña anterior** (valores
+que no coinciden con la física nueva), y el borrado previo no llegó a limpiarlos
+a tiempo antes del reintento de escritura — contención transitoria, al ser el
+punto más activo de todo el árbol (colección en vivo cada pocos segundos). Un
+segundo ciclo borrar→escribir, ya sin esa contención, lo resolvió por completo
+(el script ahora reintenta esto solo). Esto significa que la conclusión de
+§4.1 sobre `NIVEL_TANQUE` — "nada antes del 07-09" — estaba incompleta: sólo no
+se había mirado lo bastante atrás.
+
+**Sigue pendiente de este lado del usuario**: confirmar en la consola de
+ICONICS que el `Min Time Extent` del Data Logger sigue alto (ver la cabecera de
+`generar-historia-simulada.mjs`, incidente del 26-08) — si volvió a bajar,
+julio entero puede purgarse solo, sin ningún error visible, y habría que
+repetir la inserción.
+
 ---
 
 ## 5 · Las fases
