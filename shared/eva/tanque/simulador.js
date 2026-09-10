@@ -372,6 +372,39 @@ export function valorEn(clave, ms) {
     case 'setpointVaciado':
       return 40
 
+    /*
+     * ── PLAN 27 F5: ELECTROVÁLVULAS Y BOMBA DE AIRE ─────────────────────
+     *
+     * S1 (inferior) abre en el paro —el mismo tramo que ya llena el
+     * tanque—, S2 (superior) abre impulsando —el mismo tramo que ya lo
+     * vacía—: no son un ciclo nuevo, son las válvulas de la MISMA
+     * alternancia que `arranqueParoLlenado`/`arranqueParoVaciado` ya
+     * describen. El estado de cada una se deriva de su propia orden: sin
+     * mantenimiento activo en la demo, `2` (en marcha) mientras la orden lo
+     * pide, `1` (apagado) en el resto.
+     */
+    case 'manualAutoS1':
+    case 'manualAutoS2':
+    case 'manualAutoBa':
+      return false
+    case 'arranqueParoS1':
+      return !marcha
+    case 'arranqueParoS2':
+      return marcha
+    case 'mttoS1':
+    case 'mttoS2':
+    case 'mttoBa':
+      return false
+    case 'estadoS1':
+      return !marcha ? 2 : 1
+    case 'estadoS2':
+      return marcha ? 2 : 1
+    // La bomba de aire acompaña al motor principal.
+    case 'arranqueParoBa':
+      return marcha
+    case 'estadoBa':
+      return marcha ? 2 : 1
+
     default:
       return null
   }

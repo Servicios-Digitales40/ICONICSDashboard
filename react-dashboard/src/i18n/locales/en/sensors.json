@@ -193,6 +193,66 @@
       "label": "Draining Setpoint",
       "corto": "Drain SP",
       "nota": "Level setpoint at which draining stops. Unit unconfirmed — assumed to be the same as Tank Level."
+    },
+    "manualAutoS1": {
+      "label": "Lower Solenoid Valve Mode",
+      "corto": "S1 Mode",
+      "nota": "Mode selector for the lower solenoid valve. Auto/Manual mapping unconfirmed — same criterion as the drive mode."
+    },
+    "arranqueParoS1": {
+      "label": "Lower Solenoid Valve Command",
+      "corto": "S1 Cmd",
+      "nota": "Open/close command for the lower solenoid valve."
+    },
+    "mttoS1": {
+      "label": "Maintenance Lockout (S1)",
+      "corto": "S1 Mtto",
+      "nota": "Maintenance lockout for the lower solenoid valve."
+    },
+    "estadoS1": {
+      "label": "Lower Solenoid Valve State",
+      "corto": "S1 State",
+      "nota": "State of the lower solenoid valve. 0 is the PLC's initial value: treated as no data, not as off."
+    },
+    "manualAutoS2": {
+      "label": "Upper Solenoid Valve Mode",
+      "corto": "S2 Mode",
+      "nota": "Mode selector for the upper solenoid valve. Auto/Manual mapping unconfirmed."
+    },
+    "arranqueParoS2": {
+      "label": "Upper Solenoid Valve Command",
+      "corto": "S2 Cmd",
+      "nota": "Open/close command for the upper solenoid valve."
+    },
+    "mttoS2": {
+      "label": "Maintenance Lockout (S2)",
+      "corto": "S2 Mtto",
+      "nota": "Maintenance lockout for the upper solenoid valve."
+    },
+    "estadoS2": {
+      "label": "Upper Solenoid Valve State",
+      "corto": "S2 State",
+      "nota": "State of the upper solenoid valve. 0 is the PLC's initial value: treated as no data, not as off."
+    },
+    "manualAutoBa": {
+      "label": "Air Pump Mode",
+      "corto": "AP Mode",
+      "nota": "Mode selector for the air pump. Auto/Manual mapping unconfirmed."
+    },
+    "arranqueParoBa": {
+      "label": "Air Pump Command",
+      "corto": "AP Cmd",
+      "nota": "Start/stop command for the air pump."
+    },
+    "mttoBa": {
+      "label": "Maintenance Lockout (Air Pump)",
+      "corto": "AP Mtto",
+      "nota": "Maintenance lockout for the air pump."
+    },
+    "estadoBa": {
+      "label": "Air Pump State",
+      "corto": "AP State",
+      "nota": "State of the air pump. 0 is the PLC's initial value: treated as no data, not as off."
     }
   },
   "quality": {

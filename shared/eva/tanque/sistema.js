@@ -31,6 +31,17 @@ import { ESTADOS_ORDEN, enReposo, estadoDeSenal, peor } from "./estado.js";
 import { bandaDe, margenConsumido } from "../comun/umbrales.js";
 
 /**
+ * Naturalezas que no se comparan contra un umbral (Plan 27 F3-F5): una
+ * `banda`/`margen` calculados de todos modos —sin entrada en `umbrales.js`,
+ * `bandaDe` cae en "nominal" siempre que haya valor— no mentirían para
+ * `mando`/`consigna`/`crudo` porque coinciden con lo que ya dice `estado`,
+ * pero SÍ contradirían a `estado` para un `"estado"` de equipo, que puede ser
+ * `critico`. Se excluyen las cuatro por igual para no depender de esa
+ * coincidencia.
+ */
+const SIN_BANDA_POR_NATURALEZA = new Set(["alarma", "mando", "consigna", "crudo", "estado"]);
+
+/**
  * Booleano utilizable o `null`.
  *
  * No vale `toNumber`: convertiría `false` en 0 y un 0 es un número perfectamente
@@ -57,9 +68,11 @@ function sanear(key, raw) {
 /**
  * Construye una señal ya evaluada.
  *
- * `texto` sólo lo llevan las booleanas, y sale de `etiquetas` del catálogo: es
- * la única forma de que «Manual»/«Automático» se escriba en un sitio y no en
- * cada tarjeta que lo pinte.
+ * `texto` lo llevan las booleanas y las de `naturaleza: "estado"` (Plan 27
+ * F5: un enumerado 1-4, no un booleano, pero igual de necesitado de una
+ * palabra), y sale de `etiquetas` del catálogo: es la única forma de que
+ * «Manual»/«Automático» —o «Run»/«Error»— se escriba en un sitio y no en cada
+ * tarjeta que lo pinte.
  */
 export function createSenal({
   key,
@@ -80,16 +93,29 @@ export function createSenal({
 
   const v = sanear(key, valor);
   const estado = estadoDeSenal(key, v, { reposo });
+  /*
+   * `naturaleza: "estado"` (Plan 27 F5) también lleva `texto` desde
+   * `etiquetas`, aunque su `tipo` sea "real" y no "booleano": es un
+   * enumerado (1-4), no una medida, y `SIN_BANDA` es la misma lista que ya
+   * excluye a `alarma`/`mando`/`consigna`/`crudo` de una banda que no les
+   * corresponde — aquí importa de verdad, porque a diferencia de esas
+   * cuatro, `estadoDeSenal` SÍ puede devolver algo distinto de `nominal`
+   * para un "estado", y una `banda` calculada aparte (que sin umbral
+   * declarado saldría siempre `nominal`) contradiría esa lectura.
+   */
+  const sinBanda = meta.tipo === "booleano" || SIN_BANDA_POR_NATURALEZA.has(meta.naturaleza);
 
   return {
     ...meta,
     valor: v,
-    texto: meta.tipo === "booleano" && v !== null ? meta.etiquetas?.[String(v)] ?? null : null,
+    texto: (meta.tipo === "booleano" || meta.naturaleza === "estado") && v !== null
+      ? meta.etiquetas?.[String(v)] ?? null
+      : null,
     estado,
     // La banda cruda se conserva junto al estado porque no son lo mismo: una
     // señal en `reposo` puede estar fuera de banda, y la tarjeta lo explica.
-    banda: meta.tipo === "booleano" ? null : bandaDe(key, v),
-    margen: meta.tipo === "booleano" ? null : margenConsumido(key, v),
+    banda: sinBanda ? null : bandaDe(key, v),
+    margen: sinBanda ? null : margenConsumido(key, v),
     /* Sólo cuando de verdad falta el valor: un motivo junto a una medición
        buena sería ruido, y peor, invitaría a leerlo como una advertencia. */
     motivo: v === null ? motivo : null,

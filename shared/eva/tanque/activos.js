@@ -25,19 +25,28 @@
  * Una tarjeta por señal daría sesenta y seis cajas idénticas sin jerarquía: la
  * pantalla volvería a ser la lista de tags que ya es la vista de Assets.
  * Agrupando por PREGUNTA —¿hay agua?, ¿se está impulsando?, ¿sale?, ¿con qué
- * energía?— cada tarjeta responde algo, y el orden de abajo es el del
- * recorrido físico del agua, que es como lo cuenta quien opera la instalación.
+ * energía?, ¿por dónde circula?, ¿está habilitado?— cada tarjeta responde
+ * algo, y el orden de abajo es el del recorrido físico del agua, que es como
+ * lo cuenta quien opera la instalación.
  *
- * Los dos activos nuevos que anticipa
- * `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` F5 —«Seguridad» y «Válvulas y
- * aire»— entran cuando el plan llegue a esa fase, no antes: el Plan 27 F3
- * dio de alta `CONTROL` y `PARO_DE_EMERGENCIA` (`SEGURIDAD/`) colgados
- * PROVISIONALMENTE de `electrico` —el activo del armario, donde suele
- * montarse un mando/paro real—, precisamente para no arrastrar el cambio de
- * cuatro a seis activos a una fase que no lo pedía: ese quinto activo toca a
- * la maqueta 3D, la accesibilidad y media docena de vistas más, y F5 es
- * donde se paga ese coste de una vez, con las señales de las válvulas
- * también listas.
+ * ── LOS DOS ACTIVOS DE F5, Y POR QUÉ NO ANTES ──────────────────────
+ *
+ * `CONTROL` y `PARO_DE_EMERGENCIA` (`SEGURIDAD/`) entraron al catálogo en el
+ * Plan 27 F3, colgados PROVISIONALMENTE de `electrico` —el activo del
+ * armario, donde suele montarse un mando/paro real—, precisamente para no
+ * arrastrar el cambio de cuatro a seis activos a una fase que no lo pedía.
+ * F5 es donde se paga ese coste de una vez, con las señales de las válvulas
+ * también listas: los dos activos nuevos, «Seguridad» (recoge lo que estaba
+ * provisional en `electrico`) y «Válvulas y aire» (las dos electroválvulas y
+ * la bomba de aire, que hasta ahora no tenían ningún hogar).
+ *
+ * `MANDO_DEL_VARIADOR_VFD/` queda con cinco puntos SIN catalogar
+ * (`DP_ESTADO_VFD`, `FRECUENCIA_VFD`, `MTTO_VFD`, `RESET_FALLA_VFD`,
+ * `START_STOP_VFD`) — encajarían en `bombeo`, que ya existe, pero ninguna
+ * fase de F0 a F5 los pide explícitamente
+ * (`docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §1, tabla de F5) y añadirlos aquí
+ * sería ensanchar el alcance sin que el plan lo haya decidido. Quedan
+ * pendientes para cuando se revise esa rama.
  *
  * Aquí no hay iconos ni colores: esto es dominio, se prueba en node y no
  * importa React. La presentación vive en `components/`.
@@ -68,6 +77,19 @@ const CATALOGO = [
     label: "Suministro eléctrico",
     corto: "Eléctrico",
     pregunta: "¿Con qué calidad de energía?",
+  },
+  // Plan 27 F5.
+  {
+    id: "valvulasYAire",
+    label: "Válvulas y aire",
+    corto: "Válvulas",
+    pregunta: "¿Por dónde está circulando, y en qué modo?",
+  },
+  {
+    id: "seguridad",
+    label: "Seguridad",
+    corto: "Seguridad",
+    pregunta: "¿Está el proceso habilitado, y se puede arrancar?",
   },
 ];
 

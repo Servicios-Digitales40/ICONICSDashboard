@@ -210,6 +210,8 @@ export const SISTEMAS = [
       // Plan 27 F4.
       "energía trifásica de línea, diez lecturas del variador por Modbus, y el " +
         "automatismo de llenado y vaciado",
+      // Plan 27 F5.
+      "el modo, la orden y el estado de las dos electroválvulas y la bomba de aire",
     ],
     /*
      * Las palabras que Whisper tiene que oír bien EN ESTE SISTEMA. Ver

@@ -193,6 +193,66 @@
       "label": "Consigna de vaciado",
       "corto": "SP vaciado",
       "nota": "Consigna de nivel a la que se detiene el vaciado. Unidad sin confirmar — se presume la misma de Nivel del tanque."
+    },
+    "manualAutoS1": {
+      "label": "Modo de la electroválvula inferior",
+      "corto": "Modo S1",
+      "nota": "Selector de modo de la electroválvula inferior. Correspondencia Automático/Manual no confirmada — mismo criterio que el modo del variador."
+    },
+    "arranqueParoS1": {
+      "label": "Orden de la electroválvula inferior",
+      "corto": "Orden S1",
+      "nota": "Orden de apertura/cierre de la electroválvula inferior."
+    },
+    "mttoS1": {
+      "label": "Bloqueo de mantenimiento (S1)",
+      "corto": "Mtto S1",
+      "nota": "Bloqueo por mantenimiento de la electroválvula inferior."
+    },
+    "estadoS1": {
+      "label": "Estado de la electroválvula inferior",
+      "corto": "Estado S1",
+      "nota": "Estado de la electroválvula inferior. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado."
+    },
+    "manualAutoS2": {
+      "label": "Modo de la electroválvula superior",
+      "corto": "Modo S2",
+      "nota": "Selector de modo de la electroválvula superior. Correspondencia Automático/Manual no confirmada."
+    },
+    "arranqueParoS2": {
+      "label": "Orden de la electroválvula superior",
+      "corto": "Orden S2",
+      "nota": "Orden de apertura/cierre de la electroválvula superior."
+    },
+    "mttoS2": {
+      "label": "Bloqueo de mantenimiento (S2)",
+      "corto": "Mtto S2",
+      "nota": "Bloqueo por mantenimiento de la electroválvula superior."
+    },
+    "estadoS2": {
+      "label": "Estado de la electroválvula superior",
+      "corto": "Estado S2",
+      "nota": "Estado de la electroválvula superior. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado."
+    },
+    "manualAutoBa": {
+      "label": "Modo de la bomba de aire",
+      "corto": "Modo BA",
+      "nota": "Selector de modo de la bomba de aire. Correspondencia Automático/Manual no confirmada."
+    },
+    "arranqueParoBa": {
+      "label": "Orden de la bomba de aire",
+      "corto": "Orden BA",
+      "nota": "Orden de marcha/paro de la bomba de aire."
+    },
+    "mttoBa": {
+      "label": "Bloqueo de mantenimiento (bomba de aire)",
+      "corto": "Mtto BA",
+      "nota": "Bloqueo por mantenimiento de la bomba de aire."
+    },
+    "estadoBa": {
+      "label": "Estado de la bomba de aire",
+      "corto": "Estado BA",
+      "nota": "Estado de la bomba de aire. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado."
     }
   },
   "quality": {

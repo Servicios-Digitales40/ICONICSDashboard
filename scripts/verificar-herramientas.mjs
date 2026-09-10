@@ -150,6 +150,20 @@ const EN_REPOSO = {
   RECIRCULACION_AUTOMATICA: true,
   SETPOINT_LLENANDO: 80,
   SETPOINT_VACIADO: 40,
+  // Plan 27 F5: en reposo, S1 (llenado) abierta y en marcha; S2 (vaciado) y
+  // la bomba de aire, cerradas/paradas. Ninguna en mantenimiento.
+  MANUAL_AUTO_S1: false,
+  START_STOP_S1: true,
+  MTTO_S1: false,
+  ESTADO_S1: 2,
+  MANUAL_AUTO_S2: false,
+  START_STOP_S2: false,
+  MTTO_S2: false,
+  ESTADO_S2: 1,
+  MANUAL_AUTO_BA: false,
+  START_STOP_BA: false,
+  MTTO_BA: false,
+  ESTADO_BA: 1,
 }
 
 /**
@@ -1909,6 +1923,13 @@ await checkAsync(
       'Consigna de frecuencia leída del variador', 'Potencia nominal parametrizada',
       'Tensión de salida hacia el motor', 'Orden de llenado', 'Orden de vaciado',
       'Recirculación automática', 'Consigna de llenado', 'Consigna de vaciado',
+      // Plan 27 F5: las doce de las electroválvulas y la bomba de aire.
+      'Modo de la electroválvula inferior', 'Orden de la electroválvula inferior',
+      'Bloqueo de mantenimiento (S1)', 'Estado de la electroválvula inferior',
+      'Modo de la electroválvula superior', 'Orden de la electroválvula superior',
+      'Bloqueo de mantenimiento (S2)', 'Estado de la electroválvula superior',
+      'Modo de la bomba de aire', 'Orden de la bomba de aire',
+      'Bloqueo de mantenimiento (bomba de aire)', 'Estado de la bomba de aire',
     ].sort())
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo

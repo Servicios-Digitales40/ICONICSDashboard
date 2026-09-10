@@ -117,6 +117,17 @@ export const LAYOUT = {
   // `aire: true` se lo dice a la maqueta, que no puede dibujarle un anillo en
   // el suelo a algo que está a cuatro metros del suelo.
   distribucion: { x: 0.3, y: 4.12, z: 0.27, rotY: 0, ficha: 0.95, aire: true },
+
+  /*
+   * Plan 27 F5: los dos activos nuevos, sin modelo 3D propio todavía —sus
+   * señales son puntos del PLC, no una pieza que ya estuviera dibujada en
+   * esta maqueta—, así que se anclan en el suelo, fuera del bastidor, en vez
+   * de forzarlos sobre la bandeja donde no hay sitio de sobra. Cuando exista
+   * un modelo propio para las electroválvulas y para un panel de mando, esto
+   * se sustituye por su posición real.
+   */
+  valvulasYAire: { x: 3.0, y: 0, z: 1.2, rotY: 0, ficha: 1.4 },
+  seguridad: { x: -3.0, y: 0, z: 1.5, rotY: 0, ficha: 1.8 },
 };
 
 /** Radio del suelo. Se encogió con la instalación: ya no hay nave que cubrir. */

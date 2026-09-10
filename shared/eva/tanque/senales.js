@@ -156,13 +156,13 @@ export const RAMAS = {
  *   decimales    cifras significativas al formatear
  *   tipo         "real" | "booleano"
  *   naturaleza   opcional; ausente = "medida" (comportamiento de siempre).
- *                "alarma" y "mando" están implementados desde F3; "consigna"
- *                y "crudo" desde F4 (ver `estadoDeSenal` en `./estado.js`,
- *                que trata a los tres últimos igual: se informa, no se
- *                juzga). "estado", "contador" y "sin_instrumento" siguen en
- *                el diseño de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 —
- *                entran cuando lo haga la fase que los necesite (F5), no
- *                antes.
+ *                "alarma" y "mando" desde F3; "consigna" y "crudo" desde F4;
+ *                "estado" desde F5 (ver `estadoDeSenal` en `./estado.js`:
+ *                "mando"/"consigna"/"crudo" se informan sin juzgar,
+ *                "estado" usa la tabla común `ESTADO_EQUIPO`). "contador" y
+ *                "sin_instrumento" siguen en el diseño de
+ *                `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 sin ninguna señal
+ *                que los use todavía.
  *   estadoActivo sólo con `naturaleza: "alarma"`: qué estado reporta cuando
  *                el bit está activo ("critico" si no se declara). Permite
  *                que un par de dos niveles del propio PLC (`NIVEL_ALTO` /
@@ -522,13 +522,11 @@ const CATALOGO = [
     decimales: 0,
     tipo: "booleano",
     naturaleza: "mando",
-    // Sin activo propio todavía: el quinto activo («Seguridad») es del Plan
-    // 27 F5, no de F3 — meterlo ya habría arrastrado la agrupación de la
-    // maqueta 3D, la accesibilidad y media docena de vistas más a un cambio
-    // que ese plan reserva para más adelante. Se cuelga de `electrico`
-    // porque el mando/paro de un proceso suele montarse junto al armario del
-    // suministro, y es donde ya vive `Modo del variador`.
-    activo: "electrico",
+    // Plan 27 F5: activo propio («Seguridad»). Hasta F4 vivía
+    // PROVISIONALMENTE en `electrico` para no arrastrar el cambio de cuatro
+    // a seis activos a una fase que no lo pedía — ver la cabecera de
+    // `activos.js`.
+    activo: "seguridad",
     historizado: false,
     escala: null,
     subirEsBueno: null,
@@ -553,9 +551,8 @@ const CATALOGO = [
     tipo: "booleano",
     // Sin `naturaleza`: se trata como cualquier booleano sin banda (ver la
     // cabecera de `estado.js`), porque su polaridad no está confirmada.
-    // Sin activo propio: ver la nota de `control`, aquí al lado — el quinto
-    // activo es del Plan 27 F5, no de F3.
-    activo: "electrico",
+    // Plan 27 F5: activo propio («Seguridad») — ver la nota de `control`.
+    activo: "seguridad",
     historizado: false,
     escala: null,
     subirEsBueno: null,
@@ -981,6 +978,238 @@ const CATALOGO = [
     subirEsBueno: null,
     soloEnMarcha: false,
     nota: "Consigna de nivel a la que se detiene el vaciado. Unidad sin confirmar — se presume la misma de Nivel del tanque.",
+  },
+
+  /*
+   * ── PLAN 27 F5: LAS DOS ELECTROVÁLVULAS Y LA BOMBA DE AIRE ──────────
+   *
+   * Doce señales de tres ramas (`SOLENOIDE_1_INFERIOR/`,
+   * `SOLENOIDE_2_SUPERIOR/`, `BOMBA_DE_AIRE/`), las tres con la MISMA forma
+   * (`Lista-variables.pdf` §1.4-§1.6): un selector de modo (booleano
+   * genérico, como `modoVdf`), una orden de apertura/marcha
+   * (`naturaleza: "mando"`), un bloqueo de mantenimiento
+   * (`naturaleza: "mando"` también: es una orden del operador, no una
+   * condición) y un estado de equipo (`naturaleza: "estado"`, la tabla
+   * común de `ESTADO_EQUIPO` en `./estado.js`).
+   *
+   * Primer uso real de `naturaleza: "estado"` en el catálogo — `MTTO_VFD` y
+   * `DP_ESTADO_VFD` (el mismo patrón, en `MANDO_DEL_VARIADOR_VFD/`) quedan
+   * fuera de esta fase, ver la cabecera de `activos.js`.
+   */
+  {
+    key: "manualAutoS1",
+    rama: "solenoide1Inferior",
+    tag: "MANUAL_AUTO_S1",
+    label: "Modo de la electroválvula inferior",
+    corto: "Modo S1",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Manual", false: "Automático" },
+    nota: "Selector de modo de la electroválvula inferior. Correspondencia Automático/Manual no confirmada — mismo criterio que el modo del variador.",
+  },
+  {
+    key: "arranqueParoS1",
+    rama: "solenoide1Inferior",
+    tag: "START_STOP_S1",
+    label: "Orden de la electroválvula inferior",
+    corto: "Orden S1",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Abrir", false: "Cerrar" },
+    nota: "Orden de apertura/cierre de la electroválvula inferior.",
+  },
+  {
+    key: "mttoS1",
+    rama: "solenoide1Inferior",
+    tag: "MTTO_S1",
+    label: "Bloqueo de mantenimiento (S1)",
+    corto: "Mtto S1",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Bloqueada", false: "Disponible" },
+    nota: "Bloqueo por mantenimiento de la electroválvula inferior.",
+  },
+  {
+    key: "estadoS1",
+    rama: "solenoide1Inferior",
+    tag: "ESTADO_S1",
+    label: "Estado de la electroválvula inferior",
+    corto: "Estado S1",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "estado",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { 1: "Apagado", 2: "En marcha", 3: "Error", 4: "Mantenimiento" },
+    nota: "Estado de la electroválvula inferior. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado.",
+  },
+
+  {
+    key: "manualAutoS2",
+    rama: "solenoide2Superior",
+    tag: "MANUAL_AUTO_S2",
+    label: "Modo de la electroválvula superior",
+    corto: "Modo S2",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Manual", false: "Automático" },
+    nota: "Selector de modo de la electroválvula superior. Correspondencia Automático/Manual no confirmada.",
+  },
+  {
+    key: "arranqueParoS2",
+    rama: "solenoide2Superior",
+    tag: "START_STOP_S2",
+    label: "Orden de la electroválvula superior",
+    corto: "Orden S2",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Abrir", false: "Cerrar" },
+    nota: "Orden de apertura/cierre de la electroválvula superior.",
+  },
+  {
+    key: "mttoS2",
+    rama: "solenoide2Superior",
+    tag: "MTTO_S2",
+    label: "Bloqueo de mantenimiento (S2)",
+    corto: "Mtto S2",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Bloqueada", false: "Disponible" },
+    nota: "Bloqueo por mantenimiento de la electroválvula superior.",
+  },
+  {
+    key: "estadoS2",
+    rama: "solenoide2Superior",
+    tag: "ESTADO_S2",
+    label: "Estado de la electroválvula superior",
+    corto: "Estado S2",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "estado",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { 1: "Apagado", 2: "En marcha", 3: "Error", 4: "Mantenimiento" },
+    nota: "Estado de la electroválvula superior. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado.",
+  },
+
+  {
+    key: "manualAutoBa",
+    rama: "bombaDeAire",
+    tag: "MANUAL_AUTO_BA",
+    label: "Modo de la bomba de aire",
+    corto: "Modo BA",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Manual", false: "Automático" },
+    nota: "Selector de modo de la bomba de aire. Correspondencia Automático/Manual no confirmada.",
+  },
+  {
+    key: "arranqueParoBa",
+    rama: "bombaDeAire",
+    tag: "START_STOP_BA",
+    label: "Orden de la bomba de aire",
+    corto: "Orden BA",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "En marcha", false: "Detenida" },
+    nota: "Orden de marcha/paro de la bomba de aire.",
+  },
+  {
+    key: "mttoBa",
+    rama: "bombaDeAire",
+    tag: "MTTO_BA",
+    label: "Bloqueo de mantenimiento (bomba de aire)",
+    corto: "Mtto BA",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Bloqueada", false: "Disponible" },
+    nota: "Bloqueo por mantenimiento de la bomba de aire.",
+  },
+  {
+    key: "estadoBa",
+    rama: "bombaDeAire",
+    tag: "ESTADO_BA",
+    label: "Estado de la bomba de aire",
+    corto: "Estado BA",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "estado",
+    activo: "valvulasYAire",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { 1: "Apagado", 2: "En marcha", 3: "Error", 4: "Mantenimiento" },
+    nota: "Estado de la bomba de aire. 0 es el valor inicial del PLC: se trata como sin dato, no como apagado.",
   },
 ];
 

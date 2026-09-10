@@ -89,7 +89,7 @@ describe("Detalle de activo en modo simulado", () => {
     expect(fetchTrampa).not.toHaveBeenCalled();
   });
 
-  it("las cuatro pestañas están presentes, y elegir una navega a ese activo", async () => {
+  it("las seis pestañas están presentes, y elegir una navega a ese activo", async () => {
     cortarLaRed();
     const onNavigate = vi.fn();
 
@@ -98,7 +98,10 @@ describe("Detalle de activo en modo simulado", () => {
     await waitFor(() => expect(screen.getByRole("tablist")).toBeTruthy(), { timeout: 4_000 });
 
     const pestañas = screen.getAllByRole("tab");
-    expect(pestañas.map((p) => p.textContent)).toEqual(["Tanque", "Bombeo", "Distribución", "Eléctrico"]);
+    // "Válvulas" y "Seguridad" se sumaron en el Plan 27 F5.
+    expect(pestañas.map((p) => p.textContent)).toEqual([
+      "Tanque", "Bombeo", "Distribución", "Eléctrico", "Válvulas", "Seguridad",
+    ]);
 
     fireEvent.click(screen.getByRole("tab", { name: "Bombeo" }));
     // Plan 13 F7: el rango viaja también, para que cambiar de pestaña no lo

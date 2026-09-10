@@ -87,6 +87,14 @@ export function peor(claves) {
 }
 
 /**
+ * Codificación común a `Estado VFD`, `Estado S1`, `Estado S2` y `Estado BA`
+ * (Plan 27 F5, `Lista-variables.pdf` §1.6). `Estado VFD` no está en el
+ * catálogo todavía (`MANDO_DEL_VARIADOR_VFD/` queda fuera del alcance de
+ * F0-F5); la tabla se deja aquí, común, para que entrar no repita esto.
+ */
+const ESTADO_EQUIPO = { 1: "nominal", 2: "nominal", 3: "critico", 4: "atencion" };
+
+/**
  * ¿Está el sistema sin impulsar?
  *
  * Exige que **las dos** señales estén medidas y las dos por debajo de su umbral.
@@ -150,6 +158,24 @@ export function estadoDeSenal(key, valor, { reposo = false } = {}) {
   if (["mando", "consigna", "crudo"].includes(meta.naturaleza)) {
     if (reposo && meta.soloEnMarcha) return "reposo";
     return valor === null || valor === undefined ? "sin_dato" : "nominal";
+  }
+
+  /*
+   * `naturaleza: "estado"` (`ESTADO_S1`/`ESTADO_S2`/`ESTADO_BA`, Plan 27 F5):
+   * el enumerado de equipo que comparten las cuatro señales `Estado *` del
+   * PLC (`Lista-variables.pdf` §1.6) — 1 Apagado, 2 Run, 3 Error,
+   * 4 Mantenimiento. A diferencia de `alarma`, aquí la tabla es UNA sola,
+   * común a las cuatro, así que se fija aquí y no por señal.
+   *
+   * `0` es el valor inicial del PLC antes del primer ciclo de la lógica de
+   * estados, y el propio PDF avisa: "conviene tratarlo como sin dato y no
+   * como apagado". Cualquier otro código fuera de la tabla (no debería
+   * salir, pero el servidor no lo garantiza) se trata igual que `0`: no
+   * inventar un estado que el programa no ha declarado.
+   */
+  if (meta.naturaleza === "estado") {
+    if (valor === null || valor === undefined) return "sin_dato";
+    return ESTADO_EQUIPO[valor] ?? "sin_dato";
   }
 
   if (meta.tipo === "booleano") {
