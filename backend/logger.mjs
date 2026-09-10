@@ -83,6 +83,37 @@ function normalizarNivel(nivel) {
 }
 
 /**
+ * Sin acentos, para la TERMINAL — nunca para lo que responde la API.
+ *
+ * Medido el 10-09-2026: en una consola sin página de códigos UTF-8, un
+ * mensaje de log con tildes llega como `Petici├│n rechazada` — el backend
+ * escribe UTF-8 correcto (el navegador lo pinta bien, `curl` con la terminal
+ * configurada también), pero una terminal en otra página de códigos
+ * destroza cualquier byte fuera de ASCII. Arreglar la terminal es lo
+ * correcto (`chcp 65001`), pero mientras tanto el mensaje sigue siendo
+ * ilegible para quien lee el log a diario.
+ *
+ * Se aplica SÓLO al mensaje de la línea de log, nunca a lo que
+ * `errores.mjs`/las rutas devuelven en el cuerpo JSON — eso lo lee el
+ * navegador o `scripts/`, que sí hablan UTF-8, y CLAUDE.md §4.6 sigue
+ * pidiendo español correcto ahí. Es la misma técnica NFD que ya usa
+ * `ia/indices/bm25.mjs` para comparar sin acento, aplicada aquí para
+ * MOSTRAR sin acento en vez de para comparar.
+ *
+ * Se engancha en `hooks.logMethod` de pino y no en el envoltorio de abajo
+ * (`debug`/`info`/`warn`/`error`) porque `pino: instancia` se le da a
+ * Fastify TAL CUAL como su logger nativo — cada `request.log.warn(...)` de
+ * las rutas (empezando por `errores.mjs`, que es de donde salía el ejemplo
+ * mojibake) llama a la instancia cruda, no al envoltorio. Sólo el hook ve
+ * las dos vías.
+ */
+function quitarAcentos(texto) {
+  return String(texto ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+}
+
+/**
  * Un `Error` en `meta.err` se serializa a `{}` con `JSON.stringify`. pino trae
  * un serializador propio para eso, pero sólo se aplica si el campo se llama
  * `err`; aquí se normaliza antes para no depender de que quien loguea acierte
@@ -151,6 +182,21 @@ export function createLogger({ level = DEFAULT_LEVEL } = {}) {
     base: undefined,
     timestamp: pino.stdTimeFunctions.isoTime,
     transport: construirTransporte(),
+    hooks: {
+      /*
+       * Las dos formas de llamar a pino: `log('mensaje')` (el `mensaje`
+       * llega en `inputArgs[0]`) y `log({...meta}, 'mensaje')` (llega en
+       * `inputArgs[1]`, y es la única forma que usa este archivo y
+       * `request.log` de Fastify). Se muta el argumento y se delega en el
+       * método real: es el patrón que documenta la propia API de pino para
+       * este hook.
+       */
+      logMethod(inputArgs, metodo) {
+        if (typeof inputArgs[0] === 'string') inputArgs[0] = quitarAcentos(inputArgs[0])
+        else if (typeof inputArgs[1] === 'string') inputArgs[1] = quitarAcentos(inputArgs[1])
+        return metodo.apply(this, inputArgs)
+      },
+    },
   })
 
   return {

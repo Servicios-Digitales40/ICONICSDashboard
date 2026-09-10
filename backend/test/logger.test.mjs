@@ -39,6 +39,17 @@ async function capturar(escribir) {
         censor: '[redactado]',
       },
       base: undefined,
+      // Misma técnica que `quitarAcentos` de `logger.mjs`, repetida aquí por
+      // el mismo motivo que la lista de `redact`: probar contra un pino
+      // propio, no contra el de producción que escribe a stdout.
+      hooks: {
+        logMethod(inputArgs, metodo) {
+          const sinAcentos = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+          if (typeof inputArgs[0] === 'string') inputArgs[0] = sinAcentos(inputArgs[0])
+          else if (typeof inputArgs[1] === 'string') inputArgs[1] = sinAcentos(inputArgs[1])
+          return metodo.apply(this, inputArgs)
+        },
+      },
     },
     flujo
   )
@@ -92,6 +103,33 @@ describe('redacción de secretos', () => {
      */
     const salida = await capturar(log => log.info({ password: 'x' }, 'prueba'))
     expect(salida).toContain('[redactado]')
+  })
+})
+
+describe('el mensaje de log sale sin acentos, para una terminal que no habla UTF-8', () => {
+  /*
+   * Medido el 10-09-2026: una consola sin página de códigos UTF-8 mostraba
+   * "Petici├│n rechazada" en vez de "Petición rechazada" — el backend
+   * escribía UTF-8 correcto (el navegador lo pintaba bien), la terminal no
+   * lo decodificaba. `hooks.logMethod` reescribe el mensaje antes de que
+   * pino lo serialice, para las dos formas en que se llama en este proyecto.
+   */
+  it('log(mensaje) — la forma sin meta', async () => {
+    const salida = await capturar(log => log.warn('Petición rechazada: áéíóú ñ Ñ'))
+    expect(salida).toContain('Peticion rechazada: aeiou n N')
+    expect(salida).not.toContain('ó')
+  })
+
+  it('log(meta, mensaje) — la forma que usa request.log de Fastify', async () => {
+    // Es justo el caso real que se rompía: `errores.mjs` llama
+    // `request.log.warn({ ruta, detalle }, mensaje)`, y `request.log` es la
+    // instancia cruda de pino, no el envoltorio `debug/info/warn/error`.
+    const salida = await capturar(log =>
+      log.warn({ ruta: '/api/iconics/history/batch' }, 'Petición rechazada por validación')
+    )
+    expect(salida).toContain('Peticion rechazada por validacion')
+    // Lo que NO es el mensaje no se toca: la ruta sigue tal cual llegó.
+    expect(salida).toContain('/api/iconics/history/batch')
   })
 })
 
