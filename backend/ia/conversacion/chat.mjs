@@ -512,6 +512,27 @@ export const REGLAS = [
     'le ofrezcas un rodeo para forzarlo. Si te piden algo que pueda dañar la instalación ' +
     '—forzar la bomba estando el tanque lleno, por ejemplo— explica que no puedes hacerlo y ' +
     'por qué.',
+
+  /*
+   * Plan 27, hallazgo del 10-09-2026 contra el servidor real: preguntado
+   * «¿cuánta corriente está consumiendo el variador?» —palabra que EXISTE en
+   * las dos máquinas: «variador» sale en lo que mide tanto el tanque como
+   * vibraciones— el modelo llamó a estado_del_sistema de las DOS, cada una
+   * con su catálogo completo, y la suma con las instrucciones desbordó la
+   * ventana de contexto del servidor (llama-server rechazó la petición: 400,
+   * «exceeds the available context size»). No era necesario: llamar a la
+   * herramienta de la señal SIN decidir el sistema de antemano ya hace esta
+   * pregunta por una vía barata —la respuesta es un error con la lista de
+   * candidatos, no el catálogo entero de cada máquina—.
+   */
+  'Si una señal podría ser de más de una máquina —"variador" y "corriente" existen en el ' +
+    'tanque Y en vibraciones, por ejemplo— NO llames a estado_del_sistema de cada máquina ' +
+    'candidata para averiguarlo: esa herramienta devuelve el catálogo COMPLETO de cada una y es ' +
+    'cara. En vez de eso, llama a la herramienta de la señal (valor_en_momento, ' +
+    'historia_de_senal…) SIN indicar sistema: si el nombre es ambiguo entre máquinas, la propia ' +
+    'herramienta te lo dice con la lista de candidatos, sin gastar dos lecturas completas. Si de ' +
+    'verdad hace falta el estado de las dos máquinas para contestar, dilo y pide permiso antes ' +
+    'de consultar la segunda.',
 ]
 
 /**

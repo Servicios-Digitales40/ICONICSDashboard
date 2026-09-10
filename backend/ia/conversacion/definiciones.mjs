@@ -101,12 +101,11 @@ export const DEFINICIONES = [
     function: {
       name: 'hechos_de_la_planta',
       description:
-        'Lo que YA se sabe confirmado de esta instalación: datos que alguien verificó y que no se ' +
-        'deducen del servidor —cuántos sensores hay, cómo se llama un grupo, qué tensión ' +
-        'nominal aplica—. Consúltala antes de suponer un detalle de la instalación. Cada hecho ' +
-        'trae su ORIGEN: cítalo cuando lo uses. Devuelve TAMBIÉN la bitácora de intervenciones: ' +
-        'qué ha fallado antes y cómo se resolvió. Úsala para "¿cómo arreglé esto la última ' +
-        'vez?", "¿esto ya había pasado?", "¿qué se hizo con el aPico?".',
+        'Lo que YA se sabe confirmado de esta instalación: datos que alguien verificó y no se ' +
+        'deducen del servidor —cuántos sensores hay, cómo se llama un grupo, qué tensión nominal ' +
+        'aplica—. Consúltala antes de suponer un detalle. Cada hecho trae su ORIGEN: cítalo. ' +
+        'Devuelve TAMBIÉN la bitácora de intervenciones: qué ha fallado y cómo se resolvió. Úsala ' +
+        'para "¿cómo arreglé esto la última vez?", "¿esto ya había pasado?".',
       parameters: {
         type: 'object',
         properties: {
@@ -124,14 +123,11 @@ export const DEFINICIONES = [
     function: {
       name: 'registrar_intervencion',
       description:
-        'Anota en la bitácora algo que SE HIZO en la instalación: qué fallaba y qué se hizo ' +
-        'para arreglarlo. LLÁMALA SIEMPRE que el usuario cuente que ha resuelto, arreglado, ' +
-        'cambiado, ajustado o configurado algo — «ya quedó», «lo resolví», «ya lo arreglé», ' +
-        '«cambié la histéresis», «ya configuré los rodamientos», «lo dejé andando». No le ' +
-        'preguntes si quiere que lo guardes: guárdalo y díselo. Sirve para que dentro de seis ' +
-        'meses, cuando el mismo síntoma vuelva, se pueda leer cómo se resolvió — es lo primero ' +
-        'que se pierde en una planta. Si el intento NO funcionó, ponlo igual con resuelto=false: ' +
-        'saber lo que no sirvió ahorra repetirlo.',
+        'Anota en la bitácora algo que SE HIZO: qué fallaba y qué se hizo para arreglarlo. ' +
+        'LLÁMALA SIEMPRE que el usuario cuente que ha resuelto, arreglado, cambiado o configurado ' +
+        'algo —«ya quedó», «lo resolví», «cambié la histéresis»—. No preguntes si quiere que lo ' +
+        'guardes: guárdalo y díselo. Si el intento NO funcionó, usa igual resuelto=false: saber ' +
+        'lo que no sirvió ahorra repetirlo.',
       parameters: {
         type: 'object',
         properties: {
@@ -160,16 +156,12 @@ export const DEFINICIONES = [
       name: 'cerrar_diagnostico',
       description:
         'Registra la causa REAL de un riesgo que diagnosticar_falla YA narró, con el mismo `id` ' +
-        'que esa herramienta usó para las candidatas — así la próxima vez que este riesgo se ' +
-        'dispare, esta corrección cuenta de verdad, con id exacto, no como una frase suelta. ' +
-        'LLÁMALA SÓLO cuando el técnico confirme o corrija, explícitamente y después de haber ' +
-        'intervenido, cuál fue la causa real — nunca antes, nunca para especular sobre una causa ' +
-        'todavía no comprobada. No le preguntes si quiere que lo guardes: si te lo está contando, ' +
-        'guárdalo y díselo. Si la causa real es una de las que diagnosticar_falla propuso, pásala ' +
-        'en `causaId` con el MISMO id (no el título, no una paráfrasis) — si dices el id ' +
-        'equivocado, la herramienta te lo rechaza y te da la lista de los válidos, así que puedes ' +
-        'corregir. Si la causa real NO estaba en esa lista, descríbela en `causaLibre` en vez de ' +
-        '`causaId`.',
+        'de esa herramienta. LLÁMALA SÓLO cuando el técnico confirme o corrija, ya intervenido, ' +
+        'cuál fue la causa real — nunca antes, nunca para especular. No preguntes si quiere que lo ' +
+        'guardes: si te lo cuenta, guárdalo y díselo. Si la causa es una candidata de ' +
+        'diagnosticar_falla, pásala en `causaId` con el MISMO id (no el título) — un id ' +
+        'equivocado se rechaza con la lista de válidos. Si no estaba en esa lista, usa ' +
+        '`causaLibre` en vez de `causaId`.',
       parameters: {
         type: 'object',
         properties: {
@@ -274,13 +266,11 @@ export const DEFINICIONES = [
     function: {
       name: 'sistemas_de_la_planta',
       description:
-        'Qué sistemas hay en esta planta, qué mide cada uno y qué NO se puede afirmar de él. ' +
-        'NO tiene los datos confirmados de la instalación ni la bitácora de lo que se ha ' +
-        'arreglado: para «¿qué se hizo con esto?», «¿ya había pasado?» o «¿qué sabes de la ' +
-        'planta?» la herramienta es hechos_de_la_planta. ' +
-        'Llámala cuando no sepas a qué sistema se refiere la pregunta, o para "¿qué puedes ' +
-        'ver?". Cada sistema es una instalación SEPARADA, con su propio PLC: no relaciones una ' +
-        'señal de uno con una de otro. Es barata y no toca el servidor de planta.',
+        'Qué sistemas hay, qué mide cada uno y qué NO se puede afirmar de él. NO tiene datos ' +
+        'confirmados ni bitácora: para eso, hechos_de_la_planta. Llámala cuando no sepas a qué ' +
+        'sistema se refiere la pregunta, o para "¿qué puedes ver?". Cada sistema es una ' +
+        'instalación SEPARADA, con su propio PLC: no relaciones una señal de uno con una de otro. ' +
+        'Es barata y no toca el servidor de planta.',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -289,17 +279,13 @@ export const DEFINICIONES = [
     function: {
       name: 'riesgos_activos',
       description:
-        'Qué PUEDE pasar en UN sistema si sigue así: cruza varias señales a la vez y devuelve ' +
-        'las combinaciones peligrosas, con su evidencia medida, la hipótesis y qué revisar. ' +
-        'Para "¿hay algún riesgo?", "¿es peligroso que siga así?". Distinta de ' +
-        'estado_del_sistema: aquélla dice cómo está cada señal AHORA; ésta, qué combinaciones ' +
-        'son peligrosas aunque cada señal esté en banda. Trae `sin_comprobar`: si no está ' +
-        'vacío, NO digas que no hay riesgos — di que hay cosas que no se pudieron mirar. No es ' +
-        'el panel de alarmas de ICONICS. Hay que decir DE QUÉ SISTEMA: si no lo sabes, llama ' +
-        'antes a sistemas_de_la_planta. Cada riesgo trae su `id`: para explicar CUÁL es la causa ' +
-        'más probable de uno concreto —no sólo qué podría pasar— pásaselo a ' +
-        'diagnosticar_falla(sistema, riesgoId), que cruza los datos con el manual y con casos ' +
-        'previos ya resueltos y te da una lista de causas puntuada.',
+        'Qué PUEDE pasar en UN sistema si sigue así: cruza varias señales y devuelve las ' +
+        'combinaciones peligrosas, con evidencia, hipótesis y qué revisar. Para "¿hay algún ' +
+        'riesgo?". Distinta de estado_del_sistema: aquélla dice cómo está cada señal AHORA; ésta, ' +
+        'qué combinaciones son peligrosas aunque cada una esté en banda. Trae `sin_comprobar`: si ' +
+        'no está vacío, NO digas que no hay riesgos, di que no se pudo mirar. No es el panel de ' +
+        'alarmas de ICONICS. Hay que decir DE QUÉ SISTEMA. Cada riesgo trae su `id`: para la ' +
+        'causa más probable de uno concreto, pásaselo a diagnosticar_falla(sistema, riesgoId).',
       parameters: {
         type: 'object',
         properties: {
@@ -343,14 +329,13 @@ export const DEFINICIONES = [
     function: {
       name: 'estado_del_sistema',
       description:
-        'Estado de UNA máquina ahora mismo, de una sola vez: sus señales con valor, unidad, ' +
-        'estado y banda de límites, agrupadas, y cuántas están en banda, en aviso, fuera de ' +
-        'límite o sin dato. Úsala para "¿cómo va?", "¿está bombeando?", "¿qué nivel tiene el ' +
-        'tanque?", "¿cómo están las vibraciones?", "¿los rodamientos están bien?" y para ' +
-        'CUALQUIER pregunta sobre el momento actual. NO la llames varias veces para la misma ' +
-        'máquina: lo devuelve todo junto. HAY QUE DECIR DE QUÉ SISTEMA — son instalaciones ' +
-        'SEPARADAS, con su propio PLC, y contestar del otro sería contestar de otra máquina. ' +
-        'Si no sabes el id, llama antes a sistemas_de_la_planta.',
+        'Estado de UNA máquina ahora mismo: sus señales con valor, unidad, estado y banda, ' +
+        'agrupadas, y cuántas en banda/aviso/límite/sin dato. Para "¿cómo va?", "¿qué nivel tiene ' +
+        'el tanque?" y CUALQUIER pregunta del momento actual. NO la llames varias veces para la ' +
+        'misma máquina: lo devuelve todo junto. Tampoco la llames para VARIAS máquinas a la vez ' +
+        'sólo por no saber a cuál pertenece algo — para eso hay herramientas más baratas que ' +
+        'resuelven el nombre. HAY QUE DECIR DE QUÉ SISTEMA: son instalaciones SEPARADAS, con su ' +
+        'propio PLC.',
       parameters: {
         type: 'object',
         properties: {
@@ -365,11 +350,12 @@ export const DEFINICIONES = [
     function: {
       name: 'historia_de_senal',
       description:
-        'Cómo ha evolucionado UNA señal en un período: devuelve el mínimo y el máximo con la hora ' +
-        'en que ocurrieron, el promedio, el primer y el último valor, y cuántas muestras hubo. ' +
-        'Úsala para "¿cómo ha ido el nivel esta mañana?", "¿la vibración del apoyo 1 ayer?". ' +
-        'Sirve a CUALQUIER máquina. No todas las señales tienen serie propia: si pides una que ' +
-        'no la tiene, la herramienta lo dice y hay que contarlo tal cual.',
+        'Cómo ha evolucionado UNA señal en un período: mínimo y máximo con su hora, promedio, ' +
+        'primer y último valor, y cuántas muestras hubo. Úsala para "¿cómo ha ido el nivel esta ' +
+        'mañana?". Sirve a CUALQUIER máquina — si el nombre de la señal es ambiguo entre dos, la ' +
+        'herramienta lo dice con la lista de candidatas, así que es la vía barata para saber de ' +
+        'qué máquina es algo sin pedirle el estado completo a ninguna. No todas las señales ' +
+        'tienen serie propia: si pides una que no la tiene, la herramienta lo dice.',
       parameters: {
         type: 'object',
         properties: {
@@ -393,7 +379,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -428,7 +414,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal', 'momento'],
@@ -461,7 +447,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal', 'periodoA', 'periodoB'],
@@ -496,7 +482,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -527,7 +513,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -539,16 +525,12 @@ export const DEFINICIONES = [
     function: {
       name: 'correlacionar_senales',
       description:
-        'Compara DOS O MÁS señales sobre la misma ventana de tiempo y devuelve, para cada par, si ' +
-        'se movieron juntas (coeficiente de -1 a 1 y su lectura en palabras), más los valores ' +
-        'atípicos de cada señal CON SU HORA y cuáles de ellos cayeron en el mismo instante. ' +
-        'ÉSTA ES LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?", "¿qué ' +
-        'pasó cuando cayó la presión?", "¿tiene que ver la tensión con el fallo del motor?". ' +
-        'Sólo con señales que tengan serie propia. Lo que devuelve es un INDICIO, ' +
-        'no una demostración de causa: dilo así al redactar. ' +
-        'Los activos de una MISMA máquina SÍ se cruzan —el nivel del tanque y la presión de la ' +
-        'red lo son— y no debes negarte por eso: si fueran de dos máquinas, la herramienta lo ' +
-        'detecta y te lo dice.',
+        'Compara DOS O MÁS señales en la misma ventana: si se movieron juntas (coeficiente -1 a 1 ' +
+        'y su lectura en palabras), más los valores atípicos de cada una CON SU HORA y cuáles ' +
+        'coincidieron. LA HERRAMIENTA DEL DIAGNÓSTICO: úsala para "¿por qué se paró la bomba?". ' +
+        'Sólo con señales que tengan serie propia. Devuelve un INDICIO, no una causa demostrada: ' +
+        'dilo así. Los activos de una MISMA máquina SÍ se cruzan —nivel del tanque y presión de ' +
+        'la red lo son—; si fueran de dos máquinas, la herramienta lo detecta y te lo dice.',
       parameters: {
         type: 'object',
         properties: {
@@ -568,7 +550,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senales'],
@@ -590,7 +572,7 @@ export const DEFINICIONES = [
           periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
           sistema: {
             type: 'string',
-            description: 'Id de la máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
           },
         },
         required: ['senal'],
@@ -602,14 +584,12 @@ export const DEFINICIONES = [
     function: {
       name: 'generar_reporte',
       description:
-        'Genera un PDF descargable de la instalación: un gráfico por cada señal con historia que ' +
-        'se pida (o las cuatro, si no se nombra ninguna) más una tabla con el valor actual de las ' +
-        'que no tienen serie. Úsala para "genera un reporte", "quiero un PDF de esta semana", ' +
-        '"expórtame los datos del tanque". El período admite hasta unos 90 días, igual que ' +
-        'historia_de_senal, porque aquí se agrega por día. El enlace de descarga se le entrega al ' +
-        'usuario automáticamente; no lo repitas ni lo inventes en tu respuesta. Cada gráfico del PDF ' +
-        'YA lleva su propia interpretación de la tendencia, escrita por el sistema — no hace falta ' +
-        'pedirla aparte.',
+        'Genera un PDF descargable: un gráfico por cada señal con historia que se pida (o las ' +
+        'cuatro, si no se nombra ninguna) más una tabla con el valor actual de las que no tienen ' +
+        'serie. Úsala para "genera un reporte", "quiero un PDF de esta semana". Período hasta ~90 ' +
+        'días, igual que historia_de_senal. El enlace de descarga se entrega automáticamente; no ' +
+        'lo repitas ni lo inventes. Cada gráfico YA lleva su interpretación de tendencia — no hace ' +
+        'falta pedirla aparte.',
       parameters: {
         type: 'object',
         properties: {
@@ -646,12 +626,10 @@ export const DEFINICIONES = [
     function: {
       name: 'consultar_documentacion',
       description:
-        'Busca en la documentación de planta (manuales, procedimientos) y devuelve los fragmentos ' +
-        'más parecidos a la pregunta, citables por archivo y página. Úsala para "¿cómo se arranca ' +
-        'la bomba?", "procedimiento de mantenimiento", "especificaciones de la válvula". Si la ' +
-        'pregunta es claramente sobre UNA máquina, pasa su `sistema`: así no compiten los manuales ' +
-        'de la otra. Si es general de la planta, o no estás seguro, NO lo pases — acotar de más ' +
-        'esconde el manual que la contesta.',
+        'Busca en manuales y procedimientos, devuelve los fragmentos más parecidos, citables por ' +
+        'archivo y página. Úsala para "¿cómo se arranca la bomba?". Si la pregunta es claramente ' +
+        'de UNA máquina, pasa su `sistema` para que no compitan los manuales de la otra. Si es ' +
+        'general o no estás seguro, NO lo pases — acotar de más esconde el manual que contesta.',
       parameters: {
         type: 'object',
         properties: {
@@ -676,12 +654,11 @@ export const DEFINICIONES = [
     function: {
       name: 'limites_del_manual',
       description:
-        'Busca en la documentación de planta un límite documentado de UNA señal (máximo, mínimo, ' +
-        'rango admisible) y lo devuelve como número con su unidad y de qué documento y página ' +
-        'sale, en vez de un párrafo para interpretar. Úsala cuando necesites comparar una lectura ' +
-        'contra lo que dice el manual: "¿150 V es demasiado?", "¿cuál es la presión máxima según ' +
-        'el manual?". Son CANDIDATOS encontrados por patrón, no lecturas garantizadas: puede haber ' +
-        'más de uno y puede que ninguno sea el correcto.',
+        'Busca en el manual un límite documentado de UNA señal (máximo, mínimo, rango) y lo ' +
+        'devuelve como número con su unidad y de qué página sale, en vez de un párrafo a ' +
+        'interpretar. Úsala para comparar una lectura contra el manual: "¿150 V es demasiado?". ' +
+        'Son CANDIDATOS por patrón, no lecturas garantizadas: puede haber más de uno o ninguno ' +
+        'correcto.',
       parameters: {
         type: 'object',
         properties: {
@@ -696,24 +673,16 @@ export const DEFINICIONES = [
     function: {
       name: 'diagnostico',
       description:
-        'Herramienta COMPUESTA para diagnosticar una avería o un síntoma DEL TANQUE Y SU GRUPO DE ' +
-        'BOMBEO: en una sola llamada ' +
-        'reúne el estado actual, la historia con fecha de los extremos, la correlación entre las ' +
-        'señales implicadas y los límites que documenta el manual, y calcula el exceso sobre esos ' +
-        'límites ya con su fecha. SÓLO sirve para esa máquina: su catálogo de señales es el del ' +
-        'tanque. Si el síntoma es del sistema de vibraciones, NO la llames — usa diagnosticar_falla ' +
-        'con el id de un riesgo activo, o estado_del_sistema e historia_de_senal por separado. ' +
-        'Para el tanque, ÚSALA SIEMPRE que te pregunten por qué falló algo, qué causó un ' +
-        'problema, o te cuenten un síntoma ("se paró la bomba tras un pico de tensión", "el ' +
-        'caudal está siendo demasiado alto") — es la primera y normalmente ÚNICA llamada que hace ' +
-        'falta para eso, en vez de encadenar estado_del_sistema, historia_de_senal, ' +
-        'correlacionar_senales y limites_del_manual una por una. Nombra en el síntoma las señales ' +
-        'de las que hables si las conoces: si no nombras ninguna, se miran las cuatro que tienen ' +
-        'historia. El resultado separa lo MEDIDO de lo DOCUMENTADO; la hipótesis que los junte es ' +
-        'tuya, y tienes que decir cuál es cuál. Si el síntoma es en realidad un riesgo YA activo ' +
-        'con `id` conocido —de riesgos_activos, o de una pregunta que lo cita— usa mejor ' +
-        'diagnosticar_falla: da una lista de causas ya puntuada y ordenada, cruzando también los ' +
-        'casos previos resueltos, que esta herramienta no consulta.',
+        'COMPUESTA, SÓLO DEL TANQUE Y SU GRUPO DE BOMBEO: en una llamada reúne estado actual, ' +
+        'historia con fecha de los extremos, correlación entre las señales implicadas y límites ' +
+        'del manual con su exceso ya calculado. Si el síntoma es de vibraciones, usa ' +
+        'diagnosticar_falla o estado_del_sistema/historia_de_senal por separado. ÚSALA SIEMPRE ' +
+        'que pregunten por qué falló algo o cuenten un síntoma del tanque ("se paró la bomba tras ' +
+        'un pico de tensión") — normalmente la ÚNICA llamada que hace falta, en vez de encadenar ' +
+        'varias herramientas sueltas. Nombra en el síntoma las señales que conozcas; si no ' +
+        'nombras ninguna, mira las que tienen historia. Separa lo MEDIDO de lo DOCUMENTADO al ' +
+        'redactar. Si el síntoma es un riesgo YA activo con `id` conocido, usa mejor ' +
+        'diagnosticar_falla: da causas ya puntuadas con casos previos, que ésta no consulta.',
       parameters: {
         type: 'object',
         properties: {
@@ -741,16 +710,13 @@ export const DEFINICIONES = [
       name: 'diagnosticar_falla',
       description:
         'La causa más probable de UN riesgo YA activo, con su `id` —de riesgos_activos, de ' +
-        'estado_del_sistema, o de una pregunta que ya lo menciona—: cruza los datos que dispararon ' +
-        'el riesgo, lo que dice el manual de planta y los casos previos resueltos con el MISMO ' +
-        'síntoma, y devuelve las causas candidatas YA ORDENADAS de más a menos respaldada, cada ' +
-        'una con su banda ALTO/MEDIO/BAJO y de qué fuentes viene ese respaldo. NARRA LA LISTA EN ' +
-        'EL ORDEN EN QUE LLEGA, SIN REORDENARLA — el orden ya es la puntuación, y reordenarla por ' +
-        'tu cuenta deshace el trabajo de cruzar las tres fuentes. Cita el `origen` de cada causa ' +
-        '(de qué manual o regla sale) y di explícitamente cuándo un caso previo la respalda o la ' +
-        'descarta. Distinta de diagnostico: aquélla arma un dossier libre a partir de un síntoma ' +
-        'en prosa; ésta puntúa las causas de un riesgo concreto y ya identificado, con casos ' +
-        'previos incluidos.',
+        'estado_del_sistema, o de una pregunta que ya lo menciona—: cruza los datos que lo ' +
+        'dispararon, el manual y los casos previos con el MISMO síntoma, y devuelve causas YA ' +
+        'ORDENADAS de más a menos respaldada, cada una con su banda ALTO/MEDIO/BAJO y su fuente. ' +
+        'NARRA LA LISTA EN EL ORDEN EN QUE LLEGA, SIN REORDENARLA — el orden ya es la puntuación. ' +
+        'Cita el `origen` de cada causa y di cuándo un caso previo la respalda o la descarta. ' +
+        'Distinta de diagnostico: aquélla arma un dossier libre desde un síntoma en prosa; ésta ' +
+        'puntúa las causas de un riesgo ya identificado, con casos previos incluidos.',
       parameters: {
         type: 'object',
         properties: {
