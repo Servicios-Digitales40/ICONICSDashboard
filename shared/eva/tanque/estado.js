@@ -134,13 +134,21 @@ export function estadoDeSenal(key, valor, { reposo = false } = {}) {
   }
 
   /*
-   * `naturaleza: "mando"` (`CONTROL`, Plan 27 F3): una orden o modo, no una
-   * condición que juzgar. Mismo criterio que el booleano genérico de abajo,
-   * separado aparte porque su significado —«hay orden» o «no hay»— no tiene
-   * nada que ver con la ausencia de banda de una medida, y conviene que el
-   * porqué quede junto al campo, no adivinado por omisión.
+   * `naturaleza: "mando"` (`CONTROL`, Plan 27 F3), `"consigna"` (los dos
+   * set points de `AUTOMATISMO_LLENADO_VACIO/`, Plan 27 F4) y `"crudo"` (los
+   * diez registros de `LECTURA_VARIADOR_MODBUS_RTU/`, Plan 27 F4): ninguna es
+   * una condición que juzgar. Una orden no es buena ni mala, un set point es
+   * una configuración y un registro sin escalar no se puede comparar contra
+   * nada hasta que se confirme su divisor — juzgarlo sería inventar la
+   * calibración que falta. Las tres comparten el mismo trato: se informa el
+   * valor, nunca se pinta una banda sobre él.
+   *
+   * `soloEnMarcha` SÍ se respeta aquí: varios de los diez crudos del
+   * variador (frecuencia, corriente, par…) sólo dicen algo con el motor
+   * impulsando, igual que `cargaMotor`.
    */
-  if (meta.naturaleza === "mando") {
+  if (["mando", "consigna", "crudo"].includes(meta.naturaleza)) {
+    if (reposo && meta.soloEnMarcha) return "reposo";
     return valor === null || valor === undefined ? "sin_dato" : "nominal";
   }
 

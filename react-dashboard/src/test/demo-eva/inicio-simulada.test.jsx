@@ -53,8 +53,8 @@ describe("Inicio (landing) en modo simulado", () => {
 
     montar();
 
-    // 18: las ocho de siempre más las diez del Plan 27 F3.
-    await waitFor(() => expect(screen.getByText("/ 18")).toBeTruthy(), { timeout: 4_000 });
+    // 40: las ocho de siempre más las diez del Plan 27 F3 y las veintidós de F4.
+    await waitFor(() => expect(screen.getByText("/ 40")).toBeTruthy(), { timeout: 4_000 });
     expect(fetchTrampa).not.toHaveBeenCalled();
   });
 

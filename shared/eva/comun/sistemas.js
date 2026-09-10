@@ -207,6 +207,9 @@ export const SISTEMAS = [
       "tensión de línea y eficiencia energética",
       // Plan 27 F3.
       "las ocho alarmas del PLC, y si el proceso está habilitado",
+      // Plan 27 F4.
+      "energía trifásica de línea, diez lecturas del variador por Modbus, y el " +
+        "automatismo de llenado y vaciado",
     ],
     /*
      * Las palabras que Whisper tiene que oír bien EN ESTE SISTEMA. Ver
@@ -250,6 +253,12 @@ export const SISTEMAS = [
         "error de ninguna de las dos.",
       "La correspondencia Automático/Manual del modo del variador no está confirmada.",
       "La polaridad del paro de emergencia no está confirmada: no se pinta como alarma.",
+      // Plan 27 F4.
+      "Los diez registros que lee el variador por Modbus RTU llegan sin escalar: se " +
+        "muestran sin unidad hasta que se confirme el factor de conversión de cada uno.",
+      "La tensión de línea del medidor de energía (L1-N) se declara en voltios en el " +
+        "manual, pero el valor medido no es plausible para esa magnitud: se muestra sin " +
+        "unidad hasta aclarar la escala.",
     ],
   },
   {

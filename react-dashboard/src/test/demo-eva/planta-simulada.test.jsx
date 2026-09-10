@@ -73,11 +73,12 @@ describe("Demo EVA en modo simulado", () => {
 
     montar();
 
-    // «18 señales · 18 con lectura» es el rótulo de la tarjeta de estado (las
-    // ocho de siempre más las diez del Plan 27 F3). Si el simulador no
-    // conociera el árbol entero, la segunda cifra sería menor que la primera.
+    // «40 señales · 40 con lectura» es el rótulo de la tarjeta de estado (las
+    // ocho de siempre, las diez del Plan 27 F3 y las veintidós de F4). Si el
+    // simulador no conociera el árbol entero, la segunda cifra sería menor
+    // que la primera.
     await waitFor(
-      () => expect(screen.getByText(/18 señales · 18 con lectura/)).toBeTruthy(),
+      () => expect(screen.getByText(/40 señales · 40 con lectura/)).toBeTruthy(),
       { timeout: 4_000 }
     );
 

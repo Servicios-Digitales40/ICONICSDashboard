@@ -70,9 +70,16 @@ describe("catálogo de señales", () => {
       expect(typeof s.corto, key).toBe("string");
       expect(["real", "booleano"], key).toContain(s.tipo);
       expect(typeof s.historizado, key).toBe("boolean");
-      // Toda señal real necesita escala, o la geometría (barras, arcos, el
-      // líquido del tanque) no tendría contra qué normalizar.
-      if (s.tipo === "real") expect(s.escala, key).toMatchObject({ min: expect.any(Number), max: expect.any(Number) });
+      // Toda señal real con un rango operativo confirmado necesita escala,
+      // o la geometría (barras, arcos, el líquido del tanque) no tendría
+      // contra qué normalizar. Las de naturaleza "crudo" (Plan 27 F4: los
+      // diez registros del variador sin escalar) y las que aún no tienen
+      // rango conocido (los cinco del medidor de energía, los dos set
+      // points) declaran `escala: null` a propósito: `dominioY()` y
+      // `BarraBanda` ya saben tratar esa ausencia sin inventar un rango.
+      if (s.tipo === "real" && s.escala !== null) {
+        expect(s.escala, key).toMatchObject({ min: expect.any(Number), max: expect.any(Number) });
+      }
     }
   });
 

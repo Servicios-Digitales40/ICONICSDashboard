@@ -156,12 +156,13 @@ export const RAMAS = {
  *   decimales    cifras significativas al formatear
  *   tipo         "real" | "booleano"
  *   naturaleza   opcional; ausente = "medida" (comportamiento de siempre).
- *                "alarma" y "mando" están implementados (Plan 27 F3, ver
- *                `estadoDeSenal` en `./estado.js`); "estado", "consigna",
- *                "contador", "crudo" y "sin_instrumento" están en el diseño
- *                de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 pero ninguna
- *                señal los usa todavía — entran cuando lo haga la fase que
- *                los necesite (F4/F5), no antes.
+ *                "alarma" y "mando" están implementados desde F3; "consigna"
+ *                y "crudo" desde F4 (ver `estadoDeSenal` en `./estado.js`,
+ *                que trata a los tres últimos igual: se informa, no se
+ *                juzga). "estado", "contador" y "sin_instrumento" siguen en
+ *                el diseño de `docs/PLAN-27-VARIABLES-DEL-TANQUE.md` §2 —
+ *                entran cuando lo haga la fase que los necesite (F5), no
+ *                antes.
  *   estadoActivo sólo con `naturaleza: "alarma"`: qué estado reporta cuando
  *                el bit está activo ("critico" si no se declara). Permite
  *                que un par de dos niveles del propio PLC (`NIVEL_ALTO` /
@@ -565,6 +566,421 @@ const CATALOGO = [
     // usarla en lógica nueva." No verificado: no se pinta como alarma hasta
     // que alguien lo confirme contra el programa real del PLC.
     nota: "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma.",
+  },
+
+  /*
+   * ── PLAN 27 F4: LO QUE SE MIDE DE VERDAD ────────────────────────────
+   *
+   * Veintidós señales de tres ramas: `MEDIDOR_DE_ENERGIA/`,
+   * `LECTURA_VARIADOR_MODBUS_RTU/` y `AUTOMATISMO_LLENADO_VACIO/`.
+   *
+   * Los diez registros del variador (`Lista-variables.pdf` §1.8) son el
+   * caso de libro de `naturaleza: "crudo"`: el PDF lo dice explícito —
+   * "Todos son Int sin escalar: el factor de escala lo aplica el FB de
+   * lectura, no el DB"— y esa confirmación sigue pendiente (§3 de este
+   * plan). Se leen, se enseñan, y se pintan SIN unidad hasta tenerla.
+   *
+   * `TENSION_L1_N` y `TENSION_MAXIMA_L1_N` son un caso distinto, aunque el
+   * resultado se vea igual: el PDF SÍ les da unidad (V), pero el valor
+   * medido —hasta 276 V— no es plausible como tensión fase-neutro de una
+   * red 208Y/120 (nominal ~120 V), la misma anomalía que ya tiene
+   * `INDICE_DESVIACION_VOLTAJE`. No se etiquetan `crudo` —no son un
+   * registro sin escalar, son un Real con una unidad declarada que no
+   * cuadra— así que se quedan como medida normal y es sólo el campo
+   * `unidad` el que confiesa la duda, con su `nota`.
+   *
+   * Los cinco restantes de `MEDIDOR_DE_ENERGIA/` no tienen ninguna anomalía
+   * medida todavía: llevan la unidad que declara el PDF y ninguna entrada en
+   * `umbrales.js` — sin banda que jugar hasta que alguien confirme un rango
+   * operativo, mismo criterio que el resto del catálogo con `PROVISIONALES`.
+   *
+   * `AUTOMATISMO_LLENADO_VACIO/` reparte en tres formas: dos órdenes
+   * (`naturaleza: "mando"`, como `CONTROL`), un modo (booleano genérico,
+   * como `modoVdf`) y dos set points (`naturaleza: "consigna"`) cuya unidad
+   * sigue sin confirmar —pregunta 2 de §3— aunque el PDF sugiere que
+   * comparten la de `nivelTanque`.
+   */
+  {
+    key: "corrienteL1",
+    rama: "medidorDeEnergia",
+    tag: "DP_CORRIENTE_L1",
+    label: "Corriente de línea (L1)",
+    corto: "Corriente L1",
+    unidad: "A",
+    decimales: 2,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+  },
+  {
+    key: "potenciaReactivaL1",
+    rama: "medidorDeEnergia",
+    tag: "POTENCIA_REACTIVA_QN_L1",
+    label: "Potencia reactiva (L1)",
+    corto: "Pot. reactiva",
+    unidad: "var",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+  },
+  {
+    key: "energiaAparenteL1",
+    rama: "medidorDeEnergia",
+    tag: "DP_ENERGIA_APARENTEL1",
+    label: "Energía aparente acumulada (L1)",
+    corto: "Energía L1",
+    unidad: "VAh",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    // Es un acumulador: sólo crece. Ni subir ni bajar es "bueno" o "malo" en
+    // sí mismo, es el registro de lo consumido.
+    subirEsBueno: null,
+    soloEnMarcha: false,
+  },
+  {
+    key: "tensionL1N",
+    rama: "medidorDeEnergia",
+    tag: "TENSION_L1_N",
+    label: "Tensión de línea (L1-N)",
+    corto: "Tensión L1-N",
+    // Sin unidad: ver la nota de cabecera de esta sección. El PDF dice "V",
+    // pero 276 V no es plausible como fase-neutro de una red 208Y/120.
+    unidad: "",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    nota: "El PDF la declara en voltios, pero el valor medido no es plausible como tensión fase-neutro de esta red. Sin escala confirmada.",
+  },
+  {
+    key: "tensionMaximaL1N",
+    rama: "medidorDeEnergia",
+    tag: "TENSION_MAXIMA_L1_N",
+    label: "Máximo histórico de tensión (L1-N)",
+    corto: "Tensión máx. L1-N",
+    unidad: "",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    nota: "Máximo histórico de tensionL1N: hereda la misma duda de escala.",
+  },
+  {
+    key: "potenciaActivaL1",
+    rama: "medidorDeEnergia",
+    tag: "POTENCIA_ACTIVA_L1",
+    label: "Potencia activa (L1)",
+    corto: "Pot. activa",
+    unidad: "W",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+  },
+  {
+    key: "potenciaAparenteL1",
+    rama: "medidorDeEnergia",
+    tag: "POTENCIA_APARENTE_L1",
+    label: "Potencia aparente (L1)",
+    corto: "Pot. aparente",
+    unidad: "VA",
+    decimales: 1,
+    tipo: "real",
+    activo: "electrico",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+  },
+
+  {
+    key: "frecuenciaSalidaVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "FRECUENCIA_DE_SALIDA",
+    label: "Frecuencia de salida del variador",
+    corto: "Frec. salida",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar (Lista-variables.pdf §1.8): el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "velocidadMotor",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "VELOCIDAD",
+    label: "Velocidad calculada del motor",
+    // No "Velocidad" a secas: el sistema de vibraciones ya tiene una señal
+    // con ese nombre corto ("velocidad eficaz"), y resolverla por nombre
+    // acabaría en ambigüedad entre dos máquinas distintas.
+    corto: "Velocidad VFD",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "corrienteVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "DP_CORRIENTE",
+    label: "Corriente de salida del variador",
+    corto: "Corriente VFD",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "torqueVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "TORQUE",
+    label: "Par estimado por el variador",
+    corto: "Torque",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "potenciaActualVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "PWR_ACTUAL",
+    label: "Potencia instantánea del variador",
+    corto: "Pot. instant.",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "energiaAcumuladaVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "KWH_TOTAL",
+    label: "Energía acumulada del variador",
+    corto: "Energía VFD",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    // Es un acumulador de parámetro fijo, no depende de si el motor impulsa
+    // en este instante.
+    soloEnMarcha: false,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "voltajeBusDc",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "VOLTAJE_BUS_DC",
+    label: "Tensión del bus de continua",
+    corto: "Bus DC",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "referenciaVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "REFERENCIA",
+    label: "Consigna de frecuencia leída del variador",
+    corto: "Referencia",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "potenciaNominalVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "POTENCIA_NOMINAL",
+    label: "Potencia nominal parametrizada",
+    corto: "Pot. nominal",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    // Parámetro fijo del variador, no una lectura de proceso: no depende de
+    // si el motor está impulsando ahora mismo.
+    soloEnMarcha: false,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+  {
+    key: "voltajeSalidaVariador",
+    rama: "lecturaVariadorModbusRtu",
+    tag: "VOLTAJE_SALIDA",
+    label: "Tensión de salida hacia el motor",
+    corto: "Tensión salida",
+    unidad: "",
+    decimales: 0,
+    tipo: "real",
+    naturaleza: "crudo",
+    activo: "bombeo",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: true,
+    nota: "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar.",
+  },
+
+  {
+    key: "arranqueParoLlenado",
+    rama: "automatismoLlenadoVacio",
+    tag: "ARRANQUE_PARO_LLENADO",
+    label: "Orden de llenado",
+    corto: "Orden llenado",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "En marcha", false: "Detenida" },
+    nota: "Orden de inicio/parada de la secuencia de llenado.",
+  },
+  {
+    key: "arranqueParoVaciado",
+    rama: "automatismoLlenadoVacio",
+    tag: "ARRANQUE_PARO_VACIADO",
+    label: "Orden de vaciado",
+    corto: "Orden vaciado",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    naturaleza: "mando",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "En marcha", false: "Detenida" },
+    nota: "Orden de inicio/parada de la secuencia de vaciado.",
+  },
+  {
+    key: "recirculacionAutomatica",
+    rama: "automatismoLlenadoVacio",
+    tag: "RECIRCULACION_AUTOMATICA",
+    label: "Recirculación automática",
+    corto: "Recirc. auto",
+    unidad: "",
+    decimales: 0,
+    tipo: "booleano",
+    // Sin `naturaleza`: es un modo de operación, no una orden puntual —mismo
+    // trato que `modoVdf`, booleano genérico sin banda.
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    etiquetas: { true: "Habilitada", false: "Deshabilitada" },
+    nota: "Habilita el ciclo automático de recirculación entre tanques.",
+  },
+  {
+    key: "setpointLlenado",
+    rama: "automatismoLlenadoVacio",
+    tag: "SETPOINT_LLENANDO",
+    label: "Consigna de llenado",
+    corto: "SP llenado",
+    // Sin unidad: pregunta 2 de §3 del plan, sin responder. El PDF sugiere
+    // que comparte la de nivelTanque (banda de histéresis de 40 unidades
+    // entre 40 y 80), pero lo deja condicionado a que lo sea.
+    unidad: "",
+    decimales: 1,
+    tipo: "real",
+    naturaleza: "consigna",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    nota: "Consigna de nivel a la que se detiene el llenado. Unidad sin confirmar — se presume la misma de Nivel del tanque.",
+  },
+  {
+    key: "setpointVaciado",
+    rama: "automatismoLlenadoVacio",
+    tag: "SETPOINT_VACIADO",
+    label: "Consigna de vaciado",
+    corto: "SP vaciado",
+    unidad: "",
+    decimales: 1,
+    tipo: "real",
+    naturaleza: "consigna",
+    activo: "tanque",
+    historizado: false,
+    escala: null,
+    subirEsBueno: null,
+    soloEnMarcha: false,
+    nota: "Consigna de nivel a la que se detiene el vaciado. Unidad sin confirmar — se presume la misma de Nivel del tanque.",
   },
 ];
 

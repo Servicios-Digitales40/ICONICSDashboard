@@ -88,6 +88,111 @@
       "label": "Paro de emergencia",
       "corto": "Paro emerg.",
       "nota": "Estado del circuito de paro de emergencia. Polaridad sin confirmar: no se pinta como alarma."
+    },
+    "corrienteL1": {
+      "label": "Corriente de línea (L1)",
+      "corto": "Corriente L1"
+    },
+    "potenciaReactivaL1": {
+      "label": "Potencia reactiva (L1)",
+      "corto": "Pot. reactiva"
+    },
+    "energiaAparenteL1": {
+      "label": "Energía aparente acumulada (L1)",
+      "corto": "Energía L1"
+    },
+    "tensionL1N": {
+      "label": "Tensión de línea (L1-N)",
+      "corto": "Tensión L1-N",
+      "nota": "El PDF la declara en voltios, pero el valor medido no es plausible como tensión fase-neutro de esta red. Sin escala confirmada."
+    },
+    "tensionMaximaL1N": {
+      "label": "Máximo histórico de tensión (L1-N)",
+      "corto": "Tensión máx. L1-N",
+      "nota": "Máximo histórico de tensionL1N: hereda la misma duda de escala."
+    },
+    "potenciaActivaL1": {
+      "label": "Potencia activa (L1)",
+      "corto": "Pot. activa"
+    },
+    "potenciaAparenteL1": {
+      "label": "Potencia aparente (L1)",
+      "corto": "Pot. aparente"
+    },
+    "frecuenciaSalidaVariador": {
+      "label": "Frecuencia de salida del variador",
+      "corto": "Frec. salida",
+      "nota": "Registro Modbus sin escalar (Lista-variables.pdf §1.8): el factor de escala del variador está sin confirmar."
+    },
+    "velocidadMotor": {
+      "label": "Velocidad calculada del motor",
+      "corto": "Velocidad VFD",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "corrienteVariador": {
+      "label": "Corriente de salida del variador",
+      "corto": "Corriente VFD",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "torqueVariador": {
+      "label": "Par estimado por el variador",
+      "corto": "Torque",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "potenciaActualVariador": {
+      "label": "Potencia instantánea del variador",
+      "corto": "Pot. instant.",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "energiaAcumuladaVariador": {
+      "label": "Energía acumulada del variador",
+      "corto": "Energía VFD",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "voltajeBusDc": {
+      "label": "Tensión del bus de continua",
+      "corto": "Bus DC",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "referenciaVariador": {
+      "label": "Consigna de frecuencia leída del variador",
+      "corto": "Referencia",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "potenciaNominalVariador": {
+      "label": "Potencia nominal parametrizada",
+      "corto": "Pot. nominal",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "voltajeSalidaVariador": {
+      "label": "Tensión de salida hacia el motor",
+      "corto": "Tensión salida",
+      "nota": "Registro Modbus sin escalar: el factor de escala del variador está sin confirmar."
+    },
+    "arranqueParoLlenado": {
+      "label": "Orden de llenado",
+      "corto": "Orden llenado",
+      "nota": "Orden de inicio/parada de la secuencia de llenado."
+    },
+    "arranqueParoVaciado": {
+      "label": "Orden de vaciado",
+      "corto": "Orden vaciado",
+      "nota": "Orden de inicio/parada de la secuencia de vaciado."
+    },
+    "recirculacionAutomatica": {
+      "label": "Recirculación automática",
+      "corto": "Recirc. auto",
+      "nota": "Habilita el ciclo automático de recirculación entre tanques."
+    },
+    "setpointLlenado": {
+      "label": "Consigna de llenado",
+      "corto": "SP llenado",
+      "nota": "Consigna de nivel a la que se detiene el llenado. Unidad sin confirmar — se presume la misma de Nivel del tanque."
+    },
+    "setpointVaciado": {
+      "label": "Consigna de vaciado",
+      "corto": "SP vaciado",
+      "nota": "Consigna de nivel a la que se detiene el vaciado. Unidad sin confirmar — se presume la misma de Nivel del tanque."
     }
   },
   "quality": {

@@ -125,6 +125,31 @@ const EN_REPOSO = {
   FALLA_VARIADOR_DE_FRECUENCIA: false,
   CONTROL: false,
   PARO_DE_EMERGENCIA: true,
+  // Plan 27 F4: energía, variador y automatismo. La instalación en reposo:
+  // el motor parado da los "crudos" del variador en su valor de reposo (0,
+  // salvo los dos parámetros fijos), y el automatismo sin ninguna orden activa.
+  DP_CORRIENTE_L1: 1.2,
+  POTENCIA_REACTIVA_QN_L1: 0.3,
+  DP_ENERGIA_APARENTEL1: 4821.6,
+  TENSION_L1_N: 266.5,
+  TENSION_MAXIMA_L1_N: 279.1,
+  POTENCIA_ACTIVA_L1: 210,
+  POTENCIA_APARENTE_L1: 260,
+  FRECUENCIA_DE_SALIDA: 0,
+  VELOCIDAD: 0,
+  DP_CORRIENTE: 0,
+  TORQUE: 0,
+  PWR_ACTUAL: 0,
+  KWH_TOTAL: 1345,
+  VOLTAJE_BUS_DC: 310,
+  REFERENCIA: 0,
+  POTENCIA_NOMINAL: 1500,
+  VOLTAJE_SALIDA: 0,
+  ARRANQUE_PARO_LLENADO: false,
+  ARRANQUE_PARO_VACIADO: false,
+  RECIRCULACION_AUTOMATICA: true,
+  SETPOINT_LLENANDO: 80,
+  SETPOINT_VACIADO: 40,
 }
 
 /**
@@ -784,8 +809,20 @@ await checkAsync('«velocidad» a secas no se resuelve como «velocidad eficaz»
   const eficaz = sistemasDeSenal('velocidad eficaz').map((x) => x.clave)
   assert.ok(!eficaz.includes('velocidad'), 'la del variador no puede colarse aquí')
 
+  /*
+   * Plan 27 F4 añadió `velocidadMotor` al tanque —el mismo tag `VELOCIDAD`
+   * del PDF, del variador de la BOMBA— así que «velocidad del variador» deja
+   * de ser exclusiva de vibraciones: hoy nombra un concepto real en las DOS
+   * máquinas, y son rpm de dos motores distintos. Preguntarlo sin decir cuál
+   * es ambiguo de verdad, no una falla de resolución — es exactamente el
+   * caso que `sistemasDeSenal` existe para no adivinar.
+   */
   const variador = sistemasDeSenal('velocidad del variador')
-  assert.deepEqual(variador, [{ sistema: 'vibraciones', clave: 'velocidad' }])
+  assert.equal(variador.length, 2, 'las dos máquinas tienen su propia "velocidad del variador"')
+  assert.deepEqual(
+    new Set(variador.map((x) => x.sistema)),
+    new Set(['tanque', 'vibraciones']),
+  )
 })
 
 await checkAsync('un nombre que no existe en NINGUNA máquina no cita sólo el tanque', async () => {
@@ -1860,6 +1897,18 @@ await checkAsync(
       'Nivel alto-alto', 'Nivel alto', 'Nivel bajo-bajo', 'Nivel bajo',
       'Presión alta', 'Falta de presión', 'Bajo flujo', 'Falla del variador',
       'Mando del proceso', 'Paro de emergencia',
+      // Plan 27 F4: las veintidós de energía, variador y automatismo — ninguna
+      // historizada todavía, mismo motivo.
+      'Corriente de línea (L1)', 'Potencia reactiva (L1)',
+      'Energía aparente acumulada (L1)', 'Tensión de línea (L1-N)',
+      'Máximo histórico de tensión (L1-N)', 'Potencia activa (L1)',
+      'Potencia aparente (L1)', 'Frecuencia de salida del variador',
+      'Velocidad calculada del motor', 'Corriente de salida del variador',
+      'Par estimado por el variador', 'Potencia instantánea del variador',
+      'Energía acumulada del variador', 'Tensión del bus de continua',
+      'Consigna de frecuencia leída del variador', 'Potencia nominal parametrizada',
+      'Tensión de salida hacia el motor', 'Orden de llenado', 'Orden de vaciado',
+      'Recirculación automática', 'Consigna de llenado', 'Consigna de vaciado',
     ].sort())
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo

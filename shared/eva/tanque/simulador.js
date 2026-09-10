@@ -289,6 +289,89 @@ export function valorEn(clave, ms) {
     case 'paroDeEmergencia':
       return true
 
+    /*
+     * ── PLAN 27 F4: ENERGÍA, VARIADOR Y AUTOMATISMO ─────────────────────
+     *
+     * `MEDIDOR_DE_ENERGIA/`: mide el suministro de la instalación entera, no
+     * sólo el motor —el PLC y el resto del panel siguen consumiendo con la
+     * bomba parada—, así que ninguna de las siete se anula en el paro.
+     */
+    case 'corrienteL1':
+      return 1.1 + 0.6 * Number(marcha) + rizado(ms, 21, 0.08)
+    case 'potenciaReactivaL1':
+      return 0.25 + 0.15 * Number(marcha) + rizado(ms, 22, 0.03)
+    case 'energiaAparenteL1':
+      // Acumulador: crece con el tiempo transcurrido, nunca baja.
+      return 4800 + ms / 3.6e7
+    case 'potenciaActivaL1':
+      return 195 + 90 * Number(marcha) + rizado(ms, 23, 4)
+    case 'potenciaAparenteL1':
+      return 245 + 100 * Number(marcha) + rizado(ms, 24, 4)
+
+    /*
+     * `tensionL1N`/`tensionMaximaL1N` reutilizan la MISMA onda que
+     * `tensionLinea` —son la misma red— pero con la anomalía de escala ya
+     * medida contra el servidor real (~266-276 V donde `tensionLinea` da
+     * ~121): multiplicar por ~2,2 reproduce esa proporción sin inventar una
+     * física nueva.
+     */
+    case 'tensionL1N':
+      return (121.4 + 3.4 * onda(ms, JORNADA_MS * 1.3, 0.7) + rizado(ms, 7, 0.35)) * 2.2
+    case 'tensionMaximaL1N':
+      // El máximo histórico se queda unos volts por encima del instantáneo.
+      return (121.4 + 3.4 * onda(ms, JORNADA_MS * 1.3, 0.7) + rizado(ms, 7, 0.35)) * 2.2 + 6
+
+    /*
+     * `LECTURA_VARIADOR_MODBUS_RTU/`: diez registros SIN ESCALAR (§1.8 del
+     * PDF), así que lo que se simula es el REGISTRO crudo, no la magnitud
+     * física — de ahí que los números no lleven unidad ni intenten parecer
+     * Hz o rpm de verdad. La mayoría cae a 0 en el paro porque son lecturas
+     * del variador DETENIDO; los dos parámetros fijos (potencia nominal,
+     * energía acumulada) no dependen de si el motor impulsa ahora mismo.
+     */
+    case 'frecuenciaSalidaVariador':
+      return marcha ? 400 + rizado(ms, 31, 5) : 0
+    case 'velocidadMotor':
+      return marcha ? 1450 + rizado(ms, 32, 15) : 0
+    case 'corrienteVariador':
+      return marcha ? 62 + rizado(ms, 33, 4) : 0
+    case 'torqueVariador':
+      return marcha ? 58 + rizado(ms, 34, 6) : 0
+    case 'potenciaActualVariador':
+      return marcha ? 1100 + rizado(ms, 35, 60) : 0
+    case 'energiaAcumuladaVariador':
+      return 1300 + ms / 2.4e7
+    case 'voltajeBusDc':
+      // El bus de continua se mantiene cargado con el variador alimentado,
+      // impulse o no: sólo baja de verdad si se corta la entrada trifásica.
+      return 308 + rizado(ms, 36, 3)
+    case 'referenciaVariador':
+      return marcha ? 400 + rizado(ms, 31, 5) : 0
+    case 'potenciaNominalVariador':
+      // Parámetro fijo del variador, no una lectura de proceso.
+      return 1500
+    case 'voltajeSalidaVariador':
+      return marcha ? 3800 + rizado(ms, 37, 20) : 0
+
+    /*
+     * `AUTOMATISMO_LLENADO_VACIO/`: la misma alternancia marcha/paro que ya
+     * dibuja `nivelTanque` —la fórmula de esa señal RESTA nivel mientras
+     * impulsa y lo SUMA en el paro—, así que llenado y vaciado son sus dos
+     * mitades, no un ciclo nuevo que inventar.
+     */
+    case 'arranqueParoLlenado':
+      return !marcha
+    case 'arranqueParoVaciado':
+      return marcha
+    case 'recirculacionAutomatica':
+      return true
+    // Los dos set points son parámetros de configuración, no lecturas de
+    // proceso: los valores que trae Lista-variables.pdf §1.7 como iniciales.
+    case 'setpointLlenado':
+      return 80
+    case 'setpointVaciado':
+      return 40
+
     default:
       return null
   }

@@ -205,9 +205,16 @@ describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta
     const eficaz = sistemasDeSenal("velocidad eficaz").map((x) => x.clave);
     expect(eficaz).not.toContain("velocidad");
 
-    expect(sistemasDeSenal("velocidad del variador")).toEqual([
-      { sistema: "vibraciones", clave: "velocidad" },
-    ]);
+    /*
+     * Plan 27 F4 añadió `velocidadMotor` al tanque, con el mismo tag
+     * `VELOCIDAD` del PDF — el variador de la BOMBA, no el de vibraciones.
+     * «velocidad del variador» deja de ser exclusiva de una máquina: hoy
+     * nombra un concepto real en las dos, y preguntarlo sin decir cuál es
+     * ambiguo de verdad, no una falla de resolución.
+     */
+    const variador = sistemasDeSenal("velocidad del variador");
+    expect(variador.length).toBe(2);
+    expect(new Set(variador.map((x) => x.sistema))).toEqual(new Set(["tanque", "vibraciones"]));
   });
 
   it("un nombre ambiguo devuelve TODOS los candidatos, no el primero", () => {

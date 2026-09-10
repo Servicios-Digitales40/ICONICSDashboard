@@ -88,6 +88,111 @@
       "label": "Emergency Stop",
       "corto": "E-Stop",
       "nota": "State of the emergency-stop circuit. Polarity unconfirmed: not shown as an alarm."
+    },
+    "corrienteL1": {
+      "label": "Line Current (L1)",
+      "corto": "Current L1"
+    },
+    "potenciaReactivaL1": {
+      "label": "Reactive Power (L1)",
+      "corto": "Reactive Pwr"
+    },
+    "energiaAparenteL1": {
+      "label": "Accumulated Apparent Energy (L1)",
+      "corto": "Energy L1"
+    },
+    "tensionL1N": {
+      "label": "Line Voltage (L1-N)",
+      "corto": "Voltage L1-N",
+      "nota": "The PDF declares it in volts, but the measured value isn't plausible as a phase-to-neutral voltage on this grid. Scale unconfirmed."
+    },
+    "tensionMaximaL1N": {
+      "label": "Historical Maximum Voltage (L1-N)",
+      "corto": "Max Voltage L1-N",
+      "nota": "Historical maximum of tensionL1N: inherits the same scale doubt."
+    },
+    "potenciaActivaL1": {
+      "label": "Active Power (L1)",
+      "corto": "Active Pwr"
+    },
+    "potenciaAparenteL1": {
+      "label": "Apparent Power (L1)",
+      "corto": "Apparent Pwr"
+    },
+    "frecuenciaSalidaVariador": {
+      "label": "Drive Output Frequency",
+      "corto": "Out. Freq.",
+      "nota": "Unscaled Modbus register (Lista-variables.pdf §1.8): the drive's scale factor is unconfirmed."
+    },
+    "velocidadMotor": {
+      "label": "Calculated Motor Speed",
+      "corto": "VFD Speed",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "corrienteVariador": {
+      "label": "Drive Output Current",
+      "corto": "VFD Current",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "torqueVariador": {
+      "label": "Torque Estimated by the Drive",
+      "corto": "Torque",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "potenciaActualVariador": {
+      "label": "Drive Instantaneous Power",
+      "corto": "Inst. Power",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "energiaAcumuladaVariador": {
+      "label": "Drive Accumulated Energy",
+      "corto": "VFD Energy",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "voltajeBusDc": {
+      "label": "DC Bus Voltage",
+      "corto": "DC Bus",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "referenciaVariador": {
+      "label": "Frequency Reference Read Back from the Drive",
+      "corto": "Reference",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "potenciaNominalVariador": {
+      "label": "Parameterized Rated Power",
+      "corto": "Rated Power",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "voltajeSalidaVariador": {
+      "label": "Output Voltage to the Motor",
+      "corto": "Out. Voltage",
+      "nota": "Unscaled Modbus register: the drive's scale factor is unconfirmed."
+    },
+    "arranqueParoLlenado": {
+      "label": "Filling Command",
+      "corto": "Fill Cmd",
+      "nota": "Start/stop command for the filling sequence."
+    },
+    "arranqueParoVaciado": {
+      "label": "Draining Command",
+      "corto": "Drain Cmd",
+      "nota": "Start/stop command for the draining sequence."
+    },
+    "recirculacionAutomatica": {
+      "label": "Automatic Recirculation",
+      "corto": "Auto Recirc.",
+      "nota": "Enables the automatic recirculation cycle between tanks."
+    },
+    "setpointLlenado": {
+      "label": "Filling Setpoint",
+      "corto": "Fill SP",
+      "nota": "Level setpoint at which filling stops. Unit unconfirmed — assumed to be the same as Tank Level."
+    },
+    "setpointVaciado": {
+      "label": "Draining Setpoint",
+      "corto": "Drain SP",
+      "nota": "Level setpoint at which draining stops. Unit unconfirmed — assumed to be the same as Tank Level."
     }
   },
   "quality": {
