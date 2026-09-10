@@ -125,6 +125,31 @@ check('el recuento de señales de cada sistema sale del registro', () => {
   }
 })
 
+check('el campo "historia" de cada sistema no lleva una cifra que ya no cuadra', () => {
+  /*
+   * `sistema.historia` es prosa suelta —no hay una plantilla que la genere,
+   * como sí la hay para el recuento de arriba— y por eso se puede quedar
+   * atrás sin que ningún otro check lo note: pasó con la del tanque («Cinco
+   * de las ocho señales tienen serie propia») hasta el 10-09-2026, con
+   * cincuenta ya historizadas y CINCO señalado como el total en el propio
+   * prompt del modelo.
+   *
+   * No se compara CONTRA una plantilla —cada sistema redacta distinto, ver
+   * `vibraciones.js`— sino que se exige que el número de señales CON serie
+   * hoy aparezca en algún sitio de la frase. Es una guarda floja a propósito:
+   * no impide redactar mejor, sólo impide que la cifra deje de ser cierta.
+   */
+  for (const sistema of SISTEMAS) {
+    const conSerie = sistema.claves().filter(clave => sistema.esHistorizada(clave)).length
+    const numeros = (sistema.historia.match(/\d+/g) ?? []).map(Number)
+    assert.ok(
+      numeros.includes(conSerie),
+      `"historia" de "${sistema.id}" no menciona ${conSerie} (las que hoy tienen serie propia): ` +
+        `«${sistema.historia}»`
+    )
+  }
+})
+
 check('las limitaciones de cada sistema viajan enteras', () => {
   // `limitaciones` no es documentación: es lo que hay que decir en voz alta al
   // contestar sobre esa máquina. Una que no llegue al prompt es una afirmación

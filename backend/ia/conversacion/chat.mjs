@@ -198,11 +198,15 @@ function contieneCifras(texto) {
   const sinRecuentos = String(texto ?? '')
     // «8 señales», «4 activos», «ocho puntos».
     .replace(/\b\d+\s+(se[ñn]al|activo|punto|tag|magnitud)(es)?\b/gi, '')
-    // «sólo 4 tienen historia». Es el otro modo de contar el catálogo, y sin
-    // esta forma se bloqueaba la respuesta a «¿qué puedes consultar?» por su
-    // segunda mitad. Se ata a las palabras «serie» o «historia» a propósito:
-    // ninguna medición de proceso se escribe jamás así.
-    .replace(/\b\d+\s+(?:de\s+(?:ellas|ellos|las\s+ocho)\s+)?(?:s[oó]lo\s+)?tienen?\s+(?:serie|historia)\b/gi, '')
+    // «sólo 4 tienen historia», «50 de las 52 tienen serie». Es el otro modo
+    // de contar el catálogo, y sin esta forma se bloqueaba la respuesta a
+    // «¿qué puedes consultar?» por su segunda mitad. Se ata a las palabras
+    // «serie» o «historia» a propósito: ninguna medición de proceso se
+    // escribe jamás así. «las/los + dígitos» y no «las ocho» a secas
+    // (Plan 27 F8, 10-09-2026): con el catálogo escribiéndose con cifras
+    // («50 de las 52»), un número deletreado fijo se quedaba atrás cada vez
+    // que el catálogo crecía.
+    .replace(/\b\d+\s+(?:de\s+(?:ellas|ellos|las\s+\d+|los\s+\d+)\s+)?(?:s[oó]lo\s+)?tienen?\s+(?:serie|historia)\b/gi, '')
   return /\d/.test(sinRecuentos)
 }
 
@@ -432,7 +436,7 @@ export const REGLAS = [
     'datos se leen, no se calculan.',
 
   'No hagas aritmética. Cita los números tal y como vienen de la herramienta. Si te dice que ' +
-    'hay 8 señales, 5 en banda y 3 en reposo, di exactamente eso; no restes, no sumes y no ' +
+    '31 señales están en banda y 6 en aviso, di exactamente eso; no las sumes, no restes y no ' +
     'repartas por activos de tu cuenta. Una cuenta mal hecha en la frase final estropea una ' +
     'consulta que salió bien.',
 

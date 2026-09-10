@@ -242,7 +242,10 @@ export const SISTEMAS = [
       "correlacionar_senales",
       "grafico_de_senal",
     ],
-    historia: "Cinco de las ocho señales tienen serie propia verificada. Las otras tres NO.",
+    historia:
+      "50 de las 52 señales del catálogo tienen serie propia desde el 10-09-2026 (Plan 27 F6): " +
+      "medidas, alarmas, mandos y lecturas del variador. cargaMotor y eficienciaEnergetica NO " +
+      "se historizan — el historiador les devuelve la serie de temperaturaTanque.",
     limitaciones: [
       "Los límites con los que se evalúa cada señal son estimaciones nuestras para un " +
         "sistema de agua genérico, no rangos confirmados por quien opera la instalación.",

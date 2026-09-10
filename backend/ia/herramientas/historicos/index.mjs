@@ -393,14 +393,19 @@ export function crearHerramientasDeHistoricos({
     /**
      * Todo el sistema de una vez.
      *
-     * ── POR QUÉ DEVUELVE LAS OCHO Y NO ADMITE FILTRO ───────────────────
+     * ── POR QUÉ DEVUELVE TODAS Y NO ADMITE FILTRO ───────────────────────
      *
-     * Porque son ocho. El catálogo entero cabe en una respuesta que cuesta una
-     * sola lectura en lote, y el modelo tiene **una consulta por pregunta**
-     * (ver `chat.mjs`): una herramienta que devolviera sólo la señal pedida
-     * obligaría a elegir bien a la primera, y «¿va todo bien?» no nombra
-     * ninguna señal. Devolverlo todo hace que la pregunta vaga y la concreta
-     * se respondan con la misma llamada.
+     * Porque `readPoints` no las trocea: una sola petición al `/Data/Read` de
+     * ICONICS lee las cincuenta y dos del catálogo de una vez (`client.mjs`),
+     * y el modelo tiene **una consulta por pregunta** (ver `chat.mjs`): una
+     * herramienta que devolviera sólo la señal pedida obligaría a elegir bien
+     * a la primera, y «¿va todo bien?» no nombra ninguna señal. Devolverlo
+     * todo hace que la pregunta vaga y la concreta se respondan con la misma
+     * llamada.
+     *
+     * Esto es distinto de `/history/batch` (Plan 27 F6): ESE endpoint sí topa
+     * en `MAX_SERIES_BATCH` porque es HTTP público, validado por Zod, y lo
+     * usa el navegador — `readPoints` corre en proceso, sin esa frontera.
      */
 
     /**

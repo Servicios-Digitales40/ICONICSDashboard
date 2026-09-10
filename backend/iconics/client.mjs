@@ -285,10 +285,10 @@ export function createIconicsClient(config, authenticator) {
       event: `la lectura en lote de ${pointNames.length} señales`,
       /*
        * Se nombran las señales, no sólo cuántas: con el tablero abierto son
-       * lotes de ocho cada pocos segundos, y «8 señales» repetido no permite
-       * distinguir la pantalla de planta de la de vibraciones cuando una de
-       * las dos va mal. Se recorta a tres para que la línea siga siendo una
-       * línea.
+       * lotes de decenas cada pocos segundos, y «52 señales» repetido no
+       * permite distinguir la pantalla de planta de la de vibraciones cuando
+       * una de las dos va mal. Se recorta a tres para que la línea siga
+       * siendo una línea.
        */
       describir: ms =>
         `Leídas ${pointNames.length} señales en ${ms} ms (${resumirNombres(pointNames)})`,
