@@ -39,6 +39,7 @@ import { conConcurrenciaAcotada } from "@shared/concurrencia.js";
 import {
   AGREGADO,
   MAX_PUNTOS,
+  MAX_SERIES_BATCH,
   SIN_SERIE,
   VENTANA,
   intervaloHMS,
@@ -220,53 +221,77 @@ export async function leerSeries(claves, rango = VENTANA) {
   if (!pedibles.length) return salida;
 
   const { inicio, fin } = resolverRango(rango);
-  const respuesta = await fetchIconicsHistoryBatch(
-    pedibles.map((clave) => puntoHistorico(clave)),
-    { startDate: inicio.toISOString(), endDate: fin.toISOString(), aggregate: AGREGADO }
+
+  /*
+   * `/history/batch` topa en `MAX_SERIES_BATCH` puntos (Plan 27 F6,
+   * 10-09-2026): con cincuenta señales historizadas, una sola pestaña de
+   * `DetalleActivo` puede pedir más de las que cabían cuando el catálogo
+   * entero eran ocho. Trocear aquí, con la misma concurrencia acotada que ya
+   * usa `leerSerie()` para los tramos, evita que el servidor rechace el lote
+   * entero con `too_big` — la alternativa era que el frontend descubriera el
+   * tope por un 400 en vez de conocerlo de antemano.
+   */
+  const lotes = [];
+  for (let i = 0; i < pedibles.length; i += MAX_SERIES_BATCH) {
+    lotes.push(pedibles.slice(i, i + MAX_SERIES_BATCH));
+  }
+
+  const respuestas = await conConcurrenciaAcotada(
+    lotes.map((lote) => () =>
+      fetchIconicsHistoryBatch(
+        lote.map((clave) => puntoHistorico(clave)),
+        { startDate: inicio.toISOString(), endDate: fin.toISOString(), aggregate: AGREGADO }
+      )
+    ),
+    CONCURRENCIA_TRAMOS
   );
 
   /*
    * Un fallo de la petición NO se disfraza de rango vacío: sin esto, una caída
    * de red y un historiador sin muestras llegarían indistinguibles a la
    * gráfica, que es el modo de fallo que `metaPorClave.error` existe para
-   * evitar. Se propaga para que el hook lo cuente como error de cada señal.
+   * evitar. Se propaga para que el hook lo cuente como error de cada señal —
+   * un solo lote roto invalida la ventana entera, igual que antes de trocear.
    */
-  if (!respuesta?.ok) {
-    throw new Error(respuesta?.error ?? "El historiador no respondió.");
+  const fallido = respuestas.find((r) => !r?.ok);
+  if (fallido) {
+    throw new Error(fallido.error ?? "El historiador no respondió.");
   }
 
-  const series = respuesta.payload?.series ?? {};
-  for (const clave of pedibles) {
-    const serie = series[puntoHistorico(clave)];
-    const datos = normalizar(serie?.data);
-    /*
-     * La cobertura viene CONTADA por el servidor, que es quien troceó: los
-     * índices de los tramos con dato ya no existen aquí, sólo cuántos fueron.
-     * Se reconstruye la forma que `cobertura()` produce para no cambiar el
-     * contrato de quien la lee.
-     */
-    const tramos = serie?.tramos ?? 0;
-    salida[clave] = {
-      datos,
-      motivo: null,
-      hasMore: Boolean(serie?.hasMore),
-      cobertura: tramos
-        ? {
-            tramos,
-            tramosConDato: serie.tramosConDato ?? 0,
-            completa: (serie.tramosConDato ?? 0) === tramos,
-            /*
-             * `desde`/`hasta` van en null a propósito: nombran el PRIMER y
-             * ÚLTIMO tramo que trajeron muestras, y esa posición se pierde al
-             * contar en el servidor. Declararlo vacío es honesto; rellenarlo
-             * con los bordes de la ventana diría que la cobertura llega hasta
-             * ahí cuando no se sabe.
-             */
-            desde: null,
-            hasta: null,
-          }
-        : null,
-    };
+  for (let i = 0; i < lotes.length; i++) {
+    const series = respuestas[i].payload?.series ?? {};
+    for (const clave of lotes[i]) {
+      const serie = series[puntoHistorico(clave)];
+      const datos = normalizar(serie?.data);
+      /*
+       * La cobertura viene CONTADA por el servidor, que es quien troceó: los
+       * índices de los tramos con dato ya no existen aquí, sólo cuántos fueron.
+       * Se reconstruye la forma que `cobertura()` produce para no cambiar el
+       * contrato de quien la lee.
+       */
+      const tramos = serie?.tramos ?? 0;
+      salida[clave] = {
+        datos,
+        motivo: null,
+        hasMore: Boolean(serie?.hasMore),
+        cobertura: tramos
+          ? {
+              tramos,
+              tramosConDato: serie.tramosConDato ?? 0,
+              completa: (serie.tramosConDato ?? 0) === tramos,
+              /*
+               * `desde`/`hasta` van en null a propósito: nombran el PRIMER y
+               * ÚLTIMO tramo que trajeron muestras, y esa posición se pierde al
+               * contar en el servidor. Declararlo vacío es honesto; rellenarlo
+               * con los bordes de la ventana diría que la cobertura llega hasta
+               * ahí cuando no se sabe.
+               */
+              desde: null,
+              hasta: null,
+            }
+          : null,
+      };
+    }
   }
 
   return salida;

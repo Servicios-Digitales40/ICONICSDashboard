@@ -30,6 +30,7 @@
 import { z } from 'zod'
 import { isSafeHistoryArgument, isSafePointName } from '../iconics/validation.mjs'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
+import { MAX_SERIES_BATCH } from '../../shared/eva/comun/historia.js'
 
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
 export const MAX_PREGUNTA = 2000
@@ -207,12 +208,11 @@ export const ControlBombaSchema = z.object({
 /**
  * Series admitidas en una sola llamada a `/history/batch`.
  *
- * Cinco son las del pronóstico, que es el consumidor que motivó la ruta;
- * ocho, el catálogo entero del sistema del tanque. Diez deja margen sin
- * dejarlo abierto: cada señal multiplica los tramos, y una lista sin techo
- * convierte una petición en cientos de lecturas al historiador.
+ * El número vive en `shared/eva/comun/historia.js` — lo necesita también el
+ * frontend, para trocear ANTES de llamar y no descubrir el tope por un 400
+ * (Plan 27 F6, 10-09-2026: una pestaña de once señales lo hizo saltar).
  */
-export const MAX_SERIES_BATCH = 10
+export { MAX_SERIES_BATCH }
 
 export const HistoryBatchSchema = z
   .object({

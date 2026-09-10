@@ -119,6 +119,26 @@ export const VENTANA = { horas: 6, puntos: 24 };
  */
 export const MAX_PUNTOS = 100;
 
+/**
+ * Series admitidas en una sola llamada a `/history/batch`.
+ *
+ * Vivía sólo en `backend/http/esquemas.mjs` (Zod), escrito cuando el
+ * catálogo entero del tanque eran ocho señales y ninguna pestaña de
+ * `DetalleActivo` podía pedir más de cuatro o cinco de golpe. El Plan 27 F6
+ * (10-09-2026) historizó cincuenta, y una sola pestaña (Estación de llenado)
+ * pasó a pedir once — el servidor rechazó el lote entero con
+ * `too_big`/`No more than 10 points per request`, y las tarjetas de esa
+ * pestaña se quedaron sin histórico de golpe.
+ *
+ * El límite en sí sigue siendo válido — diez deja margen sin dejarlo
+ * abierto: cada señal multiplica los tramos, y una lista sin techo convierte
+ * una petición en cientos de lecturas al historiador —, lo que hacía falta
+ * era que quien arma la lista lo conociera: `data/tanque/historia.js`
+ * trocea en lotes de este tamaño antes de llamar a la ruta, en vez de que el
+ * backend sea la única guarda y el frontend se entere por el 400 de turno.
+ */
+export const MAX_SERIES_BATCH = 10;
+
 /** Segundos → `HH:MM:SS`, que es el formato de intervalo que espera ICONICS. */
 export function intervaloHMS(segundos) {
   const s = Math.max(1, Math.round(segundos));

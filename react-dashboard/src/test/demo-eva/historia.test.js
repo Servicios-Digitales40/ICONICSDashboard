@@ -11,18 +11,22 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-const { fetchIconicsHistory } = vi.hoisted(() => ({
+const { fetchIconicsHistory, fetchIconicsHistoryBatch } = vi.hoisted(() => ({
   fetchIconicsHistory: vi.fn(async () => ({ data: [] })),
+  fetchIconicsHistoryBatch: vi.fn(async () => ({ ok: true, payload: { series: {} } })),
 }));
 
-vi.mock("@/lib/iconics", () => ({ fetchIconicsHistory }));
+vi.mock("@/lib/iconics", () => ({ fetchIconicsHistory, fetchIconicsHistoryBatch }));
 
 import {
   leerSerie,
+  leerSeries,
   rangoAyer,
   rangoPersonalizado,
   rangoSemana,
 } from "@/Demo-EVA/data/tanque/historia.js";
+import { MAX_SERIES_BATCH } from "@shared/eva/comun/historia.js";
+import { historizadasMedidas } from "@/Demo-EVA/domain/senales.js";
 
 describe("los accesos rápidos contra el historiador son aritmética de calendario, no de red", () => {
   it("«Ayer» es el día completo anterior, sin tocar hoy", () => {
@@ -198,5 +202,47 @@ describe("leerSerie pide el intervalo correcto según el tipo de rango", () => {
     expect(fetchIconicsHistory).not.toHaveBeenCalled();
     expect(datos).toEqual([]);
     expect(motivo).toBeTruthy();
+  });
+});
+
+describe("leerSeries trocea en lotes de MAX_SERIES_BATCH (Plan 27 F6)", () => {
+  /*
+   * Medido contra el servidor real el 10-09-2026: con cincuenta señales
+   * historizadas, la pestaña «Estación de llenado» pedía once de golpe y
+   * `/api/iconics/history/batch` rechazaba el lote ENTERO con
+   * `too_big`/"No more than 10 points per request" — las tarjetas de esa
+   * pestaña se quedaban sin histórico. Este archivo nunca había probado
+   * `leerSeries` directamente (sólo `leerSerie`, uno a uno), y por eso nadie
+   * atrapó la regresión antes de llegar a producción.
+   */
+  it("con más de MAX_SERIES_BATCH claves, hace VARIAS llamadas, ninguna por encima del tope", async () => {
+    fetchIconicsHistoryBatch.mockClear();
+
+    // Señales reales, historizadas y medidas de verdad — no hace falta que
+    // sean muchas más de once: lo que importa es cruzar el tope.
+    const claves = historizadasMedidas();
+    expect(claves.length).toBeGreaterThan(MAX_SERIES_BATCH);
+
+    await leerSeries(claves, { inicio: new Date("2026-09-01"), fin: new Date("2026-09-02") });
+
+    expect(fetchIconicsHistoryBatch.mock.calls.length).toBeGreaterThan(1);
+    for (const [puntos] of fetchIconicsHistoryBatch.mock.calls) {
+      expect(puntos.length).toBeLessThanOrEqual(MAX_SERIES_BATCH);
+    }
+    // Ninguna clave se pierde ni se repite al trocear.
+    const totalPedido = fetchIconicsHistoryBatch.mock.calls.reduce((n, [puntos]) => n + puntos.length, 0);
+    expect(totalPedido).toBe(claves.length);
+  });
+
+  it("si un lote falla, se propaga el error — no se disfraza de rango vacío", async () => {
+    fetchIconicsHistoryBatch.mockClear();
+    fetchIconicsHistoryBatch
+      .mockResolvedValueOnce({ ok: true, payload: { series: {} } })
+      .mockResolvedValueOnce({ ok: false, error: "ICONICS History request failed." });
+
+    const claves = historizadasMedidas();
+    await expect(
+      leerSeries(claves, { inicio: new Date("2026-09-01"), fin: new Date("2026-09-02") })
+    ).rejects.toThrow(/ICONICS History request failed/);
   });
 });
