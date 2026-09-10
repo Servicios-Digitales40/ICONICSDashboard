@@ -1,4 +1,23 @@
-# Plan de Alarmas — rama Moises3
+# Plan de Alarmas — rama Moises3 (OBSOLETO)
+
+> **OBSOLETO (10-09-2026).** Este plan proponía reconstruir "Alarmas" sobre
+> 11 puntos MQTT (`iot:Data_mqtt/pruebaiot/DP-*`, leídos vía
+> `/fwxapi/rest/v1/Data`) porque el endpoint nativo de alarmas de ICONICS no
+> se lograba leer. Se abandonó tras definir sólo 1 de las 11 alarmas.
+>
+> El camino que de verdad se tomó fue otro: `docs/PLAN-27-VARIABLES-DEL-TANQUE.md`
+> (F3) historizó las **8 alarmas reales del DB del PLC** —
+> `ac:TDCON/DEMO/ALARMAS/*`, sin pasar por MQTT ni por Swagger— con severidad,
+> activo asignado y condición de disparo ya declarados en
+> `shared/eva/tanque/senales.js` (`naturaleza: "alarma"`). Esa vía está
+> implementada, probada y en producción; la de este documento nunca llegó a
+> escribirse. Se deja el archivo tal cual, como registro de la decisión
+> descartada, no como trabajo pendiente.
+>
+> Ver también la vista «Alarmas → En vivo» (`views/comunes/AlarmasEva.jsx`),
+> que es donde ese catálogo real se muestra hoy.
+
+---
 
 Plan de trabajo separado del [`PLAN-MOISES3-UI-UX.md`](./PLAN-MOISES3-UI-UX.md)
 general. Se centra en retomar y redefinir la funcionalidad de Alarmas de la
