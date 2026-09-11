@@ -231,6 +231,34 @@ export async function createApp(config) {
   // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
   // `controlar_bomba` escribe, y necesita la misma puerta que usa
   // `/api/iconics/write` para negarse cuando el puente está en solo lectura.
+  /*
+   * El diario de accionamientos (Plan 22 F3). Se construye SIEMPRE, también
+   * en solo lectura: un intento rechazado por `ICONICS_READ_ONLY` es
+   * exactamente una de las líneas que interesa tener — alguien pulsó el botón
+   * y el puente dijo que no.
+   *
+   * Sube por delante de las herramientas desde el Plan 23 F6: `controlar_bomba`
+   * también anota, así que la factoría tiene que recibirlo. No depende de nada
+   * de lo que se construye en medio.
+   */
+  const diario = crearDiario({
+    ruta: config.diario.ruta,
+    maxBytes: config.diario.maxBytes,
+    diasRetencion: config.diario.dias,
+  })
+
+  /*
+   * El diario de CONVERSACIONES (Plan 23 F6): una línea por turno del
+   * asistente. Archivo aparte del de accionamientos —son dos dominios y dos
+   * lectores distintos, ver el bloque `diario:` de `config.mjs`— y el mismo
+   * mecanismo de `lib/diario.mjs` debajo.
+   */
+  const diarioConversaciones = crearDiario({
+    ruta: config.diario.conversaciones.ruta,
+    maxBytes: config.diario.conversaciones.maxBytes,
+    diasRetencion: config.diario.conversaciones.dias,
+  })
+
   const herramientas = createHerramientas({
     client,
     turnos: config.ia.turnos,
@@ -239,6 +267,7 @@ export async function createApp(config) {
     motorDiagnostico,
     reportes: config.reportes,
     historyConcurrencia: config.limits.historyConcurrencia,
+    diario,
   })
   const chat = createChat({ config, herramientas })
 
@@ -253,18 +282,6 @@ export async function createApp(config) {
   // index.html con un 200 — y el frontend creería que existe el micrófono y que
   // una página HTML es una transcripción.
   const voz = createVoz({ config })
-
-  /*
-   * El diario de accionamientos (Plan 22 F3). Se construye SIEMPRE, también
-   * en solo lectura: un intento rechazado por `ICONICS_READ_ONLY` es
-   * exactamente una de las líneas que interesa tener — alguien pulsó el botón
-   * y el puente dijo que no.
-   */
-  const diario = crearDiario({
-    ruta: config.diario.ruta,
-    maxBytes: config.diario.maxBytes,
-    diasRetencion: config.diario.dias,
-  })
 
   /* ── Plugins ───────────────────────────────────────────────────── */
 
@@ -493,7 +510,7 @@ export async function createApp(config) {
     registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, voz, indiceDocumentos })
     registerIconicsRoutes(instancia, { config, client })
     registerControlRoutes(instancia, { config, herramientas, diario })
-    registerChatRoutes(instancia, { config, chat, cola })
+    registerChatRoutes(instancia, { config, chat, cola, diarioConversaciones })
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })

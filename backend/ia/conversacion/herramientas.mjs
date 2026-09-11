@@ -1058,6 +1058,20 @@ export function createHerramientas({
   // arriba — un número que viene de fuera, no una variable de entorno leída
   // aquí.
   historyConcurrencia = 6,
+  /*
+   * El diario de accionamientos (Plan 23 F6 · IA-10).
+   *
+   * `null` por defecto, y eso NO es una concesión a las pruebas: es que el
+   * diario no cambia lo que la herramienta hace, sólo deja constancia. Un
+   * montaje sin él acciona igual —con sus dos guardas y su relectura— y se
+   * queda sin la línea en disco, que es exactamente lo que pasaba hasta hoy.
+   *
+   * Lo recibe la factoría y no `controlar_bomba` directamente porque es
+   * `app.mjs` quien sabe dónde vive el archivo, igual que ya se lo dice a
+   * `controlRoutes.mjs`: las dos puertas al mismo accionamiento escriben en el
+   * mismo diario porque las dos lo reciben del mismo sitio.
+   */
+  diario = null,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -1106,7 +1120,7 @@ export function createHerramientas({
        hablan, y el orden del catálogo es lo primero que lee. */
     ...crearHerramientasDeRegistro(),
     ...crearHerramientasDeMaquina({
-      client, readOnly, maquina: { leerMaquina, resolverSistema, evaluarRiesgosDe },
+      client, readOnly, diario, maquina: { leerMaquina, resolverSistema, evaluarRiesgosDe },
     }),
     /* Las de historia van detrás de las de máquina: es el orden en que se
        pregunta —primero cómo está, después cómo ha estado—. */
@@ -1182,7 +1196,7 @@ export function createHerramientas({
    * siempre: el destinatario es un modelo en mitad de un turno, y un error que
    * puede leer es un error del que se puede recuperar.
    */
-  async function ejecutar(nombre, argumentos = {}) {
+  async function ejecutar(nombre, argumentos = {}, contexto = {}) {
     const fn = herramientas[nombre]
     if (!fn) {
       return fallo(`No existe la herramienta "${nombre}".`, { herramientas: Object.keys(herramientas) })
@@ -1208,7 +1222,19 @@ export function createHerramientas({
     }
 
     try {
-      return await fn(argumentos)
+      /*
+       * El contexto es del LLAMADOR, no del modelo (Plan 23 F6).
+       *
+       * Hoy lleva una sola cosa —`yaAnota`, que dice si quien llama escribe él
+       * mismo en el diario— y va aparte de `argumentos` a propósito: eso lo
+       * escribe el modelo y esto no. Mezclarlos dejaría al modelo pudiendo
+       * pedir `yaAnota: true` y borrar así su propio rastro del diario, que es
+       * exactamente lo que un diario de accionamientos no puede permitir.
+       *
+       * Por eso tampoco pasa por el esquema Zod: no es parte del contrato que
+       * el modelo lee.
+       */
+      return await fn(argumentos, contexto)
     } catch (error) {
       // Una excepción aquí es un fallo del puente, no del servidor de planta.
       // Se devuelve como dato para que el modelo lo cuente en vez de quedarse

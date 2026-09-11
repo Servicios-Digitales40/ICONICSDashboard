@@ -32,6 +32,11 @@ import { SISTEMA } from '../../../../shared/eva/comun/sistemas.js'
 import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
 import { toBooleano } from '../../../../shared/eva/tanque/sistema.js'
 import { fallo } from '../lib/respuesta.mjs'
+/* Para avisar de que el diario no pudo escribir (Plan 23 F6). No se propaga el
+   fallo —cuando se anota, la bomba ya se accionó— pero tampoco se traga: un
+   diario que dejó de escribir sin que nadie se entere es el mismo problema que
+   no tenerlo, descubierto más tarde. */
+import { logger } from '../../../logger.mjs'
 /*
  * `agruparPorRegla` sigue en `herramientas.mjs`: la usan también las de
  * históricos, y sacarla es parte de la limpieza que queda cuando el
@@ -80,8 +85,57 @@ const TAG_CONTROL_BOMBA = 'ac:TDCON/DEMO/SEGURIDAD/CONTROL'
  * @param {boolean} args.readOnly  si está en true, ninguna escritura sale
  * @param {object}  args.maquina   ayudantes de `lib/maquina.mjs`
  */
-export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
+export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario = null }) {
   const { leerMaquina, resolverSistema, evaluarRiesgosDe } = maquina
+
+  /**
+   * Anota el accionamiento en el diario, si lo hay (Plan 23 F6 · IA-10).
+   *
+   * ── POR QUÉ ESTO FALTABA, Y POR QUÉ IMPORTA ────────────────────────
+   *
+   * Hasta hoy sólo anotaba `controlRoutes.mjs`, el botón del tablero. Una
+   * bomba encendida DESDE EL CHAT no dejaba rastro en el diario que existe
+   * justo para contestar «¿qué se le hizo a la instalación?» meses después: el
+   * mismo accionamiento, sobre el mismo tag, con las mismas consecuencias,
+   * constaba o no según por qué puerta hubiera entrado.
+   *
+   * `origen` es lo que distingue las dos puertas. El botón anota `ip` y
+   * `usuario` porque tiene un `request` delante; aquí no hay ninguno —la
+   * herramienta corre dentro del bucle del modelo y no sabe quién preguntó, ni
+   * tiene por qué—, así que se marca el CANAL. Quien lea el diario dentro de
+   * seis meses necesita saber que aquello lo pidió alguien hablando con el
+   * asistente y no pulsando un botón, porque son dos conversaciones distintas
+   * las que hay que ir a buscar.
+   *
+   * No lanza y no cambia lo que se devuelve: cuando se anota, la bomba YA se
+   * accionó. Mismo criterio que la cabecera de `lib/diario.mjs`.
+   */
+  async function anotarAccionamiento(entrada, yaAnota) {
+    /*
+     * ── POR QUÉ PUEDE HABER QUIEN ANOTE POR NOSOTROS ───────────────────
+     *
+     * Porque el botón del tablero **pasa por esta misma función**: su ruta
+     * llama a `ejecutar('controlar_bomba', …)` para no duplicar las dos
+     * guardas ni la relectura (ver la cabecera de `controlRoutes.mjs`). Al
+     * añadir aquí la anotación, cada pulsación del botón dejaba DOS líneas: la
+     * suya, con `ip` y `usuario`, y la nuestra marcada como `asistente` —que
+     * es falso, porque nadie habló con el asistente—.
+     *
+     * Un diario que duplica es malo; uno que miente sobre el canal es peor,
+     * porque manda a buscar una conversación que no existe. Así que quien
+     * tiene el `request` delante anota él —sabe quién fue— y nos lo dice.
+     */
+    if (yaAnota || !diario) return
+    const { ok, error } = await diario.anotar({ origen: 'asistente', ...entrada })
+    if (!ok) {
+      logger.error(
+        `No se pudo anotar en el diario el accionamiento pedido por el asistente: ${error}. ` +
+          'La orden SÍ se ejecutó; lo que falta es su constancia en disco. Revisa permisos y ' +
+          'espacio en `datos/`.',
+        { error }
+      )
+    }
+  }
 
   return {
     /**
@@ -227,51 +281,80 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
      * la cabecera del archivo. La del nivel sólo se aplica al ENCENDIDO — apagar
      * la bomba nunca puede desbordar el tanque, así que no se retrasa.
      */
-    async controlar_bomba({ encender } = {}) {
+    async controlar_bomba({ encender } = {}, { yaAnota = false } = {}) {
       if (typeof encender !== 'boolean') {
+        /*
+         * Ésta NO se anota, y es la única que no.
+         *
+         * Las demás salidas son órdenes que alguien dio y el puente rechazó —y
+         * eso interesa—. Ésta es una llamada mal formada: no llegó a decir si
+         * encender o apagar, así que no hubo orden que registrar. Anotarla
+         * llenaría el diario de intentos del modelo que no son intentos sobre
+         * la instalación. Mismo criterio que en `controlRoutes.mjs`, donde el
+         * cuerpo vacío lo rechaza el esquema antes de llegar a la ruta y por
+         * eso tampoco deja línea.
+         */
         return fallo('Falta decir si hay que encender (true) o apagar (false) la bomba.')
       }
 
+      const accionPedida = encender ? 'encender' : 'apagar'
+
       if (readOnly) {
-        return fallo(
+        const motivo =
           'El puente ICONICS está en modo solo lectura (ICONICS_READ_ONLY=true), así que no puedo ' +
-            'escribir en la instalación. Dile al operador que para habilitar el control tiene que ' +
-            'arrancar el servidor con ICONICS_READ_ONLY=false.'
-        )
+          'escribir en la instalación. Dile al operador que para habilitar el control tiene que ' +
+          'arrancar el servidor con ICONICS_READ_ONLY=false.'
+        await anotarAccionamiento({
+          resultado: 'rechazada', accion: accionPedida, motivo,
+        }, yaAnota)
+        return fallo(motivo)
       }
 
       if (encender) {
         const lectura = await leerMaquina(SISTEMA.tanque)
         if (!lectura.ok) {
-          return fallo(
+          const motivo =
             `No puedo comprobar el nivel del tanque antes de encender la bomba, así que no la ` +
-              `enciendo: ${lectura.error}`
-          )
+            `enciendo: ${lectura.error}`
+          await anotarAccionamiento({ resultado: 'rechazada', accion: accionPedida, motivo }, yaAnota)
+          return fallo(motivo)
         }
 
         const nivel = lectura.estado.dominio.senales?.nivelTanque?.valor
         const u = UMBRALES.nivelTanque
         if (typeof nivel !== 'number' || !Number.isFinite(nivel)) {
-          return fallo(
+          const motivo =
             'No hay una lectura válida del nivel del tanque ahora mismo, así que no enciendo la ' +
-              'bomba: encenderla a ciegas podría desbordarlo.'
-          )
+            'bomba: encenderla a ciegas podría desbordarlo.'
+          await anotarAccionamiento({ resultado: 'rechazada', accion: accionPedida, motivo }, yaAnota)
+          return fallo(motivo)
         }
         if (u && typeof u.avisoMax === 'number' && nivel >= u.avisoMax) {
-          return fallo(
+          const motivo =
             `No enciendo la bomba: el tanque está al ${redondear(nivel, 1)} %, por encima del ` +
-              `${u.avisoMax} % de aviso. Encenderla ahora arriesga desbordarlo. Espera a que baje ` +
-              `el nivel o dile al operador que lo revise antes de forzarlo.`,
-            { nivelTanque: redondear(nivel, 1), avisoSuperior: u.avisoMax }
-          )
+            `${u.avisoMax} % de aviso. Encenderla ahora arriesga desbordarlo. Espera a que baje ` +
+            `el nivel o dile al operador que lo revise antes de forzarlo.`
+          /* El nivel que la disparó va en la línea: sin él, dentro de seis
+             meses «no la encendí por nivel alto» no se puede contrastar con lo
+             que el historiador dice que había en ese momento. */
+          await anotarAccionamiento({
+            resultado: 'rechazada',
+            accion: accionPedida,
+            motivo,
+            nivelTanque: redondear(nivel, 1),
+          }, yaAnota)
+          return fallo(motivo, { nivelTanque: redondear(nivel, 1), avisoSuperior: u.avisoMax })
         }
       }
 
       const r = await client.writePoint(TAG_CONTROL_BOMBA, encender)
       if (!r?.ok) {
-        return fallo(
+        const motivo =
           `El servidor ICONICS no aceptó la escritura sobre la bomba: ${r?.error ?? 'error del servidor'}.`
-        )
+        await anotarAccionamiento({
+          resultado: 'rechazada', accion: accionPedida, tag: TAG_CONTROL_BOMBA, motivo,
+        }, yaAnota)
+        return fallo(motivo)
       }
 
       /*
@@ -288,15 +371,37 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina }) {
       const valorLeido = toBooleano(r.confirmacion?.leido ?? null)
 
       if (!r.confirmada || valorLeido !== encender) {
-        return fallo(
+        const motivo =
           `Mandé la orden de ${encender ? 'encender' : 'apagar'} la bomba y el servidor la aceptó, ` +
-            `pero al releer ${TAG_CONTROL_BOMBA} sigue valiendo ${valorLeido ?? 'sin dato'} en vez de ` +
-            `${encender}. La escritura no ha tenido efecto real sobre la instalación: dile al usuario ` +
-            `que la orden no se aplicó y que hay que revisar la configuración de ese punto en el ` +
-            `servidor ICONICS, no reintentarlo tal cual.`,
-          { valorEscrito: encender, valorLeido }
-        )
+          `pero al releer ${TAG_CONTROL_BOMBA} sigue valiendo ${valorLeido ?? 'sin dato'} en vez de ` +
+          `${encender}. La escritura no ha tenido efecto real sobre la instalación: dile al usuario ` +
+          `que la orden no se aplicó y que hay que revisar la configuración de ese punto en el ` +
+          `servidor ICONICS, no reintentarlo tal cual.`
+        /* Ésta es de las importantes: la escritura SALIÓ hacia la planta y no
+           tuvo efecto. Sin línea, el diario diría que nadie intentó nada
+           cuando lo que pasó es que el punto está mal configurado. */
+        await anotarAccionamiento({
+          resultado: 'rechazada',
+          accion: accionPedida,
+          tag: TAG_CONTROL_BOMBA,
+          motivo,
+          valorPedido: encender,
+          valorLeido,
+          coinciden: false,
+          intentos: r.intentos ?? null,
+        }, yaAnota)
+        return fallo(motivo, { valorEscrito: encender, valorLeido })
       }
+
+      await anotarAccionamiento({
+        resultado: 'cumplida',
+        accion: accionPedida,
+        tag: TAG_CONTROL_BOMBA,
+        valorPedido: encender,
+        valorLeido,
+        coinciden: true,
+        intentos: r.intentos ?? null,
+      }, yaAnota)
 
       return {
         ok: true,

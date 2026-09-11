@@ -43,7 +43,43 @@ import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esq
 import { firmarEnlace } from '../lib/enlacesFirmados.mjs'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
 
-export function registerChatRoutes(fastify, { config, chat, cola }) {
+export function registerChatRoutes(fastify, { config, chat, cola, diarioConversaciones = null }) {
+  /**
+   * Una línea por turno, en disco (Plan 23 F6 · IA-10).
+   *
+   * ── POR QUÉ NO BASTA EL LOG ────────────────────────────────────────
+   *
+   * Justo debajo hay un `request.log.info` con la pregunta y el resumen, y es
+   * bueno — pero es un log: rota, se pierde al reiniciar el contenedor, y en
+   * una instalación sin destino persistente configurado no queda nada. Esto es
+   * lo mismo que `lib/diario.mjs` hace con los accionamientos, aplicado a la
+   * otra pregunta que se hace meses después: «¿qué se le preguntó al asistente
+   * y por dónde fue a mirar?».
+   *
+   * ── QUÉ ENTRA Y QUÉ NO ─────────────────────────────────────────────
+   *
+   * El nombre de cada herramienta y sus argumentos, NO sus resultados. Los
+   * resultados son datos de planta —a veces series enteras— y duplicarlos en
+   * disco no añade nada: con el nombre y los argumentos se reconstruye la
+   * consulta y se vuelve a ejecutar si hace falta, que es exactamente lo que
+   * hace `medir-asistente.mjs`. Es la misma frontera que defiende
+   * `separarAdjuntos` en `chat.mjs`.
+   *
+   * No lanza: cuando se anota, el turno ya se contestó. Mismo criterio que el
+   * diario de accionamientos.
+   */
+  async function anotarTurno(request, entrada) {
+    if (!diarioConversaciones) return
+    const { ok, error } = await diarioConversaciones.anotar(entrada)
+    if (!ok) {
+      request.log.error(
+        { error },
+        'No se pudo anotar el turno en el diario de conversaciones. La respuesta SÍ se entregó; ' +
+          'lo que falta es su constancia en disco. Revisa permisos y espacio en `datos/`.'
+      )
+    }
+  }
+
 
   fastify.get('/api/chat', async () => ({
     ok: true,
@@ -269,10 +305,42 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
           `Consulta del asistente resuelta en ${(duracionMs / 1000).toFixed(1)} s ` +
             `con ${herramientas} herramienta(s): «${pregunta.slice(0, 80)}${pregunta.length > 80 ? '…' : ''}»`
         )
+
+        await anotarTurno(request, {
+          resultado: resumen?.bloqueada ? 'bloqueada' : 'contestada',
+          pregunta,
+          herramientas: resumen?.herramientas ?? [],
+          modelo: chat.modeloActivo(),
+          idioma,
+          duracionMs,
+          /* Un resumen con `ok` en falso significa que alguna herramienta
+             falló, no que el turno se cayera: el asistente contestó igual,
+             contando lo que no pudo leer. Se distingue porque son dos cosas
+             distintas al leer el diario. */
+          conFalloDeHerramienta: resumen?.ok === false,
+        })
       } catch (error) {
         const duracionMs = Date.now() - empezado
         // Cancelar no es un error que reportar: el cliente ya se fue.
         const cancelado = error?.name === 'AbortError' || abortador.signal.aborted
+
+        /*
+         * El turno que NO llegó a contestarse se anota igual, y con su causa.
+         *
+         * Un diario que sólo guardara los turnos buenos daría a entender que
+         * en las horas en que el modelo estuvo caído nadie preguntó nada —el
+         * mismo motivo por el que el diario de accionamientos guarda los
+         * rechazos—. Y es justo lo que se busca al abrirlo: «esa tarde que iba
+         * mal, ¿qué pasaba?».
+         */
+        await anotarTurno(request, {
+          resultado: cancelado ? 'cancelada' : 'error',
+          pregunta,
+          modelo: chat.modeloActivo(),
+          idioma,
+          duracionMs,
+          ...(cancelado ? {} : { motivo: error?.message ?? String(error) }),
+        })
 
         if (cancelado) {
           request.log.debug(

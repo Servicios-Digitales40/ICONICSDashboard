@@ -620,6 +620,52 @@ formato de línea) al archivo nuevo; una prueba de integración que confirme
 que `controlar_bomba` vía chat deja una línea en `diario-accionamientos.jsonl`
 igual que el botón físico.
 
+> **HECHA el 11-09-2026.** Las dos piezas. Verde: 166 comprobaciones en
+> `verificar-herramientas.mjs` (4 nuevas), 79 en `verificar-backend.mjs`, los
+> 27 verificadores, 299 pruebas de backend, lint y tipos.
+>
+> **1 · El hueco real, cerrado.** `controlar_bomba` anota en el mismo diario
+> que el botón, con `origen: "asistente"`. Se anotan el éxito y **todos** los
+> rechazos —solo lectura, nivel alto, lectura fallida, escritura no aceptada y
+> escritura sin efecto—, porque «no la encendí porque el tanque estaba al 92 %»
+> contesta a la misma pregunta que «la encendí». La única salida que NO se
+> anota es la llamada sin `encender`: no llegó a ser una orden sobre la
+> instalación, y anotarla llenaría el diario de tanteos del modelo.
+>
+> **2 · Y un defecto que apareció al hacerlo.** El botón del tablero **pasa por
+> esta misma herramienta** (`controlRoutes.mjs` lo dice en su cabecera: llama a
+> `ejecutar('controlar_bomba', …)` para no duplicar las guardas). Así que la
+> primera versión dejaba **dos líneas por pulsación**, y la segunda decía
+> `origen: "asistente"` de algo que había hecho una persona en el tablero. Un
+> diario que duplica es malo; uno que miente sobre el canal manda a buscar una
+> conversación que no existe.
+>
+> Se corrige con un tercer parámetro de `ejecutar(nombre, argumentos,
+> contexto)`: la ruta pasa `{ yaAnota: true }` y la herramienta se calla, porque
+> quien tiene el `request` delante anota mejor —sabe la IP y el usuario—. El
+> contexto va **aparte de `argumentos`** a propósito: eso lo escribe el modelo y
+> esto no, y mezclarlos le dejaría pedir `yaAnota: true` para borrar su propio
+> rastro del diario.
+>
+> **3 · El registro de turno, en su propio archivo.** `datos/diario-conversaciones.jsonl`,
+> con el mismo mecanismo de `lib/diario.mjs` y tope propio (4 MB: un turno pesa
+> más que un accionamiento y se producen muchos más). Archivo aparte porque son
+> dos dominios y dos lectores: uno contesta «¿qué se le hizo a la instalación?»
+> y otro «¿qué se le preguntó al asistente?».
+>
+> Guarda la pregunta, qué herramientas se llamaron y cómo terminó —contestada,
+> bloqueada, cancelada o con error—, **nunca los resultados**: son datos de
+> planta, a veces series enteras, y con el nombre y los argumentos se
+> reconstruye la consulta. Es la misma frontera que ya defiende
+> `separarAdjuntos`. Los turnos que fallan o se cancelan se anotan igual, por el
+> mismo motivo que los rechazos del otro diario.
+>
+> **4 · Un falso positivo que conviene conocer.** `verificar-codigos.mjs` se
+> puso en rojo por un comentario mío que contenía el literal `ok: false` —el
+> guion rastrea texto de rutas, no AST—. Se reescribió el comentario, no el
+> verificador: hacía bien su trabajo, y relajarlo para acallarlo es justo lo que
+> este proyecto no hace.
+
 ---
 
 ## 8 · F7 — `IA-08`: router de modelo

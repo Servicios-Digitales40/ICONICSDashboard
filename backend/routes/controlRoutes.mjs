@@ -40,7 +40,16 @@ export function registerControlRoutes(fastify, { herramientas, diario = crearDia
       const accionPedida = encender ? 'encender' : 'apagar'
       const quien = { ip: request.ip, usuario: request.usuario?.id ?? null }
 
-      const resultado = await herramientas.ejecutar('controlar_bomba', { encender })
+      /*
+       * `yaAnota: true` — esta ruta escribe ella misma en el diario, unas
+       * líneas más abajo, y con algo que la herramienta no tiene: la IP y el
+       * usuario. Sin esto la pulsación dejaría DOS líneas, y la de la
+       * herramienta diría `origen: "asistente"` de algo que hizo una persona
+       * en el tablero (Plan 23 F6).
+       */
+      const resultado = await herramientas.ejecutar(
+        'controlar_bomba', { encender }, { yaAnota: true }
+      )
 
       if (!resultado.ok) {
         const esSoloLectura = /ICONICS_READ_ONLY/.test(resultado.error ?? '')

@@ -692,6 +692,17 @@ function readDiarioRuta(rawValue) {
 }
 
 /**
+ * Ruta del diario de CONVERSACIONES (Plan 23 F6). Mismo criterio que el de
+ * accionamientos, archivo distinto: ver el porqué en el bloque `diario:`.
+ */
+function readDiarioConversacionesRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || join('datos', 'diario-conversaciones.jsonl')
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
+/**
  * Carpeta de salida de los PDF de exportación de chat. Mismo criterio que
  * `readReportesDir` —vacío no es «desactivado», sólo cae al valor por
  * defecto— y a propósito NO reutiliza esa función: son dos configuraciones
@@ -1054,6 +1065,35 @@ export function loadConfig(env = process.env) {
         'DIARIO_MAX_BYTES', env.DIARIO_MAX_BYTES, MAX_BYTES_DIARIO, 1024
       ),
       dias: readInteger('DIARIO_DIAS', env.DIARIO_DIAS, DIAS_RETENCION, 1),
+      /**
+       * El OTRO diario: una línea por turno del asistente (Plan 23 F6 · IA-10).
+       *
+       * ── POR QUÉ NO ES EL MISMO ARCHIVO ─────────────────────────────
+       *
+       * Porque son dos dominios distintos y se leen en momentos distintos. El
+       * de accionamientos contesta «¿qué se le hizo a la instalación?» y lo
+       * abre quien investiga por qué arrancó la bomba; éste contesta «¿qué se
+       * le preguntó al asistente y por dónde fue a mirar?» y lo abre quien
+       * afina el asistente. Mezclarlos obligaría a filtrar por tipo para leer
+       * cualquiera de los dos, y haría que la poda de uno se llevara al otro.
+       *
+       * Comparten el MECANISMO (`lib/diario.mjs`: JSONL, candado, poda que se
+       * anota) porque es el mismo problema; no comparten el archivo.
+       *
+       * Tope propio y más pequeño: un turno son más bytes que un
+       * accionamiento —lleva la pregunta— y se producen muchos más. Con 4 MB
+       * son del orden de diez mil turnos, meses de uso real.
+       */
+      conversaciones: Object.freeze({
+        ruta: readDiarioConversacionesRuta(env.DIARIO_CONVERSACIONES),
+        maxBytes: readInteger(
+          'DIARIO_CONVERSACIONES_MAX_BYTES', env.DIARIO_CONVERSACIONES_MAX_BYTES,
+          4 * 1024 * 1024, 1024
+        ),
+        dias: readInteger(
+          'DIARIO_CONVERSACIONES_DIAS', env.DIARIO_CONVERSACIONES_DIAS, DIAS_RETENCION, 1
+        ),
+      }),
     }),
 
     /**

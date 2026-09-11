@@ -900,6 +900,54 @@ console.log('\n── Reportes PDF (Plan 14 §5) ──────────�
   await server.close()
 }
 
+console.log('\n── El diario de conversaciones (Plan 23 F6 · IA-10) ────────')
+{
+  /*
+   * Sin `IA_BASE` el asistente no está configurado y el turno acaba en error.
+   * Es exactamente uno de los casos que este diario tiene que registrar, y el
+   * único que se puede provocar aquí sin traerse un llama-server falso —que ya
+   * vive en `verificar-chat.mjs` y no se duplica—. El camino feliz lo cubre
+   * ese otro verificador.
+   *
+   * Lo que se fija aquí: que un turno que NO llegó a contestarse deje línea. Un
+   * diario que sólo guardara los turnos buenos daría a entender que en las
+   * horas en que el modelo estuvo caído nadie preguntó nada, que es justo lo
+   * contrario de lo que se busca al abrirlo.
+   */
+  const dirConversaciones = await mkdtemp(join(tmpdir(), 'iconics-conversaciones-'))
+  const rutaConversaciones = join(dirConversaciones, 'conversaciones.jsonl')
+  const { base: chatBase, server } = await mount({
+    DIARIO_CONVERSACIONES: rutaConversaciones,
+  })
+
+  const sinAsistente = await call(chatBase, '/api/chat', postJson({ pregunta: '¿cómo va el tanque?' }))
+
+  check('sin IA_BASE la consulta se rechaza con 503 y su código', () => {
+    assert.equal(sinAsistente.status, 503)
+    assert.match(sinAsistente.body.error, /no está configurado/i)
+  })
+
+  /*
+   * El `readFile` va FUERA del `check`, y no es cosmético: `check()` llama a
+   * la comprobación sin `await` (ver su definición), así que una función
+   * `async` dentro le devolvería una promesa que nadie espera — la aserción
+   * correría después, fuera del `try`, y el caso saldría en verde sin haber
+   * comprobado nada. Una prueba que no puede fallar es peor que no tenerla.
+   */
+  const escritoSinTurno = await readFile(rutaConversaciones, 'utf8').catch(() => null)
+
+  check('un 503 de configuración NO ensucia el diario de conversaciones', () => {
+    /*
+     * La ruta se corta ANTES de encolar nada: no hubo turno. Anotarlo sería
+     * contar como pregunta algo que nunca llegó al asistente, igual que el
+     * cuerpo vacío no deja línea en el diario de accionamientos.
+     */
+    assert.equal(escritoSinTurno, null, `el diario se escribió sin haber turno: ${escritoSinTurno}`)
+  })
+
+  await server.close()
+}
+
 console.log('\n── Exportar la conversación a PDF ──────────────────────────')
 {
   // IA_BACKLOG_CHAT_DIR, no IA_REPORTES_DIR: desde Plan 16 la exportación de

@@ -56,6 +56,9 @@ import {
   pointName,
   puntoHistorico,
 } from '../shared/eva/tanque/senales.js'
+/* El diario de accionamientos: desde el Plan 23 F6 también lo alimenta la
+   herramienta del asistente, no sólo el botón del tablero. */
+import { crearDiario } from '../backend/lib/diario.mjs'
 import { PROVISIONALES } from '../shared/eva/comun/umbrales.js'
 import {
   NO_COMPARTEN,
@@ -3221,6 +3224,93 @@ await checkAsync('sin decir encender o apagar no se adivina', async () => {
 
   assert.equal(r.ok, false)
   assert.equal(client.escrituras.length, 0)
+})
+
+/* ── El diario, también desde el chat (Plan 23 F6 · IA-10) ───────────── */
+
+/** Un diario en un temporal, para no escribir en el de la instalación. */
+async function diarioTemporal() {
+  const dir = await mkdtemp(join(tmpdir(), 'diario-asistente-'))
+  const ruta = join(dir, 'diario.jsonl')
+  return {
+    diario: crearDiario({ ruta }),
+    async lineas() {
+      const texto = await readFile(ruta, 'utf8').catch(() => '')
+      return texto.split('\n').filter(Boolean).map(l => JSON.parse(l))
+    },
+  }
+}
+
+/**
+ * El hueco que F6 cierra.
+ *
+ * Hasta el 11-09-2026 sólo anotaba `controlRoutes.mjs`, el botón del tablero.
+ * Una bomba encendida DESDE EL CHAT no dejaba rastro en el diario que existe
+ * justo para contestar «¿qué se le hizo a la instalación?» meses después: el
+ * mismo accionamiento, sobre el mismo tag y con las mismas consecuencias,
+ * constaba o no según la puerta por la que hubiera entrado.
+ */
+await checkAsync('una orden dada por el asistente deja su línea, marcada como suya', async () => {
+  const { diario, lineas } = await diarioTemporal()
+  const h = createHerramientas({ client: clienteFalso(), readOnly: false, diario })
+
+  await h.ejecutar('controlar_bomba', { encender: true })
+
+  const [entrada] = await lineas()
+  assert.ok(entrada, 'la orden del asistente no dejó línea en el diario')
+  assert.equal(entrada.resultado, 'cumplida')
+  assert.equal(entrada.accion, 'encender')
+  assert.match(entrada.tag, /SEGURIDAD\/CONTROL$/)
+  assert.equal(entrada.coinciden, true, 'no persiste la confirmación de la relectura')
+  /*
+   * `origen` es lo que distingue las dos puertas. El botón anota `ip` y
+   * `usuario` porque tiene un `request`; aquí no hay ninguno, así que se marca
+   * el CANAL — quien lea el diario necesita saber que aquello se pidió
+   * hablando con el asistente, porque es otra conversación la que hay que ir a
+   * buscar.
+   */
+  assert.equal(entrada.origen, 'asistente')
+})
+
+await checkAsync('un rechazo del asistente también deja constancia, con su motivo', async () => {
+  const { diario, lineas } = await diarioTemporal()
+  const h = createHerramientas({ client: clienteFalso(), readOnly: true, diario })
+
+  await h.ejecutar('controlar_bomba', { encender: true })
+
+  const [entrada] = await lineas()
+  assert.ok(entrada, 'el rechazo no dejó línea')
+  assert.equal(entrada.resultado, 'rechazada')
+  assert.match(entrada.motivo, /ICONICS_READ_ONLY/)
+  assert.equal(entrada.origen, 'asistente')
+})
+
+/**
+ * Una llamada mal formada NO es un accionamiento.
+ *
+ * Es la única salida que no se anota: no llegó a decir si encender o apagar,
+ * así que no hubo orden sobre la instalación que registrar. Anotarla llenaría
+ * el diario de tanteos del modelo. Mismo criterio que en `controlRoutes.mjs`,
+ * donde el cuerpo vacío lo rechaza el esquema antes de llegar a la ruta.
+ */
+await checkAsync('una llamada sin `encender` no ensucia el diario', async () => {
+  const { diario, lineas } = await diarioTemporal()
+  const h = createHerramientas({ client: clienteFalso(), readOnly: false, diario })
+
+  await h.ejecutar('controlar_bomba', {})
+
+  assert.equal((await lineas()).length, 0, 'una llamada mal formada dejó línea')
+})
+
+/** Sin diario montado la bomba se acciona igual: el diario constata, no decide. */
+await checkAsync('sin diario, el accionamiento funciona igual', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
+    encender: true,
+  })
+
+  assert.equal(r.ok, true, `sin diario dejó de accionar: ${r.error}`)
+  assert.equal(client.escrituras.length, 1)
 })
 
 /**
