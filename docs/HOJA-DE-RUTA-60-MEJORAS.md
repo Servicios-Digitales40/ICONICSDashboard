@@ -222,6 +222,29 @@ ponen en el dominio.
 > un servicio esté declarado. Lo que se enseñe tiene que venir de haber
 > preguntado.
 
+> **Escrito el 11-09-2026, sin empezar** — [`PLAN-24-USABILIDAD.md`](por-completar/PLAN-24-USABILIDAD.md),
+> en la rama `Moises7` (la del Plan 23). La investigación previa está hecha
+> contra el código real, y **cambia el plan de forma importante: cuatro de las
+> diez entregas ya están construidas, en todo o en parte**, porque los planes
+> 20 a 23 y el 27 pasaron por encima del frontend después de la auditoría de
+> `Moises6` que generó estas sesenta propuestas.
+>
+> - `USO-02` (estado en la URL) **está hecho** — `app/routes/useNavegacion.js`
+>   ya es History API con filtro de serializables. Lo que queda es adopción por
+>   vista, siguiendo el patrón que `AlarmasEva` ya estableció.
+> - `USO-10` (modo muro) **está hecho salvo el latido** — `app/modoMuro.js`.
+> - `USO-01` **tiene el motor hecho** (`estadoDelDato.js`) y lo consumen sólo
+>   cuatro archivos. La palabra es «obligatoria», y hoy es opcional.
+> - `USO-04` **tiene el canal montado** (códigos + `errors.json` +
+>   `verificar-codigos.mjs`) y le falta justo la acción que le da nombre.
+>
+> **`USO-05` se parte, como se partió `SEG-01`.** La bandeja y el acuse van en
+> el 24; la unificación de las dos pestañas de Alarmas **no se puede decidir
+> sin planta** y va al Plan 26 detrás de `ICO-10` — por la asimetría de
+> cobertura que el cierre del Plan 23 dejó anotada (vibraciones trae
+> contadores del Alarm Server, el tanque sólo bits de PLC). Fusionarlas hoy
+> sería inventar la decisión.
+
 ### Plan 25 · Layout y funcionalidad nueva
 
 `NUE-01` vista de Turno · `NUE-02` línea de tiempo por máquina ·
@@ -247,6 +270,7 @@ van a crecer es reorganizar a ciegas, y los planes 21 a 25 son los que lo dicen.
 | Qué | Por qué no se puede antes |
 |---|---|
 | `ICO-10` contrato de alarmas | `readAlarmHistory()` del falso devuelve `{ alarms: [] }`. Sólo están confirmados `eventId` y `startDate`; el resto del mapeo hay que **descubrirlo**, no inventarlo |
+| `USO-05` unificar las dos pestañas de Alarmas | **Viene del Plan 24**, que entrega la bandeja y el acuse pero no esto. Depende de `ICO-10`: hoy la cobertura es asimétrica —vibraciones trae contadores del Alarm Server, el tanque sólo bits de PLC del Plan 27 F6— y decidir si pueden ser una sola lista sin conocer el contrato real es inventar la decisión. Ver [`PLAN-24-USABILIDAD.md`](por-completar/PLAN-24-USABILIDAD.md) §0.2 |
 | `ICO-03` suscripciones | No es implementación: es una pregunta que sólo contesta el servidor. ¿Expone FrameWorX suscripciones en esta versión y con esta licencia? Sin respuesta no se decide si se hace |
 | `SEG-01` federación OIDC | El flujo no se ejercita con el transporte falso |
 | `SEG-06` certificado de planta | Comprobar que `NODE_EXTRA_CA_CERTS` acepta el autofirmado de `bms-server` |
