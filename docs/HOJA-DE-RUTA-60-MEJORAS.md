@@ -124,15 +124,26 @@ cada uno de estos se pueda demostrar en vez de opinar.
 `medir-asistente.mjs` reejecute las herramientas con los argumentos que ya
 captura, para que la auditoría de cifras corra también contra el modelo real.
 
-> **Escrito el 10-09-2026**, sin empezar. Las ocho investigaciones de la §0
-> de [`PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) están hechas
-> contra el código real (no supuestas), incluido un hallazgo colateral:
+> **Se ejecuta en la rama `Moises7`**, sacada de `IntegracionMoises6Gustavo5`
+> (`ed89864`) el 11-09-2026 — no en `Mejoras-Demo-6.0`, donde se escribió: esa
+> rama se quedó en `8a9ef8d` y no lleva la integración de Gustavo5.
+>
+> **Escrito el 10-09-2026**, sin empezar. Los cinco hallazgos de la §0
+> de [`PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) están hechos
+> contra el código real (no supuestos), incluido uno colateral:
 > `controlar_bomba` no anota en el diario de accionamientos de SEG-08. `IA-09`
 > se fijó en cuatro de las siete candidatas de `MEJORAS-ASISTENTE.md`
 > (`tendencia_multiple`, `resumen_de_turno`, `buscar_evento`,
-> `comparar_maquinas`) — `estado_de_alarmas` quedó parcialmente cubierta por
-> el Plan 27, `espectro_de_vibracion` depende de habilitar hardware y
-> `exportar_datos` no tiene un fallo real detrás.
+> `comparar_maquinas`) — `espectro_de_vibracion` depende de habilitar hardware
+> y `exportar_datos` no tiene un fallo real detrás.
+>
+> `estado_de_alarmas` queda fuera por estar **parcialmente cubierta, pero de
+> dos formas distintas según la máquina**: vibraciones trae contadores del
+> servidor de alarmas de ICONICS y el tanque sólo bits de PLC del Plan 27 F3,
+> árbol para el que el puente sigue avisando de que «el servidor no publica
+> alarmas». Revisado el 11-09-2026 — antes esto decía, de menos, que el Plan 27
+> la cubría. Una herramienta de alarmas de verdad tiene que resolver esa
+> asimetría primero.
 
 ### Plan 24 · Usabilidad
 

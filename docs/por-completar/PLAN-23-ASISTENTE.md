@@ -11,11 +11,27 @@
 > `ICONICS_FAKE=true` se puede tener sin GPU dedicada para el desarrollo
 > offline y con GPU real para medir contra el modelo (`medir-asistente.mjs`).
 
-> **Rama.** `Mejoras-Demo-6.0`, a continuación del Plan 22.
+> **Rama.** `Moises7`, sacada de `IntegracionMoises6Gustavo5` (commit `ed89864`)
+> el 11-09-2026.
+>
+> Este plan se escribió sobre `Mejoras-Demo-6.0`, pero esa rama se quedó atrás:
+> su punta es `8a9ef8d` y el trabajo real siguió por `IntegracionMoises6Gustavo5`
+> (Plan 22.5, ya cerrado). Ejecutarlo sobre la rama donde se escribió habría
+> significado aplicarlo a un árbol sin la integración de Gustavo5.
 
 > **ESTADO — SIN EMPEZAR (10-09-2026).** Este documento es el plan, no su
-> ejecución. Las ocho investigaciones de la §0 sí están hechas —contra el
-> código real, no supuestas— y son la base de cada fase.
+> ejecución. La investigación previa a cada una de las ocho entregas sí está
+> hecha —contra el código real, no supuesta— y es la base de cada fase.
+>
+> **Revisado contra el código el 11-09-2026.** Los cinco hallazgos de la §0
+> siguen siendo ciertos, archivo y línea incluidos. Se corrigieron cinco
+> desajustes de detalle —marcados abajo con su fecha— que no cambian ninguna
+> fase pero sí lo que hay que creerse al leerlas.
+>
+> (Este bloque decía «las ocho investigaciones de la §0». La §0 tiene **cinco**
+> hallazgos numerados, no ocho; el ocho son las ENTREGAS. Se arregla porque es
+> justo el tipo de contradicción interna que `verificar-instrucciones.mjs`
+> existe para atrapar en el prompt, y aquí estaba en el plan.)
 
 ---
 
@@ -231,17 +247,41 @@ adivinarlo solo del texto.
 
 **Decisión de alcance.** `docs/MEJORAS-ASISTENTE.md` (28-08-2026) propone
 siete candidatas (B4-B10); revisado contra el código de hoy, B4
-(`estado_de_alarmas`) quedó **parcialmente cubierta** de forma indirecta —
-`estado_del_sistema` ya expone las alarmas reales del PLC desde el Plan 27,
-aunque no hay una herramienta dedicada a SÓLO alarmas o a su historial. Las
-otras seis siguen totalmente vigentes. Este plan construye estas cuatro:
+(`estado_de_alarmas`) quedó **parcialmente cubierta** de forma indirecta, por
+dos vías DISTINTAS según la máquina, y no hay herramienta dedicada a SÓLO
+alarmas ni a su historial. Las otras seis siguen totalmente vigentes. Este
+plan construye estas cuatro:
+
+> **Corregido el 11-09-2026.** Aquí se decía que «`estado_del_sistema` ya
+> expone las alarmas reales del PLC desde el Plan 27», y eso mezclaba dos
+> cosas que no son la misma:
+>
+> · **Vibraciones** sí trae contadores del **servidor de alarmas de ICONICS**
+>   (`activasSinReconocer`, `activasReconocidas`, `normalSinReconocer`) —
+>   `shared/eva/vibraciones/estadoVibraciones.js` línea 251.
+> · **El tanque** no tiene nada de eso. Lo del Plan 27 F3 es otra cosa: las
+>   ocho señales de `ALARMAS/` con `naturaleza: "alarma"`, que son **bits del
+>   PLC** juzgados por polaridad en `shared/eva/tanque/estado.js` línea 141.
+>   Para ese árbol el aviso de `herramientas/lib/formato.mjs` línea 111 sigue
+>   diciendo, hoy, que «el servidor **no** publica alarmas para este árbol».
+>
+> La decisión (no construir la herramienta en este plan) no cambia. Pero el
+> motivo escrito era inexacto justo en la frase que la deja fuera, y una
+> herramienta de alarmas de verdad tendría que resolver esa asimetría entre
+> las dos máquinas antes que nada — no es un envoltorio de algo ya uniforme.
 
 ### 4.1 · `tendencia_multiple`
 
 **Por qué primero.** Causó un fallo real y medido: una pregunta el
-28-08-2026 agotó las rondas de `IA_MAX_PASOS` (4×2) pidiendo varias señales
-una por una en vez de en un viaje. `historia_de_senal` sigue siendo de UNA
-señal (`definiciones.mjs` línea 351) — no cambió desde entonces.
+28-08-2026 agotó las rondas de `IA_MAX_PASOS` pidiendo varias señales una por
+una en vez de en un viaje. `historia_de_senal` sigue siendo de UNA señal
+(`definiciones.mjs` línea 351) — no cambió desde entonces.
+
+> **Corregido el 11-09-2026.** Aquí decía «`IA_MAX_PASOS` (4×2)». El valor por
+> defecto es **3** (`config.mjs` línea 179, `DEFAULTS.iaMaxPasos`), y el tope
+> de herramientas por turno es `IA_MAX_PASOS*2` — o sea 3×2 con la config de
+> hoy. El 4 venía de la medición del 28-08, con otro valor puesto a mano; tal
+> y como estaba escrito parecía describir la configuración actual.
 
 **Forma.** Mismo patrón que `correlacionar_senales` (que ya acepta un array
 `senales` de 2 a 4): un array de nombres, un período, devuelve el resumen de
@@ -304,6 +344,22 @@ mismo rigor que las 22 existentes: casos de éxito, de señal no encontrada,
 de período sin datos. `verificar-instrucciones.mjs` tiene que seguir en
 verde con 26 herramientas en el registro.
 
+> **Añadido el 11-09-2026 — el inventario es literal, y hay que tocarlo.**
+> `verificar-herramientas.mjs` línea 2665 lleva un `check` cuyo TÍTULO dice
+> «son veintidós herramientas, y sólo una escribe en la PLANTA» y cuya
+> comprobación es un `assert.deepEqual` contra la lista de los 22 nombres
+> **escritos a mano, en orden**. No es un recuento automático: añadir las
+> cuatro de F3 sin actualizar esa lista Y su título deja el verificador en
+> rojo por un desajuste que parece un fallo de implementación y no lo es.
+>
+> El orden de esa lista tampoco es libre: los comentarios de dentro explican
+> que `sistemas_de_la_planta` abre y las de manuales cierran, a propósito.
+> Las cuatro nuevas se colocan por familia, no al final por comodidad.
+>
+> Lo que sí sale solo es la invariante de que toda definición anunciada tenga
+> implementación y al revés (línea 2832): esa compara `h.definiciones` contra
+> `h.nombres` y no lleva número escrito.
+
 ---
 
 ## 5 · F4 — `IA-02`: auditar cifras tras redactar, contra el modelo real
@@ -329,10 +385,18 @@ cambiando de forma (nuevos esquemas Zod, caché, foco, cuatro herramientas
 nuevas) mediría un blanco en movimiento — por eso va después.
 
 **Pruebas.** No es un verificador (`medir-asistente.mjs` no da código de
-error, mide). El criterio de éxito es que el banco de 20 casos
-(`backend/ia/evaluacion/banco.mjs`) deje de tener el pase libre de cifras y
-el reporte muestre una tasa real de invención — sea cero, sea la que sea, por
-primera vez medida de verdad.
+error, mide). El criterio de éxito es que el banco
+(`backend/ia/evaluacion/banco.mjs`, **21 casos** — `BANCO`, línea 39) deje de
+tener el pase libre de cifras y el reporte muestre una tasa real de invención
+— sea cero, sea la que sea, por primera vez medida de verdad.
+
+> **Corregido el 11-09-2026.** El plan decía «el banco de 20 casos», aquí y en
+> §4. Son 21. Y no todos sirven igual para esta medición: `banco.mjs` marca
+> algunos con `dependeDelEstado` y exporta `CASOS_ESTABLES` (línea 233) justo
+> para separarlos. Una tasa de invención de cifras calculada sobre casos que
+> dependen del estado real de la planta mide dos cosas a la vez — al
+> implementar, decidir si la tasa se reporta sobre el banco entero o sólo
+> sobre los estables, y decirlo en la salida en vez de dejarlo implícito.
 
 ---
 
@@ -449,12 +513,28 @@ heurística no invoca ningún modelo para decidir.
   posterior las retome; B9 además depende de habilitar hardware, no sólo de
   código.
 - **No unifica los tres resolvedores de nombre** (`B1` de
-  `MEJORAS-ASISTENTE.md`, confirmado vigente: `resolverSenal`,
-  `sistemasDeSenal`, `resolverSenalDeSistema` siguen siendo tres sitios
-  distintos). Es un refactor real con su propio riesgo — cualquiera de las
-  ocho fases de este plan podría tropezar con esos tres sitios y no arreglar
-  los tres a la vez sería peor que no tocarlos. Queda para un plan aparte, o
-  para cuando `IA-09`/F3 obligue a tocarlos por necesidad, no por limpieza.
+  `MEJORAS-ASISTENTE.md`, confirmado vigente el 11-09-2026: `resolverSenal`
+  en `backend/ia/conversacion/herramientas.mjs` línea 508, `sistemasDeSenal`
+  en `shared/eva/comun/sistemas.js` línea 691 y `resolverSenalDeSistema` en
+  `backend/ia/herramientas/historicos/index.mjs` línea 133 siguen siendo tres
+  sitios distintos). Es un refactor real con su propio riesgo — cualquiera de
+  las ocho fases de este plan podría tropezar con esos tres sitios y no
+  arreglar los tres a la vez sería peor que no tocarlos. Queda para un plan
+  aparte, o para cuando `IA-09`/F3 obligue a tocarlos por necesidad, no por
+  limpieza.
+
+  > **Matizado el 11-09-2026: F3 casi con seguridad los toca.** Esto estaba
+  > escrito como hipótesis («o para cuando F3 obligue»), pero medido contra el
+  > código es lo más probable: `resolverSenalDeSistema` ya se llama en **ocho**
+  > puntos de `historicos/index.mjs` (líneas 171, 431, 533, 609, 652, 743, 925
+  > y 1171), y las cuatro herramientas de F3 caen justo encima —
+  > `buscar_evento` resuelve una señal dentro de un sistema, y
+  > `comparar_maquinas` resuelve **la misma magnitud en los dos** (§4.4),
+  > que es exactamente el caso que hoy no tiene un solo dueño.
+  >
+  > No se reabre aquí el refactor. Pero al llegar a F3 conviene decidirlo a
+  > propósito —unificar, o añadir el noveno y décimo uso sabiendo que se
+  > añaden— en vez de descubrirlo a mitad de la fase.
 - **No hace routing de modelo por turno**, sólo por conversación (§8) — el
   routing más fino requeriría resolver primero la contención de VRAM.
 - **No toca la caché entre CONVERSACIONES distintas** (§2) — sería compartir
