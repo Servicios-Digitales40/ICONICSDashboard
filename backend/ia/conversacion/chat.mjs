@@ -27,7 +27,7 @@
  * sistema porque parece que funciona.
  */
 import { logger } from '../../logger.mjs'
-import { SISTEMAS } from '../../../shared/eva/comun/sistemas.js'
+import { SISTEMA, SISTEMAS } from '../../../shared/eva/comun/sistemas.js'
 import {
   HERRAMIENTAS_CON_TEXTO_AJENO,
   HERRAMIENTAS_DE_ESCRITURA,
@@ -1257,7 +1257,7 @@ export function createChat({ config, herramientas }) {
         logger.warn('El modelo no llamó a ninguna herramienta y tampoco escribió nada', {
           pregunta: pregunta.slice(0, 120),
         })
-        onEvento({ tipo: 'texto', delta: NO_SE_QUE_CONTESTAR })
+        onEvento({ tipo: 'texto', delta: noSeQueContestar() })
         return {
           herramientas: [], bloqueada: false, sinRedactar: true,
           turnosRecordados: previos.length,
@@ -1412,13 +1412,22 @@ export function createChat({ config, herramientas }) {
  *
  * Enumera lo que SÍ se puede preguntar en vez de disculparse: es lo único
  * accionable, y la causa más común de llegar aquí es haber pedido un rango.
+ *
+ * La cifra de señales con historia se CUENTA aquí, no se escribe a mano: es
+ * el mismo fallo que arregló `inventarioDeLaPlanta()` (Plan 20 F7) — con el
+ * catálogo del tanque escrito a mano decía «las cuatro señales que el
+ * historiador guarda: nivel, temperatura, caudal y presión» cuando ya eran
+ * 50 de 52 (Plan 27 F6), y ese texto SÍ le llega al usuario en pantalla
+ * cuando el modelo se queda mudo.
  */
-const NO_SE_QUE_CONTESTAR =
-  'No he sabido responder a eso. Puedo darte el estado actual de toda la instalación de agua ' +
-  '—el nivel y la temperatura del tanque, el caudal, la presión, la carga del motor, el modo ' +
-  'del variador, la tensión de línea y la eficiencia energética— y la evolución de las cuatro ' +
-  'señales que el historiador guarda: nivel, temperatura, caudal y presión. También comparar ' +
-  'dos períodos de una de ellas.'
+function noSeQueContestar() {
+  const conSerie = SISTEMA.tanque.claves().filter((c) => SISTEMA.tanque.esHistorizada(c))
+  return (
+    'No he sabido responder a eso. Puedo darte el estado actual de toda la instalación de agua ' +
+    `—sus ${SISTEMA.tanque.claves().length} señales— y la evolución de las ${conSerie.length} ` +
+    'que el historiador guarda. También comparar dos períodos de una de ellas.'
+  )
+}
 
 /**
  * Qué se le dice al usuario cuando se bloquea una respuesta.
@@ -1427,14 +1436,19 @@ const NO_SE_QUE_CONTESTAR =
  * este proceso, porque son dos averías con arreglos distintos. Antes estaba
  * cableado el diagnóstico de `--jinja`, y con la bandera bien puesta mandaba
  * a revisar algo que no tenía nada que ver.
+ *
+ * La cifra de señales, igual que en `noSeQueContestar()`, se cuenta y no se
+ * escribe a mano: decía «las ocho señales... las cuatro que el historiador
+ * guarda» con el catálogo ya en 52 (Plan 27), y este texto también le llega
+ * al usuario en pantalla.
  */
 function avisoDeBloqueo(vistaAlgunaLlamada) {
+  const conSerie = SISTEMA.tanque.claves().filter((c) => SISTEMA.tanque.esHistorizada(c))
   const base =
     'No voy a darte cifras porque no he consultado los datos de la instalación para esta ' +
-    'pregunta. Puedo leer el estado actual de las ocho señales del sistema de agua, y la ' +
-    'evolución de las cuatro que el historiador guarda —nivel del tanque, temperatura del ' +
-    'tanque, caudal y presión— en el período que quieras. También comparar dos períodos ' +
-    'entre sí.'
+    `pregunta. Puedo leer el estado actual de las ${SISTEMA.tanque.claves().length} señales del ` +
+    `sistema de agua, y la evolución de las ${conSerie.length} que el historiador guarda, en el ` +
+    'período que quieras. También comparar dos períodos entre sí.'
 
   /*
    * El aviso de `--jinja` solo se añade si el modelo NO ha usado herramientas

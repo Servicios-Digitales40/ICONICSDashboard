@@ -584,12 +584,13 @@ export const DEFINICIONES = [
     function: {
       name: 'generar_reporte',
       description:
-        'Genera un PDF descargable: un gráfico por cada señal con historia que se pida (o las ' +
-        'cuatro, si no se nombra ninguna) más una tabla con el valor actual de las que no tienen ' +
-        'serie. Úsala para "genera un reporte", "quiero un PDF de esta semana". Período hasta ~90 ' +
-        'días, igual que historia_de_senal. El enlace de descarga se entrega automáticamente; no ' +
-        'lo repitas ni lo inventes. Cada gráfico YA lleva su interpretación de tendencia — no hace ' +
-        'falta pedirla aparte.',
+        'Genera un PDF descargable: un gráfico por cada señal con historia que se pida (o TODO ' +
+        'el catálogo del tanque si no se nombra ninguna — hoy 52 señales) más una tabla con el ' +
+        'valor actual de las que no tienen serie. Úsala para "genera un reporte", "quiero un PDF ' +
+        'de esta semana", "un reporte de todas las señales". Período hasta ~90 días, igual que ' +
+        'historia_de_senal. El enlace de descarga se entrega automáticamente; no lo repitas ni lo ' +
+        'inventes. Cada gráfico YA lleva su interpretación de tendencia — no hace falta pedirla ' +
+        'aparte.',
       parameters: {
         type: 'object',
         properties: {
@@ -597,9 +598,12 @@ export const DEFINICIONES = [
             type: 'array',
             items: { type: 'string' },
             description:
-              'Nombres de señal en lenguaje llano, ej. ["nivel", "temperatura"]. Si se omite, entra ' +
-              'la instalación entera: las que tienen serie como gráfico y las otras ' +
-              'cuatro como tabla de valores actuales.',
+              'Nombres de señal en lenguaje llano, ej. ["nivel", "temperatura"], SÓLO si el ' +
+              'usuario pidió señales concretas. Si pidió "todas", "el catálogo entero" o no ' +
+              'especificó ninguna, OMITE este campo por completo — así entra la instalación ' +
+              'entera: las que tienen serie como gráfico y las que no como tabla de valores ' +
+              'actuales. No selecciones tú un subconjunto "representativo": eso deja fuera ' +
+              'señales que el usuario sí esperaba ver.',
           },
           periodo: {
             type: 'string',
