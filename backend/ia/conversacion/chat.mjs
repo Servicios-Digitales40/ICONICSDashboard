@@ -619,7 +619,7 @@ const IDIOMAS_DEL_MODELO = {
   en: 'You answer in English, in short sentences.',
 };
 
-export function instrucciones(catalogo, maxPasos, idioma = 'es') {
+export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null) {
   return [
     'Te llamas Tdconcito. Eres el asistente de un tablero que vigila VARIOS SISTEMAS de una',
     `planta industrial. ${IDIOMAS_DEL_MODELO[idioma] ?? IDIOMAS_DEL_MODELO.es}`,
@@ -723,9 +723,43 @@ export function instrucciones(catalogo, maxPasos, idioma = 'es') {
     'CORRELACIÓN NO ES CAUSA. Si dos señales se mueven a la vez, eso es un indicio, no una',
     'demostración. Dilo cuando lo uses.',
     '',
+    /*
+     * ── DE QUÉ SE ESTABA HABLANDO (Plan 23 F2 · IA-07) ─────────────
+     *
+     * Va aquí y NO en `REGLAS` porque `REGLAS` es lo que vale siempre; esto
+     * cambia cada turno. Y va como un HECHO, no como una sugerencia: la regla
+     * de conversación que ya existe le pide al modelo resolver «¿y la
+     * presión?» por su cuenta, y cuando lo resuelve mal no hay red debajo.
+     *
+     * Lo que entra es la IDENTIDAD —qué señal, qué sistema— y nunca el valor.
+     * Es la frontera que `historialAMensajes` defiende un piso más arriba: los
+     * resultados de turnos anteriores no vuelven al contexto, porque el modelo
+     * los mezcla con la pregunta nueva y cita la cifra vieja como recién leída.
+     * Recordar de qué se hablaba no reabre esa puerta; recordar cuánto medía,
+     * sí.
+     */
+    ...(foco ? textoDelFoco(foco) : []),
     'Las señales de la instalación:',
     catalogo,
   ].join('\n')
+}
+
+/** El bloque de foco del turno. Fuera de `instrucciones` por legibilidad. */
+function textoDelFoco({ senal, sistema }) {
+  const de = [senal && `señal=${senal}`, sistema && `sistema=${sistema}`]
+    .filter(Boolean)
+    .join(', ')
+
+  return [
+    'DE QUÉ SE ESTABA HABLANDO:',
+    '',
+    `El turno anterior habló de: ${de}.`,
+    'Si esta pregunta no nombra una señal ni un sistema —«¿y ayer?», «¿y la presión?»— es MUY',
+    'probable que se refiera a eso. Si nombra una señal nueva pero no el sistema, mantén el',
+    'sistema salvo que esa señal no exista en él. Y consúltalo con la herramienta igual: saber',
+    'de qué se hablaba NO es saber cuánto medía.',
+    '',
+  ]
 }
 
 /**
@@ -844,6 +878,44 @@ export function createChat({ config, herramientas }) {
    * el Plan 23 §9 dice explícitamente no abrir.
    */
   const cacheDeConsultas = new Map()
+
+  /**
+   * De qué se hablaba en el último turno de cada conversación (Plan 23 F2).
+   *
+   * Sólo `{ senal, sistema }`, nunca un valor: ver `textoDelFoco`. Vive donde
+   * la caché y se poda igual —clave por conversación, tope compartido de
+   * entradas— porque es el mismo tipo de estado y tiene el mismo riesgo si
+   * crece sin techo o si se comparte entre pantallas.
+   */
+  const focoDeConversacion = new Map()
+
+  /** Mismo criterio que `podarCache`: por antigüedad de inserción. */
+  function podarFoco() {
+    while (focoDeConversacion.size >= config.ia.cache.max) {
+      const primera = focoDeConversacion.keys().next()
+      if (primera.done) break
+      focoDeConversacion.delete(primera.value)
+    }
+  }
+
+  /**
+   * La identidad de lo consultado, si la hay.
+   *
+   * Se saca del RESULTADO y no de los argumentos porque el resultado trae la
+   * señal ya resuelta a su nombre de catálogo (`meta.label`): el modelo escribe
+   * «nivel» o «el nivel del tanque», y lo que conviene recordar es a qué
+   * resolvió eso. Un fallo no fija foco —si la consulta no salió, no se estaba
+   * hablando de nada todavía— y las herramientas que no van de una señal
+   * concreta tampoco.
+   */
+  function focoDe(resultado) {
+    if (!resultado?.ok) return null
+
+    const senal = typeof resultado.senal === 'string' ? resultado.senal : null
+    const sistema = typeof resultado.sistema === 'string' ? resultado.sistema : null
+
+    return senal || sistema ? { senal, sistema } : null
+  }
 
   /** Igual que `podarHistoryCache`: primero lo caducado, luego lo más viejo. */
   function podarCache(ahora) {
@@ -1120,8 +1192,17 @@ export function createChat({ config, herramientas }) {
 
     const previos = historialAMensajes(historial)
 
+    /*
+     * El foco del turno ANTERIOR de esta conversación (Plan 23 F2 · IA-07).
+     *
+     * Sin `conversacionId` no hay foco, igual que no hay caché: no se sabe de
+     * qué conversación viene la pregunta, y adivinarlo sería darle a una
+     * pantalla el contexto de otra.
+     */
+    const foco = conversacionId ? focoDeConversacion.get(conversacionId) ?? null : null
+
     const messages = [
-      { role: 'system', content: instrucciones(catalogo, maxPasos, idioma) },
+      { role: 'system', content: instrucciones(catalogo, maxPasos, idioma, foco) },
       ...previos,
       { role: 'user', content: pregunta },
     ]
@@ -1458,6 +1539,28 @@ export function createChat({ config, herramientas }) {
     const avisos = [...new Set(resultados.map(r => r.resultado?.aviso).filter(Boolean))]
     for (const aviso of avisos) {
       if (!mencionaElAviso(texto, aviso)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
+    }
+
+    /*
+     * De qué se ha hablado, para el turno siguiente (Plan 23 F2 · IA-07).
+     *
+     * El ÚLTIMO resultado que traiga identidad, no el primero: si la pregunta
+     * encadenó varias consultas —estado del tanque y luego historia de la
+     * presión—, de lo que se acabó hablando es de lo último.
+     *
+     * Se guarda sólo la identidad (`focoDe` se encarga), y sólo si hubo
+     * conversación que identificar. Un turno sin herramientas no borra el foco
+     * anterior: preguntar «¿y eso es grave?» no cambia de qué se hablaba.
+     */
+    if (conversacionId) {
+      for (let i = resultados.length - 1; i >= 0; i--) {
+        const nuevo = focoDe(resultados[i].resultado)
+        if (nuevo) {
+          podarFoco()
+          focoDeConversacion.set(conversacionId, nuevo)
+          break
+        }
+      }
     }
 
     return {

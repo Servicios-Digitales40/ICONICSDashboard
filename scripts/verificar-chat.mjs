@@ -1252,6 +1252,111 @@ await check('un período cerrado se cachea aunque lo de AHORA no', async () => {
   assert.equal(ejecutadas.length, 2, 'una ventana que llega hasta ahora se sirvió de la caché')
 })
 
+/* ── La memoria del foco (Plan 23 F2 · IA-07) ────────────────────────── */
+
+console.log('\n── Memoria del foco ────────────────────────────────────────')
+
+/** El mensaje `system` de la pasada que decide, que es donde va el foco. */
+const instruccionesDelTurno = () =>
+  peticiones.find(p => p.tools).messages.find(m => m.role === 'system').content
+
+await check('el turno siguiente sabe de qué señal se hablaba', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  await preguntar(chat, '¿cómo fue el nivel ayer?', [], 'conv-foco')
+
+  peticiones = []
+  await preguntar(chat, '¿y hace tres horas?', [], 'conv-foco')
+
+  const sistema = instruccionesDelTurno()
+  assert.match(sistema, /DE QUÉ SE ESTABA HABLANDO/, 'el segundo turno no lleva el foco')
+  assert.match(sistema, /señal=Nivel del tanque/, 'no cita la señal ya resuelta a su nombre')
+})
+
+/**
+ * El foco recuerda la IDENTIDAD, nunca el valor.
+ *
+ * Es la frontera del Plan 23 §0.4 y la misma que defiende `historialAMensajes`:
+ * los resultados de turnos anteriores no vuelven al contexto, porque el modelo
+ * mezcla la cifra vieja con la pregunta nueva y la cita como recién leída.
+ * Saber de qué se hablaba no reabre esa puerta; saber cuánto medía, sí.
+ */
+await check('el foco NO arrastra las cifras del turno anterior', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  await preguntar(chat, '¿cómo fue el nivel ayer?', [], 'conv-cifras')
+
+  peticiones = []
+  await preguntar(chat, '¿y hace tres horas?', [], 'conv-cifras')
+
+  /*
+   * Se mira EL BLOQUE DEL FOCO, no el prompt entero.
+   *
+   * El prompt lleva cifras propias y legítimas —«52 señales, 50 con serie
+   * propia», del inventario de la planta— que no vienen de ningún turno
+   * anterior. Buscar un «52» suelto en todo el texto acusa al foco de algo que
+   * hizo el inventario, que es exactamente el falso positivo que convierte una
+   * prueba en ruido.
+   */
+  const bloque = instruccionesDelTurno()
+    .split('DE QUÉ SE ESTABA HABLANDO')[1]
+    .split('Las señales de la instalación')[0]
+
+  assert.doesNotMatch(
+    bloque, /\d/,
+    `el foco se llevó una cifra del turno anterior al prompt del siguiente: ${bloque.trim()}`
+  )
+})
+
+await check('sin `conversacionId` no hay foco', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  await preguntar(chat, '¿cómo fue el nivel ayer?')
+
+  peticiones = []
+  await preguntar(chat, '¿y hace tres horas?')
+
+  assert.doesNotMatch(
+    instruccionesDelTurno(), /DE QUÉ SE ESTABA HABLANDO/,
+    'dio foco sin saber de qué conversación venía la pregunta'
+  )
+})
+
+await check('el foco de una conversación no se le da a otra', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+
+  await preguntar(chat, '¿cómo fue el nivel ayer?', [], 'conv-una')
+
+  peticiones = []
+  await preguntar(chat, '¿y hace tres horas?', [], 'conv-otra')
+
+  assert.doesNotMatch(
+    instruccionesDelTurno(), /DE QUÉ SE ESTABA HABLANDO/,
+    'la conversación nueva heredó el foco de la anterior'
+  )
+})
+
+/** Una consulta que falla no fija foco: no se llegó a hablar de nada. */
+await check('una consulta fallida no deja foco', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('herramienta_inventada', {})
+
+  await preguntar(chat, 'algo raro', [], 'conv-fallo')
+
+  peticiones = []
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel' })
+  await preguntar(chat, 'y ahora esto', [], 'conv-fallo')
+
+  assert.doesNotMatch(
+    instruccionesDelTurno(), /DE QUÉ SE ESTABA HABLANDO/,
+    'una herramienta que falló dejó foco'
+  )
+})
+
 /* ── Cierre ──────────────────────────────────────────────────────────── */
 
 llama.close()

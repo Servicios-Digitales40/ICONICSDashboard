@@ -310,6 +310,31 @@ seguido de "¿y hace tres horas?" sin nombrar la señal — la segunda llamada
 tiene que resolver a `nivelTanque`/`tanque` sin que el modelo tenga que
 adivinarlo solo del texto.
 
+> **HECHA el 11-09-2026.** `focoDeConversacion` en la clausura de `createChat`,
+> `instrucciones()` con un cuarto argumento opcional, y `textoDelFoco()` con la
+> prosa. Verde: 56 comprobaciones en `verificar-chat.mjs` (5 nuevas), los 27
+> verificadores, 299 pruebas de backend, lint y tipos.
+>
+> **1 · La identidad sale del RESULTADO, no de los argumentos.** El modelo
+> escribe «nivel» o «el nivel del tanque»; lo que conviene recordar es a qué
+> resolvió eso, y el resultado ya lo trae con su nombre de catálogo
+> (`meta.label`). Se toma el ÚLTIMO resultado con identidad del turno: si la
+> pregunta encadenó estado y luego historia de otra señal, de lo que se acabó
+> hablando es de lo último.
+>
+> **2 · Un turno sin herramientas no borra el foco.** Preguntar «¿y eso es
+> grave?» no cambia de qué se estaba hablando. Tampoco lo fija una consulta que
+> falló: si no salió, no se llegó a hablar de nada.
+>
+> **3 · Vive donde la caché de F1 y se poda igual** —clave por conversación,
+> mismo tope—: es el mismo tipo de estado y tiene el mismo riesgo si crece sin
+> techo o si se comparte entre pantallas. Sin `conversacionId` no hay foco,
+> igual que no hay caché.
+>
+> **La frontera del §0.4, probada:** el bloque del foco no contiene ni un
+> dígito. Recordar de qué se hablaba no reabre la puerta que
+> `historialAMensajes` cierra; recordar cuánto medía, sí.
+
 ---
 
 ## 4 · F3 — `IA-09`: las cuatro herramientas nuevas
