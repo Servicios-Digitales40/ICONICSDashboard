@@ -81,6 +81,7 @@ import {
 } from "../lib/useAsistente.js";
 import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 import { markdownSeguro } from "../lib/markdown.js";
+import { MS_SILENCIO_DICTADO } from "../lib/audio.js";
 import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
 
 const MONO = "'IBM Plex Mono', monospace";
@@ -679,7 +680,7 @@ export function Asistente() {
               no tenerlo. Y desaparece durante el manos libres: ahí el turno
               lo abre y lo cierra el otro botón. */}
           {dictado.disponible && !ocupado && !manosLibres.activo && (
-            <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} />
+            <BotonMicrofono t={t} dictado={dictado} onTexto={anadirAlBorrador} onEnviar={lanzar} />
           )}
 
           {/* El manos libres exige además que el navegador sepa hablar. */}
@@ -738,17 +739,30 @@ export function Asistente() {
  * en una pantalla táctil de planta, con guantes, se suelta sola. Al conmutar,
  * el gesto no compite con pensar la pregunta.
  *
- * ── POR QUÉ EL TEXTO SE AÑADE Y NO SE ENVÍA ────────────────────────
+ * ── DOS PARADAS, DOS DESTINOS ──────────────────────────────────────
  *
- * Lo que devuelve la transcripción va al cuadro de entrada, no a la consulta.
- * Whisper se equivoca con el ruido de una sala de máquinas y con los nombres
- * de tag; una pregunta lanzada sobre una frase mal oída gasta un minuto de GPU
- * en responder a algo que nadie preguntó. Ver `backend/routes/vozRoutes.mjs`.
+ * Parada MANUAL (pulsar otra vez): lo transcrito va al CUADRO de entrada, para
+ * revisarlo antes de enviar. Whisper se equivoca con el ruido de una sala de
+ * máquinas y con los nombres de tag; una pregunta lanzada sobre una frase mal
+ * oída gasta un minuto de GPU en responder a algo que nadie preguntó. Por eso
+ * la parada a mano NO envía. Ver `backend/routes/vozRoutes.mjs`.
+ *
+ * Parada por SILENCIO (3 s sin hablar, `MS_SILENCIO_DICTADO`): ENVÍA directo.
+ * Es una elección explícita del operador —«que se mande solo»—, asumiendo el
+ * riesgo de arriba a cambio de no tener que pulsar para parar ni para enviar.
+ * El detector exige haber hablado antes de poder cortar, así que quedarse
+ * callado sin decir nada no manda un mensaje vacío.
  */
-function BotonMicrofono({ t, dictado, onTexto }) {
+function BotonMicrofono({ t, dictado, onTexto, onEnviar }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("assistant");
   const { grabando, transcribiendo, empezar, detener } = dictado;
+
+  // Ref para que el callback de silencio no se quede con un `onEnviar` viejo:
+  // se lee siempre el último sin recrear el callback en cada render (mismo
+  // criterio que `cerrarTurnoRef` del manos libres en useAsistente.js).
+  const enviarRef = useRef(onEnviar);
+  enviarRef.current = onEnviar;
 
   if (transcribiendo) {
     return (
@@ -763,9 +777,21 @@ function BotonMicrofono({ t, dictado, onTexto }) {
   }
 
   const alPulsar = async () => {
-    if (!grabando) return empezar();
-    const texto = await detener();
-    if (texto) onTexto(texto);
+    if (grabando) {
+      // Parada a mano: al cuadro, para revisar.
+      const texto = await detener();
+      if (texto) onTexto(texto);
+      return;
+    }
+    // Empezar a grabar con auto-corte por silencio: a los 3 s callado, se
+    // detiene, se transcribe y se ENVÍA (opción elegida por el operador).
+    empezar({
+      msSilencio: MS_SILENCIO_DICTADO,
+      alDetectarSilencio: async () => {
+        const texto = await detener();
+        if (texto) enviarRef.current?.(texto);
+      },
+    });
   };
 
   return (

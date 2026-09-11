@@ -423,6 +423,29 @@ export const EJE = Object.freeze({
 });
 
 /**
+ * ── CARGA RADIAL APROXIMADA SOBRE CADA RODAMIENTO — PROVISIONAL ────
+ *
+ * ⚠️ VALOR ESTIMADO, NO MEDIDO. Existe sólo para que la vida L10 se pueda
+ * calcular (ver `shared/eva/vibraciones/vidaRodamiento.js`). En cuanto tengas
+ * la carga real, **MODIFÍCALA AQUÍ** — es el único sitio donde vive.
+ *
+ * De dónde sale (banco del 09-09-2026): el eje horizontal apoya en dos
+ * chumaceras con un disco en medio. Peso soportado ≈ disco (~1 kg) + eje
+ * (~1 kg) ≈ 2 kg → ~20 N, repartido entre los dos apoyos ≈ 10 N cada uno; se
+ * redondea a 15 N por un margen de acoplamiento y desequilibrio.
+ *
+ * Es una carga MUY baja frente a la capacidad del rodamiento (C ≈ 14 kN), así
+ * que la vida por fatiga sale enorme: en este banco el rodamiento no falla por
+ * fatiga, sino por contaminación o por los defectos que se inducen para la
+ * demo. El número está puesto para el MECANISMO, no porque la fatiga sea aquí
+ * el riesgo real — de ahí que salga `provisional`.
+ *
+ * Para cambiarlo: mide o calcula la carga radial real en newtons (peso
+ * soportado, tensión de correa, empuje, etc.) y sustituye el 15.
+ */
+export const CARGA_RADIAL_APROX_N = 15; // PROVISIONAL — ver el bloque de arriba
+
+/**
  * ── MEDIDAS POR CANAL ──────────────────────────────────────────────
  *
  * Cada medida existe tres veces, una por canal. El sufijo se pega al nombre:

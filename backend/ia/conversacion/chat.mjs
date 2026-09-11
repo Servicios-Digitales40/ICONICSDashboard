@@ -1492,6 +1492,32 @@ function resumirSinModelo(nombre, resultado) {
     )
   }
 
+  /* Análisis de vibraciones (`estado_del_sistema` del sistema de vibraciones):
+     sus `apoyos` ya vienen como FRASES hechas en código —velocidad, aceleración,
+     DKW y banderas por apoyo—, así que se listan tal cual, con el variador, los
+     riesgos activos y lo que no se pudo comprobar. Sin esta rama, cuando el
+     modelo pequeño no llegaba a redactar el usuario recibía «devolvió datos,
+     pero no he podido resumirlos» sobre un análisis que el código ya tenía
+     escrito. Es el mismo criterio que la rama de `activos` de arriba. */
+  if (Array.isArray(resultado.apoyos)) {
+    const lineas = ['Sistema de vibraciones, ahora mismo:']
+    for (const frase of resultado.apoyos) lineas.push(`· ${frase}`)
+
+    const v = resultado.variador
+    if (v) {
+      lineas.push(`Variador: velocidad ${v.velocidad_rpm} rpm, par ${v.par_pct} %, fallo ${v.fallo}.`)
+    }
+
+    const riesgos = (Array.isArray(resultado.riesgos) ? resultado.riesgos : [])
+      .map((r) => r?.titulo ?? r?.id)
+      .filter(Boolean)
+    lineas.push(riesgos.length ? `Riesgos activos: ${riesgos.join('; ')}.` : 'Sin riesgos activos.')
+
+    if (resultado.sin_comprobar) lineas.push(resultado.sin_comprobar)
+    lineas.push('Lectura en tiempo real de ICONICS.')
+    return lineas.filter(Boolean).join('\n')
+  }
+
   return 'La consulta devolvió datos, pero no he podido resumirlos.'
 }
 

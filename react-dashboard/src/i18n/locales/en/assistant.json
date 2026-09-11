@@ -130,7 +130,7 @@
   "voice": {
     "transcribingAria": "Transcribing what you said",
     "stopAria": "Stop recording and transcribe",
-    "stop": "Stop and transcribe",
+    "stop": "Stop and transcribe (or stay quiet 3 s to send it automatically)",
     "dictateAria": "Dictate the question",
     "dictate": "Dictate the question",
     "handsFree": "Hands-free: speak and hear the answer",
