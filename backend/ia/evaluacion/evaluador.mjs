@@ -51,7 +51,15 @@
  * de línea), que son estructura y no dato.
  */
 export function numerosDeTexto(texto) {
-  const sinListas = String(texto ?? '').replace(/^\s*\d+[.)]\s/gm, '')
+  /*
+   * El ordinal puede venir envuelto en marcado: el modelo escribe listas como
+   * `**4. Informativo: …**`, con los asteriscos DELANTE del número. Medido el
+   * 11-09-2026 contra el modelo real: ese «4» se contaba como una cifra del
+   * texto y se marcaba como inventado, cuando es la numeración de una lista —
+   * estructura, no dato. `[*_#\s]*` cubre negrita, cursiva y encabezados sin
+   * tocar nada que sea una medición.
+   */
+  const sinListas = String(texto ?? '').replace(/^[*_#\s]*\d+[.)]\s/gm, '')
   return [...sinListas.matchAll(/-?\d+(?:[.,]\d+)?/g)].map(m => m[0])
 }
 

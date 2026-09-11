@@ -10,7 +10,7 @@
 > `backend/ia/herramientas/historicos/index.mjs` (`resolverSenalDeSistema`
 > sigue siendo el tercer resolvedor de nombres que B1 propone unificar). B6,
 > B7, B8 y B5 entran en
-> [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md)
+> [`docs/completados/PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md)
 > F3, con su nombre final (`tendencia_multiple`, `resumen_de_turno`,
 > `buscar_evento`, `comparar_maquinas`).
 
@@ -283,21 +283,21 @@ que falló el 28-08-2026 agotó las rondas antes de contestar.
 
 **Qué cambia.** Una llamada, varias señales, un solo viaje.
 
-> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.1.
+> Entra en [`docs/completados/PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md) §4.1.
 
 ## B7 · `resumen_de_turno`
 
 Qué pasó en las últimas 8 h en una sola herramienta: rangos, alarmas, tiempo en
 marcha. Hoy son cuatro o cinco llamadas encadenadas.
 
-> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.2.
+> Entra en [`docs/completados/PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md) §4.2.
 
 ## B8 · `buscar_evento`
 
 «¿Cuándo fue la última vez que la presión bajó de X?» — hoy no hay forma de
 preguntarlo sin traerse la serie entera.
 
-> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.3.
+> Entra en [`docs/completados/PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md) §4.3.
 
 ## B9 · `espectro_de_vibracion`
 

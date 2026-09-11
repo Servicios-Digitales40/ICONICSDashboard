@@ -129,7 +129,7 @@ captura, para que la auditoría de cifras corra también contra el modelo real.
 > rama se quedó en `8a9ef8d` y no lleva la integración de Gustavo5.
 >
 > **Escrito el 10-09-2026**, sin empezar. Los cinco hallazgos de la §0
-> de [`PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) están hechos
+> de [`PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md) están hechos
 > contra el código real (no supuestos), incluido uno colateral:
 > `controlar_bomba` no anota en el diario de accionamientos de SEG-08. `IA-09`
 > se fijó en cuatro de las siete candidatas de `MEJORAS-ASISTENTE.md`
@@ -168,7 +168,21 @@ captura, para que la auditoría de cifras corra también contra el modelo real.
 > —longitud de la pregunta, rondas gastadas, turnos de contexto— para poder
 > decidirlo con datos en vez de suponerlo.
 >
-> Queda **F4** (`IA-02`), que necesita `llama-server` levantado para medir algo.
+> **PLAN 23 CERRADO el 11-09-2026.** **F4** (`IA-02`) hecha contra el modelo
+> real: `medir-asistente.mjs` reejecuta las herramientas con los argumentos que
+> ya captura, así que la auditoría de cifras por fin puede fallar. Medido con
+> `qwen-3.5-4B`: **12 de 20 casos (60 %), 4 fallos de cifra, los 4 deriva de
+> señal viva, 0 invenciones**.
+>
+> De las ocho entregas: **seis hechas** (`IA-04`, `IA-06`, `IA-07`, `IA-09`
+> parcial, `IA-05`, `IA-10`, `IA-02`) y **dos descartadas con su motivo
+> escrito** (`IA-08` el router, y `comparar_maquinas` dentro de `IA-09`).
+>
+> Salieron además dos hallazgos que no estaban en el plan: un **cruce
+> silencioso entre las dos máquinas** al resolver nombres (corregido en
+> `98fe465` — 10 de 42 etiquetas de vibraciones resolvían a una señal del
+> tanque) y que el **health miente diciendo «token válido»** cuando ICONICS
+> devuelve la página de login (anotado como **B9** en `BACKLOG-BACKEND.md`).
 >
 > `estado_de_alarmas` queda fuera por estar **parcialmente cubierta, pero de
 > dos formas distintas según la máquina**: vibraciones trae contadores del

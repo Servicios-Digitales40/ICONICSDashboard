@@ -236,10 +236,84 @@ histórico declarado) y comprueban que **no contesten en verde**.
 
 ---
 
+## B9 · El health dice «token válido» mientras ICONICS devuelve el login
+
+**Medido el 11-09-2026 con la planta delante**, en un backend con 7 h 53 min de
+marcha. La pantalla de Salud mostraba:
+
+```
+Origen de datos        Con problemas
+  Se alcanza https://bms-server y el token es válido,
+  pero la última lectura (hace 2 s) no trajo NI UN valor de 52 puntos pedidos.
+Puente hacia ICONICS   Funcionando
+  Alcanzable: sí    Token: válido
+```
+
+Y lo que ICONICS estaba devolviendo de verdad a cada lectura era esto:
+
+```json
+{"ok": true, "status": 200,
+ "payload": "<html><head><title>Working...</title></head>
+             <form action=\"https://bms-server/.../connect/authorize\">…"}
+```
+
+La página de **login de OIDC**. La sesión había caducado en el servidor y el
+puente estaba recibiendo el formulario de reautenticación en lugar de datos.
+
+**Por qué el health no lo ve.** `tokenValid` sale de
+`authenticator.hasValidToken()`, que es:
+
+```js
+return Boolean(accessToken) && Date.now() < expiresAtMs
+```
+
+Es decir: **comprueba nuestra memoria, no al servidor**. Si ICONICS invalida la
+sesión por su cuenta —reinicio, expiración del lado del servidor, política de
+sesiones— nuestro reloj sigue diciendo que el token vale hasta la hora que
+guardamos. `estadoDeLosDatos` tiene una rama para `!tokenValid` con el mensaje
+correcto («no hay token válido, revisa usuario y contraseña»), pero **no hay
+ninguna rama para «el token parece nuestro y aun así el servidor nos manda al
+login»**, que es el caso real.
+
+**Por qué es peor que un fallo normal.** Es exactamente el modo que el
+CLAUDE.md §2.4 señala: *un servidor que contesta y no dice nada*. La respuesta
+llega con `ok: true` y `status: 200` porque, como petición HTTP, salió bien. El
+tablero se quedó en «Conectando…» y «Sin dato», y **la pantalla que existe para
+diagnosticar daba un diagnóstico equivocado**: decía «token válido» cuando lo
+único que había que hacer era reautenticar. Se descubrió por casualidad, al
+mirar el `payload` en crudo durante otra tarea.
+
+**Qué haría falta.** Dos piezas, y la primera sirve sola:
+
+1. **Que el cliente reconozca la respuesta de reautenticación.** Un `payload`
+   que es HTML —o que contiene `connect/authorize`— no es una lectura, es una
+   sesión caída. Hoy pasa por el mismo camino que un valor. Detectarlo permite
+   además **renovar y reintentar una vez**, que es lo que un operador espera y
+   lo que haría que el incidente no se viera siquiera.
+2. **Que el health lo diga con esas palabras.** Una rama nueva en
+   `estadoDeLosDatos`: «se alcanza el servidor, pero está pidiendo
+   reautenticación: la sesión caducó del lado de ICONICS». Y que `tokenValid`
+   deje de anunciarse como verdad absoluta cuando lo que sabemos es sólo lo que
+   apuntamos nosotros.
+
+**Tamaño.** Pequeño y acotado: el reconocimiento vive en `iconics/client.mjs`
+(donde ya se normaliza la respuesta) y el mensaje en
+`routes/systemRoutes.mjs`. Lo caro sería probarlo contra el servidor real con
+la sesión caducada a propósito; con un doble que devuelva el HTML del
+`authorize` se cubre el camino entero sin planta.
+
+**Mientras tanto**, el síntoma a reconocer: *alcanzable sí, token válido, y
+cero valores de todos los puntos pedidos*. Eso es sesión caducada — se arregla
+reiniciando el puente.
+
+---
+
 ## Orden sugerido
 
 1. ~~**B1**~~ — hecho el 28-08-2026
-2. **B3** — la asimetría que más se nota en una demo
+2. **B9** — el único que se manifiesta como una avería en pantalla, y el
+   diagnóstico que da es el equivocado. Además es de los pequeños.
+3. **B3** — la asimetría que más se nota en una demo
 3. **B4** — deja de ser una limitación en cuanto haya una segunda máquina con histórico
 4. **B5** — decisión de una tarde, pero un verificador en rojo permanente no sirve
 5. **B2** — el rediseño de los motores de reglas, ya local gracias a B1

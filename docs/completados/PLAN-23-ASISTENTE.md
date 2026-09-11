@@ -541,17 +541,78 @@ nuevas) mediría un blanco en movimiento — por eso va después.
 
 **Pruebas.** No es un verificador (`medir-asistente.mjs` no da código de
 error, mide). El criterio de éxito es que el banco
-(`backend/ia/evaluacion/banco.mjs`, **21 casos** — `BANCO`, línea 39) deje de
+(`backend/ia/evaluacion/banco.mjs`, **20 casos** — `BANCO`) deje de
 tener el pase libre de cifras y el reporte muestre una tasa real de invención
 — sea cero, sea la que sea, por primera vez medida de verdad.
 
-> **Corregido el 11-09-2026.** El plan decía «el banco de 20 casos», aquí y en
-> §4. Son 21. Y no todos sirven igual para esta medición: `banco.mjs` marca
-> algunos con `dependeDelEstado` y exporta `CASOS_ESTABLES` (línea 233) justo
-> para separarlos. Una tasa de invención de cifras calculada sobre casos que
-> dependen del estado real de la planta mide dos cosas a la vez — al
-> implementar, decidir si la tasa se reporta sobre el banco entero o sólo
-> sobre los estables, y decirlo en la salida en vez de dejarlo implícito.
+> **Corregido el 11-09-2026, y RECORREGIDO el mismo día.** El plan original
+> decía «20 casos»; yo lo cambié a 21 contando mal (un `grep -c "id:"` que
+> incluía una línea de más) y lo repetí en dos commits. **Son 20**, medido
+> con `BANCO.length`: 18 estables y 2 marcados `dependeDelEstado`
+> (`reposo-no-es-averia`, `diagnostico-medido-vs-hipotesis`).
+>
+> Queda dicho porque es exactamente el fallo que este plan persigue en el
+> asistente —dar una cifra sin haberla leído— cometido por quien lo escribe.
+> Y sirve de recordatorio para el resumen: la tasa se reporta sobre el banco
+> entero y también sin los que dependen del estado, que ya es lo que hace el
+> guion.
+
+> **HECHA el 11-09-2026, contra `qwen-3.5-4B` en `10.10.17.18:8080`.** El
+> guion reconstruye las herramientas con `createHerramientas` y reejecuta cada
+> llamada con los argumentos que ya viajaron por el flujo SSE. Sin tocar el
+> camino de producción, como el plan pedía.
+>
+> **La medición, por primera vez de verdad:**
+>
+> | | |
+> |---|---|
+> | Casos que pasan | **12 de 20 (60 %)** · sin los que dependen del estado: 12 de 18 (67 %) |
+> | Fallos de cifra | 4 |
+> | De ellos, **deriva** de señal viva | **4** |
+> | **Invenciones reales** | **0** |
+>
+> Antes esta comprobación **no podía fallar nunca**: se le pasaban todos los
+> números del texto como válidos. Ahora puede, y no falla — que es un resultado
+> distinto de no haberlo mirado.
+>
+> **1 · Deriva no es invención, y la diferencia se DICE.** El modelo contestó
+> «73.6 %» y la reejecución, treinta segundos después, devolvió 73.4 %. El
+> nivel del tanque es una señal viva (tres lecturas seguidas: 73.4, 73.5,
+> 73.5). No se perdona con una tolerancia —un margen a ojo en la única
+> comprobación que existe para impedir números a ojo taparía justo las
+> invenciones pequeñas, que son las creíbles—: se clasifica. «73.4 ≈ 73.5
+> (deriva de señal viva)» frente a «sin nada parecido en el resultado».
+>
+> **2 · El instrumento se destapó a sí mismo tres falsos positivos**, y esto es
+> lo que más enseñó. La primera tanda acusó de inventar tres cifras que eran
+> correctas:
+>
+> · `sin-comprobar-no-es-verde` — el «4» de «**4. Informativo: …**». El filtro
+>   de ordinales de lista no lo veía porque los asteriscos de markdown van
+>   DELANTE del número.
+> · `limite-del-manual` — «5.8 psi» y «3.3», citados con archivo y página.
+> · `reporte-en-pdf` — el «7» de «últimos 7 días», el período que el modelo
+>   pidió.
+>
+> Los dos últimos por el mismo atajo mío: no le pasé `indiceDocumentos` ni
+> `reportes` a la instancia de auditoría, razonando que las herramientas sin
+> sus dependencias «se niegan solas y no aportan números falsos, sólo no
+> aportan ninguno». **Es falso.** Una herramienta que no puede correr no deja
+> el resultado vacío: deja la auditoría CIEGA, y una auditoría ciega acusa. Es
+> exactamente lo que la cabecera del guion advertía —«un evaluador que da
+> falsos positivos se apaga a la semana»— reintroducido por el atajo.
+>
+> Corregido: la auditoría recibe todo lo que el turno pudo usar (el `diario` no,
+> y ése sí a propósito: reejecutar no es accionar), un turno cuya reejecución
+> falló se marca **NO VERIFICABLE** en vez de acusar, y el filtro de ordinales
+> admite el marcado. Tras los tres arreglos, los tres casos pasan.
+>
+> **3 · Lo que el banco dice del MODELO**, que es para lo que existe: falla en
+> decir que los límites son estimaciones nuestras (`de-donde-sale-el-limite`),
+> en llamar «avería» a una máquina en reposo, y en encadenar siete herramientas
+> donde se esperaba `diagnostico`. Y **varía entre tandas**: el mismo caso pasa
+> y falla según el turno. Por eso este instrumento se lee comparando corridas,
+> nunca leyendo una — como dice su propia cabecera.
 
 ---
 
