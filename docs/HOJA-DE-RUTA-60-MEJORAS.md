@@ -7,10 +7,10 @@
 > **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`. Planes 23 a 26,
 > pendientes.
 
-> **Plan 22.5, fuera de esta numeración.** No es una fase del roadmap de 60
-> mejoras: es la integración de `origin/Gustavo5` (8 commits propios desde
-> que divergió) en una rama nueva. Ver
-> [`docs/por-completar/PLAN-22.5-INTEGRACION-GUSTAVO5.md`](por-completar/PLAN-22.5-INTEGRACION-GUSTAVO5.md).
+> **Plan 22.5, fuera de esta numeración — completado el 11-09-2026.** No es
+> una fase del roadmap de 60 mejoras: fue la integración de `origin/Gustavo5`
+> (8 commits propios) en la rama `IntegracionMoises6Gustavo5`. Ver
+> [`docs/completados/PLAN-22.5-INTEGRACION-GUSTAVO5.md`](completados/PLAN-22.5-INTEGRACION-GUSTAVO5.md).
 
 ---
 

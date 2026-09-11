@@ -12,10 +12,19 @@
 > — no desde `main` ni desde `Gustavo5`, porque el trabajo activo vive en la
 > primera.
 
-> **ESTADO — SIN EMPEZAR (10-09-2026).** Investigado con `git diff`/`git show`
-> contra ambas ramas, no supuesto: la divergencia y los conflictos exactos ya
-> están identificados (§1). Este documento es el plan, la ejecución es el
-> paso siguiente.
+> **ESTADO — PLAN COMPLETADO (11-09-2026).** Rama `IntegracionMoises6Gustavo5`
+> creada, merge (`4a76f7e`) resuelto con el criterio decidido en §2 — ambos
+> conflictos reales quedaron exactamente donde §1 los predijo, sin sorpresas.
+> Verificado end-to-end: lint, types, los 27 verificadores offline (incluye
+> `verificar-vida-rodamiento.mjs`, nuevo, descubierto automáticamente por la
+> tanda), 299 tests de backend, 652 de frontend, build + `verificar-bundle`,
+> el script `frecuencias-rodamiento.mjs` corrido a mano, y un reporte PDF
+> generado y verificado con `pdfjs-dist`: la marca TDCON, la síntesis
+> automática y el aviso de cobertura conviven en el mismo documento de 2
+> páginas. Un fix adicional, descubierto en la verificación y no parte del
+> conflicto: `vidaRodamiento.js` (intacto de Gustavo5) fallaba `npm run
+> types` por falta de JSDoc en sus funciones — corregido sin cambiar
+> comportamiento. Sin push — la rama queda local hasta que se pida.
 
 > **Por qué el número 22.5.** Es trabajo de integración de ramas, no una
 > fase nueva del roadmap de 60 mejoras (`docs/HOJA-DE-RUTA-60-MEJORAS.md`,
