@@ -313,6 +313,27 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
           modelo: chat.modeloActivo(),
           idioma,
           duracionMs,
+          /*
+           * ── LAS SEÑALES CON LAS QUE SE MEDIRÁ UN ROUTER (Plan 23) ──────
+           *
+           * `IA-08` proponía elegir modelo por conversación según lo compleja
+           * que pareciera la pregunta. Se descartó —choca con que el modelo
+           * activo sea global por VRAM, y con que `IA_MODELOS` venga vacío por
+           * defecto— pero la pregunta de fondo sigue siendo buena: ¿hay
+           * preguntas que de verdad necesiten el modelo grande?
+           *
+           * Eso no se contesta suponiendo. Estas tres son exactamente las
+           * señales baratas que aquella heurística iba a usar, y guardarlas
+           * permite MEDIRLO con semanas de uso real antes de decidir nada:
+           * si las preguntas largas o las que gastan varias rondas son las
+           * lentas, un router tendría algo que decidir; si no, no.
+           *
+           * Es el mismo orden que `medir-calibracion.mjs` impuso para los
+           * umbrales del motor: primero se mide, después se pone el número.
+           */
+          caracteresPregunta: pregunta.length,
+          rondas: resumen?.rondas ?? null,
+          turnosDeContexto: resumen?.turnosRecordados ?? 0,
           /* Un resumen con `ok` en falso significa que alguna herramienta
              falló, no que el turno se cayera: el asistente contestó igual,
              contando lo que no pudo leer. Se distingue porque son dos cosas

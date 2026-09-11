@@ -1312,6 +1312,8 @@ export function createChat({ config, herramientas }) {
     /** Resultados, para la red de seguridad y para los avisos obligatorios. */
     const resultados = []
     let ejecutadasTotal = 0
+    /** Rondas de modelo gastadas. Ver el `return` del final. */
+    let rondas = 0
 
     /**
      * Lo que dijo el modelo cuando decidió NO llamar a nada.
@@ -1332,6 +1334,7 @@ export function createChat({ config, herramientas }) {
     let huboTextoAjeno = false
 
     for (let paso = 0; paso < maxPasos; paso++) {
+      rondas += 1
       onEvento({
         tipo: 'estado',
         // A partir de la segunda ronda ya está trabajando sobre datos, no
@@ -1515,7 +1518,7 @@ export function createChat({ config, herramientas }) {
           vistaAlgunaLlamada,
         })
         onEvento({ tipo: 'texto', delta: avisoDeBloqueo(vistaAlgunaLlamada) })
-        return { herramientas: [], bloqueada: true, turnosRecordados: previos.length }
+        return { herramientas: [], bloqueada: true, turnosRecordados: previos.length, rondas }
       }
 
       /*
@@ -1533,13 +1536,13 @@ export function createChat({ config, herramientas }) {
         onEvento({ tipo: 'texto', delta: noSeQueContestar() })
         return {
           herramientas: [], bloqueada: false, sinRedactar: true,
-          turnosRecordados: previos.length,
+          turnosRecordados: previos.length, rondas,
         }
       }
 
       // Sin cifras es una respuesta legítima: un saludo, una aclaración.
       onEvento({ tipo: 'texto', delta: contenido })
-      return { herramientas: [], bloqueada: false, turnosRecordados: previos.length }
+      return { herramientas: [], bloqueada: false, turnosRecordados: previos.length, rondas }
     }
 
     /* ── Redactar con los datos delante ─────────────────────────────── */
@@ -1574,7 +1577,7 @@ export function createChat({ config, herramientas }) {
       })
       return {
         herramientas: ejecutadas, bloqueada: false,
-        sinRedactar: true, marcado, turnosRecordados: previos.length,
+        sinRedactar: true, marcado, turnosRecordados: previos.length, rondas,
       }
     }
 
@@ -1626,6 +1629,18 @@ export function createChat({ config, herramientas }) {
       bloqueada: false,
       longitud: texto.length,
       turnosRecordados: previos.length,
+      /*
+       * Cuántas RONDAS costó, que no es lo mismo que cuántas herramientas.
+       *
+       * Tres herramientas en una ronda es el modelo acertando a la primera;
+       * tres en tres rondas es el modelo encadenando, y cada ronda es otra
+       * llamada al modelo con su espera entera. Es la señal que distingue una
+       * pregunta cara de una barata, y hasta ahora se calculaba dentro del
+       * bucle y se tiraba al salir. Ver el diario de conversaciones en
+       * `chatRoutes.mjs`: se registra para poder MEDIR, más adelante, si un
+       * router de modelo tendría algo que decidir.
+       */
+      rondas,
     }
   }
 

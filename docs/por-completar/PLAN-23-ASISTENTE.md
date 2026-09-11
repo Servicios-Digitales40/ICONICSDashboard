@@ -705,6 +705,44 @@ confirmando que el router elige el modelo esperado de la lista de
 `IA_MODELOS` — sin necesitar `llama-server` real para esto, porque la
 heurística no invoca ningún modelo para decidir.
 
+> **DESCARTADA el 11-09-2026, y en su lugar se MIDE.** Esta fase no se
+> implementa. El motivo no es que sea difícil: es que, con el código delante,
+> **la propuesta de esta misma sección no se sostiene**.
+>
+> **1 · «Una vez por conversación» no resuelve el choque, lo esconde.** El §8
+> ya parte de que el modelo activo es global al servidor por VRAM, y propone
+> decidir por conversación para no cambiarlo a media charla. Pero si la
+> elección es por conversación y el modelo es global, dos pantallas con
+> conversaciones distintas se pisan igual: la A elige el 9B, la B el 4B, y cada
+> turno alterna → una recarga de varios gigas por mensaje. Es exactamente el
+> escenario que `usarModelo` documenta como inaceptable. Para que funcionara,
+> el modelo tendría que dejar de ser global — que es la decisión que el propio
+> §8 dice no reabrir.
+>
+> **2 · `IA_MODELOS` viene VACÍO por defecto**, dato que no estaba en el plan.
+> Sin dos modelos configurados no hay entre qué elegir, así que la heurística
+> no se ejecutaría nunca en una instalación normal.
+>
+> **3 · Y no hay nada que diga cuál es «el capaz».** `readModelos` sólo
+> garantiza que el primero es el de por defecto; la lista es de nombres, sin
+> orden semántico. Un router tendría que inferirlo del nombre («4B» / «9B»),
+> que es frágil y específico de Qwen, o inventarse una convención que nadie
+> escribió.
+>
+> **Lo que sí se hizo, y es la parte útil.** La pregunta de fondo —¿hay
+> preguntas que de verdad necesiten el modelo grande?— es buena, y no se
+> contesta suponiendo. El diario de conversaciones de F6 registra ahora las
+> tres señales baratas que esta heurística iba a usar: `caracteresPregunta`,
+> `rondas` (cuántas llamadas al modelo costó el turno, que no es lo mismo que
+> cuántas herramientas) y `turnosDeContexto`, junto al `modelo` y la
+> `duracionMs` que ya guardaba.
+>
+> Con semanas de uso real eso contesta si las preguntas largas o las que gastan
+> varias rondas son de verdad las lentas. Si lo son, un router tendrá algo que
+> decidir y se diseñará sobre datos; si no, se habrá ahorrado. Es el mismo
+> orden que `medir-calibracion.mjs` impuso para los umbrales del motor: primero
+> se mide, después se pone el número.
+
 ---
 
 ## 9 · Lo que este plan NO hace

@@ -155,7 +155,20 @@ captura, para que la auditoría de cifras corra también contra el modelo real.
 > que `correlacionar_senales` podía contestar `ok: true` mezclando dos PLC. La
 > prueba que lo cubría usaba claves técnicas, que no colisionan.
 >
-> Quedan F4 a F7: `IA-02` (necesita `llama-server`), `IA-05`, `IA-10` e `IA-08`.
+> **Al día 11-09-2026 (2).** Hechas también **F6** (`IA-10`, los dos diarios) y
+> **F5** (`IA-05`, progreso de la primera pasada).
+>
+> **`IA-08` (router de modelo) se descartó**, y en su lugar se mide. La
+> propuesta del plan —elegir una vez por conversación— no se sostiene con el
+> código delante: el modelo activo es global por VRAM, así que dos pantallas
+> con conversaciones distintas se pisarían igual, una recarga de varios gigas
+> por mensaje. Además `IA_MODELOS` viene vacío por defecto (no habría entre qué
+> elegir) y su lista no declara cuál es el modelo capaz. En su lugar, el diario
+> de conversaciones registra las señales que esa heurística iba a usar
+> —longitud de la pregunta, rondas gastadas, turnos de contexto— para poder
+> decidirlo con datos en vez de suponerlo.
+>
+> Queda **F4** (`IA-02`), que necesita `llama-server` levantado para medir algo.
 >
 > `estado_de_alarmas` queda fuera por estar **parcialmente cubierta, pero de
 > dos formas distintas según la máquina**: vibraciones trae contadores del

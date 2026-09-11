@@ -1143,6 +1143,85 @@ await check('el texto del manual llega al modelo MARCADO como cita', async () =>
   assert.match(contenido, /arranque la bomba/i)
 })
 
+/* ── Las señales con las que se medirá un router (Plan 23, en vez de IA-08) ── */
+
+/**
+ * `rondas` cuenta LLAMADAS AL MODELO, no herramientas.
+ *
+ * ── POR QUÉ ESTA PRUEBA EXISTE ─────────────────────────────────────
+ *
+ * `IA-08` (router de modelo) se descartó: elegir por conversación no resuelve
+ * que el modelo activo sea global por VRAM, `IA_MODELOS` viene vacío por
+ * defecto y su lista no declara cuál es el capaz. Pero la pregunta de fondo
+ * —¿hay preguntas que necesiten el modelo grande?— sigue siendo buena, y se
+ * decidió MEDIRLA antes que suponerla: el diario de conversaciones guarda esta
+ * señal junto a la longitud de la pregunta y los turnos de contexto.
+ *
+ * Si alguien quita `rondas` del resumen, esa medición se pierde sin que nada
+ * avise y el día que se quiera decidir sobre el router no habrá datos. De ahí
+ * esta prueba, que además fija la distinción que la hace útil: tres
+ * herramientas en una ronda es el modelo acertando a la primera; tres en tres
+ * rondas es el modelo encadenando, y cada ronda es otra espera entera.
+ */
+await check('el resumen dice cuántas RONDAS de modelo costó el turno', async () => {
+  const chat = chatDePrueba()
+
+  /*
+   * Una herramienta DISTINTA por ronda —la guarda de repetidas cortaría el
+   * encadenamiento si fueran iguales— y el guion se avanza desde fuera, no con
+   * un getter.
+   *
+   * El llama-server falso de este archivo lee `guion.toolCall` DOS veces por
+   * respuesta (una en la condición y otra en el spread; está dicho en su
+   * cabecera). Un getter que avanzara un índice consumiría dos entradas por
+   * ronda y la segunda saldría vacía: la prueba mediría un encadenamiento que
+   * nunca ocurrió.
+   */
+  const paso = nombre => {
+    guion = {
+      toolCall: {
+        id: `c-${nombre}`, type: 'function',
+        function: { name: nombre, arguments: '{"sistema":"tanque"}' },
+      },
+      texto: 'Listo.',
+    }
+  }
+
+  paso('estado_del_sistema')
+  const eventos = []
+  const enCurso = chat.responder({
+    pregunta: 'algo que encadene',
+    onEvento: e => {
+      eventos.push(e)
+      // En cuanto la primera herramienta se ejecuta, se cambia el guion para
+      // que la ronda siguiente pida otra distinta.
+      if (e.tipo === 'herramienta' && e.nombre === 'estado_del_sistema') {
+        paso('historia_de_senal')
+      }
+    },
+  })
+  const resumen = await enCurso
+
+  assert.equal(resumen.herramientas.length, 2, 'no encadenó las dos herramientas')
+  assert.ok(
+    resumen.rondas >= 2,
+    `dos herramientas encadenadas tendrían que ser al menos 2 rondas, dice ${resumen.rondas}`
+  )
+  assert.ok(
+    resumen.rondas > resumen.herramientas.length - 1 || resumen.rondas >= 2,
+    'rondas y herramientas no se distinguen'
+  )
+})
+
+await check('un turno sin herramientas gasta UNA ronda, y lo dice', async () => {
+  guion = { contenido: 'No hace falta consultar nada.' }
+
+  const { resumen } = await preguntar(chatDePrueba(), 'hola')
+
+  assert.equal(resumen.herramientas.length, 0)
+  assert.equal(resumen.rondas, 1, `un turno sin herramientas dice ${resumen.rondas} rondas`)
+})
+
 /* ── El progreso de la primera pasada (Plan 23 F5 · IA-05) ───────────── */
 
 console.log('\n── Progreso mientras piensa ────────────────────────────────')

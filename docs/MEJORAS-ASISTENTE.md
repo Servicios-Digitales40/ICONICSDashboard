@@ -362,6 +362,38 @@ acordarse de consultarlo.
 **Qué cambia.** Inyectar los hechos relevantes de la máquina en cuestión sin
 que se pidan.
 
+## C4.5 · Router de modelo — DESCARTADO, y en su lugar se mide
+
+> **Descartado el 11-09-2026.** Era `IA-08` del Plan 23 (F7) y no se
+> implementa. El motivo no es la dificultad: es que la propuesta **no se
+> sostiene con el código delante**.
+>
+> - **Elegir «una vez por conversación» no resuelve el choque.** El modelo
+>   activo es global al servidor por VRAM (ver `usarModelo` en `chat.mjs`), así
+>   que dos pantallas con conversaciones distintas se pisarían igual: una
+>   recarga de varios gigas por mensaje. Para que funcionara, el modelo tendría
+>   que dejar de ser global — la decisión que el propio plan dice no reabrir.
+> - **`IA_MODELOS` viene vacío por defecto**, así que en una instalación normal
+>   no habría entre qué elegir y la heurística no se ejecutaría nunca.
+> - **La lista no declara cuál es el modelo capaz.** `readModelos` sólo
+>   garantiza que el primero es el de por defecto. Un router tendría que
+>   inferirlo del nombre («4B»/«9B») —frágil y específico de Qwen— o inventarse
+>   una convención que nadie escribió.
+>
+> **Lo que se hizo en su lugar.** La pregunta de fondo —¿hay preguntas que de
+> verdad necesiten el modelo grande?— es buena y no se contesta suponiendo. El
+> diario de conversaciones (Plan 23 F6) registra ahora las tres señales baratas
+> que esa heurística iba a usar: `caracteresPregunta`, `rondas` —cuántas
+> llamadas al modelo costó el turno, que no es lo mismo que cuántas
+> herramientas— y `turnosDeContexto`, junto al `modelo` y la `duracionMs` que
+> ya guardaba.
+>
+> Con semanas de uso real eso dice si las preguntas largas o las que gastan
+> varias rondas son de verdad las lentas. Mismo orden que impuso
+> `medir-calibracion.mjs` para los umbrales del motor: primero se mide, después
+> se pone el número. Retomarlo exige además resolver la contención de VRAM,
+> que es un plan aparte.
+
 ## C5 · Presupuesto de rondas adaptativo
 
 **Hoy.** 4 rondas × 2 herramientas. Cuando una herramienta pide reintento con
