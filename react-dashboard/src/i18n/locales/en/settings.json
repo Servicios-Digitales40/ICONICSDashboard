@@ -65,6 +65,7 @@
       "noReachable_conMotivo": "{{donde}} is unreachable: {{motivo}}.",
       "noToken": "{{donde}} is reachable but there is no valid token: reads would go out unauthenticated. Check ICONICS_USERNAME / ICONICS_PASSWORD and that user’s permissions.",
       "readFailed": "{{donde}} is reachable and the token is valid, but the last read —{{desde}} s ago— FAILED: {{motivo}}. Answering is not delivering.",
+      "needsReauth": "{{donde}} is reachable, but it is asking for RE-AUTHENTICATION: the session expired on the ICONICS side and for the last {{desde}} s it has been returning the login page instead of data. The token the bridge holds looks valid because its expiry has not arrived yet, but the server no longer accepts it. Restarting the bridge fixes it.",
       "neverRead": "{{donde}} is reachable and the token is valid. No live reading has been requested yet since the bridge started.",
       "noValues_one": "{{donde}} is reachable and the token is valid, but the last read ({{segundos}} s ago) brought back NOT A SINGLE value out of the 1 point requested.",
       "noValues_other": "{{donde}} is reachable and the token is valid, but the last read ({{segundos}} s ago) brought back NOT A SINGLE value out of the {{count}} points requested.",

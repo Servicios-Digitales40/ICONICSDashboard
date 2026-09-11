@@ -168,6 +168,35 @@ export function estadoDeLosDatos({ config, connectivity, tokenValid, lecturas, a
 
   if (falloEsLoUltimo) {
     const desde = Math.round((ahora - Date.parse(ultimoFallo.instante)) / 1000)
+
+    /*
+     * ── LA SESIÓN CADUCADA TIENE SU PROPIA FRASE (B9) ──────────────────
+     *
+     * Porque el arreglo es distinto de cualquier otro fallo de lectura: no hay
+     * nada que revisar en la planta ni en la red, hay que renovar el token. La
+     * rama genérica de abajo diría «la última lectura FALLÓ» con el motivo
+     * dentro, y quien lo lea saldrá a comprobar el servidor — que está
+     * perfectamente.
+     *
+     * `tokenValid` sigue diciendo que sí, y por eso no basta con mirarlo:
+     * `hasValidToken()` comprueba nuestro reloj (`Date.now() < expiresAtMs`),
+     * no al servidor. Lo único que sabe la verdad es la respuesta que llegó, y
+     * el cliente ya la marca.
+     */
+    if (ultimoFallo.reautenticacion) {
+      return {
+        ...base,
+        estado: 'error',
+        ultimoFallo,
+        detalle:
+          `Se alcanza ${donde}, pero está pidiendo REAUTENTICACIÓN: la sesión caducó del lado ` +
+          `de ICONICS y desde hace ${desde} s devuelve la página de login en vez de datos. El ` +
+          'token que el puente guarda parece válido porque aún no ha llegado su hora, pero el ' +
+          'servidor ya no lo acepta. Se arregla reiniciando el puente.',
+        plantilla: { clave: 'needsReauth', donde, desde },
+      }
+    }
+
     return {
       ...base,
       estado: 'error',

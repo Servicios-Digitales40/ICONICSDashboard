@@ -407,6 +407,42 @@ describe('salud — una lectura que FALLÓ no es una lectura que nadie pidió', 
     expect(datos.ultimoFallo).toEqual(FALLO)
   })
 
+  /**
+   * La sesión caducada tiene su propia frase, y no es un capricho (B9).
+   *
+   * ── EL INCIDENTE ───────────────────────────────────────────────────
+   *
+   * Medido el 11-09-2026 en un puente con casi ocho horas de marcha: ICONICS
+   * había invalidado la sesión por su cuenta y devolvía la página de login de
+   * OIDC —con un 200— a cada lectura. La pantalla decía «se alcanza el
+   * servidor y el token es válido», porque `hasValidToken()` comprueba NUESTRO
+   * reloj y nunca al servidor, y el operador salía a revisar una planta que
+   * estaba perfectamente.
+   *
+   * El arreglo es distinto de cualquier otro fallo de lectura —renovar el
+   * token, no mirar la red—, así que el mensaje tiene que decirlo con esas
+   * palabras. Si esta prueba cae, la tarjeta volvió al genérico «la última
+   * lectura FALLÓ» y con él a mandar a buscar la avería al sitio equivocado.
+   */
+  it('la sesión caducada se dice como tal, no como «la lectura falló»', () => {
+    const datos = tarjeta({
+      ultima: null,
+      ultimoFallo: {
+        instante: '2026-09-09T10:00:00Z',
+        motivo: 'ICONICS pide reautenticación: la sesión caducó del lado del servidor.',
+        reautenticacion: true,
+      },
+    })
+
+    expect(datos.estado).toBe('error')
+    expect(datos.plantilla.clave).toBe('needsReauth')
+    expect(datos.detalle).toMatch(/REAUTENTICACIÓN/)
+    /* Lo que hay que hacer, dicho: sin esto la frase describe y no resuelve. */
+    expect(datos.detalle).toMatch(/reiniciando el puente/i)
+    /* Y que NO caiga en el genérico, que es el fallo que esto corrige. */
+    expect(datos.plantilla.clave).not.toBe('readFailed')
+  })
+
   it('un fallo POSTERIOR a una lectura buena manda: el origen se acaba de caer', () => {
     const datos = tarjeta({
       ultima: { ...BUENA, instante: '2026-09-09T09:59:00Z' },

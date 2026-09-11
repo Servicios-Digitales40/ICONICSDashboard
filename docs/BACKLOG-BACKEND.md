@@ -236,7 +236,31 @@ histórico declarado) y comprueban que **no contesten en verde**.
 
 ---
 
-## B9 · El health dice «token válido» mientras ICONICS devuelve el login
+## B9 · El health dice «token válido» mientras ICONICS devuelve el login — **HECHO (11-09-2026)**
+
+> **Las dos piezas, y una prueba que las ata.** El cliente reconoce la respuesta
+> de reautenticación en `request()` —por donde pasa toda salida— y la devuelve
+> como `{ ok: false, status: 401, reautenticacion: true }` en vez de como un
+> sobre bueno con HTML dentro. La marca viaja hasta `/api/health`, que tiene
+> ahora su propia rama: «está pidiendo REAUTENTICACIÓN… se arregla reiniciando
+> el puente», en los dos idiomas (`needsReauth`).
+>
+> **Dos señales, y hacen falta las dos** para no acusar de más: que el cuerpo
+> sea texto —el JSON de una lectura nunca lo es— y que lleve `connect/authorize`
+> o `signin-oidc`. Con una sola, un manual que hablara del flujo OIDC o un error
+> en texto plano caerían aquí por error.
+>
+> **Lo que NO se hizo**, y queda dicho: renovar y reintentar automáticamente. La
+> detección es lo que hace que el incidente se vea; el reintento haría que no se
+> viera siquiera, y es un cambio de comportamiento sobre el camino de datos que
+> merece su propia decisión. Hoy el operador lee qué pasa y reinicia.
+>
+> Probado sin planta: `backend/test/reautenticacion.test.mjs` levanta un ICONICS
+> de mentira que devuelve la página de login con 200 —el cuerpo real, recortado—
+> y comprueba el camino entero, incluido que el HTML no viaje como si fuera el
+> valor de un punto.
+
+### El problema, tal como se encontró
 
 **Medido el 11-09-2026 con la planta delante**, en un backend con 7 h 53 min de
 marcha. La pantalla de Salud mostraba:
@@ -311,8 +335,7 @@ reiniciando el puente.
 ## Orden sugerido
 
 1. ~~**B1**~~ — hecho el 28-08-2026
-2. **B9** — el único que se manifiesta como una avería en pantalla, y el
-   diagnóstico que da es el equivocado. Además es de los pequeños.
+2. ~~**B9**~~ — hecho el 11-09-2026
 3. **B3** — la asimetría que más se nota en una demo
 3. **B4** — deja de ser una limitación en cuanto haya una segunda máquina con histórico
 4. **B5** — decisión de una tarde, pero un verificador en rojo permanente no sirve

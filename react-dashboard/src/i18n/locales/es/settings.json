@@ -65,6 +65,7 @@
       "noReachable_conMotivo": "No se alcanza {{donde}}: {{motivo}}.",
       "noToken": "Se alcanza {{donde}} pero no hay token válido: las lecturas saldrían sin autenticar. Revisa ICONICS_USERNAME / ICONICS_PASSWORD y los permisos de ese usuario.",
       "readFailed": "Se alcanza {{donde}} y el token es válido, pero la última lectura —hace {{desde}} s— FALLÓ: {{motivo}}. Contestar no es entregar.",
+      "needsReauth": "Se alcanza {{donde}}, pero está pidiendo REAUTENTICACIÓN: la sesión caducó del lado de ICONICS y desde hace {{desde}} s devuelve la página de login en vez de datos. El token que el puente guarda parece válido porque aún no ha llegado su hora, pero el servidor ya no lo acepta. Se arregla reiniciando el puente.",
       "neverRead": "Se alcanza {{donde}} y el token es válido. Todavía no se ha pedido ninguna lectura en vivo desde que arrancó el puente.",
       "noValues_one": "Se alcanza {{donde}} y el token es válido, pero la última lectura (hace {{segundos}} s) no trajo NI UN valor de 1 punto pedido.",
       "noValues_other": "Se alcanza {{donde}} y el token es válido, pero la última lectura (hace {{segundos}} s) no trajo NI UN valor de {{count}} puntos pedidos.",

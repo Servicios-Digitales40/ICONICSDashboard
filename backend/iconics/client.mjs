@@ -32,6 +32,36 @@ async function parsePayload(response) {
   return contentType.includes(JSON_CONTENT_TYPE) ? response.json() : response.text()
 }
 
+/**
+ * ¿Esto es la página de login de OIDC en vez de una lectura? (B9)
+ *
+ * ── EL INCIDENTE QUE ESTO EXISTE PARA NO REPETIR ───────────────────
+ *
+ * Medido el 11-09-2026 en un puente con 7 h 53 min de marcha. La sesión había
+ * caducado DEL LADO DE ICONICS, y el servidor dejó de contestar datos para
+ * empezar a contestar esto, con un 200 y su `<form action=".../connect/authorize">`:
+ *
+ *     {"ok": true, "status": 200,
+ *      "payload": "<html><head><title>Working...</title></head>…"}
+ *
+ * Como petición HTTP salió bien, así que el sobre decía `ok: true` y el HTML
+ * viajaba como si fuera el valor de un punto. El tablero se quedaba en «Sin
+ * dato» y la pantalla de Salud decía «token válido», porque `hasValidToken()`
+ * comprueba NUESTRO reloj y nunca al servidor. Es el modo de fallo del §2.4
+ * del CLAUDE.md —un servidor que contesta y no dice nada— y encima el
+ * diagnóstico que daba la pantalla era el equivocado.
+ *
+ * Se mira aquí y no en cada operación porque toda salida pasa por `request()`.
+ * Dos señales, y hacen falta las dos: que el cuerpo sea texto (el JSON de una
+ * lectura nunca lo es) y que lleve la marca del flujo de autorización. Con una
+ * sola, un manual que hablara de `connect/authorize` o un error en texto plano
+ * caerían aquí por error.
+ */
+function esPaginaDeReautenticacion(payload) {
+  if (typeof payload !== 'string') return false
+  return /connect\/authorize|signin-oidc/i.test(payload)
+}
+
 function toErrorMessage(error) {
   return error instanceof Error ? error.message : 'Unexpected proxy error.'
 }
@@ -154,6 +184,30 @@ export function createIconicsClient(config, authenticator) {
         )
         return { ok: false, status: response.status, error: failure, payload }
       }
+      /*
+       * Un 200 que en realidad es el login NO es una lectura (B9).
+       *
+       * Va DESPUÉS del `!response.ok` a propósito: el servidor lo manda con
+       * 200, así que por esa rama no cae. Y sale como fallo —no como sobre
+       * bueno con HTML dentro— porque lo que hay que hacer con él es
+       * reautenticar, no pintarlo. El 401 es lo que el servidor debería haber
+       * contestado, y lo que hace que quien llame lo trate como lo que es.
+       */
+      if (esPaginaDeReautenticacion(payload)) {
+        logger.error(
+          `ICONICS devolvió la página de reautenticación en vez de datos para ` +
+            `${event ?? 'la petición'}: la sesión caducó del lado del servidor. ` +
+            'Las lecturas seguirán vacías hasta que se renueve el token.',
+          { ...meta, status: response.status, durationMs }
+        )
+        return {
+          ok: false,
+          status: 401,
+          error: 'ICONICS pide reautenticación: la sesión caducó del lado del servidor.',
+          reautenticacion: true,
+        }
+      }
+
       return { ok: true, status: response.status, payload, headers: response.headers }
     } catch (error) {
       const ms = Date.now() - startedAt
@@ -299,6 +353,11 @@ export function createIconicsClient(config, authenticator) {
       ultimoFalloDeLectura = {
         instante: new Date().toISOString(),
         motivo: result.error ?? `HTTP ${result.status}`,
+        /* La marca viaja hasta `/api/health` (B9): la sesión caducada tiene su
+           propia frase y su propio arreglo —renovar el token—, y sin esto
+           caería en el mensaje genérico de «la lectura falló», que manda a
+           revisar un servidor que está perfectamente. */
+        ...(result.reautenticacion ? { reautenticacion: true } : {}),
       }
       return result
     }
