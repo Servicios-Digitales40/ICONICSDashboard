@@ -225,7 +225,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
                     type="checkbox"
                     checked={seleccion.has(a.eventId)}
                     onChange={() => alternarSeleccion(a.eventId)}
-                    aria-label={`Seleccionar evento ${a.eventId}`}
+                    aria-label={traducir("selectEventAria", { id: a.eventId })}
                   />
                 )}
                 <span style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, minWidth: 150 }}>

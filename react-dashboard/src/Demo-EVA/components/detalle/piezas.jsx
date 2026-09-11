@@ -233,7 +233,7 @@ export function GraficaHistoria({
            * este aviso desaparece solo, sin tocar el componente.
            */}
           {hayBandaConAviso && (
-            <span style={avisoPastilla(t)}>banda estimada, sin confirmar</span>
+            <span style={avisoPastilla(t)}>{traducir("estimatedBand")}</span>
           )}
           {/*
            * Cobertura: qué parte del rango pedido traía datos.

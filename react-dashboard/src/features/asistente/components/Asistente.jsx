@@ -590,7 +590,7 @@ export function Asistente() {
 
         {errorExportar && (
           <div role="status" style={{ padding: "6px 14px 0", fontSize: 11, color: t.coral, fontFamily: MONO, lineHeight: 1.45 }}>
-            No se pudo exportar la conversación: {errorExportar}
+            {traducir("actions.exportError", { motivo: errorExportar })}
           </div>
         )}
 

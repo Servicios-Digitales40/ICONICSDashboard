@@ -100,6 +100,7 @@ export default function ActivoEnMaqueta({
   onSeñalar,
   onSeleccionar,
   onDetalle,
+  onAlarmas,
   detalle = false,
 }) {
   const P = usePaleta3D();
@@ -184,6 +185,7 @@ export default function ActivoEnMaqueta({
           altura={alturaFicha}
           onCerrar={() => onSeleccionar(null)}
           onDetalle={onDetalle ? () => onDetalle(activo.id) : null}
+          onAlarmas={onAlarmas}
         />
       ) : (
         señalado && <EtiquetaActivo activo={activo} altura={alturaFicha - 0.3} />

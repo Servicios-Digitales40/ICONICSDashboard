@@ -1,4 +1,5 @@
 {
+  "estimatedBand": "banda estimada, sin confirmar",
   "status": {
     "critico": {
       "label": "Fuera de límite",
@@ -376,6 +377,9 @@
     "sub": "Señala un activo para verlo, púlsalo para sus señales · cada tarjeta va donde está el aparato que mide",
     "loading": "Leyendo señales…",
     "provenance": "Los colores de estado salen de umbrales locales; ICONICS no publica un estado para <b>{{raiz}}</b>. La disposición sale de un dibujo del equipo real, con cotas tomadas a ojo sobre una perspectiva: es la del skid, no la de un plano acotado.",
+    "moreInDetail_one": "+{{count}} más en el detalle",
+    "moreInDetail_other": "+{{count}} más en el detalle",
+    "viewFullDetail": "Ver detalle completo",
     "view": {
       "isometrica": "Isométrica",
       "superior": "Superior",

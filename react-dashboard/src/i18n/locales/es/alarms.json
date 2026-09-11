@@ -12,6 +12,7 @@
   },
   "empty": "Sin eventos en esta ventana.",
   "emptyForAsset": "Sin eventos en esta ventana para {{activo}}.",
+  "selectEventAria": "Seleccionar evento {{id}}",
   "allAssets": "Todos los activos",
   "loading": "Consultando el historial de alarmas…",
   "vivo": {

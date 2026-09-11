@@ -1,4 +1,5 @@
 {
+  "estimatedBand": "estimated band, unconfirmed",
   "status": {
     "critico": {
       "label": "Out of Limits",
@@ -376,6 +377,9 @@
     "sub": "Hover an asset to see it, click it for its signals · each card sits where the instrument that measures it is",
     "loading": "Reading signals…",
     "provenance": "Status colours come from local thresholds; ICONICS publishes no status for <b>{{raiz}}</b>. The layout comes from a drawing of the real equipment, with dimensions taken by eye off a perspective view: it is the skid’s, not a dimensioned plan.",
+    "moreInDetail_one": "+{{count}} more in detail view",
+    "moreInDetail_other": "+{{count}} more in detail view",
+    "viewFullDetail": "View full detail",
     "view": {
       "isometrica": "Isometric",
       "superior": "Top",

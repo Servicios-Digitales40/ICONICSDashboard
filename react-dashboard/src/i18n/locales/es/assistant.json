@@ -103,6 +103,7 @@
   "actions": {
     "exportPdfAria": "Exportar la conversación a PDF",
     "exportPdf": "Exportar PDF",
+    "exportError": "No se pudo exportar la conversación: {{motivo}}",
     "clearAria": "Borrar la conversación",
     "clear": "Borrar",
     "restoreAria": "Restaurar tamaño",
@@ -148,7 +149,7 @@
   },
   "welcome": {
     "lead": "Pregunta por el estado del sistema de agua o por cómo ha evolucionado una de sus señales.",
-    "caveat": "Las respuestas salen de ICONICS, no de la memoria del modelo. Sólo cuatro de las ocho señales tienen historia —nivel, temperatura, caudal y presión—; si preguntas por el pasado de otra, te lo dirá en vez de inventarlo. Los límites con los que se juzga cada valor son estimaciones nuestras, no rangos confirmados de la instalación."
+    "caveat": "Las respuestas salen de ICONICS, no de la memoria del modelo. No todas las señales tienen historia; si preguntas por el pasado de una que no la tiene, te lo dirá en vez de inventarlo. Los límites con los que se juzga cada valor son estimaciones nuestras, no rangos confirmados de la instalación."
   },
   "notes": {
     "cancelledPartial": "Cancelaste la consulta; la respuesta quedó a medias.",

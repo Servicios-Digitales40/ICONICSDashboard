@@ -12,6 +12,7 @@
   },
   "empty": "No events in this window.",
   "emptyForAsset": "No events in this window for {{activo}}.",
+  "selectEventAria": "Select event {{id}}",
   "allAssets": "All assets",
   "loading": "Querying the alarm history…",
   "vivo": {

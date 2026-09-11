@@ -103,6 +103,7 @@
   "actions": {
     "exportPdfAria": "Export the conversation to PDF",
     "exportPdf": "Export PDF",
+    "exportError": "Could not export the conversation: {{motivo}}",
     "clearAria": "Clear the conversation",
     "clear": "Clear",
     "restoreAria": "Restore size",
@@ -148,7 +149,7 @@
   },
   "welcome": {
     "lead": "Ask about the state of the water system, or how one of its signals has moved.",
-    "caveat": "The answers come from ICONICS, not from the model’s memory. Only four of the eight signals have history —level, temperature, flow rate and pressure—; if you ask about the past of another one, it will say so rather than invent it. The limits each value is judged against are our own estimates, not confirmed ranges from the plant."
+    "caveat": "The answers come from ICONICS, not from the model’s memory. Not every signal has history; if you ask about the past of one that doesn’t, it will say so rather than invent it. The limits each value is judged against are our own estimates, not confirmed ranges from the plant."
   },
   "notes": {
     "cancelledPartial": "You cancelled the query; the answer was left half-written.",

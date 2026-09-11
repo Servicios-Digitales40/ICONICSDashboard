@@ -22,20 +22,26 @@
  *
  * ── CÓMO DECIDE QUE UNA CADENA ES ESPAÑOL ──────────────────────────
  *
- * Dos señales, y basta con una:
+ * Tres señales, y basta con una:
  *
  *   1. Lleva un carácter que el inglés no usa: á é í ó ú ñ ¿ ¡ «.
  *   2. Tiene más de una palabra y alguna es de una lista corta de palabras
  *      españolas que no existen en inglés (de, la, que, para, con, una…).
+ *   3. Tiene más de una palabra y alguna es un verbo de botón que este
+ *      proyecto usa de verdad (ver, borrar, exportar…) — `VERBOS_UI`, no
+ *      una lista de verbos españoles en general.
  *
  * Es una heurística y no un analizador de idioma. Sigue fallando —conocido y
- * aceptado— con una palabra SUELTA en español sin tilde: «Actualizar» pasa, y
- * no hay forma de cazarla sin una lista de verbos que se desactualizaría sola.
- * A cambio no necesita un modelo ni una lista de 10.000 palabras.
+ * aceptado— con una palabra SUELTA en español sin tilde y sin partícula ni
+ * verbo de las dos listas: «Actualizar» sola pasa, y no hay forma de cazarla
+ * sin una lista de verbos que se desactualizaría sola. A cambio no necesita
+ * un modelo ni una lista de 10.000 palabras.
  *
  * El listón estuvo en DOS partículas hasta el 09-09-2026, y ése fue el hueco
  * por el que se coló «Salud del sistema»: una partícula, sin tildes, siendo el
- * título de la pantalla.
+ * título de la pantalla. La señal 3 se añadió el 11-09-2026 por el mismo
+ * motivo: «Ver detalle completo» —dos palabras de contenido, cero partículas,
+ * sin tilde— pasaba limpio con sólo las dos primeras señales.
  *
  * ── DÓNDE MIRA ─────────────────────────────────────────────────────
  *
@@ -51,6 +57,16 @@
  * `views/vibraciones/Vibraciones.jsx`, escrito como `message={ "…" + "…" }`. Un
  * verificador que da un falso verde es peor que no tenerlo, porque además
  * convence.
+ *
+ * ── Y EL HUECO DE LA INTERPOLACIÓN EN MEDIO DE LA FRASE ────────────
+ *
+ * El 11-09-2026, otro falso verde: `>+{ocultas} más en el detalle<` no se
+ * evaluaba porque el patrón del nodo JSX no cruza una `{`, y ahí se detiene
+ * antes de llegar a «más en el detalle». `HUECO_INTERPOLACION` sustituye
+ * cada `{identificador}` simple por espacios de la misma longitud ANTES de
+ * buscar nodos, así el texto alrededor sí se evalúa entero — ver su cabecera
+ * para el porqué de que sólo cubra identificadores simples y no cualquier
+ * `{…}`.
  *
  * NO mira comentarios —que van en español a propósito (CLAUDE.md §4.6)—, ni
  * los diccionarios, ni las pruebas, ni `shared/`, que es dominio y tiene su
@@ -128,6 +144,28 @@ const PARTICULAS = new Set([
 ])
 
 /**
+ * Verbos de botón/acción sin tilde y sin partícula que un texto de UI de
+ * este proyecto usa de verdad — no una lista genérica de verbos españoles,
+ * que se desactualizaría sola (ver la nota de cabecera sobre ese límite
+ * aceptado). Cada uno confirmado contra `i18n/locales/es/*.json` el
+ * 11-09-2026: son los infinitivos y participios de botón que YA aparecen en
+ * el diccionario, así que añadir uno nuevo aquí no es adivinar vocabulario,
+ * es admitir el que el propio proyecto ya habla.
+ *
+ * Ninguno es también una palabra inglesa —«ver», «borrar», «exportar» no lo
+ * son—, así que no hay riesgo de marcar un texto en inglés correcto. Sólo
+ * cuentan si la frase tiene DOS O MÁS palabras (mismo criterio que
+ * `PARTICULAS`): «Ver» suelto podría ser un identificador y no se marca,
+ * «Ver detalle» ya no puede serlo.
+ */
+const VERBOS_UI = new Set([
+  'ver', 'borrar', 'exportar', 'descargar', 'copiar', 'reintentar', 'cerrar',
+  'guardar', 'editar', 'buscar', 'filtrar', 'actualizar', 'seleccionar',
+  'aceptar', 'confirmar', 'cancelar', 'enviar', 'volver', 'abrir', 'subir',
+  'completo', 'completa', 'detalle',
+])
+
+/**
  * ── POR QUÉ BASTA UNA PARTÍCULA, Y NO DOS ──────────────────────────
  *
  * Pedía dos para no marcar «Data del» ni un identificador suelto. El precio
@@ -138,12 +176,22 @@ const PARTICULAS = new Set([
  * Con una basta, siempre que la frase tenga MÁS DE UNA PALABRA: eso ya descarta
  * el identificador suelto, que era el caso que preocupaba. Y «Data del» ahora
  * se marca, que es lo correcto — es español a medias, no una excepción.
+ *
+ * ── LA TERCERA SEÑAL, AÑADIDA EL 11-09-2026 ────────────────────────
+ *
+ * «Ver detalle completo» pasó limpio: sin tilde, y ni «ver», «detalle» ni
+ * «completo» son partículas —son sustantivos y un verbo, no conectores—. Dos
+ * palabras de contenido sin ningún conector es exactamente el hueco que la
+ * cabecera del archivo ya documentaba como conocido. `VERBOS_UI` lo cierra
+ * para el vocabulario de botón que este proyecto realmente usa, sin
+ * pretender ser un diccionario de verbos españoles.
  */
 function pareceEspanol(texto) {
   if (DIACRITICOS.test(texto)) return true
   const palabras = texto.toLowerCase().match(/[a-záéíóúñ]+/g) ?? []
   if (palabras.length < 2) return false
-  return palabras.some(p => PARTICULAS.has(p))
+  if (palabras.some(p => PARTICULAS.has(p))) return true
+  return palabras.some(p => VERBOS_UI.has(p))
 }
 
 /* ── Quitar comentarios sin romper las cadenas ───────────────────────── */
@@ -240,6 +288,26 @@ function sinComentarios(fuente) {
 const NODO_JSX = />([^<>{}"'`]+)</g
 
 /**
+ * ── EL HUECO DE LA INTERPOLACIÓN, Y POR QUÉ SE CIERRA ASÍ ──────────
+ *
+ * `NODO_JSX` no cruza una `{`, así que `>+{ocultas} más en el detalle<` — un
+ * contador con la cifra interpolada en medio de la frase, patrón normal en
+ * JSX — nunca llegaba a evaluarse: el regex se detenía en la primera llave y
+ * «más en el detalle» no se capturaba entero. Se coló así el 10-09-2026 en
+ * `FichaActivo.jsx`, con dos partículas (`en`, `el`) que SÍ estaban en la
+ * lista — no era un hueco de vocabulario, era un hueco de qué se llega a leer.
+ *
+ * La solución no es dejar que `NODO_JSX` cruce cualquier `{…}` —eso capturaría
+ * JSX anidado real, `<div>{<Otro/>}</div>`, como si fuera texto— sino sólo el
+ * caso seguro: una interpolación SIMPLE, un identificador solo
+ * (`{ocultas}`, `{count}`, `{nombre}`), sin comillas, sin operadores, sin
+ * espacios. Es exactamente la forma que ya usan más de 400 sitios del árbol
+ * (confirmado por muestreo) para meter una cifra o un nombre en mitad de una
+ * frase, y no la forma de una expresión ni de un componente.
+ */
+const HUECO_INTERPOLACION = /\{[A-Za-z_][A-Za-z0-9_]*\}/g
+
+/**
  * Lo que delata que un `>…<` no era un nodo JSX sino código.
  *
  * `a > b ? c : d` y `x && y` casan con el patrón de arriba porque llevan `>`
@@ -294,7 +362,16 @@ function hallazgosDe(fuente) {
     encontrados.push({ linea: limpio.slice(0, indice).split('\n').length, valor })
   }
 
-  for (const m of limpio.matchAll(NODO_JSX)) anotar(m.index, m[1])
+  /*
+   * Sólo para que `NODO_JSX` pueda CRUZAR una interpolación simple sin
+   * confundirla con el cierre de un nodo: cada `{identificador}` se sustituye
+   * por espacios de la MISMA longitud, así que los índices de `matchAll`
+   * —usados después para el número de línea— siguen apuntando al `limpio`
+   * original sin desplazarse ni un carácter.
+   */
+  const paraNodos = limpio.replace(HUECO_INTERPOLACION, (m) => ' '.repeat(m.length))
+
+  for (const m of paraNodos.matchAll(NODO_JSX)) anotar(m.index, m[1])
   for (const m of limpio.matchAll(ATRIBUTO)) anotar(m.index, m[2])
   /* Dos grupos: el de comillas o el de acento grave, según cuál casara. */
   for (const m of limpio.matchAll(ATRIBUTO_EN_LLAVES)) anotar(m.index, m[2] ?? m[3])

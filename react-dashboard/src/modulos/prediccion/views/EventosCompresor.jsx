@@ -165,6 +165,8 @@ function Kpi({ icon, label, value, sub, t, color }) {
 }
 
 function PredictionTooltip({ active, payload, label, t }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation("prediction");
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload;
   if (!point) return null;
@@ -181,7 +183,9 @@ function PredictionTooltip({ active, payload, label, t }) {
         padding: "10px 12px",
       }}
     >
-      <div style={{ fontSize: 11, color: t.textFaint }}>{label} h antes del evento</div>
+      <div style={{ fontSize: 11, color: t.textFaint }}>
+        {traducir("panel.hoursBeforeEvent", { n: label })}
+      </div>
       <div style={{ marginTop: 5, fontFamily: MONO, fontSize: 18, fontWeight: 750, color: t.text }}>
         {formatNumber(point.anomaly_index, 2)} / 100
       </div>

@@ -74,7 +74,7 @@ export function DataSourceBanner() {
             fontFamily: "inherit",
           }}
         >
-          volver a datos reales
+          {traducir("layout:source.toReal")}
         </button>
       ) : (
         <code style={{ fontSize: 11, opacity: 0.85, fontFamily: "'IBM Plex Mono', monospace" }}>
