@@ -1510,5 +1510,362 @@ export function crearHerramientasDeHistoricos({
         },
       }
     },
+    /**
+     * Varias señales en la MISMA ventana, cada una con su resumen.
+     *
+     * ── POR QUÉ EXISTE, Y POR QUÉ NO ES `correlacionar_senales` ────────
+     *
+     * Por un fallo medido el 28-08-2026: preguntado por tres señales a la vez,
+     * el modelo gastó las rondas de `IA_MAX_PASOS` pidiéndolas de una en una
+     * con `historia_de_senal` —que es de UNA señal— y se quedó sin pasos antes
+     * de contestar. No era indecisión: no había forma de pedirlas juntas.
+     *
+     * `correlacionar_senales` ya acepta una lista, pero contesta otra
+     * pregunta: si se mueven JUNTAS. Ésta contesta «¿cómo van estas tres?», y
+     * por eso NO devuelve coeficiente ni pares. Darle correlaciones a quien
+     * sólo preguntó cómo van invita a leer una causa donde no se buscaba
+     * ninguna, que es el error que las reglas de veracidad persiguen.
+     *
+     * La prohibición de cruzar máquinas se aplica IGUAL que allí, y por el
+     * mismo motivo: aunque aquí no se calcule ninguna relación, presentar en
+     * una misma tabla señales de dos PLC distintos ya sugiere que se pueden
+     * leer juntas.
+     */
+    async tendencia_multiple({ senales, periodo, sistema } = {}) {
+      /* Misma tolerancia que `correlacionar_senales`: el modelo manda a veces
+         una cadena donde el esquema pide lista, y rechazarla cuesta una ronda
+         de treinta segundos por algo que se entiende. */
+      const lista = Array.isArray(senales)
+        ? senales
+        : String(senales ?? '').split(/[,;]|\by\b/).map(s => s.trim()).filter(Boolean)
+
+      if (lista.length < 2) {
+        return fallo(
+          'Para una tendencia múltiple hacen falta al menos DOS señales. Para una sola, usa ' +
+            'historia_de_senal.',
+          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+        )
+      }
+      if (lista.length > 4) {
+        return fallo('Como mucho cuatro señales a la vez, para que el resultado quepa entero.')
+      }
+
+      /* Todas se resuelven ANTES de salir a la red: si una no existe o no
+         tiene serie, decirlo ahora ahorra las lecturas de las demás. */
+      const claves = []
+      const sistemasDe = []
+      for (const nombre of lista) {
+        const r = resolverSenalDeSistema(nombre, sistema)
+        if (!r.ok) return r
+        if (!r.historizada) {
+          return fallo(
+            `${r.meta.label} no tiene serie histórica propia, así que no se puede seguir su ` +
+              `tendencia. ${SIN_SERIE} Su valor de ahora sí se puede dar con estado_del_sistema.`,
+            { senalesConHistoria: SISTEMA[r.sistemaId].series.historizadas() }
+          )
+        }
+        if (!claves.includes(r.clave)) {
+          claves.push(r.clave)
+          sistemasDe.push(r.sistemaId)
+        }
+      }
+
+      const deSistemas = [...new Set(sistemasDe)]
+      if (deSistemas.length > 1) {
+        return fallo(
+          `Esas señales no son de la misma máquina: pertenecen a ${deSistemas.join(' y ')}. ` +
+            `${NO_COMPARTEN}`,
+          { sistemas: deSistemas }
+        )
+      }
+      if (claves.length < 2) {
+        return fallo('Las señales que has dado son la misma. Dime dos distintas.')
+      }
+
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const sistemaId = deSistemas[0]
+      const series = await Promise.all(claves.map(clave => leerSerie(clave, v, sistemaId)))
+
+      const fallidas = claves.filter((_, i) => !series[i].ok)
+      if (fallidas.length) {
+        return fallo(
+          `El historiador no devolvió la serie de ` +
+            `${fallidas.map(k => metaDe(k, sistemaId).label).join(' y ')} en ${v.etiqueta}.`
+        )
+      }
+
+      /*
+       * Una señal sin muestras NO tumba la consulta: se devuelve con su hueco
+       * declarado. Las otras dos pueden ser exactamente lo que se preguntaba, y
+       * negar las tres por una sería esconder dato que sí hay — la regla de
+       * `shared/quality.js` un piso más arriba: un hueco se cuenta, no se
+       * disfraza ni contagia.
+       */
+      const senalesResumidas = claves.map((clave, i) => {
+        const meta = metaDe(clave, sistemaId)
+        const resumen = resumirSerie(series[i].datos, meta.decimales, series[i].ventana)
+
+        return {
+          senal: meta.label,
+          unidad: meta.unidad || null,
+          ...(resumen
+            ? resumen
+            : {
+              sinDato: true,
+              motivo:
+                  `No hay ninguna muestra en ${v.etiqueta}: el historiador no guarda ese tramo, ` +
+                  `o todas vinieron con mala calidad.`,
+            }),
+          ...(series[i].truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
+          ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        }
+      })
+
+      const sinDato = senalesResumidas.filter(s => s.sinDato)
+
+      return {
+        ok: true,
+        periodo: v.etiqueta,
+        sistema: sistemaId,
+        fuente: 'historiador',
+        senales: senalesResumidas,
+        ...(sinDato.length
+          ? {
+            aviso:
+                `${sinDato.map(s => s.senal).join(' y ')} no tienen muestras en este período. No ` +
+                `digas que valían cero: no se midieron.`,
+          }
+          : {}),
+        nota:
+          'Cada señal va por separado y NO se ha calculado ninguna relación entre ellas. Si te ' +
+          'preguntan si se mueven juntas, usa correlacionar_senales: verlas subir a la vez en ' +
+          'esta tabla no es una correlación medida.',
+        ...avisoDeUmbrales(),
+      }
+    },
+
+    /**
+     * Cuándo cruzó una señal un umbral.
+     *
+     * ── POR QUÉ ES UNA HERRAMIENTA Y NO UNA LECTURA MÁS ────────────────
+     *
+     * Porque «¿cuándo fue la última vez que la presión bajó de 2?» hoy sólo se
+     * puede contestar trayéndose la serie entera y que el MODELO la recorra, y
+     * eso es exactamente lo que las reglas de veracidad le prohíben: no hace
+     * aritmética ni inspecciona series, cita lo que la herramienta ya calculó.
+     * Sin esto, la pregunta se contesta mal o no se contesta.
+     *
+     * Devuelve el PRIMER y el ÚLTIMO cruce, no todos: son los dos que se
+     * preguntan («¿cuándo empezó?», «¿cuándo fue la última vez?») y la lista
+     * entera de un episodio largo son cientos de muestras del mismo suceso.
+     */
+    async buscar_evento({ senal, condicion, valor, periodo, sistema } = {}) {
+      const resuelto = resolverSenalDeSistema(senal, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada, conSerie } = resuelto
+
+      if (!historizada) {
+        return fallo(
+          `${meta.label} no tiene serie histórica propia, así que no se puede buscar cuándo ` +
+            `cruzó un valor. ${SIN_SERIE}`,
+          { senalesConHistoria: conSerie, senalPedida: meta.label }
+        )
+      }
+
+      const umbral = Number(valor)
+      if (!Number.isFinite(umbral)) {
+        return fallo(
+          'Falta el valor con el que comparar, y tiene que ser un número. Por ejemplo: ' +
+            'buscar_evento(senal="presión", condicion="por debajo de", valor=2).'
+        )
+      }
+
+      const comparar = {
+        'por debajo de': (x) => x < umbral,
+        'por encima de': (x) => x > umbral,
+        'igual a': (x) => x === umbral,
+      }[condicion]
+
+      if (!comparar) {
+        return fallo(
+          `No entiendo la condición "${condicion}". Tiene que ser una de: "por debajo de", ` +
+            `"por encima de", "igual a".`,
+          { condiciones: ['por debajo de', 'por encima de', 'igual a'] }
+        )
+      }
+
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      const serie = await leerSerie(clave, v, sistemaId)
+      if (!serie.ok) {
+        if (serie.status >= 502) {
+          return fallo(
+            'No se pudo contactar con el servidor ICONICS para leer el historiador. No es que ' +
+              'falten datos: el servidor no está respondiendo.'
+          )
+        }
+        return fallo(
+          `El historiador no devolvió la serie de ${meta.label} en ${v.etiqueta}: ` +
+            `${serie.error ?? 'error del servidor'}.`
+        )
+      }
+
+      const validos = serie.datos.filter(d => typeof d.valor === 'number')
+      if (!validos.length) {
+        return fallo(
+          `No hay ninguna muestra de ${meta.label} en ${v.etiqueta}, así que no se puede decir ` +
+            `si cruzó ${umbral}. El historiador no guarda ese tramo, o todas vinieron con mala ` +
+            `calidad.`
+        )
+      }
+
+      const cruces = validos.filter(d => comparar(d.valor))
+
+      /*
+       * Que NO se cumpliera nunca es una respuesta, y buena: hay que poder
+       * contestar «no, en las últimas 24 h la presión no bajó de 2» con la
+       * misma confianza que el caso contrario. Por eso viaja cuántas muestras
+       * se miraron: sin ese número, «no pasó» y «no lo sé» se parecen.
+       */
+      if (!cruces.length) {
+        return {
+          ok: true,
+          senal: meta.label,
+          unidad: meta.unidad || null,
+          periodo: v.etiqueta,
+          sistema: sistemaId,
+          fuente: 'historiador',
+          condicion: `${condicion} ${umbral}`,
+          ocurrio: false,
+          muestrasRevisadas: validos.length,
+          nota:
+            `En ${v.etiqueta} no hubo ninguna muestra ${condicion} ${umbral}. Es un resultado ` +
+            `medido sobre ${validos.length} muestras, no una falta de datos.`,
+          ...avisoDeUmbrales(),
+        }
+      }
+
+      const primera = cruces[0]
+      const ultima = cruces[cruces.length - 1]
+      const extremo = condicion === 'por debajo de'
+        ? cruces.reduce((a, b) => (b.valor < a.valor ? b : a))
+        : cruces.reduce((a, b) => (b.valor > a.valor ? b : a))
+
+      return {
+        ok: true,
+        senal: meta.label,
+        unidad: meta.unidad || null,
+        periodo: v.etiqueta,
+        sistema: sistemaId,
+        fuente: 'historiador',
+        condicion: `${condicion} ${umbral}`,
+        ocurrio: true,
+        veces: cruces.length,
+        muestrasRevisadas: validos.length,
+        primeraVez: { cuando: horaLocalDe(primera.t), valor: +primera.valor.toFixed(meta.decimales) },
+        ultimaVez: { cuando: horaLocalDe(ultima.t), valor: +ultima.valor.toFixed(meta.decimales) },
+        ...(condicion !== 'igual a'
+          ? {
+            valorExtremo: {
+              cuando: horaLocalDe(extremo.t),
+              valor: +extremo.valor.toFixed(meta.decimales),
+            },
+          }
+          : {}),
+        nota:
+          `«${cruces.length} veces» son MUESTRAS que cumplían la condición, no episodios ` +
+          `distintos: un solo suceso de unos minutos deja muchas muestras seguidas. Descríbelo ` +
+          `como un episodio entre la primera y la última vez, salvo que estén muy separadas.`,
+        ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        ...avisoDeUmbrales(),
+      }
+    },
+
+    /**
+     * Qué ha pasado en las últimas horas, en una sola llamada.
+     *
+     * ── POR QUÉ COMPUESTA ──────────────────────────────────────────────
+     *
+     * Porque «¿qué pasó en el turno?» son hoy cuatro o cinco llamadas
+     * encadenadas —estado, riesgos, y la historia de cada señal— y cada una de
+     * más es contexto gastado y una oportunidad de que el modelo se pierda a
+     * media cadena. Mismo patrón que `diagnostico`: no es una fuente de datos
+     * nueva, es una composición de las que ya hay.
+     *
+     * ── LO QUE NO INVENTA ──────────────────────────────────────────────
+     *
+     * «Tiempo en marcha / en reposo» sería lo natural de pedirle a un resumen
+     * de turno, y NO se calcula: esta planta no publica un contador de marcha,
+     * y deducirlo del promedio de una señal sería una hipótesis presentada
+     * como medición. Si algún día el catálogo declara esa señal, se añade aquí
+     * leyéndola, no estimándola.
+     */
+    async resumen_de_turno({ sistema, periodo } = {}) {
+      const elegido = resolverSistema(sistema)
+      if (!elegido.ok) return elegido
+
+      const sistemaId = elegido.sistema.id
+      const v = resolverVentana(periodo, { turnos })
+      if (v.error) return fallo(v.error)
+
+      /* Las series de ESTA máquina, no las del tanque por defecto: es el fallo
+         que `diagnostico` documenta —contestar de una máquina con el catálogo
+         de la otra— y aquí se evita preguntándole al registro. */
+      const conSerie = SISTEMA[sistemaId].series.historizadas?.() ?? []
+      const claves = (SISTEMA[sistemaId].series.claves?.() ?? [])
+        .filter(k => SISTEMA[sistemaId].esHistorizada(k))
+        .slice(0, 4)
+
+      const [estado, riesgos, tendencia] = await Promise.all([
+        dameHerramientas().estado_del_sistema({ sistema: sistemaId }),
+        dameHerramientas().riesgos_activos({ sistema: sistemaId }),
+        claves.length >= 2
+          ? dameHerramientas().tendencia_multiple({
+            senales: claves.map(k => SISTEMA[sistemaId].etiquetaDe(k) ?? k),
+            periodo,
+            sistema: sistemaId,
+          })
+          : Promise.resolve(null),
+      ])
+
+      /*
+       * El estado es la pata imprescindible: sin él esto no es un resumen.
+       * Los riesgos y la tendencia pueden faltar legítimamente —una máquina
+       * sin motor de reglas, otra sin series— y su ausencia se DECLARA en vez
+       * de devolver un resumen que parece completo y no lo está. Es el mismo
+       * fallo que `diagnostico` arrastró semanas: un error escondido dentro de
+       * una respuesta con `ok: true`.
+       */
+      if (!estado.ok) return estado
+
+      return {
+        ok: true,
+        sistema: sistemaId,
+        maquina: elegido.sistema.nombre,
+        periodo: v.etiqueta,
+        estadoAhora: estado,
+        ...(riesgos.ok
+          ? { riesgos }
+          : { riesgosNoDisponibles: riesgos.error }),
+        ...(tendencia === null
+          ? {
+            tendenciaNoDisponible:
+                `«${elegido.sistema.nombre}» no tiene al menos dos señales con serie propia, así ` +
+                `que no hay tendencia que resumir.`,
+          }
+          : tendencia.ok
+            ? { tendencia }
+            : { tendenciaNoDisponible: tendencia.error }),
+        ...(conSerie.length ? { senalesConSerie: conSerie.length } : {}),
+        nota:
+          'Es un resumen COMPUESTO de tres consultas: el estado de ahora, los riesgos y la ' +
+          'tendencia del período. Cita cada parte por lo que es y no mezcles el instante actual ' +
+          'con el resumen del tramo. Si alguna parte falta, dilo: no la des por vacía.',
+      }
+    },
   }
 }

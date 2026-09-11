@@ -575,6 +575,97 @@ export const DEFINICIONES = [
   {
     type: 'function',
     function: {
+      name: 'tendencia_multiple',
+      description:
+        'Cómo han ido VARIAS señales (2 a 4) en el MISMO período, cada una con su mínimo, ' +
+        'máximo y promedio por separado. Úsala para "¿cómo van el nivel, la presión y el ' +
+        'caudal esta mañana?" en vez de llamar a historia_de_senal una vez por señal — eso ' +
+        'agota las rondas y te quedas sin contestar. NO calcula ninguna relación entre ellas: ' +
+        'si lo que preguntan es si se mueven juntas, usa correlacionar_senales. Todas tienen ' +
+        'que ser de la MISMA máquina y tener serie propia.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senales: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Las señales, en lenguaje llano, de dos a cuatro: ["nivel", "presión", "caudal"]. ' +
+              'Mismas formas de nombrarlas que en historia_de_senal.',
+          },
+          periodo: {
+            type: 'string',
+            description: 'El período, igual que en historia_de_senal. Si se omite, las últimas 6 horas.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+          },
+        },
+        required: ['senales'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'buscar_evento',
+      description:
+        'CUÁNDO cruzó una señal un valor: la primera y la última vez que estuvo por debajo o ' +
+        'por encima de un umbral en un período, con su hora y su valor exactos. Para "¿cuándo ' +
+        'fue la última vez que la presión bajó de 2?", "¿ha pasado hoy de 80 grados?". ' +
+        'Contesta también que NO ocurrió, y eso es un resultado medido, no una falta de datos. ' +
+        'Úsala en vez de pedir la serie entera: tú no puedes recorrerla ni comparar muestra a ' +
+        'muestra, y esta herramienta ya lo hace.',
+      parameters: {
+        type: 'object',
+        properties: {
+          senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
+          condicion: {
+            type: 'string',
+            enum: ['por debajo de', 'por encima de', 'igual a'],
+            description: 'Qué se busca: que estuviera por debajo, por encima o igual al valor.',
+          },
+          valor: { type: 'number', description: 'El valor umbral con el que comparar.' },
+          periodo: {
+            type: 'string',
+            description: 'Dónde buscar, igual que en historia_de_senal. Si se omite, las últimas 6 horas.',
+          },
+          sistema: {
+            type: 'string',
+            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+          },
+        },
+        required: ['senal', 'condicion', 'valor'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'resumen_de_turno',
+      description:
+        'COMPUESTA: qué ha pasado en una máquina durante un período, en UNA llamada — su estado ' +
+        'de ahora, los riesgos activos y cómo han ido sus señales con serie. Para "¿qué pasó en ' +
+        'las últimas 8 horas?", "resúmeme el turno", "¿cómo ha ido la mañana?". Úsala en vez de ' +
+        'encadenar estado_del_sistema + riesgos_activos + varias historia_de_senal: es lo mismo ' +
+        'en un solo viaje. Si alguna parte no está disponible lo dice; no la des por vacía.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sistema: { type: 'string', description: 'Id del sistema. Los ids salen de sistemas_de_la_planta.' },
+          periodo: {
+            type: 'string',
+            description: 'El período a resumir, igual que en historia_de_senal. Si se omite, las últimas 6 horas.',
+          },
+        },
+        required: ['sistema'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'grafico_de_senal',
       description:
         'Genera un gráfico de la evolución de UNA señal historizada en un período, para ' +
@@ -926,6 +1017,26 @@ export const ESQUEMAS = Object.freeze({
     senales: ListaDeSenales,
     periodo: Texto.optional(),
     sistema: Texto.optional(),
+  }).passthrough(),
+  tendencia_multiple: z.object({
+    senales: ListaDeSenales,
+    periodo: Texto.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  buscar_evento: z.object({
+    senal: Texto,
+    /* El enum SÍ se valida aquí, al contrario que los nombres de señal: son
+       tres valores nuestros, cerrados, y no hay resolvedor detrás que sepa
+       corregir «menor que» por «por debajo de». La herramienta contesta con la
+       lista de válidas de todos modos. */
+    condicion: z.enum(['por debajo de', 'por encima de', 'igual a']),
+    valor: Numero,
+    periodo: Texto.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  resumen_de_turno: z.object({
+    sistema: Texto,
+    periodo: Texto.optional(),
   }).passthrough(),
   grafico_de_senal: z.object({
     senal: Texto,

@@ -1098,17 +1098,22 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
 await checkAsync('cruzar máquinas se detecta con el NOMBRE, no sólo con la clave', async () => {
   const h = createHerramientas({ client: clienteFalso() })
 
-  const r = await h.ejecutar('correlacionar_senales', {
-    senales: ['nivel del tanque', 'Velocidad eficaz · Lado acople'],
-    periodo: 'últimas 6 horas',
-  })
+  /* Las dos que aceptan varias señales: la guarda es la misma y las dos la
+     necesitan. `tendencia_multiple` (Plan 23 F3) nació con este patrón ya
+     corregido, y se comprueba aquí para que no se le escape a la siguiente. */
+  for (const herramienta of ['correlacionar_senales', 'tendencia_multiple']) {
+    const r = await h.ejecutar(herramienta, {
+      senales: ['nivel del tanque', 'Velocidad eficaz · Lado acople'],
+      periodo: 'últimas 6 horas',
+    })
 
-  assert.equal(r.ok, false, 'cruzó dos máquinas sin darse cuenta')
-  assert.match(r.error, /no son de la misma máquina/i, 'el motivo no es el cruce')
-  assert.deepEqual(
-    [...r.sistemas].sort(), ['tanque', 'vibraciones'],
-    'no dice cuáles se intentó cruzar'
-  )
+    assert.equal(r.ok, false, `${herramienta} cruzó dos máquinas sin darse cuenta`)
+    assert.match(r.error, /no son de la misma máquina/i, `${herramienta}: el motivo no es el cruce`)
+    assert.deepEqual(
+      [...r.sistemas].sort(), ['tanque', 'vibraciones'],
+      `${herramienta}: no dice cuáles se intentó cruzar`
+    )
+  }
 })
 
 /** La contrapartida: el arbitraje resuelve a la máquina buena, no se niega. */
@@ -1157,16 +1162,18 @@ await checkAsync('el arbitraje NO cambia lo que ya resolvía bien', async () => 
 await checkAsync('«nivel, presión» se acepta igual que ["nivel", "presión"]', async () => {
   const h = createHerramientas({ client: clienteFalso() })
 
-  const conCadena = await h.ejecutar('correlacionar_senales', {
-    senales: 'nivel, presión',
-    periodo: 'últimas 6 horas',
-  })
+  for (const herramienta of ['correlacionar_senales', 'tendencia_multiple']) {
+    const conCadena = await h.ejecutar(herramienta, {
+      senales: 'nivel, presión',
+      periodo: 'últimas 6 horas',
+    })
 
-  assert.doesNotMatch(
-    conCadena.error ?? '', /tiene que ser una lista/,
-    'rechazó la cadena que sabe interpretar'
-  )
-  assert.equal(conCadena.ok, true, `con cadena: ${conCadena.error}`)
+    assert.doesNotMatch(
+      conCadena.error ?? '', /tiene que ser una lista/,
+      `${herramienta} rechazó la cadena que sabe interpretar`
+    )
+    assert.equal(conCadena.ok, true, `${herramienta} con cadena: ${conCadena.error}`)
+  }
 })
 
 await checkAsync('dos señales de la MISMA otra máquina sí se correlacionan', async () => {
@@ -2895,11 +2902,161 @@ await checkAsync('un campo que no existe en el esquema no rompe la llamada', asy
   assert.notEqual(r.ok, false, `un campo de más no debería fallar: ${r.error}`)
 })
 
+/* ── Las tres nuevas (Plan 23 F3 · IA-09) ────────────────────────────── */
+
+console.log('\n── tendencia_multiple ──────────────────────────────────────')
+
+await checkAsync('varias señales en una sola llamada, cada una con su resumen', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('tendencia_multiple', {
+    senales: ['nivel', 'presión', 'temperatura'],
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.senales.length, 3, 'no devolvió una entrada por señal')
+  for (const s of r.senales) {
+    assert.ok(s.senal, 'una señal sin nombre')
+    assert.ok(typeof s.promedio === 'number' || s.sinDato, `${s.senal} sin resumen ni hueco`)
+  }
+})
+
+/**
+ * NO devuelve correlación, y eso es el punto de que exista.
+ *
+ * Es la diferencia con `correlacionar_senales`: aquélla contesta «¿se mueven
+ * juntas?» y ésta «¿cómo van?». Colar un coeficiente aquí invitaría a leer una
+ * causa donde nadie preguntó por ninguna.
+ */
+await checkAsync('no calcula ninguna relación entre las señales', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('tendencia_multiple', {
+    senales: ['nivel', 'presión'],
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.correlaciones, undefined, 'devolvió correlaciones sin que se las pidieran')
+  assert.match(r.nota, /no se ha calculado ninguna relación/i, 'no avisa de que no las calcula')
+})
+
+await checkAsync('una sola señal se rechaza y remite a historia_de_senal', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('tendencia_multiple', { senales: ['nivel'] })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /historia_de_senal/, 'no dice cuál usar para una sola')
+})
+
+await checkAsync('una señal sin serie propia se rechaza ANTES de leer nada', async () => {
+  const client = clienteFalso()
+  const r = await createHerramientas({ client }).ejecutar('tendencia_multiple', {
+    senales: ['nivel', 'carga del motor'],
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene serie histórica propia/i)
+  assert.equal(client.historial.length, 0, 'salió a la red pese a saber que no podía')
+})
+
+console.log('\n── buscar_evento ───────────────────────────────────────────')
+
+await checkAsync('encuentra la primera y la última vez que se cruzó el umbral', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('buscar_evento', {
+    senal: 'nivel', condicion: 'por debajo de', valor: 200, periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.ocurrio, true)
+  assert.ok(r.primeraVez?.cuando && r.ultimaVez?.cuando, 'faltan las horas del cruce')
+  assert.equal(typeof r.primeraVez.valor, 'number', 'el cruce no trae su valor')
+})
+
+/**
+ * Que NO ocurriera es una respuesta medida, no una falta de datos.
+ *
+ * Y por eso viaja `muestrasRevisadas`: sin ese número, «no pasó» y «no lo sé»
+ * se parecen demasiado, y el modelo acabaría contestando lo segundo cuando lo
+ * cierto es lo primero.
+ */
+await checkAsync('«no ocurrió» se distingue de «no hay datos»', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('buscar_evento', {
+    senal: 'nivel', condicion: 'por debajo de', valor: -999, periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.ocurrio, false)
+  assert.ok(r.muestrasRevisadas > 0, 'no dice sobre cuántas muestras lo afirma')
+  assert.match(r.nota, /no una falta de datos/i)
+})
+
+await checkAsync('una condición que no existe se rechaza con las válidas', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('buscar_evento', {
+    senal: 'nivel', condicion: 'menor que', valor: 5,
+  })
+
+  assert.equal(r.ok, false)
+  // La para el esquema Zod (Plan 23 F0), que es donde debe pararse: es un enum
+  // cerrado y no hay resolvedor que sepa corregir «menor que».
+  assert.match(r.error, /no tiene un valor admitido|condici/i)
+})
+
+await checkAsync('sin serie propia no se puede buscar un cruce', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('buscar_evento', {
+    senal: 'carga del motor', condicion: 'por encima de', valor: 5,
+  })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene serie histórica propia/i)
+})
+
+console.log('\n── resumen_de_turno ────────────────────────────────────────')
+
+await checkAsync('compone estado, riesgos y tendencia en una sola llamada', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: 'tanque', periodo: 'últimas 6 horas' })
+
+  assert.equal(r.ok, true, r.error)
+  assert.ok(r.estadoAhora?.ok, 'el estado no llegó, o llegó con un error dentro')
+  assert.ok(r.riesgos || r.riesgosNoDisponibles, 'ni riesgos ni el motivo de que falten')
+  assert.ok(r.tendencia || r.tendenciaNoDisponible, 'ni tendencia ni el motivo de que falte')
+})
+
+/**
+ * Una parte que falta se DECLARA, no se calla.
+ *
+ * Es el fallo que `diagnostico` arrastró semanas: un error escondido dentro de
+ * una respuesta con `ok: true`, que el modelo redacta como si estuviera
+ * completa. Aquí una máquina sin motor de reglas tiene que decir por qué no
+ * hay riesgos, no devolver la lista vacía.
+ */
+await checkAsync('lo que falta se dice, no se da por vacío', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: 'vibraciones' })
+
+  assert.equal(r.ok, true, r.error)
+  if (!r.riesgos) {
+    assert.ok(r.riesgosNoDisponibles, 'sin riesgos y sin decir por qué')
+  }
+  assert.match(r.nota, /no la des por vacía/i, 'no le advierte al modelo sobre las partes ausentes')
+})
+
+await checkAsync('un sistema inventado no se resume con el de al lado', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: 'prensa' })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no hay ningún sistema/i)
+})
+
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son veintidós herramientas, y sólo una escribe en la PLANTA', () => {
+check('son veinticinco herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -2950,6 +3107,20 @@ check('son veintidós herramientas, y sólo una escribe en la PLANTA', () => {
     'correlacionar_senales',
     'grafico_de_senal',
     'generar_reporte',
+    /* Plan 23 F3: las tres nuevas cierran la familia de historia, justo antes
+       de las de manuales. Es el orden en que se añadieron y el que tiene el
+       registro de verdad.
+
+       Se pensaron detrás de `correlacionar_senales` —`tendencia_multiple` es
+       su pareja fácil de confundir: una resume varias señales por separado, la
+       otra las cruza— y el sitio se cedió al orden real en vez de reordenar el
+       objeto para que cuadrara con la intención. Lo que el modelo lee sigue
+       siendo correcto: las tres están entre las de historia, que es su
+       familia, y la distinción entre las dos parejas la hace su descripción,
+       que es donde el modelo la mira. */
+    'tendencia_multiple',
+    'buscar_evento',
+    'resumen_de_turno',
     'consultar_documentacion',
     'limites_del_manual',
     'diagnostico',

@@ -438,6 +438,53 @@ mismo rigor que las 22 existentes: casos de éxito, de señal no encontrada,
 de período sin datos. `verificar-instrucciones.mjs` tiene que seguir en
 verde con 26 herramientas en el registro.
 
+> **PARCIAL — TRES DE CUATRO, el 11-09-2026.** `tendencia_multiple`,
+> `buscar_evento` y `resumen_de_turno` están hechas: 162 comprobaciones en
+> `verificar-herramientas.mjs` (11 nuevas), los 27 verificadores, 299 pruebas
+> de backend, lint y tipos. El registro tiene **25**, no 26:
+> `comparar_maquinas` sigue pendiente — ver abajo.
+>
+> **1 · El inventario literal sí había que tocarlo**, como avisaba §4: la lista
+> de nombres a mano de `verificar-herramientas.mjs` y su título. Ahora dice
+> «veinticinco». Las tres van al final de la familia de historia, que es el
+> orden real del registro; se pensaron detrás de `correlacionar_senales` y el
+> sitio se cedió al orden de verdad en vez de reordenar el objeto para que
+> cuadrara con la intención.
+>
+> **2 · `resumen_de_turno` NO calcula «tiempo en marcha / en reposo»**, que el
+> §4.2 mencionaba. Esta planta no publica un contador de marcha, y deducirlo
+> del promedio de una señal sería una hipótesis presentada como medición — lo
+> que el §2.5 del CLAUDE.md prohíbe. Compone lo que las piezas existentes ya
+> saben decir, y declara la parte que falte en vez de darla por vacía.
+>
+> **3 · `tendencia_multiple` no devuelve correlación, y hay una prueba que lo
+> exige.** Es la diferencia con su pareja: una contesta «¿cómo van?» y la otra
+> «¿se mueven juntas?». Colar un coeficiente invitaría a leer una causa donde
+> nadie preguntó por ninguna.
+>
+> **4 · Escribir esta fase destapó un fallo grave preexistente**, corregido
+> aparte en su propio commit (`98fe465`): la guarda que impide cruzar las dos
+> máquinas **no protegía el caso real**. 10 de las 42 etiquetas de vibraciones
+> resolvían a una señal del tanque, porque el índice del tanque engancha
+> «velocidad» dentro de «Velocidad eficaz · Lado acople» por contención, y a
+> `sistemasDeSenal` sólo se le preguntaba cuando el índice NO resolvía. Así,
+> `correlacionar_senales` cruzaba dos PLC y contestaba `ok: true` con la señal
+> de la otra máquina renombrada. La prueba que lo cubría usaba claves técnicas
+> (`vRMS_S1`), que no colisionan.
+>
+> De paso se deshizo una regresión del F0 de este mismo plan: el esquema
+> `z.array()` había dejado inalcanzable la tolerancia a `senales: "nivel,
+> presión"` que el 4B necesita, y la prueba escrita entonces **fijaba la
+> regresión como si fuera lo correcto**.
+>
+> **5 · `comparar_maquinas` queda para el siguiente tramo**, y ahora se sabe
+> por qué es la cara: resolver la misma magnitud en dos sistemas a la vez es
+> exactamente el punto donde los dos catálogos chocan. El commit de seguridad
+> puso el arbitraje que faltaba (si el registro dice que un nombre es
+> inequívoco de otra máquina, gana el registro), así que el terreno está
+> preparado — pero unificarlos de verdad sigue siendo B3 del backlog y sigue
+> mereciendo su propia fase, no ir escondido dentro de ésta.
+
 > **Añadido el 11-09-2026 — el inventario es literal, y hay que tocarlo.**
 > `verificar-herramientas.mjs` línea 2665 lleva un `check` cuyo TÍTULO dice
 > «son veintidós herramientas, y sólo una escribe en la PLANTA» y cuya
