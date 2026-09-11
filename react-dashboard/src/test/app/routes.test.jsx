@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las catorce vistas, agrupadas por SISTEMA", () => {
+  it("son las quince vistas, agrupadas por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -56,9 +56,8 @@ describe("superficie de la aplicación", () => {
       // General — del servidor, no de una máquina: valen para las dos.
       "eva-alarmas",
       "eva-assets",
-      // Ni siquiera es de este servidor: consulta otro backend con el conjunto
-      // MetroPT-3, que son compresores de metro. Va aquí justamente para no
-      // afirmar que sus curvas son del tanque ni del motor de vibraciones.
+      // Backend Django de forecasting: sección propia de proyección/predicción.
+      "eva-proyeccion",
       "eva-prediccion",
       // Sin `nav`.
       "eva-detalle",
@@ -92,6 +91,7 @@ describe("el sidebar que sale del registro", () => {
       "sec-llenado",
       "sec-vibraciones",
       "sec-general",
+      "sec-proyeccion",
     ]);
 
     const llenado = NAV.find((n) => n.group === "sec-llenado");
@@ -109,15 +109,18 @@ describe("el sidebar que sale del registro", () => {
 
     // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
     // dentro de un sistema, estaría diciendo que sus eventos son sólo de ése.
-    //
-    // «Predicción (Beta)» está aquí por una razón más fuerte todavía: no lee
-    // este servidor en absoluto, sino otro backend con el conjunto MetroPT-3.
-    // Colgarla de una de las dos estaciones afirmaría que sus curvas son de esa
-    // máquina, y no lo son de ninguna de las dos.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.label).toBe("General");
     expect(general.children.map((c) => c.id)).toEqual([
-      "eva-alarmas", "eva-assets", "eva-prediccion",
+      "eva-alarmas", "eva-assets",
+    ]);
+
+    // Las dos vistas del backend Django quedan en su propia sección. No son
+    // datos de la estación de llenado ni del sistema de vibraciones.
+    const proyeccion = NAV.find((n) => n.group === "sec-proyeccion");
+    expect(proyeccion.label).toBe("Proyección y predicción");
+    expect(proyeccion.children.map((c) => c.id)).toEqual([
+      "eva-proyeccion", "eva-prediccion",
     ]);
   });
 

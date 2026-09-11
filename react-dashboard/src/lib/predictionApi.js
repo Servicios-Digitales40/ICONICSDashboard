@@ -11,8 +11,8 @@
  */
 
 function defaultBase() {
-  if (typeof window === "undefined") return "http://10.10.21.11:8000";
-  return `${window.location.protocol}//${window.location.hostname}:8000`;
+  if (typeof window === "undefined") return "http://10.10.21.11:8001";
+  return `${window.location.protocol}//${window.location.hostname}:8001`;
 }
 
 export const PREDICTION_API_BASE = (
@@ -69,6 +69,27 @@ export async function fetchEventHistory({ eventId, hoursBefore, signal } = {}) {
     body: JSON.stringify({
       event_id: Number(eventId),
       hours_before: Number(hoursBefore),
+    }),
+    signal,
+  });
+
+  return parseResponse(response);
+}
+
+/**
+ * Proyección de consumo energético para un compresor.
+ *
+ * El backend recibe, por ejemplo:
+ *   { compressor: "CP01", days: 30, persist: false }
+ */
+export async function fetchConsumptionForecast({ compressor, days = 30, persist = false, signal } = {}) {
+  const response = await fetch(`${PREDICTION_API_BASE}/api/v1/forecasting/forecast/`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      compressor: String(compressor || ""),
+      days: Number(days),
+      persist: Boolean(persist),
     }),
     signal,
   });

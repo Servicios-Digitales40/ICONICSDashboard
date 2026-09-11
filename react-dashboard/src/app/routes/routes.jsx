@@ -51,7 +51,7 @@
 import { lazy } from "react";
 import {
   Bell, Box, Boxes, BrainCircuit, Cog, Droplets, Factory, Home, LayoutDashboard, Power,
-  ShieldAlert, Waves,
+  ShieldAlert, TrendingUp, Waves,
 } from "lucide-react";
 
 /**
@@ -86,6 +86,7 @@ export const NAV_GROUPS = {
   "sec-llenado": { label: "Estación de llenado", icon: <Droplets size={17} /> },
   "sec-vibraciones": { label: "Estación de vibraciones", icon: <Waves size={17} /> },
   "sec-general": { label: "General", icon: <Boxes size={17} /> },
+  "sec-proyeccion": { label: "Proyección y predicción", icon: <TrendingUp size={17} /> },
 };
 
 /*
@@ -242,34 +243,33 @@ export const ROUTES = [
 
   {
     /*
-     * ── POR QUÉ ESTA VISTA VA EN «GENERAL» Y NO EN UNA MÁQUINA ─────────
+     * Proyección energética de CP01, CP02 y CP03. Vive en una sección propia
+     * porque consulta el backend Django de forecasting, no el servidor ICONICS
+     * de las dos estaciones de la demo.
+     */
+    id: "eva-proyeccion",
+    component: lazy(() => import("@/Demo-EVA/views/ProyeccionConsumo.jsx")),
+    title: "Proyección de consumo",
+    sub: "Consumo energético proyectado y real · CP01, CP02 y CP03 · 30 días",
+    nav: { label: "Proyección de consumo", icon: <TrendingUp size={17} />, group: "sec-proyeccion" },
+  },
+
+  {
+    /*
+     * Predicción MetroPT-3. Se agrupa junto con Proyección porque las dos
+     * pantallas dependen del mismo backend predictivo en el puerto 8000 y no
+     * pertenecen a ninguna de las dos máquinas ICONICS del sidebar.
      *
-     * Porque no habla de ninguna de las dos. Las otras pantallas de este
-     * registro leen el servidor ICONICS de ESTA planta; ésta consulta OTRO
-     * backend —Django, en el puerto 8000— que reproduce el conjunto de datos
-     * público MetroPT-3, que son compresores de metro.
-     *
-     * Colgarla de «Estación de llenado» o de «Estación de vibraciones» diría
-     * que sus curvas son de ese tanque o de ese motor, y no lo son. Ése es
-     * justo el cruce que la partición del sidebar existe para impedir, y aquí
-     * sería peor que entre las dos máquinas de la planta: al menos ésas
-     * comparten servidor.
-     *
-     * ── POR QUÉ «BETA» VA EN EL RÓTULO ─────────────────────────────────
-     *
-     * Porque depende de un servicio que puede no estar levantado. Si el
-     * backend predictivo no responde, la pantalla no puede enseñar nada; el
-     * resto del tablero no tiene esa dependencia. El rótulo lo dice antes de
-     * que alguien lo descubra con una pantalla vacía.
-     *
-     * Su dirección se configura con `VITE_PREDICTION_API_BASE`; sin esa
-     * variable apunta al mismo host del tablero en el puerto 8000.
+     * «Beta» permanece en el rótulo porque la vista depende de un servicio que
+     * puede no estar levantado. Su dirección se configura con
+     * `VITE_PREDICTION_API_BASE`; sin esa variable apunta al mismo host del
+     * tablero en el puerto 8000.
      */
     id: "eva-prediccion",
     component: lazy(() => import("@/Demo-EVA/views/PrediccionBeta.jsx")),
     title: "Predicción (Beta)",
     sub: "Reproducción histórica MetroPT-3 · consulta del backend predictivo V4.4",
-    nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-general" },
+    nav: { label: "Predicción (Beta)", icon: <BrainCircuit size={17} />, group: "sec-proyeccion" },
   },
 
   {

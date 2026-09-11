@@ -24,7 +24,7 @@ export const PAGE_META = Object.fromEntries(
 
 /**
  * id de página → id de su sección del sidebar (`sec-llenado`,
- * `sec-vibraciones`, `sec-general`), o `null` si la ruta no está en ninguna.
+ * `sec-vibraciones`, `sec-general`, `sec-proyeccion`), o `null` si la ruta no está en ninguna.
  *
  * Existe para que nadie tenga que preguntar «¿esta pantalla es de la estación
  * de llenado?» con una lista de ids escrita a mano. Esa lista es una copia del
