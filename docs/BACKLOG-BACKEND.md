@@ -132,6 +132,58 @@ Es también lo que permitiría sacar `resolverSenal` del ensamblador: hoy
 `documentacion/` e `historicos/` lo importan de él, y ése es el último hilo que
 las ata al archivo grande.
 
+> **MEDIDO el 11-09-2026, antes de empezarlo — y por eso NO se empezó.**
+>
+> Se fue a hacer y la medición dijo que, tal como está descrito arriba, el
+> resultado acertaría MENOS que hoy. Queda escrito para que quien lo retome no
+> lo redescubra a medio camino.
+>
+> **1 · La tabla de sinónimos envejeció con el Plan 27.** Se escribió cuando el
+> tanque tenía OCHO señales; hoy tiene **52**. Ocho de sus entradas ya chocan
+> con el catálogo ampliado:
+>
+> | sinónimo | debería dar | lo que el registro devuelve hoy |
+> |---|---|---|
+> | `voltaje` | `tensionLinea` | `voltajeBusDc`, `voltajeSalidaVariador` |
+> | `bomba` | `cargaMotor` | `manualAutoBa` |
+> | `modo` | `modoVdf` | `modoVdf` + tres `manualAuto*` |
+> | `variador` | `modoVdf` | + `fallaVariador`, `frecuenciaSalidaVariador`, `corrienteVariador` |
+> | `llenado` | `nivelTanque` | `arranqueParoLlenado`, `setpointLlenado` |
+> | `motor` | `cargaMotor` | + `velocidadMotor`, `voltajeSalidaVariador` |
+> | `tanque` | `nivelTanque` | + `temperaturaTanque` |
+> | `manual` | `modoVdf` | tres `manualAuto*` |
+>
+> Cinco señales reclaman «voltaje/tensión» y siete «bomba/motor».
+>
+> **2 · Y el resolvedor del tanque acierta por accidente, no por criterio.**
+> `construirIndice` registra con `if (!indice.has(k))`: **gana el primero que
+> llega**, y los sinónimos se insertan en el orden del catálogo. Que
+> `resolverSenal('voltaje')` dé `tensionLinea` —cosa que una prueba fija— es
+> consecuencia de que esa señal aparece antes en el array, no de ninguna regla.
+> Subir la tabla al registro tal cual rompe esa casualidad y convierte un
+> acierto frágil en un fallo visible.
+>
+> **3 · Lo que hay que hacer ANTES, y no es refactor.** Decidir, palabra por
+> palabra, cuál de las candidatas gana cada sinónimo ambiguo. Eso es
+> conocimiento de la instalación —¿«la bomba» es la carga del motor o su mando
+> manual/automático?— y lo tiene quien opera, no quien programa. Con la tabla ya
+> desambiguada, subirla al registro es mecánico y seguro.
+>
+> **4 · Además, el apartado de arriba está desactualizado en un punto:** decía
+> «ocho herramientas siguen sin `sistema`» y enumeraba siete que **ya lo
+> tienen** (`analisis_de_senal`, `perfil_de_senal`, `correlacionar_senales`,
+> `grafico_de_senal`, `valor_en_momento`, `comparar_periodos`). Medido con
+> `DEFINICIONES`: **20 de 25 aceptan `sistema`**. De las cinco que no, cuatro no
+> lo necesitan —`sistemas_de_la_planta` las lista todas, `controlar_bomba` es
+> del tanque por definición, `diagnostico` se niega explícitamente para otras
+> máquinas y `limites_del_manual` busca en manuales—. La única discutible es
+> `generar_reporte`.
+>
+> **Lo que sí estaba listo:** `aliasDe` ya es parte del contrato del registro y
+> las dos máquinas lo implementan; el hueco para los sinónimos está previsto y
+> documentado en `sistemas.js`. El trabajo pendiente es de dominio, no de
+> estructura.
+
 ---
 
 ## B4 · `pronostico_de_desgaste` está escrito contra el tanque
