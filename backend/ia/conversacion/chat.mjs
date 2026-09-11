@@ -1029,6 +1029,59 @@ export function createChat({ config, herramientas }) {
   }
 
   /**
+   * Acompaña una espera larga avisando de que sigue viva (Plan 23 F5 · IA-05).
+   *
+   * ── POR QUÉ NO ES «ACTIVAR STREAMING» ──────────────────────────────
+   *
+   * Porque `pasadaConHerramientas` usa `stream: false` A PROPÓSITO: es la
+   * pasada gruesa, la que decide, y su cabecera defiende que sea así para
+   * minimizar el número de llamadas al modelo. Leer tokens parciales de ahí
+   * rompería esa decisión. Así que el progreso no sale de la respuesta —que
+   * todavía no ha llegado— sino del reloj.
+   *
+   * ── QUÉ DICE, Y QUÉ NO SE INVENTA ──────────────────────────────────
+   *
+   * Dice el tiempo transcurrido y nada más. NO dice qué está decidiendo el
+   * modelo, porque eso no se sabe hasta que termina, ni un porcentaje, que
+   * sería un progreso fabricado. El plan contemplaba además leer alguna
+   * métrica del router de llama-server si la expusiera; comprobar si existe
+   * exige el servidor real delante, y prometer un avance que no se puede medir
+   * es exactamente lo que el §2.5 del CLAUDE.md prohíbe. Queda dicho aquí en
+   * vez de simulado.
+   *
+   * El temporizador se limpia SIEMPRE —también si la pasada lanza— o el
+   * proceso se quedaría emitiendo latidos de un turno que ya terminó.
+   */
+  async function conLatido(tarea, onEvento, base) {
+    const cada = config.ia.progresoMs
+    if (!cada) return tarea()
+
+    const empezado = Date.now()
+    const reloj = setInterval(() => {
+      const segundos = Math.round((Date.now() - empezado) / 1000)
+      /*
+       * Por debajo de un segundo no se dice nada.
+       *
+       * «Pensando… (0 s)» no informa —el contador dice cero— y además repite
+       * el mismo texto en cada latido, que en pantalla se lee como congelado:
+       * justo lo contrario de lo que esto viene a resolver. Con el intervalo
+       * real (5 s) el caso no se da nunca; con uno corto, que es como se
+       * prueba, sí. El código tiene que ser correcto también ahí.
+       */
+      if (segundos < 1) return
+      onEvento({ tipo: 'estado', valor: `${base} (${segundos} s)` })
+    }, cada)
+    // Un turno no debe mantener vivo el proceso por su temporizador.
+    reloj.unref?.()
+
+    try {
+      return await tarea()
+    } finally {
+      clearInterval(reloj)
+    }
+  }
+
+  /**
    * Pasada sin streaming: la que decide si hace falta una herramienta.
    *
    * Aquí el razonamiento SÍ se deja encendido: es donde de verdad trabaja el
@@ -1287,7 +1340,11 @@ export function createChat({ config, herramientas }) {
         valor: paso === 0 ? ESTADOS.pensando : ESTADOS.analizando,
       })
 
-      const ronda = await pasadaConHerramientas(messages, signal, { soloLectura: huboTextoAjeno })
+      const ronda = await conLatido(
+        () => pasadaConHerramientas(messages, signal, { soloLectura: huboTextoAjeno }),
+        onEvento,
+        paso === 0 ? ESTADOS.pensando : ESTADOS.analizando
+      )
 
       if (!ronda.llamadas.length) {
         sinLlamadas = ronda.contenido

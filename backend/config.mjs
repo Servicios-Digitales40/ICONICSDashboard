@@ -203,6 +203,19 @@ const DEFAULTS = {
    */
   iaCacheMax: 200,
   /**
+   * Cada cuánto se avisa de que la primera pasada sigue viva (Plan 23 F5).
+   *
+   * Entre «Pensando…» y que el modelo decida qué herramienta llamar hay una
+   * espera ciega que con el 4B en una GPU de 8 GB son decenas de segundos, y
+   * una espera larga sin señal se lee como colgado — el mismo síntoma que la
+   * cola ya resuelve diciendo cuántos hay delante.
+   *
+   * Cinco segundos: lo bastante para que no parezca muerto y lo bastante
+   * espaciado para no convertir el panel en un contador nervioso. `0` lo
+   * apaga, que es lo correcto si algún día la pasada 1 pasa a ser rápida.
+   */
+  iaProgresoMs: 5000,
+  /**
    * Corte de una transcripción de voz.
    *
    * Escala propia, como `iaTimeoutMs`: en CPU, `whisper small` tarda algo menos
@@ -953,6 +966,11 @@ export function loadConfig(env = process.env) {
        * acelera y quince segundos pasan a ser mucho. El porqué de cada cifra
        * está en `DEFAULTS`.
        */
+      /**
+       * Latido de progreso de la primera pasada (Plan 23 F5 · IA-05).
+       * `IA_PROGRESO_MS=0` lo apaga. El porqué de la cifra, en `DEFAULTS`.
+       */
+      progresoMs: readInteger('IA_PROGRESO_MS', env.IA_PROGRESO_MS, DEFAULTS.iaProgresoMs, 0),
       cache: Object.freeze({
         vivoMs: readInteger('IA_CACHE_VIVO_MS', env.IA_CACHE_VIVO_MS, DEFAULTS.iaCacheVivoMs, 0),
         cerradoMs: readInteger(

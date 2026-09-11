@@ -1143,6 +1143,90 @@ await check('el texto del manual llega al modelo MARCADO como cita', async () =>
   assert.match(contenido, /arranque la bomba/i)
 })
 
+/* ── El progreso de la primera pasada (Plan 23 F5 · IA-05) ───────────── */
+
+console.log('\n── Progreso mientras piensa ────────────────────────────────')
+
+/** Los estados emitidos en un turno, en orden. */
+const estadosDe = eventos => eventos.filter(e => e.tipo === 'estado').map(e => e.valor)
+
+/**
+ * El latido llega MIENTRAS la pasada 1 está en curso.
+ *
+ * Es lo único que esta fase promete: entre «Pensando…» y que el modelo decida
+ * qué herramienta llamar hay una espera ciega de decenas de segundos con el
+ * 4B, y una espera larga sin señal se lee como colgado.
+ *
+ * Se provoca con el intervalo bajado a 100 ms y la pasada retrasada 350 ms —
+ * el `retrasoMs` del llama-server falso—, porque con los 5 s de verdad esta
+ * prueba tardaría más que todo el resto del archivo junto.
+ */
+await check('mientras la pasada 1 tarda, se avisa de que sigue viva', async () => {
+  /*
+   * El retraso pasa del SEGUNDO a propósito, aunque encarezca esta prueba en
+   * algo más de un segundo.
+   *
+   * Por debajo de un segundo no se emite nada (ver `conLatido`), así que con
+   * los 350 ms que usan las pruebas de al lado los tres latidos caerían en
+   * 0,1 · 0,2 · 0,3 s y se silenciarían: la prueba mediría el silencio y no el
+   * latido. Con 1,2 s hay un latido de verdad, con el «(1 s)» que es
+   * exactamente lo que verá un operador.
+   */
+  guion = { contenido: 'Listo.', retrasoMs: 1200 }
+
+  const { eventos } = await preguntar(chatDePrueba({ IA_PROGRESO_MS: '300' }), 'algo')
+  const estados = estadosDe(eventos)
+
+  assert.ok(
+    estados.some(v => / \(\d+ s\)$/.test(v)),
+    `ningún estado lleva el tiempo transcurrido: ${JSON.stringify(estados)}`
+  )
+  // Y el primero sigue siendo el de siempre: el latido acompaña, no sustituye.
+  assert.equal(estados[0], 'Pensando…')
+})
+
+/** Un contador que dice cero no informa, y repetirlo parece congelado. */
+await check('no se emite un latido antes del primer segundo', async () => {
+  guion = { contenido: 'Listo.', retrasoMs: 350 }
+
+  const { eventos } = await preguntar(chatDePrueba({ IA_PROGRESO_MS: '100' }), 'algo')
+
+  assert.ok(
+    !estadosDe(eventos).includes('Pensando… (0 s)'),
+    'se emitió un latido de cero segundos'
+  )
+})
+
+await check('con IA_PROGRESO_MS=0 no hay latido', async () => {
+  guion = { contenido: 'Listo.', retrasoMs: 350 }
+
+  const { eventos } = await preguntar(chatDePrueba({ IA_PROGRESO_MS: '0' }), 'algo')
+
+  assert.ok(
+    !estadosDe(eventos).some(v => / \(\d+ s\)$/.test(v)),
+    'latió con el progreso apagado'
+  )
+})
+
+/**
+ * Una pasada rápida no lo dispara, y el temporizador queda limpio.
+ *
+ * Si el `clearInterval` faltara, este turno seguiría emitiendo latidos después
+ * de haber terminado — y en un proceso de vida larga, uno por turno, para
+ * siempre. Se comprueba mirando que no llegue nada nuevo tras la respuesta.
+ */
+await check('una pasada rápida no late, y no deja el reloj corriendo', async () => {
+  guion = { contenido: 'Listo.' }
+
+  const { eventos } = await preguntar(chatDePrueba({ IA_PROGRESO_MS: '50' }), 'algo')
+  const antes = eventos.length
+
+  assert.ok(!estadosDe(eventos).some(v => / \(\d+ s\)$/.test(v)), 'latió sin tardar nada')
+
+  await new Promise(r => setTimeout(r, 200))
+  assert.equal(eventos.length, antes, 'siguieron llegando eventos tras terminar el turno')
+})
+
 /* ── La caché entre turnos (Plan 23 F1 · IA-06) ──────────────────────── */
 
 console.log('\n── Caché entre turnos ──────────────────────────────────────')
