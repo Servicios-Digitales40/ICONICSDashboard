@@ -178,6 +178,31 @@ const DEFAULTS = {
    */
   iaMaxPasos: 3,
   /**
+   * Vida de la caché de consultas del asistente ENTRE turnos (Plan 23 F1).
+   *
+   * Dos tiempos, porque no todo el dato caduca igual. Lo de AHORA —el estado
+   * de una máquina, sus riesgos— vale segundos: citar como «ahora mismo» un
+   * valor de hace cinco minutos sería inventar una frescura que no hay, así
+   * que quince segundos es poco más que el tiempo de leer la respuesta y
+   * repreguntar. Lo YA CERRADO —«ayer», «el martes»— no cambia nunca, y lo
+   * único que decide su vida es cuánta memoria se le presta.
+   *
+   * Mismo criterio que `historyCacheMargenMs` un piso más abajo: lo que
+   * distingue una cosa de otra no es el tiempo que se guarda, es si la
+   * ventana que se pidió sigue creciendo.
+   */
+  iaCacheVivoMs: 15000,
+  iaCacheCerradoMs: 1800000,
+  /**
+   * Cuántas respuestas se guardan a la vez, sumando todas las conversaciones.
+   *
+   * Cada entrada es el resultado de una herramienta para una conversación: con
+   * el tope de `IA_MAX_PASOS*2` por turno, doscientas dan para varias
+   * conversaciones largas a la vez. El tope existe porque el puente es un
+   * proceso de vida larga y una caché sin techo no es una caché, es una fuga.
+   */
+  iaCacheMax: 200,
+  /**
    * Corte de una transcripción de voz.
    *
    * Escala propia, como `iaTimeoutMs`: en CPU, `whisper small` tarda algo menos
@@ -909,6 +934,21 @@ export function loadConfig(env = process.env) {
        * espera y quizá se prefiera bajarlo a dos.
        */
       maxPasos: readInteger('IA_MAX_PASOS', env.IA_MAX_PASOS, DEFAULTS.iaMaxPasos, 1),
+      /**
+       * La caché de consultas del asistente entre turnos (Plan 23 F1 · IA-06).
+       *
+       * `IA_CACHE_VIVO_MS=0` la apaga para lo de ahora mismo sin tocar lo
+       * cerrado, que es la palanca que hace falta si algún día el sondeo se
+       * acelera y quince segundos pasan a ser mucho. El porqué de cada cifra
+       * está en `DEFAULTS`.
+       */
+      cache: Object.freeze({
+        vivoMs: readInteger('IA_CACHE_VIVO_MS', env.IA_CACHE_VIVO_MS, DEFAULTS.iaCacheVivoMs, 0),
+        cerradoMs: readInteger(
+          'IA_CACHE_CERRADO_MS', env.IA_CACHE_CERRADO_MS, DEFAULTS.iaCacheCerradoMs, 0
+        ),
+        max: readInteger('IA_CACHE_MAX', env.IA_CACHE_MAX, DEFAULTS.iaCacheMax, 1),
+      }),
       /**
        * Horario de turnos, `manana=6-14,tarde=14-22,noche=22-6`.
        *

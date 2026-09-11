@@ -135,6 +135,31 @@ export const ChatSchema = z.object({
    * un campo de presentación.
    */
   idioma: z.enum(['es', 'en']).catch('es').default('es'),
+  /*
+   * Qué conversación es ésta (Plan 23 F1 · IA-06).
+   *
+   * ── POR QUÉ LO MANDA EL CLIENTE Y NO SE DEDUCE AQUÍ ────────────────
+   *
+   * Porque aquí no hay sesión de usuario —lo mismo que ya explica
+   * `persistencia.js` en el tablero— y el backend no tiene de dónde sacar una
+   * identidad. La alternativa era derivarla del historial, y no funciona: el
+   * bucle sólo ve los OCHO últimos turnos (`historialAMensajes`), así que el
+   * «primer turno» del que saldría un hash cambia solo en cuanto la
+   * conversación se alarga. La caché dejaría de acertar justo en las
+   * conversaciones largas, sin un error que lo delate; y dos pestañas que
+   * empiezan con la misma pregunta compartirían clave, que es la fuga entre
+   * sesiones que el Plan 23 dice explícitamente no abrir.
+   *
+   * `optional()` y no requerido: un cliente que no lo mande sigue
+   * funcionando exactamente igual, sólo que sin caché entre turnos. Mismo
+   * criterio que `idioma` — un campo de conveniencia no tumba una pregunta
+   * válida.
+   *
+   * Es opaco: se usa como CLAVE, nunca se interpreta ni se registra como si
+   * identificara a una persona. El tope corta un identificador absurdo sin
+   * tener que validar su forma, que es del cliente.
+   */
+  conversacionId: z.string().trim().min(1).max(128).optional(),
 })
 
 /**

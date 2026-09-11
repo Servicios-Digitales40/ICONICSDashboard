@@ -143,4 +143,59 @@ export function borrar() {
   } catch {
     // Ver `guardar`.
   }
+  olvidarConversacion();
+}
+
+/* ── La identidad de esta conversación (Plan 23 F1 · IA-06) ──────────── */
+
+/**
+ * La clave del id va aparte del hilo, y con la misma versión.
+ *
+ * Aparte porque el hilo se recorta y se reescribe en cada turno, y el id no
+ * debe cambiar nunca mientras la conversación siga siendo la misma. Con la
+ * misma versión porque si el formato del hilo cambia y se empieza de cero, la
+ * conversación nueva merece un id nuevo.
+ */
+const CLAVE_ID = "tdconcito.conversacion.id.v1";
+
+/**
+ * El id de esta conversación, creándolo la primera vez.
+ *
+ * ── PARA QUÉ SIRVE, Y PARA QUÉ NO ──────────────────────────────────
+ *
+ * El backend lo usa como CLAVE de su caché de consultas entre turnos: dos
+ * preguntas seguidas sobre el mismo tanque no releen ICONICS dos veces. No
+ * identifica a nadie —no hay login— y no viaja a ningún sitio más que a
+ * `POST /api/chat`.
+ *
+ * Vive en `localStorage` junto al hilo y por el mismo motivo: es de ESE
+ * navegador. Dos pestañas del tablero comparten el suyo porque comparten el
+ * hilo, que es exactamente lo que el operador ve; dos equipos distintos tienen
+ * ids distintos, que es lo que impide que la caché de uno conteste al otro.
+ *
+ * Si `localStorage` no está disponible —navegación privada, cookies de
+ * terceros bloqueadas— se devuelve `null` y no pasa nada: el backend
+ * simplemente no cachea, igual que con un cliente viejo. Nunca lanza.
+ */
+export function idDeConversacion() {
+  try {
+    const guardado = window.localStorage.getItem(CLAVE_ID);
+    if (guardado) return guardado;
+
+    const nuevo = crypto.randomUUID();
+    window.localStorage.setItem(CLAVE_ID, nuevo);
+    return nuevo;
+  } catch {
+    // Ver `guardar`: sin almacenamiento, el chat funciona igual sin recordar.
+    return null;
+  }
+}
+
+/** Olvida el id. Lo llama `borrar()`: hilo nuevo, conversación nueva. */
+function olvidarConversacion() {
+  try {
+    window.localStorage.removeItem(CLAVE_ID);
+  } catch {
+    // Ver `guardar`.
+  }
 }

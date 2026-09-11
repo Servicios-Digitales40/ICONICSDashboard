@@ -27,6 +27,16 @@
  * sistema porque parece que funciona.
  */
 import { logger } from '../../logger.mjs'
+/*
+ * `resolverVentana` decide si un período sigue creciendo, que es lo que fija
+ * la vida de una entrada en la caché de consultas (Plan 23 F1 · `vidaDe`).
+ *
+ * Se importa en vez de reinterpretar «ayer» aquí: el vocabulario de períodos
+ * —relativos, de calendario, por turno— tiene un solo dueño y no puede haber
+ * una segunda opinión sobre qué ventana es. No cierra ciclo: `herramientas.mjs`
+ * no importa nada de este archivo.
+ */
+import { resolverVentana } from './herramientas.mjs'
 import { SISTEMA, SISTEMAS } from '../../../shared/eva/comun/sistemas.js'
 import {
   HERRAMIENTAS_CON_TEXTO_AJENO,
@@ -807,6 +817,86 @@ export function createChat({ config, herramientas }) {
    */
   const MAX_HERRAMIENTAS = maxPasos * 2
 
+  /* ── La caché de consultas ENTRE turnos (Plan 23 F1 · IA-06) ───────── */
+
+  /**
+   * Lo consultado en turnos anteriores de la MISMA conversación.
+   *
+   * ── QUÉ PROBLEMA RESUELVE ──────────────────────────────────────────
+   *
+   * `firmasVistas` ya evitaba repetir una consulta idéntica dentro de un
+   * turno, pero nace y muere con él: preguntar dos veces seguidas «¿cómo está
+   * el tanque?» releía ICONICS las dos veces, y con `IA_MAX_PASOS*2`
+   * herramientas por turno eso son lecturas de sobra por una conversación
+   * normal.
+   *
+   * ── POR QUÉ SE PARECE TANTO A `historyCache` ───────────────────────
+   *
+   * Porque es el mismo problema un piso más arriba, y aquel patrón ya está
+   * probado en este proyecto: `Map` con `{expiraEn, valor}`, poda de lo
+   * caducado y, si aun así sobra, de lo más viejo —que en un `Map` es lo
+   * primero que devuelve el iterador, sin necesidad de marcas de uso—. No es
+   * una LRU y no hace falta que lo sea: todas las entradas valen lo mismo y lo
+   * que se busca es un techo de memoria.
+   *
+   * La clave lleva la conversación DELANTE, así que dos pestañas distintas no
+   * se ven entre sí aunque pregunten lo mismo: es la fuga entre sesiones que
+   * el Plan 23 §9 dice explícitamente no abrir.
+   */
+  const cacheDeConsultas = new Map()
+
+  /** Igual que `podarHistoryCache`: primero lo caducado, luego lo más viejo. */
+  function podarCache(ahora) {
+    for (const [clave, entrada] of cacheDeConsultas) {
+      if (entrada.expiraEn <= ahora) cacheDeConsultas.delete(clave)
+    }
+    while (cacheDeConsultas.size >= config.ia.cache.max) {
+      const primera = cacheDeConsultas.keys().next()
+      if (primera.done) break
+      cacheDeConsultas.delete(primera.value)
+    }
+  }
+
+  /**
+   * Cuánto vale este resultado, o 0 si no se guarda.
+   *
+   * ── LO QUE NUNCA ENTRA, Y POR QUÉ ──────────────────────────────────
+   *
+   *  - **Las que escriben.** Cachear `controlar_bomba` sería contestar «bomba
+   *    encendida» sin haberla tocado. Es el peor fallo imaginable aquí: una
+   *    orden a la planta dada por buena porque se dio hace un minuto.
+   *  - **Los fallos.** Un error de red que se repite durante media hora
+   *    convertiría una avería pasajera en una respuesta fija.
+   *  - **Las notas de repetición** (`yaConsultado`), que no son un dato.
+   *
+   * ── Y LO QUE DECIDE EL TIEMPO ──────────────────────────────────────
+   *
+   * No el nombre de la herramienta, sino si la VENTANA que se pidió sigue
+   * creciendo. «Ayer» ya no cambia y se guarda de largo; «las últimas 6
+   * horas» termina en `ahora` y caduca en segundos. Es el mismo criterio que
+   * `tramoCerrado()` en `iconics/client.mjs`, y se resuelve preguntándoselo a
+   * `resolverVentana`, que es quien sabe de períodos — aquí no se vuelve a
+   * interpretar «ayer» por nuestra cuenta.
+   */
+  function vidaDe(nombre, argumentos, resultado) {
+    const { vivoMs, cerradoMs } = config.ia.cache
+
+    if (!resultado?.ok || resultado.yaConsultado) return 0
+    if (HERRAMIENTAS_DE_ESCRITURA.includes(nombre)) return 0
+
+    const periodo = argumentos?.periodo ?? argumentos?.periodoA ?? argumentos?.momento
+    if (!periodo) return vivoMs
+
+    const ventana = resolverVentana(String(periodo), { turnos: config.ia.turnos })
+    if (ventana.error || !ventana.fin) return vivoMs
+
+    // Un margen igual al de la caché de historia: el historiador escribe con
+    // retraso, así que una ventana que llega hasta hace un minuto todavía se
+    // puede rellenar sola.
+    const cerrada = ventana.fin.getTime() < Date.now() - config.limits.historyCacheMargenMs
+    return cerrada ? cerradoMs : vivoMs
+  }
+
   /**
    * ¿Ha llamado el modelo a alguna herramienta desde que arrancó el proceso?
    *
@@ -1009,7 +1099,9 @@ export function createChat({ config, herramientas }) {
    * @param {(evento: object) => void} opciones.onEvento
    * @param {string} [opciones.idioma]  en qué idioma contesta el modelo (i18n)
    */
-  async function responder({ pregunta, historial = [], signal, onEvento, idioma = "es" }) {
+  async function responder({
+    pregunta, historial = [], signal, onEvento, idioma = "es", conversacionId,
+  }) {
     // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
     // información fija y barata, y tenerla delante evita que el modelo gaste
     // su única llamada en pedir lo que ya tiene.
@@ -1035,6 +1127,49 @@ export function createChat({ config, herramientas }) {
     ]
 
     /* ── El bucle de consultas ─────────────────────────────────────── */
+
+    /**
+     * Ejecuta una herramienta, o devuelve lo que ya se consultó en un turno
+     * ANTERIOR de esta misma conversación (Plan 23 F1 · IA-06).
+     *
+     * ── POR QUÉ DEVUELVE EL DATO Y NO UNA NOTA ─────────────────────
+     *
+     * A diferencia de `repetidas` —que dentro de un turno le contesta al
+     * modelo «ya lo pediste, responde con lo que tienes»—, aquí el modelo NO
+     * tiene el dato delante: es un turno nuevo y su contexto sólo lleva el
+     * texto de los anteriores, nunca los resultados (ver
+     * `historialAMensajes`). Darle una nota en vez del dato lo dejaría sin
+     * nada que citar.
+     *
+     * Sin `conversacionId` —un cliente viejo, o un navegador que no puede
+     * guardar nada— no hay caché y todo sigue como antes. Es deliberado: sin
+     * una identidad de conversación de verdad, la alternativa sería compartir
+     * respuestas entre pantallas distintas.
+     */
+    async function ejecutarConCache(nombre, argumentos, firma) {
+      if (!conversacionId) return herramientas.ejecutar(nombre, argumentos)
+
+      const clave = `${conversacionId}|${firma}`
+      const ahora = Date.now()
+      const guardada = cacheDeConsultas.get(clave)
+
+      if (guardada && guardada.expiraEn > ahora) {
+        logger.debug(`Herramienta "${nombre}" servida de la caché de la conversación`, {
+          herramienta: nombre,
+        })
+        return guardada.valor
+      }
+
+      const resultado = await herramientas.ejecutar(nombre, argumentos)
+
+      const vida = vidaDe(nombre, argumentos, resultado)
+      if (vida > 0) {
+        podarCache(ahora)
+        cacheDeConsultas.set(clave, { expiraEn: ahora + vida, valor: resultado })
+      }
+
+      return resultado
+    }
 
     /** Nombres de lo que se ha ejecutado, en orden. Es la traza del turno. */
     const ejecutadas = []
@@ -1153,7 +1288,7 @@ export function createChat({ config, herramientas }) {
                   `resultado más arriba. No lo vuelvas a pedir: responde ya con lo que tienes, o ` +
                   `si de verdad te falta algo, pide una consulta DISTINTA.`,
             })
-            : herramientas.ejecutar(nombre, argumentos)
+            : ejecutarConCache(nombre, argumentos, firma)
         )
       )
 

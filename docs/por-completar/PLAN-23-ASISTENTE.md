@@ -236,6 +236,41 @@ que este plan no abre.
 `firmasVistas`; el caso nuevo es la misma pregunta en el TURNO SIGUIENTE de la
 misma conversación, con y sin que haya pasado el tiempo de vida.
 
+> **HECHA el 11-09-2026.** `cacheDeConsultas` en la clausura de `createChat`,
+> con `ejecutarConCache` dentro de `responder()`. Verde: 51 comprobaciones en
+> `verificar-chat.mjs` (5 nuevas), los 27 verificadores, 299 pruebas de backend,
+> lint y tipos.
+>
+> **1 · El id lo manda el cliente, y es la decisión de la fase.** `ChatSchema`
+> gana un `conversacionId` **opcional**; el tablero lo genera junto al hilo en
+> `persistencia.js` (`localStorage`, misma vida que la conversación) y muere
+> con `borrar()`. La alternativa —derivarlo del historial en el backend— se
+> descartó con el código delante: el bucle sólo ve los OCHO últimos turnos
+> (`historialAMensajes`), así que el hash del «primer turno» cambia solo en
+> cuanto la conversación se alarga, y la caché dejaría de acertar justo en las
+> conversaciones largas **sin un error que lo delate**. Además dos pestañas que
+> empiezan con la misma pregunta compartirían clave, que es la fuga entre
+> sesiones que el §9 dice no abrir.
+>
+> Sin id no hay caché y todo funciona como antes: un cliente viejo, o un
+> navegador que no puede guardar nada, no se entera.
+>
+> **2 · Lo que NUNCA entra en la caché**, y está probado: las de
+> `HERRAMIENTAS_DE_ESCRITURA` —servir un `controlar_bomba` de caché sería
+> contestar «bomba encendida» sin tocar la planta—, los fallos —una avería de
+> red pasajera se volvería una respuesta fija durante media hora— y las notas
+> de repetición, que no son un dato.
+>
+> **3 · La vida la decide la VENTANA, no la herramienta.** Se le pregunta a
+> `resolverVentana` —importado, no reinterpretado aquí— y se compara su `fin`
+> contra `limits.historyCacheMargenMs`, el mismo criterio de `tramoCerrado()`
+> en `iconics/client.mjs`. «Ayer» no puede cambiar y vive 30 min; «las últimas
+> 6 horas» termina en ahora y vive 15 s. Tres knobs nuevos:
+> `IA_CACHE_VIVO_MS`, `IA_CACHE_CERRADO_MS`, `IA_CACHE_MAX`.
+>
+> El patrón es el de `historyCache`: `Map` con `{expiraEn, valor}`, poda de lo
+> caducado y, si sobra, de lo más viejo. No se inventó infraestructura.
+
 ---
 
 ## 3 · F2 — `IA-07`: memoria del foco

@@ -154,7 +154,7 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
         })
       }
 
-      const { pregunta, historial, idioma } = request.body
+      const { pregunta, historial, idioma, conversacionId } = request.body
 
       /* ── A partir de aquí la respuesta es un flujo ─────────────────── */
 
@@ -238,6 +238,13 @@ export function registerChatRoutes(fastify, { config, chat, cola }) {
             historial,
             signal: abortador.signal,
             onEvento: emitir,
+            /*
+             * La clave de la caché entre turnos (Plan 23 F1). Viaja tal cual:
+             * esta ruta no lo interpreta ni lo registra —es opaco, y no
+             * identifica a nadie—, sólo lo pasa. Un cliente que no lo mande
+             * responde igual, sin caché.
+             */
+            conversacionId,
             /*
              * El idioma que tiene puesto el tablero de quien pregunta. El
              * modelo contesta en él; nada de lo que hay debajo cambia. Ver

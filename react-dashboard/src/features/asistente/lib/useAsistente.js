@@ -22,7 +22,7 @@ import { API_BASE } from "@/lib/api/apiBase";
 import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
-import { borrar, cargar, guardar } from "./persistencia.js";
+import { borrar, cargar, guardar, idDeConversacion } from "./persistencia.js";
 import { sistemaDeRuta } from "@shared/eva/comun/sistemas.js";
 
 /**
@@ -241,11 +241,27 @@ export function useAsistente() {
       setOcupado(true);
       setEstado("Enviando…");
 
+      // Una sola lectura: `idDeConversacion` puede tener que CREAR el id la
+      // primera vez, y llamarla dos veces en la misma expresión escribiría en
+      // `localStorage` para nada.
+      const conversacionId = idDeConversacion();
+
       try {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta, historial, idioma }),
+          /*
+           * `conversacionId` es la clave de la caché del backend entre turnos
+           * (Plan 23 F1). Puede ser `null` si el navegador no deja guardar
+           * nada: el campo es opcional y la respuesta es la misma, sólo que
+           * sin caché. Ver `idDeConversacion` en `persistencia.js`.
+           */
+          body: JSON.stringify({
+            pregunta,
+            historial,
+            idioma,
+            ...(conversacionId ? { conversacionId } : {}),
+          }),
           signal: control.signal,
         });
 

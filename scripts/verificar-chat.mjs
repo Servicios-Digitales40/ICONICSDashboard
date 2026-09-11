@@ -199,10 +199,18 @@ function chatDePrueba(extra = {}) {
   return createChat({ config, herramientas: herramientasFalsas })
 }
 
-/** Recoge todos los eventos de una respuesta. */
-async function preguntar(chat, pregunta, historial) {
+/**
+ * Recoge todos los eventos de una respuesta.
+ *
+ * `conversacionId` es opcional y casi ninguna prueba lo manda: sin él no hay
+ * caché entre turnos (Plan 23 F1), que es justo el comportamiento que tenían
+ * todas estas comprobaciones antes de que existiera.
+ */
+async function preguntar(chat, pregunta, historial, conversacionId) {
   const eventos = []
-  const resumen = await chat.responder({ pregunta, historial, onEvento: e => eventos.push(e) })
+  const resumen = await chat.responder({
+    pregunta, historial, conversacionId, onEvento: e => eventos.push(e),
+  })
   const texto = eventos.filter(e => e.tipo === 'texto').map(e => e.delta).join('')
   return { eventos, resumen, texto }
 }
@@ -1133,6 +1141,115 @@ await check('el texto del manual llega al modelo MARCADO como cita', async () =>
   // El texto original NO se censura: el asistente tiene que poder contar lo que
   // el manual dice, que es para lo que está.
   assert.match(contenido, /arranque la bomba/i)
+})
+
+/* ── La caché entre turnos (Plan 23 F1 · IA-06) ──────────────────────── */
+
+console.log('\n── Caché entre turnos ──────────────────────────────────────')
+
+/** El guion habitual: pide una herramienta en la pasada 1 y redacta en la 2. */
+function guionDeHerramienta(nombre, argumentos = {}) {
+  return {
+    /* La forma COMPLETA que manda llama-server, con su envoltorio: `chat.mjs`
+       lee `llamada.function.name`, así que un `{name, arguments}` plano llega
+       como una llamada sin nombre —y sin nombre no hay herramienta, ni caché,
+       ni nada que probar—. */
+    toolCall: {
+      id: 'c1', type: 'function',
+      function: { name: nombre, arguments: JSON.stringify(argumentos) },
+    },
+    texto: 'Ya está.',
+  }
+}
+
+await check('la misma consulta en el turno SIGUIENTE no vuelve a ejecutarse', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('estado_del_sistema', { sistema: 'tanque' })
+
+  ejecutadas.length = 0
+  await preguntar(chat, '¿cómo está el tanque?', [], 'conv-1')
+  const trasPrimero = ejecutadas.length
+  assert.equal(trasPrimero, 1, 'el primer turno tiene que consultar de verdad')
+
+  await preguntar(chat, 'y ahora, ¿cómo está?', [], 'conv-1')
+  assert.equal(
+    ejecutadas.length, trasPrimero,
+    'el segundo turno volvió a leer: la caché entre turnos no está sirviendo'
+  )
+})
+
+/**
+ * Dos pestañas del tablero NO comparten caché.
+ *
+ * Es la frontera que el Plan 23 §9 dice no cruzar: una caché compartida entre
+ * conversaciones es una superficie de fuga entre sesiones distintas.
+ */
+await check('dos conversaciones distintas no se sirven la una a la otra', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('estado_del_sistema', { sistema: 'tanque' })
+
+  ejecutadas.length = 0
+  await preguntar(chat, '¿cómo está el tanque?', [], 'conv-A')
+  await preguntar(chat, '¿cómo está el tanque?', [], 'conv-B')
+
+  assert.equal(ejecutadas.length, 2, 'la conversación B se sirvió de lo que consultó la A')
+})
+
+/** Un cliente viejo —o un navegador que no puede guardar nada— sigue igual. */
+await check('sin `conversacionId` no hay caché, y todo funciona igual', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('estado_del_sistema', { sistema: 'tanque' })
+
+  ejecutadas.length = 0
+  await preguntar(chat, '¿cómo está el tanque?')
+  await preguntar(chat, '¿cómo está el tanque?')
+
+  assert.equal(ejecutadas.length, 2, 'cacheó sin tener con qué identificar la conversación')
+})
+
+/**
+ * La que ESCRIBE no se cachea nunca, y esta prueba es la importante.
+ *
+ * Servir de la caché un `controlar_bomba` sería contestar «bomba encendida»
+ * sin haber tocado la planta: una orden dada por buena porque se dio hace un
+ * minuto. Ninguna herramienta de `HERRAMIENTAS_DE_ESCRITURA` entra.
+ */
+await check('una orden a la planta NUNCA se sirve de la caché', async () => {
+  const chat = chatDePrueba()
+  guion = guionDeHerramienta('controlar_bomba', { encender: true })
+
+  ejecutadas.length = 0
+  await preguntar(chat, 'enciende la bomba', [], 'conv-2')
+  await preguntar(chat, 'enciéndela otra vez', [], 'conv-2')
+
+  assert.equal(
+    ejecutadas.length, 2,
+    'la segunda orden se sirvió de la caché: la bomba no se tocó y se dijo que sí'
+  )
+})
+
+/**
+ * Un período YA CERRADO vive mucho más que uno que sigue creciendo.
+ *
+ * No lo decide el nombre de la herramienta sino la ventana: «ayer» no puede
+ * cambiar, «las últimas 6 horas» termina en ahora. Se comprueba con la vida
+ * de lo vivo puesta a cero: con ella apagada, lo de ahora se vuelve a leer y
+ * lo cerrado se sigue sirviendo.
+ */
+await check('un período cerrado se cachea aunque lo de AHORA no', async () => {
+  const chat = chatDePrueba({ IA_CACHE_VIVO_MS: '0' })
+
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+  ejecutadas.length = 0
+  await preguntar(chat, '¿cómo fue el nivel ayer?', [], 'conv-3')
+  await preguntar(chat, 'repíteme lo de ayer', [], 'conv-3')
+  assert.equal(ejecutadas.length, 1, '«ayer» no se cacheó, y ya no puede cambiar')
+
+  guion = guionDeHerramienta('historia_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
+  ejecutadas.length = 0
+  await preguntar(chat, '¿y en las últimas 6 horas?', [], 'conv-3')
+  await preguntar(chat, 'repítemelo', [], 'conv-3')
+  assert.equal(ejecutadas.length, 2, 'una ventana que llega hasta ahora se sirvió de la caché')
 })
 
 /* ── Cierre ──────────────────────────────────────────────────────────── */
