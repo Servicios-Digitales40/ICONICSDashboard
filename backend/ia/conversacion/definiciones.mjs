@@ -36,7 +36,22 @@
  * que el modelo no sabe que puede pedir. Lo comprueba
  * `scripts/verificar-herramientas.mjs`, y por eso separar los dos archivos no
  * afloja nada.
+ *
+ * ── LAS DOS FORMAS DEL MISMO CONTRATO (Plan 23 F0 · IA-04) ─────────
+ *
+ * Desde el Plan 23 este archivo lleva DOS declaraciones de cada herramienta:
+ * el `parameters` en JSON Schema, que lee el modelo, y el esquema Zod de
+ * `ESQUEMAS`, que valida lo que el modelo mandó antes de ejecutar nada.
+ *
+ * Viven juntas a propósito. Antes sólo existía la primera, y no la validaba
+ * nadie: `ejecutar()` llamaba la función con lo que viniera del `JSON.parse`,
+ * y cada herramienta comprobaba a mano lo que a quien la escribió le pareció
+ * necesario. Separar las dos mitades en archivos distintos es garantizar que
+ * una se endurezca y la otra se quede atrás, que es exactamente el fallo que
+ * `shared/README.md` documenta para las reglas de negocio duplicadas.
  */
+import { z } from 'zod'
+import { ControlBombaSchema } from '../../http/esquemas.mjs'
 
 /**
  * Esquema que se le manda a llama-server en cada petición.
@@ -760,3 +775,163 @@ export const DEFINICIONES = [
     },
   },
 ]
+
+/* ── La otra mitad del contrato: qué se acepta ejecutar ──────────────── */
+
+/**
+ * Un nombre de señal, de sistema o de período tal y como lo escribe el modelo.
+ *
+ * `z.string()` y nada más, deliberadamente: el SIGNIFICADO lo resuelven
+ * `resolverSenal`, `resolverSistema` y `resolverVentana`, cada uno con su
+ * catálogo y su mensaje de error, que además lleva dentro la lista de válidos
+ * para que el modelo se corrija sin gastar otra ronda. Un `z.enum()` aquí
+ * duplicaría ese catálogo en un segundo sitio y lo dejaría divergir.
+ */
+const Texto = z.string()
+
+/**
+ * Un número tal cual lo mande el modelo, SIN rango.
+ *
+ * Y esto es una decisión, no un olvido: `dias` y `horizonteMinutos` ya se
+ * acotan donde se usan (`Math.max(1, Math.min(90, …))` en
+ * `herramientas/historicos/index.mjs`). Poner aquí `.min(1).max(90)`
+ * convertiría un `dias: 500` —que hoy se recorta a 90 y contesta— en un
+ * rechazo. Eso no es validar: es cambiar el comportamiento con la excusa de
+ * validarlo. Zod comprueba la FORMA (que sea un número y no "muchos"); el
+ * rango sigue siendo del dominio.
+ */
+const Numero = z.number()
+
+/**
+ * Lo que se acepta ejecutar, por herramienta.
+ *
+ * ── POR QUÉ `.passthrough()` Y NO ESTRICTO ─────────────────────────
+ *
+ * Un modelo pequeño añade campos que no existen («sistema» a una herramienta
+ * que no lo lleva) con la misma facilidad con que olvida uno. Rechazar por un
+ * campo de más gasta una ronda de treinta segundos en algo que la
+ * implementación ya ignora por sí sola, porque desestructura sólo lo que
+ * conoce. Lo que sí se rechaza es el campo REQUERIDO que falta y el tipo
+ * equivocado: eso no lo puede ignorar nadie sin inventarse un valor.
+ *
+ * ── LA QUE ESCRIBE NO DECLARA LO SUYO DOS VECES ────────────────────
+ *
+ * `controlar_bomba` no trae un `z.boolean()` propio: reutiliza
+ * `ControlBombaSchema`, el mismo que valida `POST /api/control/bomba` para el
+ * botón del tablero. Son las DOS entradas al único punto de este proyecto que
+ * escribe en la planta, y tienen la misma consecuencia física. Con dos
+ * esquemas separados, endurecer el de la ruta y olvidar el de la herramienta
+ * deja la puerta ancha justo por donde no se mira — y el mensaje de error,
+ * que ya estaba escrito para una persona, se hereda gratis.
+ */
+export const ESQUEMAS = Object.freeze({
+  /* Aprendizaje: escriben en nuestro JSON, no en la planta. */
+  hechos_de_la_planta: z.object({ sistema: Texto.optional() }).passthrough(),
+  registrar_intervencion: z.object({
+    sintoma: Texto,
+    solucion: Texto,
+    causa: Texto.optional(),
+    sistema: Texto.optional(),
+    resuelto: z.boolean().optional(),
+  }).passthrough(),
+  cerrar_diagnostico: z.object({
+    sistema: Texto,
+    riesgoId: Texto,
+    causaId: Texto.optional(),
+    causaLibre: Texto.optional(),
+    propuesta: Texto.optional(),
+    componente: Texto.optional(),
+    solucion: Texto,
+    resuelto: z.boolean().optional(),
+  }).passthrough(),
+  recordar_hecho: z.object({
+    hecho: Texto,
+    sistema: Texto.optional(),
+    origen: Texto,
+  }).passthrough(),
+  proponer_regla: z.object({
+    titulo: Texto,
+    sistema: Texto.optional(),
+    /* El único enum de verdad: son tres valores nuestros, cerrados, y no hay
+       un resolvedor detrás que sepa corregir «grave» por «critico». */
+    severidad: z.enum(['critico', 'atencion', 'informativo']),
+    condicion: Texto,
+    senales: z.array(Texto),
+    evidencia: Texto,
+    consecuencia: Texto,
+    accion: Texto.optional(),
+  }).passthrough(),
+
+  /* Registro: sin argumentos. */
+  sistemas_de_la_planta: z.object({}).passthrough(),
+
+  /* Máquina. */
+  riesgos_activos: z.object({ sistema: Texto }).passthrough(),
+  pronostico_de_desgaste: z.object({
+    sistema: Texto.optional(),
+    dias: Numero.optional(),
+  }).passthrough(),
+  estado_del_sistema: z.object({ sistema: Texto }).passthrough(),
+
+  /* Históricos. */
+  historia_de_senal: z.object({
+    senal: Texto,
+    periodo: Texto.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  valor_en_momento: z.object({
+    senal: Texto,
+    momento: Texto,
+    sistema: Texto.optional(),
+  }).passthrough(),
+  comparar_periodos: z.object({
+    senal: Texto,
+    periodoA: Texto,
+    periodoB: Texto,
+    sistema: Texto.optional(),
+  }).passthrough(),
+  analisis_de_senal: z.object({
+    senal: Texto,
+    periodo: Texto.optional(),
+    horizonteMinutos: Numero.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  perfil_de_senal: z.object({
+    senal: Texto,
+    dias: Numero.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  correlacionar_senales: z.object({
+    senales: z.array(Texto),
+    periodo: Texto.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  grafico_de_senal: z.object({
+    senal: Texto,
+    periodo: Texto.optional(),
+    sistema: Texto.optional(),
+  }).passthrough(),
+  generar_reporte: z.object({
+    senales: z.array(Texto).optional(),
+    periodo: Texto.optional(),
+    explicacion: Texto.optional(),
+  }).passthrough(),
+
+  /* Documentación y diagnóstico. */
+  consultar_documentacion: z.object({
+    pregunta: Texto,
+    sistema: Texto.optional(),
+  }).passthrough(),
+  limites_del_manual: z.object({ senal: Texto }).passthrough(),
+  diagnostico: z.object({
+    sintoma: Texto,
+    periodo: Texto.optional(),
+  }).passthrough(),
+  diagnosticar_falla: z.object({
+    sistema: Texto,
+    riesgoId: Texto,
+  }).passthrough(),
+
+  /* La única que escribe en la planta. Ver la cabecera de arriba. */
+  controlar_bomba: ControlBombaSchema.passthrough(),
+})

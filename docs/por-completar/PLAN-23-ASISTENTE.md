@@ -166,6 +166,40 @@ FORMA (tipos, campos requeridos, enums), no intención.
 campo requerido ausente, uno válido — sobre las 22. Extiende
 `scripts/verificar-herramientas.mjs`.
 
+> **HECHA el 11-09-2026.** `ESQUEMAS` (22, en `definiciones.mjs` junto a
+> `DEFINICIONES`) + validación en `ejecutar()`. Verde: 147 comprobaciones en
+> `verificar-herramientas.mjs`, los 27 verificadores, 299 pruebas de backend,
+> lint y tipos. Tres decisiones que el plan dejaba abiertas, y una que corrige:
+>
+> **1 · `controlar_bomba` DERIVA de `ControlBombaSchema`**, no declara el suyo.
+> Son las dos puertas al único punto que escribe en la planta —el botón por
+> `POST /api/control/bomba` y el asistente— y ahora comparten esquema y
+> mensajes. El acoplamiento `ia/` → `http/esquemas.mjs` es real y se acepta a
+> cambio de que endurecer una no deje la otra atrás.
+>
+> **2 · Un requerido ausente NO lo rechaza la validación.** Es la corrección
+> al plan tal y como estaba escrito. `estado_del_sistema({})` ya contestaba
+> «hay que decir de qué sistema» **con la lista de ids válidos dentro**, y
+> `diagnosticar_falla` sin `riesgoId` remite a `riesgos_activos`. Interceptar
+> eso con un «falta el campo sistema» genérico cambia un error del que el
+> modelo se recupera por otro del que no: se rechazaría antes y se contestaría
+> peor. Se para la FORMA imposible (`encender: "sí"`, una cadena donde va una
+> lista); la pregunta incompleta sigue siendo del dominio. Dos pruebas la
+> fijan, para que nadie la revierta por parecer más estricta.
+>
+> **3 · Los rangos no se tocan.** `dias` y `horizonteMinutos` ya se recortan
+> donde se usan (`Math.max(1, Math.min(90, …))`). Un `.max(90)` en el esquema
+> convertiría un `dias: 500` —que hoy contesta con 90— en un rechazo: cambiar
+> el comportamiento con la excusa de validarlo. Zod valida forma, no rango.
+>
+> **Hallazgo colateral:** Zod 4 ya no publica `received` ni `input` en el
+> issue, así que «ausente» y «tipo equivocado» llegan idénticos salvo por el
+> final del mensaje en inglés. Distinguirlos por esa cadena ataría el
+> comportamiento a la redacción de una dependencia, así que se mira el
+> argumento que nos mandaron. Por el mismo motivo el mensaje dice el tipo que
+> llegó de verdad: leyendo `received` decía «llegó vacío» de un `dias:
+> "muchos"` que había llegado como texto.
+
 ---
 
 ## 2 · F1 — `IA-06`: caché entre turnos

@@ -153,7 +153,7 @@ import { join } from 'node:path'
  * `chat.mjs` y los verificadores llevan importándolo de este módulo desde que
  * existe, y mover un archivo no es motivo para tocarlos.
  */
-import { DEFINICIONES } from './definiciones.mjs'
+import { DEFINICIONES, ESQUEMAS } from './definiciones.mjs'
 /*
  * Las piezas de presentación que no dependen de nada (Fase 0 del reparto):
  * ni del `client`, ni de la configuración, ni de estado. Ver la cabecera de
@@ -900,6 +900,145 @@ function siguienteDia(iso) {
 /* ── Las herramientas ────────────────────────────────────────────────── */
 
 
+/* ── Validación de argumentos del modelo (Plan 23 F0 · IA-04) ────────── */
+
+/**
+ * Los tipos de problema que este proyecto SÍ rechaza antes de ejecutar.
+ *
+ * ── POR QUÉ NO SE RECHAZA TODO LO QUE ZOD ENCUENTRA ────────────────
+ *
+ * Porque un requerido que falta ya tiene, en varias herramientas, una
+ * respuesta MEJOR que la nuestra. `estado_del_sistema({})` no contesta «falta
+ * el campo sistema»: contesta «hay que decir de qué sistema» **y adjunta la
+ * lista de ids válidos** para que el modelo se corrija sin gastar otra ronda
+ * de treinta segundos (ver `crearAyudantesDeMaquina`, y la prueba «sin
+ * `sistema` no se contesta: se pregunta cuál», que comprueba justamente que
+ * el fallo lleva los ids dentro).
+ *
+ * Interceptar eso con un mensaje genérico de validación sería cambiar un
+ * error con información de recuperación por uno sin ella. Se rechazaría antes,
+ * sí, pero el turno siguiente saldría peor.
+ *
+ * Así que la frontera es la que el propio Plan 23 fija: **Zod valida la FORMA,
+ * no la intención.** Un `encender: "sí"` o un `senales: "presión"` (cadena
+ * donde se espera lista) son formas imposibles de interpretar sin adivinar, y
+ * ésos se paran aquí. Un requerido ausente es una pregunta incompleta, y de
+ * ésas ya sabe contestar el dominio.
+ *
+ * La excepción son los requeridos que NADIE comprueba después. Hoy no hay
+ * ninguno que quede sin red —`controlar_bomba` tiene la suya y además es la
+ * única que escribe—, y si mañana lo hubiera, esta lista es donde se dice.
+ */
+function problemasQueValidamos(error, argumentos) {
+  return (error?.issues ?? []).filter(problema => !faltaDelTodo(problema, argumentos))
+}
+
+/**
+ * ¿Este problema es «no lo mandó» o «lo mandó mal»?
+ *
+ * ── POR QUÉ SE MIRA EL ARGUMENTO Y NO EL PROBLEMA ──────────────────
+ *
+ * Porque Zod 4 no lo dice. Un requerido ausente y un tipo equivocado llegan
+ * los dos como `code: 'invalid_type'`, con las mismas cuatro claves
+ * (`expected`, `code`, `path`, `message`) — `received` ya no existe como
+ * campo, y `input` tampoco. Lo único que los distingue es el final del
+ * mensaje en inglés: «…received undefined» frente a «…received number».
+ *
+ * Colgar la decisión de esa cadena sería atarse a la redacción de una
+ * dependencia: el día que Zod la cambie, los requeridos ausentes empezarían a
+ * rechazarse aquí en silencio y `estado_del_sistema` dejaría de contestar con
+ * su lista de ids. Se mira el ARGUMENTO que nos mandaron, que es un hecho
+ * nuestro y no de la librería: si la clave no está —o está puesta a
+ * `undefined`—, es una pregunta incompleta y la contesta el dominio.
+ */
+function faltaDelTodo(problema, argumentos) {
+  if (problema.code !== 'invalid_type') return false
+
+  let valor = argumentos ?? {}
+  for (const paso of problema.path ?? []) {
+    if (valor === null || typeof valor !== 'object') return false
+    if (!(paso in valor)) return true
+    valor = valor[paso]
+  }
+  return valor === undefined
+}
+
+/**
+ * Un problema de Zod dicho en español y nombrando el campo.
+ *
+ * Mismo criterio que `formatearMensaje` en `http/esquemas.mjs`: si el esquema
+ * trae un mensaje escrito a mano —como los de `ControlBombaSchema`, que ya son
+ * frases completas pensadas para una persona— se devuelve tal cual. Sólo se
+ * traduce y se antepone el campo a lo que genera Zod por su cuenta, que dice
+ * qué esperaba pero no dónde, y lo dice en inglés (§4.6 del CLAUDE.md: el
+ * texto de cara al técnico va en español).
+ *
+ * Se toma el primer problema y se cuenta cuántos más hubo. Una lista de cinco
+ * no ayuda a un modelo pequeño a corregirse; el primero, con su campo, sí.
+ */
+function mensajeDeValidacion(problemas, argumentos) {
+  const problema = problemas[0]
+  const campo = problema.path?.join('.') || ''
+  const generado = /^(Invalid|Expected|Too big|Too small|Unrecognized|Required)/.test(
+    problema.message ?? ''
+  )
+
+  let texto
+  if (!generado) {
+    texto = problema.message
+  } else if (problema.code === 'invalid_type') {
+    /*
+     * El tipo que LLEGÓ se deduce del argumento, no del problema.
+     *
+     * Zod 4 ya no publica `received` (ver `faltaDelTodo`), así que leerlo daba
+     * siempre `undefined` y el mensaje decía «y llegó vacío» de un `dias:
+     * "muchos"` que había llegado como texto. Decirle al modelo que no mandó
+     * nada cuando mandó algo mal le enseña la corrección equivocada, y es
+     * justo lo que el §4.6 del CLAUDE.md prohíbe: el mensaje explica qué
+     * falta y cómo arreglarlo, no una versión aproximada de lo ocurrido.
+     */
+    texto =
+      `El campo "${campo}" tiene que ser ${enCastellano(problema.expected)}, ` +
+      `y llegó ${enCastellano(tipoDe(valorEn(argumentos, problema.path)))}.`
+  } else {
+    texto = `El campo "${campo}" no tiene un valor admitido.`
+  }
+
+  const resto = problemas.length - 1
+  return resto > 0 ? `${texto} (Y ${resto} problema${resto > 1 ? 's' : ''} más.)` : texto
+}
+
+/** El valor que nos mandaron en esa ruta, o `undefined` si no llegó. */
+function valorEn(argumentos, ruta) {
+  let valor = argumentos ?? {}
+  for (const paso of ruta ?? []) {
+    if (valor === null || typeof valor !== 'object') return undefined
+    valor = valor[paso]
+  }
+  return valor
+}
+
+/** El tipo de un valor con el vocabulario de Zod, para poder traducirlo igual. */
+function tipoDe(valor) {
+  if (valor === null) return 'null'
+  if (Array.isArray(valor)) return 'array'
+  return typeof valor
+}
+
+/** Los nombres de tipo de Zod, en español. Lo que no esté, tal cual. */
+function enCastellano(tipo) {
+  const tipos = {
+    string: 'texto',
+    number: 'un número',
+    boolean: 'true o false',
+    array: 'una lista',
+    object: 'un objeto',
+    undefined: 'vacío',
+    null: 'nulo',
+  }
+  return tipos[tipo] ?? tipo
+}
+
 export function createHerramientas({
   client,
   turnos = {},
@@ -1028,11 +1167,44 @@ export function createHerramientas({
    * Ejecuta una herramienta por nombre. Un nombre desconocido no lanza: se
    * devuelve como error con la lista de los válidos, que es lo que permite al
    * modelo corregirse sin otra ronda de 30 segundos.
+   *
+   * ── LA VALIDACIÓN VA ANTES, Y DEVUELVE UN FALLO NORMAL (Plan 23 F0) ─
+   *
+   * Hasta el Plan 23 aquí se llamaba `fn(argumentos)` con lo que viniera del
+   * `JSON.parse` de `chat.mjs` —que además cae a `{}` en silencio si el JSON
+   * viene roto—, y cada herramienta comprobaba a mano lo que le importaba. El
+   * resultado era que dos caminos al MISMO dato tenían dos calidades de
+   * validación: `POST /api/control/bomba` pasaba por Zod y `controlar_bomba`
+   * por un `typeof`.
+   *
+   * El fallo de validación sale con la misma forma que cualquier otro fallo de
+   * negocio (`{ ok: false, error }`) y no como una excepción, por el motivo de
+   * siempre: el destinatario es un modelo en mitad de un turno, y un error que
+   * puede leer es un error del que se puede recuperar.
    */
   async function ejecutar(nombre, argumentos = {}) {
     const fn = herramientas[nombre]
     if (!fn) {
       return fallo(`No existe la herramienta "${nombre}".`, { herramientas: Object.keys(herramientas) })
+    }
+
+    const esquema = ESQUEMAS[nombre]
+    if (esquema) {
+      const validado = esquema.safeParse(argumentos ?? {})
+      const problemas = validado.success
+        ? []
+        : problemasQueValidamos(validado.error, argumentos ?? {})
+
+      if (problemas.length) {
+        return fallo(mensajeDeValidacion(problemas, argumentos ?? {}), {
+          argumentos_recibidos: Object.keys(argumentos ?? {}),
+        })
+      }
+      // Se ejecuta con lo YA validado cuando el esquema pasó entero. Si lo
+      // único que falla es un requerido que dejamos pasar a propósito (ver
+      // `problemasQueValidamos`), se ejecuta con lo que vino: la herramienta
+      // tiene su propia respuesta para eso, y es mejor que la nuestra.
+      if (validado.success) argumentos = validado.data
     }
 
     try {

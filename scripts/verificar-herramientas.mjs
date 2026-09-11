@@ -39,10 +39,12 @@ import { mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  DEFINICIONES,
   createHerramientas,
   resolverSenal,
   resolverVentana,
 } from '../backend/ia/conversacion/herramientas.mjs'
+import { ESQUEMAS } from '../backend/ia/conversacion/definiciones.mjs'
 import {
   RAIZ,
   SENALES,
@@ -2658,6 +2660,142 @@ await checkAsync(
     }
   }
 )
+
+/* ── Validación de argumentos (Plan 23 F0 · IA-04) ───────────────────── */
+
+console.log('\n── Validación de argumentos ────────────────────────────────')
+
+check('toda herramienta anunciada tiene esquema de validación, y al revés', () => {
+  const anunciadas = DEFINICIONES.map(d => d.function.name).sort()
+  assert.deepEqual(
+    Object.keys(ESQUEMAS).sort(),
+    anunciadas,
+    'lo que se le anuncia al modelo y lo que se sabe validar tienen que coincidir'
+  )
+})
+
+/**
+ * Las dos mitades del contrato dicen lo mismo sobre qué es obligatorio.
+ *
+ * El `required` del JSON Schema lo lee el modelo; el esquema Zod lo aplica el
+ * backend. Si divergen, el modelo obedece una regla y el servidor exige otra —
+ * exactamente el fallo que juntarlos en un archivo existe para evitar.
+ */
+check('lo obligatorio para el modelo es lo obligatorio para el backend', () => {
+  for (const d of DEFINICIONES) {
+    const nombre = d.function.name
+    const requeridosDelModelo = [...(d.function.parameters?.required ?? [])].sort()
+
+    // Los campos que el esquema Zod NO acepta ausentes.
+    const forma = ESQUEMAS[nombre]._def?.shape ?? ESQUEMAS[nombre].shape ?? {}
+    const requeridosDelBackend = Object.entries(forma)
+      .filter(([, tipo]) => !tipo.safeParse(undefined).success)
+      .map(([campo]) => campo)
+      .sort()
+
+    assert.deepEqual(
+      requeridosDelBackend,
+      requeridosDelModelo,
+      `${nombre}: el modelo y el backend no exigen los mismos campos`
+    )
+  }
+})
+
+/**
+ * Un tipo imposible se para ANTES de ejecutar, y se dice en español.
+ *
+ * Uno por cada clase de argumento que existe en el catálogo —booleano, número,
+ * lista, enum y texto—, porque cada una se rechaza por un camino distinto del
+ * constructor del mensaje.
+ */
+await checkAsync('un argumento con el tipo equivocado no llega a la herramienta', async () => {
+  const client = clienteFalso()
+  const h = createHerramientas({ client, readOnly: false })
+
+  const casos = [
+    ['controlar_bomba', { encender: 'sí' }, /true o false/],
+    ['perfil_de_senal', { senal: 'nivel', dias: 'muchos' }, /un número.*llegó texto/],
+    ['correlacionar_senales', { senales: 'presión' }, /una lista.*llegó texto/],
+    ['estado_del_sistema', { sistema: 5 }, /texto.*llegó un número/],
+    [
+      'proponer_regla',
+      {
+        titulo: 'x', severidad: 'grave', condicion: 'x',
+        senales: [], evidencia: 'x', consecuencia: 'x',
+      },
+      /no tiene un valor admitido/,
+    ],
+  ]
+
+  for (const [nombre, argumentos, esperado] of casos) {
+    const r = await h.ejecutar(nombre, argumentos)
+    assert.equal(r.ok, false, `${nombre} tendría que rechazar ${JSON.stringify(argumentos)}`)
+    assert.match(r.error, esperado, `${nombre} no explicó el problema`)
+    assert.ok(r.argumentos_recibidos, `${nombre}: el fallo no dice qué campos llegaron`)
+  }
+
+  // Lo que de verdad importa de todo esto: la escritura nunca salió.
+  assert.equal(client.escrituras.length, 0)
+})
+
+/**
+ * Un requerido ausente NO lo contesta la validación: lo contesta el dominio.
+ *
+ * Es la decisión documentada en `problemasQueValidamos`. La prueba mira lo que
+ * se perdería si alguien la revierte por parecer más estricta: la lista de ids
+ * válidos y el nombre de la herramienta a la que ir, que son lo que permite al
+ * modelo corregirse sin gastar otra ronda de treinta segundos.
+ */
+await checkAsync('un requerido que falta se contesta con la ayuda del dominio, no con Zod', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  const sinSistema = await h.ejecutar('estado_del_sistema', {})
+  assert.equal(sinSistema.ok, false)
+  assert.match(sinSistema.error, /de qué sistema/i, 'lo contestó la validación en vez del dominio')
+  assert.equal(sinSistema.sistemas.length, SISTEMAS.length, 'se perdió la lista de ids')
+
+  /* Con el motor montado: sin él, la herramienta se niega ANTES de mirar el
+     `riesgoId` y esta prueba mediría otra cosa. */
+  const conMotor = createHerramientas({
+    client: clienteFalso(), motorDiagnostico: motorDiagnosticoFalso({}),
+  })
+  const sinRiesgo = await conMotor.ejecutar('diagnosticar_falla', { sistema: 'tanque' })
+  assert.equal(sinRiesgo.ok, false)
+  assert.match(sinRiesgo.error, /riesgos_activos/i, 'se perdió la remisión a la otra herramienta')
+})
+
+/** Un `undefined` explícito es lo mismo que no mandarlo: no es un tipo malo. */
+await checkAsync('un campo puesto a undefined cuenta como ausente, no como inválido', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('estado_del_sistema', { sistema: undefined })
+
+  assert.equal(r.ok, false)
+  assert.match(r.error, /de qué sistema/i)
+  assert.ok(r.sistemas, 'tendría que haberlo contestado el dominio')
+})
+
+/**
+ * El rango sigue siendo del dominio, y por eso el esquema no lo toca.
+ *
+ * `dias: 500` se recorta a 90 donde se usa y contesta. Si alguien añadiera
+ * `.max(90)` al esquema, esto pasaría a ser un rechazo: un cambio de
+ * comportamiento disfrazado de validación. Ver `Numero` en `definiciones.mjs`.
+ */
+await checkAsync('un número fuera de rango se recorta como siempre, no se rechaza', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('perfil_de_senal', { senal: 'nivel del tanque', dias: 500 })
+
+  assert.equal(r.ok, true, `lo rechazó en vez de recortarlo: ${r.error}`)
+  assert.match(r.periodo, /90 días/, 'no se recortó al tope del dominio')
+})
+
+/** Un campo de más no cuesta una ronda: la herramienta ya ignora lo que no conoce. */
+await checkAsync('un campo que no existe en el esquema no rompe la llamada', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('estado_del_sistema', { sistema: 'tanque', profundidad: 'mucha' })
+
+  assert.notEqual(r.ok, false, `un campo de más no debería fallar: ${r.error}`)
+})
 
 /* ── Invariantes del registro ────────────────────────────────────────── */
 
