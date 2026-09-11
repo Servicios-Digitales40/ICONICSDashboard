@@ -14,6 +14,17 @@
 > F3, con su nombre final (`tendencia_multiple`, `resumen_de_turno`,
 > `buscar_evento`, `comparar_maquinas`).
 
+> **Al día 11-09-2026.** B6, B7 y B8 están **hechas** (Plan 23 F3,
+> commit `0d3ba34`): el registro tiene 25 herramientas. **B5 se descartó** —su
+> bloque explica por qué— y vuelve a esta lista junto a B9 y B10.
+>
+> Construirlas destapó además que la salvaguarda de B5 que esta página daba por
+> buena —«ya implementada en `correlacionar_senales`»— **no protegía el caso
+> real**: 10 de las 42 etiquetas de vibraciones resolvían a una señal del
+> tanque, así que dos PLC se cruzaban sin que saltara nada. Corregido aparte en
+> `98fe465`, con sus pruebas escritas con nombres de operador y no con claves
+> técnicas, que es lo que lo ocultaba.
+
 > **Qué es esto.** Treinta mejoras para el asistente, agrupadas en tres ejes:
 > **veracidad de los datos**, **expansión de herramientas** y **expansión de
 > capacidades**.
@@ -229,7 +240,41 @@ alarmas activas» y «el nivel bajo saltó a las 14:32».
 Misma magnitud en dos máquinas, con la salvaguarda de no correlacionar PLCs
 distintos ya implementada en `correlacionar_senales`.
 
-> Entra en [`docs/por-completar/PLAN-23-ASISTENTE.md`](por-completar/PLAN-23-ASISTENTE.md) §4.4.
+> **Descartada del Plan 23 el 11-09-2026, tras construir sus tres hermanas.**
+> Estaba en su F3 y sale de ahí; queda aquí anotada, con B9 y B10, hasta que
+> algo la empuje.
+>
+> **Por qué sale.** Tres motivos, y el primero es el que decide:
+>
+> 1. **No tiene un fallo real detrás**, que es el criterio con el que el propio
+>    plan eligió cuatro de siete. `tendencia_multiple` entró por una pregunta
+>    que agotó las rondas el 28-08-2026; `buscar_evento`, porque «¿cuándo bajó
+>    de X?» obligaba al modelo a recorrer una serie, cosa que tiene prohibida.
+>    Ésta entró por simetría de catálogo —«faltaría poder comparar»—, que es
+>    exactamente el motivo por el que B10 ya estaba fuera.
+>
+> 2. **Es la más cara, y ahora se sabe por qué.** Es la única que resuelve el
+>    MISMO nombre en dos catálogos a la vez, que es justo donde vivía el cruce
+>    silencioso corregido en `98fe465`. Aquel arreglo arbitra el caso claro —un
+>    nombre inequívoco de otra máquina gana— pero esta herramienta vive del
+>    caso contrario: «temperatura» TIENE que resolver en las dos a la vez.
+>    Construirla bien pasa por **B1** (unificar los tres resolvedores), un
+>    refactor con riesgo propio sobre la capa que el asistente usa entera.
+>
+> 3. **Es la que más se puede malinterpretar.** Su descripción tendría que
+>    decirle a un modelo pequeño que poner dos magnitudes lado a lado es
+>    legítimo pero correlacionarlas causalmente no — un matiz del que depende
+>    la regla nº 1 del proyecto. Es superficie de error nueva a cambio de
+>    ahorrar una llamada.
+>
+> **Qué se pierde, dicho sin adornos.** «¿Cuál de las dos está más caliente?»
+> sigue sin atajo: son dos llamadas y el modelo citando las dos cifras. Eso NO
+> es aritmética prohibida —citar dos números no es calcular—, así que la
+> pérdida es de comodidad, no de capacidad. Y desde F3 esas dos llamadas
+> pueden ser dos `resumen_de_turno`, no cuatro sueltas.
+>
+> **Cuándo retomarla.** Cuando B1 esté hecha: el trabajo caro habrá
+> desaparecido y construirla será casi gratis. Antes no.
 
 ## B6 · `tendencia_multiple`
 

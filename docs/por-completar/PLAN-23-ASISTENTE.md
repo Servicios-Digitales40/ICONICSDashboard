@@ -477,13 +477,27 @@ verde con 26 herramientas en el registro.
 > presión"` que el 4B necesita, y la prueba escrita entonces **fijaba la
 > regresión como si fuera lo correcto**.
 >
-> **5 · `comparar_maquinas` queda para el siguiente tramo**, y ahora se sabe
-> por qué es la cara: resolver la misma magnitud en dos sistemas a la vez es
-> exactamente el punto donde los dos catálogos chocan. El commit de seguridad
-> puso el arbitraje que faltaba (si el registro dice que un nombre es
-> inequívoco de otra máquina, gana el registro), así que el terreno está
-> preparado — pero unificarlos de verdad sigue siendo B3 del backlog y sigue
-> mereciendo su propia fase, no ir escondido dentro de ésta.
+> **5 · `comparar_maquinas` se DESCARTA de este plan** (11-09-2026), y con eso
+> F3 cierra en tres de cuatro. No se queda a medias: las tres que entraron
+> tenían un fallo real detrás, la que sale no lo tiene — el mismo criterio con
+> el que este plan eligió cuatro de las siete candidatas y dejó fuera
+> `exportar_datos` por «sin un fallo real que lo empuje».
+>
+> Los otros dos motivos, que sólo se supieron al construir las hermanas: es la
+> única que resuelve el MISMO nombre en dos catálogos a la vez —justo donde
+> vivía el cruce silencioso de `98fe465`, y el arbitraje de aquel commit
+> resuelve el caso contrario al que ésta necesita—, así que pasa por B1/B3;
+> y su uso correcto depende de que un modelo pequeño lea bien un matiz
+> («compararlas sí, correlacionarlas no») del que depende la regla nº 1 del
+> proyecto.
+>
+> Lo que se pierde es comodidad, no capacidad: «¿cuál está más caliente?» se
+> contesta con dos llamadas y el modelo citando las dos cifras, que no es
+> aritmética prohibida. Y desde F3 esas dos pueden ser dos `resumen_de_turno`.
+>
+> Queda anotada en `docs/MEJORAS-ASISTENTE.md` (B5) con su motivo, junto a
+> `espectro_de_vibracion` y `exportar_datos`. Cuando B1 esté hecha, construirla
+> será casi gratis.
 
 > **Añadido el 11-09-2026 — el inventario es literal, y hay que tocarlo.**
 > `verificar-herramientas.mjs` línea 2665 lleva un `check` cuyo TÍTULO dice

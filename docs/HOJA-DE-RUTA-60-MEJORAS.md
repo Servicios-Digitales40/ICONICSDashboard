@@ -115,7 +115,7 @@ el 22; probar que el certificado de `bms-server` se acepta, en el 26.
 `IA-02` auditar cifras tras redactar · `IA-04` validar argumentos con Zod ·
 `IA-05` progreso de la primera pasada · `IA-06` caché entre turnos ·
 `IA-07` memoria del foco · `IA-08` router de modelo ·
-`IA-09` las cuatro herramientas que faltan · `IA-10` registro por turno
+`IA-09` las herramientas que faltan · `IA-10` registro por turno
 
 Necesita `llama-server`, no ICONICS. El banco del Plan 20 F9 es lo que hace que
 cada uno de estos se pueda demostrar en vez de opinar.
@@ -136,6 +136,26 @@ captura, para que la auditoría de cifras corra también contra el modelo real.
 > (`tendencia_multiple`, `resumen_de_turno`, `buscar_evento`,
 > `comparar_maquinas`) — `espectro_de_vibracion` depende de habilitar hardware
 > y `exportar_datos` no tiene un fallo real detrás.
+
+> **Al día 11-09-2026 — F0, F1, F2 y F3 hechas** en la rama `Moises7`:
+> validación de argumentos con Zod (`36e6c64`), caché entre turnos
+> (`97fd760`), memoria del foco (`745cb97`) y **tres** herramientas nuevas
+> (`0d3ba34`). El registro pasa de 22 a 25.
+>
+> **`comparar_maquinas` se descartó**, así que `IA-09` cierra en tres de
+> cuatro. No tenía un fallo real detrás —el criterio con el que se eligieron
+> cuatro de siete—, es la única que resuelve el mismo nombre en dos catálogos
+> a la vez (pasa por `B1`), y su uso correcto depende de que un modelo pequeño
+> lea bien un matiz del que depende la regla nº 1. Vuelve a
+> `MEJORAS-ASISTENTE.md` B5 con su motivo.
+>
+> **Y salió un fallo grave que no estaba en el plan**, corregido aparte en
+> `98fe465`: la guarda contra cruzar las dos máquinas no protegía el caso real
+> —10 de las 42 etiquetas de vibraciones resolvían a una señal del tanque—, así
+> que `correlacionar_senales` podía contestar `ok: true` mezclando dos PLC. La
+> prueba que lo cubría usaba claves técnicas, que no colisionan.
+>
+> Quedan F4 a F7: `IA-02` (necesita `llama-server`), `IA-05`, `IA-10` e `IA-08`.
 >
 > `estado_de_alarmas` queda fuera por estar **parcialmente cubierta, pero de
 > dos formas distintas según la máquina**: vibraciones trae contadores del
