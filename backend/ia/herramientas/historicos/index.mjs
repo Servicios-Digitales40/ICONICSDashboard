@@ -173,6 +173,49 @@ function resolverSenalDeSistema(senal, sistemaId) {
       return senalDesconocida(senal, { paraHistoria: true })
     }
 
+    /*
+     * ── Y SI EL REGISTRO DICE QUE ES DE OTRA MÁQUINA, GANA EL REGISTRO ──
+     *
+     * El bloque de arriba sólo consultaba al registro cuando el índice del
+     * tanque NO resolvía. Ese «sólo» era el agujero, y no era teórico: medido
+     * el 11-09-2026, **10 de las 42 etiquetas de vibraciones resolvían a una
+     * señal del tanque**.
+     *
+     *   resolverSenal('Velocidad eficaz · Lado acople')  →  'velocidadMotor'
+     *   sistemasDeSenal(mismo nombre)                    →  vibraciones:vRMS_S1
+     *
+     * El índice del tanque no acierta por nombre propio sino por su respaldo
+     * de CONTENCIÓN: la frase contiene «velocidad», que es una entrada suya, y
+     * como dentro del tanque no hay empate la da por buena. El registro, que
+     * conoce las dos máquinas, sabe que ese nombre completo sólo existe en
+     * una — y nunca se le preguntaba.
+     *
+     * La consecuencia era la peor de este proyecto: `correlacionar_senales`
+     * cruzaba una señal del tanque con una de vibraciones y la guarda de
+     * `NO_COMPARTEN` no saltaba, porque para el código las dos eran del
+     * tanque. La respuesta salía `ok: true`, con la señal de la otra máquina
+     * renombrada a «Velocidad calculada del motor». Cifras reales de la
+     * máquina equivocada, sin un error en ninguna parte.
+     *
+     * La prueba que cubría el cruce usaba claves técnicas (`vRMS_S1`), que no
+     * colisionan, así que pasaba. Con el nombre que escribe un operador,
+     * fallaba.
+     *
+     * Se corrige aquí y no en `resolverSenal` a propósito: el índice del
+     * tanque no está haciendo nada malo —resuelve bien DENTRO de su máquina, y
+     * su respaldo por contención es el que hace que «el nivel del tanque ahora
+     * mismo» funcione—. Lo que faltaba es que, habiendo dos catálogos, alguien
+     * arbitre entre ellos. Unificarlos de verdad es B3 del backlog; esto es la
+     * guarda que impide que el bug siga vivo mientras tanto.
+     */
+    const enRegistro = sistemasDeSenal(senal)
+    const inequivocaDeOtra =
+      enRegistro.length === 1 && enRegistro[0].sistema !== 'tanque'
+
+    if (inequivocaDeOtra) {
+      return resolverSenalDeSistema(senal, enRegistro[0].sistema)
+    }
+
     return {
       ok: true,
       clave,

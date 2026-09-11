@@ -1074,6 +1074,101 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
   assert.match(r.error, /no son de la misma máquina/i)
 })
 
+/**
+ * El cruce de máquinas, pedido COMO LO ESCRIBE UN OPERADOR.
+ *
+ * ── POR QUÉ ESTA PRUEBA EXISTE APARTE DE LA DE ARRIBA ──────────────
+ *
+ * Porque la de arriba usa claves técnicas (`vRMS_S1`) y con ellas el fallo no
+ * aparece. Medido el 11-09-2026: **10 de las 42 etiquetas de vibraciones
+ * resolvían a una señal del tanque**, porque el índice del tanque engancha
+ * «velocidad» dentro de «Velocidad eficaz · Lado acople» por su respaldo de
+ * contención, y al resolver las dos al tanque la guarda de `NO_COMPARTEN` no
+ * saltaba: para el código eran de la misma máquina.
+ *
+ * El resultado era `ok: true` con una señal de vibraciones renombrada a
+ * «Velocidad calculada del motor» bajo `sistema: "tanque"`. Cifras reales de
+ * la máquina equivocada, sin error en ninguna parte — el modo de fallo que el
+ * CLAUDE.md señala como el peor, y contra la regla nº 1 del proyecto.
+ *
+ * Se prueba con el nombre completo de catálogo a propósito: es el que devuelve
+ * `estado_del_sistema`, o sea el que el modelo ha leído justo antes de
+ * preguntar, y el que un técnico escribiría.
+ */
+await checkAsync('cruzar máquinas se detecta con el NOMBRE, no sólo con la clave', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  const r = await h.ejecutar('correlacionar_senales', {
+    senales: ['nivel del tanque', 'Velocidad eficaz · Lado acople'],
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, false, 'cruzó dos máquinas sin darse cuenta')
+  assert.match(r.error, /no son de la misma máquina/i, 'el motivo no es el cruce')
+  assert.deepEqual(
+    [...r.sistemas].sort(), ['tanque', 'vibraciones'],
+    'no dice cuáles se intentó cruzar'
+  )
+})
+
+/** La contrapartida: el arbitraje resuelve a la máquina buena, no se niega. */
+await checkAsync('un nombre inequívoco de otra máquina resuelve a ESA máquina', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('historia_de_senal', {
+    senal: 'Velocidad eficaz · Lado acople',
+    periodo: 'últimas 6 horas',
+  })
+
+  // El cliente falso no sirve el historiador de vibraciones, así que la
+  // lectura falla; lo que se fija es que NO la contestó el tanque.
+  assert.doesNotMatch(
+    r.senal ?? '', /Velocidad calculada del motor/,
+    'la señal de vibraciones se contestó con una del tanque'
+  )
+})
+
+/**
+ * Un nombre AMBIGUO entre las dos máquinas sigue resolviendo como siempre.
+ *
+ * «Velocidad» a secas existe en el tanque y en vibraciones, así que el
+ * arbitraje no se aplica —no es inequívoca de otra— y gana el índice del
+ * tanque, que es el comportamiento anterior. La guarda corrige el caso claro
+ * sin volverse una adivinanza nueva.
+ */
+await checkAsync('el arbitraje NO cambia lo que ya resolvía bien', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  for (const nombre of ['nivel', 'presión', 'nivel del tanque', 'temperatura']) {
+    const r = await h.ejecutar('historia_de_senal', { senal: nombre, periodo: 'últimas 6 horas' })
+    assert.equal(r.ok, true, `"${nombre}" dejó de resolverse en el tanque: ${r.error}`)
+  }
+})
+
+/**
+ * Varias señales se pueden pedir como lista O como cadena.
+ *
+ * El 4B manda las dos formas con el mismo esquema delante, y la herramienta lo
+ * perdona desde antes. Al declarar el esquema Zod como `z.array()` a secas
+ * (Plan 23 F0) esa tolerancia se volvió inalcanzable: la validación rechazaba
+ * la cadena antes de llegar. Esta prueba fija que las dos formas llegan — y
+ * sustituye a la que, al escribirse F0, certificaba la regresión como si fuera
+ * lo correcto.
+ */
+await checkAsync('«nivel, presión» se acepta igual que ["nivel", "presión"]', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+
+  const conCadena = await h.ejecutar('correlacionar_senales', {
+    senales: 'nivel, presión',
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.doesNotMatch(
+    conCadena.error ?? '', /tiene que ser una lista/,
+    'rechazó la cadena que sabe interpretar'
+  )
+  assert.equal(conCadena.ok, true, `con cadena: ${conCadena.error}`)
+})
+
 await checkAsync('dos señales de la MISMA otra máquina sí se correlacionan', async () => {
   /*
    * La contrapartida, y la que faltaba: la regla prohíbe cruzar máquinas, no
@@ -2715,7 +2810,10 @@ await checkAsync('un argumento con el tipo equivocado no llega a la herramienta'
   const casos = [
     ['controlar_bomba', { encender: 'sí' }, /true o false/],
     ['perfil_de_senal', { senal: 'nivel', dias: 'muchos' }, /un número.*llegó texto/],
-    ['correlacionar_senales', { senales: 'presión' }, /una lista.*llegó texto/],
+    /* `senales` NO entra aquí: acepta lista Y cadena a propósito (ver
+       `ListaDeSenales` en `definiciones.mjs`). Se prueba abajo, y se prueba
+       que PASA. */
+    ['analisis_de_senal', { senal: 'nivel', horizonteMinutos: 'muchos' }, /un número.*llegó texto/],
     ['estado_del_sistema', { sistema: 5 }, /texto.*llegó un número/],
     [
       'proponer_regla',

@@ -803,6 +803,27 @@ const Texto = z.string()
 const Numero = z.number()
 
 /**
+ * Varias señales: una lista, o una cadena separada por comas.
+ *
+ * ── POR QUÉ LAS DOS FORMAS, Y POR QUÉ ESTO ES UNA CORRECCIÓN ───────
+ *
+ * `correlacionar_senales` acepta desde antes las dos, con su comentario y su
+ * prueba: medido con el 4B, pide un array unas veces y una cadena «nivel,
+ * presión» otras, con el mismo esquema delante. Rechazar la cadena cuesta una
+ * ronda entera de treinta segundos para corregir algo que se entiende.
+ *
+ * Al declarar el esquema como `z.array()` a secas (Plan 23 F0), esa tolerancia
+ * se volvió código muerto: la validación rechazaba la cadena antes de que la
+ * herramienta pudiera perdonarla. F0 prometía validar la FORMA sin cambiar el
+ * comportamiento, y ahí lo cambió — y la prueba que se escribió entonces fijó
+ * la regresión como si fuera lo correcto, que es la peor parte.
+ *
+ * El esquema describe ahora lo que la herramienta de verdad acepta. Quien
+ * normaliza sigue siendo la herramienta: aquí sólo se deja pasar.
+ */
+const ListaDeSenales = z.union([z.array(Texto), Texto])
+
+/**
  * Lo que se acepta ejecutar, por herramienta.
  *
  * ── POR QUÉ `.passthrough()` Y NO ESTRICTO ─────────────────────────
@@ -902,7 +923,7 @@ export const ESQUEMAS = Object.freeze({
     sistema: Texto.optional(),
   }).passthrough(),
   correlacionar_senales: z.object({
-    senales: z.array(Texto),
+    senales: ListaDeSenales,
     periodo: Texto.optional(),
     sistema: Texto.optional(),
   }).passthrough(),
