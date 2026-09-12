@@ -575,6 +575,42 @@ consulta antes de tomarla.
 
 ---
 
+### F3 · `NUE-02` — HECHA el 12-09-2026
+
+`components/LineaDeTiempo.jsx`, montada en la vista de Turno: una línea por
+máquina, con tres carriles (accionamientos, alarmas, casos).
+
+**Medido:** 787 pruebas de frontend (+11), los 28 verificadores, lint 0 errores,
+types limpio. Bundle: `index` 250,34 → **251,02 KB**; **`vendor` sin tocar**, y
+ésa era la cifra a vigilar — **ninguna librería nueva**, como pedía §0.5.
+
+**Sin librería, y la decisión tiene número.** Un eje temporal son divs
+posicionados en porcentaje: ~60 líneas. Una librería habría entrado en `vendor`
+—que acababa de subir a 330 justo por este tipo de goteo— y «diferida» no
+habría significado nada, porque la pantalla ES el eje.
+
+**Lo que encontró esta fase y no estaba previsto: las alarmas son del tanque.**
+Las nueve del catálogo llevan `naturaleza: "alarma"` en
+`shared/eva/tanque/senales.js`; **vibraciones no tiene ninguna declarada**. Es
+la misma asimetría por la que el Plan 24 mandó `USO-05` al Plan 26, y aquí
+obliga a un tercer estado de carril:
+
+| Estado | Qué significa | Cómo se pinta |
+|---|---|---|
+| vacío | se miró y no hubo nada | «sin hechos» |
+| incompleto | una fuente no se pudo leer | «incompleto», en ámbar |
+| **no aplica** | **no hay nada que consultar** | «no hay alarmas declaradas para esta máquina», con el carril en trazo discontinuo |
+
+Sin el tercero, el carril de alarmas de vibraciones diría «sin hechos» — que
+afirma que se miró. Se miró nada.
+
+**Y la regla que este componente no puede romper.** `NO_COMPARTEN`: dos marcas
+alineadas en la misma vertical *se leen* como relacionadas aunque nadie lo diga.
+Por eso son dos líneas separadas y no un eje común, y hay una prueba de que un
+caso del tanque aparece **una sola vez** en toda la pantalla.
+
+---
+
 ## 3 · Cierre del plan
 
 _(Se rellena al terminar.)_

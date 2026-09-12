@@ -86,5 +86,17 @@
       "title": "Casos cerrados",
       "empty": "No se cerró ningún caso en esta ventana."
     }
+  },
+  "timeline": {
+    "notApplicable": "no hay alarmas declaradas para esta máquina",
+    "incomplete": "incompleto: una fuente no se pudo leer",
+    "emptyLane": "sin hechos",
+    "title": "Línea de tiempo",
+    "legend": {
+      "actions": "Accionamientos",
+      "alarms": "Alarmas",
+      "cases": "Casos"
+    },
+    "perMachine": "Una por máquina: el tanque y las vibraciones son instalaciones separadas y no se cruzan."
   }
 }

@@ -44,6 +44,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle, ClipboardList, NotebookPen, RefreshCw, Siren } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { useDominio } from "@/i18n/useDominio.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { leerDiario } from "@/lib/api/diarioApi.js";
 import { listarCasos } from "@/lib/api/casosApi.js";
@@ -51,7 +52,9 @@ import { fetchHealth } from "@/lib/iconics";
 import { useEsSimulado } from "@/lib/datasource";
 import { useTheme } from "@/theme";
 import { turnoEnCurso } from "@shared/periodo.js";
+import { SISTEMA_IDS } from "@shared/eva/comun/sistemas.js";
 
+import { LineaDeTiempo } from "../../components/LineaDeTiempo.jsx";
 import { ALARMAS_HISTORIZABLES, leerAlarmas } from "../../data/comunes/alarmas.js";
 
 /**
@@ -71,6 +74,8 @@ export default function TurnoEva() {
   const { t: traducir } = useTranslation(["maintenance", "common", "alarms", "errors"]);
   const mensajeDeError = useMensajeDeError();
   const esSimulado = useEsSimulado();
+  /* El nombre de cada máquina en el idioma del tablero, no su id. */
+  const { sistema: nombreSistema } = useDominio();
 
   const [turnos, setTurnos] = useState(null);
   const [recarga, setRecarga] = useState(0);
@@ -198,6 +203,62 @@ export default function TurnoEva() {
 
   const refrescar = useCallback(() => setRecarga((n) => n + 1), []);
 
+  /**
+   * Los carriles de UNA máquina. Nada de aquí mezcla las dos.
+   *
+   * El diario no distingue máquina —hoy la única escritura sobre planta es la
+   * bomba del tanque— así que sus entradas van al carril del tanque y en
+   * vibraciones ese carril sale vacío, que es lo cierto: nadie ha accionado
+   * nada ahí porque todavía no hay nada que accionar.
+   */
+  const carrilesDe = useCallback(
+    (sistema) => {
+      const esTanque = sistema === "tanque";
+
+      return [
+        {
+          id: "acciones",
+          etiqueta: traducir("maintenance:timeline.legend.actions"),
+          color: t.accent,
+          incompleto: Boolean(diario.error),
+          hechos: esTanque
+            ? (diario.datos?.entradas ?? [])
+                .filter((e) => e.instante)
+                .map((e) => ({ t: new Date(e.instante), titulo: e.accion ?? e.tipo ?? "—" }))
+            : [],
+        },
+        {
+          id: "alarmas",
+          etiqueta: traducir("maintenance:timeline.legend.alarms"),
+          color: t.amber,
+          /*
+           * Las nueve alarmas del catálogo son del TANQUE; vibraciones no tiene
+           * ninguna declarada. El carril no está vacío por calma, está vacío
+           * porque no hay nada que consultar — y eso se dice, no se pinta como
+           * un eje tranquilo. Misma asimetría que llevó `USO-05` al Plan 26.
+           */
+          noAplica: !esTanque,
+          incompleto: Boolean(alarmas.error) || (alarmas.datos?.fallidas ?? 0) > 0,
+          hechos: esTanque
+            ? (alarmas.datos?.eventos ?? []).map((e) => ({ t: e.inicio, titulo: e.clave }))
+            : [],
+        },
+        {
+          id: "casos",
+          etiqueta: traducir("maintenance:timeline.legend.cases"),
+          color: t.success,
+          incompleto: Boolean(casos.error),
+          // Un caso sin `sistema` es «de toda la planta» y sale en las dos.
+          hechos: (casos.datos ?? [])
+            .filter((c) => !c.sistema || c.sistema === sistema)
+            .filter((c) => c.fecha && !Number.isNaN(new Date(c.fecha).getTime()))
+            .map((c) => ({ t: new Date(c.fecha), titulo: c.sintoma ?? c.causa ?? "—" })),
+        },
+      ];
+    },
+    [diario, alarmas, casos, t, traducir]
+  );
+
   const rotuloVentana = ventana
     ? ventana.configurado
       ? traducir(`maintenance:shift.names.${ventana.clave}`, {
@@ -284,6 +345,42 @@ export default function TurnoEva() {
           title={traducir("maintenance:shift.simulated.title")}
           message={traducir("maintenance:shift.simulated.body")}
         />
+      )}
+
+      {/* ── 0 · La línea de tiempo, UNA POR MÁQUINA ────────────────────── */}
+      {ventana && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <SectionLabel sub={traducir("maintenance:timeline.perMachine")}>
+            {traducir("maintenance:timeline.title")}
+          </SectionLabel>
+
+          {/*
+            Dos líneas separadas y NO un eje común, aunque quepan en la
+            pantalla. `NO_COMPARTEN`: dos marcas alineadas en la misma vertical
+            se leen como relacionadas aunque nadie lo diga, y estas dos máquinas
+            tienen PLC distinto y no comparten nada.
+          */}
+          {SISTEMA_IDS.map((sistema) => (
+            <div
+              key={sistema}
+              style={{
+                background: t.panel, border: `1px solid ${t.border}`,
+                borderRadius: 12, padding: 14,
+                display: "flex", flexDirection: "column", gap: 10,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: t.text }}>
+                {nombreSistema(sistema)}
+              </h3>
+              <LineaDeTiempo
+                sistema={sistema}
+                inicio={ventana.inicio}
+                fin={ventana.fin}
+                carriles={carrilesDe(sistema)}
+              />
+            </div>
+          ))}
+        </section>
       )}
 
       {/* ── 1 · Accionamientos ─────────────────────────────────────────── */}

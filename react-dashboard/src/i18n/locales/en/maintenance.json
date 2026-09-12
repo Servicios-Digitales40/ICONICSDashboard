@@ -86,5 +86,17 @@
       "title": "Closed cases",
       "empty": "No case was closed in this window."
     }
+  },
+  "timeline": {
+    "notApplicable": "no alarms are declared for this machine",
+    "incomplete": "incomplete: one source could not be read",
+    "emptyLane": "no events",
+    "title": "Timeline",
+    "legend": {
+      "actions": "Actions",
+      "alarms": "Alarms",
+      "cases": "Cases"
+    },
+    "perMachine": "One per machine: the tank and the vibration system are separate installations and are never crossed."
   }
 }

@@ -158,6 +158,57 @@ describe("una fuente caída no vacía las otras dos", () => {
   });
 });
 
+describe("la línea de tiempo no cruza las dos máquinas (NO_COMPARTEN)", () => {
+  it("hay UNA línea por máquina, cada una con su nombre", async () => {
+    /*
+     * Y no un eje común aunque quepa: dos marcas alineadas en la misma vertical
+     * se leen como relacionadas aunque nadie lo diga, y estas dos instalaciones
+     * tienen PLC distinto y no comparten nada.
+     */
+    enCalma();
+    montar();
+
+    await waitFor(() => expect(screen.getByText("Línea de tiempo")).toBeTruthy());
+    // Los nombres salen del dominio (`machines.json`), no de esta pantalla.
+    expect(screen.getByText("Sistema de agua industrial")).toBeTruthy();
+    expect(screen.getByText("Sistema de vibraciones")).toBeTruthy();
+  });
+
+  it("un caso del TANQUE no aparece en la línea de vibraciones", async () => {
+    enCalma();
+    listarCasos.mockResolvedValue({
+      ok: true,
+      casos: [
+        {
+          id: "c1",
+          sistema: "tanque",
+          fecha: new Date().toISOString(),
+          sintoma: "SoloDelTanque",
+        },
+      ],
+    });
+
+    const { container } = montar();
+
+    await waitFor(() => expect(screen.getByText(/SoloDelTanque/)).toBeTruthy());
+    // Una sola marca en los ejes: la del tanque. Si saliera en los dos, serían dos.
+    const marcas = container.querySelectorAll('[title*="SoloDelTanque"]');
+    expect(marcas).toHaveLength(1);
+  });
+
+  it("las alarmas de vibraciones se declaran como «no hay», no como carril vacío", async () => {
+    /*
+     * Las nueve alarmas del catálogo son del tanque. En vibraciones ese carril
+     * está vacío porque no hay nada que consultar, no porque no haya saltado
+     * nada — y decir «sin hechos» ahí afirmaría que se miró.
+     */
+    enCalma();
+    montar();
+
+    await waitFor(() => expect(screen.getByText(/no hay alarmas declaradas/i)).toBeTruthy());
+  });
+});
+
 describe("vacío y roto no son lo mismo", () => {
   it("un turno sin nada lo dice UNA vez, no con tres bloques mudos", async () => {
     enCalma();
