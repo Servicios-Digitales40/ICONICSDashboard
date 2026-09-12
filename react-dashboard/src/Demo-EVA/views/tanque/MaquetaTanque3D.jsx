@@ -195,6 +195,7 @@ function MaquetaTanque3D({ params, onNavigate }) {
           title={traducir("errors:titles.plantReadFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       )}
 

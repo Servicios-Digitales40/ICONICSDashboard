@@ -119,6 +119,25 @@ describe("RAG · Documentación — el catálogo", () => {
         fragmentos: null,
         motivoIlegible: null,
       },
+      /*
+       * Un manual RECORTADO (Plan 24 F2 · `USO-04`). Tiene fragmentos —muchos—
+       * así que hasta esta fase salía como «indexado» y en verde, igual que uno
+       * completo. El motivo es el que emite de verdad `documentos.mjs`, medido
+       * en `verificar-documentos.mjs`.
+       */
+      {
+        id: "44444444-4444-4444-4444-444444444444",
+        archivo: "enorme.docx",
+        sistema: null,
+        titulo: "Manual recortado",
+        version: 1,
+        estado: "activo",
+        subidoPor: "anonimo",
+        fecha: "2026-09-01T09:10:00.000Z",
+        fragmentos: 400,
+        motivoIlegible: null,
+        motivoParcial: "se cortó al pasar de 50,000 caracteres, en la página 12",
+      },
     ],
   };
 
@@ -128,6 +147,47 @@ describe("RAG · Documentación — el catálogo", () => {
     await waitFor(() => expect(screen.getByText("Manual indexado")).toBeTruthy());
     expect(screen.getByText(/42 fragmentos/)).toBeTruthy();
     expect(screen.getByText("indexado")).toBeTruthy();
+  });
+
+  /*
+   * ── EL RECORTADO ES EL CASO QUE EL PLAN 22 DEJÓ APUNTADO ──────────
+   *
+   * Su §F2 lo escribió así: «la pantalla de Documentación aún no la pinta; eso
+   * es del Plan 24 (`USO-04`), y hasta entonces sale en el registro de arranque,
+   * que es donde alguien la busca hoy». Estas dos pruebas son el cierre de esa
+   * deuda, y la primera comprueba justo lo que hacía el fallo invisible: que NO
+   * se vea como uno indexado.
+   */
+  it("un manual recortado NO se ve como uno completo", async () => {
+    montarCon(CON_MANUALES);
+
+    await waitFor(() => expect(screen.getByText("Manual recortado")).toBeTruthy());
+    expect(screen.getByText("recortado")).toBeTruthy();
+
+    /*
+     * Tiene 400 fragmentos, así que antes de F2 caía en la rama
+     * `fragmentos > 0` y salía «indexado» en verde. Sólo el manual de 42 puede
+     * llevar esa etiqueta.
+     */
+    expect(screen.getAllByText("indexado")).toHaveLength(1);
+  });
+
+  it("el recortado dice qué se perdió, para poder decidir si importaba", async () => {
+    montarCon(CON_MANUALES);
+
+    await waitFor(() => expect(screen.getByText("Manual recortado")).toBeTruthy());
+    // Sin el motivo, «recortado» sería una etiqueta sin salida: lo que hace
+    // falta es saber DÓNDE se cortó.
+    expect(screen.getByText(/se cortó al pasar de 50,000 caracteres/)).toBeTruthy();
+  });
+
+  it("los recortados se cuentan aparte de los ilegibles", async () => {
+    montarCon(CON_MANUALES);
+
+    await waitFor(() => expect(screen.getByText("Manual recortado")).toBeTruthy());
+    // El arreglo de cada uno es distinto —uno se sustituye, del otro se decide
+    // si lo que faltó importaba—, así que son dos cuentas y no una.
+    expect(screen.getByText("Recortados")).toBeTruthy();
   });
 
   it("un manual que no se pudo leer se ve roto, no como uno vacío", async () => {
@@ -153,13 +213,14 @@ describe("RAG · Documentación — el catálogo", () => {
     // El valor de una estadística es el elemento que sigue a su etiqueta.
     const valorDe = (label) => screen.getByText(label).nextElementSibling.textContent;
 
-    // Dos activos (indexado + roto), el archivado queda fuera del recuento.
-    expect(valorDe("Documentos")).toBe("2");
+    // Tres activos (indexado + roto + recortado), el archivado queda fuera del
+    // recuento. El recortado entró en el fixture con el Plan 24 F2.
+    expect(valorDe("Documentos")).toBe("3");
     expect(screen.getByText("archivado")).toBeTruthy();
 
-    // Y ninguno de los dos activos tiene máquina asignada en este fixture:
+    // Y ninguno de los tres activos tiene máquina asignada en este fixture:
     // el contador que empuja a revisarlos los ve, y no cuenta el archivado.
-    expect(valorDe("Sin asignar")).toBe("2");
+    expect(valorDe("Sin asignar")).toBe("3");
   });
 
   it("asignar una máquina manda `accion=asignar`, no un archivado", async () => {

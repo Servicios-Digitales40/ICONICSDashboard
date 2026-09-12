@@ -1,14 +1,35 @@
 /**
  * De un fallo del puente al texto que ve un operador, en su idioma.
  *
- * ── LO QUE DECIDE, Y POR QUÉ SON DOS COSAS Y NO UNA ────────────────
+ * ── LO QUE DECIDE, Y POR QUÉ SON TRES COSAS Y NO UNA ───────────────
  *
- * Devuelve `{ titulo, detalle }`, no una cadena:
+ * Devuelve `{ titulo, detalle, accion }`, no una cadena:
  *
  *   · `titulo`  la frase del CÓDIGO, traducida. «El archivo supera el límite
  *               de este servidor.»
  *   · `detalle` lo que redactó el servidor, tal cual. «El archivo supera el
  *               límite de 25 MB.»
+ *   · `accion`  qué hacer al respecto, o `null`. «Divide el manual en partes
+ *               o súbelo sin las imágenes de mayor peso.»
+ *
+ * ── LA ACCIÓN ES OPCIONAL POR CÓDIGO, Y ESO ES DELIBERADO ──────────
+ *
+ * De los cuarenta y dos códigos del catálogo, hoy trece llevan acción. No es
+ * trabajo a medias: **la mayoría no tiene nada que pedirle a un operador de
+ * planta.** Un `ERROR_VALIDACION` interno, un `ERROR_CASO_NO_ENCONTRADO`, un
+ * `ERROR_SERVER` — la respuesta a todos ellos es «esto es un fallo del
+ * programa», y escribir «inténtalo de nuevo» debajo sería relleno.
+ *
+ * Y el relleno aquí tiene un coste concreto: enseña que el hueco de la acción
+ * no dice nada útil, y entonces se deja de leer justo en los trece casos donde
+ * sí lo dice. Por eso `verificar-codigos.mjs` comprueba la SIMETRÍA de las
+ * acciones que existen (si está en español, está en inglés) y nunca exige que
+ * existan todas.
+ *
+ * Tres códigos no llevan acción aparte porque ya la llevan DENTRO de su frase
+ * —`ERROR_ENLACE_CADUCADO` («pídele al asistente que te genere otro»),
+ * `ERROR_CONSULTA_EN_CURSO`, `ERROR_RATE_LIMITED`—. Duplicarla la diría dos
+ * veces con otras palabras, que se lee como dos instrucciones distintas.
  *
  * Separarlas es lo que permite traducir sin perder información. El código no
  * puede llevar el número —lo sabe el servidor, no el diccionario— y el mensaje
@@ -34,7 +55,7 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 /**
- * @returns {(fallo: unknown) => { titulo: string, detalle: string|null }}
+ * @returns {(fallo: unknown) => { titulo: string, detalle: string|null, accion: string|null }}
  */
 export function useMensajeDeError() {
   const { t } = useTranslation("errors");
@@ -42,8 +63,8 @@ export function useMensajeDeError() {
   return useCallback(
     (fallo) => {
       /* Una cadena suelta: alguna vista todavía guarda `error` como texto. */
-      if (typeof fallo === "string") return { titulo: fallo, detalle: null };
-      if (!fallo) return { titulo: t("codes.ERROR_UNKNOWN"), detalle: null };
+      if (typeof fallo === "string") return { titulo: fallo, detalle: null, accion: null };
+      if (!fallo) return { titulo: t("codes.ERROR_UNKNOWN"), detalle: null, accion: null };
 
       const codigo = fallo.codigo ?? null;
       const delServidor = fallo.mensajeDelServidor ?? fallo.message ?? null;
@@ -55,8 +76,17 @@ export function useMensajeDeError() {
        * genérico.
        */
       if (!codigo) {
-        return { titulo: delServidor || t("codes.ERROR_UNKNOWN"), detalle: null };
+        return { titulo: delServidor || t("codes.ERROR_UNKNOWN"), detalle: null, accion: null };
       }
+
+      /*
+       * La acción va atada al CÓDIGO, así que sin código no hay acción: un
+       * fallo sin identidad no se puede acompañar de un «qué hacer» sin
+       * adivinar cuál era. Y `defaultValue: ""` en vez de dejar que i18next
+       * devuelva la clave: una acción ausente es `null`, no el texto
+       * «actions.ERROR_X» pintado en la tarjeta.
+       */
+      const accion = t(`actions.${codigo}`, { defaultValue: "" }) || null;
 
       /*
        * Un código que el diccionario no conoce es un backend más nuevo que
@@ -65,7 +95,10 @@ export function useMensajeDeError() {
       const clave = `codes.${codigo}`;
       const traducido = t(clave, { defaultValue: "" });
       if (!traducido) {
-        return { titulo: delServidor || codigo, detalle: null };
+        /* La acción sí puede existir aunque falte la frase: son dos claves
+           independientes, y si el diccionario tiene una y no la otra, dar la
+           que hay es mejor que callar las dos. */
+        return { titulo: delServidor || codigo, detalle: null, accion };
       }
 
       /*
@@ -76,7 +109,7 @@ export function useMensajeDeError() {
       const repetido =
         delServidor && delServidor.trim().toLowerCase() === traducido.trim().toLowerCase();
 
-      return { titulo: traducido, detalle: repetido ? null : delServidor };
+      return { titulo: traducido, detalle: repetido ? null : delServidor, accion };
     },
     /* Sólo `t`: react-i18next devuelve una función nueva al cambiar de idioma. */
     [t],

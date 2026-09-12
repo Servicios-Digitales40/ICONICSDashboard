@@ -85,6 +85,7 @@ export function IconicsProductsList() {
           title={traducir("errors:titles.productListFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       ) : loading && products.length === 0 ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>

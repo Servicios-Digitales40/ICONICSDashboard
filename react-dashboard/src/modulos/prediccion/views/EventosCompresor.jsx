@@ -346,6 +346,7 @@ export default function EventosCompresor() {
             title={traducir("events.query.failed")}
             message={mensajeDeError(error).titulo}
             detalle={mensajeDeError(error).detalle}
+            accion={mensajeDeError(error).accion}
           />
         </div>
       )}

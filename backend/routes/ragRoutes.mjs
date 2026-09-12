@@ -121,6 +121,20 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
     // por sí solo no sabe si un PDF se pudo leer.
     const fragmentosPorArchivo = new Map((estadoIndice?.documentos ?? []).map(d => [d.archivo, d.fragmentos]))
     const motivoIlegiblePorArchivo = new Map((estadoIndice?.ilegibles ?? []).map(i => [i.archivo, i.motivo]))
+    /*
+     * Los RECORTADOS, que es distinto de los ilegibles (Plan 24 F2 · `USO-04`).
+     *
+     * Un parcial SÍ tiene fragmentos buscables, así que la vista lo pintaba
+     * como «indexado» y en verde — indistinguible de uno completo. Lo que el
+     * asistente puede citar de él, en cambio, está incompleto: si lo que quedó
+     * fuera era el capítulo que hacía falta, la respuesta sale corta y nadie
+     * tiene forma de saber por qué.
+     *
+     * El Plan 22 F2 lo dejó apuntado aquí a propósito («la pantalla de
+     * Documentación aún no la pinta; eso es del Plan 24»), y hasta hoy el único
+     * sitio donde constaba era el registro de arranque del servidor.
+     */
+    const motivoParcialPorArchivo = new Map((estadoIndice?.parciales ?? []).map(p => [p.archivo, p.motivo]))
 
     return {
       ok: true,
@@ -137,6 +151,7 @@ export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorMan
         ...m,
         fragmentos: m.estado === 'activo' ? fragmentosPorArchivo.get(m.archivo) ?? 0 : null,
         motivoIlegible: m.estado === 'activo' ? motivoIlegiblePorArchivo.get(m.archivo) ?? null : null,
+        motivoParcial: m.estado === 'activo' ? motivoParcialPorArchivo.get(m.archivo) ?? null : null,
       })),
     }
   })

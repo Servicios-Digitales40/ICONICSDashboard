@@ -412,6 +412,7 @@ export default function CasosRag() {
             title={traducir("errors:titles.logbookReadFailed")}
             message={mensajeDeError(estado.error).titulo}
             detalle={mensajeDeError(estado.error).detalle}
+            accion={mensajeDeError(estado.error).accion}
           />
         )}
 

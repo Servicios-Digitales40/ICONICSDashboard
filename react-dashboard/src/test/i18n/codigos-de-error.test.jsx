@@ -138,3 +138,75 @@ describe("cuando no hay código se degrada a lo de siempre", () => {
     expect(screen.queryByText(/codes\.ERROR_QUE_TODAVIA_NO_EXISTE/)).toBeNull();
   });
 });
+
+/* ── El «qué hacer» (Plan 24 F2 · USO-04) ───────────────────────────── */
+
+/** La acción de un código, en un idioma, tal y como la tiene el diccionario. */
+const accion = (idioma, codigo) =>
+  i18n.getFixedT(idioma, "errors")(`actions.${codigo}`, { defaultValue: "" });
+
+describe("un error accionable dice qué hacer, en el idioma del tablero", () => {
+  it("[es] pinta la acción además de la frase y el detalle", async () => {
+    servidorQueFalla({
+      ok: false,
+      error: "El puente arrancó con ICONICS_READ_ONLY=true.",
+      codigo: "ERROR_READ_ONLY",
+    });
+    montar();
+
+    await screen.findByText(frase("es", "ERROR_READ_ONLY"));
+    expect(screen.getByText(accion("es", "ERROR_READ_ONLY"))).toBeTruthy();
+  });
+
+  it("[en] la acción también está traducida, y no cae al español", async () => {
+    servidorQueFalla({
+      ok: false,
+      error: "El puente arrancó con ICONICS_READ_ONLY=true.",
+      codigo: "ERROR_READ_ONLY",
+    });
+    await i18n.changeLanguage("en");
+    montar();
+
+    const enIngles = accion("en", "ERROR_READ_ONLY");
+    await screen.findByText(enIngles);
+
+    /*
+     * La comprobación que importa: que NO sea la española. Es el modo de fallo
+     * real de una clave a medio traducir — i18next cae a `fallbackLng`, que es
+     * el español, y el resultado se ve «bien» salvo que está en otro idioma.
+     */
+    expect(enIngles).not.toBe(accion("es", "ERROR_READ_ONLY"));
+    expect(screen.queryByText(accion("es", "ERROR_READ_ONLY"))).toBeNull();
+  });
+
+  it("un código SIN acción no pinta un hueco ni la clave cruda", async () => {
+    /*
+     * `ERROR_BITACORA` es uno de los veintinueve que no llevan acción, y es a
+     * propósito: no hay nada que pedirle a un operador de planta ante un fallo
+     * de escritura en disco del servidor. Lo que no puede pasar es que se
+     * cuele «actions.ERROR_BITACORA» en la tarjeta.
+     */
+    servidorQueFalla({
+      ok: false,
+      error: "No se pudo escribir en datos/aprendizaje.json: EACCES",
+      codigo: "ERROR_BITACORA",
+    });
+    montar();
+
+    await screen.findByText(frase("es", "ERROR_BITACORA"));
+    expect(screen.queryByText(/actions\./)).toBeNull();
+    expect(accion("es", "ERROR_BITACORA")).toBe("");
+  });
+
+  it("un código desconocido no arrastra acción de otro", async () => {
+    servidorQueFalla({
+      ok: false,
+      error: "Fallo de una versión más nueva del puente.",
+      codigo: "ERROR_QUE_TODAVIA_NO_EXISTE",
+    });
+    montar();
+
+    await screen.findByText("Fallo de una versión más nueva del puente.");
+    expect(screen.queryByText(/actions\./)).toBeNull();
+  });
+});

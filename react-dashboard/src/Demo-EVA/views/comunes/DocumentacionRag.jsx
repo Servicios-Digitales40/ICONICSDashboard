@@ -113,6 +113,24 @@ function Estadistica({ label, valor, tono, t }) {
 function estadoDeFila(manual, { indexando, cargado }) {
   if (manual.estado === "archivado") return { clave: "archivado", tipo: "mute" };
   if (manual.motivoIlegible) return { clave: "ilegible", tipo: "bad" };
+  /*
+   * ── RECORTADO VA ANTES DE «INDEXADO», Y NO ES «ok» (Plan 24 F2) ──
+   *
+   * Un parcial TIENE fragmentos buscables, así que sin esta rama caía en
+   * `indexado` y salía en verde: indistinguible de un manual completo. Y lo que
+   * el asistente puede citar de él está incompleto — si lo que quedó fuera era
+   * el capítulo que hacía falta, la respuesta sale corta y nadie sabe por qué.
+   *
+   * `wait` y no `bad`: no está roto, está a medias. Pintarlo de rojo junto a los
+   * ilegibles borraría la distinción que el Plan 22 F2 se tomó el trabajo de
+   * mantener —«aquí SÍ hay fragmentos buscables, y lo que hay que decidir es si
+   * lo que quedó fuera importaba»— y el arreglo de cada uno es distinto.
+   *
+   * El Plan 22 lo dejó escrito: «la pantalla de Documentación aún no la pinta;
+   * eso es del Plan 24 (`USO-04`), y hasta entonces sale en el registro de
+   * arranque». Esto es esa deuda.
+   */
+  if (manual.motivoParcial) return { clave: "parcial", tipo: "wait" };
   if (manual.fragmentos > 0) return { clave: "indexado", tipo: "ok" };
   if (indexando) return { clave: "indexando", tipo: "wait" };
   if (!cargado) return { clave: "sinLeer", tipo: "wait" };
@@ -174,6 +192,12 @@ function FilaManual({
         </div>
         {estado.tipo === "bad" && manual.motivoIlegible && (
           <div style={{ fontSize: 11.5, color: t.coral, marginTop: 3 }}>{manual.motivoIlegible}</div>
+        )}
+        {/* El motivo del recorte, en ámbar y no en coral: dice qué se perdió
+            («se cortó a 400 fragmentos»), que es lo que hace falta para decidir
+            si importaba. Sin él, «recortado» sería una etiqueta sin salida. */}
+        {estado.clave === "parcial" && manual.motivoParcial && (
+          <div style={{ fontSize: 11.5, color: t.amber, marginTop: 3 }}>{manual.motivoParcial}</div>
         )}
       </div>
 
@@ -394,6 +418,7 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
               title={traducir("errors:titles.uploadFailed")}
               message={mensajeDeError(error).titulo}
               detalle={mensajeDeError(error).detalle}
+              accion={mensajeDeError(error).accion}
             />
           </div>
         )}
@@ -440,6 +465,7 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
             title={traducir("errors:titles.uploadFailed")}
             message={mensajeDeError(error).titulo}
             detalle={mensajeDeError(error).detalle}
+            accion={mensajeDeError(error).accion}
           />
         </div>
       )}
@@ -596,6 +622,7 @@ export default function DocumentacionRag() {
           title={traducir("errors:titles.catalogQueryFailed")}
           message={mensajeDeError(errorCarga).titulo}
           detalle={mensajeDeError(errorCarga).detalle}
+          accion={mensajeDeError(errorCarga).accion}
         />
       </>
     );
@@ -621,6 +648,14 @@ export default function DocumentacionRag() {
 
   const activos = datos.manuales.filter((m) => m.estado === "activo");
   const sinLeer = activos.filter((m) => m.motivoIlegible).length;
+  /*
+   * Los RECORTADOS, aparte de los ilegibles (Plan 24 F2 · `USO-04`). Cuenta
+   * propia y no sumados a `sinLeer` por el mismo motivo que el backend los
+   * mantiene en dos listas (Plan 22 F2): el arreglo de cada uno es distinto
+   * —uno hay que sustituirlo, del otro hay que decidir si lo que faltó
+   * importaba— y mezclarlos obligaría a leer el motivo para saber cuál es cuál.
+   */
+  const recortados = activos.filter((m) => m.motivoParcial).length;
   const totalFragmentos = activos.reduce((s, m) => s + (m.fragmentos ?? 0), 0);
 
   /*
@@ -699,6 +734,21 @@ export default function DocumentacionRag() {
             tono={sinLeer ? t.coral : t.text}
             t={t}
           />
+          {/*
+           * Sólo cuando hay alguno: a diferencia de «sin asignar» —un contador
+           * que existe para bajarse a cero y por eso se enseña siempre— un cero
+           * aquí no pide nada a nadie, y una métrica permanente en cero enseña a
+           * no mirar la fila. Cuando aparece, en ámbar: el manual sirve, pero
+           * incompleto.
+           */}
+          {recortados > 0 && (
+            <Estadistica
+              label={traducir("assistant:rag.docs.stats.truncated")}
+              valor={recortados}
+              tono={t.amber}
+              t={t}
+            />
+          )}
           {/*
            * En ámbar y no en rojo: un manual sin asignar no está roto, y
            * puede que «toda la planta» sea la respuesta correcta para él.

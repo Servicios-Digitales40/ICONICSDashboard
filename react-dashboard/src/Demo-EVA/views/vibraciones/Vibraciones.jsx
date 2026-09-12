@@ -362,6 +362,7 @@ function Vibraciones() {
           title={traducir("errors:titles.moduleReadFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       )}
 

@@ -85,12 +85,31 @@ const idiomas = readdirSync(LOCALES, { withFileTypes: true })
   .map(d => d.name)
   .sort()
 
-/** `{ es: { ERROR_X: 'frase' }, en: {...} }` */
-const delTablero = Object.fromEntries(
+/** El `errors.json` entero de cada idioma, para leer `codes` y `actions`. */
+const erroresPorIdioma = Object.fromEntries(
   idiomas.map(idioma => [
     idioma,
-    JSON.parse(readFileSync(join(LOCALES, idioma, 'errors.json'), 'utf8')).codes ?? {},
+    JSON.parse(readFileSync(join(LOCALES, idioma, 'errors.json'), 'utf8')),
   ])
+)
+
+/** `{ es: { ERROR_X: 'frase' }, en: {...} }` */
+const delTablero = Object.fromEntries(
+  idiomas.map(idioma => [idioma, erroresPorIdioma[idioma].codes ?? {}])
+)
+
+/**
+ * `{ es: { ERROR_X: 'qué hacer' }, en: {...} }` — el «siguiente paso» del
+ * Plan 24 F2 (`USO-04`).
+ *
+ * A diferencia de `codes`, esto es **opcional por código** y la comprobación de
+ * abajo NUNCA exige que exista. Ver la cabecera de `useMensajeDeError.js`: de
+ * los cuarenta y dos códigos, la mayoría no tiene nada que pedirle a un
+ * operador de planta, y rellenar el hueco con «inténtalo de nuevo» enseña que
+ * ese hueco no dice nada útil — que es cómo se deja de leer justo en los que sí.
+ */
+const accionesPorIdioma = Object.fromEntries(
+  idiomas.map(idioma => [idioma, erroresPorIdioma[idioma].actions ?? {}])
 )
 
 /**
@@ -144,6 +163,53 @@ check('ninguna clave de `errors:codes` sobra', () => {
     sobran.length === 0,
     `el tablero traduce códigos que el puente no emite (${sobran.length}): ${sobran.join(', ')}\n` +
     'Si es de verdad del navegador y no del puente, añádelo a SOLO_DEL_TABLERO con su motivo.'
+  )
+})
+
+/* ── 2b · Las acciones que EXISTEN, existen en los dos idiomas ────────── */
+
+console.log('\n── Lo que un error pide hacer, se sabe pedir en los dos ─────')
+
+/*
+ * La asimetría es el modo de fallo real aquí, y es del mismo tipo silencioso
+ * que el resto de este guion: quien añade una acción la escribe en el idioma en
+ * el que está pensando. La frase existe, se ve perfecta en su máquina, y en el
+ * otro idioma el hueco de «qué hacer» simplemente no aparece — sin error, sin
+ * aviso, y con el operador que habla el otro idioma sin la mitad útil del
+ * mensaje.
+ *
+ * Lo que NO se comprueba, a propósito: que todo código tenga acción. Ver el
+ * comentario de `accionesPorIdioma`.
+ */
+check('ninguna acción existe en un solo idioma', () => {
+  const todas = new Set(idiomas.flatMap(i => Object.keys(accionesPorIdioma[i])))
+  const cojas = []
+
+  for (const codigo of [...todas].sort()) {
+    const conAccion = idiomas.filter(i => String(accionesPorIdioma[i][codigo] ?? '').trim())
+    if (conAccion.length !== idiomas.length) {
+      const faltan = idiomas.filter(i => !conAccion.includes(i))
+      cojas.push(`${codigo} — sólo en ${conAccion.join(', ')}; falta en ${faltan.join(', ')}`)
+    }
+  }
+
+  assert.ok(
+    cojas.length === 0,
+    `acciones que no están en todos los idiomas (${cojas.length}):\n${cojas.map(x => `  ${x}`).join('\n')}\n` +
+    'Una acción a medio traducir deja al operador del otro idioma sin el «qué hacer».'
+  )
+})
+
+check('ninguna acción apunta a un código que no existe', () => {
+  const conocidos = new Set([...delBackend, ...SOLO_DEL_TABLERO])
+  const huerfanas = Object.keys(accionesPorIdioma[idiomas[0]])
+    .filter(k => !conocidos.has(k))
+    .sort()
+
+  assert.ok(
+    huerfanas.length === 0,
+    `acciones para códigos que nadie emite (${huerfanas.length}): ${huerfanas.join(', ')}\n` +
+    'Es trabajo muerto, y peor: sugiere que ese caso está cubierto cuando no lo está.'
   )
 })
 

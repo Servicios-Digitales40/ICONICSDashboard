@@ -181,6 +181,7 @@ function PlantaTanque({ onNavigate }) {
             title={traducir("errors:titles.waterSystemReadFailed")}
             message={mensajeDeError(error).titulo}
             detalle={mensajeDeError(error).detalle}
+            accion={mensajeDeError(error).accion}
           />
         )}
 

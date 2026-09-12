@@ -270,6 +270,7 @@ function AssetProperties({ node, intervalMs = 5000 }) {
           title={traducir("errors:titles.assetReadFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       )}
 
@@ -394,6 +395,7 @@ export function ExploradorAssets({ raiz = RAIZ_ASSETS, titulo = null, acciones =
               title={traducir("errors:titles.treeLoadFailed")}
               message={mensajeDeError(error).titulo}
               detalle={mensajeDeError(error).detalle}
+              accion={mensajeDeError(error).accion}
             />
           ) : isLoading ? (
             <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>

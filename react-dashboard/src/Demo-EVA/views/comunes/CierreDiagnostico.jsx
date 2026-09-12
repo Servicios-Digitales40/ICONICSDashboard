@@ -693,6 +693,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
             title={traducir("errors:titles.caseCloseFailed")}
             message={mensajeDeError(errorEnvio).titulo}
             detalle={mensajeDeError(errorEnvio).detalle}
+            accion={mensajeDeError(errorEnvio).accion}
           />
         )}
 

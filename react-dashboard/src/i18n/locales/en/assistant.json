@@ -7,14 +7,16 @@
         "indexado": "indexed",
         "indexando": "indexing",
         "sinLeer": "not read yet",
-        "faltaArchivo": "file missing"
+        "faltaArchivo": "file missing",
+        "parcial": "truncated"
       },
       "stats": {
         "documents": "Documents",
         "fragments": "Fragments",
         "search": "Search",
         "unread": "Unread",
-        "unassigned": "Unassigned"
+        "unassigned": "Unassigned",
+        "truncated": "Truncated"
       },
       "fragments": "{{n}} fragments",
       "wholePlant": "Whole plant",

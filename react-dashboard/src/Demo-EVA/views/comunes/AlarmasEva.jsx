@@ -201,6 +201,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
           title={traducir("errors:titles.alarmHistoryFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       ) : estado === HISTORIAL.CARGANDO ? (
         <p style={{ fontSize: 13, color: t.textFaint }}>{traducir("alarms:loading")}</p>

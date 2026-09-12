@@ -69,5 +69,20 @@
     "technicalDetail": "Detalle técnico: {{detalle}}",
     "staleBelow": "{{detalle}}. Lo que se ve abajo puede estar desactualizado.",
     "restOfBoardWorks": "El resto del tablero sigue funcionando. Cambia de vista y vuelve para reintentar."
+  },
+  "actions": {
+    "ERROR_CONNECTION_FAILED": "Comprueba que el servidor puente esté encendido y que esta pantalla tenga red. El panel «Salud del sistema» dice cuál de los dos falla.",
+    "ERROR_TIMEOUT": "El puente sigue vivo pero tardó de más. Si se repite, míralo en «Salud del sistema»: suele ser ICONICS respondiendo despacio, no el puente.",
+    "ERROR_READ_ONLY": "Es una decisión de despliegue, no una avería: este servidor arrancó con la escritura desactivada. Si tiene que poder accionar, avisa a quien lo despliega.",
+    "ERROR_ACCION_BOMBA": "Comprueba el nivel del tanque y que el proceso esté habilitado; el puente se niega a encender con el tanque alto. El detalle de abajo dice cuál de las dos guardas saltó.",
+    "ERROR_IA_SIN_CONFIGURAR": "Falta el modelo de lenguaje en este despliegue. El tablero funciona sin él; sólo el asistente queda fuera.",
+    "ERROR_VOZ_SIN_CONFIGURAR": "Falta el servidor de dictado en este despliegue. Escribe la pregunta en su lugar.",
+    "ERROR_MOTOR_SIN_MONTAR": "Falta el motor de diagnóstico en este despliegue. Las lecturas y las gráficas siguen sirviendo.",
+    "ERROR_DOCS_SIN_CONFIGURAR": "Falta la carpeta de manuales en este despliegue. El asistente responderá sin poder citar documentación.",
+    "ERROR_PDF_SIN_CONFIGURAR": "Falta configurar la exportación en este despliegue. La conversación se puede copiar a mano mientras tanto.",
+    "ERROR_PDF_SIN_DEPENDENCIAS": "Al servidor le falta una pieza para generar el PDF. Avisa a quien lo despliega: no es algo que se arregle desde el tablero.",
+    "ERROR_ARCHIVO_GRANDE": "Divide el manual en partes o súbelo sin las imágenes de mayor peso. El detalle de abajo dice cuál es el límite exacto.",
+    "ERROR_AUDIO_GRANDE": "Dicta la pregunta en frases más cortas. El detalle de abajo dice cuál es el límite exacto.",
+    "ERROR_CARGA_DESACTIVADA": "Es una decisión de despliegue. Los manuales se ponen en la carpeta del servidor; pídelo a quien lo administra."
   }
 }

@@ -58,6 +58,7 @@ export function IconicsLiveCard({ pointName, intervalMs = 5000 }) {
           title={traducir("errors:titles.pointReadFailed")}
           message={mensajeDeError(error).titulo}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       ) : !data && loading ? (
         <div style={{ fontSize: 12.5, color: t.textSoft, fontFamily: "'IBM Plex Mono', monospace" }}>

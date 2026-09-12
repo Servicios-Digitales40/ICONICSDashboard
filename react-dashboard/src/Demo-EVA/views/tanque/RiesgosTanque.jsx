@@ -465,6 +465,7 @@ function RiesgosTanque({ onNavigate }) {
           title={traducir("errors:titles.plantReadFailed")}
           message={traducir("errors:hints.staleBelow", { detalle: mensajeDeError(error).titulo })}
           detalle={mensajeDeError(error).detalle}
+          accion={mensajeDeError(error).accion}
         />
       )}
 

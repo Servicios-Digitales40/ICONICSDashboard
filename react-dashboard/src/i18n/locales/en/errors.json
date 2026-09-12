@@ -69,5 +69,20 @@
     "technicalDetail": "Technical detail: {{detalle}}",
     "staleBelow": "{{detalle}}. What you see below may be out of date.",
     "restOfBoardWorks": "The rest of the dashboard keeps working. Switch views and come back to retry."
+  },
+  "actions": {
+    "ERROR_CONNECTION_FAILED": "Check that the bridge server is running and that this screen has network access. The «System health» panel tells you which of the two is failing.",
+    "ERROR_TIMEOUT": "The bridge is alive but took too long. If it keeps happening, check «System health»: it is usually ICONICS answering slowly, not the bridge.",
+    "ERROR_READ_ONLY": "This is a deployment decision, not a fault: this server started with writing disabled. If it needs to operate the plant, tell whoever deploys it.",
+    "ERROR_ACCION_BOMBA": "Check the tank level and that the process is enabled; the bridge refuses to start the pump with a high tank. The detail below says which of the two guards tripped.",
+    "ERROR_IA_SIN_CONFIGURAR": "This deployment has no language model. The dashboard works without it; only the assistant is unavailable.",
+    "ERROR_VOZ_SIN_CONFIGURAR": "This deployment has no dictation server. Type the question instead.",
+    "ERROR_MOTOR_SIN_MONTAR": "This deployment has no diagnostics engine. Readings and charts still work.",
+    "ERROR_DOCS_SIN_CONFIGURAR": "This deployment has no manuals folder. The assistant will answer without being able to cite documentation.",
+    "ERROR_PDF_SIN_CONFIGURAR": "Exporting is not configured in this deployment. The conversation can be copied by hand in the meantime.",
+    "ERROR_PDF_SIN_DEPENDENCIAS": "The server is missing a component needed to generate the PDF. Tell whoever deploys it: this cannot be fixed from the dashboard.",
+    "ERROR_ARCHIVO_GRANDE": "Split the manual into parts, or upload it without the heaviest images. The detail below states the exact limit.",
+    "ERROR_AUDIO_GRANDE": "Dictate the question in shorter sentences. The detail below states the exact limit.",
+    "ERROR_CARGA_DESACTIVADA": "This is a deployment decision. Manuals go into the server folder; ask whoever administers it."
   }
 }

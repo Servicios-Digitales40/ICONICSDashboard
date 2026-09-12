@@ -7,14 +7,16 @@
         "indexado": "indexado",
         "indexando": "indexando",
         "sinLeer": "sin leer aún",
-        "faltaArchivo": "falta el archivo"
+        "faltaArchivo": "falta el archivo",
+        "parcial": "recortado"
       },
       "stats": {
         "documents": "Documentos",
         "fragments": "Fragmentos",
         "search": "Búsqueda",
         "unread": "Sin leer",
-        "unassigned": "Sin asignar"
+        "unassigned": "Sin asignar",
+        "truncated": "Recortados"
       },
       "fragments": "{{n}} fragmentos",
       "wholePlant": "Toda la planta",
