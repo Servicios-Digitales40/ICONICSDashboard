@@ -13,7 +13,7 @@
 
 > **Rama.** `Moises7`, la misma en la que se ejecutó y cerró el Plan 23.
 
-> **ESTADO — EN CURSO (11-09-2026). F0 y F1 hechas**, ocho fases por delante. La
+> **ESTADO — EN CURSO (11-09-2026). F0, F1 y F2 hechas**, siete fases por delante. La
 > investigación de la §0 está hecha contra el código real, con archivo y línea.
 > El resultado de cada fase se anota en la §2 según se cierra.
 
@@ -704,3 +704,72 @@ declaraba `senal` obligatorio cuando la función admite llamarse sin argumentos
 a propósito (hay una prueba para ese caso). El segundo se corrigió en la
 dirección correcta —documentar por qué es opcional— y no marcando el parámetro
 como requerido para que el tipo callara.
+
+### F2 · `USO-04` — HECHA el 11-09-2026 (`5fe235c`)
+
+**El canal ya estaba montado desde el Plan 22** (catálogo de códigos en el
+puente, `errors.json` en los dos idiomas, `verificar-codigos.mjs` fallando si un
+código nace sin traducir). Lo que faltaba es la mitad que da nombre a la
+entrega: un fallo se **nombraba**, y para saber qué hacer había que conocer el
+despliegue por dentro.
+
+`useMensajeDeError` devuelve ahora `accion` como tercer campo, y `AlertBanner`
+la pinta **debajo** del detalle. El orden es el del razonamiento de quien lee
+—qué falló, con qué dato exacto, y entonces qué hacer—; invertirlo daría una
+instrucción antes de decir a qué responde. Con borde y peso de texto normal, no
+como un cuarto gris: es lo único de la tarjeta sobre lo que alguien puede
+actuar, y un párrafo de apoyo en gris claro es lo que nadie lee.
+
+**Trece de los cuarenta y dos códigos llevan acción, y las tres decisiones que
+el plan pedía tomar explícitamente están tomadas:**
+
+1. **No todo código tiene acción, y eso no es trabajo a medias.** La mayoría no
+   tiene nada que pedirle a un operador de planta —un `ERROR_VALIDACION`
+   interno, un `ERROR_SERVER`—, y rellenar el hueco con «inténtalo de nuevo»
+   tiene un coste concreto: enseña que ese hueco no dice nada útil, y entonces
+   se deja de leer justo en los trece donde sí lo dice.
+2. **La acción es del código, no del sitio**: vive en `errors.json`, junto a la
+   frase, así que el mismo fallo no puede sugerir dos cosas distintas según la
+   pantalla.
+3. **Tres códigos no la llevan aparte porque ya la llevan DENTRO de su frase**
+   (`ERROR_ENLACE_CADUCADO` dice «pídele al asistente que te genere otro»,
+   `ERROR_CONSULTA_EN_CURSO`, `ERROR_RATE_LIMITED`). Duplicarla se leería como
+   dos instrucciones distintas. Esto no estaba previsto en el plan; salió al
+   leer los cuarenta y dos textos uno por uno.
+
+Lo del **reintento real** que el plan pedía como tercera decisión no hizo falta:
+ningún código de los trece pide un botón. Los que se arreglan reintentando ya lo
+dicen en su frase, y los demás son decisiones de despliegue —un botón
+«Reintentar» sobre `ERROR_READ_ONLY` volvería a fallar igual, que es exactamente
+el «peor que ningún botón» del plan.
+
+**`verificar-codigos.mjs` comprueba la SIMETRÍA de las que existen, nunca que
+existan todas.** Dos reglas nuevas, las dos **probadas en rojo a propósito**:
+una acción en un solo idioma (el modo de fallo real — quien la añade la escribe
+en el idioma en que está pensando, y el operador del otro se queda sin la mitad
+útil) y una acción para un código que nadie emite.
+
+**Y se cierra la deuda concreta que el Plan 22 F2 dejó apuntada aquí: los
+manuales RECORTADOS.** Su §F2 lo escribió tal cual: «la pantalla de
+Documentación aún no la pinta; eso es del Plan 24 (`USO-04`), y hasta entonces
+sale en el registro de arranque, que es donde alguien la busca hoy».
+
+El fallo era invisible por una razón precisa: un parcial **tiene fragmentos
+buscables**, así que caía en la rama `fragmentos > 0` de `estadoDeFila` y salía
+«indexado» en verde — indistinguible de un manual completo, mientras lo que el
+asistente puede citar de él está incompleto. Ahora `ragRoutes` expone
+`motivoParcial`, la fila sale «recortado» en ámbar (`wait`, no `bad`: no está
+roto, está a medias) con el motivo que dice **dónde** se cortó, y se cuentan
+aparte de los ilegibles — por el mismo motivo que el backend los mantiene en dos
+listas: el arreglo de cada uno es distinto y mezclarlos obligaría a leer el
+motivo para saber cuál es cuál.
+
+**Comprobado.** `lint` 0 errores · `types` · 28 verificadores · `i18n` con
+paridad (**1136 claves × 2 idiomas**) · `textos` · backend **303 pruebas** ·
+frontend **690 pruebas en verde** · `build` con `index` en **245,11 KB de 450**
+(**3,70 KB** de coste para esta fase).
+
+Una aserción ajena corregida, y **era correcta al fallar**: el fixture de
+`documentacion-rag.test.jsx` tiene un manual activo más, así que sus contadores
+dicen 3 y no 2. Se actualizó el número y su comentario; no se relajó la
+comprobación a «hay algún número».
