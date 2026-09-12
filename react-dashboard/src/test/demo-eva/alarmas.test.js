@@ -82,7 +82,19 @@ describe("leerAlarmas: deriva los eventos de la serie del historiador", () => {
       json: async () => ({ ok: true, data: muestras, hasMore: false }),
     })));
 
-  const T0 = new Date("2026-09-11T02:00:00.000Z");
+  /**
+   * La base va RELATIVA a ahora, no una fecha fija, porque `leerAlarmas`
+   * calcula su ventana desde `new Date()` y desde el 12-09-2026 pide la serie
+   * en CRUDO — y una lectura cruda recorta al rango pedido (regla 3 de
+   * `@shared/eva/comun/historia.js`: sin agregado el servidor cuela su muestra
+   * límite, de cualquier fecha, sin avisar).
+   *
+   * Con la fecha fija de antes, estas muestras caían fuera de la ventana y el
+   * recorte se las llevaba enteras. No era el recorte equivocándose: era la
+   * prueba afirmando que el servidor puede contestar lo que le dé la gana sobre
+   * el rango pedido, que es justo lo que ya no se acepta.
+   */
+  const T0 = new Date(Date.now() - 60 * 60_000); // una hora atrás: dentro de las 6 h que se piden
   const muestra = (min, value) => ({
     timestamp: new Date(T0.getTime() + min * 60_000).toISOString(),
     quality: 0,
@@ -134,5 +146,35 @@ describe("leerAlarmas: deriva los eventos de la serie del historiador", () => {
 
     const { eventos } = await leerAlarmas(6, "nivelAltoAlto");
     expect(eventos).toEqual([]);
+  });
+
+  /**
+   * ── LA PRUEBA QUE FALTABA, Y LO QUE COSTÓ NO TENERLA (12-09-2026) ──
+   *
+   * La pantalla enseñaba UN evento donde el servidor tenía once, sin ningún
+   * error: `leerAlarmas` se apoya en `leerSerie`, que pide `aggregate=Average`
+   * porque está pensada para caudales. Promediar un booleano lo BORRA — los
+   * cubos salen a `0,5` o sin `value`, y `0,5` nunca es un flanco.
+   *
+   * Medido con `scripts/sondear-agregado-alarma.mjs` sobre 24 h reales: con
+   * `Average`, CERO flancos en las nueve alarmas; en crudo, 5 / 7 / 2 / 11.
+   *
+   * Ninguna prueba lo cazó porque todas mockean la respuesta y ninguna miraba
+   * la PETICIÓN. Un mock siempre devuelve lo que se le pide, así que una serie
+   * de juguete con flancos perfectos pasaba igual con agregado que sin él. Ésta
+   * mira lo que se pide, que es donde estaba el fallo.
+   */
+  it("pide la serie CRUDA: con `Average` un booleano no tiene flancos", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true, status: 200,
+      json: async () => ({ ok: true, data: [], hasMore: false }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await leerAlarmas(6, "nivelAltoAlto");
+
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).not.toMatch(/aggregate/);
+    expect(url).not.toMatch(/interval/);
   });
 });

@@ -71,6 +71,71 @@ describe("el rango personalizado cubre los dos días completos, sin hora", () =>
   });
 });
 
+/**
+ * ── `crudo: true`: SIN agregado, y con el recorte que eso obliga ───
+ *
+ * Nació de un fallo silencioso (12-09-2026): el historial de alarmas enseñaba
+ * un evento donde el servidor tenía once, porque `Average` sobre un booleano
+ * borra los flancos —los cubos salen a `0,5` o sin `value`—. Ver la cabecera de
+ * `leerSerie` y `scripts/sondear-agregado-alarma.mjs`.
+ *
+ * El recorte no es celo: es la regla 3 de `@shared/eva/comun/historia.js`, y
+ * sólo aplica sin agregado. Medido el 26-08-2026: un rango vacío pedido SIN
+ * `aggregate` devuelve la muestra límite del historiador entero, con `ok: true`
+ * y sin aviso, por lejos que caiga. Para una alarma eso es un flanco inventado.
+ */
+describe("leerSerie en crudo, para los booleanos", () => {
+  it("no manda `aggregate` ni `interval` cuando se pide crudo", async () => {
+    fetchIconicsHistory.mockClear();
+    await leerSerie("nivelTanque", { horas: 6, puntos: 24 }, { crudo: true });
+
+    const [, params] = fetchIconicsHistory.mock.calls[0];
+    expect(params.aggregate).toBeUndefined();
+    expect(params.interval).toBeUndefined();
+  });
+
+  it("por defecto SIGUE mandando el agregado — esto no cambia para los caudales", async () => {
+    fetchIconicsHistory.mockClear();
+    await leerSerie("nivelTanque", { horas: 6, puntos: 24 });
+
+    const [, params] = fetchIconicsHistory.mock.calls[0];
+    expect(params.aggregate).toBe("Average");
+  });
+
+  it("descarta la muestra que el servidor cuela FUERA del rango pedido", async () => {
+    const inicio = new Date("2026-09-11T00:00:00Z");
+    const fin = new Date("2026-09-11T06:00:00Z");
+
+    fetchIconicsHistory.mockResolvedValueOnce({
+      data: [
+        // La muestra límite del historiador entero: de hace un año, sin aviso.
+        { timestamp: "2025-06-01T00:00:00.000Z", quality: 0, value: true },
+        { timestamp: "2026-09-11T02:00:00.000Z", quality: 0, value: false },
+        { timestamp: "2026-09-11T03:00:00.000Z", quality: 0, value: true },
+      ],
+    });
+
+    const { datos } = await leerSerie("nivelTanque", { inicio, fin }, { crudo: true });
+
+    expect(datos).toHaveLength(2);
+    expect(datos.every((m) => m.t >= inicio && m.t <= fin)).toBe(true);
+  });
+
+  it("con agregado NO recorta: ahí el servidor ya devuelve el rango vacío limpio", async () => {
+    // Recortar también aquí sería una regla nueva colada de rebote en el camino
+    // que usan todas las gráficas, y la trampa de la regla 3 no existe con agregado.
+    const inicio = new Date("2026-09-11T00:00:00Z");
+    const fin = new Date("2026-09-11T06:00:00Z");
+
+    fetchIconicsHistory.mockResolvedValueOnce({
+      data: [{ timestamp: "2025-06-01T00:00:00.000Z", quality: 0, value: 3 }],
+    });
+
+    const { datos } = await leerSerie("nivelTanque", { inicio, fin });
+    expect(datos).toHaveLength(1);
+  });
+});
+
 describe("leerSerie pide el intervalo correcto según el tipo de rango", () => {
   it("con {horas, puntos} (el camino de siempre) el cálculo no cambió", async () => {
     fetchIconicsHistory.mockClear();

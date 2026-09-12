@@ -96,8 +96,13 @@ export const ALARMAS_HISTORIZABLES = ALARMAS.filter((key) => SENALES[key]?.histo
  * Lo que sí hay es Hyper Historian, y las nueve alarmas del PLC están
  * declaradas ahí como booleanos historizados. `/History` las sirve —200, con
  * muestras `{ timestamp, quality, value }`— y de ahí salen los eventos mirando
- * los flancos. En treinta días de esa corrida, tres alarmas tenían flancos
- * reales: `presionAlta` (18 entradas), `faltaDePresion` (17) y `bajoFlujo` (8).
+ * los flancos.
+ *
+ * Medido en 24 h con `scripts/sondear-eventos-derivados.mjs`: `faltaDePresion`
+ * 7 eventos, `presionAlta` 5, `bajoFlujo` 2 y `paroDeEmergencia` uno que sigue
+ * activo desde antes de la ventana. Duran de un segundo a dos minutos, así que
+ * la ventana que se pida cambia mucho la lista — y por eso la pantalla dice
+ * siempre cuál está mirando.
  *
  * ── LO QUE SE GANA Y LO QUE SE PIERDE ──────────────────────────────
  *
@@ -132,7 +137,15 @@ export async function leerAlarmas(horas = 1, clave = ALARMAS_HISTORIZABLES[0]) {
   const fin = new Date();
   const inicio = new Date(fin.getTime() - horas * 3_600_000);
 
-  const { datos, motivo, hasMore } = await leerSerie(clave, { inicio, fin });
+  /*
+   * `crudo: true` NO es un detalle de rendimiento: sin él esta pantalla enseña
+   * un evento donde hay once. `leerSerie` pide `Average` por defecto —lo
+   * correcto para un caudal—, y promediar un booleano lo borra: los cubos salen
+   * a `0,5` o sin `value`, y un `0,5` no es un flanco. Medido en
+   * `scripts/sondear-agregado-alarma.mjs`; el porqué completo está en la
+   * cabecera de `leerSerie`.
+   */
+  const { datos, motivo, hasMore } = await leerSerie(clave, { inicio, fin }, { crudo: true });
 
   /*
    * `motivo` es «esta señal no tiene serie propia», no un fallo de red: se

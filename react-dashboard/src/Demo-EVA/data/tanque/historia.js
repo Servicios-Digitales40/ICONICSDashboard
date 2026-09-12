@@ -83,6 +83,28 @@ function resolverRango(rango) {
 }
 
 /**
+ * Recorta a la ventana pedida — **sólo en lectura cruda**, y no por manía.
+ *
+ * Es la regla 3 de la cabecera de `@shared/eva/comun/historia.js`, medida el
+ * 26-08-2026: **sin `aggregate`, un rango vacío no vuelve vacío**, vuelve la
+ * muestra LÍMITE del historiador entero con `ok: true` y sin aviso, por lejos
+ * que caiga del rango. Con agregado el mismo rango vacío sí devuelve `[]`.
+ *
+ * Como `crudo` es precisamente renunciar al agregado, hereda esa trampa, y esa
+ * cabecera ya dice qué toca: «una lectura cruda que alguna vez se necesite
+ * tiene que comprobar el `timestamp` de cada muestra contra el rango pedido
+ * antes de darla por buena, porque el servidor no lo hace». Esto es esa
+ * comprobación. Para una alarma importa el doble: una muestra de hace tres
+ * meses colada al principio de la ventana es un flanco inventado.
+ */
+function enRango(datos, { inicio, fin, crudo }) {
+  if (!crudo) return datos;
+  const desde = inicio.getTime();
+  const hasta = fin.getTime();
+  return datos.filter((m) => m.t.getTime() >= desde && m.t.getTime() <= hasta);
+}
+
+/**
  * Serie histórica de una señal.
  *
  * Devuelve `{ datos, motivo, hasMore }`: `datos` son `[{ t: Date, valor }]` ya
@@ -92,8 +114,28 @@ function resolverRango(rango) {
  * debería pasar casi nunca, porque el intervalo ya se calcula para caber en
  * `MAX_PUNTOS`, pero si el servidor redondea distinto no hay que fingir que
  * la serie está completa.
+ *
+ * ── `crudo: true`, Y POR QUÉ NO ES EL MODO NORMAL (12-09-2026) ─────
+ *
+ * Pide la serie SIN `aggregate`, tal como la grabó el historiador. Existe por
+ * las alarmas: son booleanos, y `AGREGADO` es `Average`.
+ *
+ * Promediar un booleano no lo degrada, **lo borra**. Medido contra
+ * `bms-server` con `scripts/sondear-agregado-alarma.mjs` sobre 24 h: con
+ * `Average` salen 0 flancos en las NUEVE alarmas; en crudo salen 5 en
+ * `presionAlta`, 7 en `faltaDePresion`, 2 en `bajoFlujo` y 11 en
+ * `paroDeEmergencia`. El promedio de un cubo de 14 min vale `0,5` —ni 0 ni 1,
+ * así que jamás es un flanco—, y la mayoría de los cubos ni siquiera traen
+ * `value`, con lo que `normalizar()` los descarta por no finitos. El resultado
+ * era una pantalla que enseñaba UN evento donde había once.
+ *
+ * No se convierte en el modo normal porque para una magnitud continua el
+ * agregado es lo correcto —y lo barato—: una ventana de 30 días en crudo son
+ * decenas de miles de muestras que nadie distingue en una gráfica de 900
+ * píxeles. Pide crudo quien necesita el valor EXACTO de cada muestra, que hoy
+ * es sólo el derivador de flancos.
  */
-export async function leerSerie(clave, rango = VENTANA) {
+export async function leerSerie(clave, rango = VENTANA, { crudo = false } = {}) {
   if (!senalInfo(clave)) return { datos: [], motivo: `Señal desconocida: ${clave}`, hasMore: false };
   if (!esHistorizada(clave)) return { datos: [], motivo: SIN_SERIE, hasMore: false };
 
@@ -109,10 +151,11 @@ export async function leerSerie(clave, rango = VENTANA) {
     const respuesta = await fetchIconicsHistory(puntoHistorico(clave), {
       startDate: inicio.toISOString(),
       endDate: fin.toISOString(),
-      aggregate: AGREGADO,
-      interval: intervaloHMS(segundos / puntos),
+      ...(crudo
+        ? {}
+        : { aggregate: AGREGADO, interval: intervaloHMS(segundos / puntos) }),
     });
-    const datos = normalizar(respuesta?.data);
+    const datos = enRango(normalizar(respuesta?.data), { inicio, fin, crudo });
     return {
       datos,
       motivo: null,
@@ -137,8 +180,7 @@ export async function leerSerie(clave, rango = VENTANA) {
       fetchIconicsHistory(puntoHistorico(clave), {
         startDate: desde.toISOString(),
         endDate: hasta.toISOString(),
-        aggregate: AGREGADO,
-        interval,
+        ...(crudo ? {} : { aggregate: AGREGADO, interval }),
       }).catch(() => null)
     ),
     CONCURRENCIA_TRAMOS
@@ -148,7 +190,7 @@ export async function leerSerie(clave, rango = VENTANA) {
   const conDato = [];
   let hasMore = false;
   respuestas.forEach((r, i) => {
-    const trozo = normalizar(r?.data);
+    const trozo = enRango(normalizar(r?.data), { inicio, fin, crudo });
     if (trozo.length) conDato.push(i);
     if (r?.hasMore) hasMore = true;
     datos.push(...trozo);
