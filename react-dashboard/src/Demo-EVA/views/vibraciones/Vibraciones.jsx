@@ -34,13 +34,14 @@
  *                         verdes con la vigilancia encendida o apagada, así
  *                         que lo apagado sólo se ve si se enseña aparte.
  */
-import { Fragment, useMemo } from "react";
+import { Fragment, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Activity, BellRing } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { Enfasis } from "@/i18n";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
+import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVista.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
@@ -326,6 +327,10 @@ function Vibraciones() {
   const { theme: t } = useTheme();
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
     useVibracion();
+
+  /* Qué pantalla tiene delante quien pregunta (Plan 24 F7). La otra máquina
+     declara lo mismo desde `DetalleActivo`: el asistente no sabe de ninguna. */
+  useEffect(() => declararContextoDeVista({ sistema: "vibraciones" }), []);
 
   const res = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),

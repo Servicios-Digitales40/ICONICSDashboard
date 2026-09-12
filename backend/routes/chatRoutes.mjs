@@ -190,7 +190,7 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
         })
       }
 
-      const { pregunta, historial, idioma, conversacionId } = request.body
+      const { pregunta, historial, idioma, conversacionId, contexto } = request.body
 
       /* ── A partir de aquí la respuesta es un flujo ─────────────────── */
 
@@ -287,6 +287,13 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
              * `instrucciones()` en `ia/conversacion/chat.mjs`.
              */
             idioma,
+            /*
+             * Desde qué pantalla se pregunta (Plan 24 F7 · `USO-07`). Viaja
+             * tal cual, validado ya por `ChatSchema` con Zod — que es la
+             * puerta que el Plan 23 F0 (`IA-04`) puso justo para esto: una
+             * entrada nueva al bucle no se cuela sin validar.
+             */
+            contexto,
           }),
         })
 

@@ -36,6 +36,7 @@ import { estadoColor, TONO } from "../../components/paleta.js";
 import { DetalleGrid } from "../../components/detalle/DetalleGrid.jsx";
 import { GraficaComparada } from "../../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../../components/detalle/SelectorRango.jsx";
+import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVista.js";
 import { descargarCSV } from "../../lib/exportar.js";
 import { armarCSVGeneral, nombreArchivoGeneral } from "../../lib/exportarTodo.js";
 
@@ -167,6 +168,23 @@ function DetalleActivo({ params, onNavigate }) {
   const [exportandoTodo, setExportandoTodo] = useState(false);
 
   const activoId = ACTIVO_IDS.includes(params?.activo) ? params.activo : ACTIVO_IDS[0];
+
+  /*
+   * Le dice al asistente qué hay en pantalla (Plan 24 F7 · `USO-07`), para que
+   * «¿y esto por qué sube?» tenga referente.
+   *
+   * Sólo IDENTIFICADORES —qué máquina, qué activo, qué rango—, nunca un valor:
+   * ver la cabecera de `contextoDeVista.js`. El rango va por su nombre de preset
+   * («ayer», «semana») y no como dos fechas, porque lo que hace falta es de qué
+   * período se habla, no reconstruir la consulta.
+   *
+   * Se limpia al desmontar: un contexto pegado de una pantalla cerrada sería
+   * peor que ninguno.
+   */
+  useEffect(
+    () => declararContextoDeVista({ sistema: "tanque", activo: activoId, rango: presetActivo }),
+    [activoId, presetActivo]
+  );
 
   /*
    * Re-sincroniza si cambian los parámetros de RANGO de la URL — un enlace

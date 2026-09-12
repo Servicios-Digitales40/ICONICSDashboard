@@ -160,6 +160,53 @@ export const ChatSchema = z.object({
    * tener que validar su forma, que es del cliente.
    */
   conversacionId: z.string().trim().min(1).max(128).optional(),
+  /*
+   * Desde qué pantalla se pregunta (Plan 24 F7 · `USO-07`).
+   *
+   * ── ES CONTEXTO DE FOCO, NO DE DATO, Y LA DIFERENCIA ES LA REGLA ───
+   *
+   * Sirve para que «¿y esto por qué sube?» tenga referente: qué máquina, qué
+   * activo y qué rango de tiempo tiene delante quien pregunta. Lo que NO puede
+   * llevar es el VALOR de nada.
+   *
+   * La frontera no se inventa aquí: está escrita en `chat.mjs`
+   * (`historialAMensajes`), que a propósito no deja entrar los RESULTADOS de
+   * herramientas de turnos previos «para que el modelo no mezcle cifras de un
+   * turno con la pregunta de otro». El Plan 23 F2 (`IA-07`, memoria del foco) ya
+   * la respetó; esto es la misma frontera vista desde el otro lado. Un valor
+   * metido aquí sería una cifra que el modelo puede citar sin que ninguna
+   * herramienta la haya leído — sin calidad, sin frescura y sin poder auditarla
+   * (`IA-02`).
+   *
+   * Por eso los campos son identificadores y no medidas, y `strict()` rechaza
+   * cualquier otro: el día que alguien quiera añadir `valorActual`, el esquema
+   * dice no y este comentario dice por qué.
+   *
+   * ── UN SISTEMA, NUNCA DOS ──────────────────────────────────────────
+   *
+   * `sistema` es uno solo, no una lista. Cruzar dos máquinas es lo que
+   * `NO_COMPARTEN` prohíbe en el dominio, y el Plan 23 encontró que esa guarda
+   * no protegía el caso real (corregido en `98fe465`). Un contexto con dos
+   * sistemas invitaría al modelo a razonar sobre los dos a la vez.
+   *
+   * `catch(undefined)` como `idioma` y `conversacionId`: un contexto mal formado
+   * no puede tumbar una pregunta válida — se atiende sin él, que es exactamente
+   * como se atendía antes de esta fase.
+   */
+  contexto: z
+    .object({
+      sistema: z.enum(['tanque', 'vibraciones']).optional(),
+      activo: z.string().trim().min(1).max(64).optional(),
+      /* El rango que está mirando, como lo nombra la vista («vivo», «ayer»,
+         «semana», «personalizado»): es de qué PERÍODO se habla, no qué valores
+         tuvo. */
+      rango: z.string().trim().min(1).max(32).optional(),
+      /* La señal enfocada, por su CLAVE de dominio — no su valor. */
+      senal: z.string().trim().min(1).max(64).optional(),
+    })
+    .strict()
+    .optional()
+    .catch(undefined),
 })
 
 /**

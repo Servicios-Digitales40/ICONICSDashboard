@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_BASE } from "@/lib/api/apiBase";
+import { contextoDeVista } from "./contextoDeVista.js";
 import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
@@ -246,6 +247,10 @@ export function useAsistente() {
       // `localStorage` para nada.
       const conversacionId = idDeConversacion();
 
+      /* Una sola lectura, por el mismo motivo de arriba: lo que importa es
+         dónde estaba el operador al preguntar, y se fija aquí. */
+      const contextoActual = contextoDeVista();
+
       try {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
@@ -261,6 +266,12 @@ export function useAsistente() {
             historial,
             idioma,
             ...(conversacionId ? { conversacionId } : {}),
+            /*
+             * Desde qué pantalla se pregunta (Plan 24 F7). Se lee AQUÍ y no
+             * en el render: lo que importa es dónde estaba el operador al
+             * preguntar, no al montarse el panel. Ver `contextoDeVista.js`.
+             */
+            ...(contextoActual ? { contexto: contextoActual } : {}),
           }),
           signal: control.signal,
         });

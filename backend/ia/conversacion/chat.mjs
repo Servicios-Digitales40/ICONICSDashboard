@@ -619,7 +619,7 @@ const IDIOMAS_DEL_MODELO = {
   en: 'You answer in English, in short sentences.',
 };
 
-export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null) {
+export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null, contexto = null) {
   return [
     'Te llamas Tdconcito. Eres el asistente de un tablero que vigila VARIOS SISTEMAS de una',
     `planta industrial. ${IDIOMAS_DEL_MODELO[idioma] ?? IDIOMAS_DEL_MODELO.es}`,
@@ -738,10 +738,61 @@ export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null) {
      * Recordar de qué se hablaba no reabre esa puerta; recordar cuánto medía,
      * sí.
      */
+    /* El contexto de pantalla va ANTES del foco: ver la cabecera de
+       `textoDelContexto` sobre cuál manda cuando discrepan. */
+    ...(contexto ? textoDelContexto(contexto) : []),
     ...(foco ? textoDelFoco(foco) : []),
     'Las señales de la instalación:',
     catalogo,
   ].join('\n')
+}
+
+/**
+ * El bloque de CONTEXTO DE PANTALLA (Plan 24 F7 · `USO-07`).
+ *
+ * ── POR QUÉ ES UN BLOQUE APARTE DEL FOCO, Y NO EL MISMO ────────────
+ *
+ * Porque contestan dos preguntas distintas y mezclarlas las haría menos útiles:
+ *
+ *   · el FOCO dice de qué se HABLÓ en el turno anterior de esta conversación;
+ *   · el contexto dice qué tiene DELANTE quien pregunta, ahora mismo.
+ *
+ * Pueden discrepar con total legitimidad —alguien mirando la maqueta del tanque
+ * puede preguntar por la última avería de vibraciones— y en ese caso el foco es
+ * mejor pista que la pantalla. Fundidos en un solo bloque, el modelo no podría
+ * distinguir «lo estás mirando» de «acabas de preguntarlo», y el orden de abajo
+ * (contexto primero, foco después) dice cuál manda cuando chocan.
+ *
+ * ── NO TRAE NINGÚN VALOR, Y EL TEXTO LO DICE EN VOZ ALTA ───────────
+ *
+ * Igual que el bloque de foco termina con «saber de qué se hablaba NO es saber
+ * cuánto medía». La razón es la misma y está en `historialAMensajes`: una cifra
+ * que llegue por aquí sería una cifra que el modelo puede citar sin que ninguna
+ * herramienta la haya leído — sin calidad, sin frescura y sin poder auditarla
+ * (`IA-02`). El esquema (`ChatSchema.contexto`, `strict()`) impide que entre; el
+ * texto se lo recuerda al modelo.
+ */
+function textoDelContexto({ sistema, activo, rango, senal }) {
+  const partes = [
+    sistema && `sistema=${sistema}`,
+    activo && `activo=${activo}`,
+    senal && `señal=${senal}`,
+    rango && `rango=${rango}`,
+  ].filter(Boolean)
+
+  if (!partes.length) return []
+
+  return [
+    'QUÉ TIENE DELANTE QUIEN PREGUNTA:',
+    '',
+    `Está en una pantalla de: ${partes.join(', ')}.`,
+    'Úsalo para resolver lo que la pregunta no diga: «¿y esto por qué sube?» o «¿cómo va?» se',
+    'refieren muy probablemente a eso. Si la pregunta nombra OTRA máquina, hazle caso a la',
+    'pregunta: mirar una pantalla no impide preguntar por otra cosa.',
+    'Esto NO son mediciones: es dónde está mirando. Los valores se consultan con la herramienta,',
+    'siempre, aunque la pantalla los tenga en pantalla.',
+    '',
+  ]
 }
 
 /** El bloque de foco del turno. Fuera de `instrucciones` por legibilidad. */
@@ -1225,7 +1276,7 @@ export function createChat({ config, herramientas }) {
    * @param {string} [opciones.idioma]  en qué idioma contesta el modelo (i18n)
    */
   async function responder({
-    pregunta, historial = [], signal, onEvento, idioma = "es", conversacionId,
+    pregunta, historial = [], signal, onEvento, idioma = "es", conversacionId, contexto = null,
   }) {
     // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
     // información fija y barata, y tenerla delante evita que el modelo gaste
@@ -1255,7 +1306,7 @@ export function createChat({ config, herramientas }) {
     const foco = conversacionId ? focoDeConversacion.get(conversacionId) ?? null : null
 
     const messages = [
-      { role: 'system', content: instrucciones(catalogo, maxPasos, idioma, foco) },
+      { role: 'system', content: instrucciones(catalogo, maxPasos, idioma, foco, contexto) },
       ...previos,
       { role: 'user', content: pregunta },
     ]
