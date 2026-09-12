@@ -165,15 +165,35 @@ export function crearDiario({
    * Una línea ilegible —la última, cortada por un apagón a mitad de
    * `appendFile`— se salta sin tirar el resto. Es justo el caso para el que se
    * eligió JSONL, y abortar la lectura entera por él sería desperdiciarlo.
+   *
+   * ── `desde`/`hasta`/`cursor`: la lectura por HTTP (Plan 25 F1) ─────
+   *
+   * Hasta el 12-09-2026 esto sólo aceptaba `limite`, porque el único que leía
+   * era el verificador. `GET /api/diario` necesita acotar por fechas —una vista
+   * de turno quiere unas horas, no dos años— y paginar, porque el archivo llega
+   * a 30 000 entradas y nadie las quiere de golpe.
+   *
+   * **El cursor es el índice dentro del archivo ya ordenado, no una fecha.**
+   * Con una fecha, dos entradas del mismo milisegundo —posible: el diario anota
+   * en ráfaga— caerían las dos en el borde y la página siguiente repetiría una
+   * o se saltaría otra. El índice no tiene ese problema.
+   *
+   * Que el archivo sólo CRECE por el final (`appendFile`) es lo que hace estable
+   * ese índice entre dos peticiones... salvo que entre medias haya una poda, que
+   * reescribe el archivo entero. Por eso `leer` devuelve también `podas`: quien
+   * pagina puede ver que el suelo se movió en vez de creer que tiene una
+   * secuencia continua (§2.4 otra vez — un hueco no se disfraza).
    */
-  async function leer({ limite = 200 } = {}) {
+  async function leer({ limite = 200, desde = null, hasta = null, cursor = 0 } = {}) {
     let contenido
     try {
       contenido = await readFile(ruta, 'utf8')
     } catch (error) {
       // Que no exista es lo normal antes del primer accionamiento; no es un
       // error que nadie tenga que ver.
-      if (error.code === 'ENOENT') return []
+      if (error.code === 'ENOENT') {
+        return { entradas: [], total: 0, cursor: null, podas: 0 }
+      }
       throw error
     }
 
@@ -188,7 +208,45 @@ export function crearDiario({
       }
     }
 
-    return entradas.reverse().slice(0, limite)
+    // De la más reciente a la más antigua, que es como se lee un diario.
+    entradas.reverse()
+
+    /*
+     * El filtro por fecha va ANTES de paginar: al revés, una página de 50
+     * podría quedarse en 3 tras filtrar y parecería que no hay más, cuando lo
+     * que pasa es que el resto del rango está más atrás en el archivo.
+     *
+     * Una entrada sin `instante` legible (`tipo: 'ilegible'`, o una poda de una
+     * versión vieja) NO se descarta por fecha: no se sabe que esté fuera del
+     * rango, y descartarla sería esconder precisamente el hueco que se anotó
+     * para que se viera.
+     */
+    const enRango = entradas.filter((e) => {
+      if (!desde && !hasta) return true;
+      const t = e?.instante ? new Date(e.instante).getTime() : NaN;
+      if (Number.isNaN(t)) return true;
+      if (desde && t < desde.getTime()) return false;
+      if (hasta && t > hasta.getTime()) return false;
+      return true;
+    })
+
+    const inicio = Math.max(0, cursor)
+    const pagina = enRango.slice(inicio, inicio + limite)
+    const siguiente = inicio + pagina.length
+
+    return {
+      entradas: pagina,
+      total: enRango.length,
+      // `null` cuando no queda nada: quien pagina no tiene que compararlo con
+      // el total para saber si ha terminado.
+      cursor: siguiente < enRango.length ? siguiente : null,
+      /*
+       * Las podas que hay EN ESTA VENTANA. No es decoración: una poda dice que
+       * faltan entradas que existieron, y quien lea el diario tiene que poder
+       * distinguir «no pasó nada» de «ya no está guardado».
+       */
+      podas: pagina.filter((e) => e?.tipo === 'poda').length,
+    }
   }
 
   return { anotar, leer, ruta }

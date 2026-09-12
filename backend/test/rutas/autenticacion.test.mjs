@@ -228,6 +228,57 @@ describe('exigirRol', () => {
 
     await app.close()
   })
+
+  /**
+   * ── EL DIARIO ES LECTURA, Y AUN ASÍ PIDE ROL (Plan 25 F1) ─────────
+   *
+   * Es la excepción declarada al criterio de este backend, donde las lecturas
+   * —`GET /api/casos`, `/api/diagnostico`, `GET /api/rag/documentos`— no llevan
+   * rol. El diario sí, porque cada entrada trae `ip` y `usuario`: no dice sólo
+   * qué le pasó a la instalación, dice **quién lo hizo y desde dónde**.
+   *
+   * Se prueba con el interruptor encendido porque hoy está apagado, y una
+   * guarda que nadie ha ejercido es una promesa, no una guarda.
+   */
+  it('el diario NIEGA a quien no tiene el rol, aunque sea sólo lectura', async () => {
+    const app = await conSesion()
+    const { cuerpo } = await entrar(app, 'mirona')
+
+    const respuesta = await app.inject({
+      method: 'GET',
+      url: '/api/diario',
+      headers: conToken(cuerpo.token),
+    })
+
+    expect(respuesta.statusCode).toBe(403)
+
+    await app.close()
+  })
+
+  it('el diario tampoco se lee SIN token', async () => {
+    const app = await conSesion()
+
+    const respuesta = await app.inject({ method: 'GET', url: '/api/diario' })
+
+    expect(respuesta.statusCode).toBe(401)
+
+    await app.close()
+  })
+
+  it('con el rol, el diario se lee', async () => {
+    const app = await conSesion()
+    const { cuerpo } = await entrar(app, 'ana')
+
+    const respuesta = await app.inject({
+      method: 'GET',
+      url: '/api/diario',
+      headers: conToken(cuerpo.token),
+    })
+
+    expect(respuesta.statusCode).toBe(200)
+
+    await app.close()
+  })
 })
 
 describe('renovar y saber quién eres', () => {

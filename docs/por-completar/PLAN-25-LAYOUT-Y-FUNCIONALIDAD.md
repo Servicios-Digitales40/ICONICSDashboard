@@ -476,6 +476,45 @@ que lanza.
 
 ---
 
+### F1 · `GET /api/diario` — HECHA el 12-09-2026
+
+`routes/diarioRoutes.mjs`, y `leer()` de `lib/diario.mjs` ampliado con rango y
+cursor. Con `exigirRol('operador')`.
+
+**Medido:** 324 pruebas de backend (+13: 7 de `leer()`, 9 de la ruta, 3 de la
+guarda con `AUTH_HABILITADA=true`), los 28 verificadores —incluido `codigos`,
+que exige que el error nuevo se sepa decir en los dos idiomas—, lint 0 errores.
+
+**Lo que se decidió al escribirla, y no estaba en el plan:**
+
+1. **El cursor es un ÍNDICE, no una fecha.** Con una fecha, dos entradas del
+   mismo milisegundo —posible, el diario anota en ráfaga— caen las dos en el
+   borde y la página siguiente repite una o se salta otra. La prueba que lo
+   fija encadena tres páginas y comprueba que se ven las diez entradas **y que
+   no hay duplicados**; mirando una sola página no se vería.
+
+2. **`podas` viaja en la respuesta aunque sea 0.** Una poda dice que faltan
+   entradas que sí existieron. Sin ese número, un turno podado y un turno
+   tranquilo llegan idénticos al cliente (§2.4).
+
+3. **Un rango invertido se rechaza con 400.** Devolver `[]` habría sido más
+   fácil, pero vacío se lee como «no pasó nada en esas horas» — una afirmación
+   sobre la instalación a partir de un error de quien pregunta.
+
+4. **El filtro por fecha va ANTES de paginar.** Al revés, una página de 50
+   podría quedarse en 3 tras filtrar y parecería que no hay más, cuando el
+   resto del rango está más atrás en el archivo.
+
+5. **Una entrada sin fecha legible no se descarta al acotar.** Una línea
+   `ilegible` es la constancia de que algo se perdió; filtrarla por una fecha
+   que no tiene la borraría justo del rango que alguien está investigando.
+
+**Y una que sí estaba, confirmada:** el rol. Es la única lectura de este backend
+que lo lleva, y se ejerce con el interruptor encendido en las pruebas — una
+guarda que nadie ha ejercido es una promesa, no una guarda.
+
+---
+
 ## 3 · Cierre del plan
 
 _(Se rellena al terminar.)_

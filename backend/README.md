@@ -467,6 +467,16 @@ herramienta `registrar_intervencion` por voz y chat; la revisa `CasosRag.jsx`.
 | `POST /api/casos` | `CrearCasoSchema` | `{ ok, caso }` · 201 |
 | `PATCH /api/casos/:id` | `{ archivado: boolean }` | `{ ok, caso }` · 404 si no existe |
 | `GET /api/diagnostico?sistema=&riesgoId=` | — | `{ ok, sistema, riesgoId, huerfano, causas }` |
+| `GET /api/diario?desde=&hasta=&limite=&cursor=` | — | `{ ok, entradas, total, cursor, podas }` · **pide rol `operador`** |
+
+**`GET /api/diario` es la única LECTURA con rol, a propósito** (Plan 25 F1).
+El resto de lecturas de este backend no lo llevan; ésta sí porque cada entrada
+trae `ip` y `usuario`: no dice sólo qué le pasó a la instalación, dice quién lo
+hizo y desde dónde. `cursor` es un ÍNDICE y no una fecha —dos entradas del mismo
+milisegundo harían que una fecha repitiera o saltara una línea—, y `podas` viaja
+siempre para poder distinguir «no pasó nada» de «ya no está guardado». No hay
+ruta de escritura: el diario lo escribe quien acciona, en el momento en que la
+orden ocurrió.
 
 **No hay `DELETE`, y es una decisión, no un olvido.** Un caso se ARCHIVA:
 deja de alimentar el diagnóstico —el índice de `ia/motor/casos.mjs` no lo

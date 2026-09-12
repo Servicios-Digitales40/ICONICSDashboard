@@ -360,6 +360,24 @@ export const AlarmsQuerySchema = z.object({
   hours: z.coerce.number().positive().optional().default(1),
 })
 
+/**
+ * `GET /api/diario` (Plan 25 F1).
+ *
+ * `limite` topa en 500 y no es una cifra decorativa: el diario llega a decenas
+ * de miles de entradas, y sin techo una sola petición podría pedirlas todas y
+ * cargarlas en memoria. El defecto de 100 es lo que cabe en una pantalla de
+ * turno sin paginar.
+ *
+ * `cursor` es un ÍNDICE, no una fecha — ver la cabecera de `leer()` en
+ * `lib/diario.mjs` para por qué una fecha no serviría aquí.
+ */
+export const DiarioQuerySchema = z.object({
+  desde: z.coerce.date({ error: '"desde" no es una fecha válida.' }).optional(),
+  hasta: z.coerce.date({ error: '"hasta" no es una fecha válida.' }).optional(),
+  limite: z.coerce.number().int().positive().max(500).optional().default(100),
+  cursor: z.coerce.number().int().min(0).optional().default(0),
+})
+
 export const ReporteQuerySchema = z.object({
   /*
    * El patrón de UUID se valida ANTES de tocar el filesystem: eso basta como

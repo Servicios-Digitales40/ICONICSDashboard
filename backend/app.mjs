@@ -55,6 +55,7 @@ import { registerCasosRoutes } from './routes/casosRoutes.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerDiagnosticoRoutes } from './routes/diagnosticoRoutes.mjs'
+import { registerDiarioRoutes } from './routes/diarioRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerRagRoutes } from './routes/ragRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
@@ -516,6 +517,10 @@ export async function createApp(config) {
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
     registerCasosRoutes(instancia)
     registerDiagnosticoRoutes(instancia, { motorDiagnostico })
+    // El MISMO `diario` que escriben `iconicsRoutes` y `controlRoutes`: esta
+    // ruta lo lee, y dos instancias apuntando al mismo archivo sería pedir que
+    // una lea a medio escribir de la otra.
+    registerDiarioRoutes(instancia, { diario })
   })
 
   /* ── Frontend ──────────────────────────────────────────────────── */
