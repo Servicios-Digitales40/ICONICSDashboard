@@ -52,7 +52,8 @@
     "justNow": "justo ahora",
     "secondsAgo": "hace {{n}} s",
     "minutesAgo": "hace {{n}} min",
-    "lastReadingAt": "Última lectura: {{cuando}}"
+    "lastReadingAt": "Última lectura: {{cuando}}",
+    "noReading": "Sin lectura"
   },
   "refresh": "Actualizar"
 }

@@ -54,6 +54,14 @@ const PaletaComandos = lazy(() =>
   import("./PaletaComandos.jsx").then((m) => ({ default: m.PaletaComandos }))
 );
 
+/**
+ * El latido del modo muro (Plan 24 F9). Diferido igual, y con más razón: sólo lo
+ * descargan las pantallas que arrancan con `?muro=1`, que son las de la pared.
+ */
+const LatidoMuroConectado = lazy(() =>
+  import("./LatidoMuro.jsx").then((m) => ({ default: m.LatidoMuroConectado }))
+);
+
 export default function App() {
   return (
     /* La barrera exterior es el último recurso: cubre lo que falle FUERA de
@@ -206,6 +214,24 @@ function Shell() {
             <Asistente />
           </Suspense>
         </ErrorBoundary>
+
+        {/*
+          * El latido, y SÓLO en modo muro (Plan 24 F9 · `USO-10`) — el espejo
+          * exacto de la paleta de abajo.
+          *
+          * Fuera del muro no hace falta: el cromo está puesto, y `UltimaLectura`
+          * ya dice cuándo llegó el último dato en la cabecera de cada vista.
+          * Añadir una segunda pastilla que diga lo mismo en una esquina sería
+          * ruido. Lo que el muro tiene de especial es justo que ese cromo se
+          * retira, y con él la única señal de que los datos siguen llegando.
+          */}
+        {muro.activo && (
+          <ErrorBoundary etiqueta="LatidoMuro">
+            <Suspense fallback={null}>
+              <LatidoMuroConectado />
+            </Suspense>
+          </ErrorBoundary>
+        )}
 
         {/* La paleta NO se monta en modo muro: un wallboard a tres metros no
             tiene teclado, así que un atajo de teclado ahí es superficie que no
