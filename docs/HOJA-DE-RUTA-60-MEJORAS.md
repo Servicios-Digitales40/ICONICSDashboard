@@ -5,7 +5,8 @@
 > las cincuenta que quedan.
 
 > **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`; **23 y 24**
-> hechos en `Moises7`. Quedan el 25 y el 26.
+> hechos en `Moises7`. El **25 está planeado** (12-09-2026) y sin empezar;
+> queda el 26.
 
 > **Plan 22.5, fuera de esta numeración — completado el 11-09-2026.** No es
 > una fase del roadmap de 60 mejoras: fue la integración de `origin/Gustavo5`
@@ -273,6 +274,37 @@ ponen en el dominio.
 `NUE-10` cuaderno de planta
 
 `NUE-05` (panel de salud) ya está hecho en el Plan 20 F10.
+
+> **Planeado el 12-09-2026** — [`PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md`](por-completar/PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md),
+> rama `Moises7`. La investigación previa vuelve a cambiar el reparto, como en
+> el Plan 24: **cinco de las entregas tienen ya construida su parte difícil.**
+>
+> - `NUE-04` **es presentación**, no motor: `diagnosticar()` ya devuelve los
+>   casos similares dentro de cada causa candidata. Sólo los pinta `CierreDiagnostico`.
+> - `NUE-06` existe **para el tanque** (`EstadoMaquinaBanner`), y su cabecera ya
+>   dice cómo generalizarlo.
+> - `NUE-07` ya agrupa por máquina y módulo en el sidebar, derivado del registro.
+> - `NUE-08` tiene la ida hecha (`contextoDeVista.js`, Plan 24 F7); falta la vuelta.
+> - `NUE-09` tiene el **cómo** se pinta un muro (`modoMuro.js` + `LatidoMuro`);
+>   falta el **qué**.
+>
+> **Dos entregas que la lista de arriba no nombra y sí son de este plan:**
+>
+> - **La pantalla de acceso** (`SEG-01`, segunda mitad). Remitida aquí desde
+>   cinco sitios del repo —`CLAUDE.md` §2.11, `backend/README.md`, el plugin, su
+>   prueba, y el cierre del Plan 22 F6— aunque no figure en esta línea.
+>   Confirmada como entrega propia antes de escribir las fases. Es lo único que
+>   desbloquea `AUTH_HABILITADA`, hoy probada y sin proteger nada.
+> - **`GET /api/diario`**. El diario de accionamientos (SEG-08) es de **sólo
+>   escritura**: no existe ninguna ruta que lo lea. Sin ella, la vista de Turno
+>   no puede decir quién accionó la bomba, que suele ser lo primero que se
+>   pregunta de un turno.
+>
+> **El riesgo de bundle no es el que esta hoja esperaba.** Medido el 12-09:
+> `index` 247,06 KB de 450 —203 libres—, pero **`vendor` 264,04 de 270: seis**.
+> Una librería nueva entra en `vendor` y lo revienta. La regla del plan es que
+> sólo entra en trozo diferido, y que no se sube ningún techo — la tercera
+> subida sin medición sigue descartada.
 
 ### Plan 26 · Código, y la sesión con planta
 
