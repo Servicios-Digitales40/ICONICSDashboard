@@ -13,7 +13,7 @@
 
 > **Rama.** `Moises7`, la misma en la que se ejecutó y cerró el Plan 23.
 
-> **ESTADO — EN CURSO (11-09-2026). F0 hecha**, nueve fases por delante. La
+> **ESTADO — EN CURSO (11-09-2026). F0 y F1 hechas**, ocho fases por delante. La
 > investigación de la §0 está hecha contra el código real, con archivo y línea.
 > El resultado de cada fase se anota en la §2 según se cierra.
 
@@ -638,3 +638,69 @@ Dos cosas medidas en vez de supuestas, ambas porque la cifra sorprendía:
   tiene violaciones graves») da timeout a los 5 s montando axe-core sobre una
   vista con Three.js. Comprobado con `git stash`: **falla igual sin estos
   cambios**. No se toca aquí —no es de esta fase— pero queda anotado.
+  **Arreglada en F1**, junto con la segunda que apareció por la misma causa.
+
+### F1 · `USO-03` — HECHA el 11-09-2026 (`d1a9d8d`)
+
+**`shared/eva/comun/procedencia.js`, y lo que importa es que RECOGE.** La
+respuesta ya estaba entera en el árbol, repartida en cinco sitios que no se
+conocen entre sí: el tag lo sabe `pointName()`, el PLC y la cadencia los
+declara `SISTEMAS`, la calidad la interpreta `shared/quality.js`, si hay serie
+propia lo decide `esHistorizada()` y la cobertura la calcula `historia.js`.
+Para saber de dónde venía un valor había que preguntar a los cinco y saber que
+existen.
+
+No calcula nada nuevo, y eso es la diferencia entre un panel de procedencia y
+una segunda opinión sobre el dato (§4.3). Consecuencia práctica: si mañana
+cambia la cadencia de una máquina o la ruta de su historiador, el panel no se
+entera y sigue diciendo la verdad. Las pruebas comparan contra lo que el
+registro declara (`SISTEMA.tanque.plc`) y no contra literales — una prueba con
+`"PLC_1 · ua:DEMO2"` escrito a mano comprobaría que nadie toca el registro, que
+no es lo que importa.
+
+**La unidad es un punto, y la firma no admite lista.** Es la restricción que
+§F1 del plan pedía respetar, y la razón es concreta: un panel de procedencia es
+transversal por naturaleza, lo que lo convierte en la invitación perfecta a
+poner dos sistemas uno al lado del otro «para comparar de dónde vienen». Sin el
+tag no se deduce la máquina de la clave — sale `null`, porque deducirla es
+exactamente el cruce que el Plan 23 corrigió en `98fe465`. Comprobado con las
+dos máquinas: vibraciones contesta con su propio PLC, su cadencia de 5 s y su
+ruta `hda:\Configuration\DEMO 3:`, sin que el módulo sepa de ninguna.
+
+**Es un `<details>` nativo, no un modal.** Tres motivos, y el segundo no era
+evidente antes de mirar: es información de consulta y no una interrupción
+(quien duda de la cifra no quiere perderla de vista); el `ModalProvider` de
+esta app maneja un identificador de texto **sin carga útil**, así que habría
+que rehacerlo para pasarle una señal; y el plegado accesible con teclado sale
+gratis.
+
+**Y calla cuando no sabe** (§2.4), que es la mitad del trabajo: sin lectura no
+finge una edad, con lectura buena no arrastra nota de calidad —se leería como
+advertencia—, y una cobertura completa no se menciona, porque «48 de 48» es
+ruido. Lo que hay que decir es cuándo NO está completa.
+
+**Dos pruebas ajenas que este panel destapó, y ninguna se relajó:**
+
+1. `edad-dato.test.jsx` buscaba `/hace/` y ahora la tarjeta tiene **dos edades
+   legítimas** (la cifra sustituida y la fila «Última lectura»). La aserción se
+   **estrecha**: identifica la cifra grande por el `title` que sólo ella lleva.
+   Aflojarla a `getAllByText(...).length > 0` habría pasado igual con la cifra
+   intacta y sólo el panel abierto.
+2. `accesibilidad.test.jsx` llevaba **dos fases en rojo por plazo agotado**, no
+   por una violación. Timeout explícito a las dos pruebas lentas, sin tocar el
+   criterio: siguen exigiendo cero violaciones graves, y `DetalleActivo` las
+   pasa **con el panel dentro** —o sea, el panel es accesible—. Se arregla
+   porque un rojo permanente que nadie atribuye a nada enseña a ignorar el
+   rojo, que es peor que una prueba lenta.
+
+**Comprobado.** `lint` 0 errores · `types` · 28 verificadores · `i18n` con
+paridad en los dos idiomas · **683 pruebas en verde, en dos pasadas seguidas**
+— la suite entera limpia por primera vez en este plan · `build` con `index` en
+**241,41 KB de 450**, o sea **1,63 KB** de coste real para esta fase.
+
+Dos errores propios que `lint` y `types` cazaron antes del commit, y que valen
+como recordatorio de para qué están: un import sin usar, y un JSDoc que
+declaraba `senal` obligatorio cuando la función admite llamarse sin argumentos
+a propósito (hay una prueba para ese caso). El segundo se corrigió en la
+dirección correcta —documentar por qué es opcional— y no marcando el parámetro
+como requerido para que el tipo callara.
