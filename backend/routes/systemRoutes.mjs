@@ -381,6 +381,24 @@ export function registerSystemRoutes(
         desfaseConHistorianMs: null,
       },
 
+      /*
+       * El horario de turnos de esta instalación (Plan 25 F2).
+       *
+       * Viaja aquí, junto a los relojes, porque es de la misma clase: un hecho
+       * del DESPLIEGUE que el tablero no puede deducir. `IA_TURNOS` vivía sólo
+       * en el backend, donde lo usa el asistente para entender «el turno de
+       * noche»; la vista de Turno necesita el mismo horario, y calcularlo por su
+       * cuenta haría que la misma palabra significara dos cosas distintas según
+       * por dónde se preguntara (§2.6).
+       *
+       * Un objeto VACÍO es la respuesta normal, no un fallo: `leerTurnos` deja
+       * el horario vacío a propósito cuando nadie lo ha declarado, porque un
+       * turno inventado devolvería datos verdaderos de las horas equivocadas.
+       * Quien lo lea tiene que distinguir «no hay turnos configurados» de «hay
+       * tres», y por eso se manda el objeto y no un booleano.
+       */
+      turnos: config.ia.turnos,
+
       servicios: {
         /*
          * `ICONICS_FAKE` primero y con nombre propio. Es el estado en el que

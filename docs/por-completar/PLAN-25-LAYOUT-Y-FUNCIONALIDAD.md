@@ -515,6 +515,51 @@ guarda que nadie ha ejercido es una promesa, no una guarda.
 
 ---
 
+### F2 · `NUE-01` — HECHA el 12-09-2026
+
+`views/comunes/TurnoEva.jsx` + `turnoEnCurso()` en `@shared/periodo.js` +
+`turnos` publicado en `/api/health` + `lib/api/diarioApi.js`.
+
+**Medido:** 776 pruebas de frontend (+9) y 334 de backend (+10), los 28
+verificadores, lint 0 errores y de vuelta a los 5 avisos de siempre, types
+limpio. Bundle: `index` 247,79 → **250,34 KB** de 450.
+
+**El riesgo #5 del plan se cumplió, y se corrigió antes de escribir código.**
+La fase iba a inventarse «las últimas 8 horas» como definición de turno.
+`shared/periodo.js` ya tenía `leerTurnos` e `IA_TURNOS`, vacío por defecto a
+propósito, con el motivo escrito: «un turno inventado devolvería datos
+verdaderos de las horas equivocadas, que es indistinguible de la respuesta
+correcta».
+
+Lo que faltaba de verdad era otra cosa: **`turnoEnCurso()`**. `resolverPeriodo`
+parte de lo que ESCRIBE una persona («el turno de noche»); una vista tiene un
+reloj y necesita la pregunta inversa. Se añadió al mismo archivo, con sus ocho
+pruebas — y lo que más se prueba es el turno que cruza medianoche (`noche=22-6`),
+donde un `desde <= h < hasta` escrito sin pensar falla dos veces: a las 23:00
+diría que no hay turno, y a las 3:00 tampoco. Además, a las 3:00 el turno
+**empezó ayer**; sin eso la vista se comería las primeras cinco horas.
+
+**Un fallo que destapó su propia prueba, y era el de esta pantalla entera.** Al
+contar sólo los eventos, que fallaran TODAS las alarmas se pintaba como
+«ninguna alarma entró en esta ventana»: un historiador caído se leía como un
+turno limpio. Corregido contando también las fuentes perdidas, y fijado con una
+prueba propia.
+
+**El horario viaja por `/api/health`.** Es un hecho del despliegue que el
+tablero no puede deducir, igual que `relojes` — y el campo va como objeto, no
+como booleano, para que «no hay turnos» y «hay tres» se distingan.
+
+**Y una cifra que hay que mirar: `vendor` 264,04 → 265,14 KB, quedan 4,86.**
+No es una librería nueva: son dos iconos de `lucide-react` (`ClipboardList`,
+`Siren`) que `routes.jsx` importa a nivel de módulo, y `lucide-react` **no está
+troceado** en `vite.config.js`, así que cae en el catch-all de `vendor`. Con
+cinco fases por delante que añaden vistas —y cada vista, su icono— esto toca el
+techo antes del final del plan. Ver §1 riesgo 1: el plan no sube techos, así
+que lo que corresponde es trocear `lucide-react`, y es una decisión que se
+consulta antes de tomarla.
+
+---
+
 ## 3 · Cierre del plan
 
 _(Se rellena al terminar.)_

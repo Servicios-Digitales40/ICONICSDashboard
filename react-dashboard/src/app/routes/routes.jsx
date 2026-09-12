@@ -65,8 +65,8 @@
  */
 import { lazy } from "react";
 import {
-  Bell, Box, Boxes, BrainCircuit, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, LayoutDashboard,
-  NotebookPen, Power, ShieldAlert, Waves,
+  Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home,
+  LayoutDashboard, NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
 /**
@@ -265,6 +265,23 @@ export const ROUTES = [
     id: "eva-assets",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AssetsEva.jsx")),
     nav: { icon: <Boxes size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ «TURNO» VA EN GENERAL Y NO EN UNA MÁQUINA ──────────────
+     *
+     * Porque un turno no es de una máquina: quien entra a las seis se hace
+     * cargo de la instalación entera. Mismo criterio que Alarmas y Assets.
+     *
+     * Cruza tres fuentes —el diario de accionamientos, los eventos derivados
+     * del historiador y los casos cerrados— que hasta ahora había que mirar en
+     * tres sitios distintos, y una de ellas ni siquiera se podía ver sin entrar
+     * al servidor.
+     */
+    id: "eva-turno",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/TurnoEva.jsx")),
+    nav: { icon: <ClipboardList size={17} />, group: "sec-general" },
   },
 
   {

@@ -371,3 +371,61 @@ export function leerTurnos(crudo) {
   }
   return turnos
 }
+
+/**
+ * ¿En qué turno cae `ahora`? — Plan 25 F2.
+ *
+ * ── POR QUÉ NO VALE `resolverPeriodo('turno de mañana')` ───────────
+ *
+ * Porque ésa contesta otra pregunta. `resolverPeriodo` parte de lo que
+ * ESCRIBE una persona —el asistente le pasa texto— y necesita que le digan qué
+ * turno quiere. La vista de Turno no tiene a nadie escribiendo: tiene un reloj,
+ * y la pregunta es la inversa — «dado este instante, ¿qué turno es?».
+ *
+ * Vive aquí, junto a `leerTurnos` y al resolvedor, porque es la MISMA noción de
+ * turno. Si esto se calculara en la vista, «el turno de noche» significaría una
+ * cosa en la pantalla y otra en el asistente, y la misma pregunta contestaría
+ * distinto según por dónde se hiciera (§2.6).
+ *
+ * ── LOS TURNOS QUE CRUZAN MEDIANOCHE ───────────────────────────────
+ *
+ * `noche=22-6` es el caso normal, no el raro, y es donde un `desde <= h < hasta`
+ * escrito sin pensar falla: a las 23:00 diría que no hay turno, y a las 3:00
+ * tampoco. Se detecta por `hasta <= desde` y se parte en dos tramos.
+ *
+ * Además, un turno de noche que empezó AYER sigue siendo el turno en curso a
+ * las 3:00 — por eso `inicio` puede caer en el día anterior. Sin eso, la vista
+ * pediría desde las 00:00 y se comería las primeras cinco horas del turno, que
+ * es justo cuando pasan las cosas que nadie vio.
+ *
+ * @param {object} turnos  `{ manana: [6,14], noche: [22,6] }` — de `leerTurnos`
+ * @param {Date}   [ahora]
+ * @returns {{ clave, inicio: Date, fin: Date } | null}  `null` si no hay turnos
+ *          configurados, o si ninguno cubre esta hora (un horario con huecos).
+ */
+export function turnoEnCurso(turnos, ahora = new Date()) {
+  const h = ahora.getHours() + ahora.getMinutes() / 60
+
+  for (const [clave, tramo] of Object.entries(turnos ?? {})) {
+    const [desde, hasta] = tramo
+    const cruzaMedianoche = hasta <= desde
+
+    const dentro = cruzaMedianoche
+      ? h >= desde || h < hasta   // 22-6: o es tarde-noche, o es madrugada
+      : h >= desde && h < hasta
+
+    if (!dentro) continue
+
+    const inicio = new Date(ahora)
+    inicio.setHours(desde, 0, 0, 0)
+    // Madrugada de un turno que cruza medianoche: empezó AYER.
+    if (cruzaMedianoche && h < hasta) inicio.setDate(inicio.getDate() - 1)
+
+    const fin = new Date(inicio)
+    fin.setHours(inicio.getHours() + (cruzaMedianoche ? 24 - desde + hasta : hasta - desde), 0, 0, 0)
+
+    return { clave, inicio, fin }
+  }
+
+  return null
+}

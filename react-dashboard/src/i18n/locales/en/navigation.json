@@ -67,6 +67,11 @@
       "nav": "Assets",
       "sub": "The eight demo points, with their raw value and quality"
     },
+    "eva-turno": {
+      "title": "Shift",
+      "nav": "Shift",
+      "sub": "What has happened since the shift started: actions, alarms and cases"
+    },
     "salud-sistema": {
       "title": "System Health",
       "nav": "Health",

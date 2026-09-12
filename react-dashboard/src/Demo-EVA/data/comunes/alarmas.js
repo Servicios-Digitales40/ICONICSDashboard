@@ -126,7 +126,7 @@ export const ALARMAS_HISTORIZABLES = ALARMAS.filter((key) => SENALES[key]?.histo
  * @param {string} clave  Clave de dominio de la alarma (`nivelAltoAlto`…).
  * @returns {Promise<{eventos: object[], clave: string, hasMore: boolean}>}
  */
-export async function leerAlarmas(horas = 1, clave = ALARMAS_HISTORIZABLES[0]) {
+export async function leerAlarmas(horas = 1, clave = ALARMAS_HISTORIZABLES[0], ventana = null) {
   /*
    * Sin alarma que consultar no se pregunta. Es la diferencia entre una lista
    * vacía —«no ha pasado nada»— y un error: preguntar igual provocaría un fallo
@@ -134,8 +134,15 @@ export async function leerAlarmas(horas = 1, clave = ALARMAS_HISTORIZABLES[0]) {
    */
   if (!clave) return { eventos: [], clave: null, hasMore: false };
 
-  const fin = new Date();
-  const inicio = new Date(fin.getTime() - horas * 3_600_000);
+  /*
+   * `ventana` explícita para la vista de Turno (Plan 25 F2). El camino de
+   * siempre —«las últimas N horas»— termina en `ahora`, y un turno no: el de
+   * noche empezó AYER a las 22:00 y su ventana no llega hasta este instante
+   * desde hace N horas, sino desde una hora concreta. Sin esto, la vista de
+   * Turno tendría que calcular `horas` restando fechas y perdería el borde.
+   */
+  const fin = ventana?.fin ?? new Date();
+  const inicio = ventana?.inicio ?? new Date(fin.getTime() - horas * 3_600_000);
 
   /*
    * `crudo: true` NO es un detalle de rendimiento: sin él esta pantalla enseña

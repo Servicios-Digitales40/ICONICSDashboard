@@ -2,7 +2,11 @@
   "close": {
     "title": "Close diagnosis",
     "sub": "Confirm or correct the cause of a risk that has been acted on",
-    "band": { "alto": "HIGH", "medio": "MEDIUM", "bajo": "LOW" },
+    "band": {
+      "alto": "HIGH",
+      "medio": "MEDIUM",
+      "bajo": "LOW"
+    },
     "system": {
       "riskOf": "{{sistema}} · risk",
       "risk": "Risk",
@@ -49,5 +53,38 @@
       "back": "Back to {{pantalla}}"
     },
     "submit": "Close case"
+  },
+  "shift": {
+    "title": "Shift",
+    "subtitle": "What has happened since it started: actions, alarms and closed cases.",
+    "lastHours": "Last {{n}} h",
+    "quiet": "No actions, alarms or cases in this window.",
+    "names": {
+      "manana": "Morning shift",
+      "tarde": "Afternoon shift",
+      "noche": "Night shift"
+    },
+    "noShifts": {
+      "title": "Shifts are not configured",
+      "body": "A fixed window is being shown, not a real shift. For this screen to follow the plant schedule, declare {{variable}} on the server (for example: manana=6-14,tarde=14-22,noche=22-6)."
+    },
+    "simulated": {
+      "title": "Simulated source",
+      "body": "Actions and cases come from the server; alarms come from the simulator. What you see here is not the plant real shift."
+    },
+    "actions": {
+      "title": "Actions",
+      "empty": "Nobody operated anything in this window.",
+      "pruned": "Earlier entries are missing: the diary was pruned by size."
+    },
+    "alarms": {
+      "title": "Alarm events",
+      "empty": "No alarm was raised in this window.",
+      "partial": "{{n}} alarm(s) could not be read; the list below is incomplete."
+    },
+    "cases": {
+      "title": "Closed cases",
+      "empty": "No case was closed in this window."
+    }
   }
 }

@@ -2,7 +2,11 @@
   "close": {
     "title": "Cerrar diagnóstico",
     "sub": "Confirma o corrige la causa de un riesgo ya intervenido",
-    "band": { "alto": "ALTO", "medio": "MEDIO", "bajo": "BAJO" },
+    "band": {
+      "alto": "ALTO",
+      "medio": "MEDIO",
+      "bajo": "BAJO"
+    },
     "system": {
       "riskOf": "{{sistema}} · riesgo",
       "risk": "Riesgo",
@@ -49,5 +53,38 @@
       "back": "Volver a {{pantalla}}"
     },
     "submit": "Cerrar caso"
+  },
+  "shift": {
+    "title": "Turno",
+    "subtitle": "Qué ha pasado desde que empezó: accionamientos, alarmas y casos cerrados.",
+    "lastHours": "Últimas {{n}} h",
+    "quiet": "Sin accionamientos, alarmas ni casos en esta ventana.",
+    "names": {
+      "manana": "Turno de mañana",
+      "tarde": "Turno de tarde",
+      "noche": "Turno de noche"
+    },
+    "noShifts": {
+      "title": "Los turnos no están configurados",
+      "body": "Se está mostrando una ventana fija, no un turno real. Para que esta pantalla siga el horario de la planta, declara {{variable}} en el servidor (por ejemplo: manana=6-14,tarde=14-22,noche=22-6)."
+    },
+    "simulated": {
+      "title": "Origen simulado",
+      "body": "Los accionamientos y los casos vienen del servidor; las alarmas, del simulador. Lo que se ve aquí no es el turno real de la planta."
+    },
+    "actions": {
+      "title": "Accionamientos",
+      "empty": "Nadie accionó nada en esta ventana.",
+      "pruned": "Faltan entradas anteriores: el diario se podó por tamaño."
+    },
+    "alarms": {
+      "title": "Eventos de alarma",
+      "empty": "Ninguna alarma entró en esta ventana.",
+      "partial": "{{n}} alarma(s) no se pudieron leer; lo de abajo está incompleto."
+    },
+    "cases": {
+      "title": "Casos cerrados",
+      "empty": "No se cerró ningún caso en esta ventana."
+    }
   }
 }

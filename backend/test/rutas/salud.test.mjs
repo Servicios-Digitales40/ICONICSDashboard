@@ -80,6 +80,33 @@ describe('GET /api/health — los campos de siempre', () => {
   })
 })
 
+describe('GET /api/health — el horario de turnos (Plan 25 F2)', () => {
+  it('publica los turnos configurados, para que el tablero no se los invente', async () => {
+    const { app } = await montarApp({ IA_TURNOS: 'manana=6-14,tarde=14-22,noche=22-6' })
+    const { turnos } = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(turnos).toEqual({ manana: [6, 14], tarde: [14, 22], noche: [22, 6] })
+
+    await app.close()
+  })
+
+  it('sin configurar viaja un objeto VACÍO, no se omite el campo', async () => {
+    /*
+     * La distinción que la vista de Turno necesita: «no hay turnos declarados»
+     * tiene que ser legible, porque de ahí sale el aviso que nombra `IA_TURNOS`
+     * en vez de inventarse un horario. Omitir el campo obligaría al cliente a
+     * tratar «no configurado» y «backend viejo» como lo mismo.
+     */
+    const { app } = await montarApp()
+    const cuerpo = json(await app.inject({ method: 'GET', url: '/api/health' }))
+
+    expect(cuerpo.turnos).toEqual({})
+    expect('turnos' in cuerpo).toBe(true)
+
+    await app.close()
+  })
+})
+
 describe('GET /api/health — los dos relojes (Plan 21 F6)', () => {
   it('publica la zona del puente y la declarada para la planta', async () => {
     const { app } = await montarApp({ PLANTA_TZ: 'America/Mexico_City' })

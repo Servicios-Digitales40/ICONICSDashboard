@@ -25,7 +25,7 @@ import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las veintitrés vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las veinticuatro vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -58,6 +58,10 @@ describe("superficie de la aplicación", () => {
       // instalación, habla del PUENTE (Plan 20 F10).
       "eva-alarmas",
       "eva-assets",
+      // `eva-turno` (Plan 25 F2) va en General por el mismo criterio que sus
+      // vecinas: un turno no es de una máquina, quien entra se hace cargo de la
+      // instalación entera.
+      "eva-turno",
       "salud-sistema",
       // Predicción — OTRO MÓDULO, no una sección más: un compresor real cuyo
       // histórico sirve otro backend. No entra por ICONICS, así que no puede
@@ -145,7 +149,9 @@ describe("el sidebar que sale del registro", () => {
     // `/api/iconics/alarms` que el botón del Topbar hacía en toda la
     // aplicación — ese botón sigue sin volver, sólo la entrada del menú.
     const general = NAV.find((n) => n.group === "sec-general");
-    expect(general.children.map((c) => c.id)).toEqual(["eva-alarmas", "eva-assets", "salud-sistema"]);
+    expect(general.children.map((c) => c.id)).toEqual([
+      "eva-alarmas", "eva-assets", "eva-turno", "salud-sistema",
+    ]);
 
     /*
      * Predicción ya NO cuelga de «General». Esta comprobación es la que

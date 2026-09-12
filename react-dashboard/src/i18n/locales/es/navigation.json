@@ -67,6 +67,11 @@
       "nav": "Assets",
       "sub": "Los ocho puntos de la demo, con su valor y su calidad en crudo"
     },
+    "eva-turno": {
+      "title": "Turno",
+      "nav": "Turno",
+      "sub": "Qué ha pasado desde que empezó el turno: accionamientos, alarmas y casos"
+    },
     "salud-sistema": {
       "title": "Salud del sistema",
       "nav": "Salud",
