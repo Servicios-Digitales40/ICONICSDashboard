@@ -525,6 +525,58 @@ uno inválido —son dos arreglos distintos, y el backend ya los distingue—; q
 renovación ocurre antes de caducar y no después de un 401; y que en modo muro
 un fallo de renovación avisa **sin** vaciar la pantalla.
 
+**HECHA el 12-09-2026.**
+
+**No hay `fetch` centralizado, y eso decidió el mecanismo.** Al investigar
+cómo mandar `Authorization` en cada petición se encontró que hay al menos SEIS
+clientes con `fetch()` propio (`iconics/apiClient.js`, `casosApi.js`,
+`diarioApi.js`, `cuadernoApi.js`, `ragApi.js`, `useAsistente.js` con 5 puntos de
+streaming/voz, más dos sueltos en `ControlesTanque.jsx` y `Asistente.jsx`).
+Se consideró interceptar `window.fetch` globalmente —un solo punto de
+cambio— y se descartó: sería invisible al leer cualquier cliente por
+separado, y arriesgaría las pruebas que ya mockean `globalThis.fetch`
+directamente (F0, F2, F4, F7 lo hacen). Se optó por `authHeaders()` explícito,
+añadido a cada uno de los ~14 puntos de `fetch` — más archivos tocados, pero
+nada oculto.
+
+**Un solo cambio cubrió el aviso de sesión inválida en los seis clientes.**
+`errorDeRespuesta()` ya se llamaba desde todos para construir su error; se
+modificó UNA vez ahí para que un 401 dispare `EVENTO_SESION_INVALIDA` con el
+`caducado` que ya distingue el backend, en vez de repetir la detección en cada
+cliente.
+
+**Un error de diseño real, cazado por los propios tests existentes antes de
+escribir uno nuevo.** El primer borrador de `ContenidoDelShell` montaba
+`PantallaDeAcceso` COMO OVERLAY sobre el tablero, que seguía montado debajo.
+Los tests de `modo-muro-shell.test.jsx` seguían «pasando» porque nunca buscaban
+la pantalla de acceso — pero el diseño era el equivocado: con `bloqueando`, el
+tablero de abajo seguiría pidiendo rutas que iban a devolver 401 igual, sólo
+que sin que nadie lo viera. Corregido para que `bloqueando` REEMPLACE el
+contenido, no lo tape — y ENTONCES esos mismos tests fallaron de verdad,
+porque `SesionProvider` pregunta `/api/auth/yo` al montar y ningún test lo
+mockeaba. Se les añadió el mock (dos archivos), que es exactamente el impacto
+esperable de encender un provider nuevo que envuelve toda la app.
+
+**La pregunta difícil del Plan 22 tiene su propio componente, separado del
+latido.** `AvisoRenovacionMuro` es una pastilla flotante —mismo patrón que
+`LatidoMuro`— en la esquina OPUESTA: las dos informan de cosas distintas (si
+los DATOS siguen llegando, si la SESIÓN sigue viva) y superponerlas confundiría
+las dos preguntas en una.
+
+**`useSistemaAgua()`/`useDominio()` no se tocaron.** El proveedor de sesión es
+independiente del de datos; ninguna vista tuvo que cambiar para saber de
+`AUTH_HABILITADA`.
+
+**Medido:** 899 pruebas de frontend (+22: 16 de `sesion.js`, 6 de
+`errorDelPuente.js`, 6 de la pantalla de acceso vía `<App/>`, 10 de
+`SesionProvider` aislado — dos tests existentes actualizados con el mock
+nuevo), los 28 verificadores —incluido `backend`, sin tocar en esta fase—,
+lint 0 errores, types limpio, i18n en paridad (1225 claves × 2). Bundle:
+`index` 258,77 → **266,07 KB** (la fase más pesada del plan: el formulario de
+acceso, el proveedor de sesión y catorce puntos de cliente modificados);
+`vendor` 265,82 → **266,45 KB** (dos iconos nuevos). Ambos con margen amplio
+(184 KB y 63,5 KB libres).
+
 ---
 
 ## F10 · `NUE-09` — muro multi-máquina

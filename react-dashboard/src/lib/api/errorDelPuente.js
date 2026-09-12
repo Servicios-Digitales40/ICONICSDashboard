@@ -28,6 +28,8 @@
  * quedarse mudo. La degradación es a lo de siempre, no a nada.
  */
 
+import { avisarSesionInvalida } from "./sesionInvalida.js";
+
 /** Un fallo del puente que conserva el código para poder traducirlo. */
 export class ErrorDelPuente extends Error {
   /**
@@ -64,6 +66,19 @@ export class ErrorDelPuente extends Error {
  * es quien conoce la ruta.
  */
 export function errorDeRespuesta(cuerpo, estado, porDefecto = "") {
+  /*
+   * Plan 25 F9: un 401 de CUALQUIER cliente avisa a `SesionProvider`, que
+   * decide qué hacer con `caducado` (intentar renovar, o pedir acceso). Aquí y
+   * no en cada cliente por separado — los seis lo llaman ya para construir su
+   * error, así que un solo cambio los cubre a todos sin tocarlos uno a uno.
+   *
+   * `cuerpo?.caducado` puede faltar (una ruta que no pasa por `autenticar`, un
+   * 401 de otra clase) y entonces se trata como «no caducado, simplemente
+   * inválido» — el lado que fuerza pedir acceso de nuevo en vez de reintentar
+   * una renovación que quizá no tenga sentido.
+   */
+  if (estado === 401) avisarSesionInvalida(cuerpo?.caducado === true);
+
   const delServidor = typeof cuerpo?.error === "string" ? cuerpo.error : "";
 
   return new ErrorDelPuente({

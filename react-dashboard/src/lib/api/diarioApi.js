@@ -13,6 +13,7 @@
  */
 import { API_BASE } from "./apiBase.js";
 import { errorDeRespuesta } from "./errorDelPuente.js";
+import { authHeaders } from "./sesion.js";
 
 async function parseResponse(response) {
   const raw = await response.text();
@@ -48,6 +49,6 @@ export async function leerDiario({ desde, hasta, limite, cursor, signal } = {}) 
   if (limite) params.set("limite", String(limite));
   if (cursor) params.set("cursor", String(cursor));
 
-  const response = await fetch(`${API_BASE}/api/diario?${params}`, { signal });
+  const response = await fetch(`${API_BASE}/api/diario?${params}`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }

@@ -18,11 +18,29 @@ const irA = (url) => globalThis.history.replaceState(null, "", url);
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");
   vi.stubEnv("VITE_ICONICS_CHAOS", "none");
+  /*
+   * `SesionProvider` (Plan 25 F9) pregunta `/api/auth/yo` al montar. Sin
+   * mockearla, jsdom no tiene backend detrás y la llamada falla — que
+   * `SesionProvider` interpreta como «hace falta acceso» (el lado que no deja
+   * pasar de más) y bloquearía estas pruebas, que no son sobre autenticación.
+   * Se responde como un servidor con `AUTH_HABILITADA=false`, que es el
+   * defecto real del proyecto.
+   */
+  vi.stubGlobal("fetch", vi.fn(async (url) => {
+    if (String(url).includes("/api/auth/yo")) {
+      return new Response(
+        JSON.stringify({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: false }),
+        { status: 200 }
+      );
+    }
+    return new Response(JSON.stringify({ ok: false, error: "no mockeado en esta prueba" }), { status: 404 });
+  }));
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   irA("/");
 });
 

@@ -24,6 +24,8 @@ import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.
 import { useTheme } from "@/theme";
 
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
+import { authHeaders } from "@/lib/api/sesion.js";
+import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 import { fmtSenal } from "../../lib/formato.js";
 import { UltimaLectura } from "../../components/base.jsx";
 import { useAhora } from "../../lib/useAhora.js";
@@ -142,11 +144,18 @@ function ControlesTanque() {
     try {
       const r = await fetch("/api/control/bomba", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ encender: accion === "encender" }),
       });
       const cuerpo = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(cuerpo?.error ?? `El servidor respondió ${r.status}.`);
+      /*
+       * `errorDeRespuesta` y no un `new Error` a mano (Plan 25 F9): un 401
+       * aquí es el que más importa avisar de todos — es la única ruta que
+       * ACCIONA planta desde el tablero, y sin esto un token caducado dejaría
+       * a alguien pulsando «encender» sin que la app nunca le pidiera volver
+       * a entrar.
+       */
+      if (!r.ok) throw errorDeRespuesta(cuerpo, r.status, `El servidor respondió ${r.status}.`);
       setResultado({ ok: true, mensaje: `Bomba ${cuerpo.accion}.` });
     } catch (e) {
       setResultado({ ok: false, mensaje: e.message });

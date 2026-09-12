@@ -77,5 +77,13 @@
       "assistantNotConfigured": "The chat responds 503 and the dashboard works the same.",
       "docsNotLoadedYet": "The index loads on the first search; none has been requested yet."
     }
+  },
+  "access": {
+    "title": "Dashboard access",
+    "subtitle": "This server requires a session. Sign in with your credentials.",
+    "userPlaceholder": "Username",
+    "passwordPlaceholder": "Password",
+    "submit": "Sign in",
+    "renewalFailedWall": "The session could not be renewed. Data may fall behind."
   }
 }

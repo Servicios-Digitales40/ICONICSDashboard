@@ -11,6 +11,7 @@
  */
 import { API_BASE } from "./apiBase.js";
 import { errorDeRespuesta } from "./errorDelPuente.js";
+import { authHeaders } from "./sesion.js";
 
 async function parseResponse(response) {
   const raw = await response.text();
@@ -37,7 +38,7 @@ async function parseResponse(response) {
  *  sin pasar por una conversación con el modelo. */
 export async function obtenerDiagnostico({ sistema, riesgoId, signal }) {
   const params = new URLSearchParams({ sistema, riesgoId });
-  const response = await fetch(`${API_BASE}/api/diagnostico?${params}`, { signal });
+  const response = await fetch(`${API_BASE}/api/diagnostico?${params}`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }
 
@@ -47,7 +48,7 @@ export async function obtenerDiagnostico({ sistema, riesgoId, signal }) {
 export async function registrarCaso(datos, { signal } = {}) {
   const response = await fetch(`${API_BASE}/api/casos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(datos),
     signal,
   });
@@ -58,7 +59,7 @@ export async function registrarCaso(datos, { signal } = {}) {
  *  archivadas**: la pantalla de revisión necesita enseñar precisamente lo
  *  que el diagnóstico ya no mira, para poder devolverlo. */
 export async function listarCasos({ signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/casos`, { signal });
+  const response = await fetch(`${API_BASE}/api/casos`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }
 
@@ -70,7 +71,7 @@ export async function listarCasos({ signal } = {}) {
 export async function archivarCaso({ id, archivado, signal }) {
   const response = await fetch(`${API_BASE}/api/casos/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ archivado }),
     signal,
   });

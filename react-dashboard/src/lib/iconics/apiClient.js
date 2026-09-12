@@ -7,9 +7,10 @@
  */
 import { API_BASE } from "@/lib/api/apiBase";
 import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
+import { authHeaders } from "@/lib/api/sesion.js";
 
 async function getJson(path) {
-  const response = await fetch(`${API_BASE}${path}`);
+  const response = await fetch(`${API_BASE}${path}`, { headers: authHeaders() });
   const payload = await response.json();
   if (!response.ok || payload?.ok === false) {
     /*
@@ -108,7 +109,7 @@ export function browseIconics(path) {
 async function enviarJson(metodo, path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: metodo,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body),
   });
   const payload = await response.json();

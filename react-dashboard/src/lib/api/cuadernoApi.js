@@ -10,6 +10,7 @@
  */
 import { API_BASE } from "./apiBase.js";
 import { errorDeRespuesta } from "./errorDelPuente.js";
+import { authHeaders } from "./sesion.js";
 
 async function parseResponse(response) {
   const raw = await response.text();
@@ -45,7 +46,7 @@ export async function leerCuaderno({ desde, hasta, limite, cursor, signal } = {}
   if (limite) params.set("limite", String(limite));
   if (cursor) params.set("cursor", String(cursor));
 
-  const response = await fetch(`${API_BASE}/api/cuaderno?${params}`, { signal });
+  const response = await fetch(`${API_BASE}/api/cuaderno?${params}`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }
 
@@ -64,7 +65,7 @@ export async function leerCuaderno({ desde, hasta, limite, cursor, signal } = {}
 export async function escribirEnCuaderno({ texto, sistema }) {
   const response = await fetch(`${API_BASE}/api/cuaderno`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ texto, ...(sistema ? { sistema } : {}) }),
   });
   return parseResponse(response);

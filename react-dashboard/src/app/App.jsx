@@ -19,6 +19,9 @@ import { DataSourceProvider } from "@/lib/datasource";
 import { queryClient } from "@/lib/queryClient.js";
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
+import { SesionProvider, useSesion } from "./providers/SesionProvider.jsx";
+import { PantallaDeAcceso } from "./PantallaDeAcceso.jsx";
+import { AvisoRenovacionMuro } from "./AvisoRenovacionMuro.jsx";
 import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
 import { EVENTO_NAVEGAR } from "@/features/asistente/lib/navegarDesdeAsistente.js";
@@ -168,6 +171,27 @@ function Shell() {
   });
 
   return (
+    /*
+     * `SesionProvider` envuelve TODO el contenido, con `enMuro` calculado aquí
+     * a partir de `nav.params` — el provider no lee la URL por su cuenta para
+     * no duplicar el parseo de `useNavegacion` (Plan 25 F9). El contenido real
+     * va en `ContenidoDelShell`, que es quien puede leer `useSesion()`: un
+     * componente no puede consumir el contexto que él mismo está montando.
+     */
+    <SesionProvider enMuro={muro.activo}>
+      <ContenidoDelShell
+        t={t} nav={nav} navigate={navigate} muro={muro}
+        cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
+        PageComponent={PageComponent}
+      />
+    </SesionProvider>
+  );
+}
+
+function ContenidoDelShell({ t, nav, navigate, muro, cajonAbierto, setCajonAbierto, PageComponent }) {
+  const { bloqueando, fase, habilitada, avisoFalloRenovacion } = useSesion();
+
+  return (
     <div
       style={{
         minHeight: "100vh", background: t.page, display: "flex",
@@ -179,6 +203,40 @@ function Shell() {
         zoom: muro.activo ? String(muro.escala) : undefined,
       }}
     >
+      {/*
+        * Mientras se verifica si hace falta acceso (Plan 25 F9), no se pinta
+        * nada del tablero todavía: un parpadeo del sidebar y luego el modal de
+        * acceso encima sería peor que un instante en blanco. Es corto —una
+        * llamada a `/api/auth/yo`— y sólo pasa una vez por carga de página.
+        */}
+      {fase === "verificando" ? null : bloqueando ? (
+        /*
+         * `bloqueando` reemplaza el tablero, no lo tapa: con la sesión
+         * pendiente FUERA de muro, las vistas de abajo pedirían rutas que
+         * van a devolver 401 igualmente, así que no hay razón para montarlas
+         * ya. En muro, `bloqueando` nunca es `true` — ver `SesionProvider`.
+         */
+        <PantallaDeAcceso />
+      ) : (
+        <>
+          {/* El aviso de renovación fallida, sólo en muro y sólo si hace
+              falta — nunca tapa el tablero. */}
+          {muro.activo && habilitada && avisoFalloRenovacion && <AvisoRenovacionMuro />}
+
+          <ContenidoDelTablero
+            t={t} nav={nav} navigate={navigate} muro={muro}
+            cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
+            PageComponent={PageComponent}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ContenidoDelTablero({ t, nav, navigate, muro, cajonAbierto, setCajonAbierto, PageComponent }) {
+  return (
+    <>
       {!muro.activo && (
         <Sidebar
           page={nav.page}
@@ -268,6 +326,6 @@ function Shell() {
           </ErrorBoundary>
         )}
       </div>
-    </div>
+    </>
   );
 }

@@ -77,5 +77,13 @@
       "assistantNotConfigured": "El chat responde 503 y el tablero funciona igual.",
       "docsNotLoadedYet": "El índice se carga a la primera búsqueda; todavía no se ha pedido ninguna."
     }
+  },
+  "access": {
+    "title": "Acceso al tablero",
+    "subtitle": "Este servidor exige sesión. Entra con tus credenciales.",
+    "userPlaceholder": "Usuario",
+    "passwordPlaceholder": "Contraseña",
+    "submit": "Entrar",
+    "renewalFailedWall": "La sesión no se pudo renovar. Los datos pueden ir quedando atrás."
   }
 }

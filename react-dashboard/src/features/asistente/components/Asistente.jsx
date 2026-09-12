@@ -84,6 +84,8 @@ import { markdownSeguro } from "../lib/markdown.js";
 import { MS_SILENCIO_DICTADO } from "../lib/audio.js";
 import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
 import { navegarDesdeAsistente } from "../lib/navegarDesdeAsistente.js";
+import { authHeaders } from "@/lib/api/sesion.js";
+import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
 import { destinoDeHerramienta } from "../lib/navegacionDelAsistente.js";
 
 const MONO = "'IBM Plex Mono', monospace";
@@ -484,11 +486,11 @@ export function Asistente() {
         .map((m) => ({ rol: m.rol, texto: m.texto }));
       const r = await fetch("/api/chat/exportar", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ historial }),
       });
       const cuerpo = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(cuerpo?.error ?? `El servidor respondió ${r.status}.`);
+      if (!r.ok) throw errorDeRespuesta(cuerpo, r.status, `El servidor respondió ${r.status}.`);
       window.open(cuerpo.url, "_blank");
     } catch (e) {
       setErrorExportar(e.message);

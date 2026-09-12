@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { API_BASE } from "@/lib/api/apiBase";
 import { contextoDeVista } from "./contextoDeVista.js";
 import { errorDeRespuesta } from "@/lib/api/errorDelPuente.js";
+import { authHeaders } from "@/lib/api/sesion.js";
 import { aWav, grabar, puedeGrabar } from "./audio.js";
 import { alQuedarseMuda, callar, desbloquearVoz, hablar, puedeHablar } from "./vozSalida.js";
 import { borrar, cargar, guardar, idDeConversacion } from "./persistencia.js";
@@ -150,7 +151,7 @@ export function useAsistente() {
   useEffect(() => {
     let cancelado = false;
 
-    fetch(`${API_BASE}/api/chat`)
+    fetch(`${API_BASE}/api/chat`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((r) => {
         if (cancelado) return;
@@ -186,7 +187,7 @@ export function useAsistente() {
       try {
         const respuesta = await fetch(`${API_BASE}/api/chat/modelo`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify({ modelo: nombre }),
         });
 
@@ -254,7 +255,7 @@ export function useAsistente() {
       try {
         const respuesta = await fetch(`${API_BASE}/api/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders() },
           /*
            * `conversacionId` es la clave de la caché del backend entre turnos
            * (Plan 23 F1). Puede ser `null` si el navegador no deja guardar
@@ -495,7 +496,7 @@ export function useDictado() {
       return;
     }
 
-    fetch(`${API_BASE}/api/voz`)
+    fetch(`${API_BASE}/api/voz`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((r) => { if (!cancelado) setDisponible(Boolean(r?.habilitado)); })
       // Un backend sin esta ruta responde con el index.html; eso es «no hay
@@ -530,7 +531,7 @@ export function useDictado() {
 
       const respuesta = await fetch(destino, {
         method: "POST",
-        headers: { "Content-Type": "audio/wav" },
+        headers: { "Content-Type": "audio/wav", ...authHeaders() },
         body: wav,
       });
 

@@ -12,6 +12,7 @@
  */
 import { API_BASE } from "./apiBase.js";
 import { errorDeRespuesta } from "./errorDelPuente.js";
+import { authHeaders } from "./sesion.js";
 
 async function parseResponse(response) {
   const raw = await response.text();
@@ -37,7 +38,7 @@ async function parseResponse(response) {
  *  manual, si algo se está indexando ahora mismo, y si la carga de nuevos
  *  manuales está habilitada en este servidor. */
 export async function listarManuales({ signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/rag/documentos`, { signal });
+  const response = await fetch(`${API_BASE}/api/rag/documentos`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }
 
@@ -57,7 +58,7 @@ export async function subirManual({ archivo, sistema, titulo, signal }) {
     `${API_BASE}/api/rag/documentos?${query({ nombre: archivo.name, sistema, titulo })}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
+      headers: { "Content-Type": "application/octet-stream", ...authHeaders() },
       body: archivo,
       signal,
     }
@@ -70,7 +71,7 @@ export async function subirManual({ archivo, sistema, titulo, signal }) {
 export async function reemplazarManual({ id, archivo, signal }) {
   const response = await fetch(`${API_BASE}/api/rag/documentos?id=${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/octet-stream" },
+    headers: { "Content-Type": "application/octet-stream", ...authHeaders() },
     body: archivo,
     signal,
   });
@@ -81,6 +82,7 @@ export async function reemplazarManual({ id, archivo, signal }) {
 export async function archivarManual({ id, signal }) {
   const response = await fetch(`${API_BASE}/api/rag/documentos?id=${encodeURIComponent(id)}`, {
     method: "PATCH",
+    headers: authHeaders(),
     signal,
   });
   return parseResponse(response);
@@ -102,6 +104,7 @@ export async function asignarSistemaManual({ id, sistema, signal }) {
   const params = new URLSearchParams({ id, accion: "asignar", sistema: sistema ?? "" });
   const response = await fetch(`${API_BASE}/api/rag/documentos?${params}`, {
     method: "PATCH",
+    headers: authHeaders(),
     signal,
   });
   return parseResponse(response);
