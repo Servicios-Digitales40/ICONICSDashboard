@@ -114,6 +114,21 @@ La regla para este plan, confirmada antes de empezar:
 > Una librería nueva **sólo** si viaja en trozo diferido, como la pila 3D y
 > `xlsx`. Nada nuevo en `vendor`.
 
+> **Corregido el 12-09-2026, tras F2.** El techo de `vendor` se subió de 270 a
+> **330**, decidido por quien lleva el proyecto tras plantearle la medición y
+> las alternativas. Lo que lo empujó no fue una librería nueva —la regla de
+> arriba se ha cumplido— sino que **`lucide-react` no está troceado** y cae en
+> el catch-all: los dos iconos de la vista de Turno costaron 1,10 KB de los
+> 5,96 que quedaban.
+>
+> Mi recomendación era trocear `lucide-react` en vez de subir el techo, y se
+> descartó; queda anotada como palanca pendiente en la cabecera de
+> `verificar-bundle.mjs` junto a la del idioma activo. La condición que el
+> propio guion exigía —«si alguna vez hay que subirlo, que sea con su propia
+> medición delante»— **sí se cumple aquí**: la subida anterior de `index` fue
+> por holgura, ésta tiene su medición. Y se gana su propio límite, más estrecho:
+> `vendor` no vuelve a subir sin haber tomado antes una de las dos palancas.
+
 Con dos guardas, porque «diferido» no puede volverse la puerta de atrás por la
 que entra cualquier cosa:
 

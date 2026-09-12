@@ -184,8 +184,51 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  * `index` sin una medición que lo empuje, la respuesta es que no.** Serían tres
  * seguidas, y a la tercera esto ya no mide nada — es un número que se mueve
  * solo. Lo que toca entonces es `COD-07` (Plan 26) y la palanca del idioma.
+ *
+ * ── `vendor` sube de 270 a 330 (12-09-2026), CON medición ──────────
+ *
+ * La nota de arriba dejó la puerta entornada con una condición: «si alguna vez
+ * hay que subirlo, que sea con su propia medición delante». Ésta es esa vez, y
+ * ésta es la medición.
+ *
+ * **Qué lo empuja.** El Plan 25 F2 añadió la vista de Turno, y con ella dos
+ * iconos (`ClipboardList`, `Siren`). `vendor` pasó de 264,04 a 265,14 KB:
+ * **+1,10 KB por dos iconos**. Medido con `git stash` a los dos lados, no
+ * estimado.
+ *
+ * El motivo es que `routes.jsx` importa los iconos a nivel de módulo —los
+ * necesita el sidebar al arrancar, así que no pueden ir en un `lazy()`— y
+ * `lucide-react` **no está en `PAQUETES_3D` ni en ninguna otra regla de
+ * `manualChunks`**, con lo que cae en el catch-all de `vendor`. Cada vista
+ * nueva del plan trae su icono, y quedan cinco fases: con 4,86 KB de margen,
+ * el techo se tocaba antes del final por el peso de unos pictogramas.
+ *
+ * **Lo que se consideró antes y por qué no se hizo.** Trocear `lucide-react` a
+ * su propio chunk era la alternativa —una línea, el mismo mecanismo que aísla
+ * la pila 3D— y se propuso primero. No se eligió: los iconos siguen siendo de
+ * carga inmediata, así que el peso no desaparece del arranque, sólo cambia de
+ * casilla y de número al que mirar. Se decidió subir el techo, que al menos no
+ * finge que el arranque adelgazó.
+ *
+ * **Por qué 330 y no 280.** Por lo mismo que `index` fue a 450: un techo que se
+ * roza cada dos fases manda a mover el número en vez de a mirar el bundle. 330
+ * deja ~65 KB, sitio para las cinco fases que quedan y las que vengan detrás.
+ *
+ * **Lo que esta subida NO cambia, y sigue siendo lo importante:**
+ *
+ *   · La pila 3D fuera del arranque la comprueban `HUELLAS_3D` y la resolución
+ *     de trozos, no un número. Ahí no se ha tocado nada.
+ *   · **La palanca del idioma activo (~40 KB) sigue sin tomarse y sigue siendo
+ *     lo correcto**, y ahora también la de trocear `lucide-react`. Subir un
+ *     techo no cancela ninguna de las dos: sólo deja de bloquear el trabajo.
+ *   · `COD-07` (Plan 26) sigue siendo el sitio donde esto se arregla de verdad.
+ *
+ * Y el aviso que ESTA subida se gana, que es más estrecho que el anterior:
+ * **`vendor` ya no se sube más sin haber tomado antes una de las dos palancas.**
+ * Tres subidas en once días son suficientes; la cuarta sería admitir que este
+ * número no mide nada.
  */
-const PRESUPUESTO_KB = { index: 450, vendor: 270 };
+const PRESUPUESTO_KB = { index: 450, vendor: 330 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [

@@ -356,26 +356,32 @@ node --env-file=.env.local scripts/medir-asistente.mjs    # el banco de 20 casos
 ```bash
 node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
 ```
-> **Hoy pasa** (medido el 11-09-2026: `index` 239,83 KB sobre 450,
-> `vendor` 264,33 KB sobre 270).
+> **Hoy pasa** (medido el 12-09-2026: `index` 250,34 KB sobre 450,
+> `vendor` 265,14 KB sobre 330).
 >
-> Los dos techos se han subido, y las cuatro subidas están razonadas con su
+> Los dos techos se han subido, y las cinco subidas están razonadas con su
 > medición —o con su ausencia de medición, dicha en voz alta— en la cabecera
 > del propio guion. Conviene saberlo porque roza la regla de «no se sube el
 > techo para callarlo»:
 >
-> · `vendor` 90 → 210 (TanStack Query) → 270 (la librería de i18n).
+> · `vendor` 90 → 210 (TanStack Query) → 270 (la librería de i18n) → **330 el
+>   12-09-2026, ésta sí con medición delante**: el Plan 25 F2 destapó que
+>   `lucide-react` no está troceado y cae en el catch-all, así que **dos iconos
+>   de una vista nueva costaron 1,10 KB** de un margen que eran 4,86. Medido con
+>   `git stash` a los dos lados.
 > · `index` 170 → 200 (los diccionarios, con `prediction.json` sacado antes
 >   del arranque) → 300 el 09-09-2026 → **450 el 11-09-2026**. Las dos últimas
 >   **por holgura, no por medición**: margen pedido para el trabajo que viene
 >   (el Plan 24 y los que le siguen), con nada en rojo en el momento de
 >   subirlas — 239,83 de 300 cuando se puso 450.
 >
-> **Dos seguidas sin medición es el límite, y está escrito en el guion**: una
-> tercera no toca. A partir de ahí lo que corresponde es `COD-07` (Plan 26) y
-> la palanca pendiente, que sigue siendo cargar **sólo el idioma activo**
-> (~40 KB fuera del camino crítico); subir el techo no la cancela. Ver
-> `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo la situación anterior.
+> **Dos seguidas sin medición es el límite para `index`, y está escrito en el
+> guion**: una tercera no toca. Y desde el 12-09, **`vendor` no se sube más sin
+> haber tomado antes una de las dos palancas**: cargar sólo el idioma activo
+> (~40 KB) o trocear `lucide-react`. A partir de ahí lo que corresponde es
+> `COD-07` (Plan 26); subir un techo no cancela ninguna palanca, sólo deja de
+> bloquear el trabajo. Ver `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo
+> la situación anterior.
 >
 > Lo que este guion protege de verdad —que la pila 3D no viaje en el arranque—
 > no depende de ninguno de esos números sino de `HUELLAS_3D`, y ahí no se ha
