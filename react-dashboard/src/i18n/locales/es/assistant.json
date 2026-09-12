@@ -122,7 +122,8 @@
     "copyAria": "Copiar la respuesta",
     "copied": "Copiada",
     "copy": "Copiar",
-    "downloadReport": "Descargar reporte"
+    "downloadReport": "Descargar reporte",
+    "goToView": "Ver en pantalla"
   },
   "input": {
     "listening": "Te escucho…",

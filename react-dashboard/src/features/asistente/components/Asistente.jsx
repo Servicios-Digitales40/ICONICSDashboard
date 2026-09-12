@@ -71,7 +71,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ArrowDown, Ban, Bot, Check, Copy, FileDown, FileText, Loader2, Maximize2,
+  ArrowDown, ArrowUpRight, Ban, Bot, Check, Copy, FileDown, FileText, Loader2, Maximize2,
   Mic, Minimize2, Paperclip, PhoneCall, PhoneOff, RotateCw, Send, Square,
   Trash2, TriangleAlert, X,
 } from "lucide-react";
@@ -83,6 +83,8 @@ import { conAdjunto, useAdjuntoTexto } from "../lib/useAdjuntoTexto.js";
 import { markdownSeguro } from "../lib/markdown.js";
 import { MS_SILENCIO_DICTADO } from "../lib/audio.js";
 import { EVENTO_PREGUNTA } from "../lib/preguntaExterna.js";
+import { navegarDesdeAsistente } from "../lib/navegarDesdeAsistente.js";
+import { destinoDeHerramienta } from "../lib/navegacionDelAsistente.js";
 
 const MONO = "'IBM Plex Mono', monospace";
 const SANS = "'Plus Jakarta Sans', sans-serif";
@@ -992,6 +994,23 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
   const consultas = mensaje.error ? [] : (mensaje.consultas ?? []);
   const adjuntos = mensaje.error ? [] : (mensaje.adjuntos ?? []);
 
+  /*
+   * Plan 25 F7 (`NUE-08`, la vuelta): a dónde llevaría esta respuesta, si a
+   * alguna. Se deriva de las CONSULTAS ya hechas —no se guarda estado nuevo—
+   * porque `destinoDeHerramienta` es puro y barato; recalcularlo al pintar es
+   * más simple que mantenerlo sincronizado con `consultas` en dos sitios.
+   *
+   * El ÚLTIMO destino no nulo, no el primero: en un diagnóstico encadenado
+   * (riesgos_activos → diagnosticar_falla) la llamada más tardía es la más
+   * específica, y es la que de verdad importa mostrar.
+   */
+  const destino = ocupado
+    ? null
+    : consultas
+        .map((c) => destinoDeHerramienta(c.nombre, c.argumentos))
+        .filter(Boolean)
+        .at(-1) ?? null;
+
   return (
     <div style={{ maxWidth: "92%" }}>
       {hayBurbuja && (
@@ -1069,7 +1088,27 @@ function Turno({ mensaje, t, puedeReintentar, onReintentar, ocupado, onPreguntar
               </div>
             ))}
           </div>
-          {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {/*
+              «Ir a ver» — la vuelta de `contextoDeVista.js`. NO navega solo:
+              es un botón que alguien pulsa, mismo criterio que
+              `pedirAlAsistente()` no manda nada hasta que alguien lo llama.
+              Aparecer sin que nadie lo pida sería sorprender a mitad de
+              conversación, y el operador podría seguir preguntando sin que
+              la pantalla cambiara debajo de él.
+            */}
+            {destino && (
+              <button
+                type="button"
+                onClick={() => navegarDesdeAsistente(destino.ruta, destino.params)}
+                className="eva-asis-boton"
+                style={botonReintentar(t)}
+              >
+                <ArrowUpRight size={12} /> {traducir("actions.goToView")}
+              </button>
+            )}
+            {Boolean(mensaje.texto) && <BotonCopiar t={t} texto={mensaje.texto} />}
+          </div>
         </div>
       )}
 

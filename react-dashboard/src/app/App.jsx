@@ -12,7 +12,7 @@
  * `app/routes/`, de donde también salen `NAV` para el Sidebar y `PAGE_META`
  * para el Topbar. Añadir una página es una sola edición, en `routes.jsx`.
  */
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
@@ -21,6 +21,7 @@ import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
 import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
+import { EVENTO_NAVEGAR } from "@/features/asistente/lib/navegarDesdeAsistente.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { leerModoMuro, useRotacionMuro } from "./modoMuro.js";
 
@@ -128,6 +129,29 @@ function Shell() {
   // `undefined`, que tumbaría la aplicación entera. Pasa al renombrar rutas,
   // cuando algo sigue navegando al id viejo.
   const PageComponent = PAGES[nav.page] ?? PAGES[DEFAULT_ROUTE];
+
+  /*
+   * Plan 25 F7 (`NUE-08`, la vuelta): el asistente pide navegar con un evento
+   * —`navegarDesdeAsistente()`, simétrico a `pedirAlAsistente()`— y aquí es
+   * donde se escucha, porque aquí es donde vive `navigate()`. El asistente NO
+   * lo llama directamente: vive fuera del árbol de rutas a propósito, y
+   * pasarle `navigate` como prop lo acoplaría a este componente.
+   *
+   * Se valida `ruta` contra `ROUTE_IDS` ANTES de navegar: un id que no existe
+   * —el modelo alucinó un nombre de herramienta, o `navegacionDelAsistente.js`
+   * y `routes.jsx` se desincronizaron— no debe ensuciar el historial con una
+   * URL inválida. Se ignora en silencio, igual que un evento sin nadie
+   * escuchando es el caso normal para `preguntaExterna.js`.
+   */
+  useEffect(() => {
+    const alNavegar = (e) => {
+      const ruta = e?.detail?.ruta;
+      if (typeof ruta !== "string" || !ROUTE_IDS.includes(ruta)) return;
+      navigate(ruta, e.detail.params ?? {});
+    };
+    window.addEventListener(EVENTO_NAVEGAR, alNavegar);
+    return () => window.removeEventListener(EVENTO_NAVEGAR, alNavegar);
+  }, [navigate]);
 
   // El cajón de navegación (Sidebar por debajo de 900px) es del Shell y no del
   // Sidebar: el botón que lo abre vive en el Topbar, así que el estado tiene

@@ -122,7 +122,8 @@
     "copyAria": "Copy the answer",
     "copied": "Copied",
     "copy": "Copy",
-    "downloadReport": "Download report"
+    "downloadReport": "Download report",
+    "goToView": "View on screen"
   },
   "input": {
     "listening": "Listening…",

@@ -397,6 +397,48 @@ los cuatro identificadores. Navegar necesita un id de ruta, no una medida.
 prueba ya existe: que siga en verde es la mitad del trabajo); y que un id de
 ruta que no existe no rompe la aplicación.
 
+**HECHA el 12-09-2026, con una limitación real documentada en el propio
+código, no descubierta después.**
+
+**El canal existente para la vuelta no era el que se esperaba.** El plan decía
+«el canal ya existe y se llama `preguntaExterna.js`; esto es su simétrico».
+Cierto en espíritu, pero investigando de dónde saldría el destino de la
+navegación apareció el dato que importa: `chat.mjs` ya emite por SSE
+`{ tipo: 'herramienta', nombre, argumentos }` cada vez que el modelo llama a
+una herramienta — son los ARGUMENTOS DE ENTRADA que el modelo escribió, no el
+resultado de la herramienta. Y da la casualidad de que `diagnosticar_falla` y
+`cerrar_diagnostico` YA exigen `sistema`+`riesgoId` como entrada: ese dato basta
+para navegar, **sin tocar el backend** para nada de esto.
+
+**Una limitación real que se documentó en vez de forzarla.** `riesgos_activos`
+sólo recibe `sistema` — CUÁL de los riesgos activos mencionó el modelo después
+en su texto vive en el RESULTADO de la herramienta, que no viaja por este
+canal. Fingir más precisión de la que hay habría sido peor que no ofrecerla:
+esa llamada navega a la vista de Riesgos ENTERA, no a una tarjeta concreta.
+Está escrito así, con el motivo, en la cabecera de
+`navegacionDelAsistente.js` — no es un pendiente oculto, es una decisión.
+
+**El registro de destinos es explícito y corto a propósito**, no un intento
+genérico de mapear cualquier herramienta a una vista: `analisis_de_senal`,
+`correlacionar_senales` y otras muchas no corresponden 1:1 a ninguna pantalla,
+y un botón que aterrizara en un sitio sin relación sería más confuso que
+ningún botón.
+
+**El botón no navega solo.** Aparece bajo la respuesta terminada («Ver en
+pantalla») y espera a que alguien lo pulse — mismo criterio que
+`pedirAlAsistente()` no manda nada hasta que una vista lo llama. Navegar sin
+que nadie lo pida habría cambiado la pantalla debajo de una conversación en
+curso.
+
+**Medido:** 852 pruebas de frontend (+24: 15 del dominio de navegación puro, 4
+del transporte del evento contra `App.jsx` real, 5 de integración con el panel
+del asistente), los 28 verificadores —incluido `instrucciones`, que comprueba
+que el prompt no se contradiga con el registro de herramientas—, lint 0
+errores, types limpio. La prueba del backend que fija `strict()` en
+`ChatSchema.contexto` **no se tocó** y sigue en verde, confirmando que la
+frontera de F7 no se movió. Bundle: `index` 256,66 → **257,11 KB**; `vendor`
+265,54 → **265,82 KB** (un icono nuevo, `ArrowUpRight`).
+
 ---
 
 ## F8 · `NUE-10` — cuaderno de planta
