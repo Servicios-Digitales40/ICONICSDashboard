@@ -126,6 +126,11 @@
       "title": "Cerrar diagnóstico",
       "nav": "Cierre de diagnóstico",
       "sub": "Confirma o corrige la causa de un riesgo ya intervenido"
+    },
+    "eva-bandeja": {
+      "title": "Hallazgos",
+      "nav": "Hallazgos",
+      "sub": "Riesgos activos y casos similares que el sistema ya calculó y aún no ha visto nadie"
     }
   },
   "palette": {

@@ -65,7 +65,7 @@
  */
 import { lazy } from "react";
 import {
-  Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home,
+  Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
   LayoutDashboard, NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
@@ -305,6 +305,19 @@ export const ROUTES = [
     id: "eva-turno",
     component: lazy(() => import("@/Demo-EVA/views/comunes/TurnoEva.jsx")),
     nav: { icon: <ClipboardList size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ VA EN «GENERAL», IGUAL QUE «TURNO» ─────────────────────
+     *
+     * Un hallazgo puede ser de cualquiera de las dos máquinas, así que la
+     * bandeja misma no es de ninguna — cuelga aquí por el mismo motivo que
+     * Alarmas, Assets y Turno.
+     */
+    id: "eva-bandeja",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
+    nav: { icon: <Inbox size={17} />, group: "sec-general" },
   },
 
   {

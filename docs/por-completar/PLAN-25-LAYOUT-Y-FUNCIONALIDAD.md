@@ -327,6 +327,57 @@ esta bandeja enseña, y nada más.
 descartada también —«no lo hice» contesta a la misma pregunta que «lo hice», que
 es el argumento de `lib/diario.mjs`— y que la bandeja vacía dice que está vacía.
 
+**HECHA el 12-09-2026, con el nombre y el alcance corregidos antes de escribir
+una línea de vista.**
+
+Investigar «propuesta» antes de nombrar nada destapó que la palabra **ya
+significa algo concreto y distinto** en este proyecto: `shared/eva/comun/aprendizaje.js`
+tiene un ciclo completo de propuestas de REGLAS de riesgo que el asistente
+sugiere (`proponer_regla`), revisadas por terminal (`scripts/revisar-propuestas.mjs`)
+y nunca desde el tablero — a propósito, porque aprobar una exige escribir la
+regla y su prueba a mano, no pulsar un botón. Reutilizar el nombre para algo
+que sí se acepta o descarta con un click habría hecho creer que las dos
+bandejas se tratan igual. Se renombró a **«Hallazgos»**, y esas propuestas de
+reglas se quedan fuera de esta bandeja — ni siquiera en solo lectura, porque
+mezclar las dos conceptualmente era el riesgo, no sólo el nombre.
+
+**Los «diagnósticos sin cerrar» de la especificación original no entraron.**
+`diagnosticEventId` se genera una vez por llamada a `/api/diagnostico` y no se
+persiste hasta que alguien cierra el caso — no existe ningún registro de qué
+diagnósticos se calcularon y quedaron abiertos. Construirlo habría sido
+inventar un dato que no existe (§2.5). Documentado en la cabecera de
+`shared/eva/comun/hallazgos.js`; queda pendiente si algún día se decide
+persistir ese evento.
+
+**Lo que sí entró: riesgos activos de las dos máquinas y casos similares
+proactivos (F0), normalizados por `shared/eva/comun/hallazgos.js`** — dominio
+puro que no calcula ni puntúa nada, sólo proyecta las salidas de
+`evaluarRiesgos()`/`evaluarRiesgosVibracion()` y `buscarCasosSimilares()` a una
+forma común. El id de cada hallazgo lleva su origen y su sistema por delante
+(`riesgo:tanque:derrame`, `caso:vibraciones:desalineacion:c1`), mismo criterio
+que `idDeEvento()` en alarmas, para que nunca se confunda un hallazgo de una
+máquina con el de otra.
+
+**«Descartar» no escribe en ningún diario, y es una relectura de la frontera
+del plan, no un incumplimiento.** El diario de accionamientos
+(`lib/diario.mjs`) registra ACCIONES SOBRE PLANTA — encender la bomba, no
+encenderla—; descartar un hallazgo en la bandeja no es una acción sobre el
+PLC, es una preferencia de interfaz, exactamente como «leído» en Alarmas. Se
+reutilizó ese mismo mecanismo, extraído a `lib/vistoPorMi.js` (parametrizado
+por namespace, para que dos bandejas no compartan memoria de vistos). Cuando
+un hallazgo SÍ lleva a una acción real —accionar la bomba— esa acción ya deja
+su rastro en el diario por la ruta de control existente; la bandeja no
+necesita escribir nada porque no es ella quien acciona.
+
+**Navegar a un hallazgo también lo descarta**, con el mismo mecanismo que el
+botón de descartar: si alguien fue a mirarlo, ya lo ha visto.
+
+**Medido:** 828 pruebas de frontend (+19: 9 de la vista, 10 de dominio y del
+módulo de "vistos" extraído), los 28 verificadores —incluido `modulos`, que
+confirma que ninguna fuente se cruzó—, lint 0 errores, types limpio. Bundle:
+`index` 255,52 → **256,66 KB**; `vendor` 265,14 → **265,54 KB** (un icono
+nuevo, `Inbox`).
+
 ---
 
 ## F7 · `NUE-08` — asistente acoplado, de ida y vuelta

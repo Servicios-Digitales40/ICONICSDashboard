@@ -98,5 +98,17 @@
       "cases": "Casos"
     },
     "perMachine": "Una por máquina: el tanque y las vibraciones son instalaciones separadas y no se cruzan."
+  },
+  "findings": {
+    "title": "Hallazgos",
+    "subtitle": "Riesgos activos de las dos máquinas y casos similares que respaldan sus causas, en un solo sitio.",
+    "list": "Pendientes",
+    "empty": "No hay hallazgos pendientes: ningún riesgo activo, o ya los has visto todos.",
+    "view": "Ver",
+    "dismiss": "Descartar",
+    "origin": {
+      "riesgo": "Riesgo activo",
+      "caso": "Caso similar"
+    }
   }
 }

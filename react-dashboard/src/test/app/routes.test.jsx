@@ -26,7 +26,7 @@ import { buildNav } from "@/app/routes/buildNav.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las veinticuatro vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las veinticinco vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -63,6 +63,9 @@ describe("superficie de la aplicación", () => {
       // vecinas: un turno no es de una máquina, quien entra se hace cargo de la
       // instalación entera.
       "eva-turno",
+      // `eva-bandeja` (Plan 25 F6) — igual: un hallazgo puede ser de cualquiera
+      // de las dos máquinas, así que la bandeja no es de ninguna.
+      "eva-bandeja",
       "salud-sistema",
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
@@ -166,7 +169,7 @@ describe("el sidebar que sale del registro", () => {
     // aplicación — ese botón sigue sin volver, sólo la entrada del menú.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.children.map((c) => c.id)).toEqual([
-      "eva-alarmas", "eva-assets", "eva-turno", "salud-sistema",
+      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "salud-sistema",
     ]);
 
     /*

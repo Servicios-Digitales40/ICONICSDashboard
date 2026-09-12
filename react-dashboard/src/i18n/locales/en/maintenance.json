@@ -98,5 +98,17 @@
       "cases": "Cases"
     },
     "perMachine": "One per machine: the tank and the vibration system are separate installations and are never crossed."
+  },
+  "findings": {
+    "title": "Findings",
+    "subtitle": "Active risks from both machines and similar cases backing their causes, in one place.",
+    "list": "Pending",
+    "empty": "No pending findings: no active risk, or you have already seen them all.",
+    "view": "View",
+    "dismiss": "Dismiss",
+    "origin": {
+      "riesgo": "Active risk",
+      "caso": "Similar case"
+    }
   }
 }

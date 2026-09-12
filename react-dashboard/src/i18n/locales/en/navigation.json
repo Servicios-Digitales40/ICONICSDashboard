@@ -126,6 +126,11 @@
       "title": "Close Diagnosis",
       "nav": "Diagnosis Closeout",
       "sub": "Confirm or correct the cause of a risk already acted on"
+    },
+    "eva-bandeja": {
+      "title": "Findings",
+      "nav": "Findings",
+      "sub": "Active risks and similar cases the system already calculated and no one has seen yet"
     }
   },
   "palette": {

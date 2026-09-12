@@ -40,6 +40,7 @@ import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
 import { MONO, PuntoEstado } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
+import { crearVistoPorMi } from "@/lib/vistoPorMi.js";
 
 const VENTANAS = [
   { horas: 1, clave: "h1" },
@@ -51,49 +52,11 @@ const VENTANAS = [
 
 /**
  * Los eventos que este operador ya ha visto, entre visitas a la pantalla
- * (Plan 24 F5 · `USO-05`).
- *
- * ── POR QUÉ `localStorage` Y NO EL SERVIDOR ────────────────────────
- *
- * Porque «leído» y «reconocido» son dos cosas distintas y confundirlas sería
- * grave. El ACUSE es un hecho de la instalación: viaja al Alarm Server, queda
- * con nombre y lo ven todos. El «leído» es una conveniencia de ESTA pantalla
- * para esta persona —qué ha mirado ya— y mandarlo al servidor lo convertiría en
- * una afirmación sobre el turno que nadie ha hecho.
- *
- * Por eso vive en el navegador, es por dispositivo, y se pierde al limpiar el
- * almacenamiento — todo aceptable para lo que es. Lo que NO puede pasar es que
- * un fallo al leerlo tire la vista: en un kiosco con el almacenamiento
- * bloqueado, `localStorage` lanza al tocarlo.
+ * (Plan 24 F5 · `USO-05`). Extraído a `lib/vistoPorMi.js` el 12-09-2026
+ * (Plan 25 F6), al necesitar la bandeja de hallazgos el mismo mecanismo
+ * sobre otro conjunto de ids — ver la cabecera de ese archivo.
  */
-const CLAVE_VISTOS = "eva:alarmas:vistos";
-
-function leerVistos() {
-  try {
-    const crudo = globalThis.localStorage?.getItem(CLAVE_VISTOS);
-    const lista = crudo ? JSON.parse(crudo) : [];
-    return new Set(Array.isArray(lista) ? lista : []);
-  } catch {
-    // Sin memoria de lo leído se ve todo como nuevo, que es el lado seguro:
-    // enseña de más, nunca de menos.
-    return new Set();
-  }
-}
-
-function guardarVistos(vistos) {
-  try {
-    /*
-     * Se guardan como máximo los últimos 500. Sin tope, la lista crece con cada
-     * evento de la planta para siempre — y lo que importa es no volver a marcar
-     * como nuevo algo de esta semana, no llevar el registro de un año.
-     */
-    const lista = [...vistos].slice(-500);
-    globalThis.localStorage?.setItem(CLAVE_VISTOS, JSON.stringify(lista));
-  } catch {
-    // Un kiosco con el almacenamiento bloqueado sigue funcionando: pierde la
-    // memoria de lo leído, no la pantalla.
-  }
-}
+const vistoPorMi = crearVistoPorMi("eva:alarmas");
 
 /**
  * Cuánto duró una alarma, en la unidad que se lea de un vistazo.
@@ -194,7 +157,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
    * inicializador perezoso y sin setter es la forma de decir «esto se calcula al
    * montar y ya»; un `useRef` haría lo mismo pero se leería como estado mutable.
    */
-  const [vistos] = useState(leerVistos);
+  const [vistos] = useState(vistoPorMi.leer);
 
 
   const cargar = useCallback(async () => {
@@ -252,7 +215,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
   const idsVisibles = filtradas.map((e) => idDeEvento(alarmaSel, e)).join(",");
   useEffect(() => {
     if (!idsVisibles) return;
-    guardarVistos(new Set([...leerVistos(), ...idsVisibles.split(",")]));
+    vistoPorMi.marcar(idsVisibles.split(","));
   }, [idsVisibles]);
 
   /*
