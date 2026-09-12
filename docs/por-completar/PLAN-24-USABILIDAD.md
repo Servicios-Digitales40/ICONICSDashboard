@@ -13,9 +13,9 @@
 
 > **Rama.** `Moises7`, la misma en la que se ejecutó y cerró el Plan 23.
 
-> **ESTADO — SIN EMPEZAR (11-09-2026).** Este documento es el plan, no su
-> ejecución. La investigación de la §0 sí está hecha, contra el código real y
-> con archivo y línea.
+> **ESTADO — EN CURSO (11-09-2026). F0 hecha**, nueve fases por delante. La
+> investigación de la §0 está hecha contra el código real, con archivo y línea.
+> El resultado de cada fase se anota en la §2 según se cierra.
 
 ---
 
@@ -531,9 +531,15 @@ preguntado. El latido tiene que venir de haber preguntado.
 ## 1 · Riesgos de este plan
 
 1. **Es el plan con más superficie de UI de los seis, y el bundle tiene
-   techo.** Nueve entregas añaden pantalla. `index` está en 195,43 KB sobre
-   300 y esos 300 son de holgura, no de medición. Se mide en cada fase, no al
-   final. La palanca, si aprieta, es el idioma activo — no el techo.
+   techo.** Nueve entregas añaden pantalla. Se mide en cada fase, no al final.
+   La palanca, si aprieta, es el idioma activo — no el techo.
+
+   **Corregido el 11-09-2026, al medirlo en F0:** este punto decía 195,43 KB
+   sobre 300, tomado de la última medición escrita (09-09-2026). El real es
+   **239,78 KB de base**, medido con `git stash` para separarlo del coste de la
+   fase. No es una regresión de este plan —los 44 KB son anteriores— pero sí
+   cambia lo que dice este riesgo: el margen es de **60 KB para nueve fases**,
+   no de 105. La palanca del idioma activo (~40 KB) deja de ser teórica.
 2. **Cuatro entregas son adopción, no construcción, y la adopción se
    abandona a medias.** `USO-01`, `USO-02` y `USO-04` consisten en llevar a
    todas las vistas algo que ya funciona en unas pocas. Es el trabajo que más
@@ -553,4 +559,63 @@ preguntado. El latido tiene que venir de haber preguntado.
 
 ## 2 · Resultado
 
-_(Se rellena al ejecutar, fase a fase, como en los planes 22 y 23.)_
+### F0 · `USO-01` — HECHA el 11-09-2026 (`a301c51`)
+
+**Los tres sitios**, y el orden de importancia no era el que parecía:
+
+- **`ControlesTanque`** es el que cuenta. La cifra de 34 px del nivel se
+  convierte en su edad al congelarse (y baja a 20 px: lo que se enseña deja de
+  ser una medida). Lo que lo hace grave no es el tamaño sino lo que ya decía su
+  propia cabecera — ese nivel es el MISMO dato que la guarda de «nivel de
+  tanque alto» del backend mira en el momento de encender, así que con la
+  lectura congelada el operador y esa guarda deciden sobre dos números
+  distintos.
+- **`FichaActivo`** recibe `ahora` como PROP desde un solo reloj arriba. No es
+  detalle: la fila se repite una vez por señal del activo, y `useAhora.js` ya
+  nombraba ese caso exacto como su antipatrón.
+- **`InicioTanque`** tenía una trampa que no estaba prevista: `REJILLA_VISTAS`
+  es una constante de MÓDULO, así que su `dato()` es una función pura llamada
+  fuera del árbol de React y **no puede usar un hook**. Se resolvió adjuntando
+  la señal y aplicando la frescura en `TarjetaVista`. Y sólo la entrada que
+  trae una MEDIDA la adjunta: de las tres, dos devuelven CUENTAS («3 en
+  aviso»), que siguen siendo ciertas con la lectura vieja. Atenuarlas por igual
+  habría sido mentir en la otra dirección.
+
+**`scripts/verificar-frescura.mjs`**, que es la mitad que importa: entra solo en
+la tanda por existir (**28 ahora, eran 27**) y se comprobó que **se pone rojo de
+verdad** al saltarse la puerta — un verificador que nunca se ha visto fallar no
+prueba nada.
+
+**Dos reglas suyas nacieron mal, y salió a cuenta descubrirlo en el acto:**
+
+1. Marcaba `Demo-EVA/lib/formato.js`, que es donde `fmtSenal` **se define**.
+   Exigirle a la definición que consulte un reloj no tiene sentido. Ahora es
+   `NO_ES_PRESENTACION`, deliberadamente separado de `EXENTOS`: son dos cosas
+   distintas y mezclarlas invitaría a colar ahí una vista.
+2. Contaba las menciones en COMENTARIOS como llamadas. Dio un falso positivo en
+   la cabecera que explica por qué `FilaSenal` recibe `ahora` como prop — es
+   decir, **castigaba escribir buenas cabeceras**, en un repo cuya primera
+   convención es escribirlas. Se lee el fuente sin comentarios.
+
+**`modulos/prediccion/` queda fuera, con su motivo escrito** — el plan exigía
+decidirlo explícitamente y no dejarlo sin mirar. Medido: no usa `fmtSenal` ni
+`fmtCifra` en ningún archivo, no pasa por el motor de sondeo y por tanto no
+tiene `receivedAt`. Lo que enseña es el histórico de un compresor consultado a
+Django, y **un histórico no envejece mientras lo miras**. Darle una frescura
+derivada de cuándo se hizo el `fetch` respondería una pregunta distinta de la
+que el usuario lee.
+
+**Comprobado.** `lint` 0 errores · `types` · **28 verificadores** ·
+`i18n`/`textos`/`codigos` · `build`.
+
+Dos cosas medidas en vez de supuestas, ambas porque la cifra sorprendía:
+
+- **El bundle.** `index` quedó en **239,83 KB** de 300, y el plan decía 195,43.
+  Medido contra la base con `git stash`: **ya estaba en 239,78 antes de esta
+  fase**. El coste real de F0 son **0,05 KB**. Los 44 KB son anteriores y no de
+  aquí — pero el margen que la §1 daba por bueno es menor de lo que el plan
+  creía, y eso importa para las nueve fases que quedan.
+- **Una prueba roja que no es mía.** `accesibilidad.test.jsx` («PlantaTanque no
+  tiene violaciones graves») da timeout a los 5 s montando axe-core sobre una
+  vista con Three.js. Comprobado con `git stash`: **falla igual sin estos
+  cambios**. No se toca aquí —no es de esta fase— pero queda anotado.
