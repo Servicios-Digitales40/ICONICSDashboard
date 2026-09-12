@@ -23,21 +23,19 @@
  * activo — es el destino del indicador «N alarmas activas» de `TarjetaActivo`
  * (Planta) y `CabeceraActivo` (Detalle).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useFormato } from "@/i18n/formato.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
-import { CheckCheck, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import { AlertBanner, Button, SectionLabel, Tabs } from "@/components/ui/index.js";
-import { fetchHealth, acknowledgeIconicsAlarms } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 
 import { estadoHistorial, HISTORIAL } from "../../data/comunes/estadoDelDato.js";
-import {
-  ALARMAS_HISTORIZABLES, etiquetaDePunto, leerAlarmas, perteneceAlActivo,
-} from "../../data/comunes/alarmas.js";
+import { ALARMAS_HISTORIZABLES, leerAlarmas } from "../../data/comunes/alarmas.js";
+import { idDeEvento } from "@shared/eva/comun/eventosDeAlarma.js";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
 import { MONO, PuntoEstado } from "../../components/base.jsx";
@@ -50,8 +48,6 @@ const VENTANAS = [
   { horas: 48, clave: "h48" },
 ];
 
-/** Cuánto dura la petición de confirmar el acuse. El mismo que `ControlesTanque`. */
-const VENTANA_CONFIRMACION_MS = 4000;
 
 /**
  * Los eventos que este operador ya ha visto, entre visitas a la pantalla
@@ -99,11 +95,29 @@ function guardarVistos(vistos) {
   }
 }
 
-/** "2026-08-20 10:00:00" → algo legible. Si no parsea, se enseña tal cual llegó — nunca una fecha inventada. */
-function fechaLegible(startDate, locale) {
-  if (!startDate) return "—";
-  const fecha = new Date(String(startDate).replace(" ", "T"));
-  return Number.isNaN(fecha.getTime()) ? startDate : fecha.toLocaleString(locale);
+/**
+ * Cuánto duró una alarma, en la unidad que se lea de un vistazo.
+ *
+ * ── POR QUÉ NO PASA POR EL DICCIONARIO ─────────────────────────────
+ *
+ * Porque `2 h 14 min` se escribe igual en los dos idiomas: son cifras y las
+ * abreviaturas de hora y minuto, que el español y el inglés comparten. Meterlo
+ * en i18n añadiría cuatro claves para producir el mismo texto.
+ *
+ * Los segundos sólo aparecen por debajo del minuto: una alarma que duró 4 h no
+ * necesita decir cuántos segundos, y añadirlos haría la columna ilegible en la
+ * lista.
+ */
+function fmtDuracion(ms) {
+  const seg = Math.round(ms / 1000);
+  if (seg < 60) return `${seg} s`;
+
+  const min = Math.floor(seg / 60);
+  if (min < 60) return `${min} min`;
+
+  const h = Math.floor(min / 60);
+  const resto = min % 60;
+  return resto ? `${h} h ${resto} min` : `${h} h`;
 }
 
 function ChipVentana({ activo, onClick, t, children }) {
@@ -157,16 +171,16 @@ function HistorialAlarmas({ activoFiltro, t }) {
    * pantalla que abre sin datos y con un selector por tocar se lee como rota.
    */
   const [alarmaSel, setAlarmaSel] = useState(ALARMAS_HISTORIZABLES[0] ?? null);
-  const [alarmas, setAlarmas] = useState([]);
+  /**
+   * Los eventos derivados de la serie de la alarma elegida.
+   *
+   * Se llamaba `alarmas` cuando venían del Alarm Server tal cual. Ahora son
+   * EVENTOS construidos a partir de los flancos (`eventosDeAlarma`), y el
+   * nombre lo dice: no son lo que ICONICS llama una alarma.
+   */
+  const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // `true` hasta que /api/health confirme lo contrario: es el lado seguro,
-  // el mismo criterio que el propio backend usa para ICONICS_READ_ONLY.
-  const [readOnly, setReadOnly] = useState(true);
-  const [seleccion, setSeleccion] = useState(() => new Set());
-  const [reconociendo, setReconociendo] = useState(false);
-  const [confirmando, setConfirmando] = useState(false);
-  const timeoutConfirmar = useRef(null);
 
   /*
    * Lo ya visto por esta persona en este dispositivo, LEÍDO UNA VEZ al montar.
@@ -182,16 +196,13 @@ function HistorialAlarmas({ activoFiltro, t }) {
    */
   const [vistos] = useState(leerVistos);
 
-  // El temporizador de la confirmación no puede sobrevivir al desmontaje: sin
-  // esto, salir de la pestaña deja un `setConfirmando` apuntando a un
-  // componente que ya no existe. Mismo cuidado que `ControlesTanque`.
-  useEffect(() => () => clearTimeout(timeoutConfirmar.current), []);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setAlarmas(await leerAlarmas(horas, alarmaSel));
+      const { eventos: derivados } = await leerAlarmas(horas, alarmaSel);
+      setEventos(derivados);
     } catch (e) {
       /*
        * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
@@ -208,97 +219,59 @@ function HistorialAlarmas({ activoFiltro, t }) {
     cargar();
   }, [cargar]);
 
-  useEffect(() => {
-    let vivo = true;
-    fetchHealth()
-      .then((h) => vivo && setReadOnly(Boolean(h.readOnly)))
-      .catch(() => {}); // sin respuesta, se queda en `true`: el lado seguro.
-    return () => {
-      vivo = false;
-    };
-  }, []);
 
-  const filtradas = alarmas
-    .filter((a) => perteneceAlActivo(a, activoFiltro))
-    .slice()
-    .sort((a, b) => String(b.startDate ?? "").localeCompare(String(a.startDate ?? "")));
+  /*
+   * ── YA NO HAY FILTRO POR ACTIVO AQUÍ, Y ES CONSECUENCIA ────────────
+   *
+   * El historial es de UNA alarma, elegida en el selector, así que todos sus
+   * eventos son del mismo activo por construcción: filtrar por activo sobre
+   * ellos sería o no filtrar nada, o vaciar la lista entera. Los chips de
+   * activo siguen sirviendo en la pestaña «En vivo», que sí mira las nueve a la
+   * vez.
+   *
+   * Se ordena del más reciente al más antiguo, como antes — lo que cambia es
+   * que ahora el criterio es una `Date` y no una cadena.
+   */
+  const filtradas = useMemo(
+    () => [...eventos].sort((a, b) => b.inicio.getTime() - a.inicio.getTime()),
+    [eventos]
+  );
 
   const estado = estadoHistorial({ error, loading, datos: filtradas, minimo: 1 });
 
-  /** Cuáles de las que se están viendo son NUEVAS. Ver la nota de `vistos`. */
+  /** Cuáles de los que se están viendo son NUEVOS. Ver la nota de `vistos`. */
   const nuevas = useMemo(
-    () => filtradas.filter((a) => a.eventId != null && !vistos.has(String(a.eventId))),
-    [filtradas, vistos]
+    () => filtradas.filter((e) => !vistos.has(idDeEvento(alarmaSel, e))),
+    [filtradas, vistos, alarmaSel]
   );
 
   /*
    * Al llegar una tanda del servidor, lo que se enseña queda marcado como
    * leído en el almacenamiento — no en el estado. Ver `nuevas`.
    */
+  const idsVisibles = filtradas.map((e) => idDeEvento(alarmaSel, e)).join(",");
   useEffect(() => {
-    if (!filtradas.length) return;
-    const ids = filtradas.map((a) => a.eventId).filter((id) => id != null).map(String);
-    if (!ids.length) return;
-    guardarVistos(new Set([...leerVistos(), ...ids]));
-    // `filtradas` se recalcula en cada render (es un `.filter().sort()` suelto),
-    // así que la dependencia real es su contenido: los ids concretos.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtradas.map((a) => a.eventId).join(",")]);
+    if (!idsVisibles) return;
+    guardarVistos(new Set([...leerVistos(), ...idsVisibles.split(",")]));
+  }, [idsVisibles]);
 
-  function alternarSeleccion(eventId) {
-    setSeleccion((prev) => {
-      const siguiente = new Set(prev);
-      if (siguiente.has(eventId)) siguiente.delete(eventId);
-      else siguiente.add(eventId);
-      return siguiente;
-    });
-  }
-
-  /**
-   * Reconocer, con confirmación de dos pasos (Plan 24 F5 · `USO-05`).
+  /*
+   * ── AQUÍ YA NO SE RECONOCE, Y ES UNA CONSECUENCIA MEDIDA ──────────
    *
-   * ── POR QUÉ ESTO NECESITA CONFIRMARSE ──────────────────────────────
+   * El acuse (Plan 24 F5) vivía aquí, con su confirmación de dos pasos y su
+   * anotación en el diario. Se retira porque esta pestaña ya no enseña eventos
+   * del Alarm Server: los deriva de la serie del historiador, y un flanco no
+   * tiene `eventId` — reconocer es una operación del Alarm Server SOBRE un id
+   * suyo.
    *
-   * Porque es una acción SOBRE LA INSTALACIÓN, no sobre el tablero: el acuse
-   * viaja al Alarm Server de ICONICS y allí queda, con el nombre de quien lo
-   * hizo. No se deshace desde aquí, y un acuse en masa —la casilla de cabecera
-   * selecciona la ventana entera— puede tapar de una vez un aviso que nadie ha
-   * leído todavía.
+   * Medido el 12-09-2026 (`scripts/sondear-alarmas.mjs`): `/AlarmHistory`
+   * devuelve 500 en esta instalación, así que ese id no existe y el botón
+   * fallaría siempre. Un botón que se sabe que va a fallar es peor que ninguno.
    *
-   * Mismo patrón de dos pasos que `ControlesTanque` (Plan 13): el primer clic
-   * pide confirmar, un segundo dentro de la ventana ejecuta, y cualquier otra
-   * cosa cancela. Se copia ese patrón y no se monta un modal por el motivo que
-   * esa vista ya argumentó —no hay `ConfirmDialog` en el proyecto y crear uno
-   * para dos botones sería sobre-ingeniería—, y además aquí el modal taparía la
-   * lista de lo que se está a punto de reconocer, que es justo lo que hay que
-   * seguir viendo mientras se decide.
+   * Lo que se retira es la UI, no la capacidad: `acknowledgeIconicsAlarms` sigue
+   * en `lib/iconics` y la ruta del puente sigue anotando en el diario, para el
+   * día que haya Alarm Historian (`ICO-10`, Plan 26).
    */
-  function pedirReconocer() {
-    if (seleccion.size === 0) return;
-    if (confirmando) {
-      reconocer();
-      return;
-    }
-    setConfirmando(true);
-    clearTimeout(timeoutConfirmar.current);
-    timeoutConfirmar.current = setTimeout(() => setConfirmando(false), VENTANA_CONFIRMACION_MS);
-  }
-
-  async function reconocer() {
-    clearTimeout(timeoutConfirmar.current);
-    setConfirmando(false);
-    if (seleccion.size === 0) return;
-    setReconociendo(true);
-    try {
-      await acknowledgeIconicsAlarms([...seleccion]);
-      setSeleccion(new Set());
-      await cargar();
-    } catch (e) {
-      setError(e);
-    } finally {
-      setReconociendo(false);
-    }
-  }
 
   return (
     <>
@@ -368,27 +341,19 @@ function HistorialAlarmas({ activoFiltro, t }) {
           </span>
         )}
 
-        {!readOnly && (
-          // `primary` (azul) y no `success` (verde): la *Regla del Color con
-          // Significado* reserva verde para una señal en banda, no para un
-          // botón de acción. Azul es su única excepción — "lo accionable".
-          /* El texto estaba escrito a mano en español —«Reconocer»— y se colaba
-             por el hueco que `verificar-textos.mjs` documenta en su cabecera:
-             una palabra suelta, sin tilde, sin partícula ni verbo de sus listas.
-             Ahora pasa por el diccionario, y «reconocer» entra en `VERBOS_UI`
-             para cerrar ese hueco. */
-          <Button
-            variant="primary" icon={<CheckCheck size={13} />}
-            onClick={pedirReconocer} loading={reconociendo}
-          >
-            {confirmando
-              ? traducir("alarms:ack.confirm")
-              : seleccion.size > 0
-                ? traducir("alarms:ack.actionCount", { count: seleccion.size })
-                : traducir("alarms:ack.action")}
-          </Button>
-        )}
       </div>
+
+      {/*
+       * De dónde sale esta lista, dicho en la propia pantalla.
+       *
+       * No es un detalle técnico de más: estos eventos NO son los del Alarm
+       * Server —esta instalación no lo tiene— sino flancos derivados de la serie
+       * del historiador. Por eso no hay mensaje, ni severidad, ni acuse; y quien
+       * lea la pantalla merece saberlo antes de preguntarse dónde están.
+       */}
+      <p style={{ fontSize: 11.5, color: t.textFaint, margin: "0 0 12px", lineHeight: 1.5 }}>
+        {traducir("alarms:history.derivedNote")}
+      </p>
 
       {estado === HISTORIAL.SIN_CONEXION ? (
         <AlertBanner
@@ -406,34 +371,47 @@ function HistorialAlarmas({ activoFiltro, t }) {
         </p>
       ) : (
         <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: "hidden" }}>
-          {filtradas.map((a) => {
-            const punto = etiquetaDePunto(a);
-            return (
-              <div
-                key={a.eventId}
-                style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "9px 14px",
-                  borderTop: `1px solid ${t.border}`, fontSize: 12.5, color: t.text,
-                }}
-              >
-                {!readOnly && (
-                  <input
-                    type="checkbox"
-                    checked={seleccion.has(a.eventId)}
-                    onChange={() => alternarSeleccion(a.eventId)}
-                    aria-label={traducir("selectEventAria", { id: a.eventId })}
-                  />
-                )}
-                <span style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, minWidth: 150 }}>
-                  {fechaLegible(a.startDate, locale)}
+          {filtradas.map((e) => (
+            <div
+              key={idDeEvento(alarmaSel, e)}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "9px 14px",
+                borderTop: `1px solid ${t.border}`, fontSize: 12.5, color: t.text,
+              }}
+            >
+              {/* Un punto rojo mientras siga activa: es lo primero que hay que
+                  ver en una lista donde casi todo ya terminó. */}
+              <PuntoEstado color={e.activa ? t.coral : t.border} size={7} />
+
+              <span style={{ fontFamily: MONO, fontSize: 11, color: t.textFaint, minWidth: 150 }}>
+                {e.inicio.toLocaleString(locale)}
+              </span>
+
+              {/*
+               * `desdeAntes` dice que la alarma YA estaba activa cuando empieza
+               * la ventana, así que esa hora es el borde del rango y no el
+               * momento real de entrada. Se marca en vez de callarlo: una hora
+               * que parece exacta y no lo es se cree.
+               */}
+              {e.desdeAntes && (
+                <span style={{ fontSize: 10.5, color: t.amber }}>
+                  {traducir("alarms:history.fromBefore")}
                 </span>
-                <span style={{ minWidth: 90, color: t.textSoft }}>{punto ?? "—"}</span>
-                <span style={{ flex: 1, fontFamily: MONO, fontSize: 11, color: t.textFaint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {a.eventId}
-                </span>
-              </div>
-            );
-          })}
+              )}
+
+              <span style={{ minWidth: 120, color: t.textSoft }}>
+                {e.activa
+                  ? traducir("alarms:history.stillActive")
+                  : e.fin.toLocaleString(locale)}
+              </span>
+
+              {/* Sin duración cuando sigue activa: poner una afirmaría que
+                  terminó. Ver `eventosDeAlarma.js`. */}
+              <span style={{ flex: 1, fontFamily: MONO, fontSize: 11, color: t.textFaint }}>
+                {e.duracionMs === null ? "—" : fmtDuracion(e.duracionMs)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </>

@@ -2,26 +2,40 @@
 /**
  * alarmas-eva.test.jsx
  * ------------------------------------------------------------------
- * Plan 13, Fase 9 (F1): la vista completa — lista, filtro por activo, y el
- * botón de reconocer que sólo aparece cuando `/api/health` confirma que el
- * puente NO está en modo solo lectura. Se mockea `@/lib/iconics` porque lo
- * que importa aquí es el cableado de la vista, no la red — el contrato de
- * cada función del cliente ya lo prueba `apiClient.test.js`.
+ * La pestaña «Historial» de la vista de Alarmas.
+ *
+ * ── POR QUÉ ESTA SUITE CAMBIÓ ENTERA (12-09-2026) ──────────────────
+ *
+ * Porque cambió la fuente. Esta pantalla pedía a `/AlarmHistory` y probaba el
+ * acuse; medido con `scripts/sondear-alarmas.mjs` contra `bms-server`, ese
+ * endpoint devuelve **500** — esta instalación no tiene Alarm Historian.
+ *
+ * Lo que sí hay es Hyper Historian con las nueve alarmas historizadas como
+ * booleanos, así que los eventos se DERIVAN de los flancos de esa serie. Se
+ * mockea `leerAlarmas` —la capa de datos— y no `fetch`: lo que se prueba aquí
+ * es el cableado de la vista, y la derivación ya tiene su propia suite en
+ * `eventos-de-alarma.test.js`.
+ *
+ * Y por eso desaparecieron las pruebas del acuse: reconocer es una operación
+ * del Alarm Server sobre un `eventId` suyo, y un flanco no lo tiene. No es que
+ * se hayan dejado de probar — es que el botón ya no existe, y hay una prueba
+ * de que NO está.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
-import { ALARMAS_HISTORIZABLES } from "@/Demo-EVA/data/comunes/alarmas.js";
-import { pointName, puntoHistorico } from "@/Demo-EVA/domain/senales.js";
 
-const { fetchIconicsAlarms, fetchHealth, acknowledgeIconicsAlarms } = vi.hoisted(() => ({
-  fetchIconicsAlarms: vi.fn(async () => ({ alarms: [] })),
-  fetchHealth: vi.fn(async () => ({ readOnly: true })),
-  acknowledgeIconicsAlarms: vi.fn(async () => ({ result: {} })),
+const { leerAlarmas, ALARMAS_HISTORIZABLES } = vi.hoisted(() => ({
+  leerAlarmas: vi.fn(async () => ({ eventos: [], clave: "nivelAltoAlto", hasMore: false })),
+  ALARMAS_HISTORIZABLES: ["nivelAltoAlto", "presionAlta", "bajoFlujo"],
 }));
 
-vi.mock("@/lib/iconics", () => ({ fetchIconicsAlarms, fetchHealth, acknowledgeIconicsAlarms }));
+vi.mock("@/Demo-EVA/data/comunes/alarmas.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  leerAlarmas,
+  ALARMAS_HISTORIZABLES,
+}));
 
 import AlarmasEva from "@/Demo-EVA/views/comunes/AlarmasEva.jsx";
 
@@ -32,157 +46,125 @@ afterEach(() => {
 
 const montar = () => render(<ThemeProvider><AlarmasEva /></ThemeProvider>);
 
-const EVENTO_NIVEL = { eventId: "e1", startDate: "2026-08-20 10:00:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/NIVEL_TANQUE" };
-const EVENTO_CAUDAL = { eventId: "e2", startDate: "2026-08-20 09:00:00", pointName: "ac:TDCON/DEMO/INSTRUMENTACION_DE_PROCESO/FLUJO_INSTANTANEO" };
+const T0 = new Date("2026-09-11T02:00:00.000Z");
+const min = (n) => new Date(T0.getTime() + n * 60_000);
 
-describe("AlarmasEva: la lista, y lo que dice cuando está vacía o falla", () => {
+/** Un evento ya derivado, como lo devuelve `eventosDeAlarma`. */
+const evento = ({ inicio, fin, activa = false, desdeAntes = false }) => ({
+  inicio,
+  fin,
+  duracionMs: fin ? fin.getTime() - inicio.getTime() : null,
+  activa,
+  desdeAntes,
+});
+
+const conEventos = (eventos) =>
+  leerAlarmas.mockResolvedValue({ eventos, clave: "nivelAltoAlto", hasMore: false });
+
+describe("la lista de eventos derivados", () => {
   it("sin eventos en la ventana, lo dice — no una tabla vacía muda", async () => {
     montar();
     await waitFor(() => expect(screen.getByText(/Sin eventos en esta ventana/)).toBeTruthy());
   });
 
-  it("con eventos, se listan ordenados del más reciente al más antiguo", async () => {
-    fetchIconicsAlarms.mockResolvedValueOnce({ alarms: [EVENTO_CAUDAL, EVENTO_NIVEL] });
+  it("un evento cerrado enseña su entrada, su salida y su duración", async () => {
+    conEventos([evento({ inicio: min(0), fin: min(4) })]);
     montar();
 
-    await waitFor(() => expect(screen.getByText("e1")).toBeTruthy());
-    const filas = screen.getAllByText(/^e[12]$/).map((n) => n.textContent);
-    expect(filas).toEqual(["e1", "e2"]); // e1 es 10:00, e2 es 09:00 — e1 primero
+    await waitFor(() => expect(screen.getByText("4 min")).toBeTruthy());
+  });
+
+  it("se ordenan del más reciente al más antiguo", async () => {
+    conEventos([
+      evento({ inicio: min(0), fin: min(2) }),   // el viejo, 2 min
+      evento({ inicio: min(30), fin: min(39) }), // el nuevo, 9 min
+    ]);
+    montar();
+
+    await waitFor(() => expect(screen.getByText("9 min")).toBeTruthy());
+    const filas = screen.getAllByText(/^\d+ min$/).map((n) => n.textContent);
+    expect(filas).toEqual(["9 min", "2 min"]);
   });
 
   it("un fallo de red se cuenta como fallo, no como «sin eventos»", async () => {
-    fetchIconicsAlarms.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    leerAlarmas.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     montar();
 
     await waitFor(() => expect(screen.getByText(/No se pudo leer el historial/)).toBeTruthy());
     expect(screen.queryByText(/Sin eventos/)).toBeNull();
   });
+});
 
-  it("«Actualizar» vuelve a pedir la ventana actual", async () => {
+describe("lo que sigue activo no se cierra con una hora inventada", () => {
+  it("una alarma aún activa lo dice, y no enseña duración", async () => {
+    /*
+     * La aserción que protege §2.4 en la pantalla: poner una duración
+     * afirmaría que terminó. Es además el caso que más importa de la lista —
+     * la alarma que sigue sonando.
+     */
+    conEventos([evento({ inicio: min(0), fin: null, activa: true })]);
     montar();
-    await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole("button", { name: /Actualizar/ }));
-    await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText(/sigue activa/)).toBeTruthy());
+    expect(screen.getByText("—")).toBeTruthy();
   });
 
-  /*
-   * ── SE PIDE CON UN PUNTO, Y ESE ERA EL BUG (12-09-2026) ─────────────
-   *
-   * Esta prueba afirmaba `[undefined, 6]` — es decir, que el historial se pedía
-   * SIN `pointName`. Fijaba exactamente el comportamiento que dejaba la pantalla
-   * en «ICONICS AlarmHistory request failed»: con el punto ausente el puente lo
-   * omite del querystring y el servidor recibe una petición sin filtro, que
-   * rechaza.
-   *
-   * Ahora se comprueba lo contrario, y con la ruta que el historiador reconoce
-   * de verdad (`hda:`, no el tag en vivo `ac:`). Se compara contra
-   * `puntoHistorico()` y no contra la cadena escrita a mano: si mañana cambia la
-   * tabla de rama→carpeta del catálogo, la prueba sigue diciendo la verdad.
-   */
-  it("cambiar de ventana (6 horas) vuelve a pedir con las horas nuevas Y con su punto", async () => {
+  it("una que venía de antes de la ventana se marca, para no dar su hora por exacta", async () => {
+    conEventos([evento({ inicio: min(0), fin: min(5), desdeAntes: true })]);
     montar();
-    await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(1));
+
+    await waitFor(() => expect(screen.getByText(/venía de antes/)).toBeTruthy());
+  });
+});
+
+describe("el selector de alarma, y la ventana", () => {
+  it("arranca pidiendo la primera alarma del catálogo, no una lista vacía", async () => {
+    montar();
+
+    await waitFor(() => expect(leerAlarmas).toHaveBeenCalled());
+    expect(leerAlarmas.mock.calls[0][1]).toBe("nivelAltoAlto");
+  });
+
+  it("cambiar de alarma vuelve a pedir, con la clave nueva", async () => {
+    montar();
+    await waitFor(() => expect(leerAlarmas).toHaveBeenCalledTimes(1));
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "presionAlta" } });
+
+    await waitFor(() => expect(leerAlarmas).toHaveBeenCalledTimes(2));
+    expect(leerAlarmas.mock.calls[1][1]).toBe("presionAlta");
+  });
+
+  it("cambiar de ventana vuelve a pedir con las horas nuevas", async () => {
+    montar();
+    await waitFor(() => expect(leerAlarmas).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole("button", { name: "6 horas" }));
-    await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(2));
 
-    const [punto, horas] = fetchIconicsAlarms.mock.calls[1];
-    expect(horas).toBe(6);
-    expect(punto).toBe(puntoHistorico(ALARMAS_HISTORIZABLES[0]));
+    await waitFor(() => expect(leerAlarmas).toHaveBeenCalledTimes(2));
+    expect(leerAlarmas.mock.calls[1][0]).toBe(6);
   });
+});
 
-  it("el punto que se pide es del HISTORIADOR, no el tag en vivo", () => {
+describe("no se ofrece lo que no se puede hacer", () => {
+  it("NO hay botón de reconocer: un flanco no tiene eventId del Alarm Server", async () => {
     /*
-     * La distinción que el Plan 27 F6 descubrió para las series, aplicada aquí:
-     * desde la reorganización del árbol del 09-09-2026 los dos nombres no
-     * coinciden, y sólo el `hda:` contesta. Confirmado contra el servidor real.
+     * La prueba que sustituye a las tres del acuse. Sin ella, alguien podría
+     * volver a añadir el botón «porque antes estaba» y la suite no diría nada —
+     * y el botón fallaría siempre contra este servidor.
      */
-    const clave = ALARMAS_HISTORIZABLES[0];
-
-    expect(puntoHistorico(clave)).toMatch(/^hda:/);
-    expect(puntoHistorico(clave)).not.toBe(pointName(clave));
-  });
-});
-
-describe("AlarmasEva: el filtro por activo, contra los eventos ya traídos", () => {
-  it("filtrar por «Tanque» esconde el evento de Distribución, sin volver a pedir al servidor", async () => {
-    fetchIconicsAlarms.mockResolvedValueOnce({ alarms: [EVENTO_NIVEL, EVENTO_CAUDAL] });
+    conEventos([evento({ inicio: min(0), fin: min(4) })]);
     montar();
-    await waitFor(() => expect(screen.getByText("e1")).toBeTruthy());
-    expect(screen.getByText("e2")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Tanque" }));
-
-    expect(screen.getByText("e1")).toBeTruthy();
-    expect(screen.queryByText("e2")).toBeNull();
-    expect(fetchIconicsAlarms).toHaveBeenCalledTimes(1); // el filtro es local, no una nueva petición
-  });
-});
-
-describe("AlarmasEva: reconocer, sólo cuando el puente no está en solo lectura", () => {
-  it("con el puente en solo lectura (por defecto y confirmado), no hay botón ni casillas", async () => {
-    fetchIconicsAlarms.mockResolvedValueOnce({ alarms: [EVENTO_NIVEL] });
-    montar();
-    await waitFor(() => expect(screen.getByText("e1")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("4 min")).toBeTruthy());
 
     expect(screen.queryByRole("button", { name: /Reconocer/ })).toBeNull();
-    expect(screen.queryByLabelText(/Seleccionar evento/)).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
-  /*
-   * ── DOS CLICS, NO UNO (Plan 24 F5 · USO-05) ────────────────────────
-   *
-   * Esta prueba hacía UN clic y esperaba el acuse. Falló al añadirse la
-   * confirmación de dos pasos, y falló con razón: reconocer es una escritura
-   * sobre la instalación —el acuse viaja al Alarm Server y allí queda— y la
-   * casilla de cabecera puede seleccionar la ventana entera, así que un clic
-   * accidental tapaba de una vez avisos que nadie había leído.
-   *
-   * Se actualiza a dos clics Y se añade la prueba de que UNO solo no basta, que
-   * es la mitad que de verdad protege: sin ella, quitar la confirmación mañana
-   * dejaría esta suite en verde.
-   */
-  it("con el puente en escritura, aparecen las casillas y el botón, y dos clics reconocen los eventIds elegidos", async () => {
-    fetchHealth.mockResolvedValueOnce({ readOnly: false });
-    fetchIconicsAlarms.mockResolvedValue({ alarms: [EVENTO_NIVEL] });
+  it("la pantalla dice de dónde salen estos eventos", async () => {
+    // Que no son del Alarm Server, y por eso no traen mensaje ni severidad.
     montar();
-
-    await waitFor(() => expect(screen.getByRole("button", { name: /Reconocer/ })).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Seleccionar evento e1"));
-
-    // Primer clic: pide confirmar y NO manda nada.
-    fireEvent.click(screen.getByRole("button", { name: /Reconocer/ }));
-    expect(acknowledgeIconicsAlarms).not.toHaveBeenCalled();
-
-    // El botón lo dice, en vez de quedarse igual y no hacer nada.
-    const confirmar = await screen.findByRole("button", { name: /Pulsa otra vez/ });
-    fireEvent.click(confirmar);
-
-    await waitFor(() => expect(acknowledgeIconicsAlarms).toHaveBeenCalledWith(["e1"]));
-  });
-
-  it("un solo clic no acciona nada: es una escritura sobre la instalación", async () => {
-    fetchHealth.mockResolvedValueOnce({ readOnly: false });
-    fetchIconicsAlarms.mockResolvedValue({ alarms: [EVENTO_NIVEL] });
-    montar();
-
-    await waitFor(() => expect(screen.getByRole("button", { name: /Reconocer/ })).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Seleccionar evento e1"));
-    fireEvent.click(screen.getByRole("button", { name: /Reconocer/ }));
-
-    // Se espera de verdad, en vez de comprobar en el mismo tick: un acuse que
-    // saliera con un retardo de una promesa pasaría una aserción inmediata.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(acknowledgeIconicsAlarms).not.toHaveBeenCalled();
-  });
-
-  it("si /api/health no responde, se queda en modo solo lectura — el lado seguro", async () => {
-    fetchHealth.mockRejectedValueOnce(new Error("no disponible"));
-    fetchIconicsAlarms.mockResolvedValueOnce({ alarms: [EVENTO_NIVEL] });
-    montar();
-
-    await waitFor(() => expect(screen.getByText("e1")).toBeTruthy());
-    expect(screen.queryByRole("button", { name: /Reconocer/ })).toBeNull();
+    await waitFor(() => expect(screen.getByText(/se derivan de la serie/)).toBeTruthy());
   });
 });

@@ -29,6 +29,9 @@
   },
   "unreadBadge": "{{count}} unread",
   "history": {
-    "pointLabel": "Alarm"
+    "pointLabel": "Alarm",
+    "derivedNote": "These events are derived from the historian series (when the bit went to 1 and back to 0). They are not Alarm Server events, so they carry no message, severity or acknowledgement.",
+    "fromBefore": "already active",
+    "stillActive": "still active"
   }
 }

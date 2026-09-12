@@ -57,20 +57,82 @@ describe("etiquetaDePunto: el nombre corto del catálogo, no el tag crudo, cuand
   });
 });
 
-describe("leerAlarmas: delgado sobre fetchIconicsAlarms", () => {
-  it("devuelve el arreglo de alarmas tal cual", async () => {
+/**
+ * ── `leerAlarmas` YA NO LLAMA A `/AlarmHistory` (12-09-2026) ─────────
+ *
+ * Estas dos pruebas mockeaban `fetch` para devolver `{ alarms: [...] }` y
+ * afirmaban que la función pasaba eso tal cual. Fijaban un contrato que el
+ * servidor real no cumple: medido con `scripts/sondear-alarmas.mjs` contra
+ * `bms-server`, `/AlarmHistory` devuelve **500** en esta instalación porque no
+ * hay Alarm Historian montado.
+ *
+ * Ahora los eventos se DERIVAN de la serie del historiador —que sí responde— y
+ * la función devuelve `{ eventos, clave, hasMore }`. Se mockea `/History`, que
+ * es a donde va de verdad la petición.
+ */
+describe("leerAlarmas: deriva los eventos de la serie del historiador", () => {
+  /*
+   * La forma que devuelve EL PUENTE, no la de ICONICS: `{ data, hasMore }`, ya
+   * aplanada por `backend/iconics/client.mjs`. Lo que sí es de ICONICS y hay que
+   * respetar es que `value` viene BOOLEANO, no 0/1 — medido el 12-09-2026.
+   */
+  const serieDelServidor = (muestras) =>
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true, status: 200,
-      json: async () => ({ alarms: [EVENTO_NIVEL] }),
+      json: async () => ({ ok: true, data: muestras, hasMore: false }),
     })));
-    expect(await leerAlarmas(6)).toEqual([EVENTO_NIVEL]);
+
+  const T0 = new Date("2026-09-11T02:00:00.000Z");
+  const muestra = (min, value) => ({
+    timestamp: new Date(T0.getTime() + min * 60_000).toISOString(),
+    quality: 0,
+    value,
   });
 
-  it("si el servidor no manda alarms (forma inesperada), no revienta — devuelve []", async () => {
+  it("un flanco de subida y otro de bajada son un evento con su duración", async () => {
+    serieDelServidor([muestra(0, false), muestra(5, true), muestra(9, false)]);
+
+    const { eventos } = await leerAlarmas(6, "nivelAltoAlto");
+
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0].duracionMs).toBe(4 * 60_000);
+    expect(eventos[0].activa).toBe(false);
+  });
+
+  it("una serie sin flancos no inventa eventos", async () => {
+    serieDelServidor([muestra(0, false), muestra(5, false)]);
+
+    const { eventos } = await leerAlarmas(6, "nivelAltoAlto");
+    expect(eventos).toEqual([]);
+  });
+
+  it("devuelve también QUÉ alarma se leyó, para que la vista no lo suponga", async () => {
+    serieDelServidor([muestra(0, false)]);
+
+    const { clave } = await leerAlarmas(6, "presionAlta");
+    expect(clave).toBe("presionAlta");
+  });
+
+  it("sin alarma que consultar no pregunta, y lo dice con una lista vacía", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { eventos, clave } = await leerAlarmas(6, null);
+
+    expect(eventos).toEqual([]);
+    expect(clave).toBeNull();
+    // La diferencia entre «no ha pasado nada» y un error del servidor: no se
+    // pregunta en vez de provocar el fallo que esta función existe para evitar.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("una respuesta con forma inesperada no revienta — devuelve una lista vacía", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true, status: 200,
       json: async () => ({}),
     })));
-    expect(await leerAlarmas()).toEqual([]);
+
+    const { eventos } = await leerAlarmas(6, "nivelAltoAlto");
+    expect(eventos).toEqual([]);
   });
 });
