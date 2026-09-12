@@ -35,6 +35,25 @@
  *      necesita su propio nombre `hda:`; queda por confirmar si las alarmas
  *      siguen la misma regla. Se prueban las dos.
  *
+ *  D · **¿Hace falta `/AlarmHistory`, o basta `/History`?** Es la pregunta que
+ *      de verdad decide cómo se construye la pantalla, y la planteó quien
+ *      conoce el servidor: «creo que no tengo el Alarm Historian definido, pero
+ *      sí tengo el Historian».
+ *
+ *      Tiene mucho sentido, y el catálogo lo respalda: las nueve alarmas son
+ *      `tipo: "booleano"` con `historizado: true`, y su ruta `hda:` tiene la
+ *      MISMA forma que la de cualquier serie del tanque — sólo cambia la
+ *      carpeta (`ALARMAS` en vez de `INSTRUMENTACION_PROCESO`). Si es así, el
+ *      historial se puede derivar de los FLANCOS de esa serie 0/1 (0→1 la
+ *      alarma entra, 1→0 se va) sin depender de un subsistema que quizá no
+ *      está montado.
+ *
+ *      Son dos endpoints DISTINTOS de dos subsistemas distintos:
+ *      `/AlarmHistory` es del Alarm Historian, con sus propios eventos —y con
+ *      mensaje, severidad y acuse, que un flanco no puede dar—; `/History` es
+ *      Hyper Historian. Esta sección pide la alarma por `/History` y dice
+ *      cuántas muestras y cuántos flancos hay.
+ *
  * Sólo LEE. No escribe nada en ICONICS y no reconoce ninguna alarma.
  *
  *   node --env-file=.env.local scripts/sondear-alarmas.mjs [clave]
@@ -96,6 +115,67 @@ async function alarmas({ punto, horas }) {
   } catch (error) {
     return { status: 0, ms: Date.now() - t0, error: error.message, url: url.toString() }
   }
+}
+
+/**
+ * La misma alarma, pero por `/History` — el historiador que sí está montado.
+ *
+ * SIN agregado a propósito: una alarma es un booleano, y promediar 0 y 1 daría
+ * «0,37 de alarma», que no significa nada. Lo que hace falta son las muestras
+ * crudas para ver los flancos.
+ */
+async function historia({ punto, horas }) {
+  const fin = new Date()
+  const inicio = new Date(fin.getTime() - horas * 3600_000)
+
+  const url = new URL(config.iconics.endpoints.history)
+  url.searchParams.set('pointName', punto)
+  url.searchParams.set('startDate', inicio.toISOString())
+  url.searchParams.set('endDate', fin.toISOString())
+
+  const t0 = Date.now()
+  try {
+    const r = await fetch(url, {
+      headers: { ...(await auth.authorizationHeaders()), 'X-ICO-MAX-ITEM-COUNT': '100' },
+      signal: AbortSignal.timeout(60_000),
+    })
+    const tipo = r.headers.get('content-type') ?? ''
+    const cuerpo = tipo.includes('application/json') ? await r.json() : await r.text()
+
+    /* Aplanado igual que `client.mjs`: el servidor envuelve las muestras en
+       `historicalSamples`, o las manda sueltas. */
+    const muestras = []
+    if (Array.isArray(cuerpo)) {
+      for (const item of cuerpo) {
+        if (Array.isArray(item?.historicalSamples)) muestras.push(...item.historicalSamples)
+        else if (item?.timestamp !== undefined) muestras.push(item)
+      }
+    }
+    return { status: r.status, ms: Date.now() - t0, cuerpo, muestras, url: url.toString() }
+  } catch (error) {
+    return { status: 0, ms: Date.now() - t0, error: error.message, muestras: [], url: url.toString() }
+  }
+}
+
+/**
+ * Cuántos FLANCOS hay en una serie 0/1 — que es lo que sería un «evento».
+ *
+ * No decide nada sobre cómo presentarlos: sólo cuenta, para que la sonda pueda
+ * decir si esta vía tiene material del que construir un historial.
+ */
+function flancosDe(muestras) {
+  let entradas = 0
+  let salidas = 0
+  let previo = null
+
+  for (const m of muestras) {
+    const v = m?.value
+    if (v === null || v === undefined) continue
+    const activa = Number(v) !== 0
+    if (previo !== null && activa !== previo) (activa ? entradas++ : salidas++)
+    previo = activa
+  }
+  return { entradas, salidas }
 }
 
 /** Resume una respuesta sin decidir nada sobre su contenido. */
@@ -185,6 +265,63 @@ if (!conDatos) {
     console.log('      ⚠ Sin esto el filtro por activo no puede funcionar, y la lista')
     console.log('        saldría vacía en silencio. Añade el nombre real a CAMPOS_PUNTO.')
   }
+}
+
+/* ── D · ¿basta /History? ─────────────────────────────────────────── */
+
+sep('D · Si /History sirve la alarma (sin necesitar el Alarm Historian)')
+
+console.log('  Son dos subsistemas distintos: /AlarmHistory es del Alarm Historian')
+console.log('  y /History es Hyper Historian. La alarma está declarada como')
+console.log('  booleano historizado, así que /History debería servirla como 0/1.\n')
+
+const porHistoria = await historia({ punto: historico, horas: 24 })
+
+if (porHistoria.error) {
+  console.log(`  ✗ fallo de red: ${porHistoria.error}`)
+} else if (porHistoria.status !== 200) {
+  const detalle = typeof porHistoria.cuerpo === 'string'
+    ? porHistoria.cuerpo.slice(0, 200)
+    : JSON.stringify(porHistoria.cuerpo).slice(0, 200)
+  console.log(`  ✗ HTTP ${porHistoria.status} en ${porHistoria.ms} ms — ${detalle}`)
+} else {
+  const { entradas, salidas } = flancosDe(porHistoria.muestras)
+  console.log(`  ✓ HTTP 200 en ${porHistoria.ms} ms — ${porHistoria.muestras.length} muestra(s)`)
+  console.log(`    flancos en 24 h: ${entradas} entrada(s), ${salidas} salida(s)`)
+
+  if (porHistoria.muestras.length > 0) {
+    console.log('\n  Una muestra, sin interpretar:')
+    console.log(JSON.stringify(porHistoria.muestras[0], null, 2).split('\n').map(l => `  ${l}`).join('\n'))
+  }
+}
+
+/* ── El veredicto, que es para lo que se corre esto ───────────────── */
+
+sep('VEREDICTO')
+
+const alarmHistoryVale = [conHda, conAc].some(r => r.status === 200)
+const historyVale = porHistoria.status === 200
+
+if (alarmHistoryVale && historyVale) {
+  console.log('  Las DOS vías funcionan.')
+  console.log('  Preferir /AlarmHistory: sus eventos traen mensaje, severidad y acuse,')
+  console.log('  que un flanco derivado de una serie 0/1 no puede dar.')
+} else if (alarmHistoryVale) {
+  console.log('  SÓLO /AlarmHistory. El Alarm Historian está montado y responde.')
+  console.log('  Usar sus eventos; la sección A dice qué campos traen.')
+} else if (historyVale) {
+  console.log('  SÓLO /History — es decir, NO hay Alarm Historian montado.')
+  console.log('  El historial se construye derivando los FLANCOS de la serie 0/1:')
+  console.log('  0→1 la alarma entra, 1→0 se va. Da entrada, salida y duración.')
+  console.log('')
+  console.log('  Y entonces el botón «Reconocer» NO puede estar en esa pestaña: el')
+  console.log('  acuse es una operación del Alarm Server sobre un eventId suyo, y un')
+  console.log('  flanco no tiene ese id. Un botón que se sabe que va a fallar es peor')
+  console.log('  que ninguno.')
+} else {
+  console.log('  NINGUNA de las dos respondió.')
+  console.log('  Revisa la ventana de tiempo (quizá no hubo alarmas en 24 h) y que')
+  console.log('  la ruta `hda:` de arriba sea la que tu servidor conoce.')
 }
 
 sep('Qué hacer con esto')
