@@ -14,6 +14,7 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { Card, Cifra, Delta, MONO } from "../base.jsx";
 import { fmtNum } from "@/lib/format.js";
 import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
+import { PanelProcedencia } from "./PanelProcedencia.jsx";
 import {
   BandaValor, EstadoBooleano, GraficaAusente, GraficaBufer, GraficaHistoria, InsigniaOrigen,
 } from "./piezas.jsx";
@@ -123,6 +124,11 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
           {senalTexto(senal.key, "nota")}
         </p>
       )}
+
+      {/* Al final y plegado: es información de consulta, no parte de la
+          lectura. Quien mira el tablero quiere la cifra; quien duda de ella
+          abre esto. Ver la cabecera de `PanelProcedencia.jsx`. */}
+      <PanelProcedencia senal={senal} punto={senal.punto ?? null} cobertura={cobertura} ahora={ahora} />
     </Card>
   );
 }

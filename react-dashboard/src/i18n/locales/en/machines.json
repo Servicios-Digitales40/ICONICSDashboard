@@ -385,5 +385,27 @@
       "superior": "Top",
       "frontal": "Front"
     }
+  },
+  "provenance": {
+    "title": "Where does this reading come from?",
+    "point": "ICONICS point",
+    "machine": "Machine",
+    "polling": "Re-read",
+    "everySeconds": "every {{segundos}} s",
+    "lastRead": "Last reading",
+    "neverRead": "None has arrived yet",
+    "quality": "Quality",
+    "history": "History",
+    "historized": "Own series ({{ruta}}, {{agregado}})",
+    "notHistorized": "This point has no series of its own in the historian",
+    "coverage": "Range coverage",
+    "coverageGaps": "{{conDato}} of {{tramos}} segments with data",
+    "unknown": "Cannot be determined",
+    "reason": {
+      "calidadMala": "The server flagged the reading as bad",
+      "calidadIncierta": "The server flagged the reading as uncertain",
+      "sinEntrega": "The point exists but stopped delivering a value",
+      "calidadDesconocida": "It arrived with a quality code we cannot interpret"
+    }
   }
 }

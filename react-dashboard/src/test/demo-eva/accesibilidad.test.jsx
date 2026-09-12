@@ -90,12 +90,39 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
     await auditarAccesibilidad();
   });
 
+  /*
+   * Mismo timeout explícito, y por el mismo motivo que el de abajo — aunque
+   * aquí sea UNA sola pasada de axe-core.
+   *
+   * Esta prueba llevaba tiempo en rojo por plazo agotado, no por una
+   * violación: se encontró así al cerrar el Plan 24 F0 y se comprobó entonces
+   * (con `git stash`) que fallaba igual sin los cambios de esa fase. Planta
+   * monta la rejilla de los cuatro activos con sus cincuenta y dos señales, y
+   * auditarla entera pasa de 5 s en esta máquina.
+   *
+   * Se arregla aquí porque llevaba dos fases estorbando la lectura de la suite:
+   * un rojo permanente que nadie atribuye a nada acaba enseñando a ignorar el
+   * rojo, que es peor que la prueba lenta. El criterio no se toca — sigue
+   * exigiendo cero violaciones graves.
+   */
   it("PlantaTanque no tiene violaciones graves", async () => {
     montarComoLaApp(<PlantaTanque onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
     await auditarAccesibilidad();
-  });
+  }, 30_000);
 
+  /*
+   * Timeout explícito, y no el de 5 s por defecto: esta prueba monta la vista
+   * CUATRO veces y pasa axe-core por cada una, sobre un árbol que crece con la
+   * aplicación. Al añadir el panel de procedencia (Plan 24 F1) cada tarjeta
+   * suma un `<details>` más que auditar y las cuatro pasadas dejaron de caber.
+   *
+   * Se amplía el plazo en vez de recortar la cobertura —auditar dos activos en
+   * lugar de cuatro habría dejado de mirar la mitad— porque lo que esta prueba
+   * tarda no es un problema de la aplicación: es el coste de axe-core, que en
+   * producción nadie paga. Lo que no se toca es el criterio: sigue exigiendo
+   * cero violaciones graves en los cuatro.
+   */
   it("DetalleActivo no tiene violaciones graves, en sus cuatro activos", async () => {
     for (const activo of ["tanque", "bombeo", "distribucion", "electrico"]) {
       cleanup();
@@ -103,7 +130,7 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
       await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy());
       await auditarAccesibilidad();
     }
-  });
+  }, 30_000);
 
   it("AssetsEva no tiene violaciones graves, incluso con el árbol vacío", async () => {
     // ExploradorAssets no pasa por el transporte simulado de Demo EVA: habla

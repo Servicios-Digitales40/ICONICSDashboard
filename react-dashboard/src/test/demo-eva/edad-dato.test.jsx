@@ -107,7 +107,20 @@ describe("TarjetaVariable (DetalleGrid): la cifra grande, misma regla", () => {
     });
     montarDetalle(senal);
     expect(screen.queryByText(/62[.,]5/)).toBeNull();
-    expect(screen.getByText(/hace/)).toBeTruthy();
+
+    /*
+     * `getAllByText` y la comprobación del `title`, no un `getByText(/hace/)`
+     * a secas: desde el Plan 24 F1 la tarjeta tiene DOS edades legítimas —la
+     * cifra grande sustituida, y la fila «Última lectura» del panel de
+     * procedencia—, así que un `getByText` falla por ambigüedad.
+     *
+     * La aserción se estrecha en vez de relajarse: lo que esta prueba
+     * comprueba es que LA CIFRA GRANDE se sustituye, y se identifica por el
+     * `title` que sólo ella lleva. Aflojar a `getAllByText(...).length > 0`
+     * habría pasado igual con la cifra intacta y sólo el panel abierto.
+     */
+    const edades = screen.getAllByText(/hace/);
+    expect(edades.some((n) => n.getAttribute("title"))).toBe(true);
   });
 
   it("fresco: se ve el número", () => {

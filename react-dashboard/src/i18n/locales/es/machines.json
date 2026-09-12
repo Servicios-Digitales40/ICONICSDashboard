@@ -385,5 +385,27 @@
       "superior": "Superior",
       "frontal": "Frontal"
     }
+  },
+  "provenance": {
+    "title": "¿De dónde sale este dato?",
+    "point": "Punto de ICONICS",
+    "machine": "Máquina",
+    "polling": "Relectura",
+    "everySeconds": "cada {{segundos}} s",
+    "lastRead": "Última lectura",
+    "neverRead": "Todavía no ha llegado ninguna",
+    "quality": "Calidad",
+    "history": "Historial",
+    "historized": "Serie propia ({{ruta}}, {{agregado}})",
+    "notHistorized": "Este punto no tiene serie propia en el historiador",
+    "coverage": "Cobertura del rango",
+    "coverageGaps": "{{conDato}} de {{tramos}} tramos con dato",
+    "unknown": "No se puede determinar",
+    "reason": {
+      "calidadMala": "El servidor marcó la lectura como mala",
+      "calidadIncierta": "El servidor marcó la lectura como incierta",
+      "sinEntrega": "El punto existe pero dejó de entregar valor",
+      "calidadDesconocida": "Llegó con una calidad que no sabemos interpretar"
+    }
   }
 }

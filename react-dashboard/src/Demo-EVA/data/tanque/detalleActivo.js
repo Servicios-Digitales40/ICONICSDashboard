@@ -22,6 +22,7 @@ import { useSeriesHistoricas, useSistemaAgua } from "../comunes/hooks.js";
 import { useEvaSource } from "../comunes/EvaProvider.jsx";
 import { VENTANA } from "./historia.js";
 import { delta } from "../../lib/modelo.js";
+import { pointName } from "../../domain/senales.js";
 
 /** Muestras vivas que se pintan en «Tiempo real»: a 3 s por ciclo, ~5 min. */
 const PUNTOS_VIVO = 100;
@@ -72,6 +73,15 @@ export function useDetalleActivo(activoId, rango = VENTANA, enVivo = false) {
       const meta = s.historizado && !enVivo ? metaPorClave[s.key] : null;
       return {
         ...s,
+        /*
+         * El nombre completo del punto en ICONICS, para el panel de
+         * procedencia (Plan 24 F1). Se resuelve AQUÍ y no en el componente
+         * por dos motivos: esta es la capa que sabe de qué máquina viene el
+         * dato (§4.3 — la presentación no compone tags), y `pointName` es del
+         * catálogo del tanque, así que una tarjeta que lo llamara por su
+         * cuenta quedaría atada a una sola máquina.
+         */
+        punto: pointName(s.key),
         historiaReal: s.historizado ? (enVivo ? seriesVivas[s.key] ?? [] : porClave[s.key] ?? []) : null,
         historiaCargando: s.historizado && !enVivo ? historiaLoading : false,
         historiaMotivo: meta?.motivo ?? null,
