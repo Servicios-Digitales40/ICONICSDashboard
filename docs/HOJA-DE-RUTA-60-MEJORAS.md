@@ -4,8 +4,8 @@
 > propuestas en seis frentes). El Plan 20 ejecutó las diez primeras; esto ordena
 > las cincuenta que quedan.
 
-> **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`. Planes 23 a 26,
-> pendientes.
+> **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`; **23 y 24**
+> hechos en `Moises7`. Quedan el 25 y el 26.
 
 > **Plan 22.5, fuera de esta numeración — completado el 11-09-2026.** No es
 > una fase del roadmap de 60 mejoras: fue la integración de `origin/Gustavo5`
@@ -48,7 +48,7 @@ Tres cosas distintas, y sólo la primera bloquea:
 | 21 | ICONICS: el registro despacha de verdad | no · **hecho** |
 | 22 | Seguridad | no · **hecho** |
 | 23 | Asistente | no (necesita GPU) |
-| 24 | Usabilidad | no |
+| 24 | Usabilidad | no · **hecho** |
 | 25 | Layout y funcionalidad nueva | no |
 | 26 | Código, y la sesión con planta | **sí, y sólo éste** |
 
@@ -222,7 +222,7 @@ ponen en el dominio.
 > un servicio esté declarado. Lo que se enseñe tiene que venir de haber
 > preguntado.
 
-> **Escrito el 11-09-2026, sin empezar** — [`PLAN-24-USABILIDAD.md`](por-completar/PLAN-24-USABILIDAD.md),
+> **HECHO el 11-09-2026, las diez entregas** — [`PLAN-24-USABILIDAD.md`](completados/PLAN-24-USABILIDAD.md),
 > en la rama `Moises7` (la del Plan 23). La investigación previa está hecha
 > contra el código real, y **cambia el plan de forma importante: cuatro de las
 > diez entregas ya están construidas, en todo o en parte**, porque los planes
@@ -244,6 +244,25 @@ ponen en el dominio.
 > cobertura que el cierre del Plan 23 dejó anotada (vibraciones trae
 > contadores del Alarm Server, el tanque sólo bits de PLC). Fusionarlas hoy
 > sería inventar la decisión.
+
+
+> **CERRADO el 11-09-2026.** Las diez entregas, en diez commits (`a301c51` a
+> `a1540d8`). Ocho construidas o completadas, `USO-05` acotada con su mitad
+> remitida al Plan 26, y ninguna descartada.
+>
+> **El coste total en bundle fueron ~7 KB** (239,78 → 246,48 de un techo de 450),
+> para nueve entregas que añaden interfaz. El riesgo que el plan puso primero
+> —«es el plan con más superficie de UI de los seis»— sobreestimaba mucho: la
+> palanca del idioma activo sigue sin tomarse y sigue sin hacer falta.
+>
+> **Cinco cosas que destapó y no estaban en el plan:** tres textos en español
+> escritos a mano (uno de ellos el ejemplo LITERAL que `verificar-textos.mjs`
+> citaba como su hueco conocido, ahora cerrado); que el acuse de alarmas **no
+> entraba en el diario de SEG-08** —el mismo hueco que el Plan 23 encontró con
+> `controlar_bomba`, en otra ruta—; que los manuales recortados se pintaban
+> «indexado» en verde, deuda que el Plan 22 F2 dejó apuntada aquí; y un fallo de
+> accesibilidad que llevaba dos fases en rojo **por plazo agotado, no por una
+> violación**.
 
 ### Plan 25 · Layout y funcionalidad nueva
 
@@ -270,7 +289,7 @@ van a crecer es reorganizar a ciegas, y los planes 21 a 25 son los que lo dicen.
 | Qué | Por qué no se puede antes |
 |---|---|
 | `ICO-10` contrato de alarmas | `readAlarmHistory()` del falso devuelve `{ alarms: [] }`. Sólo están confirmados `eventId` y `startDate`; el resto del mapeo hay que **descubrirlo**, no inventarlo |
-| `USO-05` unificar las dos pestañas de Alarmas | **Viene del Plan 24**, que entrega la bandeja y el acuse pero no esto. Depende de `ICO-10`: hoy la cobertura es asimétrica —vibraciones trae contadores del Alarm Server, el tanque sólo bits de PLC del Plan 27 F6— y decidir si pueden ser una sola lista sin conocer el contrato real es inventar la decisión. Ver [`PLAN-24-USABILIDAD.md`](por-completar/PLAN-24-USABILIDAD.md) §0.2 |
+| `USO-05` unificar las dos pestañas de Alarmas | **Viene del Plan 24**, que entrega la bandeja y el acuse pero no esto. Depende de `ICO-10`: hoy la cobertura es asimétrica —vibraciones trae contadores del Alarm Server, el tanque sólo bits de PLC del Plan 27 F6— y decidir si pueden ser una sola lista sin conocer el contrato real es inventar la decisión. Ver [`PLAN-24-USABILIDAD.md`](completados/PLAN-24-USABILIDAD.md) §0.2 |
 | `ICO-03` suscripciones | No es implementación: es una pregunta que sólo contesta el servidor. ¿Expone FrameWorX suscripciones en esta versión y con esta licencia? Sin respuesta no se decide si se hace |
 | `SEG-01` federación OIDC | El flujo no se ejercita con el transporte falso |
 | `SEG-06` certificado de planta | Comprobar que `NODE_EXTRA_CA_CERTS` acepta el autofirmado de `bms-server` |

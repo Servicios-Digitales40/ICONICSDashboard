@@ -13,9 +13,9 @@
 
 > **Rama.** `Moises7`, la misma en la que se ejecutó y cerró el Plan 23.
 
-> **ESTADO — EN CURSO (11-09-2026). F0, F1 y F2 hechas**, siete fases por delante. La
-> investigación de la §0 está hecha contra el código real, con archivo y línea.
-> El resultado de cada fase se anota en la §2 según se cierra.
+> **ESTADO — CERRADO el 11-09-2026. Las diez entregas hechas**, una de ellas
+> acotada con su mitad remitida al Plan 26 (`USO-05`, §0.2). El resultado de
+> cada fase está en la §2 y el cierre del plan en la §3.
 
 ---
 
@@ -773,3 +773,192 @@ Una aserción ajena corregida, y **era correcta al fallar**: el fixture de
 `documentacion-rag.test.jsx` tiene un manual activo más, así que sus contadores
 dicen 3 y no 2. Se actualizó el número y su comentario; no se relajó la
 comprobación a «hay algún número».
+
+### F3 · `USO-09` — HECHA el 11-09-2026 (`1f3038a`)
+
+**Dos de las cuatro cosas ya estaban unificadas antes de esta fase**, y el §0
+hallazgo 5 las daba por repartidas: `nombreArchivo` era ya la única regla de
+nombre (`exportarTodo` la reusa desde el Plan 22 F1) y la nota de cobertura ya
+viajaba dentro del archivo. El hueco real era la **procedencia** — y sólo se
+podía cerrar en esta fase, porque necesitaba el dominio que F1 acababa de
+escribir. El orden de §0.3 (F1 antes que F3) resultó ser una dependencia real, no
+una preferencia.
+
+`notaDeProcedencia()` declara tag, máquina con su PLC, agregado, ruta del
+historiador y cuándo se exportó. Sale de `procedenciaDe()`, así que el archivo y
+el panel de F1 no pueden discrepar. Con dos instalaciones que `NO_COMPARTEN`,
+esto no es cosmética: «presion-del-tanque_2026-09-10.csv» en el escritorio de
+alguien no decía a qué planta pertenecía.
+
+En `exportarTodo` va **una vez y no cinco**: las cinco señales son de la misma
+máquina, y repetir la cabecera invitaría a leer cada bloque como si pudiera venir
+de otro sitio.
+
+**Seis pruebas ajenas en rojo, ninguna por un fallo del exportador**: hacían
+`split(CRLF)[0]` para leer la cabecera. Se arreglaron localizando la cabecera por
+su CONTENIDO, que es más fuerte que reajustar índices — sobreviven a la siguiente
+nota que alguien ponga delante y siguen fallando si la cabecera desaparece.
+
+### F4 · `USO-02` — HECHA el 11-09-2026 (`b66a79e`)
+
+Adopción, como el §0 hallazgo 1 anticipaba. Viajan los **filtros** (máquina en
+Documentación, estado en Casos); un valor corrupto cae solo en el comportamiento
+por defecto.
+
+**Y no viaja la búsqueda, con su motivo escrito**: se escribe letra a letra, y
+con `pushState` una palabra de ocho caracteres deja ocho entradas en el
+historial. Hay una prueba de que no navega — la mitad que nadie echa en falta
+hasta que «atrás» pide ocho pulsaciones.
+
+**Una decisión que reconsideré:** iba a usar `replaceState` para que un filtro no
+apilara historial, y lo descarté al ver que `DetalleActivo` ya apila con su rango
+desde el Plan 11. Inventar aquí una segunda semántica de navegación, distinta de
+la de la vista hermana, cuesta más que el historial de más. Si llega a molestar,
+se cambia en `useNavegacion`, que es donde vive esa decisión.
+
+Los ids de ruta son `rag-documentacion` y `rag-casos` — los verifiqué en
+`routes.jsx` en vez de suponerlos, y no eran los que había supuesto.
+
+### F5 · `USO-05` — HECHA el 11-09-2026 (`c9aad48`)
+
+Alcance acotado como §0.2 decidió. Las tres entregas:
+
+1. **Confirmación de dos pasos.** Es una escritura sobre la instalación y la
+   casilla de cabecera selecciona la ventana entera, así que un clic accidental
+   tapaba de una vez avisos que nadie había leído. Mismo patrón que
+   `ControlesTanque`; no un modal, que además taparía la lista de lo que se está
+   a punto de reconocer.
+2. **Leído/no leído en `localStorage`.** La distinción importa y es la razón de
+   no mandarlo al servidor: el ACUSE es un hecho de la instalación, con nombre y
+   visible para todos; el «leído» es una conveniencia de esta pantalla para esta
+   persona. Envuelto en `try/catch` porque un kiosco con el almacenamiento
+   bloqueado lanza al tocarlo — pierde la memoria, no la pantalla.
+3. **El acuse entra en el diario de SEG-08**, con sus `eventIds`. Era el **mismo
+   hueco que el Plan 23 encontró con `controlar_bomba`**, en otra ruta: quien
+   escribió el diario cubrió el botón de la bomba y nadie volvió a pasar por las
+   otras escrituras.
+
+**Y dos textos en español escritos a mano que este trabajo destapó**:
+«Reconocer» y «Actualizar». El segundo es el ejemplo **literal** que la cabecera
+de `verificar-textos.mjs` cita como su hueco conocido («"Actualizar" sola
+pasa»). Los dos al diccionario, y «reconocer» a `VERBOS_UI` para cerrar el hueco.
+
+### F6 · `USO-06` — HECHA el 11-09-2026 (`4d5e1c4`)
+
+Las cuatro condiciones del plan, cumplidas: destinos del registro (la prueba
+cuenta contra `ROUTES`, así que una lista a mano la rompería), sin dependencia
+nueva, diferida con el cuidado del barril, y **no se monta en modo muro** — un
+wallboard no tiene teclado.
+
+Busca sin acentos, que es el caso real en español, y en las tres formas del
+nombre más su sección. **No acciona nada**, a propósito: encender una bomba
+desde una caja con autocompletado es la clase de atajo que una instalación no
+debe tener, y `ControlesTanque` pide dos clics deliberados justo para eso.
+
+### F7 · `USO-07` — HECHA el 11-09-2026 (`e2f6273`)
+
+Las tres restricciones vienen del Plan 23, y la primera tiene consecuencias:
+**ni una medida entra**. Se hace cumplir en dos sitios —el recorte a cuatro
+campos de `contextoDeVista.js` y el `strict()` de `ChatSchema.contexto`— porque
+una sola guarda sería la única defensa. El motivo, en una frase: una cifra que
+llegue por aquí es una cifra que el modelo puede citar sin que ninguna
+herramienta la haya leído, sin calidad, sin frescura y sin poder auditarla.
+
+Entra por la validación con Zod, que es lo que el plan pedía explícitamente:
+`IA-04` puso esa puerta justo para esto. `catch(undefined)` para que un contexto
+mal formado no tumbe una pregunta válida.
+
+**En el prompt es un bloque aparte del foco, y en ese orden.** Contestan dos
+preguntas distintas —qué tienes delante vs. de qué se habló— y pueden discrepar
+con razón: alguien mirando la maqueta del tanque puede preguntar por la última
+avería de vibraciones. Fundidos, el modelo no podría distinguirlo.
+
+No es un contexto de React: el asistente vive **fuera** del árbol de las vistas,
+así que un proveedor común acoplaría las dos cosas — el mismo acoplamiento que
+`preguntaExterna.js` evitó con un evento.
+
+La limpieza es condicional a propósito: React puede montar la vista entrante
+antes de desmontar la saliente, y un `actual = null` a ciegas borraría el
+contexto que la pantalla nueva acaba de declarar. Hay una prueba de eso.
+
+### F8 · `USO-08` — HECHA el 11-09-2026 (`bad0f43`)
+
+**44 × 44 px** para lo que acciona o confirma, 32 para el resto. Medido antes de
+fijarlo, no después: el `Button` del kit daba **36 px de alto**, y ése era el
+botón de «Encender» de `ControlesTanque`.
+
+Se sube con `minHeight` en el **kit** y no vista por vista, así ninguna pantalla
+futura nace por debajo. La variante `icon` lleva además `minWidth`: era la única
+cuadrada y daba 32 de ancho con 44 de alto — un objetivo de 32 × 44 no es un
+objetivo de 44, el dedo falla por el lado estrecho.
+
+**Se mide en unidades del sistema**, no en píxeles pintados: a `zoom: 1.6` un
+objetivo de 36 se pinta a 57,6 y sigue siendo de 36 a escala 1.
+
+**Y lo que NO se hizo: un verificador.** `design:detect` no puede medir esto —las
+alturas salen de `padding` más tipografía en estilos en línea— así que el
+criterio va a `DESIGN.md` como regla revisable a ojo más un suelo en el kit, en
+vez de un guion que finja medir lo que no puede (§2.5).
+
+### F9 · `USO-10` — HECHA el 11-09-2026 (`a1540d8`)
+
+El latido, que era lo único que faltaba del modo muro (§0 hallazgo 2).
+
+**No es un reloj**: un reloj sigue corriendo con el sondeo caído y certifica lo
+contrario de lo que parece. Late la última lectura real — el mismo `receivedAt`
+de F0.
+
+Las tres restricciones: un pulso por lectura reusando `.pulso-lectura` (más
+fiable que el `setTimeout` con estado que fue mi primer intento), **degrada al
+estado peor** con «sin lectura» y «congelado» diciendo cosas distintas, y cabe
+en el cromo retirado. Se monta sólo en modo muro, espejo de la paleta de F6.
+
+**Una prueba mía falló y falló con razón**: buscaba `.pulso-lectura`, pero
+`src/test/setup.js` fuerza `prefers-reduced-motion: reduce` por un motivo ajeno
+a esta fase. El componente hacía lo correcto. Se invirtió la prueba en vez de
+forzar el mock — lo que hay que garantizar es la mitad accesible.
+
+---
+
+## 3 · Cierre del plan
+
+**Las diez entregas, cerradas el 11-09-2026.** Ocho construidas o completadas,
+una acotada con su mitad remitida al Plan 26 (`USO-05`, §0.2), y ninguna
+descartada.
+
+**Estado final medido:** `lint` 0 errores · `types` · **28 verificadores** (eran
+27; `verificar-frescura.mjs` entró solo por existir) · `i18n` con paridad en
+**1146 claves × 2 idiomas** · `textos` · `frescura` · backend **307 pruebas** ·
+frontend **734 pruebas** · `index` **246,48 KB de 450**.
+
+**El coste total en bundle fue de ~7 KB** (239,78 → 246,48), para nueve entregas
+que añaden interfaz. El riesgo nº1 sobreestimaba mucho: la palanca del idioma
+activo sigue sin tomarse y sigue sin hacer falta.
+
+### Lo que este plan destapó y no estaba previsto
+
+1. **Cuatro de las diez entregas ya estaban construidas** (§0). Leer el código
+   antes de escribir el plan fue lo que evitó reimplementar piezas que funcionan.
+2. **Tres textos en español escritos a mano** —«Reconocer», «Actualizar» y la
+   etiqueta del `ErrorBoundary` de la paleta—, uno de ellos el ejemplo literal
+   que `verificar-textos.mjs` citaba como su hueco conocido. El hueco está
+   cerrado con «reconocer» en `VERBOS_UI`.
+3. **El acuse de alarmas no entraba en el diario de SEG-08**, el mismo hueco que
+   el Plan 23 encontró con `controlar_bomba` en otra ruta.
+4. **Los manuales recortados se pintaban «indexado» en verde** (F2), deuda que el
+   Plan 22 F2 dejó apuntada explícitamente aquí.
+5. **Un fallo de accesibilidad que llevaba dos fases en rojo** por plazo agotado,
+   no por una violación. Arreglado en F1 sin tocar el criterio.
+
+### Lo que queda remitido al Plan 26
+
+- **`USO-05`, la unificación de las dos pestañas de Alarmas** — detrás de
+  `ICO-10`, por la asimetría de cobertura. Anotado también en la tabla del Plan
+  26 de la hoja de ruta, para que el punto partido no se pierda.
+- **La palanca del idioma activo** (~40 KB, `BACKLOG-FRONTEND.md` F5), que sigue
+  siendo lo correcto aunque el techo ya no apriete.
+- **`PlantaTanque`/`DetalleActivo` y axe-core**: las dos pruebas necesitan 30 s
+  de plazo porque el árbol crece con la aplicación. No es un problema de la
+  aplicación —es el coste de axe-core, que en producción nadie paga— pero si
+  vuelve a crecer, la respuesta es partir la auditoría por activo, no subir el
+  plazo otra vez.
