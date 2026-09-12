@@ -54,6 +54,23 @@
  *      Hyper Historian. Esta sección pide la alarma por `/History` y dice
  *      cuántas muestras y cuántos flancos hay.
  *
+ * ── RESULTADO, MEDIDO EL 12-09-2026 CONTRA `bms-server` ────────────
+ *
+ * **`/AlarmHistory` NO está disponible en esta instalación.** Devuelve 500 con
+ * las dos rutas —`ac:TDCON/DEMO/ALARMAS/NIVEL_ALTO_ALTO` y
+ * `hda:\Configuration\DEMO TANQUE\ALARMAS:NIVEL_ALTO_ALTO`— y 400 sin
+ * `pointName`. Comprobado con el token ya caliente, así que no es un problema
+ * de autenticación: el Alarm Historian no está montado.
+ *
+ * **`/History` SÍ sirve las nueve alarmas.** HTTP 200, muestras booleanas de la
+ * forma `{ timestamp, quality: 0, value: false }`. En 30 días, tres tienen
+ * flancos reales: `presionAlta` (18 entradas / 17 salidas), `faltaDePresion`
+ * (17/17) y `bajoFlujo` (8/8); las otras seis no cambiaron de estado.
+ *
+ * Conclusión: **el historial se construye derivando los flancos de `/History`**,
+ * y el botón «Reconocer» no puede estar en esa pestaña — el acuse es del Alarm
+ * Server, sobre un `eventId` que aquí no existe.
+ *
  * Sólo LEE. No escribe nada en ICONICS y no reconoce ninguna alarma.
  *
  *   node --env-file=.env.local scripts/sondear-alarmas.mjs [clave]
@@ -186,7 +203,14 @@ function describir(r) {
     return `✗ HTTP ${r.status} en ${r.ms} ms — ${detalle}`
   }
   const lista = Array.isArray(r.cuerpo) ? r.cuerpo : null
-  if (!lista) return `? HTTP 200 en ${r.ms} ms, pero el cuerpo NO es un array: ${typeof r.cuerpo}`
+  if (!lista) {
+    /* Casi siempre es la página de login: ver la nota del VEREDICTO. Se marca
+       con ✗ y no con «?» porque NO es una respuesta del endpoint. */
+    const pista = typeof r.cuerpo === 'string' && /<html|<!doctype/i.test(r.cuerpo)
+      ? ' — parece la PÁGINA DE LOGIN, no el endpoint (token aún no caliente)'
+      : ` — el cuerpo no es un array sino ${typeof r.cuerpo}`
+    return `✗ HTTP 200 en ${r.ms} ms${pista}`
+  }
   return `✓ HTTP 200 en ${r.ms} ms — ${lista.length} evento(s)`
 }
 
@@ -194,6 +218,14 @@ const sep = t => console.log(`\n${'─'.repeat(66)}\n${t}\n`)
 
 console.log(`\nSonda de /AlarmHistory · alarma "${clave}"`)
 console.log(`Servidor: ${config.iconics.apiBase}`)
+
+/*
+ * El token, ANTES de la primera medición. Sin esto la primera llamada sale sin
+ * autenticar, ICONICS devuelve su página de login con un 200, y la sonda medía
+ * eso en vez del endpoint — fue el falso positivo de la primera corrida. Ver la
+ * nota del VEREDICTO.
+ */
+await auth.authorizationHeaders()
 
 /* ── C · ¿ac: o hda:? ─────────────────────────────────────────────── */
 
@@ -299,7 +331,27 @@ if (porHistoria.error) {
 
 sep('VEREDICTO')
 
-const alarmHistoryVale = [conHda, conAc].some(r => r.status === 200)
+/*
+ * ── UN 200 NO BASTA PARA DECIR QUE UNA VÍA FUNCIONA (12-09-2026) ────
+ *
+ * Esto era `r.status === 200` a secas, y la primera corrida contra el servidor
+ * real dio un VEREDICTO FALSO: «las dos vías funcionan», cuando `/AlarmHistory`
+ * devolvía 500 con las dos rutas.
+ *
+ * El 200 era la página de LOGIN. La primera llamada de la sonda sale antes de
+ * que el token esté caliente, ICONICS responde con HTML de autenticación y un
+ * 200 perfectamente válido — es el mismo hallazgo que el Plan 23 anotó como
+ * `B9` en `BACKLOG-BACKEND.md`, donde el health decía «token válido» por lo
+ * mismo.
+ *
+ * Así que se exige que el cuerpo sea un ARRAY: es lo que distingue una
+ * respuesta del endpoint de una página que el servidor devolvió en su lugar.
+ * Una sonda que da un falso positivo es peor que no medir — lleva a construir
+ * sobre algo que no está.
+ */
+const respondeDeVerdad = r => r.status === 200 && Array.isArray(r.cuerpo)
+
+const alarmHistoryVale = [conHda, conAc].some(respondeDeVerdad)
 const historyVale = porHistoria.status === 200
 
 if (alarmHistoryVale && historyVale) {
