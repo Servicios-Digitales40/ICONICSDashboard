@@ -133,11 +133,23 @@ Seis hallazgos concretos:
   [`BACKLOG-FRONTEND.md`](../BACKLOG-FRONTEND.md) y del Plan 26 (`COD-04`),
   no de usabilidad. Parametrizar vistas mientras se les añade procedencia y
   frescura sería mover dos cosas a la vez.
-- **No sube el techo del bundle para callar a `verificar-bundle.mjs`.** El
-  `index` está en 195,43 KB sobre 300 (medido el 09-09-2026, y esos 300 son
-  «por holgura, no por medición»). Este plan añade superficie de UI: si el
-  techo se acerca, la palanca es cargar sólo el idioma activo (~40 KB,
-  `BACKLOG-FRONTEND.md` F5), no subir el número.
+- **No sube el techo del bundle para callar a `verificar-bundle.mjs`.** Si un
+  build se pone en rojo, la palanca es cargar sólo el idioma activo (~40 KB,
+  `BACKLOG-FRONTEND.md` F5), no mover el número.
+
+  **Matiz del 11-09-2026, y conviene leerlo entero porque roza esta regla.** El
+  techo de `index` se subió de 300 a **450**, a petición explícita y como
+  decisión de producto: vienen nueve fases de este plan más los planes 25 y 26,
+  todos añadiendo interfaz. No es «callarlo» —nada estaba en rojo: `index`
+  estaba en 239,83 KB de 300, con 60 KB libres— sino dimensionar por adelantado
+  para no volver a discutir el número a mitad de camino.
+  
+  Lo que no cambia: `vendor` se queda en 270, lo que el guion protege de verdad
+  (que la pila 3D no viaje en el arranque) no depende de estos números sino de
+  `HUELLAS_3D`, y la palanca del idioma activo sigue pendiente y sigue siendo
+  lo correcto. La cabecera de `verificar-bundle.mjs` lo argumenta en largo, con
+  el aviso que esa subida se gana: **es la segunda seguida sin una medición que
+  la empuje, y una tercera sería que no.**
 
 ## 0.2 · `USO-05` se parte, como se partió `SEG-01`
 
@@ -535,11 +547,17 @@ preguntado. El latido tiene que venir de haber preguntado.
    La palanca, si aprieta, es el idioma activo — no el techo.
 
    **Corregido el 11-09-2026, al medirlo en F0:** este punto decía 195,43 KB
-   sobre 300, tomado de la última medición escrita (09-09-2026). El real es
+   sobre 300, tomado de la última medición escrita (09-09-2026). El real era
    **239,78 KB de base**, medido con `git stash` para separarlo del coste de la
-   fase. No es una regresión de este plan —los 44 KB son anteriores— pero sí
-   cambia lo que dice este riesgo: el margen es de **60 KB para nueve fases**,
-   no de 105. La palanca del idioma activo (~40 KB) deja de ser teórica.
+   fase. No era una regresión de este plan —los 44 KB son anteriores— pero
+   dejaba el margen en 60 KB para nueve fases, no en 105.
+
+   **Y ese mismo día el techo subió a 450** (ver §0.1), así que el margen real
+   pasa a ~210 KB y este riesgo deja de morder durante este plan. Lo que **no**
+   desaparece: el bundle sigue creciendo y nadie ha tomado la palanca del
+   idioma activo. El riesgo se ha aplazado, no resuelto — y el propio
+   `verificar-bundle.mjs` deja escrito que una tercera subida sin medición no
+   toca. Se sigue midiendo en cada fase.
 2. **Cuatro entregas son adopción, no construcción, y la adopción se
    abandona a medias.** `USO-01`, `USO-02` y `USO-04` consisten en llevar a
    todas las vistas algo que ya funciona en unas pocas. Es el trabajo que más
@@ -610,7 +628,8 @@ que el usuario lee.
 
 Dos cosas medidas en vez de supuestas, ambas porque la cifra sorprendía:
 
-- **El bundle.** `index` quedó en **239,83 KB** de 300, y el plan decía 195,43.
+- **El bundle.** `index` quedó en **239,83 KB** (de 300 entonces; el techo pasó
+  a 450 ese mismo día, ver §0.1), y el plan decía 195,43.
   Medido contra la base con `git stash`: **ya estaba en 239,78 antes de esta
   fase**. El coste real de F0 son **0,05 KB**. Los 44 KB son anteriores y no de
   aquí — pero el margen que la §1 daba por bueno es menor de lo que el plan

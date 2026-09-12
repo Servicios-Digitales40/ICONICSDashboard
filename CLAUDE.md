@@ -356,23 +356,30 @@ node --env-file=.env.local scripts/medir-asistente.mjs    # el banco de 20 casos
 ```bash
 node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
 ```
-> **Hoy pasa** (medido el 09-09-2026: `index` 195,43 KB sobre 300,
-> `vendor` 264,01 KB sobre 270).
+> **Hoy pasa** (medido el 11-09-2026: `index` 239,83 KB sobre 450,
+> `vendor` 264,33 KB sobre 270).
 >
-> Los dos techos se han subido, y las tres subidas están razonadas con su
-> medición en la cabecera del propio guion. Conviene saberlo porque roza la
-> regla de «no se sube el techo para callarlo»:
+> Los dos techos se han subido, y las cuatro subidas están razonadas con su
+> medición —o con su ausencia de medición, dicha en voz alta— en la cabecera
+> del propio guion. Conviene saberlo porque roza la regla de «no se sube el
+> techo para callarlo»:
 >
 > · `vendor` 90 → 210 (TanStack Query) → 270 (la librería de i18n).
 > · `index` 170 → 200 (los diccionarios, con `prediction.json` sacado antes
->   del arranque) → **300 el 09-09-2026, y ésta por holgura, no por medición**:
->   se pidió margen para el trabajo que viene.
+>   del arranque) → 300 el 09-09-2026 → **450 el 11-09-2026**. Las dos últimas
+>   **por holgura, no por medición**: margen pedido para el trabajo que viene
+>   (el Plan 24 y los que le siguen), con nada en rojo en el momento de
+>   subirlas — 239,83 de 300 cuando se puso 450.
+>
+> **Dos seguidas sin medición es el límite, y está escrito en el guion**: una
+> tercera no toca. A partir de ahí lo que corresponde es `COD-07` (Plan 26) y
+> la palanca pendiente, que sigue siendo cargar **sólo el idioma activo**
+> (~40 KB fuera del camino crítico); subir el techo no la cancela. Ver
+> `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo la situación anterior.
 >
 > Lo que este guion protege de verdad —que la pila 3D no viaje en el arranque—
-> no depende de esos números sino de `HUELLAS_3D`, y ahí no se ha tocado nada.
-> La palanca pendiente sigue siendo cargar **sólo el idioma activo** (~40 KB
-> fuera del camino crítico); subir el techo no la cancela. Ver
-> `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo la situación anterior.
+> no depende de ninguno de esos números sino de `HUELLAS_3D`, y ahí no se ha
+> tocado nada. Es lo que destapó los 827 KB colados del 08-09.
 
 **Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
 `verificar-herramientas.mjs` y el verificador específico de lo que tocó

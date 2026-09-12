@@ -139,8 +139,53 @@ const DIST = resolve(process.argv[2] ?? join(AQUI, "..", "react-dashboard", "dis
  *
  * Si alguna vez `index` se acerca a 300 de verdad, la respuesta no es 400: es
  * mirar qué se coló en el camino crítico.
+ *
+ * ── `index` sube de 300 a 450 (11-09-2026) — Y LA FRASE DE ARRIBA ──
+ *
+ * La línea anterior dice, literalmente, que la respuesta a acercarse a 300 no
+ * es 400. Aquí se pone 450, así que hay que decir con precisión en qué se
+ * parece este caso al que esa frase prohíbe y en qué no.
+ *
+ * **En qué NO se parece: nada está apretando.** Medido hoy, con F0 del Plan 24
+ * ya dentro: `index` **239,83 KB** de 300, o sea 60 KB libres y ningún build
+ * en rojo. Esa frase se escribió para el caso en que el guion avisa y alguien
+ * sube el número para que se calle. Aquí no hay nada que callar: el techo no
+ * ha saltado, y si saltara, la respuesta seguiría siendo mirar qué entró.
+ *
+ * **En qué sí se parece, y por eso el aviso de abajo:** es la SEGUNDA subida
+ * consecutiva sin una medición que la empuje. La del 09-09 ya fue «por
+ * holgura»; ésta también. Dos seguidas convierten «damos margen para lo que
+ * viene» en una costumbre, y una costumbre es exactamente cómo un presupuesto
+ * deja de ser un presupuesto.
+ *
+ * **Por qué se hace igual.** Es una decisión de producto, tomada con el plan
+ * delante y no al final de una tanda: el Plan 24 tiene NUEVE fases por delante
+ * que añaden superficie de interfaz (panel de procedencia, errores con acción,
+ * bandeja de eventos, paleta de comandos), y detrás vienen los planes 25 y 26.
+ * Con 300, ese trabajo habría vuelto aquí a mitad de camino a discutir el
+ * número en vez de a mirar el bundle. 450 deja ~210 KB, que es sitio para todo
+ * el Plan 24 y el 25 sin volver a tocarlo.
+ *
+ * **Lo que esta subida NO cambia, y es lo importante:**
+ *
+ *   · **Lo que este guion protege de verdad sigue intacto.** La pila 3D fuera
+ *     del arranque la comprueban `HUELLAS_3D` y la resolución de trozos, no un
+ *     número. Ahí no se ha tocado una línea, y es lo que destapó los 827 KB
+ *     colados del 08-09.
+ *   · **`vendor` se queda en 270.** Es el que lleva dos subidas en nueve días y
+ *     ya pesa más que el resto del arranque junto; ampliarle el margen «de
+ *     paso» sería justo lo que la nota de `COD-07` pide no hacer. Si alguna vez
+ *     hay que subirlo, que sea con su propia medición delante.
+ *   · **La palanca del idioma activo (~40 KB) sigue sin tomarse y sigue siendo
+ *     lo correcto.** Tres subidas de techo no la cancelan; sólo dejan de
+ *     bloquear el trabajo mientras tanto.
+ *
+ * Y el aviso que esta subida se gana: **la próxima vez que alguien quiera subir
+ * `index` sin una medición que lo empuje, la respuesta es que no.** Serían tres
+ * seguidas, y a la tercera esto ya no mide nada — es un número que se mueve
+ * solo. Lo que toca entonces es `COD-07` (Plan 26) y la palanca del idioma.
  */
-const PRESUPUESTO_KB = { index: 300, vendor: 270 };
+const PRESUPUESTO_KB = { index: 450, vendor: 270 };
 
 /** Rastros inequívocos de que la pila 3D está dentro de un archivo. */
 const HUELLAS_3D = [
