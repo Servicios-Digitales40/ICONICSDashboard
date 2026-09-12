@@ -475,7 +475,13 @@ function ZonaCarga({ t, sistemas, subiendo, error, onSubir }) {
 
 /* ── La vista ──────────────────────────────────────────────────────────── */
 
-export default function DocumentacionRag() {
+/**
+ * @param {object} p
+ * @param {{filtro?: string}} [p.params]  El filtro por máquina viaja en la URL
+ *   desde el Plan 24 F4 (`USO-02`) — ver `filtroSistema` abajo.
+ * @param {(page: string, params?: object) => void} [p.onNavigate]
+ */
+export default function DocumentacionRag({ params, onNavigate }) {
   /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
@@ -488,8 +494,43 @@ export default function DocumentacionRag() {
   const [subiendo, setSubiendo] = useState(false);
   const [errorSubida, setErrorSubida] = useState(null);
   const [idOcupado, setIdOcupado] = useState(null);
-  /** `""` = todos · `"sin-asignar"` · `"planta"` · el id de un sistema. */
-  const [filtroSistema, setFiltroSistema] = useState("");
+  /**
+   * `""` = todos · `"sin-asignar"` · `"planta"` · el id de un sistema.
+   *
+   * ── POR QUÉ ESTE FILTRO VIAJA EN LA URL (Plan 24 F4 · `USO-02`) ──
+   *
+   * Porque pasa el criterio del mecanismo: es lo que alguien querría **enviar
+   * por chat a un compañero** («mira, estos nueve están sin asignar») o dejar
+   * puesto en una pantalla. Un desplegable abierto o el archivo a medio subir
+   * no lo pasan, y por eso no viajan.
+   *
+   * El valor arranca de la URL y de ahí en más `onNavigate` la mantiene al día
+   * — el mismo patrón que `AlarmasEva` estableció con `?tab=vivo&activo=<id>` y
+   * que `DetalleActivo` ya usa para su rango. Es una CADENA, así que sobrevive
+   * al filtro de `esSerializable()` de `useNavegacion`; un valor desconocido
+   * cae solo en «todos», porque `manualesVisibles` no reconoce ningún caso y
+   * devuelve la lista completa.
+   */
+  const [filtroSistema, setFiltroSistema] = useState(
+    typeof params?.filtro === "string" ? params.filtro : ""
+  );
+
+  /**
+   * Cambiar de filtro: el estado local y la URL a la vez.
+   *
+   * Usa `onNavigate` —que apila con `pushState`— y no un `replaceState` propio,
+   * por consistencia con `DetalleActivo`, que ya hace exactamente esto con su
+   * rango de tiempo desde el Plan 11. Apilar tiene un coste real —cinco cambios
+   * de filtro son cinco pulsaciones de «atrás» para salir de la pantalla— pero
+   * inventar aquí una segunda semántica de navegación, distinta de la de la
+   * vista hermana, cuesta más: son dos comportamientos que explicar en vez de
+   * uno. Si el historial llega a molestar, se cambia en `useNavegacion` para
+   * las dos, que es donde vive esa decisión.
+   */
+  const elegirFiltro = (valor) => {
+    setFiltroSistema(valor);
+    onNavigate?.("rag-documentacion", valor ? { filtro: valor } : {});
+  };
 
   /*
    * Con el nombre ya traducido: `shared/` los declara en español y aquí se
@@ -794,7 +835,7 @@ export default function DocumentacionRag() {
            */
           <select
             value={filtroSistema}
-            onChange={(e) => setFiltroSistema(e.target.value)}
+            onChange={(e) => elegirFiltro(e.target.value)}
             style={{ ...fieldStyle(t), height: 30, fontSize: 12, padding: "0 8px", width: 190 }}
           >
             <option value="">{traducir("assistant:rag.docs.filter.all")}</option>

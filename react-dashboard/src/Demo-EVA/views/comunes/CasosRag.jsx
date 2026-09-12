@@ -253,15 +253,45 @@ function FilaCaso({ caso, t, nombreDeSistema, onArchivar, ocupado }) {
 
 /* ── Vista ───────────────────────────────────────────────────────────── */
 
-export default function CasosRag() {
+export default function CasosRag({ params, onNavigate }) {
   /* El código del puente elige la frase; el detalle va debajo. Ver `@/i18n`. */
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "navigation", "common", "errors"]);
   const { theme: t } = useTheme();
   const [estado, setEstado] = useState({ loading: true, error: null, casos: [] });
-  const [filtro, setFiltro] = useState("activos");
+
+  /**
+   * `"activos"` (por defecto) · `"archivados"` · `"todos"`.
+   *
+   * Viaja en la URL desde el Plan 24 F4 (`USO-02`): «mira los casos
+   * archivados» es exactamente el enlace que alguien manda por chat. Un valor
+   * desconocido cae solo en el comportamiento de «todos», porque el filtro de
+   * abajo sólo reconoce dos casos y deja pasar el resto.
+   */
+  const [filtro, setFiltro] = useState(
+    typeof params?.filtro === "string" ? params.filtro : "activos"
+  );
+
+  /**
+   * La búsqueda NO viaja, y es una decisión, no un olvido.
+   *
+   * Se escribe letra a letra: con `onNavigate` —que apila con `pushState`— una
+   * palabra de ocho caracteres dejaría ocho entradas en el historial, y salir
+   * de la pantalla con «atrás» pediría ocho pulsaciones. El filtro son tres
+   * botones y cada pulsación es una intención completa; teclear no lo es hasta
+   * que alguien para.
+   *
+   * El criterio del mecanismo (`useNavegacion`) es «lo que alguien querría
+   * enviar o dejar puesto en un kiosco». Un texto a medio escribir no lo es.
+   */
   const [busqueda, setBusqueda] = useState("");
+
+  /** Cambiar de filtro: estado local y URL a la vez. Ver `DocumentacionRag`. */
+  const elegirFiltro = (valor) => {
+    setFiltro(valor);
+    onNavigate?.("rag-casos", valor === "activos" ? {} : { filtro: valor });
+  };
   const [ocupado, setOcupado] = useState(null);
   const [aviso, setAviso] = useState(null);
 
@@ -360,7 +390,7 @@ export default function CasosRag() {
                 key={f}
                 type="button"
                 aria-pressed={filtro === f}
-                onClick={() => setFiltro(f)}
+                onClick={() => elegirFiltro(f)}
                 style={{
                   padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600,
                   fontFamily: SANS, cursor: "pointer",
