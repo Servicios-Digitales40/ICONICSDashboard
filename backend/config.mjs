@@ -716,6 +716,17 @@ function readDiarioConversacionesRuta(rawValue) {
 }
 
 /**
+ * Ruta del CUADERNO de planta (Plan 25 F8). Mismo criterio, tercer archivo:
+ * ver el porqué en el bloque `diario:`.
+ */
+function readCuadernoRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || join('datos', 'cuaderno.jsonl')
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
+/**
  * Carpeta de salida de los PDF de exportación de chat. Mismo criterio que
  * `readReportesDir` —vacío no es «desactivado», sólo cae al valor por
  * defecto— y a propósito NO reutiliza esa función: son dos configuraciones
@@ -1111,6 +1122,35 @@ export function loadConfig(env = process.env) {
         dias: readInteger(
           'DIARIO_CONVERSACIONES_DIAS', env.DIARIO_CONVERSACIONES_DIAS, DIAS_RETENCION, 1
         ),
+      }),
+
+      /**
+       * El CUADERNO de planta (Plan 25 F8 · `NUE-10`): notas de una PERSONA,
+       * no hechos que el sistema registró.
+       *
+       * ── POR QUÉ NO ES EL DIARIO DE ACCIONAMIENTOS ───────────────────
+       *
+       * Porque mezclarlos borraría la diferencia entre «el sistema hizo X» y
+       * «alguien dice que pasó Y». «Cambié el filtro» no es un accionamiento
+       * —no hay ningún tag que lo confirme— y anotarlo en el mismo archivo
+       * que «se accionó la bomba» le prestaría una autoridad que no tiene:
+       * quien lea el diario de accionamientos meses después tiene que poder
+       * confiar en que cada línea es un hecho de la instalación, no una
+       * afirmación sin verificar.
+       *
+       * Comparte el MECANISMO (`lib/diario.mjs`) por el mismo motivo que el
+       * de conversaciones: JSONL, candado, poda que se anota. No comparte
+       * archivo con ninguno de los otros dos.
+       *
+       * Tope generoso y retención larga: una nota pesa poco y una planta
+       * puede querer consultar «qué se cambió el año pasado en esta válvula».
+       */
+      cuaderno: Object.freeze({
+        ruta: readCuadernoRuta(env.CUADERNO_RUTA),
+        maxBytes: readInteger(
+          'CUADERNO_MAX_BYTES', env.CUADERNO_MAX_BYTES, MAX_BYTES_DIARIO, 1024
+        ),
+        dias: readInteger('CUADERNO_DIAS', env.CUADERNO_DIAS, DIAS_RETENCION, 1),
       }),
     }),
 

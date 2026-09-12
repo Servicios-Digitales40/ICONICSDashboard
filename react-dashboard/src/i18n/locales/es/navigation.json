@@ -131,6 +131,11 @@
       "title": "Hallazgos",
       "nav": "Hallazgos",
       "sub": "Riesgos activos y casos similares que el sistema ya calculó y aún no ha visto nadie"
+    },
+    "eva-cuaderno": {
+      "title": "Cuaderno",
+      "nav": "Cuaderno",
+      "sub": "Notas de quien está delante de la máquina, con su hora y su autor"
     }
   },
   "palette": {

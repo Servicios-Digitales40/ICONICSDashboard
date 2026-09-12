@@ -110,5 +110,18 @@
       "riesgo": "Riesgo activo",
       "caso": "Caso similar"
     }
+  },
+  "notebook": {
+    "title": "Cuaderno de planta",
+    "subtitle": "Notas de quien está delante de la máquina — lo que dice una persona, no un accionamiento del sistema.",
+    "placeholder": "Cambié el filtro, la bomba hace ruido al arrancar…",
+    "machine": "Máquina",
+    "wholePlant": "Toda la planta",
+    "save": "Guardar nota",
+    "saving": "Guardando…",
+    "saveError": "No se pudo guardar la nota",
+    "loadError": "No se pudieron leer las notas",
+    "list": "Notas",
+    "empty": "Todavía no hay ninguna nota."
   }
 }

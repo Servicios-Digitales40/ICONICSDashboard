@@ -131,6 +131,11 @@
       "title": "Findings",
       "nav": "Findings",
       "sub": "Active risks and similar cases the system already calculated and no one has seen yet"
+    },
+    "eva-cuaderno": {
+      "title": "Notebook",
+      "nav": "Notebook",
+      "sub": "Notes from whoever is in front of the machine, with their time and author"
     }
   },
   "palette": {

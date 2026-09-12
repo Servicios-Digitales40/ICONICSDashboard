@@ -322,6 +322,19 @@ export const ROUTES = [
 
   {
     /*
+     * ── POR QUÉ VA EN «GENERAL», IGUAL QUE «TURNO» Y «HALLAZGOS» ───────
+     *
+     * Una nota puede ser de cualquiera de las dos máquinas, o de ninguna en
+     * concreto («se fue la luz media hora») — el cuaderno mismo no es de
+     * ninguna instalación.
+     */
+    id: "eva-cuaderno",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/CuadernoEva.jsx")),
+    nav: { icon: <NotebookPen size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
      * ── POR QUÉ VA EN «GENERAL» Y NO EN UNA MÁQUINA ────────────────────
      *
      * Porque no habla de ninguna: habla del PUENTE. Es el mismo criterio por

@@ -279,6 +279,45 @@ describe('exigirRol', () => {
 
     await app.close()
   })
+
+  /**
+   * ── EL CUADERNO ES LA SEGUNDA EXCEPCIÓN, POR EL MISMO MOTIVO (Plan 25 F8) ─
+   *
+   * Cada nota trae `autor`: información de personas, no sólo de la
+   * instalación. Mismo criterio que el diario de accionamientos.
+   */
+  it('el cuaderno NIEGA a quien no tiene el rol', async () => {
+    const app = await conSesion()
+    const { cuerpo } = await entrar(app, 'mirona')
+
+    const respuesta = await app.inject({
+      method: 'GET',
+      url: '/api/cuaderno',
+      headers: conToken(cuerpo.token),
+    })
+
+    expect(respuesta.statusCode).toBe(403)
+
+    await app.close()
+  })
+
+  it('con el rol, el cuaderno se lee y se puede escribir en él', async () => {
+    const app = await conSesion()
+    const { cuerpo } = await entrar(app, 'ana')
+
+    const lectura = await app.inject({ method: 'GET', url: '/api/cuaderno', headers: conToken(cuerpo.token) })
+    expect(lectura.statusCode).toBe(200)
+
+    const escritura = await app.inject({
+      method: 'POST',
+      url: '/api/cuaderno',
+      payload: { texto: 'Nota de prueba' },
+      headers: conToken(cuerpo.token),
+    })
+    expect(escritura.statusCode).toBe(201)
+
+    await app.close()
+  })
 })
 
 describe('renovar y saber quién eres', () => {

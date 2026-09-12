@@ -56,6 +56,7 @@ import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerDiagnosticoRoutes } from './routes/diagnosticoRoutes.mjs'
 import { registerDiarioRoutes } from './routes/diarioRoutes.mjs'
+import { registerCuadernoRoutes } from './routes/cuadernoRoutes.mjs'
 import { registerIconicsRoutes } from './routes/iconicsRoutes.mjs'
 import { registerRagRoutes } from './routes/ragRoutes.mjs'
 import { registerReportesRoutes } from './routes/reportesRoutes.mjs'
@@ -258,6 +259,18 @@ export async function createApp(config) {
     ruta: config.diario.conversaciones.ruta,
     maxBytes: config.diario.conversaciones.maxBytes,
     diasRetencion: config.diario.conversaciones.dias,
+  })
+
+  /*
+   * El CUADERNO de planta (Plan 25 F8 · `NUE-10`): notas de una PERSONA, no
+   * accionamientos del sistema. Archivo aparte de los otros dos diarios —el
+   * porqué está en el bloque `cuaderno:` de `config.mjs`— y el mismo
+   * mecanismo de `lib/diario.mjs` debajo.
+   */
+  const cuaderno = crearDiario({
+    ruta: config.diario.cuaderno.ruta,
+    maxBytes: config.diario.cuaderno.maxBytes,
+    diasRetencion: config.diario.cuaderno.dias,
   })
 
   const herramientas = createHerramientas({
@@ -521,6 +534,7 @@ export async function createApp(config) {
     // ruta lo lee, y dos instancias apuntando al mismo archivo sería pedir que
     // una lea a medio escribir de la otra.
     registerDiarioRoutes(instancia, { diario })
+    registerCuadernoRoutes(instancia, { cuaderno })
   })
 
   /* ── Frontend ──────────────────────────────────────────────────── */

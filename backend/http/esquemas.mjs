@@ -378,6 +378,34 @@ export const DiarioQuerySchema = z.object({
   cursor: z.coerce.number().int().min(0).optional().default(0),
 })
 
+/**
+ * `GET /api/cuaderno` (Plan 25 F8). Mismo criterio que `DiarioQuerySchema`, un
+ * archivo distinto: ver `lib/diario.mjs` para por qué el cursor es un índice y
+ * no una fecha.
+ */
+export const CuadernoQuerySchema = DiarioQuerySchema
+
+/** Longitud máxima de una nota. Un cuaderno no es un informe. */
+export const MAX_NOTA = 1000
+
+/**
+ * `POST /api/cuaderno` (Plan 25 F8).
+ *
+ * `sistema` es OPCIONAL: una nota puede ser de una máquina concreta —«cambié
+ * el filtro del tanque»— o de la planta en general —«se fue la luz media
+ * hora»—, y obligar a elegir una de las dos falsearía la segunda.
+ *
+ * Lo que NO está aquí, y es la mitad de la frontera: `autor` e `instante`. No
+ * los manda el cliente — los pone el servidor (`request.usuario`, el reloj),
+ * porque un campo que el cliente puede escribir es un campo que se puede
+ * falsificar, y «quién lo dijo» es precisamente lo que un cuaderno no puede
+ * dejar en manos de quien escribe la nota.
+ */
+export const CuadernoNotaSchema = z.object({
+  texto: z.string().trim().min(1, 'La nota no puede estar vacía.').max(MAX_NOTA),
+  sistema: z.enum(SISTEMA_IDS).optional(),
+})
+
 export const ReporteQuerySchema = z.object({
   /*
    * El patrón de UUID se valida ANTES de tocar el filesystem: eso basta como

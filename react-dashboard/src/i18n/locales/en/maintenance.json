@@ -110,5 +110,18 @@
       "riesgo": "Active risk",
       "caso": "Similar case"
     }
+  },
+  "notebook": {
+    "title": "Plant notebook",
+    "subtitle": "Notes from whoever is in front of the machine — what a person says, not something the system did.",
+    "placeholder": "Changed the filter, the pump makes noise on startup…",
+    "machine": "Machine",
+    "wholePlant": "Whole plant",
+    "save": "Save note",
+    "saving": "Saving…",
+    "saveError": "The note could not be saved",
+    "loadError": "The notes could not be read",
+    "list": "Notes",
+    "empty": "No notes yet."
   }
 }

@@ -460,6 +460,42 @@ borraría la diferencia entre un hecho registrado y una afirmación.
 hora no los pone el cliente (los pone el servidor, o son falsificables); y que
 el archivo a medias se lee hasta la penúltima línea.
 
+**HECHA el 12-09-2026, reutilizando `crearDiario()` sin tocarlo.**
+
+**El mecanismo era genérico desde el Plan 25 F1, y no hizo falta cambiar
+nada de él.** `crearDiario()` ya se parametriza por `ruta`, y ya tenía dos
+instancias con archivos distintos (accionamientos, conversaciones). El
+cuaderno es la tercera: `datos/cuaderno.jsonl`, configurable por
+`CUADERNO_RUTA`. Todo el trabajo de JSONL, candado, poda y línea a medias que
+F1 ya construyó y probó se hereda entero.
+
+**Una diferencia de semántica que SÍ importó, y vive en la ruta, no en la
+librería.** `anotar()` nunca lanza y devuelve `{ ok, error }` — decisión
+correcta para el diario de accionamientos, donde la bomba ya se accionó y un
+500 mentiría sobre si la orden se ejecutó. Para el cuaderno esa razón NO
+existe: no hay ningún "ya pasó" que proteger, así que
+`registerCuadernoRoutes` SÍ propaga el fallo con un 500 cuando `{ ok: false }`.
+Mismo `crearDiario()`, dos rutas con criterio distinto sobre el mismo
+resultado — la extensibilidad estaba en el sitio correcto desde F1.
+
+**`GET /api/cuaderno` es la SEGUNDA excepción a «las lecturas no llevan
+rol»**, y por el mismo motivo que la primera (`GET /api/diario`, F1): cada
+nota trae `autor`, información de personas.
+
+**El autor y el instante no tienen ni campo en el formulario.** No es sólo que
+el backend los ignore si llegan — la vista `CuadernoEva.jsx` ni siquiera
+ofrece un sitio donde escribirlos, para que a nadie se le ocurra que podría.
+
+**Un fallo al guardar deja el texto puesto.** Es la consecuencia visible de la
+diferencia de semántica de arriba: si la nota no se guardó, la persona lo sabe
+y no tiene que reescribirla para reintentar.
+
+**Medido:** 861 pruebas de frontend (+9) y 345 de backend (+11: 9 del
+contrato HTTP, 2 de la guarda de rol con `AUTH_HABILITADA=true`), los 28
+verificadores —incluido `codigos`, con el error nuevo en los dos idiomas—,
+lint 0 errores, types limpio. Bundle: `index` 257,11 → **258,77 KB**;
+**`vendor` sin tocar** — el icono (`NotebookPen`) ya viajaba por RAG.
+
 ---
 
 ## F9 · Pantalla de acceso y renovación (`SEG-01`, segunda mitad)
