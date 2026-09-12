@@ -27,5 +27,8 @@
     "actionCount": "Acknowledge ({{count}})",
     "confirm": "Sure? Press again"
   },
-  "unreadBadge": "{{count}} unread"
+  "unreadBadge": "{{count}} unread",
+  "history": {
+    "pointLabel": "Alarm"
+  }
 }

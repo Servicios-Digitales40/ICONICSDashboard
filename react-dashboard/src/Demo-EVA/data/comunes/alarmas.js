@@ -1,10 +1,18 @@
 /**
- * Historial de alarmas de la instalación — no un semáforo de alarmas
+ * Historial de alarmas de UNA alarma del PLC — no un semáforo de alarmas
  * ACTIVAS. `GET /api/iconics/alarms` llama a `readAlarmHistory` en el
  * puente: lo que trae es "qué ha pasado", nunca "qué está sonando ahora
  * mismo". Prometer lo segundo con lo primero sería exactamente el tipo de
  * mentira que este tablero evita en todo lo demás — la vista y la insignia
  * del Topbar tienen que decirlo tal cual.
+ *
+ * ── «DE UNA ALARMA» Y NO «DE LA INSTALACIÓN» (12-09-2026) ───────────
+ *
+ * Esta cabecera decía «de la instalación», y era la promesa que rompía la
+ * pantalla: el servidor no sirve el historial sin un punto concreto. Ver
+ * `leerAlarmas()` abajo para el fallo exacto y la decisión. Se corrige aquí
+ * porque una cabecera que promete más de lo que el archivo hace es peor que
+ * ninguna.
  *
  * ── LA FORMA DE UN EVENTO, Y LO QUE NO SE PUEDE DAR POR HECHO ────────
  *
@@ -18,7 +26,7 @@
  * VACÍA en silencio, que es peor que enseñarla sin filtrar.
  */
 import { fetchIconicsAlarms } from "@/lib/iconics";
-import { SENALES, SENAL_KEYS, pointName } from "../../domain/senales.js";
+import { ALARMAS, SENALES, SENAL_KEYS, pointName, puntoHistorico } from "../../domain/senales.js";
 
 /** Nombres de campo que ICONICS podría usar para el punto de origen del evento. */
 const CAMPOS_PUNTO = ["pointName", "PointName", "tag", "Tag", "point", "Point"];
@@ -62,11 +70,59 @@ export function etiquetaDePunto(alarma) {
 }
 
 /**
- * Historial de alarmas de las últimas `horas`. Delgado a propósito: sólo
- * envuelve `fetchIconicsAlarms` para que la vista y la insignia del Topbar
- * no tengan que saber de la forma HTTP de la respuesta.
+ * Las alarmas del PLC que se pueden consultar en el historiador, para el
+ * selector de la vista.
+ *
+ * Sale del catálogo y no de una lista escrita a mano: las ocho llevan
+ * `naturaleza: "alarma"` desde el Plan 27 F3, y quien añada una novena la
+ * declara ahí y aparece aquí sola.
  */
-export async function leerAlarmas(horas = 1) {
-  const { alarms } = await fetchIconicsAlarms(undefined, horas);
+export const ALARMAS_HISTORIZABLES = ALARMAS.filter((key) => SENALES[key]?.historizado);
+
+/**
+ * Historial de una alarma en las últimas `horas`.
+ *
+ * ── POR QUÉ AHORA PIDE UN PUNTO, Y ANTES NO ────────────────────────
+ *
+ * Porque sin él el servidor no contesta. Esta función llamaba a
+ * `fetchIconicsAlarms(undefined, horas)`, y con `pointName` ausente el puente
+ * lo omite del querystring (`withParams` en `iconics/client.mjs` sólo pone lo
+ * que tiene valor): a `/AlarmHistory` le llegaba una petición SIN filtro de
+ * punto —el historial de la planta entera— y respondía con el error que la
+ * pantalla enseñaba, «ICONICS AlarmHistory request failed».
+ *
+ * ── Y POR QUÉ LA RUTA `hda:` Y NO EL TAG EN VIVO ───────────────────
+ *
+ * Porque es la que el historiador reconoce:
+ * `hda:\Configuration\DEMO TANQUE\ALARMAS:NIVEL_ALTO_ALTO`, confirmada contra
+ * el servidor real el 12-09-2026. Es la misma distinción que el Plan 27 F6 ya
+ * descubrió para las SERIES del tanque —el nombre en vivo (`ac:`) y el del
+ * historiador no coinciden desde la reorganización del árbol del 09-09-2026— y
+ * `puntoHistorico()` es quien la resuelve, para que esta capa no repita la
+ * tabla de rama→carpeta.
+ *
+ * ── LO QUE ESTO CAMBIA DE LA PANTALLA, Y ES UNA DECISIÓN ───────────
+ *
+ * La pestaña «Historial» pasa a ser de UNA alarma, no de toda la instalación.
+ * No es un recorte por comodidad: pedir las ocho serían ocho peticiones por
+ * cada cambio de ventana, y el historiador las sirve de una en una. Lo que se
+ * gana es que la pantalla dice la verdad sobre lo que está mirando; lo que se
+ * pierde es la vista agregada, y eso vuelve a estar sobre la mesa el día que
+ * `ICO-10` (Plan 26) confirme si el servidor sabe servirla.
+ *
+ * @param {number} horas
+ * @param {string} clave  Clave de dominio de la alarma (`nivelAltoAlto`…).
+ */
+export async function leerAlarmas(horas = 1, clave = ALARMAS_HISTORIZABLES[0]) {
+  const punto = clave ? puntoHistorico(clave) : null;
+
+  /*
+   * Sin punto no se pregunta. Es la diferencia entre una lista vacía —«no ha
+   * pasado nada»— y un error que dice qué falta: preguntar igual devolvería el
+   * mismo fallo del servidor que esta función existe para no provocar.
+   */
+  if (!punto) return [];
+
+  const { alarms } = await fetchIconicsAlarms(punto, horas);
   return Array.isArray(alarms) ? alarms : [];
 }

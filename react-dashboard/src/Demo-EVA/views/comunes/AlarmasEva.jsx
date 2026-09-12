@@ -35,7 +35,9 @@ import { fetchHealth, acknowledgeIconicsAlarms } from "@/lib/iconics";
 import { useTheme } from "@/theme";
 
 import { estadoHistorial, HISTORIAL } from "../../data/comunes/estadoDelDato.js";
-import { etiquetaDePunto, leerAlarmas, perteneceAlActivo } from "../../data/comunes/alarmas.js";
+import {
+  ALARMAS_HISTORIZABLES, etiquetaDePunto, leerAlarmas, perteneceAlActivo,
+} from "../../data/comunes/alarmas.js";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
 import { MONO, PuntoEstado } from "../../components/base.jsx";
@@ -143,9 +145,18 @@ function ChipsActivo({ activoFiltro, onElegir, t, traducir, activoTexto }) {
 function HistorialAlarmas({ activoFiltro, t }) {
   const mensajeDeError = useMensajeDeError();
   const { t: traducir } = useTranslation(["alarms", "errors"]);
-  const { activo: activoTexto } = useDominio();
+  const { activo: activoTexto, senal: senalTexto } = useDominio();
   const { locale } = useFormato();
   const [horas, setHoras] = useState(1);
+  /**
+   * Qué alarma se está consultando (12-09-2026).
+   *
+   * El historiador sirve el historial POR PUNTO, así que esta pantalla mira una
+   * alarma a la vez y hay que decir cuál. Arranca en la primera del catálogo —
+   * `NIVEL_ALTO_ALTO`, la de más consecuencia— en vez de dejarlo vacío: una
+   * pantalla que abre sin datos y con un selector por tocar se lee como rota.
+   */
+  const [alarmaSel, setAlarmaSel] = useState(ALARMAS_HISTORIZABLES[0] ?? null);
   const [alarmas, setAlarmas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -180,7 +191,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
     setLoading(true);
     setError(null);
     try {
-      setAlarmas(await leerAlarmas(horas));
+      setAlarmas(await leerAlarmas(horas, alarmaSel));
     } catch (e) {
       /*
        * Se guarda el ERROR entero, no su `.message`: aplanarlo aquí tiraba el
@@ -191,7 +202,7 @@ function HistorialAlarmas({ activoFiltro, t }) {
     } finally {
       setLoading(false);
     }
-  }, [horas]);
+  }, [horas, alarmaSel]);
 
   useEffect(() => {
     cargar();
@@ -299,6 +310,37 @@ function HistorialAlarmas({ activoFiltro, t }) {
             </ChipVentana>
           ))}
         </div>
+
+        {/*
+         * Qué alarma se consulta (12-09-2026).
+         *
+         * Va junto a los chips de ventana porque son la misma decisión partida
+         * en dos: QUÉ se mira y DE CUÁNDO. Un `<select>` y no chips como los de
+         * al lado: son ocho opciones y crecerían con el catálogo, mientras que
+         * las ventanas son cuatro y fijas.
+         */}
+        {ALARMAS_HISTORIZABLES.length > 0 && (
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 12, color: t.textFaint }}>
+              {traducir("alarms:history.pointLabel")}
+            </span>
+            <select
+              value={alarmaSel ?? ""}
+              onChange={(e) => setAlarmaSel(e.target.value)}
+              style={{
+                height: 32, fontSize: 12, padding: "0 8px", borderRadius: 8,
+                background: t.panel, color: t.text, border: `1px solid ${t.border}`,
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {ALARMAS_HISTORIZABLES.map((key) => (
+                /* El rótulo sale del diccionario de dominio, como en el resto
+                   del tablero: `shared/` declara los nombres en español. */
+                <option key={key} value={key}>{senalTexto(key, "corto")}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {/* «Actualizar» estaba escrito a mano, y es el ejemplo LITERAL que la
             cabecera de `verificar-textos.mjs` nombra como su hueco conocido

@@ -12,6 +12,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
+import { ALARMAS_HISTORIZABLES } from "@/Demo-EVA/data/comunes/alarmas.js";
+import { pointName, puntoHistorico } from "@/Demo-EVA/domain/senales.js";
 
 const { fetchIconicsAlarms, fetchHealth, acknowledgeIconicsAlarms } = vi.hoisted(() => ({
   fetchIconicsAlarms: vi.fn(async () => ({ alarms: [] })),
@@ -64,13 +66,42 @@ describe("AlarmasEva: la lista, y lo que dice cuando está vacía o falla", () =
     await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(2));
   });
 
-  it("cambiar de ventana (6 horas) vuelve a pedir con las horas nuevas", async () => {
+  /*
+   * ── SE PIDE CON UN PUNTO, Y ESE ERA EL BUG (12-09-2026) ─────────────
+   *
+   * Esta prueba afirmaba `[undefined, 6]` — es decir, que el historial se pedía
+   * SIN `pointName`. Fijaba exactamente el comportamiento que dejaba la pantalla
+   * en «ICONICS AlarmHistory request failed»: con el punto ausente el puente lo
+   * omite del querystring y el servidor recibe una petición sin filtro, que
+   * rechaza.
+   *
+   * Ahora se comprueba lo contrario, y con la ruta que el historiador reconoce
+   * de verdad (`hda:`, no el tag en vivo `ac:`). Se compara contra
+   * `puntoHistorico()` y no contra la cadena escrita a mano: si mañana cambia la
+   * tabla de rama→carpeta del catálogo, la prueba sigue diciendo la verdad.
+   */
+  it("cambiar de ventana (6 horas) vuelve a pedir con las horas nuevas Y con su punto", async () => {
     montar();
     await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole("button", { name: "6 horas" }));
     await waitFor(() => expect(fetchIconicsAlarms).toHaveBeenCalledTimes(2));
-    expect(fetchIconicsAlarms.mock.calls[1]).toEqual([undefined, 6]);
+
+    const [punto, horas] = fetchIconicsAlarms.mock.calls[1];
+    expect(horas).toBe(6);
+    expect(punto).toBe(puntoHistorico(ALARMAS_HISTORIZABLES[0]));
+  });
+
+  it("el punto que se pide es del HISTORIADOR, no el tag en vivo", () => {
+    /*
+     * La distinción que el Plan 27 F6 descubrió para las series, aplicada aquí:
+     * desde la reorganización del árbol del 09-09-2026 los dos nombres no
+     * coinciden, y sólo el `hda:` contesta. Confirmado contra el servidor real.
+     */
+    const clave = ALARMAS_HISTORIZABLES[0];
+
+    expect(puntoHistorico(clave)).toMatch(/^hda:/);
+    expect(puntoHistorico(clave)).not.toBe(pointName(clave));
   });
 });
 

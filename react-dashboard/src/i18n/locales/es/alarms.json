@@ -27,5 +27,8 @@
     "actionCount": "Reconocer ({{count}})",
     "confirm": "¿Seguro? Pulsa otra vez"
   },
-  "unreadBadge": "{{count}} sin leer"
+  "unreadBadge": "{{count}} sin leer",
+  "history": {
+    "pointLabel": "Alarma"
+  }
 }
