@@ -53,5 +53,6 @@
     "secondsAgo": "hace {{n}} s",
     "minutesAgo": "hace {{n}} min",
     "lastReadingAt": "Última lectura: {{cuando}}"
-  }
+  },
+  "refresh": "Actualizar"
 }

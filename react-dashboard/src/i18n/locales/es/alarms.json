@@ -21,5 +21,11 @@
     "sinAlarmas": "Sin alarmas activas",
     "activas_one": "{{count}} alarma activa",
     "activas_other": "{{count}} alarmas activas"
-  }
+  },
+  "ack": {
+    "action": "Reconocer",
+    "actionCount": "Reconocer ({{count}})",
+    "confirm": "¿Seguro? Pulsa otra vez"
+  },
+  "unreadBadge": "{{count}} sin leer"
 }

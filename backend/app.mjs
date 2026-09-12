@@ -508,7 +508,7 @@ export async function createApp(config) {
 
     registerAuthRoutes(instancia, { config })
     registerSystemRoutes(instancia, { config, client, authenticator, startedAt, chat, cola, voz, indiceDocumentos })
-    registerIconicsRoutes(instancia, { config, client })
+    registerIconicsRoutes(instancia, { config, client, diario })
     registerControlRoutes(instancia, { config, herramientas, diario })
     registerChatRoutes(instancia, { config, chat, cola, diarioConversaciones })
     registerVozRoutes(instancia, { config, voz })

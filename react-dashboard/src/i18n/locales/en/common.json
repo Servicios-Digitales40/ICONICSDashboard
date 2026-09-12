@@ -53,5 +53,6 @@
     "secondsAgo": "{{n}} s ago",
     "minutesAgo": "{{n}} min ago",
     "lastReadingAt": "Last reading: {{cuando}}"
-  }
+  },
+  "refresh": "Refresh"
 }

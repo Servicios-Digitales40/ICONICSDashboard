@@ -23,7 +23,7 @@
  * activo — es el destino del indicador «N alarmas activas» de `TarjetaActivo`
  * (Planta) y `CabeceraActivo` (Detalle).
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useFormato } from "@/i18n/formato.js";
@@ -47,6 +47,55 @@ const VENTANAS = [
   { horas: 24, clave: "h24" },
   { horas: 48, clave: "h48" },
 ];
+
+/** Cuánto dura la petición de confirmar el acuse. El mismo que `ControlesTanque`. */
+const VENTANA_CONFIRMACION_MS = 4000;
+
+/**
+ * Los eventos que este operador ya ha visto, entre visitas a la pantalla
+ * (Plan 24 F5 · `USO-05`).
+ *
+ * ── POR QUÉ `localStorage` Y NO EL SERVIDOR ────────────────────────
+ *
+ * Porque «leído» y «reconocido» son dos cosas distintas y confundirlas sería
+ * grave. El ACUSE es un hecho de la instalación: viaja al Alarm Server, queda
+ * con nombre y lo ven todos. El «leído» es una conveniencia de ESTA pantalla
+ * para esta persona —qué ha mirado ya— y mandarlo al servidor lo convertiría en
+ * una afirmación sobre el turno que nadie ha hecho.
+ *
+ * Por eso vive en el navegador, es por dispositivo, y se pierde al limpiar el
+ * almacenamiento — todo aceptable para lo que es. Lo que NO puede pasar es que
+ * un fallo al leerlo tire la vista: en un kiosco con el almacenamiento
+ * bloqueado, `localStorage` lanza al tocarlo.
+ */
+const CLAVE_VISTOS = "eva:alarmas:vistos";
+
+function leerVistos() {
+  try {
+    const crudo = globalThis.localStorage?.getItem(CLAVE_VISTOS);
+    const lista = crudo ? JSON.parse(crudo) : [];
+    return new Set(Array.isArray(lista) ? lista : []);
+  } catch {
+    // Sin memoria de lo leído se ve todo como nuevo, que es el lado seguro:
+    // enseña de más, nunca de menos.
+    return new Set();
+  }
+}
+
+function guardarVistos(vistos) {
+  try {
+    /*
+     * Se guardan como máximo los últimos 500. Sin tope, la lista crece con cada
+     * evento de la planta para siempre — y lo que importa es no volver a marcar
+     * como nuevo algo de esta semana, no llevar el registro de un año.
+     */
+    const lista = [...vistos].slice(-500);
+    globalThis.localStorage?.setItem(CLAVE_VISTOS, JSON.stringify(lista));
+  } catch {
+    // Un kiosco con el almacenamiento bloqueado sigue funcionando: pierde la
+    // memoria de lo leído, no la pantalla.
+  }
+}
 
 /** "2026-08-20 10:00:00" → algo legible. Si no parsea, se enseña tal cual llegó — nunca una fecha inventada. */
 function fechaLegible(startDate, locale) {
@@ -105,6 +154,27 @@ function HistorialAlarmas({ activoFiltro, t }) {
   const [readOnly, setReadOnly] = useState(true);
   const [seleccion, setSeleccion] = useState(() => new Set());
   const [reconociendo, setReconociendo] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const timeoutConfirmar = useRef(null);
+
+  /*
+   * Lo ya visto por esta persona en este dispositivo, LEÍDO UNA VEZ al montar.
+   * Ver `CLAVE_VISTOS`.
+   *
+   * Es una instantánea a propósito y por eso no tiene setter: si se actualizara,
+   * las filas se marcarían como leídas delante de quien las está mirando y el
+   * indicador desaparecería en el mismo render que lo enseñó. La memoria se
+   * escribe en el efecto de abajo; lo que se VE no cambia hasta la siguiente
+   * visita — que es exactamente lo que hace útil una bandeja. `useState` con
+   * inicializador perezoso y sin setter es la forma de decir «esto se calcula al
+   * montar y ya»; un `useRef` haría lo mismo pero se leería como estado mutable.
+   */
+  const [vistos] = useState(leerVistos);
+
+  // El temporizador de la confirmación no puede sobrevivir al desmontaje: sin
+  // esto, salir de la pestaña deja un `setConfirmando` apuntando a un
+  // componente que ya no existe. Mismo cuidado que `ControlesTanque`.
+  useEffect(() => () => clearTimeout(timeoutConfirmar.current), []);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -144,6 +214,26 @@ function HistorialAlarmas({ activoFiltro, t }) {
 
   const estado = estadoHistorial({ error, loading, datos: filtradas, minimo: 1 });
 
+  /** Cuáles de las que se están viendo son NUEVAS. Ver la nota de `vistos`. */
+  const nuevas = useMemo(
+    () => filtradas.filter((a) => a.eventId != null && !vistos.has(String(a.eventId))),
+    [filtradas, vistos]
+  );
+
+  /*
+   * Al llegar una tanda del servidor, lo que se enseña queda marcado como
+   * leído en el almacenamiento — no en el estado. Ver `nuevas`.
+   */
+  useEffect(() => {
+    if (!filtradas.length) return;
+    const ids = filtradas.map((a) => a.eventId).filter((id) => id != null).map(String);
+    if (!ids.length) return;
+    guardarVistos(new Set([...leerVistos(), ...ids]));
+    // `filtradas` se recalcula en cada render (es un `.filter().sort()` suelto),
+    // así que la dependencia real es su contenido: los ids concretos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtradas.map((a) => a.eventId).join(",")]);
+
   function alternarSeleccion(eventId) {
     setSeleccion((prev) => {
       const siguiente = new Set(prev);
@@ -153,7 +243,39 @@ function HistorialAlarmas({ activoFiltro, t }) {
     });
   }
 
+  /**
+   * Reconocer, con confirmación de dos pasos (Plan 24 F5 · `USO-05`).
+   *
+   * ── POR QUÉ ESTO NECESITA CONFIRMARSE ──────────────────────────────
+   *
+   * Porque es una acción SOBRE LA INSTALACIÓN, no sobre el tablero: el acuse
+   * viaja al Alarm Server de ICONICS y allí queda, con el nombre de quien lo
+   * hizo. No se deshace desde aquí, y un acuse en masa —la casilla de cabecera
+   * selecciona la ventana entera— puede tapar de una vez un aviso que nadie ha
+   * leído todavía.
+   *
+   * Mismo patrón de dos pasos que `ControlesTanque` (Plan 13): el primer clic
+   * pide confirmar, un segundo dentro de la ventana ejecuta, y cualquier otra
+   * cosa cancela. Se copia ese patrón y no se monta un modal por el motivo que
+   * esa vista ya argumentó —no hay `ConfirmDialog` en el proyecto y crear uno
+   * para dos botones sería sobre-ingeniería—, y además aquí el modal taparía la
+   * lista de lo que se está a punto de reconocer, que es justo lo que hay que
+   * seguir viendo mientras se decide.
+   */
+  function pedirReconocer() {
+    if (seleccion.size === 0) return;
+    if (confirmando) {
+      reconocer();
+      return;
+    }
+    setConfirmando(true);
+    clearTimeout(timeoutConfirmar.current);
+    timeoutConfirmar.current = setTimeout(() => setConfirmando(false), VENTANA_CONFIRMACION_MS);
+  }
+
   async function reconocer() {
+    clearTimeout(timeoutConfirmar.current);
+    setConfirmando(false);
     if (seleccion.size === 0) return;
     setReconociendo(true);
     try {
@@ -178,19 +300,50 @@ function HistorialAlarmas({ activoFiltro, t }) {
           ))}
         </div>
 
+        {/* «Actualizar» estaba escrito a mano, y es el ejemplo LITERAL que la
+            cabecera de `verificar-textos.mjs` nombra como su hueco conocido
+            («"Actualizar" sola pasa»). Entra en el diccionario, y su verbo en
+            `VERBOS_UI` para que el guion lo cace la próxima vez. */}
         <Button variant="ghost" icon={<RefreshCw size={13} />} onClick={cargar} loading={loading}>
-          Actualizar
+          {traducir("common:refresh")}
         </Button>
+
+        {/*
+         * Cuántas de las que se ven son nuevas para esta persona (Plan 24 F5).
+         * Sólo si hay alguna: un «0 sin leer» permanente es ruido que enseña a
+         * no mirar la fila, el mismo criterio que el contador de recortados de
+         * Documentación en F2.
+         */}
+        {nuevas.length > 0 && (
+          <span
+            style={{
+              fontFamily: MONO, fontSize: 11, fontWeight: 700, padding: "3px 9px",
+              borderRadius: 999, background: t.accentSoft, color: t.accent,
+              border: `1px solid ${t.accent}33`,
+            }}
+          >
+            {traducir("alarms:unreadBadge", { count: nuevas.length })}
+          </span>
+        )}
 
         {!readOnly && (
           // `primary` (azul) y no `success` (verde): la *Regla del Color con
           // Significado* reserva verde para una señal en banda, no para un
           // botón de acción. Azul es su única excepción — "lo accionable".
+          /* El texto estaba escrito a mano en español —«Reconocer»— y se colaba
+             por el hueco que `verificar-textos.mjs` documenta en su cabecera:
+             una palabra suelta, sin tilde, sin partícula ni verbo de sus listas.
+             Ahora pasa por el diccionario, y «reconocer» entra en `VERBOS_UI`
+             para cerrar ese hueco. */
           <Button
             variant="primary" icon={<CheckCheck size={13} />}
-            onClick={reconocer} loading={reconociendo}
+            onClick={pedirReconocer} loading={reconociendo}
           >
-            Reconocer {seleccion.size > 0 ? `(${seleccion.size})` : ""}
+            {confirmando
+              ? traducir("alarms:ack.confirm")
+              : seleccion.size > 0
+                ? traducir("alarms:ack.actionCount", { count: seleccion.size })
+                : traducir("alarms:ack.action")}
           </Button>
         )}
       </div>

@@ -162,6 +162,10 @@ const VERBOS_UI = new Set([
   'ver', 'borrar', 'exportar', 'descargar', 'copiar', 'reintentar', 'cerrar',
   'guardar', 'editar', 'buscar', 'filtrar', 'actualizar', 'seleccionar',
   'aceptar', 'confirmar', 'cancelar', 'enviar', 'volver', 'abrir', 'subir',
+  /* Anadidos el 11-09-2026 (Plan 24 F5): los dos se colaron escritos a mano
+     en AlarmasEva, y "Actualizar" es el ejemplo que la cabecera de este guion
+     citaba como su hueco conocido. */
+  'reconocer',
   'completo', 'completa', 'detalle',
 ])
 

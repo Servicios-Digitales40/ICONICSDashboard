@@ -47,7 +47,7 @@ function formatLocalTimestamp(date) {
   return `${day} ${time}`
 }
 
-export function registerIconicsRoutes(fastify, { config, client }) {
+export function registerIconicsRoutes(fastify, { config, client, diario = null }) {
   const { defaultPointName, readOnly } = config.iconics
   const { maxAlarmHours, historyConcurrencia } = config.limits
 
@@ -365,7 +365,49 @@ export function registerIconicsRoutes(fastify, { config, client }) {
         `Reconocimiento de ${eventIds.length} alarma(s) (petición de ${request.ip})`
       )
 
-      return responder(reply, await client.acknowledgeAlarms(eventIds, comment))
+      const resultado = await client.acknowledgeAlarms(eventIds, comment)
+
+      /*
+       * ── EL ACUSE ENTRA EN EL DIARIO (Plan 24 F5 · `USO-05`) ────────
+       *
+       * Reconocer una alarma es una escritura sobre la instalación: viaja al
+       * Alarm Server y allí queda. El diario de SEG-08 existe para contestar
+       * «¿qué se le hizo a la instalación?» meses después, y hasta hoy esto no
+       * constaba — sólo en el log de pino, que rota y se pierde al reiniciar el
+       * contenedor.
+       *
+       * Es el MISMO hueco que el Plan 23 encontró con `controlar_bomba`, en otra
+       * ruta: quien escribió el diario cubrió el botón de la bomba y nadie
+       * volvió a pasar por las otras escrituras. Se cierra con el mismo patrón y
+       * con la misma regla de `lib/diario.mjs`: **el fallo del diario no tumba
+       * la petición** —cuando se anota, el acuse ya se mandó— pero tampoco se
+       * traga en silencio, porque un diario que dejó de escribir sin que nadie
+       * se entere es el mismo problema que no tenerlo.
+       */
+      if (diario) {
+        const { ok, error } = await diario.anotar({
+          resultado: resultado?.ok === false ? 'rechazada' : 'cumplida',
+          accion: 'reconocer_alarmas',
+          eventos: eventIds.length,
+          /* Los ids, no sólo cuántos: sin ellos la línea no sirve para
+             reconstruir QUÉ se reconoció. */
+          eventIds,
+          comentario: comment ?? null,
+          motivo: resultado?.ok === false ? resultado?.error ?? null : null,
+          ip: request.ip,
+          usuario: request.usuario?.id ?? null,
+        })
+
+        if (!ok) {
+          request.log.error(
+            { error, eventos: eventIds.length },
+            'No se pudo anotar el reconocimiento de alarmas en el diario. El acuse SÍ se mandó; ' +
+              'lo que falta es su constancia en disco. Revisa permisos y espacio en `datos/`.'
+          )
+        }
+      }
+
+      return responder(reply, resultado)
     }
   )
 }

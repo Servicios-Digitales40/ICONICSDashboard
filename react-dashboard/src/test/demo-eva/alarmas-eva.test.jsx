@@ -99,7 +99,39 @@ describe("AlarmasEva: reconocer, sólo cuando el puente no está en solo lectura
     expect(screen.queryByLabelText(/Seleccionar evento/)).toBeNull();
   });
 
-  it("con el puente en escritura, aparecen las casillas y el botón, y reconocer llama con los eventIds elegidos", async () => {
+  /*
+   * ── DOS CLICS, NO UNO (Plan 24 F5 · USO-05) ────────────────────────
+   *
+   * Esta prueba hacía UN clic y esperaba el acuse. Falló al añadirse la
+   * confirmación de dos pasos, y falló con razón: reconocer es una escritura
+   * sobre la instalación —el acuse viaja al Alarm Server y allí queda— y la
+   * casilla de cabecera puede seleccionar la ventana entera, así que un clic
+   * accidental tapaba de una vez avisos que nadie había leído.
+   *
+   * Se actualiza a dos clics Y se añade la prueba de que UNO solo no basta, que
+   * es la mitad que de verdad protege: sin ella, quitar la confirmación mañana
+   * dejaría esta suite en verde.
+   */
+  it("con el puente en escritura, aparecen las casillas y el botón, y dos clics reconocen los eventIds elegidos", async () => {
+    fetchHealth.mockResolvedValueOnce({ readOnly: false });
+    fetchIconicsAlarms.mockResolvedValue({ alarms: [EVENTO_NIVEL] });
+    montar();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Reconocer/ })).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Seleccionar evento e1"));
+
+    // Primer clic: pide confirmar y NO manda nada.
+    fireEvent.click(screen.getByRole("button", { name: /Reconocer/ }));
+    expect(acknowledgeIconicsAlarms).not.toHaveBeenCalled();
+
+    // El botón lo dice, en vez de quedarse igual y no hacer nada.
+    const confirmar = await screen.findByRole("button", { name: /Pulsa otra vez/ });
+    fireEvent.click(confirmar);
+
+    await waitFor(() => expect(acknowledgeIconicsAlarms).toHaveBeenCalledWith(["e1"]));
+  });
+
+  it("un solo clic no acciona nada: es una escritura sobre la instalación", async () => {
     fetchHealth.mockResolvedValueOnce({ readOnly: false });
     fetchIconicsAlarms.mockResolvedValue({ alarms: [EVENTO_NIVEL] });
     montar();
@@ -108,7 +140,10 @@ describe("AlarmasEva: reconocer, sólo cuando el puente no está en solo lectura
     fireEvent.click(screen.getByLabelText("Seleccionar evento e1"));
     fireEvent.click(screen.getByRole("button", { name: /Reconocer/ }));
 
-    await waitFor(() => expect(acknowledgeIconicsAlarms).toHaveBeenCalledWith(["e1"]));
+    // Se espera de verdad, en vez de comprobar en el mismo tick: un acuse que
+    // saliera con un retardo de una promesa pasaría una aserción inmediata.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(acknowledgeIconicsAlarms).not.toHaveBeenCalled();
   });
 
   it("si /api/health no responde, se queda en modo solo lectura — el lado seguro", async () => {
