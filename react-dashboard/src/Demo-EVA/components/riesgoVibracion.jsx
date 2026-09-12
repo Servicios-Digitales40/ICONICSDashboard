@@ -24,6 +24,7 @@ import { useProsa } from "@/i18n/useProsa.js";
 import { pedirAlAsistente } from "@/features/asistente";
 
 import { preguntaSobreRiesgoVibracion } from "../domain/riesgosVibracion.js";
+import { CasosPrevios } from "./CasosPrevios.jsx";
 
 /**
  * Cada nivel con su token de color y su icono.
@@ -155,6 +156,14 @@ export function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
           {riesgo.nota}
         </p>
       )}
+
+      {/*
+        Plan 25 F0 (`NUE-04`): «esto ya pasó antes», antes de decidir cerrar el
+        caso. Mismo componente que la tarjeta del tanque, con su sistema — que
+        es lo único que cambia: `NO_COMPARTEN` prohíbe cruzar las dos máquinas,
+        y aquí eso significa que los casos que se cuentan son los de ésta.
+      */}
+      <CasosPrevios sistema="vibraciones" riesgoId={original.id} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button

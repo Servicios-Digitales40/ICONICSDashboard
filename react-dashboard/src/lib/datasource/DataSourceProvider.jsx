@@ -163,3 +163,31 @@ export function useDataSource() {
   if (!ctx) throw new Error("useDataSource debe usarse dentro de <DataSourceProvider>");
   return ctx;
 }
+
+/**
+ * ¿Lo que se ve NO es el servidor real? — para HOJAS que pueden montarse sin
+ * proveedor (Plan 25 F0).
+ *
+ * ── POR QUÉ NO VALE `useDataSource()` PARA ESTO ────────────────────
+ *
+ * Porque lanza fuera del proveedor, y eso es correcto para quien CONSUME el
+ * origen: nadie debe dar por supuesto «real» sin haberlo declarado. Pero
+ * convierte a cualquier componente que lo use en algo que exige el árbol de
+ * contextos entero para dibujarse — y una tira dentro de una tarjeta de riesgo
+ * es una hoja de presentación, que se monta suelta en las pruebas de idioma y
+ * de vocabulario sin levantar la aplicación.
+ *
+ * ── POR QUÉ EL DEFECTO ES `true` Y NO `false` ──────────────────────
+ *
+ * Porque «no lo sé» tiene que caer del lado que no toca la red. Sin proveedor,
+ * esto responde «simulado», y la consecuencia es que una consulta opcional no
+ * se hace. Al revés —suponer «real»— la consecuencia sería un tablero montado
+ * sin declarar su origen llamando al servidor de planta, que es exactamente lo
+ * que la cabecera de este archivo dice que no puede pasar.
+ *
+ * No sustituye a `useDataSource()`: quien de verdad dependa del origen —el
+ * Topbar, la cinta, `EvaProvider`— sigue usando el que lanza.
+ */
+export function useEsSimulado() {
+  return useContext(Ctx)?.esSimulado ?? true;
+}

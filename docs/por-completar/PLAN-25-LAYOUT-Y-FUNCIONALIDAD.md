@@ -432,7 +432,47 @@ frescura es por máquina; y que con una máquina caída la otra se sigue viendo.
 
 ## 2 · Resultado
 
-_(Se rellena al cerrar cada fase, con su commit, lo medido y lo que destapó.)_
+### F0 · `NUE-04` — HECHA el 12-09-2026
+
+`components/CasosPrevios.jsx`, montado en las dos tarjetas de riesgo. Pide
+`/api/diagnostico` —el mismo motor, ninguna lógica propia— y enseña «Ya pasó N
+veces antes» junto al riesgo, antes de decidir si se cierra el caso.
+
+**Medido:** `index` 247,06 → **247,42 KB** (+0,36) de 450; `vendor` **264,04
+KB**, sin tocar. Ninguna librería nueva, como pedía §0.5. 767 pruebas (+8), lint
+0 errores, types limpio, los 28 verificadores, i18n en paridad.
+
+**Dos cosas que destapó, y las dos son del mismo tipo: lo que este componente
+NO puede hacer.**
+
+1. **El enlace «ver los casos» se quitó al comprobar a dónde iba.** `CasosRag`
+   filtra por `params.filtro` y nada más — no acepta `sistema` ni `riesgoId`, y
+   su búsqueda por texto **no viaja en la URL a propósito** (se teclea letra a
+   letra y llenaría el historial; lo explica su cabecera). El enlace habría
+   abierto la lista completa sin filtrar: «ver los 3 casos» llevando a cuarenta
+   hace que el contador parezca mentir. Se deja el número sin enlace.
+
+2. **El componente pegaba al servidor con el simulador encendido**, y lo cazó
+   `vibraciones-simulada.test.jsx` —que corta la red— antes del commit. Es
+   literalmente el fallo que `DataSourceProvider` nombra en su cabecera:
+   «acabaría dejando alguno pegando al servidor con el simulador encendido».
+
+   El modo de fallo era **invisible**: la tarjeta se pintaba igual, porque el
+   error de esta consulta se traga a propósito, y lo único que pasaba es que el
+   tablero simulado llamaba tres veces a un servidor que no estaba.
+
+**Y un cambio de diseño que salió de arreglarlo.** El primer arreglo usaba
+`useDataSource()`, que **lanza** fuera de su proveedor — correcto para quien
+consume el origen, pero rompió once pruebas: convertía una hoja de presentación
+en algo que exige el árbol de contextos entero para dibujarse, y las tarjetas de
+riesgo se montan sueltas en las pruebas de idioma y de vocabulario.
+
+De ahí sale `useEsSimulado()` (`lib/datasource/`), para hojas: el mismo dato,
+y **sin proveedor responde «simulado»**. El defecto importa y está razonado en
+su cabecera — «no lo sé» tiene que caer del lado que no toca la red, porque al
+revés un tablero montado sin declarar su origen llamaría al servidor de planta.
+`useDataSource()` no se tocó: quien de verdad depende del origen sigue usando el
+que lanza.
 
 ---
 

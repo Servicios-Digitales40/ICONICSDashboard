@@ -48,6 +48,7 @@ import { evaluarPronostico, preguntaSobrePronostico } from "../../domain/pronost
 import { evaluarRiesgos, preguntaSobreRiesgo } from "../../domain/riesgos.js";
 import { PROVISIONALES } from "../../domain/umbrales.js";
 import { UltimaLectura } from "../../components/base.jsx";
+import { CasosPrevios } from "../../components/CasosPrevios.jsx";
 
 /* ── El pronóstico ─────────────────────────────────────────────────── */
 
@@ -210,6 +211,13 @@ function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
           {riesgo.nota}
         </p>
       )}
+
+      {/*
+       * Plan 25 F0 (`NUE-04`): «esto ya pasó antes», ANTES de decidir cerrar el
+       * caso. El dato ya lo calculaba el motor; lo único que le faltaba era
+       * verse aquí. Con cero casos no pinta nada — ver su cabecera.
+       */}
+      <CasosPrevios sistema="tanque" riesgoId={original.id} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button

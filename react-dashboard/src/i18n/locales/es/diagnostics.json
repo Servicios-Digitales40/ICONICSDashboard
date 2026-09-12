@@ -80,5 +80,9 @@
     "tendencia_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h.",
     "tendenciaContraria_sube": "«{{senal}}» subió en las últimas {{ventanaH}} h. La firma de esta causa la declaraba bajando.",
     "tendenciaContraria_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h. La firma de esta causa la declaraba subiendo."
+  },
+  "priorCases": {
+    "happened_one": "Ya pasó {{count}} vez antes",
+    "happened_other": "Ya pasó {{count}} veces antes"
   }
 }

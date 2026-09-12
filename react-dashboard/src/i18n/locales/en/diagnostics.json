@@ -80,5 +80,9 @@
     "tendencia_baja": "«{{senal}}» fell over the last {{ventanaH}} h.",
     "tendenciaContraria_sube": "«{{senal}}» rose over the last {{ventanaH}} h. This cause’s signature declared it falling.",
     "tendenciaContraria_baja": "«{{senal}}» fell over the last {{ventanaH}} h. This cause’s signature declared it rising."
+  },
+  "priorCases": {
+    "happened_one": "Happened {{count}} time before",
+    "happened_other": "Happened {{count}} times before"
   }
 }
