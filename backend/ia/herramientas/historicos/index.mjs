@@ -84,6 +84,8 @@ import { resolverInstante } from '../../../../shared/periodo.js'
 
 import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
 import { fallo } from '../lib/respuesta.mjs'
+import { narrarTendenciaEnIngles } from '../../i18n/narrarTendencia.mjs'
+import { narrarMecanismoEnIngles } from '../../i18n/narrarRiesgo.mjs'
 /*
  * Lo que sigue en `herramientas.mjs` es lo que todavía no tiene una familia
  * propia: el índice de nombres de señal del tanque (`resolverSenal`,
@@ -311,7 +313,7 @@ export function crearHerramientasDeHistoricos({
      * es el modelo quien va a redactar la frase final y el error caro es que
      * convierta «horas estimadas de exposición» en «le quedan dos años».
      */
-    async pronostico_de_desgaste({ sistema = 'tanque', dias = 30 } = {}) {
+    async pronostico_de_desgaste({ sistema = 'tanque', dias = 30 } = {}, { idioma = 'es' } = {}) {
       /*
        * ── LA GUARDA DEL PUNTO 3 DEL ALTA ─────────────────────────────
        *
@@ -413,23 +415,33 @@ export function crearHerramientasDeHistoricos({
         sistema: 'Tanque y grupo de bombeo',
         ventana_dias: d,
         muestras: r.muestras,
-        mecanismos: r.activos.map((x) => ({
-          titulo: x.titulo,
-          componente: x.componente,
-          horas_estimadas: x.horasEstimadas,
-          fraccion_del_tiempo: x.fraccion,
-          por_que_degrada: x.mecanismo,
-          a_donde_lleva: x.consecuencia,
-          que_revisar: x.accion,
-          norma: x.norma ?? undefined,
-        })),
-        sin_exposicion: r.sinExposicion?.map((x) => x.titulo) ?? [],
-        sin_comprobar: r.noEvaluables?.map((x) => ({ titulo: x.titulo, por_que: x.porque })) ?? [],
-        aviso:
-          'Las horas son ESTIMADAS a partir de la fracción de muestras que cumplían la condición, ' +
-          'no contadas reloj en mano. El historiador promedia, así que los episodios más cortos ' +
-          'que el intervalo no aparecen. NO estimes cuántos meses o años tardará en averiarse ' +
-          'nada: estas horas dicen cuánta exposición se ha acumulado, no cuánta vida queda.',
+        mecanismos: r.activos.map((x) => {
+          const m = narrarMecanismoEnIngles(x, idioma)
+          return {
+            titulo: m.titulo,
+            componente: m.componente,
+            horas_estimadas: x.horasEstimadas,
+            fraccion_del_tiempo: x.fraccion,
+            por_que_degrada: m.mecanismo,
+            a_donde_lleva: m.consecuencia,
+            que_revisar: m.accion,
+            norma: x.norma ?? undefined,
+          }
+        }),
+        sin_exposicion: r.sinExposicion?.map((x) => narrarMecanismoEnIngles(x, idioma).titulo) ?? [],
+        sin_comprobar: r.noEvaluables?.map((x) => {
+          const m = narrarMecanismoEnIngles(x, idioma)
+          return { titulo: m.titulo, por_que: x.porque }
+        }) ?? [],
+        aviso: idioma === 'en'
+          ? 'The hours are ESTIMATED from the fraction of samples that met the condition, not ' +
+            'counted with a stopwatch. The historian averages, so episodes shorter than the ' +
+            'interval do not show up. Do NOT estimate how many months or years until something ' +
+            'fails: these hours say how much exposure has accumulated, not how much life remains.'
+          : 'Las horas son ESTIMADAS a partir de la fracción de muestras que cumplían la condición, ' +
+            'no contadas reloj en mano. El historiador promedia, así que los episodios más cortos ' +
+            'que el intervalo no aparecen. NO estimes cuántos meses o años tardará en averiarse ' +
+            'nada: estas horas dicen cuánta exposición se ha acumulado, no cuánta vida queda.',
       }
     },
 
@@ -459,7 +471,7 @@ export function crearHerramientasDeHistoricos({
      * es sobre una sola magnitud. Si hicieran falta dos, la segunda pregunta
      * las trae — y el modelo tiene una consulta por turno de todos modos.
      */
-    async historia_de_senal({ senal, periodo, sistema } = {}) {
+    async historia_de_senal({ senal, periodo, sistema } = {}, { idioma = 'es' } = {}) {
       /*
        * ── DOS CAMINOS, PORQUE HAY DOS CATÁLOGOS ──────────────────────
        *
@@ -533,17 +545,20 @@ export function crearHerramientasDeHistoricos({
         unidad: meta.unidad || null,
         ...resumen,
         ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
         ...(meta.nota ? { nota: meta.nota } : {}),
         ...(meta.soloEnMarcha
           ? {
-            avisoReposo:
-                'Esta señal sólo significa algo con la instalación impulsando. La instalación está ' +
+            avisoReposo: idioma === 'en'
+              ? 'This signal only means something while the plant is pumping. The plant is idle ' +
+                'most of the time, so a low average or a zero minimum reflects the idle hours, ' +
+                'not a problem.'
+              : 'Esta señal sólo significa algo con la instalación impulsando. La instalación está ' +
                 'parada la mayor parte del tiempo, así que un promedio bajo o un mínimo de cero ' +
                 'reflejan las horas en reposo y no un problema.',
           }
           : {}),
-        ...avisoDeUmbrales(),
+        ...avisoDeUmbrales(idioma),
       }
     },
 
@@ -572,7 +587,7 @@ export function crearHerramientasDeHistoricos({
      * Aun así se devuelve `exacto: false` y la hora real de la muestra: es un
      * valor reconstruido, y el operador tiene derecho a saberlo.
      */
-    async valor_en_momento({ senal, momento, sistema } = {}) {
+    async valor_en_momento({ senal, momento, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, meta, historizada } = resuelto
@@ -635,9 +650,9 @@ export function crearHerramientasDeHistoricos({
           'Es el valor vigente en ese instante, reconstruido por el historiador entre las dos ' +
           'muestras que lo rodean. Cítalo como el valor de ese momento; no lo llames mínimo, ' +
           'máximo ni promedio, que son de un tramo y esto es un punto.',
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
         ...(meta.nota ? { nota2: meta.nota } : {}),
-        ...avisoDeUmbrales(),
+        ...avisoDeUmbrales(idioma),
       }
     },
 
@@ -648,17 +663,20 @@ export function crearHerramientasDeHistoricos({
      * pedirle al modelo que reste dos números es pedirle aritmética, y una
      * resta mal hecha en la frase final estropea una consulta que salió bien.
      */
-    async comparar_periodos({ senal, periodoA, periodoB, sistema } = {}) {
+    async comparar_periodos({ senal, periodoA, periodoB, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, sistemaId } = resuelto
 
       /* El `sistema` viaja a las dos llamadas: sin él, la de dentro volvería a
          resolver contra el tanque y las dos mitades de la comparación podrían
-         hablar de máquinas distintas. */
+         hablar de máquinas distintas. `idioma` viaja igual (i18n del
+         asistente): sin reenviarlo, las dos mitades de la comparación
+         narrarían siempre en español aunque toda la conversación fuera en
+         inglés. */
       const [a, b] = await Promise.all([
-        dameHerramientas().historia_de_senal({ senal, periodo: periodoA, sistema: sistemaId }),
-        dameHerramientas().historia_de_senal({ senal, periodo: periodoB, sistema: sistemaId }),
+        dameHerramientas().historia_de_senal({ senal, periodo: periodoA, sistema: sistemaId }, { idioma }),
+        dameHerramientas().historia_de_senal({ senal, periodo: periodoB, sistema: sistemaId }, { idioma }),
       ])
 
       if (!a.ok) return a
@@ -683,7 +701,7 @@ export function crearHerramientasDeHistoricos({
         nota:
           `La diferencia es «${b.periodo}» menos «${a.periodo}». Un valor negativo significa que ` +
           `el segundo período fue más bajo.`,
-        ...avisoDeUmbrales(),
+        ...avisoDeUmbrales(idioma),
       }
     },
 
@@ -691,7 +709,7 @@ export function crearHerramientasDeHistoricos({
     /**
      * Análisis estadístico y proyección de una señal.
      */
-    async analisis_de_senal({ senal, periodo, horizonteMinutos = 60, sistema } = {}) {
+    async analisis_de_senal({ senal, periodo, horizonteMinutos = 60, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, meta, sistemaId, historizada } = resuelto
@@ -734,7 +752,7 @@ export function crearHerramientasDeHistoricos({
         periodo: v.etiqueta,
         unidad: meta.unidad || null,
         estadisticas: stats,
-        tendencia: calcularTendencia(validos),
+        tendencia: narrarTendenciaEnIngles(calcularTendencia(validos), idioma),
         proyeccion: proyeccion
           ? {
               horizonteMinutos,
@@ -782,7 +800,7 @@ export function crearHerramientasDeHistoricos({
      * hora o algo que no había pasado nunca. Con el perfil delante, el modelo
      * puede decir cuál de las dos cosas es.
      */
-    async perfil_de_senal({ senal, dias = 14, sistema } = {}) {
+    async perfil_de_senal({ senal, dias = 14, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, meta, sistemaId, historizada } = resuelto
@@ -861,16 +879,20 @@ export function crearHerramientasDeHistoricos({
 
         ...(ceros
           ? {
-            aCero: `${Math.round(100 * ceros / valores.length)} % de las lecturas fueron exactamente 0` +
-              (meta.soloEnMarcha ? ', que en esta señal es la instalación en reposo.' : '.'),
+            aCero: idioma === 'en'
+              ? `${Math.round(100 * ceros / valores.length)} % of readings were exactly 0` +
+                (meta.soloEnMarcha ? ', which for this signal means the plant was idle.' : '.')
+              : `${Math.round(100 * ceros / valores.length)} % de las lecturas fueron exactamente 0` +
+                (meta.soloEnMarcha ? ', que en esta señal es la instalación en reposo.' : '.'),
           }
           : {}),
 
         ...(typeof actual === 'number'
           ? {
             valorActual: redondear(actual, meta.decimales),
-            posicionDelActual:
-                `El valor de ahora es más alto que el ${posicion} % de las lecturas del período.`,
+            posicionDelActual: idioma === 'en'
+              ? `The current value is higher than ${posicion} % of this period's readings.`
+              : `El valor de ahora es más alto que el ${posicion} % de las lecturas del período.`,
           }
           : { valorActual: null }),
 
@@ -882,7 +904,7 @@ export function crearHerramientasDeHistoricos({
          * quedarse en un comentario de código: si la instalación pasa la mitad
          * del tiempo fuera de su «banda normal», el problema es la banda.
          */
-        ...(UMBRALES[clave] ? comparacionConLaBanda(clave, orden) : {}),
+        ...(UMBRALES[clave] ? comparacionConLaBanda(clave, orden, idioma) : {}),
 
         /*
          * El aviso que evita el error de lectura más probable de esta
@@ -898,8 +920,13 @@ export function crearHerramientasDeHistoricos({
          */
         ...(meta.soloEnMarcha
           ? {
-            avisoReposo:
-                'Esta señal sólo significa algo con la instalación impulsando, y la instalación ' +
+            avisoReposo: idioma === 'en'
+              ? 'This signal only means something while the plant is pumping, and the plant is ' +
+                'idle most of the time. The profile mixes both situations, so the percentiles ' +
+                'mostly describe idle time: a value above p95 can simply mean it is pumping now ' +
+                'and was not before. Do NOT call it an anomaly without first checking, with ' +
+                'estado_del_sistema, whether the system is running.'
+              : 'Esta señal sólo significa algo con la instalación impulsando, y la instalación ' +
                 'está parada la mayor parte del tiempo. El perfil mezcla las dos situaciones, así ' +
                 'que los percentiles describen sobre todo el reposo: un valor por encima del p95 ' +
                 'puede ser simplemente que ahora está bombeando y antes no. NO lo cuentes como ' +
@@ -907,10 +934,13 @@ export function crearHerramientasDeHistoricos({
           }
           : {}),
 
-        aviso:
-          'Este perfil es lo que la instalación ha hecho de verdad, medido del historiador. No ' +
-          'dice qué es correcto, dice qué es habitual: si la instalación lleva semanas ' +
-          'funcionando mal, lo anómalo aquí sería lo bueno.',
+        aviso: idioma === 'en'
+          ? 'This profile is what the plant has actually done, measured from the historian. It ' +
+            'does not say what is correct, it says what is usual: if the plant has been running ' +
+            'poorly for weeks, the anomaly here would be the good behaviour.'
+          : 'Este perfil es lo que la instalación ha hecho de verdad, medido del historiador. No ' +
+            'dice qué es correcto, dice qué es habitual: si la instalación lleva semanas ' +
+            'funcionando mal, lo anómalo aquí sería lo bueno.',
       }
     },
 
@@ -935,7 +965,7 @@ export function crearHerramientasDeHistoricos({
      * dice con esas palabras para que el modelo no lo convierta en una
      * afirmación causal al redactar.
      */
-    async correlacionar_senales({ senales, periodo, sistema } = {}) {
+    async correlacionar_senales({ senales, periodo, sistema } = {}, { idioma = 'es' } = {}) {
       /*
        * Se acepta lista o cadena separada por comas.
        *
@@ -1183,10 +1213,13 @@ export function crearHerramientasDeHistoricos({
          * cuesta lo mismo que uno que falta: enseña a saltarse la línea del ⚠,
          * y entonces se pierde el día que dice algo.
          */
-        aviso:
-          'Que dos señales se muevan juntas es un indicio de que algo las relaciona, no una ' +
-          'prueba de que una cause la otra: puede haber una tercera causa común, o ser ' +
-          'casualidad en una ventana corta. Correlación no es causa.',
+        aviso: idioma === 'en'
+          ? 'Two signals moving together is an indication that something relates them, not proof ' +
+            'that one causes the other: there could be a common third cause, or it could be a ' +
+            'coincidence in a short window. Correlation is not causation.'
+          : 'Que dos señales se muevan juntas es un indicio de que algo las relaciona, no una ' +
+            'prueba de que una cause la otra: puede haber una tercera causa común, o ser ' +
+            'casualidad en una ventana corta. Correlación no es causa.',
       }
     },
 
@@ -1210,7 +1243,7 @@ export function crearHerramientasDeHistoricos({
      * necesita para escribir («subió de 41 a 63 entre las 8 y las 11») y no
      * puede describir de memoria una imagen que nunca ve.
      */
-    async grafico_de_senal({ senal, periodo, sistema } = {}) {
+    async grafico_de_senal({ senal, periodo, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, meta, sistemaId, historizada } = resuelto
@@ -1235,7 +1268,7 @@ export function crearHerramientasDeHistoricos({
         svg = renderizarGraficoSerie(serie.datos, {
           titulo: meta.label,
           unidad: meta.unidad || null,
-          banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave]) : null,
+          banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null,
         })
       } catch (error) {
         // El caso conocido es una sola muestra válida en la ventana. Se cuenta
@@ -1260,7 +1293,7 @@ export function crearHerramientasDeHistoricos({
        */
       const valores = serie.datos.filter(d => typeof d.valor === 'number').map(d => d.valor)
       const stats = estadisticasBasicas(valores, meta.decimales)
-      const tendencia = calcularTendencia(serie.datos)
+      const tendencia = narrarTendenciaEnIngles(calcularTendencia(serie.datos), idioma)
       const anomalias = detectarAnomalias(serie.datos, { media: stats.media, desv: stats.desv })
 
       return {
@@ -1531,7 +1564,7 @@ export function crearHerramientasDeHistoricos({
      * una misma tabla señales de dos PLC distintos ya sugiere que se pueden
      * leer juntas.
      */
-    async tendencia_multiple({ senales, periodo, sistema } = {}) {
+    async tendencia_multiple({ senales, periodo, sistema } = {}, { idioma = 'es' } = {}) {
       /* Misma tolerancia que `correlacionar_senales`: el modelo manda a veces
          una cadena donde el esquema pide lista, y rechazarla cuesta una ronda
          de treinta segundos por algo que se entiende. */
@@ -1619,7 +1652,7 @@ export function crearHerramientasDeHistoricos({
                   `o todas vinieron con mala calidad.`,
             }),
           ...(series[i].truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-          ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
+          ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
         }
       })
 
@@ -1642,7 +1675,7 @@ export function crearHerramientasDeHistoricos({
           'Cada señal va por separado y NO se ha calculado ninguna relación entre ellas. Si te ' +
           'preguntan si se mueven juntas, usa correlacionar_senales: verlas subir a la vez en ' +
           'esta tabla no es una correlación medida.',
-        ...avisoDeUmbrales(),
+        ...avisoDeUmbrales(idioma),
       }
     },
 
@@ -1661,7 +1694,7 @@ export function crearHerramientasDeHistoricos({
      * preguntan («¿cuándo empezó?», «¿cuándo fue la última vez?») y la lista
      * entera de un episodio largo son cientos de muestras del mismo suceso.
      */
-    async buscar_evento({ senal, condicion, valor, periodo, sistema } = {}) {
+    async buscar_evento({ senal, condicion, valor, periodo, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
       const { clave, meta, sistemaId, historizada, conSerie } = resuelto
@@ -1744,7 +1777,7 @@ export function crearHerramientasDeHistoricos({
           nota:
             `En ${v.etiqueta} no hubo ninguna muestra ${condicion} ${umbral}. Es un resultado ` +
             `medido sobre ${validos.length} muestras, no una falta de datos.`,
-          ...avisoDeUmbrales(),
+          ...avisoDeUmbrales(idioma),
         }
       }
 
@@ -1780,8 +1813,8 @@ export function crearHerramientasDeHistoricos({
           `distintos: un solo suceso de unos minutos deja muchas muestras seguidas. Descríbelo ` +
           `como un episodio entre la primera y la última vez, salvo que estén muy separadas.`,
         ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave]) } : {}),
-        ...avisoDeUmbrales(),
+        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
+        ...avisoDeUmbrales(idioma),
       }
     },
 

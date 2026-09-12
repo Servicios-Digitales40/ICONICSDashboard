@@ -1333,7 +1333,7 @@ export function percentil(ordenados, q) {
  * respeta su banda, callar es lo correcto: el operador no necesita leer que
  * todo encaja.
  */
-export function comparacionConLaBanda(clave, ordenados) {
+export function comparacionConLaBanda(clave, ordenados, idioma = 'es') {
   const u = UMBRALES[clave]
   if (!u) return {}
 
@@ -1347,6 +1347,25 @@ export function comparacionConLaBanda(clave, ordenados) {
 
   const fuera = bajoMinimo + sobreMaximo
   if (fuera < 5) return {}
+
+  /*
+   * Traducido con cuidado de conservar las mismas palabras clave que activan
+   * `SAYS_THE_THRESHOLD_THING`/`DICE_LO_DE_LOS_UMBRALES` en `chat.mjs`: esta
+   * frase es la que más veces dispara esa red de seguridad, así que su
+   * versión inglesa tiene que seguir conteniendo "estimate"/"unconfirmed".
+   */
+  if (idioma === 'en') {
+    return {
+      desajusteConLaBanda:
+        `${fuera} % of this period's readings fall outside the band the dashboard uses to ` +
+        `evaluate this signal` +
+        (bajoMinimo ? `, ${bajoMinimo} % below the minimum` : '') +
+        (sobreMaximo ? `, ${sobreMaximo} % above the maximum` : '') +
+        `. An installation does not spend most of its time outside its normal range: the band ` +
+        `is more likely wrong than the installation. Those limits are our own unconfirmed ` +
+        `estimate. Say so when you cite this signal's status.`,
+    }
+  }
 
   return {
     desajusteConLaBanda:

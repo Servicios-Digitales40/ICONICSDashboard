@@ -206,10 +206,10 @@ function chatDePrueba(extra = {}) {
  * caché entre turnos (Plan 23 F1), que es justo el comportamiento que tenían
  * todas estas comprobaciones antes de que existiera.
  */
-async function preguntar(chat, pregunta, historial, conversacionId) {
+async function preguntar(chat, pregunta, historial, conversacionId, idioma) {
   const eventos = []
   const resumen = await chat.responder({
-    pregunta, historial, conversacionId, onEvento: e => eventos.push(e),
+    pregunta, historial, conversacionId, idioma, onEvento: e => eventos.push(e),
   })
   const texto = eventos.filter(e => e.tipo === 'texto').map(e => e.delta).join('')
   return { eventos, resumen, texto }
@@ -517,6 +517,109 @@ await check('y si NO lo cuenta, el de correlación sí se añade', async () => {
   const { texto } = await preguntar(chat, 'algo')
 
   assert.match(texto, /correlaci[oó]n no es causa/i, 'el backend tiene que añadirlo')
+})
+
+/*
+ * ── LA MISMA RED DE SEGURIDAD, CON UN AVISO EN INGLÉS (i18n del asistente) ──
+ *
+ * `avisoDeUmbrales()`/el aviso de `correlacionar_senales` ahora nacen en el
+ * idioma de la petición (ver `backend/ia/i18n/` y `lib/formato.mjs`), y
+ * `mencionaElAviso` tiene su propio par de detectores en inglés
+ * (`SAYS_THE_THRESHOLD_THING`/`SAYS_THE_CORRELATION_THING`) para no comparar
+ * un texto inglés contra un regex español. Si esto se rompiera, el backend
+ * pegaría el aviso en ESPAÑOL detrás de una respuesta en inglés — la mezcla
+ * de idiomas que todo este trabajo existe para evitar, en la advertencia que
+ * más importa que se lea bien.
+ */
+await check('el aviso de umbrales EN INGLÉS se reconoce si el modelo ya lo dijo, en inglés', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true, senal: 'Tank level', valor: 12.1,
+      aviso: 'These thresholds are our own estimate, not ranges confirmed by the installation.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: 'The tank level is at 12.1 %, which is an unconfirmed estimate for this installation.',
+  }
+  const { texto } = await preguntar(chat, 'algo', undefined, undefined, 'en')
+
+  assert.doesNotMatch(texto, /⚠/, 'ya lo contó en inglés: no hay que repetirlo')
+})
+
+await check('el aviso de umbrales EN INGLÉS SÍ se añade si el modelo lo ignora', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true, senal: 'Tank level', valor: 12.1,
+      aviso: 'These thresholds are our own estimate, not ranges confirmed by the installation.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'historia_de_senal', arguments: '{}' } },
+    texto: 'The tank level is at 12.1 %, out of range.',   // omite el aviso
+  }
+  const { texto } = await preguntar(chat, 'algo', undefined, undefined, 'en')
+
+  assert.match(texto, /estimate/i, 'el backend tiene que añadirlo, EN INGLÉS')
+  assert.doesNotMatch(texto, /estimaciones nuestras/i, 'nunca en español detrás de una respuesta en inglés')
+})
+
+await check('el aviso de correlación EN INGLÉS se reconoce por su idea, no por el de umbrales', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true,
+      correlaciones: [{ entre: 'A y B', coeficiente: 0.9 }],
+      aviso: 'Two signals moving together is an indication that something relates them, not proof. Correlation is not causation.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'correlacionar_senales', arguments: '{}' } },
+    texto: 'They moved together (0.9). This is an indication that something relates them, not a proven cause.',
+  }
+  const { texto } = await preguntar(chat, 'algo', undefined, undefined, 'en')
+
+  assert.doesNotMatch(texto, /⚠/, 'ya lo contó en inglés: no hay que repetirlo')
+})
+
+await check('si el modelo NO cuenta el aviso de correlación EN INGLÉS, se añade EN INGLÉS', async () => {
+  const conAviso = {
+    ...herramientasFalsas,
+    ejecutar: async () => ({
+      ok: true,
+      correlaciones: [{ entre: 'A y B', coeficiente: 0.9 }],
+      aviso: 'Two signals moving together is an indication that something relates them, not proof. Correlation is not causation.',
+    }),
+  }
+  const chat = createChat({
+    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    herramientas: conAviso,
+  })
+
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'correlacionar_senales', arguments: '{}' } },
+    texto: 'The level drops BECAUSE the pressure is at minimum.',
+  }
+  const { texto } = await preguntar(chat, 'algo', undefined, undefined, 'en')
+
+  assert.match(texto, /correlation is not causation/i, 'el backend tiene que añadirlo, EN INGLÉS')
 })
 
 await check('si el modelo YA contó el aviso, no se repite', async () => {

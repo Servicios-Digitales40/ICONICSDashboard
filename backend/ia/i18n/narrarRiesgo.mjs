@@ -149,6 +149,34 @@ export function narrarTituloEnIngles(n, catalogo) {
   return titulo ? { ...n, titulo } : n;
 }
 
+/**
+ * Rehace en inglés un mecanismo de desgaste de `pronostico_de_desgaste`
+ * (`shared/eva/comun/pronostico.js`, catálogo `mechanisms` de `domain.json`).
+ *
+ * Más simple que `narrarRiesgoEnIngles`: los mecanismos no citan cifras
+ * variables —su prosa es fija por id, como ya confirma `useProsa.mecanismo()`
+ * del frontend—, así que no hace falta interpolar ni resolver `context`.
+ *
+ * @param {{titulo,componente,mecanismo,consecuencia,accion,confirmar?}} m
+ * @param {"es"|"en"} idioma
+ * @returns {object} el mismo objeto, con sus campos en inglés cuando `idioma`
+ *   es "en" y existe traducción; español (sin cambios) en cualquier otro caso
+ */
+export function narrarMecanismoEnIngles(m, idioma) {
+  if (!m || idioma !== "en" || !DOMAIN_EN) return m;
+  const bloque = DOMAIN_EN.mechanisms?.[m.id];
+  if (!bloque) return m;
+
+  const salida = { ...m };
+  if (m.titulo !== undefined) salida.titulo = bloque.titulo ?? m.titulo;
+  if (m.componente !== undefined) salida.componente = bloque.componente ?? m.componente;
+  if (m.mecanismo !== undefined) salida.mecanismo = bloque.mecanismo ?? m.mecanismo;
+  if (m.consecuencia !== undefined) salida.consecuencia = bloque.consecuencia ?? m.consecuencia;
+  if (m.accion !== undefined) salida.accion = bloque.accion ?? m.accion;
+  if (m.confirmar) salida.confirmar = bloque.confirmar ?? m.confirmar;
+  return salida;
+}
+
 /** Para pruebas: si el catálogo no se pudo cargar. */
 export function catalogoDisponible() {
   return DOMAIN_EN !== null;

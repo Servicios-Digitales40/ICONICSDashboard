@@ -13,9 +13,17 @@
  * servidor, no reciben configuración y no guardan estado. Estaban ahí porque
  * el archivo creció a su alrededor, no porque necesitaran estarlo.
  *
- * Sacarlas es la primera fase del reparto y la más barata: no cambia ninguna
- * firma, no obliga a pasar un contexto y no toca ninguna herramienta. Lo único
- * que cambia es de dónde se importan.
+ * Sacarlas fue la primera fase del reparto y la más barata: no cambió ninguna
+ * firma, no obligó a pasar un contexto y no tocó ninguna herramienta. Lo único
+ * que cambió fue de dónde se importan.
+ *
+ * `idioma` (i18n del asistente) es la primera excepción: `bandaLegible` y
+ * `avisoDeUmbrales` ya lo reciben como parámetro con valor por defecto `'es'`,
+ * así que un llamador que no lo pasa sigue funcionando exactamente igual que
+ * antes. No es lo mismo que el contexto de `client`/`turnos` que el párrafo
+ * de abajo prohíbe: es un dato de presentación —qué palabra usar—, no una
+ * dependencia de infraestructura, y estas funciones siguen sin tocar la red
+ * ni guardar estado.
  *
  * ── LO QUE NO PUEDE PASAR AQUÍ ─────────────────────────────────────
  *
@@ -77,8 +85,9 @@ export function downsamplear(muestras, max) {
  * eficiencia energética no es peor por ser alta. Escribirlo como «sin límite»
  * y no omitirlo evita que el modelo rellene el hueco con un 0 inventado.
  */
-export function bandaLegible(u) {
-  const lado = (v) => (v === null || v === undefined ? 'sin límite' : v)
+export function bandaLegible(u, idioma = 'es') {
+  const sinLimite = idioma === 'en' ? 'no limit' : 'sin límite'
+  const lado = (v) => (v === null || v === undefined ? sinLimite : v)
   return {
     limiteInferior: lado(u.min),
     avisoInferior: lado(u.avisoMin),
@@ -94,8 +103,19 @@ export function bandaLegible(u) {
  * el que iba el aviso de OEE imposible: una advertencia que sólo vive en las
  * instrucciones se diluye a los tres turnos de conversación, y ésta tiene que
  * acompañar a cada cifra que se compare contra una banda.
+ *
+ * ── `idioma`, Y POR QUÉ NO ES OPCIONAL DE VERDAD (i18n del asistente) ──
+ *
+ * Esta es la advertencia que MÁS importa que no se pierda en una mezcla de
+ * idiomas: `chat.mjs` la añade a la fuerza si el modelo no la cuenta, y esa
+ * red de seguridad (`mencionaElAviso`) tiene su propio par de detectores en
+ * inglés que sólo funcionan si el aviso que reciben YA está en ese idioma.
+ * Traducir aquí y no allí —o al revés— habría dejado la red de seguridad
+ * comparando un texto inglés contra un regex español, que es peor que no
+ * tener red: fallaría en silencio y nadie lo notaría hasta leer una
+ * respuesta con el aviso pegado en el idioma equivocado.
  */
-export const avisoDeUmbrales = () =>
+export const avisoDeUmbrales = (idioma = 'es') =>
   PROVISIONALES
     ? {
       /*
@@ -105,8 +125,12 @@ export const avisoDeUmbrales = () =>
        * seguridad no se entera, y medido con el 4B eso pasa: contestó «el
        * nivel está fuera de límite» sin decir de quién era el límite.
        */
-      aviso:
-          'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
+      aviso: idioma === 'en'
+        ? 'The thresholds used to evaluate each signal are our own estimate for a generic ' +
+          'water system, not ranges confirmed by whoever operates this installation, and the ' +
+          'server does not publish alarms for this tree. The status of each signal is the ' +
+          'dashboard’s own calculation, not ICONICS data.'
+        : 'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
           'sistema de agua genérico, no rangos confirmados por quien opera esta instalación, y ' +
           'el servidor no publica alarmas para este árbol. El estado de cada señal es un ' +
           'cálculo del tablero, no un dato de ICONICS.',

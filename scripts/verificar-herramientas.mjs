@@ -45,6 +45,7 @@ import {
   resolverVentana,
 } from '../backend/ia/conversacion/herramientas.mjs'
 import { ESQUEMAS } from '../backend/ia/conversacion/definiciones.mjs'
+import { bandaLegible } from '../backend/ia/herramientas/lib/formato.mjs'
 import {
   RAIZ,
   SENALES,
@@ -634,6 +635,19 @@ await checkAsync('estado_del_sistema(idioma: "en") narra los riesgos que trae de
 
   assert.match(texto, /Bearing diagnosis is switched off/)
   assert.doesNotMatch(texto, /diagnóstico de rodamientos está apagado/)
+})
+
+await checkAsync('pronostico_de_desgaste(idioma: "en") narra sus mecanismos con el catálogo de dominio', async () => {
+  // Reutiliza `mechanisms` de `domain.json` — el mismo catálogo que ya prueba
+  // `verificar-dominio.mjs` — así que no hace falta fijar un mecanismo activo
+  // concreto: basta con que los NO EVALUABLES salgan en inglés.
+  const h = createHerramientas({ client: clienteFalso() })
+  const en = await h.ejecutar('pronostico_de_desgaste', { sistema: 'tanque' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.ok(en.sin_comprobar.length > 0, 'el fixture en reposo tiene que dejar mecanismos sin exposición')
+  assert.match(en.sin_comprobar[0].titulo, /^[A-Z]/, 'el título tiene que estar en inglés')
+  assert.match(en.aviso, /ESTIMATED/)
 })
 
 await checkAsync('sin `sistema` no se contesta: se pregunta cuál', async () => {
@@ -1703,6 +1717,64 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
 
   assert.equal(r.ok, false)
   assert.equal(client.historial.length, 0)
+})
+
+await checkAsync('comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
+  /*
+   * Llama a `historia_de_senal` dos veces por dentro, vía `dameHerramientas()`
+   * —no por `ejecutar()`—, así que sin reenviar `idioma` a mano las dos
+   * mitades habrían narrado siempre en español pese a pedir inglés.
+   */
+  const h = createHerramientas({ client: clienteFalso() })
+  const en = await h.ejecutar('comparar_periodos', {
+    senal: 'nivel', periodoA: 'última hora', periodoB: 'últimas 2 horas',
+  }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  const texto = JSON.stringify(en)
+  assert.match(texto, /estimate/i, 'el aviso de umbrales tiene que llegar en inglés')
+  assert.doesNotMatch(texto, /estimaciones nuestras/i, 'no en español')
+})
+
+check('bandaLegible(idioma: "en") dice «no limit», no «sin límite»', () => {
+  const { limiteInferior, avisoInferior } = bandaLegible({ min: null, avisoMin: null, avisoMax: 85, max: 95 }, 'en')
+  assert.equal(limiteInferior, 'no limit')
+  assert.equal(avisoInferior, 'no limit')
+})
+
+check('bandaLegible() sin idioma sigue en español: no rompe nada existente', () => {
+  const { limiteInferior } = bandaLegible({ min: null, avisoMin: null, avisoMax: 85, max: 95 })
+  assert.equal(limiteInferior, 'sin límite')
+})
+
+/* ── El idioma de la tendencia (i18n del asistente) ──────────────────── */
+
+console.log('\n── analisis_de_senal / perfil_de_senal: tendencia en inglés ─')
+
+await checkAsync('analisis_de_senal(idioma: "en") narra la dirección de la tendencia en inglés', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const en = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.match(en.tendencia.direccion, /steady|rising|falling/)
+  assert.doesNotMatch(en.tendencia.direccion, /estable|subiendo|bajando/)
+})
+
+await checkAsync('sin `idioma`, analisis_de_senal sigue en español: no rompe nada existente', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
+
+  assert.equal(r.ok, true, r.error)
+  assert.match(r.tendencia.direccion, /estable|subiendo|bajando/)
+})
+
+await checkAsync('perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const en = await h.ejecutar('perfil_de_senal', { senal: 'nivel', dias: 14 }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.match(en.posicionDelActual, /higher than \d+ % of this period's readings/)
+  assert.doesNotMatch(en.aviso, /instalación/i)
 })
 
 /* ── limites_del_manual (Plan 14 §4) ─────────────────────────────────── */
@@ -3021,6 +3093,19 @@ await checkAsync('no calcula ninguna relación entre las señales', async () => 
 
   assert.equal(r.correlaciones, undefined, 'devolvió correlaciones sin que se las pidieran')
   assert.match(r.nota, /no se ha calculado ninguna relación/i, 'no avisa de que no las calcula')
+})
+
+await checkAsync('tendencia_multiple(idioma: "en") narra la banda y el aviso de umbrales en inglés', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const en = await h.ejecutar('tendencia_multiple', {
+    senales: ['nivel', 'presión'],
+    periodo: 'últimas 6 horas',
+  }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  const texto = JSON.stringify(en)
+  assert.match(texto, /estimate/i, 'el aviso de umbrales tiene que llegar en inglés')
+  assert.doesNotMatch(texto, /estimaciones nuestras/i, 'no en español')
 })
 
 await checkAsync('una sola señal se rechaza y remite a historia_de_senal', async () => {

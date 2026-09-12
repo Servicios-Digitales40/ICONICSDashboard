@@ -309,6 +309,25 @@ const DICE_LO_DE_LOS_UMBRALES =
 const DICE_LO_DE_LA_CORRELACION =
   /indicio|correlaci[oó]n no es causa|no (?:implica|demuestra|prueba) (?:que|una causa|causalidad)|casualidad|tercera causa/i
 
+/*
+ * ── LOS MISMOS DOS DETECTORES, EN INGLÉS (i18n del asistente) ──────────
+ *
+ * `avisoDeUmbrales()` y el aviso de correlación (`herramientas.mjs`,
+ * `correlacionar_senales`) ahora responden en el idioma de la petición —ver
+ * `backend/ia/i18n/`—. Sin este par, un modelo que SÍ mencionó la idea en
+ * inglés («these thresholds are our own estimate») no la reconocía —los
+ * regex de arriba sólo cazan palabras españolas—, y el backend le pegaba
+ * detrás el aviso EN ESPAÑOL a una respuesta en inglés: exactamente la
+ * mezcla de idiomas que este plan existe para evitar, y en el peor sitio
+ * posible, porque es la advertencia que más importa que se lea.
+ */
+const SAYS_THE_THRESHOLD_THING =
+  /estimat(?:e|ed|ion)|not confirmed|unconfirmed|provisional|does not publish|not (?:an? )?ICONICS data|dashboard('s)? (?:own )?calculation|our own limits?/i
+
+/** La idea del aviso de CORRELACIÓN, en inglés. */
+const SAYS_THE_CORRELATION_THING =
+  /(?:is|as) an indicat(?:ion|or)|correlation is not causation|does not (?:imply|prove|demonstrate)|coincidence|third (?:factor|cause)/i
+
 /**
  * ¿Ya contó el modelo el aviso de la herramienta?
  *
@@ -329,11 +348,23 @@ const DICE_LO_DE_LA_CORRELACION =
  * puede pasar es que su aviso se añada aunque el modelo ya lo hubiera contado.
  * Repetirlo es molesto; callarlo, no.
  */
-function mencionaElAviso(texto, aviso = '') {
+function mencionaElAviso(texto, aviso = '', idioma = 'es') {
   const t = String(texto ?? '')
-  return /indicio|correlaci[oó]n no es causa/i.test(String(aviso))
-    ? DICE_LO_DE_LA_CORRELACION.test(t)
-    : DICE_LO_DE_LOS_UMBRALES.test(t)
+  /*
+   * De qué aviso se trata se sigue mirando en las DOS lenguas —el aviso que
+   * llega aquí ya está en `idioma` (ver `avisoDeUmbrales()` y el de
+   * `correlacionar_senales`), pero comprobar ambas listas de palabras es
+   * más barato que arrastrar un tercer parámetro sólo para esta elección, y
+   * no cambia el resultado: un aviso no puede decir las dos cosas a la vez.
+   */
+  const esDeCorrelacion =
+    /indicio|correlaci[oó]n no es causa/i.test(String(aviso)) ||
+    /(?:is|as) an indicat(?:ion|or)|correlation is not causation/i.test(String(aviso))
+
+  if (esDeCorrelacion) {
+    return idioma === 'en' ? SAYS_THE_CORRELATION_THING.test(t) : DICE_LO_DE_LA_CORRELACION.test(t)
+  }
+  return idioma === 'en' ? SAYS_THE_THRESHOLD_THING.test(t) : DICE_LO_DE_LOS_UMBRALES.test(t)
 }
 
 /** Fecha de hoy en local, para que el modelo resuelva «hoy» y «ayer». */
@@ -1657,7 +1688,7 @@ export function createChat({ config, herramientas }) {
      */
     const avisos = [...new Set(resultados.map(r => r.resultado?.aviso).filter(Boolean))]
     for (const aviso of avisos) {
-      if (!mencionaElAviso(texto, aviso)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
+      if (!mencionaElAviso(texto, aviso, idioma)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
     }
 
     /*
