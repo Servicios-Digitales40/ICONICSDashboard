@@ -1332,9 +1332,17 @@ export function createChat({ config, herramientas }) {
      * respuestas entre pantallas distintas.
      */
     async function ejecutarConCache(nombre, argumentos, firma) {
-      if (!conversacionId) return herramientas.ejecutar(nombre, argumentos)
+      if (!conversacionId) return herramientas.ejecutar(nombre, argumentos, { idioma })
 
-      const clave = `${conversacionId}|${firma}`
+      /*
+       * `idioma` entra en la clave de caché (i18n del asistente): el mismo
+       * `riesgos_activos` con los mismos argumentos devuelve prosa distinta
+       * según el idioma de quien preguntó, y esta caché es POR CONVERSACIÓN,
+       * no por idioma — si alguien cambia el selector de idioma a media
+       * conversación, la segunda pregunta no puede heredar la respuesta ya
+       * narrada en el idioma anterior.
+       */
+      const clave = `${conversacionId}|${idioma}|${firma}`
       const ahora = Date.now()
       const guardada = cacheDeConsultas.get(clave)
 
@@ -1345,7 +1353,7 @@ export function createChat({ config, herramientas }) {
         return guardada.valor
       }
 
-      const resultado = await herramientas.ejecutar(nombre, argumentos)
+      const resultado = await herramientas.ejecutar(nombre, argumentos, { idioma })
 
       const vida = vidaDe(nombre, argumentos, resultado)
       if (vida > 0) {

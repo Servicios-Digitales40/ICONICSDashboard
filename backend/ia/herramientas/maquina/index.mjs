@@ -32,6 +32,8 @@ import { SISTEMA } from '../../../../shared/eva/comun/sistemas.js'
 import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
 import { toBooleano } from '../../../../shared/eva/tanque/sistema.js'
 import { fallo } from '../lib/respuesta.mjs'
+import { resolverPalabrasVibracion } from '../../i18n/composicionesVibracion.mjs'
+import { narrarRiesgoEnIngles, narrarTituloEnIngles } from '../../i18n/narrarRiesgo.mjs'
 /* Para avisar de que el diario no pudo escribir (Plan 23 F6). No se propaga el
    fallo —cuando se anota, la bomba ya se accionó— pero tampoco se traga: un
    diario que dejó de escribir sin que nadie se entere es el mismo problema que
@@ -152,7 +154,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
      * activas. En una máquina que puede quedarse muda —y las dos pueden— esa
      * diferencia es la respuesta entera.
      */
-    async riesgos_activos({ sistema } = {}) {
+    async riesgos_activos({ sistema } = {}, { idioma = 'es' } = {}) {
       const elegido = resolverSistema(sistema)
       if (!elegido.ok) return elegido
 
@@ -166,6 +168,27 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
       const estado = lectura.estado
       const r = evaluarRiesgosDe(elegido.sistema, estado)
       const mudos = estado.sinLectura.length
+
+      /*
+       * ── EL IDIOMA DE LA EVIDENCIA, NO SÓLO DE LA NARRACIÓN ─────────
+       *
+       * `idioma` llega por `contexto` (Plan de i18n del asistente): es del
+       * LLAMADOR —viene de la petición HTTP, nunca de un argumento que
+       * escriba el modelo— igual que `yaAnota` en `controlar_bomba`. El
+       * catálogo de riesgos (`shared/eva/*`) sigue componiendo SIEMPRE en
+       * español; lo que cambia aquí es la re-narración que se le entrega al
+       * modelo, con el mismo catálogo ya probado que usa el tablero
+       * (`react-dashboard/src/i18n/locales/en/domain.json`). Ver la cabecera
+       * de `backend/ia/i18n/narrarRiesgo.mjs`.
+       */
+      const catalogo = elegido.sistema.id === 'vibraciones' ? 'vibrationRisks' : 'risks'
+      const activos = idioma === 'en'
+        ? r.activos.map((x) => narrarRiesgoEnIngles(x, catalogo, (valores) =>
+          resolverPalabrasVibracion(x.id, valores)))
+        : r.activos
+      const noEvaluables = idioma === 'en'
+        ? r.noEvaluables.map((n) => narrarTituloEnIngles(n, catalogo))
+        : r.noEvaluables
 
       /*
        * ── SIN MOTOR DE REGLAS SE FALLA, NO SE CONTESTA EN VERDE ──────
@@ -206,19 +229,19 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
         /* Agrupados por regla: las de ámbito de canal se evalúan una vez por
            apoyo, y cuando la causa es común salen tres entradas casi idénticas.
            En el tanque, donde todas son de máquina, agrupar no cambia nada. */
-        riesgos: agruparPorRegla(r.activos),
+        riesgos: agruparPorRegla(activos),
         sin_comprobar:
-          r.noEvaluables.length === 0
+          noEvaluables.length === 0
             ? 'ninguna: se pudieron evaluar todas las reglas'
-            : `${r.noEvaluables.length} no se pudieron evaluar por falta de lecturas: ` +
-              [...new Set(r.noEvaluables.map((x) => x.titulo))].slice(0, 4).join('; '),
+            : `${noEvaluables.length} no se pudieron evaluar por falta de lecturas: ` +
+              [...new Set(noEvaluables.map((x) => x.titulo))].slice(0, 4).join('; '),
         ...(mudos > 0
           ? {
             puntos_sin_lectura: `${mudos} de ${estado.puntosPedidos} puntos no entregan lectura ahora mismo.`,
           }
           : {}),
         aviso:
-          (r.activos.length === 0 && r.noEvaluables.length > 0
+          (activos.length === 0 && noEvaluables.length > 0
             ? 'NO digas que no hay riesgos: hay reglas que no se pudieron evaluar por falta de ' +
               'lecturas. «Sin riesgos detectados» y «no se pudo mirar» son cosas distintas. '
             : '') +
@@ -246,7 +269,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
      * necesita para no equivocarse depende del catálogo que tenga delante. Ver
      * la cabecera de `estadoVibraciones.js`.
      */
-    async estado_del_sistema({ sistema } = {}) {
+    async estado_del_sistema({ sistema } = {}, { idioma = 'es' } = {}) {
       const elegido = resolverSistema(sistema)
       if (!elegido.ok) return elegido
 
@@ -262,7 +285,27 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
       /* Los riesgos van dentro del estado y no en una segunda llamada: son la
          mitad de la respuesta a «¿cómo está?», y pedirlos aparte costaba un
          turno que el modelo casi nunca daba. */
-      const riesgos = evaluarRiesgosDe(elegido.sistema, estado)
+      const riesgosCrudos = evaluarRiesgosDe(elegido.sistema, estado)
+
+      /*
+       * Mismo criterio de i18n que `riesgos_activos`, ver su comentario. Se
+       * narra aquí para las dos máquinas por igual aunque hoy sólo lo
+       * consuma vibraciones —`resumenTanqueParaAsistente()` no usa
+       * `riesgos` en su respuesta a propósito, tiene su propia herramienta
+       * para eso (ver la cabecera de `estadoTanque.js`)—: bifurcar por
+       * máquina aquí sería que esta función tuviera que saber lo que cada
+       * `resumen()` decide consumir, y ésa es información que sólo tiene
+       * el propio `resumen()`.
+       */
+      const catalogo = elegido.sistema.id === 'vibraciones' ? 'vibrationRisks' : 'risks'
+      const riesgos = idioma === 'en'
+        ? {
+          ...riesgosCrudos,
+          activos: riesgosCrudos.activos.map((x) => narrarRiesgoEnIngles(x, catalogo, (valores) =>
+            resolverPalabrasVibracion(x.id, valores))),
+          noEvaluables: riesgosCrudos.noEvaluables.map((n) => narrarTituloEnIngles(n, catalogo)),
+        }
+        : riesgosCrudos
 
       return {
         ok: true,

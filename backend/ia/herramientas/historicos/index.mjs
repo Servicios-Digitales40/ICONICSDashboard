@@ -1804,7 +1804,7 @@ export function crearHerramientasDeHistoricos({
      * como medición. Si algún día el catálogo declara esa señal, se añade aquí
      * leyéndola, no estimándola.
      */
-    async resumen_de_turno({ sistema, periodo } = {}) {
+    async resumen_de_turno({ sistema, periodo } = {}, { idioma = 'es' } = {}) {
       const elegido = resolverSistema(sistema)
       if (!elegido.ok) return elegido
 
@@ -1820,9 +1820,17 @@ export function crearHerramientasDeHistoricos({
         .filter(k => SISTEMA[sistemaId].esHistorizada(k))
         .slice(0, 4)
 
+      /*
+       * `idioma` se reenvía a las dos herramientas que narran riesgos (i18n
+       * del asistente): esto llama a `estado_del_sistema`/`riesgos_activos`
+       * DIRECTAMENTE —no por `ejecutar()`, que es quien normalmente añade el
+       * `contexto`—, así que sin este reenvío `resumen_de_turno` habría sido
+       * el único camino que se quedaba siempre en español pese a pedir
+       * inglés en toda la conversación.
+       */
       const [estado, riesgos, tendencia] = await Promise.all([
-        dameHerramientas().estado_del_sistema({ sistema: sistemaId }),
-        dameHerramientas().riesgos_activos({ sistema: sistemaId }),
+        dameHerramientas().estado_del_sistema({ sistema: sistemaId }, { idioma }),
+        dameHerramientas().riesgos_activos({ sistema: sistemaId }, { idioma }),
         claves.length >= 2
           ? dameHerramientas().tendencia_multiple({
             senales: claves.map(k => SISTEMA[sistemaId].etiquetaDe(k) ?? k),

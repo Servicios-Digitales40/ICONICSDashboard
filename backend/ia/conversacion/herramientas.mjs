@@ -1225,11 +1225,14 @@ export function createHerramientas({
       /*
        * El contexto es del LLAMADOR, no del modelo (Plan 23 F6).
        *
-       * Hoy lleva una sola cosa —`yaAnota`, que dice si quien llama escribe él
-       * mismo en el diario— y va aparte de `argumentos` a propósito: eso lo
-       * escribe el modelo y esto no. Mezclarlos dejaría al modelo pudiendo
-       * pedir `yaAnota: true` y borrar así su propio rastro del diario, que es
-       * exactamente lo que un diario de accionamientos no puede permitir.
+       * Lleva `yaAnota` —si quien llama escribe él mismo en el diario— y,
+       * desde el i18n del asistente, `idioma`: el de la petición HTTP, no
+       * algo que el modelo pida. Los dos van aparte de `argumentos` a
+       * propósito: eso lo escribe el modelo y esto no. Mezclar `idioma` ahí
+       * dejaría al modelo elegir en qué idioma le llega la evidencia — sin
+       * relación con en qué idioma tiene que responder, que es una decisión
+       * del tablero, no suya. Mezclar `yaAnota` es peor: dejaría al modelo
+       * borrar su propio rastro del diario.
        *
        * Por eso tampoco pasa por el esquema Zod: no es parte del contrato que
        * el modelo lee.

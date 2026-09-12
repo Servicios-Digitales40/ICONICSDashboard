@@ -555,6 +555,87 @@ for (const sistema of SISTEMAS) {
   })
 }
 
+/*
+ * ── EL IDIOMA DE LA EVIDENCIA (i18n del asistente) ──────────────────
+ *
+ * `chat.mjs` ya hace que el modelo NARRE en el idioma del tablero; esto
+ * comprueba que lo que se le entrega para narrar —`evidencia`, `titulo`—
+ * también nace en ese idioma, con las MISMAS cifras. Sin esto, un tablero en
+ * inglés le pasaba al modelo una frase española y le tocaba traducirla sobre
+ * la marcha — justo lo que `chat.mjs` ya decide no permitir para la SALIDA
+ * (ver su cabecera). El mismo argumento vale para lo que entra.
+ */
+await checkAsync('riesgos_activos(idioma: "en") narra en inglés, con las mismas cifras', async () => {
+  // Nivel bajo con la bomba impulsando: activa «marcha-en-seco», que declara
+  // `datos()` — el caso donde más importa que la cifra citada sea la misma.
+  const client = clienteFalso({
+    valores: { ...EN_REPOSO, NIVEL_TANQUE: 5, CARGA_TRABAJO_MOTOR: 60 },
+  })
+  const h = createHerramientas({ client })
+
+  const es = await h.ejecutar('riesgos_activos', { sistema: 'tanque' })
+  const en = await h.ejecutar('riesgos_activos', { sistema: 'tanque' }, { idioma: 'en' })
+
+  const riesgoEs = es.riesgos.find(r => r.id === 'marcha-en-seco')
+  const riesgoEn = en.riesgos.find(r => r.id === 'marcha-en-seco')
+
+  assert.ok(riesgoEs, 'el fixture tiene que activar marcha-en-seco')
+  assert.match(riesgoEs.titulo, /Riesgo de marcha en seco/)
+  assert.match(riesgoEn.titulo, /Dry-running risk/)
+  assert.match(riesgoEn.evidencia_medida, /5(\.0)? %/, 'la cifra tiene que seguir siendo 5, no traducida')
+  assert.match(riesgoEn.evidencia_medida, /below the 25 % mark/)
+})
+
+await checkAsync('riesgos_activos(idioma: "en") en vibraciones traduce también las PALABRAS', async () => {
+  // «rodamientos-sin-vigilar» agrupa tres apoyos y su evidencia enumera
+  // notación (BPFO, BPFI, FTF) — no debe traducirse — dentro de una frase
+  // que sí. Buen caso para las tres COMPOSICIONES que necesitan resolverse
+  // antes de interpolar.
+  const client = createFakeIconicsClient({ rnd: () => 0.99 })
+  const h = createHerramientas({ client })
+
+  const en = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const riesgo = en.riesgos.find(r => r.id === 'rodamientos-sin-vigilar')
+
+  assert.ok(riesgo, 'el fixture tiene que activar rodamientos-sin-vigilar')
+  assert.match(riesgo.titulo, /bearing diagnosis is switched off/i)
+  const evidencia = Array.isArray(riesgo.evidencia_medida) ? riesgo.evidencia_medida[0] : riesgo.evidencia_medida
+  assert.match(evidencia, /BPFO, BPFI, FTF/, 'la notación no se traduce')
+  assert.match(evidencia, /3 of 3/, 'la cuenta sí se narra en inglés')
+})
+
+await checkAsync('sin `idioma` (o con "es"), riesgos_activos sigue en español: no rompe nada existente', async () => {
+  const client = clienteFalso({
+    valores: { ...EN_REPOSO, NIVEL_TANQUE: 5, CARGA_TRABAJO_MOTOR: 60 },
+  })
+  const h = createHerramientas({ client })
+
+  const sinContexto = await h.ejecutar('riesgos_activos', { sistema: 'tanque' })
+  const conEs = await h.ejecutar('riesgos_activos', { sistema: 'tanque' }, { idioma: 'es' })
+
+  assert.deepEqual(sinContexto.riesgos, conEs.riesgos)
+  assert.match(sinContexto.riesgos[0].titulo, /Riesgo de marcha en seco/)
+})
+
+await checkAsync('estado_del_sistema(idioma: "en") narra los riesgos que trae dentro', async () => {
+  /*
+   * Los riesgos de `estado_del_sistema` pasan por `sistema.resumen()`, un
+   * camino distinto al de `riesgos_activos` — hay que probar los dos. El
+   * tanque no sirve de caso: `resumenTanqueParaAsistente()` no usa `riesgos`
+   * en su respuesta a propósito («tiene su propia herramienta para eso», ver
+   * su cabecera) — vibraciones sí, «porque es donde vive la mitad de su
+   * respuesta».
+   */
+  const client = createFakeIconicsClient({ rnd: () => 0.99 })
+  const h = createHerramientas({ client })
+
+  const en = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const texto = JSON.stringify(en)
+
+  assert.match(texto, /Bearing diagnosis is switched off/)
+  assert.doesNotMatch(texto, /diagnóstico de rodamientos está apagado/)
+})
+
 await checkAsync('sin `sistema` no se contesta: se pregunta cuál', async () => {
   /*
    * El defecto tendría que ser el tanque, y entonces una pregunta sobre
@@ -3026,6 +3107,23 @@ await checkAsync('compone estado, riesgos y tendencia en una sola llamada', asyn
   assert.ok(r.estadoAhora?.ok, 'el estado no llegó, o llegó con un error dentro')
   assert.ok(r.riesgos || r.riesgosNoDisponibles, 'ni riesgos ni el motivo de que falten')
   assert.ok(r.tendencia || r.tendenciaNoDisponible, 'ni tendencia ni el motivo de que falte')
+})
+
+await checkAsync('resumen_de_turno(idioma: "en") reenvía el idioma a las herramientas que llama por dentro', async () => {
+  /*
+   * Esta llama a `estado_del_sistema`/`riesgos_activos` DIRECTAMENTE, vía
+   * `dameHerramientas()`, no por `ejecutar()` — que es quien normalmente
+   * añade `contexto`. Sin reenviarlo a mano aquí, era el único camino que
+   * se quedaba siempre en español pese a pedir inglés en toda la
+   * conversación: el hueco que este caso cierra.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const en = await h.ejecutar('resumen_de_turno', { sistema: 'vibraciones' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  const texto = JSON.stringify(en)
+  assert.match(texto, /Bearing diagnosis is switched off/)
+  assert.doesNotMatch(texto, /diagnóstico de rodamientos está apagado/)
 })
 
 /**
