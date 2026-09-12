@@ -106,7 +106,8 @@ el 22; probar que el certificado de `bms-server` se acepta, en el 26.
 > §Resultado de [`PLAN-22-SEGURIDAD.md`](PLAN-22-SEGURIDAD.md). Dos cosas que
 > conviene saber desde aquí: **el alivio de bundle que este plan atribuía a
 > `SEG-05` no existía** —los 276 KB de `xlsx` ya iban en un trozo diferido, así
-> que COD-07 sigue necesitando su margen en otro sitio—, y **lo entregado en
+> que el presupuesto de bundle sigue necesitando su margen en otro sitio—, y
+> **lo entregado en
 > SEG-01 y SEG-09 está probado y apagado**: `AUTH_HABILITADA` y
 > `REPORTES_SECRETO` son decisiones de despliegue y no se encienden solas.
 
@@ -213,10 +214,10 @@ ponen en el dominio.
 > Arreglado fuera de plan: estado `no_responde`, comprobación real de
 > llama-server y whisper en paralelo, y telemetría de la última lectura
 > (`client.estadoLecturas()`) para poder distinguir «el servidor contesta» de
-> «llegan valores». Eso último es **media implementación de `COD-08`**
-> (telemetría del sondeo, Plan 26): lo que hay cuenta puntos con valor y con
-> calidad de la última lectura; lo que falta de COD-08 es la serie en el
-> tiempo, no el dato puntual.
+> «llegan valores». Eso último es sólo la mitad del problema: lo que hay
+> cuenta puntos con valor y con calidad de la última lectura; falta la serie
+> en el tiempo, no el dato puntual — sin entrada de plan propia por ahora
+> (ver el retiro de `COD-08` en la sección del Plan 26).
 >
 > Es también el aviso para `USO-01`: la frescura no se pinta a partir de que
 > un servicio esté declarado. Lo que se enseñe tiene que venir de haber
@@ -325,17 +326,24 @@ ponen en el dominio.
 > `vendor` 266,45 de 330, los 28 verificadores, i18n en paridad. Ver el
 > §3 (Cierre) del propio plan para el detalle completo.
 
-### Plan 26 · Código, y la sesión con planta
+### Plan 26 · La sesión con planta
 
-**Primero lo de código, que es offline** — `COD-04` partir los seis archivos de
-más de mil líneas · `COD-06` esquemas de salida · `COD-07` presupuesto de bundle
-· `COD-08` telemetría del sondeo · `COD-09` migradores y poda ·
-`COD-10` cerrar el registro (`evaluarRiesgos`, `resolverSenal`)
+> **`COD-04`, `COD-06`, `COD-07`, `COD-08`, `COD-09` y `COD-10` se retiraron de
+> este plan el 12-09-2026.** Ninguno tenía una entrada de backlog propia con
+> alcance escrito de antemano — sólo un titular de una línea aquí mismo. Al
+> verificarlos contra el código real tras el Plan 25: `COD-04` había empeorado
+> (11 archivos por encima de 1000 líneas, no seis) pero seguía siendo válido
+> postergarlo por el mismo motivo de siempre; `COD-06`, `COD-07` y `COD-08`
+> seguían vigentes sin cambios; `COD-09` nunca tuvo una lista de qué podar; y la
+> mitad de dominio de `COD-10` (`resolverSenal`) ya se había medido y
+> rechazado explícitamente el 11-09-2026 (tabla de sinónimos desactualizada,
+> ver [`BACKLOG-BACKEND.md`](BACKLOG-BACKEND.md) B3). Se decidió retirar los
+> seis en bloque en vez de arrastrar títulos sin alcance de un plan a otro; lo
+> que de ellos siga importando se replantea con una entrada propia en
+> `BACKLOG-BACKEND.md`/`BACKLOG-FRONTEND.md` cuando toque, no en esta hoja de
+> ruta.
 
-`COD-04` va deliberadamente al final: partir archivos antes de saber por dónde
-van a crecer es reorganizar a ciegas, y los planes 21 a 25 son los que lo dicen.
-
-**Y después, la sesión con planta.** Todo lo que necesita red, junto:
+**Lo que queda de este plan es sólo la sesión con planta.** Todo lo que necesita red, junto:
 
 | Qué | Por qué no se puede antes |
 |---|---|
