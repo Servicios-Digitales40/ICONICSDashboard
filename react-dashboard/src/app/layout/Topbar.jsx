@@ -13,7 +13,7 @@ import { useDataSource } from "@/lib/datasource";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { SECCION_DE_PAGINA } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
-import { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";
+import { ContextoDeMaquina } from "./ContextoDeMaquina.jsx";
 import { LanguageSelector } from "@/i18n/LanguageSelector.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
@@ -97,11 +97,17 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
    * aquí: una lista paralela se queda vieja en cuanto se añada una pantalla, y
    * la nueva heredaría la respuesta equivocada sin que nada lo delate.
    *
-   * Cuando la máquina de vibraciones tenga su propio control, esto no será un
-   * `if` con dos ramas sino un indicador por sección — su tag es otro, su
-   * estado es otro, y «encendida» no significa lo mismo en las dos.
+   * ── YA NO ES UN `if` CON DOS RAMAS (Plan 25 F4 · `NUE-06`) ─────────
+   *
+   * Esta cabecera decía: «cuando la máquina de vibraciones tenga su propio
+   * control, esto no será un `if` con dos ramas sino un indicador por sección».
+   * Eso es `ContextoDeMaquina`, y el Topbar ya sólo le pasa la sección.
+   *
+   * Con un matiz que la predicción no tenía: vibraciones **sigue sin tener tag
+   * de control**, y no se le ha inventado uno. Lo que enseña es lo que esa
+   * máquina sí produce —su peor zona ISO— más el silencio, que ahora se ve en
+   * las dos. El porqué completo está en la cabecera de ese archivo.
    */
-  const esDeLlenado = SECCION_DE_PAGINA[page] === "sec-llenado";
   const esCajon = useMediaQuery(UMBRAL_CAJON);
 
   /* El indicador de origen es el mismo con y sin interruptor; lo que cambia es
@@ -150,7 +156,7 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
                 controles de la derecha, no se oculta en modo muro: es
                 información de estado, no algo que un wallboard sin teclado
                 necesite pulsar. */}
-            {esDeLlenado && <EstadoMaquinaBanner />}
+            <ContextoDeMaquina seccion={SECCION_DE_PAGINA[page]} />
           </div>
           <p style={{ margin: "2px 0 0", fontSize: 12.5, color: t.textFaint }}>{traducir(`navigation:routes.${page}.sub`)}</p>
         </div>

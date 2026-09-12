@@ -95,3 +95,22 @@ export function useEvaSource() {
   if (!ctx) throw new Error("useEvaSource debe usarse dentro de <EvaProvider>");
   return ctx;
 }
+
+/**
+ * ¿Hay fuente de Demo EVA montada? — para CONTEXTO OPCIONAL (Plan 25 F4).
+ *
+ * ── POR QUÉ NO VALE `useEvaSource()` PARA ESTO ─────────────────────
+ *
+ * Porque lanza fuera del proveedor, y eso es correcto para quien NECESITA los
+ * datos: una vista de planta sin fuente no tiene nada que enseñar y es mejor
+ * que falle ruidosamente. Pero la barra de contexto del Topbar es un añadido
+ * sobre un título que ya se lee bien sin ella, y con el hook estricto pasaba a
+ * exigir el árbol de proveedores entero para poder dibujarse — igual que en F0
+ * con `useDataSource()`.
+ *
+ * Sin proveedor devuelve `false`, y quien lo llame no pide datos. Es el mismo
+ * criterio que `useEsSimulado()`: «no lo sé» cae del lado que no consulta.
+ */
+export function useHayFuenteEva() {
+  return useContext(Ctx) !== null;
+}

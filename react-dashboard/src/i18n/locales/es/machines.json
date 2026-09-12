@@ -407,5 +407,12 @@
       "sinEntrega": "El punto existe pero dejó de entregar valor",
       "calidadDesconocida": "Llegó con una calidad que no sabemos interpretar"
     }
+  },
+  "context": {
+    "worstZone": "Zona {{zona}}",
+    "worstZoneTip": "La peor zona ISO 10816 de los canales que están contestando ahora mismo.",
+    "silent": "{{n}} de {{total}} sin dato",
+    "silentSinTotal": "{{n}} sin dato",
+    "silentTip": "Puntos de esta máquina que no están entregando lectura. Una máquina tranquila y una máquina que no contesta no son lo mismo."
   }
 }

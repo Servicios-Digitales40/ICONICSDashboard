@@ -407,5 +407,12 @@
       "sinEntrega": "The point exists but stopped delivering a value",
       "calidadDesconocida": "It arrived with a quality code we cannot interpret"
     }
+  },
+  "context": {
+    "worstZone": "Zone {{zona}}",
+    "worstZoneTip": "The worst ISO 10816 zone among the channels currently reporting.",
+    "silent": "{{n}} of {{total}} with no data",
+    "silentSinTotal": "{{n}} with no data",
+    "silentTip": "Points of this machine that are not reporting. A quiet machine and a machine that does not answer are not the same thing."
   }
 }

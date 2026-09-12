@@ -611,6 +611,47 @@ caso del tanque aparece **una sola vez** en toda la pantalla.
 
 ---
 
+### F4 · `NUE-06` — HECHA el 12-09-2026, con un cambio de alcance
+
+`app/layout/ContextoDeMaquina.jsx`. El Topbar ya no lleva un `if` con dos
+ramas: le pasa la sección y cada máquina monta lo suyo.
+
+**Medido:** 795 pruebas de frontend (+8), los 28 verificadores, lint 0 errores,
+types limpio. Bundle: `index` 251,02 → **254,66 KB**; `vendor` sin tocar.
+
+**El `NUE-06` literal no se podía construir, y no por falta de tiempo.** El
+plan (§0.1) decía «generalizarlo: otro indicador con su propio tag, como dice su
+cabecera». Al ir a buscar ese tag: **la máquina de vibraciones no lo tiene**.
+No es que no esté cableado — no está confirmado que exista, y sus guardas
+tampoco. Lo dice `ControlesVibraciones.jsx`, que por eso es un placeholder sin
+un solo botón: «el tag de escritura de este PLC […] vive en otro árbol y no
+está comprobado».
+
+Inventarlo habría sido §2.5 exactamente. Así que la barra enseña de cada máquina
+**lo que de verdad se sabe**:
+
+| Máquina | Qué enseña | Por qué eso |
+|---|---|---|
+| Tanque | si la bomba está encendida | tag real, ya medido, el mismo que escribe `controlar_bomba` |
+| Vibraciones | su peor zona ISO | es el veredicto que esa máquina sí produce |
+| Las dos | cuántos puntos no contestan | lo que separa «tranquila» de «no sabemos nada de ella» |
+
+**La tercera fila es la que más vale, y no estaba en el plan.** Sale del
+incidente que cita `estadoMaquina.js`: el 26-08-2026 quince de veintiún puntos
+se apagaron a la vez, y una pantalla que contara sólo riesgos activos habría
+estado en verde sobre una máquina muda. La barra de contexto está **siempre**
+visible; una vista concreta, no.
+
+**Y el mismo tropiezo de F0, por tercera vez — ya es un patrón.** Los hooks de
+datos (`useSistemaAgua`, `useVibracion`) lanzan fuera de `EvaProvider`, así que
+la barra convertía el Topbar en algo que no se puede montar suelto y rompió
+`topbar-estado-maquina.test.jsx`. Se resolvió igual que en F0: `useHayFuenteEva()`
+junto al hook estricto, sin tocarlo. **Tres veces la misma lección** —un
+componente de presentación no puede exigir el árbol de contextos— y en las tres
+la cazó una prueba que ya existía.
+
+---
+
 ## 3 · Cierre del plan
 
 _(Se rellena al terminar.)_
