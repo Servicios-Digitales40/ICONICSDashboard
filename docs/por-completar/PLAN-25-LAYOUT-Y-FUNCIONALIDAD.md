@@ -652,6 +652,41 @@ la cazó una prueba que ya existía.
 
 ---
 
+### F5 · `NUE-07` — HECHA el 12-09-2026
+
+`modulo` declarado en `NAV_GROUPS`, exigido por `buildNav` y pintado como
+cabecera en el sidebar.
+
+**Medido:** 802 pruebas de frontend (+7), los 28 verificadores —incluido
+`modulos`—, lint 0 errores, types limpio. Bundle: `index` 254,66 → **255,52 KB**;
+`vendor` sin tocar.
+
+**Lo que faltaba no era la agrupación: era que fuera ejecutable.** §0.1 ya decía
+que el sidebar agrupa por máquina y módulo. Lo que no había es que el módulo
+—la frontera entre FUENTES DE DATOS de §2.1 y §4.7— **existiera como campo**.
+Vivía en la prosa de `NAV_GROUPS`, y un comentario no lo hereda una sección
+nueva: quien añada `sec-loquesea` sin pensar en su fuente la cuelga junto a las
+de ICONICS y el menú la presenta como una más. Es cómo Predicción estuvo dentro
+de «General» hasta el 03-09-2026.
+
+Ahora `buildNav` **lanza** si una sección no declara módulo, con el mensaje que
+nombra `shared/modulos.js`. Falla al construir el árbol —JS puro, ejecutable en
+Node— y no al pintarlo, así que sale en la tanda de verificadores.
+
+**Y un desorden real que sólo se vio al agrupar.** `sec-rag` es del módulo
+`monitoreo` pero estaba declarada DESPUÉS de `sec-prediccion`. Con la cabecera
+abriéndose en cada cambio de módulo, el menú pintaba **tres cabeceras para dos
+módulos**, con Predicción partiendo en dos el bloque de ICONICS — lo contrario
+de lo que la separación afirma. Las rutas `rag-*` subieron por encima de las
+`pred-*`; lo fija `sidebar-modulos.test.jsx`, que comprueba que hay exactamente
+dos cabeceras y en qué orden.
+
+Ese desorden llevaba ahí desde el 03-09 y **no era visible mientras el menú
+fuera plano**: cinco secciones seguidas no dicen nada del orden. Agrupar lo
+destapó.
+
+---
+
 ## 3 · Cierre del plan
 
 _(Se rellena al terminar.)_

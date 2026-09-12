@@ -50,7 +50,24 @@ export function buildNav(routes, groups) {
           `routes: la ruta "${r.id}" referencia el grupo "${group}", que no está declarado en NAV_GROUPS.`
         );
       }
-      const nuevo = { group, icon: meta.icon, children: [] };
+      /*
+       * `modulo` se EXIGE (Plan 25 F5): una sección sin módulo declarado es una
+       * sección cuya fuente de datos nadie decidió, y el sidebar la pintaría
+       * junto a las de ICONICS como si lo fuera. Es cómo Predicción estuvo
+       * dentro de «General» hasta el 03-09-2026 — ver `NAV_GROUPS`.
+       *
+       * Falla aquí, al construir el árbol, y no al pintarlo: este archivo es JS
+       * puro y `verificar-navegacion` lo ejecuta en Node, así que el olvido se
+       * ve en la tanda de verificadores y no en una pantalla.
+       */
+      if (!meta.modulo) {
+        throw new Error(
+          `routes: el grupo "${group}" no declara \`modulo\`. Cada sección pertenece a un ` +
+            `módulo de \`shared/modulos.js\` ("monitoreo", "prediccion"…), porque es lo que ` +
+            `dice qué fuente de datos hay detrás (CLAUDE.md §4.7).`
+        );
+      }
+      const nuevo = { group, icon: meta.icon, modulo: meta.modulo, children: [] };
       vistos.set(group, nuevo);
       items.push(nuevo);
     }

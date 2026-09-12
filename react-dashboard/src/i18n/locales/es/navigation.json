@@ -133,5 +133,9 @@
     "placeholder": "Escribe el nombre de una pantalla…",
     "empty": "Nada coincide con eso.",
     "current": "aquí"
+  },
+  "modules": {
+    "monitoreo": "Monitoreo y Diagnóstico",
+    "prediccion": "Predicción"
   }
 }

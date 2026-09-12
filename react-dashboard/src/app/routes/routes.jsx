@@ -97,10 +97,27 @@ export const DEFAULT_ROUTE = "eva-inicio";
  * «General» agrupa lo que es del SERVIDOR y no de una máquina: el historial
  * de alarmas y el navegador de puntos valen para las dos.
  */
+/**
+ * ── EL MÓDULO DE CADA SECCIÓN, DECLARADO (Plan 25 F5 · `NUE-07`) ───
+ *
+ * `modulo` no es una etiqueta de presentación: es la frontera de `CLAUDE.md`
+ * §2.1 y §4.7 —qué FUENTE DE DATOS hay detrás— escrita en un campo en vez de
+ * en un comentario.
+ *
+ * Hasta hoy esta separación existía sólo en la prosa de aquí abajo, y eso tiene
+ * un modo de fallo concreto: una sección nueva no hereda un comentario. Quien
+ * añada `sec-loquesea` sin pensar en su fuente la cuelga junto a las de
+ * ICONICS, y el sidebar la presenta como una más — que es exactamente cómo
+ * Predicción estuvo dentro de «General» hasta el 03-09-2026.
+ *
+ * Los ids salen de `shared/modulos.js`, que es el registro de verdad;
+ * `verificar-modulos.mjs` ya vigila que nadie cruce fuentes, y ahora la
+ * navegación habla su mismo vocabulario.
+ */
 export const NAV_GROUPS = {
-  "sec-llenado": { icon: <Droplets size={17} /> },
-  "sec-vibraciones": { icon: <Waves size={17} /> },
-  "sec-general": { icon: <Boxes size={17} /> },
+  "sec-llenado": { icon: <Droplets size={17} />, modulo: "monitoreo" },
+  "sec-vibraciones": { icon: <Waves size={17} />, modulo: "monitoreo" },
+  "sec-general": { icon: <Boxes size={17} />, modulo: "monitoreo" },
   /*
    * ── PREDICCIÓN NO ES UNA SECCIÓN MÁS: ES OTRO MÓDULO ───────────────
    *
@@ -117,12 +134,18 @@ export const NAV_GROUPS = {
    *
    * Ver `docs/por-completar/PLAN-19-MODULARIZACION.md` F1.
    */
-  "sec-prediccion": { icon: <BrainCircuit size={17} /> },
-  // El origen de conocimiento del asistente, no una máquina: qué manuales
-  // alimentan su búsqueda documental. Sección aparte por el mismo motivo que
-  // separa las otras dos — no es de ninguna instalación concreta, y menos
-  // aún de las dos que ya tiene la planta.
-  "sec-rag": { icon: <Database size={17} /> },
+  "sec-prediccion": { icon: <BrainCircuit size={17} />, modulo: "prediccion" },
+  /*
+   * El origen de conocimiento del asistente, no una máquina: qué manuales
+   * alimentan su búsqueda documental. Sección aparte por el mismo motivo que
+   * separa las otras dos — no es de ninguna instalación concreta, y menos
+   * aún de las dos que ya tiene la planta.
+   *
+   * `modulo: "monitoreo"` porque es el conocimiento con el que se diagnostica
+   * ESTA planta: sus manuales y sus casos son de estas máquinas. No es una
+   * tercera fuente de datos, que es lo que este campo distingue.
+   */
+  "sec-rag": { icon: <Database size={17} />, modulo: "monitoreo" },
 };
 
 /*
@@ -305,6 +328,48 @@ export const ROUTES = [
     nav: { icon: <HeartPulse size={17} />, group: "sec-general" },
   },
 
+  /*
+   * ── RAG: EL CONOCIMIENTO DEL ASISTENTE, NO UNA MÁQUINA ─────────────
+   *
+   * Sección propia y no una pestaña más de «General»: lo que hay aquí no
+   * describe ninguna instalación de la planta, describe de dónde saca el
+   * asistente lo que sabe fuera de lo que mide ICONICS. Ver la cabecera de
+   * `Demo-EVA/views/comunes/DocumentacionRag.jsx` para el porqué de cada decisión de
+   * la vista.
+   */
+  {
+    /*
+     * Va ANTES de «Documentación» a propósito. Las dos son fuentes de
+     * conocimiento del asistente, pero ésta es la única que se llena SOLA
+     * —cada cierre de diagnóstico, cada reparación contada por voz— y por
+     * tanto la única que puede degradarse sin que nadie haga nada. Un
+     * manual malo lo subió alguien; un caso basura aparece solo.
+     */
+    id: "rag-casos",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
+    nav: { icon: <NotebookPen size={17} />, group: "sec-rag" },
+  },
+
+  {
+    id: "rag-documentacion",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
+    nav: { icon: <FileText size={17} />, group: "sec-rag" },
+  },
+
+  /*
+   * ── EL ORDEN AQUÍ ES LA FRONTERA ENTRE MÓDULOS (Plan 25 F5) ────────
+   *
+   * RAG se movió ARRIBA de Predicción el 12-09-2026. No es preferencia de
+   * orden: `buildNav` coloca cada sección en la posición de su primer hijo,
+   * y el sidebar abre una cabecera de módulo cada vez que el módulo cambia.
+   * Con RAG (monitoreo) declarado DESPUÉS de Predicción, el menú abría tres
+   * cabeceras para dos módulos y dejaba a Predicción partiendo en dos el
+   * bloque de ICONICS — justo lo contrario de lo que la separación dice.
+   *
+   * Las secciones de un mismo módulo van seguidas. Lo comprueba
+   * `sidebar-modulos.test.jsx`.
+   */
+
   {
     /*
      * ── POR QUÉ ESTA VISTA TIENE SECCIÓN PROPIA ────────────────────────
@@ -380,33 +445,6 @@ export const ROUTES = [
     nav: { icon: <Factory size={17} />, group: "sec-prediccion" },
   },
 
-  /*
-   * ── RAG: EL CONOCIMIENTO DEL ASISTENTE, NO UNA MÁQUINA ─────────────
-   *
-   * Sección propia y no una pestaña más de «General»: lo que hay aquí no
-   * describe ninguna instalación de la planta, describe de dónde saca el
-   * asistente lo que sabe fuera de lo que mide ICONICS. Ver la cabecera de
-   * `Demo-EVA/views/comunes/DocumentacionRag.jsx` para el porqué de cada decisión de
-   * la vista.
-   */
-  {
-    /*
-     * Va ANTES de «Documentación» a propósito. Las dos son fuentes de
-     * conocimiento del asistente, pero ésta es la única que se llena SOLA
-     * —cada cierre de diagnóstico, cada reparación contada por voz— y por
-     * tanto la única que puede degradarse sin que nadie haga nada. Un
-     * manual malo lo subió alguien; un caso basura aparece solo.
-     */
-    id: "rag-casos",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
-    nav: { icon: <NotebookPen size={17} />, group: "sec-rag" },
-  },
-
-  {
-    id: "rag-documentacion",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
-    nav: { icon: <FileText size={17} />, group: "sec-rag" },
-  },
 
   {
     // Sin `nav`: no es una pantalla a la que un operador llegue en frío desde

@@ -3,7 +3,7 @@
  * Recibe `page` y `onNavigate` desde App.jsx, que es quien decide qué página
  * renderizar en el área principal.
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ChevronDown, PanelLeftClose, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/theme";
@@ -243,6 +243,8 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
   const { theme: t, dark } = useTheme();
   /* `traducirBarra` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducirBarra } = useTranslation("layout");
+  /* Los rótulos de sección y de módulo viven en `navigation`, con las rutas. */
+  const { t: traducirNav } = useTranslation("navigation");
   const esCajon = useMediaQuery(UMBRAL_CAJON);
   // Fuente compartida por `EvaProvider` (App.jsx envuelve el Shell entero con
   // él) — mismo hook que usa cada vista, así que el punto de "Planta" no abre
@@ -334,16 +336,55 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
         aria-label={traducirBarra("sidebar.mainNav")}
         style={{ padding: collapsed ? "8px 10px" : "8px 14px", display: "flex", flexDirection: "column", gap: 3, flex: 1, overflowY: "auto", overflowX: "hidden" }}
       >
-        {NAV.map((item) =>
-          item.children ? (
+        {NAV.map((item, i) => {
+          /*
+           * ── LA CABECERA DE MÓDULO (Plan 25 F5 · `NUE-07`) ──────────────
+           *
+           * Se pinta cuando cambia el módulo respecto al item anterior, así que
+           * sale SOLA de `NAV` sin una lista paralela aquí. Una lista escrita a
+           * mano se quedaría vieja en cuanto se añadiera una sección, que es el
+           * mismo motivo por el que `buildNav` deriva el árbol del registro.
+           *
+           * Y no es decoración: separa dos FUENTES DE DATOS distintas
+           * (`CLAUDE.md` §4.7). El compresor de Predicción no entra por ICONICS,
+           * y hasta el 03-09-2026 colgaba de «General» como si lo hiciera.
+           *
+           * Con la barra plegada no se pinta: ahí no hay sitio para un rótulo y
+           * lo que queda es una raya, que separaría sin decir por qué.
+           */
+          const moduloAnterior = i > 0 ? NAV[i - 1].modulo : null;
+          const abreModulo = Boolean(item.modulo) && item.modulo !== moduloAnterior;
+
+          const nodo = item.children ? (
             <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} />
           ) : (
             <NavButton
               key={item.id} item={item} active={page === item.id} onNavigate={navegar} t={t} dark={dark}
               collapsed={collapsed} estado={estadoPorId[item.id] ?? null}
             />
-          )
-        )}
+          );
+
+          if (!abreModulo || collapsed) return nodo;
+
+          return (
+            <Fragment key={`mod-${item.modulo}`}>
+              <h2
+                style={{
+                  margin: i === 0 ? "2px 0 4px" : "14px 0 4px",
+                  padding: "0 8px",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: t.textFaint,
+                }}
+              >
+                {traducirNav(`modules.${item.modulo}`)}
+              </h2>
+              {nodo}
+            </Fragment>
+          );
+        })}
       </nav>
 
       {/* Pie: identidad de INSTALACIÓN, no de persona — no hay login real

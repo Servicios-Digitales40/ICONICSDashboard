@@ -133,5 +133,9 @@
     "placeholder": "Type the name of a screen…",
     "empty": "Nothing matches that.",
     "current": "here"
+  },
+  "modules": {
+    "monitoreo": "Monitoring & Diagnostics",
+    "prediccion": "Prediction"
   }
 }

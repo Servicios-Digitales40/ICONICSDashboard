@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 
 import { ROUTES, DEFAULT_ROUTE } from "@/app/routes/routes.jsx";
 import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
+import { buildNav } from "@/app/routes/buildNav.js";
 
 const ids = ROUTES.map((r) => r.id);
 
@@ -63,10 +64,25 @@ describe("superficie de la aplicación", () => {
       // instalación entera.
       "eva-turno",
       "salud-sistema",
+      // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
+      // de ninguna máquina, por eso tiene su propia sección y no cuelga de
+      // «General».
+      // Son sus DOS fuentes. Los casos van primero porque son la única
+      // que se llena sola: cada cierre de diagnóstico, cada reparación
+      // contada por voz.
+      //
+      // Va ANTES de Predicción desde el 12-09-2026 (Plan 25 F5): pertenece al
+      // módulo `monitoreo`, y las secciones de un mismo módulo van seguidas
+      // para que el sidebar no abra su cabecera dos veces.
+      "rag-casos",
+      "rag-documentacion",
       // Predicción — OTRO MÓDULO, no una sección más: un compresor real cuyo
       // histórico sirve otro backend. No entra por ICONICS, así que no puede
       // colgar de ninguna de las dos estaciones ni de «General», que significa
       // «del servidor ICONICS, no de una máquina». Ver CLAUDE.md §4.7.
+      //
+      // Cierra la lista de lo navegable a propósito: es la frontera entre
+      // fuentes de datos, y en el menú se ve como el último bloque.
       //
       // Las cuatro últimas son pantallas PENDIENTES: se abren y dicen qué
       // falta para construirlas, sin dibujar un solo dato de ejemplo. Están
@@ -79,14 +95,6 @@ describe("superficie de la aplicación", () => {
       "pred-historico",
       "pred-correlacion",
       "pred-pronostico",
-      // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
-      // de ninguna máquina, por eso tiene su propia sección y no cuelga de
-      // «General».
-      // Son sus DOS fuentes. Los casos van primero porque son la única
-      // que se llena sola: cada cierre de diagnóstico, cada reparación
-      // contada por voz.
-      "rag-casos",
-      "rag-documentacion",
       // Sin `nav`: destinos de detalle, no pantallas a las que se llegue en
       // frío desde el sidebar.
       "eva-detalle",
@@ -125,8 +133,16 @@ describe("el sidebar que sale del registro", () => {
       "sec-llenado",
       "sec-vibraciones",
       "sec-general",
-      "sec-prediccion",
+      /*
+       * RAG subió por encima de Predicción el 12-09-2026 (Plan 25 F5). No es
+       * preferencia de orden: las secciones de un mismo MÓDULO van seguidas,
+       * porque el sidebar abre una cabecera cada vez que el módulo cambia. Con
+       * RAG (monitoreo) declarado después de Predicción, el menú abría tres
+       * cabeceras para dos módulos y Predicción partía en dos el bloque de
+       * ICONICS — lo contrario de lo que la separación dice.
+       */
       "sec-rag",
+      "sec-prediccion",
     ]);
 
     const llenado = NAV.find((n) => n.group === "sec-llenado");
@@ -179,6 +195,45 @@ describe("el sidebar que sale del registro", () => {
     // que mide ICONICS.
     const rag = NAV.find((n) => n.group === "sec-rag");
     expect(rag.children.map((c) => c.id)).toEqual(["rag-casos", "rag-documentacion"]);
+  });
+
+  /**
+   * ── EL MÓDULO, AHORA DECLARADO Y NO EN UN COMENTARIO (Plan 25 F5) ─
+   *
+   * La frontera entre módulos es la frontera entre FUENTES DE DATOS
+   * (`CLAUDE.md` §2.1 y §4.7), y hasta el 12-09-2026 vivía sólo en la prosa de
+   * `NAV_GROUPS`. El problema de un comentario es que una sección nueva no lo
+   * hereda: quien añada `sec-loquesea` sin pensar en su fuente la cuelga junto
+   * a las de ICONICS y el sidebar la presenta como una más — que es cómo
+   * Predicción estuvo dentro de «General» hasta el 03-09-2026.
+   */
+  it("cada sección declara a qué MÓDULO pertenece", () => {
+    const porModulo = Object.fromEntries(NAV.map((n) => [n.group ?? n.id, n.modulo]));
+
+    expect(porModulo).toEqual({
+      "sec-llenado": "monitoreo",
+      "sec-vibraciones": "monitoreo",
+      "sec-general": "monitoreo",
+      // La única que NO es de ICONICS: un compresor real servido por otro
+      // backend. Es la razón de ser de este campo.
+      "sec-prediccion": "prediccion",
+      // RAG es `monitoreo` aunque no sea una máquina: es el conocimiento con el
+      // que se diagnostica ESTA planta, no una tercera fuente de datos.
+      "sec-rag": "monitoreo",
+    });
+  });
+
+  it("una sección SIN módulo declarado no se construye: falla al montar el árbol", () => {
+    /*
+     * La guarda que convierte el campo en una regla. Sin ella, `modulo` sería
+     * un adorno que la siguiente sección puede olvidar sin consecuencias, y el
+     * sidebar la pintaría bajo la cabecera del módulo anterior — afirmando que
+     * comparte fuente de datos con él.
+     */
+    const rutas = [{ id: "x", nav: { icon: null, group: "sec-huerfana" } }];
+    const grupos = { "sec-huerfana": { icon: null } }; // sin `modulo`
+
+    expect(() => buildNav(rutas, grupos)).toThrow(/modulo/);
   });
 
   it("cada sistema tiene su propio «Riesgos», y no se mezclan", () => {
