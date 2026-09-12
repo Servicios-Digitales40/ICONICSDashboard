@@ -42,6 +42,18 @@ const Asistente = lazy(() =>
   import("@/features/asistente/components/Asistente.jsx").then((m) => ({ default: m.Asistente }))
 );
 
+/**
+ * La paleta de comandos (Plan 24 F6), con el mismo cuidado que el asistente de
+ * arriba: se importa el COMPONENTE y no un barril, por el aviso de Rollup que
+ * ese bloque documenta.
+ *
+ * Va diferida por el mismo motivo: no hace falta en el primer pintado —hay que
+ * pulsar `Ctrl+K`— así que el arranque de Planta no debe pagarla.
+ */
+const PaletaComandos = lazy(() =>
+  import("./PaletaComandos.jsx").then((m) => ({ default: m.PaletaComandos }))
+);
+
 export default function App() {
   return (
     /* La barrera exterior es el último recurso: cubre lo que falle FUERA de
@@ -194,6 +206,17 @@ function Shell() {
             <Asistente />
           </Suspense>
         </ErrorBoundary>
+
+        {/* La paleta NO se monta en modo muro: un wallboard a tres metros no
+            tiene teclado, así que un atajo de teclado ahí es superficie que no
+            se puede usar. Misma puerta que el Sidebar y el cromo. */}
+        {!muro.activo && (
+          <ErrorBoundary etiqueta="PaletaComandos">
+            <Suspense fallback={null}>
+              <PaletaComandos onNavigate={(p) => navigate(p)} paginaActual={nav.page} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       </div>
     </div>
   );

@@ -122,5 +122,11 @@
       "nav": "Cierre de diagnóstico",
       "sub": "Confirma o corrige la causa de un riesgo ya intervenido"
     }
+  },
+  "palette": {
+    "title": "Ir a…",
+    "placeholder": "Escribe el nombre de una pantalla…",
+    "empty": "Nada coincide con eso.",
+    "current": "aquí"
   }
 }

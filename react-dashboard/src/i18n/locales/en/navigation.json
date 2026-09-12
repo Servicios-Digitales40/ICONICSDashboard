@@ -122,5 +122,11 @@
       "nav": "Diagnosis Closeout",
       "sub": "Confirm or correct the cause of a risk already acted on"
     }
+  },
+  "palette": {
+    "title": "Go to…",
+    "placeholder": "Type the name of a screen…",
+    "empty": "Nothing matches that.",
+    "current": "here"
   }
 }
