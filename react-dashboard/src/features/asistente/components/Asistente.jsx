@@ -312,7 +312,7 @@ export function Asistente() {
 
   const {
     disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
-    modelo, modelos, elegirModelo, errorModelo,
+    modelo, modelos, elegirModelo, errorModelo, idioma,
   } = useAsistente();
   const { adjunto, error: errorAdjunto, cargar, quitar } = useAdjuntoTexto();
 
@@ -487,7 +487,7 @@ export function Asistente() {
       const r = await fetch("/api/chat/exportar", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ historial }),
+        body: JSON.stringify({ historial, idioma }),
       });
       const cuerpo = await r.json().catch(() => ({}));
       if (!r.ok) throw errorDeRespuesta(cuerpo, r.status, `El servidor respondió ${r.status}.`);

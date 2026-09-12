@@ -42,6 +42,7 @@ import { join } from 'node:path'
 import { CambiarModeloSchema, ChatSchema, ExportarChatSchema } from '../http/esquemas.mjs'
 import { firmarEnlace } from '../lib/enlacesFirmados.mjs'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
+import { etiquetasDeReporte } from '../ia/i18n/etiquetasReporte.mjs'
 
 export function registerChatRoutes(fastify, { config, chat, cola, diarioConversaciones = null }) {
   /**
@@ -405,7 +406,7 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
     '/api/chat/exportar',
     { schema: { body: ExportarChatSchema } },
     async (request, reply) => {
-      const { historial: turnos } = request.body
+      const { historial: turnos, idioma } = request.body
 
       if (!config.backlogChat?.dir) {
         request.log.warn(
@@ -440,10 +441,17 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
         })
       }
 
+      /*
+       * `es-MX`/`en-US` sólo cambian el FORMATO de la fecha (orden, coma vs.
+       * «a las»), no el idioma del reloj de la planta — mismo criterio que
+       * el resto de i18n del asistente: el separador es del idioma, la hora
+       * es la que es.
+       */
       const pdf = await reporteMod.componerConversacionPdf({
-        instalacion: 'Sistema de agua industrial',
-        generadoEl: new Date().toLocaleString('es-MX'),
+        instalacion: etiquetasDeReporte(idioma).instalacion,
+        generadoEl: new Date().toLocaleString(idioma === 'en' ? 'en-US' : 'es-MX'),
         turnos,
+        idioma,
       })
 
       const id = randomUUID()

@@ -240,6 +240,14 @@ export const ExportarChatSchema = z.object({
     .refine(turnos => turnos.length > 0, {
       message: 'No hay conversación que exportar.',
     }),
+  /*
+   * El idioma del tablero, para los rótulos fijos del PDF (i18n del
+   * asistente, F4). Mismo criterio que `ChatSchema.idioma`: `catch("es")` y
+   * no `default` a secas, para que un cliente viejo o un idioma no
+   * soportado exporte en español en vez de recibir un 400 por un campo de
+   * presentación.
+   */
+  idioma: z.enum(['es', 'en']).catch('es').default('es'),
 })
 
 export const CambiarModeloSchema = z.object({

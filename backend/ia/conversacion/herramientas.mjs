@@ -405,20 +405,40 @@ export function calcularTendencia(puntos) {
  * salvo que se acuerde de pedirlo. Mismo criterio que `describirCorrelacion`:
  * la frase la escribe el backend siempre igual, para no dejar la explicación
  * del reporte a que un 9B se acuerde de darla.
+ *
+ * `idioma` (i18n del asistente, F4): recibe `tendencia` CRUDA —tal como la
+ * devuelve `calcularTendencia()`, en español, nunca la ya narrada por
+ * `narrarTendenciaEnIngles`—, porque compara `direccion`/`nota` contra el
+ * texto español para decidir el verbo y la fiabilidad. Traducirla antes
+ * rompería esa comparación; se traduce el RESULTADO, no la entrada.
  */
-export function describirTendencia(tendencia, unidad = '') {
+export function describirTendencia(tendencia, unidad = '', idioma = 'es') {
   if (!tendencia || tendencia.cambioPorHora === undefined) {
-    return 'No hay muestras suficientes en este período para calcular una tendencia.'
+    return idioma === 'en'
+      ? 'Not enough samples in this period to calculate a trend.'
+      : 'No hay muestras suficientes en este período para calcular una tendencia.'
   }
 
   if (tendencia.direccion === 'estable') {
-    return 'Se mantuvo prácticamente estable en el período, sin una tendencia clara de subida o bajada.'
+    return idioma === 'en'
+      ? 'It stayed practically steady over the period, with no clear upward or downward trend.'
+      : 'Se mantuvo prácticamente estable en el período, sin una tendencia clara de subida o bajada.'
   }
 
   const u = unidad ? ` ${unidad}` : ''
-  const verbo = tendencia.direccion === 'subiendo' ? 'Subió' : 'Bajó'
   const pocoFiable = tendencia.nota?.startsWith('El ajuste es bajo')
 
+  if (idioma === 'en') {
+    const verbo = tendencia.direccion === 'subiendo' ? 'Rose' : 'Fell'
+    return (
+      `${verbo} at an average rate of ${Math.abs(tendencia.cambioPorHora)}${u} per hour` +
+      (pocoFiable
+        ? ', though with a lot of variation within the period: the trend is not very reliable.'
+        : ', fairly steadily.')
+    )
+  }
+
+  const verbo = tendencia.direccion === 'subiendo' ? 'Subió' : 'Bajó'
   return (
     `${verbo} a un ritmo medio de ${Math.abs(tendencia.cambioPorHora)}${u} por hora` +
     (pocoFiable

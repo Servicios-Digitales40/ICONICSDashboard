@@ -55,6 +55,8 @@ import { randomUUID } from 'node:crypto'
 import PDFDocument from 'pdfkit'
 import SVGtoPDF from 'svg-to-pdfkit'
 
+import { etiquetasDeReporte } from './i18n/etiquetasReporte.mjs'
+
 const MARGEN = 50
 const ANCHO_PAGINA = 595.28 // A4 en puntos
 const ALTO_PAGINA = 841.89
@@ -153,7 +155,7 @@ function sinPaginacion(doc, fn) {
 }
 
 /** Portada: fondo azul a sangre, banner centrado y bloque de título claro. */
-function dibujarPortada(doc, marca, { titulo, subtitulo, instalacion, periodo, generadoEl, folio }) {
+function dibujarPortada(doc, marca, etq, { titulo, subtitulo, instalacion, periodo, generadoEl, folio }) {
   if (marca.fondo) {
     doc.image(marca.fondo, 0, 0, { cover: [ANCHO_PAGINA, ALTO_PAGINA] })
   } else {
@@ -191,14 +193,14 @@ function dibujarPortada(doc, marca, { titulo, subtitulo, instalacion, periodo, g
   }
   if (generadoEl) {
     doc.moveDown(0.3).font('Helvetica').fontSize(10).fillColor(CLARO_TENUE)
-      .text(`Generado el ${generadoEl}`, MARGEN, doc.y, { width: ANCHO_TEXTO, align: 'center' })
+      .text(etq.generadoEl(generadoEl), MARGEN, doc.y, { width: ANCHO_TEXTO, align: 'center' })
   }
   if (folio) {
     // El folio en una "pastilla" cian tenue, para que se lea como un dato de
     // trazabilidad y no como una línea más del subtítulo.
     doc.moveDown(0.9)
     doc.font('Helvetica-Bold').fontSize(10.5)
-    const etiqueta = `FOLIO   ${folio}`
+    const etiqueta = `${etq.folio}   ${folio}`
     const anchoPastilla = doc.widthOfString(etiqueta) + 26
     const xPastilla = (ANCHO_PAGINA - anchoPastilla) / 2
     const yPastilla = doc.y
@@ -235,26 +237,27 @@ function dibujarCintillo(doc, marca) {
 }
 
 /** Pie con el folio (trazabilidad) a la izquierda y el número de página a la derecha. */
-function dibujarPie(doc, numero, total, folio) {
+function dibujarPie(doc, etq, numero, total, folio) {
   const y = ALTO_PAGINA - 40
   doc.save()
   doc.moveTo(MARGEN, y).lineTo(ANCHO_PAGINA - MARGEN, y).lineWidth(0.75).strokeColor(CIAN).stroke()
   doc.font('Helvetica').fontSize(8.5).fillColor(GRIS)
-    .text(folio ? `Folio ${folio}` : LEMA_PIE, MARGEN, y + 6, { width: 320, align: 'left', lineBreak: false })
-  doc.text(`Página ${numero} de ${total}`, ANCHO_PAGINA - MARGEN - 160, y + 6,
+    .text(folio ? `${etq.folioPie} ${folio}` : LEMA_PIE, MARGEN, y + 6,
+      { width: 320, align: 'left', lineBreak: false })
+  doc.text(etq.paginaDe(numero, total), ANCHO_PAGINA - MARGEN - 160, y + 6,
     { width: 160, align: 'right', lineBreak: false })
   doc.restore()
 }
 
 /** Estampa cintillo y pie en todas las páginas de contenido (la 0 es portada). */
-function sellarPaginas(doc, marca, folio) {
+function sellarPaginas(doc, marca, etq, folio) {
   const rango = doc.bufferedPageRange()
   const total = rango.count - 1 // sin contar la portada
   for (let i = 1; i < rango.count; i++) {
     doc.switchToPage(rango.start + i)
     sinPaginacion(doc, () => {
       dibujarCintillo(doc, marca)
-      dibujarPie(doc, i, total, folio)
+      dibujarPie(doc, etq, i, total, folio)
     })
   }
 }
@@ -308,23 +311,30 @@ function colorEstado(estado = '') {
  * arranque legible, y además es honesto cuando el historiador está caído: dice
  * cuántos gráficos se quedaron sin muestras en vez de callarlo.
  */
-function sintesisAutomatica(tablaActual, graficos) {
+function sintesisAutomatica(tablaActual, graficos, idioma = 'es') {
   const partes = []
   if (tablaActual?.length) {
     const fuera = tablaActual.filter((f) => /crit|alarm|daño|dano|aten|aviso|zona c|zona d/i.test(String(f.estado))).length
     const sinDato = tablaActual.filter((f) => f.valor === null || f.valor === undefined || /sin dato/i.test(String(f.estado))).length
     partes.push(
-      `${tablaActual.length} señal(es) con valor actual` +
-        (fuera ? `, ${fuera} fuera de banda` : ', todas en banda') +
-        (sinDato ? `, ${sinDato} sin dato` : '')
+      idioma === 'en'
+        ? `${tablaActual.length} signal(s) with a current value` +
+          (fuera ? `, ${fuera} out of band` : ', all in band') +
+          (sinDato ? `, ${sinDato} with no data` : '')
+        : `${tablaActual.length} señal(es) con valor actual` +
+          (fuera ? `, ${fuera} fuera de banda` : ', todas en banda') +
+          (sinDato ? `, ${sinDato} sin dato` : '')
     )
   }
   if (graficos?.length) {
     const conSerie = graficos.filter((g) => g.svg).length
     const sinSerie = graficos.length - conSerie
     partes.push(
-      `${conSerie} de ${graficos.length} gráfico(s) con serie histórica` +
-        (sinSerie ? `; ${sinSerie} sin muestras en el período` : '')
+      idioma === 'en'
+        ? `${conSerie} of ${graficos.length} chart(s) with historical data` +
+          (sinSerie ? `; ${sinSerie} with no samples in this period` : '')
+        : `${conSerie} de ${graficos.length} gráfico(s) con serie histórica` +
+          (sinSerie ? `; ${sinSerie} sin muestras en el período` : '')
     )
   }
   return partes.length ? `${partes.join('. ')}.` : null
@@ -355,6 +365,9 @@ function nuevoDocumento() {
  * @param {{senal: string, valor: number|string|null, unidad: string|null, estado: string}[]} datos.tablaActual
  * @param {string[]} datos.notas
  * @param {string|null} [datos.explicacion] Comentario del MODELO, aparte de `interpretacion`.
+ * @param {"es"|"en"} [datos.idioma] El del tablero (i18n del asistente, F4). El PDF
+ *   se cierra antes de que el modelo escriba nada, así que este idioma llega
+ *   por el llamador —`generar_reporte`—, no por el prompt.
  * @returns {Promise<Buffer>}
  */
 export async function componerReportePdf({
@@ -366,14 +379,16 @@ export async function componerReportePdf({
   notas,
   explicacion,
   folio,
+  idioma = 'es',
 }) {
+  const etq = etiquetasDeReporte(idioma)
   const folioFinal = folio || generarFolio()
   const { doc, cerrado } = nuevoDocumento()
   const marca = cargarMarca()
 
-  sinPaginacion(doc, () => dibujarPortada(doc, marca, {
-    titulo: 'REPORTE TÉCNICO',
-    subtitulo: 'Monitoreo y análisis de planta',
+  sinPaginacion(doc, () => dibujarPortada(doc, marca, etq, {
+    titulo: etq.reporteTitulo,
+    subtitulo: etq.reporteSubtitulo,
     instalacion,
     periodo,
     generadoEl,
@@ -384,9 +399,9 @@ export async function componerReportePdf({
 
   // Síntesis SIEMPRE presente, hecha en código: no depende de que el modelo
   // escriba nada. Ver `sintesisAutomatica`.
-  const sintesis = sintesisAutomatica(tablaActual, graficos)
+  const sintesis = sintesisAutomatica(tablaActual, graficos, idioma)
   if (sintesis) {
-    tituloSeccion(doc, 'Síntesis')
+    tituloSeccion(doc, etq.seccionSintesis)
     cajaResumen(doc, sintesis)
   }
 
@@ -394,19 +409,19 @@ export async function componerReportePdf({
   // el propio backend en cada gráfico más abajo. Con su procedencia dicha,
   // para no dejar que se lea como si fuera una cifra medida.
   if (explicacion) {
-    tituloSeccion(doc, 'Resumen del asistente')
+    tituloSeccion(doc, etq.seccionResumenAsistente)
     cajaResumen(doc, explicacion)
   }
 
   if (tablaActual.length) {
-    tituloSeccion(doc, 'Valores actuales (sin serie histórica)')
+    tituloSeccion(doc, etq.seccionValoresActuales)
 
     // Encabezado de columnas.
     let yFila = doc.y
     doc.font('Helvetica-Bold').fontSize(9).fillColor(GRIS)
-    doc.text('SEÑAL', MARGEN + 14, yFila, { width: 250, lineBreak: false })
-    doc.text('VALOR', MARGEN + 270, yFila, { width: 110, lineBreak: false })
-    doc.text('ESTADO', MARGEN + 385, yFila, { width: ANCHO_TEXTO - 385, align: 'right', lineBreak: false })
+    doc.text(etq.colSenal, MARGEN + 14, yFila, { width: 250, lineBreak: false })
+    doc.text(etq.colValor, MARGEN + 270, yFila, { width: 110, lineBreak: false })
+    doc.text(etq.colEstado, MARGEN + 385, yFila, { width: ANCHO_TEXTO - 385, align: 'right', lineBreak: false })
     doc.y = yFila + 15
     doc.save().moveTo(MARGEN, doc.y - 3).lineTo(ANCHO_PAGINA - MARGEN, doc.y - 3)
       .lineWidth(0.5).strokeColor('#D5DEEA').stroke().restore()
@@ -414,7 +429,7 @@ export async function componerReportePdf({
     for (const fila of tablaActual) {
       if (doc.y + 16 > LIMITE_INFERIOR) doc.addPage()
       yFila = doc.y
-      const valor = fila.valor === null || fila.valor === undefined ? 'sin dato' : fila.valor
+      const valor = fila.valor === null || fila.valor === undefined ? etq.sinDato : fila.valor
       const unidad = fila.unidad ? ` ${fila.unidad}` : ''
       const col = colorEstado(fila.estado)
 
@@ -430,7 +445,7 @@ export async function componerReportePdf({
     doc.moveDown(0.6)
   }
 
-  if (graficos.length) tituloSeccion(doc, 'Tendencias')
+  if (graficos.length) tituloSeccion(doc, etq.seccionTendencias)
   for (const grafico of graficos) {
     // Todo el bloque —título, gráfico, resumen— entra junto o se pasa
     // entero a la siguiente página. Nunca a medias.
@@ -457,11 +472,7 @@ export async function componerReportePdf({
     if (grafico.resumen) {
       const r = grafico.resumen
       const unidad = grafico.unidad ? ` ${grafico.unidad}` : ''
-      doc.text(
-        `Mínimo ${r.minimo}${unidad} · Máximo ${r.maximo}${unidad} · Promedio ${r.promedio}${unidad} ` +
-          `· ${r.muestras} muestras`,
-        MARGEN, doc.y, { width: ANCHO_TEXTO }
-      )
+      doc.text(etq.resumenGrafico(r, unidad), MARGEN, doc.y, { width: ANCHO_TEXTO })
       /*
        * La cobertura va JUNTO al promedio y no en una nota al pie, porque es
        * lo que dice si ese promedio se puede leer como el del período. Un
@@ -469,12 +480,7 @@ export async function componerReportePdf({
        * presentado como el de diez.
        */
       if (grafico.cobertura && !grafico.cobertura.completa) {
-        doc.fillColor('#9A6410').text(
-          `Sólo ${grafico.cobertura.diasLeidos} de los ${grafico.cobertura.diasTotal} días del ` +
-            'rango tienen registro en el historiador: estas cifras son de esos días, no del ' +
-            'período entero.',
-          MARGEN, doc.y, { width: ANCHO_TEXTO }
-        )
+        doc.fillColor('#9A6410').text(etq.coberturaParcial(grafico.cobertura), MARGEN, doc.y, { width: ANCHO_TEXTO })
         doc.fillColor(GRIS)
       }
       if (grafico.interpretacion) doc.text(grafico.interpretacion, MARGEN, doc.y, { width: ANCHO_TEXTO })
@@ -488,12 +494,12 @@ export async function componerReportePdf({
   if (notas.length) {
     const altoNotas = 24 + notas.length * 14
     if (doc.y + altoNotas > LIMITE_INFERIOR) doc.addPage()
-    tituloSeccion(doc, 'Notas y avisos')
+    tituloSeccion(doc, etq.seccionNotasYAvisos)
     doc.font('Helvetica').fontSize(10).fillColor(TEXTO)
     for (const nota of notas) doc.text(`•  ${nota}`, MARGEN, doc.y, { width: ANCHO_TEXTO })
   }
 
-  sellarPaginas(doc, marca, folioFinal)
+  sellarPaginas(doc, marca, etq, folioFinal)
   doc.end()
   return cerrado
 }
@@ -511,16 +517,21 @@ export async function componerReportePdf({
  * @param {string} datos.instalacion
  * @param {string} datos.generadoEl Fecha/hora local, legible.
  * @param {{rol: 'usuario'|'asistente', texto: string}[]} datos.turnos
+ * @param {"es"|"en"} [datos.idioma] El del tablero en el momento de exportar
+ *   (i18n del asistente, F4) — lo manda `POST /api/chat/exportar`, no viaja
+ *   con cada turno: los turnos que ya están en el idioma anterior no se
+ *   retraducen, sólo la plantilla del documento (título, «Operador»/«Asistente»).
  * @returns {Promise<Buffer>}
  */
-export async function componerConversacionPdf({ instalacion, generadoEl, turnos, folio }) {
+export async function componerConversacionPdf({ instalacion, generadoEl, turnos, folio, idioma = 'es' }) {
+  const etq = etiquetasDeReporte(idioma)
   const folioFinal = folio || generarFolio()
   const { doc, cerrado } = nuevoDocumento()
   const marca = cargarMarca()
 
-  sinPaginacion(doc, () => dibujarPortada(doc, marca, {
-    titulo: 'REPORTE DE CONVERSACIÓN',
-    subtitulo: 'Diálogo con el asistente de planta',
+  sinPaginacion(doc, () => dibujarPortada(doc, marca, etq, {
+    titulo: etq.conversacionTitulo,
+    subtitulo: etq.conversacionSubtitulo,
     instalacion,
     periodo: null,
     generadoEl,
@@ -532,13 +543,13 @@ export async function componerConversacionPdf({ instalacion, generadoEl, turnos,
   for (const turno of turnos) {
     const esUsuario = turno.rol === 'usuario'
     doc.font('Helvetica-Bold').fontSize(11).fillColor(esUsuario ? CIAN : AZUL)
-      .text(esUsuario ? 'Operador' : 'Asistente', MARGEN, doc.y, { width: ANCHO_TEXTO })
+      .text(esUsuario ? etq.rolOperador : etq.rolAsistente, MARGEN, doc.y, { width: ANCHO_TEXTO })
     doc.font('Helvetica').fontSize(10.5).fillColor(TEXTO)
       .text(turno.texto, MARGEN, doc.y, { width: ANCHO_TEXTO, align: 'left' })
     doc.moveDown()
   }
 
-  sellarPaginas(doc, marca, folioFinal)
+  sellarPaginas(doc, marca, etq, folioFinal)
   doc.end()
   return cerrado
 }

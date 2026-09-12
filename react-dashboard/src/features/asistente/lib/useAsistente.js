@@ -401,6 +401,13 @@ export function useAsistente() {
   return {
     disponible, mensajes, estado, ocupado, preguntar, reintentar, cancelar, limpiar,
     modelo, modelos, elegirModelo, errorModelo,
+    /*
+     * Se expone para que `exportarPdf` en `Asistente.jsx` (i18n del PDF, F4)
+     * lo mande a `POST /api/chat/exportar` sin recalcular `resolvedLanguage`
+     * por su cuenta — es el mismo idioma con el que ya se preguntó, y el
+     * backend lo necesita para componer el documento en ese idioma.
+     */
+    idioma,
   };
 }
 

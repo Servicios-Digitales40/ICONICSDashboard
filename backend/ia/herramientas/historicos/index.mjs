@@ -86,6 +86,7 @@ import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
 import { fallo } from '../lib/respuesta.mjs'
 import { narrarTendenciaEnIngles } from '../../i18n/narrarTendencia.mjs'
 import { narrarMecanismoEnIngles } from '../../i18n/narrarRiesgo.mjs'
+import { etiquetasDeReporte } from '../../i18n/etiquetasReporte.mjs'
 /*
  * Lo que sigue en `herramientas.mjs` es lo que todavía no tiene una familia
  * propia: el índice de nombres de señal del tanque (`resolverSenal`,
@@ -1347,7 +1348,7 @@ export function crearHerramientasDeHistoricos({
      * `analisis_de_senal`) y pasar aquí su propio comentario, que se imprime
      * aparte y con su procedencia dicha, nunca mezclado con las cifras.
      */
-    async generar_reporte({ senales, periodo, explicacion } = {}) {
+    async generar_reporte({ senales, periodo, explicacion } = {}, { idioma = 'es' } = {}) {
       const v = resolverVentana(periodo, { turnos, maxHoras: MAX_DIAS_REPORTE * 24 })
       if (v.error) return fallo(v.error)
 
@@ -1386,7 +1387,9 @@ export function crearHerramientasDeHistoricos({
                 unidad: meta.unidad || null,
                 svg: null,
                 resumen: null,
-                nota: `Sin muestras de ${meta.label} en ${v.etiqueta}.`,
+                nota: idioma === 'en'
+                  ? `No samples of ${meta.label} in ${v.etiqueta}.`
+                  : `Sin muestras de ${meta.label} en ${v.etiqueta}.`,
               }
             }
 
@@ -1402,7 +1405,7 @@ export function crearHerramientasDeHistoricos({
               svg = renderizarGraficoSerie(downsamplear(muestras, PUNTOS_GRAFICO_REPORTE), {
                 titulo: meta.label,
                 unidad: meta.unidad || null,
-                banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave]) : null,
+                banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null,
               })
             } catch (error) {
               return {
@@ -1410,13 +1413,17 @@ export function crearHerramientasDeHistoricos({
                 unidad: meta.unidad || null,
                 svg: null,
                 resumen: null,
-                nota: `No se pudo dibujar ${meta.label}: ${error.message}`,
+                nota: idioma === 'en'
+                  ? `Could not draw ${meta.label}: ${error.message}`
+                  : `No se pudo dibujar ${meta.label}: ${error.message}`,
               }
             }
 
             if (diasLeidos < diasTotal) {
               notas.push(
-                `${meta.label}: sólo se pudieron leer ${diasLeidos} de ${diasTotal} días del historiador.`
+                idioma === 'en'
+                  ? `${meta.label}: only ${diasLeidos} of ${diasTotal} days could be read from the historian.`
+                  : `${meta.label}: sólo se pudieron leer ${diasLeidos} de ${diasTotal} días del historiador.`
               )
             }
 
@@ -1449,7 +1456,7 @@ export function crearHerramientasDeHistoricos({
                 : null,
               // La explicación GARANTIZADA del PDF — ver la cabecera de
               // `generar_reporte`. No depende de que el modelo la pida.
-              interpretacion: describirTendencia(tendencia, meta.unidad),
+              interpretacion: describirTendencia(tendencia, meta.unidad, idioma),
               nota: null,
             }
           })
@@ -1458,11 +1465,16 @@ export function crearHerramientasDeHistoricos({
 
       let tablaActual = []
       if (sinHistoriaPedidas.length) {
-        /* `sistema` es OBLIGATORIO desde que estas herramientas sirven a
-           cualquier máquina del registro: llamar sin él devuelve un fallo, y
-           el reporte caía al respaldo «sin dato» sin decir por qué. El reporte
-           es del tanque —sus señales salen de `SENAL_KEYS`— así que se nombra. */
-        const estado = await dameHerramientas().estado_del_sistema({ sistema: 'tanque' })
+        /*
+         * `sistema` es OBLIGATORIO desde que estas herramientas sirven a
+         * cualquier máquina del registro: llamar sin él devuelve un fallo, y
+         * el reporte caía al respaldo «sin dato» sin decir por qué. El reporte
+         * es del tanque —sus señales salen de `SENAL_KEYS`— así que se nombra.
+         * `idioma` se reenvía aunque el tanque no lo use en su `resumen()`
+         * (ver el mismo comentario en `estado_del_sistema` de `maquina/index.mjs`):
+         * esta llamada es directa, vía `dameHerramientas()`, no por `ejecutar()`.
+         */
+        const estado = await dameHerramientas().estado_del_sistema({ sistema: 'tanque' }, { idioma })
         if (estado.ok) {
           const todas = estado.activos.flatMap(a => a.senales)
           tablaActual = sinHistoriaPedidas.map(clave => {
@@ -1470,20 +1482,27 @@ export function crearHerramientasDeHistoricos({
             const s = todas.find(x => x.clave === clave)
             return s
               ? { senal: s.senal, valor: s.valor, unidad: s.unidad, estado: s.estado }
-              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: 'sin dato' }
+              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato }
           })
         } else {
-          notas.push('No se pudo leer el valor actual de las señales sin historia.')
+          notas.push(idioma === 'en'
+            ? 'Could not read the current value of the signals with no history.'
+            : 'No se pudo leer el valor actual de las señales sin historia.')
         }
       }
 
       if (desconocidas.length) {
-        notas.push(`No se reconocieron estas señales y se omitieron: ${desconocidas.join(', ')}.`)
+        notas.push(idioma === 'en'
+          ? `These signals were not recognized and were skipped: ${desconocidas.join(', ')}.`
+          : `No se reconocieron estas señales y se omitieron: ${desconocidas.join(', ')}.`)
       }
       if (sinHistoriaPedidas.length) {
         notas.push(
-          `${sinHistoriaPedidas.length} de las ${claves.length} señales pedidas no tienen serie ` +
-            'histórica en este servidor; van con su valor actual, sin gráfico.'
+          idioma === 'en'
+            ? `${sinHistoriaPedidas.length} of the ${claves.length} requested signals have no ` +
+              'historical series on this server; they are listed with their current value, with no chart.'
+            : `${sinHistoriaPedidas.length} de las ${claves.length} señales pedidas no tienen serie ` +
+              'histórica en este servidor; van con su valor actual, sin gráfico.'
         )
       }
 
@@ -1505,7 +1524,7 @@ export function crearHerramientasDeHistoricos({
       }
 
       const pdf = await reporteMod.componerReportePdf({
-        instalacion: 'Sistema de agua industrial',
+        instalacion: etiquetasDeReporte(idioma).instalacion,
         periodo: v.etiqueta,
         generadoEl: horaLocal(new Date().toISOString()),
         graficos,
@@ -1516,6 +1535,7 @@ export function crearHerramientasDeHistoricos({
         // procedencia dicha — ver `reporte.mjs` — para no mezclar lo medido
         // con lo que el modelo opina.
         explicacion: typeof explicacion === 'string' && explicacion.trim() ? explicacion.trim() : null,
+        idioma,
       })
 
       const id = randomUUID()
@@ -1525,7 +1545,7 @@ export function crearHerramientasDeHistoricos({
 
       return {
         ok: true,
-        instalacion: 'Sistema de agua industrial',
+        instalacion: etiquetasDeReporte(idioma).instalacion,
         periodo: v.etiqueta,
         senalesConGrafico: historizadasPedidas.map(c => senalInfo(c).label),
         senalesEnTabla: sinHistoriaPedidas.map(c => senalInfo(c).label),

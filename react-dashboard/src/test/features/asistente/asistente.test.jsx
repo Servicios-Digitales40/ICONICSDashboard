@@ -632,6 +632,9 @@ describe("exportar la conversación a PDF", () => {
       expect(llamada[1].method).toBe("POST");
       const cuerpo = JSON.parse(llamada[1].body);
       expect(cuerpo.historial.some((t) => t.rol === "usuario" && t.texto === "hola")).toBe(true);
+      // i18n del asistente (F4): el PDF de la conversación se compone en el
+      // idioma del tablero, así que el botón lo manda igual que /api/chat.
+      expect(cuerpo.idioma).toBeTruthy();
     });
   });
 

@@ -38,6 +38,7 @@ import assert from 'node:assert/strict'
 import { mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import {
   DEFINICIONES,
   createHerramientas,
@@ -2214,6 +2215,75 @@ await checkAsync(
     assert.equal(contenido.subarray(0, 4).toString(), '%PDF', 'el archivo escrito es un PDF de verdad')
   }
 )
+
+/**
+ * Extrae el texto de un PDF con `pdfjs-dist`, igual que hace
+ * `extraccion.worker.mjs` para los manuales. El texto de pdfkit viaja
+ * comprimido (FlateDecode) dentro de los content streams, así que buscar
+ * los rótulos como bytes literales del archivo no funciona — hay que
+ * decodificarlo de verdad.
+ */
+async function textoDelPdf(buffer) {
+  // `pdfjs-dist` vive en `backend/node_modules`, no en la raíz — este script
+  // corre desde la raíz (`node scripts/verificar-herramientas.mjs`), así que
+  // se resuelve por ruta explícita, igual que
+  // `backend/ia/indices/extraccion.worker.mjs`.
+  const rutaPdfjs = join(
+    process.cwd(), 'backend', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs'
+  )
+  const pdfjs = await import(pathToFileURL(rutaPdfjs).href)
+  const doc = await pdfjs.getDocument({
+    data: new Uint8Array(buffer), useSystemFonts: false, isEvalSupported: false,
+  }).promise
+  let texto = ''
+  for (let n = 1; n <= doc.numPages; n++) {
+    const contenido = await (await doc.getPage(n)).getTextContent()
+    texto += contenido.items.map((it) => it.str).join(' ') + '\n'
+  }
+  return texto
+}
+
+await checkAsync('generar_reporte(idioma: "en") compone el PDF en inglés (i18n del asistente, F4)', async () => {
+  /*
+   * El PDF se cierra antes de que el modelo escriba nada (ver la cabecera de
+   * `generar_reporte` y de `reporte.mjs`), así que esto no se puede probar
+   * mirando lo que el modelo narra — hay que abrir el propio PDF.
+   */
+  const reportes = await reportesTmp()
+  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
+    'generar_reporte',
+    { senales: ['nivel', 'carga del motor'] },
+    { idioma: 'en' }
+  )
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.instalacion, 'Industrial water system', 'la respuesta al modelo también se traduce')
+
+  const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
+  const pdf = await readFile(join(reportes.dir, `${id}.pdf`))
+  assert.equal(pdf.subarray(0, 4).toString(), '%PDF')
+
+  const texto = await textoDelPdf(pdf)
+  assert.match(texto, /TECHNICAL REPORT/, 'el título de portada tiene que estar en inglés')
+  assert.match(texto, /Trends/, 'la sección de gráficos tiene que estar en inglés')
+  assert.doesNotMatch(texto, /REPORTE T[EÉ]CNICO/, 'no debe quedar el título español')
+})
+
+await checkAsync('sin `idioma`, generar_reporte sigue en español: no rompe nada existente', async () => {
+  const reportes = await reportesTmp()
+  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
+    'generar_reporte',
+    { senales: ['nivel', 'carga del motor'] }
+  )
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.instalacion, 'Sistema de agua industrial')
+
+  const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
+  const pdf = await readFile(join(reportes.dir, `${id}.pdf`))
+  const texto = await textoDelPdf(pdf)
+  assert.match(texto, /REPORTE T[EÉ]CNICO/, 'el título en español tiene que seguir saliendo por defecto')
+})
 
 await checkAsync('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
   const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
