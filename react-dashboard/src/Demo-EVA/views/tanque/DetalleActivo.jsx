@@ -29,7 +29,7 @@ import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
 import { useDetalleActivo } from "../../data/tanque/detalleActivo.js";
 import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/tanque/historia.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
-import { historizadas, senalInfo } from "../../domain/senales.js";
+import { historizadas, pointName, senalInfo } from "../../domain/senales.js";
 import { useAhora } from "../../lib/useAhora.js";
 import { UltimaLectura, PuntoEstado } from "../../components/base.jsx";
 import { estadoColor, TONO } from "../../components/paleta.js";
@@ -230,7 +230,10 @@ function DetalleActivo({ params, onNavigate }) {
       const series = await Promise.all(
         claves.map(async (clave) => {
           const { datos, cobertura, motivo } = await source.leerSerie(clave, rango);
-          return { senal: senalInfo(clave), datos, cobertura, motivo };
+          /* `punto` para la cabecera de procedencia del archivo (Plan 24 F3):
+             las cinco son de la misma máquina, así que basta con que lo traiga
+             cualquiera — `armarCSVGeneral` la declara una vez. */
+          return { senal: senalInfo(clave), datos, cobertura, motivo, punto: pointName(clave) };
         })
       );
       descargarCSV(nombreArchivoGeneral(rango), armarCSVGeneral(series, locale));

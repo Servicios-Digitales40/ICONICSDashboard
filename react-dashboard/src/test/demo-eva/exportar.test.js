@@ -11,7 +11,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { datosACSV, nombreArchivo, notaDeCobertura, prepararSvgParaExportar } from "@/Demo-EVA/lib/exportar.js";
+import { datosACSV, nombreArchivo, notaDeCobertura, notaDeProcedencia, prepararSvgParaExportar } from "@/Demo-EVA/lib/exportar.js";
+import { SISTEMA } from "@shared/eva/comun/sistemas.js";
+import { pointName } from "@shared/eva/tanque/senales.js";
 
 const SENAL_NIVEL = { key: "nivelTanque", corto: "Nivel", unidad: "%" };
 const SENAL_SIN_UNIDAD = { key: "presionRelativa", corto: "Presión", unidad: "" };
@@ -44,27 +46,58 @@ describe("nombreArchivo: describe lo que HAY en el archivo, no lo que se pidió"
   });
 });
 
+/*
+ * ── LAS NOTAS `#` VAN DELANTE, ASÍ QUE NO SE INDEXA POR POSICIÓN ──────
+ *
+ * Estas pruebas hacían `split(CRLF)[0]` para leer la cabecera y `.slice(1)`
+ * para las filas. Funcionaba mientras la cabecera fuera siempre la primera
+ * línea; al añadir la cabecera de procedencia (Plan 24 F3) dejó de serlo y seis
+ * pruebas se pusieron en rojo de golpe — ninguna por un fallo del exportador.
+ *
+ * Se arregla localizando la cabecera por su CONTENIDO en vez de por su sitio, y
+ * eso es más fuerte que reajustar los índices a la posición nueva: una prueba
+ * que sabe «la cabecera es la línea que empieza por instante_iso» sobrevive a la
+ * siguiente nota que alguien ponga delante, y sigue fallando de verdad si la
+ * cabecera desaparece.
+ */
+const LINEAS = (csv) => csv.split("\r\n");
+const esNota = (linea) => linea.startsWith("#") || linea.startsWith('"#');
+const cabeceraDe = (csv) => LINEAS(csv).find((l) => l.startsWith("instante_iso"));
+const filasDe = (csv) => {
+  const lineas = LINEAS(csv);
+  const i = lineas.findIndex((l) => l.startsWith("instante_iso"));
+  return lineas.slice(i + 1);
+};
+
 describe("datosACSV: una fila por muestra, con procedencia y sin inventar calidad", () => {
   it("la cabecera lleva la unidad cuando el tag la declara", () => {
-    const csv = datosACSV(SENAL_NIVEL, DOS_PUNTOS);
-    expect(csv.split("\r\n")[0]).toBe("instante_iso,hora_local,valor (%)");
+    expect(cabeceraDe(datosACSV(SENAL_NIVEL, DOS_PUNTOS))).toBe("instante_iso,hora_local,valor (%)");
   });
 
   it("sin unidad declarada, la cabecera no inventa una", () => {
-    const csv = datosACSV(SENAL_SIN_UNIDAD, DOS_PUNTOS);
-    expect(csv.split("\r\n")[0]).toBe("instante_iso,hora_local,valor");
+    expect(cabeceraDe(datosACSV(SENAL_SIN_UNIDAD, DOS_PUNTOS))).toBe("instante_iso,hora_local,valor");
   });
 
   it("cada fila lleva el instante en ISO y el valor, en el orden de los datos", () => {
-    const filas = datosACSV(SENAL_NIVEL, DOS_PUNTOS).split("\r\n").slice(1);
+    const filas = filasDe(datosACSV(SENAL_NIVEL, DOS_PUNTOS));
     expect(filas).toHaveLength(2);
     expect(filas[0]).toContain(DOS_PUNTOS[0].t.toISOString());
     expect(filas[0]).toContain("62.5");
     expect(filas[1]).toContain(DOS_PUNTOS[1].t.toISOString());
   });
 
-  it("sin datos, sólo queda la cabecera — no una fila vacía", () => {
-    expect(datosACSV(SENAL_NIVEL, []).split("\r\n")).toHaveLength(1);
+  it("sin datos no hay ninguna fila — ni una vacía", () => {
+    expect(filasDe(datosACSV(SENAL_NIVEL, []))).toHaveLength(0);
+  });
+
+  it("la cabecera de procedencia va antes de la de columnas, y sólo como comentario", () => {
+    const lineas = LINEAS(datosACSV(SENAL_NIVEL, DOS_PUNTOS));
+    const iCabecera = lineas.findIndex((l) => l.startsWith("instante_iso"));
+
+    // Todo lo que va delante de la cabecera es una nota `#`: nada que Excel
+    // pueda confundir con datos.
+    expect(iCabecera).toBeGreaterThan(0);
+    expect(lineas.slice(0, iCabecera).every(esNota)).toBe(true);
   });
 
   /*
@@ -74,12 +107,12 @@ describe("datosACSV: una fila por muestra, con procedencia y sin inventar calida
    * comportando como antes: "es-MX" es su valor por defecto.
    */
   it("sin locale, sigue formateando como es-MX (el valor por defecto)", () => {
-    const filas = datosACSV(SENAL_NIVEL, DOS_PUNTOS).split("\r\n").slice(1);
+    const filas = filasDe(datosACSV(SENAL_NIVEL, DOS_PUNTOS));
     expect(filas[0]).toContain(DOS_PUNTOS[0].t.toLocaleString("es-MX"));
   });
 
   it("con locale en-US, la hora de la fila se escribe en inglés", () => {
-    const filas = datosACSV(SENAL_NIVEL, DOS_PUNTOS, null, "en-US").split("\r\n").slice(1);
+    const filas = filasDe(datosACSV(SENAL_NIVEL, DOS_PUNTOS, null, "en-US"));
     expect(filas[0]).toContain(DOS_PUNTOS[0].t.toLocaleString("en-US"));
     expect(filas[0]).not.toContain(DOS_PUNTOS[0].t.toLocaleString("es-MX"));
   });
@@ -139,5 +172,61 @@ describe("prepararSvgParaExportar: fondo y título dentro de la imagen", () => {
     prepararSvgParaExportar(original, { titulo: "x", fondo: "#fff" });
     expect(original.querySelector(".trazo-de-verdad")).toBeTruthy();
     expect(original.querySelector("rect")).toBeNull();
+  });
+});
+
+/* ── La procedencia del archivo (Plan 24 F3 · USO-09) ────────────────── */
+
+describe("notaDeProcedencia: un CSV que se puede defender solo meses después", () => {
+  const PUNTO = pointName("nivelTanque");
+
+  it("declara el tag entero, la máquina con su PLC y el agregado", () => {
+    const nota = notaDeProcedencia({ senal: { ...SENAL_NIVEL, historizado: true }, punto: PUNTO });
+
+    expect(nota).toContain(PUNTO);
+    // Del registro, no de un literal: si alguien cambia el PLC en
+    // `sistemas.js`, el archivo tiene que seguir diciendo la verdad.
+    expect(nota).toContain(SISTEMA.tanque.plc);
+    expect(nota).toContain(SISTEMA.tanque.series.agregado);
+  });
+
+  it("cada línea es un comentario `#`: Excel no la confunde con datos", () => {
+    const nota = notaDeProcedencia({ senal: SENAL_NIVEL, punto: PUNTO });
+
+    for (const linea of nota.split("\r\n")) {
+      expect(linea.startsWith("#") || linea.startsWith('"#')).toBe(true);
+    }
+  });
+
+  it("sin punto no inventa máquina: es el cruce que este archivo no puede reintroducir", () => {
+    const nota = notaDeProcedencia({ senal: SENAL_NIVEL, punto: null });
+
+    expect(nota).not.toContain(SISTEMA.tanque.plc);
+    expect(nota).not.toContain(SISTEMA.vibraciones.plc);
+    // Pero sigue fechando la exportación: lo que no se sabe se calla, lo que
+    // sí se sabe se dice.
+    expect(nota).toMatch(/# exportado:/);
+  });
+
+  it("una señal sin serie propia no promete un agregado que no tiene", () => {
+    const nota = notaDeProcedencia({
+      senal: { ...SENAL_NIVEL, historizado: false }, punto: PUNTO,
+    });
+    expect(nota).not.toMatch(/# agregado:/);
+  });
+
+  it("sin señal no hay nota, en vez de una nota vacía", () => {
+    expect(notaDeProcedencia({ senal: null })).toBeNull();
+  });
+
+  it("la del tanque y la de vibraciones no se pueden confundir", () => {
+    const delTanque = notaDeProcedencia({ senal: SENAL_NIVEL, punto: PUNTO });
+    const deVibra = notaDeProcedencia({
+      senal: { key: "x", corto: "x" }, punto: SISTEMA.vibraciones.puntos()[0],
+    });
+
+    expect(delTanque).toContain(SISTEMA.tanque.plc);
+    expect(deVibra).toContain(SISTEMA.vibraciones.plc);
+    expect(deVibra).not.toContain(SISTEMA.tanque.plc);
   });
 });

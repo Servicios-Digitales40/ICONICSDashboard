@@ -27,6 +27,7 @@
  * porque el nombre seguía diciendo el rango original.
  */
 import { AGREGADO } from "@shared/eva/comun/historia.js";
+import { procedenciaDe } from "@shared/eva/comun/procedencia.js";
 
 /** "Presión del tanque" → "presion-del-tanque". Sin acentos: un nombre de archivo no debe depender de que el sistema operativo los soporte bien. */
 function slug(texto) {
@@ -97,7 +98,7 @@ export function celdaCSV(valor) {
 /** Fin de línea de CSV: Windows/Excel lo esperan así. */
 export const CRLF = "\r\n";
 
-export function datosACSV(senal, datos, cobertura = null, locale = "es-MX") {
+export function datosACSV(senal, datos, cobertura = null, locale = "es-MX", punto = null) {
   const cabecera = ["instante_iso", "hora_local", senal.unidad ? `valor (${senal.unidad})` : "valor"];
   const filas = (datos ?? []).map((p) => [
     p.t.toISOString(),
@@ -106,8 +107,23 @@ export function datosACSV(senal, datos, cobertura = null, locale = "es-MX") {
   ]);
 
   const cuerpo = [cabecera, ...filas].map((fila) => fila.map(celdaCSV).join(",")).join(CRLF);
-  const nota = notaDeCobertura(cobertura, null, locale);
-  return nota ? nota + CRLF + cuerpo : cuerpo;
+
+  /*
+   * Orden de las notas: procedencia primero, cobertura después. La procedencia
+   * dice DE DÓNDE salió el archivo y la cobertura QUÉ LE FALTA, así que se leen
+   * en ese orden — igual que el `accion` de F2 va después del detalle.
+   *
+   * `punto` es el último parámetro y opcional para no romper las llamadas que
+   * ya existían: sin él la nota sale sin máquina, que es exactamente lo que
+   * `procedenciaDe()` hace cuando no puede identificarla, y nunca una máquina
+   * adivinada.
+   */
+  const notas = [
+    notaDeProcedencia({ senal, punto, locale }),
+    notaDeCobertura(cobertura, null, locale),
+  ].filter(Boolean);
+
+  return notas.length ? notas.join(CRLF) + CRLF + cuerpo : cuerpo;
 }
 
 /**
@@ -148,6 +164,61 @@ export function notaDeCobertura(cobertura, etiqueta = null, locale = "es-MX") {
   );
 }
 
+
+/**
+ * La PROCEDENCIA del archivo, en líneas de comentario delante de todo
+ * (Plan 24 F3 · `USO-09`).
+ *
+ * ── POR QUÉ UN CSV TIENE QUE PODER DEFENDERSE SOLO ─────────────────
+ *
+ * Porque se abre meses después, en otra máquina, fuera de esta aplicación y
+ * por alguien que no recuerda de qué pantalla salió. Hasta ahora el archivo
+ * decía QUÉ señal y en qué rango —en su nombre— pero no de qué máquina, de qué
+ * PLC, ni con qué agregado del historiador. Con dos instalaciones que no se
+ * pueden mezclar (`NO_COMPARTEN`), «presion-del-tanque_…csv» en el escritorio
+ * de alguien no basta para saber a qué planta pertenece.
+ *
+ * Sale de `procedenciaDe()` y no se recompone aquí: es el mismo dominio que
+ * pinta el panel de F1, así que el archivo y la pantalla no pueden discrepar.
+ * Si mañana cambia la ruta del historiador de una máquina, los dos lo heredan.
+ *
+ * ── POR QUÉ `#` Y NO UNA CABECERA DE COLUMNAS ──────────────────────
+ *
+ * Mismo criterio que `notaDeCobertura`, y por el mismo motivo: Excel y pandas
+ * tratan `#` como comentario o como fila suelta, nunca como parte de la
+ * cabecera. Meter la procedencia en columnas obligaría a repetirla en cada
+ * fila o a romper la rejilla del CSV.
+ */
+export function notaDeProcedencia({ senal, punto = null, locale = "es-MX" } = {}) {
+  const p = procedenciaDe({ senal, punto });
+  if (!p) return null;
+
+  const lineas = [];
+
+  /* El tag entero: es lo que permite ir a ICONICS a comprobar el punto. */
+  if (p.punto) lineas.push(`# punto: ${p.punto}`);
+
+  /*
+   * Máquina y PLC juntos, como en el panel: son el mismo hecho visto de dos
+   * formas, y es la línea que impide confundir dos instalaciones.
+   */
+  if (p.sistema) {
+    lineas.push(`# maquina: ${p.sistema.nombre} (${p.sistema.plc})`);
+  }
+
+  if (p.serie.historizada && p.serie.agregado) {
+    lineas.push(`# agregado: ${p.serie.agregado}${p.serie.ruta ? ` via ${p.serie.ruta}` : ""}`);
+  }
+
+  /*
+   * Cuándo se exportó, no cuándo se midió: el rango de las muestras ya va en
+   * el nombre del archivo y en sus propias filas. Esto fecha el ACTO de
+   * exportar, que es lo que falta para reconstruir de dónde salió el archivo.
+   */
+  lineas.push(`# exportado: ${new Date().toLocaleString(locale)}`);
+
+  return lineas.map(celdaCSV).join(CRLF);
+}
 
 /** BOM UTF-8: sin él, Excel en español abre el CSV interpretando los acentos como otra cosa. */
 const BOM_UTF8 = "﻿";

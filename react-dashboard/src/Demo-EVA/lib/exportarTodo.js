@@ -54,7 +54,7 @@
  */
 import { AGREGADO } from "@shared/eva/comun/historia.js";
 
-import { CRLF, celdaCSV, fechaArchivo, notaDeCobertura } from "./exportar.js";
+import { CRLF, celdaCSV, fechaArchivo, notaDeCobertura, notaDeProcedencia } from "./exportar.js";
 
 /**
  * Las columnas del CSV general. `senal` primero porque es la que se usa para
@@ -94,6 +94,7 @@ function notaDeSerieVacia(senal, motivo) {
  *   datos: {t:Date, valor:number}[],
  *   cobertura?: {tramos:number, tramosConDato:number, completa:boolean, desde:Date|null, hasta:Date|null}|null,
  *   motivo?: string|null,
+ *   punto?: string|null,
  * }[]} series
  */
 export function armarCSVGeneral(series, locale = "es-MX") {
@@ -101,6 +102,33 @@ export function armarCSVGeneral(series, locale = "es-MX") {
 
   const notas = [];
   const filas = [];
+
+  /*
+   * ── LA PROCEDENCIA VA UNA VEZ, NO CINCO (Plan 24 F3 · `USO-09`) ──
+   *
+   * Las cinco señales de este archivo son de la MISMA máquina —es el catálogo
+   * del tanque, y `NO_COMPARTEN` garantiza que un CSV nunca mezcla dos
+   * instalaciones—, así que su punto de origen, su PLC y su agregado son los
+   * mismos para todas. Repetir la cabecera cinco veces diría lo mismo cinco
+   * veces; peor, invitaría a leer cada bloque como si pudiera venir de otro
+   * sitio.
+   *
+   * Lo que SÍ es por señal es la cobertura, y eso ya se resolvió antes de esta
+   * fase: cada nota lleva su `etiqueta` delante porque cinco notas seguidas sin
+   * nombre no se pueden atribuir a nada.
+   *
+   * Se toma de la primera señal con punto conocido. Si ninguna lo trae, la nota
+   * sale sin máquina en vez de con una adivinada.
+   */
+  const primeraConPunto = lista.find((s) => s.punto);
+  if (primeraConPunto) {
+    const cabecera = notaDeProcedencia({
+      senal: primeraConPunto.senal,
+      punto: primeraConPunto.punto,
+      locale,
+    });
+    if (cabecera) notas.push(cabecera);
+  }
 
   for (const { senal, datos, cobertura, motivo } of lista) {
     const muestras = datos ?? [];

@@ -176,7 +176,13 @@ export function GraficaHistoria({
   const tituloExportado = `${senal.label ?? senal.corto}${senal.unidad ? ` (${senal.unidad})` : ""}`;
 
   const alExportarCSV = () =>
-    descargarCSV(nombreArchivo(senal, datos, "csv"), datosACSV(senal, datos, cobertura, locale));
+    /* `senal.punto` lo adjunta la capa de datos desde el Plan 24 F1; es lo que
+       permite que el archivo declare su máquina y su PLC. Sin él la cabecera
+       sale sin máquina, nunca con una adivinada. */
+    descargarCSV(
+      nombreArchivo(senal, datos, "csv"),
+      datosACSV(senal, datos, cobertura, locale, senal.punto ?? null)
+    );
   const alExportarPNG = () => {
     const svg = svgRef.current?.querySelector("svg");
     if (svg) descargarPNG(svg, nombreArchivo(senal, datos, "png"), { titulo: tituloExportado, fondo: t.panel });
