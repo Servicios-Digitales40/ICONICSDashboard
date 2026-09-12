@@ -4,9 +4,8 @@
 > propuestas en seis frentes). El Plan 20 ejecutó las diez primeras; esto ordena
 > las cincuenta que quedan.
 
-> **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`; **23 y 24**
-> hechos en `Moises7`. El **25 está planeado** (12-09-2026) y sin empezar;
-> queda el 26.
+> **Estado.** Planes 20, 21 y 22 **hechos** en `Mejoras-Demo-6.0`; **23, 24 y
+> 25** hechos en `Moises7`. Queda el 26.
 
 > **Plan 22.5, fuera de esta numeración — completado el 11-09-2026.** No es
 > una fase del roadmap de 60 mejoras: fue la integración de `origin/Gustavo5`
@@ -275,7 +274,7 @@ ponen en el dominio.
 
 `NUE-05` (panel de salud) ya está hecho en el Plan 20 F10.
 
-> **Planeado el 12-09-2026** — [`PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md`](por-completar/PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md),
+> **Planeado el 12-09-2026** — [`PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md`](completados/PLAN-25-LAYOUT-Y-FUNCIONALIDAD.md),
 > rama `Moises7`. La investigación previa vuelve a cambiar el reparto, como en
 > el Plan 24: **cinco de las entregas tienen ya construida su parte difícil.**
 >
@@ -305,6 +304,26 @@ ponen en el dominio.
 > Una librería nueva entra en `vendor` y lo revienta. La regla del plan es que
 > sólo entra en trozo diferido, y que no se sube ningún techo — la tercera
 > subida sin medición sigue descartada.
+
+> **HECHO el 12-09-2026, las once entregas.** Nueve `NUE-*` construidas
+> enteras, más la pantalla de acceso y `GET /api/diario` (las dos remitidas
+> aquí, ninguna en la lista de arriba). Ninguna acotada, ninguna descartada. El
+> techo de `vendor` **sí subió una vez** (270 → 330, tras F2), con su propia
+> medición delante —dos iconos de una vista costaron el margen que quedaba— y
+> se ganó un límite propio: no vuelve a subir sin tomar antes una de las dos
+> palancas pendientes (idioma activo, o trocear `lucide-react`).
+>
+> **Lo más caro que destapó no fue de este plan, fue de F4**: el indicador de
+> «peor zona ISO» de vibraciones llevaba semanas sin mostrar nada en
+> producción real —filtraba un campo que el objeto nunca tiene— y sus propias
+> pruebas lo certificaban, porque mockeaban la forma equivocada en vez de
+> pasar por el cálculo de verdad. Lo destapó F10 al necesitar el mismo dato, y
+> se corrigió en el mismo tramo de trabajo, junto con un +19 KB de bundle que
+> ese mismo arreglo coló de más en el chunk de arranque.
+>
+> Estado final: backend 345 pruebas, frontend 919, `index` 267,44 KB de 450,
+> `vendor` 266,45 de 330, los 28 verificadores, i18n en paridad. Ver el
+> §3 (Cierre) del propio plan para el detalle completo.
 
 ### Plan 26 · Código, y la sesión con planta
 

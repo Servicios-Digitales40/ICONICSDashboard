@@ -918,4 +918,84 @@ destapó.
 
 ## 3 · Cierre del plan
 
-_(Se rellena al terminar.)_
+**Las once entregas, cerradas el 12-09-2026.** Nueve `NUE-*` construidas
+enteras, la pantalla de acceso (§0.2, remitida aquí desde cinco sitios del
+repo aunque la hoja de ruta no la nombrara) y `GET /api/diario` (§0.3, el
+sustrato que F2 y F8 necesitaban) — ninguna acotada, ninguna descartada.
+
+**Estado final medido:** `lint` 0 errores · `types` limpio · **28
+verificadores** · `i18n` con paridad en **1236 claves × 2 idiomas** ·
+`textos` · `frescura` · `modulos` · backend **345 pruebas** (+38 sobre el
+cierre del Plan 24) · frontend **919 pruebas** (+185) · `index` **267,44 KB
+de 450** · `vendor` **266,45 KB de 330**.
+
+**El coste en `vendor` obligó a subir su techo una vez, con medición
+delante** (270 → 330, tras F2): no por una librería nueva, sino porque
+`lucide-react` no está troceado y cada vista añade sus iconos al catch-all.
+Quedó su propio límite, más estrecho que el de `index`: no se sube de nuevo
+sin tomar antes una de las dos palancas pendientes (idioma activo, o trocear
+`lucide-react`).
+
+**El coste en `index` fue de ~20 KB para once entregas** —la mayoría vistas
+nuevas, más el flujo de sesión completo de F9—, con un pico y su corrección
+propios: F10 midió +19 KB de una sola vez al construir el muro, y resultó ser
+un motor de reglas de 900+ líneas colado en el arranque por un componente que
+se monta siempre. Corregido antes de comitear, sin dejarlo para después.
+
+### Lo que este plan destapó y no estaba previsto
+
+1. **Cinco de las once entregas tenían ya construida su parte difícil** (§0.1):
+   `NUE-04` era presentación de un cálculo que el motor ya hacía; `NUE-06`,
+   `NUE-07` y `NUE-08` tenían la mitad hecha en fases anteriores; `NUE-09`
+   tenía resuelto el CÓMO y le faltaba el QUÉ. Leer el código antes de escribir
+   el plan volvió a evitar reimplementar piezas que funcionaban — igual que en
+   el Plan 24.
+
+2. **Dos entregas que la hoja de ruta no nombraba resultaron ser de este
+   plan**: la pantalla de acceso (remitida desde cinco sitios del repo) y
+   `GET /api/diario` (el diario de accionamientos era de sólo escritura desde
+   el Plan 22, y nadie lo había notado hasta que F2 lo necesitó).
+
+3. **«Propuesta» ya significaba algo distinto y concreto en el proyecto**
+   (F6): un ciclo de reglas de riesgo con aprobación deliberadamente fuera del
+   tablero. Reutilizar el nombre para la bandeja de hallazgos habría
+   confundido dos flujos con garantías muy distintas — se corrigió el nombre
+   antes de escribir la vista, no después.
+
+4. **Un bug real de F4, que llevaba semanas en producción sin que nadie lo
+   viera**: el indicador de «peor zona ISO» de vibraciones filtraba un campo
+   que el objeto real nunca tiene, así que nunca mostraba nada — y sus propias
+   pruebas lo certificaban, porque mockeaban la forma equivocada directamente
+   en vez de pasar por el cálculo de verdad. Lo destapó F10 al necesitar el
+   mismo dato para el muro, y se corrigió en el mismo tramo de trabajo.
+
+5. **Un mismo tropiezo de diseño, repetido tres veces y cazado las tres por
+   pruebas que ya existían**: un hook de datos que lanza fuera de su proveedor
+   (`useDataSource`, `useEvaSource`) convierte un componente de PRESENTACIÓN
+   en algo que exige el árbol de contextos entero para poder montarse. Pasó en
+   F0, otra vez en F4, y la lección —un hook tolerante junto al estricto, que
+   responde el lado seguro sin proveedor— quedó documentada las tres veces en
+   vez de simplemente repetirse.
+
+6. **Un incidente propio, durante F8**: `Write` en vez de `Edit` sobrescribió
+   `backend/http/esquemas.mjs` por completo. Detectado antes de tocar nada
+   más, restaurado con `git restore` de inmediato, verificado con `node -e`
+   que el archivo cargaba y con `git diff --stat` que no quedó rastro. Sin
+   pérdida de trabajo, y anotado aquí en vez de omitido.
+
+### Lo que queda remitido a otro plan
+
+- **`USO-05` (unificar las dos pestañas de Alarmas)** sigue en el Plan 26,
+  detrás de `ICO-10` — la asimetría de cobertura entre las dos máquinas no se
+  resuelve sin conocer el contrato real del Alarm Server.
+- **Las dos palancas de bundle** (cargar sólo el idioma activo, trocear
+  `lucide-react`) siguen sin tomarse y siguen sin hacer falta con el margen
+  actual — pero son la condición para que `vendor` pueda volver a subir.
+- **Encender `AUTH_HABILITADA` en producción** es una decisión de despliegue
+  que este plan deja posible, no puesta (§0.4) — la pantalla de acceso que
+  faltaba ya existe, pero el interruptor lo acciona quien despliegue, no una
+  fase de este plan.
+- **`COD-04`** (partir los seis archivos de más de mil líneas) sigue en el
+  Plan 26 a propósito: partir archivos antes de saber por dónde iban a crecer
+  —que es justo lo que los planes 21 a 25 acaban de decir— habría sido
+  reorganizar a ciegas.
