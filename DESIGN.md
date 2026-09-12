@@ -290,6 +290,47 @@ No hay líneas dobles, ni esquinas cortadas, ni bordes de más de 1px.
 
 **La Regla de los Dos Radios.** 16px contiene, 9px se pulsa. Un radio nuevo necesita justificarse contra esos dos; un valor intermedio (10px, 12px) rompe la lectura del sistema sin aportar nada.
 
+## Criterio táctil
+
+> Plan 24 F8 (`USO-08`). El destino de este tablero es una pantalla en planta, y
+> quien la toca lleva guantes. Un control que se falla al pulsar no es una
+> molestia de diseño cuando el control acciona una bomba.
+
+**El mínimo es 44 × 44 px de área pulsable** para cualquier control que accione
+la instalación o confirme algo, y 32 × 32 px para el resto (un chip de filtro,
+una pestaña). Sale de la recomendación de WCAG 2.5.5 (44) y del mínimo
+practicable de WCAG 2.5.8 (24), subido a 32 porque aquí no hay ratón de
+precisión.
+
+**Se mide en UNIDADES DEL SISTEMA, no en píxeles pintados.** El modo muro escala
+todo con `zoom` (`app/modoMuro.js`), así que a 1.6 un objetivo de 36 px se pinta
+a 57,6 — y eso no lo hace accesible: a escala 1, que es como se ve desde un
+portátil, sigue siendo de 36. Es la misma frontera que `modoMuro.js` argumenta
+para el techo de 16 px del texto.
+
+**Lo medido el 11-09-2026, antes de fijar el número:** el `Button` del kit da
+`padding: 9px 16px` sobre texto de 13 px ≈ **36 px de alto**. Por debajo del
+mínimo, y era el botón de «Encender» de `ControlesTanque`. Se sube con
+`minHeight` en el propio kit —no vista por vista— para que ninguna pantalla
+futura nazca por debajo.
+
+**Separación:** dos controles adyacentes que hacen cosas distintas van con al
+menos 8 px entre sus áreas pulsables. Los dos botones de `ControlesTanque`
+(encender / apagar) son el caso que esto protege.
+
+**Nada depende sólo de `hover`.** Un tooltip que aparece al pasar el cursor no
+existe para un dedo. `HoverTip` ya responde también a `focus` (WCAG 2.1.1), y
+eso es el mínimo: la información que sólo esté ahí no puede ser necesaria para
+operar.
+
+### Lo que no se comprueba automáticamente, y por qué
+
+`npm run design:detect` no puede medir esto: las alturas salen de `padding` más
+tipografía dentro de objetos de estilo en línea, y calcularlas exigiría resolver
+el layout — que es lo que hace un navegador, no un analizador estático. Así que
+esto es una regla revisable a ojo y un `minHeight` en el kit, no un verificador
+que finja medir lo que no puede (`CLAUDE.md` §2.5).
+
 ## Components
 
 ### Buttons
