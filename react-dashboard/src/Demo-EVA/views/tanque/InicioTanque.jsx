@@ -33,7 +33,7 @@
  *    (`MaquetaHero`) — mismos activos, mismo `SNIVEL_TANQUE`.
  *  - Cada tarjeta de la rejilla lleva un dato real de su vista, no un icono
  *    solo: un mini-tablero, no un segundo Canvas (propuesta 3 reinterpretada
- *    — ver `VISTAS[].dato` para por qué NO son 4 escenas 3D adicionales).
+ *    — ver `REJILLA_VISTAS[].dato` para por qué NO son 4 escenas 3D adicionales).
  *  - El badge "En vivo" ya existía (`UltimaLectura`, con su pulso de una sola
  *    vez por lectura fresca); aquí gana más presencia y un sparkline de
  *    fondo detrás de la cifra (propuestas 6 y 2 — ver `CifraEnVivo`).
@@ -67,6 +67,8 @@ import { useEnVista } from "@/lib/motion.js";
 import { Cifra, MONO, SANS, Spark, UltimaLectura } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
 import { fmtSenal } from "../../lib/formato.js";
+import { useAhora } from "../../lib/useAhora.js";
+import { presentarValor } from "../../data/comunes/estadoDelDato.js";
 import MaquetaHero from "../../three-d/components/MaquetaHero.jsx";
 
 const REJILLA = `
@@ -387,7 +389,16 @@ const REJILLA = `
  * placeholder, la franja simplemente no aparece (mismo criterio que
  * `FranjaAtencion` en Planta).
  */
-const VISTAS = [
+/**
+ * Las cuatro entradas de la rejilla, cada una con el dato real de su vista.
+ *
+ * Exportada sólo para que `test/demo-eva/` pueda
+ * comprobar la distinción de la que depende F0 del Plan 24: de estas entradas,
+ * unas devuelven CUENTAS y una devuelve una MEDIDA, y sólo la medida caduca con
+ * el reloj. Nada fuera de este archivo y sus pruebas la usa — el nombre lleva
+ * el prefijo para que quede claro que no es un registro público.
+ */
+export const REJILLA_VISTAS = [
   {
     id: "eva-planta",
     Icono: LayoutDashboard,
@@ -402,10 +413,21 @@ const VISTAS = [
   {
     id: "eva-maqueta",
     Icono: Factory,
+    /*
+     * Éste es el único `dato()` que enseña una MEDIDA y no una cuenta, así que
+     * es el único al que la frescura le aplica (Plan 24 F0, `USO-01`): «3 en
+     * aviso» sigue siendo cierto aunque la lectura tenga dos minutos, pero
+     * «62 %» no.
+     *
+     * Devuelve la señal cruda en `senal` en vez de resolver aquí la frescura
+     * porque `REJILLA_VISTAS` es una constante de módulo: `dato()` es una función pura
+     * llamada fuera del árbol de React y no puede usar un hook. Quien sí puede
+     * es `TarjetaVista`, que es donde se aplica.
+     */
     dato: (sistema) => {
       const s = sistema.senales.nivelTanque;
       if (!s || s.estado === "sin_dato") return null;
-      return { clave: "level", valores: { valor: fmtSenal(s) }, estado: s.estado };
+      return { clave: "level", valores: { valor: fmtSenal(s) }, estado: s.estado, senal: s };
     },
   },
   {
@@ -554,11 +576,25 @@ function TrazoFlujo({ hayCaudal, t }) {
   );
 }
 
-function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
+function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay, ahora }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
-  const { t: traducir } = useTranslation(["dashboard", "navigation"]);
+  const { t: traducir } = useTranslation(["dashboard", "navigation", "machines"]);
   const { Icono } = vista;
   const dato = vista.dato(sistema);
+
+  // Sólo el `dato()` que trae una MEDIDA adjunta su señal — ver el comentario
+  // en `REJILLA_VISTAS`. Los que cuentan (cuántas en aviso, cuántas con lectura) no
+  // caducan con el reloj y pasan de largo por aquí.
+  const { atenuado } = presentarValor({
+    receivedAt: dato?.senal?.receivedAt,
+    stale: dato?.senal?.stale,
+    ahora,
+    formateado: null,
+  });
+  // Sin señal no hay frescura que aplicar: `presentarValor` sin `receivedAt`
+  // devuelve `sinDato`, que no atenúa — pero decirlo explícito evita que un
+  // cambio futuro en ese valor por defecto apague esta tarjeta por accidente.
+  const envejecido = Boolean(dato?.senal) && atenuado;
   return (
     <button
       type="button"
@@ -600,7 +636,13 @@ function TarjetaVista({ vista, sistema, dark, onNavigate, t, delay }) {
       {dato && (
         <div className="eva-tarjeta-dato">
           <span style={{ fontSize: 11.5, color: t.textFaint }}>{traducir("dashboard:home.views.now")}</span>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: t.text, fontFamily: MONO }}>
+          <span
+            title={envejecido ? traducir("machines:signal.stale") : undefined}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700,
+              color: envejecido ? t.textFaint : t.text, fontFamily: MONO,
+            }}
+          >
             <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: estadoColor(dark, dato.estado) }} />
             {traducir(`dashboard:home.counts.${dato.clave}`, dato.valores)}
           </span>
@@ -720,6 +762,8 @@ function InicioTanque({ onNavigate }) {
   const { t: traducir } = useTranslation(["dashboard", "navigation"]);
 
   const { sistema, loading, error, lastUpdated, series } = useSistemaAgua();
+  // Un solo reloj para las tarjetas de vista (Plan 24 F0). Ver `useAhora.js`.
+  const ahora = useAhora();
   // Mismo criterio que dentro de `CifraEnVivo`: sin la primera lectura, "ahora
   // mismo" hablaría de un conteo que todavía no llegó. La espera se convierte
   // en un dato ("qué está pasando") en vez de quedar en un silencio junto a
@@ -805,10 +849,10 @@ function InicioTanque({ onNavigate }) {
         </SectionLabel>
 
         <div className="eva-inicio-grid">
-          {VISTAS.map((vista, i) => (
+          {REJILLA_VISTAS.map((vista, i) => (
             <TarjetaVista
               key={vista.id} vista={vista} sistema={sistema} dark={dark}
-              onNavigate={onNavigate} t={t} delay={0.15 + i * 0.06}
+              onNavigate={onNavigate} t={t} delay={0.15 + i * 0.06} ahora={ahora}
             />
           ))}
         </div>

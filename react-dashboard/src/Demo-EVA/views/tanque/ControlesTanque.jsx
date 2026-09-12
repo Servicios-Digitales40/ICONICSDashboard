@@ -26,18 +26,53 @@ import { useTheme } from "@/theme";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { fmtSenal } from "../../lib/formato.js";
 import { UltimaLectura } from "../../components/base.jsx";
+import { useAhora } from "../../lib/useAhora.js";
+import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
 
 const VENTANA_CONFIRMACION_MS = 4000;
 
+/**
+ * El nivel del tanque, con su frescura — y aquí eso pesa más que en cualquier
+ * otra pantalla (Plan 24 F0, `USO-01`).
+ *
+ * La cabecera de este archivo ya dice que éste es el MISMO dato que la guarda
+ * de «nivel de tanque alto» del backend está mirando en el momento de
+ * encender. Si la lectura está congelada, el operador y esa guarda están
+ * decidiendo sobre dos números distintos: él ve el último que llegó, ella lee
+ * el que haya cuando el comando aterrice. Enseñar aquí una cifra vieja como si
+ * fuera de ahora mismo es, de todas las formas de cometer ese error en el
+ * tablero, la que tiene un accionamiento de bomba al lado.
+ */
 function EstadoTanque({ sistema, lastUpdated, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "errors"]);
   const senal = sistema.senales?.nivelTanque;
+  const ahora = useAhora();
+
+  const { atenuado, texto, frescura } = presentarValor({
+    receivedAt: senal?.receivedAt,
+    stale: senal?.stale,
+    ahora,
+    formateado: fmtSenal(senal),
+  });
+  const congelado = frescura === FRESCURA.CONGELADO;
+
   return (
     <Panel title={traducir("machines:controls.tankLevel")} code="ac:TDCON/DEMO/SENSORES/NIVEL_TANQUE">
       <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-        <span style={{ fontSize: 34, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-          {fmtSenal(senal)}
+        <span
+          title={atenuado ? traducir("machines:signal.stale") : undefined}
+          style={{
+            // Congelado baja de 34 a 20: lo que se enseña deja de ser una
+            // medida y pasa a ser su edad («hace 4 min»), y un texto así a 34px
+            // grita como si fuera el dato. Atenuar sin encoger sería seguir
+            // dándole el peso visual de una lectura buena.
+            fontSize: congelado ? 20 : 34, fontWeight: 800,
+            color: atenuado ? t.textFaint : t.text,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
+          {texto}
         </span>
       </div>
       <p style={{ margin: "8px 0 0", fontSize: 12.5, color: t.textFaint }}>

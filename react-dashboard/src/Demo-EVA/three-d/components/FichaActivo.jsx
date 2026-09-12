@@ -36,6 +36,8 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
 import { fmtSenal } from "../../lib/formato.js";
+import { useAhora } from "../../lib/useAhora.js";
+import { FRESCURA, presentarValor } from "../../data/comunes/estadoDelDato.js";
 import { estadoColor, TONO } from "../../components/paleta.js";
 import { pideAtencion } from "../../domain/estado.js";
 import { historizadasMedidas } from "../../domain/senales.js";
@@ -44,10 +46,27 @@ import { historizadasMedidas } from "../../domain/senales.js";
     para no recorrer el array entero por cada señal del activo. */
 const MEDIDAS = new Set(historizadasMedidas());
 
-/** Una señal dentro de la ficha: punto de estado, nombre, valor y banda. */
-function FilaSenal({ senal, t, dark }) {
+/**
+ * Una señal dentro de la ficha: punto de estado, nombre, valor y banda.
+ *
+ * `ahora` llega como PROP y no de un `useAhora()` propio (Plan 24 F0): esta
+ * fila se repite una vez por señal del activo, y la cabecera de `useAhora.js`
+ * ya nombra este caso exacto como el antipatrón que evita — ocho temporizadores
+ * repintando cada segundo por algo que un solo reloj arriba resuelve igual.
+ */
+function FilaSenal({ senal, t, dark, ahora }) {
   const { estado: estadoTexto, senal: senalTexto } = useDominio();
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines"]);
   const reposo = senal.estado === "reposo";
+
+  const { atenuado, texto, frescura } = presentarValor({
+    receivedAt: senal.receivedAt,
+    stale: senal.stale,
+    ahora,
+    formateado: fmtSenal(senal),
+  });
+  const congelado = frescura === FRESCURA.CONGELADO;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "4px 0" }}>
@@ -61,12 +80,17 @@ function FilaSenal({ senal, t, dark }) {
         {senalTexto(senal.key, "corto")}
       </span>
       <span
+        title={atenuado ? traducir("machines:signal.stale") : undefined}
         style={{
-          fontFamily: "'IBM Plex Mono', monospace", fontSize: 12, fontWeight: 700,
-          color: reposo ? t.textFaint : t.text, whiteSpace: "nowrap",
+          fontFamily: "'IBM Plex Mono', monospace",
+          // Congelado baja a 11: el texto pasa a ser una edad («hace 4 min»),
+          // no una medida, y en una fila de 12px compite con el nombre de la
+          // señal si conserva el mismo peso.
+          fontSize: congelado ? 11 : 12, fontWeight: 700,
+          color: reposo || atenuado ? t.textFaint : t.text, whiteSpace: "nowrap",
         }}
       >
-        {fmtSenal(senal)}
+        {texto}
       </span>
       <span style={{ fontSize: 9.5, color: t.textFaint, width: 46, textAlign: "right", flexShrink: 0 }}>
         {estadoTexto(senal.estado, "corto")}
@@ -84,6 +108,8 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle,
   // tema como cualquier tarjeta. Fijarlo a claro dejaría los puntos de estado
   // con la paleta equivocada justo en modo oscuro, que es el de un wallboard.
   const { theme: t, dark } = useTheme();
+  // Un solo reloj para todas las filas de la ficha. Ver `FilaSenal`.
+  const ahora = useAhora();
   const color = estadoColor(dark, activo.estado);
   // Alarmas fuera de la lista de señales (ver el filtro de `senalesSinAlarmas`
   // más abajo): mismo criterio que Planta y Detalle desde que "Alarmas" tiene
@@ -203,7 +229,7 @@ export default function FichaActivo({ activo, altura = 2.5, onCerrar, onDetalle,
               Plan 27 (Alarmas → En vivo); esta ficha ya no las repite como
               fila — el badge de arriba, si hay alguna activa, lleva allá. */}
           {senalesAMostrar.map((s) => (
-            <FilaSenal key={s.key} senal={s} t={t} dark={dark} />
+            <FilaSenal key={s.key} senal={s} t={t} dark={dark} ahora={ahora} />
           ))}
           {/* Un texto informativo, no un segundo botón: «Ver detalle completo»
               de más abajo ya es el único punto de acción — dos botones al
