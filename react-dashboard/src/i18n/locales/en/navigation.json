@@ -136,6 +136,11 @@
       "title": "Notebook",
       "nav": "Notebook",
       "sub": "Notes from whoever is in front of the machine, with their time and author"
+    },
+    "eva-muro": {
+      "title": "Plant wall",
+      "nav": "Wall",
+      "sub": "Both machines at once, each with its status, alarms and freshness"
     }
   },
   "palette": {

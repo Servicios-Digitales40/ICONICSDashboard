@@ -600,6 +600,54 @@ común que promedie las dos. Un latido único es exactamente el fallo que
 **Cómo se comprueba.** Que ninguna cifra agrega las dos máquinas; que la
 frescura es por máquina; y que con una máquina caída la otra se sigue viendo.
 
+**HECHA el 12-09-2026, con un bug real de F4 descubierto y corregido en el
+mismo tramo de trabajo.**
+
+**No había ninguna vista que mostrara las dos máquinas a la vez, y hacía falta
+construirla entera.** `modoMuro.js` resuelve CÓMO se pinta un muro (zoom, sin
+cromo, rotación opcional entre `?vistas=a,b,c`), pero rotar es enseñar UNA
+máquina cada vez — nunca las dos juntas. `MuroPlanta.jsx` es esa vista: dos
+paneles, uno por máquina, cada uno con su propio latido, su propio peor
+veredicto y su propia frescura. Es una vista NORMAL y navegable —no «sólo
+muro»—, mismo criterio que ninguna otra vista de este proyecto existe
+únicamente para ese modo.
+
+**El «peor veredicto» de vibraciones estaba ROTO desde F4, y F10 lo destapó
+porque necesita el mismo dato.** `ContextoDeMaquina.jsx` (F4) filtraba
+`canal.zona && canal.nivel` directamente sobre `canales` — un campo que ESE
+objeto nunca tiene: `bandaISO()` se calcula aparte, con `vRMS` y
+`normaAplicable` de `evaluarRiesgosVibracion()`. El filtro daba SIEMPRE
+vacío, así que ese indicador de contexto **nunca mostraba nada en producción
+real** desde que se escribió — sus pruebas pasaban porque mockeaban la forma
+equivocada directamente, sin pasar por el cálculo de verdad. Se corrigió
+extrayendo `peorZonaDe()` (de `InicioVibraciones.jsx`, que sí lo hacía bien) a
+`shared/eva/vibraciones/vibraciones.js`, y se repararon los ocho tests de F4
+que certificaban el bug sin saberlo.
+
+**Un segundo hallazgo, esta vez de bundle, en el mismo componente.** El primer
+arreglo llamaba a `evaluarRiesgosVibracion()` completo para obtener
+`normaAplicable` — y ese motor trae consigo 900+ líneas de reglas
+(`riesgosVibracion.js`) que `ContextoDeMaquina.jsx` no necesita para nada más.
+Como este componente se monta SIEMPRE (vive en el Topbar), ese archivo entero
+se coló en el chunk de ARRANQUE: **+19 KB medidos**, muy por encima de
+cualquier fase anterior del plan. Se extrajo `normaAplicableDe(velocidad)` —la
+misma fórmula de dos líneas, duplicada deliberadamente en vez de crear una
+dependencia cruzada entre el motor de reglas y una utilidad de presentación—
+y el bundle volvió a su rango normal.
+
+**Las alarmas activas siguen siendo sólo del tanque, con las mismas palabras
+que ya fijó F3.** El panel de vibraciones dice que no hay alarmas
+DECLARADAS, no «0 activas» — un cero ahí afirmaría que se miró y no había
+ninguna.
+
+**Medido:** 919 pruebas de frontend (+20: 8 de `peorZonaDe`/`normaAplicableDe`,
+7 de `MuroPlanta`, 5 de corrección en los tests de F4), los 28
+verificadores —incluido `riesgos-vibracion`, sin romper ninguna regla al
+extraer las dos funciones—, lint 0 errores, types limpio, i18n en paridad
+(1236 claves × 2). Bundle: `index` 266,07 → **267,44 KB** tras el arreglo de
+bundle (un pico intermedio de 285,32 KB, corregido antes de comitear);
+`vendor` sin tocar (dos iconos reutilizados, `Power` ya importado).
+
 ---
 
 ## 1 · Riesgos de este plan

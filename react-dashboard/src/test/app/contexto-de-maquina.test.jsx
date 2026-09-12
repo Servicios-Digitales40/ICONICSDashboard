@@ -13,6 +13,18 @@
  * distinta de una máquina tranquila, **desde el Topbar**. Es el incidente del
  * 26-08-2026 que cita `estadoMaquina.js` —quince de veintiún puntos apagados a
  * la vez— llevado al sitio que está siempre a la vista.
+ *
+ * ── CORREGIDO EN PLAN 25 F10: `canales` MOCKEABA UNA FORMA QUE NUNCA EXISTIÓ ──
+ *
+ * Hasta el 12-09-2026 estas pruebas mockeaban `canales: { c1: { zona, nivel } }`
+ * directamente. `ContextoDeVibraciones` calculaba `peorZona` filtrando
+ * exactamente esos campos, así que pasaba en verde — pero `canales[id]` NUNCA
+ * tiene `zona` ni `nivel` en el sistema real: `bandaISO()` se calcula aparte,
+ * a partir de `vRMS` y `normaAplicable` de `evaluarRiesgosVibracion()`. El
+ * indicador de contexto de vibraciones no mostraba nada en producción desde
+ * que se escribió, y esta suite lo certificaba sin darse cuenta. Se descubrió
+ * al construir F10, que necesita el mismo dato — ver la cabecera de
+ * `peorZonaDe()` en `shared/eva/vibraciones/vibraciones.js`.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -64,8 +76,16 @@ const tanque = (extra = {}) =>
     sistema: { sinLectura: [], puntosPedidos: 8, ...extra },
   });
 
+/*
+ * Con velocidad >= 600 rpm (`RPM_MINIMA_ISO`), `evaluarRiesgosVibracion`
+ * afirma `normaAplicable: true` y `peorZonaDe()` puede evaluar. Sin
+ * `variador.velocidad` a este nivel, cualquier `vRMS` que se mockee más abajo
+ * no produce zona — es el mismo mecanismo real que corrigió el bug de F4.
+ */
 const vibracion = (extra = {}) =>
-  useVibracion.mockReturnValue({ canales: {}, puntosSinDato: [], ...extra });
+  useVibracion.mockReturnValue({
+    canales: {}, variador: { velocidad: 900 }, alarmas: {}, puntosSinDato: [], ...extra,
+  });
 
 describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
   it("en vibraciones NO aparece el estado de la bomba del tanque", async () => {
@@ -76,7 +96,8 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
      */
     conBombaEncendida();
     tanque();
-    vibracion({ canales: { c1: { zona: "B", nivel: "nominal" } } });
+    // vRMS = 1.0 mm/s cae en zona B (0,71–1,8) con la norma aplicable.
+    vibracion({ canales: { S1: { vRMS: 1.0 } } });
 
     montar("sec-vibraciones");
 
@@ -97,13 +118,8 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
   it("en vibraciones se enseña la PEOR zona de las que contestan", () => {
     conBombaEncendida();
     tanque();
-    vibracion({
-      canales: {
-        c1: { zona: "A", nivel: "nominal" },
-        c2: { zona: "D", nivel: "critico" },
-        c3: { zona: "B", nivel: "atencion" },
-      },
-    });
+    // S1 zona A (0,3), S2 zona D (5,0 > 4,5 de alarma), S3 zona B (1,2).
+    vibracion({ canales: { S1: { vRMS: 0.3 }, S2: { vRMS: 5.0 }, S3: { vRMS: 1.2 } } });
 
     montar("sec-vibraciones");
     expect(screen.getByText(/Zona D/)).toBeTruthy();
@@ -112,11 +128,12 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
   it("sin ninguna zona evaluable no se pinta «todo bien»: no se pinta nada", () => {
     /*
      * §2.4. No haber podido evaluar ninguna zona no es un veredicto favorable,
-     * y una pastilla verde ahí lo afirmaría.
+     * y una pastilla verde ahí lo afirmaría. Aquí no se evalúa porque la
+     * velocidad está por debajo del mínimo ISO (600 rpm): la norma no aplica.
      */
     conBombaEncendida();
     tanque();
-    vibracion({ canales: { c1: { zona: null, nivel: null } } });
+    vibracion({ canales: { S1: { vRMS: 1.0 } }, variador: { velocidad: 100 } });
 
     montar("sec-vibraciones");
     expect(screen.queryByText(/Zona/)).toBeNull();

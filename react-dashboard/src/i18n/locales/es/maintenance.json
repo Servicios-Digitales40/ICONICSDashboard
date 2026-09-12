@@ -123,5 +123,15 @@
     "loadError": "No se pudieron leer las notas",
     "list": "Notas",
     "empty": "Todavía no hay ninguna nota."
+  },
+  "wall": {
+    "title": "Muro de planta",
+    "subtitle": "Las dos máquinas a la vez: su peor riesgo, sus alarmas activas y si el dato sigue llegando.",
+    "noRisk": "Sin riesgos activos",
+    "zone": "Zona {{zona}}",
+    "alarmsActive_one": "{{count}} alarma activa",
+    "alarmsActive_other": "{{count}} alarmas activas",
+    "alarmsNone": "Ninguna alarma activa",
+    "alarmsNotApplicable": "Esta máquina no tiene alarmas declaradas en el PLC"
   }
 }

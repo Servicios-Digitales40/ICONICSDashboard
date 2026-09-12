@@ -766,6 +766,32 @@ export const LIMITES_ISO = Object.freeze({ nueva: 0.71, aviso: 1.8, alarma: 4.5 
 export const RPM_MINIMA_ISO = 600;
 
 /**
+ * ¿Se sabe si ISO 10816 aplica, dada la velocidad? `null` cuando no se sabe
+ * la velocidad —«no se sabe si aplica» y «no aplica» son cosas distintas, y
+ * la segunda apagaría las reglas en silencio—, `true`/`false` en el resto.
+ *
+ * ── POR QUÉ ES UNA FUNCIÓN APARTE, Y NO SÓLO PARTE DE `evaluarRiesgosVibracion` ──
+ *
+ * Porque `ContextoDeMaquina.jsx` (Plan 25 F4/F10) necesita SÓLO esto —para
+ * `peorZonaDe()`, en la barra de contexto del Topbar, que se monta SIEMPRE—
+ * y `evaluarRiesgosVibracion()` trae consigo el motor entero de reglas
+ * (`riesgosVibracion.js`, 900+ líneas). Llamar al motor completo sólo para
+ * leer dos líneas de él metía ese archivo en el chunk de ARRANQUE: +19 KB
+ * medidos al construir F10, en un componente que se monta en cada pantalla.
+ * Se descubrió al medir el bundle tras esta fase — ver `verificar-bundle.mjs`.
+ *
+ * `evaluarRiesgosVibracion()` sigue calculando lo mismo por su cuenta, no
+ * llama a esta función: son la MISMA fórmula en dos sitios (dos líneas, y
+ * quedaba peor una dependencia cruzada entre el motor de reglas y esta
+ * utilidad de presentación que la duplicación mínima).
+ */
+export function normaAplicableDe(velocidad) {
+  return velocidad === null || velocidad === undefined || !Number.isFinite(velocidad)
+    ? null
+    : velocidad >= RPM_MINIMA_ISO;
+}
+
+/**
  * Hasta 12 Hz (720 rpm) la frecuencia de giro sigue lo bastante cerca del
  * corte del filtro como para que la atenuación importe. Por encima, la
  * componente de giro entra limpia y el número se puede leer tal cual.
@@ -799,6 +825,35 @@ export function bandaISO(vRMS, normaAplicable) {
   if (vRMS > LIMITES_ISO.aviso) return { zona: "C", label: "zona C · insatisfactoria", nivel: "atencion" };
   if (vRMS > LIMITES_ISO.nueva) return { zona: "B", label: "zona B · admisible", nivel: "ok" };
   return { zona: "A", label: "zona A · como nueva", nivel: "ok" };
+}
+
+/**
+ * El PEOR veredicto ISO entre los canales, o `null` si ninguno se pudo
+ * evaluar (Plan 25 F10, extraída de `InicioVibraciones.jsx` — ver su
+ * cabecera para el porqué del PEOR y no un promedio).
+ *
+ * ── POR QUÉ ES UNA FUNCIÓN Y NO SE REPITE EN CADA PANTALLA ─────────
+ *
+ * Porque ya se repitió una vez sin que nadie lo notara: `ContextoDeMaquina.jsx`
+ * (Plan 25 F4) tenía su PROPIA versión inline, que filtraba
+ * `canal.zona && canal.nivel` directamente sobre `canales[id]` — un campo que
+ * ESTE objeto nunca tiene, porque `bandaISO()` no se llama al construir
+ * `canales` en `sistemaVibraciones.js`, se llama aparte, con
+ * `res.normaAplicable` de `evaluarRiesgosVibracion()`. El filtro daba SIEMPRE
+ * vacío, así que ese indicador de contexto no mostraba nada en producción real
+ * — sólo funcionaba en las pruebas de F4, que lo mockeaban con la forma
+ * equivocada directamente. Se descubrió al construir F10, que necesita el
+ * mismo dato y sí lo prueba contra el cálculo de verdad.
+ *
+ * @param {object} canales         `sistema.canales` — `{ [id]: { vRMS, … } }`
+ * @param {boolean} normaAplicable de `evaluarRiesgosVibracion(...).normaAplicable`
+ * @returns {{zona, label, nivel} | null}
+ */
+export function peorZonaDe(canales, normaAplicable) {
+  const veredictos = CANALES
+    .map((c) => bandaISO(canales?.[c.id]?.vRMS, normaAplicable))
+    .filter(Boolean);
+  return veredictos.length ? veredictos.reduce((a, b) => (b.zona > a.zona ? b : a)) : null;
 }
 
 /**

@@ -52,6 +52,7 @@ import { useHayFuenteEva } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
 import { useVibracion } from "@/Demo-EVA/data/vibraciones/vibracion.js";
 import { useTheme } from "@/theme";
+import { normaAplicableDe, peorZonaDe } from "@shared/eva/vibraciones/vibraciones.js";
 
 import { EstadoMaquinaBanner } from "./EstadoMaquinaBanner.jsx";
 
@@ -115,18 +116,24 @@ function ContextoDelTanque() {
 function ContextoDeVibraciones() {
   const { t: traducir } = useTranslation(["machines", "common"]);
   const { theme: t } = useTheme();
-  const { canales, puntosSinDato } = useVibracion();
+  const { canales, variador, puntosSinDato } = useVibracion();
 
   /*
-   * El peor veredicto que se pueda AFIRMAR ahora mismo. Un canal sin zona
-   * evaluada no cuenta como «bien»: no cuenta.
+   * `peorZonaDe()` — Plan 25 F10. Un primer intento de esta fase filtraba
+   * `canal.zona && canal.nivel` directamente sobre `canales`, y SIEMPRE daba
+   * vacío: ese campo no existe ahí, `bandaISO()` se calcula aparte con
+   * `normaAplicable`. Este indicador no mostraba nada en producción real
+   * desde que se escribió en F4 — se descubrió al construir F10, que
+   * necesita el mismo dato.
+   *
+   * `normaAplicableDe()` y no `evaluarRiesgosVibracion()` completo: ese motor
+   * trae 900+ líneas de reglas que no hacen falta aquí, y metía todo ese
+   * archivo en el chunk de ARRANQUE —este componente se monta SIEMPRE, en el
+   * Topbar—. Medido: +19 KB. Ver su cabecera en
+   * `shared/eva/vibraciones/vibraciones.js`.
    */
-  const peorZona = useMemo(() => {
-    const conZona = Object.values(canales ?? {}).filter((c) => c?.zona && c?.nivel);
-    if (!conZona.length) return null;
-    const orden = { critico: 3, atencion: 2, nominal: 1 };
-    return conZona.reduce((a, b) => ((orden[b.nivel] ?? 0) > (orden[a.nivel] ?? 0) ? b : a));
-  }, [canales]);
+  const normaAplicable = useMemo(() => normaAplicableDe(variador?.velocidad), [variador]);
+  const peorZona = useMemo(() => peorZonaDe(canales, normaAplicable), [canales, normaAplicable]);
 
   return (
     <Pastillas>

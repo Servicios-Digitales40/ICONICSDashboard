@@ -123,5 +123,15 @@
     "loadError": "The notes could not be read",
     "list": "Notes",
     "empty": "No notes yet."
+  },
+  "wall": {
+    "title": "Plant wall",
+    "subtitle": "Both machines at once: their worst risk, their active alarms, and whether data keeps arriving.",
+    "noRisk": "No active risks",
+    "zone": "Zone {{zona}}",
+    "alarmsActive_one": "{{count}} active alarm",
+    "alarmsActive_other": "{{count}} active alarms",
+    "alarmsNone": "No active alarms",
+    "alarmsNotApplicable": "This machine has no alarms declared in the PLC"
   }
 }

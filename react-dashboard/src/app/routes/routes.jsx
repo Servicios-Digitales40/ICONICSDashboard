@@ -335,6 +335,20 @@ export const ROUTES = [
 
   {
     /*
+     * ── POR QUÉ ES UNA VISTA NORMAL, NO «SÓLO MURO» ────────────────────
+     *
+     * `?muro=1` es una capa de presentación que le quita el cromo a
+     * CUALQUIER ruta — no hay precedente de una vista que exista sólo para
+     * ese modo, y ésta no rompe el patrón: sirve también fuera de muro, para
+     * ver el resumen de las dos máquinas de un vistazo.
+     */
+    id: "eva-muro",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/MuroPlanta.jsx")),
+    nav: { icon: <Power size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
      * ── POR QUÉ VA EN «GENERAL» Y NO EN UNA MÁQUINA ────────────────────
      *
      * Porque no habla de ninguna: habla del PUENTE. Es el mismo criterio por

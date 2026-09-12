@@ -136,6 +136,11 @@
       "title": "Cuaderno",
       "nav": "Cuaderno",
       "sub": "Notas de quien está delante de la máquina, con su hora y su autor"
+    },
+    "eva-muro": {
+      "title": "Muro de planta",
+      "nav": "Muro",
+      "sub": "Las dos máquinas a la vez, cada una con su estado, sus alarmas y su frescura"
     }
   },
   "palette": {
