@@ -98,21 +98,53 @@ function historialAMensajes(historial) {
     .slice(-MAX_MENSAJES_HISTORIAL)
 }
 
-/** Estados que se le enseñan al usuario mientras espera. */
-export const ESTADOS = {
-  pensando: 'Pensando…',
-  consultando: 'Consultando ICONICS…',
-  documentacion: 'Buscando en la documentación…',
-  analizando: 'Analizando los datos…',
-  // La bomba no se «consulta»: se actúa sobre ella, y la escritura tarda lo
-  // suyo porque `controlar_bomba` relee el punto para confirmar el efecto. Un
-  // «Consultando ICONICS…» ahí diría que se está leyendo algo que no es.
-  controlando: 'Actuando sobre la bomba…',
-  // `diagnostico` hace varias lecturas por dentro (estado, historia,
-  // correlación, manual): un «Consultando ICONICS…» fijo durante ese rato
-  // parece colgado porque no cambia, cuando SÍ está avanzando.
-  diagnosticando: 'Reuniendo el dossier de diagnóstico…',
-  redactando: 'Redactando la respuesta…',
+/**
+ * Estados que se le enseñan al usuario mientras espera, por idioma.
+ *
+ * ── HALLAZGO DEL 12-09-2026 (i18n del asistente) ────────────────────
+ *
+ * Hasta esta fase `ESTADOS` era un mapa plano en español: con el tablero en
+ * inglés, la respuesta final ya salía traducida (F1-F5), pero los avisos de
+ * progreso —«Analizando los datos…», «Leyendo las señales en vivo…»— seguían
+ * en español, porque nunca pasan por el prompt ni por el resultado de una
+ * tool: se emiten aparte, en el bucle de streaming (`onEvento({tipo:
+ * 'estado', ...})`), y quedaron fuera del radar de "narración en el idioma
+ * del tablero". Se resuelven aquí con el mismo criterio que
+ * `IDIOMAS_DEL_MODELO`: por `idioma`, con español de respaldo.
+ */
+const ESTADOS_POR_IDIOMA = {
+  es: {
+    pensando: 'Pensando…',
+    consultando: 'Consultando ICONICS…',
+    documentacion: 'Buscando en la documentación…',
+    analizando: 'Analizando los datos…',
+    // La bomba no se «consulta»: se actúa sobre ella, y la escritura tarda lo
+    // suyo porque `controlar_bomba` relee el punto para confirmar el efecto. Un
+    // «Consultando ICONICS…» ahí diría que se está leyendo algo que no es.
+    controlando: 'Actuando sobre la bomba…',
+    // `diagnostico` hace varias lecturas por dentro (estado, historia,
+    // correlación, manual): un «Consultando ICONICS…» fijo durante ese rato
+    // parece colgado porque no cambia, cuando SÍ está avanzando.
+    diagnosticando: 'Reuniendo el dossier de diagnóstico…',
+    redactando: 'Redactando la respuesta…',
+  },
+  en: {
+    pensando: 'Thinking…',
+    consultando: 'Querying ICONICS…',
+    documentacion: 'Searching the documentation…',
+    analizando: 'Analyzing the data…',
+    controlando: 'Acting on the pump…',
+    diagnosticando: 'Assembling the diagnostic dossier…',
+    redactando: 'Drafting the reply…',
+  },
+}
+
+/** Los estados en español — siguen exportados con este nombre por compatibilidad. */
+export const ESTADOS = ESTADOS_POR_IDIOMA.es
+
+/** Los estados en el idioma pedido, con español de respaldo. */
+function estadosDe(idioma) {
+  return ESTADOS_POR_IDIOMA[idioma] ?? ESTADOS_POR_IDIOMA.es
 }
 
 /**
@@ -122,19 +154,23 @@ export const ESTADOS = {
  * «Pensando…» fijo durante ese rato es indistinguible de un cuelgue: el
  * operador pulsa otra vez y ahora hay dos preguntas peleándose por la misma
  * GPU. Ver la cabecera de `chatRoutes.mjs`.
+ *
+ * Guarda la CLAVE (`'consultando'`, `'analizando'`…), no el texto ya
+ * resuelto: el texto depende de `idioma`, que aquí no se conoce todavía —se
+ * resuelve en el momento de emitir el evento, con `estadosDe(idioma)`.
  */
 const ESTADO_POR_HERRAMIENTA = {
-  estado_del_sistema: ESTADOS.consultando,
-  historia_de_senal: ESTADOS.consultando,
-  valor_en_momento: ESTADOS.consultando,
-  comparar_periodos: ESTADOS.consultando,
-  analisis_de_senal: ESTADOS.analizando,
-  perfil_de_senal: ESTADOS.analizando,
-  correlacionar_senales: ESTADOS.analizando,
-  grafico_de_senal: ESTADOS.consultando,
-  consultar_documentacion: ESTADOS.documentacion,
-  limites_del_manual: ESTADOS.documentacion,
-  diagnostico: ESTADOS.diagnosticando,
+  estado_del_sistema: 'consultando',
+  historia_de_senal: 'consultando',
+  valor_en_momento: 'consultando',
+  comparar_periodos: 'consultando',
+  analisis_de_senal: 'analizando',
+  perfil_de_senal: 'analizando',
+  correlacionar_senales: 'analizando',
+  grafico_de_senal: 'consultando',
+  consultar_documentacion: 'documentacion',
+  limites_del_manual: 'documentacion',
+  diagnostico: 'diagnosticando',
   /*
    * Plan 16 Fase 4: sin esta entrada caía en el defecto
    * `ESTADOS.consultando` = «Consultando ICONICS…», y `diagnosticar_falla`
@@ -142,8 +178,8 @@ const ESTADO_POR_HERRAMIENTA = {
    * que `diagnostico`: las dos son composiciones de varias fuentes, no una
    * lectura sola.
    */
-  diagnosticar_falla: ESTADOS.diagnosticando,
-  controlar_bomba: ESTADOS.controlando,
+  diagnosticar_falla: 'diagnosticando',
+  controlar_bomba: 'controlando',
 }
 
 /**
@@ -1423,6 +1459,7 @@ export function createChat({ config, herramientas }) {
      */
     let huboTextoAjeno = false
 
+    const estados = estadosDe(idioma)
     for (let paso = 0; paso < maxPasos; paso++) {
       rondas += 1
       onEvento({
@@ -1430,13 +1467,13 @@ export function createChat({ config, herramientas }) {
         // A partir de la segunda ronda ya está trabajando sobre datos, no
         // decidiendo desde cero. Decir «Pensando…» otra vez haría parecer que
         // ha vuelto al principio.
-        valor: paso === 0 ? ESTADOS.pensando : ESTADOS.analizando,
+        valor: paso === 0 ? estados.pensando : estados.analizando,
       })
 
       const ronda = await conLatido(
         () => pasadaConHerramientas(messages, signal, { soloLectura: huboTextoAjeno }),
         onEvento,
-        paso === 0 ? ESTADOS.pensando : ESTADOS.analizando
+        paso === 0 ? estados.pensando : estados.analizando
       )
 
       if (!ronda.llamadas.length) {
@@ -1497,7 +1534,7 @@ export function createChat({ config, herramientas }) {
 
       onEvento({
         tipo: 'estado',
-        valor: ESTADO_POR_HERRAMIENTA[invocaciones[0].nombre] ?? ESTADOS.consultando,
+        valor: estados[ESTADO_POR_HERRAMIENTA[invocaciones[0].nombre]] ?? estados.consultando,
       })
       for (const { nombre, argumentos, firma } of invocaciones) {
         if (!repetidas.some(r => r.firma === firma)) {
@@ -1636,7 +1673,7 @@ export function createChat({ config, herramientas }) {
     }
 
     /* ── Redactar con los datos delante ─────────────────────────────── */
-    onEvento({ tipo: 'estado', valor: ESTADOS.redactando })
+    onEvento({ tipo: 'estado', valor: estados.redactando })
     const { texto, marcado } = await pasadaRedactando(messages, signal, onEvento)
 
     /*

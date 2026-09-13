@@ -34,6 +34,8 @@ import { toBooleano } from '../../../../shared/eva/tanque/sistema.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { resolverPalabrasVibracion } from '../../i18n/composicionesVibracion.mjs'
 import { narrarRiesgoEnIngles, narrarTituloEnIngles } from '../../i18n/narrarRiesgo.mjs'
+import { narrarResumenTanqueEnIngles, narrarSistema, narrarPrimeraLimitacion } from '../../i18n/narrarEstadoTanque.mjs'
+import { narrarResumenVibracionesEnIngles } from '../../i18n/narrarEstadoVibraciones.mjs'
 /* Para avisar de que el diario no pudo escribir (Plan 23 F6). No se propaga el
    fallo —cuando se anota, la bomba ya se accionó— pero tampoco se traga: un
    diario que dejó de escribir sin que nadie se entere es el mismo problema que
@@ -219,9 +221,27 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
         )
       }
 
+      /*
+       * `sin_comprobar`/`aviso`/`puntos_sin_lectura` son frases propias de
+       * ESTA herramienta (no de `shared/`), y hasta esta fase no se
+       * traducían: F2/F3 sólo tradujeron `activos`/`noEvaluables` (la
+       * evidencia en sí). Mismo hallazgo del 12-09-2026 que el de
+       * `estado_del_sistema` — se cierra aquí para las dos herramientas
+       * a la vez.
+       */
+      const sinComprobar = idioma === 'en'
+        ? (noEvaluables.length === 0
+          ? 'none: all rules could be evaluated'
+          : `${noEvaluables.length} could not be evaluated due to missing readings: ` +
+            [...new Set(noEvaluables.map((x) => x.titulo))].slice(0, 4).join('; '))
+        : (noEvaluables.length === 0
+          ? 'ninguna: se pudieron evaluar todas las reglas'
+          : `${noEvaluables.length} no se pudieron evaluar por falta de lecturas: ` +
+            [...new Set(noEvaluables.map((x) => x.titulo))].slice(0, 4).join('; '))
+
       return {
         ok: true,
-        sistema: elegido.sistema.nombre,
+        sistema: idioma === 'en' ? narrarSistema(elegido.sistema.id, elegido.sistema.nombre) : elegido.sistema.nombre,
         maquina: elegido.sistema.maquina,
         fuente: 'tiempo real',
         momento: lectura.receivedAt,
@@ -229,25 +249,32 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
         /* Agrupados por regla: las de ámbito de canal se evalúan una vez por
            apoyo, y cuando la causa es común salen tres entradas casi idénticas.
            En el tanque, donde todas son de máquina, agrupar no cambia nada. */
-        riesgos: agruparPorRegla(activos),
-        sin_comprobar:
-          noEvaluables.length === 0
-            ? 'ninguna: se pudieron evaluar todas las reglas'
-            : `${noEvaluables.length} no se pudieron evaluar por falta de lecturas: ` +
-              [...new Set(noEvaluables.map((x) => x.titulo))].slice(0, 4).join('; '),
+        riesgos: agruparPorRegla(activos, idioma),
+        sin_comprobar: sinComprobar,
         ...(mudos > 0
           ? {
-            puntos_sin_lectura: `${mudos} de ${estado.puntosPedidos} puntos no entregan lectura ahora mismo.`,
+            puntos_sin_lectura: idioma === 'en'
+              ? `${mudos} of ${estado.puntosPedidos} points are not returning a reading right now.`
+              : `${mudos} de ${estado.puntosPedidos} puntos no entregan lectura ahora mismo.`,
           }
           : {}),
-        aviso:
-          (activos.length === 0 && noEvaluables.length > 0
+        aviso: idioma === 'en'
+          ? (activos.length === 0 && noEvaluables.length > 0
+            ? 'Do NOT say there are no risks: there are rules that could not be evaluated due to ' +
+              'missing readings. "No risks detected" and "could not check" are different things. '
+            : '') +
+            'These rules are evaluated by the dashboard by crossing signals, they are NOT alarms ' +
+            'from the ICONICS server. ' +
+            (elegido.sistema.limitaciones?.[0]
+              ? narrarPrimeraLimitacion(elegido.sistema.id, elegido.sistema.limitaciones[0])
+              : '')
+          : (activos.length === 0 && noEvaluables.length > 0
             ? 'NO digas que no hay riesgos: hay reglas que no se pudieron evaluar por falta de ' +
               'lecturas. «Sin riesgos detectados» y «no se pudo mirar» son cosas distintas. '
             : '') +
-          'Estas reglas las evalúa el tablero cruzando señales, NO son alarmas del servidor ' +
-          'ICONICS. ' +
-          (elegido.sistema.limitaciones?.[0] ?? ''),
+            'Estas reglas las evalúa el tablero cruzando señales, NO son alarmas del servidor ' +
+            'ICONICS. ' +
+            (elegido.sistema.limitaciones?.[0] ?? ''),
       }
     },
 
@@ -307,14 +334,38 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
         }
         : riesgosCrudos
 
-      return {
-        ok: true,
-        ...elegido.sistema.resumen(estado, {
-          riesgos,
-          agrupar: agruparPorRegla,
-          horaLocal: horaLocal(lectura.receivedAt),
-        }),
-      }
+      const resumenCrudo = elegido.sistema.resumen(estado, {
+        riesgos,
+        // `agrupar` cita `x.canalLabel` (español fijo, ver la cabecera de
+        // `agruparPorRegla`): se le fija el idioma aquí para que el «Lado
+        // acople, Rodamiento intermedio…» de `resumen.riesgos` salga en el
+        // idioma correcto sin que `shared/eva/vibraciones/estadoVibraciones.js`
+        // tenga que saber de `idioma`.
+        agrupar: (activos) => agruparPorRegla(activos, idioma),
+        horaLocal: horaLocal(lectura.receivedAt),
+      })
+
+      /*
+       * ── EL HALLAZGO DEL 12-09-2026 ──────────────────────────────────
+       *
+       * `resumen()` de CADA máquina compone su bloque completo —nombre de
+       * instalación, estado general, nombres de activo, frases explicativas—
+       * siempre en español: es dominio puro (CLAUDE.md §2.7) y no sabe de
+       * `idioma`. Hasta esta fase sólo se traducía `riesgos` (arriba), que es
+       * apenas una parte de lo que el modelo recibe — el resto viajaba en
+       * español SIEMPRE, y el modelo lo citaba fielmente en español aunque el
+       * tablero pidiera inglés. No era el modelo desobedeciendo el prompt: era
+       * el dato que se le entregaba para narrar el que ya venía roto. Mismo
+       * criterio que `riesgos`: se narra AQUÍ, después de que `shared/`
+       * compuso, nunca dentro de `shared/`.
+       */
+      const resumen = idioma === 'en'
+        ? (elegido.sistema.id === 'vibraciones'
+          ? narrarResumenVibracionesEnIngles(resumenCrudo, estado, riesgos)
+          : narrarResumenTanqueEnIngles(resumenCrudo))
+        : resumenCrudo
+
+      return { ok: true, ...resumen }
     },
 
     /**

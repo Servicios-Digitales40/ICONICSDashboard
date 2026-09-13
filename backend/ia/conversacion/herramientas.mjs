@@ -178,6 +178,7 @@ import { crearHerramientasDeHistoricos } from '../herramientas/historicos/index.
 /* Plan 16 Fase 4: una sola herramienta, `diagnosticar_falla`. Sólo necesita
    `motorDiagnostico` (`ia/motor/diagnostico.mjs`) — no toca el `client`. */
 import { crearHerramientasDeDiagnostico } from '../herramientas/diagnostico/index.mjs'
+import { narrarCanalPorLabel } from '../i18n/narrarEstadoVibraciones.mjs'
 
 export { DEFINICIONES }
 
@@ -333,13 +334,25 @@ function primeraFrase(texto, tope = 180) {
  * medido, y es lo único que distingue un apoyo de otro cuando la regla es la
  * misma. Lo que se dice una sola vez es la hipótesis y la acción, que son
  * idénticas por definición —vienen de la misma regla—.
+ *
+ * `idioma` (hallazgo del 12-09-2026, i18n del asistente): `x.canalLabel`
+ * viene de `CANALES[].label` en `shared/eva/vibraciones/vibraciones.js`,
+ * español fijo — F2/F3 tradujeron `titulo`/`evidencia`/etc. de cada riesgo
+ * pero nunca este campo, así que "Lado acople, Rodamiento intermedio, Lado
+ * libre" seguía colándose en inglés. Se traduce con el mismo catálogo que
+ * ya usa `narrarEstadoVibraciones.mjs` para lo mismo.
  */
-export function agruparPorRegla(activos) {
+export function agruparPorRegla(activos, idioma = 'es') {
+  const TODA_LA_MAQUINA = idioma === 'en' ? 'the whole machine' : 'toda la máquina'
+
   const porId = new Map()
   for (const x of activos) {
+    const apoyo = x.canalLabel
+      ? (idioma === 'en' ? narrarCanalPorLabel(x.canalLabel) : x.canalLabel)
+      : TODA_LA_MAQUINA
     const previo = porId.get(x.id)
     if (previo) {
-      previo.apoyos.push(x.canalLabel ?? 'toda la máquina')
+      previo.apoyos.push(apoyo)
       previo.evidencia_medida.push(x.evidencia)
       continue
     }
@@ -355,7 +368,7 @@ export function agruparPorRegla(activos) {
       id: x.id,
       titulo: x.titulo,
       severidad: x.nivel ?? x.severidad,
-      apoyos: [x.canalLabel ?? 'toda la máquina'],
+      apoyos: [apoyo],
       evidencia_medida: [x.evidencia],
       hipotesis: primeraFrase(x.consecuencia),
       que_revisar: primeraFrase(x.accion),

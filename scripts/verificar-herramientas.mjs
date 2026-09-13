@@ -638,6 +638,83 @@ await checkAsync('estado_del_sistema(idioma: "en") narra los riesgos que trae de
   assert.doesNotMatch(texto, /diagnóstico de rodamientos está apagado/)
 })
 
+/*
+ * ── EL HALLAZGO DEL 12-09-2026: `resumen()` NUNCA RECIBÍA `idioma` ─────
+ *
+ * Reportado en producción: con el tablero en inglés, "How is the plant
+ * doing right now?" devolvía la respuesta ENTERA en español —"Estado
+ * actual de la planta", "Situación: La instalación está En reposo"—. No
+ * era el modelo desobedeciendo el prompt: `estado_del_sistema` para el
+ * TANQUE nunca pasa por `riesgos` (tiene su propia herramienta para eso),
+ * así que su `resumen()` —nombre de instalación, estado general, nombres
+ * de activo, la frase de reposo— salía siempre en español, sin que nada
+ * en la cadena de `idioma` lo tocara. Vibraciones tenía el mismo hueco en
+ * TODO lo que no fuera `riesgos`: nombre de sistema, la frase de cada
+ * apoyo, variador, servidor de alarmas, `sin_comprobar`, `aviso`.
+ */
+await checkAsync('estado_del_sistema(idioma: "en") del TANQUE narra TODO el resumen, no sólo riesgos', async () => {
+  const client = clienteFalso({
+    valores: { ...EN_REPOSO, NIVEL_TANQUE: 54.2 },
+  })
+  const h = createHerramientas({ client })
+  const en = await h.ejecutar('estado_del_sistema', { sistema: 'tanque' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.equal(en.instalacion, 'Industrial Water System')
+  assert.equal(en.estadoGeneral, 'Idle')
+  assert.match(en.queSignificaReposo, /is not pumping water/)
+  assert.match(en.queSonLosActivos, /PARTS of this same machine/)
+  assert.equal(en.activos[0].activo, 'Storage Tank')
+  assert.equal(en.activos[0].responde, 'Is there water, and in what condition?')
+  const nivel = en.activos.flatMap((a) => a.senales).find((s) => s.clave === 'nivelTanque')
+  assert.equal(nivel.senal, 'Tank Level')
+  assert.equal(nivel.estado, 'In Range')
+  assert.match(en.conHistoria[0], /^[A-Z]/, 'conHistoria trae sólo el label, sin clave: tiene que traducirse por texto')
+  assert.doesNotMatch(JSON.stringify(en), /Nivel del tanque|Sistema de agua industrial|En reposo/)
+})
+
+await checkAsync('estado_del_sistema(idioma: "en") de VIBRACIONES narra el nombre de sistema, apoyos y avisos', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const en = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.match(en.sistema, /Vibration System — ANOTHER MACHINE/)
+  assert.match(en.apoyos[0], /Drive end \(S1, bearing/)
+  assert.match(en.apoyos[0], /RMS velocity/)
+  assert.doesNotMatch(en.apoyos[0], /Lado acople|velocidad eficaz/)
+  assert.match(en.servidor_de_alarmas.detalle, /Only area counters are available/)
+  assert.match(en.aviso, /ANOTHER MACHINE, not the tank/)
+  assert.doesNotMatch(en.aviso, /OTRA MÁQUINA/)
+})
+
+await checkAsync('riesgos_activos(idioma: "en") de vibraciones traduce «apoyos» agrupados, y el aviso completo', async () => {
+  /*
+   * `agruparPorRegla` cita `x.canalLabel` (S1→"Lado acople") y
+   * `elegido.sistema.limitaciones[0]` en el aviso final — dos campos que
+   * F2/F3 no tradujeron porque sólo tocaron `titulo`/`evidencia`/etc. de
+   * cada riesgo, no el envoltorio que los agrupa.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const en = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true, en.error)
+  assert.match(en.riesgos[0].apoyos, /Drive end, Intermediate bearing, Non-drive end/)
+  assert.doesNotMatch(en.riesgos[0].apoyos, /Lado acople/)
+  assert.match(en.aviso, /Peak acceleration on the drive-end bearing/)
+  assert.doesNotMatch(en.aviso, /aceleración de pico/)
+})
+
+await checkAsync('sin `idioma`, el resumen de ambas máquinas sigue en español: no rompe nada existente', async () => {
+  const h1 = createHerramientas({ client: clienteFalso() })
+  const es1 = await h1.ejecutar('estado_del_sistema', { sistema: 'tanque' })
+  assert.equal(es1.instalacion, 'Sistema de agua industrial')
+
+  const h2 = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const es2 = await h2.ejecutar('estado_del_sistema', { sistema: 'vibraciones' })
+  assert.match(es2.sistema, /Sistema de vibraciones — OTRA MÁQUINA/)
+  assert.match(es2.apoyos[0], /Lado acople/)
+})
+
 await checkAsync('pronostico_de_desgaste(idioma: "en") narra sus mecanismos con el catálogo de dominio', async () => {
   // Reutiliza `mechanisms` de `domain.json` — el mismo catálogo que ya prueba
   // `verificar-dominio.mjs` — así que no hace falta fijar un mecanismo activo

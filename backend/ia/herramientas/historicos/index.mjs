@@ -86,6 +86,7 @@ import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
 import { fallo } from '../lib/respuesta.mjs'
 import { narrarTendenciaEnIngles } from '../../i18n/narrarTendencia.mjs'
 import { narrarMecanismoEnIngles } from '../../i18n/narrarRiesgo.mjs'
+import { narrarSistema } from '../../i18n/narrarEstadoTanque.mjs'
 import { etiquetasDeReporte } from '../../i18n/etiquetasReporte.mjs'
 /*
  * Lo que sigue en `herramientas.mjs` es lo que todavía no tiene una familia
@@ -1903,10 +1904,14 @@ export function crearHerramientasDeHistoricos({
        */
       if (!estado.ok) return estado
 
+      const nombreSistema = idioma === 'en'
+        ? narrarSistema(sistemaId, elegido.sistema.nombre)
+        : elegido.sistema.nombre
+
       return {
         ok: true,
         sistema: sistemaId,
-        maquina: elegido.sistema.nombre,
+        maquina: nombreSistema,
         periodo: v.etiqueta,
         estadoAhora: estado,
         ...(riesgos.ok
@@ -1914,8 +1919,10 @@ export function crearHerramientasDeHistoricos({
           : { riesgosNoDisponibles: riesgos.error }),
         ...(tendencia === null
           ? {
-            tendenciaNoDisponible:
-                `«${elegido.sistema.nombre}» no tiene al menos dos señales con serie propia, así ` +
+            tendenciaNoDisponible: idioma === 'en'
+              ? `«${nombreSistema}» does not have at least two signals with their own series, so ` +
+                `there is no trend to summarize.`
+              : `«${nombreSistema}» no tiene al menos dos señales con serie propia, así ` +
                 `que no hay tendencia que resumir.`,
           }
           : tendencia.ok

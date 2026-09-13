@@ -1409,6 +1409,42 @@ await check('una pasada rápida no late, y no deja el reloj corriendo', async ()
   assert.equal(eventos.length, antes, 'siguieron llegando eventos tras terminar el turno')
 })
 
+/*
+ * ── LOS ESTADOS DE PROGRESO, EN EL IDIOMA DEL TABLERO (hallazgo del 12-09-2026) ──
+ *
+ * Reportado en producción: con el tablero en inglés, "Analizando los
+ * datos…"/"Pensando…" seguían en español mientras el asistente trabajaba,
+ * aunque la respuesta final ya saliera en inglés (F1-F5). No pasan por el
+ * prompt ni por el resultado de una tool —se emiten aparte, en el bucle de
+ * streaming— así que quedaron fuera del alcance de esas fases. Se resuelven
+ * en `ESTADOS_POR_IDIOMA`/`estadosDe(idioma)` dentro de `chat.mjs`.
+ */
+await check('los estados de progreso ("Pensando…", "Analizando…"…) salen en inglés con idioma:"en"', async () => {
+  ejecutadas = []
+  guion = {
+    toolCall: {
+      id: 'c1', type: 'function',
+      function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque","periodo":"ayer"}' },
+    },
+    texto: 'The tank level was between 52% and 68% yesterday.',
+  }
+
+  const { eventos } = await preguntar(chatDePrueba(), 'how was the level yesterday?', undefined, undefined, 'en')
+  const estados = estadosDe(eventos)
+
+  assert.ok(estados.length > 0, 'no se emitió ningún estado')
+  for (const valor of estados) {
+    assert.doesNotMatch(valor, /Pensando|Consultando|Analizando|Redactando/, `estado en español: "${valor}"`)
+  }
+  assert.ok(estados.some(v => /Thinking|Querying|Analyzing|Drafting/.test(v)), `ningún estado en inglés: ${JSON.stringify(estados)}`)
+})
+
+await check('sin `idioma`, los estados de progreso siguen en español: no rompe nada existente', async () => {
+  guion = { contenido: 'Listo.' }
+  const { eventos } = await preguntar(chatDePrueba(), 'algo')
+  assert.equal(estadosDe(eventos)[0], 'Pensando…')
+})
+
 /* ── La caché entre turnos (Plan 23 F1 · IA-06) ──────────────────────── */
 
 console.log('\n── Caché entre turnos ──────────────────────────────────────')
