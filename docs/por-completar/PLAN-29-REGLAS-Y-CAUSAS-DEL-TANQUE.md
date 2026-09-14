@@ -1,6 +1,18 @@
 # PLAN 29 — Más reglas y más causas para el tanque
 
-**Estado:** propuesta, pendiente de revisión. **No se ha escrito código.**
+**Estado:** F1, F3 y F4 **completadas** el 14-09-2026. F2 **bloqueada** por el
+historiador (ver su fase). El plan se archiva en `completados/` cuando F2 cierre.
+
+| Fase | Estado | Commit |
+|---|---|---|
+| F1 — causas sobre riesgos existentes | ✅ hecha | `5ae93b6` |
+| F2 — firmas temporales | ⛔ bloqueada: el historiador no sirve muestras | — |
+| F3 — cruce con alarmas del PLC | ✅ hecha | `fcd6146` |
+| F4 — coherencia orden/realimentación | ✅ hecha | `79ef4f6` |
+
+**Resultado medido:** el tanque pasa de **10 a 17 reglas** y de **17 a 34
+causas**. Ningún riesgo del tanque se queda con una sola causa candidata, y
+ninguna regla nueva se apoya en un umbral inventado por nosotros.
 **Fecha:** 14-09-2026
 **Alcance:** SÓLO el tanque. Vibraciones queda fuera de este plan por decisión
 explícita del 14-09-2026.
