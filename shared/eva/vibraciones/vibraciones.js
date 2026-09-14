@@ -80,11 +80,54 @@
  *   motor        WEG W22 143/5T, 2 HP (1,5 kW), 2 polos → 3475 rpm a plena
  *                carga. Con variador, la velocidad varía, y las frecuencias
  *                de defecto de rodamiento varían con ella.
- *   rodamientos  6205 ZZ (lado acople) y 6204 ZZ (lado ventilador).
+ *   rodamientos  6205 ZZ en el lado acople del MOTOR. Ver el aviso de abajo
+ *                sobre el que se creía que era el del lado ventilador.
  *   norma        1,5 kW está MUY por debajo de los 15 kW de ISO 10816-3. La
  *                tabla que aplica es **ISO 10816-1 Clase I**. Usar la de
  *                10816-3 pondría el aviso en 4,5 mm/s y se perdería la mitad
  *                del margen útil.
+ *
+ * ── NO SON TRES APOYOS DEL MOTOR: SON UN TREN DE ROTOR (04-09-2026) ─
+ *
+ * Este archivo daba por hecho que los tres canales medían el motor, y por eso
+ * S3 —«lado libre»— llevaba el **6204 ZZ** del catálogo WEG, que es el
+ * rodamiento del lado ventilador de ese motor.
+ *
+ * El levantamiento de campo de I+D+i («Reporte técnico de activos — Bancos
+ * didácticos TDCON 4.0», 02-09-2026, §3.2 y §3.3) enseña otra cosa: el banco
+ * es un TREN DE ROTOR y sólo el primer acelerómetro está sobre el motor.
+ *
+ *     [Motor WEG] ─ acoplamiento ─ [Chumacera 1] ─ [Disco de desbalance] ─
+ *     [Chumacera 2] ─ (extremo libre del eje)
+ *
+ *          S1 en la carcasa del motor
+ *                        S2 en la chumacera 1
+ *                                                       S3 en la chumacera 2
+ *
+ * Con eso, «FREE_END» no es el ventilador del motor: es el extremo libre del
+ * EJE, pasada la segunda chumacera. Así que el 6204 describía una pieza que
+ * ese canal no está midiendo, y sus BPFO/BPFI/FTF habrían apuntado a otro
+ * rodamiento — el fallo exacto contra el que ya estaba escrito el comentario
+ * de S2, que dedujo lo mismo un canal antes y por su cuenta («un rodamiento
+ * INTERMEDIO no es del motor»).
+ *
+ * S3 pasa a `rodamiento: null`. Las chumaceras son soportes de pie y su
+ * referencia no sale de ningún catálogo que tengamos: el reporte la marca como
+ * dato faltante de prioridad alta (§8.4). Sin referencia no hay geometría, y
+ * sin geometría no hay frecuencias de defecto.
+ *
+ * ── LO QUE EL REPORTE PIDE Y AQUÍ YA ESTABA ────────────────────────
+ *
+ * Conviene saberlo antes de salir a buscar lo que ya se tiene. Su §8 lista
+ * como «prioridad alta, bloquea cualquier análisis de vibraciones»:
+ *
+ *   #1 placa del motor WEG   → aquí arriba, confirmada. El reporte no llegó a
+ *                              fotografiarla; este catálogo la tiene.
+ *   #2 sensibilidad de los   → confirmadas por el usuario y en `CANALES`:
+ *      acelerómetros           100,05 · 99 · 100 mV/g, una por sonda.
+ *
+ * Lo que sigue faltando de su lista, y de verdad falta, va en `ACELEROMETRO`
+ * y en `TREN_MECANICO` con su marca puesta.
  */
 
 /**
@@ -134,6 +177,8 @@ export const CANALES = [
     sensibilidad: 100.05,
     // Del catálogo WEG del W22 143/5T: el rodamiento del lado acople.
     rodamiento: "6205 ZZ",
+    // Único canal que SÍ está sobre el motor. Ver `TREN_MECANICO`.
+    ubicacion: "motor",
   },
   {
     id: "S2",
@@ -147,8 +192,12 @@ export const CANALES = [
      * se pone ninguno. Sin referencia no se pueden calcular BPFO/BPFI/FTF, y
      * ponerlas con la geometría del 6205 daría frecuencias de defecto de otro
      * rodamiento: números con aspecto de diagnóstico apuntando a otra pieza.
+     *
+     * Confirmado en campo el 02-09-2026: es la CHUMACERA 1, un soporte de pie
+     * del tren de rotor. La deducción de arriba era correcta.
      */
     rodamiento: null,
+    ubicacion: "chumacera-1",
   },
   {
     id: "S3",
@@ -165,12 +214,236 @@ export const CANALES = [
      * S02 trae 99, así que el nominal no era una apuesta segura.
      */
     sensibilidad: 100,
-    rodamiento: "6204 ZZ",
+    /*
+     * Estuvo en "6204 ZZ" —el lado ventilador del motor según el catálogo WEG—
+     * hasta el 04-09-2026, y era la pieza equivocada: este canal está sobre la
+     * CHUMACERA 2, no sobre el motor. La cabecera cuenta cómo se vio.
+     *
+     * Vuelve a `null` por el mismo motivo que S2, palabra por palabra: sin la
+     * referencia del rodamiento no hay geometría, y sin geometría las BPFO,
+     * BPFI y FTF que se calcularan serían las de otra pieza.
+     */
+    rodamiento: null,
+    ubicacion: "chumacera-2",
   },
 ];
 
 /** Canal por id. */
 export const CANAL = Object.fromEntries(CANALES.map((c) => [c.id, c]));
+
+/**
+ * ── EL TREN DE ROTOR, DE IZQUIERDA A DERECHA ───────────────────────
+ *
+ * El orden físico de las piezas del banco. Levantado en campo el 02-09-2026
+ * («Reporte técnico de activos — Bancos didácticos TDCON 4.0», §3.2).
+ *
+ * ── POR QUÉ ESTO ES DOMINIO Y NO GEOMETRÍA DE LA VISTA 3D ──────────
+ *
+ * Porque es un hecho de la máquina, no una decisión de dibujo: QUÉ piezas hay
+ * y en qué orden se atraviesan responde a preguntas que no son visuales —«¿qué
+ * hay entre el motor y el disco?», «¿qué apoyo está más cerca del
+ * desequilibrio?»— y el asistente las va a recibir igual que la pantalla.
+ *
+ * Los metros de la escena SÍ son de la vista, y viven en
+ * `Demo-EVA/three-d/lib/rotor.js`. Es el mismo reparto que hacen
+ * `domain/activos.js` y `three-d/lib/layout.js` para el tanque: aquí el
+ * inventario y su orden, allí dónde cae cada cosa en el suelo.
+ *
+ * ── LA UTILIDAD QUE JUSTIFICA ESCRIBIRLO ───────────────────────────
+ *
+ * Que los tres acelerómetros NO cubren el tren entero, y eso se ve leyendo la
+ * columna `canal`: el disco de desbalance —la pieza que el banco existe para
+ * desequilibrar— no tiene sensor propio. Se lee por los dos apoyos que lo
+ * flanquean, y eso es exactamente lo que un desequilibrio produce: una subida
+ * del 1× en LOS DOS soportes a la vez.
+ *
+ * `confianza` es la etiqueta del propio reporte y se conserva tal cual, porque
+ * su §0 pide respetarla: `PLACA` leído de placa, `MEDIDO` tomado en campo,
+ * `FOTO` identificado a ojo sin placa legible.
+ */
+export const TREN_MECANICO = [
+  {
+    id: "motor",
+    label: "Motor",
+    tipo: "motor",
+    canal: "S1",
+    detalle: "WEG W22 143/5T, 2 HP (1,5 kW), 2 polos, 3475 rpm a plena carga",
+    confianza: "PLACA",
+  },
+  {
+    id: "acoplamiento",
+    label: "Acoplamiento",
+    tipo: "acoplamiento",
+    canal: null,
+    detalle: "En el extremo del motor. Rígido o flexible: no se distingue en la foto",
+    confianza: "FOTO",
+  },
+  {
+    id: "chumacera-1",
+    label: "Chumacera 1",
+    tipo: "chumacera",
+    canal: "S2",
+    detalle: "Soporte de pie con rodamiento. Modelo sin identificar",
+    confianza: "FOTO",
+  },
+  {
+    id: "disco",
+    label: "Disco de desbalance",
+    tipo: "disco",
+    /*
+     * SIN SENSOR PROPIO, y es lo interesante de esta fila. El desequilibrio se
+     * introduce aquí y se mide en los apoyos de al lado — que es como se mide
+     * un desequilibrio de verdad. Poner `canal: "S2"` porque es el más cercano
+     * diría que este disco está instrumentado, y no lo está.
+     */
+    canal: null,
+    detalle: "Disco metálico con barrenos periféricos para masas de prueba",
+    confianza: "FOTO",
+  },
+  {
+    id: "chumacera-2",
+    label: "Chumacera 2",
+    tipo: "chumacera",
+    canal: "S3",
+    detalle: "Soporte de pie con rodamiento. Modelo sin identificar",
+    confianza: "FOTO",
+  },
+  {
+    id: "extremo-libre",
+    label: "Extremo libre del eje",
+    tipo: "extremo",
+    canal: null,
+    detalle: "El eje termina en voladizo, sin apoyo ni sensor",
+    confianza: "FOTO",
+  },
+];
+
+/** Elemento del tren por id. */
+export const ELEMENTO_TREN = Object.fromEntries(TREN_MECANICO.map((e) => [e.id, e]));
+
+/** El elemento del tren donde está montado un canal, o `null`. */
+export function elementoDeCanal(canalId) {
+  return TREN_MECANICO.find((e) => e.canal === canalId) ?? null;
+}
+
+/**
+ * ── LA SONDA ───────────────────────────────────────────────────────
+ *
+ * Las tres son la misma referencia; lo que cambia de una a otra es la
+ * sensibilidad de calibración, y ésa va en `CANALES` porque es de cada unidad.
+ *
+ * ── POR QUÉ HAY CAMPOS EN `null` EN VEZ DE NO ESTAR ────────────────
+ *
+ * Porque son los que hacen falta para cosas concretas y no los tenemos, y un
+ * campo ausente se lee como «no aplica» mientras que un `null` con su motivo
+ * al lado se lee como «falta». El reporte los pide en su §8.2 con prioridad
+ * alta, y sin ellos:
+ *
+ *   `rangoFrecuenciaHz`  no se puede saber si el aRMS cubre la banda donde
+ *                        aparece el picado de un rodamiento — que es la razón
+ *                        por la que se mira el aRMS.
+ *   `salida`             no se sabe si el lazo es IEPE o 4-20 mA, y con ello
+ *                        qué significa exactamente un «cable roto» de los que
+ *                        vigila AlarmWorX.
+ *   `rangoAceleracionG`  no se sabe a partir de qué golpe la sonda satura, así
+ *                        que un aPeak alto no se puede distinguir de un tope.
+ */
+export const ACELEROMETRO = Object.freeze({
+  fabricante: "Hansford Sensors",
+  modelo: "HS-100100020",
+  /*
+   * El reporte marca el modelo como PARCIAL: el encuadre de la foto pudo
+   * cortar un carácter final. Se conserva la marca porque pedir una hoja de
+   * datos por una referencia con un dígito de más devuelve la de otra sonda.
+   */
+  confianzaModelo: "PARCIAL",
+  tipo: "Acelerómetro piezoeléctrico industrial, cuerpo de acero inoxidable",
+  cantidad: 3,
+  montaje: "roscado",
+  /*
+   * El montaje roscado es el bueno: es el único que transmite la alta
+   * frecuencia sin que la propia fijación se convierta en un filtro. Lo dice
+   * el reporte, y coincide con lo que el aRMS necesita para servir de algo.
+   */
+  montajeDetalle: "Sobre espárrago o adaptador hexagonal, atornillado al soporte",
+  rangoFrecuenciaHz: null,
+  salida: null,
+  rangoAceleracionG: null,
+});
+
+/**
+ * ── LOS EJES QUE SE MIDEN, Y LOS QUE NO ────────────────────────────
+ *
+ * Las tres sondas están montadas en VERTICAL, y sólo en vertical. No hay
+ * medición horizontal ni axial en ningún punto del banco.
+ *
+ * No es un detalle de montaje: acota lo que este módulo puede afirmar.
+ *
+ *   · La desalineación se manifiesta sobre todo en AXIAL. Sin eje axial, una
+ *     desalineación de acoplamiento puede pasar entera por debajo del radar.
+ *   · Un desequilibrio da 1× en las dos radiales; una holgura o una pata coja
+ *     dan una relación H/V muy distinta de 1. Con una sola radial las dos se
+ *     ven igual.
+ *   · ISO 20816 pide las dos radiales en cada soporte y al menos una axial en
+ *     el rodamiento de empuje. Este banco no cumple ese muestreo, así que
+ *     ninguna pantalla debe presentar su resultado como una evaluación
+ *     conforme a esa norma. Otra cosa es el CRITERIO de severidad de ISO
+ *     10816-1 Clase I sobre el vRMS, que sí se usa y sí vale.
+ *
+ * Se declara aquí, en el dominio, para que la vista 3D pueda dibujar los ejes
+ * que faltan en vez de enseñar tres flechas verticales y dejar creer que ésa
+ * es toda la instrumentación que hace falta tener.
+ */
+export const EJES_MEDIDA = Object.freeze({
+  medidos: ["vertical"],
+  ausentes: ["horizontal", "axial"],
+  norma: "ISO 20816 pide dos radiales por soporte y una axial en el de empuje",
+});
+
+/**
+ * ── EL EJE ─────────────────────────────────────────────────────────
+ *
+ * 60 cm, tomados en campo. Es la única cota que tenemos del tren.
+ *
+ * `ambiguo` no es un adorno: el reporte avisa en su §7.2 de que no está
+ * definido si esos 60 cm son la longitud TOTAL del eje o la longitud LIBRE
+ * entre soportes, ni si incluyen el tramo que entra en el acoplamiento. La
+ * diferencia importa en cuanto alguien quiera calcular una velocidad crítica o
+ * una flecha, así que la cota se guarda con la advertencia pegada y no suelta.
+ *
+ * El diámetro falta (§8.3), y sin diámetro no hay velocidad crítica posible.
+ */
+export const EJE = Object.freeze({
+  longitudCm: 60,
+  confianza: "MEDIDO",
+  ambiguo:
+    "No está definido si son longitud total o libre entre soportes, ni si incluyen el acoplamiento",
+  diametroMm: null,
+  distanciaEntreChumacerasMm: null,
+});
+
+/**
+ * ── CARGA RADIAL APROXIMADA SOBRE CADA RODAMIENTO — PROVISIONAL ────
+ *
+ * ⚠️ VALOR ESTIMADO, NO MEDIDO. Existe sólo para que la vida L10 se pueda
+ * calcular (ver `shared/eva/vibraciones/vidaRodamiento.js`). En cuanto tengas
+ * la carga real, **MODIFÍCALA AQUÍ** — es el único sitio donde vive.
+ *
+ * De dónde sale (banco del 09-09-2026): el eje horizontal apoya en dos
+ * chumaceras con un disco en medio. Peso soportado ≈ disco (~1 kg) + eje
+ * (~1 kg) ≈ 2 kg → ~20 N, repartido entre los dos apoyos ≈ 10 N cada uno; se
+ * redondea a 15 N por un margen de acoplamiento y desequilibrio.
+ *
+ * Es una carga MUY baja frente a la capacidad del rodamiento (C ≈ 14 kN), así
+ * que la vida por fatiga sale enorme: en este banco el rodamiento no falla por
+ * fatiga, sino por contaminación o por los defectos que se inducen para la
+ * demo. El número está puesto para el MECANISMO, no porque la fatiga sea aquí
+ * el riesgo real — de ahí que salga `provisional`.
+ *
+ * Para cambiarlo: mide o calcula la carga radial real en newtons (peso
+ * soportado, tensión de correa, empuje, etc.) y sustituye el 15.
+ */
+export const CARGA_RADIAL_APROX_N = 15; // PROVISIONAL — ver el bloque de arriba
 
 /**
  * ── MEDIDAS POR CANAL ──────────────────────────────────────────────
@@ -493,6 +766,32 @@ export const LIMITES_ISO = Object.freeze({ nueva: 0.71, aviso: 1.8, alarma: 4.5 
 export const RPM_MINIMA_ISO = 600;
 
 /**
+ * ¿Se sabe si ISO 10816 aplica, dada la velocidad? `null` cuando no se sabe
+ * la velocidad —«no se sabe si aplica» y «no aplica» son cosas distintas, y
+ * la segunda apagaría las reglas en silencio—, `true`/`false` en el resto.
+ *
+ * ── POR QUÉ ES UNA FUNCIÓN APARTE, Y NO SÓLO PARTE DE `evaluarRiesgosVibracion` ──
+ *
+ * Porque `ContextoDeMaquina.jsx` (Plan 25 F4/F10) necesita SÓLO esto —para
+ * `peorZonaDe()`, en la barra de contexto del Topbar, que se monta SIEMPRE—
+ * y `evaluarRiesgosVibracion()` trae consigo el motor entero de reglas
+ * (`riesgosVibracion.js`, 900+ líneas). Llamar al motor completo sólo para
+ * leer dos líneas de él metía ese archivo en el chunk de ARRANQUE: +19 KB
+ * medidos al construir F10, en un componente que se monta en cada pantalla.
+ * Se descubrió al medir el bundle tras esta fase — ver `verificar-bundle.mjs`.
+ *
+ * `evaluarRiesgosVibracion()` sigue calculando lo mismo por su cuenta, no
+ * llama a esta función: son la MISMA fórmula en dos sitios (dos líneas, y
+ * quedaba peor una dependencia cruzada entre el motor de reglas y esta
+ * utilidad de presentación que la duplicación mínima).
+ */
+export function normaAplicableDe(velocidad) {
+  return velocidad === null || velocidad === undefined || !Number.isFinite(velocidad)
+    ? null
+    : velocidad >= RPM_MINIMA_ISO;
+}
+
+/**
  * Hasta 12 Hz (720 rpm) la frecuencia de giro sigue lo bastante cerca del
  * corte del filtro como para que la atenuación importe. Por encima, la
  * componente de giro entra limpia y el número se puede leer tal cual.
@@ -526,6 +825,35 @@ export function bandaISO(vRMS, normaAplicable) {
   if (vRMS > LIMITES_ISO.aviso) return { zona: "C", label: "zona C · insatisfactoria", nivel: "atencion" };
   if (vRMS > LIMITES_ISO.nueva) return { zona: "B", label: "zona B · admisible", nivel: "ok" };
   return { zona: "A", label: "zona A · como nueva", nivel: "ok" };
+}
+
+/**
+ * El PEOR veredicto ISO entre los canales, o `null` si ninguno se pudo
+ * evaluar (Plan 25 F10, extraída de `InicioVibraciones.jsx` — ver su
+ * cabecera para el porqué del PEOR y no un promedio).
+ *
+ * ── POR QUÉ ES UNA FUNCIÓN Y NO SE REPITE EN CADA PANTALLA ─────────
+ *
+ * Porque ya se repitió una vez sin que nadie lo notara: `ContextoDeMaquina.jsx`
+ * (Plan 25 F4) tenía su PROPIA versión inline, que filtraba
+ * `canal.zona && canal.nivel` directamente sobre `canales[id]` — un campo que
+ * ESTE objeto nunca tiene, porque `bandaISO()` no se llama al construir
+ * `canales` en `sistemaVibraciones.js`, se llama aparte, con
+ * `res.normaAplicable` de `evaluarRiesgosVibracion()`. El filtro daba SIEMPRE
+ * vacío, así que ese indicador de contexto no mostraba nada en producción real
+ * — sólo funcionaba en las pruebas de F4, que lo mockeaban con la forma
+ * equivocada directamente. Se descubrió al construir F10, que necesita el
+ * mismo dato y sí lo prueba contra el cálculo de verdad.
+ *
+ * @param {object} canales         `sistema.canales` — `{ [id]: { vRMS, … } }`
+ * @param {boolean} normaAplicable de `evaluarRiesgosVibracion(...).normaAplicable`
+ * @returns {{zona, label, nivel} | null}
+ */
+export function peorZonaDe(canales, normaAplicable) {
+  const veredictos = CANALES
+    .map((c) => bandaISO(canales?.[c.id]?.vRMS, normaAplicable))
+    .filter(Boolean);
+  return veredictos.length ? veredictos.reduce((a, b) => (b.zona > a.zona ? b : a)) : null;
 }
 
 /**
