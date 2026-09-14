@@ -1105,6 +1105,23 @@ export function createHerramientas({
    * mismo diario porque las dos lo reciben del mismo sitio.
    */
   diario = null,
+
+  /*
+   * El CUADERNO de planta (Plan 25 F8), no el diario de accionamientos de
+   * arriba: notas de una PERSONA («cambié el filtro»), sin que nada las
+   * confirme. `resumen_de_turno` lo necesita para poder decir qué se anotó
+   * en el turno — antes de esto no había NINGUNA herramienta que leyera el
+   * cuaderno, así que "¿qué notas se han hecho?" no podía contestarse con
+   * datos reales por ninguna vía (medido el 14-09-2026: el modelo respondió
+   * igualmente, inventando fecha y contenido).
+   *
+   * `null` por defecto por el mismo motivo que `diario`: un montaje sin él
+   * sigue funcionando, sólo que `resumen_de_turno` no puede citar notas.
+   */
+  cuaderno = null,
+
+  // Sólo para pruebas: ver el JSDoc de `crearHerramientasDeHistoricos`.
+  leerAprendizajeDe,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -1130,11 +1147,15 @@ export function createHerramientas({
 
   /*
    * Las señales del pronóstico: sólo las que tienen serie PROPIA verificada.
-   * `cargaMotor` no está y no puede estar — el historiador devuelve ahí la
-   * curva de la temperatura del tanque sin dar error.
+   * `cargaMotor` volvió a esta lista el 14-09-2026: planta le dio
+   * `Historical data source` propio (antes el historiador devolvía ahí la
+   * curva de la temperatura del tanque sin dar error). El mecanismo
+   * "esfuerzo-sin-resultado" de `pronostico.js`, que la necesita, ya se
+   * puede evaluar.
    */
   const SENALES_PRONOSTICO = [
     'nivelTanque', 'temperaturaTanque', 'presionRelativa', 'tensionLinea', 'flujoInstantaneo',
+    'cargaMotor',
   ]
 
   const herramientas = {
@@ -1161,6 +1182,8 @@ export function createHerramientas({
       client,
       turnos,
       reportes,
+      cuaderno,
+      ...(leerAprendizajeDe ? { leerAprendizajeDe } : {}),
       historia: { leerSerie, leerSerieEnRango, leerHistoriaLarga },
       maquina: { leerMaquina, resolverSistema },
       senalesPronostico: SENALES_PRONOSTICO,

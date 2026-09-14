@@ -35,7 +35,7 @@ import assert from 'node:assert/strict'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
-import { RAIZ, TODOS_LOS_PUNTOS, esHistorizada, pointName, puntoHistorico, historizadas } from '../shared/eva/tanque/senales.js'
+import { RAIZ, SENALES, TODOS_LOS_PUNTOS, esHistorizada, pointName, puntoHistorico, historizadas } from '../shared/eva/tanque/senales.js'
 import { valorEn } from '../shared/eva/tanque/simulador.js'
 import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones/vibraciones.js'
 import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
@@ -278,38 +278,49 @@ await checkAsync('el nombre hda: (Plan 27 F6) también se reconoce, no sólo el 
   }
 })
 
-await checkAsync('cincuenta señales, no cinco: F6 cerró la mayoría del catálogo', async () => {
-  assert.equal(historizadas().length, 50)
+await checkAsync('cincuenta y dos señales: el catálogo del tanque quedó historizado por completo', async () => {
+  // Plan 27 F6 (10-09-2026): cincuenta de las cincuenta y dos. El
+  // 14-09-2026 planta le dio Historical data source propio a las dos que
+  // quedaban (`cargaMotor`, `eficienciaEnergetica`), así que hoy son las 52.
+  assert.equal(historizadas().length, 52)
 })
 
-await checkAsync('las dos SIN historia reciben la serie de la temperatura, como el servidor real', async () => {
+await checkAsync('una señal SIN historia recibe la serie de la temperatura, como el servidor real', async () => {
   /*
    * Es la invariante cara de este archivo: no falla, y eso es justo lo que
    * hay que reproducir. `herramientas.mjs` nunca deja que esto se llame para
-   * estas tres claves (la guarda va ANTES de la red, ver
+   * una señal sin serie propia (la guarda va ANTES de la red, ver
    * `verificar-herramientas.mjs`), pero cualquier otro consumidor del
    * transporte —la ruta REST directa, por ejemplo— tiene que ver la MISMA
    * trampa que vería contra el servidor de verdad.
+   *
+   * Ya no queda una señal real sin historia en el catálogo del tanque —la
+   * última, `cargaMotor`, se corrigió en planta el 14-09-2026 (ver
+   * `senales.js`)—, así que se apaga su bandera sólo durante esta prueba
+   * para seguir ejercitando el cruce con la temperatura que SÍ reproduce
+   * `fakeClient.mjs` cuando `esHistorizada()` dice que falta.
    */
-  const cliente = sinCaos()
-  const rango = {
-    startDate: new Date(1_700_000_000_000 - 3_600_000).toISOString(),
-    endDate: new Date(1_700_000_000_000).toISOString(),
-    interval: '00:15:00',
-  }
+  SENALES.cargaMotor.historizado = false
+  try {
+    const cliente = sinCaos()
+    const rango = {
+      startDate: new Date(1_700_000_000_000 - 3_600_000).toISOString(),
+      endDate: new Date(1_700_000_000_000).toISOString(),
+      interval: '00:15:00',
+    }
 
-  const temperatura = await cliente.readHistory({ pointName: pointName('temperaturaTanque'), ...rango })
+    const temperatura = await cliente.readHistory({ pointName: pointName('temperaturaTanque'), ...rango })
 
-  // `tensionLinea` ya NO está aquí: desde el 24-08-2026 sirve su propia serie.
-  for (const clave of ['cargaMotor', 'eficienciaEnergetica']) {
-    assert.ok(!esHistorizada(clave), `${clave} no debería estar historizada`)
-    const r = await cliente.readHistory({ pointName: pointName(clave), ...rango })
+    assert.ok(!esHistorizada('cargaMotor'), 'cargaMotor no debería estar historizada durante esta prueba')
+    const r = await cliente.readHistory({ pointName: pointName('cargaMotor'), ...rango })
 
-    assert.equal(r.ok, true, `${clave} tendría que responder ok:true, como el servidor real`)
+    assert.equal(r.ok, true, 'cargaMotor tendría que responder ok:true, como el servidor real')
     assert.deepEqual(
       r.data.map(d => d.value), temperatura.data.map(d => d.value),
-      `${clave} no coincide con la serie de temperatura`
+      'cargaMotor no coincide con la serie de temperatura'
     )
+  } finally {
+    SENALES.cargaMotor.historizado = true
   }
 })
 

@@ -61,10 +61,14 @@ const MARGEN = 50
 const ANCHO_PAGINA = 595.28 // A4 en puntos
 const ALTO_PAGINA = 841.89
 
-/* El cintillo (1276×189) se dibuja a sangre, así que su alto sale de su propia
- * proporción al ancho de página. El margen superior del contenido lo deja
- * libre; el inferior reserva sitio para el pie. */
-const ALTO_CINTILLO = Math.round(ANCHO_PAGINA * (189 / 1276)) // ≈ 88
+/* El cintillo se dibuja a sangre. A su proporción natural (bastante más
+ * ancha que alta) se comía casi tanto sitio como el gráfico de la página,
+ * así que se fija un alto menor y se RECORTA la imagen —nunca se aplasta—:
+ * `dibujarCintillo` la dibuja a su ancho completo y centrada verticalmente
+ * dentro de este alto, con un `clip()` que descarta lo que sobra arriba y
+ * abajo. El margen superior del contenido lo deja libre; el inferior
+ * reserva sitio para el pie. */
+const ALTO_CINTILLO = 52
 const MARGEN_SUP = ALTO_CINTILLO + 20
 const MARGEN_INF = 56
 const LIMITE_INFERIOR = ALTO_PAGINA - MARGEN_INF
@@ -102,6 +106,19 @@ function leerMarca(nombre) {
   } catch {
     return null // Falta la pieza: se dibuja el reemplazo en vectores.
   }
+}
+
+/**
+ * Ancho y alto reales de un PNG, leídos de su IHDR (bytes 16-23: dos enteros
+ * de 4 bytes, big-endian). Nunca se confía en un tamaño de memoria o de
+ * comentario: el archivo de `ia/marca/` lo reemplaza quien administra la
+ * marca, y un comentario con el tamaño de la versión anterior queda
+ * desactualizado en el mismo instante en que alguien sube un PNG distinto —
+ * medido: `cintillo.png` es hoy 1022×251, no 1276×189.
+ */
+function dimensionesPng(buffer) {
+  if (!buffer || buffer.length < 24) return null
+  return { ancho: buffer.readUInt32BE(16), alto: buffer.readUInt32BE(20) }
 }
 
 function cargarMarca() {
@@ -224,7 +241,24 @@ function dibujarPortada(doc, marca, etq, { titulo, subtitulo, instalacion, perio
 /** Cintillo de cabecera de una página de contenido (imagen a sangre, o vector). */
 function dibujarCintillo(doc, marca) {
   if (marca.cintillo) {
-    doc.image(marca.cintillo, 0, 0, { width: ANCHO_PAGINA })
+    /*
+     * La imagen es más ancha que alta: a todo el ancho de página su alto
+     * natural es mayor que `ALTO_CINTILLO`. Se dibuja a su escala natural
+     * —nunca se aplasta, eso distorsionaría el logo— y se recorta con
+     * `clip()` a la franja que sí cabe, centrada verticalmente para no
+     * perder el logo si queda más arriba o más abajo del centro.
+     *
+     * El alto natural sale de los píxeles REALES del archivo (`dimensionesPng`),
+     * no de un número de comentario: `cintillo.png` cambió de 1276×189 a
+     * 1022×251 sin que nada en el código se enterara hasta que se midió a
+     * mano el 14-09-2026 — la franja llevaba tiempo mal centrada.
+     */
+    const dim = dimensionesPng(marca.cintillo)
+    const altoNatural = dim ? ANCHO_PAGINA * (dim.alto / dim.ancho) : ALTO_CINTILLO
+    doc.save()
+    doc.rect(0, 0, ANCHO_PAGINA, ALTO_CINTILLO).clip()
+    doc.image(marca.cintillo, 0, (ALTO_CINTILLO - altoNatural) / 2, { width: ANCHO_PAGINA })
+    doc.restore()
     return
   }
   doc.save()

@@ -88,7 +88,7 @@ export function crearAyudantesDeHistoria({ client, historyConcurrencia }) {
    */
   const deSistema = (sistemaId) => SISTEMA[sistemaId] ?? SISTEMA.tanque
 
-async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque') {
+async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque', { crudo = false } = {}) {
   const segundos = (ventana.fin - ventana.inicio) / 1000
   // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
   // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
@@ -108,8 +108,16 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
     pointName: deSistema(sistemaId).series.punto(clave),
     startDate: ventana.inicio.toISOString(),
     endDate: ventana.fin.toISOString(),
-    aggregate: deSistema(sistemaId).series.agregado ?? AGREGADO,
-    interval,
+    /*
+     * `crudo: true` pide la serie SIN `aggregate`, tal como la grabó el
+     * historiador — existe por las alarmas: son booleanas, y promediarlas
+     * no las degrada, las BORRA. Medido contra el servidor real (mismo
+     * criterio que ya usaba el frontend, `Demo-EVA/data/tanque/historia.js`):
+     * con `Average` salen 0 flancos en las nueve alarmas del tanque; en
+     * crudo, 7 en `faltaDePresion` en 24 h. El cubo de un agregado vale
+     * `0,5` —ni 0 ni 1—, así que nunca es un flanco.
+     */
+    ...(crudo ? {} : { aggregate: deSistema(sistemaId).series.agregado ?? AGREGADO, interval }),
   })
 
   if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
@@ -132,10 +140,28 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
    */
   return {
     ok: true,
-    datos: normalizar(r.data),
+    datos: enRango(normalizar(r.data), ventana, crudo),
     truncada: Boolean(r.hasMore),
     ventana: { inicio: ventana.inicio, fin: ventana.fin, segundosPorPunto },
   }
+}
+
+/**
+ * Recorta a la ventana pedida, y SÓLO en modo `crudo`.
+ *
+ * Es la regla 3 de `shared/eva/comun/historia.js`, medida el 26-08-2026: sin
+ * `aggregate`, un rango vacío no vuelve vacío — vuelve la muestra LÍMITE del
+ * historiador ENTERO con `ok: true`, por lejos que caiga del rango pedido.
+ * Con agregado el servidor sí recorta solo; en crudo hay que comprobar el
+ * `timestamp` de cada muestra a mano. Para una alarma importa el doble: una
+ * muestra de hace tres meses colada al principio de la ventana es un flanco
+ * inventado.
+ */
+function enRango(datos, { inicio, fin }, crudo) {
+  if (!crudo) return datos
+  const desde = inicio.getTime()
+  const hasta = fin.getTime()
+  return datos.filter((m) => m.t.getTime() >= desde && m.t.getTime() <= hasta)
 }
 
 /**
@@ -166,20 +192,20 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
  * que ya hacía `leerSerieEnRango()`, y fusionar los tramos aquí para que
  * los cuatro llamadores no tengan que saber que la ventana se troceó.
  */
-async function leerSerie(clave, ventana, sistemaId = 'tanque') {
+async function leerSerie(clave, ventana, sistemaId = 'tanque', { crudo = false } = {}) {
   if (!deSistema(sistemaId).esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
 
   const { tramos } = planificar({ inicio: ventana.inicio, fin: ventana.fin, puntosPorTramo: 96 })
 
   // Un solo tramo: la ventana ya es corta, la llamada de siempre sin
   // recomponer nada — mismo `interval` que si `planificar()` no existiera.
-  if (tramos.length === 1) return leerUnTramo(clave, ventana, undefined, sistemaId)
+  if (tramos.length === 1) return leerUnTramo(clave, ventana, undefined, sistemaId, { crudo })
 
   // Concurrencia ACOTADA (Plan 15 Fase 3): mismo criterio que
   // `leerSerieEnRango()`, y por el mismo motivo — más tramos con la Fase 1
   // debajo pueden ser más páginas HTTP por tramo.
   const tareas = tramos.map(
-    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo, sistemaId)
+    (tramo) => () => leerUnTramo(clave, { inicio: tramo.desde, fin: tramo.hasta }, tramo, sistemaId, { crudo })
   )
   const resultados = await conConcurrenciaAcotada(tareas, historyConcurrencia)
 

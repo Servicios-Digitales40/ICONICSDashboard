@@ -341,21 +341,26 @@ check('el punto de TIEMPO REAL y el HISTÓRICO ya no son el mismo nombre (Plan 2
 })
 
 check('sólo las señales verificadas están marcadas como historizadas', () => {
-  // Plan 27 F6 (10-09-2026): cincuenta de las cincuenta y dos, contra las
-  // cinco de antes — quedan fuera las dos de las que el servidor sigue
-  // resolviendo a la serie de la temperatura.
-  assert.equal(historizadas().length, 50)
+  // Plan 27 F6 (10-09-2026): cincuenta de las cincuenta y dos. El
+  // 14-09-2026 planta le dio Historical data source propio a las dos que
+  // quedaban fuera (`cargaMotor`, `eficienciaEnergetica`), así que hoy son
+  // las 52.
+  assert.equal(historizadas().length, 52)
   for (const k of ['cargaMotor', 'eficienciaEnergetica']) {
-    assert.equal(esHistorizada(k), false, `${k} NO puede estar historizada`)
+    assert.equal(esHistorizada(k), true, `${k} SÍ está historizada`)
   }
 })
 
 check('el catálogo que va al prompt no inventa unidades', () => {
+  // El caudal fue el ejemplo hasta el 14-09-2026: el usuario confirmó su
+  // unidad (L/min) al calibrar los umbrales tras el incidente de esa fecha.
+  // El registro crudo del variador sigue sin unidad confirmada (Lista-
+  // variables.pdf §1.8: "sin escalar"), así que hereda el ejemplo.
   const cat = createHerramientas({ client: clienteFalso() }).catalogo()
   const caudal = cat.find(s => s.nombre === 'Caudal instantáneo')
-  // El tag no dice si son l/s o m³/h. Poner una de las dos sería inventarse
-  // la magnitud, y el modelo la copiaría tal cual.
-  assert.equal(caudal.unidad, null, 'el caudal no tiene unidad declarada')
+  assert.equal(caudal.unidad, 'L/min', 'el caudal ya tiene unidad confirmada')
+  const frecuencia = cat.find(s => s.nombre === 'Frecuencia de salida del variador')
+  assert.equal(frecuencia.unidad, null, 'el registro crudo del variador no tiene unidad declarada')
   assert.equal(cat.find(s => s.nombre === 'Nivel del tanque').unidad, '%')
 })
 
@@ -1452,12 +1457,15 @@ await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async ()
 })
 
 await checkAsync('las unidades que el servidor no declara viajan vacías', async () => {
+  // `flujoInstantaneo` fue el ejemplo hasta el 14-09-2026 (unidad confirmada:
+  // L/min, ver `senales.js`); el registro crudo del variador sigue sin
+  // confirmar y hereda el ejemplo.
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
 
-  const caudal = senales.find(s => s.clave === 'flujoInstantaneo')
-  assert.equal(caudal.unidad, null, 'inventarle l/s sería inventarse la magnitud')
-  assert.ok(caudal.nota, 'y hay que decir por qué está vacía')
+  const frecuencia = senales.find(s => s.clave === 'frecuenciaSalidaVariador')
+  assert.equal(frecuencia.unidad, null, 'inventarle una unidad sería inventarse la magnitud')
+  assert.ok(frecuencia.nota, 'y hay que decir por qué está vacía')
 
   assert.equal(senales.find(s => s.clave === 'nivelTanque').unidad, '%')
 })
@@ -1586,25 +1594,35 @@ await checkAsync('pedir la historia de una señal NO historizada no llega a la r
    * comprobar que la herramienta falla — hay que comprobar que **no preguntó**.
    * Si algún día alguien mueve la guarda detrás de la llamada, esto se cae.
    */
-  const client = clienteFalso()
-  const h = createHerramientas({ client })
+  // Desde el 14-09-2026 el catálogo del tanque está historizado por
+  // completo (ver más arriba): se apagan las dos banderas sólo para esta
+  // prueba, y se restauran al final, para seguir ejercitando la guarda sin
+  // depender de una señal real que ya no existe en el catálogo.
+  for (const k of ['cargaMotor', 'eficienciaEnergetica']) SENALES[k].historizado = false
+  try {
+    const client = clienteFalso()
+    const h = createHerramientas({ client })
 
-  for (const nombre of ['carga del motor', 'eficiencia energética']) {
-    const r = await h.ejecutar('historia_de_senal', { senal: nombre })
-    assert.equal(r.ok, false, `"${nombre}" no puede devolver serie`)
-    assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
-    // Cuántas hay se lee del catálogo, no de un número escrito aquí: la lista
-    // crece según se configuren en el Data Historian.
-    assert.equal(r.senalesConHistoria?.length, historizadas().length, 'y decir cuáles sí la tienen')
+    for (const nombre of ['carga del motor', 'eficiencia energética']) {
+      const r = await h.ejecutar('historia_de_senal', { senal: nombre })
+      assert.equal(r.ok, false, `"${nombre}" no puede devolver serie`)
+      assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
+      // Cuántas hay se lee del catálogo, no de un número escrito aquí: la lista
+      // crece según se configuren en el Data Historian.
+      assert.equal(r.senalesConHistoria?.length, historizadas().length, 'y decir cuáles sí la tienen')
+    }
+
+    assert.equal(client.historial.length, 0, 'NINGUNA pudo salir a la red')
+  } finally {
+    for (const k of ['cargaMotor', 'eficienciaEnergetica']) SENALES[k].historizado = true
   }
-
-  assert.equal(client.historial.length, 0, 'NINGUNA pudo salir a la red')
 })
 
 await checkAsync('el modo del variador ya tiene serie (Plan 27 F6)', async () => {
   // Hasta el 10-09-2026 era el ejemplo de señal SIN historia; F6 le confirmó
-  // la suya (`hda:...MANDO_DEL_VARIADOR_VFD:MODO_AM_VDF`). Las dos que
-  // quedan sin serie propia son `cargaMotor` y `eficienciaEnergetica`.
+  // la suya (`hda:...MANDO_DEL_VARIADOR_VFD:MODO_AM_VDF`). El 14-09-2026 se
+  // le confirmó la suya también a `cargaMotor` y `eficienciaEnergetica`, así
+  // que hoy el catálogo del tanque está historizado por completo.
   const client = clienteFalso()
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'modo del variador' })
 
@@ -1788,13 +1806,22 @@ await checkAsync('las claves son los períodos YA resueltos, no el texto del mod
 })
 
 await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a la red', async () => {
-  const client = clienteFalso()
-  const r = await createHerramientas({ client }).ejecutar('comparar_periodos', {
-    senal: 'carga del motor', periodoA: 'última hora', periodoB: 'ayer',
-  })
+  // Desde el 14-09-2026 `cargaMotor` SÍ tiene serie propia (ver más arriba);
+  // se apaga la bandera sólo para esta prueba, y se restaura al final, para
+  // seguir ejercitando la guarda sin depender de una señal real que ya no
+  // existe en el catálogo del tanque.
+  SENALES.cargaMotor.historizado = false
+  try {
+    const client = clienteFalso()
+    const r = await createHerramientas({ client }).ejecutar('comparar_periodos', {
+      senal: 'carga del motor', periodoA: 'última hora', periodoB: 'ayer',
+    })
 
-  assert.equal(r.ok, false)
-  assert.equal(client.historial.length, 0)
+    assert.equal(r.ok, false)
+    assert.equal(client.historial.length, 0)
+  } finally {
+    SENALES.cargaMotor.historizado = true
+  }
 })
 
 await checkAsync('comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
@@ -2102,9 +2129,11 @@ await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se 
   assert.equal(r.ok, true)
   // Las cuatro PRIMERAS del catálogo con serie propia, en su orden — no las
   // cuatro originales del Plan 8: desde que `modoVdf` se historizó (Plan 27
-  // F6), entra ella y sale `presionRelativa`, que pasó al quinto puesto.
+  // F6) entró ella y salió `presionRelativa`; desde que `cargaMotor` se
+  // historizó (14-09-2026) entra ella, en su puesto natural (tercero), y
+  // saca a `flujoInstantaneo` de las cuatro primeras.
   assert.deepEqual(r.senalesConsideradas.sort(), [
-    'Caudal instantáneo', 'Modo del variador', 'Nivel del tanque', 'Temperatura del tanque',
+    'Carga de trabajo del motor', 'Modo del variador', 'Nivel del tanque', 'Temperatura del tanque',
   ].sort())
   assert.match(r.nota, /no nombraba ninguna señal/i)
 })
@@ -2117,28 +2146,36 @@ await checkAsync(
      * La señal SIN historia es la CARGA DEL MOTOR, no la tensión.
      *
      * El escenario usaba la tensión hasta el 24-08-2026, cuando pasó a servir
-     * su propia serie. Lo que se prueba aquí no es esa señal en concreto sino
-     * la mezcla —una con historia y otra sin ella—, así que se cambia por una
-     * que siga sin tenerla en vez de reescribir la invariante.
+     * su propia serie, y pasó a la carga del motor. Desde el 14-09-2026 esa
+     * también tiene serie propia (ver más arriba) — y ya no queda una tercera
+     * señal real sin historia en el catálogo del tanque para heredar el
+     * patrón. Lo que se prueba aquí no es esa señal en concreto sino la
+     * mezcla —una con historia y otra sin ella—, así que se apaga la
+     * bandera sólo durante esta prueba en vez de reescribir la invariante.
      */
-    const client = clienteFalso()
-    const r = await createHerramientas({ client }).ejecutar('diagnostico', {
-      sintoma: 'caudal abundante con el motor muy cargado',
-    })
+    SENALES.cargaMotor.historizado = false
+    try {
+      const client = clienteFalso()
+      const r = await createHerramientas({ client }).ejecutar('diagnostico', {
+        sintoma: 'caudal abundante con el motor muy cargado',
+      })
 
-    assert.equal(r.ok, true)
-    assert.deepEqual(r.senalesConsideradas.sort(), ['Caudal instantáneo', 'Carga de trabajo del motor'].sort())
+      assert.equal(r.ok, true)
+      assert.deepEqual(r.senalesConsideradas.sort(), ['Caudal instantáneo', 'Carga de trabajo del motor'].sort())
 
-    // El caudal SÍ tiene historia: tiene que haberse leído.
-    assert.ok(r.medido.historia.some(h => h.senal === 'Caudal instantáneo'))
-    // La carga NO tiene historia: no puede aparecer como serie leída, y
-    // tampoco puede haber salido a la red a pedirla.
-    assert.ok(!r.medido.historia.some(h => h.senal === 'Carga de trabajo del motor'))
+      // El caudal SÍ tiene historia: tiene que haberse leído.
+      assert.ok(r.medido.historia.some(h => h.senal === 'Caudal instantáneo'))
+      // La carga NO tiene historia: no puede aparecer como serie leída, y
+      // tampoco puede haber salido a la red a pedirla.
+      assert.ok(!r.medido.historia.some(h => h.senal === 'Carga de trabajo del motor'))
 
-    // Con una sola señal historizada de las dos consideradas, no se pide
-    // correlación — y el dossier tiene que decir por qué, no callarlo.
-    assert.equal(typeof r.medido.correlacion, 'string')
-    assert.match(r.medido.correlacion, /al menos dos/i)
+      // Con una sola señal historizada de las dos consideradas, no se pide
+      // correlación — y el dossier tiene que decir por qué, no callarlo.
+      assert.equal(typeof r.medido.correlacion, 'string')
+      assert.match(r.medido.correlacion, /al menos dos/i)
+    } finally {
+      SENALES.cargaMotor.historizado = true
+    }
   }
 )
 
@@ -2253,11 +2290,14 @@ await checkAsync(
     assert.equal(r.ok, true)
     // El reparto sale del catálogo, no de una lista escrita aquí: al historizar
     // una señal más, pasa sola de la tabla al gráfico. Plan 27 F6 (10-09-2026):
-    // cincuenta de las cincuenta y dos ya tienen serie propia por `hda:` — sólo
-    // quedan en tabla las dos que comparten la de `temperaturaTanque`.
+    // cincuenta de las cincuenta y dos ya tenían serie propia por `hda:`; el
+    // 14-09-2026 planta le dio Historical data source a las dos que quedaban
+    // (`cargaMotor`, `eficienciaEnergetica`), así que hoy son las 52 — no
+    // queda ninguna en tabla.
     assert.deepEqual(r.senalesConGrafico.sort(), [
-      'Nivel del tanque', 'Temperatura del tanque', 'Modo del variador',
-      'Caudal instantáneo', 'Presión relativa', 'Tensión de línea',
+      'Nivel del tanque', 'Temperatura del tanque', 'Carga de trabajo del motor',
+      'Modo del variador', 'Caudal instantáneo', 'Presión relativa', 'Tensión de línea',
+      'Eficiencia energética',
       'Nivel alto-alto', 'Nivel alto', 'Nivel bajo-bajo', 'Nivel bajo',
       'Presión alta', 'Falta de presión', 'Bajo flujo', 'Falla del variador',
       'Mando del proceso', 'Paro de emergencia',
@@ -2278,9 +2318,7 @@ await checkAsync(
       'Modo de la bomba de aire', 'Orden de la bomba de aire',
       'Bloqueo de mantenimiento (bomba de aire)', 'Estado de la bomba de aire',
     ].sort())
-    assert.deepEqual(r.senalesEnTabla.sort(), [
-      'Carga de trabajo del motor', 'Eficiencia energética',
-    ].sort())
+    assert.deepEqual(r.senalesEnTabla.sort(), [])
 
     // El resultado para el modelo lleva el enlace, NUNCA el PDF — mismo
     // contrato que `grafico_de_senal` con el SVG.
@@ -2363,15 +2401,23 @@ await checkAsync('sin `idioma`, generar_reporte sigue en español: no rompe nada
 })
 
 await checkAsync('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
-  const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
-    'generar_reporte',
-    // Una CON historia (gráfico) y otra SIN ella (tabla). La tensión servía de
-    // ejemplo de «sin historia» hasta que pasó a tener la suya el 24-08-2026.
-    { senales: ['nivel', 'carga del motor'] }
-  )
-  assert.equal(r.ok, true)
-  assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
-  assert.deepEqual(r.senalesEnTabla, ['Carga de trabajo del motor'])
+  // Una CON historia (gráfico) y otra SIN ella (tabla). La tensión servía de
+  // ejemplo de «sin historia» hasta que pasó a tener la suya el 24-08-2026,
+  // y la carga del motor hasta el 14-09-2026 — ver más arriba. Ya no queda
+  // una tercera señal real sin historia en el catálogo, así que se apaga la
+  // bandera sólo durante esta prueba.
+  SENALES.cargaMotor.historizado = false
+  try {
+    const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
+      'generar_reporte',
+      { senales: ['nivel', 'carga del motor'] }
+    )
+    assert.equal(r.ok, true)
+    assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
+    assert.deepEqual(r.senalesEnTabla, ['Carga de trabajo del motor'])
+  } finally {
+    SENALES.cargaMotor.historizado = true
+  }
 })
 
 await checkAsync('una señal inventada en la lista se ignora y se reporta, no rompe el reporte', async () => {
@@ -2528,11 +2574,18 @@ await checkAsync('valor_en_momento sin hora no adivina, y el futuro se rechaza',
 await checkAsync('valor_en_momento respeta la guarda de señales sin historia', async () => {
   // La misma regla que el resto: sin ella el servidor devuelve la curva de la
   // temperatura del tanque bajo el nombre de otra señal, y sin dar error.
-  const r = await createHerramientas({ client: clienteFalso() })
-    .ejecutar('valor_en_momento', { senal: 'carga del motor', momento: 'ayer a las 11:16' })
+  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
+  // se apaga la bandera sólo para esta prueba.
+  SENALES.cargaMotor.historizado = false
+  try {
+    const r = await createHerramientas({ client: clienteFalso() })
+      .ejecutar('valor_en_momento', { senal: 'carga del motor', momento: 'ayer a las 11:16' })
 
-  assert.equal(r.ok, false)
-  assert.ok(r.senalesConHistoria, 'tiene que ofrecer las que sí tienen serie')
+    assert.equal(r.ok, false)
+    assert.ok(r.senalesConHistoria, 'tiene que ofrecer las que sí tienen serie')
+  } finally {
+    SENALES.cargaMotor.historizado = true
+  }
 })
 
 /* ── Cobertura: qué significa el recuento de puntos ──────────────────── */
@@ -3264,14 +3317,21 @@ await checkAsync('una sola señal se rechaza y remite a historia_de_senal', asyn
 })
 
 await checkAsync('una señal sin serie propia se rechaza ANTES de leer nada', async () => {
-  const client = clienteFalso()
-  const r = await createHerramientas({ client }).ejecutar('tendencia_multiple', {
-    senales: ['nivel', 'carga del motor'],
-  })
+  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
+  // se apaga la bandera sólo para esta prueba.
+  SENALES.cargaMotor.historizado = false
+  try {
+    const client = clienteFalso()
+    const r = await createHerramientas({ client }).ejecutar('tendencia_multiple', {
+      senales: ['nivel', 'carga del motor'],
+    })
 
-  assert.equal(r.ok, false)
-  assert.match(r.error, /no tiene serie histórica propia/i)
-  assert.equal(client.historial.length, 0, 'salió a la red pese a saber que no podía')
+    assert.equal(r.ok, false)
+    assert.match(r.error, /no tiene serie histórica propia/i)
+    assert.equal(client.historial.length, 0, 'salió a la red pese a saber que no podía')
+  } finally {
+    SENALES.cargaMotor.historizado = true
+  }
 })
 
 console.log('\n── buscar_evento ───────────────────────────────────────────')
@@ -3320,13 +3380,99 @@ await checkAsync('una condición que no existe se rechaza con las válidas', asy
 })
 
 await checkAsync('sin serie propia no se puede buscar un cruce', async () => {
+  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
+  // se apaga la bandera sólo para esta prueba.
+  SENALES.cargaMotor.historizado = false
+  try {
+    const h = createHerramientas({ client: clienteFalso() })
+    const r = await h.ejecutar('buscar_evento', {
+      senal: 'carga del motor', condicion: 'por encima de', valor: 5,
+    })
+
+    assert.equal(r.ok, false)
+    assert.match(r.error, /no tiene serie histórica propia/i)
+  } finally {
+    SENALES.cargaMotor.historizado = true
+  }
+})
+
+console.log('\n── alarma_sostenida ─────────────────────────────────────────')
+
+await checkAsync('una señal que no es alarma se rechaza, con el nombre de la herramienta correcta', async () => {
   const h = createHerramientas({ client: clienteFalso() })
-  const r = await h.ejecutar('buscar_evento', {
-    senal: 'carga del motor', condicion: 'por encima de', valor: 5,
-  })
+  const r = await h.ejecutar('alarma_sostenida', { alarma: 'nivel del tanque' })
 
   assert.equal(r.ok, false)
-  assert.match(r.error, /no tiene serie histórica propia/i)
+  assert.match(r.error, /no es una alarma/i)
+  assert.match(r.error, /historia_de_senal/)
+})
+
+await checkAsync('un arranque normal (un solo pulso corto) NO se marca sostenido', async () => {
+  const client = clienteFalso({
+    historia: async (opciones) => {
+      const t0 = new Date(opciones.startDate).getTime()
+      // Un pulso de 60 s cerca del principio de la ventana, y nada más.
+      return {
+        ok: true,
+        data: [
+          { timestamp: new Date(t0).toISOString(), value: false, quality: 0 },
+          { timestamp: new Date(t0 + 10_000).toISOString(), value: true, quality: 0 },
+          { timestamp: new Date(t0 + 70_000).toISOString(), value: false, quality: 0 },
+        ],
+      }
+    },
+  })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'falta de presión' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.activaAhora, false)
+  assert.equal(r.activoSegundos, 60)
+  assert.equal(r.sostenida, false)
+})
+
+await checkAsync('el patrón del incidente real —parpadeo repetido— SÍ se marca sostenido', async () => {
+  const client = clienteFalso({
+    historia: async (opciones) => {
+      const t0 = new Date(opciones.startDate).getTime()
+      // Cinco pulsos de 40 s cada uno, separados: 200 s activos en total,
+      // por encima del corte (150 s), sin que ninguno por separado sea largo.
+      const data = []
+      for (let i = 0; i < 5; i++) {
+        const inicio = t0 + i * 50_000
+        data.push({ timestamp: new Date(inicio).toISOString(), value: true, quality: 0 })
+        data.push({ timestamp: new Date(inicio + 40_000).toISOString(), value: false, quality: 0 })
+      }
+      return { ok: true, data }
+    },
+  })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'bajo flujo' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.eventosEnVentana, 5)
+  assert.equal(r.activoSegundos, 200)
+  assert.equal(r.sostenida, true)
+  assert.match(r.interpretacion, /no es un arranque normal/i)
+})
+
+await checkAsync('sigue activa AHORA MISMO, sin haberse apagado: también sostenida', async () => {
+  const client = clienteFalso({
+    historia: async (opciones) => {
+      const t0 = new Date(opciones.startDate).getTime()
+      // Entra a los 30 s de la ventana y no vuelve a apagarse.
+      return {
+        ok: true,
+        data: [
+          { timestamp: new Date(t0).toISOString(), value: false, quality: 0 },
+          { timestamp: new Date(t0 + 30_000).toISOString(), value: true, quality: 0 },
+        ],
+      }
+    },
+  })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'falta de presión' })
+
+  assert.equal(r.ok, true)
+  assert.equal(r.activaAhora, true)
+  assert.equal(r.sostenida, true)
 })
 
 console.log('\n── resumen_de_turno ────────────────────────────────────────')
@@ -3339,6 +3485,80 @@ await checkAsync('compone estado, riesgos y tendencia en una sola llamada', asyn
   assert.ok(r.estadoAhora?.ok, 'el estado no llegó, o llegó con un error dentro')
   assert.ok(r.riesgos || r.riesgosNoDisponibles, 'ni riesgos ni el motivo de que falten')
   assert.ok(r.tendencia || r.tendenciaNoDisponible, 'ni tendencia ni el motivo de que falte')
+})
+
+await checkAsync('cita notas del cuaderno DENTRO de la ventana y del sistema, ninguna otra', async () => {
+  /*
+   * El incidente del 14-09-2026: preguntado "¿qué notas se han hecho este
+   * turno?", el modelo dijo que no había ninguna —cuando sí las había— y
+   * fechó mal una intervención real. La causa de fondo: `resumen_de_turno`
+   * no traía notas ni intervenciones en absoluto, así que no había ningún
+   * dato real que citar. Esto prueba que ahora sí llegan, y sólo las que
+   * corresponden.
+   */
+  const cuaderno = {
+    async leer({ desde, hasta }) {
+      const todas = [
+        { instante: '2026-09-14T15:44:17.000Z', texto: 'Se purgó la bomba', autor: 'anonimo' },
+        { instante: '2026-09-14T10:00:00.000Z', texto: 'Nota de vibraciones', sistema: 'vibraciones', autor: 'ana' },
+        { instante: '2020-01-01T00:00:00.000Z', texto: 'Nota viejísima, fuera de ventana', autor: 'ana' },
+      ]
+      const entradas = todas.filter((n) => {
+        const t = new Date(n.instante).getTime()
+        return t >= desde.getTime() && t <= hasta.getTime()
+      })
+      return { entradas, total: entradas.length, cursor: null, podas: 0 }
+    },
+  }
+  const h = createHerramientas({ client: clienteFalso(), cuaderno })
+  const r = await h.ejecutar('resumen_de_turno', {
+    sistema: 'tanque', periodo: 'últimos 90 días',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.notas.length, 1, `esperaba 1 nota del tanque, salieron: ${JSON.stringify(r.notas)}`)
+  assert.equal(r.notas[0].texto, 'Se purgó la bomba')
+  assert.equal(r.notas[0].cuando, '2026-09-14T15:44:17.000Z', 'la fecha tiene que ser la real, no inventada')
+})
+
+await checkAsync('sin cuaderno montado, lo dice — no calla la ausencia', async () => {
+  const h = createHerramientas({ client: clienteFalso() })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: 'tanque' })
+
+  assert.equal(r.ok, true, r.error)
+  assert.deepEqual(r.notas, [])
+  assert.match(r.notasNoDisponibles ?? '', /no tiene el cuaderno de planta montado/i)
+})
+
+await checkAsync('cita intervenciones DENTRO de la ventana, con su fecha real — no "ayer" inventado', async () => {
+  // Relativas a AHORA, no fechas fijas: la ventana de "últimas 6 horas" se
+  // resuelve contra el reloj real en el momento de ejecutar la prueba.
+  const haceUnaHora = new Date(Date.now() - 3_600_000).toISOString()
+  const hace10dias = new Date(Date.now() - 10 * 86_400_000).toISOString()
+
+  const leerAprendizajeDe = async () => ({
+    intervenciones: [
+      {
+        id: 'interv-1', fecha: haceUnaHora, sistema: 'tanque',
+        sintoma: 'Problemas de presión en la bomba', causa: 'Fuga por codo de purga dañado',
+        solucion: 'Se reparó el codo de purga', resuelto: true, origen: 'el usuario',
+      },
+      {
+        // Fuera de la ventana de "últimas 6 horas": no debe aparecer.
+        id: 'interv-2', fecha: hace10dias, sistema: 'tanque',
+        sintoma: 'Otro síntoma antiguo', solucion: 'Otra solución', resuelto: true, origen: 'el usuario',
+      },
+    ],
+  })
+  const h = createHerramientas({ client: clienteFalso(), leerAprendizajeDe })
+  const r = await h.ejecutar('resumen_de_turno', {
+    sistema: 'tanque', periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.intervenciones.length, 1, `salieron: ${JSON.stringify(r.intervenciones)}`)
+  assert.equal(r.intervenciones[0].cuando, haceUnaHora)
+  assert.equal(r.intervenciones[0].causa, 'Fuga por codo de purga dañado')
 })
 
 await checkAsync('resumen_de_turno(idioma: "en") reenvía el idioma a las herramientas que llama por dentro', async () => {
@@ -3389,7 +3609,7 @@ await checkAsync('un sistema inventado no se resume con el de al lado', async ()
 
 console.log('\n── El registro ─────────────────────────────────────────────')
 
-check('son veinticinco herramientas, y sólo una escribe en la PLANTA', () => {
+check('son veintiséis herramientas, y sólo una escribe en la PLANTA', () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   assert.deepEqual(h.nombres, [
@@ -3453,6 +3673,11 @@ check('son veinticinco herramientas, y sólo una escribe en la PLANTA', () => {
        que es donde el modelo la mira. */
     'tendencia_multiple',
     'buscar_evento',
+    /* Nueva el 14-09-2026, del mismo incidente que corrigió los umbrales de
+       flujoInstantaneo/presionRelativa: mide si una ALARMA lleva sostenida
+       en una ventana reciente, en vez de sólo "¿está activa ahora?". Va
+       justo antes de `resumen_de_turno`, con el resto de historia. */
+    'alarma_sostenida',
     'resumen_de_turno',
     'consultar_documentacion',
     'limites_del_manual',

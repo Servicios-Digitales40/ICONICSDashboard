@@ -44,6 +44,8 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { logger } from '../../../logger.mjs'
+
 import {
   alinearSeries,
   correlacionPearson,
@@ -54,6 +56,7 @@ import {
   regresionLineal,
 } from '../../../../shared/eva/comun/estadistica.js'
 import { renderizarGraficoSerie } from '../../../../shared/eva/comun/graficos.js'
+import { eventosDeAlarma, evaluarPersistencia } from '../../../../shared/eva/comun/eventosDeAlarma.js'
 import {
   MAX_PUNTOS,
   SIN_SERIE,
@@ -74,6 +77,8 @@ import {
 } from '../../../../shared/eva/tanque/senales.js'
 import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
 import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
+import { intervencionesRecientes } from '../../../../shared/eva/comun/aprendizaje.js'
+import { leerAprendizaje } from '../aprendizaje/index.mjs'
 import {
   NO_COMPARTEN,
   SISTEMA,
@@ -298,9 +303,16 @@ function metaDe(clave, sistemaId) {
  * @param {object} args.historia   ayudantes de `lib/historia.mjs`
  * @param {object} args.maquina    ayudantes de `lib/maquina.mjs`
  * @param {string[]} args.senalesPronostico  claves con serie propia verificada
+ * @param {object} [args.cuaderno] el cuaderno de planta (Plan 25 F8), para que
+ *   `resumen_de_turno` pueda citar notas reales — `null` si no está montado.
+ * @param {Function} [args.leerAprendizajeDe] `leerAprendizaje` de
+ *   `ia/herramientas/aprendizaje/index.mjs` por defecto — inyectable para que
+ *   las pruebas de `resumen_de_turno` no dependan del `datos/aprendizaje.json`
+ *   real, que cambia con cada intervención registrada en producción.
  */
 export function crearHerramientasDeHistoricos({
-  client, turnos, reportes, historia, maquina, senalesPronostico, dameHerramientas,
+  client, turnos, reportes, historia, maquina, senalesPronostico, dameHerramientas, cuaderno = null,
+  leerAprendizajeDe = leerAprendizaje,
 }) {
   const { leerSerie, leerSerieEnRango, leerHistoriaLarga } = historia
   const { leerMaquina, resolverSistema } = maquina
@@ -1840,6 +1852,100 @@ export function crearHerramientasDeHistoricos({
     },
 
     /**
+     * ── ¿ESTA ALARMA SE RESOLVIÓ SOLA, O NO SE ASIENTA? ────────────────
+     *
+     * El incidente del 14-09-2026 (una fuga en un codo de purga) enseñó que
+     * "¿está activa la alarma ahora mismo?" no basta: un arranque normal de
+     * la bomba TAMBIÉN activa `faltaDePresion` un instante — medido, hasta
+     * 2 minutos en un evento aislado (`data/comunes/alarmas.js`, sondeo del
+     * 12-09-2026). Lo que distinguió aquel incidente no fue que la alarma
+     * se encendiera, sino que **no se apagó de verdad**: siguió parpadeando
+     * más de dos horas sin asentarse, mientras que un ciclo sano se resuelve
+     * solo.
+     *
+     * Esta herramienta responde exactamente esa pregunta —¿sigue sin
+     * resolverse?— sumando el tiempo activo de la alarma en una ventana
+     * reciente (`shared/eva/comun/eventosDeAlarma.js` → `evaluarPersistencia`,
+     * defectos de 5 min / 150 s fijados ese mismo día contra las dos medidas
+     * de arriba). No decide NINGUNA causa: sólo mide persistencia, igual que
+     * `evaluarRiesgos()` sólo mide umbrales — la causa la sigue dando
+     * `diagnosticar_falla`.
+     *
+     * ── `crudo: true`, SIN EXCEPCIÓN ─────────────────────────────────────
+     *
+     * Una alarma es booleana, y promediarla no la degrada, la BORRA: medido,
+     * `Average` da 0 flancos en las nueve alarmas del tanque. Sin `crudo`
+     * aquí, esta herramienta vería siempre "sin eventos" y diría "resuelta"
+     * de una que en realidad no lo estuvo nunca.
+     *
+     * ── SÓLO EL TANQUE, POR AHORA ────────────────────────────────────────
+     *
+     * Igual que `pronostico_de_desgaste`: el criterio de "sostenida" no está
+     * escrito contra el catálogo de otra máquina, así que se declara y no se
+     * improvisa una respuesta sobre datos que no se han mirado.
+     */
+    async alarma_sostenida({ alarma, sistema, ventanaMinutos } = {}, { idioma = 'es' } = {}) {
+      const resuelto = resolverSenalDeSistema(alarma, sistema)
+      if (!resuelto.ok) return resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
+
+      if (sistemaId !== 'tanque') {
+        return fallo(
+          `Esta herramienta todavía sólo evalúa persistencia de alarmas del tanque, así que no ` +
+            `puede servir a «${meta.label}». Su historia sí se puede dar con historia_de_senal.`,
+          { sistema: sistemaId }
+        )
+      }
+
+      if (meta.naturaleza !== 'alarma') {
+        return fallo(
+          `«${meta.label}» no es una alarma del PLC, es una medida continua. Esta herramienta sólo ` +
+            'evalúa persistencia de las alarmas booleanas (p.ej. "falta de presión", "bajo flujo", ' +
+            '"presión alta"). Para su historia usa historia_de_senal.'
+        )
+      }
+
+      if (!historizada) {
+        return fallo(`${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE}`)
+      }
+
+      const minutos = Math.max(1, Math.min(60, Math.round(Number(ventanaMinutos) || 5)))
+      const ahora = new Date()
+      const inicio = new Date(ahora.getTime() - minutos * 60_000)
+
+      const serie = await leerSerie(clave, { inicio, fin: ahora }, sistemaId, { crudo: true })
+      if (!serie.ok) {
+        return fallo(`El historiador no devolvió la serie de ${meta.label} en los últimos ${minutos} min.`)
+      }
+
+      const eventos = eventosDeAlarma(serie.datos)
+      const persistencia = evaluarPersistencia(eventos, { ahora, ventanaMs: minutos * 60_000 })
+      const activaAhora = eventos.some((e) => e.activa)
+      const activoSegundos = Math.round(persistencia.activoMs / 1000)
+
+      return {
+        ok: true,
+        alarma: meta.label,
+        ventanaMinutos: minutos,
+        activaAhora,
+        eventosEnVentana: eventos.length,
+        activoSegundos,
+        sostenida: persistencia.sostenida,
+        interpretacion: persistencia.sostenida
+          ? `${meta.label} lleva ${activoSegundos} s activa (contando reapariciones) de los ` +
+            `últimos ${minutos} min, y ${activaAhora ? 'sigue activa ahora mismo' : 'volvió a activarse ' +
+              'varias veces'}. Esto NO es un arranque normal: un ciclo sano se resuelve en menos de ` +
+            '2 minutos y no vuelve a aparecer.'
+          : `${meta.label} no muestra un patrón sostenido en los últimos ${minutos} min ` +
+            `(${activoSegundos} s activa en total, ${eventos.length} evento(s)). Compatible con un ` +
+            'arranque normal, si lo hubo.',
+        nota:
+          'Mide persistencia, no causa: para las causas candidatas de un riesgo activo usa ' +
+          'diagnosticar_falla.',
+      }
+    },
+
+    /**
      * Qué ha pasado en las últimas horas, en una sola llamada.
      *
      * ── POR QUÉ COMPUESTA ──────────────────────────────────────────────
@@ -1908,6 +2014,54 @@ export function crearHerramientasDeHistoricos({
         ? narrarSistema(sistemaId, elegido.sistema.nombre)
         : elegido.sistema.nombre
 
+      /*
+       * ── NOTAS DEL CUADERNO E INTERVENCIONES DEL TURNO ──────────────────
+       *
+       * Hasta el 14-09-2026 este resumen no incluía NINGUNA de las dos, y
+       * "¿qué notas se han hecho este turno?" no tenía ninguna herramienta
+       * que pudiera contestarla con datos reales — medido ese día: el
+       * modelo respondió de todos modos, inventando que no había notas y
+       * fechando mal una intervención real (dijo "ayer" de una fechada
+       * HOY). Sin dato que citar, un modelo pequeño no se queda callado;
+       * inventa. La forma de que deje de inventar es dejar de darle la
+       * oportunidad.
+       *
+       * Las dos se filtran por la MISMA ventana que ya resolvió `v` —el
+       * turno pedido, no "las últimas 8 horas" fijas— y por sistema: una
+       * nota o intervención sin `sistema` es de TODA la planta y entra
+       * igual, una de la otra máquina no.
+       */
+      const enVentanaYSistema = (fechaIso) => {
+        const t = new Date(fechaIso).getTime()
+        return Number.isFinite(t) && t >= v.inicio.getTime() && t <= v.fin.getTime()
+      }
+      const deEstaMaquina = (s) => !s || s === sistemaId
+
+      let notas = []
+      if (cuaderno) {
+        try {
+          const { entradas } = await cuaderno.leer({ desde: v.inicio, hasta: v.fin, limite: 50 })
+          notas = entradas
+            .filter((n) => deEstaMaquina(n.sistema))
+            .map((n) => ({ cuando: n.instante, texto: n.texto, autor: n.autor }))
+        } catch (error) {
+          logger.warn('No se pudo leer el cuaderno de planta para resumen_de_turno', { error: error.message })
+        }
+      }
+
+      let intervenciones = []
+      try {
+        const almacen = await leerAprendizajeDe()
+        intervenciones = intervencionesRecientes(almacen, 50)
+          .filter((i) => deEstaMaquina(i.sistema) && enVentanaYSistema(i.fecha))
+          .map((i) => ({
+            cuando: i.fecha, sintoma: i.sintoma, causa: i.causa ?? undefined,
+            que_se_hizo: i.solucion, funciono: i.resuelto,
+          }))
+      } catch (error) {
+        logger.warn('No se pudo leer las intervenciones para resumen_de_turno', { error: error.message })
+      }
+
       return {
         ok: true,
         sistema: sistemaId,
@@ -1929,10 +2083,17 @@ export function crearHerramientasDeHistoricos({
             ? { tendencia }
             : { tendenciaNoDisponible: tendencia.error }),
         ...(conSerie.length ? { senalesConSerie: conSerie.length } : {}),
+        notas,
+        ...(cuaderno ? {} : { notasNoDisponibles: 'Este servidor no tiene el cuaderno de planta montado.' }),
+        intervenciones,
         nota:
-          'Es un resumen COMPUESTO de tres consultas: el estado de ahora, los riesgos y la ' +
-          'tendencia del período. Cita cada parte por lo que es y no mezcles el instante actual ' +
-          'con el resumen del tramo. Si alguna parte falta, dilo: no la des por vacía.',
+          'Es un resumen COMPUESTO de cinco consultas: el estado de ahora, los riesgos, la ' +
+          'tendencia del período, las notas del cuaderno y las intervenciones registradas. Cita ' +
+          'cada parte por lo que es y no mezcles el instante actual con el resumen del tramo. Si ' +
+          'alguna parte falta, dilo: no la des por vacía. Un array vacío en "notas" o ' +
+          '"intervenciones" SÍ significa que no las hubo en este período —no que no se hayan ' +
+          'podido consultar, para eso está "notasNoDisponibles"—, y no afirmes una fecha para una ' +
+          'nota o intervención que no esté literalmente en su campo "cuando".',
       }
     },
   }

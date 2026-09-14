@@ -134,3 +134,69 @@ function cerrar({ inicio, desdeAntes }, fin) {
 export function idDeEvento(clave, evento) {
   return `hist:${clave}:${evento.inicio.toISOString()}`
 }
+
+/**
+ * Cuánto tiempo estuvo activa la alarma DENTRO de `[inicio, fin]`, sumando
+ * todos los eventos que se solapan con esa ventana — recortando el que
+ * empieza antes y el que sigue activo al final (`fin: null` se recorta a
+ * `fin` de la ventana, nunca se extrapola).
+ *
+ * Es la pieza que faltaba para distinguir un arranque normal de uno que no
+ * se resuelve: un evento SUELTO no dice nada por sí mismo (`faltaDePresion`
+ * llega a durar hasta 2 min en un arranque sano, medido — ver
+ * `data/comunes/alarmas.js`), pero CUÁNTO tiempo activo se acumula en una
+ * ventana corta sí lo distingue, incluso cuando el patrón viene en pulsos
+ * cortos y parpadeantes en vez de un único tramo largo — que es justo la
+ * forma que tomó el incidente del 14-09-2026 (parpadeo continuo durante más
+ * de dos horas, nunca un solo evento largo).
+ */
+export function tiempoActivoEnVentana(eventos, { inicio, fin }) {
+  const inicioMs = inicio.getTime()
+  const finMs = fin.getTime()
+  let totalMs = 0
+  for (const e of eventos) {
+    const desde = Math.max(e.inicio.getTime(), inicioMs)
+    const hasta = Math.min(e.fin ? e.fin.getTime() : finMs, finMs)
+    if (hasta > desde) totalMs += hasta - desde
+  }
+  return totalMs
+}
+
+/**
+ * ¿Esta alarma lleva "sostenida" — activa sin resolverse de verdad— en la
+ * ventana reciente?
+ *
+ * ── POR QUÉ NO BASTA CON "¿ESTÁ ACTIVA AHORA MISMO?" ─────────────────
+ *
+ * Porque un arranque normal de la bomba TAMBIÉN pasa por la alarma activa un
+ * instante — la diferencia no es que se encienda, es que no se apaga y se
+ * queda así, o que vuelve a encenderse una y otra vez sin llegar a asentarse.
+ * Mirar sólo el instante actual no puede distinguir las dos cosas.
+ *
+ * ── DE DÓNDE SALEN LOS DEFECTOS ───────────────────────────────────────
+ *
+ * `ventanaMs` (5 min) y `corteMs` (150 s) se fijaron el 14-09-2026 contra dos
+ * medidas reales, no a ojo: un arranque sano nunca pasó de 2 min (120 s) de
+ * un único evento (`data/comunes/alarmas.js`), y el incidente de esa fecha
+ * mantuvo la alarma activa una fracción muy alta de CUALQUIER ventana de
+ * varios minutos durante más de dos horas seguidas. 150 s queda por ENCIMA
+ * del evento aislado más largo medido —así que un solo arranque largo pero
+ * sano no dispara esto por sí solo, hacen falta varios pulsos o algo
+ * genuinamente más largo—, y muy por debajo de lo que acumula un episodio
+ * real en la misma ventana.
+ *
+ * @param {EventoDeAlarma[]} eventos  de `eventosDeAlarma()`, ya en la ventana
+ *   que se va a evaluar (o una más amplia; esta función recorta sola).
+ * @param {{ahora?: Date, ventanaMs?: number, corteMs?: number}} [opciones]
+ * @returns {{activoMs: number, ventanaMs: number, fraccion: number, sostenida: boolean}}
+ */
+export function evaluarPersistencia(eventos, { ahora = new Date(), ventanaMs = 5 * 60_000, corteMs = 150_000 } = {}) {
+  const inicio = new Date(ahora.getTime() - ventanaMs)
+  const activoMs = tiempoActivoEnVentana(eventos, { inicio, fin: ahora })
+  return {
+    activoMs,
+    ventanaMs,
+    fraccion: activoMs / ventanaMs,
+    sostenida: activoMs >= corteMs,
+  }
+}

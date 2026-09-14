@@ -54,11 +54,24 @@ export const UMBRALES = {
   // expuestas; por encima de 45 °C ya no es agua de servicio.
   temperaturaTanque: { min: 4, avisoMin: 10, avisoMax: 35, max: 45 },
 
-  // Sin unidad declarada (ver `senales.js`), así que la banda está en las
-  // unidades del tag, sean las que sean. Es el umbral que MÁS depende de la
-  // confirmación del usuario.
-  flujoInstantaneo: { min: 0, avisoMin: 2, avisoMax: 45, max: 55 },
-  presionRelativa: { min: 0.5, avisoMin: 1.5, avisoMax: 5.5, max: 6.5 },
+  // Unidad CONFIRMADA por el usuario el 14-09-2026: L/min. `avisoMax`
+  // corregido ese mismo día contra el historiador real (tres días
+  // distintos, ver el incidente del 14-09-2026): el caudal de esta
+  // instalación nunca pasa de ~21 L/min bombeando, así que el 45 de antes
+  // —nunca alcanzable— dejaba `posible-fuga` sin poder dispararse jamás.
+  // `min`/`avisoMin`/`max` siguen sin confirmar.
+  flujoInstantaneo: { min: 0, avisoMin: 2, avisoMax: 25, max: 55 },
+  // Unidad CONFIRMADA por el usuario el 14-09-2026: PSI. `avisoMax`/`max`
+  // corregidos ese mismo día: medido contra un día real de bombeo (17
+  // ciclos, 849 muestras), la operación SANA ya llega a una mediana de
+  // 6,74 PSI — por encima del `avisoMax` de 5,5 que había antes, así que la
+  // banda vieja marcaba "sobrepresión crítica" la mayor parte del tiempo
+  // que la bomba trabajaba. `min`/`avisoMin` siguen sin confirmar, y además
+  // necesitan un diseño distinto al de un umbral instantáneo: cada arranque
+  // normal pasa por presión casi cero un par de segundos, así que un
+  // umbral bajo comparado en un instante no puede distinguir un arranque
+  // sano de una fuga real — ver la nota de `riesgos.js` sobre `posible-fuga`.
+  presionRelativa: { min: 0.5, avisoMin: 1.5, avisoMax: 7.2, max: 7.5 },
 
   // Sin límite inferior: un motor descargado no está en falta, sólo ocioso.
   // Por arriba, 95 % es el umbral clásico de sobrecarga sostenida.

@@ -261,12 +261,22 @@ describe("la historia no miente sobre lo que el servidor publica", () => {
   });
 
   it("un rango absoluto de un día entero sigue vacío para lo no historizado", async () => {
-    const { datos, motivo } = await enT(T0).readSerie("cargaMotor", {
-      inicio: new Date(T0 - 24 * 3_600_000),
-      fin: new Date(T0),
-    });
-    expect(datos).toEqual([]);
-    expect(motivo).toBe(SIN_SERIE);
+    // Desde el 14-09-2026 las 52 señales del catálogo están historizadas
+    // (ver dominio.test.js): ya no queda una clave real con `historizado:
+    // false` para probar este camino. Se da de alta una señal sintética con
+    // ese catálogo -no una clave desconocida, que es un motivo distinto,
+    // "Señal desconocida"- y se retira al terminar.
+    SENALES.señalDePrueba = { ...SENALES.cargaMotor, key: "señalDePrueba", historizado: false };
+    try {
+      const { datos, motivo } = await enT(T0).readSerie("señalDePrueba", {
+        inicio: new Date(T0 - 24 * 3_600_000),
+        fin: new Date(T0),
+      });
+      expect(datos).toEqual([]);
+      expect(motivo).toBe(SIN_SERIE);
+    } finally {
+      delete SENALES.señalDePrueba;
+    }
   });
 
   it("Plan 13 F9: errorPeticion también degrada el historiador, no sólo la lectura en vivo", () => {

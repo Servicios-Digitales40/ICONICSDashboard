@@ -19,6 +19,7 @@ const { fetchIconicsHistory, fetchIconicsHistoryBatch } = vi.hoisted(() => ({
 vi.mock("@/lib/iconics", () => ({ fetchIconicsHistory, fetchIconicsHistoryBatch }));
 
 import {
+  SIN_SERIE,
   leerSerie,
   leerSeries,
   rangoAyer,
@@ -26,7 +27,7 @@ import {
   rangoSemana,
 } from "@/Demo-EVA/data/tanque/historia.js";
 import { MAX_SERIES_BATCH } from "@shared/eva/comun/historia.js";
-import { historizadasMedidas } from "@/Demo-EVA/domain/senales.js";
+import { SENALES, historizadasMedidas } from "@/Demo-EVA/domain/senales.js";
 
 describe("los accesos rápidos contra el historiador son aritmética de calendario, no de red", () => {
   it("«Ayer» es el día completo anterior, sin tocar hoy", () => {
@@ -259,14 +260,24 @@ describe("leerSerie pide el intervalo correcto según el tipo de rango", () => {
 
   it("una señal no historizada no llega a pedir nada, con cualquier tipo de rango", async () => {
     fetchIconicsHistory.mockClear();
-    const { datos, motivo } = await leerSerie("cargaMotor", {
-      inicio: new Date(),
-      fin: new Date(),
-    });
+    // Antes del 14-09-2026 esto se probaba con "cargaMotor": planta le dio
+    // Historical data source propio y hoy las 52 señales del catálogo están
+    // historizadas, así que ya no hay una clave real que sirva de ejemplo —
+    // se da de alta una sintética con `historizado: false` para seguir
+    // probando el motivo SIN_SERIE en vez de "Señal desconocida".
+    SENALES.señalDePrueba = { ...SENALES.cargaMotor, key: "señalDePrueba", historizado: false };
+    try {
+      const { datos, motivo } = await leerSerie("señalDePrueba", {
+        inicio: new Date(),
+        fin: new Date(),
+      });
 
-    expect(fetchIconicsHistory).not.toHaveBeenCalled();
-    expect(datos).toEqual([]);
-    expect(motivo).toBeTruthy();
+      expect(fetchIconicsHistory).not.toHaveBeenCalled();
+      expect(datos).toEqual([]);
+      expect(motivo).toBe(SIN_SERIE);
+    } finally {
+      delete SENALES.señalDePrueba;
+    }
   });
 });
 

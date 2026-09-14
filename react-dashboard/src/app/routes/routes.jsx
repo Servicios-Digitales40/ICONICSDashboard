@@ -234,9 +234,12 @@ export const ROUTES = [
     // Todavía sin construir, y es el placeholder con más cuidado de los dos:
     // esta pantalla ESCRIBIRÁ en el PLC. Un botón que parezca operativo y no
     // lo sea es peor que no tener pantalla, así que no hay ninguno.
+    //
+    // Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
+    // archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
+    // Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-vibraciones" }`.
     id: "vib-controles",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/ControlesVibraciones.jsx")),
-    nav: { icon: <Power size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -341,10 +344,13 @@ export const ROUTES = [
      * CUALQUIER ruta — no hay precedente de una vista que exista sólo para
      * ese modo, y ésta no rompe el patrón: sirve también fuera de muro, para
      * ver el resumen de las dos máquinas de un vistazo.
+     *
+     * Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
+     * archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
+     * Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-general" }`.
      */
     id: "eva-muro",
     component: lazy(() => import("@/Demo-EVA/views/comunes/MuroPlanta.jsx")),
-    nav: { icon: <Power size={17} />, group: "sec-general" },
   },
 
   {

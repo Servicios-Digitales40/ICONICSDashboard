@@ -89,24 +89,30 @@ describe("catálogo de señales", () => {
      * devuelve la serie de STEMPERATURA_TANQUE. Si alguien marca una de más,
      * la vista pintaría la curva de la temperatura con otro rótulo y nadie lo
      * notaría — que es justo lo que pasó con `tensionLinea` hasta que se le
-     * configuró su `Historical data source` el 24-08-2026, y con las otras
+     * configuró su `Historical data source` el 24-08-2026, con las otras
      * cuarenta y cinco hasta que el Plan 27 F6 (10-09-2026) confirmó su serie
-     * propia por `hda:`.
+     * propia por `hda:`, y con `cargaMotor`/`eficienciaEnergetica` hasta que
+     * planta les dio `Historical data source` propio bajo `SENSORES/` el
+     * 14-09-2026 — confirmado contra el servidor real que ya no devuelven la
+     * serie de `temperaturaTanque`.
      *
      * El NÚMERO no es fijo: es lo que esté verificado en el servidor. Al
      * historizar otra señal crece aquí y se quita de la lista de abajo.
      */
-    expect(historizadas().length).toBe(50);
+    expect(historizadas().length).toBe(52);
 
     for (const key of ["cargaMotor", "eficienciaEnergetica"]) {
-      expect(esHistorizada(key), `${key} NO tiene serie propia en el historiador`).toBe(false);
+      expect(esHistorizada(key), `${key} SÍ tiene serie propia en el historiador`).toBe(true);
     }
   });
 
   it("las señales con unidad o nombre dudosos lo confiesan", () => {
     // Si alguien «limpia» estas notas, la interfaz dejaría de advertir de que
     // la unidad o el rótulo son una lectura nuestra y no del servidor.
-    for (const key of ["flujoInstantaneo", "presionRelativa", "tensionLinea", "modoVdf"]) {
+    // `flujoInstantaneo` y `presionRelativa` salieron de esta lista el
+    // 14-09-2026: el usuario confirmó sus unidades (L/min y PSI), así que su
+    // `nota` de "unidad no declarada" dejó de ser cierta y se quitó.
+    for (const key of ["tensionLinea", "modoVdf"]) {
       expect(SENALES[key].nota, `${key} sin nota de procedencia`).toBeTruthy();
     }
   });

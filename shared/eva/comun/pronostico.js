@@ -170,13 +170,14 @@ export const MECANISMOS = [
   },
   {
     /*
-     * Se deja en el catálogo A PROPÓSITO aunque hoy nunca pueda evaluarse.
-     *
-     * `cargaMotor` no tiene historia en este servidor, así que este mecanismo
-     * sale siempre como «sin comprobar». Borrarlo dejaría la pantalla más
-     * limpia y escondería que hay un desgaste que nadie está vigilando. Que
-     * aparezca en la lista de lo no evaluable es justamente lo que hace
-     * visible que falta configurar el historiador.
+     * Hasta el 14-09-2026 se dejaba en el catálogo A PROPÓSITO aunque nunca
+     * pudiera evaluarse: `cargaMotor` no tenía historia propia en el
+     * servidor (el historiador devolvía ahí la serie de `temperaturaTanque`
+     * sin avisar), así que este mecanismo salía siempre como «sin
+     * comprobar». Borrarlo habría escondido que había un desgaste que nadie
+     * vigilaba. Planta le dio `Historical data source` propio ese día — ver
+     * `shared/eva/tanque/senales.js` — y este mecanismo ya se puede evaluar
+     * de verdad.
      */
     id: "esfuerzo-sin-resultado",
     titulo: "Horas moviendo poco caudal con el motor cargado",

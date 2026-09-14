@@ -174,17 +174,20 @@ check('sin la señal que necesita, queda SIN COMPROBAR, no en cero', () => {
   )
 })
 
-check('la carga del motor no tiene historia: su mecanismo NUNCA se evalúa', () => {
+check('sin la fila de carga del motor, su mecanismo se declara no evaluable', () => {
   /*
-   * Se deja en el catálogo a propósito. `cargaMotor` no tiene serie propia en
-   * este servidor, así que este mecanismo siempre sale sin comprobar — y eso,
-   * visible en pantalla, es lo que recuerda que falta configurar el
-   * historiador. Si algún día se arregla, esta comprobación falla y avisa de
-   * que ya se puede evaluar.
+   * Hasta el 14-09-2026 `cargaMotor` no tenía serie propia en el servidor —
+   * el historiador devolvía ahí la de `temperaturaTanque` sin avisar—, así
+   * que esta ausencia era el dato real que llegaba siempre. Planta le dio
+   * `Historical data source` propio ese día (ver `senales.js`), así que HOY
+   * esto ya no describe al servidor: `SANA` se deja sin `cargaMotor` a
+   * propósito para seguir probando el caso general —una fila sin uno de los
+   * campos que un mecanismo `necesita` lo deja en `noEvaluables`, nunca lo
+   * calla en silencio— con o sin el arreglo de planta.
    */
   const r = evaluarPronostico(filas(100, SANA), VENTANA)
   const esf = r.noEvaluables.find(n => n.id === 'esfuerzo-sin-resultado')
-  assert.ok(esf, 'con la historia rota tiene que estar en no evaluables')
+  assert.ok(esf, 'sin cargaMotor en la fila tiene que estar en no evaluables')
 })
 
 check('una rejilla vacía no da ningún mecanismo por limpio', () => {

@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createEvaSource } from "@/Demo-EVA/data/comunes/evaSource.js";
 import { SIN_SERIE } from "@/Demo-EVA/data/tanque/historia.js";
-import { SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "@/Demo-EVA/domain/senales.js";
+import { SENALES, SENAL_KEYS, TODOS_LOS_PUNTOS, pointName } from "@/Demo-EVA/domain/senales.js";
 import { createBufferRodante } from "@/Demo-EVA/lib/buffer.js";
 import { createSistema } from "@/Demo-EVA/domain/sistema.js";
 
@@ -188,14 +188,21 @@ describe("quién lee el pasado lo decide la fuente", () => {
     // El transporte real no trae serie: el histórico de este árbol no se pide
     // como el de Resonac y vive en `data/tanque/historia.js`. Se comprueba con una
     // señal NO historizada, que se rechaza por catálogo antes de tocar la red.
+    // Desde el 14-09-2026 las 52 señales del catálogo están historizadas
+    // (planta le dio Historical data source a cargaMotor/eficienciaEnergetica):
+    // ya no queda una clave real así, se da de alta una sintética para probarlo.
+    SENALES.señalDePrueba = { ...SENALES.cargaMotor, key: "señalDePrueba", historizado: false };
     const source = createEvaSource({ transport: transporteFalso(EN_MARCHA), intervalMs: 60_000 });
 
-    const { datos, motivo } = await source.leerSerie("cargaMotor");
+    try {
+      const { datos, motivo } = await source.leerSerie("señalDePrueba");
 
-    expect(datos).toEqual([]);
-    expect(motivo).toBe(SIN_SERIE);
-
-    source.stop();
+      expect(datos).toEqual([]);
+      expect(motivo).toBe(SIN_SERIE);
+    } finally {
+      source.stop();
+      delete SENALES.señalDePrueba;
+    }
   });
 });
 

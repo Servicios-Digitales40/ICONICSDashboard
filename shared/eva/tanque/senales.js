@@ -229,12 +229,15 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "bombeo",
-    // Medido: el historiador devuelve aquí la serie de la temperatura.
-    historizado: false,
+    // Corregido en planta el 14-09-2026: se le dio Historical data source
+    // propio bajo SENSORES/ (antes redirigía a la serie de temperatura, ver
+    // la cabecera de este archivo). Confirmado contra el servidor real:
+    // `hda:\Configuration\DEMO TANQUE\SENSORES:CARGA_TRABAJO_MOTOR` devuelve
+    // su propia serie, ya no la de temperaturaTanque.
+    historizado: true,
     escala: { min: 0, max: 100 },
     subirEsBueno: null,
     soloEnMarcha: true,
-    nota: "El historiador no publica serie propia de este tag.",
   },
   {
     key: "modoVdf",
@@ -267,9 +270,8 @@ const CATALOGO = [
     tag: "FLUJO_INSTANTANEO",
     label: "Caudal instantáneo",
     corto: "Caudal",
-    // Sin unidad declarada: el tag no dice si son l/s o m³/h, y poner una de
-    // las dos sería inventarse la magnitud. Ver `nota`.
-    unidad: "",
+    // Unidad CONFIRMADA por el usuario el 14-09-2026: L/min.
+    unidad: "L/min",
     decimales: 2,
     tipo: "real",
     activo: "distribucion",
@@ -277,7 +279,6 @@ const CATALOGO = [
     escala: { min: 0, max: 60 },
     subirEsBueno: true,
     soloEnMarcha: true,
-    nota: "Unidad no declarada en el servidor.",
   },
   {
     key: "presionRelativa",
@@ -287,7 +288,8 @@ const CATALOGO = [
     tag: "PRESION_RELATIVA",
     label: "Presión relativa",
     corto: "Presión",
-    unidad: "",
+    // Unidad CONFIRMADA por el usuario el 14-09-2026: PSI.
+    unidad: "PSI",
     decimales: 2,
     tipo: "real",
     activo: "distribucion",
@@ -295,7 +297,6 @@ const CATALOGO = [
     escala: { min: 0, max: 8 },
     subirEsBueno: true,
     soloEnMarcha: true,
-    nota: "Unidad no declarada en el servidor.",
   },
   {
     key: "tensionLinea",
@@ -332,11 +333,13 @@ const CATALOGO = [
     decimales: 1,
     tipo: "real",
     activo: "electrico",
-    historizado: false,
+    // Corregido en planta el 14-09-2026, igual que cargaMotor. El tag del
+    // historiador NO se llama igual que el de vivo: es `KPI_EFICIENCIA_ENERGETICA`
+    // (con guion bajo entre KPI y EFICIENCIA) — ver `OVERRIDE_TAG_HDA` más abajo.
+    historizado: true,
     escala: { min: 0, max: 100 },
     subirEsBueno: true,
     soloEnMarcha: true,
-    nota: "El historiador no publica serie propia de este tag.",
   },
 
   /*
@@ -1317,14 +1320,14 @@ export const ALARMAS = SENAL_KEYS.filter((k) => SENALES[k].naturaleza === "alarm
  * hay una regla que derive el uno del otro; por eso esto es tabla, no
  * cálculo (tal como anticipaba el plan en su §F6).
  *
- * `cargaMotor` y `eficienciaEnergetica` quedan permanentemente fuera —por
- * eso `historizado` sigue en `false` para ellas pese a estar en la rama
- * `sensores` como `tensionLinea`—: son las dos de las que la cabecera de
- * este archivo documenta que el historiador devuelve la serie de
- * `temperaturaTanque`. `tensionLinea` es la excepción de la excepción: su
- * `Historical data source` SÍ está configurado en el activo, contra el punto
- * SUELTO de la raíz del árbol `hda:` (`Tension`, sin carpeta) — el mismo que
- * ya se documentaba en agosto para `INDICE_DESVIACION_VOLTAJE`.
+ * `cargaMotor` y `eficienciaEnergetica` se corrigieron en planta el
+ * 14-09-2026: ya tienen `Historical data source` propio bajo `SENSORES/`, y
+ * dejaron de devolver la serie de `temperaturaTanque` (el defecto que
+ * documentaba esta cabecera hasta ese commit). `tensionLinea` sigue aparte,
+ * a propósito: su histórico ya funcionaba contra el punto SUELTO de la raíz
+ * del árbol `hda:` (`Tension`, sin carpeta) desde antes, con más historia
+ * acumulada que la ruta nueva bajo `SENSORES/` — confirmado que las dos dan
+ * el mismo valor, así que no hay motivo para migrarla y perder ese histórico.
  */
 const B = String.fromCharCode(92);
 const RAIZ_HDA = `hda:${B}Configuration${B}DEMO TANQUE${B}`;
@@ -1341,11 +1344,16 @@ const RAMA_A_CARPETA_HDA = {
   lecturaVariadorModbusRtu: "LECTURA_VARIADOR_MODBUS_RTU",
   medidorDeEnergia: "MEDIDOR_DE_ENERGIA",
   alarmas: "ALARMAS",
+  // Desde el 14-09-2026 (cargaMotor y eficienciaEnergetica, ver arriba).
+  sensores: "SENSORES",
 };
 
 const OVERRIDE_TAG_HDA = {
   DP_ENERGIA_APARENTEL1: "DP_EENERGIA_APARENTEL1",
   Modo_AM_VDF: "MODO_AM_VDF",
+  // Confirmado con browse() el 14-09-2026: el historiador lleva guion bajo
+  // entre KPI y EFICIENCIA; el tag en vivo (`ac:`) no.
+  KPIEFICIENCIA_ENERGETICA: "KPI_EFICIENCIA_ENERGETICA",
 };
 
 /**

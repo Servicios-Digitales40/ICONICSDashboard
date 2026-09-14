@@ -282,6 +282,7 @@ export async function createApp(config) {
     reportes: config.reportes,
     historyConcurrencia: config.limits.historyConcurrencia,
     diario,
+    cuaderno,
   })
   const chat = createChat({ config, herramientas })
 

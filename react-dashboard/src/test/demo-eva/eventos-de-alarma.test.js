@@ -18,7 +18,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { eventosDeAlarma, idDeEvento } from "@shared/eva/comun/eventosDeAlarma.js";
+import {
+  eventosDeAlarma,
+  evaluarPersistencia,
+  idDeEvento,
+  tiempoActivoEnVentana,
+} from "@shared/eva/comun/eventosDeAlarma.js";
 import { normalizar } from "@shared/eva/comun/historia.js";
 
 /** Atajo: minutos desde una base fija, para que las pruebas se lean. */
@@ -175,5 +180,93 @@ describe("idDeEvento: estable, y nunca confundible con uno del Alarm Server", ()
     const [b] = eventosDeAlarma([m(0, 0), m(5, 1)]);
 
     expect(idDeEvento("presionAlta", a)).not.toBe(idDeEvento("bajoFlujo", b));
+  });
+});
+
+describe("tiempoActivoEnVentana: solapar eventos con un rango, sin extrapolar", () => {
+  it("un evento cerrado que cabe entero en la ventana cuenta su duración exacta", () => {
+    const eventos = eventosDeAlarma([m(0, 0), m(2, 1), m(5, 0)]);
+    const ms = tiempoActivoEnVentana(eventos, { inicio: min(0), fin: min(10) });
+    expect(ms).toBe(3 * 60_000);
+  });
+
+  it("un evento que empieza ANTES de la ventana se recorta al borde", () => {
+    const eventos = eventosDeAlarma([m(0, 1), m(10, 0)]); // desdeAntes: true
+    const ms = tiempoActivoEnVentana(eventos, { inicio: min(4), fin: min(10) });
+    expect(ms).toBe(6 * 60_000); // sólo de min(4) a min(10), no los 10 min enteros
+  });
+
+  it("un evento que sigue activo (sin fin) se recorta al fin de la ventana, nunca se extrapola", () => {
+    const eventos = eventosDeAlarma([m(0, 0), m(2, 1)]); // activa: true, fin: null
+    const ms = tiempoActivoEnVentana(eventos, { inicio: min(0), fin: min(6) });
+    expect(ms).toBe(4 * 60_000); // de min(2) a min(6), no más allá
+  });
+
+  it("varios eventos cortos se suman, aunque ninguno por separado sea largo", () => {
+    const eventos = eventosDeAlarma([
+      m(0, 0), m(1, 1), m(1.5, 0),
+      m(3, 1), m(3.5, 0),
+      m(5, 1), m(5.5, 0),
+    ]);
+    const ms = tiempoActivoEnVentana(eventos, { inicio: min(0), fin: min(10) });
+    expect(ms).toBe(3 * 0.5 * 60_000); // tres pulsos de 30 s cada uno
+  });
+
+  it("sin eventos, sin tiempo activo", () => {
+    expect(tiempoActivoEnVentana([], { inicio: min(0), fin: min(10) })).toBe(0);
+  });
+});
+
+describe("evaluarPersistencia: distingue un arranque normal de uno que no se resuelve", () => {
+  /*
+   * Los defectos (5 min / 150 s) se fijaron el 14-09-2026 contra dos medidas
+   * reales: un arranque sano nunca pasó de 2 min (120 s) en un evento aislado
+   * (`data/comunes/alarmas.js`), y el incidente de esa fecha mantuvo la
+   * alarma activa mucho más de 150 s en CUALQUIER ventana de 5 minutos,
+   * durante más de dos horas — en pulsos cortos y repetidos, no un solo
+   * tramo largo. El corte queda por ENCIMA del evento aislado más largo
+   * medido a propósito: un solo arranque largo pero sano no dispara esto
+   * por sí solo.
+   */
+  it("un arranque normal (un evento de hasta 2 min, aislado) NO se marca sostenido", () => {
+    const eventos = eventosDeAlarma([m(0, 0), m(1, 1), m(3, 0)]); // 2 min activo
+    const r = evaluarPersistencia(eventos, { ahora: min(4) });
+    expect(r.activoMs).toBe(2 * 60_000);
+    expect(r.sostenida).toBe(false);
+  });
+
+  it("el mismo patrón del incidente real —parpadeo repetido sin asentarse— SÍ se marca sostenido", () => {
+    // Ocho pulsos de 20 s cada uno, cada 30 s, dentro de los últimos 5
+    // minutos: 160 s activos en total, por encima del corte de 150 s,
+    // aunque cada pulso por separado sea corto (el último termina a los
+    // 3 min 50 s, bien dentro de la ventana de 5 min).
+    const inicios = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5];
+    const muestras = inicios.flatMap((n) => [m(n, 1), m(n + 1 / 3, 0)]);
+    const eventos = eventosDeAlarma(muestras);
+
+    expect(eventos).toHaveLength(8);
+    const r = evaluarPersistencia(eventos, { ahora: min(5), ventanaMs: 5 * 60_000, corteMs: 150_000 });
+    expect(r.activoMs).toBe(8 * 20_000);
+    expect(r.sostenida).toBe(true);
+  });
+
+  it("justo en el corte: exactamente 150 s cuenta como sostenida (>=, no >)", () => {
+    const eventos = eventosDeAlarma([m(0, 0), m(1, 1), m(3.5, 0)]); // 150 s
+    const r = evaluarPersistencia(eventos, { ahora: min(4), ventanaMs: 5 * 60_000, corteMs: 150_000 });
+    expect(r.activoMs).toBe(150_000);
+    expect(r.sostenida).toBe(true);
+  });
+
+  it("una alarma que sigue activa ahora mismo también cuenta hasta el instante actual", () => {
+    const eventos = eventosDeAlarma([m(0, 0), m(1, 1)]); // sin cerrar, lleva 3 min activa
+    const r = evaluarPersistencia(eventos, { ahora: min(4), ventanaMs: 5 * 60_000, corteMs: 150_000 });
+    expect(r.activoMs).toBe(3 * 60_000);
+    expect(r.sostenida).toBe(true);
+  });
+
+  it("sin ningún evento, no hay nada que resolver", () => {
+    const r = evaluarPersistencia([], { ahora: min(5) });
+    expect(r.activoMs).toBe(0);
+    expect(r.sostenida).toBe(false);
   });
 });

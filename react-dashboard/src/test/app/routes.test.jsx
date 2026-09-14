@@ -161,7 +161,10 @@ describe("el sidebar que sale del registro", () => {
 
     const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
-      "vib-inicio", "eva-vibraciones", "vib-controles",
+      // `vib-controles` oculta del sidebar para esta demo (14-09-2026): la
+      // ruta sigue existiendo (ver el test de `ids` más arriba), sólo no
+      // trae `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
+      "vib-inicio", "eva-vibraciones",
       "eva-riesgos-vibracion", "vib-3d",
     ]);
 
@@ -175,7 +178,10 @@ describe("el sidebar que sale del registro", () => {
     // aplicación — ese botón sigue sin volver, sólo la entrada del menú.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.children.map((c) => c.id)).toEqual([
-      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "eva-cuaderno", "eva-muro", "salud-sistema",
+      // `eva-muro` oculta del sidebar para esta demo (14-09-2026): la ruta
+      // sigue existiendo (ver el test de `ids` más arriba), sólo no trae
+      // `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
+      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "eva-cuaderno", "salud-sistema",
     ]);
 
     /*

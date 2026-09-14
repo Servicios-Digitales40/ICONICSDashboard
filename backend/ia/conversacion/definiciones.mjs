@@ -643,13 +643,54 @@ export const DEFINICIONES = [
   {
     type: 'function',
     function: {
+      name: 'alarma_sostenida',
+      description:
+        'Si una alarma del PLC lleva rato SIN RESOLVERSE de verdad, no sólo si está activa ahora ' +
+        'mismo. Un arranque normal de la bomba también activa un instante alarmas como "falta de ' +
+        'presión" (hasta 2 min, medido) — lo que distingue una avería real es que la alarma no se ' +
+        'asienta: sigue parpadeando o activa mucho más tiempo del que dura un ciclo sano. Úsala para ' +
+        '"¿la falta de presión sigue sin resolverse?", "¿el bajo flujo se ha estabilizado?". Sólo ' +
+        'sirve al tanque, y sólo a sus alarmas (falta de presión, presión alta, bajo flujo, nivel ' +
+        'alto/alto-alto, nivel bajo/bajo-bajo, falla del variador, paro de emergencia) — para una ' +
+        'medida continua (nivel, presión, caudal…) usa historia_de_senal. No decide ninguna causa, ' +
+        'sólo mide persistencia: para las causas candidatas de un riesgo activo sigue haciendo falta ' +
+        'diagnosticar_falla.',
+      parameters: {
+        type: 'object',
+        properties: {
+          alarma: {
+            type: 'string',
+            description:
+              'Nombre de la alarma, en lenguaje llano: "falta de presión", "bajo flujo", "presión ' +
+              'alta", "nivel alto", "paro de emergencia"…',
+          },
+          ventanaMinutos: {
+            type: 'number',
+            description:
+              'Cuántos minutos recientes revisar. Si el usuario no lo dice, omítelo — se usan los ' +
+              'últimos 5 minutos, que es lo que distingue un arranque normal de uno que no se resuelve.',
+          },
+        },
+        required: ['alarma'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'resumen_de_turno',
       description:
         'COMPUESTA: qué ha pasado en una máquina durante un período, en UNA llamada — su estado ' +
-        'de ahora, los riesgos activos y cómo han ido sus señales con serie. Para "¿qué pasó en ' +
-        'las últimas 8 horas?", "resúmeme el turno", "¿cómo ha ido la mañana?". Úsala en vez de ' +
-        'encadenar estado_del_sistema + riesgos_activos + varias historia_de_senal: es lo mismo ' +
-        'en un solo viaje. Si alguna parte no está disponible lo dice; no la des por vacía.',
+        'de ahora, los riesgos activos, cómo han ido sus señales con serie, las NOTAS del cuaderno ' +
+        'de planta y las INTERVENCIONES registradas en ese período. Para "¿qué pasó en las ' +
+        'últimas 8 horas?", "resúmeme el turno", "¿cómo ha ido la mañana?", "¿qué notas se han ' +
+        'hecho este turno?", "¿se ha registrado alguna intervención?". Úsala en vez de encadenar ' +
+        'estado_del_sistema + riesgos_activos + varias historia_de_senal: es lo mismo en un solo ' +
+        'viaje. Un array VACÍO en "notas" o "intervenciones" significa que no las hubo en ese ' +
+        'período — nunca lo tomes como que la herramienta no pudo consultarlas (para eso existe ' +
+        '"notasNoDisponibles"), y nunca afirmes una fecha para una de ellas que no esté ' +
+        'literalmente en su campo "cuando". Si alguna parte no está disponible lo dice; no la des ' +
+        'por vacía.',
       parameters: {
         type: 'object',
         properties: {
@@ -1033,6 +1074,10 @@ export const ESQUEMAS = Object.freeze({
     valor: Numero,
     periodo: Texto.optional(),
     sistema: Texto.optional(),
+  }).passthrough(),
+  alarma_sostenida: z.object({
+    alarma: Texto,
+    ventanaMinutos: Numero.optional(),
   }).passthrough(),
   resumen_de_turno: z.object({
     sistema: Texto,

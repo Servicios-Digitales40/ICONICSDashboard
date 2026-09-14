@@ -122,12 +122,15 @@ check('el aviso de derrame lleva las DOS cifras que lo justifican', () => {
 console.log('\n── Presión alta + bomba activa ─────────────────────────────')
 
 check('presión por encima del aviso con la bomba impulsando avisa de sobrepresión', () => {
-  const r = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, presionRelativa: 6 }))
+  // 7.5, no 6: el 14-09-2026 se subió `avisoMax` de 5.5 a 7.2 PSI (medido
+  // contra un día real de bombeo — la operación sana llegaba a 6.9), así
+  // que el fixture tiene que quedar por encima del umbral nuevo.
+  const r = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, presionRelativa: 7.5 }))
   assert.ok(ids(r).includes('sobrepresion'), `salieron: ${ids(r)}`)
 })
 
 check('la misma presión con la bomba parada no avisa', () => {
-  const r = evaluarRiesgos(sistemaCon({ ...PARADA, presionRelativa: 6 }))
+  const r = evaluarRiesgos(sistemaCon({ ...PARADA, presionRelativa: 7.5 }))
   assert.ok(!ids(r).includes('sobrepresion'), 'avisó con la bomba parada')
 })
 
@@ -141,7 +144,7 @@ check('nivel bajo con la bomba en marcha avisa de marcha en seco', () => {
 
 check('presión alta con caudal bajo apunta a obstrucción', () => {
   const r = evaluarRiesgos(sistemaCon({
-    ...EN_MARCHA, presionRelativa: 6, flujoInstantaneo: 1,
+    ...EN_MARCHA, presionRelativa: 7.5, flujoInstantaneo: 1,
   }))
   assert.ok(ids(r).includes('obstruccion'), `salieron: ${ids(r)}`)
 })
@@ -157,7 +160,7 @@ check('obstrucción y fuga no pueden salir a la vez', () => {
   // Son condiciones opuestas. Que salieran juntas significaría que los umbrales
   // se solapan, y la pantalla diría dos cosas contrarias con la misma cara.
   for (const escenario of [
-    { ...EN_MARCHA, presionRelativa: 6, flujoInstantaneo: 1 },
+    { ...EN_MARCHA, presionRelativa: 7.5, flujoInstantaneo: 1 },
     { ...EN_MARCHA, presionRelativa: 1, flujoInstantaneo: 50 },
   ]) {
     const salidas = ids(evaluarRiesgos(sistemaCon(escenario)))
