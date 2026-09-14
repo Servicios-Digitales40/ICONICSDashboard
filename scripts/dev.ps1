@@ -2,14 +2,14 @@
 .SYNOPSIS
   Compila y arranca el backend y Vite en terminales independientes.
 .DESCRIPTION
-  El backend sirve dist en :3001; Vite ofrece recarga en caliente en :5173
+  El backend sirve dist en :3002; Vite ofrece recarga en caliente en :5174
   y reenvia /api al backend. La simulacion se configura con ICONICS_FAKE
   en .env.local. No hay prototipos ni selector de simulacion del frontend.
 .PARAMETER SinBuild
   Reutiliza el dist existente sin compilar.
 .PARAMETER BasePath
   Subruta para el build. El valor local por defecto es /asistente/ para IIS.
-  Usa / para servir directamente desde localhost:3001. El build configura
+  Usa / para servir directamente desde localhost:3002. El build configura
   VITE_BASE_PATH y VITE_API_BASE juntos; Vite de desarrollo usa la raiz.
 .EXAMPLE
   .\scripts\dev.ps1 -BasePath /
@@ -36,7 +36,7 @@ if (-not (Test-Path (Join-Path $frontend 'node_modules'))) {
 }
 
 # Se compila ANTES de arrancar nada, no en paralelo con los dos procesos: el
-# backend en :3001 sirve `dist` desde el primer segundo, y arrancarlo contra
+# backend en :3002 sirve `dist` desde el primer segundo, y arrancarlo contra
 # un build a medio escribir serviria una pantalla rota o vieja sin que nada lo
 # avisara. `npm run build` no vuela en Windows PowerShell 5.1: su codigo de
 # salida solo llega a $LASTEXITCODE, nunca lanza por si mismo.
@@ -80,19 +80,19 @@ function Start-Ventana([string]$titulo, [string]$directorio, [string]$comando) {
   Start-Process $shell -ArgumentList '-NoExit', '-Command', $script
 }
 
-Start-Ventana 'ICONICS · backend :3001' $raiz `
+Start-Ventana 'ICONICS · backend :3002' $raiz `
   "node --env-file=.env.local backend/server.mjs"
 
-Start-Ventana 'ICONICS · vite :5173' $frontend 'npm run dev'
+Start-Ventana 'ICONICS · vite :5174' $frontend 'npm run dev'
 
 Write-Host ''
 if ($BasePath -and $BasePath -ne '/') {
-  Write-Host "  backend   :3001   compilado para vivir bajo '$BasePath' — NO abre suelto en localhost:3001$BasePath" -ForegroundColor DarkGray
+  Write-Host "  backend   :3002   compilado para vivir bajo '$BasePath' — NO abre suelto en localhost:3002$BasePath" -ForegroundColor DarkGray
   Write-Host "            hace falta el proxy inverso de IIS por delante (docs/PLAN-20-ASISTENTE.md §F7)" -ForegroundColor DarkGray
 } else {
-  Write-Host '  backend   http://localhost:3001   (build compilado)' -ForegroundColor DarkGray
+  Write-Host '  backend   http://localhost:3002   (build compilado)' -ForegroundColor DarkGray
 }
-Write-Host '  frontend  http://localhost:5173   <- abre esta' -ForegroundColor Cyan
+Write-Host '  frontend  http://localhost:5174   <- abre esta' -ForegroundColor Cyan
 
 
 # Las mismas URLs para el resto de la red. Se listan aqui y no solo en la
@@ -108,7 +108,7 @@ if ($ips) {
   Write-Host ''
   Write-Host '  desde la red:' -ForegroundColor DarkGray
   foreach ($ip in $ips) {
-    Write-Host ("    http://{0}:5173   ({1})" -f $ip.IPAddress, $ip.InterfaceAlias) -ForegroundColor Gray
+    Write-Host ("    http://{0}:5174   ({1})" -f $ip.IPAddress, $ip.InterfaceAlias) -ForegroundColor Gray
   }
   Write-Host '    si el ping llega pero el puerto no: scripts\exponer-en-red.ps1 (como admin)' -ForegroundColor DarkGray
 }
