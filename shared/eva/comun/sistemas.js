@@ -107,11 +107,11 @@ import {
   SENALES,
   SENAL_KEYS,
   TODOS_LOS_PUNTOS,
-  RAIZ,
+  RAMAS,
   esHistorizada as esHistorizadaTanque,
   historizadas as historizadasTanque,
   parsePointName,
-  pointName,
+  puntoHistorico as puntoHistoricoTanque,
 } from "../tanque/senales.js";
 import { valorDePunto } from "../tanque/simulador.js";
 import { estadoDelTanque, resumenTanqueParaAsistente } from "../tanque/estadoTanque.js";
@@ -140,7 +140,14 @@ export const SISTEMAS = [
     nombre: "Tanque y grupo de bombeo",
     maquina: "Tanque de almacenamiento, bomba, red de distribución y su suministro",
     plc: "PLC_1 · ua:DEMO2",
-    raices: [RAIZ],
+    /*
+     * Trece ramas, no una (Plan 27 F1): la reorganización del 09-09-2026
+     * dejó `SENSORES/` como una rama más, hermana de las doce que reproducen
+     * el DB del PLC. `verificar-catalogo --real` explora el padre de cada
+     * raíz declarada y avisa si aparece una catorceava sin que nadie la
+     * añada aquí (Plan 27 F0).
+     */
+    raices: Object.values(RAMAS),
     puntos: () => TODOS_LOS_PUNTOS,
     /* `parse` devuelve la clave de dominio envuelta, para que las dos máquinas
        tengan la MISMA forma de identidad aunque una la tenga plana y la otra
@@ -169,26 +176,32 @@ export const SISTEMAS = [
      *
      * Estaba dentro de `historia.js`, escrita para el tanque: `ac:` y no
      * `hda:`, `Average` y no `Interpolative`. Otra máquina puede necesitar
-     * otra combinación —vibraciones ya sabe que su sitio es `hda:` el día que
-     * registre—, y con una sola copia la segunda tendría que elegir entre
-     * mentir o tocar el archivo de la primera.
+     * otra combinación, y con una sola copia la segunda tendría que elegir
+     * entre mentir o tocar el archivo de la primera.
      *
-     * `historizadas` es la puerta, y no una lista informativa: a TRES de las
-     * ocho señales el historiador les devuelve la serie de la temperatura del
-     * tanque, con marcas de tiempo correctas y sin dar error. Lo que no está
-     * aquí no se puede pedir.
+     * **Corregido el 10-09-2026 (Plan 27 F6):** hasta este commit `punto`
+     * era `pointName` a secas —el mismo nombre que en vivo—, que fue cierto
+     * mientras el redirect del historiador vivía configurado en el activo
+     * del servidor. La reorganización del árbol del 09-09-2026 lo rompió
+     * para doce de las trece ramas: hoy el tanque necesita su PROPIO nombre
+     * `hda:`, igual que ya lo necesitaba vibraciones desde el 27-08-2026.
+     * Ver `puntoHistorico` en `tanque/senales.js` para la tabla rama→carpeta
+     * y los dos nombres que no derivan por regla fija.
+     *
+     * `historizadas` es la puerta, y no una lista informativa: a DOS de las
+     * cincuenta y dos señales el historiador les devuelve la serie de la
+     * temperatura del tanque, con marcas de tiempo correctas y sin dar
+     * error. Lo que no está aquí no se puede pedir.
      */
     series: {
       historizadas: historizadasTanque,
-      ruta: "ac:",
+      ruta: "hda:",
       agregado: "Average",
-      /* En el tanque el punto histórico se pide con el MISMO nombre que en
-         vivo. En vibraciones no, y por eso esto es un campo del registro y no
-         una función importada por quien lee. Ver `puntoHistorico` allí. */
-      punto: pointName,
+      punto: puntoHistoricoTanque,
       nota:
-        "Cinco de las ocho señales tienen serie propia verificada. A las otras tres el " +
-        "historiador les devuelve la serie de la temperatura del tanque, sin dar error.",
+        "Cincuenta de las cincuenta y dos señales tienen serie propia verificada por rama. A las " +
+        "otras dos (carga del motor, eficiencia energética) el historiador les devuelve la serie " +
+        "de la temperatura del tanque, sin dar error.",
     },
     /** Mecanismos de desgaste acumulado, para el pronóstico. */
     desgaste: MECANISMOS,
@@ -198,6 +211,13 @@ export const SISTEMAS = [
       "caudal instantáneo y presión relativa de la red",
       "carga del motor y modo del variador",
       "tensión de línea y eficiencia energética",
+      // Plan 27 F3.
+      "las ocho alarmas del PLC, y si el proceso está habilitado",
+      // Plan 27 F4.
+      "energía trifásica de línea, diez lecturas del variador por Modbus, y el " +
+        "automatismo de llenado y vaciado",
+      // Plan 27 F5.
+      "el modo, la orden y el estado de las dos electroválvulas y la bomba de aire",
     ],
     /*
      * Las palabras que Whisper tiene que oír bien EN ESTE SISTEMA. Ver
@@ -222,13 +242,34 @@ export const SISTEMAS = [
       "correlacionar_senales",
       "grafico_de_senal",
     ],
-    historia: "Cinco de las ocho señales tienen serie propia verificada. Las otras tres NO.",
+    historia:
+      "50 de las 52 señales del catálogo tienen serie propia desde el 10-09-2026 (Plan 27 F6): " +
+      "medidas, alarmas, mandos y lecturas del variador. cargaMotor y eficienciaEnergetica NO " +
+      "se historizan — el historiador les devuelve la serie de temperaturaTanque.",
     limitaciones: [
       "Los límites con los que se evalúa cada señal son estimaciones nuestras para un " +
         "sistema de agua genérico, no rangos confirmados por quien opera la instalación.",
-      "El servidor no publica alarmas para este árbol: el estado de cada señal es un " +
-        "cálculo del tablero, no un dato de ICONICS.",
+      /*
+       * Plan 27 F3: desde el 09-09-2026 el servidor SÍ publica ocho bits de
+       * alarma del PLC (`ALARMAS/`). La frase anterior —«el servidor no
+       * publica alarmas»— dejó de ser cierta, y una limitación declarada que
+       * ya no aplica es peor que ninguna: el asistente la repetiría. Lo que
+       * sigue siendo cierto, y lo que hay que decir en su lugar, es que
+       * ahora hay DOS fuentes que no siempre van a coincidir.
+       */
+      "Además del bit de alarma que publica el PLC para ocho condiciones, el tablero " +
+        "sigue calculando su propia banda para cada señal contra umbrales nuestros. Las " +
+        "dos pueden no coincidir: los del PLC son los del programa, los del tablero son " +
+        "una estimación genérica. El desacuerdo es información de diagnóstico, no un " +
+        "error de ninguna de las dos.",
       "La correspondencia Automático/Manual del modo del variador no está confirmada.",
+      "La polaridad del paro de emergencia no está confirmada: no se pinta como alarma.",
+      // Plan 27 F4.
+      "Los diez registros que lee el variador por Modbus RTU llegan sin escalar: se " +
+        "muestran sin unidad hasta que se confirme el factor de conversión de cada uno.",
+      "La tensión de línea del medidor de energía (L1-N) se declara en voltios en el " +
+        "manual, pero el valor medido no es plausible para esa magnitud: se muestra sin " +
+        "unidad hasta aclarar la escala.",
     ],
   },
   {

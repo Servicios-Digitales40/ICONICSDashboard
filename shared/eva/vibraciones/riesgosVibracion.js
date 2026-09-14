@@ -94,6 +94,20 @@ const VECES_ASIMETRIA = 3;
  *   consecuencia hipótesis, en condicional
  *   accion       qué comprobar
  *   norma        de dónde sale el criterio, cuando sale de algún sitio
+ *   expone       los nombres que la frase de `evidencia` puede citar
+ *   datos        (datos) => los valores con los que se compuso esa frase
+ *
+ * Los dos últimos son para el tablero bilingüe y no cambian nada aquí: el
+ * español lo sigue escribiendo `evidencia`. Lo que hacen es permitir REHACER
+ * la misma frase en otro idioma con las mismas cifras — traducir el resultado
+ * ya compuesto no es posible, porque en inglés las palabras no van en el mismo
+ * orden. Ver `react-dashboard/src/i18n/useProsa.js`.
+ *
+ * `expone` es el contrato y `datos` la implementación, y están separados a
+ * propósito: la mitad de estas frases tienen trozos opcionales, así que lo que
+ * `datos` devuelve en una ejecución concreta NO es la lista de lo que la regla
+ * sabe decir. `scripts/verificar-dominio.mjs` comprueba el inglés contra
+ * `expone`, no contra una llamada de muestra que sólo recorrería una rama.
  */
 export const REGLAS = [
   /* ── Lo que invalida a las demás ─────────────────────────────── */
@@ -109,6 +123,12 @@ export const REGLAS = [
       `El variador entrega ${fmt(d.frecuencia, 2)} Hz y el motor gira a ` +
       `${fmt(d.velocidad, 0)} rpm, por debajo de las ${RPM_MINIMA_ISO} rpm ` +
       `desde las que la norma se pronuncia.`,
+    expone: ["frecuencia", "velocidad", "rpmMinima"],
+    datos: (d) => ({
+      frecuencia: fmt(d.frecuencia, 2),
+      velocidad: fmt(d.velocidad, 0),
+      rpmMinima: RPM_MINIMA_ISO,
+    }),
     consecuencia:
       "Las lecturas de velocidad eficaz salen BAJAS por construcción: a esta " +
       "velocidad la frecuencia de giro cae fuera de la banda 10–1000 Hz que " +
@@ -138,6 +158,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `${fmt(d.velocidad, 0)} rpm son ${fmt(d.velocidad / 60, 2)} Hz de giro, ` +
       `justo por encima de los 10 Hz en que arranca la banda de medida de la norma.`,
+    expone: ["velocidad", "hz"],
+    datos: (d) => ({ velocidad: fmt(d.velocidad, 0), hz: fmt(d.velocidad / 60, 2) }),
     consecuencia:
       "El filtro paso alto de 10 Hz no corta en seco: en su propia frecuencia " +
       "atenúa cerca de un 30 %. La componente de desequilibrio, que es la que " +
@@ -159,6 +181,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `${fmt(d.velocidad, 0)} rpm, por debajo de las ${RPM_MINIMA_MODULO} rpm ` +
       "mínimas del SIPLUS CMS SM 1281.",
+    expone: ["velocidad", "rpmMinima"],
+    datos: (d) => ({ velocidad: fmt(d.velocidad, 0), rpmMinima: RPM_MINIMA_MODULO }),
     consecuencia:
       "El módulo no garantiza sus medidas por debajo de ese régimen. Lo que " +
       "publique ahora mismo no es comparable con nada.",
@@ -177,6 +201,16 @@ export const REGLAS = [
       `El par del variador es ${fmt(d.par, 2)} %` +
       (hay(d.potencia) ? ` y la potencia ${fmt(d.potencia, 2)} kW` : "") +
       ": la máquina gira, pero no está trabajando.",
+    /*
+     * `contexto` elige entre dos formas de la misma frase, y lo decide el
+     * dominio porque es él quien sabe si la potencia llegó. Un hueco vacío en
+     * la plantilla no bastaría: en inglés dejaría la conjunción colgando.
+     */
+    expone: ["par", "potencia"],
+    datos: (d) => ({
+      par: fmt(d.par, 2),
+      ...(hay(d.potencia) ? { potencia: fmt(d.potencia, 2), contexto: "conPotencia" } : {}),
+    }),
     consecuencia:
       "En vacío no aparecen las vibraciones que sólo se manifiestan bajo " +
       "carga —desalineación forzada por el par, holguras que se cierran, " +
@@ -199,6 +233,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `Velocidad eficaz ${fmt(d.vRMS, 3)} mm/s, por encima de los ` +
       `${LIMITES_ISO.alarma} mm/s en que ISO 10816-1 Clase I sitúa la zona D.`,
+    expone: ["vRMS", "limite"],
+    datos: (d) => ({ vRMS: fmt(d.vRMS, 3), limite: LIMITES_ISO.alarma }),
     consecuencia:
       "Zona D es la de daño: a este nivel la máquina se está deteriorando " +
       "mientras funciona. Las causas habituales en este rango son " +
@@ -219,6 +255,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `Velocidad eficaz ${fmt(d.vRMS, 3)} mm/s: zona C de ISO 10816-1 Clase I ` +
       `(por encima de ${LIMITES_ISO.aviso} mm/s).`,
+    expone: ["vRMS", "limite"],
+    datos: (d) => ({ vRMS: fmt(d.vRMS, 3), limite: LIMITES_ISO.aviso }),
     consecuencia:
       "Zona C es «insatisfactoria»: la máquina puede seguir funcionando, " +
       "pero no de forma indefinida. Dejarla ahí acorta la vida de los " +
@@ -303,6 +341,8 @@ export const REGLAS = [
     nivel: "atencion",
     cuando: (d) => Math.abs(d.offset) > 0,
     evidencia: (d) => `Desviación declarada por el módulo: ${fmt(d.offset, 4)}.`,
+    expone: ["offset"],
+    datos: (d) => ({ offset: fmt(d.offset, 4) }),
     consecuencia:
       "Una desviación distinta de cero apunta al montaje o al cableado del " +
       "acelerómetro —base floja, par de apriete insuficiente, alimentación " +
@@ -325,6 +365,11 @@ export const REGLAS = [
       `\`FAULT_BMS\` vale ${fmt(d.fallo, 0)}` +
       (hay(d.ultimoFallo) ? ` y el último fallo registrado fue ${fmt(d.ultimoFallo, 0)}` : "") +
       ".",
+    expone: ["fallo", "ultimoFallo"],
+    datos: (d) => ({
+      fallo: fmt(d.fallo, 0),
+      ...(hay(d.ultimoFallo) ? { ultimoFallo: fmt(d.ultimoFallo, 0), contexto: "conUltimo" } : {}),
+    }),
     consecuencia:
       "Con el variador en fallo, la velocidad publicada puede no " +
       "corresponderse con lo que hace el eje, y toda la evaluación de " +
@@ -355,6 +400,17 @@ export const REGLAS = [
         `apoyo: ${off.map((v) => v.corto).join(", ")}.`
       );
     },
+    /*
+     * `cuales` va ya unido, y no como lista, porque sus elementos son
+     * NOTACIÓN —BPFO, BPFI, FTF—: se escriben igual en los dos idiomas.
+     * Compárese con `vigilancia-en-aviso`, que sí manda claves sueltas
+     * porque allí lo que se enumera son palabras.
+     */
+    expone: ["n", "cuales"],
+    datos: (d) => {
+      const off = rodamientosApagados(d);
+      return { n: off.length, cuales: off.map((v) => v.corto).join(", ") };
+    },
     consecuencia:
       "El módulo calcula el espectro de envolvente y sabe mirar las frecuencias " +
       "exactas a las que golpea cada defecto de un rodamiento. Con eso apagado, " +
@@ -383,6 +439,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `Se publican pero nadie las compara con un límite: ` +
       `${umbralesApagados(d).map((v) => v.corto).join(", ")}.`,
+    expone: ["cuales"],
+    datos: (d) => ({ cuales: umbralesApagados(d).map((v) => v.corto).join(", ") }),
     consecuencia:
       "El valor aparece en pantalla y parece vigilado. No lo está: si sube, el " +
       "módulo no encenderá ni aviso ni alarma.",
@@ -401,6 +459,16 @@ export const REGLAS = [
       vigilanciasDisparadas(d)
         .map((v) => `${v.label}: ${v.estado.label}`)
         .join(". ") + ".",
+    /*
+     * Aquí viajan las CLAVES y no el texto: el nombre de una vigilancia y su
+     * estado son palabras —«Velocidad eficaz contra su umbral», «En aviso»— y
+     * el tablero ya sabe decirlas en los dos idiomas. Quien arma la lista es
+     * el puente, que es el único que sabe en qué idioma se está pintando.
+     */
+    expone: ["disparadas"],
+    datos: (d) => ({
+      disparadas: vigilanciasDisparadas(d).map((v) => ({ clave: v.key, estado: v.estado.id })),
+    }),
     consecuencia:
       "El módulo ha cruzado uno de sus propios criterios. A diferencia de las " +
       "banderas generales de alarma y aviso, esto dice QUÉ vigilancia concreta " +
@@ -429,6 +497,12 @@ export const REGLAS = [
       confianzasBajas(d)
         .map((q) => `${q.label}: ${fmt(q.valor, 3)} (lo normal es ${QC_NOMINAL})`)
         .join(". ") + ".",
+    /* `label` aquí es notación (VRMS, ARMS, DKW): no se traduce. */
+    expone: ["bajas", "nominal"],
+    datos: (d) => ({
+      bajas: confianzasBajas(d).map((q) => ({ label: q.label, valor: fmt(q.valor, 3) })),
+      nominal: QC_NOMINAL,
+    }),
     consecuencia:
       "El módulo acompaña cada medida con su propia confianza. Cuando baja, el " +
       "número sigue publicándose igual: no se distingue del bueno mirándolo.",
@@ -457,6 +531,28 @@ export const REGLAS = [
         (hay(sev) ? `. Severidad máxima ${fmt(sev, 0)}` : "") +
         "."
       );
+    },
+    /*
+     * Cuatro formas de la misma frase, según lleguen o no las dos cifras
+     * opcionales. El `contexto` las nombra; una sola plantilla con huecos que
+     * a veces quedan vacíos dejaría comas colgando.
+     *
+     * «DEMO VIBRACIONES» no viaja: es el nombre del área en el servidor de
+     * alarmas y va literal en las dos frases, como un tag.
+     */
+    expone: ["total", "sinReconocer", "severidad"],
+    datos: (d) => {
+      const sin = num(d.alarmas?.activasSinReconocer);
+      const con = num(d.alarmas?.activasReconocidas);
+      const sev = d.alarmas?.severidadActivas;
+      const contexto =
+        sin && hay(sev) ? "ambos" : sin ? "sinReconocer" : hay(sev) ? "severidad" : null;
+      return {
+        total: sin + con,
+        ...(sin ? { sinReconocer: sin } : {}),
+        ...(hay(sev) ? { severidad: fmt(sev, 0) } : {}),
+        ...(contexto ? { contexto } : {}),
+      };
     },
     /*
      * Estas alarmas las emite ICONICS con límites puestos por quien conoce el
@@ -492,6 +588,8 @@ export const REGLAS = [
     evidencia: (d) =>
       `${num(d.alarmas?.normalSinReconocer)} alarma(s) de «DEMO VIBRACIONES» ` +
       "dispararon y volvieron a normal sin que nadie las reconociera.",
+    expone: ["n"],
+    datos: (d) => ({ n: num(d.alarmas?.normalSinReconocer) }),
     consecuencia:
       "La máquina está bien AHORA. Pero algo la sacó de banda mientras nadie " +
       "miraba, y sin reconocerlas no queda constancia de que se revisara qué fue.",
@@ -519,7 +617,11 @@ export const REGLAS = [
       const conDato = Object.values(d.aRMSPorCanal ?? {}).filter(hay).length;
       return conDato >= 3
         ? { ok: true }
-        : { ok: false, porque: `Sólo ${conDato} de ${CANALES.length} apoyos entregan aceleración; hacen falta 3 para comparar.` };
+        : {
+          ok: false,
+          porque: `Sólo ${conDato} de ${CANALES.length} apoyos entregan aceleración; hacen falta 3 para comparar.`,
+          motivo: { clave: "pocosApoyos", conDato, total: CANALES.length },
+        };
     },
     cuando: (d) => Boolean(peorApoyo(d.aRMSPorCanal)),
     evidencia: (d) => {
@@ -529,6 +631,19 @@ export const REGLAS = [
         `${fmt(p.veces, 1)} veces lo que el resto de apoyos de la misma ` +
         `máquina (${fmt(p.referencia, 3)} m/s² de mediana).`
       );
+    },
+    /* `canal` viaja como id: el nombre del apoyo lo dice el puente. */
+    expone: ["canal", "valor", "veces", "referencia"],
+    datos: (d) => {
+      const p = peorApoyo(d.aRMSPorCanal);
+      return p
+        ? {
+          canal: p.id,
+          valor: fmt(p.valor, 3),
+          veces: fmt(p.veces, 1),
+          referencia: fmt(p.referencia, 3),
+        }
+        : {};
     },
     consecuencia:
       "Una diferencia grande entre apoyos del mismo eje suele ser local: " +
@@ -656,6 +771,11 @@ function peorApoyo(porCanal) {
  *
  * Devuelve `{ activos, noEvaluables, evaluadas, normaAplicable, provisional }`.
  *
+ * Cada entrada de `noEvaluables` lleva el motivo dos veces: `porque`, la frase
+ * en español que consume el backend, y `motivo`, el mismo hecho por claves para
+ * que el tablero lo diga en el idioma activo. Es el mismo reparto que ya hacen
+ * `falta` y `faltaClave` en los riesgos del tanque.
+ *
  * `noEvaluables` no es relleno: es la lista de lo que NO se ha podido mirar.
  * Una pantalla que enseña cinco riesgos apagados y calla que otros tres no se
  * han evaluado transmite una calma que no le corresponde.
@@ -697,6 +817,7 @@ export function evaluarRiesgosVibracion(estado) {
           canalLabel: canal?.label ?? null,
           titulo: regla.titulo,
           porque: `Sin dato de ${faltan.join(", ")}.`,
+          motivo: { clave: "sinDato", faltan },
         });
         continue;
       }
@@ -711,6 +832,7 @@ export function evaluarRiesgosVibracion(estado) {
           canalLabel: canal?.label ?? null,
           titulo: regla.titulo,
           porque: propia.porque,
+          motivo: propia.motivo ?? null,
         });
         continue;
       }
@@ -728,6 +850,10 @@ export function evaluarRiesgosVibracion(estado) {
               ? "No se conoce la velocidad, así que no se sabe si ISO 10816 aplica."
               : `A ${fmt(velocidad, 0)} rpm la máquina está por debajo de las ` +
                 `${RPM_MINIMA_ISO} rpm desde las que ISO 10816 se pronuncia.`,
+          motivo:
+            normaAplicable === null
+              ? { clave: "sinVelocidad" }
+              : { clave: "bajoNorma", velocidad: fmt(velocidad, 0), rpmMinima: RPM_MINIMA_ISO },
         });
         continue;
       }
@@ -745,6 +871,15 @@ export function evaluarRiesgosVibracion(estado) {
         consecuencia: regla.consecuencia,
         accion: regla.accion,
         norma: regla.norma ?? null,
+        /*
+         * CON QUÉ se compuso la evidencia, para que el tablero pueda rehacerla
+         * en otro idioma con las mismas cifras (ver `i18n/useProsa.js`). Aquí
+         * van YA FORMATEADAS —a diferencia del tanque, donde viajan en crudo—
+         * porque casi ninguna es una señal del catálogo: son derivadas —cuántas
+         * vigilancias hay apagadas, cuántas veces peor está un apoyo— y sus
+         * decimales sólo los conoce la propia regla.
+         */
+        valores: regla.datos?.(datos) ?? {},
         /* Advertencia sobre la propia lectura del dato, cuando la hay. Viaja
            hasta la tarjeta: si el estado está deducido y no confirmado, quien
            lo lea tiene que verlo junto al veredicto, no en el código. */

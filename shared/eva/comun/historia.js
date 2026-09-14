@@ -13,11 +13,17 @@
  * Están medidas contra el servidor real (Plan 8 §1.3) y son la razón de que
  * esto viva en `shared/` en vez de repetirse en los dos lados:
  *
- * 1. **El punto histórico se nombra con `ac:`, igual que el de tiempo real.**
- *    La sintaxis `hda:\Configuration\…` que usaba el catálogo del tablero
- *    anterior responde 500 para este árbol, con las dos variantes de barra
- *    probadas. Por eso aquí el punto histórico se nombra con `pointName` y no
- *    hay un `historyPointName` aparte.
+ * 1. **El punto histórico NO se nombra igual que el de tiempo real** — al
+ *    revés de lo que decía esta nota hasta el 10-09-2026. Fue cierto mientras
+ *    el redirect del historiador vivió configurado en el propio activo del
+ *    servidor; la reorganización del árbol del 09-09-2026 lo rompió para doce
+ *    de las trece ramas del tanque: `ac:TDCON/DEMO/…` da 500 en `/History`, y
+ *    sólo el árbol PROPIO del historiador, `hda:\Configuration\DEMO
+ *    TANQUE\…`, contesta (Plan 27 §4, cerrado en F6). Por eso el nombre
+ *    histórico es un campo del registro (`series.punto` en `sistemas.js`) y
+ *    no un cálculo desde `pointName` — `puntoHistorico()` en
+ *    `tanque/senales.js` trae la tabla rama→carpeta, con los dos nombres que
+ *    no derivan por regla fija.
  *
  * 2. **Sólo algunas señales tienen serie propia.** A las demás el historiador
  *    les devuelve la curva de `STEMPERATURA_TANQUE` —idéntica hasta el último
@@ -26,7 +32,10 @@
  *
  *    Cuáles son vive en el catálogo (`historizado`), no en este texto: la
  *    lista cambia según lo que se configure en el Data Historian. Eran cuatro
- *    hasta el 24-08-2026, cuando `tensionLinea` pasó a servir la suya.
+ *    hasta el 24-08-2026, cuando `tensionLinea` pasó a servir la suya, y
+ *    cincuenta de cincuenta y dos desde el 10-09-2026 (Plan 27 F6) — quedan
+ *    fuera `cargaMotor` y `eficienciaEnergetica`, que comparten la de
+ *    `temperaturaTanque`.
  *
  * La segunda es la que hace peligroso compartir este archivo a medias. Un
  * asistente que se olvidara de la guarda no fallaría: contestaría, con
@@ -109,6 +118,26 @@ export const VENTANA = { horas: 6, puntos: 24 };
  * rango que por su densidad real necesitaría varias páginas.
  */
 export const MAX_PUNTOS = 100;
+
+/**
+ * Series admitidas en una sola llamada a `/history/batch`.
+ *
+ * Vivía sólo en `backend/http/esquemas.mjs` (Zod), escrito cuando el
+ * catálogo entero del tanque eran ocho señales y ninguna pestaña de
+ * `DetalleActivo` podía pedir más de cuatro o cinco de golpe. El Plan 27 F6
+ * (10-09-2026) historizó cincuenta, y una sola pestaña (Estación de llenado)
+ * pasó a pedir once — el servidor rechazó el lote entero con
+ * `too_big`/`No more than 10 points per request`, y las tarjetas de esa
+ * pestaña se quedaron sin histórico de golpe.
+ *
+ * El límite en sí sigue siendo válido — diez deja margen sin dejarlo
+ * abierto: cada señal multiplica los tramos, y una lista sin techo convierte
+ * una petición en cientos de lecturas al historiador —, lo que hacía falta
+ * era que quien arma la lista lo conociera: `data/tanque/historia.js`
+ * trocea en lotes de este tamaño antes de llamar a la ruta, en vez de que el
+ * backend sea la única guarda y el frontend se entere por el 400 de turno.
+ */
+export const MAX_SERIES_BATCH = 10;
 
 /** Segundos → `HH:MM:SS`, que es el formato de intervalo que espera ICONICS. */
 export function intervaloHMS(segundos) {
@@ -265,7 +294,9 @@ function cobertura(conDato, ventana) {
   if (!ventana?.inicio || !ventana?.fin || !ventana?.segundosPorPunto) return {};
 
   const total = Math.round(
-    (new Date(ventana.fin) - new Date(ventana.inicio)) / 1000 / ventana.segundosPorPunto
+    (new Date(ventana.fin).getTime() - new Date(ventana.inicio).getTime()) /
+      1000 /
+      ventana.segundosPorPunto
   );
   if (!Number.isFinite(total) || total <= 0) return {};
 
