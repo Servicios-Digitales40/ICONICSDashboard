@@ -61,6 +61,31 @@
       "evidencia": "The water in the tank is at {{temperaturaTanque}} °C.",
       "consecuencia": "Above its service band the water loses its fitness for the process, and if it keeps rising the risk of cavitation at the suction increases.",
       "accion": "Check the heat input and the turnover of the tank."
+    },
+    "nivel-critico-con-bomba-impulsando": {
+      "titulo": "Critical level alarm and the pump is still delivering",
+      "evidencia": "The PLC high-high level alarm is active and the pump is still delivering (motor load {{cargaMotor}} %).",
+      "consecuencia": "The PLC itself already declares the level critical and pumping has not stopped: what is failing is not the detection, it is that the order to stop is not getting through, or nobody has given it.",
+      "accion": "Confirm whether the high-high level interlock is bypassed and who is commanding the pump."
+    },
+    "emergencia-con-motor-en-carga": {
+      "titulo": "Emergency stop requested and the motor is still drawing power",
+      "evidencia": "The emergency stop is engaged and the motor is still at a load of {{cargaMotor}} %.",
+      "consecuencia": "An emergency stop that does not cut the drive leaves the plant without its last protection: whoever pressed it did so expecting the machine to stop.",
+      "accion": "Check the safety chain between the pushbutton and the contactor, and do not treat the machine as stopped while there is load."
+    },
+    "variador-en-falla-y-sigue-mandando": {
+      "titulo": "The VFD reports a fault and the motor is still under load",
+      "evidencia": "The drive reports an active fault and the motor is still at a load of {{cargaMotor}} %.",
+      "consecuencia": "A drive in fault is not governing the motor the way the automatic system believes: the load being read may not match the setpoint, and its protections may not be active.",
+      "accion": "Read the fault code on the drive before resetting it, and find out what is keeping the motor under load."
+    },
+    "alarma-de-proceso-sin-respaldo-analogico": {
+      "titulo": "The PLC pressure alarm and our reading do not agree",
+      "evidencia": "The PLC has the high-pressure alarm active and the reading is {{presionRelativa}}, below our warning threshold ({{avisoPresion}}).",
+      "consecuencia": "The PLC alarm and this dashboard's threshold are not describing the same plant. The alarm prevails —it was set by whoever knows the process— so most likely the threshold here is badly calibrated.",
+      "accion": "Compare the limit configured in the PLC against the one in this dashboard before trusting the pressure bands.",
+      "nota": "Our pressure thresholds are still an estimate, not a figure from the plant."
     }
   },
   "causes": {
@@ -139,6 +164,38 @@
     "umbral-de-presion-sin-calibrar": {
       "titulo": "The low-pressure threshold is still an estimate of ours",
       "componente": "Installation thresholds"
+    },
+    "enclavamiento-nivel-alto-puenteado": {
+      "titulo": "The high-high level interlock is bypassed or disabled",
+      "componente": "High-high level interlock"
+    },
+    "bomba-mandada-en-manual": {
+      "titulo": "Someone is commanding the pump manually, outside the automatic system",
+      "componente": "Pump command / drive mode"
+    },
+    "cadena-de-seguridad-interrumpida": {
+      "titulo": "The safety chain does not reach the contactor",
+      "componente": "Safety chain / power contactor"
+    },
+    "lectura-de-emergencia-invertida": {
+      "titulo": "The polarity of the emergency contact is not the one we assume",
+      "componente": "Emergency pushbutton / contact wiring"
+    },
+    "falla-del-variador-sin-reponer": {
+      "titulo": "The drive has an active fault that has not been reset",
+      "componente": "Variable frequency drive"
+    },
+    "motor-alimentado-por-fuera-del-variador": {
+      "titulo": "The motor is being fed through a path that does not go through the drive",
+      "componente": "Power switchgear / drive bypass"
+    },
+    "umbral-del-tablero-mal-calibrado": {
+      "titulo": "This dashboard's pressure threshold is not the plant's",
+      "componente": "Installation thresholds"
+    },
+    "alarma-y-medida-de-puntos-distintos": {
+      "titulo": "The alarm and the reading are not measuring the same point of the network",
+      "componente": "Pressure instrumentation"
     },
     "impulsor-desgastado": {
       "titulo": "Worn impeller",

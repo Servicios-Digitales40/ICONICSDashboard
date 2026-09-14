@@ -319,6 +319,124 @@ export const REGLAS = [
     // que la tarjeta pueda decirlo en vez de afirmar un modo que no consta.
     nota: "La correspondencia Automático/Manual no está confirmada en el servidor.",
   },
+  /* ── El cruce con las alarmas del PLC ───────────────────────────── */
+
+  /*
+   * ── POR QUÉ ESTAS CUATRO NO SON «UN SISTEMA DE ALARMAS» ───────────
+   *
+   * La cabecera de este archivo lo prohíbe expresamente: las alarmas están en
+   * el servidor, mandan sobre lo que se calcule aquí, y esto es una capa de
+   * anticipación ENCIMA. Una regla que dispare con `nivelAltoAlto === true` y
+   * nada más sería justamente eso — y además repetiría dos cosas que ya
+   * existen: `estadoDeSenal()` juzga las ocho alarmas con su `estadoActivo`
+   * (Plan 27 F3) y `AlarmasEva` pinta sus eventos por flancos
+   * (`eventosDeAlarma.js`).
+   *
+   * Lo que ninguna de las dos hace es CRUZAR la alarma con el estado de la
+   * máquina, que es la razón de ser de este archivo: «los problemas viven en
+   * las combinaciones». Una alarma de nivel crítico ya la cuenta el servidor;
+   * que además la bomba siga impulsando es un hecho distinto, y peor.
+   *
+   * Ninguna de las cuatro introduce un umbral nuestro: todas comparan un bit
+   * del PLC contra una señal que ya se leía. Es lo que permite escribirlas
+   * mientras `PROVISIONALES` siga en `true` (Plan 29 §1).
+   */
+  {
+    id: "nivel-critico-con-bomba-impulsando",
+    titulo: "Alarma de nivel crítico y la bomba sigue impulsando",
+    severidad: "critico",
+    necesita: ["nivelAltoAlto", "cargaMotor"],
+    cuando: (v, ctx) => ctx.impulsando && v.nivelAltoAlto === true,
+    evidencia: (v) =>
+      `La alarma de nivel alto-alto del PLC está activa y la bomba sigue impulsando ` +
+      `(carga del motor ${v.cargaMotor.toFixed(1)} %).`,
+    consecuencia:
+      "El propio PLC ya declara el nivel como crítico y el bombeo no se ha detenido: lo que " +
+      "falla no es la detección, es que la orden de parar no está llegando o nadie la ha dado.",
+    accion: "Confirmar si el enclavamiento por nivel alto-alto está puenteado y quién manda la bomba.",
+  },
+  {
+    /*
+     * `paroDeEmergencia` es la única alarma con `invertida: true` —contacto
+     * normalmente cerrado, `TRUE` es «sin emergencia»—, confirmado contra el
+     * programa real el 10-09-2026. Aquí se compara contra `false` por eso, y
+     * no se niega el bit a mano en ningún otro sitio: `estado.js` ya lee
+     * `invertida` para pintarlo, y duplicar la inversión en dos archivos es
+     * exactamente lo que su cabecera avisa de no hacer.
+     */
+    id: "emergencia-con-motor-en-carga",
+    titulo: "Paro de emergencia pedido y el motor sigue consumiendo",
+    severidad: "critico",
+    necesita: ["paroDeEmergencia", "cargaMotor"],
+    cuando: (v, ctx) => ctx.impulsando && v.paroDeEmergencia === false,
+    evidencia: (v) =>
+      `El paro de emergencia está accionado y el motor sigue con una carga del ` +
+      `${v.cargaMotor.toFixed(1)} %.`,
+    consecuencia:
+      "Un paro de emergencia que no corta el accionamiento deja la instalación sin su última " +
+      "protección: si alguien lo pulsó, lo hizo contando con que la máquina se detuviera.",
+    accion:
+      "Comprobar la cadena de seguridad entre el pulsador y el contactor, y no dar por " +
+      "detenida la máquina mientras haya carga.",
+  },
+  {
+    id: "variador-en-falla-y-sigue-mandando",
+    titulo: "El variador declara falla y el motor sigue en carga",
+    severidad: "critico",
+    necesita: ["fallaVariador", "cargaMotor"],
+    cuando: (v, ctx) => ctx.impulsando && v.fallaVariador === true,
+    evidencia: (v) =>
+      `El variador reporta falla activa y el motor sigue con una carga del ` +
+      `${v.cargaMotor.toFixed(1)} %.`,
+    consecuencia:
+      "Un variador en falla no está gobernando el motor como cree el automatismo: la carga que " +
+      "se lee puede no corresponder a la consigna, y sus protecciones pueden no estar activas.",
+    accion: "Leer el código de falla en el variador antes de reponerlo, y ver qué lo mantiene en carga.",
+  },
+  {
+    /*
+     * ── LA QUE ENSEÑA EL DESACUERDO, SIN RESOLVERLO ────────────────
+     *
+     * Las tres de arriba cruzan alarma con estado de máquina. Ésta cruza la
+     * alarma con NUESTRO umbral para la misma magnitud, y no decide quién
+     * tiene razón: la cabecera de este archivo ya dice que gana la alarma.
+     * Lo que hace es DECIR que discrepan, que hoy no lo dice nadie.
+     *
+     * Es el mismo criterio que `hayConflicto()` aplica entre las fuentes de
+     * un diagnóstico (`backend/ia/motor/diagnostico.mjs`): enseñar el
+     * desacuerdo es el trabajo, no resolverlo.
+     *
+     * Y es la regla que habría cazado el incidente del 14-09-2026 sin esperar
+     * a que alguien lo midiera a mano: `presionRelativa.avisoMax` estaba en
+     * 5,5 mientras la operación sana llegaba a 6,74, así que nuestro umbral
+     * gritaba «sobrepresión» con la alarma del PLC callada. Esa discrepancia
+     * llevaba semanas delante y no había nada que la nombrara.
+     *
+     * Severidad `atencion` y no `critico` a propósito: lo que está en duda es
+     * un umbral, no la máquina. Decirlo crítico sería darle a una
+     * discrepancia de configuración el mismo peso que a una emergencia.
+     */
+    id: "alarma-de-proceso-sin-respaldo-analogico",
+    titulo: "La alarma de presión del PLC y nuestra medida no coinciden",
+    severidad: "atencion",
+    necesita: ["presionAlta", "presionRelativa"],
+    cuando: (v) =>
+      v.presionAlta === true && v.presionRelativa < lim("presionRelativa", "avisoMax"),
+    evidencia: (v) =>
+      `El PLC tiene activa la alarma de presión alta y la lectura es ` +
+      `${v.presionRelativa.toFixed(2)}, por debajo de nuestro umbral de aviso ` +
+      `(${lim("presionRelativa", "avisoMax")}).`,
+    datos: () => ({ avisoPresion: lim("presionRelativa", "avisoMax") }),
+    consecuencia:
+      "La alarma del PLC y el umbral de este tablero no describen la misma instalación. La " +
+      "alarma manda —la puso quien conoce el proceso—, así que lo más probable es que el " +
+      "umbral de aquí esté mal calibrado.",
+    accion:
+      "Contrastar el límite configurado en el PLC con el de este tablero antes de fiarse de " +
+      "las bandas de presión.",
+    nota: "Nuestros umbrales de presión siguen siendo una estimación, no un dato de la instalación.",
+  },
+
   {
     id: "agua-caliente",
     titulo: "Temperatura del agua alta",

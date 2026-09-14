@@ -449,6 +449,83 @@ export const CAUSAS_POR_RIESGO = {
     }),
   ],
 
+  /*
+   * ── LAS CAUSAS DE LOS CRUCES CON ALARMA (PLAN 29 F3) ──────────────
+   *
+   * Las cuatro reglas nuevas de `riesgos.js` no preguntan «¿hay alarma?» sino
+   * «¿la alarma y el estado de la máquina se contradicen?». Sus causas siguen
+   * esa misma forma: lo que puede fallar cuando el PLC ya detectó algo y la
+   * máquina no se enteró. Todas transcritas de la `accion`/`consecuencia` de
+   * su regla, como el resto del archivo.
+   */
+  "nivel-critico-con-bomba-impulsando": [
+    causaTanque({
+      id: "enclavamiento-nivel-alto-puenteado",
+      titulo: "El enclavamiento por nivel alto-alto está puenteado o deshabilitado",
+      componente: "Enclavamiento de nivel alto-alto",
+      terminosManual: ["enclavamiento", "puente", "bypass", "nivel alto alto"],
+      riesgoId: "nivel-critico-con-bomba-impulsando",
+    }),
+    causaTanque({
+      id: "bomba-mandada-en-manual",
+      titulo: "Alguien manda la bomba en manual, por fuera del automatismo",
+      componente: "Mando de la bomba / modo del variador",
+      terminosManual: ["manual", "mando local", "automatismo"],
+      riesgoId: "nivel-critico-con-bomba-impulsando",
+    }),
+  ],
+
+  "emergencia-con-motor-en-carga": [
+    causaTanque({
+      id: "cadena-de-seguridad-interrumpida",
+      titulo: "La cadena de seguridad no llega al contactor",
+      componente: "Cadena de seguridad / contactor de potencia",
+      terminosManual: ["cadena de seguridad", "contactor", "paro de emergencia", "rele"],
+      riesgoId: "emergencia-con-motor-en-carga",
+    }),
+    causaTanque({
+      id: "lectura-de-emergencia-invertida",
+      titulo: "La polaridad del contacto de emergencia no es la que damos por buena",
+      componente: "Pulsador de emergencia / cableado del contacto",
+      terminosManual: ["normalmente cerrado", "polaridad", "contacto", "cableado"],
+      riesgoId: "emergencia-con-motor-en-carga",
+    }),
+  ],
+
+  "variador-en-falla-y-sigue-mandando": [
+    causaTanque({
+      id: "falla-del-variador-sin-reponer",
+      titulo: "El variador tiene una falla activa sin reponer",
+      componente: "Variador de frecuencia",
+      terminosManual: ["falla", "reposicion", "reset", "codigo de fallo"],
+      riesgoId: "variador-en-falla-y-sigue-mandando",
+    }),
+    causaTanque({
+      id: "motor-alimentado-por-fuera-del-variador",
+      titulo: "El motor recibe tensión por una vía que no pasa por el variador",
+      componente: "Maniobra de potencia / by-pass del variador",
+      terminosManual: ["by-pass", "maniobra", "arranque directo", "contactor"],
+      riesgoId: "variador-en-falla-y-sigue-mandando",
+    }),
+  ],
+
+  "alarma-de-proceso-sin-respaldo-analogico": [
+    causaTanque({
+      id: "umbral-del-tablero-mal-calibrado",
+      titulo: "El umbral de presión de este tablero no es el de la instalación",
+      componente: "Umbrales de la instalación",
+      terminosManual: ["umbral", "calibracion", "rango de servicio", "presion"],
+      riesgoId: "alarma-de-proceso-sin-respaldo-analogico",
+    }),
+    causaTanque({
+      id: "alarma-y-medida-de-puntos-distintos",
+      titulo: "La alarma y la lectura no miden el mismo punto de la red",
+      componente: "Instrumentación de presión",
+      terminosManual: ["punto de medida", "transmisor", "toma de presion"],
+      riesgoId: "alarma-de-proceso-sin-respaldo-analogico",
+    }),
+  ],
+
   "agua-caliente": [
     causaTanque({
       id: "aporte-termico-externo",

@@ -30,6 +30,7 @@ import assert from 'node:assert/strict'
 import { createSistema } from '../shared/eva/tanque/sistema.js'
 import { evaluarRiesgos, preguntaSobreRiesgo, REGLAS } from '../shared/eva/tanque/riesgos.js'
 import { REPOSO, UMBRALES } from '../shared/eva/comun/umbrales.js'
+import { SENALES } from '../shared/eva/tanque/senales.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -300,11 +301,31 @@ check('la pregunta al asistente lleva la evidencia ya medida', () => {
 check('todas las reglas declaran las señales que necesitan', () => {
   // Sin `necesita` bien puesto, una regla se evaluaría con `undefined` dentro y
   // produciría un aviso a partir de una comparación con un hueco.
-  const claves = new Set(Object.keys(UMBRALES))
+  /*
+   * ── SE PREGUNTA AL CATÁLOGO, NO A `UMBRALES` (PLAN 29 F3) ─────────
+   *
+   * Esto miraba `Object.keys(UMBRALES)`, y funcionó mientras todas las reglas
+   * comparaban magnitudes con banda. Las cuatro reglas de cruce con alarma
+   * necesitan bits del PLC (`nivelAltoAlto`, `paroDeEmergencia`,
+   * `fallaVariador`, `presionAlta`) y las ocho alarmas NO están en `UMBRALES`
+   * — no por olvido: una alarma booleana no tiene banda que declarar, es
+   * exactamente lo que dice la cabecera de ese archivo («las señales booleanas
+   * no tienen banda y valen `null` entero»).
+   *
+   * Que `modoVdf` sí figure allí, con `null` explícito, es lo que mantuvo la
+   * comprobación en pie hasta hoy: era la única booleana que una regla
+   * necesitaba.
+   *
+   * Lo que esta prueba quiere saber es si la señal EXISTE, y eso lo define
+   * `SENALES`, que es el catálogo. `UMBRALES` sólo dice qué banda tiene la que
+   * ya existe. Preguntar al archivo correcto es además más estricto: una regla
+   * que pida una clave inventada sigue fallando, y ahora también falla si pide
+   * una que tenga umbral pero no esté en el catálogo.
+   */
   for (const regla of REGLAS) {
     assert.ok(Array.isArray(regla.necesita) && regla.necesita.length, `${regla.id} sin necesita`)
     for (const k of regla.necesita) {
-      assert.ok(claves.has(k), `${regla.id} necesita "${k}", que no es una señal conocida`)
+      assert.ok(k in SENALES, `${regla.id} necesita "${k}", que no es una señal conocida`)
     }
   }
 })
@@ -397,6 +418,101 @@ check('sin la lectura de caudal se declara no evaluable, no silencio', () => {
   assert.ok(!ids(res).includes('bomba-sin-salida'))
   assert.ok(idsNoEval(res).includes('bomba-sin-salida'),
     'tiene que constar que no se pudo mirar')
+})
+
+/* ── El cruce con las alarmas del PLC, Plan 29 F3 ────────────────────── */
+
+console.log('\n── El cruce con las alarmas del PLC (Plan 29 F3) ──────────')
+
+/*
+ * Estas cuatro reglas NO son un sistema de alarmas —la cabecera de
+ * `riesgos.js` lo prohíbe—: disparan cuando la alarma del PLC y el estado de
+ * la máquina se CONTRADICEN. Por eso cada una se prueba dos veces: con la
+ * contradicción y sin ella. Que calle cuando la alarma está activa y la
+ * máquina hace lo que debe es la mitad del valor de la regla.
+ */
+
+check('nivel crítico con la bomba impulsando es CRÍTICO', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, nivelAltoAlto: true }))
+  assert.ok(ids(res).includes('nivel-critico-con-bomba-impulsando'))
+})
+
+check('la misma alarma con la bomba PARADA no cruza nada', () => {
+  // El PLC sigue avisando del nivel —y su vista lo pinta—, pero aquí no hay
+  // contradicción que enseñar: nadie está llenando.
+  const res = evaluarRiesgos(sistemaCon({ ...PARADA, nivelAltoAlto: true }))
+  assert.ok(!ids(res).includes('nivel-critico-con-bomba-impulsando'))
+})
+
+check('sin la alarma de nivel, la regla se declara no evaluable', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, nivelAltoAlto: null }))
+  assert.ok(idsNoEval(res).includes('nivel-critico-con-bomba-impulsando'),
+    'tiene que constar que no se pudo mirar, no callar')
+})
+
+check('el paro de emergencia se lee INVERTIDO: `false` es la condición mala', () => {
+  /*
+   * Contacto normalmente cerrado, confirmado contra el programa real el
+   * 10-09-2026: `true` es «sin emergencia». Si esta comprobación se
+   * invirtiera, la regla avisaría en toda operación normal y callaría en la
+   * única situación que existe para cazar.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, paroDeEmergencia: false }))
+  assert.ok(ids(res).includes('emergencia-con-motor-en-carga'))
+})
+
+check('con el paro SIN accionar (`true`) no se avisa de nada', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, paroDeEmergencia: true }))
+  assert.ok(!ids(res).includes('emergencia-con-motor-en-carga'))
+})
+
+check('variador en falla con el motor en carga es CRÍTICO', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, fallaVariador: true }))
+  assert.ok(ids(res).includes('variador-en-falla-y-sigue-mandando'))
+})
+
+check('variador en falla con el motor PARADO no cruza nada', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...PARADA, fallaVariador: true }))
+  assert.ok(!ids(res).includes('variador-en-falla-y-sigue-mandando'))
+})
+
+check('alarma de presión del PLC con nuestra lectura en banda: se enseña el desacuerdo', () => {
+  /*
+   * La que habría cazado el incidente del 14-09-2026 sin medirlo a mano.
+   * `presionRelativa: 3` está muy por debajo del `avisoMax` de 7,2, así que
+   * nuestro umbral dice «normal» mientras el PLC grita.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, presionAlta: true, presionRelativa: 3 }))
+  assert.ok(ids(res).includes('alarma-de-proceso-sin-respaldo-analogico'))
+})
+
+check('cuando alarma y medida COINCIDEN, no hay desacuerdo que contar', () => {
+  // Presión por encima de nuestro aviso y alarma activa: las dos dicen lo
+  // mismo. Avisar aquí sería ruido, y encima duplicaría a `sobrepresion`.
+  const res = evaluarRiesgos(sistemaCon({
+    ...EN_MARCHA, presionAlta: true, presionRelativa: UMBRALES.presionRelativa.avisoMax + 0.5,
+  }))
+  assert.ok(!ids(res).includes('alarma-de-proceso-sin-respaldo-analogico'))
+})
+
+check('ninguna regla de cruce dispara en una instalación sana', () => {
+  /*
+   * La comprobación que protege de un falso positivo permanente: con las
+   * cuatro alarmas en su estado bueno, ninguna de las cuatro puede aparecer.
+   * `paroDeEmergencia: true` es el estado BUENO — ver arriba.
+   */
+  const res = evaluarRiesgos(sistemaCon({
+    ...EN_MARCHA,
+    nivelAltoAlto: false, paroDeEmergencia: true, fallaVariador: false, presionAlta: false,
+  }))
+  for (const id of [
+    'nivel-critico-con-bomba-impulsando',
+    'emergencia-con-motor-en-carga',
+    'variador-en-falla-y-sigue-mandando',
+    'alarma-de-proceso-sin-respaldo-analogico',
+  ]) {
+    assert.ok(!ids(res).includes(id), `${id} no puede disparar con todo en orden`)
+  }
 })
 
 /* ── Resultado ───────────────────────────────────────────────────────── */

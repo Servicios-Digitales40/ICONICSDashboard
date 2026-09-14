@@ -123,13 +123,40 @@ Nueve. Cada una con la evidencia de que no inventa nada.
 
 ### A — Sobre alarmas nativas
 
-| id | Condición | Severidad | De dónde sale |
+> ── REDISEÑADO EL 14-09-2026, AL LEER `estado.js` Y `AlarmasEva` ────
+>
+> La propuesta original era escribir cinco reglas que dispararan con el bit:
+> `nivelAltoAlto === true` → riesgo crítico. **Eso estaba mal**, y lo dice la
+> propia cabecera de `riesgos.js`:
+>
+> > *NO es un sistema de alarmas. Las alarmas de esta instalación están en el
+> > servidor —once, con límites puestos por quien conoce el proceso— y mandan
+> > sobre cualquier cosa que se calcule aquí. Esto es una capa de anticipación
+> > ENCIMA.*
+>
+> Y además ya están cubiertas dos veces: `estadoDeSenal()` juzga las ocho con
+> su `estadoActivo` desde el Plan 27 F3, y `AlarmasEva` pinta sus eventos con
+> flancos desde `eventosDeAlarma.js`. Una regla que sólo repita el bit
+> duplicaría las dos y añadiría un tercer sitio donde la misma alarma puede
+> decir algo distinto.
+>
+> **Lo que sí es nuevo, y es lo que este bloque escribe: el CRUCE.** Una alarma
+> sola ya la cuenta el servidor. Lo que nadie dice hoy es qué significa una
+> alarma activa JUNTO A un estado de máquina — y eso es exactamente la
+> definición de este archivo («los problemas viven en las COMBINACIONES»).
+
+| id | Condición | Severidad | Qué añade sobre la alarma sola |
 |---|---|---|---|
-| `emergencia-activa` | `paroDeEmergencia` en condición mala | crítico | `estadoActivo` de la señal; `invertida` confirmada 10-09-2026 |
-| `variador-en-falla` | `fallaVariador === true` | crítico | `estadoActivo: "critico"` declarado |
-| `nivel-critico-alto` | `nivelAltoAlto === true` | crítico | `estadoActivo: "critico"` + nota «Riesgo de derrame» |
-| `nivel-critico-bajo` | `nivelBajoBajo === true` | crítico | `estadoActivo: "critico"` |
-| `alarma-de-proceso-activa` | `presionAlta`/`faltaDePresion`/`bajoFlujo` | crítico | `estadoActivo` de cada una |
+| `nivel-critico-con-bomba-impulsando` | `nivelAltoAlto` activa **y** `impulsando` | crítico | La alarma dice que el nivel es crítico; esto dice que además nadie ha parado la bomba |
+| `emergencia-con-motor-en-carga` | `paroDeEmergencia` en condición mala **y** `cargaMotor` por encima de reposo | crítico | El paro está pedido y el motor sigue consumiendo: el corte no llegó al accionamiento |
+| `variador-en-falla-y-sigue-mandando` | `fallaVariador` activa **y** `impulsando` | crítico | El variador declara falla y aun así hay carga en el motor |
+| `alarma-de-proceso-sin-respaldo-analogico` | alguna de `presionAlta`/`faltaDePresion`/`bajoFlujo` activa **y** su señal analógica en banda nominal | atención | Alarma y medida se contradicen: o el umbral del PLC o el nuestro está mal. Hoy nadie lo cruza |
+
+La cuarta es la más valiosa y la que mejor encaja con «gana la alarma»: **no
+decide quién tiene razón**, sólo enseña el desacuerdo — el mismo criterio que
+`hayConflicto()` aplica entre fuentes del diagnóstico. Y es la que habría
+cazado el incidente del 14-09-2026 (`presionRelativa.avisoMax` en 5,5 mientras
+la operación sana llegaba a 6,74) sin esperar a que alguien lo midiera a mano.
 
 > **DECIDIDO el 14-09-2026: una sola regla con tres causas**, no tres reglas.
 > El objetivo del plan es que el motor pueda DESEMPATAR, y tres reglas
@@ -250,11 +277,49 @@ Riesgos tocados: `posible-fuga`, `derrame`, `marcha-en-seco`,
 **Pruebas:** `verificar-catalogo.mjs`, `verificar-diagnostico.mjs`,
 `verificar-riesgos.mjs`.
 
-### F2 — Firmas temporales transcribibles
+### F2 — Firmas temporales transcribibles — **BLOQUEADA**
+
 Las cuatro de §5, cada una con su justificación transcrita en comentario, al
 estilo de `sin-recirculacion-minima`. **Precedido de medir** si esas señales
 tienen serie suficiente en las ventanas propuestas.
-**Pruebas:** `verificar-temporal.mjs`, `verificar-diagnostico.mjs`.
+
+> ── BLOQUEADA EL 14-09-2026: EL HISTORIADOR NO SIRVE ────────────────
+>
+> `node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs` no
+> devuelve una sola muestra. Hay red y la autenticación funciona —el servidor
+> contesta—, pero el historial se niega de dos maneras distintas:
+>
+>   · **HTTP 500** en las analógicas (`NIVEL_TANQUE`, `FLUJO_INSTANTANEO`,
+>     `PRESION_RELATIVA`, `KPIEFICIENCIA_ENERGETICA`…), con `traceId` distinto
+>     en cada una.
+>   · **Timeout a los 15 s** en las ocho alarmas de `ALARMAS/`. El propio
+>     cliente ya lo interpreta: «suele ser un servidor de planta saturado, no
+>     caído: acepta la conexión y no contesta».
+>
+> No es una regresión nuestra: `verificar-antiguedad-historico.mjs` no se toca
+> desde el Plan 18, y el 02-09-2026 este mismo guion midió historia contigua
+> desde el 18-08.
+>
+> **Por qué eso bloquea la fase y no sólo la retrasa.** Las cuatro firmas
+> propuestas usan ventanas de 2 h, 6 h y 24 h. `temporal.mjs` tiene medido que
+> **27 de 36 ventanas de 1 h no reunían ni `PUNTOS_MINIMOS`** porque el
+> historiador sólo guarda densidad de 15 min en las horas recientes. Una
+> ventana de 24 h es MÁS vulnerable a eso, no menos. Declarar las cuatro firmas
+> sin medir sería escribir cuatro términos que salen en 0 y no lo sabríamos:
+> el mismo defecto que `presionRelativa.avisoMax` —un número plausible que no
+> podía dispararse jamás— con otro disfraz.
+>
+> **Qué hace falta para desbloquearla:** que el historiador vuelva a servir, y
+> volver a correr la sonda. Entonces se mide, por señal y por ventana, cuántos
+> puntos hay, y se declaran sólo las firmas que tengan serie detrás.
+>
+> **Lo que NO se hace mientras tanto:** declararlas «provisionalmente» para no
+> dejar la fase vacía. Una firma sin serie no falla ruidosamente — se queda en
+> silencio, que es indistinguible de «esta causa no tiene tendencia», y
+> contamina el cuarto término justo en la fuente que más discrimina.
+
+**Pruebas (cuando se desbloquee):** `verificar-temporal.mjs`,
+`verificar-diagnostico.mjs`.
 
 ### F3 — Reglas sobre alarmas nativas (bloque A)
 Cinco reglas + sus causas. Toca `riesgos.js` y `causas.js`.
