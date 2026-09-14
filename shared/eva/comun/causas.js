@@ -209,6 +209,28 @@ export const CAUSAS_POR_RIESGO = {
 
   /* ── Tanque ───────────────────────────────────────────────────────── */
 
+  /*
+   * ── «EL CORTE NO VE» Y «VE Y NADIE ACTÚA» NO SON LA MISMA AVERÍA ──
+   *
+   * Plan 29 F1. La `accion` de esta regla pide dos cosas, no una: «Confirmar
+   * que el corte por nivel alto está operativo Y QUE EL LAZO DE CONTROL
+   * RESPONDE». Son dos puntos de fallo en serie, y hasta el 14-09-2026 los
+   * cubría una causa sola.
+   *
+   * Lo que permite separarlos por fin son las alarmas nativas del PLC
+   * (`nivelAlto` / `nivelAltoAlto`), historizadas y con su polaridad
+   * confirmada contra Lista-variables.pdf §1.10. El técnico las contrasta con
+   * el nivel medido:
+   *
+   *   nivel alto + alarma INACTIVA  → el corte no ve. Falla la detección.
+   *   nivel alto + alarma ACTIVA    → el corte ve y la bomba sigue. Falla la
+   *                                   actuación, no la medida.
+   *
+   * Es una distinción que NINGUNA firma temporal podía dar —las dos cursan
+   * con el mismo nivel subiendo— y por eso se apoya en un bit del PLC y no en
+   * una tendencia. Ver `backend/ia/motor/temporal.mjs` sobre qué discrimina
+   * cada fuente.
+   */
   derrame: [
     causaTanque({
       id: "corte-nivel-alto-no-actua",
@@ -217,8 +239,40 @@ export const CAUSAS_POR_RIESGO = {
       terminosManual: ["nivel alto", "corte", "enclavamiento", "lazo de control"],
       riesgoId: "derrame",
     }),
+    causaTanque({
+      id: "lazo-de-control-no-responde",
+      titulo: "El lazo de control no responde aunque la alarma de nivel está activa",
+      componente: "Lazo de control / mando de la bomba",
+      terminosManual: ["lazo de control", "mando", "no responde", "enclavamiento"],
+      riesgoId: "derrame",
+    }),
+    causaTanque({
+      id: "aporte-externo-no-controlado",
+      titulo: "Entra agua al tanque por una vía que el control no gobierna",
+      componente: "Circuito de llenado / electroválvula superior",
+      terminosManual: ["llenado", "aporte", "electrovalvula", "entrada de agua"],
+      riesgoId: "derrame",
+    }),
   ],
 
+  /*
+   * ── LAS DOS CAUSAS CURSAN IGUAL EN EL NIVEL; LA ALARMA LAS SEPARA ──
+   *
+   * Plan 29 F1. Estas dos existían desde el Plan 16 y no había forma de
+   * desempatarlas: las dos cursan con `nivelTanque` bajando, así que `datos`
+   * es el mismo para ambas —verdad física— y una `firmaTemporal` sobre el
+   * nivel tampoco las distinguiría (se auditó el 14-09-2026 y se descartó por
+   * eso, en vez de declarar una firma que no discrimina).
+   *
+   * Lo que sí las separa es `nivelBajoBajo`, la alarma nativa del PLC:
+   *
+   *   nivel bajo + alarma ACTIVA   → la protección hizo su trabajo y el nivel
+   *                                  es real: falta agua. → `nivel-real-insuficiente`
+   *   nivel bajo + alarma INACTIVA → el nivel está bajo y la protección no lo
+   *                                  ve. → `proteccion-nivel-bajo-no-actua`
+   *
+   * Mismo mecanismo que en `derrame`, en el otro extremo del tanque.
+   */
   "marcha-en-seco": [
     causaTanque({
       id: "nivel-real-insuficiente",
@@ -298,12 +352,46 @@ export const CAUSAS_POR_RIESGO = {
     }),
   ],
 
+  /*
+   * ── TRES MECANISMOS QUE ESTABAN EN UNA SOLA FRASE (PLAN 29 F1) ────
+   *
+   * La `consecuencia` de esta regla dice, literal: «compatible con fuga,
+   * rotura o UNA SALIDA QUEDADA ABIERTA». Son dos mecanismos distintos —una
+   * pérdida no querida y una salida abierta a propósito que nadie cerró— y
+   * hasta el 14-09-2026 los cubría una sola causa que los agrupaba. Agrupados
+   * no se pueden desempatar, que es justo lo que el diagnóstico tiene que
+   * hacer: no se revisa igual una red buscando una rotura que un colector
+   * comprobando qué válvula quedó abierta.
+   *
+   * La tercera no sale de la `consecuencia` sino de la `nota` de la propia
+   * regla —«El umbral de "hay presión" todavía es una estimación nuestra»— y
+   * es la que más falta hacía. El 14-09-2026 se midió que `flujoInstantaneo.
+   * avisoMax` estaba en 45 cuando esta instalación no pasa de ~21 L/min: la
+   * regla no podía dispararse JAMÁS. Corregido el umbral, la primera vez que
+   * dispare hay que poder decir «esto también puede ser que el umbral siga sin
+   * calibrar», en vez de mandar a alguien a recorrer la red por un número
+   * nuestro.
+   */
   "posible-fuga": [
     causaTanque({
       id: "fuga-o-rotura-en-la-red",
       titulo: "Fuga, rotura o salida abierta en la red",
       componente: "Red de distribución",
       terminosManual: ["fuga", "rotura", "descarga anomala"],
+      riesgoId: "posible-fuga",
+    }),
+    causaTanque({
+      id: "salida-quedada-abierta",
+      titulo: "Una salida de la red quedó abierta",
+      componente: "Válvulas de salida / colector de distribución",
+      terminosManual: ["valvula abierta", "salida", "colector", "purga"],
+      riesgoId: "posible-fuga",
+    }),
+    causaTanque({
+      id: "umbral-de-presion-sin-calibrar",
+      titulo: "El umbral de presión baja todavía es una estimación nuestra",
+      componente: "Umbrales de la instalación",
+      terminosManual: ["presion minima", "calibracion", "rango de servicio"],
       riesgoId: "posible-fuga",
     }),
   ],
@@ -330,6 +418,20 @@ export const CAUSAS_POR_RIESGO = {
     }),
   ],
 
+  /*
+   * ── `fallaVariador` DICE CUÁL DE LAS DOS ES (PLAN 29 F1) ──────────
+   *
+   * Otro par que cursaba idéntico: la tensión se sale de rango igual venga el
+   * problema de fuera o esté mal ajustada la protección de dentro. La alarma
+   * nativa del variador lo desempata, porque dice si el equipo SE ENTERÓ:
+   *
+   *   tensión fuera + `fallaVariador` INACTIVA → el variador recibe mal de
+   *       fuera y no protesta. Lo que falla está aguas arriba de él.
+   *       → `problema-en-el-suministro`
+   *   tensión fuera + `fallaVariador` ACTIVA   → el variador SÍ lo detectó.
+   *       Si aun así el motor siguió en carga, lo que falla es el ajuste de
+   *       sus protecciones. → `protecciones-variador-mal-ajustadas`
+   */
   "tension-fuera-con-motor": [
     causaTanque({
       id: "problema-en-el-suministro",

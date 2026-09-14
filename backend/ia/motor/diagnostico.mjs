@@ -430,7 +430,14 @@ function fuenteDominante(respaldo) {
  * modelo lo narre y la UI lo muestre, en vez de fingir que todo apunta al
  * mismo sitio.
  */
-function hayConflicto(causas) {
+/*
+ * EXPORTADA para `verificar-diagnostico.mjs` (Plan 29 F1). La prueba de «con
+ * una sola causa no hay conflicto» se apoyaba en que `derrame` tuviera
+ * exactamente una causa en el catálogo, y se puso en rojo al añadirle las dos
+ * que le faltaban — sin que este archivo cambiara. Probar la guarda
+ * directamente la desacopla de cuántas causas declare `causas.js` hoy.
+ */
+export function hayConflicto(causas) {
   if (causas.length < 2) return false
   const primera = fuenteDominante(causas[0].respaldo)
   const segunda = fuenteDominante(causas[1].respaldo)

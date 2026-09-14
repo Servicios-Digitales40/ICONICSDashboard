@@ -88,6 +88,14 @@
       "titulo": "The automatic high-level cut-out is not acting",
       "componente": "High-level control loop"
     },
+    "lazo-de-control-no-responde": {
+      "titulo": "The control loop is not responding although the level alarm is active",
+      "componente": "Control loop / pump command"
+    },
+    "aporte-externo-no-controlado": {
+      "titulo": "Water is entering the tank through a path the control does not govern",
+      "componente": "Filling circuit / upper solenoid valve"
+    },
     "nivel-real-insuficiente": {
       "titulo": "The actual tank level is insufficient",
       "componente": "Water supply to the tank"
@@ -123,6 +131,14 @@
     "fuga-o-rotura-en-la-red": {
       "titulo": "Leak, burst or an outlet left open in the network",
       "componente": "Distribution network"
+    },
+    "salida-quedada-abierta": {
+      "titulo": "An outlet of the network was left open",
+      "componente": "Outlet valves / distribution manifold"
+    },
+    "umbral-de-presion-sin-calibrar": {
+      "titulo": "The low-pressure threshold is still an estimate of ours",
+      "componente": "Installation thresholds"
     },
     "impulsor-desgastado": {
       "titulo": "Worn impeller",

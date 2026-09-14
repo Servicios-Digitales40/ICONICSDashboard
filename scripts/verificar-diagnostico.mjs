@@ -578,10 +578,31 @@ await check('cuando la misma fuente respalda a las dos, no hay conflicto que ens
 })
 
 await check('con una sola causa candidata, no hay con qué entrar en conflicto', async () => {
-  // `derrame` sólo tiene una causa transcrita (`corte-nivel-alto-no-actua`).
-  const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'derrame' })
-  assert.equal(resultado.causas.length, 1)
-  assert.equal(resultado.conflicto, false)
+  /*
+   * ── POR QUÉ ESTA PRUEBA YA NO NOMBRA UN RIESGO CONCRETO ───────────
+   *
+   * Nombraba `derrame`, «que sólo tiene una causa transcrita». El Plan 29 F1
+   * le añadió dos —el corte que no ve y el lazo que no responde son averías
+   * distintas— y esta prueba se puso en rojo sin que nada del motor hubiera
+   * cambiado: afirmaba `causas.length === 1`, que es un dato del CATÁLOGO, no
+   * una propiedad del motor.
+   *
+   * Hoy NINGÚN riesgo del tanque tiene una sola causa, y eso es precisamente
+   * lo que el Plan 29 perseguía. Buscar otro riesgo de una causa para seguir
+   * apoyándose en él sería volver a atar la prueba a una cifra que el
+   * catálogo puede cambiar mañana — y la próxima vez tampoco estaría roto
+   * nada.
+   *
+   * Lo que esta prueba defiende es la guarda `causas.length < 2` de
+   * `hayConflicto()`, así que se construye el caso en vez de buscarlo: un
+   * riesgo real, filtrado a su primera causa. Si el catálogo crece o mengua,
+   * esto sigue diciendo lo mismo.
+   */
+  const completo = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'derrame' })
+  assert.ok(completo.causas.length >= 1, 'el riesgo de apoyo tiene que tener causas')
+
+  const { hayConflicto } = await import('../backend/ia/motor/diagnostico.mjs')
+  assert.equal(hayConflicto(completo.causas.slice(0, 1)), false)
 })
 
 await check('un riesgo huérfano no tiene conflicto (ni causas que comparar)', async () => {
