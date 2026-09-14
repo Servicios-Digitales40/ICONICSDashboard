@@ -12,6 +12,7 @@
  * se llama su fallo.
  */
 import { logger } from '../logger.mjs'
+import { isGoodQuality } from '../../shared/quality.js'
 
 const JSON_CONTENT_TYPE = 'application/json'
 const NOT_CONFIGURED = Object.freeze({
@@ -29,6 +30,36 @@ const CONTINUATION_HEADER = 'X-ICO-CONTINUATION'
 async function parsePayload(response) {
   const contentType = response.headers.get('content-type') ?? ''
   return contentType.includes(JSON_CONTENT_TYPE) ? response.json() : response.text()
+}
+
+/**
+ * ¿Esto es la página de login de OIDC en vez de una lectura? (B9)
+ *
+ * ── EL INCIDENTE QUE ESTO EXISTE PARA NO REPETIR ───────────────────
+ *
+ * Medido el 11-09-2026 en un puente con 7 h 53 min de marcha. La sesión había
+ * caducado DEL LADO DE ICONICS, y el servidor dejó de contestar datos para
+ * empezar a contestar esto, con un 200 y su `<form action=".../connect/authorize">`:
+ *
+ *     {"ok": true, "status": 200,
+ *      "payload": "<html><head><title>Working...</title></head>…"}
+ *
+ * Como petición HTTP salió bien, así que el sobre decía `ok: true` y el HTML
+ * viajaba como si fuera el valor de un punto. El tablero se quedaba en «Sin
+ * dato» y la pantalla de Salud decía «token válido», porque `hasValidToken()`
+ * comprueba NUESTRO reloj y nunca al servidor. Es el modo de fallo del §2.4
+ * del CLAUDE.md —un servidor que contesta y no dice nada— y encima el
+ * diagnóstico que daba la pantalla era el equivocado.
+ *
+ * Se mira aquí y no en cada operación porque toda salida pasa por `request()`.
+ * Dos señales, y hacen falta las dos: que el cuerpo sea texto (el JSON de una
+ * lectura nunca lo es) y que lleve la marca del flujo de autorización. Con una
+ * sola, un manual que hablara de `connect/authorize` o un error en texto plano
+ * caerían aquí por error.
+ */
+function esPaginaDeReautenticacion(payload) {
+  if (typeof payload !== 'string') return false
+  return /connect\/authorize|signin-oidc/i.test(payload)
 }
 
 function toErrorMessage(error) {
@@ -70,6 +101,8 @@ export function createIconicsClient(config, authenticator) {
   const {
     maxUpstreamItems, healthTimeoutMs, upstreamTimeoutMs, batchCacheTtlMs,
     maxHistoryPaginas, maxHistoryMs,
+    historyCacheTtlMs, historyCacheMax, historyCacheMargenMs,
+    writeConfirmIntentos, writeConfirmEsperaMs,
   } = config.limits
 
   /**
@@ -151,6 +184,30 @@ export function createIconicsClient(config, authenticator) {
         )
         return { ok: false, status: response.status, error: failure, payload }
       }
+      /*
+       * Un 200 que en realidad es el login NO es una lectura (B9).
+       *
+       * Va DESPUÉS del `!response.ok` a propósito: el servidor lo manda con
+       * 200, así que por esa rama no cae. Y sale como fallo —no como sobre
+       * bueno con HTML dentro— porque lo que hay que hacer con él es
+       * reautenticar, no pintarlo. El 401 es lo que el servidor debería haber
+       * contestado, y lo que hace que quien llame lo trate como lo que es.
+       */
+      if (esPaginaDeReautenticacion(payload)) {
+        logger.error(
+          `ICONICS devolvió la página de reautenticación en vez de datos para ` +
+            `${event ?? 'la petición'}: la sesión caducó del lado del servidor. ` +
+            'Las lecturas seguirán vacías hasta que se renueve el token.',
+          { ...meta, status: response.status, durationMs }
+        )
+        return {
+          ok: false,
+          status: 401,
+          error: 'ICONICS pide reautenticación: la sesión caducó del lado del servidor.',
+          reautenticacion: true,
+        }
+      }
+
       return { ok: true, status: response.status, payload, headers: response.headers }
     } catch (error) {
       const ms = Date.now() - startedAt
@@ -214,6 +271,61 @@ export function createIconicsClient(config, authenticator) {
   }
 
   /**
+   * Cómo fue la última lectura en vivo que salió de verdad al servidor.
+   *
+   * ── QUÉ PROBLEMA RESUELVE ESTO ─────────────────────────────────────
+   *
+   * `ping()` demuestra que `/echo` contesta, y con eso `/api/health` decía que
+   * el origen de datos «funciona». Pero un servidor que contesta y no entrega
+   * un solo valor da exactamente la misma respuesta a `ping()` que uno sano —y
+   * eso pasó: la pantalla de salud se quedó en verde mientras la planta no
+   * mandaba datos. Contestar no es lo mismo que entregar.
+   *
+   * Aquí se apunta lo que sólo se sabe al leer de verdad: cuándo fue la última
+   * lectura, cuántos puntos trajeron valor y cuántos con calidad aceptable.
+   *
+   * ── `null` NO ES CERO ──────────────────────────────────────────────
+   *
+   * `instante: null` significa «todavía nadie ha pedido una lectura», que es
+   * el estado normal de un puente recién arrancado con ninguna pantalla
+   * abierta. Es una situación distinta de «hace once minutos que no llega un
+   * valor», y confundirlas pintaría de rojo un arranque sano (§2.4).
+   */
+  let ultimaLectura = null
+  let ultimoFalloDeLectura = null
+
+  /** Lo que `/api/health` necesita para poder decir la verdad sobre los datos. */
+  function estadoLecturas() {
+    return { ultima: ultimaLectura, ultimoFallo: ultimoFalloDeLectura }
+  }
+
+  /**
+   * Apunta el resultado de una lectura en lote.
+   *
+   * Cuenta sobre los puntos PEDIDOS y no sobre los devueltos: un punto que el
+   * servidor omite es justo el caso que hay que ver, y contando sólo lo que
+   * llegó saldría 8 de 8 con la mitad de las señales ausentes.
+   */
+  function apuntarLectura(pointNames, byPointName) {
+    let conValor = 0
+    let conCalidadBuena = 0
+
+    for (const punto of pointNames) {
+      const dato = byPointName[punto]?.payload
+      if (!dato) continue
+      if (dato.value !== undefined && dato.value !== null) conValor++
+      if (isGoodQuality(dato.quality)) conCalidadBuena++
+    }
+
+    ultimaLectura = {
+      instante: new Date().toISOString(),
+      puntosPedidos: pointNames.length,
+      conValor,
+      conCalidadBuena,
+    }
+  }
+
+  /**
    * Lee muchos puntos en una sola llamada (`POST /Data`).
    * Devuelve un mapa indexado por `pointName`, que es la forma que espera el
    * motor de sondeo del frontend.
@@ -227,17 +339,28 @@ export function createIconicsClient(config, authenticator) {
       event: `la lectura en lote de ${pointNames.length} señales`,
       /*
        * Se nombran las señales, no sólo cuántas: con el tablero abierto son
-       * lotes de ocho cada pocos segundos, y «8 señales» repetido no permite
-       * distinguir la pantalla de planta de la de vibraciones cuando una de
-       * las dos va mal. Se recorta a tres para que la línea siga siendo una
-       * línea.
+       * lotes de decenas cada pocos segundos, y «52 señales» repetido no
+       * permite distinguir la pantalla de planta de la de vibraciones cuando
+       * una de las dos va mal. Se recorta a tres para que la línea siga
+       * siendo una línea.
        */
       describir: ms =>
         `Leídas ${pointNames.length} señales en ${ms} ms (${resumirNombres(pointNames)})`,
       meta: { senales: pointNames.length, puntos: pointNames },
     })
 
-    if (!result.ok) return result
+    if (!result.ok) {
+      ultimoFalloDeLectura = {
+        instante: new Date().toISOString(),
+        motivo: result.error ?? `HTTP ${result.status}`,
+        /* La marca viaja hasta `/api/health` (B9): la sesión caducada tiene su
+           propia frase y su propio arreglo —renovar el token—, y sin esto
+           caería en el mensaje genérico de «la lectura falló», que manda a
+           revisar un servidor que está perfectamente. */
+        ...(result.reautenticacion ? { reautenticacion: true } : {}),
+      }
+      return result
+    }
 
     const byPointName = {}
     if (Array.isArray(result.payload)) {
@@ -245,68 +368,152 @@ export function createIconicsClient(config, authenticator) {
         byPointName[item.pointName] = { ok: true, status: 200, payload: item }
       }
     }
+
+    apuntarLectura(pointNames, byPointName)
     return { ok: true, status: 200, payload: byPointName }
   }
 
   /**
-   * Caché muy corta de las lecturas en lote.
+   * Caché muy corta de las lecturas en vivo, POR PUNTO.
    *
    * El motor de sondeo agrupa muy bien DENTRO de un navegador —una petición
    * por ciclo con la unión de los tags que las vistas montadas necesitan—,
-   * pero eso es por CADA pantalla encendida, y todas piden lo mismo. Con diez
-   * wallboards en planta, ICONICS recibía diez veces la misma consulta cada
-   * quince segundos.
+   * pero eso es por CADA pantalla encendida, y todas piden casi lo mismo. Con
+   * diez wallboards en planta, ICONICS recibía diez veces la misma consulta.
    *
-   * Se guarda la PROMESA y no el resultado: así las peticiones que llegan
-   * mientras la llamada está en vuelo esperan a esa misma llamada en vez de
-   * arrancar la suya. Es el mismo patrón que `pendingAuthentication` en el
-   * autenticador, y por la misma razón.
+   * ── POR QUÉ DEJÓ DE INDEXARSE POR CONJUNTO (Plan 21 F4) ────────────
+   *
+   * Porque la clave era el conjunto ENTERO de puntos, ordenado y unido. Eso
+   * hace que dos lecturas compartan caché **sólo si piden exactamente lo
+   * mismo**: la pantalla del tanque (8 puntos) y la de vibraciones (73) no
+   * comparten nada, lo cual está bien porque no se solapan — pero tampoco
+   * comparten nada dos vistas de la MISMA máquina que se solapen en el 90 %,
+   * ni la vista completa con la que sólo mira un activo.
+   *
+   * Y empeora con el catálogo: el número de conjuntos distintos que se pueden
+   * pedir crece con las combinaciones de vistas montadas, no con el número de
+   * puntos. Cada vista nueva multiplica las claves posibles; cada punto nuevo
+   * sólo suma una.
+   *
+   * Indexando por punto, el coste deja de depender de cómo se agrupen las
+   * vistas: se pide a ICONICS lo que falte, agrupado en UNA llamada, y lo que
+   * ya está fresco no se vuelve a pedir aunque venga en otro conjunto.
+   *
+   * ── LO QUE NO CAMBIA ───────────────────────────────────────────────
+   *
+   * El sobre que se devuelve, punto por punto. Si el lote que hacía falta
+   * falla, se devuelve ESE fallo tal cual —y no una respuesta parcial— porque
+   * es lo que hoy ve el frontend y lo que `/api/iconics/data/batch` traduce a
+   * un código HTTP. Una lectura a medias que se presentara como buena sería
+   * justo la clase de mentira que este proyecto persigue.
+   *
+   * Se guarda la PROMESA del lote y no su resultado: así las peticiones que
+   * llegan mientras la llamada está en vuelo esperan a esa misma llamada en
+   * vez de arrancar la suya. Es el mismo patrón que `pendingAuthentication` en
+   * el autenticador, y por la misma razón.
    *
    * La ventana (2 s) es un orden de magnitud menor que la cadencia de sondeo,
    * así que ningún dato llega más viejo de lo que ya llegaba. Una escritura
    * puede leerse desactualizada durante esos 2 s; no se invalida por punto
    * porque el único escritor es la vista de Data, que no está en producción.
    */
-  const batchCache = new Map()
+  const puntoCache = new Map()
 
-  /** Ordenada: el mismo conjunto de puntos en otro orden es la misma lectura. */
-  function batchKey(pointNames) {
-    return [...pointNames].sort().join(' ')
+  function podarPuntoCache(ahora) {
+    for (const [punto, entrada] of puntoCache) {
+      if (entrada.expiraEn <= ahora) puntoCache.delete(punto)
+    }
   }
 
-  function pruneBatchCache(now) {
-    for (const [key, entry] of batchCache) {
-      if (entry.expiresAt <= now) batchCache.delete(key)
+  /** Quita del caché los puntos de un lote que falló, sin tocar los de otro. */
+  function olvidar(puntos, lote) {
+    for (const punto of puntos) {
+      if (puntoCache.get(punto)?.lote === lote) puntoCache.delete(punto)
     }
+  }
+
+  /**
+   * Compone la respuesta a partir de las entradas ya resueltas.
+   *
+   * Recibe las entradas CAPTURADAS antes de esperar a nada: si se releyeran
+   * del mapa después del `await`, un lote que falló entre medias las habría
+   * borrado y esta función devolvería un `ok: true` sin esos puntos — es decir,
+   * una lectura incompleta presentada como buena.
+   */
+  async function componer(entradas) {
+    const lotes = new Set()
+    for (const [, entrada] of entradas) if (entrada) lotes.add(entrada.lote)
+
+    const resultados = await Promise.all([...lotes])
+
+    /*
+     * Si CUALQUIERA de los lotes implicados falló, falla la lectura entera. Es
+     * el comportamiento de siempre y se conserva a propósito: quien pide ocho
+     * señales y recibe seis sin saberlo pinta una pantalla con dos huecos que
+     * parecen datos ausentes de la planta, cuando lo que pasó es que el puente
+     * no pudo leer.
+     */
+    const fallo = resultados.find(resultado => !resultado?.ok)
+    if (fallo) return fallo
+
+    const porLote = new Map()
+    for (let i = 0; i < resultados.length; i++) porLote.set([...lotes][i], resultados[i])
+
+    const byPointName = {}
+    for (const [punto, entrada] of entradas) {
+      if (!entrada) continue
+      const item = porLote.get(entrada.lote)?.payload?.[punto]
+      // Un punto que el servidor no devolvió se omite, igual que antes: para
+      // el motor de sondeo eso es un hueco, que es lo que es.
+      if (item) byPointName[punto] = item
+    }
+
+    return { ok: true, status: 200, payload: byPointName }
   }
 
   function readPoints(pointNames) {
     if (!isConfigured) return Promise.resolve(NOT_CONFIGURED)
     if (batchCacheTtlMs <= 0) return fetchPoints(pointNames)
 
-    const now = Date.now()
-    const key = batchKey(pointNames)
-    const cached = batchCache.get(key)
-    if (cached && cached.expiresAt > now) return cached.promise
+    const ahora = Date.now()
+    podarPuntoCache(ahora)
 
-    const promise = fetchPoints(pointNames)
-    batchCache.set(key, { expiresAt: now + batchCacheTtlMs, promise })
+    const faltantes = pointNames.filter(punto => {
+      const entrada = puntoCache.get(punto)
+      return !(entrada && entrada.expiraEn > ahora)
+    })
 
-    // Un fallo no se cachea: mantener 2 s el error de una caída momentánea
-    // retrasaría la recuperación de todas las pantallas a la vez, y el
-    // siguiente ciclo de sondeo llega enseguida de todos modos.
-    promise
-      .then(result => { if (!result?.ok) batchCache.delete(key) })
-      .catch(() => batchCache.delete(key))
+    if (faltantes.length) {
+      // UNA sola llamada con todo lo que falte, venga de donde venga: es lo
+      // que hace que trocear las vistas no multiplique las peticiones.
+      const lote = fetchPoints(faltantes)
+      const expiraEn = ahora + batchCacheTtlMs
+      for (const punto of faltantes) puntoCache.set(punto, { expiraEn, lote })
 
-    pruneBatchCache(now)
-    return promise
+      /*
+       * Un fallo no se cachea: mantener 2 s el error de una caída momentánea
+       * retrasaría la recuperación de todas las pantallas a la vez, y el
+       * siguiente ciclo de sondeo llega enseguida de todos modos.
+       */
+      lote.then(
+        resultado => { if (!resultado?.ok) olvidar(faltantes, lote) },
+        () => olvidar(faltantes, lote)
+      )
+    }
+
+    // Capturado AHORA, antes de esperar: ver la cabecera de `componer`.
+    return componer(pointNames.map(punto => [punto, puntoCache.get(punto)]))
   }
 
-  /**
-   * Serie histórica del Hyper Historian.
+  /* ── Serie histórica del Hyper Historian ──────────────────────────
    *
-   * Normaliza las dos formas en que el servidor la devuelve —envuelta en
+   * Son DOS funciones desde el Plan 20 F6, y la separación es la que hace
+   * legible la caché: `readHistory` decide si hace falta salir al servidor y
+   * `leerHistoriaDelServidor` sale. Todo lo que sigue —la paginación, el
+   * presupuesto, la normalización de las dos formas de respuesta— es de la
+   * segunda; lo de la primera está en su propio comentario, justo debajo.
+   *
+   * Normaliza las dos formas en que el servidor devuelve la serie —envuelta en
    * `historicalSamples` o como muestras sueltas— a una sola lista
    * `{ timestamp, value, quality }`, para que el frontend no tenga que
    * conocer ambas.
@@ -333,7 +540,97 @@ export function createIconicsClient(config, authenticator) {
    * las dos cosas pasó, para quien lo necesite sin romper a quien sólo mira
    * `hasMore`.
    */
-  async function readHistory({ pointName, startDate, endDate, aggregate, interval }) {
+  /**
+   * Caché de tramos históricos YA CERRADOS.
+   *
+   * ── QUÉ SE CACHEA, Y QUÉ NO ────────────────────────────────────────
+   *
+   * Sólo lo que no puede cambiar. Un tramo cuyo `endDate` pasó hace más de
+   * `historyCacheMargenMs` es inmutable por definición: nadie escribe una
+   * muestra con fecha de ayer. Lo que toca «ahora» NO entra, porque el
+   * historiador escribe con retraso y cachear el borde congelaría un hueco que
+   * se iba a llenar solo.
+   *
+   * Tampoco entra una lectura TRUNCADA. Si el presupuesto de páginas o de
+   * tiempo cortó la serie, guardarla sería fijar un recorte accidental —el de
+   * un momento en que el servidor iba lento— durante toda la vida de la
+   * entrada, y las gráficas siguientes heredarían esa cobertura sin motivo.
+   * Un fallo tampoco: el siguiente en pedirlo tiene derecho a que se intente
+   * otra vez.
+   *
+   * ── POR QUÉ AQUÍ Y NO EN LA RUTA ───────────────────────────────────
+   *
+   * Porque `POST /api/iconics/history/batch` trocea la ventana y llama a esta
+   * misma función una vez por (señal × tramo). Cacheando aquí, los dos caminos
+   * —el tramo suelto y la ventana troceada— comparten entradas: la pantalla de
+   * «Gráficas» de la segunda pestaña no vuelve a pedir ni un tramo.
+   *
+   * Se guarda la PROMESA, igual que en `batchCache` y por el mismo motivo: dos
+   * pantallas que abren la misma vista a la vez esperan a la misma llamada en
+   * vez de arrancar cada una la suya.
+   */
+  const historyCache = new Map()
+
+  function historyKey({ pointName, startDate, endDate, aggregate, interval }) {
+    return [pointName, startDate, endDate, aggregate ?? '', interval ?? ''].join('|')
+  }
+
+  /** ¿Es un tramo que ya no puede cambiar? Ver `historyCacheMargenMs`. */
+  function tramoCerrado(endDate) {
+    if (!endDate) return false
+    const fin = new Date(endDate).getTime()
+    if (!Number.isFinite(fin)) return false
+    return fin < Date.now() - historyCacheMargenMs
+  }
+
+  /**
+   * Deja la caché por debajo del tope, tirando primero lo caducado y, si no
+   * basta, lo más viejo.
+   *
+   * `Map` conserva el orden de inserción, así que «lo más viejo» es lo primero
+   * que devuelve el iterador — no hace falta guardar marcas de uso ni ordenar
+   * nada. No es una LRU: no es lo mismo, y aquí no importa, porque todo lo que
+   * hay dentro vale lo mismo (un tramo que ya no cambia) y lo que se busca es
+   * un techo de memoria, no una tasa de acierto óptima.
+   */
+  function podarHistoryCache(ahora) {
+    for (const [clave, entrada] of historyCache) {
+      if (entrada.expiraEn <= ahora) historyCache.delete(clave)
+    }
+    while (historyCache.size >= historyCacheMax) {
+      const primera = historyCache.keys().next()
+      if (primera.done) break
+      historyCache.delete(primera.value)
+    }
+  }
+
+  async function readHistory(opciones) {
+    if (!isConfigured) return NOT_CONFIGURED
+
+    if (historyCacheTtlMs <= 0 || !tramoCerrado(opciones.endDate)) {
+      return leerHistoriaDelServidor(opciones)
+    }
+
+    const ahora = Date.now()
+    const clave = historyKey(opciones)
+    const cacheada = historyCache.get(clave)
+    if (cacheada && cacheada.expiraEn > ahora) return cacheada.promesa
+
+    const promesa = leerHistoriaDelServidor(opciones)
+    podarHistoryCache(ahora)
+    historyCache.set(clave, { expiraEn: ahora + historyCacheTtlMs, promesa })
+
+    promesa
+      .then(resultado => {
+        // Ver la cabecera: ni los fallos ni las series truncadas se guardan.
+        if (!resultado?.ok || resultado.truncada) historyCache.delete(clave)
+      })
+      .catch(() => historyCache.delete(clave))
+
+    return promesa
+  }
+
+  async function leerHistoriaDelServidor({ pointName, startDate, endDate, aggregate, interval }) {
     if (!isConfigured) return NOT_CONFIGURED
 
     const inicio = Date.now()
@@ -434,12 +731,118 @@ export function createIconicsClient(config, authenticator) {
 
   /* ── Escritura ────────────────────────────────────────────────────── */
 
+  /** Pausa entre relecturas de confirmación. */
+  const esperar = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+  /**
+   * ¿Es lo leído el mismo valor que se escribió?
+   *
+   * ── POR QUÉ NO BASTA `===` ─────────────────────────────────────────
+   *
+   * Porque el valor no vuelve como se mandó. Se escribe el booleano `true` y
+   * ICONICS puede devolverlo como `"True"`, como `1` o como `true`, según el
+   * tipo del tag y de por dónde salga la lectura. Comparar con `===` daría
+   * «no coincide» sobre una escritura que sí entró, que es peor que no
+   * comprobar: enseñaría a desconfiar de la confirmación.
+   *
+   * Se compara por VALOR y no por forma, y sólo entre las tres formas que este
+   * servidor usa. Cualquier otra cosa se compara tal cual.
+   */
+  function mismoValor(escrito, leido) {
+    if (escrito === leido) return true
+    if (escrito === null || escrito === undefined) return false
+    if (leido === null || leido === undefined) return false
+
+    const aBooleano = v => {
+      if (typeof v === 'boolean') return v
+      if (typeof v === 'number') return v !== 0
+      if (typeof v === 'string') {
+        const t = v.trim().toLowerCase()
+        if (t === 'true' || t === '1') return true
+        if (t === 'false' || t === '0') return false
+      }
+      return null
+    }
+
+    if (typeof escrito === 'boolean') {
+      const l = aBooleano(leido)
+      return l !== null && l === escrito
+    }
+
+    if (typeof escrito === 'number' || typeof leido === 'number') {
+      const a = Number(escrito)
+      const b = Number(leido)
+      if (Number.isFinite(a) && Number.isFinite(b)) return a === b
+    }
+
+    return String(escrito) === String(leido)
+  }
+
+  /** El valor de una lectura, en las dos grafías con que llega. */
+  function valorLeido(lectura) {
+    return lectura?.payload?.value ?? lectura?.payload?.Value ?? null
+  }
+
+  /**
+   * Relee lo escrito y dice si de verdad entró.
+   *
+   * ── POR QUÉ ESTO NO PUEDE DARSE POR SUPUESTO ───────────────────────
+   *
+   * Un `ok: true` del servidor dice que ACEPTÓ la petición, no que el PLC haya
+   * tomado el valor. Se comprobó contra el tag real de esta demo: primero
+   * configurado como «Static value» —aceptaba la escritura y seguía leyendo
+   * `true` siempre— y luego como fuente en tiempo real con escaneo cada ~1 s,
+   * donde una relectura inmediata puede traer el valor de antes del ciclo.
+   *
+   * Por eso se reintenta con espera: ver `writeConfirmIntentos` en
+   * `config.mjs`, donde están los números y de dónde salen.
+   *
+   * ── LA CONFIRMACIÓN INFORMA, NO DECIDE ─────────────────────────────
+   *
+   * Una escritura que el servidor aceptó y que no se pudo confirmar sigue
+   * devolviendo `ok: true`, con `confirmacion` diciendo que no coincide. La
+   * decisión de tratarlo como fallo es de quien llama, porque depende de la
+   * consecuencia: `controlar_bomba` lo convierte en un 409 —una bomba que se
+   * cree encendida y no lo está es un problema— y la vista de Data se limita a
+   * enseñarlo.
+   *
+   * Convertirlo aquí en `ok: false` habría cambiado el contrato de
+   * `/api/iconics/write` sin que nadie lo pidiera.
+   */
+  async function confirmarEscrituras(items) {
+    const confirmacion = []
+
+    for (let intento = 0; intento < writeConfirmIntentos; intento++) {
+      if (intento > 0) await esperar(writeConfirmEsperaMs)
+
+      confirmacion.length = 0
+      let todasCoinciden = true
+
+      for (const { pointName, value } of items) {
+        const lectura = await readPoint(pointName)
+        const leido = lectura?.ok ? valorLeido(lectura) : null
+        const coincide = Boolean(lectura?.ok) && mismoValor(value, leido)
+        if (!coincide) todasCoinciden = false
+        confirmacion.push({ pointName, pedido: value, leido, coincide })
+      }
+
+      if (todasCoinciden) return { confirmacion, intentos: intento + 1 }
+    }
+
+    return { confirmacion, intentos: writeConfirmIntentos }
+  }
+
   /**
    * Envío común a `POST /Data/Write`, que atiende tanto una escritura suelta
    * como un lote: para el servidor las dos son la misma lista de `WriteItem`.
    * Lo único que cambia es cómo se traza y cómo se presenta el resultado.
+   *
+   * `confirmar` releé lo escrito y adjunta `confirmacion`. Va encendido por
+   * defecto: dar por buena una escritura porque la petición HTTP no dio error
+   * es la diferencia entre «se apagó» y «se mandó apagar», y el defecto tiene
+   * que ser el que no promete de más.
    */
-  async function sendWrite(items, trace) {
+  async function sendWrite(items, trace, { confirmar = true } = {}) {
     if (!isConfigured) return NOT_CONFIGURED
 
     const result = await request({
@@ -450,37 +853,74 @@ export function createIconicsClient(config, authenticator) {
     })
 
     if (!result.ok) return result
-    return {
+
+    const sobre = {
       ok: true,
       status: 200,
       results: Array.isArray(result.payload) ? result.payload : [result.payload],
     }
+
+    if (!confirmar) return sobre
+
+    const { confirmacion, intentos } = await confirmarEscrituras(items)
+    const sinConfirmar = confirmacion.filter(c => !c.coincide)
+
+    if (sinConfirmar.length) {
+      /*
+       * Se registra SIEMPRE, aunque el sobre siga siendo `ok`. Es la línea que
+       * se busca cuando alguien dice que dio la orden y no pasó nada, y sin
+       * ella el único rastro sería un 200 en el log de accesos.
+       */
+      logger.warn(
+        {
+          puntos: sinConfirmar.map(c => c.pointName),
+          detalle: sinConfirmar,
+          intentos,
+        },
+        `El servidor aceptó la escritura de ${sinConfirmar.length} punto(s) pero la relectura NO ` +
+          `lo confirma tras ${intentos} intento(s). La escritura puede no haber tenido efecto ` +
+          'sobre la instalación: revisa la configuración de esos puntos en ICONICS antes de ' +
+          'reintentarla tal cual.'
+      )
+    }
+
+    return { ...sobre, confirmacion, confirmada: sinConfirmar.length === 0, intentos }
   }
 
   /**
    * Escribe un punto. Sirve además para disparar los Data Manipulators de
    * GridWorX, escribiendo `true` en su punto `.@@Execute`.
    */
-  async function writePoint(pointName, value) {
+  async function writePoint(pointName, value, opciones) {
     const result = await sendWrite([{ pointName, value }], {
       failure: 'ICONICS write request failed.',
       event: `la escritura de ${pointName}`,
       describir: ms => `Escrito ${pointName} = ${value} en ${ms} ms`,
       meta: { pointName, valor: value },
-    })
+    }, opciones)
 
     if (!result.ok) return result
-    return { ok: true, status: 200, result: result.results[0] }
+    return {
+      ok: true,
+      status: 200,
+      result: result.results[0],
+      confirmacion: result.confirmacion?.[0] ?? null,
+      confirmada: result.confirmada,
+      // Cuántas relecturas costó (Plan 22 F3). `sendWrite` ya lo cuenta y este
+      // envoltorio lo perdía; el diario de accionamientos lo anota, porque una
+      // orden que necesita tres intentos hoy es la que fallará mañana.
+      intentos: result.intentos ?? null,
+    }
   }
 
-  function writePoints(items) {
+  function writePoints(items, opciones) {
     return sendWrite(items, {
       failure: 'ICONICS batch write request failed.',
       event: `la escritura de ${items.length} puntos`,
       describir: ms =>
         `Escritos ${items.length} puntos en ${ms} ms (${resumirNombres(items.map(i => i.pointName))})`,
       meta: { puntos: items.length, nombres: items.map(i => i.pointName) },
-    })
+    }, opciones)
   }
 
   /* ── Alarmas ──────────────────────────────────────────────────────── */
@@ -545,6 +985,7 @@ export function createIconicsClient(config, authenticator) {
   return {
     acknowledgeAlarms,
     browse,
+    estadoLecturas,
     ping,
     readAlarmHistory,
     readHistory,
