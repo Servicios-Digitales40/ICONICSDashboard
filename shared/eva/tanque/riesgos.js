@@ -437,6 +437,97 @@ export const REGLAS = [
     nota: "Nuestros umbrales de presión siguen siendo una estimación, no un dato de la instalación.",
   },
 
+  /* ── Coherencia entre orden y realimentación ────────────────────── */
+
+  /*
+   * ── POR QUÉ ESTAS TRES NO NECESITAN NINGÚN UMBRAL NUESTRO ─────────
+   *
+   * Plan 29 F4. Comparan DOS LECTURAS ENTRE SÍ —lo que se mandó contra lo que
+   * el equipo reporta—, no una lectura contra una banda estimada. Una orden
+   * que no se cumple es una avería lo digan como lo digan nuestros umbrales, y
+   * por eso se pueden escribir mientras `PROVISIONALES` siga en `true`.
+   *
+   * ── EL `0` DEL PLC NO ES «APAGADO», Y AQUÍ IMPORTA ────────────────
+   *
+   * `estadoSx` declara `1: Apagado · 2: En marcha · 3: Error · 4: Mantenimiento`,
+   * y su propia `nota` avisa de que **`0` es el valor inicial del PLC: se trata
+   * como sin dato**. Estas reglas comparan contra `2` y contra `3` —valores
+   * declarados—, nunca contra «distinto de 1»: un `0` recién arrancado el PLC
+   * no puede leerse como una válvula que desobedece. Es §2.4 aplicado a un
+   * estado discreto: la ausencia no se disfraza.
+   *
+   * ── LA QUE NO ESTÁ AQUÍ, Y POR QUÉ ────────────────────────────────
+   *
+   * `variador-no-sigue-consigna` (referencia contra frecuencia de salida) se
+   * dejó fuera a propósito: necesitaría una tolerancia de divergencia que
+   * nadie ha medido, y la divergencia normal de una rampa de arranque es
+   * desconocida. Sin ese número la regla dispararía en cada arranque — el
+   * mismo defecto que `presionRelativa.avisoMax` tenía hasta el 14-09-2026,
+   * escrito otra vez con otra señal. Entra cuando se mida.
+   */
+  {
+    /*
+     * La tolerancia de ESTA sí es cualitativa, no un número fino: una válvula
+     * que recibe orden de abrir y sigue reportando «Apagado» no depende de
+     * acertar un margen. Aun así se declara la reserva en `nota`: el sondeo
+     * puede pillar el instante entre la orden y el movimiento, y eso no es una
+     * avería.
+     */
+    id: "orden-sin-respuesta",
+    titulo: "Una electroválvula no responde a la orden que tiene",
+    severidad: "critico",
+    necesita: ["arranqueParoS1", "estadoS1"],
+    cuando: (v) => v.arranqueParoS1 === true && v.estadoS1 === 1,
+    evidencia: (v) =>
+      `La electroválvula inferior tiene orden de abrir y su estado se lee como ` +
+      `"Apagado" (${v.estadoS1}).`,
+    consecuencia:
+      "El automatismo cree que la válvula está abierta y el proceso se comporta como si no lo " +
+      "estuviera. Todo lo que dependa de ese paso de agua —llenado, recirculación— está " +
+      "operando sobre una suposición falsa.",
+    accion:
+      "Comprobar la alimentación de la bobina y el final de carrera antes de fiarse del " +
+      "estado que reporta el automatismo.",
+    nota:
+      "Una sola lectura puede caer en el instante entre la orden y el movimiento; lo que " +
+      "importa es que se sostenga.",
+  },
+  {
+    /*
+     * `3: "Error"` no es una deducción nuestra: es el propio equipo el que lo
+     * declara. Es la regla más barata de justificar del archivo entero —no
+     * compara nada, sólo deja de ignorar un diagnóstico que ya existía en el
+     * dato y que ninguna regla miraba.
+     */
+    id: "actuador-en-error",
+    titulo: "Una electroválvula reporta error",
+    severidad: "critico",
+    necesita: ["estadoS1"],
+    cuando: (v) => v.estadoS1 === 3,
+    evidencia: () => 'La electroválvula inferior reporta su estado como "Error".',
+    consecuencia:
+      "El equipo declara que no puede cumplir su función. Mientras siga así, su posición real " +
+      "no se puede dar por conocida en ningún sentido.",
+    accion: "Revisar el actuador y qué condición lo dejó en error antes de reponerlo.",
+  },
+  {
+    // Informativo por el mismo motivo que `variador-en-manual`: operar con un
+    // bloqueo de mantenimiento puesto es legítimo y se hace a diario. Lo que
+    // importa es que quede DICHO, porque cambia quién protege la instalación.
+    id: "bloqueo-de-mantenimiento-con-proceso-en-marcha",
+    titulo: "Hay un bloqueo de mantenimiento puesto con el proceso en marcha",
+    severidad: "informativo",
+    necesita: ["mttoS1", "cargaMotor"],
+    cuando: (v, ctx) => ctx.impulsando && v.mttoS1 === true,
+    evidencia: (v) =>
+      `La electroválvula inferior está bloqueada por mantenimiento y la bomba sigue ` +
+      `impulsando (carga ${v.cargaMotor.toFixed(1)} %).`,
+    consecuencia:
+      "Un elemento bloqueado no obedece al automatismo: las maniobras que lo necesiten no se " +
+      "ejecutarán, aunque el control las pida.",
+    accion: "Confirmar que el bloqueo es intencionado y que quien lo puso sabe que el proceso corre.",
+  },
+
   {
     id: "agua-caliente",
     titulo: "Temperatura del agua alta",

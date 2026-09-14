@@ -80,6 +80,25 @@
       "consecuencia": "A drive in fault is not governing the motor the way the automatic system believes: the load being read may not match the setpoint, and its protections may not be active.",
       "accion": "Read the fault code on the drive before resetting it, and find out what is keeping the motor under load."
     },
+    "orden-sin-respuesta": {
+      "titulo": "A solenoid valve is not responding to the order it has",
+      "evidencia": "The lower solenoid valve has an order to open and its state reads as \"Off\" ({{estadoS1}}).",
+      "consecuencia": "The automatic system believes the valve is open and the process behaves as if it were not. Everything that depends on that water path —filling, recirculation— is operating on a false assumption.",
+      "accion": "Check the coil supply and the limit switch before trusting the state the automatic system reports.",
+      "nota": "A single reading can fall in the instant between the order and the movement; what matters is that it persists."
+    },
+    "actuador-en-error": {
+      "titulo": "A solenoid valve reports an error",
+      "evidencia": "The lower solenoid valve reports its state as \"Error\".",
+      "consecuencia": "The equipment declares that it cannot perform its function. While it stays that way, its actual position cannot be taken as known in either direction.",
+      "accion": "Inspect the actuator and find out what condition left it in error before resetting it."
+    },
+    "bloqueo-de-mantenimiento-con-proceso-en-marcha": {
+      "titulo": "A maintenance lock is in place while the process is running",
+      "evidencia": "The lower solenoid valve is locked for maintenance and the pump is still delivering (load {{cargaMotor}} %).",
+      "consecuencia": "A locked element does not obey the automatic system: any manoeuvre that needs it will not be carried out, even if the control asks for it.",
+      "accion": "Confirm that the lock is intentional and that whoever set it knows the process is running."
+    },
     "alarma-de-proceso-sin-respaldo-analogico": {
       "titulo": "The PLC pressure alarm and our reading do not agree",
       "evidencia": "The PLC has the high-pressure alarm active and the reading is {{presionRelativa}}, below our warning threshold ({{avisoPresion}}).",
@@ -196,6 +215,26 @@
     "alarma-y-medida-de-puntos-distintos": {
       "titulo": "The alarm and the reading are not measuring the same point of the network",
       "componente": "Pressure instrumentation"
+    },
+    "bobina-o-alimentacion-de-la-valvula": {
+      "titulo": "The solenoid coil is not being energised, or it is burnt out",
+      "componente": "Solenoid coil / valve supply"
+    },
+    "final-de-carrera-desajustado": {
+      "titulo": "The limit switch does not confirm the position even though the valve moves",
+      "componente": "Limit switch / position feedback"
+    },
+    "valvula-agarrotada": {
+      "titulo": "The valve is seized and never actually moves",
+      "componente": "Solenoid valve body"
+    },
+    "fallo-interno-del-actuador": {
+      "titulo": "Internal actuator fault",
+      "componente": "Solenoid valve"
+    },
+    "condicion-externa-dejo-el-actuador-en-error": {
+      "titulo": "An external condition left the actuator in error",
+      "componente": "Supply / command wiring"
     },
     "impulsor-desgastado": {
       "titulo": "Worn impeller",

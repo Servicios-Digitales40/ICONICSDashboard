@@ -526,6 +526,55 @@ export const CAUSAS_POR_RIESGO = {
     }),
   ],
 
+  /*
+   * ── LAS CAUSAS DE LA COHERENCIA ORDEN/REALIMENTACIÓN (PLAN 29 F4) ──
+   *
+   * `bloqueo-de-mantenimiento-con-proceso-en-marcha` NO está aquí, y es
+   * deliberado: es informativa, igual que `variador-en-manual`. El bloqueo ES
+   * el hecho; no hay avería debajo que diagnosticar. Su clasificación va en
+   * `SIN_CAUSAS_DELIBERADO`, con el mismo motivo.
+   */
+  "orden-sin-respuesta": [
+    causaTanque({
+      id: "bobina-o-alimentacion-de-la-valvula",
+      titulo: "La bobina de la electroválvula no recibe tensión o está quemada",
+      componente: "Bobina / alimentación de la electroválvula",
+      terminosManual: ["bobina", "solenoide", "alimentacion", "electrovalvula"],
+      riesgoId: "orden-sin-respuesta",
+    }),
+    causaTanque({
+      id: "final-de-carrera-desajustado",
+      titulo: "El final de carrera no confirma la posición aunque la válvula se mueva",
+      componente: "Final de carrera / realimentación de posición",
+      terminosManual: ["final de carrera", "posicion", "realimentacion", "sensor"],
+      riesgoId: "orden-sin-respuesta",
+    }),
+    causaTanque({
+      id: "valvula-agarrotada",
+      titulo: "La válvula está agarrotada y no llega a moverse",
+      componente: "Cuerpo de la electroválvula",
+      terminosManual: ["agarrotada", "atascada", "vastago", "obstruccion"],
+      riesgoId: "orden-sin-respuesta",
+    }),
+  ],
+
+  "actuador-en-error": [
+    causaTanque({
+      id: "fallo-interno-del-actuador",
+      titulo: "Fallo interno del actuador",
+      componente: "Electroválvula",
+      terminosManual: ["fallo", "error", "actuador", "diagnostico"],
+      riesgoId: "actuador-en-error",
+    }),
+    causaTanque({
+      id: "condicion-externa-dejo-el-actuador-en-error",
+      titulo: "Una condición externa dejó al actuador en error",
+      componente: "Alimentación / cableado de mando",
+      terminosManual: ["alimentacion", "cableado", "condicion", "reposicion"],
+      riesgoId: "actuador-en-error",
+    }),
+  ],
+
   "agua-caliente": [
     causaTanque({
       id: "aporte-termico-externo",
@@ -632,6 +681,15 @@ export const SIN_CAUSAS_DELIBERADO = {
     motivo:
       "El riesgo sólo informa de que el variador está en modo manual: no hay una avería " +
       "debajo que diagnosticar, el propio modo es el hecho.",
+  },
+  // Plan 29 F4, y por el mismo motivo exacto que el anterior: poner un bloqueo
+  // de mantenimiento es una decisión de alguien, no un síntoma. Lo que la
+  // regla aporta es que quede DICHO mientras el proceso corre.
+  "bloqueo-de-mantenimiento-con-proceso-en-marcha": {
+    clase: "informativo",
+    motivo:
+      "El bloqueo de mantenimiento lo pone una persona a propósito: el hecho es el bloqueo " +
+      "mismo, no una avería que haya que diagnosticar debajo.",
   },
 
   /*

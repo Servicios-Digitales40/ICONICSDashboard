@@ -515,6 +515,63 @@ check('ninguna regla de cruce dispara en una instalación sana', () => {
   }
 })
 
+/* ── Coherencia entre orden y realimentación, Plan 29 F4 ─────────────── */
+
+console.log('\n── Coherencia orden/realimentación (Plan 29 F4) ───────────')
+
+check('una válvula con orden de abrir que se lee "Apagado" es CRÍTICA', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, arranqueParoS1: true, estadoS1: 1 }))
+  assert.ok(ids(res).includes('orden-sin-respuesta'))
+})
+
+check('con la válvula obedeciendo (estado "En marcha") no se avisa', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, arranqueParoS1: true, estadoS1: 2 }))
+  assert.ok(!ids(res).includes('orden-sin-respuesta'))
+})
+
+check('sin orden de abrir, una válvula apagada es lo normal', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, arranqueParoS1: false, estadoS1: 1 }))
+  assert.ok(!ids(res).includes('orden-sin-respuesta'))
+})
+
+check('el `0` del PLC NO se lee como una válvula que desobedece', () => {
+  /*
+   * La comprobación que justifica escribir estas reglas contra valores
+   * DECLARADOS (`=== 1`, `=== 3`) y nunca contra «distinto de 2». `estadoS1`
+   * declara en su propia nota que `0` es el valor inicial del PLC y se trata
+   * como sin dato. Un arranque de PLC no es una avería, y confundirlos sería
+   * disfrazar la ausencia de dato (CLAUDE.md §2.4) con un estado discreto.
+   */
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, arranqueParoS1: true, estadoS1: 0 }))
+  assert.ok(!ids(res).includes('orden-sin-respuesta'),
+    'un 0 recién arrancado el PLC no puede ser una orden desatendida')
+  assert.ok(!ids(res).includes('actuador-en-error'),
+    'ni un error')
+})
+
+check('un actuador que reporta "Error" (3) se dice, sin deducir nada', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, estadoS1: 3 }))
+  assert.ok(ids(res).includes('actuador-en-error'))
+})
+
+check('un actuador en mantenimiento (4) no es un error', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, estadoS1: 4 }))
+  assert.ok(!ids(res).includes('actuador-en-error'))
+})
+
+check('un bloqueo de mantenimiento con el proceso en marcha se dice, y es INFORMATIVO', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...EN_MARCHA, mttoS1: true }))
+  const aviso = res.activos.find((a) => a.id === 'bloqueo-de-mantenimiento-con-proceso-en-marcha')
+  assert.ok(aviso, 'tiene que salir')
+  assert.equal(aviso.severidad, 'informativo',
+    'poner un bloqueo es una decisión de alguien, no un síntoma')
+})
+
+check('el mismo bloqueo con el proceso PARADO no se menciona', () => {
+  const res = evaluarRiesgos(sistemaCon({ ...PARADA, mttoS1: true }))
+  assert.ok(!ids(res).includes('bloqueo-de-mantenimiento-con-proceso-en-marcha'))
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {
