@@ -69,7 +69,12 @@ const fuente = readFileSync(
 const cuerpo = fuente.match(/function paraLeer\(texto\) \{[\s\S]*?\n\}/)
 assert.ok(cuerpo, 'no se encontró `paraLeer` en vozSalida.js: ¿se renombró?')
 
-// eslint-disable-next-line no-new-func
+/*
+ * `new Function` a propósito: este verificador comprueba el TEXTO de
+ * `paraLeer` tal y como viaja al navegador, sin importar el módulo entero (que
+ * arrastraría `speechSynthesis`). La supresión de `no-new-func` que había aquí
+ * sobraba: la regla no está activada en este árbol.
+ */
 const paraLeer = new Function(`${cuerpo[0]}; return paraLeer`)()
 
 console.log(`\n${c.negrita}Voz de salida y manos libres${c.reset}`)

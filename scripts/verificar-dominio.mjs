@@ -1,0 +1,268 @@
+#!/usr/bin/env node
+/**
+ * scripts/verificar-dominio.mjs
+ * ------------------------------------------------------------------
+ * Que la prosa del dominio se sepa decir en inglés, regla por regla.
+ *
+ * ── POR QUÉ ESTE Y NO LA PARIDAD DE `verificar-i18n.mjs` ───────────
+ *
+ * Porque el español de esta prosa NO está en el diccionario, y no debe estar:
+ * lo escribe `shared/eva/` y lo consume también el backend para que el modelo
+ * lo narre. `es/domain.json` está vacío a propósito y el español llega por
+ * `defaultValue` (ver `i18n/useProsa.js`).
+ *
+ * Con ese diseño, comparar es↔en no dice nada. Lo que hay que comparar es el
+ * inglés contra EL DOMINIO — que es la fuente de verdad, no un espejo del otro
+ * idioma. Esta comprobación es por eso más fuerte que la que sustituye: una
+ * regla nueva se caza aquí aunque nadie toque ningún JSON.
+ *
+ * ── EL MODO DE FALLO QUE CIERRA ────────────────────────────────────
+ *
+ * Una regla nueva en `shared/eva/tanque/riesgos.js` sale funcionando: se
+ * evalúa, se pinta, y en un tablero en inglés aparece **en español**, porque
+ * cae en el `defaultValue`. No hay error, no hay clave cruda en pantalla, no
+ * falla ninguna prueba. Se descubre en planta, o no se descubre — que es
+ * exactamente el patrón que ya obligó a escribir `verificar-textos.mjs`.
+ *
+ * ── QUÉ COMPRUEBA ──────────────────────────────────────────────────
+ *
+ *  1. **Cada id del dominio tiene su bloque en inglés**, con los campos de
+ *     prosa que esa regla declara — ni de más ni de menos. Una regla sin
+ *     `nota` no debe tener `nota` traducida: sería texto que no se pinta nunca.
+ *  2. **Las cifras que cita el inglés existen.** Si la frase inglesa interpola
+ *     `{{nivelTanque}}`, la regla tiene que declarar esa señal en `necesita` o
+ *     emitirla en su `datos()`. Sin esto, el inglés enseñaría `{{nivelTanque}}`
+ *     literal mientras el español sale bien, que es el peor reparto posible.
+ *  3. **El inglés no inventa ids.** Un bloque en `en/domain.json` que no
+ *     corresponde a ninguna regla es trabajo tirado, y sugiere cobertura que
+ *     no existe.
+ *
+ * ── CÓMO LEE EL DOMINIO ────────────────────────────────────────────
+ *
+ * Importándolo. `shared/eva/` es dominio puro y se puede importar en Node sin
+ * levantar nada (§2.7) — de hecho es la razón de que esa regla exista. Nada
+ * de leer el fuente con expresiones regulares: si el catálogo cambia de forma,
+ * este guion tiene que romperse, no adivinar.
+ *
+ * ── USO ────────────────────────────────────────────────────────────
+ *
+ *   node scripts/verificar-dominio.mjs
+ *
+ * Sin red, sin build. Entra solo en `npm run verificar` (Plan 20 F2).
+ */
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
+import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
+import { CAUSAS_POR_RIESGO } from '../shared/eva/comun/causas.js'
+import { MECANISMOS } from '../shared/eva/comun/pronostico.js'
+
+const AQUI = dirname(fileURLToPath(import.meta.url))
+const EN = join(AQUI, '..', 'react-dashboard', 'src', 'i18n', 'locales', 'en', 'domain.json')
+
+const c = {
+  verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
+  negrita: '\x1b[1m', reset: '\x1b[0m',
+}
+
+let passed = 0
+const fallos = []
+
+function check(nombre, fn) {
+  try {
+    fn()
+    passed += 1
+    console.log(`  ${c.verde}✓${c.reset} ${nombre}`)
+  } catch (error) {
+    fallos.push(`${nombre} — ${error.message}`)
+    console.log(`  ${c.rojo}✗${c.reset} ${nombre}`)
+    console.log(`    ${c.gris}${error.message.split('\n').slice(0, 10).join('\n    ')}${c.reset}`)
+  }
+}
+
+const ingles = JSON.parse(readFileSync(EN, 'utf8'))
+
+/**
+ * Los campos de PROSA de cada catálogo, en el orden en que se leen.
+ *
+ * Lo que NO está aquí también es una decisión: `terminosManual` de una causa
+ * son los términos con los que se busca en un corpus de manuales EN ESPAÑOL, y
+ * `norma` de un mecanismo es una referencia («ISO 10816-7»). Traducir
+ * cualquiera de los dos rompería algo en vez de mejorarlo.
+ */
+const CAMPOS_POR_CATALOGO = {
+  risks: ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota'],
+  vibrationRisks: ['titulo', 'evidencia', 'consecuencia', 'accion', 'nota'],
+  causes: ['titulo', 'componente'],
+  mechanisms: ['titulo', 'componente', 'mecanismo', 'consecuencia', 'accion', 'confirmar'],
+}
+
+/** Las variables `{{asi}}` de una cadena. */
+function variablesDe(texto) {
+  const encontradas = String(texto ?? '').match(/\{\{\s*([\w.]+)[^}]*\}\}/g) ?? []
+  return [...new Set(encontradas.map(v => v.replace(/[{}\s]/g, '').split(',')[0]))]
+}
+
+/**
+ * Los nombres que una entrada puede ofrecer para interpolar.
+ *
+ * Dos formas, y la diferencia importa:
+ *
+ *  · Si la regla declara `expone`, ése es su CONTRATO y se toma tal cual. Lo
+ *    hacen las de vibración, cuyas frases tienen trozos opcionales: llamar a su
+ *    `datos()` de muestra recorrería una sola rama y daría por inexistente la
+ *    mitad del vocabulario. El inglés que citara `{{sinReconocer}}` se marcaría
+ *    como error estando bien.
+ *  · Si no, se llama a `datos()` sin argumentos, que es su firma. Vale para
+ *    las del tanque: lo que devuelven son umbrales fijos del catálogo. El
+ *    `try` convierte cualquier sorpresa en «no puedo comprobarlo» en vez de en
+ *    una caída.
+ */
+function nombresDisponibles(regla) {
+  const nombres = new Set(regla.necesita ?? [])
+
+  if (regla.expone) {
+    for (const k of regla.expone) nombres.add(k)
+    return nombres
+  }
+
+  try {
+    for (const k of Object.keys(regla.datos?.() ?? {})) nombres.add(k)
+  } catch {
+    return null
+  }
+  return nombres
+}
+
+/**
+ * El campo de prosa al que pertenece una clave inglesa.
+ *
+ * `evidencia_conPotencia` es la misma frase que `evidencia` en su otra forma
+ * (i18next `context`), no un campo nuevo: se comprueba contra la misma regla y
+ * con las mismas variables disponibles.
+ */
+function campoBase(clave) {
+  return clave.split('_')[0]
+}
+
+/* ── Los catálogos que ya están migrados ─────────────────────────────── */
+
+/**
+ * Las causas, sin repetir.
+ *
+ * `CAUSAS_POR_RIESGO` las indexa por riesgo y la misma causa aparece en varios
+ * —«desequilibrio» sirve a `vibracion-en-alarma` y a `vibracion-en-aviso`—, así
+ * que se aplanan por id: lo que hay que traducir es cada causa una vez.
+ */
+function causasUnicas() {
+  const vistas = new Map()
+  for (const lista of Object.values(CAUSAS_POR_RIESGO)) {
+    for (const c of lista) if (!vistas.has(c.id)) vistas.set(c.id, c)
+  }
+  return [...vistas.values()]
+}
+
+const CATALOGOS = [
+  { nombre: 'riesgos del tanque', bloque: 'risks', entradas: REGLAS_TANQUE },
+  { nombre: 'riesgos de vibración', bloque: 'vibrationRisks', entradas: REGLAS_VIBRACION },
+  { nombre: 'causas candidatas', bloque: 'causes', entradas: causasUnicas() },
+  { nombre: 'mecanismos de desgaste', bloque: 'mechanisms', entradas: MECANISMOS },
+]
+
+console.log(`\n${c.negrita}Prosa del dominio${c.reset}: ${CATALOGOS.map(x => `${x.entradas.length} ${x.nombre}`).join(', ')}`)
+
+for (const { nombre, bloque, entradas } of CATALOGOS) {
+  const CAMPOS = CAMPOS_POR_CATALOGO[bloque]
+  console.log(`\n── ${nombre} ──────────────────────────────────────────────`)
+
+  check(`«${bloque}»: cada entrada tiene su bloque en inglés, con sus campos`, () => {
+    const problemas = []
+
+    for (const regla of entradas) {
+      const traducido = ingles[bloque]?.[regla.id]
+      if (!traducido) {
+        problemas.push(`«${regla.id}» no está traducida`)
+        continue
+      }
+
+      for (const campo of CAMPOS) {
+        const loTiene = regla[campo] !== undefined && regla[campo] !== null
+        const traducidoLoTiene = typeof traducido[campo] === 'string' && traducido[campo].trim() !== ''
+
+        if (loTiene && !traducidoLoTiene) problemas.push(`«${regla.id}» sin «${campo}»`)
+        if (!loTiene && traducidoLoTiene) problemas.push(`«${regla.id}» traduce «${campo}», que la regla no tiene`)
+      }
+
+      /*
+       * Y las claves que el inglés trae de más. Una variante de contexto
+       * —`evidencia_conPotencia`— es legítima si su forma base existe: sin ella
+       * i18next no tiene a qué caer cuando el contexto no llega, y la frase
+       * saldría en español justo en el caso corriente.
+       */
+      for (const clave of Object.keys(traducido)) {
+        const base = campoBase(clave)
+        if (!CAMPOS.includes(base)) {
+          problemas.push(`«${regla.id}» traduce «${clave}», que no es un campo de prosa`)
+        } else if (clave !== base && typeof traducido[base] !== 'string') {
+          problemas.push(`«${regla.id}» tiene «${clave}» pero no «${base}», su forma sin contexto`)
+        }
+      }
+    }
+
+    assert.ok(
+      problemas.length === 0,
+      `${problemas.length} problema(s):\n${problemas.join('\n')}\n` +
+      'El inglés va en `react-dashboard/src/i18n/locales/en/domain.json`.'
+    )
+  })
+
+  check(`«${bloque}»: las cifras que cita el inglés las ofrece la entrada`, () => {
+    const problemas = []
+
+    for (const regla of entradas) {
+      const disponibles = nombresDisponibles(regla)
+      if (!disponibles) continue
+
+      for (const [campo, texto] of Object.entries(ingles[bloque]?.[regla.id] ?? {})) {
+        if (!CAMPOS.includes(campoBase(campo))) continue
+        for (const variable of variablesDe(texto)) {
+          if (!disponibles.has(variable)) {
+            problemas.push(
+              `«${regla.id}.${campo}» interpola {{${variable}}}, que la regla no ofrece ` +
+              `(tiene: ${[...disponibles].join(', ') || '—'})`
+            )
+          }
+        }
+      }
+    }
+
+    assert.ok(problemas.length === 0, `${problemas.length} problema(s):\n${problemas.join('\n')}`)
+  })
+
+  check(`«${bloque}»: el inglés no traduce ids que no existen`, () => {
+    const conocidos = new Set(entradas.map(r => r.id))
+    const sobran = Object.keys(ingles[bloque] ?? {}).filter(id => !conocidos.has(id))
+
+    assert.ok(
+      sobran.length === 0,
+      `traduce ids que el dominio no tiene (${sobran.length}): ${sobran.join(', ')}`
+    )
+  })
+}
+
+/* ── Resumen ─────────────────────────────────────────────────────────── */
+
+if (fallos.length) {
+  console.log(`\n${c.rojo}${c.negrita}${fallos.length} fallo(s).${c.reset}\n`)
+} else {
+  const total = CATALOGOS.reduce((n, x) => n + x.entradas.length, 0)
+  console.log(
+    `\n${c.verde}${c.negrita}${passed} comprobaciones correctas: ` +
+    `${total} entradas del dominio, todas con su inglés.${c.reset}\n`
+  )
+}
+
+assert.equal(fallos.length, 0, `${fallos.length} comprobaciones del dominio fallaron`)
