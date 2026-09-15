@@ -42,6 +42,7 @@ import {
   HERRAMIENTAS_CON_TEXTO_AJENO,
   HERRAMIENTAS_DE_ESCRITURA,
 } from './definiciones.mjs'
+import { acotarCatalogo } from './intencion.mjs'
 
 /**
  * Tokens extra que se le dan a la primera pasada para pensar.
@@ -1227,11 +1228,41 @@ export function createChat({ config, herramientas }) {
      * anota que ya lo revisé», el segundo encargo no se atiende en ese turno.
      * A cambio, ningún texto de fuera puede alcanzar una escritura.
      */
-    const definiciones = soloLectura
+    const permitidas = soloLectura
       ? herramientas.definiciones.filter(
         d => !HERRAMIENTAS_DE_ESCRITURA.includes(d?.function?.name)
       )
       : herramientas.definiciones
+
+    /*
+     * ── ACOTAR POR INTENCIÓN, DESPUÉS DE LA GUARDA (PLAN 28 F5) ───────
+     *
+     * El orden importa y no es casual: `soloLectura` es una GUARDA DE
+     * SEGURIDAD —impide que un texto de fuera alcance una escritura— y el
+     * acotado es una OPTIMIZACIÓN. Acotar primero y filtrar después daría el
+     * mismo resultado hoy, pero deja abierta la puerta a que mañana alguien
+     * toque el acotado y debilite la guarda sin darse cuenta. Filtrando
+     * primero, lo que el acotado recibe ya está limpio: sólo puede quitar de
+     * una lista segura, nunca añadir.
+     *
+     * Y el acotado NUNCA amplía: `acotarCatalogo` filtra la lista que le
+     * pasan, así que no puede devolver una herramienta que la guarda haya
+     * quitado.
+     */
+    /*
+     * La pregunta se saca del ÚLTIMO mensaje de usuario y no de una variable
+     * de fuera: esta función se llama en cada ronda del bucle, y en las
+     * siguientes `messages` ya lleva los resultados de las herramientas. El
+     * último `role: 'user'` sigue siendo lo que el técnico preguntó.
+     */
+    const ultimaPregunta = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
+    const { definiciones, intenciones, acotado } = acotarCatalogo(permitidas, ultimaPregunta)
+
+    if (acotado) {
+      logger.debug('Catálogo acotado por intención', {
+        intenciones, de: permitidas.length, a: definiciones.length,
+      })
+    }
 
     const respuesta = await llamarModelo({
       messages,
