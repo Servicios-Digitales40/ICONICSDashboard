@@ -384,38 +384,53 @@ reiniciando el puente.
 
 ---
 
-## B10 — `verificar-antiguedad-historico.mjs` satura el servidor que interroga
+## ~~B10~~ — la sonda del histórico pedía el punto EN VIVO, no el del archivo
 
-**Medido el 14-09-2026.** La sonda devuelve «sin dato ni siquiera en los
-últimos días» para TODOS los puntos del tanque: HTTP 500 en las analógicas
-(`NIVEL_TANQUE`, `FLUJO_INSTANTANEO`, `PRESION_RELATIVA`,
-`KPIEFICIENCIA_ENERGETICA`) y timeout de 15 s en las ocho de `ALARMAS/`.
+**Hecho el 15-09-2026.** Un cambio de una línea: `pointName()` → `puntoHistorico()`.
 
-**El historiador NO está caído.** El mismo día, por el camino que usa
-producción —`crearAyudantesDeHistoria().leerSerie()`— las mismas señales
-responden sin problema: 21 puntos en 6 h para `presionRelativa`,
-`temperaturaTanque`, `cargaMotor` y `eficienciaEnergetica`. Y el commit
-`3864acb`, de esa misma mañana, recalibró umbrales contra 849 muestras reales.
+**El síntoma.** La sonda devolvía «sin dato ni siquiera en los últimos días»
+para TODOS los puntos del tanque: HTTP 500 en las analógicas y timeout de 15 s
+en las ocho de `ALARMAS/`. El historiador funcionaba: por el camino de
+producción las mismas señales daban 21 puntos en 6 h, y el commit `3864acb`
+había recalibrado umbrales contra 849 muestras reales esa misma mañana.
 
-**La diferencia está en lo que pide cada uno.** La sonda no lee una serie:
-hace búsqueda binaria hacia atrás recorriendo hasta `TOPE_TRAMOS = 365` para
-encontrar la muestra más antigua. Eso castiga a un servidor que contesta sin
-esfuerzo a una consulta normal — y el propio cliente ya lo interpreta bien al
-agotar el plazo: «suele ser un servidor de planta saturado, no caído».
+**La causa, medida.** `/History` sólo contesta sobre el árbol PROPIO del
+historiador (`hda:\Configuration\DEMO TANQUE\…`), no sobre el nombre `ac:` del
+valor en vivo. Desde la reorganización del árbol del 09-09-2026, pedir `ac:`
+da 500 en doce de las trece ramas — está documentado en la cabecera de
+`puntoHistorico()` en `senales.js` y en §4 del Plan 27. Producción se actualizó
+entonces (`series.punto` pasó a `puntoHistorico`); esta sonda se quedó atrás.
 
-**Por qué importa arreglarlo y no sólo saberlo.** Esta sonda es la única
-herramienta que responde «¿desde cuándo hay historia de verdad?», y hoy
-contesta «desde nunca» sobre un historiador que funciona. Un instrumento que
-da un falso negativo es peor que no tenerlo: el 14-09-2026 llevó a declarar
-BLOQUEADA una fase del Plan 29 que no lo estaba.
+Mismo rango, misma señal, medido antes de tocar nada:
 
-**Posibles salidas** (no decidido): espaciar las peticiones, bajar
-`TOPE_TRAMOS`, o empezar por una consulta ancha y sólo afinar si devuelve
-dato. Lo que no vale es subir el timeout: el problema no es que tarde.
+```
+nivelTanque   ac:  → 500      hda: → 200, 35 muestras
+presionRelativa ac: → 500     hda: → 200, 35 muestras
+fallaVariador ac:  → 504      hda: → 200
+```
 
-**Nota de método, que es la parte que no caduca.** El fallo de un camino de
-lectura no autoriza a declarar caída la fuente. Antes de escribir «el
-historiador no sirve» en un plan, se prueba por el camino que usa producción.
+**La hipótesis que esta entrada traía era FALSA.** Decía que la sonda saturaba
+el servidor con sus 365 tramos y proponía espaciar peticiones o bajar
+`TOPE_TRAMOS`. No: falla **en el primer tramo**, sin carga ninguna. Nada de la
+búsqueda hacia atrás estaba mal — el algoritmo, que costó dos intentos, sigue
+intacto. Se cambió el nombre que pide, y ya.
+
+**Resultado.** Recorre las 52 señales y contesta: historia contigua desde el
+18-08-2026 en `nivelTanque` y `temperaturaTanque` —coincide con lo medido el
+02-09, que es la comprobación de que no miente—, desde el 08 o 09-09 en las
+ramas nuevas. Los «sin dato» que quedan son verdaderos negativos: el servidor
+responde 200 con cero muestras (comprobado en `mttoS1`, `arranqueParoS1`,
+`setpointLlenado`, `potenciaActualVariador`).
+
+**Las dos notas de método, que son lo que no caduca:**
+
+1. El fallo de UN camino de lectura no autoriza a declarar caída la fuente.
+   Antes de escribir «el historiador no sirve» en un plan, se prueba por el
+   camino que usa producción. (Esto ya estaba escrito aquí y se cumplió.)
+2. Y la que faltaba: **una hipótesis sobre la causa, aunque explique el
+   síntoma, no es la causa.** «Satura el servidor» encajaba con los timeouts y
+   con los 500, y era plausible sin ser cierta. Costaba una sola petición
+   comprobarlo, y esa petición debió ir antes de escribir la entrada.
 
 ---
 
@@ -423,6 +438,7 @@ historiador no sirve» en un plan, se prueba por el camino que usa producción.
 
 1. ~~**B1**~~ — hecho el 28-08-2026
 2. ~~**B9**~~ — hecho el 11-09-2026
+2. ~~**B10**~~ — hecho el 15-09-2026 (una línea: `pointName` → `puntoHistorico`)
 3. **B3** — la asimetría que más se nota en una demo
 3. **B4** — deja de ser una limitación en cuanto haya una segunda máquina con histórico
 4. **B5** — decisión de una tarde, pero un verificador en rojo permanente no sirve

@@ -55,6 +55,14 @@
  * Sin argumentos, recorre las señales de `historizadas()`. Un argumento es
  * la `key` del catálogo (`shared/eva/tanque/senales.js`), no el nombre del tag.
  *
+ * ── SE PREGUNTA POR EL ÁRBOL `hda:`, NO POR EL DE VIVO ──────────────
+ *
+ * `/History` sólo contesta sobre el árbol propio del historiador
+ * (`puntoHistorico()`), no sobre el nombre `ac:` del valor en vivo
+ * (`pointName()`). Desde la reorganización del 09-09-2026, pedir `ac:` da 500
+ * en doce de las trece ramas del tanque. Ver la nota de B10 más abajo, en el
+ * cuerpo.
+ *
  * Habla con el servidor ICONICS real de `.env.local` — no monta la app, no
  * necesita el backend levantado, pero SÍ necesita ICONICS_FAKE=false (o sin
  * poner) y las credenciales de verdad. Con ICONICS_FAKE=true no tiene
@@ -66,7 +74,7 @@ import { createAuthenticator } from '../backend/iconics/authenticator.mjs'
 import { createIconicsClient } from '../backend/iconics/client.mjs'
 import { logger } from '../backend/logger.mjs'
 import { intervaloHMS } from '../shared/eva/comun/historia.js'
-import { esHistorizada, historizadas, pointName, senalInfo } from '../shared/eva/tanque/senales.js'
+import { esHistorizada, historizadas, puntoHistorico, senalInfo } from '../shared/eva/tanque/senales.js'
 import { isGoodQuality } from '../shared/quality.js'
 
 // Un sondeo por tramo: la traza INFO de cada llamada (`iconics/client.mjs`)
@@ -232,7 +240,32 @@ async function main() {
       continue
     }
 
-    const tag = pointName(clave)
+    /*
+     * ── `hda:`, NO `ac:` — ARREGLO DE B10 (15-09-2026) ─────────────────
+     *
+     * Esto pedía `pointName(clave)`, que es el nombre del punto EN VIVO. Y
+     * `/History` no lo acepta desde la reorganización del árbol del
+     * 09-09-2026: contra `ac:TDCON/DEMO/…` devuelve 500 en doce de las trece
+     * ramas. Sólo contesta el árbol PROPIO del historiador,
+     * `hda:\Configuration\DEMO TANQUE\…` — `hda:` es el ARCHIVO, `ac:` es el
+     * VALOR EN VIVO, y lo mismo sabía `vibraciones.js` de su máquina desde
+     * agosto.
+     *
+     * Producción ya lo hacía bien: `series.punto` de `sistemas.js` pasó a
+     * `puntoHistorico` en el Plan 27. Esta sonda se quedó atrás y nadie lo
+     * notó porque su falso negativo —«sin dato ni siquiera en los últimos
+     * días»— se lee como un problema del servidor, no del guion.
+     *
+     * Medido antes de tocar nada: mismo rango, misma señal, `ac:` → 500 y
+     * `hda:` → 200 con 35 muestras. La hipótesis que este arreglo venía a
+     * atender (que la sonda saturaba el servidor con sus 365 tramos) era
+     * FALSA: falla ya en el primer tramo, sin carga ninguna.
+     */
+    const tag = puntoHistorico(clave)
+    if (!tag) {
+      console.log(`${c.gris}· ${senal.label} (${clave}): sin nombre conocido en el árbol del historiador.${c.reset}`)
+      continue
+    }
     process.stdout.write(`${senal.label} (${tag})… `)
     try {
       const { borde, motivo } = await buscarBorde(tag)

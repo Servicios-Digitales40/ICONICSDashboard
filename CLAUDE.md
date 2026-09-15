@@ -331,7 +331,15 @@ node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad d
 > .env.local». Es la causa habitual de verlo en rojo dentro de una tanda de
 > `verificar-*`, y no es una regresión — estaba listado junto a los que sí
 > corren sin red. Con `--env-file` y red a planta pasa: medido el
-> 02-09-2026, historia contigua desde el 18-08.
+> 02-09-2026 y confirmado el 15-09-2026, historia contigua desde el 18-08.
+>
+> Entre esas dos fechas estuvo dando un falso negativo —«sin dato ni siquiera
+> en los últimos días» sobre un historiador que funcionaba— porque pedía el
+> punto con `pointName()` (`ac:`, el valor EN VIVO) y `/History` sólo contesta
+> sobre el árbol propio del historiador (`puntoHistorico()`, `hda:`) desde la
+> reorganización del 09-09-2026. Arreglado (B10). Vale la pena saberlo al
+> escribir cualquier guion nuevo contra `/History`: **`hda:` es el ARCHIVO,
+> `ac:` es el VALOR**, y confundirlos da 500, no un error que se explique solo.
 >
 > Ojo al diagnosticarlo desde fuera: `bms-server` usa **certificado
 > autofirmado**, así que un `curl` sin `-k` devuelve 000 y parece que no hay
