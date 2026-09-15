@@ -183,10 +183,76 @@ sin porcentajes. Si `estado` no es `completo` (Plan 28 F3), lo dice.
 - Los dos idiomas
 
 **Criterios de aceptación**
-- [ ] El modelo narra, no diagnostica
-- [ ] Sin LLM la vista sigue siendo útil
-- [ ] Ningún botón acciona planta
-- [ ] `verificar-i18n` y `verificar-textos` en verde
+- [x] El modelo narra, no diagnostica
+- [x] Sin LLM la vista sigue siendo útil
+- [x] Ningún botón acciona planta
+- [x] `verificar-i18n` y `verificar-textos` en verde
+
+**Estado: COMPLETADA el 15-09-2026.** 25 comprobaciones nuevas (15 en
+`verificar-narrador.mjs`, 10 en `avisos-eva.test.jsx`), 31/31 verificadores,
+348 del backend, build dentro de techo.
+
+**La decisión que este plan dejaba abierta** («`chat.mjs` o una ruta propia»)
+se cierra con **ruta propia**, y por tres motivos que no son de gusto:
+
+1. **Coste.** `responder()` monta el catálogo de herramientas y el prompt de
+   sistema en cada turno: ~14 000 tokens fijos. Aquí no hace falta ninguna
+   herramienta, así que serían 14 000 tokens por aviso para no usarlos.
+2. **La frontera.** Con herramientas en la mano, un modelo al que se le pide
+   narrar un diagnóstico puede llamar a `diagnosticar_falla` y traerse OTRO.
+   Lo que narraría ya no sería lo que el motor decidió, y §2.3 se rompería por
+   el camino más difícil de detectar: el resultado seguiría pareciendo
+   correcto. Hay una comprobación dedicada a esto.
+3. **La conversación.** Un aviso no es un turno de nadie: no tiene historial
+   previo ni lo tendrá.
+
+Lo que sí se reutiliza —literalmente, sin reescribir una coma— es
+`comoRedactar` de `herramientas/diagnostico/index.mjs`. Cada cláusula de esa
+instrucción tiene un defecto medido detrás («3 casos previos» del 03-09, el
+orden de §2.3, el `estado` del Plan 28 F3), y una segunda versión «parecida»
+para esta pantalla significaría que el próximo arreglo entra en una y no en la
+otra. Es §2.6 aplicado a una instrucción en vez de a una regla de negocio; el
+modo de fallo es el mismo. `verificar-narrador.mjs` comprueba que llega entera.
+
+**Piezas**
+- `backend/ia/motor/narrador.mjs` — una llamada, sin herramientas, sin
+  razonamiento (gastaría del mismo `max_tokens` que el párrafo). Devuelve
+  `texto: null` con su motivo ante cualquier fallo; nunca lanza.
+- `GET /api/diagnostico/narrado` — ruta aparte de `/api/diagnostico` porque
+  tardan dos órdenes de magnitud distintos y fallan por motivos distintos.
+- `AvisosEva.jsx` — narración y ficha determinista JUNTAS. No es redundancia:
+  es lo que permite ver que el párrafo dice lo que el motor decidió.
+- Los avisos se piden **de uno en uno**, no con `Promise.all`: cada uno ocupa
+  el modelo decenas de segundos, así que en paralelo harían cola igual y
+  dejarían la pantalla vacía hasta el último.
+
+**Un defecto que atrapó la prueba antes que la pantalla.** La vista usaba
+`AlertBanner` con `tone=` y children; su API real es `type=` + `title`/
+`message`. Habría reventado con `Cannot read properties of undefined` en cuanto
+alguien abriera la pantalla con un aviso cargando.
+
+### Sobre la suite de frontend: inestabilidad PREEXISTENTE
+
+Al correr la tanda completa aparecían fallos en pruebas ajenas a este trabajo
+(`accesibilidad`, `selector-rango`, `detalle-activo-simulada`,
+`planta-simulada`), y **cambiaban de nombre en cada tanda**.
+
+Se midió antes de concluir nada, con un worktree limpio en el commit de F1:
+
+| | tanda 1 | tanda 2 | tanda 3 |
+|---|---|---|---|
+| Base F1 (sin F2) | verde | **1 fallo** | verde |
+| Con F2 | 1 fallo | 3 fallos | 1 fallo |
+
+**La base también falla**, así que no lo introdujo F2. Ninguna de las pruebas
+que fallan es de este trabajo: las 10 de `avisos-eva` y las 12 de F1 no han
+fallado en ninguna tanda. F2 no lo causa, pero sí lo hace más visible —añade
+10 pruebas a una suite que ya iba justa de recursos en esta máquina.
+
+Queda **anotado y sin arreglar**, que es lo que corresponde: arreglarlo es otro
+trabajo, y fingir que no existe porque una tanda salió verde sería peor. Si CI
+lo reproduce, el sitio donde mirar es el aislamiento entre archivos de prueba
+—`cleanup()` y los sondeos que cada vista deja vivos—, no estas fases.
 
 ### F3 — Ciclo de vida del aviso
 

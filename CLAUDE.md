@@ -297,6 +297,7 @@ node scripts/verificar-backend.mjs          # contrato HTTP completo
 node scripts/verificar-herramientas.mjs      # cada herramienta del asistente
 node scripts/verificar-chat.mjs               # el bucle de conversación
 node scripts/verificar-diagnostico.mjs        # el motor: las 4 fuentes y su puntuación
+node scripts/verificar-narrador.mjs            # narrar un diagnóstico YA calculado, sin rediagnosticarlo
 node scripts/verificar-documentos.mjs          # índice de manuales / BM25
 node scripts/verificar-casos.mjs                # índice de casos previos
 node scripts/verificar-casos-cierre.mjs          # cierre de diagnóstico (form y chat)

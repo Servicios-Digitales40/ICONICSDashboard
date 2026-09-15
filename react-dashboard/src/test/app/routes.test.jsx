@@ -26,7 +26,7 @@ import { buildNav } from "@/app/routes/buildNav.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las veintisiete vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las veintiocho vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -66,6 +66,10 @@ describe("superficie de la aplicación", () => {
       // `eva-bandeja` (Plan 25 F6) — igual: un hallazgo puede ser de cualquiera
       // de las dos máquinas, así que la bandeja no es de ninguna.
       "eva-bandeja",
+      // `eva-avisos` (Plan 31 F2) — la otra cara de la bandeja: aquélla es un
+      // INVENTARIO y ésta un AVISO. Va justo detrás a propósito, y en General
+      // por el mismo motivo: un aviso puede ser de cualquiera de las dos.
+      "eva-avisos",
       // `eva-cuaderno` (Plan 25 F8) — igual: una nota puede ser de cualquiera
       // de las dos, o de ninguna en concreto.
       "eva-cuaderno",
@@ -181,7 +185,7 @@ describe("el sidebar que sale del registro", () => {
       // `eva-muro` oculta del sidebar para esta demo (14-09-2026): la ruta
       // sigue existiendo (ver el test de `ids` más arriba), sólo no trae
       // `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
-      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "eva-cuaderno", "salud-sistema",
+      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "eva-avisos", "eva-cuaderno", "salud-sistema",
     ]);
 
     /*

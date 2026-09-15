@@ -131,6 +131,19 @@
       "caso": "Caso similar"
     }
   },
+  "notices": {
+    "title": "Avisos",
+    "subtitle": "Lo que está pasando ahora mismo, con la causa que el sistema ya calculó y contada en una frase.",
+    "list": "Ahora mismo",
+    "empty": "Nada que avisar: ninguna de las dos máquinas tiene un riesgo activo.",
+    "narratingTitle": "Redactando",
+    "narrating": "Redactando los avisos ({{hechos}} de {{total}}). Con el modelo pequeño cada uno tarda medio minuto largo.",
+    "notNarrated": "No se pudo redactar el aviso; la causa de arriba la calculó el sistema igual.",
+    "noCauses": "Este riesgo no tiene causas candidatas declaradas.",
+    "notDiagnosed": "No se pudo diagnosticar este riesgo, pero sigue activo.",
+    "detail": "Ver el diagnóstico",
+    "seeRisks": "Ver riesgos"
+  },
   "notebook": {
     "title": "Cuaderno de planta",
     "subtitle": "Notas de quien está delante de la máquina — lo que dice una persona, no un accionamiento del sistema.",

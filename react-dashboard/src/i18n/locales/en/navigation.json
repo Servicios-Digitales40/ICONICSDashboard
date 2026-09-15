@@ -132,6 +132,11 @@
       "nav": "Findings",
       "sub": "Active risks and similar cases the system already calculated and no one has seen yet"
     },
+    "eva-avisos": {
+      "title": "Notices",
+      "nav": "Notices",
+      "sub": "What is happening now, diagnosed and told in one sentence"
+    },
     "eva-cuaderno": {
       "title": "Notebook",
       "nav": "Notebook",

@@ -38,6 +38,7 @@ import { createIndiceCasos } from './ia/motor/casos.mjs'
 import { createMotorDiagnostico } from './ia/motor/diagnostico.mjs'
 import { createGestorManuales } from './ia/indices/manuales.mjs'
 import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
+import { crearNarrador } from './ia/motor/narrador.mjs'
 import { createHerramientas } from './ia/conversacion/herramientas.mjs'
 import { crearAyudantesDeHistoria } from './ia/herramientas/lib/historia.mjs'
 import { createVoz } from './ia/voz.mjs'
@@ -381,6 +382,22 @@ export async function createApp(config) {
   })
   const chat = createChat({ config, herramientas })
 
+  /*
+   * ── EL NARRADOR DE AVISOS (PLAN 31 F2) ─────────────────────────────
+   *
+   * Se monta SIEMPRE, igual que el chat: sin `IA_BASE` no lanza, devuelve
+   * `texto: null` con su motivo y la vista enseña el diagnóstico sin narrar.
+   * Montarlo condicionalmente obligaría a la ruta a distinguir entre «no hay
+   * narrador» y «el narrador no pudo», que son la misma respuesta para quien
+   * mira la pantalla.
+   *
+   * No pasa por `chat`: narrar un diagnóstico ya calculado no necesita el
+   * catálogo de herramientas —unos 14 000 tokens por turno— y con herramientas
+   * en la mano el modelo podría rediagnosticar, que es justo lo que §2.3
+   * prohíbe. Ver la cabecera de `ia/motor/narrador.mjs`.
+   */
+  const narrador = crearNarrador({ config })
+
   // Las consultas se atienden de una en una, pero NINGUNA se rechaza por eso:
   // el que llega segundo espera su turno con el flujo abierto y sabiendo
   // cuántos tiene delante. Ver la cabecera de `ia/conversacion/cola.mjs`.
@@ -625,7 +642,7 @@ export async function createApp(config) {
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
     registerCasosRoutes(instancia)
-    registerDiagnosticoRoutes(instancia, { motorDiagnostico, diarioDiagnosticos })
+    registerDiagnosticoRoutes(instancia, { motorDiagnostico, diarioDiagnosticos, narrador })
     // El MISMO `diario` que escriben `iconicsRoutes` y `controlRoutes`: esta
     // ruta lo lee, y dos instancias apuntando al mismo archivo sería pedir que
     // una lea a medio escribir de la otra.

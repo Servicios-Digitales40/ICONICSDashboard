@@ -54,6 +54,40 @@ export async function obtenerDiagnostico({ sistema, riesgoId, valoresSensores, s
   return parseResponse(response);
 }
 
+/**
+ * El mismo diagnóstico, además NARRADO por el modelo — Plan 31 F2.
+ *
+ * ── POR QUÉ ES UNA FUNCIÓN APARTE Y NO UNA BANDERA ──────────────────
+ *
+ * Porque tardan cosas muy distintas. `obtenerDiagnostico` es determinista y
+ * vuelve en milisegundos; ésta espera a un modelo de lenguaje y puede tardar
+ * decenas de segundos. Quien sólo necesita las causas —`CierreDiagnostico`,
+ * que pre-rellena un formulario— no debe compartir contrato con eso.
+ *
+ * ── `narracion: null` NO ES UN ERROR ────────────────────────────────
+ *
+ * Es el caso normal de un servidor sin `IA_BASE`, y `sinNarracion` dice por
+ * qué. La respuesta trae las causas igual: la narración es el adorno, el
+ * diagnóstico es el dato. Quien pinte esto enseña el diagnóstico y, si acaso,
+ * menciona que no se pudo redactar — nunca al revés.
+ *
+ * `idioma` lo manda la PANTALLA y no se deduce de una cabecera: el tablero ya
+ * sabe en qué idioma está, y `Accept-Language` dice lo que puso el navegador,
+ * que es otra cosa.
+ */
+export async function obtenerDiagnosticoNarrado({ sistema, riesgoId, idioma, valoresSensores, signal }) {
+  const params = new URLSearchParams({ sistema, riesgoId });
+  if (idioma) params.set("idioma", idioma);
+  if (valoresSensores && Object.keys(valoresSensores).length > 0) {
+    params.set("valoresSensores", JSON.stringify(valoresSensores));
+  }
+  const response = await fetch(`${API_BASE}/api/diagnostico/narrado?${params}`, {
+    headers: authHeaders(),
+    signal,
+  });
+  return parseResponse(response);
+}
+
 /** Cierra un caso: lo que el sistema ya sabía más lo que confirmó o
  *  corrigió la persona. Ver `shared/eva/comun/aprendizaje.js` (`crearIntervencion`)
  *  para la forma completa de `datos`. */

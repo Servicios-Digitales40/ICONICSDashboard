@@ -26,6 +26,7 @@ import { z } from 'zod'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
 import { resumirDiagnosticos } from '../ia/motor/metricas.mjs'
+import { crearHerramientasDeDiagnostico } from '../ia/herramientas/diagnostico/index.mjs'
 
 /**
  * ── `valoresSensores` POR FIN TIENE QUIEN LO TRAIGA (PLAN 28 F1) ────
@@ -99,7 +100,43 @@ const MetricasQuerySchema = z.object({
   horas: z.coerce.number().int().min(1).max(168).optional(),
 })
 
-export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDiagnosticos }) {
+/**
+ * Un diagnóstico, calculado y NARRADO — Plan 31 F2.
+ *
+ *   GET /api/diagnostico/narrado?sistema=&riesgoId=&idioma=
+ *
+ * ── POR QUÉ ES UNA RUTA APARTE Y NO UNA BANDERA DE LA DE ARRIBA ─────
+ *
+ * Porque tardan dos órdenes de magnitud distintos y fallan por motivos
+ * distintos. `/api/diagnostico` es determinista y contesta en milisegundos;
+ * ésta llama a un modelo de lenguaje y puede tardar decenas de segundos o no
+ * contestar. Meterlas en la misma ruta con `?narrar=1` habría hecho que quien
+ * sólo quiere las causas —`CierreDiagnostico`, que las necesita para
+ * pre-rellenar un formulario— compartiera contrato con algo que puede tardar
+ * un minuto.
+ *
+ * ── LA NARRACIÓN PUEDE FALTAR, Y LA RESPUESTA SIGUE SIENDO ÚTIL ─────
+ *
+ * `narracion: null` con su `motivo` no es un error: es el caso normal de un
+ * servidor sin `IA_BASE`, y la vista enseña el diagnóstico sin narrar. Por eso
+ * esto NO devuelve 503 cuando falta el modelo — devolvería un error sobre una
+ * respuesta que está entera salvo el adorno. Sí lo devuelve si falta el MOTOR,
+ * que es la parte que no se puede degradar.
+ */
+const NarradoQuerySchema = z.object({
+  sistema: z.enum(SISTEMA_IDS, { error: 'Falta o no reconozco "sistema".' }),
+  riesgoId: z.string().min(1, 'Falta "riesgoId".'),
+  valoresSensores: ValoresSensoresSchema,
+  /*
+   * El idioma lo manda la PANTALLA, no se deduce de una cabecera: el tablero
+   * ya sabe en qué idioma está y `Accept-Language` dice lo que puso el
+   * navegador, que es otra cosa. Un aviso en inglés bajo una interfaz en
+   * español es exactamente el defecto que `verificar-i18n` persigue.
+   */
+  idioma: z.enum(['es', 'en']).optional(),
+})
+
+export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDiagnosticos, narrador }) {
   fastify.get(
     '/api/diagnostico/metricas',
     { schema: { querystring: MetricasQuerySchema } },
@@ -137,6 +174,71 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDia
         }
       } catch (error) {
         return responderError(reply, 500, CODIGOS.ERROR_DIAGNOSTICO, error.message)
+      }
+    }
+  )
+
+  fastify.get(
+    '/api/diagnostico/narrado',
+    { schema: { querystring: NarradoQuerySchema } },
+    async (request, reply) => {
+      if (!motorDiagnostico) {
+        return reply.code(503).send({
+          ok: false,
+          error: 'Este servidor no tiene el motor de diagnóstico montado.',
+          codigo: CODIGOS.ERROR_MOTOR_SIN_MONTAR,
+        })
+      }
+
+      const { idioma = 'es', ...entrada } = request.query
+
+      let resultado
+      try {
+        resultado = await motorDiagnostico.diagnosticar(entrada)
+      } catch (error) {
+        return responderError(reply, 400, CODIGOS.ERROR_DIAGNOSTICO, error.message)
+      }
+
+      /*
+       * ── LA INSTRUCCIÓN SALE DE LA HERRAMIENTA, NO SE REESCRIBE ───────
+       *
+       * `comoRedactar` vive en `herramientas/diagnostico/index.mjs` porque
+       * nació para el modelo del chat, y cada una de sus cláusulas tiene un
+       * defecto medido detrás: «si NO viene `casosCitados`, no los menciones»
+       * es el «3 casos previos» del 03-09-2026; «narra en ESE orden» es §2.3;
+       * «si viene `estado`, DILO antes» es el Plan 28 F3.
+       *
+       * Se pide a la MISMA herramienta que usa el chat —no se copia su texto
+       * aquí— para que el día que alguien añada una cláusula por un defecto
+       * nuevo, valga para las dos superficies. Es §2.6 aplicado a una
+       * instrucción en vez de a una regla de negocio; el modo de fallo es el
+       * mismo.
+       *
+       * Se le pasa un motor de un solo uso que devuelve el resultado YA
+       * calculado, en vez de dejar que lo recalcule: es el mismo diagnóstico,
+       * y pedirlo dos veces duplicaría la escritura en el diario —dos entradas
+       * para un solo diagnóstico falsearían las métricas del Plan 28 F7.
+       */
+      const paraNarrar = await crearHerramientasDeDiagnostico({
+        motorDiagnostico: { diagnosticar: async () => resultado },
+      }).diagnosticar_falla(entrada)
+
+      const narracion = narrador && paraNarrar?.ok
+        ? await narrador.narrar({ diagnostico: paraNarrar, idioma })
+        : { texto: null, motivo: 'sin_servidor' }
+
+      return {
+        ok: true,
+        ...resultado,
+        /*
+         * La narración va en su propio campo y NO fusionada con el resultado:
+         * quien consuma esto tiene que poder distinguir lo que calculó el motor
+         * de lo que escribió el modelo. Mezclarlos haría imposible auditar cuál
+         * de los dos dijo qué — que es la pregunta que se hace después de un
+         * «3 casos previos».
+         */
+        narracion: narracion.texto,
+        ...(narracion.motivo ? { sinNarracion: narracion.motivo } : {}),
       }
     }
   )

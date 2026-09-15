@@ -66,7 +66,7 @@
 import { lazy } from "react";
 import {
   Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
-  LayoutDashboard, NotebookPen, Power, ShieldAlert, Waves,
+  LayoutDashboard, MessageSquareText, NotebookPen, Power, ShieldAlert, Waves,
 } from "lucide-react";
 
 /**
@@ -321,6 +321,31 @@ export const ROUTES = [
     id: "eva-bandeja",
     component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
     nav: { icon: <Inbox size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ NO ES UNA PESTAÑA DE «HALLAZGOS» (Plan 31 F2) ──────────
+     *
+     * Porque el tono es distinto y mezclarlos estropea los dos. «Hallazgos» es
+     * un INVENTARIO —una lista que puede ser larga y que se repasa—; esto es un
+     * AVISO —«oye, mira esto»—. Juntos, o la lista larga se lee con la urgencia
+     * del aviso, o el aviso se pierde dentro de una lista.
+     *
+     * Va JUSTO DETRÁS de «Hallazgos» a propósito: son las dos caras de lo
+     * mismo, y el orden dice cuál se mira primero cuando hay prisa.
+     *
+     * En «General» por el mismo motivo que su vecina: un aviso puede ser de
+     * cualquiera de las dos máquinas, así que la vista no es de ninguna.
+     *
+     * Es la única pantalla del tablero que llama a un modelo de lenguaje sin
+     * que nadie haya escrito una pregunta. Por eso su vista explica, en su
+     * cabecera, por qué el diagnóstico se dispara al ABRIRLA y no al activarse
+     * el riesgo.
+     */
+    id: "eva-avisos",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
+    nav: { icon: <MessageSquareText size={17} />, group: "sec-general" },
   },
 
   {

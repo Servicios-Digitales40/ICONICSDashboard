@@ -132,6 +132,11 @@
       "nav": "Hallazgos",
       "sub": "Riesgos activos y casos similares que el sistema ya calculó y aún no ha visto nadie"
     },
+    "eva-avisos": {
+      "title": "Avisos",
+      "nav": "Avisos",
+      "sub": "Lo que está pasando ahora, diagnosticado y contado en una frase"
+    },
     "eva-cuaderno": {
       "title": "Cuaderno",
       "nav": "Cuaderno",

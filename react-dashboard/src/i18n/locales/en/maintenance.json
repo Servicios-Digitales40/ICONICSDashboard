@@ -131,6 +131,19 @@
       "caso": "Similar case"
     }
   },
+  "notices": {
+    "title": "Notices",
+    "subtitle": "What is happening right now, with the cause the system already computed, told in one sentence.",
+    "list": "Right now",
+    "empty": "Nothing to report: neither machine has an active risk.",
+    "narratingTitle": "Writing",
+    "narrating": "Writing the notices ({{hechos}} of {{total}}). With the small model each one takes a good half minute.",
+    "notNarrated": "The notice could not be written; the cause above was computed by the system anyway.",
+    "noCauses": "This risk has no candidate causes declared.",
+    "notDiagnosed": "This risk could not be diagnosed, but it is still active.",
+    "detail": "See the diagnosis",
+    "seeRisks": "See risks"
+  },
   "notebook": {
     "title": "Plant notebook",
     "subtitle": "Notes from whoever is in front of the machine — what a person says, not something the system did.",
