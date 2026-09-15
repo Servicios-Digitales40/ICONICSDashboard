@@ -699,12 +699,41 @@ await checkAsync('riesgos_activos(idioma: "en") de vibraciones traduce «apoyos�
    * F2/F3 no tradujeron porque sólo tocaron `titulo`/`evidencia`/etc. de
    * cada riesgo, no el envoltorio que los agrupa.
    */
+  /*
+   * ── POR QUÉ SE BUSCA EL RIESGO Y NO SE USA `riesgos[0]` ────────────
+   *
+   * Esto miraba `riesgos[0]`, y por eso llevaba semanas dando un rojo
+   * intermitente en CI que aquí no se reproducía —seis corridas locales
+   * limpias, y en el runner «Input: 'Non-drive end'»—. El commit `3864acb` lo
+   * declaró «preexistente y no relacionado» y se quedó así.
+   *
+   * La causa no es el azar del transporte falso (`rnd: () => 0.99` apaga el
+   * caos) ni el reloj (barridas 24 h simuladas: el resultado no se mueve). Es
+   * que este escenario activa CUATRO riesgos —`rodamientos-sin-vigilar`,
+   * `dkw-sin-referencia`, `medida-sin-vigilar`, `alarmas-sin-reconocer`— y
+   * sólo el primero agrupa los tres apoyos. El orden entre riesgos de la misma
+   * severidad no está garantizado, así que `[0]` apunta a uno distinto según
+   * la máquina.
+   *
+   * Lo que esta prueba quiere comprobar es la TRADUCCIÓN de un `apoyos`
+   * agrupado, no qué riesgo sale primero. Se busca por id: si mañana el orden
+   * vuelve a cambiar, esto sigue diciendo lo mismo.
+   */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
   const en = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
-  assert.match(en.riesgos[0].apoyos, /Drive end, Intermediate bearing, Non-drive end/)
-  assert.doesNotMatch(en.riesgos[0].apoyos, /Lado acople/)
+
+  const agrupado = (en.riesgos ?? []).find((r) => r.apoyos?.includes(','))
+  assert.ok(agrupado, 'el escenario tiene que producir al menos un riesgo con varios apoyos')
+  assert.match(agrupado.apoyos, /Drive end, Intermediate bearing, Non-drive end/)
+  assert.doesNotMatch(agrupado.apoyos, /Lado acople/)
+
+  // Y ningún riesgo, agrupado o no, puede quedarse con la etiqueta en español.
+  for (const riesgo of en.riesgos ?? []) {
+    assert.doesNotMatch(riesgo.apoyos ?? '', /Lado acople|Rodamiento intermedio|Lado libre/)
+  }
+
   assert.match(en.aviso, /Peak acceleration on the drive-end bearing/)
   assert.doesNotMatch(en.aviso, /aceleración de pico/)
 })
