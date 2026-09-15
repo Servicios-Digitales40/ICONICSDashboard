@@ -240,3 +240,128 @@ describe("los casos similares proactivos (F0) también aparecen como hallazgo", 
     expect(screen.getByText(/Caso similar/)).toBeTruthy();
   });
 });
+
+/**
+ * ── LA CUARTA PREGUNTA (PLAN 31 F1) ────────────────────────────────
+ *
+ * La tarjeta ya contestaba qué pasa, qué puede pasar y qué mirar. El «por qué
+ * está pasando» lo calculaba el motor en esta misma pantalla desde hacía meses
+ * —`obtenerDiagnostico` ya se llamaba— y se tiraba todo menos `casosCitados`.
+ *
+ * Lo que estas pruebas defienden no es que la línea exista, sino que dice la
+ * verdad: la banda SIEMPRE con el título, un estado incompleto dicho en voz
+ * alta, y silencio —no una causa inventada— cuando no hay diagnóstico.
+ */
+describe("la causa más respaldada se enseña, con su banda", () => {
+  const conDiagnostico = (diagnostico) => {
+    enCalma();
+    evaluarRiesgos.mockReturnValue({
+      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
+      noEvaluables: [], evaluadas: 1,
+    });
+    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    obtenerDiagnostico.mockResolvedValue(diagnostico);
+  };
+
+  it("la primera causa se pinta con su título y su banda", async () => {
+    conDiagnostico({
+      estado: "completo",
+      causas: [
+        { id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto", casosCitados: [] },
+        { id: "otra", titulo: "Otra cosa", banda: "bajo", casosCitados: [] },
+      ],
+    });
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+    expect(screen.getByText(/ALTO/i)).toBeTruthy();
+    // Sólo la PRIMERA: la lista entera con su respaldo vive en Cierre de
+    // diagnóstico, que es donde alguien va a elegir una.
+    expect(screen.queryByText("Otra cosa")).toBeNull();
+  });
+
+  it("un diagnóstico PARCIAL lo dice: la banda sola se leería como completa", async () => {
+    /*
+     * Plan 28 F3. Es el defecto que esa fase arregló en el cierre de
+     * diagnóstico, y aquí se repetiría igual: «ALTO» calculado sin los
+     * manuales y «ALTO» con las cuatro fuentes se pintaban idénticos.
+     */
+    conDiagnostico({
+      estado: "parcial",
+      causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto", casosCitados: [] }],
+    });
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText(/diagnóstico parcial/i)).toBeTruthy());
+  });
+
+  it("un diagnóstico COMPLETO no añade ninguna advertencia", async () => {
+    conDiagnostico({
+      estado: "completo",
+      causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto", casosCitados: [] }],
+    });
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+    expect(screen.queryByText(/diagnóstico parcial|sin respaldo suficiente/i)).toBeNull();
+  });
+
+  it("un riesgo HUÉRFANO no inventa una causa: se calla y la tarjeta sigue sirviendo", async () => {
+    // `causas: []` es un HECHO —se diagnosticó y no hay causas transcritas—,
+    // no un fallo. La tarjeta sigue contestando las otras tres preguntas.
+    conDiagnostico({ estado: "insuficiente", huerfano: true, causas: [] });
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText("Riesgo de derrame")).toBeTruthy());
+    expect(screen.queryByText(/Causa más respaldada/i)).toBeNull();
+  });
+
+  it("si el diagnóstico NO se pudo pedir, tampoco se inventa nada", async () => {
+    enCalma();
+    evaluarRiesgos.mockReturnValue({
+      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
+      noEvaluables: [], evaluadas: 1,
+    });
+    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    obtenerDiagnostico.mockRejectedValue(new Error("el puente no contesta"));
+
+    montar();
+
+    await waitFor(() => expect(screen.getByText("Riesgo de derrame")).toBeTruthy());
+    expect(screen.queryByText(/Causa más respaldada/i)).toBeNull();
+  });
+});
+
+describe("ninguna petición de más: la llamada al motor ya se hacía", () => {
+  it("se pide UNA vez por riesgo activo, no una por riesgo y otra por sus casos", async () => {
+    /*
+     * La afirmación de F1 que más fácil sería romper sin darse cuenta: el
+     * diagnóstico y los casos citados salen de la MISMA respuesta, así que
+     * enseñar la causa no puede costar una segunda llamada. Si alguien añade
+     * un `obtenerDiagnostico` para la causa, esto lo atrapa.
+     */
+    enCalma();
+    evaluarRiesgos.mockReturnValue({
+      activos: [
+        { id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" },
+        { id: "cavitacion", titulo: "Cavitación", severidad: "atencion", evidencia: "E" },
+      ],
+      noEvaluables: [], evaluadas: 2,
+    });
+    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    obtenerDiagnostico.mockResolvedValue({
+      estado: "completo",
+      causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto", casosCitados: [] }],
+    });
+
+    montar();
+
+    await waitFor(() => expect(screen.getAllByText("Fuga o rotura en la red").length).toBe(2));
+    expect(obtenerDiagnostico).toHaveBeenCalledTimes(2);
+  });
+});
+

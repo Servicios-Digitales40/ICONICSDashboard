@@ -29,7 +29,24 @@ se queda a mitad de la cuarta:
 - **por qué está pasando** → ❌
 
 La cuarta la contesta `motorDiagnostico.diagnosticar()`, que existe, está
-probado y **la Bandeja no llama**.
+probado y **la Bandeja ya llama**.
+
+> **Corrección del 15-09-2026, al empezar F1.** Este plan decía «la Bandeja no
+> llama», y era falso. `useCasosDeRiesgosActivos` pedía `/api/diagnostico` por
+> cada riesgo activo y se quedaba con esto:
+>
+> ```js
+> .then((data) => ({ riesgoId, casos: data?.causas?.[0]?.casosCitados ?? [] }))
+> ```
+>
+> Es decir: pedía el diagnóstico entero —causas puntuadas, bandas, respaldo de
+> las cuatro fuentes, estado— y conservaba los casos citados de la primera
+> causa. **La cuarta pregunta llevaba meses calculada y pagada en esta
+> pantalla, y sin enseñarse.**
+>
+> Eso hace F1 más barata de lo planeado y mueve dónde está el trabajo: no es
+> «añadir una llamada al motor», es dejar de tirar el resultado. La llamada no
+> cambia; cambia el `.then`.
 
 ## 2. Lo que este plan NO hace, y es la mitad del diseño
 
@@ -105,10 +122,37 @@ afirmar algo que no se ha hecho (§2.4).
 - El diagnóstico se pide al MONTAR la vista, no en cada render
 
 **Criterios de aceptación**
-- [ ] El badge no añade peticiones
-- [ ] Cuenta hallazgos, no diagnósticos
-- [ ] La vista enseña la causa más respaldada, con su banda
-- [ ] Sin LLM: F1 entera es determinista
+- [x] El badge no añade peticiones
+- [x] Cuenta hallazgos, no diagnósticos
+- [x] La vista enseña la causa más respaldada, con su banda
+- [x] Sin LLM: F1 entera es determinista
+
+**Estado: COMPLETADA el 15-09-2026.** 12 pruebas nuevas, 943 en verde, 30/30
+verificadores.
+
+Lo que se construyó, que no es exactamente lo planeado:
+
+- `data/comunes/hallazgos.js` — `useConteoHallazgos()`, sobre el snapshot que
+  los dos sondeos ya traen. Cero peticiones, con prueba que cuenta `fetch`.
+- `lib/vistoPorMi.js` — **le faltaba `suscribir()`**. El plan daba por hecho
+  que el badge podía leer la misma clave que la Bandeja y enterarse de los
+  descartes; no podía. Hasta ahora quien marcaba y quien leía eran el mismo
+  componente, así que su `useState` bastaba. El badge vive en otro árbol de
+  React, y el evento `storage` del navegador no sirve —por estándar sólo se
+  dispara en las OTRAS pestañas, nunca en la que escribió—.
+- `Sidebar.jsx` — el badge, en el punto de estado que ya existía. También en la
+  **cabecera del grupo**, que el plan no preveía: con la barra colapsada a 72px
+  o el grupo plegado los hijos no se pintan, y el badge habría desaparecido
+  justo en los dos estados donde más falta hace.
+- `BandejaEva.jsx` — la línea de causa, con su banda y con el estado del
+  diagnóstico cuando no es `completo` (Plan 28 F3).
+
+**El defecto que estuvo a punto de colarse.** El primer borrador del hook
+llamaba a `vistoPorMi.clave` y `vistoPorMi.suscribir()` dando por hecho que
+existían. Ninguno de los dos existía, y **ninguno habría dado error**:
+`evento.key === undefined` simplemente no se cumple nunca, y `baja?.()` se
+traga la ausencia. El badge habría contado bien al montar y no habría bajado
+jamás al descartar. Lo atrapó leer el archivo en vez de asumir su forma.
 
 ### F2 — La vista de avisos narrados
 

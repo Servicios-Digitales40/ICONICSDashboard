@@ -12,6 +12,7 @@ import { useMediaQuery } from "@/lib/viewport.js";
 import { NAV } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/index.js";
 import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
+import { useConteoHallazgos } from "@/Demo-EVA/data/comunes/hallazgos.js";
 import { estadoColor } from "@/Demo-EVA/components/paleta.js";
 import { RAIZ } from "@shared/eva/tanque/senales.js";
 
@@ -80,6 +81,49 @@ function MarcaEstacion({ size = 18 }) {
  */
 const UMBRAL_CAJON = "(max-width: 900px)";
 
+/**
+ * Cuántos hallazgos sin mirar cuelgan de esta entrada — Plan 31 F1.
+ *
+ * ── POR QUÉ UN NÚMERO Y NO UN PUNTO ────────────────────────────────
+ *
+ * Porque con la barra colapsada a 72px el badge es lo ÚNICO que queda visible
+ * de la entrada, y ahí «3» invita a abrir mientras que un punto sólo dice
+ * «algo». El punto de estado de al lado sí es un punto porque su información
+ * es cualitativa —en banda, en aviso, fuera de límite— y ya la lleva el color.
+ *
+ * ── POR QUÉ NUNCA SE PINTA EN CERO ─────────────────────────────────
+ *
+ * Un badge en «0» es ruido: ocupa sitio para decir que no hay nada que decir, y
+ * a las dos semanas se deja de mirar el que sí tiene número. Cero es la
+ * ausencia del badge, no un badge con un cero.
+ *
+ * `aria-hidden` a propósito: el número ya viaja en la etiqueta accesible de
+ * quien lo pinta, redactado («2 hallazgos sin mirar»), y anunciarlo dos veces
+ * lo leería como «2 2».
+ */
+function BadgeConteo({ conteo, t }) {
+  if (!conteo) return null;
+
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        position: "absolute", top: -5, left: -7,
+        minWidth: 15, height: 15, padding: "0 4px", borderRadius: 999,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: t.coral, color: "#fff",
+        fontSize: 9.5, fontWeight: 800, lineHeight: 1,
+        border: `1.5px solid ${t.sidebar}`,
+      }}
+    >
+      {/* Se corta en 9+: a partir de ahí el número exacto no cambia ninguna
+          decisión —hay que ir a mirar igual— y dos cifras no caben sin
+          ensanchar el badge por encima del icono. */}
+      {conteo > 9 ? "9+" : conteo}
+    </span>
+  );
+}
+
 /** Envuelve en tooltip solo cuando la barra está colapsada y no se ve el texto. */
 function MaybeTip({ collapsed, label, children }) {
   return collapsed ? <HoverTip label={label}>{children}</HoverTip> : children;
@@ -101,12 +145,25 @@ function MaybeTip({ collapsed, label, children }) {
  * El punto de color nunca va solo: el texto lo acompaña en el tooltip y en el
  * `title` (DESIGN.md), y eso no cambia — sólo cambia quién escribe el texto.
  */
-function NavButton({ item, active, onNavigate, t, dark, indent = false, collapsed = false, estado = null }) {
+function NavButton({ item, active, onNavigate, t, dark, indent = false, collapsed = false, estado = null, conteo = 0 }) {
   const { t: traducir } = useTranslation("navigation");
+  const { t: traducirBarra } = useTranslation("layout");
   const { estado: textoDeEstado } = useDominio();
 
   const nombre = traducir(`routes.${item.id}.nav`);
-  const etiqueta = estado ? `${nombre} — ${textoDeEstado(estado).toLowerCase()}` : nombre;
+  /*
+   * El conteo entra en la etiqueta accesible, no sólo en el número pintado.
+   * Mismo criterio que el punto de estado (DESIGN.md): un indicador visual
+   * nunca va solo — quien navegue con lector de pantalla o con la barra
+   * colapsada tiene que poder enterarse por texto.
+   */
+  const etiqueta = [
+    nombre,
+    estado ? `— ${textoDeEstado(estado).toLowerCase()}` : null,
+    conteo > 0 ? `— ${traducirBarra("sidebar.pendingFindings", { count: conteo })}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <MaybeTip collapsed={collapsed} label={etiqueta}>
@@ -140,6 +197,7 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
               }}
             />
           )}
+          <BadgeConteo conteo={conteo} t={t} />
         </span>
         {!collapsed && nombre}
         {!collapsed && active && <span style={{ marginLeft: "auto", width: 6, height: 6, borderRadius: "50%", background: t.gradAccent }} />}
@@ -149,8 +207,9 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
 }
 
 /** Grupo desplegable: cabecera que colapsa/expande sus hijos. */
-function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSidebar }) {
+function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSidebar, conteoPorId = {} }) {
   const { t: traducir } = useTranslation("navigation");
+  const { t: traducirBarra } = useTranslation("layout");
   const nombre = traducir(`sections.${item.group}`);
   const childActive = item.children.some((c) => c.id === page);
 
@@ -174,6 +233,21 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
    */
   const [open, setOpen] = useState(!collapsed);
 
+  /*
+   * ── POR QUÉ LA CABECERA TAMBIÉN LLEVA EL BADGE ─────────────────────
+   *
+   * Porque los hijos NO siempre están pintados: con la barra colapsada a 72px
+   * no se pintan nunca, y con el grupo plegado tampoco. Un badge que sólo
+   * viviera en el hijo desaparecería justo en los dos estados donde más falta
+   * hace —quien plegó la sección es precisamente quien no la está mirando.
+   *
+   * Se SUMA el de los hijos en vez de contarlo aparte: la cabecera dice
+   * «aquí dentro hay N», y cuando el grupo se abre el número se reparte entre
+   * los hijos que lo aportan. Así los dos niveles cuentan lo mismo y no hay dos
+   * verdades sobre el mismo hecho.
+   */
+  const conteoHijos = item.children.reduce((suma, c) => suma + (conteoPorId[c.id] ?? 0), 0);
+
   useEffect(() => {
     if (collapsed) setOpen(false);
     else setOpen(true);
@@ -187,7 +261,13 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <MaybeTip collapsed={collapsed} label={nombre}>
+      {/* Con la barra colapsada el tooltip es lo ÚNICO que se lee de esta
+          cabecera, así que el conteo tiene que ir dentro: el badge sin texto
+          diría «hay algo» sin decir dónde. */}
+      <MaybeTip
+        collapsed={collapsed}
+        label={conteoHijos > 0 ? `${nombre} — ${traducirBarra("sidebar.pendingFindings", { count: conteoHijos })}` : nombre}
+      >
         <button
           className="nav-item"
           onClick={() => {
@@ -207,7 +287,13 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
             fontSize: 13.5, fontWeight: childActive ? 700 : 500, fontFamily: "'Inter', sans-serif",
           }}
         >
-          <span style={{ display: "flex", color: childActive ? t.accent : t.textFaint }}>{item.icon}</span>
+          <span style={{ position: "relative", display: "flex", flexShrink: 0, color: childActive ? t.accent : t.textFaint }}>
+            {item.icon}
+            {/* Sólo con el grupo cerrado: abierto, el badge lo llevan los
+                hijos que lo aportan, y enseñar los dos a la vez contaría lo
+                mismo dos veces en la misma pantalla. */}
+            <BadgeConteo conteo={open && !collapsed ? 0 : conteoHijos} t={t} />
+          </span>
           {!collapsed && (
             <>
               {nombre}
@@ -223,7 +309,10 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
       {open && !collapsed && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
           {item.children.map((child) => (
-            <NavButton key={child.id} item={child} active={page === child.id} onNavigate={onNavigate} t={t} indent />
+            <NavButton
+              key={child.id} item={child} active={page === child.id} onNavigate={onNavigate} t={t} indent
+              conteo={conteoPorId[child.id] ?? 0}
+            />
           ))}
         </div>
       )}
@@ -251,6 +340,17 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
   // un segundo motor de sondeo, sólo lee el que ya corre.
   const { sistema } = useSistemaAgua();
   const estadoPorId = { "eva-planta": estadoPlanta(sistema) };
+  /*
+   * ── EL BADGE NO SONDEA (Plan 31 F1) ────────────────────────────────
+   *
+   * `useConteoHallazgos` cuenta sobre el snapshot que los dos sondeos ya
+   * traen; no sale a la red. Es la condición que hace que un contador pueda
+   * vivir en el sidebar, donde se paga en TODAS las pantallas — y es justo lo
+   * que le faltaba al de la campana del Topbar, retirado el 31-08-2026 por
+   * sondear cada 30 s en todas ellas (ver `routes.jsx`, `eva-alarmas`).
+   */
+  const { total: hallazgosPendientes } = useConteoHallazgos();
+  const conteoPorId = { "eva-bandeja": hallazgosPendientes };
   const [collapsedPref, setCollapsedPref] = useState(() => {
     try { return localStorage.getItem(STORAGE_KEY) === "1"; } catch { return false; }
   });
@@ -356,11 +456,11 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           const abreModulo = Boolean(item.modulo) && item.modulo !== moduloAnterior;
 
           const nodo = item.children ? (
-            <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} />
+            <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} conteoPorId={conteoPorId} />
           ) : (
             <NavButton
               key={item.id} item={item} active={page === item.id} onNavigate={navegar} t={t} dark={dark}
-              collapsed={collapsed} estado={estadoPorId[item.id] ?? null}
+              collapsed={collapsed} estado={estadoPorId[item.id] ?? null} conteo={conteoPorId[item.id] ?? 0}
             />
           );
 

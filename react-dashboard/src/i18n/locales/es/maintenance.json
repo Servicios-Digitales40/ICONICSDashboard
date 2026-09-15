@@ -121,6 +121,11 @@
     "empty": "No hay hallazgos pendientes: ningún riesgo activo, o ya los has visto todos.",
     "view": "Ver",
     "dismiss": "Descartar",
+    "likelyCause": "Causa más respaldada:",
+    "state": {
+      "parcial": "diagnóstico parcial",
+      "insuficiente": "sin respaldo suficiente"
+    },
     "origin": {
       "riesgo": "Riesgo activo",
       "caso": "Caso similar"

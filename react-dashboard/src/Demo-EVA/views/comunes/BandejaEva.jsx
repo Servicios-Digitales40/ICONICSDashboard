@@ -65,14 +65,33 @@ const SEVERIDAD_DEFECTO = { token: "accent", suave: "accentSoft", Icono: History
 const vistoPorMi = crearVistoPorMi("eva:hallazgos");
 
 /**
- * Los casos similares de LOS riesgos activos de un sistema.
+ * El diagnóstico de LOS riesgos activos de un sistema.
  *
- * Se pide sólo para las causas de riesgos que ya están activos: pedirlo para
- * los que no lo están sería preguntar por hallazgos que no van a aparecer, y
- * es exactamente el mismo criterio de "no preguntar sin necesidad" que
+ * Se pide sólo para los riesgos que ya están activos: pedirlo para los que no
+ * lo están sería preguntar por hallazgos que no van a aparecer, y es
+ * exactamente el mismo criterio de "no preguntar sin necesidad" que
  * `leerAlarmas` aplica sin `clave`.
+ *
+ * ── ESTA LLAMADA YA SE HACÍA; LO QUE SE TIRABA ERA LA RESPUESTA ─────
+ *
+ * Hasta el Plan 31 F1 esto se llamaba `useCasosDeRiesgosActivos` y se quedaba
+ * con `data?.causas?.[0]?.casosCitados`: pedía el diagnóstico entero —causas
+ * puntuadas, bandas, respaldo de las cuatro fuentes, estado— y conservaba los
+ * casos citados de la primera causa. Todo lo demás se descartaba en el mismo
+ * `.then`.
+ *
+ * Así que la cuarta pregunta —«por qué está pasando»— llevaba meses calculada
+ * y pagada en esta pantalla, y sin enseñarse. Guardar el resultado entero no
+ * añade ni una petición: es la misma llamada, sin el `?.[0]?.casosCitados`.
+ *
+ * ── POR QUÉ MONTAR LA VISTA Y NO ACTIVARSE EL RIESGO ────────────────
+ *
+ * Porque esto cuesta una petición por riesgo activo, y se paga sólo cuando hay
+ * alguien delante. Diagnosticar en el flanco de activación lo pagaría siempre,
+ * mire alguien o no — que es por lo que el contador de la campana del Topbar
+ * está retirado desde el 31-08-2026. Ver Plan 31 §2.3.
  */
-function useCasosDeRiesgosActivos(sistema, activos) {
+function useDiagnosticoDeRiesgosActivos(sistema, activos) {
   const [porRiesgo, setPorRiesgo] = useState({});
 
   const riesgoIds = activos.map((r) => r.id).join(",");
@@ -88,13 +107,20 @@ function useCasosDeRiesgosActivos(sistema, activos) {
     Promise.all(
       riesgoIds.split(",").map((riesgoId) =>
         obtenerDiagnostico({ sistema, riesgoId, signal: control.signal })
-          .then((data) => ({ riesgoId, casos: data?.causas?.[0]?.casosCitados ?? [] }))
-          .catch(() => ({ riesgoId, casos: [] }))
+          .then((data) => ({ riesgoId, diagnostico: data ?? null }))
+          /*
+           * Un fallo deja `diagnostico: null`, NO un objeto vacío con
+           * `causas: []`. La diferencia importa: `[]` diría «se diagnosticó y
+           * no hay causas» —que es un hecho, el de un riesgo huérfano— y
+           * `null` dice «no se pudo diagnosticar». Confundirlos disfrazaría
+           * una caída de red de resultado (§2.4).
+           */
+          .catch(() => ({ riesgoId, diagnostico: null }))
       )
     ).then((resultados) => {
       if (!vivo) return;
       const salida = {};
-      for (const { riesgoId, casos } of resultados) salida[riesgoId] = casos;
+      for (const { riesgoId, diagnostico } of resultados) salida[riesgoId] = diagnostico;
       setPorRiesgo(salida);
     });
 
@@ -105,6 +131,84 @@ function useCasosDeRiesgosActivos(sistema, activos) {
   }, [sistema, riesgoIds]);
 
   return porRiesgo;
+}
+
+/*
+ * Cada banda con su color — mismo mapa y mismos rótulos que
+ * `CierreDiagnostico`: el rótulo sale de `maintenance:close.band` por la
+ * propia clave, aquí sólo se decide de qué color. Duplicar el vocabulario
+ * habría dejado dos formas de escribir «ALTO» en dos pantallas que hablan del
+ * mismo diagnóstico.
+ */
+const BANDA_TOKEN = { alto: "coral", medio: "amber", bajo: "textFaint" };
+
+/**
+ * La causa más respaldada de un hallazgo de riesgo — Plan 31 F1.
+ *
+ * ── LO QUE ESTA LÍNEA CONTESTA ──────────────────────────────────────
+ *
+ * La cuarta pregunta. La tarjeta ya decía qué pasa (`evidencia`), qué puede
+ * pasar (`consecuencia`) y qué mirar (`accion`); faltaba POR QUÉ está pasando,
+ * y el motor llevaba meses calculándolo en esta misma pantalla sin que nadie lo
+ * enseñara. Ver la cabecera de `useDiagnosticoDeRiesgosActivos`.
+ *
+ * ── SÓLO LA PRIMERA CAUSA, Y CON SU BANDA ───────────────────────────
+ *
+ * Una tarjeta de bandeja es un resumen: la lista entera de causas con su
+ * respaldo ya vive en Cierre de diagnóstico, que es donde alguien va a
+ * ELEGIR una. Aquí sólo hace falta lo suficiente para decidir si merece la
+ * pena abrirlo.
+ *
+ * La banda va SIEMPRE con el título, nunca el título solo. Sin ella la
+ * primera causa se lee como «la causa», y es lo que el motor no dice: dice
+ * cuál está mejor respaldada y CON CUÁNTO. «BAJO» delante cambia por completo
+ * lo que la frase promete.
+ *
+ * ── LOS TRES CASOS QUE NO SON UNA CAUSA ─────────────────────────────
+ *
+ * `null` (no se pudo diagnosticar), huérfano (no hay causas transcritas
+ * debajo) y todavía cargando se distinguen entre sí y del caso normal. Los
+ * tres se callan en vez de inventar una línea: la Bandeja sigue siendo útil
+ * sin diagnóstico —ya contesta las otras tres preguntas—, así que un hueco no
+ * rompe la tarjeta. Lo que sí la rompería es un «sin causa» que se leyera como
+ * «no hay causa».
+ */
+function CausaMasRespaldada({ hallazgo, t, traducir }) {
+  const { causa: traducirCausa } = useProsa();
+
+  if (hallazgo.origen !== "riesgo") return null;
+
+  const primera = hallazgo.diagnostico?.causas?.[0];
+  if (!primera) return null;
+
+  const token = BANDA_TOKEN[primera.banda] ?? BANDA_TOKEN.bajo;
+
+  return (
+    <p style={{ margin: "2px 0 0", display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap", fontSize: 12.5 }}>
+      <span
+        style={{
+          fontSize: 9.5, fontWeight: 700, padding: "1px 7px", borderRadius: 999,
+          color: t[token], background: `${t[token]}22`, flexShrink: 0,
+        }}
+      >
+        {traducir(`maintenance:close.band.${primera.banda ?? "bajo"}`)}
+      </span>
+      <span style={{ color: t.textSoft }}>
+        {traducir("maintenance:findings.likelyCause")}{" "}
+        <strong style={{ color: t.text, fontWeight: 600 }}>{traducirCausa(primera).titulo}</strong>
+      </span>
+      {/*
+        Plan 28 F3: un diagnóstico al que le faltó una fuente se pintaba idéntico
+        a uno completo. Aquí se dice, aunque sea corto — quien lea «ALTO» sin
+        saber que se calculó sin los manuales está leyendo otra cosa.
+      */}
+      {hallazgo.diagnostico.estado && hallazgo.diagnostico.estado !== "completo" && (
+        <span style={{ fontSize: 11, color: t.amber }}>
+          {traducir(`maintenance:findings.state.${hallazgo.diagnostico.estado}`)}
+        </span>
+      )}
+    </p>
+  );
 }
 
 export default function BandejaEva({ onNavigate }) {
@@ -124,30 +228,39 @@ export default function BandejaEva({ onNavigate }) {
     [canales, variador, alarmas]
   );
 
-  const casosTanque = useCasosDeRiesgosActivos("tanque", activosTanque);
-  const casosVibracion = useCasosDeRiesgosActivos("vibraciones", activosVibracion);
+  const diagnosticoTanque = useDiagnosticoDeRiesgosActivos("tanque", activosTanque);
+  const diagnosticoVibracion = useDiagnosticoDeRiesgosActivos("vibraciones", activosVibracion);
 
   const hallazgos = useMemo(() => {
     const salida = [];
 
-    for (const riesgo of activosTanque) {
-      const traducido = traducirRiesgo(riesgo);
-      salida.push(hallazgoDeRiesgo("tanque", { ...riesgo, titulo: traducido.titulo, evidencia: traducido.evidencia }));
-      for (const caso of casosTanque[riesgo.id] ?? []) {
-        salida.push(hallazgoDeCaso("tanque", riesgo.id, caso));
-      }
-    }
+    const agregar = (sistema, riesgos, traducirlo, porRiesgo) => {
+      for (const riesgo of riesgos) {
+        const traducido = traducirlo(riesgo);
+        const diagnostico = porRiesgo[riesgo.id] ?? null;
 
-    for (const riesgo of activosVibracion) {
-      const traducido = traducirRiesgoVibracion(riesgo);
-      salida.push(hallazgoDeRiesgo("vibraciones", { ...riesgo, titulo: traducido.titulo, evidencia: traducido.evidencia }));
-      for (const caso of casosVibracion[riesgo.id] ?? []) {
-        salida.push(hallazgoDeCaso("vibraciones", riesgo.id, caso));
+        salida.push({
+          ...hallazgoDeRiesgo(sistema, { ...riesgo, titulo: traducido.titulo, evidencia: traducido.evidencia }),
+          /*
+           * El diagnóstico viaja PEGADO al hallazgo, no fusionado con él:
+           * `hallazgoDeRiesgo` es dominio compartido y no sabe de diagnósticos
+           * (su cabecera dice, literalmente, que ese módulo no calcula nada).
+           * Meterlo dentro obligaría a `shared/` a conocer la forma del motor.
+           */
+          diagnostico,
+        });
+
+        for (const caso of diagnostico?.causas?.[0]?.casosCitados ?? []) {
+          salida.push(hallazgoDeCaso(sistema, riesgo.id, caso));
+        }
       }
-    }
+    };
+
+    agregar("tanque", activosTanque, traducirRiesgo, diagnosticoTanque);
+    agregar("vibraciones", activosVibracion, traducirRiesgoVibracion, diagnosticoVibracion);
 
     return ordenarHallazgos(salida);
-  }, [activosTanque, activosVibracion, casosTanque, casosVibracion, traducirRiesgo, traducirRiesgoVibracion]);
+  }, [activosTanque, activosVibracion, diagnosticoTanque, diagnosticoVibracion, traducirRiesgo, traducirRiesgoVibracion]);
 
   const visibles = hallazgos.filter((h) => !descartados.has(h.id));
 
@@ -225,6 +338,7 @@ export default function BandejaEva({ onNavigate }) {
                   </div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: t.text }}>{h.titulo}</p>
                   <p style={{ margin: 0, fontSize: 12.5, color: t.textSoft }}>{h.resumen}</p>
+                  <CausaMasRespaldada hallazgo={h} t={t} traducir={traducir} />
                 </div>
 
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>

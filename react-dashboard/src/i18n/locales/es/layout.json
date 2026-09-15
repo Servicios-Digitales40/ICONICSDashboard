@@ -26,7 +26,9 @@
     "collapse": "Colapsar barra",
     "expandAria": "Expandir barra lateral",
     "collapseAria": "Colapsar barra lateral",
-    "plantRoot": "Instalación: {{raiz}}"
+    "plantRoot": "Instalación: {{raiz}}",
+    "pendingFindings_one": "{{count}} hallazgo sin mirar",
+    "pendingFindings_other": "{{count}} hallazgos sin mirar"
   },
   "plant": "Instalación"
 }

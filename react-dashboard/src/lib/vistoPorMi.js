@@ -27,6 +27,18 @@
  * sobre conjuntos de ids DISTINTOS, y no pueden compartir clave de
  * almacenamiento: si la compartieran, marcar como visto un evento de alarma
  * marcaría también como visto un hallazgo con el mismo id por casualidad.
+ *
+ * ── POR QUÉ AVISA A QUIEN ESCUCHE (Plan 31 F1) ──────────────────────
+ *
+ * Hasta ahora quien marcaba y quien leía eran el mismo componente, así que su
+ * propio `useState` bastaba. El badge del sidebar rompe eso: lee la MISMA clave
+ * que la Bandeja desde otro árbol de React, y sin aviso seguiría marcando lo
+ * que ya se descartó hasta la siguiente recarga.
+ *
+ * El evento `storage` del navegador no sirve para esto —por estándar sólo se
+ * dispara en las OTRAS pestañas, nunca en la que escribió—, así que hace falta
+ * un aviso propio. El de `storage` sigue haciendo falta aparte, para la segunda
+ * pantalla abierta en el mismo puesto; lo pone quien se suscribe.
  */
 
 /**
@@ -35,6 +47,7 @@
  */
 export function crearVistoPorMi(clave, tope = 500) {
   const claveCompleta = `${clave}:vistos`;
+  const oyentes = new Set();
 
   function leer() {
     try {
@@ -64,7 +77,26 @@ export function crearVistoPorMi(clave, tope = 500) {
   /** Marca `ids` como vistos, sumándolos a los que ya había. */
   function marcar(ids) {
     guardar(new Set([...leer(), ...ids]));
+    /*
+     * Se avisa aunque `guardar` haya fallado (kiosco con almacenamiento
+     * bloqueado): quien escuche tiene que releer de todas formas. Si no se
+     * guardó nada, releerá lo mismo y no pasa nada; callarse, en cambio,
+     * dejaría la pantalla marcando algo que la persona acaba de descartar.
+     */
+    for (const oyente of oyentes) oyente();
   }
 
-  return { leer, marcar };
+  /**
+   * Avisa cuando `marcar` cambia algo. Devuelve la baja.
+   *
+   * Sólo cubre los cambios de ESTA pestaña, que es lo que `storage` no cubre.
+   * Quien quiera enterarse también de las otras, escucha `storage` además de
+   * esto — ver `Demo-EVA/data/comunes/hallazgos.js`.
+   */
+  function suscribir(oyente) {
+    oyentes.add(oyente);
+    return () => oyentes.delete(oyente);
+  }
+
+  return { leer, marcar, suscribir, clave: claveCompleta };
 }

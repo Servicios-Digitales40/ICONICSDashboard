@@ -121,6 +121,11 @@
     "empty": "No pending findings: no active risk, or you have already seen them all.",
     "view": "View",
     "dismiss": "Dismiss",
+    "likelyCause": "Best-backed cause:",
+    "state": {
+      "parcial": "partial diagnosis",
+      "insuficiente": "not enough backing"
+    },
     "origin": {
       "riesgo": "Active risk",
       "caso": "Similar case"
