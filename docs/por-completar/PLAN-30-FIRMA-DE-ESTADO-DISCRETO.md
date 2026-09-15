@@ -1,6 +1,26 @@
 # PLAN 30 — La quinta fuente: firma de estado discreto
 
-**Estado:** por completar
+**Estado:** las dos fases **completadas** el 15-09-2026.
+
+**Resultado medido:** los riesgos del tanque con 2+ causas y sin nada que las
+desempate bajan de **11 a 6**. Ocho causas declaran `firmaEstado`, y
+verificadas contra ICONICS real desempatan de verdad: en `marcha-en-seco`,
+`derrame` y `tension-fuera-con-motor`, una causa de cada par gana 1 punto y la
+otra recibe evidencia EN CONTRA.
+
+**Los seis que quedan, y por qué.** Cuatro son los cruces del Plan 29 F3
+(`nivel-critico-con-bomba-impulsando`, `emergencia-con-motor-en-carga`,
+`variador-en-falla-y-sigue-mandando`, `alarma-de-proceso-sin-respaldo-analogico`):
+su alarma ya está en la condición de la REGLA, así que repetirla como firma no
+distinguiría sus causas entre sí. `actuador-en-error` y `agua-caliente` son el
+caso que el Plan 29 F2 ya documentó: sus causas comparten mecanismo y lo que
+las separaría no está escrito en la regla. Ninguno se arregla con más firmas;
+harían falta señales o reglas nuevas.
+
+**Hallazgo del camino:** el historiador graba las alarmas **por excepción**
+—`nivelAlto` trae 20 muestras en 24 h y CERO en 12 h, 6 h o 2 h—, así que una
+ventana corta no alcanza el último cambio y vuelve vacía. Vacío no es
+«inactiva»: es «no cambió aquí». De ahí `VENTANA_MINIMA_ESTADO_H`.
 **Fecha:** 15-09-2026
 **Alcance:** SÓLO el tanque. Vibraciones sigue fuera por decisión del 14-09-2026.
 

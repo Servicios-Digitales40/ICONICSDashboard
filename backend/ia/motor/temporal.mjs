@@ -206,6 +206,32 @@ const NOMBRE_DIRECCION = { sube: 'subió', baja: 'bajó' }
 const MUESTRAS_MINIMAS_ESTADO = 1
 
 /**
+ * ── ESTE HISTORIADOR GRABA LAS ALARMAS POR EXCEPCIÓN ─────────────────
+ *
+ * Medido el 15-09-2026 sobre `nivelAlto`, 24 h en crudo: veinte muestras, y
+ * seis de ellas son pulsos de UN SEGUNDO (15:23:05 a 1, 15:23:07 a 0). Entre
+ * las 18:25 de ayer y ahora, NADA. No es que la señal no exista: es que sólo
+ * se apunta cuando cambia.
+ *
+ * Eso rompe la intuición de la ventana corta. Pedir `nivelAlto` en 2 h
+ * devuelve CERO muestras —`enRango` recorta lo que cae fuera, y con razón:
+ * sin agregado el servidor devuelve la muestra límite del historiador entero,
+ * que colada al principio de una ventana sería un flanco inventado—. Cero
+ * muestras no significa «la alarma estuvo inactiva»: significa «no cambió
+ * dentro de esta ventana», y el estado real puede ser cualquiera de los dos.
+ *
+ * De ahí la ventana MÍNIMA. Una firma de estado sobre este historiador
+ * necesita mirar lo bastante atrás como para alcanzar el último cambio; por
+ * debajo de eso, la respuesta honesta no es un veredicto sino silencio. 24 h
+ * es lo medido: con esa ventana `nivelAlto` trae sus veinte muestras.
+ *
+ * No se convierte en «si está vacío, asume inactiva». Eso es exactamente
+ * disfrazar de dato una ausencia (§2.4) — y en el peor sentido, porque
+ * afirmaría que una protección NO actuó, que es media acusación.
+ */
+const VENTANA_MINIMA_ESTADO_H = 24
+
+/**
  * ¿Coincide lo observado en la ventana con lo que la firma declara?
  *
  * `estado` puede ser:
@@ -313,7 +339,16 @@ export function createEvaluadorTemporal({ historia }) {
 
     for (const item of firma) {
       const ahora = new Date()
-      const ventana = { inicio: new Date(ahora.getTime() - item.ventanaH * 3600000), fin: ahora }
+      /*
+       * La ventana se ENSANCHA al mínimo si la firma pide menos — ver
+       * `VENTANA_MINIMA_ESTADO_H`. No se rechaza la firma ni se avisa: con
+       * grabación por excepción, una ventana corta no es un error de quien la
+       * declaró, es una ventana que no alcanza el último cambio. Se mira más
+       * atrás y se dice en la frase cuánto se miró, que es lo que el técnico
+       * necesita para juzgar la evidencia.
+       */
+      const ventanaH = Math.max(item.ventanaH, VENTANA_MINIMA_ESTADO_H)
+      const ventana = { inicio: new Date(ahora.getTime() - ventanaH * 3600000), fin: ahora }
 
       let resultado
       try {
@@ -337,15 +372,18 @@ export function createEvaluadorTemporal({ historia }) {
        * leer, no «la serie de X trajo un 1». El valor sigue disponible en el
        * historiador para quien quiera contrastarlo.
        */
+      // `ventanaH` y no `item.ventanaH`: es la que de verdad se miró. Citar la
+      // declarada sería decirle al técnico que la evidencia cubre dos horas
+      // cuando cubre veinticuatro.
       const texto = coincide
-        ? `La señal "${item.senal}" estuvo en ${declarado} en las últimas ${item.ventanaH} h.`
-        : `La señal "${item.senal}" NO estuvo en ${declarado} en las últimas ${item.ventanaH} h.`
+        ? `La señal "${item.senal}" estuvo en ${declarado} en las últimas ${ventanaH} h.`
+        : `La señal "${item.senal}" NO estuvo en ${declarado} en las últimas ${ventanaH} h.`
 
       const plantilla = {
         clave: coincide ? 'estado' : 'estadoContrario',
         senal: item.senal,
         estado: String(declarado),
-        ventanaH: item.ventanaH,
+        ventanaH,
       }
 
       if (coincide) {

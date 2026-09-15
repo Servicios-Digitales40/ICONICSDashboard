@@ -63,7 +63,10 @@ import { PROVISIONALES } from "./umbrales.js";
  * de una frase que YA ESTABA escrita en `riesgos.js`, no de una relación
  * física inventada aquí.
  */
-function causaTanque({ id, titulo, componente, terminosManual, riesgoId, firmaTemporal = null }) {
+function causaTanque({
+  id, titulo, componente, terminosManual, riesgoId,
+  firmaTemporal = null, firmaEstado = null,
+}) {
   return {
     id,
     titulo,
@@ -72,6 +75,17 @@ function causaTanque({ id, titulo, componente, terminosManual, riesgoId, firmaTe
     origen: `riesgos.js · accion (${riesgoId})`,
     provisional: PROVISIONALES,
     ...(firmaTemporal ? { firmaTemporal } : {}),
+    /*
+     * `firmaEstado` (Plan 30) mira un FLANCO donde `firmaTemporal` mira una
+     * pendiente. Este azúcar las descarta a las dos si no se declaran, y ése
+     * es justo el riesgo de escribirlo así: al añadir la segunda clase se
+     * olvidó aquí, y las ocho firmas declaradas en este archivo se caían en
+     * silencio —el objeto salía sin ellas y el motor no tenía nada que
+     * evaluar—. Lo cazó `verificar-temporal.mjs` contando cuántos riesgos
+     * quedaban sin desempate, no una excepción: un campo que se pierde por el
+     * camino no lanza nada.
+     */
+    ...(firmaEstado ? { firmaEstado } : {}),
   };
 }
 
@@ -238,6 +252,9 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Lazo de control de nivel alto",
       terminosManual: ["nivel alto", "corte", "enclavamiento", "lazo de control"],
       riesgoId: "derrame",
+      // Plan 30 F2. «El corte no ve»: el nivel está alto —la regla ya está
+      // activa— y la alarma del PLC no ha entrado.
+      firmaEstado: [{ senal: "nivelAlto", estado: "inactiva", ventanaH: 24 }],
     }),
     causaTanque({
       id: "lazo-de-control-no-responde",
@@ -245,6 +262,10 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Lazo de control / mando de la bomba",
       terminosManual: ["lazo de control", "mando", "no responde", "enclavamiento"],
       riesgoId: "derrame",
+      // El reverso: la alarma SÍ entró y la bomba siguió. Falla la actuación,
+      // no la medida. Es la distinción que el propio título de esta causa
+      // nombraba y que hasta ahora no tenía con qué sostenerse.
+      firmaEstado: [{ senal: "nivelAlto", estado: "activa", ventanaH: 24 }],
     }),
     causaTanque({
       id: "aporte-externo-no-controlado",
@@ -280,6 +301,10 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Suministro de agua al tanque",
       terminosManual: ["nivel", "suministro", "llenado", "aporte de agua"],
       riesgoId: "marcha-en-seco",
+      // La protección SÍ vio lo que había que ver: el nivel es real y falta
+      // agua. Plan 30 F2 — el desempate que la cabecera de arriba describía
+      // en prosa desde el Plan 29, ahora ejecutable.
+      firmaEstado: [{ senal: "nivelBajoBajo", estado: "activa", ventanaH: 24 }],
     }),
     causaTanque({
       id: "proteccion-nivel-bajo-no-actua",
@@ -287,6 +312,10 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Lazo de control de nivel bajo",
       terminosManual: ["nivel bajo", "proteccion", "enclavamiento", "corte"],
       riesgoId: "marcha-en-seco",
+      // El reverso exacto: el nivel está bajo —lo dice la regla, que ya está
+      // activa— y la alarma del PLC no ha entrado. Eso es la protección sin
+      // ver, y es la única de las dos causas que esa ausencia confirma.
+      firmaEstado: [{ senal: "nivelBajoBajo", estado: "inactiva", ventanaH: 24 }],
     }),
   ],
 
@@ -439,6 +468,18 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Válvulas de salida / colector de distribución",
       terminosManual: ["valvula abierta", "salida", "colector", "purga"],
       riesgoId: "posible-fuga",
+      /*
+       * Plan 30 F2. «Una salida quedada abierta» es literalmente lo que dice
+       * la `consecuencia` de la regla, y `estadoS2` puede confirmarlo: la
+       * electroválvula superior reportando «En marcha» (2) es una salida
+       * efectivamente abierta. Es lo que separa esta causa de una rotura —que
+       * no mueve ninguna válvula— sin tener que recorrer la red.
+       *
+       * Las otras dos de este riesgo no llevan firma: una rotura no deja
+       * rastro en ningún estado discreto, y «el umbral sin calibrar» es una
+       * duda sobre NUESTRO número, no sobre la planta.
+       */
+      firmaEstado: [{ senal: "estadoS2", estado: 2, ventanaH: 24 }],
     }),
     causaTanque({
       id: "umbral-de-presion-sin-calibrar",
@@ -524,12 +565,18 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Acometida / suministro eléctrico",
       terminosManual: ["suministro", "acometida", "tension de linea"],
       riesgoId: "tension-fuera-con-motor",
+      // Plan 30 F2. El variador NO protestó: recibe mal de fuera y lo que
+      // falla está aguas arriba de él.
+      firmaEstado: [{ senal: "fallaVariador", estado: "inactiva", ventanaH: 24 }],
     }),
     causaTanque({
       id: "protecciones-variador-mal-ajustadas",
       titulo: "Protecciones del variador mal ajustadas",
       componente: "Variador de frecuencia",
       terminosManual: ["protecciones", "variador", "ajuste"],
+      // El variador SÍ lo detectó y el motor siguió en carga: lo que falla es
+      // el ajuste de sus protecciones, no el suministro.
+      firmaEstado: [{ senal: "fallaVariador", estado: "activa", ventanaH: 24 }],
       riesgoId: "tension-fuera-con-motor",
     }),
   ],
@@ -633,6 +680,19 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Final de carrera / realimentación de posición",
       terminosManual: ["final de carrera", "posicion", "realimentacion", "sensor"],
       riesgoId: "orden-sin-respuesta",
+      /*
+       * Plan 30 F2, y es la única de las tres que un estado puede señalar.
+       * Si la válvula llegó a reportar «En marcha» (2) en algún momento
+       * reciente, es que SÍ se mueve — y entonces lo que no funciona es la
+       * confirmación de posición, no la válvula. Una bobina quemada o un
+       * vástago agarrotado nunca habrían dado ese 2.
+       *
+       * Las otras dos causas se quedan sin firma a propósito: `estadoS1` no
+       * distingue una bobina sin tensión de una válvula atascada —las dos se
+       * quedan en 1— y declarar la misma firma en ambas no desempata nada,
+       * que es la regla que salió de medir en el Plan 29 F2.
+       */
+      firmaEstado: [{ senal: "estadoS1", estado: 2, ventanaH: 24 }],
     }),
     causaTanque({
       id: "valvula-agarrotada",

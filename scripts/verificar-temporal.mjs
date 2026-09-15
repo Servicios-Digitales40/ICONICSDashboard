@@ -362,6 +362,38 @@ await check('la serie se pide en CRUDO: un agregado borraría los flancos', asyn
     'sin `crudo: true` el historiador devuelve la booleana promediada')
 })
 
+await check('una ventana corta se ensancha al mínimo: este historiador graba por excepción', async () => {
+  /*
+   * ── MEDIDO EL 15-09-2026, Y CAMBIÓ EL DISEÑO ──────────────────────
+   *
+   * `nivelAlto` en 24 h trae 20 muestras; en 12 h, 6 h y 2 h trae CERO. No es
+   * que la señal falte: es que sólo se apunta cuando cambia, y el último
+   * cambio fue a las 18:25 de la víspera. Seis de esas veinte muestras son
+   * pulsos de un segundo.
+   *
+   * Cero muestras NO es «la alarma estuvo inactiva» — es «no cambió en esta
+   * ventana», y el estado real puede ser cualquiera. Tratarlo como inactiva
+   * afirmaría que una protección no actuó, que es media acusación sacada de
+   * una ausencia de dato (§2.4).
+   */
+  const historia = historiaFalsa({ nivelAlto: { datos: serieBooleana([0, 1]) } })
+  await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelAlto', estado: 'activa', ventanaH: 2 }], 'tanque')
+
+  const { inicio, fin } = historia.llamadas[0].ventana
+  const horas = (fin.getTime() - inicio.getTime()) / 3600000
+  assert.ok(horas >= 24, `se pidieron ${horas} h: una ventana corta no alcanza el último cambio`)
+})
+
+await check('la frase cita la ventana que se MIRÓ, no la que se declaró', async () => {
+  const historia = historiaFalsa({ nivelAlto: { datos: serieBooleana([0, 1]) } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelAlto', estado: 'activa', ventanaH: 2 }], 'tanque')
+
+  assert.equal(r.evidenciaAFavor[0].plantilla.ventanaH, 24,
+    'decir «2 h» cuando la evidencia cubre 24 engaña sobre su alcance')
+})
+
 await check('sin serie, o sin firma, silencio — nunca «inactiva» por defecto', async () => {
   const evaluador = createEvaluadorTemporal({ historia: historiaFalsa({}) })
   const sinSerie = await evaluador.evaluarEstado(
@@ -419,6 +451,44 @@ await check('toda `firmaTemporal` declarada nombra señales reales del tanque', 
   }
 })
 
+await check('toda `firmaEstado` declarada nombra señales reales, historizadas y del tipo correcto', async () => {
+  const { CAUSAS_POR_RIESGO } = await import('../shared/eva/comun/causas.js')
+  const { SENALES, esHistorizada } = await import('../shared/eva/tanque/senales.js')
+
+  for (const [riesgoId, causas] of Object.entries(CAUSAS_POR_RIESGO)) {
+    for (const causa of causas) {
+      if (!causa.firmaEstado) continue
+      for (const item of causa.firmaEstado) {
+        const meta = SENALES[item.senal]
+        assert.ok(meta, `${causa.id} (${riesgoId}) declara "${item.senal}", que no es una señal del tanque`)
+        assert.ok(esHistorizada(item.senal),
+          `${causa.id} declara "${item.senal}", sin serie: su firma nunca podría evaluarse`)
+
+        /*
+         * El TIPO tiene que casar con lo declarado, y esto sí caza un error
+         * real: `estado: "activa"` sobre una señal numérica —o un número sobre
+         * una booleana— no falla, se queda en silencio para siempre. Es el
+         * mismo defecto que la prueba de `esHistorizada` evita por otra vía.
+         */
+        if (typeof item.estado === 'number') {
+          assert.equal(meta.naturaleza, 'estado',
+            `${causa.id} compara "${item.senal}" contra un número, pero no es de naturaleza "estado"`)
+          assert.ok(item.estado in (meta.etiquetas ?? {}),
+            `${causa.id} declara el estado ${item.estado}, que "${item.senal}" no declara en sus etiquetas`)
+        } else {
+          assert.ok(['activa', 'inactiva'].includes(item.estado),
+            `${causa.id} declara un estado desconocido: "${item.estado}"`)
+          assert.equal(meta.tipo, 'booleano',
+            `${causa.id} usa "${item.estado}" sobre "${item.senal}", que no es booleana`)
+        }
+
+        assert.ok(Number.isFinite(item.ventanaH) && item.ventanaH > 0,
+          `${causa.id} declara una ventana que no es un número de horas positivo`)
+      }
+    }
+  }
+})
+
 await check('dos causas del MISMO riesgo no comparten una firma idéntica', async () => {
   /*
    * ── LA REGLA QUE SALIÓ DE MEDIR, NO DE TEORIZAR (14-09-2026) ──────
@@ -434,14 +504,18 @@ await check('dos causas del MISMO riesgo no comparten una firma idéntica', asyn
    */
   const { CAUSAS_POR_RIESGO } = await import('../shared/eva/comun/causas.js')
 
-  for (const [riesgoId, causas] of Object.entries(CAUSAS_POR_RIESGO)) {
-    const vistas = new Set()
-    for (const causa of causas) {
-      if (!causa.firmaTemporal) continue
-      const huella = JSON.stringify(causa.firmaTemporal)
-      assert.ok(!vistas.has(huella),
-        `en "${riesgoId}", dos causas declaran la MISMA firma: no distingue nada`)
-      vistas.add(huella)
+  // Las DOS clases de firma, cada una con su propio conjunto: que dos causas
+  // compartan `firmaEstado` es tan inútil como compartir `firmaTemporal`.
+  for (const clase of ['firmaTemporal', 'firmaEstado']) {
+    for (const [riesgoId, causas] of Object.entries(CAUSAS_POR_RIESGO)) {
+      const vistas = new Set()
+      for (const causa of causas) {
+        if (!causa[clase]) continue
+        const huella = JSON.stringify(causa[clase])
+        assert.ok(!vistas.has(huella),
+          `en "${riesgoId}", dos causas declaran la MISMA ${clase}: no distingue nada`)
+        vistas.add(huella)
+      }
     }
   }
 })
