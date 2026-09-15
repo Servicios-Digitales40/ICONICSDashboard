@@ -25,6 +25,7 @@
 import { z } from 'zod'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
+import { resumirDiagnosticos } from '../ia/motor/metricas.mjs'
 
 /**
  * ── `valoresSensores` POR FIN TIENE QUIEN LO TRAIGA (PLAN 28 F1) ────
@@ -67,7 +68,79 @@ const DiagnosticoQuerySchema = z.object({
   valoresSensores: ValoresSensoresSchema,
 })
 
-export function registerDiagnosticoRoutes(fastify, { motorDiagnostico }) {
+/**
+ * Cuántos diagnósticos, de qué clase y cuánto tardaron — Plan 28 F7.
+ *
+ *   GET /api/diagnostico/metricas?horas=   el resumen de la ventana
+ *
+ * ── SE AGREGA DEL DIARIO, NO DE CONTADORES EN MEMORIA ───────────────
+ *
+ * El porqué está en la cabecera de `ia/motor/metricas.mjs`, y en resumen: un
+ * contador paralelo puede desincronizarse del diario y se va con el proceso —
+ * justo cuando más interesa mirarlo, que es después de un incidente.
+ *
+ * ── POR QUÉ NO LLEVA `exigirRol` ────────────────────────────────────
+ *
+ * A diferencia de `GET /api/diario`, esto NO es un registro de personas: son
+ * agregados del proceso —cuántos diagnósticos salieron insuficientes, qué
+ * fuente se cayó más, cuánto tardó el p95—. No hay ninguna IP ni ningún
+ * usuario en la respuesta. Mismo criterio que el resto de lecturas de este
+ * backend, que no lo llevan.
+ *
+ * La guarda de autenticación sí, y la pone el ámbito (`app.mjs`), como a las
+ * demás rutas de API.
+ */
+const MetricasQuerySchema = z.object({
+  /*
+   * La ventana acota el recorrido: el diario llega a megas y agregar dos años
+   * para contestar «¿cómo va hoy?» sería trabajo de sobra. 24 h por defecto,
+   * una semana de tope — más allá conviene leer el archivo directamente.
+   */
+  horas: z.coerce.number().int().min(1).max(168).optional(),
+})
+
+export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDiagnosticos }) {
+  fastify.get(
+    '/api/diagnostico/metricas',
+    { schema: { querystring: MetricasQuerySchema } },
+    async (request, reply) => {
+      if (!diarioDiagnosticos) {
+        return reply.code(503).send({
+          ok: false,
+          error: 'Este servidor no tiene el diario de diagnósticos montado.',
+          codigo: CODIGOS.ERROR_DIARIO_SIN_MONTAR,
+        })
+      }
+
+      const horas = request.query.horas ?? 24
+      const desde = new Date(Date.now() - horas * 3_600_000)
+
+      try {
+        /*
+         * `limite` alto a propósito: aquí se quiere AGREGAR la ventana entera,
+         * no paginarla. El tope existe para que una ventana absurda no se lleve
+         * la memoria del proceso, no para recortar el resultado — y si se
+         * alcanza, `truncado` lo dice en vez de servir un promedio calculado
+         * sobre la mitad de los datos sin avisar (§2.4).
+         */
+        const TOPE = 5000
+        const { entradas, total } = await diarioDiagnosticos.leer({
+          desde, hasta: new Date(), limite: TOPE,
+        })
+
+        return {
+          ok: true,
+          ventanaHoras: horas,
+          desde: desde.toISOString(),
+          ...resumirDiagnosticos(entradas),
+          ...(total > TOPE ? { truncado: { tope: TOPE, hay: total } } : {}),
+        }
+      } catch (error) {
+        return responderError(reply, 500, CODIGOS.ERROR_DIAGNOSTICO, error.message)
+      }
+    }
+  )
+
   fastify.get(
     '/api/diagnostico',
     { schema: { querystring: DiagnosticoQuerySchema } },

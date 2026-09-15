@@ -168,6 +168,79 @@ await check('se anota cuánto tardó: una regresión de latencia se ve en el dia
   assert.ok(linea.duracionMs >= 0)
 })
 
+console.log('\n── Las métricas salen del diario (Plan 28 F7) ──────────────')
+
+await check('los agregados CUADRAN entre sí, no se contradicen', async () => {
+  /*
+   * ── EL DEFECTO QUE ESTA COMPROBACIÓN CAZÓ AL ESCRIBIRLA ───────────
+   *
+   * La primera versión daba «3 completos» y a la vez «manual caído en 2»:
+   * dos afirmaciones contradictorias sacadas del MISMO archivo. La causa era
+   * que el envoltorio del diario se escribió en la F2, antes de que la F3
+   * añadiera `estado`, y nadie lo trajo al diario — así que la métrica caía a
+   * un «completo» por defecto que nadie había medido.
+   *
+   * Es la clase de defecto que sólo aparece cuando algo LEE lo que se
+   * escribió. Guardar de menos no se nota hasta que alguien pregunta.
+   */
+  const r = await app.inject({ method: 'GET', url: '/api/diagnostico/metricas' })
+  assert.equal(r.statusCode, 200)
+  const m = r.json()
+
+  const sumaEstados = Object.values(m.porEstado).reduce((a, b) => a + b, 0)
+  assert.equal(sumaEstados, m.total, 'todo diagnóstico tiene que caer en algún estado')
+
+  const caidos = Object.values(m.fuentesCaidas).reduce((a, b) => a + b, 0)
+  if (caidos > 0) {
+    assert.ok(
+      (m.porEstado.parcial ?? 0) + (m.porEstado.insuficiente ?? 0) > 0,
+      'hay fuentes caídas pero ningún diagnóstico parcial ni insuficiente'
+    )
+  }
+})
+
+await check('un estado que NO se declaró no se cuenta como completo', async () => {
+  /*
+   * Una línea escrita antes de la F3 no sabe su estado. Darla por completa
+   * afirmaría algo que no se midió (§2.4), así que se cuenta aparte y con un
+   * nombre que se ve.
+   */
+  const { resumirDiagnosticos } = await import('../backend/ia/motor/metricas.mjs')
+  const r = resumirDiagnosticos([{ tipo: 'diagnostico', sistema: 'tanque' }])
+
+  assert.equal(r.porEstado.sin_declarar, 1)
+  assert.equal(r.porEstado.completo, undefined)
+})
+
+await check('las podas se cuentan aparte, no como diagnósticos', async () => {
+  // Una poda dice que faltan entradas que existieron. Contarla como
+  // diagnóstico inflaría el total con algo que no lo es, y callarla dejaría
+  // creer que la ventana está completa.
+  const { resumirDiagnosticos } = await import('../backend/ia/motor/metricas.mjs')
+  const r = resumirDiagnosticos([
+    { tipo: 'diagnostico', sistema: 'tanque', estado: 'completo' },
+    { tipo: 'poda', descartadas: 400 },
+  ])
+
+  assert.equal(r.total, 1)
+  assert.equal(r.podas, 1)
+})
+
+await check('el p95 no se esconde detrás de una media', async () => {
+  /*
+   * Un diagnóstico que tarda diez veces más que los demás desaparece en una
+   * media, y es justo el que el técnico nota. El p95 lo enseña.
+   */
+  const { resumirDiagnosticos } = await import('../backend/ia/motor/metricas.mjs')
+  const entradas = [...Array(19)].map(() => ({ tipo: 'diagnostico', duracionMs: 10 }))
+  entradas.push({ tipo: 'diagnostico', duracionMs: 5000 })
+
+  const r = resumirDiagnosticos(entradas)
+  assert.equal(r.duracionMs.p50, 10)
+  assert.ok(r.duracionMs.p95 > 100, `el p95 quedó en ${r.duracionMs.p95}: el caso lento se perdió`)
+  assert.equal(r.duracionMs.max, 5000)
+})
+
 console.log('\n── El diario no se come el diagnóstico ─────────────────────')
 
 await check('un diario que no se puede escribir NO tumba la respuesta', async () => {

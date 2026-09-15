@@ -287,7 +287,22 @@ export async function createApp(config) {
         riesgoId: resultado.riesgoId,
         diagnosticEventId: resultado.diagnosticEventId,
         huerfano: resultado.huerfano,
+        /*
+         * `estado` y `senalesVetadas` (F3 y F4) se archivan aquí porque este
+         * envoltorio se escribió en la F2, ANTES de que existieran, y al
+         * añadirlos al motor nadie los trajo al diario. Lo destapó la F7 al
+         * agregar: `porEstado` daba «3 completos» mientras `fuentesCaidas`
+         * decía que dos habían perdido el manual — dos afirmaciones
+         * contradictorias sacadas del mismo archivo, porque el campo faltaba y
+         * la métrica caía a un valor por defecto.
+         *
+         * Es la clase de defecto que sólo se ve cuando algo LEE lo que se
+         * escribió. Guardar de más no se nota; guardar de menos tampoco, hasta
+         * que alguien pregunta.
+         */
+        estado: resultado.estado ?? null,
         ...(resultado.conflicto ? { conflicto: true } : {}),
+        ...(resultado.senalesVetadas ? { senalesVetadas: resultado.senalesVetadas } : {}),
         // Sólo el veredicto de cada causa, no la causa entera: el título y el
         // componente están en `causas.js` y no cambian, así que archivarlos
         // sería copiar el catálogo en cada línea.
@@ -610,7 +625,7 @@ export async function createApp(config) {
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
     registerCasosRoutes(instancia)
-    registerDiagnosticoRoutes(instancia, { motorDiagnostico })
+    registerDiagnosticoRoutes(instancia, { motorDiagnostico, diarioDiagnosticos })
     // El MISMO `diario` que escriben `iconicsRoutes` y `controlRoutes`: esta
     // ruta lo lee, y dos instancias apuntando al mismo archivo sería pedir que
     // una lea a medio escribir de la otra.
