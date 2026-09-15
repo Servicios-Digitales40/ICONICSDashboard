@@ -75,6 +75,27 @@ function conUnRiesgo() {
   evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
 }
 
+/**
+ * Apaga el riesgo del tanque, como haría el siguiente sondeo.
+ *
+ * El snapshot tiene que cambiar de IDENTIDAD, no sólo de contenido: la vista
+ * memoiza `evaluarRiesgos(sistemaTanque)` con `sistemaTanque` de dependencia
+ * —que es lo correcto, porque esa evaluación corre en cada lectura de ICONICS—
+ * así que devolver siempre el mismo `{}` dejaría el memo congelado y la prueba
+ * estaría midiendo el memo en vez del ciclo de vida.
+ */
+function apagarElRiesgo() {
+  useSistemaAgua.mockReturnValue({ sistema: { t: Date.now() } });
+  evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 1 });
+}
+
+const remontar = (rerender, onNavigate = () => {}) =>
+  rerender(
+    <ThemeProvider>
+      <AvisosEva onNavigate={onNavigate} />
+    </ThemeProvider>
+  );
+
 const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
@@ -217,6 +238,87 @@ describe("un aviso NO acciona planta", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Ver riesgos/i }));
     expect(onNavigate).toHaveBeenCalledWith("eva-riesgos-vibracion");
+  });
+});
+
+/**
+ * ── EL CICLO DE VIDA EN LA PANTALLA (PLAN 31 F3) ───────────────────
+ *
+ * El ciclo lo decide `shared/eva/comun/avisos.js` y se prueba aparte, sin React
+ * (`avisos-ciclo.test.js`). Lo que se comprueba AQUÍ es lo que sólo se ve en la
+ * pantalla: que un aviso resuelto se distingue de uno vigente, y que «leído» no
+ * apaga un riesgo que sigue activo.
+ */
+describe("un aviso sobrevive a su riesgo, y se nota que es pasado", () => {
+  it("el riesgo se apaga: el aviso sigue, marcado y sin color de severidad", async () => {
+    conUnRiesgo();
+    obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "Hay una fuga." });
+
+    const { rerender } = montar();
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+
+    // Ahora el riesgo deja de estar activo.
+    apagarElRiesgo();
+    remontar(rerender);
+
+    /*
+     * Sigue ahí —es la decisión del 15-09-2026: un riesgo de veinte minutos de
+     * madrugada no puede desaparecer sin dejar rastro— pero DICHO, porque si no
+     * la vista mezclaría presente y pasado con el mismo aspecto.
+     */
+    await waitFor(() => expect(screen.getByText(/Ya no está activo/i)).toBeTruthy());
+    expect(screen.getByText("Posible fuga en la red")).toBeTruthy();
+  });
+
+  it("«ya no está activo» NO dice «resuelto»: nadie ha confirmado nada", async () => {
+    /*
+     * El riesgo pudo dejar de cumplirse porque se arregló, porque se paró la
+     * bomba o porque el sensor dejó de dar dato. El texto no promete cuál (§2.5).
+     */
+    conUnRiesgo();
+    obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
+
+    const { rerender } = montar();
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+
+    apagarElRiesgo();
+    remontar(rerender);
+
+    await waitFor(() => expect(screen.getByText(/Ya no está activo/i)).toBeTruthy());
+    expect(screen.queryByText(/^Resuelto$|arreglad/i)).toBeNull();
+  });
+});
+
+describe("«leído» no apaga un riesgo", () => {
+  it("marcar leído un aviso VIGENTE lo deja en la lista", async () => {
+    conUnRiesgo();
+    obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
+
+    montar();
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /^Leído$/i }));
+
+    // Sigue: su riesgo no ha desaparecido, y «visto» es de esta persona, no de
+    // la planta.
+    expect(screen.getByText("Posible fuga en la red")).toBeTruthy();
+    // Pero el botón ya no se ofrece dos veces.
+    expect(screen.queryByRole("button", { name: /^Leído$/i })).toBeNull();
+  });
+
+  it("un aviso leído Y apagado desaparece: ya no hay nada pendiente", async () => {
+    conUnRiesgo();
+    obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
+
+    const { rerender } = montar();
+    await waitFor(() => expect(screen.getByText("Fuga o rotura en la red")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: /^Leído$/i }));
+
+    apagarElRiesgo();
+    remontar(rerender);
+
+    await waitFor(() => expect(screen.getByText(/Nada que avisar/i)).toBeTruthy());
   });
 });
 

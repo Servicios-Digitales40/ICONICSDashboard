@@ -1,7 +1,13 @@
 # PLAN 31 — De reactivo a activo: avisos narrados
 
-**Estado:** por completar
+**Estado:** COMPLETADO (F1, F2 y F3) el 15-09-2026
 **Fecha:** 15-09-2026
+
+> **Lo que queda fuera y no es un olvido.** Nada de esto se ha visto correr en
+> el demo: las tres fases están probadas, no observadas. Y sigue en pie la
+> inestabilidad PREEXISTENTE de la suite de frontend documentada en F2 —fallos
+> que cambian de nombre entre tandas, también sin este trabajo—, pendiente de
+> perseguir.
 **Alcance:** el tablero y el asistente. No toca el motor de diagnóstico —el
 Plan 28 lo dejó con todo lo que esto necesita.
 
@@ -274,6 +280,60 @@ Esa era la pieza que faltaba — la cabecera de `hallazgos.js` decía que los
 «diagnósticos sin cerrar» no se podían construir porque *«no hay ningún sitio
 donde conste qué diagnósticos se calcularon»*. **Desde el 15-09-2026 sí lo
 hay.**
+
+**Estado: COMPLETADA el 15-09-2026.** 15 comprobaciones de dominio
+(`avisos-ciclo.test.js`) + 4 de vista. 972 en el frontend, 348 en el backend,
+31/31 verificadores, build dentro de techo.
+
+### Las cuatro decisiones, y por qué
+
+**Cierre — el aviso SOBREVIVE a su riesgo.** Decidido contra mi recomendación,
+y la razón de quien decidió es mejor que la mía: un riesgo que se enciende
+veinte minutos de madrugada y se apaga solo no puede desaparecer sin dejar
+rastro en la pantalla que existe para avisar de él. Queda en el diario, sí,
+pero el diario es donde se mira DESPUÉS de saber que hay algo que mirar.
+
+**Y el problema que eso crea, que fue la mitad del trabajo.** Si un aviso
+sobrevive, la vista mezcla presente y pasado. Dos tarjetas idénticas —una de un
+riesgo activo AHORA, otra de uno apagado hace una hora— son la forma de que se
+deje de mirar la pantalla: si no se distingue lo urgente de lo histórico de un
+vistazo, todo se lee como histórico. Por eso `estado` no es decoración; es lo
+que hace sostenible la decisión. El resuelto pierde el color de severidad, baja
+de contraste y lleva rótulo — no sólo color (DESIGN.md).
+
+**El rótulo dice «ya no está activo», no «resuelto».** Nadie ha confirmado que
+se arreglara: pudo pararse la bomba, o el sensor pudo dejar de dar dato (§2.5).
+Hay una prueba dedicada a que ese texto no prometa más de lo medido.
+
+**Cooldown — 30 minutos por riesgo.** Un presostato en el límite enciende y
+apaga su riesgo cada pocos segundos; sin cooldown, cada rebote encolaría otra
+narración de 30-90 s y el asistente de al lado esperaría (`cola.mjs`). Dentro
+del cooldown se REUSA el texto ya escrito. **No es un umbral medido y no se
+presenta como tal**: es el orden de magnitud en que la narración deja de valer,
+con su razón escrita. Si alguna vez se mide cada cuánto rebota de verdad un
+riesgo aquí, este número es lo que hay que revisar.
+
+**Persistencia — de esta persona, como hoy.** `vistoPorMi`/`localStorage`,
+igual que Alarmas y Hallazgos. Un aviso leído en el taller sigue visible en la
+sala de control, que es correcto: son dos personas. Mandarlo al servidor
+convertiría «lo he visto» en una afirmación sobre el turno que nadie firmó —
+justo lo que la cabecera de `vistoPorMi.js` dice que no debe pasar.
+
+**Duplicados — la identidad es `sistema:riesgoId`.** No `diagnosticEventId`,
+que `diagnostico.mjs` genera con `Date.now()` en cada llamada: con él, cada
+sondeo habría añadido un aviso «nuevo» del mismo hallazgo y la vista crecería
+sin parar. Hay una prueba que lo fija.
+
+### Dónde vive cada cosa
+
+El ciclo de vida es **dominio puro** (`shared/eva/comun/avisos.js`): decide qué
+avisos existen y en qué estado, sin saber de React ni de HTTP, y se prueba en
+Node. El reloj entra por parámetro, que es lo que permite probar un cooldown de
+media hora sin esperarla. La vista sólo conecta ese dominio con la red — §4.3.
+
+`narradoEn` se sella **aunque la narración salga `null`**: lo que el cooldown
+protege es la LLAMADA, no el texto. Sin eso, un servidor de IA caído haría que
+cada sondeo reintentara todas las narraciones — el bucle que esta fase evita.
 
 ---
 

@@ -44,15 +44,16 @@
  * que el contador de alarmas del Topbar está retirado desde el 31-08-2026. Ver
  * Plan 31 §2.3.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Info, MessageSquareText, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Info, MessageSquareText, ShieldAlert } from "lucide-react";
 
 import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
 import { useProsa } from "@/i18n/useProsa.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 import { obtenerDiagnosticoNarrado } from "@/lib/api/casosApi.js";
+import { ESTADO_AVISO, marcarVisto, reconciliarAvisos } from "@shared/eva/comun/avisos.js";
 
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { useVibracion } from "../../data/vibraciones/vibracion.js";
@@ -84,16 +85,22 @@ const BANDA_TOKEN = { alto: "coral", medio: "amber", bajo: "textFaint" };
  * De una en una, el primer aviso aparece en cuanto está listo y los demás van
  * cayendo. Con alguien mirando, eso es lo que importa.
  *
- * ── SE PIDE UNA VEZ POR MONTAJE, NO EN CADA SONDEO ──────────────────
+ * ── EL CICLO DE VIDA NO SE DECIDE AQUÍ (PLAN 31 F3) ─────────────────
  *
- * La lista de riesgos activos cambia de identidad en cada lectura de ICONICS
- * (cada pocos segundos), pero lo que importa es QUÉ riesgos son. La dependencia
- * es la lista de ids en texto; si fueran los objetos, cada sondeo relanzaría
- * todas las narraciones y la pantalla no terminaría nunca.
+ * Quién sobrevive, quién se marca resuelto y quién merece otra narración lo
+ * decide `shared/eva/comun/avisos.js`, que es dominio puro y se prueba sin
+ * React. Este hook sólo conecta ese dominio con la red y con el estado de
+ * React — `CLAUDE.md` §4.3: la presentación no decide reglas.
+ *
+ * En F2 esto vaciaba la lista cada vez que cambiaba el conjunto de riesgos
+ * (`setAvisos([])`), que era correcto mientras un aviso no sobrevivía a su
+ * riesgo. Con F3 sobrevive, así que reconciliar sustituye a reiniciar: lo que
+ * ya estaba se conserva, se le actualiza el estado y sólo se narra lo que hace
+ * falta narrar.
  */
 function useAvisosNarrados(riesgosPorSistema, idioma) {
   const [avisos, setAvisos] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const [narrando, setNarrando] = useState(0);
 
   /* La clave de identidad: qué riesgos, no qué objetos. */
   const clave = useMemo(
@@ -114,40 +121,78 @@ function useAvisosNarrados(riesgosPorSistema, idioma) {
   refRiesgos.current = riesgosPorSistema;
 
   useEffect(() => {
-    if (!clave) {
-      setAvisos([]);
-      setCargando(false);
-      return undefined;
-    }
-
     const control = new AbortController();
     let vivo = true;
-    setCargando(true);
-    setAvisos([]);
+
+    /*
+     * La reconciliación se hace DENTRO del actualizador de estado, no fuera:
+     * así se parte siempre de la lista vigente aunque una narración anterior
+     * haya terminado entre medias. Calcularla fuera con `avisos` obligaría a
+     * meterlo en las dependencias, y cada narración que llega relanzaría el
+     * efecto entero.
+     */
+    let pendientes = [];
+    setAvisos((previos) => {
+      const activos = refRiesgos.current.flatMap(({ sistema, activos: lista }) =>
+        lista.map((riesgo) => ({ sistema, riesgo }))
+      );
+      const { avisos: siguientes, aNarrar } = reconciliarAvisos({ previos, activos });
+      pendientes = aNarrar;
+      return siguientes;
+    });
+
+    if (!pendientes.length) {
+      setNarrando(0);
+      return () => {
+        vivo = false;
+        control.abort();
+      };
+    }
+
+    setNarrando(pendientes.length);
 
     (async () => {
-      for (const { sistema, activos } of refRiesgos.current) {
-        for (const riesgo of activos) {
-          if (!vivo) return;
-          try {
-            const data = await obtenerDiagnosticoNarrado({
-              sistema, riesgoId: riesgo.id, idioma, signal: control.signal,
-            });
-            if (!vivo) return;
-            setAvisos((previos) => [...previos, { sistema, riesgo, diagnostico: data, error: null }]);
-          } catch (error) {
-            if (!vivo || error.name === "AbortError") return;
-            /*
-             * Un riesgo que falló se enseña IGUAL, con su evidencia y sin
-             * diagnóstico. Saltárselo escondería un riesgo activo por un fallo
-             * de red — exactamente al revés de lo que tiene que hacer una
-             * pantalla de avisos.
-             */
-            setAvisos((previos) => [...previos, { sistema, riesgo, diagnostico: null, error }]);
-          }
+      for (const aviso of pendientes) {
+        if (!vivo) return;
+
+        /*
+         * Un riesgo que falló se enseña IGUAL, con su evidencia y sin
+         * diagnóstico. Saltárselo escondería un riesgo activo por un fallo de
+         * red — exactamente al revés de lo que debe hacer una pantalla de
+         * avisos.
+         */
+        let resultado;
+        try {
+          const data = await obtenerDiagnosticoNarrado({
+            sistema: aviso.sistema, riesgoId: aviso.riesgo.id, idioma, signal: control.signal,
+          });
+          resultado = { diagnostico: data, narracion: data?.narracion ?? null, error: null };
+        } catch (error) {
+          if (!vivo || error.name === "AbortError") return;
+          resultado = { diagnostico: null, narracion: null, error };
         }
+
+        if (!vivo) return;
+        setAvisos((previos) =>
+          previos.map((a) =>
+            a.id === aviso.id
+              ? {
+                ...a,
+                ...resultado,
+                /*
+                 * `narradoEn` se sella aunque la narración haya salido null: lo
+                 * que el cooldown protege es la LLAMADA, no el texto. Sin esto,
+                 * un servidor de IA caído haría que cada sondeo reintentara
+                 * todas las narraciones — justo el bucle que esta fase evita.
+                 */
+                narradoEn: Date.now(),
+              }
+              : a
+          )
+        );
+        setNarrando((n) => Math.max(n - 1, 0));
       }
-      if (vivo) setCargando(false);
+      if (vivo) setNarrando(0);
     })();
 
     return () => {
@@ -156,14 +201,35 @@ function useAvisosNarrados(riesgosPorSistema, idioma) {
     };
   }, [clave, idioma]);
 
-  return { avisos, cargando };
+  const marcarLeido = useCallback((id) => {
+    setAvisos((previos) => marcarVisto(previos, id));
+  }, []);
+
+  return { avisos, narrando, marcarLeido };
 }
 
 /** Un aviso: el riesgo, su narración y la ficha determinista debajo. */
-function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo, onNavigate }) {
+function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo, onNavigate, onLeido }) {
   const { sistema, riesgo, diagnostico } = aviso;
-  const sev = SEVERIDAD_TOKEN[riesgo.severidad] ?? SEVERIDAD_DEFECTO;
-  const { Icono } = sev;
+  const resuelto = aviso.estado === ESTADO_AVISO.RESUELTO;
+
+  /*
+   * ── UN AVISO RESUELTO SE VE DISTINTO, Y ES LA MITAD DE F3 ───────────
+   *
+   * Si un aviso sobrevive a su riesgo —la decisión del 15-09-2026— la vista
+   * mezcla presente y pasado. Dos tarjetas idénticas, una de un riesgo activo
+   * AHORA y otra de uno que se apagó hace una hora, es la forma de que se deje
+   * de mirar la pantalla: si no se distingue lo urgente de lo histórico de un
+   * vistazo, todo se lee como histórico.
+   *
+   * El resuelto pierde el color de severidad —ya no hay severidad que
+   * comunicar— y baja de contraste. No se oculta ni se tacha: sigue habiendo
+   * algo que leer, y el que nadie haya confirmado que se arregló es justamente
+   * el motivo por el que sigue ahí.
+   */
+  const sev = resuelto ? null : SEVERIDAD_TOKEN[riesgo.severidad] ?? SEVERIDAD_DEFECTO;
+  const Icono = resuelto ? CheckCircle2 : sev.Icono;
+  const colorIcono = resuelto ? t.textFaint : t[sev.token];
 
   const causa = diagnostico?.causas?.[0] ?? null;
   const banda = BANDA_TOKEN[causa?.banda] ?? BANDA_TOKEN.bajo;
@@ -172,18 +238,39 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
     <li
       style={{
         background: t.panel, border: `1px solid ${t.border}`,
-        borderLeft: `4px solid ${t[sev.token]}`,
+        borderLeft: `4px solid ${resuelto ? t.border : t[sev.token]}`,
         borderRadius: 12, padding: 16,
         display: "flex", flexDirection: "column", gap: 10,
+        opacity: resuelto ? 0.72 : 1,
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <Icono size={18} color={t[sev.token]} style={{ flexShrink: 0, marginTop: 2 }} />
+        <Icono size={18} color={colorIcono} style={{ flexShrink: 0, marginTop: 2 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: t.textFaint, textTransform: "uppercase" }}>
               {nombreSistema(sistema)}
             </span>
+            {/*
+              El rótulo, además del color: un indicador que sólo sea cromático
+              no lo lee quien no distingue ese par de tonos (DESIGN.md), y aquí
+              la diferencia entre «está pasando» y «pasó» es la información
+              principal de la tarjeta.
+
+              Dice «ya no está activo» y NO «resuelto» a secas: nadie ha
+              confirmado que se arreglara. Pudo pararse la bomba, o el sensor
+              pudo dejar de dar dato (§2.5).
+            */}
+            {resuelto && (
+              <span
+                style={{
+                  fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                  color: t.textSoft, background: t.hover,
+                }}
+              >
+                {traducir("maintenance:notices.noLongerActive")}
+              </span>
+            )}
           </div>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>{textoDeRiesgo.titulo}</p>
           <p style={{ margin: "3px 0 0", fontSize: 12.5, color: t.textSoft }}>{textoDeRiesgo.evidencia}</p>
@@ -284,6 +371,36 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
         >
           {traducir("maintenance:notices.seeRisks")}
         </button>
+
+        {/*
+          ── «LEÍDO», Y POR QUÉ NO SE LLAMA «DESCARTAR» ────────────────────
+
+          Porque no descarta nada: un aviso VIGENTE marcado como leído se queda
+          en la lista, porque su riesgo sigue ahí y «visto» no apaga un riesgo.
+          Lo que hace es dejar constancia de que esta persona ya lo miró, para
+          que cuando el riesgo se apague el aviso se vaya solo en vez de
+          acumularse.
+
+          Es de ESTA persona en ESTE dispositivo, como en Alarmas y Hallazgos:
+          un aviso leído en el taller sigue visible en la sala de control, que
+          es correcto — son dos personas distintas. Ver `lib/vistoPorMi.js`
+          sobre por qué «visto» nunca se manda al servidor.
+        */}
+        {!aviso.vistoEn && (
+          <button
+            type="button"
+            onClick={() => onLeido?.(aviso.id)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "9px 13px", borderRadius: 8, cursor: "pointer",
+              border: `1px solid ${t.border}`, background: "transparent",
+              color: t.textFaint, fontSize: 12.5, fontWeight: 600, minHeight: 44,
+            }}
+          >
+            <Check size={14} />
+            {traducir("maintenance:notices.markRead")}
+          </button>
+        )}
       </div>
     </li>
   );
@@ -313,9 +430,7 @@ export default function AvisosEva({ onNavigate }) {
   );
 
   const idioma = i18n.language?.startsWith("en") ? "en" : "es";
-  const { avisos, cargando } = useAvisosNarrados(riesgosPorSistema, idioma);
-
-  const hayRiesgos = activosTanque.length + activosVibracion.length > 0;
+  const { avisos, narrando, marcarLeido } = useAvisosNarrados(riesgosPorSistema, idioma);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -328,7 +443,13 @@ export default function AvisosEva({ onNavigate }) {
         </p>
       </header>
 
-      {!hayRiesgos ? (
+      {/*
+        La lista vacía se decide por los AVISOS, no por los riesgos activos: un
+        aviso resuelto y sin leer sigue siendo algo que enseñar aunque ya no
+        haya ningún riesgo activo. Mirar los riesgos aquí —como en F2— habría
+        escondido exactamente el caso que F3 existe para conservar.
+      */}
+      {avisos.length === 0 ? (
         <p style={{ margin: 0, fontSize: 13, color: t.textSoft, textAlign: "center", padding: "24px 0" }}>
           {traducir("maintenance:notices.empty")}
         </p>
@@ -351,6 +472,7 @@ export default function AvisosEva({ onNavigate }) {
                     : traducirRiesgoVibracion(aviso.riesgo)
                 }
                 onNavigate={onNavigate}
+                onLeido={marcarLeido}
               />
             ))}
           </ul>
@@ -361,14 +483,11 @@ export default function AvisosEva({ onNavigate }) {
             «cargando» durante ese rato se lee como colgada — el mismo síntoma
             que la cola del asistente ya resuelve diciendo cuántos hay delante.
           */}
-          {cargando && (
+          {narrando > 0 && (
             <AlertBanner
               type="info"
               title={traducir("maintenance:notices.narratingTitle")}
-              message={traducir("maintenance:notices.narrating", {
-                hechos: avisos.length,
-                total: activosTanque.length + activosVibracion.length,
-              })}
+              message={traducir("maintenance:notices.narrating", { pendientes: narrando })}
             />
           )}
         </>
