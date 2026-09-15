@@ -228,7 +228,86 @@ export async function createApp(config) {
   // `indiceDocumentos` sea `null` — el respaldo del manual sale en 0 sin él,
   // no es motivo para negar todo el diagnóstico, igual que
   // `limites_del_manual` no le impide funcionar a `diagnostico`.
-  const motorDiagnostico = createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal })
+  const motorSinDiario = createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluadorTemporal })
+
+  /*
+   * El diario de DIAGNÓSTICOS (Plan 28 F2): una línea por diagnóstico
+   * resuelto, con el snapshot de evidencia que lo sostiene. Cuarto uso de
+   * `lib/diario.mjs` y por el mismo motivo que los otros tres — el porqué de
+   * que sea un archivo aparte está en el bloque `diagnosticos:` de
+   * `config.mjs`.
+   *
+   * Se crea AQUÍ y no junto a sus tres hermanos, más abajo: el motor lo
+   * envuelve justo debajo, y una dependencia declarada después de su uso es
+   * una que se rompe en cuanto alguien reordene el archivo.
+   */
+  const diarioDiagnosticos = crearDiario({
+    ruta: config.diario.diagnosticos.ruta,
+    maxBytes: config.diario.diagnosticos.maxBytes,
+    diasRetencion: config.diario.diagnosticos.dias,
+  })
+
+  /*
+   * ── EL DIARIO SE ENVUELVE AQUÍ, NO SE PASA A CADA CONSUMIDOR ────────
+   *
+   * Plan 28 F2. El motor tiene DOS consumidores —`GET /api/diagnostico` para
+   * la vista de cierre y `diagnosticar_falla` para el chat— y los dos tienen
+   * que quedar registrados. Pasarles el diario y confiar en que cada uno anote
+   * es el mismo defecto que el Plan 20 F5 ya corrigió con las guardas de
+   * autenticación: *la llevaban trece de treinta y tres, y olvidarla en la
+   * siguiente no rompía nada visible*. Un consumidor nuevo que no anotara
+   * dejaría un hueco silencioso en la auditoría.
+   *
+   * Envolviendo `diagnosticar()` una sola vez, registrarse deja de ser algo
+   * que haya que acordarse de hacer: quien llame al motor queda anotado por
+   * construcción.
+   *
+   * ── Y NO SE ANOTA DENTRO DEL MOTOR, QUE SERÍA LO OTRO OBVIO ─────────
+   *
+   * Porque `ia/motor/diagnostico.mjs` se prueba en Node sin tocar disco, y
+   * meterle un `appendFile` lo ataría a un sistema de archivos que no
+   * necesita. Es la misma frontera que mantiene `snapshot.mjs` separado de la
+   * escritura (Plan 28 F1).
+   */
+  const motorDiagnostico = {
+    async diagnosticar(entrada) {
+      const t0 = Date.now()
+      const resultado = await motorSinDiario.diagnosticar(entrada)
+
+      /*
+       * `anotar` NUNCA lanza —devuelve `{ok:false}`— por decisión de
+       * `lib/diario.mjs`: quien llama ya tiene su diagnóstico, y tumbarlo
+       * porque el disco esté lleno sería perder lo útil por no poder guardar
+       * la copia. Se registra el fallo en el log, que es el otro sitio donde
+       * queda constancia.
+       */
+      const anotacion = await diarioDiagnosticos.anotar({
+        tipo: 'diagnostico',
+        sistema: resultado.sistema,
+        riesgoId: resultado.riesgoId,
+        diagnosticEventId: resultado.diagnosticEventId,
+        huerfano: resultado.huerfano,
+        ...(resultado.conflicto ? { conflicto: true } : {}),
+        // Sólo el veredicto de cada causa, no la causa entera: el título y el
+        // componente están en `causas.js` y no cambian, así que archivarlos
+        // sería copiar el catálogo en cada línea.
+        causas: (resultado.causas ?? []).map(c => ({
+          id: c.id, banda: c.banda, respaldo: c.respaldo,
+        })),
+        snapshot: resultado.snapshot ?? null,
+        duracionMs: Date.now() - t0,
+      })
+
+      if (!anotacion.ok) {
+        logger.warn(
+          'No se pudo anotar el diagnóstico en su diario; el resultado sí se entregó',
+          { error: anotacion.error, diagnosticEventId: resultado.diagnosticEventId }
+        )
+      }
+
+      return resultado
+    },
+  }
 
   // `readOnly` se pasa porque el catálogo YA NO es de solo lectura entero:
   // `controlar_bomba` escribe, y necesita la misma puerta que usa
@@ -272,6 +351,7 @@ export async function createApp(config) {
     maxBytes: config.diario.cuaderno.maxBytes,
     diasRetencion: config.diario.cuaderno.dias,
   })
+
 
   const herramientas = createHerramientas({
     client,

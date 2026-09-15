@@ -758,6 +758,16 @@ function readCuadernoRuta(rawValue) {
   )
 }
 
+/** Dónde vive el diario de diagnósticos (Plan 28 F2). Mismo criterio que sus
+ *  tres hermanos: en `datos/`, que está en `.gitignore` porque es estado que
+ *  el backend genera en marcha, no código. */
+function readDiarioDiagnosticosRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || join('datos', 'diario-diagnosticos.jsonl')
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
 /**
  * Carpeta de salida de los PDF de exportación de chat. Mismo criterio que
  * `readReportesDir` —vacío no es «desactivado», sólo cae al valor por
@@ -1183,6 +1193,40 @@ export function loadConfig(env = process.env) {
           'CUADERNO_MAX_BYTES', env.CUADERNO_MAX_BYTES, MAX_BYTES_DIARIO, 1024
         ),
         dias: readInteger('CUADERNO_DIAS', env.CUADERNO_DIAS, DIAS_RETENCION, 1),
+      }),
+
+      /**
+       * El diario de DIAGNÓSTICOS (Plan 28 F2): una línea por diagnóstico
+       * resuelto, con el snapshot de evidencia que lo sostiene.
+       *
+       * ── POR QUÉ UN CUARTO ARCHIVO Y NO UNA CARPETA MÁS ──────────────
+       *
+       * Por el mismo criterio que separó el cuaderno del diario de
+       * accionamientos: son dominios distintos con lectores distintos. Un
+       * accionamiento dice «el sistema hizo X»; un diagnóstico dice «el
+       * sistema concluyó Y, y ésta era la evidencia». Mezclarlos obligaría a
+       * quien lea cualquiera de los dos a filtrar por tipo, y convertiría una
+       * poda del uno en pérdida de entradas del otro.
+       *
+       * El mecanismo debajo es el mismo de siempre (`lib/diario.mjs`): JSONL,
+       * candado, poda anotada. No hay módulo nuevo — es el cuarto uso de la
+       * misma factoría, y eso es exactamente lo que se quería al escribirla.
+       *
+       * Tope MÁS GRANDE que los otros: una línea de diagnóstico lleva su
+       * snapshot —lecturas, calidades, referencias de manual y de casos— y
+       * ronda el kilobyte, cinco veces lo que pesa un accionamiento. Con 16 MB
+       * son del orden de quince mil diagnósticos, que en una planta donde se
+       * diagnostica unas veces al día es más de una década.
+       */
+      diagnosticos: Object.freeze({
+        ruta: readDiarioDiagnosticosRuta(env.DIARIO_DIAGNOSTICOS),
+        maxBytes: readInteger(
+          'DIARIO_DIAGNOSTICOS_MAX_BYTES', env.DIARIO_DIAGNOSTICOS_MAX_BYTES,
+          16 * 1024 * 1024, 1024
+        ),
+        dias: readInteger(
+          'DIARIO_DIAGNOSTICOS_DIAS', env.DIARIO_DIAGNOSTICOS_DIAS, DIAS_RETENCION, 1
+        ),
       }),
     }),
 
