@@ -169,8 +169,40 @@ const DEFAULTS = {
    * respuestas del asistente por sistema.
    */
   iaTimeoutMs: 180000,
-  /** Tope de tokens de la respuesta. Con este presupuesto, cada token se paga. */
-  iaMaxTokens: 512,
+  /**
+   * Tope de tokens de la respuesta. Con este presupuesto, cada token se paga.
+   *
+   * ── POR QUÉ 1536 Y NO 512 (15-09-2026) ──────────────────────────────
+   *
+   * Porque 512 rompía el turno entero, y de una forma que no se explica sola.
+   * En Qwen3.5 los tokens de razonamiento gastan de ESTE mismo presupuesto
+   * (ver `llamarModelo` en `ia/conversacion/chat.mjs`), así que un tope corto
+   * tiene dos modos de fallo, no uno:
+   *
+   *   · Se agota redactando   → `content` vacío. Molesto, pero la red de
+   *                             seguridad del backend lo cubre.
+   *   · Se agota escribiendo los ARGUMENTOS de una herramienta → el JSON
+   *     queda sin cerrar, llama-server no lo puede parsear y devuelve **500**.
+   *     Eso NO lo cubre nada: `llamarModelo` convierte cualquier respuesta no
+   *     OK en excepción y el turno se cae con un error en la pantalla de
+   *     planta.
+   *
+   * El segundo, medido con qwen-3.5-4B y este defecto en 512, preguntando «el
+   * día de ayer se presentó alguna alarma importante?»:
+   *
+   *   Failed to parse tool call arguments as JSON … invalid string: missi
+   *
+   * «missi» cortado a media palabra es la firma del presupuesto agotado a
+   * mitad del JSON. Tardó 73,8 s en fallar. Con 1536, la misma pregunta se
+   * contesta.
+   *
+   * 512 era razonable cuando el asistente tenía pocas herramientas; hoy son
+   * veintiséis, y elegir entre ellas y componer varios argumentos ya no cabe.
+   * Subirlo cuesta latencia sólo cuando el modelo de verdad la usa —`max_tokens`
+   * es un TOPE, no una reserva—, así que el precio de pasarse es bajo y el de
+   * quedarse corto es un 500 en la cara del operador.
+   */
+  iaMaxTokens: 1536,
   /**
    * Herramientas encadenadas por pregunta. Tres cubre el diagnóstico completo
    * —estado, historia de la señal sospechosa y manual— sin dejar que un modelo
