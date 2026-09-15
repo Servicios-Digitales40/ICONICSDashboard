@@ -1,6 +1,35 @@
 # PLAN 28 — Auditoría y extensión del Motor de Diagnóstico
 
-**Estado:** por completar
+**Estado:** las siete fases **completadas** el 15-09-2026.
+
+| Fase | Qué dejó |
+|---|---|
+| F1 | Snapshot de evidencia. Cierra además H7: `valoresSensores` por fin tiene quien lo traiga |
+| F2 | Diario de diagnósticos — cuarto uso de `lib/diario.mjs`, sin módulo nuevo |
+| F3 | «No respalda» deja de ser lo mismo que «no contestó» |
+| F4 | La calidad VETA: un sensor inválido baja la banda, con su motivo archivado |
+| F5 | Clasificador de intención — **63% menos catálogo** de media |
+| F6 | `causaReal` separa id de catálogo y texto libre, leyendo las dos formas |
+| F7 | Métricas agregadas del diario, sin contadores paralelos |
+
+**Tres defectos que salieron al construir, y no estaban en el plan:**
+
+1. **F4 no la recorría nadie.** El motor sabía vetar y ningún consumidor le
+   mandaba la calidad — el mismo H7 con otra forma. La vista la tenía delante
+   (`createSenal` lleva `motivo`) y la tiraba al aplanar.
+2. **El acotado de F5 confundía «centrífuga» con «fuga».** Una pregunta de
+   manual acababa en el subconjunto de diagnóstico: el error caro.
+3. **La F2 no guardaba `estado` ni `senalesVetadas`.** Se escribió antes que F3
+   y F4, y al añadirlos al motor nadie los llevó al diario. Lo destapó la F7 al
+   agregar: los números se contradecían entre sí.
+
+Los tres comparten forma — algo escrito y no recorrido, o guardado y no leído —
+y ninguno habría fallado ruidosamente.
+
+**Lo que este plan NO hizo**, y sigue en §7: diagnóstico automático por evento,
+recalibrar `bandaDe()` (necesita corpus real), y los umbrales analógicos
+(`PROVISIONALES` sigue en `true`).
+
 **Fecha de redacción:** 14-09-2026
 **Origen:** un encargo externo pedía «diseñar un Motor de Diagnóstico Industrial
 basado en evidencia». El motor ya existe desde el Plan 16, con la aritmética
