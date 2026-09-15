@@ -806,6 +806,125 @@ await check('una causa SIN firma declarada no cuenta como fuente caída', async 
   assert.equal(r.estado, 'completo', 'nada se cayó: el diagnóstico está completo')
 })
 
+/* ── La calidad como veto, Plan 28 F4 ───────────────────────────────── */
+
+console.log('\n── Un sensor inválido no respalda nada (Plan 28 F4) ───────')
+
+/** Las tres señales que `bomba-sin-salida` necesita, todas en buena calidad. */
+const MUESTRA_SANA = {
+  presionRelativa: { valor: 3, quality: 0 },
+  flujoInstantaneo: { valor: 0, quality: 0 },
+  cargaMotor: { valor: 55, quality: 0 },
+}
+
+await check('una señal de MALA calidad se descuenta de `datos`', async () => {
+  /*
+   * ── POR QUÉ SE DESCUENTA Y NO SE PONDERA ──────────────────────────
+   *
+   * Un sensor inválido no es evidencia débil de una falla: es AUSENCIA de
+   * evidencia. Contarlo como medio punto sería disfrazar el hueco de dato,
+   * que es lo que prohíbe el §2.4. Y un quinto término obligaría además a
+   * recalibrar `bandaDe()`, bloqueado por falta de corpus real.
+   */
+  const { QUALITY_SIN_DATO } = await import('../shared/quality.js')
+
+  const sano = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', valoresSensores: MUESTRA_SANA,
+  })
+  const roto = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque',
+    riesgoId: 'bomba-sin-salida',
+    valoresSensores: { ...MUESTRA_SANA, flujoInstantaneo: { valor: 0, quality: QUALITY_SIN_DATO } },
+  })
+
+  assert.equal(sano.causas[0].respaldo.datos, 3)
+  assert.equal(roto.causas[0].respaldo.datos, 2, 'la señal vetada sale de la cuenta')
+})
+
+await check('el veto se DICE, con el nombre de la señal', async () => {
+  // Un `datos` más bajo sin explicación es un número que nadie puede auditar.
+  const { QUALITY_BAD_UA } = await import('../shared/quality.js')
+
+  const r = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque',
+    riesgoId: 'bomba-sin-salida',
+    valoresSensores: { ...MUESTRA_SANA, presionRelativa: { valor: 3, quality: QUALITY_BAD_UA } },
+  })
+
+  assert.deepEqual(r.senalesVetadas, ['presionRelativa'])
+  // Y su motivo queda archivado con su código, para la F2.
+  assert.equal(r.snapshot.calidades.presionRelativa.motivo, 'mala')
+})
+
+await check('las CUATRO clases de mala calidad vetan, no sólo la mala', async () => {
+  /*
+   * `motivoDeCalidad` distingue cuatro situaciones y las tiene medidas contra
+   * el servidor real. Las cuatro son «no se pudo medir», así que las cuatro
+   * vetan — incluida `desconocida`, que es la que declara que NO SABEMOS qué
+   * significa ese código: darla por buena sería afirmar algo no medido (§2.5).
+   */
+  const q = await import('../shared/quality.js')
+
+  for (const [nombre, quality] of [
+    ['mala', q.QUALITY_BAD_UA],
+    ['incierta', q.QUALITY_UNCERTAIN],
+    ['sin entrega', q.QUALITY_SIN_DATO],
+    ['desconocida', 7],
+  ]) {
+    const r = await SIN_FUENTES.diagnosticar({
+      sistema: 'tanque',
+      riesgoId: 'bomba-sin-salida',
+      valoresSensores: { ...MUESTRA_SANA, cargaMotor: { valor: 55, quality } },
+    })
+    assert.deepEqual(r.senalesVetadas, ['cargaMotor'], `«${nombre}» tenía que vetar`)
+  }
+})
+
+await check('un número PELADO no se veta: «no consta» no es «mala»', async () => {
+  /*
+   * La muestra puede llegar como objeto `{valor, quality}` o como número
+   * suelto —`evaluarRiesgos` pasa lo segundo—. Un número sin calidad
+   * declarada no dice que la calidad sea mala: dice que no consta. Vetarlo
+   * castigaría a todo el que llame con la forma de siempre.
+   */
+  const r = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque',
+    riesgoId: 'bomba-sin-salida',
+    valoresSensores: { presionRelativa: 3, flujoInstantaneo: 0, cargaMotor: 55 },
+  })
+
+  assert.equal(r.senalesVetadas, undefined, 'sin calidad declarada no se veta nada')
+  assert.equal(r.causas[0].respaldo.datos, 3)
+})
+
+await check('sin `valoresSensores`, el comportamiento es EXACTAMENTE el de antes', async () => {
+  // El criterio de aceptación de la fase: quien no traiga muestra no nota que
+  // esta fase existe.
+  const r = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(r.senalesVetadas, undefined)
+  assert.equal(r.causas[0].respaldo.datos, 3, 'las tres señales que declara la regla')
+})
+
+await check('el suelo de `datos` sigue en 1 aunque se vete todo', async () => {
+  /*
+   * Un riesgo activo tiene al menos un dato detrás por definición —algo lo
+   * disparó—, y eso no cambia porque la muestra que llega DESPUÉS ya no valga.
+   * Bajar a 0 diría que el riesgo se activó sin evidencia, que es falso.
+   */
+  const { QUALITY_SIN_DATO } = await import('../shared/quality.js')
+  const todoRoto = Object.fromEntries(
+    Object.keys(MUESTRA_SANA).map((k) => [k, { valor: 0, quality: QUALITY_SIN_DATO }])
+  )
+
+  const r = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', valoresSensores: todoRoto,
+  })
+
+  assert.equal(r.causas[0].respaldo.datos, 1)
+  assert.equal(r.senalesVetadas.length, 3, 'y las tres constan como vetadas')
+})
+
 /* ── El snapshot de evidencia, Plan 28 F1 ───────────────────────────── */
 
 console.log('\n── El snapshot de evidencia (Plan 28 F1) ──────────────────')

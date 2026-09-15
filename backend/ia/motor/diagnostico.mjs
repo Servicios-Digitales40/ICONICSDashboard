@@ -46,6 +46,7 @@
 import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
+import { isGoodQuality } from '../../../shared/quality.js'
 import { logger } from '../../logger.mjs'
 import { construirSnapshot } from './snapshot.mjs'
 
@@ -306,6 +307,58 @@ function reglaDe(sistema, riesgoId) {
  */
 function datosDe(regla) {
   return Math.min(Math.max(regla.necesita?.length ?? 0, 1), 3)
+}
+
+/**
+ * Las señales que la regla necesita y que NO llegaron en buena calidad.
+ *
+ * ── LA CALIDAD ES UN VETO, NO UN QUINTO TÉRMINO (PLAN 28 F4) ────────
+ *
+ * Un sumando más subiría el máximo teórico y obligaría a recalibrar
+ * `bandaDe()`, que sigue BLOQUEADO a propósito por falta de corpus real (Plan
+ * 17 F7a). Pero el motivo de fondo no es aritmético, es de dominio:
+ *
+ *   **un sensor inválido no es evidencia débil de una falla, es AUSENCIA de
+ *   evidencia.**
+ *
+ * Contarlo como medio punto sería disfrazar el hueco de dato, que es
+ * exactamente lo que prohíbe el §2.4. Así que no se pondera: se descuenta. La
+ * señal que no se pudo medir sale de la cuenta de `datos` como si la regla no
+ * la declarara.
+ *
+ * ── EL SUELO EN 1 SE MANTIENE, Y NO ES UNA CONTRADICCIÓN ────────────
+ *
+ * `datosDe` nunca baja de 1 porque el riesgo YA ESTÁ ACTIVO cuando se pide su
+ * diagnóstico: algo lo disparó. Eso sigue siendo cierto aunque una de sus
+ * señales tenga mala calidad — `evaluarRiesgos()` no evalúa una regla a la
+ * que le falte una lectura (la declara «no evaluable»), así que si el riesgo
+ * está activo es que en el momento de dispararse todas estaban. Lo que este
+ * veto recoge es el caso en que la muestra que llega AQUÍ, después, ya no lo
+ * está.
+ *
+ * ── POR QUÉ NO LO DECIDE ESTE MÓDULO LEYENDO SENSORES ───────────────
+ *
+ * Porque el motor no lee sensores, y eso no cambia con esta fase (§0 del Plan
+ * 28). La calidad viaja dentro de `valoresSensores`, que la trae quien llama
+ * desde la frontera donde ya se filtra — el motor de sondeo en el frontend, la
+ * capa de herramientas en el backend, como describe `shared/quality.js`.
+ *
+ * @returns {string[]} claves vetadas; vacío si no hay muestra o si todo vale
+ */
+function senalesVetadas(regla, valoresSensores) {
+  if (!valoresSensores) return []
+
+  const vetadas = []
+  for (const clave of regla.necesita ?? []) {
+    const bruto = valoresSensores[clave]
+    // Una señal que la regla necesita y que NO viene en la muestra no se veta:
+    // no se sabe nada de ella, y «no consta» no es «mala» (§2.4, y la misma
+    // distinción que hace `calidadesDe` en `snapshot.mjs`).
+    if (bruto === undefined || bruto === null) continue
+    if (typeof bruto !== 'object') continue // número pelado: sin calidad declarada
+    if (!isGoodQuality(bruto.quality)) vetadas.push(clave)
+  }
+  return vetadas
 }
 
 /**
@@ -690,7 +743,16 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
       }
     }
 
-    const datos = datosDe(regla)
+    /*
+     * Plan 28 F4: la calidad VETA, no pondera. Cada señal que la regla
+     * necesita y que llegó en mala calidad se descuenta de `datos` como si no
+     * estuviera declarada — ver `senalesVetadas`. El suelo en 1 de `datosDe`
+     * se respeta igual: un riesgo activo tiene al menos un dato detrás.
+     */
+    const vetadas = senalesVetadas(regla, valoresSensores)
+    const datos = vetadas.length
+      ? Math.min(Math.max((regla.necesita?.length ?? 0) - vetadas.length, 1), 3)
+      : datosDe(regla)
 
     // La frase de `datos`, con cifras — Plan 17 Fase 4 (G6). Sólo existe si
     // quien llama trajo `valoresSensores`: ver el JSDoc de `diagnosticar`.
@@ -860,6 +922,14 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
       sistema, riesgoId, diagnosticEventId,
       huerfano: false, conflicto: hayConflicto(causas), causas,
       estado, estadoFuentes,
+      /*
+       * Plan 28 F4: el veto se DICE, no sólo se aplica. Un `datos` más bajo
+       * sin explicación sería un número que nadie puede auditar — y la razón
+       * por la que bajó (un sensor que dejó de entregar) es justo lo que el
+       * técnico necesita saber antes de fiarse del diagnóstico. Sólo viaja
+       * cuando hay algo vetado, como `conflicto` y `estado`.
+       */
+      ...(vetadas.length ? { senalesVetadas: vetadas } : {}),
       snapshot,
     }
   }
