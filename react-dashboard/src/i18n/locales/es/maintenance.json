@@ -20,6 +20,21 @@
         "title": "Las fuentes no coinciden",
         "message": "El manual y los casos anteriores respaldan causas distintas. Revisa la evidencia de cada una antes de elegir — el sistema no ha resuelto el desacuerdo por ti."
       },
+      "sources": {
+        "name": {
+          "manual": "los manuales",
+          "casos": "los casos previos",
+          "temporal": "la tendencia del historiador"
+        },
+        "parcial": {
+          "title": "Este diagnóstico se calculó con una fuente menos",
+          "message": "No se pudo consultar {{fuentes}}. Las causas de abajo salen de lo que sí respondió, así que su orden pesa menos de lo habitual."
+        },
+        "insuficiente": {
+          "title": "No se pudo consultar ninguna fuente",
+          "message": "Falló {{fuentes}}. Lo único que queda son los datos del propio riesgo, y ésos valen igual para todas las causas: el orden de abajo es el del catálogo, NO un ranking. No tomes la primera por la más probable."
+        }
+      },
       "proposed": " — propuesta por el sistema",
       "backing": "datos {{datos}} · manual {{manual}} · casos {{casos}}",
       "backingTemporal": " · temporal {{temporal}}"

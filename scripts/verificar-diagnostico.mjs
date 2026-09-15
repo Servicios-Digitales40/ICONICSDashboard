@@ -712,6 +712,100 @@ await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin ev
 
 /* ── Por qué un riesgo no tiene causas (Plan 20) ──────────────────────── */
 
+/* ── Estados y degradación explícita, Plan 28 F3 ────────────────────── */
+
+console.log('\n── «No respalda» y «no contestó» (Plan 28 F3) ─────────────')
+
+/** Un índice que siempre lanza: la fuente caída. */
+const indiceQueFalla = {
+  buscar: async () => { throw new Error('el índice no responde') },
+  buscarCasosSimilares: async () => { throw new Error('el índice no responde') },
+}
+
+await check('una fuente que RESPONDE y no respalda se distingue de una CAÍDA', async () => {
+  /*
+   * ── LA PROPIEDAD QUE DEFINE ESTA FASE ─────────────────────────────
+   *
+   * Los dos casos dan `manual: 0`. Hasta el Plan 28 F3 eran indistinguibles
+   * salvo por un `logger.warn` que nadie mira al leer un diagnóstico — y un
+   * diagnóstico calculado con el índice caído se presentaba idéntico a uno
+   * calculado con todo en pie, con la misma banda. Eso es §2.5: degradar en
+   * silencio.
+   */
+  const vacio = await createMotorDiagnostico({ indiceDocumentos: manualFalso({}) })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+  const roto = await createMotorDiagnostico({ indiceDocumentos: indiceQueFalla })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(vacio.causas[0].respaldo.manual, 0)
+  assert.equal(roto.causas[0].respaldo.manual, 0, 'las dos dan el mismo punto...')
+
+  assert.equal(vacio.causas[0].estadoFuentes.manual, 'sin_respaldo')
+  assert.equal(roto.causas[0].estadoFuentes.manual, 'caida', '...y ya no el mismo estado')
+})
+
+await check('el estado global se DERIVA de las fuentes, no se escribe a mano', async () => {
+  /*
+   * UNA caída de tres es `parcial`, y para comprobarlo hay que montar las
+   * otras dos de verdad: un índice sin montar también cuenta como caído —es
+   * el mismo «no se pudo consultar»—, así que pasar sólo el que falla daría
+   * `insuficiente` y la prueba no distinguiría los dos estados.
+   */
+  const evaluadorTemporal = {
+    evaluar: async () => ({ puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }),
+    evaluarEstado: async () => ({ puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }),
+  }
+  const roto = await createMotorDiagnostico({
+    indiceDocumentos: indiceQueFalla,
+    indiceCasos: casosFalsos([]),
+    evaluadorTemporal,
+  }).diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(roto.estado, 'parcial', 'una caída de tres es parcial')
+  assert.equal(roto.estadoFuentes.manual, 'caida')
+  assert.equal(roto.estadoFuentes.casos, 'sin_respaldo', 'las otras dos sí contestaron')
+  // Y viaja al snapshot, que es lo que audita la F2.
+  assert.deepEqual(roto.snapshot.fuentesCaidas, ['manual'])
+})
+
+await check('sin NINGUNA fuente montada, el diagnóstico se declara insuficiente', async () => {
+  /*
+   * Con las tres caídas sólo queda `datos`, que es el MISMO para todas las
+   * causas del riesgo —verdad física, ver la cabecera del archivo—. O sea que
+   * no hay nada que pueda desempatarlas: el orden que sale es el del catálogo,
+   * no un ranking, y presentarlo como tal sería mentir sobre su autoridad.
+   */
+  const r = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(r.estado, 'insuficiente')
+  assert.deepEqual(r.snapshot.fuentesCaidas.sort(), ['casos', 'manual', 'temporal'])
+})
+
+await check('un riesgo huérfano es insuficiente, y no por haber fallado nada', async () => {
+  const r = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'variador-en-manual' })
+
+  assert.equal(r.huerfano, true)
+  assert.equal(r.estado, 'insuficiente')
+  assert.equal(r.sinCausas.deliberado, true, 'y sigue diciendo POR QUÉ no tiene causas')
+})
+
+await check('una causa SIN firma declarada no cuenta como fuente caída', async () => {
+  /*
+   * `agua-caliente` se quedó sin `firmaTemporal` a propósito en el Plan 29 F2
+   * —sus dos causas comparten mecanismo, y una firma repetida no desempata
+   * nada—. Eso es una decisión del catálogo, no un fallo: llamarlo «caída»
+   * diría que falta una pieza que nadie quiso poner, y contagiaría el estado
+   * global a «parcial» en un diagnóstico que está completo.
+   */
+  const evaluadorTemporal = { evaluar: async () => ({ puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }) }
+  const r = await createMotorDiagnostico({
+    indiceDocumentos: manualFalso({}), indiceCasos: casosFalsos([]), evaluadorTemporal,
+  }).diagnosticar({ sistema: 'tanque', riesgoId: 'agua-caliente' })
+
+  assert.equal(r.causas[0].estadoFuentes.temporal, 'sin_respaldo')
+  assert.equal(r.estado, 'completo', 'nada se cayó: el diagnóstico está completo')
+})
+
 /* ── El snapshot de evidencia, Plan 28 F1 ───────────────────────────── */
 
 console.log('\n── El snapshot de evidencia (Plan 28 F1) ──────────────────')

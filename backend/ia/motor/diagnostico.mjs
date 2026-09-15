@@ -102,6 +102,77 @@ export const CLAVES_DE_EVIDENCIA = {
  *  las dos no la cambia. */
 const TOPE_TEMPORAL = 2
 
+/**
+ * ── «NO RESPALDA» Y «NO CONTESTÓ» DEJAN DE SER EL MISMO 0 (PLAN 28 F3) ──
+ *
+ * Hasta esta fase, las tres funciones de respaldo devolvían `puntos: 0` en dos
+ * situaciones que no se parecen en nada: cuando la fuente respondió y no
+ * respalda esa causa, y cuando la fuente se cayó o no está montada. Lo único
+ * que distinguía la segunda era un `logger.warn` — un sitio donde nadie mira
+ * al leer un diagnóstico, y que además no viaja al técnico ni al modelo.
+ *
+ * Eso rozaba el §2.5 de CLAUDE.md: *un servidor sin una pieza montada se niega
+ * y explica qué falta; no degrada en silencio*. Un diagnóstico calculado con
+ * el índice de manuales caído se presentaba idéntico a uno calculado con todo
+ * en pie, y con la misma banda — que es peor que no dar el diagnóstico,
+ * porque parece completo.
+ *
+ * Tres estados y no más:
+ *
+ *   `consultada`   respondió y respalda (puntos > 0)
+ *   `sin_respaldo` respondió y no respalda (puntos === 0) — un resultado
+ *                  MEDIDO, no una ausencia
+ *   `caida`        falló, agotó su plazo o no está montada
+ *
+ * El `logger.warn` se queda: duplicar no estorba, y el log sigue siendo el
+ * sitio donde se investiga POR QUÉ falló. Lo que cambia es que deja de ser el
+ * único sitio donde consta QUE falló.
+ */
+export const ESTADO_FUENTE = Object.freeze({
+  CONSULTADA: 'consultada',
+  SIN_RESPALDO: 'sin_respaldo',
+  CAIDA: 'caida',
+})
+
+/** Una fuente que contestó: su estado sale de si respalda o no. La que no
+ *  contesta nunca pasa por aquí — se declara `caida` en su propio `catch`. */
+function estadoDe(puntos) {
+  return puntos > 0 ? ESTADO_FUENTE.CONSULTADA : ESTADO_FUENTE.SIN_RESPALDO
+}
+
+/**
+ * ── EL ESTADO DEL DIAGNÓSTICO SE DERIVA, NO SE DECLARA ──────────────
+ *
+ * Se calcula de los estados por fuente, así que no puede desincronizarse de
+ * ellos. Escribirlo a mano en cada rama sería el defecto que este proyecto ya
+ * conoce por otro nombre: dos verdades sobre lo mismo en dos sitios.
+ *
+ * `datos` no entra en la cuenta y es deliberado: esa fuente no se consulta,
+ * viene YA resuelta por `evaluarRiesgos()` antes de llegar aquí (ver la
+ * cabecera del archivo). No puede caerse, así que preguntar por su estado no
+ * significaría nada.
+ *
+ *   `completo`     ninguna de las tres fuentes consultables se cayó
+ *   `parcial`      alguna se cayó, pero al menos una sigue en pie
+ *   `insuficiente` las tres caídas: sólo queda `datos`, que es el mismo para
+ *                  TODAS las causas del riesgo — o sea que no hay nada que
+ *                  pueda desempatarlas, y el orden que salga es el del
+ *                  catálogo, no un ranking
+ */
+export const ESTADO_DIAGNOSTICO = Object.freeze({
+  COMPLETO: 'completo',
+  PARCIAL: 'parcial',
+  INSUFICIENTE: 'insuficiente',
+})
+
+function estadoGlobal(fuentes) {
+  const consultables = [fuentes.manual, fuentes.casos, fuentes.temporal]
+  const caidas = consultables.filter(e => e === ESTADO_FUENTE.CAIDA).length
+  if (caidas === 0) return ESTADO_DIAGNOSTICO.COMPLETO
+  if (caidas === consultables.length) return ESTADO_DIAGNOSTICO.INSUFICIENTE
+  return ESTADO_DIAGNOSTICO.PARCIAL
+}
+
 /** Lo que devuelve una firma que no se declaró. Congelado: lo comparten todas
  *  las causas sin firma y nadie debe poder empujar evidencia dentro. */
 const SIN_RESPALDO_TEMPORAL = Object.freeze({
@@ -247,20 +318,21 @@ function datosDe(regla) {
  * asimetría que `casos.mjs` ya no tiene desde el Plan 16.
  */
 async function respaldoDelManual(indiceDocumentos, sistema, causa) {
-  if (!indiceDocumentos) return { puntos: 0, fragmentos: [] }
+  if (!indiceDocumentos) return { puntos: 0, fragmentos: [], estado: ESTADO_FUENTE.CAIDA }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
     const fragmentos = await indiceDocumentos.buscar(consulta, { top: 2, sistema })
     // El objeto entero, no sólo `.score`: `puntosDeScore` decide sobre
     // `coseno`/`scoreCrudo` (absolutos), no sobre el `score` normalizado
     // que sólo sirve para ordenar — ver la cabecera de este archivo.
-    return { puntos: puntosDeScore(fragmentos[0]), fragmentos }
+    const puntos = puntosDeScore(fragmentos[0])
+    return { puntos, fragmentos, estado: estadoDe(puntos) }
   } catch (error) {
     logger.warn('Búsqueda en manuales falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id,
       error: error.message,
     })
-    return { puntos: 0, fragmentos: [] }
+    return { puntos: 0, fragmentos: [], estado: ESTADO_FUENTE.CAIDA }
   }
 }
 
@@ -304,7 +376,9 @@ async function respaldoDelManual(indiceDocumentos, sistema, causa) {
  * señal negativa, de la fuente que sea, cuenta entera.
  */
 async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
-  if (!indiceCasos) return { puntos: 0, casos: [], confirmados: [], refutados: [] }
+  if (!indiceCasos) {
+    return { puntos: 0, casos: [], confirmados: [], refutados: [], estado: ESTADO_FUENTE.CAIDA }
+  }
   const consulta = [causa.titulo, ...(causa.terminosManual ?? [])].join(' ')
   try {
     const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, riesgoId, texto: consulta, top: 5 })
@@ -343,13 +417,22 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
     // `confirmados`/`refutados` viajan aparte —no sólo dentro de `casos`—
     // para que quien arme `evidenciaAFavor`/`evidenciaEnContra` (Plan 17
     // Fase 4, G6) sepa cuáles son cuáles sin tener que re-derivarlo.
-    return { puntos, casos: [...confirmados, ...refutados, ...porTexto], confirmados, refutados }
+    return {
+      puntos, casos: [...confirmados, ...refutados, ...porTexto], confirmados, refutados,
+      /*
+       * `estadoDe(puntos)` no vale aquí: los casos pueden RESTAR —un intento
+       * fallido, una causa refutada— así que `puntos` llega a ser negativo o
+       * cero habiendo encontrado casos de verdad. Lo que dice si esta fuente
+       * respaldó algo es si encontró algo, no su aritmética.
+       */
+      estado: encontrados.length > 0 ? ESTADO_FUENTE.CONSULTADA : ESTADO_FUENTE.SIN_RESPALDO,
+    }
   } catch (error) {
     logger.warn('Búsqueda en casos falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id,
       error: error.message,
     })
-    return { puntos: 0, casos: [], confirmados: [], refutados: [] }
+    return { puntos: 0, casos: [], confirmados: [], refutados: [], estado: ESTADO_FUENTE.CAIDA }
   }
 }
 
@@ -362,8 +445,25 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
  * temporal.mjs` para la aritmética.
  */
 async function respaldoTemporal(evaluadorTemporal, sistema, causa) {
-  if (!evaluadorTemporal || (!causa.firmaTemporal && !causa.firmaEstado)) {
-    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
+  /*
+   * Dos motivos distintos para no tener respaldo temporal, y sólo uno es una
+   * caída (Plan 28 F3):
+   *
+   *   sin `evaluadorTemporal`  → la fuente NO ESTÁ MONTADA. Es `caida`.
+   *   sin firma declarada      → la causa no declara ninguna, y eso es una
+   *                              decisión del catálogo, no un fallo. El Plan
+   *                              29 F2 dejó a `agua-caliente` sin firma a
+   *                              propósito porque una firma repetida no
+   *                              desempata nada. Llamar a eso «caída» diría
+   *                              que falta una pieza que nadie quiso poner.
+   */
+  if (!evaluadorTemporal) {
+    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [], estado: ESTADO_FUENTE.CAIDA }
+  }
+  if (!causa.firmaTemporal && !causa.firmaEstado) {
+    return {
+      puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [], estado: ESTADO_FUENTE.SIN_RESPALDO,
+    }
   }
   try {
     /*
@@ -388,16 +488,29 @@ async function respaldoTemporal(evaluadorTemporal, sistema, causa) {
         : SIN_RESPALDO_TEMPORAL,
     ])
 
+    const evidenciaAFavor = [...tendencia.evidenciaAFavor, ...estado.evidenciaAFavor]
+    const evidenciaEnContra = [...tendencia.evidenciaEnContra, ...estado.evidenciaEnContra]
+
     return {
       puntos: Math.min(tendencia.puntos + estado.puntos, TOPE_TEMPORAL),
-      evidenciaAFavor: [...tendencia.evidenciaAFavor, ...estado.evidenciaAFavor],
-      evidenciaEnContra: [...tendencia.evidenciaEnContra, ...estado.evidenciaEnContra],
+      evidenciaAFavor,
+      evidenciaEnContra,
+      /*
+       * Igual que en `casos`, y por el mismo motivo: `temporal` también puede
+       * dar evidencia EN CONTRA con 0 puntos —una tendencia que va al revés de
+       * la declarada—, y eso es haber consultado, no haber callado. Lo que
+       * distingue «consultada» de «sin respaldo» es si el historiador dijo
+       * algo, no cuánto sumó.
+       */
+      estado: (evidenciaAFavor.length + evidenciaEnContra.length) > 0
+        ? ESTADO_FUENTE.CONSULTADA
+        : ESTADO_FUENTE.SIN_RESPALDO,
     }
   } catch (error) {
     logger.warn('El evaluador temporal falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id, error: error.message,
     })
-    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
+    return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [], estado: ESTADO_FUENTE.CAIDA }
   }
 }
 
@@ -550,6 +663,13 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
         conflicto: false,
         causas: [],
         /*
+         * Un huérfano es `insuficiente` por definición (Plan 28 F3): no hay
+         * causas que puntuar, así que ninguna fuente se llegó a consultar. No
+         * es que fallaran — es que no había nada que preguntarles. `sinCausas`
+         * de abajo es el que explica cuál de las dos clases de huérfano es.
+         */
+        estado: ESTADO_DIAGNOSTICO.INSUFICIENTE,
+        /*
          * DOS situaciones distintas detrás del mismo `null` de `causasDe()`:
          * un riesgo que NO TIENE causas debajo —y es correcto— y uno que sí
          * las tendría pero nadie las ha transcrito. Ver la cabecera de
@@ -675,6 +795,17 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
         origen: causa.origen,
         provisional: causa.provisional,
         respaldo: { datos, manual: manual.puntos, casos: casos.puntos, temporal: temporal.puntos, total },
+        /*
+         * Plan 28 F3: POR QUÉ cada término vale lo que vale. `manual: 0` con
+         * `estado.manual === 'caida'` y `manual: 0` con `'sin_respaldo'` son
+         * el mismo número y dos situaciones distintas — la primera dice que no
+         * se pudo mirar, la segunda que se miró y no hay.
+         */
+        estadoFuentes: {
+          manual: manual.estado,
+          casos: casos.estado,
+          temporal: temporal.estado,
+        },
         banda: bandaDe(total, fuentesActivas),
         evidenciaAFavor,
         evidenciaEnContra,
@@ -706,13 +837,29 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
      * `snapshot.mjs` — «observación de lo que ya ocurría», y hay una prueba
      * que exige que `causas` sea idéntico con él y sin él.
      */
+    /*
+     * El estado global se deriva de la PRIMERA causa y no de todas: las tres
+     * fuentes se consultan con los mismos índices para todas ellas, así que si
+     * el de manuales se cayó, se cayó para las cinco. Recorrerlas todas daría
+     * el mismo resultado con más pasos y dejaría la duda de qué hacer si
+     * discreparan — que no pueden.
+     */
+    const estadoFuentes = causas[0]?.estadoFuentes ?? {
+      manual: ESTADO_FUENTE.CAIDA, casos: ESTADO_FUENTE.CAIDA, temporal: ESTADO_FUENTE.CAIDA,
+    }
+    const estado = estadoGlobal(estadoFuentes)
+    const fuentesCaidas = Object.entries(estadoFuentes)
+      .filter(([, e]) => e === ESTADO_FUENTE.CAIDA)
+      .map(([nombre]) => nombre)
+
     const snapshot = construirSnapshot({
-      diagnosticEventId, sistema, riesgoId, valoresSensores, causas,
+      diagnosticEventId, sistema, riesgoId, valoresSensores, causas, fuentesCaidas,
     })
 
     return {
       sistema, riesgoId, diagnosticEventId,
       huerfano: false, conflicto: hayConflicto(causas), causas,
+      estado, estadoFuentes,
       snapshot,
     }
   }

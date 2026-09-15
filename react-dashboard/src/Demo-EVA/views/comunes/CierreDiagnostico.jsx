@@ -191,6 +191,29 @@ function ZonaSistema({ t, sistemaNombre, tituloRiesgo, canalLabel, evidencia, ac
                 message={traducir("close.system.conflict.message")}
               />
             )}
+            {/*
+              Plan 28 F3: un diagnóstico al que le faltó una fuente se pintaba
+              idéntico a uno completo, con la misma banda. Aquí eso importa más
+              que en el chat: el técnico está cerrando un caso y va a confirmar
+              o corregir la causa que el sistema propone — si esa propuesta se
+              calculó sin los manuales, tiene que saberlo ANTES de elegir.
+
+              `insuficiente` es el caso duro y se pinta como error, no como
+              aviso: con las tres fuentes caídas el orden de las causas es el
+              del catálogo, no un ranking, así que «la primera» no significa
+              «la más probable».
+            */}
+            {diagnostico.data.estado && diagnostico.data.estado !== "completo" && (
+              <AlertBanner
+                type={diagnostico.data.estado === "insuficiente" ? "error" : "warning"}
+                title={traducir(`close.system.sources.${diagnostico.data.estado}.title`)}
+                message={traducir(`close.system.sources.${diagnostico.data.estado}.message`, {
+                  fuentes: (diagnostico.data.snapshot?.fuentesCaidas ?? [])
+                    .map((f) => traducir(`close.system.sources.name.${f}`))
+                    .join(", "),
+                })}
+              />
+            )}
             {diagnostico.data.causas.map((c, i) => {
               const banda = BANDA_INFO[c.banda] ?? BANDA_INFO.bajo;
               const tieneEvidencia = (c.evidenciaAFavor?.length > 0) || (c.evidenciaEnContra?.length > 0);

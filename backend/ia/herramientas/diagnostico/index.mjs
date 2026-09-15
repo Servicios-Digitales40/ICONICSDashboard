@@ -149,10 +149,32 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
         }
       }
 
+      /*
+       * ── LAS FUENTES CAÍDAS SE DICEN, NO SE CALLAN (PLAN 28 F3) ─────
+       *
+       * Hasta esta fase, un diagnóstico calculado con el índice de manuales
+       * caído salía idéntico a uno calculado con todo en pie: `manual: 0` en
+       * los dos casos, y la misma banda. El modelo lo narraba como completo
+       * porque no tenía forma de saber que no lo era.
+       *
+       * Eso es peor que no dar el diagnóstico —§2.5: «no degrada en
+       * silencio»— porque parece fiable. Con `estado` y `fuentesCaidas`, el
+       * modelo puede decirlo, y el `comoRedactar` de abajo le obliga.
+       */
+      const caidas = Object.entries(resultado.estadoFuentes ?? {})
+        .filter(([, e]) => e === 'caida')
+        .map(([nombre]) => nombre)
+
       return {
         ok: true,
         sistema: resultado.sistema,
         riesgoId: resultado.riesgoId,
+        // Sólo viaja cuando NO está completo: igual que `conflicto`, «nada que
+        // decir no se dice» — un `estado: "completo"` en cada respuesta sería
+        // ruido que el modelo acabaría narrando.
+        ...(resultado.estado !== 'completo'
+          ? { estado: resultado.estado, fuentesCaidas: caidas }
+          : {}),
         // Plan 17 Fase 4 (G9): sólo viaja cuando es `true` — igual que
         // `manualCitado`/`casosCitados` vacíos, "nada que decir" no se dice.
         ...(resultado.conflicto ? { conflicto: true } : {}),
@@ -218,6 +240,26 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           'distinta (datos, manual o casos): DILO explícitamente — "el manual apunta a X, pero el ' +
           'histórico apunta a Y" — y NO elijas un ganador por tu cuenta ni lo suavices como si las ' +
           'fuentes coincidieran. Enseñar el desacuerdo es el trabajo aquí, no resolverlo. ' +
+          /*
+           * ── PLAN 28 F3, Y LA LECCIÓN DEL «3 CASOS PREVIOS» ───────────
+           *
+           * La misma clase de defecto que se midió el 03-09-2026 con
+           * `casosCitados`: un dato que viaja y que ninguna instrucción
+           * obliga a usar acaba narrado como le parece al modelo — o no
+           * narrado en absoluto. Aquí es más grave, porque callarlo presenta
+           * como completo un diagnóstico al que le faltó una fuente.
+           *
+           * Y la contrapartida explícita, que es lo que faltó aquella vez: si
+           * NO viene `estado`, es que todo funcionó. No hay que mencionarlo.
+           */
+          'Si viene `estado`, el diagnóstico NO se calculó con todas sus fuentes: `fuentesCaidas` ' +
+          'dice cuáles no contestaron (manual = los manuales, casos = los casos previos, ' +
+          'temporal = la tendencia del historiador). DILO al técnico antes de narrar las causas, ' +
+          'con naturalidad y sin alarmismo — "no pude consultar los manuales, así que esto se ' +
+          'apoya sólo en los datos y en los casos previos". Con `estado: "insuficiente"` no ' +
+          'contestó NINGUNA: ahí el orden de las causas no significa nada más que el orden en que ' +
+          'están escritas, así que NO presentes una como la más probable. Si NO viene `estado`, ' +
+          'todo funcionó y no hay nada que mencionar. ' +
           'Más adelante en la conversación, cuando el técnico cuente qué encontró o qué hizo para ' +
           'resolver ESTE riesgo —no antes, y no lo fuerces si sigue hablando de otra cosa—, usa ' +
           'cerrar_diagnostico (no registrar_intervencion) con este mismo `riesgoId`: si la causa ' +

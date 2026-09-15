@@ -20,6 +20,21 @@
         "title": "The sources disagree",
         "message": "The manual and the previous cases back different causes. Review the evidence for each before choosing — the system has not resolved the disagreement for you."
       },
+      "sources": {
+        "name": {
+          "manual": "the manuals",
+          "casos": "the previous cases",
+          "temporal": "the historian trend"
+        },
+        "parcial": {
+          "title": "This diagnosis was computed with one source missing",
+          "message": "{{fuentes}} could not be consulted. The causes below come from what did answer, so their ordering carries less weight than usual."
+        },
+        "insuficiente": {
+          "title": "No source could be consulted",
+          "message": "{{fuentes}} failed. All that is left is the risk's own data, and that counts the same for every cause: the order below is the catalogue's, NOT a ranking. Do not take the first one as the most likely."
+        }
+      },
       "proposed": " — proposed by the system",
       "backing": "data {{datos}} · manual {{manual}} · cases {{casos}}",
       "backingTemporal": " · trend {{temporal}}"
