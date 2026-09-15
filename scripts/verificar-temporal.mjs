@@ -66,8 +66,10 @@ function historiaFalsa(seriePorSenal = {}) {
   const llamadas = []
   return {
     llamadas,
-    async leerSerie(senal, ventana, sistemaId) {
-      llamadas.push({ senal, ventana, sistemaId })
+    // `opciones` se registra desde el Plan 30: la firma de estado DEBE pedir
+    // la serie en crudo, y sin guardarlo no hay forma de comprobarlo.
+    async leerSerie(senal, ventana, sistemaId, opciones) {
+      llamadas.push({ senal, ventana, sistemaId, opciones })
       const entrada = seriePorSenal[senal]
       if (!entrada) return { ok: false, motivo: 'sin serie de mentira para esta señal' }
       if (entrada.error) throw new Error(entrada.error)
@@ -272,6 +274,112 @@ await check('una señal que arranca en un valor normal sigue midiéndose igual',
   assert.equal(r.puntos, 1, 'el guardián apagó una tendencia legítima')
 })
 
+
+/* ── La firma de ESTADO DISCRETO, Plan 30 ────────────────────────────── */
+
+console.log('\n── La firma de estado discreto (Plan 30) ──────────────────')
+
+/** Serie booleana: `valores` en 0/1, una muestra por cuarto de hora. */
+function serieBooleana(valores) {
+  const ahora = new Date()
+  return valores.map((valor, i) => ({
+    t: new Date(ahora.getTime() - (valores.length - 1 - i) * 900000),
+    valor,
+  }))
+}
+
+await check('una alarma que estuvo activa confirma una firma que la declara "activa"', async () => {
+  const historia = historiaFalsa({ nivelBajoBajo: { datos: serieBooleana([0, 0, 1, 1]) } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelBajoBajo', estado: 'activa', ventanaH: 2 }], 'tanque')
+
+  assert.equal(r.puntos, 1)
+  assert.equal(r.evidenciaAFavor.length, 1)
+  assert.equal(r.evidenciaEnContra.length, 0)
+  assert.equal(r.evidenciaAFavor[0].plantilla.clave, 'estado')
+})
+
+await check('una alarma que NO se activó pesa EN CONTRA, no en silencio', async () => {
+  /*
+   * Es la mitad que de verdad desempata: «la protección no ve» se distingue de
+   * «ve y nadie actuó» justamente porque la alarma NO entró. Si esto se
+   * callara, las dos causas volverían a empatar.
+   */
+  const historia = historiaFalsa({ nivelBajoBajo: { datos: serieBooleana([0, 0, 0, 0]) } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelBajoBajo', estado: 'activa', ventanaH: 2 }], 'tanque')
+
+  assert.equal(r.puntos, 0)
+  assert.equal(r.evidenciaAFavor.length, 0)
+  assert.equal(r.evidenciaEnContra.length, 1)
+  assert.equal(r.evidenciaEnContra[0].plantilla.clave, 'estadoContrario')
+})
+
+await check('"inactiva" exige que NINGUNA muestra lo esté, no sólo la última', async () => {
+  // Una alarma que entró y salió dentro de la ventana SÍ ocurrió: mirar sólo
+  // el valor final la borraría.
+  const historia = historiaFalsa({ nivelAlto: { datos: serieBooleana([0, 1, 1, 0]) } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelAlto', estado: 'inactiva', ventanaH: 2 }], 'tanque')
+
+  assert.equal(r.puntos, 0, 'hubo un tramo activa: no puede contar como inactiva')
+})
+
+await check('un estado NUMÉRICO se compara por igualdad contra el valor declarado', async () => {
+  const historia = historiaFalsa({ estadoS1: { datos: serieBooleana([1, 1, 3]) } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'estadoS1', estado: 3, ventanaH: 2 }], 'tanque')
+
+  assert.equal(r.puntos, 1)
+})
+
+await check('el `0` del PLC no se hace pasar por ningún estado declarado', async () => {
+  /*
+   * `estadoSx` declara 1..4 y su nota dice que `0` es el valor inicial del
+   * PLC, tratado como sin dato. Comparar por igualdad —y nunca por «distinto
+   * de»— es lo que impide que un arranque de PLC confirme una causa.
+   */
+  const historia = historiaFalsa({ estadoS1: { datos: serieBooleana([0, 0, 0]) } })
+  for (const estado of [1, 3]) {
+    const r = await createEvaluadorTemporal({ historia })
+      .evaluarEstado([{ senal: 'estadoS1', estado, ventanaH: 2 }], 'tanque')
+    assert.equal(r.puntos, 0, `un 0 no puede confirmar el estado ${estado}`)
+  }
+})
+
+await check('la serie se pide en CRUDO: un agregado borraría los flancos', async () => {
+  /*
+   * Medido en `historia.mjs`: con `Average` salen 0 flancos en las nueve
+   * alarmas del tanque, porque el cubo de un agregado vale 0,5 y eso nunca es
+   * un flanco. Si esta opción se perdiera, la firma quedaría muda sin error.
+   */
+  const historia = historiaFalsa({ nivelAlto: { datos: serieBooleana([0, 1]) } })
+  await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelAlto', estado: 'activa', ventanaH: 1 }], 'tanque')
+
+  assert.equal(historia.llamadas.length, 1)
+  assert.equal(historia.llamadas[0].opciones?.crudo, true,
+    'sin `crudo: true` el historiador devuelve la booleana promediada')
+})
+
+await check('sin serie, o sin firma, silencio — nunca «inactiva» por defecto', async () => {
+  const evaluador = createEvaluadorTemporal({ historia: historiaFalsa({}) })
+  const sinSerie = await evaluador.evaluarEstado(
+    [{ senal: 'nivelAlto', estado: 'activa', ventanaH: 2 }], 'tanque'
+  )
+  const sinFirma = await evaluador.evaluarEstado(undefined, 'tanque')
+
+  assert.deepEqual(sinSerie, { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] })
+  assert.deepEqual(sinFirma, { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] })
+})
+
+await check('un `leerSerie` que lanza no rompe nada: se cuenta como sin respaldo', async () => {
+  const historia = historiaFalsa({ nivelAlto: { error: 'El historiador no contesta' } })
+  const r = await createEvaluadorTemporal({ historia })
+    .evaluarEstado([{ senal: 'nivelAlto', estado: 'activa', ventanaH: 2 }], 'tanque')
+
+  assert.deepEqual(r, { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] })
+})
 
 /* ── Las firmas DECLARADAS en el catálogo, Plan 29 F2 ────────────────── */
 

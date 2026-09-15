@@ -79,9 +79,25 @@ export function useEvidencia() {
         });
       }
 
+      /*
+       * `context` sale de `direccion` para las firmas de TENDENCIA y no existe
+       * para las de ESTADO (Plan 30): allí el estado declarado es un dato
+       * variable —«activa», «inactiva», «estado 3»— y no una de dos ramas
+       * fijas, así que viaja como interpolación y no como contexto. Sin esta
+       * distinción, i18next buscaría `evidence.estado_activa` y caería al
+       * `defaultValue` en español.
+       */
       return traducir(`evidence.${p.clave}`, {
         context: p.direccion,
         senal: senal(p.senal),
+        /*
+         * El motor compone el estado en español («activa», «inactiva») porque
+         * es lo que lee el modelo. Aquí se traduce por CLAVE: interpolarlo tal
+         * cual dejaría «was activa» en una frase inglesa. Un estado numérico
+         * («estado 3») no está en la tabla y cae a sí mismo, que es correcto:
+         * el número es el mismo en los dos idiomas.
+         */
+        estado: traducir(`evidence.state.${p.estado}`, { defaultValue: p.estado }),
         ventanaH: p.ventanaH,
         defaultValue: e.texto,
       });

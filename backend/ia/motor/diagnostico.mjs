@@ -91,7 +91,23 @@ export const CLAVES_DE_EVIDENCIA = {
   causaDescartada: 'diagnostics',      // un cierre anterior descartó esta causa
   tendencia: 'diagnostics',            // una señal de la firma se mueve como la causa declaraba
   tendenciaContraria: 'diagnostics',   // ...y se mueve al revés
+  // Plan 30: la otra mitad del término temporal — un flanco, no una pendiente.
+  estado: 'diagnostics',               // la señal estuvo en el estado que la causa declaraba
+  estadoContrario: 'diagnostics',      // ...y no estuvo
 }
+
+/** Tope del término `temporal`, compartido por sus DOS firmas — ver
+ *  `respaldoTemporal`. «temporal 0..2» es la promesa del módulo, y tenerlas
+ *  las dos no la cambia. */
+const TOPE_TEMPORAL = 2
+
+/** Lo que devuelve una firma que no se declaró. Congelado: lo comparten todas
+ *  las causas sin firma y nadie debe poder empujar evidencia dentro. */
+const SIN_RESPALDO_TEMPORAL = Object.freeze({
+  puntos: 0,
+  evidenciaAFavor: Object.freeze([]),
+  evidenciaEnContra: Object.freeze([]),
+})
 
 /**
  * ── EL CORTE ES SOBRE MAGNITUD ABSOLUTA, NO SOBRE EL RANKING (PLAN 17 §G2) ──
@@ -345,11 +361,37 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
  * temporal.mjs` para la aritmética.
  */
 async function respaldoTemporal(evaluadorTemporal, sistema, causa) {
-  if (!evaluadorTemporal || !causa.firmaTemporal) {
+  if (!evaluadorTemporal || (!causa.firmaTemporal && !causa.firmaEstado)) {
     return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
   }
   try {
-    return await evaluadorTemporal.evaluar(causa.firmaTemporal, sistema)
+    /*
+     * ── DOS FIRMAS, UN SOLO TÉRMINO (PLAN 30) ─────────────────────────
+     *
+     * `firmaTemporal` mira una PENDIENTE; `firmaEstado` mira un FLANCO. Las
+     * dos contestan a la misma pregunta —«¿qué dice el pasado reciente sobre
+     * esta causa?»— así que comparten el término `temporal` y su tope de 2, en
+     * vez de abrir un quinto sumando que subiría el máximo de 9 a 11 y
+     * obligaría a recalibrar `bandaDe()`, bloqueado por falta de corpus real.
+     *
+     * Una causa puede declarar las dos, una, o ninguna. Lo que NO puede es
+     * sumar más de 2 por tenerlas ambas: el tope se aplica al total, no a cada
+     * una, porque «temporal 0..2» es la promesa de este módulo.
+     */
+    const [tendencia, estado] = await Promise.all([
+      causa.firmaTemporal
+        ? evaluadorTemporal.evaluar(causa.firmaTemporal, sistema)
+        : SIN_RESPALDO_TEMPORAL,
+      causa.firmaEstado && evaluadorTemporal.evaluarEstado
+        ? evaluadorTemporal.evaluarEstado(causa.firmaEstado, sistema)
+        : SIN_RESPALDO_TEMPORAL,
+    ])
+
+    return {
+      puntos: Math.min(tendencia.puntos + estado.puntos, TOPE_TEMPORAL),
+      evidenciaAFavor: [...tendencia.evidenciaAFavor, ...estado.evidenciaAFavor],
+      evidenciaEnContra: [...tendencia.evidenciaEnContra, ...estado.evidenciaEnContra],
+    }
   } catch (error) {
     logger.warn('El evaluador temporal falló durante un diagnóstico; se cuenta como sin respaldo', {
       causa: causa.id, error: error.message,

@@ -79,7 +79,13 @@
     "tendencia_sube": "«{{senal}}» subió en las últimas {{ventanaH}} h.",
     "tendencia_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h.",
     "tendenciaContraria_sube": "«{{senal}}» subió en las últimas {{ventanaH}} h. La firma de esta causa la declaraba bajando.",
-    "tendenciaContraria_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h. La firma de esta causa la declaraba subiendo."
+    "tendenciaContraria_baja": "«{{senal}}» bajó en las últimas {{ventanaH}} h. La firma de esta causa la declaraba subiendo.",
+    "estado": "«{{senal}}» estuvo en {{estado}} en las últimas {{ventanaH}} h.",
+    "estadoContrario": "«{{senal}}» NO estuvo en {{estado}} en las últimas {{ventanaH}} h, y la firma de esta causa lo declaraba.",
+    "state": {
+      "activa": "activa",
+      "inactiva": "inactiva"
+    }
   },
   "priorCases": {
     "happened_one": "Ya pasó {{count}} vez antes",

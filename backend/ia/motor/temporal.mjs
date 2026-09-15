@@ -163,6 +163,75 @@ const NOMBRE_DIRECCION = { sube: 'subió', baja: 'bajó' }
  *   (`herramientas/lib/historia.mjs`) — el MISMO ayudante que ya usan las
  *   herramientas de históricos, no un cliente propio.
  */
+/**
+ * ── LA SEGUNDA CLASE DE FIRMA: UN FLANCO, NO UNA PENDIENTE (PLAN 30) ──
+ *
+ * Todo lo de arriba mide TENDENCIAS: mínimos cuadrados sobre una señal
+ * analógica, `sube` o `baja`. Eso deja fuera a la evidencia que de verdad
+ * separa la mayoría de las causas del tanque, y está medido: tras el Plan 29,
+ * ONCE riesgos tienen dos o más causas y ninguna forma de desempatarlas,
+ * porque lo que las distingue no es una pendiente sino un BIT.
+ *
+ *   `marcha-en-seco`  nivel bajo + `nivelBajoBajo` ACTIVA   → falta agua de verdad
+ *                     nivel bajo + `nivelBajoBajo` INACTIVA → la protección no ve
+ *
+ * Las dos cursan con el nivel cayendo, así que una firma de tendencia sobre
+ * `nivelTanque` les daría el MISMO punto a ambas. La alarma del PLC las separa
+ * limpiamente. Ese razonamiento ya estaba escrito en tres comentarios de
+ * `causas.js` desde el Plan 29 — en prosa, que el código no puede leer. Esto lo
+ * hace ejecutable.
+ *
+ * ── POR QUÉ NO ES UN QUINTO TÉRMINO ──────────────────────────────────
+ *
+ * Porque un sumando nuevo sube el máximo teórico de 9 a 11 y obligaría a
+ * recalibrar `bandaDe()`, que sigue BLOQUEADO a propósito por falta de corpus
+ * real (Plan 17 F7a). Y porque las dos firmas contestan a la misma pregunta
+ * —«¿qué dice el pasado reciente sobre esta causa?»—: una mirando una
+ * pendiente, otra mirando un flanco. Comparten término y comparten tope.
+ *
+ * ── POR QUÉ LA SERIE SE PIDE EN CRUDO ────────────────────────────────
+ *
+ * Porque promediar una booleana no la degrada, la BORRA: el cubo de un
+ * agregado vale 0,5 —ni 0 ni 1— y eso nunca es un flanco. Está medido en
+ * `historia.mjs`: con `Average` salen 0 flancos en las nueve alarmas del
+ * tanque; en crudo, 7 en `faltaDePresion` en 24 h. Por eso aquí se pasa
+ * `{ crudo: true }` y en `evaluar()` no.
+ */
+
+/** Cuántas muestras hacen falta para opinar sobre un estado discreto.
+ *  Menos exigente que `PUNTOS_MINIMOS`: una pendiente necesita tres puntos
+ *  para ser una recta, pero «la alarma estuvo activa» se sostiene con una sola
+ *  muestra que lo diga. Lo que NO se tolera es cero: sin muestras no hay
+ *  ventana que mirar, y eso es silencio, no «inactiva». */
+const MUESTRAS_MINIMAS_ESTADO = 1
+
+/**
+ * ¿Coincide lo observado en la ventana con lo que la firma declara?
+ *
+ * `estado` puede ser:
+ *   "activa" / "inactiva"  para señales booleanas (`naturaleza: "alarma"`)
+ *   un número              para las de `naturaleza: "estado"` (`estadoS1 === 3`)
+ *
+ * ── EL `0` DEL PLC NO ES UN ESTADO, Y AQUÍ TAMPOCO ───────────────────
+ *
+ * `estadoSx` declara `1: Apagado · 2: En marcha · 3: Error · 4: Mantenimiento`,
+ * y su propia nota dice que `0` es el valor inicial del PLC, tratado como sin
+ * dato. Se compara por IGUALDAD contra el valor declarado, nunca por «distinto
+ * de», así que un `0` recién arrancado no puede hacerse pasar por ninguno de
+ * los cuatro. Es §2.4 aplicado a un estado discreto, el mismo criterio que
+ * siguen las reglas del Plan 29 F4.
+ */
+function cumpleEstado(datos, estado) {
+  if (typeof estado === 'number') {
+    return datos.some(d => Number(d.valor) === estado)
+  }
+  // Booleana: "activa" es cualquier muestra distinta de cero en la ventana;
+  // "inactiva" exige que NINGUNA lo esté — no basta con que la última no lo
+  // esté, porque una alarma que entró y salió dentro de la ventana SÍ ocurrió.
+  const huboActiva = datos.some(d => Number(d.valor) !== 0)
+  return estado === 'activa' ? huboActiva : !huboActiva
+}
+
 export function createEvaluadorTemporal({ historia }) {
   /**
    * @param {Array<{senal: string, direccion: 'sube'|'baja', ventanaH: number}>} [firma]
@@ -227,5 +296,74 @@ export function createEvaluadorTemporal({ historia }) {
     return { puntos: Math.min(favorables, TOPE_PUNTOS), evidenciaAFavor, evidenciaEnContra }
   }
 
-  return { evaluar }
+  /**
+   * La firma de ESTADO DISCRETO — Plan 30. Misma forma de contrato que
+   * `evaluar()`: puntos 0..2, evidencia a favor y en contra, y silencio cuando
+   * no hay con qué opinar.
+   *
+   * @param {Array<{senal: string, estado: 'activa'|'inactiva'|number, ventanaH: number}>} [firma]
+   * @param {string} sistemaId
+   */
+  async function evaluarEstado(firma, sistemaId) {
+    if (!firma?.length) return { puntos: 0, evidenciaAFavor: [], evidenciaEnContra: [] }
+
+    const evidenciaAFavor = []
+    const evidenciaEnContra = []
+    let favorables = 0
+
+    for (const item of firma) {
+      const ahora = new Date()
+      const ventana = { inicio: new Date(ahora.getTime() - item.ventanaH * 3600000), fin: ahora }
+
+      let resultado
+      try {
+        // `crudo: true` NO es opcional aquí — ver la cabecera de esta sección.
+        resultado = await historia.leerSerie(item.senal, ventana, sistemaId, { crudo: true })
+      } catch (error) {
+        logger.warn('leerSerie falló evaluando una firma de estado; se cuenta como sin dato', {
+          senal: item.senal, error: error.message,
+        })
+        continue
+      }
+
+      if (!resultado.ok || resultado.datos.length < MUESTRAS_MINIMAS_ESTADO) continue // silencio
+
+      const coincide = cumpleEstado(resultado.datos, item.estado)
+      const declarado = typeof item.estado === 'number' ? `estado ${item.estado}` : item.estado
+
+      /*
+       * La frase describe lo que la firma DECLARABA y si se cumplió, no el
+       * valor crudo: «la alarma X estuvo activa» es lo que el técnico necesita
+       * leer, no «la serie de X trajo un 1». El valor sigue disponible en el
+       * historiador para quien quiera contrastarlo.
+       */
+      const texto = coincide
+        ? `La señal "${item.senal}" estuvo en ${declarado} en las últimas ${item.ventanaH} h.`
+        : `La señal "${item.senal}" NO estuvo en ${declarado} en las últimas ${item.ventanaH} h.`
+
+      const plantilla = {
+        clave: coincide ? 'estado' : 'estadoContrario',
+        senal: item.senal,
+        estado: String(declarado),
+        ventanaH: item.ventanaH,
+      }
+
+      if (coincide) {
+        favorables++
+        evidenciaAFavor.push({ fuente: 'temporal', texto, referencia: item.senal, plantilla })
+      } else {
+        /*
+         * EN CONTRA de verdad, no silencio: si una causa declara que su alarma
+         * tuvo que activarse y no se activó, eso PESA en contra de esa causa.
+         * Es exactamente lo que distingue «la protección no ve» de «ve y nadie
+         * actuó», y callarlo dejaría las dos causas empatadas otra vez.
+         */
+        evidenciaEnContra.push({ fuente: 'temporal', texto, referencia: item.senal, plantilla })
+      }
+    }
+
+    return { puntos: Math.min(favorables, TOPE_PUNTOS), evidenciaAFavor, evidenciaEnContra }
+  }
+
+  return { evaluar, evaluarEstado }
 }
