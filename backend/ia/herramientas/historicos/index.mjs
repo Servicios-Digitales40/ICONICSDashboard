@@ -1931,17 +1931,28 @@ export function crearHerramientasDeHistoricos({
         eventosEnVentana: eventos.length,
         activoSegundos,
         sostenida: persistencia.sostenida,
-        interpretacion: persistencia.sostenida
-          ? `${meta.label} lleva ${activoSegundos} s activa (contando reapariciones) de los ` +
-            `últimos ${minutos} min, y ${activaAhora ? 'sigue activa ahora mismo' : 'volvió a activarse ' +
-              'varias veces'}. Esto NO es un arranque normal: un ciclo sano se resuelve en menos de ` +
-            '2 minutos y no vuelve a aparecer.'
-          : `${meta.label} no muestra un patrón sostenido en los últimos ${minutos} min ` +
-            `(${activoSegundos} s activa en total, ${eventos.length} evento(s)). Compatible con un ` +
-            'arranque normal, si lo hubo.',
-        nota:
-          'Mide persistencia, no causa: para las causas candidatas de un riesgo activo usa ' +
-          'diagnosticar_falla.',
+        interpretacion: idioma === 'en'
+          ? (persistencia.sostenida
+            ? `${meta.label} has been active for ${activoSegundos} s (counting reappearances) out of ` +
+              `the last ${minutos} min, and ${activaAhora ? 'is still active right now' : 'came back ' +
+                'several times'}. This is NOT a normal start-up: a healthy cycle clears in under ` +
+              '2 minutes and does not come back.'
+            : `${meta.label} shows no sustained pattern over the last ${minutos} min ` +
+              `(${activoSegundos} s active in total, ${eventos.length} event(s)). Consistent with a ` +
+              'normal start-up, if there was one.')
+          : (persistencia.sostenida
+            ? `${meta.label} lleva ${activoSegundos} s activa (contando reapariciones) de los ` +
+              `últimos ${minutos} min, y ${activaAhora ? 'sigue activa ahora mismo' : 'volvió a activarse ' +
+                'varias veces'}. Esto NO es un arranque normal: un ciclo sano se resuelve en menos de ` +
+              '2 minutos y no vuelve a aparecer.'
+            : `${meta.label} no muestra un patrón sostenido en los últimos ${minutos} min ` +
+              `(${activoSegundos} s activa en total, ${eventos.length} evento(s)). Compatible con un ` +
+              'arranque normal, si lo hubo.'),
+        nota: idioma === 'en'
+          ? 'It measures persistence, not cause: for the candidate causes of an active risk use ' +
+            'diagnosticar_falla.'
+          : 'Mide persistencia, no causa: para las causas candidatas de un riesgo activo usa ' +
+            'diagnosticar_falla.',
       }
     },
 

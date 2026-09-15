@@ -3475,6 +3475,41 @@ await checkAsync('sigue activa AHORA MISMO, sin haberse apagado: también sosten
   assert.equal(r.sostenida, true)
 })
 
+await checkAsync('alarma_sostenida(idioma: "en") narra en inglés, no sólo acepta el argumento', async () => {
+  /*
+   * ── POR QUÉ ESTA PRUEBA EXISTE ────────────────────────────────────
+   *
+   * La herramienta declaraba `idioma` y no lo usaba: ESLint lo marcaba desde
+   * que se escribió (`'idioma' is assigned a value but never used`) y el error
+   * se arrastró como «preexistente» sin que nadie leyera qué decía. No era
+   * ruido de linter — era una traducción sin terminar: `interpretacion` y
+   * `nota` salían en español con el tablero en inglés.
+   *
+   * Ninguna de las cuatro pruebas de arriba pasaba `idioma`, así que el hueco
+   * no lo cazaba nada. Ésta lo cierra.
+   */
+  const client = clienteFalso({
+    historia: async (opciones) => {
+      const t0 = new Date(opciones.startDate).getTime()
+      return {
+        ok: true,
+        data: [
+          { timestamp: new Date(t0).toISOString(), value: false, quality: 0 },
+          { timestamp: new Date(t0 + 30_000).toISOString(), value: true, quality: 0 },
+        ],
+      }
+    },
+  })
+  const en = await createHerramientas({ client })
+    .ejecutar('alarma_sostenida', { alarma: 'falta de presión' }, { idioma: 'en' })
+
+  assert.equal(en.ok, true)
+  assert.match(en.interpretacion, /NOT a normal start-up/)
+  assert.match(en.nota, /measures persistence, not cause/)
+  assert.doesNotMatch(en.interpretacion, /arranque normal/)
+  assert.doesNotMatch(en.nota, /Mide persistencia/)
+})
+
 console.log('\n── resumen_de_turno ────────────────────────────────────────')
 
 await checkAsync('compone estado, riesgos y tendencia en una sola llamada', async () => {
