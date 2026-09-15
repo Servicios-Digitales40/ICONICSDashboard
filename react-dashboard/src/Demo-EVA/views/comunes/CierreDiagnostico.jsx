@@ -40,7 +40,7 @@
  * la EVIDENCIA medida —la cifra— necesita que el riesgo siga activo ahora
  * mismo, y su ausencia se explica en pantalla, no se esconde.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, ChevronLeft, ClipboardCheck, Loader2, XCircle } from "lucide-react";
 
@@ -555,11 +555,33 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   const [errorEnvio, setErrorEnvio] = useState(null);
   const [cerrado, setCerrado] = useState(false);
 
-  // En cuanto llega la propuesta, se pre-selecciona la primera — «nadie
-  // teclea el diagnóstico»: confirmarlo es un caso de no tocar nada.
+  /*
+   * En cuanto llega la propuesta, se pre-selecciona la primera — «nadie teclea
+   * el diagnóstico»: confirmarlo es un caso de no tocar nada.
+   *
+   * ── POR QUÉ UNA MARCA Y NO `!causaId` (15-09-2026) ───────────────────
+   *
+   * La guarda era `!causaId`, y se apoyaba sin saberlo en un defecto: la lista
+   * de candidatas cambiaba de identidad en CADA render, así que este efecto se
+   * re-ejecutaba continuamente y siempre llegaba antes de que nadie pudiera
+   * tocar nada. Al memoizar la lista, el efecto pasó a correr una sola vez —y
+   * apareció la carrera que el defecto tapaba—: si el efecto se ejecuta DESPUÉS
+   * de que la persona ya eligió, `causaId` vale «__otra__», `!causaId` es falso
+   * y no pisa nada... pero sólo por suerte. El orden lo decidía el temporizado,
+   * y CI lo destapó en `cierre-diagnostico.test.jsx` mientras en local pasaba.
+   *
+   * La marca hace la intención explícita: preseleccionar es algo que ocurre UNA
+   * vez por diagnóstico cargado, no «mientras no haya nada elegido». Se reinicia
+   * con el `diagnosticEventId`, que es lo que identifica una carga concreta:
+   * pedir otro riesgo vuelve a proponer, y eso sí se quiere.
+   */
+  const yaPreseleccionado = useRef(null);
   useEffect(() => {
-    if (causasCandidatas.length > 0 && !causaId) setCausaId(causasCandidatas[0].id);
-  }, [causasCandidatas, causaId]);
+    if (!causasCandidatas.length) return;
+    if (yaPreseleccionado.current === diagnosticEventId) return;
+    yaPreseleccionado.current = diagnosticEventId;
+    setCausaId(causasCandidatas[0].id);
+  }, [causasCandidatas, diagnosticEventId]);
 
   const causaSeleccionada = causasCandidatas.find((c) => c.id === causaId) ?? null;
 
