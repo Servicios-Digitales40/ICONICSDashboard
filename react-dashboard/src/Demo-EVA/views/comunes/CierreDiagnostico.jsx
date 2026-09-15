@@ -706,9 +706,42 @@ export default function CierreDiagnostico({ params, onNavigate }) {
             },
           }
           : {}),
+        /*
+         * ── `tipo` MÁS LA SEPARACIÓN `id`/`texto` (PLAN 28 F6) ───────
+         *
+         * Ésta es la pantalla donde la distinción es CIERTA: o la persona
+         * eligió una candidata del catálogo, o escribió la suya en «Otra
+         * causa». Perderla aquí obligaba a cada consumidor a adivinar después
+         * si `tipo` era un id o texto libre — y `respaldoDeCasos()`, que
+         * compara `causaReal.id === causa.id` para CONFIRMAR una causa, con
+         * texto libre no fallaba: simplemente no acertaba nunca.
+         *
+         * `tipo` se sigue mandando para los lectores que no pasan por
+         * `causaRealDe()`. `id: null` dice «no era ninguna de las candidatas»,
+         * que es distinto de «no se declaró».
+         */
         causaReal: causaId === OTRA_CAUSA
-          ? { tipo: causaLibre.trim(), ...(componenteLibre.trim() ? { componente: componenteLibre.trim() } : {}) }
-          : { tipo: causaSeleccionada?.id, componente: causaSeleccionada?.componente },
+          ? {
+            tipo: causaLibre.trim(),
+            id: null,
+            texto: causaLibre.trim(),
+            ...(componenteLibre.trim() ? { componente: componenteLibre.trim() } : {}),
+          }
+          : {
+            tipo: causaSeleccionada?.id,
+            id: causaSeleccionada?.id ?? null,
+            texto: causaSeleccionada?.titulo ?? causaSeleccionada?.id ?? null,
+            componente: causaSeleccionada?.componente,
+          },
+        /*
+         * El componente sube también al nivel de la intervención (no sólo
+         * dentro de `causaReal`): es lo que `textoDeRecuperacion` indexa, y lo
+         * que hace que buscar «el filtro de la línea» encuentre este caso
+         * aunque su síntoma se pareciera poco.
+         */
+        ...(causaId === OTRA_CAUSA
+          ? (componenteLibre.trim() ? { componente: componenteLibre.trim() } : {})
+          : (causaSeleccionada?.componente ? { componente: causaSeleccionada.componente } : {})),
         resultado: observaciones.trim() ? { observaciones: observaciones.trim() } : undefined,
         // Sólo se afirma cuando hay con qué comparar: sin propuesta del
         // sistema —riesgo huérfano de causas—, no hay «correcto» que evaluar.

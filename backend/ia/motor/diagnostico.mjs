@@ -43,6 +43,7 @@
  * demasiado fino o demasiado grueso, se ajusta aquí, en un solo sitio: no
  * hace falta tocar `documentos.mjs` ni `casos.mjs`.
  */
+import { causaRealDe } from '../../../shared/eva/comun/aprendizaje.js'
 import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
@@ -452,7 +453,14 @@ async function respaldoDeCasos(indiceCasos, sistema, riesgoId, causa) {
   try {
     const encontrados = await indiceCasos.buscarCasosSimilares({ sistema, riesgoId, texto: consulta, top: 5 })
 
-    const confirmados = encontrados.filter(c => c.causaReal?.tipo === causa.id)
+    /*
+     * `causaRealDe` (Plan 28 F6) lee las DOS formas: la nueva, que separa
+     * `{id, texto}`, y la vieja `{tipo}` que mezclaba las dos cosas. Antes
+     * esto comparaba `causaReal?.tipo` a mano, y con texto libre esa
+     * comparación no fallaba: simplemente no acertaba nunca, y el caso caía a
+     * la proxy de texto sin que nadie lo notara.
+     */
+    const confirmados = encontrados.filter(c => causaRealDe(c).id === causa.id)
     const refutados = encontrados.filter(
       c => c.diagnostico?.propuesta === causa.id && c.diagnosticoCorrecto === false
     )
@@ -851,12 +859,13 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
          * cual y es la pantalla la que decide: si el id existe en el catálogo
          * lo dice en su idioma, y si no, enseña lo que la persona escribió.
          */
+        const real = causaRealDe(refutado)
         evidenciaEnContra.push({
           fuente: 'casos',
           texto: `Un técnico descartó esta causa en un cierre anterior — la causa real fue ` +
-            `"${refutado.causaReal?.tipo ?? 'otra'}".`,
+            `"${real.texto ?? 'otra'}".`,
           referencia: refutado.id,
-          plantilla: { clave: 'causaDescartada', causaReal: refutado.causaReal?.tipo ?? null },
+          plantilla: { clave: 'causaDescartada', causaReal: real.id ?? real.texto ?? null },
         })
       }
       // `temporal` (Plan 17 Fase 6, G5): frases YA construidas por

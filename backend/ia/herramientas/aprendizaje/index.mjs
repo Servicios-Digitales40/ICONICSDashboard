@@ -420,7 +420,22 @@ export function crearHerramientasDeAprendizaje() {
         )
       }
 
+      /*
+       * ── AQUÍ SÍ SE SABE CUÁL DE LAS DOS ES (PLAN 28 F6) ─────────────
+       *
+       * `causaReal.tipo` guardaba un id del catálogo o texto libre, y cada
+       * consumidor tenía que adivinar cuál. Este punto es el único del sistema
+       * donde la distinción es CIERTA —o vino por `causaId`, validado contra
+       * las candidatas, o por `causaLibre`— así que es donde hay que
+       * registrarla en vez de perderla.
+       *
+       * `tipo` se sigue escribiendo: `causaRealDe()` lee las dos formas, pero
+       * cualquier lector viejo que no haya pasado por ella sigue encontrando
+       * lo de siempre.
+       */
       let causaRealTipo = null
+      let causaRealId = null
+      let causaRealTexto = null
       if (causaId) {
         const candidata = candidatas.find((c) => c.id === causaId)
         if (!candidata) {
@@ -431,12 +446,15 @@ export function crearHerramientasDeAprendizaje() {
           )
         }
         causaRealTipo = candidata.id
+        causaRealId = candidata.id
+        causaRealTexto = candidata.titulo ?? candidata.id
       } else if (causaLibre) {
         // Mismo criterio que "Otra causa" en CierreDiagnostico.jsx: el texto
-        // libre viaja en `causaReal.tipo` tal cual, sin fingir que es un id
-        // del catálogo — no compite con `causasDe()`, no hay contra qué
-        // validarlo.
+        // libre viaja tal cual, sin fingir que es un id del catálogo — no
+        // compite con `causasDe()`, no hay contra qué validarlo. Con la forma
+        // nueva eso queda DICHO: `id: null` es «no es una candidata».
         causaRealTipo = String(causaLibre).trim()
+        causaRealTexto = causaRealTipo
       } else {
         return fallo(
           'Hace falta `causaId` (si la causa real estaba entre las que propuso diagnosticar_falla) ' +
@@ -458,7 +476,15 @@ export function crearHerramientasDeAprendizaje() {
         causa: causaRealTipo,
         resuelto,
         disparador: { tipo: 'riesgo', riesgoId },
-        causaReal: { tipo: causaRealTipo, ...(componente ? { componente } : {}) },
+        causaReal: {
+          // `tipo` se mantiene para los lectores que no pasan por
+          // `causaRealDe()`; `id`/`texto` son la separación de la F6.
+          tipo: causaRealTipo,
+          id: causaRealId,
+          texto: causaRealTexto,
+          ...(componente ? { componente } : {}),
+        },
+        ...(componente ? { componente } : {}),
         // Sólo se afirma `diagnosticoCorrecto` cuando hay `propuesta` con
         // que compararla — mismo criterio, literal, que
         // `CierreDiagnostico.jsx`: "no hay acierto que evaluar sin

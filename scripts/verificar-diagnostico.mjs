@@ -806,6 +806,85 @@ await check('una causa SIN firma declarada no cuenta como fuente caída', async 
   assert.equal(r.estado, 'completo', 'nada se cayó: el diagnóstico está completo')
 })
 
+/* ── El modelo de intervención, Plan 28 F6 ──────────────────────────── */
+
+console.log('\n── `causaReal`: id y texto separados (Plan 28 F6) ─────────')
+
+await check('la forma VIEJA (`tipo`) sigue confirmando una causa', async () => {
+  /*
+   * ── LO QUE NO SE PUEDE ROMPER ─────────────────────────────────────
+   *
+   * Una intervención no se edita —«lo que pasó, pasó»—, así que las guardadas
+   * antes de esta fase van a tener sólo `tipo` para siempre. Si el motor
+   * dejara de leerlas, todo el historial de cierres quedaría fuera del
+   * diagnóstico sin que nadie lo notara: `respaldoDeCasos` no falla cuando no
+   * encuentra, simplemente cae a la proxy de texto.
+   */
+  const indiceCasos = casosFalsos([
+    {
+      id: 'viejo', sistema: 'tanque', fecha: '2026-01-01', resuelto: true, score: 0,
+      causaReal: { tipo: 'sin-recirculacion-minima' },
+    },
+  ])
+  const r = await createMotorDiagnostico({ indiceCasos })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  const causa = r.causas.find(c => c.id === 'sin-recirculacion-minima')
+  assert.ok(causa.respaldo.casos > 0, 'un cierre viejo tiene que seguir respaldando')
+})
+
+await check('la forma NUEVA (`id`/`texto`) confirma igual', async () => {
+  const indiceCasos = casosFalsos([
+    {
+      id: 'nuevo', sistema: 'tanque', fecha: '2026-09-15', resuelto: true, score: 0,
+      causaReal: { tipo: 'sin-recirculacion-minima', id: 'sin-recirculacion-minima', texto: 'Sin línea de recirculación mínima' },
+    },
+  ])
+  const r = await createMotorDiagnostico({ indiceCasos })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  const causa = r.causas.find(c => c.id === 'sin-recirculacion-minima')
+  assert.ok(causa.respaldo.casos > 0)
+})
+
+await check('una causa LIBRE (`id: null`) no confirma ninguna candidata', async () => {
+  /*
+   * Es la distinción que la forma vieja no podía expresar. Con `tipo` a secas,
+   * un texto libre como «se rompió el codo de purga» se comparaba contra los
+   * ids del catálogo: no fallaba, simplemente no acertaba nunca, y nadie podía
+   * distinguir eso de «este cierre no confirma nada».
+   *
+   * Ahora `id: null` lo DICE, y el caso sigue disponible para la proxy de
+   * texto — que es lo correcto: no confirma un id, pero su relato sigue
+   * valiendo.
+   */
+  const indiceCasos = casosFalsos([
+    {
+      id: 'libre', sistema: 'tanque', fecha: '2026-09-15', resuelto: true, score: 0,
+      causaReal: { tipo: 'se rompió el codo de purga', id: null, texto: 'se rompió el codo de purga' },
+    },
+  ])
+  const r = await createMotorDiagnostico({ indiceCasos })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  for (const causa of r.causas) {
+    const confirmadaPorId = (causa.evidenciaAFavor ?? [])
+      .some(e => e.fuente === 'casos' && e.referencia === 'libre')
+    assert.equal(confirmadaPorId, false, `«${causa.id}» no debía darse por confirmada`)
+  }
+})
+
+await check('`causaRealDe` lee las dos formas sin que nadie migre nada', async () => {
+  const { causaRealDe } = await import('../shared/eva/comun/aprendizaje.js')
+
+  assert.deepEqual(causaRealDe({ causaReal: { tipo: 'algo' } }), { id: 'algo', texto: 'algo' },
+    'la vieja se devuelve en ambos: sin el catálogo delante no se sabe cuál era')
+  assert.deepEqual(causaRealDe({ causaReal: { id: 'x', texto: 'Equis' } }), { id: 'x', texto: 'Equis' })
+  assert.deepEqual(causaRealDe({ causaReal: { id: null, texto: 'libre' } }), { id: null, texto: 'libre' })
+  assert.deepEqual(causaRealDe({}), { id: null, texto: null })
+  assert.deepEqual(causaRealDe(null), { id: null, texto: null })
+})
+
 /* ── La calidad como veto, Plan 28 F4 ───────────────────────────────── */
 
 console.log('\n── Un sensor inválido no respalda nada (Plan 28 F4) ───────')

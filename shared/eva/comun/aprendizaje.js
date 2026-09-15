@@ -233,7 +233,74 @@ export function crearIntervencion(datos, ahora = new Date()) {
     ...(typeof datos.diagnosticoCorrecto === "boolean"
       ? { diagnosticoCorrecto: datos.diagnosticoCorrecto }
       : {}),
+
+    /*
+     * ── LO QUE AÑADE EL PLAN 28 F6, Y POR QUÉ TODO ES OPCIONAL ────────
+     *
+     * `respaldoDeCasos()` recupera casos por parecido de TEXTO cuando no hay
+     * un id estructurado que mirar, y eso es una proxy: «vibración alta» y
+     * «presión alta» se parecen en un espacio vectorial y no tienen nada que
+     * ver en la planta. Cuanto más estructurado esté el caso, menos hay que
+     * adivinar.
+     *
+     * Siguen siendo opcionales por la regla del Plan 16 F5 —«las dos puertas
+     * escriben en el mismo sitio»—: por voz nadie dicta una lista de variables
+     * afectadas, y un campo obligatorio rompería la puerta rápida, que es la
+     * que consigue que anotar cueste una frase dicha en voz alta.
+     */
+    ...(datos.componente ? { componente: String(datos.componente) } : {}),
+    ...(Array.isArray(datos.variablesAfectadas) && datos.variablesAfectadas.length
+      ? { variablesAfectadas: datos.variablesAfectadas.map(String) }
+      : {}),
+    ...(Array.isArray(datos.evidencia) && datos.evidencia.length
+      ? { evidencia: datos.evidencia.map((e) => ({ ...e })) }
+      : {}),
   };
+}
+
+/**
+ * La causa REAL de una intervención, separada en id y texto.
+ *
+ * ── EL CAMPO QUE MEZCLABA DOS COSAS ────────────────────────────────
+ *
+ * `causaReal.tipo` guarda un id del catálogo cuando el técnico eligió una de
+ * las candidatas, y TEXTO LIBRE cuando escribió la suya. El propio código lo
+ * sabía y lo toleraba: `diagnostico.mjs` comenta que «viaja tal cual y es la
+ * pantalla la que decide: si el id existe en el catálogo lo dice en su idioma,
+ * y si no, enseña lo que la persona escribió».
+ *
+ * Eso obliga a cada consumidor a adivinar cuál de las dos cosas tiene delante.
+ * `respaldoDeCasos()` compara `causaReal.tipo === causa.id` para CONFIRMAR una
+ * causa: con texto libre esa comparación no falla, simplemente no acierta
+ * nunca, y el caso cae a la proxy de texto sin que nadie lo note.
+ *
+ * ── SE LEE DE LOS DOS SITIOS, NO SE MIGRA ──────────────────────────
+ *
+ * Una intervención no se edita —«lo que pasó, pasó»—, así que las guardadas
+ * antes de esta fase van a seguir teniendo sólo `tipo` para siempre. Esta
+ * función lee las dos formas y devuelve la separación; nadie tiene que migrar
+ * nada ni recordar cuál se escribió.
+ *
+ * @returns {{id: string|null, texto: string|null}}
+ */
+export function causaRealDe(intervencion) {
+  const causaReal = intervencion?.causaReal;
+  if (!causaReal) return { id: null, texto: null };
+
+  // La forma nueva manda si está: quien la escribió ya hizo la distinción.
+  if (causaReal.id !== undefined || causaReal.texto !== undefined) {
+    return { id: causaReal.id ?? null, texto: causaReal.texto ?? null };
+  }
+
+  /*
+   * La forma vieja. No se puede saber desde aquí si `tipo` es un id o texto
+   * —haría falta el catálogo, y `aprendizaje.js` no lo conoce ni debe—, así
+   * que se devuelve en AMBOS: quien tenga el catálogo delante comprobará el
+   * id, y quien sólo quiera enseñarlo usará el texto. Es lo que ya hacían los
+   * dos consumidores, ahora sin que cada uno lo redescubra.
+   */
+  const tipo = causaReal.tipo ?? null;
+  return { id: tipo, texto: tipo };
 }
 
 /**

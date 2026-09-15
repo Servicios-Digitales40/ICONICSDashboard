@@ -76,6 +76,24 @@ export function textoDeRecuperacion(intervencion) {
     intervencion.causaReal?.tipo && intervencion.diagnostico?.propuesta
       ? `El sistema propuso "${intervencion.diagnostico.propuesta}"; la causa real fue "${intervencion.causaReal.tipo}".`
       : null,
+
+    /*
+     * ── LO QUE AÑADE EL PLAN 28 F6 AL TEXTO INDEXADO ─────────────────
+     *
+     * Estos tres campos son opcionales y casi nunca vienen por la puerta de
+     * voz, así que la mayoría de los casos no cambian ni una letra. Cuando SÍ
+     * vienen, es lo que distingue una recuperación útil de una por parecido
+     * genérico: buscar «el filtro de la línea de impulsión» encuentra el caso
+     * que nombra ese componente, aunque su síntoma se pareciera poco.
+     *
+     * Van al final a propósito: el síntoma y la solución siguen siendo lo que
+     * más pesa —son lo que el técnico escribió sobre lo que pasó— y añadir
+     * esto delante cambiaría la puntuación de todos los casos existentes.
+     */
+    intervencion.componente ? `Componente: ${intervencion.componente}.` : null,
+    intervencion.variablesAfectadas?.length
+      ? `Señales afectadas: ${intervencion.variablesAfectadas.join(", ")}.`
+      : null,
   ];
 
   return partes.filter(Boolean).join(" ");

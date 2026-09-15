@@ -564,9 +564,22 @@ const DiagnosticoPropuestoSchema = z.object({
   candidatas: z.array(CandidataSchema).optional(),
 })
 
+/**
+ * ── `tipo` MEZCLABA DOS COSAS; `id`/`texto` LAS SEPARAN (PLAN 28 F6) ──
+ *
+ * `tipo` guardaba un id del catálogo cuando el técnico eligió una candidata y
+ * TEXTO LIBRE cuando escribió la suya, y cada consumidor tenía que adivinar
+ * cuál tenía delante. Los tres campos conviven a propósito: `tipo` para quien
+ * no pase por `causaRealDe()`, y la separación para quien sí.
+ *
+ * `id` admite `null` explícito: es como se dice «la causa real NO era ninguna
+ * de las candidatas», que es distinto de «no se declaró».
+ */
 const CausaRealSchema = z.object({
   componente: z.string().optional(),
   tipo: z.string().optional(),
+  id: z.string().nullable().optional(),
+  texto: z.string().nullable().optional(),
 })
 
 const ResultadoCasoSchema = z.object({
@@ -602,6 +615,15 @@ export const CrearCasoSchema = z.object({
   causaReal: CausaRealSchema.optional(),
   resultado: ResultadoCasoSchema.optional(),
   diagnosticoCorrecto: z.boolean().optional(),
+
+  /*
+   * Plan 28 F6: lo que hace que un caso se pueda recuperar por algo más que el
+   * parecido de su texto. Todos opcionales — la puerta de voz no los rellena y
+   * eso está bien (§ «las dos puertas escriben en el mismo sitio», Plan 16 F5).
+   */
+  componente: z.string().trim().min(1).optional(),
+  variablesAfectadas: z.array(z.string().trim().min(1)).optional(),
+  evidencia: z.array(z.record(z.string(), z.unknown())).optional(),
 })
 
 /**
