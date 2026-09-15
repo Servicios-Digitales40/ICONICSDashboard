@@ -356,7 +356,23 @@ function senalesVetadas(regla, valoresSensores) {
     // distinción que hace `calidadesDe` en `snapshot.mjs`).
     if (bruto === undefined || bruto === null) continue
     if (typeof bruto !== 'object') continue // número pelado: sin calidad declarada
-    if (!isGoodQuality(bruto.quality)) vetadas.push(clave)
+
+    /*
+     * DOS formas de declarar la calidad, y las dos son legítimas:
+     *
+     *   `quality`  el código CRUDO de OPC, como lo devuelve el servidor. Es lo
+     *              que trae quien lee de la frontera del backend.
+     *   `motivo`   la calidad YA interpretada por `motivoDeCalidad()`, que es
+     *              como viaja dentro de `createSenal` (`shared/eva/tanque/
+     *              sistema.js`) desde el Plan 21 F3 — el frontend no reenvía
+     *              el código crudo porque ya lo resolvió al recibirlo.
+     *
+     * Aceptar sólo la primera habría dejado el veto sin poder dispararse desde
+     * la pantalla, que es justo donde más falta hace. `motivo: null` significa
+     * calidad buena, igual que en el catálogo.
+     */
+    if (bruto.motivo != null) { vetadas.push(clave); continue }
+    if (bruto.quality !== undefined && !isGoodQuality(bruto.quality)) vetadas.push(clave)
   }
   return vetadas
 }

@@ -79,7 +79,31 @@ export function calidadesDe(valoresSensores) {
      * `quality` no se inventa una: se dice que no consta, que es distinto de
      * decir que es buena.
      */
-    const quality = bruto && typeof bruto === 'object' ? bruto.quality : undefined
+    const objeto = bruto && typeof bruto === 'object' ? bruto : null
+
+    /*
+     * La calidad llega de DOS formas y las dos se archivan igual (Plan 28 F4):
+     * `quality` es el código crudo de OPC —lo que trae quien lee de la
+     * frontera del backend— y `motivo` es esa misma calidad YA interpretada,
+     * que es como viaja dentro de `createSenal` desde el Plan 21 F3. El
+     * frontend no reenvía el código porque ya lo resolvió al recibirlo.
+     */
+    if (objeto && objeto.motivo != null) {
+      const m = objeto.motivo
+      salida[clave] = typeof m === 'object'
+        ? { motivo: m.codigo, texto: m.texto, consta: true }
+        : { motivo: m, consta: true }
+      continue
+    }
+    // `motivo: null` explícito es calidad BUENA, no ausencia de dato: el
+    // catálogo lo usa así, y confundirlo archivaría como «no consta» algo que
+    // sí se midió.
+    if (objeto && 'motivo' in objeto) {
+      salida[clave] = { motivo: null, consta: true }
+      continue
+    }
+
+    const quality = objeto ? objeto.quality : undefined
     if (quality === undefined) {
       salida[clave] = { motivo: null, consta: false }
       continue

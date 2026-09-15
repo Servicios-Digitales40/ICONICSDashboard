@@ -36,8 +36,20 @@ async function parseResponse(response) {
 /** Las causas candidatas de un riesgo, ya puntuadas y ordenadas — el mismo
  *  `motorDiagnostico` que usa la herramienta de chat `diagnosticar_falla`,
  *  sin pasar por una conversación con el modelo. */
-export async function obtenerDiagnostico({ sistema, riesgoId, signal }) {
+export async function obtenerDiagnostico({ sistema, riesgoId, valoresSensores, signal }) {
   const params = new URLSearchParams({ sistema, riesgoId });
+  /*
+   * La muestra de sensores con su calidad (Plan 28 F4). Es OPCIONAL: sin ella
+   * el diagnóstico sale como siempre, y con ella el motor puede vetar las
+   * señales cuya lectura no vale — un sensor inválido no respalda una causa.
+   *
+   * Viaja como JSON en la query porque el endpoint es un GET y la muestra son
+   * unas pocas señales. `URLSearchParams` ya codifica; no hay que escapar a
+   * mano.
+   */
+  if (valoresSensores && Object.keys(valoresSensores).length > 0) {
+    params.set("valoresSensores", JSON.stringify(valoresSensores));
+  }
   const response = await fetch(`${API_BASE}/api/diagnostico?${params}`, { headers: authHeaders(), signal });
   return parseResponse(response);
 }

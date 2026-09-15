@@ -880,6 +880,35 @@ await check('las CUATRO clases de mala calidad vetan, no sólo la mala', async (
   }
 })
 
+await check('la calidad YA INTERPRETADA (`motivo`) veta igual que el código crudo', async () => {
+  /*
+   * ── LA FORMA QUE MANDA LA PANTALLA ────────────────────────────────
+   *
+   * `createSenal` resuelve la calidad al recibir el valor (Plan 21 F3), así
+   * que el frontend no reenvía el código crudo de OPC: manda `motivo`, ya
+   * interpretado. Aceptar sólo `quality` habría dejado el veto sin poder
+   * dispararse desde la vista de cierre — que es justo donde más falta hace,
+   * porque ahí el técnico está a punto de confirmar la causa propuesta.
+   *
+   * Y `motivo: null` explícito es calidad BUENA, no ausencia: el catálogo lo
+   * usa así, y confundirlo archivaría como «no consta» algo que sí se midió.
+   */
+  const conMotivo = {
+    presionRelativa: { valor: 3, motivo: null },
+    flujoInstantaneo: { valor: 0, motivo: { codigo: 'sin_entrega', texto: 'Dejó de entregar.' } },
+    cargaMotor: { valor: 55, motivo: null },
+  }
+  const r = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque', riesgoId: 'bomba-sin-salida', valoresSensores: conMotivo,
+  })
+
+  assert.deepEqual(r.senalesVetadas, ['flujoInstantaneo'])
+  assert.equal(r.causas[0].respaldo.datos, 2)
+  assert.equal(r.snapshot.calidades.flujoInstantaneo.motivo, 'sin_entrega')
+  assert.equal(r.snapshot.calidades.presionRelativa.consta, true,
+    '`motivo: null` es calidad buena MEDIDA, no «no consta»')
+})
+
 await check('un número PELADO no se veta: «no consta» no es «mala»', async () => {
   /*
    * La muestra puede llegar como objeto `{valor, quality}` o como número

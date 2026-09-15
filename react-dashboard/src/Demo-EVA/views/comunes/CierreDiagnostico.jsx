@@ -517,9 +517,44 @@ export default function CierreDiagnostico({ params, onNavigate }) {
     return snapshot;
   }, [sistemaId, agua.sistema, vibracion.canales, vibracion.variador]);
 
+  /**
+   * La misma muestra, pero CON la calidad de cada señal — Plan 28 F4.
+   *
+   * ── POR QUÉ DOS Y NO UNA ────────────────────────────────────────────
+   *
+   * `muestraSensores` viaja al CERRAR el caso y se archiva en
+   * `aprendizaje.json` con la forma plana `{clave: número}` que tiene desde el
+   * Plan 16 F5. Cambiarla rompería todo lo que ya la lee — es el mismo
+   * criterio por el que `solucion` siguió siendo texto y no un objeto.
+   *
+   * Ésta viaja al PEDIR el diagnóstico, y lleva `motivo` además del valor
+   * porque el motor lo necesita para vetar: una señal cuya calidad no es buena
+   * no respalda nada (§2.4 — un sensor inválido es ausencia de evidencia, no
+   * evidencia débil). `createSenal` ya resolvió esa calidad al recibir el
+   * valor, así que aquí sólo hay que dejar de tirarla al aplanar.
+   *
+   * Sólo para el tanque: `useVibracion` no expone la calidad por canal, así
+   * que inventarle un `motivo: null` afirmaría que es buena sin haberlo
+   * medido. Sin el campo, el motor la trata como «no consta» y no veta, que es
+   * lo honesto.
+   */
+  const muestraConCalidad = useMemo(() => {
+    if (sistemaId !== "tanque") return null;
+    return Object.fromEntries(
+      Object.entries(agua.sistema?.senales ?? {})
+        .filter(([, s]) => s.valor !== null && s.valor !== undefined)
+        .map(([clave, s]) => [clave, { valor: s.valor, motivo: s.motivo ?? null }])
+    );
+  }, [sistemaId, agua.sistema]);
+
   /* ── El diagnóstico calculado (GET /api/diagnostico) ────────────────── */
 
   const [diagnostico, setDiagnostico] = useState({ loading: true, error: null, data: null });
+
+  // Ver el comentario de `valoresSensores` en el efecto de abajo: la muestra
+  // se lee por ref para que el sondeo no relance el diagnóstico.
+  const muestraRef = useRef(muestraConCalidad);
+  muestraRef.current = muestraConCalidad;
 
   useEffect(() => {
     if (!riesgoId) {
@@ -528,7 +563,20 @@ export default function CierreDiagnostico({ params, onNavigate }) {
     }
     const control = new AbortController();
     setDiagnostico((d) => ({ ...d, loading: true, error: null }));
-    obtenerDiagnostico({ sistema: sistemaId, riesgoId, signal: control.signal })
+    obtenerDiagnostico({
+      sistema: sistemaId,
+      riesgoId,
+      /*
+       * La muestra se lee de una REF y no de la dependencia del efecto, y es
+       * deliberado: `muestraConCalidad` cambia con cada sondeo —cada tres
+       * segundos en el tanque—, así que ponerla en el array de dependencias
+       * relanzaría el diagnóstico continuamente. Lo que se quiere es la
+       * muestra del INSTANTE en que se abrió la pantalla, que es la que
+       * acompaña a este diagnóstico concreto.
+       */
+      valoresSensores: muestraRef.current,
+      signal: control.signal,
+    })
       .then((data) => setDiagnostico({ loading: false, error: null, data }))
       .catch((e) => {
         if (e.name === "AbortError") return;
