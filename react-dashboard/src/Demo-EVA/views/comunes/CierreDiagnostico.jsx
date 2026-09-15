@@ -75,6 +75,11 @@ const BANDA_INFO = {
  *  persona escribió una causa que el sistema no tenía transcrita. */
 const OTRA_CAUSA = "__otra__";
 
+/** Lista vacía estable, para que «no hay causas» no cambie de identidad en
+ *  cada render — ver el memo de `causasCandidatas`. Congelada porque nadie
+ *  debe empujar nada dentro de un valor compartido por todos los renders. */
+const SIN_CAUSAS = Object.freeze([]);
+
 /**
  * El título y el subtítulo de la pantalla, que se pintaban TRES veces —sin
  * riesgo, caso cerrado y el caso normal— con las mismas dos frases copiadas.
@@ -514,7 +519,28 @@ export default function CierreDiagnostico({ params, onNavigate }) {
     return () => control.abort();
   }, [sistemaId, riesgoId, traducir]);
 
-  const causasCandidatas = diagnostico.data?.causas ?? [];
+  /*
+   * ── POR QUÉ ESTO ES UN MEMO Y NO UN `?? []` SUELTO ───────────────────
+   *
+   * `?? []` construye un array NUEVO en cada render, y esta lista viaja como
+   * dependencia de un efecto (la preselección de más abajo) y de un
+   * `useCallback` (el envío). Con una identidad distinta cada vez, los dos se
+   * rehacían en cada render en lugar de cuando cambia el diagnóstico — que es
+   * lo que ESLint venía avisando.
+   *
+   * No era un fallo visible: el efecto está guardado por `!causaId`, así que
+   * preselecciona una vez y las repeticiones no hacen nada. Pero deja el
+   * efecto corriendo en cada pulsación de tecla del formulario, y basta con
+   * que alguien le quite esa guarda para que empiece a pisar lo que el técnico
+   * eligió a mano.
+   *
+   * El array vacío se saca a una constante de módulo por lo mismo: un literal
+   * aquí volvería a cambiar de identidad cuando no hay causas.
+   */
+  const causasCandidatas = useMemo(
+    () => diagnostico.data?.causas ?? SIN_CAUSAS,
+    [diagnostico.data]
+  );
   const diagnosticEventId = diagnostico.data?.diagnosticEventId ?? null;
 
   /* ── Lo que aporta la persona ────────────────────────────────────────── */

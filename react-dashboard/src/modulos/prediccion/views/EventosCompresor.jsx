@@ -70,6 +70,10 @@ import { MONO, SANS } from "@/Demo-EVA/components/base.jsx";
 const EVENTOS = [1, 2, 3, 4];
 const HORAS_MAX = 168;
 
+/** Línea de tiempo vacía, estable entre renders — ver el memo de `timeline`.
+ *  Congelada: es un valor compartido, nadie debe empujar nada dentro. */
+const SIN_TIMELINE = Object.freeze([]);
+
 /*
  * El aspecto de un estado. Devuelve la CLAVE y no el rótulo: es una función
  * pura y no puede llamar a un hook, igual que `aspectoDe` en Salud o
@@ -272,7 +276,15 @@ export default function EventosCompresor() {
   const consulta = useMutation({ mutationFn: fetchEventHistory });
   const loading = consulta.isPending;
 
-  const timeline = data?.timeline ?? [];
+  /*
+   * Memoizada por lo mismo que `causasCandidatas` en `CierreDiagnostico.jsx`:
+   * un `?? []` suelto es un array nuevo cada render, y esta lista alimenta los
+   * dos `useMemo` de abajo. Con la identidad cambiando siempre, ninguno de los
+   * dos memoiza nada — recorren la serie entera en cada render, que es
+   * justamente lo que un memo viene a evitar. Aquí sí se nota: la línea de
+   * tiempo del compresor puede traer cientos de puntos.
+   */
+  const timeline = useMemo(() => data?.timeline ?? SIN_TIMELINE, [data]);
   const selected = selectedIndex == null ? null : timeline[selectedIndex] ?? null;
   const selectedMeta = selected ? statusMeta(selected.status, t) : null;
   const policy = selected?.policy ?? data?.model?.policy ?? {};

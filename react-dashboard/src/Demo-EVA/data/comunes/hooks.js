@@ -52,7 +52,17 @@ export function useSistemaAgua() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source, marca]);
 
-  const ventana = useMemo(() => source.buffer.estado(), [source, marca]);
+  const ventana = useMemo(
+    () => source.buffer.estado(),
+    // Misma razón EXACTA que el memo de arriba, y por eso la misma excusa: el
+    // búfer es mutable y no cambia de identidad al crecer, así que `marca` —la
+    // hora de la última lectura— es la dependencia real. La regla no puede
+    // saberlo y pide quitar `marca` por «innecesaria»; hacerlo congelaría esto
+    // en el primer valor. El memo de `series` ya lo declaraba y éste se quedó
+    // sin ello.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [source, marca]
+  );
 
   return { ...snapshot, series, ventana };
 }
