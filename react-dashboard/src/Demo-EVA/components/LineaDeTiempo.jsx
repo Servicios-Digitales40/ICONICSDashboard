@@ -76,6 +76,32 @@ export function LineaDeTiempo({ inicio, fin, carriles }) {
       if (ms < inicio.getTime()) continue;
       salida.push({ ms, pct: ((ms - inicio.getTime()) / total) * 100 });
     }
+
+    /*
+     * ── EL BORDE DERECHO SE ROTULA SIEMPRE (15-09-2026) ─────────────────
+     *
+     * Las marcas caen en fronteras redondas, pero `fin` casi nunca lo es: en
+     * un turno en curso `fin` es AHORA MISMO y avanza con el reloj. Medido
+     * sobre una ventana real de 07:00 a 08:05, las tres marcas (07:00, 07:30,
+     * 08:00) se agolpaban en el 92 % izquierdo y el último tramo del eje se
+     * quedaba sin rotular — con hechos pintados dentro, que es lo que hacía
+     * dudar de la hora.
+     *
+     * El arreglo no es meter más marcas —el paso está elegido para que salgan
+     * entre 4 y 8, y con 1,08 h caen en la rama de 30 min— sino rotular el
+     * final, que es la única hora que el técnico necesita leer siempre: hasta
+     * cuándo llega lo que está mirando.
+     *
+     * Se omite si ya hay una marca pegada al borde, porque «08:00» y «08:05»
+     * a un 8 % de distancia se solapan y se leen peor que una sola. El 6 % es
+     * lo que ocupa una etiqueta de cinco caracteres en el ancho típico de esta
+     * vista; por debajo de eso, la redonda ya sitúa el final lo bastante bien.
+     */
+    const ultima = salida[salida.length - 1];
+    if (!ultima || ultima.pct < 94) {
+      salida.push({ ms: fin.getTime(), pct: 100, esFin: true });
+    }
+
     return salida;
   }, [inicio, fin, total]);
 
@@ -96,8 +122,17 @@ export function LineaDeTiempo({ inicio, fin, carriles }) {
             key={ms}
             style={{
               position: "absolute",
-              left: `${pct}%`,
-              transform: "translateX(-50%)",
+              /*
+               * Las marcas se centran sobre su instante, salvo las de los dos
+               * extremos: centrar el 0 % y el 100 % deja media etiqueta fuera
+               * del contenedor, recortada. Se anclan por su borde interior, que
+               * las mantiene dentro sin mover la hora que señalan.
+               */
+              ...(pct >= 100
+                ? { right: 0 }
+                : pct <= 0
+                  ? { left: 0 }
+                  : { left: `${pct}%`, transform: "translateX(-50%)" }),
               fontSize: 10,
               color: t.textFaint,
               fontVariantNumeric: "tabular-nums",

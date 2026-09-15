@@ -138,4 +138,49 @@ describe("el eje se rotula en horas redondas", () => {
     expect(screen.queryByText(/:13/)).toBeNull();
     expect(screen.getByText(/07:00/)).toBeTruthy();
   });
+
+  it("el final de la ventana se rotula aunque no caiga en hora redonda", () => {
+    /*
+     * ── EL CASO REAL QUE LO DESTAPÓ (15-09-2026) ──────────────────────
+     *
+     * En un turno EN CURSO, `fin` es ahora mismo y casi nunca es una frontera
+     * redonda. Con una ventana de 07:00 a 08:05 las marcas caían en 07:00,
+     * 07:30 y 08:00 —el paso de 30 min que le toca a 1,08 h— y la última se
+     * quedaba en el 92 %: el tramo final del eje aparecía sin rotular, con
+     * hechos dibujados dentro. Es lo que hacía dudar de qué hora marcaba el
+     * borde derecho.
+     *
+     * La hora de fin es justamente la que el técnico necesita leer siempre:
+     * hasta cuándo llega lo que está mirando.
+     */
+    const inicio = new Date(2026, 8, 12, 7, 0, 0);
+    const fin = new Date(2026, 8, 12, 8, 5, 0);
+
+    render(
+      <ThemeProvider>
+        <LineaDeTiempo sistema="tanque" inicio={inicio} fin={fin} carriles={[carril()]} />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByText(/08:05/)).toBeTruthy();
+    // Y las redondas siguen ahí: la de fin se SUMA, no las sustituye.
+    expect(screen.getByText(/07:30/)).toBeTruthy();
+  });
+
+  it("no se duplica el final cuando la ventana ya acaba en hora redonda", () => {
+    /*
+     * De 07:00 a 08:00 la última marca redonda ya está en el 100 %. Añadir
+     * otra encima pintaría «08:00» dos veces en el mismo punto.
+     */
+    const inicio = new Date(2026, 8, 12, 7, 0, 0);
+    const fin = new Date(2026, 8, 12, 8, 0, 0);
+
+    render(
+      <ThemeProvider>
+        <LineaDeTiempo sistema="tanque" inicio={inicio} fin={fin} carriles={[carril()]} />
+      </ThemeProvider>
+    );
+
+    expect(screen.getAllByText(/08:00/)).toHaveLength(1);
+  });
 });
