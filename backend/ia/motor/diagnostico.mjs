@@ -47,6 +47,7 @@ import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
 import { logger } from '../../logger.mjs'
+import { construirSnapshot } from './snapshot.mjs'
 
 const REGLAS_POR_SISTEMA = {
   tanque: REGLAS_TANQUE,
@@ -698,7 +699,22 @@ export function createMotorDiagnostico({ indiceDocumentos, indiceCasos, evaluado
     // veces"—.
     causas.sort((a, b) => b.respaldo.total - a.respaldo.total)
 
-    return { sistema, riesgoId, diagnosticEventId, huerfano: false, conflicto: hayConflicto(causas), causas }
+    /*
+     * El snapshot se construye AL FINAL y sobre lo que ya está calculado
+     * (Plan 28 F1): no vuelve a consultar ninguna fuente, así que no puede
+     * alterar el resultado ni añadir una sola petición. Ver la cabecera de
+     * `snapshot.mjs` — «observación de lo que ya ocurría», y hay una prueba
+     * que exige que `causas` sea idéntico con él y sin él.
+     */
+    const snapshot = construirSnapshot({
+      diagnosticEventId, sistema, riesgoId, valoresSensores, causas,
+    })
+
+    return {
+      sistema, riesgoId, diagnosticEventId,
+      huerfano: false, conflicto: hayConflicto(causas), causas,
+      snapshot,
+    }
   }
 
   return { diagnosticar }

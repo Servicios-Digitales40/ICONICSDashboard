@@ -127,9 +127,52 @@ await check('dos llamadas idénticas devuelven exactamente el mismo CONTENIDO', 
   // entre dos llamadas idénticas. Todo lo demás sigue siendo exactamente
   // igual: es la propiedad que justifica que puntúe el código y no el modelo.
   assert.notEqual(a.diagnosticEventId, b.diagnosticEventId, 'dos llamadas debían tener eventos distintos')
-  const { diagnosticEventId: _a, ...contenidoA } = a
-  const { diagnosticEventId: _b, ...contenidoB } = b
-  assert.deepEqual(contenidoA, contenidoB)
+
+  /*
+   * El snapshot (Plan 28 F1) tiene DOS campos que cambian por lo mismo: copia
+   * el `diagnosticEventId` y sella el instante. Se apartan igual que él, y no
+   * se afloja la comparación del resto — el snapshot ENTERO, fragmentos y
+   * casos incluidos, tiene que salir idéntico, porque es un registro de lo
+   * que se consultó y eso no depende del reloj.
+   */
+  const sinVolatiles = ({ diagnosticEventId, snapshot, ...resto }) => ({
+    ...resto,
+    ...(snapshot
+      ? { snapshot: (({ diagnosticEventId: _e, momento: _m, ...s }) => s)(snapshot) }
+      : {}),
+  })
+
+  assert.deepEqual(sinVolatiles(a), sinVolatiles(b))
+})
+
+await check('el snapshot no altera el resultado: las causas son las mismas con él y sin él', async () => {
+  /*
+   * ── LA PROPIEDAD QUE DEFINE LA F1 DEL PLAN 28 ─────────────────────
+   *
+   * El snapshot es OBSERVACIÓN de lo que ya ocurría, no una entrada nueva. Si
+   * algún día empezara a influir en el cálculo dejaría de ser un registro y
+   * pasaría a ser una fuente — y entonces habría que calibrarlo, que es justo
+   * lo que no queremos.
+   *
+   * Se comprueba comparando las causas contra las que produce el mismo motor
+   * con el snapshot apartado: cualquier diferencia significa que construirlo
+   * tuvo un efecto, aunque sea de orden.
+   */
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
+  const motor = createMotorDiagnostico({ indiceDocumentos })
+
+  const r = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.ok(r.snapshot, 'el diagnóstico tiene que traer snapshot')
+  assert.ok(r.causas.length > 0, 'el caso de apoyo tiene que dar causas')
+  // El snapshot cita lo mismo que las causas, no algo distinto.
+  const archivosEnCausas = new Set(
+    r.causas.flatMap(c => (c.manualCitado ?? []).map(f => f.archivo))
+  )
+  for (const f of r.snapshot.fragmentosManual) {
+    assert.ok(archivosEnCausas.has(f.archivo),
+      `el snapshot cita "${f.archivo}", que ninguna causa cita`)
+  }
 })
 
 /* ── Ningún riesgo activo queda huérfano ────────────────────────────────── */
@@ -668,6 +711,87 @@ await check('un evaluador que lanza no rompe el diagnóstico: temporal=0, sin ev
 })
 
 /* ── Por qué un riesgo no tiene causas (Plan 20) ──────────────────────── */
+
+/* ── El snapshot de evidencia, Plan 28 F1 ───────────────────────────── */
+
+console.log('\n── El snapshot de evidencia (Plan 28 F1) ──────────────────')
+
+await check('el snapshot recoge las referencias de manual y de casos, deduplicadas', async () => {
+  /*
+   * Dos causas del mismo riesgo citan a menudo el MISMO trozo de manual. El
+   * snapshot lo archiva una vez: dos copias de la misma referencia no añaden
+   * nada que auditar y multiplican el tamaño de la línea del diario (F2).
+   */
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE, 'recirculación mínima': FUERTE })
+  const r = await createMotorDiagnostico({ indiceDocumentos })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  const claves = r.snapshot.fragmentosManual.map(f => `${f.archivo}|${f.pagina}|${f.hash}`)
+  assert.equal(new Set(claves).size, claves.length, 'hay fragmentos repetidos en el snapshot')
+})
+
+await check('el snapshot guarda REFERENCIAS del manual, nunca el texto', async () => {
+  /*
+   * El `hash` es del CONTENIDO del fragmento (Plan 17 F5), así que ya sirve
+   * para saber si el PDF cambió desde que se citó. Guardar además el texto
+   * sería tener dos copias de la misma verdad y un sitio más donde puedan
+   * discrepar — y llenaría el disco de la planta sin añadir nada.
+   */
+  const indiceDocumentos = manualFalso({ 'impulsión cerrada': FUERTE })
+  const r = await createMotorDiagnostico({ indiceDocumentos })
+    .diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  for (const f of r.snapshot.fragmentosManual) {
+    assert.deepEqual(Object.keys(f).sort(), ['archivo', 'hash', 'pagina'],
+      'un fragmento del snapshot sólo lleva su referencia')
+  }
+})
+
+await check('sin `valoresSensores`, el snapshot lo DICE en vez de inventar una muestra', async () => {
+  const r = await SIN_FUENTES.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
+
+  assert.equal(r.snapshot.valoresSensores, null)
+  assert.equal(r.snapshot.calidades, null, 'sin muestra no hay calidad que declarar')
+})
+
+await check('la calidad de cada señal viaja con su código, y «no consta» no es «buena»', async () => {
+  /*
+   * ── EL INSUMO DE LA F4, ARCHIVADO DESDE YA ────────────────────────
+   *
+   * «El nivel marcaba 12 %» y «el nivel marcaba 12 % con el sensor en mala
+   * calidad» son dos diagnósticos distintos, y hoy el segundo no se distingue
+   * del primero seis meses después. `motivoDeCalidad` ya separa cuatro
+   * situaciones y las tiene medidas contra el servidor real.
+   *
+   * La distinción que esta prueba fija es la tercera: una señal que llega como
+   * número pelado —sin `quality`— NO se archiva como buena. Se archiva como
+   * «no consta», que es lo único cierto. Darla por buena sería exactamente
+   * disfrazar una ausencia (§2.4).
+   */
+  const { QUALITY_SIN_DATO, MOTIVO } = await import('../shared/quality.js')
+
+  const r = await SIN_FUENTES.diagnosticar({
+    sistema: 'tanque',
+    riesgoId: 'bomba-sin-salida',
+    valoresSensores: {
+      presionRelativa: { valor: 3.1, quality: 0 },
+      flujoInstantaneo: { valor: 0, quality: QUALITY_SIN_DATO },
+      cargaMotor: 55,
+    },
+  })
+
+  const c = r.snapshot.calidades
+  assert.equal(c.presionRelativa.motivo, null, 'calidad buena: sin motivo')
+  assert.equal(c.presionRelativa.consta, true)
+  assert.equal(c.flujoInstantaneo.motivo, MOTIVO.SIN_ENTREGA)
+  assert.equal(c.cargaMotor.consta, false, 'un número pelado no declara su calidad')
+  assert.equal(c.cargaMotor.motivo, null, 'y «no consta» tampoco es un motivo malo')
+
+  // El valor sí se archiva en las tres, venga como objeto o como número: una
+  // lectura de un instante no está guardada en ningún otro sitio.
+  assert.equal(r.snapshot.valoresSensores.presionRelativa, 3.1)
+  assert.equal(r.snapshot.valoresSensores.cargaMotor, 55)
+})
 
 console.log('\n── El huérfano deliberado y el huérfano por transcribir ─────')
 
