@@ -273,6 +273,71 @@ await check('una señal que arranca en un valor normal sigue midiéndose igual',
 })
 
 
+/* ── Las firmas DECLARADAS en el catálogo, Plan 29 F2 ────────────────── */
+
+console.log('\n── Las firmas declaradas en causas.js (Plan 29 F2) ────────')
+
+/*
+ * Lo de arriba prueba el MECANISMO con series de mentira. Esto prueba lo que
+ * el catálogo declara: una firma mal escrita —una señal que no existe, una
+ * dirección inventada, una ventana de cero— no la caza ninguna prueba del
+ * mecanismo, porque el mecanismo funcionaría igual. Se quedaría en silencio,
+ * que es indistinguible de «esta causa no tiene tendencia».
+ */
+
+await check('toda `firmaTemporal` declarada nombra señales reales del tanque', async () => {
+  const { CAUSAS_POR_RIESGO } = await import('../shared/eva/comun/causas.js')
+  const { SENALES, esHistorizada } = await import('../shared/eva/tanque/senales.js')
+
+  for (const [riesgoId, causas] of Object.entries(CAUSAS_POR_RIESGO)) {
+    for (const causa of causas) {
+      if (!causa.firmaTemporal) continue
+      for (const item of causa.firmaTemporal) {
+        assert.ok(item.senal in SENALES,
+          `${causa.id} (${riesgoId}) declara "${item.senal}", que no es una señal del tanque`)
+        /*
+         * Sin serie no hay pendiente que calcular: `leerSerie` devolvería
+         * vacío y la firma quedaría muda para siempre. Es el defecto que este
+         * plan vino a no repetir — un término declarado que nunca puede sumar.
+         */
+        assert.ok(esHistorizada(item.senal),
+          `${causa.id} declara "${item.senal}", que no está historizada: su firma nunca podría evaluarse`)
+        assert.ok(['sube', 'baja'].includes(item.direccion),
+          `${causa.id} declara una dirección desconocida: "${item.direccion}"`)
+        assert.ok(Number.isFinite(item.ventanaH) && item.ventanaH > 0,
+          `${causa.id} declara una ventana que no es un número de horas positivo`)
+      }
+    }
+  }
+})
+
+await check('dos causas del MISMO riesgo no comparten una firma idéntica', async () => {
+  /*
+   * ── LA REGLA QUE SALIÓ DE MEDIR, NO DE TEORIZAR (14-09-2026) ──────
+   *
+   * `agua-caliente` estuvo a punto de llevar la misma firma
+   * —`temperaturaTanque` sube— en sus DOS causas, porque las dos cursan igual.
+   * Eso no desempata: les da el mismo punto a ambas y deja el orden como
+   * estaba, con más pasos y aparentando criterio.
+   *
+   * El cuarto término existe para DISTINGUIR causas del mismo riesgo (ver la
+   * cabecera de `temporal.mjs`). Una firma repetida dentro de un riesgo es la
+   * señal de que se declaró por rellenar, no por discriminar.
+   */
+  const { CAUSAS_POR_RIESGO } = await import('../shared/eva/comun/causas.js')
+
+  for (const [riesgoId, causas] of Object.entries(CAUSAS_POR_RIESGO)) {
+    const vistas = new Set()
+    for (const causa of causas) {
+      if (!causa.firmaTemporal) continue
+      const huella = JSON.stringify(causa.firmaTemporal)
+      assert.ok(!vistas.has(huella),
+        `en "${riesgoId}", dos causas declaran la MISMA firma: no distingue nada`)
+      vistas.add(huella)
+    }
+  }
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {

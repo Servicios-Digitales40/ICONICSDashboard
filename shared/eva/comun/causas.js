@@ -297,6 +297,27 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Variador de frecuencia",
       terminosManual: ["consigna", "variador", "frecuencia", "velocidad"],
       riesgoId: "sobrepresion",
+      /*
+       * ── TRANSCRITA DE «Revisar la consigna del variador» ───────────
+       *
+       * Plan 29 F2. Es la firma que distingue esta causa de
+       * `valvula-alivio-no-actua`: una consigna subida es un CAMBIO en
+       * `referenciaVariador`; una válvula de alivio que no abre no mueve esa
+       * señal en absoluto. `datos` no puede separarlas —misma evidencia
+       * física— y el manual tampoco, porque las dos salen de la misma regla.
+       *
+       * ── MEDIDA ANTES DE DECLARARLA (14-09-2026) ───────────────────
+       *
+       * `referenciaVariador` en 2 h: 7 puntos, todos 39,50 exactos. Plano,
+       * así que hoy `tendenciaDe` devuelve `null` y esta firma suma 0 — y eso
+       * es lo CORRECTO: la consigna no se ha tocado. La firma existe para el
+       * día que alguien la suba, no para que sume siempre.
+       *
+       * Dicho de otro modo: 7 puntos confirman que hay SERIE con la que
+       * opinar (`PUNTOS_MINIMOS` es 3). Que hoy la serie diga «no se movió»
+       * no es un defecto de la firma, es la respuesta.
+       */
+      firmaTemporal: [{ senal: "referenciaVariador", direccion: "sube", ventanaH: 2 }],
     }),
     causaTanque({
       id: "valvula-alivio-no-actua",
@@ -321,6 +342,38 @@ export const CAUSAS_POR_RIESGO = {
       componente: "Filtro de línea",
       terminosManual: ["filtro", "colmatado", "obstruccion"],
       riesgoId: "obstruccion",
+      /*
+       * ── TRANSCRITA DE «filtro sucio», Y DEL MECANISMO ─────────────
+       *
+       * Plan 29 F2. La `consecuencia` de `obstruccion` nombra los dos
+       * mecanismos: «válvula cerrada, filtro sucio u obstrucción». Un filtro
+       * se colmata PROGRESIVAMENTE —el caudal cae poco a poco— mientras que
+       * una válvula que se cierra es un salto. Ésa es justamente la clase de
+       * distinción que sólo el cuarto término puede dar, y por eso la firma
+       * va en esta causa y no en `valvula-impulsion-parcialmente-cerrada`.
+       *
+       * ── LA RESERVA, MEDIDA Y NO TEÓRICA (14-09-2026) ──────────────
+       *
+       * `flujoInstantaneo` en 6 h dio 9 puntos y `evaluar()` devolvió 1 punto
+       * A FAVOR de «baja» — pero la instalación llevaba 24 h SIN BOMBEAR
+       * (`cargaMotor` máximo 0,27 %). La serie iba de 0,0018 a −0,0307 L/min:
+       * ruido de un caudalímetro en reposo, no una tendencia.
+       *
+       * `BASE_MINIMA_RELATIVA` no lo atrapó por poco (base 0,0018 contra un
+       * máximo de 0,164: 1,1 %, justo por encima del 1 % que exige callar), y
+       * `UMBRAL_CAMBIO_RELATIVO` tampoco, porque dividir un ruido por otro
+       * ruido da un cambio relativo enorme. Es el escenario que la cabecera
+       * de `temporal.mjs` ya avisaba: «muerde el día que alguien declare una
+       * [firma] sobre caudal o presión».
+       *
+       * Se declara igual, y no es contradicción: esta firma sólo se consulta
+       * cuando `obstruccion` YA está activo, y esa regla exige `ctx.impulsando`
+       * — con la bomba parada nadie llega hasta aquí. La reserva queda escrita
+       * porque el margen es fino: si algún día se declara una firma de caudal
+       * en una causa cuyo riesgo NO exija impulsión, hay que revisar
+       * `BASE_MINIMA_RELATIVA` antes, no después.
+       */
+      firmaTemporal: [{ senal: "flujoInstantaneo", direccion: "baja", ventanaH: 6 }],
     }),
   ],
 
@@ -408,6 +461,38 @@ export const CAUSAS_POR_RIESGO = {
       terminosManual: ["impulsor", "desgaste", "rodete", "rodamientos"],
       origen: "riesgos.js · consecuencia + pronostico.js · MECANISMOS (esfuerzo-sin-resultado)",
       provisional: PROVISIONALES,
+      /*
+       * ── TRANSCRITA DEL MECANISMO, NO INVENTADA ────────────────────
+       *
+       * Plan 29 F2. «Impulsor desgastado» es acumulativo por definición —lo
+       * dice `MECANISMOS` en `pronostico.js`, de donde sale el `componente` de
+       * esta causa—: la bomba mueve cada vez menos agua por la misma energía.
+       * `obstruccion-interna-bomba`, su causa hermana en este riesgo, es lo
+       * contrario: aparece de golpe cuando algo entra en la línea. Una cae
+       * despacio, la otra salta.
+       *
+       * ── POR QUÉ 24 h Y NO UNA VENTANA CORTA ───────────────────────
+       *
+       * Porque un desgaste no se ve en dos horas. Medido el 14-09-2026:
+       * `eficienciaEnergetica` en 24 h da 26 puntos, muy por encima de
+       * `PUNTOS_MINIMOS`, así que la ventana larga TIENE serie con la que
+       * opinar — que era la duda que este plan tenía por la nota de
+       * `temporal.mjs` sobre ventanas sin puntos suficientes.
+       *
+       * ── LA RESERVA: ES UN KPI, Y EN REPOSO VALE CERO ──────────────
+       *
+       * En la misma medida, las 26 muestras iban de 0,00 a 0,27 % con la
+       * instalación parada 24 h. Con la bomba quieta este KPI no mide
+       * rendimiento, mide nada — y una serie que arranca en ~0 es justo lo
+       * que `BASE_MINIMA_RELATIVA` existe para callar.
+       *
+       * No muerde aquí por la misma razón que en `filtro-colmatado`:
+       * `esfuerzo-sin-resultado` exige `cargaMotor >= avisoMax` para estar
+       * activo, así que cuando esta firma se consulta la bomba está
+       * trabajando de sobra. Queda dicho para que nadie mueva esta firma a
+       * una causa cuyo riesgo no lo exija.
+       */
+      firmaTemporal: [{ senal: "eficienciaEnergetica", direccion: "baja", ventanaH: 24 }],
     },
     causaTanque({
       id: "obstruccion-interna-bomba",
@@ -575,6 +660,27 @@ export const CAUSAS_POR_RIESGO = {
     }),
   ],
 
+  /*
+   * ── SIN `firmaTemporal`, Y ES UNA DECISIÓN MEDIDA (PLAN 29 F2) ────
+   *
+   * Este riesgo entró en la lista de candidatos a firma temporal y salió al
+   * auditarlo. Las dos causas de aquí —un aporte de calor externo y una falta
+   * de renovación— cursan EXACTAMENTE IGUAL en `temperaturaTanque`: las dos
+   * son la temperatura subiendo despacio. Declarar la misma firma en ambas
+   * les daría el mismo punto, que es no desempatar nada con más pasos; y
+   * declararla sólo en una privilegiaría a esa causa por un mecanismo que las
+   * dos comparten.
+   *
+   * Lo que sí las separaría es el caudal de llenado —si entra agua nueva, hay
+   * renovación— pero eso NO está escrito en la regla, y este archivo
+   * transcribe, no inventa (ver la cabecera). Cuando alguien lo escriba en
+   * `riesgos.js`, aquí se transcribe.
+   *
+   * Es el mismo criterio que dejó a `marcha-en-seco` y
+   * `tension-fuera-con-motor` sin firma en la F1: no todo par de causas se
+   * desempata con una tendencia, y forzarlo produce un término que suma
+   * siempre y no distingue nunca.
+   */
   "agua-caliente": [
     causaTanque({
       id: "aporte-termico-externo",

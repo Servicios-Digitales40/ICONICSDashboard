@@ -1,18 +1,31 @@
 # PLAN 29 — Más reglas y más causas para el tanque
 
-**Estado:** F1, F3 y F4 **completadas** el 14-09-2026. F2 **bloqueada** por el
-historiador (ver su fase). El plan se archiva en `completados/` cuando F2 cierre.
+**Estado:** las cuatro fases **completadas** el 14-09-2026.
 
 | Fase | Estado | Commit |
 |---|---|---|
 | F1 — causas sobre riesgos existentes | ✅ hecha | `5ae93b6` |
-| F2 — firmas temporales | ⛔ bloqueada: el historiador no sirve muestras | — |
+| F2 — firmas temporales | ✅ hecha | (este) |
 | F3 — cruce con alarmas del PLC | ✅ hecha | `fcd6146` |
 | F4 — coherencia orden/realimentación | ✅ hecha | `79ef4f6` |
 
-**Resultado medido:** el tanque pasa de **10 a 17 reglas** y de **17 a 34
-causas**. Ningún riesgo del tanque se queda con una sola causa candidata, y
-ninguna regla nueva se apoya en un umbral inventado por nosotros.
+**Resultado medido:** el tanque pasa de **10 a 17 reglas**, de **17 a 34
+causas** y de **1 a 4 firmas temporales**. Ningún riesgo se queda con una sola
+causa candidata, y ninguna regla nueva se apoya en un umbral inventado por
+nosotros.
+
+**Lo que queda pendiente, y no es de este plan:**
+
+- Los umbrales analógicos siguen siendo estimaciones (`PROVISIONALES === true`).
+  Ninguna regla nueva depende de ellos, pero las viejas sí.
+- `variador-no-sigue-consigna` espera a que alguien mida la divergencia normal
+  de una rampa de arranque (§3·B).
+- `verificar-antiguedad-historico.mjs` satura el servidor con su búsqueda
+  binaria de 365 tramos. No afecta a producción — el camino de
+  `historia.mjs` responde — pero la sonda no sirve hoy para lo que existe.
+  Anotado en `docs/BACKLOG-BACKEND.md`.
+- Vibraciones no se ha tocado. Tiene 15 huérfanos de 18 riesgos y **ninguna**
+  firma temporal; el mismo trabajo está por hacer allí.
 **Fecha:** 14-09-2026
 **Alcance:** SÓLO el tanque. Vibraciones queda fuera de este plan por decisión
 explícita del 14-09-2026.
@@ -289,49 +302,66 @@ Riesgos tocados: `posible-fuga`, `derrame`, `marcha-en-seco`,
 **Pruebas:** `verificar-catalogo.mjs`, `verificar-diagnostico.mjs`,
 `verificar-riesgos.mjs`.
 
-### F2 — Firmas temporales transcribibles — **BLOQUEADA**
+### F2 — Firmas temporales transcribibles
 
 Las cuatro de §5, cada una con su justificación transcrita en comentario, al
 estilo de `sin-recirculacion-minima`. **Precedido de medir** si esas señales
 tienen serie suficiente en las ventanas propuestas.
 
-> ── BLOQUEADA EL 14-09-2026: EL HISTORIADOR NO SIRVE ────────────────
+> ── SE DIO POR BLOQUEADA, Y ERA FALSO. VALE LA PENA EL PORQUÉ ───────
 >
-> `node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs` no
-> devuelve una sola muestra. Hay red y la autenticación funciona —el servidor
-> contesta—, pero el historial se niega de dos maneras distintas:
+> El 14-09-2026 esta fase se marcó BLOQUEADA con esta evidencia: `node
+> --env-file=.env.local scripts/verificar-antiguedad-historico.mjs` devolvía
+> HTTP 500 en todas las analógicas del tanque y timeout de 15 s en las ocho
+> alarmas, sin una sola muestra. La conclusión escrita fue «el historiador no
+> sirve».
 >
->   · **HTTP 500** en las analógicas (`NIVEL_TANQUE`, `FLUJO_INSTANTANEO`,
->     `PRESION_RELATIVA`, `KPIEFICIENCIA_ENERGETICA`…), con `traceId` distinto
->     en cada una.
->   · **Timeout a los 15 s** en las ocho alarmas de `ALARMAS/`. El propio
->     cliente ya lo interpreta: «suele ser un servidor de planta saturado, no
->     caído: acepta la conexión y no contesta».
+> **La conclusión era más ancha que el dato.** Probado el mismo día por el
+> camino que usa producción —`crearAyudantesDeHistoria().leerSerie()`, el
+> mismo que llama `temporal.mjs`— el historiador del tanque responde:
 >
-> No es una regresión nuestra: `verificar-antiguedad-historico.mjs` no se toca
-> desde el Plan 18, y el 02-09-2026 este mismo guion midió historia contigua
-> desde el 18-08.
+> ```
+> presionRelativa       OK  21 puntos     cargaMotor            OK  21 puntos
+> temperaturaTanque     OK  21 puntos     eficienciaEnergetica  OK  21 puntos
+> flujoInstantaneo      OK   8 puntos     nivelTanque           reautenticación
+> ```
 >
-> **Por qué eso bloquea la fase y no sólo la retrasa.** Las cuatro firmas
-> propuestas usan ventanas de 2 h, 6 h y 24 h. `temporal.mjs` tiene medido que
-> **27 de 36 ventanas de 1 h no reunían ni `PUNTOS_MINIMOS`** porque el
-> historiador sólo guarda densidad de 15 min en las horas recientes. Una
-> ventana de 24 h es MÁS vulnerable a eso, no menos. Declarar las cuatro firmas
-> sin medir sería escribir cuatro términos que salen en 0 y no lo sabríamos:
-> el mismo defecto que `presionRelativa.avisoMax` —un número plausible que no
-> podía dispararse jamás— con otro disfraz.
+> (El único fallo es la PRIMERA llamada de la tanda, con el token frío: «la
+> sesión caducó del lado del servidor». No es el historiador.)
 >
-> **Qué hace falta para desbloquearla:** que el historiador vuelva a servir, y
-> volver a correr la sonda. Entonces se mide, por señal y por ventana, cuántos
-> puntos hay, y se declaran sólo las firmas que tengan serie detrás.
+> Lo que fallaba era la SONDA, no el servidor. `verificar-antiguedad-historico.
+> mjs` no busca una serie: hace búsqueda binaria hacia atrás recorriendo hasta
+> `TOPE_TRAMOS = 365` para encontrar la muestra más antigua. Eso satura un
+> servidor que contesta sin problema a una consulta normal de 6 h — y el propio
+> cliente ya lo dice al interpretar el timeout: «suele ser un servidor de
+> planta saturado, no caído».
 >
-> **Lo que NO se hace mientras tanto:** declararlas «provisionalmente» para no
-> dejar la fase vacía. Una firma sin serie no falla ruidosamente — se queda en
-> silencio, que es indistinguible de «esta causa no tiene tendencia», y
-> contamina el cuarto término justo en la fuente que más discrimina.
+> **La lección, que es la que se queda escrita:** un síntoma en UN camino de
+> lectura no autoriza a declarar caída la fuente entera. Se comprueba por el
+> camino que usa producción antes de escribir un bloqueo en un plan; un plan
+> que declara bloqueado lo que funciona cuesta más que uno que no dice nada.
+>
+> Queda aparte, y no es de esta fase ni del tanque: esa sonda parece tener un
+> problema propio. Anotado en `docs/BACKLOG-BACKEND.md`.
 
-**Pruebas (cuando se desbloquee):** `verificar-temporal.mjs`,
-`verificar-diagnostico.mjs`.
+**Medición que habilita las cuatro firmas** (14-09-2026, contra ICONICS real,
+por el camino de producción). `PUNTOS_MINIMOS` es 3:
+
+| Señal | Ventana | Puntos |
+|---|---|---|
+| `referenciaVariador` | 2 h | 7 |
+| `flujoInstantaneo` | 6 h | 8 |
+| `eficienciaEnergetica` | 24 h | 24 |
+| `temperaturaTanque` | 2 h | 7 |
+| `temperaturaTanque` | 1 h | 4 |
+
+Las cuatro superan el mínimo con holgura. La reserva que este plan citaba de
+`temporal.mjs` —«27 de 36 ventanas de 1 h no reunían ni 3 puntos», medido el
+02-09-2026— **hoy ya no se cumple**: 4 puntos en 1 h. Es coherente con
+`3864acb`, que descubrió historización propia para `cargaMotor` y
+`eficienciaEnergetica`.
+
+**Pruebas:** `verificar-temporal.mjs`, `verificar-diagnostico.mjs`.
 
 ### F3 — Reglas sobre alarmas nativas (bloque A)
 Cinco reglas + sus causas. Toca `riesgos.js` y `causas.js`.

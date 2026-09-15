@@ -384,6 +384,41 @@ reiniciando el puente.
 
 ---
 
+## B10 — `verificar-antiguedad-historico.mjs` satura el servidor que interroga
+
+**Medido el 14-09-2026.** La sonda devuelve «sin dato ni siquiera en los
+últimos días» para TODOS los puntos del tanque: HTTP 500 en las analógicas
+(`NIVEL_TANQUE`, `FLUJO_INSTANTANEO`, `PRESION_RELATIVA`,
+`KPIEFICIENCIA_ENERGETICA`) y timeout de 15 s en las ocho de `ALARMAS/`.
+
+**El historiador NO está caído.** El mismo día, por el camino que usa
+producción —`crearAyudantesDeHistoria().leerSerie()`— las mismas señales
+responden sin problema: 21 puntos en 6 h para `presionRelativa`,
+`temperaturaTanque`, `cargaMotor` y `eficienciaEnergetica`. Y el commit
+`3864acb`, de esa misma mañana, recalibró umbrales contra 849 muestras reales.
+
+**La diferencia está en lo que pide cada uno.** La sonda no lee una serie:
+hace búsqueda binaria hacia atrás recorriendo hasta `TOPE_TRAMOS = 365` para
+encontrar la muestra más antigua. Eso castiga a un servidor que contesta sin
+esfuerzo a una consulta normal — y el propio cliente ya lo interpreta bien al
+agotar el plazo: «suele ser un servidor de planta saturado, no caído».
+
+**Por qué importa arreglarlo y no sólo saberlo.** Esta sonda es la única
+herramienta que responde «¿desde cuándo hay historia de verdad?», y hoy
+contesta «desde nunca» sobre un historiador que funciona. Un instrumento que
+da un falso negativo es peor que no tenerlo: el 14-09-2026 llevó a declarar
+BLOQUEADA una fase del Plan 29 que no lo estaba.
+
+**Posibles salidas** (no decidido): espaciar las peticiones, bajar
+`TOPE_TRAMOS`, o empezar por una consulta ancha y sólo afinar si devuelve
+dato. Lo que no vale es subir el timeout: el problema no es que tarde.
+
+**Nota de método, que es la parte que no caduca.** El fallo de un camino de
+lectura no autoriza a declarar caída la fuente. Antes de escribir «el
+historiador no sirve» en un plan, se prueba por el camino que usa producción.
+
+---
+
 ## Orden sugerido
 
 1. ~~**B1**~~ — hecho el 28-08-2026
