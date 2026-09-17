@@ -35,7 +35,7 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 import { escribirEnCuaderno, leerCuaderno } from "@/lib/api/cuadernoApi.js";
-import { SISTEMA_IDS } from "@shared/eva/comun/sistemas.js";
+import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
 
 const MAX_NOTA = 1000;
 
@@ -133,9 +133,13 @@ export default function CuadernoEva() {
               }}
             >
               {/* Vacío = «no es de ninguna máquina en concreto» — «se fue la
-                  luz media hora» no tiene por qué elegir tanque o vibraciones. */}
+                  luz media hora» no tiene por qué elegir una máquina. */}
               <option value="">{traducir("maintenance:notebook.wholePlant")}</option>
-              {SISTEMA_IDS.map((s) => (
+              {/* EN SERVICIO, no todos: ofrecer la estación de llenado —cerrada
+                  por mantenimiento— invitaría a escribir una nota sobre una
+                  máquina que nadie está mirando. Las notas que YA existen con
+                  ese sistema se siguen leyendo: ocultar no es borrar. */}
+              {SISTEMA_IDS_EN_SERVICIO.map((s) => (
                 <option key={s} value={s}>{nombreSistema(s)}</option>
               ))}
             </select>

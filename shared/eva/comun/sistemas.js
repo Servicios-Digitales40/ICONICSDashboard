@@ -506,6 +506,43 @@ export const SISTEMA = Object.fromEntries(SISTEMAS.map((s) => [s.id, s]));
 export const SISTEMA_IDS = SISTEMAS.map((s) => s.id);
 
 /**
+ * Los sistemas EN SERVICIO: los que el tablero está leyendo ahora mismo.
+ *
+ * ── POR QUÉ NO SE FILTRA `SISTEMA_IDS` DIRECTAMENTE ─────────────────
+ *
+ * Porque esa lista hace DOS trabajos que se parecen y no son el mismo:
+ *
+ *   · **qué puede existir** — valida esquemas Zod (`http/esquemas.mjs`,
+ *     `diagnosticoRoutes.mjs`) y decide si un caso guardado es válido
+ *     (`scripts/purgar-casos-invalidos.mjs`).
+ *   · **qué se enseña** — llena los selectores de Turno y Cuaderno.
+ *
+ * Filtrarla habría arreglado lo segundo rompiendo lo primero: los 11 casos
+ * previos del tanque pasarían a tener un `sistema` que el backend no reconoce,
+ * y el purgador los daría por inválidos. Ocultar una máquina no puede
+ * invalidar su historia — eso no es cerrarla, es borrarla.
+ *
+ * Así que `SISTEMA_IDS` sigue diciendo qué existe, y esto dice qué está en
+ * servicio. Lo consume la UI.
+ *
+ * Con las dos máquinas abiertas, las dos listas son iguales y esto no hace
+ * nada. Es exactamente lo que debe pasar al reabrir.
+ */
+export const SISTEMAS_EN_SERVICIO = SISTEMAS.filter((s) => !s.cerrado);
+
+/** Ids de los sistemas en servicio. Para selectores y filtros de la UI. */
+export const SISTEMA_IDS_EN_SERVICIO = SISTEMAS_EN_SERVICIO.map((s) => s.id);
+
+/**
+ * ¿Está esta máquina cerrada? Devuelve el MOTIVO o `null`.
+ *
+ * Devuelve el texto y no un booleano a propósito: quien lo pinte necesita
+ * decir por qué está cerrada, y un `true` obligaría a escribir ese porqué en
+ * la vista —donde se quedaría viejo— en vez de leerlo del registro.
+ */
+export const cerradoPorMantenimiento = (sistemaId) => SISTEMA[sistemaId]?.cerrado ?? null;
+
+/**
  * La advertencia que viaja con cualquier respuesta que toque más de un sistema.
  *
  * Se escribe una vez y se cita en las instrucciones del modelo y en las

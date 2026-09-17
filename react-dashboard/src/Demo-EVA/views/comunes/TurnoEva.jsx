@@ -52,7 +52,7 @@ import { fetchHealth } from "@/lib/iconics";
 import { useEsSimulado } from "@/lib/datasource";
 import { useTheme } from "@/theme";
 import { turnoEnCurso } from "@shared/periodo.js";
-import { SISTEMA_IDS } from "@shared/eva/comun/sistemas.js";
+import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
 
 import { LineaDeTiempo } from "../../components/LineaDeTiempo.jsx";
 import { ALARMAS_HISTORIZABLES, leerAlarmas } from "../../data/comunes/alarmas.js";
@@ -360,7 +360,11 @@ export default function TurnoEva() {
             se leen como relacionadas aunque nadie lo diga, y estas dos máquinas
             tienen PLC distinto y no comparten nada.
           */}
-          {SISTEMA_IDS.map((sistema) => (
+          {/* EN SERVICIO, no todos: la estación de llenado está cerrada (rama
+              `Vibraciones1.0`) y su carril saldría vacío para siempre, que se
+              lee como «no ha pasado nada» y no como «no se está mirando». Ver
+              `SISTEMAS_EN_SERVICIO` en `shared/eva/comun/sistemas.js`. */}
+          {SISTEMA_IDS_EN_SERVICIO.map((sistema) => (
             <div
               key={sistema}
               style={{

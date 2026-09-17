@@ -1,5 +1,18 @@
 /**
- * Vista «Alarmas» — dos pestañas, dos fuentes que no se pueden confundir.
+ * Vista «Alarmas» — dos fuentes que no se pueden confundir; hoy sólo una.
+ *
+ * ── UNA SOLA PESTAÑA MIENTRAS LA ESTACIÓN ESTÉ CERRADA ─────────────
+ *
+ * Rama `Vibraciones1.0`, 17-09-2026. «En vivo» y los chips de activo son de la
+ * ESTACIÓN DE LLENADO y sólo de ella —las ocho señales `naturaleza: "alarma"`
+ * del PLC_1, y los cuatro activos que agrupamos nosotros— así que se cierran
+ * con ella. Queda «Historial», que son eventos de GENESIS64 y valen para las
+ * dos máquinas; por eso esta vista sigue en `comunes/`.
+ *
+ * El código de las dos piezas se conserva entero, con su `eslint-disable` y su
+ * motivo: reabrir es devolver la pestaña a `Tabs` y la rama al ternario.
+ *
+ * Lo que sigue describe el diseño COMPLETO, que es el que vuelve al reabrir.
  *
  * ── LAS DOS PESTAÑAS SON DOS COSAS DISTINTAS, A PROPÓSITO ──────────
  *
@@ -103,7 +116,15 @@ function ChipVentana({ activo, onClick, t, children }) {
 /**
  * El chip de activo se comparte entre las dos pestañas —es el mismo filtro,
  * `activoFiltro`—, así que se declara una sola vez.
+ *
+ * ── CERRADO CON LA ESTACIÓN DE LLENADO (rama `Vibraciones1.0`) ──────
+ *
+ * Filtra por `ACTIVO_IDS` —Tanque, Bombeo, Distribución, Eléctrico—, que es
+ * una agrupación NUESTRA del tanque (`CLAUDE.md` §2.10) y no existe en el
+ * sistema de vibraciones. Se conserva entero en vez de comentarlo: son 14
+ * líneas, se lee mejor así, y reabrir es volver a llamarlo.
  */
+// eslint-disable-next-line no-unused-vars -- cerrado con la estación de llenado, ver arriba
 function ChipsActivo({ activoFiltro, onElegir, t, traducir, activoTexto }) {
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -403,6 +424,17 @@ function FilaAlarma({ senal, dark, t }) {
   );
 }
 
+/**
+ * ── CERRADO CON LA ESTACIÓN DE LLENADO (rama `Vibraciones1.0`) ──────
+ *
+ * Esta pestaña enseña las ocho señales `naturaleza: "alarma"` del PLC_1, y las
+ * lee por `useSistemaAgua()` — que además ABRÍA el sondeo del tanque, 52
+ * puntos cada 3 s, sólo por entrar en Alarmas.
+ *
+ * Se conserva entera: reabrir es devolver su pestaña a `Tabs` y su rama al
+ * ternario del componente principal.
+ */
+/* eslint-disable no-unused-vars -- cerrado, ver arriba */
 function EstadoAlarmasVivo({ activoFiltro, dark, t }) {
   const { t: traducir } = useTranslation("alarms");
   const { activo: activoTexto } = useDominio();
@@ -449,54 +481,70 @@ function EstadoAlarmasVivo({ activoFiltro, dark, t }) {
     </>
   );
 }
+/* eslint-enable no-unused-vars */
 
 export default function AlarmasEva({ params, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("alarms");
-  const { activo: activoTexto } = useDominio();
-  const { theme: t, dark } = useTheme();
-  const [tab, setTab] = useState(params?.tab === "vivo" ? "vivo" : "historial");
+  /* `activoTexto` y `dark` los usaban los chips y la pestaña «En vivo»,
+     cerradas con la estación de llenado. Vuelven al reabrir. */
+  const { theme: t } = useTheme();
+  /*
+   * `tab` ya no es estado: con «En vivo» cerrada sólo queda «Historial», y una
+   * variable que sólo puede valer una cosa se lee como si pudiera valer otra.
+   * Vuelve a ser `useState` al reabrir.
+   *
+   * `?tab=vivo` en la URL deja de tener efecto — no revienta, cae en la única
+   * pestaña que hay, que es lo correcto para un enlace viejo guardado en
+   * favoritos.
+   */
   const [activoFiltro, setActivoFiltro] = useState(params?.activo ?? "");
 
   // Un enlace nuevo (badge de otro activo, o volver atrás en el navegador)
   // llega como un rerender con `params` distintos, no como un montaje nuevo
   // — mismo criterio que el rango de `DetalleActivo`.
   useEffect(() => {
-    if (params?.tab === "vivo") setTab("vivo");
     if (params?.activo) setActivoFiltro(params.activo);
-  }, [params?.tab, params?.activo]);
+  }, [params?.activo]);
 
-  const cambiarTab = (siguiente) => {
-    setTab(siguiente);
-    onNavigate?.("eva-alarmas", activoFiltro ? { tab: siguiente, activo: activoFiltro } : { tab: siguiente });
+  const cambiarTab = () => {
+    onNavigate?.("eva-alarmas", activoFiltro ? { tab: "historial", activo: activoFiltro } : { tab: "historial" });
   };
 
-  const elegirActivo = (id) => {
-    setActivoFiltro(id);
-    onNavigate?.("eva-alarmas", id ? { tab, activo: id } : { tab });
-  };
+  /* Lo llamaban los chips de activo, cerrados con la estación de llenado:
+   * const elegirActivo = (id) => {
+   *   setActivoFiltro(id);
+   *   onNavigate?.("eva-alarmas", id ? { tab, activo: id } : { tab });
+   * };
+   */
 
   return (
     <>
       <SectionLabel sub={traducir("alarms:sub")}>Alarmas</SectionLabel>
 
+      {/*
+        ── LA PESTAÑA «EN VIVO» Y LOS CHIPS, CERRADOS ───────────────────
+        Rama `Vibraciones1.0`. Las dos piezas son de la ESTACIÓN DE LLENADO y
+        sólo de ella: «En vivo» enseña las ocho señales `naturaleza: "alarma"`
+        del PLC_1 (vía `useSistemaAgua`, que además abría su sondeo), y los
+        chips filtran por sus cuatro activos —Tanque, Bombeo, Distribución,
+        Eléctrico—, que no existen en el sistema de vibraciones.
+
+        «Historial» se queda: `/api/iconics/alarms` son eventos de GENESIS64 y
+        valen para las dos máquinas (por eso esta vista vive en `comunes/`).
+
+        Para reabrir: devolver el segundo `item` de `Tabs`, el `ChipsActivo` y
+        la rama `EstadoAlarmasVivo` del ternario de abajo.
+      */}
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 16 }}>
         <Tabs
-          items={[
-            { key: "historial", label: traducir("alarms:tabs.historial") },
-            { key: "vivo", label: traducir("alarms:tabs.vivo") },
-          ]}
-          value={tab}
+          items={[{ key: "historial", label: traducir("alarms:tabs.historial") }]}
+          value="historial"
           onChange={cambiarTab}
         />
-        <ChipsActivo activoFiltro={activoFiltro} onElegir={elegirActivo} t={t} traducir={traducir} activoTexto={activoTexto} />
       </div>
 
-      {tab === "historial" ? (
-        <HistorialAlarmas activoFiltro={activoFiltro} t={t} />
-      ) : (
-        <EstadoAlarmasVivo activoFiltro={activoFiltro} dark={dark} t={t} />
-      )}
+      <HistorialAlarmas activoFiltro={activoFiltro} t={t} />
     </>
   );
 }
