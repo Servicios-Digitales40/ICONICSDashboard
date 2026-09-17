@@ -52,6 +52,7 @@ import { fieldStyle } from "@/components/ui/Input.jsx";
 import { archivarCaso, listarCasos } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
+import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
 
 import { MONO, SANS } from "../../components/base.jsx";
 
@@ -259,7 +260,7 @@ export default function CasosRag({ params, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "navigation", "common", "errors"]);
   const { theme: t } = useTheme();
-  const [estado, setEstado] = useState({ loading: true, error: null, casos: [] });
+  const [estado, setEstado] = useState({ loading: true, error: null, casos: [], ocultos: 0 });
 
   /**
    * `"activos"` (por defecto) · `"archivados"` · `"todos"`.
@@ -311,7 +312,34 @@ export default function CasosRag({ params, onNavigate }) {
     setEstado((e) => ({ ...e, loading: true, error: null }));
     try {
       const data = await listarCasos({ signal });
-      setEstado({ loading: false, error: null, casos: data.casos ?? [] });
+      /*
+       * ── SÓLO LOS DE MÁQUINAS EN SERVICIO (rama `Vibraciones1.0`) ────
+       *
+       * La bitácora tiene 13 casos y NINGUNO es de vibraciones: once con
+       * `sistema: "tanque"` y dos con `"grupo de bombeo"` —un id que ya no
+       * existe, de antes de que el registro de sistemas se cerrara—. Con la
+       * estación de llenado cerrada, enseñarlos sería llenar la pantalla de una
+       * máquina que el tablero no está mirando.
+       *
+       * Se filtra AQUÍ y no en `visibles` a propósito: los contadores de
+       * «activos/archivados» y el mensaje de vacío se calculan sobre
+       * `estado.casos`, así que filtrar más abajo dejaría «11 activos» junto a
+       * una lista vacía — el descuadre clásico de filtrar en la capa de
+       * pintado y no en la de datos.
+       *
+       * Los casos NO se borran ni se archivan: siguen en el JSONL y el índice
+       * del asistente los sigue usando. Lo que cambia es qué se enseña.
+       *
+       * Un caso sin `sistema` se conserva: es de la planta entera, no de una
+       * máquina cerrada.
+       *
+       * Para reabrir: quitar este filtro.
+       */
+      const todos = data.casos ?? [];
+      const casos = todos.filter(
+        (c) => !c.sistema || SISTEMA_IDS_EN_SERVICIO.includes(c.sistema)
+      );
+      setEstado({ loading: false, error: null, casos, ocultos: todos.length - casos.length });
     } catch (e) {
       if (e.name === "AbortError") return;
       /*
@@ -319,7 +347,7 @@ export default function CasosRag({ params, onNavigate }) {
        * `codigo` que manda el puente y con él la única forma de traducir el fallo.
        * Quien lo pinta pasa por `useMensajeDeError`.
        */
-      setEstado({ loading: false, error: e, casos: [] });
+      setEstado({ loading: false, error: e, casos: [], ocultos: 0 });
     }
   }, []);
 
@@ -457,9 +485,19 @@ export default function CasosRag({ params, onNavigate }) {
               fontSize: 13, color: t.textSoft, maxWidth: "68ch",
             }}
           >
-            {traducir(estado.casos.length === 0
-              ? "assistant:rag.cases.empty"
-              : "assistant:rag.cases.noMatch")}
+            {/*
+              ── EL VACÍO TIENE QUE DECIR POR QUÉ (§2.4) ──────────────────
+              Con la estación de llenado cerrada, la bitácora tiene 13 casos y
+              ninguno visible. «No hay casos cerrados» sería FALSO: hay trece,
+              de una máquina que no se está mirando. `emptyOcultos` lo dice y
+              nombra lo que de verdad falta —cerrar el primer diagnóstico de
+              vibraciones—, que es uno de los objetivos de esta rama.
+            */}
+            {estado.casos.length === 0 && estado.ocultos > 0
+              ? traducir("assistant:rag.cases.emptyOcultos", { count: estado.ocultos })
+              : traducir(estado.casos.length === 0
+                ? "assistant:rag.cases.empty"
+                : "assistant:rag.cases.noMatch")}
           </div>
         ) : (
           <div>

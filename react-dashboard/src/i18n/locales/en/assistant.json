@@ -56,6 +56,8 @@
       "searchPlaceholder": "Search by symptom, cause or risk…",
       "loading": "Reading the logbook…",
       "empty": "No intervention has been recorded yet. They fill themselves in when a diagnosis is closed from Risks, or when a repair is described to the assistant by voice or chat.",
+      "emptyOcultos_one": "No intervention has been recorded yet for the vibration system. There is {{count}} case from the filling station, which is closed for maintenance: it is still on file and not shown here. This logbook fills up when a diagnosis is closed from Risks, or when a repair is described to the assistant.",
+      "emptyOcultos_other": "No intervention has been recorded yet for the vibration system. There are {{count}} cases from the filling station, which is closed for maintenance: they are still on file and not shown here. This logbook fills up when a diagnosis is closed from Risks, or when a repair is described to the assistant.",
       "noMatch": "No case matches this filter.",
       "footnote": "Archiving does not delete: the case stays on file with its text and date intact, and stops counting as backing in diagnoses. It can be restored at any time.",
       "chip": {

@@ -56,6 +56,8 @@
       "searchPlaceholder": "Buscar por síntoma, causa o riesgo…",
       "loading": "Leyendo la bitácora…",
       "empty": "Todavía no hay ninguna intervención registrada. Se llenan solas al cerrar un diagnóstico desde Riesgos, o contándole una reparación al asistente por voz o por chat.",
+      "emptyOcultos_one": "Todavía no hay ninguna intervención registrada en el sistema de vibraciones. Hay {{count}} caso de la estación de llenado, que está cerrada por mantenimiento: sigue guardado y no se muestra aquí. Esta bitácora se llena al cerrar un diagnóstico desde Riesgos, o contándole una reparación al asistente.",
+      "emptyOcultos_other": "Todavía no hay ninguna intervención registrada en el sistema de vibraciones. Hay {{count}} casos de la estación de llenado, que está cerrada por mantenimiento: siguen guardados y no se muestran aquí. Esta bitácora se llena al cerrar un diagnóstico desde Riesgos, o contándole una reparación al asistente.",
       "noMatch": "Ningún caso encaja con este filtro.",
       "footnote": "Archivar no borra: el caso queda en el archivo con su texto y su fecha intactos, y deja de contar como respaldo en los diagnósticos. Se puede devolver cuando se quiera.",
       "chip": {
