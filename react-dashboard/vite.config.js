@@ -248,5 +248,63 @@ export default defineConfig({
     // Rellena ResizeObserver y matchMedia, que jsdom no trae y Recharts sí
     // usa. Es inocuo en las pruebas de node: comprueba antes de definir.
     setupFiles: ["./src/test/setup.js"],
+
+    /*
+     * ── POR QUÉ SE LIMITA EL PARALELISMO (17-09-2026) ──────────────────
+     *
+     * Porque sin esto la suite fallaba de forma INTERMITENTE, y el modo de
+     * fallo despistaba: las pruebas que caían CAMBIABAN DE NOMBRE en cada
+     * tanda —`accesibilidad`, `selector-rango`, `planta-simulada`,
+     * `detalle-exportar`, `grafica-comparada`—, todas pasaban al correrlas
+     * solas, y la carpeta entera pasaba. Parecía una fuga de estado entre
+     * archivos.
+     *
+     * No lo era. Los cuatro fallos de una tanda capturada eran, los cuatro,
+     * `Test timed out in 5000ms` — ningún aserto falso, ninguna prueba
+     * mintiendo: pruebas que no terminaban a tiempo.
+     *
+     * Las medidas:
+     *
+     *   · 16 núcleos → vitest lanza ~15 workers, cada uno con su jsdom y su
+     *     propio grafo de imports (Recharts, i18n, el tema).
+     *   · `import 533.96s` sobre 118 s de reloj: los workers pasaban más
+     *     tiempo importando que ejecutando.
+     *   · La prueba que más cae —«los cuatro accesos» de `selector-rango`—
+     *     tarda 1 348 ms AISLADA. Contra el `testTimeout` por defecto de
+     *     5 000 ms, el margen es 3,7×, y basta la contención de quince
+     *     workers para comérselo.
+     *   · Las cinco que fallan montan vistas pesadas (Recharts). Las 972
+     *     restantes, no.
+     *   · `--no-file-parallelism`: verde. Paralelo por defecto: rojo en 2 de
+     *     4 tandas.
+     *
+     * ── POR QUÉ NO SE SUBE `testTimeout` ──────────────────────────────
+     *
+     * Sería tratar el síntoma. El techo de 5 s no está mal: una prueba de
+     * componente que tarde más es una prueba que hay que mirar, y subirlo a
+     * 15 s escondería una regresión de rendimiento real el día que la haya.
+     * Lo que estaba mal era pedirle a la máquina quince veces más trabajo
+     * simultáneo del que puede hacer sin que las esperas se disparen.
+     *
+     * ── POR QUÉ 4 Y NO 1 ──────────────────────────────────────────────
+     *
+     * Serie entera son ~4 min; con cuatro workers la suite sigue sobre los
+     * 2 min y queda margen de sobra sobre el timeout. Uno solo pagaría el
+     * doble de tiempo para resolver un problema que cuatro ya resuelven.
+     *
+     * Si algún día la suite vuelve a ponerse intermitente, lo PRIMERO que hay
+     * que mirar es si los fallos son `timed out` (entonces es esto otra vez,
+     * y el número de aquí) o asertos de verdad (entonces sí es el código).
+     *
+     * ── `maxWorkers`, NO `poolOptions` ────────────────────────────────
+     *
+     * Vitest 4 ELIMINÓ `poolOptions`: las opciones del pool subieron al nivel
+     * de `test`. Escrito como `poolOptions.forks.maxForks` —la forma de
+     * vitest 3— la configuración se ignora en silencio salvo por una línea
+     * `DEPRECATED` en la salida, y la suite sigue lanzando quince workers. Se
+     * midió: con esa forma, cuatro tandas seguidas fallaron y la duración no
+     * se movió de 115 s, que fue lo que delató que no se estaba aplicando.
+     */
+    maxWorkers: 4,
   },
 });

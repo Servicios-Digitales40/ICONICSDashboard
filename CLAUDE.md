@@ -284,6 +284,27 @@ npm test              # vitest — dominio, componentes, hooks
 npm run design:detect  # impeccable — antipatrones de diseño/CSS
 npm run build           # confirma que el bundle sigue compilando
 ```
+> **La suite corre con `maxWorkers: 4`, y es deliberado** (17-09-2026,
+> `vite.config.js`). Sin ese tope la suite fallaba de forma intermitente —2 de
+> cada 4 tandas— y el modo de fallo despistaba: las pruebas que caían cambiaban
+> de nombre en cada tanda, todas pasaban al correrlas solas y la carpeta entera
+> pasaba. Parecía fuga de estado entre archivos.
+>
+> No lo era: los fallos eran, todos, `Test timed out in 5000ms`. Ningún aserto
+> falso. En 16 núcleos vitest lanzaba ~15 workers con su jsdom y su grafo de
+> imports cada uno; `import` marcaba 534 s sobre 118 s de reloj. La prueba que
+> más caía tarda **1 348 ms aislada** contra un techo de 5 s: 3,7× de margen,
+> que la contención se come. Con el tope: `import` 60-88 s y **4 de 4 tandas en
+> verde**.
+>
+> No se subió `testTimeout`: eso trata el síntoma y escondería una regresión de
+> rendimiento real el día que la haya.
+>
+> **Si la suite vuelve a ponerse intermitente, mira primero SI los fallos dicen
+> `timed out`** (entonces es contención — este número) **o son asertos**
+> (entonces sí es el código). Ojo además con la forma: vitest 4 eliminó
+> `poolOptions`, y escrito a la manera de vitest 3 se ignora en silencio salvo
+> por una línea `DEPRECATED` — se perdió una vuelta entera por eso.
 
 **Backend** (`backend/`):
 ```bash
