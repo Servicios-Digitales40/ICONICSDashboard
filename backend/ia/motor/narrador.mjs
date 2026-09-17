@@ -104,14 +104,47 @@ export function instruccionDeNarracion(comoRedactar, { idioma = 'es' } = {}) {
         'Do not tell anyone to operate the plant — say what is happening and what is worth ' +
         'looking at, never "switch this off" or "open that valve". ' +
         'Never present the conclusion as yours: it was computed before you were called. Say what ' +
-        'the diagnosis says, not what you think.'
+        'the diagnosis says, not what you think. ' +
+        /* El porqué, medido, está en la rama española de abajo. */
+        'Start with what is happening in the plant, never with the state of the diagnostic ' +
+        'system. Unless `fuentesCaidas` names something, do NOT mention sources, lookups or ' +
+        'limitations: saying you could not consult the manuals or the past cases when that list ' +
+        'is empty is false.'
       : 'Escribe UN párrafo corto, de cuatro frases como mucho, para un técnico de planta que ' +
         'acaba de abrir el tablero y no te ha preguntado nada. No saludes, no te presentes, no ' +
         'ofrezcas más ayuda y no hagas preguntas: no hay nadie hablando contigo. ' +
         'No mandes accionar la planta — di qué está pasando y qué conviene mirar, nunca «apaga ' +
         'esto» ni «abre aquella válvula». ' +
         'Nunca presentes la conclusión como tuya: ya estaba calculada antes de llamarte. Di lo ' +
-        'que dice el diagnóstico, no lo que te parece a ti.'
+        'que dice el diagnóstico, no lo que te parece a ti. ' +
+        /*
+         * ── MEDIDO EL 17-09-2026: 6/6 ABRÍAN CON UNA AVERÍA FALSA ────
+         *
+         * Sin esta frase, el 4B abría SIEMPRE así —seis de seis, con el
+         * mensaje exacto de este narrador sobre `posible-fuga`—:
+         *
+         *   «No pude consultar los manuales ni los casos previos…»
+         *
+         * Falso: `fuentesCaidas` venía vacío y la primera causa citaba dos
+         * fragmentos de manual. El modelo se contradecía dos frases después.
+         *
+         * La causa es de ESTE bloque, no del `comoRedactar`. Se midió: el
+         * mismo cuerpo de datos con el `comoRedactar` SOLO da 0/6; añadiendo
+         * estas reglas de forma, 6/6. Pedir «un párrafo corto» empuja al
+         * modelo a abrir con una frase de contexto, y la más disponible en el
+         * prompt es justamente el EJEMPLO de cómo narrar una fuente caída que
+         * el `comoRedactar` lleva dentro («no pude consultar los manuales, así
+         * que esto se apoya sólo en…»). El modelo copia la plantilla que tiene
+         * más a mano.
+         *
+         * Por eso el arreglo dice con qué EMPEZAR, en vez de sólo prohibir: un
+         * hueco que el modelo tiene que rellenar lo rellena con lo que ve, y
+         * dejarlo abierto ya costó el «3 casos previos» del 03-09.
+         */
+        'Empieza por lo que está pasando en la planta, nunca por el estado del sistema de ' +
+        'diagnóstico. Salvo que `fuentesCaidas` traiga algún nombre, NO menciones fuentes, ' +
+        'consultas ni limitaciones: decir que no pudiste consultar los manuales o los casos ' +
+        'cuando esa lista está vacía es falso.'
 
   /*
    * El `comoRedactar` del motor va PRIMERO y el añadido después, no al revés:

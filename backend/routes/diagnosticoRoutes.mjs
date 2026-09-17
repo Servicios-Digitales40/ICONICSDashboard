@@ -231,6 +231,15 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDia
         ok: true,
         ...resultado,
         /*
+         * `fuentesCaidas` la calcula la HERRAMIENTA a partir de
+         * `estadoFuentes`, no el motor, así que `...resultado` no la trae y
+         * la respuesta salía con `fuentesCaidas: undefined` — medido el
+         * 17-09-2026. Quien consuma esto no podía distinguir «ninguna fuente
+         * se cayó» de «esta versión no lo sabe», que es justo la distinción
+         * que §2.4 exige. Se toma de `paraNarrar`, que es quien la calculó.
+         */
+        fuentesCaidas: paraNarrar?.fuentesCaidas ?? [],
+        /*
          * La narración va en su propio campo y NO fusionada con el resultado:
          * quien consuma esto tiene que poder distinguir lo que calculó el motor
          * de lo que escribió el modelo. Mezclarlos haría imposible auditar cuál

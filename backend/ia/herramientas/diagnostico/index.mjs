@@ -169,12 +169,32 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
         ok: true,
         sistema: resultado.sistema,
         riesgoId: resultado.riesgoId,
-        // Sólo viaja cuando NO está completo: igual que `conflicto`, «nada que
-        // decir no se dice» — un `estado: "completo"` en cada respuesta sería
-        // ruido que el modelo acabaría narrando.
-        ...(resultado.estado !== 'completo'
-          ? { estado: resultado.estado, fuentesCaidas: caidas }
-          : {}),
+        /*
+         * ── EL CAMPO VIAJA SIEMPRE DESDE EL 17-09-2026 ─────────────────
+         *
+         * Aquí ponía «sólo viaja cuando NO está completo … un
+         * `estado: "completo"` en cada respuesta sería ruido que el modelo
+         * acabaría narrando», y la medida contra el modelo real dice lo
+         * contrario: es la AUSENCIA la que se narra mal.
+         *
+         * Medido con `qwen-3.5-4B` sobre `posible-fuga` (`estado: "completo"`,
+         * `manual: 1` en la primera causa). Sin el campo, el modelo abrió con
+         * «No pude consultar los manuales ni los casos previos» — falso, y
+         * además se contradijo dos frases después citando ese mismo manual.
+         *
+         * Se intentó primero arreglarlo SÓLO en la instrucción, añadiendo la
+         * frase positiva. No bastó: se repitió palabra por palabra. El
+         * `comoRedactar` son ~3 000 caracteres y esa cláusula cae al 74% del
+         * bloque; un 4B no lo sigue entero. **Una instrucción que compite con
+         * otras veinte no se obedece; un campo en los datos, sí** — es la misma
+         * lección que `casosCitados`, que tampoco se resolvió sólo con prosa.
+         *
+         * Así que el hecho va donde el modelo no puede perderlo: en el objeto.
+         * `fuentesCaidas: []` dice «ninguna se cayó» de forma explícita, en vez
+         * de dejar que lo deduzca de un campo que no está.
+         */
+        estado: resultado.estado,
+        fuentesCaidas: caidas,
         // Plan 17 Fase 4 (G9): sólo viaja cuando es `true` — igual que
         // `manualCitado`/`casosCitados` vacíos, "nada que decir" no se dice.
         ...(resultado.conflicto ? { conflicto: true } : {}),
@@ -258,8 +278,36 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
           'con naturalidad y sin alarmismo — "no pude consultar los manuales, así que esto se ' +
           'apoya sólo en los datos y en los casos previos". Con `estado: "insuficiente"` no ' +
           'contestó NINGUNA: ahí el orden de las causas no significa nada más que el orden en que ' +
-          'están escritas, así que NO presentes una como la más probable. Si NO viene `estado`, ' +
-          'todo funcionó y no hay nada que mencionar. ' +
+          'están escritas, así que NO presentes una como la más probable. ' +
+          /*
+           * ── MEDIDO EL 17-09-2026: EL PESIMISMO INVENTADO ─────────────
+           *
+           * Aquí ponía sólo «Si NO viene `estado`, todo funcionó y no hay nada
+           * que mencionar», y NO bastó. Primera narración contra el modelo real
+           * (`qwen-3.5-4B`, riesgo `posible-fuga`, `estado: "completo"` y
+           * `manual: 1` en la primera causa), y empezó así:
+           *
+           *   «No pude consultar los manuales ni los casos previos, así que
+           *    este diagnóstico se apoya solo en los datos…»
+           *
+           * Falso. Las tres fuentes contestaron; lo que pasó es que dos
+           * devolvieron 0 puntos. El modelo leyó «respaldo 0» y escribió
+           * «fuente caída», que son cosas distintas —`sin_respaldo` NO es
+           * `caida`, y el motor las distingue desde el Plan 28 F3—.
+           *
+           * Es el MISMO defecto que el «3 casos previos» del 03-09, en la
+           * dirección contraria: allí el modelo rellenó un hueco inventando
+           * respaldo, aquí lo rellena inventando una avería. La lección se
+           * repite: una instrucción que sólo dice «no menciones X» deja al
+           * modelo deducir X por su cuenta; hay que darle la frase POSITIVA
+           * que debe creer.
+           *
+           * Y es más grave en un aviso que en el chat: le dice al técnico que
+           * el sistema está medio roto cuando está entero.
+           */
+          'Con `fuentesCaidas: []` NO se cayó ninguna fuente: NO digas que no pudiste consultar ' +
+          'los manuales ni los casos. Un `respaldo` en 0 significa que se consultó y no había nada ' +
+          'para esa causa, no que fallara. ' +
           'Más adelante en la conversación, cuando el técnico cuente qué encontró o qué hizo para ' +
           'resolver ESTE riesgo —no antes, y no lo fuerces si sigue hablando de otra cosa—, usa ' +
           'cerrar_diagnostico (no registrar_intervencion) con este mismo `riesgoId`: si la causa ' +

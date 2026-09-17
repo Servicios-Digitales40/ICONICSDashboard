@@ -26,6 +26,7 @@
 import { createServer } from 'node:http'
 
 import { crearNarrador, instruccionDeNarracion } from '../backend/ia/motor/narrador.mjs'
+import { crearHerramientasDeDiagnostico } from '../backend/ia/herramientas/diagnostico/index.mjs'
 import { loadConfig } from '../backend/config.mjs'
 
 const c = {
@@ -276,6 +277,98 @@ await check('la instrucción existe en los dos idiomas, y NO mezcla', () => {
   if (!/No saludes/i.test(es)) throw new Error('el español no es español')
   if (!/Do not greet/i.test(en)) throw new Error('el inglés no es inglés')
   if (/No saludes/i.test(en)) throw new Error('el inglés arrastra español')
+})
+
+console.log(`\n${c.negrita}── Lo que el modelo NO puede deducir por su cuenta ─────────${c.reset}`)
+
+await check('un diagnóstico completo NO se puede narrar como si faltaran fuentes', async () => {
+  /*
+   * ── EL DEFECTO MEDIDO EL 17-09-2026 ─────────────────────────────────
+   *
+   * Primera narración de este proyecto contra el modelo real: con
+   * `estado: "completo"` y `manual: 1`, el 4B escribió «No pude consultar los
+   * manuales ni los casos previos». Falso — las tres fuentes contestaron; dos
+   * devolvieron 0 PUNTOS, que no es lo mismo que estar caídas.
+   *
+   * Es el mismo patrón que el «3 casos previos» del 03-09 en la dirección
+   * contraria: allí inventó respaldo, aquí inventó una avería. Y en un aviso
+   * es peor, porque le dice al técnico que el sistema está roto cuando está
+   * entero.
+   *
+   * Lo que se puede comprobar sin el modelo real es que la instrucción ya no
+   * se apoya sólo en la AUSENCIA de `estado` —que fue lo que no bastó— sino
+   * que afirma lo positivo y desmonta la confusión concreta.
+   *
+   * Se pide el `comoRedactar` de VERDAD a la herramienta, no el `'BASE'` de
+   * relleno de las otras comprobaciones: la cláusula vive ahí, y afirmarlo
+   * sobre un texto inventado no probaría nada del sistema real.
+   */
+  const { diagnosticar_falla } = crearHerramientasDeDiagnostico({
+    motorDiagnostico: {
+      diagnosticar: async () => ({
+        sistema: 'tanque', riesgoId: 'posible-fuga',
+        huerfano: false, conflicto: false, estado: 'completo',
+        estadoFuentes: { manual: 'consultada', casos: 'sin_respaldo', temporal: 'sin_respaldo' },
+        causas: [{
+          id: 'fuga-red', titulo: 'Fuga', componente: null, banda: 'medio',
+          respaldo: { datos: 3, manual: 0, casos: 0, temporal: 0, total: 3 },
+          origen: 'x', manualCitado: [], casosCitados: [],
+          evidenciaAFavor: [], evidenciaEnContra: [],
+        }],
+      }),
+    },
+  })
+  const resultado = await diagnosticar_falla({ sistema: 'tanque', riesgoId: 'posible-fuga' })
+
+  /*
+   * El campo viaja SIEMPRE desde el 17-09-2026, también cuando está completo.
+   * Antes se omitía —«nada que decir no se dice»— y era la ausencia la que el
+   * modelo narraba mal: no puede afirmar «ninguna se cayó» sobre un campo que
+   * no ve.
+   */
+  if (resultado.estado !== 'completo') throw new Error('debería venir `estado: "completo"`')
+  if (!Array.isArray(resultado.fuentesCaidas) || resultado.fuentesCaidas.length !== 0) {
+    throw new Error('debería venir `fuentesCaidas: []`, explícito y vacío')
+  }
+
+  const texto = instruccionDeNarracion(resultado.comoRedactar)
+
+  /*
+   * ── LO QUE DE VERDAD LO ARREGLÓ ─────────────────────────────────────
+   *
+   * La cláusula en `comoRedactar` NO bastó: con el mensaje exacto del
+   * narrador, 6 de 6 narraciones seguían abriendo con la avería inventada. La
+   * causa estaba en el bloque PROPIO del narrador —el de la forma—, que al
+   * pedir «un párrafo corto» empujaba al modelo a abrir con una frase de
+   * contexto, y la plantilla más a mano en el prompt era el ejemplo de cómo
+   * narrar una fuente caída. Con la frase de abajo: 0 de 6.
+   *
+   * Por eso se comprueba aquí y no en `comoRedactar`: es donde está el
+   * arreglo medido.
+   */
+  if (!/Empieza por lo que está pasando en la planta/i.test(texto)) {
+    throw new Error('no dice por dónde EMPEZAR; prohibir sin dar alternativa no bastó (6/6 fallaban)')
+  }
+  if (!/NO menciones fuentes, consultas ni limitaciones/i.test(texto)) {
+    throw new Error('no prohíbe hablar del sistema de diagnóstico cuando no hay nada caído')
+  }
+  if (!/fuentesCaidas/.test(texto)) {
+    throw new Error('no dice cuál es la ÚNICA señal válida de que algo falló')
+  }
+  /* Y la cláusula de la herramienta sigue estando, que es la otra mitad. */
+  if (!/Un `respaldo` en 0 significa que se consultó/i.test(texto)) {
+    throw new Error('no distingue «respaldo 0» de «fuente caída»')
+  }
+})
+
+await check('la prohibición existe en los DOS idiomas', () => {
+  const en = instruccionDeNarracion('BASE', { idioma: 'en' })
+  if (!/Start with what is happening in the plant/i.test(en)) {
+    throw new Error('el inglés no lleva el arreglo del 17-09')
+  }
+  if (!/do NOT mention sources, lookups or limitations/i.test(en)) {
+    throw new Error('el inglés no prohíbe hablar de las fuentes')
+  }
 })
 
 await check('la forma va DESPUÉS de la verdad: si se contradicen, gana la forma', () => {
