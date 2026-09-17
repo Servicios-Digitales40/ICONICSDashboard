@@ -50,9 +50,11 @@ import { useTheme } from "@/theme";
 import { hallazgoDeCaso, hallazgoDeRiesgo, ordenarHallazgos } from "@shared/eva/comun/hallazgos.js";
 import { obtenerDiagnostico } from "@/lib/api/casosApi.js";
 
-import { useSistemaAgua } from "../../data/comunes/hooks.js";
+/* Cerrados con la estación de llenado (rama `Vibraciones1.0`) — ver el bloque
+   de `useConteoHallazgos` en el cuerpo del componente:
+   import { useSistemaAgua } from "../../data/comunes/hooks.js";
+   import { evaluarRiesgos } from "../../domain/riesgos.js"; */
 import { useVibracion } from "../../data/vibraciones/vibracion.js";
-import { evaluarRiesgos } from "../../domain/riesgos.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 const SEVERIDAD_TOKEN = {
@@ -214,21 +216,29 @@ function CausaMasRespaldada({ hallazgo, t, traducir }) {
 export default function BandejaEva({ onNavigate }) {
   const { theme: t } = useTheme();
   const { t: traducir } = useTranslation(["maintenance", "diagnostics", "common"]);
-  const { riesgo: traducirRiesgo, riesgoVibracion: traducirRiesgoVibracion } = useProsa();
+  /* `riesgo` (el del tanque) sale al reabrir la estación de llenado. */
+  const { riesgoVibracion: traducirRiesgoVibracion } = useProsa();
   const { sistema: nombreSistema } = useDominio();
 
   const [descartados, setDescartados] = useState(() => vistoPorMi.leer());
 
-  const { sistema: sistemaTanque } = useSistemaAgua();
+  /*
+   * ── SÓLO VIBRACIONES (rama `Vibraciones1.0`, 17-09-2026) ───────────
+   *
+   * Con la estación de llenado cerrada, sus hallazgos serían pendientes de una
+   * máquina que nadie va a mirar. Y no es sólo ruido visual: cada riesgo
+   * activo cuesta una llamada a `/api/diagnostico` al abrir esta vista.
+   *
+   * Para reabrir: devolver `useSistemaAgua()`, su `evaluarRiesgos`, el
+   * `useDiagnosticoDeRiesgosActivos("tanque", …)` y su `agregar(...)` de abajo.
+   */
   const { canales, variador, alarmas } = useVibracion();
 
-  const { activos: activosTanque } = useMemo(() => evaluarRiesgos(sistemaTanque), [sistemaTanque]);
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
     [canales, variador, alarmas]
   );
 
-  const diagnosticoTanque = useDiagnosticoDeRiesgosActivos("tanque", activosTanque);
   const diagnosticoVibracion = useDiagnosticoDeRiesgosActivos("vibraciones", activosVibracion);
 
   const hallazgos = useMemo(() => {
@@ -256,11 +266,12 @@ export default function BandejaEva({ onNavigate }) {
       }
     };
 
-    agregar("tanque", activosTanque, traducirRiesgo, diagnosticoTanque);
+    /* La estación de llenado, cerrada — ver el bloque de arriba:
+       agregar("tanque", activosTanque, traducirRiesgo, diagnosticoTanque); */
     agregar("vibraciones", activosVibracion, traducirRiesgoVibracion, diagnosticoVibracion);
 
     return ordenarHallazgos(salida);
-  }, [activosTanque, activosVibracion, diagnosticoTanque, diagnosticoVibracion, traducirRiesgo, traducirRiesgoVibracion]);
+  }, [activosVibracion, diagnosticoVibracion, traducirRiesgoVibracion]);
 
   const visibles = hallazgos.filter((h) => !descartados.has(h.id));
 

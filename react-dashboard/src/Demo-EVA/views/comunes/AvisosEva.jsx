@@ -55,9 +55,11 @@ import { useTheme } from "@/theme";
 import { obtenerDiagnosticoNarrado } from "@/lib/api/casosApi.js";
 import { ESTADO_AVISO, marcarVisto, reconciliarAvisos } from "@shared/eva/comun/avisos.js";
 
-import { useSistemaAgua } from "../../data/comunes/hooks.js";
+/* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
+   import { useSistemaAgua } from "../../data/comunes/hooks.js"; */
 import { useVibracion } from "../../data/vibraciones/vibracion.js";
-import { evaluarRiesgos } from "../../domain/riesgos.js";
+/* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
+   import { evaluarRiesgos } from "../../domain/riesgos.js"; */
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 const SEVERIDAD_TOKEN = {
@@ -412,21 +414,26 @@ export default function AvisosEva({ onNavigate }) {
   const { riesgo: traducirRiesgo, riesgoVibracion: traducirRiesgoVibracion, causa: traducirCausa } = useProsa();
   const { sistema: nombreSistema } = useDominio();
 
-  const { sistema: sistemaTanque } = useSistemaAgua();
+  /*
+   * ── SÓLO VIBRACIONES (rama `Vibraciones1.0`, 17-09-2026) ───────────
+   *
+   * Con la estación de llenado cerrada por mantenimiento, avisar de sus
+   * riesgos sería avisar de una máquina que nadie está mirando — y cada aviso
+   * cuesta una llamada al modelo de 30-90 s, así que el coste no es teórico.
+   *
+   * Para reabrir: devolver `useSistemaAgua()`, su `evaluarRiesgos` y la
+   * entrada `tanque` de `riesgosPorSistema`.
+   */
   const { canales, variador, alarmas } = useVibracion();
 
-  const { activos: activosTanque } = useMemo(() => evaluarRiesgos(sistemaTanque), [sistemaTanque]);
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
     [canales, variador, alarmas]
   );
 
   const riesgosPorSistema = useMemo(
-    () => [
-      { sistema: "tanque", activos: activosTanque },
-      { sistema: "vibraciones", activos: activosVibracion },
-    ],
-    [activosTanque, activosVibracion]
+    () => [{ sistema: "vibraciones", activos: activosVibracion }],
+    [activosVibracion]
   );
 
   const idioma = i18n.language?.startsWith("en") ? "en" : "es";

@@ -11,7 +11,10 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useMediaQuery } from "@/lib/viewport.js";
 import { NAV } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/index.js";
-import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
+/* Cerrado con la estación de llenado (rama `Vibraciones1.0`): suscribirse aquí
+   arrancaba el sondeo del tanque en todas las pantallas. Ver el bloque de
+   `estadoPorId` más abajo.
+   import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js"; */
 import { useConteoHallazgos } from "@/Demo-EVA/data/comunes/hallazgos.js";
 import { estadoColor } from "@/Demo-EVA/components/paleta.js";
 import { RAIZ } from "@shared/eva/tanque/senales.js";
@@ -27,22 +30,26 @@ import { RAIZ } from "@shared/eva/tanque/senales.js";
  */
 const RAIZ_INSTALACION = RAIZ;
 
-/**
- * Estado de "Planta" para el punto de la barra: mismo criterio y mismos
- * tres estados que ya usa la tarjeta de Planta en el Inicio
- * (`InicioTanque.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más que
- * varios en aviso, y sin lectura no hay punto que pintar. Vive aquí y no
- * como import compartido porque son cuatro líneas y las dos vistas ya
- * evalúan `sistema.resumen` de formas ligeramente distintas (aquí no hace
- * falta el texto, sólo el estado).
+/*
+ * Estado de "Planta" para el punto de la barra — CERRADO con la estación de
+ * llenado (rama `Vibraciones1.0`). Se conserva entero, comentado, porque
+ * reabrirlo es descomentar esto y su `useSistemaAgua()`.
+ *
+ * Mismo criterio y mismos tres estados que ya usa la tarjeta de Planta en el
+ * Inicio (`InicioTanque.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más
+ * que varios en aviso, y sin lectura no hay punto que pintar. Vive aquí y no
+ * como import compartido porque son cuatro líneas y las dos vistas ya evalúan
+ * `sistema.resumen` de formas ligeramente distintas (aquí no hace falta el
+ * texto, sólo el estado).
+ *
+ * function estadoPlanta(sistema) {
+ *   const { fueraDeLimite, enAviso, medidas } = sistema.resumen;
+ *   if (!medidas) return null;
+ *   if (fueraDeLimite > 0) return "critico";
+ *   if (enAviso > 0) return "atencion";
+ *   return "nominal";
+ * }
  */
-function estadoPlanta(sistema) {
-  const { fueraDeLimite, enAviso, medidas } = sistema.resumen;
-  if (!medidas) return null;
-  if (fueraDeLimite > 0) return "critico";
-  if (enAviso > 0) return "atencion";
-  return "nominal";
-}
 
 /**
  * La marca de la demo: una gota con su línea de nivel, no un rayo genérico.
@@ -338,8 +345,24 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
   // Fuente compartida por `EvaProvider` (App.jsx envuelve el Shell entero con
   // él) — mismo hook que usa cada vista, así que el punto de "Planta" no abre
   // un segundo motor de sondeo, sólo lee el que ya corre.
-  const { sistema } = useSistemaAgua();
-  const estadoPorId = { "eva-planta": estadoPlanta(sistema) };
+  /*
+   * ── EL PUNTO DE ESTADO DEL TANQUE, RETIRADO (Vibraciones1.0) ───────
+   *
+   * Sólo marcaba `eva-planta`, que ya no está en el menú (ver `routes.jsx`).
+   * Pero lo que importa no es el punto: era `useSistemaAgua()` **aquí**.
+   *
+   * `subscribeSistema` arranca el motor de sondeo por conteo de referencias
+   * (`evaSource.js`), y el sidebar está montado en TODAS las pantallas. Con
+   * esta línea, abrir cualquier vista de vibraciones seguía leyendo los 52
+   * puntos del tanque cada 3 s — el mismo defecto por el que se retiró el
+   * contador de alarmas del Topbar el 31-08.
+   *
+   * Es el motivo de que ocultar las rutas no baste para callar la red: la
+   * suscripción no vive en la vista, vive en el chrome.
+   *
+   * Para reabrir: devolver `useSistemaAgua()` y el `estadoPorId` de abajo.
+   */
+  const estadoPorId = {};
   /*
    * ── EL BADGE NO SONDEA (Plan 31 F1) ────────────────────────────────
    *

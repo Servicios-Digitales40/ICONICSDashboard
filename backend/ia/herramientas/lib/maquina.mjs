@@ -104,6 +104,46 @@ function resolverSistema(id) {
       sistemas: SISTEMAS.map((x) => ({ sistema: x.id, es: x.nombre })),
     })
   }
+
+  /*
+   * ── LA GUARDA DE «CERRADO POR MANTENIMIENTO» ───────────────────────
+   *
+   * Rama `Vibraciones1.0`, 17-09-2026. Una máquina cerrada se declara en
+   * `shared/eva/comun/sistemas.js` con `cerrado`, y aquí se NIEGA de verdad.
+   *
+   * ── POR QUÉ NO BASTABA DECÍRSELO EN EL PROMPT ──────────────────────
+   *
+   * Porque una instrucción compite con el resto del prompt y no siempre gana.
+   * Medido HOY, en este mismo proyecto: el narrador de avisos abría 6 de cada 6
+   * narraciones con «no pude consultar los manuales» a pesar de que su
+   * instrucción lo prohibía, porque la plantilla que tenía más a mano decía
+   * otra cosa. Con eso a la vista, dejar el cierre de una máquina en manos de
+   * una frase del prompt sería confiar en lo que acaba de fallar.
+   *
+   * Con la guarda, el peor caso es que el modelo intente leerla y reciba una
+   * negativa que explica qué pasa y qué ofrecer. Sin ella, el peor caso es que
+   * conteste con datos viejos del búfer como si fueran de ahora.
+   *
+   * Va en `resolverSistema` y no en cada herramienta porque es el cuello por
+   * el que pasan todas las de máquina: una guarda por herramienta se olvida en
+   * la siguiente, que es el mismo motivo por el que la guarda `autenticar` se
+   * aplica por ámbito y no ruta por ruta (`CLAUDE.md` §2.11).
+   */
+  if (s.cerrado) {
+    return fallo(
+      `El sistema «${s.nombre}» está CERRADO POR MANTENIMIENTO: el tablero no lo está leyendo, ` +
+        'así que no hay ningún dato suyo que consultar. Dilo tal cual —no inventes valores, no ' +
+        'digas que está en banda y no uses lecturas de otra máquina para hablar de ésta— y ' +
+        'ofrece las que sí están en servicio.',
+      {
+        sistema: s.id,
+        cerrado: true,
+        motivo: s.cerrado,
+        enServicio: SISTEMAS.filter((x) => !x.cerrado).map((x) => ({ sistema: x.id, es: x.nombre })),
+      }
+    )
+  }
+
   return { ok: true, sistema: s }
 }
 

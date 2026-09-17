@@ -47,10 +47,12 @@ import { useMemo, useSyncExternalStore } from "react";
 import { crearVistoPorMi } from "@/lib/vistoPorMi.js";
 import { hallazgoDeRiesgo } from "@shared/eva/comun/hallazgos.js";
 
-import { evaluarRiesgos } from "../../domain/riesgos.js";
+/* Cerrados con la estación de llenado (rama `Vibraciones1.0`) — ver el bloque
+   de `useConteoHallazgos`:
+   import { evaluarRiesgos } from "../../domain/riesgos.js";
+   import { useSistemaAgua } from "./hooks.js"; */
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import { useVibracion } from "../vibraciones/vibracion.js";
-import { useSistemaAgua } from "./hooks.js";
 
 /**
  * La misma clave que `BandejaEva`, a propósito.
@@ -72,12 +74,29 @@ const vistoPorMi = crearVistoPorMi("eva:hallazgos");
  * @returns {{ total: number, porSistema: { tanque: number, vibraciones: number } }}
  */
 export function useConteoHallazgos() {
-  const { sistema: sistemaTanque } = useSistemaAgua();
+  /*
+   * ── SÓLO VIBRACIONES (rama `Vibraciones1.0`, 17-09-2026) ───────────
+   *
+   * Esto contaba las dos máquinas, y por eso `useSistemaAgua()` estaba aquí.
+   * El problema no era el conteo: este hook lo usa el BADGE DEL SIDEBAR, que
+   * está montado en todas las pantallas, y `subscribeSistema` arranca el motor
+   * de sondeo por conteo de referencias (`evaSource.js`).
+   *
+   * O sea que el badge —escrito para NO añadir peticiones, y con una prueba
+   * que lo comprueba— mantenía vivo el sondeo del tanque en todas las
+   * pantallas de vibraciones. Su prueba seguía en verde porque cuenta `fetch`
+   * en el propio badge, no las suscripciones que abre.
+   *
+   * Con la estación de llenado cerrada, contar sus riesgos sería además
+   * mentir: son riesgos de una máquina que nadie está mirando.
+   *
+   * Para reabrir: descomentar `useSistemaAgua` y su `evaluarRiesgos`, y sumar
+   * `tanque` en el `useMemo` de abajo.
+   */
   const { canales, variador, alarmas } = useVibracion();
 
   const descartados = useSyncExternalStore(suscribirseADescartes, leerDescartes, leerDescartes);
 
-  const { activos: activosTanque } = useMemo(() => evaluarRiesgos(sistemaTanque), [sistemaTanque]);
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
     [canales, variador, alarmas]
@@ -92,11 +111,16 @@ export function useConteoHallazgos() {
     const pendientes = (sistema, activos) =>
       activos.filter((r) => !descartados.has(hallazgoDeRiesgo(sistema, r).id)).length;
 
-    const tanque = pendientes("tanque", activosTanque);
     const vibraciones = pendientes("vibraciones", activosVibracion);
 
-    return { total: tanque + vibraciones, porSistema: { tanque, vibraciones } };
-  }, [activosTanque, activosVibracion, descartados]);
+    /*
+     * `porSistema` conserva `tanque: 0` en vez de quitar la clave: quien lea
+     * esto tiene que poder distinguir «esa máquina no tiene hallazgos» de
+     * «esta versión no la cuenta». Con la estación cerrada es lo primero por
+     * construcción, y decirlo explícitamente es lo que pide §2.4.
+     */
+    return { total: vibraciones, porSistema: { tanque: 0, vibraciones } };
+  }, [activosVibracion, descartados]);
 }
 
 /*

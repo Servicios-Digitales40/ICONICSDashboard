@@ -66,15 +66,22 @@
 import { lazy } from "react";
 import {
   Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
-  LayoutDashboard, MessageSquareText, NotebookPen, Power, ShieldAlert, Waves,
+  LayoutDashboard, MessageSquareText, NotebookPen, ShieldAlert, Waves,
+  /* `Power` se va con la estación de llenado (rama `Vibraciones1.0`): lo usaba
+     `eva-controles`, y `vib-controles` sigue sin `nav`. Vuelve al reabrir. */
 } from "lucide-react";
 
 /**
- * Ruta que se muestra al arrancar la app. `eva-inicio` es la landing de la
- * demo: prueba con una lectura en vivo que el dato es real y ofrece las
- * cuatro vistas como entradas propias, antes de que el prospecto elija.
+ * Ruta que se muestra al arrancar la app.
+ *
+ * `vib-inicio` desde la rama `Vibraciones1.0` (17-09-2026). Era `eva-inicio`,
+ * la landing del tanque, y con esa máquina cerrada por mantenimiento el
+ * arranque caía en una pantalla que ya no está en el menú: navegable pero
+ * huérfana, y sondeando una máquina que nadie va a mirar.
+ *
+ * Para reabrir la estación de llenado, esto vuelve a `eva-inicio`.
  */
-export const DEFAULT_ROUTE = "eva-inicio";
+export const DEFAULT_ROUTE = "vib-inicio";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
 /**
@@ -170,16 +177,37 @@ export const NAV_GROUPS = {
  * medir el presupuesto del arranque cuando pasó con el asistente.
  */
 export const ROUTES = [
+  /*
+   * ── LA ESTACIÓN DE LLENADO ESTÁ CERRADA POR MANTENIMIENTO ──────────
+   *
+   * Rama `Vibraciones1.0`, 17-09-2026. Las cinco vistas del tanque pierden su
+   * `nav` y por tanto su sección entera del sidebar: `buildNav` deriva las
+   * secciones de las rutas que traen `nav`, así que «Estación de llenado»
+   * desaparece sola sin una lista paralela que mantener.
+   *
+   * ── POR QUÉ SIN `nav` Y NO BORRADAS ────────────────────────────────
+   *
+   * Es el patrón que este registro ya usa dos veces —`vib-controles` y
+   * `eva-muro`—: la ruta sigue existiendo y sigue navegable escribiendo su id,
+   * pero no se ofrece. Borrarlas obligaría a reescribirlas para volver, y lo
+   * que se quiere es justo lo contrario: que volver cueste una línea.
+   *
+   * El código del tanque NO se toca en esta rama. Se consulta cuando hace
+   * falta —es el módulo maduro y el espejo del que copiar— y no se modifica.
+   *
+   * **Para reabrir**: devolver el `nav` a estas cinco (los iconos siguen
+   * importados a propósito, ver el bloque de `lucide-react`), poner
+   * `DEFAULT_ROUTE` en `eva-inicio` y volver a montar `EvaProvider` sin acotar
+   * en `App.jsx`. Ver `docs/por-completar/PLAN-32-VIBRACIONES.md` F1.
+   */
   {
     id: "eva-inicio",
     component: lazy(() => import("@/Demo-EVA/views/tanque/InicioTanque.jsx")),
-    nav: { icon: <Home size={17} />, group: "sec-llenado" },
   },
 
   {
     id: "eva-planta",
     component: lazy(() => import("@/Demo-EVA/views/tanque/PlantaTanque.jsx")),
-    nav: { icon: <LayoutDashboard size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -187,7 +215,6 @@ export const ROUTES = [
     // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
     id: "eva-riesgos",
     component: lazy(() => import("@/Demo-EVA/views/tanque/RiesgosTanque.jsx")),
-    nav: { icon: <ShieldAlert size={17} />, group: "sec-llenado" },
   },
 
   {
@@ -195,13 +222,11 @@ export const ROUTES = [
     // operativa de primer nivel (encender/apagar la bomba), no un diagnóstico.
     id: "eva-controles",
     component: lazy(() => import("@/Demo-EVA/views/tanque/ControlesTanque.jsx")),
-    nav: { icon: <Power size={17} />, group: "sec-llenado" },
   },
 
   {
     id: "eva-maqueta",
     component: lazy(() => import("@/Demo-EVA/views/tanque/MaquetaTanque3D.jsx")),
-    nav: { icon: <Box size={17} />, group: "sec-llenado" },
   },
 
   /*

@@ -141,6 +141,25 @@ export const SISTEMAS = [
     maquina: "Tanque de almacenamiento, bomba, red de distribución y su suministro",
     plc: "PLC_1 · ua:DEMO2",
     /*
+     * ── CERRADO POR MANTENIMIENTO (rama `Vibraciones1.0`, 17-09-2026) ──
+     *
+     * El motivo, en una frase, o ausente si la máquina está en servicio. No es
+     * un booleano a propósito: un `cerrado: true` no dice POR QUÉ, y quien se
+     * encuentre la negativa —o el asistente al explicarla— necesita el motivo,
+     * no la bandera.
+     *
+     * Lo lee `resolverSistema()` en `ia/herramientas/lib/maquina.mjs`, que
+     * niega toda herramienta de máquina sobre este sistema. La declaración vive
+     * aquí, en el registro, y no en la guarda: así cerrar o reabrir una máquina
+     * es editar SU entrada, y no buscar condicionales repartidos por el
+     * backend.
+     *
+     * Para reabrir: quitar este campo y la primera entrada de `limitaciones`.
+     */
+    cerrado:
+      "Rebuild del módulo de vibraciones (rama Vibraciones1.0): el tablero no lee esta " +
+      "máquina mientras dure, y su código no se modifica.",
+    /*
      * Trece ramas, no una (Plan 27 F1): la reorganización del 09-09-2026
      * dejó `SENSORES/` como una rama más, hermana de las doce que reproducen
      * el DB del PLC. `verificar-catalogo --real` explora el padre de cada
@@ -247,6 +266,30 @@ export const SISTEMAS = [
       "medidas, alarmas, mandos y lecturas del variador. cargaMotor y eficienciaEnergetica NO " +
       "se historizan — el historiador les devuelve la serie de temperaturaTanque.",
     limitaciones: [
+      /*
+       * ── CERRADO POR MANTENIMIENTO (rama `Vibraciones1.0`, 17-09-2026) ──
+       *
+       * Va PRIMERA porque es la que cambia si se puede contestar o no, y el
+       * resto sólo matiza CÓMO contestar.
+       *
+       * Esta máquina sigue en `SISTEMAS` a propósito. Quitarla de aquí habría
+       * sido lo obvio y es lo que se descartó: el registro alimenta también el
+       * motor de diagnóstico, el transporte falso y `NO_COMPARTEN` —la regla
+       * que impide cruzar las dos instalaciones—, así que borrarla para callar
+       * al asistente se habría llevado por delante piezas que vibraciones
+       * necesita, y habría dejado sin sentido la prohibición de cruzar dos
+       * máquinas cuando sólo queda una.
+       *
+       * Así que el sistema sigue declarado y lo que se declara es que está
+       * cerrado. `limitaciones` es el campo para esto: su cabecera dice que no
+       * es documentación, es «lo que hay que confesar al contestar».
+       *
+       * Para reabrir: quitar esta entrada.
+       */
+      "ESTA MÁQUINA ESTÁ CERRADA POR MANTENIMIENTO y el tablero no la está " +
+        "leyendo, así que NO tienes datos suyos. No inventes valores, no digas que están en " +
+        "banda y no uses lecturas de otra máquina para hablar de ésta: di que está cerrada y " +
+        "ofrece el sistema de vibraciones, que sí está en servicio.",
       "Los límites con los que se evalúa cada señal son estimaciones nuestras para un " +
         "sistema de agua genérico, no rangos confirmados por quien opera la instalación.",
       /*
