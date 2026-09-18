@@ -215,6 +215,36 @@ describe('PATCH /api/maquinas/:id', () => {
     expect(json(r).maquina.nombre).toBe('Motor renombrado')
   })
 
+  /*
+   * ── LO QUE ESTA PRUEBA ENCONTRÓ, PROBANDO A MANO ───────────────────
+   *
+   * `EditarMaquinaSchema` usaba `.omit({ id: true })`, que **descarta el campo
+   * en silencio**: un `PATCH {"id":"otro"}` pasaba la validación con el cuerpo
+   * vacío, el gestor no llegaba a ver el `id` —así que su guarda nunca
+   * disparaba— y la ruta contestaba **200 con la máquina sin cambiar**.
+   *
+   * Quien lo pidiera se quedaba creyendo que lo había cambiado. Lo cazó probar
+   * contra el backend levantado, no la suite: las pruebas de aquí comprobaban
+   * que el id NO cambia, y no cambiaba.
+   *
+   * Con `.strict()` el campo de más es un 400 con su motivo.
+   */
+  it('mandar un `id` en el PATCH se RECHAZA, no se ignora', async () => {
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: maquinaValida() })
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: '/api/maquinas/vib-motor-02',
+      payload: { id: 'otro-id' },
+    })
+
+    expect(r.statusCode).toBe(400)
+
+    /* Y la máquina original sigue ahí, con su id. */
+    const sigue = await app.inject({ method: 'GET', url: '/api/maquinas/vib-motor-02' })
+    expect(sigue.statusCode).toBe(200)
+  })
+
   it('editar una que no existe da 404, y no la crea', async () => {
     const r = await app.inject({
       method: 'PATCH',

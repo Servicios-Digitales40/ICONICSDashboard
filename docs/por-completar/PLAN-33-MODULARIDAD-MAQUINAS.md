@@ -1269,6 +1269,46 @@ idiomas con paridad · `verificar-textos` sin español suelto · bundle `index`
 301,78 KB de 450 · lint y types limpios. El pintado de limitaciones se
 comprobó **por mutación**.
 
+#### Comprobado contra el backend levantado (18-09-2026)
+
+Primera vez que el Plan 33 se ejerce por HTTP y no sólo en la suite. Todo por
+`:3001` y `:5173` salvo lo indicado:
+
+| Qué | Resultado |
+|---|---|
+| `GET /api/maquinas/tipos` | 200, el tipo con sus 18 reglas y 7 roles |
+| `GET /api/maquinas` sin ninguna | `{cuantas: 0}`, no un error |
+| `GET` una que no existe | 404 **con** `ERROR_MAQUINA_NO_ENCONTRADA` |
+| `POST` sin variables | 400 con `problemas` por campo, separando error de aviso |
+| `POST` válido | 201, y **persiste en `datos/maquinas.json`** |
+| `historyVerified: true` del cliente | llega como **`false`**, y `HISTORICAL_DATA` no aparece |
+| `POST` con raíz solapada | 400 nombrando **las dos raíces** |
+| Vite sirve la vista y el proxy `/api` | 200 las dos |
+| Contador de casos sobre datos reales | 11 para `tanque`, 0 para la nueva |
+
+#### El defecto que sólo apareció probando a mano
+
+**`PATCH {"id":"otro"}` devolvía 200.**
+
+`EditarMaquinaSchema` usaba `.omit({ id: true })`, que **descarta el campo en
+silencio**: la validación pasaba con el cuerpo vacío, el gestor nunca veía el
+`id` —así que su guarda no disparaba— y la ruta contestaba 200 con la máquina
+sin cambiar. Quien lo pidiera se quedaba **creyendo que lo había cambiado**.
+
+Es exactamente lo que el comentario de ese esquema decía que no debía pasar:
+«un esquema que simplemente lo ignore dejaría al cliente creyendo que lo
+cambió». La advertencia estaba escrita y el código hacía lo contrario.
+
+**La suite no podía verlo**: sus pruebas comprobaban que el id NO cambia, y no
+cambiaba. Lo que faltaba era comprobar que la petición se **rechaza**.
+
+Arreglado con `.strict()` —el campo de más es un 400 con su motivo— y con la
+prueba que faltaba. Verificado contra un backend limpio en `:3099`: 400 al
+mandar `id`, 200 en una edición legítima.
+
+La guarda del gestor se queda: protege a quien no entre por HTTP. Lo que deja
+de ser es **inalcanzable**.
+
 #### Lo que queda para cuando el Plan 25 encienda la autenticación
 
 El asistente de seis pasos descrito en §8, con su paso 5b —el sondeo

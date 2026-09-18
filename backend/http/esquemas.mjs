@@ -770,14 +770,31 @@ export const CrearMaquinaSchema = z.object({
 })
 
 /**
- * `PATCH /api/maquinas/:id` — todo opcional, y **sin `id`**.
+ * `PATCH /api/maquinas/:id` — todo opcional, y el `id` SE RECHAZA.
  *
- * El id no está aquí a propósito: es lo que guardan los casos previos, y
+ * El id es lo que guardan los casos previos (`intervencion.sistema`), y
  * cambiarlo los dejaría apuntando a una máquina que ya no existe con ese
- * nombre. El gestor lo rechaza además en su capa, porque un esquema que
- * simplemente lo ignore dejaría al cliente creyendo que lo cambió.
+ * nombre. Para otro id se crea otra máquina; que sea trabajo es correcto,
+ * porque mover casos es una decisión y no un efecto colateral.
+ *
+ * ── POR QUÉ NO BASTA `.omit({ id: true })` ─────────────────────────
+ *
+ * Porque `omit` **descarta el campo en silencio**: un `PATCH {"id":"otro"}`
+ * pasaba la validación con el cuerpo vacío, el gestor no llegaba a ver el `id`
+ * —así que su guarda nunca disparaba— y la ruta contestaba **200 con la
+ * máquina sin cambiar**. Quien lo pidió se queda creyendo que lo cambió.
+ *
+ * Es justo lo que este comentario decía que no debía pasar, comprobado contra
+ * el backend real el 18-09-2026: la advertencia estaba escrita y el código
+ * hacía lo contrario.
+ *
+ * Con `.strict()` el campo de más es un 400 con su motivo. La guarda del
+ * gestor se queda igualmente —es la que protege a quien no entre por HTTP—,
+ * pero deja de ser la única, y sobre todo deja de ser inalcanzable.
  */
-export const EditarMaquinaSchema = CrearMaquinaSchema.partial().omit({ id: true })
+export const EditarMaquinaSchema = CrearMaquinaSchema.partial()
+  .omit({ id: true })
+  .strict()
 
 /** El id en la ruta. */
 export const MaquinaParamsSchema = z.object({ id: IdMaquinaSchema })
