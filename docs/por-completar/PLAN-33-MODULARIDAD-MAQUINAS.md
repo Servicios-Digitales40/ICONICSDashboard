@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría) y F1 completadas · F2 en adelante por completar
+**Estado:** Fase 0 (auditoría), F1 y F2 completadas · F3 en adelante por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -315,8 +315,8 @@ nueva pasaría las otras dos validaciones y fallaría en ésta.
 | Aislamiento casos | `IMPLEMENTADO`, obligatorio | igual | ninguno |
 | Motor recibe máquina | `PARCIAL` — mapa literal de reglas | dinámico | forma común de reglas |
 | Assets desde ICONICS | `IMPLEMENTADO` — browse | igual | ninguno |
-| **Alta por configuración** | **`NO IMPLEMENTADO`** | UI + persistencia | **~3 300 líneas/máquina** |
-| **Capacidad read/write por variable** | **`NO IMPLEMENTADO`** | declarada, deny-by-default | modelo entero |
+| **Alta por configuración** | `PARCIAL` — persistencia y API (F2) | UI + registro | falta F3 (registro) y F5 (UI) |
+| **Capacidad read/write por variable** | `IMPLEMENTADO` (F2) | declarada, deny-by-default | falta la UI (F5) |
 | **Detección de deriva vs ICONICS** | **`NO IMPLEMENTADO`** | VALID/DEGRADED/INVALID | mecanismo entero |
 | Planta > Configuración | `NO IMPLEMENTADO` | vista nueva | vista + API |
 | Rutas `/machines/:id/...` | `NO IMPLEMENTADO` — rutas fijas | dinámicas | router |
@@ -788,7 +788,7 @@ lo que funciona.
 | `backend/ia/herramientas/lib/maquina.mjs` | guarda + `switch` | **REFACTOR** | el `switch` → tipo. La guarda `cerrado` se queda |
 | `backend/ia/motor/diagnostico.mjs` | 963 líneas | **REFACTOR mínimo** | sólo `REGLAS_POR_SISTEMA`. La aritmética NO se toca |
 | `backend/ia/herramientas/historicos/index.mjs` | 2 111 líneas, 2 `if` por id | **REFACTOR** | es B3, ya conocido |
-| `backend/http/esquemas.mjs:198` | `z.enum` **literal** | **REPLACE** | defecto real: el archivo ya importa `SISTEMA_IDS` |
+| `backend/http/esquemas.mjs:198` | ~~`z.enum` literal~~ | **HECHO (F2)** | corregido a `z.enum(SISTEMA_IDS)` |
 | `backend/ia/indices/documentos.mjs` | aislamiento RAG | **KEEP** (+tipo) | ya funciona |
 | `backend/ia/motor/casos.mjs` | aislamiento casos | **KEEP** | ya obligatorio |
 | `backend/routes/iconicsRoutes.mjs` | 40 endpoints | **KEEP** | se reutiliza tal cual |
@@ -1013,16 +1013,68 @@ arranque.
 
 ---
 
-### F2 · Persistencia y CRUD
+### F2 · Persistencia y CRUD ✅
 
-**Objetivo**: `datos/maquinas.json` y su API, sin que nadie lo consuma aún.
-**Backend**: `indices/maquinas.mjs`, `maquinasRoutes.mjs`, `verificarConfiguracion.mjs`.
-**DB**: archivo nuevo. **Tests**: CRUD, validación contra ICONICS falso,
-escritura atómica concurrente.
-**Dependencias**: F1.
-**Riesgos**: bajo — nada lo consume.
-**Aceptación**: crear/editar/borrar contra `ICONICS_FAKE`; una config inválida
-se rechaza **con el motivo**.
+**Completada el 18-09-2026.**
+
+**Qué se hizo**: `shared/eva/comun/configuracionMaquina.js` (forma pura),
+`backend/ia/indices/maquinas.mjs` (disco), `backend/routes/maquinasRoutes.mjs`
+(HTTP), los esquemas, dos códigos de error con sus frases en los dos idiomas,
+`scripts/verificar-maquinas.mjs` (38 comprobaciones) y
+`backend/test/rutas/maquinas.test.mjs` (16).
+
+`verificarConfiguracion.mjs` **no** entra aquí: contrastar contra ICONICS
+necesita red y es F8. Una máquina se guarda bien formada y con estado
+`UNKNOWN`, que es exactamente lo que significa — nadie ha mirado todavía.
+
+**Nadie consume esto.** El registro sigue leyendo sus dos máquinas escritas a
+mano; construir entradas de `SISTEMAS` desde la configuración es F3.
+
+#### El defecto que encontró la prueba de contrato
+
+`crearMaquina()` guardaba las variables **tal como llegaban**, sin pasarlas por
+`crearVariable()`. Por HTTP eso dejaba `acceso: undefined` en vez de `"read"`, y
+`historyVerified: undefined` en vez de `false`.
+
+No llegó a ser un agujero —`permiteEscritura(undefined)` es `false`— pero **el
+deny-by-default tiene que estar en el dato**: el primer lector que escriba
+`if (v.acceso !== "read")` para decidir si pide confirmación abriría la puerta
+sin tocar aquella línea.
+
+La prueba del dominio **no lo veía** porque construía sus casos llamando a
+`crearVariable` a mano. Lo cazó la de HTTP, que entra por donde entrará la
+pantalla.
+
+#### Tres decisiones que no eran obvias
+
+**El id no se puede cambiar al editar.** Es lo que guardan los 11 casos del
+tanque (`intervencion.sistema`), y cambiarlo los dejaría apuntando a una
+máquina que ya no existe con ese nombre. Se rechaza en el esquema **y** en el
+gestor: un esquema que lo ignorara dejaría al cliente creyendo que lo cambió.
+
+**Sin contador de casos, `DELETE` desactiva.** El valor por defecto de
+`contarCasosDe` es `1`, no `0`: cero autoriza a borrar, y asumirlo convertiría
+una dependencia mal cableada en pérdida de historia. Ante la duda, el error
+barato.
+
+**Las capacidades se derivan en la ruta, no se guardan.** Almacenarlas sería
+tener dos versiones de la misma verdad, y la guardada quedaría vieja en cuanto
+alguien editara una variable.
+
+#### De paso
+
+Se corrigió el `z.enum(['tanque','vibraciones'])` literal de
+[esquemas.mjs:198](backend/http/esquemas.mjs#L198) —el defecto que la auditoría
+marcó `REPLACE`— por `z.enum(SISTEMA_IDS)`. El archivo ya importaba esa lista y
+la usaba dos veces más abajo.
+
+**Medido**: `verificar-maquinas` 38 · rutas de máquinas 16 ·
+`verificar-codigos` 40 códigos en 2 idiomas · los 31 verificadores · 364
+pruebas de backend (antes 348) · 982 de frontend (29 omitidas) · lint y types
+limpios.
+
+Las dos guardas críticas se comprobaron **por mutación**: rompiendo el
+deny-by-default y la protección de casos, y confirmando que las pruebas caen.
 
 ---
 

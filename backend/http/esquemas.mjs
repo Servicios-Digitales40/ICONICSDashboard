@@ -30,6 +30,7 @@
 import { z } from 'zod'
 import { isSafeHistoryArgument, isSafePointName } from '../iconics/validation.mjs'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
+import { ACCESOS } from '../../shared/eva/comun/configuracionMaquina.js'
 import { MAX_SERIES_BATCH } from '../../shared/eva/comun/historia.js'
 
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
@@ -195,7 +196,16 @@ export const ChatSchema = z.object({
    */
   contexto: z
     .object({
-      sistema: z.enum(['tanque', 'vibraciones']).optional(),
+      /*
+       * Derivado del registro, no escrito a mano (Plan 33 F2). Hasta hoy era
+       * `z.enum(['tanque', 'vibraciones'])` literal, en un archivo que ya
+       * importa `SISTEMA_IDS` y lo usa dos veces más abajo: una máquina nueva
+       * habría pasado esas dos validaciones y fallado sólo aquí, en el
+       * contexto de la vista, que es de los sitios donde peor se lee el fallo
+       * —la pregunta llega sin foco y el asistente contesta sin saber de qué
+       * máquina le hablan—.
+       */
+      sistema: z.enum(SISTEMA_IDS).optional(),
       activo: z.string().trim().min(1).max(64).optional(),
       /* El rango que está mirando, como lo nombra la vista («vivo», «ayer»,
          «semana», «personalizado»): es de qué PERÍODO se habla, no qué valores
@@ -698,6 +708,80 @@ export function primerMensaje(error) {
  * vez de `path`—, pero conserva el `message` de Zod tal cual, así que el
  * mismo criterio de cuándo anteponer el campo vale igual.
  */
+/* ── Máquinas configuradas (Plan 33 F2) ───────────────────────────── */
+
+/**
+ * ── POR QUÉ ESTE ESQUEMA COMPRUEBA TAN POCO ─────────────────────────
+ *
+ * Porque lo que de verdad hace válida a una máquina —que tenga raíz, que su
+ * tipo exista, que sus raíces no se solapen con las de otra, que los roles que
+ * sus reglas necesitan estén cubiertos— **no se puede decir en un esquema**:
+ * depende del registro de tipos y de las DEMÁS máquinas ya configuradas.
+ *
+ * Eso lo valida `problemasDeMaquina()` en `shared/`, que es dominio puro y lo
+ * usan los dos lados: el backend para no guardar basura, y la vista de
+ * configuración para señalar el campo antes de enviar.
+ *
+ * Aquí sólo se comprueba la FORMA: que lo que llega sea un objeto con las
+ * piezas del tamaño correcto. Duplicar las reglas de negocio en Zod sería
+ * tener dos copias de la misma regla — el incidente que `shared/README.md`
+ * documenta.
+ */
+const IdMaquinaSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, 'El id sólo admite minúsculas, dígitos y guiones.')
+
+const VariableMaquinaSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  pointName: z.string().trim().min(1).max(512),
+  historyPointName: z.string().trim().min(1).max(512).nullish(),
+  /* No se acepta `historyVerified` del cliente: lo pone el sondeo, no quien
+     rellena el formulario. Prometer historia es una afirmación sobre el
+     servidor, y el servidor ya ha mentido sobre eso (ver `crearVariable`). */
+  assetId: z.string().trim().min(1).max(64).nullish(),
+  rol: z.string().trim().min(1).max(64).nullish(),
+  alias: z.array(z.string().trim().min(1).max(128)).max(32).optional(),
+  unidad: z.string().trim().max(32).nullish(),
+  descripcion: z.string().trim().max(512).nullish(),
+  /* Deny by default: ausente significa lectura. Ver `configuracionMaquina.js`. */
+  acceso: z.enum(ACCESOS).optional(),
+})
+
+const AssetMaquinaSchema = z.object({
+  id: z.string().trim().min(1).max(64),
+  pointName: z.string().trim().min(1).max(512),
+  rol: z.enum(['raiz', 'secundario']).optional(),
+  nombre: z.string().trim().max(128).nullish(),
+})
+
+/** `POST /api/maquinas` — da de alta una máquina. */
+export const CrearMaquinaSchema = z.object({
+  id: IdMaquinaSchema,
+  nombre: z.string().trim().min(1).max(128).optional(),
+  tipo: z.string().trim().min(1).max(64),
+  plc: z.string().trim().min(1).max(128).optional(),
+  assets: z.array(AssetMaquinaSchema).max(256).optional(),
+  variables: z.array(VariableMaquinaSchema).max(2048).optional(),
+  cadenciaMs: z.number().int().min(500).max(600_000).optional(),
+  limitaciones: z.array(z.string().trim().min(1).max(1024)).max(32).optional(),
+})
+
+/**
+ * `PATCH /api/maquinas/:id` — todo opcional, y **sin `id`**.
+ *
+ * El id no está aquí a propósito: es lo que guardan los casos previos, y
+ * cambiarlo los dejaría apuntando a una máquina que ya no existe con ese
+ * nombre. El gestor lo rechaza además en su capa, porque un esquema que
+ * simplemente lo ignore dejaría al cliente creyendo que lo cambió.
+ */
+export const EditarMaquinaSchema = CrearMaquinaSchema.partial().omit({ id: true })
+
+/** El id en la ruta. */
+export const MaquinaParamsSchema = z.object({ id: IdMaquinaSchema })
+
 export function primerMensajeDeValidacion(erroresDeValidacion) {
   const problema = erroresDeValidacion?.[0]
   if (!problema) return 'Cuerpo de la petición inválido.'

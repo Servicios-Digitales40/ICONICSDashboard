@@ -56,6 +56,8 @@
     "ERROR_SIN_ARCHIVO": "No llegó ningún archivo.",
     "ERROR_MANUAL": "No se pudo completar la operación sobre el manual.",
     "ERROR_MANUAL_NO_ENCONTRADO": "Ese manual ya no está en el catálogo.",
+    "ERROR_MAQUINA_INVALIDA": "La configuración de la máquina está incompleta.",
+    "ERROR_MAQUINA_NO_ENCONTRADA": "Esa máquina no está configurada.",
     "ERROR_VOZ_SIN_CONFIGURAR": "El dictado por voz no está configurado en este servidor.",
     "ERROR_AUDIO_GRANDE": "El audio supera el límite de este servidor.",
     "ERROR_SIN_AUDIO": "No llegó ningún audio.",

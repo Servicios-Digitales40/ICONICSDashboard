@@ -758,6 +758,23 @@ function readCuadernoRuta(rawValue) {
   )
 }
 
+/**
+ * Dónde viven las MÁQUINAS CONFIGURADAS (Plan 33 F2).
+ *
+ * En `datos/` como sus hermanos, y por el mismo motivo: es estado que se
+ * genera en marcha, no código. Pero con una diferencia que conviene tener
+ * presente — los diarios son `.jsonl` que sólo crecen, y esto es un JSON que
+ * se REESCRIBE entero en cada alta. Por eso pasa por `escribirJsonAtomico` y
+ * por el candado de `lib/jsonAtomico.mjs`: una escritura a medias aquí no
+ * pierde una línea, pierde el archivo.
+ */
+function readMaquinasRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || join('datos', 'maquinas.json')
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
 /** Dónde vive el diario de diagnósticos (Plan 28 F2). Mismo criterio que sus
  *  tres hermanos: en `datos/`, que está en `.gitignore` porque es estado que
  *  el backend genera en marcha, no código. */
@@ -1228,6 +1245,22 @@ export function loadConfig(env = process.env) {
           'DIARIO_DIAGNOSTICOS_DIAS', env.DIARIO_DIAGNOSTICOS_DIAS, DIAS_RETENCION, 1
         ),
       }),
+    }),
+
+    /**
+     * Las MÁQUINAS CONFIGURADAS (Plan 33 F2).
+     *
+     * Fuera de `diario:` a propósito, aunque viva en la misma carpeta: los
+     * diarios son JSONL que sólo crecen y se podan por antigüedad, y esto es un
+     * registro que se reescribe entero y **no se poda nunca**. Una máquina
+     * configurada no caduca; borrarla por vieja dejaría sus casos previos
+     * huérfanos, que es justo lo que `eliminar()` se niega a hacer.
+     *
+     * Por eso no tiene `maxBytes` ni `dias`: no serían un tope mal elegido,
+     * serían un concepto que aquí no aplica.
+     */
+    maquinas: Object.freeze({
+      ruta: readMaquinasRuta(env.MAQUINAS_RUTA),
     }),
 
     /**

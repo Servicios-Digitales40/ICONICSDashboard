@@ -101,6 +101,16 @@ export const CODIGOS = Object.freeze({
   ERROR_MANUAL: 'ERROR_MANUAL',
   ERROR_MANUAL_NO_ENCONTRADO: 'ERROR_MANUAL_NO_ENCONTRADO',
 
+  /* ── Máquinas configuradas (Plan 33) ────────────────────────────── */
+
+  /**
+   * La configuración no está bien formada. La respuesta trae `problemas`, una
+   * lista de `{campo, problema}`, para que la pantalla los pinte donde toca en
+   * vez de un aviso genérico encima del formulario.
+   */
+  ERROR_MAQUINA_INVALIDA: 'ERROR_MAQUINA_INVALIDA',
+  ERROR_MAQUINA_NO_ENCONTRADA: 'ERROR_MAQUINA_NO_ENCONTRADA',
+
   /* ── Dictado por voz ────────────────────────────────────────────── */
 
   ERROR_VOZ_SIN_CONFIGURAR: 'ERROR_VOZ_SIN_CONFIGURAR',

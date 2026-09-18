@@ -56,6 +56,8 @@
     "ERROR_SIN_ARCHIVO": "No file arrived.",
     "ERROR_MANUAL": "The operation on the manual could not be completed.",
     "ERROR_MANUAL_NO_ENCONTRADO": "That manual is no longer in the catalogue.",
+    "ERROR_MAQUINA_INVALIDA": "The machine configuration is incomplete.",
+    "ERROR_MAQUINA_NO_ENCONTRADA": "That machine is not configured.",
     "ERROR_VOZ_SIN_CONFIGURAR": "Voice dictation is not configured on this server.",
     "ERROR_AUDIO_GRANDE": "The audio exceeds this server’s limit.",
     "ERROR_SIN_AUDIO": "No audio arrived.",

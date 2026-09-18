@@ -37,6 +37,7 @@ import { createIndiceDocumentos } from './ia/indices/documentos.mjs'
 import { createIndiceCasos } from './ia/motor/casos.mjs'
 import { createMotorDiagnostico } from './ia/motor/diagnostico.mjs'
 import { createGestorManuales } from './ia/indices/manuales.mjs'
+import { createGestorMaquinas } from './ia/indices/maquinas.mjs'
 import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
 import { crearNarrador } from './ia/motor/narrador.mjs'
 import { createHerramientas } from './ia/conversacion/herramientas.mjs'
@@ -53,6 +54,10 @@ import { crearDiario } from './lib/diario.mjs'
 import { logger } from './logger.mjs'
 import { registerAuthRoutes } from './routes/authRoutes.mjs'
 import { registerCasosRoutes } from './routes/casosRoutes.mjs'
+import { registerMaquinasRoutes } from './routes/maquinasRoutes.mjs'
+/* Sólo para CONTAR cuántos casos nombran una máquina antes de darla de baja.
+   Ver el cableado de `registerMaquinasRoutes` más abajo. */
+import { listarCasos } from './ia/herramientas/aprendizaje/index.mjs'
 import { registerChatRoutes } from './routes/chatRoutes.mjs'
 import { registerControlRoutes } from './routes/controlRoutes.mjs'
 import { registerDiagnosticoRoutes } from './routes/diagnosticoRoutes.mjs'
@@ -368,6 +373,20 @@ export async function createApp(config) {
     diasRetencion: config.diario.cuaderno.dias,
   })
 
+  /*
+   * Las MÁQUINAS CONFIGURADAS (Plan 33 F2).
+   *
+   * Se construye siempre, aunque el archivo no exista: leer una configuración
+   * que no está devuelve la lista vacía, y eso es lo correcto —todavía no se
+   * ha configurado ninguna—, no un error. Igual que `aprendizaje.json`.
+   *
+   * **Nadie lo consume todavía**, y es deliberado: el registro sigue leyendo
+   * sus dos máquinas escritas a mano. Construir entradas de `SISTEMAS` a partir
+   * de esto es la F3, y separar las dos fases es lo que permite que un fallo
+   * aquí no pueda confundirse con una regresión del tablero.
+   */
+  const gestorMaquinas = createGestorMaquinas({ ruta: config.maquinas.ruta })
+
 
   const herramientas = createHerramientas({
     client,
@@ -642,6 +661,20 @@ export async function createApp(config) {
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
     registerCasosRoutes(instancia)
+    /*
+     * El contador de casos entra POR LA PUERTA y no lo consulta la ruta por su
+     * cuenta: así el CRUD de configuración no necesita el motor de casos para
+     * existir, y se puede montar en una prueba sin él.
+     *
+     * Qué hace con el número está en `maquinasRoutes.mjs`: con casos, una baja
+     * DESACTIVA en vez de borrar. Borrar dejaría esas intervenciones apuntando
+     * a un sistema que el backend no reconoce.
+     */
+    registerMaquinasRoutes(instancia, {
+      gestorMaquinas,
+      contarCasosDe: async id =>
+        (await listarCasos()).filter(c => c?.sistema === id).length,
+    })
     registerDiagnosticoRoutes(instancia, { motorDiagnostico, diarioDiagnosticos, narrador })
     // El MISMO `diario` que escriben `iconicsRoutes` y `controlRoutes`: esta
     // ruta lo lee, y dos instancias apuntando al mismo archivo sería pedir que
