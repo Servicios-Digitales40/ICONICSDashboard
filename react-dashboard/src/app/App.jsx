@@ -18,6 +18,7 @@ import { ThemeProvider, useTheme } from "@/theme";
 import { DataSourceProvider } from "@/lib/datasource";
 import { queryClient } from "@/lib/queryClient.js";
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
+import { MaquinaProvider } from "@/Demo-EVA/data/comunes/MaquinaContext.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { SesionProvider, useSesion } from "./providers/SesionProvider.jsx";
 import { PantallaDeAcceso } from "./PantallaDeAcceso.jsx";
@@ -179,11 +180,25 @@ function Shell() {
      * componente no puede consumir el contexto que él mismo está montando.
      */
     <SesionProvider enMuro={muro.activo}>
-      <ContenidoDelShell
-        t={t} nav={nav} navigate={navigate} muro={muro}
-        cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
-        PageComponent={PageComponent}
-      />
+      {/*
+        `MaquinaProvider` va DENTRO del Shell y no arriba con los demás porque
+        necesita `nav`, que nace aquí. Y recibe la navegación ya parseada en
+        vez de leer `location` por su cuenta: duplicar ese parseo daría dos
+        versiones de «en qué página estoy» que pueden discrepar — el mismo
+        criterio por el que `SesionProvider` recibe `enMuro` calculado
+        (Plan 25 F9).
+
+        NO sondea nada: sólo dice de qué máquina va la pantalla. El motivo
+        largo está en la cabecera de `MaquinaContext.jsx`, y tiene dos
+        regresiones detrás.
+      */}
+      <MaquinaProvider page={nav.page} params={nav.params}>
+        <ContenidoDelShell
+          t={t} nav={nav} navigate={navigate} muro={muro}
+          cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
+          PageComponent={PageComponent}
+        />
+      </MaquinaProvider>
     </SesionProvider>
   );
 }

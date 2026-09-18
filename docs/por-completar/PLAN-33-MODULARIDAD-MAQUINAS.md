@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría) y F1–F5 completadas (F5 de sólo lectura) · F6 en adelante por completar
+**Estado:** Fase 0 (auditoría) y F1–F6 completadas (F5 de sólo lectura) · F7 en adelante por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -319,7 +319,7 @@ nueva pasaría las otras dos validaciones y fallaría en ésta.
 | **Capacidad read/write por variable** | `IMPLEMENTADO` (F2) | declarada, deny-by-default | falta la UI (F5) |
 | **Detección de deriva vs ICONICS** | **`NO IMPLEMENTADO`** | VALID/DEGRADED/INVALID | mecanismo entero |
 | Planta > Configuración | `PARCIAL` — sólo lectura (F5) | alta por UI | asistente de alta (necesita Plan 25) |
-| Rutas `/machines/:id/...` | `NO IMPLEMENTADO` — rutas fijas | dinámicas | router |
+| Direccionar una máquina | `IMPLEMENTADO` (F6) — `?maquina=` + contexto | igual | ninguno: la query string ya servía |
 | MachineType | `NO IMPLEMENTADO` | ¿separado? | ver §6 |
 
 ### Lo que el gap NO es
@@ -1317,18 +1317,75 @@ servidor.
 
 ---
 
-### F6 · Frontend dinámico
+### F6 · Frontend dinámico — ✅ **el contexto; las rutas no hacían falta**
 
-**Objetivo**: rutas por máquina y `MachineContext`.
-**Frontend**: `routes.jsx` dinámico + redirecciones; `MachineContext`;
-quitar los `=== "tanque"` de `CierreDiagnostico`, `AvisosEva`, `BandejaEva`,
-`TurnoEva`, `navegacionDelAsistente`.
-**Tests**: **la prueba de sondeo de chrome** (copia de `llenado-cerrado`);
-las rutas viejas redirigen.
-**Dependencias**: F4.
-**Riesgos**: **alto — regresión de sondeo**. Ya ocurrió dos veces.
-**Aceptación**: ningún componente siempre montado suscribe una máquina; las
-rutas viejas siguen funcionando.
+**Completada el 18-09-2026.**
+
+**Qué se hizo**: `Demo-EVA/data/comunes/MaquinaContext.jsx`, cableado en el
+Shell, y `test/demo-eva/maquina-contexto.test.jsx` (9 pruebas). Más tres
+defectos preexistentes que la fase destapó.
+
+#### Por qué NO se crearon rutas `/machines/:id`
+
+El plan las proponía por analogía con un router de path params. **Este tablero
+no tiene eso y no le hace falta**: `useNavegacion` usa la History API y **los
+parámetros ya viajan en la query string**, llegando a cada vista como
+`params`. Una máquina configurada se direcciona con `?maquina=vib-02` sin
+tocar el router, sin redirecciones y sin romper ningún enlace guardado.
+
+Traer un enrutador para esto sería justo lo que la cabecera de
+`useNavegacion.js` dice que no se ha hecho y por qué: «una dependencia nueva en
+el bundle de planta tendría que ganarse su sitio con algo más que esto».
+
+#### Lo que el contexto hace, y lo que deliberadamente no
+
+Contesta **quién**: `useMaquina()` da `{id, registro, enServicio, cerrada}`.
+
+**No suscribe nada.** Envuelve el Shell entero, así que si pidiera datos los
+pediría en todas las pantallas — la regresión de 31-08-2026 (contador de
+alarmas del Topbar) y 17-09-2026 (badge de hallazgos). Saber de qué máquina va
+una pantalla es barato; leerla, no. Su prueba mira las **suscripciones**.
+
+Y **la ruta manda sobre el parámetro**: en `vib-inicio` la máquina es
+vibraciones, y un `?maquina=tanque` pegado a mano no cambia de qué habla esa
+pantalla. Al revés, un parámetro olvidado al navegar haría que una vista del
+tanque hablara de vibraciones, con cifras reales y sin error.
+
+#### Tres defectos preexistentes, encontrados al cablearlo
+
+**1. El tanque declaraba una ruta que no existe.** `eva-3d` — la vista se llama
+`eva-maqueta`. Y le faltaban `eva-controles` y `eva-detalle`.
+
+**2. Vibraciones declaraba UNA de sus cinco pantallas.** Faltaban `vib-inicio`
+—la de arranque de esta rama—, `vib-controles`, `eva-riesgos-vibracion` y
+`vib-3d`.
+
+**3. El dictado leía `window.location.hash`, y esta app no usa hash.**
+`useNavegacion` migró a la History API; con `hash` vacío, `sistemaDeRuta()`
+devolvía **siempre `null`** y el vocabulario de Whisper no se elegía nunca.
+
+Los tres son el mismo tipo de fallo: **no dan error**. Una ruta que no existe
+simplemente nunca encaja, y una transcripción peor no se distingue de una
+pregunta mal dicha — se lee como que el operador habló raro. El efecto
+combinado era que preguntar por voz desde vibraciones se transcribía con el
+vocabulario del agua, que es exactamente lo que ese mecanismo existe para
+impedir.
+
+Se añaden **dos comprobaciones a `routes.test.jsx`**: que toda ruta declarada
+por un sistema exista, y que ninguna la reclamen dos. Ese desajuste no se ve
+mirando ninguno de los dos archivos por separado.
+
+**Medido**: 9 pruebas nuevas · **1002** de frontend (antes 991, 29 omitidas) ·
+365 de backend · los 34 verificadores · lint y types limpios. La precedencia
+ruta>parámetro se comprobó **por mutación**.
+
+#### Lo que queda de esta fase
+
+Los `=== "tanque"` de `CierreDiagnostico`, `AvisosEva`, `BandejaEva`,
+`TurnoEva` y `navegacionDelAsistente` siguen ahí. Ahora **se pueden** quitar
+—el contexto da la máquina— pero eso es refactor de cinco vistas vivas, y
+hacerlo en la misma fase que introduce el contexto mezclaría dos cosas que
+conviene poder revertir por separado.
 
 ---
 

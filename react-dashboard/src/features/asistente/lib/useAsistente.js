@@ -527,11 +527,22 @@ export function useDictado() {
        * una pregunta deformada hace que el asistente conteste sobre otra cosa
        * — que es peor que no entenderla, porque no se nota.
        *
-       * Se lee del hash y no de un estado propio: la pantalla activa ya está
+       * Se lee de la URL y no de un estado propio: la pantalla activa ya está
        * ahí, y duplicarla en el asistente sería una segunda fuente de verdad
        * que puede quedarse atrás al navegar.
+       *
+       * ── DEL HASH AL PATH (Plan 33 F6, 18-09-2026) ──────────────────
+       *
+       * Esto leía `window.location.hash`, y **esta aplicación no usa hash**:
+       * `useNavegacion` migró a la History API para que un kiosco pueda abrir
+       * `/vib-inicio` directamente. Con `hash` vacío, `sistemaDeRuta()`
+       * devolvía SIEMPRE `null` y el dictado se pedía sin vocabulario — es
+       * decir, el mecanismo entero llevaba tiempo sin hacer nada.
+       *
+       * No daba error y no se veía: una transcripción peor no se distingue de
+       * una pregunta mal dicha. Se leía como que el operador habló raro.
        */
-      const sistema = sistemaDeRuta(window.location.hash);
+      const sistema = sistemaDeRuta(window.location.pathname);
       const destino = sistema
         ? `${API_BASE}/api/voz?sistema=${encodeURIComponent(sistema)}`
         : `${API_BASE}/api/voz`;

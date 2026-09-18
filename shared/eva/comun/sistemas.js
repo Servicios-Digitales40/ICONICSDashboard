@@ -250,7 +250,24 @@ export const SISTEMAS = [
     /* Qué pantallas hablan de este sistema. Lo usa el dictado para elegir el
        vocabulario, y vive aquí porque «qué pantallas son mías» es una
        propiedad del sistema, no de la interfaz. */
-    rutas: ["eva-inicio", "eva-planta", "eva-riesgos", "eva-3d", "eva-alarmas", "eva-assets"],
+    /*
+     * ── CORREGIDA EL 18-09-2026 (Plan 33 F6) ───────────────────────
+     *
+     * Decía `eva-3d`, que NO EXISTE: esa vista se llama `eva-maqueta`. Y
+     * faltaban `eva-controles` y `eva-detalle`, las dos del tanque.
+     *
+     * No daba error en ningún sitio —una ruta que no existe simplemente nunca
+     * encaja— pero el dictado usa esta lista para elegir vocabulario, así que
+     * en la maqueta 3D del tanque pedía la transcripción sin él.
+     *
+     * `eva-alarmas` y `eva-assets` se quedan aunque sean de «General»: no son
+     * exclusivas del tanque, pero mientras la otra máquina no las reclame,
+     * darles su vocabulario transcribe mejor que dejarlas sin ninguno.
+     */
+    rutas: [
+      "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta",
+      "eva-detalle", "eva-alarmas", "eva-assets",
+    ],
     herramientas: [
       "estado_del_sistema",
       "historia_de_senal",
@@ -462,7 +479,20 @@ export const SISTEMAS = [
       "vibración, rodamiento, lado acople, lado libre, apoyo, velocidad eficaz, " +
       "aceleración eficaz, valor de daño, DKW, aRMS, vRMS, envolvente, espectro, " +
       "BPFO, BPFI, factor de cresta, variador, milímetros por segundo",
-    rutas: ["eva-vibraciones"],
+    /*
+     * ── COMPLETADA EL 18-09-2026 (Plan 33 F6) ──────────────────────
+     *
+     * Declaraba UNA sola —`eva-vibraciones`— y esta máquina tiene cinco
+     * pantallas. Las otras cuatro nacieron después y nadie volvió aquí.
+     *
+     * El efecto se nota en el dictado: `vib-inicio` es la pantalla de ARRANQUE
+     * de esta rama, y preguntar por voz desde ahí transcribía sin el
+     * vocabulario de vibraciones —«lado acople» y «rodamiento» deformados—,
+     * que es justo lo que ese campo existe para impedir.
+     */
+    rutas: [
+      "vib-inicio", "eva-vibraciones", "vib-controles", "eva-riesgos-vibracion", "vib-3d",
+    ],
     /*
      * Eran una sola —`estado_de_vibraciones`— porque cada herramienta estaba
      * escrita contra la forma de dominio del tanque. Desde que hay una forma

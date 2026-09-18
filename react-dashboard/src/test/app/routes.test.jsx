@@ -22,6 +22,7 @@ import { describe, expect, it } from "vitest";
 import { ROUTES, DEFAULT_ROUTE } from "@/app/routes/routes.jsx";
 import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 import { buildNav } from "@/app/routes/buildNav.js";
+import { SISTEMAS } from "@shared/eva/comun/sistemas.js";
 
 const ids = ROUTES.map((r) => r.id);
 
@@ -128,6 +129,46 @@ describe("superficie de la aplicación", () => {
       (id) => /^(dashboard|area-|maquina-3d|maqueta-3d|machine-detail|assets|sandbox)/.test(id)
     );
     expect(deResonac).toEqual([]);
+  });
+
+  /*
+   * ── LAS `rutas` DEL REGISTRO CONTRA LAS QUE EXISTEN (Plan 33 F6) ───
+   *
+   * Cada sistema declara en `shared/eva/comun/sistemas.js` qué pantallas son
+   * suyas. Esa lista **se había quedado vieja** y nadie lo vio:
+   *
+   *   · el tanque declaraba `eva-3d`, que NO EXISTE —la vista se llama
+   *     `eva-maqueta`— y le faltaban `eva-controles` y `eva-detalle`;
+   *   · vibraciones declaraba UNA de sus cinco, incluida la que falta
+   *     `vib-inicio`, que es la pantalla de arranque de esta rama.
+   *
+   * Nada daba error: una ruta que no existe simplemente nunca encaja. Pero el
+   * dictado usa esa lista para elegir el vocabulario que Whisper tiene que oír
+   * bien, así que preguntar por voz desde vibraciones se transcribía con las
+   * palabras del agua — «lado acople» y «rodamiento» deformados, que es justo
+   * lo que ese campo existe para impedir.
+   *
+   * Un desajuste así no se ve mirando ninguno de los dos archivos por
+   * separado. Aquí se ven los dos.
+   */
+  it("toda ruta declarada por un sistema existe de verdad", () => {
+    for (const s of SISTEMAS) {
+      const fantasma = (s.rutas ?? []).filter((r) => !ids.includes(r));
+      expect(fantasma, `«${s.id}» declara rutas que no existen`).toEqual([]);
+    }
+  });
+
+  it("ninguna ruta pertenece a dos sistemas a la vez", () => {
+    /* `sistemaDeRuta` devuelve la PRIMERA que encaja, así que una ruta en dos
+       listas daría el vocabulario de una máquina en la pantalla de la otra,
+       siempre igual y sin avisar. */
+    const vistas = new Map();
+    for (const s of SISTEMAS) {
+      for (const r of s.rutas ?? []) {
+        expect(vistas.has(r), `«${r}» la reclaman ${vistas.get(r)} y ${s.id}`).toBe(false);
+        vistas.set(r, s.id);
+      }
+    }
   });
 
   it("ningún id se repite y toda ruta tiene componente", () => {
