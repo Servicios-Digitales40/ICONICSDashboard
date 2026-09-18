@@ -176,6 +176,28 @@ function resolverSistema(id) {
  * que la salvaguarda lee.
  */
 function evaluarRiesgosDe(sistema, estado) {
+  /*
+   * ── UNA MÁQUINA SIN FORMA DE DOMINIO NO SE EVALÚA (Plan 33 F3) ────
+   *
+   * Las máquinas CONFIGURADAS traen `dominio: null` a propósito: tienen una
+   * lista plana de variables con su rol, no la forma que esperan los motores
+   * de reglas (`{canales, variador, alarmas}` en vibraciones, el `Sistema` del
+   * tanque). Ver `shared/eva/comun/construirSistema.js`.
+   *
+   * Sin esta guarda, ese `null` llegaría al motor y **no daría error**: medido
+   * el 18-09-2026, `evaluarRiesgosVibracion(null)` devuelve TRES riesgos
+   * activos —los tres `dkw-sin-referencia`, una regla que dispara ante la
+   * AUSENCIA de dato—. La regla es correcta; lo falso sería afirmar esos tres
+   * riesgos sobre tres apoyos que la máquina configurada no ha declarado.
+   *
+   * Se devuelve `evaluadas: 0`, que es lo que `riesgos_activos` ya convierte
+   * en un fallo explícito en vez de un «ninguna: se pudieron evaluar todas las
+   * reglas». Ver el bloque de abajo sobre el `default`.
+   */
+  if (!estado?.dominio) {
+    return { activos: [], noEvaluables: [], evaluadas: 0 }
+  }
+
   switch (sistema.id) {
     case 'tanque':
       return evaluarRiesgos(estado.dominio)

@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría), F1 y F2 completadas · F3 en adelante por completar
+**Estado:** Fase 0 (auditoría), F1, F2 y F3 completadas · F4 en adelante por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -1078,20 +1078,64 @@ deny-by-default y la protección de casos, y confirmando que las pruebas caen.
 
 ---
 
-### F3 · El registro acepta configuración
+### F3 · El registro acepta configuración ✅
 
-**Objetivo**: `SISTEMAS` puede recibir entradas construidas. **La fase de más
-riesgo.**
-**Backend**: `registrarSistema()` + `construirSistema(config, tipo)`.
-**Tests**: **una máquina configurada y una escrita a mano se comportan igual** —
-mismo `parse`, mismo contrato de tres estados en `modelo`, misma validación al
-cargar.
-**Dependencias**: F1, F2.
-**Riesgos**: **alto**. Aquí es donde se reintroducen los dos incidentes
-históricos si la validación afloja.
-**Aceptación**: `validarRegistro()` **lanza** ante una configuración
-incompleta; `verificar-transporte-falso` pasa con una máquina configurada;
-`modelo()` distingue `undefined` de `null`.
+**Completada el 18-09-2026.**
+
+**Qué se hizo**: `shared/eva/comun/construirSistema.js`, `registrarSistema()`
+en `sistemas.js`, una guarda en `evaluarRiesgosDe`, y
+`scripts/verificar-registro-configurado.mjs` (31 comprobaciones de
+**equivalencia**).
+
+**El registro se alimenta, no se sustituye.** `SISTEMAS` sigue siendo el mismo
+array que importa medio proyecto; `registrarSistema()` añade y vuelve a correr
+`validarRegistro()` sobre lo añadido.
+
+#### El hallazgo: `dominio` ausente no es `dominio: null`
+
+Las máquinas escritas a mano traen `dominio` en su estado —la forma que leen
+los motores de reglas—. Una configurada **no puede tenerla**: tiene una lista
+plana de variables con su rol, no `{canales, variador, alarmas}`.
+
+Al construir el estado, `dominio` salía **ausente**. Y `estadoComun` sólo
+propaga lo que va en `extra`, así que ponerlo suelto **se descartaba en
+silencio** — comprobado.
+
+Eso importa porque `evaluarRiesgosDe` lo lee. Medido: pasarle un dominio vacío
+a `evaluarRiesgosVibracion` devuelve **tres riesgos ACTIVOS**. No son un falso
+positivo —los tres son `dkw-sin-referencia`, una regla que dispara *ante la
+ausencia* de dato, y es correcta— pero afirmarlos sobre una máquina
+configurada sería hablar de **tres apoyos que esa máquina no ha declarado**.
+
+Dos cambios: `dominio: null` explícito dentro de `extra` (presente y nulo dice
+«no tengo forma de dominio»; ausente es indistinguible de un descuido), y una
+**guarda en `evaluarRiesgosDe`** que devuelve `evaluadas: 0` en vez de llamar
+al motor — que es lo que `riesgos_activos` ya convierte en un fallo explícito.
+
+#### La prueba estaba mal planteada, y corregirla aclaró el contrato
+
+Exigía que el estado configurado tuviera **todos** los campos del de
+vibraciones. Pero ese trae `normaAplicable` y `canal`, que son suyos —ISO 10816
+y los tres apoyos—: exigirlos es exigir que toda máquina sea vibraciones.
+
+Ahora compara contra **la intersección de las dos escritas a mano**: 14 campos,
+calculados intersecando en vez de escritos, para que un campo que mañana pase a
+ser común quede exigido sin que nadie venga a añadirlo.
+
+#### Lo que una máquina configurada declara que no puede hacer
+
+Sus limitaciones se **derivan**, no se escriben: los roles sin mapear («no hay
+riesgos» aquí significa «no se pudo mirar»), la ausencia de serie verificada y
+que sobre ella sólo se lee. Y sus `herramientas` también: no ofrece
+`historia_de_senal` sin serie verificada, porque ofrecerla y negarse después
+gasta un turno del modelo para llegar al mismo sitio.
+
+**Medido**: `verificar-registro-configurado` 31 · `verificar-herramientas` 169
+(22 omitidas, igual que antes) · `verificar-riesgos` 48 · `riesgos-vibracion` 40
+· **los 33 verificadores** · 364 de backend · 982 de frontend (29 omitidas) ·
+lint y types limpios.
+
+La guarda de `dominio` se comprobó **por mutación**.
 
 ---
 

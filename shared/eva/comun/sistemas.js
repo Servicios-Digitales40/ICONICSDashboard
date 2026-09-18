@@ -958,6 +958,96 @@ function validarRegistro() {
 validarRegistro();
 
 /**
+ * ── DAR DE ALTA UNA MÁQUINA CONFIGURADA (Plan 33 F3) ────────────────
+ *
+ * `SISTEMAS` deja de ser sólo lo que este archivo escribe: también admite
+ * entradas construidas desde `datos/maquinas.json` por
+ * `construirSistema(config, tipo)`.
+ *
+ * ── POR QUÉ SE AÑADE AQUÍ Y NO SE SUSTITUYE EL ARRAY ────────────────
+ *
+ * Porque medio proyecto importa `SISTEMAS`, `SISTEMA` y `SISTEMA_IDS` —unas
+ * cien veces— y todas esperan el mismo objeto. Sustituir el registro por una
+ * factoría habría obligado a tocar cada una de esas importaciones para pasarle
+ * la configuración, que es una reescritura, no una migración.
+ *
+ * Alimentarlo conserva además lo que de verdad protege este archivo: la
+ * validación de abajo corre sobre lo que se añade, exactamente igual que sobre
+ * lo escrito a mano.
+ *
+ * ── LO QUE SE VALIDA, Y POR QUÉ LANZA ──────────────────────────────
+ *
+ * Lanza, igual que `validarRegistro()`. Es distinto de
+ * `problemasDeMaquina()`, que devuelve una lista: aquélla valida lo que
+ * escribe una PERSONA en un formulario —y merece que le digan qué corregir—;
+ * esto valida lo que va a ENTRAR en el registro, y una entrada mal formada ahí
+ * no da un error visible más adelante, da una máquina que contesta `null` con
+ * calidad buena.
+ *
+ * Las dos comprobaciones propias de esta puerta son las que no tienen sentido
+ * sobre un módulo escrito a mano:
+ *
+ *   · **id repetido** — `SISTEMA[id]` devolvería una de las dos sin decir
+ *     cuál, y los casos previos de esa máquina irían a la que ganara.
+ *   · **raíz solapada** — `sistemaDePunto()` devuelve la PRIMERA que encaja,
+ *     así que los puntos de una se atribuirían a la otra de forma estable.
+ *
+ * Las dos las comprueba también `problemasDeMaquina()` antes de guardar. Se
+ * repiten aquí a propósito: aquélla mira contra las demás CONFIGURADAS, y ésta
+ * contra el registro entero, que incluye las escritas a mano.
+ *
+ * @param {object} entrada  lo que devuelve `construirSistema()`
+ * @returns {object} la misma entrada, ya registrada
+ */
+export function registrarSistema(entrada) {
+  if (!entrada?.id) {
+    throw new Error("registrarSistema: la entrada no trae `id`.");
+  }
+  if (SISTEMA[entrada.id]) {
+    throw new Error(
+      `registrarSistema: ya hay un sistema con el id «${entrada.id}». Dos entradas con el ` +
+        "mismo id harían que `SISTEMA[id]` devolviera una de las dos sin decir cuál, y los " +
+        "casos previos de esa máquina irían a la que ganara.",
+    );
+  }
+
+  for (const raiz of entrada.raices ?? []) {
+    for (const otro of SISTEMAS) {
+      for (const suya of otro.raices ?? []) {
+        if (raiz.startsWith(suya) || suya.startsWith(raiz)) {
+          throw new Error(
+            `registrarSistema: la raíz «${raiz}» de «${entrada.id}» se solapa con «${suya}» ` +
+              `de «${otro.id}». \`sistemaDePunto()\` devuelve la primera que encaja, así que ` +
+              "los puntos de una se atribuirían a la otra sin dar error.",
+          );
+        }
+      }
+    }
+  }
+
+  SISTEMAS.push(entrada);
+  SISTEMA[entrada.id] = entrada;
+  SISTEMA_IDS.push(entrada.id);
+
+  /*
+   * En servicio salvo que se declare cerrada. Se recalcula en vez de empujar
+   * para que las dos listas no puedan divergir — que una máquina esté en
+   * `SISTEMAS` y no en `SISTEMAS_EN_SERVICIO` es un estado legítimo, pero
+   * mantenerlo a mano en dos sitios es como deja de serlo.
+   */
+  if (!entrada.cerrado) {
+    SISTEMAS_EN_SERVICIO.push(entrada);
+    SISTEMA_IDS_EN_SERVICIO.push(entrada.id);
+  }
+
+  /* La MISMA validación que las escritas a mano. Si la entrada construida no
+     la pasa, es un defecto de `construirSistema`, y es mejor no arrancar. */
+  validarRegistro();
+
+  return entrada;
+}
+
+/**
  * A qué sistema pertenece una pantalla.
  *
  * Se le pasa el hash de la ruta —`#/eva-vibraciones`— y devuelve el id del
