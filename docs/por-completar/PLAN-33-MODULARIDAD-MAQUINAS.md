@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría) y F1–F6 completadas (F5 de sólo lectura) · F7 en adelante por completar
+**Estado:** Fase 0 (auditoría) y F1–F7 completadas (F5 de sólo lectura) · F8, F9 y F10 por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -1389,19 +1389,67 @@ conviene poder revertir por separado.
 
 ---
 
-### F7 · Tool Calling genérico
+### F7 · Tool Calling genérico ✅
 
-**Objetivo**: las 10 herramientas de historia aceptan `sistema`. **Es B3 del
-backlog**, no trabajo nuevo.
-**Backend**: índice de sinónimos por máquina (Plan 32 F6);
-`historicos/index.mjs` pierde sus dos `if`.
-**Tests**: `verificar-herramientas` con una máquina configurada; el resolvedor
-**sigue preguntando ante ambigüedad**.
-**Dependencias**: F4.
-**Riesgos**: medio — un resolvedor que elija en vez de preguntar contesta
-correctamente sobre la máquina equivocada.
-**Aceptación**: las 10 herramientas contestan sobre vibraciones; ninguna elige
-por el usuario ante ambigüedad.
+**Completada el 18-09-2026.**
+
+#### El gap era mucho más pequeño de lo que este plan decía
+
+La auditoría afirmó que «diez herramientas resuelven nombres contra el catálogo
+del tanque». **Medido: eran tres.** Trece de las catorce de `historicos/` ya
+usan `resolverSenalDeSistema`, el resolvedor por máquina. B3 estaba
+mayormente hecho y el plan lo contó como pendiente entero.
+
+| Herramienta | Lo que estaba mal |
+|---|---|
+| `limites_del_manual` | resolvía con el índice del tanque y acotaba el RAG a `sistema: 'tanque'` **literal** |
+| `generar_reporte` | resolvía contra el tanque y **no aceptaba `sistema`** |
+| `alarma_sostenida` | lo aceptaba **en código** y no lo declaraba: el modelo no tenía forma de pasarlo |
+
+#### Lo que se arregló, y cómo
+
+**`limites_del_manual`** pregunta ahora al REGISTRO con `sistemasDeSenal()`
+—que devuelve una lista y nunca elige— y acota el RAG a la máquina de la señal.
+El `sistema` del argumento sólo **desempata**: una señal que existe en una sola
+no cambia de dueño porque alguien pase el id de otra. El literal `'tanque'`
+tenía escrito al lado que dejaría de ser cierto «al parametrizar la resolución
+por máquina»; ese momento era éste.
+
+**`generar_reporte`** acepta `sistema` y resuelve con el mismo resolvedor que
+sus trece hermanas. Y **se niega a mezclar dos máquinas en un PDF**: eso es lo
+que `NO_COMPARTEN` prohíbe, y en papel dura más que una respuesta de chat —
+alguien lo archiva y seis meses después nadie recuerda que esas curvas no se
+podían comparar.
+
+**`alarma_sostenida`** declara el `sistema` que ya aceptaba.
+
+#### La guarda que evitó que el arreglo fuera peor que el defecto
+
+`generar_reporte` dibuja con `senalInfo`, `UMBRALES` y `leerSerieEnRango`,
+**todos del catálogo del tanque**. Dejar pasar una clave de vibraciones tras
+resolverla habría producido un PDF con rótulos vacíos o con la señal del agua
+que ocupara esa posición.
+
+Así que se añade la **misma guarda que ya tiene `pronostico_de_desgaste`** unas
+líneas más arriba, y por el mismo motivo escrito allí: resolver por máquina, y
+negarse con su porqué mientras el cuerpo no esté parametrizado.
+
+Lo que F7 arregla es la **resolución**: antes, pedir el reporte de una señal de
+vibraciones caía en «ninguna de las señales pedidas se reconoce» — una negativa
+redactada como si la señal no existiera, teniendo serie. Ahora se reconoce, se
+sabe de quién es, y se dice por qué no se puede dibujar todavía.
+
+**Medido**: `verificar-herramientas` 169 (22 omitidas, igual que antes) ·
+`verificar-instrucciones` 28 reglas × 2 sistemas · `verificar-documentos` 24 ·
+los 34 verificadores · 365 de backend · 1002 de frontend · lint y types
+limpios.
+
+#### Lo que sigue pendiente, y no es de esta fase
+
+El **índice de sinónimos por máquina** (Plan 32 F6): el tanque sabe que «la
+bomba» es la carga del motor, y vibraciones no tiene equivalente. Eso no
+impide resolver por máquina —lo que F7 hacía— sino que una máquina entienda
+cómo la nombra la gente.
 
 ---
 
@@ -1428,6 +1476,91 @@ por el usuario ante ambigüedad.
 50 series verificadas.
 **Aceptación**: los 11 casos siguen resolviendo; las 50 series siguen dando las
 mismas muestras; los dos `NO_COMPARTEN` reactivados y en verde.
+
+---
+
+### F10 · Las vistas que pertenecen a una máquina
+
+**Por completar.** Añadida el 18-09-2026, a petición del usuario.
+
+#### Por qué faltaba
+
+La petición original (§12) pedía tres apartados con nueve vistas **dentro de
+cada máquina**. Al escribir este plan eso se trató en §10 como «rutas
+dinámicas» y **no se convirtió en ninguna fase**: ninguna de F1–F9 lo cubre.
+Es un hueco del plan, no una decisión.
+
+Se ve al abrir el tablero: la sección «Estación de vibraciones» tiene cuatro
+entradas —Inicio, Gráficas, Riesgos, Vista 3D— y las otras cinco viven en
+«General» y «RAG», fuera de la máquina.
+
+#### El criterio, corregido por el usuario
+
+Lo que hay hoy en «General» está ahí por una razón escrita en `routes.jsx`: un
+turno o una alarma no son de una máquina, quien entra a las seis se hace cargo
+de la instalación entera. **Con dos máquinas eso era razonable; con N deja de
+serlo**, y con una sola abierta sólo esconde lo que hay.
+
+El usuario acotó dónde aplica cada criterio, y la distinción es correcta:
+
+| Vista | Dónde va | Por qué |
+|---|---|---|
+| **Turno** | General | Un turno **sí** es de la planta entera |
+| **Alarmas** | **De la máquina** | Un área de alarmas cuelga de un asset |
+| **Hallazgos** | **De la máquina** | Un riesgo se evalúa con las reglas de SU tipo |
+| **Avisos** | **De la máquina** | Un aviso nace de un hallazgo de esa máquina |
+| **Casos previos** | **De la máquina** | Ya llevan `sistema` obligatorio |
+| **RAG documental** | **De la máquina** | Ya filtra por `sistema` |
+| **Historización** | **De la máquina** | **No existe** — ver abajo |
+
+#### La estructura resultante
+
+```
+Máquina
+├── Visualización   Inicio · Gráficas · Vista 3D · Alarmas · Historización
+├── Diagnóstico     Hallazgos · Avisos
+└── Documentación   Casos previos · RAG documental
+
+General                Turno · Assets · Configuración · Cuaderno · Salud
+```
+
+«Riesgos» y «Hallazgos» son hoy dos nombres para lo mismo (`RiesgosVibracion`
+y `BandejaEva`). Al encuadrarlas hay que quedarse con **uno**: dos entradas de
+menú que contestan la misma pregunta se leen como dos cosas distintas.
+
+#### Lo que cuesta, y lo que no
+
+**Cinco de las siete son reubicación, no construcción.** `CasosRag` ya filtra
+por sistema, `BandejaEva` y `AvisosEva` ya distinguen por máquina, y
+`useMaquina()` existe desde F6. Lo que falta es que lean el contexto en vez de
+recibirlo por props o mostrarlo todo.
+
+**Historización es distinta: hay que construirla.** Depende de
+`data/vibraciones/historia.js`, que es **F3 del Plan 32** — y ésa está
+bloqueada por **F2 del mismo plan**, el historiador que devuelve 0 muestras
+con `tramosFallidos: 1`. Mientras eso no se resuelva, la entrada existiría para
+decir que no hay datos.
+
+#### Riesgo principal
+
+**La regresión de sondeo, otra vez.** Cinco vistas que hoy no pertenecen a
+ninguna máquina pasarían a leer una. Si alguna queda montada fuera de su
+sección —o si el encuadre se hace con un hook que suscribe— se revive la
+lectura del tanque desde vibraciones. La prueba tiene que mirar
+**suscripciones**, como `llenado-cerrado.test.jsx`.
+
+#### Dependencias
+
+F6 (hecha) para el contexto. **Historización depende del Plan 32 F2-F3.** Las
+otras seis no dependen de nada pendiente.
+
+#### Aceptación
+
+- Las nueve vistas salen bajo su máquina, en los tres apartados.
+- Hallazgos, Avisos, Casos y RAG enseñan **sólo** lo de esa máquina.
+- Ninguna de ellas suscribe una máquina distinta de la suya.
+- «Riesgos» y «Hallazgos» no coexisten con nombres distintos.
+- Turno sigue en General, cruzando máquinas.
 
 ---
 

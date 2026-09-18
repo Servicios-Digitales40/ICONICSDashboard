@@ -670,6 +670,17 @@ export const DEFINICIONES = [
               'Cuántos minutos recientes revisar. Si el usuario no lo dice, omítelo — se usan los ' +
               'últimos 5 minutos, que es lo que distingue un arranque normal de uno que no se resuelve.',
           },
+          /*
+           * El código ya lo aceptaba y se negaba con su motivo para otras
+           * máquinas; lo que faltaba era DECLARARLO, así que el modelo no
+           * tenía forma de pasarlo. Plan 33 F7.
+           */
+          sistema: {
+            type: 'string',
+            description:
+              'Id del sistema, para desambiguar si el nombre de la alarma existe en más de una ' +
+              'máquina. Por omisión "tanque", la única a la que esta herramienta puede contestar.',
+          },
         },
         required: ['alarma'],
       },
@@ -758,6 +769,19 @@ export const DEFINICIONES = [
               'El período de los gráficos, en lenguaje llano. Igual que en historia_de_senal, hasta ' +
               '~90 días. Si se omite, las últimas 6 horas.',
           },
+          /*
+           * Plan 33 F7. Antes esta herramienta resolvía los nombres SIEMPRE
+           * contra el catálogo del tanque, así que pedir el reporte de una
+           * señal de vibraciones caía en «ninguna se reconoce» — una negativa
+           * redactada como si la señal no existiera, teniendo serie.
+           */
+          sistema: {
+            type: 'string',
+            description:
+              'Id del sistema. Por omisión "tanque", HOY la única máquina cuyo PDF se sabe ' +
+              'dibujar: para otra, la herramienta lo dice en vez de armar un reporte con los ' +
+              'rótulos equivocados. Un reporte NUNCA mezcla dos máquinas.',
+          },
           explicacion: {
             type: 'string',
             description:
@@ -814,6 +838,19 @@ export const DEFINICIONES = [
         type: 'object',
         properties: {
           senal: { type: 'string', description: 'Nombre de la señal, en lenguaje llano.' },
+          /*
+           * Sólo DESEMPATA (Plan 33 F7): la máquina sale del registro, y una
+           * señal que existe en una sola no cambia de dueño porque alguien
+           * pase el id de otra. Si la señal es de otra máquina, la herramienta
+           * lo dice y remite a `consultar_documentacion`.
+           */
+          sistema: {
+            type: 'string',
+            description:
+              'Id del sistema, SÓLO si el nombre de la señal existe en más de una máquina. ' +
+              'La extracción de límites está escrita contra el catálogo del tanque: para otra ' +
+              'máquina la herramienta lo dice y remite a consultar_documentacion.',
+          },
         },
         required: ['senal'],
       },

@@ -33,6 +33,9 @@ import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../sha
  * planta»; es el mismo validador que usa el manifiesto de manuales, para que
  * el asistente y la pantalla midan «sistema válido» con la misma vara. */
 import { sistemaValido } from '../../../../shared/eva/comun/manuales.js'
+/* Quién reclama un nombre de señal, preguntando al REGISTRO y no a un
+   catálogo concreto. Devuelve una lista y nunca elige — Plan 33 F7. */
+import { sistemasDeSenal } from '../../../../shared/eva/comun/sistemas.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
 
@@ -353,11 +356,67 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
      * sesgada hacia palabras de límite— y un filtrado por patrón encima de
      * los fragmentos que ya devuelve.
      */
-    async limites_del_manual({ senal } = {}) {
+    async limites_del_manual({ senal, sistema } = {}) {
       if (!indiceDocumentos) {
         return fallo(
           'Este servidor no tiene documentación de planta cargada (falta la variable ' +
             'IA_DOCS_DIR). No puedo consultar límites del manual: dilo así y no contestes de memoria.'
+        )
+      }
+
+      /*
+       * ── DE QUÉ MÁQUINA ES ESTA SEÑAL (Plan 33 F7) ────────────────────
+       *
+       * Hasta hoy esta herramienta resolvía SIEMPRE contra el catálogo del
+       * tanque y acotaba la búsqueda a `sistema: 'tanque'`. El comentario de
+       * abajo ya avisaba de que ese literal dejaría de ser cierto «al
+       * parametrizar la resolución por máquina».
+       *
+       * Ese momento es éste. `sistemasDeSenal()` pregunta al REGISTRO qué
+       * máquinas reclaman un nombre, y devuelve una lista: con un nombre
+       * ambiguo salen varias y hay que preguntar, porque elegir es cómo se
+       * contesta correctamente sobre la instalación equivocada.
+       *
+       * El `sistema` del argumento sólo DESEMPATA. No se usa para forzar la
+       * máquina: una señal que sólo existe en una no cambia de dueño porque
+       * alguien pase el id de otra.
+       */
+      /* `duenos` y no `candidatos`: más abajo hay otro `candidatos`, el de los
+         límites extraídos del manual, y son cosas distintas. */
+      const duenos = sistemasDeSenal(senal)
+      let encontrado = duenos[0] ?? null
+
+      if (duenos.length > 1) {
+        const acotado = sistema
+          ? duenos.filter((d) => d.sistema === String(sistema).trim())
+          : duenos
+
+        if (acotado.length !== 1) {
+          return fallo(
+            `«${senal}» existe en más de un sitio: ` +
+              `${acotado.map((d) => `${d.clave} (${d.sistema})`).join('; ')}. ` +
+              'Di de qué sistema y con qué nombre exacto.',
+            { candidatos: acotado }
+          )
+        }
+        encontrado = acotado[0]
+      }
+
+      const sistemaDeLaSenal = encontrado?.sistema ?? null
+
+      /*
+       * Los límites se extraen con `anclaDeSenal` y `senalInfo`, que son del
+       * catálogo del TANQUE: esa parte no está parametrizada todavía. Así que
+       * una señal de otra máquina se niega en vez de resolverse contra el
+       * catálogo equivocado — que devolvería `null` y acabaría diciendo que la
+       * señal no existe, teniendo manual.
+       */
+      if (sistemaDeLaSenal && sistemaDeLaSenal !== 'tanque') {
+        return fallo(
+          `«${senal}» es del sistema «${sistemaDeLaSenal}», y la extracción de límites del ` +
+            'manual sólo está escrita contra el catálogo del tanque. Su documentación sí se ' +
+            `puede buscar con consultar_documentacion(sistema="${sistemaDeLaSenal}").`,
+          { sistema: sistemaDeLaSenal }
         )
       }
 
@@ -382,11 +441,22 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        * respaldar una señal de agua, y hasta hoy podía: los nueve manuales
        * estaban sin asignar y competían todos contra todo.
        *
-       * OJO al parametrizar la resolución de señales por máquina (la fase
-       * pendiente que menciona la cabecera): en ese momento este `'tanque'`
-       * deja de ser cierto y hay que derivarlo de la señal resuelta.
+       * ── YA NO ES UN LITERAL (Plan 33 F7, 18-09-2026) ────────────────
+       *
+       * Esto decía `sistema: 'tanque'` a pelo, con una nota avisando de que
+       * dejaría de ser cierto al parametrizar la resolución por máquina. Ese
+       * momento llegó: ahora la máquina sale de `sistemasDeSenal()` arriba, y
+       * si la señal fuera de otra, la guarda de allí ya se ha negado.
+       *
+       * El `?? 'tanque'` cubre el caso en que el registro no reclame el nombre
+       * pero `resolverSenal` sí lo reconozca —pasa con los sinónimos del
+       * tanque, que el registro no conoce—. Ahí la señal es del tanque por
+       * construcción: `senalInfo` viene de su catálogo.
        */
-      const resultados = await indiceDocumentos.buscar(consulta, { top: 5, sistema: 'tanque' })
+      const resultados = await indiceDocumentos.buscar(consulta, {
+        top: 5,
+        sistema: sistemaDeLaSenal ?? 'tanque',
+      })
 
       if (!resultados.length) {
         const estado = indiceDocumentos.estado()

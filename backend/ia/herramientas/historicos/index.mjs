@@ -67,9 +67,11 @@ import {
   normalizar,
   resumirSerie,
 } from '../../../../shared/eva/comun/historia.js'
+/* `SENAL_KEYS` se fue en el Plan 33 F7: `generar_reporte` era su último
+   consumidor, y ahora las claves salen del registro de la máquina pedida
+   (`entrada.claves()`) en vez de la lista del tanque. */
 import {
   SENALES,
-  SENAL_KEYS,
   esHistorizada,
   historizadas,
   pointName,
@@ -1361,19 +1363,57 @@ export function crearHerramientasDeHistoricos({
      * `analisis_de_senal`) y pasar aquí su propio comentario, que se imprime
      * aparte y con su procedencia dicha, nunca mezclado con las cifras.
      */
-    async generar_reporte({ senales, periodo, explicacion } = {}, { idioma = 'es' } = {}) {
+    async generar_reporte({ senales, periodo, explicacion, sistema } = {}, { idioma = 'es' } = {}) {
       const v = resolverVentana(periodo, { turnos, maxHoras: MAX_DIAS_REPORTE * 24 })
       if (v.error) return fallo(v.error)
 
+      /*
+       * ── EL REPORTE YA NO ES SÓLO DEL TANQUE (Plan 33 F7) ────────────
+       *
+       * Esto resolvía con `resolverSenal`, el índice de nombres DEL TANQUE, y
+       * sin aceptar `sistema`. Pedir el reporte de una señal de vibraciones
+       * caía en «ninguna de las señales pedidas se reconoce» — una negativa
+       * redactada como si la señal no existiera, teniendo serie.
+       *
+       * Ahora pasa por `resolverSenalDeSistema`, el mismo resolvedor que ya
+       * usan las otras trece herramientas de este archivo. Sin `sistema` sigue
+       * cayendo al tanque, así que ninguna llamada existente cambia.
+       *
+       * ── POR QUÉ EL REPORTE ES DE UNA SOLA MÁQUINA ───────────────────
+       *
+       * Un PDF que mezcle series de dos instalaciones separadas es
+       * exactamente lo que `NO_COMPARTEN` prohíbe, y en papel dura más que una
+       * respuesta de chat: alguien lo archiva y seis meses después nadie
+       * recuerda que esas dos curvas no se pueden comparar. Si las señales
+       * pedidas son de máquinas distintas, se niega y lo dice.
+       */
       let claves
+      let sistemaDelReporte = null
       const desconocidas = []
+
       if (senales && senales.length) {
         claves = []
         for (const nombre of senales) {
-          const clave = resolverSenal(nombre)
-          if (clave) claves.push(clave)
-          else desconocidas.push(nombre)
+          const r = resolverSenalDeSistema(nombre, sistema)
+          if (!r.ok) {
+            desconocidas.push(nombre)
+            continue
+          }
+
+          if (sistemaDelReporte && r.sistemaId !== sistemaDelReporte) {
+            return fallo(
+              `«${nombre}» es de «${r.sistemaId}» y las anteriores de ` +
+                `«${sistemaDelReporte}». Un reporte no mezcla dos máquinas: son instalaciones ` +
+                'separadas, y en un PDF esa mezcla sobrevive a la conversación que la explicaba. ' +
+                'Pide un reporte por máquina.',
+              { sistemas: [sistemaDelReporte, r.sistemaId] }
+            )
+          }
+
+          sistemaDelReporte = r.sistemaId
+          claves.push(r.clave)
         }
+
         if (!claves.length) {
           return fallo(
             `Ninguna de las señales pedidas se reconoce: ${desconocidas.join(', ')}. El catálogo ` +
@@ -1381,7 +1421,48 @@ export function crearHerramientasDeHistoricos({
           )
         }
       } else {
-        claves = [...SENAL_KEYS]
+        /*
+         * Sin señales se manda el catálogo entero de la máquina pedida. Con
+         * `sistema` declarado son SUS claves; sin él, las del tanque, que es
+         * lo que hacía antes.
+         */
+        sistemaDelReporte = sistema ? String(sistema).trim() : 'tanque'
+        const entrada = SISTEMA[sistemaDelReporte]
+        if (!entrada) {
+          return fallo(`No hay ningún sistema llamado "${sistema}" en esta planta.`, {
+            sistemas: Object.keys(SISTEMA),
+          })
+        }
+        claves = entrada.claves().filter((k) => entrada.esHistorizada(k))
+      }
+
+      /*
+       * ── Y EL CUERPO DE ABAJO SIGUE SIENDO DEL TANQUE ────────────────
+       *
+       * Misma situación —y misma guarda— que `pronostico_de_desgaste` unas
+       * líneas más arriba: `esHistorizada`, `senalInfo`, `UMBRALES` y
+       * `leerSerieEnRango` salen de `tanque/senales.js` e `historia.js`. Nada
+       * de eso mira de qué máquina es la clave.
+       *
+       * Lo que F7 arregla es la RESOLUCIÓN del nombre: antes, pedir el reporte
+       * de una señal de vibraciones caía en «ninguna de las señales pedidas se
+       * reconoce», una negativa redactada como si la señal no existiera
+       * teniendo serie. Ahora se reconoce, se sabe de quién es, y se dice por
+       * qué no se puede dibujar todavía.
+       *
+       * Sin esta guarda el arreglo sería peor que el defecto: una clave de
+       * vibraciones entraría a `senalInfo` —que no la conoce—, y el PDF saldría
+       * con rótulos vacíos o con la señal del agua que ocupe esa posición.
+       *
+       * Se cae sola cuando el dibujo salga del registro en vez del catálogo.
+       */
+      if (sistemaDelReporte && sistemaDelReporte !== 'tanque') {
+        return fallo(
+          `El reporte en PDF todavía se dibuja contra el catálogo del tanque, así que no puede ` +
+            `armar uno de «${sistemaDelReporte}» aunque sus señales tengan serie. Sus datos sí ` +
+            `se pueden dar en la conversación: historia_de_senal(sistema="${sistemaDelReporte}").`,
+          { sistema: sistemaDelReporte }
+        )
       }
 
       const historizadasPedidas = claves.filter(esHistorizada)
