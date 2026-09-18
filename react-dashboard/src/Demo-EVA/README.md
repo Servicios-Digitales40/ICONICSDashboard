@@ -4,6 +4,26 @@ La aplicación, sobre árboles **reales** del servidor ICONICS. Nació sobre uno
 —`ac:TDCON/DEMO/SENSORES/`, la estación de llenado— y hoy sirve **dos máquinas**
 en secciones separadas del sidebar, con una tercera prevista:
 
+> ### ⚠ Rama `Vibraciones1.0`: la estación de llenado está cerrada
+>
+> Desde el 17-09-2026, **`views/tanque/` y `data/tanque/` no se tocan**. Sus
+> cinco vistas siguen registradas en `routes.jsx` pero sin `nav`, así que la
+> sección entera desaparece del sidebar —`buildNav` la deriva de las rutas que
+> traen `nav`—.
+>
+> Lo que conviene saber antes de tocar algo de `comunes/`: varias de esas
+> vistas evaluaban LAS DOS máquinas y ahora están acotadas a vibraciones
+> (`BandejaEva`, `AvisosEva`, `CasosRag`, `TurnoEva`, `CuadernoEva`, y la
+> pestaña «En vivo» de `AlarmasEva`). Cada una lleva su bloque «para reabrir».
+>
+> **El sondeo del tanque se corta en el chrome, no en las vistas.** Arranca por
+> conteo de referencias desde `subscribeSistema` (`data/comunes/evaSource.js`),
+> así que basta con que un componente siempre montado —el sidebar, el badge de
+> hallazgos— llame a `useSistemaAgua()` para que vuelva a leerse en todas las
+> pantallas. Lo vigila `test/app/llenado-cerrado.test.jsx`.
+>
+> Plan completo: [`docs/por-completar/PLAN-32-VIBRACIONES.md`](../../../docs/por-completar/PLAN-32-VIBRACIONES.md).
+
 | Sección | Máquina | Árbol | Vistas |
 |---|---|---|---|
 | Estación de llenado | Tanque y grupo de bombeo (`PLC_1`) | `ac:TDCON/DEMO/SENSORES/` | 5 |

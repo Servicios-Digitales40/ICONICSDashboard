@@ -40,7 +40,7 @@ Ver [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../docs/por-completar/PLAN-8-DEMO-
 
 | Archivo | Qué contiene |
 |---|---|
-| `eva/comun/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `estado()`, `resumen()`, `series`, `desgaste` |
+| `eva/comun/sistemas.js` | **El registro.** Qué máquinas hay, su PLC, sus raíces, y su comportamiento: `puntos()`, `parse()`, `modelo()`, `estado()`, `resumen()`, `series`, `desgaste`, `cerrado` |
 | `eva/comun/estadoMaquina.js` | **La forma común.** Cómo cuenta cualquier máquina cómo está: señales, grupos, recuento y —lo que más importa— los puntos que NO contestaron |
 
 **El tanque** — `ac:TDCON/DEMO/SENSORES/`, ocho señales planas:
@@ -153,6 +153,32 @@ todavía no tiene series.
 > obligatorio está `series.nota`: una máquina sin histórico es perfectamente
 > válida, pero el silencio no, porque se lee como que sí lo tiene. Es el punto 3
 > del alta, puesto en el código.
+
+> **Una máquina puede estar CERRADA, y hay dos listas que no son la misma.**
+> (17-09-2026, rama `Vibraciones1.0`.)
+>
+> El campo opcional `cerrado` lleva el MOTIVO —no un booleano: quien lo pinte
+> necesita decir por qué, y un `true` obligaría a escribir ese porqué en la
+> vista, donde se queda viejo—. De él salen:
+>
+> - **`SISTEMA_IDS`** — qué EXISTE. Valida esquemas Zod y decide si un caso
+>   guardado es válido (`scripts/purgar-casos-invalidos.mjs`).
+> - **`SISTEMA_IDS_EN_SERVICIO`** — qué se ENSEÑA. Selectores, filtros, bucles
+>   de verificadores.
+>
+> **No se filtra la primera.** Se intentó y se descartó: los 11 casos previos
+> del tanque pasarían a tener un `sistema` que el backend no reconoce, y el
+> purgador los daría por inválidos. Ocultar una máquina no puede invalidar su
+> historia — eso no es cerrarla, es borrarla.
+>
+> Quien cierra de verdad es `resolverSistema()` en
+> `backend/ia/herramientas/lib/maquina.mjs`: niega toda herramienta de máquina
+> sobre un sistema `cerrado`. Está ahí y no en cada herramienta por el mismo
+> motivo que `autenticar` se aplica por ámbito — una guarda por herramienta se
+> olvida en la siguiente.
+>
+> Con las dos máquinas abiertas, las dos listas son iguales y nada de esto
+> hace nada. Es lo que debe pasar al reabrir.
 
 ### Lo que ya está probado del alta
 

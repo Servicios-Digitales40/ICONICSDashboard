@@ -6,6 +6,20 @@ de un servidor **ICONICS** (AssetWorX y Hyper Historian).
 Nació sobre una instalación de agua industrial y hoy sirve **dos máquinas** en
 secciones separadas, con el registro preparado para las que vengan.
 
+> ### ⚠ Rama `Vibraciones1.0`: sólo vibraciones
+>
+> **Desde el 17-09-2026, la estación de llenado está cerrada por
+> mantenimiento.** El tablero arranca en `vib-inicio`, no ofrece las vistas del
+> tanque, no lee sus 52 puntos y el asistente se niega a contestar sobre esa
+> máquina.
+>
+> Su código sigue entero en el árbol —**cerrado no es borrado**— y cada sitio
+> lleva escrito cómo volver. El plan, con qué se cerró y cómo se reabre, está
+> en [`docs/por-completar/PLAN-32-VIBRACIONES.md`](docs/por-completar/PLAN-32-VIBRACIONES.md).
+>
+> Mientras dure la rama, **el código del tanque se consulta pero no se
+> modifica**, y sus pruebas están omitidas con su motivo.
+
 El proyecto son dos piezas: un backend puente en Node que resuelve la
 autenticación contra ICONICS, y un frontend en React que consume ese backend.
 

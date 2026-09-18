@@ -12,6 +12,31 @@ enseña dos instalaciones de planta (un sistema de agua y un sistema de
 vibraciones) y un asistente de IA que responde sobre ellas. Detalle de
 producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 
+> ## ⚠ RAMA `Vibraciones1.0`: LA ESTACIÓN DE LLENADO ESTÁ CERRADA
+>
+> **Desde el 17-09-2026 y hasta nuevo aviso, esta demo es SÓLO de vibraciones.**
+>
+> El tanque y su grupo de bombeo están **cerrados por mantenimiento**: no salen
+> en el menú, no se leen sus puntos, el asistente se niega a contestar sobre
+> ellos y sus pruebas están omitidas. El plan completo —qué se cerró, por qué
+> así y cómo se reabre— está en
+> [`docs/por-completar/PLAN-32-VIBRACIONES.md`](docs/por-completar/PLAN-32-VIBRACIONES.md) §2.
+>
+> **Las dos reglas de esta rama:**
+>
+> 1. **El código del tanque NO se modifica.** Se consulta cuanto haga falta —es
+>    el módulo maduro y el espejo del que copiar para vibraciones— pero no se
+>    edita. Si algo del tanque parece que hay que arreglar, se anota; no se toca.
+> 2. **Sus pruebas no se arreglan.** Las que dependen de esa máquina están
+>    omitidas con su motivo escrito y su «para reabrir». Una que falle por el
+>    cierre se omite igual; una que falle por OTRA cosa sí es un defecto.
+>
+> **Cerrado no es borrado.** Todo lo del tanque sigue en el árbol, comentado o
+> con `.skip`, y cada sitio dice cómo volver. Reabrir es deshacer, no reescribir.
+>
+> Lo que sigue en este documento describe el proyecto COMPLETO, que es el que
+> vuelve al reabrir.
+
 ## 2. No negociables (arquitectura)
 
 Estas decisiones ya se tomaron. No se reabren por conveniencia de una tarea
@@ -416,6 +441,17 @@ node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranqu
 > Lo que este guion protege de verdad —que la pila 3D no viaje en el arranque—
 > no depende de ninguno de esos números sino de `HUELLAS_3D`, y ahí no se ha
 > tocado nada. Es lo que destapó los 827 KB colados del 08-09.
+
+> **En la rama `Vibraciones1.0`, parte de la suite está OMITIDA a propósito.**
+> Hoy: 29 pruebas de frontend con `.skip` y 22 comprobaciones de
+> `verificar-herramientas.mjs` con `omitir()`. No son deuda ni fallos tapados —
+> cada una lleva su motivo y su «para reabrir», y el guion de herramientas
+> **imprime al final cuántas omitió y por qué**, para que nadie lea su verde
+> como si hubiera mirado las 191.
+>
+> Lo que eso significa al trabajar: **un rojo nuevo es un defecto de verdad**,
+> porque lo del cierre ya está omitido. Y si una prueba falla por depender del
+> tanque, se omite con su motivo — no se arregla tocando esa máquina (§1).
 
 **Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
 `verificar-herramientas.mjs` y el verificador específico de lo que tocó
