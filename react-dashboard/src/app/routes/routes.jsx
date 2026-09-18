@@ -320,6 +320,25 @@ export const ROUTES = [
 
   {
     /*
+     * ── «CONFIGURACIÓN» VA JUNTO A ASSETS, Y NO EN UNA MÁQUINA ─────────
+     *
+     * Porque no es de ninguna: es donde se declara QUÉ máquinas existen, y
+     * ponerla dentro de una obligaría a entrar en la máquina A para dar de alta
+     * la B. Mismo criterio que Assets, con el que además comparte materia
+     * prima — el árbol de ICONICS.
+     *
+     * De sólo lectura por ahora: el alta incluye decidir qué variables son
+     * escribibles, y eso necesita autenticación en el tablero (Plan 25). Está
+     * explicado en la propia pantalla, no sólo en el plan — ver la cabecera de
+     * `ConfiguracionPlanta.jsx`.
+     */
+    id: "eva-configuracion",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/ConfiguracionPlanta.jsx")),
+    nav: { icon: <Cog size={17} />, group: "sec-general" },
+  },
+
+  {
+    /*
      * ── POR QUÉ «TURNO» VA EN GENERAL Y NO EN UNA MÁQUINA ──────────────
      *
      * Porque un turno no es de una máquina: quien entra a las seis se hace

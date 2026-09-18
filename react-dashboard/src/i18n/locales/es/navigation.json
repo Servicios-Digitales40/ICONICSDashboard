@@ -146,6 +146,11 @@
       "title": "Muro de planta",
       "nav": "Muro",
       "sub": "Las dos máquinas a la vez, cada una con su estado, sus alarmas y su frescura"
+    },
+    "eva-configuracion": {
+      "title": "Configuración",
+      "nav": "Configuración",
+      "sub": "Qué máquinas conoce el tablero, y con qué señales de ICONICS"
     }
   },
   "palette": {

@@ -46,6 +46,9 @@
       },
       "eva-assets": {
         "frase": "The eight demo points, with their raw value and quality."
+      },
+      "eva-configuracion": {
+        "frase": "Which machines the dashboard knows, and with which ICONICS signals."
       }
     },
     "counts": {

@@ -26,7 +26,7 @@ import { buildNav } from "@/app/routes/buildNav.js";
 const ids = ROUTES.map((r) => r.id);
 
 describe("superficie de la aplicación", () => {
-  it("son las veintiocho vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las veintinueve vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -59,6 +59,11 @@ describe("superficie de la aplicación", () => {
       // instalación, habla del PUENTE (Plan 20 F10).
       "eva-alarmas",
       "eva-assets",
+      // `eva-configuracion` (Plan 33 F5) va junto a Assets y no dentro de una
+      // máquina: es donde se declara QUÉ máquinas existen, y meterla en una
+      // obligaría a entrar en la máquina A para dar de alta la B. Comparte
+      // además materia prima con Assets — el árbol de ICONICS.
+      "eva-configuracion",
       // `eva-turno` (Plan 25 F2) va en General por el mismo criterio que sus
       // vecinas: un turno no es de una máquina, quien entra se hace cargo de la
       // instalación entera.
@@ -201,7 +206,8 @@ describe("el sidebar que sale del registro", () => {
       // `eva-muro` oculta del sidebar para esta demo (14-09-2026): la ruta
       // sigue existiendo (ver el test de `ids` más arriba), sólo no trae
       // `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
-      "eva-alarmas", "eva-assets", "eva-turno", "eva-bandeja", "eva-avisos", "eva-cuaderno", "salud-sistema",
+      "eva-alarmas", "eva-assets", "eva-configuracion", "eva-turno", "eva-bandeja", "eva-avisos",
+      "eva-cuaderno", "salud-sistema",
     ]);
 
     /*

@@ -414,5 +414,28 @@
     "silent": "{{n}} de {{total}} sin dato",
     "silentSinTotal": "{{n}} sin dato",
     "silentTip": "Puntos de esta máquina que no están entregando lectura. Una máquina tranquila y una máquina que no contesta no son lo mismo."
+  },
+  "config": {
+    "title": "Configuración · Planta",
+    "sub": "Qué máquinas conoce el tablero, y con qué señales de ICONICS",
+    "list": "Máquinas configuradas",
+    "none": "Todavía no hay ninguna máquina configurada.",
+    "noneHint": "Las máquinas que trae el tablero de fábrica no salen aquí: están escritas en el código y no se configuran desde esta pantalla.",
+    "loading": "Cargando…",
+    "variables": "variables",
+    "series": "con serie verificada",
+    "assets": "assets",
+    "capabilities": "Lo que sabe hacer",
+    "limitations": "Lo que no puede hacer",
+    "state": "Estado",
+    "stateUnknown": "Sin comprobar contra ICONICS",
+    "stateUnknownHint": "Nadie ha mirado todavía si sus puntos siguen existiendo. No es un fallo: es que no se ha comprobado.",
+    "types": "Tipos disponibles",
+    "typeRules": "reglas",
+    "newMachine": "Nueva máquina",
+    "readOnly": "Esta pantalla es de sólo lectura por ahora",
+    "readOnlyWhy": "Dar de alta una máquina desde aquí necesita que el tablero sepa pedir credenciales, y todavía no sabe. Mientras tanto se configuran por la API.",
+    "deleted": "Máquina eliminada",
+    "deactivated": "Máquina desactivada, no eliminada"
   }
 }

@@ -46,6 +46,9 @@
       },
       "eva-assets": {
         "frase": "Los ocho puntos de la demo, con su valor y su calidad en crudo."
+      },
+      "eva-configuracion": {
+        "frase": "Qué máquinas conoce el tablero, y con qué señales de ICONICS."
       }
     },
     "counts": {

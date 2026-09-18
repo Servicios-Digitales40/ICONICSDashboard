@@ -414,5 +414,28 @@
     "silent": "{{n}} of {{total}} with no data",
     "silentSinTotal": "{{n}} with no data",
     "silentTip": "Points of this machine that are not reporting. A quiet machine and a machine that does not answer are not the same thing."
+  },
+  "config": {
+    "title": "Configuration · Plant",
+    "sub": "Which machines the dashboard knows, and with which ICONICS signals",
+    "list": "Configured machines",
+    "none": "No machines have been configured yet.",
+    "noneHint": "Machines that ship with the dashboard are not listed here: they are written in code and are not configured from this screen.",
+    "loading": "Loading…",
+    "variables": "variables",
+    "series": "with verified history",
+    "assets": "assets",
+    "capabilities": "What it can do",
+    "limitations": "What it cannot do",
+    "state": "State",
+    "stateUnknown": "Not checked against ICONICS",
+    "stateUnknownHint": "Nobody has checked yet whether its points still exist. This is not a failure: it simply has not been checked.",
+    "types": "Available types",
+    "typeRules": "rules",
+    "newMachine": "New machine",
+    "readOnly": "This screen is read-only for now",
+    "readOnlyWhy": "Registering a machine from here requires the dashboard to know how to ask for credentials, and it does not yet. In the meantime they are configured through the API.",
+    "deleted": "Machine deleted",
+    "deactivated": "Machine deactivated, not deleted"
   }
 }

@@ -146,6 +146,11 @@
       "title": "Plant wall",
       "nav": "Wall",
       "sub": "Both machines at once, each with its status, alarms and freshness"
+    },
+    "eva-configuracion": {
+      "title": "Configuration",
+      "nav": "Configuration",
+      "sub": "Which machines the dashboard knows, and with which ICONICS signals"
     }
   },
   "palette": {

@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría) y F1–F4 completadas · F5 en adelante por completar
+**Estado:** Fase 0 (auditoría) y F1–F5 completadas (F5 de sólo lectura) · F6 en adelante por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -318,7 +318,7 @@ nueva pasaría las otras dos validaciones y fallaría en ésta.
 | **Alta por configuración** | `PARCIAL` — persistencia y API (F2) | UI + registro | falta F3 (registro) y F5 (UI) |
 | **Capacidad read/write por variable** | `IMPLEMENTADO` (F2) | declarada, deny-by-default | falta la UI (F5) |
 | **Detección de deriva vs ICONICS** | **`NO IMPLEMENTADO`** | VALID/DEGRADED/INVALID | mecanismo entero |
-| Planta > Configuración | `NO IMPLEMENTADO` | vista nueva | vista + API |
+| Planta > Configuración | `PARCIAL` — sólo lectura (F5) | alta por UI | asistente de alta (necesita Plan 25) |
 | Rutas `/machines/:id/...` | `NO IMPLEMENTADO` — rutas fijas | dinámicas | router |
 | MachineType | `NO IMPLEMENTADO` | ¿separado? | ver §6 |
 
@@ -1202,16 +1202,78 @@ limpios. La comprobación del punto histórico se validó **por mutación**.
 
 ---
 
-### F5 · Planta > Configuración (UI)
+### F5 · Planta > Configuración (UI) — ✅ **de sólo lectura**
 
-**Objetivo**: la vista de seis pasos.
-**Frontend**: vista nueva, reutilizando `AssetsEva.jsx` para el árbol.
-**Asistente**: ninguno. **Seguridad**: `exigirRol`.
-**Dependencias**: F2. **Bloqueante externo**: marcar variables escribibles
-**requiere el Plan 25** (autenticación en el tablero).
-**Riesgos**: medio — UX que permita configuraciones plausibles pero falsas.
-**Aceptación**: configurar vibraciones **desde cero por la UI**, sin tocar
-código, y que salga idéntica a F4.
+**Completada el 18-09-2026, con su alcance recortado y dicho en voz alta.**
+
+**Qué se hizo**: `react-dashboard/src/lib/api/maquinasApi.js`,
+`views/comunes/ConfiguracionPlanta.jsx`, su ruta en `sec-general`, el bloque
+`config` en los dos diccionarios y
+`test/demo-eva/configuracion-planta.test.jsx` (9 pruebas).
+
+#### Por qué NO lleva el asistente de alta
+
+El plan lo anunciaba: marcar variables escribibles **depende del Plan 25**, y
+§20 lo declara dependencia dura, no recomendación. Hoy `AUTH_HABILITADA=false`
+— los roles existen y están probados, pero **no protegen nada**. Una pantalla
+que dejara marcar una variable como escribible sin autenticación pondría esa
+decisión al alcance de cualquiera con acceso al tablero.
+
+Así que la vista **enseña y explica**; el alta sigue por la API, que ya tiene
+`exigirRol('administrador')` declarado y listo para cuando el interruptor se
+encienda.
+
+**Y lo dice en pantalla, no sólo aquí.** Una vista sin botón de «nueva
+máquina» y sin explicación se lee como una vista rota; el aviso va arriba del
+todo, porque leerlo después de buscar el botón sin encontrarlo no sirve.
+
+#### Lo que la vista defiende
+
+**Pinta las limitaciones.** Es lo que más importa: una máquina recién
+configurada es válida y está casi ciega. Enseñar sólo lo que sabe hacer la
+haría parecer completa, y «no hay riesgos» se leería como «está bien» en vez de
+«no se pudo mirar».
+
+**Explica la lista vacía.** Quien ve el tanque y vibraciones en el menú y esta
+lista vacía concluye que la pantalla está rota. No lo está: esas dos están
+escritas en código.
+
+**`UNKNOWN` no se pinta como error.** Significa «nadie ha comprobado todavía»,
+no «está roto». Pintarlo en rojo enseñaría a ignorar los rojos de verdad.
+
+**No despierta el sondeo.** No llama a ningún hook de máquina, y la prueba mira
+las **suscripciones** —no lo que se pinta—, que es la regresión que este
+proyecto ya cometió dos veces.
+
+#### De paso: `ErrorDelPuente` no conservaba el cuerpo
+
+`POST /api/maquinas` rechaza con una lista de `{campo, problema}` para que la
+pantalla señale el paso que falla. Esa lista **se perdía al construir el
+error**: `errorDeRespuesta` se quedaba sólo con `codigo` y `mensaje`.
+
+Se añadió `detalle` con el cuerpo entero. Sin él, la vista habría tenido que
+reimplementar la validación para saber dónde apuntar — que es cómo nacen las
+dos copias de una regla.
+
+#### Tres cosas que se corrigieron sobre la marcha
+
+- `Panel` no acepta `icon`, sino `right`.
+- `useMensajeDeError` devuelve `{titulo, detalle, accion}`, no una cadena.
+- **`toBeInTheDocument` no existe en este proyecto**: no hay `jest-dom`
+  instalado. La convención es `.toBeTruthy()`, y adaptarse a ella era mejor que
+  añadir una dependencia para una prueba.
+
+**Medido**: 9 pruebas nuevas · **991** de frontend (antes 982, 29 omitidas) ·
+364 de backend · los 34 verificadores · `verificar-i18n` 1297 claves × 2
+idiomas con paridad · `verificar-textos` sin español suelto · bundle `index`
+301,78 KB de 450 · lint y types limpios. El pintado de limitaciones se
+comprobó **por mutación**.
+
+#### Lo que queda para cuando el Plan 25 encienda la autenticación
+
+El asistente de seis pasos descrito en §8, con su paso 5b —el sondeo
+comparativo de series—, que es el único que no se puede resolver preguntando al
+servidor.
 
 ---
 

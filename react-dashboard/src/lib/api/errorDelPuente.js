@@ -37,8 +37,10 @@ export class ErrorDelPuente extends Error {
    * @param {string} [opciones.codigo]   uno de `backend/http/codigos.mjs`
    * @param {string} [opciones.mensaje]  el texto que redactó el servidor
    * @param {number} [opciones.estado]   el código HTTP, para depurar
+   * @param {object} [opciones.detalle]  lo que el cuerpo traiga además del
+   *   mensaje. Hoy sólo `problemas` de `/api/maquinas` (Plan 33 F5)
    */
-  constructor({ codigo = null, mensaje = "", estado = null } = {}) {
+  constructor({ codigo = null, mensaje = "", estado = null, detalle = null } = {}) {
     /*
      * `message` se queda con el texto del servidor —no con el código— para que
      * un `console.error` o una traza sigan siendo legibles sin traducir nada.
@@ -48,6 +50,23 @@ export class ErrorDelPuente extends Error {
     this.codigo = codigo;
     this.mensajeDelServidor = mensaje || null;
     this.estado = estado;
+    /*
+     * ── POR QUÉ UN ERROR PUEDE LLEVAR MÁS QUE UNA FRASE ────────────
+     *
+     * Porque algunos fallos no se explican en una línea. `POST /api/maquinas`
+     * rechaza una configuración incompleta con una LISTA de `{campo,
+     * problema}`, y esa lista es lo que permite a la pantalla señalar el paso
+     * que está mal en vez de un aviso genérico encima del formulario.
+     *
+     * Sin este campo la lista se perdía al construir el error, y la vista
+     * habría tenido que reimplementar la validación para saber dónde apuntar —
+     * que es cómo nacen las dos copias de una misma regla (`shared/README.md`).
+     *
+     * Es `null` para los demás clientes, que no mandan nada aparte. Se guarda
+     * el cuerpo entero y no sólo `problemas` para no tener que volver aquí la
+     * próxima vez que un error necesite acompañamiento.
+     */
+    this.detalle = detalle;
   }
 }
 
@@ -85,5 +104,8 @@ export function errorDeRespuesta(cuerpo, estado, porDefecto = "") {
     codigo: typeof cuerpo?.codigo === "string" ? cuerpo.codigo : null,
     mensaje: delServidor || porDefecto || (estado ? `HTTP ${estado}` : ""),
     estado,
+    /* El cuerpo entero, para lo que un error traiga además del mensaje. Ver
+       `detalle` en el constructor. */
+    detalle: cuerpo && typeof cuerpo === "object" ? cuerpo : null,
   });
 }
