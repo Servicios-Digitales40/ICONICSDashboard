@@ -66,6 +66,30 @@ function enCalma() {
   obtenerDiagnostico.mockResolvedValue({ causas: [] });
 }
 
+/**
+ * Riesgos activos de LA máquina en servicio.
+ *
+ * ── POR QUÉ EXISTE ESTE HELPER (rama `Vibraciones1.0`) ─────────────
+ *
+ * Doce comprobaciones de este archivo montaban su escenario llamando a
+ * `evaluarRiesgos` —el del tanque— directamente. Con la estación de llenado
+ * cerrada, `BandejaEva` ya no lo evalúa, así que todas se quedaban sin nada
+ * que enseñar.
+ *
+ * Se adapta en UN sitio en vez de reescribir doce: lo que esas pruebas afirman
+ * —descartar es local, navegar también descarta, la severidad ordena, los
+ * casos similares aparecen— no depende de qué máquina sea el riesgo.
+ *
+ * El nombre dice «en servicio» y no «vibraciones» a propósito: al reabrir el
+ * tanque, esto vuelve a ser `evaluarRiesgos` y las doce siguen sirviendo sin
+ * tocarlas otra vez.
+ */
+function conRiesgos(activos) {
+  evaluarRiesgosVibracion.mockReturnValue({
+    activos, noEvaluables: [], evaluadas: activos.length,
+  });
+}
+
 const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
@@ -83,12 +107,21 @@ describe("sin nada activo, la bandeja lo dice", () => {
 });
 
 describe("los riesgos activos aparecen como hallazgos, sin mezclar máquinas", () => {
-  it("un riesgo del tanque y uno de vibraciones NO se confunden", async () => {
+  /*
+   * ── OMITIDO: HACEN FALTA DOS MÁQUINAS (rama `Vibraciones1.0`) ──────
+   *
+   * Comprueba `NO_COMPARTEN`: que un riesgo del tanque y uno de vibraciones no
+   * se confunden en la misma bandeja. Con la estación de llenado cerrada sólo
+   * hay una, así que no queda con qué contrastar — no porque la regla haya
+   * dejado de valer.
+   *
+   * Es de las primeras que hay que reactivar al reabrir: vigila un no
+   * negociable (§2.1). Para reabrir: quitar el `.skip` y devolver el primer
+   * `conRiesgos` a `evaluarRiesgos`.
+   */
+  it.skip("un riesgo del tanque y uno de vibraciones NO se confunden", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "Nivel al 98%" }],
-      noEvaluables: [], evaluadas: 1,
-    });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "Nivel al 98%" }]);
     evaluarRiesgosVibracion.mockReturnValue({
       activos: [{ id: "desalineacion", titulo: "Desalineación", severidad: "atencion", evidencia: "Zona D" }],
       noEvaluables: [], evaluadas: 1,
@@ -104,14 +137,10 @@ describe("los riesgos activos aparecen como hallazgos, sin mezclar máquinas", (
 
   it("se ordenan por severidad: crítico antes que atención", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [
+    conRiesgos([
         { id: "leve", titulo: "Riesgo leve", severidad: "atencion", evidencia: "X" },
         { id: "grave", titulo: "Riesgo grave", severidad: "critico", evidencia: "Y" },
-      ],
-      noEvaluables: [], evaluadas: 2,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+      ]);
 
     montar();
 
@@ -129,11 +158,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
      * aquí — lo que SÍ se verifica es que "descartar" es puramente local.
      */
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
 
     montar();
     await waitFor(() => expect(screen.getByText("Riesgo de derrame")).toBeTruthy());
@@ -146,11 +171,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
   it("un hallazgo descartado sigue descartado tras remontar la pantalla", async () => {
     // Persiste entre visitas — el mismo criterio que "vistos" en Alarmas.
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
 
     const { unmount } = montar();
     await waitFor(() => expect(screen.getByText("Riesgo de derrame")).toBeTruthy());
@@ -165,11 +186,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
 
   it("navegar a un hallazgo TAMBIÉN lo descarta, con el mismo mecanismo", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
 
     const onNavigate = vi.fn();
     montar(onNavigate);
@@ -177,7 +194,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
 
     fireEvent.click(screen.getByRole("button", { name: /Ver/i }));
 
-    expect(onNavigate).toHaveBeenCalledWith("eva-riesgos");
+    expect(onNavigate).toHaveBeenCalledWith("eva-riesgos-vibracion");
     await waitFor(() => expect(screen.getByText(/No hay hallazgos pendientes/)).toBeTruthy());
   });
 
@@ -202,11 +219,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
 describe("los casos similares proactivos (F0) también aparecen como hallazgo", () => {
   it("un caso similar de un riesgo activo se enseña, y navega al cierre de diagnóstico", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
     obtenerDiagnostico.mockResolvedValue({
       causas: [{ id: "derrame", casosCitados: [{ id: "c1", fecha: "2026-08-01", resuelto: true, resumen: "La válvula no cerró" }] }],
     });
@@ -219,16 +232,12 @@ describe("los casos similares proactivos (F0) también aparecen como hallazgo", 
     const botones = screen.getAllByRole("button", { name: /Ver/i });
     fireEvent.click(botones[botones.length - 1]);
 
-    expect(onNavigate).toHaveBeenCalledWith("cierre-diagnostico", { sistema: "tanque", riesgoId: "derrame" });
+    expect(onNavigate).toHaveBeenCalledWith("cierre-diagnostico", { sistema: "vibraciones", riesgoId: "derrame" });
   });
 
   it("un caso similar NO lleva severidad inventada: no se pinta crítico ni atención por su cuenta", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "informativo", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "informativo", evidencia: "E" }]);
     obtenerDiagnostico.mockResolvedValue({
       causas: [{ id: "derrame", casosCitados: [{ id: "c1", fecha: "2026-08-01", resuelto: true, resumen: "La válvula no cerró" }] }],
     });
@@ -255,11 +264,7 @@ describe("los casos similares proactivos (F0) también aparecen como hallazgo", 
 describe("la causa más respaldada se enseña, con su banda", () => {
   const conDiagnostico = (diagnostico) => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
     obtenerDiagnostico.mockResolvedValue(diagnostico);
   };
 
@@ -322,11 +327,7 @@ describe("la causa más respaldada se enseña, con su banda", () => {
 
   it("si el diagnóstico NO se pudo pedir, tampoco se inventa nada", async () => {
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }],
-      noEvaluables: [], evaluadas: 1,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conRiesgos([{ id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" }]);
     obtenerDiagnostico.mockRejectedValue(new Error("el puente no contesta"));
 
     montar();
@@ -345,14 +346,10 @@ describe("ninguna petición de más: la llamada al motor ya se hacía", () => {
      * un `obtenerDiagnostico` para la causa, esto lo atrapa.
      */
     enCalma();
-    evaluarRiesgos.mockReturnValue({
-      activos: [
+    conRiesgos([
         { id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "E" },
         { id: "cavitacion", titulo: "Cavitación", severidad: "atencion", evidencia: "E" },
-      ],
-      noEvaluables: [], evaluadas: 2,
-    });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+      ]);
     obtenerDiagnostico.mockResolvedValue({
       estado: "completo",
       causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto", casosCitados: [] }],

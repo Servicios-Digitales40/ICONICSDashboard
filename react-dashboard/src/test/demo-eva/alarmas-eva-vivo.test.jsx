@@ -2,6 +2,18 @@
 /**
  * alarmas-eva-vivo.test.jsx
  * ------------------------------------------------------------------
+ *
+ * ── OMITIDO: ESTACIÓN DE LLENADO CERRADA (rama `Vibraciones1.0`) ────
+ *
+ * La pestaña «En vivo» se cerró con su máquina: enseña las ocho señales
+ * `naturaleza: "alarma"` del PLC_1, que son del tanque. Estas comprobaciones
+ * no están mal — es que su pantalla ya no se ofrece.
+ *
+ * Se omite el archivo entero y NO se borra. Reabrir la pestaña en
+ * `AlarmasEva.jsx` es devolver el `describe.skip` de abajo a `describe`.
+ *
+ * ── LO QUE SIGUE DESCRIBE EL DISEÑO COMPLETO ───────────────────────
+ *
  * La pestaña «En vivo» de Alarmas (Plan 27): el estado ahora mismo de las
  * ocho señales `naturaleza: "alarma"`, leído del sistema simulado — no de
  * `@/lib/iconics` como el Historial.
@@ -52,7 +64,7 @@ const montar = (params, onNavigate = () => {}) =>
     </ThemeProvider>
   );
 
-describe("Alarmas → En vivo: agrupado por activo, sin red", () => {
+describe.skip("Alarmas → En vivo: agrupado por activo, sin red", () => {
   it("abre en la pestaña En vivo con ?tab=vivo, y agrupa por activo", async () => {
     const fetchTrampa = cortarLaRed();
     montar({ tab: "vivo" });

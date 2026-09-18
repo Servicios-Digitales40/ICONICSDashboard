@@ -95,7 +95,13 @@ describe("el badge cuenta lo ya calculado: no añade ni una petición", () => {
     const fetchEspia = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     vi.stubGlobal("fetch", fetchEspia);
 
-    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [RIESGO_VIB] });
+    /*
+     * Dos riesgos de VIBRACIONES (rama `Vibraciones1.0`). Antes era uno de cada
+     * máquina; el badge ya no cuenta la estación de llenado, así que un riesgo
+     * del tanque aquí sumaría 0 y la prueba mediría el cierre en vez de las
+     * peticiones. Lo que afirma no cambia: contar no sale a la red.
+     */
+    conRiesgos({ vibraciones: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }] });
     montar();
 
     expect(screen.getByText("2")).toBeTruthy();
@@ -114,7 +120,9 @@ describe("cero no se pinta", () => {
 
 describe("cuenta hallazgos, no diagnósticos", () => {
   it("el número es el de riesgos activos, y el texto accesible dice «hallazgos»", () => {
-    conRiesgos({ tanque: [RIESGO_TANQUE, { ...RIESGO_TANQUE, id: "cavitacion" }], vibraciones: [RIESGO_VIB] });
+    conRiesgos({
+      vibraciones: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }, { ...RIESGO_VIB, id: "holgura" }],
+    });
     montar();
 
     expect(screen.getByText("3")).toBeTruthy();
@@ -126,14 +134,26 @@ describe("cuenta hallazgos, no diagnósticos", () => {
     expect(screen.getAllByTitle(/3 hallazgos sin mirar/i).length).toBeGreaterThan(0);
   });
 
-  it("los dos sistemas suman en el mismo contador, sin mezclarse en el conteo", () => {
+  /*
+   * ── AHORA SE CUENTA LO CONTRARIO (rama `Vibraciones1.0`) ───────────
+   *
+   * Esto afirmaba que las dos máquinas suman en el mismo contador. Con la
+   * estación de llenado cerrada, lo que hay que defender es justo lo inverso:
+   * que sus riesgos NO suman — porque el badge cuelga del sidebar y contarlos
+   * volvería a abrir su sondeo en todas las pantallas (ver
+   * `llenado-cerrado.test.jsx`).
+   *
+   * Al reabrir, esta comprobación vuelve a ser la de antes.
+   */
+  it("un riesgo de la estación de llenado NO suma: está cerrada", () => {
     conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [] });
     const { unmount } = montar();
-    expect(screen.getByText("1")).toBeTruthy();
+    expect(screen.queryByText("1")).toBeNull();
     unmount();
 
-    conRiesgos({ tanque: [], vibraciones: [RIESGO_VIB] });
+    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [RIESGO_VIB] });
     montar();
+    /* Uno, no dos: sólo cuenta el de vibraciones. */
     expect(screen.getByText("1")).toBeTruthy();
   });
 });

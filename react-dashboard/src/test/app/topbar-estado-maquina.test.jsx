@@ -60,7 +60,17 @@ const montar = (page) =>
   );
 
 describe("Topbar: el indicador de encendido es de UNA máquina", () => {
-  it("en las pantallas de la estación de llenado, se ve", async () => {
+  /*
+   * ── OMITIDO: SU PANTALLA ESTÁ CERRADA (rama `Vibraciones1.0`) ──────
+   *
+   * El indicador se ve en `sec-llenado`, y esa sección ya no existe en el
+   * sidebar. Los otros cuatro casos de este grupo siguen corriendo, y son los
+   * que de verdad protegen la regla: que el indicador del tanque NO aparezca
+   * en vibraciones ni en las pantallas generales.
+   *
+   * Para reabrir: quitar el `.skip`.
+   */
+  it.skip("en las pantallas de la estación de llenado, se ve", async () => {
     montar("eva-planta");
     await waitFor(() => {
       expect(screen.getByText(/Encendida|Apagada/i)).toBeTruthy();
@@ -100,7 +110,13 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     // Si esta condición se implementara con una lista de ids escrita a mano,
     // una pantalla añadida a vibraciones caería fuera de la lista y el
     // indicador volvería a aparecer donde no debe.
-    expect(SECCION_DE_PAGINA["eva-planta"]).toBe("sec-llenado");
+    //
+    // `eva-planta` ya no aparece aquí (rama `Vibraciones1.0`): sin `nav` no
+    // tiene sección, y eso es EXACTAMENTE lo que esta prueba afirma — que la
+    // sección se deriva del registro. Con una lista escrita a mano, cerrar la
+    // estación de llenado no habría cambiado nada y el indicador seguiría
+    // saliendo en sus pantallas. Al reabrir vuelve a valer "sec-llenado".
+    expect(SECCION_DE_PAGINA["eva-planta"] ?? null).toBeNull();
     expect(SECCION_DE_PAGINA["eva-vibraciones"]).toBe("sec-vibraciones");
     expect(SECCION_DE_PAGINA["eva-riesgos-vibracion"]).toBe("sec-vibraciones");
 

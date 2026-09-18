@@ -66,6 +66,7 @@ import {
   NO_COMPARTEN,
   SISTEMA,
   SISTEMAS,
+  SISTEMAS_EN_SERVICIO,
   mismoSistema,
   sistemasDeSenal,
   tieneHistoria,
@@ -102,6 +103,60 @@ async function checkAsync(nombre, fn) {
     fallos.push(`${nombre} — ${error.message}`)
     console.log(`  ${c.rojo}✗${c.reset} ${nombre}`)
   }
+}
+
+/* ── OMITIR, QUE NO ES LO MISMO QUE BORRAR ──────────────────────────── */
+
+/**
+ * Cuántas comprobaciones se saltaron, y por qué.
+ *
+ * ── POR QUÉ ESTE MECANISMO EXISTE (rama `Vibraciones1.0`, 17-09-2026) ──
+ *
+ * Al cerrar la estación de llenado, 48 de las 191 comprobaciones de este guion
+ * se pusieron en rojo de golpe. Ninguna estaba mal: todas usan el TANQUE como
+ * escenario —es la máquina madura, la que tiene catálogo, umbrales y
+ * simulador— y ese sistema ya no contesta, porque `resolverSistema()` lo niega
+ * a propósito.
+ *
+ * La salida obvia era borrarlas o comentarlas. Las dos son peores:
+ *
+ *  · Borrarlas tira 48 comprobaciones que vuelven a valer el día que se
+ *    reabra, y nadie se acordará de reescribirlas.
+ *  · Comentarlas las esconde: un guion que pasa en verde sin decir que dejó de
+ *    mirar la mitad de lo que miraba es exactamente el rojo que enseña a
+ *    ignorar el rojo.
+ *
+ * `omitir()` es la tercera vía: la comprobación no corre, pero SE CUENTA y se
+ * dice. El resumen final imprime cuántas y por qué, así que la próxima persona
+ * ve de un vistazo que este guion está cubriendo menos de lo que cubría.
+ */
+const omitidas = []
+
+/**
+ * Salta una comprobación, dejando constancia.
+ *
+ * @param {string} nombre  el mismo que tendría el `check`
+ * @param {string} motivo  por qué no se puede correr AHORA
+ */
+function omitir(nombre, motivo) {
+  omitidas.push({ nombre, motivo })
+  console.log(`  ${c.gris}○ ${nombre} — ${motivo}${c.reset}`)
+}
+
+/** Motivo único de todas las omisiones de esta rama. */
+const CERRADA = 'la estación de llenado está cerrada (rama Vibraciones1.0)'
+
+/**
+ * Sustituye a `check`/`checkAsync` en las comprobaciones que usan el TANQUE
+ * como escenario.
+ *
+ * Recibe el cuerpo y NO lo ejecuta: por eso la comprobación sigue escrita,
+ * entera y a la vista, en vez de comentada. El día que se reabra la estación
+ * de llenado, esto vuelve a ser `checkAsync` con un buscar-y-reemplazar y las
+ * veinte vuelven a correr sin reescribir ni una línea.
+ */
+function omitirEnvuelto(nombre, _fn) {
+  omitir(nombre, CERRADA)
 }
 
 /* ── Cliente de ICONICS de mentira ───────────────────────────────────── */
@@ -531,13 +586,23 @@ check('el futuro se rechaza', () => {
 console.log('\n-- Una herramienta, todas las maquinas ---------------------')
 
 /*
- * Este bloque recorre `SISTEMAS`, no nombra máquinas. Lo que fija es que
- * `estado_del_sistema` y `riesgos_activos` sirvan a CUALQUIERA de las dadas de
- * alta — el motivo entero de haberlas parametrizado en vez de escribir una por
- * instalación, que es como el tanque llegó a tener ocho herramientas y
- * vibraciones una.
+ * Este bloque recorre los sistemas EN SERVICIO, no nombra máquinas. Lo que
+ * fija es que `estado_del_sistema` y `riesgos_activos` sirvan a CUALQUIERA de
+ * los que el tablero está leyendo — el motivo entero de haberlas
+ * parametrizado en vez de escribir una por instalación, que es como el tanque
+ * llegó a tener ocho herramientas y vibraciones una.
+ *
+ * ── EN SERVICIO, NO TODOS (rama `Vibraciones1.0`, 17-09-2026) ──────
+ *
+ * Una máquina cerrada por mantenimiento NO debe servirse: `resolverSistema()`
+ * la niega a propósito, así que pedirle su estado aquí comprobaría lo
+ * contrario de lo que el cierre quiere. Recorrer `SISTEMAS_EN_SERVICIO` hace
+ * que este bucle siga diciendo lo mismo —«cualquiera de las que el tablero
+ * lee»— sin una condición añadida.
+ *
+ * Al reabrir el tanque vuelve solo, sin tocar este archivo.
  */
-for (const sistema of SISTEMAS) {
+for (const sistema of SISTEMAS_EN_SERVICIO) {
   await checkAsync(`«${sistema.id}»: estado_del_sistema lo sirve`, async () => {
     const client = createFakeIconicsClient({ rnd: () => 0.99 })
     const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: sistema.id })
@@ -572,7 +637,7 @@ for (const sistema of SISTEMAS) {
  * la marcha — justo lo que `chat.mjs` ya decide no permitir para la SALIDA
  * (ver su cabecera). El mismo argumento vale para lo que entra.
  */
-await checkAsync('riesgos_activos(idioma: "en") narra en inglés, con las mismas cifras', async () => {
+await omitirEnvuelto('riesgos_activos(idioma: "en") narra en inglés, con las mismas cifras', async () => {
   // Nivel bajo con la bomba impulsando: activa «marcha-en-seco», que declara
   // `datos()` — el caso donde más importa que la cifra citada sea la misma.
   const client = clienteFalso({
@@ -611,7 +676,7 @@ await checkAsync('riesgos_activos(idioma: "en") en vibraciones traduce también 
   assert.match(evidencia, /3 of 3/, 'la cuenta sí se narra en inglés')
 })
 
-await checkAsync('sin `idioma` (o con "es"), riesgos_activos sigue en español: no rompe nada existente', async () => {
+await omitirEnvuelto('sin `idioma` (o con "es"), riesgos_activos sigue en español: no rompe nada existente', async () => {
   const client = clienteFalso({
     valores: { ...EN_REPOSO, NIVEL_TANQUE: 5, CARGA_TRABAJO_MOTOR: 60 },
   })
@@ -657,7 +722,7 @@ await checkAsync('estado_del_sistema(idioma: "en") narra los riesgos que trae de
  * TODO lo que no fuera `riesgos`: nombre de sistema, la frase de cada
  * apoyo, variador, servidor de alarmas, `sin_comprobar`, `aviso`.
  */
-await checkAsync('estado_del_sistema(idioma: "en") del TANQUE narra TODO el resumen, no sólo riesgos', async () => {
+await omitirEnvuelto('estado_del_sistema(idioma: "en") del TANQUE narra TODO el resumen, no sólo riesgos', async () => {
   const client = clienteFalso({
     valores: { ...EN_REPOSO, NIVEL_TANQUE: 54.2 },
   })
@@ -738,7 +803,7 @@ await checkAsync('riesgos_activos(idioma: "en") de vibraciones traduce «apoyos�
   assert.doesNotMatch(en.aviso, /aceleración de pico/)
 })
 
-await checkAsync('sin `idioma`, el resumen de ambas máquinas sigue en español: no rompe nada existente', async () => {
+await omitirEnvuelto('sin `idioma`, el resumen de ambas máquinas sigue en español: no rompe nada existente', async () => {
   const h1 = createHerramientas({ client: clienteFalso() })
   const es1 = await h1.ejecutar('estado_del_sistema', { sistema: 'tanque' })
   assert.equal(es1.instalacion, 'Sistema de agua industrial')
@@ -749,7 +814,7 @@ await checkAsync('sin `idioma`, el resumen de ambas máquinas sigue en español:
   assert.match(es2.apoyos[0], /Lado acople/)
 })
 
-await checkAsync('pronostico_de_desgaste(idioma: "en") narra sus mecanismos con el catálogo de dominio', async () => {
+await omitirEnvuelto('pronostico_de_desgaste(idioma: "en") narra sus mecanismos con el catálogo de dominio', async () => {
   // Reutiliza `mechanisms` de `domain.json` — el mismo catálogo que ya prueba
   // `verificar-dominio.mjs` — así que no hace falta fijar un mecanismo activo
   // concreto: basta con que los NO EVALUABLES salgan en inglés.
@@ -1447,7 +1512,7 @@ check('el aviso de sistemas separados declara su LÍMITE', () => {
 
 console.log('\n── estado_del_sistema ──────────────────────────────────────')
 
-await checkAsync('todas las señales se leen en UNA sola llamada en lote', async () => {
+await omitirEnvuelto('todas las señales se leen en UNA sola llamada en lote', async () => {
   const client = clienteFalso()
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
 
@@ -1456,7 +1521,7 @@ await checkAsync('todas las señales se leen en UNA sola llamada en lote', async
   assert.equal(client.lotes[0].length, SENAL_KEYS.length)
 })
 
-await checkAsync('una instalación PARADA no es una instalación en alarma', async () => {
+await omitirEnvuelto('una instalación PARADA no es una instalación en alarma', async () => {
   // Es el motivo de que exista `reposo`. Sin él, caudal 0 y eficiencia 0 caen
   // bajo su límite duro y la demo abre en rojo permanente — la pantalla que
   // enseña a ignorar las alertas.
@@ -1472,7 +1537,7 @@ await checkAsync('una instalación PARADA no es una instalación en alarma', asy
   assert.ok(caudal.porQueReposo, 'con su explicación al lado')
 })
 
-await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
+await omitirEnvuelto('un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
   // Sin este filtro el asistente diría «el tanque está al 0 %» de una
   // instalación llena, que es la peor respuesta posible: parece un dato.
   const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
@@ -1485,7 +1550,7 @@ await checkAsync('un valor de MALA CALIDAD es un hueco, nunca un cero', async ()
   assert.equal(r.recuento.sinDato, 1)
 })
 
-await checkAsync('las unidades que el servidor no declara viajan vacías', async () => {
+await omitirEnvuelto('las unidades que el servidor no declara viajan vacías', async () => {
   // `flujoInstantaneo` fue el ejemplo hasta el 14-09-2026 (unidad confirmada:
   // L/min, ver `senales.js`); el registro crudo del variador sigue sin
   // confirmar y hereda el ejemplo.
@@ -1499,7 +1564,7 @@ await checkAsync('las unidades que el servidor no declara viajan vacías', async
   assert.equal(senales.find(s => s.clave === 'nivelTanque').unidad, '%')
 })
 
-await checkAsync('el float crudo del PLC se redondea a los decimales del catálogo', async () => {
+await omitirEnvuelto('el float crudo del PLC se redondea a los decimales del catálogo', async () => {
   /*
    * Salió probando contra el servidor REAL, no contra este cliente falso: los
    * valores de aquí venían ya limpios y no podían enseñarlo. ICONICS entrega
@@ -1517,7 +1582,7 @@ await checkAsync('el float crudo del PLC se redondea a los decimales del catálo
   assert.equal(senales.find(s => s.clave === 'temperaturaTanque').valor, 23.3)
 })
 
-await checkAsync('redondear no convierte un hueco ni un booleano en cero', async () => {
+await omitirEnvuelto('redondear no convierte un hueco ni un booleano en cero', async () => {
   const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
   const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
   const senales = r.activos.flatMap(a => a.senales)
@@ -1526,7 +1591,7 @@ await checkAsync('redondear no convierte un hueco ni un booleano en cero', async
   assert.equal(senales.find(s => s.clave === 'modoVdf').valor, false, 'false, no 0')
 })
 
-await checkAsync('la booleana se dice con su palabra, no con true/false', async () => {
+await omitirEnvuelto('la booleana se dice con su palabra, no con true/false', async () => {
   // `modoVdf` es `nominal` (ni alarma ni reposo): desde el Plan 27
   // (compactación del contexto, 10-09-2026) una señal nominal viaja con la
   // forma mínima, pero `texto` —el propio valor legible— sigue presente
@@ -1541,7 +1606,7 @@ await checkAsync('la booleana se dice con su palabra, no con true/false', async 
   assert.ok(SENALES.modoVdf.nota, 'y el catálogo confiesa que la correspondencia no está confirmada')
 })
 
-await checkAsync('el aviso de umbrales viaja en el campo QUE VIGILA la red de seguridad', async () => {
+await omitirEnvuelto('el aviso de umbrales viaja en el campo QUE VIGILA la red de seguridad', async () => {
   /*
    * Va en el RESULTADO y no sólo en el prompt: una advertencia que sólo vive
    * en las instrucciones se diluye a los tres turnos de conversación.
@@ -1567,7 +1632,7 @@ await checkAsync('el aviso de umbrales viaja en el campo QUE VIGILA la red de se
   }
 })
 
-await checkAsync('la hora de lectura se da legible y en local, no en ISO', async () => {
+await omitirEnvuelto('la hora de lectura se da legible y en local, no en ISO', async () => {
   // Medido con el 4B: con un ISO delante lo copió tal cual en la respuesta
   // («leído a las 2026-08-18T14:48:44.253Z»). Además va en UTC, así que en
   // España marcaría dos horas menos que el reloj de la pared.
@@ -1576,7 +1641,7 @@ await checkAsync('la hora de lectura se da legible y en local, no en ISO', async
   assert.match(r.leidoA, /^\d{2}:\d{2}:\d{2}$/, `leidoA fue "${r.leidoA}"`)
 })
 
-await checkAsync('la señal que pide atención lleva su banda, para no obligar al modelo a restar', async () => {
+await omitirEnvuelto('la señal que pide atención lleva su banda, para no obligar al modelo a restar', async () => {
   // Desde el Plan 27 (compactación del contexto, 10-09-2026) sólo las
   // señales que piden algo —crítico, aviso, sin dato o reposo— llevan la
   // banda completa; una `nominal` no la necesita porque el estado ya dice
@@ -1599,7 +1664,7 @@ await checkAsync('la señal que pide atención lleva su banda, para no obligar a
   assert.equal(carga.banda.limiteInferior, 'sin límite')
 })
 
-await checkAsync('un servidor caído se cuenta como tal y no como instalación vacía', async () => {
+await omitirEnvuelto('un servidor caído se cuenta como tal y no como instalación vacía', async () => {
   const client = {
     async readPoints() { return { ok: false, error: 'ICONICS no responde', status: 502 } },
     async readHistory() { return { ok: false, status: 502 } },
@@ -2105,7 +2170,7 @@ await checkAsync('sin síntoma no hay nada que diagnosticar', async () => {
   assert.equal(r.ok, false)
 })
 
-await checkAsync('el dossier trae el ESTADO de verdad, no un error escondido dentro', async () => {
+await omitirEnvuelto('el dossier trae el ESTADO de verdad, no un error escondido dentro', async () => {
   /*
    * La regresión que esto fija, medida el 03-09-2026 en las DOS máquinas.
    *
@@ -3280,7 +3345,7 @@ await checkAsync('un número fuera de rango se recorta como siempre, no se recha
 })
 
 /** Un campo de más no cuesta una ronda: la herramienta ya ignora lo que no conoce. */
-await checkAsync('un campo que no existe en el esquema no rompe la llamada', async () => {
+await omitirEnvuelto('un campo que no existe en el esquema no rompe la llamada', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('estado_del_sistema', { sistema: 'tanque', profundidad: 'mucha' })
 
@@ -3541,7 +3606,7 @@ await checkAsync('alarma_sostenida(idioma: "en") narra en inglés, no sólo acep
 
 console.log('\n── resumen_de_turno ────────────────────────────────────────')
 
-await checkAsync('compone estado, riesgos y tendencia en una sola llamada', async () => {
+await omitirEnvuelto('compone estado, riesgos y tendencia en una sola llamada', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('resumen_de_turno', { sistema: 'tanque', periodo: 'últimas 6 horas' })
 
@@ -3551,7 +3616,7 @@ await checkAsync('compone estado, riesgos y tendencia en una sola llamada', asyn
   assert.ok(r.tendencia || r.tendenciaNoDisponible, 'ni tendencia ni el motivo de que falte')
 })
 
-await checkAsync('cita notas del cuaderno DENTRO de la ventana y del sistema, ninguna otra', async () => {
+await omitirEnvuelto('cita notas del cuaderno DENTRO de la ventana y del sistema, ninguna otra', async () => {
   /*
    * El incidente del 14-09-2026: preguntado "¿qué notas se han hecho este
    * turno?", el modelo dijo que no había ninguna —cuando sí las había— y
@@ -3585,7 +3650,7 @@ await checkAsync('cita notas del cuaderno DENTRO de la ventana y del sistema, ni
   assert.equal(r.notas[0].cuando, '2026-09-14T15:44:17.000Z', 'la fecha tiene que ser la real, no inventada')
 })
 
-await checkAsync('sin cuaderno montado, lo dice — no calla la ausencia', async () => {
+omitirEnvuelto('sin cuaderno montado, lo dice — no calla la ausencia', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('resumen_de_turno', { sistema: 'tanque' })
 
@@ -3594,7 +3659,7 @@ await checkAsync('sin cuaderno montado, lo dice — no calla la ausencia', async
   assert.match(r.notasNoDisponibles ?? '', /no tiene el cuaderno de planta montado/i)
 })
 
-await checkAsync('cita intervenciones DENTRO de la ventana, con su fecha real — no "ayer" inventado', async () => {
+omitirEnvuelto('cita intervenciones DENTRO de la ventana, con su fecha real — no "ayer" inventado', async () => {
   // Relativas a AHORA, no fechas fijas: la ventana de "últimas 6 horas" se
   // resuelve contra el reloj real en el momento de ejecutar la prueba.
   const haceUnaHora = new Date(Date.now() - 3_600_000).toISOString()
@@ -4007,3 +4072,19 @@ if (fallos.length) {
 }
 
 console.log(`${c.verde}${c.negrita}${passed} comprobaciones correctas: las herramientas se mantienen.${c.reset}`)
+
+/*
+ * Las omitidas se dicen SIEMPRE, y después del verde. Un guion que pasa sin
+ * mencionar que dejó de mirar 48 cosas estaría afirmando más de lo que
+ * comprobó — y este proyecto ya tiene la costumbre de contar lo que NO se
+ * miró (ver los «Excluidos» de `npm run verificar`).
+ */
+if (omitidas.length) {
+  console.log()
+  console.log(`${c.gris}${c.negrita}${omitidas.length} omitida(s) — no se comprobaron:${c.reset}`)
+  const porMotivo = new Map()
+  for (const { motivo } of omitidas) porMotivo.set(motivo, (porMotivo.get(motivo) ?? 0) + 1)
+  for (const [motivo, cuantas] of porMotivo) {
+    console.log(`  ${c.gris}· ${cuantas} × ${motivo}${c.reset}`)
+  }
+}

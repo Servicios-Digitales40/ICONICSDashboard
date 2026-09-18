@@ -79,11 +79,17 @@ const MANUALES = {
   ],
 };
 
+/*
+ * `sistema: "vibraciones"` en los tres (rama `Vibraciones1.0`): la vista de
+ * Casos filtra a máquinas EN SERVICIO, y un caso del tanque ya no se pinta —
+ * la prueba quedaría midiendo el cierre en vez de la traducción. Lo que estas
+ * comprobaciones afirman no cambia: qué claves se ven en inglés.
+ */
 /** Una por cada combinación de chips: resuelto o no, con veredicto y sin él. */
 const CASOS = {
   casos: [
     { id: "c1", sintoma: "Noise at bearing 2", causa: "Bearing", solucion: "Replaced", fecha: "2026-09-02T09:00:00Z", sistema: "vibraciones", origen: "cierre", resuelto: true, diagnosticoCorrecto: true, diagnostico: { propuesta: "Bearing wear", respaldo: "high" } },
-    { id: "c2", sintoma: "Low pressure", causa: "Under investigation", fecha: "2026-09-01T09:00:00Z", sistema: "tanque", origen: "chat", resuelto: false, diagnosticoCorrecto: false },
+    { id: "c2", sintoma: "Low pressure", causa: "Under investigation", fecha: "2026-09-01T09:00:00Z", sistema: "vibraciones", origen: "chat", resuelto: false, diagnosticoCorrecto: false },
     { id: "c3", sintoma: "Intermittent vibration", fecha: "2026-08-30T09:00:00Z", sistema: null, origen: "voz", archivado: true, resuelto: true },
   ],
 };
@@ -169,7 +175,13 @@ const CLAVES_VISIBLES = {
     "assistant:rag.cases.archive",
     "assistant:rag.cases.restore",
     "common:actions.refresh",
-    "machines:systems.tanque",
+    /*
+     * `machines:systems.tanque` ya NO se pinta aquí (rama `Vibraciones1.0`):
+     * esta vista sólo enseña casos de máquinas en servicio, así que el nombre
+     * del tanque no llega a la pantalla y exigirlo mediría el cierre en vez de
+     * la traducción. Sigue en la lista de `documentacion`, que sí enumera las
+     * dos máquinas en su selector. Vuelve al reabrir.
+     */
     "machines:systems.vibraciones",
   ],
 };

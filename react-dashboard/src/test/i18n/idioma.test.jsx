@@ -53,7 +53,7 @@ const montarSidebar = () =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <Sidebar page="eva-inicio" onNavigate={() => {}} />
+          <Sidebar page="vib-inicio" onNavigate={() => {}} />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
@@ -66,22 +66,34 @@ const cambiarA = async (idioma) => {
 };
 
 describe("la aplicación habla los dos idiomas", () => {
+  /*
+   * ── SE COMPRUEBA CON VIBRACIONES, NO CON LLENADO ───────────────────
+   *
+   * Rama `Vibraciones1.0`: la sección «Estación de llenado» ya no sale del
+   * sidebar, así que buscarla aquí mediría el cierre en vez del idioma.
+   *
+   * La afirmación NO cambia —el tablero rotula su navegación en los dos
+   * idiomas— sólo la sección con la que se comprueba. Por eso se ADAPTA y no
+   * se omite: es una de las pruebas que hay que conservar viva, porque un
+   * rótulo sin traducir se ve igual de mal con una máquina que con dos.
+   *
+   * Al reabrir, vuelven las dos líneas de «Estación de llenado».
+   */
   it("en español rotula la navegación en español", async () => {
     montarSidebar();
 
-    expect(await screen.findByText("Estación de llenado")).toBeTruthy();
-    expect(screen.getByText("Estación de vibraciones")).toBeTruthy();
+    expect(await screen.findByText("Estación de vibraciones")).toBeTruthy();
+    expect(screen.getByText("General")).toBeTruthy();
   });
 
   it("en inglés rotula la MISMA navegación en inglés", async () => {
     await cambiarA("en");
     montarSidebar();
 
-    expect(await screen.findByText("Filling Station")).toBeTruthy();
-    expect(screen.getByText("Vibration Station")).toBeTruthy();
+    expect(await screen.findByText("Vibration Station")).toBeTruthy();
     // Y ya no queda nada del español: si saliera, sería una clave sin traducir
     // cayendo al `fallbackLng`.
-    expect(screen.queryByText("Estación de llenado")).toBeNull();
+    expect(screen.queryByText("Estación de vibraciones")).toBeNull();
   });
 
   it("el vocabulario del DOMINIO también se traduce, sin tocar `shared/`", async () => {
@@ -104,13 +116,14 @@ describe("el cambio es en caliente, sin recargar", () => {
   it("la pantalla ya montada se repinta al cambiar de idioma", async () => {
     // Es la afirmación de §3: cambiar el idioma NO puede exigir un F5. Se monta
     // en español, se cambia, y se comprueba el MISMO árbol sin volver a montar.
+    // Con vibraciones, no con llenado — ver el bloque del primer `describe`.
     montarSidebar();
-    expect(await screen.findByText("Estación de llenado")).toBeTruthy();
+    expect(await screen.findByText("Estación de vibraciones")).toBeTruthy();
 
     await cambiarA("en");
 
-    expect(screen.getByText("Filling Station")).toBeTruthy();
-    expect(screen.queryByText("Estación de llenado")).toBeNull();
+    expect(screen.getByText("Vibration Station")).toBeTruthy();
+    expect(screen.queryByText("Estación de vibraciones")).toBeNull();
   });
 });
 

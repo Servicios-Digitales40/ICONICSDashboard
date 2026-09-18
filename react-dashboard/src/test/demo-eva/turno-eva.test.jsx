@@ -158,7 +158,25 @@ describe("una fuente caída no vacía las otras dos", () => {
   });
 });
 
-describe("la línea de tiempo no cruza las dos máquinas (NO_COMPARTEN)", () => {
+/*
+ * ── OMITIDO: HACEN FALTA DOS MÁQUINAS (rama `Vibraciones1.0`) ──────
+ *
+ * Este grupo comprueba que la línea de tiempo NO cruza las dos instalaciones:
+ * una línea por máquina, y un caso del tanque que no aparece en la de
+ * vibraciones. Con la estación de llenado cerrada hay UNA sola línea, así que
+ * la afirmación no se puede montar — no porque haya dejado de ser cierta, sino
+ * porque no queda con qué contrastarla.
+ *
+ * Los otros tres grupos de este archivo siguen corriendo: el turno, las
+ * fuentes caídas y la distinción entre vacío y roto no dependen de cuántas
+ * máquinas haya.
+ *
+ * Es el grupo que MÁS conviene reactivar al reabrir el tanque: vigila
+ * `NO_COMPARTEN`, que es un no negociable (§2.1).
+ *
+ * Para reabrir: quitar el `.skip`.
+ */
+describe.skip("la línea de tiempo no cruza las dos máquinas (NO_COMPARTEN)", () => {
   it("hay UNA línea por máquina, cada una con su nombre", async () => {
     /*
      * Y no un eje común aunque quepa: dos marcas alineadas en la misma vertical

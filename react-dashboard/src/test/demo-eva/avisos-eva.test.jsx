@@ -68,25 +68,40 @@ const DIAGNOSTICO = {
   causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto" }],
 };
 
+/*
+ * ── EL ESCENARIO ES DE VIBRACIONES (rama `Vibraciones1.0`) ──────────
+ *
+ * Estos helpers colocaban el riesgo en el TANQUE, y la vista ya no lo evalúa:
+ * con la estación de llenado cerrada, `AvisosEva` sólo mira vibraciones. Doce
+ * de las catorce comprobaciones de este archivo se quedaban sin nada que
+ * enseñar.
+ *
+ * Se ADAPTA y no se omite: lo que prueban —que la narración acompaña al dato,
+ * que sin LLM la vista sigue sirviendo, que un aviso sobrevive a su riesgo, que
+ * ningún botón acciona planta— no depende de qué máquina sea. Cambia el
+ * escenario, no la afirmación.
+ *
+ * Al reabrir, basta con devolver estos dos helpers al tanque.
+ */
 function conUnRiesgo() {
   useSistemaAgua.mockReturnValue({ sistema: {} });
   useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-  evaluarRiesgos.mockReturnValue({ activos: [RIESGO], noEvaluables: [], evaluadas: 1 });
-  evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+  evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+  evaluarRiesgosVibracion.mockReturnValue({ activos: [RIESGO], noEvaluables: [], evaluadas: 1 });
 }
 
 /**
- * Apaga el riesgo del tanque, como haría el siguiente sondeo.
+ * Apaga el riesgo, como haría el siguiente sondeo.
  *
  * El snapshot tiene que cambiar de IDENTIDAD, no sólo de contenido: la vista
- * memoiza `evaluarRiesgos(sistemaTanque)` con `sistemaTanque` de dependencia
- * —que es lo correcto, porque esa evaluación corre en cada lectura de ICONICS—
- * así que devolver siempre el mismo `{}` dejaría el memo congelado y la prueba
- * estaría midiendo el memo en vez del ciclo de vida.
+ * memoiza `evaluarRiesgosVibracion({canales, variador, alarmas})` con esos
+ * objetos de dependencia —que es lo correcto, porque esa evaluación corre en
+ * cada lectura de ICONICS— así que devolver siempre el mismo `{}` dejaría el
+ * memo congelado y la prueba estaría midiendo el memo en vez del ciclo de vida.
  */
 function apagarElRiesgo() {
-  useSistemaAgua.mockReturnValue({ sistema: { t: Date.now() } });
-  evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 1 });
+  useVibracion.mockReturnValue({ canales: { t: Date.now() }, variador: {}, alarmas: {} });
+  evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 1 });
 }
 
 const remontar = (rerender, onNavigate = () => {}) =>
@@ -218,7 +233,7 @@ describe("un aviso NO acciona planta", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Ver el diagnóstico/i }));
     expect(onNavigate).toHaveBeenCalledWith("cierre-diagnostico", {
-      sistema: "tanque", riesgoId: "fuga-en-red",
+      sistema: "vibraciones", riesgoId: "fuga-en-red",
     });
   });
 
@@ -326,11 +341,11 @@ describe("no se narra más de lo necesario", () => {
   it("se pide UNA vez por riesgo activo", async () => {
     useSistemaAgua.mockReturnValue({ sistema: {} });
     useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-    evaluarRiesgos.mockReturnValue({
-      activos: [RIESGO, { ...RIESGO, id: "cavitacion", titulo: "Cavitación" }],
+    evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    evaluarRiesgosVibracion.mockReturnValue({
+      activos: [RIESGO, { ...RIESGO, id: "desbalance", titulo: "Desbalance" }],
       noEvaluables: [], evaluadas: 2,
     });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
     obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
 
     montar();
@@ -349,7 +364,7 @@ describe("no se narra más de lo necesario", () => {
 
     await waitFor(() => expect(obtenerDiagnosticoNarrado).toHaveBeenCalled());
     expect(obtenerDiagnosticoNarrado.mock.calls[0][0]).toMatchObject({
-      sistema: "tanque", riesgoId: "fuga-en-red", idioma: expect.stringMatching(/^(es|en)$/),
+      sistema: "vibraciones", riesgoId: "fuga-en-red", idioma: expect.stringMatching(/^(es|en)$/),
     });
   });
 });

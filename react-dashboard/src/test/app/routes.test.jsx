@@ -142,8 +142,18 @@ describe("el sidebar que sale del registro", () => {
     // `sec-prediccion` es la quinta desde el 03-09-2026, y no es cosmética:
     // marca la frontera entre los dos MÓDULOS (CLAUDE.md §4.7). Las cuatro
     // primeras se sirven de ICONICS; esa quinta, no.
+    /*
+     * ── «sec-llenado» YA NO SALE (rama `Vibraciones1.0`, 17-09-2026) ──
+     *
+     * Y que desaparezca SOLA es justo lo que esta prueba defiende: `buildNav`
+     * deriva las secciones de las rutas que traen `nav`, así que quitarlo de
+     * las cinco vistas del tanque basta. No hubo que tocar ninguna lista de
+     * secciones — si la hubiera, cerrar una máquina exigiría acordarse de dos
+     * sitios.
+     *
+     * Al reabrir vuelve la primera, y con ella el bloque `llenado` de abajo.
+     */
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
-      "sec-llenado",
       "sec-vibraciones",
       "sec-general",
       /*
@@ -158,10 +168,16 @@ describe("el sidebar que sale del registro", () => {
       "sec-prediccion",
     ]);
 
-    const llenado = NAV.find((n) => n.group === "sec-llenado");
-    expect(llenado.children.map((c) => c.id)).toEqual([
-      "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta",
-    ]);
+    /*
+     * La sección del tanque no existe mientras esté cerrada. Se comprueba su
+     * AUSENCIA en vez de borrar el bloque: si alguien devolviera un `nav` a
+     * una de sus vistas sin querer, la sección reaparecería a medias —una
+     * pantalla suelta bajo una cabecera— y esto lo atrapa.
+     *
+     * Al reabrir, vuelve el `toEqual` con las cinco:
+     *   "eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta"
+     */
+    expect(NAV.find((n) => n.group === "sec-llenado")).toBeUndefined();
 
     const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
@@ -230,7 +246,7 @@ describe("el sidebar que sale del registro", () => {
     const porModulo = Object.fromEntries(NAV.map((n) => [n.group ?? n.id, n.modulo]));
 
     expect(porModulo).toEqual({
-      "sec-llenado": "monitoreo",
+      /* `"sec-llenado": "monitoreo"` vuelve al reabrir la estación. */
       "sec-vibraciones": "monitoreo",
       "sec-general": "monitoreo",
       // La única que NO es de ICONICS: un compresor real servido por otro
@@ -264,8 +280,12 @@ describe("el sidebar que sale del registro", () => {
     const conRiesgos = NAV.flatMap((s) =>
       (s.children ?? []).filter((c) => /riesgos/.test(c.id)).map((c) => [s.group, c.id])
     );
+    /*
+     * Con la estación de llenado cerrada queda una sola, y la afirmación sigue
+     * valiendo: NINGUNA sección tiene dos «Riesgos» dentro. Al reabrir vuelve
+     * la línea `["sec-llenado", "eva-riesgos"]` delante.
+     */
     expect(conRiesgos).toEqual([
-      ["sec-llenado", "eva-riesgos"],
       ["sec-vibraciones", "eva-riesgos-vibracion"],
     ]);
   });
