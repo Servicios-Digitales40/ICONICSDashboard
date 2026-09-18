@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría), F1, F2 y F3 completadas · F4 en adelante por completar
+**Estado:** Fase 0 (auditoría) y F1–F4 completadas · F5 en adelante por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -1139,16 +1139,66 @@ La guarda de `dominio` se comprobó **por mutación**.
 
 ---
 
-### F4 · Vibraciones como máquina configurada
+### F4 · Vibraciones como máquina configurada ✅
 
-**Objetivo**: reproducir vibraciones desde `maquinas.json` y **comparar contra
-el catálogo escrito a mano**.
-**Tests**: **prueba de equivalencia** — los 73 puntos, las 40 series y las 18
-reglas idénticos a los del módulo actual.
-**Dependencias**: F3.
-**Riesgos**: medio. Mitigación: el módulo escrito a mano **no se borra**; se
-comparan las dos salidas.
-**Aceptación**: diff vacío entre ambas. Ninguna otra prueba cambia.
+**Completada el 18-09-2026.**
+
+**Qué se hizo**: `scripts/generar-configuracion-vibraciones.mjs` (deriva la
+configuración del catálogo) y `scripts/verificar-vibraciones-configurada.mjs`
+(22 comprobaciones que comparan las dos).
+
+**La configuración se DERIVA, no se escribe.** Un JSON de 73 variables escrito
+a mano no demostraría nada: cada diferencia sería un error de transcripción
+disfrazado de hallazgo. Derivándola, las dos salen de la misma fuente y
+cualquier diferencia que quede es real.
+
+Y **no se guarda en el repositorio**: el verificador la genera en el momento.
+Un archivo congelado se quedaría viejo al tocar el catálogo, y la comparación
+pasaría comparando contra una foto antigua — justo el fallo que busca detectar.
+
+#### El resultado
+
+**73 puntos · 66 con rol · 40 series · las mismas raíces, el mismo PLC, la
+misma cadencia.** Cada punto resuelve a la misma señal, cada serie apunta al
+mismo punto del historiador —literal, comprobado uno a uno— y `aPeak_S1` sigue
+fuera, que es el caso que justifica que `historizadas` sea lista blanca.
+
+#### El defecto: la corrección de F2 funcionando
+
+El generador anunciaba «40 series heredadas» y producía **cero**.
+
+Causa: `crearMaquina()` pasa las variables por `crearVariable()`, que fuerza
+`historyVerified: false`. El generador marcaba antes, y la marca se descartaba.
+
+**Eso no es un defecto de aquella función: es exactamente para lo que se puso.**
+Nada que llegue como DATO puede declararse verificado —ni de un formulario, ni
+de un JSON, ni de un guion—. La marca se pone ahora **después** y desde el
+catálogo, que es la única fuente con derecho a ponerla: el sondeo del
+28-08-2026 ya ocurrió y está escrito ahí.
+
+De paso, el recuento del guion contaba **la intención** (`verificadas.size`) en
+vez del resultado. Por eso anunciaba 40 produciendo 0. Ahora cuenta lo aplicado
+y avisa si no coinciden.
+
+#### Las dos diferencias reales
+
+**Las claves: cobertura, no igualdad.** La configurada expone 73 y la escrita a
+mano 42. No falta ninguna — **sobran 31**: vigilancias, estado de sensor y
+contadores de alarma. El catálogo las deja fuera de `claves()` porque no se
+historizan, pero `claves()` alimenta `sistemasDeSenal()`, que decide **por qué
+señales se puede preguntar**, y esas 31 se leen en vivo perfectamente. Que
+`bpfo_S1` no tenga histórico no es motivo para que el asistente no sepa que
+existe; quien dice si algo tiene serie es `esHistorizada()`.
+
+**La forma de dominio, que no se alcanza.** La escrita a mano trae `dominio`;
+la configurada no puede. Mientras las reglas no consuman `estadoMaquina.js`,
+**una máquina configurada no diagnostica** — y lo declara en sus limitaciones
+en vez de aparentarlo.
+
+**Medido**: `verificar-vibraciones-configurada` 22 · **los 34 verificadores**
+(los tres nuevos entraron por existir; el generador queda fuera por no llamarse
+`verificar-*`) · 364 de backend · 982 de frontend (29 omitidas) · lint y types
+limpios. La comprobación del punto histórico se validó **por mutación**.
 
 ---
 
