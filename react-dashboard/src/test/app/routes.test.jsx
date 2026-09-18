@@ -199,18 +199,26 @@ describe("el sidebar que sale del registro", () => {
      *
      * Al reabrir vuelve la primera, y con ella el bloque `llenado` de abajo.
      */
+    /*
+     * ── «sec-rag» TAMPOCO SALE YA (Plan 33 F10, 18-09-2026) ──────────
+     *
+     * Y por el mismo mecanismo que `sec-llenado`: sus dos vistas —Casos
+     * previos y RAG documental— pasaron a la máquina, así que la sección se
+     * quedó sin hijos y desapareció sola. No hubo que tocar `NAV_GROUPS`.
+     *
+     * El motivo del traslado es que un caso previo y un manual SON de una
+     * máquina: los casos ya llevan `sistema` obligatorio y el RAG ya filtra
+     * por él. Tenerlos en una sección aparte obligaba a salir de la máquina
+     * para ver su propia documentación.
+     *
+     * Al reabrir la estación de llenado habrá DOS máquinas reclamando esas
+     * vistas, y entonces hay que decidir: o una copia por máquina —que es lo
+     * que F10 implanta— o volver a una sección común. Lo primero es lo
+     * correcto mientras el contenido se filtre por máquina.
+     */
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
       "sec-vibraciones",
       "sec-general",
-      /*
-       * RAG subió por encima de Predicción el 12-09-2026 (Plan 25 F5). No es
-       * preferencia de orden: las secciones de un mismo MÓDULO van seguidas,
-       * porque el sidebar abre una cabecera cada vez que el módulo cambia. Con
-       * RAG (monitoreo) declarado después de Predicción, el menú abría tres
-       * cabeceras para dos módulos y Predicción partía en dos el bloque de
-       * ICONICS — lo contrario de lo que la separación dice.
-       */
-      "sec-rag",
       "sec-prediccion",
     ]);
 
@@ -225,13 +233,43 @@ describe("el sidebar que sale del registro", () => {
      */
     expect(NAV.find((n) => n.group === "sec-llenado")).toBeUndefined();
 
+    /*
+     * ── LAS NUEVE VISTAS DE LA MÁQUINA (Plan 33 F10) ─────────────────
+     *
+     * Antes eran cuatro, y las otras cinco vivían en «General» y «RAG». Eso
+     * tenía sentido con dos máquinas —un turno o una alarma no son de una
+     * sola— y deja de tenerlo con N: los hallazgos, los avisos, los casos y
+     * los manuales SON de una máquina, y las cuatro cosas ya se filtran por
+     * `sistema` en el backend.
+     *
+     * Turno se queda en «General» a propósito: un turno sí es de la planta
+     * entera, quien entra a las seis se hace cargo de todo.
+     *
+     * `eva-riesgos-vibracion` YA NO SALE: contestaba la misma pregunta que
+     * «Hallazgos» con otro nombre, y dos entradas que dicen lo mismo se leen
+     * como dos cosas distintas. La ruta sigue navegable por id —el asistente
+     * la usa como destino— sólo no tiene entrada de menú.
+     */
     const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
     expect(vibraciones.children.map((c) => c.id)).toEqual([
       // `vib-controles` oculta del sidebar para esta demo (14-09-2026): la
       // ruta sigue existiendo (ver el test de `ids` más arriba), sólo no
       // trae `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
-      "vib-inicio", "eva-vibraciones",
-      "eva-riesgos-vibracion", "vib-3d",
+      "vib-inicio", "eva-vibraciones", "vib-3d", "eva-alarmas",
+      "eva-bandeja", "eva-avisos",
+      "rag-casos", "rag-documentacion",
+    ]);
+
+    /*
+     * Y salen agrupadas en tres apartados. El rótulo es un SEPARADOR, no un
+     * nivel de menú: viaja en el hijo y el Sidebar lo pinta cuando cambia
+     * respecto al anterior, así que el orden sale del orden de declaración y
+     * no de una segunda lista que mantener.
+     */
+    expect(vibraciones.children.map((c) => c.apartado)).toEqual([
+      "visualizacion", "visualizacion", "visualizacion", "visualizacion",
+      "diagnostico", "diagnostico",
+      "documentacion", "documentacion",
     ]);
 
     // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
@@ -247,7 +285,7 @@ describe("el sidebar que sale del registro", () => {
       // `eva-muro` oculta del sidebar para esta demo (14-09-2026): la ruta
       // sigue existiendo (ver el test de `ids` más arriba), sólo no trae
       // `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
-      "eva-alarmas", "eva-assets", "eva-configuracion", "eva-turno", "eva-bandeja", "eva-avisos",
+      "eva-assets", "eva-configuracion", "eva-turno",
       "eva-cuaderno", "salud-sistema",
     ]);
 
@@ -271,12 +309,23 @@ describe("el sidebar que sale del registro", () => {
       "pred-pronostico",
     ]);
 
-    // RAG es su propia sección por el mismo motivo que las otras tres NO se
-    // mezclan entre sí: lo que hay aquí no describe una instalación de la
-    // planta, describe de dónde saca el asistente lo que sabe fuera de lo
-    // que mide ICONICS.
-    const rag = NAV.find((n) => n.group === "sec-rag");
-    expect(rag.children.map((c) => c.id)).toEqual(["rag-casos", "rag-documentacion"]);
+    /*
+     * ── RAG DEJÓ DE SER SECCIÓN (Plan 33 F10, 18-09-2026) ────────────
+     *
+     * Era su propia sección porque «no describe una instalación, describe de
+     * dónde saca el asistente lo que sabe». Eso sigue siendo cierto del RAG
+     * como mecanismo — y falso de estas dos VISTAS: un caso previo y un manual
+     * son de UNA máquina. Los casos llevan `sistema` obligatorio desde el Plan
+     * 16 y el RAG documental ya filtra por él.
+     *
+     * Tenerlos aparte obligaba a salir de la máquina para ver su propia
+     * documentación, y con N máquinas configuradas habría sido una sección con
+     * todo mezclado y un filtro que recordar.
+     *
+     * Se comprueba la AUSENCIA, no se borra el bloque: si alguien devolviera
+     * una vista a `sec-rag`, la sección reaparecería a medias y esto lo caza.
+     */
+    expect(NAV.find((n) => n.group === "sec-rag")).toBeUndefined();
   });
 
   /**
@@ -299,9 +348,12 @@ describe("el sidebar que sale del registro", () => {
       // La única que NO es de ICONICS: un compresor real servido por otro
       // backend. Es la razón de ser de este campo.
       "sec-prediccion": "prediccion",
-      // RAG es `monitoreo` aunque no sea una máquina: es el conocimiento con el
-      // que se diagnostica ESTA planta, no una tercera fuente de datos.
-      "sec-rag": "monitoreo",
+      /*
+       * `"sec-rag": "monitoreo"` ya no sale: sus dos vistas pasaron a la
+       * máquina en el Plan 33 F10 y la sección se quedó sin hijos. Vuelve si
+       * alguien devuelve una vista a esa sección — que es lo que esta
+       * comprobación atraparía.
+       */
     });
   });
 
@@ -328,13 +380,23 @@ describe("el sidebar que sale del registro", () => {
       (s.children ?? []).filter((c) => /riesgos/.test(c.id)).map((c) => [s.group, c.id])
     );
     /*
-     * Con la estación de llenado cerrada queda una sola, y la afirmación sigue
-     * valiendo: NINGUNA sección tiene dos «Riesgos» dentro. Al reabrir vuelve
-     * la línea `["sec-llenado", "eva-riesgos"]` delante.
+     * ── HOY NO HAY NINGUNO EN EL MENÚ, Y LA REGLA SIGUE EN PIE ────────
+     *
+     * Dos cosas se acumularon: la estación de llenado está cerrada (su
+     * «Riesgos» no trae `nav`), y el de vibraciones salió del menú en el Plan
+     * 33 F10 porque contestaba lo mismo que «Hallazgos» con otro nombre.
+     *
+     * La afirmación que este caso defiende —NINGUNA sección tiene dos
+     * «Riesgos» dentro, porque serían dos motores de reglas sobre dos máquinas
+     * distintas— se cumple trivialmente con cero. Se conserva en vez de
+     * borrarse porque es lo que atraparía a quien devuelva los dos a la misma
+     * sección al reabrir: ahí volvería a decir algo.
      */
-    expect(conRiesgos).toEqual([
-      ["sec-vibraciones", "eva-riesgos-vibracion"],
-    ]);
+    expect(conRiesgos).toEqual([]);
+
+    /* Y la ruta sigue existiendo, navegable por id: cerrado no es borrado, y
+       el asistente la usa como destino en `navegacionDelAsistente.js`. */
+    expect(ids).toContain("eva-riesgos-vibracion");
   });
 
   it("la ruta por defecto está visible en el menú", () => {

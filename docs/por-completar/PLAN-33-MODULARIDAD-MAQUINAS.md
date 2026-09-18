@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría) y F1–F7 completadas (F5 de sólo lectura) · F8, F9 y F10 por completar
+**Estado:** Fase 0 (auditoría), F1–F7 y F10 completadas · F8 y F9 por completar
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -1479,9 +1479,109 @@ mismas muestras; los dos `NO_COMPARTEN` reactivados y en verde.
 
 ---
 
-### F10 · Las vistas que pertenecen a una máquina
+### F10 · Las vistas que pertenecen a una máquina ✅
 
-**Por completar.** Añadida el 18-09-2026, a petición del usuario.
+**Completada el 18-09-2026**, salvo Historización (depende del Plan 32 F2).
+
+**Qué se hizo**: las cinco vistas se movieron a la máquina, «Riesgos» se
+unificó con «Hallazgos», y las nueve salen agrupadas en tres apartados.
+`test/app/vistas-por-maquina.test.jsx` (8 pruebas).
+
+#### El menú, antes y después
+
+```
+ANTES                          DESPUÉS
+Estación de vibraciones        Estación de vibraciones
+ · Inicio                        VISUALIZACIÓN
+ · Gráficas                      · Inicio · Gráficas · Vista 3D · Alarmas
+ · Riesgos                       DIAGNÓSTICO
+ · Vista 3D                      · Hallazgos · Avisos
+General                          DOCUMENTACIÓN
+ · Alarmas · Assets              · Casos previos · RAG documental
+ · Configuración · Turno       General
+ · Hallazgos · Avisos            · Assets · Configuración · Turno
+ · Cuaderno · Salud              · Cuaderno · Salud
+RAG                            (RAG desapareció sola)
+ · Casos previos · RAG
+```
+
+#### Dos secciones desaparecieron solas, y eso es el mecanismo funcionando
+
+`sec-rag` se quedó sin hijos y `buildNav` la omitió —igual que `sec-llenado` al
+cerrar el tanque—. **No hubo que tocar `NAV_GROUPS`**: las secciones se derivan
+de las rutas que traen `nav`.
+
+#### El apartado es un separador, no un nivel
+
+`buildNav` y `NavGroup` sólo manejan un nivel de grupos. Hacerlos recursivos
+habría exigido decidir qué pasa al colapsar el sidebar, qué se recuerda plegado
+y cómo cuenta el badge de un subgrupo — **tres decisiones de chrome para
+conseguir lo mismo que un rótulo**.
+
+El `apartado` viaja en el hijo y el Sidebar lo pinta cuando **cambia** respecto
+al anterior, así que el orden sale del orden de declaración de las rutas —que
+ya es el orden del menú— y no de una segunda lista que mantener.
+
+#### «Riesgos» y «Hallazgos» eran lo mismo
+
+Dos entradas que contestan la misma pregunta se leen como dos cosas distintas:
+alguien mira una, no encuentra lo que busca y no sabe que la otra existe.
+
+Se unifica en **Hallazgos** (`eva-bandeja`), que ya distingue por máquina y es
+la que trabajó el Plan 31. `eva-riesgos-vibracion` pierde su `nav` y **sigue
+navegable por id**: el asistente la usa como destino en
+`navegacionDelAsistente.js`. Cerrado no es borrado.
+
+#### Qué filtra cada vista, y qué NO se tocó
+
+- **Casos previos** — pasa de `SISTEMA_IDS_EN_SERVICIO` (todas las abiertas) a
+  **esta** máquina. Con una sola abierta las dos listas coinciden, así que no
+  cambia nada hoy; cambia al reabrir el tanque, que es cuando importa y cuando
+  nadie se acordaría de venir. Los casos `sistema: null` se siguen enseñando:
+  son de la planta entera.
+- **RAG documental** — la máquina **preselecciona** el filtro, no lo impone.
+  Ésta es también la pantalla donde se asignan los manuales sin sistema, y un
+  filtro fijo escondería justo los que hay que asignar.
+- **Hallazgos, Avisos y Alarmas** — ya estaban acotadas a vibraciones por el
+  cierre de F1, cada una con su «para reabrir». No se tocó ninguna.
+
+#### Lo que se comprobó, y no era obvio
+
+**`AlarmasEva` importa `useSistemaAgua`** — el riesgo de sondeo que esta fase
+declaraba. Comprobado: la función que lo llama (`EstadoAlarmasVivo`) está
+**desconectada** —su pestaña se retiró al cerrar el tanque— así que el hook no
+se ejecuta. `llenado-cerrado.test.jsx` sigue en verde, que es lo que lo fija.
+
+#### Tres pruebas existentes cambiaron, y las tres por buenos motivos
+
+`routes.test.jsx` (el inventario), y dos aserciones de
+`topbar-estado-maquina.test.jsx`. Ésta última **vuelve a demostrar lo que
+afirma, ahora por el otro lado**: `eva-bandeja` estaba en «General» esta mañana
+y hoy dice `sec-vibraciones` sin que nadie tocara su lista, porque la sección
+sale del registro.
+
+Y el indicador de encendido sigue sin verse en Alarmas — ahora por un motivo
+**más fuerte**: sólo se pinta en `sec-llenado`, así que una pantalla de
+vibraciones lo excluye por partida doble.
+
+#### Lo que queda
+
+**Historización.** No es reubicar, es construir: depende de
+`data/vibraciones/historia.js` (Plan 32 F3), bloqueado por el historiador que
+devuelve 0 muestras (Plan 32 F2). Mientras tanto, la máquina tiene **ocho**
+vistas y no nueve.
+
+**Casos previos sale vacío**: vibraciones tiene 0 casos de 13. No es un defecto
+de F10, es la foto real del módulo.
+
+**Medido**: 8 pruebas nuevas · **1010** de frontend (antes 1002, 29 omitidas) ·
+los 34 verificadores · `verificar-i18n` 1300 claves × 2 idiomas con paridad ·
+`verificar-textos` sin español suelto · bundle `index` 303,25 KB de 450 · lint
+y types limpios. El límite de Turno se comprobó **por mutación**.
+
+---
+
+### F10 — la petición original
 
 #### Por qué faltaba
 

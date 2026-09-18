@@ -66,9 +66,12 @@
 import { lazy } from "react";
 import {
   Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
-  LayoutDashboard, MessageSquareText, NotebookPen, ShieldAlert, Waves,
+  LayoutDashboard, MessageSquareText, NotebookPen, Waves,
   /* `Power` se va con la estación de llenado (rama `Vibraciones1.0`): lo usaba
-     `eva-controles`, y `vib-controles` sigue sin `nav`. Vuelve al reabrir. */
+     `eva-controles`, y `vib-controles` sigue sin `nav`. Vuelve al reabrir.
+
+     `ShieldAlert` se va con «Riesgos» (Plan 33 F10): esa vista salió del menú
+     al unificarse con «Hallazgos». Vuelve si se restaura su `nav`. */
 } from "lucide-react";
 
 /**
@@ -241,7 +244,7 @@ export const ROUTES = [
   {
     id: "vib-inicio",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
-    nav: { icon: <Home size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <Home size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
   },
 
   {
@@ -252,7 +255,7 @@ export const ROUTES = [
     // son las medidas del instante, con su escala y su banda de norma.
     id: "eva-vibraciones",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
-    nav: { icon: <LayoutDashboard size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <LayoutDashboard size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
   },
 
   {
@@ -272,9 +275,24 @@ export const ROUTES = [
     // evalúa el tanque —nivel, presión, caudal— y éste un motor con
     // acelerómetros. Las dos listas juntas serían la invitación a buscar una
     // relación entre ellas que no existe.
+    //
+    // ── FUERA DEL MENÚ DESDE EL 18-09-2026 (Plan 33 F10) ───────────────
+    //
+    // «Riesgos» y «Hallazgos» contestaban la MISMA pregunta con dos nombres, y
+    // dos entradas de menú que contestan lo mismo se leen como dos cosas
+    // distintas: alguien mira una, no encuentra lo que busca y no sabe que la
+    // otra existe.
+    //
+    // Se unifica en «Hallazgos» (`eva-bandeja`) y no al revés porque aquélla
+    // ya distingue por máquina y es la que el Plan 31 trabajó. Ésta se queda
+    // navegable por id —cerrado no es borrado—: sigue siendo la vista que
+    // pinta las 18 reglas con su evidencia, y el asistente la usa como destino
+    // en `navegacionDelAsistente.js`.
+    //
+    // Restaurar: devolver `nav: { icon: <ShieldAlert size={17} />, group:
+    // "sec-vibraciones", apartado: "diagnostico" }`.
     id: "eva-riesgos-vibracion",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
-    nav: { icon: <ShieldAlert size={17} />, group: "sec-vibraciones" },
   },
 
   {
@@ -284,7 +302,7 @@ export const ROUTES = [
     // desbloqueó exactamente, y por qué antes no valía una escena provisional.
     id: "vib-3d",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
-    nav: { icon: <Box size={17} />, group: "sec-vibraciones" },
+    nav: { icon: <Box size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
   },
 
   {
@@ -306,7 +324,7 @@ export const ROUTES = [
     // `activo.alarmas.activas` del sistema en vivo, no `useAlarmCount()`.
     id: "eva-alarmas",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
-    nav: { icon: <Bell size={17} />, group: "sec-general" },
+    nav: { icon: <Bell size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
   },
 
   {
@@ -364,7 +382,7 @@ export const ROUTES = [
      */
     id: "eva-bandeja",
     component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
-    nav: { icon: <Inbox size={17} />, group: "sec-general" },
+    nav: { icon: <Inbox size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
   },
 
   {
@@ -389,7 +407,7 @@ export const ROUTES = [
      */
     id: "eva-avisos",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
-    nav: { icon: <MessageSquareText size={17} />, group: "sec-general" },
+    nav: { icon: <MessageSquareText size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
   },
 
   {
@@ -462,13 +480,13 @@ export const ROUTES = [
      */
     id: "rag-casos",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
-    nav: { icon: <NotebookPen size={17} />, group: "sec-rag" },
+    nav: { icon: <NotebookPen size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
   },
 
   {
     id: "rag-documentacion",
     component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
-    nav: { icon: <FileText size={17} />, group: "sec-rag" },
+    nav: { icon: <FileText size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
   },
 
   /*

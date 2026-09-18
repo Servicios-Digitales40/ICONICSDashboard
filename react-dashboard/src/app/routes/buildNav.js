@@ -71,7 +71,25 @@ export function buildNav(routes, groups) {
       vistos.set(group, nuevo);
       items.push(nuevo);
     }
-    vistos.get(group).children.push({ id: r.id, icon });
+    /*
+     * ── `apartado`: UN RÓTULO, NO UN NIVEL DE MENÚ (Plan 33 F10) ──────
+     *
+     * Una máquina llega a tener nueve vistas, y nueve seguidas se leen como
+     * una lista. Se agrupan en tres bloques —Visualización, Diagnóstico,
+     * Documentación— con un rótulo fino delante del primero de cada uno.
+     *
+     * Es un SEPARADOR, no un segundo nivel: no se pliega, no se navega y no
+     * cambia la forma del árbol. Hacerlo anidable habría exigido que este
+     * archivo y `NavGroup` fueran recursivos, y con ello decidir qué pasa al
+     * colapsar el sidebar, qué se recuerda plegado y cómo cuenta el badge de
+     * un subgrupo. Tres decisiones de chrome para conseguir lo mismo que un
+     * rótulo.
+     *
+     * Viaja en el hijo y lo pinta el Sidebar comparando con el anterior: así
+     * el orden del apartado sale del orden de declaración de las rutas, que ya
+     * es el orden del menú, y no hay una segunda lista que mantener.
+     */
+    vistos.get(group).children.push({ id: r.id, icon, apartado: r.nav.apartado ?? null });
   }
 
   return items;

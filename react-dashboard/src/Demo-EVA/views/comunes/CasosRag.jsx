@@ -1,18 +1,26 @@
 /**
  * RAG · Casos — la bitácora de intervenciones, para revisarla y podarla.
  *
- * ── POR QUÉ ESTA PANTALLA VA EN «RAG» Y NO EN UNA MÁQUINA ──────────
+ * ── POR QUÉ EXISTE ESTA PANTALLA ───────────────────────────────────
  *
- * Porque la sección RAG es «de dónde saca el asistente lo que sabe fuera de
- * lo que mide ICONICS» (ver `app/routes/routes.jsx`), y hasta ahora sólo
- * enseñaba una de las dos fuentes: los manuales. Los casos previos son la
- * OTRA —la Fuente #3 del diagnóstico, ver `backend/ia/motor/casos.mjs`— y
- * no se veían por ningún lado. Un caso se escribía por voz, por chat o
- * cerrando un diagnóstico, y a partir de ahí sólo existía dentro de una
- * búsqueda por parecido que nadie podía inspeccionar.
+ * Los casos previos son la Fuente #3 del diagnóstico (ver
+ * `backend/ia/motor/casos.mjs`) y no se veían por ningún lado. Un caso se
+ * escribía por voz, por chat o cerrando un diagnóstico, y a partir de ahí sólo
+ * existía dentro de una búsqueda por parecido que nadie podía inspeccionar.
  *
- * Colgarla de una máquina habría sido peor: la bitácora tiene casos de las
- * dos, y algunos de ninguna (`sistema: null`).
+ * ── DE «RAG» A LA MÁQUINA (Plan 33 F10, 18-09-2026) ────────────────
+ *
+ * Esta cabecera decía que colgar la pantalla de una máquina «habría sido
+ * peor», porque la bitácora tiene casos de las dos y algunos de ninguna.
+ *
+ * Con dos máquinas eso era razonable. Con máquinas que se dan de alta por
+ * configuración deja de serlo: una sección común sería todo mezclado y un
+ * filtro que recordar, y salir de la máquina para ver SU historial es
+ * exactamente lo que no debería hacer falta.
+ *
+ * Así que la vista cuelga de la máquina y filtra por ella. Los casos
+ * `sistema: null` —de la planta entera— se siguen enseñando en todas: no son
+ * de nadie en particular, y esconderlos los perdería.
  *
  * ── QUÉ PROBLEMA RESUELVE DE VERDAD ────────────────────────────────
  *
@@ -53,6 +61,7 @@ import { archivarCaso, listarCasos } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
+import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
 
 import { MONO, SANS } from "../../components/base.jsx";
 
@@ -260,6 +269,9 @@ export default function CasosRag({ params, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["assistant", "navigation", "common", "errors"]);
   const { theme: t } = useTheme();
+  /* De qué máquina cuelga esta pantalla en el menú (Plan 33 F10). Sólo el id:
+     esta vista no lee ni un punto, así que no necesita nada más. */
+  const { id: maquinaId } = useMaquina();
   const [estado, setEstado] = useState({ loading: true, error: null, casos: [], ocultos: 0 });
 
   /**
@@ -335,10 +347,26 @@ export default function CasosRag({ params, onNavigate }) {
        *
        * Para reabrir: quitar este filtro.
        */
+      /*
+       * ── DE «LAS EN SERVICIO» A «ÉSTA» (Plan 33 F10) ────────────────
+       *
+       * Filtraba a `SISTEMA_IDS_EN_SERVICIO` —todas las máquinas abiertas— y
+       * ahora esta vista cuelga de UNA máquina en el menú. Enseñar los casos
+       * de las demás bajo su sección sería decir que son suyos.
+       *
+       * Con una sola máquina abierta las dos listas coinciden, así que esto no
+       * cambia nada HOY. Cambia al reabrir la estación de llenado, que es
+       * cuando la diferencia importa y cuando nadie se acordaría de venir.
+       *
+       * Sin máquina en contexto —si alguien abre la ruta suelta— se cae al
+       * filtro de antes: enseñar todo lo que está en servicio es mejor que una
+       * pantalla vacía sin explicación.
+       */
       const todos = data.casos ?? [];
-      const casos = todos.filter(
-        (c) => !c.sistema || SISTEMA_IDS_EN_SERVICIO.includes(c.sistema)
-      );
+      const casos = todos.filter((c) => {
+        if (!c.sistema) return true; // de la planta entera, no de una máquina
+        return maquinaId ? c.sistema === maquinaId : SISTEMA_IDS_EN_SERVICIO.includes(c.sistema);
+      });
       setEstado({ loading: false, error: null, casos, ocultos: todos.length - casos.length });
     } catch (e) {
       if (e.name === "AbortError") return;
@@ -349,7 +377,10 @@ export default function CasosRag({ params, onNavigate }) {
        */
       setEstado({ loading: false, error: e, casos: [], ocultos: 0 });
     }
-  }, []);
+    /* `maquinaId` es dependencia de verdad desde el Plan 33 F10: el filtro lo
+       usa, así que sin ella cambiar de máquina dejaría en pantalla los casos
+       de la anterior. Lo avisó `react-hooks/exhaustive-deps`. */
+  }, [maquinaId]);
 
   useEffect(() => {
     const ac = new AbortController();

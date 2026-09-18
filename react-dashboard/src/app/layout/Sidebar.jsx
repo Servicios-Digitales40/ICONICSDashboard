@@ -315,11 +315,38 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
 
       {open && !collapsed && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {item.children.map((child) => (
-            <NavButton
-              key={child.id} item={child} active={page === child.id} onNavigate={onNavigate} t={t} indent
-              conteo={conteoPorId[child.id] ?? 0}
-            />
+          {item.children.map((child, i) => (
+            <Fragment key={child.id}>
+              {/*
+                ── EL RÓTULO DEL APARTADO (Plan 33 F10) ─────────────────
+                Se pinta cuando CAMBIA respecto al hijo anterior, así que el
+                orden de los apartados sale del orden de declaración de las
+                rutas —que ya es el orden del menú— y no de una segunda lista
+                que alguien tendría que mantener en paralelo.
+                Es un separador: no se pliega, no se navega, no recibe foco.
+              */}
+              {child.apartado && child.apartado !== item.children[i - 1]?.apartado && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    padding: "9px 0 3px 30px",
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    letterSpacing: 0.8,
+                    textTransform: "uppercase",
+                    color: t.textSoft,
+                    opacity: 0.6,
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  {traducir(`apartados.${child.apartado}`)}
+                </div>
+              )}
+              <NavButton
+                item={child} active={page === child.id} onNavigate={onNavigate} t={t} indent
+                conteo={conteoPorId[child.id] ?? 0}
+              />
+            </Fragment>
           ))}
         </div>
       )}

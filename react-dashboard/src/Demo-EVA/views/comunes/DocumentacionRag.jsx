@@ -38,6 +38,9 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
+/* De qué máquina cuelga esta pantalla, para preseleccionar su filtro
+   (Plan 33 F10). Sólo el id: esta vista no lee ningún punto. */
+import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
 
 /** Cada cuántos ms se vuelve a preguntar mientras hay algo indexándose. Lo
  *  bastante rápido para que se sienta en vivo, lo bastante espaciado para no
@@ -511,8 +514,24 @@ export default function DocumentacionRag({ params, onNavigate }) {
    * cae solo en «todos», porque `manualesVisibles` no reconoce ningún caso y
    * devuelve la lista completa.
    */
+  /*
+   * ── LA MÁQUINA PRESELECCIONA, NO IMPONE (Plan 33 F10) ──────────────
+   *
+   * Esta vista cuelga ahora de una máquina en el menú, así que arranca
+   * filtrada por ella: entrar desde «Estación de vibraciones» y ver los nueve
+   * manuales de toda la planta sería enseñar los de otra bajo su sección.
+   *
+   * Pero el filtro sigue siendo del usuario, y eso importa: ésta es también la
+   * pantalla donde se ASIGNAN los manuales sin sistema, y un filtro fijo
+   * escondería justo los que hay que asignar. El selector sigue ahí, con
+   * «toda la planta» y «sin asignar».
+   *
+   * El parámetro de la URL manda sobre la máquina: un enlace guardado con
+   * `?filtro=` dice explícitamente qué quería ver quien lo guardó.
+   */
+  const { id: maquinaId } = useMaquina();
   const [filtroSistema, setFiltroSistema] = useState(
-    typeof params?.filtro === "string" ? params.filtro : ""
+    typeof params?.filtro === "string" ? params.filtro : maquinaId ?? ""
   );
 
   /**

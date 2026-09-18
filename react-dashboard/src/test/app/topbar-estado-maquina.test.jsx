@@ -118,14 +118,39 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     // saliendo en sus pantallas. Al reabrir vuelve a valer "sec-llenado".
     expect(SECCION_DE_PAGINA["eva-planta"] ?? null).toBeNull();
     expect(SECCION_DE_PAGINA["eva-vibraciones"]).toBe("sec-vibraciones");
-    expect(SECCION_DE_PAGINA["eva-riesgos-vibracion"]).toBe("sec-vibraciones");
+    /*
+     * ── LA SEGUNDA RUTA CAMBIÓ (Plan 33 F10, 18-09-2026) ─────────────
+     *
+     * Era `eva-riesgos-vibracion`, que salió del menú al unificarse con
+     * «Hallazgos»: sin `nav` no tiene sección, exactamente como `eva-planta`
+     * arriba. Se sustituye por `eva-bandeja`, que ES la vista de hallazgos de
+     * esta máquina desde F10.
+     *
+     * Y el cambio vuelve a demostrar lo que la prueba afirma, ahora por el
+     * otro lado: `eva-bandeja` estaba en «General» esta mañana y hoy dice
+     * «sec-vibraciones» sin que nadie tocara esta lista, porque la sección
+     * sale del registro. Con una lista escrita a mano, mover una vista de
+     * sección no habría cambiado nada aquí.
+     */
+    expect(SECCION_DE_PAGINA["eva-riesgos-vibracion"] ?? null).toBeNull();
+    expect(SECCION_DE_PAGINA["eva-bandeja"]).toBe("sec-vibraciones");
 
-    // `eva-alarmas` volvió al sidebar el 10-09-2026 (Plan 27) bajo
-    // «sec-general» — sigue sin ser del tanque ni de vibraciones, así que el
-    // indicador sigue sin aparecer ahí (comprobado arriba). `eva-detalle` SÍ
-    // sigue sin `nav`, y por tanto sin sección: el indicador tampoco debe
-    // dársela por supuesta.
-    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-general");
+    /*
+     * ── ALARMAS PASÓ A LA MÁQUINA (Plan 33 F10, 18-09-2026) ──────────
+     *
+     * Estaba en «sec-general» desde el Plan 27, y ahora cuelga de la máquina:
+     * un área de alarmas pertenece a un asset, no al servidor.
+     *
+     * El indicador sigue SIN verse ahí, y ahora por un motivo más fuerte: sólo
+     * se pinta en `sec-llenado` —lee un tag del tanque—, así que una pantalla
+     * de vibraciones lo excluye por partida doble. La comprobación de arriba
+     * («en las pantallas de Alarmas, NO se ve») es la que lo fija de verdad;
+     * ésta sólo verifica de dónde sale la sección.
+     *
+     * `eva-detalle` sigue sin `nav`, y por tanto sin sección: el indicador
+     * tampoco debe dársela por supuesta.
+     */
+    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-vibraciones");
     expect(SECCION_DE_PAGINA["eva-detalle"]).toBeNull();
   });
 });

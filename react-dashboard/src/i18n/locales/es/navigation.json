@@ -162,5 +162,10 @@
   "modules": {
     "monitoreo": "Monitoreo y Diagnóstico",
     "prediccion": "Predicción"
+  },
+  "apartados": {
+    "visualizacion": "Visualización",
+    "diagnostico": "Diagnóstico",
+    "documentacion": "Documentación"
   }
 }
