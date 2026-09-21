@@ -1049,10 +1049,24 @@ validarRegistro();
  * repiten aquí a propósito: aquélla mira contra las demás CONFIGURADAS, y ésta
  * contra el registro entero, que incluye las escritas a mano.
  *
+ * ── EL SOLAPE CON UNA MÁQUINA ESCRITA A MANO SE TOLERA, Y SE DICE (Plan 38) ─
+ *
+ * Mientras dure la rama, la máquina de vibraciones existe DOS veces: escrita
+ * a mano en `vibraciones.js` y configurada desde el árbol (Plan 36). Las dos
+ * apuntan a la misma raíz porque SON la misma instalación; retirar la escrita
+ * a mano es la F5 del Plan 34, y hasta entonces registrar la configurada
+ * tiene que ser posible. Con `toleraSolapeConEscritas`, el solape con una
+ * entrada escrita a mano no lanza: se devuelve en `solapes` para que quien
+ * registra lo escriba en el registro de arranque. El solape entre DOS
+ * configuradas sigue siendo un error —`problemasDeMaquina` ya lo impide al
+ * guardar—, y `sistemaDePunto()` sigue devolviendo la primera que encaja: la
+ * escrita a mano, que va antes en el array.
+ *
  * @param {object} entrada  lo que devuelve `construirSistema()`
- * @returns {object} la misma entrada, ya registrada
+ * @param {{toleraSolapeConEscritas?: boolean}} [opciones]
+ * @returns {object} la misma entrada, ya registrada, con `solapes` si los hubo
  */
-export function registrarSistema(entrada) {
+export function registrarSistema(entrada, { toleraSolapeConEscritas = false } = {}) {
   if (!entrada?.id) {
     throw new Error("registrarSistema: la entrada no trae `id`.");
   }
@@ -1064,10 +1078,15 @@ export function registrarSistema(entrada) {
     );
   }
 
+  const solapes = [];
   for (const raiz of entrada.raices ?? []) {
     for (const otro of SISTEMAS) {
       for (const suya of otro.raices ?? []) {
         if (raiz.startsWith(suya) || suya.startsWith(raiz)) {
+          if (toleraSolapeConEscritas && !otro.configurada) {
+            solapes.push({ raiz, con: otro.id, suya });
+            continue;
+          }
           throw new Error(
             `registrarSistema: la raíz «${raiz}» de «${entrada.id}» se solapa con «${suya}» ` +
               `de «${otro.id}». \`sistemaDePunto()\` devuelve la primera que encaja, así que ` +
@@ -1077,6 +1096,7 @@ export function registrarSistema(entrada) {
       }
     }
   }
+  if (solapes.length) entrada.solapes = solapes;
 
   SISTEMAS.push(entrada);
   SISTEMA[entrada.id] = entrada;
@@ -1099,6 +1119,47 @@ export function registrarSistema(entrada) {
 
   return entrada;
 }
+
+/**
+ * Saca del registro una máquina CONFIGURADA. Plan 38.
+ *
+ * Sólo las configuradas: una escrita a mano es código y se retira editando el
+ * código, no en caliente. Existe porque la configuración cambia en vivo —se
+ * edita una máquina, se sondean sus series, se quita del tablero— y la
+ * entrada del registro es una FOTO de esa configuración: para que el registro
+ * diga la verdad hay que rehacerla, y rehacerla empieza por quitar la vieja.
+ *
+ * Devuelve `true` si había algo que quitar. No lanza por un id que no está:
+ * quien sincroniza quita todas las configuradas antes de volver a
+ * registrarlas, y «no estaba» es un estado normal ahí.
+ */
+export function desregistrarSistema(id) {
+  const entrada = SISTEMA[id];
+  if (!entrada) return false;
+  if (!entrada.configurada) {
+    throw new Error(
+      `desregistrarSistema: «${id}» está escrita a mano en el código, no configurada. Una ` +
+        "máquina de código se retira editando el código, no en caliente.",
+    );
+  }
+  const quitar = (lista) => {
+    const i = lista.indexOf(entrada);
+    if (i !== -1) lista.splice(i, 1);
+  };
+  quitar(SISTEMAS);
+  quitar(SISTEMAS_EN_SERVICIO);
+  const quitarId = (lista) => {
+    const i = lista.indexOf(id);
+    if (i !== -1) lista.splice(i, 1);
+  };
+  quitarId(SISTEMA_IDS);
+  quitarId(SISTEMA_IDS_EN_SERVICIO);
+  delete SISTEMA[id];
+  return true;
+}
+
+/** Las máquinas configuradas que hay hoy en el registro. */
+export const sistemasConfigurados = () => SISTEMAS.filter((s) => s.configurada);
 
 /**
  * A qué sistema pertenece una pantalla.

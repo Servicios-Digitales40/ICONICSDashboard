@@ -24,6 +24,7 @@
 import { SISTEMA, SISTEMAS } from '../../../../shared/eva/comun/sistemas.js'
 import { evaluarRiesgos } from '../../../../shared/eva/tanque/riesgos.js'
 import { evaluarRiesgosVibracion } from '../../../../shared/eva/vibraciones/riesgosVibracion.js'
+import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 import { isGoodQuality } from '../../../../shared/quality.js'
 import { fallo } from './respuesta.mjs'
 
@@ -196,6 +197,20 @@ function evaluarRiesgosDe(sistema, estado) {
    */
   if (!estado?.dominio) {
     return { activos: [], noEvaluables: [], evaluadas: 0 }
+  }
+
+  /*
+   * ── UNA CONFIGURADA SE EVALÚA CON LAS REGLAS DE SU TIPO (Plan 38 F1) ─
+   *
+   * El `switch` de abajo va por id y sólo conoce las dos escritas a mano. Una
+   * máquina configurada trae `tipo`, y el tipo trae `evaluarRiesgos` por
+   * referencia; su dominio ya tiene la forma que ese motor espera (Plan 34
+   * F3). Sin esta rama caía en el `default` y el asistente decía «no se pudo
+   * evaluar ninguna regla» de una máquina que sí las tiene.
+   */
+  if (sistema.configurada && sistema.tipo) {
+    const tipo = tipoDe(sistema.tipo)
+    if (tipo?.evaluarRiesgos) return tipo.evaluarRiesgos(estado.dominio)
   }
 
   switch (sistema.id) {

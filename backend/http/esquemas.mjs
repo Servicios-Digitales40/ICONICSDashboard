@@ -30,8 +30,26 @@
 import { z } from 'zod'
 import { isSafeHistoryArgument, isSafePointName } from '../iconics/validation.mjs'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
+
 import { ACCESOS } from '../../shared/eva/comun/configuracionMaquina.js'
 import { MAX_SERIES_BATCH } from '../../shared/eva/comun/historia.js'
+
+/**
+ * Un id de sistema que EXISTE en el registro, comprobado al validar.
+ *
+ * ── POR QUÉ NO ES `z.enum(SISTEMA_IDS)` (Plan 38 F1) ──────────────
+ *
+ * `z.enum` copia la lista al construir el esquema. Medido con zod 4: un id
+ * añadido a `SISTEMA_IDS` después de arrancar **no pasa** el enum. Y desde el
+ * Plan 38 el registro cambia en caliente —una máquina configurada entra al
+ * darla de alta, sale al quitarla—, así que la validación tiene que mirar la
+ * lista en el momento de validar, no la que había al importar este archivo.
+ *
+ * El mensaje se conserva: quien mandaba un `sistema` desconocido recibía «no
+ * reconozco», y sigue recibiéndolo.
+ */
+export const sistemaConocido = (error = 'Falta o no reconozco "sistema".') =>
+  z.string().trim().min(1, error).refine((id) => SISTEMA_IDS.includes(id), { error })
 
 /** Longitud máxima de una pregunta. Más que esto no es una pregunta. */
 export const MAX_PREGUNTA = 2000
@@ -205,7 +223,7 @@ export const ChatSchema = z.object({
        * —la pregunta llega sin foco y el asistente contesta sin saber de qué
        * máquina le hablan—.
        */
-      sistema: z.enum(SISTEMA_IDS).optional(),
+      sistema: sistemaConocido().optional(),
       activo: z.string().trim().min(1).max(64).optional(),
       /* El rango que está mirando, como lo nombra la vista («vivo», «ayer»,
          «semana», «personalizado»): es de qué PERÍODO se habla, no qué valores
@@ -421,7 +439,7 @@ export const MAX_NOTA = 1000
  */
 export const CuadernoNotaSchema = z.object({
   texto: z.string().trim().min(1, 'La nota no puede estar vacía.').max(MAX_NOTA),
-  sistema: z.enum(SISTEMA_IDS).optional(),
+  sistema: sistemaConocido().optional(),
 })
 
 export const ReporteQuerySchema = z.object({
@@ -612,7 +630,7 @@ const ResultadoCasoSchema = z.object({
  * significa cada una — sólo guardarla junto al resto del caso.
  */
 export const CrearCasoSchema = z.object({
-  sistema: z.enum(SISTEMA_IDS).nullish(),
+  sistema: sistemaConocido().nullish(),
   sintoma: TextoDeCasoSchema('sintoma'),
   causa: z.string().trim().min(1).optional(),
   solucion: TextoDeCasoSchema('solucion'),

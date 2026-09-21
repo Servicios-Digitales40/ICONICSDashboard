@@ -45,6 +45,15 @@ export async function montarApp(extra = {}) {
     // sobre el `Documentos/Reportes` de verdad de quien las corriera.
     IA_REPORTES_DIR: reportesDir,
     IA_BACKLOG_CHAT_DIR: backlogChatDir,
+    /*
+     * Un `maquinas.json` VACÍO y propio. Desde el Plan 38 el backend registra
+     * al arrancar las máquinas configuradas del archivo; con el valor por
+     * defecto (`datos/maquinas.json`) cada prueba metería en el registro las
+     * máquinas de quien la corre, y el inventario de sistemas dependería del
+     * disco de cada máquina de desarrollo. Las pruebas que necesitan máquinas
+     * configuradas pasan su propia ruta en `extra`.
+     */
+    MAQUINAS_RUTA: join(reportesDir, 'maquinas.json'),
     ...extra,
   })
 

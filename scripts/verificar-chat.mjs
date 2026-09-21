@@ -27,6 +27,8 @@
  */
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { createChat } from '../backend/ia/conversacion/chat.mjs'
@@ -967,7 +969,13 @@ await check('un 500 del modelo se propaga con su código', async () => {
 
 console.log('\n── La ruta /api/chat ───────────────────────────────────────')
 
-const baseEnv = { PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist' }
+/* `MAQUINAS_RUTA` propio y vacío: desde el Plan 38 el backend registra al
+   arrancar las máquinas configuradas del archivo, y este guion no puede
+   depender de lo que haya en el `datos/maquinas.json` de quien lo corre. */
+const baseEnv = {
+  PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist',
+  MAQUINAS_RUTA: join(tmpdir(), `verificar-chat-maquinas-${process.pid}.json`),
+}
 
 async function montar(env) {
   const server = await createApp(loadConfig({ ...baseEnv, ...env }))

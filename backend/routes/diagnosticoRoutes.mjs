@@ -32,7 +32,7 @@
  * pertenece, en vez de quedarse en «basta con tener sesión».
  */
 import { z } from 'zod'
-import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
+import { sistemaConocido } from '../http/esquemas.mjs'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
 import { resumirDiagnosticos } from '../ia/motor/metricas.mjs'
 import { crearHerramientasDeDiagnostico } from '../ia/herramientas/diagnostico/index.mjs'
@@ -73,7 +73,7 @@ const ValoresSensoresSchema = z
   .optional()
 
 const DiagnosticoQuerySchema = z.object({
-  sistema: z.enum(SISTEMA_IDS, { error: 'Falta o no reconozco "sistema".' }),
+  sistema: sistemaConocido(),
   riesgoId: z.string().min(1, 'Falta "riesgoId".'),
   valoresSensores: ValoresSensoresSchema,
 })
@@ -133,7 +133,7 @@ const MetricasQuerySchema = z.object({
  * que es la parte que no se puede degradar.
  */
 const NarradoQuerySchema = z.object({
-  sistema: z.enum(SISTEMA_IDS, { error: 'Falta o no reconozco "sistema".' }),
+  sistema: sistemaConocido(),
   riesgoId: z.string().min(1, 'Falta "riesgoId".'),
   valoresSensores: ValoresSensoresSchema,
   /*

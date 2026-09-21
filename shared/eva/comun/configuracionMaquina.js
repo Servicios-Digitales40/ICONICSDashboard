@@ -262,8 +262,16 @@ export function normalizarConfiguracion(bruto) {
   };
 }
 
-/** Los ids de sistema que ya están ocupados por el registro escrito a mano. */
-const IDS_DEL_REGISTRO = () => SISTEMAS.map((s) => s.id);
+/**
+ * Los ids de sistema que ya están ocupados por el registro ESCRITO A MANO.
+ *
+ * Sólo las de código. Desde el Plan 38 las máquinas configuradas también viven
+ * en `SISTEMAS` (`configurada: true`), y contarlas aquí hacía que editar una
+ * máquina la rechazara por chocar consigo misma: «ya hay un sistema con el id
+ * vib-motor-03», que era ella. El choque entre DOS configuradas lo mira
+ * `otrosIds`, que excluye la propia.
+ */
+const IDS_DEL_REGISTRO = () => SISTEMAS.filter((s) => !s.configurada).map((s) => s.id);
 
 /**
  * ¿Está bien formada esta máquina? Devuelve la lista de problemas, vacía si no

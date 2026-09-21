@@ -38,6 +38,7 @@ import { createIndiceCasos } from './ia/motor/casos.mjs'
 import { createMotorDiagnostico } from './ia/motor/diagnostico.mjs'
 import { createGestorManuales } from './ia/indices/manuales.mjs'
 import { createGestorMaquinas } from './ia/indices/maquinas.mjs'
+import { conRegistroSincronizado, sincronizarRegistroConfigurado } from './ia/indices/registroConfigurado.mjs'
 import { createEvaluadorTemporal } from './ia/motor/temporal.mjs'
 import { crearNarrador } from './ia/motor/narrador.mjs'
 import { createHerramientas } from './ia/conversacion/herramientas.mjs'
@@ -380,12 +381,18 @@ export async function createApp(config) {
    * que no está devuelve la lista vacía, y eso es lo correcto —todavía no se
    * ha configurado ninguna—, no un error. Igual que `aprendizaje.json`.
    *
-   * **Nadie lo consume todavía**, y es deliberado: el registro sigue leyendo
-   * sus dos máquinas escritas a mano. Construir entradas de `SISTEMAS` a partir
-   * de esto es la F3, y separar las dos fases es lo que permite que un fallo
-   * aquí no pueda confundirse con una regresión del tablero.
+   * ── EL REGISTRO LAS CONOCE (Plan 38 F1) ────────────────────────────
+   *
+   * Este bloque decía «nadie lo consume todavía: el registro sigue leyendo sus
+   * dos máquinas escritas a mano». Desde el Plan 38 las configuradas ACTIVAS
+   * entran en `SISTEMAS` al arrancar y se rehacen tras cada escritura
+   * (`conRegistroSincronizado`), así que el asistente, los casos, el motor de
+   * diagnóstico y los manuales las conocen igual que a las escritas a mano.
+   * Una que no se pueda construir se omite y se dice en el registro de
+   * arranque; el resto sigue.
    */
-  const gestorMaquinas = createGestorMaquinas({ ruta: config.maquinas.ruta })
+  const gestorMaquinas = conRegistroSincronizado(createGestorMaquinas({ ruta: config.maquinas.ruta }))
+  await sincronizarRegistroConfigurado(gestorMaquinas)
 
 
   const herramientas = createHerramientas({
