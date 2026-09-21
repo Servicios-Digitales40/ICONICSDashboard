@@ -35,8 +35,8 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1079** pruebas · 29 omitidas |
-| Suite de backend | **378** pruebas |
+| Suite de frontend | **1081** pruebas · 29 omitidas |
+| Suite de backend | **385** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
 | Lint y types | limpios |
@@ -47,9 +47,12 @@ sus 26 herramientas, el motor de diagnóstico determinista, el RAG documental,
 los casos previos, el transporte falso (`ICONICS_FAKE=true`), el CRUD de
 máquinas configuradas con su comprobación contra ICONICS, —desde el Plan 36—
 **el alta y la edición de una máquina marcando los tres árboles de ICONICS**
-desde `Planta › Configuración`, y —desde el Plan 37— **una sección del menú por
+desde `Planta › Configuración`, —desde el Plan 37— **una sección del menú por
 máquina configurada**, con Inicio, Gráficas y Vista 3D leyendo SUS puntos
-(medido contra planta: 94 de 94 puntos de `vib-motor-03`).
+(medido contra planta: 94 de 94 puntos de `vib-motor-03`), y —desde el Plan
+38— **el backend registra las configuradas al arrancar y tras cada cambio**,
+así que el asistente, los casos, el motor de diagnóstico y los manuales las
+conocen, y su sección trae también Hallazgos, Avisos, Casos previos y RAG.
 
 ### Qué está a medias
 
@@ -211,6 +214,11 @@ máquina configurada haga todo lo que hace el catálogo.
 máquina configurada; Inicio, Gráficas y 3D parametrizadas). Queda **F4**
 (Alarmas de la máquina), y **verlo en el navegador**.
 
+**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F2 completas: el backend registra las
+configuradas (`registroConfigurado.mjs`), las rutas validan `sistema` contra la
+lista viva (`sistemaConocido()`), y Hallazgos, Avisos, Casos y RAG entran en la
+sección de cada máquina. **Pendiente de verse en el navegador.**
+
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
 ### Próximos pasos, por prioridad
@@ -363,6 +371,14 @@ veces la prueba seguía verde porque miraba lo que se **pinta**, no lo que se
 El 09-09 una reorganización rompió el histórico de 12 de 13 ramas del tanque
 por esto.
 
+**`z.enum(SISTEMA_IDS)` copia la lista al construir el esquema.** Medido con
+zod 4: un id empujado a `SISTEMA_IDS` después no pasa el enum. Desde el Plan 38
+el registro cambia en caliente, así que todo lo que valide `sistema` usa
+`sistemaConocido()` (`esquemas.mjs`), que mira la lista al validar. Y el
+registro es un módulo: **`montarApp` usa un `maquinas.json` vacío y propio**,
+porque con el valor por defecto cada prueba registraría las máquinas del disco
+de quien la corre.
+
 **Las carpetas de `hda:` NO terminan en `\`; las de `ac:` SÍ terminan en `/`.**
 Una regla «carpeta = termina en separador» valía para un árbol y rompía el
 otro. En `shared/eva/comun/arbolIconics.js` la carpeta del historiador se
@@ -436,8 +452,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** |
-| Backend | **377 passed** |
-| Frontend | **1053 passed · 29 skipped** |
+| Backend | **385 passed** |
+| Frontend | **1081 passed · 29 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

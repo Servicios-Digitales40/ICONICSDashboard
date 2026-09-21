@@ -370,8 +370,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 378 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1079 (+29 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 385 — contratos HTTP, config, logger
+cd react-dashboard && npm test  # 1081 (+29 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 
@@ -454,9 +454,10 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
 Los vivos hoy son el **32** (vibraciones), el **33** (modularidad de máquinas,
-F9), el **34** (máquinas desde el árbol, F5) y el **37** (las vistas de una
-máquina configurada, F4); el **36** (configurar marcando el árbol) está
-archivado. Ver `HANDOFF.md` §5 para cuál sigue.
+F9), el **34** (máquinas desde el árbol, F5), el **37** (las vistas de una
+máquina configurada, F4) y el **38** (el registro conoce las configuradas,
+pendiente de verse en el navegador); el **36** (configurar marcando el árbol)
+está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer
 
