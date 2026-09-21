@@ -384,6 +384,53 @@ describe('renovar y saber quién eres', () => {
 
     await sinAuth.close()
   })
+
+  /**
+   * ── EL CASO POR EL QUE SE COLÓ UN DEFECTO (21-09-2026) ─────────────
+   *
+   * Con la autenticación ENCENDIDA y SIN token. Es la primera pregunta que
+   * hace el tablero al arrancar, antes de que nadie haya entrado, y la prueba
+   * de arriba no lo cubría: comprobaba «con sesión abierta» y «con el
+   * interruptor apagado», los dos extremos, nunca el medio.
+   *
+   * La ruta llevaba la guarda de ámbito y contestaba **401**, así que
+   * `SesionProvider` caía en su `catch`. Resultado: al encender
+   * `AUTH_HABILITADA` de verdad, el tablero cargaba entero sin pedir
+   * credenciales. No era un agujero —las rutas de datos seguían devolviendo
+   * 401 y las vistas salían vacías— pero parecía que la autenticación no
+   * estaba puesta, que es la peor forma de fallar.
+   */
+  it('con la autenticación ENCENDIDA y sin token, contesta 200 y `autenticado: false`', async () => {
+    const app = await conSesion()
+
+    const respuesta = await app.inject({ method: 'GET', url: '/api/auth/yo' })
+
+    expect(respuesta.statusCode).toBe(200)
+    const cuerpo = json(respuesta)
+    expect(cuerpo.usuario.autenticado).toBe(false)
+    /* `habilitada: true` es lo que distingue este caso del interruptor
+       apagado: el tablero tiene que saber que HAY que entrar, no que no
+       hace falta. */
+    expect(cuerpo.habilitada).toBe(true)
+
+    await app.close()
+  })
+
+  it('un token inválido tampoco la tumba: es «no hay sesión», no un error', async () => {
+    /* Ausente, caducado o falso son el mismo caso desde aquí, y cuál sea no
+       cambia lo que el tablero hace. Distinguirlos filtraría si un usuario
+       existe. */
+    const app = await conSesion()
+
+    const respuesta = await app.inject({
+      method: 'GET', url: '/api/auth/yo', headers: conToken('esto.no.es'),
+    })
+
+    expect(respuesta.statusCode).toBe(200)
+    expect(json(respuesta).usuario.autenticado).toBe(false)
+
+    await app.close()
+  })
 })
 
 describe('el arranque se niega a fingir que hay sesión', () => {

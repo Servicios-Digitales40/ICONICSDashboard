@@ -34,11 +34,28 @@ import { montarApp } from '../ayudas.mjs'
  *    autenticación activada en un contenedor que se reinicia solo porque su
  *    propia sonda responde 401.
  *  · `POST /api/auth/login` (Plan 22 F6) — exigir una sesión para pedir una
- *    sesión no lo puede cumplir nadie. Sólo el login: `/api/auth/renovar` y
- *    `/api/auth/yo` parten de una que ya existe y SÍ pasan por la guarda, y
- *    esta lista es tan estrecha a propósito.
+ *    sesión no lo puede cumplir nadie.
+ *  · `GET /api/auth/yo` (Plan 35 F4) — es la ruta que el tablero pregunta
+ *    ANTES de tener sesión, para decidir si pinta la pantalla de acceso. Aquí
+ *    ponía que «parte de una que ya existe y SÍ pasa por la guarda», y era
+ *    falso: con la guarda contestaba 401 a quien todavía no había entrado,
+ *    que es justo el caso que existe para resolver. El tablero cargaba
+ *    entero sin pedir credenciales — no era un agujero, porque las rutas de
+ *    datos seguían cerradas, pero parecía que la autenticación no estaba
+ *    puesta.
+ *
+ *    **La ruta no queda abierta**: resuelve el token a mano y sin lanzar, así
+ *    que distingue a quien trae uno válido de quien no. Lo comprueban dos
+ *    pruebas en `autenticacion.test.mjs`.
+ *
+ * `/api/auth/renovar` sí parte de una sesión que ya existe y sigue pasando
+ * por la guarda. Esta lista es estrecha a propósito.
  */
-const SIN_GUARDA = [/^\/api\/health/, /^\/api\/auth\/login$/]
+const SIN_GUARDA = [
+  /^\/api\/health/,
+  /^\/api\/auth\/login$/,
+  /^\/api\/auth\/yo$/,
+]
 
 /**
  * Un cuerpo cualquiera para los métodos que lo llevan.

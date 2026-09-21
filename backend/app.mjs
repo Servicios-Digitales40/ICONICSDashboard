@@ -644,10 +644,30 @@ export async function createApp(config) {
 
       /*
        * Y el login, por lo obvio y por eso mismo fácil de olvidar: exigir una
-       * sesión para pedir una sesión no lo puede cumplir nadie. Sólo `login`
-       * —`renovar` y `yo` parten de una que ya existe y sí pasan por aquí.
+       * sesión para pedir una sesión no lo puede cumplir nadie.
        */
       if (request.url.startsWith('/api/auth/login')) return
+
+      /*
+       * ── Y `/api/auth/yo` (defecto del 21-09-2026) ──────────────────
+       *
+       * Aquí ponía que `renovar` y `yo` «parten de una sesión que ya existe y
+       * sí pasan por aquí». Es cierto de `renovar` y **falso de `yo`**: es la
+       * ruta que el tablero pregunta ANTES de tener sesión, para decidir si
+       * pinta la pantalla de acceso. Con la guarda puesta contestaba 401 a
+       * quien todavía no había entrado, que es justo el caso que existe para
+       * resolver.
+       *
+       * Se vio al encender `AUTH_HABILITADA` de verdad (Plan 35 F4): el
+       * tablero cargaba entero sin pedir credenciales. No era un agujero
+       * —toda ruta de datos seguía devolviendo 401 y las vistas salían
+       * vacías— pero sí la peor forma de fallar: parecía que la
+       * autenticación no estaba puesta.
+       *
+       * La ruta resuelve el token a mano y sin lanzar, así que sigue
+       * distinguiendo a quien traiga uno válido de quien no.
+       */
+      if (request.url.startsWith('/api/auth/yo')) return
 
       return instancia.autenticar(request, reply)
     })

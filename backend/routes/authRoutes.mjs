@@ -129,22 +129,60 @@ export function registerAuthRoutes(fastify, { config }) {
     }
   )
 
-  fastify.get(
-    '/api/auth/yo',
-    { onRequest: [fastify.autenticar] },
-    async request => ({
-      ok: true,
-      // `autenticado: false` con la autenticación apagada, y el tablero puede
-      // decidir con eso si pinta una pantalla de acceso — sin tener que
-      // adivinarlo por el código de estado de otra ruta.
-      usuario: {
-        id: request.usuario.id,
-        roles: request.usuario.roles,
-        autenticado: request.usuario.autenticado,
-      },
-      habilitada,
-    })
-  )
+  /**
+   * ¿Quién soy, y hace falta entrar?
+   *
+   * ── POR QUÉ NO LLEVA `autenticar` (defecto del 21-09-2026) ────────
+   *
+   * Porque es la ruta que el tablero pregunta **antes** de tener sesión, para
+   * decidir si pinta la pantalla de acceso. Llevaba la guarda, y entonces
+   * contestaba **401** a quien todavía no había entrado — que es justo el
+   * caso que tiene que saber resolver.
+   *
+   * El comentario de esta ruta ya decía lo que quería conseguir: «el tablero
+   * puede decidir con eso si pinta una pantalla de acceso, sin tener que
+   * adivinarlo por el código de estado de otra ruta». Con la guarda puesta,
+   * había que adivinarlo por el código de estado de esta misma — y el
+   * proveedor caía en su `catch`, que asume «pendiente» sin saber si la
+   * autenticación está siquiera encendida.
+   *
+   * **Se vio al encender el interruptor de verdad** (Plan 35 F4): el tablero
+   * cargaba entero sin pedir credenciales. No era un agujero —toda ruta de
+   * datos seguía devolviendo 401 y la pantalla salía vacía— pero sí la peor
+   * forma de fallar: parecía que la autenticación no estaba puesta.
+   *
+   * Sin guarda, `request.usuario` no lo pone el hook, así que se resuelve el
+   * token **a mano** y sin lanzar: quien traiga uno válido recibe su
+   * identidad, y quien no, `autenticado: false`, que es la respuesta correcta
+   * a «todavía no he entrado».
+   */
+  fastify.get('/api/auth/yo', async request => {
+    if (!habilitada) {
+      return {
+        ok: true,
+        usuario: { id: 'anonimo', roles: ['operador'], autenticado: false },
+        habilitada,
+      }
+    }
+
+    try {
+      const { sub, roles } = await request.jwtVerify()
+      return {
+        ok: true,
+        usuario: { id: sub, roles: roles ?? [], autenticado: true },
+        habilitada,
+      }
+    } catch {
+      /* Un token ausente, caducado o falso son el mismo caso desde aquí: no
+         hay sesión. Cuál de los tres es no cambia lo que el tablero hace —
+         pedir acceso— y distinguirlos aquí filtraría si un usuario existe. */
+      return {
+        ok: true,
+        usuario: { id: null, roles: [], autenticado: false },
+        habilitada,
+      }
+    }
+  })
 }
 
 /**
