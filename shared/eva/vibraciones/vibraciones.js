@@ -14,7 +14,7 @@
  *
  * Por su ruta en AssetWorX, igual que el tanque:
  *
- *     ac:TDCON/Motors/01/S1/vRMS_S1
+ *     ac:TDCON/DemoVibraciones/Vibraciones/S1/vRMS_S1
  *
  * Ni por node id de OPC UA (`ua:DEMO3\[http://BMS_1]i=458..592`) ni por el
  * grupo del historiador. Los tres caminos llevan al mismo dato; la diferencia
@@ -133,9 +133,29 @@
 /**
  * Rama de este motor en AssetWorX. Los puntos NO cuelgan de aquí directamente:
  * cada apoyo tiene su carpeta (`S1/`, `S2/`, `S3/`) y el variador la suya
- * (`V20/`). Enumerado con `Data/Browse` el 27-08-2026.
+ * (`V20/`).
+ *
+ * ── CORREGIDA EL 21-09-2026 (Plan 34 F0.2) ─────────────────────────
+ *
+ * Decía `ac:TDCON/Motors/01/`, enumerada con `Data/Browse` el 27-08-2026, y
+ * **esa rama ya no responde**: explorarla falla y pedir uno de sus puntos
+ * devuelve `value: undefined` con calidad `2147483652` —por encima de
+ * `QUALITY_BAD_UA`, o sea MALA—. El mismo punto bajo la rama de aquí contesta
+ * con calidad buena.
+ *
+ * Es el **segundo caso del mismo día**: la del historiador también había
+ * cambiado (ver `GRUPO_HISTORIADOR`). Las dos puntas de esta máquina —el
+ * valor en vivo y el archivo— se movieron, y ninguna prueba lo vio porque
+ * ninguna comparaba el catálogo contra el árbol. Eso es lo que viene a
+ * arreglar el Plan 34.
+ *
+ * **Y la rama nueva es más grande.** Publica 184 puntos frente a los 73 que
+ * este catálogo declara, y tiene carpetas que no conoce: `S4` —un cuarto
+ * canal que el usuario confirmó que NO es un apoyo de esta máquina, está por
+ * conveniencia— y `Pantalla`. No se incorporan aquí: este cambio es de RUTA,
+ * no de alcance. Lo que entra y lo que no lo decide la configuración (F4).
  */
-export const RAIZ_VIB = "ac:TDCON/Motors/01/";
+export const RAIZ_VIB = "ac:TDCON/DemoVibraciones/Vibraciones/";
 
 /**
  * Carpeta del variador dentro de la rama. Los tags `*_BMS` viven aquí y no
@@ -925,7 +945,7 @@ export const VARIADOR_POR_CLAVE = Object.fromEntries(VARIADOR.map((v) => [v.key,
 export const JANITZA_SIN_DATO = true;
 
 /**
- * Carpeta de un canal dentro de la rama: `ac:TDCON/Motors/01/S1/`.
+ * Carpeta de un canal dentro de la rama: `ac:TDCON/DemoVibraciones/Vibraciones/S1/`.
  *
  * Los tres apoyos son carpetas hermanas y el nombre de la carpeta es el id del
  * canal, no su sufijo — coinciden hoy, pero son dos cosas distintas: el sufijo
@@ -1175,8 +1195,8 @@ export const historizadas = () => [...CON_SERIE];
  * ── POR QUÉ NO ES EL MISMO NOMBRE QUE EN VIVO ──────────────────────
  *
  * Porque esta máquina se lee del historiador por `hda:` con el grupo en el
- * nombre —`hda:\Configuration\DEMO 3:vRMS_S1`— mientras que en vivo se lee
- * por `ac:` con su carpeta de apoyo —`ac:TDCON/Motors/01/S1/vRMS_S1`—. En el
+ * nombre —`hda:\Configuration\DEMO_VIBRACIONES\S1:vRMS_S1`— mientras que en vivo se lee
+ * por `ac:` con su carpeta de apoyo —`${RAIZ_VIB}S1/vRMS_S1`—. En el
  * tanque son el mismo nombre; aquí no.
  *
  * Ese «aquí no» es justo lo que obligó a que el nombre del punto histórico

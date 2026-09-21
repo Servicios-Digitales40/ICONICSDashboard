@@ -14,7 +14,7 @@
  *            Hoy `vibraciones`.
  *
  * La diferencia entre SISTEMA y TIPO es la que abre esta fase: el sistema
- * `vibraciones` es el motor que hay montado —con su raíz `ac:TDCON/Motors/01/`
+ * `vibraciones` es el motor que hay montado —con su raíz `ac:TDCON/DemoVibraciones/Vibraciones/`
  * y sus sensibilidades de 100,05 / 99 / 100 mV/g—; el tipo `vibraciones` es lo
  * que sabríamos hacer con CUALQUIER motor vigilado por un SM 1281.
  *

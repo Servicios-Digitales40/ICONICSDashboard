@@ -139,10 +139,15 @@ check('el instante se lee por AssetWorX, no por el historiador', () => {
 })
 
 check('los puntos se construyen como los devuelve el servidor', () => {
-  assert.equal(puntoMedida('vRMS', 'S1'), 'ac:TDCON/Motors/01/S1/vRMS_S1')
-  assert.equal(puntoMedida('aRMS', 'S3'), 'ac:TDCON/Motors/01/S3/aRMS_S3')
-  // El variador vive en su propia carpeta: bajo `01/` no responde.
-  assert.equal(puntoVariador('velocidad'), 'ac:TDCON/Motors/01/V20/SPEED_BMS')
+  /* Contra `RAIZ_VIB` y no contra la ruta literal: lo que esto protege es la
+     COMPOSICIÓN —carpeta de apoyo, sufijo, carpeta del variador—, no dónde
+     cuelga la rama. La rama se movió el 21-09-2026 (Plan 34 F0.2) y fijarla
+     dos veces obliga a tocar la prueba por un cambio que no es suyo. Que la
+     raíz sea la que responde hoy lo comprueba el check de arriba. */
+  assert.equal(puntoMedida('vRMS', 'S1'), `${RAIZ_VIB}S1/vRMS_S1`)
+  assert.equal(puntoMedida('aRMS', 'S3'), `${RAIZ_VIB}S3/aRMS_S3`)
+  // El variador vive en su propia carpeta: junto a los apoyos no responde.
+  assert.equal(puntoVariador('velocidad'), `${RAIZ_VIB}V20/SPEED_BMS`)
 })
 
 check('la errata «Alarrma_S1» del servidor se respeta, y sólo en S1', () => {
@@ -154,9 +159,9 @@ check('la errata «Alarrma_S1» del servidor se respeta, y sólo en S1', () => {
    * Si alguien corrige el nombre en el servidor, esta prueba falla — que es lo
    * que se quiere: obliga a quitar la excepción en vez de dejarla arrastrada.
    */
-  assert.equal(puntoBandera('alarma', 'S1'), 'ac:TDCON/Motors/01/S1/Alarrma_S1')
-  assert.equal(puntoBandera('alarma', 'S2'), 'ac:TDCON/Motors/01/S2/Alarma_S2')
-  assert.equal(puntoBandera('alarma', 'S3'), 'ac:TDCON/Motors/01/S3/Alarma_S3')
+  assert.equal(puntoBandera('alarma', 'S1'), `${RAIZ_VIB}S1/Alarrma_S1`)
+  assert.equal(puntoBandera('alarma', 'S2'), `${RAIZ_VIB}S2/Alarma_S2`)
+  assert.equal(puntoBandera('alarma', 'S3'), `${RAIZ_VIB}S3/Alarma_S3`)
 })
 
 check('parsePunto es el inverso exacto, y rechaza lo que no reconoce', () => {
@@ -170,7 +175,12 @@ check('parsePunto es el inverso exacto, y rechaza lo que no reconoce', () => {
      un cambio en el servidor debe verse como dato ausente, nunca como una
      asignación a la señal equivocada. */
   assert.equal(parsePunto('ac:TDCON/DEMO/SENSORES/SNIVEL_TANQUE'), null)
-  assert.equal(parsePunto('ac:TDCON/Motors/01/S1/INVENTADO_S1'), null)
+  assert.equal(parsePunto(`${RAIZ_VIB}S1/INVENTADO_S1`), null)
+  /* La rama VIEJA de esta misma máquina (`ac:TDCON/Motors/01/`, muerta desde
+     el 21-09-2026) tampoco se reconoce: un punto con el nombre correcto
+     colgando de donde ya no cuelga es ajeno, y colarlo sería asignar una
+     lectura que nadie entrega a la señal que sí existe. */
+  assert.equal(parsePunto('ac:TDCON/Motors/01/S1/vRMS_S1'), null)
   assert.equal(parsePunto(null), null)
   /* El nombre VIEJO de un punto que sí existe: se leía así hasta el
      27-08-2026. Tiene que dar `null` como cualquier otro desconocido — si
@@ -603,9 +613,9 @@ check('los nombres irregulares del servidor se respetan tal cual', () => {
    * número suelto. Está así en el servidor: «arreglarlo» pediría un tag que no
    * existe y el punto volvería vacío sin que nadie se enterase.
    */
-  assert.equal(puntoVigilancia('monVRMS', 'S2'), 'ac:TDCON/Motors/01/S2/MonState_vRMS_2')
-  assert.equal(puntoVigilancia('monVRMS', 'S1'), 'ac:TDCON/Motors/01/S1/MonState_vRMS_S1')
-  assert.equal(puntoVigilancia('bpfo', 'S3'), 'ac:TDCON/Motors/01/S3/MonState_e_f_BPFO_S3')
+  assert.equal(puntoVigilancia('monVRMS', 'S2'), `${RAIZ_VIB}S2/MonState_vRMS_2`)
+  assert.equal(puntoVigilancia('monVRMS', 'S1'), `${RAIZ_VIB}S1/MonState_vRMS_S1`)
+  assert.equal(puntoVigilancia('bpfo', 'S3'), `${RAIZ_VIB}S3/MonState_e_f_BPFO_S3`)
 })
 
 check('parsePunto sigue siendo el inverso exacto de TODAS las familias', () => {

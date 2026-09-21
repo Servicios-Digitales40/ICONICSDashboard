@@ -39,8 +39,13 @@
  *
  *   sí  → el tipo         vRMS se mide en mm/s · ISO 10816-1 Clase I
  *                         · las 18 reglas · qué es un apoyo
- *   no  → la instancia    ac:TDCON/Motors/01/ · sensibilidad 100,05
- *                         · rodamiento 6205 ZZ · el grupo DEMO 3
+ *   no  → la instancia    su raíz en AssetWorX · sensibilidad 100,05
+ *                         · rodamiento 6205 ZZ · su grupo del historiador
+ *
+ * Las dos rutas de ese ejemplo se movieron el 21-09-2026 —y las dos son de la
+ * instancia, que es justo lo que esta frontera predecía—. Por eso aquí ya no
+ * se escriben: el tipo no tiene por qué saberlas, y citarlas era la forma de
+ * que este archivo caducara con ellas.
  *
  * El mejor ejemplo de que la frontera está bien puesta ya está escrito en el
  * catálogo: S2 declara `rodamiento: null` porque es una chumacera y no sale
@@ -87,7 +92,7 @@ import {
  *
  * Un «rol» es el papel que juega una variable dentro del tipo, con
  * independencia de cómo se llame su tag en un servidor concreto. `vRMS` es un
- * rol; `ac:TDCON/Motors/01/S1/vRMS` es el punto que lo cumple en ESTA máquina.
+ * rol; `ac:TDCON/DemoVibraciones/Vibraciones/S1/vRMS` es el punto que lo cumple en ESTA máquina.
  *
  * Es la pieza que hace posible el alta por configuración: al dar de alta un
  * motor, quien configura dice «este punto cumple el rol vRMS del apoyo S1», y
