@@ -2,7 +2,20 @@
 /**
  * scripts/comprobar-historia-vibraciones.mjs
  * ------------------------------------------------------------------
- * ¿Ya registra el grupo `DEMO 3` del Hyper Historian?
+ * ¿Ya registra el grupo `DEMO_VIBRACIONES` del Hyper Historian?
+ *
+ * ── CORREGIDO EL 21-09-2026 (Plan 34 F0) ──────────────────────────
+ *
+ * Esta sonda preguntaba por `DEMO 3` y comparaba contra un control llamado
+ * `DEMO DANONE`. **Ninguno de los dos existe ya** en el servidor: listados
+ * los dieciocho grupos del historiador, están `DEMO TANQUE` y
+ * `DEMO_VIBRACIONES`. Así que la sonda escrita para distinguir tres casos
+ * daba siempre el mismo —«no registra»— y su control no podía desmentirlo,
+ * porque también apuntaba a un grupo inexistente.
+ *
+ * Hoy el control es `DEMO TANQUE`, que sí registra, y los tags de vibraciones
+ * llevan su **carpeta de apoyo** delante: el grupo nuevo agrupa por apoyo y
+ * el nombre plano de antes ya no resuelve.
  *
  * ── POR QUÉ EXISTE ────────────────────────────────────────────────
  *
@@ -40,13 +53,18 @@ const HORAS = Number(process.argv[2]) || 24
 const BASE = 'http://127.0.0.1:3001'
 
 /** El grupo que SÍ registra. Sin este control, un fallo general parece local. */
-const CONTROL = { grupo: 'DEMO DANONE', tag: 'Tension' }
+const CONTROL = { grupo: 'DEMO TANQUE', tag: 'Tension' }
 
+/** El grupo de esta máquina. Agrupa por apoyo: el tag va detrás de su carpeta. */
+const GRUPO = 'DEMO_VIBRACIONES'
+
+/* `carpeta/tag`, porque el grupo agrupa por apoyo. Los tres apoyos y el
+   variador, que es donde están las medidas que interesan. */
 const VIBRACION = [
-  'vRMS_S1', 'vRMS_S2', 'vRMS_S3',
-  'aRMS_S1', 'aRMS_S2', 'aRMS_S3',
-  'DKW_S1', 'DKW_S2', 'DKW_S3',
-  'SPEED_BMS', 'TORQUE_BMS', 'FREQ OUTPUT_BMS',
+  'S1:vRMS_S1', 'S2:vRMS_S2', 'S3:vRMS_S3',
+  'S1:aRMS_S1', 'S2:aRMS_S2', 'S3:aRMS_S3',
+  'S1:DKW_S1', 'S2:DKW_S2', 'S3:DKW_S3',
+  'V20:SPEED_BMS', 'V20:TORQUE_BMS', 'V20:FREQ OUTPUT_BMS',
 ]
 
 const fin = new Date()
@@ -101,10 +119,10 @@ if (ctrl.estado === 'error') {
   process.exit(1)
 }
 
-console.log(`${c.negrita}DEMO 3${c.reset} — vibraciones y variador`)
+console.log(`${c.negrita}${GRUPO}${c.reset} — vibraciones y variador`)
 const res = []
 for (const tag of VIBRACION) {
-  const r = await serie(`${RAIZ}DEMO 3:${tag}`)
+  const r = await serie(`${RAIZ}${GRUPO}${B}${tag}`)
   res.push({ tag, ...r })
   const cifras = r.estado === 'datos'
     ? `${String(r.n).padStart(3)} muestras   min ${r.min.toFixed(3)}   max ${r.max.toFixed(3)}`
@@ -125,7 +143,7 @@ if (conDatos === res.length) {
 } else if (errores === res.length) {
   console.log(`${c.rojo}${c.negrita}Sigue sin registrar: los ${errores} puntos dan error.${c.reset}`)
   console.log('El control SÍ funciona, así que ICONICS está bien y el historiador')
-  console.log('también. Lo que falta es del grupo `DEMO 3` en Workbench:')
+  console.log(`también. Lo que falta es del grupo \`${GRUPO}\` en Workbench:`)
   console.log(`  ${c.gris}·${c.reset} que los tags estén habilitados`)
   console.log(`  ${c.gris}·${c.reset} que tengan grupo de colección asignado`)
   console.log(`  ${c.gris}·${c.reset} que la configuración se haya APLICADO tras editarla`)

@@ -430,14 +430,22 @@ export const SISTEMAS = [
     },
     esHistorizada: esHistorizadaVibracion,
     /*
-     * ── CON SERIES DESDE EL 28-08-2026 ─────────────────────────────
+     * ── RE-SONDEADO EL 21-09-2026 (Plan 34 F0) ─────────────────────
      *
-     * El grupo `DEMO 3` registra. Veintitrés de las veinticuatro claves tienen
-     * serie propia verificada punto por punto contra el servidor.
+     * **El grupo cambió de nombre y de forma, y esto apuntaba al viejo.**
+     * Decía `DEMO 3`, que hoy devuelve 500; el grupo real es
+     * `DEMO_VIBRACIONES` y agrupa por apoyo. Durante semanas se leyó como «el
+     * historiador de vibraciones no registra»: sí registraba. El detalle y
+     * las cifras, en la cabecera de `GRUPO_HISTORIADOR`.
      *
-     * La que falta es `aPeak_S1`, que devuelve la serie de `aRMS_S1` sin dar
-     * error — el mismo fallo que el tanque tiene con tres de sus ocho. Por eso
-     * `historizadas` es una lista blanca de `vibraciones.js` y no `() => true`.
+     * Treinta y seis claves tienen serie; cuatro —las de aviso— no existen en
+     * el árbol y salieron de la lista.
+     *
+     * `historizadas` sigue siendo lista blanca y no `() => true` por la misma
+     * razón de siempre, ahora con dos casos medidos: `aPeak_S1` devuelve la
+     * serie de `aRMS_S1` (1805 de 1805 valores idénticos) y las nueve `QC_*`
+     * devuelven todas la misma serie. El servidor contesta sin error en los
+     * dos casos.
      *
      * Y por eso la RUTA importa: esta máquina se lee por `hda:` con el grupo
      * en el nombre, al revés que el tanque, que se lee por `ac:` con el mismo
@@ -450,12 +458,16 @@ export const SISTEMAS = [
       agregado: "Average",
       punto: puntoHistoricoVibracion,
       nota:
-        "El grupo DEMO 3 registra 40 de los 73 puntos de esta máquina, sondeados uno a uno el " +
-        "28-08-2026: las doce medidas de los tres apoyos (menos aPeak_S1), sus banderas y su " +
-        "calidad, y el variador entero. NO se historizan las vigilancias del módulo " +
-        "(MonState_*), el estado de los sensores ni los contadores de alarma. La aceleración " +
-        "de pico del lado acople (aPeak_S1) queda fuera aunque el servidor conteste: devuelve " +
-        "la serie de la aceleración eficaz del mismo apoyo, sin dar error.",
+        "El grupo DEMO_VIBRACIONES registra 36 de los 73 puntos de esta máquina, re-sondeados " +
+        "uno a uno el 21-09-2026: once de las doce medidas de los tres apoyos, la alarma y el " +
+        "offset de S2 y S3, las nueve calidades y once claves del variador. NO se historizan " +
+        "las vigilancias del módulo (MonState_*), el estado de los sensores ni los contadores " +
+        "de alarma. Quedan fuera la aceleración de pico del lado acople (aPeak_S1), que " +
+        "devuelve la serie de la aceleración eficaz del mismo apoyo sin dar error, y las tres " +
+        "señales de aviso de los apoyos más la del variador, cuyos tags no existen en el " +
+        "árbol. Las nueve calidades SÍ tienen serie, pero es la MISMA para las nueve: quien " +
+        "vete por calidad no está leyendo la de esa medida. El registro está detenido desde " +
+        "el 15-09-2026, y también el del tanque: eso es de planta, no de esta máquina.",
     },
     /* Sin mecanismos de desgaste: sin historia no hay exposición acumulada
        que contar, y un pronóstico sobre el instante sería adivinación. */
@@ -505,15 +517,26 @@ export const SISTEMAS = [
        tanque y todavía no aceptan `sistema`: ver B3 del backlog. */
     herramientas: ["estado_del_sistema", "riesgos_activos", "historia_de_senal"],
     historia:
-      "40 de los 73 puntos tienen serie propia desde el 28-08-2026: medidas, banderas, calidad " +
-      "y variador. Las vigilancias del módulo y el estado de los sensores NO se historizan, " +
-      "aunque sí se leen en vivo. aPeak_S1 devuelve la serie de aRMS_S1 y queda fuera.",
+      "36 de los 73 puntos tienen serie propia, re-sondeados uno a uno el 21-09-2026: " +
+      "medidas, banderas, calidad y variador. Las vigilancias del módulo y el estado de los " +
+      "sensores NO se historizan, aunque sí se leen en vivo. aPeak_S1 devuelve la serie de " +
+      "aRMS_S1 y queda fuera; las cuatro señales de aviso tampoco existen en el historiador. " +
+      "El registro está detenido desde el 15-09-2026 —también el del tanque—, así que no hay " +
+      "muestras posteriores a esa fecha en ninguna señal.",
     limitaciones: [
       "La aceleración de pico del lado acople (aPeak_S1) NO tiene serie propia: el " +
         "historiador devuelve ahí la de la aceleración eficaz del mismo apoyo. No se puede " +
         "hablar de su evolución, aunque las de los otros dos apoyos sí.",
       "Las vigilancias del módulo (MonState_*) y el estado de los sensores se leen EN VIVO " +
         "pero no se historizan: se puede decir cómo están ahora, nunca cómo estaban antes.",
+      "Las nueve señales de calidad (QC_*) devuelven TODAS la misma serie: hay una sola " +
+        "calidad histórica, no una por medida y apoyo. No se puede afirmar que la calidad de " +
+        "una medida concreta fuera buena o mala en el pasado.",
+      "Las señales de aviso de los tres apoyos y la del variador no existen en el " +
+        "historiador: de ellas sólo hay valor en vivo.",
+      "El registro del historiador está detenido desde el 15-09-2026, y el del tanque " +
+        "también: es de planta, no de esta máquina. No hay muestras posteriores, así que " +
+        "cualquier pregunta por los últimos días se contesta diciendo que no hay dato.",
       "El histórico empezó el 26-08-2026: no hay nada anterior, y las primeras horas se " +
         "grabaron mientras la configuración todavía se movía.",
       "Sin mecanismos de desgaste declarados no hay pronóstico: se puede describir cómo ha " +

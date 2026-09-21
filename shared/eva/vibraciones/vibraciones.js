@@ -144,12 +144,38 @@ export const RAIZ_VIB = "ac:TDCON/Motors/01/";
 export const CARPETA_VARIADOR = "V20/";
 
 /**
- * Grupo del Hyper Historian. Ya no se usa para leer el instante (ver la nota
- * de cabecera), pero se conserva porque es donde vivirán las SERIES el día que
- * el grupo registre de verdad. El espacio de «DEMO 3» es literal: sin él
- * ICONICS responde 500 y parece que el tag no existe.
+ * Grupo del Hyper Historian donde viven las SERIES de esta máquina.
+ *
+ * ── CORREGIDO EL 21-09-2026 (Plan 34 F0) ───────────────────────────
+ *
+ * Decía `hda:\Configuration\DEMO 3:` y **ese grupo ya no existe**: explorarlo
+ * devuelve 500 y pedirle una serie, `ok=false`. Listados los dieciocho grupos
+ * del historiador contra el servidor real, están `DEMO TANQUE` y
+ * `DEMO_VIBRACIONES`; no hay ningún `DEMO 3`.
+ *
+ * Es el **incidente B10 otra vez** (09-09-2026): el nombre del punto histórico
+ * dejó de poder deducirse, y el síntoma no fue un error sino «no hay datos» —
+ * que es como se leyó durante semanas («el grupo DEMO 3 no registra»). Sí
+ * registraba: le preguntábamos al sitio equivocado. Con el nombre de aquí,
+ * `S1:aRMS_S1` devuelve 1749 muestras en siete días.
+ *
+ * **Y cambió la FORMA, no sólo el nombre.** El grupo viejo era plano
+ * —`DEMO 3:vRMS_S1`, el tag pelado— y el nuevo tiene **una carpeta por
+ * apoyo**: `DEMO_VIBRACIONES\S1:vRMS_S1`. Por eso esta constante ya no
+ * termina en `:` y `puntoHistorico()` compone la carpeta antes del tag.
+ *
+ * ── ESTO ES TÁCTICO Y TIENE FECHA DE RETIRADA ──────────────────────
+ *
+ * El Plan 34 migra esta máquina a configuración derivada del árbol, y su F5
+ * retira esta constante entera: el nombre histórico pasará a guardarse
+ * literal y por variable en `historyPointName`, que es donde no puede volver
+ * a caducar en silencio. Se arregla aquí igualmente porque desbloquea la
+ * Historización del Plan 32 F3 mientras eso llega.
  */
-export const GRUPO_HISTORIADOR = "hda:\\Configuration\\DEMO 3:";
+export const GRUPO_HISTORIADOR = "hda:\\Configuration\\DEMO_VIBRACIONES\\";
+
+/** Carpeta del variador DENTRO del grupo del historiador. Ver `CARPETA_VARIADOR`. */
+const CARPETA_VARIADOR_HISTORICO = "V20";
 
 /**
  * ── LOS TRES CANALES ───────────────────────────────────────────────
@@ -1042,20 +1068,33 @@ export function parsePunto(nombre) {
 }
 
 /**
- * ── LAS SERIES, SONDEADAS PUNTO POR PUNTO EL 28-08-2026 ────────────
+ * ── RE-SONDEADAS PUNTO POR PUNTO EL 21-09-2026 (Plan 34 F0) ────────
  *
- * El grupo `DEMO 3` del Hyper Historian registra **41 de los 73 puntos** de
- * esta máquina. No es una estimación: se pidió la serie de cada uno contra el
- * servidor real y se anotó cuál devolvió muestras.
+ * El sondeo anterior (28-08-2026) se hizo contra el grupo `DEMO 3`, que **ya
+ * no existe**: hoy el grupo es `DEMO_VIBRACIONES` y agrupa por apoyo. Ver la
+ * cabecera de `GRUPO_HISTORIADOR`. Lo de abajo es el árbol de HOY, volcado
+ * entero (94 tags) y con la serie de cada uno pedida al servidor real.
  *
- *   medidas    12 de 12   vRMS, aRMS, aPeak y DKW en los tres apoyos
- *   banderas    8 de  9   alarma, aviso y offset (ver la excepción abajo)
- *   calidades   9 de  9   QC_vRMS, QC_aRMS, QC_DKW
- *   variador   12 de 12   entero
+ * De las 40 claves que esta lista declaraba, **36 existen y 4 no**. Las
+ * cuatro que no son las de aviso —`Warning_S1/S2/S3` y `WARNING_BMS`—: no
+ * están en el árbol bajo ningún nombre, así que salen de la lista. Pedirlas
+ * era pedir un punto inexistente.
+ *
+ *   medidas    11 de 12   vRMS, aRMS, aPeak y DKW, menos `aPeak_S1`
+ *   banderas    5 de  9   alarma y offset (ver las excepciones abajo)
+ *   calidades   9 de  9   QC_vRMS, QC_aRMS, QC_DKW — pero ver el defecto
+ *   variador   11 de 12   entero menos `aviso`
  *   ─────────────────────
  *   vigilancias 0 de 24   los `MonState_*` NO se historizan
  *   sensor      0 de  3   `Sensor_state_*` tampoco
  *   alarmas     0 de  4   los contadores de `ae:` no son de este grupo
+ *
+ * ── EL REGISTRO ESTÁ DETENIDO DESDE EL 15-09-2026 ──────────────────
+ *
+ * Última muestra de esta máquina: `2026-09-15 23:00`. Última del tanque:
+ * `2026-09-15 23:01`. Para las dos a la vez, así que **no es de vibraciones y
+ * no es nuestro**: es de planta. Las series de arriba se midieron en la
+ * ventana en la que sí hubo registro (14 al 16 de septiembre).
  *
  * ── LO QUE ESTA LISTA NO DECIDE ────────────────────────────────────
  *
@@ -1067,13 +1106,35 @@ export function parsePunto(nombre) {
  *
  * Esta lista es sólo la puerta del historiador.
  *
- * ── DOS EXCEPCIONES, Y LAS DOS SON DEL SERVIDOR ────────────────────
+ * ── TRES EXCEPCIONES, Y LAS TRES SON DEL SERVIDOR ──────────────────
  *
  * `aPeak_S1` devuelve **la serie de `aRMS_S1`**: muestra por muestra y con las
  * mismas marcas de tiempo. Se comprobó cruzando las doce series de los apoyos
  * entre sí y es el único par que colisiona — `aPeak_S2` y `aPeak_S3` traen la
  * suya. Es el mismo fallo que el tanque tiene con tres de sus ocho señales, y
  * el motivo de que esto sea una LISTA BLANCA: lo que no está aquí no se pide.
+ *
+ * **Cuantificado el 21-09-2026:** de 1805 marcas de tiempo comunes, los 1805
+ * valores son IDÉNTICOS — el 100 %. El contraste lo confirma: `aPeak_S2`
+ * frente a `aRMS_S2` coincide en 3 de 321. Consecuencia para quien venga al
+ * factor de cresta (`aPeak/aRMS`, Plan 32 §4.2): **en S1 no se puede calcular
+ * sobre historia**, daría exactamente 1,0 siempre. En S2 y S3 sí.
+ *
+ * ── LAS NUEVE CALIDADES SON LA MISMA SERIE (defecto nuevo) ─────────
+ *
+ * Medido el 21-09-2026 y **no documentado hasta hoy**: las nueve `QC_*` de
+ * los tres apoyos —`QC_vRMS`, `QC_aRMS` y `QC_DKW` en S1, S2 y S3— devuelven
+ * **una única serie**, idéntica entre las nueve. Están declaradas como
+ * calidad independiente por medida y por apoyo, y no lo son.
+ *
+ * Se quedan en la lista, y es deliberado: el árbol las publica, existen, y
+ * recortarlas escondería el problema en vez de decirlo. Pero **quien vete por
+ * calidad tiene que saber que no está leyendo la de esa medida**, y eso pesa
+ * porque la calidad manda sobre el veto del motor (`CLAUDE.md` §2.4).
+ *
+ * La salida de fondo no es editar esta lista: es el Plan 34, donde
+ * `historyVerified` se gana sondeando por variable en vez de heredarse de una
+ * lista blanca escrita a mano. Ahí estas nueve arrancan en `false`.
  *
  * `alarma_S1` no está por otra razón. En vivo ese tag se llama `Alarrma_S1`
  * —con dos erres, ver `ERRATAS_DEL_SERVIDOR`— pero en el historiador está
@@ -1087,17 +1148,19 @@ const CON_SERIE = new Set([
   "vRMS_S1", "aRMS_S1", "DKW_S1",
   "vRMS_S2", "aRMS_S2", "aPeak_S2", "DKW_S2",
   "vRMS_S3", "aRMS_S3", "aPeak_S3", "DKW_S3",
-  // Banderas. `alarma_S1` fuera, ver arriba.
-  "aviso_S1", "offset_S1",
-  "alarma_S2", "aviso_S2", "offset_S2",
-  "alarma_S3", "aviso_S3", "offset_S3",
+  /* Banderas. `alarma_S1` fuera, ver arriba. Y los tres `aviso_S*` fuera
+     desde el 21-09-2026: su tag `Warning_S*` no existe en el árbol. */
+  "offset_S1",
+  "alarma_S2", "offset_S2",
+  "alarma_S3", "offset_S3",
   // Calidad de cada medida, en los tres apoyos.
   "qcVRMS_S1", "qcARMS_S1", "qcDKW_S1",
   "qcVRMS_S2", "qcARMS_S2", "qcDKW_S2",
   "qcVRMS_S3", "qcARMS_S3", "qcDKW_S3",
-  // El variador entero.
+  /* El variador, menos `aviso`: su tag `WARNING_BMS` tampoco existe en el
+     árbol (21-09-2026). */
   "velocidad", "frecuencia", "tensionSalida", "corriente", "par", "potencia",
-  "busCC", "fallo", "ultimoFallo", "aviso", "listo", "habilitado",
+  "busCC", "fallo", "ultimoFallo", "listo", "habilitado",
 ]);
 
 /** ¿Esta clave tiene serie PROPIA verificada? Lista blanca: ver arriba. */
@@ -1120,10 +1183,17 @@ export const historizadas = () => [...CON_SERIE];
  * saliera del registro en vez de estar cableado: mientras hubo una sola
  * máquina, `pointName()` del tanque servía para las dos cosas.
  *
- * El espacio de «DEMO 3» es literal: sin él ICONICS responde 500 y parece que
- * el tag no existe. El tag va PELADO, sin la carpeta del apoyo, y **sin pasar
- * por `ERRATAS_DEL_SERVIDOR`**: la doble erre de `Alarrma_S1` es del árbol
- * `ac:` y el historiador lo tiene bien escrito.
+ * ── EL TAG YA NO VA PELADO (Plan 34 F0, 21-09-2026) ────────────────
+ *
+ * Hasta hoy esto componía `DEMO 3:` + el tag, sin carpeta, porque el grupo
+ * viejo era plano. El grupo actual —`DEMO_VIBRACIONES`— agrupa **por apoyo**,
+ * así que el nombre lleva la carpeta delante: `S1:vRMS_S1` para los tres
+ * apoyos y `V20:SPEED_BMS` para el variador. Comprobado tag a tag contra el
+ * árbol real: los 94 puntos del grupo cuelgan de `S1`, `S2`, `S3`, `V20` o
+ * `Jaritza`.
+ *
+ * Sigue **sin pasar por `ERRATAS_DEL_SERVIDOR`**: la doble erre de
+ * `Alarrma_S1` es del árbol `ac:` y el historiador lo tiene bien escrito.
  */
 export function puntoHistorico(clave) {
   if (!CON_SERIE.has(clave)) return null;
@@ -1132,7 +1202,7 @@ export function puntoHistorico(clave) {
      troceado por `_` de abajo las partiría mal (`tensionSalida` no tiene `_`,
      pero `ultimoFallo` tampoco y `FREQ OUTPUT_BMS` sí lo tiene en el TAG). */
   const v = VARIADOR.find((x) => x.key === clave);
-  if (v) return `${GRUPO_HISTORIADOR}${v.tag}`;
+  if (v) return `${GRUPO_HISTORIADOR}${CARPETA_VARIADOR_HISTORICO}:${v.tag}`;
 
   const corte = clave.lastIndexOf("_");
   const base = clave.slice(0, corte);
@@ -1149,6 +1219,12 @@ export function puntoHistorico(clave) {
 
   /* Sin `comoLoEscribeElServidor`: la doble erre de `Alarrma_S1` es del árbol
      `ac:`, y el historiador tiene ese tag bien escrito. Meterla aquí pediría
-     un punto que en `hda:` no existe. */
-  return familia ? `${GRUPO_HISTORIADOR}${familia.tag}_${canal.sufijo}` : null;
+     un punto que en `hda:` no existe.
+
+     La carpeta del apoyo (`S1:`) va delante desde el Plan 34 F0: el grupo
+     actual agrupa por apoyo, y el sufijo del canal nombra las dos cosas —la
+     carpeta y el final del tag—. */
+  return familia
+    ? `${GRUPO_HISTORIADOR}${canal.sufijo}:${familia.tag}_${canal.sufijo}`
+    : null;
 }
