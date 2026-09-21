@@ -131,11 +131,57 @@ check('y alcanza también las que se leen en vivo sin serie', () => {
   }
 })
 
-check('las MISMAS 40 series historizadas', () => {
-  assert.deepEqual(
-    [...configurada.series.historizadas()].sort(),
-    [...aMano.series.historizadas()].sort(),
+/*
+ * ── AQUÍ LAS DOS DEJAN DE SER IGUALES, Y ES EL PUNTO (Plan 34 F2) ──
+ *
+ * Hasta el 21-09-2026 esto exigía la MISMA lista de series en las dos, porque
+ * la configuración se generaba HEREDANDO la lista blanca del catálogo. Desde
+ * F2 se genera SONDEANDO: se pide cada serie al servidor y se comparan entre
+ * sí, y **sin red no se verifica ninguna**.
+ *
+ * Eso es lo correcto y no un apaño para que esto pase: una serie se promete
+ * después de mirarla, y aquí no se ha podido mirar. El guion corre sin planta
+ * a propósito —está en la tanda—, así que lo que puede afirmar es la relación
+ * entre las dos listas, no su tamaño.
+ *
+ * Con `--sondear` contra planta, medido el 21-09-2026:
+ *
+ *   36  las que el catálogo declara historizadas
+ *   19  las que el sondeo verifica como serie PROPIA
+ *    9  comparten serie con otra (las nueve `QC_*`: una sola serie para todas)
+ *    8  no varían en la ventana, así que no se pueden distinguir
+ *
+ * La invariante que vale en los dos casos: la configuración es un
+ * SUBCONJUNTO del catálogo. Prometer menos es correcto; prometer algo que el
+ * catálogo no declara sería inventar.
+ */
+check('las series de la configuración son un SUBCONJUNTO de las del catálogo', () => {
+  const delCatalogo = new Set(aMano.series.historizadas())
+  const sondeadas = [...configurada.series.historizadas()]
+
+  assert.ok(
+    sondeadas.length <= delCatalogo.size,
+    `la configuración promete ${sondeadas.length} series y el catálogo declara ` +
+      `${delCatalogo.size}`,
   )
+  for (const clave of sondeadas) {
+    assert.ok(
+      delCatalogo.has(clave),
+      `«${clave}» está verificada en la configuración y el catálogo no la declara`,
+    )
+  }
+})
+
+check('sin sondear, la configuración NO promete ninguna serie', () => {
+  /*
+   * El valor seguro, y la diferencia que define esta fase. Antes este guion
+   * generaba 40 series verificadas sin haber preguntado a nadie — y aquellas
+   * 40 resultaron apuntar a un grupo del historiador que ya no existía.
+   *
+   * Si esto empieza a fallar es que alguien volvió a heredar la lista blanca
+   * en vez de sondearla.
+   */
+  assert.deepEqual([...configurada.series.historizadas()], [])
 })
 
 /*
@@ -158,13 +204,23 @@ check('cada serie apunta al MISMO punto histórico, literal', () => {
  * Las 31 que sólo tiene la configurada se comprueban arriba: ninguna promete
  * serie.
  */
-check('`esHistorizada` contesta igual para todas las claves comunes', () => {
+check('`esHistorizada` nunca promete más que el catálogo (Plan 34 F2)', () => {
+  /*
+   * Ya no se exige que contesten IGUAL: sin sondear, la configuración dice
+   * `false` a todo, y eso es lo correcto —ver arriba—. Lo que sí tiene que
+   * cumplirse siempre es la dirección: si la configuración dice que una clave
+   * tiene serie, el catálogo también.
+   *
+   * Al revés es legítimo: el catálogo la declara y el sondeo todavía no la ha
+   * confirmado.
+   */
   for (const clave of aMano.claves()) {
-    assert.equal(
-      configurada.esHistorizada(clave),
-      aMano.esHistorizada(clave),
-      `«${clave}» no coincide`
-    )
+    if (configurada.esHistorizada(clave)) {
+      assert.ok(
+        aMano.esHistorizada(clave),
+        `«${clave}» promete serie en la configuración y el catálogo no la declara`,
+      )
+    }
   }
 })
 
@@ -282,19 +338,48 @@ check('y lo DECLARA: no aparenta poder diagnosticar', () => {
   )
 })
 
-check('dice que sus series son HEREDADAS, no verificadas aquí', () => {
+check('dice que sus series se SONDEAN, y que sin sondear no hay ninguna', () => {
+  /*
+   * Este texto decía «heredando el sondeo del 28-08-2026» hasta el Plan 34
+   * F2. Dejarlo habría sido peor que un comentario viejo: `limitaciones` es,
+   * por contrato, lo que el asistente confiesa al contestar — una máquina que
+   * declare heredada una verificación que ahora hace sería mentir hacia el
+   * lado cómodo.
+   */
   assert.ok(
-    configurada.limitaciones.some((l) => /heredando el sondeo/i.test(l)),
-    'presenta como propia una verificación que no hizo'
+    configurada.limitaciones.some((l) => /sondeándolas|sondear/i.test(l)),
+    'no dice cómo se verifican sus series'
+  )
+  assert.ok(
+    !configurada.limitaciones.some((l) => /heredando el sondeo/i.test(l)),
+    'sigue diciendo que hereda un sondeo que ya no hereda'
   )
 })
 
 /*
- * Con las 40 series heredadas, la configurada SÍ puede ofrecer historia. Es lo
- * que demuestra que la derivación no perdió nada por el camino.
+ * ── LAS HERRAMIENTAS SE DERIVAN DE LO VERIFICADO (Plan 34 F2) ──────
+ *
+ * Antes esto afirmaba que la configurada ofrece `historia_de_senal` «con las
+ * 40 series heredadas». Ya no las hereda: sin sondear no tiene ninguna, y
+ * entonces **no debe ofrecer historia** — que es justo lo que `capacidadesDe`
+ * existe para garantizar: «el tablero ofrecería histórico de una máquina sin
+ * series, y el error aparecería al pulsar, no al configurar».
+ *
+ * Así que lo que se comprueba es la correspondencia, no el resultado fijo:
+ * ofrece historia si y sólo si tiene alguna serie verificada.
  */
-check('con sus series, ofrece `historia_de_senal`', () => {
-  assert.ok(configurada.herramientas.includes('historia_de_senal'))
+check('ofrece `historia_de_senal` si y sólo si tiene series verificadas', () => {
+  const tieneSeries = [...configurada.series.historizadas()].length > 0
+  assert.equal(
+    configurada.herramientas.includes('historia_de_senal'),
+    tieneSeries,
+    tieneSeries
+      ? 'tiene series verificadas y no ofrece historia'
+      : 'no tiene ninguna serie verificada y ofrece historia igualmente',
+  )
+})
+
+check('el estado en vivo se ofrece siempre: no depende del historiador', () => {
   assert.ok(configurada.herramientas.includes('estado_del_sistema'))
 })
 

@@ -154,36 +154,88 @@ const configurada = crearMaquina({
     'Configuración DERIVADA del catálogo escrito a mano (Plan 33 F4). Existe para ' +
       'comparar las dos, no para sustituirlo: el módulo original sigue siendo el que ' +
       'sirve esta máquina.',
-    'Sus series se dan por verificadas HEREDANDO el sondeo del 28-08-2026, no por haberlas ' +
-      'comprobado aquí.',
+    /*
+     * Este texto cambió con el Plan 34 F2: hasta el 21-09-2026 decía que las
+     * series se daban por verificadas «heredando el sondeo del 28-08-2026».
+     * Ya no se heredan — y menos mal: aquel sondeo se había hecho contra un
+     * grupo del historiador que a día de hoy no existe.
+     */
+    'Sus series se verifican SONDEÁNDOLAS con `--sondear`: se pide cada una al servidor y se ' +
+      'comparan entre sí, porque el historiador puede devolver la serie de otra señal sin dar ' +
+      'error. Sin esa bandera ninguna queda verificada, que es el valor seguro.',
   ],
 })
 
 /*
- * ── LA VERIFICACIÓN SE HEREDA, Y VA DESPUÉS DE `crearMaquina` ──────
+ * ── LA VERIFICACIÓN SE GANA SONDEANDO (Plan 34 F2, 21-09-2026) ─────
  *
- * `historizadas()` es una lista blanca sondeada punto por punto contra el
- * servidor real el 28-08-2026. No es una promesa del servidor —a `aPeak_S1` le
- * contesta con la serie de `aRMS_S1`, sin dar error— sino el resultado de
- * haber mirado. Copiarla es heredar ESA verificación, no hacer una nueva.
+ * Hasta hoy esto HEREDABA la marca del catálogo: `historizadas()` era una
+ * lista blanca sondeada el 28-08-2026, y copiarla era heredar aquella
+ * verificación en vez de hacer una nueva. La cabecera de este guion lo decía
+ * con todas las letras —«es la diferencia entre heredar una verificación y
+ * hacerla»— y el 21-09 se vio por qué importaba: **aquel sondeo se hizo
+ * contra un árbol que ya no existe**. El `datos/maquinas.json` de entonces
+ * prometía 40 series verificadas sobre un grupo que devuelve 500.
  *
- * ── POR QUÉ AQUÍ Y NO AL CONSTRUIR CADA VARIABLE ───────────────────
+ * Con `--sondear` se pide la serie de cada variable al servidor y se comparan
+ * entre sí (`backend/lib/sondearSeries.mjs`). Sin la bandera, ninguna
+ * variable queda verificada — que es el valor seguro y el que deja este guion
+ * corriendo sin red.
+ *
+ * ── POR QUÉ VA DESPUÉS DE `crearMaquina` ───────────────────────────
  *
  * Porque `crearVariable()` fuerza `historyVerified: false`, y `crearMaquina()`
- * pasa todas las variables por ahí. Marcarlas antes no servía de nada: la
- * marca se perdía y este guion decía «40 series heredadas» produciendo cero.
- *
- * Eso NO es un defecto de aquella función: es exactamente para lo que se puso.
- * Nada que llegue como DATO puede declararse verificado —ni de un formulario,
- * ni de un JSON, ni de este guion— porque prometer una serie sin haberla
- * sondeado es cómo se acaba enseñando la señal de al lado con el rótulo
- * correcto.
- *
- * Así que la marca se pone DESPUÉS y desde el catálogo, que es la única fuente
- * que tiene derecho a ponerla: el sondeo ya ocurrió y está escrito ahí.
+ * pasa todas las variables por ahí. Eso NO es un estorbo: es exactamente para
+ * lo que se puso. Nada que llegue como DATO puede declararse verificado —ni de
+ * un formulario, ni de un JSON, ni de este guion— porque prometer una serie
+ * sin haberla sondeado es cómo se acaba enseñando la señal de al lado con el
+ * rótulo correcto.
  */
-for (const v of configurada.variables) {
-  if (verificadas.has(v.id) && v.historyPointName) v.historyVerified = true
+const SONDEAR = process.argv.includes('--sondear')
+
+if (SONDEAR) {
+  const { loadConfig } = await import('../backend/config.mjs')
+  const { createAuthenticator } = await import('../backend/iconics/authenticator.mjs')
+  const { createIconicsClient } = await import('../backend/iconics/client.mjs')
+  const { sondearSeries } = await import('../backend/lib/sondearSeries.mjs')
+
+  const config = loadConfig()
+  if (!config.iconics.apiBase) {
+    console.error(
+      'Falta ICONICS_API_BASE: `--sondear` necesita red a la planta.\n' +
+        '  node --env-file=.env.local scripts/generar-configuracion-vibraciones.mjs --sondear',
+    )
+    process.exit(1)
+  }
+
+  const cliente = createIconicsClient(config, createAuthenticator(config))
+
+  /*
+   * La ventana por defecto son siete días. Es la que el historiador contesta
+   * —a treinta devuelve vacío SIN dar error, medido en las dos máquinas— y la
+   * que da margen para que una señal haya variado.
+   */
+  const hasta = new Date()
+  const desde = new Date(hasta.getTime() - 7 * 24 * 3600 * 1000)
+
+  const sondeo = await sondearSeries(configurada, {
+    leerSerie: (o) => cliente.readHistory(o),
+    desde: desde.toISOString(),
+    hasta: hasta.toISOString(),
+  })
+
+  const porId = new Map(sondeo.variables.map((v) => [v.id, v]))
+  for (const v of configurada.variables) {
+    const r = porId.get(v.id)
+    /* Sólo un `true` explícito verifica. Un sondeo que no pudo leer deja la
+       variable como estaba, que aquí es `false`. */
+    if (r?.historyVerified === true) v.historyVerified = true
+  }
+
+  console.error(`Sondeo: ${sondeo.motivo}`)
+  for (const v of sondeo.variables.filter((x) => x.sondeo.causa === 'serie-compartida')) {
+    console.error(`  · ${v.id} comparte serie con ${v.sondeo.compartidaCon.join(', ')}`)
+  }
 }
 
 const salida = {
@@ -191,7 +243,10 @@ const salida = {
   maquinas: [configurada],
 }
 
-const destino = process.argv[2]
+/* El destino es el primer argumento que NO sea una bandera: con `--sondear`
+   delante, `process.argv[2]` era la bandera y se escribía un archivo llamado
+   «--sondear». */
+const destino = process.argv.slice(2).find((a) => !a.startsWith('--'))
 if (destino) {
   await writeFile(destino, `${JSON.stringify(salida, null, 2)}\n`, 'utf8')
   console.error(`Escrito ${destino}`)
@@ -201,21 +256,30 @@ if (destino) {
 
 /*
  * Se cuenta lo APLICADO, no lo que se pretendía aplicar. La primera versión
- * imprimía `verificadas.size` —lo que dice el catálogo— y por eso anunciaba
- * «40 series heredadas» mientras producía cero: el número venía de la
- * intención, no del resultado.
+ * imprimía lo que dice el catálogo y por eso anunciaba «40 series heredadas»
+ * mientras producía cero: el número venía de la intención, no del resultado.
+ *
+ * Desde el Plan 34 F2 el contraste es otro y más útil: lo que el catálogo
+ * CREE historizado frente a lo que el sondeo VERIFICÓ. Que no cuadren no es
+ * un defecto de este guion — es justo el dato que la fase existe para sacar a
+ * la luz.
  */
-const heredadas = configurada.variables.filter(v => v.historyVerified).length
-if (heredadas !== verificadas.size) {
+const verificadasAhora = configurada.variables.filter(v => v.historyVerified).length
+if (!SONDEAR) {
   console.error(
-    `AVISO: el catálogo declara ${verificadas.size} series y sólo se marcaron ${heredadas}. ` +
-      'Alguna clave del catálogo no encontró su variable.',
+    `Sin \`--sondear\`: ninguna de las ${verificadas.size} series que el catálogo declara ` +
+      'queda verificada. Es el valor seguro — una serie se promete después de mirarla.',
+  )
+} else if (verificadasAhora !== verificadas.size) {
+  console.error(
+    `El catálogo declara ${verificadas.size} series historizadas y el sondeo verificó ` +
+      `${verificadasAhora}. La diferencia está arriba, variable por variable.`,
   )
 }
 
 console.error(
-  `\n${configurada.variables.length} variables · ${heredadas} series heredadas · ` +
-    `${sinRol.length} sin rol en el tipo`,
+  `\n${configurada.variables.length} variables · ${verificadasAhora} series verificadas` +
+    `${SONDEAR ? ' por sondeo' : ' (sin sondear)'} · ${sinRol.length} sin rol en el tipo`,
 )
 if (sinRol.length) {
   console.error(

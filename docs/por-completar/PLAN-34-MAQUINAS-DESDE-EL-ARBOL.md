@@ -1,6 +1,6 @@
 # PLAN 34 — Las máquinas se configuran desde el árbol de ICONICS
 
-**Estado:** F0, F0.2 y F1 completadas · F2–F5 por completar
+**Estado:** F0, F0.2, F1 y F2 completadas · F3–F5 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -434,7 +434,9 @@ S2, S3, V20**. Fuera `S4` y `Pantalla`.
 
 ---
 
-### F2 — `historyVerified` se gana sondeando, no heredando
+### F2 — `historyVerified` se gana sondeando, no heredando ✅
+
+**Completada el 21-09-2026.**
 
 **Objetivo.** Convertir en código el sondeo del 21-09: pedir la serie y
 **comparar huellas** para cazar la serie prestada.
@@ -455,6 +457,86 @@ serie de otra, con marcas de tiempo correctas y sin error (§2.6).
 **Riesgo.** Medio-bajo. Trampa conocida: con la máquina parada (§2.3) todo
 vale 0 y **dos series de ceros parecen la misma**. El sondeo tiene que
 negarse a concluir sobre una ventana sin variación, no declarar `false`.
+
+#### Lo que de verdad pasó
+
+**El sondeo con el servidor sano** (`backend/lib/sondearSeries.mjs`):
+
+| | |
+|---|---|
+| Verificadas como serie propia | **19** de 36 |
+| Comparten serie con otra | **9** — las nueve `QC_*`, cazadas |
+| No varían en la ventana | **8** — banderas que no cambiaron |
+| Sin muestras · no se pudieron leer | 0 · 0 |
+
+Y con `aPeak_S1` / `aRMS_S1` forzados juntos, el caso que da nombre a la
+fase: **las dos a `false` por serie compartida**, mientras `aPeak_S2` y
+`aRMS_S2` quedan verificadas. Exactamente el comportamiento pedido.
+
+**La trampa de la máquina parada está resuelta y probada.** Una serie sin
+variación no verifica y **no desmiente**: queda `UNKNOWN` con su motivo. Dos
+series de ceros no se declaran «compartidas» — eso habría borrado la
+verificación de la máquina entera por estar detenida.
+
+#### El historiador se cayó a mitad de la fase, y lo demostró
+
+Mientras se regeneraba la configuración, el Hyper Historian **dejó de
+responder consultas**. Comprobado con el tanque como control —que esta rama no
+toca—: las dos máquinas a la vez, misma ventana que minutos antes devolvía
+1830 muestras. El árbol (`browse`) y el valor en vivo seguían respondiendo.
+
+No fue un estorbo: fue la prueba en planta de la cautela principal. El sondeo
+marcó las 36 como «no se pudieron leer» y **no tocó ninguna
+`historyVerified`**. `UNKNOWN` ≠ `INVALID`, con el servidor real haciendo de
+banco de pruebas.
+
+#### Dos defectos destapados al regenerar
+
+- **El generador escribía un archivo llamado `--sondear`.** `process.argv[2]`
+  era la bandera cuando iba delante del destino. Hoy el destino es el primer
+  argumento que no empieza por `--`.
+- **Una `limitaciones` que ya mentía:** decía «sus series se dan por
+  verificadas heredando el sondeo del 28-08-2026». Ese texto lo lee el
+  asistente, y afirmaba heredar una verificación que la fase acababa de
+  convertir en propia.
+
+#### El estado de `datos/maquinas.json`
+
+**Regenerado con 0 series verificadas, y es lo correcto.** La última pasada se
+hizo con el historiador ya caído, y el valor seguro es no prometer lo que no
+se ha podido comprobar. Las rutas sí quedaron vivas (0 referencias a
+`Motors/01` ni a `DEMO 3`).
+
+**Se vuelve a sondear cuando ICONICS registre**, con un comando:
+
+```bash
+node --env-file=.env.local scripts/generar-configuracion-vibraciones.mjs \
+  --sondear datos/maquinas.json
+```
+
+Esto es lo que la fase deja montado de cara a lo que viene: **el sondeo es una
+función que se repite, no una tabla que se edita**. Cuando el historiador
+empiece a registrar señales que hoy no registra, o cuando se añadan variables
+nuevas en ICONICS, lo que hay que hacer es volver a correrlo. El resultado de
+hoy no es una conclusión: es una foto con fecha.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `verificar-sondeo-series` | **17** comprobaciones, sin red |
+| `npm run verificar` | **los 38** |
+| Backend · Frontend | 368 · 1013 (29 omitidas) |
+| Lint y types | limpios |
+
+Roto a propósito antes de darlo por bueno (`CLAUDE.md` §6.2): quitando la
+guarda de variación, fallan **3** comprobaciones y sale con código 1.
+
+`verificar-vibraciones-configurada` cambió tres afirmaciones, y el cambio es
+el contenido de la fase: ya no exige que las dos listas de series sean
+**iguales** —la configuración ahora sabe más que el catálogo— sino que la
+configuración sea un **subconjunto**, que sin sondear no prometa **ninguna**, y
+que ofrezca `historia_de_senal` **si y sólo si** tiene series verificadas.
 
 ---
 
@@ -572,3 +654,22 @@ vivo está por confirmar con la máquina girando.
 **Con la máquina parada no se puede terminar de verificar** (§2.3). F2 puede
 clasificar lo que ya tiene historia, pero la verificación en vivo necesita que
 el motor gire.
+
+**El Hyper Historian dejó de responder el 21-09-2026 por la tarde.** Las dos
+máquinas a la vez, con el árbol y el valor en vivo funcionando. Es de planta.
+Mientras dure, `datos/maquinas.json` queda con **0 series verificadas**, que
+es el estado honesto.
+
+**Lo que viene, dicho por el usuario el 21-09-2026:** cuando ICONICS esté bien
+configurado empezará a generar histórico, y **es probable que se añadan
+variables nuevas** a las que ya hay. Las dos cosas son el caso para el que F2
+está construida —se vuelve a sondear y ya está—, pero conviene no darlas por
+hechas:
+
+- Una variable nueva **no aparece sola** en la configuración: hay que volver a
+  descubrir (F1) y luego sondear (F2). Hoy son dos comandos; desde F4 será la
+  pantalla.
+- Cuando el historiador registre de verdad, es esperable que **suban las 19**
+  y que bajen las «8 sin variación» —esas sólo esperan a que su bandera
+  cambie alguna vez—. Las **9 `QC_*` no van a subir**: comparten serie de
+  origen, y eso no lo arregla registrar más.
