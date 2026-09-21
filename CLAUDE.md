@@ -112,23 +112,38 @@ regla.
     sólo señales sueltas. Si el servidor publica equipos de verdad algún día,
     se sustituye `shared/eva/activos.js` y ninguna vista se entera — pero
     hasta entonces, ese archivo es la única fuente de esa agrupación.
-11. **La autenticación está implementada y APAGADA**
-    (`backend/http/plugins/autenticacion.mjs`, `AUTH_HABILITADA=false`). Desde
-    el Plan 22 F6 ya no es un decorador vacío: hay JWT, censo de usuarios,
-    roles y caducidad, todo probado con el interruptor encendido en la suite.
+11. **La autenticación está ENCENDIDA, con tres roles jerárquicos**
+    (`backend/http/plugins/autenticacion.mjs`, `AUTH_HABILITADA=true` desde el
+    21-09-2026). Este punto decía «implementada y APAGADA», y que el tablero
+    «todavía no sabe pedir un token»: el Plan 25 resolvió la pantalla de acceso
+    y la renovación, y el Plan 35 cerró el resto.
 
-    Sigue apagada porque **el tablero todavía no sabe pedir un token** —
-    pantalla de acceso y renovación son del Plan 25. No se enciende como efecto
-    colateral de otra tarea, y conviene no confundir «probado» con «protegiendo
-    algo»: hoy no protege nada, a propósito.
+    ```
+    administrador  >  operador  >  visualizador
+    ```
 
-    Lo mismo vale para `REPORTES_SECRETO` (F7): sin él los enlaces de descarga
-    no caducan, y el arranque lo avisa.
+    **La jerarquía es pura**: un administrador puede todo lo que puede un
+    operador, incluido accionar la planta. Vive en `shared/roles.js` —es
+    dominio, no HTTP— y la usan el backend para negar y la pantalla para no
+    ofrecer lo que va a fallar. La herencia se resuelve **al comprobar, no al
+    firmar**: un token con los roles ya expandidos llevaría dentro la jerarquía
+    del día en que se emitió.
+
+    **Apagada por defecto sigue siendo lo correcto** para un despliegue que no
+    la configure. Lo que cambió es que encenderla ya funciona de punta a punta.
+
+    `REPORTES_SECRETO` (Plan 22 F7) es aparte y sigue igual: sin él los enlaces
+    de descarga no caducan, y el arranque lo avisa.
 
     Desde el Plan 20 F5 la guarda `autenticar` **la aplica el ámbito** donde se
     registran las rutas de API (`app.mjs`), no cada ruta: la llevaban trece de
     treinta y tres, y olvidarla en la siguiente no rompía nada visible.
-    `exigirRol` sí sigue declarándose ruta por ruta, que es donde hay criterio.
+    `exigirRol` sí sigue declarándose ruta por ruta, que es donde hay criterio
+    — y desde el Plan 35 F2 **la lleva toda ruta de API**, con tres exenciones
+    declaradas: las sondas de salud, `/api/auth/*` (exigir rol para saber qué
+    rol tienes no lo puede cumplir nadie) y `GET /api/reportes`, cuyo control
+    de acceso es el **enlace firmado**. Hay una prueba que entra con el rol
+    más bajo y falla si alguna ruta nueva le deja pasar.
     `test/rutas/guardas.test.mjs` recorre el inventario real y falla si alguna
     queda fuera.
 

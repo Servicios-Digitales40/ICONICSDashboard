@@ -232,12 +232,12 @@ pronóstico.
 
 | Problema | Estado |
 |---|---|
-| **Autenticación implementada y APAGADA** | `AUTH_HABILITADA=false`. Hay JWT, roles y caducidad, probados. **Hoy no protegen nada, a propósito**: el tablero no sabe pedir token (Plan 25) |
+| **Autenticación ENCENDIDA** | `AUTH_HABILITADA=true` desde el 21-09-2026 (Plan 35 F4). Tres roles con jerarquía —`administrador > operador > visualizador`—, rol mínimo en las 37 rutas y el tablero pidiendo credenciales. Esta fila decía que el tablero «no sabe pedir token»: el Plan 25 lo resolvió y nadie actualizó el handoff |
 | **Umbrales provisionales** | Las bandas del tanque son «estimaciones nuestras para un sistema de agua genérico», no confirmadas por quien opera |
 | **Señales sin histórico** | `aPeak_S1` (vibraciones) y `cargaMotor` + `eficienciaEnergetica` (tanque) **devuelven la serie de otra señal, sin dar error** |
 | **Diagnóstico de rodamientos apagado** | `MonState_e_f_BPFO/BPFI/FTF` en posición 0. Es configuración del SM 1281, no código |
 | **Sin geometría de chumaceras** | S2 y S3 declaran `rodamiento: null`. Sin referencia no hay frecuencias de defecto en dos de tres apoyos |
-| **Una máquina configurada no diagnostica** | Trae `dominio: null`: las reglas esperan la forma de dominio de su máquina, no una lista plana. Declarado en sus `limitaciones` |
+| **Una máquina configurada NO lee alarmas ni estado de sensor** | Ya diagnostica —el Plan 34 F3 reconstruye su dominio desde los roles— pero esas dos piezas no son roles del tipo, así que van vacías y se declara. Se recogen en la F4 de ese plan |
 | **10 herramientas sin índice de sinónimos** | B3 del backlog. Resuelven por máquina desde F7, pero vibraciones no tiene sinónimos propios |
 | **Janitza da mala calidad** | En 16 de 18 tags |
 

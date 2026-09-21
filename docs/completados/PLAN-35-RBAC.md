@@ -1,6 +1,6 @@
 # PLAN 35 — RBAC: tres roles, con jerarquía, encendidos
 
-**Estado:** F1, F2 y F3 completadas · F4 por completar
+**Estado:** F1–F4 completadas · plan terminado
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -48,10 +48,12 @@ el peor momento.
 | Pantalla de acceso, `SesionProvider`, renovación | **Funciona.** Plan 25, ya en `completados/` |
 | `exigirRol` | Funciona, **pero sin jerarquía** (§3.1) |
 
-> **El `HANDOFF.md` está desactualizado en esto.** Dice que la autenticación
-> sigue apagada porque «el tablero todavía no sabe pedir un token — pantalla
-> de acceso y renovación son del Plan 25». Ese plan está **completado**, y las
-> piezas existen. Corregirlo es parte de F4.
+> **El `HANDOFF.md` estaba desactualizado en esto.** Decía que la
+> autenticación seguía apagada porque «el tablero todavía no sabe pedir un
+> token — pantalla de acceso y renovación son del Plan 25». Ese plan está
+> **completado**, y las piezas existían. **Corregido en F4**, junto con
+> `CLAUDE.md` §2.11 y la cabecera de `config.mjs`, que afirmaba además que
+> «con `true` el servidor NO arranca».
 
 Comprobado en vivo: los tres usuarios autentican y reciben un JWT con sus
 roles dentro; sin token, `401`.
@@ -117,7 +119,7 @@ demo lo va a poner delante:
 | | Quién es | Dónde vive |
 |---|---|---|
 | `ICONICS_USERNAME` | El **puente** ante ICONICS. Sesión de **máquina** | `.env.local`, ya configurada |
-| `AUTH_USUARIOS` | La **persona** que mira el tablero. Sesión de **usuario** | `AUTH_USUARIOS`, hoy vacía |
+| `AUTH_USUARIOS` | La **persona** que mira el tablero. Sesión de **usuario** | `.env.local`, con los tres usuarios desde F4 |
 
 **Consecuencia que hay que decir en la demo:** el tablero lee planta con
 `ICONICS_USERNAME` **sea quien sea** quien entre. El rol decide qué puede
@@ -432,7 +434,7 @@ fallan **4** comprobaciones.
 
 ---
 
-### F4 — Encender `AUTH_HABILITADA`
+### F4 — Encender `AUTH_HABILITADA` ✅
 
 **Objetivo.** Que el interruptor quede en `true` y el tablero funcione.
 
@@ -450,6 +452,72 @@ Plan 22 F6 lo dejó apagado.
 - `CLAUDE.md` §2.11 actualizado.
 
 **Riesgo.** Alto si se adelanta; bajo detrás de F2 y F3.
+
+#### Lo que de verdad pasó · completada el 21-09-2026
+
+**`.env.local` con las tres variables**, y el bloque reescrito: el que había
+decía que la autenticación «todavía NO está implementada» y que «con true el
+servidor NO arranca». Lo segundo era falso incluso entonces —lo único que
+impide arrancar es faltar `AUTH_SECRETO` o que sea corto— y lo primero llevaba
+dos planes sin ser cierto.
+
+**Probado contra el backend real**, no contra el transporte falso:
+
+```
+sin token            → 401
+GET /api/health/live → 200   (las sondas siguen fuera, como debían)
+```
+
+Y los tres usuarios entran con sus roles dentro del JWT:
+
+```
+MyUser  → {"id":"MyUser","roles":["administrador"]}
+Moises  → {"id":"Moises","roles":["operador"]}
+Gustavo → {"id":"Gustavo","roles":["visualizador"]}
+```
+
+**La matriz final, con la configuración de verdad:**
+
+```
+                          MyUser   Moises   Gustavo
+GET  iconics/data           200      200      200
+GET  maquinas (panel)       200      403      403
+POST cuaderno               400      400      403
+```
+
+> Durante la medición salió un `401` suelto para MyUser en la primera fila.
+> **No era del código**: mi script leía el token de un archivo que todavía no
+> se había escrito. Repetida la llamada, `200`. Se anota porque una cifra rara
+> sin explicar envenena la siguiente lectura de este documento.
+
+#### Tres documentos que mentían, corregidos
+
+Los tres decían lo mismo y ninguno se había actualizado al completarse el Plan
+25:
+
+| Dónde | Qué decía |
+|---|---|
+| `HANDOFF.md` | «no protegen nada: el tablero no sabe pedir token (Plan 25)» |
+| `CLAUDE.md` §2.11 | «implementada y APAGADA […] el tablero todavía no sabe pedir un token» |
+| `config.mjs` | «todavía no implementada […] con `true` el servidor NO arranca» |
+
+De paso se corrigió otra fila del `HANDOFF` que también había caducado: «una
+máquina configurada no diagnostica». Ya diagnostica desde el Plan 34 F3; lo
+que le falta es leer alarmas y estado de sensor.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| Backend · Frontend | 369 · **1028** (29 omitidas) |
+| `npm run verificar` | los **40** |
+| Puertas | 169 · 22 omitidas · 68 |
+| Lint y types | limpios |
+
+Las dos puertas y las dos suites siguen verdes **con `AUTH_HABILITADA=true` en
+`.env.local`**, que era el riesgo real de esta fase: las pruebas montan su
+propia configuración y no leen ese archivo, pero convenía comprobarlo en vez
+de suponerlo.
 
 ---
 

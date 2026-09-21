@@ -1355,12 +1355,21 @@ export function loadConfig(env = process.env) {
     }),
 
     /**
-     * Autenticación de usuarios (todavía no implementada).
+     * Autenticación de usuarios. **Implementada y utilizable** (Plan 35).
      *
-     * Apagada por defecto, como todo lo que aún no existe. Con `true` el
-     * servidor NO arranca a propósito: ver `http/plugins/autenticacion.mjs`.
-     * Un servidor que acepta la variable y sigue sirviendo sin pedir nada es
-     * peor que uno que se niega, porque quien la puso creería estar protegido.
+     * Este bloque decía «todavía no implementada» y que «con `true` el
+     * servidor NO arranca a propósito». Las dos cosas dejaron de ser ciertas:
+     * el Plan 22 F6 trajo JWT, censo y caducidad; el Plan 25, la pantalla de
+     * acceso y la renovación; y el Plan 35, la jerarquía de roles y el rol
+     * mínimo de cada ruta.
+     *
+     * Con `true` el servidor arranca y exige sesión. Lo único que lo detiene
+     * es **faltar `AUTH_SECRETO`** o que sea corto, y eso sí es a propósito:
+     * firmar tokens con una clave adivinable es peor que no firmarlos.
+     *
+     * Sigue apagada POR DEFECTO, que es distinto de no existir. Un despliegue
+     * que no la configure funciona como siempre; uno que la encienda pide
+     * credenciales de verdad.
      *
      * No confundir con la sesión OIDC contra ICONICS (`iconics.canAuthenticate`):
      * aquella es de máquina, esta es de persona.
