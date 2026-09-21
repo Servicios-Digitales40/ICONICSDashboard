@@ -150,16 +150,20 @@ check('los puntos se construyen como los devuelve el servidor', () => {
   assert.equal(puntoVariador('velocidad'), `${RAIZ_VIB}V20/SPEED_BMS`)
 })
 
-check('la errata «Alarrma_S1» del servidor se respeta, y sólo en S1', () => {
+check('la errata «Alarrma_S1» ya no se traduce: el servidor la corrigió', () => {
   /*
-   * En `S1/` la alarma está escrita con dos erres en ICONICS; en S2 y S3 no.
-   * Escribirla «bien» pediría un punto inexistente y la pantalla enseñaría un
-   * guión sin que nadie supiera por qué.
+   * En `S1/` la alarma estuvo escrita con dos erres en ICONICS, y este
+   * catálogo lo reproducía para que el punto respondiera. La cabecera de
+   * aquella excepción decía qué hacer si se corregía: quitarla.
    *
-   * Si alguien corrige el nombre en el servidor, esta prueba falla — que es lo
-   * que se quiere: obliga a quitar la excepción en vez de dejarla arrastrada.
+   * Se corrigió. Medido el 21-09-2026 contra el árbol real: `Alarrma_S1` no
+   * aparece en `browse` y leerlo da calidad 2147483652 (mala); `Alarma_S1`
+   * está y devuelve `false` con calidad 0.
+   *
+   * Ahora los tres apoyos se nombran igual, que es lo que había que poder
+   * afirmar.
    */
-  assert.equal(puntoBandera('alarma', 'S1'), `${RAIZ_VIB}S1/Alarrma_S1`)
+  assert.equal(puntoBandera('alarma', 'S1'), `${RAIZ_VIB}S1/Alarma_S1`)
   assert.equal(puntoBandera('alarma', 'S2'), `${RAIZ_VIB}S2/Alarma_S2`)
   assert.equal(puntoBandera('alarma', 'S3'), `${RAIZ_VIB}S3/Alarma_S3`)
 })

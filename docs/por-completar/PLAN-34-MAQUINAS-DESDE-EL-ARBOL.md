@@ -1,6 +1,6 @@
 # PLAN 34 — Las máquinas se configuran desde el árbol de ICONICS
 
-**Estado:** F0 completada · F1–F5 por completar
+**Estado:** F0, F0.2 y F1 completadas · F2–F5 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -292,7 +292,36 @@ la carpeta `scripts/`: un verificador nuevo entra por existir.
 
 ---
 
-### F1 — Descubrir las variables desde el árbol
+### F0.2 — La raíz EN VIVO también había cambiado ✅
+
+**Completada el 21-09-2026.** La destapó F1: el descubridor no encontraba
+**ninguno** de los 73 puntos declarados.
+
+`RAIZ_VIB` decía `ac:TDCON/Motors/01/` y esa rama ya no responde.
+
+| | |
+|---|---|
+| `browse ac:TDCON/Motors/` | falla |
+| `read .../Motors/01/S1/vRMS_S1` | sin valor · calidad **2147483652 (mala)** |
+| `read .../DemoVibraciones/.../S1/vRMS_S1` | `value` · calidad **0 (buena)** |
+
+Corregida a `ac:TDCON/DemoVibraciones/Vibraciones/`. **Los 73 puntos
+declarados: 73 presentes, 0 ausentes, 72 con calidad buena** (el restante es
+un sensor, no la ruta).
+
+Las dos puntas de esta máquina se habían movido el mismo día, y **ninguna
+prueba lo vio** porque ninguna comparaba el catálogo contra el árbol.
+
+La rama nueva publica **184 puntos** frente a los 73 del catálogo, con
+carpetas que no conoce: `S4` —confirmado por el usuario: no es un apoyo de
+esta máquina, está por conveniencia— y `Pantalla`. No entran aquí: el cambio
+es de RUTA, no de alcance.
+
+---
+
+### F1 — Descubrir las variables desde el árbol ✅
+
+**Completada el 21-09-2026.**
 
 **Objetivo.** Un lector que recorre ICONICS y **propone** las variables de una
 máquina, en lugar de derivarlas del catálogo.
@@ -317,9 +346,91 @@ Donde el nombre coincide, se sugiere; donde no, lo decide una persona.
   default, Plan 33 §20).
 - Lo que no puede emparejar lo dice; **no lo adivina** (§2.5 de `CLAUDE.md`).
 
-**Riesgo.** Medio: los nombres del árbol tienen erratas reales (`Alarrma_S1`
-en `ac:` bien escrito en `hda:`; `LOWERLEVEL 2` sin espacio, `UPER LEVEL 3`).
-Son el argumento de que el emparejamiento sea editable.
+**Riesgo.** Medio: los nombres del árbol tienen erratas reales (`LOWERLEVEL 2`
+sin espacio, `UPER LEVEL 3` sin la P). Son el argumento de que el
+emparejamiento sea editable.
+
+#### Lo que de verdad pasó
+
+**Se amplió el alcance con dos piezas pedidas, y las dos resultaron
+necesarias.**
+
+**El ROL.** Conecta una variable con las reglas del tipo, y es por tanto la
+pieza que va a cerrar el hueco de F3. Hubo una corrección que cambió el
+resultado: **la clave de dominio y el tag del servidor no son el mismo
+texto**, y sólo coinciden en una de las cinco familias (`qcVRMS` → `QC_vRMS`,
+`aviso` → `Warning`, `velocidad` → `SPEED_BMS`). Preguntando por clave se
+resolvían **12 de 184**; por tag, **65**. De ahí `rolesDeTag` en el tipo,
+hermano de `rolesDeClave` y con la misma cautela: devuelve LISTA, y con dos
+candidatos no se propone ninguno.
+
+Sobre los 73 puntos que el catálogo declara: **64 de 68 con rol, 0
+ambiguos**. Los 4 sin rol son erratas que el catálogo ya documenta
+(`Sensor_state_1` sin la `S`, `MonState_vRMS_2`).
+
+**Las ALARMAS.** Sondeada `ae:/DEMO VIBRACIONES`: **57 hijos** que no son lo
+mismo —42 alarmas, 6 contadores, 9 acciones de escritura—. Se devuelven por
+separado porque **sólo los contadores leen**:
+
+| | |
+|---|---|
+| `=ActiveUnackedCount` | `0` · calidad 0 |
+| `=NormalUnackedCount` | `17` · calidad 0 |
+| `.Alarm_MonState_vRMS` | sin valor · calidad **2147483682 (mala)** |
+
+El área **lista** sus 42 alarmas y no entrega el estado de ninguna. Confirma
+lo que el catálogo decía —«la pantalla dice CUÁNTAS hay y no CUÁL es cada
+una»— y lo acota: no es que no estén publicadas, es que no responden. Las
+acciones no se proponen para nada: son escrituras, deny by default.
+
+#### Un tercer nombre movido: la errata se corrigió
+
+El descubridor no encontraba `Alarrma_S1`. Medido: **ya no existe**. Hoy el
+servidor lo escribe `Alarma_S1` y responde con calidad buena; el nombre viejo
+da calidad mala.
+
+La cabecera de aquella excepción dejaba dicho qué hacer —«si se corrige allí,
+esta excepción sobra y hay que quitarla»— y su prueba lo cazó. Se retiró
+`ERRATAS_DEL_SERVIDOR` con su función traductora, que ya no traducía nada.
+`MonState_vRMS_2` y `Sensor_state_1` **siguen irregulares** y se respetan:
+comprobado en el mismo sondeo.
+
+Tercer nombre de esta máquina que se mueve el mismo día, tras las dos raíces.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| Contra el árbol real | 184 en vivo · 125 en historiador · **122 emparejados** · 0 fallos |
+| Roles sobre lo declarado | **64 de 68** · 0 ambiguos |
+| Alarmas | 6 contadores · 42 alarmas · 9 acciones |
+| `verificar-descubrimiento` | **21** comprobaciones, sin red |
+| `npm run verificar` | **los 37** |
+| Backend · Frontend | 368 · 1013 (29 omitidas) |
+
+Los 3 tags que no empareja son justo los que ninguna regla de nombres
+acertaría —`LOWER LEVEL 1`, `UPER LEVEL 3`, `Jaritza\L1:Tension L-N`—: la
+prueba de que el emparejamiento tiene que ser editable.
+
+El verificador se rompió a propósito antes de darlo por bueno
+(`CLAUDE.md` §6.2): quitando la guarda de ambigüedad falla la comprobación
+del tag duplicado y sale con código 1.
+
+#### Lo que queda para la UI (F4)
+
+El modelo de alta que pediste —nombre, activos, variables, variables
+historizadas, alarmas— encaja con lo que hay, **con un matiz**: «variables
+historizadas» no es una lista aparte sino **la segunda dirección de cada
+variable** (`historyPointName`). Separarlas obligaría a casarlas después, que
+es justo lo que se rompió dos veces hoy. En pantalla: una fila por variable
+con dos columnas, la del histórico ya rellenada donde el nombre coincide.
+
+Se añaden dos campos a los cinco: el **rol** (sin él no hay diagnóstico) y el
+**PLC**, que ya es obligatorio en `crearMaquina` porque es lo que sostiene
+`NO_COMPARTEN`.
+
+Los activos de vibraciones, confirmados por el usuario: **Alarm, Jaritza, S1,
+S2, S3, V20**. Fuera `S4` y `Pantalla`.
 
 ---
 

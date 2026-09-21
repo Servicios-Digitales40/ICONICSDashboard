@@ -956,27 +956,34 @@ function carpetaDe(canal) {
 }
 
 /**
- * ── UN TAG MAL ESCRITO EN EL SERVIDOR ──────────────────────────────
+ * ── LA ERRATA DEL SERVIDOR QUE SE CORRIGIÓ, Y AQUÍ SE RETIRA ───────
  *
- * En `S1/` la alarma se llama **`Alarrma_S1`**, con dos erres. En S2 y S3 está
- * bien escrita. Es un error de dedo en la configuración de ICONICS, visto al
- * enumerar el árbol el 27-08-2026.
+ * En `S1/` la alarma se llamaba **`Alarrma_S1`**, con dos erres, mientras que
+ * en S2 y S3 estaba bien. Un error de dedo en la configuración de ICONICS,
+ * visto al enumerar el árbol el 27-08-2026, que este catálogo tenía que
+ * reproducir para que el punto respondiera.
  *
- * Se respeta aquí por lo mismo que se respetan `MonState_vRMS_2` y
- * `Sensor_state_1` más abajo: escribirlo «bien» pediría un punto que no
- * existe, y el fallo no se vería —la pantalla enseñaría un guión y nadie
- * sabría que el nombre estaba mal armado—.
+ * La cabecera de entonces dejó escrito qué hacer: «es una errata del
+ * servidor, no una convención. **Si se corrige allí, esta excepción sobra y
+ * hay que quitarla**».
  *
- * **Es una errata del servidor, no una convención.** Si se corrige allí, esta
- * excepción sobra y hay que quitarla; la prueba de `verificar-riesgos-vibracion`
- * lo detecta porque comprueba el nombre contra el servidor.
+ * **Se corrigió.** Medido el 21-09-2026 contra el árbol real:
+ *
+ *   Alarrma_S1   no está en `browse`; leerlo da calidad 2147483652 (MALA)
+ *   Alarma_S1    está en `browse`;    leerlo da `false` con calidad 0
+ *
+ * Así que la excepción se retira y el mapa desaparece con ella: hoy el nombre
+ * bien escrito es el que existe, y mantener la traducción pediría un punto
+ * que ya no está —exactamente el fallo que la excepción evitaba, con los
+ * papeles cambiados—.
+ *
+ * Lo destapó el descubridor del Plan 34 F1: de los 73 puntos declarados no
+ * encontraba éste en el árbol. Es el tercer nombre de esta máquina que se
+ * mueve el mismo día, después de las dos raíces (F0 y F0.2).
+ *
+ * `MonState_vRMS_2` y `Sensor_state_1` **siguen irregulares** y se respetan
+ * como antes: se comprobó en el mismo sondeo que siguen escritos así.
  */
-const ERRATAS_DEL_SERVIDOR = { Alarma_S1: "Alarrma_S1" };
-
-function comoLoEscribeElServidor(nombre) {
-  return ERRATAS_DEL_SERVIDOR[nombre] ?? nombre;
-}
-
 /** Nombre completo del punto de una medida en un canal. */
 export function puntoMedida(medidaKey, canalId) {
   const m = MEDIDAS.find((x) => x.key === medidaKey);
@@ -990,7 +997,9 @@ export function puntoBandera(banderaKey, canalId) {
   const b = BANDERAS.find((x) => x.key === banderaKey);
   const c = CANAL[canalId];
   if (!b || !c) return null;
-  return `${carpetaDe(c)}${comoLoEscribeElServidor(`${b.tag}_${c.sufijo}`)}`;
+  /* Sin traducción de erratas desde el 21-09-2026: la única que había
+     (`Alarrma_S1`) la corrigió el servidor. Ver la cabecera de arriba. */
+  return `${carpetaDe(c)}${b.tag}_${c.sufijo}`;
 }
 
 /**
@@ -1156,12 +1165,16 @@ export function parsePunto(nombre) {
  * `historyVerified` se gana sondeando por variable en vez de heredarse de una
  * lista blanca escrita a mano. Ahí estas nueve arrancan en `false`.
  *
- * `alarma_S1` no está por otra razón. En vivo ese tag se llama `Alarrma_S1`
- * —con dos erres, ver `ERRATAS_DEL_SERVIDOR`— pero en el historiador está
- * escrito bien, `Alarma_S1`, y responde. La errata es sólo del árbol `ac:`.
- * Se deja fuera igualmente porque la lista se hizo con el nombre en vivo y
- * conviene que el sondeo y la declaración digan lo mismo; corregir las dos
- * puntas a la vez es un cambio aparte, no un efecto colateral de éste.
+ * `alarma_S1` sigue fuera, pero **ya no por la errata**. Estaba excluida
+ * porque en vivo el tag se llamaba `Alarrma_S1` y en el historiador
+ * `Alarma_S1`, y convenía que el sondeo y la declaración dijeran lo mismo. El
+ * 21-09-2026 el servidor corrigió el nombre en vivo, así que las dos puntas
+ * coinciden y ese motivo desapareció.
+ *
+ * Se deja fuera igualmente porque **su serie no se ha sondeado con el nombre
+ * nuevo**, y una serie prometida sin comprobar puede ser la de otra señal —es
+ * la regla de esta lista, y `aPeak_S1` es la prueba de que no es teórica—.
+ * Entra cuando el sondeo de la F2 del Plan 34 diga que su serie es suya.
  */
 const CON_SERIE = new Set([
   // Las cuatro medidas de los tres apoyos, menos `aPeak_S1`.

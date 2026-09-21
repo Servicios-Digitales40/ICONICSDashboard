@@ -65,6 +65,7 @@
 import {
   BANDERAS,
   CALIDADES,
+  CANALES,
   LIMITES_ISO,
   MEDIDAS,
   QC_NOMINAL,
@@ -146,6 +147,7 @@ export const ROLES = Object.freeze({
       rolDe("medida", m.key),
       Object.freeze({
         clave: m.key,
+        tag: m.tag,
         ambito: "apoyo",
         familia: "medida",
         label: m.label,
@@ -163,6 +165,7 @@ export const ROLES = Object.freeze({
       rolDe("bandera", b.key),
       Object.freeze({
         clave: b.key,
+        tag: b.tag,
         ambito: "apoyo",
         familia: "bandera",
         label: b.label,
@@ -173,7 +176,7 @@ export const ROLES = Object.freeze({
   ...Object.fromEntries(
     CALIDADES.map((q) => [
       rolDe("calidad", q.key),
-      Object.freeze({ clave: q.key, ambito: "apoyo", familia: "calidad", label: q.label }),
+      Object.freeze({ clave: q.key, tag: q.tag, ambito: "apoyo", familia: "calidad", label: q.label }),
     ]),
   ),
   ...Object.fromEntries(
@@ -181,6 +184,7 @@ export const ROLES = Object.freeze({
       rolDe("vigilancia", v.key),
       Object.freeze({
         clave: v.key,
+        tag: v.tag,
         ambito: "apoyo",
         familia: "vigilancia",
         label: v.label,
@@ -197,6 +201,7 @@ export const ROLES = Object.freeze({
       rolDe("variador", v.key),
       Object.freeze({
         clave: v.key,
+        tag: v.tag,
         ambito: "maquina",
         familia: "variador",
         label: v.label,
@@ -222,6 +227,34 @@ export const rolesDeAmbito = (ambito) =>
 export const rolesDeClave = (clave) =>
   Object.entries(ROLES)
     .filter(([, r]) => r.clave === clave)
+    .map(([rol]) => rol);
+
+/**
+ * Qué roles reclaman un TAG del servidor. La otra puerta del mismo índice.
+ *
+ * ── POR QUÉ HACEN FALTA LAS DOS (Plan 34 F1) ──────────────────────
+ *
+ * Porque la clave de dominio y el tag del servidor **no son el mismo texto**,
+ * y sólo coinciden por casualidad en una de las cinco familias:
+ *
+ *   medida     vRMS      → `vRMS`         coinciden
+ *   calidad    qcVRMS    → `QC_vRMS`      no
+ *   bandera    aviso     → `Warning`      no
+ *   variador   velocidad → `SPEED_BMS`    no
+ *
+ * Quien descubre una máquina desde el árbol tiene el TAG delante —es lo que
+ * `browse` devuelve— y no la clave. Preguntando sólo por clave se resolvían
+ * 12 de 184 puntos: las doce medidas, justo las que coinciden. El resto caía
+ * en «sin rol» y habría ido entero a revisión manual, que es el trabajo que
+ * esto existe para ahorrar.
+ *
+ * Devuelve una LISTA por el mismo motivo que `rolesDeClave`: dos familias
+ * pueden reclamar el mismo nombre, y elegir una por su cuenta es contestar
+ * correctamente sobre la señal equivocada.
+ */
+export const rolesDeTag = (tag) =>
+  Object.entries(ROLES)
+    .filter(([, r]) => r.tag === tag)
     .map(([rol]) => rol);
 
 /**
@@ -400,6 +433,34 @@ export const TIPO_VIBRACIONES = Object.freeze({
   roles: ROLES,
   rolesRequeridos: ROLES_REQUERIDOS,
   umbrales: UMBRALES,
+
+  /*
+   * ── EL ÍNDICE INVERSO, EN EL OBJETO Y NO SÓLO SUELTO (Plan 34 F1) ─
+   *
+   * `rolesDeClave` ya existía como export de este módulo. Viaja además aquí
+   * porque quien descubre una máquina desde el árbol recibe UN TIPO, no este
+   * archivo: el descubridor es genérico y no puede importar el de
+   * vibraciones sin dejar de servir para el siguiente.
+   *
+   * Sigue devolviendo una LISTA, y el descubridor respeta esa cautela: con
+   * más de un candidato no propone ninguno.
+   */
+  rolesDeClave,
+  /* La otra puerta del índice: por TAG del servidor, que es lo que tiene
+     delante quien descubre desde el árbol. Ver su cabecera. */
+  rolesDeTag,
+
+  /*
+   * Los apoyos que este tipo reconoce. El descubridor los necesita para
+   * partir `vRMS_S1` en clave y canal — el rol es del tipo y no sabe de
+   * apoyos, así que el sufijo hay que quitarlo antes de preguntar.
+   *
+   * Es una propiedad del TIPO y no de la instancia porque la FORMA de los
+   * apoyos (que existen, que se nombran con un sufijo) vale para cualquier
+   * motor vigilado por un SM 1281. Cuáles tiene el de hoy —tres, con estas
+   * sensibilidades— sigue siendo de la instancia, en `CANALES`.
+   */
+  canales: Object.freeze(CANALES.map((c) => Object.freeze({ id: c.id, sufijo: c.sufijo }))),
 
   /* Las 18 reglas, por referencia. Ver la cabecera: no se copian. */
   reglas: REGLAS,
