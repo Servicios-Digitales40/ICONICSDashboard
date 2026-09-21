@@ -176,6 +176,97 @@ const PRESUPUESTO_POR_DEFECTO = { maxHistoryPaginas: 20, maxHistoryMs: 20000 }
  * @param {() => number} [opciones.rnd]    inyectable para pruebas — Math.random por defecto
  * @param {{maxHistoryPaginas?: number, maxHistoryMs?: number}} [opciones.limits] mismo presupuesto que usa el cliente real
  */
+/**
+ * El árbol de `browse` derivado del registro. Ver la cabecera de `browse`.
+ *
+ * Devuelve dos índices: `hijos` (carpeta → nodos directos) y `hojas` (los
+ * puntos finales, para contestar `[]` al explorarlos).
+ */
+export function construirArbolFalso(sistemas) {
+  const hijos = new Map()
+  const hojas = new Set()
+  const BARRA = String.fromCharCode(92)
+
+  const anadir = (carpeta, nodo) => {
+    if (!hijos.has(carpeta)) hijos.set(carpeta, [])
+    const lista = hijos.get(carpeta)
+    if (!lista.some(n => n.pointName === nodo.pointName)) lista.push(nodo)
+  }
+
+  /* `ac:TDCON/DEMO/SENSORES/Tension` → carpetas `ac:`, `ac:TDCON/`, …, hoja al final.
+     Una carpeta declarada como raíz sin hojas directas se registra vacía. */
+  const enVivo = (punto, { soloCarpeta = false } = {}) => {
+    const cuerpo = punto.slice('ac:'.length)
+    const trozos = cuerpo.split('/')
+    let carpeta = 'ac:'
+    for (let i = 0; i < trozos.length; i++) {
+      const seg = trozos[i]
+      if (!seg) continue
+      const esUltimo = i === trozos.length - 1
+      const esCarpeta = !esUltimo || soloCarpeta
+      const pointName = esCarpeta ? `${carpeta}${seg}/` : `${carpeta}${seg}`
+      anadir(carpeta, { pointName, shortName: seg, class: esCarpeta ? 1 : 0 })
+      if (esCarpeta) {
+        if (!hijos.has(pointName)) hijos.set(pointName, [])
+        carpeta = pointName
+      } else {
+        hojas.add(pointName)
+      }
+    }
+  }
+
+  /* `hda:\Configuration\GRUPO\S1:vRMS_S1` → carpetas hasta `…\S1\`, tag al final. */
+  const historico = tag => {
+    const dosPuntos = tag.lastIndexOf(':')
+    if (dosPuntos <= 'hda'.length) return
+    const ruta = tag.slice('hda:'.length, dosPuntos)
+    const nombre = tag.slice(dosPuntos + 1)
+    /* Las carpetas del historiador NO llevan contrabarra final (medido el
+       21-09-2026: con ella el servidor real contesta 500). `hda:` es la raíz. */
+    const trozos = ruta.split(BARRA).filter(Boolean)
+    let carpeta = 'hda:'
+    for (const seg of trozos) {
+      const pointName = `${carpeta}${BARRA}${seg}`
+      anadir(carpeta, { pointName, shortName: seg, class: 1 })
+      carpeta = pointName
+    }
+    anadir(carpeta, { pointName: tag, shortName: nombre, class: 0 })
+    hojas.add(tag)
+  }
+
+  /* `ae:/AREA=Contador` → el área lista sus hijos con el marcador delante. */
+  const alarma = punto => {
+    const marca = punto.search(/[=.\\]/)
+    if (marca === -1) return
+    const area = punto.slice(0, marca)
+    anadir('ae:', { pointName: area, shortName: area.slice('ae:/'.length), class: 1 })
+    anadir(area, { pointName: punto, shortName: punto.slice(marca), class: 0 })
+    hojas.add(punto)
+  }
+
+  for (const sistema of sistemas) {
+    for (const raiz of sistema.raices ?? []) {
+      if (raiz.startsWith('ac:')) enVivo(raiz, { soloCarpeta: true })
+    }
+    for (const punto of sistema.puntos()) {
+      if (punto.startsWith('ac:')) enVivo(punto)
+      else if (punto.startsWith('ae:')) alarma(punto)
+    }
+    const series = sistema.series
+    if (series?.historizadas && series?.punto) {
+      for (const clave of series.historizadas()) {
+        const tag = series.punto(clave)
+        if (typeof tag === 'string' && tag.startsWith('hda:')) historico(tag)
+      }
+    }
+  }
+
+  /* Sin ruta se contesta la raíz en vivo: es lo que explora `AssetsEva`. */
+  hijos.set('', hijos.get('ac:') ?? [])
+
+  return { hijos, hojas }
+}
+
 export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.random, limits } = {}) {
   const { maxHistoryPaginas, maxHistoryMs } = { ...PRESUPUESTO_POR_DEFECTO, ...limits }
   /**
@@ -379,20 +470,51 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
   }
 
   /**
-   * Enumerar el árbol devuelve los puntos de LA rama pedida, no la unión de
-   * todas. Es lo que hace el servidor —las raíces de cada máquina son ramas
-   * hermanas— y también lo que evita que quien explore el tanque se encuentre
-   * acelerómetros de otra máquina en la lista. Sin ruta, se enumeran todas:
-   * es la raíz.
+   * Enumerar el árbol devuelve los HIJOS DIRECTOS de la rama pedida, con la
+   * forma del servidor real: nodos `{ pointName, shortName }`, carpetas
+   * terminadas en su separador. Plan 36 F1.
+   *
+   * ── POR QUÉ CAMBIÓ DE FORMA (21-09-2026) ──────────────────────────
+   *
+   * Hasta este plan devolvía TODOS los puntos de la máquina como cadenas
+   * sueltas, sin niveles. Bastaba para «¿de qué rama es este punto?», pero
+   * no para nada que RECORRA el árbol: el descubridor (`descubrirDesdeArbol`)
+   * y la pantalla de configuración expanden carpeta a carpeta, leen
+   * `shortName` y distinguen hoja de rama por la forma del nombre. Contra
+   * el fake antiguo los dos veían un árbol vacío —cero variables, sin
+   * error— que es el modo de fallo que este proyecto más detesta.
+   *
+   * El árbol se DERIVA de lo que el registro declara: los puntos en vivo
+   * (`puntos()`), los nombres históricos de sus series (`series.punto`) y las
+   * raíces. Nada se escribe a mano aquí: una máquina nueva en `sistemas.js`
+   * aparece en el árbol por existir.
+   *
+   *   ac:   carpeta `…/S1/`   hoja `…/S1/vRMS_S1`
+   *   hda:  carpeta `…\S1`   tag  `…\S1:vRMS_S1`   (sin contrabarra final)
+   *   ae:   área `ae:/DEMO VIBRACIONES` → hijos con `shortName` `=Contador`
+   *
+   * Pedir una HOJA devuelve `ok` con lista vacía, como el servidor. Pedir
+   * una rama que no existe devuelve `ok: false`, para que quien recorre lo
+   * cuente como fallo y no como «rama vacía» —la distinción que `recorrer`
+   * hace a propósito—.
+   *
+   * Sigue siendo cierto que las máquinas no se mezclan: la raíz `ac:`
+   * enumera las carpetas de primer nivel de todas, pero cada rama sólo
+   * devuelve lo que cuelga de ella.
    */
+  const ARBOL = construirArbolFalso(SISTEMAS)
+
   async function browse(path) {
     const p = path ?? ''
-    const puntos = []
-    for (const sistema of SISTEMAS) {
-      const tocado = !p || sistema.raices.some(r => r.startsWith(p) || p.startsWith(r))
-      if (tocado) puntos.push(...sistema.puntos())
+    if (ARBOL.hijos.has(p)) {
+      return { ok: true, status: 200, payload: ARBOL.hijos.get(p) }
     }
-    return { ok: true, status: 200, payload: puntos }
+    if (ARBOL.hojas.has(p)) return { ok: true, status: 200, payload: [] }
+    return {
+      ok: false,
+      status: 404,
+      error: `No existe la rama «${p}» en el transporte falso: ninguna máquina del registro la declara.`,
+    }
   }
 
   async function search(text) {

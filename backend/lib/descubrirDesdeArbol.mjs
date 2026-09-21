@@ -70,9 +70,29 @@ import {
   crearVariable,
   ESTADO_CONFIGURACION,
 } from '../../shared/eva/comun/configuracionMaquina.js'
+import {
+  BARRA_HDA,
+  canalesDe,
+  clasificarArea,
+  emparejarPorNombre,
+  nombreFinal,
+  normalizarRaizHistorica,
+  proponerRol,
+} from '../../shared/eva/comun/arbolIconics.js'
 
-/** Separador de carpeta del historiador. `hda:` usa contrabarra, `ac:` barra. */
-const BARRA_HDA = String.fromCharCode(92)
+/*
+ * ── LAS REGLAS PURAS SE MOVIERON A `shared/` (Plan 36 F1) ──────────
+ *
+ * `nombreFinal`, `proponerRol`, la clasificación de un área y el
+ * emparejamiento por nombre vivían aquí hasta el 21-09-2026. La pantalla de
+ * configuración las necesita también —tiene delante los mismos nodos— y
+ * reescribirlas en el tablero habría sido dos copias de la misma regla
+ * (`CLAUDE.md` §2.6). Viven en `shared/eva/comun/arbolIconics.js`; aquí se
+ * re-exportan para que quien las importaba de este módulo siga funcionando.
+ *
+ * Lo que se queda aquí es lo que necesita red: el RECORRIDO.
+ */
+export { nombreFinal, proponerRol }
 
 /**
  * ── LOS TRES ESPACIOS DE NOMBRES, QUE NO SON INTERCAMBIABLES ──────
@@ -88,26 +108,6 @@ const BARRA_HDA = String.fromCharCode(92)
  * descubrimiento lo trata aparte: lo que cuelga de un área de AlarmWorX no se
  * lee igual ni significa lo mismo. Ver `descubrirAlarmas`.
  */
-
-/**
- * El nombre final de un punto, sea del árbol que sea.
- *
- * `ac:TDCON/.../S1/vRMS_S1`              → `vRMS_S1`
- * `hda:\Configuration\DEMO_VIB\S1:vRMS_S1` → `vRMS_S1`
- *
- * Es lo único que se compara para PROPONER un emparejamiento. No se normaliza
- * mayúsculas ni se quitan espacios a propósito: dos nombres que sólo se
- * parecen no son el mismo punto, y afinar la coincidencia aquí sería empezar
- * a adivinar. Lo que no case exacto lo resuelve una persona.
- */
-export function nombreFinal(pointName) {
-  if (typeof pointName !== 'string' || !pointName) return null
-  const trasDosPuntos = pointName.includes(':')
-    ? pointName.slice(pointName.lastIndexOf(':') + 1)
-    : pointName
-  const trozos = trasDosPuntos.split(/[/\\]/)
-  return trozos[trozos.length - 1] || null
-}
 
 /**
  * Recorre una rama y devuelve sus puntos hoja, con su ruta.
@@ -230,83 +230,6 @@ async function recorrerEnVivo(raiz, { explorar, profundidadMax }) {
 }
 
 /**
- * Qué rol del tipo cumple un punto, PROPUESTO por su nombre.
- *
- * ── POR QUÉ ESTO IMPORTA MÁS QUE EL RESTO DEL DESCUBRIMIENTO ──────
- *
- * Porque el rol es lo que conecta una variable con las reglas. Sin rol,
- * `vRMS_S1` es un número con nombre; con `medida:vRMS` en el apoyo `S1`, las
- * 18 reglas del tipo saben qué es y pueden evaluarlo.
- *
- * Es la pieza que falta para cerrar el hueco de `dominio: null` —hoy una
- * máquina configurada no diagnostica (Plan 34 F3)— y por eso se propone aquí,
- * cuando el nombre del tag todavía está delante.
- *
- * ── LA AMBIGÜEDAD NO SE RESUELVE, SE DECLARA ─────────────────────
- *
- * `rolesDeClave()` devuelve una LISTA a propósito, y su cabecera dice por
- * qué: `aviso` encaja en dos familias —bandera de apoyo y aviso del
- * variador—, «y elegir una es como se contesta correctamente sobre la señal
- * equivocada».
- *
- * Así que cuando hay más de un candidato **no se propone ninguno** y se
- * devuelven todos para que decida una persona. Quedarse con el primero sería
- * rápido y estaría mal la mitad de las veces, sin dar error.
- *
- * ── SE PREGUNTA POR TAG, NO POR CLAVE ────────────────────────────
- *
- * Es la corrección que hizo útil esta función. La clave de dominio y el tag
- * del servidor sólo coinciden en una de las cinco familias:
- *
- *   medida     vRMS      → `vRMS`         coinciden
- *   calidad    qcVRMS    → `QC_vRMS`      no
- *   bandera    aviso     → `Warning`      no
- *   variador   velocidad → `SPEED_BMS`    no
- *
- * `browse` devuelve el TAG. Preguntando por clave se resolvían **12 de 184**
- * —las doce medidas, justo las que coinciden— y los otros 172 caían en «sin
- * rol». Se pregunta por las dos puertas, empezando por el tag.
- *
- * El sufijo de canal se quita antes: el rol es del TIPO y no sabe de apoyos
- * concretos. `QC_vRMS_S1` → tag `QC_vRMS`, canal `S1`.
- */
-export function proponerRol(corto, tipo, { canales = [] } = {}) {
-  const nada = { rol: null, candidatos: [], canal: null }
-  if (!tipo?.roles || !corto) return nada
-
-  const porTag = typeof tipo.rolesDeTag === 'function' ? tipo.rolesDeTag : null
-  const porClave = typeof tipo.rolesDeClave === 'function' ? tipo.rolesDeClave : null
-  /* Sin índice del tipo no se adivina: el catálogo de roles es suyo. */
-  if (!porTag && !porClave) return nada
-
-  /* ¿Termina en el sufijo de algún canal declarado? Se prueban los más largos
-     primero: `S1` y `S11` convivirían mal con una comparación ingenua. */
-  const sufijos = [...canales].sort((a, b) => b.length - a.length)
-  const canal = sufijos.find((s) => corto.endsWith(`_${s}`)) ?? null
-  const sinCanal = canal ? corto.slice(0, -(canal.length + 1)) : corto
-
-  /*
-   * Cuatro intentos, y los cuatro hacen falta: por tag y por clave, con y sin
-   * el sufijo de canal. Los tags del variador lo llevan DENTRO del nombre
-   * (`SPEED_BMS`, `FREQ OUTPUT_BMS`) y a los de apoyo se lo añade el canal.
-   */
-  const candidatos = [
-    ...new Set([
-      ...(porTag?.(sinCanal) ?? []),
-      ...(porTag?.(corto) ?? []),
-      ...(porClave?.(sinCanal) ?? []),
-      ...(porClave?.(corto) ?? []),
-    ]),
-  ]
-
-  return {
-    rol: candidatos.length === 1 ? candidatos[0] : null,
-    candidatos,
-    canal,
-  }
-}
-
-/**
  * Lo que un área de alarmas publica, clasificado por lo que se puede hacer
  * con ello.
  *
@@ -382,28 +305,9 @@ export async function descubrirAlarmas(area, { explorar }) {
     }
   }
 
-  const contadores = []
-  const alarmas = []
-  const acciones = []
-
-  for (const hijo of respuesta.payload ?? []) {
-    const corto = hijo?.shortName ?? ''
-    const pointName = hijo?.pointName
-    if (!pointName) continue
-
-    if (corto.startsWith('=')) {
-      contadores.push({ pointName, corto, lee: true })
-    } else if (corto.startsWith(BARRA_HDA)) {
-      acciones.push({ pointName, corto })
-    } else if (corto.startsWith('.')) {
-      /*
-       * `lee: false` medido, no supuesto. Si algún día el servidor empieza a
-       * entregarlas, esto se descubre sondeando —igual que `historyVerified`
-       * en F2— y no cambiando esta marca a mano.
-       */
-      alarmas.push({ pointName, corto, lee: false })
-    }
-  }
+  /* La clasificación es regla pura y vive en `shared/` (ver la cabecera de
+     `arbolIconics.js`): la pantalla la aplica a los mismos nodos. */
+  const { contadores, alarmas, acciones } = clasificarArea(respuesta.payload ?? [])
 
   return {
     estado: ESTADO_CONFIGURACION.VALID,
@@ -445,8 +349,15 @@ export async function descubrirVariables(
   }
 
   const vivo = await recorrerEnVivo(raizEnVivo, { explorar, profundidadMax })
+  /*
+   * Sin contrabarra final: el servidor contesta 500 a
+   * `hda:\Configuration\DEMO_VIBRACIONES\` y bien a la misma ruta sin ella
+   * (medido el 21-09-2026). El catálogo escrito a mano la lleva, y quien
+   * copie de ahí la pegaría igual: se quita aquí y no se le pide a nadie que
+   * lo sepa.
+   */
   const historico = raizHistorico
-    ? await recorrer(raizHistorico, { explorar, profundidadMax })
+    ? await recorrer(normalizarRaizHistorica(raizHistorico), { explorar, profundidadMax })
     : { puntos: [], fallos: [] }
 
   const fallos = [...vivo.fallos, ...historico.fallos]
@@ -471,30 +382,24 @@ export async function descubrirVariables(
   }
 
   /*
-   * El índice del historiador va por nombre final. Si dos tags distintos
-   * terminan igual —dos apoyos con la misma medida en carpetas distintas— la
-   * coincidencia deja de ser única y NO se propone: proponer una de las dos
-   * sería elegir al azar por la máquina.
+   * El emparejamiento por nombre final es regla pura y vive en `shared/`
+   * (`emparejarPorNombre`): si dos tags distintos terminan igual la
+   * coincidencia no es única y NO se propone —proponer una sería elegir al
+   * azar por la máquina—. La pantalla aplica exactamente la misma regla.
    */
-  const porNombre = new Map()
-  const ambiguos = new Set()
-  for (const p of historico.puntos) {
-    const clave = nombreFinal(p.pointName)
-    if (!clave) continue
-    if (porNombre.has(clave)) ambiguos.add(clave)
-    porNombre.set(clave, p.pointName)
-  }
+  const emparejamiento = emparejarPorNombre(
+    vivo.puntos.map((p) => p.pointName),
+    historico.puntos.map((p) => p.pointName),
+  )
 
   /* Los sufijos de canal que este tipo conoce, para partir el nombre del tag.
      Salen del tipo y no de una expresión regular: qué es un apoyo lo dice él. */
-  const canales = (tipo?.canales ?? []).map((c) => c.sufijo ?? c.id).filter(Boolean)
+  const canales = canalesDe(tipo)
 
-  const emparejados = new Set()
   const variables = vivo.puntos.map((p) => {
     const clave = nombreFinal(p.pointName)
-    const ambiguo = ambiguos.has(clave)
-    const historyPointName = !ambiguo ? (porNombre.get(clave) ?? null) : null
-    if (historyPointName) emparejados.add(historyPointName)
+    const historyPointName = emparejamiento.pares.get(p.pointName) ?? null
+    const ambiguo = emparejamiento.procedencia.get(p.pointName) === 'ambiguo-en-historiador'
 
     const { rol, candidatos, canal } = proponerRol(clave, tipo, { canales })
 
@@ -539,9 +444,7 @@ export async function descubrirVariables(
 
   /* Lo que el historiador publica y nadie reclamó. No se descarta en silencio:
      puede ser una señal que la máquina debería declarar y no declara. */
-  const sinEmparejar = historico.puntos
-    .filter((p) => !emparejados.has(p.pointName))
-    .map((p) => p.pointName)
+  const sinEmparejar = emparejamiento.sinEmparejar
 
   const conHistoria = variables.filter((v) => v.historyPointName).length
   const conRol = variables.filter((v) => v.rol).length

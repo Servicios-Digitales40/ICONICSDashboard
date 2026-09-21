@@ -210,11 +210,68 @@ await checkAsync('el árbol del tanque y el de vibraciones no se mezclan al enum
   const cliente = sinCaos()
 
   const tanque = await cliente.browse(RAIZ)
-  assert.equal(tanque.payload.some(p => p.startsWith(RAIZ_VIB)), false, 'el tanque trajo acelerómetros')
+  assert.equal(tanque.payload.some(p => p.pointName.startsWith(RAIZ_VIB)), false, 'el tanque trajo acelerómetros')
 
   const vib = await cliente.browse(RAIZ_VIB)
-  assert.equal(vib.payload.some(p => p.startsWith(RAIZ)), false, 'las vibraciones trajeron el tanque')
+  assert.equal(vib.payload.some(p => p.pointName.startsWith(RAIZ)), false, 'las vibraciones trajeron el tanque')
   assert.equal(vib.payload.length > 0, true, 'la rama de vibraciones salió vacía')
+})
+
+/*
+ * ── EL ÁRBOL TIENE NIVELES, COMO EL DEL SERVIDOR (Plan 36 F1) ─────────
+ *
+ * Hasta el Plan 36 `browse` devolvía todos los puntos como cadenas sueltas.
+ * El descubridor y la pantalla de configuración expanden carpeta a carpeta y
+ * leen `shortName`, y contra aquel fake veían un árbol VACÍO sin error. Lo
+ * que se defiende aquí es la forma que los dos consumen.
+ */
+await checkAsync('browse devuelve los HIJOS DIRECTOS como nodos, no todos los puntos como cadenas', async () => {
+  const cliente = sinCaos()
+  const raiz = await cliente.browse(RAIZ_VIB)
+
+  for (const nodo of raiz.payload) {
+    assert.equal(typeof nodo.pointName, 'string', 'cada hijo es un nodo con pointName')
+    assert.equal(typeof nodo.shortName, 'string', 'cada hijo trae shortName')
+    assert.ok(nodo.pointName.endsWith('/'), `bajo la raíz cuelgan carpetas, no hojas: ${nodo.pointName}`)
+  }
+  const nombres = raiz.payload.map(n => n.shortName)
+  assert.ok(nombres.includes('S1') && nombres.includes('V20'), `las carpetas son los apoyos y el variador: ${nombres}`)
+
+  const s1 = await cliente.browse(`${RAIZ_VIB}S1/`)
+  assert.ok(s1.payload.length > 0, 'S1 tiene hojas')
+  assert.ok(s1.payload.every(n => !n.pointName.endsWith('/')), 'bajo S1 sólo hay hojas')
+  assert.ok(s1.payload.some(n => n.shortName === 'vRMS_S1'), 'vRMS_S1 cuelga de S1')
+})
+
+await checkAsync('explorar una HOJA contesta ok y vacío; una rama inexistente contesta ok=false', async () => {
+  const cliente = sinCaos()
+  const hoja = await cliente.browse(`${RAIZ_VIB}S1/vRMS_S1`)
+  assert.equal(hoja.ok, true)
+  assert.deepEqual(hoja.payload, [])
+
+  const nada = await cliente.browse('ac:NO/EXISTE/')
+  assert.equal(nada.ok, false, 'una rama que nadie declara no puede parecer una rama vacía')
+  assert.match(nada.error, /No existe la rama/)
+})
+
+await checkAsync('el historiador y el área de alarmas también se recorren, con la forma de cada espacio', async () => {
+  const cliente = sinCaos()
+  const B = String.fromCharCode(92)
+  /* Sin contrabarra final: el servidor real contesta 500 con ella (21-09-2026). */
+  const grupo = await cliente.browse(`hda:${B}Configuration${B}DEMO_VIBRACIONES`)
+  assert.equal(grupo.ok, true)
+  assert.ok(grupo.payload.every(n => !n.pointName.includes(':', 4)), 'bajo el grupo cuelgan carpetas por apoyo, no tags')
+  assert.ok(grupo.payload.every(n => !n.pointName.endsWith(B)), 'las carpetas del historiador no llevan contrabarra final')
+  const conBarra = await cliente.browse(`hda:${B}Configuration${B}DEMO_VIBRACIONES${B}`)
+  assert.equal(conBarra.ok, false, 'con contrabarra final el servidor real dice 500, y el fake no lo disimula')
+
+  const s1 = await cliente.browse(`hda:${B}Configuration${B}DEMO_VIBRACIONES${B}S1`)
+  assert.ok(s1.payload.some(n => n.pointName.endsWith(':vRMS_S1')), 'el tag lleva dos puntos tras la carpeta')
+
+  const area = await cliente.browse('ae:/DEMO VIBRACIONES')
+  assert.equal(area.ok, true)
+  assert.ok(area.payload.length >= 4, 'los contadores del área')
+  assert.ok(area.payload.every(n => n.shortName.startsWith('=')), 'los contadores llevan el igual delante')
 })
 
 await checkAsync('pedir la HISTORIA de un punto de vibración falla, como falla el grupo DEMO 3', async () => {
