@@ -42,5 +42,10 @@
     "administrador": "Administrator",
     "operador": "Operator",
     "visualizador": "Viewer"
+  },
+  "sesion": {
+    "salirTip": "Sign out",
+    "salirAria": "Sign out of {{usuario}}'s session",
+    "sinRol": "no role"
   }
 }

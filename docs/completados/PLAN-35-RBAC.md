@@ -1,6 +1,6 @@
 # PLAN 35 — RBAC: tres roles, con jerarquía, encendidos
 
-**Estado:** F1–F4 completadas · plan terminado
+**Estado:** F1–F5 completadas · plan terminado
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -518,6 +518,76 @@ Las dos puertas y las dos suites siguen verdes **con `AUTH_HABILITADA=true` en
 `.env.local`**, que era el riesgo real de esta fase: las pruebas montan su
 propia configuración y no leen ese archivo, pero convenía comprobarlo en vez
 de suponerlo.
+
+---
+
+### F5 — Quién está dentro, y cómo salir ✅
+
+**Completada el 21-09-2026.** No estaba en el plan: salió de usar el tablero
+con los tres roles y descubrir que **no se podía cambiar de usuario sin
+vaciar `localStorage` desde la consola**.
+
+**Por qué entró antes que el Plan 34 F4.** Porque F4 construye el panel de
+administración, y probarlo exige alternar entre administrador y operador
+constantemente. Sin poder salir, cada vuelta de prueba pasaba por las
+herramientas de desarrollador — y en una demo, por abrirlas delante del
+cliente.
+
+Hay un segundo motivo: con tres roles, **una acción que falla con 403 no se
+explica sola**. Quien la intenta no sabe si le falta permiso o si algo está
+roto. Ver «Moisés · Operador» en la barra contesta esa pregunta antes de que
+se haga.
+
+**Qué es.** Una pastilla en el Topbar con el usuario, su rol y un botón de
+salir. No se pinta con la autenticación apagada ni antes de entrar: un
+«Salir» que no lleva a ninguna parte diría algo falso sobre cómo está
+configurado el tablero.
+
+> **Salir es local, y está escrito en el código.** `borrarSesion()` tira el
+> token de este navegador; **no lo revoca en el servidor**. Un JWT vale hasta
+> que caduca. Para una sesión de planta con caducidad corta es el compromiso
+> razonable, pero conviene no suponer que «salir» desconecta a quien ya copió
+> su token.
+
+#### Dos defectos que destapó usar el tablero de verdad
+
+Ninguno lo habría encontrado la suite: los dos sólo aparecen con la
+autenticación encendida y alguien navegando.
+
+**1 · `/api/auth/yo` pedía sesión para decir si hacía falta sesión.** El
+tablero cargaba entero sin pedir credenciales. Ver el commit propio; la
+prueba de esa ruta cubría los dos extremos —con sesión, sin autenticación— y
+nunca el medio, que es el único estado en que un tablero real arranca.
+
+**2 · El cliente de máquinas no mandaba el token en sus lecturas.** Y el
+síntoma no se parecía a la causa: un administrador pulsaba «Configuración» y
+**volvía al login**. La vista llamaba a `listarMaquinas`, el backend
+contestaba 401 por falta de cabecera, y `errorDelPuente` traduce **todo 401**
+a «tu sesión no vale». El proveedor hacía lo correcto con esa información; la
+información era falsa. Volvía a pasar tras reautenticarse, porque el token
+nuevo tampoco viajaba.
+
+> **La lección, para la siguiente ruta que cambie de rol:** cuando una ruta
+> deja de ser pública, **su cliente deja de poder llamarla sin cabecera**. F2
+> puso rol a `/api/maquinas` y su cliente se quedó atrás. Auditados los demás:
+> `apiClient.js` —que sirve todas las lecturas de planta— sí la manda, y los
+> otros clientes están completos.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `sesion-actual.test.jsx` | **4** pruebas nuevas |
+| Frontend | **1032** · 29 omitidas |
+| Backend | 371 |
+| `npm run verificar` | los **40** |
+| i18n | **1327** claves × 2 idiomas, con paridad |
+
+Roto a propósito (`CLAUDE.md` §6.2): quitando la guarda de «no hay sesión»,
+fallan 2 comprobaciones. Y la suite cazó de paso que el componente reventaba
+al montarse sin proveedor —tres pruebas del Topbar—, lo mismo que ya le había
+pasado al Sidebar en F3: se arregla leyendo el contexto en vez de usar
+`useSesion()`.
 
 ---
 

@@ -52,21 +52,51 @@ export function problemasDeError(error) {
   return Array.isArray(lista) ? lista : [];
 }
 
+/*
+ * ── LAS LECTURAS TAMBIÉN MANDAN EL TOKEN (Plan 35, 21-09-2026) ──────
+ *
+ * Y no lo hacían. Eran rutas públicas hasta que el Plan 35 F2 puso rol mínimo
+ * a todo `/api/maquinas` —el panel de administración es del administrador—,
+ * pero **este cliente se quedó atrás**: seguía pidiéndolas sin cabecera.
+ *
+ * El síntoma no se parecía a la causa. Un administrador entraba, pulsaba
+ * «Configuración» y **volvía al login**: la vista llamaba a `listarMaquinas`,
+ * el backend contestaba 401 por falta de token, y `errorDelPuente` traduce
+ * todo 401 a «tu sesión no vale» y despacha `EVENTO_SESION_INVALIDA`. El
+ * proveedor hacía lo correcto con esa información; la información era falsa.
+ *
+ * Y volvía a pasar tras reautenticarse, porque el token nuevo tampoco
+ * viajaba. Desde fuera parecía que el login no guardaba nada.
+ *
+ * La lección, que vale para la siguiente ruta que cambie de rol: **cuando una
+ * ruta deja de ser pública, su cliente deja de poder llamarla sin cabecera**,
+ * y el fallo no aparece hasta que alguien enciende la autenticación.
+ */
+
 /** Los tipos de máquina que este programa sabe interpretar. */
 export async function listarTipos({ signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/maquinas/tipos`, { signal });
+  const response = await fetch(`${API_BASE}/api/maquinas/tipos`, {
+    headers: { ...authHeaders() },
+    signal,
+  });
   return parseResponse(response);
 }
 
 /** Las máquinas configuradas, con sus capacidades ya derivadas. */
 export async function listarMaquinas({ signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/maquinas`, { signal });
+  const response = await fetch(`${API_BASE}/api/maquinas`, {
+    headers: { ...authHeaders() },
+    signal,
+  });
   return parseResponse(response);
 }
 
 /** Una máquina por su id. */
 export async function obtenerMaquina(id, { signal } = {}) {
-  const response = await fetch(`${API_BASE}/api/maquinas/${encodeURIComponent(id)}`, { signal });
+  const response = await fetch(`${API_BASE}/api/maquinas/${encodeURIComponent(id)}`, {
+    headers: { ...authHeaders() },
+    signal,
+  });
   return parseResponse(response);
 }
 

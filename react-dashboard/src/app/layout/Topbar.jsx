@@ -14,6 +14,7 @@ import { useMediaQuery } from "@/lib/viewport.js";
 import { SECCION_DE_PAGINA } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { ContextoDeMaquina } from "./ContextoDeMaquina.jsx";
+import { SesionActual } from "./SesionActual.jsx";
 import { LanguageSelector } from "@/i18n/LanguageSelector.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
@@ -227,6 +228,11 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
           <Shuffle size={13} className={regenerating ? "shuffle-icon-spin" : ""} />
           regenerar
         </button> */}
+
+        {/* Quién está dentro y cómo salir (Plan 35 F5). Va primero del grupo
+            derecho: es lo que se busca cuando una acción falla por permisos,
+            y no hay que recorrer los indicadores para encontrarlo. */}
+        <SesionActual />
 
         <VersionBuild t={t} />
 
