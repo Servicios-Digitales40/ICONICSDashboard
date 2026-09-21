@@ -46,7 +46,9 @@ export function registerCasosRoutes(fastify) {
    * propuesto, y decidir aquí qué es «lo importante» obligaría a tocar el
    * backend cada vez que la vista quiera enseñar un campo más.
    */
-  fastify.get('/api/casos', async () => {
+  fastify.get(
+    '/api/casos',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] }, async () => {
     const casos = await listarCasos()
     return { ok: true, total: casos.length, casos }
   })

@@ -107,7 +107,10 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
 
   fastify.get(
     '/api/iconics/data',
-    { schema: { querystring: PointNameQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: PointNameQuerySchema },
+    },
     async (request, reply) => {
       const pointName = request.query.pointName ?? defaultPointName
       const result = await client.readPoint(pointName)
@@ -121,7 +124,10 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
    * valida elemento a elemento — `parsePointList` descarta los huecos que deja
    * una coma de más.
    */
-  fastify.get('/api/iconics/data/batch', async (request, reply) => {
+  fastify.get(
+    '/api/iconics/data/batch',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] },
+    async (request, reply) => {
     const points = parsePointList(request.query.points ?? '')
 
     if (points.length === 0) {
@@ -144,7 +150,10 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
 
   fastify.get(
     '/api/iconics/history',
-    { schema: { querystring: HistoryQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: HistoryQuerySchema },
+    },
     async (request, reply) => {
       const { pointName, startDate, endDate, aggregate, interval } = request.query
       return responder(
@@ -183,7 +192,10 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
    */
   fastify.post(
     '/api/iconics/history/batch',
-    { schema: { body: HistoryBatchSchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { body: HistoryBatchSchema },
+    },
     async request => {
       const { points: puntos, startDate: inicio, endDate: fin, aggregate } = request.body
 
@@ -288,18 +300,26 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
 
   fastify.get(
     '/api/iconics/browse',
-    { schema: { querystring: BrowseQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: BrowseQuerySchema },
+    },
     async (request, reply) => responder(reply, await client.browse(request.query.path))
   )
 
   fastify.get(
     '/api/iconics/points',
-    { schema: { querystring: SearchQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: SearchQuerySchema },
+    },
     async (request, reply) => responder(reply, await client.search(request.query.query))
   )
 
-  fastify.get('/api/iconics/userinfo', async (request, reply) =>
-    responder(reply, await client.readUserInfo())
+  fastify.get(
+    '/api/iconics/userinfo',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] },
+    async (request, reply) => responder(reply, await client.readUserInfo())
   )
 
   /* ── Escritura ────────────────────────────────────────────────────── */
@@ -335,7 +355,10 @@ export function registerIconicsRoutes(fastify, { config, client, diario = null }
 
   fastify.get(
     '/api/iconics/alarms',
-    { schema: { querystring: AlarmsQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: AlarmsQuerySchema },
+    },
     async (request, reply) => {
       const { pointName } = request.query
       const hours = Math.min(request.query.hours, maxAlarmHours)

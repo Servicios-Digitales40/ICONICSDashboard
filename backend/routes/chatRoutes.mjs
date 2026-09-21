@@ -82,7 +82,9 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
   }
 
 
-  fastify.get('/api/chat', async () => ({
+  fastify.get(
+    '/api/chat',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] }, async () => ({
     ok: true,
     habilitado: config.ia.isConfigured,
     modelo: config.ia.isConfigured ? chat.modeloActivo() : null,
@@ -404,7 +406,12 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
    */
   fastify.post(
     '/api/chat/exportar',
-    { schema: { body: ExportarChatSchema } },
+    {
+      /* `operador`: exportar una conversación deja un archivo en el servidor,
+         y quien sólo mira no genera artefactos (Plan 35 F2). */
+      onRequest: [fastify.autenticar, fastify.exigirRol('operador')],
+      schema: { body: ExportarChatSchema },
+    },
     async (request, reply) => {
       const { historial: turnos, idioma } = request.body
 

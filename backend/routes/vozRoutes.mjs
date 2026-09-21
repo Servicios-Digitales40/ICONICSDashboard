@@ -45,7 +45,9 @@
 import { CODIGOS, responderError } from '../http/codigos.mjs'
 
 export function registerVozRoutes(fastify, { config, voz }) {
-  fastify.get('/api/voz', async () => ({
+  fastify.get(
+    '/api/voz',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] }, async () => ({
     ok: true,
     habilitado: config.ia.whisper.isConfigured,
     idioma: config.ia.whisper.isConfigured ? config.ia.whisper.idioma : null,

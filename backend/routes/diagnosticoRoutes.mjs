@@ -19,8 +19,17 @@
  * que las rutas de sólo lectura no la llevaban — y ese criterio, aplicado ruta
  * por ruta, dejó veinte sin guarda de las que nadie llevaba la cuenta.
  *
- * Lo que sigue sin llevar esta ruta es `exigirRol`: leer un diagnóstico ya
- * calculado no acciona nada.
+ * ── Y DESDE EL PLAN 35 F2 TAMBIÉN LLEVAN `exigirRol` ───────────────
+ *
+ * Con `visualizador`, que es el rol mínimo. Aquí decía que estas rutas no lo
+ * llevaban porque «leer un diagnóstico ya calculado no acciona nada», y eso
+ * seguía siendo cierto — lo que cambió es que ahora hay un rol POR DEBAJO de
+ * operador, y una ruta sin rol declarado no distingue a quien sólo mira de
+ * quien puede actuar.
+ *
+ * Declararlo no restringe a nadie que antes pasara: un operador alcanza
+ * `visualizador` por jerarquía. Lo que hace es que la ruta diga a qué nivel
+ * pertenece, en vez de quedarse en «basta con tener sesión».
  */
 import { z } from 'zod'
 import { SISTEMA_IDS } from '../../shared/eva/comun/sistemas.js'
@@ -80,16 +89,16 @@ const DiagnosticoQuerySchema = z.object({
  * contador paralelo puede desincronizarse del diario y se va con el proceso —
  * justo cuando más interesa mirarlo, que es después de un incidente.
  *
- * ── POR QUÉ NO LLEVA `exigirRol` ────────────────────────────────────
+ * ── POR QUÉ SU ROL MÍNIMO ES `visualizador` Y NO `operador` ────────
  *
  * A diferencia de `GET /api/diario`, esto NO es un registro de personas: son
  * agregados del proceso —cuántos diagnósticos salieron insuficientes, qué
  * fuente se cayó más, cuánto tardó el p95—. No hay ninguna IP ni ningún
- * usuario en la respuesta. Mismo criterio que el resto de lecturas de este
- * backend, que no lo llevan.
+ * usuario en la respuesta, así que no hay nada que proteger de quien sólo
+ * mira.
  *
- * La guarda de autenticación sí, y la pone el ámbito (`app.mjs`), como a las
- * demás rutas de API.
+ * La guarda de autenticación la pone el ámbito (`app.mjs`), como a las demás
+ * rutas de API; el rol se declara aquí, que es donde hay criterio.
  */
 const MetricasQuerySchema = z.object({
   /*
@@ -139,7 +148,10 @@ const NarradoQuerySchema = z.object({
 export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDiagnosticos, narrador }) {
   fastify.get(
     '/api/diagnostico/metricas',
-    { schema: { querystring: MetricasQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: MetricasQuerySchema },
+    },
     async (request, reply) => {
       if (!diarioDiagnosticos) {
         return reply.code(503).send({
@@ -180,7 +192,10 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDia
 
   fastify.get(
     '/api/diagnostico/narrado',
-    { schema: { querystring: NarradoQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: NarradoQuerySchema },
+    },
     async (request, reply) => {
       if (!motorDiagnostico) {
         return reply.code(503).send({
@@ -254,7 +269,10 @@ export function registerDiagnosticoRoutes(fastify, { motorDiagnostico, diarioDia
 
   fastify.get(
     '/api/diagnostico',
-    { schema: { querystring: DiagnosticoQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: DiagnosticoQuerySchema },
+    },
     async (request, reply) => {
       if (!motorDiagnostico) {
         return reply.code(503).send({

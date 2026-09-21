@@ -485,7 +485,10 @@ export function registerSystemRoutes(
 
   fastify.get(
     '/api/context',
-    { schema: { querystring: PointNameQuerySchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
+      schema: { querystring: PointNameQuerySchema },
+    },
     async request => {
       const pointName = request.query.pointName ?? config.iconics.defaultPointName
 

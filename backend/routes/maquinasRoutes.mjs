@@ -127,19 +127,27 @@ export function registerMaquinasRoutes(
    * pantalla de configuración —«¿de qué tipo es esta máquina?»— y porque un
    * tipo no existe sin máquinas que lo usen.
    */
-  fastify.get('/api/maquinas/tipos', async () => ({
-    ok: true,
-    tipos: resumenDeTipos(),
-  }))
+  fastify.get(
+    '/api/maquinas/tipos',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('administrador')] },
+    async () => ({ ok: true, tipos: resumenDeTipos() })
+  )
 
-  fastify.get('/api/maquinas', async () => {
-    const maquinas = await gestorMaquinas.listar()
-    return { ok: true, cuantas: maquinas.length, maquinas: maquinas.map(conCapacidades) }
-  })
+  fastify.get(
+    '/api/maquinas',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('administrador')] },
+    async () => {
+      const maquinas = await gestorMaquinas.listar()
+      return { ok: true, cuantas: maquinas.length, maquinas: maquinas.map(conCapacidades) }
+    }
+  )
 
   fastify.get(
     '/api/maquinas/:id',
-    { schema: { params: MaquinaParamsSchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('administrador')],
+      schema: { params: MaquinaParamsSchema },
+    },
     async (request, reply) => {
       const maquina = await gestorMaquinas.obtener(request.params.id)
       if (!maquina) {
@@ -171,12 +179,21 @@ export function registerMaquinasRoutes(
    * pondría a la pantalla de configuración a competir con el sondeo del
    * tablero por el mismo presupuesto.
    *
-   * Sin rol: es una LECTURA de la planta, como `/api/iconics/data`. Lo que
-   * escribe es nuestro propio archivo de configuración, no la instalación.
+   * ── SU ROL MÍNIMO ES `administrador` (Plan 35 F2) ─────────────────
+   *
+   * Aquí decía «sin rol: es una LECTURA de la planta, como
+   * `/api/iconics/data`». Eso describe lo que la ruta HACE, y el criterio de
+   * esta fase es otro: **dónde vive** la acción. Comprobar una configuración
+   * es trabajo del panel de administración, igual que darla de alta o
+   * sondearla, y quien no puede configurar una máquina tampoco tiene por qué
+   * poder lanzar una lectura de sus 73 puntos.
    */
   fastify.post(
     '/api/maquinas/:id/verificar',
-    { schema: { params: MaquinaParamsSchema } },
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('administrador')],
+      schema: { params: MaquinaParamsSchema },
+    },
     async (request, reply) => {
       const maquina = await gestorMaquinas.obtener(request.params.id)
       if (!maquina) {

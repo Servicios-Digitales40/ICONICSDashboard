@@ -82,7 +82,9 @@ function negarSiNoSePuedeEscribir(config, gestorManuales, reply) {
 }
 
 export function registerRagRoutes(fastify, { config, indiceDocumentos, gestorManuales }) {
-  fastify.get('/api/rag/documentos', async () => {
+  fastify.get(
+    '/api/rag/documentos',
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] }, async () => {
     const manuales = gestorManuales ? await gestorManuales.listar() : []
 
     /*

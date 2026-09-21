@@ -132,3 +132,107 @@ describe('la guarda de autenticación cubre toda la API', () => {
     await app.close()
   })
 })
+
+/**
+ * ── Y NINGUNA SE QUEDA SIN ROL MÍNIMO (Plan 35 F2) ───────────────────
+ *
+ * Hermana de la de arriba, y por el mismo motivo. `autenticar` contesta «¿hay
+ * alguien?»; `exigirRol` contesta «¿este alguien alcanza?». Una ruta sin rol
+ * declarado deja pasar a cualquiera con sesión —incluido un visualizador— y
+ * **eso no se ve**: la ruta funciona, sus pruebas pasan, y el hueco aparece el
+ * día que alguien que sólo debía mirar acciona algo.
+ *
+ * Antes de esta fase lo declaraban 18 de 37 URLs. El resto sólo exigía estar
+ * autenticado, que con tres roles ya no distingue nada.
+ */
+describe('la guarda de rol cubre toda la API', () => {
+  /**
+   * Las que quedan fuera a propósito, con su motivo.
+   *
+   *  · `/api/health*` y `POST /api/auth/login` — ni siquiera pasan por
+   *    `autenticar`: no hay rol que exigir a quien todavía no tiene sesión.
+   *  · `/api/auth/renovar` y `/api/auth/yo` — parten de una sesión que ya
+   *    existe y su trabajo es justamente decir cuál es. Exigirles un rol
+   *    mínimo impediría a un visualizador saber que es visualizador.
+   *  · `GET /api/reportes` — el enlace va firmado (`REPORTES_SECRETO`) y se
+   *    abre desde el propio adjunto del chat. Su control de acceso es la
+   *    firma, no el rol; exigir los dos rompería la descarga sin añadir nada
+   *    que la firma no diga ya.
+   */
+  const SIN_ROL = [
+    /^\/api\/health/,
+    /^\/api\/auth\//,
+    /^\/api\/reportes$/,
+  ]
+
+  /**
+   * ── CÓMO SE OBSERVA, Y POR QUÉ ASÍ ──────────────────────────────────
+   *
+   * No espiando `exigirRol` —se llama al REGISTRAR la ruta, así que para
+   * cuando la prueba puede envolverlo los hooks ya están puestos— sino
+   * midiendo el efecto: **se enciende la autenticación, se entra como el rol
+   * más bajo y se mira qué deja pasar**.
+   *
+   * Es lo que de verdad importa. Una ruta que devuelve 200 a un visualizador
+   * está declarando que un visualizador puede usarla, lo haya escrito alguien
+   * a propósito o se le haya olvidado. Y así la prueba no depende de CÓMO se
+   * declara el rol, sólo de que el resultado sea el correcto.
+   */
+  it('ninguna ruta deja pasar a un visualizador si no lo declara', async () => {
+    const { app } = await montarApp({
+      AUTH_HABILITADA: 'true',
+      AUTH_SECRETO: 'clave-de-pruebas-suficientemente-larga-32',
+      /* Un censo de uno: sólo hace falta el rol más bajo. El hash da igual
+         porque el token se firma aquí, sin pasar por el login. */
+      AUTH_USUARIOS: 'miron:visualizador:scrypt$00$00',
+    })
+
+    const token = app.jwt.sign({ sub: 'miron', roles: ['visualizador'] })
+    const inventario = app.inventarioApi()
+    expect(inventario.length).toBeGreaterThan(20)
+
+    /* Las que un visualizador SÍ puede usar, por decisión de esta fase: leer
+       valores, historia, alarmas, diagnósticos y el catálogo de casos. Es la
+       lista de lo permitido, no de lo olvidado, y por eso se escribe entera. */
+    const VISUALIZADOR_PUEDE = [
+      /^\/api\/iconics\//,
+      /^\/api\/diagnostico/,
+      /^\/api\/context$/,
+      /^\/api\/casos$/,
+      /^\/api\/chat$/,
+      /^\/api\/voz$/,
+      /^\/api\/rag\/documentos$/,
+    ]
+
+    const dejanPasar = []
+    for (const { url, metodos } of inventario) {
+      if (SIN_ROL.some(patron => patron.test(url))) continue
+      if (VISUALIZADOR_PUEDE.some(patron => patron.test(url))) continue
+
+      for (const metodo of metodos) {
+        const respuesta = await app.inject({
+          method: metodo,
+          url,
+          headers: { authorization: `Bearer ${token}` },
+          ...(metodo === 'GET' || metodo === 'DELETE' ? {} : { payload: CUERPO }),
+        })
+
+        /* 403 es lo que se espera. Cualquier otra cosa —incluido un 400 por
+           cuerpo inválido— significa que la petición LLEGÓ a la ruta, o sea
+           que la guarda de rol no la paró. */
+        if (respuesta.statusCode !== 403) {
+          dejanPasar.push(`${metodo} ${url} → ${respuesta.statusCode}`)
+        }
+      }
+    }
+
+    expect(
+      dejanPasar,
+      `Estas rutas dejan pasar a un visualizador:\n  ${dejanPasar.join('\n  ')}\n\n` +
+        'Si un visualizador debe poder usarlas, añádelas a VISUALIZADOR_PUEDE; ' +
+        'si no, declara su rol mínimo con `fastify.exigirRol(...)`.'
+    ).toEqual([])
+
+    await app.close()
+  })
+})

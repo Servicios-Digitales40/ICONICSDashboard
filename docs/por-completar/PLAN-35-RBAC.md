@@ -1,6 +1,6 @@
 # PLAN 35 — RBAC: tres roles, con jerarquía, encendidos
 
-**Estado:** F1 completada · F2–F4 por completar
+**Estado:** F1 y F2 completadas · F3–F4 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -251,6 +251,82 @@ prueba falla si aparece una nueva sin él.
 de treinta rutas. Un rol de más deja pasar; uno de menos rompe al operador.
 Por eso la matriz se comprueba con los tres tokens, no se razona sobre el
 papel.
+
+#### Lo que de verdad pasó · ✅ completada el 21-09-2026
+
+**El criterio, afinado por el usuario:** «el operador tendrá acceso a la
+mayoría de cosas menos al futuro panel de administración, donde vivirá la
+configuración y el alta de las máquinas». Eso mueve una familia entera
+respecto a lo que decía la tabla de arriba: **todo `/api/maquinas` pasa a
+`administrador`**, incluidas sus lecturas.
+
+Quedó así, sobre las 37 URLs del inventario:
+
+| Rol mínimo | Rutas |
+|---|---|
+| `visualizador` | `/api/iconics/*` (lecturas), `/api/diagnostico*`, `/api/context`, y los `GET` de casos, chat, voz y documentos |
+| `operador` | escribir en cuaderno, casos, RAG, dictado, reportes, `chat/exportar`, control de planta y las escrituras de ICONICS |
+| `administrador` | **todo `/api/maquinas`**: listar, tipos, detalle, alta, edición, baja, descubrir, sondear y verificar |
+| *(sin rol)* | `/api/health*`, `/api/auth/*` y `GET /api/reportes` — ver abajo |
+
+**Tres exenciones, cada una con su motivo:**
+
+- `/api/health*` y `POST /api/auth/login` ni siquiera pasan por `autenticar`:
+  no hay rol que exigir a quien todavía no tiene sesión.
+- `/api/auth/renovar` y `/api/auth/yo` parten de una sesión que ya existe y su
+  trabajo es decir cuál es. Exigirles rol impediría a un visualizador saber
+  que es visualizador.
+- `GET /api/reportes` se abre desde el adjunto del chat con un **enlace
+  firmado** (`REPORTES_SECRETO`). Su control de acceso es la firma; exigir
+  además un rol rompería la descarga sin añadir nada.
+
+#### La prueba que impide volver a olvidarlo
+
+Hermana de la de `autenticar`, y **mide el efecto en vez de espiar el
+mecanismo**: enciende la autenticación, entra con el rol más bajo y comprueba
+que toda ruta fuera de la lista de permitidas devuelve `403`.
+
+Se hizo así porque `exigirRol` se llama **al registrar** la ruta, no al
+servirla: envolverlo desde la prueba llegaría tarde. Y sale mejor de lo
+previsto — la prueba no depende de CÓMO se declare el rol, sólo de que un
+visualizador no pase. Una ruta nueva sin rol aparece en el fallo con su código
+de estado.
+
+**Cazó una que se me había pasado**: `POST /api/chat/exportar`, que deja un
+archivo en el servidor y ahora pide `operador`.
+
+#### La matriz, medida con los tres usuarios
+
+```
+                          MyUser   Moises   Gustavo
+                          (admin)  (oper)   (visor)
+GET  iconics/data           200      200      200
+GET  diagnostico            400      400      400
+GET  casos                  200      200      200
+POST cuaderno               400      400      403
+POST control/bomba          400      400      403
+POST chat/exportar          400      400      403
+GET  maquinas               200      403      403
+POST descubrir              400      403      403
+POST verificar              404      403      403
+```
+
+`GET /api/maquinas` con **403 para el operador** es lo que pediste: el panel
+de administración es suyo y sólo suyo.
+
+> **Nota sobre `GET /api/cuaderno`:** sigue pidiendo `operador` desde el Plan
+> 20, así que un visualizador no lo ve. Encaja con «sólo visualización» y se
+> deja como estaba.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `guardas.test.mjs` | **4** pruebas (3 + la del rol) |
+| Backend | **369** (368 + 1) |
+| `npm run verificar` | los **40** |
+| Frontend | 1017 · 29 omitidas |
+| Lint y types | limpios |
 
 ---
 
