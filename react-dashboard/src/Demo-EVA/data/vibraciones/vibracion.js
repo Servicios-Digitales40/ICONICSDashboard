@@ -151,7 +151,25 @@ export function useDominioVibracion() {
     return fuente.subscribeVibracion(setEstado);
   }, [fuente]);
 
-  /* La configurada trae su meta en la instantánea; la escrita a mano no la
-     necesita traer porque es constante. */
-  return configurada ? estado : { ...estado, ...META_ESCRITA_A_MANO };
+  /*
+   * La meta de la máquina va SIEMPRE, también en el primer render.
+   *
+   * La configurada la trae en cada instantánea, pero el estado inicial es
+   * `VACIO` y no la tiene: la primera pintada de Inicio hacía
+   * `maquina.configurada` sobre `undefined` y tumbaba la vista entera con
+   * «No se pudo mostrar esta sección». Lo destapó el usuario al abrir la
+   * sección el 21-09-2026: ninguna prueba renderizaba el hook real con una
+   * configurada antes de la primera lectura.
+   */
+  if (!configurada) return { ...estado, ...META_ESCRITA_A_MANO };
+  return {
+    ...estado,
+    canalesMeta: estado.canalesMeta ?? [],
+    maquina: estado.maquina ?? {
+      id: configurada.id,
+      nombre: configurada.nombre ?? configurada.id,
+      configurada: true,
+      area: configurada.arboles?.alarmas ?? null,
+    },
+  };
 }

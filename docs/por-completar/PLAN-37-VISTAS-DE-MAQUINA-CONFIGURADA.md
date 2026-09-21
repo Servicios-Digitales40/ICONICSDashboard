@@ -1,6 +1,6 @@
 # PLAN 37 — Las vistas de una máquina configurada
 
-**Estado:** F1–F3 completadas · F4 por completar · **pendiente de verse en el navegador**
+**Estado:** F1–F3 completadas · F4 por completar · vista en el navegador el 21-09-2026 (un defecto, corregido)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -237,6 +237,16 @@ configurada: no se afirman tres sobre una de dos.
 
 **Con la máquina escrita a mano nada cambia**: las pruebas existentes de las
 tres vistas siguen en verde sin tocarlas.
+
+#### Lo que destapó abrirla en el navegador (21-09-2026)
+
+Las siete vistas de la sección caían con «No se pudo mostrar esta sección:
+Cannot read properties of undefined (reading 'configurada')». El primer render
+de `useDominioVibracion()` devuelve el estado vacío, y con una máquina
+configurada ese estado no traía `maquina`: la meta llegaba con la primera
+lectura, y las vistas la leían antes. Ninguna prueba renderizaba el hook real
+con una configurada antes de la primera lectura; ahora una lo hace
+(`dominio-vibracion-hook.test.jsx`), y se rompió a propósito para verla caer.
 
 ### F4 — Alarmas de la máquina
 

@@ -35,7 +35,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1081** pruebas · 29 omitidas |
+| Suite de frontend | **1083** pruebas · 29 omitidas |
 | Suite de backend | **385** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
@@ -453,7 +453,7 @@ cd react-dashboard && npm test
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** |
 | Backend | **385 passed** |
-| Frontend | **1081 passed · 29 skipped** |
+| Frontend | **1083 passed · 29 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
