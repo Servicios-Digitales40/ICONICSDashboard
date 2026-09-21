@@ -60,6 +60,8 @@
 import fp from 'fastify-plugin'
 import jwt from '@fastify/jwt'
 
+import { alcanza } from '../../../shared/roles.js'
+
 /** El anónimo de siempre, cuando la autenticación está apagada. */
 const ANONIMO = Object.freeze({ id: 'anonimo', roles: ['operador'], autenticado: false })
 
@@ -130,28 +132,48 @@ async function autenticacionPlugin(fastify, { config }) {
   })
 
   /**
-   * Guarda de rol.
+   * Guarda de rol MÍNIMO.
    *
    * Leer el tablero lo puede hacer cualquiera con sesión; accionar una bomba,
    * no. Es la misma frontera que hoy marca `ICONICS_READ_ONLY` a nivel de
    * servidor, marcada por persona.
+   *
+   * ── DESDE EL PLAN 35 F1 ES JERÁRQUICA ──────────────────────────
+   *
+   * Antes comparaba por igualdad —`roles.includes(rol)`— y eso producía el
+   * defecto que la fase existe para arreglar: **el administrador podía menos
+   * que el operador**. Medido el 21-09-2026 con los tres roles en vivo: un
+   * `administrador` recibía 403 al escribir en el cuaderno, al accionar la
+   * bomba y al cerrar un caso, porque esas rutas piden `operador` literal.
+   *
+   * Ahora el argumento es el rol MÍNIMO y quien alcanza más, pasa. La tabla
+   * vive en `shared/roles.js` porque es dominio: la necesita también la
+   * pantalla, para no ofrecer un botón que el servidor va a rechazar.
+   *
+   * Un rol desconocido no alcanza nada, ni siquiera a sí mismo — deny by
+   * default, que es lo que protege de un `AUTH_USUARIOS` con una errata.
    *
    * Responde **403 y no 404**: un 404 diría que la ruta no existe, y quien lo
    * vea buscará el fallo en el despliegue en vez de en sus permisos. Esconder
    * la existencia de la ruta no aporta nada aquí — el tablero es de la red de
    * planta, no de internet, y su API está publicada en el propio Swagger.
    */
-  fastify.decorate('exigirRol', rol => async (request, reply) => {
+  fastify.decorate('exigirRol', rolMinimo => async (request, reply) => {
     if (!habilitada) return
 
-    if (!request.usuario?.roles?.includes(rol)) {
+    if (!alcanza(request.usuario?.roles, rolMinimo)) {
       request.log.warn(
-        { ruta: request.url, usuario: request.usuario?.id, rolExigido: rol },
-        `Acceso denegado a ${request.url}: el usuario no tiene el rol "${rol}".`
+        {
+          ruta: request.url,
+          usuario: request.usuario?.id,
+          rolExigido: rolMinimo,
+          rolesDelUsuario: request.usuario?.roles ?? [],
+        },
+        `Acceso denegado a ${request.url}: sus roles no alcanzan "${rolMinimo}".`
       )
       return reply.code(403).send({
         ok: false,
-        error: `Esta acción requiere el rol "${rol}".`,
+        error: `Esta acción requiere el rol "${rolMinimo}" o superior.`,
       })
     }
   })
