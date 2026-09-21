@@ -48,9 +48,23 @@ import { useEnVista } from "@/lib/motion.js";
 
 import { Cifra, MONO, SANS, UltimaLectura } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
-import { bandaISO, CANALES, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
+import { bandaISO, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
+
+/*
+ * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA (Plan 37 F3) ─────────────
+ *
+ * Esta pantalla sirve a la máquina escrita a mano Y a cualquier configurada
+ * del mismo tipo (`?maquina=<id>`). Las tarjetas de abajo navegan a las rutas
+ * de la máquina de la pantalla: para una configurada, a las genéricas
+ * `maq-*` con su parámetro. Riesgos y Controles no existen todavía para una
+ * configurada (Plan 37 §2 D6), así que no se ofrecen.
+ */
+const DESTINO_CONFIGURADA = Object.freeze({
+  "eva-vibraciones": "maq-graficas",
+  "vib-3d": "maq-3d",
+});
 import RotorHero from "../../three-d/components/RotorHero.jsx";
 import { rpmEjeDe } from "../../three-d/lib/rotor.js";
 
@@ -491,8 +505,15 @@ function InicioVibraciones({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t, dark } = useTheme();
-  const { canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos } =
-    useVibracion();
+  const { canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos, canalesMeta, maquina } =
+    useDominioVibracion();
+
+  /* A qué ruta lleva cada tarjeta, y con qué parámetro: la máquina de la
+     pantalla. Ver `DESTINO_CONFIGURADA`. */
+  const destino = (id) => (maquina.configurada ? DESTINO_CONFIGURADA[id] ?? id : id);
+  const paramsDestino = maquina.configurada ? { maquina: maquina.id } : undefined;
+  const vistas = maquina.configurada ? VISTAS.filter((v) => DESTINO_CONFIGURADA[v.id]) : VISTAS;
+  const navegar = (id) => onNavigate?.(destino(id), paramsDestino);
 
   const res = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
@@ -518,11 +539,11 @@ function InicioVibraciones({ onNavigate }) {
    * un número tranquilizador que no describe a ninguno de los dos.
    */
   const peor = useMemo(() => {
-    const veredictos = CANALES
+    const veredictos = canalesMeta
       .map((c) => bandaISO(canales?.[c.id]?.vRMS, res.normaAplicable))
       .filter(Boolean);
     return veredictos.length ? veredictos.reduce((a, b) => (b.zona > a.zona ? b : a)) : null;
-  }, [canales, res.normaAplicable]);
+  }, [canales, canalesMeta, res.normaAplicable]);
 
   /*
    * Cuántos apoyos tienen APAGADO el diagnóstico de rodamiento. Es el
@@ -533,10 +554,10 @@ function InicioVibraciones({ onNavigate }) {
    */
   const sinVigilar = useMemo(() => {
     const claves = VIGILANCIAS.filter((v) => v.grupo === "rodamiento").map((v) => v.key);
-    return CANALES.filter((c) =>
+    return canalesMeta.filter((c) =>
       claves.some((k) => canales?.[c.id]?.vigilancias?.[k]?.id === "apagado")
     ).length;
-  }, [canales]);
+  }, [canales, canalesMeta]);
 
   const giro = useMemo(() => rpmEjeDe(variador), [variador]);
 
@@ -597,14 +618,17 @@ function InicioVibraciones({ onNavigate }) {
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => onNavigate?.("eva-vibraciones")}>
+              <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => navegar("eva-vibraciones")}>
                 {traducir("dashboard:home.hero.enter", {
                   pantalla: traducir("navigation:routes.eva-vibraciones.nav"),
                 })}
               </Button>
-              <Button variant="ghost" icon={<ShieldAlert size={15} />} onClick={() => onNavigate?.("eva-riesgos-vibracion")}>
-                {traducir("machines:vibration.seeRisks")}
-              </Button>
+              {/* Riesgos no existe todavía para una máquina configurada (Plan 37 §2 D6). */}
+              {!maquina.configurada && (
+                <Button variant="ghost" icon={<ShieldAlert size={15} />} onClick={() => onNavigate?.("eva-riesgos-vibracion")}>
+                  {traducir("machines:vibration.seeRisks")}
+                </Button>
+              )}
             </div>
           </div>
         </section>
@@ -628,7 +652,7 @@ function InicioVibraciones({ onNavigate }) {
                 {traducir("machines:vibration.nobodyWatching")}
               </div>
               <p style={{ margin: "3px 0 0", fontSize: 12.5, color: t.textSoft, lineHeight: 1.55 }}>
-                En {sinVigilar} de los {CANALES.length} apoyos, las frecuencias de defecto
+                En {sinVigilar} de los {canalesMeta.length} apoyos, las frecuencias de defecto
                 (BPFO, BPFI, FTF) están apagadas en el módulo. Son el único diagnóstico que
                 distingue un rodamiento picándose de una máquina que vibra un poco más: sin
                 ellas, un rodamiento en mal estado sólo se verá cuando ya haya movido el valor
@@ -643,10 +667,10 @@ function InicioVibraciones({ onNavigate }) {
         </SectionLabel>
 
         <div className="vib-inicio-grid">
-          {VISTAS.map((vista, i) => (
+          {vistas.map((vista, i) => (
             <TarjetaVista
               key={vista.id} vista={vista} contexto={contexto} dark={dark}
-              onNavigate={onNavigate} t={t} delay={0.15 + i * 0.06}
+              onNavigate={navegar} t={t} delay={0.15 + i * 0.06}
             />
           ))}
         </div>

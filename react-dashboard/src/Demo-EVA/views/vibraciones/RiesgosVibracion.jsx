@@ -49,7 +49,7 @@ import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
 import { TarjetaRiesgo } from "../../components/riesgoVibracion.jsx";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 function RiesgosVibracion({ onNavigate }) {
@@ -77,7 +77,7 @@ function RiesgosVibracion({ onNavigate }) {
       })
       : n.porque;
   const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
-    useVibracion();
+    useDominioVibracion();
 
   const res = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),

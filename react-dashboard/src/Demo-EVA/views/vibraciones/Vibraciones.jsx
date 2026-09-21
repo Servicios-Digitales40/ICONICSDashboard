@@ -46,10 +46,10 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 
 import { UltimaLectura } from "../../components/base.jsx";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import {
-  AREA_ALARMAS, CANALES, CONTADORES_ALARMA, LIMITES_ISO, MEDIDAS, VIGILANCIAS,
+  CONTADORES_ALARMA, LIMITES_ISO, MEDIDAS, VIGILANCIAS,
   bandaISO,
 } from "../../domain/vibraciones.js";
 
@@ -78,11 +78,14 @@ const fmt = (v, dec) =>
  * diferencia importa cuando alguien intenta averiguar por qué la pantalla
  * está tan tranquila.
  */
-function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
+function TarjetaApoyo({ canal, datos, normaAplicable, t, configurada = false }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { canal: canalTexto, medida: medidaTexto, zonaIso } = useDominio();
   const banda = bandaISO(datos?.vRMS, normaAplicable);
+  /* «Lado acople» es dónde está montado el S1 de la máquina escrita a mano.
+     Una configurada no lo ha dicho: su apoyo se llama como su id. */
+  const nombre = configurada ? canal.label : canalTexto(canal.id);
 
   return (
     <article
@@ -94,7 +97,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
     >
       <header>
         <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: t.text }}>
-          {canalTexto(canal.id)}
+          {nombre}
         </h3>
         {/*
           El id del apoyo y el nombre del equipo son IDENTIFICADORES del
@@ -103,7 +106,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
           una referencia de catálogo, no una palabra.
         */}
         <div style={{ fontSize: 11, color: t.textFaint, marginTop: 3 }}>
-          {canal.id} · {canal.equipo}
+          {canal.id}{canal.equipo ? ` · ${canal.equipo}` : ""}
           {canal.rodamiento
             ? ` · ${traducir("machines:vibration.bearing", { modelo: canal.rodamiento })}`
             : ""}
@@ -164,7 +167,7 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t }) {
  * «esto vibra más», dicen «la pista exterior está picada». Y estaban apagadas
  * en los tres canales.
  */
-function TablaVigilancias({ canales, t }) {
+function TablaVigilancias({ canales, canalesMeta, configurada = false, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { canal: canalTexto, vigilancia, estadoVigilancia } = useDominio();
@@ -204,7 +207,7 @@ function TablaVigilancias({ canales, t }) {
         <thead>
           <tr>
             <th style={{ textAlign: "left", padding: "4px 8px", color: t.textFaint, fontWeight: 700 }} />
-            {CANALES.map((c) => (
+            {canalesMeta.map((c) => (
               <th
                 key={c.id}
                 style={{
@@ -212,7 +215,7 @@ function TablaVigilancias({ canales, t }) {
                   fontWeight: 700, fontSize: 10, letterSpacing: "0.06em",
                 }}
               >
-                {canalTexto(c.id).toUpperCase()}
+                {(configurada ? c.label : canalTexto(c.id)).toUpperCase()}
               </th>
             ))}
           </tr>
@@ -222,7 +225,7 @@ function TablaVigilancias({ canales, t }) {
             <Fragment key={titulo}>
               <tr>
                 <td
-                  colSpan={CANALES.length + 1}
+                  colSpan={canalesMeta.length + 1}
                   style={{
                     padding: "12px 8px 4px", fontSize: 10, fontWeight: 700,
                     letterSpacing: "0.06em", textTransform: "uppercase", color: t.textFaint,
@@ -234,7 +237,7 @@ function TablaVigilancias({ canales, t }) {
               {filas.map((v) => (
                 <tr key={v.key}>
                   <td style={{ padding: "4px 8px", color: t.textSoft }}>{vigilancia(v.key)}</td>
-                  {CANALES.map((c) => {
+                  {canalesMeta.map((c) => {
                     const e = canales?.[c.id]?.vigilancias?.[v.key] ?? null;
                     return (
                       <td key={c.id} style={{ padding: "4px 8px", color: color(e), fontWeight: 600 }}>
@@ -263,7 +266,7 @@ function TablaVigilancias({ canales, t }) {
  * alarma por alarma devuelve calidad mala. El pie lo dice, en vez de dejar que
  * el número parezca saber más de lo que sabe.
  */
-function PanelAlarmas({ alarmas, t }) {
+function PanelAlarmas({ alarmas, area, t }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const hayAlgo = CONTADORES_ALARMA.some((a) => (alarmas?.[a.key] ?? 0) > 0);
@@ -311,7 +314,7 @@ function PanelAlarmas({ alarmas, t }) {
         {hayAlgo
           ? traducir("machines:vibration.alarms.fromIconics")
           : traducir("machines:vibration.alarms.none")}
-        <Enfasis>{traducir("machines:vibration.alarmCounters", { area: AREA_ALARMAS })}</Enfasis>
+        {area && <Enfasis>{traducir("machines:vibration.alarmCounters", { area })}</Enfasis>}
       </p>
     </div>
   );
@@ -325,12 +328,13 @@ function Vibraciones() {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t } = useTheme();
-  const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos } =
-    useVibracion();
+  const { canales, variador, alarmas, loading, error, lastUpdated, puntosSinDato, puntosPedidos, canalesMeta, maquina } =
+    useDominioVibracion();
 
   /* Qué pantalla tiene delante quien pregunta (Plan 24 F7). La otra máquina
-     declara lo mismo desde `DetalleActivo`: el asistente no sabe de ninguna. */
-  useEffect(() => declararContextoDeVista({ sistema: "vibraciones" }), []);
+     declara lo mismo desde `DetalleActivo`: el asistente no sabe de ninguna.
+     Con una máquina configurada se declara la suya (Plan 37 F3). */
+  useEffect(() => declararContextoDeVista({ sistema: maquina.id }), [maquina.id]);
 
   const res = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
@@ -380,7 +384,9 @@ function Vibraciones() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <SectionLabel>{traducir("machines:vibration.threeSupports")}</SectionLabel>
+        <SectionLabel>
+          {traducir(maquina.configurada ? "machines:vibration.supports" : "machines:vibration.threeSupports")}
+        </SectionLabel>
         <UltimaLectura fecha={lastUpdated} t={t} />
       </div>
 
@@ -391,10 +397,11 @@ function Vibraciones() {
           gap: 16,
         }}
       >
-        {CANALES.map((c) => (
+        {canalesMeta.map((c) => (
           <TarjetaApoyo
             key={c.id}
             canal={c}
+            configurada={maquina.configurada}
             datos={canales?.[c.id]}
             normaAplicable={res.normaAplicable}
             t={t}
@@ -446,10 +453,10 @@ function Vibraciones() {
         </div>
       </div>
 
-      <PanelAlarmas alarmas={alarmas} t={t} />
+      <PanelAlarmas alarmas={alarmas} area={maquina.area ?? null} t={t} />
 
       <SectionLabel>{traducir("machines:vibration.watchesTitle")}</SectionLabel>
-      <TablaVigilancias canales={canales} t={t} />
+      <TablaVigilancias canales={canales} canalesMeta={canalesMeta} configurada={maquina.configurada} t={t} />
 
       {/*
         Los riesgos que se deducen de estas medidas viven en su PROPIA

@@ -65,11 +65,10 @@ import { useTheme } from "@/theme";
 
 import { PuntoEstado } from "../../components/base.jsx";
 import { estadoColor } from "../../components/paleta.js";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { ESTADOS_ORDEN } from "../../domain/estado.js";
 import {
   ACELEROMETRO,
-  CANAL,
   EJE,
   EJES_MEDIDA,
   LIMITES_ISO,
@@ -248,11 +247,13 @@ function BotonBarra({ activo, onClick, children, t, titulo }) {
  * los tres apoyos instrumentados diría, por omisión, que la instrumentación
  * cubre la máquina.
  */
-function TiraDelTren({ estadoPorCanal, seleccionado, onSeleccionar, t, dark }) {
+function TiraDelTren({ estadoPorCanal, canalMeta, seleccionado, onSeleccionar, t, dark }) {
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
       {TREN_MECANICO.map((el) => {
-        const canal = el.canal ? CANAL[el.canal] : null;
+        /* Un apoyo del banco que ESTA máquina no instrumenta se pinta como el
+           resto del tren: sin sonda. Es un hueco, no un cero (Plan 37 F3). */
+        const canal = el.canal ? canalMeta[el.canal] ?? null : null;
         const estado = el.canal ? estadoPorCanal[el.canal] : null;
         const activo = seleccionado === el.id;
         const medible = Boolean(el.canal);
@@ -311,18 +312,20 @@ function TiraDelTren({ estadoPorCanal, seleccionado, onSeleccionar, t, dark }) {
 }
 
 /** Las cuatro medidas del apoyo seleccionado. */
-function FichaApoyo({ elemento, datos, normaAplicable, t, dark }) {
+function FichaApoyo({ elemento, canal, configurada = false, datos, normaAplicable, t, dark }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   const {
     estado: estadoTexto, canal: canalTexto, medida: medidaTexto, zonaIso,
   } = useDominio();
-  const canal = CANAL[elemento.canal];
   const estado = estadoDeApoyo(datos, normaAplicable);
   const banda = bandaISO(datos?.vRMS, normaAplicable);
+  /* «Lado acople» es dónde está el S1 de la máquina escrita a mano; una
+     configurada no lo ha dicho y su apoyo se llama como su id. */
+  const nombre = configurada ? canal.label : canalTexto(canal.id);
 
   return (
-    <Panel title={`${elemento.label} · ${canalTexto(canal.id)}`} code={canal.equipo}>
+    <Panel title={`${elemento.label} · ${nombre}`} code={canal.equipo ?? undefined}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <PuntoEstado color={estadoColor(dark, estado)} size={8} />
         <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text }}>
@@ -389,7 +392,11 @@ function Vibraciones3D({ onNavigate }) {
   const reduce = usePrefersReducedMotion();
   const angosto = useMediaQuery("(max-width: 720px)");
 
-  const { canales, variador, loading, error, puntosSinDato, puntosPedidos } = useVibracion();
+  const { canales, variador, loading, error, puntosSinDato, puntosPedidos, canalesMeta, maquina } =
+    useDominioVibracion();
+  /* Los apoyos DE ESTA MÁQUINA, por id: el banco 3D es del tipo y trae los
+     tres; cuáles instrumenta esta máquina lo dice ella (Plan 37 F3). */
+  const canalMeta = useMemo(() => Object.fromEntries(canalesMeta.map((c) => [c.id, c])), [canalesMeta]);
 
   const [seleccionado, setSeleccionado] = useState(null);
   const [ejes, setEjes] = useState(true);
@@ -400,10 +407,10 @@ function Vibraciones3D({ onNavigate }) {
   const estadoPorCanal = useMemo(() => {
     const m = {};
     for (const el of TREN_MECANICO) {
-      if (el.canal) m[el.canal] = estadoDeApoyo(canales?.[el.canal], normaAplicable);
+      if (el.canal && canalMeta[el.canal]) m[el.canal] = estadoDeApoyo(canales?.[el.canal], normaAplicable);
     }
     return m;
-  }, [canales, normaAplicable]);
+  }, [canales, canalMeta, normaAplicable]);
 
   const giro = useMemo(() => rpmEjeDe(variador), [variador]);
 
@@ -471,6 +478,7 @@ function Vibraciones3D({ onNavigate }) {
         respaldo={
           <TiraDelTren
             estadoPorCanal={estadoPorCanal}
+            canalMeta={canalMeta}
             seleccionado={seleccionado}
             onSeleccionar={setSeleccionado}
             t={t}
@@ -551,6 +559,7 @@ function Vibraciones3D({ onNavigate }) {
         <div style={{ marginTop: 12 }}>
           <TiraDelTren
             estadoPorCanal={estadoPorCanal}
+            canalMeta={canalMeta}
             seleccionado={seleccionado}
             onSeleccionar={setSeleccionado}
             t={t}
@@ -559,9 +568,11 @@ function Vibraciones3D({ onNavigate }) {
         </div>
       </div>
 
-      {elementoSeleccionado && (
+      {elementoSeleccionado && canalMeta[elementoSeleccionado.canal] && (
         <FichaApoyo
           elemento={elementoSeleccionado}
+          canal={canalMeta[elementoSeleccionado.canal]}
+          configurada={maquina.configurada}
           datos={canales?.[elementoSeleccionado.canal]}
           normaAplicable={normaAplicable}
           t={t}
