@@ -166,7 +166,17 @@ export function crearAsset({ id, pointName, rol = "secundario", nombre = null })
  * defensa que impide cruzar dos instalaciones.
  */
 export function crearMaquina(
-  { id, nombre, tipo, plc, assets = [], variables = [], cadenciaMs = 5000, limitaciones = [] },
+  {
+    id,
+    nombre,
+    tipo,
+    plc,
+    assets = [],
+    variables = [],
+    cadenciaMs = 5000,
+    limitaciones = [],
+    arboles = null,
+  },
   ahora = new Date(),
 ) {
   return {
@@ -174,6 +184,19 @@ export function crearMaquina(
     nombre: nombre?.trim() || id,
     tipo,
     plc: plc || null,
+    /*
+     * Las tres raíces del árbol desde las que se configuró (Plan 36 F2), para
+     * volver a abrirla donde se marcó. Opcional: una máquina dada de alta por
+     * la API antes de ese plan no las trae, y `arbolesDe()` en
+     * `configurarDesdeArbol.js` deduce lo que puede de sus assets.
+     */
+    arboles: arboles
+      ? {
+          enVivo: arboles.enVivo ?? null,
+          historico: arboles.historico ?? null,
+          alarmas: arboles.alarmas ?? null,
+        }
+      : null,
     assets: assets.map((a) => crearAsset(a)),
     /*
      * ── LAS VARIABLES PASAN POR `crearVariable`, SIEMPRE ───────────

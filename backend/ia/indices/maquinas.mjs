@@ -42,11 +42,60 @@ import { readFile } from 'node:fs/promises'
 
 import {
   configuracionVacia,
+  crearAsset,
   crearMaquina,
+  crearVariable,
   normalizarConfiguracion,
   problemasDeMaquina,
   raicesDe,
 } from '../../../shared/eva/comun/configuracionMaquina.js'
+
+/**
+ * Las variables de una máquina tras una edición: las que llegan, con lo que
+ * ya se SABÍA de ellas conservado. Plan 36 F3.
+ *
+ * ── LO QUE ESTO EVITA ─────────────────────────────────────────────
+ *
+ * Un `PATCH` con `variables` sustituía la lista entera tal como llegaba. Y la
+ * lista que llega de la pantalla no puede traer `historyVerified` —el esquema
+ * lo rechaza a propósito: prometer historia es una afirmación sobre el
+ * servidor que sólo el sondeo puede hacer—, así que editar una máquina para
+ * añadirle una variable **borraba la verificación de las otras 36**. Sin
+ * error: la máquina seguía válida, sólo que ciega para su pasado.
+ *
+ * Es el riesgo que el Plan 36 F3 señala como lo caro de la fase: «no es la
+ * UI, es no perder información al guardar».
+ *
+ * ── LA REGLA ──────────────────────────────────────────────────────
+ *
+ * Una variable que llega se empareja con la anterior por `pointName` —es su
+ * identidad en ICONICS; el `id` lo pone la pantalla y puede cambiar—. Si la
+ * anterior existía y su `historyPointName` no cambió, conserva
+ * `historyVerified` y `estado`: lo que se sondeó sigue siendo cierto de la
+ * misma serie. Si cambió el punto histórico, la verificación ya no habla de
+ * esa serie y vuelve a `false`, que es el valor seguro. Una variable nueva
+ * pasa por `crearVariable`, como en el alta.
+ *
+ * Las variables que NO llegan se quitan: eso es lo que significa editar la
+ * lista. Quitar una en silencio no es un riesgo aquí porque la pantalla las
+ * enseña todas antes de guardar, incluidas las que el árbol ya no tiene.
+ */
+export function fusionarVariables(anteriores, entrantes) {
+  const porPunto = new Map((anteriores ?? []).map(v => [v.pointName, v]))
+
+  return (entrantes ?? []).map(entrante => {
+    const nueva = crearVariable(entrante)
+    const previa = porPunto.get(entrante.pointName)
+    if (!previa) return nueva
+
+    const mismaSerie = (previa.historyPointName ?? null) === (nueva.historyPointName ?? null)
+    return {
+      ...nueva,
+      historyVerified: mismaSerie ? Boolean(previa.historyVerified) : false,
+      estado: previa.estado ?? nueva.estado,
+    }
+  })
+}
 import { tipoDe } from '../../../shared/eva/tipos/index.js'
 import { conCandado, escribirJsonAtomico } from '../../lib/jsonAtomico.mjs'
 import { logger } from '../../logger.mjs'
@@ -208,7 +257,16 @@ export function createGestorMaquinas({ ruta }) {
         }
       }
 
-      const actualizada = { ...config.maquinas[i], ...cambios, id }
+      const anterior = config.maquinas[i]
+      const actualizada = {
+        ...anterior,
+        ...cambios,
+        id,
+        ...(cambios?.assets ? { assets: cambios.assets.map(a => crearAsset(a)) } : {}),
+        ...(cambios?.variables
+          ? { variables: fusionarVariables(anterior.variables ?? [], cambios.variables) }
+          : {}),
+      }
       const ctx = contextoDe(config.maquinas, id)
 
       const problemas = problemasDeMaquina(actualizada, ctx)

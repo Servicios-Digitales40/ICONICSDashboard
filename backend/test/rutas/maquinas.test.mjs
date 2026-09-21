@@ -31,6 +31,7 @@ import { join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
+import { createGestorMaquinas } from '../../ia/indices/maquinas.mjs'
 import { json, montarApp } from '../ayudas.mjs'
 
 let carpeta
@@ -254,6 +255,143 @@ describe('PATCH /api/maquinas/:id', () => {
 
     expect(r.statusCode).toBe(404)
     expect(json(await app.inject({ method: 'GET', url: '/api/maquinas' })).cuantas).toBe(0)
+  })
+
+  /*
+   * ── LO CARO DE EDITAR: NO PERDER LO QUE YA SE SABÍA (Plan 36 F3) ──
+   *
+   * La pantalla manda la lista de variables ENTERA y sin `historyVerified`
+   * —el esquema lo rechaza a propósito—. Antes de `fusionarVariables`, un
+   * PATCH para añadir una variable dejaba las demás sin verificación, sin
+   * error: la máquina seguía válida, sólo que ciega para su pasado.
+   */
+  it('añadir una variable CONSERVA la verificación de las que ya estaban', async () => {
+    const payload = maquinaValida()
+    payload.variables[0].historyPointName = 'hda:g:vRMS_S1'
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload })
+
+    /* Se gana la verificación por el camino que sí puede darla: anotándola
+       como lo haría el sondeo. */
+    const gestorMaquinas = createGestorMaquinas({ ruta: join(carpeta, 'maquinas.json') })
+    const guardada = await gestorMaquinas.obtener('vib-motor-02')
+    await gestorMaquinas.anotarRevision('vib-motor-02', {
+      estado: guardada.estado,
+      variables: guardada.variables.map(v => ({ ...v, historyVerified: true })),
+    })
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: '/api/maquinas/vib-motor-02',
+      payload: {
+        variables: [
+          { id: 'v1', pointName: 'ac:PRUEBA/vib-motor-02/S1/vRMS', historyPointName: 'hda:g:vRMS_S1', rol: 'medida:vRMS' },
+          { id: 'v2', pointName: 'ac:PRUEBA/vib-motor-02/S1/aRMS', rol: 'medida:aRMS' },
+        ],
+      },
+    })
+    expect(r.statusCode).toBe(200)
+
+    const { variables } = json(r).maquina
+    expect(variables).toHaveLength(2)
+    expect(variables.find(v => v.id === 'v1').historyVerified).toBe(true)
+    /* La nueva nace con los valores seguros, como en el alta. */
+    const nueva = variables.find(v => v.id === 'v2')
+    expect(nueva.historyVerified).toBe(false)
+    expect(nueva.acceso).toBe('read')
+  })
+
+  it('cambiar el punto histórico de una variable RETIRA su verificación', async () => {
+    const payload = maquinaValida()
+    payload.variables[0].historyPointName = 'hda:g:vRMS_S1'
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload })
+
+    const gestorMaquinas = createGestorMaquinas({ ruta: join(carpeta, 'maquinas.json') })
+    const guardada = await gestorMaquinas.obtener('vib-motor-02')
+    await gestorMaquinas.anotarRevision('vib-motor-02', {
+      estado: guardada.estado,
+      variables: guardada.variables.map(v => ({ ...v, historyVerified: true })),
+    })
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: '/api/maquinas/vib-motor-02',
+      payload: {
+        variables: [
+          { id: 'v1', pointName: 'ac:PRUEBA/vib-motor-02/S1/vRMS', historyPointName: 'hda:g:OTRA', rol: 'medida:vRMS' },
+        ],
+      },
+    })
+    expect(r.statusCode).toBe(200)
+    /* Lo que se sondeó era OTRA serie: la nueva no puede heredar su marca. */
+    expect(json(r).maquina.variables[0].historyVerified).toBe(false)
+  })
+
+  it('las tres raíces (`arboles`) se guardan y vuelven, para reabrir la máquina donde se marcó', async () => {
+    const arboles = { enVivo: 'ac:PRUEBA/vib-motor-02/', historico: 'hda:g:', alarmas: null }
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/maquinas',
+      payload: { ...maquinaValida(), arboles },
+    })
+    expect(r.statusCode).toBe(201)
+    expect(json(r).maquina.arboles).toEqual(arboles)
+
+    const leida = json(await app.inject({ method: 'GET', url: '/api/maquinas/vib-motor-02' }))
+    expect(leida.maquina.arboles).toEqual(arboles)
+  })
+})
+
+/*
+ * ── EL DESCUBRIMIENTO CONTRA EL TRANSPORTE FALSO (Plan 36 F1) ──────
+ *
+ * Hasta el Plan 36 no se podía probar aquí: el fake devolvía todos los
+ * puntos como cadenas planas y el descubridor veía un árbol VACÍO sin error.
+ * Con el `browse` jerárquico, la ruta entera se ejercita sin planta.
+ */
+describe('POST /api/maquinas/descubrir', () => {
+  it('propone las variables de la máquina de vibraciones recorriendo el fake', async () => {
+    const B = String.fromCharCode(92)
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/maquinas/descubrir',
+      payload: {
+        raizEnVivo: 'ac:TDCON/DEMO_VIBRACIONES/Vibraciones/',
+        raizHistorico: `hda:${B}Configuration${B}DEMO_VIBRACIONES${B}`,
+        areaAlarmas: 'ae:/DEMO VIBRACIONES',
+        tipo: 'vibraciones',
+      },
+    })
+    expect(r.statusCode).toBe(200)
+
+    const cuerpo = json(r)
+    expect(cuerpo.estado).toBe('VALID')
+    expect(cuerpo.resumen.enVivo).toBeGreaterThan(50)
+    expect(cuerpo.resumen.emparejados).toBeGreaterThan(0)
+    expect(cuerpo.resumen.conRol).toBeGreaterThan(50)
+    expect(cuerpo.alarmas.contadores.length).toBeGreaterThanOrEqual(4)
+
+    /* Toda propuesta nace sin promesas. */
+    for (const v of cuerpo.variables) {
+      expect(v.historyVerified).toBe(false)
+      expect(v.acceso).toBe('read')
+    }
+    const vrms = cuerpo.variables.find(v => v.id === 'vRMS_S1')
+    expect(vrms.rol).toBe('medida:vRMS')
+    expect(vrms.assetId).toBe('S1')
+    expect(vrms.historyPointName).toContain('S1:vRMS_S1')
+  })
+
+  it('una raíz que no existe es UNKNOWN con motivo, no una máquina sin variables', async () => {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/maquinas/descubrir',
+      payload: { raizEnVivo: 'ac:NO/EXISTE/' },
+    })
+    expect(r.statusCode).toBe(200)
+    const cuerpo = json(r)
+    expect(cuerpo.estado).toBe('UNKNOWN')
+    expect(cuerpo.variables).toEqual([])
+    expect(cuerpo.motivo).toMatch(/No se pudo recorrer/)
   })
 })
 

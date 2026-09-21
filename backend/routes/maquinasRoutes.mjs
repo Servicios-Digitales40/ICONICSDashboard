@@ -11,17 +11,18 @@
  * traduce entre HTTP y esas dos piezas, que es lo que hace el resto de
  * `routes/`.
  *
- * ── LO QUE ESTAS RUTAS NO HACEN TODAVÍA ────────────────────────────
+ * ── QUIÉN LAS CONSUME HOY ──────────────────────────────────────────
  *
- * **Nadie las consume.** Ni el registro las lee (eso es F3), ni hay pantalla
- * que las llame (F5). Es deliberado: F2 es persistencia, y una fase de
- * persistencia que además cambie lo que el programa hace no se podría
- * distinguir de una regresión si fallara.
+ * Nacieron sin consumidor (Plan 33 F2: «una fase de persistencia que además
+ * cambie lo que el programa hace no se podría distinguir de una regresión»).
+ * Hoy las lee el registro (`construirSistema`, F3) y las llama la pantalla de
+ * `Planta › Configuración`: la lista y la ficha desde el Plan 33 F5, y el alta
+ * y la edición marcando el árbol desde el Plan 36.
  *
- * **No comprueban contra ICONICS.** Que los puntos existan es otra pregunta,
- * necesita red, y la contesta `POST /api/maquinas/:id/verificar` cuando exista
- * (F8). Hoy una máquina se guarda bien formada y con estado `UNKNOWN`, que es
- * exactamente lo que significa: nadie ha mirado todavía.
+ * **La forma de la máquina no es lo único que se comprueba.** Que sus puntos
+ * sigan existiendo lo contesta `/verificar` (Plan 33 F8); que sus series sean
+ * de verdad suyas, `/sondear` (Plan 34 F2). Una máquina recién guardada está
+ * `UNKNOWN`, que es exactamente lo que significa: nadie ha mirado todavía.
  *
  * ── POR QUÉ `exigirRol` VA RUTA POR RUTA Y `autenticar` NO ─────────
  *
@@ -31,14 +32,15 @@
  * quién puede configurar una máquina no es la misma pregunta que quién puede
  * verla (`CLAUDE.md` §2.11).
  *
- * ── UN AVISO QUE HAY QUE TENER DELANTE ─────────────────────────────
+ * ── LO QUE PROTEGE EL ROL, Y LO QUE SIGUE SIN PODERSE HACER ───────
  *
- * `AUTH_HABILITADA=false`. Los roles están implementados y probados, pero HOY
- * NO PROTEGEN NADA, a propósito. Estas rutas escriben configuración, no
- * planta: ninguna de ellas puede mover un actuador. Pero **marcar una variable
- * como escribible sí es una decisión con consecuencias**, y por eso el Plan 33
- * §20 declara la autenticación del tablero (Plan 25) como dependencia dura de
- * la pantalla de configuración (F5), no de esta fase.
+ * Este bloque decía «`AUTH_HABILITADA=false`: los roles no protegen nada». El
+ * Plan 35 la encendió (21-09-2026) y todo `/api/maquinas` pide
+ * `administrador`. Estas rutas escriben configuración, no planta: ninguna
+ * puede mover un actuador. Pero **marcar una variable como escribible sí es
+ * una decisión con consecuencias**, y por eso sigue fuera de la pantalla de
+ * configuración (Plan 36 §5): el esquema la acepta por la API, la pantalla no
+ * la ofrece, y `WRITABLE_VARIABLES` nunca se deriva (Plan 33 §20).
  */
 import {
   CrearMaquinaSchema,

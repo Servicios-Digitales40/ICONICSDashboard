@@ -767,6 +767,21 @@ export const CrearMaquinaSchema = z.object({
   variables: z.array(VariableMaquinaSchema).max(2048).optional(),
   cadenciaMs: z.number().int().min(500).max(600_000).optional(),
   limitaciones: z.array(z.string().trim().min(1).max(1024)).max(32).optional(),
+  /*
+   * ── LAS TRES RAÍCES DESDE LAS QUE SE CONFIGURÓ (Plan 36 F2) ────────
+   *
+   * Para poder volver a abrir la máquina en la pantalla donde se marcó. La
+   * raíz en vivo y el área ya se podían deducir de los assets; la del
+   * historiador NO —los nombres `hda:` no se derivan de nada (B10)— y sin
+   * ella editar obligaba a teclearla otra vez cada vez.
+   */
+  arboles: z
+    .object({
+      enVivo: z.string().trim().min(1).max(512),
+      historico: z.string().trim().min(1).max(512).nullish(),
+      alarmas: z.string().trim().min(1).max(512).nullish(),
+    })
+    .optional(),
 })
 
 /**
