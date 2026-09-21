@@ -370,8 +370,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 376 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1052 (+29 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 377 — contratos HTTP, config, logger
+cd react-dashboard && npm test  # 1053 (+29 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 

@@ -300,6 +300,41 @@ describe('PATCH /api/maquinas/:id', () => {
     expect(nueva.acceso).toBe('read')
   })
 
+  /*
+   * Destapado usándola el 21-09-2026: una máquina comprobada con 24 variables,
+   * editada a 44, seguía diciendo `VALID` con 20 en `UNKNOWN`. El veredicto
+   * era sobre otra lista.
+   */
+  it('añadir un punto que nadie ha comprobado devuelve la máquina a UNKNOWN; re-guardar igual no', async () => {
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: maquinaValida() })
+    await app.inject({ method: 'POST', url: '/api/maquinas/vib-motor-02/verificar' })
+    const comprobada = json(await app.inject({ method: 'GET', url: '/api/maquinas/vib-motor-02' }))
+    expect(comprobada.maquina.estado).not.toBe('UNKNOWN')
+
+    /* La misma lista, otra vez: el veredicto sigue valiendo. */
+    const igual = await app.inject({
+      method: 'PATCH',
+      url: '/api/maquinas/vib-motor-02',
+      payload: { variables: [{ id: 'v1', pointName: 'ac:PRUEBA/vib-motor-02/S1/vRMS', rol: 'medida:vRMS' }] },
+    })
+    expect(json(igual).maquina.estado).toBe(comprobada.maquina.estado)
+
+    /* Un punto nuevo: el veredicto ya no habla de esta máquina. */
+    const ampliada = await app.inject({
+      method: 'PATCH',
+      url: '/api/maquinas/vib-motor-02',
+      payload: {
+        variables: [
+          { id: 'v1', pointName: 'ac:PRUEBA/vib-motor-02/S1/vRMS', rol: 'medida:vRMS' },
+          { id: 'v2', pointName: 'ac:PRUEBA/vib-motor-02/S1/aRMS', rol: 'medida:aRMS' },
+        ],
+      },
+    })
+    expect(json(ampliada).maquina.estado).toBe('UNKNOWN')
+    /* Pero la variable que sí se comprobó conserva su propio estado. */
+    expect(json(ampliada).maquina.variables.find(v => v.id === 'v1').estado).not.toBe('UNKNOWN')
+  })
+
   it('cambiar el punto histórico de una variable RETIRA su verificación', async () => {
     const payload = maquinaValida()
     payload.variables[0].historyPointName = 'hda:g:vRMS_S1'

@@ -45,6 +45,7 @@ import {
   crearAsset,
   crearMaquina,
   crearVariable,
+  ESTADO_CONFIGURACION,
   normalizarConfiguracion,
   problemasDeMaquina,
   raicesDe,
@@ -258,14 +259,37 @@ export function createGestorMaquinas({ ruta }) {
       }
 
       const anterior = config.maquinas[i]
+      const variables = cambios?.variables
+        ? fusionarVariables(anterior.variables ?? [], cambios.variables)
+        : null
+
+      /*
+       * ── EL ESTADO DE LA MÁQUINA VUELVE A `UNKNOWN` SI CAMBIÓ QUÉ LEE ──
+       *
+       * `estado: VALID` significa «todos sus puntos siguen existiendo», y lo
+       * anotó una comprobación sobre UNA lista de variables. Si la lista
+       * cambia —se añaden 20 puntos que nadie ha mirado— ese veredicto ya no
+       * habla de esta máquina. Se destapó usándola el 21-09-2026: una máquina
+       * editada de 24 a 44 variables seguía diciendo `VALID` con 20 de ellas
+       * en `UNKNOWN`. Cada variable conserva SU estado (`fusionarVariables`);
+       * lo que se retira es la afirmación sobre el conjunto.
+       *
+       * Se compara por `pointName`: volver a guardar la misma lista no borra
+       * nada.
+       */
+      const conjunto = lista => new Set((lista ?? []).map(v => v.pointName))
+      const cambioQueLee =
+        variables &&
+        (conjunto(variables).size !== conjunto(anterior.variables).size ||
+          [...conjunto(variables)].some(p => !conjunto(anterior.variables).has(p)))
+
       const actualizada = {
         ...anterior,
         ...cambios,
         id,
         ...(cambios?.assets ? { assets: cambios.assets.map(a => crearAsset(a)) } : {}),
-        ...(cambios?.variables
-          ? { variables: fusionarVariables(anterior.variables ?? [], cambios.variables) }
-          : {}),
+        ...(variables ? { variables } : {}),
+        ...(cambioQueLee ? { estado: ESTADO_CONFIGURACION.UNKNOWN } : {}),
       }
       const ctx = contextoDe(config.maquinas, id)
 

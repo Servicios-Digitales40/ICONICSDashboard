@@ -35,8 +35,8 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1052** pruebas · 29 omitidas |
-| Suite de backend | **376** pruebas |
+| Suite de frontend | **1053** pruebas · 29 omitidas |
+| Suite de backend | **377** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
 | Lint y types | limpios |
@@ -51,11 +51,12 @@ desde `Planta › Configuración`.
 
 ### Qué está a medias
 
-**Ni el Plan 33 ni el Plan 36 se han visto correr en el navegador.** El 36 está
-probado con 33 pruebas de vista y 22 de dominio, y su descubrimiento y su
-exploración se ejercitaron por HTTP contra el servidor real; **nadie ha abierto
-la pantalla**. Es la brecha más importante de este handoff, y es lo primero que
-hay que hacer (§5). Si algo no se ve bien, no lo sabemos.
+**El Plan 33 no se ha visto correr en el navegador.** Está probado con la suite
+y ejercido por `curl` contra el backend real, **no observado en pantalla**. El
+Plan 36 sí: el usuario dio de alta `vib-motor-03` contra planta el 21-09-2026 y
+eso destapó tres defectos de la ficha, ya corregidos
+(`PLAN-36` §4.1). El editor sólo lo ha usado quien lo escribió y quien lo pidió;
+una segunda vuelta con otra persona sigue pendiente.
 
 **La máquina de vibraciones tiene OCHO vistas, no nueve.** Falta
 **Historización**, y no es reubicar sino construir: depende del historiador,
@@ -209,10 +210,10 @@ hechas, **pendiente de verse en el navegador**.
 
 ### Próximos pasos, por prioridad
 
-**0 · Ver el Plan 36 en el navegador.** Arrancar con `ICONICS_FAKE=true` (§9),
-entrar como administrador, `Planta › Configuración › Nueva máquina`, teclear
-las tres raíces, explorar, marcar `S1`, guardar. Después lo mismo contra
-planta real. Es lo único de ese plan que no está hecho.
+**0 · Seguir usando la pantalla del Plan 36 contra planta.** La primera vuelta
+(21-09-2026) destapó tres defectos de la ficha en una hora de uso; conviene una
+segunda: editar una máquina para quitar variables, emparejar a mano un tag de
+`Jaritza\L1`, y sondear después de editar. §9 dice cómo arrancar.
 
 **1 · Plan 32 F2 — desbloquear el historiador.** Por qué el grupo `DEMO 3`
 devuelve 0 muestras: si dejó de registrar, o si la ruta cambió como en el
@@ -427,8 +428,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** |
-| Backend | **376 passed** |
-| Frontend | **1052 passed · 29 skipped** |
+| Backend | **377 passed** |
+| Frontend | **1053 passed · 29 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

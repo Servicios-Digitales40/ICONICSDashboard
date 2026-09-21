@@ -1,6 +1,6 @@
 # PLAN 36 — Configurar una máquina marcando el árbol de ICONICS
 
-**Estado:** F1–F3 completadas · **pendiente de verse en el navegador**
+**Estado:** F1–F3 completadas · vista en el navegador el 21-09-2026 (§4.1)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -12,12 +12,11 @@
 > Es el punto **2 de los cuatro de la siguiente demo**: el panel de
 > administración.
 
-> **Lo que este plan NO ha hecho: verse en pantalla.** Las tres fases están
-> probadas con 33 pruebas de vista, 22 comprobaciones de dominio y 8 pruebas
-> de contrato HTTP, y el descubrimiento y la exploración se han ejercitado
-> contra el servidor real por HTTP. **Nadie ha abierto la pantalla en un
-> navegador.** Es la misma brecha que el `HANDOFF` declara para el Plan 33, y
-> el siguiente paso es cerrarla: `HANDOFF.md` §9 dice cómo.
+> Las tres fases están probadas con 34 pruebas de vista, 22 comprobaciones de
+> dominio y 9 pruebas de contrato HTTP; el descubrimiento y la exploración se
+> ejercitaron contra el servidor real por HTTP. **El usuario abrió la pantalla
+> el mismo día y dio de alta una máquina contra planta**; lo que destapó está
+> en §4.1 y ya está corregido.
 
 ---
 
@@ -302,6 +301,27 @@ probado en el dominio: `marcasDe` → `proponerVariables` →
 `configuracionDesdeMarcas` devuelve la misma lista.
 
 ---
+
+## 4.1 Lo que destapó probarla en el navegador
+
+El usuario abrió la pantalla el mismo día, dio de alta `vib-motor-03` con
+`S1`, la comprobó, la sondeó, y la editó para añadir `V20`. La ficha quedó
+diciendo tres cosas ciertas en momentos distintos: «44 variables», «las 24
+variables declaradas siguen existiendo» y «2 con serie verificada» junto a
+«9 de 43 verificadas». Tres defectos, ninguno del editor:
+
+- **La ficha no descartaba la comprobación ni el sondeo de la configuración
+  anterior** al guardar una edición. Se descartan.
+- **La lista no se volvía a pedir cuando el servidor anotaba algo.** Comprobar
+  y sondear escriben en la máquina; la cabecera de la ficha seguía con la
+  máquina tal como se listó al entrar. Se recarga cuando `anotado` es cierto.
+- **Editar dejaba la máquina en `VALID` con 20 variables en `UNKNOWN`.** El
+  veredicto era sobre otra lista. Si cambia QUÉ lee la máquina, su estado
+  vuelve a `UNKNOWN`; cada variable conserva el suyo. Re-guardar la misma lista
+  no borra nada.
+
+Backend 377 · frontend 1053. La pantalla ya se ha visto correr; lo que queda es
+que la revise alguien más que quien la escribió.
 
 ## 5. Lo que queda fuera
 

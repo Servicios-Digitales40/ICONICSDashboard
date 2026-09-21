@@ -110,11 +110,40 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
   const [sondeos, setSondeos] = useState({});
   const [sondeando, setSondeando] = useState(null);
 
+  const cargar = useCallback(async (signal) => {
+    /* Las dos a la vez: son independientes y la pantalla las necesita juntas. */
+    const [maquinas, tipos] = await Promise.all([
+      listarMaquinas({ signal }),
+      listarTipos({ signal }),
+    ]);
+    return { maquinas: maquinas.maquinas ?? [], tipos: tipos.tipos ?? [] };
+  }, []);
+
+  /*
+   * ── LA LISTA SE VUELVE A PEDIR CUANDO EL SERVIDOR ANOTÓ ALGO ────────
+   *
+   * Comprobar y sondear ESCRIBEN en la máquina (su estado, el
+   * `historyVerified` de cada variable). Hasta el 21-09-2026 la ficha seguía
+   * pintando la máquina tal como se listó al entrar: el sondeo decía «9 de 43
+   * verificadas» y la cabecera de la misma ficha seguía diciendo «2 con serie
+   * verificada». Dos cifras de la misma máquina, en la misma pantalla, y las
+   * dos ciertas en momentos distintos. Lo destapó usarla.
+   */
+  const recargar = useCallback(async () => {
+    try {
+      const { maquinas, tipos } = await cargar();
+      setEstado({ cargando: false, error: null, maquinas, tipos });
+    } catch (error) {
+      setEstado((prev) => ({ ...prev, error }));
+    }
+  }, [cargar]);
+
   const comprobar = useCallback(async (id) => {
     setComprobando(id);
     try {
       const revision = await verificarMaquina(id);
       setRevisiones((previas) => ({ ...previas, [id]: revision }));
+      if (revision?.anotado) await recargar();
     } catch (error) {
       /* Un fallo al comprobar NO es un veredicto sobre la máquina: es que no
          se pudo mirar. Se pinta como tal, sin tocar su estado. */
@@ -125,13 +154,14 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
     } finally {
       setComprobando(null);
     }
-  }, []);
+  }, [recargar]);
 
   const sondear = useCallback(async (id) => {
     setSondeando(id);
     try {
       const sondeo = await sondearMaquina(id);
       setSondeos((previos) => ({ ...previos, [id]: sondeo }));
+      if (sondeo?.anotado) await recargar();
     } catch (error) {
       setSondeos((previos) => ({
         ...previos,
@@ -140,16 +170,7 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
     } finally {
       setSondeando(null);
     }
-  }, []);
-
-  const cargar = useCallback(async (signal) => {
-    /* Las dos a la vez: son independientes y la pantalla las necesita juntas. */
-    const [maquinas, tipos] = await Promise.all([
-      listarMaquinas({ signal }),
-      listarTipos({ signal }),
-    ]);
-    return { maquinas: maquinas.maquinas ?? [], tipos: tipos.tipos ?? [] };
-  }, []);
+  }, [recargar]);
 
   useEffect(() => {
     const control = new AbortController();
@@ -183,13 +204,20 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
   const alGuardar = useCallback(async (maquina, avisos) => {
     setEditor(null);
     setGuardado({ maquina, avisos });
-    try {
-      const { maquinas, tipos } = await cargar();
-      setEstado({ cargando: false, error: null, maquinas, tipos });
-    } catch (error) {
-      setEstado((prev) => ({ ...prev, error }));
+    /*
+     * La comprobación y el sondeo que se pintaban eran de la configuración
+     * ANTERIOR. Tras editar, una ficha que dijera «las 24 variables siguen
+     * existiendo» sobre una máquina que ahora tiene 44 estaría mintiendo con
+     * un dato que fue cierto. Se descartan; quien quiera saber, vuelve a
+     * comprobar.
+     */
+    const id = maquina?.id;
+    if (id) {
+      setRevisiones(({ [id]: _vieja, ...resto }) => resto);
+      setSondeos(({ [id]: _viejo, ...resto }) => resto);
     }
-  }, [cargar]);
+    await recargar();
+  }, [recargar]);
 
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
 

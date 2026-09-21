@@ -365,6 +365,35 @@ describe("el sondeo de series", () => {
    * Sin punto histórico no hay series que comparar, y el botón prometería un
    * trabajo que no se puede hacer.
    */
+  /*
+   * Destapado usándola el 21-09-2026: el sondeo decía «9 de 43 verificadas» y
+   * la cabecera de la MISMA ficha seguía diciendo «2 con serie verificada».
+   * Cuando el servidor anota algo, la lista se vuelve a pedir.
+   */
+  it("tras un sondeo ANOTADO, la ficha se recarga con lo que el servidor guardó", async () => {
+    listarMaquinas
+      .mockResolvedValueOnce({ ok: true, cuantas: 1, maquinas: [conHistoria()] })
+      .mockResolvedValueOnce({
+        ok: true,
+        cuantas: 1,
+        maquinas: [maquina({ variables: [{ id: "aPeak_S1", pointName: "ac:PRUEBA/M02/S1/aPeak", historyPointName: "hda:g:aPeak_S1", historyVerified: true, acceso: "read" }] })],
+      });
+    sondearMaquina.mockResolvedValue({
+      ok: true, estado: "VALID", motivo: "1 de 1 series verificadas.",
+      resumen: { total: 1, verificadas: 1, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      pendientes: [], anotado: true,
+    });
+
+    montar();
+    await screen.findByText("Motor conveyor 4");
+    expect(screen.getByText(/0 con serie verificada/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sondear sus series/i }));
+
+    await waitFor(() => expect(listarMaquinas).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/1 con serie verificada/)).toBeTruthy();
+  });
+
   it("una máquina sin histórico NO ofrece el botón de sondear", async () => {
     listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
 
