@@ -51,6 +51,7 @@ import {
   ESTADO_CONFIGURACION,
   capacidadesDe,
 } from '../../shared/eva/comun/configuracionMaquina.js'
+import { construirSistema } from '../../shared/eva/comun/construirSistema.js'
 import { verificarMaquina } from '../lib/verificarConfiguracion.mjs'
 import { descubrirAlarmas, descubrirVariables } from '../lib/descubrirDesdeArbol.mjs'
 import { sondearSeries } from '../lib/sondearSeries.mjs'
@@ -64,11 +65,44 @@ import { resumenDeTipos, tipoDe } from '../../shared/eva/tipos/index.js'
  * calculan aquí a partir de la configuración y del tipo. Guardarlas sería
  * tener dos versiones de la misma verdad, y la almacenada se quedaría vieja en
  * cuanto alguien editara una variable.
+ *
+ * ── LAS LIMITACIONES TAMBIÉN SE DERIVAN (Plan 34 F4) ───────────────
+ *
+ * Y hasta el 21-09-2026 **no salían por aquí**. El defecto se destapó dando de
+ * alta una máquina desde el árbol con variables que el tipo no reconoce: la
+ * API contestó `capacidades: [..., "DIAGNOSTICS"]` con **cero roles
+ * requeridos cubiertos**, y sin una sola línea que lo dijera.
+ *
+ * Eso es exactamente lo que `construirSistema` evita cuando registra la
+ * máquina —«el asistente diría "no hay riesgos" de una máquina cuyas reglas
+ * nunca se evaluaron»— pero quien consulta la API veía otra cosa. Dos
+ * versiones de la misma verdad, que es lo que el párrafo de arriba prohíbe
+ * para las capacidades y valía igual para esto.
+ *
+ * Se derivan del mismo sitio que el registro, no de una copia: se construye la
+ * entrada y se le piden sus `limitaciones`. Un tipo desconocido no puede
+ * construirse, y entonces viajan las declaradas a mano y nada más.
  */
-const conCapacidades = maquina => ({
-  ...maquina,
-  capacidades: capacidadesDe(maquina, tipoDe(maquina.tipo)),
-})
+const conCapacidades = maquina => {
+  const tipo = tipoDe(maquina.tipo)
+
+  let limitaciones = maquina.limitaciones ?? []
+  if (tipo) {
+    try {
+      limitaciones = construirSistema(maquina, tipo).limitaciones
+    } catch {
+      /* Una configuración que no se puede construir es un problema, pero NO
+         de esta función: `problemasDeMaquina` ya lo dice al guardarla. Aquí
+         se devuelven las declaradas y no se inventa el resto. */
+    }
+  }
+
+  return {
+    ...maquina,
+    capacidades: capacidadesDe(maquina, tipo),
+    limitaciones,
+  }
+}
 
 export function registerMaquinasRoutes(
   fastify,

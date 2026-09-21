@@ -504,6 +504,21 @@ export async function descubrirVariables(
         pointName: p.pointName,
         historyPointName,
         rol,
+        /*
+         * ── EL APOYO SE PROPONE COMO `assetId` ─────────────────────
+         *
+         * Y no sólo como `canal` informativo, que es como salía hasta el
+         * 21-09-2026. El defecto lo destapó dar de alta una máquina desde
+         * cero con lo que este módulo propone: las 65 variables llegaban con
+         * `assetId: null`, y `dominioDesdeRoles` empareja por ahí —el apoyo
+         * de una variable ES el activo al que pertenece (Plan 34 F3)—. Con
+         * el campo vacío, ninguna encontraba su apoyo y la máquina no
+         * diagnosticaba.
+         *
+         * Es la clase de hueco que sólo aparece recorriendo el circuito
+         * entero: cada fase por separado estaba bien.
+         */
+        assetId: canal,
       }),
       /* Los candidatos viajan aunque haya rol: cuando son varios, la pantalla
          tiene que poder ofrecerlos en vez de pedir que se escriba uno. */

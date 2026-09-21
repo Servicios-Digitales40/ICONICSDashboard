@@ -262,6 +262,32 @@ check('un tag del variador se reconoce aunque lleve el sufijo dentro', () => {
   assert.equal(s.canal, null)
 })
 
+await checkAsync('el apoyo se propone como `assetId`, que es por donde empareja F3', async () => {
+  /*
+   * Defecto real, destapado el 21-09-2026 al dar de alta una máquina desde
+   * cero con lo que este módulo propone: las variables llegaban con `canal`
+   * informativo y `assetId: null`, y `dominioDesdeRoles` empareja por
+   * `assetId` —el apoyo de una variable ES el activo al que pertenece—. Con
+   * el campo vacío, ninguna encontraba su apoyo y la máquina no diagnosticaba.
+   *
+   * Cada fase estaba bien por separado. El hueco sólo aparece recorriendo el
+   * circuito entero, que es la razón de que esta comprobación exista.
+   */
+  const r = await descubrirVariables(
+    { raizEnVivo: RAIZ, tipo: TIPO_VIBRACIONES },
+    {
+      explorar: arbolFalso({
+        [RAIZ]: [`${RAIZ}S1/`],
+        [`${RAIZ}S1/`]: [`${RAIZ}S1/vRMS_S1`],
+        [`${RAIZ}S1/vRMS_S1`]: [],
+      }),
+    },
+  )
+  assert.equal(r.variables[0].rol, 'medida:vRMS')
+  assert.equal(r.variables[0].assetId, 'S1', 'sin `assetId` el dominio no la coloca')
+  assert.equal(r.variables[0].canal, 'S1', '`canal` sigue viajando para la pantalla')
+})
+
 check('un tag que el tipo no conoce NO recibe rol, y se nota', () => {
   const x = proponerRol('CONECTED 1', TIPO_VIBRACIONES, { canales: CANALES })
   assert.equal(x.rol, null)
