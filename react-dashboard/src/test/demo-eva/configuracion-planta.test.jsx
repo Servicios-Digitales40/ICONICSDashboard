@@ -27,11 +27,17 @@ vi.mock("@/lib/api/maquinasApi.js", () => ({
   listarMaquinas: vi.fn(),
   listarTipos: vi.fn(),
   verificarMaquina: vi.fn(),
+  sondearMaquina: vi.fn(),
   problemasDeError: () => [],
 }));
 
 import { ThemeProvider } from "@/theme";
-import { listarMaquinas, listarTipos, verificarMaquina } from "@/lib/api/maquinasApi.js";
+import {
+  listarMaquinas,
+  listarTipos,
+  sondearMaquina,
+  verificarMaquina,
+} from "@/lib/api/maquinasApi.js";
 import ConfiguracionPlanta from "@/Demo-EVA/views/comunes/ConfiguracionPlanta.jsx";
 
 /** La vista pide el tema por contexto, como todas las de este tablero. */
@@ -246,6 +252,117 @@ describe("la comprobación contra ICONICS", () => {
  *
  * Una vista de configuración no necesita valores en vivo. Esto lo fija.
  */
+/*
+ * ── EL SONDEO DE SERIES (Plan 34 F4) ─────────────────────────────────
+ *
+ * Contesta una pregunta distinta de la comprobación: no si los puntos
+ * EXISTEN, sino si la serie que el historiador devuelve por una variable es
+ * de VERDAD suya. Hace falta porque el servidor contesta que sí y devuelve la
+ * serie de otra señal, sin dar error.
+ *
+ * Lo que estas pruebas defienden es que esa diferencia se VEA. Una variable
+ * cuya serie es la de otra no produce un hueco: produce una gráfica con el
+ * número equivocado bajo el rótulo correcto, y si la pantalla no lo dice,
+ * nadie lo descubre mirando.
+ */
+describe("el sondeo de series", () => {
+  /** Una máquina con punto histórico: sin él no hay nada que sondear. */
+  const conHistoria = () =>
+    maquina({
+      variables: [
+        {
+          id: "aPeak_S1",
+          pointName: "ac:PRUEBA/M02/S1/aPeak",
+          historyPointName: "hda:g:aPeak_S1",
+          historyVerified: false,
+          acceso: "read",
+        },
+      ],
+    });
+
+  it("nombra las variables cuya serie es la de OTRA señal", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
+    sondearMaquina.mockResolvedValue({
+      ok: true,
+      estado: "DEGRADED",
+      motivo: "1 de 2 series verificadas como propias.",
+      resumen: { total: 2, verificadas: 1, compartidas: 1, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      pendientes: [
+        {
+          id: "aPeak_S1",
+          causa: "serie-compartida",
+          motivo: "El historiador devuelve la MISMA serie que para aRMS_S1.",
+          compartidaCon: ["aRMS_S1"],
+        },
+      ],
+      anotado: true,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
+
+    /* Con cuál la comparte, no sólo que «hay un problema»: es lo único
+       accionable — dice qué gráfica no hay que creerse. */
+    expect(await screen.findByText(/aPeak_S1 → aRMS_S1/)).toBeTruthy();
+    /* El rótulo del resumen, no el motivo: los dos contienen «1 de 2 series
+       verificadas» y `getByText` con eso solo devuelve dos coincidencias. */
+    expect(screen.getByText("1 de 2 series verificadas como propias")).toBeTruthy();
+  });
+
+  /*
+   * La distinción que justifica la fase, en pantalla. Una serie plana no
+   * desmiente nada: con la máquina parada todas lo son, y pintarlo como
+   * problema de la variable mandaría a buscar una avería que no existe.
+   */
+  it("«no varía» NO se pinta como serie compartida", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
+    sondearMaquina.mockResolvedValue({
+      ok: true,
+      estado: "UNKNOWN",
+      motivo: "0 de 1 series verificadas: no varían en la ventana.",
+      resumen: { total: 1, verificadas: 0, compartidas: 0, sinVariacion: 1, sinDatos: 0, fallos: 0 },
+      pendientes: [
+        { id: "aPeak_S1", causa: "sin-variacion", motivo: "No varía.", compartidaCon: null },
+      ],
+      anotado: true,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
+
+    await screen.findByText("0 de 1 series verificadas como propias");
+    /* El rótulo de «serie de otra señal» NO aparece: no es ese problema. */
+    expect(screen.queryByText(/devuelve la serie de otra señal/i)).toBeNull();
+  });
+
+  it("un fallo de red se pinta como «no se pudo», sin tumbar la pantalla", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
+    sondearMaquina.mockRejectedValue(new Error("se cayó la red"));
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
+
+    expect(await screen.findByText(/No se pudieron sondear las series/i)).toBeTruthy();
+    /* La ficha sigue en pie: un sondeo fallido no es un veredicto. */
+    expect(screen.getByText("Motor conveyor 4")).toBeTruthy();
+  });
+
+  /*
+   * Sin punto histórico no hay series que comparar, y el botón prometería un
+   * trabajo que no se puede hacer.
+   */
+  it("una máquina sin histórico NO ofrece el botón de sondear", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+
+    montar();
+    await screen.findByText("Motor conveyor 4");
+
+    expect(screen.queryByRole("button", { name: /Sondear sus series/i })).toBeNull();
+    /* Pero sí el de comprobar: esa pregunta se puede contestar igualmente. */
+    expect(screen.getByRole("button", { name: /Comprobar contra ICONICS/i })).toBeTruthy();
+  });
+});
+
 describe("no despierta el sondeo de ninguna máquina", () => {
   /*
    * Se sustituye el PROVIDER, que es por donde pasa cualquier lectura de

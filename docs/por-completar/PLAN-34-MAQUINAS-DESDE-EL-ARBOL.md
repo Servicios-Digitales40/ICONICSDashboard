@@ -1,8 +1,11 @@
 # PLAN 34 — Las máquinas se configuran desde el árbol de ICONICS
 
-**Estado:** F0, F0.2, F1, F2 y F3 completadas · F4–F5 por completar
+**Estado:** F0, F0.2, F1, F2, F3 y F4 completadas · F5 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
+
+> **F4 entregó el descubrimiento y el sondeo; el alta editable espera al Plan
+> 25** (autenticación). Ver la decisión de alcance en su fase.
 
 > **Mientras dure esta rama, la ESTACIÓN DE LLENADO está cerrada.** Este plan
 > migra **sólo vibraciones**. El tanque se mira —es el espejo— y **no se
@@ -645,10 +648,14 @@ hay**.
 
 ---
 
-### F4 — Configurar vibraciones desde la pantalla
+### F4 — El descubrimiento y el sondeo, por HTTP y en pantalla ✅
 
-**Objetivo.** Dar de alta la máquina **desde el navegador**, contra el árbol
-real, con el emparejamiento de F1 y el sondeo de F2.
+**Completada el 21-09-2026, con el alcance recortado.** Ver «La decisión de
+alcance» más abajo: el alta editable **no entra**, porque choca con una
+decisión de seguridad ya tomada.
+
+**Objetivo original.** Dar de alta la máquina **desde el navegador**, contra el
+árbol real, con el emparejamiento de F1 y el sondeo de F2.
 
 La vista de `Planta › Configuración` es hoy de sólo lectura (Plan 33 F5):
 aquí gana edición.
@@ -669,6 +676,87 @@ declara. Para que una máquina configurada evalúe también sus reglas de alarma
 la pantalla tiene que dejar declarar **el área** (`ae:/...`) como parte de la
 máquina — el descubridor ya la sabe leer y clasificar (F1), y sabe que sólo
 los contadores entregan valor.
+
+#### La decisión de alcance, y por qué
+
+**F4 tal como estaba escrita chocaba con el Plan 33 §20.** La vista de
+`Planta › Configuración` es de sólo lectura **a propósito**, y su cabecera lo
+dice:
+
+> «Marcar variables escribibles **depende del Plan 25**, y §20 lo declara
+> **dependencia dura, no recomendación**. Hoy `AUTH_HABILITADA=false` — los
+> roles existen y están probados, pero **no protegen nada**. Una pantalla que
+> dejara marcar una variable como escribible sin autenticación pondría esa
+> decisión al alcance de cualquiera con acceso al tablero.»
+
+Comprobado: `AUTH_HABILITADA` sigue en `false` por defecto y comentada en
+`.env.local`. Así que la fase se replanteó en vez de forzarla —`CLAUDE.md` §2:
+«si una tarea choca con una de estas, la tarea se replantea, no la regla»— y
+el usuario eligió el alcance recortado el 21-09-2026.
+
+**Lo que SÍ entra**, porque no reabre esa decisión:
+
+- Los dos endpoints, con `exigirRol('administrador')` ya declarado y listo.
+- El **sondeo desde la pantalla**, que escribe en NUESTRO archivo de
+  configuración y no en la instalación — el mismo argumento por el que
+  «Comprobar contra ICONICS» ya estaba permitido en F8 del Plan 33.
+
+**Lo que NO entra, y espera al Plan 25:** el alta editable desde el navegador.
+
+#### Lo que se construyó
+
+**Dos endpoints nuevos** (46 → 48 en el inventario):
+
+| | |
+|---|---|
+| `POST /api/maquinas/descubrir` | recorre el árbol y **propone**; no guarda nada |
+| `POST /api/maquinas/:id/sondear` | sondea las series y **sí anota** `historyVerified` |
+
+La asimetría es deliberada y está escrita en las dos: descubrir devuelve una
+propuesta que alguien tiene que revisar —una variable mal emparejada no da
+error, da la señal de al lado bajo el rótulo correcto—; sondear devuelve el
+resultado de una medición, donde no hay nada que elegir.
+
+**Probados contra el servidor real:**
+
+```
+descubrir → VALID · 184 en vivo · 122 emparejados · 65 con rol · 0 ambiguos
+            alarmas: 6 contadores · 42 alarmas · 9 acciones
+sondear   → DEGRADED · 19 de 36 verificadas · anotado: true
+```
+
+> **El historiador volvió** durante esta fase. El sondeo por HTTP dejó
+> `datos/maquinas.json` con **19 verificadas** y las nueve `QC_*` en `false`,
+> con un solo POST. Es exactamente el flujo previsto en §8 para cuando ICONICS
+> empiece a registrar.
+
+**En pantalla**, la ficha de cada máquina gana un botón «Sondear sus series»
+junto al de comprobar, y un bloque que pinta lo que **no** quedó verificado
+**con su causa**, porque son cuatro cosas distintas que una cuenta sola
+confundiría: `serie-compartida` (accionable: esa gráfica no hay que creérsela),
+`sin-variacion`, `sin-muestras` y `no-se-pudo-leer`. Las dos últimas no son un
+veredicto sobre la variable.
+
+El botón **sólo aparece si la máquina declara algún punto histórico**: sin
+ellos no hay series que comparar, y prometería un trabajo imposible.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| Vista | **16** pruebas (12 + 4 nuevas) |
+| Frontend | **1017** · 29 omitidas |
+| `npm run verificar` | los **39** |
+| Backend | 368 |
+| i18n | 1314 claves × 2 idiomas, con paridad · **41 códigos** con frase |
+
+Roto a propósito (`CLAUDE.md` §6.2): quitando el «→ con quién comparte serie»
+del render, falla la prueba que lo defiende.
+
+**Dos cosas que cazaron los verificadores existentes**: `verificar-codigos`
+exigió frase en dos idiomas para el código nuevo —41 ahora—, y de paso volví a
+caer en la trampa del `HANDOFF` §8: un backend viejo en el 3001 respondía 404 a
+las rutas nuevas. Se mide levantando un puerto propio.
 
 ---
 
@@ -747,6 +835,30 @@ vivo está por confirmar con la máquina girando.
 **Con la máquina parada no se puede terminar de verificar** (§2.3). F2 puede
 clasificar lo que ya tiene historia, pero la verificación en vivo necesita que
 el motor gire.
+
+---
+
+## 9. Dónde encaja esto en la siguiente demo
+
+Los cuatro puntos que el usuario quiere tocar (21-09-2026), y qué plan cubre
+cada uno. Se anota aquí porque explica **por qué F4 se recortó** en vez de
+forzarse: su parte que falta no es un olvido, es el punto 3 de esta lista.
+
+| | Qué es | Dónde vive |
+|---|---|---|
+| **1 · Modularidad** | Máquinas configuradas desde el árbol | **Este plan** · falta F5 |
+| **2 · Panel de administración** | El alta editable en pantalla | **F4 de este plan**, bloqueada por el 3 |
+| **3 · RBAC** | Encender la autenticación y los roles | **Plan 25** · `AUTH_HABILITADA=false` hoy |
+| **4 · Diagnóstico de vibraciones** | Factor de cresta, `necesita`, rpm | **Plan 32 F4** |
+
+Dos avisos para quien los planifique:
+
+- **El 2 depende del 3, y es dependencia dura**, no una preferencia de orden
+  (Plan 33 §20). Con RBAC encendido, F4 se completa con lo que ya está hecho:
+  los dos endpoints existen y llevan `exigirRol('administrador')` declarado.
+- **El 4 tiene una corrección medida aquí** (§2.6): el factor de cresta
+  `aPeak/aRMS` **no se puede calcular sobre historia en S1** —daría 1,0
+  siempre—, aunque el Plan 32 lo dé por coste cero. En S2 y S3 sí.
 
 **El Hyper Historian dejó de responder el 21-09-2026 por la tarde.** Las dos
 máquinas a la vez, con el árbol y el valor en vivo funcionando. Es de planta.

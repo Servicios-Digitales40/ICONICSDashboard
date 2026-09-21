@@ -799,6 +799,24 @@ export const EditarMaquinaSchema = CrearMaquinaSchema.partial()
 /** El id en la ruta. */
 export const MaquinaParamsSchema = z.object({ id: IdMaquinaSchema })
 
+/**
+ * `POST /api/maquinas/descubrir` — propone variables desde el árbol.
+ *
+ * No lleva `id` ni toca ninguna máquina guardada: es una consulta al servidor
+ * que devuelve una PROPUESTA para que una persona la revise. Por eso es un
+ * POST y no un GET —lleva tres rutas en el cuerpo, que en una query string
+ * serían ilegibles— pero no escribe nada (Plan 34 F4).
+ *
+ * `tipo` es opcional: sin él se descubren las variables y sus emparejamientos,
+ * pero no se propone ningún rol, porque los roles son del tipo.
+ */
+export const DescubrirMaquinaSchema = z.object({
+  raizEnVivo: z.string().trim().min(1).max(512),
+  raizHistorico: z.string().trim().min(1).max(512).nullish(),
+  areaAlarmas: z.string().trim().min(1).max(512).nullish(),
+  tipo: z.string().trim().min(1).max(64).nullish(),
+})
+
 export function primerMensajeDeValidacion(erroresDeValidacion) {
   const problema = erroresDeValidacion?.[0]
   if (!problema) return 'Cuerpo de la petición inválido.'

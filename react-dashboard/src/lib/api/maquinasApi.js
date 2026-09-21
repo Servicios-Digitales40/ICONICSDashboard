@@ -124,6 +124,65 @@ export async function verificarMaquina(id, { signal } = {}) {
 }
 
 /**
+ * Propone las variables de una máquina recorriendo el árbol de ICONICS.
+ * Plan 34 F4.
+ *
+ * ── NO GUARDA NADA, Y ESO ES EL PUNTO ──────────────────────────────
+ *
+ * Devuelve una PROPUESTA: las variables que el árbol publica, con su
+ * emparejamiento `ac:` ↔ `hda:` sugerido donde el nombre coincide y su rol
+ * propuesto donde el tipo lo reconoce. Quien la revisa decide qué entra.
+ *
+ * Lo que no resuelve lo DICE en vez de adivinarlo: `procedencia` explica por
+ * qué se propuso cada emparejamiento, `rolCandidatos` trae los varios cuando
+ * hay más de uno, y `sinEmparejar` lista lo que el historiador publica y
+ * nadie reclamó. Una variable mal emparejada no da error — da una gráfica con
+ * la señal de al lado bajo el rótulo correcto.
+ *
+ * `tipo` es opcional: sin él se descubren variables y emparejamientos, pero
+ * ningún rol, porque los roles son del tipo.
+ */
+export async function descubrirMaquina(
+  { raizEnVivo, raizHistorico = null, areaAlarmas = null, tipo = null },
+  { signal } = {},
+) {
+  const response = await fetch(`${API_BASE}/api/maquinas/descubrir`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ raizEnVivo, raizHistorico, areaAlarmas, tipo }),
+    signal,
+  });
+  return parseResponse(response);
+}
+
+/**
+ * Sondea las series de una máquina y anota cuáles son de verdad suyas.
+ * Plan 34 F4.
+ *
+ * ── POR QUÉ ÉSTE SÍ ESCRIBE, Y `descubrir` NO ──────────────────────
+ *
+ * Porque aquí no hay nada que decidir: la serie es de esta variable o es la
+ * de otra, y eso lo dice el servidor comparando. Lo que se guarda es el
+ * resultado de una medición, no una elección de nadie.
+ *
+ * Escribe en NUESTRO archivo de configuración, no en la instalación — el
+ * mismo argumento por el que `verificarMaquina` ya puede escribir sin la
+ * autenticación de la que depende el alta.
+ *
+ * `pendientes` trae sólo lo que NO quedó verificado, con su `causa`:
+ * `serie-compartida` (el servidor da la misma serie a varias),
+ * `sin-variacion` (no se puede distinguir de otra plana), `sin-muestras` o
+ * `no-se-pudo-leer`. Las dos últimas no son un veredicto sobre la variable.
+ */
+export async function sondearMaquina(id, { signal } = {}) {
+  const response = await fetch(
+    `${API_BASE}/api/maquinas/${encodeURIComponent(id)}/sondear`,
+    { method: "POST", headers: { ...authHeaders() }, signal },
+  );
+  return parseResponse(response);
+}
+
+/**
  * Da de baja una máquina.
  *
  * La respuesta trae `desactivada`: con casos previos asociados el backend NO

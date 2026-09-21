@@ -26,19 +26,30 @@
  * Decirlo en pantalla —y no sólo en un plan— es parte del trabajo: una vista
  * sin botón de «nueva máquina» y sin explicación se lee como una vista rota.
  *
- * ── LO ÚNICO QUE ESCRIBE: LA COMPROBACIÓN (F8) ─────────────────────
+ * ── LO QUE SÍ ESCRIBE: DOS PREGUNTAS AL SERVIDOR ───────────────────
  *
- * «Comprobar contra ICONICS» contrasta los puntos de una máquina y guarda el
- * veredicto. Escribe en NUESTRO archivo de configuración, no en la
- * instalación: no mueve un actuador ni cambia un tag, así que no necesita la
- * autenticación de la que depende el alta.
+ * «Comprobar contra ICONICS» (Plan 33 F8) contrasta los puntos de una máquina
+ * y guarda el veredicto. «Sondear sus series» (Plan 34 F4) pide cada serie y
+ * las compara entre sí, y anota qué variable puede prometer historia.
  *
- * Va bajo demanda y no al pintar la lista: cuesta una lectura completa de cada
- * máquina, y el limitador corta en 300 peticiones por minuto y por IP.
+ * Las dos escriben en NUESTRO archivo de configuración, no en la instalación:
+ * no mueven un actuador ni cambian un tag, así que no necesitan la
+ * autenticación de la que sí depende el alta.
+ *
+ * Y contestan preguntas distintas: comprobar dice si los puntos siguen
+ * EXISTIENDO; sondear, si la serie que el historiador devuelve por una
+ * variable es de VERDAD suya —porque contesta que sí y devuelve la de otra
+ * señal, sin dar error—.
+ *
+ * Las dos van bajo demanda y no al pintar la lista: cuestan una lectura
+ * completa de cada máquina, y el limitador corta en 300 peticiones por minuto
+ * y por IP.
  *
  * ── LO QUE ESTA VISTA NO HACE, Y ES DELIBERADO ─────────────────────
  *
- * **No sondea.** No llama a `useSistemaAgua()` ni a ningún hook de máquina.
+ * **No suscribe ninguna máquina al sondeo en vivo.** Ojo con el nombre: el
+ * botón «Sondear sus series» pide historia UNA vez al pulsarlo, y eso es otra
+ * cosa. Aquí no se llama a `useSistemaAgua()` ni a ningún hook de máquina.
  * El sondeo arranca por conteo de referencias en `subscribeSistema`, no al
  * montar una vista, y este proyecto ya ha revivido el sondeo de una máquina
  * cerrada DOS veces por colgar una lectura de un componente que se monta
@@ -48,10 +59,15 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Boxes, Cog, Info, RefreshCw, ShieldAlert } from "lucide-react";
+import { Boxes, Cog, Info, RefreshCw, ShieldAlert, Waves } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
-import { listarMaquinas, listarTipos, verificarMaquina } from "@/lib/api/maquinasApi.js";
+import {
+  listarMaquinas,
+  listarTipos,
+  sondearMaquina,
+  verificarMaquina,
+} from "@/lib/api/maquinasApi.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
@@ -83,6 +99,25 @@ export default function ConfiguracionPlanta() {
   const [revisiones, setRevisiones] = useState({});
   const [comprobando, setComprobando] = useState(null);
 
+  /*
+   * ── EL SONDEO DE SERIES (Plan 34 F4) ───────────────────────────────
+   *
+   * Hermano de la comprobación, y contesta otra pregunta. «Comprobar» dice si
+   * los puntos siguen EXISTIENDO; «sondear» dice si la serie que el
+   * historiador devuelve por una variable es de VERDAD suya.
+   *
+   * Hace falta porque el servidor contesta que sí y devuelve la serie de otra
+   * señal, sin dar error: medido, `aPeak_S1` trae la de `aRMS_S1` en 1805 de
+   * 1805 valores, y las nueve `QC_*` devuelven todas la misma.
+   *
+   * Escribe —anota `historyVerified` por variable— y eso está permitido por el
+   * mismo motivo que la comprobación: toca NUESTRO archivo de configuración,
+   * no la instalación. No mueve un actuador ni cambia un tag, así que no
+   * depende de la autenticación de la que sí depende el alta (Plan 33 §20).
+   */
+  const [sondeos, setSondeos] = useState({});
+  const [sondeando, setSondeando] = useState(null);
+
   const comprobar = useCallback(async (id) => {
     setComprobando(id);
     try {
@@ -100,6 +135,27 @@ export default function ConfiguracionPlanta() {
       }));
     } finally {
       setComprobando(null);
+    }
+  }, []);
+
+  const sondear = useCallback(async (id) => {
+    setSondeando(id);
+    try {
+      const sondeo = await sondearMaquina(id);
+      setSondeos((previos) => ({ ...previos, [id]: sondeo }));
+    } catch (error) {
+      /* Igual que arriba: no haber podido sondear no es un veredicto sobre
+         las series de la máquina. Se pinta como `UNKNOWN`, sin tocar nada. */
+      setSondeos((previos) => ({
+        ...previos,
+        [id]: {
+          estado: "UNKNOWN",
+          motivo: error?.mensajeDelServidor ?? error?.message,
+          anotado: false,
+        },
+      }));
+    } finally {
+      setSondeando(null);
     }
   }, []);
 
@@ -201,6 +257,9 @@ export default function ConfiguracionPlanta() {
             revision={revisiones[m.id] ?? null}
             comprobando={comprobando === m.id}
             onComprobar={() => comprobar(m.id)}
+            sondeo={sondeos[m.id] ?? null}
+            sondeando={sondeando === m.id}
+            onSondear={() => sondear(m.id)}
           />
         ))}
       </Panel>
@@ -246,7 +305,11 @@ export default function ConfiguracionPlanta() {
  * campo `limitaciones` existe por contrato para esto —«lo que hay que confesar
  * al contestar»— y una pantalla que lo omita rompe ese contrato por su lado.
  */
-function FichaDeMaquina({ maquina, traducir, t, revision, comprobando, onComprobar }) {
+function FichaDeMaquina({
+  maquina, traducir, t,
+  revision, comprobando, onComprobar,
+  sondeo, sondeando, onSondear,
+}) {
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
 
   const conSerie = (maquina.variables ?? []).filter((v) => v.historyVerified).length;
@@ -370,30 +433,131 @@ function FichaDeMaquina({ maquina, traducir, t, revision, comprobando, onComprob
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onComprobar}
-        disabled={comprobando}
-        style={{
-          marginTop: 9,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "5px 11px",
-          borderRadius: 9,
-          cursor: comprobando ? "default" : "pointer",
-          border: `1px solid ${t.border}`,
-          background: t.panel,
-          color: t.textSoft,
-          fontSize: 11.5,
-          fontWeight: 600,
-          fontFamily: "'Inter', sans-serif",
-          opacity: comprobando ? 0.6 : 1,
-        }}
-      >
-        <RefreshCw size={13} />
-        {traducir(comprobando ? "machines:config.checking" : "machines:config.check")}
-      </button>
+      {/*
+        ── EL RESULTADO DEL SONDEO (Plan 34 F4) ──────────────────────────
+
+        Se pinta lo que NO quedó verificado, y con su causa, porque son cuatro
+        cosas distintas que una cuenta sola confundiría:
+
+          `serie-compartida`  el servidor da la MISMA serie a varias variables
+          `sin-variacion`     plana en la ventana: no se distingue de otra igual
+          `sin-muestras`      contestó, y no hay nada en la ventana
+          `no-se-pudo-leer`   no se llegó a mirar
+
+        Las dos últimas **no son un veredicto sobre la variable**, y por eso no
+        se pintan como problema suyo. La primera sí: mientras dure, esa
+        variable no puede prometer historia.
+      */}
+      {sondeo && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: t.panel,
+            border: `1px solid ${t.border}`,
+          }}
+        >
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>
+            {sondeo.resumen
+              ? traducir("machines:config.probeResult", {
+                  verificadas: sondeo.resumen.verificadas,
+                  total: sondeo.resumen.total,
+                })
+              : traducir("machines:config.probeUnknown")}
+          </div>
+
+          {sondeo.motivo && (
+            <div style={{ ...textoSuave, marginTop: 3 }}>{sondeo.motivo}</div>
+          )}
+
+          {/* Sólo las que comparten serie: es lo accionable. Una variable sin
+              variación se resuelve esperando a que la máquina gire. */}
+          {sondeo.pendientes?.some((p) => p.causa === "serie-compartida") && (
+            <div style={{ marginTop: 6 }}>
+              <div style={{ ...textoSuave, fontWeight: 600 }}>
+                {traducir("machines:config.probeShared")}
+              </div>
+              <ul style={{ margin: "3px 0 0", paddingLeft: 16 }}>
+                {sondeo.pendientes
+                  .filter((p) => p.causa === "serie-compartida")
+                  .map((p) => (
+                    <li
+                      key={p.id}
+                      style={{
+                        ...textoSuave,
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 11,
+                      }}
+                    >
+                      {p.id}
+                      {p.compartidaCon?.length ? ` → ${p.compartidaCon.join(", ")}` : ""}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+
+          {sondeo.anotado === false && (
+            <div style={{ ...textoSuave, marginTop: 4, fontStyle: "italic" }}>
+              {traducir("machines:config.probeNotSaved")}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ marginTop: 9, display: "flex", gap: 7, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={onComprobar}
+          disabled={comprobando}
+          style={{ ...estiloBoton(t), opacity: comprobando ? 0.6 : 1,
+            cursor: comprobando ? "default" : "pointer" }}
+        >
+          <RefreshCw size={13} />
+          {traducir(comprobando ? "machines:config.checking" : "machines:config.check")}
+        </button>
+
+        {/*
+          El sondeo sólo tiene sentido si la máquina declara algún punto
+          histórico: sin ellos no hay series que comparar, y el botón
+          prometería un trabajo que no se puede hacer.
+        */}
+        {maquina.capacidades?.includes("HISTORICAL_DATA") ||
+        maquina.variables?.some((v) => v.historyPointName) ? (
+          <button
+            type="button"
+            onClick={onSondear}
+            disabled={sondeando}
+            style={{ ...estiloBoton(t), opacity: sondeando ? 0.6 : 1,
+              cursor: sondeando ? "default" : "pointer" }}
+          >
+            <Waves size={13} />
+            {traducir(sondeando ? "machines:config.probing" : "machines:config.probe")}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
+}
+
+/** Los dos botones de una ficha comparten forma: 9px de radio, como el kit. */
+function estiloBoton(t) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    /* 44px de alto mínimo NO: estos no accionan la instalación, así que el
+       criterio táctil de `DESIGN.md` les pide 32. `5px 11px` sobre 11,5px da
+       ~32. */
+    padding: "7px 11px",
+    minHeight: 32,
+    borderRadius: 9,
+    border: `1px solid ${t.border}`,
+    background: t.panel,
+    color: t.textSoft,
+    fontSize: 11.5,
+    fontWeight: 600,
+    fontFamily: "'Inter', sans-serif",
+  };
 }

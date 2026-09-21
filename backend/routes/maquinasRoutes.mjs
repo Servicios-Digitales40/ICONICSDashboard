@@ -42,6 +42,7 @@
  */
 import {
   CrearMaquinaSchema,
+  DescubrirMaquinaSchema,
   EditarMaquinaSchema,
   MaquinaParamsSchema,
 } from '../http/esquemas.mjs'
@@ -51,6 +52,8 @@ import {
   capacidadesDe,
 } from '../../shared/eva/comun/configuracionMaquina.js'
 import { verificarMaquina } from '../lib/verificarConfiguracion.mjs'
+import { descubrirAlarmas, descubrirVariables } from '../lib/descubrirDesdeArbol.mjs'
+import { sondearSeries } from '../lib/sondearSeries.mjs'
 import { resumenDeTipos, tipoDe } from '../../shared/eva/tipos/index.js'
 
 /**
@@ -211,6 +214,182 @@ export function registerMaquinasRoutes(
           .filter((v) => v.estado === ESTADO_CONFIGURACION.INVALID)
           .map((v) => ({ id: v.id, pointName: v.pointName })),
         anotado: anotar,
+      }
+    }
+  )
+
+  /**
+   * Propone las variables de una máquina recorriendo el árbol de ICONICS.
+   *
+   * ── POR QUÉ NO ESCRIBE NADA ────────────────────────────────────
+   *
+   * Porque lo que devuelve es una PROPUESTA, no una configuración. Quien la
+   * revisa decide qué entra, corrige los emparejamientos que el nombre no
+   * resolvió y la guarda con el `POST /api/maquinas` de siempre.
+   *
+   * Guardarla aquí «para ahorrar un paso» daría de alta una máquina que nadie
+   * ha mirado, con los roles que un algoritmo propuso — y una variable mal
+   * emparejada no da error: da una pantalla que enseña la señal equivocada
+   * con el rótulo correcto (`CLAUDE.md` §2.5).
+   *
+   * Es un POST porque lleva tres rutas en el cuerpo, no porque escriba.
+   */
+  fastify.post(
+    '/api/maquinas/descubrir',
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('administrador')],
+      schema: { body: DescubrirMaquinaSchema },
+    },
+    async (request, reply) => {
+      if (!client) {
+        return responderError(
+          reply, 503, CODIGOS.ERROR_ICONICS_NO_CONFIGURADO,
+          'Este servidor no tiene cliente de ICONICS, así que no puede recorrer el árbol.'
+        )
+      }
+
+      const { raizEnVivo, raizHistorico, areaAlarmas, tipo: tipoId } = request.body
+
+      /* Un tipo inventado se rechaza en vez de descubrir sin roles y callar:
+         quien pidió roles tiene que saber que no los va a recibir. */
+      const tipo = tipoId ? tipoDe(tipoId) : null
+      if (tipoId && !tipo) {
+        return responderError(
+          reply, 400, CODIGOS.ERROR_VALIDACION,
+          `No existe ningún tipo de máquina "${tipoId}".`
+        )
+      }
+
+      const explorar = (ruta) => client.browse(ruta)
+
+      const hallazgo = await descubrirVariables(
+        { raizEnVivo, raizHistorico: raizHistorico ?? null, tipo },
+        { explorar },
+      )
+
+      /* Las alarmas son su propio espacio (`ae:`) y se piden aparte: lo que
+         cuelga de un área no se lee igual ni significa lo mismo. */
+      const alarmas = areaAlarmas
+        ? await descubrirAlarmas(areaAlarmas, { explorar })
+        : null
+
+      request.log.info(
+        { raizEnVivo, raizHistorico, areaAlarmas, ...hallazgo.resumen },
+        `Descubiertas ${hallazgo.resumen.enVivo} variables en vivo bajo «${raizEnVivo}»`
+      )
+
+      return {
+        ok: true,
+        estado: hallazgo.estado,
+        motivo: hallazgo.motivo,
+        resumen: hallazgo.resumen,
+        variables: hallazgo.variables,
+        sinEmparejar: hallazgo.sinEmparejar,
+        fallos: hallazgo.fallos,
+        alarmas,
+      }
+    }
+  )
+
+  /**
+   * Sondea las series de una máquina ya guardada y anota qué está verificado.
+   *
+   * ── POR QUÉ ESTE SÍ ANOTA, Y EL DE DESCUBRIR NO ────────────────
+   *
+   * Porque aquí no hay nada que decidir: la serie es de esta variable o es la
+   * de otra, y eso lo dice el servidor comparando, no una persona mirando. Lo
+   * que se guarda es el resultado de una medición.
+   *
+   * Y como toda medición, **puede no salir**. Una variable que no se pudo leer
+   * conserva su marca anterior en vez de bajar a `false`: un corte de red no
+   * puede borrar una verificación que sí se hizo (`UNKNOWN` ≠ `INVALID`).
+   */
+  fastify.post(
+    '/api/maquinas/:id/sondear',
+    {
+      onRequest: [fastify.autenticar, fastify.exigirRol('administrador')],
+      schema: { params: MaquinaParamsSchema },
+    },
+    async (request, reply) => {
+      const maquina = await gestorMaquinas.obtener(request.params.id)
+      if (!maquina) {
+        return responderError(
+          reply, 404, CODIGOS.ERROR_MAQUINA_NO_ENCONTRADA,
+          `No hay ninguna máquina configurada con el id "${request.params.id}".`
+        )
+      }
+
+      if (!client) {
+        return {
+          ok: true,
+          estado: ESTADO_CONFIGURACION.UNKNOWN,
+          motivo:
+            'Este servidor no tiene cliente de ICONICS, así que no se pueden pedir las series.',
+          anotado: false,
+        }
+      }
+
+      /*
+       * Siete días. Es la ventana que el historiador contesta —a treinta
+       * devuelve vacío SIN dar error, medido en las dos máquinas— y la que da
+       * margen para que una señal haya variado, que es lo que hace falta para
+       * distinguir dos series.
+       */
+      const hasta = new Date()
+      const desde = new Date(hasta.getTime() - 7 * 24 * 3600 * 1000)
+
+      const resultado = await sondearSeries(maquina, {
+        leerSerie: (opciones) => client.readHistory(opciones),
+        desde: desde.toISOString(),
+        hasta: hasta.toISOString(),
+      })
+
+      /*
+       * Se anotan las variables con su `historyVerified` nuevo, pero NO el
+       * estado de la máquina: el sondeo dice si sus series son suyas, no si su
+       * configuración sigue siendo cierta. Eso lo contesta `/verificar`, y
+       * pisarlo aquí mezclaría dos preguntas distintas.
+       */
+      const variables = resultado.variables.length
+        ? maquina.variables.map((v) => {
+            const sondeada = resultado.variables.find((s) => s.id === v.id)
+            if (!sondeada) return v
+            /* `undefined` es «no se tocó»: conserva lo que hubiera. */
+            return sondeada.historyVerified === undefined
+              ? v
+              : { ...v, historyVerified: sondeada.historyVerified }
+          })
+        : null
+
+      if (variables) {
+        await gestorMaquinas.anotarRevision(maquina.id, {
+          estado: maquina.estado ?? ESTADO_CONFIGURACION.UNKNOWN,
+          variables,
+        })
+      }
+
+      request.log.info(
+        { maquina: maquina.id, ...resultado.resumen },
+        `Sondeadas las series de «${maquina.id}»: ${resultado.resumen.verificadas} de ` +
+          `${resultado.resumen.total} verificadas`
+      )
+
+      return {
+        ok: true,
+        estado: resultado.estado,
+        motivo: resultado.motivo,
+        resumen: resultado.resumen,
+        /* Sólo lo que NO quedó verificado: mandar las 36 para señalar las 17
+           que importan es ruido en una pantalla que va a pintar ésas. */
+        pendientes: resultado.variables
+          .filter((v) => v.historyVerified !== true)
+          .map((v) => ({
+            id: v.id,
+            causa: v.sondeo.causa,
+            motivo: v.sondeo.motivo,
+            compartidaCon: v.sondeo.compartidaCon ?? null,
+          })),
+        anotado: Boolean(variables),
       }
     }
   )

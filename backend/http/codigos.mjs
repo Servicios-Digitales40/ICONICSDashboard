@@ -69,6 +69,12 @@ export const CODIGOS = Object.freeze({
   /* ── ICONICS ────────────────────────────────────────────────────── */
 
   ERROR_READ_ONLY: 'ERROR_READ_ONLY',
+  /**
+   * Este servidor no tiene cliente de ICONICS, así que no puede recorrer el
+   * árbol ni pedir series. Es distinto de que ICONICS falle: aquí no se ha
+   * llegado a preguntar (Plan 34 F4).
+   */
+  ERROR_ICONICS_NO_CONFIGURADO: 'ERROR_ICONICS_NO_CONFIGURADO',
   ERROR_PUNTOS_REQUERIDOS: 'ERROR_PUNTOS_REQUERIDOS',
   ERROR_PUNTOS_INVALIDOS: 'ERROR_PUNTOS_INVALIDOS',
   /** El accionamiento de la bomba lo rechazó una guarda, o falló al escribir. */
