@@ -66,6 +66,7 @@ import {
   BANDERAS,
   CALIDADES,
   CANALES,
+  CONTADORES_ALARMA,
   LIMITES_ISO,
   MEDIDAS,
   QC_NOMINAL,
@@ -462,6 +463,18 @@ export const TIPO_VIBRACIONES = Object.freeze({
    * sensibilidades— sigue siendo de la instancia, en `CANALES`.
    */
   canales: Object.freeze(CANALES.map((c) => Object.freeze({ id: c.id, sufijo: c.sufijo }))),
+
+  /*
+   * Los CONTADORES que publica el área de alarmas de un SM 1281 (Plan 37 F2):
+   * su clave en las reglas y el sufijo con que el servidor los nombra
+   * (`=ActiveUnackedCount`). Es del tipo porque cualquier área de AlarmWorX
+   * publica los mismos cuatro; QUÉ área es la de esta máquina lo dice su
+   * configuración. Sin esto, una máquina configurada que marcó sus contadores
+   * los guardaba como variables sin rol y `alarmas` iba vacío igual.
+   */
+  contadoresAlarma: Object.freeze(
+    CONTADORES_ALARMA.map((c) => Object.freeze({ key: c.key, sufijo: c.sufijo, nivel: c.nivel ?? null })),
+  ),
 
   /* Las 18 reglas, por referencia. Ver la cabecera: no se copian. */
   reglas: REGLAS,

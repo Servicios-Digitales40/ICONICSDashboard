@@ -51,7 +51,10 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { useDataSource } from "@/lib/datasource";
+import { AREA_ALARMAS, CANALES } from "@shared/eva/vibraciones/vibraciones.js";
 
+import { fuenteDeMaquinaConfigurada } from "../comunes/fuenteDeMaquina.js";
+import { useMaquina } from "../comunes/MaquinaContext.jsx";
 import { fuenteDeVibracion } from "./vibracionSource.js";
 
 const VACIO = {
@@ -63,6 +66,12 @@ const VACIO = {
   lastUpdated: null,
   puntosSinDato: [],
 };
+
+/** Lo que la máquina escrita a mano sabe de sí misma y una vista necesita. */
+const META_ESCRITA_A_MANO = Object.freeze({
+  canalesMeta: CANALES,
+  maquina: Object.freeze({ id: "vibraciones", nombre: null, configurada: false, area: AREA_ALARMAS }),
+});
 
 /**
  * El estado de vibración, listo para `evaluarRiesgosVibracion`.
@@ -97,4 +106,52 @@ export function useVibracion() {
   }, [fuente]);
 
   return estado;
+}
+
+/**
+ * El dominio de vibración DE LA MÁQUINA DE LA PANTALLA. Plan 37 F2.
+ *
+ * ── EN QUÉ SE DIFERENCIA DE `useVibracion()` ──────────────────────
+ *
+ * `useVibracion()` es siempre la máquina escrita a mano. Éste mira
+ * `useMaquina()`: si la pantalla es de una máquina CONFIGURADA
+ * (`?maquina=<id>`), abre la fuente de esa máquina —un motor sobre sus
+ * variables, `dominioDesdeRoles` como forma—; si no, es exactamente
+ * `useVibracion()`. Las vistas de vibraciones lo usan para pintar la máquina
+ * que la ruta dice, sin saber cuál de las dos es.
+ *
+ * Devuelve además lo que una vista saca hoy del catálogo y una configurada no
+ * tiene: `canalesMeta` (los apoyos, con su rótulo) y `maquina` (id, nombre,
+ * si es configurada).
+ *
+ * ── POR QUÉ `useVibracion()` NO SE HIZO DEPENDIENTE DE LA MÁQUINA ──
+ *
+ * Porque lo llama el badge del sidebar (`useConteoHallazgos`), que está
+ * montado en TODAS las pantallas. Un hook de chrome que cambiara de máquina
+ * con la navegación abriría el motor de cada máquina configurada al pasar por
+ * su sección — la regresión que este proyecto ya cometió dos veces
+ * (31-08-2026, 17-09-2026). Éste sólo lo montan las vistas de la máquina.
+ *
+ * Las DOS fuentes se resuelven siempre y sólo se suscribe la que toca: los
+ * hooks no pueden llamarse a medias, y `fuenteDeVibracion()` es una lectura
+ * de caché, no una suscripción.
+ */
+export function useDominioVibracion() {
+  const [estado, setEstado] = useState(VACIO);
+  const { transporte } = useDataSource();
+  const { configurada } = useMaquina();
+
+  const fuente = useMemo(
+    () => (configurada ? fuenteDeMaquinaConfigurada(configurada, transporte) : fuenteDeVibracion(transporte)),
+    [configurada, transporte],
+  );
+
+  useEffect(() => {
+    setEstado(VACIO);
+    return fuente.subscribeVibracion(setEstado);
+  }, [fuente]);
+
+  /* La configurada trae su meta en la instantánea; la escrita a mano no la
+     necesita traer porque es constante. */
+  return configurada ? estado : { ...estado, ...META_ESCRITA_A_MANO };
 }
