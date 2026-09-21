@@ -36,7 +36,7 @@
  * Son dos árboles distintos, con distinto contenido y distinto nombre para la
  * misma señal:
  *
- *   ac:   73 puntos    ac:TDCON/DemoVibraciones/Vibraciones/S1/vRMS_S1
+ *   ac:   73 puntos    ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/vRMS_S1
  *   hda:  94 tags      hda:\Configuration\DEMO_VIBRACIONES\S1:vRMS_S1
  *
  * La intención es que el administrador de ICONICS mantenga las carpetas

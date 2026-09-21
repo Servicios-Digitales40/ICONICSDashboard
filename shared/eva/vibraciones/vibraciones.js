@@ -14,7 +14,7 @@
  *
  * Por su ruta en AssetWorX, igual que el tanque:
  *
- *     ac:TDCON/DemoVibraciones/Vibraciones/S1/vRMS_S1
+ *     ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/vRMS_S1
  *
  * Ni por node id de OPC UA (`ua:DEMO3\[http://BMS_1]i=458..592`) ni por el
  * grupo del historiador. Los tres caminos llevan al mismo dato; la diferencia
@@ -155,7 +155,7 @@
  * conveniencia— y `Pantalla`. No se incorporan aquí: este cambio es de RUTA,
  * no de alcance. Lo que entra y lo que no lo decide la configuración (F4).
  */
-export const RAIZ_VIB = "ac:TDCON/DemoVibraciones/Vibraciones/";
+export const RAIZ_VIB = "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/";
 
 /**
  * Carpeta del variador dentro de la rama. Los tags `*_BMS` viven aquí y no
@@ -945,7 +945,7 @@ export const VARIADOR_POR_CLAVE = Object.fromEntries(VARIADOR.map((v) => [v.key,
 export const JANITZA_SIN_DATO = true;
 
 /**
- * Carpeta de un canal dentro de la rama: `ac:TDCON/DemoVibraciones/Vibraciones/S1/`.
+ * Carpeta de un canal dentro de la rama: `ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/`.
  *
  * Los tres apoyos son carpetas hermanas y el nombre de la carpeta es el id del
  * canal, no su sufijo — coinciden hoy, pero son dos cosas distintas: el sufijo

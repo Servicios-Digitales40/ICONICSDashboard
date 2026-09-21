@@ -110,7 +110,7 @@ export const HECHOS_INICIALES = [
     id: "vibraciones-se-leen-en-vivo",
     sistema: "vibraciones",
     hecho:
-      "Las medidas de vibración se leen EN VIVO del árbol de activos, en «ac:TDCON/DemoVibraciones/Vibraciones/», " +
+      "Las medidas de vibración se leen EN VIVO del árbol de activos, en «ac:TDCON/DEMO_VIBRACIONES/Vibraciones/», " +
       "con una carpeta por apoyo (S1, S2, S3) y otra para el variador (V20). NO se leen del " +
       "historiador: dos puntos («DKW_S1» sin muestras y «MonState_v_f_S3» ni declarado) hacían " +
       "esperar 5 segundos al lote entero y volvían sin valor.",

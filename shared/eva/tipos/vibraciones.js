@@ -94,7 +94,7 @@ import {
  *
  * Un «rol» es el papel que juega una variable dentro del tipo, con
  * independencia de cómo se llame su tag en un servidor concreto. `vRMS` es un
- * rol; `ac:TDCON/DemoVibraciones/Vibraciones/S1/vRMS` es el punto que lo cumple en ESTA máquina.
+ * rol; `ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/vRMS` es el punto que lo cumple en ESTA máquina.
  *
  * Es la pieza que hace posible el alta por configuración: al dar de alta un
  * motor, quien configura dice «este punto cumple el rol vRMS del apoyo S1», y
