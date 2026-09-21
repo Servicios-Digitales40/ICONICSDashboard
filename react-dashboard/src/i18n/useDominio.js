@@ -40,6 +40,7 @@ import { estadoInfo } from "@shared/eva/tanque/estado.js";
 import { senalInfo } from "@shared/eva/tanque/senales.js";
 import { activoInfo } from "@shared/eva/tanque/activos.js";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
+import { useMaquinasConfiguradas } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
 import { CANALES, MEDIDAS, VARIADOR, VIGILANCIAS } from "@shared/eva/vibraciones/vibraciones.js";
 
 /**
@@ -111,22 +112,37 @@ export function useDominio() {
    * esto sustituye, y un id crudo dice más que una cadena vacía cuando el
    * manifiesto trae un sistema que ya no existe.
    */
+  /*
+   * ── LAS CONFIGURADAS TAMBIÉN TIENEN NOMBRE (Plan 38 F2) ────────────
+   *
+   * `resumenDeSistemas()` sólo conoce las escritas a mano. Una máquina
+   * configurada se llama como la nombró quien la configuró, y eso no está en
+   * ningún diccionario: se lee del provider que ya trae la lista para el menú.
+   * Fuera de él devuelve la forma vacía, así que aquí no cambia nada.
+   */
+  const { maquinas: configuradas } = useMaquinasConfiguradas();
+
   const sistema = useCallback(
     (id) => {
       if (!id) return "";
       const info = resumenDeSistemas().find((s) => s.id === id);
-      return t(`machines:systems.${id}`, { defaultValue: info?.nombre ?? id });
+      const configurada = configuradas.find((m) => m.id === id);
+      return t(`machines:systems.${id}`, { defaultValue: info?.nombre ?? configurada?.nombre ?? id });
     },
-    [t]
+    [t, configuradas]
   );
 
   /**
    * Los sistemas declarados, con su nombre ya traducido. Es lo que necesita
-   * un `<select>`: la lista entera, no un nombre suelto.
+   * un `<select>`: la lista entera, no un nombre suelto. Las configuradas van
+   * detrás de las escritas a mano.
    */
   const sistemas = useCallback(
-    () => resumenDeSistemas().map((s) => ({ id: s.id, nombre: sistema(s.id) })),
-    [sistema]
+    () => [
+      ...resumenDeSistemas().map((s) => ({ id: s.id, nombre: sistema(s.id) })),
+      ...configuradas.map((m) => ({ id: m.id, nombre: sistema(m.id) })),
+    ],
+    [sistema, configuradas]
   );
 
   /* ── El vocabulario de la OTRA máquina ───────────────────────────── */

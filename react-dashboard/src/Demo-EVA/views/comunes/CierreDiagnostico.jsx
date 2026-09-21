@@ -55,7 +55,7 @@ import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgos, REGLAS as REGLAS_TANQUE } from "../../domain/riesgos.js";
 import { evaluarRiesgosVibracion, REGLAS as REGLAS_VIBRACION } from "../../domain/riesgosVibracion.js";
 
@@ -442,7 +442,12 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   const { riesgo: traducirRiesgo, riesgoVibracion: traducirRiesgoVibracion,
     noEvaluable: tituloDeRegla, noEvaluableVibracion: tituloDeReglaVibracion } = useProsa();
   const { theme: t } = useTheme();
-  const sistemaId = params?.sistema === "vibraciones" ? "vibraciones" : "tanque";
+  /* El id de la máquina de la URL. Lo que no es el tanque es una máquina de
+     vibraciones: la escrita a mano o una CONFIGURADA de su tipo (Plan 38 F2),
+     que llega con `?maquina=<id>` para que `useDominioVibracion` lea la suya. */
+  const sistemaId = params?.sistema ?? "tanque";
+  const esConfigurada = sistemaId !== "tanque" && sistemaId !== "vibraciones";
+  const paramsRiesgos = esConfigurada ? { maquina: sistemaId } : {};
   const riesgoId = params?.riesgoId ?? "";
 
   /*
@@ -457,14 +462,14 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   // necesita sondear el tanque mientras se rellena este formulario, y
   // viceversa.
   const agua = useSistemaAgua();
-  const vibracion = useVibracion();
+  const vibracion = useDominioVibracion();
 
   const activosTanque = useMemo(
     () => (sistemaId === "tanque" ? evaluarRiesgos(agua.sistema).activos : []),
     [sistemaId, agua.sistema]
   );
   const activosVibracion = useMemo(
-    () => (sistemaId === "vibraciones"
+    () => (sistemaId !== "tanque"
       ? evaluarRiesgosVibracion({ canales: vibracion.canales, variador: vibracion.variador, alarmas: vibracion.alarmas }).activos
       : []),
     [sistemaId, vibracion.canales, vibracion.variador, vibracion.alarmas]
@@ -791,7 +796,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
             <Button
               variant="secondary"
               icon={<ChevronLeft size={14} />}
-              onClick={() => onNavigate?.(rutaRiesgos)}
+              onClick={() => onNavigate?.(rutaRiesgos, paramsRiesgos)}
             >
               {traducir("maintenance:close.done.back", { pantalla: nombreRiesgos })}
             </Button>
@@ -855,7 +860,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
           </Button>
           <Button
             variant="secondary"
-            onClick={() => onNavigate?.(rutaRiesgos)}
+            onClick={() => onNavigate?.(rutaRiesgos, paramsRiesgos)}
           >
             {traducir("common:actions.cancel")}
           </Button>

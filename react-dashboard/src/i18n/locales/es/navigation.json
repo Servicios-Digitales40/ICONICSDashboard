@@ -166,6 +166,26 @@
       "title": "Vista 3D",
       "nav": "Vista 3D",
       "sub": "Máquina configurada · dónde mide cada sonda, y en qué dirección"
+    },
+    "maq-hallazgos": {
+      "title": "Hallazgos",
+      "nav": "Hallazgos",
+      "sub": "Máquina configurada · lo que sus reglas ven ahora, ordenado por lo que pide atención"
+    },
+    "maq-avisos": {
+      "title": "Avisos",
+      "nav": "Avisos",
+      "sub": "Máquina configurada · los hallazgos narrados, para leer y dar por vistos"
+    },
+    "maq-casos": {
+      "title": "Casos previos",
+      "nav": "Casos previos",
+      "sub": "Máquina configurada · intervenciones cerradas sobre esta máquina"
+    },
+    "maq-rag": {
+      "title": "RAG documental",
+      "nav": "RAG documental",
+      "sub": "Máquina configurada · los manuales que el asistente consulta sobre ella"
     }
   },
   "palette": {

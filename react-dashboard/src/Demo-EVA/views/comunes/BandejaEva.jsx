@@ -54,7 +54,7 @@ import { obtenerDiagnostico } from "@/lib/api/casosApi.js";
    de `useConteoHallazgos` en el cuerpo del componente:
    import { useSistemaAgua } from "../../data/comunes/hooks.js";
    import { evaluarRiesgos } from "../../domain/riesgos.js"; */
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
 const SEVERIDAD_TOKEN = {
@@ -232,14 +232,17 @@ export default function BandejaEva({ onNavigate }) {
    * Para reabrir: devolver `useSistemaAgua()`, su `evaluarRiesgos`, el
    * `useDiagnosticoDeRiesgosActivos("tanque", …)` y su `agregar(...)` de abajo.
    */
-  const { canales, variador, alarmas } = useVibracion();
+  /* La máquina DE LA PANTALLA (Plan 38 F2): la escrita a mano en su sección,
+     una configurada en la suya (`?maquina=<id>`). El hook elige la fuente. */
+  const { canales, variador, alarmas, maquina } = useDominioVibracion();
+  const sistemaId = maquina.id;
 
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
     [canales, variador, alarmas]
   );
 
-  const diagnosticoVibracion = useDiagnosticoDeRiesgosActivos("vibraciones", activosVibracion);
+  const diagnosticoVibracion = useDiagnosticoDeRiesgosActivos(sistemaId, activosVibracion);
 
   const hallazgos = useMemo(() => {
     const salida = [];
@@ -268,10 +271,10 @@ export default function BandejaEva({ onNavigate }) {
 
     /* La estación de llenado, cerrada — ver el bloque de arriba:
        agregar("tanque", activosTanque, traducirRiesgo, diagnosticoTanque); */
-    agregar("vibraciones", activosVibracion, traducirRiesgoVibracion, diagnosticoVibracion);
+    agregar(sistemaId, activosVibracion, traducirRiesgoVibracion, diagnosticoVibracion);
 
     return ordenarHallazgos(salida);
-  }, [activosVibracion, diagnosticoVibracion, traducirRiesgoVibracion]);
+  }, [sistemaId, activosVibracion, diagnosticoVibracion, traducirRiesgoVibracion]);
 
   const visibles = hallazgos.filter((h) => !descartados.has(h.id));
 
@@ -291,10 +294,15 @@ export default function BandejaEva({ onNavigate }) {
     vistoPorMi.marcar([h.id]);
     setDescartados((prev) => new Set([...prev, h.id]));
 
+    /* Una máquina configurada viaja como `?maquina=`: es lo que lee
+       `MaquinaProvider` en las rutas que no son de ninguna (Plan 38 F2). */
+    const deMaquina = maquina.configurada ? { maquina: h.sistema } : null;
     if (h.origen === "riesgo") {
-      onNavigate?.(h.sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion");
+      const ruta = h.sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
+      if (deMaquina) onNavigate?.(ruta, deMaquina);
+      else onNavigate?.(ruta);
     } else {
-      onNavigate?.("cierre-diagnostico", { sistema: h.sistema, riesgoId: h.referencia.riesgoId });
+      onNavigate?.("cierre-diagnostico", { sistema: h.sistema, riesgoId: h.referencia.riesgoId, ...(deMaquina ?? {}) });
     }
   };
 

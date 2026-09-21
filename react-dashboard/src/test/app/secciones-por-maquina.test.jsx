@@ -34,7 +34,10 @@ afterEach(() => {
 
 describe("el árbol del menú con máquinas configuradas", () => {
   it("sin máquinas, las rutas de máquina existen pero no salen en el menú", () => {
-    expect(RUTAS_POR_MAQUINA).toEqual(["maq-inicio", "maq-graficas", "maq-3d"]);
+    expect(RUTAS_POR_MAQUINA).toEqual([
+      "maq-inicio", "maq-graficas", "maq-3d",
+      "maq-hallazgos", "maq-avisos", "maq-casos", "maq-rag",
+    ]);
     const ids = NAV.flatMap((n) => (n.children ?? [n]).map((c) => c.id));
     for (const id of RUTAS_POR_MAQUINA) expect(ids).not.toContain(id);
     /* El árbol sin máquinas es idéntico al que devuelve `buildNav` a secas. */
@@ -48,8 +51,15 @@ describe("el árbol del menú con máquinas configuradas", () => {
     expect(secciones.map((s) => s.label)).toEqual(["Nuevo-Modor", "Segundo motor"]);
     for (const s of secciones) {
       expect(s.modulo).toBe("monitoreo");
-      expect(s.children.map((c) => c.id)).toEqual(["maq-inicio", "maq-graficas", "maq-3d"]);
-      expect(s.children.every((c) => c.apartado === "visualizacion")).toBe(true);
+      expect(s.children.map((c) => c.id)).toEqual([
+        "maq-inicio", "maq-graficas", "maq-3d",
+        "maq-hallazgos", "maq-avisos", "maq-casos", "maq-rag",
+      ]);
+      /* Los tres apartados, en el mismo orden que la máquina escrita a mano. */
+      expect(s.children.map((c) => c.apartado)).toEqual([
+        "visualizacion", "visualizacion", "visualizacion",
+        "diagnostico", "diagnostico", "documentacion", "documentacion",
+      ]);
     }
     /* El parámetro viaja en el hijo: es lo que el Sidebar manda al navegar. */
     expect(secciones[0].children[0].params).toEqual({ maquina: "vib-motor-03" });

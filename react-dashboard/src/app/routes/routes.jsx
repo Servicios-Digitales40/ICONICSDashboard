@@ -381,6 +381,37 @@ export const ROUTES = [
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
     porMaquina: { icon: <Box size={17} />, apartado: "visualizacion" },
   },
+  /*
+   * Diagnóstico y Documentación de una máquina configurada (Plan 38 F2). Son
+   * las mismas vistas que la máquina escrita a mano —leen la máquina de la
+   * pantalla por `useMaquina()`/`useDominioVibracion()`— y valen porque desde
+   * el Plan 38 F1 el backend registra las configuradas: los casos, el motor
+   * de diagnóstico y los manuales las conocen.
+   */
+  {
+    id: "maq-hallazgos",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
+    porMaquina: { icon: <Inbox size={17} />, apartado: "diagnostico" },
+  },
+  {
+    id: "maq-avisos",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
+    porMaquina: { icon: <MessageSquareText size={17} />, apartado: "diagnostico" },
+  },
+  {
+    id: "maq-casos",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
+    porMaquina: { icon: <NotebookPen size={17} />, apartado: "documentacion" },
+  },
+  {
+    id: "maq-rag",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
+    porMaquina: { icon: <FileText size={17} />, apartado: "documentacion" },
+  },
 
   {
     // Se queda en producción a propósito: es la herramienta con la que se

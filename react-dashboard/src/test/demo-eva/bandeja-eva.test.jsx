@@ -43,6 +43,13 @@ vi.mock("@/Demo-EVA/data/comunes/hooks.js", async (importOriginal) => ({
 vi.mock("@/Demo-EVA/data/vibraciones/vibracion.js", async (importOriginal) => ({
   ...(await importOriginal()),
   useVibracion,
+  /* La vista lee la máquina de la pantalla por `useDominioVibracion` (Plan 38
+     F2). Aquí es la escrita a mano, con el mismo dominio de mentira. */
+  useDominioVibracion: () => ({
+    ...useVibracion(),
+    canalesMeta: [],
+    maquina: { id: "vibraciones", nombre: null, configurada: false, area: null },
+  }),
 }));
 vi.mock("@/lib/api/casosApi.js", async (importOriginal) => ({
   ...(await importOriginal()),

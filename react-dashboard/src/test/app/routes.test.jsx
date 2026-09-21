@@ -65,6 +65,12 @@ describe("superficie de la aplicación", () => {
       "maq-inicio",
       "maq-graficas",
       "maq-3d",
+      // Y las cuatro de Diagnóstico y Documentación (Plan 38 F2), que valen
+      // porque el backend ya registra las configuradas.
+      "maq-hallazgos",
+      "maq-avisos",
+      "maq-casos",
+      "maq-rag",
       "eva-assets",
       // `eva-configuracion` (Plan 33 F5) va junto a Assets y no dentro de una
       // máquina: es donde se declara QUÉ máquinas existen, y meterla en una

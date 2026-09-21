@@ -166,6 +166,26 @@
       "title": "3D View",
       "nav": "3D View",
       "sub": "Configured machine · where each probe measures, and in which direction"
+    },
+    "maq-hallazgos": {
+      "title": "Findings",
+      "nav": "Findings",
+      "sub": "Configured machine · what its rules see now, ordered by what needs attention"
+    },
+    "maq-avisos": {
+      "title": "Notices",
+      "nav": "Notices",
+      "sub": "Configured machine · the findings, narrated, to read and mark as seen"
+    },
+    "maq-casos": {
+      "title": "Previous cases",
+      "nav": "Previous cases",
+      "sub": "Configured machine · closed interventions on this machine"
+    },
+    "maq-rag": {
+      "title": "Document RAG",
+      "nav": "Document RAG",
+      "sub": "Configured machine · the manuals the assistant consults about it"
     }
   },
   "palette": {

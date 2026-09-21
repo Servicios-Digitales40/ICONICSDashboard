@@ -57,7 +57,7 @@ import { ESTADO_AVISO, marcarVisto, reconciliarAvisos } from "@shared/eva/comun/
 
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { useSistemaAgua } from "../../data/comunes/hooks.js"; */
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { evaluarRiesgos } from "../../domain/riesgos.js"; */
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
@@ -364,7 +364,12 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
         </button>
         <button
           type="button"
-          onClick={() => onNavigate?.(sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion")}
+          onClick={() => {
+            const ruta = sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
+            /* Una configurada viaja como `?maquina=` (Plan 38 F2). */
+            if (sistema === "tanque" || sistema === "vibraciones") onNavigate?.(ruta);
+            else onNavigate?.(ruta, { maquina: sistema });
+          }}
           style={{
             padding: "9px 13px", borderRadius: 8, cursor: "pointer",
             border: `1px solid ${t.border}`, background: t.hover,
@@ -424,7 +429,9 @@ export default function AvisosEva({ onNavigate }) {
    * Para reabrir: devolver `useSistemaAgua()`, su `evaluarRiesgos` y la
    * entrada `tanque` de `riesgosPorSistema`.
    */
-  const { canales, variador, alarmas } = useVibracion();
+  /* La máquina DE LA PANTALLA (Plan 38 F2): la escrita a mano o una
+     configurada (`?maquina=<id>`). El hook elige la fuente. */
+  const { canales, variador, alarmas, maquina } = useDominioVibracion();
 
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
@@ -432,8 +439,8 @@ export default function AvisosEva({ onNavigate }) {
   );
 
   const riesgosPorSistema = useMemo(
-    () => [{ sistema: "vibraciones", activos: activosVibracion }],
-    [activosVibracion]
+    () => [{ sistema: maquina.id, activos: activosVibracion }],
+    [maquina.id, activosVibracion]
   );
 
   const idioma = i18n.language?.startsWith("en") ? "en" : "es";
