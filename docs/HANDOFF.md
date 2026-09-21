@@ -35,8 +35,8 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1053** pruebas · 29 omitidas |
-| Suite de backend | **377** pruebas |
+| Suite de frontend | **1079** pruebas · 29 omitidas |
+| Suite de backend | **378** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
 | Lint y types | limpios |
@@ -45,9 +45,11 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 Funcionalmente: el tablero de vibraciones (73 puntos en vivo), el asistente con
 sus 26 herramientas, el motor de diagnóstico determinista, el RAG documental,
 los casos previos, el transporte falso (`ICONICS_FAKE=true`), el CRUD de
-máquinas configuradas con su comprobación contra ICONICS, y —desde el Plan 36—
+máquinas configuradas con su comprobación contra ICONICS, —desde el Plan 36—
 **el alta y la edición de una máquina marcando los tres árboles de ICONICS**
-desde `Planta › Configuración`.
+desde `Planta › Configuración`, y —desde el Plan 37— **una sección del menú por
+máquina configurada**, con Inicio, Gráficas y Vista 3D leyendo SUS puntos
+(medido contra planta: 94 de 94 puntos de `vib-motor-03`).
 
 ### Qué está a medias
 
@@ -205,15 +207,21 @@ máquina configurada haga todo lo que hace el catálogo.
 
 **`PLAN-32-VIBRACIONES.md`** — F1 completa. Quedan F2–F6.
 
-**`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`: F1–F3
-hechas, **pendiente de verse en el navegador**.
+**`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas (sección por
+máquina configurada; Inicio, Gráficas y 3D parametrizadas). Queda **F4**
+(Alarmas de la máquina), y **verlo en el navegador**.
+
+**`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
 ### Próximos pasos, por prioridad
 
-**0 · Seguir usando la pantalla del Plan 36 contra planta.** La primera vuelta
-(21-09-2026) destapó tres defectos de la ficha en una hora de uso; conviene una
-segunda: editar una máquina para quitar variables, emparejar a mano un tag de
-`Jaritza\L1`, y sondear después de editar. §9 dice cómo arrancar.
+**0 · Ver el Plan 37 en el navegador.** Nadie ha abierto todavía la sección de
+`Nuevo-Modor` en el menú. Entrar en Inicio, Gráficas y Vista 3D de esa
+máquina, comprobar que pinta SUS apoyos (`S1`, `S2`, `S3` por su id, no «Lado
+acople») y que la sección de vibraciones escrita a mano sigue igual. Después,
+**Plan 37 F4** (Alarmas de la máquina configurada) y una segunda vuelta al
+Plan 36: quitar variables, emparejar a mano un tag de `Jaritza\L1`, sondear
+tras editar. §9 dice cómo arrancar.
 
 **1 · Plan 32 F2 — desbloquear el historiador.** Por qué el grupo `DEMO 3`
 devuelve 0 muestras: si dejó de registrar, o si la ruta cambió como en el
