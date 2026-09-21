@@ -71,7 +71,13 @@ export const NAV = buildNav(ROUTES, NAV_GROUPS);
  * falta para evitarlo. Quien la use dentro de un componente puede memoizarla
  * si mide que hace falta (`CLAUDE.md` §4.8).
  */
-export const navParaRol = (puede) => buildNav(ROUTES, NAV_GROUPS, puede);
+export const navParaRol = (puede, maquinas = []) => buildNav(ROUTES, NAV_GROUPS, puede, maquinas);
+
+/**
+ * Las rutas que se ofrecen POR MÁQUINA configurada (Plan 37 F1): no tienen
+ * entrada de menú propia, la tiene cada máquina que las reclama.
+ */
+export const RUTAS_POR_MAQUINA = ROUTES.filter((r) => r.porMaquina).map((r) => r.id);
 
 /**
  * El rol mínimo de cada ruta, o `null` si no declara ninguno.

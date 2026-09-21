@@ -151,6 +151,21 @@
       "title": "Configuración",
       "nav": "Configuración",
       "sub": "Qué máquinas conoce el tablero, y con qué señales de ICONICS"
+    },
+    "maq-inicio": {
+      "title": "Inicio",
+      "nav": "Inicio",
+      "sub": "Máquina configurada · qué contesta ahora mismo"
+    },
+    "maq-graficas": {
+      "title": "Gráficas",
+      "nav": "Gráficas",
+      "sub": "Máquina configurada · estado mecánico, sólo el instante"
+    },
+    "maq-3d": {
+      "title": "Vista 3D",
+      "nav": "Vista 3D",
+      "sub": "Máquina configurada · dónde mide cada sonda, y en qué dirección"
     }
   },
   "palette": {

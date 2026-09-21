@@ -221,12 +221,25 @@ describe('la guarda de rol cubre toda la API', () => {
       /^\/api\/rag\/documentos$/,
     ]
 
+    /*
+     * Y las que puede usar SÓLO PARA LEER (Plan 37 F1): la lista y la ficha
+     * de las máquinas configuradas, porque el tablero de una máquina lo mira
+     * cualquiera con sesión y para pintarlo necesita su configuración. Se
+     * declara por método a propósito: en la misma URL, `POST`, `PATCH` y
+     * `DELETE` siguen siendo del administrador y se comprueban abajo.
+     */
+    const VISUALIZADOR_PUEDE_LEER = [
+      /^\/api\/maquinas$/,
+      /^\/api\/maquinas\/:id$/,
+    ]
+
     const dejanPasar = []
     for (const { url, metodos } of inventario) {
       if (SIN_ROL.some(patron => patron.test(url))) continue
       if (VISUALIZADOR_PUEDE.some(patron => patron.test(url))) continue
 
       for (const metodo of metodos) {
+        if (metodo === 'GET' && VISUALIZADOR_PUEDE_LEER.some(patron => patron.test(url))) continue
         const respuesta = await app.inject({
           method: metodo,
           url,

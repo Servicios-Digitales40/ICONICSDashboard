@@ -15,6 +15,33 @@ import { SECCION_DE_PAGINA } from "../routes/index.js";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { ContextoDeMaquina } from "./ContextoDeMaquina.jsx";
 import { SesionActual } from "./SesionActual.jsx";
+import { useMaquina } from "@/Demo-EVA/data/comunes/MaquinaContext.jsx";
+
+/**
+ * El nombre de la máquina CONFIGURADA de la pantalla, junto al título.
+ *
+ * Sólo para las configuradas (Plan 37 F1): sus vistas son genéricas y el
+ * título dice «Inicio» o «Gráficas» sin decir de qué máquina. Las escritas a
+ * mano ya lo llevan en el título traducido («Inicio · Vibraciones»).
+ *
+ * No sondea nada: lee el contexto, que a su vez sólo lee la URL y la lista de
+ * máquinas cargada una vez por sesión.
+ */
+function NombreDeMaquinaConfigurada() {
+  const { theme: t } = useTheme();
+  const { configurada } = useMaquina();
+  if (!configurada) return null;
+  return (
+    <span
+      style={{
+        fontSize: 12.5, fontWeight: 600, color: t.accent, background: t.accentSoft,
+        borderRadius: 999, padding: "3px 10px", fontFamily: "'Inter', sans-serif",
+      }}
+    >
+      {configurada.nombre ?? configurada.id}
+    </span>
+  );
+}
 import { LanguageSelector } from "@/i18n/LanguageSelector.jsx";
 
 /** El mismo umbral que decide, en `Sidebar.jsx`, cuándo la barra pasa a cajón. */
@@ -153,6 +180,10 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: 21, fontWeight: 800, color: t.text, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{traducir(`navigation:routes.${page}.title`)}</h1>
+            {/* En una vista de máquina CONFIGURADA el título es genérico
+                («Inicio»), así que el nombre de la máquina va al lado: es lo
+                que dice de cuál se habla (Plan 37 F1). */}
+            <NombreDeMaquinaConfigurada />
             {/* Permanente entre las pestañas de SU máquina — a diferencia de los
                 controles de la derecha, no se oculta en modo muro: es
                 información de estado, no algo que un wallboard sin teclado

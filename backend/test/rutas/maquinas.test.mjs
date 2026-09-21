@@ -80,6 +80,49 @@ describe('GET /api/maquinas/tipos', () => {
   })
 })
 
+/*
+ * ── LEER SÍ; DECIDIR NO (Plan 37 F1) ─────────────────────────────────
+ *
+ * El tablero de una máquina configurada lo mira cualquiera con sesión, y para
+ * pintarlo necesita su configuración. Un visualizador lee la lista; lo que no
+ * puede es dar de alta, editar ni borrar.
+ */
+describe('un visualizador y las máquinas configuradas', () => {
+  it('puede LEER la lista y la ficha, y no puede escribir', async () => {
+    await app.close()
+    ;({ app } = await montarApp({
+      MAQUINAS_RUTA: join(carpeta, 'maquinas.json'),
+      AUTH_HABILITADA: 'true',
+      AUTH_SECRETO: 'clave-de-pruebas-suficientemente-larga-32',
+      AUTH_USUARIOS: 'miron:visualizador:scrypt$00$00;admin:administrador:scrypt$00$00',
+    }))
+    const admin = app.jwt.sign({ sub: 'admin', roles: ['administrador'] })
+    const miron = app.jwt.sign({ sub: 'miron', roles: ['visualizador'] })
+
+    await app.inject({
+      method: 'POST', url: '/api/maquinas', payload: maquinaValida(),
+      headers: { authorization: `Bearer ${admin}` },
+    })
+
+    const lista = await app.inject({ method: 'GET', url: '/api/maquinas', headers: { authorization: `Bearer ${miron}` } })
+    expect(lista.statusCode).toBe(200)
+    expect(json(lista).cuantas).toBe(1)
+
+    const ficha = await app.inject({ method: 'GET', url: '/api/maquinas/vib-motor-02', headers: { authorization: `Bearer ${miron}` } })
+    expect(ficha.statusCode).toBe(200)
+
+    for (const [method, url, payload] of [
+      ['POST', '/api/maquinas', maquinaValida('otra')],
+      ['PATCH', '/api/maquinas/vib-motor-02', { nombre: 'x' }],
+      ['DELETE', '/api/maquinas/vib-motor-02', undefined],
+      ['POST', '/api/maquinas/vib-motor-02/verificar', undefined],
+    ]) {
+      const r = await app.inject({ method, url, payload, headers: { authorization: `Bearer ${miron}` } })
+      expect(r.statusCode, `${method} ${url}`).toBe(403)
+    }
+  })
+})
+
 describe('GET /api/maquinas', () => {
   it('sin ninguna configurada devuelve lista vacía, no un error', async () => {
     const r = await app.inject({ method: 'GET', url: '/api/maquinas' })

@@ -151,6 +151,21 @@
       "title": "Configuration",
       "nav": "Configuration",
       "sub": "Which machines the dashboard knows, and with which ICONICS signals"
+    },
+    "maq-inicio": {
+      "title": "Home",
+      "nav": "Home",
+      "sub": "Configured machine · what the machine answers right now"
+    },
+    "maq-graficas": {
+      "title": "Charts",
+      "nav": "Charts",
+      "sub": "Configured machine · mechanical state, the instant only"
+    },
+    "maq-3d": {
+      "title": "3D View",
+      "nav": "3D View",
+      "sub": "Configured machine · where each probe measures, and in which direction"
     }
   },
   "palette": {

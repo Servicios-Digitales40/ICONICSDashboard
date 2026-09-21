@@ -17,6 +17,7 @@ import { HoverTip } from "@/components/ui/index.js";
    `estadoPorId` más abajo.
    import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js"; */
 import { useConteoHallazgos } from "@/Demo-EVA/data/comunes/hallazgos.js";
+import { useMaquinasConfiguradas } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
 import { estadoColor } from "@/Demo-EVA/components/paleta.js";
 import { RAIZ } from "@shared/eva/tanque/senales.js";
 
@@ -153,6 +154,18 @@ function MaybeTip({ collapsed, label, children }) {
  * El punto de color nunca va solo: el texto lo acompaña en el tooltip y en el
  * `title` (DESIGN.md), y eso no cambia — sólo cambia quién escribe el texto.
  */
+/**
+ * ¿Está activa esta entrada? Una entrada de máquina configurada lleva
+ * `params.maquina` (Plan 37 F1), y dos secciones distintas apuntan a la MISMA
+ * ruta con distinto parámetro: la ruta sola no dice cuál de las dos es la
+ * pantalla actual.
+ */
+function estaActiva(item, page, params) {
+  if (item.id !== page) return false;
+  if (!item.params) return true;
+  return Object.entries(item.params).every(([k, v]) => params?.[k] === v);
+}
+
 function NavButton({ item, active, onNavigate, t, dark, indent = false, collapsed = false, estado = null, conteo = 0 }) {
   const { t: traducir } = useTranslation("navigation");
   const { t: traducirBarra } = useTranslation("layout");
@@ -177,7 +190,7 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
     <MaybeTip collapsed={collapsed} label={etiqueta}>
       <button
         className={`nav-item ${active ? "nav-active" : ""}`}
-        onClick={() => onNavigate(item.id)}
+        onClick={() => onNavigate(item.id, item.params)}
         title={collapsed ? undefined : etiqueta}
         style={{
           display: "flex", alignItems: "center", gap: 11, width: "100%",
@@ -215,11 +228,13 @@ function NavButton({ item, active, onNavigate, t, dark, indent = false, collapse
 }
 
 /** Grupo desplegable: cabecera que colapsa/expande sus hijos. */
-function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSidebar, conteoPorId = {} }) {
+function NavGroup({ item, page, params, onNavigate, t, collapsed = false, onExpandSidebar, conteoPorId = {} }) {
   const { t: traducir } = useTranslation("navigation");
   const { t: traducirBarra } = useTranslation("layout");
-  const nombre = traducir(`sections.${item.group}`);
-  const childActive = item.children.some((c) => c.id === page);
+  /* Una sección de máquina configurada trae su nombre como dato (`label`):
+     lo puso una persona al configurarla y no está en ningún diccionario. */
+  const nombre = item.label ?? traducir(`sections.${item.group}`);
+  const childActive = item.children.some((c) => estaActiva(c, page, params));
 
   /*
    * ── POR QUÉ ARRANCAN ABIERTOS ──────────────────────────────────────
@@ -344,7 +359,7 @@ function NavGroup({ item, page, onNavigate, t, collapsed = false, onExpandSideba
                 </div>
               )}
               <NavButton
-                item={child} active={page === child.id} onNavigate={onNavigate} t={t} indent
+                item={child} active={estaActiva(child, page, params)} onNavigate={onNavigate} t={t} indent
                 conteo={conteoPorId[child.id] ?? 0}
               />
             </Fragment>
@@ -363,15 +378,20 @@ const STORAGE_KEY = "sidebar:collapsed";
  * @param onCerrarCajon  lo llama el propio Sidebar al navegar o al pulsar el
  *                       fondo, y lo llama el Topbar al pulsar el botón de menú.
  */
-export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon }) {
+export function Sidebar({ page, params = {}, onNavigate, abiertaCajon = false, onCerrarCajon }) {
   const { theme: t, dark } = useTheme();
   /*
    * El menú se acota al rol de quien mira (Plan 35 F3). NO es seguridad —la
    * ruta omitida sigue existiendo y sigue siendo navegable escribiendo su
    * id— sino no ofrecer un camino que termina en un 403.
+   *
+   * Y desde el Plan 37 F1 trae una sección por máquina CONFIGURADA en
+   * servicio. Las máquinas salen del provider —una lectura al resolverse la
+   * sesión, no un sondeo— y el árbol se rehace cuando cambian.
    */
   const { puede } = usePermisos();
-  const NAV = navParaRol(puede);
+  const { maquinas: configuradas } = useMaquinasConfiguradas();
+  const NAV = navParaRol(puede, configuradas);
   /* `traducirBarra` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducirBarra } = useTranslation("layout");
   /* Los rótulos de sección y de módulo viven en `navigation`, con las rutas. */
@@ -425,8 +445,8 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
   // navegable un panel que se abre y se cierra en un gesto.
   const collapsed = esCajon ? false : collapsedPref;
 
-  const navegar = (id) => {
-    onNavigate(id);
+  const navegar = (id, paramsDestino) => {
+    onNavigate(id, paramsDestino);
     // Elegir una página es la señal de que el cajón ya cumplió su propósito.
     if (esCajon) onCerrarCajon?.();
   };
@@ -514,10 +534,10 @@ export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon 
           const abreModulo = Boolean(item.modulo) && item.modulo !== moduloAnterior;
 
           const nodo = item.children ? (
-            <NavGroup key={item.group} item={item} page={page} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} conteoPorId={conteoPorId} />
+            <NavGroup key={item.group} item={item} page={page} params={params} onNavigate={navegar} t={t} collapsed={collapsed} onExpandSidebar={() => setCollapsedPref(false)} conteoPorId={conteoPorId} />
           ) : (
             <NavButton
-              key={item.id} item={item} active={page === item.id} onNavigate={navegar} t={t} dark={dark}
+              key={item.id} item={item} active={estaActiva(item, page, params)} onNavigate={navegar} t={t} dark={dark}
               collapsed={collapsed} estado={estadoPorId[item.id] ?? null} conteo={conteoPorId[item.id] ?? 0}
             />
           );

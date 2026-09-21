@@ -349,6 +349,39 @@ export const ROUTES = [
     nav: { icon: <Bell size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
   },
 
+  /*
+   * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA (Plan 37 F1) ─────────────
+   *
+   * Cuatro rutas GENÉRICAS, sin `nav` propio: no pertenecen a ninguna máquina
+   * hasta que una las reclama. Cada máquina configurada en servicio produce en
+   * el menú su propia sección con estas cuatro dentro (`buildNav`), y la
+   * máquina viaja en `?maquina=<id>`, que es lo que `MaquinaProvider` lee
+   * cuando la ruta no es de ninguna (Plan 33 F6).
+   *
+   * Son los MISMOS componentes que la máquina escrita a mano, parametrizados
+   * por la máquina de la pantalla (Plan 37 F3). Una vista por TIPO, no una
+   * copia por máquina: el día que se configure la segunda, no se añade nada
+   * aquí.
+   *
+   * `porMaquina` es lo que las marca; el `icon` es el de la entrada, y
+   * `iconoSeccion` el de la sección de la máquina.
+   */
+  {
+    id: "maq-inicio",
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
+    porMaquina: { icon: <Home size={17} />, iconoSeccion: <Waves size={17} />, apartado: "visualizacion" },
+  },
+  {
+    id: "maq-graficas",
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
+    porMaquina: { icon: <LayoutDashboard size={17} />, apartado: "visualizacion" },
+  },
+  {
+    id: "maq-3d",
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
+    porMaquina: { icon: <Box size={17} />, apartado: "visualizacion" },
+  },
+
   {
     // Se queda en producción a propósito: es la herramienta con la que se
     // diagnostica un «falta un dato en el panel», navegando el árbol de

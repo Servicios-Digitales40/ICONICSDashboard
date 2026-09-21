@@ -78,7 +78,10 @@ export function PaletaComandos({ onNavigate, paginaActual }) {
    */
   const destinos = useMemo(
     () =>
-      ROUTES.map((r) => ({
+      /* Las rutas de máquina configurada (`porMaquina`) no entran: sin el
+         parámetro de máquina llevan a una pantalla que no sabe de cuál hablar.
+         Se llega a ellas desde la sección de cada máquina (Plan 37 F1). */
+      ROUTES.filter((r) => !r.porMaquina).map((r) => ({
         id: r.id,
         titulo: traducir(`navigation:routes.${r.id}.title`, { defaultValue: r.id }),
         nav: traducir(`navigation:routes.${r.id}.nav`, { defaultValue: r.id }),

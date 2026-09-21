@@ -48,9 +48,42 @@
  * cambiar de idioma repintaría toda la aplicación menos el menú — que es
  * justo el sitio donde más se nota.
  */
-export function buildNav(routes, groups, puede = () => true) {
+export function buildNav(routes, groups, puede = () => true, maquinas = []) {
   const items = [];
   const vistos = new Map(); // id de grupo → objeto ya insertado en `items`
+
+  /*
+   * ── UNA SECCIÓN POR MÁQUINA CONFIGURADA (Plan 37 F1) ──────────────
+   *
+   * Las rutas marcadas `porMaquina` no tienen `nav` propio: no son de
+   * ninguna máquina hasta que una las reclama. Cada máquina configurada en
+   * servicio produce un grupo `maq:<id>` con esas rutas como hijos, y el
+   * parámetro `maquina` viaja en el hijo para que el Sidebar navegue con él.
+   *
+   * El grupo lleva `label` —el nombre de la máquina— y no un id de sección
+   * que traducir: el nombre lo puso una persona al configurarla y no está en
+   * ningún diccionario. Es la única excepción a «aquí no hay texto» de la
+   * cabecera, y por eso viaja como dato de la máquina, no como texto del menú.
+   *
+   * Las secciones de máquina van DELANTE de las rutas estáticas: son
+   * máquinas, como la escrita a mano, y van juntas al principio del menú.
+   */
+  const porMaquina = routes.filter((r) => r.porMaquina && (!r.rol || puede(r.rol)));
+  for (const m of maquinas ?? []) {
+    if (!m?.id || !porMaquina.length) continue;
+    items.push({
+      group: `maq:${m.id}`,
+      label: m.nombre ?? m.id,
+      icon: porMaquina[0].porMaquina.iconoSeccion ?? porMaquina[0].porMaquina.icon,
+      modulo: "monitoreo",
+      children: porMaquina.map((r) => ({
+        id: r.id,
+        icon: r.porMaquina.icon,
+        apartado: r.porMaquina.apartado ?? null,
+        params: { maquina: m.id },
+      })),
+    });
+  }
 
   for (const r of routes) {
     if (!r.nav) continue;

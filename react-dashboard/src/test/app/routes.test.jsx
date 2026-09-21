@@ -59,6 +59,12 @@ describe("superficie de la aplicación", () => {
       // `salud-sistema` es la más «del servidor» de todas: no habla de ninguna
       // instalación, habla del PUENTE (Plan 20 F10).
       "eva-alarmas",
+      // Las tres de una máquina CONFIGURADA (Plan 37 F1): genéricas, sin `nav`
+      // propio. Cada máquina configurada en servicio las reclama en su propia
+      // sección con `?maquina=<id>`; aquí sólo existen.
+      "maq-inicio",
+      "maq-graficas",
+      "maq-3d",
       "eva-assets",
       // `eva-configuracion` (Plan 33 F5) va junto a Assets y no dentro de una
       // máquina: es donde se declara QUÉ máquinas existen, y meterla en una

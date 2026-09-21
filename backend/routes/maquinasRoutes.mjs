@@ -135,9 +135,24 @@ export function registerMaquinasRoutes(
     async () => ({ ok: true, tipos: resumenDeTipos() })
   )
 
+  /**
+   * ── LAS DOS LECTURAS LAS PUEDE HACER UN `visualizador` (Plan 37 F1) ─
+   *
+   * Hasta el 21-09-2026 todo `/api/maquinas` pedía `administrador` (Plan 35
+   * F2): el panel de administración es suyo. Pero el TABLERO de una máquina
+   * configurada —sus vistas de Inicio, Gráficas, 3D— lo mira cualquiera con
+   * sesión, y para pintarlo hace falta saber qué puntos leer: eso es su
+   * configuración. Sin esta lectura, un operador vería la sección de la
+   * máquina en el menú y una pantalla que no puede cargar nada.
+   *
+   * Lo que se expone son nombres de punto y roles, y los nombres de punto ya
+   * los puede recorrer un visualizador con `GET /api/iconics/browse`. Las
+   * escrituras —alta, edición, baja, comprobar, sondear— siguen siendo del
+   * administrador: leer qué máquinas hay no es lo mismo que decidirlas.
+   */
   fastify.get(
     '/api/maquinas',
-    { onRequest: [fastify.autenticar, fastify.exigirRol('administrador')] },
+    { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] },
     async () => {
       const maquinas = await gestorMaquinas.listar()
       return { ok: true, cuantas: maquinas.length, maquinas: maquinas.map(conCapacidades) }
@@ -147,7 +162,7 @@ export function registerMaquinasRoutes(
   fastify.get(
     '/api/maquinas/:id',
     {
-      onRequest: [fastify.autenticar, fastify.exigirRol('administrador')],
+      onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')],
       schema: { params: MaquinaParamsSchema },
     },
     async (request, reply) => {

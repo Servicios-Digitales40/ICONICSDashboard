@@ -54,15 +54,17 @@
  */
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Boxes, Cog, Info, Pencil, Plus, RefreshCw, ShieldAlert, Waves } from "lucide-react";
+import { Boxes, Cog, Info, Pencil, Plus, RefreshCw, ShieldAlert, Trash2, Waves } from "lucide-react";
 
 import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import {
+  eliminarMaquina,
   listarMaquinas,
   listarTipos,
   sondearMaquina,
   verificarMaquina,
 } from "@/lib/api/maquinasApi.js";
+import { avisarMaquinasCambiaron } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
@@ -217,6 +219,39 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
       setSondeos(({ [id]: _viejo, ...resto }) => resto);
     }
     await recargar();
+    /* El menú deriva una sección por máquina (Plan 37 F1): que se entere. */
+    avisarMaquinasCambiaron();
+  }, [recargar]);
+
+  /*
+   * ── QUITAR DEL TABLERO (Plan 37 F1) ────────────────────────────────
+   *
+   * La API existía desde el Plan 33 F2 y la pantalla no la ofrecía. Con una
+   * sección por máquina en el menú, una configuración de prueba que ya no se
+   * usa ocupa sitio a la vista de todos, y borrarla por `curl` no es un camino
+   * que se pueda pedir a quien administra la planta.
+   *
+   * El servidor decide si borra o DESACTIVA —con casos previos que la nombren,
+   * desactiva— y la respuesta lo dice. Aquí se pinta esa diferencia, porque un
+   * «hecho» sobre una máquina que sigue en disco sería mentir.
+   */
+  const [quitando, setQuitando] = useState(null);
+  const [quitada, setQuitada] = useState(null);
+
+  const quitar = useCallback(async (maquina) => {
+    setQuitando(maquina.id);
+    try {
+      const r = await eliminarMaquina(maquina.id);
+      setQuitada({ maquina, desactivada: r.desactivada, motivo: r.motivo ?? null });
+      setRevisiones(({ [maquina.id]: _v, ...resto }) => resto);
+      setSondeos(({ [maquina.id]: _s, ...resto }) => resto);
+      await recargar();
+      avisarMaquinasCambiaron();
+    } catch (error) {
+      setEstado((prev) => ({ ...prev, error }));
+    } finally {
+      setQuitando(null);
+    }
   }, [recargar]);
 
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
@@ -275,6 +310,16 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
         </div>
       )}
 
+      {quitada && (
+        <div style={{ marginBottom: 14 }}>
+          <AlertBanner
+            type={quitada.desactivada ? "warning" : "success"}
+            title={traducir(quitada.desactivada ? "machines:config.deactivated" : "machines:config.deleted")}
+            message={quitada.motivo ?? traducir("machines:config.editor.removedHint")}
+          />
+        </div>
+      )}
+
       {estado.error && (
         <div style={{ marginBottom: 14 }}>
           <AlertBanner
@@ -329,6 +374,8 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
             sondeando={sondeando === m.id}
             onSondear={() => sondear(m.id)}
             onEditar={() => setEditor({ maquina: m })}
+            quitando={quitando === m.id}
+            onQuitar={() => quitar(m)}
           />
         ))}
       </Panel>
@@ -379,8 +426,12 @@ function FichaDeMaquina({
   revision, comprobando, onComprobar,
   sondeo, sondeando, onSondear,
   onEditar,
+  quitando = false, onQuitar,
 }) {
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
+  /* Dos pulsaciones para quitar: la primera pregunta, la segunda confirma. Un
+     solo clic que borre una máquina del menú de todos es demasiado barato. */
+  const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
 
   const conSerie = (maquina.variables ?? []).filter((v) => v.historyVerified).length;
   const limitaciones = maquina.limitaciones ?? [];
@@ -605,6 +656,27 @@ function FichaDeMaquina({
           <Pencil size={13} />
           {traducir("machines:config.edit")}
         </button>
+
+        {/* Plan 37 F1: quitar del tablero. El servidor decide si borra o desactiva. */}
+        {!confirmandoQuitar ? (
+          <button type="button" onClick={() => setConfirmandoQuitar(true)} disabled={quitando}
+            style={{ ...estiloBoton(t), cursor: "pointer", color: t.coral }}>
+            <Trash2 size={13} />
+            {traducir(quitando ? "machines:config.editor.removing" : "machines:config.editor.remove")}
+          </button>
+        ) : (
+          <span style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+            <span style={{ ...textoSuave, color: t.text }}>
+              {traducir("machines:config.editor.removeConfirm", { nombre: maquina.nombre })}
+            </span>
+            <Button variant="danger" onClick={() => { setConfirmandoQuitar(false); onQuitar?.(); }}>
+              {traducir("machines:config.editor.removeYes")}
+            </Button>
+            <Button variant="secondary" onClick={() => setConfirmandoQuitar(false)}>
+              {traducir("machines:config.editor.removeNo")}
+            </Button>
+          </span>
+        )}
       </div>
     </div>
   );

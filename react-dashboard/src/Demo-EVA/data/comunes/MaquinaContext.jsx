@@ -46,8 +46,34 @@
 import { createContext, useContext, useMemo } from "react";
 
 import { SISTEMA, SISTEMAS_EN_SERVICIO, sistemaDeRuta } from "@shared/eva/comun/sistemas.js";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
+
+import { useMaquinasConfiguradas } from "./MaquinasConfiguradas.jsx";
 
 const Ctx = createContext(null);
+
+/**
+ * La entrada de registro de una máquina CONFIGURADA, o `null`.
+ *
+ * Se construye con `construirSistema` —la misma función que haría el registro
+ * si alguien la registrara— y NO se registra en `SISTEMAS`: el registro es un
+ * módulo que valida al cargar y lanza, y meterle entradas en caliente desde
+ * un provider de React sería tener dos registros que pueden discrepar. Aquí
+ * la entrada vive lo que vive la pantalla.
+ *
+ * Una configuración que no se puede construir (tipo desconocido, sin
+ * variables) da `null`, igual que una máquina que no existe. Quien consuma
+ * decide qué decir; lo que no puede es caer en otra máquina de consuelo.
+ */
+function entradaConfigurada(maquina) {
+  if (!maquina) return null;
+  try {
+    return construirSistema(maquina, tipoDe(maquina.tipo));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * El id de máquina de una navegación, o `null`.
@@ -83,13 +109,28 @@ export function maquinaDeNavegacion({ page, params } = {}) {
  * @param {object} props.params    parámetros de la URL, ya parseados
  */
 export function MaquinaProvider({ page, params, children }) {
+  const { maquinas: configuradas } = useMaquinasConfiguradas();
+
   const valor = useMemo(() => {
     const id = maquinaDeNavegacion({ page, params });
-    const registro = id ? SISTEMA[id] ?? null : null;
+    /*
+     * Primero el registro escrito a mano; si no está, las configuradas (Plan
+     * 37 F1). El orden importa: un id del registro no puede ser sustituido
+     * por una configuración con el mismo nombre —`problemasDeMaquina` ya
+     * impide crearla, y aquí se respeta lo mismo—.
+     */
+    const configurada = id && !SISTEMA[id] ? configuradas.find((m) => m.id === id) ?? null : null;
+    const registro = id ? SISTEMA[id] ?? entradaConfigurada(configurada) : null;
 
     return {
       /** El id pedido, exista o no en el registro. */
       id,
+      /**
+       * La configuración de la máquina cuando es una CONFIGURADA, o `null`
+       * para las escritas a mano. Es lo que necesita quien construya su
+       * fuente de datos: las variables con su punto y su rol.
+       */
+      configurada,
       /**
        * Su entrada del registro, o `null`.
        *
@@ -105,9 +146,9 @@ export function MaquinaProvider({ page, params, children }) {
       /** El motivo del cierre, cuando lo hay. Para poder explicarlo. */
       cerrada: registro?.cerrado ?? null,
       /** Las que sí se pueden ofrecer, para cuando la pedida no valga. */
-      enServicioIds: SISTEMAS_EN_SERVICIO.map((s) => s.id),
+      enServicioIds: [...SISTEMAS_EN_SERVICIO.map((s) => s.id), ...configuradas.map((m) => m.id)],
     };
-  }, [page, params]);
+  }, [page, params, configuradas]);
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;
 }
@@ -123,6 +164,7 @@ export function useMaquina() {
   return (
     useContext(Ctx) ?? {
       id: null,
+      configurada: null,
       registro: null,
       enServicio: false,
       cerrada: null,

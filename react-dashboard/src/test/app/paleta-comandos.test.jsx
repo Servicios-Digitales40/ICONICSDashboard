@@ -78,7 +78,13 @@ describe("los destinos salen del registro, no de una lista escrita a mano", () =
      * para el sidebar.
      */
     const opciones = screen.getAllByRole("button");
-    expect(opciones).toHaveLength(ROUTES.length);
+    /*
+     * Menos las de máquina CONFIGURADA (`porMaquina`, Plan 37 F1): sin el
+     * parámetro de máquina llevan a una pantalla que no sabe de cuál hablar,
+     * así que la paleta no las ofrece sueltas. Se llega a ellas desde la
+     * sección de cada máquina en el sidebar.
+     */
+    expect(opciones).toHaveLength(ROUTES.filter((r) => !r.porMaquina).length);
   });
 
   it("marca en qué pantalla se está, para no ofrecerla como si fuera otro sitio", () => {

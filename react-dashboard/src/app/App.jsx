@@ -19,6 +19,7 @@ import { DataSourceProvider } from "@/lib/datasource";
 import { queryClient } from "@/lib/queryClient.js";
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { MaquinaProvider } from "@/Demo-EVA/data/comunes/MaquinaContext.jsx";
+import { MaquinasConfiguradasProvider } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { SesionProvider, useSesion } from "./providers/SesionProvider.jsx";
 import { usePermisos } from "./providers/usePermisos.js";
@@ -201,13 +202,21 @@ function Shell() {
         largo está en la cabecera de `MaquinaContext.jsx`, y tiene dos
         regresiones detrás.
       */}
-      <MaquinaProvider page={nav.page} params={nav.params}>
-        <ContenidoDelShell
-          t={t} nav={nav} navigate={navigate} muro={muro}
-          cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
-          PageComponent={PageComponent}
-        />
-      </MaquinaProvider>
+      {/*
+        `MaquinasConfiguradasProvider` va entre la sesión y la máquina: necesita
+        el token para leer `/api/maquinas`, y `MaquinaProvider` lo necesita a
+        él para resolver una máquina configurada (Plan 37 F1). Lee UNA vez al
+        resolverse la sesión; no sondea.
+      */}
+      <MaquinasConfiguradasProvider>
+        <MaquinaProvider page={nav.page} params={nav.params}>
+          <ContenidoDelShell
+            t={t} nav={nav} navigate={navigate} muro={muro}
+            cajonAbierto={cajonAbierto} setCajonAbierto={setCajonAbierto}
+            PageComponent={PageComponent}
+          />
+        </MaquinaProvider>
+      </MaquinasConfiguradasProvider>
     </SesionProvider>
   );
 }
@@ -280,7 +289,8 @@ function ContenidoDelTablero({ t, nav, navigate, muro, cajonAbierto, setCajonAbi
       {!muro.activo && (
         <Sidebar
           page={nav.page}
-          onNavigate={(p) => navigate(p)}
+          params={nav.params}
+          onNavigate={(p, params) => navigate(p, params ?? {})}
           abiertaCajon={cajonAbierto}
           onCerrarCajon={() => setCajonAbierto(false)}
         />
