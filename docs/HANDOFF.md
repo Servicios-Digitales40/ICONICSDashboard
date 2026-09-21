@@ -1,6 +1,7 @@
 # HANDOFF — dónde estamos y cómo seguir
 
-**Fecha:** 21-09-2026 · **Rama viva:** `Vibraciones1.0` · **HEAD:** `157be49`
+**Fecha:** 21-09-2026 · **Rama viva:** `Vibraciones1.0` · **HEAD:** el último
+commit del Plan 36 (el de documentos); `git log -1` lo dice.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -34,24 +35,27 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1013** pruebas · 29 omitidas |
-| Suite de backend | **368** pruebas |
-| Verificadores | **los 35** de `npm run verificar` |
+| Suite de frontend | **1052** pruebas · 29 omitidas |
+| Suite de backend | **376** pruebas |
+| Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
 | Lint y types | limpios |
-| Bundle | `index` 303 KB / 450 · `vendor` 266 / 330 |
+| Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
 
 Funcionalmente: el tablero de vibraciones (73 puntos en vivo), el asistente con
 sus 26 herramientas, el motor de diagnóstico determinista, el RAG documental,
-los casos previos, el transporte falso (`ICONICS_FAKE=true`) y el CRUD de
-máquinas configuradas con su comprobación contra ICONICS.
+los casos previos, el transporte falso (`ICONICS_FAKE=true`), el CRUD de
+máquinas configuradas con su comprobación contra ICONICS, y —desde el Plan 36—
+**el alta y la edición de una máquina marcando los tres árboles de ICONICS**
+desde `Planta › Configuración`.
 
 ### Qué está a medias
 
-**Nada del Plan 33 se ha visto correr en el navegador.** Está probado con 1013
-pruebas y ejercido por `curl` contra el backend real, **no observado en
-pantalla**. Es la brecha más importante de este handoff: si algo no se ve bien,
-no lo sabemos.
+**Ni el Plan 33 ni el Plan 36 se han visto correr en el navegador.** El 36 está
+probado con 33 pruebas de vista y 22 de dominio, y su descubrimiento y su
+exploración se ejercitaron por HTTP contra el servidor real; **nadie ha abierto
+la pantalla**. Es la brecha más importante de este handoff, y es lo primero que
+hay que hacer (§5). Si algo no se ve bien, no lo sabemos.
 
 **La máquina de vibraciones tiene OCHO vistas, no nueve.** Falta
 **Historización**, y no es reubicar sino construir: depende del historiador,
@@ -188,15 +192,27 @@ en el remoto—.
 Hay **13 ramas locales y 24 remotas**, todas anteriores. `POR CONFIRMAR` si
 alguna sigue en uso; ninguna se ha tocado en este trabajo.
 
-### Los dos planes vivos
+### Los planes vivos
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
 se puede hacer sin tocar el código del tanque.
 
+**`PLAN-34-MAQUINAS-DESDE-EL-ARBOL.md`** — F0–F4 completas. Queda **F5**
+(retirar `vibraciones.js` como catálogo), que sólo tiene sentido cuando una
+máquina configurada haga todo lo que hace el catálogo.
+
 **`PLAN-32-VIBRACIONES.md`** — F1 completa. Quedan F2–F6.
 
+**`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`: F1–F3
+hechas, **pendiente de verse en el navegador**.
+
 ### Próximos pasos, por prioridad
+
+**0 · Ver el Plan 36 en el navegador.** Arrancar con `ICONICS_FAKE=true` (§9),
+entrar como administrador, `Planta › Configuración › Nueva máquina`, teclear
+las tres raíces, explorar, marcar `S1`, guardar. Después lo mismo contra
+planta real. Es lo único de ese plan que no está hecho.
 
 **1 · Plan 32 F2 — desbloquear el historiador.** Por qué el grupo `DEMO 3`
 devuelve 0 muestras: si dejó de registrar, o si la ruta cambió como en el
@@ -237,6 +253,7 @@ pronóstico.
 | **Señales sin histórico** | `aPeak_S1` (vibraciones) y `cargaMotor` + `eficienciaEnergetica` (tanque) **devuelven la serie de otra señal, sin dar error** |
 | **Diagnóstico de rodamientos apagado** | `MonState_e_f_BPFO/BPFI/FTF` en posición 0. Es configuración del SM 1281, no código |
 | **Sin geometría de chumaceras** | S2 y S3 declaran `rodamiento: null`. Sin referencia no hay frecuencias de defecto en dos de tres apoyos |
+| **El historiador rechaza una carpeta con `\` final** | `browse` de `hda:\Configuration\DEMO_VIBRACIONES` responde; la misma ruta con contrabarra final da **500 sin detalle** (medido 21-09-2026). El catálogo escrito a mano la lleva (`GRUPO_HISTORIADOR`). La pantalla y el descubridor la quitan (`normalizarRaizHistorica`) |
 | **Una máquina configurada NO lee alarmas ni estado de sensor** | Ya diagnostica —el Plan 34 F3 reconstruye su dominio desde los roles— pero esas dos piezas no son roles del tipo, así que van vacías y se declara. Se recogen en la F4 de ese plan |
 | **10 herramientas sin índice de sinónimos** | B3 del backlog. Resuelven por máquina desde F7, pero vibraciones no tiene sinónimos propios |
 | **Janitza da mala calidad** | En 16 de 18 tags |
@@ -337,6 +354,13 @@ veces la prueba seguía verde porque miraba lo que se **pinta**, no lo que se
 El 09-09 una reorganización rompió el histórico de 12 de 13 ramas del tanque
 por esto.
 
+**Las carpetas de `hda:` NO terminan en `\`; las de `ac:` SÍ terminan en `/`.**
+Una regla «carpeta = termina en separador» valía para un árbol y rompía el
+otro. En `shared/eva/comun/arbolIconics.js` la carpeta del historiador se
+define por exclusión —lo que no es tag es carpeta— y es lo que usan la
+pantalla, el descubridor y el fake. Y cada carpeta `ac:` cuelga un
+`.Attributes` que no es ni carpeta ni señal: se filtra (`esNodoDeSistema`).
+
 **El transporte falso devuelve cualquier punto que le pidan.** Contra
 `ICONICS_FAKE=true` una configuración inventada sale `VALID`, y es correcto:
 para ese servidor esos puntos existen. Tiene además un `CAOS.ausente`
@@ -402,17 +426,32 @@ cd react-dashboard && npm test
 
 | | Esperado |
 |---|---|
-| `npm run verificar` | **Los 35 pasaron** |
-| Backend | **368 passed** |
-| Frontend | **1013 passed · 29 skipped** |
+| `npm run verificar` | **Los 41 pasaron** |
+| Backend | **376 passed** |
+| Frontend | **1052 passed · 29 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
 
 ### Dar de alta la máquina de vibraciones
 
-`datos/maquinas.json` **no viaja con el repo** (`.gitignore`). Para verla en
-`Planta › Configuración`:
+`datos/maquinas.json` **no viaja con el repo** (`.gitignore`). Hay dos caminos.
+
+**Desde la pantalla (Plan 36):** con el backend arrancado —vale con
+`ICONICS_FAKE=true`— entra como administrador, `Planta › Configuración ›
+Nueva máquina`, y teclea las tres raíces:
+
+```
+ac:TDCON/DEMO_VIBRACIONES/Vibraciones/
+hda:\Configuration\DEMO_VIBRACIONES
+ae:/DEMO VIBRACIONES
+```
+
+Explorar, marcar `S1` (sus 26 variables quedan marcadas), quitar lo que no
+sea de la máquina, rellenar id y PLC, guardar. Después, en la ficha, «Sondear
+sus series» para ganar la verificación.
+
+**Desde el catálogo (Plan 33 F4), para comparar:**
 
 ```bash
 node scripts/generar-configuracion-vibraciones.mjs datos/maquinas.json
@@ -423,9 +462,9 @@ El backend la sirve sin reiniciar; `GET /api/maquinas` devuelve `cuantas: 1`.
 
 > Esa configuración **se deriva del catálogo**, no se escribe a mano: las dos
 > salen de la misma fuente, así que cualquier diferencia es real.
-> `verificar-vibraciones-configurada.mjs` las compara (22 comprobaciones).
+> `verificar-vibraciones-configurada.mjs` las compara.
 
-### Los 38 verificadores
+### Los 44 verificadores
 
 Tres quedan fuera de la tanda: `todo` (es el corredor), `antiguedad-historico`
 (necesita red real y `--env-file`) y `bundle` (necesita `dist/`).
@@ -435,8 +474,8 @@ Tres quedan fuera de la tanda: `todo` (es el corredor), `antiguedad-historico`
 | **Asistente** | `herramientas` · `chat` · `intencion` · `instrucciones` · `evaluacion` · `inyeccion` · `narrador` |
 | **Motor** | `diagnostico` · `temporal` · `calibracion` · `casos` · `casos-cierre` · `pronostico` · `vida-rodamiento` |
 | **Dominio** | `riesgos` · `riesgos-vibracion` · `dominio` · `catalogo` · `modulos` · `aprendizaje` |
-| **Máquinas (Plan 33)** | `maquinas` · `registro-configurado` · `vibraciones-configurada` · `deriva-iconics` |
-| **Backend** | `backend` · `tls` · `codigos` · `frescura` · `diario-diagnosticos` |
+| **Máquinas (Planes 33, 34 y 36)** | `maquinas` · `registro-configurado` · `vibraciones-configurada` · `deriva-iconics` · `descubrimiento` · `sondeo-series` · `dominio-configurado` · `punto-historico-vibraciones` · `configurar-desde-arbol` |
+| **Backend** | `backend` · `tls` · `codigos` · `frescura` · `diario-diagnosticos` · `roles` |
 | **Documentos** | `documentos` |
 | **i18n** | `i18n` · `textos` |
 | **Voz** | `voz` · `manos-libres` |

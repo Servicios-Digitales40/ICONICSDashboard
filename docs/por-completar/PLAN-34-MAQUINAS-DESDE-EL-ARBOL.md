@@ -4,8 +4,11 @@
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
-> **F4 entregó el descubrimiento y el sondeo; el alta editable espera al Plan
-> 25** (autenticación). Ver la decisión de alcance en su fase.
+> **F4 entregó el descubrimiento y el sondeo; el alta editable esperaba al Plan
+> 25** (autenticación). El Plan 35 la encendió y **el Plan 36 entregó el alta y
+> la edición marcando los tres árboles**
+> ([`docs/completados/PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`](../completados/PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md)).
+> Ver la decisión de alcance en F4.
 
 > **Mientras dure esta rama, la ESTACIÓN DE LLENADO está cerrada.** Este plan
 > migra **sólo vibraciones**. El tanque se mira —es el espejo— y **no se

@@ -355,12 +355,12 @@ montan además un `llama-server` falso, así que corren en cualquier máquina.
 ```bash
 npm run lint       # ESLint: fallos reales + la frontera de shared/ (§2.7)
 npm run types      # tsc sobre shared/ con checkJs; no compila nada
-npm run verificar  # los 35 verificar-* que corren sin red
+npm run verificar  # los 41 verificar-* que corren sin red
 ```
 
 `npm run verificar` **descubre** la carpeta `scripts/`: un verificador nuevo
 entra en la tanda por existir. Lo único enumerado es lo que se excluye, con su
-motivo. Hay **38 guiones `verificar-*`**; tres quedan fuera de la tanda
+motivo. Hay **44 guiones `verificar-*`**; tres quedan fuera de la tanda
 (`todo` es el corredor, `antiguedad-historico` necesita red real y `bundle`
 necesita `dist/`).
 
@@ -370,8 +370,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 368 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1013 (+29 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 376 — contratos HTTP, config, logger
+cd react-dashboard && npm test  # 1052 (+29 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 
@@ -453,8 +453,10 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-Los dos vivos hoy son el **33** (modularidad de máquinas) y el **32**
-(vibraciones); ver `HANDOFF.md` §5 para cuál sigue.
+Los vivos hoy son el **32** (vibraciones), el **33** (modularidad de máquinas,
+F9) y el **34** (máquinas desde el árbol, F5); el **36** (configurar marcando
+el árbol) está archivado con sus tres fases hechas y **pendiente de verse en el
+navegador**. Ver `HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer
 
