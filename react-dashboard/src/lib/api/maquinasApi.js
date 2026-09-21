@@ -100,6 +100,30 @@ export async function editarMaquina(id, cambios, { signal } = {}) {
 }
 
 /**
+ * Contrasta una máquina contra ICONICS y anota el resultado. Plan 33 F8.
+ *
+ * ── LO QUE DEVUELVE, Y POR QUÉ `anotado` IMPORTA ───────────────────
+ *
+ * `{ estado, motivo, resumen, ausentes, anotado }`.
+ *
+ * `anotado` es `false` cuando el estado salió `UNKNOWN` —no se pudo mirar— y
+ * el backend decidió NO guardarlo: lo que se sabía ayer sigue siendo la mejor
+ * información disponible, y pisarlo con «hubo un corte de red» perdería un
+ * dato cierto a cambio de uno que no dice nada de la máquina.
+ *
+ * Quien lo pinte tiene que distinguirlo: enseñar `UNKNOWN` como si fuera el
+ * estado nuevo de la máquina sería exactamente la confusión que esta fase
+ * existe para evitar.
+ */
+export async function verificarMaquina(id, { signal } = {}) {
+  const response = await fetch(
+    `${API_BASE}/api/maquinas/${encodeURIComponent(id)}/verificar`,
+    { method: "POST", headers: { ...authHeaders() }, signal },
+  );
+  return parseResponse(response);
+}
+
+/**
  * Da de baja una máquina.
  *
  * La respuesta trae `desactivada`: con casos previos asociados el backend NO

@@ -436,6 +436,14 @@
     "readOnly": "Esta pantalla es de sólo lectura por ahora",
     "readOnlyWhy": "Dar de alta una máquina desde aquí necesita que el tablero sepa pedir credenciales, y todavía no sabe. Mientras tanto se configuran por la API.",
     "deleted": "Máquina eliminada",
-    "deactivated": "Máquina desactivada, no eliminada"
+    "deactivated": "Máquina desactivada, no eliminada",
+    "check": "Comprobar contra ICONICS",
+    "checking": "Comprobando…",
+    "stateVALID": "Todos sus puntos siguen existiendo",
+    "stateDEGRADED": "Le faltan puntos en ICONICS",
+    "stateINVALID": "Ninguno de sus puntos existe ya",
+    "notSaved": "No se pudo comprobar: se conserva lo que se sabía antes",
+    "missing": "Puntos que ya no están",
+    "lastChecked": "Comprobada"
   }
 }

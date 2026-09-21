@@ -436,6 +436,14 @@
     "readOnly": "This screen is read-only for now",
     "readOnlyWhy": "Registering a machine from here requires the dashboard to know how to ask for credentials, and it does not yet. In the meantime they are configured through the API.",
     "deleted": "Machine deleted",
-    "deactivated": "Machine deactivated, not deleted"
+    "deactivated": "Machine deactivated, not deleted",
+    "check": "Check against ICONICS",
+    "checking": "Checking…",
+    "stateVALID": "All its points still exist",
+    "stateDEGRADED": "Some of its points are missing in ICONICS",
+    "stateINVALID": "None of its points exist any more",
+    "notSaved": "Could not check: what was known before is kept",
+    "missing": "Points that are gone",
+    "lastChecked": "Checked"
   }
 }

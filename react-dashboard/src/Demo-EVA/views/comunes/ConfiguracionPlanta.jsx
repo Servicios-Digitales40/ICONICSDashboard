@@ -1,5 +1,6 @@
 /**
- * Vista «Planta › Configuración»: qué máquinas conoce el tablero. Plan 33 F5.
+ * Vista «Planta › Configuración»: qué máquinas conoce el tablero, y si su
+ * configuración sigue siendo cierta. Plan 33 F5 y F8.
  *
  * ── QUÉ ENSEÑA, Y POR QUÉ ESO Y NO MÁS ─────────────────────────────
  *
@@ -25,6 +26,16 @@
  * Decirlo en pantalla —y no sólo en un plan— es parte del trabajo: una vista
  * sin botón de «nueva máquina» y sin explicación se lee como una vista rota.
  *
+ * ── LO ÚNICO QUE ESCRIBE: LA COMPROBACIÓN (F8) ─────────────────────
+ *
+ * «Comprobar contra ICONICS» contrasta los puntos de una máquina y guarda el
+ * veredicto. Escribe en NUESTRO archivo de configuración, no en la
+ * instalación: no mueve un actuador ni cambia un tag, así que no necesita la
+ * autenticación de la que depende el alta.
+ *
+ * Va bajo demanda y no al pintar la lista: cuesta una lectura completa de cada
+ * máquina, y el limitador corta en 300 peticiones por minuto y por IP.
+ *
  * ── LO QUE ESTA VISTA NO HACE, Y ES DELIBERADO ─────────────────────
  *
  * **No sondea.** No llama a `useSistemaAgua()` ni a ningún hook de máquina.
@@ -35,12 +46,12 @@
  * hallazgos, 17-09-2026). Una pantalla de configuración no necesita valores en
  * vivo, así que no los pide.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Boxes, Cog, Info, ShieldAlert } from "lucide-react";
+import { Boxes, Cog, Info, RefreshCw, ShieldAlert } from "lucide-react";
 
 import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
-import { listarMaquinas, listarTipos } from "@/lib/api/maquinasApi.js";
+import { listarMaquinas, listarTipos, verificarMaquina } from "@/lib/api/maquinasApi.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
@@ -56,6 +67,41 @@ export default function ConfiguracionPlanta() {
     maquinas: [],
     tipos: [],
   });
+
+  /*
+   * ── LA COMPROBACIÓN ES BAJO DEMANDA (Plan 33 F8) ───────────────────
+   *
+   * Y no al pintar la lista: cuesta una lectura completa de cada máquina —73
+   * puntos en el caso de vibraciones— y el limitador corta en 300 peticiones
+   * por minuto y por IP. Verificar al abrir la pantalla la pondría a competir
+   * con el sondeo del tablero por el mismo presupuesto.
+   *
+   * El resultado se guarda aparte del listado, no fusionado con él: la
+   * respuesta trae `ausentes` y `motivo`, que no están en la máquina guardada,
+   * y mezclarlos haría que un recargado de la lista los borrara sin avisar.
+   */
+  const [revisiones, setRevisiones] = useState({});
+  const [comprobando, setComprobando] = useState(null);
+
+  const comprobar = useCallback(async (id) => {
+    setComprobando(id);
+    try {
+      /* El `await` va FUERA del actualizador: el callback de `setState` es
+         síncrono, y meterlo dentro es un error de sintaxis —lo cazó el
+         compilador, no una prueba—. */
+      const revision = await verificarMaquina(id);
+      setRevisiones((previas) => ({ ...previas, [id]: revision }));
+    } catch (error) {
+      /* Un fallo al comprobar NO es un veredicto sobre la máquina: es que no
+         se pudo mirar. Se pinta como tal, sin tocar su estado. */
+      setRevisiones((previas) => ({
+        ...previas,
+        [id]: { estado: "UNKNOWN", motivo: error?.mensajeDelServidor ?? error?.message, anotado: false },
+      }));
+    } finally {
+      setComprobando(null);
+    }
+  }, []);
 
   useEffect(() => {
     const control = new AbortController();
@@ -147,7 +193,15 @@ export default function ConfiguracionPlanta() {
         )}
 
         {estado.maquinas.map((m) => (
-          <FichaDeMaquina key={m.id} maquina={m} traducir={traducir} t={t} />
+          <FichaDeMaquina
+            key={m.id}
+            maquina={m}
+            traducir={traducir}
+            t={t}
+            revision={revisiones[m.id] ?? null}
+            comprobando={comprobando === m.id}
+            onComprobar={() => comprobar(m.id)}
+          />
         ))}
       </Panel>
 
@@ -192,7 +246,7 @@ export default function ConfiguracionPlanta() {
  * campo `limitaciones` existe por contrato para esto —«lo que hay que confesar
  * al contestar»— y una pantalla que lo omita rompe ese contrato por su lado.
  */
-function FichaDeMaquina({ maquina, traducir, t }) {
+function FichaDeMaquina({ maquina, traducir, t, revision, comprobando, onComprobar }) {
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
 
   const conSerie = (maquina.variables ?? []).filter((v) => v.historyVerified).length;
@@ -252,7 +306,7 @@ function FichaDeMaquina({ maquina, traducir, t }) {
         como error enseñaría a ignorar los errores de verdad, y además sería
         falso — «no pude mirar» y «está roto» no son lo mismo (Plan 33 §21).
       */}
-      {maquina.estado === "UNKNOWN" && (
+      {maquina.estado === "UNKNOWN" && !revision && (
         <div style={{ marginTop: 7, display: "flex", gap: 7 }}>
           <Info size={14} style={{ color: t.textSoft, flexShrink: 0, marginTop: 1 }} />
           <div>
@@ -265,6 +319,81 @@ function FichaDeMaquina({ maquina, traducir, t }) {
           </div>
         </div>
       )}
+
+      {/*
+        ── EL RESULTADO DE LA COMPROBACIÓN (Plan 33 F8) ──────────────────
+
+        `UNKNOWN` se pinta en gris y NUNCA en rojo. Significa «no se ha podido
+        mirar», no «está roto», y pintarlo como error enseñaría a ignorar los
+        errores de verdad — además de ser falso.
+
+        Cuando `anotado` es `false`, la respuesta ni siquiera cambió el estado
+        guardado: lo que se sabía antes sigue siendo la mejor información, y
+        eso también se dice.
+      */}
+      {revision && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: revision.estado === "INVALID" ? t.coralSoft : t.panel,
+            border: `1px solid ${
+              { VALID: t.success, DEGRADED: t.amber, INVALID: t.coral }[revision.estado] ??
+              t.border
+            }33`,
+          }}
+        >
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>
+            {revision.estado === "UNKNOWN"
+              ? traducir("machines:config.notSaved")
+              : traducir(`machines:config.state${revision.estado}`)}
+          </div>
+          {revision.motivo && (
+            <div style={{ ...textoSuave, marginTop: 3 }}>{revision.motivo}</div>
+          )}
+
+          {revision.ausentes?.length > 0 && (
+            <div style={{ marginTop: 5 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: t.text, opacity: 0.8 }}>
+                {traducir("machines:config.missing")}
+              </div>
+              <ul style={{ margin: "2px 0 0", paddingLeft: 15 }}>
+                {revision.ausentes.map((v) => (
+                  <li key={v.pointName} style={{ ...textoSuave, fontFamily: "monospace" }}>
+                    {v.pointName}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={onComprobar}
+        disabled={comprobando}
+        style={{
+          marginTop: 9,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "5px 11px",
+          borderRadius: 9,
+          cursor: comprobando ? "default" : "pointer",
+          border: `1px solid ${t.border}`,
+          background: t.panel,
+          color: t.textSoft,
+          fontSize: 11.5,
+          fontWeight: 600,
+          fontFamily: "'Inter', sans-serif",
+          opacity: comprobando ? 0.6 : 1,
+        }}
+      >
+        <RefreshCw size={13} />
+        {traducir(comprobando ? "machines:config.checking" : "machines:config.check")}
+      </button>
     </div>
   );
 }

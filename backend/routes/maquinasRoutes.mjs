@@ -46,7 +46,11 @@ import {
   MaquinaParamsSchema,
 } from '../http/esquemas.mjs'
 import { CODIGOS } from '../http/codigos.mjs'
-import { capacidadesDe } from '../../shared/eva/comun/configuracionMaquina.js'
+import {
+  ESTADO_CONFIGURACION,
+  capacidadesDe,
+} from '../../shared/eva/comun/configuracionMaquina.js'
+import { verificarMaquina } from '../lib/verificarConfiguracion.mjs'
 import { resumenDeTipos, tipoDe } from '../../shared/eva/tipos/index.js'
 
 /**
@@ -63,7 +67,10 @@ const conCapacidades = maquina => ({
   capacidades: capacidadesDe(maquina, tipoDe(maquina.tipo)),
 })
 
-export function registerMaquinasRoutes(fastify, { gestorMaquinas, contarCasosDe = null } = {}) {
+export function registerMaquinasRoutes(
+  fastify,
+  { gestorMaquinas, contarCasosDe = null, client = null } = {}
+) {
   if (!gestorMaquinas) {
     throw new Error(
       'registerMaquinasRoutes necesita `gestorMaquinas`. Sin él las rutas existirían y ' +
@@ -105,6 +112,106 @@ export function registerMaquinasRoutes(fastify, { gestorMaquinas, contarCasosDe 
         )
       }
       return { ok: true, maquina: conCapacidades(maquina) }
+    }
+  )
+
+  /**
+   * ── ¿SIGUE SIENDO CIERTA ESTA CONFIGURACIÓN? (Plan 33 F8) ─────────
+   *
+   * Contrasta sus puntos contra ICONICS y anota el resultado.
+   *
+   * ── POR QUÉ ES POST Y NO GET ──────────────────────────────────────
+   *
+   * Porque MODIFICA: guarda el estado y la fecha de revisión en
+   * `maquinas.json`. Un GET que escriba es el tipo de ruta que alguien acaba
+   * llamando desde un sondeo o un prefetch del navegador, y entonces cada
+   * carga de la pantalla saldría a leer los 73 puntos de cada máquina.
+   *
+   * ── POR QUÉ BAJO DEMANDA Y NO EN CADA LECTURA ─────────────────────
+   *
+   * Porque comprobar cuesta una lectura completa de la máquina, y el limitador
+   * corta en 300 peticiones por minuto y por IP. Verificar al pintar la lista
+   * pondría a la pantalla de configuración a competir con el sondeo del
+   * tablero por el mismo presupuesto.
+   *
+   * Sin rol: es una LECTURA de la planta, como `/api/iconics/data`. Lo que
+   * escribe es nuestro propio archivo de configuración, no la instalación.
+   */
+  fastify.post(
+    '/api/maquinas/:id/verificar',
+    { schema: { params: MaquinaParamsSchema } },
+    async (request, reply) => {
+      const maquina = await gestorMaquinas.obtener(request.params.id)
+      if (!maquina) {
+        return responderError(
+          reply, 404, CODIGOS.ERROR_MAQUINA_NO_ENCONTRADA,
+          `No hay ninguna máquina configurada con el id "${request.params.id}".`
+        )
+      }
+
+      /*
+       * Sin cliente no se inventa un veredicto: se dice que no se pudo mirar.
+       * Es `UNKNOWN`, que es exactamente lo que significa — y NO se anota, para
+       * no pisar con «no pude comprobar» un `VALID` de ayer que sigue siendo la
+       * mejor información disponible.
+       */
+      if (!client) {
+        return {
+          ok: true,
+          estado: ESTADO_CONFIGURACION.UNKNOWN,
+          motivo:
+            'Este servidor no tiene cliente de ICONICS, así que no se puede comprobar si los ' +
+            'puntos siguen existiendo.',
+          anotado: false,
+        }
+      }
+
+      const resultado = await verificarMaquina(maquina, {
+        leerPuntos: (puntos) => client.readPoints(puntos),
+      })
+
+      /*
+       * ── UN `UNKNOWN` NO PISA LO QUE YA SE SABÍA ────────────────────
+       *
+       * Si no se pudo mirar, lo anterior sigue siendo la mejor información que
+       * hay. Guardar `UNKNOWN` encima de un `VALID` de ayer perdería un dato
+       * cierto a cambio de uno que sólo dice «hubo un corte de red».
+       *
+       * Sí se devuelve al cliente: quien pidió la comprobación tiene derecho a
+       * saber que no salió.
+       */
+      const anotar = resultado.estado !== ESTADO_CONFIGURACION.UNKNOWN
+
+      if (anotar) {
+        await gestorMaquinas.anotarRevision(maquina.id, {
+          estado: resultado.estado,
+          variables: resultado.variables,
+        })
+      }
+
+      request.log.info(
+        {
+          maquina: maquina.id,
+          estado: resultado.estado,
+          ausentes: resultado.resumen.ausentes,
+          total: resultado.resumen.total,
+        },
+        `Comprobada «${maquina.id}» contra ICONICS: ${resultado.estado} ` +
+          `(${resultado.resumen.presentes}/${resultado.resumen.total} puntos)`
+      )
+
+      return {
+        ok: true,
+        estado: resultado.estado,
+        motivo: resultado.motivo,
+        resumen: resultado.resumen,
+        /* Sólo las que faltan: devolver las 73 para decir que 70 están bien es
+           mandar ruido a una pantalla que va a pintar las 3 que importan. */
+        ausentes: resultado.variables
+          .filter((v) => v.estado === ESTADO_CONFIGURACION.INVALID)
+          .map((v) => ({ id: v.id, pointName: v.pointName })),
+        anotado: anotar,
+      }
     }
   )
 

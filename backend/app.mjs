@@ -674,6 +674,11 @@ export async function createApp(config) {
       gestorMaquinas,
       contarCasosDe: async id =>
         (await listarCasos()).filter(c => c?.sistema === id).length,
+      /* Para `POST /api/maquinas/:id/verificar` (Plan 33 F8): contrastar la
+         configuración contra ICONICS necesita leer sus puntos. Es el MISMO
+         cliente que el resto del backend —con su caché de lote y su
+         concurrencia acotada—, no uno propio. */
+      client,
     })
     registerDiagnosticoRoutes(instancia, { motorDiagnostico, diarioDiagnosticos, narrador })
     // El MISMO `diario` que escriben `iconicsRoutes` y `controlRoutes`: esta

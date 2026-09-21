@@ -257,6 +257,77 @@ describe('PATCH /api/maquinas/:id', () => {
   })
 })
 
+/*
+ * ── LA DERIVA, POR HTTP (Plan 33 F8) ───────────────────────────────
+ *
+ * `verificar-deriva-iconics.mjs` prueba el VEREDICTO con un cliente de
+ * mentira. Esto prueba lo que sólo se ve desde la ruta: que el resultado se
+ * anote —o no—, y qué se le devuelve a la pantalla.
+ *
+ * ── POR QUÉ AQUÍ NO SE AFIRMA EL VEREDICTO ─────────────────────────
+ *
+ * `montarApp` levanta con `ICONICS_FAKE=true`, y el transporte falso
+ * **devuelve cualquier punto que le pidan** —un tag fuera de todos los
+ * catálogos sale con `value: null` y calidad buena, ver `readPoints` en
+ * `fakeClient.mjs`—. O sea: contra el falso, una configuración inventada sale
+ * `VALID`, y eso es correcto: para ese servidor, esos puntos existen.
+ *
+ * Además tiene un `CAOS.ausente` aleatorio que omite puntos de vez en cuando,
+ * así que afirmar `VALID` a secas haría esta prueba intermitente — el defecto
+ * que costó la tanda del 17-09.
+ *
+ * Así que aquí se comprueba el CONTRATO DE LA RUTA —qué campos vuelven, que se
+ * anote, que un 404 sea 404— y el VEREDICTO se prueba en
+ * `verificar-deriva-iconics.mjs`, con un cliente de mentira que sí puede
+ * simular un punto borrado.
+ */
+describe('POST /api/maquinas/:id/verificar', () => {
+  it('una máquina que no existe da 404 con código', async () => {
+    const r = await app.inject({ method: 'POST', url: '/api/maquinas/fantasma/verificar' })
+    expect(r.statusCode).toBe(404)
+    expect(json(r).codigo).toBe('ERROR_MAQUINA_NO_ENCONTRADA')
+  })
+
+  it('comprueba, devuelve un estado conocido y lo ANOTA', async () => {
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: maquinaValida() })
+
+    const r = await app.inject({ method: 'POST', url: '/api/maquinas/vib-motor-02/verificar' })
+    expect(r.statusCode).toBe(200)
+
+    const cuerpo = json(r)
+    expect(['VALID', 'DEGRADED', 'INVALID']).toContain(cuerpo.estado)
+    expect(cuerpo.anotado).toBe(true)
+
+    /* Y queda en disco, para que la pantalla lo vea sin volver a comprobar. La
+       máquina nace `UNKNOWN`, así que haber salido de ahí ya dice que la
+       comprobación llegó al archivo. */
+    const guardada = json(await app.inject({ method: 'GET', url: '/api/maquinas/vib-motor-02' }))
+    expect(guardada.maquina.estado).not.toBe('UNKNOWN')
+    expect(guardada.maquina.revisada).toBeTruthy()
+  })
+
+  it('la respuesta trae el contrato entero: motivo, resumen y ausentes', async () => {
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: maquinaValida() })
+
+    const cuerpo = json(
+      await app.inject({ method: 'POST', url: '/api/maquinas/vib-motor-02/verificar' })
+    )
+
+    expect(typeof cuerpo.motivo).toBe('string')
+    expect(cuerpo.motivo.length).toBeGreaterThan(0)
+    expect(cuerpo.resumen.total).toBe(1)
+    expect(cuerpo.resumen.presentes + cuerpo.resumen.ausentes).toBe(1)
+
+    /*
+     * `ausentes` trae SÓLO las que faltan —devolver las 73 para decir que 70
+     * están bien es ruido— y cada una con su `pointName`: quien tiene que ir a
+     * buscarlas necesita el nombre, no el conteo.
+     */
+    expect(cuerpo.ausentes).toHaveLength(cuerpo.resumen.ausentes)
+    for (const v of cuerpo.ausentes) expect(v.pointName).toBeTruthy()
+  })
+})
+
 describe('DELETE /api/maquinas/:id', () => {
   it('una máquina sin casos se elimina', async () => {
     await app.inject({ method: 'POST', url: '/api/maquinas', payload: maquinaValida() })

@@ -1,6 +1,6 @@
 # PLAN 33 — Modularidad de Máquinas
 
-**Estado:** Fase 0 (auditoría), F1–F7 y F10 completadas · F8 y F9 por completar
+**Estado:** Fase 0 (auditoría), F1–F8 y F10 completadas · F9 por completar (bloqueada por la rama)
 **Fecha:** 18-09-2026
 **Rama de trabajo actual:** `Vibraciones1.0`
 
@@ -317,7 +317,7 @@ nueva pasaría las otras dos validaciones y fallaría en ésta.
 | Assets desde ICONICS | `IMPLEMENTADO` — browse | igual | ninguno |
 | **Alta por configuración** | `PARCIAL` — persistencia y API (F2) | UI + registro | falta F3 (registro) y F5 (UI) |
 | **Capacidad read/write por variable** | `IMPLEMENTADO` (F2) | declarada, deny-by-default | falta la UI (F5) |
-| **Detección de deriva vs ICONICS** | **`NO IMPLEMENTADO`** | VALID/DEGRADED/INVALID | mecanismo entero |
+| Detección de deriva vs ICONICS | `IMPLEMENTADO` (F8) | VALID/DEGRADED/INVALID/UNKNOWN | ninguno |
 | Planta > Configuración | `PARCIAL` — sólo lectura (F5) | alta por UI | asistente de alta (necesita Plan 25) |
 | Direccionar una máquina | `IMPLEMENTADO` (F6) — `?maquina=` + contexto | igual | ninguno: la query string ya servía |
 | MachineType | `NO IMPLEMENTADO` | ¿separado? | ver §6 |
@@ -1453,7 +1453,78 @@ cómo la nombra la gente.
 
 ---
 
-### F8 · Deriva ICONICS
+### F8 · Deriva ICONICS ✅
+
+**Completada el 21-09-2026.**
+
+**Qué se hizo**: `backend/lib/verificarConfiguracion.mjs`,
+`POST /api/maquinas/:id/verificar`, el botón «Comprobar contra ICONICS» en la
+vista, `scripts/verificar-deriva-iconics.mjs` (13 comprobaciones) y 3 pruebas
+de vista + 3 de ruta.
+
+#### La distinción que justifica la fase
+
+`UNKNOWN` y `INVALID` **se ven igual desde fuera** —ninguna variable contestó—
+y significan cosas opuestas. Colapsarlos daría de baja la planta entera en un
+corte de red, y lo haría de forma convincente: un estado rojo que parece
+diagnóstico.
+
+Es el principio de `CLAUDE.md` §2.4 un nivel más arriba: la ausencia de
+**comprobación** no se disfraza de comprobación fallida.
+
+| Señal | Veredicto |
+|---|---|
+| Todos los puntos responden | `VALID` |
+| Faltan algunos | `DEGRADED`, **nombrando cuáles** |
+| No responde ninguno, **habiendo contestado el servidor** | `INVALID` |
+| `readPoints` devuelve `ok:false`, o lanza | **`UNKNOWN`** |
+
+#### Cómo se sabe que un punto ya no está
+
+`readPoints` **omite del payload** los puntos que el servidor no devolvió. Esa
+ausencia es la señal.
+
+Lo que **no** es señal es la **calidad**: un punto con calidad mala existe —el
+servidor contesta por él— y lo que falla es su sensor. Marcarlo como
+configuración rota pondría en rojo una máquina cuya única falta es tener un
+sensor averiado, que es justo lo que el tablero debe poder enseñar.
+
+#### Dos decisiones
+
+**Un `UNKNOWN` no pisa lo que ya se sabía.** Si no se pudo mirar, el `VALID` de
+ayer sigue siendo la mejor información: guardar encima «hubo un corte de red»
+perdería un dato cierto. La respuesta lo dice con `anotado: false`.
+
+**Bajo demanda, no al pintar la lista.** Comprobar cuesta una lectura completa
+—73 puntos en vibraciones— y el limitador corta en 300 peticiones por minuto y
+por IP. Verificar al abrir la pantalla la pondría a competir con el sondeo del
+tablero.
+
+#### Lo que se aprendió probando
+
+El **transporte falso devuelve cualquier punto que le pidan**, así que contra
+`ICONICS_FAKE=true` una configuración inventada sale `VALID` — y es correcto:
+para ese servidor, esos puntos existen. Además tiene un `CAOS.ausente`
+aleatorio.
+
+Por eso la prueba de ruta comprueba **el contrato** (qué campos vuelven, que se
+anote, que un 404 sea 404) y el **veredicto** se prueba en
+`verificar-deriva-iconics.mjs`, con un cliente de mentira que sí puede simular
+un punto borrado. Afirmar `VALID` contra el falso habría sido intermitente.
+
+**Medido**: 13 del verificador nuevo · 12 de la vista · 20 de la ruta · **1013**
+de frontend (29 omitidas) · **368** de backend · **los 35 verificadores** · lint
+y types limpios. La distinción `UNKNOWN`/`INVALID` se comprobó **por mutación**.
+
+#### Lo que NO hace
+
+**No repara.** Una variable que desaparece y reaparece con otro nombre puede ser
+un renombrado o puede ser OTRA variable. El sistema informa; una persona decide
+(`CLAUDE.md` §2.5).
+
+---
+
+### F8 — la petición original
 
 **Objetivo**: VALID/DEGRADED/INVALID/UNKNOWN visibles y respetados.
 **Backend**: verificación al arranque y bajo demanda; la guarda de

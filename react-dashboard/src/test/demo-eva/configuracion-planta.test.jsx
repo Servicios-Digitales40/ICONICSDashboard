@@ -2,7 +2,7 @@
 /**
  * configuracion-planta.test.jsx
  * ------------------------------------------------------------------
- * La vista «Planta › Configuración». Plan 33 F5.
+ * La vista «Planta › Configuración». Plan 33 F5 y F8.
  *
  * ── QUÉ DEFIENDE ESTA PRUEBA ───────────────────────────────────────
  *
@@ -20,17 +20,18 @@
  *     este proyecto ya ha cometido dos veces, y la prueba mira las
  *     SUSCRIPCIONES, no el menú — como `llenado-cerrado.test.jsx`.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api/maquinasApi.js", () => ({
   listarMaquinas: vi.fn(),
   listarTipos: vi.fn(),
+  verificarMaquina: vi.fn(),
   problemasDeError: () => [],
 }));
 
 import { ThemeProvider } from "@/theme";
-import { listarMaquinas, listarTipos } from "@/lib/api/maquinasApi.js";
+import { listarMaquinas, listarTipos, verificarMaquina } from "@/lib/api/maquinasApi.js";
 import ConfiguracionPlanta from "@/Demo-EVA/views/comunes/ConfiguracionPlanta.jsx";
 
 /** La vista pide el tema por contexto, como todas las de este tablero. */
@@ -161,6 +162,74 @@ describe("la vista de configuración", () => {
     await waitFor(() => {
       expect(screen.getByText(/el puente no contesta/i)).toBeTruthy();
     });
+  });
+});
+
+/*
+ * ── LA DERIVA, EN PANTALLA (Plan 33 F8) ────────────────────────────
+ *
+ * Lo que se defiende aquí es que los cuatro estados se lean distinto, y sobre
+ * todo que `UNKNOWN` NO se pinte como un fallo de la máquina: significa «no se
+ * ha podido mirar», y presentarlo como error enseñaría a ignorar los errores
+ * de verdad.
+ */
+describe("la comprobación contra ICONICS", () => {
+  it("enseña qué puntos faltan, con su nombre", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    verificarMaquina.mockResolvedValue({
+      ok: true,
+      estado: "DEGRADED",
+      motivo: "1 de 3 variables ya no existen en ICONICS: ac:PRUEBA/M/S1/DKW.",
+      resumen: { total: 3, presentes: 2, ausentes: 1 },
+      ausentes: [{ id: "DKW_S1", pointName: "ac:PRUEBA/M/S1/DKW" }],
+      anotado: true,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Comprobar contra ICONICS/i }));
+
+    /* El nombre del punto, no sólo el conteo: quien tiene que ir a buscarlo lo
+       necesita. */
+    expect(await screen.findByText("ac:PRUEBA/M/S1/DKW")).toBeTruthy();
+    /* El motivo COMPLETO, no un fragmento: «/ya no existen/» también encaja en
+       el rótulo «Puntos que ya no están» y devolvía dos coincidencias. */
+    expect(
+      screen.getByText(/1 de 3 variables ya no existen en ICONICS/i)
+    ).toBeTruthy();
+  });
+
+  /*
+   * La comprobación que justifica la fase. `UNKNOWN` y `INVALID` se ven igual
+   * desde fuera —ninguna variable contestó— y significan cosas opuestas.
+   */
+  it("un UNKNOWN dice que no se pudo mirar, no que la máquina esté rota", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    verificarMaquina.mockResolvedValue({
+      ok: true,
+      estado: "UNKNOWN",
+      motivo: "ICONICS no contestó a la lectura. No se ha podido mirar.",
+      resumen: { total: 3, presentes: 0, ausentes: 0 },
+      ausentes: [],
+      anotado: false,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Comprobar contra ICONICS/i }));
+
+    expect(await screen.findByText(/se conserva lo que se sabía antes/i)).toBeTruthy();
+    /* Y NO se afirma que falten puntos: no se sabe. */
+    expect(screen.queryByText(/ninguno de sus puntos/i)).toBeNull();
+  });
+
+  it("un fallo de red se pinta como «no se pudo», sin tumbar la pantalla", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    verificarMaquina.mockRejectedValue(new Error("el puente no contesta"));
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Comprobar contra ICONICS/i }));
+
+    expect(await screen.findByText(/se conserva lo que se sabía antes/i)).toBeTruthy();
+    expect(screen.getByText("Motor conveyor 4")).toBeTruthy();
   });
 });
 
