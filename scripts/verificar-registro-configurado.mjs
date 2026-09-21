@@ -226,9 +226,37 @@ check('produce el NÚCLEO COMÚN de las dos máquinas escritas a mano', () => {
  * Afirmarlos sobre una máquina configurada sería hablar de tres apoyos que no
  * existen.
  */
-check('`dominio` viaja explícito y nulo, no ausente', () => {
+check('`dominio` viaja explícito, y con roles se RECONSTRUYE (Plan 34 F3)', () => {
+  /*
+   * Hasta el 21-09-2026 esto exigía `dominio: null` y una máquina configurada
+   * no diagnosticaba. Desde F3 se reconstruye desde los roles, así que esta
+   * máquina —que declara `medida:vRMS` y `medida:aRMS`— sí trae forma.
+   *
+   * Lo que NO cambia es que la propiedad tenga que ESTAR: ausente es
+   * indistinguible de un descuido.
+   */
   const est = entrada.estado(() => 1.23, entrada)
   assert.ok('dominio' in est, 'sin la propiedad, `undefined` parece un descuido')
+  assert.ok(est.dominio, 'declara roles: tendría que haber reconstruido su dominio')
+  assert.ok(est.dominio.canales, 'sin `canales` las reglas de apoyo no leen nada')
+  assert.ok(est.dominio.variador, 'sin `variador` las reglas de máquina no leen nada')
+})
+
+check('una máquina SIN roles sigue dando `dominio: null`', () => {
+  /*
+   * La guarda de `evaluarRiesgosDe` no se retira: sin roles no hay con qué
+   * reconstruir, y un dominio a medias es peor que ninguno. Medido el
+   * 18-09-2026, un dominio vacío devuelve TRES riesgos activos
+   * —`dkw-sin-referencia`, una regla que dispara ante la ausencia de dato—, y
+   * afirmarlos sería hablar de apoyos que nadie declaró.
+   */
+  const cfg = configuracion()
+  const pelada = construirSistema(
+    { ...cfg, id: `${cfg.id}-sin-roles`, variables: cfg.variables.map(v => ({ ...v, rol: null })) },
+    TIPO,
+  )
+  const est = pelada.estado(() => 1.23, pelada)
+  assert.ok('dominio' in est)
   assert.equal(est.dominio, null)
 })
 

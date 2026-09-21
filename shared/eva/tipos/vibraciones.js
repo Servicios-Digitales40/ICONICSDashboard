@@ -75,6 +75,7 @@ import {
   VARIADOR,
   VIGILANCIAS,
   bandaISO,
+  decodificarVigilancia,
   normaAplicableDe,
   peorZonaDe,
 } from "../vibraciones/vibraciones.js";
@@ -469,6 +470,17 @@ export const TIPO_VIBRACIONES = Object.freeze({
 
   /* La forma común (`estadoMaquina.js`) la construye esta función. */
   estado: estadoDeVibraciones,
+
+  /*
+   * Cómo se lee un estado de vigilancia, que llega codificado en base64.
+   *
+   * Viaja en el tipo porque quien reconstruye el dominio de una máquina
+   * configurada (`dominioDesdeRoles`, Plan 34 F3) es genérico y no puede
+   * importar el módulo de vibraciones sin dejar de servir para otro tipo.
+   * Sin esta función, esas claves quedan como HUECO — nunca como «en orden»,
+   * que es la lectura que apagaría ocho reglas en silencio.
+   */
+  decodificarVigilancia,
   resumen: resumenVibracionesParaAsistente,
 
   /* Criterio de norma, que es del tipo y no de la instalación. */

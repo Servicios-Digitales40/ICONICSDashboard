@@ -310,25 +310,45 @@ check('conserva los alias de cada señal', () => {
 console.log(`\n${c.negrita}Lo que no alcanza, y lo declara${c.reset}`)
 
 /*
- * ── LA DIFERENCIA REAL, Y NO ES UN DEFECTO DE ESTA FASE ────────────
+ * ── LA DIFERENCIA QUE HABÍA AQUÍ SE CERRÓ (Plan 34 F3) ─────────────
  *
- * La escrita a mano trae `dominio`: la forma que leen los motores de reglas
- * (`{canales, variador, alarmas}`). Una configuración no tiene dónde ponerla,
- * porque su estructura es una lista plana de variables con su rol.
+ * Hasta el 21-09-2026 esta sección decía que una máquina configurada NO puede
+ * diagnosticar: la escrita a mano traía `dominio` —la forma que leen los
+ * motores de reglas— y la configuración, una lista plana de variables.
  *
- * Mientras las reglas no consuman la forma común (`estadoMaquina.js`), una
- * máquina configurada NO puede diagnosticar. Eso es F4 del propio Plan 33
- * —«el diagnóstico ve»— y aquí lo que toca es que se note.
+ * `dominioDesdeRoles()` cierra ese hueco: coloca cada variable en
+ * `{canales, variador}` usando su rol y su `assetId`. La equivalencia se
+ * comprueba a fondo en `verificar-dominio-configurado.mjs` —los 66 valores y
+ * las 18 reglas, en cuatro escenarios—; aquí basta con fijar que la
+ * configurada ya no viaja sin forma.
+ *
+ * Lo que SIGUE sin alcanzar son las dos piezas que no son roles del tipo: los
+ * contadores del área de alarmas y el estado del sensor. Ver abajo.
  */
 check('la escrita a mano SÍ trae forma de dominio', () => {
   const est = aMano.estado(() => null, aMano)
   assert.ok(est.dominio, 'si esto falla, el motor de reglas cambió de entrada')
 })
 
-check('la configurada trae `dominio: null`, explícito', () => {
+check('la configurada TAMBIÉN trae forma de dominio, reconstruida', () => {
   const est = configurada.estado(() => null, configurada)
   assert.ok('dominio' in est, 'ausente parecería un descuido')
-  assert.equal(est.dominio, null)
+  assert.ok(est.dominio, 'debería reconstruirse desde los roles')
+  assert.deepEqual(
+    Object.keys(est.dominio.canales).sort(),
+    ['S1', 'S2', 'S3'],
+    'los tres apoyos del tipo tienen que estar, aunque no entreguen valor',
+  )
+})
+
+check('lo que NO sale de un rol se declara: alarmas y estado del sensor', () => {
+  /*
+   * No es un olvido: las alarmas son del servidor de ICONICS que vigila el
+   * área, y el estado del sensor es del SM 1281. Ninguna describe una medida
+   * del motor, que es lo que un rol nombra. Se recogen en F4.
+   */
+  const est = configurada.estado(() => null, configurada)
+  assert.deepEqual(est.dominio.sinRoles.sort(), ['alarmas', 'sensores'])
 })
 
 check('y lo DECLARA: no aparenta poder diagnosticar', () => {
@@ -436,6 +456,7 @@ console.log(
     `el catálogo de vibraciones.${c.reset}`
 )
 console.log(
-  `${c.amarillo}Lo que NO reproduce —y está declarado— es la forma de dominio: sin ella las ` +
-    `reglas no se evalúan.${c.reset}`
+  `${c.amarillo}La forma de dominio SÍ se reproduce desde el Plan 34 F3. Lo que queda fuera ` +
+    `—y está declarado—\nson las alarmas y el estado del sensor: no salen de un rol del ` +
+    `tipo.${c.reset}`
 )

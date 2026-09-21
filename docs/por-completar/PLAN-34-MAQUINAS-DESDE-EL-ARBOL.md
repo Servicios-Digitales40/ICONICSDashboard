@@ -1,6 +1,6 @@
 # PLAN 34 — Las máquinas se configuran desde el árbol de ICONICS
 
-**Estado:** F0, F0.2, F1 y F2 completadas · F3–F5 por completar
+**Estado:** F0, F0.2, F1, F2 y F3 completadas · F4–F5 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -194,10 +194,15 @@ Este plan **no reabre esa frontera**. La usa.
 
 ---
 
-## 4. El hueco que hay que cerrar sí o sí
+## 4. El hueco que había que cerrar sí o sí — **cerrado en F3**
 
-**Una máquina configurada hoy no diagnostica.** Trae `dominio: null` y
-`evaluarRiesgosDe` **se niega a evaluar**.
+> **Resuelto el 21-09-2026.** `dominioDesdeRoles()` reconstruye la forma y una
+> máquina configurada ya diagnostica: 66 valores idénticos y los mismos
+> riesgos en cuatro escenarios. Lo que sigue describe el problema tal como
+> estaba, porque es lo que explica por qué la solución es como es.
+
+**Una máquina configurada no diagnosticaba.** Traía `dominio: null` y
+`evaluarRiesgosDe` **se negaba a evaluar**.
 
 No es un descuido, está medido el 18-09-2026: pasarle un dominio vacío a
 `evaluarRiesgosVibracion` devuelve **tres riesgos ACTIVOS falsos** —los tres
@@ -207,8 +212,9 @@ regla es correcta; falso sería afirmarlos sobre apoyos no declarados.
 La causa es de forma: las reglas esperan `{canales, variador, alarmas}` y la
 configuración da una **lista plana de variables con su rol**.
 
-> Migrar vibraciones sin cerrar esto **pierde el diagnóstico**, que es el
-> objetivo 3 del Plan 32. Por eso F3 existe y por eso es la fase de riesgo.
+> Migrar vibraciones sin cerrar esto **habría perdido el diagnóstico**, que es
+> el objetivo 3 del Plan 32. Por eso F3 existía y por eso era la fase de
+> riesgo — y por eso se hizo **antes** de retirar nada.
 
 Lo que lo hace viable: `ROLES` y `ROLES_REQUERIDOS` ya están en el tipo, y
 `rolDe(familia, clave)` ya lo usa el generador. La información para
@@ -540,7 +546,10 @@ que ofrezca `historia_de_senal` **si y sólo si** tiene series verificadas.
 
 ---
 
-### F3 — El adaptador de dominio · **la fase que decide el plan**
+### F3 — El adaptador de dominio · **la fase que decide el plan** ✅
+
+**Completada el 21-09-2026.** La forma **sí se puede reconstruir** desde los
+roles sin perder información. El plan no se replantea.
 
 **Objetivo.** Reconstruir `{canales, variador, alarmas}` desde los roles, para
 que una máquina configurada **diagnostique**.
@@ -553,9 +562,86 @@ que una máquina configurada **diagnostique**.
 - No reaparecen los tres `dkw-sin-referencia` falsos de §4.
 - `verificar-riesgos-vibracion` pasa contra las dos.
 
-**Riesgo. Alto, y es el riesgo del plan.** Si la forma de dominio no se puede
-reconstruir desde los roles sin perder información, **esta fase lo revela y el
-plan se replantea aquí**, no en F5. Se hace antes de retirar nada.
+**Riesgo. Alto, y era el riesgo del plan.** Si la forma de dominio no se
+pudiera reconstruir desde los roles sin perder información, esta fase lo
+revelaría y el plan se replantearía aquí, no en F5.
+
+#### Lo que de verdad pasó
+
+**Se pudo, y sin inventar nada.** El rol ya lleva dentro las dos cosas que
+hacen falta para colocar una variable: la **familia** dice a qué saco va
+(`medida` → `canales[c].vRMS`, `variador` → `variador.par`) y el **ámbito** si
+se reparte por apoyo o es una sola. La correspondencia no se inventó aquí: se
+decidió al declarar los roles, y este adaptador la aplica.
+
+**El apoyo salió del `assetId`, no de un campo nuevo.** Una variable de ámbito
+`apoyo` ya sabe a cuál pertenece: es el activo al que está asignada
+(`assetId: "S1"` para `vRMS_S1`). Añadir un `canal` aparte habría sido el
+mismo dato dicho dos veces, con la posibilidad de que se contradijeran.
+
+> Lo que esto **exige** es que los activos de la máquina se llamen como los
+> canales de su tipo. Para vibraciones lo son (`S1`, `S2`, `S3`) y es natural
+> —describen la misma pieza—, pero conviene saberlo antes de configurar la
+> siguiente máquina.
+
+#### La equivalencia, medida
+
+Contra la configuración derivada, con cuatro lecturas distintas:
+
+| | |
+|---|---|
+| Valores del dominio | **66 coinciden uno a uno · 0 diferencias** |
+| Riesgos, 4 escenarios | **IDÉNTICOS** en los cuatro |
+| `hash` · `cero` · `vRMS alto` · `nada responde` | 8=8 · 5=5 · 8=8 · 3=3 |
+
+**El escenario que importaba era «nada responde».** Es el del 18-09-2026, el
+que producía tres `dkw-sin-referencia` falsos. Un adaptador que omitiera
+claves en vez de ponerlas a `null` habría pasado los otros tres y fallado
+justo ahí. De ahí la decisión de **recorrer las claves DEL TIPO y no las de la
+configuración**: así la clave siempre existe y vale `null` cuando falta, y el
+dominio tiene la misma forma para toda máquina del tipo.
+
+#### La guarda de `evaluarRiesgosDe` NO se retiró
+
+Y no debe retirarse. Una máquina cuyas variables no declaran rol sigue dando
+`dominio: null`, porque no hay con qué reconstruir — y un dominio a medias es
+peor que ninguno. Lo que cambió es que ahora casi ninguna máquina cae ahí.
+
+#### Lo que queda fuera, y está declarado
+
+**Dos piezas del dominio no son roles del tipo:**
+
+- `alarmas` — los contadores del área de ICONICS (`ae:`). Son del servidor de
+  alarmas, no de la máquina.
+- `sensores` — el estado del sensor de cada apoyo. Es del SM 1281.
+
+Ninguna describe una medida del motor, que es lo que un rol nombra. El
+adaptador las deja vacías y lo dice en `sinRoles`.
+
+**Y eso añadió una `limitaciones` nueva**, porque el modo de fallo es
+silencioso: las reglas de alarma leen `alarmas: {}` y no disparan, que desde
+fuera se ve igual que «no hay ninguna alarma activa». Sin confesarlo, el
+asistente diría que la máquina está tranquila sobre unos contadores que nadie
+ha leído. Se recogen en F4.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `verificar-dominio-configurado` | **13** comprobaciones, sin red |
+| `npm run verificar` | **los 39** |
+| Backend · Frontend | 368 · 1013 (29 omitidas) |
+| Lint y types | limpios |
+
+Roto a propósito antes de darlo por bueno (`CLAUDE.md` §6.2): haciendo que una
+clave ausente se omita en vez de valer `null`, falla la comprobación de la
+invariante y sale con código 1.
+
+Dos verificadores existentes cambiaron sus afirmaciones, y el cambio es el
+contenido de la fase: `verificar-registro-configurado` y
+`verificar-vibraciones-configurada` exigían `dominio: null`. Ahora exigen que
+**se reconstruya cuando hay roles** y que **siga siendo `null` cuando no los
+hay**.
 
 ---
 
@@ -576,6 +662,13 @@ aquí gana edición.
 
 **Riesgo.** Medio, y es de UX: 94 variables en pantalla sin ahogar a quien las
 revisa. Aplica `DESIGN.md` —criterio táctil, 44 px para lo que acciona—.
+
+**Lo que F3 le deja pendiente.** El área de alarmas y el estado del sensor no
+son roles del tipo, así que hoy el dominio reconstruido los deja vacíos y lo
+declara. Para que una máquina configurada evalúe también sus reglas de alarma,
+la pantalla tiene que dejar declarar **el área** (`ae:/...`) como parte de la
+máquina — el descubridor ya la sabe leer y clasificar (F1), y sabe que sólo
+los contadores entregan valor.
 
 ---
 

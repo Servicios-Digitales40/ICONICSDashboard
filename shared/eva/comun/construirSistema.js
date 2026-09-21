@@ -53,6 +53,7 @@
  * `registrarSistema()`.
  */
 import { capacidadesDe, permiteEscritura } from "./configuracionMaquina.js";
+import { dominioDesdeRoles } from "./dominioDesdeRoles.js";
 import { estadoComun, senalComun } from "./estadoMaquina.js";
 
 /**
@@ -121,6 +122,43 @@ export function construirSistema(maquina, tipo) {
   );
   const clavesConSerie = conSerie.map((v) => v.id ?? v.pointName);
 
+  /*
+   * ── QUÉ SE LE PUEDE DAR AL ADAPTADOR, Y QUÉ NO ────────────────────
+   *
+   * `dominioDesdeRoles` reconstruye lo que SALE de un rol: las medidas, las
+   * banderas, las calidades y las vigilancias de cada apoyo, más el variador.
+   *
+   * Dos piezas del dominio no son roles, y aquí no hay de dónde sacarlas:
+   *
+   *   `sensores`  el estado del sensor de cada apoyo (SM 1281)
+   *   `alarmas`   los contadores del área de ICONICS (`ae:`)
+   *
+   * Las máquinas escritas a mano las leen porque sus catálogos saben componer
+   * esos nombres. Una configuración no los declara con rol —el generador ya
+   * lo reporta: «7 sin rol (sensor y alarmas)»— así que se pasan vacías y el
+   * adaptador lo DECLARA en `sinRoles` en vez de fingir que las miró.
+   *
+   * La consecuencia es concreta y está probada: las reglas de alarma no
+   * disparan sobre una máquina configurada, porque `alarmas: {}` no es «cero
+   * alarmas», es «no se leyeron». Recogerlas es trabajo de F4, cuando la
+   * pantalla permita declarar el área.
+   */
+  const reconstruirDominio = (valorDe) => {
+    if (!tipo?.roles) return null;
+    const tieneRoles = (maquina.variables ?? []).some((v) => v.rol);
+    if (!tieneRoles) return null;
+
+    return dominioDesdeRoles(maquina, tipo, valorDe, {
+      /* Las vigilancias llegan codificadas y sólo el tipo sabe decodificarlas.
+         Sin decodificador quedan como hueco, nunca como «en orden». */
+      leerEstado: tipo.decodificarVigilancia
+        ? (punto) => tipo.decodificarVigilancia(valorDe(punto))
+        : null,
+      alarmas: null,
+      sensores: {},
+    });
+  };
+
   return {
     id: maquina.id,
     nombre: maquina.nombre ?? maquina.id,
@@ -163,17 +201,25 @@ export function construirSistema(maquina, tipo) {
     modelo: (nombre) => (porPunto.has(nombre) ? null : undefined),
 
     /**
-     * El estado en la forma común.
+     * El estado en la forma común, con su dominio reconstruido.
      *
-     * No lo construye el tipo: `tipo.estado` está escrito contra la forma de
-     * dominio de la máquina escrita a mano —`{canales, variador, alarmas}` en
-     * vibraciones— y una máquina configurada no tiene esa forma, tiene una
-     * lista plana de variables con su rol.
+     * No lo construye el tipo: `tipo.estado` está escrito contra los
+     * catálogos de la máquina escrita a mano, que componen nombres de punto.
+     * Una máquina configurada trae una lista plana de variables con su rol.
      *
-     * Construir aquí la forma común es lo honesto mientras las reglas no
-     * consuman `estadoMaquina.js` directamente (F4 del Plan 33). Lo que se
-     * pierde es el `dominio`, y por eso viaja `null` en vez de un objeto a
-     * medias que las reglas intentarían leer.
+     * ── EL DOMINIO YA NO VIAJA `null` (Plan 34 F3) ─────────────────
+     *
+     * Hasta el 21-09-2026 aquí se perdía el `dominio` y las reglas se
+     * negaban a evaluar: una máquina configurada no diagnosticaba. Desde F3
+     * lo reconstruye `dominioDesdeRoles()`, que coloca cada variable en
+     * `{canales, variador}` usando su rol —la familia dice a qué saco va, el
+     * ámbito si se reparte por apoyo— y su `assetId` como apoyo.
+     *
+     * **Medido antes de conectarlo**, sobre la configuración derivada y con
+     * cuatro lecturas distintas: los 66 valores del dominio coinciden uno a
+     * uno con los de la máquina escrita a mano, y los riesgos salen
+     * IDÉNTICOS en los cuatro escenarios —incluido «nada responde», que es el
+     * que producía los tres `dkw-sin-referencia` falsos—.
      */
     estado: (valorDe, sistemaRegistro, leidoA = null) => {
       const sinLectura = [];
@@ -226,34 +272,27 @@ export function construirSistema(maquina, tipo) {
         puntosPedidos: puntos.length,
         leidoA,
         /*
-         * ── `dominio: null` EXPLÍCITO, Y NO AUSENTE ────────────────
+         * ── EL DOMINIO, RECONSTRUIDO DESDE LOS ROLES (Plan 34 F3) ──
          *
-         * Las máquinas escritas a mano lo traen por `extra`, y es lo que lee
-         * `evaluarRiesgosDe` para pasárselo al motor de reglas. Una máquina
-         * configurada no tiene esa forma —tiene una lista plana de variables
-         * con su rol, no `{canales, variador, alarmas}`— así que aquí no hay
-         * dominio que dar.
+         * Va dentro de `extra` porque es por donde `estadoComun` deja pasar
+         * lo que no son sus campos fijos: suelto fuera, se descarta en
+         * silencio — comprobado.
          *
-         * Que la propiedad ESTÉ y valga `null` es lo que permite a quien la
-         * lea distinguir «esta máquina no tiene forma de dominio» de «se me
-         * olvidó ponerla». Sin ella, `estado.dominio` es `undefined`, que es
-         * indistinguible de un descuido.
+         * **Sigue pudiendo ser `null`, y eso no ha cambiado.** Un tipo sin
+         * `roles`, o una máquina cuyas variables no declaren ninguno, no
+         * tiene con qué reconstruir. En ese caso la propiedad ESTÁ y vale
+         * `null`, que es lo que permite a `evaluarRiesgosDe` distinguir «esta
+         * máquina no tiene forma de dominio» de «se me olvidó ponerla».
          *
-         * Y hace falta de verdad: medido el 18-09-2026, pasarle un dominio
-         * vacío a `evaluarRiesgosVibracion` devuelve **tres riesgos ACTIVOS**
-         * —los tres `dkw-sin-referencia`, una regla que dispara ante la
-         * AUSENCIA de dato—. La regla es correcta; lo que sería falso es
-         * afirmarlos sobre tres apoyos que esta máquina no ha declarado.
-         *
-         * Por eso `evaluarRiesgosDe` tiene que NEGARSE ante `dominio: null`
-         * en vez de evaluar — ver su guarda en `ia/herramientas/lib/
-         * maquina.mjs`.
-         *
-         * Va dentro de `extra` porque es por donde `estadoComun` deja pasar lo
-         * que no son sus campos fijos: sueltó fuera, se descarta en silencio —
-         * comprobado.
+         * Lo que no se hace nunca es entregar un dominio A MEDIAS. Medido el
+         * 18-09-2026: pasarle un dominio vacío a `evaluarRiesgosVibracion`
+         * devuelve **tres riesgos ACTIVOS** —los `dkw-sin-referencia`, una
+         * regla que dispara ante la AUSENCIA de dato—. La regla es correcta;
+         * falso sería afirmarlos sobre tres apoyos que nadie declaró. Por eso
+         * la reconstrucción recorre las claves DEL TIPO y pone `null` en lo
+         * que falta, en vez de omitir la clave.
          */
-        extra: { dominio: null },
+        extra: { dominio: reconstruirDominio(valorDe) },
       });
     },
 
@@ -379,6 +418,28 @@ export function construirSistema(maquina, tipo) {
       const escribibles = (maquina.variables ?? []).filter((v) => permiteEscritura(v.acceso));
       if (!escribibles.length) {
         propias.push("Ninguna de sus variables es escribible: sobre esta máquina sólo se lee.");
+      }
+
+      /*
+       * ── LAS DOS PIEZAS QUE EL DOMINIO NO RECONSTRUYE (Plan 34 F3) ──
+       *
+       * Los contadores del área de alarmas y el estado del sensor de cada
+       * apoyo no son roles del tipo —las alarmas son del servidor de ICONICS,
+       * el sensor es del SM 1281— así que la reconstrucción los deja vacíos.
+       *
+       * Y eso hay que CONFESARLO, porque el modo de fallo es silencioso: las
+       * reglas de alarma leen `alarmas: {}` y no disparan, que desde fuera se
+       * ve igual que «no hay ninguna alarma activa». Sin esta línea, el
+       * asistente diría que la máquina está tranquila sobre unos contadores
+       * que nadie ha leído.
+       */
+      if (tipo.roles) {
+        propias.push(
+          "Los contadores del servidor de alarmas y el estado de los sensores NO se leen en " +
+            "esta máquina: no son medidas del motor, así que no se declaran como variables " +
+            "con rol. Las reglas que dependen de ellos no se evalúan, y su silencio no " +
+            "significa que no haya alarmas.",
+        );
       }
 
       return propias;
