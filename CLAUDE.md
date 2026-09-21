@@ -37,6 +37,22 @@ producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 > Lo que sigue en este documento describe el proyecto COMPLETO, que es el que
 > vuelve al reabrir.
 
+### Empezar aquí
+
+**Sesión nueva:** lee [`docs/HANDOFF.md`](docs/HANDOFF.md) antes que nada. Trae
+el estado real —qué funciona, qué está a medias, qué está roto—, las decisiones
+ya tomadas con su porqué, y las trampas conocidas. Este archivo dice las
+reglas; aquél dice dónde estamos.
+
+**Las cuatro restricciones duras**, en una línea cada una:
+
+| | |
+|---|---|
+| **Node 24** | Se declara en `.nvmrc` y en los tres `package.json`. **No es 18**: con otra mayor, `npm ci` se niega. Ver §5 |
+| **Dependencias** | El backend **sí las tiene** (Fastify, zod, pino, pdfkit…). La regla no es «ninguna» sino **ninguna NUEVA sin pedirla antes** — ver §6 |
+| **Sólo LLM local** | `llama-server` por `IA_BASE`. Nada sale a una API de terceros (§2.1) |
+| **ICONICS es la única fuente** | De todo dato de sensor de planta. Sin MQTT, sin OPC-UA en el camino, sin event bus (§2.1) |
+
 ## 2. No negociables (arquitectura)
 
 Estas decisiones ya se tomaron. No se reabren por conveniencia de una tarea
@@ -274,190 +290,122 @@ tuviera una rama «ésta no es de ICONICS», que es exactamente el `if` repetido
 en cinco archivos que ese registro existe para evitar. Ver
 [`docs/por-completar/PLAN-19-MODULARIZACION.md`](docs/por-completar/PLAN-19-MODULARIZACION.md) §0.2.
 
+### 4.8 Primero lo mínimo; escalar sólo si se justifica
+
+La solución más pequeña que resuelva el problema **de verdad**, y crecer sólo
+con una medición o un incidente delante. No es minimalismo por estética: es que
+cada pieza de más hay que mantenerla, y las que se añaden «por si acaso» nadie
+las revisa después.
+
+Tres ejemplos de este repo, los tres con su porqué escrito en el código:
+
+- **Sin base de datos** (§2.2): JSON con escritura atómica. Un puñado de
+  máquinas no justifica un motor. Se revisa **con medición**, no por intuición.
+- **Sin enrutador** en el frontend: `useNavegacion` son ~100 líneas sobre la
+  History API. «Una dependencia nueva en el bundle de planta tendría que
+  ganarse su sitio con algo más que esto.»
+- **Un rótulo, no un nivel de menú** (Plan 33 F10): agrupar nueve vistas en
+  tres apartados se resolvió con un separador. Hacerlo anidable habría exigido
+  decidir plegado, colapsado y conteo del badge — tres decisiones de chrome
+  para el mismo resultado visible.
+
+El corolario práctico: **cuando dudes entre dos diseños, escribe el pequeño y
+deja anotado qué mediría para justificar el grande.**
+
 ## 5. Pruebas — qué existe y cuándo correrlas
 
-Antes de dar una tarea por terminada, corre lo que toque de esta lista.
+Antes de dar una tarea por terminada, corre lo que toque.
 
-**En la raíz** (Plan 20 F1 y F2 — miran el árbol entero):
+### 5.1 La puerta obligatoria
+
+**Antes de tocar el modelo, el prompt o cualquier herramienta del asistente**,
+estas dos tienen que pasar. No son parte de «la tanda»: son la puerta.
+
+```bash
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # cada herramienta
+ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
+```
+
+`ICONICS_FAKE=true` levanta el backend entero —tablero, historiador,
+asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
+montan además un `llama-server` falso, así que corren en cualquier máquina.
+
+> **Hoy `verificar-herramientas` reporta 169 correctas y 22 OMITIDAS** (la
+> estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
+> qué. Ese verde significa «169 de 191», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 191.
+
+### 5.2 La tanda completa
+
 ```bash
 npm run lint       # ESLint: fallos reales + la frontera de shared/ (§2.7)
 npm run types      # tsc sobre shared/ con checkJs; no compila nada
-npm run verificar  # la tanda completa de verificar-* que corre sin red
+npm run verificar  # los 35 verificar-* que corren sin red
 ```
-> Las tres corren también en CI (`.github/workflows/ci.yml`) en cuatro trabajos
-> paralelos, para que el rojo diga DÓNDE sin abrir el registro. `npm run
-> verificar` **descubre** la carpeta `scripts/` en vez de llevar una lista: un
-> verificador nuevo entra en la tanda por existir, y lo único enumerado es lo
-> que se excluye, con su motivo.
 
-**La versión de Node se declara en `.nvmrc` (hoy `24`), y en un solo sitio.**
-CI la lee con `node-version-file`; los tres `package.json` la repiten como
-`engines` para que instalar con otra mayor avise en el momento.
+`npm run verificar` **descubre** la carpeta `scripts/`: un verificador nuevo
+entra en la tanda por existir. Lo único enumerado es lo que se excluye, con su
+motivo. Hay **38 guiones `verificar-*`**; tres quedan fuera de la tanda
+(`todo` es el corredor, `antiguedad-historico` necesita red real y `bundle`
+necesita `dist/`).
 
-No es ceremonia: el 07-09-2026 CI se cayó por esto sin que nadie tocara CI. Un
-`npm uninstall` desde una máquina con npm 11 reescribió
-`react-dashboard/package-lock.json` con el árbol que npm 11 considera correcto,
-y el CI de entonces —Node 22, o sea npm 10— calculó otro y se negó a instalar
-(«Missing: @esbuild/…@0.28.2 from lock file»). **Un lockfile lo escribe una
-versión de npm y lo consume otra**, y `npm ci` hace bien en no improvisar. Si
-alguna vez hay que cambiar de Node, se cambia `.nvmrc` y se regeneran los tres
-locks **con esa versión**, no con la que tenga a mano quien lo haga.
+Las tres corren también en CI (`.github/workflows/ci.yml`) en cuatro trabajos
+paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 
-**Frontend** (`react-dashboard/`):
+### 5.3 Las suites
+
 ```bash
-npm test              # vitest — dominio, componentes, hooks
-npm run design:detect  # impeccable — antipatrones de diseño/CSS
-npm run build           # confirma que el bundle sigue compilando
+cd backend && npm test          # 368 — contratos HTTP, config, logger
+cd react-dashboard && npm test  # 1013 (+29 omitidas) — dominio, vistas, hooks
+cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
-> **La suite corre con `maxWorkers: 4`, y es deliberado** (17-09-2026,
-> `vite.config.js`). Sin ese tope la suite fallaba de forma intermitente —2 de
-> cada 4 tandas— y el modo de fallo despistaba: las pruebas que caían cambiaban
-> de nombre en cada tanda, todas pasaban al correrlas solas y la carpeta entera
-> pasaba. Parecía fuga de estado entre archivos.
->
-> No lo era: los fallos eran, todos, `Test timed out in 5000ms`. Ningún aserto
-> falso. En 16 núcleos vitest lanzaba ~15 workers con su jsdom y su grafo de
-> imports cada uno; `import` marcaba 534 s sobre 118 s de reloj. La prueba que
-> más caía tarda **1 348 ms aislada** contra un techo de 5 s: 3,7× de margen,
-> que la contención se come. Con el tope: `import` 60-88 s y **4 de 4 tandas en
-> verde**.
->
-> No se subió `testTimeout`: eso trata el síntoma y escondería una regresión de
-> rendimiento real el día que la haya.
->
-> **Si la suite vuelve a ponerse intermitente, mira primero SI los fallos dicen
-> `timed out`** (entonces es contención — este número) **o son asertos**
-> (entonces sí es el código). Ojo además con la forma: vitest 4 eliminó
-> `poolOptions`, y escrito a la manera de vitest 3 se ignora en silencio salvo
-> por una línea `DEPRECATED` — se perdió una vuelta entera por eso.
 
-**Backend** (`backend/`):
+> **La suite de frontend corre con `maxWorkers: 4`, y es deliberado.** Sin ese
+> tope fallaba de forma intermitente, y el modo de fallo despistaba: los
+> nombres cambiaban en cada tanda y todas pasaban al correrlas solas. Eran
+> **timeouts por contención**, no fugas de estado.
+>
+> **Si vuelve a ponerse intermitente, mira primero SI los fallos dicen `timed
+> out`** (entonces es contención) **o son asertos** (entonces es el código). El
+> detalle medido está en `HANDOFF.md` §9 y en `vite.config.js`.
+
+### 5.4 Contra planta real
+
 ```bash
-npm test               # vitest — contratos HTTP (esquemas Zod), config, logger
+node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs
 ```
 
-**Verificadores de extremo a extremo** (`scripts/`, sin red real — levantan un
-ICONICS y un llama-server falsos):
-```bash
-node scripts/verificar-backend.mjs          # contrato HTTP completo
-node scripts/verificar-herramientas.mjs      # cada herramienta del asistente
-node scripts/verificar-chat.mjs               # el bucle de conversación
-node scripts/verificar-diagnostico.mjs        # el motor: las 4 fuentes y su puntuación
-node scripts/verificar-narrador.mjs            # narrar un diagnóstico YA calculado, sin rediagnosticarlo
-node scripts/verificar-documentos.mjs          # índice de manuales / BM25
-node scripts/verificar-casos.mjs                # índice de casos previos
-node scripts/verificar-casos-cierre.mjs          # cierre de diagnóstico (form y chat)
-node scripts/verificar-temporal.mjs               # la 4ª fuente (tendencia)
-node scripts/verificar-calibracion.mjs             # sensibilidad de umbrales al tamaño de corpus
-node scripts/verificar-riesgos.mjs                  # reglas de riesgo del tanque
-node scripts/verificar-riesgos-vibracion.mjs         # reglas de riesgo de vibraciones
-node scripts/verificar-pronostico.mjs                 # desgaste acumulado
-node scripts/verificar-voz.mjs                          # dictado (whisper falso)
-node scripts/verificar-manos-libres.mjs                  # ciclo de voz completo
-node scripts/verificar-transporte-falso.mjs                # ICONICS_FAKE sirve las dos máquinas
-node scripts/verificar-modulos.mjs                         # los dos módulos no cruzan fuentes (§4.7)
-node scripts/verificar-catalogo.mjs                         # el catálogo declarado es coherente
-node scripts/verificar-instrucciones.mjs                     # el prompt no se contradice con el registro
-node scripts/verificar-evaluacion.mjs                         # el evaluador del asistente juzga como debe
-node scripts/verificar-inyeccion.mjs                           # un manual no puede dar órdenes al asistente
-node scripts/verificar-tls.mjs                                  # una CA propia basta, sin apagar la verificación
-node scripts/verificar-i18n.mjs                                  # los dos idiomas dicen lo mismo, con el mismo marcado
-node scripts/verificar-textos.mjs                                 # no queda texto de pantalla en español fuera del diccionario
-node scripts/verificar-codigos.mjs                                 # cada código de error del puente se sabe decir en los dos idiomas
-```
-> Los cuatro últimos son del Plan 20 y del 21. `verificar-catalogo.mjs` admite además
-> `--real` para contrastar contra el árbol de ICONICS de verdad — ese modo sí
-> necesita red y `--env-file`, y por eso el guion sin banderas no la toca.
+Sin `--env-file` **falla siempre** con «Falta ICONICS_API_BASE». Es la causa
+habitual de verlo en rojo dentro de una tanda, y no es una regresión.
 
-**Sonda contra ICONICS REAL** (no vale el falso: necesita red a planta y
-`--env-file`):
-```bash
-node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs   # edad de la última muestra
-```
-> **Sin `--env-file` falla siempre**, con «Falta ICONICS_API_BASE en
-> .env.local». Es la causa habitual de verlo en rojo dentro de una tanda de
-> `verificar-*`, y no es una regresión — estaba listado junto a los que sí
-> corren sin red. Con `--env-file` y red a planta pasa: medido el
-> 02-09-2026 y confirmado el 15-09-2026, historia contigua desde el 18-08.
->
-> Entre esas dos fechas estuvo dando un falso negativo —«sin dato ni siquiera
-> en los últimos días» sobre un historiador que funcionaba— porque pedía el
-> punto con `pointName()` (`ac:`, el valor EN VIVO) y `/History` sólo contesta
-> sobre el árbol propio del historiador (`puntoHistorico()`, `hda:`) desde la
-> reorganización del 09-09-2026. Arreglado (B10). Vale la pena saberlo al
-> escribir cualquier guion nuevo contra `/History`: **`hda:` es el ARCHIVO,
-> `ac:` es el VALOR**, y confundirlos da 500, no un error que se explique solo.
->
-> Ojo al diagnosticarlo desde fuera: `bms-server` usa **certificado
-> autofirmado**, así que un `curl` sin `-k` devuelve 000 y parece que no hay
-> servidor. Lo hay. Node lo acepta por `NODE_TLS_REJECT_UNAUTHORIZED=0` en
-> `.env.local` — que por eso mismo no arranca con `NODE_ENV=production`.
+Los **instrumentos de medida** (`scripts/medir-*.mjs`) necesitan los servidores
+de IA y **no devuelven código de error**: miden, no afirman. No los metas en
+una tanda de `verificar-*`. De su salida salen los `UMBRAL_*` del motor.
 
-**Instrumentos de medida** (necesitan los servidores de IA: `:8081` para la
-calibración, `:8080` para la narración — ninguno necesita ICONICS):
-```bash
-node --env-file=.env.local scripts/medir-calibracion.mjs   # distribución real de coseno y BM25
-node --env-file=.env.local scripts/medir-narracion.mjs     # ¿obedece el modelo la instrucción de conflicto?
-node --env-file=.env.local scripts/medir-asistente.mjs    # el banco de 20 casos contra el modelo real
-```
-> No afirma nada, **mide**: de su salida salen los `UMBRAL_*` de
-> `ia/motor/diagnostico.mjs`. No es un verificador y no devuelve código de
-> error — no lo metas en una tanda de `verificar-*`. Su hermano sí lo es:
-> `verificar-calibracion.mjs` prueba el MECANISMO sin servidores, sobre un
-> corpus sintético. Separarlos es lo que impide poner un umbral a ojo y
-> después escribir la prueba que lo confirme.
+### 5.5 Node 24, en un solo sitio
 
-**Tras compilar el frontend:**
-```bash
-node scripts/verificar-bundle.mjs   # la pila 3D no viaja en el chunk de arranque
-```
-> **Hoy pasa** (medido el 12-09-2026: `index` 250,34 KB sobre 450,
-> `vendor` 265,14 KB sobre 330).
->
-> Los dos techos se han subido, y las cinco subidas están razonadas con su
-> medición —o con su ausencia de medición, dicha en voz alta— en la cabecera
-> del propio guion. Conviene saberlo porque roza la regla de «no se sube el
-> techo para callarlo»:
->
-> · `vendor` 90 → 210 (TanStack Query) → 270 (la librería de i18n) → **330 el
->   12-09-2026, ésta sí con medición delante**: el Plan 25 F2 destapó que
->   `lucide-react` no está troceado y cae en el catch-all, así que **dos iconos
->   de una vista nueva costaron 1,10 KB** de un margen que eran 4,86. Medido con
->   `git stash` a los dos lados.
-> · `index` 170 → 200 (los diccionarios, con `prediction.json` sacado antes
->   del arranque) → 300 el 09-09-2026 → **450 el 11-09-2026**. Las dos últimas
->   **por holgura, no por medición**: margen pedido para el trabajo que viene
->   (el Plan 24 y los que le siguen), con nada en rojo en el momento de
->   subirlas — 239,83 de 300 cuando se puso 450.
->
-> **Dos seguidas sin medición es el límite para `index`, y está escrito en el
-> guion**: una tercera no toca. Y desde el 12-09, **`vendor` no se sube más sin
-> haber tomado antes una de las dos palancas**: cargar sólo el idioma activo
-> (~40 KB) o trocear `lucide-react`. A partir de ahí lo que corresponde es
-> `COD-07` (Plan 26); subir un techo no cancela ninguna palanca, sólo deja de
-> bloquear el trabajo. Ver `docs/BACKLOG-FRONTEND.md` F5, que sigue describiendo
-> la situación anterior.
->
-> Lo que este guion protege de verdad —que la pila 3D no viaje en el arranque—
-> no depende de ninguno de esos números sino de `HUELLAS_3D`, y ahí no se ha
-> tocado nada. Es lo que destapó los 827 KB colados del 08-09.
+Se declara en `.nvmrc` y los tres `package.json` lo repiten como `engines`.
+**No es 18**: con otra mayor, `npm ci` se niega.
 
-> **En la rama `Vibraciones1.0`, parte de la suite está OMITIDA a propósito.**
-> Hoy: 29 pruebas de frontend con `.skip` y 22 comprobaciones de
-> `verificar-herramientas.mjs` con `omitir()`. No son deuda ni fallos tapados —
-> cada una lleva su motivo y su «para reabrir», y el guion de herramientas
-> **imprime al final cuántas omitió y por qué**, para que nadie lea su verde
-> como si hubiera mirado las 191.
->
-> Lo que eso significa al trabajar: **un rojo nuevo es un defecto de verdad**,
-> porque lo del cierre ya está omitido. Y si una prueba falla por depender del
-> tanque, se omite con su motivo — no se arregla tocando esa máquina (§1).
+El 07-09-2026 CI se cayó por esto sin que nadie tocara CI: un lockfile escrito
+por npm 11 y consumido por npm 10. **Un lockfile lo escribe una versión de npm
+y lo consume otra**, y `npm ci` hace bien en no improvisar. Si hay que cambiar
+de Node, se cambia `.nvmrc` y se regeneran los tres locks **con esa versión**.
 
-**Regla de oro:** un cambio que toca `backend/ia/` corre como mínimo
-`verificar-herramientas.mjs` y el verificador específico de lo que tocó
-(`verificar-diagnostico.mjs` si tocó el motor, `verificar-documentos.mjs` si
-tocó el índice de manuales, etc.). Un cambio en `shared/eva/` corre los
-verificadores de ambas instalaciones si el archivo es común a las dos.
+### 5.6 Reglas de oro
+
+- Un cambio en `backend/ia/` corre **§5.1** y el verificador de lo que tocó
+  (`verificar-diagnostico` si fue el motor, `verificar-documentos` si el índice
+  de manuales…).
+- Un cambio en `shared/eva/` corre los verificadores de **ambas** instalaciones
+  si el archivo es común.
+- **En esta rama parte de la suite está OMITIDA a propósito** (29 pruebas de
+  frontend y 22 comprobaciones de herramientas). Por eso **un rojo nuevo es un
+  defecto de verdad**. Y si una prueba falla por depender del tanque, se omite
+  con su motivo — no se arregla tocando esa máquina (§1).
+
+El catálogo completo de los 38 verificadores, con qué protege cada uno, está en
+[`docs/HANDOFF.md`](docs/HANDOFF.md) §9.
 
 ## 6. Flujo de trabajo con Claude Code
 
@@ -477,8 +425,42 @@ verificadores de ambas instalaciones si el archivo es común a las dos.
   (ver `docs/completados/PLAN-17-CERRAR-AUDITORIA.md`, sección de auditoría de
   duplicados).
 
+### 6.1 Cómo se estructura un plan
+
+Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
+
+- una cabecera de **estado** en la primera línea (`F1–F8 completadas · F9 por
+  completar`), que se actualiza **en el mismo commit** que la fase;
+- **fases numeradas** `F1`, `F2`…, cada una con objetivo, dependencias, riesgos
+  y criterios de aceptación;
+- al completarse, la fase se reescribe con **lo que de verdad pasó**: qué se
+  midió, qué defecto apareció, qué se decidió y por qué. Un plan que sólo diga
+  «hecho ✅» no sirve dentro de seis meses.
+
+El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
+Los dos vivos hoy son el **33** (modularidad de máquinas) y el **32**
+(vibraciones); ver `HANDOFF.md` §5 para cuál sigue.
+
+### 6.2 Qué NO hacer
+
+- **No añadir dependencias.** Ni al backend ni al frontend. Si una parece
+  necesaria, **se pide antes** con el motivo y qué se descartó. Hay 15 en el
+  backend y todas tienen su porqué; la 16 no entra sola.
+- **No refactorizar fuera del alcance pedido.** Si ves algo mejorable, se
+  anota en `docs/BACKLOG-*.md`; no se arregla de paso. Un commit que mezcla el
+  trabajo pedido con tres mejoras no se puede revertir a medias.
+- **No tocar el código del tanque** mientras dure esta rama (§1).
+- **No subir un techo** —de bundle, de timeout, de límite— para callar un rojo.
+  Se mide primero, y si se sube, se escribe con qué medición.
+- **No "arreglar" una prueba omitida.** Las que están con `.skip` u `omitir()`
+  llevan su motivo escrito; una que falle por el cierre se omite igual (§5.6).
+- **No dar por buena una prueba que pasa sin haberla visto fallar.** Si es
+  importante, rómpela a propósito una vez y comprueba que la caza.
+
 ## 7. Referencias
 
+- **[`docs/HANDOFF.md`](docs/HANDOFF.md) — estado real, decisiones tomadas,
+  trampas conocidas y cómo verificar. Lo primero que lee una sesión nueva.**
 - [`README.md`](README.md) — arranque, variables de entorno, orígenes de datos
 - [`PRODUCT.md`](PRODUCT.md) — producto, usuarios, posicionamiento
 - [`DESIGN.md`](DESIGN.md) — sistema de diseño
