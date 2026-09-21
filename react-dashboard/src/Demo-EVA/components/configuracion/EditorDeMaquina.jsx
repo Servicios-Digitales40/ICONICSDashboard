@@ -1,0 +1,895 @@
+/**
+ * El editor de una máquina configurada: tres árboles de ICONICS en paralelo
+ * —tiempo real, historizadas, alarmas— donde se marca lo que pertenece a la
+ * máquina, y un formulario que lo guarda. Plan 36 F1–F3.
+ *
+ * ── EL MODELO DE INTERACCIÓN, DECIDIDO CON EL USUARIO ──────────────
+ *
+ * «Al configurar la máquina desde el sistema es la idea, ir marcando los
+ * activos, variables historizadas, variables de tiempo real.» Y: «marcar el
+ * activo marque todas las variables y el usuario pudiera ir quitando».
+ *
+ *   - Marcar un activo (carpeta) marca todas sus variables. Quitar una deja
+ *     n−1. Es más rápido que marcar 104 de una en una, y es cómo se piensa
+ *     una máquina: «este apoyo es mío, menos estas tres señales».
+ *   - Los árboles se leen por rama: la raíz y su primer nivel al explorar,
+ *     y lo demás al abrir o marcar. Nunca un volcado de las 104 hojas.
+ *   - El emparejamiento `ac:` ↔ `hda:` se PROPONE por nombre y se ve. Lo que
+ *     no casa se señala, no se esconde; y se puede emparejar a mano.
+ *
+ * ── POR QUÉ LA PANTALLA NO DECIDE NADA ─────────────────────────────
+ *
+ * Todo lo que aquí parece una decisión —qué carpeta es un activo, qué
+ * `assetId` lleva una variable, qué rol se le propone, qué serie se le
+ * empareja, qué variable guardada ya no está— lo decide
+ * `shared/eva/comun/configurarDesdeArbol.js` y `arbolIconics.js`, que son
+ * dominio puro y se prueban en Node. Este componente pinta lo que aquéllos
+ * devuelven y recoge lo que la persona marca (`CLAUDE.md` §4.3). Si una
+ * regla cambia, cambia allí y la pantalla no se entera.
+ *
+ * ── LO QUE NO SE PUEDE HACER DESDE AQUÍ, A PROPÓSITO ───────────────
+ *
+ * **Marcar una variable como escribible.** Todo entra como `acceso: "read"`
+ * —lo pone el servidor, esta pantalla ni lo manda—. Habilitar la escritura
+ * sobre la planta es una decisión aparte con su propia conversación (Plan
+ * 36 §5; Plan 33 §20: `WRITABLE_VARIABLES` nunca se deriva).
+ *
+ * **Prometer historia.** `historyVerified` nace en `false` y se gana
+ * sondeando desde la ficha, porque el servidor contesta que sí y devuelve la
+ * serie de otra señal (medido). Aquí sólo se elige QUÉ serie se le propone.
+ *
+ * ── AL EDITAR: LO QUE YA NO ESTÁ SE SEÑALA, NO SE BORRA (F3) ───────
+ *
+ * Una variable guardada que el árbol ya no tiene puede ser un corte de red
+ * o un cambio de nombre en el servidor —en este servidor cambian cuatro
+ * nombres al mes—. Se pinta aparte, marcada, con «ya no está en el árbol», y
+ * lo decide una persona. Una cuya carpeta no se pudo leer ni siquiera se da
+ * por ausente: «no se pudo comprobar». Es `UNKNOWN` ≠ `INVALID` variable a
+ * variable, y lo calcula `compararConArbol`.
+ *
+ * ── NO SUSCRIBE NINGUNA MÁQUINA ─────────────────────────────────────
+ *
+ * Cada `browse` es una petición al abrir o marcar una rama, no un sondeo. Ver
+ * la cabecera de `ConfiguracionPlanta.jsx` y las dos veces que este proyecto
+ * revivió el sondeo de una máquina cerrada desde un componente de chrome.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  Link2,
+  Save,
+  Search,
+  Unlink,
+  X,
+} from "lucide-react";
+
+import { AlertBanner, Button, Panel, fieldStyle } from "@/components/ui/index.js";
+import { useArbolIconics } from "@/Demo-EVA/data/comunes/useArbolIconics.js";
+import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
+import { crearMaquina, editarMaquina, problemasDeError } from "@/lib/api/maquinasApi.js";
+import { useTheme } from "@/theme";
+import {
+  clasificarArea,
+  esCarpetaEnVivo,
+  esCarpetaHistorica,
+  esTagHistorico,
+  nombreDeCarpeta,
+  nombreFinal,
+  normalizarRaizHistorica,
+} from "@shared/eva/comun/arbolIconics.js";
+import { problemasDeMaquina } from "@shared/eva/comun/configuracionMaquina.js";
+import {
+  activosDesdeRaiz,
+  arbolesDe,
+  carpetaDe,
+  compararConArbol,
+  configuracionDesdeMarcas,
+  hojasBajo,
+  marcasDe,
+  proponerVariables,
+} from "@shared/eva/comun/configurarDesdeArbol.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
+
+import {
+  CabeceraGrupo,
+  Casilla,
+  Etiqueta,
+  Fila,
+  Mono,
+  Nota,
+  REJILLA_CONFIGURADOR,
+} from "./ArbolMarcable.jsx";
+
+/**
+ * @param {object} props
+ * @param {object|null} props.maquina  la máquina a editar, o `null` para una nueva
+ * @param {Array<{id: string, nombre: string}>} props.tipos  los tipos que el
+ *   servidor sabe interpretar
+ * @param {string[]} props.otrosIds  ids de las DEMÁS máquinas configuradas,
+ *   para que la validación del dominio cace un id repetido antes de enviar
+ * @param {(maquina: object, avisos: object[]) => void} props.onGuardado
+ * @param {() => void} props.onCancelar
+ */
+export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds = [], onGuardado, onCancelar }) {
+  /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
+  const { t: traducir } = useTranslation(["machines", "errors"]);
+  const { theme: t } = useTheme();
+  const mensajeDeError = useMensajeDeError();
+  const tx = useCallback((clave, opciones) => traducir(`machines:config.editor.${clave}`, opciones), [traducir]);
+
+  const editando = Boolean(maquina);
+  const arbol = useArbolIconics();
+
+  /* ── El formulario y las tres raíces ───────────────────────────────── */
+
+  const [formulario, setFormulario] = useState(() => ({
+    id: maquina?.id ?? "",
+    nombre: maquina?.nombre ?? "",
+    plc: maquina?.plc ?? "",
+    tipo: maquina?.tipo ?? tipos[0]?.id ?? "",
+  }));
+  const [arboles, setArboles] = useState(() => {
+    const a = maquina ? arbolesDe(maquina) : {};
+    return { enVivo: a.enVivo ?? "", historico: a.historico ?? "", alarmas: a.alarmas ?? "" };
+  });
+
+  /* ── Lo marcado y lo decidido a mano ───────────────────────────────── */
+
+  const [marcas, setMarcas] = useState(() => new Set(maquina ? marcasDe(maquina).vivos : []));
+  const [contadores, setContadores] = useState(() => new Set(maquina ? marcasDe(maquina).contadores : []));
+  const [emparejamientos, setEmparejamientos] = useState(() => (maquina ? marcasDe(maquina).emparejamientos : new Map()));
+  const [roles, setRoles] = useState(() => (maquina ? marcasDe(maquina).roles : new Map()));
+  const [abiertas, setAbiertas] = useState(() => new Set());
+
+  /* ── La exploración ─────────────────────────────────────────────────── */
+
+  const [exploracion, setExploracion] = useState("no"); // no | cargando | si
+  const [errorRaiz, setErrorRaiz] = useState(null);
+
+  const explorar = useCallback(async () => {
+    const raiz = arboles.enVivo.trim();
+    if (!raiz) {
+      setErrorRaiz(tx("rootRequired"));
+      return;
+    }
+    setExploracion("cargando");
+    setErrorRaiz(null);
+    arbol.olvidar();
+
+    const hijos = await arbol.cargarDosNiveles(raiz);
+    if (hijos === null) {
+      const error = arbol.hijosActuales().get(raiz)?.error;
+      setErrorRaiz(`${tx("rootNotFound", { ruta: raiz })}${error ? ` — ${mensajeDeError(error).titulo}` : ""}`);
+    }
+    const grupo = normalizarRaizHistorica(arboles.historico);
+    if (grupo) await arbol.cargarDosNiveles(grupo);
+    if (arboles.alarmas.trim()) await arbol.cargar(arboles.alarmas.trim());
+
+    /*
+     * Al editar, las carpetas de las variables guardadas se leen aunque no
+     * cuelguen del primer nivel: sin leerlas, `compararConArbol` no podría
+     * decir si la variable sigue o no —y las daría por «sin comprobar», que
+     * es correcto pero no es lo que quien abre la máquina quiere saber—.
+     */
+    for (const v of maquina?.variables ?? []) {
+      const carpeta = carpetaDe(v.pointName);
+      if (carpeta && !arbol.hijosActuales().has(carpeta)) await arbol.cargar(carpeta);
+    }
+    setExploracion("si");
+    // `arbol` es un objeto nuevo por render; sus funciones son estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arboles, maquina, tx, mensajeDeError]);
+
+  /* Al abrir una máquina existente se explora sola: es lo que se vino a ver. */
+  useEffect(() => {
+    if (editando && exploracion === "no" && arboles.enVivo) explorar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editando]);
+
+  /* ── Lo derivado: todo sale del dominio ─────────────────────────────── */
+
+  const raiz = arboles.enVivo.trim();
+  /* Sin contrabarra final: el servidor contesta 500 con ella (ver `esCarpetaHistorica`). */
+  const historico = normalizarRaizHistorica(arboles.historico);
+  const area = arboles.alarmas.trim();
+  const tipoObj = tipoDe(formulario.tipo);
+  const { hijosPorCarpeta } = arbol;
+
+  const hijosRaiz = arbol.hijosDe(raiz);
+  const activos = useMemo(
+    () => (hijosRaiz ? activosDesdeRaiz(raiz, hijosRaiz, hijosPorCarpeta, tipoObj) : null),
+    [raiz, hijosRaiz, hijosPorCarpeta, tipoObj],
+  );
+
+  const tagsHda = useMemo(() => {
+    if (!historico) return [];
+    const tags = [];
+    for (const [carpeta, hijos] of hijosPorCarpeta) {
+      if (!carpeta.startsWith(historico)) continue;
+      for (const h of hijos ?? []) if (esTagHistorico(h.pointName)) tags.push(h.pointName);
+    }
+    return tags;
+  }, [historico, hijosPorCarpeta]);
+
+  const variables = useMemo(
+    () =>
+      raiz
+        ? proponerVariables({ raiz, marcados: [...marcas], tagsHistoricos: tagsHda, emparejamientos, roles, tipo: tipoObj })
+        : [],
+    [raiz, marcas, tagsHda, emparejamientos, roles, tipoObj],
+  );
+  const porPunto = useMemo(() => new Map(variables.map((v) => [v.pointName, v])), [variables]);
+  const tagUsadoPor = useMemo(
+    () => new Map(variables.filter((v) => v.historyPointName).map((v) => [v.historyPointName, v])),
+    [variables],
+  );
+
+  const comparacion = useMemo(
+    () => (maquina && exploracion === "si" ? compararConArbol(maquina, hijosPorCarpeta) : null),
+    [maquina, exploracion, hijosPorCarpeta],
+  );
+
+  const payload = useMemo(
+    () =>
+      configuracionDesdeMarcas({
+        formulario,
+        arboles: { enVivo: raiz, historico: historico || null, alarmas: area || null },
+        variables,
+        contadores: [...contadores].map((pointName) => ({ pointName })),
+      }),
+    [formulario, raiz, historico, area, variables, contadores],
+  );
+
+  /* La misma validación que aplica el servidor, antes de enviar: es para lo
+     que `problemasDeMaquina` vive en `shared/`. */
+  const problemas = useMemo(() => problemasDeMaquina(payload, { tipoDe, otrosIds }), [payload, otrosIds]);
+  const bloquean = problemas.filter((p) => !p.aviso);
+  const avisos = problemas.filter((p) => p.aviso);
+
+  /* ── Marcar y quitar ────────────────────────────────────────────────── */
+
+  const alternarHoja = useCallback((pointName) => {
+    setMarcas((prev) => {
+      const s = new Set(prev);
+      if (s.has(pointName)) s.delete(pointName);
+      else s.add(pointName);
+      return s;
+    });
+  }, []);
+
+  const marcarCarpeta = useCallback(
+    async (carpeta, marcar) => {
+      /* No se puede marcar lo que no se ha leído: se lee en profundidad y
+         después se cuentan sus hojas sobre lo leído ahora mismo. */
+      await arbol.cargarEnProfundidad(carpeta);
+      const hojas = hojasBajo(carpeta, arbol.hijosActuales()) ?? [];
+      setMarcas((prev) => {
+        const s = new Set(prev);
+        for (const h of hojas) marcar ? s.add(h) : s.delete(h);
+        return s;
+      });
+      if (marcar) setAbiertas((prev) => new Set(prev).add(carpeta));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const alternarAbierta = useCallback(
+    (carpeta) => {
+      setAbiertas((prev) => {
+        const s = new Set(prev);
+        if (s.has(carpeta)) s.delete(carpeta);
+        else s.add(carpeta);
+        return s;
+      });
+      if (arbol.hijosDe(carpeta) === undefined) arbol.cargar(carpeta);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hijosPorCarpeta],
+  );
+
+  const emparejar = useCallback((vivo, tag) => {
+    setEmparejamientos((prev) => {
+      const m = new Map(prev);
+      if (tag === undefined) m.delete(vivo);
+      else m.set(vivo, tag);
+      return m;
+    });
+  }, []);
+
+  const elegirRol = useCallback((vivo, rol) => {
+    setRoles((prev) => new Map(prev).set(vivo, rol || null));
+  }, []);
+
+  /* ── Guardar ────────────────────────────────────────────────────────── */
+
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState(null);
+  const [problemasServidor, setProblemasServidor] = useState([]);
+
+  const guardar = useCallback(async () => {
+    setGuardando(true);
+    setErrorGuardar(null);
+    setProblemasServidor([]);
+    try {
+      const respuesta = editando
+        ? await editarMaquina(maquina.id, {
+            nombre: payload.nombre,
+            ...(payload.plc ? { plc: payload.plc } : {}),
+            tipo: payload.tipo,
+            arboles: payload.arboles,
+            assets: payload.assets,
+            variables: payload.variables,
+          })
+        : await crearMaquina(payload);
+      onGuardado?.(respuesta.maquina, respuesta.avisos ?? []);
+    } catch (error) {
+      setErrorGuardar(error);
+      setProblemasServidor(problemasDeError(error));
+    } finally {
+      setGuardando(false);
+    }
+  }, [editando, maquina, payload, onGuardado]);
+
+  /* ── Estilos comunes ────────────────────────────────────────────────── */
+
+  const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif", lineHeight: 1.45 };
+  const rotulo = { fontSize: 11.5, fontWeight: 600, color: t.text, fontFamily: "'Inter', sans-serif", display: "block", marginBottom: 4 };
+  const campo = { ...fieldStyle(t), fontSize: 12.5, padding: "8px 11px" };
+  const campoMono = { ...campo, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12 };
+
+  const cambiar = (campoNombre) => (e) => setFormulario((f) => ({ ...f, [campoNombre]: e.target.value }));
+  const cambiarArbol = (clave) => (e) => setArboles((a) => ({ ...a, [clave]: e.target.value }));
+
+  const conSerie = variables.filter((v) => v.historyPointName).length;
+  const sinRol = variables.filter((v) => !v.rol).length;
+  const activosMarcados = new Set(variables.map((v) => v.activo).filter(Boolean)).size;
+
+  return (
+    <div>
+      <style>{REJILLA_CONFIGURADOR}</style>
+
+      {/* ── El formulario ─────────────────────────────────────────────── */}
+      <Panel
+        title={editando ? tx("editTitle", { nombre: maquina.nombre }) : tx("newTitle")}
+        right={<FolderTree size={15} style={{ color: t.textSoft }} />}
+      >
+        <p style={{ ...textoSuave, margin: "0 0 12px" }}>{tx("intro")}</p>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <div>
+            <label style={rotulo} htmlFor="cfg-id">{tx("fieldId")}</label>
+            <input id="cfg-id" className="field" style={campoMono} value={formulario.id}
+              onChange={cambiar("id")} disabled={editando} placeholder="vib-motor-02" />
+            {!editando && <div style={{ ...textoSuave, fontSize: 11, marginTop: 3, color: t.textFaint }}>{tx("fieldIdHint")}</div>}
+          </div>
+          <div>
+            <label style={rotulo} htmlFor="cfg-nombre">{tx("fieldName")}</label>
+            <input id="cfg-nombre" className="field" style={campo} value={formulario.nombre} onChange={cambiar("nombre")} />
+          </div>
+          <div>
+            <label style={rotulo} htmlFor="cfg-plc">{tx("fieldPlc")}</label>
+            <input id="cfg-plc" className="field" style={campoMono} value={formulario.plc}
+              onChange={cambiar("plc")} placeholder="PLC_2 · ua:DEMO3" />
+            <div style={{ ...textoSuave, fontSize: 11, marginTop: 3, color: t.textFaint }}>{tx("fieldPlcHint")}</div>
+          </div>
+          <div>
+            <label style={rotulo} htmlFor="cfg-tipo">{tx("fieldType")}</label>
+            <select id="cfg-tipo" className="field" style={campo} value={formulario.tipo} onChange={cambiar("tipo")}>
+              {tipos.map((tipo) => (
+                <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 14 }}>
+          <div>
+            <label style={rotulo} htmlFor="cfg-raiz">{tx("rootLive")}</label>
+            <input id="cfg-raiz" className="field" style={campoMono} value={arboles.enVivo}
+              onChange={cambiarArbol("enVivo")} placeholder="ac:TDCON/…/" />
+          </div>
+          <div>
+            <label style={rotulo} htmlFor="cfg-hda">{tx("rootHistory")}</label>
+            <input id="cfg-hda" className="field" style={campoMono} value={arboles.historico}
+              onChange={cambiarArbol("historico")} placeholder={`hda:${String.fromCharCode(92)}Configuration${String.fromCharCode(92)}…${String.fromCharCode(92)}`} />
+            <div style={{ ...textoSuave, fontSize: 11, marginTop: 3, color: t.textFaint }}>{tx("rootHistoryHint")}</div>
+          </div>
+          <div>
+            <label style={rotulo} htmlFor="cfg-ae">{tx("rootAlarms")}</label>
+            <input id="cfg-ae" className="field" style={campoMono} value={arboles.alarmas}
+              onChange={cambiarArbol("alarmas")} placeholder="ae:/…" />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Button variant="secondary" icon={<Search size={14} />} onClick={explorar} loading={exploracion === "cargando"}>
+            {exploracion === "cargando" ? tx("exploring") : exploracion === "si" ? tx("reexplore") : tx("explore")}
+          </Button>
+          {errorRaiz && <span style={{ ...textoSuave, color: t.coral }}>{errorRaiz}</span>}
+        </div>
+      </Panel>
+
+      {/* ── Los tres árboles ──────────────────────────────────────────── */}
+      {exploracion !== "no" && (
+        <div className="eva-configurador-grid" style={{ marginTop: 14 }}>
+          <Panel title={tx("colLive")} noPad>
+            <div className="eva-configurador-columna">
+              <ColumnaEnVivo
+                tx={tx} t={t} raiz={raiz} activos={activos} arbol={arbol} marcas={marcas} porPunto={porPunto}
+                abiertas={abiertas} roles={roles} tagsHda={tagsHda} emparejamientos={emparejamientos}
+                onHoja={alternarHoja} onCarpeta={marcarCarpeta} onAbrir={alternarAbierta}
+                onRol={elegirRol} onEmparejar={emparejar} comparacion={comparacion}
+              />
+            </div>
+          </Panel>
+
+          <Panel title={tx("colHistory")} noPad>
+            <div className="eva-configurador-columna">
+              <ColumnaHistorico
+                tx={tx} t={t} historico={historico} arbol={arbol} abiertas={abiertas} tagUsadoPor={tagUsadoPor}
+                variables={variables} onAbrir={alternarAbierta} onEmparejar={emparejar}
+              />
+            </div>
+          </Panel>
+
+          <Panel title={tx("colAlarms")} noPad>
+            <div className="eva-configurador-columna">
+              <ColumnaAlarmas
+                tx={tx} t={t} area={area} arbol={arbol} contadores={contadores} setContadores={setContadores}
+              />
+            </div>
+          </Panel>
+        </div>
+      )}
+
+      {/* ── El resumen y el guardado ──────────────────────────────────── */}
+      {exploracion !== "no" && (
+        <div style={{ marginTop: 14 }}>
+          <Panel>
+            <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>
+              {tx("summary", { variables: variables.length + contadores.size, series: conSerie, sinRol, activos: activosMarcados })}
+            </div>
+
+            {(bloquean.length > 0 || problemasServidor.length > 0) && (
+              <div style={{ marginTop: 10 }}>
+                <AlertBanner
+                  type="warning"
+                  title={tx("problems")}
+                  message={
+                    <ul style={{ margin: 0, paddingLeft: 16 }}>
+                      {[...bloquean, ...problemasServidor].map((p, i) => (
+                        <li key={`${p.campo}-${i}`}>
+                          <Mono apagado style={{ fontSize: 11 }}>{p.campo}</Mono> · {p.problema}
+                        </li>
+                      ))}
+                    </ul>
+                  }
+                />
+              </div>
+            )}
+
+            {avisos.length > 0 && (
+              <div style={{ marginTop: 10, display: "flex", gap: 7 }}>
+                <AlertTriangle size={14} style={{ color: t.amber, flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>{tx("warnings")}</div>
+                  <ul style={{ margin: "3px 0 0", paddingLeft: 15 }}>
+                    {avisos.map((a, i) => (
+                      <li key={i} style={textoSuave}>{a.problema}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {errorGuardar && problemasServidor.length === 0 && (
+              <div style={{ marginTop: 10 }}>
+                <AlertBanner
+                  type="error"
+                  title={editando ? tx("saveEdit") : tx("save")}
+                  message={mensajeDeError(errorGuardar).titulo}
+                  detalle={mensajeDeError(errorGuardar).detalle}
+                  accion={mensajeDeError(errorGuardar).accion}
+                />
+              </div>
+            )}
+
+            <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <Button icon={<Save size={14} />} onClick={guardar} loading={guardando} disabled={bloquean.length > 0 || guardando}>
+                {guardando ? tx("saving") : editando ? tx("saveEdit") : tx("save")}
+              </Button>
+              <Button variant="secondary" icon={<X size={14} />} onClick={onCancelar}>{tx("back")}</Button>
+            </div>
+          </Panel>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────── */
+/* Columna 1 · Tiempo real                                                */
+/* ───────────────────────────────────────────────────────────────────── */
+
+function ColumnaEnVivo({
+  tx, t, raiz, activos, arbol, marcas, porPunto, abiertas, roles,
+  onHoja, onCarpeta, onAbrir, onRol, onEmparejar, comparacion, tagsHda,
+}) {
+  const error = arbol.errorDe(raiz);
+  if (!raiz) return <Nota>{tx("rootRequired")}</Nota>;
+  if (error) return <Nota tono="error">{tx("loadFailed")}</Nota>;
+  if (!activos) return <Nota>{tx("exploring")}</Nota>;
+
+  const grupo = (lista) =>
+    lista.map((a) => (
+      <CarpetaEnVivo
+        key={a.pointName} tx={tx} t={t} activo={a} nivel={0} arbol={arbol} marcas={marcas} porPunto={porPunto}
+        abiertas={abiertas} roles={roles} onHoja={onHoja} onCarpeta={onCarpeta} onAbrir={onAbrir} onRol={onRol}
+        onEmparejar={onEmparejar} tagsHda={tagsHda}
+      />
+    ));
+
+  const hojasSueltas = (arbol.hijosDe(raiz) ?? []).filter((h) => !esCarpetaEnVivo(h.pointName));
+
+  return (
+    <div>
+      <CabeceraGrupo>{tx("recognized")}</CabeceraGrupo>
+      {activos.reconocidos.length === 0 && <Nota>—</Nota>}
+      {grupo(activos.reconocidos)}
+
+      {activos.otros.length > 0 && (
+        <>
+          <CabeceraGrupo sub={tx("othersHint")}>{tx("others")}</CabeceraGrupo>
+          {grupo(activos.otros)}
+        </>
+      )}
+
+      {hojasSueltas.length > 0 && (
+        <>
+          <CabeceraGrupo>{tx("rootLeaves")}</CabeceraGrupo>
+          {hojasSueltas.map((h) => (
+            <FilaHoja key={h.pointName} tx={tx} t={t} hoja={h} nivel={0} marcada={marcas.has(h.pointName)}
+              variable={porPunto.get(h.pointName)} roles={roles} onHoja={onHoja} onRol={onRol} onEmparejar={onEmparejar} tagsHda={tagsHda} />
+          ))}
+        </>
+      )}
+
+      {comparacion && comparacion.ausentes.length > 0 && (
+        <>
+          <CabeceraGrupo sub={tx("missingHint")}>{tx("missingTitle")}</CabeceraGrupo>
+          {comparacion.ausentes.map((v) => (
+            <Fila key={v.pointName} nivel={0}>
+              <Casilla marcada={marcas.has(v.pointName)} etiqueta={v.id} onChange={() => onHoja(v.pointName)} />
+              <Mono>{v.id}</Mono>
+              <Etiqueta tono="aviso" title={v.pointName}>{tx("missing")}</Etiqueta>
+            </Fila>
+          ))}
+        </>
+      )}
+
+      {comparacion && comparacion.sinComprobar.length > 0 && (
+        <>
+          <CabeceraGrupo>{tx("uncheckedTitle")}</CabeceraGrupo>
+          {comparacion.sinComprobar.map((v) => (
+              <Fila key={v.pointName} nivel={0}>
+                <Casilla marcada={marcas.has(v.pointName)} etiqueta={v.id} onChange={() => onHoja(v.pointName)} />
+                <Mono>{v.id}</Mono>
+                <Etiqueta tono="neutro" title={v.pointName}>{tx("unchecked")}</Etiqueta>
+              </Fila>
+            ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Una carpeta del árbol en vivo: su casilla tri-estado, su conteo y, abierta, sus hijos. */
+function CarpetaEnVivo({ tx, t, activo, nivel, arbol, marcas, porPunto, abiertas, roles, onHoja, onCarpeta, onAbrir, onRol, onEmparejar, tagsHda }) {
+  const carpeta = activo.pointName;
+  const hijos = arbol.hijosDe(carpeta);
+  const error = arbol.errorDe(carpeta);
+  const abierta = abiertas.has(carpeta);
+
+  const hojas = hojasBajo(carpeta, arbol.hijosPorCarpeta);
+  const marcadas = hojas ? hojas.filter((h) => marcas.has(h)).length : 0;
+  const todas = hojas ? hojas.length > 0 && marcadas === hojas.length : false;
+  const algunas = marcadas > 0 && !todas;
+
+  return (
+    <div>
+      <Fila nivel={nivel} resaltada={algunas || todas}>
+        <Casilla
+          marcada={todas}
+          indeterminada={algunas}
+          etiqueta={tx("markAll", { activo: activo.id })}
+          onChange={() => onCarpeta(carpeta, !todas)}
+        />
+        <button
+          type="button"
+          onClick={() => onAbrir(carpeta)}
+          aria-expanded={abierta}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, flex: 1, minHeight: 32, padding: "0 4px",
+            background: "transparent", border: "none", cursor: "pointer", textAlign: "left", color: t.text,
+          }}
+        >
+          {abierta ? <ChevronDown size={13} color={t.textFaint} /> : <ChevronRight size={13} color={t.textFaint} />}
+          <Mono style={{ fontWeight: 600 }}>{activo.id}</Mono>
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: t.textFaint }}>
+            {hojas === null
+              ? tx("notLoaded")
+              : `${tx("leaves", { n: hojas.length })}${activo.conRol !== undefined ? ` · ${tx("withRole", { n: activo.conRol })}` : ""}`}
+            {marcadas > 0 ? ` · ${marcadas}/${hojas?.length ?? "?"}` : ""}
+          </span>
+        </button>
+      </Fila>
+
+      {abierta && error && <Nota tono="error">{tx("loadFailed")}</Nota>}
+      {abierta && hijos && hijos.length === 0 && <Nota>{tx("empty")}</Nota>}
+      {abierta && hijos && hijos.map((h) =>
+        esCarpetaEnVivo(h.pointName) ? (
+          <CarpetaEnVivo
+            key={h.pointName} tx={tx} t={t} nivel={nivel + 1} arbol={arbol} marcas={marcas} porPunto={porPunto}
+            abiertas={abiertas} roles={roles} onHoja={onHoja} onCarpeta={onCarpeta} onAbrir={onAbrir} onRol={onRol}
+            onEmparejar={onEmparejar} tagsHda={tagsHda}
+            activo={{ id: nombreDeCarpeta(h.pointName), pointName: h.pointName }}
+          />
+        ) : (
+          <FilaHoja
+            key={h.pointName} tx={tx} t={t} hoja={h} nivel={nivel + 1} marcada={marcas.has(h.pointName)}
+            variable={porPunto.get(h.pointName)} roles={roles} onHoja={onHoja} onRol={onRol} onEmparejar={onEmparejar} tagsHda={tagsHda}
+          />
+        ),
+      )}
+    </div>
+  );
+}
+
+/** Una variable en vivo: casilla, nombre y, si está marcada, su rol y su serie. */
+function FilaHoja({ tx, t, hoja, nivel, marcada, variable, roles, onHoja, onRol, onEmparejar, tagsHda }) {
+  const corto = hoja.shortName ?? nombreFinal(hoja.pointName);
+  const v = marcada ? variable : null;
+  const ambiguo = v && v.rolCandidatos.length > 1 && !roles.has(v.pointName);
+  const selector = { ...fieldStyle(t), fontSize: 11, padding: "3px 6px", width: "auto", minHeight: 32, maxWidth: 160 };
+
+  /* Los tags del historiador con este mismo nombre final, para el caso
+     ambiguo: dos carpetas con el mismo tag, y hay que elegir cuál. */
+  const candidatosTag = v && v.procedencia === "ambiguo-en-historiador"
+    ? tagsHda.filter((tag) => nombreFinal(tag) === nombreFinal(v.pointName))
+    : [];
+
+  return (
+    <Fila nivel={nivel} resaltada={marcada}>
+      <Casilla marcada={marcada} etiqueta={corto} onChange={() => onHoja(hoja.pointName)} />
+      <Mono apagado={!marcada} style={{ flex: 1 }}>{corto}</Mono>
+
+      {v && (ambiguo ? (
+        <select aria-label={tx("ambiguousRole")} style={selector} value="" onChange={(e) => onRol(v.pointName, e.target.value)}>
+          <option value="">{tx("ambiguousRole")}</option>
+          {v.rolCandidatos.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+      ) : (
+        <Etiqueta tono={v.rol ? "ok" : "neutro"} title={tx("role")}>{v.rol ?? tx("noRole")}</Etiqueta>
+      ))}
+
+      {v && (v.historyPointName ? (
+        <span title={`${v.procedencia === "a-mano" ? tx("pairedManual") : tx("paired")} · ${v.historyPointName}`} style={{ display: "flex", color: t.success }}>
+          <Link2 size={13} />
+        </span>
+      ) : candidatosTag.length > 1 ? (
+        <select aria-label={tx("ambiguous")} style={selector} value="" onChange={(e) => onEmparejar(v.pointName, e.target.value)}>
+          <option value="">{tx("ambiguous")}</option>
+          {candidatosTag.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+        </select>
+      ) : (
+        <span title={tx("unpaired")} style={{ display: "flex", color: t.textFaint }}>
+          <Unlink size={13} />
+        </span>
+      ))}
+    </Fila>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────── */
+/* Columna 2 · Historizadas                                               */
+/* ───────────────────────────────────────────────────────────────────── */
+
+function ColumnaHistorico({ tx, t, historico, arbol, abiertas, tagUsadoPor, variables, onAbrir, onEmparejar }) {
+  if (!historico) return <Nota>{tx("noHistoryRoot")}</Nota>;
+  const hijos = arbol.hijosDe(historico);
+  const error = arbol.errorDe(historico);
+  if (error) return <Nota tono="error">{tx("loadFailed")}</Nota>;
+  if (!hijos) return <Nota>{tx("exploring")}</Nota>;
+
+  const sinPareja = variables.filter((v) => !v.historyPointName);
+
+  /* Cuántos tags leídos no reclama nadie: lo que el historiador publica y
+     la máquina no declara. Se dice arriba, no se esconde. */
+  let tagsLeidos = 0;
+  for (const [carpeta, hijosLeidos] of arbol.hijosPorCarpeta) {
+    if (!carpeta.startsWith(historico)) continue;
+    tagsLeidos += (hijosLeidos ?? []).filter((h) => esTagHistorico(h.pointName)).length;
+  }
+  const sinReclamar = tagsLeidos - tagUsadoPor.size;
+
+  return (
+    <div>
+      {tagsLeidos > 0 && (
+        <Nota>{tx("unpairedCount", { n: Math.max(0, sinReclamar) })}</Nota>
+      )}
+      {hijos.length === 0 && <Nota>{tx("empty")}</Nota>}
+      {hijos.map((h) =>
+        esCarpetaHistorica(h.pointName) ? (
+          <CarpetaHistorica key={h.pointName} tx={tx} t={t} carpeta={h} nivel={0} arbol={arbol} abiertas={abiertas}
+            tagUsadoPor={tagUsadoPor} sinPareja={sinPareja} onAbrir={onAbrir} onEmparejar={onEmparejar} />
+        ) : (
+          <FilaTag key={h.pointName} tx={tx} t={t} tag={h} nivel={0} usadoPor={tagUsadoPor.get(h.pointName)}
+            sinPareja={sinPareja} onEmparejar={onEmparejar} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function CarpetaHistorica({ tx, t, carpeta, nivel, arbol, abiertas, tagUsadoPor, sinPareja, onAbrir, onEmparejar }) {
+  const ruta = carpeta.pointName;
+  const hijos = arbol.hijosDe(ruta);
+  const error = arbol.errorDe(ruta);
+  const abierta = abiertas.has(ruta);
+  const emparejados = (hijos ?? []).filter((h) => tagUsadoPor.has(h.pointName)).length;
+
+  return (
+    <div>
+      <Fila nivel={nivel}>
+        <button
+          type="button"
+          onClick={() => onAbrir(ruta)}
+          aria-expanded={abierta}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, flex: 1, minHeight: 32, padding: "0 4px",
+            background: "transparent", border: "none", cursor: "pointer", textAlign: "left", color: t.text,
+          }}
+        >
+          {abierta ? <ChevronDown size={13} color={t.textFaint} /> : <ChevronRight size={13} color={t.textFaint} />}
+          <Mono style={{ fontWeight: 600 }}>{carpeta.shortName ?? nombreDeCarpeta(ruta)}</Mono>
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: t.textFaint }}>
+            {hijos ? `${hijos.length} · ${emparejados} ↔` : tx("notLoaded")}
+          </span>
+        </button>
+      </Fila>
+      {abierta && error && <Nota tono="error">{tx("loadFailed")}</Nota>}
+      {abierta && hijos && hijos.length === 0 && <Nota>{tx("empty")}</Nota>}
+      {abierta && hijos && hijos.map((h) =>
+        esCarpetaHistorica(h.pointName) ? (
+          <CarpetaHistorica key={h.pointName} tx={tx} t={t} carpeta={h} nivel={nivel + 1} arbol={arbol} abiertas={abiertas}
+            tagUsadoPor={tagUsadoPor} sinPareja={sinPareja} onAbrir={onAbrir} onEmparejar={onEmparejar} />
+        ) : (
+          <FilaTag key={h.pointName} tx={tx} t={t} tag={h} nivel={nivel + 1} usadoPor={tagUsadoPor.get(h.pointName)}
+            sinPareja={sinPareja} onEmparejar={onEmparejar} />
+        ),
+      )}
+    </div>
+  );
+}
+
+/** Un tag del historiador: con quién está emparejado, o con quién se puede emparejar a mano. */
+function FilaTag({ tx, t, tag, nivel, usadoPor, sinPareja, onEmparejar }) {
+  const corto = tag.shortName ?? nombreFinal(tag.pointName);
+  const selector = { ...fieldStyle(t), fontSize: 11, padding: "3px 6px", width: "auto", minHeight: 32, maxWidth: 170 };
+
+  return (
+    <Fila nivel={nivel} resaltada={Boolean(usadoPor)}>
+      <span style={{ display: "flex", width: 32, justifyContent: "center", color: usadoPor ? t.success : t.textFaint }}>
+        {usadoPor ? <Link2 size={13} /> : <Unlink size={13} />}
+      </span>
+      <Mono apagado={!usadoPor} style={{ flex: 1 }}>{corto}</Mono>
+      {usadoPor ? (
+        <>
+          <Etiqueta tono="ok" title={usadoPor.pointName}>{tx("tagPaired", { variable: usadoPor.id })}</Etiqueta>
+          {usadoPor.procedencia === "a-mano" && (
+            <button
+              type="button"
+              onClick={() => onEmparejar(usadoPor.pointName, undefined)}
+              title={tx("unpair")}
+              aria-label={`${tx("unpair")} ${corto}`}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: 32, minHeight: 32,
+                background: "transparent", border: "none", cursor: "pointer", color: t.textSoft }}
+            >
+              <X size={13} />
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <Etiqueta tono="neutro">{tx("tagUnpaired")}</Etiqueta>
+          {sinPareja.length > 0 && (
+            <select aria-label={`${tx("pairWith")} ${corto}`} style={selector} value=""
+              onChange={(e) => e.target.value && onEmparejar(e.target.value, tag.pointName)}>
+              <option value="">{tx("pairWith")}</option>
+              {sinPareja.map((v) => <option key={v.pointName} value={v.pointName}>{v.id}</option>)}
+            </select>
+          )}
+        </>
+      )}
+    </Fila>
+  );
+}
+
+/* ───────────────────────────────────────────────────────────────────── */
+/* Columna 3 · Alarmas                                                    */
+/* ───────────────────────────────────────────────────────────────────── */
+
+function ColumnaAlarmas({ tx, t, area, arbol, contadores, setContadores }) {
+  const [verAlarmas, setVerAlarmas] = useState(false);
+  if (!area) return <Nota>{tx("noAlarmArea")}</Nota>;
+  const hijos = arbol.hijosDe(area);
+  const error = arbol.errorDe(area);
+  if (error) return <Nota tono="error">{tx("loadFailed")}</Nota>;
+  if (!hijos) return <Nota>{tx("exploring")}</Nota>;
+
+  const { contadores: lista, alarmas, acciones } = clasificarArea(hijos);
+  const marcados = lista.filter((c) => contadores.has(c.pointName)).length;
+  const todos = lista.length > 0 && marcados === lista.length;
+
+  const alternar = (pointName) =>
+    setContadores((prev) => {
+      const s = new Set(prev);
+      if (s.has(pointName)) s.delete(pointName);
+      else s.add(pointName);
+      return s;
+    });
+
+  const alternarTodos = () =>
+    setContadores((prev) => {
+      const s = new Set(prev);
+      for (const c of lista) todos ? s.delete(c.pointName) : s.add(c.pointName);
+      return s;
+    });
+
+  return (
+    <div>
+      <CabeceraGrupo>{tx("counters")}</CabeceraGrupo>
+      {lista.length > 0 && (
+        <Fila resaltada={marcados > 0}>
+          <Casilla marcada={todos} indeterminada={marcados > 0 && !todos} etiqueta={tx("includeArea")} onChange={alternarTodos} />
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: t.text }}>{tx("includeArea")}</span>
+        </Fila>
+      )}
+      {lista.length === 0 && <Nota>—</Nota>}
+      {lista.map((c) => (
+        <Fila key={c.pointName} nivel={1} resaltada={contadores.has(c.pointName)}>
+          <Casilla marcada={contadores.has(c.pointName)} etiqueta={nombreFinal(c.pointName)} onChange={() => alternar(c.pointName)} />
+          <Mono apagado={!contadores.has(c.pointName)}>{nombreFinal(c.pointName)}</Mono>
+        </Fila>
+      ))}
+
+      <CabeceraGrupo>{tx("alarmsListed")}</CabeceraGrupo>
+      <Fila>
+        <button
+          type="button"
+          onClick={() => setVerAlarmas((v) => !v)}
+          aria-expanded={verAlarmas}
+          style={{ display: "flex", alignItems: "center", gap: 6, minHeight: 32, padding: "0 4px",
+            background: "transparent", border: "none", cursor: "pointer", color: t.text }}
+        >
+          {verAlarmas ? <ChevronDown size={13} color={t.textFaint} /> : <ChevronRight size={13} color={t.textFaint} />}
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12 }}>{alarmas.length}</span>
+        </button>
+      </Fila>
+      {verAlarmas && alarmas.map((a) => (
+        <Fila key={a.pointName} nivel={1}>
+          <span style={{ width: 32 }} />
+          <Mono apagado>{a.corto.replace(/^\./, "")}</Mono>
+        </Fila>
+      ))}
+
+      <CabeceraGrupo sub={tx("actionsHint")}>{tx("actions")}</CabeceraGrupo>
+      <Nota>{acciones.length}</Nota>
+    </div>
+  );
+}

@@ -139,16 +139,30 @@ describe("la vista de configuración", () => {
   });
 
   /*
-   * Sin esta frase, la ausencia de un botón de «nueva máquina» se lee como una
-   * pantalla sin terminar en vez de como una decisión.
+   * ── EL ALTA YA SE OFRECE (Plan 36) ─────────────────────────────────
+   *
+   * Hasta el Plan 35 esta prueba defendía lo contrario: que la pantalla
+   * DIJERA por qué no había botón de alta. Con la autenticación encendida el
+   * botón existe, y lo que la pantalla tiene que decir ahora es lo que sigue
+   * sin poderse decidir desde aquí: qué variables son escribibles.
    */
-  it("dice por qué no se puede dar de alta desde aquí todavía", async () => {
+  it("ofrece dar de alta una máquina, y dice que todo entra como lectura", async () => {
     listarMaquinas.mockResolvedValue({ ok: true, cuantas: 0, maquinas: [] });
 
     montar();
 
-    expect(await screen.findByText(/sólo lectura/i)).toBeTruthy();
-    expect(screen.getByText(/credenciales/i)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Nueva máquina/i })).toBeTruthy();
+    expect(screen.getByText(/entra como lectura/i)).toBeTruthy();
+    expect(screen.getByText(/escribible/i)).toBeTruthy();
+  });
+
+  it("cada máquina configurada ofrece editar sus variables (Plan 36 F3)", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+
+    montar();
+
+    await screen.findByText("Motor conveyor 4");
+    expect(screen.getByRole("button", { name: /Editar variables/i })).toBeTruthy();
   });
 
   it("enseña los tipos disponibles con sus reglas", async () => {

@@ -367,10 +367,10 @@ export const ROUTES = [
      * la B. Mismo criterio que Assets, con el que además comparte materia
      * prima — el árbol de ICONICS.
      *
-     * De sólo lectura por ahora: el alta incluye decidir qué variables son
-     * escribibles, y eso necesita autenticación en el tablero (Plan 25). Está
-     * explicado en la propia pantalla, no sólo en el plan — ver la cabecera de
-     * `ConfiguracionPlanta.jsx`.
+     * Desde el Plan 36 también se da de alta y se edita desde aquí, marcando
+     * los tres árboles de ICONICS. Lo que sigue sin poderse decidir en esta
+     * pantalla es qué variables son escribibles: todo entra como lectura, y
+     * la pantalla lo dice — ver la cabecera de `ConfiguracionPlanta.jsx`.
      *
      * ── ES EL PANEL DE ADMINISTRACIÓN (Plan 35 F3) ─────────────────────
      *

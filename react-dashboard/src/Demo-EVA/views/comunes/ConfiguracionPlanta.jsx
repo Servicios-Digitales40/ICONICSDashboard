@@ -1,6 +1,8 @@
 /**
- * Vista «Planta › Configuración»: qué máquinas conoce el tablero, y si su
- * configuración sigue siendo cierta. Plan 33 F5 y F8.
+ * Vista «Planta › Configuración»: qué máquinas conoce el tablero, si su
+ * configuración sigue siendo cierta, y —desde el Plan 36— cómo se da de alta
+ * o se edita una marcando el árbol de ICONICS. Plan 33 F5 y F8, Plan 34 F4,
+ * Plan 36 F1–F3.
  *
  * ── QUÉ ENSEÑA, Y POR QUÉ ESO Y NO MÁS ─────────────────────────────
  *
@@ -9,59 +11,52 @@
  * (tanque, vibraciones): ésas están en el código y no se configuran desde
  * aquí, así que mezclarlas invitaría a intentar editarlas.
  *
- * ── POR QUÉ ES DE SÓLO LECTURA, Y NO ES UNA FASE A MEDIAS ──────────
+ * ── YA NO ES DE SÓLO LECTURA, Y POR QUÉ AHORA SÍ ───────────────────
  *
- * Porque el alta de una máquina incluye decidir **qué variables son
- * escribibles**, y eso es una decisión con consecuencias sobre la instalación.
- * Hoy `AUTH_HABILITADA=false`: los roles están implementados y probados, pero
- * no protegen nada, a propósito (`CLAUDE.md` §2.11). Una pantalla que
- * permitiera marcar una variable como escribible sin autenticación dejaría esa
- * decisión al alcance de cualquiera con acceso al tablero.
+ * Hasta el 21-09-2026 esta vista sólo enseñaba, y su cabecera decía por qué:
+ * el alta incluía decidir qué variables son escribibles, y con
+ * `AUTH_HABILITADA=false` esa decisión habría quedado al alcance de
+ * cualquiera con acceso al tablero (Plan 33 §20, dependencia dura del Plan
+ * 25). El Plan 35 encendió la autenticación y puso `administrador` como rol
+ * mínimo a todo `/api/maquinas` y a esta ruta; con eso, el alta desde aquí
+ * dejó de chocar con esa decisión.
  *
- * El Plan 33 §20 ya lo declara como **dependencia dura del Plan 25**, no como
- * una recomendación. Así que esta vista enseña y explica; el alta sigue
- * haciéndose por la API, que sí tiene `exigirRol` declarado y listo para
- * cuando el interruptor se encienda.
+ * Y aun así **marcar una variable como escribible sigue sin poderse hacer
+ * desde aquí**. Todo entra como `acceso: "read"` y lo pone el servidor. No
+ * es una limitación a medias: es el alcance del Plan 36 (§5), porque
+ * habilitar la escritura sobre la planta es una decisión aparte con su
+ * propia conversación. El aviso de arriba lo dice en pantalla.
  *
- * Decirlo en pantalla —y no sólo en un plan— es parte del trabajo: una vista
- * sin botón de «nueva máquina» y sin explicación se lee como una vista rota.
+ * ── EL ALTA ES MARCAR EL ÁRBOL, NO RELLENAR UN CATÁLOGO ────────────
+ *
+ * El editor (`EditorDeMaquina.jsx`) enseña los tres árboles de ICONICS en
+ * paralelo —tiempo real, historizadas, alarmas— y deja marcar activos y
+ * variables. Es el flujo de quien configura ICONICS, reproducido aquí; el
+ * porqué está en `PLAN-36` §2.4: en este servidor cambian cuatro nombres al
+ * mes, y un catálogo escrito a mano caduca cada vez sin que nadie se entere.
  *
  * ── LO QUE SÍ ESCRIBE: DOS PREGUNTAS AL SERVIDOR ───────────────────
  *
  * «Comprobar contra ICONICS» (Plan 33 F8) contrasta los puntos de una máquina
  * y guarda el veredicto. «Sondear sus series» (Plan 34 F4) pide cada serie y
- * las compara entre sí, y anota qué variable puede prometer historia.
- *
- * Las dos escriben en NUESTRO archivo de configuración, no en la instalación:
- * no mueven un actuador ni cambian un tag, así que no necesitan la
- * autenticación de la que sí depende el alta.
- *
- * Y contestan preguntas distintas: comprobar dice si los puntos siguen
- * EXISTIENDO; sondear, si la serie que el historiador devuelve por una
- * variable es de VERDAD suya —porque contesta que sí y devuelve la de otra
- * señal, sin dar error—.
- *
- * Las dos van bajo demanda y no al pintar la lista: cuestan una lectura
- * completa de cada máquina, y el limitador corta en 300 peticiones por minuto
- * y por IP.
+ * las compara entre sí, y anota qué variable puede prometer historia. Las dos
+ * van bajo demanda y no al pintar la lista: cuestan una lectura completa de
+ * cada máquina, y el limitador corta en 300 peticiones por minuto y por IP.
  *
  * ── LO QUE ESTA VISTA NO HACE, Y ES DELIBERADO ─────────────────────
  *
- * **No suscribe ninguna máquina al sondeo en vivo.** Ojo con el nombre: el
- * botón «Sondear sus series» pide historia UNA vez al pulsarlo, y eso es otra
- * cosa. Aquí no se llama a `useSistemaAgua()` ni a ningún hook de máquina.
- * El sondeo arranca por conteo de referencias en `subscribeSistema`, no al
- * montar una vista, y este proyecto ya ha revivido el sondeo de una máquina
- * cerrada DOS veces por colgar una lectura de un componente que se monta
- * siempre (el contador de alarmas del Topbar, 31-08-2026; el badge de
- * hallazgos, 17-09-2026). Una pantalla de configuración no necesita valores en
- * vivo, así que no los pide.
+ * **No suscribe ninguna máquina al sondeo en vivo.** Aquí no se llama a
+ * ningún hook de máquina. El sondeo arranca por conteo de referencias en
+ * `subscribeSistema`, no al montar una vista, y este proyecto ya ha revivido
+ * el sondeo de una máquina cerrada DOS veces por colgar una lectura de un
+ * componente que se monta siempre (31-08-2026, 17-09-2026). El editor lee el
+ * árbol con `browse` al abrir o marcar una rama: una petición, no un sondeo.
  */
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Boxes, Cog, Info, RefreshCw, ShieldAlert, Waves } from "lucide-react";
+import { Boxes, Cog, Info, Pencil, Plus, RefreshCw, ShieldAlert, Waves } from "lucide-react";
 
-import { AlertBanner, Panel, SectionLabel } from "@/components/ui/index.js";
+import { AlertBanner, Button, Panel, SectionLabel } from "@/components/ui/index.js";
 import {
   listarMaquinas,
   listarTipos,
@@ -71,7 +66,14 @@ import {
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
-export default function ConfiguracionPlanta() {
+/*
+ * El editor entra diferido: trae el índice de tipos del dominio y tres
+ * árboles que la lista no necesita. Quien sólo viene a comprobar una máquina
+ * no lo carga.
+ */
+const EditorDeMaquina = lazy(() => import("@/Demo-EVA/components/configuracion/EditorDeMaquina.jsx"));
+
+export default function ConfiguracionPlanta({ params = {} } = {}) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "errors"]);
   const { theme: t } = useTheme();
@@ -85,12 +87,17 @@ export default function ConfiguracionPlanta() {
   });
 
   /*
-   * ── LA COMPROBACIÓN ES BAJO DEMANDA (Plan 33 F8) ───────────────────
+   * ── EL EDITOR (Plan 36) ─────────────────────────────────────────────
    *
-   * Y no al pintar la lista: cuesta una lectura completa de cada máquina —73
-   * puntos en el caso de vibraciones— y el limitador corta en 300 peticiones
-   * por minuto y por IP. Verificar al abrir la pantalla la pondría a competir
-   * con el sondeo del tablero por el mismo presupuesto.
+   * `null` es la lista; `{ maquina: null }` es un alta; `{ maquina }` es una
+   * edición. Un enlace `?maquina=<id>` abre la edición al entrar, para que
+   * desde otra pantalla se pueda mandar a alguien a «esta máquina».
+   */
+  const [editor, setEditor] = useState(null);
+  const [guardado, setGuardado] = useState(null);
+
+  /*
+   * ── LA COMPROBACIÓN ES BAJO DEMANDA (Plan 33 F8) ───────────────────
    *
    * El resultado se guarda aparte del listado, no fusionado con él: la
    * respuesta trae `ausentes` y `motivo`, que no están en la máquina guardada,
@@ -99,31 +106,13 @@ export default function ConfiguracionPlanta() {
   const [revisiones, setRevisiones] = useState({});
   const [comprobando, setComprobando] = useState(null);
 
-  /*
-   * ── EL SONDEO DE SERIES (Plan 34 F4) ───────────────────────────────
-   *
-   * Hermano de la comprobación, y contesta otra pregunta. «Comprobar» dice si
-   * los puntos siguen EXISTIENDO; «sondear» dice si la serie que el
-   * historiador devuelve por una variable es de VERDAD suya.
-   *
-   * Hace falta porque el servidor contesta que sí y devuelve la serie de otra
-   * señal, sin dar error: medido, `aPeak_S1` trae la de `aRMS_S1` en 1805 de
-   * 1805 valores, y las nueve `QC_*` devuelven todas la misma.
-   *
-   * Escribe —anota `historyVerified` por variable— y eso está permitido por el
-   * mismo motivo que la comprobación: toca NUESTRO archivo de configuración,
-   * no la instalación. No mueve un actuador ni cambia un tag, así que no
-   * depende de la autenticación de la que sí depende el alta (Plan 33 §20).
-   */
+  /* ── EL SONDEO DE SERIES (Plan 34 F4) — ver la cabecera ───────────── */
   const [sondeos, setSondeos] = useState({});
   const [sondeando, setSondeando] = useState(null);
 
   const comprobar = useCallback(async (id) => {
     setComprobando(id);
     try {
-      /* El `await` va FUERA del actualizador: el callback de `setState` es
-         síncrono, y meterlo dentro es un error de sintaxis —lo cazó el
-         compilador, no una prueba—. */
       const revision = await verificarMaquina(id);
       setRevisiones((previas) => ({ ...previas, [id]: revision }));
     } catch (error) {
@@ -144,19 +133,22 @@ export default function ConfiguracionPlanta() {
       const sondeo = await sondearMaquina(id);
       setSondeos((previos) => ({ ...previos, [id]: sondeo }));
     } catch (error) {
-      /* Igual que arriba: no haber podido sondear no es un veredicto sobre
-         las series de la máquina. Se pinta como `UNKNOWN`, sin tocar nada. */
       setSondeos((previos) => ({
         ...previos,
-        [id]: {
-          estado: "UNKNOWN",
-          motivo: error?.mensajeDelServidor ?? error?.message,
-          anotado: false,
-        },
+        [id]: { estado: "UNKNOWN", motivo: error?.mensajeDelServidor ?? error?.message, anotado: false },
       }));
     } finally {
       setSondeando(null);
     }
+  }, []);
+
+  const cargar = useCallback(async (signal) => {
+    /* Las dos a la vez: son independientes y la pantalla las necesita juntas. */
+    const [maquinas, tipos] = await Promise.all([
+      listarMaquinas({ signal }),
+      listarTipos({ signal }),
+    ]);
+    return { maquinas: maquinas.maquinas ?? [], tipos: tipos.tipos ?? [] };
   }, []);
 
   useEffect(() => {
@@ -164,21 +156,14 @@ export default function ConfiguracionPlanta() {
 
     (async () => {
       try {
-        /*
-         * Las dos a la vez: son independientes y la pantalla las necesita
-         * juntas. En serie, la lista tardaría lo que tarden las dos.
-         */
-        const [maquinas, tipos] = await Promise.all([
-          listarMaquinas({ signal: control.signal }),
-          listarTipos({ signal: control.signal }),
-        ]);
+        const { maquinas, tipos } = await cargar(control.signal);
+        setEstado({ cargando: false, error: null, maquinas, tipos });
 
-        setEstado({
-          cargando: false,
-          error: null,
-          maquinas: maquinas.maquinas ?? [],
-          tipos: tipos.tipos ?? [],
-        });
+        /* El enlace profundo se resuelve cuando ya se sabe qué máquinas hay. */
+        if (params?.maquina) {
+          const pedida = maquinas.find((m) => m.id === params.maquina);
+          if (pedida) setEditor({ maquina: pedida });
+        }
       } catch (error) {
         if (control.signal.aborted) return;
         setEstado({ cargando: false, error, maquinas: [], tipos: [] });
@@ -186,9 +171,46 @@ export default function ConfiguracionPlanta() {
     })();
 
     return () => control.abort();
-  }, []);
+    // `params.maquina` sólo se mira al entrar: después manda lo que haga la persona.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargar]);
+
+  /*
+   * Tras guardar, la lista se vuelve a pedir en vez de parchearla a mano: la
+   * respuesta del alta trae la máquina, pero sus capacidades y limitaciones
+   * las deriva el servidor y es él quien tiene la versión buena.
+   */
+  const alGuardar = useCallback(async (maquina, avisos) => {
+    setEditor(null);
+    setGuardado({ maquina, avisos });
+    try {
+      const { maquinas, tipos } = await cargar();
+      setEstado({ cargando: false, error: null, maquinas, tipos });
+    } catch (error) {
+      setEstado((prev) => ({ ...prev, error }));
+    }
+  }, [cargar]);
 
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
+
+  if (editor) {
+    return (
+      <>
+        <SectionLabel sub={traducir("machines:config.sub")}>
+          {traducir("machines:config.title")}
+        </SectionLabel>
+        <Suspense fallback={<p style={textoSuave}>{traducir("machines:config.loading")}</p>}>
+          <EditorDeMaquina
+            maquina={editor.maquina}
+            tipos={estado.tipos}
+            otrosIds={estado.maquinas.filter((m) => m.id !== editor.maquina?.id).map((m) => m.id)}
+            onGuardado={alGuardar}
+            onCancelar={() => setEditor(null)}
+          />
+        </Suspense>
+      </>
+    );
+  }
 
   return (
     <>
@@ -197,9 +219,8 @@ export default function ConfiguracionPlanta() {
       </SectionLabel>
 
       {/*
-        El aviso va ARRIBA y no al final: es lo que explica por qué no hay un
-        botón de «nueva máquina», y leerlo después de buscarlo sin encontrarlo
-        no sirve de nada.
+        El aviso va ARRIBA: dice lo que esta pantalla NO deja decidir —qué
+        variables son escribibles— antes de que alguien lo busque.
       */}
       <div style={{ marginBottom: 14 }}>
         <AlertBanner
@@ -209,14 +230,25 @@ export default function ConfiguracionPlanta() {
         />
       </div>
 
+      {guardado && (
+        <div style={{ marginBottom: 14 }}>
+          <AlertBanner
+            type="success"
+            title={traducir("machines:config.editor.saved", { nombre: guardado.maquina?.nombre ?? guardado.maquina?.id })}
+            message={traducir("machines:config.editor.savedHint")}
+            accion={
+              guardado.avisos?.length ? (
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {guardado.avisos.map((a, i) => <li key={i}>{a.problema}</li>)}
+                </ul>
+              ) : null
+            }
+          />
+        </div>
+      )}
+
       {estado.error && (
         <div style={{ marginBottom: 14 }}>
-          {/*
-            `mensajeDeError` devuelve `{titulo, detalle, accion}`, no una
-            cadena: el título es la frase traducida por CÓDIGO y el detalle lo
-            que sólo el servidor sabe —qué variable falta, qué tag rechazó la
-            guarda—. Mismo uso que `CasosRag.jsx`.
-          */}
           <AlertBanner
             type="error"
             title={traducir("machines:config.list")}
@@ -229,7 +261,15 @@ export default function ConfiguracionPlanta() {
 
       <Panel
         title={traducir("machines:config.list")}
-        right={<Boxes size={15} style={{ color: t.textSoft }} />}
+        right={
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* 44 px: da de alta una máquina, que es confirmar algo (DESIGN.md). */}
+            <Button icon={<Plus size={14} />} onClick={() => setEditor({ maquina: null })} disabled={estado.cargando}>
+              {traducir("machines:config.newMachine")}
+            </Button>
+            <Boxes size={15} style={{ color: t.textSoft }} />
+          </div>
+        }
       >
         {estado.cargando && <p style={textoSuave}>{traducir("machines:config.loading")}</p>}
 
@@ -260,6 +300,7 @@ export default function ConfiguracionPlanta() {
             sondeo={sondeos[m.id] ?? null}
             sondeando={sondeando === m.id}
             onSondear={() => sondear(m.id)}
+            onEditar={() => setEditor({ maquina: m })}
           />
         ))}
       </Panel>
@@ -309,6 +350,7 @@ function FichaDeMaquina({
   maquina, traducir, t,
   revision, comprobando, onComprobar,
   sondeo, sondeando, onSondear,
+  onEditar,
 }) {
   const textoSuave = { fontSize: 11.5, color: t.textSoft, fontFamily: "'Inter', sans-serif" };
 
@@ -386,13 +428,9 @@ function FichaDeMaquina({
       {/*
         ── EL RESULTADO DE LA COMPROBACIÓN (Plan 33 F8) ──────────────────
 
-        `UNKNOWN` se pinta en gris y NUNCA en rojo. Significa «no se ha podido
-        mirar», no «está roto», y pintarlo como error enseñaría a ignorar los
-        errores de verdad — además de ser falso.
-
-        Cuando `anotado` es `false`, la respuesta ni siquiera cambió el estado
-        guardado: lo que se sabía antes sigue siendo la mejor información, y
-        eso también se dice.
+        `UNKNOWN` se pinta en gris y NUNCA en rojo. Cuando `anotado` es
+        `false`, la respuesta ni siquiera cambió el estado guardado: lo que se
+        sabía antes sigue siendo la mejor información, y eso también se dice.
       */}
       {revision && (
         <div
@@ -444,9 +482,8 @@ function FichaDeMaquina({
           `sin-muestras`      contestó, y no hay nada en la ventana
           `no-se-pudo-leer`   no se llegó a mirar
 
-        Las dos últimas **no son un veredicto sobre la variable**, y por eso no
-        se pintan como problema suyo. La primera sí: mientras dure, esa
-        variable no puede prometer historia.
+        Las dos últimas **no son un veredicto sobre la variable**. La primera
+        sí: mientras dure, esa variable no puede prometer historia.
       */}
       {sondeo && (
         <div
@@ -471,8 +508,6 @@ function FichaDeMaquina({
             <div style={{ ...textoSuave, marginTop: 3 }}>{sondeo.motivo}</div>
           )}
 
-          {/* Sólo las que comparten serie: es lo accionable. Una variable sin
-              variación se resuelve esperando a que la máquina gire. */}
           {sondeo.pendientes?.some((p) => p.causa === "serie-compartida") && (
             <div style={{ marginTop: 6 }}>
               <div style={{ ...textoSuave, fontWeight: 600 }}>
@@ -536,19 +571,25 @@ function FichaDeMaquina({
             {traducir(sondeando ? "machines:config.probing" : "machines:config.probe")}
           </button>
         ) : null}
+
+        {/* Plan 36 F3: la misma pantalla del alta, cargando lo ya marcado. */}
+        <button type="button" onClick={onEditar} style={{ ...estiloBoton(t), cursor: "pointer" }}>
+          <Pencil size={13} />
+          {traducir("machines:config.edit")}
+        </button>
       </div>
     </div>
   );
 }
 
-/** Los dos botones de una ficha comparten forma: 9px de radio, como el kit. */
+/** Los botones de una ficha comparten forma: 9px de radio, como el kit. */
 function estiloBoton(t) {
   return {
     display: "flex",
     alignItems: "center",
     gap: 6,
     /* 44px de alto mínimo NO: estos no accionan la instalación, así que el
-       criterio táctil de `DESIGN.md` les pide 32. `5px 11px` sobre 11,5px da
+       criterio táctil de `DESIGN.md` les pide 32. `7px 11px` sobre 11,5px da
        ~32. */
     padding: "7px 11px",
     minHeight: 32,
