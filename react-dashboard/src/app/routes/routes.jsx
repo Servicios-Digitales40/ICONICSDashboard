@@ -287,6 +287,7 @@ export const ROUTES = [
     // archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
     // Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-vibraciones" }`.
     id: "vib-controles",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/ControlesVibraciones.jsx")),
   },
 
@@ -312,6 +313,7 @@ export const ROUTES = [
     // Restaurar: devolver `nav: { icon: <ShieldAlert size={17} />, group:
     // "sec-vibraciones", apartado: "diagnostico" }`.
     id: "eva-riesgos-vibracion",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
   },
 
@@ -400,6 +402,7 @@ export const ROUTES = [
      * al servidor.
      */
     id: "eva-turno",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/TurnoEva.jsx")),
     nav: { icon: <ClipboardList size={17} />, group: "sec-general" },
   },
@@ -413,6 +416,7 @@ export const ROUTES = [
      * Alarmas, Assets y Turno.
      */
     id: "eva-bandeja",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
     nav: { icon: <Inbox size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
   },
@@ -438,6 +442,7 @@ export const ROUTES = [
      * el riesgo.
      */
     id: "eva-avisos",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
     nav: { icon: <MessageSquareText size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
   },
@@ -451,6 +456,7 @@ export const ROUTES = [
      * ninguna instalación.
      */
     id: "eva-cuaderno",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CuadernoEva.jsx")),
     nav: { icon: <NotebookPen size={17} />, group: "sec-general" },
   },
@@ -511,12 +517,14 @@ export const ROUTES = [
      * manual malo lo subió alguien; un caso basura aparece solo.
      */
     id: "rag-casos",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
     nav: { icon: <NotebookPen size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
   },
 
   {
     id: "rag-documentacion",
+    rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
     nav: { icon: <FileText size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
   },

@@ -35,12 +35,74 @@ afterEach(cleanup);
 /** El `puede()` de un rol, con la MISMA tabla que usa el backend. */
 const comoRol = (rol) => (rolMinimo) => alcanza([rol], rolMinimo);
 
+/** Los ids que un rol ve en el menú, aplanando los grupos. */
+const menuDe = (rol) =>
+  navParaRol(comoRol(rol)).flatMap((i) => (i.children ? i.children.map((c) => c.id) : [i.id]));
+
 describe("el menú se acota al rol", () => {
   it("un visualizador NO ve el panel de administración", () => {
-    const ids = navParaRol(comoRol(ROL.VISUALIZADOR))
-      .flatMap((i) => (i.children ? i.children.map((c) => c.id) : [i.id]));
+    expect(menuDe(ROL.VISUALIZADOR)).not.toContain("eva-configuracion");
+  });
 
-    expect(ids).not.toContain("eva-configuracion");
+  /*
+   * ── LO QUE UN VISUALIZADOR VE, ENTERO ──────────────────────────────
+   *
+   * La lista se escribe completa a propósito, y no como «no ve X»: es la
+   * definición del rol —«sólo el apartado de visualización de cada máquina»—
+   * y una ruta nueva sin `rol` declarado aparecería aquí sola, obligando a
+   * decidir si le corresponde en vez de colarse por defecto.
+   *
+   * Es el mismo criterio que la prueba de inventario del backend: la lista de
+   * lo permitido, no la de lo olvidado.
+   */
+  it("un visualizador ve EXACTAMENTE las vistas de visualización", () => {
+    expect(menuDe(ROL.VISUALIZADOR).sort()).toEqual([
+      /* Vibraciones: lo que se mira, no lo que se decide.
+         `eva-muro` no está porque no tiene entrada de menú —se abre con
+         `?muro=1`—, no porque el rol lo excluya. */
+      "eva-alarmas",
+      "eva-assets",
+      "eva-vibraciones",
+      /* Predicción: son gráficas de otro backend, todas de lectura. */
+      "pred-correlacion",
+      "pred-eventos",
+      "pred-historico",
+      "pred-inicio",
+      "pred-pronostico",
+      "pred-variables",
+      "salud-sistema",
+      "vib-3d",
+      "vib-inicio",
+    ]);
+  });
+
+  it("lo que un visualizador NO ve son diagnóstico, registro y control", () => {
+    const menu = menuDe(ROL.VISUALIZADOR);
+
+    /* Diagnóstico: interpretar una medida es trabajo de operador. */
+    expect(menu).not.toContain("eva-bandeja");
+    expect(menu).not.toContain("eva-avisos");
+    expect(menu).not.toContain("eva-riesgos-vibracion");
+    /* Registro: dejan rastro de quién hizo qué. */
+    expect(menu).not.toContain("eva-cuaderno");
+    expect(menu).not.toContain("eva-turno");
+    /* Documentación del caso: se escribe, no sólo se lee. */
+    expect(menu).not.toContain("rag-casos");
+    expect(menu).not.toContain("rag-documentacion");
+    /* Y lo que acciona la instalación. */
+    expect(menu).not.toContain("vib-controles");
+  });
+
+  it("un operador ve todo lo del visualizador, y además lo suyo", () => {
+    /* La jerarquía, comprobada sobre el menú y no sólo sobre la tabla: si
+       alguien pusiera `rol: "visualizador"` en una vista, el operador
+       seguiría viéndola. */
+    const visor = menuDe(ROL.VISUALIZADOR);
+    const oper = menuDe(ROL.OPERADOR);
+
+    for (const id of visor) expect(oper).toContain(id);
+    expect(oper).toContain("eva-cuaderno");
+    expect(oper.length).toBeGreaterThan(visor.length);
   });
 
   it("un operador tampoco: el panel es del administrador", () => {

@@ -1,6 +1,6 @@
 # PLAN 35 — RBAC: tres roles, con jerarquía, encendidos
 
-**Estado:** F1–F5 completadas · plan terminado
+**Estado:** F1–F6 completadas · plan terminado
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -588,6 +588,57 @@ fallan 2 comprobaciones. Y la suite cazó de paso que el componente reventaba
 al montarse sin proveedor —tres pruebas del Topbar—, lo mismo que ya le había
 pasado al Sidebar en F3: se arregla leyendo el contexto en vez de usar
 `useSesion()`.
+
+---
+
+### F6 — El visualizador ve sólo visualización ✅
+
+**Completada el 21-09-2026.** Tampoco estaba en el plan: salió de pedir la
+matriz de vistas por rol y **comparar lo que había con la definición**.
+
+F2 decidió el rol mínimo de las rutas de API —que es lo que protege— y F3
+montó el mecanismo para que las vistas declararan rol, pero sólo se aplicó a
+Configuración, que era el caso nombrado explícitamente. El resultado: un
+visualizador **veía 21 de 22 vistas**, con los botones de escritura
+devolviéndole 403 dentro de ellas.
+
+Funcionalmente estaba protegido. Pero la definición decía «sólo el apartado
+de visualización de cada máquina», y el menú ofrecía mucho más.
+
+**Ocho vistas pasan a `operador`**, por tres criterios:
+
+| | Por qué |
+|---|---|
+| Hallazgos, Avisos, Riesgos | **Diagnóstico**: interpretar una medida no es mirarla |
+| Casos previos, Documentación | Se **escriben**, no sólo se leen |
+| Turno, Cuaderno | **Registro**: dejan rastro de quién hizo qué |
+| Controles | **Acciona** la instalación |
+
+El visualizador queda con **12 de 22**: Inicio, Gráficas, Vista 3D, Alarmas,
+Assets, Salud y las seis de Predicción.
+
+> El apartado `visualizacion` que el Plan 33 F10 había puesto en el menú
+> resultó marcar **exactamente** la frontera que hacía falta. No se tocó: se
+> usó.
+
+#### La prueba se escribe como lista de lo PERMITIDO
+
+Y no como «no ve X». Es la definición del rol, y una ruta nueva sin `rol`
+declarado aparece sola en el fallo, obligando a decidir si le corresponde en
+vez de colarse por defecto. Mismo criterio que la prueba de inventario del
+backend.
+
+De paso cazó un error mío: había puesto `eva-muro` en la lista, y esa vista
+**no tiene entrada de menú** —se abre con `?muro=1`—. No la excluía el rol.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `permisos.test.jsx` | **14** (11 + 3) |
+| Frontend | **1035** · 29 omitidas |
+| `npm run verificar` | los **40** |
+| Lint y types | limpios |
 
 ---
 
