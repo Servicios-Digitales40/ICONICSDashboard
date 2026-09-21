@@ -9,9 +9,29 @@
  *     id:        string   — clave de navegación, única
  *     component: Comp     — el componente de página
  *     nav?:      { icon, group? }
+ *     rol?:      string   — rol MÍNIMO para verla (Plan 35 F3)
  *   }
  *
  * Sin `nav`, la ruta existe pero no aparece en el sidebar.
+ *
+ * ── QUÉ HACE `rol`, Y QUÉ NO HACE ──────────────────────────────────
+ *
+ * Sin `rol`, la vista es para cualquiera con sesión. Con él, se pide ese rol
+ * o superior —la jerarquía vive en `@shared/roles.js`, la misma que usa el
+ * backend—, y entonces pasan dos cosas: **desaparece del menú** y, si alguien
+ * llega por URL, la pantalla explica que no le corresponde en vez de cargar y
+ * romperse.
+ *
+ * **Esto NO es la protección.** Las rutas de este registro siguen siendo
+ * navegables escribiendo su id, y el código de la vista viaja igualmente al
+ * navegador: cualquiera puede leerlo o llamar a la API con `curl`. Quien
+ * protege es `exigirRol` en el backend (Plan 35 F2), que devuelve 403 aunque
+ * la pantalla se salte entera.
+ *
+ * Lo que `rol` evita es ofrecer un camino que termina en un error: una
+ * entrada de menú que lleva a una vista incapaz de cargar nada, o un botón
+ * que devuelve 403 al pulsarlo. «Un botón que puede fallar es peor que su
+ * ausencia» (`DESIGN.md`).
  *
  * ── DÓNDE ESTÁ EL TEXTO ────────────────────────────────────────────
  *
@@ -349,8 +369,20 @@ export const ROUTES = [
      * escribibles, y eso necesita autenticación en el tablero (Plan 25). Está
      * explicado en la propia pantalla, no sólo en el plan — ver la cabecera de
      * `ConfiguracionPlanta.jsx`.
+     *
+     * ── ES EL PANEL DE ADMINISTRACIÓN (Plan 35 F3) ─────────────────────
+     *
+     * `rol: "administrador"` — el criterio del usuario: «el operador tendrá
+     * acceso a la mayoría de cosas menos al futuro panel de administración,
+     * donde vivirá la configuración y el alta de las máquinas».
+     *
+     * El backend ya lo impone: desde F2, todo `/api/maquinas` pide
+     * `administrador`. Esto es lo que hace que **la pantalla diga lo mismo**,
+     * en vez de ofrecer una entrada de menú que lleva a una vista que no va a
+     * poder cargar nada.
      */
     id: "eva-configuracion",
+    rol: "administrador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/ConfiguracionPlanta.jsx")),
     nav: { icon: <Cog size={17} />, group: "sec-general" },
   },

@@ -21,10 +21,19 @@ import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { MaquinaProvider } from "@/Demo-EVA/data/comunes/MaquinaContext.jsx";
 import { ToastProvider, ModalProvider, Modal } from "./providers/index.js";
 import { SesionProvider, useSesion } from "./providers/SesionProvider.jsx";
+import { usePermisos } from "./providers/usePermisos.js";
+import SinPermiso from "./SinPermiso.jsx";
 import { PantallaDeAcceso } from "./PantallaDeAcceso.jsx";
 import { AvisoRenovacionMuro } from "./AvisoRenovacionMuro.jsx";
 import { Sidebar, Topbar, DataSourceBanner } from "./layout/index.js";
-import { PAGES, PAGE_META, ROUTE_IDS, DEFAULT_ROUTE, useNavegacion } from "./routes/index.js";
+import {
+  PAGES,
+  PAGE_META,
+  ROL_DE_PAGINA,
+  ROUTE_IDS,
+  DEFAULT_ROUTE,
+  useNavegacion,
+} from "./routes/index.js";
 import { EVENTO_NAVEGAR } from "@/features/asistente/lib/navegarDesdeAsistente.js";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { leerModoMuro, useRotacionMuro } from "./modoMuro.js";
@@ -250,6 +259,22 @@ function ContenidoDelShell({ t, nav, navigate, muro, cajonAbierto, setCajonAbier
 }
 
 function ContenidoDelTablero({ t, nav, navigate, muro, cajonAbierto, setCajonAbierto, PageComponent }) {
+  /*
+   * ── LLEGAR POR URL A UNA VISTA QUE NO TE TOCA (Plan 35 F3) ─────────
+   *
+   * El menú ya no la ofrece, pero **ocultar no cierra**: la ruta sigue siendo
+   * navegable escribiendo su id. Sin esto, la vista montaba, pedía sus datos,
+   * el backend contestaba 403 y la pantalla se quedaba vacía — el dato nunca
+   * salía, pero parecía una avería.
+   *
+   * No sustituye a la guarda del servidor y no pretende hacerlo: el código de
+   * la vista viaja al navegador igualmente. Lo que hace es contestar con
+   * dignidad en vez de romperse.
+   */
+  const { puede, rol } = usePermisos();
+  const rolExigido = ROL_DE_PAGINA[nav.page] ?? null;
+  const sinPermiso = Boolean(rolExigido) && !puede(rolExigido);
+
   return (
     <>
       {!muro.activo && (
@@ -294,7 +319,11 @@ function ContenidoDelTablero({ t, nav, navigate, muro, cajonAbierto, setCajonAbi
                 son imports normales y nunca llegan a mostrar este respaldo:
                 si algún día se parte alguna por ruta, aquí ya está el hueco. */}
             <Suspense fallback={<CargandoVista t={t} />}>
-              <PageComponent params={nav.params} onNavigate={navigate} />
+              {sinPermiso ? (
+                <SinPermiso rolExigido={rolExigido} rolActual={rol} />
+              ) : (
+                <PageComponent params={nav.params} onNavigate={navigate} />
+              )}
             </Suspense>
           </ErrorBoundary>
         </main>

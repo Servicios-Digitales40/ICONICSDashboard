@@ -49,5 +49,38 @@ export const SECCION_DE_PAGINA = Object.fromEntries(
   ROUTES.map((r) => [r.id, r.nav?.group ?? null])
 );
 
-/** Árbol del sidebar, en orden. Ver `buildNav.js` para las reglas de orden. */
+/**
+ * Árbol del sidebar, en orden, SIN filtrar por rol.
+ *
+ * Es el menú completo: el que ve un administrador, y el que ve todo el mundo
+ * con `AUTH_HABILITADA=false`. Se conserva como constante porque lo consumen
+ * las pruebas que comprueban el ORDEN del menú y la ausencia de la estación
+ * de llenado, y ésas no dependen de quién mire.
+ *
+ * Para el menú de una sesión concreta, `navParaRol()` (Plan 35 F3).
+ */
 export const NAV = buildNav(ROUTES, NAV_GROUPS);
+
+/**
+ * El árbol del sidebar para unos permisos dados.
+ *
+ * @param puede  `(rolMinimo) => boolean`, normalmente el de `usePermisos()`
+ *
+ * No es un hook ni memoiza: es una función pura sobre un array de una docena
+ * de entradas, y llamarla al pintar cuesta menos que el `useMemo` que haría
+ * falta para evitarlo. Quien la use dentro de un componente puede memoizarla
+ * si mide que hace falta (`CLAUDE.md` §4.8).
+ */
+export const navParaRol = (puede) => buildNav(ROUTES, NAV_GROUPS, puede);
+
+/**
+ * El rol mínimo de cada ruta, o `null` si no declara ninguno.
+ *
+ * Lo usa la pantalla que decide qué hacer cuando alguien llega por URL a una
+ * vista que no le corresponde. Se deriva del registro en vez de escribirse
+ * aparte, por lo mismo que `SECCION_DE_PAGINA`: una segunda lista se queda
+ * vieja en cuanto alguien añade una ruta.
+ */
+export const ROL_DE_PAGINA = Object.fromEntries(
+  ROUTES.map((r) => [r.id, r.rol ?? null])
+);

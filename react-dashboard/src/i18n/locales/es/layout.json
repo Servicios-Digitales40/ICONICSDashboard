@@ -30,5 +30,17 @@
     "pendingFindings_one": "{{count}} hallazgo sin mirar",
     "pendingFindings_other": "{{count}} hallazgos sin mirar"
   },
-  "plant": "Instalación"
+  "plant": "Instalación",
+  "sinPermiso": {
+    "title": "Sin acceso a esta vista",
+    "sub": "Tu rol no alcanza el que esta pantalla necesita",
+    "necesita": "Esta pantalla requiere el rol «{{rol}}» o superior.",
+    "tuRol": "Tu rol es «{{rol}}».",
+    "queHacer": "Si necesitas entrar, pídeselo a quien administra el tablero. La vista existe y funciona: lo que falta es el permiso."
+  },
+  "roles": {
+    "administrador": "Administrador",
+    "operador": "Operador",
+    "visualizador": "Visualizador"
+  }
 }

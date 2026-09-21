@@ -9,7 +9,8 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/theme";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useMediaQuery } from "@/lib/viewport.js";
-import { NAV } from "../routes/index.js";
+import { navParaRol } from "../routes/index.js";
+import { usePermisos } from "../providers/usePermisos.js";
 import { HoverTip } from "@/components/ui/index.js";
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`): suscribirse aquí
    arrancaba el sondeo del tanque en todas las pantallas. Ver el bloque de
@@ -364,6 +365,13 @@ const STORAGE_KEY = "sidebar:collapsed";
  */
 export function Sidebar({ page, onNavigate, abiertaCajon = false, onCerrarCajon }) {
   const { theme: t, dark } = useTheme();
+  /*
+   * El menú se acota al rol de quien mira (Plan 35 F3). NO es seguridad —la
+   * ruta omitida sigue existiendo y sigue siendo navegable escribiendo su
+   * id— sino no ofrecer un camino que termina en un 403.
+   */
+  const { puede } = usePermisos();
+  const NAV = navParaRol(puede);
   /* `traducirBarra` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducirBarra } = useTranslation("layout");
   /* Los rótulos de sección y de módulo viven en `navigation`, con las rutas. */

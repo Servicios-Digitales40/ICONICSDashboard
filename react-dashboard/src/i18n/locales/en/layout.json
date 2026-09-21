@@ -30,5 +30,17 @@
     "pendingFindings_one": "{{count}} finding to review",
     "pendingFindings_other": "{{count}} findings to review"
   },
-  "plant": "Plant"
+  "plant": "Plant",
+  "sinPermiso": {
+    "title": "No access to this view",
+    "sub": "Your role does not reach the one this screen needs",
+    "necesita": "This screen requires the «{{rol}}» role or higher.",
+    "tuRol": "Your role is «{{rol}}».",
+    "queHacer": "If you need access, ask whoever administers the dashboard. The view exists and works: what is missing is the permission."
+  },
+  "roles": {
+    "administrador": "Administrator",
+    "operador": "Operator",
+    "visualizador": "Viewer"
+  }
 }

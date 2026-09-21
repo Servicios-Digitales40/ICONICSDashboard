@@ -1,6 +1,6 @@
 # PLAN 35 — RBAC: tres roles, con jerarquía, encendidos
 
-**Estado:** F1 y F2 completadas · F3–F4 por completar
+**Estado:** F1, F2 y F3 completadas · F4 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -330,7 +330,7 @@ de administración es suyo y sólo suyo.
 
 ---
 
-### F3 — El frontend respeta el rol
+### F3 — El frontend respeta el rol ✅
 
 **Objetivo.** Que el tablero enseñe lo que el rol puede hacer, y que el panel
 de administración exista.
@@ -356,6 +356,79 @@ traga.
 **Riesgo.** Medio. El modo muro (`modoMuro.js`) es un caso a mirar: una
 pantalla sin teclado que caduca la sesión a mitad de turno. El Plan 25 ya
 dejó `AvisoRenovacionMuro` para esto.
+
+#### Lo que de verdad pasó · completada el 21-09-2026
+
+**Una pregunta del usuario cambió el alcance**, y para mejor: «desde un punto
+de vista de ciberseguridad esto no debería poder realizarse, ¿no?», sobre que
+las rutas ocultas siguen siendo navegables por URL.
+
+La respuesta corta es que **ocultar no es proteger, y nunca lo fue**: el
+código de todas las vistas viaja al navegador y cualquiera puede llamar a la
+API con `curl` sin pasar por la pantalla. Quien protege es `exigirRol` (F2),
+que devuelve 403 aunque el frontend se salte entero.
+
+Pero la pregunta destapó un hueco real que iba a dejar implícito: **una vista
+a la que se llega por URL montaba, pedía datos, recibía 403 y se quedaba
+vacía**. El dato nunca salía, pero la respuesta parecía una avería. De ahí
+salió `SinPermiso.jsx`, que ahora es parte de la fase y tiene sus pruebas.
+
+Quedan tres capas, y sólo la primera protege:
+
+| | |
+|---|---|
+| **1 · El servidor niega** | F2. Es la única que es seguridad |
+| **2 · El menú no ofrece** | cortesía: no llevar a un 403 |
+| **3 · La URL directa explica** | «esta vista pide rol X, tú tienes Y» |
+
+Lo que **no** se hizo: quitar la ruta del registro. Sería esconder en vez de
+cerrar, y rompería los enlaces directos legítimos de quien sí tiene el rol.
+
+#### Las piezas
+
+- **`usePermisos()`** — `puede(rolMinimo)`, con la tabla de `@shared/roles.js`,
+  la misma que usa el backend. No expone la lista de roles a pelo: quien la
+  recibiera escribiría `roles.includes("operador")` y ahí se pierde la
+  jerarquía, que es el defecto que F1 vino a arreglar.
+- **`rol` en el registro de rutas** — hoy sólo `eva-configuracion`, con
+  `administrador`.
+- **`buildNav(routes, groups, puede)`** — `puede` entra **por la puerta** y no
+  se importa: este archivo es JS puro que `verificar-navegacion` ejecuta en
+  Node, y atarlo a React le quitaría eso. Un grupo que se queda sin hijos no
+  se pinta: una sección vacía se lee como algo roto.
+- **`SinPermiso.jsx`** — la capa 3.
+
+#### Dos decisiones de «qué hacer sin información»
+
+Las dos van hacia **permitir**, y por el mismo motivo:
+
+- **Con `AUTH_HABILITADA=false`, todo permitido.** El backend tampoco niega
+  nada; un menú recortado dejaría el tablero de hoy inservible.
+- **Sin `SesionProvider`, todo permitido.** `usePermisos` lee el contexto
+  directamente en vez de usar `useSesion()`, que lanza. Mismo patrón que
+  `useSesionResuelta()` y `useEsSimulado()`: son hojas que se montan fuera del
+  árbol completo —el Sidebar en una prueba— y reventar ahí convierte un
+  montaje sin proveedor en una pantalla en blanco.
+
+> El criterio general: **la pantalla restringe exactamente cuando el backend
+> restringe, y nunca más.** Esconder de más miente igual que esconder de
+> menos, sólo que en la otra dirección.
+
+Eso obligó a exportar el contexto como `CtxSesion`. Lo destapó la suite: el
+Sidebar reventaba en seis pruebas que lo montan sin proveedor.
+
+#### Lo medido al cerrar
+
+| | |
+|---|---|
+| `permisos.test.jsx` | **11** pruebas nuevas |
+| Frontend | **1028** · 29 omitidas |
+| Backend | 369 |
+| `npm run verificar` | los **40** |
+| i18n | **1324** claves × 2 idiomas, con paridad |
+
+Roto a propósito (`CLAUDE.md` §6.2): desactivando el filtro de `buildNav`
+fallan **4** comprobaciones.
 
 ---
 

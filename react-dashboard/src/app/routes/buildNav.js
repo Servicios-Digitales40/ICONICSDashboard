@@ -8,8 +8,9 @@
  */
 
 /**
- * @param routes  el array ROUTES (solo se leen `id` y `nav`)
+ * @param routes  el array ROUTES (solo se leen `id`, `nav` y `rol`)
  * @param groups  mapa id de grupo → { icon }
+ * @param puede   `(rolMinimo) => boolean`; por defecto, todo permitido
  * @returns array de items: `{ id, icon }` o `{ group, icon, children: [...] }`
  *
  * Reglas:
@@ -18,6 +19,23 @@
  *      absorbe al resto, estén donde estén en el array.
  *   3. Las rutas sin `nav` se omiten: existen y son navegables por id, pero
  *      no tienen entrada de menú.
+ *   4. Las rutas con `rol` que `puede()` rechaza se omiten, y un grupo que se
+ *      queda sin hijos no se pinta (Plan 35 F3).
+ *
+ * ── POR QUÉ `puede` ENTRA POR LA PUERTA Y NO SE IMPORTA ────────────
+ *
+ * Porque este archivo es JS puro que `verificar-navegacion` ejecuta en Node,
+ * sin React ni contexto de sesión. Importar el hook lo ataría al navegador y
+ * dejaría de poder comprobarse en la tanda — que es justo lo que su cabecera
+ * dice que hay que conservar.
+ *
+ * El valor por defecto es «todo permitido», y no es pereza: es el mismo
+ * criterio que el backend con `AUTH_HABILITADA=false`. Un menú que escondiera
+ * entradas que el servidor sí acepta mentiría en la dirección contraria.
+ *
+ * Y conviene repetirlo aquí: **esto no protege nada**. La ruta omitida sigue
+ * existiendo y sigue siendo navegable por id. Quien niega es `exigirRol` en
+ * el backend; esto sólo evita ofrecer un camino que no lleva a ninguna parte.
  *
  * ── AQUÍ NO HAY TEXTO, Y ES DELIBERADO ─────────────────────────────
  *
@@ -30,12 +48,15 @@
  * cambiar de idioma repintaría toda la aplicación menos el menú — que es
  * justo el sitio donde más se nota.
  */
-export function buildNav(routes, groups) {
+export function buildNav(routes, groups, puede = () => true) {
   const items = [];
   const vistos = new Map(); // id de grupo → objeto ya insertado en `items`
 
   for (const r of routes) {
     if (!r.nav) continue;
+    /* Una ruta que declara rol y no se alcanza no entra en el menú. Sigue
+       existiendo y sigue siendo navegable: ver la cabecera. */
+    if (r.rol && !puede(r.rol)) continue;
     const { icon, group } = r.nav;
 
     if (!group) {
@@ -92,5 +113,13 @@ export function buildNav(routes, groups) {
     vistos.get(group).children.push({ id: r.id, icon, apartado: r.nav.apartado ?? null });
   }
 
-  return items;
+  /*
+   * Un grupo cuyos hijos se han filtrado todos se cae con ellos. Sin esto, un
+   * visualizador vería la sección «General» abierta y vacía — peor que no
+   * verla, porque parece que algo se rompió al cargar.
+   *
+   * No puede decidirse al crear el grupo: el primer hijo lo crea y los
+   * siguientes pueden filtrarse, así que sólo se sabe al final.
+   */
+  return items.filter((item) => !item.children || item.children.length > 0);
 }

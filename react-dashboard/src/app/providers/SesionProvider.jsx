@@ -50,6 +50,16 @@ import { EVENTO_SESION_INVALIDA } from "@/lib/api/sesionInvalida.js";
 
 const Ctx = createContext(null);
 
+/**
+ * El contexto, para los hooks que pueden montarse SIN proveedor.
+ *
+ * `useSesion()` lanza a propósito —quien la pide de verdad la necesita— pero
+ * hay hojas que se montan fuera del árbol completo, como el Sidebar en una
+ * prueba. Ésas leen el contexto directamente y deciden qué hacer con `null`,
+ * igual que `useSesionResuelta()` aquí abajo. Ver `usePermisos.js`.
+ */
+export { Ctx as CtxSesion };
+
 /** Cada cuánto se revisa si toca renovar. Más frecuente que el umbral (30 min) para no perderlo por poco. */
 const INTERVALO_REVISION_MS = 5 * 60_000;
 
