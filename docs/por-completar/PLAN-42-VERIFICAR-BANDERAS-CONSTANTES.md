@@ -1,6 +1,6 @@
 # PLAN 42 — Verificar una bandera que nunca cambió, sin forzarla
 
-**Estado:** F0–F4 por completar · escrito el 22-09-2026
+**Estado:** F0 completada · F1–F4 por completar · escrito el 22-09-2026
 **Rama:** `Vibraciones1.0`
 **Origen:** B13 del backlog de backend, destapado al cerrar la F4 del Plan 41
 
@@ -100,19 +100,81 @@ tiene en común con `vRMS_S1`** (misma lógica de `mismaSerie`, pero sobre
 marcas, no valores). El guion se guarda como `scripts/medir-cadencia-historiador.mjs`
 —un `medir-`, no un `verificar-`: mide, no afirma (`CLAUDE.md` §5.4)—.
 
-**Si sale periódico:** F1 es «coincidencia de marcas con una serie verificada
-del mismo grupo». **Si sale al cambiar:** una constante no tiene marcas, y lo
-único que el sondeo puede afirmar es que **el tag `hda:` existe en el grupo**
-(el descubrimiento ya lo sabe: 117 series del árbol); entonces F1 se
-reescribe con ese criterio, más débil, y **se dice más débil** en la
-limitación. Las dos ramas se dejan escritas; la que no se dé se tacha con la
-cifra que la descartó.
+~~**Si sale periódico:** F1 es «coincidencia de marcas con una serie verificada
+del mismo grupo».~~ **Descartado con la cifra:** `Alarma_S1` tiene 8 muestras en
+24 h frente a 569 de `vRMS_S1`. No es periódico.
+
+**Si sale al cambiar:** ~~una constante no tiene marcas, y lo único que el
+sondeo puede afirmar es que el tag `hda:` existe en el grupo~~. **Tampoco fue
+así del todo, y eso es lo que salvó la vía A:** la constante SÍ tiene marcas —
+pocas— y **todas caen en marcas de la serie verificada**. Ver abajo.
+
+#### Lo que de verdad pasó (22-09-2026, tarde)
+
+El guion es `scripts/medir-cadencia-historiador.mjs`, escrito y corrido en el
+día. Va por `client.readHistory` con `aggregate: 'Average'` e `interval: 0`,
+exactamente como el sondeo. Primero las cinco de la tabla, después `--todas`
+(las 86 de `vib-motor-03`, 24 h).
+
+| Serie | n | primera | última | cadencia | distintos | marcas comunes con `vRMS_S1` |
+|---|---|---|---|---|---|---|
+| `vRMS_S1` | 569 | 21-09 22:01 | 22-09 21:19 | 60 s | 564 | (testigo) |
+| `Alarma_S1` | 8 | 21-09 23:21 | 22-09 17:09 | ~2 h, irregular | 1 (=0) | **8 de 8** |
+| `MonState_vRMS_S1` | 2 | 22-09 14:40 | 22-09 17:09 | — | 1 (=1) | **2 de 2** |
+| `FAULT_BMS` | 8 | 21-09 23:21 | 22-09 17:09 | ~2 h, irregular | 1 (=0) | **8 de 8** |
+| `MonState_aRMS_S2` | **0** | — | — | — | — | 0 |
+
+**Lo que dice la tabla.**
+
+1. **El grupo registra sólo al cambiar.** Una bandera constante deja 8
+   muestras al día, no 569. La cadencia «mediana» de esas 8 no significa
+   nada (los saltos son de 15 min a 6 h): no hay cadencia que tolerar, y la
+   «tolerancia de cadencia» que preveía la F1 **no existe**.
+2. **Pero cuando escribe una constante, lo hace en el mismo minuto que
+   escribe las medidas.** Las 8 marcas de `Alarma_S1`, `Warning_S1` y
+   `FAULT_BMS` son **las mismas 8** (23:05, 23:20, 23:43, 23:52, 01:05, 05:06,
+   11:07, 17:09 en la primera pasada), y son los instantes en que `vRMS_S1`
+   **reanuda tras un hueco**: el historiador escribe todo el grupo cuando la
+   recolección (re)arranca. Sobre las 86: las banderas coinciden 8/8, 9/9 ó
+   10/10; los `MonState` 2/2, 1/1 y tres en 1/2. **Ninguna constante con
+   muestras tiene menos de la mitad de sus marcas en el testigo.**
+3. **Las marcas van alineadas a la petición, no al reloj del PLC.** La
+   primera pasada dio todas las marcas en «:42.624»; la segunda en «:01». Es
+   la rejilla de 60 s del agregado `Average`, anclada en `startDate`. Así que
+   «misma marca» quiere decir **escrita en el mismo minuto**, no al
+   milisegundo. La F1 lo dice así.
+4. **`MonState_aRMS_S2` no tiene muestras porque el historiador nunca escribió
+   nada de ella** en la ventana: ni al arrancar ni al cambiar. `HorasMarcha`
+   igual. Es distinto de `S1/ACTUAL_SPEED`, que en la primera pasada devolvía
+   «History request failed» (**no recolectada**) y en la segunda ya
+   contestaba. Tres estados distintos que el criterio viejo aplanaba en dos.
+
+**Dos cosas más que salieron de medir, y que no son de este plan:**
+
+- **Las ventanas de 72 h y 168 h devolvieron 0 muestras con 20 páginas
+  vacías** (`truncada`, continuación tras continuación sin datos) en las
+  cinco series, la misma tarde en que 24 h traía 569. Por la mañana el
+  sondeo de 7 días sí traía material. El historiador se mueve; la ruta
+  `/sondear` prueba 24 → 72 → 168 y hoy las dos últimas le cuestan 40
+  páginas para nada. Anotado en el backlog (B14), no tocado aquí.
+- Con el agregado a 60 s, `aPeak_S1` (grupo de 1 s) sale con 1337 marcas y
+  `vRMS_S1` con 569: las dos comparten 565. Es la razón de que el sondeo
+  compare por marca y no por posición (Plan 41), vista otra vez.
+
+**Decisión: F1 sigue la rama «al cambiar» reforzada.** El criterio no es
+«existe en el grupo» (demasiado débil: `MonState_aRMS_S2` existe y no se
+escribe) ni «misma cadencia» (no la hay), sino **«la mitad o más de sus marcas
+son marcas de una serie propia de este mismo sondeo»**. Lo que afirma:
+«el historiador escribe esta variable, en los mismos minutos en que escribe
+una que sí verificó». Lo que no afirma, y se declara: que sea distinta de
+otra constante igual.
 
 **Criterios de aceptación.**
-- [ ] Tabla de arriba rellena con las cifras del historiador real.
-- [ ] Explicado por qué `MonState_aRMS_S2` no tiene muestras (¿no está en el
-      grupo? ¿nunca escribió?).
-- [ ] Decidido y escrito cuál de las dos ramas sigue F1.
+- [x] Tabla de arriba rellena con las cifras del historiador real.
+- [x] Explicado por qué `MonState_aRMS_S2` no tiene muestras: el historiador
+      no escribió nada de ella en 24 h, ni al reanudar la recolección. No
+      es «no recolectada» (eso da 500) ni «constante» (eso deja marcas).
+- [x] Decidido y escrito cuál de las dos ramas sigue F1.
 
 ### F1 — El criterio nuevo en el sondeo
 
