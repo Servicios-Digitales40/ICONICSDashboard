@@ -1,6 +1,6 @@
 # PLAN 37 — Las vistas de una máquina configurada
 
-**Estado:** F1–F3 completadas · **F4 (Alarmas) por completar — se ejecuta en el Plan 41 §F4** · vista en el navegador el 21-09-2026 (un defecto, corregido; falta volver a entrar: Plan 41 §F0)
+**Estado:** F1–F3 completadas y **confirmadas en el navegador el 22-09-2026** (Plan 41 F0) · **F4 (Alarmas) por completar — se ejecuta en el Plan 41 §F4**
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 

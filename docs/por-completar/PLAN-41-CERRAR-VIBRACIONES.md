@@ -1,6 +1,6 @@
 # PLAN 41 — Cerrar Vibraciones 1.0: lo que de verdad queda
 
-**Estado:** F0–F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
+**Estado:** **F0 completada** (22-09-2026: navegador confirmado, Plan 38 archivado, defecto de `decodificarVigilancia` corregido) · F1–F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
 **Rama:** `Vibraciones1.0`
 **Fecha:** 22-09-2026
 
@@ -59,7 +59,11 @@ más cierran: entre las dos confirman tres planes.
 
 ---
 
-### F0 — Confirmar en el navegador lo que ya está escrito
+### F0 — Confirmar en el navegador lo que ya está escrito ✅
+
+**Completada el 22-09-2026.** El usuario recorrió el muro, el menú y las siete
+vistas con `vib-motor-03` y el asistente delante; todo pintó. Salió **un
+defecto del tipo**, corregido en esta misma fase (abajo).
 
 **Objetivo.** Cerrar la confirmación pendiente de los Planes 37, 38 y 40 sin
 escribir una línea.
@@ -75,17 +79,115 @@ Plan 40 F2 es la ruta por defecto.
 
 **Criterios de aceptación.**
 
-- [ ] Las siete vistas pintan sin caerse, y pintan **sus** apoyos, con el
-      nombre que tengan en el árbol.
-- [ ] El muro de planta enseña **un panel por configurada**.
-- [ ] Lo que la máquina no tiene sale como **hueco, no como cero**
-      (`CLAUDE.md` §2.4): sin sensor de estado, sin rodamiento declarado, sin
-      sensibilidad. La ficha ya lo confiesa en `limitaciones`.
-- [ ] Preguntar al asistente **desde esa pantalla** y comprobar que contesta
-      sobre `Nuevo-Modor`, no sobre otra máquina.
+- [x] Las siete vistas pintan sin caerse, y pintan **sus** apoyos, con el
+      nombre que tengan en el árbol (hoy S1/S2/S3 sin nombre, como en planta).
+- [x] El muro de planta enseña **un panel por configurada** («Nuevo-Modor ·
+      Sin lectura · El valor de daño no tiene referencia aprendida»).
+- [x] Lo que la máquina no tiene sale como **hueco, no como cero**: los tres
+      apoyos dicen «Sensibilidad de esta sonda sin confirmar», y el estado de
+      alarmas «—» donde no hay severidad.
+- [x] El asistente, preguntado desde esa pantalla, contestó sobre
+      `Nuevo-Modor`: tres apoyos en zona A, 604 rpm en vacío, 17 alarmas
+      vueltas a normal sin reconocer, «3 de 95 señales sin lectura», y con el
+      aviso de OTRA MÁQUINA (no relacionarla con el tanque).
+
+#### Lo que se vio, y lo que salió de mirar
+
+**«92 / 95, 3 sin dato».** Los tres se identificaron leyendo los puntos en
+vivo (`/api/iconics/data/batch`) y reproduciendo el cálculo de la vista con
+`construirSistema(...).estado(...)`:
+
+| Punto | Qué pasa | Veredicto |
+|---|---|---|
+| `S3/MonState_vRMS_S3` | calidad `2147483660` (bit alto OPC: *bad*), sin valor; también fue «sin muestras» en el historiador | **punto muerto en el servidor**, en vivo y en histórico |
+| `ae:…=ActiveAckedMaxSeverity` | calidad buena, sin valor | legítimo: **0 alarmas activas**, no hay severidad máxima |
+| `ae:…=ActiveUnackedMaxSeverity` | ídem | ídem |
+
+*Observación, no arreglo:* contar «no hay alarmas» como «sin dato» es honesto
+por §2.4 pero discutible; se deja anotado. El **95** (la máquina se grabó con
+94) era el usuario editando desde la pantalla: añadió `TORRETA` y después
+quitó los 6 contadores del área → **89 variables**, sin el asset del área de
+alarmas. Es su decisión; consecuencia declarada: el panel «Servidor de alarmas
+de ICONICS» se queda sin fuente y `alarmas-activas` / `alarmas-sin-reconocer`
+pasan a no evaluables.
+
+**El defecto del tipo, corregido aquí.** `decodificarVigilancia`
+(`shared/eva/vibraciones/vibraciones.js`) sólo entendía la **cadena base64**
+del arreglo de bytes, que es como publicaba el módulo en el catálogo a mano.
+Los 24 `MonState_*` de la configurada llegan como **entero** con calidad
+buena —`1` en vRMS/aRMS/DKW/a_f/v_f, `0` en BPFI/BPFO/FTF—, exactamente las
+posiciones medidas el 26-08 como `[0 1 0 0]` y `[1 0 0 0]`: el servidor
+publica el índice en vez del arreglo. Con el decodificador viejo, el dominio
+marcaba **24 vigilancias como sin dato teniendo valor** (el fallo inverso a
+§2.4). Ahora acepta las dos formas; las posiciones 2 y 3 siguen sin
+confirmar en ambas; un booleano sigue siendo `null` a propósito.
+
+Medido con la lectura real: `dominio.sinDato` pasó de **24 a 2**. Los dos
+que quedan son de la instalación, no del tablero: `MonState_vRMS_S3` (muerto,
+arriba) y **`vigilancia:monVRMS@S2`**, porque el servidor llama a ese tag
+`MonState_vRMS_2` —sin la `S`— y el reconocimiento de roles no lo emparejó.
+**Para quien configure**: asignarle el rol en el editor, o añadir el alias en
+`aliasDeTags.js`. Es el paso 4 de F1 en otra forma: nombres del árbol.
+
+La prueba nueva en `verificar-riesgos-vibracion.mjs` se vio **fallar** con el
+arreglo retirado (`Cannot read properties of null`) antes de darla por buena.
+Después: puerta §5.1 verde (190/22 herramientas, 71 chat), `riesgos-vibracion`
+41, `dominio-configurado` 13, `vibraciones-configurada` 35, lint, tipos y la
+carpeta `test/demo-eva` (712). Un rojo intermitente en
+`fuente-de-maquina.test.js` no se repitió ni solo ni en la segunda tanda:
+contención, como describe `HANDOFF.md` §9.
 
 **Al cerrarse:** el Plan 38 queda **completado** (no le queda código); el Plan
 37 pierde su nota de «falta volver a entrar».
+
+#### Preparación local, 22-09-2026
+
+**El backend local arrancó sin ninguna máquina.** `datos/maquinas.json` nació
+vacío a las 11:44, en el mismo arranque (36 bytes), y `GET /api/maquinas`
+contestó `cuantas: 0`. Sin embargo el diario de diagnósticos guarda **192
+entradas de `vib-motor-03` en las últimas 24 h**: la máquina existió en este
+mismo backend el 21-09 y hoy no estaba. La `Nuevo-Modor` de la que habla el
+Plan 40 F4 es la del `maquinas.json` **de planta**; aquí había que recrearla.
+
+Se recreó **por el mismo camino que la pantalla**, contra el `bms-server`
+real, sin tocar el editor: `POST /api/maquinas/descubrir` sobre
+`ac:TDCON/DEMO_VIBRACIONES/Vibraciones/` con `hda:\Configuration\DEMO_VIBRACIONES`
+y `ae:/DEMO VIBRACIONES`, y el cuerpo del alta armado con las mismas funciones
+del dominio que usa `EditorDeMaquina.jsx` (`configuracionDesdeMarcas`,
+`normalizarRaizHistorica`, `problemasDeMaquina`).
+
+Lo que devolvió el árbol, medido: **174 puntos en vivo, 117 series en el
+historiador, 101 emparejadas por nombre**; 65 con rol. De los 174, se dejaron
+fuera —igual que haría quien marca el árbol— el espejo de alarmas `Alarm/`
+(43), los medidores de energía `Jaritza/L1` y `L2` (18), `Pantalla`,
+`TORRETA` y los `.Attributes` de cada carpeta (nodo de sistema, no señal).
+Se dejaron S1, S2, S3 y la carpeta del variador `V20`, **más los tres
+`Sensoroffset_S*` que cuelgan de `NOT_USED/`**: el tipo exige `bandera:offset`
+y sin ellos `problemasDeMaquina` avisaba. Resultado: **94 variables, las
+mismas que el Plan 37 registra para la de planta**; 65 con rol, 73 con serie;
+6 assets (raíz, S1, S2, S3, V20 y el área de alarmas), **todos sin `nombre`**,
+que es como está la de planta hasta el paso 4 de F1.
+
+`POST …/verificar`: **VALID, 94 de 94 presentes en ICONICS.**
+
+Un tropiezo propio, anotado para que no se repita: el primer alta grabó
+`arboles.historico` como `hda:ConfigurationDEMO_VIBRACIONES` —bash se comió
+las barras al pasar por `node -e`—; se corrigió con `PATCH` y la máquina
+siguió VALID. Las `historyPointName` por variable no se vieron afectadas
+porque venían del descubrimiento.
+
+**Lo que falta de F0 es exactamente el navegador**, con estas URLs:
+
+```
+http://localhost:5173/eva-muro                        el muro (ruta por defecto)
+http://localhost:5173/maq-inicio?maquina=vib-motor-03
+http://localhost:5173/maq-graficas?maquina=vib-motor-03
+http://localhost:5173/maq-3d?maquina=vib-motor-03
+http://localhost:5173/maq-hallazgos?maquina=vib-motor-03
+http://localhost:5173/maq-avisos?maquina=vib-motor-03
+http://localhost:5173/maq-casos?maquina=vib-motor-03
+http://localhost:5173/maq-rag?maquina=vib-motor-03
+```
 
 ---
 
@@ -123,6 +225,42 @@ su F3. No se puede hacer desde el repo: **necesita ICONICS delante**.
 
 **Al cerrarse:** el Plan 40 queda **completado**. El Plan 32 F2 y F3 se cierran
 detrás, sin trabajo de código.
+
+#### Línea base del sondeo EN PARO, local, 22-09-2026
+
+Al recrear la máquina (F0) se sondeó contra el historiador real con el motor
+parado. Es la referencia contra la que se compara el sondeo en marcha del
+paso 1, y tardó **20 s** para 73 series:
+
+```
+20 verificadas como propias   13 comparten serie   37 no varían   3 sin muestras   0 fallos
+→ estado DEGRADED · «53 de 73 series declaradas están sin sondear» va a limitaciones
+```
+
+- **Verificadas (20):** las 12 medidas de los tres apoyos (`vRMS`, `aRMS`,
+  `aPeak`, `DKW` × S1–S3) y 8 del variador (`FREQ OUTPUT`, `SPEED`, `CURRENT`,
+  `TORQUE`, `TOTAL KWH`, `DC BUS VOLTS`, `ENABLED`, `READY TO RUN`).
+- **Compartidas (13):** las **nueve `QC_*` son una sola serie** —el defecto ya
+  escrito en `vibraciones.js`—, más **dos parejas entre carpetas distintas**:
+  `UPPER_LEVEL_2 ↔ ACTUAL PWR_BMS` y `OUTPUT VOLTS_BMS ↔ Numero de arranques`.
+  **Sospecha, no afirmación:** con el motor parado, dos series constantes
+  coinciden en todos sus valores sin ser la misma. El sondeo en marcha dirá
+  si es un defecto del servidor o un falso positivo del criterio en paro.
+- **Sin variación (37):** las `MonState_*`, los `LOWER/UPPER_LEVEL`, los tres
+  `Sensoroffset`, el estado del variador (`FAULT`, `WARNING`…) y las señales
+  del motor (`Temperaturadeldevanado`, corrientes, presión). Es lo esperable
+  con el motor parado y **la razón de que el paso 1 exija sondear girando.**
+- **Sin muestras (3):** `MonState_aRMS_S2`, `MonState_vRMS_S3`, `HorasMarcha`.
+
+**Una discrepancia que hay que re-medir en marcha, y que importa para F3:**
+este sondeo dio **`aPeak_S1` verificada como serie PROPIA**, distinta de
+`aRMS_S1`. El 21-09 se midieron 1805 de 1805 valores idénticos entre las dos
+(`vibraciones.js:1151`), y sobre eso descansa «el factor de cresta es
+imposible en S1». El sondeo de hoy compara en «la ventana donde hay datos»
+(commit `7367642`), que puede no ser la del 21-09. **No se cambia el
+veredicto con una sola medida en paro**: se repite el sondeo girando y, si
+las dos series siguen siendo distintas, F3 recupera el factor de cresta en S1
+y se corrige la cabecera de `vibraciones.js`.
 
 ---
 
@@ -214,6 +352,25 @@ es diseñar a ciegas.
 modifica** (`CLAUDE.md` §1): si la medida dice que hay que tocarlo, esta fase
 se convierte en una vista nueva junto a él, o se anota y se deja para la
 reapertura.
+
+**Primera medida, 22-09-2026 (de paso, al descubrir la máquina para F0).**
+`POST /api/maquinas/descubrir` ya clasifica el área `ae:/DEMO VIBRACIONES`, y
+contestó **VALID** con este reparto:
+
+```
+ 6 contadores que SÍ leen     =ActiveAckedCount  =ActiveAckedMaxSeverity
+                              =ActiveUnackedCount =ActiveUnackedMaxSeverity
+                              =NormalUnackedCount =NormalUnackedMaxSeverity
+42 alarmas que el área LISTA pero NO ENTREGA   ae:/DEMO VIBRACIONES.Alarm_MonState_vRMS, …
+ 9 acciones de escritura      \Acknowledge \Silence \LatchReset \ShelvedOn …
+```
+
+Las 42 son las mismas que en `ac:` cuelgan de `Vibraciones/Alarm/` (43 hojas,
+ninguna con rol). Esto acota el trabajo de F4 antes de empezarlo: **los
+contadores del área sí se leen; las alarmas individuales del área no** —lo
+que se puede pintar de una configurada es lo que `/api/iconics/alarms` diga
+del área, y eso es lo que queda por medir. Los 6 contadores ya viajan en la
+máquina como variables sin rol (`assetId: "DEMO VIBRACIONES"`).
 
 **Criterios de aceptación.**
 

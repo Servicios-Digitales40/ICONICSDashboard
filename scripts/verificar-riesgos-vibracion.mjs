@@ -534,6 +534,23 @@ check('un estado que no se sabe leer da null, y NO «apagado»', () => {
   assert.equal(decodificarVigilancia(undefined), null)
 })
 
+check('el estado también llega como ÍNDICE entero, y significa lo mismo', () => {
+  /*
+   * Medido el 22-09-2026 en la configurada `vib-motor-03` contra el servidor
+   * real: los MonState_* llegan como `1` y `0`, no como base64. Sin esto las
+   * 24 vigilancias salían «sin dato» teniendo valor (Plan 41 F0).
+   */
+  assert.equal(decodificarVigilancia(1).id, 'ok', '1 ≡ [0 1 0 0]')
+  assert.equal(decodificarVigilancia(0).id, 'apagado', '0 ≡ [1 0 0 0]')
+  assert.equal(decodificarVigilancia(2).id, 'aviso')
+  assert.equal(decodificarVigilancia(3).confirmado, false, 'la 3 sigue sin confirmar también como entero')
+  assert.equal(decodificarVigilancia(4), null, 'fuera del catálogo')
+  assert.equal(decodificarVigilancia(-1), null)
+  assert.equal(decodificarVigilancia(1.5), null, 'no entero')
+  assert.equal(decodificarVigilancia(NaN), null)
+  assert.equal(decodificarVigilancia(true), null, 'un booleano no dice qué posición es')
+})
+
 check('el diagnóstico de rodamientos apagado se denuncia como CRÍTICO', () => {
   /*
    * Es el caso real: BPFO, BPFI y FTF estaban en [1 0 0 0] en los tres canales

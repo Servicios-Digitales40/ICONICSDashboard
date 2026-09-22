@@ -251,11 +251,13 @@ Plan 41**, y es correcto.
 **`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas. Queda **F4**
 (Alarmas), en el Plan 41 F4, cuyo primer paso es medir el área `ae:`.
 
-**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F3 completas y **sin código
-pendiente**: el backend registra las configuradas (`registroConfigurado.mjs`),
-las rutas validan `sistema` contra la lista viva, y el asistente contesta sobre
-una configurada (6 de 7 preguntas llegan a `Nuevo-Modor`). Hoy hay **8 rutas
-`maq-*`** en `routes.jsx`. Sólo espera confirmarse en pantalla (Plan 41 F0).
+**`PLAN-38-REGISTRO-DINAMICO.md`** — **COMPLETADO y archivado el 22-09-2026**
+(Plan 41 F0): el backend registra las configuradas (`registroConfigurado.mjs`),
+las rutas validan `sistema` contra la lista viva, hay **8 rutas `maq-*`**, y
+se vio en el navegador con `vib-motor-03`: muro, menú, siete vistas y el
+asistente contestando sobre ella. De mirarlo salió y se corrigió un defecto
+del tipo: `decodificarVigilancia` sólo entendía base64 y los `MonState_*` de
+una configurada llegan como entero (24 vigilancias «sin dato» teniendo valor).
 
 **`PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md`** — F0–F3 y F5 completas.
 Queda **F4**, pasos en planta, en el Plan 41 F1.
@@ -276,13 +278,11 @@ lo citaba nadie. Antes ya estaban archivados el **34**, el **36** y el **39**.
 > [`PLAN-41-CERRAR-VIBRACIONES.md`](por-completar/PLAN-41-CERRAR-VIBRACIONES.md),
 > que además deja escrito qué se midió para descartar el resto.
 
-**0 · Plan 41 F0 — confirmar en el navegador.** La sección de `Nuevo-Modor` se
-abrió el 21-09 y las siete vistas caían en el primer render; está corregido y
-**falta volver a entrar**: Inicio, Gráficas, Vista 3D, Hallazgos, Avisos, Casos
-previos y RAG, comprobando que pinta SUS apoyos con el nombre del árbol, y que
-el **muro de planta** (ruta por defecto desde el Plan 40 F2) enseña un panel
-por configurada. Y **preguntarle al asistente desde esa pantalla**. Cierra el
-Plan 38 y la nota pendiente del 37.
+**0 · Plan 41 F0 — confirmar en el navegador. ✅ HECHO el 22-09-2026.** Las
+siete vistas, el muro, el menú y el asistente se vieron con `vib-motor-03`
+recreada en local contra el `bms-server` real (94 variables; el usuario la
+dejó después en 89). Cerró el Plan 38 y la nota del 37, y destapó el defecto
+de `decodificarVigilancia` (corregido). Detalle en el Plan 41 §F0.
 
 **1 · Plan 41 F1 — los pasos en planta** (es la F4 del Plan 40). Sondear
 `Nuevo-Modor` **con el motor girando** (en paro quedaron 33 series sin

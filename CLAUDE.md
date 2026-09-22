@@ -465,9 +465,9 @@ El vivo que manda hoy es el **41** (cerrar Vibraciones 1.0), escrito el
 quedaba de verdad** —confirmar en el navegador, los pasos en planta, el índice
 de sinónimos, normalizar por rpm y las alarmas de la máquina— y dice qué fases
 dadas por pendientes **ya estaban hechas**. Siguen abiertos el **32**
-(vibraciones; sólo F6 es código vivo), el **37** (F4, alarmas), el **38** (sin
-código pendiente, sólo confirmarse en pantalla) y el **40** (F4, pasos en
-planta): los cuatro se cierran desde el 41. El **33** queda aparte, con su F9
+(vibraciones; sólo F6 es código vivo), el **37** (F4, alarmas) y el **40** (F4,
+pasos en planta): los tres se cierran desde el 41. El **38** se cerró con la
+F0 del 41 (22-09-2026) y está archivado. El **33** queda aparte, con su F9
 **bloqueada hasta reabrir** la estación de llenado.
 
 Archivados: el **34** (máquinas desde el árbol), el **36** (configurar marcando

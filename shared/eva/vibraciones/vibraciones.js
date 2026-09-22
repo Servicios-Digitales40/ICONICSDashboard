@@ -605,6 +605,17 @@ export const BANDERAS = [
  *
  * **Confirmar contra la tabla `MonState` del manual del SM 1281 antes de
  * apoyar ninguna decisión en las posiciones 2 y 3.**
+ *
+ * ── EL MISMO ESTADO LLEGA DE DOS FORMAS (22-09-2026, Plan 41 F0) ────
+ *
+ * Al leer la máquina CONFIGURADA `vib-motor-03` contra el servidor real, los
+ * 24 `MonState_*` no llegaron como base64 sino como **entero** con calidad
+ * buena: `1` en vRMS/aRMS/DKW/a_f/v_f y `0` en BPFI/BPFO/FTF — exactamente
+ * las posiciones que el 26-08 se midieron como `[0 1 0 0]` y `[1 0 0 0]`.
+ * El servidor publica el ÍNDICE en vez del arreglo. Con el decodificador de
+ * sólo base64, las 24 vigilancias salían «sin dato» teniendo valor: el fallo
+ * inverso al de `CLAUDE.md` §2.4, y fallo igual. Se aceptan las dos formas;
+ * las posiciones 2 y 3 siguen sin confirmar en ambas.
  */
 export const VIGILANCIA = [
   { indice: 0, id: "apagado", label: "No se vigila", confirmado: true },
@@ -614,7 +625,14 @@ export const VIGILANCIA = [
 ];
 
 /**
- * Cadena base64 del módulo → `{ indice, id, label, confirmado }`, o `null`.
+ * Valor crudo del módulo → `{ indice, id, label, confirmado }`, o `null`.
+ *
+ * Dos formas de entrada, medidas las dos (ver la cabecera de `VIGILANCIA`):
+ * la cadena base64 del arreglo de bytes, y el **índice como entero**. Un
+ * entero fuera de 0–3, o no entero, es `null`: no es un estado que este
+ * catálogo sepa leer. Un booleano también es `null` a propósito —`true` no
+ * dice si es la posición 1 o «hay algo encendido»—; si un servidor lo publica
+ * así, se mide antes de admitirlo.
  *
  * Devuelve `null` —y no la posición 0— cuando no hay exactamente un byte a 1.
  * Un arreglo con dos bytes encendidos, o con ninguno, no es un estado que este
@@ -622,6 +640,10 @@ export const VIGILANCIA = [
  * que no entendemos en una afirmación sobre la máquina.
  */
 export function decodificarVigilancia(valor) {
+  if (typeof valor === "number") {
+    if (!Number.isInteger(valor)) return null;
+    return VIGILANCIA.find((v) => v.indice === valor) ?? null;
+  }
   if (typeof valor !== "string") return null;
   let bytes;
   try {

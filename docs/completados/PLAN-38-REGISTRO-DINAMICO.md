@@ -1,6 +1,6 @@
 # PLAN 38 — El registro conoce las máquinas configuradas
 
-**Estado:** F1–F3 completadas · **sin trabajo de código pendiente** · F2 sólo espera confirmarse en el navegador tras la corrección del 21-09 (Plan 37), que se hace en el **Plan 41 §F0** · F3 medida contra el modelo real
+**Estado:** **COMPLETADO el 22-09-2026** · F1–F3 hechas · F2 confirmada en el navegador en el Plan 41 F0 (siete vistas, muro, menú y asistente sobre `vib-motor-03`) · F3 medida contra el modelo real · archivado en `completados/`
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
