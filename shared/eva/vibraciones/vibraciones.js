@@ -513,6 +513,14 @@ export const MEDIDAS = [
     norma: "ISO 10816-1 Clase I",
     mide: "Desequilibrio, desalineación y holguras. Es la medida de « estado " +
       "general de la máquina», y la única que una norma acota en absoluto.",
+    /*
+     * Cómo la nombra un manual o una norma (Plan 39 F3). `limites_del_manual`
+     * sólo da por candidato un número que esté en la misma oración que uno de
+     * estos términos; sin ellos, el límite de la aceleración se colaría como
+     * límite de la velocidad por compartir página. Van normalizados (sin
+     * acentos, minúsculas) porque así se comparan.
+     */
+    terminosManual: ["velocidad eficaz", "velocidad rms", "velocidad de vibracion", "vrms", "mm/s"],
   },
   {
     key: "aRMS",
@@ -525,6 +533,7 @@ export const MEDIDAS = [
     norma: null,
     mide: "Energía de alta frecuencia. Sube cuando un rodamiento empieza a " +
       "picarse, mucho antes de que se note en la velocidad.",
+    terminosManual: ["aceleracion eficaz", "aceleracion rms", "arms"],
   },
   {
     key: "aPeak",
@@ -537,6 +546,7 @@ export const MEDIDAS = [
     norma: null,
     mide: "El golpe más fuerte del intervalo. Comparado con el aRMS da el " +
       "factor de cresta, que distingue un impacto seco de un ruido de fondo.",
+    terminosManual: ["aceleracion de pico", "aceleracion pico", "apeak", "valor pico"],
   },
   {
     key: "DKW",
@@ -554,6 +564,7 @@ export const MEDIDAS = [
      */
     mide: "Cuántas veces peor está la máquina que cuando se aprendió su " +
       "referencia. Sin aprendizaje previo no significa nada.",
+    terminosManual: ["dkw", "valor caracteristico de daño", "valor caracteristico de dano"],
   },
 ];
 

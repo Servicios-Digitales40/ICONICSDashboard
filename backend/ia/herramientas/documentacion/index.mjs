@@ -35,7 +35,8 @@ import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../sha
 import { sistemaValido } from '../../../../shared/eva/comun/manuales.js'
 /* Quién reclama un nombre de señal, preguntando al REGISTRO y no a un
    catálogo concreto. Devuelve una lista y nunca elige — Plan 33 F7. */
-import { sistemasDeSenal } from '../../../../shared/eva/comun/sistemas.js'
+import { SISTEMA, sistemasDeSenal } from '../../../../shared/eva/comun/sistemas.js'
+import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
 
@@ -83,7 +84,13 @@ const PALABRAS_LIMITE =
  * el título de la tabla.
  */
 const NUMERO_UNIDAD =
-  /(\d+(?:[.,]\d+)?)\s*(v|voltios?|bar(?:es)?|mbar|psi|°c|celsius|%|kw|hz|amperios?|l\/s|m3\/h|rpm)?\b/i
+  /*
+   * Las unidades de vibración (Plan 39 F3): `mm/s`, `m/s²`. El cierre es
+   * `(?!\w)` y no `\b` porque «²» y «%» no son caracteres de palabra, y
+   * tras ellos `\b` no encontraba frontera: el patrón retrocedía y devolvía
+   * el número SIN unidad.
+   */
+  /(\d+(?:[.,]\d+)?)\s*(mm\/s|m\/s[²2]?|v|voltios?|bar(?:es)?|mbar|psi|°c|celsius|%|kw|hz|amperios?|l\/s|m3\/h|rpm)?(?!\w)/i
 
 /** Cuántos caracteres a cada lado de la palabra de límite se miran buscando un número. */
 const VENTANA_CANDIDATO = 40
@@ -106,7 +113,12 @@ const VENTANA_CANDIDATO = 40
  * señales del catálogo.
  */
 function anclaDeSenal(clave) {
-  const [primera] = normalizarTexto(SENALES[clave].label).split(' ').filter(p => p.length >= 4)
+  return anclaGenerica(SENALES[clave].label)
+}
+
+/** La misma regla, para una etiqueta cualquiera: la primera palabra con cuerpo. */
+function anclaGenerica(label) {
+  const [primera] = normalizarTexto(label ?? '').split(' ').filter(p => p.length >= 4)
   return primera ? [primera] : []
 }
 
@@ -405,29 +417,53 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       const sistemaDeLaSenal = encontrado?.sistema ?? null
 
       /*
-       * Los límites se extraen con `anclaDeSenal` y `senalInfo`, que son del
-       * catálogo del TANQUE: esa parte no está parametrizada todavía. Así que
-       * una señal de otra máquina se niega en vez de resolverse contra el
-       * catálogo equivocado — que devolvería `null` y acabaría diciendo que la
-       * señal no existe, teniendo manual.
+       * ── DE QUÉ MÁQUINA, Y CON QUÉ PALABRAS (Plan 39 F3) ──────────────
+       *
+       * Hasta el 22-09-2026 esto se negaba para toda máquina que no fuera el
+       * tanque: los límites se extraían con `anclaDeSenal` y `senalInfo`, que
+       * son de SU catálogo. Una máquina configurada no tiene ese catálogo,
+       * pero tiene algo mejor para esto: su entrada dice qué ROL cumple cada
+       * variable (`metaDe(clave).rol`) y el TIPO declara, por rol, con qué
+       * palabras habla un manual de esa medida (`terminosManual`). Así que la
+       * etiqueta sale de la máquina y las anclas del tipo, y la misma
+       * extracción sirve para las dos.
+       *
+       * Lo que sigue sin poderse es una entrada sin `metaDe`: sin etiqueta ni
+       * rol no hay con qué buscar, y se dice.
        */
+      let meta
+      let anclas
+      let consulta
       if (sistemaDeLaSenal && sistemaDeLaSenal !== 'tanque') {
-        return fallo(
-          `«${senal}» es del sistema «${sistemaDeLaSenal}», y la extracción de límites del ` +
-            'manual sólo está escrita contra el catálogo del tanque. Su documentación sí se ' +
-            `puede buscar con consultar_documentacion(sistema="${sistemaDeLaSenal}").`,
-          { sistema: sistemaDeLaSenal }
-        )
+        const entrada = SISTEMA[sistemaDeLaSenal]
+        const propia = entrada?.metaDe?.(encontrado.clave) ?? null
+        if (!propia) {
+          return fallo(
+            `«${senal}» es del sistema «${sistemaDeLaSenal}», y esa entrada no declara metaDe(): ` +
+              'sin etiqueta ni rol no sé con qué términos buscar su límite. Su documentación sí ' +
+              `se puede buscar con consultar_documentacion(sistema="${sistemaDeLaSenal}").`,
+            { sistema: sistemaDeLaSenal }
+          )
+        }
+        const rol = tipoDe(entrada.tipo)?.roles?.[propia.rol] ?? null
+        const terminos = [rol?.label, rol?.corto, ...(rol?.terminosManual ?? [])].filter(Boolean)
+        meta = { label: propia.label, unidad: propia.unidad }
+        anclas = terminos.length
+          ? [...new Set(terminos.map(normalizarTexto).filter(t => t.length >= 3))]
+          : anclaGenerica(propia.label)
+        consulta =
+          `${[propia.label, ...terminos, rol?.norma ?? ''].filter(Boolean).join(' ')} ` +
+          'maximo minimo limite admisible no debe exceder rango'
+      } else {
+        const clave = resolverSenal(senal)
+        if (!clave) return senalDesconocida(senal, { paraHistoria: true })
+        meta = senalInfo(clave)
+        anclas = anclaDeSenal(clave)
+        // Se sesga la consulta hacia palabras de límite además del nombre de la
+        // señal: BM25 es léxico, así que sin estas palabras en la consulta
+        // puntuaría igual una página que sólo menciona la señal de pasada.
+        consulta = `${meta.label} maximo minimo limite admisible no debe exceder rango`
       }
-
-      const clave = resolverSenal(senal)
-      if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-      const meta = senalInfo(clave)
-
-      // Se sesga la consulta hacia palabras de límite además del nombre de la
-      // señal: BM25 es léxico, así que sin estas palabras en la consulta
-      // puntuaría igual una página que sólo menciona la señal de pasada.
-      const consulta = `${meta.label} maximo minimo limite admisible no debe exceder rango`
       /*
        * ── EL SISTEMA NO SE PREGUNTA AQUÍ: SE SABE ─────────────────────
        *
@@ -452,6 +488,10 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        * pero `resolverSenal` sí lo reconozca —pasa con los sinónimos del
        * tanque, que el registro no conoce—. Ahí la señal es del tanque por
        * construcción: `senalInfo` viene de su catálogo.
+       *
+       * Desde el Plan 39 F3 la señal puede ser de una configurada: entonces
+       * `sistemaDeLaSenal` es su id y la búsqueda se acota a SUS manuales y a
+       * los de toda la planta, que es donde vive la norma.
        */
       const resultados = await indiceDocumentos.buscar(consulta, {
         top: 5,
@@ -469,7 +509,6 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
         )
       }
 
-      const anclas = anclaDeSenal(clave)
       const candidatos = []
       for (const r of resultados) {
         for (const c of extraerCandidatosLimite(r.texto, anclas)) {
@@ -490,6 +529,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       return {
         ok: true,
         senal: meta.label,
+        sistema: sistemaDeLaSenal ?? 'tanque',
         unidadDeclaradaEnICONICS: meta.unidad || null,
         // Seis, mismo tope que las coincidencias de correlacionar_senales: de
         // sobra para que el modelo elija entre candidatos que no cuadran, sin
@@ -565,11 +605,25 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        * los imports de este archivo).
        */
       if (sistema !== SISTEMA_DEL_DOSSIER) {
+        /*
+         * Se niega POR CAPACIDAD, no por id (Plan 39 F3): el dossier encadena
+         * `senalesMencionadas` e `historizadas()` del catálogo del tanque, y un
+         * tipo tendría que declarar su equivalente —qué señales nombra un
+         * síntoma, cuáles tienen historia— para que se pudiera componer. Hoy
+         * ningún tipo lo declara, y el mensaje dice qué faltaría en vez de
+         * fingir que la máquina no existe.
+         */
+        const entrada = SISTEMA[String(sistema).trim()]
+        const porTipo = entrada?.tipo
+          ? ` La máquina «${sistema}» es del tipo «${entrada.tipo}», y ese tipo no declara dossier ` +
+            '(qué señales nombra un síntoma y cuáles tienen historia).'
+          : ''
         return fallo(
           `El dossier compuesto sólo cubre "${SISTEMA_DEL_DOSSIER}" hoy: su catálogo de señales ` +
-            `es el de esa máquina. Para "${sistema}", usa diagnosticar_falla con el id de un ` +
-            `riesgo activo —da causas ya puntuadas—, o pide estado_del_sistema, ` +
-            `historia_de_senal y consultar_documentacion por separado con ese sistema.`
+            `es el de esa máquina.${porTipo} Para "${sistema}", usa diagnosticar_falla con el id de un ` +
+            `riesgo activo —da causas ya puntuadas—, limites_del_manual para un límite concreto, ` +
+            `o pide estado_del_sistema, historia_de_senal y consultar_documentacion por separado ` +
+            `con ese sistema.`
         )
       }
 

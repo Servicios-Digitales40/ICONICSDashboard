@@ -463,6 +463,45 @@ await check('un manual SIN sistema asignado responde a los dos (toda la planta)'
   assert.ok(paraVibraciones.length > 0, 'y a vibraciones también')
 })
 
+await check('un manual asignado a un TIPO responde a toda configurada de ese tipo, y a ninguna otra máquina', async () => {
+  /*
+   * Plan 39 F3. La ISO 20816-3 no es de un motor: es de toda máquina que se
+   * vigile por vibraciones. Con la máquina escrita a mano retirada (Plan 40),
+   * el único alcance que la deja visible a las configuradas es su TIPO.
+   */
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'iso.txt'), textoLargo('frontera de zona velocidad rms', 2))
+  await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
+    version: 1,
+    manuales: [{ id: 'm1', archivo: 'iso.txt', sistema: 'tipo:vibraciones' }],
+  }))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const paraLaConfigurada = await indice.buscar('frontera de zona velocidad rms', { sistema: ESPEJO.id })
+  const paraElTanque = await indice.buscar('frontera de zona velocidad rms', { sistema: 'tanque' })
+  const paraElTipo = await indice.buscar('frontera de zona velocidad rms', { sistema: 'tipo:vibraciones' })
+
+  assert.ok(paraLaConfigurada.length > 0, 'la configurada de ese tipo tenía que verlo')
+  assert.equal(paraElTanque.length, 0, 'el tanque no es de ese tipo y no debía verlo')
+  assert.ok(paraElTipo.length > 0, 'pedirlo por el tipo también lo encuentra')
+})
+
+await check('un manual asignado a una máquina que YA NO EXISTE se declara, no se pierde en silencio', async () => {
+  // Lo que pasó el 22-09-2026 con `vibraciones`: retirada en el Plan 40, tres
+  // manuales seguían asignados a ella y ninguna configurada los veía.
+  const dir = await carpetaNueva()
+  await writeFile(join(dir, 'iso.txt'), textoLargo('frontera de zona velocidad rms', 2))
+  await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
+    version: 1,
+    manuales: [{ id: 'm1', archivo: 'iso.txt', sistema: 'vibraciones' }],
+  }))
+
+  const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
+  const paraLaConfigurada = await indice.buscar('frontera de zona velocidad rms', { sistema: ESPEJO.id })
+  assert.equal(paraLaConfigurada.length, 0, 'un id que no existe no es el de ninguna máquina')
+  assert.deepEqual(indice.estado().conSistemaDesconocido, [{ archivo: 'iso.txt', sistema: 'vibraciones' }])
+})
+
 await check('sin manifiesto en la carpeta, nada se excluye (compatibilidad con lo que ya había)', async () => {
   const dir = await carpetaNueva()
   await writeFile(join(dir, 'sin-catalogar.txt'), textoLargo('procedimiento sin catalogar', 2))

@@ -33,7 +33,13 @@
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, extname, basename } from 'node:path'
 import { logger } from '../../logger.mjs'
-import { EXTENSIONES_MANUAL, NOMBRE_MANIFIESTO, normalizarManifiesto } from '../../../shared/eva/comun/manuales.js'
+import {
+  EXTENSIONES_MANUAL,
+  NOMBRE_MANIFIESTO,
+  manualSirveA,
+  normalizarManifiesto,
+  sistemaValido,
+} from '../../../shared/eva/comun/manuales.js'
 import { indexarTerminos, puntuarBm25 } from './bm25.mjs'
 import { NECESITAN_HILO, extraerTexto } from './extraccion.mjs'
 import {
@@ -621,12 +627,11 @@ export function createIndiceDocumentos({
     await asegurarAlDia()
     if (!indice.length) return []
 
+    /* Quién respalda a quién lo decide el dominio (`manualSirveA`): el mismo
+       id, «toda la planta», o —desde el Plan 39 F3— el TIPO de la máquina. */
     const delSistema = sistema === undefined
       ? indice
-      : indice.filter(f => {
-        const sistemaDelArchivo = mapaSistemas.get(f.archivo) ?? null
-        return sistemaDelArchivo === null || sistemaDelArchivo === sistema
-      })
+      : indice.filter(f => manualSirveA(mapaSistemas.get(f.archivo) ?? null, sistema))
     if (!delSistema.length) return []
 
     const lexico = puntuarBm25(delSistema, pregunta)
@@ -726,6 +731,18 @@ export function createIndiceDocumentos({
       modo: usaEmbeddings ? 'embeddings + BM25' : 'BM25',
       documentos: [...porArchivo].map(([archivo, fragmentos]) => ({ archivo, fragmentos })),
       ilegibles,
+      /*
+       * Manuales cuyo alcance no es ninguna máquina registrada ni ningún tipo
+       * (Plan 39 F3). Pasa cuando una máquina se retira o se renombra y el
+       * manifiesto sigue apuntándole: el 22-09-2026 la ISO 20816-3 y dos
+       * manuales más seguían asignados a `vibraciones`, retirada en el Plan
+       * 40, y ninguna configurada los veía. Se calcula al pedir el estado, no
+       * al cargar, porque las configuradas se registran después de montar el
+       * índice y al arrancar habría avisado en falso.
+       */
+      conSistemaDesconocido: [...mapaSistemas]
+        .filter(([, sistema]) => sistema && !sistemaValido(sistema))
+        .map(([archivo, sistema]) => ({ archivo, sistema })),
       /*
        * Lo que se indexó a medias (Plan 22 F2). Separado de `ilegibles`
        * porque significa otra cosa: aquí SÍ hay fragmentos buscables, y lo

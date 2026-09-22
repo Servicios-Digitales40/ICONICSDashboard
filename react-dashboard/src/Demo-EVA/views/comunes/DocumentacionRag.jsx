@@ -35,12 +35,15 @@ import {
   subirManual,
 } from "@/lib/api/ragApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
+import { alcanceDeTipo, manualSirveA } from "@shared/eva/comun/manuales.js";
+import { TIPOS } from "@shared/eva/tipos/index.js";
 import { useTheme } from "@/theme";
 
 import { MONO, SANS } from "../../components/base.jsx";
 /* De qué máquina cuelga esta pantalla, para preseleccionar su filtro
    (Plan 33 F10). Sólo el id: esta vista no lee ningún punto. */
 import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
+import { useMaquinasConfiguradas } from "../../data/comunes/MaquinasConfiguradas.jsx";
 
 /** Cada cuántos ms se vuelve a preguntar mientras hay algo indexándose. Lo
  *  bastante rápido para que se sienta en vivo, lo bastante espaciado para no
@@ -557,8 +560,25 @@ export default function DocumentacionRag({ params, onNavigate }) {
    * pantalla. Ver `sistema()` en `useDominio`.
    */
   const { sistemas: sistemasTraducidos } = useDominio();
-  const sistemas = sistemasTraducidos();
+  /*
+   * Las máquinas, y después cada TIPO (Plan 39 F3): «todas las de vigilancia
+   * de vibraciones». Una norma no es de un motor concreto, y asignarla a uno
+   * la escondería a los demás del mismo tipo. El alcance de tipo viaja en el
+   * mismo campo que el id de la máquina (`tipo:vibraciones`), así que entra
+   * en los mismos selectores sin una segunda lista.
+   */
+  const sistemas = [
+    ...sistemasTraducidos(),
+    ...TIPOS.map((tp) => ({
+      id: alcanceDeTipo(tp.id),
+      nombre: traducir("assistant:rag.docs.byType", { tipo: tp.nombre }),
+    })),
+  ];
   const sistemasPorId = new Map(sistemas.map((s) => [s.id, s.nombre]));
+  /* Para saber de qué tipo es la máquina del filtro sin pasar por el registro:
+     la pantalla conoce las configuradas por su proveedor. */
+  const { maquinas: configuradas } = useMaquinasConfiguradas();
+  const tipoDeMaquina = (id) => configuradas.find((m) => m.id === id)?.tipo ?? null;
 
   const cargar = useCallback(async (signal) => {
     /*
@@ -737,7 +757,9 @@ export default function DocumentacionRag({ params, onNavigate }) {
     if (!filtroSistema) return true;
     if (filtroSistema === "sin-asignar") return m.estado === "activo" && !m.sistema;
     if (filtroSistema === "planta") return !m.sistema;
-    return m.sistema === filtroSistema;
+    /* Filtrar por una máquina enseña los suyos Y los de su tipo; los de toda
+       la planta no, que para eso está «planta». Misma regla que el índice. */
+    return Boolean(m.sistema) && manualSirveA(m.sistema, filtroSistema, tipoDeMaquina(filtroSistema));
   });
 
   return (

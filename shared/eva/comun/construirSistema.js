@@ -507,6 +507,10 @@ export function construirSistema(maquina, tipo) {
         unidad: v.unidad ?? rol?.unidad ?? "",
         decimales: rol?.decimales ?? porFamilia,
         naturaleza: booleana ? "alarma" : "medida",
+        /* El rol del tipo que cumple esta variable (`medida:vRMS`), para que
+           quien tenga la clave pueda pedirle al tipo lo que el rol declara
+           —sus términos de manual, su norma— sin volver a la configuración. */
+        rol: v.rol ?? null,
       };
     },
 

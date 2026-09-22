@@ -20,6 +20,7 @@
       },
       "fragments": "{{n}} fragmentos",
       "wholePlant": "Toda la planta",
+      "byType": "Todas las de {{tipo}}",
       "systemTip": "A qué máquina pertenece este manual",
       "replaceTip": "Reemplazar contenido",
       "archiveTip": "Archivar (no borra el archivo)",

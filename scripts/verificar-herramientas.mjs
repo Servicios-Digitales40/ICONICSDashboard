@@ -2308,6 +2308,80 @@ await checkAsync('limites_del_manual acota al tanque sin que nadie se lo pida', 
   assert.equal(indiceDocumentos.ultimaBusqueda.sistema, 'tanque')
 })
 
+await checkAsync('[configurada] limites_del_manual sirve a una señal de vibraciones con los términos de su TIPO', async () => {
+  /*
+   * Plan 39 F3. Hasta hoy esto se negaba («sólo está escrita contra el
+   * catálogo del tanque»). La etiqueta sale de la máquina (`metaDe`), las
+   * anclas del tipo (`terminosManual` del rol) y la búsqueda se acota a la
+   * máquina, que es lo que permite que la norma —sin sistema asignado— entre.
+   */
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'ISO-20816-3.pdf', pagina: 7, score: 0.9,
+      texto: 'Para máquinas del grupo 2 la velocidad de vibración eficaz no debe exceder 4,5 mm/s.',
+    },
+  ])
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'vRMS_S1' })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, ESPEJO.id, 'no acotó a la máquina de la señal')
+  assert.equal(r.sistema, ESPEJO.id)
+  assert.match(r.senal, /Velocidad eficaz/)
+  assert.equal(r.unidadDeclaradaEnICONICS, 'mm/s')
+  assert.equal(r.candidatos.length, 1)
+  assert.equal(r.candidatos[0].valor, 4.5)
+  assert.equal(r.candidatos[0].unidad, 'mm/s', 'la unidad de vibración no se reconoció')
+  assert.equal(r.candidatos[0].documento, 'ISO-20816-3.pdf')
+  assert.equal(r.candidatos[0].pagina, 7)
+})
+
+await checkAsync('[configurada] el límite de la aceleración no se cuela como límite de la velocidad', async () => {
+  // Las anclas del tipo hacen aquí lo que `anclaDeSenal` hace con el tanque:
+  // un número sólo cuenta si su oración nombra ESTA medida.
+  const indiceDocumentos = indiceDocumentosFalso([
+    {
+      archivo: 'ISO-20816-3.pdf', pagina: 7, score: 0.9,
+      texto:
+        'La velocidad eficaz no debe exceder 4,5 mm/s.\n' +
+        'La aceleración eficaz no debe exceder 10 m/s².',
+    },
+  ])
+  const h = createHerramientas({ client: clienteFalso(), indiceDocumentos })
+
+  const v = await h.ejecutar('limites_del_manual', { senal: 'vRMS_S2' })
+  assert.equal(v.ok, true, v.error)
+  assert.deepEqual(v.candidatos.map(c => c.valor), [4.5])
+
+  const a = await h.ejecutar('limites_del_manual', { senal: 'aRMS_S2' })
+  assert.equal(a.ok, true, a.error)
+  assert.deepEqual(a.candidatos.map(c => [c.valor, c.unidad]), [[10, 'm/s²']])
+})
+
+await checkAsync('[configurada] la misma medida en tres apoyos pide desempate, y con el apoyo se resuelve', async () => {
+  const indiceDocumentos = indiceDocumentosFalso([
+    { archivo: 'ISO-20816-3.pdf', pagina: 7, score: 0.9, texto: 'La velocidad eficaz no debe exceder 4,5 mm/s.' },
+  ])
+  const h = createHerramientas({ client: clienteFalso(), indiceDocumentos })
+
+  const ambigua = await h.ejecutar('limites_del_manual', { senal: 'velocidad eficaz' })
+  assert.equal(ambigua.ok, false)
+  assert.match(ambigua.error, /más de un sitio/)
+  assert.ok(ambigua.candidatos.every(c => c.sistema === ESPEJO.id))
+
+  const conApoyo = await h.ejecutar('limites_del_manual', { senal: 'velocidad eficaz S3' })
+  assert.equal(conApoyo.ok, true, conApoyo.error)
+  assert.match(conApoyo.senal, /S3|Lado libre/)
+})
+
+await checkAsync('[configurada] el dossier se niega POR CAPACIDAD y nombra el tipo', async () => {
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos: indiceDocumentosFalso([]) })
+    .ejecutar('diagnostico', { sintoma: 'vibra mucho', sistema: ESPEJO.id })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /tipo «vibraciones», y ese tipo no declara dossier/)
+  assert.match(r.error, /limites_del_manual/)
+})
+
 await checkAsync('«máximo» y «mínimo» CON acento se reconocen, no sólo sin él', async () => {
   // Bug real, encontrado probando contra un PDF de verdad: el patrón sólo
   // cubría "maxim"/"minim" sin tilde, así que nunca casaba con el texto

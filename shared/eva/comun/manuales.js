@@ -26,7 +26,8 @@
  * subidas que el índice no sabe leer, o se rechazan archivos que sí sabría.
  * Una sola lista, usada por los dos lados.
  */
-import { SISTEMAS } from "./sistemas.js";
+import { SISTEMA, SISTEMAS } from "./sistemas.js";
+import { tipoDe } from "../tipos/index.js";
 
 /**
  * Extensiones que el índice de documentación sabe extraer. La misma lista que
@@ -84,7 +85,50 @@ export function manifiestoVacio() {
  */
 export function sistemaValido(id) {
   if (id === null || id === undefined || id === "") return true;
+  const tipo = tipoDeAlcance(id);
+  if (tipo !== null) return tipoDe(tipo) !== null;
   return SISTEMAS.some((s) => s.id === id);
+}
+
+/*
+ * ── UN MANUAL PUEDE SER DE UN TIPO, NO SÓLO DE UNA MÁQUINA (Plan 39 F3) ──
+ *
+ * La ISO 20816-3 no es del motor «Nuevo-Modor»: es de toda máquina que se
+ * vigile por vibraciones, y de ninguna bomba. Hasta el 22-09-2026 el alcance
+ * de un manual era un id de máquina o «toda la planta», y la norma estaba
+ * asignada a `vibraciones`, la máquina escrita a mano. Al retirarla (Plan 40)
+ * ese id dejó de existir y la norma quedó invisible para las configuradas:
+ * el filtro del índice sólo dejaba pasar «el mismo id» o «sin asignar».
+ *
+ * El alcance se escribe `tipo:<id del tipo>` en el MISMO campo `sistema` del
+ * manifiesto, para no cambiar su forma ni la de la API: un valor más entre
+ * los que ya acepta `sistemaValido`. Quien decide si un manual respalda a
+ * una máquina es `manualSirveA`, y es el único sitio donde esa regla vive:
+ * la usan el índice del backend al filtrar y la pantalla al listar.
+ */
+export const PREFIJO_TIPO = "tipo:";
+
+/** El alcance que significa «todas las máquinas de este tipo». */
+export const alcanceDeTipo = (tipoId) => `${PREFIJO_TIPO}${tipoId}`;
+
+/** El id del tipo de un alcance `tipo:X`, o `null` si no es de tipo. */
+export function tipoDeAlcance(valor) {
+  if (typeof valor !== "string" || !valor.startsWith(PREFIJO_TIPO)) return null;
+  return valor.slice(PREFIJO_TIPO.length) || null;
+}
+
+/**
+ * ¿Un manual con este alcance respalda a esta máquina?
+ *
+ * `tipoDelSistema` se puede pasar para no depender del registro —la pantalla
+ * conoce las configuradas por su proveedor, no por `SISTEMA`—; por defecto
+ * se mira en el registro.
+ */
+export function manualSirveA(alcance, sistemaId, tipoDelSistema = SISTEMA[sistemaId]?.tipo ?? null) {
+  if (alcance === null || alcance === undefined || alcance === "") return true;
+  if (alcance === sistemaId) return true;
+  const tipo = tipoDeAlcance(alcance);
+  return tipo !== null && tipoDelSistema === tipo;
 }
 
 /**

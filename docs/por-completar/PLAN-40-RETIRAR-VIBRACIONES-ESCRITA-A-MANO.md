@@ -340,6 +340,12 @@ escrito), sin `SISTEMA.vibraciones` en ningún guion.
 - Medido al cerrar: puerta 182 correctas + 22 omitidas (herramientas) y 71
   (chat); `npm run verificar` 41 de 41; backend 385; frontend 1090 (+29
   omitidas); lint y types limpios.
+- **Lo que esta fase no vio y el Plan 39 F3 encontró horas después:** los
+  manuales asignados a `vibraciones` en el manifiesto de `Documentacion/`
+  quedaron huérfanos —un id que no existe no es de nadie— y ninguna
+  configurada veía la ISO 20816-3. Se resolvió con un alcance de TIPO para los
+  manuales (Plan 39 F3); en planta hay que reasignarlos desde la pantalla
+  (queda en F4).
 
 ### F4 — Planta
 
@@ -361,7 +367,10 @@ necesitan ICONICS delante y se dejan escritos para quien los dé:
 2. Si `vibraciones-configurada` sigue en `datos/maquinas.json` de planta,
    darla de baja o dejarla inactiva: dos configuradas sobre la misma raíz se
    solapan y el registro se queda con la primera.
-3. Y dar nombre a los tres apoyos en el árbol (`S1` → «Lado acople», etc.):
+3. En `Planta › Documentación`, pasar la ISO 20816-3, el manual del SM 1281 y
+   el del V20 a «Todas las de Vigilancia de vibraciones»: siguen asignados a
+   `vibraciones`, que ya no existe, y así no los ve ninguna máquina.
+4. Y dar nombre a los tres apoyos en el árbol (`S1` → «Lado acople», etc.):
    una configurada saca el nombre del apoyo de `assets[].nombre`, y sin él el
    asistente dice «S1 (S1, bearing unidentified)». Después:
    `node --env-file=.env.local scripts/medir-asistente-configurada.mjs --maquina Nuevo-Modor`

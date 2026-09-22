@@ -847,9 +847,10 @@ export const DEFINICIONES = [
           sistema: {
             type: 'string',
             description:
-              'Id del sistema, SÓLO si el nombre de la señal existe en más de una máquina. ' +
-              'La extracción de límites está escrita contra el catálogo del tanque: para otra ' +
-              'máquina la herramienta lo dice y remite a consultar_documentacion.',
+              'Id del sistema, SÓLO si el nombre de la señal existe en más de una máquina ' +
+              '(p. ej. la misma medida en varios apoyos: pasa también el apoyo en el nombre, ' +
+              '"vRMS_S1"). La máquina sale del registro por el nombre de la señal; sirve para ' +
+              'el tanque y para cualquier máquina configurada.',
           },
         },
         required: ['senal'],

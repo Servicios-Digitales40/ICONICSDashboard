@@ -291,6 +291,37 @@ describe('PATCH /api/rag/documentos', () => {
     expect(json(r).manual.estado).toBe('activo')
   })
 
+  it('asignar a un TIPO (tipo:vibraciones) se acepta y persiste', async () => {
+    // Plan 39 F3: una norma es de todas las máquinas de un tipo, no de una.
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido'))
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=tipo:vibraciones`,
+    })
+
+    expect(r.statusCode).toBe(200)
+    expect(json(r).manual.sistema).toBe('tipo:vibraciones')
+
+    const listado = json(await app.inject({ method: 'GET', url: '/api/rag/documentos' }))
+    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('tipo:vibraciones')
+  })
+
+  it('asignar a un tipo que no existe da 400, igual que una máquina que no existe', async () => {
+    const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
+    const subida = json(await subir(app, 'manual.txt', 'contenido', { sistema: 'tanque' }))
+
+    const r = await app.inject({
+      method: 'PATCH',
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=tipo:compresor`,
+    })
+
+    expect(r.statusCode).toBe(400)
+    const listado = json(await app.inject({ method: 'GET', url: '/api/rag/documentos' }))
+    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('tanque')
+  })
+
   it('asignar a un sistema que no existe da 400 y no toca el manual', async () => {
     const { app } = conRegistro(await montarConDocs({ RAG_UPLOAD_ENABLED: 'true' }))
     const subida = json(await subir(app, 'manual.txt', 'contenido', { sistema: 'tanque' }))

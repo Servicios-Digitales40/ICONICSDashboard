@@ -160,6 +160,9 @@ export const ROLES = Object.freeze({
         escala: m.escala,
         norma: m.norma,
         mide: m.mide,
+        /* Con qué palabras lo nombra un manual: lo usa `limites_del_manual`
+           para anclar un número a ESTA medida y no a la de al lado. */
+        terminosManual: Object.freeze([...(m.terminosManual ?? [])]),
       }),
     ]),
   ),

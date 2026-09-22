@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F2 completadas · F3–F6 por completar
+**Estado:** F0–F3 completadas · F4–F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -457,6 +457,60 @@ para `vib-motor-03`; `limites_del_manual(senal="vRMS_S1", sistema=...)` no
 se niega.
 
 **Depende de** F1 (etiquetas y roles por señal).
+
+**Lo que de verdad pasó (22-09-2026).**
+
+- **`limites_del_manual` ya no se niega para una configurada.** La etiqueta y
+  la unidad salen de la máquina (`metaDe(clave)`, que ahora dice también qué
+  `rol` cumple la variable) y las anclas del TIPO: cada medida de
+  `vibraciones.js` declara `terminosManual` («velocidad eficaz», «velocidad
+  rms», «mm/s»…) y el rol lo lleva. La búsqueda se acota a la máquina de la
+  señal, como ya hacía con el tanque. El extractor gana las unidades de
+  vibración (`mm/s`, `m/s²`); el cierre del patrón pasa de `\b` a `(?!\w)`
+  porque tras «²» o «%» no había frontera de palabra y el número salía sin
+  unidad. El dossier sigue negándose, ahora **por capacidad**: nombra el tipo
+  y dice qué tendría que declarar.
+- **Lo que la medición destapó no estaba en el plan: los manuales de
+  vibraciones eran invisibles para toda configurada.** La primera corrida
+  contra el modelo real llegó a `Nuevo-Modor` pero «la documentación no
+  contiene límites». Sondeado el índice real: con `sistema="vib-motor-03"`,
+  cero fragmentos para cualquier consulta. La causa: en
+  `Documentacion/.manifiesto.json` la ISO 20816-3, el manual del SM 1281 y el
+  del V20 estaban asignados a `vibraciones`, la máquina escrita a mano que el
+  Plan 40 retiró ese mismo día. El filtro del índice sólo dejaba pasar «el
+  mismo id» o «sin asignar», así que un id que ya no existe no era de nadie.
+- **La respuesta es un alcance nuevo: el TIPO.** Una norma no es de un motor,
+  es de toda máquina que se vigile por vibraciones y de ninguna bomba. El
+  alcance se escribe `tipo:vibraciones` en el mismo campo `sistema` del
+  manifiesto —ni la forma ni la API cambian— y la regla de quién respalda a
+  quién vive UNA vez, en `shared/eva/comun/manuales.js·manualSirveA`: la usan
+  el índice al filtrar y la pantalla al listar. `sistemaValido` acepta el
+  alcance de tipo; la pantalla de manuales ofrece «Todas las de Vigilancia de
+  vibraciones» en los dos selectores, y filtrar por una máquina enseña los
+  suyos y los de su tipo. `estado()` del índice declara los manuales cuyo
+  alcance no es ninguna máquina ni ningún tipo (`conSistemaDesconocido`),
+  para que la próxima retirada no se pierda en silencio.
+- **El dato local se reasignó**: los tres manuales pasan a `tipo:vibraciones`
+  en `Documentacion/.manifiesto.json` (no versionado). En planta hay que
+  hacer lo mismo desde la pantalla de manuales.
+- **Medido.** Antes: 3 rondas, dos `consultar_documentacion` sin resultado,
+  «no contiene límites». Después: `consultar_documentacion(sistema=
+  "vib-motor-03")` encuentra la ISO y el modelo la cita para `Nuevo-Modor`
+  («La documentación técnica (ISO-20816-3) que consulté para esta máquina…
+  establece…»). El modelo eligió texto libre, no `limites_del_manual`; las
+  dos resuelven el caso.
+- **Lo que `limites_del_manual` NO puede con esta guía, y lo dice.** Sobre el
+  índice real, `vRMS_S1` encuentra las páginas 1, 3 y 6 de la ISO y devuelve
+  «ninguna tiene un número junto a una palabra de límite»: las fronteras de
+  zona están en una TABLA («A/B 1,4 22 2,3 37 B/C 2,8 45 4,5 71»), sin
+  «máximo» ni «no debe exceder» al lado. Es la limitación conocida del
+  extractor por patrón, y remite a `consultar_documentacion`, que es lo que
+  el modelo hizo. Leer tablas de fronteras es otro trabajo (Plan 32 F5).
+- Comprobaciones nuevas: 4 en `verificar-herramientas` (la señal de una
+  configurada resuelve con la unidad, la aceleración no se cuela como
+  velocidad, el desempate por apoyo, el dossier por capacidad), 2 en
+  `verificar-documentos` (alcance de tipo; id que ya no existe declarado) y 2
+  en `rag.test` (asignar a un tipo; a un tipo que no existe da 400).
 
 ### F4 — Reporte por tipo
 

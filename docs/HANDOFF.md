@@ -36,9 +36,9 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | | |
 |---|---|
 | Suite de frontend | **1090** pruebas · 29 omitidas |
-| Suite de backend | **385** pruebas |
+| Suite de backend | **387** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **182** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **186** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
@@ -248,7 +248,7 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F2 completas, F3–F6 por
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F3 completas, F4–F6 por
 completar. Que las herramientas del asistente sirvan a cualquier máquina
 configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
 vibraciones. F0 puso una configurada espejo en la puerta
@@ -258,9 +258,13 @@ variador, contadores de alarma, etiquetas con apoyo— y el modelo pasó de «no
 tiene lecturas disponibles» a citar mm/s por apoyo. F2 dio a las dos entradas
 de vibraciones `metaDe` (unidad, decimales, naturaleza), quitó la caída al
 tanque de `lib/historia.mjs`, arregló `resumen_de_turno` y `alarma_sostenida`,
-y el historiador falso sirve por fin las series de vibraciones. Quedan: manual
-(F3), reporte (F4), el prompt de la máquina que se tiene delante (F5) y el
-alta automática según el estado de validación (F6).
+y el historiador falso sirve por fin las series de vibraciones. F3 hizo que
+`limites_del_manual` sirva a una configurada con los términos de su tipo y
+destapó que los manuales de vibraciones estaban asignados a una máquina que ya
+no existía: ahora se asignan al TIPO (`tipo:vibraciones`) y el modelo cita la
+ISO 20816-3 para `Nuevo-Modor`. Quedan: reporte (F4), el prompt de la máquina
+que se tiene delante (F5) y el alta automática según el estado de validación
+(F6).
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
@@ -438,6 +442,15 @@ registro es un módulo: **`montarApp` usa un `maquinas.json` vacío y propio**,
 porque con el valor por defecto cada prueba registraría las máquinas del disco
 de quien la corre.
 
+**Retirar o renombrar una máquina deja huérfanos los manuales asignados a
+ella.** El 22-09-2026 la ISO 20816-3 y dos manuales más seguían asignados a
+`vibraciones` (retirada en el Plan 40) y ninguna configurada los veía: el
+índice sólo deja pasar «el mismo id» o «sin asignar», y un id que ya no existe
+no es de nadie. Desde el Plan 39 F3 un manual se puede asignar a un **tipo**
+(`tipo:vibraciones`), que es lo que una norma es; y `GET /api/rag/documentos`
+trae en el estado del índice `conSistemaDesconocido`, que es donde mirar
+después de retirar una máquina.
+
 **Las carpetas de `hda:` NO terminan en `\`; las de `ac:` SÍ terminan en `/`.**
 Una regla «carpeta = termina en separador» valía para un árbol y rompía el
 otro. En `shared/eva/comun/arbolIconics.js` la carpeta del historiador se
@@ -513,7 +526,7 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** |
-| Backend | **385 passed** |
+| Backend | **387 passed** |
 | Frontend | **1083 passed · 29 skipped** |
 | Lint y types | sin salida |
 
@@ -551,6 +564,12 @@ El backend la sirve sin reiniciar; `GET /api/maquinas` devuelve `cuantas: 1`.
 > demo es esta configurada. `generar-configuracion-vibraciones.mjs` se retiró
 > con ella. `verificar-vibraciones-configurada.mjs` compara la fixture con
 > `shared/eva/vibraciones/catalogoDemo.js`, la forma de la entrada retirada.
+
+**Y los manuales de vibraciones se asignan al TIPO**, no a una máquina: en
+`Planta › Documentación`, cada manual de vibraciones (la ISO 20816-3, el del
+SM 1281, el del V20) va en «Todas las de Vigilancia de vibraciones»
+(`tipo:vibraciones`). Uno asignado a una máquina que ya no existe no lo ve
+nadie (§8).
 
 ### Los 44 verificadores
 
