@@ -460,8 +460,10 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-El único vivo hoy es el **33** (modularidad de máquinas), con su F9 —la
-estación de llenado como configurada— **bloqueada hasta reabrir** la rama. El
+Los vivos hoy son el **42** (verificar una bandera que nunca cambió sin
+forzarla: el criterio del sondeo con series constantes, escrito el 22-09-2026
+desde B13) y el **33** (modularidad de máquinas), con su F9 —la estación de
+llenado como configurada— **bloqueada hasta reabrir** la rama. El
 **41** (cerrar Vibraciones 1.0) se escribió y se completó el 22-09-2026 tras
 sondear los demás contra el código, y con él se archivaron el **32**, el **37**,
 el **38** y el **40**; su §0 dice qué se dio por pendiente y ya estaba hecho, y

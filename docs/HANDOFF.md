@@ -271,9 +271,12 @@ ni la regla de cresta. El frontend ya lo tiene por HMR.
 acoplado: quitar la limitación «sin carga» de `vib-motor-03` y mirar la
 cresta de cada apoyo con carga (S2 daba 7,7 en vacío).
 
-**2 · B13 del backlog de backend** — que el sondeo pueda verificar una bandera
-constante comparando marcas de tiempo. Es lo que reabriría unas «Alarmas» de la
-configurada por flancos. Se escribe como plan antes de tocarlo.
+**2 · Plan 42 — verificar una bandera que nunca cambió, sin forzarla**
+(`por-completar/PLAN-42-VERIFICAR-BANDERAS-CONSTANTES.md`, escrito el 22-09).
+Es B13 como plan: empieza por **medir** si el historiador registra periódico o
+sólo al cambiar (F0, un `medir-`), y de ahí sale el criterio del sondeo (F1),
+sus trece comprobaciones (F2) y los flancos de la configurada (F3). Ninguna
+fase exige ir a la máquina.
 
 **3 · F7 (el ciclo de vida del sondeo) y F8 (marcar fuera de la raíz)** del
 backlog de frontend: la red que falta antes de tocar motores, y una decisión
