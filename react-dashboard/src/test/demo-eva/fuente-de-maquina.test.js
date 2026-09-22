@@ -31,6 +31,25 @@ import { TRANSPORTES } from "@/lib/iconics";
 import { QUALITY_SIN_DATO } from "@shared/quality.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
+import { enMarchaVib } from "@shared/eva/vibraciones/simuladorVibraciones.js";
+
+/**
+ * Un instante con el motor SIMULADO en marcha, para la prueba que lee del
+ * origen simulado (F10 del backlog, 22-09-2026).
+ *
+ * El simulador no usa `Math.random`: su marcha y su paro van por RELOJ DE
+ * PARED, en ciclos, y con el motor parado `vRMSEn()` devuelve `null` —el
+ * módulo no publica—. La prueba leía con `Date.now()` real, así que caía o no
+ * según la hora a la que corriera la tanda: «2 de 4 en la carpeta, 0 solo»
+ * era pura coincidencia de reloj, no orden ni contención. Cazado con
+ * `--reporter=verbose`: `vRMS_S1: expected 'undefined' to be 'number'`.
+ * Misma receta que `simulador-vibraciones.test.js`.
+ */
+const T0 = Date.UTC(2026, 7, 27, 9, 0, 0);
+const EN_MARCHA = (() => {
+  for (let i = 0; i < 200; i++) if (enMarchaVib(T0 + i * 5_000)) return T0 + i * 5_000;
+  throw new Error("el ciclo del simulador no tiene tramo en marcha");
+})();
 
 const RAIZ = "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/";
 const AREA = "ae:/DEMO VIBRACIONES";
@@ -90,6 +109,7 @@ const primeraLectura = (fuente) =>
 
 afterEach(() => {
   olvidarFuentesDeMaquina();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -179,8 +199,13 @@ describe("la fuente de una máquina configurada", () => {
      * El caos suave puede volver mala una lectura de cada cincuenta (valor 0,
      * calidad incierta) o dejar fuera una de cada cien. Se fija el azar para
      * que la prueba mida la física del tipo, no la suerte del preset.
+     *
+     * Y se fija el RELOJ, que era lo que de verdad la hacía intermitente:
+     * sólo `Date`, no los temporizadores —el transporte espera `latenciaMs`
+     * con `setTimeout`, y con los timers falsos esa espera no terminaría—.
      */
     vi.spyOn(Math, "random").mockReturnValue(0.99);
+    vi.useFakeTimers({ toFake: ["Date"], now: EN_MARCHA });
     const m = maquina();
     const sensor = variable("SENSOR_S1", `${RAIZ}S1/SENSOR_S1`, null, "S1");
     const transporte = transporteDeConfigurada({ ...m, variables: [...m.variables, sensor] }, TRANSPORTES.SIMULADO);

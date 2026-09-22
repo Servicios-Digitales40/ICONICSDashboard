@@ -40,9 +40,26 @@ Vistas registradas en `routes.jsx`: **14**, repartidas en tres secciones
 
 **Nuevos, salidos del Plan 41 (22-09-2026):**
 
-## F9 · El editor no deja escribir las limitaciones de una máquina
+## F9 · El editor no deja escribir las limitaciones de una máquina — **HECHO (22-09-2026)**
 
-**Hoy.** `limitaciones` es un campo de la configuración (`CrearMaquinaSchema`,
+> **Lo que se hizo.** Un `textarea` «Limitaciones de la instalación» en
+> `EditorDeMaquina`, una por línea; `configuracionDesdeMarcas` las limpia
+> (`limitacionesLimpias`: espacios, líneas vacías, repetidas) y las manda
+> **siempre** como arreglo, porque al editar «vacío» significa «borra las
+> mías» y omitirlo significaría «no toques nada».
+>
+> **Lo que el diseño de abajo no había visto**: `GET /api/maquinas/:id`
+> devuelve `limitaciones` MEZCLADAS (propias + las que deriva la validación).
+> Cargarlas tal cual habría re-grabado «65 series sin sondear» como si alguien
+> lo hubiera escrito. Por eso la API separa ahora `limitacionesPropias`
+> (`maquinasRoutes.mjs · conCapacidades`) y el editor lee ésa. Y si la API no
+> la trae —un backend anterior a este cambio—, el PATCH **no toca** las
+> limitaciones: mandar `[]` desde un campo que arrancó vacío sin que nadie lo
+> vaciara habría borrado lo escrito. Tres pruebas en `editor-de-maquina`
+> (alta limpia, edición sólo con las propias, backend viejo) y una en
+> `rutas/maquinas.test.mjs`.
+
+**Hoy (antes del arreglo).** `limitaciones` es un campo de la configuración (`CrearMaquinaSchema`,
 `EditarMaquinaSchema`) y la ficha de `ConfiguracionPlanta` lo **enseña**, pero
 `EditorDeMaquina` no tiene campo para escribirlo. El 22-09-2026 hizo falta
 grabar «El motor gira sin carga acoplada…» en `vib-motor-03` y sólo se pudo
@@ -58,12 +75,27 @@ formulario del editor, que viaje en `payload.limitaciones` y se lea de
 `maquina.limitaciones` al editar. Las derivadas por la validación no se
 editan: se suman (`construirSistema`). Pequeño, con su prueba.
 
-## F10 · Un intermitente que NO es contención
+## F10 · Un intermitente que NO es contención — **CAZADO Y ARREGLADO (22-09-2026)**
 
-`fuente-de-maquina.test.js › con el origen SIMULADO…` cae 2 de 4 veces al
-correr sólo `src/test/demo-eva`, con un **aserto** y en ~70–90 ms; pasa 3 de 3
-solo y en dos suites completas. Orden o estado compartido entre pruebas de esa
-carpeta, no carga. Detalle y qué hacer primero en `HANDOFF.md` §9.
+`fuente-de-maquina.test.js › con el origen SIMULADO…` caía 2 de 4 veces al
+correr sólo `src/test/demo-eva`, con un **aserto** y en ~70–90 ms; pasaba solo
+y en suites completas. Se supuso orden o estado compartido. **No era eso.**
+
+**Cazado** a la sexta tanda con `--reporter=verbose`:
+`vRMS_S1: expected 'undefined' to be 'number'`. **La causa:** el simulador no
+usa `Math.random` —la prueba ya lo fijaba en 0,99 y no servía de nada—; su
+marcha y su paro van por **reloj de pared**, en ciclos, y con el motor
+parado `vRMSEn()` devuelve `null` (el módulo no publica). El transporte lo
+convierte en `{ quality: SIN_DATO }` sin `value`, y la prueba leía con
+`Date.now()` real. Caía o no **según la hora a la que corriera la tanda**;
+que fallara en la carpeta y no sola era coincidencia.
+
+**El arreglo**, sólo en la prueba: fijar el reloj en un instante en marcha
+(`vi.useFakeTimers({ toFake: ["Date"], now: EN_MARCHA })`, sólo `Date` porque
+el transporte espera su latencia con `setTimeout`), con la misma receta que
+`simulador-vibraciones.test.js`. El simulador y el transporte no se tocaron:
+hacen lo que deben. La lección va a `HANDOFF.md` §9: un intermitente que no
+dice `timed out` puede ser **reloj**, no sólo orden.
 
 ---
 
@@ -258,8 +290,8 @@ para máquinas armadas con tags de varias zonas (haría falta el 2).
 
 ## Orden sugerido (revisado el 22-09-2026)
 
-1. **F9** — el campo de limitaciones: pequeño, concreto, y hoy ya hizo falta
-2. **F10** — capturar el aserto del intermitente antes de que se normalice
+1. ~~**F9**~~ — hecho el 22-09-2026
+2. ~~**F10**~~ — cazado y arreglado el 22-09-2026 (era el reloj, no el orden)
 3. **F7 (el ciclo de vida)** — la única red que falta antes de tocar motores
 4. **F8** — decidir entre varias raíces y marcar desde cualquier punto; la
    pregunta que decide sigue siendo si es para una carpeta suelta o para

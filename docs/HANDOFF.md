@@ -76,10 +76,6 @@ siguen registradas y se abren por URL**: ocultar no es borrar.
 **«Casos previos» sale vacío** en vibraciones: hay 13 casos y **ninguno** es
 suyo (11 del tanque, 2 de «grupo de bombeo»). Es la foto real del módulo.
 
-**El editor no escribe limitaciones.** La ficha las enseña; para grabar «sin
-carga acoplada» en `vib-motor-03` hubo que usar la API. Es F9 del backlog de
-frontend.
-
 **El backend que corre puede ir por detrás del código.** Es un proceso
 `node` arrancado a mano: los cambios en `shared/` no entran hasta reiniciarlo
 (el frontend sí, por HMR). El 22-09 estuvo toda la tarde con el `shared/` de
@@ -279,10 +275,14 @@ cresta de cada apoyo con carga (S2 daba 7,7 en vacío).
 constante comparando marcas de tiempo. Es lo que reabriría unas «Alarmas» de la
 configurada por flancos. Se escribe como plan antes de tocarlo.
 
-**3 · El intermitente que NO es contención** (`fuente-de-maquina.test.js`,
-§9): capturar el aserto la próxima vez que caiga en el subconjunto `demo-eva`.
+**3 · F7 (el ciclo de vida del sondeo) y F8 (marcar fuera de la raíz)** del
+backlog de frontend: la red que falta antes de tocar motores, y una decisión
+de diseño sin tomar.
 
 **4 · Reabrir la estación de llenado** — Plan 33 F9. Es el final de la rama.
+
+*(F9 —limitaciones en el editor—, B11 —color del PDF por clave— y la captura
+del intermitente F10 se hicieron el 22-09 por la tarde; ver los backlogs y §9.)*
 
 ---
 
@@ -618,17 +618,20 @@ reloj.
 out`** (contención — este número) **o son asertos** (el código). No se subió
 `testTimeout`: eso trata el síntoma y escondería una regresión real.
 
-**Uno que NO es contención, observado el 22-09-2026 y sin resolver:**
-`fuente-de-maquina.test.js › con el origen SIMULADO las medidas con rol y
-apoyo salen con valor…` cayó **2 de 4 veces** al correr sólo la carpeta
-`src/test/demo-eva`, con un **aserto** (no un timeout) y en ~70–90 ms; pasó
-**3 de 3 solo** y en **dos suites completas** (1097). Ese patrón —falla en un
-subconjunto, nunca solo ni en la suite entera— es **orden o estado
-compartido** entre pruebas de esa carpeta, no carga: la prueba fija
-`Math.random` con `vi.spyOn` y lee del simulador, que depende del reloj.
-Ninguna de las tres tandas rojas coincidió con un cambio en lo que ese archivo
-prueba. Pendiente: capturar el aserto exacto la próxima vez que caiga (correr
-la carpeta con `--reporter=verbose`) antes de tocar nada.
+**Y uno que NO era contención ni orden: era el RELOJ (22-09-2026, cazado y
+arreglado).** `fuente-de-maquina.test.js › con el origen SIMULADO…` caía «a
+veces» con un aserto y nunca a demanda. Se supuso estado compartido entre
+pruebas de la carpeta. Cazado a la sexta tanda con `--reporter=verbose`:
+`vRMS_S1: expected 'undefined' to be 'number'`. El simulador de vibraciones
+**no usa `Math.random`** —fijarlo en 0,99, como hacía la prueba, no servía de
+nada—: su marcha y su paro van por reloj de pared en **ciclos de 10 min**, y
+parado, `vRMSEn()` devuelve `null`. La prueba leía con `Date.now()` real, así
+que caía o no según la hora. El arreglo, sólo en la prueba: fijar el reloj en
+un instante en marcha (`vi.useFakeTimers({ toFake: ["Date"] })`, sólo `Date`,
+porque el transporte espera su latencia con `setTimeout`). **La lección:** un
+intermitente que no dice `timed out` y no se reproduce solo puede ser el
+reloj, no sólo el orden; y la primera pregunta es «¿qué lee este código del
+`Date.now()`?». Detalle en el backlog de frontend, F10.
 
 ### El bundle
 
