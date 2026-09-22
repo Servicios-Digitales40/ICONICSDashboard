@@ -19,17 +19,38 @@
  * `configuracionMaquina.js` hace arrancar `historyVerified` en `false` y dice
  * que «sólo pasa a `true` tras un sondeo que compare». Esto es ese sondeo.
  *
- * ── LO QUE SE COMPARA, Y POR QUÉ ES UNA HUELLA ────────────────────
+ * ── LO QUE SE COMPARA, Y POR QUÉ POR MARCA DE TIEMPO ──────────────
  *
  * No se compara «tiene datos» —eso ya lo contesta el propio historiador— sino
- * si DOS variables distintas traen la misma serie. Para eso se resume cada
- * una en una huella: sus primeros valores, redondeados y en orden.
+ * si DOS variables distintas traen la misma serie.
  *
- * Dos huellas iguales entre variables distintas significan que el servidor
+ * Dos series iguales entre variables distintas significan que el servidor
  * está sirviendo la misma serie con dos nombres. Ninguna de las dos se marca
  * como verificada: no se sabe cuál de ellas es la legítima —puede que
  * ninguna— y elegir una sería exactamente la afirmación que este módulo
  * existe para no hacer.
+ *
+ * **Se comparan EMPAREJANDO POR MARCA DE TIEMPO, y la serie entera** (Plan
+ * 41, 22-09-2026). Antes se comparaban las OCHO primeras muestras por
+ * POSICIÓN, y las dos decisiones estaban mal por el mismo motivo: dos
+ * variables del mismo apoyo pueden registrarse en grupos distintos del
+ * historiador —medido en esta planta: `aPeak_S1` cada segundo y `aRMS_S1`
+ * cada cinco— así que a la misma hora les corresponden posiciones distintas.
+ * Comparar por posición enfrentaba la muestra de las 10:00:01 de una con la
+ * de las 10:00:05 de la otra; y mirar sólo ocho muestras convertía cualquier
+ * coincidencia inicial en un veredicto sobre la serie completa.
+ *
+ * El 22-09-2026 eso dio un FALSO POSITIVO contra planta: `aPeak_S1` y
+ * `aRMS_S1` se declararon «serie compartida» —y perdieron las dos su
+ * historia— cuando en realidad traen 1340 y 566 muestras distintas. Lo que
+ * coincidía eran sus ocho primeras muestras de un tramo en el que la máquina
+ * estaba casi parada y las dos eran ruido cerca de cero.
+ *
+ * Ahora se exige que coincidan **todas** las muestras de las marcas de tiempo
+ * que ambas tienen en común, y que esas marcas comunes sean suficientes
+ * (`MINIMO_COMUNES`) para que la coincidencia signifique algo. Dos series con
+ * densidades distintas dejan de compararse mal: o comparten las marcas y se
+ * las compara de verdad, o no las comparten y no son la misma serie.
  *
  * ── LA TRAMPA DE LA MÁQUINA PARADA ────────────────────────────────
  *
@@ -79,17 +100,7 @@
 import { ESTADO_CONFIGURACION } from '../../shared/eva/comun/configuracionMaquina.js'
 
 /**
- * Cuántas muestras entran en la huella.
- *
- * Ocho bastan para distinguir dos señales físicas distintas y mantienen la
- * comparación barata con decenas de variables. Si dos series coinciden en
- * ocho muestras consecutivas y siguen siendo distintas, la diferencia es tan
- * pequeña que el emparejamiento merece una mirada humana igualmente.
- */
-const MUESTRAS_HUELLA = 8
-
-/**
- * Cuántos decimales sobreviven a la huella.
+ * Cuántos decimales sobreviven a la comparación.
  *
  * Seis: suficiente para no colapsar dos medidas cercanas, y suficientemente
  * poco para que un redondeo distinto en dos peticiones no invente una
@@ -98,21 +109,63 @@ const MUESTRAS_HUELLA = 8
 const DECIMALES_HUELLA = 6
 
 /**
- * El resumen comparable de una serie.
+ * Cuántas marcas de tiempo en común hacen falta para poder opinar.
  *
- * Devuelve `null` cuando no hay con qué comparar. Es distinto de una huella
- * vacía: `null` significa «no se puede opinar», y quien llama lo trata como
- * tal en vez de compararlo con otros `null` y declararlos iguales.
+ * Con una sola marca común, que dos series coincidan no dice nada: dos
+ * señales cualquiera coinciden en un instante suelto. Ocho es el mismo número
+ * que antes tenía la huella, pero aquí significa otra cosa —ocho INSTANTES
+ * comparados, no ocho posiciones— y por debajo de eso el sondeo prefiere
+ * callar (`sin-variacion`) a afirmar.
  */
-export function huellaDe(muestras) {
+const MINIMO_COMUNES = 8
+
+/** La marca de tiempo de una muestra, venga como venga del servidor. */
+const marcaDe = (m) => String(m?.timestamp ?? m?.Timestamp ?? '')
+
+/**
+ * La serie indexada POR MARCA DE TIEMPO, para poder compararla con otra.
+ *
+ * Devuelve `null` cuando no hay con qué comparar. Es distinto de un mapa
+ * vacío: `null` significa «no se puede opinar», y quien llama lo trata como
+ * tal en vez de compararlo con otros `null` y declararlos iguales.
+ *
+ * Una muestra sin número o sin marca no entra: colarla compararía ceros
+ * implícitos con datos reales, o alinearía dos series por una marca vacía.
+ */
+export function firmaDe(muestras) {
   if (!Array.isArray(muestras) || !muestras.length) return null
 
-  const valores = muestras
-    .slice(0, MUESTRAS_HUELLA)
-    .map((m) => (typeof m?.value === 'number' ? m.value.toFixed(DECIMALES_HUELLA) : null))
+  const porMarca = new Map()
+  for (const m of muestras) {
+    const marca = marcaDe(m)
+    if (!marca) continue
+    if (typeof m?.value !== 'number') return null
+    porMarca.set(marca, m.value.toFixed(DECIMALES_HUELLA))
+  }
 
-  if (valores.some((v) => v === null)) return null
-  return valores.join(',')
+  return porMarca.size ? porMarca : null
+}
+
+/**
+ * ¿Estas dos series son la MISMA serie?
+ *
+ * Sí cuando, sobre las marcas de tiempo que ambas tienen, **todos** los
+ * valores coinciden, y hay suficientes marcas comunes para que eso signifique
+ * algo. Con pocas marcas en común devuelve `false`: no es que sean distintas,
+ * es que no hay con qué afirmar que son iguales — y este módulo sólo afirma
+ * lo que puede sostener.
+ */
+export function mismaSerie(a, b) {
+  if (!a || !b) return false
+
+  let comunes = 0
+  for (const [marca, valor] of a) {
+    if (!b.has(marca)) continue
+    if (b.get(marca) !== valor) return false
+    comunes += 1
+  }
+
+  return comunes >= MINIMO_COMUNES
 }
 
 /**
@@ -183,18 +236,34 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
   }
 
   /*
-   * Las huellas se agrupan ANTES de decidir nada: una variable sólo se puede
-   * declarar verificada si su serie no la comparte nadie, y eso no se sabe
-   * hasta haberlas visto todas.
+   * Las series se comparan ENTRE SÍ antes de decidir nada: una variable sólo
+   * se puede declarar verificada si su serie no la comparte nadie, y eso no se
+   * sabe hasta haberlas visto todas.
+   *
+   * Es O(n²) sobre las variables de UNA máquina, y es deliberado: agrupar por
+   * una clave era O(n), pero exigía que dos series iguales produjeran la misma
+   * clave — justo lo que no se puede pedir cuando dos variables se registran
+   * con densidades distintas. Con 94 variables son 4 371 comparaciones de
+   * mapas ya construidos, delante de 94 peticiones al historiador: el coste
+   * está en la red, no aquí.
    */
-  const porHuella = new Map()
   for (const l of leidas) {
     if (!l.ok) continue
-    const huella = tieneVariacion(l.muestras) ? huellaDe(l.muestras) : null
-    l.huella = huella
-    if (!huella) continue
-    if (!porHuella.has(huella)) porHuella.set(huella, [])
-    porHuella.get(huella).push(l.variable.id ?? l.variable.pointName)
+    l.firma = tieneVariacion(l.muestras) ? firmaDe(l.muestras) : null
+  }
+
+  const idDe = (l) => l.variable.id ?? l.variable.pointName
+  const comparables = leidas.filter((l) => l.firma)
+  const compartenCon = new Map()
+  for (let i = 0; i < comparables.length; i += 1) {
+    for (let j = i + 1; j < comparables.length; j += 1) {
+      if (!mismaSerie(comparables[i].firma, comparables[j].firma)) continue
+      for (const [uno, otro] of [[i, j], [j, i]]) {
+        const id = idDe(comparables[uno])
+        if (!compartenCon.has(id)) compartenCon.set(id, [])
+        compartenCon.get(id).push(idDe(comparables[otro]))
+      }
+    }
   }
 
   const variables = leidas.map((l) => {
@@ -228,7 +297,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       }
     }
 
-    if (!l.huella) {
+    if (!l.firma) {
       /* Sin variación: ni se verifica ni se desmiente. Ver la cabecera. */
       return {
         ...base,
@@ -242,9 +311,8 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       }
     }
 
-    const comparten = porHuella.get(l.huella) ?? []
-    if (comparten.length > 1) {
-      const otras = comparten.filter((id) => id !== (l.variable.id ?? l.variable.pointName))
+    const otras = compartenCon.get(l.variable.id ?? l.variable.pointName) ?? []
+    if (otras.length) {
       return {
         ...base,
         historyVerified: false,
@@ -253,8 +321,8 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
           causa: 'serie-compartida',
           motivo:
             `El historiador devuelve para esta variable la MISMA serie que para ` +
-            `${otras.join(', ')}. No se puede saber cuál es la legítima, así que ninguna ` +
-            'promete historia.',
+            `${otras.join(', ')}: coinciden TODOS los valores de las marcas de tiempo que ` +
+            'comparten. No se puede saber cuál es la legítima, así que ninguna promete historia.',
           compartidaCon: otras,
         },
       }

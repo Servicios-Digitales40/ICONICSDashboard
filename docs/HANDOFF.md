@@ -329,7 +329,7 @@ pronóstico.
 |---|---|
 | **Autenticación ENCENDIDA** | `AUTH_HABILITADA=true` desde el 21-09-2026 (Plan 35 F4). Tres roles con jerarquía —`administrador > operador > visualizador`—, rol mínimo en las 37 rutas y el tablero pidiendo credenciales. Esta fila decía que el tablero «no sabe pedir token»: el Plan 25 lo resolvió y nadie actualizó el handoff |
 | **Umbrales provisionales** | Las bandas del tanque son «estimaciones nuestras para un sistema de agua genérico», no confirmadas por quien opera |
-| **Señales sin histórico** | `aPeak_S1` (vibraciones) y `cargaMotor` + `eficienciaEnergetica` (tanque) **devuelven la serie de otra señal, sin dar error** |
+| **Señales sin histórico** | Las **nueve `QC_*`** de vibraciones devuelven UNA sola serie, y tres grupos de señales booleanas del variador coinciden entre sí. `cargaMotor` + `eficienciaEnergetica` (tanque) **devuelven la serie de otra señal, sin dar error**. `aPeak_S1` estaba en esta lista **por un defecto NUESTRO de comparación**, no del servidor: ver el incidente del 22-09 |
 | **Diagnóstico de rodamientos apagado** | `MonState_e_f_BPFO/BPFI/FTF` en posición 0. Es configuración del SM 1281, no código |
 | **Sin geometría de chumaceras** | S2 y S3 declaran `rodamiento: null`. Sin referencia no hay frecuencias de defecto en dos de tres apoyos |
 | **El historiador rechaza una carpeta con `\` final** | `browse` de `hda:\Configuration\DEMO_VIBRACIONES` responde; la misma ruta con contrabarra final da **500 sin detalle** (medido 21-09-2026). El catálogo escrito a mano la lleva (`GRUPO_HISTORIADOR`). La pantalla y el descubridor la quitan (`normalizarRaizHistorica`) |
@@ -494,6 +494,7 @@ sirviendo código viejo. **Levanta un puerto propio para medir.**
 | 18-09 | `aviso` existe en **dos familias** con ámbitos distintos: indexar roles por clave colapsaba una sobre otra en silencio |
 | 18-09 | El dictado leía `location.hash` en una app que usa History API: **el vocabulario no se elegía nunca** |
 | 18-09 | `.omit({id:true})` descartaba el campo **en silencio**: un `PATCH` con `id` devolvía 200 sin cambiar nada |
+| 22-09 | El sondeo acusaba de «serie compartida» a `aPeak_S1` y `aRMS_S1`, que son series distintas. Comparaba **ocho muestras por POSICIÓN**, y esas dos se registran en grupos distintos del historiador (1 s y 5 s): a la misma hora les tocan posiciones distintas. Agravado por una ventana de **7 días fijos** que, con un hueco de registro, devolvía un tramo viejo con la máquina parada donde todo es ruido cerca de cero. **Lo cazó el usuario mirando ICONICS**, no la suite |
 
 ---
 

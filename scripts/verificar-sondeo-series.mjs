@@ -20,6 +20,11 @@
  *             verificación buena por no haber podido mirar.
  *   QUEDARSE  marcar `true` sin comparar. Es el defecto `aPeak_S1`, que llevaba
  *             meses en el catálogo y sólo se vio cruzando series.
+ *   CONFUNDIR marcar `false` por comparar MAL. Medido contra planta el
+ *             22-09-2026: `aPeak_S1` y `aRMS_S1` se declararon «serie
+ *             compartida» comparando ocho muestras por POSICIÓN, y en realidad
+ *             se registran en grupos distintos —1 s y 5 s— con 1340 y 566
+ *             muestras propias. Los casos de abajo fijan las tres.
  *
  * ── POR QUÉ SIN RED ────────────────────────────────────────────────
  *
@@ -36,7 +41,7 @@
  */
 import assert from 'node:assert/strict'
 
-import { huellaDe, sondearSeries, tieneVariacion } from '../backend/lib/sondearSeries.mjs'
+import { firmaDe, mismaSerie, sondearSeries, tieneVariacion } from '../backend/lib/sondearSeries.mjs'
 import { ESTADO_CONFIGURACION } from '../shared/eva/comun/configuracionMaquina.js'
 
 const c = {
@@ -60,9 +65,22 @@ async function check(nombre, fn) {
 
 const VENTANA = { desde: '2026-09-14T00:00:00Z', hasta: '2026-09-16T00:00:00Z' }
 
-/** Muestras con valores dados, con marcas de tiempo correlativas. */
+/**
+ * Muestras con valores dados, una por hora desde las 00:00.
+ *
+ * La marca de tiempo ya no es decorado: es POR DONDE se emparejan dos series.
+ * `serieCada` construye una con otra cadencia, que es lo que distingue dos
+ * grupos del historiador (1 s y 5 s en esta planta).
+ */
 const serie = (...valores) =>
-  valores.map((value, i) => ({ timestamp: `2026-09-14T0${i}:00:00Z`, value }))
+  valores.map((value, i) => ({ timestamp: `2026-09-14T${String(i).padStart(2, '0')}:00:00Z`, value }))
+
+/** Como `serie`, pero una muestra cada `horas` horas. */
+const serieCada = (horas, ...valores) =>
+  valores.map((value, i) => ({
+    timestamp: `2026-09-14T${String(i * horas).padStart(2, '0')}:00:00Z`,
+    value,
+  }))
 
 /** Una variable de mentira, con su punto histórico. */
 const v = (id) => ({ id, pointName: `ac:x/${id}`, historyPointName: `hda:g:${id}` })
@@ -80,19 +98,38 @@ console.log(`\n${c.negrita}El sondeo de series: ganar la verificación, no hered
 
 /* ── La huella ───────────────────────────────────────────────────────── */
 
-await check('la huella resume la serie, y dos series distintas no colisionan', () => {
-  assert.notEqual(huellaDe(serie(1, 2, 3)), huellaDe(serie(1, 2, 4)))
-  assert.equal(huellaDe(serie(1, 2, 3)), huellaDe(serie(1, 2, 3)))
+await check('la firma indexa por marca de tiempo, y dos series distintas no se confunden', () => {
+  assert.equal(mismaSerie(firmaDe(serie(1, 2, 3, 4, 5, 6, 7, 8)), firmaDe(serie(1, 2, 3, 4, 5, 6, 7, 8))), true)
+  assert.equal(mismaSerie(firmaDe(serie(1, 2, 3, 4, 5, 6, 7, 8)), firmaDe(serie(1, 2, 3, 4, 5, 6, 7, 9))), false)
 })
 
-await check('sin muestras no hay huella: `null` es «no se puede opinar»', () => {
-  assert.equal(huellaDe([]), null)
-  assert.equal(huellaDe(null), null)
+await check('sin muestras no hay firma: `null` es «no se puede opinar»', () => {
+  assert.equal(firmaDe([]), null)
+  assert.equal(firmaDe(null), null)
+  assert.equal(mismaSerie(null, firmaDe(serie(1, 2))), false, 'null no compara igual con nada')
+  assert.equal(mismaSerie(null, null), false, 'dos «no se sabe» no son «son iguales»')
 })
 
-await check('una muestra sin número no produce una huella a medias', () => {
-  /* Colarla daría una huella que compara ceros implícitos con datos reales. */
-  assert.equal(huellaDe([{ value: 1 }, { value: null }]), null)
+await check('una muestra sin número no produce una firma a medias', () => {
+  /* Colarla daría una firma que compara ceros implícitos con datos reales. */
+  assert.equal(firmaDe([{ timestamp: 't1', value: 1 }, { timestamp: 't2', value: null }]), null)
+})
+
+await check('sin marcas de tiempo EN COMÚN no se afirma que sean la misma serie', () => {
+  /*
+   * Dos series que no se solapan en el tiempo no se pueden comparar. Antes,
+   * comparadas por posición, dos tramos de días distintos con los mismos
+   * valores se declaraban la misma serie.
+   */
+  const enero = [1, 2, 3, 4, 5, 6, 7, 8].map((value, i) => ({ timestamp: `2026-01-0${i + 1}T00:00:00Z`, value }))
+  const marzo = [1, 2, 3, 4, 5, 6, 7, 8].map((value, i) => ({ timestamp: `2026-03-0${i + 1}T00:00:00Z`, value }))
+  assert.equal(mismaSerie(firmaDe(enero), firmaDe(marzo)), false)
+})
+
+await check('pocas marcas en común no bastan para acusar: coincidir en un instante no es ser la misma serie', () => {
+  const a = serie(1, 2, 3)
+  const b = [{ timestamp: '2026-09-14T00:00:00Z', value: 1 }]
+  assert.equal(mismaSerie(firmaDe(a), firmaDe(b)), false)
 })
 
 await check('una serie plana NO tiene variación, aunque tenga muchas muestras', () => {
@@ -115,8 +152,8 @@ await check('dos variables con la MISMA serie: ninguna se verifica', async () =>
     {
       ...VENTANA,
       leerSerie: historiadorFalso({
-        'hda:g:aPeak_S1': serie(1, 2, 3, 4),
-        'hda:g:aRMS_S1': serie(1, 2, 3, 4),
+        'hda:g:aPeak_S1': serie(1, 2, 3, 4, 5, 6, 7, 8),
+        'hda:g:aRMS_S1': serie(1, 2, 3, 4, 5, 6, 7, 8),
       }),
     },
   )
@@ -131,7 +168,13 @@ await check('dos variables con la MISMA serie: ninguna se verifica', async () =>
 await check('la variable con la que se comparte se NOMBRA, no se deja adivinar', async () => {
   const r = await sondearSeries(
     { variables: [v('a'), v('b')] },
-    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:a': serie(5, 6), 'hda:g:b': serie(5, 6) }) },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:a': serie(5, 6, 7, 8, 9, 10, 11, 12),
+        'hda:g:b': serie(5, 6, 7, 8, 9, 10, 11, 12),
+      }),
+    },
   )
   assert.deepEqual(r.variables[0].sondeo.compartidaCon, ['b'])
   assert.deepEqual(r.variables[1].sondeo.compartidaCon, ['a'])
@@ -140,7 +183,7 @@ await check('la variable con la que se comparte se NOMBRA, no se deja adivinar',
 await check('nueve variables con la misma serie se cazan las nueve', async () => {
   /* Las `QC_*` de los tres apoyos, medidas contra planta el 21-09-2026. */
   const ids = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9']
-  const mapa = Object.fromEntries(ids.map((id) => [`hda:g:${id}`, serie(1, 0, 1, 0)]))
+  const mapa = Object.fromEntries(ids.map((id) => [`hda:g:${id}`, serie(1, 0, 1, 0, 1, 0, 1, 0)]))
   const r = await sondearSeries(
     { variables: ids.map(v) },
     { ...VENTANA, leerSerie: historiadorFalso(mapa) },
@@ -149,10 +192,70 @@ await check('nueve variables con la misma serie se cazan las nueve', async () =>
   assert.equal(r.resumen.verificadas, 0)
 })
 
+await check('dos variables del MISMO apoyo con cadencias distintas NO son la misma serie', async () => {
+  /*
+   * El falso positivo medido contra planta el 22-09-2026, y la razón de que
+   * este módulo compare por marca de tiempo.
+   *
+   * `aPeak_S1` se registra en el grupo de 1 segundo y `aRMS_S1` en el de 5:
+   * 1340 muestras contra 566 en 24 h. Comparadas por POSICIÓN, las ocho
+   * primeras de una se enfrentaban a ocho instantes distintos de la otra, y
+   * un tramo con la máquina casi parada las hacía coincidir. Las dos perdían
+   * su historia por un cruce que no existía.
+   *
+   * Aquí una tiene el doble de densidad que la otra y valores distintos en
+   * los instantes que comparten: son dos series, y las dos se verifican.
+   */
+  const r = await sondearSeries(
+    { variables: [v('aPeak_S1'), v('aRMS_S1')] },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:aPeak_S1': serieCada(1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
+        'hda:g:aRMS_S1': serieCada(2, 1, 2, 3, 4, 5, 6, 7, 8),
+      }),
+    },
+  )
+  assert.equal(r.resumen.compartidas, 0, 'dos cadencias distintas no son un cruce')
+  assert.equal(r.resumen.verificadas, 2)
+})
+
+await check('una serie que es un SUBCONJUNTO exacto de otra sí es un cruce', async () => {
+  /*
+   * El otro lado de lo mismo, y por qué no basta con «tienen distinta
+   * densidad». Si el historiador sirve la misma serie en dos puntos y uno se
+   * lee con menos resolución, los valores de las marcas comunes coinciden
+   * TODOS: eso sí es servir la misma serie con dos nombres.
+   */
+  const completa = serieCada(1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+  const mitad = completa.filter((_, i) => i % 2 === 0)
+  const r = await sondearSeries(
+    { variables: [v('a'), v('b')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:a': completa, 'hda:g:b': mitad }) },
+  )
+  assert.equal(r.resumen.compartidas, 0, 'con 5 marcas comunes no hay suficiente para acusar')
+  assert.equal(r.resumen.verificadas, 2)
+
+  /* Con suficientes marcas en común, sí se acusa. */
+  const largaA = serieCada(1, ...Array.from({ length: 20 }, (_, i) => i + 1))
+  const largaB = largaA.filter((_, i) => i % 2 === 0)
+  const r2 = await sondearSeries(
+    { variables: [v('a'), v('b')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:a': largaA, 'hda:g:b': largaB }) },
+  )
+  assert.equal(r2.resumen.compartidas, 2, 'diez marcas comunes, todas iguales: es la misma serie')
+})
+
 await check('una serie propia SÍ se verifica', async () => {
   const r = await sondearSeries(
     { variables: [v('a'), v('b')] },
-    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:a': serie(1, 2, 3), 'hda:g:b': serie(9, 8, 7) }) },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:a': serie(1, 2, 3, 4, 5, 6, 7, 8),
+        'hda:g:b': serie(9, 8, 7, 6, 5, 4, 3, 2),
+      }),
+    },
   )
   assert.equal(r.resumen.verificadas, 2)
   assert.equal(r.estado, ESTADO_CONFIGURACION.VALID)
@@ -244,9 +347,9 @@ await check('verificar unas y no otras es DEGRADED, y el motivo lo desglosa', as
     {
       ...VENTANA,
       leerSerie: historiadorFalso({
-        'hda:g:a': serie(1, 2, 3),
-        'hda:g:b': serie(4, 5, 6),
-        'hda:g:c': serie(4, 5, 6),
+        'hda:g:a': serie(1, 2, 3, 4, 5, 6, 7, 8),
+        'hda:g:b': serie(4, 5, 6, 7, 8, 9, 10, 11),
+        'hda:g:c': serie(4, 5, 6, 7, 8, 9, 10, 11),
       }),
     },
   )

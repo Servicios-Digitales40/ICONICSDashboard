@@ -398,19 +398,51 @@ export function registerMaquinasRoutes(
       }
 
       /*
-       * Siete días. Es la ventana que el historiador contesta —a treinta
-       * devuelve vacío SIN dar error, medido en las dos máquinas— y la que da
-       * margen para que una señal haya variado, que es lo que hace falta para
-       * distinguir dos series.
+       * ── LA VENTANA SE ELIGE, NO SE FIJA (22-09-2026) ────────────────
+       *
+       * Eran siete días fijos: la ventana que el historiador contesta —a
+       * treinta devuelve vacío SIN dar error— y la que da margen para que una
+       * señal haya variado, que es lo que hace falta para distinguir dos
+       * series.
+       *
+       * El problema es que una ventana ancha no trae MÁS información: trae la
+       * más VIEJA. Medido contra planta: con un hueco de registro entre el
+       * 15-09 y el 21-09, la petición de 7 días devolvía el tramo del 15 —con
+       * la máquina casi parada, 52 series con muestras y 44 de ellas planas—
+       * mientras que la de 24 h traía el tramo de hoy, con 74 series y 1340
+       * muestras en las que más registran. Sobre el tramo viejo, dos señales
+       * distintas se ven iguales porque las dos son ruido cerca de cero.
+       *
+       * Así que se prueba de la MÁS RECIENTE a la más amplia y se usa la
+       * primera que traiga material suficiente para comparar. No es «la que
+       * más muestras dé»: es la más nueva que sirva, porque una serie reciente
+       * describe la máquina de ahora y una vieja describe la de entonces.
        */
+      const VENTANAS_HORAS = [24, 72, 7 * 24]
       const hasta = new Date()
-      const desde = new Date(hasta.getTime() - 7 * 24 * 3600 * 1000)
 
-      const resultado = await sondearSeries(maquina, {
-        leerSerie: (opciones) => client.readHistory(opciones),
-        desde: desde.toISOString(),
-        hasta: hasta.toISOString(),
-      })
+      let resultado = null
+      let ventanaUsada = null
+      for (const horas of VENTANAS_HORAS) {
+        const desde = new Date(hasta.getTime() - horas * 3600 * 1000)
+        const intento = await sondearSeries(maquina, {
+          leerSerie: (opciones) => client.readHistory(opciones),
+          desde: desde.toISOString(),
+          hasta: hasta.toISOString(),
+        })
+        resultado = intento
+        ventanaUsada = horas
+        /* Suficiente para opinar: alguna serie verificó. Si ninguna lo hizo
+           —máquina parada, o sin registro— se prueba una ventana más ancha
+           antes de rendirse. */
+        if (intento.resumen.verificadas > 0) break
+      }
+
+      request.log.info(
+        { maquina: maquina.id, ventanaHoras: ventanaUsada, ...resultado.resumen },
+        `Sondeadas las series de «${maquina.id}» sobre las últimas ${ventanaUsada} h: ` +
+          `${resultado.resumen.verificadas}/${resultado.resumen.total} verificadas`
+      )
 
       /*
        * Se anotan las variables con su `historyVerified` nuevo, pero NO el
