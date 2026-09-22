@@ -1,6 +1,6 @@
 # PLAN 42 — Verificar una bandera que nunca cambió, sin forzarla
 
-**Estado:** F0–F2 completadas · F3–F4 por completar · escrito el 22-09-2026
+**Estado:** F0–F3 completadas · F4 por completar · escrito el 22-09-2026
 **Rama:** `Vibraciones1.0`
 **Origen:** B13 del backlog de backend, destapado al cerrar la F4 del Plan 41
 
@@ -379,12 +379,41 @@ eventos, una vista de alarmas enseñaría **cero flancos con fundamento** y los
 para el tanque. Si funciona, la vista `maq-alarmas` se decide **entonces**, con
 la regla de §4.8 delante y no antes.
 
+#### Lo que de verdad pasó (22-09-2026)
+
+**La cadena funciona para una configurada.** Un check en
+`verificar-vibraciones-configurada` lee del falso la bandera `alarma_S3` de la
+espejo —la del apoyo que en la simulación SÍ alarma: su vRMS mete un pico en
+algunos ciclos— por `readHistory` con `interval: 0`, la pasa por `normalizar`
+(`shared/eva/comun/historia.js`) y por `eventosDeAlarma`, y exige que la
+serie tenga 0 y 1, que salga al menos un evento **cerrado** con `inicio` y
+`fin` como fechas, `duracionMs === fin − inicio` y `activa: false`. No fue
+`Alarma_S1` como decía el plan: en la espejo `alarma_S1` no tiene serie (el
+catálogo la retiró el 21-09 porque el servidor le contestaba con otra) y la
+del apoyo 2 no alarma nunca en el falso. La del apoyo 3 sí, y es la misma
+cadena. Hubo que elegir la ventana: la última hora, porque el paso de 1 s
+del falso con 20 páginas cubre 33 min y el pico cae ahí; con 6 h se leía un
+tramo plano y el check decía «no hay flanco que probar» — que es lo que debe
+decir, no un verde vacío.
+
+**Decisión: `maq-alarmas` NO se crea todavía.** Con las once banderas de
+`vib-motor-03` registradas, `eventosDeAlarma` sobre cualquiera de ellas da
+**cero eventos** — son constantes precisamente porque nunca alarmaron—. Una
+vista hoy enseñaría una lista vacía con fundamento y los 6 contadores del
+área que Inicio ya enseña: es el «rótulo, no nivel de menú» de §4.8. Lo que
+sí queda hecho es lo que faltaba para poder crearla en una tarde cuando haga
+falta: las banderas prometen historia (`clavesConSerie`), el asistente puede
+pedirlas con `historia_de_senal`, y la cadena está probada. **La vista se
+decide cuando una bandera cambie de verdad** —el sondeo la verá pasar de
+`registrada-constante` a `serie-propia`— o cuando alguien la pida con un
+caso delante. Anotado en el backlog de frontend (F11) con este criterio.
+
 **Criterios de aceptación.**
-- [ ] Un verificador (`verificar-flancos-configurada` o un check en
-      `verificar-vibraciones-configurada`) demuestra un flanco 0→1→0 de
-      `Alarma_S1` de la espejo convertido en un evento con entrada, salida y
-      duración.
-- [ ] Decidido y escrito si se crea `maq-alarmas`, con el porqué.
+- [x] Un check en `verificar-vibraciones-configurada` demuestra un flanco
+      0→1→0 de una bandera de la espejo convertido en un evento con entrada,
+      salida y duración (es `alarma_S3`, no `Alarma_S1`; ver arriba).
+- [x] Decidido y escrito si se crea `maq-alarmas`: no, hasta que haya un
+      flanco real que enseñar; el porqué está arriba.
 
 ### F4 — Cerrar
 
