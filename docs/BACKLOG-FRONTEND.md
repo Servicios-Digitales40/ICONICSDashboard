@@ -20,6 +20,53 @@ Vistas registradas en `routes.jsx`: **14**, repartidas en tres secciones
 
 ---
 
+## Auditoría del 22-09-2026 — contrastado con el código, no con la memoria
+
+> Mismo método que con los planes ese día (Plan 41 §0): cada punto se buscó en
+> el árbol. **Cinco de ocho ya no existen.** Se dejan abajo con su texto
+> original porque explican POR QUÉ el código quedó como quedó; esto dice qué
+> queda de verdad.
+
+| | Estado real | Dónde se ve |
+|---|---|---|
+| **F1** vistas duplicadas | **RESUELTO para vibraciones.** Hay UNA vista por TIPO parametrizada por máquina (`InicioVibraciones`, `Vibraciones`, `Vibraciones3D`, `RiesgosVibracion` reciben la configurada). El tanque conserva las suyas porque está cerrado; unificarlo es la reapertura (Plan 33 F9), no este punto | Planes 37 y 40 |
+| **F2** dos motores de sondeo | **PARCIAL, y el resto bloqueado por la rama.** `fuenteDeMaquinaConfigurada` ES el `useMaquina(sistemaId)` que se pedía: abre un motor por máquina y lee cadencia, puntos y estado de la configuración. `evaSource.js` sigue para el tanque hasta reabrir | `data/comunes/fuenteDeMaquina.js` |
+| **F3** indicador por sección | **RESUELTO.** `Topbar` monta `ContextoDeMaquina seccion={SECCION_DE_PAGINA[page]}`; el contexto lo aporta la sección, no un `if` | `test/app/contexto-de-maquina.test.jsx`, `topbar-estado-maquina.test.jsx` |
+| **F4** secciones desde el registro | **RESUELTO.** `buildNav` deriva una sección por máquina configurada; añadir una máquina no toca `routes.jsx` | `test/app/secciones-por-maquina.test.jsx` |
+| **F5** bundle | **RESUELTO.** Verificador en verde: `index` 343,6 KB / 450 · `vendor` 269,1 / 330 · `three` diferido. Los techos se subieron con medición escrita en el guion (ver B5) | `verificar-bundle` |
+| **F6** placeholders | **DESAPARECIDOS.** `ControlesVibraciones.jsx` y `VibracionesEva3D.jsx` no existen; la 3D de la configurada es `Vibraciones3D` y Controles no se prometió | Plan 40 |
+| **F7** cobertura | **PARCIAL.** La sección de una máquina nueva SÍ está probada (F4). Las cadencias distintas por máquina, también (`cadencia-del-registro.test.js`). Lo que sigue sin red es el **ciclo de vida**: que dos motores vivos sondeen por separado y mueran con su vista | — |
+| **F8** una sola raíz | **ABIERTO.** El commit `c99099b` fue el apunte, no el arreglo; la decisión entre «varias raíces» y «marcar desde cualquier punto» sigue sin tomar | — |
+
+**Nuevos, salidos del Plan 41 (22-09-2026):**
+
+## F9 · El editor no deja escribir las limitaciones de una máquina
+
+**Hoy.** `limitaciones` es un campo de la configuración (`CrearMaquinaSchema`,
+`EditarMaquinaSchema`) y la ficha de `ConfiguracionPlanta` lo **enseña**, pero
+`EditorDeMaquina` no tiene campo para escribirlo. El 22-09-2026 hizo falta
+grabar «El motor gira sin carga acoplada…» en `vib-motor-03` y sólo se pudo
+con `PATCH /api/maquinas/:id` a mano.
+
+**Por qué importa.** Las limitaciones propias son lo que quien opera sabe de
+la instalación y el tablero no puede deducir: «sin carga acoplada», «el
+rodamiento intermedio no tiene referencia». El asistente las cita (`CLAUDE.md`
+§2.5). Si sólo se escriben por API, no las escribe nadie.
+
+**El arreglo.** Un campo de texto multilínea —una limitación por línea— en el
+formulario del editor, que viaje en `payload.limitaciones` y se lea de
+`maquina.limitaciones` al editar. Las derivadas por la validación no se
+editan: se suman (`construirSistema`). Pequeño, con su prueba.
+
+## F10 · Un intermitente que NO es contención
+
+`fuente-de-maquina.test.js › con el origen SIMULADO…` cae 2 de 4 veces al
+correr sólo `src/test/demo-eva`, con un **aserto** y en ~70–90 ms; pasa 3 de 3
+solo y en dos suites completas. Orden o estado compartido entre pruebas de esa
+carpeta, no carga. Detalle y qué hacer primero en `HANDOFF.md` §9.
+
+---
+
 ## F1 · Cada máquina duplica sus vistas
 
 **Hoy.** Medido:
@@ -209,14 +256,14 @@ para máquinas armadas con tags de varias zonas (haría falta el 2).
 
 ---
 
-## Orden sugerido
+## Orden sugerido (revisado el 22-09-2026)
 
-1. **F4** — pequeño, aislado, y convierte «añadir una sección» en «no hacer nada»
-2. **F7 (la prueba del sondeo)** — antes de tocar los motores, no después
-3. **F2** — el `useMaquina` unificado, con la red ya puesta
-4. **F3** — cae solo una vez F4 y F2 estén hechos
-5. **F1** — el mayor, y el que más gana con hacerlo al final: con el sondeo
-   unificado, parametrizar una vista es mucho menos trabajo
-6. **F5** — decisión de una tarde, coordinada con B5
+1. **F9** — el campo de limitaciones: pequeño, concreto, y hoy ya hizo falta
+2. **F10** — capturar el aserto del intermitente antes de que se normalice
+3. **F7 (el ciclo de vida)** — la única red que falta antes de tocar motores
+4. **F8** — decidir entre varias raíces y marcar desde cualquier punto; la
+   pregunta que decide sigue siendo si es para una carpeta suelta o para
+   máquinas armadas con tags de varias zonas
+5. **F2 (la mitad del tanque)** — con la reapertura, no antes
 
-**F6 no es una tarea**: es algo que revisar cuando llegue la #3.
+**F1, F3, F4, F5 y F6 están cerrados**; se conservan arriba por su porqué.

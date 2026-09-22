@@ -31,83 +31,85 @@ omitidas con su motivo.
 Cerrado **no es borrado**: todo sigue en el árbol y cada sitio dice cómo
 volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
-### Qué funciona (verde, medido hoy)
+### Qué funciona (verde, medido el 22-09-2026 por la tarde)
 
 | | |
 |---|---|
-| Suite de frontend | **1092** pruebas · 29 omitidas |
+| Suite de frontend | **1097** pruebas · 29 omitidas |
 | Suite de backend | **390** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
-| `verificar-chat` | **71** correctas (3 sobre una configurada) |
+| `verificar-chat` | **71** correctas |
+| `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
-| Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
+| Bundle | `index` 343,6 KB / 450 · `vendor` 269,1 / 330 · `three` diferido |
 
-Funcionalmente: el tablero de vibraciones (73 puntos en vivo), el asistente con
-sus 26 herramientas, el motor de diagnóstico determinista, el RAG documental,
-los casos previos, el transporte falso (`ICONICS_FAKE=true`), el CRUD de
-máquinas configuradas con su comprobación contra ICONICS, —desde el Plan 36—
-**el alta y la edición de una máquina marcando los tres árboles de ICONICS**
-desde `Planta › Configuración`, —desde el Plan 37— **una sección del menú por
-máquina configurada**, con Inicio, Gráficas y Vista 3D leyendo SUS puntos
-(medido contra planta: 94 de 94 puntos de `vib-motor-03`), y —desde el Plan
-38— **el backend registra las configuradas al arrancar y tras cada cambio**,
-así que el asistente, los casos, el motor de diagnóstico y los manuales las
-conocen, y su sección trae también Hallazgos, Avisos, Casos previos y RAG.
+Funcionalmente: el tablero de vibraciones por **máquinas configuradas** (una
+sección por máquina con siete vistas —Inicio, Gráficas, Vista 3D, Hallazgos,
+Avisos, Casos previos, RAG— y un muro de planta), el asistente con sus 26
+herramientas contestando sobre la configurada que se tiene delante, el motor
+de diagnóstico determinista con las reglas del TIPO, el RAG documental con los
+manuales asignados al tipo, el transporte falso (`ICONICS_FAKE=true`), el
+CRUD de máquinas con verificación contra ICONICS y **sondeo de series variable
+por variable**, y el alta marcando los tres árboles desde
+`Planta › Configuración`.
 
-**Desde el Plan 40 (22-09-2026) no hay máquina de vibraciones escrita a mano.**
-La entrada `vibraciones` salió de `SISTEMAS`; el tablero enseña vibraciones
-sólo por sus máquinas configuradas (una sección por máquina y un muro de
-planta), el asistente las sirve por su tipo, y el transporte falso sigue
-publicando la instalación de la demo para que se pueda configurar sin planta.
-Sin `datos/maquinas.json` el tablero arranca sin vibraciones y lo dice: hay
-que sembrarlo (§9, «Dar de alta»).
+**Desde el Plan 40 no hay máquina de vibraciones escrita a mano**, y desde el
+Plan 41 (22-09-2026) el tipo también **deriva los nombres con que una persona
+pide una señal** («velocidad eficaz lado acople» → `vRMS_S1`), entiende el
+`MonState` como entero, y tiene una regla de **factor de cresta** que sólo se
+evalúa con carga. Sin `datos/maquinas.json` el tablero arranca sin
+vibraciones y lo dice.
+
+**Visto en el navegador el 22-09-2026** con `vib-motor-03` recreada contra el
+`bms-server` real: muro, menú, las siete vistas y el asistente. De mirarlo
+salió un defecto del tipo, corregido el mismo día.
 
 ### Qué está a medias
 
 **El módulo de Predicción está OCULTO del menú** (22-09-2026, a petición del
 usuario: no se usa en esta demo, para ningún rol). Sus seis vistas del
 compresor perdieron su `nav` en `app/routes/routes.jsx` y la sección
-`sec-prediccion` se quedó sin hijos, así que desaparece sola —el mismo
-mecanismo con el que se cerró la estación de llenado—. **Las rutas siguen
-registradas y se abren por URL**: ocultar no es borrar. Cada una lleva escrito
-su `nav` en un comentario, y `routes.test.jsx` comprueba las dos mitades: que
-no estén en el menú y que no se hayan borrado.
-
-
-**El Plan 33 no se ha visto correr en el navegador.** Está probado con la suite
-y ejercido por `curl` contra el backend real, **no observado en pantalla**. El
-Plan 36 sí: el usuario dio de alta `vib-motor-03` contra planta el 21-09-2026 y
-eso destapó tres defectos de la ficha, ya corregidos
-(`PLAN-36` §4.1). El editor sólo lo ha usado quien lo escribió y quien lo pidió;
-una segunda vuelta con otra persona sigue pendiente.
-
-**La máquina de vibraciones tiene OCHO vistas, no nueve.** Falta
-**Historización**, y no es reubicar sino construir: depende del historiador,
-que hoy devuelve cero (ver §6).
+`sec-prediccion` se quedó sin hijos, así que desaparece sola. **Las rutas
+siguen registradas y se abren por URL**: ocultar no es borrar.
 
 **«Casos previos» sale vacío** en vibraciones: hay 13 casos y **ninguno** es
-suyo (11 del tanque, 2 de «grupo de bombeo»). No es un defecto de la vista, es
-la foto real del módulo.
+suyo (11 del tanque, 2 de «grupo de bombeo»). Es la foto real del módulo.
 
-**El Plan 40 está hecho en el repo y no en planta (F4).** Faltan tres pasos
-que sólo se pueden dar contra ICONICS: sondear `Nuevo-Modor` con el motor en
-marcha (el sondeo en paro dejó 33 series sin muestras), dar de baja la
-configurada `vibraciones-configurada` si sigue en planta, y correr
-`medir-asistente-configurada --maquina Nuevo-Modor` sin otra vibraciones en
-el registro. Y en el `datos/maquinas.json` local hay que volver a sembrar o
-poner nombre a los tres apoyos desde el árbol: sin `assets[].nombre` el
-asistente dice «S1 (S1, bearing unidentified)».
+**El editor no escribe limitaciones.** La ficha las enseña; para grabar «sin
+carga acoplada» en `vib-motor-03` hubo que usar la API. Es F9 del backlog de
+frontend.
+
+**El backend que corre puede ir por detrás del código.** Es un proceso
+`node` arrancado a mano: los cambios en `shared/` no entran hasta reiniciarlo
+(el frontend sí, por HMR). El 22-09 estuvo toda la tarde con el `shared/` de
+las 11:44.
+
+### Lo que la instalación no permite (no es un defecto del tablero)
+
+**El motor gira sin nada acoplado.** 602 rpm, par ≈ 0 %, 0 kW, 1,4 A de
+magnetización. Las vibraciones que sólo aparecen bajo esfuerzo no se pueden
+observar; la regla de cresta sale «no evaluable · en vacío» (en vacío S2 daba
+7,7 sin nada roto) y `medida-en-vacio` está siempre activa. Declarado en las
+`limitaciones` de la máquina para que el asistente lo cite.
+
+**El historiador contesta, pero a su manera.** Tres sondeos el 22-09: **21
+series propias** de 86; las nueve `QC_*` son una sola serie; **35 «sin
+variación»** que son banderas y estados que no cambian porque la máquina no
+trabaja. «Devuelve 0 muestras» —lo que decía aquí hasta hoy— **ya no es
+cierto**; lo que hay es un motor que no da nada que registrar.
+
+**El Alarm Server de GENESIS64 da 500 a `AlarmHistory`** para cualquier
+punto —del área de vibraciones y del tanque—. Por eso «Alarmas» de la
+configurada se cerró sin vista (Plan 41 F4): los 6 contadores del área se leen
+en vivo y se enseñan en Inicio; el historial de eventos no existe.
 
 ### Qué está roto
 
-**El historiador de vibraciones devuelve 0 muestras.** Ocho claves probadas
-—tres `vRMS`, `aRMS`, `DKW` y tres del variador— dan **0 muestras y
-`tramosFallidos: 1`** en 6 h y en 24 h. El tanque, en el mismo instante,
-devuelve 86.
-
-**Es el bloqueante real del objetivo de la rama**, y está por encima de
-cualquier fase pendiente del Plan 33.
+**Nada medido hoy.** El único rojo conocido es intermitente y **no es
+contención**: `fuente-de-maquina.test.js` cae a veces en el subconjunto
+`demo-eva` con un aserto y nunca solo ni en la suite entera (§9, F10 del
+backlog de frontend).
 
 ---
 

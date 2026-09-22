@@ -70,6 +70,26 @@ parametrizarlo por máquina) y en B7 (`diagnostico` como orquestador).
 
 ---
 
+## Auditoría del 22-09-2026 — contrastado con el código
+
+> Cada punto se buscó en el árbol el mismo día que se cerró el Plan 41. Lo
+> que sigue abajo es el texto original, que explica el porqué; esto dice qué
+> queda.
+
+| | Estado real |
+|---|---|
+| **B2** switch por máquina | **PARCIAL, resto bloqueado por la rama.** Una configurada se evalúa con `tipo.evaluarRiesgos` (Plan 38 F1); el `switch` sólo conserva `case 'tanque'`. Desaparece con la reapertura |
+| **B3** dos resolvedores | **MITAD HECHA** (Plan 41 F2): el tipo deriva los alias de vibraciones. La unificación con el `SINONIMOS` del tanque, con la reapertura |
+| **B4** pronóstico contra el tanque | **ABIERTO**, sin urgencia: vibraciones sigue sin mecanismos de desgaste declarados, así que la para la primera guarda, la legítima |
+| **B5** bundle | **RESUELTO.** Verificador en verde con techos medidos (343,6/450 y 269,1/330) |
+| **B6, B7** fronteras | Siguen siendo fronteras a vigilar, no tareas |
+| **B8** cobertura | Ver corrección abajo: **una de sus tres afirmaciones ya es falsa** |
+| **B11** color del PDF por palabras | **ABIERTO**, pequeño y real |
+| **B12** el tipo describe un SM 1281 | Informativo; sin cliente con otro equipo, no se toca |
+| **B13** banderas constantes | **NUEVO** (Plan 41 F4) |
+
+---
+
 ## B2 · `evaluarRiesgosDe` sigue siendo un `switch` por máquina
 
 **Hoy.** [`herramientas.mjs`] mantiene un `switch (sistema.id)` con una rama
@@ -294,10 +314,10 @@ histórico declarado) y comprueban que **no contesten en verde**.
 - **El ciclo de vida del sondeo por máquina.** Ninguna prueba comprueba que dos
   sistemas con `cadenciaMs` distinta sondeen por separado y no acaben en el
   mismo lote. Es la regla que `sistemas.js` declara innegociable y no tiene red.
-- **`SISTEMA` es una instantánea.** Se construye con `Object.fromEntries` en el
-  import: empujar a `SISTEMAS` no lo actualiza. En producción no importa —el
-  registro es estático—, pero no hay nada que lo diga en el código, sólo el
-  comentario del verificador.
+- ~~**`SISTEMA` es una instantánea.**~~ **Ya no (22-09-2026):** desde el Plan
+  33 F3 el registro es dinámico y `registrarSistema()` actualiza `SISTEMAS`,
+  `SISTEMA` y `SISTEMA_IDS` a la vez (`sistemas.js`), con validación de id
+  repetido y raíz solapada. El verificador `registro-configurado` lo cubre.
 - **El backend contra ICONICS real.** Los verificadores corren con
   `fakeClient`. Los scripts `comprobar-*` existen para el servidor real pero no
   están en ningún flujo: se invocan a mano y nadie se acuerda.
@@ -496,12 +516,13 @@ el archivo de alias cubre el caso de uno en uno.
 
 1. ~~**B1**~~ — hecho el 28-08-2026
 2. ~~**B9**~~ — hecho el 11-09-2026
-2. ~~**B10**~~ — hecho el 15-09-2026 (una línea: `pointName` → `puntoHistorico`)
-3. **B3** — la asimetría que más se nota en una demo
-3. **B4** — deja de ser una limitación en cuanto haya una segunda máquina con histórico
-4. **B5** — decisión de una tarde, pero un verificador en rojo permanente no sirve
-5. **B2** — el rediseño de los motores de reglas, ya local gracias a B1
-6. **B8** — la prueba del sondeo por máquina, antes de que haya tres
+3. ~~**B10**~~ — hecho el 15-09-2026
+4. ~~**B5**~~ — resuelto: verificador de bundle en verde con techos medidos
+5. **B11** — el color del PDF por clave, no por palabras: pequeño y real
+6. **B13** — el sondeo de banderas constantes, como plan antes de tocarlo
+7. **B4** — cuando vibraciones declare mecanismos de desgaste, no antes
+8. **B8 (el ciclo de vida del sondeo)** — la red que falta
+9. **B2 y la otra mitad de B3** — con la reapertura del tanque (Plan 33 F9)
 
 **B6 y B7 no son tareas**: son fronteras que vigilar en la revisión de la #3.
 
