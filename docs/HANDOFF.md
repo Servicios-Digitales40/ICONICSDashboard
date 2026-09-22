@@ -67,11 +67,11 @@ que sembrarlo (§9, «Dar de alta»).
 
 **El módulo de Predicción está OCULTO del menú** (22-09-2026, a petición del
 usuario: no se usa en esta demo, para ningún rol). Sus seis vistas del
-compresor perdieron su  en  y la sección
- se quedó sin hijos, así que desaparece sola —el mismo
+compresor perdieron su `nav` en `app/routes/routes.jsx` y la sección
+`sec-prediccion` se quedó sin hijos, así que desaparece sola —el mismo
 mecanismo con el que se cerró la estación de llenado—. **Las rutas siguen
 registradas y se abren por URL**: ocultar no es borrar. Cada una lleva escrito
-su  en un comentario, y  comprueba las dos mitades: que
+su `nav` en un comentario, y `routes.test.jsx` comprueba las dos mitades: que
 no estén en el menú y que no se hayan borrado.
 
 
