@@ -78,13 +78,14 @@ describe("el menú se acota al rol", () => {
       "maq-3d",
       "maq-graficas",
       "maq-inicio",
-      /* Predicción: son gráficas de otro backend, todas de lectura. */
-      "pred-correlacion",
-      "pred-eventos",
-      "pred-historico",
-      "pred-inicio",
-      "pred-pronostico",
-      "pred-variables",
+      /*
+       * Las seis de Predicción ya no salen (22-09-2026): se ocultaron del menú
+       * —no se usan en esta demo, para NINGÚN rol— quitándoles `nav`. Eran
+       * gráficas de otro backend, todas de lectura, y por eso las veía un
+       * visualizador. Sus rutas siguen registradas y se abren por URL; vuelven
+       * al menú en cuanto alguna recupere su `nav`, y entonces esta lista
+       * vuelve a crecer.
+       */
       "salud-sistema",
     ]);
   });

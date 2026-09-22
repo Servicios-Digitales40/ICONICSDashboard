@@ -80,8 +80,11 @@ describe("la aplicación habla los dos idiomas", () => {
    * se omite: es una de las pruebas que hay que conservar viva, porque un
    * rótulo sin traducir se ve igual de mal con una máquina que con veinte.
    *
-   * «Predicción»/«Prediction» acompaña porque «General» se escribe igual en
-   * los dos idiomas y solo no distingue nada.
+   * «Turno»/«Shift» acompaña porque «General» se escribe igual en los dos
+   * idiomas y solo no distingue nada. Hasta el 22-09-2026 ese papel lo hacía
+   * «Predicción»/«Prediction», y se cambió al ocultarse esa sección del menú:
+   * la afirmación es la misma —la navegación se rotula en los dos idiomas— y
+   * ahora se comprueba con una vista que sigue en pantalla.
    *
    * Al reabrir, vuelven las dos líneas de «Estación de llenado».
    */
@@ -89,7 +92,7 @@ describe("la aplicación habla los dos idiomas", () => {
     montarSidebar();
 
     expect((await screen.findAllByText("Planta")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Predicción").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Turno").length).toBeGreaterThan(0);
     expect(screen.getByText("General")).toBeTruthy();
   });
 
@@ -98,11 +101,11 @@ describe("la aplicación habla los dos idiomas", () => {
     montarSidebar();
 
     expect((await screen.findAllByText("Plant")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Prediction").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Shift").length).toBeGreaterThan(0);
     // Y ya no queda nada del español: si saliera, sería una clave sin traducir
     // cayendo al `fallbackLng`.
     expect(screen.queryAllByText("Planta")).toEqual([]);
-    expect(screen.queryAllByText("Predicción")).toEqual([]);
+    expect(screen.queryAllByText("Turno")).toEqual([]);
   });
 
   it("el vocabulario del DOMINIO también se traduce, sin tocar `shared/`", async () => {

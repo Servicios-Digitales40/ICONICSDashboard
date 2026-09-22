@@ -570,6 +570,22 @@ export const ROUTES = [
    * `sidebar-modulos.test.jsx`.
    */
 
+  /*
+   * ── PREDICCIÓN, FUERA DEL MENÚ (22-09-2026) ────────────────────────
+   *
+   * Las seis vistas del compresor salen del sidebar para TODOS los roles, a
+   * petición del usuario: no se van a usar en esta demo.
+   *
+   * Se ocultan como se ocultó la estación de llenado y como está `eva-muro`:
+   * quitando `nav`, no borrando la ruta. Siguen registradas y se abren por
+   * URL, así que nada se pierde y volver es devolver una línea a cada una.
+   * Borrarlas habría dejado el módulo `prediccion` declarado en
+   * `shared/modulos.js` apuntando a pantallas que ya no existen.
+   *
+   * Restaurar: devolver a cada ruta su `nav`, que está escrito debajo en su
+   * comentario. El grupo `sec-prediccion` sigue declarado arriba y vuelve a
+   * aparecer solo en cuanto una ruta lo reclame.
+   */
   {
     /*
      * ── POR QUÉ ESTA VISTA TIENE SECCIÓN PROPIA ────────────────────────
@@ -602,12 +618,12 @@ export const ROUTES = [
      */
     id: "pred-inicio",
     component: lazy(() => import("@/modulos/prediccion/views/InicioCompresor.jsx")),
-    nav: { icon: <Home size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <Home size={17} />, group: "sec-prediccion" }` */
   },
   {
     id: "pred-eventos",
     component: lazy(() => import("@/modulos/prediccion/views/EventosCompresor.jsx")),
-    nav: { icon: <BrainCircuit size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <BrainCircuit size={17} />, group: "sec-prediccion" }` */
   },
 
   /*
@@ -627,22 +643,22 @@ export const ROUTES = [
   {
     id: "pred-variables",
     component: lazy(() => import("@/modulos/prediccion/views/VariablesCompresor.jsx")),
-    nav: { icon: <Boxes size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <Boxes size={17} />, group: "sec-prediccion" }` */
   },
   {
     id: "pred-historico",
     component: lazy(() => import("@/modulos/prediccion/views/HistoricoCompresor.jsx")),
-    nav: { icon: <LayoutDashboard size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <LayoutDashboard size={17} />, group: "sec-prediccion" }` */
   },
   {
     id: "pred-correlacion",
     component: lazy(() => import("@/modulos/prediccion/views/CorrelacionCompresor.jsx")),
-    nav: { icon: <Cog size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <Cog size={17} />, group: "sec-prediccion" }` */
   },
   {
     id: "pred-pronostico",
     component: lazy(() => import("@/modulos/prediccion/views/PronosticoCompresor.jsx")),
-    nav: { icon: <Factory size={17} />, group: "sec-prediccion" },
+    /* Oculta (22-09-2026). Restaurar: `nav: { icon: <Factory size={17} />, group: "sec-prediccion" }` */
   },
 
 

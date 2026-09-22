@@ -255,10 +255,21 @@ describe("el sidebar que sale del registro", () => {
      * verdadero: «Planta». El muro entra en ella porque es la pantalla de
      * arranque y no tiene otra sección de la que colgar.
      */
+    /*
+     * ── «sec-prediccion» TAMPOCO SALE YA (22-09-2026) ────────────────
+     *
+     * Y por el MISMO mecanismo que `sec-llenado` y `sec-rag`: sus seis vistas
+     * del compresor perdieron su `nav` —no se usan en esta demo, para ningún
+     * rol— y la sección se quedó sin hijos y desapareció sola. `NAV_GROUPS`
+     * sigue declarándola, y vuelve en cuanto una ruta la reclame.
+     *
+     * Las seis rutas SIGUEN registradas y se abren por URL: ocultar no es
+     * borrar. Cada una lleva escrito su `nav` en un comentario, que es lo que
+     * hay que devolver para restaurarlas.
+     */
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
       "sec-planta",
       "sec-general",
-      "sec-prediccion",
     ]);
 
     /* Y con una máquina configurada, su sección va DELANTE de las de planta:
@@ -267,7 +278,6 @@ describe("el sidebar que sale del registro", () => {
       `maq:${MAQUINA.id}`,
       "sec-planta",
       "sec-general",
-      "sec-prediccion",
     ]);
 
     /*
@@ -353,15 +363,13 @@ describe("el sidebar que sale del registro", () => {
      * servidor en absoluto — es un compresor real servido por otro backend.
      * Mezclarlo ahí es el mismo cruce de fuentes que CLAUDE.md §2.1 prohíbe.
      */
-    const prediccion = NAV.find((n) => n.group === "sec-prediccion");
-    expect(prediccion.children.map((c) => c.id)).toEqual([
-      "pred-inicio",
-      "pred-eventos",
-      "pred-variables",
-      "pred-historico",
-      "pred-correlacion",
-      "pred-pronostico",
-    ]);
+    /*
+     * Y desde el 22-09-2026 no cuelga de NINGUNA: las seis vistas se ocultaron
+     * —no se usan en esta demo— y la sección se quedó sin hijos. La razón de
+     * arriba sigue viva para cuando vuelvan: si alguien las restaura, tienen
+     * que volver a `sec-prediccion` y no a «General».
+     */
+    expect(NAV.find((n) => n.group === "sec-prediccion")).toBeUndefined();
 
     /*
      * ── RAG DEJÓ DE SER SECCIÓN (Plan 33 F10, 18-09-2026) ────────────
@@ -392,6 +400,30 @@ describe("el sidebar que sale del registro", () => {
    * a las de ICONICS y el sidebar la presenta como una más — que es cómo
    * Predicción estuvo dentro de «General» hasta el 03-09-2026.
    */
+  it("las vistas de predicción están OCULTAS, no borradas: siguen abriéndose por URL", () => {
+    /*
+     * Ocultar y borrar se ven igual en el sidebar y no son lo mismo. Las seis
+     * vistas del compresor salieron del menú el 22-09-2026 —no se usan en esta
+     * demo, para ningún rol— quitándoles `nav`, que es como se cerró la
+     * estación de llenado: la ruta sigue registrada y se abre por URL.
+     *
+     * Esto lo fija por los dos lados. Si alguien las borrara, la primera
+     * mitad falla; si alguien devolviera un `nav` sin querer, falla la
+     * segunda y con ella la sección reaparecería en el menú.
+     */
+    const PREDICCION = [
+      "pred-inicio", "pred-eventos", "pred-variables",
+      "pred-historico", "pred-correlacion", "pred-pronostico",
+    ];
+
+    for (const id of PREDICCION) {
+      const ruta = ROUTES.find((r) => r.id === id);
+      expect(ruta, `la ruta «${id}» se borró en vez de ocultarse`).toBeTruthy();
+      expect(ruta.component, `«${id}» quedó sin componente que abrir`).toBeTruthy();
+      expect(ruta.nav, `«${id}» volvió al menú`).toBeUndefined();
+    }
+  });
+
   it("cada sección declara a qué MÓDULO pertenece", () => {
     const porModulo = Object.fromEntries(NAV.map((n) => [n.group ?? n.id, n.modulo]));
 
@@ -399,9 +431,13 @@ describe("el sidebar que sale del registro", () => {
       /* `"sec-llenado": "monitoreo"` vuelve al reabrir la estación. */
       "sec-planta": "monitoreo",
       "sec-general": "monitoreo",
-      // La única que NO es de ICONICS: un compresor real servido por otro
-      // backend. Es la razón de ser de este campo.
-      "sec-prediccion": "prediccion",
+      /*
+       * `"sec-prediccion": "prediccion"` ya no sale: sus seis vistas se
+       * ocultaron el 22-09-2026 y la sección se quedó sin hijos. Era la única
+       * que NO es de ICONICS —un compresor servido por otro backend— y sigue
+       * siendo la razón de ser de este campo, así que vuelve en cuanto alguien
+       * devuelva una vista a esa sección. Esta comprobación lo atraparía.
+       */
       /*
        * `"sec-rag": "monitoreo"` ya no sale: sus dos vistas pasaron a la
        * máquina en el Plan 33 F10 y la sección se quedó sin hijos. Vuelve si

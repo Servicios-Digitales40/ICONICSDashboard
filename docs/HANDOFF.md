@@ -35,7 +35,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1090** pruebas · 29 omitidas |
+| Suite de frontend | **1092** pruebas · 29 omitidas |
 | Suite de backend | **390** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
@@ -64,6 +64,16 @@ Sin `datos/maquinas.json` el tablero arranca sin vibraciones y lo dice: hay
 que sembrarlo (§9, «Dar de alta»).
 
 ### Qué está a medias
+
+**El módulo de Predicción está OCULTO del menú** (22-09-2026, a petición del
+usuario: no se usa en esta demo, para ningún rol). Sus seis vistas del
+compresor perdieron su  en  y la sección
+ se quedó sin hijos, así que desaparece sola —el mismo
+mecanismo con el que se cerró la estación de llenado—. **Las rutas siguen
+registradas y se abren por URL**: ocultar no es borrar. Cada una lleva escrito
+su  en un comentario, y  comprueba las dos mitades: que
+no estén en el menú y que no se hayan borrado.
+
 
 **El Plan 33 no se ha visto correr en el navegador.** Está probado con la suite
 y ejercido por `curl` contra el backend real, **no observado en pantalla**. El

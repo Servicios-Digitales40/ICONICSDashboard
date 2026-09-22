@@ -133,8 +133,9 @@ describe("el Sidebar con una máquina configurada", () => {
     const seccion = await screen.findByRole("button", { name: /Nuevo-Modor/ });
     expect(seccion).toBeTruthy();
 
-    /* Hay dos «Inicio»: el del compresor (Predicción) y el de la sección de la
-       máquina. Los hijos de una sección van en el bloque que sigue a su cabecera. */
+    /* Los hijos de una sección van en el bloque que sigue a su cabecera, y se
+       busca ahí y no en todo el menú: el «Inicio» de una máquina no es el de
+       otra, y con dos configuradas habría uno por sección. */
     const contenedor = seccion.nextElementSibling;
     fireEvent.click(within(contenedor).getByRole("button", { name: /^Inicio/ }));
     expect(onNavigate).toHaveBeenCalledWith("maq-inicio", { maquina: "vib-motor-03" });
@@ -150,9 +151,16 @@ describe("el Sidebar con una máquina configurada", () => {
     const inicio = within(seccion.nextElementSibling).getByRole("button", { name: /^Inicio/ });
     expect(inicio.className).toMatch(/nav-active/);
 
-    /* Y el «Inicio» del compresor (`pred-inicio`), que es OTRA ruta, no. */
-    const otros = screen.getAllByRole("button", { name: /^Inicio/ }).filter((b) => b !== inicio);
-    expect(otros.length).toBeGreaterThan(0);
-    for (const b of otros) expect(b.className).not.toMatch(/nav-active/);
+    /*
+     * Y ninguna OTRA entrada del menú se marca activa por compartir ruta.
+     *
+     * Hasta el 22-09-2026 esto se comprobaba contra el «Inicio» del compresor
+     * (`pred-inicio`), que era otra ruta con el mismo rótulo; al ocultarse
+     * Predicción dejó de haber un segundo «Inicio», así que se comprueba
+     * sobre el menú entero, que es lo que de verdad importa: sólo una entrada
+     * activa, y es la de esta máquina.
+     */
+    const activas = screen.getAllByRole("button").filter((b) => /nav-active/.test(b.className));
+    expect(activas).toEqual([inicio]);
   });
 });

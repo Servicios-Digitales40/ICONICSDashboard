@@ -40,11 +40,24 @@ const montar = (props = {}) =>
   );
 
 describe("el menú agrupa por módulo, no sólo por sección", () => {
-  it("los dos módulos tienen su cabecera", () => {
+  it("el módulo que tiene secciones lleva su cabecera; el que no, no se anuncia", () => {
+    /*
+     * ── PREDICCIÓN ESTÁ OCULTA (22-09-2026) ──────────────────────────
+     *
+     * Sus seis vistas salieron del menú —no se usan en esta demo, para ningún
+     * rol— quitándoles `nav`, así que la sección se quedó sin hijos y el
+     * módulo sin secciones que anunciar. Una cabecera sola, sin nada debajo,
+     * sería peor que ninguna.
+     *
+     * Lo que este archivo protege NO ha cambiado: que la frontera entre
+     * fuentes de datos se VEA en el menú. Sigue comprobado abajo, en el orden
+     * y en la estructura, y vuelve entero en cuanto una vista `pred-*`
+     * recupere su `nav`.
+     */
     montar();
 
     expect(screen.getByText("Monitoreo y Diagnóstico")).toBeTruthy();
-    expect(screen.getByText("Predicción", { selector: "h2" })).toBeTruthy();
+    expect(screen.queryByText("Predicción", { selector: "h2" })).toBeNull();
   });
 
   it("cada cabecera aparece UNA sola vez, aunque el módulo tenga varias secciones", () => {
@@ -57,16 +70,21 @@ describe("el menú agrupa por módulo, no sólo por sección", () => {
     expect(screen.getAllByText("Monitoreo y Diagnóstico")).toHaveLength(1);
   });
 
-  it("la cabecera de Predicción va DESPUÉS de las secciones de Monitoreo", () => {
+  it("no hay más cabecera que la del módulo con secciones, y va la primera", () => {
     /*
      * El orden no es cosmético: separa lo que entra por ICONICS de lo que no.
-     * Si Predicción volviera a colarse entre las secciones de Monitoreo, su
-     * cabecera quedaría en medio y este orden fallaría.
+     * Mientras Predicción esté oculta (22-09-2026) sólo queda una cabecera, y
+     * eso también hay que fijarlo: si apareciera una segunda sin que nadie
+     * devolviera una vista, sería una sección fantasma.
+     *
+     * Al restaurar Predicción, esto vuelve a ser:
+     *   expect(cabeceras).toEqual(["Monitoreo y Diagnóstico", "Predicción"]);
+     * y su cabecera tiene que ir DESPUÉS, nunca entre las de Monitoreo.
      */
     const { container } = montar();
     const cabeceras = [...container.querySelectorAll("h2")].map((h) => h.textContent);
 
-    expect(cabeceras).toEqual(["Monitoreo y Diagnóstico", "Predicción"]);
+    expect(cabeceras).toEqual(["Monitoreo y Diagnóstico"]);
   });
 
   it("las cabeceras son <h2>: el menú tiene estructura, no sólo estilo", () => {
