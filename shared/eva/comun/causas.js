@@ -763,6 +763,31 @@ export const CAUSAS_POR_RIESGO = {
   "vibracion-en-alarma": causasVibracionAlta("vibracion-en-alarma"),
   "vibracion-en-aviso": causasVibracionAlta("vibracion-en-aviso"),
 
+  /*
+   * Plan 41 F3. Una cresta alta con carga son impactos, y los impactos vienen
+   * de dos sitios. Las dos van `provisional: true` por el mismo motivo que la
+   * regla lleva `norma: null`: el umbral de 6 es de la literatura, no de una
+   * norma, y no está calibrado con esta máquina.
+   */
+  "factor-de-cresta-alto": [
+    {
+      id: "rodamiento-picado",
+      titulo: "Rodamiento con la pista picada",
+      componente: "Rodamiento del apoyo señalado",
+      terminosManual: ["rodamiento", "picado", "pista", "bpfo", "bpfi", "impacto"],
+      origen: "riesgosVibracion.js · consecuencia (factor-de-cresta-alto)",
+      provisional: true,
+    },
+    {
+      id: "holgura-que-golpea",
+      titulo: "Holgura mecánica que golpea a cada vuelta",
+      componente: "Fijación del apoyo / juego del eje",
+      terminosManual: ["holgura", "juego", "apriete", "golpeteo"],
+      origen: "riesgosVibracion.js · consecuencia (factor-de-cresta-alto)",
+      provisional: true,
+    },
+  ],
+
   "asimetria-entre-apoyos": [
     {
       id: "rodamiento-en-mal-estado",

@@ -238,10 +238,11 @@ sobrevivió al sondeo: F0 confirmar en el navegador, F1 los pasos en planta, F2
 el índice de sinónimos, F3 normalizar por rpm, F4 las alarmas de la máquina, F5
 archivar. Su §0 es la tabla de qué se dio por pendiente y ya estaba hecho.
 
-**`PLAN-32-VIBRACIONES.md`** — F1 y **F5** completas. **F4 parcial**:
-`necesita` está en las 17 reglas, y el **factor de cresta es imposible en S1**
-(defecto del servidor, medido). F2 y F3 sólo esperan el sondeo en planta.
-**F6 —sinónimos— es su única fase de código viva**, y se ejecuta en el Plan 41 F2.
+**`PLAN-32-VIBRACIONES.md`** — F1, **F4, F5 y F6** completas (las tres últimas
+cerradas el 22-09 desde el Plan 41: `terminosManual` ya estaba; los sinónimos
+los deriva el tipo; el factor de cresta es regla del tipo, sólo con carga y
+con puerta para «pico y eficaz con la misma cifra»; «normalizar por rpm» se
+descartó con el porqué). F2 y F3 sólo esperan cerrar el sondeo en planta.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
@@ -299,7 +300,12 @@ para la reapertura. **Hay que reiniciar el backend** para que el asistente lo
 vea, y los apoyos necesitan su `nombre` en la configuración para que «lado
 acople» resuelva (F1 paso 4).
 
-**3 · Plan 41 F3 — normalizar por rpm.** Lo único que queda del Plan 32 F4.
+**3 · Plan 41 F3 — factor de cresta. ✅ HECHO el 22-09-2026.** «Normalizar por
+rpm» se descartó con el porqué (ISO 10816-1 ya es independiente de la
+velocidad; el rpm sólo decide si aplica). Nueva regla del tipo
+`factor-de-cresta-alto` (19 reglas), que sólo se evalúa **con carga** —en
+vacío S2 daba 18,5 sin nada roto— y se declara no evaluable si pico y eficaz
+llegan con la misma cifra. Falta la medida con la máquina trabajando.
 
 **4 · Plan 41 F4 — Alarmas de la máquina** (Plan 37 F4). Su primer paso es
 **medir** cómo contesta `/api/iconics/alarms` a un área `ae:` entera; hasta
@@ -654,6 +660,18 @@ reloj.
 **Si vuelve a ponerse intermitente, mira primero SI los fallos dicen `timed
 out`** (contención — este número) **o son asertos** (el código). No se subió
 `testTimeout`: eso trata el síntoma y escondería una regresión real.
+
+**Uno que NO es contención, observado el 22-09-2026 y sin resolver:**
+`fuente-de-maquina.test.js › con el origen SIMULADO las medidas con rol y
+apoyo salen con valor…` cayó **2 de 4 veces** al correr sólo la carpeta
+`src/test/demo-eva`, con un **aserto** (no un timeout) y en ~70–90 ms; pasó
+**3 de 3 solo** y en **dos suites completas** (1097). Ese patrón —falla en un
+subconjunto, nunca solo ni en la suite entera— es **orden o estado
+compartido** entre pruebas de esa carpeta, no carga: la prueba fija
+`Math.random` con `vi.spyOn` y lee del simulador, que depende del reloj.
+Ninguna de las tres tandas rojas coincidió con un cambio en lo que ese archivo
+prueba. Pendiente: capturar el aserto exacto la próxima vez que caiga (correr
+la carpeta con `--reporter=verbose`) antes de tocar nada.
 
 ### El bundle
 

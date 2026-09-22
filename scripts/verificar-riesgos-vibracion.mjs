@@ -551,6 +551,62 @@ check('el estado también llega como ÍNDICE entero, y significa lo mismo', () =
   assert.equal(decodificarVigilancia(true), null, 'un booleano no dice qué posición es')
 })
 
+/* ── El factor de cresta (Plan 41 F3) ───────────────────────────────── */
+
+check('una cresta alta CON CARGA dispara, y cita el pico, el eficaz y el par', () => {
+  /* 3,0 / 0,4 = 7,5 > 6, con el variador a 62 % de par. */
+  const r = evaluarRiesgosVibracion(estado({ canales: { S2: { aPeak: 3.0, aRMS: 0.4 } } }))
+  const activos = r.activos.filter((a) => a.id === 'factor-de-cresta-alto')
+  assert.equal(activos.length, 1, 'sólo el apoyo estropeado')
+  assert.equal(activos[0].canal, 'S2')
+  assert.match(activos[0].evidencia, /7,5|7\.5/)
+  assert.match(activos[0].evidencia, /62 %/)
+  assert.equal(activos[0].nivel, 'atencion')
+  assert.equal(activos[0].norma, null, 'sin norma detrás, y lo dice')
+})
+
+check('el escenario sano no dispara la cresta: 1,2 / 0,4 = 3, ruido de desequilibrio', () => {
+  const r = evaluarRiesgosVibracion(estado())
+  assert.ok(!r.activos.some((a) => a.id === 'factor-de-cresta-alto'))
+  assert.ok(!r.noEvaluables.some((a) => a.id === 'factor-de-cresta-alto'), 'y SÍ se evaluó')
+})
+
+check('EN VACÍO la cresta no se evalúa, aunque el número sea enorme', () => {
+  /* Medido el 22-09-2026 en S2 con el motor girando sin carga: 6,4 / 0,35 ≈ 18.
+     Un eficaz minúsculo hace que cualquier pico dispare; la regla no lo da
+     por avería, se declara no evaluable y dice por qué. */
+  const r = evaluarRiesgosVibracion(estado({
+    canales: { S2: { aPeak: 6.4, aRMS: 0.35 } },
+    variador: { par: -0.05, potencia: 0 },
+  }))
+  assert.ok(!r.activos.some((a) => a.id === 'factor-de-cresta-alto'), 'no puede salir como activa')
+  const ne = r.noEvaluables.filter((a) => a.id === 'factor-de-cresta-alto')
+  assert.equal(ne.length, CANALES.length, 'los tres apoyos, porque el par es de la máquina')
+  assert.equal(ne[0].motivo.clave, 'enVacio')
+  assert.match(ne[0].porque, /vac[íi]o/)
+})
+
+check('pico y eficaz con la MISMA cifra no es una cresta de 1,0: no se evalúa', () => {
+  /* El historiador entregó la serie de aRMS_S1 como aPeak_S1 (21-09-2026).
+     Dividirlas daría exactamente 1 y parecería una máquina perfecta. */
+  const r = evaluarRiesgosVibracion(estado({ canales: { S1: { aPeak: 0.4, aRMS: 0.4 } } }))
+  const ne = r.noEvaluables.find((a) => a.id === 'factor-de-cresta-alto' && a.canal === 'S1')
+  assert.ok(ne, 'S1 tiene que salir como no evaluable')
+  assert.equal(ne.motivo.clave, 'mismaCifra')
+  /* Y los otros dos apoyos, con sus medidas distintas, sí se evalúan. */
+  assert.ok(!r.noEvaluables.some((a) => a.id === 'factor-de-cresta-alto' && a.canal !== 'S1'))
+})
+
+check('sin par no hay cresta evaluable: «con carga» es condición, no adorno', () => {
+  /* El par no va en `necesita` —es un rol de la MÁQUINA y la regla es por
+     canal; `tipos.test.js` lo prohíbe—, así que lo reclama `evaluable`. */
+  const r = evaluarRiesgosVibracion(estado({ variador: { par: null } }))
+  const ne = r.noEvaluables.filter((a) => a.id === 'factor-de-cresta-alto')
+  assert.equal(ne.length, CANALES.length)
+  assert.equal(ne[0].motivo.clave, 'sinPar')
+  assert.match(ne[0].porque, /par del variador/)
+})
+
 check('el diagnóstico de rodamientos apagado se denuncia como CRÍTICO', () => {
   /*
    * Es el caso real: BPFO, BPFI y FTF estaban en [1 0 0 0] en los tres canales

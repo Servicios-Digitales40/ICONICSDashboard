@@ -80,6 +80,25 @@ const PAR_EN_VACIO = 2;
 const VECES_ASIMETRIA = 3;
 
 /**
+ * Factor de cresta —pico sobre eficaz de la aceleración— a partir del cual
+ * la señal está hecha de GOLPES y no de ruido (Plan 41 F3).
+ *
+ * Una vibración de desequilibrio es casi senoidal: su pico es √2 ≈ 1,4 veces
+ * el eficaz, y con armónicos llega a 3. Un rodamiento picado da impactos
+ * secos y cortos que suben el pico mucho más que el eficaz: la literatura
+ * sitúa el cambio de régimen entre 5 y 6 (Plan 32 §4.1). Se toma **6**, el
+ * extremo alto, para que una cresta alta sea un aviso que raramente
+ * sobra, no una alarma que raramente falta.
+ *
+ * **No sale de ninguna norma y no está calibrado con esta máquina**: la
+ * regla lo dice en `norma: null` y sus causas van `provisional: true`.
+ * Medido el 22-09-2026 con el motor girando EN VACÍO: S1 4,4 · S2 18,5 ·
+ * S3 4,7 —un eficaz minúsculo hace que cualquier pico dispare—. Por eso la
+ * regla exige carga (`PAR_EN_VACIO`), igual que `medida-en-vacio`.
+ */
+const CRESTA_IMPACTO = 6;
+
+/**
  * Forma de una regla:
  *
  *   id           identificador estable
@@ -218,6 +237,87 @@ export const REGLAS = [
     accion:
       "Tomar la medida de referencia con la máquina en su condición normal " +
       "de trabajo, no en vacío.",
+    norma: null,
+  },
+
+  /* ── El factor de cresta: golpes, no ruido (Plan 41 F3) ────────── */
+  {
+    id: "factor-de-cresta-alto",
+    titulo: "La aceleración está hecha de golpes, no de ruido",
+    ambito: "canal",
+    /*
+     * `par` NO va en `necesita` aunque la regla lo exija: `necesita` de una
+     * regla por canal se resuelve a roles DE APOYO (`tipos/vibraciones.js`
+     * deriva de ahí lo que una máquina tiene que aportar por apoyo), y el par
+     * es del variador. El evaluador lo copia en los datos de cada canal junto
+     * con la `cresta` ya calculada, y `evaluable` lo reclama con su motivo.
+     */
+    necesita: ["aRMS", "aPeak"],
+    exigeNorma: false,
+    nivel: "atencion",
+    evaluable: (d) => {
+      if (!hay(d.par)) {
+        return {
+          ok: false,
+          porque: "Sin el par del variador no se sabe si la máquina trabaja o gira en vacío, y la cresta sólo dice algo con carga.",
+          motivo: { clave: "sinPar" },
+        };
+      }
+      /*
+       * En vacío el eficaz es minúsculo y cualquier pico lo multiplica por
+       * diez sin que haya nada roto: medido 18,5 en S2 con el motor girando
+       * sin carga. La cresta sólo dice algo con la máquina trabajando.
+       */
+      if (Math.abs(d.par) < PAR_EN_VACIO) {
+        return {
+          ok: false,
+          porque: `Con ${fmt(d.par, 2)} % de par la máquina gira en vacío, y ahí la cresta no distingue un golpe de un eficaz pequeño.`,
+          motivo: { clave: "enVacio", par: fmt(d.par, 2) },
+        };
+      }
+      /*
+       * La misma cifra para pico y eficaz no es una cresta de 1,0: es el
+       * servidor entregando una medida por la otra (el historiador lo hizo
+       * con `aPeak_S1`, medido el 21-09-2026). Dividirlas daría exactamente
+       * 1 y parecería una máquina perfecta.
+       */
+      if (d.aPeak === d.aRMS) {
+        return {
+          ok: false,
+          porque: "El pico y el eficaz llegan con la MISMA cifra: no se puede calcular la cresta sin dar por buena una medida que puede ser la otra.",
+          motivo: { clave: "mismaCifra" },
+        };
+      }
+      return { ok: true };
+    },
+    cuando: (d) => hay(d.cresta) && d.cresta > CRESTA_IMPACTO,
+    evidencia: (d) =>
+      `Factor de cresta ${fmt(d.cresta, 1)}: la aceleración de pico ` +
+      `(${fmt(d.aPeak, 3)} m/s²) es ${fmt(d.cresta, 1)} veces la eficaz ` +
+      `(${fmt(d.aRMS, 3)} m/s²), por encima de ${CRESTA_IMPACTO}, con ` +
+      `${fmt(d.par, 0)} % de par.`,
+    expone: ["cresta", "aPeak", "aRMS", "limite", "par"],
+    datos: (d) => ({
+      cresta: fmt(d.cresta, 1),
+      aPeak: fmt(d.aPeak, 3),
+      aRMS: fmt(d.aRMS, 3),
+      limite: CRESTA_IMPACTO,
+      par: fmt(d.par, 0),
+    }),
+    consecuencia:
+      "Una cresta alta con carga suele venir de impactos cortos y repetidos: " +
+      "un rodamiento con la pista picada, o una holgura que golpea a cada " +
+      "vuelta. El desequilibrio y la desalineación no la suben: son casi " +
+      "senoidales. La velocidad eficaz puede seguir en zona A mientras esto pasa.",
+    accion:
+      "Comprobar si las vigilancias de rodamiento (BPFO, BPFI, FTF) están " +
+      "encendidas en ese apoyo y qué dicen; revisar holguras y apriete. Si " +
+      "persiste con carga, programar la inspección del rodamiento.",
+    /*
+     * Sin norma detrás, y dicho aquí para que nadie lo cite como si la
+     * tuviera: el 6 es de la literatura de análisis de vibraciones, no de
+     * ISO 10816, y no está calibrado con esta máquina.
+     */
     norma: null,
   },
 
@@ -780,6 +880,23 @@ function peorApoyo(porCanal) {
  * Una pantalla que enseña cinco riesgos apagados y calla que otros tres no se
  * han evaluado transmite una calma que no le corresponde.
  */
+/**
+ * Los datos con que se evalúa una regla de CANAL: lo medido en el apoyo más
+ * lo derivado que una regla de apoyo necesita y no está en él (Plan 41 F3).
+ *
+ *   cresta  pico / eficaz de la aceleración. `null` sin las dos medidas o con
+ *           eficaz cero: dividir por cero no es una cresta infinita, es un
+ *           hueco. Se calcula aquí y no en cada regla para que el número que
+ *           citan la evidencia y el `cuando` sea el mismo.
+ *   par     el del variador, que es de la máquina, copiado al apoyo porque
+ *           «con carga» es condición de validez de una medida de apoyo.
+ */
+function datosDeCanal(canal, variador) {
+  const cresta =
+    hay(canal.aPeak) && hay(canal.aRMS) && canal.aRMS > 0 ? canal.aPeak / canal.aRMS : null;
+  return { ...canal, cresta, par: variador?.par };
+}
+
 export function evaluarRiesgosVibracion(estado) {
   const canales = estado?.canales ?? {};
   const variador = estado?.variador ?? {};
@@ -804,7 +921,7 @@ export function evaluarRiesgosVibracion(estado) {
   for (const regla of REGLAS) {
     const objetivos =
       regla.ambito === "canal"
-        ? CANALES.map((c) => ({ canal: c, datos: canales[c.id] ?? {} }))
+        ? CANALES.map((c) => ({ canal: c, datos: datosDeCanal(canales[c.id] ?? {}, variador) }))
         : [{ canal: null, datos: datosMaquina }];
 
     for (const { canal, datos } of objetivos) {

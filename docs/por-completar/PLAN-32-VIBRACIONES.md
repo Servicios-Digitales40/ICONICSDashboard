@@ -1,6 +1,6 @@
 # PLAN 32 — Vibraciones 1.0: el módulo completo
 
-**Estado:** F1, **F5 y F6** completadas · F4 parcial (`necesita` hecho; la cresta en S1 se re-mide: dos sondeos del 22-09 dan `aPeak_S1` propia) · F2 y F3 sólo esperan cerrar el sondeo en planta · lo vivo se ejecuta en el **Plan 41** (F1 y F3)
+**Estado:** F1, **F4, F5 y F6** completadas (F4 cerrada en el Plan 41 F3: `necesita` en las 19 reglas, factor de cresta con sus puertas, y «normalizar por rpm» descartado con el porqué) · F2 y F3 sólo esperan cerrar el sondeo en planta (Plan 41 F1)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 17-09-2026
 
@@ -219,7 +219,7 @@ La vista Gráficas de la sección de cada configurada ya usa `GraficaHistoria` y
 (F2), no la vista. **No tiene trabajo de código propio**: en cuanto F2 dé
 series verificadas, esta fase se cierra mirando la pantalla.
 
-### F4 — El diagnóstico ve · **PARCIALMENTE HECHA (sondeo del 22-09-2026)**
+### F4 — El diagnóstico ve · ✅ **COMPLETADA (Plan 41 F3, 22-09-2026)**
 
 De los tres puntos que pedía, **uno está hecho y otro resultó imposible**:
 
@@ -235,8 +235,18 @@ De los tres puntos que pedía, **uno está hecho y otro resultó imposible**:
   de S1 estaría puntuando un 1,0 fabricado por un defecto del historiador, que
   es justo lo que `CLAUDE.md` §2.4 prohíbe. **Queda fuera hasta que el
   servidor publique `aPeak_S1` de verdad**, y entonces vale para S1 también.
-- **Normalizar por rpm: queda**, y es lo único vivo de esta fase. Recogido en
-  el **Plan 41 §F3**.
+- **Normalizar por rpm: NO se hace, y está decidido** (Plan 41 F3,
+  22-09-2026). ISO 10816-1 juzga la velocidad eficaz precisamente porque su
+  severidad es casi independiente de la velocidad en 10–1000 Hz; el rpm ya
+  hace en el motor lo que la norma dice (aplica desde 600, borde a 720).
+  Escalar exigiría una ley y una referencia que no hay calibradas.
+- **Factor de cresta: HECHO como regla del tipo** (`factor-de-cresta-alto`,
+  Plan 41 F3), con la puerta que reconcilia la medida del 21-09: si `aPeak`
+  y `aRMS` llegan con la misma cifra, la regla se declara no evaluable en vez
+  de puntuar un 1,0. Y sólo con carga: en vacío S2 daba 18,5 sin nada roto.
+
+**Con eso F4 queda COMPLETADA** en lo que se puede desde el repo. La medida
+pendiente —la cresta de cada apoyo con la máquina en carga— es de planta.
 
 ### F5 — RAG y casos · ✅ **COMPLETADA (Plan 39 F3, confirmada el 22-09-2026)**
 Pedía `terminosManual` en las causas de vibraciones para alcanzar los 47

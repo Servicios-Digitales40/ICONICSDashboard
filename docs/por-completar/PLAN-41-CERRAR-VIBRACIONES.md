@@ -1,6 +1,6 @@
 # PLAN 41 — Cerrar Vibraciones 1.0: lo que de verdad queda
 
-**Estado:** **F0 y F2 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia` y el índice de sinónimos en el tipo) · F1 a medias (sondeo en marcha hecho; quedan los pasos 2–4 en planta) · F3–F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
+**Estado:** **F0, F2 y F3 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia`, el índice de sinónimos y el factor de cresta en el tipo) · F1 a medias (sondeo en marcha hecho; quedan los pasos 2–4 en planta y la cresta con carga) · F4 y F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
 **Rama:** `Vibraciones1.0`
 **Fecha:** 22-09-2026
 
@@ -377,9 +377,68 @@ resolver mal: sin coincidencia clara, que el asistente pregunte.
 
 ---
 
-### F3 — Normalizar por rpm (lo que queda del Plan 32 F4)
+### F3 — El factor de cresta, y por qué NO se normaliza por rpm ✅
 
-**Objetivo.** Que el diagnóstico de vibraciones tenga en cuenta la velocidad de
+**Completada el 22-09-2026, con el alcance cambiado y decidido por el
+usuario.** Se le planteó la objeción de abajo con tres opciones; eligió «sólo
+factor de cresta», confirmando antes que estas reglas son **del tipo**
+`vibraciones` (viven en `riesgosVibracion.js`) y otro tipo traería las suyas.
+
+**La objeción a «normalizar por rpm».** El Plan 32 §4.2 decía que «un vRMS de
+2 mm/s a 600 rpm y otro a 3400 no significan lo mismo, y hoy se juzgan con el
+mismo umbral». Pero ISO 10816-1 juzga la **velocidad eficaz** precisamente
+porque es la magnitud cuya severidad es casi independiente de la velocidad en
+la banda 10–1000 Hz: por eso la norma da **un solo umbral por clase de
+máquina**. Lo que el rpm ya hace en el motor es lo que la norma dice: decidir
+si aplica (`RPM_MINIMA_ISO`, 600) y avisar del borde (`RPM_BORDE_ISO`, 720).
+Escalar el vRMS exigiría una ley física (∝ ω, ω² o ω³ según régimen) y una
+velocidad de referencia calibrada que no tenemos; saldría `provisional: true`
+y sin norma detrás. **No se hace, y queda escrito aquí para que no se
+redescubra.**
+
+**Lo que sí se hizo: `factor-de-cresta-alto`.** Coste cero —`aPeak` y `aRMS`
+ya se leen en los tres apoyos— y con literatura detrás (Plan 32 §4.1:
+desequilibrio 1,4–3, impactos > 5–6). Una regla por canal:
+
+- La **cresta** (`aPeak / aRMS`) la calcula el evaluador en `datosDeCanal` y
+  entra en los datos del apoyo junto con el **par** del variador, para que la
+  evidencia y el `cuando` citen el mismo número.
+- Umbral `CRESTA_IMPACTO = 6`, el extremo alto: aviso que raramente sobra.
+  `norma: null` y sus dos causas (`rodamiento-picado`, `holgura-que-golpea`)
+  van `provisional: true`: no está calibrado con esta máquina.
+- **Tres puertas de «no evaluable», y las tres medidas:**
+  - **sin par** (`sinPar`): no se sabe si trabaja o gira en vacío;
+  - **en vacío** (`enVacio`, mismo `PAR_EN_VACIO` que `medida-en-vacio`):
+    medido hoy con el motor girando sin carga, **S1 4,4 · S2 18,5 · S3 4,7**
+    — un eficaz minúsculo hace que cualquier pico dispare sin que haya nada
+    roto. Sin esta puerta, la regla habría salido activa en S2 ahora mismo;
+  - **misma cifra** (`mismaCifra`): `aPeak === aRMS` no es una cresta de 1,0,
+    es el servidor entregando una medida por la otra (el historiador lo hizo
+    con `aPeak_S1` el 21-09). Dividirlas daría exactamente 1 y parecería una
+    máquina perfecta. **Esto reconcilia las dos mediciones**: si el servidor
+    vuelve a servir la misma serie, la regla lo dice en vez de puntuar.
+- `par` **no va en `necesita`**: `tipos.test.js` prohíbe que una regla por
+  canal exija un rol de la máquina (de `necesita` se derivan los roles que
+  cada apoyo tiene que aportar). Lo reclama `evaluable`, con su motivo.
+
+**Lo que hubo que tocar por añadir una regla, y que el repo exige:** su inglés
+en `en/domain.json` (`vibrationRisks`), el inglés de sus dos causas (`causes`)
+—`verificar-dominio` falla sin ellos—, y las causas en `causas.js` —
+`verificar-diagnostico` obliga a declararlas o a clasificar la regla en
+`SIN_CAUSAS_*`. Ahora son **19 reglas** sobre 3 apoyos.
+
+**Medido:** `verificar-riesgos-vibracion` +5 (46), `dominio` 87 entradas con
+inglés, `diagnostico` 59, `dominio-configurado` 13, `vibraciones-configurada`
+36, `instrucciones`, puerta §5.1 (190/22 y 71), backend 390, frontend 1097,
+lint y tipos.
+
+**Con el motor en carga** —que hoy no se dio— la regla se evalúa de verdad.
+Es la medida que falta: la primera vez que la máquina trabaje, mirar qué
+cresta da cada apoyo y anotarla aquí. Si S2 sigue por encima de 6 con carga,
+o hay un rodamiento que mirar o el 6 hay que revisarlo; las dos cosas se
+saben mirando, no antes.
+
+**Objetivo (original).** Que el diagnóstico de vibraciones tenga en cuenta la velocidad de
 giro al juzgar una medida.
 
 **Alcance, ya recortado por el sondeo.** De los tres puntos que pedía el Plan

@@ -276,6 +276,14 @@
       "titulo": "Bearing in poor condition at that support",
       "componente": "Bearing of the indicated support"
     },
+    "rodamiento-picado": {
+      "titulo": "Bearing with a pitted race",
+      "componente": "Bearing of the indicated support"
+    },
+    "holgura-que-golpea": {
+      "titulo": "Mechanical looseness knocking on every turn",
+      "componente": "Support fixing / shaft play"
+    },
     "fijacion-floja-en-el-apoyo": {
       "titulo": "Loose fixing at that support",
       "componente": "Fixing bolts of the indicated support"
@@ -347,6 +355,12 @@
       "evidencia_conPotencia": "Drive torque is {{par}} % and power {{potencia}} kW: the machine is turning, but it is not working.",
       "consecuencia": "Off load, the vibrations that only show under load do not appear — misalignment forced by torque, clearances that close up, cavitation. A clean measurement here does not rule out a problem in service.",
       "accion": "Take the baseline measurement with the machine in its normal working condition, not off load."
+    },
+    "factor-de-cresta-alto": {
+      "titulo": "The acceleration is made of impacts, not noise",
+      "evidencia": "Crest factor {{cresta}}: the peak acceleration ({{aPeak}} m/s²) is {{cresta}} times the RMS ({{aRMS}} m/s²), above {{limite}}, at {{par}} % torque.",
+      "consecuencia": "A high crest factor under load usually comes from short, repeated impacts: a bearing with a pitted race, or a looseness that knocks on every turn. Unbalance and misalignment do not raise it: they are nearly sinusoidal. RMS velocity can stay in zone A while this happens.",
+      "accion": "Check whether the bearing monitors (BPFO, BPFI, FTF) are enabled on that support and what they say; check clearances and tightness. If it persists under load, schedule a bearing inspection."
     },
     "vibracion-en-alarma": {
       "titulo": "Vibration in the damage zone",
