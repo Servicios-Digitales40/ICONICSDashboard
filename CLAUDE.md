@@ -174,8 +174,8 @@ regla.
 │   └── src/
 │       ├── Demo-EVA/           Todo lo que sabe de las dos máquinas de planta
 │       │   ├── domain/            Puertas (re-export) hacia shared/eva/ — ver §4.2
-│       │   ├── data/               Lectura de red, por máquina: tanque/, vibraciones/, comunes/
-│       │   ├── views/              Presentación, por máquina: tanque/, vibraciones/, comunes/
+│       │   ├── data/               Lectura de red: tanque/, comunes/ y vibraciones/ (por configurada)
+│       │   ├── views/              Presentación: tanque/, comunes/ y vibraciones/ (por configurada)
 │       │   ├── components/         Piezas de presentación de esta demo
 │       │   └── three-d/            Maqueta 3D
 │       ├── modulos/             Módulos que NO se sirven de ICONICS — ver §4.7
@@ -189,7 +189,8 @@ regla.
 ├── shared/                 Dominio puro que usan LOS DOS programas (§2.6, §2.7)
 │   └── eva/                  Las dos instalaciones — ver shared/README.md para el mapa completo
 │       ├── tanque/             Su catálogo, física, reglas y proyección
-│       ├── vibraciones/        Lo mismo, para la otra máquina
+│       ├── vibraciones/        Lo que es del TIPO (catálogo, física, reglas) y catalogoDemo.js,
+│       │                       la forma de la entrada retirada en el Plan 40 (referencia, no registro)
 │       └── comun/              Lo que ninguna posee sola: el registro, la forma
 │                               común, umbrales, historia, aprendizaje, casos
 ├── scripts/                Verificadores (`verificar-*.mjs`) y sondas contra ICONICS real
@@ -265,7 +266,8 @@ archivo/vista se distingue por **máquina**, no por el nombre de la demo:
   `MaquetaTanque3D`, `DetalleActivo` (ya es exclusivo del tanque por
   contenido, no necesita el sufijo).
 - `vibraciones/` — `InicioVibraciones`, `RiesgosVibracion`, `Vibraciones`,
-  `Vibraciones3D`, `ControlesVibraciones`.
+  `Vibraciones3D`. Desde el Plan 40 F2 todas reciben la máquina CONFIGURADA
+  que se tiene delante; no hay vista de una vibraciones escrita a mano.
 - `comunes/` — lo que no pertenece a una sola máquina (el explorador de
   Assets, Alarmas, Cierre de diagnóstico, Documentación, Predicción). Aquí
   "Eva" en el nombre no es ruido porque no hay máquina que distinguir.
@@ -289,8 +291,12 @@ qué variable falta), nunca un genérico "algo salió mal".
 
 Dos palabras que se parecen y no se pueden intercambiar:
 
-- **Sistema** — una máquina de planta leída por ICONICS. Hoy `tanque` y
-  `vibraciones`. Se declaran en `shared/eva/comun/sistemas.js`, que **no es
+- **Sistema** — una máquina de planta leída por ICONICS. Hoy `tanque`,
+  escrito a mano, más **cada máquina configurada** (`datos/maquinas.json`),
+  que el backend registra al arrancar y tras cada cambio. **Desde el Plan 40
+  no hay máquina de vibraciones escrita a mano**: la de la demo es una
+  configurada de tipo `vibraciones`. Se declaran en
+  `shared/eva/comun/sistemas.js`, que **no es
   una lista de nombres sino código ejecutable**: cada entrada trae `raices`,
   `puntos()`, `parse()`, `modelo()`, `esHistorizada()` y `cadenciaMs`, todo
   ello dando por hecho que hay tags de ICONICS detrás.
@@ -454,12 +460,15 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-Los vivos hoy son el **32** (vibraciones), el **33** (modularidad de máquinas,
-F9), el **34** (máquinas desde el árbol, F5), el **37** (las vistas de una
-máquina configurada, F4), el **38** (el registro conoce las configuradas y el asistente contesta
-sobre ellas; F1–F3, pendiente de confirmarse en el navegador) y el **39** (las
-herramientas del asistente sirven a cualquier configurada, por tipo; F0
-completada, F1–F6 por completar); el **36** (configurar marcando el árbol) está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
+Los vivos hoy son el **32** (vibraciones, reformulado para la configurada), el
+**33** (modularidad de máquinas, F9), el **37** (las vistas de una máquina
+configurada, F4), el **38** (el registro conoce las configuradas y el asistente
+contesta sobre ellas; pendiente de confirmarse en el navegador), el **39** (las
+herramientas del asistente sirven a cualquier configurada, por tipo; F0–F2
+completadas, F3–F6 por completar) y el **40** (retirar la vibraciones escrita a
+mano; hecho salvo F4, que son pasos en planta). El **34** (máquinas desde el
+árbol) y el **36** (configurar marcando el árbol) están archivados. Ver
+`HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer
 

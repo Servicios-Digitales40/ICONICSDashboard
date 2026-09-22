@@ -27,7 +27,7 @@ en secciones separadas del sidebar, con una tercera prevista:
 | Sección | Máquina | Árbol | Vistas |
 |---|---|---|---|
 | Estación de llenado | Tanque y grupo de bombeo (`PLC_1`) | `ac:TDCON/DEMO/SENSORES/` | 5 |
-| Vibraciones | Motor WEG + SIPLUS CMS (`PLC_2`) | `ac:TDCON/Motors/01/` y `ae:` | 5 |
+| Una por máquina configurada (Plan 40) | Hoy: motor WEG + SIPLUS CMS (`PLC_2`), tipo `vibraciones` | Los que diga su configuración (`ac:TDCON/DEMO_VIBRACIONES/Vibraciones/` y `ae:`) | 7 |
 | General | — | — | 4 |
 
 **Van en secciones aparte a propósito, y no es cosmético.** Son instalaciones
@@ -138,7 +138,7 @@ data/       la frontera con la red
   EvaProvider.jsx el único sitio que crea una fuente
   hooks.js        useSistemaAgua(), useSerieHistorica()
   vibracion.js    la OTRA máquina: su propio sondeo en lote, sin `EvaProvider`
-  simuladorVibracion.js  esa máquina sin red: sólo `read()`, no hay historia
+  (la simulación de una configurada la hace su TIPO: `construirSistema(...).modelo`, Plan 40 F0)
   transportes.js  clase de transporte → transporte, para CUALQUIER máquina
 
 lib/        derivaciones y formato, sin React salvo donde se indique
@@ -200,20 +200,19 @@ generar, invirtiendo la dependencia. Hubo un tiempo en que el único simulador
 era el del tablero anterior, que generaba otros puntos, y pulsar «Simulado»
 dejaba esta sección entera sin dato.
 
-**Y hay DOS simuladores, uno por máquina.**
-[`data/simuladorVibracion.js`](data/simuladorVibracion.js) sirve el sistema de
-vibraciones, y es un archivo aparte por lo mismo que lo son su catálogo y sus
-reglas: son dos instalaciones sin un punto en común. La física de cada una vive
-en `@shared/eva/tanque/simulador.js` y `@shared/eva/vibraciones/simuladorVibraciones.js`, y las
-comparte con el transporte falso del backend (`ICONICS_FAKE=true`), para que los
-dos programas sirviendo el mismo instante enseñen lo mismo.
+**Y una máquina configurada se simula con su TIPO** (Plan 40 F0). Hasta el
+22-09-2026 había un segundo simulador, `data/simuladorVibracion.js`, para la
+máquina de vibraciones escrita a mano; esa máquina ya no existe (Plan 40), y
+el archivo se fue con ella. Hoy `transporteDeConfigurada` pide a
+`construirSistema(maquina, tipo).modelo(punto, ms)` el valor de cada tag de la
+configuración, y el tipo lo genera por rol y apoyo con la física de
+`@shared/eva/vibraciones/simuladorVibraciones.js`, la misma que usa el
+transporte falso del backend (`ICONICS_FAKE=true`): los dos programas
+sirviendo el mismo instante enseñan lo mismo, con los tags de ESA máquina.
 
-El de vibraciones **no tiene `readSerie()`**: ninguna señal de ese catálogo está
-historizada todavía, y servir series inventadas enseñaría a la pantalla una
-máquina que no existe. Lo que sí reproduce es el apagón medido el 26-08-2026 —al
-pararse el variador se van los `vRMS` y sobreviven la aceleración y el pico—,
-porque de ahí sale la mitad de la pantalla que declara lo que NO se pudo
-comprobar.
+Lo que reproduce es el apagón medido el 26-08-2026 —al pararse el variador se
+van los `vRMS` y sobreviven la aceleración y el pico—, porque de ahí sale la
+mitad de la pantalla que declara lo que NO se pudo comprobar.
 
 **Dos bucles de animación en toda la sección**:
 el destello de la baliza en crítico, y el giro del impulsor cuando la bomba

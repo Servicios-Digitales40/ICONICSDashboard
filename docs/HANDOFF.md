@@ -35,10 +35,10 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1083** pruebas · 29 omitidas |
+| Suite de frontend | **1090** pruebas · 29 omitidas |
 | Suite de backend | **385** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **183** correctas (14 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **182** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
@@ -54,6 +54,14 @@ máquina configurada**, con Inicio, Gráficas y Vista 3D leyendo SUS puntos
 38— **el backend registra las configuradas al arrancar y tras cada cambio**,
 así que el asistente, los casos, el motor de diagnóstico y los manuales las
 conocen, y su sección trae también Hallazgos, Avisos, Casos previos y RAG.
+
+**Desde el Plan 40 (22-09-2026) no hay máquina de vibraciones escrita a mano.**
+La entrada `vibraciones` salió de `SISTEMAS`; el tablero enseña vibraciones
+sólo por sus máquinas configuradas (una sección por máquina y un muro de
+planta), el asistente las sirve por su tipo, y el transporte falso sigue
+publicando la instalación de la demo para que se pueda configurar sin planta.
+Sin `datos/maquinas.json` el tablero arranca sin vibraciones y lo dice: hay
+que sembrarlo (§9, «Dar de alta»).
 
 ### Qué está a medias
 
@@ -71,6 +79,15 @@ que hoy devuelve cero (ver §6).
 **«Casos previos» sale vacío** en vibraciones: hay 13 casos y **ninguno** es
 suyo (11 del tanque, 2 de «grupo de bombeo»). No es un defecto de la vista, es
 la foto real del módulo.
+
+**El Plan 40 está hecho en el repo y no en planta (F4).** Faltan tres pasos
+que sólo se pueden dar contra ICONICS: sondear `Nuevo-Modor` con el motor en
+marcha (el sondeo en paro dejó 33 series sin muestras), dar de baja la
+configurada `vibraciones-configurada` si sigue en planta, y correr
+`medir-asistente-configurada --maquina Nuevo-Modor` sin otra vibraciones en
+el registro. Y en el `datos/maquinas.json` local hay que volver a sembrar o
+poner nombre a los tres apoyos desde el árbol: sin `assets[].nombre` el
+asistente dice «S1 (S1, bearing unidentified)».
 
 ### Qué está roto
 
@@ -122,8 +139,9 @@ react-dashboard/src/   React + Vite
 
 - **MÓDULO** — agrupación por **fuente de datos** (`shared/modulos.js`). Hoy
   `monitoreo` (ICONICS) y `prediccion` (API externa).
-- **SISTEMA** — una **máquina** de planta (`sistemas.js`). Hoy `tanque` y
-  `vibraciones`.
+- **SISTEMA** — una **máquina** de planta (`sistemas.js`). Hoy `tanque`,
+  escrito a mano, más cada configurada registrada (la de vibraciones lo es
+  desde el Plan 40).
 - **TIPO** — de qué **clase** es una máquina (`shared/eva/tipos/`). Sus reglas,
   su física, su norma.
 
@@ -205,11 +223,17 @@ alguna sigue en uso; ninguna se ha tocado en este trabajo.
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
 se puede hacer sin tocar el código del tanque.
 
-**`PLAN-34-MAQUINAS-DESDE-EL-ARBOL.md`** — F0–F4 completas. Queda **F5**
-(retirar `vibraciones.js` como catálogo), que sólo tiene sentido cuando una
-máquina configurada haga todo lo que hace el catálogo.
+**`PLAN-34-MAQUINAS-DESDE-EL-ARBOL.md`** está en `docs/completados/`: su F5
+(retirar el catálogo escrito a mano) la hizo el Plan 40.
 
-**`PLAN-32-VIBRACIONES.md`** — F1 completa. Quedan F2–F6.
+**`PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md`** — F0–F3 y F5 completas.
+La simulación es del tipo (F0), el frontend enseña vibraciones sólo por
+configuradas (F2), la entrada `vibraciones` salió del registro y el backend,
+los guiones y la fixture `scripts/lib/vibraciones-espejo.json` viven sin ella
+(F1+F3). Queda **F4**, pasos en planta (arriba, «Qué está a medias»).
+
+**`PLAN-32-VIBRACIONES.md`** — F1 completa. F2–F6 reformuladas para la
+máquina configurada (ya no hay escrita a mano sobre la que hacerlas).
 
 **`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas (sección por
 máquina configurada; Inicio, Gráficas y 3D parametrizadas). Queda **F4**
@@ -242,12 +266,14 @@ alta automática según el estado de validación (F6).
 
 ### Próximos pasos, por prioridad
 
-**0 · Confirmar los Planes 37 y 38 en el navegador.** La sección de
-`Nuevo-Modor` se abrió el 21-09 y las siete vistas caían en el primer render;
-está corregido y **falta volver a entrar**: Inicio, Gráficas, Vista 3D,
-Hallazgos, Avisos, Casos previos y RAG, comprobar que pinta SUS apoyos (`S1`,
-`S2`, `S3` por su id, no «Lado acople») y que la sección escrita a mano sigue
-igual. Y **preguntarle al asistente desde esa pantalla**: lo medido está en el
+**0 · Confirmar los Planes 37, 38 y 40 en el navegador, y cerrar el 40 en
+planta.** La sección de `Nuevo-Modor` se abrió el 21-09 y las siete vistas
+caían en el primer render; está corregido y **falta volver a entrar**: Inicio,
+Gráficas, Vista 3D, Hallazgos, Avisos, Casos previos y RAG, comprobar que pinta
+SUS apoyos con el nombre que tengan en el árbol, y que el **muro de planta**
+(la ruta por defecto desde el Plan 40 F2) enseña un panel por configurada. Ya
+no hay sección escrita a mano que comparar. Después los tres pasos de F4 del
+Plan 40 (sondear en marcha, dar de baja la espejo en planta, medir). Y **preguntarle al asistente desde esa pantalla**: lo medido está en el
 Plan 38 F3, con lo que aún se va a las cuatro máquinas («¿hay algún riesgo
 activo?»). Después, **Plan 37 F4** (Alarmas de la máquina configurada) y una
 segunda vuelta al Plan 36: quitar variables, emparejar a mano un tag de

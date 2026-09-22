@@ -1,6 +1,6 @@
 # PLAN 34 — Las máquinas se configuran desde el árbol de ICONICS
 
-**Estado:** F0, F0.2, F1, F2, F3 y F4 completadas · F5 por completar
+**Estado:** F0, F0.2, F1, F2, F3, F4 y F5 completadas (F5 la hizo el Plan 40)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -784,6 +784,18 @@ configuración, ganado por sondeo**, antes de que el catálogo se vaya.
 - La suite sigue en sus números, o los que cambien están justificados.
 
 **Riesgo.** Alto si se adelanta; bajo si F3 y F4 cumplieron.
+
+**Lo que de verdad pasó (22-09-2026).** Esta fase se ejecutó como el
+[Plan 40](../por-completar/PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md),
+que la desglosa en cinco: la simulación pasa al tipo (F0), el backend deja de
+necesitar el id (F1), el frontend enseña vibraciones sólo por configuradas
+(F2), la entrada sale de `SISTEMAS` con `GRUPO_HISTORIADOR` y el arreglo
+táctico de F0 (F3), y los documentos (F5). Los tres criterios de aceptación de
+aquí se cumplen; los números de la suite que cambiaron están justificados en
+ese plan. Lo que este plan llamaba «catálogo» sobrevive como
+`shared/eva/vibraciones/catalogoDemo.js`: fuera del registro, como referencia
+contra la que se compara la configurada y como lo que el transporte falso
+publica. Lo que falta del Plan 40 (F4) son pasos en planta, no código.
 
 ---
 

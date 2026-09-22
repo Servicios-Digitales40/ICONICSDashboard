@@ -1,6 +1,6 @@
 # PLAN 32 — Vibraciones 1.0: el módulo completo
 
-**Estado:** F1 completada · F2 en adelante por completar
+**Estado:** F1 completada · F2–F6 por completar, reformuladas el 22-09-2026 para la máquina CONFIGURADA (Plan 40)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 17-09-2026
 
@@ -191,25 +191,39 @@ exigiría otro hardware.
 
 ## 5. Fases siguientes
 
+> **Revisadas el 22-09-2026 (Plan 40 F5).** Estas fases se escribieron para la
+> máquina de vibraciones ESCRITA A MANO, que ya no existe: desde el Plan 40 la
+> demo es una máquina **configurada** de tipo `vibraciones`. Lo que pedía
+> tocar el catálogo se hace ahora en el TIPO (`shared/eva/tipos/vibraciones.js`
+> y los módulos de `shared/eva/vibraciones/`) y vale para toda configurada de
+> ese tipo; lo que pedía datos de la instalación se hace en su configuración.
+
 ### F2 — Desbloquear el historiador
 Por qué `DEMO 3` devuelve 0 muestras: si el grupo dejó de registrar, o si la
-ruta cambió como en B10. **Bloquea el objetivo 1 y las `firmaTemporal`.**
+ruta cambió como en B10. **Bloquea el objetivo 1 y las `firmaTemporal`.** Para
+la configurada, la respuesta se gana **sondeando en marcha** (`Nuevo-Modor`
+quedó con 33 series sin muestras por sondearse en paro: Plan 40 F4) y queda
+escrita en `historyVerified` variable por variable, no en una lista.
 
 ### F3 — Las señales en la pantalla
-`data/vibraciones/historia.js` y reutilizar `GraficaHistoria` y
-`SelectorRango`, que ya son genéricos.
+La vista Gráficas de la sección de cada configurada ya usa `GraficaHistoria` y
+`SelectorRango` (Plan 37 F2). Lo que falta es que tenga series que pintar
+(F2), no la vista.
 
 ### F4 — El diagnóstico ve
 `necesita` en las 8 reglas que no lo tienen, factor de cresta, y normalizar por
-rpm.
+rpm: en `riesgosVibracion.js`, que es del tipo, así que lo gana toda
+configurada de vibraciones a la vez.
 
 ### F5 — RAG y casos
 `terminosManual` en las causas de vibraciones, para alcanzar los 47 fragmentos
-de la ISO 20816-3 que ya están indexados.
+de la ISO 20816-3 que ya están indexados. Es del tipo; el manual se asigna a la
+máquina configurada por su id (Plan 39 F3 acota la búsqueda por tipo).
 
 ### F6 — Índice de sinónimos
 Que el asistente entienda «el apoyo del motor» como el tanque entiende «la
-bomba».
+bomba». El tipo ya trae `vocabulario` (Plan 40 F3) y los alias de cada variable
+viajan en la configuración; lo que falta es el índice que los cruce.
 
 ---
 

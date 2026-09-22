@@ -1,6 +1,6 @@
 # PLAN 40 — Retirar la máquina de vibraciones escrita a mano
 
-**Estado:** F0–F3 completadas · F4 (planta) y F5 (documentos) por completar
+**Estado:** F0–F3 y F5 completadas · F4 (pasos en planta, del usuario) por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -353,12 +353,45 @@ motor girando (el sondeo en paro dejó 33 sin muestras), dar de baja
 **Criterios.** El instrumento sobre `Nuevo-Modor` sin otra vibraciones en el
 registro; el número de series verificadas anotado.
 
+**Pendiente (22-09-2026): no se puede hacer desde el repo.** Los tres pasos
+necesitan ICONICS delante y se dejan escritos para quien los dé:
+
+1. Con el motor girando, en la ficha de `Nuevo-Modor`, «Sondear sus series».
+   Anotar aquí cuántas quedan verificadas (en paro fueron 33 sin muestras).
+2. Si `vibraciones-configurada` sigue en `datos/maquinas.json` de planta,
+   darla de baja o dejarla inactiva: dos configuradas sobre la misma raíz se
+   solapan y el registro se queda con la primera.
+3. Y dar nombre a los tres apoyos en el árbol (`S1` → «Lado acople», etc.):
+   una configurada saca el nombre del apoyo de `assets[].nombre`, y sin él el
+   asistente dice «S1 (S1, bearing unidentified)». Después:
+   `node --env-file=.env.local scripts/medir-asistente-configurada.mjs --maquina Nuevo-Modor`
+   y anotar cuántas de las 8 preguntas llegan a la máquina.
+
 ### F5 — Documentos
 
 `HANDOFF`, `CLAUDE.md` (§4.7 habla de «`tanque` y `vibraciones`»),
 `shared/README.md`, `Demo-EVA/README.md`, y el Plan 34 F5 cerrado remitiendo
 aquí. El Plan 32 se revisa: lo que pedía para la escrita a mano se reformula
 para la configurada o se cierra.
+
+**Lo que de verdad pasó (22-09-2026).**
+
+- `CLAUDE.md`: §4.7 dice que un sistema es el tanque más cada configurada, y
+  que no hay vibraciones escrita a mano; el árbol de §3 y la nomenclatura de
+  §4.4 ya no listan `ControlesVibraciones` ni un simulador por máquina; §6.1
+  añade este plan a los vivos y archiva el 34.
+- `HANDOFF`: números medidos hoy, un párrafo en «Qué funciona», F4 en «Qué
+  está a medias», el 34 archivado y el 40 entre los planes vivos, y el paso 0
+  de «Próximos» incluye el muro de planta y los tres pasos de F4.
+- `shared/README.md`: la sección de vibraciones pasa a describir el TIPO y
+  `catalogoDemo.js` como referencia fuera del registro.
+- `Demo-EVA/README.md`: la fila de la tabla es «una sección por configurada»;
+  el párrafo de los dos simuladores cuenta que el segundo se fue con la
+  máquina y que una configurada se simula con su tipo.
+- Plan 34: F5 cerrada remitiendo aquí y el plan archivado en
+  `docs/completados/`. Plan 32: F2–F6 reformuladas para la configurada, con
+  una nota de por qué; ninguna se cerró, porque ninguna estaba hecha.
+- Lo que este documento no puede cerrar es F4, y lo dice arriba.
 
 ---
 

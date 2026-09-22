@@ -58,8 +58,12 @@ Ver [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../docs/por-completar/PLAN-8-DEMO-
 | `eva/comun/pronostico.js` | Sus 5 mecanismos de desgaste acumulado |
 | `eva/tanque/estadoTanque.js` | Su proyección a la forma común, y cómo se narra al asistente |
 
-**El sistema de vibraciones** — `ac:TDCON/Motors/01/` más `ae:/DEMO VIBRACIONES`,
-73 puntos sobre tres apoyos:
+**El tipo `vibraciones`** — desde el Plan 40 (22-09-2026) **no hay una
+máquina de vibraciones escrita a mano en `sistemas.js`**: la de la demo
+(`ac:TDCON/DEMO_VIBRACIONES/Vibraciones/` más `ae:/DEMO VIBRACIONES`, 73
+puntos sobre tres apoyos) es una **configurada** que `construirSistema` monta
+sobre `tipos/vibraciones.js`. Lo que queda en esta carpeta es lo que es del
+tipo, y una referencia:
 
 | Archivo | Qué contiene |
 |---|---|
@@ -68,10 +72,12 @@ Ver [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../docs/por-completar/PLAN-8-DEMO-
 | `eva/vibraciones/simuladorVibraciones.js` | Su física: `valorVibracionEn(punto, ms)` |
 | `eva/vibraciones/sistemaVibraciones.js` | De puntos sueltos a `{ canales, variador, alarmas }` — el recorrido que antes estaba escrito dos veces |
 | `eva/vibraciones/estadoVibraciones.js` | Su proyección a la forma común, y su narración (la frase viene hecha: ver su cabecera) |
+| `eva/vibraciones/catalogoDemo.js` | `CATALOGO_VIBRACIONES`: la FORMA de la entrada retirada, reconstruida desde los módulos de arriba. No está en el registro; es contra lo que se compara la configurada (`verificar-vibraciones-configurada`) y lo que publica el transporte falso cuando nadie ha configurado la máquina |
 
-Los dos catálogos **no se unifican**, y no es pendiente de nadie: son dos formas
-de datos, no dos versiones de la misma. Lo que sí se comparte es el PUERTO que
-ambos implementan, y eso es lo que declara `comun/sistemas.js`.
+El catálogo del tanque y el tipo de vibraciones **no se unifican**, y no es
+pendiente de nadie: son dos formas de datos, no dos versiones de la misma. Lo
+que sí se comparte es el PUERTO que ambos implementan —`comun/sistemas.js` lo
+declara y `comun/construirSistema.js` lo monta para una configurada—.
 
 Lo que sí se unificó es **cómo se cuentan hacia afuera**. Cada máquina proyecta
 su dominio a la forma de `comun/estadoMaquina.js`, y sobre esa forma se escriben una
