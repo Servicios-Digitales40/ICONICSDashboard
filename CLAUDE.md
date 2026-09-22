@@ -345,11 +345,11 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 178 correctas y 22 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 179 correctas y 22 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «178 de 200», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 200. Nueve de las 178 son sobre una
-> máquina **configurada** (Plan 39 F0), y también lo imprime.
+> qué. Ese verde significa «179 de 201», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 201. Diez de las 179 son sobre una
+> máquina **configurada** (Plan 39 F0–F1), y también lo imprime.
 
 ### 5.2 La tanda completa
 

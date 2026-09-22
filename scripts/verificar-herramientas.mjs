@@ -77,6 +77,7 @@ import { construirSistema } from '../shared/eva/comun/construirSistema.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+import { enMarchaVib } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 
 const c = {
@@ -686,23 +687,49 @@ await checkAsync('[configurada] sistemas_de_la_planta la lista con su id, su nom
   assert.ok(suya.limitaciones.length > 0, 'una configurada tiene que confesar lo que no sabe hacer')
 })
 
-await checkAsync('[configurada] estado_del_sistema la lee: puntos pedidos, y cuántos no contestaron', async () => {
-  const r = await createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-    .ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
-  assert.equal(r.ok, true, r.error)
-  assert.equal(r.sistema, ESPEJO.id)
-  assert.equal(r.configurada, true)
-  assert.equal(r.puntosPedidos, ESPEJO.variables.length)
-  // El falso sirve sus puntos como los de la escrita a mano: la mayoría
-  // contesta. Las vigilancias codificadas quedan como hueco declarado (ver
-  // `dominioDesdeRoles`), por eso no se exige cero.
-  assert.ok(r.sinLectura < r.puntosPedidos / 2, `${r.sinLectura} de ${r.puntosPedidos} sin lectura: el falso no la está sirviendo`)
+/*
+ * La simulación de vibraciones depende de la HORA: la máquina alterna marcha
+ * y paro en un ciclo de diez minutos (`enMarchaVib`), y en paro el variador y
+ * las velocidades no entregan. Un aserto sobre «cuántos sin lectura» sin fijar
+ * el instante daba 2 o 30 según cuándo corriera. Se fija un instante EN MARCHA
+ * y se comparan las dos entradas en ese mismo instante.
+ */
+let instanteEnMarcha = 0
+while (!enMarchaVib(instanteEnMarcha)) instanteEnMarcha += 60_000
+
+await checkAsync('[configurada] estado_del_sistema la lee como a la escrita a mano: mismos huecos, mismos valores por apoyo', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const suya = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
+  const escrita = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' })
+  assert.equal(suya.ok, true, suya.error)
+  assert.equal(suya.sistema, ESPEJO.id)
+  assert.equal(suya.configurada, true)
+  assert.equal(suya.puntosPedidos, ESPEJO.variables.length)
+  // Mismos tags, mismo instante: los mismos huecos que la escrita a mano.
+  assert.equal(suya.sinLectura, escrita.puntos_sin_lectura)
+
   /*
-   * LO QUE HOY NO TRAE, y el Plan 39 F1 tiene que traer: ni un valor por
-   * apoyo, ni el variador. Se fija aquí para que F1 tenga que cambiar este
-   * aserto a la vista, no para dar el hueco por bueno.
+   * Plan 39 F1: el estado lo compone el TIPO. Tres apoyos redactados con su
+   * número, y el número es el de la escrita a mano —mismo tag, mismo
+   * instante— aunque el rótulo del apoyo sea otro (la configurada no sabe
+   * que S1 es el «lado acople»; sabe que se llama S1).
    */
-  assert.equal(r.apoyos, undefined, 'F1 ya trae apoyos: actualiza esta comprobación')
+  assert.equal(suya.apoyos.length, 3, 'tres apoyos redactados')
+  const cifras = texto => texto.match(/\d+\.\d+/g) ?? []
+  assert.deepEqual(suya.apoyos.map(cifras), escrita.apoyos.map(cifras), 'las cifras de cada apoyo son las de la escrita a mano')
+  for (const a of suya.apoyos) assert.match(a, /velocidad eficaz \d/)
+  assert.ok(suya.variador && suya.norma && suya.servidor_de_alarmas, 'variador, norma y contadores vienen del tipo')
+  assert.match(suya.aviso, new RegExp(`sistema="${ESPEJO.id}"`), 'el aviso remite a SU id, no a «vibraciones»')
+})
+
+await checkAsync('[configurada] estado_del_sistema(idioma: "en") narra sus apoyos en inglés y conserva su id', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const en = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id }, { idioma: 'en' })
+  assert.equal(en.ok, true, en.error)
+  assert.equal(en.sistema, ESPEJO.id, 'el id no se traduce')
+  assert.equal(en.apoyos.length, 3)
+  for (const a of en.apoyos) assert.match(a, /RMS velocity/)
+  assert.match(en.aviso, new RegExp(`sistema="${ESPEJO.id}"`))
 })
 
 await checkAsync('[configurada] riesgos_activos la evalúa con las reglas de su TIPO', async () => {

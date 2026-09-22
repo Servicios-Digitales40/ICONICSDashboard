@@ -55,6 +55,7 @@
 import { capacidadesDe, permiteEscritura } from "./configuracionMaquina.js";
 import { dominioDesdeRoles } from "./dominioDesdeRoles.js";
 import { estadoComun, senalComun } from "./estadoMaquina.js";
+import { canalesDeMaquina, contadoresDeMaquina } from "./vistaDeMaquina.js";
 
 /**
  * Índice de una máquina configurada: sus puntos y cómo se resuelve cada uno.
@@ -123,6 +124,59 @@ export function construirSistema(maquina, tipo) {
   const clavesConSerie = conSerie.map((v) => v.id ?? v.pointName);
 
   /*
+   * ── LO QUE EL TIPO NOMBRA Y CÓMO SE LLAMA AQUÍ (Plan 39 F1) ────────
+   *
+   * El tipo habla en claves canónicas: `vRMS_S1`, `frecuencia`,
+   * `activasSinReconocer`. Esta máquina habla con SUS ids y SUS tags —en la
+   * planta, la frecuencia del variador se llama `FREQ OUTPUT_BMS`—. El mapa
+   * traduce lo primero a lo segundo por ROL y apoyo, que es lo único que las
+   * dos tienen en común; los contadores del área, que no tienen rol, entran
+   * por el sufijo con que el servidor de alarmas los publica.
+   */
+  const apoyos = canalesDeMaquina(maquina, tipo);
+  const apoyoDe = (assetId) => apoyos.find((c) => c.id === assetId) ?? null;
+  const contadores = contadoresDeMaquina(maquina, tipo.contadoresAlarma);
+
+  const canonicas = new Map();
+  for (const v of maquina.variables ?? []) {
+    const r = v.rol ? tipo.roles?.[v.rol] : null;
+    if (!r?.clave) continue;
+    const canonica = r.ambito === "apoyo" && v.assetId ? `${r.clave}_${v.assetId}` : r.clave;
+    if (!canonicas.has(canonica)) canonicas.set(canonica, v);
+  }
+  for (const [key, punto] of Object.entries(contadores)) {
+    const v = porPunto.get(punto);
+    if (v && !canonicas.has(key)) canonicas.set(key, v);
+  }
+
+  /**
+   * La etiqueta de una variable: su descripción, o el rótulo del rol con el
+   * apoyo detrás cuando lo tiene («Velocidad eficaz · S1»). Sin el apoyo, tres
+   * variables de tres apoyos se llamaban igual y el asistente tenía que pedir
+   * que eligieran (medido el 21-09-2026 con `Nuevo-Modor`).
+   */
+  const etiquetaDeVariable = (v) => {
+    if (v.descripcion) return v.descripcion;
+    const rol = tipo.roles?.[v.rol] ?? null;
+    const base = rol?.label ?? v.clave ?? v.id ?? v.pointName;
+    const apoyo = v.assetId ? apoyoDe(v.assetId) : null;
+    return apoyo ? `${base} · ${apoyo.label}` : base;
+  };
+
+  /** Para `tipo.estado`: la señal canónica del tipo, con el nombre de esta máquina. */
+  const resolver = (canonica) => {
+    const v = canonicas.get(canonica);
+    if (!v) return null;
+    const clave = v.id ?? v.pointName;
+    return {
+      clave,
+      tag: v.pointName,
+      label: etiquetaDeVariable(v),
+      historia: clavesConSerie.includes(clave),
+    };
+  };
+
+  /*
    * ── QUÉ SE LE PUEDE DAR AL ADAPTADOR, Y QUÉ NO ────────────────────
    *
    * `dominioDesdeRoles` reconstruye lo que SALE de un rol: las medidas, las
@@ -135,18 +189,30 @@ export function construirSistema(maquina, tipo) {
    *
    * Las máquinas escritas a mano las leen porque sus catálogos saben componer
    * esos nombres. Una configuración no los declara con rol —el generador ya
-   * lo reporta: «7 sin rol (sensor y alarmas)»— así que se pasan vacías y el
-   * adaptador lo DECLARA en `sinRoles` en vez de fingir que las miró.
+   * lo reporta: «7 sin rol (sensor y alarmas)»—.
    *
-   * La consecuencia es concreta y está probada: las reglas de alarma no
-   * disparan sobre una máquina configurada, porque `alarmas: {}` no es «cero
-   * alarmas», es «no se leyeron». Recogerlas es trabajo de F4, cuando la
-   * pantalla permita declarar el área.
+   * Las ALARMAS se resolvieron en el Plan 39 F1: los contadores del área se
+   * reconocen por el sufijo con que AlarmWorX los publica
+   * (`tipo.contadoresAlarma`, `contadoresDeMaquina`), se leen aquí y se le
+   * ENTREGAN al adaptador. Sin ninguno marcado se pasa `null` —que el
+   * adaptador declara en `sinRoles`— y nunca «cero alarmas»: `{}` no es cero,
+   * es «no se leyeron», y con eso las reglas de alarma no disparan.
+   *
+   * Los SENSORES siguen fuera: no hay sufijo ni rol que los identifique.
    */
   const reconstruirDominio = (valorDe) => {
     if (!tipo?.roles) return null;
     const tieneRoles = (maquina.variables ?? []).some((v) => v.rol);
     if (!tieneRoles) return null;
+
+    const alarmas = Object.keys(contadores).length
+      ? Object.fromEntries(
+          Object.entries(contadores).map(([key, punto]) => {
+            const valor = valorDe(punto);
+            return [key, valor === undefined ? null : valor];
+          }),
+        )
+      : null;
 
     return dominioDesdeRoles(maquina, tipo, valorDe, {
       /* Las vigilancias llegan codificadas y sólo el tipo sabe decodificarlas.
@@ -154,7 +220,7 @@ export function construirSistema(maquina, tipo) {
       leerEstado: tipo.decodificarVigilancia
         ? (punto) => tipo.decodificarVigilancia(valorDe(punto))
         : null,
-      alarmas: null,
+      alarmas,
       sensores: {},
     });
   };
@@ -203,9 +269,12 @@ export function construirSistema(maquina, tipo) {
     /**
      * El estado en la forma común, con su dominio reconstruido.
      *
-     * No lo construye el tipo: `tipo.estado` está escrito contra los
-     * catálogos de la máquina escrita a mano, que componen nombres de punto.
-     * Una máquina configurada trae una lista plana de variables con su rol.
+     * Desde el Plan 39 F1 lo construye el TIPO cuando declara `estado`:
+     * recibe el dominio reconstruido, los apoyos de esta máquina y cómo se
+     * llama aquí cada señal (`resolver`), y pone bandas, grupos y rótulos.
+     * El camino genérico de abajo queda para un tipo sin `estado`. Hasta ese
+     * día `tipo.estado` estaba escrito contra los catálogos de la máquina
+     * escrita a mano, y una configurada salía como una lista plana.
      *
      * ── EL DOMINIO YA NO VIAJA `null` (Plan 34 F3) ─────────────────
      *
@@ -223,22 +292,74 @@ export function construirSistema(maquina, tipo) {
      */
     estado: (valorDe, sistemaRegistro, leidoA = null) => {
       const sinLectura = [];
+      for (const punto of puntos) {
+        const valor = valorDe(punto);
+        if (valor === null || valor === undefined) sinLectura.push(punto);
+      }
+      const registro = sistemaRegistro ?? { id: maquina.id, nombre: maquina.nombre, limitaciones: [] };
+
+      /*
+       * ── EL ESTADO LO COMPONE EL TIPO CUANDO SABE (Plan 39 F1) ─────────
+       *
+       * Un tipo con `estado` —vibraciones lo tiene— pone bandas ISO, agrupa
+       * por apoyo, nombra el variador y los contadores. Hasta hoy una
+       * configurada salía de aquí como una lista plana de variables sin
+       * criterio, y el asistente no tenía nada que contar de ella. Los huecos
+       * se cuentan igual que antes, sobre TODAS sus variables. El camino de
+       * abajo queda para un tipo que no declare `estado`.
+       */
+      /** Una variable declarada, en la forma común y sin criterio: el camino genérico. */
+      const senalGenerica = (v) => {
+        const rol = tipo.roles?.[v.rol] ?? null;
+        const valor = valorDe(v.pointName);
+        return senalComun({
+          clave: v.id ?? v.pointName,
+          label: etiquetaDeVariable(v),
+          valor,
+          unidad: v.unidad ?? rol?.unidad ?? "",
+          estado: null,
+          banda: null,
+          motivo:
+            valor === null || valor === undefined
+              ? "El punto no entregó valor en esta lectura."
+              : null,
+          historia: clavesConSerie.includes(v.id ?? v.pointName),
+          grupo: v.assetId ?? null,
+        });
+      };
+
+      const dominio = reconstruirDominio(valorDe);
+      if (tipo.estado && dominio) {
+        const est = tipo.estado(valorDe, registro, leidoA, {
+          dominio,
+          apoyos,
+          resolver,
+          sinLectura,
+          puntosPedidos: puntos.length,
+        });
+
+        /*
+         * Lo que la máquina DECLARA y el tipo no coloca —una bandera, una
+         * vigilancia, una medida sin apoyo— sale igual, sin criterio y
+         * agrupado por su activo. Ninguna variable configurada desaparece del
+         * estado por no tener sitio en el catálogo del tipo: desaparecer se
+         * leería como «no existe», y existe.
+         */
+        const emitidas = new Set(est.senales.map((s) => s.clave));
+        const sueltas = (maquina.variables ?? []).filter(
+          (v) => v.pointName && !emitidas.has(v.id ?? v.pointName),
+        );
+        if (!sueltas.length) return est;
+        return { ...est, senales: [...est.senales, ...sueltas.map(senalGenerica)] };
+      }
 
       const senales = (maquina.variables ?? []).map((v) => {
         const rol = tipo.roles?.[v.rol] ?? null;
         const valor = valorDe(v.pointName);
 
-        /*
-         * Los puntos mudos se APUNTAN, no se deducen después. Es lo que
-         * permite decir «29 de 73 no contestan» —la frase que separa una
-         * pantalla en verde de una ciega— y lo que hace funcionar
-         * `estaMuda()`.
-         */
-        if (valor === null || valor === undefined) sinLectura.push(v.pointName);
-
         return senalComun({
           clave: v.id ?? v.pointName,
-          label: v.descripcion ?? rol?.label ?? v.id ?? v.pointName,
+          label: etiquetaDeVariable(v),
           valor,
           unidad: v.unidad ?? rol?.unidad ?? "",
           /*
@@ -266,7 +387,7 @@ export function construirSistema(maquina, tipo) {
        * las mismas que el asistente ve.
        */
       return estadoComun({
-        sistema: sistemaRegistro ?? { id: maquina.id, nombre: maquina.nombre, limitaciones: [] },
+        sistema: registro,
         senales,
         sinLectura,
         puntosPedidos: puntos.length,
@@ -292,7 +413,7 @@ export function construirSistema(maquina, tipo) {
          * la reconstrucción recorre las claves DEL TIPO y pone `null` en lo
          * que falta, en vez de omitir la clave.
          */
-        extra: { dominio: reconstruirDominio(valorDe) },
+        extra: { dominio },
       });
     },
 
@@ -303,24 +424,41 @@ export function construirSistema(maquina, tipo) {
      * por contrato, «lo que hay que confesar al contestar». Una máquina cuyas
      * reglas no se evalúan y que no lo diga se lee como una máquina sana.
      */
-    resumen: (estado) => ({
-      sistema: maquina.id,
-      nombre: maquina.nombre ?? maquina.id,
-      configurada: true,
-      senales: estado?.senales?.length ?? 0,
-      recuento: estado?.recuento ?? null,
-      /* Cuántos puntos no contestaron, de cuántos. Sin este par, un estado con
-         todas las señales en hueco se lee igual que uno sano. */
-      sinLectura: estado?.sinLectura?.length ?? 0,
-      puntosPedidos: estado?.puntosPedidos ?? 0,
-    }),
+    resumen: (estado, ctx = {}) => {
+      const identidad = {
+        sistema: maquina.id,
+        nombre: maquina.nombre ?? maquina.id,
+        configurada: true,
+        senales: estado?.senales?.length ?? 0,
+        recuento: estado?.recuento ?? null,
+        /* Cuántos puntos no contestaron, de cuántos. Sin este par, un estado con
+           todas las señales en hueco se lee igual que uno sano. */
+        sinLectura: estado?.sinLectura?.length ?? 0,
+        puntosPedidos: estado?.puntosPedidos ?? 0,
+      };
+
+      /*
+       * ── EL RESUMEN TAMBIÉN ES DEL TIPO (Plan 39 F1) ────────────────────
+       *
+       * Hasta hoy esto eran los cuatro recuentos de arriba y nada más: el
+       * modelo, con 64 de 94 puntos leyendo, decía «no tiene lecturas». El
+       * tipo sabe redactar cada apoyo con su número, su unidad y su veredicto
+       * ISO —y está medido que redactado desde el código el modelo no
+       * confunde velocidad con aceleración—. Los recuentos se quedan encima:
+       * lo primero que hay que decir sigue siendo cuántos puntos no contestaron.
+       */
+      if (tipo.resumen && estado?.dominio && ctx.riesgos && ctx.agrupar) {
+        return { ...tipo.resumen(estado, ctx), ...identidad };
+      }
+      return identidad;
+    },
 
     claves: () => [...porClave.keys()],
 
     etiquetaDe: (clave) => {
       const v = porClave.get(clave);
       if (!v) return null;
-      return v.descripcion ?? tipo.roles?.[v.rol]?.label ?? clave;
+      return etiquetaDeVariable(v);
     },
 
     /** Los nombres por los que alguien puede pedir una señal de esta máquina. */
@@ -328,7 +466,9 @@ export function construirSistema(maquina, tipo) {
       const v = porClave.get(clave);
       if (!v) return [];
       const rol = tipo.roles?.[v.rol] ?? null;
-      return [clave, v.descripcion, rol?.label, rol?.corto, ...(v.alias ?? [])].filter(Boolean);
+      return [...new Set(
+        [clave, v.descripcion, etiquetaDeVariable(v), rol?.label, rol?.corto, ...(v.alias ?? [])].filter(Boolean),
+      )];
     },
 
     esHistorizada: (clave) => clavesConSerie.includes(clave),
@@ -355,9 +495,14 @@ export function construirSistema(maquina, tipo) {
     desgaste: null,
     cadenciaMs: maquina.cadenciaMs ?? 5_000,
 
-    mide: (maquina.variables ?? [])
-      .map((v) => v.descripcion ?? tipo.roles?.[v.rol]?.label)
-      .filter(Boolean),
+    /* Sin repetir: una máquina con tres apoyos mide «velocidad eficaz» una vez,
+       no tres. Esta lista va al prompt del asistente, donde cada línea de más
+       cuesta contexto (Plan 39 F1). */
+    mide: [...new Set(
+      (maquina.variables ?? [])
+        .map((v) => v.descripcion ?? tipo.roles?.[v.rol]?.label)
+        .filter(Boolean),
+    )],
 
     /* Sin vocabulario propio: el dictado cae al contexto general, que
        transcribe algo peor pero nunca deforma con el vocabulario de otra

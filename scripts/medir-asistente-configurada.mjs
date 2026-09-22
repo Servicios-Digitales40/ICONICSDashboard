@@ -185,6 +185,18 @@ const CASOS = [
     herramienta: ['riesgos_activos'],
     porque: 'Igual que el anterior, para la herramienta que más se usa desde Hallazgos.',
   },
+  {
+    id: 'apoyos-desde-su-pantalla',
+    pregunta: '¿Qué vibración tiene cada apoyo ahora mismo?',
+    conContexto: true,
+    herramienta: ['estado_del_sistema'],
+    porque:
+      'Plan 39 F1: el estado de una configurada tiene que traer VALORES por apoyo, no recuentos. ' +
+      'Antes de F1 el modelo contestaba «no tiene lecturas disponibles» con 64 de 94 puntos leyendo.',
+    /* Además de llegar a la máquina, ¿el texto cita una velocidad con su unidad? */
+    citaValores: /\d+[.,]\d+\s*mm\/s/,
+    dependeDelEstado: true,
+  },
   senal && {
     id: 'historia-desde-su-pantalla',
     pregunta: `¿Cómo ha ido ${senal.etiqueta} en los últimos 7 días?`,
@@ -326,6 +338,10 @@ for (const caso of casos) {
       `${ev.nombraOtra ? ' y lo dice en el texto' : ''}${c.reset}`)
   }
   if (!ev.nombraLaMaquina) console.log(`      ${c.gris}el texto no nombra la máquina${c.reset}`)
+  if (caso.citaValores) {
+    const cita = caso.citaValores.test(turno.texto)
+    console.log(`      ${cita ? c.verde : c.amarillo}${cita ? 'cita valores con unidad' : 'NO cita ningún valor con unidad'}${c.reset}`)
+  }
   if (ev.veredicto !== 'otra-maquina' && ev.otrasNombradas.length) {
     console.log(`      ${c.amarillo}el texto habla de ${ev.otrasNombradas.map(s => `«${SISTEMA[s].nombre}»`).join(', ')}${c.reset}`)
   }

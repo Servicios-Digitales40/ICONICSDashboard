@@ -38,8 +38,10 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 import { construirSistema } from '../shared/eva/comun/construirSistema.js'
-import { SISTEMA } from '../shared/eva/comun/sistemas.js'
+import { SISTEMA, valorSimuladoDe } from '../shared/eva/comun/sistemas.js'
+import { contadoresDeMaquina } from '../shared/eva/comun/vistaDeMaquina.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
+import { enMarchaVib } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m', amarillo: '\x1b[33m',
@@ -341,14 +343,23 @@ check('la configurada TAMBIÉN trae forma de dominio, reconstruida', () => {
   )
 })
 
-check('lo que NO sale de un rol se declara: alarmas y estado del sensor', () => {
+check('lo que NO sale de un rol se declara: el estado del sensor (las alarmas ya se leen)', () => {
   /*
-   * No es un olvido: las alarmas son del servidor de ICONICS que vigila el
-   * área, y el estado del sensor es del SM 1281. Ninguna describe una medida
-   * del motor, que es lo que un rol nombra. Se recogen en F4.
+   * No es un olvido: el estado del sensor es del SM 1281, no una medida del
+   * motor, y ningún rol lo nombra. Hasta el Plan 39 F1 aquí figuraban también
+   * las alarmas; desde entonces los contadores del área se reconocen por su
+   * sufijo (`tipo.contadoresAlarma`) y se le entregan al dominio, así que
+   * dejan de estar «sin rol». Sólo si la máquina no marcó ninguno vuelven a
+   * aparecer aquí, que es lo correcto: no leído no es cero.
    */
   const est = configurada.estado(() => null, configurada)
-  assert.deepEqual(est.dominio.sinRoles.sort(), ['alarmas', 'sensores'])
+  assert.deepEqual(est.dominio.sinRoles.sort(), ['sensores'])
+
+  const sinContadores = construirSistema(
+    { ...configuracion, variables: configuracion.variables.filter((v) => !v.pointName.startsWith('ae:')) },
+    tipoDe('vibraciones'),
+  )
+  assert.deepEqual(sinContadores.estado(() => null, sinContadores).dominio.sinRoles.sort(), ['alarmas', 'sensores'])
 })
 
 check('y lo DECLARA: no aparenta poder diagnosticar', () => {
@@ -439,6 +450,94 @@ console.log(
     `${configurada.series.historizadas().length} series${c.reset}`
 )
 
+/* ── El estado y el resumen salen del TIPO (Plan 39 F1) ─────────────── */
+
+console.log('\n── El estado y el resumen salen del tipo (Plan 39 F1) ───────')
+
+/*
+ * Se leen las dos entradas con el simulador del catálogo, en un instante EN
+ * MARCHA (la simulación alterna marcha y paro cada diez minutos). Los tags de
+ * la configurada son los de la escrita a mano, así que `valorSimuladoDe` les
+ * da el mismo valor: lo que se compara es qué hace cada entrada con él.
+ */
+let instante = 0
+while (!enMarchaVib(instante)) instante += 60_000
+const leerSimulado = (punto) => valorSimuladoDe(punto, instante) ?? null
+const tipoVib = tipoDe('vibraciones')
+
+check('la configurada arma su estado con el tipo: bandas ISO en la velocidad eficaz y grupos por apoyo', () => {
+  const est = configurada.estado(leerSimulado, configurada)
+  const vrms = est.senales.filter((s) => s.clave.startsWith('vRMS_'))
+  assert.equal(vrms.length, 3, 'tres velocidades eficaces, una por apoyo')
+  for (const s of vrms) {
+    assert.ok(s.banda, `${s.clave} sin banda ISO`)
+    assert.notEqual(s.valor, null, `${s.clave} sin valor simulado`)
+  }
+  assert.deepEqual(est.grupos.map((g) => g.id), ['S1', 'S2', 'S3', 'variador', 'alarmas'])
+  assert.equal(est.apoyos?.length, 3, 'los apoyos viajan en el estado')
+})
+
+check('sus señales llevan SU tag literal y si tienen historia', () => {
+  const est = configurada.estado(leerSimulado, configurada)
+  const s = est.senales.find((x) => x.clave === 'vRMS_S1')
+  assert.equal(s.tag, configuracion.variables.find((v) => v.id === 'vRMS_S1').pointName)
+  assert.equal(s.historia, configurada.esHistorizada('vRMS_S1'))
+})
+
+check('en el mismo instante, cada señal vale lo mismo que en la escrita a mano', () => {
+  const valores = (est) => Object.fromEntries(est.senales.map((s) => [s.clave, s.valor]))
+  const suya = valores(configurada.estado(leerSimulado, configurada))
+  const escrita = valores(aMano.estado(leerSimulado, aMano))
+  for (const [clave, valor] of Object.entries(escrita)) {
+    assert.equal(suya[clave], valor, `«${clave}» difiere`)
+  }
+})
+
+check('lee los contadores del área de alarmas, que no tienen rol en el tipo', () => {
+  const esperados = Object.keys(contadoresDeMaquina(configuracion, tipoVib.contadoresAlarma))
+  assert.ok(esperados.length > 0, 'la espejo tiene que traer los contadores del catálogo')
+  const est = configurada.estado(leerSimulado, configurada)
+  assert.deepEqual(Object.keys(est.dominio.alarmas).sort(), esperados.sort())
+  assert.ok(!est.dominio.sinRoles.includes('alarmas'), 'con contadores leídos, «alarmas» ya no está sin rol')
+})
+
+check('el resumen para el asistente trae los apoyos redactados y la identidad de la configurada', () => {
+  const est = configurada.estado(leerSimulado, configurada)
+  const riesgos = tipoVib.evaluarRiesgos(est.dominio)
+  const r = configurada.resumen(est, { riesgos, agrupar: (x) => x })
+  assert.equal(r.sistema, configurada.id)
+  assert.equal(r.configurada, true)
+  assert.equal(r.puntosPedidos, configuracion.variables.length)
+  assert.equal(r.apoyos.length, 3)
+  for (const a of r.apoyos) assert.match(a, /velocidad eficaz \d/)
+  assert.match(r.aviso, new RegExp(`sistema="${configurada.id}"`), 'el aviso remite a SU id')
+})
+
+check('sin descripción, la etiqueta lleva el apoyo, y cada señal lleva el id de la máquina', () => {
+  /* Como `Nuevo-Modor` en planta: sin descripciones, y con el variador
+     nombrado como lo nombra el servidor, no como lo nombra el tipo. */
+  const comoEnPlanta = {
+    ...configuracion,
+    variables: configuracion.variables.map((v) => ({
+      ...v,
+      descripcion: null,
+      id: v.rol?.startsWith('variador:') ? `${v.id.toUpperCase()}_BMS` : v.id,
+    })),
+  }
+  const entrada = construirSistema(comoEnPlanta, tipoVib)
+  assert.equal(entrada.etiquetaDe('vRMS_S1'), 'Velocidad eficaz · S1')
+  assert.equal(entrada.etiquetaDe('vRMS_S2'), 'Velocidad eficaz · S2')
+  const est = entrada.estado(leerSimulado, entrada)
+  assert.ok(est.senales.some((s) => s.clave === 'FRECUENCIA_BMS'), 'la señal del variador lleva el id de la máquina')
+  assert.ok(!est.senales.some((s) => s.clave === 'frecuencia'), 'y no la clave canónica del tipo')
+  assert.equal(est.senales.find((s) => s.clave === 'vRMS_S1').label, 'Velocidad eficaz · S1')
+
+  /* Y «mide» —lo que va al prompt— no repite tres veces lo que mide en tres
+     apoyos: con 73 variables sin descripción, cabe en una lista corta. */
+  assert.equal(new Set(entrada.mide).size, entrada.mide.length)
+  assert.ok(entrada.mide.length < comoEnPlanta.variables.length / 2, `mide tiene ${entrada.mide.length} entradas`)
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {
@@ -456,7 +555,8 @@ console.log(
     `el catálogo de vibraciones.${c.reset}`
 )
 console.log(
-  `${c.amarillo}La forma de dominio SÍ se reproduce desde el Plan 34 F3. Lo que queda fuera ` +
-    `—y está declarado—\nson las alarmas y el estado del sensor: no salen de un rol del ` +
+  `${c.amarillo}La forma de dominio SÍ se reproduce desde el Plan 34 F3, y el estado y el resumen ` +
+    `salen del tipo desde el Plan 39 F1.\nLo que queda fuera —y está declarado— es el estado del ` +
+    `sensor: no sale de un rol del ` +
     `tipo.${c.reset}`
 )

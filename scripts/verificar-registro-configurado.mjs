@@ -279,9 +279,42 @@ check('un hueco NO se disfraza de cero', () => {
 })
 
 check('una banda no se inventa sin umbrales calibrados', () => {
+  /*
+   * Esta variable tiene rol pero NO apoyo (`assetId`): el tipo no puede
+   * colocarla en su dominio y sale sin criterio, como una señal suelta. Una
+   * banda aquí sería inventada.
+   */
   const est = entrada.estado(() => 999, entrada)
   assert.equal(est.senales[0].banda, null)
   assert.equal(est.senales[0].estado, null)
+})
+
+check('la banda que SÍ sale es la de la norma del tipo, y sólo donde hay norma (Plan 39 F1)', () => {
+  /* La misma máquina, con su apoyo declarado: el tipo la coloca en S1 y la
+     velocidad eficaz lleva ISO 10816; la aceleración, que ninguna norma
+     acota, sigue sin banda. */
+  const conApoyo = configuracion('vib-m02-apoyo', 'ac:PRUEBA/M02B/')
+  conApoyo.assets.push({ id: 'S1', pointName: 'ac:PRUEBA/M02B/S1/', rol: 'secundario' })
+  for (const v of conApoyo.variables) v.assetId = 'S1'
+  /* La norma sólo aplica si se sabe la velocidad: sin variador, el veredicto
+     es «no se sabe», no «zona D». Se declara la velocidad para poder juzgar. */
+  conApoyo.variables.push(
+    crearVariable({ id: 'velocidad', pointName: 'ac:PRUEBA/M02B/V20/velocidad', rol: 'variador:velocidad' }),
+  )
+  const est = construirSistema(conApoyo, TIPO).estado(() => 999, null)
+  const vrms = est.senales.find((s) => s.clave === 'vRMS_S1')
+  const arms = est.senales.find((s) => s.clave === 'aRMS_S1')
+  assert.ok(vrms.banda, 'la velocidad eficaz lleva la banda ISO del tipo')
+  assert.equal(vrms.estado, 'critico', `999 mm/s a 999 rpm es zona D (salió ${vrms.estado})`)
+  assert.equal(arms.banda, null, 'la aceleración no tiene norma que la acote')
+  assert.equal(est.senales.length, 3, 'y no aparece ninguna señal que la máquina no declare')
+
+  /* Sin la velocidad, el mismo 999 no se juzga: la norma no se sabe si aplica. */
+  const sinVelocidad = construirSistema(
+    { ...conApoyo, id: 'vib-m02-sin-velocidad', variables: conApoyo.variables.filter((v) => v.id !== 'velocidad') },
+    TIPO,
+  ).estado(() => 999, null)
+  assert.equal(sinVelocidad.senales.find((s) => s.clave === 'vRMS_S1').estado, null)
 })
 
 check('el rol del tipo aporta etiqueta y unidad reales', () => {

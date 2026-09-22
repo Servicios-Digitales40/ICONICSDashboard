@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0 completada · F1–F6 por completar
+**Estado:** F0–F1 completadas · F2–F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -214,16 +214,19 @@ del historiador sea **literalmente el mismo**, y que nunca se le niegue por
 desconocida. Servir la historia de vibraciones en el falso es trabajo de F2,
 y ahí se mide de verdad la unidad.
 
-**Con `rnd: 0.99`, 30 de 73 puntos sin lectura.** Son las vigilancias
-codificadas en base64: `dominioDesdeRoles` las deja como hueco declarado
-cuando no hay `leerEstado`, y `construirSistema.estado()` no se lo pasa. La
-escrita a mano sí las decodifica. Es un hueco de F1 (estado por tipo), y el
-aserto de hoy lo deja escrito: exige menos de la mitad sin lectura, no cero.
+**La simulación depende de la hora, y la primera lectura lo escondió.** En
+un ensayo salieron 30 de 73 puntos sin lectura y se atribuyó a las
+vigilancias codificadas; era falso —`construirSistema` ya las decodifica con
+`tipo.decodificarVigilancia`—. El simulador de vibraciones alterna marcha y
+paro en un ciclo de diez minutos (`enMarchaVib`) y en paro el variador y las
+velocidades no entregan: la misma lectura, minutos después, dio 2 de 73 en
+las dos entradas. Por eso el aserto de estado fija un instante EN MARCHA con
+`ahora` del transporte falso y compara la configurada con la escrita a mano
+**en ese mismo instante**, en vez de exigir un número.
 
-**`estado_del_sistema` de una configurada no trae `apoyos`.** Hay un aserto
-que lo fija (`r.apoyos === undefined`) con el mensaje «F1 ya trae apoyos:
-actualiza esta comprobación». No es dar el hueco por bueno: es que F1 tenga
-que pasar por ahí a la vista.
+**`estado_del_sistema` de una configurada no traía `apoyos`.** F0 lo dejó
+fijado con un aserto (`r.apoyos === undefined`, «F1 ya trae apoyos: actualiza
+esta comprobación») para que F1 tuviera que pasar por ahí a la vista. Pasó.
 
 **La etiqueta tiene dos dueños.** Con la espejo registrada,
 `sistemasDeSenal('Velocidad eficaz · Lado acople')` devuelve `vibraciones` y
@@ -241,32 +244,103 @@ y llegue al motor, que es lo que el Plan 38 F1 generalizó.
 `verificar-chat` 68 → **71**; `verificar-vibraciones-configurada` 25, igual;
 los 41 verificadores en verde; lint limpio.
 
-### F1 — Estado y resumen por tipo
+### F1 — Estado y resumen por tipo ✅
+
+**Completada el 21-09-2026.**
 
 **Objetivo.** Que `estado_del_sistema` sobre una configurada devuelva lo que
 devuelve sobre la escrita a mano: apoyos con sus medidas y su banda ISO,
 variador, alarmas, y un resumen que el modelo pueda redactar.
 
-**Cómo.**
-- `estadoDeVibraciones` y `resumenVibracionesParaAsistente` aceptan el
-  dominio ya construido y la lista de canales de la máquina
-  (`canalesDeMaquina`, Plan 37) en vez de `CANALES` y de fabricar el dominio
-  con tags fijos. La escrita a mano las llama como hoy; la configurada, con
-  `dominioDesdeRoles`.
-- `construirSistema.estado()` usa `tipo.estado` cuando el tipo lo trae: bandas
-  ISO, norma aplicable, `soloEnMarcha`, etiquetas con apoyo (`Velocidad
-  eficaz · S1`), unidad del rol. Lo genérico de hoy queda como camino para un
-  tipo sin `estado`.
-- `construirSistema.resumen()` usa `tipo.resumen`; los cuatro recuentos de hoy
-  se quedan dentro, porque «cuántos puntos no contestaron» sigue siendo lo
-  primero que hay que decir.
-- `etiquetaDe`/`aliasDe` añaden el apoyo cuando el tipo tiene canales y la
-  variable no trae descripción.
+- `estadoDeVibraciones(valorDe, registro, leidoA, opciones)` acepta el
+  dominio ya reconstruido, los apoyos de la máquina y un `resolver` que dice
+  cómo se llama aquí cada señal canónica del tipo; sin opciones, la escrita a
+  mano sale igual que antes. `resumenVibracionesParaAsistente` lee los apoyos
+  del estado y remite a `historia_de_senal(sistema="<su id>")`.
+- `construirSistema`: `estado()` llama a `tipo.estado` con el dominio, los
+  apoyos (`canalesDeMaquina`) y el resolvedor por rol; `resumen()` llama a
+  `tipo.resumen` y deja encima la identidad y los recuentos; lee los
+  contadores del área (`contadoresDeMaquina`) y se los entrega al dominio;
+  `etiquetaDe` compone «rótulo · apoyo» cuando no hay descripción; `mide` no
+  repite.
+- El narrador inglés sigue a los apoyos del estado, no traduce el id de una
+  configurada y remite a su id en el aviso.
+- Pruebas: 7 checks nuevos en `verificar-vibraciones-configurada` (25 → 31,
+  con uno reescrito), 1 más en `verificar-herramientas` (178 → 179) y el de
+  estado reescrito con reloj fijo. Seis de los siete se vieron fallar sin F1.
 
-**Criterios.** Sobre la configurada, `estado_del_sistema` trae `apoyos[]` con
-valores y banda; la etiqueta de `vRMS_S1` es distinta de la de `vRMS_S2`; el
-instrumento gana «¿qué vibración tiene cada apoyo?» y contesta con valores;
-«no he podido resumirlos» desaparece de ese caso (hoy: 2 de 7 casos).
+#### Lo que de verdad pasó (F1)
+
+**El resolvedor, y no sólo los apoyos.** El plan decía «acepten el dominio y
+los canales». Faltaba lo tercero: en planta, la frecuencia del variador de
+`Nuevo-Modor` se llama `FREQ OUTPUT_BMS`, y su id de dominio es ése, no
+`frecuencia`. Si el tipo hubiera nombrado las señales con sus claves
+canónicas, la historia, los casos y las series —que van por el id de la
+variable— no habrían encontrado la señal que el estado enseñaba. El
+`resolver` traduce cada clave canónica a la variable de la máquina por ROL y
+apoyo, y la señal sale con SU id, SU tag literal y si tiene serie. Hay un
+check que renombra el variador como en planta y lo comprueba.
+
+**Los contadores de alarma entraron aquí, no en F4.** El comentario de
+`construirSistema` decía que recogerlos era «trabajo de F4, cuando la
+pantalla permita declarar el área». La pantalla ya lo permite desde el Plan
+36, el tipo ya declara sus sufijos desde el Plan 37 F2 y el frontend ya los
+leía; sólo el backend los pasaba como `null`. Con ellos, `dominio.sinRoles`
+de la espejo pasa de `['alarmas', 'sensores']` a `['sensores']`, y el check
+que fijaba lo primero se reescribió diciendo por qué. Sin ningún contador
+marcado sigue siendo `null`, y el check lo comprueba quitándolos.
+
+**La escrita a mano no cambió ni un valor.** `verificar-vibraciones` (13),
+`verificar-dominio-configurado` y las 385 del backend pasan igual; el check
+de la espejo compara señal por señal contra la escrita a mano en el mismo
+instante del simulador y coinciden todas.
+
+**El estado genérico se queda para un tipo sin `estado`.** No hay ninguno
+hoy; existe para que dar de alta un tipo nuevo sin narrador no rompa el
+alta. Lo que cambió en ese camino es que la etiqueta lleva el apoyo.
+
+**Lo que todavía no hace una configurada de este tipo**, y se quedó dicho en
+el código: el estado del sensor por apoyo (`sensores`), que no tiene rol ni
+sufijo; la sensibilidad y el rodamiento de cada apoyo (el resumen dice
+«rodamiento sin identificar»); y `enReposo`, que el tipo no sabe para
+ninguna de las dos.
+
+**Sólo lo que la máquina declara, y todo lo que declara.** La primera versión
+emitía el catálogo canónico entero del tipo: una máquina de prueba con dos
+variables salía con veinte señales «sin dato» de apoyos y variador que no
+tenía, y `verificar-registro-configurado` la cazó (tres checks). Con
+resolvedor, una clave que la máquina no declara no se emite —no es un hueco,
+es inventar la ausencia de algo que nadie declaró—; y lo que la máquina
+declara y el tipo no coloca (una bandera, una vigilancia, una medida sin
+apoyo) sale igual, sin criterio y agrupado por su activo. Ninguna variable
+desaparece del estado por no tener sitio en el catálogo del tipo. El check de
+la banda se reescribió en dos: sin apoyo declarado no hay banda; con apoyo y
+velocidad, la velocidad eficaz lleva ISO y la aceleración no.
+
+**Contra el modelo real** (`medir-asistente-configurada --maquina
+vib-motor-03`, con el caso nuevo «¿qué vibración tiene cada apoyo?»; la
+máquina seguía parada, 0 rpm):
+
+| Caso | Antes de F1 (Plan 38 F3) | Con F1 |
+|---|---|---|
+| ¿Cómo está esta máquina? (contexto) | `vib-motor-03`, pero «no he podido resumirlos» | `vib-motor-03`: «La máquina Nuevo-Modor (vib-motor-03) está parada» |
+| ¿Qué vibración tiene cada apoyo? (contexto) | — (caso nuevo) | `vib-motor-03`, **cita valores con unidad** (mm/s), y dice que está en reposo a 0 rpm |
+| ¿Cómo está Nuevo-Modor? | `vib-motor-03`: «no tiene lecturas disponibles» | `vib-motor-03`: «Nuevo-Modor está parado» |
+| ¿Hay algún riesgo activo? (contexto) | barría las cuatro | sólo `vib-motor-03` (2 rondas) |
+| ¿Cómo ha ido Velocidad eficaz · S1…? (contexto) | `vib-motor-03`, pedía desambiguar | **`"vibraciones"`**: se fue a la escrita a mano |
+| Documentación (contexto) | `vib-motor-03`, 6 rondas, sin redactar | `vib-motor-03`, 3 rondas, redacta |
+
+**7 de 8 llegan** (antes 6 de 7). Ninguna respuesta acabó en «no he podido
+resumirlos»: con apoyos redactados el 4B tiene algo que contar. Dos cosas
+que no se pueden atribuir a F1 y se anotan tal cual: el barrido de «¿hay
+algún riesgo?» no apareció en esta tanda y sí en las dos anteriores —es
+variación del modelo, no un arreglo, y F5 sigue en pie—; y la pregunta de
+historia, que ahora nombra la señal con su apoyo («Velocidad eficaz · S1»)
+gracias a las etiquetas nuevas, se fue a `"vibraciones"` por primera vez.
+La etiqueta compuesta coincide con la de la escrita a mano y la máquina
+configurada es la misma instalación: es el hallazgo de las dos dueñas del
+Plan 34 F5, ahora visible desde el modelo. Una tanda no decide; se vuelve a
+medir al cerrar F2.
 
 **Depende de** F0.
 

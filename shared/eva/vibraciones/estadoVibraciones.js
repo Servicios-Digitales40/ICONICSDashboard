@@ -60,13 +60,65 @@ function peorEstado(estados) {
 }
 
 /**
+ * ── LA MISMA FUNCIÓN PARA UNA MÁQUINA CONFIGURADA (Plan 39 F1) ─────
+ *
+ * Hasta el 21-09-2026 esto sabía componer UNA máquina: la escrita a mano,
+ * con sus tres apoyos de `CANALES` y sus tags fijos. Una configurada de este
+ * mismo tipo llegaba al asistente con una lista plana de 73 variables sin
+ * banda, y su resumen eran cuatro recuentos: el modelo decía «no tiene
+ * lecturas» con 64 de 94 puntos leyendo. Medido en el Plan 38 F3.
+ *
+ * Lo que cambia es de dónde salen tres cosas, y las tres vienen por
+ * `opciones`: el DOMINIO (una configurada lo reconstruye `dominioDesdeRoles`
+ * desde sus roles; sin él se fabrica el de la escrita a mano, como siempre),
+ * los APOYOS (los de esa máquina, con el nombre que les puso quien la
+ * configuró) y cómo se llama cada señal EN ESA MÁQUINA (`resolver`: su id y
+ * su tag literales, porque en el servidor `frecuencia` puede llamarse
+ * `FREQ OUTPUT_BMS`). Sin opciones, la escrita a mano sale byte a byte igual.
+ *
  * @param {(punto: string) => any} valorDe  valor ya saneado, o `null`
  * @param {object} sistemaRegistro          su entrada en `sistemas.js`
  * @param {string} [leidoA]
+ * @param {object} [opciones]
+ * @param {object} [opciones.dominio]   el dominio ya reconstruido; sin él, el de la escrita a mano
+ * @param {{id: string, label: string, equipo?: string, rodamiento?: string|null}[]} [opciones.apoyos]
+ *   los apoyos de ESA máquina; sin ellos, `CANALES`
+ * @param {(clave: string) => ({clave?: string, tag?: string|null, label?: string|null, historia?: boolean}|null)} [opciones.resolver]
+ *   cómo se llama en esa máquina lo que el tipo nombra `vRMS_S1`, `frecuencia` o `activasSinReconocer`
+ * @param {string[]} [opciones.sinLectura]  los puntos sin lectura, si quien llama ya los contó sobre TODAS sus variables
+ * @param {number} [opciones.puntosPedidos]
  */
-export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null) {
-  const dominio = createSistemaVibraciones(valorDe);
+export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null, opciones = {}) {
+  const apoyos = opciones.apoyos ?? CANALES;
+  const resolver = opciones.resolver ?? (() => null);
+  const dominio = opciones.dominio ?? createSistemaVibraciones(valorDe);
   const { canales, variador, alarmas, sinDato, puntosPedidos } = dominio;
+
+  /**
+   * La señal con el nombre de ESTA máquina; sin resolvedor, el canónico del tipo.
+   *
+   * Con resolvedor, una clave que la máquina NO declara devuelve `null` y no
+   * se emite: una configurada con un solo apoyo no puede salir con doce
+   * señales «sin dato» de apoyos que no tiene. Eso no sería un hueco, sería
+   * inventar la ausencia de algo que nadie declaró. La escrita a mano emite
+   * su catálogo entero, como siempre.
+   */
+  const configurada = Boolean(opciones.resolver);
+  const propia = (clave, tagPorDefecto, labelPorDefecto) => {
+    const r = resolver(clave);
+    if (configurada && !r) return null;
+    const s = r ?? {};
+    return {
+      clave: s.clave ?? clave,
+      tag: s.tag !== undefined ? s.tag : tagPorDefecto(),
+      label: s.label ?? labelPorDefecto,
+      ...(s.historia !== undefined ? { historia: s.historia } : {}),
+      /* El motivo del hueco, como en el camino genérico de `construirSistema`;
+         `senalComun` lo anula cuando hay valor. La escrita a mano no lo
+         llevaba y no se le añade: no cambia ni un campo suyo. */
+      ...(configurada ? { motivo: "El punto no entregó valor en esta lectura." } : {}),
+    };
+  };
 
   /*
    * ¿Aplica la norma? `null` —y no `false`— cuando no se sabe la velocidad.
@@ -80,24 +132,24 @@ export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null) {
 
   const senales = [];
 
-  for (const c of CANALES) {
+  for (const c of apoyos) {
     const d = canales[c.id] ?? {};
     for (const m of MEDIDAS) {
       const valor = d[m.key] ?? null;
       const banda = m.key === "vRMS" ? bandaISO(valor, normaAplicable) : null;
+      // `vRMS_S1`: única dentro de la máquina, y es como la nombra el
+      // servidor. `canal` va aparte para quien quiera agrupar por apoyo.
+      const s = propia(`${m.key}_${c.id}`, () => puntoMedida(m.key, c.id), `${m.label} · ${c.label}`);
+      if (!s) continue;
 
       senales.push(
         senalComun({
-          // `vRMS_S1`: única dentro de la máquina, y es como la nombra el
-          // servidor. `canal` va aparte para quien quiera agrupar por apoyo.
-          clave: `${m.key}_${c.id}`,
-          label: `${m.label} · ${c.label}`,
+          ...s,
           valor,
           unidad: m.unidad,
           estado: valor === null ? "sin_dato" : banda ? ESTADO_POR_ZONA[banda.zona] ?? null : null,
           canal: c.id,
           grupo: c.id,
-          tag: puntoMedida(m.key, c.id),
           banda: m.key === "vRMS" ? LIMITES_ISO : null,
           nota: m.norma ?? null,
           decimales: m.decimales,
@@ -108,32 +160,32 @@ export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null) {
 
   for (const v of VARIADOR) {
     const valor = variador[v.key] ?? null;
+    const s = propia(v.key, () => puntoVariador(v.key), v.label);
+    if (!s) continue;
     senales.push(
       senalComun({
-        clave: v.key,
-        label: v.label,
+        ...s,
         valor,
         unidad: v.unidad,
         // El variador no tiene bandas declaradas en este catálogo.
         estado: valor === null ? "sin_dato" : null,
         grupo: "variador",
-        tag: puntoVariador(v.key),
         decimales: v.decimales,
       }),
     );
   }
 
   for (const a of CONTADORES_ALARMA) {
-    const valor = alarmas[a.key] ?? null;
+    const valor = alarmas?.[a.key] ?? null;
+    const s = propia(a.key, () => puntoAlarma(a.key), a.label);
+    if (!s) continue;
     senales.push(
       senalComun({
-        clave: a.key,
-        label: a.label,
+        ...s,
         valor,
         unidad: "",
         estado: valor === null ? "sin_dato" : null,
         grupo: "alarmas",
-        tag: puntoAlarma(a.key),
         decimales: 0,
       }),
     );
@@ -143,10 +195,10 @@ export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null) {
     sistema: sistemaRegistro,
     senales,
     grupos: [
-      ...CANALES.map((c) => ({
+      ...apoyos.map((c) => ({
         id: c.id,
         label: c.label,
-        responde: `¿Cómo vibra el ${c.label.toLowerCase()}? (${c.equipo})`,
+        responde: `¿Cómo vibra el ${c.label.toLowerCase()}?${c.equipo ? ` (${c.equipo})` : ""}`,
       })),
       { id: "variador", label: "Variador", responde: "¿A qué régimen y con qué carga gira?" },
       {
@@ -160,10 +212,14 @@ export function estadoDeVibraciones(valorDe, sistemaRegistro, leidoA = null) {
        eso mejor que un «nominal» que nadie ha comprobado. */
     estadoGeneral: peorEstado(senales.map((s) => s.estado)),
     enReposo: null,
-    sinLectura: sinDato,
-    puntosPedidos,
+    /* Una configurada cuenta sus huecos sobre TODAS sus variables (también las
+       que el tipo no nombra); el dominio sólo sabe de las que tienen rol. */
+    sinLectura: opciones.sinLectura ?? sinDato,
+    puntosPedidos: opciones.puntosPedidos ?? puntosPedidos,
     leidoA,
-    extra: { dominio, normaAplicable, canal: CANAL },
+    /* `apoyos` viaja en el estado para que el resumen y el narrador inglés
+       hablen de los apoyos de ESTA máquina, no de los del catálogo. */
+    extra: { dominio, normaAplicable, canal: CANAL, apoyos },
   });
 }
 
@@ -202,16 +258,19 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
   const { riesgos, agrupar } = ctx;
   const { canales, variador, alarmas } = estado.dominio;
   const sinLectura = estado.sinLectura.length;
+  /* Los apoyos de la máquina que se está contando (Plan 39 F1); la escrita a
+     mano los trae de `CANALES` y sale igual que siempre. */
+  const apoyos = estado.apoyos ?? CANALES;
 
   return {
     sistema: "Sistema de vibraciones — OTRA MÁQUINA, no el tanque",
     maquina: estado.maquina,
     fuente: "tiempo real",
 
-    apoyos: CANALES.map((c) => {
-      const d = canales[c.id];
+    apoyos: apoyos.map((c) => {
+      const d = canales[c.id] ?? {};
       const apagadas = VIGILANCIAS.filter(
-        (v) => v.grupo === "rodamiento" && d.vigilancias[v.key]?.id === "apagado",
+        (v) => v.grupo === "rodamiento" && d.vigilancias?.[v.key]?.id === "apagado",
       ).map((v) => v.key.toUpperCase());
       const veredicto = bandaISO(d.vRMS, estado.normaAplicable);
 
@@ -292,7 +351,7 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
     aviso:
       "OTRA MÁQUINA, no el tanque: no relaciones estas vibraciones con su caudal, presión " +
       "ni nivel. SÍ hay histórico de sus medidas, banderas y variador: se puede consultar con " +
-      "historia_de_senal(sistema=\"vibraciones\"). Lo que NO se puede es poner plazo a una " +
+      `historia_de_senal(sistema="${estado.sistema ?? "vibraciones"}"). Lo que NO se puede es poner plazo a una ` +
       "avería: esta máquina no tiene mecanismos de desgaste declarados." +
       (sinLectura > 0
         ? ` Ahora mismo ${sinLectura} de ${estado.puntosPedidos} puntos no entregan lectura: eso no ` +
