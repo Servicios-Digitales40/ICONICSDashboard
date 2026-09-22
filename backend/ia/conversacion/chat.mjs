@@ -431,6 +431,16 @@ function hoyLocal() {
  *
  * Ahora se cuenta. Una máquina nueva aparece aquí sola, con sus cifras, en
  * cuanto entra en `SISTEMAS`.
+ *
+ * ── POR QUÉ LLEVA EL ID, Y NO SÓLO EL NOMBRE (Plan 38 F3) ──────────
+ *
+ * Porque las herramientas piden el ID y el modelo sólo veía el NOMBRE. Medido
+ * el 21-09-2026 con la primera máquina configurada («Nuevo-Modor», id
+ * `vib-motor-03`): preguntada por su nombre, el modelo llamó a
+ * `estado_del_sistema(sistema="Nuevo-Modor")`, falló, y llegó al id bueno
+ * sólo porque el error de la herramienta se lo dio — una ronda de más en cada
+ * pregunta. Con las escritas a mano no se notaba: «tanque» y «vibraciones»
+ * son a la vez nombre corriente e id.
  */
 function inventarioDeLaPlanta() {
   return SISTEMAS.map(sistema => {
@@ -438,7 +448,7 @@ function inventarioDeLaPlanta() {
     const conSerie = claves.filter(clave => sistema.esHistorizada(clave))
 
     const lineas = [
-      `${sistema.nombre} — ${sistema.maquina}`,
+      `${sistema.nombre} (sistema="${sistema.id}") — ${sistema.maquina}`,
       `  Origen: ${sistema.plc}. ${claves.length} señales, ${conSerie.length} con serie propia.`,
       `  Mide: ${sistema.mide.join('; ')}.`,
       `  Historia: ${sistema.historia}`,
@@ -841,8 +851,21 @@ export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null, co
  * texto se lo recuerda al modelo.
  */
 function textoDelContexto({ sistema, activo, rango, senal }) {
+  /*
+   * El nombre al lado del id, y la orden de pasar ESE id (Plan 38 F3).
+   *
+   * Medido el 21-09-2026 desde la pantalla de la primera máquina configurada
+   * (`contexto.sistema="vib-motor-03"`): a «¿cómo está esta máquina?» el
+   * modelo llamó a `estado_del_sistema(sistema="vibraciones")` — la escrita
+   * a mano, que describe la misma instalación— y contestó con sus 73 señales
+   * como si fueran las 94 de la otra. El bloque decía el id, pero las
+   * definiciones de las herramientas decían «"tanque" o "vibraciones"», y el
+   * modelo se quedó con lo que le sonaba. Ahora el bloque dice el nombre
+   * —para que reconozca de qué máquina se habla— y que el id va tal cual.
+   */
+  const nombre = sistema ? SISTEMA[sistema]?.nombre : null
   const partes = [
-    sistema && `sistema=${sistema}`,
+    sistema && `sistema=${sistema}${nombre && nombre !== sistema ? ` («${nombre}»)` : ''}`,
     activo && `activo=${activo}`,
     senal && `señal=${senal}`,
     rango && `rango=${rango}`,
@@ -857,6 +880,10 @@ function textoDelContexto({ sistema, activo, rango, senal }) {
     'Úsalo para resolver lo que la pregunta no diga: «¿y esto por qué sube?» o «¿cómo va?» se',
     'refieren muy probablemente a eso. Si la pregunta nombra OTRA máquina, hazle caso a la',
     'pregunta: mirar una pantalla no impide preguntar por otra cosa.',
+    ...(sistema ? [
+      `Si la pregunta no nombra otra máquina, a toda herramienta que pida \`sistema\` le pasas EXACTAMENTE "${sistema}",`,
+      'tal cual: no su nombre, y no el id de otra máquina que se le parezca.',
+    ] : []),
     'Esto NO son mediciones: es dónde está mirando. Los valores se consultan con la herramienta,',
     'siempre, aunque la pantalla los tenga en pantalla.',
     '',

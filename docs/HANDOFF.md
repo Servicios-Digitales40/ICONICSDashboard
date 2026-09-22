@@ -214,22 +214,31 @@ máquina configurada haga todo lo que hace el catálogo.
 máquina configurada; Inicio, Gráficas y 3D parametrizadas). Queda **F4**
 (Alarmas de la máquina), y **verlo en el navegador**.
 
-**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F2 completas: el backend registra las
+**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F3 completas: el backend registra las
 configuradas (`registroConfigurado.mjs`), las rutas validan `sistema` contra la
-lista viva (`sistemaConocido()`), y Hallazgos, Avisos, Casos y RAG entran en la
-sección de cada máquina. **Pendiente de verse en el navegador.**
+lista viva (`sistemaConocido()`), Hallazgos, Avisos, Casos y RAG entran en la
+sección de cada máquina, y **el asistente contesta sobre una configurada**:
+medido contra el modelo real con `medir-asistente-configurada.mjs`, 6 de 7
+preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
+id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
+primer render (Plan 37).
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
 ### Próximos pasos, por prioridad
 
-**0 · Ver el Plan 37 en el navegador.** Nadie ha abierto todavía la sección de
-`Nuevo-Modor` en el menú. Entrar en Inicio, Gráficas y Vista 3D de esa
-máquina, comprobar que pinta SUS apoyos (`S1`, `S2`, `S3` por su id, no «Lado
-acople») y que la sección de vibraciones escrita a mano sigue igual. Después,
-**Plan 37 F4** (Alarmas de la máquina configurada) y una segunda vuelta al
-Plan 36: quitar variables, emparejar a mano un tag de `Jaritza\L1`, sondear
-tras editar. §9 dice cómo arrancar.
+**0 · Confirmar los Planes 37 y 38 en el navegador.** La sección de
+`Nuevo-Modor` se abrió el 21-09 y las siete vistas caían en el primer render;
+está corregido y **falta volver a entrar**: Inicio, Gráficas, Vista 3D,
+Hallazgos, Avisos, Casos previos y RAG, comprobar que pinta SUS apoyos (`S1`,
+`S2`, `S3` por su id, no «Lado acople») y que la sección escrita a mano sigue
+igual. Y **preguntarle al asistente desde esa pantalla**: lo medido está en el
+Plan 38 F3, con lo que aún se va a las cuatro máquinas («¿hay algún riesgo
+activo?»). Después, **Plan 37 F4** (Alarmas de la máquina configurada) y una
+segunda vuelta al Plan 36: quitar variables, emparejar a mano un tag de
+`Jaritza\L1`, sondear tras editar, y proponer la descripción con la carpeta
+(«Velocidad eficaz · S1») para que tres `vRMS` no compartan etiqueta. §9 dice
+cómo arrancar.
 
 **1 · Plan 32 F2 — desbloquear el historiador.** Por qué el grupo `DEMO 3`
 devuelve 0 muestras: si dejó de registrar, o si la ruta cambió como en el
@@ -350,6 +359,15 @@ Por eso el cierre de una máquina es una guarda en `resolverSistema()`.
 **Un modelo pequeño no encadena bien.** Pedirle «vuelve a llamar añadiendo
 `sistema=...`» no funciona: reintenta con otro nombre o se rinde. Se arregla
 **no necesitando el reintento**.
+
+**Pasa a las herramientas lo que las descripciones le enseñan, no lo que el
+registro tiene.** Medido el 21-09-2026 (Plan 38 F3): con doce descripciones
+diciendo «"tanque" o "vibraciones"», desde la pantalla de `Nuevo-Modor` llamó
+con `sistema="vibraciones"`; por nombre, con `sistema="Nuevo-Modor"`. Al
+imprimir el id en el inventario y quitar los ejemplos fijos, 6 de 7 preguntas
+llegan a la máquina a la primera. Lo que sigue sin resolverse en el prompt:
+una pregunta sin máquina («¿hay algún riesgo activo?») con contexto de
+pantalla la lee como «en la planta» y **barre las cuatro**.
 
 **El catálogo de herramientas se acota por intención.** 26 herramientas son
 ~8 650 tokens que viajan en cada llamada; con el prompt, ~14 330 fijos.
@@ -514,6 +532,18 @@ node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs
 
 Sin `--env-file` **falla siempre** con «Falta ICONICS_API_BASE». No es una
 regresión.
+
+**El asistente sobre una máquina configurada** (Plan 38 F3), contra el modelo
+real y la planta real; unos seis minutos por tanda:
+
+```bash
+node --env-file=.env.local scripts/medir-asistente-configurada.mjs --maquina vib-motor-03
+```
+
+Es un `medir-`, no un `verificar-`: imprime a qué máquina fue cada herramienta
+y no devuelve código de error. Apaga la autenticación **sólo en su proceso**
+(monta la app sin puerto); `medir-asistente.mjs`, que no lo hace, recibe 401
+con `AUTH_HABILITADA=true` y está anotado en el plan.
 
 ### La suite intermitente
 

@@ -126,7 +126,7 @@ export const DEFINICIONES = [
         properties: {
           sistema: {
             type: 'string',
-            description: 'Id del sistema para filtrar (por ejemplo "tanque" o "vibraciones"). Omítelo para verlos todos.',
+            description: 'Id del sistema para filtrar, tal como lo devuelve sistemas_de_la_planta. Omítelo para verlos todos.',
           },
         },
         required: [],
@@ -155,7 +155,7 @@ export const DEFINICIONES = [
             description: 'Qué se hizo exactamente. Cuanto más concreto, más sirve dentro de seis meses.',
           },
           causa: { type: 'string', description: 'Por qué pasaba, si se llegó a saber.' },
-          sistema: { type: 'string', description: 'Id del sistema: "tanque" o "vibraciones".' },
+          sistema: { type: 'string', description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre).' },
           resuelto: {
             type: 'boolean',
             description: 'false si se intentó y NO funcionó. Por omisión true.',
@@ -180,7 +180,7 @@ export const DEFINICIONES = [
       parameters: {
         type: 'object',
         properties: {
-          sistema: { type: 'string', description: 'Id del sistema: "tanque" o "vibraciones".' },
+          sistema: { type: 'string', description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre).' },
           riesgoId: {
             type: 'string',
             description: 'El `id` del riesgo — el mismo que le pasaste a diagnosticar_falla.',
@@ -394,7 +394,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal'],
@@ -429,7 +429,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal', 'momento'],
@@ -462,7 +462,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal', 'periodoA', 'periodoB'],
@@ -497,7 +497,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal'],
@@ -528,7 +528,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal'],
@@ -565,7 +565,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senales'],
@@ -599,7 +599,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senales'],
@@ -633,7 +633,7 @@ export const DEFINICIONES = [
           },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal', 'condicion', 'valor'],
@@ -730,7 +730,7 @@ export const DEFINICIONES = [
           periodo: { type: 'string', description: 'Período sobre el que dibujar. Igual que en historia_de_senal.' },
           sistema: {
             type: 'string',
-            description: 'Máquina si NO es el tanque, p.ej. "vibraciones". Omítelo para el tanque.',
+            description: 'Id del sistema, tal como lo devuelve sistemas_de_la_planta (el id, no el nombre). Omítelo sólo para el tanque.',
           },
         },
         required: ['senal'],

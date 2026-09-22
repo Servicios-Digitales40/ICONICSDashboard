@@ -292,6 +292,14 @@ marcha. Hoy son cuatro o cinco llamadas encadenadas.
 
 > Entra en [`docs/completados/PLAN-23-ASISTENTE.md`](completados/PLAN-23-ASISTENTE.md) §4.2.
 
+**Defecto visto al leer el código, sin arreglar (21-09-2026, Plan 38 F3).**
+`resumen_de_turno` pide `SISTEMA[id].series.claves?.()`, y `claves()` está en
+el sistema, no en `series`: la lista de señales sale vacía para TODAS las
+máquinas, no sólo para una configurada. Y `metaDe` en `historicos/` devuelve
+`unidad: ''` para cualquier máquina que no sea el tanque, así que las series de
+vibraciones viajan al modelo sin unidad. Ninguno de los dos entró en esa fase
+porque no son de la máquina configurada: son de la herramienta.
+
 ## B8 · `buscar_evento`
 
 «¿Cuándo fue la última vez que la presión bajó de X?» — hoy no hay forma de

@@ -113,6 +113,22 @@ check('cada sistema del registro aparece nombrado en el prompt', () => {
   }
 })
 
+check('cada sistema del registro aparece con su ID, no sólo con su nombre', () => {
+  /*
+   * Las herramientas piden el id. Con las escritas a mano no se notaba que el
+   * prompt no lo decía —«tanque» y «vibraciones» son nombre e id a la vez—;
+   * con la primera configurada («Nuevo-Modor» / `vib-motor-03`) el modelo
+   * llamó a la herramienta con el nombre y falló (Plan 38 F3, 21-09-2026).
+   */
+  for (const sistema of SISTEMAS) {
+    assert.ok(
+      PROMPT_PLANO.includes(`sistema="${sistema.id}"`),
+      `El sistema "${sistema.id}" aparece en el prompt sin su id. El modelo sólo puede ` +
+        'llamar a las herramientas con el nombre, y el nombre no es lo que piden.'
+    )
+  }
+})
+
 check('el recuento de señales de cada sistema sale del registro', () => {
   for (const sistema of SISTEMAS) {
     const claves = sistema.claves().length

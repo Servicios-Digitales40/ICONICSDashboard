@@ -1,6 +1,6 @@
 # PLAN 38 — El registro conoce las máquinas configuradas
 
-**Estado:** F1–F2 completadas · **pendiente de verse en el navegador**
+**Estado:** F1–F3 completadas · F2 **pendiente de confirmarse en el navegador** tras la corrección del 21-09 (Plan 37) · F3 medida contra el modelo real
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -157,6 +157,129 @@ diccionario, y `sistemas()` las lista en los selectores del RAG.
 **Lo que cambió de sitio en las pruebas existentes**: los dobles de
 `vibracion.js` que sólo sustituían `useVibracion` ahora sustituyen también
 `useDominioVibracion`, devolviendo lo mismo con la máquina escrita a mano.
+
+### F3 — El asistente sobre una máquina configurada ✅
+
+**Completada el 21-09-2026.** La pidió el usuario en vez de seguir con las
+vistas: «quiero ver si el asistente me puede contestar sobre ella y cómo
+contesta». F1 había dejado el registro vivo y las rutas aceptando el id; nadie
+había preguntado todavía al modelo.
+
+**Objetivo.** Medir, contra el modelo real y la planta real, si una pregunta
+sobre `Nuevo-Modor` (`vib-motor-03`) LLEGA a esa máquina —no a la escrita a
+mano, que describe la misma instalación—, y corregir lo mínimo que la medición
+justifique.
+
+- `scripts/medir-asistente-configurada.mjs`: instrumento (`medir-`, no
+  `verificar-`; mide, no afirma). Construye siete preguntas a partir de la
+  máquina que hay —nombre, id, una señal con serie— y las hace por el mismo
+  camino que el tablero, tres nombrándola sin contexto y cuatro con el
+  `contexto.sistema` que manda su propia pantalla. Por caso dice a qué
+  máquina fue cada herramienta: la suya, otra del registro, o un id que no
+  existe (su nombre).
+- El inventario del prompt imprime el id de cada sistema junto al nombre;
+  el bloque de contexto de pantalla imprime el nombre junto al id y ordena
+  pasar ese id tal cual; las doce descripciones del parámetro `sistema` en
+  `definiciones.mjs` dejan de decir «"tanque" o "vibraciones"».
+- `esDeVibraciones()` en `maquina/index.mjs`: el catálogo inglés de riesgos
+  se elige por TIPO, no por `id === 'vibraciones'`.
+- `verificar-instrucciones`: un check nuevo exige el id de cada sistema en el
+  prompt. Se vio fallar con el `chat.mjs` anterior.
+
+#### Lo que de verdad pasó (F3)
+
+**Cómo se midió.** Backend montado en proceso contra ICONICS real y
+`llama-server` real (`qwen-3.5-4B`, el modelo por defecto), con la
+autenticación apagada sólo en ese proceso —las claves de `AUTH_USUARIOS` son
+hashes, no hay con qué entrar—. `Nuevo-Modor` estaba parada (0 rpm, 64 de 94
+puntos con lectura) durante toda la medición. Cada tanda dura unos seis
+minutos; cada pregunta, entre 30 y 80 s.
+
+**Lo que destapó la primera pregunta, antes del instrumento.** Desde la
+pantalla de `Nuevo-Modor` (`contexto.sistema="vib-motor-03"`), «¿cómo está
+esta máquina? ¿qué vibración tiene cada apoyo?» llamó a
+`estado_del_sistema(sistema="vibraciones")` y contestó con las 73 señales de
+la escrita a mano —«28 de 73 sin lectura», el motor WEG— como si fueran las
+94 de la configurada. Ninguna cifra delataba el cambio: son la misma
+instalación. Y por nombre, sin contexto, «¿cómo está Nuevo-Modor?» llamó a
+`estado_del_sistema(sistema="Nuevo-Modor")`, falló, y llegó a `vib-motor-03`
+porque el error de la herramienta trae la lista de ids. Una ronda de más por
+pregunta.
+
+**Por qué.** El inventario del prompt decía `Nuevo-Modor — Motor vigilado…`
+sin el id, y las definiciones de las herramientas decían literalmente «Id
+del sistema: "tanque" o "vibraciones"» en doce sitios. Con las escritas a
+mano no se notaba: «tanque» y «vibraciones» son nombre corriente e id a la
+vez. El modelo hacía lo que le decían.
+
+**Antes, sobre `Nuevo-Modor` (sin tocar nada):**
+
+| Caso | Contexto | Herramienta → `sistema` | Veredicto |
+|---|---|---|---|
+| ¿Qué máquinas hay? | no | `sistemas_de_la_planta` | ✓ la lista, con las 4 |
+| ¿Cómo está Nuevo-Modor? | no | `"Nuevo-Modor"` → error → `"vib-motor-03"` | ~ llegó corrigiendo, 3 rondas |
+| ¿Nuevo-Modor tiene riesgos? | no | `"Nuevo-Modor"` → error → `"vib-motor-03"` | ~ llegó corrigiendo, 3 rondas |
+| ¿Cómo está esta máquina? | sí | `sistemas_de_la_planta`, `"vib-motor-03"` | ✓ pero «no he podido resumirlos» |
+| ¿Hay algún riesgo activo? | sí | `"vibraciones"`, `"vibraciones-configurada"`, `"vib-motor-03"` | ✗ contesta sobre las tres |
+| ¿Cómo ha ido Velocidad eficaz en 7 días? | sí | `historia_de_senal` **sin** `sistema` | ? el texto habla «del motor WEG, sistema de vibraciones»: leyó la escrita a mano |
+| ¿Qué dice la documentación…? | sí | `consultar_documentacion` **sin** `sistema` | ? sin filtrar por máquina |
+
+4 de 7 llegaron (2 corrigiendo el id) · 1 se fue a otra máquina · 2 sin decir
+máquina. **Con el contexto de su pantalla: 1 de 4.** Nombrándola: 3 de 3.
+
+Sobre `vibraciones-configurada` (la otra configurada, medida por error la
+primera vez porque el instrumento tomaba la primera del registro) salió
+parecido: 4 de 7 y 2 a otra máquina; `riesgos_activos` por nombre fue a
+`"vibraciones"` directamente.
+
+**Después (los cuatro cambios de arriba):**
+
+| Caso | Contexto | Herramienta → `sistema` | Veredicto |
+|---|---|---|---|
+| ¿Qué máquinas hay? | no | `sistemas_de_la_planta` | ✓ |
+| ¿Cómo está Nuevo-Modor? | no | `"vib-motor-03"` | ✓ 2 rondas |
+| ¿Nuevo-Modor tiene riesgos? | no | `"vib-motor-03"` | ✓ 2 rondas: «2 informativos, 6 sin comprobar por falta de dato» |
+| ¿Cómo está esta máquina? | sí | `sistemas_de_la_planta`, `"vib-motor-03"` | ✓ pero «no he podido resumirlos» |
+| ¿Hay algún riesgo activo? | sí | `"tanque"`, `"vibraciones"`, `"vibraciones-configurada"`, `"vib-motor-03"` | ✗ barre las cuatro |
+| ¿Cómo ha ido Velocidad eficaz en 7 días? | sí | `historia_de_senal(sistema="vib-motor-03")` | ✓ y pide desambiguar: hay tres «Velocidad eficaz» |
+| ¿Qué dice la documentación…? | sí | `consultar_documentacion(sistema="vib-motor-03")`, `limites_del_manual` × 4 | ✓ 6 rondas, «no he podido resumirlos» |
+
+**6 de 7 llegaron, ninguno corrigiendo el id · 1 a otra máquina · 0 sin decir
+máquina. Con el contexto de su pantalla: 3 de 4.** Nombrándola: 3 de 3, una
+ronda menos cada una.
+
+**Lo que queda, y por qué no se forzó aquí.**
+
+- **«¿Hay algún riesgo activo?» desde su pantalla barre las cuatro máquinas.**
+  Antes y después. La pregunta no nombra máquina y el modelo la lee como «en
+  la planta»: llama a `sistemas_de_la_planta` y luego a `riesgos_activos`
+  por cada una, `Nuevo-Modor` incluida. No es la máquina equivocada, es
+  todas; y la regla de `HANDOFF.md` §8 dice que una regla que importa va en
+  el código, no en el prompt. Lo que se mediría antes de tocarlo: si con
+  `contexto.sistema` y una pregunta sin máquina conviene que `intencion.mjs`
+  quite `sistemas_de_la_planta` del catálogo de ese turno. Hoy es `SIEMPRE`.
+- **«La consulta devolvió datos, pero no he podido resumirlos»** en dos de
+  los siete, antes y después: `estado_del_sistema` de una máquina de 94
+  variables, y la documentación tras seis rondas. El modelo de 4B no redacta
+  sobre un resultado tan largo. Es **C6** de `MEJORAS-ASISTENTE.md`, no de
+  esta fase; con la configurada se nota más porque trae 94 variables sin
+  agrupar donde la escrita a mano trae un `resumen()`.
+- **Las variables sin descripción comparten etiqueta.** `Velocidad eficaz` es
+  la etiqueta de `vRMS_S1`, `vRMS_S2` y `vRMS_S3` a la vez, porque
+  `Nuevo-Modor` se configuró sin descripciones y `etiquetaDe` cae al rótulo
+  del rol. El asistente lo resolvió bien —pidió elegir—, pero la pregunta era
+  ambigua por construcción. Que el configurador (Plan 36) proponga la
+  descripción con la carpeta («Velocidad eficaz · S1») es lo que lo quita.
+- **`medir-asistente.mjs` con `AUTH_HABILITADA=true` recibe 401** en cada
+  `inject`; no se tocó porque no es de esta fase. El instrumento nuevo apaga
+  la autenticación en su propio proceso y dice por qué en la cabecera.
+- Leyendo el código de las herramientas salieron dos defectos que no son de
+  la máquina configurada sino de la herramienta (`resumen_de_turno` y las
+  unidades de `metaDe`); anotados en **B7** de `MEJORAS-ASISTENTE.md`.
+
+**Verificación**: puerta (`verificar-herramientas` 169 · `verificar-chat` 68),
+`verificar-instrucciones` 28 reglas con el check nuevo, los 41 verificadores,
+backend 385, lint y tipos limpios. El frontend no se tocó.
 
 ## 4. Lo que queda fuera
 

@@ -61,6 +61,16 @@ import { agruparPorRegla, horaLocal, redondear } from '../../conversacion/herram
  * `shared/quality.js` existe para no dejar pasar como una lectura válida.
  */
 const TAG_CONTROL_BOMBA = 'ac:TDCON/DEMO/SEGURIDAD/CONTROL'
+/**
+ * Si el sistema es de vibraciones, sea la entrada escrita a mano o una
+ * configurada de ese TIPO (Plan 38 F3).
+ *
+ * Hasta el 21-09-2026 esto era `sistema.id === 'vibraciones'`, y una máquina
+ * configurada de tipo vibraciones caía en el catálogo inglés del tanque: sus
+ * riesgos se narraban en inglés con el diccionario de la otra máquina. En
+ * español no se notaba porque el catálogo compone siempre en español.
+ */
+const esDeVibraciones = sistema => sistema.id === 'vibraciones' || sistema.tipo === 'vibraciones'
 
 /*
  * ── LA RELECTURA DE CONFIRMACIÓN SE MUDÓ AL CLIENTE (Plan 21 F5) ────
@@ -183,7 +193,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
        * (`react-dashboard/src/i18n/locales/en/domain.json`). Ver la cabecera
        * de `backend/ia/i18n/narrarRiesgo.mjs`.
        */
-      const catalogo = elegido.sistema.id === 'vibraciones' ? 'vibrationRisks' : 'risks'
+      const catalogo = esDeVibraciones(elegido.sistema) ? 'vibrationRisks' : 'risks'
       const activos = idioma === 'en'
         ? r.activos.map((x) => narrarRiesgoEnIngles(x, catalogo, (valores) =>
           resolverPalabrasVibracion(x.id, valores)))
@@ -324,7 +334,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
        * `resumen()` decide consumir, y ésa es información que sólo tiene
        * el propio `resumen()`.
        */
-      const catalogo = elegido.sistema.id === 'vibraciones' ? 'vibrationRisks' : 'risks'
+      const catalogo = esDeVibraciones(elegido.sistema) ? 'vibrationRisks' : 'risks'
       const riesgos = idioma === 'en'
         ? {
           ...riesgosCrudos,
@@ -360,7 +370,7 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
        * compuso, nunca dentro de `shared/`.
        */
       const resumen = idioma === 'en'
-        ? (elegido.sistema.id === 'vibraciones'
+        ? (esDeVibraciones(elegido.sistema)
           ? narrarResumenVibracionesEnIngles(resumenCrudo, estado, riesgos)
           : narrarResumenTanqueEnIngles(resumenCrudo))
         : resumenCrudo
