@@ -38,7 +38,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | Suite de frontend | **1083** pruebas · 29 omitidas |
 | Suite de backend | **385** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **179** correctas (10 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **183** correctas (14 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
@@ -224,17 +224,19 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F1 completas, F2–F6 por
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F2 completas, F3–F6 por
 completar. Que las herramientas del asistente sirvan a cualquier máquina
 configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
 vibraciones. F0 puso una configurada espejo en la puerta
 (`scripts/lib/configuracionEspejo.mjs`). F1 hizo que el estado y el resumen
 de una configurada los componga el tipo —apoyos con valores y banda ISO,
 variador, contadores de alarma, etiquetas con apoyo— y el modelo pasó de «no
-tiene lecturas disponibles» a citar mm/s por apoyo (7 de 8 preguntas llegan).
-Quedan: unidades en historia (F2), manual (F3), reporte (F4), el prompt de la
-máquina que se tiene delante (F5) y el alta automática según el estado de
-validación (F6).
+tiene lecturas disponibles» a citar mm/s por apoyo. F2 dio a las dos entradas
+de vibraciones `metaDe` (unidad, decimales, naturaleza), quitó la caída al
+tanque de `lib/historia.mjs`, arregló `resumen_de_turno` y `alarma_sostenida`,
+y el historiador falso sirve por fin las series de vibraciones. Quedan: manual
+(F3), reporte (F4), el prompt de la máquina que se tiene delante (F5) y el
+alta automática según el estado de validación (F6).
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
@@ -467,10 +469,10 @@ ICONICS_FAKE=true node scripts/verificar-herramientas.mjs
 ICONICS_FAKE=true node scripts/verificar-chat.mjs
 ```
 
-**Criterio de éxito:** `verificar-herramientas` imprime **179 correctas y 22
-omitidas**, y «10 de ellas sobre una máquina CONFIGURADA». Las omitidas son
-del cierre y el guion las cuenta a propósito; las diez son la espejo de
-vibraciones registrada sólo para su bloque (Plan 39 F0–F1).
+**Criterio de éxito:** `verificar-herramientas` imprime **183 correctas y 22
+omitidas**, y «14 de ellas sobre una máquina CONFIGURADA». Las omitidas son
+del cierre y el guion las cuenta a propósito; las catorce son la espejo de
+vibraciones registrada sólo para su bloque (Plan 39 F0–F2).
 
 ### La tanda completa
 

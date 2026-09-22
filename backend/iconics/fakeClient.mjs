@@ -143,7 +143,51 @@ const MAX_UPSTREAM_ITEMS = MAX_PUNTOS
  * `MAX_UPSTREAM_ITEMS` puntos empezando en `offset`; `siguienteOffset` es
  * `null` cuando esa página llega al final de la rejilla.
  */
-function paginaDe(clave, startMs, endMs, pasoMs, offset, rnd) {
+/**
+ * La media de un tramo para un punto EN VIVO de cualquier máquina que no sea
+ * el tanque (Plan 39 F2): se muestrea su simulación unas veces dentro del
+ * tramo y se promedia, que es lo que hace `Average` en el historiador. Si la
+ * máquina simulada está parada en todo el tramo —`valorSimuladoDe` da
+ * `null`— no hay muestra, que es exactamente lo que devuelve el servidor
+ * real de un tramo sin registro: nada, no un cero.
+ */
+const SUBMUESTRAS_SIMULADAS = 4
+function mediaSimulada(puntoEnVivo, desdeMs, hastaMs) {
+  const paso = (hastaMs - desdeMs) / SUBMUESTRAS_SIMULADAS
+  let suma = 0
+  let n = 0
+  for (let i = 0; i < SUBMUESTRAS_SIMULADAS; i++) {
+    const v = valorSimuladoDe(puntoEnVivo, desdeMs + (i + 0.5) * paso)
+    if (typeof v === 'number' && Number.isFinite(v)) { suma += v; n += 1 }
+    else if (typeof v === 'boolean') { suma += v ? 1 : 0; n += 1 }
+  }
+  return n ? suma / n : null
+}
+
+/**
+ * De qué máquina y qué clave es un nombre `hda:` que no es del tanque.
+ *
+ * Se pregunta al REGISTRO: la entrada cuya `series.punto(clave)` sea
+ * exactamente ese nombre. Devuelve también el punto EN VIVO con que se
+ * simula la serie —la única forma de darle valores—; una configurada con tags
+ * ajenos a toda máquina escrita a mano no tiene simulación, y entonces no
+ * hay serie que servir.
+ */
+function serieDeOtraMaquina(nombrePunto) {
+  for (const sistema of SISTEMAS) {
+    if (sistema.id === 'tanque') continue
+    const clave = sistema.claves().find(k => sistema.series.punto(k) === nombrePunto)
+    if (!clave) continue
+    const enVivo = sistema.puntos().find(p => {
+      const d = sistema.parse(p)
+      return d && (d.canal ? `${d.clave}_${d.canal}` : d.clave) === clave
+    })
+    return { sistema, clave, enVivo: enVivo ?? null }
+  }
+  return null
+}
+
+function paginaDe(mediaDe, startMs, endMs, pasoMs, offset, rnd) {
   const totalPuntos = Math.max(1, Math.round((endMs - startMs) / pasoMs))
   const fin = Math.min(offset + MAX_UPSTREAM_ITEMS, totalPuntos)
 
@@ -152,7 +196,8 @@ function paginaDe(clave, startMs, endMs, pasoMs, offset, rnd) {
     const cierre = startMs + (i + 1) * pasoMs
     if (rnd() < CAOS.ausente) continue
 
-    let value = mediaDelTramo(clave, cierre - pasoMs, cierre)
+    let value = mediaDe(cierre - pasoMs, cierre)
+    if (value === null || value === undefined) continue
     let quality = QUALITY_GOOD_UA
     if (rnd() < CAOS.malaCalidad) { quality = QUALITY_BAD_UA; value = 0 }
 
@@ -382,31 +427,39 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
      * Vibraciones ya necesitaba lo mismo desde antes; el tanque se suma aquí.
      */
     const clave = parsePointName(nombrePunto) ?? parsePuntoHistorico(nombrePunto)
-    if (!clave) {
+
+    /** La media de cada tramo, según de quién sea el punto. */
+    let mediaDe = null
+    if (clave) {
+      const claveServida = esHistorizada(clave) ? clave : CLAVE_CRUZADA
+      mediaDe = (desde, hasta) => mediaDelTramo(claveServida, desde, hasta)
+    } else {
       /*
-       * El punto puede ser de OTRA máquina dada de alta, y entonces el error
-       * dice por qué. El caso vivo es vibraciones: el grupo `DEMO 3` del Hyper
-       * Historian está definido pero no entrega —HTTP 500 en sus 119 tags el
-       * 25-08-2026, y su `esHistorizada` sigue en `false` hasta que la
-       * configuración deje de moverse—. Servir aquí una serie inventada
-       * enseñaría al asistente a pedir tendencias de una máquina que todavía
-       * no las tiene.
+       * El punto puede ser de OTRA máquina dada de alta (Plan 39 F2). Se
+       * pregunta al REGISTRO y no a un catálogo concreto: una entrada cuya
+       * `series.punto(clave)` sea este nombre. Si esa clave tiene serie
+       * (`esHistorizada`) y un punto en vivo con simulación, se sirve su
+       * media por tramo; si la máquina la declara pero no la historiza, el
+       * mismo 500 que da el servidor real por un tag que no se recolecta.
        *
-       * Se pregunta al REGISTRO y no a un catálogo concreto: una máquina nueva
-       * sin historia entra sola en este camino, y el día que alguna la tenga,
-       * `esHistorizada` de su entrada será lo único que haya que mirar.
+       * Hasta el 21-09-2026 aquí se negaba TODA serie que no fuera del tanque
+       * con el argumento de que el grupo `DEMO 3` de vibraciones no entregaba.
+       * Ese grupo ya no existe y `DEMO_VIBRACIONES` registra 36 series
+       * verificadas: negarlas dejaba sin probar, contra el falso, todo lo que
+       * las herramientas de historia hacen con una máquina que no es el tanque.
        */
-      const otro = sistemaDePunto(nombrePunto)
-      if (otro?.parse(nombrePunto)) {
+      const otra = serieDeOtraMaquina(nombrePunto)
+      if (otra?.sistema.esHistorizada(otra.clave) && otra.enVivo) {
+        mediaDe = (desde, hasta) => mediaSimulada(otra.enVivo, desde, hasta)
+      } else if (otra || sistemaDePunto(nombrePunto)?.parse(nombrePunto)) {
         return {
           ok: false, status: 500,
           error: 'ICONICS History request failed: point is not being collected.',
         }
+      } else {
+        return { ok: false, status: 500, error: 'ICONICS History request failed: unknown point.' }
       }
-      return { ok: false, status: 500, error: 'ICONICS History request failed: unknown point.' }
     }
-
-    const claveServida = esHistorizada(clave) ? clave : CLAVE_CRUZADA
 
     const startMs = new Date(startDate).getTime()
     const endMs = new Date(endDate).getTime()
@@ -431,7 +484,7 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
         break
       }
 
-      const pagina = paginaDe(claveServida, startMs, endMs, pasoMs, offset, rnd)
+      const pagina = paginaDe(mediaDe, startMs, endMs, pasoMs, offset, rnd)
       paginasPedidas += 1
       data.push(...pagina.data)
       siguienteOffset = pagina.siguienteOffset

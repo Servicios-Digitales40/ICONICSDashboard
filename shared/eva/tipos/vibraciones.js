@@ -208,6 +208,10 @@ export const ROLES = Object.freeze({
         familia: "variador",
         label: v.label,
         unidad: v.unidad ?? null,
+        /* Los decimales con que se cita (Plan 39 F2): la frecuencia con dos,
+           la velocidad sin ninguno. Sin ellos, una configurada redondeaba el
+           variador entero a cero decimales y la escrita a mano no. */
+        decimales: v.decimales ?? null,
       }),
     ]),
   ),

@@ -259,9 +259,10 @@ function resolverSenalDeSistema(senal, sistemaId) {
   return {
     ok: true,
     clave,
-    /* La forma que espera el cuerpo de la herramienta: rótulo y unidad. La
-       unidad sale del catálogo de la máquina, no del registro. */
-    meta: { label: s.etiquetaDe(clave) ?? clave, unidad: '' },
+    /* Rótulo, unidad, decimales y naturaleza: los sabe la máquina (Plan 39
+       F2). Hasta entonces aquí iba `unidad: ''` para todo lo que no fuera el
+       tanque, y el modelo citaba la velocidad eficaz sin «mm/s». */
+    meta: metaDe(clave, id),
     sistemaId: id,
     historizada: s.esHistorizada(clave),
     conSerie: s.series.historizadas().map((k) => s.etiquetaDe(k) ?? k),
@@ -283,11 +284,20 @@ function metaDe(clave, sistemaId) {
   if (sistemaId === 'tanque') return senalInfo(clave)
 
   const s = SISTEMA[sistemaId]
-  return {
-    label: s?.etiquetaDe(clave) ?? clave,
-    unidad: '',
-    decimales: 3,
-  }
+  /*
+   * La máquina lo sabe (`metaDe`, Plan 39 F2): la escrita a mano desde su
+   * catálogo, una configurada desde su variable y su rol. Sin ello —una
+   * entrada antigua o una clave que no es suya— se cae al rótulo solo, con
+   * la unidad VACÍA y no inventada: es lo que había hasta hoy.
+   */
+  return (
+    s?.metaDe?.(clave) ?? {
+      label: s?.etiquetaDe(clave) ?? clave,
+      unidad: '',
+      decimales: 3,
+      naturaleza: 'medida',
+    }
+  )
 }
 
 /**
@@ -1970,14 +1980,13 @@ export function crearHerramientasDeHistoricos({
       if (!resuelto.ok) return resuelto
       const { clave, meta, sistemaId, historizada } = resuelto
 
-      if (sistemaId !== 'tanque') {
-        return fallo(
-          `Esta herramienta todavía sólo evalúa persistencia de alarmas del tanque, así que no ` +
-            `puede servir a «${meta.label}». Su historia sí se puede dar con historia_de_senal.`,
-          { sistema: sistemaId }
-        )
-      }
-
+      /*
+       * Se niega por la NATURALEZA de la señal, no por la máquina (Plan 39
+       * F2). Hasta entonces había un `sistemaId !== 'tanque'` delante: una
+       * bandera booleana con serie de cualquier otra máquina se rechazaba sin
+       * mirarla. La persistencia se evalúa igual sobre cualquier serie
+       * booleana; lo que no tiene sentido es evaluarla sobre una medida.
+       */
       if (meta.naturaleza !== 'alarma') {
         return fallo(
           `«${meta.label}» no es una alarma del PLC, es una medida continua. Esta herramienta sólo ` +
@@ -2068,7 +2077,10 @@ export function crearHerramientasDeHistoricos({
          que `diagnostico` documenta —contestar de una máquina con el catálogo
          de la otra— y aquí se evita preguntándole al registro. */
       const conSerie = SISTEMA[sistemaId].series.historizadas?.() ?? []
-      const claves = (SISTEMA[sistemaId].series.claves?.() ?? [])
+      /* `claves()` está en la ENTRADA, no en `series`: hasta el Plan 39 F2 se
+         pedía a `series.claves`, que no existe, y la tendencia salía vacía para
+         todas las máquinas. */
+      const claves = SISTEMA[sistemaId].claves()
         .filter(k => SISTEMA[sistemaId].esHistorizada(k))
         .slice(0, 4)
 

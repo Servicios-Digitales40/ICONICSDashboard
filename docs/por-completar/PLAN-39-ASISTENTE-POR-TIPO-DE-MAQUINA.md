@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F1 completadas · F2–F6 por completar
+**Estado:** F0–F2 completadas · F3–F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -344,22 +344,97 @@ medir al cerrar F2.
 
 **Depende de** F0.
 
-### F2 — Historia por tipo
+### F2 — Historia por tipo ✅
+
+**Completada el 21-09-2026.**
 
 **Objetivo.** Que las nueve herramientas de historia traten a una configurada
 como a la escrita a mano: unidad, decimales, etiqueta única, y ningún camino
 que caiga al tanque sin decirlo.
 
-**Cómo.** `metaDe` lee `unidad`/`decimales` de la variable (ya guardadas en
-`construirSistema`) o del rol; `lib/historia.mjs` deja de hacer
-`?? SISTEMA.tanque` y falla con el id que no encontró; `resumen_de_turno`
-pide `claves()` a la entrada, no a `series`; `alarma_sostenida` se niega por
-capacidad (la entrada no declara señales de alarma con serie) y no por id.
+- `metaDe(clave)` en las dos entradas de vibraciones: la escrita a mano desde
+  su catálogo (`sistemas.js`), la configurada desde su variable y su rol
+  (`construirSistema`). Devuelve rótulo, unidad, decimales y `naturaleza`
+  (`alarma` para una bandera booleana, `medida` para el resto). Las
+  herramientas de historia lo usan en el resolvedor y en su propio `metaDe`;
+  sin él, caen a la unidad VACÍA de antes, nunca a una inventada.
+- `lib/historia.mjs`: un id que no está en el registro es un fallo con nombre;
+  ya no se convierte en el tanque.
+- `resumen_de_turno` pide `claves()` a la entrada. `alarma_sostenida` se niega
+  por la naturaleza de la señal, no por la máquina.
+- El historiador falso sirve las series de las máquinas que no son el tanque
+  preguntando al registro de quién es un nombre `hda:`, con la media por tramo
+  de su simulación; una serie declarada y no verificada sigue dando el 500 del
+  servidor.
+- Los roles del variador llevan `decimales`; la bandera «real» (desviación del
+  sensor) tiene tres.
+- Pruebas: `verificar-transporte-falso` 26 → 28 (una reescrita), `verificar-
+  vibraciones-configurada` 31 → 33, `verificar-herramientas` 179 → 183 (el de
+  historia reescrito: ahora exige `ok`, unidad y la misma serie que la escrita
+  a mano). Las nueve nuevas o reescritas se vieron fallar sin F2.
 
-**Criterios.** `historia_de_senal(vRMS_S1, sistema=vib-motor-03)` trae
-`unidad: "mm/s"`; `resumen_de_turno` lista señales para las tres máquinas;
-un `sistema` inexistente en `lib/historia.mjs` es un fallo con nombre, no la
-serie del tanque.
+#### Lo que de verdad pasó (F2)
+
+**La escrita a mano también viajaba sin unidad.** `metaDe` en `historicos/`
+devolvía `unidad: ''` para TODO lo que no fuera el tanque, así que la
+velocidad eficaz de la vibraciones escrita a mano llegaba al modelo sin
+«mm/s» desde el 28-08-2026, cuando empezó a tener series. Es de esta rama y
+se arregló en las dos: el catálogo ya sabía la unidad, nadie se la pedía.
+
+**El historiador falso negaba lo que ya existe.** Negaba toda serie que no
+fuera del tanque «porque el grupo `DEMO 3` no entrega». Ese grupo ya no
+existe y `DEMO_VIBRACIONES` registra 36 series verificadas; el comentario
+llevaba semanas siendo falso y dejaba sin probar, sin red, todo lo que las
+herramientas de historia hacen con otra máquina —incluida la caída al tanque
+de `lib/historia.mjs`, que sólo se veía con planta—. Ahora pregunta al
+registro (`serieDeOtraMaquina`): la entrada cuya `series.punto(clave)` sea el
+nombre pedido, con serie verificada y un punto en vivo que simular. La
+comprobación que fijaba la negativa se reescribió en tres: pedir por el nombre
+en vivo falla (B10), una historizada se sirve, y una declarada sin verificar
+sigue fallando. Para esta última hizo falta una configurada con un grupo que
+sólo ella reclame: la escrita a mano tiene el mismo nombre `hda:` verificado
+y, en el orden del registro, la habría servido.
+
+**Los decimales no estaban en el rol.** Los roles del variador copiaban
+`unidad` pero no `decimales`, y una configurada redondeaba la frecuencia a
+cero decimales donde la escrita a mano daba dos. El check que compara los
+metadatos clave por clave entre las dos entradas lo cazó (siete claves
+distintas), junto con la desviación del sensor: una bandera de tipo `real`
+lleva tres decimales, no cero como las booleanas.
+
+**`alarma_sostenida` se niega igual, pero por lo que es.** Sobre una
+velocidad eficaz dice «es una medida continua», no «sólo evalúa alarmas del
+tanque». Ninguna máquina de vibraciones tiene hoy una bandera booleana con
+serie —las de aviso no existen en el árbol—, así que el camino positivo
+queda sin ejercitar hasta que alguna la tenga; el check fija la negativa
+correcta.
+
+**`resumen_de_turno` tenía la tendencia vacía para todas las máquinas** desde
+que existe, por pedir `series.claves()`. Con `claves()` trae la tendencia de
+las cuatro primeras series con historia; la desviación del sensor viaja entre
+ellas sin unidad, que es la que tiene.
+
+**Contra el modelo real** (`medir-asistente-configurada --maquina
+vib-motor-03`; el caso de historia mira ahora si el texto cita mm/s):
+
+| Caso | Con F1 | Con F2 |
+|---|---|---|
+| ¿Cómo ha ido Velocidad eficaz · S1 en 7 días? (contexto) | `"vibraciones"`: la escrita a mano | `vib-motor-03`, **cita mm/s**: «La señal Velocidad eficaz · S1 en el sistema vib-motor-03 ha mostrado…» |
+| ¿Qué vibración tiene cada apoyo? (contexto) | cita mm/s | cita mm/s, «en el sistema vib-motor-03 (Nuevo-Modor)» |
+| ¿Hay algún riesgo activo? (contexto) | sólo `vib-motor-03` | sólo `vib-motor-03` |
+| Documentación (contexto) | redacta | 4 rondas, «no he podido resumirlos» |
+| Los otros cuatro | llegan | llegan |
+
+**8 de 8 llegan; ninguna se fue a otra máquina.** Con contexto de pantalla,
+5 de 5. Dos cosas que decir tal cual: la pregunta de historia volvió a
+`vib-motor-03` —la tanda de F1 la había visto irse a `"vibraciones"`— y una
+tanda no decide en ningún sentido; y en «¿cómo está Nuevo-Modor?» el modelo
+escribió «no se pudo obtener el estado actual» tras una llamada que en las
+otras tres preguntas del mismo minuto contestó «parada»: el instrumento no
+guarda el resultado de la herramienta, así que no se sabe si falló la lectura
+de planta en ese instante o si el modelo leyó mal. Guardar el resultado de
+cada llamada, como hace `medir-asistente.mjs` reejecutándola, es lo que
+haría falta para distinguirlo; queda para F6, que amplía el instrumento.
 
 **Depende de** F0. Independiente de F1.
 

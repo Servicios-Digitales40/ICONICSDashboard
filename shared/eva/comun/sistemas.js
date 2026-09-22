@@ -428,6 +428,45 @@ export const SISTEMAS = [
         CALIDADES_VIB.find((x) => x.key === base);
       return f ? `${f.label} · ${c.label}` : null;
     },
+
+    /**
+     * Rótulo, unidad, decimales y naturaleza de una clave (Plan 39 F2).
+     *
+     * Las herramientas de historia lo pedían con `senalInfo`, que es del
+     * tanque, y para cualquier otra máquina ponían `unidad: ''`: el modelo
+     * recibía la velocidad eficaz sin «mm/s» y la frecuencia sin «Hz». Sale
+     * del mismo catálogo que `etiquetaDe`. `naturaleza` distingue una
+     * bandera booleana (`alarma`) de una medida continua, que es lo que
+     * `alarma_sostenida` necesita saber para negarse con motivo.
+     */
+    metaDe: (clave) => {
+      const v = VARIADOR_VIB.find((x) => x.key === clave);
+      if (v) {
+        return { label: v.label, unidad: v.unidad ?? "", decimales: v.decimales ?? 3, naturaleza: "medida" };
+      }
+
+      const corte = clave.lastIndexOf("_");
+      const base = clave.slice(0, corte);
+      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
+      if (!c) return null;
+
+      const m = MEDIDAS_VIB.find((x) => x.key === base);
+      if (m) {
+        return { label: `${m.label} · ${c.label}`, unidad: m.unidad ?? "", decimales: m.decimales ?? 3, naturaleza: "medida" };
+      }
+      const b = BANDERAS_VIB.find((x) => x.key === base);
+      if (b) {
+        return {
+          label: `${b.label} · ${c.label}`,
+          unidad: "",
+          decimales: b.tipo === "real" ? 3 : 0,
+          naturaleza: b.tipo === "booleano" ? "alarma" : "medida",
+        };
+      }
+      const q = CALIDADES_VIB.find((x) => x.key === base);
+      if (q) return { label: `${q.label} · ${c.label}`, unidad: "", decimales: 0, naturaleza: "medida" };
+      return null;
+    },
     esHistorizada: esHistorizadaVibracion,
     /*
      * ── RE-SONDEADO EL 21-09-2026 (Plan 34 F0) ─────────────────────

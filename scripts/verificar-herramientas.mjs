@@ -77,6 +77,7 @@ import { construirSistema } from '../shared/eva/comun/construirSistema.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+import { crearAyudantesDeHistoria } from '../backend/ia/herramientas/lib/historia.mjs'
 import { enMarchaVib } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 
@@ -744,17 +745,64 @@ await checkAsync('[configurada] riesgos_activos la evalúa con las reglas de su 
   assert.ok(suya.sin_comprobar, 'falta el recuento de lo que NO se pudo mirar')
 })
 
-await checkAsync('[configurada] historia_de_senal la trata como a la escrita a mano: mismo punto, misma respuesta', async () => {
-  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+await checkAsync('[configurada] historia_de_senal la trata como a la escrita a mano: mismo punto, misma serie, misma unidad', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
   const suya = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
   const escrita = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: 'vibraciones', periodo: 'últimas 6 horas' })
   // El punto del historiador es LITERAL en la configuración y tiene que ser el
   // mismo que el del catálogo: deducirlo del nombre en vivo es el defecto B10.
   assert.equal(configurada.series.punto('vRMS_S1'), SISTEMA.vibraciones.series.punto('vRMS_S1'))
-  // El falso contesta lo mismo a las dos (hoy: que ese grupo no entrega). Lo
-  // que NO puede pasar es que a la configurada se le niegue por desconocida.
-  assert.equal(suya.ok, escrita.ok)
-  assert.doesNotMatch(suya.error ?? '', /no (conozco|existe|reconozco)|sistemas_de_la_planta/i)
+  assert.equal(suya.ok, true, suya.error)
+  assert.equal(escrita.ok, true, escrita.error)
+  /*
+   * Plan 39 F2: la unidad la sabe la máquina —antes viajaba vacía para todo
+   * lo que no fuera el tanque— y la serie es la misma que la de la escrita a
+   * mano: mismo nombre hda:, mismo historiador falso, mismo instante.
+   */
+  assert.equal(suya.unidad, 'mm/s')
+  assert.equal(escrita.unidad, 'mm/s')
+  assert.equal(suya.muestras, escrita.muestras)
+  assert.equal(suya.promedio, escrita.promedio)
+  assert.match(suya.senal, /Velocidad eficaz/)
+})
+
+await checkAsync('[configurada] la frecuencia del variador viaja en Hz y con los decimales de su rol', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'frecuencia', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.unidad, 'Hz')
+  // Dos decimales, los del rol `variador:frecuencia`; el float crudo del PLC
+  // no se cita tal cual (ver `metaDe` en historicos/).
+  assert.ok(/^-?\d+(\.\d{1,2})?$/.test(String(r.promedio)), `promedio con más de 2 decimales: ${r.promedio}`)
+})
+
+await checkAsync('[configurada] alarma_sostenida se niega por la NATURALEZA de la señal, no por la máquina', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const r = await h.ejecutar('alarma_sostenida', { alarma: 'vRMS_S1', sistema: ESPEJO.id })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /medida continua/, 'una velocidad eficaz no es una alarma booleana')
+  assert.doesNotMatch(r.error, /del tanque/, 'hasta el Plan 39 F2 se negaba por no ser el tanque')
+})
+
+await checkAsync('[configurada] resumen_de_turno le pide la tendencia de sus series, no una lista vacía', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  assert.equal(r.ok, true, r.error)
+  // Hasta el Plan 39 F2 pedía `series.claves()`, que no existe, y la
+  // tendencia salía `null` para TODAS las máquinas.
+  assert.ok(r.tendencia?.ok, 'la tendencia de las series con historia tiene que venir')
+  assert.ok(r.tendencia.senales.length >= 2)
+  // Con su unidad donde la hay (la desviación del sensor no tiene, y viaja vacía, no inventada).
+  assert.ok(r.tendencia.senales.some(s => s.unidad === 'mm/s'), 'la velocidad eficaz viaja en mm/s')
+})
+
+await checkAsync('un id de sistema que no existe NO se convierte en el tanque al leer una serie', async () => {
+  // `lib/historia.mjs` hacía `SISTEMA[id] ?? SISTEMA.tanque`: con «velocidad»,
+  // que existe en las dos máquinas, servía la curva del tanque sin dar error.
+  const { leerSerie } = crearAyudantesDeHistoria({ client: clienteFalso(), historyConcurrencia: 2 })
+  const r = await leerSerie('velocidad', { inicio: new Date(Date.now() - 3_600_000), fin: new Date() }, 'no-existe')
+  assert.equal(r.ok, false)
+  assert.match(r.motivo, /no-existe/)
 })
 
 await checkAsync('[configurada] diagnosticar_falla acepta su id y llega al motor', async () => {

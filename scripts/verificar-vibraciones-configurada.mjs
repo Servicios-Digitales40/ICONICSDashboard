@@ -538,6 +538,30 @@ check('sin descripción, la etiqueta lleva el apoyo, y cada señal lleva el id d
   assert.ok(entrada.mide.length < comoEnPlanta.variables.length / 2, `mide tiene ${entrada.mide.length} entradas`)
 })
 
+/* ── Los metadatos de cada clave, por máquina (Plan 39 F2) ──────────── */
+
+console.log('\n── Unidad, decimales y naturaleza por clave (Plan 39 F2) ────')
+
+check('la configurada y la escrita a mano dan la misma unidad y decimales a cada clave con serie', () => {
+  for (const clave of configurada.series.historizadas()) {
+    const suya = configurada.metaDe(clave)
+    const escrita = aMano.metaDe(clave)
+    assert.ok(suya && escrita, `${clave}: sin metadatos en alguna de las dos`)
+    assert.equal(suya.unidad, escrita.unidad, `${clave}: unidad`)
+    assert.equal(suya.decimales, escrita.decimales, `${clave}: decimales`)
+    assert.equal(suya.naturaleza, escrita.naturaleza, `${clave}: naturaleza`)
+  }
+  assert.equal(configurada.metaDe('vRMS_S1').unidad, 'mm/s')
+  assert.equal(configurada.metaDe('frecuencia').decimales, 2)
+})
+
+check('una bandera booleana es una «alarma» para alarma_sostenida; una medida, no', () => {
+  assert.equal(configurada.metaDe('alarma_S1').naturaleza, 'alarma')
+  assert.equal(aMano.metaDe('alarma_S1').naturaleza, 'alarma')
+  assert.equal(configurada.metaDe('vRMS_S1').naturaleza, 'medida')
+  assert.equal(configurada.metaDe('no-existe'), null)
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {

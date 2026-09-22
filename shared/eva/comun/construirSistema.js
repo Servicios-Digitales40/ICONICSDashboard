@@ -471,6 +471,28 @@ export function construirSistema(maquina, tipo) {
       )];
     },
 
+    /**
+     * Rótulo, unidad, decimales y naturaleza de una clave (Plan 39 F2). La
+     * unidad la trae la variable si quien configuró la escribió; si no, el
+     * rol del tipo. Los decimales, del rol. Una bandera booleana es una
+     * `alarma` para `alarma_sostenida`; lo demás, medida.
+     */
+    metaDe: (clave) => {
+      const v = porClave.get(clave);
+      if (!v) return null;
+      const rol = tipo.roles?.[v.rol] ?? null;
+      const booleana = rol?.familia === "bandera" && rol?.tipo === "booleano";
+      /* Una bandera «real» (la desviación del sensor) es una medida con tres
+         decimales; las booleanas y las calidades, ninguno. */
+      const porFamilia = rol?.familia === "medida" || rol?.tipo === "real" ? 3 : 0;
+      return {
+        label: etiquetaDeVariable(v),
+        unidad: v.unidad ?? rol?.unidad ?? "",
+        decimales: rol?.decimales ?? porFamilia,
+        naturaleza: booleana ? "alarma" : "medida",
+      };
+    },
+
     esHistorizada: (clave) => clavesConSerie.includes(clave),
 
     series: {

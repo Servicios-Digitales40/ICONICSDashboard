@@ -82,13 +82,26 @@ export function crearAyudantesDeHistoria({ client, historyConcurrencia }) {
    * sería pedirles algo que todavía no saben. Quien sí lo sabe —el asistente,
    * cuando el modelo dice de qué máquina habla— lo pasa.
    *
-   * No es el defecto peligroso que se evita en `estado_del_sistema`: allí un
-   * defecto contestaba de la máquina equivocada con datos reales; aquí una
-   * clave que no es del tanque no existe en su catálogo y la guarda la para.
+   * Lo que YA NO hace (Plan 39 F2) es convertir un id desconocido en el
+   * tanque: `SISTEMA[id] ?? SISTEMA.tanque` pedía al historiador la serie del
+   * tanque con la clave de otra máquina, y si la clave existía en las dos
+   * —«velocidad»— servía la curva equivocada sin dar error. Un id que no está
+   * en el registro es un fallo con nombre.
    */
-  const deSistema = (sistemaId) => SISTEMA[sistemaId] ?? SISTEMA.tanque
+  const deSistema = (sistemaId) => SISTEMA[sistemaId] ?? null
+  const sinSistema = (sistemaId) => ({
+    ok: false,
+    status: 0,
+    motivo: `No hay ningún sistema «${sistemaId}» en el registro`,
+    error:
+      `No hay ningún sistema «${sistemaId}» en el registro: sin su entrada no se sabe cómo nombra ` +
+      'el historiador sus series. Los ids salen de sistemas_de_la_planta.',
+  })
 
 async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque', { crudo = false } = {}) {
+  const sistema = deSistema(sistemaId)
+  if (!sistema) return sinSistema(sistemaId)
+
   const segundos = (ventana.fin - ventana.inicio) / 1000
   // Un punto cada 15 min como en la vista de Planta, pero sin pasar del tope
   // del servidor: por debajo de 25 h manda la resolución, por encima el tope.
@@ -105,7 +118,7 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
     // Cómo se nombra el punto en el historiador lo dice la máquina: el tanque
     // usa `ac:` —el mismo nombre que en vivo— y vibraciones `hda:` con su
     // grupo delante. Ver `series.punto` en `shared/eva/comun/sistemas.js`.
-    pointName: deSistema(sistemaId).series.punto(clave),
+    pointName: sistema.series.punto(clave),
     startDate: ventana.inicio.toISOString(),
     endDate: ventana.fin.toISOString(),
     /*
@@ -117,7 +130,7 @@ async function leerUnTramo(clave, ventana, tramoPlanificado, sistemaId = 'tanque
      * crudo, 7 en `faltaDePresion` en 24 h. El cubo de un agregado vale
      * `0,5` —ni 0 ni 1—, así que nunca es un flanco.
      */
-    ...(crudo ? {} : { aggregate: deSistema(sistemaId).series.agregado ?? AGREGADO, interval }),
+    ...(crudo ? {} : { aggregate: sistema.series.agregado ?? AGREGADO, interval }),
   })
 
   if (!r?.ok) return { ok: false, status: r?.status ?? 0, error: r?.error }
@@ -193,7 +206,9 @@ function enRango(datos, { inicio, fin }, crudo) {
  * los cuatro llamadores no tengan que saber que la ventana se troceó.
  */
 async function leerSerie(clave, ventana, sistemaId = 'tanque', { crudo = false } = {}) {
-  if (!deSistema(sistemaId).esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
+  const sistema = deSistema(sistemaId)
+  if (!sistema) return sinSistema(sistemaId)
+  if (!sistema.esHistorizada(clave)) return { ok: false, motivo: SIN_SERIE }
 
   const { tramos } = planificar({ inicio: ventana.inicio, fin: ventana.fin, puntosPorTramo: 96 })
 

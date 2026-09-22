@@ -38,8 +38,11 @@ import { loadConfig } from '../backend/config.mjs'
 import { RAIZ, SENALES, TODOS_LOS_PUNTOS, esHistorizada, pointName, puntoHistorico, historizadas } from '../shared/eva/tanque/senales.js'
 import { valorEn } from '../shared/eva/tanque/simulador.js'
 import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones/vibraciones.js'
-import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
-import { SISTEMAS } from '../shared/eva/comun/sistemas.js'
+import { enMarchaVib, valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+import { SISTEMA, SISTEMAS, desregistrarSistema, registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 import { isGoodQuality } from '../shared/quality.js'
 
 const c = {
@@ -274,10 +277,19 @@ await checkAsync('el historiador y el área de alarmas también se recorren, con
   assert.ok(area.payload.every(n => n.shortName.startsWith('=')), 'los contadores llevan el igual delante')
 })
 
-await checkAsync('pedir la HISTORIA de un punto de vibración falla, como falla el grupo DEMO 3', async () => {
-  // `esHistorizada` sigue en `false` en todo ese catálogo. Servir aquí una
-  // serie inventada enseñaría al asistente a afirmar tendencias de esta
-  // máquina, que es justo lo que ese archivo prohíbe todavía.
+/*
+ * ── LA HISTORIA DE VIBRACIONES, EN EL FALSO (Plan 39 F2) ──────────────
+ *
+ * Hasta el 21-09-2026 el falso negaba TODA serie que no fuera del tanque, con
+ * el argumento de que el grupo `DEMO 3` no entregaba. Ese grupo ya no existe
+ * y `DEMO_VIBRACIONES` registra 36 series verificadas; negarlas dejaba sin
+ * probar, sin red, todo lo que las herramientas de historia hacen con otra
+ * máquina. Ahora el falso pregunta al REGISTRO de quién es un nombre `hda:`
+ * y sirve la media por tramo de su simulación. Tres cosas se fijan:
+ */
+await checkAsync('la historia de vibraciones se pide por su nombre hda:, no por el punto en vivo', async () => {
+  // El nombre en vivo (`ac:`) no es el del historiador: el servidor real lo
+  // rechaza, y el falso también. Es la trampa B10 de este proyecto.
   const cliente = sinCaos()
   const r = await cliente.readHistory({
     pointName: puntoVariador('velocidad'),
@@ -286,6 +298,66 @@ await checkAsync('pedir la HISTORIA de un punto de vibración falla, como falla 
     interval: '00:15:00',
   })
   assert.equal(r.ok, false)
+  assert.match(r.error, /not being collected/)
+})
+
+await checkAsync('una serie historizada de vibraciones se sirve con la media de su simulación', async () => {
+  let t = 1_700_000_000_000
+  while (!enMarchaVib(t)) t += 60_000   // la máquina simulada tiene que estar en marcha
+  const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
+  const vib = SISTEMA.vibraciones
+  for (const clave of ['vRMS_S1', 'velocidad', 'frecuencia']) {
+    assert.equal(vib.esHistorizada(clave), true, `${clave} tiene que estar historizada para esta comprobación`)
+    const r = await cliente.readHistory({
+      pointName: vib.series.punto(clave),
+      startDate: new Date(t - 3_600_000).toISOString(),
+      endDate: new Date(t).toISOString(),
+      interval: '00:15:00',
+    })
+    assert.equal(r.ok, true, `${clave}: ${r.error}`)
+    assert.ok(r.data.length > 0, `${clave}: sin muestras`)
+    for (const d of r.data) {
+      assert.ok(isGoodQuality(d.quality))
+      assert.ok(Number.isFinite(d.value), `${clave}: valor no numérico`)
+    }
+  }
+})
+
+await checkAsync('una serie declarada pero NO verificada sigue fallando como en el servidor', async () => {
+  /*
+   * La escrita a mano no tiene con qué probarlo: `series.punto` sólo nombra
+   * lo que está en su lista blanca. Una configurada SÍ: la espejo sin sondear
+   * declara el nombre hda: de cada variable con `historyVerified: false`, que
+   * es exactamente la máquina recién configurada de la que el asistente no
+   * debe afirmar tendencias. Se registra sólo para esta comprobación.
+   */
+  const sinSondear = construirSistema(configuracionEspejo().configurada, tipoDe('vibraciones'))
+  assert.equal(sinSondear.esHistorizada('vRMS_S1'), false)
+  assert.ok(sinSondear.series.punto('vRMS_S1'), 'declara el nombre en el historiador')
+
+  // La ESCRITA A MANO sí la tiene verificada y usa el MISMO nombre hda:, así
+  // que el falso, que pregunta a quien reclama el nombre en el orden del
+  // registro, la serviría. Para ver la negativa hace falta un nombre que sólo
+  // la espejo reclame: se le cambia el grupo a uno que la escrita a mano no usa.
+  const cfg = configuracionEspejo().configurada
+  cfg.id = 'vibraciones-sin-verificar'
+  for (const v of cfg.variables) {
+    if (v.historyPointName) v.historyPointName = v.historyPointName.replace('DEMO_VIBRACIONES', 'GRUPO_SIN_VERIFICAR')
+  }
+  const soloSuya = registrarSistema(construirSistema(cfg, tipoDe('vibraciones')), { toleraSolapeConEscritas: true })
+  try {
+    const cliente = sinCaos()
+    const r = await cliente.readHistory({
+      pointName: soloSuya.series.punto('vRMS_S1'),
+      startDate: new Date(1_700_000_000_000 - 3_600_000).toISOString(),
+      endDate: new Date(1_700_000_000_000).toISOString(),
+      interval: '00:15:00',
+    })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /not being collected/)
+  } finally {
+    desregistrarSistema(soloSuya.id)
+  }
 })
 
 /* ── El historiador ───────────────────────────────────────────────────── */

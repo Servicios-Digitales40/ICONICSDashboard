@@ -203,6 +203,8 @@ const CASOS = [
     conContexto: true,
     herramienta: ['historia_de_senal', 'analisis_de_senal', 'perfil_de_senal', 'tendencia_multiple'],
     porque: 'Su historiador es OTRA raíz que la escrita a mano; si se va a la otra, lee series ajenas.',
+    /* Plan 39 F2: la serie viaja con su unidad; antes llegaba con `unidad: ''`. */
+    citaValores: /mm\/s/,
     dependeDelEstado: true,
   },
   {
