@@ -463,6 +463,18 @@ no es de nadie. Desde el Plan 39 F3 un manual se puede asignar a un **tipo**
 trae en el estado del índice `conSistemaDesconocido`, que es donde mirar
 después de retirar una máquina.
 
+**El reconocimiento de roles TOLERA la grafía, pero no inventa conceptos.**
+Desde el 22-09-2026 `rolesDeTag` y `rolesDeClave` comparan por forma canónica
+—minúsculas, y el espacio y el guión medio valen como guión bajo—, así que
+`VRMS_S1`, `vRMS_S1` y `vrms_s1` son el mismo rol, y el sufijo del apoyo se
+detecta igual. Antes era `===` contra la grafía exacta del SM 1281: **pasar
+los tags de planta a mayúsculas dejaba sin rol a nueve de doce señales**, y con
+ellas la máquina se quedaba sin reglas, sin estado y sin catálogo. Un nombre
+DISTINTO —otro fabricante que llame `VEL_RMS` a la velocidad eficaz— se
+declara en `shared/eva/vibraciones/aliasDeTags.js`, y el tipo **no arranca** si
+un alias reclama dos roles. Lo que sigue sin poderse es inventar un concepto
+que el equipo no publique: eso se declara en las limitaciones de la máquina.
+
 **Las carpetas de `hda:` NO terminan en `\`; las de `ac:` SÍ terminan en `/`.**
 Una regla «carpeta = termina en separador» valía para un árbol y rompía el
 otro. En `shared/eva/comun/arbolIconics.js` la carpeta del historiador se

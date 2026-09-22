@@ -255,6 +255,51 @@ check('el sufijo del apoyo se separa, y viaja aparte del rol', () => {
   assert.equal(v.canal, 'S3', 'el apoyo es de la máquina, no del tipo')
 })
 
+check('el mismo tag en CUALQUIER grafia da el mismo rol y el mismo apoyo', () => {
+  /*
+   * El 22-09-2026 el reconocimiento comparaba con `===` contra la grafia
+   * exacta del SM 1281. Medido ese dia: pasar los tags de planta a MAYUSCULAS
+   * —una decision de nomenclatura razonable— dejaba sin rol a nueve de doce
+   * senales, y con ellas la maquina se quedaba sin reglas, sin estado y sin
+   * catalogo para el asistente.
+   *
+   * El apoyo va aparte a proposito: durante el arreglo, el rol ya se resolvia
+   * en minusculas pero el CANAL no, y esa media resolucion es peor que
+   * ninguna —la senal entra sin apoyo y las reglas por apoyo no la ven—.
+   */
+  for (const nombre of ['vRMS_S1', 'VRMS_S1', 'vrms_s1', 'VRMS_s1', 'vRMS S1']) {
+    const r = proponerRol(nombre, TIPO_VIBRACIONES, { canales: CANALES })
+    assert.equal(r.rol, 'medida:vRMS', `«${nombre}» no resolvio el rol`)
+    assert.equal(r.canal, 'S1', `«${nombre}» no resolvio el apoyo`)
+  }
+})
+
+check('el canal que se devuelve es el DECLARADO por el tipo, no el que traia el nombre', () => {
+  /* Quien lo recibe lo usa como `assetId`: dos grafias del mismo apoyo
+     partirian la maquina en dos activos que son el mismo. */
+  const r = proponerRol('vrms_s2', TIPO_VIBRACIONES, { canales: CANALES })
+  assert.equal(r.canal, 'S2', 'devolvio la grafia del nombre en vez de la del tipo')
+})
+
+check('el espacio y el guion bajo no distinguen un tag de otro', () => {
+  /* `FREQ OUTPUT_BMS` lleva un espacio donde los demas llevan guion bajo. Al
+     normalizar la nomenclatura de planta, ese nombre cambia. */
+  for (const nombre of ['FREQ OUTPUT_BMS', 'FREQ_OUTPUT_BMS', 'freq_output_bms']) {
+    const r = proponerRol(nombre, TIPO_VIBRACIONES, { canales: CANALES })
+    assert.equal(r.rol, 'variador:frecuencia', `«${nombre}» no se reconocio`)
+  }
+})
+
+check('tolerar grafias NO afloja lo que no se reconoce', () => {
+  /* La otra mitad: que `VRMS_S1` resuelva no puede hacer que resuelva algo
+     que el tipo no mide. Un rol inventado es peor que ninguno. */
+  for (const nombre of ['ESTADO_TORRETA', 'Tension L-N', 'PAGINA']) {
+    const r = proponerRol(nombre, TIPO_VIBRACIONES, { canales: CANALES })
+    assert.equal(r.rol, null, `«${nombre}» recibio un rol que nadie declaro`)
+    assert.deepEqual(r.candidatos, [])
+  }
+})
+
 check('un tag del variador se reconoce aunque lleve el sufijo dentro', () => {
   /* `SPEED_BMS` no termina en un canal: el `_BMS` es parte del tag. */
   const s = proponerRol('SPEED_BMS', TIPO_VIBRACIONES, { canales: CANALES })

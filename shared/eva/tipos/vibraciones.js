@@ -90,6 +90,7 @@ import {
   resumenVibracionesParaAsistente,
 } from "../vibraciones/estadoVibraciones.js";
 import { valorVibracionDe } from "../vibraciones/simuladorVibraciones.js";
+import { ALIAS_DE_ROL, formaComparable } from "../vibraciones/aliasDeTags.js";
 
 /**
  * ── LOS ROLES: QUÉ PUEDE MEDIR UNA MÁQUINA DE ESTE TIPO ────────────
@@ -228,16 +229,48 @@ export const rolesDeAmbito = (ambito) =>
     .map(([rol]) => rol);
 
 /**
+ * ── EL ÍNDICE POR FORMA CANÓNICA (22-09-2026) ──────────────────────
+ *
+ * `rolesDeTag` y `rolesDeClave` comparaban con `===` contra UN nombre, así
+ * que el reconocimiento automático dependía de la grafía exacta del SM 1281.
+ * Medido: pasar los tags de planta a mayúsculas dejaba sin rol a nueve de doce
+ * señales, y `actual_Speed` (en vivo) no emparejaba con `actual_speed` (en el
+ * historiador) siendo la misma señal.
+ *
+ * Ahora las dos puertas del índice se construyen UNA vez sobre la forma
+ * comparable —minúsculas, separadores unificados— y admiten los alias que
+ * declare `aliasDeTags.js`. El tipo sigue describiendo qué mide la máquina; lo
+ * que deja de importar es cómo lo deletrea el servidor.
+ *
+ * Se construyen como `Map` y no recorriendo `ROLES` en cada llamada: el
+ * descubridor pregunta una vez por cada hoja del árbol —184 en esta planta— y
+ * cada pregunta recorría los 30 roles cuatro veces (ver `proponerRol`).
+ */
+function indicePor(sacarNombres) {
+  const indice = new Map();
+  for (const [rol, declarado] of Object.entries(ROLES)) {
+    for (const nombre of sacarNombres(rol, declarado)) {
+      const clave = formaComparable(nombre);
+      if (!clave) continue;
+      if (!indice.has(clave)) indice.set(clave, []);
+      const roles = indice.get(clave);
+      if (!roles.includes(rol)) roles.push(rol);
+    }
+  }
+  return indice;
+}
+
+const POR_TAG = indicePor((rol, d) => [d.tag, ...(ALIAS_DE_ROL[rol] ?? [])]);
+const POR_CLAVE = indicePor((rol, d) => [d.clave]);
+
+/**
  * Qué roles reclaman una clave. Devuelve una LISTA, nunca el primero.
  *
  * Es el mismo criterio que `sistemasDeSenal()` aplica entre máquinas y por el
  * mismo motivo: `aviso` encaja en dos familias, y elegir una es como se
  * contesta correctamente sobre la señal equivocada. Quien llama pregunta.
  */
-export const rolesDeClave = (clave) =>
-  Object.entries(ROLES)
-    .filter(([, r]) => r.clave === clave)
-    .map(([rol]) => rol);
+export const rolesDeClave = (clave) => POR_CLAVE.get(formaComparable(clave)) ?? [];
 
 /**
  * Qué roles reclaman un TAG del servidor. La otra puerta del mismo índice.
@@ -262,10 +295,7 @@ export const rolesDeClave = (clave) =>
  * pueden reclamar el mismo nombre, y elegir una por su cuenta es contestar
  * correctamente sobre la señal equivocada.
  */
-export const rolesDeTag = (tag) =>
-  Object.entries(ROLES)
-    .filter(([, r]) => r.tag === tag)
-    .map(([rol]) => rol);
+export const rolesDeTag = (tag) => POR_TAG.get(formaComparable(tag)) ?? [];
 
 /**
  * ── LO QUE UNA MÁQUINA DE ESTE TIPO TIENE QUE APORTAR ──────────────
@@ -342,6 +372,36 @@ const DESAMBIGUA = Object.freeze({
  * convierte el error de arriba en un arranque fallido en vez de un diagnóstico
  * torcido.
  */
+/**
+ * Ningún NOMBRE —propio o alias— puede reclamar dos roles distintos.
+ *
+ * Un alias mal puesto no se ve: es una señal reconocida como lo que no es, con
+ * su rótulo correcto encima. Y al comparar por forma canónica el riesgo crece,
+ * porque dos tags que el servidor distinguía por una mayúscula pasan a ser el
+ * mismo nombre para este índice.
+ *
+ * Así que se comprueba al cargar y se rompe el arranque, igual que
+ * `comprobarDesambiguaciones()`. Es preferible un backend que no arranca
+ * diciendo qué alias choca, a uno que diagnostica con la señal equivocada.
+ *
+ * `DESAMBIGUA` cubre el caso legítimo —`aviso` existe en dos familias— y por
+ * eso las claves que resuelve no cuentan como choque.
+ */
+function comprobarNombresUnicos() {
+  for (const [indice, queEs] of [[POR_TAG, "tag"], [POR_CLAVE, "clave"]]) {
+    for (const [nombre, roles] of indice) {
+      if (roles.length < 2) continue;
+      if (queEs === "clave" && DESAMBIGUA[roles[0]?.split(":")[1]]) continue;
+      if (Object.values(DESAMBIGUA).some((r) => roles.includes(r))) continue;
+      throw new Error(
+        `tipos/vibraciones.js: el ${queEs} «${nombre}» lo reclaman ${roles.length} roles ` +
+          `(${roles.join(", ")}). Un nombre no puede ser dos cosas: revisa ` +
+          "vibraciones/aliasDeTags.js o declara cual gana en DESAMBIGUA.",
+      );
+    }
+  }
+}
+
 function comprobarDesambiguaciones() {
   const AMBITO_DE_REGLA = { canal: "apoyo", maquina: "maquina" };
 
@@ -371,6 +431,7 @@ function comprobarDesambiguaciones() {
   }
 }
 
+comprobarNombresUnicos();
 comprobarDesambiguaciones();
 
 export const ROLES_REQUERIDOS = Object.freeze(

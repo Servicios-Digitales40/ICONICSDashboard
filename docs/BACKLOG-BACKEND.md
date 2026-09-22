@@ -451,7 +451,32 @@ sólo como respaldo. Es un cambio de `reporte.mjs` y de quien arma
 
 ---
 
-## Orden sugerido
+## B12 · El tipo `vibraciones` describe un SM 1281, no «cualquier motor»
+
+**Hoy.** Los 30 roles del tipo nacen de cinco listas en
+`shared/eva/vibraciones/vibraciones.js` (medidas, banderas, vigilancias,
+confianzas, variador), y cada uno declara el `tag` con que lo publica el
+SIPLUS CMS SM 1281 de esta instalación. Desde el 22-09-2026 la comparación
+tolera la grafía y hay un archivo de alias por rol
+(`vibraciones/aliasDeTags.js`), así que un equipo que llame `VEL_RMS` a la
+velocidad eficaz se absorbe escribiendo un alias — sin tocar reglas ni estado.
+
+**Lo que eso NO resuelve, y hay que saberlo antes de prometer que «vale para
+cualquier motor»:**
+
+- **Un equipo que mida cosas distintas.** Si un servidor no publica el valor
+  característico de daño, ese rol no existe en esa máquina y las reglas que lo
+  necesitan no se evalúan. Se declara en las limitaciones (`construirSistema`),
+  que es lo correcto, pero no se puede inventar.
+- **Los apoyos son `S1`, `S2`, `S3`.** `CANALES` los declara el tipo; un motor
+  con acelerómetros nombrados de otra forma no separaría el sufijo.
+- **Las 18 reglas SÍ son portables**: declaran `necesita: ["vRMS"]`, conceptos,
+  no tags. Ahí no hay acoplamiento que deshacer.
+
+**Propuesta, sólo cuando llegue un cliente real con otro equipo.** Perfiles de
+nomenclatura: un mismo tipo con varios diccionarios de tags, y al configurar se
+elige el del fabricante. Hasta entonces sería adivinar qué alias hacen falta, y
+el archivo de alias cubre el caso de uno en uno.
 
 1. ~~**B1**~~ — hecho el 28-08-2026
 2. ~~**B9**~~ — hecho el 11-09-2026

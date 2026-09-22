@@ -307,11 +307,24 @@ export function proponerRol(corto, tipo, { canales = [] } = {}) {
   /* Sin índice del tipo no se adivina: el catálogo de roles es suyo. */
   if (!porTag && !porClave) return nada;
 
-  /* ¿Termina en el sufijo de algún canal declarado? Los más largos primero:
-     `S1` y `S11` convivirían mal con una comparación ingenua. */
+  /*
+   * ¿Termina en el sufijo de algún canal declarado? Los más largos primero:
+   * `S1` y `S11` convivirían mal con una comparación ingenua.
+   *
+   * La comparación IGNORA mayúsculas y trata el espacio como el guión bajo,
+   * igual que el índice de roles del tipo (22-09-2026). Sin esto, `VRMS_s1`
+   * resolvía el rol pero se quedaba sin canal, y esa media resolución es peor
+   * que ninguna: la señal entra sin apoyo y las reglas por apoyo no la ven.
+   *
+   * El canal que se DEVUELVE es el declarado por el tipo (`S1`), no el que
+   * traía el nombre (`s1`): quien lo recibe lo usa como `assetId`, y dos
+   * grafías del mismo apoyo partirían la máquina en dos.
+   */
   const sufijos = [...canales].sort((a, b) => b.length - a.length);
-  const canal = sufijos.find((s) => corto.endsWith(`_${s}`)) ?? null;
-  const sinCanal = canal ? corto.slice(0, -(canal.length + 1)) : corto;
+  const cortoComparable = corto.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  const canal =
+    sufijos.find((s) => cortoComparable.endsWith(`_${String(s).toLowerCase()}`)) ?? null;
+  const sinCanal = canal ? corto.slice(0, -(String(canal).length + 1)) : corto;
 
   /* Cuatro intentos, y los cuatro hacen falta: por tag y por clave, con y sin
      el sufijo. Los tags del variador lo llevan DENTRO (`SPEED_BMS`). */
