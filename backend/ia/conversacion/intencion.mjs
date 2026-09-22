@@ -41,6 +41,7 @@
  * Así que este archivo sólo acota cuando está SEGURO. Una pregunta que encaja
  * en dos intenciones, o en ninguna, recibe las veintiséis.
  */
+import { SISTEMAS } from '../../../shared/eva/comun/sistemas.js'
 
 /**
  * Las familias, por lo que el modelo necesita PODER hacer.
@@ -50,6 +51,39 @@
  * fallo que ya se midió antes de que existiera esta fase.
  */
 const SIEMPRE = ['sistemas_de_la_planta']
+
+/*
+ * ── CUÁNDO EL REGISTRO NO HACE FALTA (Plan 39 F5) ──────────────────
+ *
+ * `sistemas_de_la_planta` está en todas las intenciones porque el modelo
+ * tiene que poder averiguar de qué máquina le hablan. Pero con CONTEXTO DE
+ * PANTALLA ya lo sabe, y medido el 21-09-2026 lo que hacía con la
+ * herramienta a mano era barrer las cuatro máquinas ante «¿hay algún riesgo
+ * activo?». Así que, con contexto, el registro sale del turno —salvo que la
+ * pregunta nombre OTRA máquina del registro o pida la planta entera—, y el
+ * modelo no puede llamar a lo que no tiene.
+ *
+ * Las marcas de «planta entera» son deliberadamente pocas: una palabra de más
+ * aquí devuelve el barrido; una de menos deja al modelo sin registro ante una
+ * pregunta que sí lo pedía, y eso se ve en el instrumento
+ * (`medir-asistente-configurada`, caso «inventario»).
+ */
+const MARCAS_PLANTA = [
+  'maquinas', 'sistemas', 'planta', 'cuales hay', 'que hay', 'todas las', 'todos los',
+  'otra maquina', 'otras maquinas', 'otro sistema', 'otros sistemas', 'las demas', 'los demas',
+  'machines', 'systems', 'plant', 'which ones', 'the others', 'other machine',
+]
+
+/** ¿La pregunta nombra otra máquina del registro, o la planta entera? */
+export function mencionaOtraMaquina(pregunta, sistemaId) {
+  const texto = normalizar(pregunta)
+  if (!texto) return false
+  if (MARCAS_PLANTA.some((m) => contienePalabra(texto, m))) return true
+  return SISTEMAS.some((s) => {
+    if (s.id === sistemaId) return false
+    return [s.id, s.nombre].filter(Boolean).some((n) => contienePalabra(texto, normalizar(n)))
+  })
+}
 
 const FAMILIAS = Object.freeze({
   /** Lo que dice el papel. */
@@ -247,8 +281,14 @@ function esLetraODigito(ch) {
  * @param {string} pregunta
  * @returns {{definiciones: object[], intenciones: string[], acotado: boolean}}
  */
-export function acotarCatalogo(catalogo, pregunta) {
+export function acotarCatalogo(catalogo, pregunta, { contexto = null } = {}) {
   const intenciones = intencionesDe(pregunta)
+
+  /* Con contexto de pantalla y sin otra máquina nombrada, el registro sale
+     del turno, se acote o no por intención: ver MARCAS_PLANTA arriba. */
+  const sinRegistro = Boolean(contexto?.sistema) && !mencionaOtraMaquina(pregunta, contexto.sistema)
+  const nombreDe = (d) => d?.function?.name ?? d?.name
+  const sinElRegistro = (defs) => (sinRegistro ? defs.filter((d) => !SIEMPRE.includes(nombreDe(d))) : defs)
 
   /*
    * Ninguna marca reconocida: puede ser conversación general («¿qué es una
@@ -260,16 +300,16 @@ export function acotarCatalogo(catalogo, pregunta) {
    * sistema; acotar ahí es donde más fácil sería cerrar de más.
    */
   if (intenciones.length === 0 || intenciones.length >= 3) {
-    return { definiciones: catalogo, intenciones, acotado: false }
+    return { definiciones: sinElRegistro(catalogo), intenciones, acotado: false, sinRegistro }
   }
 
   const familias = new Set(intenciones.flatMap((i) => INTENCIONES[i] ?? []))
   const permitidas = new Set([
-    ...SIEMPRE,
+    ...(sinRegistro ? [] : SIEMPRE),
     ...[...familias].flatMap((f) => FAMILIAS[f] ?? []),
   ])
 
-  const definiciones = catalogo.filter((d) => permitidas.has(d?.function?.name ?? d?.name))
+  const definiciones = catalogo.filter((d) => permitidas.has(nombreDe(d)))
 
   /*
    * Si el filtro deja el catálogo casi entero no merece la pena: se devuelve
@@ -278,11 +318,11 @@ export function acotarCatalogo(catalogo, pregunta) {
    * pregunta, y abrir es más barato que equivocarse.
    */
   if (definiciones.length < 3 || definiciones.length >= catalogo.length - 2) {
-    return { definiciones: catalogo, intenciones, acotado: false }
+    return { definiciones: sinElRegistro(catalogo), intenciones, acotado: false, sinRegistro }
   }
 
-  return { definiciones, intenciones, acotado: true }
+  return { definiciones, intenciones, acotado: true, sinRegistro }
 }
 
 /** Para las pruebas y para `verificar-intencion.mjs`. */
-export const _interno = Object.freeze({ FAMILIAS, INTENCIONES, MARCAS, normalizar })
+export const _interno = Object.freeze({ FAMILIAS, INTENCIONES, MARCAS, MARCAS_PLANTA, normalizar })

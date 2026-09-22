@@ -1220,7 +1220,34 @@ export function createHerramientas({
    * tenerla delante evita que el modelo gaste su única llamada en pedir lo que
    * ya tiene. Lo consume `chat.mjs`.
    */
-  function catalogo() {
+  /**
+   * Las señales que el prompt pone delante del modelo.
+   *
+   * Sin `sistemaId`, o con el tanque, el catálogo de siempre. Con el id de una
+   * máquina CONFIGURADA (Plan 39 F5), el suyo: su entrada sabe la etiqueta,
+   * la unidad y si cada clave tiene serie verificada. Hasta entonces el
+   * modelo tenía delante las 52 señales del tanque aunque estuviera mirando
+   * un motor de vibraciones, y a «¿qué vibración tiene cada apoyo?» le
+   * faltaba con qué nombrar las señales que iba a pedir.
+   *
+   * `activo` va a `null`: una configurada no tiene los cuatro activos del
+   * tanque, y la etiqueta ya lleva su apoyo («Velocidad eficaz · Lado acople»).
+   */
+  function catalogo(sistemaId = null) {
+    const entrada = sistemaId ? SISTEMA[String(sistemaId).trim()] : null
+    if (entrada?.metaDe) {
+      return entrada.claves().map(k => {
+        const meta = entrada.metaDe(k)
+        return {
+          nombre: meta?.label ?? entrada.etiquetaDe(k) ?? k,
+          unidad: meta?.unidad || null,
+          activo: null,
+          historia: entrada.esHistorizada(k),
+          soloEnMarcha: false,
+          sistema: entrada.id,
+        }
+      })
+    }
     return SENAL_KEYS.map(k => {
       const s = SENALES[k]
       return {

@@ -436,18 +436,18 @@ responde 200 con cero muestras (comprobado en `mttoS1`, `arranqueParoS1`,
 
 ## B11 · El PDF colorea los estados por palabras que las etiquetas ya no dicen
 
-**Hoy.**  decide el color de una fila de la tabla de
+**Hoy.** `reporte.mjs·colorEstado` decide el color de una fila de la tabla de
 valores actuales buscando «crit», «alarm», «normal», «ok»… en el texto del
-estado. Las etiquetas de  son «Fuera de límite»,
+estado. Las etiquetas de `shared/eva/tanque/estado.js` son «Fuera de límite»,
 «En aviso», «En banda», «Sin dato»: la primera y la tercera no casan con
 ningún patrón y salen en gris, igual que «sin criterio». Se vio el 22-09-2026
-al pasar la tabla de una máquina configurada por  (Plan 39 F4);
+al pasar la tabla de una máquina configurada por `estadoInfo` (Plan 39 F4);
 al tanque le pasa lo mismo desde que esas etiquetas existen.
 
-**Propuesta.** Que la fila lleve la CLAVE del estado (, …)
-además de la etiqueta y que  mire la clave; el texto libre queda
-sólo como respaldo. Es un cambio de  y de quien arma
- (), sin tocar el dominio del tanque.
+**Propuesta.** Que la fila lleve la CLAVE del estado (`nominal`, `critico`…)
+además de la etiqueta y que `colorEstado` mire la clave; el texto libre queda
+sólo como respaldo. Es un cambio de `reporte.mjs` y de quien arma
+`tablaActual` (`generar_reporte`), sin tocar el dominio del tanque.
 
 ---
 

@@ -820,9 +820,20 @@ export function instrucciones(catalogo, maxPasos, idioma = 'es', foco = null, co
        `textoDelContexto` sobre cuál manda cuando discrepan. */
     ...(contexto ? textoDelContexto(contexto) : []),
     ...(foco ? textoDelFoco(foco) : []),
-    'Las señales de la instalación:',
+    cabeceraDelCatalogo(contexto),
     catalogo,
   ].join('\n')
+}
+
+/**
+ * La cabecera del bloque de señales. Con una configurada delante, el catálogo
+ * es el SUYO y la cabecera lo dice, para que el modelo no lo lea como «las
+ * señales de la planta» y no busque el tanque en él (Plan 39 F5).
+ */
+function cabeceraDelCatalogo(contexto) {
+  const entrada = contexto?.sistema ? SISTEMA[contexto.sistema] : null
+  if (!entrada?.metaDe) return 'Las señales de la instalación:'
+  return `Las señales de «${entrada.nombre}» (${entrada.id}), la máquina que se tiene delante — las de otras máquinas las da estado_del_sistema con su id:`
 }
 
 /**
@@ -883,6 +894,14 @@ function textoDelContexto({ sistema, activo, rango, senal }) {
     ...(sistema ? [
       `Si la pregunta no nombra otra máquina, a toda herramienta que pida \`sistema\` le pasas EXACTAMENTE "${sistema}",`,
       'tal cual: no su nombre, y no el id de otra máquina que se le parezca.',
+      /*
+       * Plan 39 F5. Medido el 21-09-2026: desde la pantalla de una configurada,
+       * «¿hay algún riesgo activo?» se leía como «en la planta» y barría las
+       * cuatro máquinas. El registro de sistemas sale además del turno
+       * (`intencion.mjs`) cuando la pregunta no nombra otra; esto se lo dice.
+       */
+      'Ya sabes de qué máquina se habla: NO llames a sistemas_de_la_planta ni consultes OTRAS máquinas',
+      `salvo que la pregunta nombre otra o pida la planta entera. «¿Hay algún riesgo activo?» desde aquí es de "${sistema}", no de todas.`,
     ] : []),
     'Esto NO son mediciones: es dónde está mirando. Los valores se consultan con la herramienta,',
     'siempre, aunque la pantalla los tenga en pantalla.',
@@ -1236,7 +1255,7 @@ export function createChat({ config, herramientas }) {
    * Por eso lleva presupuesto propio: el de la respuesta más una reserva para
    * pensar, o un razonamiento largo truncaría la llamada a la herramienta.
    */
-  async function pasadaConHerramientas(messages, signal, { soloLectura = false } = {}) {
+  async function pasadaConHerramientas(messages, signal, { soloLectura = false, contexto = null } = {}) {
     /*
      * ── LA DEFENSA QUE DE VERDAD MUERDE (Plan 21 F8) ─────────────────
      *
@@ -1283,7 +1302,12 @@ export function createChat({ config, herramientas }) {
      * último `role: 'user'` sigue siendo lo que el técnico preguntó.
      */
     const ultimaPregunta = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
-    const { definiciones, intenciones, acotado } = acotarCatalogo(permitidas, ultimaPregunta)
+    const { definiciones, intenciones, acotado, sinRegistro } = acotarCatalogo(permitidas, ultimaPregunta, { contexto })
+    if (sinRegistro) {
+      logger.debug('sistemas_de_la_planta fuera del turno: hay contexto de pantalla y la pregunta no nombra otra máquina', {
+        sistema: contexto?.sistema,
+      })
+    }
 
     if (acotado) {
       logger.debug('Catálogo acotado por intención', {
@@ -1406,11 +1430,13 @@ export function createChat({ config, herramientas }) {
     // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
     // información fija y barata, y tenerla delante evita que el modelo gaste
     // su única llamada en pedir lo que ya tiene.
-    const catalogo = herramientas.catalogo()
+    /* El de la máquina que se tiene delante, si hay contexto de pantalla y es
+       una configurada; si no, el del tanque, como siempre (Plan 39 F5). */
+    const catalogo = herramientas.catalogo(contexto?.sistema ?? null)
       .map(s => [
         `  ${s.nombre}`,
         s.unidad ? ` (${s.unidad})` : ' (sin unidad declarada)',
-        ` · ${s.activo}`,
+        s.activo ? ` · ${s.activo}` : '',
         s.historia ? ' · con historia' : ' · SIN historia',
         // Que una señal sólo valga en marcha es la mitad de por qué la demo no
         // abre en rojo: sin esta marca, el modelo lee «caudal 0» con la bomba
@@ -1529,7 +1555,7 @@ export function createChat({ config, herramientas }) {
       })
 
       const ronda = await conLatido(
-        () => pasadaConHerramientas(messages, signal, { soloLectura: huboTextoAjeno }),
+        () => pasadaConHerramientas(messages, signal, { soloLectura: huboTextoAjeno, contexto }),
         onEvento,
         paso === 0 ? estados.pensando : estados.analizando
       )

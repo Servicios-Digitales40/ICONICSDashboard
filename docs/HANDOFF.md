@@ -38,7 +38,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | Suite de frontend | **1090** pruebas · 29 omitidas |
 | Suite de backend | **387** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **189** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
@@ -248,7 +248,7 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F4 completas, F5–F6 por
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F5 completas, F6 por
 completar. Que las herramientas del asistente sirvan a cualquier máquina
 configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
 vibraciones. F0 puso una configurada espejo en la puerta
@@ -264,9 +264,12 @@ destapó que los manuales de vibraciones estaban asignados a una máquina que ya
 no existía: ahora se asignan al TIPO (`tipo:vibraciones`) y el modelo cita la
 ISO 20816-3 para `Nuevo-Modor`. F4: `generar_reporte` dibuja el PDF de una
 configurada —rótulos de su entrada, banda de su tipo, orden de su estado— y
-está medido contra planta: 12 páginas y 17 gráficos de `Nuevo-Modor`. Quedan:
-el prompt de la máquina que se tiene delante (F5) y el alta automática según
-el estado de validación (F6).
+está medido contra planta: 12 páginas y 17 gráficos de `Nuevo-Modor`. F5: el
+prompt lleva el catálogo de la máquina que se tiene delante (+835 tokens,
+medidos) y `sistemas_de_la_planta` sale del turno con contexto; «¿hay algún
+riesgo activo?» desde `Nuevo-Modor` ya no barre las cuatro máquinas. El
+instrumento da **9 de 9**. Queda el alta automática según el estado de
+validación (F6).
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
@@ -412,9 +415,13 @@ registro tiene.** Medido el 21-09-2026 (Plan 38 F3): con doce descripciones
 diciendo «"tanque" o "vibraciones"», desde la pantalla de `Nuevo-Modor` llamó
 con `sistema="vibraciones"`; por nombre, con `sistema="Nuevo-Modor"`. Al
 imprimir el id en el inventario y quitar los ejemplos fijos, 6 de 7 preguntas
-llegan a la máquina a la primera. Lo que sigue sin resolverse en el prompt:
-una pregunta sin máquina («¿hay algún riesgo activo?») con contexto de
-pantalla la lee como «en la planta» y **barre las cuatro**.
+llegan a la máquina a la primera. Lo que quedaba —una pregunta sin máquina
+(«¿hay algún riesgo activo?») con contexto de pantalla la leía como «en la
+planta» y **barría las cuatro**— lo cerró el Plan 39 F5 (22-09-2026), y no
+con más texto: con contexto, `sistemas_de_la_planta` **sale de las
+definiciones del turno** (`intencion.mjs·acotarCatalogo`) salvo que la
+pregunta nombre otra máquina o pida la planta entera. El modelo no puede
+llamar a lo que no tiene. El instrumento pasó a 9 de 9.
 
 **El catálogo de herramientas se acota por intención.** 26 herramientas son
 ~8 650 tokens que viajan en cada llamada; con el prompt, ~14 330 fijos.

@@ -24,7 +24,14 @@
 import assert from 'node:assert/strict'
 
 import { instrucciones, REGLAS } from '../backend/ia/conversacion/chat.mjs'
-import { SISTEMAS } from '../shared/eva/comun/sistemas.js'
+import { registrarSistema, SISTEMAS } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* Una configurada registrada, para el bloque de contexto (Plan 39 F5). */
+const ESPEJO = configuracionEspejo({ verificadasDelCatalogo: true }).configurada
+registrarSistema(construirSistema(ESPEJO, tipoDe('vibraciones')))
 
 const c = {
   reset: '\x1b[0m',
@@ -234,6 +241,23 @@ check('ninguna regla se queda sin texto', () => {
       `La regla ${i + 1} está vacía o es demasiado corta para decir nada.`
     )
   }
+})
+
+check('sin contexto, el bloque de señales es «de la instalación»; con una configurada delante, es el SUYO y lo dice', () => {
+  assert.ok(PROMPT.includes('Las señales de la instalación:'))
+  assert.ok(!PROMPT.includes('NO llames a sistemas_de_la_planta'), 'sin contexto no hay máquina que dar por sabida')
+
+  const conContexto = instrucciones(CATALOGO, 3, 'es', null, { sistema: ESPEJO.id })
+  assert.ok(conContexto.includes(`Las señales de «${ESPEJO.nombre}» (${ESPEJO.id}), la máquina que se tiene delante`))
+  assert.ok(!conContexto.includes('Las señales de la instalación:'))
+  // Plan 39 F5: lo que impide el barrido de las cuatro máquinas.
+  assert.ok(conContexto.includes('NO llames a sistemas_de_la_planta'))
+  assert.ok(conContexto.includes(`es de "${ESPEJO.id}", no de todas`))
+
+  // Con el tanque delante, el bloque sigue siendo el de la instalación: no
+  // es una configurada y su catálogo es el de siempre.
+  const conTanque = instrucciones(CATALOGO, 3, 'es', null, { sistema: 'tanque' })
+  assert.ok(conTanque.includes('Las señales de la instalación:'))
 })
 
 check('el prompt cambia de idioma, y SOLO el idioma (i18n)', () => {

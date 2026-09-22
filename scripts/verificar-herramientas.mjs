@@ -2706,6 +2706,23 @@ await checkAsync(
   }
 )
 
+await checkAsync('[configurada] catalogo(id) da las señales de la configurada, con unidad y si tienen serie; sin id, el del tanque', async () => {
+  // Plan 39 F5: es lo que el prompt pone delante del modelo desde su pantalla.
+  const h = createHerramientas({ client: clienteFalso() })
+  const suyo = h.catalogo(ESPEJO.id)
+  assert.equal(suyo.length, configurada.claves().length)
+  const vrms = suyo.find(s => /Velocidad eficaz · Lado acople/.test(s.nombre))
+  assert.ok(vrms, 'falta la velocidad eficaz del lado acople')
+  assert.equal(vrms.unidad, 'mm/s')
+  assert.equal(vrms.historia, true, 'vRMS_S1 está verificada en la espejo')
+  assert.equal(vrms.activo, null, 'una configurada no tiene los cuatro activos del tanque')
+  assert.equal(suyo.filter(s => s.historia).length, configurada.series.historizadas().length)
+
+  const delTanque = h.catalogo()
+  assert.ok(delTanque.some(s => /Nivel del tanque/.test(s.nombre)))
+  assert.deepEqual(h.catalogo('tanque').map(s => s.nombre), delTanque.map(s => s.nombre))
+})
+
 await checkAsync('[configurada] generar_reporte dibuja el PDF de una configurada con sus rótulos y su unidad', async () => {
   /*
    * Plan 39 F4. Hasta hoy se negaba («todavía se dibuja contra el catálogo

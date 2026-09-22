@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F4 completadas · F5–F6 por completar
+**Estado:** F0–F5 completadas · F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -588,6 +588,55 @@ el prompt con catálogo de 94 variables se mide y queda escrito aquí; el
 instrumento pasa de 6 de 7 a 7 de 7 en la tanda base.
 
 **Depende de** F1 (etiquetas únicas), independiente del resto.
+
+**Lo que de verdad pasó (22-09-2026).**
+
+- **El catálogo del prompt es el de la máquina del contexto.**
+  `herramientas.catalogo(sistemaId)` devuelve, para una configurada, sus
+  claves con etiqueta, unidad y si tienen serie (`metaDe`, `esHistorizada`);
+  sin id o con el tanque, el de siempre. La cabecera del bloque lo dice: «Las
+  señales de «Nuevo-Modor» (vib-motor-03), la máquina que se tiene delante»,
+  para que el modelo no lo lea como las señales de la planta.
+- **El registro sale del turno cuando ya se sabe de qué máquina.**
+  `acotarCatalogo(catalogo, pregunta, { contexto })` quita
+  `sistemas_de_la_planta` de las definiciones cuando hay `contexto.sistema` y
+  la pregunta no nombra otra máquina del registro ni pide la planta entera
+  (`mencionaOtraMaquina`, con `MARCAS_PLANTA` deliberadamente cortas). Se
+  aplica se acote o no por intención: el modelo no puede llamar a lo que no
+  tiene. Y el bloque de contexto se lo dice con palabras: «NO llames a
+  sistemas_de_la_planta … «¿Hay algún riesgo activo?» desde aquí es de
+  "vib-motor-03", no de todas».
+- **Medido el tamaño del prompt** con `scripts/medir-prompt-configurada.mjs`
+  (nuevo instrumento; cuenta con el `/tokenize` del servidor, qwen-3.5-4B):
+
+  | Prompt | Señales | Caracteres | Tokens |
+  |---|---|---|---|
+  | Sin contexto (tanque) | 52 | 25 618 | 6 771 |
+  | Con `Nuevo-Modor` delante | 94 | 27 906 | 7 606 |
+
+  +835 tokens, el 112 % del de siempre. El prompt ya pesaba 6,8 k tokens sin
+  esta fase; el catálogo de 94 variables añade un 12 %. Se da por bueno con
+  esa cifra delante; si una máquina llega a las 300 variables habrá que
+  acotar el catálogo por intención, no antes.
+- **Medido contra el modelo y la planta reales** (9 casos, uno por uno y en
+  tanda): **9 de 9 llegan a `Nuevo-Modor`**, 6 de 6 con contexto y 3 de 3 por
+  nombre. El criterio de esta fase: «¿Hay algún riesgo activo?» desde su
+  pantalla llama a `riesgos_activos` **sólo** con `vib-motor-03` (2 rondas,
+  39 s); antes barría las cuatro máquinas. Lo que el catálogo cambió además:
+  «¿cómo ha ido la velocidad eficaz?» pide `historia_de_senal(senal="Velocidad
+  eficaz · S1", sistema="vib-motor-03")` con la etiqueta exacta del catálogo.
+- **Lo que la tanda enseñó y no es de esta fase:** el caso de la
+  documentación tardó 124 s y 4 rondas porque el modelo, con el catálogo
+  delante, probó `limites_del_manual` con OCHO señales una a una antes de caer
+  a `consultar_documentacion`. Cada llamada contestó honestamente («las
+  fronteras están en tabla») y el modelo acabó citando la ISO, pero el precio
+  fue alto. Queda anotado para el prompt (B3 del backlog del asistente): una
+  negativa por señal debería remitir UNA vez al texto libre.
+- Comprobaciones: 4 nuevas en `verificar-intencion` (31), 1 en
+  `verificar-instrucciones` (la cabecera y la línea anti-barrido, con y sin
+  contexto), 1 en `verificar-herramientas` (`catalogo(id)`, 190). El
+  `verificar-intencion` de «sobrevive a cualquier acotado» dice ahora «SIN
+  contexto de pantalla», que es lo que siempre había comprobado.
 
 ### F6 — El alta automática, de punta a punta
 

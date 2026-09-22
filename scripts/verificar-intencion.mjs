@@ -154,7 +154,7 @@ check('acotar sólo QUITA: nunca añade una herramienta que no estaba', () => {
   assert.ok(!nombresDe(r.definiciones).includes('registrar_intervencion'))
 })
 
-check('`sistemas_de_la_planta` sobrevive a cualquier acotado', () => {
+check('`sistemas_de_la_planta` sobrevive a cualquier acotado SIN contexto de pantalla', () => {
   /*
    * Es el registro de qué máquinas existen y con qué ids. Sin él el modelo
    * inventa nombres de sistema — un fallo ya medido antes de esta fase.
@@ -168,6 +168,8 @@ check('`sistemas_de_la_planta` sobrevive a cualquier acotado', () => {
     )
   }
 })
+
+
 
 check('una intención de diagnóstico conserva con qué mirar', () => {
   /*
