@@ -215,6 +215,14 @@ const CASOS = [
     porque: 'El RAG filtra por sistema con el registro vivo; mide que acepte el id de una configurada.',
     dependeDelEstado: true,
   },
+  {
+    id: 'reporte-desde-su-pantalla',
+    pregunta: 'Hazme un reporte de esta semana',
+    conContexto: true,
+    herramienta: ['generar_reporte'],
+    porque: 'Plan 39 F4: el PDF de una configurada. Mide que el modelo pase SU id y que la herramienta no se niegue.',
+    dependeDelEstado: true,
+  },
 ].filter(Boolean)
 
 const soloUno = opcion('caso')

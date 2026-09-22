@@ -434,6 +434,23 @@ responde 200 con cero muestras (comprobado en `mttoS1`, `arranqueParoS1`,
 
 ---
 
+## B11 · El PDF colorea los estados por palabras que las etiquetas ya no dicen
+
+**Hoy.**  decide el color de una fila de la tabla de
+valores actuales buscando «crit», «alarm», «normal», «ok»… en el texto del
+estado. Las etiquetas de  son «Fuera de límite»,
+«En aviso», «En banda», «Sin dato»: la primera y la tercera no casan con
+ningún patrón y salen en gris, igual que «sin criterio». Se vio el 22-09-2026
+al pasar la tabla de una máquina configurada por  (Plan 39 F4);
+al tanque le pasa lo mismo desde que esas etiquetas existen.
+
+**Propuesta.** Que la fila lleve la CLAVE del estado (, …)
+además de la etiqueta y que  mire la clave; el texto libre queda
+sólo como respaldo. Es un cambio de  y de quien arma
+ (), sin tocar el dominio del tanque.
+
+---
+
 ## Orden sugerido
 
 1. ~~**B1**~~ — hecho el 28-08-2026

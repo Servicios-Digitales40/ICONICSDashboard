@@ -78,6 +78,11 @@ import {
   senalInfo,
 } from '../../../../shared/eva/tanque/senales.js'
 import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
+import { tipoDe } from '../../../../shared/eva/tipos/index.js'
+/* La etiqueta humana de un estado de la forma común («nominal» → «Normal»).
+   Vive con el tanque porque nació allí, pero las claves son las de
+   `senalComun` y las usa también el tipo de vibraciones. */
+import { estadoInfo } from '../../../../shared/eva/tanque/estado.js'
 import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
 import { intervencionesRecientes } from '../../../../shared/eva/comun/aprendizaje.js'
 import { leerAprendizaje } from '../aprendizaje/index.mjs'
@@ -1443,7 +1448,13 @@ export function crearHerramientasDeHistoricos({
             sistemas: Object.keys(SISTEMA),
           })
         }
-        claves = entrada.claves().filter((k) => entrada.esHistorizada(k))
+        /* El tanque: sus 52 señales tienen serie, así que «todas» y «las
+           historizadas» coinciden. Una configurada, no: entra entera —lo que
+           tiene serie como gráfico, el resto en tabla, como promete la
+           descripción— y más abajo se queda con lo que su tipo sabe leer. */
+        claves = sistemaDelReporte === 'tanque'
+          ? entrada.claves().filter((k) => entrada.esHistorizada(k))
+          : entrada.claves()
       }
 
       /*
@@ -1466,24 +1477,70 @@ export function crearHerramientasDeHistoricos({
        *
        * Se cae sola cuando el dibujo salga del registro en vez del catálogo.
        */
-      if (sistemaDelReporte && sistemaDelReporte !== 'tanque') {
+      /*
+       * ── DE QUÉ MÁQUINA ES EL PDF, Y QUIÉN LO ROTULA (Plan 39 F4) ─────
+       *
+       * Hasta el 22-09-2026 esto se negaba para toda máquina que no fuera el
+       * tanque: los rótulos salían de `senalInfo`, las series de
+       * `esHistorizada` y las bandas de `UMBRALES`, todo de SU catálogo. Una
+       * configurada trae lo mismo por otro camino: la etiqueta, la unidad y
+       * los decimales los sabe su entrada (`metaDe`), qué series tiene lo
+       * dice ella (`esHistorizada`), y la banda bajo la curva la declara su
+       * TIPO por rol (`bandaDe`), que sólo la da a lo que tiene norma detrás.
+       * El del tanque sigue siendo el suyo, sin tocar.
+       *
+       * Lo que sigue sin poderse es una entrada sin `metaDe`: sin etiqueta ni
+       * unidad por señal no se puede rotular un PDF, y se dice.
+       */
+      const esTanque = sistemaDelReporte === 'tanque'
+      const entrada = SISTEMA[sistemaDelReporte]
+      if (!esTanque && !entrada?.metaDe) {
         return fallo(
-          `El reporte en PDF todavía se dibuja contra el catálogo del tanque, así que no puede ` +
-            `armar uno de «${sistemaDelReporte}» aunque sus señales tengan serie. Sus datos sí ` +
-            `se pueden dar en la conversación: historia_de_senal(sistema="${sistemaDelReporte}").`,
+          `«${sistemaDelReporte}» no declara metaDe(): sin etiqueta ni unidad por señal no se ` +
+            `puede rotular un PDF. Sus datos sí se pueden dar en la conversación: ` +
+            `historia_de_senal(sistema="${sistemaDelReporte}").`,
           { sistema: sistemaDelReporte }
         )
       }
+      const tipo = esTanque ? null : tipoDe(entrada.tipo)
+      const metaDeReporte = (clave) => (esTanque ? senalInfo(clave) : metaDe(clave, sistemaDelReporte))
+      const historizada = (clave) => (esTanque ? esHistorizada(clave) : entrada.esHistorizada(clave))
+      const bandaDe = (clave) => {
+        if (esTanque) return UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null
+        const u = tipo?.bandaDe?.(metaDeReporte(clave)?.rol) ?? null
+        return u ? bandaLegible(u, idioma) : null
+      }
+      const instalacion = esTanque ? etiquetasDeReporte(idioma).instalacion : entrada.nombre
 
-      const historizadasPedidas = claves.filter(esHistorizada)
-      const sinHistoriaPedidas = claves.filter(c => !esHistorizada(c))
+      /*
+       * Una configurada se lee UNA vez: su estado da el ORDEN de las señales
+       * —apoyos, variador, alarmas, el que compone su tipo— y el valor actual
+       * de las que no tienen serie. Sin esto los gráficos saldrían en el orden
+       * del `maquinas.json`, que es el del árbol de ICONICS, no el de leer.
+       */
+      let lecturaConfigurada = null
+      if (!esTanque) {
+        lecturaConfigurada = await leerMaquina(entrada)
+        const orden = new Map(
+          (lecturaConfigurada.ok ? lecturaConfigurada.estado.senales : []).map((s, i) => [s.clave, i])
+        )
+        claves = [...claves].sort((a, b) => (orden.get(a) ?? 1e9) - (orden.get(b) ?? 1e9))
+        /* Sin señales pedidas entra «toda la máquina», pero sólo lo que tiene
+           serie o lo que el tipo compone en su estado: una variable sin rol no
+           tiene rótulo ni lectura que enseñar, y una fila «sin dato» de algo
+           que sí tiene valor en vivo sería mentir. */
+        if (!senales?.length) claves = claves.filter((k) => historizada(k) || orden.has(k))
+      }
+
+      const historizadasPedidas = claves.filter(historizada)
+      const sinHistoriaPedidas = claves.filter(c => !historizada(c))
       const notas = []
 
       const graficos = historizadasPedidas.length
         ? await Promise.all(
           historizadasPedidas.map(async clave => {
-            const meta = senalInfo(clave)
-            const { muestras, diasLeidos, diasTotal } = await leerSerieEnRango(clave, v)
+            const meta = metaDeReporte(clave)
+            const { muestras, diasLeidos, diasTotal } = await leerSerieEnRango(clave, v, sistemaDelReporte)
 
             if (!muestras.length) {
               return {
@@ -1509,7 +1566,7 @@ export function crearHerramientasDeHistoricos({
               svg = renderizarGraficoSerie(downsamplear(muestras, PUNTOS_GRAFICO_REPORTE), {
                 titulo: meta.label,
                 unidad: meta.unidad || null,
-                banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null,
+                banda: bandaDe(clave),
               })
             } catch (error) {
               return {
@@ -1568,7 +1625,27 @@ export function crearHerramientasDeHistoricos({
         : []
 
       let tablaActual = []
-      if (sinHistoriaPedidas.length) {
+      if (sinHistoriaPedidas.length && !esTanque) {
+        /* El valor actual sale de la lectura de arriba, con la forma común
+           (`estado.senales`): la etiqueta, la unidad y el estado los puso el
+           tipo al componer el estado. */
+        if (lecturaConfigurada?.ok) {
+          const todas = lecturaConfigurada.estado.senales
+          tablaActual = sinHistoriaPedidas.map(clave => {
+            const meta = metaDeReporte(clave)
+            const s = todas.find(x => x.clave === clave)
+            return s
+              /* La etiqueta, no la clave interna: «Normal», no «nominal». Sin
+                 estado no hay criterio, y se dice con un guion, no con «en banda». */
+              ? { senal: s.label, valor: s.valor, unidad: s.unidad || null, estado: s.estado ? estadoInfo(s.estado).label : '—' }
+              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato }
+          })
+        } else {
+          notas.push(idioma === 'en'
+            ? 'Could not read the current value of the signals with no history.'
+            : 'No se pudo leer el valor actual de las señales sin historia.')
+        }
+      } else if (sinHistoriaPedidas.length) {
         /*
          * `sistema` es OBLIGATORIO desde que estas herramientas sirven a
          * cualquier máquina del registro: llamar sin él devuelve un fallo, y
@@ -1628,7 +1705,7 @@ export function crearHerramientasDeHistoricos({
       }
 
       const pdf = await reporteMod.componerReportePdf({
-        instalacion: etiquetasDeReporte(idioma).instalacion,
+        instalacion,
         periodo: v.etiqueta,
         generadoEl: horaLocal(new Date().toISOString()),
         graficos,
@@ -1649,10 +1726,11 @@ export function crearHerramientasDeHistoricos({
 
       return {
         ok: true,
-        instalacion: etiquetasDeReporte(idioma).instalacion,
+        instalacion,
+        sistema: sistemaDelReporte,
         periodo: v.etiqueta,
-        senalesConGrafico: historizadasPedidas.map(c => senalInfo(c).label),
-        senalesEnTabla: sinHistoriaPedidas.map(c => senalInfo(c).label),
+        senalesConGrafico: historizadasPedidas.map(c => metaDeReporte(c).label),
+        senalesEnTabla: sinHistoriaPedidas.map(c => metaDeReporte(c).label),
         ...(notas.length ? { notas } : {}),
         nota:
           'El reporte ya se ha generado y el enlace de descarga se le ha entregado al usuario; no ' +
@@ -1663,7 +1741,7 @@ export function crearHerramientasDeHistoricos({
           tipo: 'reporte',
           formato: 'pdf',
           url: `/api/reportes?id=${id}`,
-          titulo: `Reporte — ${v.etiqueta}`,
+          titulo: esTanque ? `Reporte — ${v.etiqueta}` : `Reporte — ${entrada.nombre} — ${v.etiqueta}`,
         },
       }
     },

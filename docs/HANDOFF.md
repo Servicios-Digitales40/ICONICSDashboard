@@ -38,7 +38,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | Suite de frontend | **1090** pruebas · 29 omitidas |
 | Suite de backend | **387** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **186** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **189** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
@@ -248,7 +248,7 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F3 completas, F4–F6 por
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F4 completas, F5–F6 por
 completar. Que las herramientas del asistente sirvan a cualquier máquina
 configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
 vibraciones. F0 puso una configurada espejo en la puerta
@@ -262,9 +262,11 @@ y el historiador falso sirve por fin las series de vibraciones. F3 hizo que
 `limites_del_manual` sirva a una configurada con los términos de su tipo y
 destapó que los manuales de vibraciones estaban asignados a una máquina que ya
 no existía: ahora se asignan al TIPO (`tipo:vibraciones`) y el modelo cita la
-ISO 20816-3 para `Nuevo-Modor`. Quedan: reporte (F4), el prompt de la máquina
-que se tiene delante (F5) y el alta automática según el estado de validación
-(F6).
+ISO 20816-3 para `Nuevo-Modor`. F4: `generar_reporte` dibuja el PDF de una
+configurada —rótulos de su entrada, banda de su tipo, orden de su estado— y
+está medido contra planta: 12 páginas y 17 gráficos de `Nuevo-Modor`. Quedan:
+el prompt de la máquina que se tiene delante (F5) y el alta automática según
+el estado de validación (F6).
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 

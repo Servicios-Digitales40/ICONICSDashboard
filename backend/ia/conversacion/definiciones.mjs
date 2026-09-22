@@ -742,8 +742,8 @@ export const DEFINICIONES = [
     function: {
       name: 'generar_reporte',
       description:
-        'Genera un PDF descargable: un gráfico por cada señal con historia que se pida (o TODO ' +
-        'el catálogo del tanque si no se nombra ninguna — hoy 52 señales) más una tabla con el ' +
+        'Genera un PDF descargable de UNA máquina: un gráfico por cada señal con historia que se ' +
+        'pida (o TODO el catálogo de esa máquina si no se nombra ninguna) más una tabla con el ' +
         'valor actual de las que no tienen serie. Úsala para "genera un reporte", "quiero un PDF ' +
         'de esta semana", "un reporte de todas las señales". Período hasta ~90 días, igual que ' +
         'historia_de_senal. El enlace de descarga se entrega automáticamente; no lo repitas ni lo ' +
@@ -778,9 +778,9 @@ export const DEFINICIONES = [
           sistema: {
             type: 'string',
             description:
-              'Id del sistema. Por omisión "tanque", HOY la única máquina cuyo PDF se sabe ' +
-              'dibujar: para otra, la herramienta lo dice en vez de armar un reporte con los ' +
-              'rótulos equivocados. Un reporte NUNCA mezcla dos máquinas.',
+              'Id del sistema, tal como lo devuelve sistemas_de_la_planta. Por omisión "tanque". ' +
+              'Sirve para cualquier máquina del registro, incluidas las configuradas: sus rótulos, ' +
+              'unidades y bandas los pone su tipo. Un reporte NUNCA mezcla dos máquinas.',
           },
           explicacion: {
             type: 'string',
@@ -1130,6 +1130,9 @@ export const ESQUEMAS = Object.freeze({
     senales: z.array(Texto).optional(),
     periodo: Texto.optional(),
     explicacion: Texto.optional(),
+    /* Plan 39 F4: ya no pasa sólo por `.passthrough()`; es un argumento con
+       nombre, como en las demás herramientas por máquina. */
+    sistema: Texto.optional(),
   }).passthrough(),
 
   /* Documentación y diagnóstico. */

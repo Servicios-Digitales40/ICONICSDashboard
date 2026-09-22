@@ -350,13 +350,30 @@ function sintesisAutomatica(tablaActual, graficos, idioma = 'es') {
   if (tablaActual?.length) {
     const fuera = tablaActual.filter((f) => /crit|alarm|daño|dano|aten|aviso|zona c|zona d/i.test(String(f.estado))).length
     const sinDato = tablaActual.filter((f) => f.valor === null || f.valor === undefined || /sin dato/i.test(String(f.estado))).length
+    /*
+     * «Todas en banda» sólo se puede afirmar de las filas que TIENEN criterio.
+     * Una máquina configurada trae señales sin banda declarada (el variador,
+     * los contadores, un nombre de equipo): su estado es «—», y decir de ellas
+     * que están en banda sería afirmar algo que nadie evaluó (Plan 39 F4).
+     */
+    const sinCriterio = tablaActual.filter((f) => !f.estado || f.estado === '—').length
+    const conCriterio = tablaActual.length - sinCriterio
+    const banda = fuera
+      ? (idioma === 'en' ? `, ${fuera} out of band` : `, ${fuera} fuera de banda`)
+      : conCriterio
+        ? (idioma === 'en'
+          ? (sinCriterio ? `, the ${conCriterio} with a band criterion are in band` : ', all in band')
+          : (sinCriterio ? `, las ${conCriterio} con criterio de banda están en banda` : ', todas en banda'))
+        : ''
     partes.push(
       idioma === 'en'
         ? `${tablaActual.length} signal(s) with a current value` +
-          (fuera ? `, ${fuera} out of band` : ', all in band') +
+          banda +
+          (sinCriterio ? `, ${sinCriterio} with no band criterion` : '') +
           (sinDato ? `, ${sinDato} with no data` : '')
         : `${tablaActual.length} señal(es) con valor actual` +
-          (fuera ? `, ${fuera} fuera de banda` : ', todas en banda') +
+          banda +
+          (sinCriterio ? `, ${sinCriterio} sin criterio de banda` : '') +
           (sinDato ? `, ${sinDato} sin dato` : '')
     )
   }

@@ -528,6 +528,19 @@ export const TIPO_VIBRACIONES = Object.freeze({
   simular: (descriptor, ms) => valorVibracionDe(descriptor, ms),
 
   /*
+   * La banda que se dibuja bajo la serie de un rol en un reporte (Plan 39
+   * F4). Sólo la velocidad eficaz tiene norma detrás (ISO 10816-1 Clase I):
+   * aviso a 1,8 mm/s y alarma a 4,5. Las demás medidas no tienen banda
+   * declarada, y pintarles una sería inventar un límite. Misma forma que los
+   * `UMBRALES` del tanque (`min`, `avisoMin`, `avisoMax`, `max`) para que
+   * `bandaLegible` la lea sin saber de qué máquina viene.
+   */
+  bandaDe: (rolId) =>
+    rolId === rolDe("medida", "vRMS")
+      ? Object.freeze({ min: null, avisoMin: null, avisoMax: LIMITES_ISO.aviso, max: LIMITES_ISO.alarma })
+      : null,
+
+  /*
    * Cómo se lee un estado de vigilancia, que llega codificado en base64.
    *
    * Viaja en el tipo porque quien reconstruye el dominio de una máquina

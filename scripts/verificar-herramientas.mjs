@@ -2706,6 +2706,63 @@ await checkAsync(
   }
 )
 
+await checkAsync('[configurada] generar_reporte dibuja el PDF de una configurada con sus rótulos y su unidad', async () => {
+  /*
+   * Plan 39 F4. Hasta hoy se negaba («todavía se dibuja contra el catálogo
+   * del tanque»). La etiqueta y la unidad salen de la entrada, la serie del
+   * historiador falso (Plan 39 F2) y la banda del tipo.
+   */
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar('generar_reporte', {
+    sistema: ESPEJO.id,
+    senales: ['vRMS_S1', 'aRMS_S2'],
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.sistema, ESPEJO.id)
+  assert.equal(r.instalacion, ESPEJO.nombre, 'la portada lleva el nombre de la máquina, no «Sistema de agua»')
+  assert.deepEqual(r.senalesConGrafico, ['Velocidad eficaz · Lado acople', 'Aceleración eficaz · Rodamiento intermedio'])
+  assert.deepEqual(r.senalesEnTabla, [])
+  assert.equal(r._adjunto.tipo, 'reporte')
+  assert.match(r._adjunto.titulo, new RegExp(ESPEJO.nombre))
+
+  const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
+  const contenido = await readFile(join(reportes.dir, `${id}.pdf`))
+  assert.equal(contenido.subarray(0, 4).toString(), '%PDF', 'el archivo escrito es un PDF de verdad')
+})
+
+await checkAsync('[configurada] sin señales, el reporte trae TODAS las suyas: las verificadas como gráfico y el resto en tabla, en el orden de su tipo', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar('generar_reporte', {
+    sistema: ESPEJO.id,
+    periodo: 'últimas 6 horas',
+  })
+
+  assert.equal(r.ok, true, r.error)
+  // El reparto sale de la configuración —qué series están verificadas—, no de
+  // una lista escrita aquí.
+  assert.equal(r.senalesConGrafico.length, configurada.series.historizadas().length)
+  assert.ok(r.senalesEnTabla.length > 0, 'las señales sin serie van en tabla, no desaparecen')
+  // El orden lo compone el tipo: primero los apoyos (S1, S2, S3), después el
+  // variador y las alarmas. No el orden del árbol de ICONICS.
+  assert.match(r.senalesConGrafico[0], /Lado acople/)
+  const iApoyo = r.senalesConGrafico.findIndex(s => /Lado libre/.test(s))
+  const iVariador = r.senalesConGrafico.findIndex(s => /Frecuencia|Velocidad del variador|Corriente/.test(s))
+  assert.ok(iApoyo >= 0 && iVariador > iApoyo, `el variador (${iVariador}) tenía que ir después de los apoyos (${iApoyo})`)
+})
+
+await checkAsync('[configurada] un reporte no mezcla una señal del tanque con una de la configurada', async () => {
+  const reportes = await reportesTmp()
+  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar('generar_reporte', {
+    senales: ['nivel', 'vRMS_S1'],
+  })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no mezcla dos máquinas/)
+})
+
 /**
  * Extrae el texto de un PDF con `pdfjs-dist`, igual que hace
  * `extraccion.worker.mjs` para los manuales. El texto de pdfkit viaja

@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F3 completadas · F4–F6 por completar
+**Estado:** F0–F4 completadas · F5–F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -527,6 +527,48 @@ devuelve un enlace firmado y el PDF abre con los tres apoyos; el caso
 «hazme un reporte de esta semana» del instrumento llega.
 
 **Depende de** F1 y F2.
+
+**Lo que de verdad pasó (22-09-2026).**
+
+- **`generar_reporte` ya no se niega para una configurada.** Los rótulos, la
+  unidad y los decimales salen de su entrada (`metaDe`), qué series tiene lo
+  dice ella (`esHistorizada`), la serie la lee `leerSerieEnRango` con su id, y
+  la banda bajo la curva la declara el TIPO por rol: `bandaDe(rol)` en
+  `tipos/vibraciones.js` sólo la da a la velocidad eficaz (ISO 10816-1: aviso
+  1,8 y alarma 4,5 mm/s); a lo demás no le pinta un límite que no tiene. La
+  portada lleva el nombre de la máquina, no «Sistema de agua industrial». El
+  del tanque no se tocó: mismo camino, mismos asertos.
+- **El orden lo compone el tipo, no el árbol.** La máquina se lee UNA vez y su
+  `estado.senales` —apoyos, variador, alarmas, en ese orden— ordena las
+  claves y da el valor actual de la tabla. Sin señales pedidas entra toda la
+  máquina, pero sólo lo que tiene serie o lo que el tipo compone: una
+  variable sin rol no tiene rótulo ni lectura, y una fila «sin dato» de algo
+  que sí tiene valor en vivo sería mentir.
+- **`sistema` deja de pasar por `.passthrough()`**: es un argumento con nombre
+  en el esquema, como en las demás herramientas por máquina.
+- **Medido contra el modelo y la planta reales.** «Hazme un reporte de esta
+  semana» desde la pantalla de `Nuevo-Modor`: una ronda,
+  `generar_reporte(periodo="esta semana", sistema="vib-motor-03")`, y el PDF
+  existe: 12 páginas, 17 gráficos con serie de Hyper Historian (66–166
+  muestras en S2 y S3, con su tendencia interpretada) y una tabla de 77
+  valores actuales. Los 33 sin muestras que dejó el sondeo en paro (Plan 40
+  F4) salen como «sin muestras», no como cero.
+- **Dos cosas que ese PDF enseñó y se corrigieron en la misma fase.** La
+  tabla imprimía el estado como clave interna («nominal», «sin_dato») en vez
+  de su etiqueta: ahora pasa por `estadoInfo`, como el tanque. Y la síntesis
+  decía «todas en banda» de 77 filas de las que 30 no tenían dato y el resto
+  no tenía criterio: ahora sólo afirma «en banda» sobre las filas que tienen
+  criterio, y dice cuántas no lo tienen.
+- **Lo que la tabla sigue enseñando y no es un defecto de esta fase:** una
+  configurada trae variables que no son un valor —espectros, estados de
+  vigilancia en base64, nombres de equipo—; salen con su valor tal cual o
+  «sin dato». Decidir qué NO va en la tabla es del tipo (Plan 36, segunda
+  vuelta), no de la herramienta.
+- Comprobaciones nuevas: 3 en `verificar-herramientas` (189): el PDF de una
+  configurada con sus rótulos y su nombre; el reporte entero en el orden del
+  tipo, verificadas como gráfico y el resto en tabla; y que no mezcla una
+  señal del tanque con una de la configurada. El instrumento gana el caso
+  `reporte-desde-su-pantalla` (9 casos).
 
 ### F5 — El prompt habla de la máquina que se tiene delante
 
