@@ -140,6 +140,15 @@ export function crearVariable({
     pointName,
     historyPointName: historyPointName || null,
     historyVerified: false,
+    /*
+     * CÓMO quedó verificada, cuando lo esté (Plan 42 F1): `serie-propia` —varió
+     * y no coincide con ninguna otra— o `registrada-constante` —plana, pero el
+     * historiador la escribe en los mismos minutos que una propia—. La segunda
+     * es una promesa más débil y la máquina lo declara en sus limitaciones
+     * (`construirSistema.js`); sin este campo no sabría cuáles son. `null`
+     * mientras no esté verificada. Lo pone el sondeo, nunca el cliente.
+     */
+    historyVerifiedComo: null,
     assetId: assetId || null,
     rol: rol || null,
     alias: Array.isArray(alias) ? alias.filter(Boolean) : [],

@@ -93,6 +93,8 @@ export function fusionarVariables(anteriores, entrantes) {
     return {
       ...nueva,
       historyVerified: mismaSerie ? Boolean(previa.historyVerified) : false,
+      /* Viaja con la verificación: es su explicación (Plan 42 F1). */
+      historyVerifiedComo: mismaSerie && previa.historyVerified ? (previa.historyVerifiedComo ?? null) : null,
       estado: previa.estado ?? nueva.estado,
     }
   })

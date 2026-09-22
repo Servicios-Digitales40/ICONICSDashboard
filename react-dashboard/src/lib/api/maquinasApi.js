@@ -203,6 +203,11 @@ export async function descubrirMaquina(
  * `serie-compartida` (el servidor da la misma serie a varias),
  * `sin-variacion` (no se puede distinguir de otra plana), `sin-muestras` o
  * `no-se-pudo-leer`. Las dos últimas no son un veredicto sobre la variable.
+ *
+ * `resumen.constantes` (Plan 42 F1) es la parte de `verificadas` que lo está
+ * por MARCAS DE TIEMPO y no por valores: banderas que nunca cambiaron y el
+ * historiador escribe igual. Prometen historia, pero no se distinguen de otra
+ * constante igual; la ficha lo dice aparte.
  */
 export async function sondearMaquina(id, { signal } = {}) {
   const response = await fetch(

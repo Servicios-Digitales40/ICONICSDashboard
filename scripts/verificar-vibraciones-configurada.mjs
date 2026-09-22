@@ -41,6 +41,11 @@ import { tipoDe } from '../shared/eva/tipos/index.js'
 import { enMarchaVib, valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 import { CATALOGO_VIBRACIONES } from '../shared/eva/vibraciones/catalogoDemo.js'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
+import { sondearSeries } from '../backend/lib/sondearSeries.mjs'
+import { registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { normalizar } from '../shared/eva/comun/historia.js'
+import { eventosDeAlarma } from '../shared/eva/comun/eventosDeAlarma.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m', amarillo: '\x1b[33m',
@@ -637,6 +642,119 @@ check('una configurada con raíz PROPIA —tags que el catálogo no conoce— ta
   assert.equal(e.modelo(vrms.pointName, instante), configurada.modelo(configuracion.variables.find((v) => v.id === 'vRMS_S3').pointName, instante))
   assert.equal(typeof e.modelo(contador.pointName, instante), 'number', 'los contadores del área se simulan por su clave')
   assert.equal(e.modelo('ac:OTRA/PLANTA/x', instante), undefined)
+})
+
+/* ── Las banderas constantes, sondeadas contra el transporte falso (Plan 42) ── */
+
+console.log(`\n${c.negrita}Las banderas que nunca cambiaron, sondeadas sin red${c.reset}`)
+
+/*
+ * El falso sirve las series del catálogo sobre UNA rejilla, así que una
+ * bandera plana comparte marcas con una medida que varía: es el caso medido
+ * en planta el 22-09-2026 (las banderas de `vib-motor-03` escritas en los
+ * mismos minutos que `vRMS_S1`), reproducido sin ICONICS. Lo que se comprueba
+ * es la CADENA entera: sondeo → `historyVerifiedComo` → `construirSistema`
+ * las ofrece como historia y declara que no se distinguen entre sí.
+ *
+ * `rnd: () => 0.99` apaga el caos del falso (huecos y mala calidad al azar):
+ * aquí se prueba el criterio, no la tolerancia al ruido.
+ */
+async function checkAsync(nombre, fn) {
+  try {
+    await fn()
+    passed += 1
+    console.log(`  ${c.verde}✓${c.reset} ${nombre}`)
+  } catch (error) {
+    fallos.push(`${nombre} — ${error.message}`)
+    console.log(`  ${c.rojo}✗${c.reset} ${nombre}`)
+  }
+}
+
+const AHORA_FALSO = Date.UTC(2026, 8, 22, 12, 0, 0)
+const falso = createFakeIconicsClient({ ahora: () => AHORA_FALSO, rnd: () => 0.99 })
+const { configurada: sinSondear } = configuracionEspejo()
+/* El falso sólo simula la serie de una máquina que esté EN EL REGISTRO —como
+   hace `verificar-herramientas`—; en el backend la registra el alta. */
+registrarSistema(construirSistema(sinSondear, tipoDe('vibraciones')))
+const sondeo = await sondearSeries(sinSondear, {
+  leerSerie: (o) => falso.readHistory(o),
+  desde: new Date(AHORA_FALSO - 6 * 3600 * 1000).toISOString(),
+  hasta: new Date(AHORA_FALSO).toISOString(),
+})
+const constantes = sondeo.variables.filter((v) => v.sondeo.causa === 'registrada-constante')
+
+await checkAsync('alguna bandera del falso es plana, y sale REGISTRADA con testigo y cifras', async () => {
+  assert.ok(sondeo.resumen.constantes > 0, `ninguna constante registrada: ${sondeo.motivo}`)
+  for (const v of constantes) {
+    assert.equal(v.historyVerified, true)
+    assert.equal(v.historyVerifiedComo, 'registrada-constante')
+    assert.ok(v.sondeo.testigo, `«${v.id}» no dice con qué testigo se comparó`)
+    assert.ok(v.sondeo.marcasComunes > 0)
+  }
+})
+
+await checkAsync('las propias siguen siendo propias: el criterio nuevo no las toca', async () => {
+  const propias = sondeo.variables.filter((v) => v.sondeo.causa === 'serie-propia')
+  assert.ok(propias.length > 0, 'ninguna serie propia en el falso')
+  for (const v of propias) assert.equal(v.historyVerifiedComo, 'serie-propia')
+  assert.equal(sondeo.resumen.verificadas, propias.length + constantes.length)
+})
+
+await checkAsync('`construirSistema` ofrece las constantes registradas como historia y lo confiesa', async () => {
+  /* Como hace la ruta: se anotan `historyVerified` y su cómo, nada más. */
+  const anotada = {
+    ...sinSondear,
+    variables: sinSondear.variables.map((v) => {
+      const s = sondeo.variables.find((x) => x.id === v.id)
+      return s?.historyVerified === undefined
+        ? v
+        : { ...v, historyVerified: s.historyVerified, historyVerifiedComo: s.historyVerified ? s.historyVerifiedComo : null }
+    }),
+  }
+  const sistema = construirSistema(anotada, tipoDe('vibraciones'))
+  const historizadas = new Set(sistema.series.historizadas())
+  for (const v of constantes) {
+    assert.ok(historizadas.has(v.id), `«${v.id}» quedó registrada y no se ofrece como historia`)
+  }
+  const limitacion = sistema.limitaciones.find((l) => /constantes/.test(l) && /REGISTRADAS/.test(l))
+  assert.ok(limitacion, 'no declara que las constantes no se distinguen entre sí')
+  assert.match(limitacion, new RegExp(constantes[0].id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+})
+
+/*
+ * ── LO QUE LA VERIFICACIÓN ABRE: FLANCOS (Plan 42 F3) ──────────────
+ *
+ * Con las banderas verificadas, «Alarmas» de una configurada serían los
+ * FLANCOS de sus series —como hace el tanque con `eventosDeAlarma`—. Antes de
+ * decidir una vista se comprueba que la cadena `readHistory → normalizar →
+ * eventosDeAlarma` funciona para una configurada. La bandera del apoyo 3 es
+ * la que en el falso SÍ alarma: su simulación mete un pico de vRMS en algunos
+ * ciclos (a los 15 min de la hora que termina en `AHORA_FALSO`, medido), y la
+ * bandera sube y baja con él. La ventana es la última hora con `interval: 0`
+ * —el paso de 1 s del falso, que con 20 páginas de 100 cubre los primeros
+ * 33 min— porque ahí cae ese pico; con 6 h se leería un tramo sin él.
+ */
+await checkAsync('la bandera de alarma del apoyo 3 tiene flancos en el falso, y salen como eventos con entrada, salida y duración', async () => {
+  const alarma = sinSondear.variables.find((v) => v.id === 'alarma_S3')
+  const r = await falso.readHistory({
+    pointName: alarma.historyPointName,
+    startDate: new Date(AHORA_FALSO - 3600 * 1000).toISOString(),
+    endDate: new Date(AHORA_FALSO).toISOString(),
+    aggregate: 'Average',
+    interval: 0,
+  })
+  assert.equal(r.ok, true, `no se pudo leer alarma_S3: ${r.error}`)
+  const serie = normalizar(r.data)
+  const valores = new Set(serie.map((m) => Math.round(m.valor)))
+  assert.ok(valores.has(0) && valores.has(1), `la bandera no cambia en el falso (${[...valores]}): no hay flanco que probar`)
+
+  const eventos = eventosDeAlarma(serie)
+  assert.ok(eventos.length >= 1, 'hay flancos y no sale ningún evento')
+  const cerrado = eventos.find((e) => e.fin !== null)
+  assert.ok(cerrado, 'ningún evento tiene salida: la cadena no cierra los flancos 1→0')
+  assert.ok(cerrado.inicio instanceof Date && cerrado.fin instanceof Date)
+  assert.ok(cerrado.duracionMs > 0 && cerrado.duracionMs === cerrado.fin - cerrado.inicio)
+  assert.equal(cerrado.activa, false)
 })
 
 /* ── Resultado ───────────────────────────────────────────────────────── */

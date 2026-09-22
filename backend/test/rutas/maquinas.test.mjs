@@ -32,6 +32,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { createGestorMaquinas } from '../../ia/indices/maquinas.mjs'
+import { ID_ESPEJO, configuracionEspejo } from '../../../scripts/lib/configuracionEspejo.mjs'
 import { json, montarApp } from '../ayudas.mjs'
 
 let carpeta
@@ -559,6 +560,79 @@ describe('POST /api/maquinas/:id/verificar', () => {
      */
     expect(cuerpo.ausentes).toHaveLength(cuerpo.resumen.ausentes)
     for (const v of cuerpo.ausentes) expect(v.pointName).toBeTruthy()
+  })
+})
+
+describe('POST /api/maquinas/:id/sondear', () => {
+  /*
+   * Plan 42 F2. Se da de alta la ESPEJO —la fixture de la máquina de
+   * vibraciones— porque el falso sólo simula la serie de una máquina que esté
+   * en el registro, y el alta la registra. El falso sirve todas sus series
+   * sobre UNA rejilla, así que una bandera plana (`alarma_S2`: el apoyo 2 no
+   * supera la banda de alarma) comparte marcas con una medida que varía. Es
+   * el caso medido en planta el 22-09-2026, servido sin red.
+   */
+  const espejo = () => {
+    const { configurada } = configuracionEspejo()
+    /* Lo que el alta no acepta: el estado lo pone la validación, y `arboles`
+       nulo no es «sin árboles», es «no viene». */
+    const { estado: _estado, arboles: _arboles, ...alta } = configurada
+    return alta
+  }
+  const ID = ID_ESPEJO
+
+  it('una bandera constante con las marcas de una propia sale REGISTRADA, y la causa viaja', async () => {
+    const alta = await app.inject({ method: 'POST', url: '/api/maquinas', payload: espejo() })
+    expect(alta.statusCode).toBe(201)
+
+    const cuerpo = json(await app.inject({ method: 'POST', url: `/api/maquinas/${ID}/sondear` }))
+    expect(cuerpo.ok).toBe(true)
+    expect(cuerpo.resumen.constantes).toBeGreaterThan(0)
+    expect(cuerpo.resumen.verificadas).toBeGreaterThan(cuerpo.resumen.constantes)
+    expect(cuerpo.motivo).toMatch(/\d+ propias y \d+ constantes/)
+    expect(cuerpo.anotado).toBe(true)
+    /* Las registradas están verificadas, así que NO van entre las pendientes. */
+    expect(cuerpo.pendientes.some((p) => p.causa === 'registrada-constante')).toBe(false)
+
+    /* Y queda en disco CON el cómo: es lo que `construirSistema` necesita para
+       redactar la limitación de que no se distingue de otra constante. */
+    const { maquina } = json(await app.inject({ method: 'GET', url: `/api/maquinas/${ID}` }))
+    const constantes = maquina.variables.filter((v) => v.historyVerifiedComo === 'registrada-constante')
+    expect(constantes).toHaveLength(cuerpo.resumen.constantes)
+    for (const v of constantes) expect(v.historyVerified).toBe(true)
+    expect(maquina.variables.find((v) => v.id === 'vRMS_S1').historyVerifiedComo).toBe('serie-propia')
+    expect(maquina.capacidades).toContain('HISTORICAL_DATA')
+    const limitacion = maquina.limitaciones.find((l) => /constantes/.test(l) && /REGISTRADAS/.test(l))
+    expect(limitacion).toBeTruthy()
+    expect(limitacion).toContain(constantes[0].id)
+  })
+
+  it('editar la máquina CONSERVA el cómo de la verificación; cambiar el punto histórico lo retira', async () => {
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: espejo() })
+    const sondeo = json(await app.inject({ method: 'POST', url: `/api/maquinas/${ID}/sondear` }))
+    expect(sondeo.resumen.constantes).toBeGreaterThan(0)
+
+    const { variables } = espejo()
+    let r = json(await app.inject({ method: 'PATCH', url: `/api/maquinas/${ID}`, payload: { variables } }))
+    const constantes = r.maquina.variables.filter((v) => v.historyVerifiedComo === 'registrada-constante')
+    expect(constantes).toHaveLength(sondeo.resumen.constantes)
+
+    const objetivo = variables.find((v) => v.id === constantes[0].id)
+    objetivo.historyPointName = 'hda:\\Configuration\\OTRO_GRUPO\\X:Y'
+    r = json(await app.inject({ method: 'PATCH', url: `/api/maquinas/${ID}`, payload: { variables } }))
+    const retirada = r.maquina.variables.find((v) => v.id === objetivo.id)
+    expect(retirada.historyVerified).toBe(false)
+    expect(retirada.historyVerifiedComo).toBe(null)
+  })
+
+  it('el cliente NO puede declarar el cómo de la verificación', async () => {
+    const payload = maquinaValida('vib-mentirosa-2')
+    payload.variables[0].historyPointName = 'hda:inventado'
+    payload.variables[0].historyVerified = true
+    payload.variables[0].historyVerifiedComo = 'registrada-constante'
+    const { maquina } = json(await app.inject({ method: 'POST', url: '/api/maquinas', payload }))
+    expect(maquina.variables[0].historyVerified).toBe(false)
+    expect(maquina.variables[0].historyVerifiedComo).toBe(null)
   })
 })
 

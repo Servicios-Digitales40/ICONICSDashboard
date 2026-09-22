@@ -442,6 +442,7 @@
     "probe": "Probe its series",
     "probing": "Probing…",
     "probeResult": "{{verificadas}} of {{total}} series verified as their own",
+    "probeConstant": "Of these, {{constantes}} are constants recorded by the historian: they have not changed, and cannot be told apart from an identical one",
     "probeUnknown": "Could not probe the series",
     "probeShared": "The historian returns another signal's series for these:",
     "probeNotSaved": "Nothing was recorded: what was known before is kept",

@@ -349,6 +349,46 @@ describe("el sondeo de series", () => {
     expect(screen.queryByText(/devuelve la serie de otra señal/i)).toBeNull();
   });
 
+  /*
+   * Plan 42 F2. Una bandera que nunca cambió se verifica por sus marcas de
+   * tiempo, y eso es una promesa más débil que «serie propia». La ficha lo
+   * dice aparte: sumarla a «propias» sin decirlo la disfrazaría, y pintarla
+   * como pendiente la confundiría con «sin sondear».
+   */
+  it("las constantes registradas se cuentan aparte, y no como pendientes", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
+    sondearMaquina.mockResolvedValue({
+      ok: true,
+      estado: "VALID",
+      motivo: "3 de 3 series verificadas (1 propias y 2 constantes registradas por el historiador).",
+      resumen: { total: 3, verificadas: 3, constantes: 2, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      pendientes: [],
+      anotado: true,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
+
+    expect(await screen.findByText("3 de 3 series verificadas como propias")).toBeTruthy();
+    expect(screen.getByText(/De ellas, 2 son constantes registradas/)).toBeTruthy();
+    expect(screen.queryByText(/devuelve la serie de otra señal/i)).toBeNull();
+  });
+
+  it("sin constantes, la ficha no habla de ellas", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
+    sondearMaquina.mockResolvedValue({
+      ok: true, estado: "VALID", motivo: "1 de 1 series verificadas como propias.",
+      resumen: { total: 1, verificadas: 1, constantes: 0, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      pendientes: [], anotado: true,
+    });
+
+    montar();
+    fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
+
+    await screen.findByText("1 de 1 series verificadas como propias");
+    expect(screen.queryByText(/constantes registradas/)).toBeNull();
+  });
+
   it("un fallo de red se pinta como «no se pudo», sin tumbar la pantalla", async () => {
     listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [conHistoria()] });
     sondearMaquina.mockRejectedValue(new Error("se cayó la red"));

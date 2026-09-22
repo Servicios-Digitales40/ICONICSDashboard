@@ -64,6 +64,62 @@
  * no verifica y no desmiente: queda `UNKNOWN`, con su motivo, y se vuelve a
  * sondear cuando la máquina gire.
  *
+ * ── LA CONSTANTE QUE SÍ ESTÁ REGISTRADA (Plan 42, 22-09-2026) ──────
+ *
+ * Hay una segunda clase de serie plana, y la regla de arriba la trataba igual
+ * que a la máquina parada: la bandera que no cambia PORQUE NADA HA FALLADO.
+ * `Alarma_S1` a cero desde que existe, `FAULT_BMS` a cero, `MonState_*` a uno.
+ * Medido en `vib-motor-03`: 35 de 86 series «sin variación», casi todas
+ * banderas y estados, y con este criterio no podían verificarse hasta que
+ * algo fallara de verdad.
+ *
+ * La salida no es comparar VALORES —dos ceros no dicen nada— sino MARCAS DE
+ * TIEMPO. La F0 del Plan 42 midió cómo registra el historiador de esta planta
+ * una constante (`scripts/medir-cadencia-historiador.mjs`, 22-09-2026, las 86
+ * series de `vib-motor-03` sobre 24 h):
+ *
+ *   vRMS_S1 (varía)        569 muestras, una por minuto cuando el grupo recolecta
+ *   Alarma_S1 (0)            8 muestras en todo el día, las 8 en marcas de vRMS_S1
+ *   Warning_S*, FAULT_BMS    8 muestras cada una, las mismas 8 marcas
+ *   MonState_* (0 ó 1)       1 ó 2 muestras, en marcas de vRMS_S1 (una: 1 de 2)
+ *   MonState_aRMS_S2         0 muestras: el historiador no escribió nada de ella
+ *   S1/ACTUAL_SPEED          «History request failed»: no está en recolección
+ *
+ * Es decir: el grupo registra **sólo al cambiar**. Una constante no tiene
+ * cadencia que comparar; lo que tiene son las pocas muestras que el
+ * historiador escribió de ella —todas en los instantes en que la recolección
+ * (re)arrancó, 23:21 y 17:09 ese día, que son también los instantes en que
+ * `vRMS_S1` reanuda tras un hueco—. Y las marcas que devuelve `readHistory`
+ * van alineadas a la petición (`Average`, `interval: 0` → rejilla de 60 s
+ * anclada en `startDate`), así que «misma marca» significa «escrita en el
+ * mismo minuto», no al milisegundo.
+ *
+ * De ahí el criterio `registrada-constante`: una serie plana queda VERIFICADA
+ * cuando tiene al menos una muestra y **la mitad o más** de sus marcas son
+ * marcas de un TESTIGO —una serie que en ESTE MISMO sondeo salió
+ * `serie-propia`—. Lo que eso afirma es exactamente esto: «el historiador
+ * escribe esta variable, y lo hace en los mismos minutos en que escribe una
+ * de esta máquina que sí verificó». Separa «registrada y tranquila» de «no
+ * escrita» (`MonState_aRMS_S2`) y de «no recolectada» (`ACTUAL_SPEED`), que es
+ * lo que la regla anterior confundía.
+ *
+ * Lo que NO afirma, y la limitación de la máquina dice en voz alta
+ * (`construirSistema.js`): que dos constantes iguales sean distintas entre sí.
+ * `Alarma_S1` y `Alarma_S2`, las dos en 0 con las mismas 8 marcas, no se
+ * pueden separar hasta que una cambie; si el servidor sirviera una por otra,
+ * mientras no cambien no se notaría. Es la misma honestidad que la puerta
+ * `mismaCifra` de la cresta (Plan 41 F3).
+ *
+ * El plan pedía que el mínimo de marcas comunes fuera «al menos tan exigente»
+ * que `MINIMO_COMUNES`. No puede serlo: con registro al cambiar, una constante
+ * tiene entre 1 y 9 marcas en 24 h, no 569. Por eso el umbral es una FRACCIÓN
+ * de sus propias marcas (`FRACCION_MARCAS_REGISTRADA`) y no una cifra
+ * absoluta; medido: 8/8 en las banderas, 2/2 y 1/2 en los `MonState`. Y la
+ * «tolerancia de cadencia» que el plan preveía no existe: no hay cadencia.
+ *
+ * Sin testigo —ninguna serie varió en el sondeo— todo sigue como antes: la
+ * constante queda `sin-variacion` y no se toca `historyVerified`.
+ *
  * ── ESTO SE VUELVE A CORRER, NO SE CORRE UNA VEZ ──────────────────
  *
  * Es la lección del 21-09-2026 y la razón de que la fase exista. El sondeo
@@ -184,6 +240,48 @@ export function tieneVariacion(muestras) {
 }
 
 /**
+ * Qué parte de las marcas de una constante tiene que caer en las del testigo
+ * para darla por registrada. Plan 42 F1.
+ *
+ * La mitad. Medido en `vib-motor-03` el 22-09-2026: las banderas coinciden en
+ * 8 de 8, los `MonState` en 2 de 2 y uno en 1 de 2. Por debajo de la mitad,
+ * la mayoría de lo que el historiador escribió de esa variable cayó en
+ * minutos en que NO escribió la serie verificada: no es el mismo registro, y
+ * el sondeo prefiere callar. Ver «LA CONSTANTE QUE SÍ ESTÁ REGISTRADA».
+ */
+const FRACCION_MARCAS_REGISTRADA = 0.5
+
+/** Las marcas de tiempo de una serie, como conjunto. Sin marca no entra. */
+export function marcasDe(muestras) {
+  const marcas = new Set()
+  for (const m of Array.isArray(muestras) ? muestras : []) {
+    const marca = marcaDe(m)
+    if (marca) marcas.add(marca)
+  }
+  return marcas
+}
+
+/**
+ * ¿Esta serie plana está REGISTRADA, a juzgar por un testigo?
+ *
+ * Sí cuando tiene marcas y al menos `FRACCION_MARCAS_REGISTRADA` de ellas son
+ * marcas del testigo. Devuelve siempre las cifras —quien llama las pone en el
+ * motivo— y `registrada` con el veredicto.
+ *
+ * @param {Set<string>} constante  marcas de la serie plana
+ * @param {Set<string>} testigo    marcas de una serie propia del MISMO sondeo
+ */
+export function registradaPor(constante, testigo) {
+  let comunes = 0
+  for (const marca of constante) if (testigo.has(marca)) comunes += 1
+  return {
+    comunes,
+    total: constante.size,
+    registrada: constante.size > 0 && comunes / constante.size >= FRACCION_MARCAS_REGISTRADA,
+  }
+}
+
+/**
  * Sondea las series de una máquina y dice cuáles son de verdad suyas.
  *
  * @param {object} maquina  su configuración, con `variables[]`
@@ -202,7 +300,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       estado: ESTADO_CONFIGURACION.UNKNOWN,
       motivo: 'Ninguna variable declara punto histórico: no hay series que sondear.',
       variables: [],
-      resumen: { total: 0, verificadas: 0, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      resumen: { total: 0, verificadas: 0, constantes: 0, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
     }
   }
 
@@ -266,6 +364,16 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
     }
   }
 
+  /*
+   * Los TESTIGOS para las constantes (Plan 42 F1): las series que en este
+   * mismo sondeo salieron propias. Ni una `serie-compartida` —no se hereda
+   * confianza de una serie sospechosa— ni una verificada en otro sondeo, que
+   * tendría otra ventana y otras marcas.
+   */
+  const testigos = comparables
+    .filter((l) => !compartenCon.has(idDe(l)))
+    .map((l) => ({ id: idDe(l), marcas: marcasDe(l.muestras) }))
+
   const variables = leidas.map((l) => {
     const base = { ...l.variable }
 
@@ -289,6 +397,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       return {
         ...base,
         historyVerified: false,
+        historyVerifiedComo: null,
         sondeo: {
           estado: ESTADO_CONFIGURACION.DEGRADED,
           causa: 'sin-muestras',
@@ -298,7 +407,40 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
     }
 
     if (!l.firma) {
-      /* Sin variación: ni se verifica ni se desmiente. Ver la cabecera. */
+      /*
+       * Sin variación. Antes de callar se mira si hay un testigo que la dé
+       * por REGISTRADA (Plan 42 F1): se elige el que más marcas comparta con
+       * ella, y su nombre y sus cifras van en el motivo.
+       */
+      const marcas = marcasDe(l.muestras)
+      let mejor = null
+      for (const t of testigos) {
+        if (t.id === idDe(l)) continue
+        const r = registradaPor(marcas, t.marcas)
+        if (!mejor || r.comunes > mejor.comunes) mejor = { ...r, testigo: t.id }
+      }
+
+      if (mejor?.registrada) {
+        return {
+          ...base,
+          historyVerified: true,
+          historyVerifiedComo: 'registrada-constante',
+          sondeo: {
+            estado: ESTADO_CONFIGURACION.VALID,
+            causa: 'registrada-constante',
+            motivo:
+              `Serie constante y registrada: ${mejor.comunes} de sus ${mejor.total} marcas de ` +
+              `tiempo coinciden con las de ${mejor.testigo}, verificada como propia en este ` +
+              'mismo sondeo. El historiador la escribe; no ha cambiado. No se puede saber si ' +
+              'es distinta de otra constante igual hasta que alguna cambie.',
+            testigo: mejor.testigo,
+            marcasComunes: mejor.comunes,
+            marcas: mejor.total,
+          },
+        }
+      }
+
+      /* Ni se verifica ni se desmiente. Ver la cabecera. */
       return {
         ...base,
         sondeo: {
@@ -306,7 +448,13 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
           causa: 'sin-variacion',
           motivo:
             'La serie no varía en toda la ventana, así que no se puede distinguir de ' +
-            'cualquier otra igual de plana. Hay que volver a sondear con la máquina en marcha.',
+            'cualquier otra igual de plana. ' +
+            (mejor
+              ? `Sólo ${mejor.comunes} de sus ${mejor.total} marcas coinciden con las de ` +
+                `${mejor.testigo}, la serie propia más parecida: no basta para darla por registrada. `
+              : 'Ninguna serie de la máquina varió en la ventana, así que no hay testigo con quien ' +
+                'comparar sus marcas. ') +
+            'Hay que volver a sondear con la máquina en marcha.',
         },
       }
     }
@@ -316,6 +464,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       return {
         ...base,
         historyVerified: false,
+        historyVerifiedComo: null,
         sondeo: {
           estado: ESTADO_CONFIGURACION.INVALID,
           causa: 'serie-compartida',
@@ -331,6 +480,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
     return {
       ...base,
       historyVerified: true,
+      historyVerifiedComo: 'serie-propia',
       sondeo: {
         estado: ESTADO_CONFIGURACION.VALID,
         causa: 'serie-propia',
@@ -345,7 +495,10 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
   const porCausa = (causa) => variables.filter((v) => v.sondeo.causa === causa).length
   const resumen = {
     total: variables.length,
+    /* Las propias Y las constantes registradas: las dos prometen historia. El
+       desglose va en `constantes`, para que la pantalla lo diga aparte. */
     verificadas: variables.filter((v) => v.historyVerified === true).length,
+    constantes: porCausa('registrada-constante'),
     compartidas: porCausa('serie-compartida'),
     sinVariacion: porCausa('sin-variacion'),
     sinDatos: porCausa('sin-muestras'),
@@ -366,7 +519,11 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
   return {
     estado,
     motivo:
-      `${resumen.verificadas} de ${resumen.total} series verificadas como propias. ` +
+      `${resumen.verificadas} de ${resumen.total} series verificadas` +
+      (resumen.constantes
+        ? ` (${resumen.verificadas - resumen.constantes} propias y ${resumen.constantes} constantes ` +
+          'registradas por el historiador). '
+        : ' como propias. ') +
       `${resumen.compartidas} comparten serie con otra, ${resumen.sinVariacion} no varían ` +
       `en la ventana, ${resumen.sinDatos} sin muestras y ${resumen.fallos} no se pudieron leer.`,
     variables,

@@ -185,8 +185,24 @@ function mediaSimulada(puntoEnVivo, desdeMs, hastaMs) {
  * simula la serie —la única forma de darle valores—; una configurada con tags
  * ajenos a toda máquina escrita a mano no tiene simulación, y entonces no
  * hay serie que servir.
+ *
+ * ── QUIÉN DECIDE SI EL TAG «SE RECOLECTA» (Plan 42 F2) ─────────────
+ *
+ * El mismo nombre `hda:` puede estar en DOS entradas: la máquina configurada
+ * que lo declara y el catálogo del tipo (`CATALOGO_VIBRACIONES`), que hace de
+ * «servidor» del falso. Sus `esHistorizada` significan cosas distintas: en la
+ * configurada es «el sondeo ya la verificó»; en el catálogo es «el grupo del
+ * historiador la registra». Para decidir si el servidor falso SIRVE la serie
+ * manda la segunda: si sólo mandara la primera, una máquina recién dada de
+ * alta —ninguna serie verificada— no podría sondearse nunca contra el falso,
+ * porque el falso le negaría las series que el sondeo necesita para
+ * verificarlas. Por eso, entre las entradas que conocen el nombre, se prefiere
+ * la que lo historiza; si ninguna lo hace, se devuelve la primera y quien
+ * llama contesta el 500 de «no se recolecta» — el caso de una configurada con
+ * su propio grupo que el catálogo no conoce (`verificar-transporte-falso`).
  */
 function serieDeOtraMaquina(nombrePunto) {
+  let primera = null
   for (const sistema of [...SISTEMAS, CATALOGO_VIBRACIONES]) {
     if (sistema.id === 'tanque') continue
     const clave = sistema.claves().find(k => sistema.series.punto(k) === nombrePunto)
@@ -195,9 +211,11 @@ function serieDeOtraMaquina(nombrePunto) {
       const d = sistema.parse(p)
       return d && (d.canal ? `${d.clave}_${d.canal}` : d.clave) === clave
     })
-    return { sistema, clave, enVivo: enVivo ?? null }
+    const candidata = { sistema, clave, enVivo: enVivo ?? null }
+    if (sistema.esHistorizada(clave) && candidata.enVivo) return candidata
+    primera ??= candidata
   }
-  return null
+  return primera
 }
 
 function paginaDe(mediaDe, startMs, endMs, pasoMs, offset, rnd) {

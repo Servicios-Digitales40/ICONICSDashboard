@@ -650,6 +650,28 @@ export function construirSistema(maquina, tipo) {
               "historia hasta comprobar que el historiador devuelve la suya y no la de otra señal.",
           );
         }
+
+        /*
+         * ── LAS CONSTANTES REGISTRADAS (Plan 42 F1) ────────────────────
+         *
+         * Una serie plana —una bandera que nunca alarmó— se verifica por sus
+         * MARCAS DE TIEMPO, no por sus valores: el historiador la escribe en
+         * los mismos minutos que una serie propia. Eso demuestra que está
+         * registrada; NO demuestra que sea distinta de otra constante igual.
+         * Si el servidor sirviera `Alarma_S1` por `Alarma_S2`, las dos en 0,
+         * no se notaría hasta que una cambiara. Se dice aquí porque es lo que
+         * el asistente tiene que confesar al hablar de sus alarmas pasadas.
+         */
+        const constantes = conSerie.filter((v) => v.historyVerifiedComo === "registrada-constante");
+        if (constantes.length) {
+          const nombres = constantes.slice(0, 6).map((v) => v.id ?? v.pointName);
+          propias.push(
+            `${constantes.length} de sus series verificadas son constantes (${nombres.join(", ")}` +
+              `${constantes.length > nombres.length ? "…" : ""}): se han comprobado como REGISTRADAS ` +
+              "por el historiador, no como distintas entre sí. Si el servidor sirviera una por otra, " +
+              "mientras no cambien no se notaría. Su historia dice «no ha cambiado», no «es suya».",
+          );
+        }
       }
 
       const escribibles = (maquina.variables ?? []).filter((v) => permiteEscritura(v.acceso));

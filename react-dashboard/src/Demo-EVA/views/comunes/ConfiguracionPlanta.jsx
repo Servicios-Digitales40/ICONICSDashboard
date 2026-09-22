@@ -563,6 +563,11 @@ function FichaDeMaquina({
 
         Las dos últimas **no son un veredicto sobre la variable**. La primera
         sí: mientras dure, esa variable no puede prometer historia.
+
+        Y de lo que SÍ quedó verificado se separa una parte (Plan 42 F1):
+        `registrada-constante`, la bandera que nunca cambió y el historiador
+        escribe igual. Cuenta como verificada —promete historia— pero es una
+        promesa más débil, y sumarla sin decirlo a «propias» la disfrazaría.
       */}
       {sondeo && (
         <div
@@ -582,6 +587,14 @@ function FichaDeMaquina({
                 })
               : traducir("machines:config.probeUnknown")}
           </div>
+
+          {sondeo.resumen?.constantes > 0 && (
+            <div style={{ ...textoSuave, marginTop: 2 }}>
+              {traducir("machines:config.probeConstant", {
+                constantes: sondeo.resumen.constantes,
+              })}
+            </div>
+          )}
 
           {sondeo.motivo && (
             <div style={{ ...textoSuave, marginTop: 3 }}>{sondeo.motivo}</div>

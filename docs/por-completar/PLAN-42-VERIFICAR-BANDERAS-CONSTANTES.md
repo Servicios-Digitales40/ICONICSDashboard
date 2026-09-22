@@ -1,6 +1,6 @@
 # PLAN 42 — Verificar una bandera que nunca cambió, sin forzarla
 
-**Estado:** F0 completada · F1–F4 por completar · escrito el 22-09-2026
+**Estado:** F0–F2 completadas · F3–F4 por completar · escrito el 22-09-2026
 **Rama:** `Vibraciones1.0`
 **Origen:** B13 del backlog de backend, destapado al cerrar la F4 del Plan 41
 
@@ -208,19 +208,79 @@ valores ya tiene su umbral en `mismaSerie` —ver el check «pocas marcas en
 común no bastan para acusar»— y éste debe ser al menos tan exigente) y la
 **tolerancia de cadencia**. Las dos salen de la F0, no se inventan.
 
-**Cómo (rama «al cambiar»).** El criterio es «existe en el grupo del
-historiador» (el descubrimiento lo devuelve como `historico` emparejado). La
-causa se llama igual pero la limitación dice más: *«…comprobadas como
-existentes en el grupo, no como escritas: el historiador sólo registra al
-cambiar y estas nunca han cambiado»*.
+~~**Cómo (rama «al cambiar»).** El criterio es «existe en el grupo del
+historiador»~~. **Descartado por la F0:** `MonState_aRMS_S2` existe en el
+grupo y el historiador no escribió nada de ella; «existe» no distingue eso de
+una bandera escrita. El criterio que sí lo distingue es el de las marcas.
+
+#### Lo que de verdad se hizo (22-09-2026)
+
+**El criterio, en `backend/lib/sondearSeries.mjs`.** Una serie plana con
+muestras se compara, por MARCAS DE TIEMPO, con cada **testigo** —las series
+que en este mismo sondeo quedaron `serie-propia`; ni las compartidas ni las
+verificadas en otro sondeo—. Se elige el testigo con más marcas en común, y
+si **la mitad o más** de las marcas de la constante son suyas
+(`FRACCION_MARCAS_REGISTRADA = 0.5`), la constante queda
+`registrada-constante`, `historyVerified: true`, estado `VALID`. El `motivo`
+dice con qué testigo y cuántas de cuántas: *«Serie constante y registrada: 8
+de sus 8 marcas de tiempo coinciden con las de vRMS_S1, verificada como
+propia en este mismo sondeo…»*. Si no llega a la mitad, sigue
+`sin-variacion` y el motivo dice también con quién se comparó y cuánto
+coincidió; sin ningún testigo, el motivo dice que no hubo con quién.
+
+**Por qué una fracción y no las «`MIN_MARCAS_COMUNES` al menos tan exigentes
+que `mismaSerie`» que pedía el plan.** Porque con registro al cambiar una
+constante tiene entre 1 y 10 marcas en 24 h. Exigir 8 absolutas dejaría fuera
+todos los `MonState` (1 ó 2 marcas) y sería una cifra copiada de otra
+pregunta. La mitad sale de la F0: lo medido fue 8/8, 9/9, 10/10, 2/2, 1/1 y
+tres en 1/2; nada por debajo. Y la **tolerancia de cadencia** no existe:
+no hay cadencia en 8 muestras irregulares. Las dos constantes del plan se
+quedaron en una, y está escrita con su porqué en el archivo.
+
+**El «cómo» de la verificación viaja con el dato.** Para que la máquina pueda
+confesar cuáles de sus series verificadas son constantes, la variable lleva
+**`historyVerifiedComo`**: `'serie-propia'`, `'registrada-constante'` o
+`null`. Lo pone el sondeo (`crearVariable` lo arranca en `null`, el esquema
+no lo acepta del cliente, `fusionarVariables` lo conserva con la
+verificación y lo retira si cambia el punto histórico). Es un campo más en la
+variable, no una tabla aparte, porque es la explicación de `historyVerified`
+y va donde va él.
+
+**La limitación, en `construirSistema.js`:** *«N de sus series verificadas son
+constantes (Alarma_S1, Warning_S1, …): se han comprobado como REGISTRADAS por
+el historiador, no como distintas entre sí. Si el servidor sirviera una por
+otra, mientras no cambien no se notaría. Su historia dice "no ha cambiado",
+no "es suya"»*. La lee el asistente y la enseña la ficha.
+
+**El resumen** gana `constantes` y el motivo del sondeo dice «68 de 86 series
+verificadas (18 propias y 50 constantes registradas por el historiador)».
+`verificadas` **incluye** las constantes —las dos prometen historia— y el
+desglose va aparte para que nadie las sume como propias sin verlo. La ficha
+de `Configuración › Planta` añade una línea con ese desglose
+(`machines:config.probeConstant`, es/en).
+
+**Y una cosa que hubo que tocar fuera del alcance previsto: el transporte
+falso.** `fakeClient.serieDeOtraMaquina` decidía si «el servidor recolecta» un
+tag preguntando `esHistorizada` a la entrada del registro que lo declara.
+Para una máquina configurada eso es «el sondeo ya la verificó» — así que una
+máquina recién dada de alta **no podía sondearse nunca contra el falso**: el
+falso le negaba las series que el sondeo necesita para verificarlas. Ahora,
+entre las entradas que conocen el nombre, manda la que lo historiza (el
+catálogo del tipo, que hace de servidor); si ninguna, el 500 de siempre. Es
+lo que permite la prueba de la ruta y el check de la espejo; el caso
+«configurada con su propio grupo que el catálogo no conoce → 500» sigue
+cubierto en `verificar-transporte-falso` (29 verdes).
 
 **Criterios de aceptación.**
-- [ ] Causa nueva `registrada-constante` en `sondearSeries`, con `motivo` en
-      español que diga **con qué testigo** y cuántas marcas coincidieron.
-- [ ] `historyVerified: true` para esas series; las `serie-compartida` y las
-      `no-se-pudo-leer` **no cambian de comportamiento**.
-- [ ] Sin testigo, todo igual que hoy.
-- [ ] `resumen` incluye el conteo nuevo y `motivo` del sondeo lo dice.
+- [x] Causa nueva `registrada-constante` en `sondearSeries`, con `motivo` en
+      español que dice **con qué testigo** y cuántas marcas coincidieron
+      (también `testigo`, `marcasComunes` y `marcas` como campos).
+- [x] `historyVerified: true` para esas series; `serie-compartida`,
+      `sin-muestras` y `no-se-pudo-leer` **no cambian** (checks 10, 11, 12 y
+      los 21 que ya había, en verde).
+- [x] Sin testigo, todo igual que hoy (check 6; y la marca previa no baja,
+      check 9).
+- [x] `resumen.constantes` y el `motivo` del sondeo lo dicen.
 
 ### F2 — Las pruebas
 
@@ -245,15 +305,65 @@ propósito una vez antes de darla por buena** (`CLAUDE.md` §6.2).
 | 12 | Una serie **`sin-muestras`** no se convierte en registrada por tener un testigo | Sin muestras no hay marcas; nada que comparar |
 | 13 | El `resumen` cuenta las registradas aparte y el `estado` del sondeo las trata como verificadas (una máquina con sólo constantes registradas y propias es `VALID`, no `DEGRADED`) | El veredicto refleja el criterio |
 
+**Hechas las trece** (22-09-2026), numeradas igual en
+`scripts/verificar-sondeo-series.mjs`, que pasa de 21 a **34** comprobaciones.
+La 5 cambió de sentido con la F0: ~~«otra cadencia (submuestra del testigo)
+sigue `sin-variacion`»~~ no tiene sentido cuando toda constante ES una
+submuestra del testigo; ahora la 5 fija el borde del umbral («la mitad justa
+sí basta», que es el caso medido `MonState_a_f_S3`, 1 de 2) y la 4 fija que
+por debajo no. **Se rompieron a propósito dos veces**: con la fracción a 1,1
+cayeron la 1, 2, 5, 8 y 13; dejando que una `serie-compartida` valga de
+testigo cayeron la 7 y la 11. Las demás no dependen de esas dos líneas.
+
 Y **fuera del verificador**:
 
-| Dónde | Qué |
+| Dónde | Qué pasó |
 |---|---|
-| `backend/test/rutas/maquinas.test.mjs` | `POST /api/maquinas/:id/sondear` con el `fakeClient` sirviendo una constante y una propia con marcas iguales devuelve la constante verificada; la respuesta lleva la causa nueva |
-| `backend/iconics/fakeClient.mjs` | Que el falso sepa servir **una serie plana con la cadencia de las demás** (hoy sirve las del espejo; hay que ver si alguna ya es plana). Si hay que añadirla, es una línea en la fixture, no una rama |
-| `scripts/verificar-vibraciones-configurada.mjs` | Con la espejo sondeada contra el falso, las banderas declaradas salen registradas y `construirSistema` las ofrece como historia (`clavesConSerie`) |
-| `react-dashboard` · `test/demo-eva/configuracion-planta.test.jsx` | La ficha enseña el conteo nuevo («N registradas sin cambios») y no lo mezcla con «sin sondear» |
-| **Contra planta** | Re-sondear `vib-motor-03` desde la pantalla: anotar aquí cuántas de las 35 pasan a registradas, cuáles no y por qué. **Es la única prueba que necesita ICONICS**, y no necesita forzar nada |
+| `backend/test/rutas/maquinas.test.mjs` | **3 pruebas nuevas** (31 en el archivo). Se da de alta la **espejo** —la fixture— porque el falso sólo simula lo que está en el registro y el alta lo registra. `POST …/sondear` devuelve `constantes > 0`, ninguna registrada entre las `pendientes`, y en disco queda `historyVerifiedComo` con la limitación redactada. Editar conserva el cómo; cambiar el punto histórico lo retira; el cliente no puede declararlo |
+| `backend/iconics/fakeClient.mjs` | No hacía falta una serie plana nueva: `alarma_S2` (el apoyo 2 no supera la banda) y `fallo` ya lo son. Lo que hacía falta era **que el falso las sirviera** a una máquina sin verificar — ver F1, «una cosa que hubo que tocar» |
+| `scripts/verificar-vibraciones-configurada.mjs` | **3 checks nuevos** (de 36 a 39, más el de F3): la espejo sin sondear, registrada y sondeada contra el falso sin caos, da constantes registradas con testigo y cifras; las propias siguen `serie-propia`; y `construirSistema` sobre el resultado anotado las ofrece en `historizadas()` y declara la limitación con su nombre |
+| `react-dashboard` · `test/demo-eva/configuracion-planta.test.jsx` | **2 pruebas nuevas** (20 en el archivo): con `constantes: 2` la ficha dice «3 de 3 verificadas como propias» y debajo «De ellas, 2 son constantes registradas…», sin pintar nada como pendiente; con `constantes: 0` no habla de ellas |
+| **Contra planta** | Hecho el 22-09-2026 a las 16:30 con el criterio nuevo sobre `vib-motor-03`, 24 h, **sin escribir** (guion suelto sobre `sondearSeries` + cliente real). Ver abajo |
+
+**El sondeo contra planta.** `DEGRADED · 68 de 86 series verificadas (18
+propias y 50 constantes registradas por el historiador). 15 comparten serie
+con otra, 0 no varían en la ventana, 2 sin muestras y 1 no se pudieron leer.`
+
+| Antes (mañana, criterio viejo) | Ahora |
+|---|---|
+| 21 propias | 18 propias |
+| — | **50 registradas constantes** |
+| 11 compartidas | 15 compartidas |
+| **35 sin variación** | **0 sin variación** |
+| 12 sin muestras | 2 sin muestras (`MonState_aRMS_S2`, `HorasMarcha`) |
+| 7 no se pudieron leer | 1 (`ESTADO_TORRETA`) |
+
+Las 50, con su testigo: las **once banderas de alarma** (`Alarma_S1/2/3`,
+`Warning_S1/2/3`, `FAULT_BMS`, `LAST FAULT_BMS`, `WARNING_BMS`) y los
+`LOWER/UPPER_LEVEL_*` coinciden **9/9 ó 10/10 con `vRMS_S1`**; los `MonState_*`
+y `Sensor_state_*` **2/2 ó 1/1 con `aPeak_S1`** (el grupo de 1 s, que tiene más
+marcas), y cinco en **1/2**: `Sensor_state_3`, `MonState_a_f_S3`,
+`MonState_e_f_BPFI/BPFO/FTF_S3`. Esas cinco pasan por el borde exacto del
+umbral, y es deliberado que pasen: la marca que no coincide es la de un
+minuto en que el testigo tenía hueco, no otro reloj.
+
+**Lo que el criterio admite y hay que saber:** `Temperaturadeldevanado`,
+`Corriente fase 1/2` y `Presion de aspiracion` quedaron registradas con **1/1**
+—una sola muestra, a 0, escrita al reanudar—. Están registradas, sí; su
+«historia» es un cero en un instante. La limitación de la máquina ya dice
+que la historia de una constante «dice no ha cambiado, no es suya».
+
+**Lo que cambió por otra causa entre la mañana y la tarde**, y no es de este
+plan: `aRMS_S3` y `aPeak_S3` pasaron de propias a **compartidas** entre sí
+(el mismo cruce que `aPeak_S1`/`aRMS_S1` tenía el 21-09, ahora en el apoyo 3:
+102 muestras de `aRMS_S3` desde las 19:32 y todas iguales a las de `aPeak_S3`
+en esas marcas); y `UPPER_LEVEL_2`, `ACTUAL PWR_BMS`, `OUTPUT VOLTS_BMS` y
+`Numero de arranques` salieron compartidas entre ellas con 9–14 marcas cada
+una y 2–7 valores distintos. Con tan pocas marcas y valores enteros, ocho
+coincidencias son alcanzables por azar entre series que apenas cambian; el
+umbral `MINIMO_COMUNES = 8` de `mismaSerie` se escribió pensando en cientos
+de marcas. **Anotado como B15 del backlog**; no se toca aquí porque no es del
+criterio nuevo y porque hoy prefiere callar (no promete historia) a afirmar.
 
 ### F3 — Lo que la verificación abre: flancos de las banderas
 

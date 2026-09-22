@@ -465,7 +465,14 @@ export function registerMaquinasRoutes(
             /* `undefined` es «no se tocó»: conserva lo que hubiera. */
             return sondeada.historyVerified === undefined
               ? v
-              : { ...v, historyVerified: sondeada.historyVerified }
+              : {
+                  ...v,
+                  historyVerified: sondeada.historyVerified,
+                  /* Cómo quedó verificada (Plan 42 F1); `null` si no lo está. */
+                  historyVerifiedComo: sondeada.historyVerified
+                    ? (sondeada.historyVerifiedComo ?? null)
+                    : null,
+                }
           })
         : null
 

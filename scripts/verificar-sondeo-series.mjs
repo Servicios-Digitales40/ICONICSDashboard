@@ -375,6 +375,209 @@ await check('sólo se sondean las variables que declaran punto histórico', asyn
   assert.equal(r.resumen.total, 1, 'la que no promete historia no se sondea')
 })
 
+/* ── La constante que sí está registrada (Plan 42 F1) ─────────────────── */
+
+console.log(`\n${c.negrita}La constante registrada: verificar por marcas, no por valores${c.reset}\n`)
+
+/*
+ * El caso medido en planta el 22-09-2026, en pequeño: una serie que varía y
+ * una bandera plana escrita en (algunas de) las mismas marcas. En planta la
+ * propia tenía 569 marcas y la bandera 8; aquí 12 y 6, misma relación.
+ */
+const propia = serie(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+/** Una constante escrita en las marcas `indices` (horas) de `serie`. */
+const constanteEn = (valor, ...indices) =>
+  indices.map((i) => ({ timestamp: `2026-09-14T${String(i).padStart(2, '0')}:00:00Z`, value: valor }))
+/** Una constante en marcas que NO son de nadie (minuto 30). */
+const constanteFuera = (valor, ...indices) =>
+  indices.map((i) => ({ timestamp: `2026-09-14T${String(i).padStart(2, '0')}:30:00Z`, value: valor }))
+
+await check('1 · una constante con las marcas de una propia del sondeo queda registrada y verificada', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('alarma')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:alarma': constanteEn(0, 0, 2, 4, 6, 8, 10) }) },
+  )
+  const alarma = r.variables.find((x) => x.id === 'alarma')
+  assert.equal(alarma.sondeo.causa, 'registrada-constante')
+  assert.equal(alarma.historyVerified, true)
+  assert.equal(alarma.historyVerifiedComo, 'registrada-constante')
+  assert.equal(alarma.sondeo.estado, ESTADO_CONFIGURACION.VALID)
+})
+
+await check('2 · el motivo NOMBRA al testigo y dice cuántas marcas coincidieron', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('alarma')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:alarma': constanteEn(0, 0, 2, 4, 6, 8, 10) }) },
+  )
+  const alarma = r.variables.find((x) => x.id === 'alarma')
+  assert.match(alarma.sondeo.motivo, /vRMS/)
+  assert.match(alarma.sondeo.motivo, /6 de sus 6 marcas/)
+  assert.equal(alarma.sondeo.testigo, 'vRMS')
+  assert.equal(alarma.sondeo.marcasComunes, 6)
+})
+
+await check('3 · sin marcas en común con el testigo sigue `sin-variacion` y no se toca la marca previa', async () => {
+  const previa = { ...v('alarma'), historyVerified: false }
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), previa] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:alarma': constanteFuera(0, 0, 2, 4, 6) }) },
+  )
+  const alarma = r.variables.find((x) => x.id === 'alarma')
+  assert.equal(alarma.sondeo.causa, 'sin-variacion')
+  assert.equal(alarma.historyVerified, false, 'conserva lo que tenía')
+  /* Y dice con quién se comparó y por qué no bastó. */
+  assert.match(alarma.sondeo.motivo, /0 de sus 4 marcas/)
+})
+
+await check('4 · POCAS marcas en común (menos de la mitad) no bastan', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('alarma')] },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:vRMS': propia,
+        /* 2 de 6 en el reloj del testigo: un tercio. */
+        'hda:g:alarma': [...constanteEn(0, 0, 2), ...constanteFuera(0, 4, 6, 8, 10)],
+      }),
+    },
+  )
+  const alarma = r.variables.find((x) => x.id === 'alarma')
+  assert.equal(alarma.sondeo.causa, 'sin-variacion')
+  assert.equal(alarma.historyVerified, undefined)
+})
+
+await check('5 · la MITAD justa sí basta (medido: MonState_a_f_S3, 1 de 2)', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('estado')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:estado': [...constanteEn(1, 3), ...constanteFuera(1, 9)] }) },
+  )
+  assert.equal(r.variables.find((x) => x.id === 'estado').sondeo.causa, 'registrada-constante')
+})
+
+await check('6 · sin NINGUNA serie propia en el sondeo (máquina parada), nada cambia', async () => {
+  const r = await sondearSeries(
+    { variables: [v('a'), v('b'), v('c')] },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:a': constanteEn(0, 0, 1, 2, 3, 4, 5, 6, 7, 8),
+        'hda:g:b': constanteEn(0, 0, 1, 2, 3, 4, 5, 6, 7, 8),
+        'hda:g:c': constanteEn(1, 0, 1, 2, 3, 4, 5, 6, 7, 8),
+      }),
+    },
+  )
+  assert.equal(r.resumen.sinVariacion, 3)
+  assert.equal(r.resumen.constantes, 0)
+  assert.equal(r.estado, ESTADO_CONFIGURACION.UNKNOWN)
+  for (const x of r.variables) {
+    assert.equal(x.historyVerified, undefined)
+    assert.match(x.sondeo.motivo, /no hay testigo/)
+  }
+})
+
+await check('7 · una `serie-compartida` NO vale como testigo', async () => {
+  const compartida = serie(4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+  const r = await sondearSeries(
+    { variables: [v('x'), v('y'), v('alarma')] },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:x': compartida,
+        'hda:g:y': compartida,
+        'hda:g:alarma': constanteEn(0, 0, 2, 4, 6, 8, 10),
+      }),
+    },
+  )
+  assert.equal(r.resumen.compartidas, 2)
+  const alarma = r.variables.find((x) => x.id === 'alarma')
+  assert.equal(alarma.sondeo.causa, 'sin-variacion', 'no se hereda confianza de una serie sospechosa')
+  assert.equal(alarma.historyVerified, undefined)
+})
+
+await check('8 · dos constantes IDÉNTICAS quedan registradas las dos, y como constantes', async () => {
+  const marcas = constanteEn(0, 0, 2, 4, 6, 8, 10)
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('alarma1'), v('alarma2')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:alarma1': marcas, 'hda:g:alarma2': marcas }) },
+  )
+  assert.equal(r.resumen.constantes, 2)
+  assert.equal(r.resumen.compartidas, 0, 'dos constantes iguales no son «serie compartida»: no hay con qué acusar')
+  for (const id of ['alarma1', 'alarma2']) {
+    const x = r.variables.find((y) => y.id === id)
+    assert.equal(x.historyVerified, true)
+    /* El campo con que `construirSistema` redacta la limitación de que no se
+       distinguen entre sí. Sin él, la máquina no sabría cuáles declarar. */
+    assert.equal(x.historyVerifiedComo, 'registrada-constante')
+    assert.match(x.sondeo.motivo, /No se puede saber si es distinta/)
+  }
+})
+
+await check('9 · una constante que YA estaba verificada y hoy no tiene testigo NO baja a false', async () => {
+  const previa = { ...v('alarma'), historyVerified: true, historyVerifiedComo: 'registrada-constante' }
+  const r = await sondearSeries(
+    { variables: [previa] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:alarma': constanteEn(0, 0, 2, 4) }) },
+  )
+  const alarma = r.variables[0]
+  assert.equal(alarma.sondeo.causa, 'sin-variacion')
+  assert.equal(alarma.historyVerified, true, 'misma regla que «si la lectura falla no se toca»')
+  assert.equal(alarma.historyVerifiedComo, 'registrada-constante')
+})
+
+await check('10 · las nueve `QC_*` (misma serie, CON variación) siguen siendo `serie-compartida`', async () => {
+  const qc = serie(192, 192, 192, 64, 64, 192, 192, 192, 64, 192, 192, 192)
+  const ids = ['QC_1', 'QC_2', 'QC_3', 'QC_4', 'QC_5', 'QC_6', 'QC_7', 'QC_8', 'QC_9']
+  const mapa = Object.fromEntries(ids.map((id) => [`hda:g:${id}`, qc]))
+  mapa['hda:g:vRMS'] = propia
+  const r = await sondearSeries({ variables: [v('vRMS'), ...ids.map(v)] }, { ...VENTANA, leerSerie: historiadorFalso(mapa) })
+  assert.equal(r.resumen.compartidas, 9)
+  assert.equal(r.resumen.constantes, 0)
+  assert.equal(r.resumen.verificadas, 1)
+})
+
+await check('11 · `aPeak_S1` idéntica a `aRMS_S1` sigue siendo `serie-compartida`', async () => {
+  const r = await sondearSeries(
+    { variables: [v('aRMS_S1'), v('aPeak_S1'), v('alarma')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:aRMS_S1': propia, 'hda:g:aPeak_S1': propia, 'hda:g:alarma': constanteEn(0, 0, 2, 4, 6) }) },
+  )
+  assert.equal(r.variables.find((x) => x.id === 'aPeak_S1').sondeo.causa, 'serie-compartida')
+  assert.equal(r.variables.find((x) => x.id === 'aRMS_S1').sondeo.causa, 'serie-compartida')
+  /* Y sin propia, la constante tampoco tiene testigo. */
+  assert.equal(r.variables.find((x) => x.id === 'alarma').sondeo.causa, 'sin-variacion')
+})
+
+await check('12 · una serie `sin-muestras` no se convierte en registrada por tener testigo', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('vacia')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:vRMS': propia, 'hda:g:vacia': [] }) },
+  )
+  const vacia = r.variables.find((x) => x.id === 'vacia')
+  assert.equal(vacia.sondeo.causa, 'sin-muestras')
+  assert.equal(vacia.historyVerified, false)
+  assert.equal(vacia.historyVerifiedComo, null)
+})
+
+await check('13 · el resumen cuenta las constantes aparte y una máquina de propias + constantes es VALID', async () => {
+  const r = await sondearSeries(
+    { variables: [v('vRMS'), v('alarma'), v('fallo')] },
+    {
+      ...VENTANA,
+      leerSerie: historiadorFalso({
+        'hda:g:vRMS': propia,
+        'hda:g:alarma': constanteEn(0, 0, 2, 4, 6, 8, 10),
+        'hda:g:fallo': constanteEn(0, 0, 1, 2, 3),
+      }),
+    },
+  )
+  assert.equal(r.resumen.verificadas, 3)
+  assert.equal(r.resumen.constantes, 2)
+  assert.equal(r.resumen.sinVariacion, 0)
+  assert.equal(r.estado, ESTADO_CONFIGURACION.VALID)
+  assert.match(r.motivo, /1 propias y 2 constantes/)
+  /* Y las propias siguen diciendo cómo quedaron. */
+  assert.equal(r.variables.find((x) => x.id === 'vRMS').historyVerifiedComo, 'serie-propia')
+})
+
 /* ── Resumen ─────────────────────────────────────────────────────────── */
 
 console.log()
