@@ -223,6 +223,14 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F6 por completar. Que
+las herramientas del asistente sirvan a cualquier máquina configurada
+pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y vibraciones:
+estado y resumen con valores (F1), unidades en historia (F2), manual (F3),
+reporte (F4), el prompt de la máquina que se tiene delante (F5) y el alta
+automática según el estado de validación (F6). Empieza por F0: una
+configurada en el transporte falso para probar sin planta.
+
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
 ### Próximos pasos, por prioridad

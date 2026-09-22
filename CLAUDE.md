@@ -455,9 +455,10 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
 Los vivos hoy son el **32** (vibraciones), el **33** (modularidad de máquinas,
 F9), el **34** (máquinas desde el árbol, F5), el **37** (las vistas de una
-máquina configurada, F4) y el **38** (el registro conoce las configuradas y el asistente contesta
-sobre ellas; F1–F3, pendiente de confirmarse en el navegador); el **36**
-(configurar marcando el árbol) está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
+máquina configurada, F4), el **38** (el registro conoce las configuradas y el asistente contesta
+sobre ellas; F1–F3, pendiente de confirmarse en el navegador) y el **39** (las
+herramientas del asistente sirven a cualquier configurada, por tipo; F0–F6
+por completar); el **36** (configurar marcando el árbol) está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer
 
