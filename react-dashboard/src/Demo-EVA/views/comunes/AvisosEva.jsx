@@ -57,6 +57,7 @@ import { ESTADO_AVISO, marcarVisto, reconciliarAvisos } from "@shared/eva/comun/
 
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { useSistemaAgua } from "../../data/comunes/hooks.js"; */
+import { useMaquinasEnVivo } from "../../data/comunes/maquinasEnVivo.js";
 import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { evaluarRiesgos } from "../../domain/riesgos.js"; */
@@ -121,27 +122,33 @@ function useAvisosNarrados(riesgosPorSistema, idioma) {
    */
   const refRiesgos = useRef(riesgosPorSistema);
   refRiesgos.current = riesgosPorSistema;
+  /* La lista vigente, por referencia, para reconciliar sin depender de ella. */
+  const refAvisos = useRef(avisos);
+  refAvisos.current = avisos;
 
   useEffect(() => {
     const control = new AbortController();
     let vivo = true;
 
     /*
-     * La reconciliación se hace DENTRO del actualizador de estado, no fuera:
-     * así se parte siempre de la lista vigente aunque una narración anterior
-     * haya terminado entre medias. Calcularla fuera con `avisos` obligaría a
-     * meterlo en las dependencias, y cada narración que llega relanzaría el
-     * efecto entero.
+     * La reconciliación se hace FUERA del actualizador de estado, sobre la
+     * lista vigente por referencia (Plan 40 F2). Hasta el 22-09-2026 se hacía
+     * dentro de `setAvisos((previos) => …)` y se sacaba `pendientes` por un
+     * canal lateral: eso sólo funcionaba si React ejecutaba el actualizador
+     * en el acto, y deja de hacerlo en cuanto la fibra tiene otra actualización
+     * pendiente —la que dispara `useMaquinasEnVivo` o `useDominioVibracion`
+     * en el mismo montaje—. Con una máquina configurada delante `pendientes`
+     * quedaba vacío y NO SE NARRABA NUNCA. Lo cazó la prueba de la vista con
+     * el hook real, no con el doble.
+     *
+     * `avisos` sigue fuera de las dependencias a propósito: cada narración que
+     * llega lo cambia y relanzaría el efecto entero.
      */
-    let pendientes = [];
-    setAvisos((previos) => {
-      const activos = refRiesgos.current.flatMap(({ sistema, activos: lista }) =>
-        lista.map((riesgo) => ({ sistema, riesgo }))
-      );
-      const { avisos: siguientes, aNarrar } = reconciliarAvisos({ previos, activos });
-      pendientes = aNarrar;
-      return siguientes;
-    });
+    const activos = refRiesgos.current.flatMap(({ sistema, activos: lista }) =>
+      lista.map((riesgo) => ({ sistema, riesgo }))
+    );
+    const { avisos: siguientes, aNarrar: pendientes } = reconciliarAvisos({ previos: refAvisos.current, activos });
+    setAvisos(siguientes);
 
     if (!pendientes.length) {
       setNarrando(0);
@@ -352,7 +359,12 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => onNavigate?.("cierre-diagnostico", { sistema, riesgoId: riesgo.id })}
+          onClick={() => onNavigate?.("cierre-diagnostico", {
+            sistema, riesgoId: riesgo.id,
+            /* Una configurada viaja como `?maquina=`: sin él, Cierre de
+               diagnóstico no abre su fuente y no encuentra el riesgo. */
+            ...(sistema !== "tanque" ? { maquina: sistema } : {}),
+          })}
           style={{
             display: "flex", alignItems: "center", gap: 6,
             padding: "9px 13px", borderRadius: 8, cursor: "pointer",
@@ -365,10 +377,10 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
         <button
           type="button"
           onClick={() => {
-            const ruta = sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
-            /* Una configurada viaja como `?maquina=` (Plan 38 F2). */
-            if (sistema === "tanque" || sistema === "vibraciones") onNavigate?.(ruta);
-            else onNavigate?.(ruta, { maquina: sistema });
+            /* El tanque tiene su pantalla; cualquier otra máquina es una
+               configurada y viaja como `?maquina=` (Plan 38 F2, Plan 40 F2). */
+            if (sistema === "tanque") onNavigate?.("eva-riesgos");
+            else onNavigate?.("maq-riesgos", { maquina: sistema });
           }}
           style={{
             padding: "9px 13px", borderRadius: 8, cursor: "pointer",
@@ -431,7 +443,13 @@ export default function AvisosEva({ onNavigate }) {
    */
   /* La máquina DE LA PANTALLA (Plan 38 F2): la escrita a mano o una
      configurada (`?maquina=<id>`). El hook elige la fuente. */
+  /*
+   * Con máquina delante (`maq-avisos`), la suya; sin ella (`eva-avisos`, la
+   * vista de planta), TODAS las configuradas activas (Plan 40 F2). Hasta
+   * entonces «sin máquina» significaba la escrita a mano.
+   */
   const { canales, variador, alarmas, maquina } = useDominioVibracion();
+  const planta = useMaquinasEnVivo();
 
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
@@ -439,8 +457,10 @@ export default function AvisosEva({ onNavigate }) {
   );
 
   const riesgosPorSistema = useMemo(
-    () => [{ sistema: maquina.id, activos: activosVibracion }],
-    [maquina.id, activosVibracion]
+    () => (maquina
+      ? [{ sistema: maquina.id, activos: activosVibracion }]
+      : planta.map((e) => ({ sistema: e.maquina.id, activos: e.riesgos.activos }))),
+    [maquina, activosVibracion, planta]
   );
 
   const idioma = i18n.language?.startsWith("en") ? "en" : "es";

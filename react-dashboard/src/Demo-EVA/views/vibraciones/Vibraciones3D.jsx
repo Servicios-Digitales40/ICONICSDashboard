@@ -656,7 +656,7 @@ function Vibraciones3D({ onNavigate }) {
 
       <button
         type="button"
-        onClick={() => onNavigate?.("eva-vibraciones")}
+        onClick={() => onNavigate?.("maq-graficas", { maquina: maquina.id })}
         style={{
           alignSelf: "flex-start",
           display: "flex", alignItems: "center", gap: 8,

@@ -442,11 +442,11 @@ export default function CierreDiagnostico({ params, onNavigate }) {
   const { riesgo: traducirRiesgo, riesgoVibracion: traducirRiesgoVibracion,
     noEvaluable: tituloDeRegla, noEvaluableVibracion: tituloDeReglaVibracion } = useProsa();
   const { theme: t } = useTheme();
-  /* El id de la máquina de la URL. Lo que no es el tanque es una máquina de
-     vibraciones: la escrita a mano o una CONFIGURADA de su tipo (Plan 38 F2),
-     que llega con `?maquina=<id>` para que `useDominioVibracion` lea la suya. */
+  /* El id de la máquina de la URL. Lo que no es el tanque es una máquina
+     CONFIGURADA (Plan 38 F2, Plan 40 F2), que llega con `?maquina=<id>` para
+     que `useDominioVibracion` lea la suya. */
   const sistemaId = params?.sistema ?? "tanque";
-  const esConfigurada = sistemaId !== "tanque" && sistemaId !== "vibraciones";
+  const esConfigurada = sistemaId !== "tanque";
   const paramsRiesgos = esConfigurada ? { maquina: sistemaId } : {};
   const riesgoId = params?.riesgoId ?? "";
 
@@ -455,7 +455,7 @@ export default function CierreDiagnostico({ params, onNavigate }) {
    * pantalla destino tal y como lo pinta el sidebar, en vez de un «Riesgos»
    * escrito aquí que puede dejar de coincidir.
    */
-  const rutaRiesgos = sistemaId === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
+  const rutaRiesgos = sistemaId === "tanque" ? "eva-riesgos" : "maq-riesgos";
   const nombreRiesgos = traducir(`navigation:routes.${rutaRiesgos}.nav`);
 
   // Sólo se suscribe a la máquina que corresponde: un caso de vibraciones no

@@ -1,7 +1,7 @@
 {
   "sections": {
     "sec-llenado": "Filling Station",
-    "sec-vibraciones": "Vibration Station",
+    "sec-planta": "Plant",
     "sec-general": "General",
     "sec-prediccion": "Prediction",
     "sec-rag": "RAG"
@@ -31,31 +31,6 @@
       "title": "3D View",
       "nav": "3D View",
       "sub": "The plant in miniature · tank level is the live value"
-    },
-    "vib-inicio": {
-      "title": "Overview · Vibration",
-      "nav": "Overview",
-      "sub": "Vibration system · what the machine reports right now"
-    },
-    "eva-vibraciones": {
-      "title": "Trends · Vibration",
-      "nav": "Trends",
-      "sub": "Mechanical condition of the vibration system · snapshot only, no history"
-    },
-    "vib-controles": {
-      "title": "Controls · Vibration",
-      "nav": "Controls",
-      "sub": "Start and stop of the vibration system · not built yet"
-    },
-    "eva-riesgos-vibracion": {
-      "title": "Risks · Vibration",
-      "nav": "Risks",
-      "sub": "What the mechanical condition implies · evidence kept apart from the hypothesis"
-    },
-    "vib-3d": {
-      "title": "3D View · Vibration",
-      "nav": "3D View",
-      "sub": "Rotor test rig · where each probe measures, and in which direction"
     },
     "eva-alarmas": {
       "title": "Alarms",
@@ -145,7 +120,7 @@
     "eva-muro": {
       "title": "Plant wall",
       "nav": "Wall",
-      "sub": "Both machines at once, each with its status, alarms and freshness"
+      "sub": "Every machine at once, each with its state, its alarms and its freshness"
     },
     "eva-configuracion": {
       "title": "Configuration",
@@ -166,6 +141,11 @@
       "title": "3D View",
       "nav": "3D View",
       "sub": "Configured machine · where each probe measures, and in which direction"
+    },
+    "maq-riesgos": {
+      "title": "Risks",
+      "nav": "Risks",
+      "sub": "What follows from this machine’s mechanical state · evidence kept apart from the hypothesis"
     },
     "maq-hallazgos": {
       "title": "Findings",

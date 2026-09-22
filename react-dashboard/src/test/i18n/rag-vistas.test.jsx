@@ -53,6 +53,48 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/*
+ * ── LA MÁQUINA DE VIBRACIONES ES UNA CONFIGURADA (Plan 40 F2) ──────
+ *
+ * Los datos decían `sistema: "vibraciones"` —la máquina escrita a mano— y la
+ * lista de claves exigía `machines:systems.vibraciones`. Esa clave ya no
+ * existe: el nombre de una máquina de vibraciones lo pone quien la configura
+ * y llega por el provider (`useDominio().sistema(id)` cae a ese nombre), no
+ * por el diccionario. Así que aquí se mockea el provider con UNA configurada,
+ * los datos la referencian por su id, y en vez de la clave se exige su NOMBRE
+ * en pantalla. Sin tilde, como el resto de los datos, para que el filtro de
+ * acentos siga midiendo sólo interfaz.
+ *
+ * «Casos previos» se monta EN la máquina (`maq-casos?maquina=…`): fuera de
+ * una máquina esa vista filtra por `SISTEMA_IDS_EN_SERVICIO`, el registro
+ * escrito a mano, y un caso de una configurada no se pintaría. Dentro, filtra
+ * por el id de la máquina en contexto, que es lo que hace su ruta `maq-casos`.
+ * «Documentación» se monta sin máquina: su selector enumera TODAS —el tanque
+ * del registro y la configurada— y eso es justo lo que se quiere ver traducido.
+ */
+const MOTOR = { id: "vib-motor-03", nombre: "Motor 3", tipo: "vibraciones", activa: true };
+
+vi.mock("@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx", async (importOriginal) => ({
+  ...(await importOriginal()),
+  useMaquinasConfiguradas: () => ({ maquinas: [MOTOR], cargando: false, error: null, recargar: () => {} }),
+}));
+
+/** `null` = sin máquina en contexto (la ruta de planta); la configurada = su ruta `maq-*`. */
+let maquinaEnContexto = null;
+vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    useMaquina: () =>
+      maquinaEnContexto
+        ? {
+            id: maquinaEnContexto.id, configurada: maquinaEnContexto, registro: null,
+            enServicio: true, cerrada: null, enServicioIds: [maquinaEnContexto.id],
+          }
+        : original.useMaquina(),
+  };
+});
+
 import i18n from "@/i18n";
 import { ThemeProvider } from "@/theme";
 import CasosRag from "@/Demo-EVA/views/comunes/CasosRag.jsx";
@@ -75,21 +117,22 @@ const MANUALES = {
   manuales: [
     { id: "m1", titulo: "Pump manual", archivo: "pump.pdf", version: 1, fragmentos: 42, estado: "activo", sistema: "tanque", fecha: "2026-09-01T10:00:00Z" },
     { id: "m2", titulo: "Limits annex", archivo: "limits.pdf", version: 2, fragmentos: 0, estado: "activo", sistema: null, motivoIlegible: "Scanned PDF, no extractable text", fecha: "2026-08-20T08:30:00Z" },
-    { id: "m3", titulo: "Old manual", archivo: "old.pdf", version: 1, fragmentos: 3, estado: "archivado", sistema: "vibraciones", fecha: "2026-07-11T12:00:00Z" },
+    { id: "m3", titulo: "Old manual", archivo: "old.pdf", version: 1, fragmentos: 3, estado: "archivado", sistema: MOTOR.id, fecha: "2026-07-11T12:00:00Z" },
   ],
 };
 
 /*
- * `sistema: "vibraciones"` en los tres (rama `Vibraciones1.0`): la vista de
- * Casos filtra a máquinas EN SERVICIO, y un caso del tanque ya no se pinta —
- * la prueba quedaría midiendo el cierre en vez de la traducción. Lo que estas
- * comprobaciones afirman no cambia: qué claves se ven en inglés.
+ * Los casos son de la máquina configurada (rama `Vibraciones1.0`, Plan 40
+ * F2): la vista de Casos filtra a la máquina en contexto, y un caso del tanque
+ * ya no se pinta — la prueba quedaría midiendo el cierre en vez de la
+ * traducción. Lo que estas comprobaciones afirman no cambia: qué claves se
+ * ven en inglés.
  */
 /** Una por cada combinación de chips: resuelto o no, con veredicto y sin él. */
 const CASOS = {
   casos: [
-    { id: "c1", sintoma: "Noise at bearing 2", causa: "Bearing", solucion: "Replaced", fecha: "2026-09-02T09:00:00Z", sistema: "vibraciones", origen: "cierre", resuelto: true, diagnosticoCorrecto: true, diagnostico: { propuesta: "Bearing wear", respaldo: "high" } },
-    { id: "c2", sintoma: "Low pressure", causa: "Under investigation", fecha: "2026-09-01T09:00:00Z", sistema: "vibraciones", origen: "chat", resuelto: false, diagnosticoCorrecto: false },
+    { id: "c1", sintoma: "Noise at bearing 2", causa: "Bearing", solucion: "Replaced", fecha: "2026-09-02T09:00:00Z", sistema: MOTOR.id, origen: "cierre", resuelto: true, diagnosticoCorrecto: true, diagnostico: { propuesta: "Bearing wear", respaldo: "high" } },
+    { id: "c2", sintoma: "Low pressure", causa: "Under investigation", fecha: "2026-09-01T09:00:00Z", sistema: MOTOR.id, origen: "chat", resuelto: false, diagnosticoCorrecto: false },
     { id: "c3", sintoma: "Intermittent vibration", fecha: "2026-08-30T09:00:00Z", sistema: null, origen: "voz", archivado: true, resuelto: true },
   ],
 };
@@ -111,10 +154,14 @@ afterEach(async () => {
   cleanup();
   vi.restoreAllMocks();
   delete globalThis.fetch;
+  maquinaEnContexto = null;
   await i18n.changeLanguage("es");
 });
 
-const montar = (Vista) => render(<ThemeProvider><Vista /></ThemeProvider>);
+const montar = (Vista, { enMaquina = null } = {}) => {
+  maquinaEnContexto = enMaquina;
+  return render(<ThemeProvider><Vista /></ThemeProvider>);
+};
 
 /**
  * Una clave sin resolver se pinta tal cual: `assistant:rag.docs.panelTitle`.
@@ -156,9 +203,9 @@ const CLAVES_VISIBLES = {
     "assistant:rag.docs.wholePlant",
     "assistant:rag.docs.upload.dropzone",
     "common:actions.refresh",
-    /* El nombre de la máquina, que salía del dominio y se quedaba en español. */
+    /* El nombre de la máquina, que salía del dominio y se quedaba en español.
+       El de la configurada no es una clave: se exige aparte, en `NOMBRES`. */
     "machines:systems.tanque",
-    "machines:systems.vibraciones",
   ],
   casos: [
     "navigation:routes.rag-casos.title",
@@ -177,13 +224,25 @@ const CLAVES_VISIBLES = {
     "common:actions.refresh",
     /*
      * `machines:systems.tanque` ya NO se pinta aquí (rama `Vibraciones1.0`):
-     * esta vista sólo enseña casos de máquinas en servicio, así que el nombre
+     * esta vista sólo enseña casos de la máquina en contexto, así que el nombre
      * del tanque no llega a la pantalla y exigirlo mediría el cierre en vez de
      * la traducción. Sigue en la lista de `documentacion`, que sí enumera las
      * dos máquinas en su selector. Vuelve al reabrir.
+     *
+     * El nombre de la configurada no es una clave: se exige en `NOMBRES`.
      */
-    "machines:systems.vibraciones",
   ],
+};
+
+/**
+ * Los nombres de máquina que ESTE dato obliga a pintar y que NO salen del
+ * diccionario: los pone quien configura la máquina y llegan por el provider.
+ * Se exigen igual que las claves, porque perderlos —pintar el id, o la máquina
+ * escrita a mano— es el mismo fallo con otra cara.
+ */
+const NOMBRES = {
+  documentacion: [MOTOR.nombre],
+  casos: [MOTOR.nombre],
 };
 
 /**
@@ -198,28 +257,35 @@ async function verTodosLosCasos() {
   }));
 }
 
+/* [nombre, Vista, ancla, claves, nombres de máquina, preparar, opciones de montaje] */
 const VISTAS = [
-  ["Documentación", DocumentacionRag, /pump\.pdf/, CLAVES_VISIBLES.documentacion, null],
-  ["Casos previos", CasosRag, /Noise at bearing 2/, CLAVES_VISIBLES.casos, verTodosLosCasos],
+  ["Documentación", DocumentacionRag, /pump\.pdf/, CLAVES_VISIBLES.documentacion, NOMBRES.documentacion, null, {}],
+  ["Casos previos", CasosRag, /Noise at bearing 2/, CLAVES_VISIBLES.casos, NOMBRES.casos, verTodosLosCasos, { enMaquina: MOTOR }],
 ];
 
 describe("las dos pantallas de RAG", () => {
-  it.each(VISTAS)("«%s» se pinta entera sin dejar una clave cruda", async (_n, Vista, ancla, _c, preparar) => {
-    montar(Vista);
+  it.each(VISTAS)("«%s» se pinta entera sin dejar una clave cruda", async (_n, Vista, ancla, _c, _m, preparar, opciones) => {
+    montar(Vista, opciones);
     await screen.findByText(ancla);
     if (preparar) await preparar();
     expect(document.body.textContent).not.toMatch(CLAVE_CRUDA);
   });
 
   it.each(VISTAS)("«%s» pinta en INGLÉS todas las claves que este dato obliga a enseñar",
-    async (_n, Vista, ancla, claves, preparar) => {
+    async (_n, Vista, ancla, claves, nombres, preparar, opciones) => {
       await i18n.changeLanguage("en");
-      montar(Vista);
+      montar(Vista, opciones);
       await screen.findByText(ancla);
       if (preparar) await preparar();
       const texto = document.body.textContent;
 
       expect(texto).not.toMatch(CLAVE_CRUDA);
+
+      /* El nombre de la máquina configurada, tal cual lo puso quien la dio de
+         alta: ni su id ni el de la escrita a mano. */
+      const sinNombre = nombres.filter((nombre) => !texto.includes(nombre));
+      expect(sinNombre, `nombres de máquina que no llegaron a pintarse: ${sinNombre.join(", ")}`)
+        .toEqual([]);
 
       /*
        * `getFixedT("en")` y no `i18n.t`: pide el texto inglés sin depender de
@@ -246,13 +312,13 @@ describe("las dos pantallas de RAG", () => {
     });
 
   it("la fecha se formatea con el locale del idioma, no fijada a es-MX", async () => {
-    montar(CasosRag);
+    montar(CasosRag, { enMaquina: MOTOR });
     await screen.findByText(/Noise at bearing 2/);
     const enEspanol = document.body.textContent;
     cleanup();
 
     await i18n.changeLanguage("en");
-    montar(CasosRag);
+    montar(CasosRag, { enMaquina: MOTOR });
     await screen.findByText(/Noise at bearing 2/);
 
     /*

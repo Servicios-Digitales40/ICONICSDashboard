@@ -10,7 +10,12 @@
  *     `…/S1/vRMS_S1`, y los contadores del área entran en `alarmas`.
  *  2. **Un motor por máquina, con SUS puntos.** Dos máquinas no comparten
  *     lote, y una máquina no pide puntos de otra.
- *  3. **El origen simulado no inventa valores**: falla con un motivo.
+ *  3. **El origen simulado simula con la física del TIPO** (Plan 40 F0): las
+ *     medidas con rol y apoyo salen con valor; lo que el tipo no sabe simular
+ *     (una variable sin rol, como el estado del sensor) queda como hueco, no
+ *     como cero. Hasta el 21-09-2026 esto afirmaba lo contrario —que se
+ *     negaba con un motivo—, porque la física sólo parseaba los tags de la
+ *     máquina escrita a mano.
  *  4. **Los apoyos salen del tipo cruzado con la máquina**, con su id como
  *     rótulo; un apoyo que la máquina no tiene no se lista.
  */
@@ -23,6 +28,7 @@ import {
   transporteDeConfigurada,
 } from "@/Demo-EVA/data/comunes/fuenteDeMaquina.js";
 import { TRANSPORTES } from "@/lib/iconics";
+import { QUALITY_SIN_DATO } from "@shared/quality.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
@@ -168,9 +174,30 @@ describe("la fuente de una máquina configurada", () => {
     expect(t2.pedidos.flat()).toHaveLength(1);
   });
 
-  it("con el origen SIMULADO no inventa valores: falla con un motivo que la vista pinta", async () => {
-    const transporte = transporteDeConfigurada(maquina(), TRANSPORTES.SIMULADO);
-    await expect(transporte.read(["x"])).rejects.toThrow(/origen simulado no conoce la máquina configurada «Nuevo-Modor»/);
+  it("con el origen SIMULADO las medidas con rol y apoyo salen con valor, y lo sin rol queda como hueco", async () => {
+    /*
+     * El caos suave puede volver mala una lectura de cada cincuenta (valor 0,
+     * calidad incierta) o dejar fuera una de cada cien. Se fija el azar para
+     * que la prueba mida la física del tipo, no la suerte del preset.
+     */
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    const m = maquina();
+    const sensor = variable("SENSOR_S1", `${RAIZ}S1/SENSOR_S1`, null, "S1");
+    const transporte = transporteDeConfigurada({ ...m, variables: [...m.variables, sensor] }, TRANSPORTES.SIMULADO);
+
+    const lectura = await transporte.read([
+      `${RAIZ}S1/vRMS_S1`, `${RAIZ}S1/aRMS_S1`, `${RAIZ}S2/vRMS_S2`, `${RAIZ}S1/SENSOR_S1`, "ac:OTRA/x",
+    ]);
+
+    for (const punto of [`${RAIZ}S1/vRMS_S1`, `${RAIZ}S1/aRMS_S1`, `${RAIZ}S2/vRMS_S2`]) {
+      expect(typeof lectura.get(punto)?.value, punto).toBe("number");
+      expect(Number.isFinite(lectura.get(punto).value), punto).toBe(true);
+    }
+    /* El estado del sensor no tiene rol: el tipo no lo simula y queda como
+       hueco honesto —sin `value`, con la calidad de «sin dato»—, nunca 0. */
+    expect(lectura.get(`${RAIZ}S1/SENSOR_S1`)).toEqual({ quality: QUALITY_SIN_DATO });
+    /* Un punto que no es de esta máquina ni siquiera aparece en la respuesta. */
+    expect(lectura.has("ac:OTRA/x")).toBe(false);
   });
 
   it("un tipo que el programa no conoce se rechaza al construir, no al pintar", () => {

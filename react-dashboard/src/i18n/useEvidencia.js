@@ -39,6 +39,8 @@ import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDominio } from "./useDominio.js";
+import { useMaquinasConfiguradas } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
+
 import { useProsa } from "./useProsa.js";
 
 export function useEvidencia() {
@@ -46,6 +48,7 @@ export function useEvidencia() {
   const { t: traducir } = useTranslation("diagnostics");
   const { senal } = useDominio();
   const { riesgo, riesgoVibracion, causa } = useProsa();
+  const { maquinas: configuradas } = useMaquinasConfiguradas();
 
   /** De qué fuente sale una evidencia: datos, manual, casos o tendencia. */
   const fuente = useCallback(
@@ -66,8 +69,12 @@ export function useEvidencia() {
        */
       if (p.clave === "evidenciaDelRiesgo") {
         const comoUnRiesgo = { id: p.riesgoId, evidencia: e.texto, valores: p.valores };
+        /* Por TIPO de máquina, no por id (Plan 40 F2): «vibraciones» dejó de
+           ser una máquina y es el tipo de cualquier configurada de ese tipo. El
+           tanque, escrito a mano, es lo único que no viene del provider. */
+        const tipo = configuradas.find((m) => m.id === p.sistema)?.tipo ?? null;
         const traducido =
-          p.sistema === "vibraciones" ? riesgoVibracion(comoUnRiesgo) : riesgo(comoUnRiesgo);
+          tipo === "vibraciones" ? riesgoVibracion(comoUnRiesgo) : riesgo(comoUnRiesgo);
         return traducido.evidencia;
       }
 
@@ -102,7 +109,7 @@ export function useEvidencia() {
         defaultValue: e.texto,
       });
     },
-    [traducir, senal, riesgo, riesgoVibracion, causa]
+    [traducir, senal, riesgo, riesgoVibracion, causa, configuradas]
   );
 
   return { fuente, texto };

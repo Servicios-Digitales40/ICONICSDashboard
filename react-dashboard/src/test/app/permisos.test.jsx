@@ -35,9 +35,21 @@ afterEach(cleanup);
 /** El `puede()` de un rol, con la MISMA tabla que usa el backend. */
 const comoRol = (rol) => (rolMinimo) => alcanza([rol], rolMinimo);
 
-/** Los ids que un rol ve en el menú, aplanando los grupos. */
+/*
+ * ── LAS MÁQUINAS SON CONFIGURADAS (Plan 40 F2) ─────────────────────
+ *
+ * Hasta el 21-09-2026 la máquina de vibraciones estaba escrita a mano y sus
+ * vistas (`vib-inicio`, `eva-vibraciones`, `vib-3d`…) salían en el menú por sí
+ * solas. Ya no: las vistas de una máquina son las genéricas `maq-*`, y sólo
+ * aparecen cuando una máquina CONFIGURADA las reclama. Por eso el menú se pide
+ * aquí con una máquina, igual que hace el Sidebar con las del provider — sin
+ * ella el rol se estaría probando sobre un menú sin máquinas.
+ */
+const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones", activa: true };
+
+/** Los ids que un rol ve en el menú, con una máquina configurada, aplanando los grupos. */
 const menuDe = (rol) =>
-  navParaRol(comoRol(rol)).flatMap((i) => (i.children ? i.children.map((c) => c.id) : [i.id]));
+  navParaRol(comoRol(rol), [MAQUINA]).flatMap((i) => (i.children ? i.children.map((c) => c.id) : [i.id]));
 
 describe("el menú se acota al rol", () => {
   it("un visualizador NO ve el panel de administración", () => {
@@ -57,12 +69,15 @@ describe("el menú se acota al rol", () => {
    */
   it("un visualizador ve EXACTAMENTE las vistas de visualización", () => {
     expect(menuDe(ROL.VISUALIZADOR).sort()).toEqual([
-      /* Vibraciones: lo que se mira, no lo que se decide.
-         `eva-muro` no está porque no tiene entrada de menú —se abre con
-         `?muro=1`—, no porque el rol lo excluya. */
+      /* Planta: lo que se mira, no lo que se decide. `eva-muro` es la entrada
+         desde el Plan 40 F2 y por eso SÍ está: es la pantalla de arranque. */
       "eva-alarmas",
       "eva-assets",
-      "eva-vibraciones",
+      "eva-muro",
+      /* La máquina configurada: su apartado de Visualización, nada más. */
+      "maq-3d",
+      "maq-graficas",
+      "maq-inicio",
       /* Predicción: son gráficas de otro backend, todas de lectura. */
       "pred-correlacion",
       "pred-eventos",
@@ -71,8 +86,6 @@ describe("el menú se acota al rol", () => {
       "pred-pronostico",
       "pred-variables",
       "salud-sistema",
-      "vib-3d",
-      "vib-inicio",
     ]);
   });
 
@@ -82,15 +95,19 @@ describe("el menú se acota al rol", () => {
     /* Diagnóstico: interpretar una medida es trabajo de operador. */
     expect(menu).not.toContain("eva-bandeja");
     expect(menu).not.toContain("eva-avisos");
-    expect(menu).not.toContain("eva-riesgos-vibracion");
+    expect(menu).not.toContain("maq-hallazgos");
+    expect(menu).not.toContain("maq-avisos");
+    expect(menu).not.toContain("maq-riesgos");
     /* Registro: dejan rastro de quién hizo qué. */
     expect(menu).not.toContain("eva-cuaderno");
     expect(menu).not.toContain("eva-turno");
     /* Documentación del caso: se escribe, no sólo se lee. */
     expect(menu).not.toContain("rag-casos");
     expect(menu).not.toContain("rag-documentacion");
-    /* Y lo que acciona la instalación. */
-    expect(menu).not.toContain("vib-controles");
+    expect(menu).not.toContain("maq-casos");
+    expect(menu).not.toContain("maq-rag");
+    /* Y lo que acciona la instalación: cerrada con el tanque, sin `nav`. */
+    expect(menu).not.toContain("eva-controles");
   });
 
   it("un operador ve todo lo del visualizador, y además lo suyo", () => {
@@ -111,11 +128,12 @@ describe("el menú se acota al rol", () => {
      * cosas menos al futuro panel de administración». Es la única entrada que
      * un operador no ve, y por eso se comprueba que las demás sí siguen ahí.
      */
-    const ids = navParaRol(comoRol(ROL.OPERADOR))
-      .flatMap((i) => (i.children ? i.children.map((c) => c.id) : [i.id]));
+    const ids = menuDe(ROL.OPERADOR);
 
     expect(ids).not.toContain("eva-configuracion");
-    expect(ids).toContain("vib-inicio");
+    expect(ids).toContain("eva-muro");
+    expect(ids).toContain("maq-inicio");
+    expect(ids).toContain("maq-hallazgos");
   });
 
   it("un administrador lo ve todo", () => {
@@ -178,7 +196,8 @@ describe("el rol de cada página sale del registro", () => {
   it("una vista sin rol declarado vale `null`, no `undefined`", () => {
     /* `undefined` sería indistinguible de una ruta que no existe, y quien lo
        lea trataría un descuido como «es para cualquiera». */
-    expect(ROL_DE_PAGINA["vib-inicio"]).toBeNull();
+    expect(ROL_DE_PAGINA["maq-inicio"]).toBeNull();
+    expect(ROL_DE_PAGINA["eva-muro"]).toBeNull();
   });
 });
 

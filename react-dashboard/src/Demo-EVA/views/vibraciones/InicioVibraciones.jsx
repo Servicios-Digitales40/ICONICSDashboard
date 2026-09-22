@@ -53,18 +53,15 @@ import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 import { bandaISO, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js";
 
 /*
- * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA (Plan 37 F3) ─────────────
+ * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA (Plan 37 F3, Plan 40 F2) ──
  *
- * Esta pantalla sirve a la máquina escrita a mano Y a cualquier configurada
- * del mismo tipo (`?maquina=<id>`). Las tarjetas de abajo navegan a las rutas
- * de la máquina de la pantalla: para una configurada, a las genéricas
- * `maq-*` con su parámetro. Riesgos y Controles no existen todavía para una
- * configurada (Plan 37 §2 D6), así que no se ofrecen.
+ * Esta pantalla sirve a cualquier máquina configurada del tipo (`?maquina=<id>`,
+ * ruta `maq-inicio`). Las tarjetas de abajo navegan a las rutas `maq-*` de la
+ * máquina de la pantalla, con su parámetro. Hasta el Plan 40 servía también a
+ * la máquina escrita a mano, con sus propias rutas; ya no existe. Riesgos vive
+ * unificado en Hallazgos (Plan 33 F10) y no se ofrece como tarjeta; Controles
+ * no existe para una configurada: sus variables son de sólo lectura.
  */
-const DESTINO_CONFIGURADA = Object.freeze({
-  "eva-vibraciones": "maq-graficas",
-  "vib-3d": "maq-3d",
-});
 import RotorHero from "../../three-d/components/RotorHero.jsx";
 import { rpmEjeDe } from "../../three-d/lib/rotor.js";
 
@@ -233,7 +230,7 @@ const REJILLA = `
  */
 const VISTAS = [
   {
-    id: "eva-vibraciones",
+    id: "maq-graficas",
     Icono: LayoutDashboard,
     dato: ({ peor }) =>
       peor
@@ -241,18 +238,7 @@ const VISTAS = [
         : null,
   },
   {
-    id: "eva-riesgos-vibracion",
-    Icono: ShieldAlert,
-    dato: ({ res }) => {
-      if (!res.evaluadas && !res.activos.length) return null;
-      if (res.activos.length > 0) {
-        return { clave: "situations", valores: { count: res.activos.length }, estado: "critico" };
-      }
-      return { clave: "rulesOk", valores: { count: res.evaluadas }, estado: "nominal" };
-    },
-  },
-  {
-    id: "vib-3d",
+    id: "maq-3d",
     Icono: Box,
     /*
      * El régimen del eje, que es la señal cuyo giro anima esa escena — el
@@ -265,11 +251,6 @@ const VISTAS = [
      */
     dato: ({ giro }) =>
       giro.medido ? { clave: "rpm", valores: { valor: Math.round(giro.real) }, estado: giro.real > 0 ? "nominal" : "sin_dato" } : null,
-  },
-  {
-    id: "vib-controles",
-    Icono: Radio,
-    dato: () => ({ clave: "pending", valores: {}, estado: "sin_dato" }),
   },
 ];
 
@@ -508,12 +489,9 @@ function InicioVibraciones({ onNavigate }) {
   const { canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos, canalesMeta, maquina } =
     useDominioVibracion();
 
-  /* A qué ruta lleva cada tarjeta, y con qué parámetro: la máquina de la
-     pantalla. Ver `DESTINO_CONFIGURADA`. */
-  const destino = (id) => (maquina.configurada ? DESTINO_CONFIGURADA[id] ?? id : id);
-  const paramsDestino = maquina.configurada ? { maquina: maquina.id } : undefined;
-  const vistas = maquina.configurada ? VISTAS.filter((v) => DESTINO_CONFIGURADA[v.id]) : VISTAS;
-  const navegar = (id) => onNavigate?.(destino(id), paramsDestino);
+  /* Cada tarjeta lleva a la ruta `maq-*` de LA MÁQUINA DE LA PANTALLA. */
+  const vistas = VISTAS;
+  const navegar = (id) => onNavigate?.(id, { maquina: maquina.id });
 
   const res = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
@@ -618,17 +596,11 @@ function InicioVibraciones({ onNavigate }) {
             </p>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => navegar("eva-vibraciones")}>
+              <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => navegar("maq-graficas")}>
                 {traducir("dashboard:home.hero.enter", {
-                  pantalla: traducir("navigation:routes.eva-vibraciones.nav"),
+                  pantalla: traducir("navigation:routes.maq-graficas.nav"),
                 })}
               </Button>
-              {/* Riesgos no existe todavía para una máquina configurada (Plan 37 §2 D6). */}
-              {!maquina.configurada && (
-                <Button variant="ghost" icon={<ShieldAlert size={15} />} onClick={() => onNavigate?.("eva-riesgos-vibracion")}>
-                  {traducir("machines:vibration.seeRisks")}
-                </Button>
-              )}
             </div>
           </div>
         </section>

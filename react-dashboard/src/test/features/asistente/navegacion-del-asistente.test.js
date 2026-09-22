@@ -32,14 +32,27 @@ describe("diagnosticar_falla y cerrar_diagnostico van al cierre de diagnóstico"
   });
 });
 
+/*
+ * ── LA OTRA MÁQUINA ES UNA CONFIGURADA (Plan 40 F2) ─────────────────
+ *
+ * Hasta el 21-09-2026 «la otra máquina» era `vibraciones`, escrita a mano, y
+ * tenía rutas propias (`vib-inicio`, `eva-riesgos-vibracion`). Ya no: toda
+ * máquina que no sea el tanque es una CONFIGURADA, y su destino es la ruta
+ * genérica de máquina con su id en `params.maquina`. El id de aquí es uno
+ * cualquiera; lo que se prueba es que viaja tal cual y que el tanque sigue
+ * yendo a sus pantallas propias.
+ */
+const MAQUINA = "vib-motor-03";
+
 describe("riesgos_activos va a la vista de riesgos DE ESE SISTEMA, sin riesgoId", () => {
   it("tanque va a eva-riesgos", () => {
     expect(destinoDeHerramienta("riesgos_activos", { sistema: "tanque" })).toEqual({ ruta: "eva-riesgos" });
   });
 
-  it("vibraciones va a eva-riesgos-vibracion — las dos máquinas NO comparten destino", () => {
-    expect(destinoDeHerramienta("riesgos_activos", { sistema: "vibraciones" })).toEqual({
-      ruta: "eva-riesgos-vibracion",
+  it("una máquina configurada va a maq-riesgos CON su id — las dos máquinas NO comparten destino", () => {
+    expect(destinoDeHerramienta("riesgos_activos", { sistema: MAQUINA })).toEqual({
+      ruta: "maq-riesgos",
+      params: { maquina: MAQUINA },
     });
   });
 
@@ -51,6 +64,8 @@ describe("riesgos_activos va a la vista de riesgos DE ESE SISTEMA, sin riesgoId"
      */
     const d = destinoDeHerramienta("riesgos_activos", { sistema: "tanque" });
     expect(d.params).toBeUndefined();
+    /* Y en una configurada, `params` lleva SÓLO la máquina. */
+    expect(destinoDeHerramienta("riesgos_activos", { sistema: MAQUINA }).params).toEqual({ maquina: MAQUINA });
   });
 
   it("sin sistema no hay destino", () => {
@@ -63,9 +78,12 @@ describe("estado_del_sistema va al Inicio de esa máquina", () => {
     expect(destinoDeHerramienta("estado_del_sistema", { sistema: "tanque" })).toEqual({ ruta: "eva-inicio" });
   });
 
-  it("vibraciones va a vib-inicio, NO a eva-inicio", () => {
+  it("una máquina configurada va a maq-inicio con su id, NO a eva-inicio", () => {
     // Las dos máquinas no pueden compartir Inicio: mezclaría instalaciones.
-    expect(destinoDeHerramienta("estado_del_sistema", { sistema: "vibraciones" })).toEqual({ ruta: "vib-inicio" });
+    expect(destinoDeHerramienta("estado_del_sistema", { sistema: MAQUINA })).toEqual({
+      ruta: "maq-inicio",
+      params: { maquina: MAQUINA },
+    });
   });
 });
 

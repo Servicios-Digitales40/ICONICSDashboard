@@ -11,30 +11,36 @@
  * ese estado no traía `maquina`: Inicio hacía `maquina.configurada` sobre
  * `undefined` y la vista entera caía en «No se pudo mostrar esta sección». La
  * meta de la máquina tiene que estar desde el primer render, con o sin
- * lectura; y con la escrita a mano, igual.
+ * lectura.
+ *
+ * Y SIN máquina delante (Plan 40 F2, retirada la escrita a mano) el hook no
+ * abre ninguna fuente: devuelve la forma vacía con `maquina: null` y
+ * `loading: false`, para que una vista de planta sepa que no hay nada que
+ * esperar. Hasta entonces «sin configurada» significaba la escrita a mano, con
+ * sus tres apoyos; esa rama ya no existe.
  */
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let configurada = null;
 vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", () => ({
-  useMaquina: () => ({ id: configurada?.id ?? "vibraciones", configurada, registro: null, enServicio: true }),
+  useMaquina: () => ({ id: configurada?.id ?? null, configurada, registro: null, enServicio: Boolean(configurada) }),
 }));
 vi.mock("@/lib/datasource", () => ({
   useDataSource: () => ({ transporte: "real" }),
 }));
-/* Fuentes que NUNCA contestan: es el primer render lo que se prueba. */
+/* Fuentes que NUNCA contestan: es el primer render lo que se prueba. Y se
+   cuenta cuántas se abren, para afirmar que sin máquina no se abre ninguna. */
+const fuenteDeMaquinaConfigurada = vi.fn(() => ({ subscribeVibracion: () => () => {} }));
 vi.mock("@/Demo-EVA/data/comunes/fuenteDeMaquina.js", () => ({
-  fuenteDeMaquinaConfigurada: () => ({ subscribeVibracion: () => () => {} }),
-}));
-vi.mock("@/Demo-EVA/data/vibraciones/vibracionSource.js", () => ({
-  fuenteDeVibracion: () => ({ subscribeVibracion: () => () => {} }),
+  fuenteDeMaquinaConfigurada: (...a) => fuenteDeMaquinaConfigurada(...a),
 }));
 
 import { useDominioVibracion } from "@/Demo-EVA/data/vibraciones/vibracion.js";
 
 afterEach(() => {
   configurada = null;
+  vi.clearAllMocks();
 });
 
 describe("useDominioVibracion antes de la primera lectura", () => {
@@ -50,13 +56,16 @@ describe("useDominioVibracion antes de la primera lectura", () => {
       id: "vib-motor-03", nombre: "Nuevo-Modor", configurada: true, area: "ae:/AREA",
     });
     expect(result.current.canalesMeta).toEqual([]);
+    expect(fuenteDeMaquinaConfigurada).toHaveBeenCalledWith(configurada, "real");
   });
 
-  it("con la máquina escrita a mano trae sus tres apoyos y su área", () => {
+  it("sin máquina delante devuelve la forma vacía, con `maquina: null`, y no abre ninguna fuente", () => {
     const { result } = renderHook(() => useDominioVibracion());
 
-    expect(result.current.maquina.id).toBe("vibraciones");
-    expect(result.current.maquina.configurada).toBe(false);
-    expect(result.current.canalesMeta.map((c) => c.id)).toEqual(["S1", "S2", "S3"]);
+    expect(result.current.maquina).toBeNull();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.canalesMeta).toEqual([]);
+    expect(result.current.canales).toEqual({});
+    expect(fuenteDeMaquinaConfigurada).not.toHaveBeenCalled();
   });
 });

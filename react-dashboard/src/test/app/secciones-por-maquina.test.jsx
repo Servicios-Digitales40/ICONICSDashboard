@@ -9,7 +9,8 @@
  *  1. **Sin máquinas configuradas el menú es el de siempre**, byte a byte:
  *     las rutas `maq-*` existen pero no aparecen solas.
  *  2. **Cada máquina en servicio produce su sección**, con su NOMBRE como
- *     rótulo y las tres vistas dentro, en el apartado de Visualización.
+ *     rótulo y sus vistas dentro, en tres apartados (Plan 40 F2: ya no hay
+ *     máquina escrita a mano al lado; lo común de planta es «Planta»).
  *  3. **Navegar desde ella lleva el parámetro de máquina**, y la entrada
  *     activa es la pareja ruta+máquina: dos máquinas apuntan a la misma ruta
  *     y sólo una puede estar marcada.
@@ -34,8 +35,11 @@ afterEach(() => {
 
 describe("el árbol del menú con máquinas configuradas", () => {
   it("sin máquinas, las rutas de máquina existen pero no salen en el menú", () => {
+    /* `maq-riesgos` (Plan 40 F2) es de máquina pero `oculta`: existe y se
+       navega con `?maquina=`, no sale en el menú. Por eso está aquí y no en
+       la lista de hijos de la sección de abajo. */
     expect(RUTAS_POR_MAQUINA).toEqual([
-      "maq-inicio", "maq-graficas", "maq-3d",
+      "maq-inicio", "maq-graficas", "maq-3d", "maq-riesgos",
       "maq-hallazgos", "maq-avisos", "maq-casos", "maq-rag",
     ]);
     const ids = NAV.flatMap((n) => (n.children ?? [n]).map((c) => c.id));
@@ -66,11 +70,14 @@ describe("el árbol del menú con máquinas configuradas", () => {
     expect(secciones[1].children[0].params).toEqual({ maquina: "vib-motor-04" });
   });
 
-  it("las secciones de máquina van delante, junto a la máquina escrita a mano", () => {
+  it("las secciones de máquina van delante, antes que las de planta", () => {
+    /* Hasta el Plan 40 F2 iban «junto a la máquina escrita a mano»
+       (`sec-vibraciones`). Esa máquina se retiró y la sección pasó a ser
+       «Planta»: las máquinas siguen yendo primero. */
     const nav = buildNav(ROUTES, NAV_GROUPS, () => true, MAQUINAS);
     expect(nav[0].group).toBe("maq:vib-motor-03");
     expect(nav[1].group).toBe("maq:vib-motor-04");
-    expect(nav[2].group).toBe("sec-vibraciones");
+    expect(nav[2].group).toBe("sec-planta");
   });
 
   it("una máquina sin id no produce sección: no se inventa nada", () => {
@@ -121,13 +128,13 @@ describe("el Sidebar con una máquina configurada", () => {
   }
 
   it("pinta la sección con el nombre de la máquina y navega con su parámetro", async () => {
-    const { onNavigate, subscribeSistema } = await montarSidebar({ page: "vib-inicio" });
+    const { onNavigate, subscribeSistema } = await montarSidebar({ page: "eva-muro" });
 
     const seccion = await screen.findByRole("button", { name: /Nuevo-Modor/ });
     expect(seccion).toBeTruthy();
 
-    /* Hay dos «Inicio»: el de vibraciones y el de la sección de la máquina.
-       Los hijos de una sección van en el bloque que sigue a su cabecera. */
+    /* Hay dos «Inicio»: el del compresor (Predicción) y el de la sección de la
+       máquina. Los hijos de una sección van en el bloque que sigue a su cabecera. */
     const contenedor = seccion.nextElementSibling;
     fireEvent.click(within(contenedor).getByRole("button", { name: /^Inicio/ }));
     expect(onNavigate).toHaveBeenCalledWith("maq-inicio", { maquina: "vib-motor-03" });
@@ -143,7 +150,7 @@ describe("el Sidebar con una máquina configurada", () => {
     const inicio = within(seccion.nextElementSibling).getByRole("button", { name: /^Inicio/ });
     expect(inicio.className).toMatch(/nav-active/);
 
-    /* Y el «Inicio» de la máquina escrita a mano, que es OTRA ruta, no. */
+    /* Y el «Inicio» del compresor (`pred-inicio`), que es OTRA ruta, no. */
     const otros = screen.getAllByRole("button", { name: /^Inicio/ }).filter((b) => b !== inicio);
     expect(otros.length).toBeGreaterThan(0);
     for (const b of otros) expect(b.className).not.toMatch(/nav-active/);

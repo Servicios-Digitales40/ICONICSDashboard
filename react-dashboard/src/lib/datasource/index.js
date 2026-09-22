@@ -18,6 +18,7 @@ export {
   DataSourceProvider,
   useDataSource,
   useEsSimulado,
+  useTransporteActual,
   TRANSPORTES,
   ORIGENES,
 } from "./DataSourceProvider.jsx";

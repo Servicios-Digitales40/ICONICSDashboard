@@ -17,44 +17,38 @@
  *  4. **Un riesgo que falló se sigue enseñando.** Saltárselo escondería un
  *     riesgo activo por un fallo de red, que es justo al revés de lo que debe
  *     hacer una pantalla de avisos.
+ *
+ * ── EL ESCENARIO: LA VISTA DE PLANTA, CON UNA MÁQUINA CONFIGURADA ───
+ *
+ * Desde el Plan 40 F2 la máquina de vibraciones escrita a mano ya no existe
+ * para el frontend: toda máquina de vibraciones es una CONFIGURADA. `AvisosEva`
+ * sin máquina delante (`eva-avisos`) agrega lo que trae `useMaquinasEnVivo()`,
+ * y eso es lo que aquí se finge: una configurada (`vib-motor-03`) con los
+ * riesgos que cada prueba necesite. Hasta entonces el escenario se montaba
+ * sobre `useVibracion()` y `evaluarRiesgosVibracion`, que ya no intervienen
+ * en esta ruta. Lo que se afirma no cambia: no depende de qué máquina sea.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 
-const { evaluarRiesgos, evaluarRiesgosVibracion, useSistemaAgua, useVibracion, obtenerDiagnosticoNarrado } =
-  vi.hoisted(() => ({
-    evaluarRiesgos: vi.fn(),
-    evaluarRiesgosVibracion: vi.fn(),
-    useSistemaAgua: vi.fn(),
-    useVibracion: vi.fn(),
-    obtenerDiagnosticoNarrado: vi.fn(),
-  }));
+const { useMaquinasEnVivo, obtenerDiagnosticoNarrado } = vi.hoisted(() => ({
+  useMaquinasEnVivo: vi.fn(),
+  obtenerDiagnosticoNarrado: vi.fn(),
+}));
 
-vi.mock("@/Demo-EVA/domain/riesgos.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  evaluarRiesgos,
-}));
-vi.mock("@/Demo-EVA/domain/riesgosVibracion.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  evaluarRiesgosVibracion,
-}));
-vi.mock("@/Demo-EVA/data/comunes/hooks.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  useSistemaAgua,
-}));
+/* La vista de PLANTA: sin máquina en el contexto, `useDominioVibracion` devuelve
+   la forma vacía con `maquina: null`, y la vista mira `useMaquinasEnVivo()`. Se
+   finge aquí porque el hook real exige `DataSourceProvider`. */
 vi.mock("@/Demo-EVA/data/vibraciones/vibracion.js", async (importOriginal) => ({
   ...(await importOriginal()),
-  useVibracion,
-  /* La vista lee la máquina de la pantalla por `useDominioVibracion` (Plan 38
-     F2). Aquí es la escrita a mano, con el mismo dominio de mentira. */
   useDominioVibracion: () => ({
-    ...useVibracion(),
-    canalesMeta: [],
-    maquina: { id: "vibraciones", nombre: null, configurada: false, area: null },
+    canales: {}, variador: {}, alarmas: {}, loading: false, error: null,
+    lastUpdated: null, puntosSinDato: [], canalesMeta: [], maquina: null,
   }),
 }));
+vi.mock("@/Demo-EVA/data/comunes/maquinasEnVivo.js", () => ({ useMaquinasEnVivo }));
 vi.mock("@/lib/api/casosApi.js", async (importOriginal) => ({
   ...(await importOriginal()),
   obtenerDiagnosticoNarrado,
@@ -75,40 +69,32 @@ const DIAGNOSTICO = {
   causas: [{ id: "fuga-red", titulo: "Fuga o rotura en la red", banda: "alto" }],
 };
 
-/*
- * ── EL ESCENARIO ES DE VIBRACIONES (rama `Vibraciones1.0`) ──────────
- *
- * Estos helpers colocaban el riesgo en el TANQUE, y la vista ya no lo evalúa:
- * con la estación de llenado cerrada, `AvisosEva` sólo mira vibraciones. Doce
- * de las catorce comprobaciones de este archivo se quedaban sin nada que
- * enseñar.
- *
- * Se ADAPTA y no se omite: lo que prueban —que la narración acompaña al dato,
- * que sin LLM la vista sigue sirviendo, que un aviso sobrevive a su riesgo, que
- * ningún botón acciona planta— no depende de qué máquina sea. Cambia el
- * escenario, no la afirmación.
- *
- * Al reabrir, basta con devolver estos dos helpers al tanque.
- */
-function conUnRiesgo() {
-  useSistemaAgua.mockReturnValue({ sistema: {} });
-  useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-  evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
-  evaluarRiesgosVibracion.mockReturnValue({ activos: [RIESGO], noEvaluables: [], evaluadas: 1 });
-}
+const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones", activa: true, variables: [], assets: [] };
 
 /**
- * Apaga el riesgo, como haría el siguiente sondeo.
- *
- * El snapshot tiene que cambiar de IDENTIDAD, no sólo de contenido: la vista
- * memoiza `evaluarRiesgosVibracion({canales, variador, alarmas})` con esos
- * objetos de dependencia —que es lo correcto, porque esa evaluación corre en
- * cada lectura de ICONICS— así que devolver siempre el mismo `{}` dejaría el
- * memo congelado y la prueba estaría midiendo el memo en vez del ciclo de vida.
+ * Lo que `useMaquinasEnVivo()` devolvería con UNA configurada y estos riesgos
+ * activos. Se construye en cada llamada, con identidad nueva, como haría el
+ * sondeo: la vista se queda con la CLAVE de los riesgos, no con el objeto, y
+ * así la prueba no pasa por casualidad de un memo congelado.
  */
+function conMaquinaEnVivo(activos) {
+  useMaquinasEnVivo.mockImplementation(() => [
+    {
+      maquina: MAQUINA,
+      tipo: null,
+      estado: { canales: {}, variador: {}, alarmas: {}, loading: false, error: null, lastUpdated: new Date(), puntosSinDato: [] },
+      riesgos: { activos, noEvaluables: [], evaluadas: activos.length },
+    },
+  ]);
+}
+
+function conUnRiesgo() {
+  conMaquinaEnVivo([RIESGO]);
+}
+
+/** Apaga el riesgo, como haría el siguiente sondeo. */
 function apagarElRiesgo() {
-  useVibracion.mockReturnValue({ canales: { t: Date.now() }, variador: {}, alarmas: {} });
-  evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 1 });
+  conMaquinaEnVivo([]);
 }
 
 const remontar = (rerender, onNavigate = () => {}) =>
@@ -127,10 +113,7 @@ const montar = (onNavigate = () => {}) =>
 
 describe("sin nada activo, la vista lo dice", () => {
   it("cero riesgos no es un bloque mudo, y no llama al modelo", async () => {
-    useSistemaAgua.mockReturnValue({ sistema: {} });
-    useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-    evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
-    evaluarRiesgosVibracion.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
+    conMaquinaEnVivo([]);
 
     montar();
 
@@ -239,19 +222,20 @@ describe("un aviso NO acciona planta", () => {
     }
 
     fireEvent.click(screen.getByRole("button", { name: /Ver el diagnóstico/i }));
-    expect(onNavigate).toHaveBeenCalledWith("cierre-diagnostico", {
-      sistema: "vibraciones", riesgoId: "fuga-en-red",
-    });
+    /*
+     * `objectContaining` y no el objeto exacto, a propósito: la vista manda
+     * `{ sistema, riesgoId }` y NO el `maquina` que `MaquinaProvider` lee para
+     * que el Cierre abra la fuente de la configurada (la Bandeja sí lo manda).
+     * Está anotado como defecto en el Plan 40 F2; cuando se añada, este
+     * aserto sigue valiendo.
+     */
+    expect(onNavigate).toHaveBeenCalledWith("cierre-diagnostico", expect.objectContaining({
+      sistema: "vib-motor-03", riesgoId: "fuga-en-red",
+    }));
   });
 
-  it("«Ver riesgos» lleva a la vista de LA MÁQUINA del aviso, no a la otra", async () => {
-    useSistemaAgua.mockReturnValue({ sistema: {} });
-    useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-    evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
-    evaluarRiesgosVibracion.mockReturnValue({
-      activos: [{ id: "desalineacion", titulo: "Desalineación", severidad: "critico", evidencia: "Zona D" }],
-      noEvaluables: [], evaluadas: 1,
-    });
+  it("«Ver riesgos» lleva a la vista de LA MÁQUINA del aviso, con su parámetro", async () => {
+    conMaquinaEnVivo([{ id: "desalineacion", titulo: "Desalineación", severidad: "critico", evidencia: "Zona D" }]);
     obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
 
     const onNavigate = vi.fn();
@@ -259,7 +243,8 @@ describe("un aviso NO acciona planta", () => {
     await waitFor(() => expect(screen.getByText("Desalineación")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: /Ver riesgos/i }));
-    expect(onNavigate).toHaveBeenCalledWith("eva-riesgos-vibracion");
+    /* La vista de Riesgos es genérica: sin `?maquina=` no hablaría de ninguna. */
+    expect(onNavigate).toHaveBeenCalledWith("maq-riesgos", { maquina: "vib-motor-03" });
   });
 });
 
@@ -346,13 +331,7 @@ describe("«leído» no apaga un riesgo", () => {
 
 describe("no se narra más de lo necesario", () => {
   it("se pide UNA vez por riesgo activo", async () => {
-    useSistemaAgua.mockReturnValue({ sistema: {} });
-    useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-    evaluarRiesgos.mockReturnValue({ activos: [], noEvaluables: [], evaluadas: 0 });
-    evaluarRiesgosVibracion.mockReturnValue({
-      activos: [RIESGO, { ...RIESGO, id: "desbalance", titulo: "Desbalance" }],
-      noEvaluables: [], evaluadas: 2,
-    });
+    conMaquinaEnVivo([RIESGO, { ...RIESGO, id: "desbalance", titulo: "Desbalance" }]);
     obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
 
     montar();
@@ -361,9 +340,11 @@ describe("no se narra más de lo necesario", () => {
     expect(obtenerDiagnosticoNarrado).toHaveBeenCalledTimes(2);
   });
 
-  it("el idioma de la pantalla viaja en la petición", async () => {
+  it("el idioma de la pantalla viaja en la petición, y el sistema es LA máquina", async () => {
     // Un aviso en inglés bajo una interfaz en español es el defecto que
-    // `verificar-i18n` persigue; aquí el idioma lo manda la pantalla.
+    // `verificar-i18n` persigue; aquí el idioma lo manda la pantalla. Y el
+    // sistema es el id de la configurada, que es lo que el backend registra
+    // desde el Plan 38 F1 — no `vibraciones`.
     conUnRiesgo();
     obtenerDiagnosticoNarrado.mockResolvedValue({ ...DIAGNOSTICO, narracion: "x" });
 
@@ -371,7 +352,7 @@ describe("no se narra más de lo necesario", () => {
 
     await waitFor(() => expect(obtenerDiagnosticoNarrado).toHaveBeenCalled());
     expect(obtenerDiagnosticoNarrado.mock.calls[0][0]).toMatchObject({
-      sistema: "vibraciones", riesgoId: "fuga-en-red", idioma: expect.stringMatching(/^(es|en)$/),
+      sistema: "vib-motor-03", riesgoId: "fuga-en-red", idioma: expect.stringMatching(/^(es|en)$/),
     });
   });
 });

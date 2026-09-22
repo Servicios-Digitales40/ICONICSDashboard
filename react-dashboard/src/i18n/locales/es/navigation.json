@@ -1,7 +1,7 @@
 {
   "sections": {
     "sec-llenado": "Estación de llenado",
-    "sec-vibraciones": "Estación de vibraciones",
+    "sec-planta": "Planta",
     "sec-general": "General",
     "sec-prediccion": "Predicción",
     "sec-rag": "RAG"
@@ -31,31 +31,6 @@
       "title": "Vista 3D",
       "nav": "Vista 3D",
       "sub": "La instalación en miniatura · el nivel del tanque es el dato en vivo"
-    },
-    "vib-inicio": {
-      "title": "Inicio · Vibraciones",
-      "nav": "Inicio",
-      "sub": "Sistema de vibraciones · qué contesta la máquina ahora mismo"
-    },
-    "eva-vibraciones": {
-      "title": "Gráficas · Vibraciones",
-      "nav": "Gráficas",
-      "sub": "Estado mecánico del sistema de vibraciones · sólo el instante, sin histórico"
-    },
-    "vib-controles": {
-      "title": "Controles · Vibraciones",
-      "nav": "Controles",
-      "sub": "Encendido y apagado del sistema de vibraciones · todavía sin construir"
-    },
-    "eva-riesgos-vibracion": {
-      "title": "Riesgos · Vibraciones",
-      "nav": "Riesgos",
-      "sub": "Qué se deduce del estado mecánico · evidencia separada de la hipótesis"
-    },
-    "vib-3d": {
-      "title": "Vista 3D · Vibraciones",
-      "nav": "Vista 3D",
-      "sub": "Banco de rotor · dónde mide cada sonda, y en qué dirección"
     },
     "eva-alarmas": {
       "title": "Alarmas",
@@ -145,7 +120,7 @@
     "eva-muro": {
       "title": "Muro de planta",
       "nav": "Muro",
-      "sub": "Las dos máquinas a la vez, cada una con su estado, sus alarmas y su frescura"
+      "sub": "Todas las máquinas a la vez, cada una con su estado, sus alarmas y su frescura"
     },
     "eva-configuracion": {
       "title": "Configuración",
@@ -166,6 +141,11 @@
       "title": "Vista 3D",
       "nav": "Vista 3D",
       "sub": "Máquina configurada · dónde mide cada sonda, y en qué dirección"
+    },
+    "maq-riesgos": {
+      "title": "Riesgos",
+      "nav": "Riesgos",
+      "sub": "Qué se deduce del estado mecánico de esta máquina · evidencia separada de la hipótesis"
     },
     "maq-hallazgos": {
       "title": "Hallazgos",

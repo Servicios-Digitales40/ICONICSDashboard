@@ -54,6 +54,7 @@ import { obtenerDiagnostico } from "@/lib/api/casosApi.js";
    de `useConteoHallazgos` en el cuerpo del componente:
    import { useSistemaAgua } from "../../data/comunes/hooks.js";
    import { evaluarRiesgos } from "../../domain/riesgos.js"; */
+import { useMaquinasEnVivo } from "../../data/comunes/maquinasEnVivo.js";
 import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
 
@@ -93,46 +94,54 @@ const vistoPorMi = crearVistoPorMi("eva:hallazgos");
  * mire alguien o no — que es por lo que el contador de la campana del Topbar
  * está retirado desde el 31-08-2026. Ver Plan 31 §2.3.
  */
-function useDiagnosticoDeRiesgosActivos(sistema, activos) {
-  const [porRiesgo, setPorRiesgo] = useState({});
+function useDiagnosticoDeRiesgosActivos(fuentes) {
+  /*
+   * Por MÁQUINA, varias a la vez (Plan 40 F2): la bandeja de planta enseña
+   * todas las configuradas. Devuelve `porSistema[sistema][riesgoId]`.
+   *
+   * La clave del efecto es una sola cadena —qué riesgos de qué máquinas—
+   * para que no se rehaga por identidad de arrays.
+   */
+  const [porSistema, setPorSistema] = useState({});
 
-  const riesgoIds = activos.map((r) => r.id).join(",");
+  const clave = fuentes
+    .filter((f) => f.activos.length)
+    .map((f) => `${f.sistema}:${f.activos.map((r) => r.id).join(",")}`)
+    .join("|");
 
   useEffect(() => {
-    if (!riesgoIds) {
-      setPorRiesgo({});
+    if (!clave) {
+      setPorSistema({});
       return undefined;
     }
     const control = new AbortController();
     let vivo = true;
 
-    Promise.all(
-      riesgoIds.split(",").map((riesgoId) =>
+    const pedidos = clave.split("|").flatMap((trozo) => {
+      const [sistema, ids] = trozo.split(":");
+      return ids.split(",").map((riesgoId) =>
         obtenerDiagnostico({ sistema, riesgoId, signal: control.signal })
-          .then((data) => ({ riesgoId, diagnostico: data ?? null }))
-          /*
-           * Un fallo deja `diagnostico: null`, NO un objeto vacío con
-           * `causas: []`. La diferencia importa: `[]` diría «se diagnosticó y
-           * no hay causas» —que es un hecho, el de un riesgo huérfano— y
-           * `null` dice «no se pudo diagnosticar». Confundirlos disfrazaría
-           * una caída de red de resultado (§2.4).
-           */
-          .catch(() => ({ riesgoId, diagnostico: null }))
-      )
-    ).then((resultados) => {
+          .then((data) => ({ sistema, riesgoId, diagnostico: data ?? null }))
+          .catch(() => ({ sistema, riesgoId, diagnostico: null }))
+      );
+    });
+
+    Promise.all(pedidos).then((resultados) => {
       if (!vivo) return;
       const salida = {};
-      for (const { riesgoId, diagnostico } of resultados) salida[riesgoId] = diagnostico;
-      setPorRiesgo(salida);
+      for (const { sistema, riesgoId, diagnostico } of resultados) {
+        (salida[sistema] ??= {})[riesgoId] = diagnostico;
+      }
+      setPorSistema(salida);
     });
 
     return () => {
       vivo = false;
       control.abort();
     };
-  }, [sistema, riesgoIds]);
+  }, [clave]);
 
-  return porRiesgo;
+  return porSistema;
 }
 
 /*
@@ -234,15 +243,27 @@ export default function BandejaEva({ onNavigate }) {
    */
   /* La máquina DE LA PANTALLA (Plan 38 F2): la escrita a mano en su sección,
      una configurada en la suya (`?maquina=<id>`). El hook elige la fuente. */
+  /*
+   * Con máquina delante (`maq-hallazgos`), la suya; sin ella (`eva-bandeja`,
+   * la bandeja de planta), TODAS las configuradas activas (Plan 40 F2). Hasta
+   * entonces «sin máquina» significaba la máquina escrita a mano.
+   */
   const { canales, variador, alarmas, maquina } = useDominioVibracion();
-  const sistemaId = maquina.id;
+  const planta = useMaquinasEnVivo();
 
   const { activos: activosVibracion } = useMemo(
     () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
     [canales, variador, alarmas]
   );
 
-  const diagnosticoVibracion = useDiagnosticoDeRiesgosActivos(sistemaId, activosVibracion);
+  const fuentes = useMemo(
+    () => (maquina
+      ? [{ sistema: maquina.id, activos: activosVibracion }]
+      : planta.map((e) => ({ sistema: e.maquina.id, activos: e.riesgos.activos }))),
+    [maquina, activosVibracion, planta]
+  );
+
+  const diagnosticoPorSistema = useDiagnosticoDeRiesgosActivos(fuentes);
 
   const hallazgos = useMemo(() => {
     const salida = [];
@@ -271,10 +292,12 @@ export default function BandejaEva({ onNavigate }) {
 
     /* La estación de llenado, cerrada — ver el bloque de arriba:
        agregar("tanque", activosTanque, traducirRiesgo, diagnosticoTanque); */
-    agregar(sistemaId, activosVibracion, traducirRiesgoVibracion, diagnosticoVibracion);
+    for (const f of fuentes) {
+      agregar(f.sistema, f.activos, traducirRiesgoVibracion, diagnosticoPorSistema[f.sistema] ?? {});
+    }
 
     return ordenarHallazgos(salida);
-  }, [sistemaId, activosVibracion, diagnosticoVibracion, traducirRiesgoVibracion]);
+  }, [fuentes, diagnosticoPorSistema, traducirRiesgoVibracion]);
 
   const visibles = hallazgos.filter((h) => !descartados.has(h.id));
 
@@ -295,12 +318,12 @@ export default function BandejaEva({ onNavigate }) {
     setDescartados((prev) => new Set([...prev, h.id]));
 
     /* Una máquina configurada viaja como `?maquina=`: es lo que lee
-       `MaquinaProvider` en las rutas que no son de ninguna (Plan 38 F2). */
-    const deMaquina = maquina.configurada ? { maquina: h.sistema } : null;
+       `MaquinaProvider` en las rutas que no son de ninguna (Plan 38 F2). El
+       tanque es lo único que no lo es (Plan 40 F2). */
+    const deMaquina = h.sistema === "tanque" ? null : { maquina: h.sistema };
     if (h.origen === "riesgo") {
-      const ruta = h.sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion";
-      if (deMaquina) onNavigate?.(ruta, deMaquina);
-      else onNavigate?.(ruta);
+      if (deMaquina) onNavigate?.("maq-riesgos", deMaquina);
+      else onNavigate?.("eva-riesgos");
     } else {
       onNavigate?.("cierre-diagnostico", { sistema: h.sistema, riesgoId: h.referencia.riesgoId, ...(deMaquina ?? {}) });
     }

@@ -17,7 +17,8 @@
  *
  * ── DE DÓNDE SALE ──────────────────────────────────────────────────
  *
- * De dos copias. `Demo-EVA/data/tanque/simulador.js` y `data/vibraciones/simuladorVibracion.js`
+ * De dos copias. `Demo-EVA/data/tanque/simulador.js` y el simulador de
+ * vibraciones del frontend (retirado con la máquina escrita a mano, Plan 40)
  * tenían el mismo cuerpo con una línea distinta: cómo se pedía el valor. Con
  * dos máquinas eso era tolerable; con la tercera, el patrón que ya ha fallado
  * dos veces en este proyecto —un simulador que sólo conoce un árbol— vuelve a

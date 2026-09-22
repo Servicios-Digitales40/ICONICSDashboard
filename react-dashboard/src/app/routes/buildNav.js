@@ -68,7 +68,9 @@ export function buildNav(routes, groups, puede = () => true, maquinas = []) {
    * Las secciones de máquina van DELANTE de las rutas estáticas: son
    * máquinas, como la escrita a mano, y van juntas al principio del menú.
    */
-  const porMaquina = routes.filter((r) => r.porMaquina && (!r.rol || puede(r.rol)));
+  /* `oculta`: existe por máquina y se navega por id con `?maquina=`, pero no
+     sale en el menú (Riesgos, unificada en Hallazgos — Plan 33 F10, Plan 40 F2). */
+  const porMaquina = routes.filter((r) => r.porMaquina && !r.porMaquina.oculta && (!r.rol || puede(r.rol)));
   for (const m of maquinas ?? []) {
     if (!m?.id || !porMaquina.length) continue;
     items.push({

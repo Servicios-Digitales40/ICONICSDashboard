@@ -25,53 +25,62 @@
  *  4. **Descartar lo apaga.** El badge y la Bandeja leen la MISMA clave de
  *     `vistoPorMi`; si divergieran, el número seguiría marcando lo que la
  *     persona ya descartó.
+ *
+ * ── EL BADGE CUENTA MÁQUINAS CONFIGURADAS (Plan 40 F2, 21-09-2026) ──
+ *
+ * Hasta hoy `useConteoHallazgos` leía la máquina de vibraciones escrita a mano
+ * con `useVibracion()` y evaluaba sus riesgos aquí. Esa máquina se retiró:
+ * ahora suma sobre `useMaquinasEnVivo()`, que trae cada máquina configurada
+ * activa con sus riesgos YA evaluados por su tipo. Por eso lo que se mockea es
+ * ese hook —la entrada del contador— y no la fuente ni el evaluador: lo que se
+ * afirma es del contador, y la fuente tiene sus propias pruebas.
+ *
+ * El tanque no es una configurada y sigue cerrado: no hay camino por el que
+ * un riesgo suyo llegue al contador, y `porSistema.tanque` es `0` fijo. Se
+ * comprueba eso en vez de «un riesgo del tanque no suma», que ya no se puede
+ * ni plantear.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 
-const { evaluarRiesgos, evaluarRiesgosVibracion, useSistemaAgua, useVibracion } = vi.hoisted(() => ({
-  evaluarRiesgos: vi.fn(),
-  evaluarRiesgosVibracion: vi.fn(),
-  useSistemaAgua: vi.fn(),
-  useVibracion: vi.fn(),
+const { useMaquinasEnVivo } = vi.hoisted(() => ({
+  useMaquinasEnVivo: vi.fn(),
 }));
 
-vi.mock("@/Demo-EVA/domain/riesgos.js", async (importOriginal) => ({
+vi.mock("@/Demo-EVA/data/comunes/maquinasEnVivo.js", async (importOriginal) => ({
   ...(await importOriginal()),
-  evaluarRiesgos,
-}));
-vi.mock("@/Demo-EVA/domain/riesgosVibracion.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  evaluarRiesgosVibracion,
-}));
-vi.mock("@/Demo-EVA/data/comunes/hooks.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  useSistemaAgua,
-}));
-vi.mock("@/Demo-EVA/data/vibraciones/vibracion.js", async (importOriginal) => ({
-  ...(await importOriginal()),
-  useVibracion,
+  useMaquinasEnVivo,
 }));
 
 import { Sidebar } from "@/app/layout/Sidebar.jsx";
+import { useConteoHallazgos } from "@/Demo-EVA/data/comunes/hallazgos.js";
 import { crearVistoPorMi } from "@/lib/vistoPorMi.js";
 
-const RIESGO_TANQUE = { id: "derrame", titulo: "Riesgo de derrame", severidad: "critico", evidencia: "Nivel al 98%" };
+const MOTOR_03 = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones", activa: true };
+const MOTOR_04 = { id: "vib-motor-04", nombre: "Segundo motor", tipo: "vibraciones", activa: true };
+
 const RIESGO_VIB = { id: "desalineacion", titulo: "Desalineación", severidad: "atencion", evidencia: "Zona D" };
 
-function conRiesgos({ tanque = [], vibraciones = [] } = {}) {
-  useSistemaAgua.mockReturnValue({ sistema: { resumen: { medidas: 0, fueraDeLimite: 0, enAviso: 0 } } });
-  useVibracion.mockReturnValue({ canales: {}, variador: {}, alarmas: {} });
-  evaluarRiesgos.mockReturnValue({ activos: tanque, noEvaluables: [], evaluadas: tanque.length });
-  evaluarRiesgosVibracion.mockReturnValue({ activos: vibraciones, noEvaluables: [], evaluadas: vibraciones.length });
+/** Una entrada de `useMaquinasEnVivo` por máquina, con sus riesgos activos ya evaluados. */
+const enVivo = (maquina, activos) => ({
+  maquina,
+  tipo: null,
+  estado: { canales: {}, variador: {}, alarmas: {}, loading: false, puntosSinDato: [] },
+  riesgos: { activos, noEvaluables: [], evaluadas: activos.length },
+});
+
+/** `{ [id de máquina]: riesgos activos }` → lo que devuelve el hook. */
+function conRiesgos(porMaquina = {}) {
+  const maquinas = [MOTOR_03, MOTOR_04].filter((m) => m.id in porMaquina);
+  useMaquinasEnVivo.mockReturnValue(maquinas.map((m) => enVivo(m, porMaquina[m.id])));
 }
 
 const montar = () =>
   render(
     <ThemeProvider>
-      <Sidebar page="eva-inicio" onNavigate={() => {}} />
+      <Sidebar page="eva-muro" onNavigate={() => {}} />
     </ThemeProvider>
   );
 
@@ -95,13 +104,7 @@ describe("el badge cuenta lo ya calculado: no añade ni una petición", () => {
     const fetchEspia = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     vi.stubGlobal("fetch", fetchEspia);
 
-    /*
-     * Dos riesgos de VIBRACIONES (rama `Vibraciones1.0`). Antes era uno de cada
-     * máquina; el badge ya no cuenta la estación de llenado, así que un riesgo
-     * del tanque aquí sumaría 0 y la prueba mediría el cierre en vez de las
-     * peticiones. Lo que afirma no cambia: contar no sale a la red.
-     */
-    conRiesgos({ vibraciones: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }] });
+    conRiesgos({ [MOTOR_03.id]: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }] });
     montar();
 
     expect(screen.getByText("2")).toBeTruthy();
@@ -111,7 +114,14 @@ describe("el badge cuenta lo ya calculado: no añade ni una petición", () => {
 
 describe("cero no se pinta", () => {
   it("sin riesgos activos no hay badge: cero es la ausencia, no un badge con un cero", () => {
-    conRiesgos();
+    conRiesgos({ [MOTOR_03.id]: [] });
+    montar();
+
+    expect(screen.queryByText("0")).toBeNull();
+  });
+
+  it("sin máquinas configuradas tampoco: no hay nada que contar", () => {
+    conRiesgos({});
     montar();
 
     expect(screen.queryByText("0")).toBeNull();
@@ -121,7 +131,7 @@ describe("cero no se pinta", () => {
 describe("cuenta hallazgos, no diagnósticos", () => {
   it("el número es el de riesgos activos, y el texto accesible dice «hallazgos»", () => {
     conRiesgos({
-      vibraciones: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }, { ...RIESGO_VIB, id: "holgura" }],
+      [MOTOR_03.id]: [RIESGO_VIB, { ...RIESGO_VIB, id: "desbalance" }, { ...RIESGO_VIB, id: "holgura" }],
     });
     montar();
 
@@ -134,27 +144,21 @@ describe("cuenta hallazgos, no diagnósticos", () => {
     expect(screen.getAllByTitle(/3 hallazgos sin mirar/i).length).toBeGreaterThan(0);
   });
 
-  /*
-   * ── AHORA SE CUENTA LO CONTRARIO (rama `Vibraciones1.0`) ───────────
-   *
-   * Esto afirmaba que las dos máquinas suman en el mismo contador. Con la
-   * estación de llenado cerrada, lo que hay que defender es justo lo inverso:
-   * que sus riesgos NO suman — porque el badge cuelga del sidebar y contarlos
-   * volvería a abrir su sondeo en todas las pantallas (ver
-   * `llenado-cerrado.test.jsx`).
-   *
-   * Al reabrir, esta comprobación vuelve a ser la de antes.
-   */
-  it("un riesgo de la estación de llenado NO suma: está cerrada", () => {
-    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [] });
-    const { unmount } = montar();
-    expect(screen.queryByText("1")).toBeNull();
-    unmount();
+  it("las máquinas configuradas suman en el mismo contador, y el tanque queda a cero: está cerrado", () => {
+    /*
+     * Dos máquinas con un riesgo cada una → 2. Y `porSistema` dice de cuál es
+     * cada uno, con el tanque a `0` fijo: no es una configurada y su sondeo no
+     * puede volver a abrirse desde el chrome (ver `llenado-cerrado.test.jsx`).
+     * Al reabrir la estación de llenado, esta comprobación vuelve a sumarlo.
+     */
+    conRiesgos({ [MOTOR_03.id]: [RIESGO_VIB], [MOTOR_04.id]: [{ ...RIESGO_VIB, id: "desbalance" }] });
 
-    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [RIESGO_VIB] });
+    const { result } = renderHook(() => useConteoHallazgos());
+    expect(result.current.total).toBe(2);
+    expect(result.current.porSistema).toEqual({ tanque: 0, [MOTOR_03.id]: 1, [MOTOR_04.id]: 1 });
+
     montar();
-    /* Uno, no dos: sólo cuenta el de vibraciones. */
-    expect(screen.getByText("1")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
   });
 });
 
@@ -162,24 +166,26 @@ describe("descartar en la Bandeja apaga el badge", () => {
   it("un riesgo ya descartado no cuenta: las dos pantallas leen la misma clave", () => {
     /*
      * Se marca con `crearVistoPorMi` sobre la MISMA clave que usa la Bandeja y
-     * con el MISMO id que construye `hallazgoDeRiesgo`. Si el badge usara una
-     * clave propia o formara el id a mano, esto seguiría contando 1 — que es
-     * justo el fallo que se quiere atrapar.
+     * con el MISMO id que construye `hallazgoDeRiesgo` — con el id de LA
+     * máquina, no con `vibraciones`. Si el badge usara una clave propia o
+     * formara el id a mano, esto seguiría contando 1 — que es justo el fallo
+     * que se quiere atrapar.
      */
-    crearVistoPorMi("eva:hallazgos").marcar(["riesgo:tanque:derrame"]);
+    crearVistoPorMi("eva:hallazgos").marcar([`riesgo:${MOTOR_03.id}:desalineacion`]);
 
-    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [] });
+    conRiesgos({ [MOTOR_03.id]: [RIESGO_VIB] });
     montar();
 
     expect(screen.queryByText("1")).toBeNull();
   });
 
   it("descartar uno de dos deja el badge en uno, no lo apaga entero", () => {
-    crearVistoPorMi("eva:hallazgos").marcar(["riesgo:tanque:derrame"]);
+    crearVistoPorMi("eva:hallazgos").marcar([`riesgo:${MOTOR_03.id}:desalineacion`]);
 
-    conRiesgos({ tanque: [RIESGO_TANQUE], vibraciones: [RIESGO_VIB] });
+    conRiesgos({ [MOTOR_03.id]: [RIESGO_VIB], [MOTOR_04.id]: [RIESGO_VIB] });
     montar();
 
+    /* El mismo riesgo en OTRA máquina es otro hallazgo: sigue contando. */
     expect(screen.getByText("1")).toBeTruthy();
   });
 });

@@ -35,7 +35,7 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 import { escribirEnCuaderno, leerCuaderno } from "@/lib/api/cuadernoApi.js";
-import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
+import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
 
 const MAX_NOTA = 1000;
 
@@ -44,6 +44,7 @@ export default function CuadernoEva() {
   const { t: traducir } = useTranslation(["maintenance", "common", "errors"]);
   const mensajeDeError = useMensajeDeError();
   const { sistema: nombreSistema } = useDominio();
+  const { enServicioIds } = useMaquina();
 
   const [notas, setNotas] = useState({ cargando: true, error: null, entradas: [] });
   const [recarga, setRecarga] = useState(0);
@@ -139,7 +140,9 @@ export default function CuadernoEva() {
                   por mantenimiento— invitaría a escribir una nota sobre una
                   máquina que nadie está mirando. Las notas que YA existen con
                   ese sistema se siguen leyendo: ocultar no es borrar. */}
-              {SISTEMA_IDS_EN_SERVICIO.map((s) => (
+              {/* Y las CONFIGURADAS con las escritas a mano (Plan 40 F2): la
+                  lista sale del contexto de máquina, que ya las suma. */}
+              {enServicioIds.map((s) => (
                 <option key={s} value={s}>{nombreSistema(s)}</option>
               ))}
             </select>

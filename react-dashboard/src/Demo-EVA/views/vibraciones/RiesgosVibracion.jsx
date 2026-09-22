@@ -219,7 +219,7 @@ function RiesgosVibracion({ onNavigate }) {
       <p style={{ margin: 0, fontSize: 11, color: t.textFaint, lineHeight: 1.6 }}>
         <Enfasis>
           {traducir("machines:vibration.risks.chartsHint", {
-            pantalla: traducir("navigation:routes.eva-vibraciones.nav"),
+            pantalla: traducir("navigation:routes.maq-graficas.nav"),
           })}
         </Enfasis>
       </p>

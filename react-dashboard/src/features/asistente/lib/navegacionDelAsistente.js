@@ -67,11 +67,17 @@ export function destinoDeHerramienta(nombre, argumentos) {
        * cabecera para por qué no se finge más precisión de la que hay.
        */
       if (!sistema) return null;
-      return { ruta: sistema === "tanque" ? "eva-riesgos" : "eva-riesgos-vibracion" };
+      /* El tanque tiene su pantalla escrita a mano; cualquier otra máquina es
+         una configurada y va a la ruta genérica CON su id (Plan 40 F2). */
+      return sistema === "tanque"
+        ? { ruta: "eva-riesgos" }
+        : { ruta: "maq-riesgos", params: { maquina: sistema } };
 
     case "estado_del_sistema":
       if (!sistema) return null;
-      return { ruta: sistema === "tanque" ? "eva-inicio" : "vib-inicio" };
+      return sistema === "tanque"
+        ? { ruta: "eva-inicio" }
+        : { ruta: "maq-inicio", params: { maquina: sistema } };
 
     case "controlar_bomba":
       // No lleva `sistema` en sus argumentos —sólo hay una bomba controlable

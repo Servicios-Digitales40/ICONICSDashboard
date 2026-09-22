@@ -52,7 +52,7 @@ import { fetchHealth } from "@/lib/iconics";
 import { useEsSimulado } from "@/lib/datasource";
 import { useTheme } from "@/theme";
 import { turnoEnCurso } from "@shared/periodo.js";
-import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
+import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
 
 import { LineaDeTiempo } from "../../components/LineaDeTiempo.jsx";
 import { ALARMAS_HISTORIZABLES, leerAlarmas } from "../../data/comunes/alarmas.js";
@@ -76,6 +76,7 @@ export default function TurnoEva() {
   const esSimulado = useEsSimulado();
   /* El nombre de cada máquina en el idioma del tablero, no su id. */
   const { sistema: nombreSistema } = useDominio();
+  const { enServicioIds } = useMaquina();
 
   const [turnos, setTurnos] = useState(null);
   const [recarga, setRecarga] = useState(0);
@@ -364,7 +365,9 @@ export default function TurnoEva() {
               `Vibraciones1.0`) y su carril saldría vacío para siempre, que se
               lee como «no ha pasado nada» y no como «no se está mirando». Ver
               `SISTEMAS_EN_SERVICIO` en `shared/eva/comun/sistemas.js`. */}
-          {SISTEMA_IDS_EN_SERVICIO.map((sistema) => (
+          {/* Y las CONFIGURADAS (Plan 40 F2): la lista sale del contexto de
+              máquina, que suma el registro y las configuradas activas. */}
+          {enServicioIds.map((sistema) => (
             <div
               key={sistema}
               style={{

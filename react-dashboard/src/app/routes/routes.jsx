@@ -97,14 +97,16 @@ import {
 /**
  * Ruta que se muestra al arrancar la app.
  *
- * `vib-inicio` desde la rama `Vibraciones1.0` (17-09-2026). Era `eva-inicio`,
- * la landing del tanque, y con esa máquina cerrada por mantenimiento el
- * arranque caía en una pantalla que ya no está en el menú: navegable pero
- * huérfana, y sondeando una máquina que nadie va a mirar.
+ * `eva-muro` desde el Plan 40 F2 (21-09-2026): todas las máquinas a la vez.
+ * Fue `vib-inicio` —el Inicio de la máquina de vibraciones escrita a mano—
+ * desde la rama `Vibraciones1.0` (17-09-2026), y antes `eva-inicio`, la
+ * landing del tanque; con esa máquina cerrada por mantenimiento el arranque
+ * caía en una pantalla fuera del menú. Las máquinas de vibraciones son ahora
+ * configuradas y cada una tiene su sección; ninguna es «la» de entrada.
  *
- * Para reabrir la estación de llenado, esto vuelve a `eva-inicio`.
+ * Para reabrir la estación de llenado, esto puede volver a `eva-inicio`.
  */
-export const DEFAULT_ROUTE = "vib-inicio";
+export const DEFAULT_ROUTE = "eva-muro";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
 /**
@@ -146,7 +148,11 @@ export const DEFAULT_ROUTE = "vib-inicio";
  */
 export const NAV_GROUPS = {
   "sec-llenado": { icon: <Droplets size={17} />, modulo: "monitoreo" },
-  "sec-vibraciones": { icon: <Waves size={17} />, modulo: "monitoreo" },
+  /* «Planta» (Plan 40 F2): lo que no es de una máquina concreta —alarmas del
+     servidor, bandeja y avisos de todas, casos y RAG—. Hasta el 21-09-2026 se
+     llamaba «sec-vibraciones» y alojaba además la máquina escrita a mano; las
+     máquinas van ahora cada una en su sección `maq:<id>`. */
+  "sec-planta": { icon: <Factory size={17} />, modulo: "monitoreo" },
   "sec-general": { icon: <Boxes size={17} />, modulo: "monitoreo" },
   /*
    * ── PREDICCIÓN NO ES UNA SECCIÓN MÁS: ES OTRO MÓDULO ───────────────
@@ -261,71 +267,10 @@ export const ROUTES = [
    * entre el caudal del tanque y la vibración de aquí uniría dos
    * instalaciones que no se tocan.
    */
-  {
-    id: "vib-inicio",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
-    nav: { icon: <Home size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
-  },
 
-  {
-    // Se llama «Gráficas» —no «Vibraciones»— por el mismo criterio que en la
-    // estación de llenado: la entrada nombra lo que la pantalla ENSEÑA, no la
-    // máquina, que ya la nombra la sección. Aquí no hay curvas todavía porque
-    // de este sistema no se usa el histórico (ver `sistemas.js`): lo que se ve
-    // son las medidas del instante, con su escala y su banda de norma.
-    id: "eva-vibraciones",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
-    nav: { icon: <LayoutDashboard size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
-  },
 
-  {
-    // Todavía sin construir, y es el placeholder con más cuidado de los dos:
-    // esta pantalla ESCRIBIRÁ en el PLC. Un botón que parezca operativo y no
-    // lo sea es peor que no tener pantalla, así que no hay ninguno.
-    //
-    // Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
-    // archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
-    // Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-vibraciones" }`.
-    id: "vib-controles",
-    rol: "operador",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/ControlesVibraciones.jsx")),
-  },
 
-  {
-    // Su propio «Riesgos», separado del de la estación de llenado: aquél
-    // evalúa el tanque —nivel, presión, caudal— y éste un motor con
-    // acelerómetros. Las dos listas juntas serían la invitación a buscar una
-    // relación entre ellas que no existe.
-    //
-    // ── FUERA DEL MENÚ DESDE EL 18-09-2026 (Plan 33 F10) ───────────────
-    //
-    // «Riesgos» y «Hallazgos» contestaban la MISMA pregunta con dos nombres, y
-    // dos entradas de menú que contestan lo mismo se leen como dos cosas
-    // distintas: alguien mira una, no encuentra lo que busca y no sabe que la
-    // otra existe.
-    //
-    // Se unifica en «Hallazgos» (`eva-bandeja`) y no al revés porque aquélla
-    // ya distingue por máquina y es la que el Plan 31 trabajó. Ésta se queda
-    // navegable por id —cerrado no es borrado—: sigue siendo la vista que
-    // pinta las 18 reglas con su evidencia, y el asistente la usa como destino
-    // en `navegacionDelAsistente.js`.
-    //
-    // Restaurar: devolver `nav: { icon: <ShieldAlert size={17} />, group:
-    // "sec-vibraciones", apartado: "diagnostico" }`.
-    id: "eva-riesgos-vibracion",
-    rol: "operador",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
-  },
 
-  {
-    // Estuvo en el sidebar vacía a propósito —el sitio decidido y el contenido
-    // no— hasta el 04-09-2026, cuando el levantamiento de campo dio la
-    // geometría real del tren de rotor. La cabecera de la vista cuenta qué
-    // desbloqueó exactamente, y por qué antes no valía una escena provisional.
-    id: "vib-3d",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
-    nav: { icon: <Box size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
-  },
 
   {
     // Reactivada el 10-09-2026 (Plan 27): dos pestañas, no una. «Historial»
@@ -346,8 +291,29 @@ export const ROUTES = [
     // `activo.alarmas.activas` del sistema en vivo, no `useAlarmCount()`.
     id: "eva-alarmas",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
-    nav: { icon: <Bell size={17} />, group: "sec-vibraciones", apartado: "visualizacion" },
+    nav: { icon: <Bell size={17} />, group: "sec-planta", apartado: "visualizacion" },
   },
+  {
+    /*
+     * ── POR QUÉ ES UNA VISTA NORMAL, NO «SÓLO MURO» ────────────────────
+     *
+     * `?muro=1` es una capa de presentación que le quita el cromo a
+     * CUALQUIER ruta — no hay precedente de una vista que exista sólo para
+     * ese modo, y ésta no rompe el patrón: sirve también fuera de muro, para
+     * ver el resumen de las dos máquinas de un vistazo.
+     *
+     * Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
+     * archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
+     * Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-general" }`.
+     */
+    /* La pantalla de entrada desde el Plan 40 F2: todas las máquinas a la vez.
+       Hasta entonces era una vista sin menú y la entrada era el Inicio de la
+       máquina de vibraciones escrita a mano. */
+    id: "eva-muro",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/MuroPlanta.jsx")),
+    nav: { icon: <Factory size={17} />, group: "sec-planta", apartado: "visualizacion" },
+  },
+
 
   /*
    * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA (Plan 37 F1) ─────────────
@@ -380,6 +346,19 @@ export const ROUTES = [
     id: "maq-3d",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
     porMaquina: { icon: <Box size={17} />, apartado: "visualizacion" },
+  },
+  {
+    /*
+     * Riesgos de la máquina configurada (Plan 40 F2). Sin entrada de menú:
+     * está unificada en Hallazgos (Plan 33 F10), pero sigue siendo el destino
+     * de la Bandeja, de los Avisos y del asistente cuando llama a
+     * `riesgos_activos`. Hasta el 21-09-2026 era `eva-riesgos-vibracion`, de
+     * la máquina escrita a mano.
+     */
+    id: "maq-riesgos",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/vibraciones/RiesgosVibracion.jsx")),
+    porMaquina: { oculta: true },
   },
   /*
    * Diagnóstico y Documentación de una máquina configurada (Plan 38 F2). Son
@@ -482,7 +461,7 @@ export const ROUTES = [
     id: "eva-bandeja",
     rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
-    nav: { icon: <Inbox size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
+    nav: { icon: <Inbox size={17} />, group: "sec-planta", apartado: "diagnostico" },
   },
 
   {
@@ -508,7 +487,7 @@ export const ROUTES = [
     id: "eva-avisos",
     rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
-    nav: { icon: <MessageSquareText size={17} />, group: "sec-vibraciones", apartado: "diagnostico" },
+    nav: { icon: <MessageSquareText size={17} />, group: "sec-planta", apartado: "diagnostico" },
   },
 
   {
@@ -525,22 +504,6 @@ export const ROUTES = [
     nav: { icon: <NotebookPen size={17} />, group: "sec-general" },
   },
 
-  {
-    /*
-     * ── POR QUÉ ES UNA VISTA NORMAL, NO «SÓLO MURO» ────────────────────
-     *
-     * `?muro=1` es una capa de presentación que le quita el cromo a
-     * CUALQUIER ruta — no hay precedente de una vista que exista sólo para
-     * ese modo, y ésta no rompe el patrón: sirve también fuera de muro, para
-     * ver el resumen de las dos máquinas de un vistazo.
-     *
-     * Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
-     * archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
-     * Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-general" }`.
-     */
-    id: "eva-muro",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/MuroPlanta.jsx")),
-  },
 
   {
     /*
@@ -583,14 +546,14 @@ export const ROUTES = [
     id: "rag-casos",
     rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/CasosRag.jsx")),
-    nav: { icon: <NotebookPen size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
+    nav: { icon: <NotebookPen size={17} />, group: "sec-planta", apartado: "documentacion" },
   },
 
   {
     id: "rag-documentacion",
     rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/DocumentacionRag.jsx")),
-    nav: { icon: <FileText size={17} />, group: "sec-vibraciones", apartado: "documentacion" },
+    nav: { icon: <FileText size={17} />, group: "sec-planta", apartado: "documentacion" },
   },
 
   /*

@@ -2,8 +2,17 @@
  * simulador-vibraciones.test.js
  * ------------------------------------------------------------------
  * El simulador del SISTEMA DE VIBRACIONES: que sirva los setenta y tres puntos
- * de la máquina sin red, y —lo que más importa— que **no le enseñe a la
+ * del catálogo sin red, y —lo que más importa— que **no le enseñe a la
  * interfaz una máquina que no existe**.
+ *
+ * ── DÓNDE VIVE LO QUE SE PRUEBA (Plan 40) ──────────────────────────
+ *
+ * La física es `shared/eva/vibraciones/simuladorVibraciones.js`, la misma
+ * para el frontend y para el transporte falso del backend. Hasta el Plan 40
+ * el frontend la envolvía en `data/vibraciones/simuladorVibracion.js`
+ * (`createTransporteVibracion`), que se retiró con la máquina escrita a
+ * mano; el transporte que aquí se monta es el genérico,
+ * `createTransporteSimulado` con ese modelo, que es lo que aquel archivo hacía.
  *
  * ── QUÉ SE PRUEBA AQUÍ Y QUÉ NO ────────────────────────────────────
  *
@@ -26,14 +35,19 @@
  *     se quedara siempre en verde dejaría sin ejercitar la pantalla entera.
  *  6. Se queda dentro de la `escala` del catálogo, que es la que usan el arco y
  *     las barras para su geometría.
+ *  7. La MISMA física por descriptor (`valorVibracionDe`, Plan 40 F0): una
+ *     máquina configurada tiene otros tags pero los mismos roles, y su tipo
+ *     simula traduciendo cada variable a `{tipo, clave, canal}`. Si el
+ *     descriptor y el tag divergieran, una configurada en «Simulado» vibraría
+ *     distinto de lo que la escrita a mano enseñó durante meses.
  */
 import { describe, expect, it } from "vitest";
 
 import {
-  createTransporteVibracion,
   enMarchaVib,
+  valorVibracionDe,
   valorVibracionEn,
-} from "@/Demo-EVA/data/vibraciones/simuladorVibracion.js";
+} from "@shared/eva/vibraciones/simuladorVibraciones.js";
 import {
   CALIDADES,
   CANALES,
@@ -43,6 +57,7 @@ import {
   VARIADOR,
   VIGILANCIAS,
   decodificarVigilancia,
+  parsePunto,
   puntoAlarma,
   puntoBandera,
   puntoCalidad,
@@ -51,9 +66,10 @@ import {
   puntoVariador,
   puntoVigilancia,
   todosLosPuntos,
-} from "@/Demo-EVA/domain/vibraciones.js";
-import { REGLAS, evaluarRiesgosVibracion } from "@/Demo-EVA/domain/riesgosVibracion.js";
-import { SIN_CAOS, isGoodQuality } from "@/lib/iconics";
+} from "@shared/eva/vibraciones/vibraciones.js";
+import { REGLAS, evaluarRiesgosVibracion } from "@shared/eva/vibraciones/riesgosVibracion.js";
+import { TIPO_VIBRACIONES } from "@shared/eva/tipos/vibraciones.js";
+import { SIN_CAOS, createTransporteSimulado, isGoodQuality } from "@/lib/iconics";
 
 /** Reloj fijo, para que ninguna prueba dependa de cuándo se ejecute. */
 const T0 = Date.UTC(2026, 7, 27, 9, 0, 0);
@@ -68,10 +84,11 @@ const EN_PARO = (() => {
   throw new Error("el ciclo no tiene tramo parado");
 })();
 
-/** Transporte sin caos y con el reloj congelado en `ms`. */
-const enT = (ms) => createTransporteVibracion({ chaos: SIN_CAOS, ahora: () => ms, rnd: () => 1 });
+/** Transporte sin caos y con el reloj congelado en `ms`, sobre la física del catálogo. */
+const enT = (ms) =>
+  createTransporteSimulado({ modelo: valorVibracionEn, chaos: SIN_CAOS, ahora: () => ms, rnd: () => 1 });
 
-/** El estado que arma `useVibracion`, pero a partir del modelo y sin React. */
+/** El estado que arma la fuente de la máquina, pero a partir del modelo y sin React. */
 function estadoEn(ms) {
   const canales = {};
   for (const c of CANALES) {
@@ -249,5 +266,73 @@ describe("el simulador respeta el catálogo", () => {
       }
       expect(decodificarVigilancia(valorVibracionEn(puntoSensor(c.id), EN_MARCHA))).not.toBeNull();
     }
+  });
+});
+
+describe("la misma física por descriptor: lo que simula una máquina configurada", () => {
+  it("un descriptor equivale al tag del catálogo del que se deriva", () => {
+    /*
+     * `{tipo, clave, canal}` es lo que `parsePunto` saca de un tag escrito a
+     * mano, y es TODO lo que la física necesita. Se comprueba por las dos
+     * puertas: el descriptor escrito a mano y el que sale de parsear el tag.
+     */
+    const tag = puntoMedida("vRMS", "S1");
+    const escrito = { tipo: "medida", clave: "vRMS", canal: "S1" };
+
+    expect(parsePunto(tag)).toMatchObject(escrito);
+    for (const ms of [EN_MARCHA, EN_PARO, EN_MARCHA + 60_000]) {
+      expect(valorVibracionDe(escrito, ms)).toEqual(valorVibracionEn(tag, ms));
+      expect(valorVibracionDe(parsePunto(tag), ms)).toEqual(valorVibracionEn(tag, ms));
+    }
+  });
+
+  it("los setenta y tres puntos dan lo mismo por tag que por su descriptor", () => {
+    // No sólo el vRMS: si alguna familia (banderas, vigilancias, contadores)
+    // hubiera quedado sólo en el camino del tag, una configurada la perdería.
+    for (const punto of todosLosPuntos()) {
+      expect(valorVibracionDe(parsePunto(punto), EN_MARCHA), punto).toEqual(valorVibracionEn(punto, EN_MARCHA));
+    }
+  });
+
+  it("un descriptor que la física no conoce es `undefined`, no un valor de consuelo", () => {
+    /*
+     * `undefined` es «no sé qué es esto» y el transporte lo deja fuera de la
+     * respuesta. Un número aquí sería inventar la lectura de una variable que
+     * el tipo no sabe simular.
+     */
+    expect(valorVibracionDe(null, EN_MARCHA)).toBeUndefined();
+    expect(valorVibracionDe({}, EN_MARCHA)).toBeUndefined();
+    expect(valorVibracionDe({ tipo: "prensa", clave: "fuerza", canal: null }, EN_MARCHA)).toBeUndefined();
+    expect(valorVibracionDe({ tipo: "medida", clave: "noExiste", canal: "S1" }, EN_MARCHA)).toBeUndefined();
+  });
+
+  it("el descriptor que el TIPO construye para un rol y un apoyo vibra como el catálogo", () => {
+    /*
+     * Es la cadena entera de una configurada en «Simulado»: la variable trae
+     * `rol` y `assetId`, el tipo los traduce con `descriptorDe`, y `simular`
+     * llama a la física. El S3 es el apoyo que más vibra en el modelo, así que
+     * un descriptor que cayera en «un apoyo cualquiera» se notaría.
+     */
+    const descriptor = TIPO_VIBRACIONES.descriptorDe("medida:vRMS", "S3");
+    expect(descriptor).toEqual({ tipo: "medida", clave: "vRMS", canal: "S3" });
+
+    const tag = puntoMedida("vRMS", "S3");
+    for (const ms of [EN_MARCHA, EN_MARCHA + 60_000]) {
+      const esperado = valorVibracionEn(tag, ms);
+      expect(esperado).not.toBeNull();
+      expect(valorVibracionDe(descriptor, ms)).toEqual(esperado);
+      expect(TIPO_VIBRACIONES.simular(descriptor, ms)).toEqual(esperado);
+    }
+    /* Y en paro se apaga igual que el tag: el apagón es del modelo, no del nombre. */
+    expect(TIPO_VIBRACIONES.simular(descriptor, EN_PARO)).toBeNull();
+  });
+
+  it("una medida de apoyo sin apoyo no tiene descriptor: hueco, no un apoyo cualquiera", () => {
+    expect(TIPO_VIBRACIONES.descriptorDe("medida:vRMS")).toBeNull();
+    expect(TIPO_VIBRACIONES.descriptorDe("rol:inventado", "S1")).toBeNull();
+    /* El variador es de la máquina, no de un apoyo: sin apoyo sí se simula. */
+    const velocidad = TIPO_VIBRACIONES.descriptorDe("variador:velocidad");
+    expect(velocidad).toEqual({ tipo: "variador", clave: "velocidad", canal: null });
+    expect(valorVibracionDe(velocidad, EN_MARCHA)).toEqual(valorVibracionEn(puntoVariador("velocidad"), EN_MARCHA));
   });
 });

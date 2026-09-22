@@ -18,7 +18,10 @@
  *     compara contra `ROUTES`, así que una lista escrita a mano la rompería;
  *   · que el atajo abra y cierre;
  *   · que buscar sin acentos encuentre lo acentuado, que es el caso real en
- *     español («vibracion» → «Vibración»);
+ *     español («configuracion» → «Configuración»; era «vibracion» →
+ *     «Vibración» hasta que la máquina escrita a mano salió del registro en
+ *     el Plan 40 F2 — las vistas de vibraciones son ahora de máquina
+ *     configurada y la paleta no las ofrece sueltas);
  *   · y que la paleta NO accione nada: sólo navega.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -96,15 +99,17 @@ describe("los destinos salen del registro, no de una lista escrita a mano", () =
 });
 
 describe("buscar en español, que es el caso real", () => {
-  it("«vibracion» sin tilde encuentra «Vibración»", () => {
+  it("«configuracion» sin tilde encuentra «Configuración»", () => {
     montar();
     pulsarAtajo();
 
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "vibracion" } });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "configuracion" } });
 
     const encontrados = screen.getAllByRole("button");
     expect(encontrados.length).toBeGreaterThan(0);
     expect(encontrados.length).toBeLessThan(ROUTES.length);
+    /* Y lo que encuentra es la acentuada, no una coincidencia casual del id. */
+    expect(encontrados.some((b) => /Configuración/.test(b.textContent))).toBe(true);
   });
 
   it("algo que no existe lo dice, en vez de dejar la lista vacía sin explicación", () => {

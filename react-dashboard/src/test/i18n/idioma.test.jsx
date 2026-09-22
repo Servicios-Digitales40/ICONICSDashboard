@@ -53,7 +53,7 @@ const montarSidebar = () =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <Sidebar page="vib-inicio" onNavigate={() => {}} />
+          <Sidebar page="eva-muro" onNavigate={() => {}} />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>
@@ -67,22 +67,29 @@ const cambiarA = async (idioma) => {
 
 describe("la aplicación habla los dos idiomas", () => {
   /*
-   * ── SE COMPRUEBA CON VIBRACIONES, NO CON LLENADO ───────────────────
+   * ── SE COMPRUEBA CON «PLANTA», NO CON LLENADO NI VIBRACIONES ───────
    *
    * Rama `Vibraciones1.0`: la sección «Estación de llenado» ya no sale del
-   * sidebar, así que buscarla aquí mediría el cierre en vez del idioma.
+   * sidebar, así que buscarla aquí mediría el cierre en vez del idioma. Y
+   * desde el Plan 40 F2 tampoco sale «Estación de vibraciones»: la máquina
+   * escrita a mano se retiró y la sección se llama «Planta» — las máquinas de
+   * vibraciones son configuradas y su rótulo es su NOMBRE, que no se traduce.
    *
    * La afirmación NO cambia —el tablero rotula su navegación en los dos
    * idiomas— sólo la sección con la que se comprueba. Por eso se ADAPTA y no
    * se omite: es una de las pruebas que hay que conservar viva, porque un
-   * rótulo sin traducir se ve igual de mal con una máquina que con dos.
+   * rótulo sin traducir se ve igual de mal con una máquina que con veinte.
+   *
+   * «Predicción»/«Prediction» acompaña porque «General» se escribe igual en
+   * los dos idiomas y solo no distingue nada.
    *
    * Al reabrir, vuelven las dos líneas de «Estación de llenado».
    */
   it("en español rotula la navegación en español", async () => {
     montarSidebar();
 
-    expect(await screen.findByText("Estación de vibraciones")).toBeTruthy();
+    expect((await screen.findAllByText("Planta")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Predicción").length).toBeGreaterThan(0);
     expect(screen.getByText("General")).toBeTruthy();
   });
 
@@ -90,10 +97,12 @@ describe("la aplicación habla los dos idiomas", () => {
     await cambiarA("en");
     montarSidebar();
 
-    expect(await screen.findByText("Vibration Station")).toBeTruthy();
+    expect((await screen.findAllByText("Plant")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Prediction").length).toBeGreaterThan(0);
     // Y ya no queda nada del español: si saliera, sería una clave sin traducir
     // cayendo al `fallbackLng`.
-    expect(screen.queryByText("Estación de vibraciones")).toBeNull();
+    expect(screen.queryAllByText("Planta")).toEqual([]);
+    expect(screen.queryAllByText("Predicción")).toEqual([]);
   });
 
   it("el vocabulario del DOMINIO también se traduce, sin tocar `shared/`", async () => {
@@ -116,14 +125,15 @@ describe("el cambio es en caliente, sin recargar", () => {
   it("la pantalla ya montada se repinta al cambiar de idioma", async () => {
     // Es la afirmación de §3: cambiar el idioma NO puede exigir un F5. Se monta
     // en español, se cambia, y se comprueba el MISMO árbol sin volver a montar.
-    // Con vibraciones, no con llenado — ver el bloque del primer `describe`.
+    // Con «Planta», no con llenado ni vibraciones — ver el bloque del primer
+    // `describe`.
     montarSidebar();
-    expect(await screen.findByText("Estación de vibraciones")).toBeTruthy();
+    expect((await screen.findAllByText("Planta")).length).toBeGreaterThan(0);
 
     await cambiarA("en");
 
-    expect(screen.getByText("Vibration Station")).toBeTruthy();
-    expect(screen.queryByText("Estación de vibraciones")).toBeNull();
+    expect(screen.getAllByText("Plant").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Planta")).toEqual([]);
   });
 });
 

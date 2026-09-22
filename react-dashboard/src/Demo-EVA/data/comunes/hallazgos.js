@@ -51,8 +51,7 @@ import { hallazgoDeRiesgo } from "@shared/eva/comun/hallazgos.js";
    de `useConteoHallazgos`:
    import { evaluarRiesgos } from "../../domain/riesgos.js";
    import { useSistemaAgua } from "./hooks.js"; */
-import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
-import { useVibracion } from "../vibraciones/vibracion.js";
+import { useMaquinasEnVivo } from "./maquinasEnVivo.js";
 
 /**
  * La misma clave que `BandejaEva`, a propósito.
@@ -71,7 +70,8 @@ const vistoPorMi = crearVistoPorMi("eva:hallazgos");
  * que no comparten estado. Sin esto, descartar un hallazgo dejaría el badge
  * marcando hasta la siguiente recarga.
  *
- * @returns {{ total: number, porSistema: { tanque: number, vibraciones: number } }}
+ * @returns {{ total: number, porSistema: Record<string, number> }}  `porSistema`
+ *   lleva una entrada por máquina configurada activa, más `tanque` (cerrado, 0).
  */
 export function useConteoHallazgos() {
   /*
@@ -93,14 +93,21 @@ export function useConteoHallazgos() {
    * Para reabrir: descomentar `useSistemaAgua` y su `evaluarRiesgos`, y sumar
    * `tanque` en el `useMemo` de abajo.
    */
-  const { canales, variador, alarmas } = useVibracion();
+  /*
+   * ── POR CONFIGURADA ACTIVA (Plan 40 F2) ────────────────────────────
+   *
+   * Hasta el 21-09-2026 contaba la máquina de vibraciones escrita a mano con
+   * `useVibracion()`, y la razón para no contar «por máquina» era que un hook
+   * de chrome que cambiara con la navegación abriría el motor de cada máquina
+   * al pasar por su sección. `useMaquinasEnVivo()` no cambia con la
+   * navegación: se suscribe una vez a la fuente de cada configurada activa, y
+   * las fuentes tienen conteo de referencias —la sección abierta comparte el
+   * motor—. Sigue sin salir a la red por su cuenta: cuenta lo que las fuentes
+   * ya traen.
+   */
+  const maquinas = useMaquinasEnVivo();
 
   const descartados = useSyncExternalStore(suscribirseADescartes, leerDescartes, leerDescartes);
-
-  const { activos: activosVibracion } = useMemo(
-    () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
-    [canales, variador, alarmas]
-  );
 
   return useMemo(() => {
     /*
@@ -111,7 +118,13 @@ export function useConteoHallazgos() {
     const pendientes = (sistema, activos) =>
       activos.filter((r) => !descartados.has(hallazgoDeRiesgo(sistema, r).id)).length;
 
-    const vibraciones = pendientes("vibraciones", activosVibracion);
+    const porSistema = { tanque: 0 };
+    let total = 0;
+    for (const { maquina, riesgos } of maquinas) {
+      const n = pendientes(maquina.id, riesgos.activos);
+      porSistema[maquina.id] = n;
+      total += n;
+    }
 
     /*
      * `porSistema` conserva `tanque: 0` en vez de quitar la clave: quien lea
@@ -119,8 +132,8 @@ export function useConteoHallazgos() {
      * «esta versión no la cuenta». Con la estación cerrada es lo primero por
      * construcción, y decirlo explícitamente es lo que pide §2.4.
      */
-    return { total: vibraciones, porSistema: { tanque: 0, vibraciones } };
-  }, [activosVibracion, descartados]);
+    return { total, porSistema };
+  }, [maquinas, descartados]);
 }
 
 /*

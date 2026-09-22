@@ -25,6 +25,19 @@
  * que se escribió, y esta suite lo certificaba sin darse cuenta. Se descubrió
  * al construir F10, que necesita el mismo dato — ver la cabecera de
  * `peorZonaDe()` en `shared/eva/vibraciones/vibraciones.js`.
+ *
+ * ── VIBRACIONES ES UNA MÁQUINA CONFIGURADA (Plan 40 F2, 21-09-2026) ─
+ *
+ * La barra de vibraciones salía por sección (`sec-vibraciones`, la de la
+ * máquina escrita a mano). Esa máquina se retiró: la barra sale ahora cuando
+ * la máquina en contexto —`useMaquina().configurada`— es de tipo
+ * `vibraciones`, sea cual sea su id, y lee su dominio con
+ * `useDominioVibracion()`. El tanque sigue saliendo por sección
+ * (`sec-llenado`), sin cambios.
+ *
+ * Por eso aquí se mockean `useMaquina` y `useDominioVibracion` en vez de
+ * `useVibracion`, que ya no existe. La afirmación es la misma: cada máquina
+ * enseña lo suyo y sólo lo suyo.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,9 +45,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ThemeProvider } from "@/theme";
 import { ContextoDeMaquina } from "@/app/layout/ContextoDeMaquina.jsx";
 
-const { useSistemaAgua, useVibracion } = vi.hoisted(() => ({
+const { useSistemaAgua, useDominioVibracion, useMaquina } = vi.hoisted(() => ({
   useSistemaAgua: vi.fn(),
-  useVibracion: vi.fn(),
+  useDominioVibracion: vi.fn(),
+  useMaquina: vi.fn(),
 }));
 
 vi.mock("@/Demo-EVA/data/comunes/hooks.js", async (importOriginal) => ({
@@ -43,8 +57,25 @@ vi.mock("@/Demo-EVA/data/comunes/hooks.js", async (importOriginal) => ({
 }));
 vi.mock("@/Demo-EVA/data/vibraciones/vibracion.js", async (importOriginal) => ({
   ...(await importOriginal()),
-  useVibracion,
+  useDominioVibracion,
 }));
+vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", async (importOriginal) => ({
+  ...(await importOriginal()),
+  useMaquina,
+}));
+
+const CONFIGURADA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones", activa: true };
+
+/** Lo que `useMaquina()` devuelve en una pantalla de esa máquina, o fuera de toda máquina. */
+const enMaquina = (configurada) =>
+  useMaquina.mockReturnValue({
+    id: configurada?.id ?? null,
+    configurada,
+    registro: null,
+    enServicio: Boolean(configurada),
+    cerrada: null,
+    enServicioIds: configurada ? [configurada.id] : [],
+  });
 /* Hay fuente montada: lo contrario tiene su propia prueba abajo. */
 vi.mock("@/Demo-EVA/data/comunes/EvaProvider.jsx", async (importOriginal) => ({
   ...(await importOriginal()),
@@ -64,12 +95,29 @@ const conBombaEncendida = () =>
     json: async () => ({ ok: true, payload: { value: true, quality: 0 } }),
   })));
 
+/*
+ * `seccion` es lo que el Topbar pasa: `SECCION_DE_PAGINA[page]`. Las rutas de
+ * máquina configurada no traen `nav`, así que en ellas es `null` y lo que
+ * decide es la máquina en contexto.
+ */
 const montar = (seccion) =>
   render(
     <ThemeProvider>
       <ContextoDeMaquina seccion={seccion} />
     </ThemeProvider>
   );
+
+/** Una pantalla de la máquina de vibraciones configurada. */
+const montarEnVibraciones = () => {
+  enMaquina(CONFIGURADA);
+  return montar(null);
+};
+
+/** Una pantalla del tanque o general: sin máquina configurada en contexto. */
+const montarSinMaquina = (seccion) => {
+  enMaquina(null);
+  return montar(seccion);
+};
 
 const tanque = (extra = {}) =>
   useSistemaAgua.mockReturnValue({
@@ -83,14 +131,17 @@ const tanque = (extra = {}) =>
  * no produce zona — es el mismo mecanismo real que corrigió el bug de F4.
  */
 const vibracion = (extra = {}) =>
-  useVibracion.mockReturnValue({
-    canales: {}, variador: { velocidad: 900 }, alarmas: {}, puntosSinDato: [], ...extra,
+  useDominioVibracion.mockReturnValue({
+    canales: {}, variador: { velocidad: 900 }, alarmas: {}, puntosSinDato: [],
+    loading: false, error: null, lastUpdated: null, canalesMeta: [],
+    maquina: { id: CONFIGURADA.id, nombre: CONFIGURADA.nombre, configurada: true, area: null },
+    ...extra,
   });
 
 describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
   it("en vibraciones NO aparece el estado de la bomba del tanque", async () => {
     /*
-     * El cruce que la separación por secciones existe para impedir. La
+     * El cruce que la separación por máquina existe para impedir. La
      * regresión es silenciosa: el indicador funciona y el dato es real, sólo
      * que es de la otra instalación.
      */
@@ -99,7 +150,7 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
     // vRMS = 1.0 mm/s cae en zona B (0,71–1,8) con la norma aplicable.
     vibracion({ canales: { S1: { vRMS: 1.0 } } });
 
-    montar("sec-vibraciones");
+    montarEnVibraciones();
 
     await waitFor(() => expect(screen.getByText(/Zona B/)).toBeTruthy());
     expect(screen.queryByText(/Encendida|Apagada/i)).toBeNull();
@@ -110,7 +161,7 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
     tanque();
     vibracion();
 
-    montar("sec-llenado");
+    montarSinMaquina("sec-llenado");
 
     await waitFor(() => expect(screen.getByText(/Encendida/i)).toBeTruthy());
   });
@@ -121,7 +172,7 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
     // S1 zona A (0,3), S2 zona D (5,0 > 4,5 de alarma), S3 zona B (1,2).
     vibracion({ canales: { S1: { vRMS: 0.3 }, S2: { vRMS: 5.0 }, S3: { vRMS: 1.2 } } });
 
-    montar("sec-vibraciones");
+    montarEnVibraciones();
     expect(screen.getByText(/Zona D/)).toBeTruthy();
   });
 
@@ -135,7 +186,7 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
     tanque();
     vibracion({ canales: { S1: { vRMS: 1.0 } }, variador: { velocidad: 100 } });
 
-    montar("sec-vibraciones");
+    montarEnVibraciones();
     expect(screen.queryByText(/Zona/)).toBeNull();
   });
 
@@ -145,7 +196,22 @@ describe("cada máquina enseña lo suyo, y sólo lo suyo", () => {
     tanque();
     vibracion();
 
-    const { container } = montar("sec-general");
+    const { container } = montarSinMaquina("sec-general");
+    expect(container.textContent).toBe("");
+  });
+
+  it("una máquina configurada de OTRO tipo no hereda la barra de vibraciones", () => {
+    /*
+     * La condición es el TIPO de la máquina, no «hay una configurada». Una de
+     * otro tipo no tiene zonas ISO que enseñar, y pintarle la barra de
+     * vibraciones sería el mismo cruce que el de la bomba, al revés.
+     */
+    conBombaEncendida();
+    tanque();
+    vibracion({ canales: { S1: { vRMS: 5.0 } } });
+    enMaquina({ id: "otra-01", nombre: "Otra", tipo: "compresor", activa: true });
+
+    const { container } = montar(null);
     expect(container.textContent).toBe("");
   });
 });
@@ -156,7 +222,7 @@ describe("una máquina muda se ve distinta de una máquina tranquila", () => {
     tanque({ sinLectura: ["a", "b", "c"], puntosPedidos: 8 });
     vibracion();
 
-    montar("sec-llenado");
+    montarSinMaquina("sec-llenado");
     expect(screen.getByText(/3 de 8 sin dato/)).toBeTruthy();
   });
 
@@ -166,7 +232,7 @@ describe("una máquina muda se ve distinta de una máquina tranquila", () => {
     tanque();
     vibracion({ puntosSinDato: ["x", "y", "z"] });
 
-    montar("sec-vibraciones");
+    montarEnVibraciones();
     expect(screen.getByText(/3 sin dato/)).toBeTruthy();
     expect(screen.queryByText(/de 0/)).toBeNull();
   });
@@ -176,7 +242,7 @@ describe("una máquina muda se ve distinta de una máquina tranquila", () => {
     tanque({ sinLectura: [], puntosPedidos: 8 });
     vibracion();
 
-    montar("sec-llenado");
+    montarSinMaquina("sec-llenado");
     expect(screen.queryByText(/sin dato/)).toBeNull();
   });
 });

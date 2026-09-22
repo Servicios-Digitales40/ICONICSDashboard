@@ -541,9 +541,10 @@ export const SISTEMAS = [
      * vocabulario de vibraciones —«lado acople» y «rodamiento» deformados—,
      * que es justo lo que ese campo existe para impedir.
      */
-    rutas: [
-      "vib-inicio", "eva-vibraciones", "vib-controles", "eva-riesgos-vibracion", "vib-3d",
-    ],
+    /* Sin rutas desde el Plan 40 F2: la sección escrita a mano salió del menú y
+       las vistas de vibraciones son las de cada máquina CONFIGURADA
+       (`maq-*`, con `?maquina=`). Esta entrada entera se retira en F3. */
+    rutas: [],
     /*
      * Eran una sola —`estado_de_vibraciones`— porque cada herramienta estaba
      * escrita contra la forma de dominio del tanque. Desde que hay una forma

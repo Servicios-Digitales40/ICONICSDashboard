@@ -173,13 +173,30 @@ describe("useMaquina() con una máquina configurada", () => {
     expect(screen.getByText("configurada:null")).toBeTruthy();
   });
 
+  /*
+   * Desde el Plan 40 F2 la única escrita a mano con rutas es el TANQUE (la de
+   * vibraciones se retira); es el que hace de máquina del registro aquí. Se
+   * comprueba por las dos vías: su ruta, y su id pegado en `?maquina=`.
+   */
   it("la máquina escrita a mano sigue siendo la del registro, aunque exista una configurada homónima", async () => {
-    listarMaquinas.mockResolvedValue({ ok: true, maquinas: [configurada("vibraciones")] });
+    listarMaquinas.mockResolvedValue({ ok: true, maquinas: [configurada("tanque")] });
 
-    montar("vib-inicio", {});
+    montar("eva-inicio", {});
 
     await waitFor(() => expect(listarMaquinas).toHaveBeenCalled());
-    expect(screen.getByText("registro:vibraciones")).toBeTruthy();
+    expect(screen.getByText("registro:tanque")).toBeTruthy();
+    expect(screen.getByText("configurada:null")).toBeTruthy();
+    /* El nombre es el del registro, no «Motor tanque» de la configurada. */
+    expect(screen.getByText("nombre:Tanque y grupo de bombeo")).toBeTruthy();
+  });
+
+  it("ni por `?maquina=` una configurada homónima sustituye a la del registro", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, maquinas: [configurada("tanque")] });
+
+    montar("maq-inicio", { maquina: "tanque" });
+
+    await waitFor(() => expect(listarMaquinas).toHaveBeenCalled());
+    expect(screen.getByText("registro:tanque")).toBeTruthy();
     expect(screen.getByText("configurada:null")).toBeTruthy();
   });
 });

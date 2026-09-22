@@ -2,7 +2,7 @@
 /**
  * hallazgos-maquina-configurada.test.jsx
  * ------------------------------------------------------------------
- * Hallazgos y Avisos con una máquina CONFIGURADA. Plan 38 F2.
+ * Hallazgos y Avisos con una máquina CONFIGURADA delante. Plan 38 F2.
  *
  * ── QUÉ DEFIENDE ───────────────────────────────────────────────────
  *
@@ -10,8 +10,28 @@
  *     `vibraciones`: es lo que el backend registra desde el Plan 38 F1 y lo
  *     que sus rutas ahora aceptan.
  *  2. **Navegar desde un hallazgo lleva el parámetro de máquina**: la vista de
- *     Riesgos es genérica y sin él hablaría de la escrita a mano.
+ *     Riesgos es genérica (`maq-riesgos`) y sin él no hablaría de ninguna.
  *  3. **Los avisos se narran por la máquina de la pantalla.**
+ *
+ * ── LA MÁQUINA VIENE DEL CONTEXTO, NO DE LA PLANTA ─────────────────
+ *
+ * Es la ruta `maq-hallazgos` / `maq-avisos` con `?maquina=<id>`: la vista lee
+ * la suya por `useDominioVibracion()` y NO agrega las demás. Por eso aquí
+ * `useMaquinasEnVivo()` se finge vacío: si la vista lo mirara con una máquina
+ * delante, mezclaría la pantalla de una máquina con las de todas (Plan 40 F2).
+ *
+ * ── LA NARRACIÓN, CON EL HOOK DE PLANTA REAL, NO ARRANCA ───────────
+ *
+ * Con el `useMaquinasEnVivo` REAL, «narra los riesgos de LA máquina» fallaba:
+ * `obtenerDiagnosticoNarrado` no se llamaba nunca aunque la lista se pintara.
+ * `useAvisosNarrados` saca los pendientes de DENTRO del actualizador de
+ * `setAvisos`, y eso sólo funciona si React lo ejecuta en el acto; basta un
+ * `setState` anterior en el mismo efecto de montaje —`setEstados({})` de
+ * `useMaquinasEnVivo`, o la primera instantánea de la fuente en
+ * `useDominioVibracion`— para que lo difiera, `pendientes` quede vacío y no
+ * se narre nada. Está reportado como defecto de `AvisosEva.jsx` en el Plan 40
+ * F2; esta prueba lo deja fuera fingiendo el hook de planta, que es lo que
+ * de todos modos corresponde a esta pantalla.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +40,9 @@ let dominio = null;
 vi.mock("@/Demo-EVA/data/vibraciones/vibracion.js", async (importOriginal) => ({
   ...(await importOriginal()),
   useDominioVibracion: () => dominio,
+}));
+vi.mock("@/Demo-EVA/data/comunes/maquinasEnVivo.js", () => ({
+  useMaquinasEnVivo: () => [],
 }));
 
 const obtenerDiagnostico = vi.fn(async () => null);
@@ -74,13 +97,11 @@ describe("Hallazgos con una máquina configurada", () => {
     );
     expect(obtenerDiagnostico).not.toHaveBeenCalledWith(expect.objectContaining({ sistema: "vibraciones" }));
 
-    /* El primer botón de la primera tarjeta es «ir a mirarlo». */
+    /* El primer botón de la primera tarjeta es «ir a mirarlo»: la vista de
+       Riesgos genérica, con la máquina en el parámetro. */
     const botones = await screen.findAllByRole("button");
     fireEvent.click(botones[0]);
-    expect(onNavigate).toHaveBeenCalledWith(
-      expect.stringMatching(/eva-riesgos-vibracion|cierre-diagnostico/),
-      expect.objectContaining({ maquina: "vib-motor-03" }),
-    );
+    expect(onNavigate).toHaveBeenCalledWith("maq-riesgos", { maquina: "vib-motor-03" });
   });
 });
 

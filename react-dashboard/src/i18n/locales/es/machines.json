@@ -45,8 +45,7 @@
     }
   },
   "systems": {
-    "tanque": "Sistema de agua industrial",
-    "vibraciones": "Sistema de vibraciones"
+    "tanque": "Sistema de agua industrial"
   },
   "plant": {
     "loading": "Leyendo el sistema de agua…",

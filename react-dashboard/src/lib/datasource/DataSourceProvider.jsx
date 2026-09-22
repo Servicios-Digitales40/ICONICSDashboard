@@ -165,6 +165,19 @@ export function useDataSource() {
 }
 
 /**
+ * La CLASE de transporte, o la real si no hay proveedor (Plan 40 F2).
+ *
+ * Para el chrome —el badge del sidebar, el muro— que se monta también sin
+ * proveedor (en pruebas, o en una pantalla suelta): lanzar ahí convertiría el
+ * Sidebar en algo que no se puede montar solo. «No lo sé» cae del lado real,
+ * que es el que no inventa nada. Una vista de máquina sigue usando
+ * `useDataSource()`, que exige el proveedor a propósito.
+ */
+export function useTransporteActual() {
+  return useContext(Ctx)?.transporte ?? TRANSPORTES.REAL;
+}
+
+/**
  * ¿Lo que se ve NO es el servidor real? — para HOJAS que pueden montarse sin
  * proveedor (Plan 25 F0).
  *

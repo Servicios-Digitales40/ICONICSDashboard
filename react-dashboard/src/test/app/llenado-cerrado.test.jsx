@@ -59,10 +59,16 @@ describe("la estación de llenado no se ofrece", () => {
      * Era `eva-inicio`, la landing del tanque. Con la máquina cerrada eso
      * dejaba el arranque en una vista fuera del menú: navegable pero huérfana,
      * y sondeando una máquina que nadie iba a mirar.
+     *
+     * Fue `vib-inicio` hasta el Plan 40 F2 (21-09-2026): la máquina de
+     * vibraciones escrita a mano salió del registro de rutas, y las de
+     * vibraciones son ahora configuradas, cada una en su sección. Ninguna es
+     * «la» de entrada, así que el arranque es el muro de planta, en «Planta».
      */
-    expect(DEFAULT_ROUTE).toBe("vib-inicio");
+    expect(DEFAULT_ROUTE).toBe("eva-muro");
+    expect(DEL_TANQUE).not.toContain(DEFAULT_ROUTE);
     const arranque = ROUTES.find((r) => r.id === DEFAULT_ROUTE);
-    expect(arranque?.nav?.group).toBe("sec-vibraciones");
+    expect(arranque?.nav?.group).toBe("sec-planta");
   });
 });
 
@@ -100,10 +106,12 @@ describe("el chrome ya no pide el dato del tanque", () => {
     }));
 
     /*
-     * `useVibracion` sí necesita el origen de datos —LANZA fuera de su
-     * proveedor, a propósito— así que se monta con él. El badge de hallazgos
-     * cuenta vibraciones, y eso se queda: lo que esta prueba vigila es que NO
-     * se cuente además el tanque.
+     * El badge de hallazgos cuenta las máquinas CONFIGURADAS (Plan 40 F2,
+     * `useMaquinasEnVivo`), que leen el transporte con el hook tolerante
+     * `useTransporteActual` — sin proveedor cae al real y no abre nada porque
+     * aquí no hay ninguna configurada. Se deja `useDataSource` declarado por si
+     * algo del chrome vuelve a exigir el proveedor: lo que esta prueba vigila
+     * es que NO se cuente el tanque, no cómo se cuenta lo demás.
      */
     vi.doMock("@/lib/datasource", async (original) => ({
       ...(await original()),
@@ -115,7 +123,7 @@ describe("el chrome ya no pide el dato del tanque", () => {
 
     render(
       <ThemeProvider>
-        <Sidebar page="vib-inicio" onNavigate={() => {}} />
+        <Sidebar page="eva-muro" onNavigate={() => {}} />
       </ThemeProvider>
     );
 

@@ -13,8 +13,11 @@
  *     tarjeta de Gráficas lleva a `maq-graficas?maquina=…`, y Riesgos —que no
  *     existe para una configurada— no se ofrece.
  *  3. **El contexto del asistente declara la máquina real**, no `vibraciones`.
- *  4. **Con la máquina escrita a mano las vistas siguen igual**: `useVibracion`
- *     y `useDominioVibracion` devuelven lo mismo fuera de una máquina configurada.
+ *  4. **Sólo queda un hook de lectura**: `useDominioVibracion`. `useVibracion`
+ *     —la máquina de vibraciones escrita a mano, montada en el chrome— se
+ *     retiró en el Plan 40 F2, y una vista que lo importara tendría que caer
+ *     en una máquina que ya no existe. Hasta esa fase este punto afirmaba lo
+ *     contrario: que los dos hooks devolvían lo mismo fuera de una configurada.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -107,10 +110,12 @@ describe("Inicio con una máquina configurada", () => {
   });
 });
 
-describe("con la máquina escrita a mano nada cambia", () => {
-  it("useDominioVibracion fuera de una máquina configurada es la fuente de siempre, con sus tres apoyos", async () => {
+describe("la máquina escrita a mano ya no tiene hook", () => {
+  it("el módulo exporta useDominioVibracion y NO useVibracion (Plan 40 F2)", async () => {
     const real = await vi.importActual("@/Demo-EVA/data/vibraciones/vibracion.js");
     expect(typeof real.useDominioVibracion).toBe("function");
-    expect(typeof real.useVibracion).toBe("function");
+    /* Si esto vuelve a ser una función, alguien ha revivido la escrita a mano
+       fuera del registro de configuradas: es lo que el Plan 40 retira. */
+    expect(real.useVibracion).toBeUndefined();
   });
 });

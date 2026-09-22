@@ -1,6 +1,6 @@
 # PLAN 40 — Retirar la máquina de vibraciones escrita a mano
 
-**Estado:** F0 completada · F1–F5 por completar
+**Estado:** F0 y F2 completadas · F1+F3 (un solo commit), F4 y F5 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -170,6 +170,81 @@ configurada o se retiran con la sección, y cada retirada se anota.
 **Criterios.** La sección `Nuevo-Modor` tiene todo lo que tenía la escrita a
 mano; el badge cuenta sus hallazgos; en SIMULADO pinta valores; la suite en
 verde con los cambios justificados.
+
+#### Lo que de verdad pasó (F2)
+
+**El orden cambió: F2 antes que F1.** La F1 sola dejaba la puerta en rojo:
+la entrada escrita a mano no tiene `tipo`, y sin el `case 'vibraciones'` por
+id dejaba de evaluar reglas y de narrar en inglés hasta que se retirara en
+F3. Así que F1 y F3 van en el mismo commit, y el frontend se hizo primero,
+con la entrada viva, para reescribir sus pruebas con una red debajo.
+
+**Lo que se retiró del frontend**: las cinco rutas de la escrita a mano
+(`vib-inicio`, `eva-vibraciones`, `vib-controles`, `eva-riesgos-vibracion`,
+`vib-3d`), `useVibracion()`, `vibracionSource.js`, el simulador de vibraciones
+del frontend y `ControlesVibraciones.jsx` (un placeholder sin botones: una
+configurada declara sus variables de sólo lectura). La sección
+`sec-vibraciones` alojaba además cinco rutas generales —alarmas, bandeja,
+avisos, casos y RAG—, así que no desaparece: se llama `sec-planta` («Planta»)
+y gana el muro, que pasa a ser la ruta de entrada (`DEFAULT_ROUTE = eva-muro`:
+todas las máquinas a la vez, ninguna es «la» de entrada).
+
+**Lo que se añadió para no perder función**: `useMaquinasEnVivo()` —una
+suscripción por configurada activa, con conteo de referencias— alimenta el
+badge del sidebar, el muro (un panel por máquina) y la bandeja y los avisos
+cuando se abren sin máquina delante, que antes eran «la escrita a mano» y
+ahora son todas. `maq-riesgos` sustituye a `eva-riesgos-vibracion` como
+destino oculto de la bandeja, los avisos y el asistente (`porMaquina.oculta`,
+que `buildNav` respeta). La pastilla del topbar se elige por la máquina de la
+pantalla y su tipo, no por sección. El transporte SIMULADO de una configurada
+simula con la física del tipo (F0) en vez de negarse. Y una tolerancia
+nueva, `useTransporteActual()`: el chrome se monta también sin proveedor de
+origen —en pruebas, en una pantalla suelta— y lanzar ahí convertía el sidebar
+en algo que no se puede montar solo; «no lo sé» cae del lado real.
+
+**Dos `id === "vibraciones"` que eran defectos latentes**: `useEvidencia`
+elegía la prosa por id de máquina —una configurada del tipo caía en la del
+tanque— y ahora lo hace por tipo desde el provider; `riesgoVibracion.jsx`
+llevaba fijo el id en los casos previos y en el cierre de diagnóstico, y ahora
+toma la máquina de la pantalla. Son los gemelos en el frontend de los que el
+backend ya había arreglado (Plan 38 F1, 39 F1).
+
+**Las pruebas**: 24 archivos rotos tras el cambio, 66 casos. La mayor parte
+por un mismo motivo, el proveedor de origen, que resolvió
+`useTransporteActual`. El resto se repartió en tres agentes por área, con la
+regla de reescribir sobre una configurada y borrar sólo lo que perdió sujeto
+(la comparación «con la escrita a mano nada cambia», el panel fijo del muro,
+la ruta de la escrita a mano). Los tres se cortaron a media tarea por el
+límite de sesión y se retomaron. Lo que cada uno reescribió y lo que
+encontró va en el commit.
+
+**Cuatro defectos que las pruebas reescritas destaparon, y se arreglaron
+aquí:**
+
+- `AvisosEva` **no narraba nunca** con una máquina configurada delante: la
+  reconciliación se hacía dentro del actualizador de estado y sacaba los
+  pendientes por un canal lateral, lo que sólo funciona si React ejecuta el
+  actualizador en el acto; con otra actualización pendiente en el mismo
+  montaje —la de `useDominioVibracion` o `useMaquinasEnVivo`— quedaba vacío.
+  Lo cazó una prueba con el hook real, no con el doble. Se reconcilia fuera,
+  sobre la lista vigente por referencia.
+- «Ver el diagnóstico» en Avisos navegaba sin `maquina`, y Cierre de
+  diagnóstico no abría la fuente de la configurada.
+- `CasosRag`, `CuadernoEva` y `TurnoEva` filtraban o listaban por
+  `SISTEMA_IDS_EN_SERVICIO`, el registro escrito a mano: al retirar la entrada
+  en F3, los casos de una configurada habrían desaparecido de la vista de
+  planta. Leen ahora `enServicioIds` del contexto de máquina, que suma las
+  configuradas.
+- Dos bucles de render por identidad de array: `useMaquinasEnVivo` se
+  resuscribía con cada array nuevo de máquinas, y `CasosRag` recargaba con
+  cada array nuevo de ids. Con el provider real no pasa (memoiza), con un
+  doble que recompone sí, y se vio como un worker de vitest sin memoria a los
+  4 GB. Las dos dependencias son ahora por contenido.
+
+**Lo que el frontend NO tiene para una configurada y sí tenía la escrita a
+mano**, que se ve ahora en pantalla: la sensibilidad de cada sensor y el
+rodamiento de cada apoyo salen como hueco declarado; el tren mecánico del 3D
+es el del tipo, no de la máquina. Plan 36, segunda vuelta.
 
 ### F3 — Retirar la entrada; guiones y fixture
 

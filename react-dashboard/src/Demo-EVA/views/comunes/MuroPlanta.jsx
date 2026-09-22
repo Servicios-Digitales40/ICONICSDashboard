@@ -53,12 +53,10 @@ import { useAhora } from "../../lib/useAhora.js";
 import { FRESCURA, frescuraDe } from "../../data/comunes/estadoDelDato.js";
 import { fmtAntiguedad } from "@/lib/format.js";
 import { useSistemaAgua } from "../../data/comunes/hooks.js";
-import { useVibracion } from "../../data/vibraciones/vibracion.js";
+import { useMaquinasEnVivo } from "../../data/comunes/maquinasEnVivo.js";
 import { useProsa } from "@/i18n/useProsa.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { evaluarRiesgos } from "../../domain/riesgos.js";
-import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
-import { peorZonaDe } from "@shared/eva/vibraciones/vibraciones.js";
 
 const SEVERIDAD_TOKEN = { critico: "coral", atencion: "amber", informativo: "accent" };
 
@@ -66,6 +64,8 @@ export default function MuroPlanta() {
   const { theme: t } = useTheme();
   const { t: traducir } = useTranslation(["maintenance", "machines", "common"]);
   const { sistema: nombreSistema } = useDominio();
+  /* Todas las configuradas activas, en vivo, una suscripción por máquina. */
+  const maquinas = useMaquinasEnVivo();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -85,7 +85,15 @@ export default function MuroPlanta() {
       */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         <PanelTanque nombreSistema={nombreSistema} t={t} traducir={traducir} />
-        <PanelVibraciones nombreSistema={nombreSistema} t={t} traducir={traducir} />
+        {maquinas.map((entrada) => (
+          <PanelConfigurada
+            key={entrada.maquina.id}
+            entrada={entrada}
+            nombreSistema={nombreSistema}
+            t={t}
+            traducir={traducir}
+          />
+        ))}
       </div>
     </div>
   );
@@ -160,28 +168,36 @@ function PanelTanque({ nombreSistema, t, traducir }) {
   );
 }
 
-function PanelVibraciones({ nombreSistema, t, traducir }) {
+/**
+ * Un panel por máquina CONFIGURADA (Plan 40 F2). Recibe su entrada de
+ * `useMaquinasEnVivo()` —estado en vivo y riesgos ya evaluados con las reglas
+ * de su tipo— y no abre motor propio: el muro se suscribe una vez a todas.
+ * Hasta el 21-09-2026 aquí había un panel fijo para la máquina de vibraciones
+ * escrita a mano, con `useVibracion()`.
+ */
+function PanelConfigurada({ entrada, nombreSistema, t, traducir }) {
   const { riesgoVibracion: traducirRiesgoVibracion } = useProsa();
-  const { canales, variador, alarmas, lastUpdated } = useVibracion();
+  const { maquina, tipo, estado, riesgos } = entrada;
 
-  const { activos, normaAplicable } = useMemo(
-    () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
-    [canales, variador, alarmas]
+  const peorRiesgo = riesgos.activos[0] ?? null;
+  const normaAplicable = riesgos.normaAplicable ?? null;
+  const peorZona = useMemo(
+    () => (tipo?.peorZona ? tipo.peorZona(estado.canales, normaAplicable) : null),
+    [tipo, estado.canales, normaAplicable]
   );
-  const peorRiesgo = activos[0] ?? null;
-  const peorZona = useMemo(() => peorZonaDe(canales, normaAplicable), [canales, normaAplicable]);
+  const esVibraciones = tipo?.id === "vibraciones";
 
   return (
     <Panel
-      titulo={nombreSistema("vibraciones")}
+      titulo={nombreSistema(maquina.id)}
       t={t}
-      frescura={<Frescura receivedAt={lastUpdated} t={t} traducir={traducir} />}
+      frescura={<Frescura receivedAt={estado.lastUpdated} t={t} traducir={traducir} />}
     >
       {peorRiesgo ? (
         <Veredicto
           t={t}
           token={SEVERIDAD_TOKEN[peorRiesgo.nivel] ?? "accent"}
-          texto={traducirRiesgoVibracion(peorRiesgo).titulo}
+          texto={esVibraciones ? traducirRiesgoVibracion(peorRiesgo).titulo : peorRiesgo.titulo}
         />
       ) : peorZona ? (
         <Veredicto
@@ -195,9 +211,9 @@ function PanelVibraciones({ nombreSistema, t, traducir }) {
 
       {/*
         Las alarmas del PLC no existen para esta máquina — no es que estén en
-        cero, es que no hay ninguna declarada (F3). Decirlo con las mismas
-        palabras que ya usa la línea de tiempo evita que un «0» se lea como
-        «se miró y no había ninguna».
+        cero, es que no hay ninguna declarada. Decirlo con las mismas palabras
+        que ya usa la línea de tiempo evita que un «0» se lea como «se miró y
+        no había ninguna».
       */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: t.textFaint }}>
         <AlertTriangle size={13} />

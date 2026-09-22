@@ -5,12 +5,13 @@
  *
  * ── QUÉ HACE, Y QUÉ NO ────────────────────────────────────────────
  *
- * Es el gemelo de `vibracionSource.js` para una máquina que no está escrita
- * en código. Aquél sondea los 73 puntos del catálogo y construye
- * `{canales, variador, alarmas}` con `createSistemaVibraciones`; éste sondea
- * las variables de la configuración y construye la MISMA forma con
- * `dominioDesdeRoles` —la equivalencia está medida (Plan 34 F3: 66 valores
- * idénticos)—. Las vistas no distinguen cuál de los dos las alimenta.
+ * Nació como gemelo de `vibracionSource.js`, la fuente de la máquina de
+ * vibraciones escrita a mano: aquélla sondeaba los 73 puntos del catálogo y
+ * construía `{canales, variador, alarmas}` con `createSistemaVibraciones`;
+ * ésta sondea las variables de la configuración y construye la MISMA forma
+ * con `dominioDesdeRoles` —la equivalencia está medida (Plan 34 F3: 66
+ * valores idénticos)—. Desde el Plan 40 la escrita a mano no existe y ésta
+ * es la única fuente de una máquina de vibraciones.
  *
  * No decide nada del dominio: qué rol es cada variable lo dice la
  * configuración, cómo se coloca lo dice `dominioDesdeRoles`, qué apoyos hay lo
@@ -25,30 +26,38 @@
  * configuración cambia (`revisada`, número de variables): editar la máquina
  * no puede dejar un motor viejo leyendo puntos que ya no son suyos.
  *
- * ── EL ORIGEN SIMULADO NO SABE DE ESTA MÁQUINA ────────────────────
+ * ── EL ORIGEN SIMULADO SIMULA CON LA FÍSICA DEL TIPO (Plan 40 F0) ──
  *
- * El simulador reproduce las máquinas escritas a mano, que declaran
- * `modelo()`. Una configurada no tiene modelo, y fingirle valores sería
- * inventar lo que falta (`CLAUDE.md` §2.5). Con el origen simulado esta fuente
- * falla en la lectura con un motivo que la vista pinta tal cual.
+ * Hasta el 21-09-2026 esta fuente se negaba con el origen simulado: «el
+ * simulador sólo reproduce las máquinas escritas en el código». La física
+ * era del tipo desde el principio; sólo sabía leer los tags de la escrita a
+ * mano. Ahora `construirSistema(...).modelo` traduce cada variable a su
+ * descriptor por rol y apoyo y el tipo simula, así que una configurada se
+ * ve en «Simulado» igual que se veía la escrita a mano. Lo que el tipo no
+ * sabe simular (el estado del sensor) sigue siendo hueco, nunca cero.
  */
-import { createPollingEngine, createRealTransport, TRANSPORTES } from "@/lib/iconics";
+import { createPollingEngine, createRealTransport, createTransporteSimulado, presetCaos, TRANSPORTES } from "@/lib/iconics";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
 import { dominioDesdeRoles } from "@shared/eva/comun/dominioDesdeRoles.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
 /** El transporte de una máquina configurada para un origen dado. */
-export function transporteDeConfigurada(maquina, clase) {
+export function transporteDeConfigurada(maquina, clase, tipo = tipoDe(maquina?.tipo)) {
   if (clase !== TRANSPORTES.SIMULADO) return createRealTransport();
-  return {
-    async read() {
-      throw new Error(
-        `El origen simulado no conoce la máquina configurada «${maquina?.nombre ?? maquina?.id}»: ` +
-          "el simulador sólo reproduce las máquinas escritas en el código. Cambia al origen real " +
-          "para verla.",
-      );
-    },
-  };
+  /*
+   * Hasta el Plan 40 F0 esto se NEGABA: «el simulador sólo reproduce las
+   * máquinas escritas en el código». La física era del tipo desde el
+   * principio, sólo que parseaba los tags de la escrita a mano; ahora la
+   * entrada construida traduce cada variable a su descriptor por rol y apoyo
+   * y el tipo simula. Un tipo sin `simular` sigue dando huecos, no ceros.
+   */
+  const entrada = construirSistema(maquina, tipo);
+  return createTransporteSimulado({
+    modelo: entrada.modelo,
+    chaos: presetCaos(),
+    etiqueta: `simulador · ${maquina?.nombre ?? maquina?.id}`,
+  });
 }
 
 /**

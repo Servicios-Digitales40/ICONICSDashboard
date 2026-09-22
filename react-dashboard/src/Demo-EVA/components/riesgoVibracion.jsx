@@ -23,6 +23,7 @@ import { useProsa } from "@/i18n/useProsa.js";
 
 import { pedirAlAsistente } from "@/features/asistente";
 
+import { useMaquina } from "../data/comunes/MaquinaContext.jsx";
 import { preguntaSobreRiesgoVibracion } from "../domain/riesgosVibracion.js";
 import { CasosPrevios } from "./CasosPrevios.jsx";
 
@@ -79,6 +80,10 @@ export function Campo({ t, rotulo, destacado = false, children }) {
 export function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("diagnostics");
+  /* La máquina de la pantalla (Plan 40 F2): sus casos previos son los de ESTA
+     máquina, y el cierre de diagnóstico se abre sobre ella. Hasta entonces iba
+     fijo el id de la escrita a mano. */
+  const { id: sistema } = useMaquina();
   /*
    * La evidencia, la consecuencia y la acción las escribe
    * `shared/eva/vibraciones/riesgosVibracion.js` en español, porque de ahí las
@@ -163,7 +168,7 @@ export function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
         es lo único que cambia: `NO_COMPARTEN` prohíbe cruzar las dos máquinas,
         y aquí eso significa que los casos que se cuentan son los de ésta.
       */}
-      <CasosPrevios sistema="vibraciones" riesgoId={original.id} />
+      <CasosPrevios sistema={sistema} riesgoId={original.id} />
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button
@@ -193,7 +198,7 @@ export function TarjetaRiesgo({ riesgo: original, t, onNavigate }) {
         <button
           type="button"
           onClick={() => onNavigate?.("cierre-diagnostico", {
-            sistema: "vibraciones", riesgoId: original.id, canalLabel: original.canalLabel ?? "",
+            sistema, maquina: sistema, riesgoId: original.id, canalLabel: original.canalLabel ?? "",
           })}
           style={{
             display: "flex", alignItems: "center", gap: 8,

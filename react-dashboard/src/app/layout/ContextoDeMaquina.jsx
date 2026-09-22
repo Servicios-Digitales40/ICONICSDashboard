@@ -18,10 +18,10 @@
  * ── LO QUE ESTA FASE ENCONTRÓ, Y CAMBIA LA ENTREGA ─────────────────
  *
  * **La máquina de vibraciones no tiene tag de control.** No es que no se haya
- * cableado: no está confirmado que exista, y sus guardas tampoco. Lo dice la
- * cabecera de `ControlesVibraciones.jsx`, que por eso es un placeholder sin un
- * solo botón — «el tag de escritura de este PLC, y confirmar que acepta la
- * orden […] viven en otro árbol y no están comprobados».
+ * cableado: no está confirmado que exista, y sus guardas tampoco. Lo decía la
+ * cabecera de `ControlesVibraciones.jsx`, un placeholder sin un solo botón que
+ * se retiró con la máquina escrita a mano (Plan 40 F2): una configurada
+ * declara sus variables de sólo lectura, así que no hay Controles que ofrecer.
  *
  * Así que el `NUE-06` literal —«otro indicador con su propio tag»— **no se
  * puede construir hoy sin inventarse el tag** (§2.5). Lo que sí se puede, y es
@@ -50,7 +50,8 @@ import { AlertTriangle, Activity } from "lucide-react";
 import { HoverTip } from "@/components/ui/HoverTip.jsx";
 import { useHayFuenteEva } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { useSistemaAgua } from "@/Demo-EVA/data/comunes/hooks.js";
-import { useVibracion } from "@/Demo-EVA/data/vibraciones/vibracion.js";
+import { useMaquina } from "@/Demo-EVA/data/comunes/MaquinaContext.jsx";
+import { useDominioVibracion } from "@/Demo-EVA/data/vibraciones/vibracion.js";
 import { useTheme } from "@/theme";
 import { normaAplicableDe, peorZonaDe } from "@shared/eva/vibraciones/vibraciones.js";
 
@@ -81,6 +82,7 @@ export function ContextoDeMaquina({ seccion }) {
    * `useEsSimulado()` en F0: «no lo sé» cae del lado que no consulta.
    */
   const hayFuente = useHayFuenteEva();
+  const { configurada } = useMaquina();
 
   /*
    * Fuera de las dos máquinas no hay contexto de máquina que dar. «Alarmas»,
@@ -93,7 +95,14 @@ export function ContextoDeMaquina({ seccion }) {
     // `useIconicsPoint`, así que sigue saliendo aunque no haya proveedor.
     return hayFuente ? <ContextoDelTanque /> : <Pastillas><EstadoMaquinaBanner /></Pastillas>;
   }
-  if (seccion === "sec-vibraciones") return hayFuente ? <ContextoDeVibraciones /> : null;
+  /*
+   * La máquina de la pantalla, si es una configurada de vibraciones (Plan 40
+   * F2). Hasta entonces la pastilla se elegía por SECCIÓN («sec-vibraciones»,
+   * la escrita a mano); las secciones de una configurada son `maq:<id>` y no
+   * tienen sección fija, así que se pregunta por la máquina y por su tipo. El
+   * hook de la máquina comparte el motor con la vista que esté abierta.
+   */
+  if (configurada?.tipo === "vibraciones") return <ContextoDeVibraciones />;
   return null;
 }
 
@@ -116,7 +125,7 @@ function ContextoDelTanque() {
 function ContextoDeVibraciones() {
   const { t: traducir } = useTranslation(["machines", "common"]);
   const { theme: t } = useTheme();
-  const { canales, variador, puntosSinDato } = useVibracion();
+  const { canales, variador, puntosSinDato } = useDominioVibracion();
 
   /*
    * `peorZonaDe()` — Plan 25 F10. Un primer intento de esta fase filtraba

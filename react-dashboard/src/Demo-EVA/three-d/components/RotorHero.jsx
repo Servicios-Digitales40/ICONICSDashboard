@@ -189,8 +189,8 @@ function Contenido({ canales, variador }) {
  * no aplica.
  *
  * @param {object} props
- * @param {object} props.canales   `canales` de `useVibracion()`
- * @param {object} props.variador  `variador` de `useVibracion()`
+ * @param {object} props.canales   `canales` de `useDominioVibracion()`
+ * @param {object} props.variador  `variador` de `useDominioVibracion()`
  * @param {React.ReactNode} [props.respaldo]  qué pintar si no hay WebGL
  */
 export default function RotorHero({ canales, variador, respaldo = null }) {

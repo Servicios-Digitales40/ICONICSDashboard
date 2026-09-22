@@ -19,15 +19,31 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ROUTES, DEFAULT_ROUTE } from "@/app/routes/routes.jsx";
+import { ROUTES, DEFAULT_ROUTE, NAV_GROUPS } from "@/app/routes/routes.jsx";
 import { NAV, PAGES, ROUTE_IDS } from "@/app/routes/index.js";
 import { buildNav } from "@/app/routes/buildNav.js";
 import { SISTEMAS } from "@shared/eva/comun/sistemas.js";
 
 const ids = ROUTES.map((r) => r.id);
 
+/*
+ * ── LAS MÁQUINAS DE VIBRACIONES SON CONFIGURADAS (Plan 40 F2) ──────
+ *
+ * Hasta el 21-09-2026 había una máquina de vibraciones escrita a mano con
+ * cinco rutas propias (`vib-inicio`, `eva-vibraciones`, `vib-controles`,
+ * `eva-riesgos-vibracion`, `vib-3d`) y una sección `sec-vibraciones` que
+ * además alojaba lo común de planta. Las cinco se retiraron: una máquina de
+ * vibraciones es ahora una CONFIGURADA, que reclama las rutas genéricas
+ * `maq-*` en su propia sección `maq:<id>`. Lo común pasó a «Planta».
+ *
+ * Donde una comprobación necesita una máquina, se le da ésta — es la misma
+ * forma que devuelve el provider y la que ya usan las demás pruebas.
+ */
+const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones", activa: true };
+const navConMaquina = () => buildNav(ROUTES, NAV_GROUPS, () => true, [MAQUINA]);
+
 describe("superficie de la aplicación", () => {
-  it("son las veintinueve vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las treinta y dos vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -49,22 +65,24 @@ describe("superficie de la aplicación", () => {
       "eva-riesgos",
       "eva-controles",
       "eva-maqueta",
-      // Vibraciones — OTRA máquina: otro motor, otro variador, otro PLC.
-      "vib-inicio",
-      "eva-vibraciones",
-      "vib-controles",
-      "eva-riesgos-vibracion",
-      "vib-3d",
-      // General — del servidor, no de una máquina: valen para las dos.
+      // Planta — lo que no es de una máquina concreta. Las cinco rutas de la
+      // máquina de vibraciones escrita a mano iban aquí hasta el Plan 40 F2;
+      // ver el bloque de arriba.
+      //
       // `salud-sistema` es la más «del servidor» de todas: no habla de ninguna
       // instalación, habla del PUENTE (Plan 20 F10).
       "eva-alarmas",
-      // Las tres de una máquina CONFIGURADA (Plan 37 F1): genéricas, sin `nav`
+      "eva-muro",
+      // Las de una máquina CONFIGURADA (Plan 37 F1): genéricas, sin `nav`
       // propio. Cada máquina configurada en servicio las reclama en su propia
       // sección con `?maquina=<id>`; aquí sólo existen.
       "maq-inicio",
       "maq-graficas",
       "maq-3d",
+      // `maq-riesgos` (Plan 40 F2) existe y se navega con `?maquina=`, pero es
+      // `oculta`: contesta lo mismo que «Hallazgos» con otro nombre (Plan 33
+      // F10), así que no tiene entrada de menú. El asistente la usa de destino.
+      "maq-riesgos",
       // Y las cuatro de Diagnóstico y Documentación (Plan 38 F2), que valen
       // porque el backend ya registra las configuradas.
       "maq-hallazgos",
@@ -93,7 +111,6 @@ describe("superficie de la aplicación", () => {
       "eva-cuaderno",
       // `eva-muro` (Plan 25 F10) — las dos máquinas A LA VEZ, así que tampoco
       // es de ninguna sola.
-      "eva-muro",
       "salud-sistema",
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
@@ -228,8 +245,27 @@ describe("el sidebar que sale del registro", () => {
      * que F10 implanta— o volver a una sección común. Lo primero es lo
      * correcto mientras el contenido se filtre por máquina.
      */
+    /*
+     * ── «sec-vibraciones» ES AHORA «sec-planta» (Plan 40 F2, 21-09-2026) ─
+     *
+     * Alojaba dos cosas que no eran la misma: la máquina de vibraciones
+     * escrita a mano y lo común de planta (alarmas, bandeja, avisos, casos,
+     * RAG). La máquina se retiró —las de vibraciones son configuradas y cada
+     * una trae su sección `maq:<id>`— y lo común se quedó, con su nombre
+     * verdadero: «Planta». El muro entra en ella porque es la pantalla de
+     * arranque y no tiene otra sección de la que colgar.
+     */
     expect(NAV.map((n) => n.group ?? n.id)).toEqual([
-      "sec-vibraciones",
+      "sec-planta",
+      "sec-general",
+      "sec-prediccion",
+    ]);
+
+    /* Y con una máquina configurada, su sección va DELANTE de las de planta:
+       es lo primero que se mira. */
+    expect(navConMaquina().map((n) => n.group ?? n.id)).toEqual([
+      `maq:${MAQUINA.id}`,
+      "sec-planta",
       "sec-general",
       "sec-prediccion",
     ]);
@@ -246,57 +282,63 @@ describe("el sidebar que sale del registro", () => {
     expect(NAV.find((n) => n.group === "sec-llenado")).toBeUndefined();
 
     /*
-     * ── LAS NUEVE VISTAS DE LA MÁQUINA (Plan 33 F10) ─────────────────
+     * ── LO QUE CUELGA DE «PLANTA» (Plan 40 F2) ───────────────────────
      *
-     * Antes eran cuatro, y las otras cinco vivían en «General» y «RAG». Eso
-     * tenía sentido con dos máquinas —un turno o una alarma no son de una
-     * sola— y deja de tenerlo con N: los hallazgos, los avisos, los casos y
-     * los manuales SON de una máquina, y las cuatro cosas ya se filtran por
-     * `sistema` en el backend.
+     * Lo que no es de una máquina concreta: las alarmas del servidor, la
+     * bandeja y los avisos de TODAS las máquinas, los casos y el RAG con el
+     * filtro abierto, y el muro. En el Plan 33 F10 estas vistas se habían
+     * llevado a la máquina escrita a mano porque «un hallazgo o un manual SON
+     * de una máquina»; eso sigue siendo cierto y lo cumplen las copias
+     * `maq-*` de cada configurada. Éstas son las vistas de planta entera.
      *
      * Turno se queda en «General» a propósito: un turno sí es de la planta
      * entera, quien entra a las seis se hace cargo de todo.
-     *
-     * `eva-riesgos-vibracion` YA NO SALE: contestaba la misma pregunta que
-     * «Hallazgos» con otro nombre, y dos entradas que dicen lo mismo se leen
-     * como dos cosas distintas. La ruta sigue navegable por id —el asistente
-     * la usa como destino— sólo no tiene entrada de menú.
      */
-    const vibraciones = NAV.find((n) => n.group === "sec-vibraciones");
-    expect(vibraciones.children.map((c) => c.id)).toEqual([
-      // `vib-controles` oculta del sidebar para esta demo (14-09-2026): la
-      // ruta sigue existiendo (ver el test de `ids` más arriba), sólo no
-      // trae `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
-      "vib-inicio", "eva-vibraciones", "vib-3d", "eva-alarmas",
+    const planta = NAV.find((n) => n.group === "sec-planta");
+    expect(planta.children.map((c) => c.id)).toEqual([
+      "eva-alarmas", "eva-muro",
       "eva-bandeja", "eva-avisos",
       "rag-casos", "rag-documentacion",
     ]);
 
     /*
-     * Y salen agrupadas en tres apartados. El rótulo es un SEPARADOR, no un
+     * ── LAS VISTAS DE UNA MÁQUINA CONFIGURADA ────────────────────────
+     *
+     * Siete en el menú, en tres apartados. El rótulo es un SEPARADOR, no un
      * nivel de menú: viaja en el hijo y el Sidebar lo pinta cuando cambia
      * respecto al anterior, así que el orden sale del orden de declaración y
      * no de una segunda lista que mantener.
+     *
+     * `maq-riesgos` NO SALE: contestaba la misma pregunta que «Hallazgos» con
+     * otro nombre, y dos entradas que dicen lo mismo se leen como dos cosas
+     * distintas. La ruta sigue navegable por id —el asistente la usa como
+     * destino— sólo no tiene entrada de menú (`porMaquina.oculta`).
      */
-    expect(vibraciones.children.map((c) => c.apartado)).toEqual([
-      "visualizacion", "visualizacion", "visualizacion", "visualizacion",
+    const maquina = navConMaquina().find((n) => n.group === `maq:${MAQUINA.id}`);
+    expect(maquina.children.map((c) => c.id)).toEqual([
+      "maq-inicio", "maq-graficas", "maq-3d",
+      "maq-hallazgos", "maq-avisos",
+      "maq-casos", "maq-rag",
+    ]);
+    expect(maquina.children.map((c) => c.apartado)).toEqual([
+      "visualizacion", "visualizacion", "visualizacion",
       "diagnostico", "diagnostico",
       "documentacion", "documentacion",
     ]);
+    /* Y cada hijo lleva la máquina: es lo que el Sidebar manda al navegar. */
+    for (const hijo of maquina.children) expect(hijo.params).toEqual({ maquina: MAQUINA.id });
 
-    // Alarmas y Assets son del SERVIDOR, no de una máquina: si alguna acabara
-    // dentro de un sistema, estaría diciendo que sus eventos son sólo de ése.
+    // Assets y Configuración son del SERVIDOR, no de una máquina: si alguna
+    // acabara dentro de un sistema, estaría diciendo que es sólo de ése.
     //
     // `eva-alarmas` volvió al sidebar el 10-09-2026 (Plan 27): dos
     // pestañas, Historial (lo de siempre) y En vivo (las alarmas del PLC).
     // Estuvo oculta del 2026-08-31 al 2026-09-10 para cortar el sondeo de
     // `/api/iconics/alarms` que el botón del Topbar hacía en toda la
-    // aplicación — ese botón sigue sin volver, sólo la entrada del menú.
+    // aplicación — ese botón sigue sin volver, sólo la entrada del menú. Hoy
+    // cuelga de «Planta», no de «General».
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.children.map((c) => c.id)).toEqual([
-      // `eva-muro` oculta del sidebar para esta demo (14-09-2026): la ruta
-      // sigue existiendo (ver el test de `ids` más arriba), sólo no trae
-      // `nav`. Restaurar en `routes.jsx` para que vuelva aquí.
       "eva-assets", "eva-configuracion", "eva-turno",
       "eva-cuaderno", "salud-sistema",
     ]);
@@ -355,7 +397,7 @@ describe("el sidebar que sale del registro", () => {
 
     expect(porModulo).toEqual({
       /* `"sec-llenado": "monitoreo"` vuelve al reabrir la estación. */
-      "sec-vibraciones": "monitoreo",
+      "sec-planta": "monitoreo",
       "sec-general": "monitoreo",
       // La única que NO es de ICONICS: un compresor real servido por otro
       // backend. Es la razón de ser de este campo.
@@ -406,9 +448,21 @@ describe("el sidebar que sale del registro", () => {
      */
     expect(conRiesgos).toEqual([]);
 
-    /* Y la ruta sigue existiendo, navegable por id: cerrado no es borrado, y
-       el asistente la usa como destino en `navegacionDelAsistente.js`. */
-    expect(ids).toContain("eva-riesgos-vibracion");
+    /* Tampoco con una máquina configurada: su «Riesgos» es `maq-riesgos`, y
+       está `oculta` a propósito (unificada en «Hallazgos»). */
+    const conRiesgosDeMaquina = navConMaquina().flatMap((s) =>
+      (s.children ?? []).filter((c) => /riesgos/.test(c.id)).map((c) => [s.group, c.id])
+    );
+    expect(conRiesgosDeMaquina).toEqual([]);
+
+    /* Y la ruta sigue existiendo, navegable por id con `?maquina=`: cerrado no
+       es borrado, y el asistente la usa como destino en
+       `navegacionDelAsistente.js`. Era `eva-riesgos-vibracion` hasta el Plan
+       40 F2; hoy es la genérica de máquina configurada. */
+    expect(ids).toContain("maq-riesgos");
+    const riesgos = ROUTES.find((r) => r.id === "maq-riesgos");
+    expect(riesgos.porMaquina?.oculta).toBe(true);
+    expect(riesgos.nav).toBeUndefined();
   });
 
   it("la ruta por defecto está visible en el menú", () => {

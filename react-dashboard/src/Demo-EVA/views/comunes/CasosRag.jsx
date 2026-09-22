@@ -60,7 +60,6 @@ import { fieldStyle } from "@/components/ui/Input.jsx";
 import { archivarCaso, listarCasos } from "@/lib/api/casosApi.js";
 import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
-import { SISTEMA_IDS_EN_SERVICIO } from "@shared/eva/comun/sistemas.js";
 import { useMaquina } from "../../data/comunes/MaquinaContext.jsx";
 
 import { MONO, SANS } from "../../components/base.jsx";
@@ -271,7 +270,11 @@ export default function CasosRag({ params, onNavigate }) {
   const { theme: t } = useTheme();
   /* De qué máquina cuelga esta pantalla en el menú (Plan 33 F10). Sólo el id:
      esta vista no lee ni un punto, así que no necesita nada más. */
-  const { id: maquinaId } = useMaquina();
+  const { id: maquinaId, enServicioIds } = useMaquina();
+  /* Por CONTENIDO, no por identidad del array: el provider lo memoiza, pero
+     un contexto que lo recomponga en cada render relanzaría la carga sin fin
+     (se vio en pruebas, 22-09-2026). */
+  const claveEnServicio = enServicioIds.join("|");
   const [estado, setEstado] = useState({ loading: true, error: null, casos: [], ocultos: 0 });
 
   /**
@@ -365,7 +368,10 @@ export default function CasosRag({ params, onNavigate }) {
       const todos = data.casos ?? [];
       const casos = todos.filter((c) => {
         if (!c.sistema) return true; // de la planta entera, no de una máquina
-        return maquinaId ? c.sistema === maquinaId : SISTEMA_IDS_EN_SERVICIO.includes(c.sistema);
+        /* `enServicioIds` suma las configuradas al registro (Plan 40 F2):
+           con sólo `SISTEMA_IDS_EN_SERVICIO`, un caso de una máquina
+           configurada desaparecía de la vista de planta. */
+        return maquinaId ? c.sistema === maquinaId : claveEnServicio.split("|").includes(c.sistema);
       });
       setEstado({ loading: false, error: null, casos, ocultos: todos.length - casos.length });
     } catch (e) {
@@ -380,7 +386,7 @@ export default function CasosRag({ params, onNavigate }) {
     /* `maquinaId` es dependencia de verdad desde el Plan 33 F10: el filtro lo
        usa, así que sin ella cambiar de máquina dejaría en pantalla los casos
        de la anterior. Lo avisó `react-hooks/exhaustive-deps`. */
-  }, [maquinaId]);
+  }, [maquinaId, claveEnServicio]);
 
   useEffect(() => {
     const ac = new AbortController();
