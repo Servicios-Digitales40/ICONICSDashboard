@@ -1,6 +1,6 @@
 # PLAN 32 — Vibraciones 1.0: el módulo completo
 
-**Estado:** F1, **F4, F5 y F6** completadas (F4 cerrada en el Plan 41 F3: `necesita` en las 19 reglas, factor de cresta con sus puertas, y «normalizar por rpm» descartado con el porqué) · F2 y F3 sólo esperan cerrar el sondeo en planta (Plan 41 F1)
+**Estado:** **COMPLETADO el 22-09-2026** en lo que la instalación permite · F1–F6 cerradas desde el Plan 41 (F2/F3: tres sondeos, 21 series propias; el motor gira **sin carga acoplada**, así que lo que no varía no va a variar — Plan 41 §F1) · pendiente de archivar en la F5 del Plan 41
 **Rama:** `Vibraciones1.0`
 **Fecha:** 17-09-2026
 
@@ -213,7 +213,14 @@ serie sea la misma. El esquema **rechaza `historyVerified` del cliente**
 **Lo que falta no es código: es sondear con el motor girando.** Es el paso 1
 de la F4 del Plan 40, recogido en el **Plan 41 §F1**.
 
-### F3 — Las señales en la pantalla · **depende de F2, sin trabajo propio**
+✅ **Cerrada el 22-09-2026 (Plan 41 F1):** tres sondeos —en paro, y dos en
+marcha—, **21 series propias**, 11 compartidas (las nueve `QC_*` y una pareja
+bajo sospecha de constantes), 35 sin variación. El motor **no tiene nada
+acoplado**, así que «con carga» no va a llegar y esas 35 son su estado real.
+`DEMO 3` ya no devuelve 0 muestras: el historiador contesta y lo que no varía
+no varía porque la máquina no trabaja.
+
+### F3 — Las señales en la pantalla · ✅ **cerrada con F2** (21 series que pintar)
 La vista Gráficas de la sección de cada configurada ya usa `GraficaHistoria` y
 `SelectorRango` (Plan 37 F2). Lo que falta es que tenga series que pintar
 (F2), no la vista. **No tiene trabajo de código propio**: en cuanto F2 dé

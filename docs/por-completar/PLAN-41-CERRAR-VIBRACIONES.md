@@ -281,6 +281,60 @@ error de nombre, y con la `S` el reconocimiento de roles lo emparejará solo.
 Quedan de F1 los pasos 2 (dar de baja la espejo en planta), 3 (manuales al
 tipo) y 4 (nombres de los apoyos), y repetir el sondeo **con carga**.
 
+**Tercer sondeo, 22-09-2026 (tarde, segunda vez en marcha).** El usuario no
+sabía si había carga; la lectura lo dijo: **602 rpm, par −0,03 %, 0 kW,
+1,38 A** — corriente de magnetización, o sea **vacío otra vez**. Sobre 86
+variables: **21 propias, 11 compartidas, 35 sin variación, 12 sin muestras,
+7 no se pudieron leer**. Tres cosas que sí cambiaron:
+
+- La pareja `UPPER_LEVEL_2 ↔ ACTUAL PWR_BMS` **desapareció**: `UPPER_LEVEL_2`
+  pasó a «sin variación» y la potencia se verificó propia. Era el **falso
+  positivo por constantes** que se sospechaba. `OUTPUT VOLTS_BMS ↔ Numero de
+  arranques` **persiste** y sigue bajo la misma sospecha (0 kW → tensión de
+  salida constante).
+- `MonState_vRMS_S2` **ya se llama así** en el servidor (el usuario lo
+  renombró): aparece con rol y «sin variación», que es lo esperable de una
+  bandera. `MonState_vRMS_S3` **volvió a entregar valor** (lo arregló en
+  ICONICS).
+- `aRMS_S3` sale **sin muestras** en el historiador por segunda vez, y en vivo
+  lee bien (0,59 m/s²). Es un punto que el historiador no está registrando;
+  se anota para el paso 1 con carga, y si persiste es del grupo de
+  historización, no del tablero.
+
+**Cresta en vacío, tercera medida:** S1 3,9 · S2 **7,7** · S3 6,0. En vacío
+la regla no evalúa (puerta `enVacio`), y con razón: S2 y S3 cruzarían el 6
+sin que nada lo respalde.
+
+#### «Con carga» no va a pasar: el motor no tiene nada acoplado (22-09-2026)
+
+Preguntado qué arrastra el motor, el usuario lo dijo: **ahora mismo, nada**.
+Gira en el banco. Eso cambia tres cosas de este plan, y las tres se cierran
+aquí en vez de quedarse esperando:
+
+- **El paso 1 de F1 («sondear en marcha») está hecho** con lo que la
+  instalación puede dar: dos sondeos girando en vacío, 21 series propias.
+  «Con carga» era la forma de que las señales que dependen del esfuerzo
+  variaran; sin nada acoplado no van a variar, y las 35 «sin variación» son
+  el estado real de la máquina, no una ventana mal elegida.
+- **La cresta con carga no se puede medir**, y la regla `factor-de-cresta-alto`
+  va a salir **siempre «no evaluable · en vacío»** en esta máquina. Es lo
+  correcto: en vacío S2 da 7,7 y S3 6,0 sin nada roto, y una regla que
+  puntuara eso estaría diagnosticando el banco de pruebas. El umbral 6 queda
+  sin calibrar hasta que haya un motor que trabaje.
+- **`medida-en-vacio` va a estar siempre activa** en esta máquina, y es
+  verdad: es el aviso de que una medida limpia aquí no descarta nada.
+
+**Lo que conviene hacer en la configuración:** añadir a `limitaciones` de
+`vib-motor-03` una línea que lo diga («El motor gira sin carga acoplada: las
+vibraciones que sólo aparecen bajo esfuerzo no se pueden observar, y la cresta
+no se evalúa»), para que el asistente lo cite en vez de que parezca un hueco
+del tablero. Es un campo de la máquina (`CrearMaquinaSchema.limitaciones`),
+se pone desde el editor, y el día que se acople algo se quita.
+
+Con esto **el Plan 32 F2 y F3 quedan cerradas**: el historiador contesta, las
+series están sondeadas variable por variable, y Gráficas tiene 21 series que
+pintar. Lo que no varía no varía porque la máquina no trabaja.
+
 **Una discrepancia que hay que re-medir en marcha, y que importa para F3:**
 este sondeo dio **`aPeak_S1` verificada como serie PROPIA**, distinta de
 `aRMS_S1`. El 21-09 se midieron 1805 de 1805 valores idénticos entre las dos
