@@ -145,6 +145,63 @@ import { ALIAS_DE_ROL, formaComparable } from "../vibraciones/aliasDeTags.js";
  */
 export const rolDe = (familia, clave) => `${familia}:${clave}`;
 
+/**
+ * Las palabras del oficio que la pantalla NO enseña pero la gente sí dice,
+ * por rol. Misma regla que los `SINONIMOS` del tanque: corta a propósito, y
+ * sólo lo que un operador dice de verdad —«rpm», «torque», «daño»—. Los
+ * rótulos y los cortos entran solos desde el rol; esto se suma encima.
+ *
+ * Sin entradas ambiguas por diseño: «vibración» a secas no está porque sería
+ * las tres medidas de los tres apoyos a la vez, y el resolvedor ya pregunta
+ * cuál cuando hay varias candidatas — ponerla aquí no mejoraría eso.
+ */
+const SINONIMOS_DE_ROL = Object.freeze({
+  [rolDe("medida", "vRMS")]: ["velocidad de vibración", "velocidad rms"],
+  [rolDe("medida", "aRMS")]: ["aceleración", "aceleración rms"],
+  [rolDe("medida", "aPeak")]: ["pico", "aceleración pico", "apeak"],
+  [rolDe("medida", "DKW")]: ["daño", "valor de daño", "valor característico"],
+  [rolDe("bandera", "offset")]: ["offset", "desviación"],
+  [rolDe("variador", "velocidad")]: ["rpm", "velocidad de giro", "revoluciones", "giro"],
+  [rolDe("variador", "frecuencia")]: ["frecuencia", "hercios", "hz"],
+  [rolDe("variador", "par")]: ["torque", "par motor"],
+  [rolDe("variador", "corriente")]: ["amperios", "amperaje", "intensidad"],
+  [rolDe("variador", "potencia")]: ["kilovatios", "kw", "potencia activa"],
+  [rolDe("variador", "tensionSalida")]: ["voltaje de salida", "voltaje del variador", "tensión del variador"],
+  [rolDe("variador", "busCC")]: ["bus dc", "bus de continua", "tensión del bus"],
+  [rolDe("variador", "fallo")]: ["falla del variador", "fallo del variador", "falla"],
+  [rolDe("variador", "aviso")]: ["aviso del variador", "warning del variador"],
+  [rolDe("vigilancia", "bpfo")]: ["pista exterior"],
+  [rolDe("vigilancia", "bpfi")]: ["pista interior"],
+  [rolDe("vigilancia", "ftf")]: ["jaula"],
+});
+
+/**
+ * Los nombres por los que se puede pedir UNA variable de una máquina de este
+ * tipo, derivados de su rol y de su apoyo. Ver `aliasDe` en la entrada del
+ * tipo para el porqué. Sin rol reconocido no hay nada que derivar: `[]`.
+ *
+ * @param {{rol?: string|null}} variable
+ * @param {{id: string, label?: string|null}|null} apoyo  el de `canalesDeMaquina`, o `null`
+ * @returns {string[]}
+ */
+function aliasDeVariable(variable, apoyo) {
+  const rol = variable?.rol ? ROLES[variable.rol] : null;
+  if (!rol) return [];
+  /* No todo rol tiene `corto` (las banderas y las calidades no): se lee sin darlo por hecho. */
+  const corto = "corto" in rol ? rol.corto : null;
+  const nombres = [...new Set([corto, rol.label, ...(SINONIMOS_DE_ROL[variable.rol] ?? [])].filter(Boolean))];
+  if (rol.ambito !== "apoyo") return nombres;
+  if (!apoyo?.id) return [];
+  const numero = String(apoyo.id).replace(/\D/g, "");
+  const formas = [
+    apoyo.id,
+    apoyo.label && apoyo.label !== apoyo.id ? apoyo.label : null,
+    numero ? `sensor ${numero}` : null,
+    numero ? `apoyo ${numero}` : null,
+  ].filter(Boolean);
+  return nombres.flatMap((n) => formas.map((f) => `${n} ${f}`));
+}
+
 export const ROLES = Object.freeze({
   ...Object.fromEntries(
     MEDIDAS.map((m) => [
@@ -576,6 +633,31 @@ export const TIPO_VIBRACIONES = Object.freeze({
     "vibración, rodamiento, lado acople, lado libre, apoyo, velocidad eficaz, " +
     "aceleración eficaz, valor de daño, DKW, aRMS, vRMS, envolvente, espectro, " +
     "BPFO, BPFI, factor de cresta, variador, milímetros por segundo",
+
+  /*
+   * ── LOS NOMBRES CON QUE UNA PERSONA PIDE UNA SEÑAL (Plan 41 F2) ────
+   *
+   * `sistemasDeSenal` ya cruza los alias que declare cada variable; el
+   * problema es que una máquina dada de alta desde el árbol NACE SIN
+   * NINGUNO (`alias: []`, `descripcion: null`), así que «la velocidad eficaz
+   * del lado acople» no encontraba «lado acople» en ningún sitio y el
+   * asistente afirmaba que la señal no existía, teniendo serie. La espejo sí
+   * los traía —«vRMS Lado acople», «Velocidad eficaz apoyo 1»…— porque se
+   * DERIVARON del catálogo escrito a mano antes de retirarlo (Plan 40 F3).
+   *
+   * Esa derivación vive aquí, en el TIPO, y la gana toda configurada: los
+   * nombres del rol (rótulo, corto, y las palabras del oficio de abajo) por
+   * las formas del apoyo (su id, el nombre que tenga en el árbol, «sensor N»,
+   * «apoyo N»). El nombre del apoyo sale de `assets[].nombre`: sin él, «lado
+   * acople» no resuelve, y ése es el paso 4 de la F1 del Plan 41 en planta.
+   *
+   * Lo que NO hace, a propósito: el rótulo a secas («velocidad eficaz») no se
+   * combina con nada porque `construirSistema` ya lo ofrece por sí solo, y
+   * con tres apoyos da tres candidatas — el resolvedor pregunta cuál, que es
+   * lo correcto. Y no es `aliasDeTags.js`: aquél reconoce cómo llama el
+   * SERVIDOR a un tag (`VEL_RMS`); esto, cómo lo llama una persona.
+   */
+  aliasDe: (variable, apoyo = null) => aliasDeVariable(variable, apoyo),
 
   descriptorDe: (rol, apoyo = null) => {
     const r = ROLES[rol];

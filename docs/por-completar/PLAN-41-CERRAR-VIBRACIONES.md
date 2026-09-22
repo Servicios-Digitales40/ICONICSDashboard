@@ -1,6 +1,6 @@
 # PLAN 41 — Cerrar Vibraciones 1.0: lo que de verdad queda
 
-**Estado:** **F0 completada** (22-09-2026: navegador confirmado, Plan 38 archivado, defecto de `decodificarVigilancia` corregido) · F1–F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
+**Estado:** **F0 y F2 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia` y el índice de sinónimos en el tipo) · F1 a medias (sondeo en marcha hecho; quedan los pasos 2–4 en planta) · F3–F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
 **Rama:** `Vibraciones1.0`
 **Fecha:** 22-09-2026
 
@@ -252,6 +252,35 @@ paso 1, y tardó **20 s** para 73 series:
   con el motor parado y **la razón de que el paso 1 exija sondear girando.**
 - **Sin muestras (3):** `MonState_aRMS_S2`, `MonState_vRMS_S3`, `HorasMarcha`.
 
+#### Lo que ya se dio de F1, 22-09-2026 (tarde)
+
+El usuario puso el motor en marcha (603 rpm, **en vacío**: par −0,05 %,
+0 kW) y se repitió el sondeo: **19 propias, 13 compartidas, 37 sin variación,
+12 sin muestras, 8 no se pudieron leer**, sobre las 89 variables que la
+máquina tenía en ese momento (el usuario la estaba editando). Lecturas:
+
+- **`aPeak_S1` volvió a salir como serie PROPIA**, distinta de `aRMS_S1`. Dos
+  sondeos (paro y marcha) contra la medida del 21-09. Va a F3.
+- Las 37 «sin variación» son casi todas **banderas y estados que deben ser
+  constantes** (MonState, Alarma, Warning, offsets, FAULT): es un límite del
+  criterio del sondeo, no un fallo de la máquina. Una serie constante no se
+  puede distinguir de otra constante, y el sondeo lo dice así.
+- Las dos parejas compartidas entre carpetas (`UPPER_LEVEL_2 ↔ ACTUAL
+  PWR_BMS`, `OUTPUT VOLTS_BMS ↔ Numero de arranques`) **persisten en marcha**.
+  Con el motor en vacío la potencia sigue en 0, así que la sospecha del falso
+  positivo por constantes sigue en pie; se re-mide **con carga**.
+- Los 8 «no se pudieron leer» son tags con grafías raras del árbol
+  (`ACTUAL_SPEED`, `QC_SPEED` por apoyo, `actual_Speed`, `MonState_vRMS_2`,
+  `ESTADO_TORRETA`).
+
+**Y dos cosas las arregló el usuario en ICONICS, no el tablero:**
+`MonState_vRMS_S3` **ya entrega valor** (era el punto muerto de F0), y
+`MonState_vRMS_2` **se está renombrando a `_S2`** en el servidor: era un
+error de nombre, y con la `S` el reconocimiento de roles lo emparejará solo.
+
+Quedan de F1 los pasos 2 (dar de baja la espejo en planta), 3 (manuales al
+tipo) y 4 (nombres de los apoyos), y repetir el sondeo **con carga**.
+
 **Una discrepancia que hay que re-medir en marcha, y que importa para F3:**
 este sondeo dio **`aPeak_S1` verificada como serie PROPIA**, distinta de
 `aRMS_S1`. El 21-09 se midieron 1805 de 1805 valores idénticos entre las dos
@@ -264,7 +293,54 @@ y se corrige la cabecera de `vibraciones.js`.
 
 ---
 
-### F2 — El índice de sinónimos (Plan 32 F6)
+### F2 — El índice de sinónimos (Plan 32 F6) ✅
+
+**Completada el 22-09-2026.** Resultó más pequeña de lo que el Plan 32 F6
+pintaba, y el motivo está medido: **el resolvedor ya existía**.
+`sistemasDeSenal` (`shared/eva/comun/sistemas.js`) cruza desde el Plan 34 los
+`aliasDe(clave)` de cada máquina —clave, descripción, etiqueta, rótulo del
+rol, corto y los alias declarados—. Lo que fallaba es que **una máquina dada
+de alta desde el árbol nace sin ninguno**: `vib-motor-03` tenía `alias: []`
+y `descripcion: null` en las 94, así que «la velocidad eficaz del lado
+acople» no encontraba «lado acople» en ningún sitio. La espejo sí los traía
+porque el Plan 40 F3 los **derivó** del catálogo a mano antes de retirarlo
+(`catalogoDemo.js` → `aliasDe`: rótulo × {id, nombre, «sensor N», «apoyo N»}).
+
+**Lo que se hizo:** esa derivación vive ahora en el TIPO —`tipo.aliasDe(variable,
+apoyo)` en `shared/eva/tipos/vibraciones.js`— y `construirSistema.aliasDe` la
+suma a lo declarado. Los nombres del rol (rótulo, corto y una tabla corta de
+**palabras del oficio** que la pantalla no enseña: «rpm», «torque», «daño»,
+«pista exterior»…) por las formas del apoyo (id, `assets[].nombre`, «sensor
+N», «apoyo N»). Lo gana toda configurada de vibraciones sin escribir un alias.
+
+**Lo que NO se hizo, a propósito:**
+- El rótulo a secas («velocidad eficaz») no se combina con nada: ya lo ofrece
+  `construirSistema`, con tres apoyos da tres candidatas y el resolvedor
+  **pregunta cuál**. Sigue siendo la regla que no se toca.
+- «vibración» a secas no entra en la tabla: sería las tres medidas de los tres
+  apoyos, y ponerla no mejoraría la pregunta que ya se hace.
+- **El tanque no se tocó** (`CLAUDE.md` §1): su `SINONIMOS` escrito a mano y
+  su resolvedor siguen donde estaban. La unificación de los dos resolvedores
+  que pide B3 queda para la reapertura; lo que B3 llamaba «la máquina nueva
+  nace sin sinónimos» **ya no pasa** para el tipo vibraciones.
+- Un apoyo **sin nombre en el árbol no responde por un nombre que no tiene**
+  (§2.5): con «rodamiento intermedio» resuelve la máquina cuyo S2 se llama
+  así, no una en la que S2 es sólo `S2`. Es el paso 4 de F1 en planta.
+
+**Un cambio de expectativa declarado:** «601 rpm» resolvía a `[]` en dos
+pruebas (una guarda de que el «1» de «601» no dispare el apoyo 1). Con «rpm»
+como palabra del oficio, resuelve a la velocidad del variador —que es lo que
+pregunta quien dice «¿va a 601 rpm?»—. La guarda se conserva con «cota 601».
+
+**Medido:** `sistemas.test.js` +5 pruebas sobre una máquina **sin alias**
+(28), `verificar-vibraciones-configurada` +1 (36: con los alias y la
+descripción quitados, el tipo deriva todos los del catálogo a mano), puerta
+§5.1 verde (190/22 y 71), backend 390, frontend 1097, los 41 verificadores.
+
+**Para verlo en el asistente hace falta reiniciar el backend**: el que corre
+cargó `shared/` antes de este cambio. Y para que «lado acople» resuelva en
+`vib-motor-03`, el apoyo tiene que tener ese nombre en la configuración
+(editor → assets), que es F1 paso 4.
 
 **Objetivo.** Que el asistente entienda «el apoyo del motor» como el tanque
 entiende «la bomba».

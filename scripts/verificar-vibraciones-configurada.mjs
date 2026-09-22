@@ -315,6 +315,28 @@ check('conserva los alias de cada señal', () => {
   }
 })
 
+/*
+ * Plan 41 F2: los alias que la espejo trae ESCRITOS, una configurada desde el
+ * árbol no los tiene. Se le quitan todos y la descripción, se deja sólo el
+ * nombre del apoyo en `assets[].nombre`, y el TIPO tiene que derivar lo mismo
+ * que el catálogo a mano ofrecía. Es el caso de `vib-motor-03` el 22-09-2026.
+ */
+check('sin ningún alias declarado, el tipo deriva los del catálogo a mano', () => {
+  const sinAlias = structuredClone(configuracion)
+  for (const v of sinAlias.variables) { v.alias = []; v.descripcion = null }
+  const desnuda = construirSistema(sinAlias, tipoDe('vibraciones'))
+  const norm = (s) => s.toLowerCase()
+  for (const clave of aMano.claves()) {
+    const suyos = new Set(desnuda.aliasDe(clave).map(norm))
+    for (const alias of aMano.aliasDe(clave)) {
+      assert.ok(suyos.has(norm(alias)), `«${clave}» sin alias declarados no deriva «${alias}»`)
+    }
+  }
+  /* Y lo que la pantalla no enseña pero la gente dice. */
+  assert.ok(desnuda.aliasDe('velocidad').includes('rpm'), 'la velocidad del variador responde a «rpm»')
+  assert.ok(desnuda.aliasDe('DKW_S2').some((a) => norm(a) === 'daño rodamiento intermedio'))
+})
+
 /* ── Lo que la configuración NO alcanza, y lo dice ───────────────────── */
 
 console.log(`\n${c.negrita}Lo que no alcanza, y lo declara${c.reset}`)

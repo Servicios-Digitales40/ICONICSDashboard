@@ -1,6 +1,6 @@
 # PLAN 32 — Vibraciones 1.0: el módulo completo
 
-**Estado:** F1 y **F5** completadas · F4 parcial (`necesita` hecho; cresta imposible en S1, del servidor) · F2 y F3 sólo esperan el sondeo en planta · **F6 es la única fase de código viva** · sondeado el 22-09-2026, lo vivo se ejecuta en el **Plan 41**
+**Estado:** F1, **F5 y F6** completadas · F4 parcial (`necesita` hecho; la cresta en S1 se re-mide: dos sondeos del 22-09 dan `aPeak_S1` propia) · F2 y F3 sólo esperan cerrar el sondeo en planta · lo vivo se ejecuta en el **Plan 41** (F1 y F3)
 **Rama:** `Vibraciones1.0`
 **Fecha:** 17-09-2026
 
@@ -247,14 +247,15 @@ declara en las cuatro medidas —`vRMS`, `aRMS`, `aPeak` y `DKW`, líneas 523 a
 los manuales se asignan al **TIPO** (`tipo:vibraciones`), y el modelo cita la
 ISO 20816-3 para `Nuevo-Modor`. Medido allí.
 
-### F6 — Índice de sinónimos · **queda, y es la fase de código viva**
+### F6 — Índice de sinónimos · ✅ **COMPLETADA (Plan 41 F2, 22-09-2026)**
 Que el asistente entienda «el apoyo del motor» como el tanque entiende «la
-bomba». El tipo ya trae `vocabulario` (Plan 40 F3) y llega a cada configurada
-por `construirSistema.js:553`, **pero hoy sólo alimenta el dictado**
-(`backend/ia/voz.mjs:79`): nadie lo usa para resolver a qué se refiere quien
-escribe. `aliasDeTags.js` **no es esto** — reconoce cómo llama el SERVIDOR a
-un tag (`VEL_RMS` → rol `vRMS`), no cómo lo llama una PERSONA. Recogido en el
-**Plan 41 §F2**.
+bomba». Resultó que el resolvedor ya existía (`sistemasDeSenal` cruza
+`aliasDe`) y lo que faltaba era que **una configurada recién dada de alta no
+tiene ningún alias**: la derivación rol × apoyo que el catálogo a mano hacía
+vive ahora en el TIPO (`tipo.aliasDe`), con una tabla corta de palabras del
+oficio («rpm», «torque», «daño», «pista exterior»…). El detalle, lo que no se
+hizo a propósito y lo medido están en el Plan 41 §F2. `aliasDeTags.js` sigue
+siendo otra cosa: cómo llama el SERVIDOR a un tag, no una persona.
 
 ---
 

@@ -478,13 +478,21 @@ export function construirSistema(maquina, tipo) {
       return etiquetaDeVariable(v);
     },
 
-    /** Los nombres por los que alguien puede pedir una señal de esta máquina. */
+    /**
+     * Los nombres por los que alguien puede pedir una señal de esta máquina:
+     * lo que declara la configuración, y lo que el TIPO deriva del rol y del
+     * apoyo (`tipo.aliasDe`, Plan 41 F2) — porque una máquina dada de alta
+     * desde el árbol nace sin alias, y sin esto «velocidad eficaz lado
+     * acople» no encontraba nada.
+     */
     aliasDe: (clave) => {
       const v = porClave.get(clave);
       if (!v) return [];
       const rol = tipo.roles?.[v.rol] ?? null;
+      const derivados = tipo.aliasDe?.(v, v.assetId ? apoyoDe(v.assetId) : null) ?? [];
       return [...new Set(
-        [clave, v.descripcion, etiquetaDeVariable(v), rol?.label, rol?.corto, ...(v.alias ?? [])].filter(Boolean),
+        [clave, v.descripcion, etiquetaDeVariable(v), rol?.label, rol?.corto, ...(v.alias ?? []), ...derivados]
+          .filter(Boolean),
       )];
     },
 

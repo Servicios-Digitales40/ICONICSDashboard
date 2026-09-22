@@ -291,11 +291,13 @@ ISO 20816-3 y los dos manuales a «Todas las de Vigilancia de vibraciones»
 —hoy no los ve ninguna máquina—, y nombrar los tres apoyos en el árbol.
 **Desbloquea el Plan 32 F2 y F3**, que no tienen trabajo de código propio.
 
-**2 · Plan 41 F2 — índice de sinónimos** (Plan 32 F6). Es **la única fase de
-código del Plan 32 que sigue viva**. El `vocabulario` del tipo ya llega a cada
-configurada (`construirSistema.js:553`) pero **sólo alimenta el dictado**
-(`voz.mjs:79`). Ojo: `aliasDeTags.js` **no es esto** —resuelve cómo llama el
-SERVIDOR a un tag, no cómo lo llama una persona—. Es **B3 del backlog**.
+**2 · Plan 41 F2 — índice de sinónimos. ✅ HECHO el 22-09-2026.** Resultó que
+el resolvedor ya existía; lo que faltaba era que una configurada nace sin
+alias. El TIPO los deriva ahora (`tipo.aliasDe`: rol × apoyo, más palabras del
+oficio como «rpm» o «daño»). El tanque no se tocó; la unificación de B3 queda
+para la reapertura. **Hay que reiniciar el backend** para que el asistente lo
+vea, y los apoyos necesitan su `nombre` en la configuración para que «lado
+acople» resuelva (F1 paso 4).
 
 **3 · Plan 41 F3 — normalizar por rpm.** Lo único que queda del Plan 32 F4.
 

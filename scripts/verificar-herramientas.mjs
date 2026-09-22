@@ -1398,9 +1398,17 @@ await checkAsync('el nombre corto solo, sin apoyo, devuelve los tres', () => {
 
 await checkAsync('lo corto no dispara dentro de otra palabra', () => {
   /* La razón del umbral de cuatro caracteres sigue viva: se conserva
-     exigiendo palabra completa en vez de descartando lo corto. */
-  assert.deepEqual(sistemasDeSenal('601 rpm'), [])
+     exigiendo palabra completa en vez de descartando lo corto. El «1» pegado
+     a «601» no puede resolver al apoyo 1. */
+  assert.deepEqual(sistemasDeSenal('cota 601'), [])
   assert.deepEqual(sistemasDeSenal('zumbido del compresor'), [])
+  /* Hasta el Plan 41 F2 aquí se exigía `sistemasDeSenal('601 rpm') → []`.
+     Desde entonces «rpm» es palabra del oficio del tipo vibraciones y
+     resuelve a la velocidad del variador —que es lo que pregunta quien dice
+     «¿va a 601 rpm?»—, y el «1» sigue sin tocar el apoyo 1. */
+  const rpm = sistemasDeSenal('601 rpm')
+  assert.ok(rpm.length > 0, '«rpm» tiene que resolver a la velocidad del variador')
+  assert.ok(rpm.every((x) => x.clave === 'velocidad'), 'y sólo a ella')
 })
 
 await checkAsync('las seis de historia sirven a cualquier máquina, no sólo al tanque', async () => {

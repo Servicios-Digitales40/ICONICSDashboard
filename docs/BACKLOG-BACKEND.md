@@ -184,6 +184,22 @@ las ata al archivo grande.
 > documentado en `sistemas.js`. El trabajo pendiente es de dominio, no de
 > estructura.
 
+> **La mitad de vibraciones, HECHA el 22-09-2026 (Plan 41 F2).** «La máquina
+> nueva nace sin sinónimos» ya no pasa para el tipo `vibraciones`: el tipo
+> deriva los alias de rol × apoyo (`tipo.aliasDe`, `shared/eva/tipos/
+> vibraciones.js`) y `construirSistema` los suma, con una tabla corta de
+> palabras del oficio. Se hizo en el TIPO y no en el registro porque las
+> palabras son del oficio, no de la máquina, y así no hay tabla que envejezca
+> con cada alta.
+>
+> **La mitad del tanque sigue tal cual**, y es a propósito: su `SINONIMOS` con
+> las ocho entradas ambiguas de arriba y su `resolverSenal` no se pueden tocar
+> mientras dure la rama `Vibraciones1.0`. La unificación en UN resolvedor —lo
+> que este apartado pide de fondo— queda para la reapertura, y cuando llegue
+> ya tendrá el patrón: lo que hoy hace `tipo.aliasDe` para vibraciones es lo
+> que un tipo `estacionLlenado` haría con la tabla del tanque, desambiguada
+> antes por quien opera (punto 3).
+
 ---
 
 ## B4 · `pronostico_de_desgaste` está escrito contra el tanque
