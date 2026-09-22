@@ -148,6 +148,8 @@ export function construirSistema(maquina, tipo) {
     const v = porPunto.get(punto);
     if (v && !canonicas.has(key)) canonicas.set(key, v);
   }
+  /** Punto del contador → su clave en el tipo, para simularlo (Plan 40 F0). */
+  const clavePorContador = new Map(Object.entries(contadores).map(([key, punto]) => [punto, key]));
 
   /**
    * La etiqueta de una variable: su descripción, o el rótulo del rol con el
@@ -251,20 +253,35 @@ export function construirSistema(maquina, tipo) {
     },
 
     /**
-     * ── SIN FÍSICA SIMULADA, Y DICIÉNDOLO ──────────────────────────
+     * ── LA FÍSICA SIMULADA ES DEL TIPO (Plan 40 F0) ────────────────
      *
-     * Una máquina configurada no trae simulador: nadie ha escrito su física.
-     * Así que con `ICONICS_FAKE=true` sus puntos se sirven con **calidad de
-     * sin-dato y sin valor**, que es lo que hace el servidor real con un punto
-     * que no entrega.
+     * Hasta el 21-09-2026 una configurada no simulaba: «nadie ha escrito su
+     * física», y con `ICONICS_FAKE=true` sus puntos salían sin dato. La
+     * física existía —la del tipo— pero parseaba los tags de la máquina
+     * escrita a mano. Ahora el tipo simula por DESCRIPTOR (`tipo.simular`), y
+     * aquí cada variable se traduce al suyo por rol y apoyo; los contadores
+     * del área, por su clave. Un tipo sin `simular`, o una variable sin rol
+     * (el estado del sensor), siguen dando `null`.
      *
      * Los tres estados se respetan enteros, y es lo que impide el fallo
      * histórico: `undefined` para lo ajeno —para que el transporte lo deje
-     * fuera de la respuesta— y `null` para lo propio, que es lo que produce el
-     * hueco honesto. Un `0` aquí habría pintado una máquina «a cero» en vez de
-     * una máquina sin datos.
+     * fuera de la respuesta— y `null` para lo propio que no entrega, que es
+     * lo que produce el hueco honesto. Un `0` aquí habría pintado una máquina
+     * «a cero» en vez de una máquina sin datos.
      */
-    modelo: (nombre) => (porPunto.has(nombre) ? null : undefined),
+    modelo: (nombre, ms) => {
+      const v = porPunto.get(nombre);
+      if (!v) return undefined;
+      if (typeof tipo.simular !== "function") return null;
+      const contador = clavePorContador.get(nombre);
+      const descriptor = contador
+        ? { tipo: "alarma", clave: contador, canal: null }
+        : v.rol && tipo.descriptorDe
+          ? tipo.descriptorDe(v.rol, v.assetId ?? null)
+          : null;
+      if (!descriptor) return null;
+      return tipo.simular(descriptor, ms) ?? null;
+    },
 
     /**
      * El estado en la forma común, con su dominio reconstruido.

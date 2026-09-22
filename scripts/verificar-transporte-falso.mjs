@@ -360,6 +360,47 @@ await checkAsync('una serie declarada pero NO verificada sigue fallando como en 
   }
 })
 
+/* ── Una configurada con tags propios, en el falso (Plan 40 F0) ──────── */
+
+console.log('\n── Una configurada con tags propios (Plan 40 F0) ─────────────')
+
+await checkAsync('una configurada de tipo vibraciones con RAÍZ PROPIA se sirve con valores, no sin dato', async () => {
+  /*
+   * Hasta el 21-09-2026 el falso sólo daba valores a los tags de la máquina
+   * escrita a mano: una configurada con otros tags salía entera «sin dato».
+   * Con la simulación en el TIPO, cualquier máquina del tipo simula. Se
+   * registra una con una raíz que ninguna escrita a mano reclama, sólo para
+   * esta comprobación.
+   */
+  const base = configuracionEspejo().configurada
+  const otra = {
+    ...base,
+    id: 'vibraciones-otra-planta',
+    assets: base.assets.map(a => ({ ...a, pointName: a.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/PLANTA').replace('ae:/DEMO VIBRACIONES', 'ae:/OTRA') })),
+    variables: base.variables.map(v => ({
+      ...v,
+      pointName: v.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/PLANTA').replace('ae:/DEMO VIBRACIONES', 'ae:/OTRA'),
+    })),
+  }
+  const entrada = registrarSistema(construirSistema(otra, tipoDe('vibraciones')))
+  try {
+    let t = 1_700_000_000_000
+    while (!enMarchaVib(t)) t += 60_000
+    const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
+    const r = await cliente.readPoints(entrada.puntos())
+    assert.equal(r.ok, true, r.error)
+    const buenos = entrada.puntos().filter(p => r.payload[p]?.ok && isGoodQuality(r.payload[p].payload?.quality))
+    assert.ok(buenos.length >= entrada.puntos().length - 5, `sólo ${buenos.length} de ${entrada.puntos().length} con calidad buena`)
+    const vrms = otra.variables.find(v => v.id === 'vRMS_S1')
+    assert.equal(typeof r.payload[vrms.pointName].payload.value, 'number')
+    // El estado del sensor no tiene rol: hueco declarado, nunca un cero.
+    const sensor = otra.variables.find(v => v.id === 'sensor_S1')
+    assert.ok(!isGoodQuality(r.payload[sensor.pointName]?.payload?.quality), 'el sensor sin rol tiene que ir sin dato')
+  } finally {
+    desregistrarSistema(entrada.id)
+  }
+})
+
 /* ── El historiador ───────────────────────────────────────────────────── */
 
 console.log('\n── El historiador ───────────────────────────────────────────')

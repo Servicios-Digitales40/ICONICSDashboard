@@ -153,10 +153,33 @@ check('un punto AJENO devuelve `undefined`, no `null`', () => {
   assert.equal(valorSimuladoDe('ac:OTRA/COSA/x'), undefined)
 })
 
-check('un punto PROPIO sin física devuelve `null`, nunca 0', () => {
+check('un punto PROPIO que no se puede simular devuelve `null`, nunca 0', () => {
+  /* Esta variable tiene rol de apoyo pero NO apoyo (`assetId`): la física del
+     tipo es POR apoyo, así que no hay qué simular. Hueco, no un valor de un
+     apoyo cualquiera ni un cero. */
   const v = entrada.modelo(`${RAIZ}S1/vRMS`)
   assert.equal(v, null)
   assert.notEqual(v, 0, 'un 0 pintaría la máquina «a cero» en vez de sin datos')
+})
+
+check('un punto PROPIO con rol y apoyo se simula con la física del TIPO (Plan 40 F0)', () => {
+  /*
+   * Hasta el 21-09-2026 una configurada no simulaba nunca: «nadie ha escrito
+   * su física». La física era del tipo desde el principio; sólo sabía leer
+   * los tags de la escrita a mano. Ahora la entrada traduce cada variable a
+   * su descriptor por rol y apoyo, y el mismo instante da el mismo valor que
+   * el catálogo para el apoyo equivalente.
+   */
+  const conApoyo = configuracion('vib-m02-simula', 'ac:PRUEBA/M02S/')
+  conApoyo.assets.push({ id: 'S3', pointName: 'ac:PRUEBA/M02S/S3/', rol: 'secundario' })
+  for (const v of conApoyo.variables) v.assetId = 'S3'
+  const e = construirSistema(conApoyo, TIPO)
+  let t = 1_700_000_000_000
+  while (aMano.modelo(`${aMano.raices[0]}S3/vRMS_S3`, t) === null) t += 60_000
+  const simulado = e.modelo('ac:PRUEBA/M02S/S1/vRMS', t)
+  assert.equal(typeof simulado, 'number', `esperaba un número, salió ${simulado}`)
+  assert.equal(simulado, aMano.modelo(`${aMano.raices[0]}S3/vRMS_S3`, t), 'la física es la del apoyo S3 del tipo')
+  assert.equal(e.modelo('ac:PRUEBA/M02S/nada', t), undefined, 'lo ajeno sigue siendo undefined')
 })
 
 check('`valorSimuladoDe` distingue las dos por el registro', () => {

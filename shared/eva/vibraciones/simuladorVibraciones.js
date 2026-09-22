@@ -505,6 +505,27 @@ function alarmaEn(clave, ms) {
 export function valorVibracionEn(nombre, ms) {
   const p = parsePunto(nombre)
   if (!p) return undefined
+  return valorVibracionDe(p, ms)
+}
+
+/**
+ * La misma física, por DESCRIPTOR y no por nombre de tag (Plan 40 F0).
+ *
+ * `{ tipo, clave, canal }` es lo que `parsePunto` saca de un tag del catálogo
+ * escrito a mano, y es todo lo que la física necesita: qué se mide, de qué
+ * apoyo. Una máquina CONFIGURADA de este tipo tiene otros tags —los suyos—
+ * pero los mismos roles, así que su entrada traduce cada variable a este
+ * descriptor por rol y apoyo, y el transporte falso le da valores. Sin esto,
+ * retirar la entrada escrita a mano dejaba a vibraciones sin simulación.
+ *
+ * Devuelve lo mismo que `valorVibracionEn`: el valor, `null` para «ahora no
+ * entrega» y `undefined` para «no sé qué es esto».
+ *
+ * @param {{tipo: string, clave: string, canal: string|null}|null} p
+ * @param {number} ms
+ */
+export function valorVibracionDe(p, ms) {
+  if (!p?.tipo) return undefined
 
   switch (p.tipo) {
     case 'medida':

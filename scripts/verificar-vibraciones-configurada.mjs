@@ -562,6 +562,45 @@ check('una bandera booleana es una «alarma» para alarma_sostenida; una medida,
   assert.equal(configurada.metaDe('no-existe'), null)
 })
 
+/* ── La simulación es del tipo (Plan 40 F0) ─────────────────────────── */
+
+console.log('\n── La simulación es del tipo (Plan 40 F0) ───────────────────')
+
+check('para el mismo instante, la configurada simula cada punto como el catálogo', () => {
+  let callados = 0
+  for (const v of configuracion.variables) {
+    const suyo = configurada.modelo(v.pointName, instante)
+    const catalogo = aMano.modelo(v.pointName, instante)
+    if (suyo === null) {
+      /* Lo que no tiene rol (sensor) o el catálogo calla siempre (`DKW_S1`) es
+         hueco en las dos, o hueco en la configurada por no tener rol. */
+      assert.ok(catalogo === null || /sensor/i.test(v.id), `${v.id}: la configurada calla y el catálogo no`)
+      callados += 1
+      continue
+    }
+    assert.deepEqual(suyo, catalogo, `${v.id} difiere`)
+  }
+  assert.ok(callados <= 5, `${callados} puntos callados: más de los tres sensores, DKW_S1 y su calidad`)
+})
+
+check('una configurada con raíz PROPIA —tags que el catálogo no conoce— también simula', () => {
+  const otra = {
+    ...configuracion,
+    id: 'vibraciones-otra-planta',
+    assets: configuracion.assets.map((a) => ({ ...a, pointName: a.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/PLANTA') })),
+    variables: configuracion.variables.map((v) => ({
+      ...v,
+      pointName: v.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/PLANTA').replace('ae:/DEMO VIBRACIONES', 'ae:/OTRA'),
+    })),
+  }
+  const e = construirSistema(otra, tipoVib)
+  const vrms = otra.variables.find((v) => v.id === 'vRMS_S3')
+  const contador = otra.variables.find((v) => v.pointName.startsWith('ae:'))
+  assert.equal(e.modelo(vrms.pointName, instante), configurada.modelo(configuracion.variables.find((v) => v.id === 'vRMS_S3').pointName, instante))
+  assert.equal(typeof e.modelo(contador.pointName, instante), 'number', 'los contadores del área se simulan por su clave')
+  assert.equal(e.modelo('ac:OTRA/PLANTA/x', instante), undefined)
+})
+
 /* ── Resultado ───────────────────────────────────────────────────────── */
 
 if (fallos.length) {

@@ -89,6 +89,7 @@ import {
   estadoDeVibraciones,
   resumenVibracionesParaAsistente,
 } from "../vibraciones/estadoVibraciones.js";
+import { valorVibracionDe } from "../vibraciones/simuladorVibraciones.js";
 
 /**
  * ── LOS ROLES: QUÉ PUEDE MEDIR UNA MÁQUINA DE ESTE TIPO ────────────
@@ -487,6 +488,30 @@ export const TIPO_VIBRACIONES = Object.freeze({
 
   /* La forma común (`estadoMaquina.js`) la construye esta función. */
   estado: estadoDeVibraciones,
+
+  /*
+   * ── LA SIMULACIÓN ES DEL TIPO (Plan 40 F0) ─────────────────────
+   *
+   * El transporte falso da valores a un punto preguntándole a su entrada del
+   * registro (`modelo()`). Hasta el 21-09-2026 sólo la máquina escrita a mano
+   * sabía simular, porque la física parseaba SUS tags; una configurada de
+   * este tipo salía «sin dato» en todo. Con el catálogo retirado (Plan 40) la
+   * física tiene que servir a cualquier máquina del tipo, y lo hace por
+   * descriptor: `descriptorDe(rol, apoyo)` traduce un rol a lo que la física
+   * entiende, y `simular` la llama. Los contadores del área no tienen rol y
+   * van por su clave (`contadoresAlarma`); el estado del sensor tampoco, y
+   * sin descriptor no se simula: queda como hueco, no como cero.
+   */
+  descriptorDe: (rol, apoyo = null) => {
+    const r = ROLES[rol];
+    if (!r?.familia || !r?.clave) return null;
+    /* Una medida de apoyo sin apoyo declarado no tiene física que simular:
+       la física es POR apoyo (S3 vibra más que S1). Hueco, no un valor de
+       un apoyo cualquiera. */
+    if (r.ambito === "apoyo" && !apoyo) return null;
+    return { tipo: r.familia, clave: r.clave, canal: r.ambito === "apoyo" ? apoyo : null };
+  },
+  simular: (descriptor, ms) => valorVibracionDe(descriptor, ms),
 
   /*
    * Cómo se lee un estado de vigilancia, que llega codificado en base64.
