@@ -494,6 +494,7 @@ sirviendo código viejo. **Levanta un puerto propio para medir.**
 | 18-09 | `aviso` existe en **dos familias** con ámbitos distintos: indexar roles por clave colapsaba una sobre otra en silencio |
 | 18-09 | El dictado leía `location.hash` en una app que usa History API: **el vocabulario no se elegía nunca** |
 | 18-09 | `.omit({id:true})` descartaba el campo **en silencio**: un `PATCH` con `id` devolvía 200 sin cambiar nada |
+| 22-09 | El editor pintaba un activo como «sin leer» y DESMARCADO si tenia una subcarpeta sin explorar (el `NOT_USED` de `S1`): `hojasBajo()` devuelve `null` si falta una rama del camino —a proposito— y solo se leian las carpetas con variables guardadas. Y el contador del historiador decia «22 · 21» porque sumaba la subcarpeta como si fuera un tag. **Los dos los cazo el usuario en pantalla** |
 | 22-09 | El sondeo acusaba de «serie compartida» a `aPeak_S1` y `aRMS_S1`, que son series distintas. Comparaba **ocho muestras por POSICIÓN**, y esas dos se registran en grupos distintos del historiador (1 s y 5 s): a la misma hora les tocan posiciones distintas. Agravado por una ventana de **7 días fijos** que, con un hueco de registro, devolvía un tramo viejo con la máquina parada donde todo es ruido cerca de cero. **Lo cazó el usuario mirando ICONICS**, no la suite |
 
 ---

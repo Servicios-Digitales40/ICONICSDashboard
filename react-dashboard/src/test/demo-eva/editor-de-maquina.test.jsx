@@ -341,6 +341,59 @@ describe("editar una máquina existente (F3)", () => {
     expect(screen.getByText("ya no está en el árbol")).toBeTruthy();
   });
 
+  it("un activo con SUBCARPETA sigue leído y marcado al reabrir (S1 · NOT_USED)", async () => {
+    /*
+     * El defecto que el usuario cazó contra planta el 22-09-2026, y que
+     * ninguna prueba veía porque el árbol de mentira no tenía subcarpetas
+     * dentro de un activo.
+     *
+     * `S1` tiene dentro la carpeta `NOT_USED`, que no aporta ninguna variable
+     * marcada. `hojasBajo()` devuelve `null` si una subcarpeta del camino no
+     * se ha leído —a propósito— y el editor pintaba ese `null` como «sin
+     * leer», desmarcando el activo entero: al reabrir, `S1` salía desactivado
+     * aunque sus variables estuvieran guardadas.
+     */
+    const SUB = `${RAIZ}S1/NOT_USED/`;
+    servirArbol({
+      ...ARBOL,
+      [`${RAIZ}S1/`]: [...S1.map((n) => hoja(`${RAIZ}S1/`, n)), carpeta(`${RAIZ}S1/`, "NOT_USED")],
+      [SUB]: [hoja(SUB, "CONECTED 1"), hoja(SUB, "NOT 1")],
+    });
+
+    montar({
+      maquina: {
+        ...guardada(),
+        assets: [{ id: "Vibraciones", pointName: RAIZ, rol: "raiz" }, { id: "S1", pointName: `${RAIZ}S1/`, rol: "secundario" }],
+        variables: [
+          { id: "vRMS_S1", pointName: `${RAIZ}S1/vRMS_S1`, historyPointName: `${HDA}${B}S1:vRMS_S1`, historyVerified: true, assetId: "S1", rol: "medida:vRMS", acceso: "read" },
+          { id: "aRMS_S1", pointName: `${RAIZ}S1/aRMS_S1`, historyPointName: `${HDA}${B}S1:aRMS_S1`, historyVerified: true, assetId: "S1", rol: "medida:aRMS", acceso: "read" },
+        ],
+      },
+    });
+
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de S1/ });
+
+    /*
+     * Lo que fallaba, y es lo que ve quien abre la pantalla: con la subcarpeta
+     * sin leer, `hojasBajo()` devolvía `null`, el conteo salía «sin leer» y la
+     * casilla del activo quedaba SIN marcar ni indeterminar —desactivada— pese
+     * a tener dos variables guardadas.
+     *
+     * La casilla se vuelve a buscar en CADA vuelta del `waitFor`: leer la
+     * subcarpeta repinta la fila, y un nodo capturado antes se queda obsoleto
+     * —comprobarlo sobre la referencia vieja falla aunque la pantalla ya esté
+     * bien—.
+     */
+    await waitFor(() => {
+      const c = screen.getByRole("checkbox", { name: /Marcar todas las variables de S1/ });
+      expect(c.checked || c.indeterminate).toBe(true);
+      expect(c.closest("div")?.textContent ?? "").not.toMatch(/sin leer/);
+    });
+
+    /* Las variables guardadas siguen marcadas: el activo no se vació. */
+    expect(await screen.findByText(/2 variables marcadas/)).toBeTruthy();
+  });
+
   it("si la carpeta de una variable NO se pudo leer, queda «no se pudo comprobar», no ausente", async () => {
     servirArbol({ ...ARBOL, [`${RAIZ}S2/`]: "FALLA" });
     montar({ maquina: guardada() });

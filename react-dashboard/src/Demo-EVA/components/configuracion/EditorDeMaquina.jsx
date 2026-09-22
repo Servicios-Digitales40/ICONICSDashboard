@@ -179,6 +179,25 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
       const carpeta = carpetaDe(v.pointName);
       if (carpeta && !arbol.hijosActuales().has(carpeta)) await arbol.cargar(carpeta);
     }
+
+    /*
+     * ── Y LAS SUBCARPETAS DE CADA ACTIVO, TENGAN VARIABLES O NO ──────
+     *
+     * `cargarDosNiveles(raiz)` lee la raíz y sus activos (`S1`, `S2`…), pero
+     * no el TERCER nivel. Y `hojasBajo()` devuelve `null` si cualquier
+     * subcarpeta del camino no se ha leído —a propósito: no afirma un conteo
+     * sobre un árbol a medias—, así que el editor pintaba ese `null` como
+     * «sin leer» y desmarcaba el activo entero.
+     *
+     * El bucle de arriba no basta: sólo lee las carpetas que tienen variables
+     * GUARDADAS. Una subcarpeta de la que no se marcó nada —el `NOT_USED` de
+     * `S1` en esta planta— no se leía nunca, y por eso `S1` salía «sin leer»
+     * y sin marcar al reabrir, mientras `S2` y `S3`, que no tienen
+     * subcarpetas, salían bien. Medido contra planta el 22-09-2026.
+     */
+    for (const activo of arbol.hijosActuales().get(raiz) ?? []) {
+      if (esCarpetaEnVivo(activo.pointName)) await arbol.cargarEnProfundidad(activo.pointName);
+    }
     setExploracion("si");
     // `arbol` es un objeto nuevo por render; sus funciones son estables.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -741,7 +760,14 @@ function CarpetaHistorica({ tx, t, carpeta, nivel, arbol, abiertas, tagUsadoPor,
   const hijos = arbol.hijosDe(ruta);
   const error = arbol.errorDe(ruta);
   const abierta = abiertas.has(ruta);
-  const emparejados = (hijos ?? []).filter((h) => tagUsadoPor.has(h.pointName)).length;
+  /*
+   * Los TAGS de la carpeta, no sus hijos: una subcarpeta no es un tag que se
+   * pueda emparejar, y contarla hacía que `S1` dijera «22 · 21» —22 hijos, de
+   * los que uno era la carpeta `NOT_USED`, y 21 tags emparejados—, como si
+   * quedara un tag suelto. Medido el 22-09-2026.
+   */
+  const tags = (hijos ?? []).filter((h) => !esCarpetaHistorica(h.pointName));
+  const emparejados = tags.filter((h) => tagUsadoPor.has(h.pointName)).length;
 
   return (
     <div>
@@ -758,7 +784,7 @@ function CarpetaHistorica({ tx, t, carpeta, nivel, arbol, abiertas, tagUsadoPor,
           {abierta ? <ChevronDown size={13} color={t.textFaint} /> : <ChevronRight size={13} color={t.textFaint} />}
           <Mono style={{ fontWeight: 600 }}>{carpeta.shortName ?? nombreDeCarpeta(ruta)}</Mono>
           <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: t.textFaint }}>
-            {hijos ? `${hijos.length} · ${emparejados} ↔` : tx("notLoaded")}
+            {hijos ? `${tags.length} · ${emparejados} ↔` : tx("notLoaded")}
           </span>
         </button>
       </Fila>
