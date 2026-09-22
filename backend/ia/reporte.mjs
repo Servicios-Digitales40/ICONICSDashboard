@@ -327,11 +327,45 @@ function cajaResumen(doc, texto) {
 }
 
 /** Color según el estado de una señal, por palabras clave. */
+/** Color por CLAVE de estado, la del dominio (`shared/eva/tanque/estado.js`). */
+const COLOR_POR_CLAVE = Object.freeze({
+  critico: '#C0392B',
+  atencion: '#C07A00',
+  nominal: '#1E7E34',
+  reposo: GRIS,
+  sin_dato: GRIS,
+})
+
+/**
+ * El color de una fila de la tabla de valores actuales.
+ *
+ * ── POR LA CLAVE, Y SÓLO DE RESPALDO POR LAS PALABRAS (B11, 22-09-2026) ──
+ *
+ * Hasta hoy el color se decidía buscando «crit», «ok» o «normal» dentro del
+ * texto del estado. Las etiquetas del dominio son «Fuera de límite», «En
+ * aviso», «En banda», «Sin dato»: la primera y la tercera no casaban con
+ * ningún patrón y salían en GRIS, igual que «sin criterio». Un PDF que pinta
+ * gris una señal fuera de límite es peor que uno sin color.
+ *
+ * La fila lleva ahora `clave` —`critico`, `atencion`, `nominal`…— además de
+ * la etiqueta, y el color sale de ahí. El texto libre queda sólo para filas
+ * que llegan sin clave (las que arma otro código o un idioma que no conoce
+ * las etiquetas), y ahí las palabras siguen siendo lo único que hay.
+ *
+ * Exportada para poder probarla sin dibujar un PDF.
+ */
+export function colorDeFila(fila) {
+  if (fila && typeof fila === 'object' && fila.clave && COLOR_POR_CLAVE[fila.clave]) {
+    return COLOR_POR_CLAVE[fila.clave]
+  }
+  return colorEstado(typeof fila === 'object' && fila ? fila.estado : fila)
+}
+
 function colorEstado(estado = '') {
   const e = String(estado).toLowerCase()
-  if (/(crit|alarm|daño|dano|peligro|zona d)/.test(e)) return '#C0392B'
+  if (/(crit|alarm|daño|dano|peligro|zona d|fuera de l)/.test(e)) return '#C0392B'
   if (/(aten|aviso|advert|borde|zona c)/.test(e)) return '#C07A00'
-  if (/(ok|normal|nueva|admisible|buena|sano|bien|zona a|zona b)/.test(e)) return '#1E7E34'
+  if (/(ok|normal|nueva|admisible|buena|sano|bien|zona a|zona b|en banda)/.test(e)) return '#1E7E34'
   return GRIS
 }
 
@@ -348,7 +382,11 @@ function colorEstado(estado = '') {
 function sintesisAutomatica(tablaActual, graficos, idioma = 'es') {
   const partes = []
   if (tablaActual?.length) {
-    const fuera = tablaActual.filter((f) => /crit|alarm|daño|dano|aten|aviso|zona c|zona d/i.test(String(f.estado))).length
+    /* Por clave cuando la fila la trae (B11); por palabras sólo si no. */
+    const fuera = tablaActual.filter((f) =>
+      f.clave ? f.clave === 'critico' || f.clave === 'atencion'
+        : /crit|alarm|daño|dano|aten|aviso|zona c|zona d|fuera de l/i.test(String(f.estado))
+    ).length
     const sinDato = tablaActual.filter((f) => f.valor === null || f.valor === undefined || /sin dato/i.test(String(f.estado))).length
     /*
      * «Todas en banda» sólo se puede afirmar de las filas que TIENEN criterio.
@@ -482,7 +520,7 @@ export async function componerReportePdf({
       yFila = doc.y
       const valor = fila.valor === null || fila.valor === undefined ? etq.sinDato : fila.valor
       const unidad = fila.unidad ? ` ${fila.unidad}` : ''
-      const col = colorEstado(fila.estado)
+      const col = colorDeFila(fila)
 
       doc.save().circle(MARGEN + 4, yFila + 6, 2.5).fill(col).restore()
       doc.font('Helvetica').fontSize(10.5).fillColor(TEXTO)

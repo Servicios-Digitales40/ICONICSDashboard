@@ -82,7 +82,19 @@ import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 /* La etiqueta humana de un estado de la forma común («nominal» → «Normal»).
    Vive con el tanque porque nació allí, pero las claves son las de
    `senalComun` y las usa también el tipo de vibraciones. */
-import { estadoInfo } from '../../../../shared/eva/tanque/estado.js'
+import { ESTADOS, estadoInfo } from '../../../../shared/eva/tanque/estado.js'
+
+/**
+ * La CLAVE de estado a partir de su etiqueta («Fuera de límite» → `critico`),
+ * o `null` si no es una etiqueta del dominio. Existe porque las señales del
+ * tanque llegan a `generar_reporte` ya descritas para el modelo —con el
+ * rótulo y sin la clave—, y el PDF colorea por clave (B11): recuperarla aquí
+ * por la etiqueta exacta es lo único que no exige tocar el tanque.
+ */
+function claveDeEtiqueta(etiqueta) {
+  if (typeof etiqueta !== 'string') return null
+  return Object.values(ESTADOS).find((e) => e.label === etiqueta)?.key ?? null
+}
 import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
 import { intervencionesRecientes } from '../../../../shared/eva/comun/aprendizaje.js'
 import { leerAprendizaje } from '../aprendizaje/index.mjs'
@@ -1637,8 +1649,8 @@ export function crearHerramientasDeHistoricos({
             return s
               /* La etiqueta, no la clave interna: «Normal», no «nominal». Sin
                  estado no hay criterio, y se dice con un guion, no con «en banda». */
-              ? { senal: s.label, valor: s.valor, unidad: s.unidad || null, estado: s.estado ? estadoInfo(s.estado).label : '—' }
-              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato }
+              ? { senal: s.label, valor: s.valor, unidad: s.unidad || null, estado: s.estado ? estadoInfo(s.estado).label : '—', clave: s.estado ?? null }
+              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato, clave: 'sin_dato' }
           })
         } else {
           notas.push(idioma === 'en'
@@ -1662,8 +1674,8 @@ export function crearHerramientasDeHistoricos({
             const meta = senalInfo(clave)
             const s = todas.find(x => x.clave === clave)
             return s
-              ? { senal: s.senal, valor: s.valor, unidad: s.unidad, estado: s.estado }
-              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato }
+              ? { senal: s.senal, valor: s.valor, unidad: s.unidad, estado: s.estado, clave: claveDeEtiqueta(s.estado) }
+              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato, clave: 'sin_dato' }
           })
         } else {
           notas.push(idioma === 'en'

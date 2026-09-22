@@ -84,7 +84,7 @@ parametrizarlo por máquina) y en B7 (`diagnostico` como orquestador).
 | **B5** bundle | **RESUELTO.** Verificador en verde con techos medidos (343,6/450 y 269,1/330) |
 | **B6, B7** fronteras | Siguen siendo fronteras a vigilar, no tareas |
 | **B8** cobertura | Ver corrección abajo: **una de sus tres afirmaciones ya es falsa** |
-| **B11** color del PDF por palabras | **ABIERTO**, pequeño y real |
+| **B11** color del PDF por palabras | **HECHO el mismo día**: la fila lleva `clave` y `colorDeFila` colorea por ella; las palabras quedan de respaldo |
 | **B12** el tipo describe un SM 1281 | Informativo; sin cliente con otro equipo, no se toca |
 | **B13** banderas constantes | **NUEVO** (Plan 41 F4) |
 
@@ -470,7 +470,18 @@ responde 200 con cero muestras (comprobado en `mttoS1`, `arranqueParoS1`,
 
 ---
 
-## B11 · El PDF colorea los estados por palabras que las etiquetas ya no dicen
+## B11 · El PDF colorea los estados por palabras que las etiquetas ya no dicen — **HECHO (22-09-2026)**
+
+> **Lo que se hizo.** Cada fila de `tablaActual` lleva `clave` además de la
+> etiqueta: en una configurada es el `estado` de la señal tal cual
+> (`nominal`, `atencion`…); en el tanque, cuyas señales llegan al reporte ya
+> descritas para el modelo —con el rótulo y sin la clave—, se recupera por la
+> etiqueta exacta contra `ESTADOS` (`claveDeEtiqueta`, en `generar_reporte`),
+> sin tocar el tanque. `reporte.mjs` exporta `colorDeFila(fila)`: por clave si
+> la hay, y si no, el respaldo por palabras de siempre —que ahora también
+> entiende «Fuera de límite» y «En banda»—. La síntesis automática cuenta
+> «fuera» por clave igual. Probado en `backend/test/reporte-color.test.mjs`
+> sin dibujar un PDF.
 
 **Hoy.** `reporte.mjs·colorEstado` decide el color de una fila de la tabla de
 valores actuales buscando «crit», «alarm», «normal», «ok»… en el texto del
@@ -518,7 +529,7 @@ el archivo de alias cubre el caso de uno en uno.
 2. ~~**B9**~~ — hecho el 11-09-2026
 3. ~~**B10**~~ — hecho el 15-09-2026
 4. ~~**B5**~~ — resuelto: verificador de bundle en verde con techos medidos
-5. **B11** — el color del PDF por clave, no por palabras: pequeño y real
+5. ~~**B11**~~ — hecho el 22-09-2026
 6. **B13** — el sondeo de banderas constantes, como plan antes de tocarlo
 7. **B4** — cuando vibraciones declare mecanismos de desgaste, no antes
 8. **B8 (el ciclo de vida del sondeo)** — la red que falta

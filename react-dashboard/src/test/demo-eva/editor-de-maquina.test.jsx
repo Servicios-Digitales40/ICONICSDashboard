@@ -276,6 +276,24 @@ describe("el alta (F2)", () => {
     await waitFor(() => expect(onGuardado).toHaveBeenCalled());
   });
 
+  it("las limitaciones se escriben una por línea y viajan limpias en el alta (F9)", async () => {
+    crearMaquina.mockResolvedValue({ ok: true, maquina: { id: "vib-motor-02", nombre: "Motor 2" }, avisos: [] });
+    montar();
+    await rellenarYMarcar();
+    fireEvent.change(screen.getByLabelText("Limitaciones de la instalación"), {
+      target: { value: "  El motor gira sin carga acoplada.  \n\nEl rodamiento intermedio no tiene referencia.\nEl motor gira sin carga acoplada.\n" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Dar de alta la máquina/ }));
+    await waitFor(() => expect(crearMaquina).toHaveBeenCalledTimes(1));
+
+    /* Sin espacios, sin líneas vacías y sin repetir. */
+    expect(crearMaquina.mock.calls[0][0].limitaciones).toEqual([
+      "El motor gira sin carga acoplada.",
+      "El rodamiento intermedio no tiene referencia.",
+    ]);
+  });
+
   it("sin nada marcado el botón de alta no se ofrece activo, y se dice qué falta", async () => {
     montar();
     fireEvent.change(screen.getByLabelText("Identificador"), { target: { value: "vib-motor-02" } });
@@ -400,6 +418,46 @@ describe("editar una máquina existente (F3)", () => {
 
     expect(await screen.findByText("Variables guardadas cuya rama no se pudo leer")).toBeTruthy();
     expect(screen.queryByText("Variables guardadas que ya no están en el árbol")).toBeNull();
+  });
+
+  it("al editar sólo se cargan las limitaciones PROPIAS, y el PATCH las lleva siempre (F9)", async () => {
+    /*
+     * `limitaciones` de la API es la lista MEZCLADA (propias + las que deriva
+     * la validación). Si el editor la cargara tal cual, «65 series sin
+     * sondear» se grabaría como si alguien lo hubiera escrito y saldría dos
+     * veces. Por eso la API separa `limitacionesPropias` y el editor lee ésa.
+     */
+    editarMaquina.mockResolvedValue({ ok: true, maquina: guardada(), avisos: [] });
+    montar({
+      maquina: {
+        ...guardada(),
+        limitacionesPropias: ["El motor gira sin carga acoplada."],
+        limitaciones: ["El motor gira sin carga acoplada.", "65 de 86 series declaradas están sin sondear."],
+      },
+    });
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de S2/ });
+
+    const campo = screen.getByLabelText("Limitaciones de la instalación");
+    expect(campo.value).toBe("El motor gira sin carga acoplada.");
+    expect(campo.value).not.toMatch(/sin sondear/);
+
+    /* Se borra la propia: el PATCH tiene que decir «ninguna», no callar. */
+    fireEvent.change(campo, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
+    await waitFor(() => expect(editarMaquina).toHaveBeenCalledTimes(1));
+    expect(editarMaquina.mock.calls[0][1].limitaciones).toEqual([]);
+  });
+
+  it("si la API no separa las propias (backend anterior a F9), el PATCH NO toca las limitaciones", async () => {
+    /* Con el campo vacío por no saber, mandar `[]` borraría lo que sí estaba escrito. */
+    editarMaquina.mockResolvedValue({ ok: true, maquina: guardada(), avisos: [] });
+    montar({ maquina: { ...guardada(), limitaciones: ["El motor gira sin carga acoplada."] } });
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de S2/ });
+
+    expect(screen.getByLabelText("Limitaciones de la instalación").value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
+    await waitFor(() => expect(editarMaquina).toHaveBeenCalledTimes(1));
+    expect(editarMaquina.mock.calls[0][1]).not.toHaveProperty("limitaciones");
   });
 
   it("añadir y quitar conserva el resto: el PATCH lleva la lista entera, con la ausente si se dejó", async () => {

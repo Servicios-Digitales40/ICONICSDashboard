@@ -103,6 +103,14 @@ const conCapacidades = maquina => {
     ...maquina,
     capacidades: capacidadesDe(maquina, tipo),
     limitaciones,
+    /*
+     * Las que escribió una persona, APARTE de la lista mezclada (F9 del
+     * backlog de frontend, 22-09-2026). `limitaciones` lleva propias más
+     * derivadas, y es lo correcto para quien lee; pero quien EDITA necesita
+     * saber cuáles son suyas, o re-grabaría las derivadas como propias y a la
+     * siguiente lectura saldrían dos veces.
+     */
+    limitacionesPropias: maquina.limitaciones ?? [],
   }
 }
 

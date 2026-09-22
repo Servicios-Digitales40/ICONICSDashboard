@@ -131,6 +131,13 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
     nombre: maquina?.nombre ?? "",
     plc: maquina?.plc ?? "",
     tipo: maquina?.tipo ?? tipos[0]?.id ?? "",
+    /*
+     * Sólo las PROPIAS (`limitacionesPropias`, que la API separa a propósito):
+     * `maquina.limitaciones` trae también las que deriva la validación —«65
+     * series sin sondear»—, y cargarlas aquí las re-grabaría como si alguien
+     * las hubiera escrito. Una por línea, que es como se leen y se escriben.
+     */
+    limitaciones: (maquina?.limitacionesPropias ?? []).join("\n"),
   }));
   const [arboles, setArboles] = useState(() => {
     const a = maquina ? arbolesDe(maquina) : {};
@@ -343,6 +350,14 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
             arboles: payload.arboles,
             assets: payload.assets,
             variables: payload.variables,
+            /*
+             * Siempre, aunque vaya vacío: vacío es «borra las mías». SALVO que
+             * la API no haya dicho cuáles son las mías (`limitacionesPropias`
+             * ausente: un backend anterior a F9). Entonces el campo arrancó
+             * vacío sin que nadie lo vaciara, y mandarlo borraría lo que sí
+             * estaba escrito. Se omite, y el servidor no toca nada.
+             */
+            ...(maquina.limitacionesPropias !== undefined ? { limitaciones: payload.limitaciones } : {}),
           })
         : await crearMaquina(payload);
       onGuardado?.(respuesta.maquina, respuesta.avisos ?? []);
@@ -394,6 +409,14 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
             <label style={rotulo} htmlFor="cfg-plc">{tx("fieldPlc")}</label>
             <input id="cfg-plc" className="field" style={campoMono} value={formulario.plc}
               onChange={cambiar("plc")} placeholder="PLC_2 · ua:DEMO3" />
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={rotulo} htmlFor="cfg-limitaciones">{tx("fieldLimits")}</label>
+            {/* Una por línea. Las que deriva la validación no se editan aquí: se suman solas. */}
+            <textarea id="cfg-limitaciones" className="field" style={{ ...campo, minHeight: 64, resize: "vertical" }}
+              value={formulario.limitaciones} onChange={cambiar("limitaciones")}
+              placeholder={tx("fieldLimitsPlaceholder")} rows={3} />
+            <div style={{ fontSize: 11, color: t.textFaint, marginTop: 4 }}>{tx("fieldLimitsHint")}</div>
             <div style={{ ...textoSuave, fontSize: 11, marginTop: 3, color: t.textFaint }}>{tx("fieldPlcHint")}</div>
           </div>
           <div>

@@ -265,6 +265,18 @@ export function proponerVariables({
  * @param {Array<{pointName: string, corto?: string}>} [entrada.contadores]  los
  *   contadores del área de alarmas marcados
  */
+/**
+ * Las limitaciones escritas a mano, como lista limpia: acepta un arreglo o un
+ * texto con una por línea, quita espacios y líneas vacías, y no repite.
+ *
+ * @param {string[]|string|null|undefined} entrada
+ * @returns {string[]}
+ */
+export function limitacionesLimpias(entrada) {
+  const lineas = Array.isArray(entrada) ? entrada : String(entrada ?? "").split(/\r?\n/);
+  return [...new Set(lineas.map((l) => String(l ?? "").trim()).filter(Boolean))];
+}
+
 export function configuracionDesdeMarcas({ formulario, arboles, variables, contadores = [] }) {
   const raiz = arboles.enVivo;
   const assets = [
@@ -319,6 +331,14 @@ export function configuracionDesdeMarcas({ formulario, arboles, variables, conta
     },
     assets,
     variables: variablesLimpias,
+    /*
+     * Lo que quien opera sabe de la instalación y el tablero no puede
+     * deducir («el motor gira sin carga acoplada»). Siempre un arreglo,
+     * aunque vaya vacío: al editar, vacío significa «borra las mías», y
+     * omitirlo significaría «no toques nada». Una por línea en el editor;
+     * aquí llegan ya partidas.
+     */
+    limitaciones: limitacionesLimpias(formulario.limitaciones),
   };
 }
 

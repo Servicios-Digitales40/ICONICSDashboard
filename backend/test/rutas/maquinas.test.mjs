@@ -165,6 +165,24 @@ describe('POST /api/maquinas', () => {
     expect(maquina.capacidades).not.toContain('WRITABLE_VARIABLES')
   })
 
+  /*
+   * F9 del backlog de frontend (22-09-2026). `limitaciones` mezcla las que
+   * escribió una persona con las que deriva la validación; quien EDITA
+   * necesita las suyas aparte, o las derivadas se re-grabarían como propias.
+   */
+  it('las limitaciones PROPIAS viajan aparte de la lista mezclada', async () => {
+    const propia = 'El motor gira sin carga acoplada.'
+    const { maquina } = json(
+      await app.inject({ method: 'POST', url: '/api/maquinas', payload: { ...maquinaValida(), limitaciones: [propia] } })
+    )
+
+    expect(maquina.limitacionesPropias).toEqual([propia])
+    expect(maquina.limitaciones).toContain(propia)
+    /* Y la mezclada trae además lo que la validación sabe: es más larga. */
+    expect(maquina.limitaciones.length).toBeGreaterThan(1)
+    expect(maquina.limitaciones.filter((l) => l === propia)).toHaveLength(1)
+  })
+
   it('el cliente NO puede declararse historia verificada', async () => {
     const payload = maquinaValida('vib-mentirosa')
     payload.variables[0].historyVerified = true
