@@ -46,16 +46,16 @@
 import { causaRealDe } from '../../../shared/eva/comun/aprendizaje.js'
 import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
-import { REGLAS as REGLAS_VIBRACION } from '../../../shared/eva/vibraciones/riesgosVibracion.js'
 import { SISTEMA } from '../../../shared/eva/comun/sistemas.js'
 import { tipoDe } from '../../../shared/eva/tipos/index.js'
 import { isGoodQuality } from '../../../shared/quality.js'
 import { logger } from '../../logger.mjs'
 import { construirSnapshot } from './snapshot.mjs'
 
+/* Sólo el tanque sigue escrito a mano (Plan 40 F1): las demás máquinas
+   traen sus reglas por TIPO, ver `reglasDe`. */
 const REGLAS_POR_SISTEMA = {
   tanque: REGLAS_TANQUE,
-  vibraciones: REGLAS_VIBRACION,
 }
 
 /**

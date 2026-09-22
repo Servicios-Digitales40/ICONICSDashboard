@@ -32,7 +32,17 @@
 import assert from 'node:assert/strict'
 
 import { compartenModulo, FUENTES, MODULOS, moduloDeSistema, moduloPorId } from '../shared/modulos.js'
-import { SISTEMAS } from '../shared/eva/comun/sistemas.js'
+import { registrarSistema, SISTEMAS } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* La máquina de vibraciones es una configurada (Plan 40 F3): se registra la
+   espejo para que las comprobaciones de módulo tengan un sistema de planta
+   que no sea el tanque. */
+const ESPEJO = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -86,8 +96,12 @@ check('todo módulo declara nombre, origen y limitaciones', () => {
 })
 
 check('cada sistema pertenece a exactamente un módulo', () => {
+  /* Una configurada no está en la lista de ningún módulo (Plan 40 F3): la
+     reclama `moduloDeSistema` por ser de ICONICS. Lo que se exige es que la
+     respuesta sea UNA, venga de la lista o de esa regla. */
   for (const id of idsDeSistemas) {
-    const dueños = MODULOS.filter(m => m.sistemas.includes(id))
+    const enLista = MODULOS.filter(m => m.sistemas.includes(id))
+    const dueños = enLista.length ? enLista : [moduloDeSistema(id)].filter(Boolean)
     assert.equal(
       dueños.length,
       1,
@@ -129,7 +143,7 @@ check('sólo un módulo servido por ICONICS declara sistemas', () => {
 console.log(`\n${c.negrita}La guarda contra el cruce de fuentes${c.reset}`)
 
 check('dos sistemas del mismo módulo sí comparten', () => {
-  assert.equal(compartenModulo('tanque', 'vibraciones'), true)
+  assert.equal(compartenModulo('tanque', ESPEJO.id), true)
 })
 
 check('un sistema desconocido no comparte con nadie', () => {
@@ -142,7 +156,10 @@ check('un sistema desconocido no comparte con nadie', () => {
 
 check('moduloDeSistema resuelve los de planta y niega el resto', () => {
   assert.equal(moduloDeSistema('tanque')?.id, 'monitoreo')
-  assert.equal(moduloDeSistema('vibraciones')?.id, 'monitoreo')
+  // Una configurada es de Monitoreo por el REGISTRO, no por una lista fija:
+  // se lee por ICONICS, y eso es lo que define el módulo (Plan 40 F3).
+  assert.equal(moduloDeSistema(ESPEJO.id)?.id, 'monitoreo')
+  assert.equal(moduloDeSistema('vibraciones'), null, 'el id de la escrita a mano ya no es de nadie')
   assert.equal(moduloDeSistema('compresor'), null)
 })
 

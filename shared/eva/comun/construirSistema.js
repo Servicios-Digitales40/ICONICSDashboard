@@ -546,7 +546,7 @@ export function construirSistema(maquina, tipo) {
     /* Sin vocabulario propio: el dictado cae al contexto general, que
        transcribe algo peor pero nunca deforma con el vocabulario de otra
        máquina. */
-    vocabulario: null,
+    vocabulario: tipo.vocabulario ?? null,
     rutas: [],
 
     /**

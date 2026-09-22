@@ -1,6 +1,6 @@
 # PLAN 40 — Retirar la máquina de vibraciones escrita a mano
 
-**Estado:** F0 y F2 completadas · F1+F3 (un solo commit), F4 y F5 por completar
+**Estado:** F0–F3 completadas · F4 (planta) y F5 (documentos) por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -154,6 +154,35 @@ registrada.
 **Criterios.** Con la entrada retirada (F3), `backend/test` y la puerta en
 verde sin un solo `'vibraciones'` como id de sistema fuera del tipo.
 
+**Lo que de verdad pasó (22-09-2026, en el mismo commit que F3).**
+
+- Se intentó F1 sola y dejó la puerta en rojo: la entrada escrita a mano no
+  tenía `tipo`, así que `esDeVibraciones = s => s.tipo === 'vibraciones'`
+  dejaba de reconocerla ANTES de que F3 la retirara. Por eso F1 y F3 van
+  juntas: no hay estado intermedio verde.
+- `lib/maquina.mjs` pierde su `case 'vibraciones'`; `motor/diagnostico.mjs`
+  sólo conoce las reglas del tanque en `REGLAS_POR_SISTEMA` (las de
+  vibraciones las trae el tipo); el banco de evaluación pregunta por «la
+  máquina de vibraciones», no por el id.
+- El narrador inglés (`narrarEstadoVibraciones.mjs`) toma `sistema` del
+  resumen y los apoyos del estado. Y la primera limitación —la única que el
+  asistente cita en su `aviso`— **ya no se traduce por el id de la máquina**,
+  que ahora lo elige quien configura, sino **por su texto**
+  (`LIMITACION_EN_POR_TEXTO` en `narrarEstadoTanque.mjs`). Si el texto no está
+  en la tabla, sale en español: mejor eso que inventar una limitación.
+- El transporte falso sigue publicando la instalación de la demo aunque
+  nadie la haya configurado: importa `CATALOGO_VIBRACIONES` y lo usa como
+  respaldo en el árbol (`construirArbolFalso`), en la lectura en vivo y en el
+  historiador. **Un defecto que apareció al hacerlo:** el respaldo se escribió
+  con `??`, que pisaba el `null` («declarado, sin dato») que devuelve una
+  configurada para un sensor sin rol; `verificar-transporte-falso` lo cazó
+  («el sensor sin rol tiene que ir sin dato») y el respaldo sólo entra con
+  `undefined` (nadie lo reclama). El contrato de tres estados de `modelo()`
+  aguantó porque había una prueba mirándolo.
+- Quedan literales `'vibraciones'` sólo como **tipo** o en cabeceras que
+  cuentan la historia; en las pruebas, `SISTEMA.vibraciones` aparece una vez,
+  para afirmar que es `undefined`.
+
 ### F2 — El frontend sin la sección escrita a mano
 
 **Objetivo.** Que el tablero enseñe vibraciones sólo por sus máquinas
@@ -262,6 +291,55 @@ retira con su motivo escrito.
 
 **Criterios.** Los 41 verificadores (o los que queden, con el cambio
 escrito), sin `SISTEMA.vibraciones` en ningún guion.
+
+**Lo que de verdad pasó (22-09-2026).**
+
+- La entrada `vibraciones` de `SISTEMAS` se retiró (258 líneas), con sus
+  importaciones y `GRUPO_HISTORIADOR`. Su FORMA se conserva en
+  `shared/eva/vibraciones/catalogoDemo.js` como `CATALOGO_VIBRACIONES`,
+  reconstruida desde los módulos del tipo y comprobada idéntica a la entrada
+  antes de borrarla. No está en el registro: es la referencia contra la que se
+  compara la configurada, y lo que el transporte falso publica.
+- `shared/modulos.js`: `monitoreo` lista sólo `tanque`; `moduloDeSistema`
+  reclama cualquier configurada (es de ICONICS por definición).
+  `verificar-modulos` exige que la respuesta sea UNA, venga de la lista o de
+  esa regla.
+- Los hechos de `aprendizaje.js` que decían `sistema: 'vibraciones'` pasan a
+  `sistema: null` (valen para el tipo, no para una máquina concreta) y el que
+  hablaba del grupo con espacio se retiró: era del historiador de la
+  instalación, no del tipo.
+- La fixture `scripts/lib/vibraciones-espejo.json` (73 variables, 36 series
+  verificadas) es la máquina de la demo. **Dos cosas que le faltaban y que
+  sólo aparecieron con la entrada fuera:** (1) los tres apoyos como assets
+  con nombre (`S1` → «Lado acople», `S2` → «Rodamiento intermedio», `S3` →
+  «Lado libre»), porque una configurada saca el nombre del apoyo de
+  `assets[].nombre` y sin eso el asistente decía «S1 (S1, bearing
+  unidentified)»; (2) sus limitaciones reales (la del `aPeak_S1` primero)
+  en vez del texto «configuración DERIVADA del catálogo… para comparar», que
+  desde esta fase es falso. `datos/maquinas.json` no está versionado: hay que
+  volver a sembrarlo (`ICONICS_FAKE=true node scripts/sembrar-espejo.mjs`),
+  y en planta darle esos nombres desde el árbol (F4).
+- `generar-configuracion-vibraciones.mjs` se retiró (derivaba del catálogo
+  que ya no existe); lo sustituye `sembrar-espejo.mjs`, que escribe la
+  fixture en `MAQUINAS_RUTA`.
+- Verificadores tocados: 15. Los que registran la espejo lo hacen arriba, una
+  vez (`verificar-herramientas`, `verificar-transporte-falso`);
+  `verificar-vibraciones-configurada` compara ahora contra
+  `CATALOGO_VIBRACIONES` y construye su propia configurada SIN verificadas
+  para el «sin sondear no promete ninguna serie»;
+  `verificar-registro-configurado` calcula el núcleo común entre el tanque y
+  el catálogo. Dos asertos cambiaron de sentido y lo dicen: el nombre del
+  sistema en inglés es el id de la configurada (un identificador no se
+  traduce), y `reglas_evaluadas` puede superar `reglas.length` porque las
+  reglas de apoyo se evalúan una vez por apoyo.
+- Frontend: seis archivos de prueba registraban la entrada escrita a mano;
+  ahora registran la espejo. Una desigualdad se perdió y está anotada en
+  `procedencia.test.js`: la ruta del historiador de una configurada es
+  `hda:` a secas (el nombre histórico viaja literal por variable), igual que
+  la del tanque. Ningún defecto en `src/`.
+- Medido al cerrar: puerta 182 correctas + 22 omitidas (herramientas) y 71
+  (chat); `npm run verificar` 41 de 41; backend 385; frontend 1090 (+29
+  omitidas); lint y types limpios.
 
 ### F4 — Planta
 

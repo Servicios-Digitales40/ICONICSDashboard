@@ -68,6 +68,14 @@ import { SENALES, esHistorizada, parsePointName, parsePuntoHistorico } from '../
 import { MAX_PUNTOS } from '../../shared/eva/comun/historia.js'
 import { mediaDelTramo } from '../../shared/eva/tanque/simulador.js'
 import { SISTEMAS, sistemaDePunto, valorSimuladoDe } from '../../shared/eva/comun/sistemas.js'
+/*
+ * El catálogo de la instalación de la DEMO (Plan 40 F3): la máquina de
+ * vibraciones ya no está escrita en el registro, pero el SERVIDOR que este
+ * transporte imita sí publica sus tags y sus series, haya o no una
+ * configurada que los reclame. Sin esto, arrancar con ICONICS_FAKE=true y sin
+ * maquinas.json daría un árbol sin vibraciones que explorar ni configurar.
+ */
+import { CATALOGO_VIBRACIONES } from '../../shared/eva/vibraciones/catalogoDemo.js'
 import { QUALITY_BAD_UA, QUALITY_GOOD_UA, QUALITY_SIN_DATO, isGoodQuality } from '../../shared/quality.js'
 
 /**
@@ -97,7 +105,12 @@ const CAOS = { malaCalidad: 0.02, ausente: 0.01 }
  * ajeno (`undefined`), punto propio que ahora no entrega (`null`) y valor.
  */
 function lecturaSimulada(name, t, rnd) {
-  const valor = valorSimuladoDe(name, t)
+  /* Primero el registro (una configurada trae su propia física); SÓLO si nadie
+     lo reclama (undefined), el catálogo de la demo, que es lo que el servidor
+     real publica. Un `null` del registro es «declarado, sin dato» y se respeta:
+     con `??` el catálogo lo habría pisado. */
+  const delRegistro = valorSimuladoDe(name, t)
+  const valor = delRegistro === undefined ? CATALOGO_VIBRACIONES.modelo(name, t) : delRegistro
   if (valor === undefined) return null
   if (valor === null) return { pointName: name, quality: QUALITY_SIN_DATO }
   if (rnd() < CAOS.malaCalidad) return { pointName: name, value: 0, quality: QUALITY_BAD_UA }
@@ -174,7 +187,7 @@ function mediaSimulada(puntoEnVivo, desdeMs, hastaMs) {
  * hay serie que servir.
  */
 function serieDeOtraMaquina(nombrePunto) {
-  for (const sistema of SISTEMAS) {
+  for (const sistema of [...SISTEMAS, CATALOGO_VIBRACIONES]) {
     if (sistema.id === 'tanque') continue
     const clave = sistema.claves().find(k => sistema.series.punto(k) === nombrePunto)
     if (!clave) continue
@@ -555,7 +568,7 @@ export function createFakeIconicsClient({ ahora = () => Date.now(), rnd = Math.r
    * enumera las carpetas de primer nivel de todas, pero cada rama sólo
    * devuelve lo que cuelga de ella.
    */
-  const ARBOL = construirArbolFalso(SISTEMAS)
+  const ARBOL = construirArbolFalso([...SISTEMAS, CATALOGO_VIBRACIONES])
 
   async function browse(path) {
     const p = path ?? ''

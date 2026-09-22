@@ -15,16 +15,43 @@
  * nadie toca el registro, que no es lo que importa.
  *
  * Es dominio puro: sin React, sin DOM, sin red (`CLAUDE.md` §2.7).
+ *
+ * ── LA OTRA MÁQUINA ES UNA CONFIGURADA (Plan 40 F3) ─────────────────
+ *
+ * `SISTEMA.vibraciones` —la entrada escrita a mano— se retiró del registro.
+ * La «otra máquina» de estas pruebas es ahora la espejo configurada
+ * (`scripts/lib/vibraciones-espejo.json`), construida con `construirSistema` y
+ * dada de alta con `registrarSistema`, igual que hace el backend al arrancar.
+ * Lo que se afirma no cambia: el módulo recoge `plc`, `cadenciaMs` y
+ * `series.ruta` de la entrada que reclama el punto, sin saber si esa entrada
+ * la escribió alguien o la construyó una configuración. Que la espejo tenga
+ * `plc` y raíces distintas del tanque es lo que hace útil la comparación, y se
+ * comprueba en vez de darse por hecho.
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { procedenciaDe, EXPLICACION_MOTIVO } from "@shared/eva/comun/procedencia.js";
-import { SISTEMA } from "@shared/eva/comun/sistemas.js";
+import { SISTEMA, desregistrarSistema, registrarSistema } from "@shared/eva/comun/sistemas.js";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
 import { MOTIVO } from "@shared/quality.js";
 import { createSenal } from "@shared/eva/tanque/sistema.js";
 import { pointName } from "@shared/eva/tanque/senales.js";
+import { ID_ESPEJO, configuracionEspejo } from "../../../../scripts/lib/configuracionEspejo.mjs";
 
 const AHORA = new Date("2026-09-11T12:00:00Z");
+
+/** La máquina de vibraciones configurada, una vez registrada. */
+let vibraciones;
+
+beforeAll(() => {
+  vibraciones = registrarSistema(
+    construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe("vibraciones")),
+  );
+});
+afterAll(() => {
+  desregistrarSistema(ID_ESPEJO);
+});
 
 const senalViva = () =>
   createSenal({ key: "nivelTanque", valor: 62.5, receivedAt: AHORA });
@@ -54,27 +81,48 @@ describe("procedenciaDe: recoge la cadena entera, sin inventar ningún tramo", (
     expect(p.serie.ruta).toBe(SISTEMA.tanque.series.ruta);
     expect(p.serie.agregado).toBe(SISTEMA.tanque.series.agregado);
 
-    // Que sean distintas es el motivo de que esto salga del registro y no de
-    // una constante: `ac:` vs `hda:`, y dos rutas que no se parecen.
-    expect(SISTEMA.vibraciones.series.ruta).not.toBe(SISTEMA.tanque.series.ruta);
+    /*
+     * ── UNA ASERCIÓN QUE PIERDE SU SUJETO (Plan 40 F3) ─────────────
+     *
+     * Aquí se afirmaba que las dos rutas eran DISTINTAS, y lo eran: el tanque
+     * decía `hda:` y la entrada escrita a mano de vibraciones llevaba el grupo
+     * entero, `hda:\Configuration\DEMO_VIBRACIONES\`. Una máquina configurada
+     * ya no puede distinguirse por ahí: `construirSistema` guarda el nombre
+     * histórico LITERAL en cada variable (`historyPointName`, por el defecto
+     * B10) y deja `series.ruta` en el `hda:` pelado, igual que el tanque.
+     *
+     * Lo que la prueba defendía no era la desigualdad sino que la ruta se LEA
+     * de la entrada de cada máquina y no de una constante del módulo. Eso se
+     * sigue comprobando: la del panel es la que declara la entrada, y la
+     * segunda máquina la declara por su cuenta. La desigualdad se deja caer
+     * con esta nota, en vez de fingirla comparando otro campo.
+     */
+    expect(vibraciones.series.ruta).toBe("hda:");
+    expect(p.serie.ruta).toBe(SISTEMA.tanque.series.ruta);
   });
 });
 
 describe("la otra máquina contesta igual, sin que el módulo sepa de ninguna", () => {
-  it("un punto de vibraciones trae SU plc, SU cadencia y SU ruta", () => {
-    const punto = SISTEMA.vibraciones.puntos()[0];
+  it("un punto de una máquina configurada trae SU plc, SU cadencia y SU ruta", () => {
+    const punto = vibraciones.puntos()[0];
     const p = procedenciaDe({ senal: { key: "x", valor: 1, historizado: true }, punto });
 
-    expect(p.sistema.id).toBe("vibraciones");
-    expect(p.sistema.plc).toBe(SISTEMA.vibraciones.plc);
-    expect(p.sistema.cadenciaMs).toBe(SISTEMA.vibraciones.cadenciaMs);
-    expect(p.serie.ruta).toBe(SISTEMA.vibraciones.series.ruta);
+    expect(p.sistema.id).toBe(ID_ESPEJO);
+    expect(p.sistema.plc).toBe(vibraciones.plc);
+    expect(p.sistema.cadenciaMs).toBe(vibraciones.cadenciaMs);
+    expect(p.serie.ruta).toBe(vibraciones.series.ruta);
+
+    // Y esos tres valores son los de la CONFIGURACIÓN, no un defecto del tipo:
+    // es lo que hace que el panel diga la verdad de esta máquina concreta.
+    const { configurada } = configuracionEspejo();
+    expect(p.sistema.plc).toBe(configurada.plc);
+    expect(p.sistema.cadenciaMs).toBe(configurada.cadenciaMs);
   });
 
   it("los dos PLC son distintos, que es justo lo que un panel no puede confundir", () => {
     const delTanque = procedenciaDe({ senal: senalViva(), punto: pointName("nivelTanque") });
     const deVibra = procedenciaDe({
-      senal: { key: "x", valor: 1 }, punto: SISTEMA.vibraciones.puntos()[0],
+      senal: { key: "x", valor: 1 }, punto: vibraciones.puntos()[0],
     });
 
     expect(delTanque.sistema.plc).not.toBe(deVibra.sistema.plc);

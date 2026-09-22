@@ -54,6 +54,16 @@ import { deflateRawSync } from 'node:zlib'
 import { join } from 'node:path'
 
 import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
+import { registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* El índice filtra por sistema contra el registro VIVO; la máquina de
+   vibraciones es la espejo configurada (Plan 40 F3). */
+const ESPEJO = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -426,7 +436,7 @@ await check('un manual de OTRO sistema no aparece, aunque el texto encaje perfec
     version: 1,
     manuales: [
       { id: 'm1', archivo: 'tanque.txt', sistema: 'tanque' },
-      { id: 'm2', archivo: 'vibraciones.txt', sistema: 'vibraciones' },
+      { id: 'm2', archivo: 'vibraciones.txt', sistema: ESPEJO.id },
     ],
   }))
 
@@ -447,7 +457,7 @@ await check('un manual SIN sistema asignado responde a los dos (toda la planta)'
 
   const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })
   const paraTanque = await indice.buscar('procedimiento de arranque general', { sistema: 'tanque' })
-  const paraVibraciones = await indice.buscar('procedimiento de arranque general', { sistema: 'vibraciones' })
+  const paraVibraciones = await indice.buscar('procedimiento de arranque general', { sistema: ESPEJO.id })
 
   assert.ok(paraTanque.length > 0, 'un manual sin sistema debía respaldar al tanque también')
   assert.ok(paraVibraciones.length > 0, 'y a vibraciones también')
@@ -470,7 +480,7 @@ await check('sin pedir `sistema` en la búsqueda, el comportamiento es el de sie
   await writeFile(join(dir, 'vibraciones.txt'), textoLargo('valvula de impulsion agarrotada', 2))
   await writeFile(join(dir, '.manifiesto.json'), JSON.stringify({
     version: 1,
-    manuales: [{ id: 'm1', archivo: 'vibraciones.txt', sistema: 'vibraciones' }],
+    manuales: [{ id: 'm1', archivo: 'vibraciones.txt', sistema: ESPEJO.id }],
   }))
 
   const indice = createIndiceDocumentos({ carpeta: dir, rutaCache: join(dir, '.cache.json') })

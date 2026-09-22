@@ -174,15 +174,29 @@ const LIMITACION_0_EN = {
   tanque:
     "The limits used to evaluate each signal are our own estimates for a generic water " +
     "system, not ranges confirmed by whoever operates the installation.",
-  vibraciones:
-    "Peak acceleration on the drive-end bearing (aPeak_S1) does not have its own series: " +
-    "the historian returns the RMS acceleration of the same bearing there instead. Its trend " +
-    "cannot be discussed, though the other two bearings' can.",
 };
+
+/*
+ * Desde el Plan 40 F3 la máquina de vibraciones no está escrita a mano: es
+ * una configurada, y su id lo elige quien la configura. Su limitación no se
+ * puede traducir por el id; se traduce por el TEXTO, que es el que viaja en la
+ * configuración. Si nadie lo escribió tal cual, sale en español —que es mejor
+ * que inventar una limitación que la máquina no declaró.
+ */
+const LIMITACION_EN_POR_TEXTO = new Map([
+  [
+    "La aceleración de pico del lado acople (aPeak_S1) NO tiene serie propia: el " +
+      "historiador devuelve ahí la de la aceleración eficaz del mismo apoyo. No se puede " +
+      "hablar de su evolución, aunque las de los otros dos apoyos sí.",
+    "Peak acceleration on the drive-end bearing (aPeak_S1) does not have its own series: " +
+      "the historian returns the RMS acceleration of the same bearing there instead. Its trend " +
+      "cannot be discussed, though the other two bearings' can.",
+  ],
+]);
 
 /** `elegido.sistema.limitaciones?.[0]`, traducida — ver el porqué arriba. */
 export function narrarPrimeraLimitacion(sistemaId, textoEspanol) {
-  return LIMITACION_0_EN[sistemaId] ?? textoEspanol;
+  return LIMITACION_0_EN[sistemaId] ?? LIMITACION_EN_POR_TEXTO.get(textoEspanol) ?? textoEspanol;
 }
 
 /*

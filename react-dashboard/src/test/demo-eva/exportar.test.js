@@ -8,12 +8,37 @@
  * `canvas`: jsdom no lo implementa (`getContext` da `null`, `toBlob` nunca
  * llama a su callback, comprobado antes de escribir esto), así que
  * `descargarPNG` en sí queda para la revisión en pantalla del Plan 13 (§6).
+ *
+ * ── LA «OTRA MÁQUINA» DE LA PROCEDENCIA ES UNA CONFIGURADA (Plan 40 F3) ─
+ *
+ * Las pruebas de `notaDeProcedencia` necesitan dos máquinas con PLC distinto
+ * para comprobar que el CSV no las confunde. La segunda era `SISTEMA.vibraciones`,
+ * escrita a mano; retirada del registro, aquí se da de alta la espejo
+ * configurada (`scripts/lib/vibraciones-espejo.json`) con `registrarSistema`,
+ * que es exactamente lo que hace el backend al arrancar. Su `plc` y sus puntos
+ * salen de la configuración, así que el CSV sigue diciendo lo que el registro
+ * declara y no un literal de esta prueba.
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { datosACSV, nombreArchivo, notaDeCobertura, notaDeProcedencia, prepararSvgParaExportar } from "@/Demo-EVA/lib/exportar.js";
-import { SISTEMA } from "@shared/eva/comun/sistemas.js";
+import { SISTEMA, desregistrarSistema, registrarSistema } from "@shared/eva/comun/sistemas.js";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
 import { pointName } from "@shared/eva/tanque/senales.js";
+import { ID_ESPEJO, configuracionEspejo } from "../../../../scripts/lib/configuracionEspejo.mjs";
+
+/** La máquina de vibraciones configurada, una vez registrada. */
+let vibraciones;
+
+beforeAll(() => {
+  vibraciones = registrarSistema(
+    construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe("vibraciones")),
+  );
+});
+afterAll(() => {
+  desregistrarSistema(ID_ESPEJO);
+});
 
 const SENAL_NIVEL = { key: "nivelTanque", corto: "Nivel", unidad: "%" };
 const SENAL_SIN_UNIDAD = { key: "presionRelativa", corto: "Presión", unidad: "" };
@@ -202,7 +227,7 @@ describe("notaDeProcedencia: un CSV que se puede defender solo meses después", 
     const nota = notaDeProcedencia({ senal: SENAL_NIVEL, punto: null });
 
     expect(nota).not.toContain(SISTEMA.tanque.plc);
-    expect(nota).not.toContain(SISTEMA.vibraciones.plc);
+    expect(nota).not.toContain(vibraciones.plc);
     // Pero sigue fechando la exportación: lo que no se sabe se calla, lo que
     // sí se sabe se dice.
     expect(nota).toMatch(/# exportado:/);
@@ -222,11 +247,14 @@ describe("notaDeProcedencia: un CSV que se puede defender solo meses después", 
   it("la del tanque y la de vibraciones no se pueden confundir", () => {
     const delTanque = notaDeProcedencia({ senal: SENAL_NIVEL, punto: PUNTO });
     const deVibra = notaDeProcedencia({
-      senal: { key: "x", corto: "x" }, punto: SISTEMA.vibraciones.puntos()[0],
+      senal: { key: "x", corto: "x" }, punto: vibraciones.puntos()[0],
     });
 
+    // Si los dos PLC fueran iguales la prueba no distinguiría nada: se exige
+    // primero que la fixture siga siendo otra máquina de verdad.
+    expect(vibraciones.plc).not.toBe(SISTEMA.tanque.plc);
     expect(delTanque).toContain(SISTEMA.tanque.plc);
-    expect(deVibra).toContain(SISTEMA.vibraciones.plc);
+    expect(deVibra).toContain(vibraciones.plc);
     expect(deVibra).not.toContain(SISTEMA.tanque.plc);
   });
 });

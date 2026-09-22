@@ -116,7 +116,7 @@ function narrarSinComprobar(noEvaluables, sinComprobarEspanol) {
   return `${noEvaluables.length} rules could not be evaluated due to missing readings: ${titulos}`;
 }
 
-function narrarAvisoVibraciones(avisoEspanol, sinLectura, puntosPedidos, sistema = "vibraciones") {
+function narrarAvisoVibraciones(avisoEspanol, sinLectura, puntosPedidos, sistema) {
   if (!avisoEspanol) return avisoEspanol;
   const base =
     "ANOTHER MACHINE, not the tank: do not relate these vibrations to its flow, pressure or " +
@@ -148,13 +148,12 @@ export function narrarResumenVibracionesEnIngles(resumen, estado, riesgosYaNarra
 
   return {
     ...resumen,
-    /* Una configurada lleva su id en `sistema` (Plan 39 F1) y no se traduce:
-       el modelo lo necesita tal cual para las herramientas. */
-    sistema: !resumen.configurada && MACHINES_EN?.systems?.vibraciones
-      ? `${MACHINES_EN.systems.vibraciones} — ANOTHER MACHINE, not the tank`
-      : resumen.sistema,
-    /* Los apoyos de la máquina que se narra; la escrita a mano trae `CANALES`. */
-    apoyos: (estado?.apoyos ?? CANALES).map((c, i) => {
+    /* El id de la máquina no se traduce (Plan 39 F1): el modelo lo necesita
+       tal cual para las herramientas. Desde el Plan 40 F1 toda máquina de
+       vibraciones es configurada y lleva su id aquí. */
+    sistema: resumen.sistema,
+    /* Los apoyos de la máquina que se narra, los que el estado trae. */
+    apoyos: (estado?.apoyos ?? []).map((c, i) => {
       const d = canales[c.id]
       return d ? narrarApoyoEnIngles(c, d, estado?.normaAplicable) : resumen.apoyos[i]
     }),
@@ -174,6 +173,6 @@ export function narrarResumenVibracionesEnIngles(resumen, estado, riesgosYaNarra
     },
     norma: `ISO 10816-1 Class I: warning ${LIMITES_ISO.aviso} mm/s, alarm ${LIMITES_ISO.alarma} mm/s`,
     sin_comprobar: narrarSinComprobar(riesgosYaNarrados?.noEvaluables, resumen.sin_comprobar),
-    aviso: narrarAvisoVibraciones(resumen.aviso, resumen.puntos_sin_lectura, estado?.puntosPedidos, estado?.sistema),
+    aviso: narrarAvisoVibraciones(resumen.aviso, resumen.puntos_sin_lectura, estado?.puntosPedidos, estado?.sistema ?? resumen.sistema),
   };
 }

@@ -47,6 +47,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { createIndiceDocumentos } from '../backend/ia/indices/documentos.mjs'
+import { registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* El índice filtra por sistema contra el registro VIVO; la máquina de
+   vibraciones es la espejo configurada (Plan 40 F3). */
+const ESPEJO = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import { createMotorDiagnostico } from '../backend/ia/motor/diagnostico.mjs'
 import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/comun/aprendizaje.js'
@@ -249,7 +259,7 @@ await check('el manual de vibraciones queda fuera de un diagnóstico del tanque'
     version: 1,
     manuales: [
       { id: 'm1', archivo: 'valvula.txt', sistema: 'tanque' },
-      { id: 'm2', archivo: 'vibraciones.txt', sistema: 'vibraciones' },
+      { id: 'm2', archivo: 'vibraciones.txt', sistema: ESPEJO.id },
     ],
   }))
 

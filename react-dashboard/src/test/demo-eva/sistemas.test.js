@@ -17,19 +17,53 @@
  * nadie se acuerde de venir aquí. Es el único sitio del proyecto donde iterar
  * todos los sistemas está bien — y aun así **nunca se mezclan sus puntos**: lo
  * que se comprueba abajo es justamente que no se solapan.
+ *
+ * ── LA SEGUNDA MÁQUINA ENTRA CONFIGURADA (Plan 40 F3) ───────────────
+ *
+ * La entrada `vibraciones` escrita a mano se retiró, y `SISTEMAS` trae de
+ * fábrica sólo el tanque. Aquí se da de alta la espejo configurada
+ * (`scripts/lib/vibraciones-espejo.json`: los mismos tags, etiquetas y alias
+ * que tenía el catálogo) con `registrarSistema`, que es el mismo camino que
+ * recorre el backend al arrancar. Se registra AL CARGAR el módulo y no en un
+ * `beforeAll` a propósito: las tablas de `it.each(SISTEMAS…)` se construyen al
+ * recoger las pruebas, antes de cualquier gancho, y con un `beforeAll` la
+ * configurada quedaría fuera de justo los bucles que este archivo existe para
+ * recorrer. Se quita en `afterAll` para no dejar el registro tocado a otras
+ * suites del mismo proceso.
+ *
+ * Las pruebas de `sistemasDeSenal` esperaban `sistema: "vibraciones"`; ahora
+ * esperan el id de la espejo. La resolución es la misma porque
+ * `construirSistema` arma `etiquetaDe` y `aliasDe` con la descripción, el
+ * rótulo del rol y los alias de la configuración —«Velocidad eficaz · Lado
+ * acople», «Velocidad eficaz», «vRMS S1»…—, que es lo que el catálogo ofrecía.
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import {
   SISTEMAS,
   SISTEMA,
   SISTEMA_IDS,
+  desregistrarSistema,
   mismoSistema,
   parsePuntoDeSistema,
+  registrarSistema,
   sistemaDePunto,
   sistemasDeSenal,
   valorSimuladoDe,
 } from "@shared/eva/comun/sistemas.js";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
+import { ID_ESPEJO, configuracionEspejo } from "../../../../scripts/lib/configuracionEspejo.mjs";
+
+registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe("vibraciones")),
+);
+afterAll(() => {
+  desregistrarSistema(ID_ESPEJO);
+});
+
+/** El id de la máquina de vibraciones de estas pruebas. */
+const VIBRACIONES = ID_ESPEJO;
 
 /** Reloj fijo: ninguna prueba puede depender de cuándo se ejecute. */
 const T0 = Date.UTC(2026, 7, 27, 9, 0, 0);
@@ -184,14 +218,14 @@ describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta
     const r = sistemasDeSenal("velocidad eficaz");
 
     expect(r.length).toBeGreaterThan(0);
-    expect(r.every((x) => x.sistema === "vibraciones")).toBe(true);
+    expect(r.every((x) => x.sistema === VIBRACIONES)).toBe(true);
   });
 
   it("la etiqueta exacta gana sobre la coincidencia parcial", () => {
     // Quien acierta el nombre entero recibe UNA señal, no la familia: la
     // igualdad se resuelve antes y no compite con la contención.
     expect(sistemasDeSenal("Velocidad eficaz · Lado acople")).toEqual([
-      { sistema: "vibraciones", clave: "vRMS_S1" },
+      { sistema: VIBRACIONES, clave: "vRMS_S1" },
     ]);
   });
 
@@ -214,7 +248,7 @@ describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta
      */
     const variador = sistemasDeSenal("velocidad del variador");
     expect(variador.length).toBe(2);
-    expect(new Set(variador.map((x) => x.sistema))).toEqual(new Set(["tanque", "vibraciones"]));
+    expect(new Set(variador.map((x) => x.sistema))).toEqual(new Set(["tanque", VIBRACIONES]));
   });
 
   it("un nombre ambiguo devuelve TODOS los candidatos, no el primero", () => {
@@ -253,7 +287,7 @@ describe("el registro reconoce un nombre de señal sin exigir la etiqueta exacta
 
     // Y con el apoyo dicho, una sola.
     expect(sistemasDeSenal("DKW del Sensor 1")).toEqual([
-      { sistema: "vibraciones", clave: "DKW_S1" },
+      { sistema: VIBRACIONES, clave: "DKW_S1" },
     ]);
   });
 

@@ -62,15 +62,16 @@ import { agruparPorRegla, horaLocal, redondear } from '../../conversacion/herram
  */
 const TAG_CONTROL_BOMBA = 'ac:TDCON/DEMO/SEGURIDAD/CONTROL'
 /**
- * Si el sistema es de vibraciones, sea la entrada escrita a mano o una
- * configurada de ese TIPO (Plan 38 F3).
+ * Si el sistema es de vibraciones: una configurada de ese TIPO (Plan 38 F3).
  *
  * Hasta el 21-09-2026 esto era `sistema.id === 'vibraciones'`, y una máquina
  * configurada de tipo vibraciones caía en el catálogo inglés del tanque: sus
  * riesgos se narraban en inglés con el diccionario de la otra máquina. En
- * español no se notaba porque el catálogo compone siempre en español.
+ * español no se notaba porque el catálogo compone siempre en español. Desde
+ * el Plan 40 F1 ya no hay entrada escrita a mano que preguntar por id: el
+ * tipo es lo único que distingue.
  */
-const esDeVibraciones = sistema => sistema.id === 'vibraciones' || sistema.tipo === 'vibraciones'
+const esDeVibraciones = sistema => sistema.tipo === 'vibraciones'
 
 /*
  * ── LA RELECTURA DE CONFIRMACIÓN SE MUDÓ AL CLIENTE (Plan 21 F5) ────

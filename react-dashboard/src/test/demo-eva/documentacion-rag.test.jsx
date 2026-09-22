@@ -11,10 +11,33 @@
  * lee con una carpeta vacía, un manual roto se ve roto y no como uno con
  * cero fragmentos a secas, y archivar no dispara sin el segundo clic de
  * confirmación.
+ *
+ * ── LA MÁQUINA QUE SE ASIGNA ES UNA CONFIGURADA (Plan 40 F3) ────────
+ *
+ * El selector «A qué máquina pertenece este manual» lista
+ * `useDominio().sistemas()`: las del registro escrito a mano —hoy sólo el
+ * tanque— más las configuradas que trae `useMaquinasConfiguradas()`. Con la
+ * entrada `vibraciones` retirada del registro, asignar a vibraciones es asignar
+ * a una configurada, así que se simula el provider con una de id
+ * `vibraciones-configurada` (el de la espejo de pruebas). Sin ella, el
+ * `<select>` no tendría esa opción y `fireEvent.change` no cambiaría nada: el
+ * PATCH saldría con `sistema=` vacío, que es «toda la planta».
  */
 import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { ID_CONFIGURADA } = vi.hoisted(() => ({ ID_CONFIGURADA: "vibraciones-configurada" }));
+
+vi.mock("@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx", async (importOriginal) => ({
+  ...(await importOriginal()),
+  useMaquinasConfiguradas: () => ({
+    maquinas: [{ id: ID_CONFIGURADA, nombre: "Motor de vibraciones (espejo)", tipo: "vibraciones" }],
+    cargando: false,
+    error: null,
+    recargar: () => {},
+  }),
+}));
 
 import { ThemeProvider } from "@/theme";
 import DocumentacionRag from "@/Demo-EVA/views/comunes/DocumentacionRag.jsx";
@@ -239,7 +262,7 @@ describe("RAG · Documentación — el catálogo", () => {
      */
     const fetchMock = vi.fn((url, opciones) => {
       if (opciones?.method === "PATCH") {
-        return respuestaJson({ ok: true, manual: { ...CON_MANUALES.manuales[0], sistema: "vibraciones" } });
+        return respuestaJson({ ok: true, manual: { ...CON_MANUALES.manuales[0], sistema: ID_CONFIGURADA } });
       }
       return respuestaJson(CON_MANUALES);
     });
@@ -254,13 +277,17 @@ describe("RAG · Documentación — el catálogo", () => {
     await waitFor(() => expect(screen.getByText("Manual indexado")).toBeTruthy());
 
     const selector = screen.getAllByTitle("A qué máquina pertenece este manual")[0];
-    fireEvent.change(selector, { target: { value: "vibraciones" } });
+    /* La opción tiene que EXISTIR en el selector: si la configurada no llegara
+       a la lista, el cambio se ignoraría y el fallo saldría más abajo como un
+       PATCH sin sistema, que es el que esta prueba distingue. */
+    expect([...selector.options].map((o) => o.value)).toContain(ID_CONFIGURADA);
+    fireEvent.change(selector, { target: { value: ID_CONFIGURADA } });
 
     await waitFor(() => {
       const patch = fetchMock.mock.calls.find(([, o]) => o?.method === "PATCH");
       expect(patch).toBeTruthy();
       expect(patch[0]).toContain("accion=asignar");
-      expect(patch[0]).toContain("sistema=vibraciones");
+      expect(patch[0]).toContain(`sistema=${ID_CONFIGURADA}`);
       expect(patch[0]).toContain("id=11111111-1111-1111-1111-111111111111");
     });
   });

@@ -34,6 +34,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
+import { registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* La máquina de vibraciones es la espejo configurada (Plan 40 F3). */
+const ESPEJO = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 import { crearIntervencion, VACIO as APRENDIZAJE_VACIO } from '../shared/eva/comun/aprendizaje.js'
 
 const c = {
@@ -135,7 +144,7 @@ const CASO_TANQUE = {
 }
 
 const CASO_VIBRACIONES = {
-  sistema: 'vibraciones',
+  sistema: ESPEJO.id,
   sintoma: 'El pico de aceleración del lado acople copiaba el valor eficaz.',
   causa: 'Configuración incorrecta del canal S1.',
   solucion: 'Se corrigió la configuración del canal S1 en el módulo SIPLUS.',

@@ -502,6 +502,17 @@ export const TIPO_VIBRACIONES = Object.freeze({
    * van por su clave (`contadoresAlarma`); el estado del sensor tampoco, y
    * sin descriptor no se simula: queda como hueco, no como cero.
    */
+  /*
+   * El vocabulario que se le da al dictado (whisper) cuando se habla de una
+   * máquina de este tipo. Estaba en la entrada escrita a mano; es del TIPO
+   * porque son las palabras del oficio, no de una máquina concreta (Plan 40
+   * F3). Sin él, «lado acople» y «rodamiento» salían deformados.
+   */
+  vocabulario:
+    "vibración, rodamiento, lado acople, lado libre, apoyo, velocidad eficaz, " +
+    "aceleración eficaz, valor de daño, DKW, aRMS, vRMS, envolvente, espectro, " +
+    "BPFO, BPFI, factor de cresta, variador, milímetros por segundo",
+
   descriptorDe: (rol, apoyo = null) => {
     const r = ROLES[rol];
     if (!r?.familia || !r?.clave) return null;

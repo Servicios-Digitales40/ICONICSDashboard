@@ -55,6 +55,8 @@
  * Los orígenes posibles. No es una lista abierta: añadir una fuente es una
  * decisión de arquitectura (CLAUDE.md §2.1), no un valor más de un enum.
  */
+import { SISTEMA } from './eva/comun/sistemas.js'
+
 export const FUENTES = Object.freeze({
   /** El servidor ICONICS FrameWorX de esta planta. */
   ICONICS: 'iconics',
@@ -79,7 +81,10 @@ export const MODULOS = Object.freeze([
     nombre: 'Monitoreo y Diagnóstico',
     fuente: FUENTES.ICONICS,
     origen: 'ICONICS FrameWorX de esta planta, vía el puente de backend.',
-    sistemas: Object.freeze(['tanque', 'vibraciones']),
+    /* Los escritos a mano. Las máquinas CONFIGURADAS son de este módulo por
+       construcción —se leen por ICONICS— y `moduloDeSistema` las reconoce
+       preguntando al registro (Plan 40 F3). */
+    sistemas: Object.freeze(['tanque']),
     herramientas: Object.freeze([
       'maquina',
       'historicos',
@@ -134,7 +139,12 @@ export function moduloPorId(id) {
  * 500 donde correspondía un «no lo conozco».
  */
 export function moduloDeSistema(sistemaId) {
-  return MODULOS.find(m => m.sistemas.includes(sistemaId)) ?? null
+  const fijo = MODULOS.find(m => m.sistemas.includes(sistemaId))
+  if (fijo) return fijo
+  /* Una máquina configurada entra en el registro por `construirSistema`, que
+     sólo sabe leer ICONICS: es de Monitoreo sin que nadie lo declare. Una que
+     no está en el registro no es de nadie. */
+  return SISTEMA[sistemaId]?.configurada ? moduloPorId('monitoreo') : null
 }
 
 /**

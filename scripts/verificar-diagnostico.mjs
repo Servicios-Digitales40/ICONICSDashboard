@@ -45,6 +45,16 @@ const FUERTE = UMBRAL_BM25_FUERTE + 1
 import { causasDe, porQueSinCausas, SIN_CAUSAS_DELIBERADO, SIN_CAUSAS_PENDIENTE } from '../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
+import { registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/* El motor resuelve las reglas de una configurada por su TIPO (Plan 38 F1);
+   la máquina de vibraciones es la espejo configurada (Plan 40 F3). */
+const ESPEJO = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -195,7 +205,7 @@ await check('todo riesgo de tanque tiene causas, o el diagnóstico dice `huerfan
 
 await check('todo riesgo de vibraciones tiene causas, o el diagnóstico dice `huerfano`', async () => {
   for (const regla of REGLAS_VIBRACION) {
-    const resultado = await SIN_FUENTES.diagnosticar({ sistema: 'vibraciones', riesgoId: regla.id })
+    const resultado = await SIN_FUENTES.diagnosticar({ sistema: ESPEJO.id, riesgoId: regla.id })
     const candidatas = causasDe(regla.id)
     if (candidatas) {
       assert.equal(resultado.huerfano, false, `${regla.id}: tiene causas pero salió huérfano`)

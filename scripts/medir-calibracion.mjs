@@ -38,6 +38,7 @@ import { createIndiceCasos } from '../backend/ia/motor/casos.mjs'
 import { CAUSAS_POR_RIESGO } from '../shared/eva/comun/causas.js'
 import { REGLAS as REGLAS_TANQUE } from '../shared/eva/tanque/riesgos.js'
 import { REGLAS as REGLAS_VIBRACION } from '../shared/eva/vibraciones/riesgosVibracion.js'
+import { sistemasConfigurados } from '../shared/eva/comun/sistemas.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', ambar: '\x1b[33m', gris: '\x1b[90m',
@@ -51,7 +52,9 @@ const embeddingModelo = process.env.IA_EMBEDDING_MODELO || 'local'
 /** El sistema al que pertenece cada riesgo, para pedir los casos bien. */
 const SISTEMA_DE_RIESGO = new Map([
   ...REGLAS_TANQUE.map(r => [r.id, 'tanque']),
-  ...REGLAS_VIBRACION.map(r => [r.id, 'vibraciones']),
+  /* La máquina de vibraciones es una CONFIGURADA (Plan 40): su id es el de
+     planta, no uno fijo. Se toma la primera activa del tipo. */
+  ...REGLAS_VIBRACION.map(r => [r.id, sistemasConfigurados().find(s => s.tipo === 'vibraciones')?.id ?? null]),
 ])
 
 function resumen(nombre, valores) {

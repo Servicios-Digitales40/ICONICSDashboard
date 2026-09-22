@@ -67,7 +67,6 @@ import {
   SISTEMA,
   SISTEMAS,
   SISTEMAS_EN_SERVICIO,
-  desregistrarSistema,
   mismoSistema,
   registrarSistema,
   sistemasDeSenal,
@@ -78,6 +77,20 @@ import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 import { crearAyudantesDeHistoria } from '../backend/ia/herramientas/lib/historia.mjs'
+import { puntoHistorico as puntoHistoricoVib, puntoMedida } from '../shared/eva/vibraciones/vibraciones.js'
+import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+
+/*
+ * ── LA MÁQUINA DE VIBRACIONES ES LA ESPEJO, PARA TODO EL GUION (Plan 40 F3) ─
+ *
+ * Hasta el 21-09-2026 este guion probaba las herramientas contra la máquina
+ * de vibraciones ESCRITA A MANO (`SISTEMA.vibraciones`) y, en un bloque aparte,
+ * contra una configurada espejo. La escrita a mano se retiró (Plan 40): la
+ * espejo se registra aquí, al principio, y es la máquina de vibraciones de
+ * todas las comprobaciones. `ESPEJO.id` donde antes iba `'vibraciones'`.
+ */
+const ESPEJO = configuracionEspejo({ verificadasDelCatalogo: true }).configurada
+const configurada = registrarSistema(construirSistema(ESPEJO, tipoDe('vibraciones')))
 import { enMarchaVib } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 
@@ -648,32 +661,23 @@ for (const sistema of SISTEMAS_EN_SERVICIO) {
  * valores sin tocar nada: `sistemaDePunto()` los atribuye a la escrita a mano,
  * que sí tiene física simulada.
  *
- * ── SÓLO PARA ESTE BLOQUE, Y SE DA DE BAJA AL SALIR ────────────────
- *
- * Registrarla para todo el guion cambiaría lo que las demás comprobaciones
- * miden: la espejo tiene las MISMAS etiquetas que la escrita a mano, y
- * `sistemasDeSenal('Velocidad eficaz · Lado acople')` pasaría de un dueño a
- * dos. Eso es un hallazgo real —es lo que hay en planta hasta el Plan 34 F5, y
- * se fija abajo como tal—, no un cambio de fixture que colar en 169 asertos.
+ * Desde el Plan 40 F3 la espejo está registrada para TODO el guion (arriba,
+ * junto a los imports): la escrita a mano ya no existe y la espejo es la
+ * máquina de vibraciones de todas las comprobaciones. Este bloque conserva
+ * las que la miran como configurada.
  */
 console.log('\n── La máquina configurada (Plan 39 F0) ─────────────────────')
 
 const antesDeConfigurada = passed
-const ESPEJO = configuracionEspejo({ verificadasDelCatalogo: true }).configurada
-const configurada = registrarSistema(
-  construirSistema(ESPEJO, tipoDe('vibraciones')),
-  { toleraSolapeConEscritas: true },
-)
 
-check('[configurada] entra en el registro y en servicio, con su solape declarado', () => {
+check('[configurada] entra en el registro y en servicio, y es la única dueña de su raíz', () => {
   assert.equal(SISTEMA[ESPEJO.id], configurada)
   assert.ok(SISTEMAS_EN_SERVICIO.includes(configurada), 'no está en servicio')
   assert.equal(configurada.configurada, true)
   assert.equal(configurada.tipo, 'vibraciones')
-  // Comparte raíz con la escrita a mano y lo tiene que DECIR: es la situación
-  // de planta hasta que el Plan 34 F5 retire el catálogo.
-  assert.ok(configurada.solapes?.length > 0, 'comparte raíz con la escrita a mano y no lo declara')
-  assert.ok(configurada.solapes.every(s => s.con === 'vibraciones'))
+  // Hasta el Plan 40 F3 compartía raíz con la escrita a mano y lo declaraba en
+  // `solapes`. Retirada aquélla, nadie más reclama sus puntos.
+  assert.equal(configurada.solapes, undefined, 'ya no hay escrita a mano con la que solaparse')
 })
 
 await checkAsync('[configurada] sistemas_de_la_planta la lista con su id, su nombre y sus herramientas', async () => {
@@ -698,29 +702,28 @@ await checkAsync('[configurada] sistemas_de_la_planta la lista con su id, su nom
 let instanteEnMarcha = 0
 while (!enMarchaVib(instanteEnMarcha)) instanteEnMarcha += 60_000
 
-await checkAsync('[configurada] estado_del_sistema la lee como a la escrita a mano: mismos huecos, mismos valores por apoyo', async () => {
+await checkAsync('[configurada] estado_del_sistema la lee con la física del tipo: apoyos con sus cifras', async () => {
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
   const suya = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
-  const escrita = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' })
   assert.equal(suya.ok, true, suya.error)
   assert.equal(suya.sistema, ESPEJO.id)
   assert.equal(suya.configurada, true)
   assert.equal(suya.puntosPedidos, ESPEJO.variables.length)
-  // Mismos tags, mismo instante: los mismos huecos que la escrita a mano.
-  assert.equal(suya.sinLectura, escrita.puntos_sin_lectura)
 
   /*
    * Plan 39 F1: el estado lo compone el TIPO. Tres apoyos redactados con su
-   * número, y el número es el de la escrita a mano —mismo tag, mismo
-   * instante— aunque el rótulo del apoyo sea otro (la configurada no sabe
-   * que S1 es el «lado acople»; sabe que se llama S1).
+   * número, y el número es el de la física del tipo para ese apoyo en ese
+   * instante —hasta el Plan 40 se comparaba con la escrita a mano, que ya no
+   * existe; la física es la misma (`valorVibracionEn`)—.
    */
   assert.equal(suya.apoyos.length, 3, 'tres apoyos redactados')
-  const cifras = texto => texto.match(/\d+\.\d+/g) ?? []
-  assert.deepEqual(suya.apoyos.map(cifras), escrita.apoyos.map(cifras), 'las cifras de cada apoyo son las de la escrita a mano')
-  for (const a of suya.apoyos) assert.match(a, /velocidad eficaz \d/)
+  for (const [i, canal] of ['S1', 'S2', 'S3'].entries()) {
+    const esperado = valorVibracionEn(puntoMedida('vRMS', canal), instanteEnMarcha)
+    assert.ok(typeof esperado === 'number', `la física tiene que dar valor a ${canal} en marcha`)
+    assert.ok(suya.apoyos[i].includes(`velocidad eficaz ${esperado.toFixed(3)} mm/s`), `${canal}: ${suya.apoyos[i]}`)
+  }
   assert.ok(suya.variador && suya.norma && suya.servidor_de_alarmas, 'variador, norma y contadores vienen del tipo')
-  assert.match(suya.aviso, new RegExp(`sistema="${ESPEJO.id}"`), 'el aviso remite a SU id, no a «vibraciones»')
+  assert.match(suya.aviso, new RegExp(`sistema="${ESPEJO.id}"`), 'el aviso remite a SU id')
 })
 
 await checkAsync('[configurada] estado_del_sistema(idioma: "en") narra sus apoyos en inglés y conserva su id', async () => {
@@ -736,34 +739,28 @@ await checkAsync('[configurada] estado_del_sistema(idioma: "en") narra sus apoyo
 await checkAsync('[configurada] riesgos_activos la evalúa con las reglas de su TIPO', async () => {
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
   const suya = await h.ejecutar('riesgos_activos', { sistema: ESPEJO.id })
-  const escrita = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' })
   assert.equal(suya.ok, true, suya.error)
+  // Todas las reglas del tipo se consideran: las que no se pudieron evaluar
+  // van en `sin_comprobar`, nunca desaparecen.
   assert.ok(suya.reglas_evaluadas > 0, 'no evaluó ninguna regla')
-  // Mismo tipo, mismas reglas: si la escrita a mano evalúa N, la configurada
-  // no puede evaluar un número distinto de reglas.
-  assert.equal(suya.reglas_evaluadas, escrita.reglas_evaluadas)
+  // Las reglas por apoyo se evalúan una vez POR APOYO, así que el recuento
+  // supera al número de reglas del tipo; lo que no puede es superar reglas × apoyos.
+  const tipo = tipoDe('vibraciones')
+  assert.ok(suya.reglas_evaluadas <= tipo.reglas.length * Math.max(1, ESPEJO.apoyos?.length ?? 3),
+    `evaluó ${suya.reglas_evaluadas} reglas con ${tipo.reglas.length} en el tipo`)
   assert.ok(suya.sin_comprobar, 'falta el recuento de lo que NO se pudo mirar')
 })
 
-await checkAsync('[configurada] historia_de_senal la trata como a la escrita a mano: mismo punto, misma serie, misma unidad', async () => {
+await checkAsync('[configurada] historia_de_senal pide su serie por el nombre LITERAL del historiador, con su unidad', async () => {
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
-  const suya = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
-  const escrita = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: 'vibraciones', periodo: 'últimas 6 horas' })
-  // El punto del historiador es LITERAL en la configuración y tiene que ser el
-  // mismo que el del catálogo: deducirlo del nombre en vivo es el defecto B10.
-  assert.equal(configurada.series.punto('vRMS_S1'), SISTEMA.vibraciones.series.punto('vRMS_S1'))
-  assert.equal(suya.ok, true, suya.error)
-  assert.equal(escrita.ok, true, escrita.error)
-  /*
-   * Plan 39 F2: la unidad la sabe la máquina —antes viajaba vacía para todo
-   * lo que no fuera el tanque— y la serie es la misma que la de la escrita a
-   * mano: mismo nombre hda:, mismo historiador falso, mismo instante.
-   */
-  assert.equal(suya.unidad, 'mm/s')
-  assert.equal(escrita.unidad, 'mm/s')
-  assert.equal(suya.muestras, escrita.muestras)
-  assert.equal(suya.promedio, escrita.promedio)
-  assert.match(suya.senal, /Velocidad eficaz/)
+  const r = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  // El punto del historiador es LITERAL en la configuración y es el del
+  // catálogo de la demo: deducirlo del nombre en vivo es el defecto B10.
+  assert.equal(configurada.series.punto('vRMS_S1'), puntoHistoricoVib('vRMS_S1'))
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.unidad, 'mm/s')
+  assert.ok(r.muestras > 0, 'el falso sirve la serie de una configurada con serie verificada (Plan 39 F2)')
+  assert.match(r.senal, /Velocidad eficaz/)
 })
 
 await checkAsync('[configurada] la frecuencia del variador viaja en Hz y con los decimales de su rol', async () => {
@@ -823,22 +820,14 @@ check('[configurada] sin series verificadas no ofrece historia, y lo dice', () =
   assert.match(sinSondear.historia, /sin serie verificada/i)
 })
 
-check('[configurada] su etiqueta tiene DOS dueños mientras conviva con la escrita a mano (Plan 34 F5)', () => {
-  // Es la situación de planta, y por eso una pregunta por la etiqueta sin
-  // decir máquina no puede resolverse sola. Se fija para que retirar el
-  // catálogo tenga que pasar por aquí.
+check('[configurada] su etiqueta tiene UNA sola dueña: la escrita a mano ya no existe (Plan 40 F3)', () => {
+  // Hasta el 21-09-2026 «Velocidad eficaz · Lado acople» tenía dos dueñas —la
+  // escrita a mano y la espejo— y una pregunta por la etiqueta sin decir
+  // máquina no podía resolverse sola. Retirada la escrita a mano, resuelve.
   assert.deepEqual(
-    sistemasDeSenal('Velocidad eficaz · Lado acople').map(x => x.sistema).sort(),
-    ['vibraciones', ESPEJO.id].sort(),
+    sistemasDeSenal('Velocidad eficaz · Lado acople').map(x => x.sistema),
+    [ESPEJO.id],
   )
-})
-
-desregistrarSistema(ESPEJO.id)
-
-check('[configurada] al darla de baja desaparece del registro y del servicio', () => {
-  assert.equal(SISTEMA[ESPEJO.id], undefined)
-  assert.ok(!SISTEMAS_EN_SERVICIO.some(s => s.id === ESPEJO.id))
-  assert.deepEqual(sistemasDeSenal('Velocidad eficaz · Lado acople').map(x => x.sistema), ['vibraciones'])
 })
 
 const sobreConfigurada = passed - antesDeConfigurada
@@ -882,7 +871,7 @@ await checkAsync('riesgos_activos(idioma: "en") en vibraciones traduce también 
   const client = createFakeIconicsClient({ rnd: () => 0.99 })
   const h = createHerramientas({ client })
 
-  const en = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const en = await h.ejecutar('riesgos_activos', { sistema: ESPEJO.id }, { idioma: 'en' })
   const riesgo = en.riesgos.find(r => r.id === 'rodamientos-sin-vigilar')
 
   assert.ok(riesgo, 'el fixture tiene que activar rodamientos-sin-vigilar')
@@ -917,7 +906,7 @@ await checkAsync('estado_del_sistema(idioma: "en") narra los riesgos que trae de
   const client = createFakeIconicsClient({ rnd: () => 0.99 })
   const h = createHerramientas({ client })
 
-  const en = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const en = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id }, { idioma: 'en' })
   const texto = JSON.stringify(en)
 
   assert.match(texto, /Bearing diagnosis is switched off/)
@@ -961,10 +950,12 @@ await omitirEnvuelto('estado_del_sistema(idioma: "en") del TANQUE narra TODO el 
 
 await checkAsync('estado_del_sistema(idioma: "en") de VIBRACIONES narra el nombre de sistema, apoyos y avisos', async () => {
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-  const en = await h.ejecutar('estado_del_sistema', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const en = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
-  assert.match(en.sistema, /Vibration System — ANOTHER MACHINE/)
+  /* Plan 40 F3: sin entrada escrita a mano, el nombre del sistema es el de la
+     configurada, y ese no se traduce: es un identificador, no una etiqueta. */
+  assert.equal(en.sistema, ESPEJO.id)
   assert.match(en.apoyos[0], /Drive end \(S1, bearing/)
   assert.match(en.apoyos[0], /RMS velocity/)
   assert.doesNotMatch(en.apoyos[0], /Lado acople|velocidad eficaz/)
@@ -1001,7 +992,7 @@ await checkAsync('riesgos_activos(idioma: "en") de vibraciones traduce «apoyos�
    * vuelve a cambiar, esto sigue diciendo lo mismo.
    */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-  const en = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const en = await h.ejecutar('riesgos_activos', { sistema: ESPEJO.id }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
 
@@ -1025,7 +1016,7 @@ await omitirEnvuelto('sin `idioma`, el resumen de ambas máquinas sigue en espa�
   assert.equal(es1.instalacion, 'Sistema de agua industrial')
 
   const h2 = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-  const es2 = await h2.ejecutar('estado_del_sistema', { sistema: 'vibraciones' })
+  const es2 = await h2.ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
   assert.match(es2.sistema, /Sistema de vibraciones — OTRA MÁQUINA/)
   assert.match(es2.apoyos[0], /Lado acople/)
 })
@@ -1101,11 +1092,11 @@ await checkAsync('una máquina sin MECANISMOS no pronostica, aunque tenga histor
    * datos no basta para afirmar una tendencia.
    */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-  const r = await h.ejecutar('pronostico_de_desgaste', { sistema: 'vibraciones' })
+  const r = await h.ejecutar('pronostico_de_desgaste', { sistema: ESPEJO.id })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no tiene pronóstico de desgaste/i)
-  assert.equal(tieneHistoria('vibraciones'), true, 'historia SÍ tiene; mecanismos no')
+  assert.equal(tieneHistoria(ESPEJO.id), true, 'historia SÍ tiene; mecanismos no')
 })
 
 await checkAsync('el registro no deja dar de alta una máquina que calle sobre su historia', () => {
@@ -1279,18 +1270,18 @@ await checkAsync('una señal de otra máquina se reconoce sin escribir su etique
    */
   assert.equal(sistemasDeSenal('velocidad eficaz').length, 3, 'son los tres apoyos, no cero')
   assert.ok(
-    sistemasDeSenal('velocidad eficaz').every((x) => x.sistema === 'vibraciones'),
+    sistemasDeSenal('velocidad eficaz').every((x) => x.sistema === ESPEJO.id),
     'las tres son de la máquina de vibraciones',
   )
   // La etiqueta exacta sigue resolviendo a UNA, y gana sobre la contención.
   assert.deepEqual(
     sistemasDeSenal('Velocidad eficaz · Lado acople'),
-    [{ sistema: 'vibraciones', clave: 'vRMS_S1' }],
+    [{ sistema: ESPEJO.id, clave: 'vRMS_S1' }],
   )
   // Y el nombre del punto de medida basta para desambiguar sin más ayuda.
   assert.deepEqual(
     sistemasDeSenal('velocidad eficaz del lado libre'),
-    [{ sistema: 'vibraciones', clave: 'vRMS_S3' }],
+    [{ sistema: ESPEJO.id, clave: 'vRMS_S3' }],
   )
 })
 
@@ -1320,7 +1311,7 @@ await checkAsync('«velocidad» a secas no se resuelve como «velocidad eficaz»
   assert.equal(variador.length, 2, 'las dos máquinas tienen su propia "velocidad del variador"')
   assert.deepEqual(
     new Set(variador.map((x) => x.sistema)),
-    new Set(['tanque', 'vibraciones']),
+    new Set(['tanque', ESPEJO.id]),
   )
 })
 
@@ -1362,7 +1353,7 @@ await checkAsync('una señal SIN serie sí manda al instante, y una ambigua se p
      puede convertirse en elegir por quien pregunta: «velocidad eficaz» son los
      tres apoyos, y contestar por uno sería correcto sobre el punto equivocado. */
   const ambigua = await h.ejecutar('historia_de_senal', {
-    senal: 'velocidad eficaz', periodo: 'hoy', sistema: 'vibraciones',
+    senal: 'velocidad eficaz', periodo: 'hoy', sistema: ESPEJO.id,
   })
 
   assert.equal(ambigua.ok, false)
@@ -1561,7 +1552,7 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
    * El campo cambia de `sistema` a `sistemas` porque ahora hay dos, y ésa es
    * justo la información: cuáles se intentó cruzar.
    */
-  assert.deepEqual(r.sistemas, ['tanque', 'vibraciones'])
+  assert.deepEqual(r.sistemas, ['tanque', ESPEJO.id])
   assert.match(r.error, /no son de la misma máquina/i)
 })
 
@@ -1601,7 +1592,7 @@ await checkAsync('cruzar máquinas se detecta con el NOMBRE, no sólo con la cla
     assert.equal(r.ok, false, `${herramienta} cruzó dos máquinas sin darse cuenta`)
     assert.match(r.error, /no son de la misma máquina/i, `${herramienta}: el motivo no es el cruce`)
     assert.deepEqual(
-      [...r.sistemas].sort(), ['tanque', 'vibraciones'],
+      [...r.sistemas].sort(), ['tanque', ESPEJO.id],
       `${herramienta}: no dice cuáles se intentó cruzar`
     )
   }
@@ -2254,10 +2245,10 @@ await checkAsync('consultar_documentacion acota la búsqueda cuando le pasan un 
     { archivo: 'M.pdf', pagina: 1, score: 0.9, texto: 'Procedimiento de arranque.' },
   ])
   const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
-    .ejecutar('consultar_documentacion', { pregunta: '¿cómo se arranca?', sistema: 'vibraciones' })
+    .ejecutar('consultar_documentacion', { pregunta: '¿cómo se arranca?', sistema: ESPEJO.id })
 
   assert.equal(r.ok, true)
-  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, 'vibraciones',
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, ESPEJO.id,
     'la herramienta no propagó el sistema a buscar()')
 })
 
@@ -2423,7 +2414,7 @@ await checkAsync('un síntoma de OTRA máquina se niega y dice a dónde ir', asy
    */
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
     sintoma: 'el apoyo S2 vibra más tras un cambio de carga',
-    sistema: 'vibraciones',
+    sistema: ESPEJO.id,
   })
 
   assert.equal(r.ok, false)
@@ -3144,12 +3135,12 @@ await checkAsync('un huérfano DELIBERADO dice por qué, y no suena a carencia',
 await checkAsync('un huérfano PENDIENTE admite que la pieza falta', async () => {
   const motorDiagnostico = motorDiagnosticoFalso({
     'alarma-del-modulo': {
-      sistema: 'vibraciones', riesgoId: 'alarma-del-modulo', huerfano: true, causas: [],
+      sistema: ESPEJO.id, riesgoId: 'alarma-del-modulo', huerfano: true, causas: [],
       sinCausas: { deliberado: false, clase: 'pendiente', motivo: 'Falta transcribirlas desde su regla.' },
     },
   })
   const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
-    .ejecutar('diagnosticar_falla', { sistema: 'vibraciones', riesgoId: 'alarma-del-modulo' })
+    .ejecutar('diagnosticar_falla', { sistema: ESPEJO.id, riesgoId: 'alarma-del-modulo' })
 
   assert.equal(r.sinCausas.deliberado, false)
   assert.match(r.aviso, /S[IÍ] deber[ií]a tener causas/i)
@@ -3845,7 +3836,7 @@ await omitirEnvuelto('cita notas del cuaderno DENTRO de la ventana y del sistema
     async leer({ desde, hasta }) {
       const todas = [
         { instante: '2026-09-14T15:44:17.000Z', texto: 'Se purgó la bomba', autor: 'anonimo' },
-        { instante: '2026-09-14T10:00:00.000Z', texto: 'Nota de vibraciones', sistema: 'vibraciones', autor: 'ana' },
+        { instante: '2026-09-14T10:00:00.000Z', texto: 'Nota de vibraciones', sistema: ESPEJO.id, autor: 'ana' },
         { instante: '2020-01-01T00:00:00.000Z', texto: 'Nota viejísima, fuera de ventana', autor: 'ana' },
       ]
       const entradas = todas.filter((n) => {
@@ -3915,7 +3906,7 @@ await checkAsync('resumen_de_turno(idioma: "en") reenvía el idioma a las herram
    * conversación: el hueco que este caso cierra.
    */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
-  const en = await h.ejecutar('resumen_de_turno', { sistema: 'vibraciones' }, { idioma: 'en' })
+  const en = await h.ejecutar('resumen_de_turno', { sistema: ESPEJO.id }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
   const texto = JSON.stringify(en)
@@ -3933,7 +3924,7 @@ await checkAsync('resumen_de_turno(idioma: "en") reenvía el idioma a las herram
  */
 await checkAsync('lo que falta se dice, no se da por vacío', async () => {
   const h = createHerramientas({ client: clienteFalso() })
-  const r = await h.ejecutar('resumen_de_turno', { sistema: 'vibraciones' })
+  const r = await h.ejecutar('resumen_de_turno', { sistema: ESPEJO.id })
 
   assert.equal(r.ok, true, r.error)
   if (!r.riesgos) {

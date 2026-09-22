@@ -98,32 +98,33 @@ export const HECHOS_INICIALES = [
       "sistema de vibraciones. Cada una con su propio motor, variador y PLC.",
     origen: "Confirmado por el usuario el 25-08-2026",
   },
+  /*
+   * Los hechos de la instalación de vibraciones llevan `sistema: null` desde
+   * el Plan 40 F3: la máquina ya no tiene un id fijo en el código —es una
+   * configurada, con el id que le pusieron en planta— y un hecho atado a un
+   * id que no existe no lo vería nadie. Son hechos de LA PLANTA que nombran
+   * la máquina en su texto. El de «DEMO 3» se retiró: ese grupo del
+   * historiador ya no existe (Plan 34 F0) y afirmarlo era enseñar a pedir
+   * series de un sitio que devuelve 500.
+   */
   {
     id: "tres-sensores",
-    sistema: "vibraciones",
+    sistema: null,
     hecho:
-      "Hay TRES acelerómetros, no dos: lado acople (100,05 mV/g), rodamiento intermedio " +
-      "(99 mV/g) y lado libre (100 mV/g). Cada uno con su calibración propia.",
+      "La máquina de vibraciones tiene TRES acelerómetros, no dos: lado acople (100,05 mV/g), " +
+      "rodamiento intermedio (99 mV/g) y lado libre (100 mV/g). Cada uno con su calibración propia.",
     origen: "Medido contra el servidor y confirmado por el usuario el 26-08-2026",
   },
   {
     id: "vibraciones-se-leen-en-vivo",
-    sistema: "vibraciones",
+    sistema: null,
     hecho:
-      "Las medidas de vibración se leen EN VIVO del árbol de activos, en «ac:TDCON/DEMO_VIBRACIONES/Vibraciones/», " +
-      "con una carpeta por apoyo (S1, S2, S3) y otra para el variador (V20). NO se leen del " +
-      "historiador: dos puntos («DKW_S1» sin muestras y «MonState_v_f_S3» ni declarado) hacían " +
-      "esperar 5 segundos al lote entero y volvían sin valor.",
-    origen: "Medido el 27-08-2026",
-  },
-  {
-    id: "grupo-con-espacio",
-    sistema: "vibraciones",
-    hecho:
-      "El grupo del historiador se llama «DEMO 3», CON espacio. Pedirlo como «DEMO3» " +
-      "devuelve HTTP 500 y parece que el tag no existe. Ese grupo es para las SERIES; " +
-      "el valor del momento no sale de ahí.",
-    origen: "Medido el 26-08-2026, matizado el 27-08-2026",
+      "Las medidas de vibración se leen EN VIVO del árbol de activos (una carpeta por apoyo " +
+      "S1, S2, S3 y otra para el variador). Sus SERIES están en el historiador, en el grupo " +
+      "DEMO_VIBRACIONES: sólo cuenta como serie propia la que se verificó sondeándola, porque " +
+      "el historiador puede devolver la serie de otra señal sin dar error (aPeak_S1 devuelve " +
+      "la de aRMS_S1).",
+    origen: "Medido el 27-08-2026; re-sondeado el 21-09-2026",
   },
   {
     id: "red-208y120",
@@ -135,10 +136,11 @@ export const HECHOS_INICIALES = [
   },
   {
     id: "rodamientos-sin-vigilar",
-    sistema: "vibraciones",
+    sistema: null,
     hecho:
-      "El diagnóstico de rodamientos del módulo (BPFO, BPFI, FTF) está APAGADO en los tres " +
-      "apoyos. Necesita la geometría del rodamiento para poder calcular esas frecuencias.",
+      "En la máquina de vibraciones, el diagnóstico de rodamientos del módulo (BPFO, BPFI, FTF) " +
+      "está APAGADO en los tres apoyos. Necesita la geometría del rodamiento para poder calcular " +
+      "esas frecuencias.",
     origen: "Medido el 26-08-2026",
   },
 ];

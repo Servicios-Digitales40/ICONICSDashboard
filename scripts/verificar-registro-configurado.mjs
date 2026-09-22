@@ -57,6 +57,9 @@ import {
   valorSimuladoDe,
 } from '../shared/eva/comun/sistemas.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
+import { RAIZ_VIB } from '../shared/eva/vibraciones/vibraciones.js'
+import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+import { CATALOGO_VIBRACIONES } from '../shared/eva/vibraciones/catalogoDemo.js'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -104,8 +107,9 @@ function configuracion(id = 'vib-m02', raiz = RAIZ) {
 /* La entrada bajo prueba, ya dentro del registro. */
 const entrada = registrarSistema(construirSistema(configuracion(), TIPO))
 
-/* Una escrita a mano, para comparar contra ella. */
-const aMano = SISTEMA.vibraciones
+/* Una escrita a mano, para comparar contra ella: el tanque, la única que
+   queda desde el Plan 40 F3. */
+const aMano = SISTEMA.tanque
 
 /* ── El contrato del registro ────────────────────────────────────────── */
 
@@ -175,10 +179,10 @@ check('un punto PROPIO con rol y apoyo se simula con la física del TIPO (Plan 4
   for (const v of conApoyo.variables) v.assetId = 'S3'
   const e = construirSistema(conApoyo, TIPO)
   let t = 1_700_000_000_000
-  while (aMano.modelo(`${aMano.raices[0]}S3/vRMS_S3`, t) === null) t += 60_000
+  while (valorVibracionEn(`${RAIZ_VIB}S3/vRMS_S3`, t) === null) t += 60_000
   const simulado = e.modelo('ac:PRUEBA/M02S/S1/vRMS', t)
   assert.equal(typeof simulado, 'number', `esperaba un número, salió ${simulado}`)
-  assert.equal(simulado, aMano.modelo(`${aMano.raices[0]}S3/vRMS_S3`, t), 'la física es la del apoyo S3 del tipo')
+  assert.equal(simulado, valorVibracionEn(`${RAIZ_VIB}S3/vRMS_S3`, t), 'la física es la del apoyo S3 del tipo')
   assert.equal(e.modelo('ac:PRUEBA/M02S/nada', t), undefined, 'lo ajeno sigue siendo undefined')
 })
 
@@ -216,18 +220,19 @@ console.log(`\n${c.negrita}El estado${c.reset}`)
  * `canal`, que son suyos —ISO 10816 y los tres apoyos— y exigírselos a una
  * máquina configurada sería exigir que TODA máquina sea vibraciones.
  *
- * El contrato es lo que las DOS escritas a mano tienen en común. Se calcula
+ * El contrato es lo que el tanque (la única escrita a mano desde el Plan 40
+ * F3) y el catálogo de la demo de vibraciones tienen en común. Se calcula
  * intersecando en vez de escribir la lista, para que un campo que mañana pase
  * a ser común entre ellas quede exigido aquí sin que nadie se acuerde de
  * venir.
  */
 const NUCLEO_COMUN = (() => {
   const deTanque = Object.keys(SISTEMA.tanque.estado(() => null, SISTEMA.tanque))
-  const deVib = Object.keys(SISTEMA.vibraciones.estado(() => null, SISTEMA.vibraciones))
+  const deVib = Object.keys(CATALOGO_VIBRACIONES.estado(() => null, CATALOGO_VIBRACIONES))
   return deTanque.filter((k) => deVib.includes(k))
 })()
 
-check('produce el NÚCLEO COMÚN de las dos máquinas escritas a mano', () => {
+check('produce el NÚCLEO COMÚN del tanque y del catálogo de vibraciones', () => {
   const est = entrada.estado(() => 1.23, entrada, '2026-09-18T12:00:00Z')
   assert.ok(NUCLEO_COMUN.length >= 14, `el núcleo común salió de ${NUCLEO_COMUN.length} campos`)
 
@@ -472,8 +477,8 @@ check('los puntos de la configurada NO caen en otra máquina', () => {
   }
 })
 
-check('y los de las escritas a mano siguen siendo suyos', () => {
-  for (const s of [SISTEMA.tanque, SISTEMA.vibraciones]) {
+check('y los de la escrita a mano siguen siendo suyos', () => {
+  for (const s of [SISTEMA.tanque]) {
     const muestra = s.puntos().slice(0, 5)
     for (const punto of muestra) {
       assert.equal(sistemaDePunto(punto).id, s.id, `${punto} cambió de dueño`)

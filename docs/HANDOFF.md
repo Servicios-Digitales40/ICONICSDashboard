@@ -511,18 +511,20 @@ Explorar, marcar `S1` (sus 26 variables quedan marcadas), quitar lo que no
 sea de la máquina, rellenar id y PLC, guardar. Después, en la ficha, «Sondear
 sus series» para ganar la verificación.
 
-**Desde el catálogo (Plan 33 F4), para comparar:**
+**Desde la fixture (Plan 40 F3), para arrancar sin planta:**
 
 ```bash
-node scripts/generar-configuracion-vibraciones.mjs datos/maquinas.json
+ICONICS_FAKE=true node scripts/sembrar-espejo.mjs        # escribe datos/maquinas.json
 ```
 
-**Criterio de éxito:** imprime `73 variables · 40 series heredadas · 7 sin rol`.
+Siembra `scripts/lib/vibraciones-espejo.json`: 73 variables, 36 series
+verificadas, los tres apoyos con nombre y las limitaciones de la instalación.
 El backend la sirve sin reiniciar; `GET /api/maquinas` devuelve `cuantas: 1`.
 
-> Esa configuración **se deriva del catálogo**, no se escribe a mano: las dos
-> salen de la misma fuente, así que cualquier diferencia es real.
-> `verificar-vibraciones-configurada.mjs` las compara.
+> Desde el Plan 40 F3 **no hay máquina de vibraciones escrita a mano**: la
+> demo es esta configurada. `generar-configuracion-vibraciones.mjs` se retiró
+> con ella. `verificar-vibraciones-configurada.mjs` compara la fixture con
+> `shared/eva/vibraciones/catalogoDemo.js`, la forma de la entrada retirada.
 
 ### Los 44 verificadores
 

@@ -115,24 +115,20 @@ import {
 } from "../tanque/senales.js";
 import { valorDePunto } from "../tanque/simulador.js";
 import { estadoDelTanque, resumenTanqueParaAsistente } from "../tanque/estadoTanque.js";
-import { estadoDeVibraciones, resumenVibracionesParaAsistente } from "../vibraciones/estadoVibraciones.js";
 import { MECANISMOS } from "./pronostico.js";
-import {
-  AREA_ALARMAS,
-  BANDERAS as BANDERAS_VIB,
-  CALIDADES as CALIDADES_VIB,
-  CANALES as CANALES_VIB,
-  GRUPO_HISTORIADOR,
-  MEDIDAS as MEDIDAS_VIB,
-  RAIZ_VIB,
-  VARIADOR as VARIADOR_VIB,
-  esHistorizada as esHistorizadaVibracion,
-  historizadas as historizadasVibracion,
-  parsePunto,
-  puntoHistorico as puntoHistoricoVibracion,
-  todosLosPuntos as todosLosPuntosVibracion,
-} from "../vibraciones/vibraciones.js";
-import { valorVibracionEn } from "../vibraciones/simuladorVibraciones.js";
+/*
+ * ── LA MÁQUINA DE VIBRACIONES YA NO ESTÁ ESCRITA AQUÍ (Plan 40 F3) ─
+ *
+ * Hasta el 21-09-2026 este array tenía una segunda entrada, `vibraciones`,
+ * escrita a mano desde `../vibraciones/vibraciones.js`. Esa máquina existe
+ * ahora sólo CONFIGURADA: `datos/maquinas.json` → `construirSistema()` con el
+ * tipo `vibraciones` (`../tipos/vibraciones.js`), registrada al arrancar por
+ * `backend/ia/indices/registroConfigurado.mjs`. Lo que aquí era la máquina
+ * —tags, series, etiquetas— es hoy la configuración; lo que era conocimiento
+ * del tipo —roles, reglas, física, resumen— sigue en `shared/eva/vibraciones/`
+ * y lo expone el tipo. La fixture de pruebas que la sustituye es
+ * `scripts/lib/vibraciones-espejo.json`.
+ */
 
 export const SISTEMAS = [
   {
@@ -330,264 +326,6 @@ export const SISTEMAS = [
       "La tensión de línea del medidor de energía (L1-N) se declara en voltios en el " +
         "manual, pero el valor medido no es plausible para esa magnitud: se muestra sin " +
         "unidad hasta aclarar la escala.",
-    ],
-  },
-  {
-    id: "vibraciones",
-    nombre: "Sistema de vibraciones",
-    maquina: "Motor WEG W22 143/5T, 2 HP (1,5 kW), 2 polos, con SIPLUS CMS 1200 SM 1281",
-    plc: "PLC_2 · ua:DEMO3",
-    /*
-     * DOS raíces, y por eso el campo es plural.
-     *
-     * Los contadores de alarma de esta máquina no son puntos de activo: son de
-     * AlarmWorX y viven en `ae:`, otro espacio de nombres. Con una sola raíz
-     * `ac:TDCON/Motors/01/`, `sistemaDePunto` devolvía `null` para los cuatro
-     * —comprobado— y `mismoSistema` contestaba «no sé» sobre dos puntos de la
-     * MISMA máquina. No rompía nada porque nadie llamaba a esas funciones
-     * todavía; era un fallo esperando a su primer usuario.
-     */
-    raices: [RAIZ_VIB, AREA_ALARMAS],
-    puntos: todosLosPuntosVibracion,
-    parse: parsePunto,
-    modelo: valorVibracionEn,
-    estado: estadoDeVibraciones,
-    resumen: resumenVibracionesParaAsistente,
-    /* Las claves de esta máquina son compuestas: la familia y su apoyo. Es lo
-       que hace que «vRMS» sola sea ambigua —hay tres— y que el resolvedor
-       tenga que pedir el apoyo en vez de elegir uno.
-
-       Entran las TRES familias que tienen serie: las medidas, las banderas
-       (alarma, aviso, offset) y la calidad de cada medida. Las vigilancias y
-       el estado del sensor se quedan fuera porque no se historizan, y este
-       método es lo que usa el resolvedor de nombres para saber por qué se
-       puede preguntar. */
-    claves: () => [
-      ...CANALES_VIB.flatMap((c) => [
-        ...MEDIDAS_VIB.map((m) => `${m.key}_${c.id}`),
-        ...BANDERAS_VIB.map((b) => `${b.key}_${c.id}`),
-        ...CALIDADES_VIB.map((q) => `${q.key}_${c.id}`),
-      ]),
-      ...VARIADOR_VIB.map((v) => v.key),
-    ],
-    /*
-     * ── LOS OTROS NOMBRES CON LOS QUE SE PIDE UNA SEÑAL ────────────
-     *
-     * La etiqueta de `DKW_S1` es «Valor característico de daño · Lado acople»,
-     * y nadie pregunta así. Se pregunta «el DKW del sensor 1» — con el nombre
-     * CORTO de la medida, que el catálogo declara y el registro no exponía, y
-     * con «sensor N» en vez del rótulo del apoyo.
-     *
-     * Sin estos alias, «DKW» resolvía a CERO señales: la etiqueta no contiene
-     * esas tres letras por ningún lado, y la clave sí las contiene pero la
-     * contención exige cuatro caracteres —el umbral que impide que «S1» o
-     * «kpi» disparen dentro de otra palabra—. El resultado era que el
-     * asistente afirmaba que la señal no existe, teniendo su serie.
-     *
-     * `aliasDe` es parte del contrato del registro: la máquina que se dé de
-     * alta declara cómo la nombra la gente, no sólo cómo la rotula la pantalla.
-     */
-    aliasDe: (clave) => {
-      const v = VARIADOR_VIB.find((x) => x.key === clave);
-      if (v) return [v.key, v.label];
-
-      const corte = clave.lastIndexOf("_");
-      const base = clave.slice(0, corte);
-      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
-      if (!c) return [];
-
-      const f =
-        MEDIDAS_VIB.find((x) => x.key === base) ??
-        BANDERAS_VIB.find((x) => x.key === base) ??
-        CALIDADES_VIB.find((x) => x.key === base);
-      if (!f) return [];
-
-      /* El apoyo se nombra de tres formas: su id (`S1`), su rótulo («Lado
-         acople») y «sensor 1», que es como lo dice quien mira la máquina y
-         cuenta los acelerómetros. Las tres se cruzan con el nombre corto y con
-         el largo de la medida. */
-      const numero = c.sufijo.replace(/\D/g, "");
-      const apoyos = [c.id, c.label, `sensor ${numero}`, `apoyo ${numero}`];
-      const nombres = [f.corto, f.label].filter(Boolean);
-
-      return nombres.flatMap((nom) => apoyos.map((ap) => `${nom} ${ap}`));
-    },
-    etiquetaDe: (clave) => {
-      const v = VARIADOR_VIB.find((x) => x.key === clave);
-      if (v) return v.label;
-
-      const corte = clave.lastIndexOf("_");
-      const base = clave.slice(0, corte);
-      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
-      if (!c) return null;
-
-      /* Las tres familias de apoyo, en el mismo orden que `claves()`. */
-      const f =
-        MEDIDAS_VIB.find((x) => x.key === base) ??
-        BANDERAS_VIB.find((x) => x.key === base) ??
-        CALIDADES_VIB.find((x) => x.key === base);
-      return f ? `${f.label} · ${c.label}` : null;
-    },
-
-    /**
-     * Rótulo, unidad, decimales y naturaleza de una clave (Plan 39 F2).
-     *
-     * Las herramientas de historia lo pedían con `senalInfo`, que es del
-     * tanque, y para cualquier otra máquina ponían `unidad: ''`: el modelo
-     * recibía la velocidad eficaz sin «mm/s» y la frecuencia sin «Hz». Sale
-     * del mismo catálogo que `etiquetaDe`. `naturaleza` distingue una
-     * bandera booleana (`alarma`) de una medida continua, que es lo que
-     * `alarma_sostenida` necesita saber para negarse con motivo.
-     */
-    metaDe: (clave) => {
-      const v = VARIADOR_VIB.find((x) => x.key === clave);
-      if (v) {
-        return { label: v.label, unidad: v.unidad ?? "", decimales: v.decimales ?? 3, naturaleza: "medida" };
-      }
-
-      const corte = clave.lastIndexOf("_");
-      const base = clave.slice(0, corte);
-      const c = CANALES_VIB.find((x) => x.id === clave.slice(corte + 1));
-      if (!c) return null;
-
-      const m = MEDIDAS_VIB.find((x) => x.key === base);
-      if (m) {
-        return { label: `${m.label} · ${c.label}`, unidad: m.unidad ?? "", decimales: m.decimales ?? 3, naturaleza: "medida" };
-      }
-      const b = BANDERAS_VIB.find((x) => x.key === base);
-      if (b) {
-        return {
-          label: `${b.label} · ${c.label}`,
-          unidad: "",
-          decimales: b.tipo === "real" ? 3 : 0,
-          naturaleza: b.tipo === "booleano" ? "alarma" : "medida",
-        };
-      }
-      const q = CALIDADES_VIB.find((x) => x.key === base);
-      if (q) return { label: `${q.label} · ${c.label}`, unidad: "", decimales: 0, naturaleza: "medida" };
-      return null;
-    },
-    esHistorizada: esHistorizadaVibracion,
-    /*
-     * ── RE-SONDEADO EL 21-09-2026 (Plan 34 F0) ─────────────────────
-     *
-     * **El grupo cambió de nombre y de forma, y esto apuntaba al viejo.**
-     * Decía `DEMO 3`, que hoy devuelve 500; el grupo real es
-     * `DEMO_VIBRACIONES` y agrupa por apoyo. Durante semanas se leyó como «el
-     * historiador de vibraciones no registra»: sí registraba. El detalle y
-     * las cifras, en la cabecera de `GRUPO_HISTORIADOR`.
-     *
-     * Treinta y seis claves tienen serie; cuatro —las de aviso— no existen en
-     * el árbol y salieron de la lista.
-     *
-     * `historizadas` sigue siendo lista blanca y no `() => true` por la misma
-     * razón de siempre, ahora con dos casos medidos: `aPeak_S1` devuelve la
-     * serie de `aRMS_S1` (1805 de 1805 valores idénticos) y las nueve `QC_*`
-     * devuelven todas la misma serie. El servidor contesta sin error en los
-     * dos casos.
-     *
-     * Y por eso la RUTA importa: esta máquina se lee por `hda:` con el grupo
-     * en el nombre, al revés que el tanque, que se lee por `ac:` con el mismo
-     * nombre que en vivo. Son dos mecánicas distintas y cada una es de su
-     * máquina — ver la cabecera de `series` en la entrada del tanque.
-     */
-    series: {
-      historizadas: historizadasVibracion,
-      ruta: GRUPO_HISTORIADOR,
-      agregado: "Average",
-      punto: puntoHistoricoVibracion,
-      nota:
-        "El grupo DEMO_VIBRACIONES registra 36 de los 73 puntos de esta máquina, re-sondeados " +
-        "uno a uno el 21-09-2026: once de las doce medidas de los tres apoyos, la alarma y el " +
-        "offset de S2 y S3, las nueve calidades y once claves del variador. NO se historizan " +
-        "las vigilancias del módulo (MonState_*), el estado de los sensores ni los contadores " +
-        "de alarma. Quedan fuera la aceleración de pico del lado acople (aPeak_S1), que " +
-        "devuelve la serie de la aceleración eficaz del mismo apoyo sin dar error, y las tres " +
-        "señales de aviso de los apoyos más la del variador, cuyos tags no existen en el " +
-        "árbol. Las nueve calidades SÍ tienen serie, pero es la MISMA para las nueve: quien " +
-        "vete por calidad no está leyendo la de esa medida. El registro está detenido desde " +
-        "el 15-09-2026, y también el del tanque: eso es de planta, no de esta máquina.",
-    },
-    /* Sin mecanismos de desgaste: sin historia no hay exposición acumulada
-       que contar, y un pronóstico sobre el instante sería adivinación. */
-    desgaste: null,
-    /* Más lenta que el tanque: el SM 1281 publica cada pocos segundos y no
-       tiene sentido pedirle más de lo que produce. */
-    cadenciaMs: 5_000,
-    mide: [
-      "velocidad eficaz, aceleración eficaz, pico y valor de daño en TRES apoyos",
-      "estado de las vigilancias del módulo, incluidas las frecuencias de defecto de rodamiento",
-      "velocidad, frecuencia, par y fallo de su propio variador",
-      "contadores del área de alarmas de ICONICS",
-    ],
-    /*
-     * El del tanque no vale aquí: son máquinas distintas y suenan distinto.
-     * Preguntando por vibraciones con el vocabulario del agua delante, «lado
-     * acople» y «rodamiento» salían deformados — que es justo lo que hace que
-     * el asistente conteste sobre otra cosa.
-     */
-    vocabulario:
-      "vibración, rodamiento, lado acople, lado libre, apoyo, velocidad eficaz, " +
-      "aceleración eficaz, valor de daño, DKW, aRMS, vRMS, envolvente, espectro, " +
-      "BPFO, BPFI, factor de cresta, variador, milímetros por segundo",
-    /*
-     * ── COMPLETADA EL 18-09-2026 (Plan 33 F6) ──────────────────────
-     *
-     * Declaraba UNA sola —`eva-vibraciones`— y esta máquina tiene cinco
-     * pantallas. Las otras cuatro nacieron después y nadie volvió aquí.
-     *
-     * El efecto se nota en el dictado: `vib-inicio` es la pantalla de ARRANQUE
-     * de esta rama, y preguntar por voz desde ahí transcribía sin el
-     * vocabulario de vibraciones —«lado acople» y «rodamiento» deformados—,
-     * que es justo lo que ese campo existe para impedir.
-     */
-    /* Sin rutas desde el Plan 40 F2: la sección escrita a mano salió del menú y
-       las vistas de vibraciones son las de cada máquina CONFIGURADA
-       (`maq-*`, con `?maquina=`). Esta entrada entera se retira en F3. */
-    rutas: [],
-    /*
-     * Eran una sola —`estado_de_vibraciones`— porque cada herramienta estaba
-     * escrita contra la forma de dominio del tanque. Desde que hay una forma
-     * común (`estadoMaquina.js`) esta máquina hereda las que no dependen de
-     * tener histórico, y las que sí se niegan solas citando `series.nota`.
-     */
-    /* `historia_de_senal` se suma el 28-08-2026, cuando el grupo del historiador
-       empezó a registrar. Las demás de historia —análisis, perfil, correlación,
-       gráfico, reporte— siguen resolviendo nombres contra el catálogo del
-       tanque y todavía no aceptan `sistema`: ver B3 del backlog. */
-    herramientas: ["estado_del_sistema", "riesgos_activos", "historia_de_senal"],
-    historia:
-      "36 de los 73 puntos tienen serie propia, re-sondeados uno a uno el 21-09-2026: " +
-      "medidas, banderas, calidad y variador. Las vigilancias del módulo y el estado de los " +
-      "sensores NO se historizan, aunque sí se leen en vivo. aPeak_S1 devuelve la serie de " +
-      "aRMS_S1 y queda fuera; las cuatro señales de aviso tampoco existen en el historiador. " +
-      "El registro está detenido desde el 15-09-2026 —también el del tanque—, así que no hay " +
-      "muestras posteriores a esa fecha en ninguna señal.",
-    limitaciones: [
-      "La aceleración de pico del lado acople (aPeak_S1) NO tiene serie propia: el " +
-        "historiador devuelve ahí la de la aceleración eficaz del mismo apoyo. No se puede " +
-        "hablar de su evolución, aunque las de los otros dos apoyos sí.",
-      "Las vigilancias del módulo (MonState_*) y el estado de los sensores se leen EN VIVO " +
-        "pero no se historizan: se puede decir cómo están ahora, nunca cómo estaban antes.",
-      "Las nueve señales de calidad (QC_*) devuelven TODAS la misma serie: hay una sola " +
-        "calidad histórica, no una por medida y apoyo. No se puede afirmar que la calidad de " +
-        "una medida concreta fuera buena o mala en el pasado.",
-      "Las señales de aviso de los tres apoyos y la del variador no existen en el " +
-        "historiador: de ellas sólo hay valor en vivo.",
-      "El registro del historiador está detenido desde el 15-09-2026, y el del tanque " +
-        "también: es de planta, no de esta máquina. No hay muestras posteriores, así que " +
-        "cualquier pregunta por los últimos días se contesta diciendo que no hay dato.",
-      "El histórico empezó el 26-08-2026: no hay nada anterior, y las primeras horas se " +
-        "grabaron mientras la configuración todavía se movía.",
-      "Sin mecanismos de desgaste declarados no hay pronóstico: se puede describir cómo ha " +
-        "evolucionado una medida, pero NO poner plazo a una avería.",
-      "El diagnóstico de rodamientos (BPFO, BPFI, FTF) está apagado en los tres apoyos: " +
-        "el módulo no los vigila, así que un rodamiento picándose sólo se verá cuando ya " +
-        "haya movido el valor eficaz.",
-      "Del servidor de alarmas sólo se leen contadores del área: CUÁL alarma se disparó " +
-        "no se puede saber, y su historial tampoco responde.",
-      "La máquina suele girar cerca de 604 rpm, pegada al borde inferior de la banda de " +
-        "medida de ISO 10816: el veredicto vale, pero la lectura llega recortada.",
     ],
   },
 ];
@@ -1091,16 +829,16 @@ validarRegistro();
  *
  * ── EL SOLAPE CON UNA MÁQUINA ESCRITA A MANO SE TOLERA, Y SE DICE (Plan 38) ─
  *
- * Mientras dure la rama, la máquina de vibraciones existe DOS veces: escrita
- * a mano en `vibraciones.js` y configurada desde el árbol (Plan 36). Las dos
- * apuntan a la misma raíz porque SON la misma instalación; retirar la escrita
- * a mano es la F5 del Plan 34, y hasta entonces registrar la configurada
- * tiene que ser posible. Con `toleraSolapeConEscritas`, el solape con una
- * entrada escrita a mano no lanza: se devuelve en `solapes` para que quien
- * registra lo escriba en el registro de arranque. El solape entre DOS
- * configuradas sigue siendo un error —`problemasDeMaquina` ya lo impide al
- * guardar—, y `sistemaDePunto()` sigue devolviendo la primera que encaja: la
- * escrita a mano, que va antes en el array.
+ * Existió para la transición: del 21-09-2026 hasta el Plan 40 F3 la máquina
+ * de vibraciones estuvo DOS veces —escrita a mano y configurada— sobre la
+ * misma raíz, y registrar la configurada tenía que ser posible. Con
+ * `toleraSolapeConEscritas`, el solape con una entrada escrita a mano no
+ * lanza: se devuelve en `solapes` para que quien registra lo escriba en el
+ * registro de arranque. Hoy la única escrita a mano es el tanque, con otras
+ * raíces, así que la opción no encuentra solapes; se conserva porque el
+ * tanque volverá a configurarse algún día por el mismo camino (Plan 33 F9).
+ * El solape entre DOS configuradas sigue siendo un error —`problemasDeMaquina`
+ * ya lo impide al guardar—.
  *
  * @param {object} entrada  lo que devuelve `construirSistema()`
  * @param {{toleraSolapeConEscritas?: boolean}} [opciones]

@@ -39,10 +39,21 @@ import { RAIZ, SENALES, TODOS_LOS_PUNTOS, esHistorizada, pointName, puntoHistori
 import { valorEn } from '../shared/eva/tanque/simulador.js'
 import { RAIZ_VIB, puntoVariador } from '../shared/eva/vibraciones/vibraciones.js'
 import { enMarchaVib, valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
-import { SISTEMA, SISTEMAS, desregistrarSistema, registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { SISTEMAS, desregistrarSistema, registrarSistema } from '../shared/eva/comun/sistemas.js'
 import { construirSistema } from '../shared/eva/comun/construirSistema.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
+
+/*
+ * La máquina de vibraciones del guion es la ESPEJO configurada (Plan 40 F3):
+ * la escrita a mano se retiró. Registrada aquí entra en el bucle «todas las
+ * máquinas del registro» y en las comprobaciones del historiador. El bloque
+ * final, que levanta el backend entero, la quita al sincronizar el registro
+ * desde `MAQUINAS_RUTA`; es el último, y nada la usa después.
+ */
+const ESPEJO_REGISTRADA = registrarSistema(
+  construirSistema(configuracionEspejo({ verificadasDelCatalogo: true }).configurada, tipoDe('vibraciones')),
+)
 import { isGoodQuality } from '../shared/quality.js'
 
 const c = {
@@ -305,7 +316,7 @@ await checkAsync('una serie historizada de vibraciones se sirve con la media de 
   let t = 1_700_000_000_000
   while (!enMarchaVib(t)) t += 60_000   // la máquina simulada tiene que estar en marcha
   const cliente = createFakeIconicsClient({ ahora: () => t, rnd: () => 0.99 })
-  const vib = SISTEMA.vibraciones
+  const vib = ESPEJO_REGISTRADA
   for (const clave of ['vRMS_S1', 'velocidad', 'frecuencia']) {
     assert.equal(vib.esHistorizada(clave), true, `${clave} tiene que estar historizada para esta comprobación`)
     const r = await cliente.readHistory({
@@ -335,16 +346,18 @@ await checkAsync('una serie declarada pero NO verificada sigue fallando como en 
   assert.equal(sinSondear.esHistorizada('vRMS_S1'), false)
   assert.ok(sinSondear.series.punto('vRMS_S1'), 'declara el nombre en el historiador')
 
-  // La ESCRITA A MANO sí la tiene verificada y usa el MISMO nombre hda:, así
-  // que el falso, que pregunta a quien reclama el nombre en el orden del
-  // registro, la serviría. Para ver la negativa hace falta un nombre que sólo
-  // la espejo reclame: se le cambia el grupo a uno que la escrita a mano no usa.
+  // La espejo registrada arriba sí la tiene verificada y usa el MISMO nombre
+  // hda:, así que el falso, que pregunta a quien reclama el nombre en el orden
+  // del registro, la serviría. Para ver la negativa hace falta una máquina con
+  // tags y grupo PROPIOS que no la tenga verificada.
   const cfg = configuracionEspejo().configurada
   cfg.id = 'vibraciones-sin-verificar'
+  for (const a of cfg.assets) a.pointName = a.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/SINVER').replace('ae:/DEMO VIBRACIONES', 'ae:/SINVER')
   for (const v of cfg.variables) {
+    v.pointName = v.pointName.replace('TDCON/DEMO_VIBRACIONES', 'OTRA/SINVER').replace('ae:/DEMO VIBRACIONES', 'ae:/SINVER')
     if (v.historyPointName) v.historyPointName = v.historyPointName.replace('DEMO_VIBRACIONES', 'GRUPO_SIN_VERIFICAR')
   }
-  const soloSuya = registrarSistema(construirSistema(cfg, tipoDe('vibraciones')), { toleraSolapeConEscritas: true })
+  const soloSuya = registrarSistema(construirSistema(cfg, tipoDe('vibraciones')))
   try {
     const cliente = sinCaos()
     const r = await cliente.readHistory({

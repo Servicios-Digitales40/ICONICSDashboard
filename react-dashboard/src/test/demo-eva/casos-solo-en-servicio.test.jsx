@@ -18,18 +18,44 @@
  * FALSO: hay trece, de una máquina que no se está mirando. Es exactamente lo
  * que §2.4 prohíbe —disfrazar «no se muestra» de «no existe»— y es la parte de
  * este cambio que más fácil sería perder en una refactorización.
+ *
+ * ── LA MÁQUINA EN SERVICIO ES UNA CONFIGURADA (Plan 40 F3) ──────────
+ *
+ * La entrada `vibraciones` escrita a mano se retiró del registro: hoy toda
+ * máquina de vibraciones es una CONFIGURADA, y la vista sabe cuáles están en
+ * servicio por `useMaquina().enServicioIds`, que suma las configuradas a las
+ * del registro. Aquí se simula ese contexto con una configurada de id
+ * `vibraciones-configurada` —el de la espejo de pruebas—, que es lo que el
+ * `MaquinaProvider` real daría con esa máquina en `maquinas.json`. El tanque
+ * sigue cerrado y sigue sin aparecer en la lista, así que las dos mitades de
+ * la prueba —se oculta lo cerrado, se enseña lo en servicio— siguen midiendo
+ * lo mismo.
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ThemeProvider } from "@/theme";
 
-const { listarCasos } = vi.hoisted(() => ({ listarCasos: vi.fn() }));
+const { listarCasos, ID_CONFIGURADA } = vi.hoisted(() => ({
+  listarCasos: vi.fn(),
+  ID_CONFIGURADA: "vibraciones-configurada",
+}));
 
 vi.mock("@/lib/api/casosApi.js", async (importOriginal) => ({
   ...(await importOriginal()),
   listarCasos,
 }));
+
+/* Lo que daría el `MaquinaProvider` en una vista de planta (sin máquina en la
+   ruta) con la espejo configurada: el registro no aporta ninguna en servicio
+   —el tanque está cerrado— y la configurada se suma detrás. */
+vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    useMaquina: () => ({ ...original.useMaquina(), enServicioIds: [ID_CONFIGURADA] }),
+  };
+});
 
 import CasosRag from "@/Demo-EVA/views/comunes/CasosRag.jsx";
 
@@ -65,8 +91,10 @@ describe("sólo se enseñan los casos de máquinas EN SERVICIO", () => {
     expect(screen.queryByText("Sintoma de c1")).toBeNull();
   });
 
-  it("un caso de vibraciones SÍ se pinta", async () => {
-    listarCasos.mockResolvedValue({ casos: [caso("c2", "vibraciones")] });
+  it("un caso de una máquina de vibraciones CONFIGURADA sí se pinta", async () => {
+    /* Es la mitad que el Plan 40 F2 arregló en la vista: filtrando sólo por
+       `SISTEMA_IDS_EN_SERVICIO`, el caso de una configurada desaparecía. */
+    listarCasos.mockResolvedValue({ casos: [caso("c2", ID_CONFIGURADA)] });
 
     montar();
 

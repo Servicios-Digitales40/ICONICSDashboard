@@ -258,16 +258,16 @@ describe('PATCH /api/rag/documentos', () => {
 
     const r = await app.inject({
       method: 'PATCH',
-      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=vibraciones`,
+      url: `/api/rag/documentos?id=${subida.manual.id}&accion=asignar&sistema=tanque`,
     })
 
     expect(r.statusCode).toBe(200)
-    expect(json(r).manual.sistema).toBe('vibraciones')
+    expect(json(r).manual.sistema).toBe('tanque')
     // Lo que la `accion` explícita protege: asignar no puede archivar.
     expect(json(r).manual.estado).toBe('activo')
 
     const listado = json(await app.inject({ method: 'GET', url: '/api/rag/documentos' }))
-    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('vibraciones')
+    expect(listado.manuales.find(m => m.id === subida.manual.id).sistema).toBe('tanque')
   })
 
   it('asignar con `sistema` vacío devuelve el manual a toda la planta', async () => {

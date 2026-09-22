@@ -22,11 +22,30 @@
  * y sólo se convertiría en el problema de antes el día que uno de los dos
  * cambie — momento en el que esta prueba sí saltaría. Se acepta a propósito en
  * vez de leer el texto fuente, que sería frágil por otro lado.
+ *
+ * ── LA SEGUNDA MÁQUINA YA NO ESTÁ ESCRITA EN EL REGISTRO (Plan 40 F3) ──
+ *
+ * `SISTEMAS` trae hoy sólo el tanque: la máquina de vibraciones existe
+ * CONFIGURADA (`construirSistema` + `registrarSistema`), y su cadencia viene
+ * de la configuración —`cadenciaMs: 5000` en la espejo— y no de un literal en
+ * este archivo. Se registra aquí la espejo para que «las dos máquinas» siga
+ * siendo cierto y el bucle de abajo recorra a las dos, igual que hará el
+ * registro de arranque del backend.
  */
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SISTEMA, SISTEMAS } from "@shared/eva/comun/sistemas.js";
+import { SISTEMA, SISTEMAS, desregistrarSistema, registrarSistema } from "@shared/eva/comun/sistemas.js";
+import { construirSistema } from "@shared/eva/comun/construirSistema.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
 import { CADENCIA_MS } from "@/Demo-EVA/data/comunes/evaSource.js";
+import { ID_ESPEJO, configuracionEspejo } from "../../../../scripts/lib/configuracionEspejo.mjs";
+
+beforeAll(() => {
+  registrarSistema(construirSistema(configuracionEspejo().configurada, tipoDe("vibraciones")));
+});
+afterAll(() => {
+  desregistrarSistema(ID_ESPEJO);
+});
 
 describe("la cadencia la declara el registro", () => {
   it("la fuente del tanque usa la del registro, no un número propio", () => {
@@ -52,6 +71,12 @@ describe("la cadencia la declara el registro", () => {
     // No es cosmético: el tanque publica cada pocos segundos y el SM 1281 tiene
     // su propio ritmo. Una cadencia única para toda la planta obligaría a la
     // más lenta a ir al paso de la más rápida, o al revés.
+    //
+    // La de vibraciones sale de SU configuración —es lo que `construirSistema`
+    // pone en la entrada—, no del tipo ni de un número del frontend.
+    expect(SISTEMA[ID_ESPEJO].cadenciaMs).toBe(configuracionEspejo().configurada.cadenciaMs);
+    expect(SISTEMA[ID_ESPEJO].cadenciaMs).not.toBe(SISTEMA.tanque.cadenciaMs);
+
     const cadencias = SISTEMAS.map((s) => s.cadenciaMs);
     expect(new Set(cadencias).size).toBeGreaterThan(1);
   });

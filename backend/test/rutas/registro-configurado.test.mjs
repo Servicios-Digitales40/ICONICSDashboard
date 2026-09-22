@@ -81,7 +81,8 @@ describe('al arrancar', () => {
     ;({ app } = await montarApp({ MAQUINAS_RUTA: join(carpeta, 'no-existe.json') }))
     expect(sistemasConfigurados()).toEqual([])
     expect(SISTEMA.tanque).toBeTruthy()
-    expect(SISTEMA.vibraciones).toBeTruthy()
+    /* Desde el Plan 40 F3 el tanque es la única escrita a mano. */
+    expect(SISTEMA.vibraciones).toBeUndefined()
   })
 
   it('una configuración que no se puede construir se OMITE y se explica, sin tumbar el resto', async () => {
@@ -160,7 +161,12 @@ describe('en caliente', () => {
     expect(json(desconocido).error).toMatch(/no reconozco "sistema"/)
   })
 
-  it('el solape de raíz con la máquina ESCRITA A MANO se tolera y se declara', async () => {
+  it('la raíz que fue de la máquina escrita a mano es ahora de la configurada, sin solape', async () => {
+    /*
+     * Hasta el Plan 40 F3 esta raíz la reclamaba la entrada escrita a mano
+     * «vibraciones» y el alta se toleraba declarando el solape. Retirada
+     * aquélla, la configurada es la única dueña de sus puntos.
+     */
     const alta = await app.inject({
       method: 'POST',
       url: '/api/maquinas',
@@ -170,12 +176,9 @@ describe('en caliente', () => {
 
     const entrada = SISTEMA['vib-motor-03']
     expect(entrada).toBeTruthy()
-    expect(entrada.solapes).toEqual([
-      expect.objectContaining({ con: 'vibraciones', raiz: RAIZ_VIB }),
-    ])
-    /* La escrita a mano sigue siendo la dueña de sus puntos. */
+    expect(entrada.solapes).toBeUndefined()
     const { sistemaDePunto } = await import('../../../shared/eva/comun/sistemas.js')
-    expect(sistemaDePunto(`${RAIZ_VIB}S1/vRMS_S1`).id).toBe('vibraciones')
+    expect(sistemaDePunto(`${RAIZ_VIB}S1/vRMS_S1`).id).toBe('vib-motor-03')
   })
 
   it('el solape entre DOS configuradas sigue rechazándose al guardar', async () => {

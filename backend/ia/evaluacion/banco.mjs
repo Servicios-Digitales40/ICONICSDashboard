@@ -55,10 +55,12 @@ export const BANCO = [
   },
   {
     id: 'vibraciones-ahora',
-    pregunta: '¿Cómo está el sistema de vibraciones?',
+    pregunta: '¿Cómo está la máquina de vibraciones?',
     porque:
       'La segunda máquina existe desde agosto y el prompt afirmaba que sólo había ocho ' +
-      'señales. Si el modelo no la reconoce, contestará sobre el tanque.',
+      'señales. Si el modelo no la reconoce, contestará sobre el tanque. Desde el Plan 40 ' +
+      'es una máquina CONFIGURADA con el nombre que le pusieron en planta, así que la ' +
+      'pregunta va por el tipo y no por un nombre que este banco no puede saber.',
     herramienta: ['estado_del_sistema', 'sistemas_de_la_planta'],
   },
 

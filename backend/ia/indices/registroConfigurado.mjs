@@ -29,10 +29,10 @@
  * ── LO QUE SE TOLERA Y LO QUE NO ──────────────────────────────────
  *
  * **El solape de raíz con una máquina escrita a mano se tolera y se registra
- * en el arranque.** Mientras dure la rama, vibraciones existe dos veces —en
- * código y configurada— y apuntan a la misma raíz porque son la misma
- * instalación (Plan 34 F5 es lo que lo resolverá). `sistemaDePunto()` sigue
- * atribuyendo esos puntos a la escrita a mano.
+ * en el arranque.** Sirvió para la transición en que vibraciones existió dos
+ * veces —en código y configurada—; desde el Plan 40 F3 la única escrita a
+ * mano es el tanque, con otras raíces, y la tolerancia no encuentra solapes.
+ * Se conserva para cuando el tanque se configure por el mismo camino.
  *
  * **Una configuración que no se puede construir se OMITE y se dice.** Un tipo
  * desconocido, una máquina sin variables: se registra el motivo y el resto
@@ -92,8 +92,7 @@ export async function sincronizarRegistroConfigurado(gestorMaquinas) {
   for (const s of solapes) {
     logger.warn(
       `La máquina configurada «${s.maquina}» comparte raíz con «${s.con}» (escrita a mano): ` +
-        `«${s.raiz}» ⊂ «${s.suya}». Hasta que el Plan 34 F5 retire el catálogo, sistemaDePunto() ` +
-        'atribuye esos puntos a la escrita a mano. Las dos describen la misma instalación.',
+        `«${s.raiz}» ⊂ «${s.suya}». sistemaDePunto() atribuye esos puntos a la escrita a mano.`,
       s,
     )
   }

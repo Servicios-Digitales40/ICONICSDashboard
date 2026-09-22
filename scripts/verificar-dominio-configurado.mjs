@@ -31,18 +31,16 @@
  *
  *   node scripts/verificar-dominio-configurado.mjs
  */
-import { execFileSync } from 'node:child_process'
 import assert from 'node:assert/strict'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { construirSistema } from '../shared/eva/comun/construirSistema.js'
 import { dominioDesdeRoles } from '../shared/eva/comun/dominioDesdeRoles.js'
-import { SISTEMA } from '../shared/eva/comun/sistemas.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createSistemaVibraciones } from '../shared/eva/vibraciones/sistemaVibraciones.js'
 import { evaluarRiesgosVibracion } from '../shared/eva/vibraciones/riesgosVibracion.js'
 import { decodificarVigilancia } from '../shared/eva/vibraciones/vibraciones.js'
+import { CATALOGO_VIBRACIONES } from '../shared/eva/vibraciones/catalogoDemo.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -65,16 +63,11 @@ function check(nombre, fn) {
 
 /* La configuración se genera AHORA, no se guarda un JSON viejo. Mismo motivo
    que en `verificar-vibraciones-configurada.mjs`. */
-const AQUI = dirname(fileURLToPath(import.meta.url))
-const generado = execFileSync(
-  process.execPath,
-  [join(AQUI, 'generar-configuracion-vibraciones.mjs')],
-  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-)
-const maquina = JSON.parse(generado).maquinas[0]
+const { configurada: maquina } = configuracionEspejo({ verificadasDelCatalogo: true })
 const TIPO = tipoDe('vibraciones')
 const configurada = construirSistema(maquina, TIPO)
-const aMano = SISTEMA.vibraciones
+/* La referencia es el catálogo del tipo (Plan 40 F3), no una entrada del registro. */
+const aMano = CATALOGO_VIBRACIONES
 
 /** Lecturas de mentira. Cada una ejercita el adaptador de otra forma. */
 const ESCENARIOS = {

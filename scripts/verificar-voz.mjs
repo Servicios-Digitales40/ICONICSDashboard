@@ -34,6 +34,18 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { escribirEspejoEn, ID_ESPEJO } from './lib/configuracionEspejo.mjs'
+
+/*
+ * La máquina de vibraciones es una CONFIGURADA (Plan 40 F3), y el vocabulario
+ * de dictado viene de su TIPO. La app la lee de `MAQUINAS_RUTA` al arrancar,
+ * así que se le escribe la espejo en una carpeta privada.
+ */
+const MAQUINAS_RUTA = join(await mkdtemp(join(tmpdir(), 'voz-maquinas-')), 'maquinas.json')
+await escribirEspejoEn(MAQUINAS_RUTA)
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -98,7 +110,7 @@ const whisperBase = `http://127.0.0.1:${whisper.address().port}`
 /* ── La app, contra el whisper falso ─────────────────────────────────── */
 
 async function levantar(extra = {}) {
-  const config = loadConfig({ LOG_LEVEL: 'ERROR', ...extra })
+  const config = loadConfig({ LOG_LEVEL: 'ERROR', MAQUINAS_RUTA, ...extra })
   const servidor = await createApp(config)
   await servidor.listen({ port: 0, host: '127.0.0.1' })
   return {
@@ -189,7 +201,7 @@ await check('el vocabulario cambia con el SISTEMA que se está mirando', async (
    */
   respuestaWhisper = { text: 'hola' }
 
-  await enviar(app.base, wavDePrueba(), 'vibraciones')
+  await enviar(app.base, wavDePrueba(), ID_ESPEJO)
   const vib = ultimoFormulario.prompt ?? ''
   assert.match(vib, /rodamiento/, 'en vibraciones tiene que oír «rodamiento»')
   assert.match(vib, /acople/)

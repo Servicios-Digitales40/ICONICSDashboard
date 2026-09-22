@@ -2,15 +2,17 @@
 /**
  * scripts/verificar-vibraciones-configurada.mjs
  * ------------------------------------------------------------------
- * La máquina de vibraciones CONFIGURADA contra la escrita a mano. Plan 33 F4.
+ * La máquina de vibraciones CONFIGURADA contra el catálogo del tipo. Plan 33 F4;
+ * desde el Plan 40 F3 la referencia es `lib/catalogoVibraciones.mjs`, no una
+ * entrada del registro.
  *
  * ── LA PREGUNTA QUE CONTESTA ESTE GUION ────────────────────────────
  *
  * ¿Puede una configuración reproducir lo que hoy hace un módulo de 1 154
  * líneas? Y donde no pueda: **qué exactamente**.
  *
- * Las dos salen de la misma fuente —la configurada se DERIVA del catálogo, ver
- * `generar-configuracion-vibraciones.mjs`— así que ninguna diferencia que
+ * Las dos salen de la misma fuente —la configurada se DERIVÓ del catálogo el
+ * 21-09-2026 y está congelada en `lib/vibraciones-espejo.json`— así que ninguna diferencia que
  * aparezca aquí es un error de transcripción. Todas son reales: son cosas que
  * la configuración no sabe expresar todavía.
  *
@@ -33,15 +35,12 @@
  * No necesita red: entra en `npm run verificar`.
  */
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
-
 import { construirSistema } from '../shared/eva/comun/construirSistema.js'
-import { SISTEMA, valorSimuladoDe } from '../shared/eva/comun/sistemas.js'
 import { contadoresDeMaquina } from '../shared/eva/comun/vistaDeMaquina.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
-import { enMarchaVib } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+import { enMarchaVib, valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
+import { CATALOGO_VIBRACIONES } from '../shared/eva/vibraciones/catalogoDemo.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m', amarillo: '\x1b[33m',
@@ -69,16 +68,19 @@ function check(nombre, fn) {
  * pasaría comparando contra una foto antigua — que es exactamente el fallo
  * que se quiere detectar.
  */
-const AQUI = dirname(fileURLToPath(import.meta.url))
-const generado = execFileSync(
-  process.execPath,
-  [join(AQUI, 'generar-configuracion-vibraciones.mjs')],
-  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-)
-
-const configuracion = JSON.parse(generado).maquinas[0]
+/*
+ * ── LA REFERENCIA ES EL CATÁLOGO DEL TIPO, NO UNA ENTRADA DEL REGISTRO ─
+ *
+ * Hasta el Plan 40 F3 se comparaba contra `SISTEMA.vibraciones`, la entrada
+ * escrita a mano, y la configuración se derivaba de ella en cada arranque.
+ * Retirada la entrada, la configuración es la FIXTURE `vibraciones-espejo.json`
+ * y la referencia es `CATALOGO_VIBRACIONES`: la misma forma que tenía la
+ * entrada, armada desde los módulos del tipo. La pregunta del guion no cambia:
+ * ¿la configuración reproduce el catálogo en todo lo que el registro consume?
+ */
+const { configurada: configuracion } = configuracionEspejo({ verificadasDelCatalogo: true })
 const configurada = construirSistema(configuracion, tipoDe('vibraciones'))
-const aMano = SISTEMA.vibraciones
+const aMano = CATALOGO_VIBRACIONES
 
 /* ── Lo que el registro consume ──────────────────────────────────────── */
 
@@ -91,8 +93,13 @@ check('los MISMOS 73 puntos, sin sobrar ni faltar ninguno', () => {
   )
 })
 
-check('las MISMAS raíces, en el mismo orden', () => {
-  assert.deepEqual(configurada.raices, aMano.raices)
+check('las MISMAS raíces, en el mismo orden, y después sus apoyos', () => {
+  /* La configurada declara además un asset por apoyo (S1, S2, S3), que es de
+     donde saca su nombre («Lado acople»); van detrás y todos cuelgan de la raíz. */
+  assert.deepEqual(configurada.raices.slice(0, aMano.raices.length), aMano.raices)
+  for (const extra of configurada.raices.slice(aMano.raices.length)) {
+    assert.ok(extra.startsWith(aMano.raices[0]), `«${extra}» no cuelga de la raíz`)
+  }
 })
 
 /*
@@ -183,7 +190,8 @@ check('sin sondear, la configuración NO promete ninguna serie', () => {
    * Si esto empieza a fallar es que alguien volvió a heredar la lista blanca
    * en vez de sondearla.
    */
-  assert.deepEqual([...configurada.series.historizadas()], [])
+  const sinSondear = construirSistema(configuracionEspejo().configurada, tipoDe('vibraciones'))
+  assert.deepEqual([...sinSondear.series.historizadas()], [])
 })
 
 /*
@@ -362,10 +370,14 @@ check('lo que NO sale de un rol se declara: el estado del sensor (las alarmas ya
   assert.deepEqual(sinContadores.estado(() => null, sinContadores).dominio.sinRoles.sort(), ['alarmas', 'sensores'])
 })
 
-check('y lo DECLARA: no aparenta poder diagnosticar', () => {
+check('y DECLARA las limitaciones de la instalación, empezando por la del aPeak_S1', () => {
+  /* Desde el Plan 40 F3 esta configuración ES la máquina de la demo, no una
+     copia para comparar; sus limitaciones son las de la instalación, y la
+     primera es la que el asistente cita en su aviso. */
+  assert.match(configurada.limitaciones[0], /aPeak_S1/)
   assert.ok(
-    configurada.limitaciones.some((l) => /derivada del catálogo/i.test(l)),
-    'no dice que es una configuración derivada'
+    !configurada.limitaciones.some((l) => /derivada del catálogo/i.test(l)),
+    'sigue diciendo que es una configuración derivada, y ya no lo es'
   )
 })
 
@@ -462,7 +474,9 @@ console.log('\n── El estado y el resumen salen del tipo (Plan 39 F1) ──�
  */
 let instante = 0
 while (!enMarchaVib(instante)) instante += 60_000
-const leerSimulado = (punto) => valorSimuladoDe(punto, instante) ?? null
+/* La física del catálogo para los tags del catálogo: la espejo NO está
+   registrada en este guion, así que no se pasa por el registro. */
+const leerSimulado = (punto) => valorVibracionEn(punto, instante) ?? null
 const tipoVib = tipoDe('vibraciones')
 
 check('la configurada arma su estado con el tipo: bandas ISO en la velocidad eficaz y grupos por apoyo', () => {
@@ -518,6 +532,8 @@ check('sin descripción, la etiqueta lleva el apoyo, y cada señal lleva el id d
      nombrado como lo nombra el servidor, no como lo nombra el tipo. */
   const comoEnPlanta = {
     ...configuracion,
+    /* Sin nombre en los assets de apoyo: el servidor sólo da «S1». */
+    assets: configuracion.assets.map((a) => ({ ...a, nombre: null })),
     variables: configuracion.variables.map((v) => ({
       ...v,
       descripcion: null,
@@ -607,7 +623,7 @@ if (fallos.length) {
   console.log(`\n${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)
   for (const f of fallos) console.log(`  ${c.rojo}✗${c.reset} ${f}`)
   console.log(
-    `${c.gris}Revisa generar-configuracion-vibraciones.mjs y ` +
+    `${c.gris}Revisa scripts/lib/vibraciones-espejo.json, scripts/lib/catalogoVibraciones.mjs y ` +
       `shared/eva/comun/construirSistema.js.${c.reset}`
   )
   process.exit(1)
