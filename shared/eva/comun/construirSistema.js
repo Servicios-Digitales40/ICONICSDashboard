@@ -643,11 +643,20 @@ export function construirSistema(maquina, tipo) {
         /* Series declaradas pero no sondeadas: existen en la configuración y
            NO se ofrecen como historia hasta que el sondeo diga que son suyas. */
         const declaradas = (maquina.variables ?? []).filter((v) => v.historyPointName).length;
-        const sinSondear = declaradas - clavesConSerie.length;
-        if (sinSondear > 0) {
+        const sinVerificar = declaradas - clavesConSerie.length;
+        if (sinVerificar > 0) {
+          /*
+           * Decía «están sin sondear», y en la ficha de `vib-motor-03` eso
+           * era falso (22-09-2026): las 18 se habían sondeado y el sondeo no
+           * pudo darlas por suyas (11 compartidas, 6 sin muestras, 1 sin
+           * leer). La variable no guarda si se sondeó o no —sólo si quedó
+           * verificada—, así que la frase dice lo que se sabe: no verificada,
+           * por cualquiera de las dos razones.
+           */
           propias.push(
-            `${sinSondear} de ${declaradas} series declaradas están sin sondear: no se ofrecen como ` +
-              "historia hasta comprobar que el historiador devuelve la suya y no la de otra señal.",
+            `${sinVerificar} de ${declaradas} series declaradas no están verificadas —sin sondear, o ` +
+              "el sondeo no pudo darlas por suyas—: no se ofrecen como historia hasta comprobar que " +
+              "el historiador devuelve la suya y no la de otra señal.",
           );
         }
 

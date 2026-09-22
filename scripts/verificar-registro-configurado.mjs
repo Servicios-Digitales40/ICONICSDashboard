@@ -525,7 +525,7 @@ check('VALID: ninguna limitación de revisión; lo comprobado no se disculpa', (
   assert.ok(!e.limitaciones.some((l) => /Sin revisar|no pudo comprobar|puntos ausentes/.test(l)))
 })
 
-check('series declaradas sin sondear: se cuentan, y no se ofrecen como historia', () => {
+check('series declaradas no verificadas: se cuentan, y no se ofrecen como historia', () => {
   const base = configuracion('medio-sondeada', 'ac:MS/')
   const m = {
     ...base,
@@ -536,7 +536,9 @@ check('series declaradas sin sondear: se cuentan, y no se ofrecen como historia'
     })),
   }
   const e = construirSistema(m, tipoDe('vibraciones'))
-  assert.ok(e.limitaciones.some((l) => /1 de 2 series declaradas están sin sondear/.test(l)))
+  /* «no están verificadas», no «sin sondear»: la variable no sabe si se
+     sondeó, sólo si quedó verificada (ver `construirSistema.js`). */
+  assert.ok(e.limitaciones.some((l) => /1 de 2 series declaradas no están verificadas/.test(l)))
   assert.deepEqual([...e.series.historizadas()], ['vRMS_S1'])
 })
 

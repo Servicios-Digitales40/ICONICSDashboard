@@ -315,7 +315,7 @@ export default function ConfiguracionPlanta({ params = {} } = {}) {
           <AlertBanner
             type={quitada.desactivada ? "warning" : "success"}
             title={traducir(quitada.desactivada ? "machines:config.deactivated" : "machines:config.deleted")}
-            message={quitada.motivo ?? traducir("machines:config.editor.removedHint")}
+            message={quitada.motivo ?? traducir("machines:config.removedHint")}
           />
         </div>
       )}
@@ -675,18 +675,18 @@ function FichaDeMaquina({
           <button type="button" onClick={() => setConfirmandoQuitar(true)} disabled={quitando}
             style={{ ...estiloBoton(t), cursor: "pointer", color: t.coral }}>
             <Trash2 size={13} />
-            {traducir(quitando ? "machines:config.editor.removing" : "machines:config.editor.remove")}
+            {traducir(quitando ? "machines:config.removing" : "machines:config.remove")}
           </button>
         ) : (
           <span style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
             <span style={{ ...textoSuave, color: t.text }}>
-              {traducir("machines:config.editor.removeConfirm", { nombre: maquina.nombre })}
+              {traducir("machines:config.removeConfirm", { nombre: maquina.nombre })}
             </span>
             <Button variant="danger" onClick={() => { setConfirmandoQuitar(false); onQuitar?.(); }}>
-              {traducir("machines:config.editor.removeYes")}
+              {traducir("machines:config.removeYes")}
             </Button>
             <Button variant="secondary" onClick={() => setConfirmandoQuitar(false)}>
-              {traducir("machines:config.editor.removeNo")}
+              {traducir("machines:config.removeNo")}
             </Button>
           </span>
         )}

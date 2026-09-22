@@ -279,6 +279,26 @@ describe("la comprobación contra ICONICS", () => {
  * número equivocado bajo el rótulo correcto, y si la pantalla no lo dice,
  * nadie lo descubre mirando.
  */
+/*
+ * Visto en pantalla el 22-09-2026: el botón rojo de la ficha decía
+ * `config.editor.remove` —la clave, no el texto— desde el Plan 37 F1, porque
+ * las claves `remove*` viven en `config` y la vista las pedía en
+ * `config.editor`. Los verificadores de i18n comprueban la paridad entre
+ * idiomas, no que cada clave pedida exista; esto sí.
+ */
+it("el botón de quitar enseña su texto, no su clave", async () => {
+  listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+
+  montar();
+  const boton = await screen.findByRole("button", { name: /Quitar del tablero/i });
+  expect(boton).toBeTruthy();
+  expect(screen.queryByText(/config\.editor\.remove/)).toBeNull();
+
+  fireEvent.click(boton);
+  expect(await screen.findByText(/¿Quitar «Motor conveyor 4» del tablero\?/)).toBeTruthy();
+  expect(screen.getByRole("button", { name: /Sí, quitar/i })).toBeTruthy();
+});
+
 describe("el sondeo de series", () => {
   /** Una máquina con punto histórico: sin él no hay nada que sondear. */
   const conHistoria = () =>
