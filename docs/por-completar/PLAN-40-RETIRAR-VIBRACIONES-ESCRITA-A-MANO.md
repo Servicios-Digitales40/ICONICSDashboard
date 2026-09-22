@@ -1,6 +1,6 @@
 # PLAN 40 — Retirar la máquina de vibraciones escrita a mano
 
-**Estado:** F0–F3 y F5 completadas · F4 (pasos en planta, del usuario) por completar
+**Estado:** F0–F3 y F5 completadas · **F4 (pasos en planta, del usuario) por completar — se ejecuta en el Plan 41 §F1**, que le añade los criterios de cierre
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 

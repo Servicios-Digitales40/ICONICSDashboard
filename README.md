@@ -405,7 +405,7 @@ node scripts/verificar-bundle.mjs         # la pila 3D no está en el arranque
 - [`docs/BACKLOG-BACKEND.md`](docs/BACKLOG-BACKEND.md) — lo pendiente del backend, ordenado por lo que costaría la máquina #3
 - [`docs/BACKLOG-FRONTEND.md`](docs/BACKLOG-FRONTEND.md) — lo pendiente del frontend, con las cifras medidas de duplicación
 - [`docs/MEJORAS-ASISTENTE.md`](docs/MEJORAS-ASISTENTE.md) — treinta mejoras para el asistente: veracidad, herramientas y capacidades
-- [`docs/por-completar/PLAN-8-DEMO-EVA.md`](docs/por-completar/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
+- [`docs/completados/PLAN-8-DEMO-EVA.md`](docs/completados/PLAN-8-DEMO-EVA.md) — la demo de sistemas de agua
 - [`docs/completados/PLAN-9-SIMULADOR-EVA.md`](docs/completados/PLAN-9-SIMULADOR-EVA.md) — el simulador de la sección
 - [`docs/completados/PLAN-10-VISTA-SVG.md`](docs/completados/PLAN-10-VISTA-SVG.md) — la vista SVG de la planta
 - [`docs/completados/PLAN-11-SELECTOR-RANGO-HISTORIA.md`](docs/completados/PLAN-11-SELECTOR-RANGO-HISTORIA.md) — el selector de rango del historiador

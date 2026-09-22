@@ -36,7 +36,7 @@ desplegar.
 ### `eva/` · las máquinas de la planta
 
 Hay **dos instalaciones**, separadas a propósito, y un registro que las declara.
-Ver [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../docs/por-completar/PLAN-8-DEMO-EVA.md).
+Ver [`docs/completados/PLAN-8-DEMO-EVA.md`](../docs/completados/PLAN-8-DEMO-EVA.md).
 
 | Archivo | Qué contiene |
 |---|---|

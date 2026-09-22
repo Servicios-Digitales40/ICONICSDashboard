@@ -1,15 +1,31 @@
 # PLAN-19 — Modularización: Monitoreo y Diagnóstico / Predicción
 
-> **ESTADO — PARCIALMENTE COMPLETADO, RESTO BLOQUEADO (revisado
-> 10-09-2026).** F1 (frontera conceptual), F2 (Predicción fuera de Demo-EVA)
-> y F3 (`shared/modulos.js`) ya están en el código — confirmado:
-> `sec-prediccion` en `routes.jsx`, `react-dashboard/src/modulos/prediccion/`
-> y `shared/modulos.js` existen. F6 (aislamiento) parece cubierta por
-> `scripts/verificar-modulos.mjs`, aunque con otro nombre que el propuesto
-> aquí — no confirmado al detalle. **F4, F5 y F7 siguen `⛔ bloqueadas`**: 
-> dependen del contrato de la API de Leonardo Carrasco (§9), información
-> que este documento declara no tener. Bloqueo real y bien declarado, no
-> trabajo olvidado.
+> **ESTADO — CERRADO Y ARCHIVADO EL 22-09-2026.** Lo que este plan podía
+> hacer desde el repo está hecho: F1 (frontera conceptual), F2 (Predicción
+> fuera de Demo-EVA), F3 (`shared/modulos.js`) y F6 (aislamiento, por
+> `scripts/verificar-modulos.mjs`).
+>
+> **F4, F5 y F7 se cierran sin hacerse, y es deliberado.** Dependen del
+> contrato de la API de Leonardo Carrasco (§9), que no llegó. No es trabajo
+> olvidado: es trabajo que no se puede empezar, y un plan abierto durante
+> meses esperando a un tercero no informa de nada que no diga esta línea.
+> El 22-09-2026 Predicción salió además del menú (commit `b06ba57`: seis
+> vistas ocultas, ninguna borrada), así que hoy no hay ni pantalla que
+> desbloquear.
+>
+> **Este documento NO se borra porque sostiene código vivo.** Cuatro cosas
+> siguen apuntando aquí y tienen que seguir encontrándolo:
+>
+> - `CLAUDE.md` §2.1 y §4.7 — §0.1 de aquí es el dueño de la acotación «de
+>   planta», y §0.2 el de la distinción módulo/sistema.
+> - `backend/config.mjs` — el proxy sigue siendo «`PLAN-19` F4, bloqueado».
+> - `react-dashboard/src/modulos/prediccion/` — `predictionApi.js`,
+>   `EventosCompresor.jsx` y `PantallaPendiente.jsx`, que **enseña esta ruta
+>   en pantalla al usuario**.
+> - `docs/completados/PLAN-20-MEJORAS-DEMO-6.md`, dos veces.
+>
+> **Si la API aparece**, esto se reabre tal cual: F4, F5 y F7 están escritas
+> y siguen siendo válidas. Reabrir es mover el archivo, no reescribirlo.
 
 ## 0. Por qué
 
@@ -25,7 +41,7 @@ importa: **de dónde vienen sus datos**.
 El síntoma de que la frontera no existe está en el código:
 
 1. `PrediccionBeta.jsx` vive en `Demo-EVA/views/comunes/`, la carpeta que
-   [`CLAUDE.md`](../CLAUDE.md) §3 define como «todo lo que sabe de las dos
+   [`CLAUDE.md`](../../CLAUDE.md) §3 define como «todo lo que sabe de las dos
    máquinas de planta». Un compresor de otra API no es ninguna de las dos.
 2. En el sidebar cuelga de `sec-general`, junto a Assets y Alarmas: archivado
    como si fuera una vista transversal de la planta.
@@ -341,7 +357,7 @@ fuera una tercera instalación nuestra.
 - **No mete el compresor en `SISTEMAS`.** Ver §0.2.
 - **No construye el modelo predictivo.** Se consume el de Leonardo.
 - **No activa la autenticación.** Sigue siendo su propio plan (G11 en
-  [`PLAN-17`](../completados/PLAN-17-CERRAR-AUDITORIA.md)).
+  [`PLAN-17`](./PLAN-17-CERRAR-AUDITORIA.md)).
 - **No arregla los tres defectos medidos el 03-09-2026** (narración de un 500
   como ausencia de historial; metadato `herramientas` obsoleto; `analisis_de_senal`
   aceptando `DKW` sin apoyo). Son de Monitoreo y van por su cuenta — aunque F3

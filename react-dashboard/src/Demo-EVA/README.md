@@ -52,7 +52,7 @@ siga siendo una isla autocontenida: las convenciones de más abajo son las que
 lo mantuvieron separable, y ese aislamiento es lo que hizo barata la transición.
 
 El plan completo, con todo lo que se midió contra el servidor antes de escribir
-una línea, está en [`docs/por-completar/PLAN-8-DEMO-EVA.md`](../../../docs/por-completar/PLAN-8-DEMO-EVA.md).
+una línea, está en [`docs/completados/PLAN-8-DEMO-EVA.md`](../../../docs/completados/PLAN-8-DEMO-EVA.md).
 
 ---
 

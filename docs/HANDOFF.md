@@ -229,99 +229,95 @@ alguna sigue en uso; ninguna se ha tocado en este trabajo.
 
 ### Los planes vivos
 
+> **Sondeados contra el código el 22-09-2026.** Lo que queda se ejecuta desde
+> el **Plan 41**; los demás están ahí para decir por qué, no para trabajar en
+> ellos directamente.
+
+**`PLAN-41-CERRAR-VIBRACIONES.md`** — **el que manda**. Recoge lo único que
+sobrevivió al sondeo: F0 confirmar en el navegador, F1 los pasos en planta, F2
+el índice de sinónimos, F3 normalizar por rpm, F4 las alarmas de la máquina, F5
+archivar. Su §0 es la tabla de qué se dio por pendiente y ya estaba hecho.
+
+**`PLAN-32-VIBRACIONES.md`** — F1 y **F5** completas. **F4 parcial**:
+`necesita` está en las 17 reglas, y el **factor de cresta es imposible en S1**
+(defecto del servidor, medido). F2 y F3 sólo esperan el sondeo en planta.
+**F6 —sinónimos— es su única fase de código viva**, y se ejecuta en el Plan 41 F2.
+
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
-se puede hacer sin tocar el código del tanque.
+se puede hacer sin tocar el código del tanque. **Es el único que no cierra el
+Plan 41**, y es correcto.
 
-**`PLAN-34-MAQUINAS-DESDE-EL-ARBOL.md`** está en `docs/completados/`: su F5
-(retirar el catálogo escrito a mano) la hizo el Plan 40.
+**`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas. Queda **F4**
+(Alarmas), en el Plan 41 F4, cuyo primer paso es medir el área `ae:`.
+
+**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F3 completas y **sin código
+pendiente**: el backend registra las configuradas (`registroConfigurado.mjs`),
+las rutas validan `sistema` contra la lista viva, y el asistente contesta sobre
+una configurada (6 de 7 preguntas llegan a `Nuevo-Modor`). Hoy hay **8 rutas
+`maq-*`** en `routes.jsx`. Sólo espera confirmarse en pantalla (Plan 41 F0).
 
 **`PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md`** — F0–F3 y F5 completas.
-La simulación es del tipo (F0), el frontend enseña vibraciones sólo por
-configuradas (F2), la entrada `vibraciones` salió del registro y el backend,
-los guiones y la fixture `scripts/lib/vibraciones-espejo.json` viven sin ella
-(F1+F3). Queda **F4**, pasos en planta (arriba, «Qué está a medias»).
+Queda **F4**, pasos en planta, en el Plan 41 F1.
 
-**`PLAN-32-VIBRACIONES.md`** — F1 completa. F2–F6 reformuladas para la
-máquina configurada (ya no hay escrita a mano sobre la que hacerlas).
-
-**`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas (sección por
-máquina configurada; Inicio, Gráficas y 3D parametrizadas). Queda **F4**
-(Alarmas de la máquina), y **verlo en el navegador**.
-
-**`PLAN-38-REGISTRO-DINAMICO.md`** — F1–F3 completas: el backend registra las
-configuradas (`registroConfigurado.mjs`), las rutas validan `sistema` contra la
-lista viva (`sistemaConocido()`), Hallazgos, Avisos, Casos y RAG entran en la
-sección de cada máquina, y **el asistente contesta sobre una configurada**:
-medido contra el modelo real con `medir-asistente-configurada.mjs`, 6 de 7
-preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
-id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
-primer render (Plan 37).
-
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** está **COMPLETADO** (F0–F6,
-22-09-2026) y archivado en `docs/completados/`. Que las herramientas del asistente sirvan a cualquier máquina
-configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
-vibraciones. F0 puso una configurada espejo en la puerta
-(`scripts/lib/configuracionEspejo.mjs`). F1 hizo que el estado y el resumen
-de una configurada los componga el tipo —apoyos con valores y banda ISO,
-variador, contadores de alarma, etiquetas con apoyo— y el modelo pasó de «no
-tiene lecturas disponibles» a citar mm/s por apoyo. F2 dio a las dos entradas
-de vibraciones `metaDe` (unidad, decimales, naturaleza), quitó la caída al
-tanque de `lib/historia.mjs`, arregló `resumen_de_turno` y `alarma_sostenida`,
-y el historiador falso sirve por fin las series de vibraciones. F3 hizo que
-`limites_del_manual` sirva a una configurada con los términos de su tipo y
-destapó que los manuales de vibraciones estaban asignados a una máquina que ya
-no existía: ahora se asignan al TIPO (`tipo:vibraciones`) y el modelo cita la
-ISO 20816-3 para `Nuevo-Modor`. F4: `generar_reporte` dibuja el PDF de una
-configurada —rótulos de su entrada, banda de su tipo, orden de su estado— y
-está medido contra planta: 12 páginas y 17 gráficos de `Nuevo-Modor`. F5: el
-prompt lleva el catálogo de la máquina que se tiene delante (+835 tokens,
-medidos) y `sistemas_de_la_planta` sale del turno con contexto; «¿hay algún
-riesgo activo?» desde `Nuevo-Modor` ya no barre las cuatro máquinas. El
-instrumento da **9 de 9**. F6 cerró el alta automática: una `INVALID` no entra
-en el registro y la omisión dice cómo volver a comprobarla; lo que la
-validación sabe —sin revisar, puntos ausentes, series sin sondear— va a las
-`limitaciones` que el asistente cita, y una prueba de contrato recorre el
-ciclo entero (crear → «sin revisar» → verificar → contesta) sin reiniciar nada.
-
-**`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
+**Archivados el 22-09-2026**: el **19** (modularización — F4/F5/F7 dependían de
+la API de Leonardo Carrasco, que no llegó; Predicción ya salió del menú) y el
+**8** (Demo EVA — sólo quedaba `PROVISIONALES = true`, que es una confirmación
+de planta y además intocable con el tanque cerrado). **Los dos se movieron a
+`completados/` en vez de borrarse porque los cita código vivo**, y uno de ellos
+—`PantallaPendiente.jsx`— enseña su ruta en pantalla. El **13** sí se borró: no
+lo citaba nadie. Antes ya estaban archivados el **34**, el **36** y el **39**.
 
 ### Próximos pasos, por prioridad
 
-**0 · Confirmar los Planes 37, 38 y 40 en el navegador, y cerrar el 40 en
-planta.** La sección de `Nuevo-Modor` se abrió el 21-09 y las siete vistas
-caían en el primer render; está corregido y **falta volver a entrar**: Inicio,
-Gráficas, Vista 3D, Hallazgos, Avisos, Casos previos y RAG, comprobar que pinta
-SUS apoyos con el nombre que tengan en el árbol, y que el **muro de planta**
-(la ruta por defecto desde el Plan 40 F2) enseña un panel por configurada. Ya
-no hay sección escrita a mano que comparar. Después los tres pasos de F4 del
-Plan 40 (sondear en marcha, dar de baja la espejo en planta, medir). Y **preguntarle al asistente desde esa pantalla**: lo medido está en el
-Plan 38 F3, con lo que aún se va a las cuatro máquinas («¿hay algún riesgo
-activo?»). Después, **Plan 37 F4** (Alarmas de la máquina configurada) y una
-segunda vuelta al Plan 36: quitar variables, emparejar a mano un tag de
-`Jaritza\L1`, sondear tras editar, y proponer la descripción con la carpeta
-(«Velocidad eficaz · S1») para que tres `vRMS` no compartan etiqueta. §9 dice
-cómo arrancar.
+> **Reescrito el 22-09-2026 tras sondear los planes contra el código.** La
+> lista anterior daba por pendientes tres cosas que ya estaban hechas y una que
+> es imposible. Todo lo vivo se ejecuta desde el
+> [`PLAN-41-CERRAR-VIBRACIONES.md`](por-completar/PLAN-41-CERRAR-VIBRACIONES.md),
+> que además deja escrito qué se midió para descartar el resto.
 
-**1 · Plan 32 F2 — desbloquear el historiador.** Por qué el grupo `DEMO 3`
-devuelve 0 muestras: si dejó de registrar, o si la ruta cambió como en el
-incidente B10. **Bloquea todo lo demás** de esta lista.
+**0 · Plan 41 F0 — confirmar en el navegador.** La sección de `Nuevo-Modor` se
+abrió el 21-09 y las siete vistas caían en el primer render; está corregido y
+**falta volver a entrar**: Inicio, Gráficas, Vista 3D, Hallazgos, Avisos, Casos
+previos y RAG, comprobando que pinta SUS apoyos con el nombre del árbol, y que
+el **muro de planta** (ruta por defecto desde el Plan 40 F2) enseña un panel
+por configurada. Y **preguntarle al asistente desde esa pantalla**. Cierra el
+Plan 38 y la nota pendiente del 37.
 
-**2 · Plan 32 F3 — las señales en pantalla.** Reutilizar `GraficaHistoria` y
-`SelectorRango`, que ya son genéricos. Con esto la máquina tendría su novena
-vista (Historización).
+**1 · Plan 41 F1 — los pasos en planta** (es la F4 del Plan 40). Sondear
+`Nuevo-Modor` **con el motor girando** (en paro quedaron 33 series sin
+muestras), dar de baja `vibraciones-configurada` si sigue en planta, pasar la
+ISO 20816-3 y los dos manuales a «Todas las de Vigilancia de vibraciones»
+—hoy no los ve ninguna máquina—, y nombrar los tres apoyos en el árbol.
+**Desbloquea el Plan 32 F2 y F3**, que no tienen trabajo de código propio.
 
-**3 · Plan 32 F4 — que el diagnóstico vea.** `necesita` en las 8 reglas que no
-lo declaran, **factor de cresta** (`aPeak/aRMS`, coste cero: las dos medidas ya
-se leen) y normalizar por rpm.
+**2 · Plan 41 F2 — índice de sinónimos** (Plan 32 F6). Es **la única fase de
+código del Plan 32 que sigue viva**. El `vocabulario` del tipo ya llega a cada
+configurada (`construirSistema.js:553`) pero **sólo alimenta el dictado**
+(`voz.mjs:79`). Ojo: `aliasDeTags.js` **no es esto** —resuelve cómo llama el
+SERVIDOR a un tag, no cómo lo llama una persona—. Es **B3 del backlog**.
 
-**4 · Plan 32 F5 — RAG y casos.** `terminosManual` en las causas de vibraciones
-para alcanzar los **47 fragmentos de la ISO 20816-3 que ya están indexados**.
+**3 · Plan 41 F3 — normalizar por rpm.** Lo único que queda del Plan 32 F4.
+
+**4 · Plan 41 F4 — Alarmas de la máquina** (Plan 37 F4). Su primer paso es
+**medir** cómo contesta `/api/iconics/alarms` a un área `ae:` entera; hasta
+entonces no se diseña. `AlarmasEva` es código del tanque y **no se toca**.
 
 **5 · Ver el Plan 33 en el navegador.** Está probado, no observado.
 
-**6 · Plan 32 F6 — índice de sinónimos.** Que el asistente entienda «el apoyo
-del motor» como el tanque entiende «la bomba». Es **B3 del backlog**.
+#### Lo que se quitó de esta lista, y por qué
+
+- **`necesita` en 8 reglas** — ya está en **las 17** de `riesgosVibracion.js`,
+  y el motor lo consume (línea 811).
+- **Factor de cresta** — **imposible en S1**: `aPeak_S1` devuelve la serie de
+  `aRMS_S1`, 1805 de 1805 valores idénticos (`vibraciones.js:1151`). Daría
+  1,0 siempre. En S2 y S3 sí se puede. La lista anterior lo daba por «coste
+  cero», y no lo es.
+- **Plan 32 F5 (`terminosManual`)** — hecho: declarados en las cuatro medidas
+  (`vibraciones.js:523-567`) y cerrado por el Plan 39 F3, que además asignó los
+  manuales al TIPO.
+- **Plan 32 F2, la parte de código** — `sondearSeries.mjs` ya gana
+  `historyVerified` variable por variable; lo que falta es el sondeo en marcha.
 
 ---
 

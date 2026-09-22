@@ -1,6 +1,6 @@
 # PLAN 32 — Vibraciones 1.0: el módulo completo
 
-**Estado:** F1 completada · F2–F6 por completar, reformuladas el 22-09-2026 para la máquina CONFIGURADA (Plan 40)
+**Estado:** F1 y **F5** completadas · F4 parcial (`necesita` hecho; cresta imposible en S1, del servidor) · F2 y F3 sólo esperan el sondeo en planta · **F6 es la única fase de código viva** · sondeado el 22-09-2026, lo vivo se ejecuta en el **Plan 41**
 **Rama:** `Vibraciones1.0`
 **Fecha:** 17-09-2026
 
@@ -198,32 +198,63 @@ exigiría otro hardware.
 > y los módulos de `shared/eva/vibraciones/`) y vale para toda configurada de
 > ese tipo; lo que pedía datos de la instalación se hace en su configuración.
 
-### F2 — Desbloquear el historiador
+### F2 — Desbloquear el historiador · **sólo queda el paso en planta**
 Por qué `DEMO 3` devuelve 0 muestras: si el grupo dejó de registrar, o si la
-ruta cambió como en B10. **Bloquea el objetivo 1 y las `firmaTemporal`.** Para
-la configurada, la respuesta se gana **sondeando en marcha** (`Nuevo-Modor`
-quedó con 33 series sin muestras por sondearse en paro: Plan 40 F4) y queda
-escrita en `historyVerified` variable por variable, no en una lista.
+ruta cambió como en B10. **Bloquea el objetivo 1 y las `firmaTemporal`.**
 
-### F3 — Las señales en la pantalla
+**Sondeado el 22-09-2026: la maquinaria del repo está completa.**
+`backend/lib/sondearSeries.mjs` gana `historyVerified` variable por variable
+(sube a `true` con muestras, lo deja intacto si no se pudo leer — no lo baja a
+`false`, que sería disfrazar un fallo de lectura de ausencia de dato), y
+`backend/ia/indices/maquinas.mjs:95` lo conserva entre ediciones mientras la
+serie sea la misma. El esquema **rechaza `historyVerified` del cliente**
+(`backend/http/esquemas.mjs:759`): lo pone el sondeo, no quien edita.
+
+**Lo que falta no es código: es sondear con el motor girando.** Es el paso 1
+de la F4 del Plan 40, recogido en el **Plan 41 §F1**.
+
+### F3 — Las señales en la pantalla · **depende de F2, sin trabajo propio**
 La vista Gráficas de la sección de cada configurada ya usa `GraficaHistoria` y
 `SelectorRango` (Plan 37 F2). Lo que falta es que tenga series que pintar
-(F2), no la vista.
+(F2), no la vista. **No tiene trabajo de código propio**: en cuanto F2 dé
+series verificadas, esta fase se cierra mirando la pantalla.
 
-### F4 — El diagnóstico ve
-`necesita` en las 8 reglas que no lo tienen, factor de cresta, y normalizar por
-rpm: en `riesgosVibracion.js`, que es del tipo, así que lo gana toda
-configurada de vibraciones a la vez.
+### F4 — El diagnóstico ve · **PARCIALMENTE HECHA (sondeo del 22-09-2026)**
 
-### F5 — RAG y casos
-`terminosManual` en las causas de vibraciones, para alcanzar los 47 fragmentos
-de la ISO 20816-3 que ya están indexados. Es del tipo; el manual se asigna a la
-máquina configurada por su id (Plan 39 F3 acota la búsqueda por tipo).
+De los tres puntos que pedía, **uno está hecho y otro resultó imposible**:
 
-### F6 — Índice de sinónimos
+- **`necesita` en las 8 reglas que no lo tenían: ✅ HECHO.** Las **17** reglas
+  de `riesgosVibracion.js` lo declaran hoy, y el motor lo usa
+  (`riesgosVibracion.js:811`) para marcar NO EVALUABLE en vez de puntuar con
+  un hueco. Se comprobó regla por regla.
+- **Factor de cresta: ⛔ IMPOSIBLE EN S1, y es del servidor.** Medido el
+  21-09-2026 y escrito en `shared/eva/vibraciones/vibraciones.js:1151`:
+  `aPeak_S1` **devuelve la serie de `aRMS_S1`** —1805 de 1805 marcas con el
+  valor idéntico, el 100 %—. El factor `aPeak/aRMS` daría **exactamente 1,0
+  siempre** en S1. En S2 y S3 sí se puede. Una regla que puntuara la cresta
+  de S1 estaría puntuando un 1,0 fabricado por un defecto del historiador, que
+  es justo lo que `CLAUDE.md` §2.4 prohíbe. **Queda fuera hasta que el
+  servidor publique `aPeak_S1` de verdad**, y entonces vale para S1 también.
+- **Normalizar por rpm: queda**, y es lo único vivo de esta fase. Recogido en
+  el **Plan 41 §F3**.
+
+### F5 — RAG y casos · ✅ **COMPLETADA (Plan 39 F3, confirmada el 22-09-2026)**
+Pedía `terminosManual` en las causas de vibraciones para alcanzar los 47
+fragmentos de la ISO 20816-3 ya indexados. **Está**: `vibraciones.js` los
+declara en las cuatro medidas —`vRMS`, `aRMS`, `aPeak` y `DKW`, líneas 523 a
+567— y el tipo los propaga a toda configurada
+(`shared/eva/tipos/vibraciones.js:166`). El Plan 39 F3 cerró la otra mitad:
+los manuales se asignan al **TIPO** (`tipo:vibraciones`), y el modelo cita la
+ISO 20816-3 para `Nuevo-Modor`. Medido allí.
+
+### F6 — Índice de sinónimos · **queda, y es la fase de código viva**
 Que el asistente entienda «el apoyo del motor» como el tanque entiende «la
-bomba». El tipo ya trae `vocabulario` (Plan 40 F3) y los alias de cada variable
-viajan en la configuración; lo que falta es el índice que los cruce.
+bomba». El tipo ya trae `vocabulario` (Plan 40 F3) y llega a cada configurada
+por `construirSistema.js:553`, **pero hoy sólo alimenta el dictado**
+(`backend/ia/voz.mjs:79`): nadie lo usa para resolver a qué se refiere quien
+escribe. `aliasDeTags.js` **no es esto** — reconoce cómo llama el SERVIDOR a
+un tag (`VEL_RMS` → rol `vRMS`), no cómo lo llama una PERSONA. Recogido en el
+**Plan 41 §F2**.
 
 ---
 

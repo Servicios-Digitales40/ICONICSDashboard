@@ -66,7 +66,7 @@ regla.
    de planta entra por `backend/iconics/client.mjs`.
 
    **La acotación «de planta» es del 03-09-2026 y tiene dueño**
-   ([`docs/por-completar/PLAN-19-MODULARIZACION.md`](docs/por-completar/PLAN-19-MODULARIZACION.md) §0.1):
+   ([`docs/completados/PLAN-19-MODULARIZACION.md`](docs/completados/PLAN-19-MODULARIZACION.md) §0.1):
    el módulo de Predicción consume un compresor real por una API externa, no
    por ICONICS. La regla no se relaja, se acota — un módulo con otra fuente
    **la declara en `shared/modulos.js` y nunca mezcla su dato con el de
@@ -309,7 +309,7 @@ De ahí sale una regla concreta: **una máquina que no se lee por ICONICS no
 entra en `SISTEMAS`.** Meterla obligaría a que cada una de esas funciones
 tuviera una rama «ésta no es de ICONICS», que es exactamente el `if` repetido
 en cinco archivos que ese registro existe para evitar. Ver
-[`docs/por-completar/PLAN-19-MODULARIZACION.md`](docs/por-completar/PLAN-19-MODULARIZACION.md) §0.2.
+[`docs/completados/PLAN-19-MODULARIZACION.md`](docs/completados/PLAN-19-MODULARIZACION.md) §0.2.
 
 ### 4.8 Primero lo mínimo; escalar sólo si se justifica
 
@@ -460,15 +460,24 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-Los vivos hoy son el **32** (vibraciones, reformulado para la configurada), el
-**33** (modularidad de máquinas, F9), el **37** (las vistas de una máquina
-configurada, F4), el **38** (el registro conoce las configuradas y el asistente
-contesta sobre ellas; pendiente de confirmarse en el navegador) y el **40**
-(retirar la vibraciones escrita a mano; hecho salvo F4, que son pasos en
-planta). El **34** (máquinas desde el árbol), el **36** (configurar marcando el
-árbol) y el **39** (las herramientas del asistente sirven a cualquier
-configurada, por tipo) están archivados. Ver
-`HANDOFF.md` §5 para cuál sigue.
+El vivo que manda hoy es el **41** (cerrar Vibraciones 1.0), escrito el
+22-09-2026 tras sondear los demás contra el código: recoge **lo único que
+quedaba de verdad** —confirmar en el navegador, los pasos en planta, el índice
+de sinónimos, normalizar por rpm y las alarmas de la máquina— y dice qué fases
+dadas por pendientes **ya estaban hechas**. Siguen abiertos el **32**
+(vibraciones; sólo F6 es código vivo), el **37** (F4, alarmas), el **38** (sin
+código pendiente, sólo confirmarse en pantalla) y el **40** (F4, pasos en
+planta): los cuatro se cierran desde el 41. El **33** queda aparte, con su F9
+**bloqueada hasta reabrir** la estación de llenado.
+
+Archivados: el **34** (máquinas desde el árbol), el **36** (configurar marcando
+el árbol), el **39** (las herramientas del asistente sirven a cualquier
+configurada, por tipo), y desde el 22-09-2026 el **19** (modularización: F4/F5/F7
+dependían de una API externa que no llegó) y el **8** (Demo EVA: sólo quedaba
+`PROVISIONALES`, que es confirmación de planta). Los dos últimos **se archivaron
+sin borrarse porque los cita código vivo**. El **13** se borró: no lo citaba
+nadie. Ver `HANDOFF.md` §5 para cuál sigue.
+
 
 ### 6.2 Qué NO hacer
 

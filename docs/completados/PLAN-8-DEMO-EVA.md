@@ -1,12 +1,27 @@
 # Plan 8 · Demo EVA · Sistemas de Agua Industrial
 
-> **ESTADO — PARCIALMENTE ABIERTO (revisado 10-09-2026).** La reorganización
-> de código que describe este plan terminó, superada por el Plan 18. Pero su
-> reserva de fondo sigue vigente hoy: `PROVISIONALES` en
-> `shared/eva/comun/umbrales.js` sigue en `true` — los umbrales operativos y
-> las unidades de tres señales que este plan dejó "pendiente de confirmar
-> por el usuario" nunca se confirmaron. No es trabajo de código; es una
-> confirmación que sólo puede dar quien opera la instalación.
+> **ESTADO — CERRADO Y ARCHIVADO EL 22-09-2026.** La reorganización de
+> código que describe terminó hace tiempo, superada por el Plan 18.
+>
+> **Queda una reserva, y no es trabajo de código:** `PROVISIONALES` sigue en
+> `true` en `shared/eva/comun/umbrales.js:41`. Los umbrales operativos y las
+> unidades de tres señales que este plan dejó «pendiente de confirmar por el
+> usuario» nunca se confirmaron, y sólo puede confirmarlos quien opera la
+> instalación. **El código ya se comporta bien sin esa confirmación**: no
+> finge que el número es bueno, obliga a decir que es provisional
+> (`CLAUDE.md` §2.5). Por eso esto se archiva en vez de quedarse abierto —
+> un plan no es el sitio donde vive un recordatorio que depende de planta.
+>
+> **Además, el tanque está cerrado por mantenimiento** mientras dure la rama
+> `Vibraciones1.0` (`CLAUDE.md` §1), así que esos umbrales no se pueden
+> tocar hoy aunque llegara la confirmación.
+>
+> **Este documento NO se borra porque sostiene código vivo.** Es el único
+> registro de por qué `PROVISIONALES` está en `true`, y lo citan
+> `shared/eva/tanque/senales.js`, `shared/README.md`, `README.md`,
+> `backend/ia/conversacion/herramientas.mjs`,
+> `react-dashboard/src/app/routes/routes.jsx`, el README de Demo-EVA y una
+> prueba de dominio.
 
 > ⚠️ **DOCUMENTO HISTÓRICO (actualizado 18-ago-2026).** Este plan se escribió
 > cuando Demo EVA era una sección dentro del tablero de OEE de Resonac, así que
@@ -124,12 +139,12 @@ puntos hoja**. No hay equipos, ni subcarpetas, ni `.ChildEquipmentNames`.
 Consecuencias inmediatas:
 
 - **No existe `Estado`.** El vocabulario de
-  [`shared/domain/estado.js`](../shared/domain/estado.js) —cuyos códigos salen
+  [`shared/domain/estado.js`](../../shared/domain/estado.js) —cuyos códigos salen
   de una expresión `IF B_Run THEN 1 …` que aquí no hay— **no aplica**. Cualquier
   color de estado en Demo EVA será *derivado por umbrales*, y eso hay que
   decirlo en pantalla, no esconderlo (D-4).
 - **No hay OEE, ni piezas, ni rechazos.** Se cae entero el rollup de
-  [`shared/plantModel.js`](../shared/plantModel.js): media de factores, FTY,
+  [`shared/plantModel.js`](../../shared/plantModel.js): media de factores, FTY,
   Pareto de rechazos, producción por hora. No es que haya que adaptarlo — es que
   no tiene entrada.
 - **No hay N máquinas.** Hay un sistema con ocho sensores. La rejilla de
@@ -391,7 +406,7 @@ src/Demo-EVA/
 ```
 
 Pruebas en `src/test/demo-eva/`, espejando el árbol, como manda
-[`src/test/README.md`](../react-dashboard/src/test/README.md).
+[`src/test/README.md`](../../react-dashboard/src/test/README.md).
 
 ---
 

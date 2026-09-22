@@ -12,7 +12,7 @@
  * Porque no hay nada que reutilizar. Aquel describe 10 máquinas × 14 tags con
  * `Estado`, OEE y contadores de pieza; aquí el servidor ofrece **ocho señales
  * planas de un solo sistema**, sin estado, sin OEE y sin producción. No es un
- * catálogo distinto: es otra forma de datos. Ver `docs/por-completar/PLAN-8-DEMO-EVA.md` §1.
+ * catálogo distinto: es otra forma de datos. Ver `docs/completados/PLAN-8-DEMO-EVA.md` §1.
  *
  * ── EL CAMPO `historizado` NO ES UN DETALLE ────────────────────────
  *
