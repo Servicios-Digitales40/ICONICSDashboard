@@ -43,7 +43,16 @@
  * **Las desactivadas no se registran.** Siguen en disco por su historia
  * (`eliminar` las desactiva cuando hay casos que las nombran), pero no son
  * máquinas en servicio.
+ *
+ * **Las INVALID tampoco (Plan 39 F6).** Una máquina cuya última revisión no
+ * encontró la raíz ni un punto que respondiera no tiene nada que contestar, y
+ * aparecer en `sistemas_de_la_planta` sería fingir. `UNKNOWN` y `DEGRADED` sí
+ * entran: que ICONICS no contestara, o que falten puntos no esenciales, no es
+ * que la máquina no exista — y `construirSistema` lo pone en sus
+ * `limitaciones` para que el asistente lo diga. La revisión (`anotarRevision`)
+ * resincroniza, así que una INVALID que vuelva a pasar entra sola.
  */
+import { ESTADO_CONFIGURACION } from '../../../shared/eva/comun/configuracionMaquina.js'
 import { construirSistema } from '../../../shared/eva/comun/construirSistema.js'
 import {
   desregistrarSistema,
@@ -70,6 +79,16 @@ export async function sincronizarRegistroConfigurado(gestorMaquinas) {
   for (const maquina of maquinas) {
     if (maquina.activa === false) {
       omitidas.push({ id: maquina.id, motivo: 'desactivada: tiene casos previos que la nombran y no está en servicio' })
+      continue
+    }
+    if (maquina.estado === ESTADO_CONFIGURACION.INVALID) {
+      omitidas.push({
+        id: maquina.id,
+        motivo:
+          `INVALID en su última revisión (${maquina.revisada ? String(maquina.revisada).slice(0, 10) : 'sin fecha'}): ` +
+          'falta la raíz o ningún punto respondió, así que no hay nada que contestar de ella. ' +
+          `Vuelve a comprobarla (POST /api/maquinas/${maquina.id}/verificar); si pasa, entra sola.`,
+      })
       continue
     }
     try {

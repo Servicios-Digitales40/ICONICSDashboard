@@ -36,7 +36,7 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | | |
 |---|---|
 | Suite de frontend | **1090** pruebas · 29 omitidas |
-| Suite de backend | **387** pruebas |
+| Suite de backend | **390** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas (3 sobre una configurada) |
@@ -248,8 +248,8 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F5 completas, F6 por
-completar. Que las herramientas del asistente sirvan a cualquier máquina
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** está **COMPLETADO** (F0–F6,
+22-09-2026) y archivado en `docs/completados/`. Que las herramientas del asistente sirvan a cualquier máquina
 configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
 vibraciones. F0 puso una configurada espejo en la puerta
 (`scripts/lib/configuracionEspejo.mjs`). F1 hizo que el estado y el resumen
@@ -268,8 +268,11 @@ está medido contra planta: 12 páginas y 17 gráficos de `Nuevo-Modor`. F5: el
 prompt lleva el catálogo de la máquina que se tiene delante (+835 tokens,
 medidos) y `sistemas_de_la_planta` sale del turno con contexto; «¿hay algún
 riesgo activo?» desde `Nuevo-Modor` ya no barre las cuatro máquinas. El
-instrumento da **9 de 9**. Queda el alta automática según el estado de
-validación (F6).
+instrumento da **9 de 9**. F6 cerró el alta automática: una `INVALID` no entra
+en el registro y la omisión dice cómo volver a comprobarla; lo que la
+validación sabe —sin revisar, puntos ausentes, series sin sondear— va a las
+`limitaciones` que el asistente cita, y una prueba de contrato recorre el
+ciclo entero (crear → «sin revisar» → verificar → contesta) sin reiniciar nada.
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
@@ -535,7 +538,7 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** |
-| Backend | **387 passed** |
+| Backend | **390 passed** |
 | Frontend | **1083 passed · 29 skipped** |
 | Lint y types | sin salida |
 

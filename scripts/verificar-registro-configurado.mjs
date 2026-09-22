@@ -490,6 +490,56 @@ check('y los de la escrita a mano siguen siendo suyos', () => {
 
 console.log(`\n${c.negrita}Lo que no se puede construir${c.reset}`)
 
+console.log(`\n${c.negrita}Lo que la validación sabe, en las limitaciones (Plan 39 F6)${c.reset}`)
+
+check('sin revisar (UNKNOWN, sin fecha): lo dice, con cuántos puntos', () => {
+  const e = construirSistema(configuracion('sin-revisar', 'ac:SR/'), tipoDe('vibraciones'))
+  assert.ok(e.limitaciones.some((l) => /Sin revisar todavía: 2 puntos declarados/.test(l)))
+})
+
+check('UNKNOWN con fecha: la última revisión no pudo comprobarla', () => {
+  const m = { ...configuracion('sin-red', 'ac:SN/'), estado: 'UNKNOWN', revisada: '2026-09-21T08:00:00.000Z' }
+  const e = construirSistema(m, tipoDe('vibraciones'))
+  assert.ok(e.limitaciones.some((l) => /La última revisión \(2026-09-21\) no pudo comprobar/.test(l)))
+  assert.ok(!e.limitaciones.some((l) => /Sin revisar todavía/.test(l)))
+})
+
+check('DEGRADED: cuántos puntos faltan y cuáles, y que salen sin dato', () => {
+  const base = configuracion('coja', 'ac:CJ/')
+  const m = {
+    ...base,
+    estado: 'DEGRADED',
+    revisada: '2026-09-22T10:00:00.000Z',
+    variables: base.variables.map((v, i) => ({ ...v, estado: i === 0 ? 'INVALID' : 'VALID' })),
+  }
+  const e = construirSistema(m, tipoDe('vibraciones'))
+  const l = e.limitaciones.find((x) => /puntos ausentes/.test(x))
+  assert.ok(l, 'no confesó los ausentes')
+  assert.match(l, /1 de 2 puntos ausentes en la última revisión \(2026-09-22\): vRMS_S1\./)
+  assert.match(l, /sin dato, no como cero/)
+})
+
+check('VALID: ninguna limitación de revisión; lo comprobado no se disculpa', () => {
+  const m = { ...configuracion('sana', 'ac:SA/'), estado: 'VALID', revisada: '2026-09-22T10:00:00.000Z' }
+  const e = construirSistema(m, tipoDe('vibraciones'))
+  assert.ok(!e.limitaciones.some((l) => /Sin revisar|no pudo comprobar|puntos ausentes/.test(l)))
+})
+
+check('series declaradas sin sondear: se cuentan, y no se ofrecen como historia', () => {
+  const base = configuracion('medio-sondeada', 'ac:MS/')
+  const m = {
+    ...base,
+    variables: base.variables.map((v, i) => ({
+      ...v,
+      historyPointName: `hda:\\X\\${v.id}`,
+      historyVerified: i === 0,
+    })),
+  }
+  const e = construirSistema(m, tipoDe('vibraciones'))
+  assert.ok(e.limitaciones.some((l) => /1 de 2 series declaradas están sin sondear/.test(l)))
+  assert.deepEqual([...e.series.historizadas()], ['vRMS_S1'])
+})
+
 check('sin tipo, `construirSistema` se niega', () => {
   assert.throws(() => construirSistema(configuracion('x', 'ac:X/'), null), /no se pasó un tipo/)
 })

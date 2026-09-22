@@ -25,6 +25,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { SISTEMA, SISTEMA_IDS, sistemasConfigurados } from '../../../shared/eva/comun/sistemas.js'
 import { sincronizarRegistroConfigurado } from '../../ia/indices/registroConfigurado.mjs'
+import { createHerramientas } from '../../ia/conversacion/herramientas.mjs'
+import { createFakeIconicsClient } from '../../iconics/fakeClient.mjs'
 import { json, montarApp } from '../ayudas.mjs'
 
 const RAIZ_VIB = 'ac:TDCON/DEMO_VIBRACIONES/Vibraciones/'
@@ -106,6 +108,61 @@ describe('al arrancar', () => {
 describe('en caliente', () => {
   beforeEach(async () => {
     ;({ app } = await montarApp({ MAQUINAS_RUTA: join(carpeta, 'maquinas.json') }))
+  })
+
+  it('el alta automática de punta a punta: crear → «sin revisar» → comprobar → la limitación se va → contesta (Plan 39 F6)', async () => {
+    const alta = await app.inject({ method: 'POST', url: '/api/maquinas', payload: configurada('vib-motor-03') })
+    expect(alta.statusCode).toBe(201)
+
+    // Recién creada nadie la ha comprobado, y el registro lo confiesa.
+    const antes = SISTEMA['vib-motor-03'].limitaciones
+    expect(antes.some(l => /Sin revisar todavía: 2 puntos declarados, ninguno comprobado/.test(l))).toBe(true)
+
+    // Comprobarla contra el transporte falso, que sirve los puntos que una
+    // configurada reclama: VALID, y la revisión queda anotada.
+    const comprobada = await app.inject({ method: 'POST', url: '/api/maquinas/vib-motor-03/verificar' })
+    expect(comprobada.statusCode).toBe(200)
+    expect(json(comprobada).estado).toBe('VALID')
+    expect(json(comprobada).anotado).toBe(true)
+
+    // Anotar resincroniza: la limitación desaparece sin reiniciar nada.
+    const despues = SISTEMA['vib-motor-03'].limitaciones
+    expect(despues.some(l => /Sin revisar|no pudo comprobar/.test(l))).toBe(false)
+
+    // Y el asistente contesta por ella con la física de su tipo.
+    const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+    const r = await h.ejecutar('estado_del_sistema', { sistema: 'vib-motor-03' })
+    expect(r.ok).toBe(true)
+    expect(r.sistema).toBe('vib-motor-03')
+    const planta = await h.ejecutar('sistemas_de_la_planta', {})
+    expect(planta.sistemas.map(s => s.id ?? s.sistema)).toContain('vib-motor-03')
+  })
+
+  it('una máquina INVALID no entra en el registro, y la omisión dice por qué (Plan 39 F6)', async () => {
+    const rota = { ...configurada('rota'), estado: 'INVALID', revisada: '2026-09-22T10:00:00.000Z' }
+    const r = await sincronizarRegistroConfigurado({ listar: async () => [rota, configurada('sana')] })
+
+    expect(SISTEMA.rota).toBeUndefined()
+    expect(SISTEMA.sana).toBeTruthy()
+    expect(r.registradas).toEqual(['sana'])
+    expect(r.omitidas).toHaveLength(1)
+    expect(r.omitidas[0].id).toBe('rota')
+    expect(r.omitidas[0].motivo).toMatch(/INVALID en su última revisión \(2026-09-22\)/)
+    expect(r.omitidas[0].motivo).toMatch(/comprobar/)
+  })
+
+  it('una DEGRADED entra, y sus puntos ausentes van en las limitaciones (Plan 39 F6)', async () => {
+    const base = configurada('coja')
+    const coja = {
+      ...base,
+      estado: 'DEGRADED',
+      revisada: '2026-09-22T10:00:00.000Z',
+      variables: base.variables.map((v, i) => ({ ...v, estado: i === 1 ? 'INVALID' : 'VALID' })),
+    }
+    await sincronizarRegistroConfigurado({ listar: async () => [coja] })
+
+    expect(SISTEMA.coja).toBeTruthy()
+    expect(SISTEMA.coja.limitaciones.some(l => /1 de 2 puntos ausentes en la última revisión \(2026-09-22\): SPEED_BMS/.test(l))).toBe(true)
   })
 
   it('dar de alta una máquina la mete en el registro, y quitarla la saca', async () => {

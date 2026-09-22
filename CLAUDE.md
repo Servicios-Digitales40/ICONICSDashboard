@@ -463,11 +463,11 @@ El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
 Los vivos hoy son el **32** (vibraciones, reformulado para la configurada), el
 **33** (modularidad de máquinas, F9), el **37** (las vistas de una máquina
 configurada, F4), el **38** (el registro conoce las configuradas y el asistente
-contesta sobre ellas; pendiente de confirmarse en el navegador), el **39** (las
-herramientas del asistente sirven a cualquier configurada, por tipo; F0–F2
-completadas, F3–F6 por completar) y el **40** (retirar la vibraciones escrita a
-mano; hecho salvo F4, que son pasos en planta). El **34** (máquinas desde el
-árbol) y el **36** (configurar marcando el árbol) están archivados. Ver
+contesta sobre ellas; pendiente de confirmarse en el navegador) y el **40**
+(retirar la vibraciones escrita a mano; hecho salvo F4, que son pasos en
+planta). El **34** (máquinas desde el árbol), el **36** (configurar marcando el
+árbol) y el **39** (las herramientas del asistente sirven a cualquier
+configurada, por tipo) están archivados. Ver
 `HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer

@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F5 completadas · F6 por completar
+**Estado:** COMPLETADO (F0–F6) · 22-09-2026
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -659,6 +659,74 @@ imprime la tabla final y va aquí, con lo que siga sin llegar.
 
 **Depende de** F1–F5.
 
+**Lo que de verdad pasó (22-09-2026).**
+
+- **Una `INVALID` no entra en el registro, y la omisión dice qué hacer.**
+  `sincronizarRegistroConfigurado` la salta con el motivo escrito —la fecha de
+  la revisión y `POST /api/maquinas/<id>/verificar`—, que ya se registraba en
+  el log como aviso. `UNKNOWN` y `DEGRADED` sí entran: que ICONICS no
+  contestara no es que la máquina no exista.
+- **Lo que la validación sabe va a `limitaciones`**, que es lo que el
+  asistente cita. Cuatro casos, y los cuatro se prueban: sin revisar («Sin
+  revisar todavía: N puntos declarados, ninguno comprobado»), `UNKNOWN` con
+  fecha («La última revisión (2026-09-21) no pudo comprobar…»), `DEGRADED`
+  («1 de 2 puntos ausentes en la última revisión (2026-09-22): vRMS_S1. Sus
+  lecturas salen sin dato, no como cero») y `VALID`, que **no añade nada**:
+  lo comprobado no se disculpa.
+- **Una limitación más, que no estaba en el plan y salió al escribirlo:**
+  series declaradas pero sin sondear. Una máquina puede traer
+  `historyPointName` en 40 variables y tener 7 verificadas; antes sólo se
+  confesaba el caso extremo (ninguna). Ahora dice «N de M series declaradas
+  están sin sondear».
+- **La prueba de contrato del ciclo pasa**, y encontró un defecto de la propia
+  prueba antes de pasar: la ruta de validación es `/verificar`, no
+  `/comprobar` —el texto de la limitación decía lo segundo y se corrigió—.
+  El ciclo completo, sobre el transporte falso: crear → el registro confiesa
+  «sin revisar» → `POST /verificar` → `VALID`, anotado → la limitación
+  desaparece **sin reiniciar nada** → `estado_del_sistema` contesta y
+  `sistemas_de_la_planta` la trae.
+- Comprobaciones: 3 nuevas en `backend/test` (390) y 5 en
+  `verificar-registro-configurado` (39).
+
+---
+
+## 3.1 La tabla final (22-09-2026)
+
+`node --env-file=.env.local scripts/medir-asistente-configurada.mjs --maquina vib-motor-03`,
+contra el modelo real y la planta real, con `Nuevo-Modor` (94 variables, 17
+series verificadas). Dos corridas completas, mismos resultados:
+
+| | Antes del plan (Plan 38 F3) | Hoy |
+|---|---|---|
+| Casos | 7 | 9 |
+| Llegan a `Nuevo-Modor` | 6 de 7 | **9 de 9** |
+| Se van a otra máquina | 1 | **0** |
+| Con contexto de pantalla | — | 6 de 6 |
+| Nombrándola sin contexto | — | 3 de 3 |
+
+Lo que cada fase cambió, medido:
+
+| Caso | Antes | Hoy |
+|---|---|---|
+| ¿Cómo está esta máquina? | «no tiene lecturas disponibles» | los tres apoyos con sus mm/s (F1) |
+| ¿Cómo ha ido vRMS_S1? | serie sin unidad | `historia_de_senal` con la etiqueta exacta y mm/s (F2, F5) |
+| ¿Qué dice la documentación? | «no contiene límites» | cita la ISO 20816-3 (F3) |
+| Hazme un reporte | se negaba | PDF de 12 páginas, 17 gráficos (F4) |
+| ¿Hay algún riesgo activo? | barría las cuatro máquinas | sólo `vib-motor-03` (F5) |
+
+**Lo que sigue sin llegar, y está medido.** El caso de la documentación cuesta
+**5 rondas y 16 llamadas** (129 s): con el catálogo delante, el modelo prueba
+`limites_del_manual` con las doce señales de vibración una a una —cada una
+contesta honestamente que las fronteras de la ISO están en una tabla, sin
+palabra de límite al lado— y sólo entonces cae a `consultar_documentacion`.
+La respuesta final es correcta y honesta («no se encuentran valores numéricos
+específicos»), pero el precio es alto. **No se arregla con más prompt**: es el
+mismo modo de fallo que `HANDOFF` §8 describe —un modelo pequeño no encadena
+bien y reintenta con otro nombre— y se arregla **no necesitando el reintento**:
+que la primera negativa por señal remita UNA vez al texto libre, o que leer
+tablas de fronteras sea trabajo del extractor (Plan 32 F5). Queda anotado
+ahí, no aquí.
+
 ---
 
 ## 4. Riesgos
@@ -698,9 +766,9 @@ cambio; entre medio, F0 da la cobertura sin GPU.
   backlog del asistente y trabajo de dominio; aquí sólo se deja la negativa
   por capacidad.
 - **El tanque como tipo** (Plan 33 F9). Bloqueado por la rama.
-- **Retirar `vibraciones.js`** (Plan 34 F5). Cuando F1–F4 estén, la
-  configurada hará todo lo que hace el catálogo en el asistente, que era la
-  condición.
+- ~~**Retirar `vibraciones.js`** (Plan 34 F5)~~ — hecho el 22-09-2026 como
+  Plan 40, en paralelo con F1–F4 de éste: la configurada ya hacía en el
+  asistente todo lo que hacía el catálogo, que era la condición.
 - **El badge del sidebar por configurada** y **Alarmas de la máquina** (Plan
   37 F4): son del tablero, no del asistente.
 - **Sinónimos por máquina** (B2) y **un solo resolvedor** (B1): mejoran cómo

@@ -52,7 +52,7 @@
  * `backend/ia/indices/maquinas.mjs`, y quien decide meterla en `SISTEMAS` es
  * `registrarSistema()`.
  */
-import { capacidadesDe, permiteEscritura } from "./configuracionMaquina.js";
+import { ESTADO_CONFIGURACION, capacidadesDe, permiteEscritura } from "./configuracionMaquina.js";
 import { dominioDesdeRoles } from "./dominioDesdeRoles.js";
 import { estadoComun, senalComun } from "./estadoMaquina.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "./vistaDeMaquina.js";
@@ -596,11 +596,52 @@ export function construirSistema(maquina, tipo) {
         );
       }
 
+      /*
+       * ── LO QUE LA VALIDACIÓN SABE (Plan 39 F6) ─────────────────────
+       *
+       * Una máquina entra en el registro sin haberse comprobado (UNKNOWN) o
+       * con puntos ausentes (DEGRADED), y eso el asistente tiene que decirlo:
+       * sin esta línea, «Nuevo-Modor está en banda» sonaría igual recién
+       * configurada que comprobada. VALID no añade nada; INVALID no llega
+       * aquí (`registroConfigurado.mjs` la omite). La fecha va a día porque
+       * es lo que un técnico compara con «¿cuándo la revisaste?».
+       */
+      const total = (maquina.variables ?? []).length;
+      const dia = maquina.revisada ? String(maquina.revisada).slice(0, 10) : null;
+      const estadoRevision = maquina.estado ?? ESTADO_CONFIGURACION.UNKNOWN;
+      if (estadoRevision === ESTADO_CONFIGURACION.UNKNOWN) {
+        propias.push(
+          dia
+            ? `La última revisión (${dia}) no pudo comprobar esta máquina contra ICONICS: no se ` +
+              `sabe si sus ${total} puntos siguen existiendo. Lo que se lea de ella no está contrastado.`
+            : `Sin revisar todavía: ${total} puntos declarados, ninguno comprobado contra ICONICS. ` +
+              "Lo que se lea de ella no está contrastado con el árbol del servidor.",
+        );
+      } else if (estadoRevision === ESTADO_CONFIGURACION.DEGRADED) {
+        const ausentes = (maquina.variables ?? []).filter((v) => v.estado === ESTADO_CONFIGURACION.INVALID);
+        const nombres = ausentes.slice(0, 6).map((v) => v.id ?? v.pointName);
+        propias.push(
+          `${ausentes.length} de ${total} puntos ausentes en la última revisión${dia ? ` (${dia})` : ""}: ` +
+            `${nombres.join(", ")}${ausentes.length > nombres.length ? "…" : ""}. Sus lecturas salen sin dato, no como cero.`,
+        );
+      }
+
       if (!clavesConSerie.length) {
         propias.push(
           "Ninguna de sus variables tiene serie histórica verificada: se puede decir cómo " +
             "está ahora, nunca cómo ha evolucionado.",
         );
+      } else {
+        /* Series declaradas pero no sondeadas: existen en la configuración y
+           NO se ofrecen como historia hasta que el sondeo diga que son suyas. */
+        const declaradas = (maquina.variables ?? []).filter((v) => v.historyPointName).length;
+        const sinSondear = declaradas - clavesConSerie.length;
+        if (sinSondear > 0) {
+          propias.push(
+            `${sinSondear} de ${declaradas} series declaradas están sin sondear: no se ofrecen como ` +
+              "historia hasta comprobar que el historiador devuelve la suya y no la de otra señal.",
+          );
+        }
       }
 
       const escribibles = (maquina.variables ?? []).filter((v) => permiteEscritura(v.acceso));
