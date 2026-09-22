@@ -1,6 +1,6 @@
 # PLAN 41 — Cerrar Vibraciones 1.0: lo que de verdad queda
 
-**Estado:** **F0, F2 y F3 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia`, el índice de sinónimos y el factor de cresta en el tipo) · F1 a medias (sondeo en marcha hecho; quedan los pasos 2–4 en planta y la cresta con carga) · F4 y F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
+**Estado:** **F0, F2 y F3 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia`, el índice de sinónimos y el factor de cresta en el tipo) · **F1 completada en este backend** (tres sondeos; nombres, limitación y manuales resueltos; «con carga» no existe: el motor no tiene nada acoplado) · F4 y F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
 **Rama:** `Vibraciones1.0`
 **Fecha:** 22-09-2026
 
@@ -334,6 +334,29 @@ se pone desde el editor, y el día que se acople algo se quita.
 Con esto **el Plan 32 F2 y F3 quedan cerradas**: el historiador contesta, las
 series están sondeadas variable por variable, y Gráficas tiene 21 series que
 pintar. Lo que no varía no varía porque la máquina no trabaja.
+
+#### Los pasos 2–4, hechos por la API contra el backend local (22-09-2026)
+
+El usuario pidió que se hicieran desde aquí en vez de desde el editor:
+
+- **Paso 4 · nombres de los apoyos: HECHO.** `PATCH /api/maquinas/vib-motor-03`
+  con `assets[].nombre`: S1 «Lado acople», S2 «Rodamiento intermedio», S3
+  «Lado libre». Es lo que hace visible la F2: con el nombre puesto, el tipo
+  deriva «Velocidad eficaz Lado acople» y el resolvedor lo encuentra.
+- **La limitación de la instalación: GRABADA** como propia («El motor gira sin
+  carga acoplada…»); las derivadas se le suman (6 en total) y la máquina
+  volvió a verificarse **VALID, 86 de 86**.
+- **Paso 3 · manuales al tipo: YA ESTABA.** La ISO 20816-3, el `TS001.9` (SM
+  1281) y el `v20 siemens` están en `sistema: "tipo:vibraciones"` en este
+  backend desde el Plan 39 F3. El paso del Plan 40 hablaba del despliegue de
+  planta; si existe otro backend, se repite allí.
+- **Paso 2 · dar de baja la espejo: NADA QUE HACER AQUÍ.** Este backend sólo
+  tiene `vib-motor-03`. Ídem: si hay otro despliegue con
+  `vibraciones-configurada`, se da de baja allí.
+
+**Para que el asistente lo vea hace falta reiniciar el backend**: el proceso
+que corre arrancó a las 11:44 con el `shared/` de entonces (sin la derivación
+de alias ni el decodificador entero).
 
 **Una discrepancia que hay que re-medir en marcha, y que importa para F3:**
 este sondeo dio **`aPeak_S1` verificada como serie PROPIA**, distinta de
