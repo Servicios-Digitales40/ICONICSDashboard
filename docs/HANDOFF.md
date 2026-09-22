@@ -35,8 +35,8 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 
 | | |
 |---|---|
-| Suite de frontend | **1097** pruebas · 29 omitidas |
-| Suite de backend | **390** pruebas |
+| Suite de frontend | **1102** pruebas · 29 omitidas |
+| Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas |
@@ -89,23 +89,40 @@ observar; la regla de cresta sale «no evaluable · en vacío» (en vacío S2 da
 7,7 sin nada roto) y `medida-en-vacio` está siempre activa. Declarado en las
 `limitaciones` de la máquina para que el asistente lo cite.
 
-**El historiador contesta, pero a su manera.** Tres sondeos el 22-09: **21
-series propias** de 86; las nueve `QC_*` son una sola serie; **35 «sin
-variación»** que son banderas y estados que no cambian porque la máquina no
-trabaja. «Devuelve 0 muestras» —lo que decía aquí hasta hoy— **ya no es
-cierto**; lo que hay es un motor que no da nada que registrar.
+**El historiador contesta, pero a su manera.** Registra **sólo al cambiar**
+(Plan 42 F0, medido): una bandera constante deja 8 muestras al día frente a
+569 de `vRMS_S1`, y las deja en los minutos en que la recolección rearranca.
+Por eso desde el Plan 42 el sondeo verifica una constante **por sus marcas de
+tiempo** (`registrada-constante`): el último sondeo del 22-09 dio **20
+propias, 38 constantes registradas, 13 compartidas** (las nueve `QC_*`, una
+sola serie, más cuatro con pocas marcas: B15), 11 sin muestras y 3 sin
+variación de 86. Las **once banderas de alarma están verificadas** sin haber
+alarmado nunca. Las «35 sin variación» de la mañana ya no existen; y ojo: las
+constantes que sólo dejan marca al rearrancar entran y salen de la ventana
+de 24 h (50 registradas a las 15:30, 38 a las 16:40). Lo ganado no se
+pierde: el sondeo no baja a `false` lo que ya estaba verificado.
 
 **El Alarm Server de GENESIS64 da 500 a `AlarmHistory`** para cualquier
 punto —del área de vibraciones y del tanque—. Por eso «Alarmas» de la
 configurada se cerró sin vista (Plan 41 F4): los 6 contadores del área se leen
-en vivo y se enseñan en Inicio; el historial de eventos no existe.
+en vivo y se enseñan en Inicio; el historial de eventos no existe. Desde el
+Plan 42 las banderas SÍ prometen historia y la cadena de flancos está probada
+para una configurada; la vista se hará cuando una bandera cambie de verdad
+(F11 del backlog de frontend). Hoy daría cero eventos.
 
 ### Qué está roto
 
-**Nada medido hoy.** El único rojo conocido es intermitente y **no es
-contención**: `fuente-de-maquina.test.js` cae a veces en el subconjunto
-`demo-eva` con un aserto y nunca solo ni en la suite entera (§9, F10 del
-backlog de frontend).
+**Un rojo en backend que no es del código, visto el 22-09 a las 16:25:**
+`salud.test.mjs › sin ninguna lectura todavía, lo DICE en vez de pintarlo mal`
+cae por **tiempo (5 s)**, también solo y también **sin los cambios del Plan
+42** (`git stash` y repetir). En el log aparece una lectura real de
+`ac:TDCON/DEMO/NIVEL_TANQUE` contra ICONICS que recibe la página de
+reautenticación: la prueba está saliendo a la red desde este entorno. Por
+confirmar si es la variable de entorno de la sesión o la prueba; no se tocó.
+
+El otro rojo conocido es intermitente y **no es contención**:
+`fuente-de-maquina.test.js` cae a veces en el subconjunto `demo-eva` con un
+aserto y nunca solo ni en la suite entera (§9, F10 del backlog de frontend).
 
 ---
 
@@ -228,8 +245,9 @@ alguna sigue en uso; ninguna se ha tocado en este trabajo.
 ### Los planes vivos
 
 > **Estado a 22-09-2026 (tarde).** El Plan 41 se escribió y se **completó en el
-> día**; con él se archivaron el 32, el 37, el 38 y el 40. En
-> `docs/por-completar/` queda **sólo el Plan 33**, y es correcto.
+> día**; con él se archivaron el 32, el 37, el 38 y el 40. El **42** se escribió
+> después y también se completó el mismo día. En `docs/por-completar/` queda
+> **sólo el Plan 33**, y es correcto.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
@@ -237,6 +255,16 @@ se puede hacer sin tocar el código del tanque. Es el final de la rama, no una
 fase.
 
 **Archivados hoy, con su estado reescrito con lo que de verdad pasó:**
+
+- **42** (verificar una bandera que nunca cambió, sin forzarla) — escrito y
+  completado el 22-09-2026 por la tarde. F0 midió que el historiador registra
+  sólo al cambiar pero escribe las constantes en los mismos minutos que las
+  medidas; F1 el criterio `registrada-constante` (la mitad o más de las marcas
+  en una serie propia del mismo sondeo) y el campo `historyVerifiedComo`; F2
+  trece checks más pruebas de ruta, ficha y espejo, y el sondeo contra planta
+  (35 «sin variación» → 0); F3 la cadena de flancos probada y `maq-alarmas`
+  aplazada hasta un flanco real. Destapó B14 y B15 y tocó el falso para que
+  una configurada sin verificar pueda sondearse contra él.
 
 - **41** (cerrar Vibraciones 1.0) — nació de sondear los planes contra el
   código: tres fases dadas por pendientes ya estaban hechas y una era
@@ -271,12 +299,11 @@ ni la regla de cresta. El frontend ya lo tiene por HMR.
 acoplado: quitar la limitación «sin carga» de `vib-motor-03` y mirar la
 cresta de cada apoyo con carga (S2 daba 7,7 en vacío).
 
-**2 · Plan 42 — verificar una bandera que nunca cambió, sin forzarla**
-(`por-completar/PLAN-42-VERIFICAR-BANDERAS-CONSTANTES.md`, escrito el 22-09).
-Es B13 como plan: empieza por **medir** si el historiador registra periódico o
-sólo al cambiar (F0, un `medir-`), y de ahí sale el criterio del sondeo (F1),
-sus trece comprobaciones (F2) y los flancos de la configurada (F3). Ninguna
-fase exige ir a la máquina.
+**2 · Re-sondear `vib-motor-03` desde la pantalla** con el backend
+reiniciado (Plan 42): el sondeo de la tarde se hizo con un guion suelto y
+**sin anotar**; el que anote es el de la ficha. Y otro día, repetir
+`medir-cadencia-historiador` para ver si las ventanas de 72 h y 168 h siguen
+vacías (B14).
 
 **3 · F7 (el ciclo de vida del sondeo) y F8 (marcar fuera de la raíz)** del
 backlog de frontend: la red que falta antes de tocar motores, y una decisión
@@ -508,8 +535,8 @@ ICONICS_FAKE=true node scripts/verificar-herramientas.mjs
 ICONICS_FAKE=true node scripts/verificar-chat.mjs
 ```
 
-**Criterio de éxito:** `verificar-herramientas` imprime **183 correctas y 22
-omitidas**, y «14 de ellas sobre una máquina CONFIGURADA». Las omitidas son
+**Criterio de éxito:** `verificar-herramientas` imprime **190 correctas y 22
+omitidas**, y «13 de ellas sobre una máquina CONFIGURADA». Las omitidas son
 del cierre y el guion las cuenta a propósito; las catorce son la espejo de
 vibraciones registrada sólo para su bloque (Plan 39 F0–F2).
 
@@ -521,13 +548,13 @@ cd backend && npm test
 cd react-dashboard && npm test
 ```
 
-**Criterio de éxito, medido el 21-09-2026:**
+**Criterio de éxito, medido el 22-09-2026 por la tarde:**
 
 | | Esperado |
 |---|---|
-| `npm run verificar` | **Los 41 pasaron** |
-| Backend | **390 passed** |
-| Frontend | **1083 passed · 29 skipped** |
+| `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
+| Backend | **398 passed** de 399 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Frontend | **1102 passed · 29 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
@@ -596,6 +623,17 @@ node --env-file=.env.local scripts/verificar-antiguedad-historico.mjs
 
 Sin `--env-file` **falla siempre** con «Falta ICONICS_API_BASE». No es una
 regresión.
+
+**Cómo registra el historiador una serie que no cambia** (Plan 42 F0):
+
+```bash
+node --env-file=.env.local scripts/medir-cadencia-historiador.mjs            # las 5 del plan
+node --env-file=.env.local scripts/medir-cadencia-historiador.mjs --todas    # las 86, 24 h
+```
+
+Por serie: muestras, primera y última marca, cadencia mediana, valores
+distintos y cuántas marcas coinciden con `vRMS_S1`. Es un `medir-`: mide, no
+afirma. De aquí salió `FRACCION_MARCAS_REGISTRADA` de `sondearSeries.mjs`.
 
 **El asistente sobre una máquina configurada** (Plan 38 F3), contra el modelo
 real y la planta real; unos seis minutos por tanda:

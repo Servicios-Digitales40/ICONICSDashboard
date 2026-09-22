@@ -377,8 +377,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 387 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1083 (+29 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 399 — contratos HTTP, config, logger
+cd react-dashboard && npm test  # 1102 (+29 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 
@@ -460,10 +460,12 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-Los vivos hoy son el **42** (verificar una bandera que nunca cambió sin
-forzarla: el criterio del sondeo con series constantes, escrito el 22-09-2026
-desde B13) y el **33** (modularidad de máquinas), con su F9 —la estación de
-llenado como configurada— **bloqueada hasta reabrir** la rama. El
+El único vivo hoy es el **33** (modularidad de máquinas), con su F9 —la
+estación de llenado como configurada— **bloqueada hasta reabrir** la rama. El
+**42** (verificar una bandera que nunca cambió sin forzarla, desde B13) se
+escribió y se completó el 22-09-2026 por la tarde: midió primero cómo registra
+el historiador una constante y de ahí salió el criterio `registrada-constante`
+del sondeo. El
 **41** (cerrar Vibraciones 1.0) se escribió y se completó el 22-09-2026 tras
 sondear los demás contra el código, y con él se archivaron el **32**, el **37**,
 el **38** y el **40**; su §0 dice qué se dio por pendiente y ya estaba hecho, y

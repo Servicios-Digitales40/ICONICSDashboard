@@ -1,6 +1,6 @@
 # PLAN 42 — Verificar una bandera que nunca cambió, sin forzarla
 
-**Estado:** F0–F3 completadas · F4 por completar · escrito el 22-09-2026
+**Estado:** F0–F4 completadas el 22-09-2026 · escrito y cerrado el mismo día
 **Rama:** `Vibraciones1.0`
 **Origen:** B13 del backlog de backend, destapado al cerrar la F4 del Plan 41
 
@@ -417,10 +417,29 @@ caso delante. Anotado en el backlog de frontend (F11) con este criterio.
 
 ### F4 — Cerrar
 
-- Limitación nueva del tipo/máquina redactada y visible en la ficha y en el
-  asistente.
-- B13 del backlog marcado hecho con la cifra de planta.
-- `HANDOFF.md` §1 y §5 al día; este plan a `completados/`.
+- [x] Limitación nueva redactada en `construirSistema` (la lee el asistente;
+      la ficha enseña el desglose del sondeo). No es del tipo sino de la
+      máquina, porque depende de qué series le salieron constantes.
+- [x] B13 del backlog marcado hecho con la cifra de planta (35 → 0 «sin
+      variación», 50 registradas). B14 y B15 nuevos con lo que la medida
+      destapó; F11 en el de frontend con el criterio para la vista.
+- [x] `HANDOFF.md` §1, §5 y §9 al día; `CLAUDE.md` §5 con las cifras; este
+      plan a `completados/`.
+
+**Lo que hay que saber para volver a esto.** El sondeo es una **foto con
+fecha** también para las constantes: a las 16:40 del mismo día, una hora
+después del sondeo de 50, otro dio **38** registradas, 11 «sin muestras» y 3
+«sin variación» — doce `MonState_*`/`Sensor_state_*` cuya única marca (el
+rearranque del 21-09 a las 14:37–14:40) había salido de la ventana de 24 h.
+No es un defecto del criterio: es que esas variables sólo dejan marca cuando
+la recolección rearranca, y la ventana se mueve. Volverán a entrar con el
+siguiente rearranque; y `sondearSeries` nunca baja a `false` una constante
+que ya estaba verificada (check 9), así que lo que se ganó no se pierde
+entre sondeos.
+
+**Lo que no se hizo, y no hace falta:** la vía B (bajar un umbral en el SM
+1281) queda como forma de verificar **una** bandera como `serie-propia` y
+calibrar contra ella, si algún día se quiere; la vía C nunca fue una fase.
 
 ## 4. Riesgos
 

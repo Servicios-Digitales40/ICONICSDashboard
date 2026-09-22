@@ -86,7 +86,9 @@ parametrizarlo por máquina) y en B7 (`diagnostico` como orquestador).
 | **B8** cobertura | Ver corrección abajo: **una de sus tres afirmaciones ya es falsa** |
 | **B11** color del PDF por palabras | **HECHO el mismo día**: la fila lleva `clave` y `colorDeFila` colorea por ella; las palabras quedan de respaldo |
 | **B12** el tipo describe un SM 1281 | Informativo; sin cliente con otro equipo, no se toca |
-| **B13** banderas constantes | **NUEVO** (Plan 41 F4) |
+| **B13** banderas constantes | **HECHO el 22-09-2026 (Plan 42).** Contra planta: las 35 «sin variación» de `vib-motor-03` pasaron a **0**; 50 constantes registradas (las once banderas de alarma incluidas), sin forzar nada |
+| **B14** ventanas anchas vacías | **NUEVO** (Plan 42 F0). 72 h y 168 h devolvieron 0 muestras con 20 páginas de continuación vacías |
+| **B15** `MINIMO_COMUNES` con pocas marcas | **NUEVO** (Plan 42 F2). Series con 9–14 marcas y valores enteros salen «compartidas» entre sí |
 
 ---
 
@@ -530,15 +532,29 @@ el archivo de alias cubre el caso de uno en uno.
 3. ~~**B10**~~ — hecho el 15-09-2026
 4. ~~**B5**~~ — resuelto: verificador de bundle en verde con techos medidos
 5. ~~**B11**~~ — hecho el 22-09-2026
-6. **B13** — el sondeo de banderas constantes, como plan antes de tocarlo
-7. **B4** — cuando vibraciones declare mecanismos de desgaste, no antes
-8. **B8 (el ciclo de vida del sondeo)** — la red que falta
-9. **B2 y la otra mitad de B3** — con la reapertura del tanque (Plan 33 F9)
+6. ~~**B13**~~ — hecho el 22-09-2026 (Plan 42)
+7. **B15** — el umbral de `mismaSerie` con pocas marcas: medir antes de tocar
+8. **B14** — las ventanas anchas vacías del historiador: mirar si sigue así
+9. **B4** — cuando vibraciones declare mecanismos de desgaste, no antes
+10. **B8 (el ciclo de vida del sondeo)** — la red que falta
+11. **B2 y la otra mitad de B3** — con la reapertura del tanque (Plan 33 F9)
 
 **B6 y B7 no son tareas**: son fronteras que vigilar en la revisión de la #3.
 
 
-## B13 · El sondeo no puede verificar una bandera que nunca cambió
+## B13 · El sondeo no puede verificar una bandera que nunca cambió — **HECHO (22-09-2026, Plan 42)**
+
+> **Lo que pasó.** Se midió primero (`scripts/medir-cadencia-historiador.mjs`):
+> el grupo registra **sólo al cambiar**, pero cuando escribe una constante lo
+> hace en los mismos minutos que las medidas (al reanudar la recolección).
+> De ahí el criterio `registrada-constante` de `sondearSeries.mjs`: la mitad o
+> más de las marcas de la constante son marcas de una serie propia del mismo
+> sondeo. Contra planta, las 35 «sin variación» pasaron a 0 y las once
+> banderas de alarma quedaron verificadas. Lo que no se puede afirmar —que dos
+> constantes iguales sean distintas— lo declara la máquina en sus
+> limitaciones. El detalle está en
+> `docs/completados/PLAN-42-VERIFICAR-BANDERAS-CONSTANTES.md`. Lo que sigue
+> es el texto original.
 
 **Hoy.** `sondearSeries.mjs` marca `historyVerified: true` sólo cuando una
 serie **varía** en la ventana y no coincide con otra. Es la salvaguarda
@@ -570,3 +586,42 @@ decisión sobre qué significa «verificada»: se escribe primero en un plan.
 **Cómo se desbloquea sin código.** Que una bandera alarme de verdad, se sondee
 después, y el sondeo la vea variar. A partir de ahí `eventosDeAlarma` sobre su
 serie da los flancos.
+
+## B14 · Las ventanas de 72 h y 168 h del historiador devuelven páginas vacías
+
+**Visto el 22-09-2026 por la tarde** (Plan 42 F0, `medir-cadencia-historiador`):
+sobre `vib-motor-03`, la ventana de 24 h traía 569 muestras de `vRMS_S1` y las
+de 72 h y 168 h devolvían **0 muestras con 20 páginas de continuación**, todas
+vacías, sin error. Por la mañana la de 7 días sí traía material (Plan 41 §0).
+
+**Lo que cuesta.** `POST /api/maquinas/:id/sondear` prueba 24 → 72 → 168 h y
+se queda con la primera que verifique algo. Cuando la de 24 h no verifica nada
+(máquina parada), las dos siguientes le cuestan **40 páginas por serie** para
+no traer nada, y un sondeo de 86 series tarda minutos.
+
+**Lo que NO se hace todavía.** Bajar `maxHistoryPaginas` o quitar ventanas:
+sería subir o bajar un techo para callar un síntoma sin saber si es del
+servidor de esa tarde o permanente (`CLAUDE.md` §6.2). Primero: repetir la
+medida otro día con el mismo guion. Si se confirma, la ruta puede cortar una
+ventana cuando la primera página venga vacía con continuación, o la lectura
+puede declarar «páginas vacías» como motivo aparte de «truncada».
+
+## B15 · `MINIMO_COMUNES = 8` se escribió pensando en cientos de marcas
+
+**Visto el 22-09-2026** en el sondeo contra planta del Plan 42:
+`UPPER_LEVEL_2`, `ACTUAL PWR_BMS`, `OUTPUT VOLTS_BMS` y `Numero de arranques`
+salieron `serie-compartida` **entre ellas**. Tienen 9–14 marcas cada una en
+24 h (se registran al cambiar) y 2–7 valores distintos, enteros. Ocho
+coincidencias de valor sobre marcas comunes son alcanzables por azar entre
+series que apenas cambian y toman valores pequeños. Por la mañana no pasaba:
+con la ventana corrida, cambian las marcas que entran.
+
+**Lo que cuesta.** Cuatro series que probablemente son legítimas no prometen
+historia. Es el lado seguro del error —callar, no afirmar— y por eso no urge.
+
+**Lo que se podría medir.** Si `mismaSerie` debe exigir, además de ocho
+coincidencias, que las series tengan **variación suficiente** en las marcas
+comunes (más de N valores distintos), o una fracción de las marcas totales.
+La cifra tiene que salir de una medida sobre las series reales, no de un
+número redondo. Toca `sondearSeries.mjs` y `verificar-sondeo-series`; se
+escribe antes como fase de un plan.

@@ -37,6 +37,7 @@ Vistas registradas en `routes.jsx`: **14**, repartidas en tres secciones
 | **F6** placeholders | **DESAPARECIDOS.** `ControlesVibraciones.jsx` y `VibracionesEva3D.jsx` no existen; la 3D de la configurada es `Vibraciones3D` y Controles no se prometió | Plan 40 |
 | **F7** cobertura | **PARCIAL.** La sección de una máquina nueva SÍ está probada (F4). Las cadencias distintas por máquina, también (`cadencia-del-registro.test.js`). Lo que sigue sin red es el **ciclo de vida**: que dos motores vivos sondeen por separado y mueran con su vista | — |
 | **F8** una sola raíz | **ABIERTO.** El commit `c99099b` fue el apunte, no el arreglo; la decisión entre «varias raíces» y «marcar desde cualquier punto» sigue sin tomar | — |
+| **F11** `maq-alarmas` | **NUEVO, en espera de un flanco real** (Plan 42 F3). Las banderas ya prometen historia y la cadena de flancos está probada; la vista se hace cuando haya un evento que enseñar | `verificar-vibraciones-configurada` |
 
 **Nuevos, salidos del Plan 41 (22-09-2026):**
 
@@ -288,11 +289,36 @@ para máquinas armadas con tags de varias zonas (haría falta el 2).
 
 ---
 
+## F11 · «Alarmas» de la máquina configurada: la vista que espera un flanco
+
+**De dónde sale.** El Plan 41 F4 cerró «Alarmas» de la configurada **sin
+vista**: el Alarm Server da 500 a `AlarmHistory` y las banderas de la máquina
+no tenían serie verificada. El Plan 42 (22-09-2026) resolvió lo segundo: las
+once banderas de `vib-motor-03` están verificadas como `registrada-constante`,
+`construirSistema` las ofrece como historia y un check de
+`verificar-vibraciones-configurada` demuestra que `readHistory → normalizar →
+eventosDeAlarma` da eventos con entrada, salida y duración para una
+configurada.
+
+**Por qué no se hizo la vista.** Porque hoy `eventosDeAlarma` sobre cualquiera
+de esas banderas da **cero eventos** —son constantes porque nunca alarmaron—.
+Una vista enseñaría una lista vacía y los seis contadores del área que Inicio
+ya enseña. Es §4.8: escribir lo pequeño y anotar qué justificaría lo grande.
+
+**Qué la justifica.** Que una bandera cambie de verdad. El sondeo lo dirá
+solo: pasará de `registrada-constante` a `serie-propia`. Ese día, la vista es
+la de `AlarmasEva` del tanque sobre las banderas de la configurada —flancos,
+sin mensaje ni severidad ni acuse, que un flanco no los tiene— y una tarde de
+trabajo. Hasta entonces, la pregunta «¿ha alarmado alguna vez?» la contesta el
+asistente con `historia_de_senal` sobre la bandera, y la contesta bien: «no ha
+cambiado».
+
 ## Orden sugerido (revisado el 22-09-2026)
 
 1. ~~**F9**~~ — hecho el 22-09-2026
 2. ~~**F10**~~ — cazado y arreglado el 22-09-2026 (era el reloj, no el orden)
 3. **F7 (el ciclo de vida)** — la única red que falta antes de tocar motores
+   *(F11 no entra en el orden: no es una tarea hasta que una bandera cambie)*
 4. **F8** — decidir entre varias raíces y marcar desde cualquier punto; la
    pregunta que decide sigue siendo si es para una carpeta suelta o para
    máquinas armadas con tags de varias zonas
