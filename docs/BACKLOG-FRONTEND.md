@@ -174,6 +174,41 @@ simulado, la traza del asistente y la accesibilidad.
 
 ---
 
+## F8 · El editor sólo deja marcar lo que cuelga de UNA raíz
+
+**Hoy.** `activoDe()` (`shared/eva/comun/configurarDesdeArbol.js`) devuelve
+`null` si el punto no empieza por la raíz en vivo, y `activosDesdeRaiz()` sólo
+ofrece los hijos DIRECTOS de esa raíz. Así que una máquina se configura con lo
+que hay bajo una sola rama: subir la raíz para alcanzar una carpeta vecina
+colapsa los activos de dentro —medido el 22-09-2026: con la raíz en
+`DEMO_VIBRACIONES/`, `S1`, `S2`, `S3` y `V20` dejaron de agruparse y el activo
+`Vibraciones` pasó a tener 163 variables juntas—.
+
+**El caso que lo destapó.** La torreta de señalización (`TORRETA/ESTADO_TORRETA`)
+colgaba de `ac:TDCON/DEMO_VIBRACIONES/`, un nivel por encima de los apoyos. Se
+resolvió moviendo el tag en ICONICS, que funciona pero es cambiar la planta
+para acomodar al tablero.
+
+**Por qué es viable.** El backend NO impone esa restricción: ningún esquema ni
+validación exige que una variable cuelgue de la raíz. Y el patrón ya existe —
+el área de alarmas (`ae:/...`) entra como asset secundario con una ruta
+completamente ajena a la raíz en vivo, y `configuracionDesdeMarcas` la añade
+sin problema. Lo que falta es poder MARCARLA desde el árbol.
+
+**Dos diseños, y la decisión no está tomada.**
+
+1. **Varias raíces en vivo declaradas.** El formulario acepta N raíces; cada
+   una aporta sus activos. Reutiliza el patrón del área de alarmas y no
+   redefine qué es una raíz. Es el paso pequeño.
+2. **Marcar desde cualquier punto del árbol.** Se explora desde arriba y se
+   marca lo que sea. Más flexible, pero «la raíz» deja de significar algo y
+   hay que redefinir qué es un activo y de dónde sale su `assetId`.
+
+Hace falta saber si esto es para una o dos carpetas sueltas (bastaría el 1) o
+para máquinas armadas con tags de varias zonas (haría falta el 2).
+
+---
+
 ## Orden sugerido
 
 1. **F4** — pequeño, aislado, y convierte «añadir una sección» en «no hacer nada»
