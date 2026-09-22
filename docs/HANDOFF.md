@@ -1,7 +1,7 @@
 # HANDOFF — dónde estamos y cómo seguir
 
 **Fecha:** 22-09-2026 (tarde) · **Rama viva:** `Vibraciones1.0` · **HEAD:** el
-cierre del Plan 41 (F5, archivar); `git log -1` lo dice.
+cierre del Plan 42 (F4, archivar); `git log -1` lo dice.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
