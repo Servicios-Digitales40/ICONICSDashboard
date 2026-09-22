@@ -345,10 +345,11 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 169 correctas y 22 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 178 correctas y 22 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «169 de 191», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 191.
+> qué. Ese verde significa «178 de 200», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 200. Nueve de las 178 son sobre una
+> máquina **configurada** (Plan 39 F0), y también lo imprime.
 
 ### 5.2 La tanda completa
 
@@ -457,8 +458,8 @@ Los vivos hoy son el **32** (vibraciones), el **33** (modularidad de máquinas,
 F9), el **34** (máquinas desde el árbol, F5), el **37** (las vistas de una
 máquina configurada, F4), el **38** (el registro conoce las configuradas y el asistente contesta
 sobre ellas; F1–F3, pendiente de confirmarse en el navegador) y el **39** (las
-herramientas del asistente sirven a cualquier configurada, por tipo; F0–F6
-por completar); el **36** (configurar marcando el árbol) está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
+herramientas del asistente sirven a cualquier configurada, por tipo; F0
+completada, F1–F6 por completar); el **36** (configurar marcando el árbol) está archivado. Ver `HANDOFF.md` §5 para cuál sigue.
 
 ### 6.2 Qué NO hacer
 

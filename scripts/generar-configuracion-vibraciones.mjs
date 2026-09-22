@@ -47,124 +47,16 @@
  */
 import { writeFile } from 'node:fs/promises'
 
-import {
-  crearMaquina,
-  crearVariable,
-} from '../shared/eva/comun/configuracionMaquina.js'
-import { SISTEMA } from '../shared/eva/comun/sistemas.js'
-import {
-  BANDERAS,
-  CALIDADES,
-  MEDIDAS,
-  VARIADOR,
-  VIGILANCIAS,
-} from '../shared/eva/vibraciones/vibraciones.js'
-import { rolDe } from '../shared/eva/tipos/vibraciones.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 
-const ORIGEN = SISTEMA.vibraciones
-
-/**
- * De qué familia es una clave del catálogo, para nombrar su rol.
- *
- * Se busca en los cinco catálogos en vez de deducirlo del nombre, y el orden
- * importa: `aviso` está en BANDERAS y en VARIADOR, y los dos son roles
- * distintos con ámbitos distintos (ver `tipos/vibraciones.js`). Aquí se
- * desempata por el CANAL —una clave con canal es de apoyo, sin canal es de la
- * máquina—, que es el dato que el catálogo ya trae y no hay que adivinar.
+/*
+ * La derivación vive en `lib/configuracionEspejo.mjs` desde el Plan 39 F0,
+ * para que `verificar-herramientas` y `verificar-chat` la importen y
+ * registren la configurada en su proceso, sin ejecutar este guion aparte.
+ * Aquí queda lo que sí es de un guion: la bandera `--sondear`, el archivo de
+ * salida y el recuento.
  */
-function familiaDe(clave, canal) {
-  const enApoyo = [
-    ['medida', MEDIDAS],
-    ['bandera', BANDERAS],
-    ['calidad', CALIDADES],
-    ['vigilancia', VIGILANCIAS],
-  ]
-
-  if (canal) {
-    for (const [familia, catalogo] of enApoyo) {
-      if (catalogo.some(x => x.key === clave)) return familia
-    }
-    return null
-  }
-
-  return VARIADOR.some(x => x.key === clave) ? 'variador' : null
-}
-
-/**
- * El id de dominio de un punto: la clave con la que se le pide su serie.
- *
- * En este catálogo es `clave_canal` para lo que vive en un apoyo, y la clave
- * sola para el variador. Se construye así —y no con el `parse`— porque tiene
- * que coincidir EXACTAMENTE con lo que devuelve `series.historizadas()`, que
- * es contra lo que se va a comparar.
- */
-const idDeDominio = (clave, canal) => (canal ? `${clave}_${canal}` : clave)
-
-const variables = []
-const sinRol = []
-
-for (const punto of ORIGEN.puntos()) {
-  const d = ORIGEN.parse(punto)
-  if (!d) continue
-
-  const id = idDeDominio(d.clave, d.canal)
-  const familia = familiaDe(d.clave, d.canal)
-  const rol = familia ? rolDe(familia, d.clave) : null
-
-  /*
-   * Los contadores de alarma (`ae:`) no tienen rol en el tipo: no son una
-   * medida de la máquina, son del servidor de alarmas. Se configuran igual
-   * —hay que leerlos— pero sin rol, y por eso se cuentan aparte en vez de
-   * inventarles uno.
-   */
-  if (!rol) sinRol.push({ punto, clave: d.clave, tipo: d.tipo })
-
-  const historico = ORIGEN.series.punto(id)
-
-  variables.push(
-    crearVariable({
-      id,
-      pointName: punto,
-      /* LITERAL, nunca derivado del nombre en vivo: no se deduce por regla
-         fija, y deducirlo es el defecto B10 de este proyecto. */
-      historyPointName: historico,
-      rol,
-      descripcion: ORIGEN.etiquetaDe(id),
-      alias: ORIGEN.aliasDe?.(id) ?? [],
-      assetId: d.canal ?? null,
-    }),
-  )
-}
-
-const verificadas = new Set(ORIGEN.series.historizadas())
-
-const configurada = crearMaquina({
-  id: 'vibraciones-configurada',
-  nombre: `${ORIGEN.nombre} (configurada)`,
-  tipo: 'vibraciones',
-  plc: ORIGEN.plc,
-  cadenciaMs: ORIGEN.cadenciaMs,
-  assets: ORIGEN.raices.map((pointName, i) => ({
-    id: pointName,
-    pointName,
-    rol: i === 0 ? 'raiz' : 'secundario',
-  })),
-  variables,
-  limitaciones: [
-    'Configuración DERIVADA del catálogo escrito a mano (Plan 33 F4). Existe para ' +
-      'comparar las dos, no para sustituirlo: el módulo original sigue siendo el que ' +
-      'sirve esta máquina.',
-    /*
-     * Este texto cambió con el Plan 34 F2: hasta el 21-09-2026 decía que las
-     * series se daban por verificadas «heredando el sondeo del 28-08-2026».
-     * Ya no se heredan — y menos mal: aquel sondeo se había hecho contra un
-     * grupo del historiador que a día de hoy no existe.
-     */
-    'Sus series se verifican SONDEÁNDOLAS con `--sondear`: se pide cada una al servidor y se ' +
-      'comparan entre sí, porque el historiador puede devolver la serie de otra señal sin dar ' +
-      'error. Sin esa bandera ninguna queda verificada, que es el valor seguro.',
-  ],
-})
+const { configurada, sinRol, verificadas } = configuracionEspejo()
 
 /*
  * ── LA VERIFICACIÓN SE GANA SONDEANDO (Plan 34 F2, 21-09-2026) ─────

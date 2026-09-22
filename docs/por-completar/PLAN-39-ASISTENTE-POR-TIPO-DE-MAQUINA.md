@@ -1,6 +1,6 @@
 # PLAN 39 — El asistente sirve a cualquier máquina configurada
 
-**Estado:** F0–F6 por completar
+**Estado:** F0 completada · F1–F6 por completar
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
@@ -167,26 +167,79 @@ la negativa honesta y por capacidad.
 
 ## 3. Las fases
 
-### F0 — Una configurada en el transporte falso, para las pruebas
+### F0 — Una configurada en el transporte falso, para las pruebas ✅
+
+**Completada el 21-09-2026.**
 
 **Objetivo.** Que `verificar-herramientas` y `verificar-chat` monten una
-máquina configurada y la ejerciten sin red. Hoy ninguno lo hace: las 169
-comprobaciones son sobre las escritas a mano, y todo lo de este plan se
-probaría sólo contra planta.
+máquina configurada y la ejerciten sin red. Hasta hoy ninguno lo hacía: las
+169 comprobaciones eran sobre las escritas a mano, y todo lo de este plan se
+habría probado sólo contra planta.
 
-**Cómo.** `generar-configuracion-vibraciones.mjs` ya deriva una configurada
-espejo de la escrita a mano; sus puntos son los mismos tags, así que el
-transporte falso les da valores simulados por `sistemaDePunto()` sin cambiar
-nada. Los guiones escriben ese `maquinas.json` en su carpeta privada
-(`MAQUINAS_RUTA`, que `montarApp` y `verificar-chat` ya usan) y la app la
-registra al arrancar.
+- `scripts/lib/configuracionEspejo.mjs`: la derivación de la configurada
+  espejo de vibraciones, sacada del guion `generar-configuracion-vibraciones`
+  a un módulo puro. El guion la llama y conserva `--sondear`, el archivo de
+  salida y el recuento; produce el mismo JSON que antes (comparado campo a
+  campo, salvo la marca de tiempo).
+- `verificar-herramientas`: bloque «La máquina configurada» con 9
+  comprobaciones. Registra la espejo, la ejercita, la da de baja. Imprime
+  «9 de ellas sobre una máquina CONFIGURADA».
+- `verificar-chat`: 3 comprobaciones sobre lo que el asistente le cuenta al
+  modelo de una configurada (inventario con id, contexto con nombre y orden,
+  baja). Se vieron fallar contra el `chat.mjs` anterior al Plan 38 F3.
 
-**Criterios.** Las herramientas de §1.1 pasan sobre la configurada con los
-mismos asertos que sobre la escrita a mano; `verificar-herramientas` imprime
-cuántas comprobaciones son sobre configuradas.
+#### Lo que de verdad pasó (F0)
 
-**Riesgo.** El solape de raíces con la escrita a mano (`toleraSolapeConEscritas`)
-es exactamente el de planta: bien, porque es lo que hay hasta el Plan 34 F5.
+**Se registra en el proceso, no por `maquinas.json`.** El plan decía escribir
+un `maquinas.json` privado y dejar que la app lo registrara. Se hizo más
+corto: los dos guiones importan el módulo y llaman a `registrarSistema` con
+`toleraSolapeConEscritas`, **sólo para su bloque**, y `desregistrarSistema`
+al salir. Registrarla para todo el guion habría cambiado lo que las otras 169
+miden —ver el hallazgo de las etiquetas—, y eso no es una fixture, es un
+cambio de fondo que hay que ver aparte.
+
+**`verificadasDelCatalogo`, una opción que el guion no usa.** `crearVariable`
+fuerza `historyVerified: false` a propósito (una serie se promete después de
+sondearla). Contra el transporte falso ese sondeo no dice nada: el falso
+sirve exactamente lo que el catálogo declara historizado. La opción marca
+esas 36 series como verificadas y sólo la pasan los verificadores; el guion
+sigue sondeando contra planta. La cabecera del módulo lo explica.
+
+**El historiador falso no sirve la historia de vibraciones, ni a mano ni
+configurada.** `readHistory` del falso sólo reconoce los nombres `hda:` del
+tanque (`parsePuntoHistorico`); los de vibraciones caen en «unknown point».
+Por eso la comprobación de historia no exige `ok: true`: exige que la
+configurada reciba **la misma respuesta** que la escrita a mano, que su punto
+del historiador sea **literalmente el mismo**, y que nunca se le niegue por
+desconocida. Servir la historia de vibraciones en el falso es trabajo de F2,
+y ahí se mide de verdad la unidad.
+
+**Con `rnd: 0.99`, 30 de 73 puntos sin lectura.** Son las vigilancias
+codificadas en base64: `dominioDesdeRoles` las deja como hueco declarado
+cuando no hay `leerEstado`, y `construirSistema.estado()` no se lo pasa. La
+escrita a mano sí las decodifica. Es un hueco de F1 (estado por tipo), y el
+aserto de hoy lo deja escrito: exige menos de la mitad sin lectura, no cero.
+
+**`estado_del_sistema` de una configurada no trae `apoyos`.** Hay un aserto
+que lo fija (`r.apoyos === undefined`) con el mensaje «F1 ya trae apoyos:
+actualiza esta comprobación». No es dar el hueco por bueno: es que F1 tenga
+que pasar por ahí a la vista.
+
+**La etiqueta tiene dos dueños.** Con la espejo registrada,
+`sistemasDeSenal('Velocidad eficaz · Lado acople')` devuelve `vibraciones` y
+`vibraciones-configurada`. Es la situación de planta —dos entradas para la
+misma instalación hasta el Plan 34 F5— y explica por qué una pregunta por la
+etiqueta sin decir máquina no puede resolverse sola. Queda fijado como
+comprobación para que retirar el catálogo tenga que pasar por ella.
+
+**`diagnosticar_falla` necesita el motor montado** (`motorDiagnostico`); la
+comprobación usa uno de mentira que devuelve lo que se le pasa, como las del
+tanque. Lo que se prueba es que la herramienta acepte el id de una configurada
+y llegue al motor, que es lo que el Plan 38 F1 generalizó.
+
+**Recuentos**: `verificar-herramientas` 169 → **178** (22 omitidas siguen);
+`verificar-chat` 68 → **71**; `verificar-vibraciones-configurada` 25, igual;
+los 41 verificadores en verde; lint limpio.
 
 ### F1 — Estado y resumen por tipo
 

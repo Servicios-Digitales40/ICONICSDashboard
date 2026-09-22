@@ -32,6 +32,10 @@ import { join } from 'node:path'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { createChat } from '../backend/ia/conversacion/chat.mjs'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { desregistrarSistema, registrarSistema } from '../shared/eva/comun/sistemas.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -346,6 +350,69 @@ await check('el texto llega troceado, no de golpe al final', async () => {
   const { eventos } = await preguntar(chatDePrueba(), 'algo')
   assert.ok(eventos.filter(e => e.tipo === 'texto').length > 3, 'debería llegar en varios deltas')
 })
+
+/* ── La máquina configurada (Plan 39 F0) ────────────────────────────── */
+
+console.log('\n── La máquina configurada (Plan 39 F0) ─────────────────────')
+
+/*
+ * Las herramientas de este guion son falsas, así que lo que se comprueba aquí
+ * NO es lo que una herramienta devuelve de una configurada (eso está en
+ * `verificar-herramientas`) sino lo que el asistente le CUENTA al modelo de
+ * ella: que el inventario la traiga con su nombre Y su id, y que el contexto
+ * de su pantalla la nombre y ordene pasar ese id tal cual.
+ *
+ * Los dos textos existen por una medición (Plan 38 F3, 21-09-2026): sin el id
+ * en el inventario el modelo llamaba con `sistema="Nuevo-Modor"`; sin el
+ * nombre y la orden en el contexto, desde su pantalla contestaba sobre la
+ * escrita a mano. Se registra la espejo sólo para este bloque, igual que en
+ * `verificar-herramientas`, y se da de baja al salir.
+ */
+{
+  const espejo = configuracionEspejo({ verificadasDelCatalogo: true }).configurada
+  const entrada = registrarSistema(
+    construirSistema(espejo, tipoDe('vibraciones')),
+    { toleraSolapeConEscritas: true },
+  )
+  const sistemaDelTurno = () =>
+    peticiones.find(p => p.tools).messages.find(m => m.role === 'system').content
+
+  await check('[configurada] el inventario del prompt la trae con su nombre y su id', async () => {
+    peticiones = []
+    guion = { texto: 'Hay tres máquinas.' }
+    await preguntar(chatDePrueba(), '¿qué máquinas hay?')
+
+    const prompt = sistemaDelTurno()
+    assert.ok(
+      prompt.includes(`${entrada.nombre} (sistema="${entrada.id}")`),
+      'el inventario tiene que decir «nombre (sistema="id")»: el modelo llama a las herramientas con el id',
+    )
+    const conSerie = entrada.claves().filter(k => entrada.esHistorizada(k)).length
+    assert.ok(prompt.includes(`${entrada.claves().length} señales, ${conSerie} con serie propia`), 'su recuento sale del registro')
+  })
+
+  await check('[configurada] el contexto de su pantalla la nombra y ordena pasar su id tal cual', async () => {
+    peticiones = []
+    guion = { texto: 'Está parada.' }
+    await chatDePrueba().responder({
+      pregunta: '¿cómo está esta máquina?', historial: [],
+      contexto: { sistema: entrada.id }, onEvento: () => {},
+    })
+
+    const prompt = sistemaDelTurno()
+    assert.ok(prompt.includes(`sistema=${entrada.id} («${entrada.nombre}»)`), 'el bloque de contexto tiene que llevar el nombre junto al id')
+    assert.ok(prompt.includes(`EXACTAMENTE "${entrada.id}"`), 'y ordenar que las herramientas reciban ese id tal cual')
+  })
+
+  desregistrarSistema(entrada.id)
+
+  await check('[configurada] al darla de baja, el prompt deja de nombrarla', async () => {
+    peticiones = []
+    guion = { texto: 'Hay dos máquinas.' }
+    await preguntar(chatDePrueba(), '¿qué máquinas hay?')
+    assert.ok(!sistemaDelTurno().includes(entrada.id))
+  })
+}
 
 /* ── El razonamiento del modelo ──────────────────────────────────────── */
 

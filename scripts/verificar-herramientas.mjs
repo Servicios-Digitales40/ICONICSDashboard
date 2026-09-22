@@ -67,11 +67,16 @@ import {
   SISTEMA,
   SISTEMAS,
   SISTEMAS_EN_SERVICIO,
+  desregistrarSistema,
   mismoSistema,
+  registrarSistema,
   sistemasDeSenal,
   tieneHistoria,
 } from '../shared/eva/comun/sistemas.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
+import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
+import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 import { MAX_PUNTOS, resumirSerie } from '../shared/eva/comun/historia.js'
 
 const c = {
@@ -626,6 +631,142 @@ for (const sistema of SISTEMAS_EN_SERVICIO) {
     assert.ok(r.sin_comprobar, 'falta el recuento de lo que NO se pudo mirar')
   })
 }
+
+/*
+ * ── LA MÁQUINA CONFIGURADA (Plan 39 F0) ─────────────────────────────
+ *
+ * Hasta el 21-09-2026 todas las comprobaciones de este guion eran sobre las
+ * máquinas escritas a mano. Las herramientas sirven también a las que entran
+ * por configuración (Plan 38 F1), y nada aquí lo miraba: lo que el Plan 39
+ * abre se habría probado sólo contra planta, a seis minutos la tanda.
+ *
+ * Se registra la configurada ESPEJO de vibraciones —derivada del catálogo,
+ * `lib/configuracionEspejo.mjs`— y se le pide lo mismo que a las escritas a
+ * mano. Sus puntos son los mismos tags, así que el transporte falso le da
+ * valores sin tocar nada: `sistemaDePunto()` los atribuye a la escrita a mano,
+ * que sí tiene física simulada.
+ *
+ * ── SÓLO PARA ESTE BLOQUE, Y SE DA DE BAJA AL SALIR ────────────────
+ *
+ * Registrarla para todo el guion cambiaría lo que las demás comprobaciones
+ * miden: la espejo tiene las MISMAS etiquetas que la escrita a mano, y
+ * `sistemasDeSenal('Velocidad eficaz · Lado acople')` pasaría de un dueño a
+ * dos. Eso es un hallazgo real —es lo que hay en planta hasta el Plan 34 F5, y
+ * se fija abajo como tal—, no un cambio de fixture que colar en 169 asertos.
+ */
+console.log('\n── La máquina configurada (Plan 39 F0) ─────────────────────')
+
+const antesDeConfigurada = passed
+const ESPEJO = configuracionEspejo({ verificadasDelCatalogo: true }).configurada
+const configurada = registrarSistema(
+  construirSistema(ESPEJO, tipoDe('vibraciones')),
+  { toleraSolapeConEscritas: true },
+)
+
+check('[configurada] entra en el registro y en servicio, con su solape declarado', () => {
+  assert.equal(SISTEMA[ESPEJO.id], configurada)
+  assert.ok(SISTEMAS_EN_SERVICIO.includes(configurada), 'no está en servicio')
+  assert.equal(configurada.configurada, true)
+  assert.equal(configurada.tipo, 'vibraciones')
+  // Comparte raíz con la escrita a mano y lo tiene que DECIR: es la situación
+  // de planta hasta que el Plan 34 F5 retire el catálogo.
+  assert.ok(configurada.solapes?.length > 0, 'comparte raíz con la escrita a mano y no lo declara')
+  assert.ok(configurada.solapes.every(s => s.con === 'vibraciones'))
+})
+
+await checkAsync('[configurada] sistemas_de_la_planta la lista con su id, su nombre y sus herramientas', async () => {
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('sistemas_de_la_planta', {})
+  assert.equal(r.ok, true, r.error)
+  const suya = r.sistemas.find(s => s.id === ESPEJO.id)
+  assert.ok(suya, 'no aparece en la lista')
+  assert.equal(suya.nombre, ESPEJO.nombre)
+  // Las herramientas salen de las CAPACIDADES de la configuración, no de una
+  // lista fija: con series verificadas, la historia se ofrece.
+  assert.deepEqual(suya.herramientas, ['estado_del_sistema', 'riesgos_activos', 'historia_de_senal'])
+  assert.ok(suya.limitaciones.length > 0, 'una configurada tiene que confesar lo que no sabe hacer')
+})
+
+await checkAsync('[configurada] estado_del_sistema la lee: puntos pedidos, y cuántos no contestaron', async () => {
+  const r = await createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+    .ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.sistema, ESPEJO.id)
+  assert.equal(r.configurada, true)
+  assert.equal(r.puntosPedidos, ESPEJO.variables.length)
+  // El falso sirve sus puntos como los de la escrita a mano: la mayoría
+  // contesta. Las vigilancias codificadas quedan como hueco declarado (ver
+  // `dominioDesdeRoles`), por eso no se exige cero.
+  assert.ok(r.sinLectura < r.puntosPedidos / 2, `${r.sinLectura} de ${r.puntosPedidos} sin lectura: el falso no la está sirviendo`)
+  /*
+   * LO QUE HOY NO TRAE, y el Plan 39 F1 tiene que traer: ni un valor por
+   * apoyo, ni el variador. Se fija aquí para que F1 tenga que cambiar este
+   * aserto a la vista, no para dar el hueco por bueno.
+   */
+  assert.equal(r.apoyos, undefined, 'F1 ya trae apoyos: actualiza esta comprobación')
+})
+
+await checkAsync('[configurada] riesgos_activos la evalúa con las reglas de su TIPO', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const suya = await h.ejecutar('riesgos_activos', { sistema: ESPEJO.id })
+  const escrita = await h.ejecutar('riesgos_activos', { sistema: 'vibraciones' })
+  assert.equal(suya.ok, true, suya.error)
+  assert.ok(suya.reglas_evaluadas > 0, 'no evaluó ninguna regla')
+  // Mismo tipo, mismas reglas: si la escrita a mano evalúa N, la configurada
+  // no puede evaluar un número distinto de reglas.
+  assert.equal(suya.reglas_evaluadas, escrita.reglas_evaluadas)
+  assert.ok(suya.sin_comprobar, 'falta el recuento de lo que NO se pudo mirar')
+})
+
+await checkAsync('[configurada] historia_de_senal la trata como a la escrita a mano: mismo punto, misma respuesta', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const suya = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  const escrita = await h.ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: 'vibraciones', periodo: 'últimas 6 horas' })
+  // El punto del historiador es LITERAL en la configuración y tiene que ser el
+  // mismo que el del catálogo: deducirlo del nombre en vivo es el defecto B10.
+  assert.equal(configurada.series.punto('vRMS_S1'), SISTEMA.vibraciones.series.punto('vRMS_S1'))
+  // El falso contesta lo mismo a las dos (hoy: que ese grupo no entrega). Lo
+  // que NO puede pasar es que a la configurada se le niegue por desconocida.
+  assert.equal(suya.ok, escrita.ok)
+  assert.doesNotMatch(suya.error ?? '', /no (conozco|existe|reconozco)|sistemas_de_la_planta/i)
+})
+
+await checkAsync('[configurada] diagnosticar_falla acepta su id y llega al motor', async () => {
+  const motorDiagnostico = {
+    async diagnosticar({ sistema, riesgoId }) {
+      return { sistema, riesgoId, huerfano: false, causas: [] }
+    },
+  }
+  const r = await createHerramientas({ client: clienteFalso(), motorDiagnostico })
+    .ejecutar('diagnosticar_falla', { sistema: ESPEJO.id, riesgoId: 'velocidad-fuera-de-norma' })
+  assert.equal(r.ok, true, r.error)
+})
+
+check('[configurada] sin series verificadas no ofrece historia, y lo dice', () => {
+  const sinSondear = construirSistema(configuracionEspejo().configurada, tipoDe('vibraciones'))
+  assert.equal(sinSondear.esHistorizada('vRMS_S1'), false)
+  assert.deepEqual(sinSondear.herramientas, ['estado_del_sistema', 'riesgos_activos'])
+  assert.match(sinSondear.historia, /sin serie verificada/i)
+})
+
+check('[configurada] su etiqueta tiene DOS dueños mientras conviva con la escrita a mano (Plan 34 F5)', () => {
+  // Es la situación de planta, y por eso una pregunta por la etiqueta sin
+  // decir máquina no puede resolverse sola. Se fija para que retirar el
+  // catálogo tenga que pasar por aquí.
+  assert.deepEqual(
+    sistemasDeSenal('Velocidad eficaz · Lado acople').map(x => x.sistema).sort(),
+    ['vibraciones', ESPEJO.id].sort(),
+  )
+})
+
+desregistrarSistema(ESPEJO.id)
+
+check('[configurada] al darla de baja desaparece del registro y del servicio', () => {
+  assert.equal(SISTEMA[ESPEJO.id], undefined)
+  assert.ok(!SISTEMAS_EN_SERVICIO.some(s => s.id === ESPEJO.id))
+  assert.deepEqual(sistemasDeSenal('Velocidad eficaz · Lado acople').map(x => x.sistema), ['vibraciones'])
+})
+
+const sobreConfigurada = passed - antesDeConfigurada
 
 /*
  * ── EL IDIOMA DE LA EVIDENCIA (i18n del asistente) ──────────────────
@@ -4072,6 +4213,7 @@ if (fallos.length) {
 }
 
 console.log(`${c.verde}${c.negrita}${passed} comprobaciones correctas: las herramientas se mantienen.${c.reset}`)
+console.log(`${c.gris}${sobreConfigurada} de ellas sobre una máquina CONFIGURADA (Plan 39 F0).${c.reset}`)
 
 /*
  * Las omitidas se dicen SIEMPRE, y después del verde. Un guion que pasa sin

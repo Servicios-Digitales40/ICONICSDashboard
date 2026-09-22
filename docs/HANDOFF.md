@@ -38,7 +38,8 @@ volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
 | Suite de frontend | **1083** pruebas · 29 omitidas |
 | Suite de backend | **385** pruebas |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **169** correctas · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **178** correctas (9 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-chat` | **71** correctas (3 sobre una configurada) |
 | Lint y types | limpios |
 | Bundle | `index` 318 KB / 450 · `vendor` 269 / 330 (el editor del Plan 36 entra diferido) |
 
@@ -223,13 +224,14 @@ preguntas llegan a `Nuevo-Modor` (eran 4 de 7, y dos de ellas corrigiendo el
 id). F2 **pendiente de confirmarse en el navegador** tras la corrección del
 primer render (Plan 37).
 
-**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0–F6 por completar. Que
-las herramientas del asistente sirvan a cualquier máquina configurada
-pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y vibraciones:
-estado y resumen con valores (F1), unidades en historia (F2), manual (F3),
-reporte (F4), el prompt de la máquina que se tiene delante (F5) y el alta
-automática según el estado de validación (F6). Empieza por F0: una
-configurada en el transporte falso para probar sin planta.
+**`PLAN-39-ASISTENTE-POR-TIPO-DE-MAQUINA.md`** — F0 completa, F1–F6 por
+completar. Que las herramientas del asistente sirvan a cualquier máquina
+configurada pidiéndole al TIPO lo que hoy traen escrito a mano el tanque y
+vibraciones: estado y resumen con valores (F1), unidades en historia (F2),
+manual (F3), reporte (F4), el prompt de la máquina que se tiene delante (F5)
+y el alta automática según el estado de validación (F6). F0 puso una
+configurada espejo en la puerta (`scripts/lib/configuracionEspejo.mjs`): 9
+comprobaciones en `verificar-herramientas` y 3 en `verificar-chat`, sin red.
 
 **`PLAN-36-CONFIGURAR-DESDE-EL-ARBOL.md`** está en `docs/completados/`.
 
@@ -462,8 +464,10 @@ ICONICS_FAKE=true node scripts/verificar-herramientas.mjs
 ICONICS_FAKE=true node scripts/verificar-chat.mjs
 ```
 
-**Criterio de éxito:** `verificar-herramientas` imprime **169 correctas y 22
-omitidas**. Las omitidas son del cierre y el guion las cuenta a propósito.
+**Criterio de éxito:** `verificar-herramientas` imprime **178 correctas y 22
+omitidas**, y «9 de ellas sobre una máquina CONFIGURADA». Las omitidas son
+del cierre y el guion las cuenta a propósito; las nueve son la espejo de
+vibraciones registrada sólo para su bloque (Plan 39 F0).
 
 ### La tanda completa
 

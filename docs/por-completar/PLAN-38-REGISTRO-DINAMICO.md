@@ -277,7 +277,8 @@ ronda menos cada una.
   la máquina configurada sino de la herramienta (`resumen_de_turno` y las
   unidades de `metaDe`); anotados en **B7** de `MEJORAS-ASISTENTE.md`.
 
-**Verificación**: puerta (`verificar-herramientas` 169 · `verificar-chat` 68),
+**Verificación**: puerta (`verificar-herramientas` 169 · `verificar-chat` 68, los
+recuentos de ese día; el Plan 39 F0 les añadió 9 y 3 sobre una configurada),
 `verificar-instrucciones` 28 reglas con el check nuevo, los 41 verificadores,
 backend 385, lint y tipos limpios. El frontend no se tocó.
 
