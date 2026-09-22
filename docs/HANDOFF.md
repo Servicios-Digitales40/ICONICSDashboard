@@ -1,7 +1,7 @@
 # HANDOFF — dónde estamos y cómo seguir
 
-**Fecha:** 21-09-2026 · **Rama viva:** `Vibraciones1.0` · **HEAD:** el último
-commit del Plan 36 (el de documentos); `git log -1` lo dice.
+**Fecha:** 22-09-2026 (tarde) · **Rama viva:** `Vibraciones1.0` · **HEAD:** el
+cierre del Plan 41 (F5, archivar); `git log -1` lo dice.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -229,103 +229,58 @@ alguna sigue en uso; ninguna se ha tocado en este trabajo.
 
 ### Los planes vivos
 
-> **Sondeados contra el código el 22-09-2026.** Lo que queda se ejecuta desde
-> el **Plan 41**; los demás están ahí para decir por qué, no para trabajar en
-> ellos directamente.
-
-**`PLAN-41-CERRAR-VIBRACIONES.md`** — **el que manda**. Recoge lo único que
-sobrevivió al sondeo: F0 confirmar en el navegador, F1 los pasos en planta, F2
-el índice de sinónimos, F3 normalizar por rpm, F4 las alarmas de la máquina, F5
-archivar. Su §0 es la tabla de qué se dio por pendiente y ya estaba hecho.
-
-**`PLAN-32-VIBRACIONES.md`** — F1, **F4, F5 y F6** completas (las tres últimas
-cerradas el 22-09 desde el Plan 41: `terminosManual` ya estaba; los sinónimos
-los deriva el tipo; el factor de cresta es regla del tipo, sólo con carga y
-con puerta para «pico y eficaz con la misma cifra»; «normalizar por rpm» se
-descartó con el porqué). F2 y F3 sólo esperan cerrar el sondeo en planta.
+> **Estado a 22-09-2026 (tarde).** El Plan 41 se escribió y se **completó en el
+> día**; con él se archivaron el 32, el 37, el 38 y el 40. En
+> `docs/por-completar/` queda **sólo el Plan 33**, y es correcto.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
-se puede hacer sin tocar el código del tanque. **Es el único que no cierra el
-Plan 41**, y es correcto.
+se puede hacer sin tocar el código del tanque. Es el final de la rama, no una
+fase.
 
-**`PLAN-37-VISTAS-DE-MAQUINA-CONFIGURADA.md`** — F1–F3 completas. Queda **F4**
-(Alarmas), en el Plan 41 F4, cuyo primer paso es medir el área `ae:`.
+**Archivados hoy, con su estado reescrito con lo que de verdad pasó:**
 
-**`PLAN-38-REGISTRO-DINAMICO.md`** — **COMPLETADO y archivado el 22-09-2026**
-(Plan 41 F0): el backend registra las configuradas (`registroConfigurado.mjs`),
-las rutas validan `sistema` contra la lista viva, hay **8 rutas `maq-*`**, y
-se vio en el navegador con `vib-motor-03`: muro, menú, siete vistas y el
-asistente contestando sobre ella. De mirarlo salió y se corrigió un defecto
-del tipo: `decodificarVigilancia` sólo entendía base64 y los `MonState_*` de
-una configurada llegan como entero (24 vigilancias «sin dato» teniendo valor).
-
-**`PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md`** — F0–F3 y F5 completas.
-Queda **F4**, pasos en planta, en el Plan 41 F1.
-
-**Archivados el 22-09-2026**: el **19** (modularización — F4/F5/F7 dependían de
-la API de Leonardo Carrasco, que no llegó; Predicción ya salió del menú) y el
-**8** (Demo EVA — sólo quedaba `PROVISIONALES = true`, que es una confirmación
-de planta y además intocable con el tanque cerrado). **Los dos se movieron a
-`completados/` en vez de borrarse porque los cita código vivo**, y uno de ellos
-—`PantallaPendiente.jsx`— enseña su ruta en pantalla. El **13** sí se borró: no
-lo citaba nadie. Antes ya estaban archivados el **34**, el **36** y el **39**.
+- **41** (cerrar Vibraciones 1.0) — nació de sondear los planes contra el
+  código: tres fases dadas por pendientes ya estaban hechas y una era
+  imposible. Lo que sobrevivió se hizo en el día: F0 el navegador confirmado
+  (y de mirarlo salió y se corrigió `decodificarVigilancia`, que sólo entendía
+  base64), F1 tres sondeos y los pasos en planta por la API, F2 los sinónimos
+  derivados por el tipo, F3 el factor de cresta (y «normalizar por rpm»
+  descartado con el porqué), F4 cerrada **sin vista** con la medida delante,
+  F5 archivar. Su §0 es la tabla del sondeo; sus fases dicen qué se midió.
+- **32** (vibraciones) — completado en lo que la instalación permite: **el
+  motor gira sin nada acoplado**, así que «con carga» no existe y las 35
+  series «sin variación» son su estado real.
+- **37** (vistas de la configurada) — F4 Alarmas cerrada sin vista: el Alarm
+  Server da 500 a `AlarmHistory` para cualquier punto (también del tanque) y
+  las banderas de la máquina no tienen serie verificada porque nunca alarmaron
+  (B13). La sección se queda con tres entradas.
+- **38** (registro dinámico) — confirmado en el navegador (Plan 41 F0).
+- **40** (retirar la vibraciones a mano) — F4 cerrada: apoyos nombrados y
+  limitación grabada por la API; manuales ya en `tipo:vibraciones`; la espejo
+  no existe en este backend (si hay otro despliegue, se da de baja allí).
+- Antes, el mismo día: el **19** y el **8** (no se borraron: los cita código
+  vivo) y el **13** (borrado: nadie lo citaba). Y de antes, el 34, el 36 y el 39.
 
 ### Próximos pasos, por prioridad
 
-> **Reescrito el 22-09-2026 tras sondear los planes contra el código.** La
-> lista anterior daba por pendientes tres cosas que ya estaban hechas y una que
-> es imposible. Todo lo vivo se ejecuta desde el
-> [`PLAN-41-CERRAR-VIBRACIONES.md`](por-completar/PLAN-41-CERRAR-VIBRACIONES.md),
-> que además deja escrito qué se midió para descartar el resto.
+**0 · Reiniciar el backend.** El que corre arrancó a las 11:44 del 22-09 con
+el `shared/` de entonces: sin el decodificador entero, sin los alias derivados
+ni la regla de cresta. El frontend ya lo tiene por HMR.
 
-**0 · Plan 41 F0 — confirmar en el navegador. ✅ HECHO el 22-09-2026.** Las
-siete vistas, el muro, el menú y el asistente se vieron con `vib-motor-03`
-recreada en local contra el `bms-server` real (94 variables; el usuario la
-dejó después en 89). Cerró el Plan 38 y la nota del 37, y destapó el defecto
-de `decodificarVigilancia` (corregido). Detalle en el Plan 41 §F0.
+**1 · Planta, cuando se pueda.** Si hay otro despliegue con
+`vibraciones-configurada`, darla de baja. El día que el motor tenga algo
+acoplado: quitar la limitación «sin carga» de `vib-motor-03` y mirar la
+cresta de cada apoyo con carga (S2 daba 7,7 en vacío).
 
-**1 · Plan 41 F1 — los pasos en planta** (es la F4 del Plan 40). Sondear
-`Nuevo-Modor` **con el motor girando** (en paro quedaron 33 series sin
-muestras), dar de baja `vibraciones-configurada` si sigue en planta, pasar la
-ISO 20816-3 y los dos manuales a «Todas las de Vigilancia de vibraciones»
-—hoy no los ve ninguna máquina—, y nombrar los tres apoyos en el árbol.
-**Desbloquea el Plan 32 F2 y F3**, que no tienen trabajo de código propio.
+**2 · B13 del backlog de backend** — que el sondeo pueda verificar una bandera
+constante comparando marcas de tiempo. Es lo que reabriría unas «Alarmas» de la
+configurada por flancos. Se escribe como plan antes de tocarlo.
 
-**2 · Plan 41 F2 — índice de sinónimos. ✅ HECHO el 22-09-2026.** Resultó que
-el resolvedor ya existía; lo que faltaba era que una configurada nace sin
-alias. El TIPO los deriva ahora (`tipo.aliasDe`: rol × apoyo, más palabras del
-oficio como «rpm» o «daño»). El tanque no se tocó; la unificación de B3 queda
-para la reapertura. **Hay que reiniciar el backend** para que el asistente lo
-vea, y los apoyos necesitan su `nombre` en la configuración para que «lado
-acople» resuelva (F1 paso 4).
+**3 · El intermitente que NO es contención** (`fuente-de-maquina.test.js`,
+§9): capturar el aserto la próxima vez que caiga en el subconjunto `demo-eva`.
 
-**3 · Plan 41 F3 — factor de cresta. ✅ HECHO el 22-09-2026.** «Normalizar por
-rpm» se descartó con el porqué (ISO 10816-1 ya es independiente de la
-velocidad; el rpm sólo decide si aplica). Nueva regla del tipo
-`factor-de-cresta-alto` (19 reglas), que sólo se evalúa **con carga** —en
-vacío S2 daba 18,5 sin nada roto— y se declara no evaluable si pico y eficaz
-llegan con la misma cifra. Falta la medida con la máquina trabajando.
-
-**4 · Plan 41 F4 — Alarmas de la máquina** (Plan 37 F4). Su primer paso es
-**medir** cómo contesta `/api/iconics/alarms` a un área `ae:` entera; hasta
-entonces no se diseña. `AlarmasEva` es código del tanque y **no se toca**.
-
-**5 · Ver el Plan 33 en el navegador.** Está probado, no observado.
-
-#### Lo que se quitó de esta lista, y por qué
-
-- **`necesita` en 8 reglas** — ya está en **las 17** de `riesgosVibracion.js`,
-  y el motor lo consume (línea 811).
-- **Factor de cresta** — **imposible en S1**: `aPeak_S1` devuelve la serie de
-  `aRMS_S1`, 1805 de 1805 valores idénticos (`vibraciones.js:1151`). Daría
-  1,0 siempre. En S2 y S3 sí se puede. La lista anterior lo daba por «coste
-  cero», y no lo es.
-- **Plan 32 F5 (`terminosManual`)** — hecho: declarados en las cuatro medidas
-  (`vibraciones.js:523-567`) y cerrado por el Plan 39 F3, que además asignó los
-  manuales al TIPO.
-- **Plan 32 F2, la parte de código** — `sondearSeries.mjs` ya gana
-  `historyVerified` variable por variable; lo que falta es el sondeo en marcha.
+**4 · Reabrir la estación de llenado** — Plan 33 F9. Es el final de la rama.
 
 ---
 

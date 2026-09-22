@@ -22,7 +22,7 @@ en secciones separadas del sidebar, con una tercera prevista:
 > hallazgos— llame a `useSistemaAgua()` para que vuelva a leerse en todas las
 > pantallas. Lo vigila `test/app/llenado-cerrado.test.jsx`.
 >
-> Plan completo: [`docs/por-completar/PLAN-32-VIBRACIONES.md`](../../../docs/por-completar/PLAN-32-VIBRACIONES.md).
+> Plan completo: [`docs/completados/PLAN-32-VIBRACIONES.md`](../../../docs/completados/PLAN-32-VIBRACIONES.md).
 
 | Sección | Máquina | Árbol | Vistas |
 |---|---|---|---|

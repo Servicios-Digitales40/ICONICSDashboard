@@ -1,6 +1,6 @@
 # PLAN 41 — Cerrar Vibraciones 1.0: lo que de verdad queda
 
-**Estado:** **F0, F2 y F3 completadas** (22-09-2026: navegador confirmado, Plan 38 archivado, `decodificarVigilancia`, el índice de sinónimos y el factor de cresta en el tipo) · **F1 completada en este backend** (tres sondeos; nombres, limitación y manuales resueltos; «con carga» no existe: el motor no tiene nada acoplado) · F4 y F5 por completar · escrito el 22-09-2026 tras sondear los cinco planes vivos
+**Estado:** **COMPLETADO el 22-09-2026, en un día.** F0 navegador confirmado y `decodificarVigilancia` corregido · F1 tres sondeos, apoyos nombrados, limitación grabada («con carga» no existe: el motor no tiene nada acoplado) · F2 sinónimos en el tipo · F3 factor de cresta (y «normalizar por rpm» descartado con el porqué) · F4 cerrada **sin vista** con la medida delante · F5 los Planes 32, 37, 38 y 40 archivados · `por-completar/` queda sólo con el 33 · escrito el 22-09-2026 tras sondear los cinco planes vivos
 **Rama:** `Vibraciones1.0`
 **Fecha:** 22-09-2026
 
@@ -543,7 +543,7 @@ sale `provisional: true` y lo dice, no se inventa el umbral.
 
 ---
 
-### F4 — Alarmas de la máquina (Plan 37 F4)
+### F4 — Alarmas de la máquina (Plan 37 F4) ✅ cerrada sin vista
 
 **Objetivo.** Que `maq-alarmas` enseñe el área de alarmas que la máquina
 declaró (`arboles.alarmas`), no la del catálogo.
@@ -584,19 +584,97 @@ que se puede pintar de una configurada es lo que `/api/iconics/alarms` diga
 del área, y eso es lo que queda por medir. Los 6 contadores ya viajan en la
 máquina como variables sin rol (`assetId: "DEMO VIBRACIONES"`).
 
+**La medida completa, 22-09-2026 (tarde), contra el `bms-server` real.**
+
+`GET /api/iconics/alarms?pointName=…&hours=48` —que es `readAlarmHistory` del
+Alarm Server de GENESIS64— contestó **500 a TODO**:
+
+| `pointName` | Qué es | Respuesta |
+|---|---|---|
+| `ae:/DEMO VIBRACIONES` | el área entera | **500** «AlarmHistory request failed» |
+| `ae:/DEMO VIBRACIONES.Alarm_MonState_vRMS` | una alarma del área | **500** |
+| `ae:/DEMO VIBRACIONES.Alarm_SensorState` | otra alarma | **500** |
+| `ae:/DEMO VIBRACIONES=ActiveUnackedCount` | un contador | **500** |
+| `ac:TDCON/DEMO/ALARMAS/NIVEL_ALTO_ALTO` | **una alarma del TANQUE** (sólo lectura) | **500** |
+| *(sin `pointName`)* | | **400** Bad Request |
+
+O sea: **no es el área, es el endpoint**. El historial del Alarm Server no
+sirve para ningún punto de esta planta hoy, ni de vibraciones ni del tanque.
+
+**Y el segundo hallazgo cambia la pregunta.** `AlarmasEva` **no usa esa
+ruta**. Su pestaña «Historial» son **flancos derivados de las series
+historizadas** de los bits de alarma del PLC: `leerAlarmas()` llama a
+`leerSerie(clave, {crudo: true})` y `eventosDeAlarma()` convierte los cambios
+0→1→0 en eventos con entrada, salida y duración (cabecera de
+`data/comunes/alarmas.js`, 12-09-2026: «el servidor no sirve el historial sin
+un punto concreto»). Se pierden mensaje, severidad y acuse, y lo dice.
+
+**Así que «Alarmas de la máquina configurada» tendría que ser lo mismo:
+flancos de sus banderas historizadas.** Y ahí está el muro de hoy:
+
+```
+Alarma_S1/S2/S3   bandera:alarma   serie: sí   verificada: NO
+Warning_S1/S2/S3  bandera:aviso    serie: sí   verificada: NO
+FAULT_BMS         variador:fallo   serie: sí   verificada: NO
+WARNING_BMS       variador:aviso   serie: sí   verificada: NO
+```
+
+Las once tienen serie declarada y **ninguna verificada**, y no por un fallo:
+el sondeo las marca «sin variación» porque **nunca han cambiado** —no ha
+habido una alarma en la ventana—, y una serie constante no se puede
+distinguir de otra constante. **Una bandera que nunca alarmó no se puede
+verificar, y sin verificar no se ofrece como historia** (§2.4). Es un límite
+del criterio del sondeo con booleanos legítimamente constantes, y va al
+backlog: hoy el tablero sólo podría enseñar flancos de esas banderas el día
+que una alarme, se sondee después, y el sondeo la vea variar.
+
+**Lo que SÍ funciona y ya se enseña**: los **6 contadores** del área en vivo,
+en el panel «Servidor de alarmas de ICONICS» de Inicio (activas sin reconocer,
+reconocidas, vueltas a normal sin reconocer, severidad máxima). Es lo único
+del Alarm Server que este servidor entrega.
+
+**Conclusión de la medida:** una vista `maq-alarmas` hoy enseñaría los mismos
+6 contadores que Inicio y una lista vacía con la explicación de por qué está
+vacía. Con la regla de §4.8 delante —lo mínimo que resuelva el problema DE
+VERDAD— no hay problema que una cuarta entrada resuelva hoy.
+
 **Criterios de aceptación.**
 
-- [ ] Escrito aquí qué contesta `/api/iconics/alarms` a un área `ae:` entera.
-- [ ] Si sale adelante: `maq-alarmas` enseña las alarmas de **su** máquina, la
-      sección pasa a cuatro entradas, y las pruebas de inventario del menú se
-      actualizan **a propósito**.
-- [ ] Ni una línea del tanque modificada.
-- [ ] La regresión de sondeo vigilada: ningún hook nuevo que dependa de
-      `useMaquina()` montado fuera de la vista de esa máquina (Plan 37 §4).
+- [x] Escrito aquí qué contesta `/api/iconics/alarms` a un área `ae:` entera.
+- [x] **No sale adelante, y lo decidió el usuario con la medida delante**
+      (22-09-2026): la sección se queda con **tres** entradas de Visualización.
+      No se creó ruta, vista ni prueba de inventario nueva.
+- [x] Ni una línea del tanque modificada.
+- [x] Sin hook nuevo, la regresión de sondeo no tiene por dónde entrar.
+
+**Para reabrir F4** hacen falta una de estas dos, y las dos son de planta, no
+del tablero: que el Alarm Server de GENESIS64 sirva `AlarmHistory` (hoy 500
+para cualquier punto), o que alguna bandera de la máquina **alarme de verdad**,
+se sondee después y quede verificada — entonces `eventosDeAlarma` sobre su
+serie da los flancos igual que en el tanque. Lo primero que sí se puede hacer
+desde el repo es el punto del backlog sobre el sondeo de booleanos
+constantes (`BACKLOG-BACKEND.md`).
 
 ---
 
-### F5 — Cerrar y archivar
+### F5 — Cerrar y archivar ✅
+
+**Hecha el 22-09-2026.** Los Planes 32, 37, 38 y 40 pasaron a `completados/`
+con su estado reescrito con lo que de verdad pasó; sus referencias por ruta
+(`CLAUDE.md` §1, `README.md`, `routes.jsx`, el README de Demo-EVA, el Plan 34)
+apuntan a la ruta nueva. Este plan se archiva con ellos: `por-completar/`
+queda **sólo con el Plan 33**, bloqueado hasta reabrir la estación de llenado.
+
+**Lo que este plan deja abierto, y dónde:**
+- **Plan 33 F9** — la estación de llenado como configurada. Es el final de la
+  rama.
+- **BACKLOG-BACKEND B13** — el sondeo no puede verificar una bandera que nunca
+  cambió; es lo que impide hoy unas «Alarmas» de la configurada por flancos.
+- **Planta** — si existe otro despliegue con `vibraciones-configurada`, darla
+  de baja allí; y el día que el motor tenga algo acoplado, quitar la
+  limitación «sin carga» y mirar la cresta con carga.
+- **HANDOFF §9** — el intermitente de `fuente-de-maquina.test.js`, que no es
+  contención.
 
 **Objetivo.** Que al terminar esto no queden planes abiertos por inercia.
 

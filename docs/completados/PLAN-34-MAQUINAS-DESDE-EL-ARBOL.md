@@ -786,7 +786,7 @@ configuración, ganado por sondeo**, antes de que el catálogo se vaya.
 **Riesgo.** Alto si se adelanta; bajo si F3 y F4 cumplieron.
 
 **Lo que de verdad pasó (22-09-2026).** Esta fase se ejecutó como el
-[Plan 40](../por-completar/PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md),
+[Plan 40](../completados/PLAN-40-RETIRAR-VIBRACIONES-ESCRITA-A-MANO.md),
 que la desglosa en cinco: la simulación pasa al tipo (F0), el backend deja de
 necesitar el id (F1), el frontend enseña vibraciones sólo por configuradas
 (F2), la entrada sale de `SISTEMAS` con `GRUPO_HISTORIADOR` y el arreglo

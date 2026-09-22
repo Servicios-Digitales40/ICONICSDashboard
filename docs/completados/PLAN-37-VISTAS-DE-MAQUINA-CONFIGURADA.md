@@ -1,6 +1,6 @@
 # PLAN 37 — Las vistas de una máquina configurada
 
-**Estado:** F1–F3 completadas y **confirmadas en el navegador el 22-09-2026** (Plan 41 F0) · **F4 (Alarmas) por completar — se ejecuta en el Plan 41 §F4**
+**Estado:** **COMPLETADO el 22-09-2026** · F1–F3 hechas y confirmadas en el navegador (Plan 41 F0) · **F4 (Alarmas) cerrada SIN vista, por decisión del usuario con la medida delante** (Plan 41 §F4: el Alarm Server da 500 a todo, también al tanque, y las banderas de la máquina no tienen serie verificada porque nunca alarmaron; la sección se queda con tres entradas) · archivado en `completados/`
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 

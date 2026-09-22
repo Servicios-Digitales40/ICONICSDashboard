@@ -227,7 +227,7 @@ export const ROUTES = [
    * **Para reabrir**: devolver el `nav` a estas cinco (los iconos siguen
    * importados a propósito, ver el bloque de `lucide-react`), poner
    * `DEFAULT_ROUTE` en `eva-inicio` y volver a montar `EvaProvider` sin acotar
-   * en `App.jsx`. Ver `docs/por-completar/PLAN-32-VIBRACIONES.md` F1.
+   * en `App.jsx`. Ver `docs/completados/PLAN-32-VIBRACIONES.md` F1.
    */
   {
     id: "eva-inicio",

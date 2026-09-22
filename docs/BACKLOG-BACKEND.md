@@ -504,3 +504,37 @@ el archivo de alias cubre el caso de uno en uno.
 6. **B8** — la prueba del sondeo por máquina, antes de que haya tres
 
 **B6 y B7 no son tareas**: son fronteras que vigilar en la revisión de la #3.
+
+
+## B13 · El sondeo no puede verificar una bandera que nunca cambió
+
+**Hoy.** `sondearSeries.mjs` marca `historyVerified: true` sólo cuando una
+serie **varía** en la ventana y no coincide con otra. Es la salvaguarda
+correcta contra el servidor que entrega una serie por otra (`aPeak_S1`, las
+nueve `QC_*`). Pero un booleano legítimamente constante —`Alarma_S1` que nunca
+alarmó, `FAULT_BMS` que nunca falló— **no puede pasar nunca**: «sin variación»
+lo deja en `false`, y sin verificar no se ofrece como historia (§2.4).
+
+**El síntoma, medido el 22-09-2026 (Plan 41 F4).** Las once banderas de
+`vib-motor-03` tienen serie declarada y ninguna verificada. Como el Alarm
+Server de GENESIS64 da 500 a `AlarmHistory` para cualquier punto (también del
+tanque), unas «Alarmas» de la máquina configurada tendrían que ser flancos de
+esas banderas, igual que hace el tanque — y hoy no hay ninguna de la que
+derivarlos. F4 se cerró sin vista por esto.
+
+**Lo que NO es la solución.** Marcar verificada una constante «porque es
+booleana»: dos banderas constantes en 0 son indistinguibles entre sí, y el
+servidor ya ha servido una serie por otra. Sería justo la afirmación que el
+sondeo existe para no hacer.
+
+**Lo que podría serlo, a medir antes.** Para una serie constante, comparar las
+**marcas de tiempo** con las de una serie del mismo grupo que sí varía: si el
+historiador escribió las mismas muestras a las mismas horas, la constante es
+suya —está registrada, sólo que no pasó nada—. Distinguiría «registrada y
+tranquila» de «no registrada», que es lo que hoy se confunde. Toca
+`backend/lib/sondearSeries.mjs` y `verificar-sondeo-series`, y es una
+decisión sobre qué significa «verificada»: se escribe primero en un plan.
+
+**Cómo se desbloquea sin código.** Que una bandera alarme de verdad, se sondee
+después, y el sondeo la vea variar. A partir de ahí `eventosDeAlarma` sobre su
+serie da los flancos.

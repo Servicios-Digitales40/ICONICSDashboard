@@ -20,7 +20,7 @@ producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 > en el menú, no se leen sus puntos, el asistente se niega a contestar sobre
 > ellos y sus pruebas están omitidas. El plan completo —qué se cerró, por qué
 > así y cómo se reabre— está en
-> [`docs/por-completar/PLAN-32-VIBRACIONES.md`](docs/por-completar/PLAN-32-VIBRACIONES.md) §2.
+> [`docs/completados/PLAN-32-VIBRACIONES.md`](docs/completados/PLAN-32-VIBRACIONES.md) §2.
 >
 > **Las dos reglas de esta rama:**
 >
@@ -460,23 +460,19 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
-El vivo que manda hoy es el **41** (cerrar Vibraciones 1.0), escrito el
-22-09-2026 tras sondear los demás contra el código: recoge **lo único que
-quedaba de verdad** —confirmar en el navegador, los pasos en planta, el índice
-de sinónimos, normalizar por rpm y las alarmas de la máquina— y dice qué fases
-dadas por pendientes **ya estaban hechas**. Siguen abiertos el **32**
-(vibraciones; sólo F6 es código vivo), el **37** (F4, alarmas) y el **40** (F4,
-pasos en planta): los tres se cierran desde el 41. El **38** se cerró con la
-F0 del 41 (22-09-2026) y está archivado. El **33** queda aparte, con su F9
-**bloqueada hasta reabrir** la estación de llenado.
+El único vivo hoy es el **33** (modularidad de máquinas), con su F9 —la
+estación de llenado como configurada— **bloqueada hasta reabrir** la rama. El
+**41** (cerrar Vibraciones 1.0) se escribió y se completó el 22-09-2026 tras
+sondear los demás contra el código, y con él se archivaron el **32**, el **37**,
+el **38** y el **40**; su §0 dice qué se dio por pendiente y ya estaba hecho, y
+sus fases qué se midió para cerrar cada una (incluida la F4, cerrada **sin
+vista** porque el Alarm Server da 500 y las banderas nunca alarmaron).
 
-Archivados: el **34** (máquinas desde el árbol), el **36** (configurar marcando
-el árbol), el **39** (las herramientas del asistente sirven a cualquier
-configurada, por tipo), y desde el 22-09-2026 el **19** (modularización: F4/F5/F7
-dependían de una API externa que no llegó) y el **8** (Demo EVA: sólo quedaba
-`PROVISIONALES`, que es confirmación de planta). Los dos últimos **se archivaron
-sin borrarse porque los cita código vivo**. El **13** se borró: no lo citaba
-nadie. Ver `HANDOFF.md` §5 para cuál sigue.
+Archivados antes: el **34**, el **36**, el **39**, y el mismo 22-09 el **19**
+(modularización: F4/F5/F7 dependían de una API externa que no llegó) y el **8**
+(Demo EVA: sólo quedaba `PROVISIONALES`). Los dos últimos **se archivaron sin
+borrarse porque los cita código vivo**. El **13** se borró: no lo citaba nadie.
+Ver `HANDOFF.md` §5 para cuál sigue.
 
 
 ### 6.2 Qué NO hacer

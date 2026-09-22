@@ -15,7 +15,7 @@ secciones separadas, con el registro preparado para las que vengan.
 >
 > Su código sigue entero en el árbol —**cerrado no es borrado**— y cada sitio
 > lleva escrito cómo volver. El plan, con qué se cerró y cómo se reabre, está
-> en [`docs/por-completar/PLAN-32-VIBRACIONES.md`](docs/por-completar/PLAN-32-VIBRACIONES.md).
+> en [`docs/completados/PLAN-32-VIBRACIONES.md`](docs/completados/PLAN-32-VIBRACIONES.md).
 >
 > Mientras dure la rama, **el código del tanque se consulta pero no se
 > modifica**, y sus pruebas están omitidas con su motivo.

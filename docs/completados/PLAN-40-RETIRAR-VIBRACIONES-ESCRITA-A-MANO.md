@@ -1,6 +1,6 @@
 # PLAN 40 — Retirar la máquina de vibraciones escrita a mano
 
-**Estado:** F0–F3 y F5 completadas · **F4 (pasos en planta, del usuario) por completar — se ejecuta en el Plan 41 §F1**, que le añade los criterios de cierre
+**Estado:** **COMPLETADO el 22-09-2026** · F0–F3 y F5 hechas · F4 cerrada en el Plan 41 §F1: tres sondeos (21 series propias; «con carga» no existe porque el motor no tiene nada acoplado), apoyos nombrados y limitación grabada por la API, manuales ya en `tipo:vibraciones`, y la espejo no existe en este backend (si hay otro despliegue, se da de baja allí) · archivado en `completados/`
 **Rama:** `Vibraciones1.0`
 **Fecha:** 21-09-2026
 
