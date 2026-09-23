@@ -212,6 +212,12 @@ export function variablesDeActivo(sistema, maquina, estado, assetId, tipo = null
           ? { min: Number.isFinite(banda.min) ? banda.min : 0, max: banda.max }
           : null;
       const historizado = Boolean(sistema.esHistorizada(clave));
+      const valor = senal?.valor ?? null;
+      /* Una lectura booleana (una bandera del variador, un estado) no se
+         formatea como cifra: la tarjeta la pinta con `EstadoBooleano`. El
+         23-09-2026 la Planta cayó en el navegador por formatear un `true`
+         como número; aquí la misma trampa se cierra para el Detalle. */
+      const booleano = typeof valor === "boolean";
 
       return {
         key: clave,
@@ -221,11 +227,11 @@ export function variablesDeActivo(sistema, maquina, estado, assetId, tipo = null
         punto: v.pointName,
         unidad: meta.unidad ?? "",
         decimales: meta.decimales ?? 1,
-        tipo: "numero",
+        tipo: booleano ? "booleano" : "numero",
         naturaleza: meta.naturaleza,
         rol: v.rol ?? null,
-        valor: senal?.valor ?? null,
-        texto: senal?.texto ?? null,
+        valor,
+        texto: senal?.texto ?? (booleano ? (valor ? "activa" : "inactiva") : null),
         /* En la tarjeta `banda` es la clave de ESTADO que colorea; en la forma
            común eso se llama `estado`. Sin lectura no hay banda. */
         banda: senal && senal.valor !== null && senal.valor !== undefined ? (senal.estado ?? null) : null,

@@ -528,6 +528,10 @@
       "limitaciones": {
         "title": "What cannot be said",
         "code": "declared by this machine's configuration and probe"
+      },
+      "booleano": {
+        "activa": "on",
+        "inactiva": "off"
       }
     },
     "detalle": {

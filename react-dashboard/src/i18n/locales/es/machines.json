@@ -528,6 +528,10 @@
       "limitaciones": {
         "title": "Lo que no se puede decir",
         "code": "declarado por la configuración y el sondeo de esta máquina"
+      },
+      "booleano": {
+        "activa": "activa",
+        "inactiva": "inactiva"
       }
     },
     "detalle": {

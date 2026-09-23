@@ -147,6 +147,24 @@ describe("variablesDeActivo: la forma de la tarjeta", () => {
     expect(variablesDeActivo(sistema, configurada, estado, "S9", TIPO)).toEqual([]);
   });
 
+  it("una lectura booleana sale como tarjeta booleana con texto, no como cifra", () => {
+    /* La Planta cayó en el navegador el 23-09-2026 por formatear un `true` como
+       número; el Detalle pasa por aquí y cierra la misma trampa en dominio. */
+    const { configurada, sistema } = espejo();
+    const estado = sistema.estado((p) => (/alarma|aviso|offset|QC_|Count/i.test(p) ? true : 1.5), sistema, LEIDO);
+    const vars = [...variablesDeActivo(sistema, configurada, estado, "S1", TIPO), ...variablesDeActivo(sistema, configurada, estado, SIN_ACTIVO, TIPO)];
+    const booleanas = vars.filter((v) => typeof v.valor === "boolean");
+    const numericas = vars.filter((v) => typeof v.valor === "number");
+
+    expect(booleanas.length).toBeGreaterThan(0);
+    for (const v of booleanas) {
+      expect(v.tipo).toBe("booleano");
+      expect(v.texto).toBe("activa");
+      expect(v.escala).toBeNull();
+    }
+    for (const v of numericas) expect(v.tipo).toBe("numero");
+  });
+
   it("sin sistema o sin máquina, vacío y sin lanzar", () => {
     expect(variablesDeActivo(null, null, null, "S1", TIPO)).toEqual([]);
   });

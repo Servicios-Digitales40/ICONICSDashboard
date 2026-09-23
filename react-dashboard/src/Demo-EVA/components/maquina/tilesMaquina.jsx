@@ -35,19 +35,38 @@ import { HISTORIAL, estadoHistorial, presentarValor } from "../../data/comunes/e
 import { Card, ESCALA, MONO, PuntoEstado, Spark } from "../base.jsx";
 import { estadoColor } from "../paleta.js";
 
-/** Valor formateado con su unidad, o el guion de «sin dato»; nunca un cero inventado. */
-const fmtValor = (senal, v = senal.valor) =>
-  hasValue(v) ? `${fmtNum(v, senal.decimales ?? 1)}${senal.unidad ? ` ${senal.unidad}` : ""}` : SIN_DATO;
+/**
+ * Valor formateado con su unidad, o el guion de «sin dato»; nunca un cero
+ * inventado.
+ *
+ * No todo valor con dato es un número: en la forma común viajan también las
+ * banderas booleanas del tipo y los contadores de alarma. El 23-09-2026 la
+ * Planta de `vib-motor-03` cayó entera en el navegador con «v.toFixed is not
+ * a function» porque esto llamaba a `fmtNum` con `true`; las pruebas no lo
+ * vieron porque su lector devolvía 1,5 para todo. Un booleano se rotula con
+ * `texto` si el tipo lo puso, o con «activa»/«inactiva» del diccionario; lo
+ * que no sea número ni booleano se enseña tal cual.
+ */
+const fmtValor = (senal, traducir = null, v = senal.valor) => {
+  if (!hasValue(v)) return SIN_DATO;
+  if (typeof v === "boolean") {
+    if (senal.texto) return senal.texto;
+    return traducir ? traducir(v ? "maquina.planta.booleano.activa" : "maquina.planta.booleano.inactiva") : String(v);
+  }
+  if (typeof v !== "number") return senal.texto ?? String(v);
+  return `${fmtNum(v, senal.decimales ?? 1)}${senal.unidad ? ` ${senal.unidad}` : ""}`;
+};
 
 /* ── Señales con historia: una tarjeta por serie verificada, con su sparkline ── */
 
 function TarjetaSenalConHistoria({ senal, datos, t, dark, delay, ahora }) {
+  const { t: traducir } = useTranslation("machines");
   const { estado: estadoTexto } = useDominio();
   const color = estadoColor(dark, senal.estado ?? "sin_dato");
-  const serie = (datos ?? []).map((p) => p.valor);
+  const serie = (datos ?? []).map((p) => p.valor).filter((v) => typeof v === "number");
   /* Un valor congelado se enseña como su EDAD, no como cifra (§2.4): ver
      `presentarValor`. `receivedAt`/`stale` los pone la vista desde la fuente. */
-  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
+  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal, traducir) });
 
   return (
     <Card t={t} delay={delay} style={{ padding: "14px 16px 14px" }}>
@@ -100,7 +119,7 @@ export function BandaSenalesConHistoria({ senales, porClave, t, dark, ahora = ne
  * hay barra: no se inventa una escala para pintar un margen.
  */
 function BarraDeBanda({ senal, banda, t, dark }) {
-  if (!banda || !hasValue(banda.max) || !hasValue(senal.valor)) return null;
+  if (!banda || !hasValue(banda.max) || typeof senal.valor !== "number") return null;
   const min = hasValue(banda.min) ? banda.min : 0;
   const pct = Math.max(0, Math.min(100, ((senal.valor - min) / (banda.max - min)) * 100));
   const aviso = hasValue(banda.avisoMax) ? Math.max(0, Math.min(100, ((banda.avisoMax - min) / (banda.max - min)) * 100)) : null;
@@ -117,10 +136,11 @@ function BarraDeBanda({ senal, banda, t, dark }) {
 }
 
 function FilaVariable({ senal, banda, t, dark, ahora }) {
+  const { t: traducir } = useTranslation("machines");
   const { estado: estadoTexto } = useDominio();
   const sinDato = !hasValue(senal.valor);
   const color = estadoColor(dark, sinDato ? "sin_dato" : senal.estado ?? "sin_dato");
-  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
+  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal, traducir) });
 
   return (
     <li style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${t.border}` }}>
@@ -191,7 +211,7 @@ function PanelTendenciaMaquina({ senal, datos, error, motivo, t, dark, ahora }) 
   const { t: traducir } = useTranslation("machines");
   const { hora } = useFormato();
   const color = estadoColor(dark, senal.estado ?? "sin_dato");
-  const { texto: valorActual } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
+  const { texto: valorActual } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal, traducir) });
 
   const filas = (datos ?? []).map((p) => ({ hora: hora(p.t), valor: p.valor }));
   const historial = estadoHistorial({ error, motivo, datos: filas, minimo: 2 });

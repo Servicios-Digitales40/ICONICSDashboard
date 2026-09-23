@@ -211,6 +211,24 @@ describe("con una máquina de tres apoyos y series verificadas a medias", () => 
     expect(screen.queryAllByText(/^1[.,]5(0+)?\s/).length).toBe(0);
   });
 
+  it("con lecturas BOOLEANAS (banderas, contadores) no revienta: las rotula como activa/inactiva", () => {
+    /* El 23-09-2026 la Planta de vib-motor-03 cayó entera en el navegador con
+       «v.toFixed is not a function»: el lector devuelve `true`/`false` en las
+       banderas y esto se formateaba como número. Aquí el lector es mixto. */
+    const { configurada } = configuracionEspejo({ verificadasDelCatalogo: true });
+    const sistema = construirSistema(configurada, TIPO);
+    const estado = sistema.estado((p) => (/alarma|aviso|offset|QC_|Count/i.test(p) ? true : 1.5), sistema, LEIDO);
+    expect(estado.senales.some((s) => typeof s.valor === "boolean")).toBe(true);
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    montar();
+
+    expect(screen.getByText("Estado de las variables")).toBeTruthy();
+    expect(screen.getAllByText("activa").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/No se pudo mostrar/)).toBeNull();
+  });
+
   it("las limitaciones del registro se enseñan tal cual, sin recalcular", () => {
     const { configurada, sistema, estado } = maquinaLeida();
     estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };

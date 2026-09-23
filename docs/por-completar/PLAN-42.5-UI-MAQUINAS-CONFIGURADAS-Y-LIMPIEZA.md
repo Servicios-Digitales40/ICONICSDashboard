@@ -539,6 +539,16 @@ motor no se para al soltar los puntos —los libera y la lectura vuelve a
 y `estado?.senales ?? []` sin `useMemo` cambiaba de identidad en cada
 render (lo cazó el linter de hooks).
 
+**Primer vistazo en el navegador (23-09-2026, el usuario):** la Planta de
+`vib-motor-03` cayó entera con «v.toFixed is not a function». Las banderas y
+los contadores llegan como `true`/`false` y `fmtValor` los formateaba como
+número; las pruebas no lo vieron porque su lector devolvía 1,5 para TODAS las
+variables (la fixture espejo con un lector constante). Corregido en los tiles
+(`fmtValor` rotula un booleano como «activa/inactiva» o con `texto`) y en
+`variablesDeActivo` (`tipo: "booleano"`), con una prueba en cada sitio cuyo
+lector es MIXTO. Lección para §3.6: las pruebas con lecturas sintéticas tienen
+que mezclar los tipos de valor que la planta produce de verdad.
+
 **Riesgos y cómo se cazan.**
 
 - *Generalizar copiando.* La prueba `sin-literales-de-maquina.test.js`
