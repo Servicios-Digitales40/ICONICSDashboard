@@ -63,6 +63,7 @@ import { bandaISO, LIMITES_ISO, VIGILANCIAS } from "../../domain/vibraciones.js"
  * no existe para una configurada: sus variables son de sólo lectura.
  */
 import RotorHero from "../../three-d/components/RotorHero.jsx";
+import { ListaDeMudos } from "../../components/maquina/ListaDeMudos.jsx";
 import { rpmEjeDe } from "../../three-d/lib/rotor.js";
 
 /* ── Rejilla ───────────────────────────────────────────────────────── */
@@ -494,8 +495,10 @@ function InicioVibraciones({ onNavigate }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { theme: t, dark } = useTheme();
-  const { canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos, canalesMeta, maquina } =
-    useDominioVibracion();
+  const {
+    canales, variador, alarmas, error, lastUpdated, puntosSinDato, puntosPedidos, canalesMeta, maquina,
+    detalleSinDato, estado: estadoComun,
+  } = useDominioVibracion();
 
   /* Cada tarjeta lleva a la ruta `maq-*` de LA MÁQUINA DE LA PANTALLA. */
   const vistas = VISTAS;
@@ -509,6 +512,9 @@ function InicioVibraciones({ onNavigate }) {
   const mudos = puntosSinDato?.length ?? 0;
   const total = puntosPedidos ?? 0;
   const contestan = Math.max(0, total - mudos);
+  /* El rótulo de un punto mudo, si la forma común ya lo conoce: la lista de
+     mudos lo enseña junto al tag (D17). */
+  const rotuloDePunto = (punto) => estadoComun?.senales?.find((s) => s.tag === punto)?.label ?? null;
 
   /*
    * `puntosPedidos` sólo lo escribe el camino de éxito del hook: vale 0
@@ -596,6 +602,12 @@ function InicioVibraciones({ onNavigate }) {
                 {traducir(hayLectura
                   ? "machines:vibration.withReading"
                   : "machines:vibration.connecting")}
+              </div>
+            )}
+            {/* Cuáles no llegan, y por qué, bajo la cifra (D17): la cifra sola era «80 / 86». */}
+            {!error && hayLectura && mudos > 0 && (
+              <div style={{ marginTop: 10, position: "relative", zIndex: 1 }}>
+                <ListaDeMudos detalle={detalleSinDato ?? []} rotuloDe={rotuloDePunto} t={t} />
               </div>
             )}
 

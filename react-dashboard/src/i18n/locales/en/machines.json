@@ -325,7 +325,6 @@
     "probeResult": "{{verificadas}} of {{total}} series verified as their own",
     "probeConstant": "Of these, {{constantes}} are constants recorded by the historian: they have not changed, and cannot be told apart from an identical one",
     "probeUnknown": "Could not probe the series",
-    "probeShared": "Their series is indistinguishable from another signal's (same values at every timestamp): it may be a historian cross-wiring or sources that genuinely coincide; until checked, they promise no history:",
     "probeNotSaved": "Nothing was recorded: what was known before is kept",
     "stateVALID": "All its points still exist",
     "stateDEGRADED": "Some of its points are missing in ICONICS",
@@ -408,7 +407,17 @@
     "removeYes": "Yes, remove",
     "removeNo": "Cancel",
     "removing": "Removing…",
-    "removedHint": "Its section disappears from the menu. If any previous case names it, it stays deactivated and its history remains valid."
+    "removedHint": "Its section disappears from the menu. If any previous case names it, it stays deactivated and its history remains valid.",
+    "causa": {
+      "serie-compartida": "Series shared with another variable",
+      "sin-variacion": "Did not vary in the window",
+      "sin-muestras": "No samples in the historian",
+      "no-se-pudo-leer": "The historian could not be read",
+      "sin-sondear": "Not probed yet"
+    },
+    "constantesSummary_one": "{{count}} verified as a recorded constant",
+    "constantesSummary_other": "{{count}} verified as recorded constants",
+    "pendientesTitle": "Unverified series, by cause"
   },
   "maquina": {
     "planta": {
@@ -477,6 +486,10 @@
       "chip": "{{nombre}} · {{n}}",
       "ningunaTitle": "No series match this filter",
       "ninguna": "Pick another asset or turn off “Measurements only” to see the other verified series."
+    },
+    "mudas": {
+      "summary_one": "Show the variable without a reading",
+      "summary_other": "Show the {{count}} variables without a reading"
     }
   }
 }

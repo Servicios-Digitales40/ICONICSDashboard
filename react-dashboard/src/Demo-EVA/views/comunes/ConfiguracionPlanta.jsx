@@ -65,6 +65,7 @@ import {
   verificarMaquina,
 } from "@/lib/api/maquinasApi.js";
 import { avisarMaquinasCambiaron } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
+import { PendientesPorCausa, pendientesDeVariables } from "@/Demo-EVA/components/configuracion/PendientesPorCausa.jsx";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
 
@@ -435,6 +436,9 @@ function FichaDeMaquina({
 
   const conSerie = (maquina.variables ?? []).filter((v) => v.historyVerified).length;
   const limitaciones = maquina.limitaciones ?? [];
+  /* Lo que el sondeo dejó PERSISTIDO: qué series no están verificadas y por
+     qué, sin tener que sondear otra vez para saberlo (D17). */
+  const persistidas = pendientesDeVariables(maquina.variables ?? []);
 
   return (
     <div
@@ -480,6 +484,17 @@ function FichaDeMaquina({
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+
+      {!sondeo && (persistidas.pendientes.length > 0 || persistidas.constantes.length > 0) && (
+        <div style={{ marginTop: 7 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>
+            {traducir("machines:config.pendientesTitle")}
+          </div>
+          <div style={{ marginTop: 3 }}>
+            <PendientesPorCausa pendientes={persistidas.pendientes} constantes={persistidas.constantes} t={t} />
           </div>
         </div>
       )}
@@ -600,28 +615,10 @@ function FichaDeMaquina({
             <div style={{ ...textoSuave, marginTop: 3 }}>{sondeo.motivo}</div>
           )}
 
-          {sondeo.pendientes?.some((p) => p.causa === "serie-compartida") && (
+          {/* Todas las pendientes, por causa (D17): antes sólo se listaban las compartidas. */}
+          {sondeo.pendientes?.length > 0 && (
             <div style={{ marginTop: 6 }}>
-              <div style={{ ...textoSuave, fontWeight: 600 }}>
-                {traducir("machines:config.probeShared")}
-              </div>
-              <ul style={{ margin: "3px 0 0", paddingLeft: 16 }}>
-                {sondeo.pendientes
-                  .filter((p) => p.causa === "serie-compartida")
-                  .map((p) => (
-                    <li
-                      key={p.id}
-                      style={{
-                        ...textoSuave,
-                        fontFamily: "'IBM Plex Mono', monospace",
-                        fontSize: 11,
-                      }}
-                    >
-                      {p.id}
-                      {p.compartidaCon?.length ? ` → ${p.compartidaCon.join(", ")}` : ""}
-                    </li>
-                  ))}
-              </ul>
+              <PendientesPorCausa pendientes={sondeo.pendientes} t={t} />
             </div>
           )}
 

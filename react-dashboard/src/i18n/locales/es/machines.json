@@ -325,7 +325,6 @@
     "probeResult": "{{verificadas}} de {{total}} series verificadas como propias",
     "probeConstant": "De ellas, {{constantes}} son constantes registradas por el historiador: no han cambiado, y no se distinguen de otra igual",
     "probeUnknown": "No se pudieron sondear las series",
-    "probeShared": "Su serie es indistinguible de la de otra señal (mismos valores en todas las marcas): puede ser un cruce del historiador o fuentes que coinciden de verdad; sin comprobarlo, no prometen historia:",
     "probeNotSaved": "No se anotó nada: se conserva lo que se sabía antes",
     "stateVALID": "Todos sus puntos siguen existiendo",
     "stateDEGRADED": "Le faltan puntos en ICONICS",
@@ -408,7 +407,17 @@
     "removeYes": "Sí, quitar",
     "removeNo": "Cancelar",
     "removing": "Quitando…",
-    "removedHint": "Su sección desaparece del menú. Si algún caso previo la nombra, queda desactivada y su historia sigue siendo válida."
+    "removedHint": "Su sección desaparece del menú. Si algún caso previo la nombra, queda desactivada y su historia sigue siendo válida.",
+    "causa": {
+      "serie-compartida": "Serie compartida con otra variable",
+      "sin-variacion": "No varió en la ventana",
+      "sin-muestras": "Sin muestras en el historiador",
+      "no-se-pudo-leer": "No se pudo leer el historiador",
+      "sin-sondear": "Sin sondear"
+    },
+    "constantesSummary_one": "{{count}} verificada como constante registrada",
+    "constantesSummary_other": "{{count}} verificadas como constante registrada",
+    "pendientesTitle": "Series sin verificar, por causa"
   },
   "maquina": {
     "planta": {
@@ -477,6 +486,10 @@
       "chip": "{{nombre}} · {{n}}",
       "ningunaTitle": "Ninguna serie con este filtro",
       "ninguna": "Elige otro activo o apaga «Sólo medidas» para ver las demás series verificadas."
+    },
+    "mudas": {
+      "summary_one": "Ver la variable sin lectura",
+      "summary_other": "Ver las {{count}} variables sin lectura"
     }
   }
 }

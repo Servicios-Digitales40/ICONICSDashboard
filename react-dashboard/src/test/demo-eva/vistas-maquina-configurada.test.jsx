@@ -121,3 +121,30 @@ describe("la máquina escrita a mano ya no tiene hook", () => {
     expect(real.useVibracion).toBeUndefined();
   });
 });
+
+describe("Inicio: los puntos que no llegan se listan, no sólo se cuentan (F6, D17)", () => {
+  it("bajo la cifra, un desplegable dice cuáles son y por qué, con el rótulo de la forma común", () => {
+    dominio = {
+      ...CONFIGURADA,
+      puntosSinDato: ["ac:M/S1/vRMS", "ac:M/V20/rpm"],
+      detalleSinDato: [
+        { punto: "ac:M/S1/vRMS", motivo: { codigo: "sin_entrega" } },
+        { punto: "ac:M/V20/rpm", motivo: null },
+      ],
+      estado: { senales: [{ clave: "vRMS_S1", tag: "ac:M/S1/vRMS", label: "Velocidad eficaz · S1" }] },
+    };
+    montar(InicioVibraciones, { onNavigate: vi.fn() });
+
+    expect(screen.getByText("Ver las 2 variables sin lectura")).toBeTruthy();
+    expect(screen.getByText(/El punto existe pero dejó de entregar valor · 1/)).toBeTruthy();
+    expect(screen.getByText(/Todavía no ha llegado ninguna · 1/)).toBeTruthy();
+    expect(screen.getByText("Velocidad eficaz · S1")).toBeTruthy();
+    expect(screen.getByText("ac:M/V20/rpm")).toBeTruthy();
+  });
+
+  it("con todos los puntos contestando no hay desplegable", () => {
+    dominio = { ...CONFIGURADA, detalleSinDato: [] };
+    montar(InicioVibraciones, { onNavigate: vi.fn() });
+    expect(screen.queryByText(/variables? sin lectura/)).toBeNull();
+  });
+});

@@ -520,3 +520,38 @@ describe("no despierta el sondeo de ninguna máquina", () => {
     vi.doUnmock("@/lib/api/maquinasApi.js");
   });
 });
+
+describe("lo que el sondeo dejó persistido se lista sin sondear otra vez (F6, D17)", () => {
+  it("las series sin verificar salen por causa con su id, y las constantes aparte", async () => {
+    listarMaquinas.mockResolvedValue({
+      ok: true, cuantas: 1,
+      maquinas: [maquina({
+        variables: [
+          { id: "vRMS_S1", pointName: "ac:P/S1/vRMS", historyPointName: "hda:a", historyVerified: true, historyVerifiedComo: "serie-propia", acceso: "read" },
+          { id: "Alarma_S1", pointName: "ac:P/S1/Alarma", historyPointName: "hda:b", historyVerified: true, historyVerifiedComo: "registrada-constante", acceso: "read" },
+          { id: "aPeak_S1", pointName: "ac:P/S1/aPeak", historyPointName: "hda:c", historyVerified: false, historyCausa: "serie-compartida", historyCompartidaCon: ["aRMS_S1"], acceso: "read" },
+          { id: "DKW_S1", pointName: "ac:P/S1/DKW", historyPointName: "hda:d", historyVerified: false, historyCausa: "no-se-pudo-leer", acceso: "read" },
+          { id: "par", pointName: "ac:P/V20/par", historyPointName: "hda:e", historyVerified: false, acceso: "read" },
+        ],
+      })],
+    });
+
+    montar();
+
+    expect(await screen.findByText("Series sin verificar, por causa")).toBeTruthy();
+    expect(screen.getByText(/Serie compartida con otra variable · 1/)).toBeTruthy();
+    expect(screen.getByText("aPeak_S1 → aRMS_S1")).toBeTruthy();
+    expect(screen.getByText(/No se pudo leer el historiador · 1/)).toBeTruthy();
+    expect(screen.getByText(/Sin sondear · 1/)).toBeTruthy();
+    expect(screen.getByText("1 verificada como constante registrada")).toBeTruthy();
+    /* La verificada como propia no es pendiente ni constante: no sale en la lista. */
+    expect(screen.queryByText("vRMS_S1")).toBeNull();
+  });
+
+  it("sin nada pendiente ni constante, la ficha no abre la sección", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    montar();
+    await screen.findByText("Motor conveyor 4");
+    expect(screen.queryByText("Series sin verificar, por causa")).toBeNull();
+  });
+});

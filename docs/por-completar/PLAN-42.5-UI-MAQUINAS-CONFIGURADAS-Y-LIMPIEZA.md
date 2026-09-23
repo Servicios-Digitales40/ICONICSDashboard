@@ -1358,6 +1358,23 @@ hay que leer el resto:
    desplegable en el Inicio; ficha de Configuración con pendientes por causa
    desde lo persistido y desde el sondeo. Pruebas: 6 mudas con motivo, la
    lista dice cuáles; una máquina con 8 sin verificar las nombra por causa.
+
+   **Hecho (23-09-2026, tarde).** El hook de vibraciones ya propagaba
+   `detalleSinDato` (la fuente lo calcula en cada lectura) y ninguna vista lo
+   leía. `components/maquina/ListaDeMudos.jsx`: un `<details>` bajo la cifra
+   del Inicio —«Ver las N variables sin lectura»— agrupado por el código del
+   motor (`sin_entrega`, `incierta`, `mala`, `desconocida`) con los textos que
+   ya usaba la ficha de procedencia, el rótulo de la forma común y el tag;
+   sin motivo se dice «todavía no ha llegado ninguna», y un código que la
+   pieza no conoce se enseña tal cual. `components/configuracion/PendientesPorCausa.jsx`
+   + `pendientesDeVariables`: en la ficha de Configuración, las series sin
+   verificar por causa con su id (y con quién se comparte), leídas de lo
+   PERSISTIDO (`historyVerified`, `historyCausa`) sin sondear otra vez, y
+   las constantes registradas aparte y plegadas; el resultado de un sondeo
+   recién hecho pasa por la misma pieza, así que ya no se listan sólo las
+   compartidas (`config.probeShared` se fue). Con `vib-motor-03` hoy: 86 mudas
+   por `sin_entrega` (motor parado) y 8 series por causa. **Puerta:** frontend
+   **1155** verdes · 20 omitidas (+12); lint, i18n (1236 claves) y textos limpios.
 3. **F6.3 · Configuración** (D18). Limitaciones plegadas;
    `herramientasDe` extraída y probada; el bloque de herramientas con
    rótulos nuevos en es/en.
