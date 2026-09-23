@@ -468,10 +468,21 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
         sondeo: {
           estado: ESTADO_CONFIGURACION.INVALID,
           causa: 'serie-compartida',
+          /*
+           * Se dice lo medido —indistinguible— y no lo inferido —«devuelve la
+           * de otra»— (22-09-2026). Dos fuentes distintas que de verdad
+           * coinciden (nueve códigos de calidad que suben y bajan juntos) y un
+           * tag del historiador apuntando a la fuente equivocada (`aPeak_S1`,
+           * 21-09) producen exactamente los mismos valores; desde aquí no se
+           * pueden separar, y afirmar el cruce sería acusar sin prueba. Lo que
+           * SÍ se sostiene es que no se puede prometer historia de ninguna.
+           */
           motivo:
-            `El historiador devuelve para esta variable la MISMA serie que para ` +
-            `${otras.join(', ')}: coinciden TODOS los valores de las marcas de tiempo que ` +
-            'comparten. No se puede saber cuál es la legítima, así que ninguna promete historia.',
+            `La serie de esta variable es INDISTINGUIBLE de la de ${otras.join(', ')}: ` +
+            'coinciden TODOS los valores de las marcas de tiempo que comparten. Puede ser un ' +
+            'cruce del historiador (una serie servida con varios nombres) o fuentes distintas que ' +
+            'coinciden de verdad; desde los valores no se puede saber, así que ninguna promete ' +
+            'historia hasta comprobarlo por otra vía.',
           compartidaCon: otras,
         },
       }

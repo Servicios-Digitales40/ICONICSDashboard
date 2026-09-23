@@ -444,7 +444,7 @@
     "probeResult": "{{verificadas}} of {{total}} series verified as their own",
     "probeConstant": "Of these, {{constantes}} are constants recorded by the historian: they have not changed, and cannot be told apart from an identical one",
     "probeUnknown": "Could not probe the series",
-    "probeShared": "The historian returns another signal's series for these:",
+    "probeShared": "Their series is indistinguishable from another signal's (same values at every timestamp): it may be a historian cross-wiring or sources that genuinely coincide; until checked, they promise no history:",
     "probeNotSaved": "Nothing was recorded: what was known before is kept",
     "stateVALID": "All its points still exist",
     "stateDEGRADED": "Some of its points are missing in ICONICS",

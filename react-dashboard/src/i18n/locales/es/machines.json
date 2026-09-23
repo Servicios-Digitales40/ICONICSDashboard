@@ -444,7 +444,7 @@
     "probeResult": "{{verificadas}} de {{total}} series verificadas como propias",
     "probeConstant": "De ellas, {{constantes}} son constantes registradas por el historiador: no han cambiado, y no se distinguen de otra igual",
     "probeUnknown": "No se pudieron sondear las series",
-    "probeShared": "El historiador les devuelve la serie de otra señal:",
+    "probeShared": "Su serie es indistinguible de la de otra señal (mismos valores en todas las marcas): puede ser un cruce del historiador o fuentes que coinciden de verdad; sin comprobarlo, no prometen historia:",
     "probeNotSaved": "No se anotó nada: se conserva lo que se sabía antes",
     "stateVALID": "Todos sus puntos siguen existiendo",
     "stateDEGRADED": "Le faltan puntos en ICONICS",

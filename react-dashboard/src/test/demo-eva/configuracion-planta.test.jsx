@@ -366,7 +366,7 @@ describe("el sondeo de series", () => {
 
     await screen.findByText("0 de 1 series verificadas como propias");
     /* El rótulo de «serie de otra señal» NO aparece: no es ese problema. */
-    expect(screen.queryByText(/devuelve la serie de otra señal/i)).toBeNull();
+    expect(screen.queryByText(/indistinguible de la de otra señal/i)).toBeNull();
   });
 
   /*
@@ -391,7 +391,7 @@ describe("el sondeo de series", () => {
 
     expect(await screen.findByText("3 de 3 series verificadas como propias")).toBeTruthy();
     expect(screen.getByText(/De ellas, 2 son constantes registradas/)).toBeTruthy();
-    expect(screen.queryByText(/devuelve la serie de otra señal/i)).toBeNull();
+    expect(screen.queryByText(/indistinguible de la de otra señal/i)).toBeNull();
   });
 
   it("sin constantes, la ficha no habla de ellas", async () => {
