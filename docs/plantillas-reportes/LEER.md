@@ -23,6 +23,11 @@ Los valores que traen («Nivel 78 %», «Bomba P-101», «12 críticas») son
 **relleno de ejemplo**, no datos: ninguno se copia al PDF. Una sección cuya
 fuente no exista en la máquina se dibuja diciendo por qué (Plan 44, D3).
 
+`render-pdf.ps1` convierte las páginas de un PDF a PNG con la API de Windows
+(`Windows.Data.Pdf`), sin instalar nada, para mirar un reporte a ojo desde
+una sesión sin visor: `.\render-pdf.ps1 -Pdf reporte.pdf -Salida .\png`.
+Así se revisaron los tres primeros (Plan 44 F3.2) y así se revisa la F7.
+
 Pesan 18,4 MB entre los ocho porque cada uno lleva dentro su arte a tamaño
 completo (2,2–2,8 MB). Se versionan igual por decisión del usuario del
 23-09-2026: son la plantilla de la que sale cada reporte y tienen que viajar

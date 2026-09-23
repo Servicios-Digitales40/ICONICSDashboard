@@ -87,7 +87,8 @@ export default {
         { etiqueta: c.chipPeriodo, valor: ventana.etiqueta },
         { etiqueta: c.chipGenerado, valor: generadoEl },
       ],
-      generadoEl,
+      /* «Generado» ya va en un chip (la maqueta lo pide ahí): no se repite debajo. */
+      generadoEl: null,
       secciones: [
         { id: 'resumen', titulo: t.secciones.resumen, bloque: 'texto', parrafos: [{ rotulo: c.sintesis, texto: sintesis }] },
         { id: 'indicadores', titulo: t.secciones.indicadores, bloque: 'indicadores',

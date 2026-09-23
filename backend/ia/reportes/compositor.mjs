@@ -34,6 +34,7 @@
 import { join } from 'node:path'
 
 import {
+  ALTO_BLOQUE_GRAFICO,
   ALTO_PAGINA,
   ANCHO_PAGINA,
   ANCHO_TEXTO,
@@ -107,7 +108,7 @@ function pastillaFolio(doc, etq, folio, x, ancho, y) {
 /** Un «chip» de dato de la portada: etiqueta pequeña arriba, valor debajo. */
 function chip(doc, { etiqueta, valor }, x, y, ancho) {
   doc.font('Helvetica-Bold').fontSize(7.5).fillColor(CLARO_TENUE)
-    .text(String(etiqueta).toUpperCase(), x, y, { width: ancho, lineBreak: false })
+  doc.text(recortar(doc, String(etiqueta).toUpperCase(), ancho), x, y, { lineBreak: false })
   doc.font('Helvetica-Bold').fontSize(11.5).fillColor(CLARO)
   const texto = valor === null || valor === undefined || valor === '' ? '—' : String(valor)
   const alto = doc.heightOfString(texto, { width: ancho })
@@ -239,6 +240,55 @@ function ausencia(doc, motivo) {
   doc.moveDown(0.6)
 }
 
+/**
+ * Un texto recortado a UNA línea que quepa en `ancho`, con «…» si sobra.
+ *
+ * Medido, no confiado: `lineBreak: false` + `ellipsis: true` de pdfkit dejó
+ * pasar una etiqueta de dos líneas en la primera tarjeta que se miró a ojo
+ * (23-09-2026), y lo que había debajo quedó tapado. Se mide con la fuente y
+ * el tamaño ACTIVOS en `doc`, así que hay que fijarlos antes de llamar.
+ */
+function recortar(doc, texto, ancho) {
+  const t = String(texto ?? '')
+  if (doc.widthOfString(t) <= ancho) return t
+  let corte = t.length
+  while (corte > 0 && doc.widthOfString(`${t.slice(0, corte).trimEnd()}…`) > ancho) corte -= 1
+  return corte > 0 ? `${t.slice(0, corte).trimEnd()}…` : ''
+}
+
+/**
+ * Un texto partido por palabras en hasta `max` líneas que quepan en `ancho`;
+ * la última se recorta con «…» si aún sobra. Para etiquetas y cabeceras, que
+ * caben en dos líneas pero no en una («Valor característico de daño»).
+ */
+function lineas(doc, texto, ancho, max = 2) {
+  const palabras = String(texto ?? '').split(/\s+/).filter(Boolean)
+  const salida = []
+  let actual = ''
+  for (const p of palabras) {
+    const candidata = actual ? `${actual} ${p}` : p
+    if (doc.widthOfString(candidata) <= ancho || !actual) {
+      actual = candidata
+    } else {
+      salida.push(actual)
+      actual = p
+      if (salida.length === max - 1) break
+    }
+  }
+  if (actual) {
+    /* Lo que no entró en las líneas anteriores se junta en la última y se recorta. */
+    const resto = palabras.slice(salida.join(' ').split(/\s+/).filter(Boolean).length).join(' ')
+    salida.push(recortar(doc, salida.length === max - 1 ? resto : actual, ancho))
+  }
+  return salida.slice(0, max)
+}
+
+/** Dibuja `lineas` una debajo de otra desde `y`; devuelve la `y` final. */
+function textoEnLineas(doc, textos, x, y, alto) {
+  textos.forEach((l, i) => doc.text(l, x, y + i * alto, { lineBreak: false }))
+  return y + textos.length * alto
+}
+
 /** ▲ o ▼ dibujados: pdfkit no tiene esos glifos en Helvetica (D13). */
 function triangulo(doc, x, y, signo, color) {
   const l = 6
@@ -256,41 +306,66 @@ function triangulo(doc, x, y, signo, color) {
  *   variacion?: {signo: number, texto: string}|null}[]} items
  */
 function indicadores(doc, items, etq) {
-  const ALTO = 66
+  /* Tres filas fijas: etiqueta (hasta 2 líneas), valor, subtítulo (hasta 2
+     líneas) con la variación a la derecha de la primera. Alto fijo para que
+     las cuatro tarjetas de una fila midan lo mismo aunque una use una línea. */
+  const ALTO = 88
   const GAP = 10
+  const SANGRIA = 10
+  const Y_ETIQUETA = 8
+  const Y_VALOR = 30
+  const Y_SUB = 58
   for (let i = 0; i < items.length; i += 4) {
     const fila = items.slice(i, i + 4)
     const cols = fila.length
     const ancho = (ANCHO_TEXTO - GAP * (cols - 1)) / cols
+    const util = ancho - SANGRIA - 8 // lo que cabe entre la barra cian y el borde derecho
     if (doc.y + ALTO > LIMITE_INFERIOR) doc.addPage()
     const y = doc.y
     fila.forEach((it, j) => {
       const x = MARGEN + j * (ancho + GAP)
+      const xi = x + SANGRIA
       doc.save().roundedRect(x, y, ancho, ALTO, 5).fill(CAJA_SUAVE).restore()
       doc.save().rect(x, y, 3, ALTO).fill(CIAN).restore()
+
+      /* Fila 1: la etiqueta, hasta dos líneas medidas a mano (ver `lineas`). */
       doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS)
-        .text(String(it.etiqueta).toUpperCase(), x + 10, y + 8, { width: ancho - 16, lineBreak: false, ellipsis: true })
+      textoEnLineas(doc, lineas(doc, String(it.etiqueta).toUpperCase(), util, 2), xi, y + Y_ETIQUETA, 9.5)
+
+      /* Fila 2: el valor grande y, si cabe, la unidad a su derecha. */
       const sinValor = it.valor === null || it.valor === undefined || it.valor === ''
       const valor = sinValor ? etq.sinValor : String(it.valor)
       doc.font('Helvetica-Bold').fontSize(sinValor ? 14 : 17).fillColor(sinValor ? GRIS : AZUL)
-        .text(valor, x + 10, y + 21, { width: ancho - 16, lineBreak: false, ellipsis: true })
+      const valorRecortado = recortar(doc, valor, util)
+      doc.text(valorRecortado, xi, y + Y_VALOR, { lineBreak: false })
       if (!sinValor && it.unidad) {
-        const anchoValor = doc.widthOfString(valor)
-        doc.font('Helvetica').fontSize(9).fillColor(GRIS)
-          .text(String(it.unidad), x + 12 + anchoValor, y + 27, { width: Math.max(10, ancho - 22 - anchoValor), lineBreak: false, ellipsis: true })
+        const anchoValor = doc.widthOfString(valorRecortado)
+        const libre = util - anchoValor - 4
+        if (libre > 12) {
+          doc.font('Helvetica').fontSize(9).fillColor(GRIS)
+          doc.text(recortar(doc, String(it.unidad), libre), xi + anchoValor + 4, y + Y_VALOR + 6, { lineBreak: false })
+        }
       }
-      doc.font('Helvetica').fontSize(8).fillColor(GRIS)
-        .text(it.sub ?? '', x + 10, y + 47, { width: ancho - 16, lineBreak: false, ellipsis: true })
-      if (it.variacion && Number.isFinite(it.variacion.signo) && it.variacion.texto) {
+
+      /* Fila 3: la variación a la derecha (se mide primero) y el subtítulo a la
+         izquierda en lo que queda, hasta dos líneas. Nada se pisa. */
+      let anchoVar = 0
+      const hayVariacion = it.variacion && Number.isFinite(it.variacion.signo) && it.variacion.texto
+      if (hayVariacion) {
         doc.font('Helvetica-Bold').fontSize(8)
-        const anchoTexto = doc.widthOfString(it.variacion.texto)
-        const xVar = x + ancho - 10 - anchoTexto
+        const textoVar = recortar(doc, it.variacion.texto, util * 0.6)
+        anchoVar = doc.widthOfString(textoVar) + (it.variacion.signo !== 0 ? 10 : 0) + 6
+        const xVar = x + ancho - 8 - doc.widthOfString(textoVar)
         /* Sólo la dirección: en una máquina subir puede ser malo o bueno según la
            señal, y este compositor no juzga. Gris para el cero, marca para el resto. */
         const color = it.variacion.signo === 0 ? GRIS : it.variacion.signo > 0 ? ROJO : VERDE
-        if (it.variacion.signo !== 0) triangulo(doc, xVar - 9, y + 8, it.variacion.signo, color)
-        doc.fillColor(color).text(it.variacion.texto, xVar, y + 7, { width: anchoTexto + 2, lineBreak: false })
+        if (it.variacion.signo !== 0) triangulo(doc, xVar - 9, y + Y_SUB + 1, it.variacion.signo, color)
+        doc.fillColor(color).text(textoVar, xVar, y + Y_SUB, { lineBreak: false })
       }
+      /* Con variación, el subtítulo tiene UNA línea en lo que ella deja; sin
+         variación, hasta dos líneas a todo el ancho. */
+      doc.font('Helvetica').fontSize(8).fillColor(GRIS)
+      textoEnLineas(doc, hayVariacion ? lineas(doc, it.sub ?? '', util - anchoVar, 1) : lineas(doc, it.sub ?? '', util, 2), xi, y + Y_SUB, 10)
     })
     doc.x = MARGEN
     doc.y = y + ALTO + GAP
@@ -314,17 +389,26 @@ function tabla(doc, { columnas, filas, pie }, etq) {
   const anchos = columnas.map((c) => ((c.ancho ?? 1) / pesoTotal) * (ANCHO_TEXTO - SANGRIA))
   const xs = anchos.reduce((acc, a, i) => [...acc, (i === 0 ? MARGEN + SANGRIA : acc[i - 1] + anchos[i - 1])], [])
 
+  const RELLENO = 8 // entre el texto de una celda y el de la siguiente
   const cabecera = () => {
     const y = doc.y
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor(GRIS)
+    /* Hasta dos líneas por título, medidas a mano («Última calibración» no cabe en una). */
+    const titulos = columnas.map((c, i) => lineas(doc, String(c.titulo).toUpperCase(), anchos[i] - RELLENO, 2))
+    const filasTitulo = Math.max(...titulos.map((t) => t.length))
     columnas.forEach((c, i) => {
-      doc.text(String(c.titulo).toUpperCase(), xs[i] + 2, y, { width: anchos[i] - 6, align: c.align ?? 'left', lineBreak: false, ellipsis: true })
+      titulos[i].forEach((l, k) => {
+        doc.text(l, xs[i] + 2, y + k * 10, { width: anchos[i] - RELLENO, align: c.align ?? 'left', lineBreak: false })
+      })
     })
-    doc.y = y + 14
+    doc.y = y + 10 * filasTitulo + 4
     doc.save().moveTo(MARGEN, doc.y - 2).lineTo(ANCHO_PAGINA - MARGEN, doc.y - 2).lineWidth(0.5).strokeColor('#D5DEEA').stroke().restore()
     doc.y += 2
   }
 
+  /* La cabecera nunca se queda sola al pie: si no cabe ella más una fila, la
+     tabla entera arranca en la página siguiente (visto el 23-09-2026). */
+  if (doc.y + 60 > LIMITE_INFERIOR) doc.addPage()
   cabecera()
   doc.font('Helvetica').fontSize(9.5)
   for (const fila of filas) {
@@ -332,7 +416,7 @@ function tabla(doc, { columnas, filas, pie }, etq) {
       const v = fila.celdas?.[c.clave]
       return v === null || v === undefined || v === '' ? etq.sinValor : String(v)
     })
-    const alto = Math.max(...textos.map((t, i) => doc.heightOfString(t, { width: anchos[i] - 6 }))) + 6
+    const alto = Math.max(...textos.map((t, i) => doc.heightOfString(t, { width: anchos[i] - RELLENO }))) + 6
     if (doc.y + alto > LIMITE_INFERIOR) {
       doc.addPage()
       cabecera()
@@ -344,7 +428,7 @@ function tabla(doc, { columnas, filas, pie }, etq) {
     columnas.forEach((c, i) => {
       const esEstado = Boolean(c.estado) && color
       doc.font(esEstado ? 'Helvetica-Bold' : 'Helvetica').fillColor(esEstado ? color : TEXTO)
-        .text(textos[i], xs[i] + 2, y, { width: anchos[i] - 6, align: c.align ?? 'left' })
+        .text(textos[i], xs[i] + 2, y, { width: anchos[i] - RELLENO, align: c.align ?? 'left' })
     })
     doc.y = y + alto
     doc.save().moveTo(MARGEN, doc.y - 1).lineTo(ANCHO_PAGINA - MARGEN, doc.y - 1).lineWidth(0.25).strokeColor('#E6ECF3').stroke().restore()
@@ -426,6 +510,24 @@ function firmas(doc, items) {
   doc.fillColor(TEXTO)
 }
 
+/**
+ * Cuánto necesita una sección para que su título no se quede solo al pie:
+ * el título más su PRIMER bloque. Una sección de gráficas necesita una
+ * gráfica entera; una de tarjetas, una fila de tarjetas; una tabla, su
+ * cabecera y una fila. Si no cabe, la sección entera pasa de página.
+ */
+function alturaMinima(seccion) {
+  const TITULO = 48
+  if (seccion.ausente) return TITULO + 40
+  switch (seccion.bloque) {
+    case 'graficas': return TITULO + (seccion.items?.[0]?.svg ? ALTO_BLOQUE_GRAFICO : 80)
+    case 'indicadores': return TITULO + 100
+    case 'tabla': return TITULO + 70
+    case 'firmas': return TITULO + 70
+    default: return TITULO + 40
+  }
+}
+
 /** ¿Trae algo que dibujar este bloque? Lo vacío se pinta como ausencia. */
 function tieneDato(seccion) {
   switch (seccion.bloque) {
@@ -486,6 +588,7 @@ export async function componerPorPlantilla({ plantilla, documento, etq }) {
     if (!BLOQUES.includes(seccion.bloque)) {
       throw new Error(`La sección «${seccion.id}» pide un bloque que el compositor no conoce: ${seccion.bloque}`)
     }
+    if (doc.y + alturaMinima(seccion) > LIMITE_INFERIOR) doc.addPage()
     tituloSeccion(doc, seccion.titulo)
     if (seccion.nota) notaDeSeccion(doc, seccion.nota)
 

@@ -286,6 +286,10 @@ export function sellarPaginas(doc, marca, etq, folio) {
 /** Título de sección: barra cian + texto marino. Deja el cursor listo debajo. */
 export function tituloSeccion(doc, texto) {
   doc.moveDown(0.4)
+  /* Un título nunca se queda solo al pie: si no cabe él más una línea de lo
+     que encabeza, pasa entero a la página siguiente. Se vio en un PDF del
+     Plan 44 (23-09-2026): la barra cian abajo y el texto en la otra página. */
+  if (doc.y + 48 > LIMITE_INFERIOR) doc.addPage()
   const y = doc.y
   doc.save().rect(MARGEN, y + 2, 4, 12).fill(CIAN).restore()
   doc.font('Helvetica-Bold').fontSize(13).fillColor(AZUL)
@@ -372,7 +376,10 @@ export function colorEstado(estado = '') {
  *   interpretacion: string|null, nota: string|null}} grafico
  */
 export function dibujarGrafico(doc, grafico, etq) {
-  if (doc.y + ALTO_BLOQUE_GRAFICO > LIMITE_INFERIOR) doc.addPage()
+  /* Sin SVG no se reserva el alto de la gráfica: una serie sin muestras es su
+     título y su nota, no media página en blanco (visto el 23-09-2026). */
+  const altoBloque = grafico.svg ? ALTO_BLOQUE_GRAFICO : RESERVA_TITULO + RESERVA_RESUMEN
+  if (doc.y + altoBloque > LIMITE_INFERIOR) doc.addPage()
 
   doc.font('Helvetica-Bold').fontSize(12).fillColor(AZUL)
     .text(grafico.titulo, MARGEN, doc.y, { width: ANCHO_TEXTO })
@@ -385,8 +392,8 @@ export function dibujarGrafico(doc, grafico, etq) {
       height: ALTO_GRAFICO,
       preserveAspectRatio: 'xMidYMid meet',
     })
+    doc.y = yGrafico + ALTO_GRAFICO + 8
   }
-  doc.y = yGrafico + ALTO_GRAFICO + 8
 
   doc.font('Helvetica').fontSize(10).fillColor(GRIS)
   if (grafico.resumen) {

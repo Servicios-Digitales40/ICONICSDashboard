@@ -97,7 +97,9 @@ export default {
       instalacion: entrada.nombre,
       chips: [
         { etiqueta: c.chipCondicion, valor: estadoGlobal ?? c.sinCriterio },
-        { etiqueta: c.chipEquipo, valor: entrada.maquina ?? entrada.nombre },
+        /* El NOMBRE del tipo («Vibraciones»), no su descripción: ésa es un
+           párrafo y en un chip de portada no cabe ni informa. */
+        { etiqueta: c.chipEquipo, valor: tipo?.nombre ?? tipo?.id ?? entrada.tipo },
         { etiqueta: c.chipPeriodo, valor: ventana.etiqueta },
       ],
       generadoEl,
@@ -126,8 +128,8 @@ export default {
           columnas: [
             { clave: 'riesgo', titulo: t.columnas.riesgo, ancho: 2 },
             { clave: 'apoyo', titulo: t.columnas.apoyo, ancho: 1.3 },
-            { clave: 'nivel', titulo: t.columnas.nivel, ancho: 0.9, estado: true },
-            { clave: 'evidencia', titulo: t.columnas.evidencia, ancho: 3 },
+            { clave: 'nivel', titulo: t.columnas.nivel, ancho: 1.25, estado: true },
+            { clave: 'evidencia', titulo: t.columnas.evidencia, ancho: 2.65 },
             { clave: 'norma', titulo: t.columnas.norma, ancho: 1.6 },
           ],
           filas: filasDiagnostico,

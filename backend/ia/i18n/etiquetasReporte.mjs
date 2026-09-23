@@ -164,7 +164,7 @@ const ES = {
       piePuntos: 'Un valor por sensor: el módulo mide un eje por apoyo, no axial/horizontal/vertical. El estado es el de la velocidad eficaz contra ISO 10816-1; las demás medidas no tienen banda declarada.',
       sinApoyos: 'Este tipo no mide vibración por apoyo: no hay puntos de medición que listar.',
       sinEspectro: 'El módulo publica vigilancias del espectro (estados MonState), no el espectro de frecuencias: no hay serie que dibujar. Lo que sí hay son las medidas eficaces por apoyo, en la sección siguiente.',
-      pieRecomendaciones: 'La prioridad se deriva del nivel de la regla (crítico → alta, atención → media, informativo → baja). Responsable y fecha se llenan a mano.',
+      pieRecomendaciones: 'La prioridad se deriva del nivel de la regla (crítico: alta, atención: media, informativo: baja). Responsable y fecha se llenan a mano.',
     },
     sensores: {
       titulo: 'REPORTE DE LECTURA DE SENSORES',
@@ -344,7 +344,7 @@ const EN = {
       piePuntos: 'One value per sensor: the module measures one axis per bearing, not axial/horizontal/vertical. Status is that of the RMS velocity against ISO 10816-1; the other measures have no declared band.',
       sinApoyos: 'This type does not measure vibration per bearing: there are no measurement points to list.',
       sinEspectro: 'The module publishes spectrum watchdogs (MonState statuses), not the frequency spectrum: there is no series to draw. What exists are the RMS measures per bearing, in the next section.',
-      pieRecomendaciones: 'Priority derives from the rule level (critical → high, warning → medium, informational → low). Owner and date are filled in by hand.',
+      pieRecomendaciones: 'Priority derives from the rule level (critical: high, warning: medium, informational: low). Owner and date are filled in by hand.',
     },
     sensores: {
       titulo: 'SENSOR READINGS REPORT',

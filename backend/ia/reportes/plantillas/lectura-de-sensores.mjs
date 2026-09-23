@@ -108,8 +108,10 @@ export default {
         { id: 'variables', titulo: t.secciones.variables, bloque: 'indicadores',
           items: d.principales.map((p) => {
             const tarjeta = tarjetaDe({ principal: p, series: d.series, anteriores: d.anteriores, grupos: d.grupos, etq, idioma })
-            /* En este reporte el subtítulo es el TAG: la trazabilidad es el tema. */
-            return { ...tarjeta, sub: p.senal.tag ?? p.clave }
+            /* En este reporte el subtítulo es la CLAVE de la señal (única en la
+               máquina y parte de su tag): la trazabilidad es el tema. El tag
+               completo va en la tabla de abajo; en una tarjeta no cabe. */
+            return { ...tarjeta, sub: p.clave }
           }) },
         { id: 'lecturas', titulo: t.secciones.lecturas, bloque: 'tabla',
           columnas: [

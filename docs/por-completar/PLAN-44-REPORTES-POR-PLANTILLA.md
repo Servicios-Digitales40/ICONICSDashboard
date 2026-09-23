@@ -469,6 +469,36 @@ imagen una vez (`doc.openImage`) y pasa el objeto: 4,4 → **1,76 MB**, 4,6 →
 **2,41**, 5,4 → **2,28**. Lo que queda es el fondo de portada (0,9 MB), el
 banner y el arte. Tiempo por reporte con el transporte falso: 0,3–0,65 s.
 
+**F3.2 · Mirado a ojo, y lo que se corrigió.** El usuario abrió el técnico y
+vio texto solapado en las tarjetas de indicador. Para mirar los PDF sin
+instalar nada se renderizaron con la API de Windows (`Windows.Data.Pdf` desde
+PowerShell; el guion es `docs/plantillas-reportes/render-pdf.ps1` y sirve
+para la F7),
+y de ahí salieron seis defectos, todos de layout y todos corregidos en
+`compositor.mjs` y `lienzo.mjs`:
+
+1. La etiqueta de una tarjeta saltaba a dos líneas aunque llevaba
+   `lineBreak: false` + `ellipsis: true`, y la variación se pintaba encima.
+   pdfkit no se dejó convencer; ahora se **mide** (`recortar`, `lineas`): la
+   etiqueta y el subtítulo caben en hasta dos líneas medidas a mano, y la
+   variación comparte fila con el subtítulo sin pisarlo. Las tarjetas miden
+   88 pt fijos.
+2. Cabeceras de columna recortadas («ÚLTIMA CALIBR…») → hasta dos líneas.
+3. Un título de sección solo al pie con su bloque en la página siguiente →
+   `alturaMinima(seccion)`: título más su primer bloque, o pasa entero.
+4. Una cabecera de tabla sola al pie → la tabla arranca en la página siguiente.
+5. Una serie sin muestras reservaba el alto de la gráfica: media página en
+   blanco y la nota debajo → sin SVG no se reserva (`dibujarGrafico`, también
+   para el catálogo).
+6. La flecha «→» del pie de recomendaciones salía como «!'»: Helvetica no la
+   tiene (D13). Se escribe con dos puntos. Grep de `→ ≥ ≤` en los textos: cero.
+
+Y tres de contenido: el chip «Equipo» llevaba la descripción entera del tipo
+(un párrafo) y ahora lleva su nombre; «Generado» era sólo la hora y se
+repetía en la portada del técnico, ahora es fecha y hora y sale una vez; el
+subtítulo de las tarjetas de sensores era el tag completo (no cabía) y ahora
+es la clave. La columna «Nivel» partía «Informativo» en dos; se ensanchó.
+
 Lo que sigue era el objetivo escrito antes de hacerlo:
 
 **Objetivo.** Escribir los tres módulos de plantilla, el argumento `tipo` en

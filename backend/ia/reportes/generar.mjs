@@ -27,7 +27,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
-import { MAX_DIAS_REPORTE, horaLocal, purgarReportesViejos, resolverVentana } from '../conversacion/herramientas.mjs'
+import { MAX_DIAS_REPORTE, purgarReportesViejos, resolverVentana } from '../conversacion/herramientas.mjs'
 import { fallo } from '../herramientas/lib/respuesta.mjs'
 import { etiquetasDeReporte } from '../i18n/etiquetasReporte.mjs'
 import { renderizarGraficoSerie } from '../../../shared/eva/comun/graficos.js'
@@ -132,7 +132,8 @@ export async function generarReportePorPlantilla(
     return fallo(`No se pudo leer «${entrada.nombre}» del servidor ICONICS: ${d.error}`)
   }
 
-  const generadoEl = horaLocal(ahora().toISOString())
+  /* Fecha Y hora: un PDF se archiva y se lee otro día; «16:19» solo no dice cuándo. */
+  const generadoEl = ahora().toLocaleString(idioma === 'en' ? 'en-US' : 'es-MX', { dateStyle: 'short', timeStyle: 'short' })
   const documento = plantilla.documento(d, {
     etq, idioma, entrada, tipo: tipoObj, ventana, generadoEl,
     explicacion: typeof explicacion === 'string' && explicacion.trim() ? explicacion.trim() : null,
