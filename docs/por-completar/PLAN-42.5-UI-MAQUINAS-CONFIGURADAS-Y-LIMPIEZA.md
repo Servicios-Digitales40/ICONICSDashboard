@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · quedan la comprobación manual en el navegador (F1, F2) y el reinicio del backend tras el vaciado (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · **F6 escrita el 23-09-2026** (lo que la máquina pidió al mirarla en planta: filtros, mudas listadas, configuración más corta, nombre y alias por asset, fuera el muro) · quedan la comprobación manual (F1, F2) y el reinicio del backend (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -1241,6 +1241,133 @@ falso del tanque (puerta §5.1).
       verde; conteos nuevos en HANDOFF §1 y §9; `verificar-textos` e `i18n`
       sin huérfanos — y desde el 23-09 «sin huérfanos» lo afirma el propio
       `verificar-i18n`, no un barrido a mano.
+
+### F6 — Lo que la máquina configurada pidió al mirarla en planta · escrita el 23-09-2026
+
+**De dónde sale.** El usuario miró el tablero contra planta (ICONICS
+conectado, motor parado por mantenimiento: el historiador contesta, el
+tiempo real no) y trajo ocho puntos: tres preguntas y cinco cambios. Las
+preguntas se contestaron leyendo el código y quedan aquí como decisiones;
+los cambios son esta fase. Las respuestas, resumidas, porque cambian cómo
+hay que leer el resto:
+
+- **Los nombres de los apoyos** («Lado acople», «Rodamiento intermedio»,
+  «Lado libre») no están en el tipo ni en las vistas: están en
+  `assets[].nombre` de `datos/maquinas.json`, escritos por API el 22-09
+  (Plan 41, paso 4). El tipo sólo conoce ids y sufijos (`tipo.canales`), y
+  `canalesDeMaquina` rotula con el nombre del asset o cae al id. Una máquina
+  con sólo S1 y S2 muestra dos apoyos: eso ya es escalable. Lo que no lo es:
+  el editor no tiene campo para el nombre, `configurarDesdeArbol` crea los
+  assets sin él, y al editar una máquina el `PATCH` reemplaza `assets`
+  enteros, así que un nombre guardado **se perdería** en la siguiente
+  edición. Dos comentarios (`vistaDeMaquina.js` §«Lo que no inventa»,
+  `Vibraciones.jsx`) dicen todavía que una configurada se rotula por id.
+- **Los riesgos** son 19 reglas por TIPO (`riesgosVibracion.js`), heredadas
+  por `rol` + `assetId` de cada variable; no hay nada por máquina. El
+  backend se niega a decir «sin riesgos» si no llegó a evaluar ninguna.
+- **Las limitaciones** no cambian ningún cálculo: viajan enteras al prompt y
+  como aviso en dos herramientas. Siete de sus ocho familias se derivan
+  solas de la configuración y el sondeo; el usuario escribe una.
+
+#### Decisiones (extienden §2)
+
+- **D15 · Nombre y alias por asset, configurados por el usuario.** Un asset
+  gana `alias: string[]` junto al `nombre` que ya tenía. Los dos se editan en
+  la pantalla de configuración, por asset marcado, y **se conservan al
+  editar**: el editor siembra su estado desde `maquina.assets` y
+  `configurarDesdeArbol` los recibe como parámetro. El tipo ofrece
+  **sugerencias** (`tipo.canales[].sugerencia`, el `label` de `CANALES` que
+  hoy se descarta): se enseñan como chips que rellenan el nombre al pulsar,
+  **nunca se aplican solas**: con dos sensores no se sabe cuál es el libre.
+  El asistente resuelve el alias por el camino que ya existe:
+  `sistemasDeSenal` → `aliasDe(clave)` → `tipo.aliasDe(variable, apoyo)`,
+  que hoy compone «DKW Lado acople», «DKW S1», «DKW sensor 1»; se le suman
+  las formas con cada alias («DKW acople chiquito»). Un alias es del
+  activo, no de la variable, y se propaga a todas las suyas. El motor de
+  diagnóstico trabaja con ids de canal y no necesita nada; la narración en
+  inglés conserva el nombre que puso el usuario, como hace con el nombre de
+  la máquina.
+- **D16 · Filtros por activo y «sólo medidas» en Planta y en Comparar.** La
+  Planta pinta hoy 72 paneles para `vib-motor-03` y sólo 12 son medidas
+  (`rol` de familia `medida`); el resto son calidades, vigilancias y variador,
+  casi todos registrados como constante. Se añaden chips de activo (de
+  `activosConVariables`) y un interruptor «sólo medidas» que **arranca
+  encendido**, con la cuenta visible («12 de 72»). En el Detalle, «Comparar
+  señales» arranca con las series del activo de la pestaña y ofrece «toda la
+  máquina» para cruzar apoyos; el mismo interruptor. El filtro es dominio
+  (`filtrarClaves` en `vistaDeMaquina.js`) y se prueba en Node; la selección
+  viaja en la URL como ya hace el rango.
+- **D17 · Lo que no llega se lista, no sólo se cuenta.** La fuente ya
+  calcula `detalleSinDato` (punto + motivo) y ninguna vista lo lee. El «80 /
+  86» del Inicio se despliega en la lista de puntos mudos con su rótulo y su
+  motivo. En Configuración la ficha lista **todas** las series pendientes
+  del sondeo por causa (hoy sólo las compartidas) y lo hace también desde lo
+  persistido (`historyVerified`, `historyCausa`), sin tener que sondear otra
+  vez; las registradas como constante se listan plegadas.
+- **D18 · Menos texto en Configuración, y las herramientas a la vista.** «Lo
+  que no puede hacer» se pliega tras «Ver N limitaciones». Se añade
+  «Herramientas del asistente para esta máquina», derivadas como ya las
+  deriva `construirSistema` (hoy como mucho tres: estado, riesgos activos,
+  historia de señal; las otras 23 son de planta entera o del tanque). Se
+  extrae `herramientasDe(maquina, tipo)` a dominio para no duplicar la
+  regla, con rótulos en presente (los de `assistant:tools.*` están en pasado:
+  son de la traza).
+- **D19 · El muro se borra; el arranque va a la primera máquina.** La vista
+  `MuroPlanta` no se usa. `?muro=1`, `LatidoMuro` y `useMaquinasEnVivo` son
+  otra cosa y se quedan. La ruta de arranque pasa a ser `inicio`, sin menú:
+  un componente que espera la lista de configuradas y **redirige con
+  `replace`** al Inicio de la primera en servicio; sin ninguna, dice que no
+  hay máquina configurada y ofrece Configuración a quien pueda entrar.
+  `useNavegacion` gana `{ replace }`; el proveedor de configuradas gana
+  `listo`, porque hoy `cargando` arranca en falso y «aún no cargó» y «no
+  hay ninguna» se confunden. La prueba «la ruta por defecto está en el
+  menú» cambia de sentido: la de arranque no es una pantalla, es un desvío.
+
+#### Pasos, cada uno con su commit
+
+1. **F6.1 · Filtros** (D16). `filtrarClaves` + pruebas; chips y
+   interruptor en `PlantaMaquina`; `comparables` por activo en
+   `DetalleMaquina` con «toda la máquina»; URL. Pruebas de vista con la
+   fixture espejo: por defecto 12 medidas, un activo deja sus 4, apagar el
+   interruptor devuelve las 22 del activo.
+2. **F6.2 · Mudas y pendientes** (D17). `detalleSinDato` por el hook; lista
+   desplegable en el Inicio; ficha de Configuración con pendientes por causa
+   desde lo persistido y desde el sondeo. Pruebas: 6 mudas con motivo, la
+   lista dice cuáles; una máquina con 8 sin verificar las nombra por causa.
+3. **F6.3 · Configuración** (D18). Limitaciones plegadas;
+   `herramientasDe` extraída y probada; el bloque de herramientas con
+   rótulos nuevos en es/en.
+4. **F6.4 · Nombre y alias** (D15). Dominio (`crearAsset`,
+   `canalesDeMaquina`, `tipo.aliasDe`, `tipo.canales[].sugerencia`),
+   esquema HTTP, editor (sección de activos con nombre, alias y
+   sugerencias; sembrado al editar; `configuracionDesdeMarcas` con
+   `nombresPorAsset`), y el caso «dame el valor de DKW del acople chiquito»
+   en `verificar-herramientas` con la espejo. Prueba de regresión: editar
+   una máquina con nombres guardados los conserva en el `PATCH`.
+5. **F6.5 · Muro y arranque** (D19). Borrar `MuroPlanta`, su prueba, sus
+   claves; ruta `inicio` con `Arranque.jsx` y su prueba (con máquinas →
+   `maq-inicio` de la primera, con `replace`; sin máquinas → texto y botón
+   según rol); `useNavegacion({ replace })`; `listo` en el proveedor; las
+   pruebas que usaban `eva-muro` de atrezzo.
+
+**Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
+(incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del
+asistente), build y bundle en F6.1 y F6.5. Comprobación manual contra
+planta al final, con el motor parado: la Planta filtrada, el Inicio con los
+86 mudos listados por motivo, el alias resolviendo en el chat.
+
+**Criterios de aceptación.**
+- [ ] `vib-motor-03` en Planta arranca con 12 paneles y dice «12 de 72»;
+      un chip de activo deja 4; el interruptor apagado deja las del activo.
+- [ ] En el Inicio, con el motor parado, el «0 / 86» se despliega en 86
+      filas con su motivo; con el motor en marcha, las que falten.
+- [ ] Configuración: limitaciones plegadas, herramientas visibles, series
+      pendientes por causa sin volver a sondear.
+- [ ] Un asset renombrado desde la pantalla conserva el nombre al editar
+      otra cosa; «dame el valor de DKW del acople chiquito» resuelve
+      `DKW_S1` en `verificar-herramientas`.
+- [ ] Sin `eva-muro`; el arranque abre el Inicio de la primera configurada
+      con la URL ya escrita; sin ninguna, lo dice.
 
 ### 3.6 · QA y contramedidas — la red que acompaña a las cinco fases
 
