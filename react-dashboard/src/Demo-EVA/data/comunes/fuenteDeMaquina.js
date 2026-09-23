@@ -266,9 +266,19 @@ export function createFuenteDeMaquina({ maquina, tipo = tipoDe(maquina?.tipo), t
 
 const fuentes = new Map();
 
-/** La clave cambia con la configuración: editar la máquina rehace el motor. */
+/**
+ * La clave cambia con la configuración: editar la máquina rehace el motor.
+ *
+ * Lleva también el nombre de la máquina y el nombre y los alias de cada asset
+ * (Plan 42.5 F6): renombrar un apoyo no cambia `revisada` ni el número de
+ * variables, y con la clave de antes una Planta o un Detalle abiertos seguían
+ * enseñando «S1» hasta recargar la página, porque el `sistema` cacheado
+ * había compuesto sus rótulos con el nombre viejo.
+ */
+const huellaDeNombres = (maquina) =>
+  [maquina.nombre ?? "", ...(maquina.assets ?? []).map((a) => `${a.id}=${a.nombre ?? ""}/${(a.alias ?? []).join(",")}`)].join(";");
 const claveDe = (maquina, clase) =>
-  `${clase}|${maquina.id}|${maquina.revisada ?? ""}|${(maquina.variables ?? []).length}`;
+  `${clase}|${maquina.id}|${maquina.revisada ?? ""}|${(maquina.variables ?? []).length}|${huellaDeNombres(maquina)}`;
 
 export function fuenteDeMaquinaConfigurada(maquina, clase) {
   const clave = claveDe(maquina, clase);

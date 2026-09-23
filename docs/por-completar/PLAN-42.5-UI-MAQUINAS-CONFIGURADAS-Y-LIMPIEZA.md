@@ -1497,6 +1497,12 @@ hay que leer el resto:
    Lleva ahora el mismo plazo explícito de 30 s que sus dos hermanas de
    axe-core; aislada tarda 0,3 s. El commit de F6.7 dijo «1172 verdes» con
    esta prueba en rojo: la cifra buena está en el commit siguiente.
+   (d) Al preguntar el usuario si renombrar un asset se reflejaba en el
+   Detalle, salió que la caché de fuentes (`fuenteDeMaquinaConfigurada`) se
+   clavaba por id, `revisada` y número de variables: un rename no cambia
+   ninguna de las tres y una Planta o un Detalle abiertos seguían con el
+   nombre viejo hasta recargar. La clave lleva ahora el nombre de la máquina
+   y el nombre y los alias de cada asset; prueba en `un-motor-por-maquina`.
 
 **Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
 (incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del

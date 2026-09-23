@@ -110,3 +110,23 @@ describe("dos vistas sobre la misma máquina", () => {
     expect(fuente.lecturaDe("vRMS_S1")).toEqual({ valor: null, receivedAt: null, stale: true, motivo: null });
   });
 });
+
+describe("la caché de fuentes distingue una máquina renombrada (Plan 42.5 F6)", () => {
+  it("cambiar el nombre o los alias de un asset rehace la fuente; la misma configuración devuelve la misma", () => {
+    const configurada = CONFIGURADA;
+    const a = fuenteDeMaquinaConfigurada(configurada, "simulado");
+    /* Misma configuración (otra copia): la misma fuente, no un segundo motor. */
+    expect(fuenteDeMaquinaConfigurada(structuredClone(configurada), "simulado")).toBe(a);
+
+    const renombrada = {
+      ...configurada,
+      assets: configurada.assets.map((x) => (x.id === "S1" ? { ...x, nombre: "Acople chiquito" } : x)),
+    };
+    const b = fuenteDeMaquinaConfigurada(renombrada, "simulado");
+    expect(b).not.toBe(a);
+    expect(b.sistema.metaDe("vRMS_S1").label).toContain("Acople chiquito");
+
+    const conAlias = { ...renombrada, assets: renombrada.assets.map((x) => (x.id === "S1" ? { ...x, alias: ["el chico"] } : x)) };
+    expect(fuenteDeMaquinaConfigurada(conAlias, "simulado")).not.toBe(b);
+  });
+});
