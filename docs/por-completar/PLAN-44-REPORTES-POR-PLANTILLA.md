@@ -344,30 +344,39 @@ dibuja. El tiempo se mide en F7 con `vib-motor-03`.
 PNG son PNG de verdad (`IHDR` leído) y los `.docx` abren como zip con su
 `word/document.xml`.
 
-### F1 — El compositor genérico por bloques, sin cambiar el PDF de hoy
+### F1 — El compositor genérico por bloques, sin cambiar el PDF de hoy · completada el 23-09-2026
 
-**Objetivo.** Extraer de `reporte.mjs` las piezas de marca y de layout
-(portada, cintillo, pie, `tituloSeccion`, `cajaResumen`, la tabla de valores,
-el bloque de gráfica) a `backend/ia/reportes/compositor.mjs`, y añadir los
-bloques que las maquetas piden: `indicadores` (4 tarjetas con valor, unidad,
-subtítulo y variación con triángulo dibujado, D13), `tabla` (columnas
-declaradas, anchos por proporción, color por clave como hoy), `texto` (caja
-con rótulo de procedencia), `lista`, `firmas`, `ausencia`, y la portada
-`lateral` (D7).
+**Lo que se hizo.** Las primitivas de `reporte.mjs` (constantes, paleta,
+marca, folio, portada, cintillo, pie, sellado, `tituloSeccion`,
+`cajaResumen`, colores, `nuevoDocumento`) se movieron **tal cual** a
+`backend/ia/reportes/lienzo.mjs` con un guion que cortó por marcas y añadió
+`export`; `reporte.mjs` las importa y re-exporta `colorDeFila` para su
+prueba. Dos añadidos al lienzo: `generarFolio(fecha, prefijo)` (D5; sin
+prefijo, el folio de siempre) y `dibujarGrafico`, que es el bloque de
+gráfica que vivía inline en `componerReportePdf` y ahora lo usan las dos
+composiciones. `reporte.mjs` pasó de 644 a 337 líneas y su cabecera dice
+dónde está cada cosa.
 
-**Regla.** `componerReportePdf` y `componerConversacionPdf` siguen exportadas
-desde `reporte.mjs` y producen el **mismo documento**: las 13 comprobaciones
-de `verificar-herramientas` y `reporte-color.test.mjs` pasan sin tocarlas. El
-compositor nuevo se prueba con un modelo de documento sintético.
+`backend/ia/reportes/compositor.mjs` (nuevo) dibuja los seis bloques
+(`indicadores`, `tabla`, `graficas`, `texto`, `lista`, `firmas`), la
+`ausencia` con su motivo, la `nota` bajo un título, y las dos portadas (D7:
+`banner` con el arte ancho arriba, `lateral` con el arte en un panel a la
+izquierda y los chips apilados a la derecha). Los triángulos de variación son
+polígonos (D13). El arte se carga de `marca/portadas/<tipo>.png` con la
+misma tolerancia que la marca: si falta, la portada sale igual. Devuelve
+`{ pdf, paginas, folio, secciones }` (D8), y un bloque desconocido es un
+`throw`, no una sección en blanco.
 
-**Pruebas nuevas** (`backend/test/reportes/compositor.test.mjs`): el
-manifiesto cuenta bien secciones con y sin dato; una sección `ausencia` lleva
-su motivo; el PDF empieza por `%PDF`; una tabla de 60 filas pagina sin
-solapar (se afirma sobre `paginas`, no sobre bytes); el folio lleva el
-prefijo del tipo; sin arte, la portada sale (tolerancia de `cargarMarca`).
-
-**Riesgo.** Mover código de layout que hoy funciona. Contramedida: mover sin
-reescribir, y correr las comprobaciones existentes antes y después.
+**Medido.** Las 192 comprobaciones de `verificar-herramientas` pasaron antes
+y después del traslado sin tocarlas (13 de ellas de `generar_reporte`);
+`reporte-color.test.mjs` igual. Seis pruebas nuevas en
+`backend/test/reportes/compositor.test.mjs`: manifiesto con y sin dato,
+ausencia con motivo y vacía con el texto genérico, sesenta filas paginan
+(3+ páginas frente a 2), sin arte sale igual y con arte carga 667×295, bloque
+desconocido lanza, folio con y sin prefijo. Lint limpio. Lo que **no** se
+pudo hacer aquí: mirar el PDF a ojo (no hay renderizador en esta máquina);
+quedan dos muestras en el scratchpad de la sesión y la mirada de verdad es
+la F7.
 
 ### F2 — Los recolectores deterministas
 

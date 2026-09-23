@@ -7,7 +7,10 @@ build/
 # (ver IA_REPORTES_DIR e IA_BACKLOG_CHAT_DIR en .env.example). Datos, no
 # codigo.
 Documentos/
-Reportes/
+# Solo la carpeta de SALIDA, anclada: un `Reportes/` suelto tambien ignoraba
+# backend/ia/reportes/ y backend/test/reportes/, que son codigo (Plan 44 F1;
+# en Windows git compara sin distinguir mayusculas).
+Documentos/Reportes/
 # Manuales de planta que alimentan el RAG del asistente (Plan 16), subidos
 # desde el tablero o dejados a mano (ver IA_DOCS_DIR en .env.example). No es
 # codigo de este repositorio: es documentacion de UNA instalacion concreta,

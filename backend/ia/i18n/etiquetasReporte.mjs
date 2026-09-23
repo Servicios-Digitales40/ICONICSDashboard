@@ -46,6 +46,14 @@ const ES = {
   rolOperador: 'Operador',
   rolAsistente: 'Asistente',
   instalacion: 'Sistema de agua industrial',
+
+  /* ── Los bloques del compositor por plantilla (Plan 44 F1) ──────────
+     Lo genérico del documento: lo que una sección dice cuando su fuente no
+     trajo nada, y el rótulo que separa lo medido de lo que redactó el modelo.
+     Los títulos de cada plantilla van en `plantillas`, más abajo. */
+  sinDatos: 'Sin datos en esta sección para esta máquina y este período.',
+  redaccionAsistente: 'Redacción del asistente',
+  sinValor: '—',
 }
 
 const EN = {
@@ -75,6 +83,10 @@ const EN = {
   rolOperador: 'Operator',
   rolAsistente: 'Assistant',
   instalacion: 'Industrial water system',
+
+  sinDatos: 'No data in this section for this machine and this period.',
+  redaccionAsistente: 'Written by the assistant',
+  sinValor: '—',
 }
 
 /**
