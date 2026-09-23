@@ -2,7 +2,7 @@
 
 **Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
 `Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice.
+lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5).
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -31,6 +31,22 @@ omitidas con su motivo.
 
 Cerrado **no es borrado**: todo sigue en el árbol y cada sitio dice cómo
 volver. El detalle está en `PLAN-32-VIBRACIONES.md` §2.5.
+
+**Desde el 22-09-2026 (noche), en `UI-Limpieza1.0`, la regla 1 cambia.** El
+usuario decidió que el tanque se piensa como **otra posible máquina
+configurada**, no como una instalación aparte (Plan 42.5 §1):
+
+1. **Su dominio** (`shared/eva/tanque/`) sigue sin borrarse: es la materia
+   prima del tipo `estacion-de-llenado` (Plan 43). Se lee y se puede mover.
+2. **Sus vistas y su lectura del historiador se sustituyen por genéricas y se
+   borran**, con las pruebas que sólo ellas justificaban. Borrar va después
+   de sustituir. La **fuente en vivo** del tanque (`EvaProvider`, `evaSource`,
+   `useSistemaAgua`) **no**: la consumen siete archivos comunes y la sustituye
+   el tipo, no este plan (Plan 42.5 F0).
+3. **Lo que no es de ninguna máquina y nadie importa se borra ya**, con la
+   evidencia en el commit.
+
+La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 ### Qué funciona (verde, medido el 22-09-2026 por la tarde)
 

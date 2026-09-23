@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F5 por completar · escrito el 22-09-2026
+**Estado:** F0 completada · F1–F5 por completar · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -154,21 +154,143 @@ embeddings de casos se regeneran solos.
 
 ## 3. Las fases
 
-### F0 — Inventario y la regla nueva
+### F0 — Inventario y la regla nueva · completada el 22-09-2026
 
 **Objetivo.** Dejar escrito qué se borra ya, qué se sustituye y qué espera al
 tipo, y que CLAUDE.md y HANDOFF digan la regla de esta rama.
 
-**Cómo.** Recorrer los 32 archivos fuera de `tanque/` que lo importan y
-clasificar cada acoplamiento: **(a)** se resuelve con D2 (lectura agnóstica),
-**(b)** es del motor y espera a B2/Plan 43, **(c)** es de una vista del tanque
-que se va a borrar. Listar los candidatos a código muerto de §0 con la
-comprobación de que nadie los importa (`grep` + `verificar-bundle`).
+**Cómo se hizo.** Un `grep` de todo `import` que apunte a una carpeta
+`tanque/` (directo, `@shared/eva/tanque/…`, o a través de las puertas
+`Demo-EVA/domain/*.js`), sobre `shared/`, `backend/`, `react-dashboard/src/` y
+`scripts/`, mirando después **para qué** usa cada archivo lo que importa. Los
+candidatos a código muerto se comprobaron buscando quién los importa fuera de
+pruebas, y se corrieron `verificar-textos` y `verificar-i18n` para saber si hoy
+hay textos huérfanos.
+
+**Lo que salió distinto de lo previsto.**
+
+- **No son 32 archivos, son 34 de código** (más 30 de pruebas y 13 guiones).
+  Tres de los que el `grep` encuentra sólo citan al tanque **dentro de un
+  comentario** (`hallazgos.js`, `AvisosEva.jsx`, `BandejaEva.jsx`: el import
+  se dejó comentado al cerrar la rama) y no cuentan.
+- **Hacen falta cuatro letras, no tres.** Hay un grupo que no es (a), (b) ni
+  (c): código que **vive en `tanque/` pero no es del tanque**. `estado.js`
+  (`ESTADOS`, `estadoInfo`, `pideAtencion`, `ESTADOS_ORDEN`) son las claves de
+  la forma común y las usan `Vibraciones3D`, `piezas.jsx`, el 3D de los dos y
+  el backend; `toBooleano` de `sistema.js` es una utilidad. Se marcan **(d)**:
+  se mueven a `shared/eva/comun/` cuando toque —en F1/F2 si lo nuevo los
+  necesita, o en el Plan 43— y **no se borran con el tanque**.
+- **La «capa de datos del tanque» son dos cosas, y sólo una es de este plan.**
+  La lectura del historiador (`data/tanque/historia.js`) es (a) y la resuelve
+  D2. La **fuente en vivo** —`EvaProvider` + `evaSource` + `useSistemaAgua` en
+  `hooks.js`, con el simulador `data/tanque/simulador.js`— es lo que
+  `construirSistema` + `fuenteDeMaquina` sustituyen **el día que el tanque
+  entre por tipo**: la consumen `App.jsx`, `LatidoMuro`, `ContextoDeMaquina`,
+  `AlarmasEva`, `CierreDiagnostico`, `MuroPlanta` y `TurnoEva`. Es (b), no
+  (c): borrarla en F4 exigiría reescribir siete consumidores comunes que no
+  están en el alcance de este plan.
+- **`eva-alarmas` sigue en el menú** (`nav`, «sec-planta»), y `AlarmasEva` es
+  del tanque por dentro: filtra por `ACTIVO_IDS` y lee `useSistemaAgua`. Es
+  la única vista del tanque que la rama no cerró. Va a F4 **[?]** junto con
+  las otras cuatro.
+- **`plc_opcua.py` ya tiene una decisión anterior en contra de borrarlo.** El
+  Plan 17 (auditoría) lo dejó por escrito: «herramienta de banco de pruebas;
+  correcto, y así se queda». Pasa a F5 como **[?]** para el usuario, no como
+  borrado cerrado.
+
+#### Los 34 acoplamientos
+
+Letras: **(a)** lo resuelve D2 o una vista genérica (F1/F2) · **(b)** es del
+motor, del asistente o de la fuente en vivo del tanque y espera a B2/Plan 43 ·
+**(c)** es de una vista del tanque que se borra en F4 · **(d)** no es del
+tanque, vive ahí por historia; se mueve a `comun/`, no se borra.
+
+| # | Archivo | Qué importa del tanque | Para qué | Letra |
+|---|---|---|---|---|
+| 1 | `shared/eva/comun/sistemas.js` | `senales`, `simulador`, `estadoTanque` | La entrada `tanque` del registro, escrita a mano | (b) |
+| 2 | `backend/ia/conversacion/herramientas.mjs` | `SENALES`, `SENAL_KEYS`, `ACTIVOS` | Índice de `resolverSenal`, `catalogoBreve()`, respaldo de `catalogo()` (B3) | (b) |
+| 3 | `backend/ia/herramientas/documentacion/index.mjs` | `SENALES`, `historizadas`, `senalInfo`… | Rótulos y claves por defecto de `resumen_documentado` | (b) |
+| 4 | `backend/ia/herramientas/historicos/index.mjs` | `SENALES`, `esHistorizada`, `pointName`… | Respaldo del tanque en `historia_de_senal` / `generar_reporte` | (b) |
+| 4′ | ídem | `ESTADOS`, `estadoInfo` | Etiqueta humana del estado común | (d) |
+| 5 | `backend/ia/herramientas/lib/maquina.mjs` | `evaluarRiesgos` | El `switch` de `evaluarRiesgosDe` (B2) | (b) |
+| 6 | `backend/ia/herramientas/maquina/index.mjs` | `toBooleano` | Leer la confirmación de un accionamiento | (d) |
+| 7 | `backend/ia/i18n/narrarEstadoTanque.mjs` | `ACTIVO_IDS`, `SENALES` | Narrar el tanque. Fuera de F5 por decisión del plan | (b) |
+| 8 | `backend/ia/motor/diagnostico.mjs` | `REGLAS_TANQUE` | Reglas por máquina del motor | (b) |
+| 9 | `backend/iconics/fakeClient.mjs` | `SENALES`, `parsePointName`, `mediaDelTramo`… | El transporte falso del tanque, que usa la puerta §5.1 | (b) |
+| 10 | `Demo-EVA/data/comunes/EvaProvider.jsx` | `createTransporteEva` (simulador) | La fuente en vivo del tanque en origen simulado | (b) |
+| 11 | `Demo-EVA/data/comunes/evaSource.js` | `leerSerie`/`leerSeries` de `historia.js` | Quién lee el pasado según el transporte | (a) |
+| 11′ | ídem | `createSistema`, `SENAL_KEYS`, `TODOS_LOS_PUNTOS` | El sondeo en vivo de las ocho señales | (b) |
+| 12 | `Demo-EVA/data/comunes/hooks.js` | `VENTANA` de `historia.js`; `useSeriesHistoricas` | Las series para las gráficas | (a) |
+| 12′ | ídem | `SISTEMA_VACIO`, `SENAL_KEYS` | `useSistemaAgua` | (b) |
+| 13 | `Demo-EVA/data/comunes/alarmas.js` | `leerSerie` | Historial de una alarma por el historiador | (a) |
+| 13′ | ídem | `ALARMAS`, `SENALES`, `pointName` | El catálogo de alarmas del tanque y su activo | (b) |
+| 14 | `Demo-EVA/domain/senales.js` | puerta | 8 consumidores de código (abajo) | muere con su último consumidor |
+| 15 | `Demo-EVA/domain/activos.js` | puerta | `MaquetaHero`, `layout.js`, `AlarmasEva`, `useDominio` | ídem |
+| 16 | `Demo-EVA/domain/riesgos.js` | puerta | `CierreDiagnostico`, `MuroPlanta` | ídem |
+| 17 | `Demo-EVA/domain/sistema.js` | puerta | `evaSource`, `hooks` | ídem |
+| 18 | `Demo-EVA/domain/estado.js` | puerta | 5 consumidores, tres de vibraciones | (d): apunta a `comun/` cuando `estado.js` se mueva |
+| 19 | `app/routes/routes.jsx` | 6 vistas de `views/tanque/` | Las rutas `eva-*` sin `nav` (y `eva-detalle`) | (c) |
+| 20 | `app/layout/Sidebar.jsx` | `RAIZ` | El pie de la barra enseña la raíz de la instalación | (a): sale del registro o de las máquinas configuradas, no del catálogo del tanque |
+| 21 | `i18n/useDominio.js` | `senalInfo`, `activoInfo` | `senal(clave)`, `activo(id)`, `unidad(clave)` para las vistas del tanque | (a)/(c): las genéricas rotulan con `sistema.metaDe`; estas funciones mueren con las vistas del tanque |
+| 21′ | ídem | `estadoInfo` | `estado(key)` | (d) |
+| 22 | `i18n/useProsa.js` | `senalInfo` | Decimales de una señal en la prosa | (a)/(c), igual que 21 |
+| 23 | `Demo-EVA/components/detalle/GraficaComparada.jsx` | `historizadasMedidas`, `SENALES[clave].escala` | Qué señales se pueden comparar y a qué escala | (a): F2 lo alimenta desde `sistema` |
+| 24 | `Demo-EVA/components/detalle/piezas.jsx` | `estadoInfo` | El color/texto de la banda de una tarjeta | (d) |
+| 25 | `Demo-EVA/lib/modelo.js` | `historizadasMedidas`, `pideAtencion` | `buildModeloEva`, el modelo del tanque para los tiles | (c) con `PlantaTanque`; `delta()` es genérico y lo usan `tiles.jsx` y `detalleActivo.js` |
+| 26 | `Demo-EVA/three-d/components/FichaActivo.jsx` | `historizadasMedidas`, `pideAtencion` | Ficha de un activo en la maqueta del tanque | (c) **[?]** F4 |
+| 27 | `Demo-EVA/three-d/components/MaquetaHero.jsx` | `ACTIVO_IDS` | Colocar los 4 activos | (c) **[?]** F4 |
+| 28 | `Demo-EVA/three-d/lib/layout.js` | `ACTIVO_IDS` | Posiciones de los 4 activos | (c) **[?]** F4 |
+| 29 | `Demo-EVA/three-d/lib/comportamiento.js` | `estadoInfo` | Color 3D de un estado; lo usan los dos 3D | (d) |
+| 30 | `Demo-EVA/views/comunes/AlarmasEva.jsx` | `ACTIVO_IDS` (+ `useSistemaAgua`) | Chips por activo del tanque | (c) **[?]** F4: es del tanque y sigue en el menú |
+| 31 | `Demo-EVA/views/comunes/AssetsEva.jsx` | `RAIZ` | Raíz por defecto del explorador | (a): la raíz de la instalación, no del tanque |
+| 32 | `Demo-EVA/views/comunes/CierreDiagnostico.jsx` | `evaluarRiesgos`, `REGLAS_TANQUE` | Dos `sistemaId === "tanque"` | (b): el tipo declara `evaluarRiesgos`/`REGLAS` |
+| 33 | `Demo-EVA/views/comunes/MuroPlanta.jsx` | `evaluarRiesgos` (+ `useSistemaAgua`) | El muro del tanque; sin ruta desde el cierre | (c) **[?]** F4 |
+| 34 | `Demo-EVA/views/vibraciones/Vibraciones3D.jsx` | `ESTADOS_ORDEN` | Ordenar la leyenda de estados | (d) |
+
+**De segundo orden** (no importan al tanque, importan a quien lo importa):
+`app/LatidoMuro.jsx` y `app/layout/ContextoDeMaquina.jsx` (`useSistemaAgua`,
+(b)), `TurnoEva.jsx` (`alarmas.js`, (b)), `components/tiles.jsx` (`delta` de
+`modelo.js`, genérico).
+
+**Las 30 pruebas y los 13 guiones** no se clasifican uno a uno: una prueba va
+con lo que prueba. Las que importan `views/tanque/` (12 archivos: `planta-simulada`,
+`detalle-*`, `selector-rango`, `inicio-simulada`, `controles`, `riesgos-*`,
+`edad-dato-controles`, `prosa-del-dominio`, `riesgos-vocabulario`,
+`accesibilidad`) **no están omitidas**: corren contra el simulador, y en F4 se
+borran con la vista o se reescriben sobre la genérica. Las 29 omitidas
+(8 bloques `.skip` en 7 archivos) son del Topbar, Alarmas en vivo, Bandeja,
+Casos RAG, estado en URL y Turno: dependen de la **fuente en vivo** (b), no de
+Planta/Detalle, así que F4 no las cierra todas; las que queden llevan
+«para reabrir: Plan 43». De los guiones, 6 `verificar-*` y `generar-historia-simulada`
+usan el catálogo del tanque para probar el falso, el motor y las herramientas
+(b); los 5 `sondear-*`/`medir-*` son instrumentos contra planta y no se tocan.
+
+#### Lo que sustituye a las vistas del tanque ya existe
+
+`fuenteDeMaquina.js` (`createFuenteDeMaquina`, `fuenteDeMaquinaConfigurada`),
+`MaquinaContext.jsx` (`useMaquina`), `maquinasEnVivo.js` y
+`data/vibraciones/vibracion.js` (`useDominioVibracion`) son la capa de datos
+que ya usan las cuatro vistas de vibraciones. F1 y F2 se construyen sobre
+**eso**, no sobre `hooks.js`. Los componentes de presentación del Detalle
+(`DetalleGrid`, `PanelProcedencia`, `SelectorRango`) no importan nada del
+tanque; `GraficaComparada` y `piezas.jsx` sí (23, 24).
+
+#### Lista de borrado de F5, cerrada
+
+| Qué | Líneas | Evidencia | Decisión |
+|---|---|---|---|
+| `features/data/` (3 componentes, 4 vistas, índice) | 912 | Ningún `import` fuera de la carpeta; sólo lo citan comentarios de `routes.jsx` y `lib/iconics/index.js`, que se actualizan. `lib/iconics` sigue vivo: 11 consumidores | **Se borra** |
+| `modulos/prediccion/` (6 vistas) | 1295 | Sólo lo importa `routes.jsx` (6 rutas sin `nav` desde el 22-09). Arrastra: `lib/queryClient.js` + `QueryClientProvider` en `App.jsx` (`@tanstack/react-query` lo usa también `ExploradorAssets`, así que la dependencia se queda), `VITE_PREDICTION_API_BASE` en `.env.local`, la entrada `prediccion` de `shared/modulos.js` y sus asertos en `verificar-modulos`, `sec-prediccion` en los dos `navigation.json` | **[?] usuario**: borrar el módulo entero o dejarlo oculto. Si se borra, el registro de módulos pierde su segundo ejemplo |
+| `scripts/plc_opcua.py` | 188 | Nadie lo ejecuta ni lo cita salvo docs. El Plan 17 decidió conservarlo como banco de pruebas | **[?] usuario**: la decisión del Plan 17 está escrita; se borra sólo si la revoca |
+| Puertas `domain/*.js` | 5 × ~13 | Ninguna huérfana hoy (tabla arriba). `pronostico.js`, `umbrales.js`, `vibraciones.js`, `riesgosVibracion.js` tienen consumidor y no son del tanque | Se borra cada una **cuando F4 le quite el último consumidor**; `estado.js` se reapunta a `comun/` |
+| `omitir()` de `verificar-herramientas` (22) | — | El motivo es `CERRADA` (la fuente en vivo y las herramientas del tanque, (b)) | **Se quedan** hasta el Plan 43 |
+| CSS y textos huérfanos | — | `verificar-textos` y `verificar-i18n` en verde hoy (1415 claves × 2 idiomas, paridad) | Nada que borrar hoy; se vuelven a correr tras F4 |
+| Modelos 3D sólo del tanque (`Armario`, `Bomba`, `Columna`, `Valvula`, `Deposito`, `Bastidor`, `Tuberias`, `ActivoEnMaqueta`, `MaquetaHero`, `FichaActivo`, `lib/layout.js`) | 1868 | Sus únicos consumidores son `MaquetaTanque3D` e `InicioTanque`. `comportamiento.js`, `materiales.js` y `rotor.js` los comparten los dos 3D y se quedan | Van con F4 **[?]**, no con F5: son de una vista, no código muerto |
 
 **Criterios de aceptación.**
-- [ ] Tabla de los 32 acoplamientos con su letra, en este plan.
-- [ ] CLAUDE.md §1 y HANDOFF §1 con la regla de §1 de este plan.
-- [ ] Lista de borrado de F5 cerrada, con la evidencia de «nadie lo importa».
+- [x] Tabla de los acoplamientos con su letra, en este plan (34, no 32; y cuatro letras).
+- [x] CLAUDE.md §1 y HANDOFF §1 con la regla de §1 de este plan.
+- [x] Lista de borrado de F5 cerrada, con la evidencia de «nadie lo importa» y dos **[?]** para el usuario (Predicción, `plc_opcua.py`).
 
 ### F1 — La lectura del historiador y la «Planta» genérica
 
