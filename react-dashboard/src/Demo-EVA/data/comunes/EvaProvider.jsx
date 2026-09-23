@@ -114,3 +114,16 @@ export function useEvaSource() {
 export function useHayFuenteEva() {
   return useContext(Ctx) !== null;
 }
+
+/**
+ * La fuente del tanque, o `null` fuera del proveedor (Plan 42.5 F2, D12).
+ *
+ * Existe para los componentes del Detalle que sirven a DOS máquinas:
+ * `SelectorRango` y `GraficaComparada` reciben el lector por props desde la
+ * vista genérica, y caen a esta fuente sólo cuando nadie les pasa uno —el
+ * tanque, hasta que F4 lo retire—. Con el hook estricto no podrían montarse
+ * en una prueba de la vista genérica sin el árbol del tanque debajo.
+ */
+export function useEvaSourceOpcional() {
+  return useContext(Ctx);
+}

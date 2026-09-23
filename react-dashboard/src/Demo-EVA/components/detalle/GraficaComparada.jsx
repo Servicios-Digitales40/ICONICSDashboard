@@ -25,7 +25,7 @@
  * en un solo eje. Existe porque nivel (%) y caudal (sin unidad declarada) no
  * se pueden comparar en valor absoluto de ninguna manera razonable.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useDominio } from "@/i18n/useDominio.js";
@@ -34,7 +34,8 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 
 import { Card, MONO, PuntoEstado } from "../base.jsx";
 import { TooltipHistoria } from "./piezas.jsx";
-import { useSeriesHistoricas } from "../../data/comunes/hooks.js";
+import { useEvaSourceOpcional } from "../../data/comunes/EvaProvider.jsx";
+import { useSeriesDe } from "../../data/comunes/useSeriesDe.js";
 import { SENALES, historizadasMedidas } from "../../domain/senales.js";
 import { combinarPorTolerancia, normalizarAEscala } from "../../lib/comparar.js";
 
@@ -47,12 +48,23 @@ const colorDeSerie = (t, i) => [t.viz.azul, t.viz.ambar, t.viz.verde, t.viz.viol
  * seleccionada" sea predecible. Ver la cabecera del archivo sobre por qué
  * `historizadas()` a secas incluiría alarmas, mandos y registros crudos.
  */
-const CLAVES_COMPARABLES = historizadasMedidas();
+/**
+ * Las comparables del TANQUE, para cuando la vista no pasa las suyas (Plan
+ * 42.5 D12): las medidas con serie propia, con la escala del catálogo. Una
+ * máquina configurada pasa `comparables` con su `label` y su `escala` (o
+ * `null` si el tipo no declara banda), y aquí no se mira ningún catálogo.
+ */
+const COMPARABLES_TANQUE = historizadasMedidas().map((clave) => ({
+  clave,
+  label: null, // se rotula con `useDominio().senal(clave, "corto")`, como siempre
+  escala: SENALES[clave]?.escala ?? null,
+}));
+const SELECCION_TANQUE = ["nivelTanque", "presionRelativa"];
 
 const MAX_SIN_NORMALIZAR = 2;
 const MAX_NORMALIZADO = 4;
 
-function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
+function ChipSenal({ clave, label, activa, deshabilitada, color, t, onToggle }) {
   const { senal: senalTexto } = useDominio();
   return (
     <button
@@ -72,18 +84,35 @@ function ChipSenal({ clave, activa, deshabilitada, color, t, onToggle }) {
       }}
     >
       {activa && <PuntoEstado color={color} size={7} />}
-      {senalTexto(clave, "corto")}
+      {label ?? senalTexto(clave, "corto")}
     </button>
   );
 }
 
-export function GraficaComparada({ rango, t, delay = 0 }) {
+export function GraficaComparada({
+  rango, t, delay = 0, comparables = COMPARABLES_TANQUE, leerSeries = null, seleccionInicial = null,
+}) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   const { senal: senalTexto } = useDominio();
   const { locale } = useFormato();
-  const [seleccion, setSeleccion] = useState(["nivelTanque", "presionRelativa"]);
+  const [seleccion, setSeleccion] = useState(() => {
+    const claves = comparables.map((c) => c.clave);
+    const pedida = (seleccionInicial ?? SELECCION_TANQUE).filter((c) => claves.includes(c));
+    return pedida.length >= 2 ? pedida : claves.slice(0, 2);
+  });
   const [normalizar, setNormalizar] = useState(false);
+
+  const porClaveComparable = useMemo(() => new Map(comparables.map((c) => [c.clave, c])), [comparables]);
+  const rotulo = (clave) => porClaveComparable.get(clave)?.label ?? senalTexto(clave, "corto");
+
+  /* Quién lee: el lector que pasa la vista, o la fuente del tanque si nadie lo
+     pasa (D12). Se memoiza para que `useSeriesDe` no refetchee en cada render. */
+  const fuenteTanque = useEvaSourceOpcional();
+  const lector = useMemo(
+    () => (leerSeries ? { leerSeries } : fuenteTanque),
+    [leerSeries, fuenteTanque],
+  );
 
   const maxSeleccion = normalizar ? MAX_NORMALIZADO : MAX_SIN_NORMALIZAR;
 
@@ -102,13 +131,15 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
   // que pedir: el búfer en vivo no tiene la profundidad para comparar
   // tendencias, y alinear dos búferes de sesión es un problema distinto que
   // esta pieza no resuelve. Se le pide al operador que elija un rango.
-  const { porClave, loading, metaPorClave } = useSeriesHistoricas(rango ? seleccion : [], rango);
+  const { porClave, loading, metaPorClave } = useSeriesDe(lector, rango ? seleccion : [], rango ?? undefined);
 
   const filas = combinarPorTolerancia(porClave);
   const filasListas = normalizar
     ? filas.map((f) => {
         const out = { ms: f.ms, t: f.t };
-        for (const clave of seleccion) out[clave] = normalizarAEscala(f[clave], SENALES[clave].escala);
+        /* Sin escala declarada, `normalizarAEscala` devuelve el valor tal cual:
+           no se inventa un 0–100 para una variable sin banda. */
+        for (const clave of seleccion) out[clave] = normalizarAEscala(f[clave], porClaveComparable.get(clave)?.escala ?? null);
         return out;
       })
     : filas;
@@ -122,10 +153,11 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
       code={traducir("machines:compare.code")}
     >
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        {CLAVES_COMPARABLES.map((clave) => (
+        {comparables.map(({ clave, label }) => (
           <ChipSenal
             key={clave}
             clave={clave}
+            label={label}
             activa={seleccion.includes(clave)}
             deshabilitada={seleccion.length >= maxSeleccion}
             color={colorDeSerie(t, Math.max(0, seleccion.indexOf(clave)))}
@@ -169,7 +201,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
             {seleccion.map((clave, i) => (
               <span key={clave} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <PuntoEstado color={colorDeSerie(t, i)} size={7} />
-                {senalTexto(clave, "corto")}
+                {rotulo(clave)}
                 {!normalizar && (i === 0 ? " · eje izquierdo" : " · eje derecho")}
               </span>
             ))}
@@ -202,7 +234,7 @@ export function GraficaComparada({ rango, t, delay = 0 }) {
                 <Area
                   key={clave}
                   yAxisId={normalizar ? "unica" : i === 0 ? "izq" : "der"}
-                  type="monotone" dataKey={clave} name={senalTexto(clave, "corto")}
+                  type="monotone" dataKey={clave} name={rotulo(clave)}
                   stroke={colorDeSerie(t, i)} fill={colorDeSerie(t, i)} fillOpacity={0.08}
                   strokeWidth={2} isAnimationActive={false} dot={false} connectNulls={false}
                 />

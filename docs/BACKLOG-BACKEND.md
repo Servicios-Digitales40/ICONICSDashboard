@@ -633,3 +633,22 @@ escribe antes como fase de un plan.
 > exactamente el caso de este punto: 9–14 marcas y valores enteros. En vivo
 > no tenían dato cuando se midió (`medir-igualdad-en-vivo`), así que no se pudo
 > discriminar por esa vía; repetir cuando el variador publique.
+
+## B16 · `salud.test.mjs` depende de que un nombre DNS falle rápido
+
+**Visto el 22-09-2026 por la noche** (Plan 42.5 F2.0): «sin ninguna lectura
+todavía, lo DICE en vez de pintarlo mal» monta el puente con
+`ICONICS_API_BASE: https://planta.local/api` y `ICONICS_FAKE=false`, y `GET
+/api/health` tarda lo que tarde la red en decir que `planta.local` no
+existe. En la línea base de esa misma noche pasó (399/399); tres horas
+después falló por `timed out in 5000ms` corrida sola y en la suite. Es el
+«rojo de entorno» que HANDOFF §1 ya citaba, ahora con la causa.
+
+**Lo que cuesta.** Un rojo intermitente en la suite de backend que no dice
+nada del código, y que enseña a ignorar el rojo.
+
+**El arreglo.** Que la prueba no salga a la red: un nombre que resuelva a
+una dirección no enrutable de forma inmediata (`http://127.0.0.1:1`), o
+doblar el cliente de ICONICS como hacen las demás pruebas de rutas. Se
+escribe como tarea aparte; no se subió el `timeout` para callarlo
+(CLAUDE.md §6.2).

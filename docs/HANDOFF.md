@@ -2,7 +2,7 @@
 
 **Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
 `Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1 completada** (la capa de datos genérica y `maq-planta`); falta mirarla en el navegador contra planta con el backend reiniciado.
+lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1 y F2 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, y la causa del sondeo persistida); falta mirarlas en el navegador contra planta con el backend reiniciado.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se

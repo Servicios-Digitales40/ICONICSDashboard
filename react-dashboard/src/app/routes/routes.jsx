@@ -362,6 +362,17 @@ export const ROUTES = [
   },
   {
     /*
+     * El Detalle de la máquina configurada (Plan 42.5 F2): pestañas por
+     * activo, una tarjeta por variable con su gráfica real. Sin entrada de
+     * menú, como `eva-detalle`: se llega desde el botón «Detalle» de Planta y
+     * desde la ficha de un apoyo en la Vista 3D, con `?maquina=&activo=`.
+     */
+    id: "maq-detalle",
+    component: lazy(() => import("@/Demo-EVA/views/maquina/DetalleMaquina.jsx")),
+    porMaquina: { oculta: true },
+  },
+  {
+    /*
      * Riesgos de la máquina configurada (Plan 40 F2). Sin entrada de menú:
      * está unificada en Hallazgos (Plan 33 F10), pero sigue siendo el destino
      * de la Bandeja, de los Avisos y del asistente cuando llama a

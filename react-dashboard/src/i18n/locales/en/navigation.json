@@ -147,6 +147,11 @@
       "nav": "3D View",
       "sub": "Configured machine · where each probe measures, and in which direction"
     },
+    "maq-detalle": {
+      "title": "Detail",
+      "nav": "Detail",
+      "sub": "Configured machine · every variable with its full history"
+    },
     "maq-riesgos": {
       "title": "Risks",
       "nav": "Risks",

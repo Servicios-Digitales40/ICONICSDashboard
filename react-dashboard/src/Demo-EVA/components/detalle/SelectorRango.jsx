@@ -25,7 +25,7 @@ import { Calendar, ChevronLeft, ChevronRight, Radio } from "lucide-react";
 import { useFormato } from "@/i18n/formato.js";
 
 import { MONO } from "../base.jsx";
-import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
+import { useEvaSourceOpcional } from "../../data/comunes/EvaProvider.jsx";
 
 /**
  * `vivo` no lleva calculadora de rango: no le pide nada al historiador, así
@@ -84,8 +84,11 @@ function botonIcono(t, deshabilitado) {
  * Se relee al cambiar de mes visible, y no antes: abrir el calendario no
  * dispara más que la consulta del mes que ya se está mirando.
  */
-function useDiasConDato(claveSonda, mesVisible, hoy) {
-  const source = useEvaSource();
+function useDiasConDato(claveSonda, mesVisible, hoy, leerSerie) {
+  /* El lector llega por props desde la vista (Plan 42.5 D12); sin él, la
+     fuente del tanque, que es quien lo pasaba implícitamente hasta entonces. */
+  const fuente = useEvaSourceOpcional();
+  const leer = leerSerie ?? fuente?.leerSerie ?? null;
   const [dias, setDias] = useState(() => new Set());
 
   const anio = mesVisible.getFullYear();
@@ -93,7 +96,7 @@ function useDiasConDato(claveSonda, mesVisible, hoy) {
 
   useEffect(() => {
     setDias(new Set());
-    if (!claveSonda) return undefined;
+    if (!claveSonda || !leer) return undefined;
 
     const inicio = new Date(anio, mes, 1);
     const finMes = new Date(anio, mes + 1, 0);
@@ -103,8 +106,7 @@ function useDiasConDato(claveSonda, mesVisible, hoy) {
     if (fin.getTime() <= inicio.getTime()) return undefined;
 
     let vivo = true;
-    source
-      .leerSerie(claveSonda, { inicio, fin })
+    leer(claveSonda, { inicio, fin })
       .then(({ datos }) => vivo && setDias(new Set(datos.map((d) => d.t.toDateString()))))
       .catch(() => vivo && setDias(new Set()));
 
@@ -114,13 +116,13 @@ function useDiasConDato(claveSonda, mesVisible, hoy) {
     // `hoy` no va en las dependencias a propósito: un cambio de fecha a
     // medianoche con el popover abierto no tiene por qué repetir la consulta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, claveSonda, anio, mes]);
+  }, [leer, claveSonda, anio, mes]);
 
   return dias;
 }
 
 /** El calendario de dos clics: día de inicio, día de fin, confirmar o cancelar. */
-function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
+function CalendarioRango({ onAplicar, onCancelar, t, claveSonda, leerSerie }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   /*
@@ -139,7 +141,7 @@ function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
   const [inicio, setInicio] = useState(null);
   const [fin, setFin] = useState(null);
   const [sobre, setSobre] = useState(null);
-  const diasConDato = useDiasConDato(claveSonda, mesVisible, hoy);
+  const diasConDato = useDiasConDato(claveSonda, mesVisible, hoy, leerSerie);
 
   const enMesDeHoy = mesVisible.getFullYear() === hoy.getFullYear() && mesVisible.getMonth() === hoy.getMonth();
 
@@ -280,7 +282,7 @@ function CalendarioRango({ onAplicar, onCancelar, t, claveSonda }) {
  * @param claveSonda     clave de una señal historizada de la pestaña activa, para
  *                       pintar en el calendario qué días tienen muestras reales
  */
-export function SelectorRango({ activo, onPreset, onPersonalizado, t, claveSonda }) {
+export function SelectorRango({ activo, onPreset, onPersonalizado, t, claveSonda, leerSerie = null }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   const [abierto, setAbierto] = useState(false);
@@ -353,6 +355,10 @@ export function SelectorRango({ activo, onPreset, onPersonalizado, t, claveSonda
           <CalendarioRango
             t={t}
             claveSonda={claveSonda}
+            leerSerie={leerSerie}
+            leerSerie={leerSerie}
+            leerSerie={leerSerie}
+            leerSerie={leerSerie}
             onCancelar={() => setAbierto(false)}
             onAplicar={(diaInicio, diaFin) => {
               onPersonalizado(diaInicio, diaFin);

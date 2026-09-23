@@ -568,6 +568,27 @@
         "title": "Lo que no se puede decir",
         "code": "declarado por la configuración y el sondeo de esta máquina"
       }
+    },
+    "detalle": {
+      "sub": "{{maquina}} en detalle: cada valor con su histórico — real cuando la serie está verificada, del búfer de esta sesión cuando no",
+      "sinActivo": "Sin activo",
+      "sinVariables": {
+        "title": "Esta máquina no tiene variables",
+        "message": "Configúralas en Configuración para verlas aquí."
+      },
+      "variables_one": "{{count}} variable en este activo",
+      "variables_other": "{{count}} variables en este activo",
+      "hasMore": "El servidor tiene más muestras de las que caben aquí; se muestra una selección representativa.",
+      "compareSub": "Las series verificadas de esta máquina, cruzadas sobre la misma línea de tiempo",
+      "irAConfiguracion": "Ver en Configuración",
+      "causa": {
+        "sin-muestras": "Sin muestras en el historiador cuando se sondeó: no promete historia.",
+        "serie-compartida": "Su serie es indistinguible de la de {{otras}}: ninguna promete historia hasta comprobarlo.",
+        "no-se-pudo-leer": "El historiador no contestó cuando se sondeó; se conserva lo anterior.",
+        "sin-variacion": "La serie no varió cuando se sondeó y no se pudo comprobar que sea suya.",
+        "sin-sondear": "Todavía no se ha sondeado la serie de esta variable."
+      },
+      "verDetalle": "Ver detalle completo de {{apoyo}}"
     }
   }
 }

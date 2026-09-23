@@ -21,10 +21,13 @@ import {
 
 const VALOR_GRANDE = { fontFamily: MONO, fontSize: 30, fontWeight: 700, lineHeight: 1 };
 
-function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
+function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null, onIrAConfiguracion = null }) {
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation("machines");
   const { senal: senalTexto } = useDominio();
+  /* Una señal de máquina CONFIGURADA llega ya rotulada (`label`, de `metaDe`);
+     la del tanque se rotula con el diccionario del catálogo, como siempre. */
+  const configurada = typeof senal.label === "string" && senal.label.length > 0;
   const esBooleano = senal.tipo === "booleano";
   const tieneBufer = senal.bufferVivo.length >= 2;
 
@@ -40,7 +43,7 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>
-            {senalTexto(senal.key)}
+            {configurada ? senal.label : senalTexto(senal.key)}
           </div>
           <div style={{ fontFamily: MONO, fontSize: 10.5, color: t.textFaint, marginTop: 2 }}>{senal.tag}</div>
         </div>
@@ -117,11 +120,32 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
         ) : (
           <GraficaAusente t={t} alto={90} mensaje={traducir("detail.noOwnSeries")} />
         )}
+        {/* Una configurada sin serie verificada dice POR QUÉ, con la causa que
+            dejó el sondeo (Plan 42.5 D4/D11), y a dónde ir a sondearla. */}
+        {!senal.historizado && configurada && !esBooleano && (
+          <p style={{ margin: "8px 0 0", fontSize: 11, color: t.textFaint, lineHeight: 1.5 }}>
+            {traducir(`maquina.detalle.causa.${senal.historiaCausa ?? "sin-sondear"}`, {
+              otras: (senal.historiaCompartidaCon ?? []).join(", "),
+            })}
+            {onIrAConfiguracion && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={onIrAConfiguracion}
+                  style={{ background: "none", border: "none", padding: 0, color: t.accent, cursor: "pointer", fontSize: 11 }}
+                >
+                  {traducir("maquina.detalle.irAConfiguracion")}
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </div>
 
       {senal.nota && (
         <p style={{ margin: "12px 0 0", fontSize: 10.5, color: t.textFaint, lineHeight: 1.5 }}>
-          {senalTexto(senal.key, "nota")}
+          {configurada ? senal.nota : senalTexto(senal.key, "nota")}
         </p>
       )}
 
@@ -133,13 +157,13 @@ function TarjetaVariable({ senal, t, dark, ahora, delay, cobertura = null }) {
   );
 }
 
-export function DetalleGrid({ variables, t, dark, ahora, cobertura = null }) {
+export function DetalleGrid({ variables, t, dark, ahora, cobertura = null, onIrAConfiguracion = null }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 18 }}>
       {variables.map((senal, i) => (
         <TarjetaVariable
           key={senal.key} senal={senal} t={t} dark={dark} ahora={ahora}
-          cobertura={cobertura} delay={i * 0.07}
+          cobertura={cobertura} delay={i * 0.07} onIrAConfiguracion={onIrAConfiguracion}
         />
       ))}
     </div>

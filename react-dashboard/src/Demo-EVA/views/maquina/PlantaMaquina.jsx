@@ -40,8 +40,9 @@
  */
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { LayoutGrid } from "lucide-react";
 
-import { AlertBanner, SectionLabel } from "@/components/ui/index.js";
+import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVista.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
@@ -148,6 +149,10 @@ function PlantaMaquina({ onNavigate }) {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: t.textSoft }}>{maquina.nombre ?? maquina.id}</div>
           <UltimaLectura fecha={lastUpdated} t={t} />
+          {/* El rótulo del botón es el nombre de la ruta a la que lleva. */}
+          <Button variant="primary" icon={<LayoutGrid size={14} />} onClick={() => onNavigate?.("maq-detalle", { maquina: maquina.id })}>
+            {traducir("navigation:routes.maq-detalle.nav")}
+          </Button>
         </div>
 
         {/* 1 · ATENCIÓN — condicional: sin riesgo activo, no se pinta. */}

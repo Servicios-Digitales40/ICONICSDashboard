@@ -27,7 +27,8 @@ import { useTheme } from "@/theme";
 
 import { useEvaSource } from "../../data/comunes/EvaProvider.jsx";
 import { useDetalleActivo } from "../../data/tanque/detalleActivo.js";
-import { VENTANA, rangoAyer, rangoPersonalizado, rangoSemana } from "../../data/tanque/historia.js";
+import { rangoPersonalizado } from "../../data/tanque/historia.js";
+import { PRESETS_RANGO, aFechaUrl, leerRangoDeUrl } from "../../data/comunes/rangoEnUrl.js";
 import { ACTIVO_IDS } from "../../domain/activos.js";
 import { historizadas, pointName, senalInfo } from "../../domain/senales.js";
 import { useAhora } from "../../lib/useAhora.js";
@@ -40,60 +41,11 @@ import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVist
 import { descargarCSV } from "../../lib/exportar.js";
 import { armarCSVGeneral, nombreArchivoGeneral } from "../../lib/exportarTodo.js";
 
-/**
- * Con qué función se calcula el rango de cada acceso rápido contra el
- * historiador. «Tiempo real» no está aquí a propósito: no le pide nada al
- * historiador, lee del búfer en vivo (ver `data/tanque/detalleActivo.js`).
+/*
+ * El rango en la URL —presets, fechas, favoritos rotos que degradan a «vivo»—
+ * vivía aquí y se mudó a `data/comunes/rangoEnUrl.js` (Plan 42.5 F2) para que
+ * el Detalle de una máquina configurada use exactamente las mismas reglas.
  */
-const PRESETS_RANGO = { ayer: rangoAyer, semana: rangoSemana };
-const PRESETS_VALIDOS = ["vivo", "ayer", "semana", "personalizado"];
-
-/** `Date` → "2026-08-19": lo único que sobrevive el viaje de ida y vuelta por la URL (`useNavegacion` descarta cualquier valor que no sea cadena, número o booleano). */
-const aFechaUrl = (dia) => dia.toISOString().slice(0, 10);
-
-/**
- * "2026-08-19" → `Date` a medianoche LOCAL de ese día.
- *
- * `new Date("2026-08-19")` (sin más) la interpreta como medianoche UTC, no
- * local: en cualquier huso al oeste de Greenwich eso cae en la TARDE del día
- * anterior. `rangoPersonalizado` recibía ese valor tal cual y arrastraba el
- * rango entero un día hacia atrás —el día de fin elegido en el calendario
- * perdía justo las horas de la tarde, que es cuando el historiador de esta
- * planta tiene muestras—. Construir con año/mes/día por separado usa el
- * constructor LOCAL de `Date`, igual que hace el calendario al generar los
- * días que se clickean.
- */
-function deFechaUrl(fechaIso) {
-  const [anio, mes, dia] = fechaIso.split("-").map(Number);
-  return new Date(anio, mes - 1, dia);
-}
-
-/**
- * `params` de la URL → el rango que hay que mostrar.
- *
- * Un valor corrupto —un `rango` desconocido, o un `personalizado` con
- * fechas que no parsean— cae en «vivo», el mismo criterio que ya usa este
- * archivo para un `activo` desconocido (y que `useNavegacion` usa para una
- * página desconocida): un favorito roto no puede tumbar la vista, tiene que
- * degradar a algo que funcione.
- */
-function leerRangoDeUrl(params) {
-  const preset = PRESETS_VALIDOS.includes(params?.rango) ? params.rango : "vivo";
-
-  if (preset === "personalizado") {
-    const { desde, hasta } = params ?? {};
-    if (desde && hasta) {
-      const rango = rangoPersonalizado(deFechaUrl(desde), deFechaUrl(hasta));
-      if (!Number.isNaN(rango.inicio.getTime()) && !Number.isNaN(rango.fin.getTime())) {
-        return { presetActivo: "personalizado", rango, personalizado: { desde, hasta } };
-      }
-    }
-    return { presetActivo: "vivo", rango: VENTANA, personalizado: null };
-  }
-
-  const calculador = PRESETS_RANGO[preset];
-  return { presetActivo: preset, rango: calculador ? calculador() : VENTANA, personalizado: null };
-}
 
 function CabeceraActivo({ activo, dark, t, lastUpdated, onNavigate }) {
   const { t: traducir } = useTranslation("machines");
@@ -332,6 +284,7 @@ function DetalleActivo({ params, onNavigate }) {
                 onPersonalizado={elegirPersonalizado}
                 t={t}
                 claveSonda={claveSonda}
+                leerSerie={source.leerSerie}
               />
               {/*
                * Sin rango del historiador (modo «Tiempo real») no hay nada
@@ -384,7 +337,7 @@ function DetalleActivo({ params, onNavigate }) {
       <SectionLabel sub={traducir("machines:detail.compareSub")}>
         {traducir("machines:compare.title")}
       </SectionLabel>
-      <GraficaComparada rango={enVivo ? null : rango} t={t} dark={dark} />
+      <GraficaComparada rango={enVivo ? null : rango} t={t} dark={dark} leerSeries={source.leerSeries} />
     </div>
   );
 }

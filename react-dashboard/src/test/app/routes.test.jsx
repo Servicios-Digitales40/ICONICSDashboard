@@ -43,7 +43,7 @@ const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones"
 const navConMaquina = () => buildNav(ROUTES, NAV_GROUPS, () => true, [MAQUINA]);
 
 describe("superficie de la aplicación", () => {
-  it("son las treinta y tres vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las treinta y cuatro vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -82,6 +82,9 @@ describe("superficie de la aplicación", () => {
       "maq-planta",
       "maq-graficas",
       "maq-3d",
+      // El Detalle de la máquina (Plan 42.5 F2): oculta, se llega desde Planta
+      // y desde la Vista 3D con `?maquina=&activo=`.
+      "maq-detalle",
       // `maq-riesgos` (Plan 40 F2) existe y se navega con `?maquina=`, pero es
       // `oculta`: contesta lo mismo que «Hallazgos» con otro nombre (Plan 33
       // F10), así que no tiene entrada de menú. El asistente la usa de destino.

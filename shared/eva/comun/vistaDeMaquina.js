@@ -132,3 +132,112 @@ export function clavesConTendencia(sistema, maquina, tipo) {
       return aa - ab || ra - rb || ca - cb;
     });
 }
+
+/** Id de la pestaña que agrupa las variables sin `assetId` en el Detalle. */
+export const SIN_ACTIVO = "__sin-activo__";
+
+/**
+ * Los activos de una máquina configurada que tienen al menos una variable,
+ * en el orden de la configuración, más «Sin activo» al final sólo si alguna
+ * variable no cuelga de ninguno (Plan 42.5 D3). Un asset sin variables no es
+ * pestaña: no habría nada que enseñar en ella.
+ *
+ * @returns {Array<{id: string, nombre: string, variables: number}>}
+ */
+export function activosConVariables(maquina) {
+  const variables = (maquina?.variables ?? []).filter((v) => v?.pointName);
+  const cuenta = new Map();
+  for (const v of variables) {
+    const id = v.assetId ?? SIN_ACTIVO;
+    cuenta.set(id, (cuenta.get(id) ?? 0) + 1);
+  }
+
+  const salida = (maquina?.assets ?? [])
+    .filter((a) => a?.id && cuenta.has(a.id))
+    .map((a) => ({ id: a.id, nombre: a.nombre || a.id, variables: cuenta.get(a.id) }));
+
+  /* Variables colgadas de un `assetId` que no está declarado en `assets`: se
+     agrupan igual, con su id como rótulo. No se pierden en silencio. */
+  const declarados = new Set(salida.map((a) => a.id));
+  for (const [id, n] of cuenta) {
+    if (id === SIN_ACTIVO || declarados.has(id)) continue;
+    salida.push({ id, nombre: id, variables: n });
+    declarados.add(id);
+  }
+
+  if (cuenta.has(SIN_ACTIVO)) salida.push({ id: SIN_ACTIVO, nombre: null, variables: cuenta.get(SIN_ACTIVO) });
+  return salida;
+}
+
+/**
+ * Las variables de UN activo de una máquina configurada, en la forma que la
+ * tarjeta del Detalle (`components/detalle/DetalleGrid.jsx`) espera (Plan
+ * 42.5 D9). La tarjeta se escribió contra la señal del tanque —`key`, `tag`,
+ * `historizado`, `escala`, `tipo: "booleano"`, `banda` como clave de
+ * estado—; la forma común trae `clave`, `label`, `estado`, `historia`. Aquí
+ * se traduce una vez, en dominio y sin React, en vez de meterle un `if` a
+ * la tarjeta o escribir otra.
+ *
+ * Lo que NO se inventa:
+ * - `escala` sólo existe si el TIPO declara banda para el rol
+ *   (`tipo.bandaDe(rol)` con `max` finito); sin ella no hay barra.
+ * - `historizado` es `esHistorizada(clave)`: la serie VERIFICADA por el
+ *   sondeo, no la declarada. Junto va `historiaCausa`, la que dejó el
+ *   sondeo (`historyCausa`), para que la tarjeta diga por qué no hay gráfica.
+ * - `subirEsBueno` no se declara: nadie lo sabe de una configurada, y la
+ *   tarjeta lo trata como opcional.
+ * - Las de naturaleza «alarma» (banderas booleanas) se excluyen: viven en
+ *   su propia sección, como en el tanque.
+ *
+ * @param {object} sistema  el de `construirSistema`
+ * @param {object} maquina  la configuración cruda
+ * @param {object|null} estado  la forma común (`estado.senales`) de la última lectura
+ * @param {string} assetId  el activo, o `SIN_ACTIVO`
+ * @param {object|null} tipo  para `bandaDe(rol)`
+ */
+export function variablesDeActivo(sistema, maquina, estado, assetId, tipo = null) {
+  if (!sistema?.metaDe || !maquina?.variables) return [];
+  const porClave = new Map((estado?.senales ?? []).map((s) => [s.clave, s]));
+
+  return maquina.variables
+    .filter((v) => v?.pointName && (v.assetId ?? SIN_ACTIVO) === assetId)
+    .map((v) => {
+      const clave = v.id ?? v.pointName;
+      const meta = sistema.metaDe(clave);
+      if (!meta || meta.naturaleza === "alarma") return null;
+      const senal = porClave.get(clave) ?? null;
+      const banda = v.rol && tipo?.bandaDe ? tipo.bandaDe(v.rol) : null;
+      const escala =
+        banda && Number.isFinite(banda.max)
+          ? { min: Number.isFinite(banda.min) ? banda.min : 0, max: banda.max }
+          : null;
+      const historizado = Boolean(sistema.esHistorizada(clave));
+
+      return {
+        key: clave,
+        label: meta.label,
+        corto: meta.label,
+        tag: v.pointName,
+        punto: v.pointName,
+        unidad: meta.unidad ?? "",
+        decimales: meta.decimales ?? 1,
+        tipo: "numero",
+        naturaleza: meta.naturaleza,
+        rol: v.rol ?? null,
+        valor: senal?.valor ?? null,
+        texto: senal?.texto ?? null,
+        /* En la tarjeta `banda` es la clave de ESTADO que colorea; en la forma
+           común eso se llama `estado`. Sin lectura no hay banda. */
+        banda: senal && senal.valor !== null && senal.valor !== undefined ? (senal.estado ?? null) : null,
+        estado: senal?.estado ?? null,
+        escala,
+        nota: senal?.nota ?? null,
+        motivo: senal?.motivo ?? null,
+        historizado,
+        historiaCausa: v.historyCausa ?? null,
+        historiaCompartidaCon: v.historyCompartidaCon ?? [],
+        historiaComo: v.historyVerifiedComo ?? null,
+      };
+    })
+    .filter(Boolean);
+}

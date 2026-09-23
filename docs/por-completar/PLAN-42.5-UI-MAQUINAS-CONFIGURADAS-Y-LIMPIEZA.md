@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F1 completadas · F2–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F2 completadas · F3–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -665,6 +665,62 @@ cada variable sin gráfica diga **por qué**.
 6. **Contexto del asistente**: `{ sistema: maquina.id, activo, rango }`
    como `DetalleActivo`.
 
+**F2 hecha (22-09-2026, noche).** Lo que de verdad pasó, paso a paso:
+
+0. **La causa del sondeo se persiste** (D11), en un commit propio:
+   `crearVariable` declara `historyCausa: null` e `historyCompartidaCon: []`,
+   la ruta de sondeo los escribe junto al veredicto y `fusionarVariables` los
+   conserva mientras la serie sea la misma. El esquema de entrada no cambió:
+   no es `strict()`, descarta los campos del cliente y `crearVariable` los
+   pone a su valor por defecto. Una configuración anterior sin los campos
+   carga y construye igual (`verificar-maquinas`, 40). **Nota honesta sobre la
+   puerta**: la suite de backend dio 398 verdes y un rojo en
+   `salud.test.mjs` por tiempo agotado; corrido solo, también. Es la prueba
+   que monta el puente con `ICONICS_API_BASE: https://planta.local/api` y
+   `ICONICS_FAKE=false`, y su tiempo depende de la resolución de ese nombre
+   en la red de quien la corre —es el «rojo de entorno» que HANDOFF §1 ya
+   citaba y que en la línea base de esta noche no apareció. No toca nada de
+   F2.0 y no se ha cambiado; queda en el backlog decidir si esa prueba debe
+   depender del DNS.
+1. **`variablesDeActivo` y `activosConVariables`** (D3, D9) en
+   `shared/eva/comun/vistaDeMaquina.js`, con `SIN_ACTIVO`. Dos matices que
+   salieron al escribirlo: en la forma común `banda` es el objeto de límites
+   y `estado` la clave de color, y en la tarjeta es al revés —el adaptador lo
+   traduce y una prueba lo afirma—; y un `assetId` que no está declarado en
+   `assets` agrupa igual con su id, en vez de perderse.
+2. **`useDetalleMaquina`** en `data/comunes/`, misma forma que
+   `useDetalleActivo`; lee de la fuente de la máquina (`lecturaDe`, `buffer`,
+   `leerSerie`) y en «Tiempo real» pasa claves vacías.
+3. **`SelectorRango` y `GraficaComparada` ganan props** (D12): `leerSerie`;
+   `comparables`, `leerSeries` y `seleccionInicial`. Sin ellas caen a la
+   fuente del tanque por `useEvaSourceOpcional()` (nuevo, en `EvaProvider`),
+   y el tanque las pasa desde `DetalleActivo`. Las cuatro pruebas del tanque
+   que las montan siguen verdes sin cambiar. `DetalleGrid` rotula con
+   `senal.label` cuando llega (una configurada) y enseña la causa persistida
+   con el enlace a Configuración cuando no hay serie verificada.
+4. **`DetalleMaquina.jsx`**, con el rango en URL extraído a
+   `data/comunes/rangoEnUrl.js` (el tanque lo importa de ahí). **[?] D3
+   «Todas»: NO.** `vib-motor-03` tiene 86 variables y 78 series verificadas;
+   una pestaña «Todas» pediría 78 series por cambio de rango en dos lotes de
+   `MAX_SERIES_BATCH`. Se anota la cifra y se deja fuera.
+5. **Entradas**: botón «Detalle» en Planta; «Ver detalle completo de S1» en
+   la ficha del apoyo seleccionado de la Vista 3D (sólo con una configurada).
+   Ruta `maq-detalle` con `porMaquina: { oculta: true }`, delante de
+   `maq-riesgos`.
+6. **Contexto**: `{ sistema, activo, rango }`, como `DetalleActivo`.
+
+Pruebas nuevas: `variables-de-activo` (12, Node), `detalle-maquina` (13:
+pestañas, causa con enlace, rango en URL y de vuelta, `personalizado`
+corrupto → vivo, exportar todo con procedencia, «Sin activo»),
+`grafica-comparada-generica` (4: los dos componentes montados SIN
+`EvaProvider`; si alguno volviera a exigir la fuente del tanque, lanza).
+Las listas de rutas de dos pruebas existentes se actualizaron con
+`maq-detalle`.
+
+Hallazgo para F4: la fixture espejo rotula `S1` como «Lado acople»; el
+nombre del asset es el rótulo de la pestaña, y las pruebas lo leen de la
+configuración en vez de fijarlo.
+
 **Riesgos y cómo se cazan.**
 
 - *Una pestaña vacía o un activo fantasma.* Un asset sin variables no es
@@ -695,14 +751,17 @@ cada variable sin gráfica diga **por qué**.
 **Criterios de aceptación.**
 - [ ] Con `vib-motor-03` contra planta: una pestaña por activo con
       variables; las 78 verificadas con gráfica; las 8 sin verificar con su
-      causa persistida y sin gráfica.
-- [ ] Rango vivo / ayer / semana / personalizado y CSV funcionan como en el
+      causa persistida y sin gráfica. **Pendiente de mirar en el navegador**
+      (misma razón que F1: backend arrancado antes de estos cambios y
+      autenticación encendida). Afirmado por prueba con la fixture espejo:
+      36 de 73 verificadas con gráfica, las demás con su causa.
+- [x] Rango vivo / ayer / semana / personalizado y CSV funcionan como en el
       tanque, y `params` sobreviven a recargar (`maquina` incluido).
-- [ ] `declararContextoDeVista` lleva `sistema` y `activo`.
-- [ ] Recargar el backend no pierde la causa del sondeo (prueba de ruta).
-- [ ] Ninguna prueba del tanque cambia salvo el paso de props en
+- [x] `declararContextoDeVista` lleva `sistema` y `activo`.
+- [x] Recargar el backend no pierde la causa del sondeo (prueba de ruta).
+- [x] Ninguna prueba del tanque cambia salvo el paso de props en
       `DetalleActivo`; todas verdes.
-- [ ] Lint, types, verificadores, dos suites, `verificar-bundle` anotado.
+- [x] Lint, types, verificadores, dos suites, `verificar-bundle` anotado. **Tras F2:** frontend **1188** verdes · 29 omitidas; backend 398 + el rojo de entorno de `salud.test.mjs` (B16); los 41 verificadores; puerta 190/22 y 71; bundle `index` 355,6 KB / 450 (+4,3 KB) · `vendor` 269,1 (igual) · `charts` 326,4 (igual) · `DetalleMaquina` diferido, 6,4 KB. El build cazó un re-export que faltaba en `rangoEnUrl.js` y que Vitest no vio: el build ES parte de la puerta.
 
 ### F3 — Casos previos y aprendizaje
 

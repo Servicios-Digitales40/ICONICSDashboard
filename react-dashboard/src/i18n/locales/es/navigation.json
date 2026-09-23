@@ -147,6 +147,11 @@
       "nav": "Vista 3D",
       "sub": "Máquina configurada · dónde mide cada sonda, y en qué dirección"
     },
+    "maq-detalle": {
+      "title": "Detalle",
+      "nav": "Detalle",
+      "sub": "Máquina configurada · cada variable con su histórico completo"
+    },
     "maq-riesgos": {
       "title": "Riesgos",
       "nav": "Riesgos",

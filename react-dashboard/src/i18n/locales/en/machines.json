@@ -568,6 +568,27 @@
         "title": "What cannot be said",
         "code": "declared by this machine's configuration and probe"
       }
+    },
+    "detalle": {
+      "sub": "{{maquina}} in detail: every value with its history — real where the series is verified, from this session's buffer where it is not",
+      "sinActivo": "No asset",
+      "sinVariables": {
+        "title": "This machine has no variables",
+        "message": "Configure them in Configuration to see them here."
+      },
+      "variables_one": "{{count}} variable in this asset",
+      "variables_other": "{{count}} variables in this asset",
+      "hasMore": "The server holds more samples than fit here; a representative selection is shown.",
+      "compareSub": "This machine's verified series, cross-plotted on the same timeline",
+      "irAConfiguracion": "Open in Configuration",
+      "causa": {
+        "sin-muestras": "No samples in the historian when probed: no history is promised.",
+        "serie-compartida": "Its series is indistinguishable from {{otras}}: neither promises history until checked.",
+        "no-se-pudo-leer": "The historian did not answer when probed; the previous verdict is kept.",
+        "sin-variacion": "The series did not vary when probed and could not be confirmed as its own.",
+        "sin-sondear": "This variable's series has not been probed yet."
+      },
+      "verDetalle": "Full detail of {{apoyo}}"
     }
   }
 }

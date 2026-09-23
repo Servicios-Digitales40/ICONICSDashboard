@@ -579,6 +579,23 @@ function Vibraciones3D({ onNavigate }) {
           dark={dark}
         />
       )}
+      {/* «Ver detalle completo» del apoyo seleccionado (Plan 42.5 F2): el Detalle
+          de la máquina, con la pestaña de este apoyo abierta. Sólo con una
+          configurada: la escrita a mano no tiene esa vista. */}
+      {elementoSeleccionado && canalMeta[elementoSeleccionado.canal] && maquina.configurada && (
+        <button
+          type="button"
+          onClick={() => onNavigate?.("maq-detalle", { maquina: maquina.id, activo: elementoSeleccionado.canal })}
+          style={{
+            alignSelf: "flex-start",
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "7px 14px", borderRadius: 9, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
+            border: `1px solid ${t.border}`, background: t.panel, color: t.text,
+          }}
+        >
+          {traducir("machines:maquina.detalle.verDetalle", { apoyo: elementoSeleccionado.canal })}
+        </button>
+      )}
 
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
         <Panel title={traducir("machines:vibration.model3d.speed.title")}>
