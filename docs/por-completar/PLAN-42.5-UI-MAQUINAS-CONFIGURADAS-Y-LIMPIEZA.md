@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F4 completadas (F4 cerrada el 23-09-2026 con la decisión del usuario: fuera todas las vistas del tanque) · F5 hecha salvo dos decisiones pendientes (Predicción y `plc_opcua.py`), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · quedan la comprobación manual en el navegador (F1, F2) y el reinicio del backend tras el vaciado (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -863,9 +863,9 @@ LLM) y se deja anotado como recomendable, no como criterio.
 **Criterios de aceptación.**
 - [ ] Backend recién arrancado tras el vaciado: `GET /api/casos` → `total: 0`;
       «Casos previos» de `vib-motor-03` dice «ninguna intervención» sin
-      cifra inventada ni mención al tanque. **Pendiente de que quien opera el
-      despliegue ejecute el vaciado** (HANDOFF §7); el guion está probado
-      contra una copia y el texto ya no nombra al tanque (prueba).
+      cifra inventada ni mención al tanque. **El vaciado se ejecutó el
+      23-09-2026** (13 → 0, copia en `datos/`; ver F5); falta sólo reiniciar
+      el backend y mirarlo en pantalla.
 - [x] `verificar-diagnostico`, `verificar-casos`, `verificar-casos-cierre`,
       `verificar-calibracion` en verde (no dependían de la bitácora).
 - [x] `casos-rag.test.jsx` sin `.skip`, 5 pruebas verdes con una configurada.
@@ -1206,12 +1206,26 @@ respetando el final de línea de cada uno. **Puerta:** frontend **1162**
 verdes · 24 omitidas; `verificar-i18n` 21 comprobaciones y `verificar-textos`
 en verde; lint limpio.
 
-**[?] Usuario**: `modulos/prediccion/` (1295 líneas, oculto; arrastra
-`lib/queryClient.js` y el `QueryClientProvider` de `App.jsx` sólo si
-`ExploradorAssets` deja de usar react-query, la entrada `prediccion` de
-`shared/modulos.js` con sus asertos en `verificar-modulos`, `sec-prediccion`
-en los dos `navigation.json` y `VITE_PREDICTION_API_BASE`); y
-`scripts/plc_opcua.py` (el Plan 17 decidió conservarlo).
+**Las dos decisiones del usuario, tomadas el 23-09-2026**:
+
+- **Predicción se queda oculta**, no se borra. `modulos/prediccion/` (1295
+  líneas) sigue registrado sin `nav`, con la entrada `prediccion` de
+  `shared/modulos.js` y sus asertos en `verificar-modulos`: el registro de
+  módulos conserva su segundo ejemplo, y volver a ofrecerla es devolver seis
+  `nav`. Nada que borrar.
+- **`scripts/plc_opcua.py` se borra**, revocando la decisión del Plan 17
+  («herramienta de banco de pruebas; así se queda»). Nadie lo ejecutaba ni lo
+  citaba salvo la documentación; la revocación queda anotada en la tabla del
+  Plan 17 y CLAUDE.md §2.1 deja de nombrarlo.
+
+**Y el vaciado de la bitácora (F3) se ejecutó en esta máquina** el
+23-09-2026 a las 08:05: 13 intervenciones (11 `tanque`, 2 `grupo de
+bombeo`) → 0; 1 hecho y 5 propuestas intactos; copia en `datos/aprendizaje.json.antes-de-purga-2026-09-23T14-05-52-089Z.json`. El
+almacén se lee del disco en cada llamada, así que el backend que corría no
+necesitaba pararse; el reinicio queda para que el criterio de F3 (`GET
+/api/casos` → `total: 0`) se mire en pantalla. De paso volvió a aparecer
+`backend/datos/aprendizaje.json` con una intervención de prueba de la suite
+(B17): se borró como artefacto, otra vez.
 
 **Se quedan, y por qué**: las 22 `omitir()` de `verificar-herramientas`
 (motivo `CERRADA`: la fuente en vivo del tanque, Plan 43); las puertas

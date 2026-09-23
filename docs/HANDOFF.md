@@ -2,7 +2,7 @@
 
 **Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
 `Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F4 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, el vaciado de la bitácora documentado en §7 sin ejecutarlo, y el 23-09 **todas las vistas del tanque borradas** por decisión del usuario: `views/tanque/`, `AlarmasEva`, los 11 modelos 3D del tanque y el panel del tanque del muro; el tanque volverá como configurada en el Plan 43). F5 hecha salvo Predicción y `plc_opcua.py`, que esperan al usuario. Falta mirar Planta y Detalle en el navegador contra planta con el backend reiniciado.
+lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F4 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, el vaciado de la bitácora documentado en §7 sin ejecutarlo, y el 23-09 **todas las vistas del tanque borradas** por decisión del usuario: `views/tanque/`, `AlarmasEva`, los 11 modelos 3D del tanque y el panel del tanque del muro; el tanque volverá como configurada en el Plan 43). F5 cerrada: Predicción se queda oculta por decisión del usuario, `plc_opcua.py` borrado, y la bitácora de casos vaciada en esta máquina el 23-09 (13 → 0, copia en `datos/`; falta reiniciar el backend). Falta mirar Planta y Detalle en el navegador contra planta con el backend reiniciado.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -460,8 +460,10 @@ Deja una copia `datos/aprendizaje.json.antes-de-purga-<fecha>.json`; los
 `hechos` y las `propuestas` no se tocan. El índice de casos arranca vacío
 sin fallar (tres guardas: `leerAprendizaje` → almacén vacío, `casos.mjs` →
 `[]`) y el motor puntúa la fuente como `sin_respaldo`, no como caída. La
-caché `datos/embeddings-cache-casos.json` se regenera sola. **No se ha
-ejecutado en esta máquina el 22-09-2026**: se deja a quien decida.
+caché `datos/embeddings-cache-casos.json` se regenera sola. **Ejecutado en
+esta máquina el 23-09-2026 a las 08:05**: 13 → 0, copia en
+`datos/aprendizaje.json.antes-de-purga-2026-09-23T14-05-52-089Z.json`. El almacén se lee del disco en cada llamada, así que no hizo
+falta parar el backend; conviene reiniciarlo para mirar `GET /api/casos`.
 
 **Efecto que hay que saber**: `DELETE /api/maquinas/:id` desactiva en vez de
 borrar cuando la bitácora tiene casos que nombran la máquina. Con la bitácora

@@ -86,8 +86,9 @@ regla.
 
 1. **ICONICS FrameWorX es la única fuente de datos de sensores DE PLANTA, y
    la única fuente de verdad sobre ellos.** No hay MQTT, no hay OPC-UA en el
-   camino de datos (`scripts/plc_opcua.py` es un guion suelto, no está
-   conectado a nada), no hay Node-RED, no hay event bus. Todo dato de sensor
+   camino de datos (el guion suelto `scripts/plc_opcua.py` se borró el
+   23-09-2026, Plan 42.5 F5: nunca estuvo conectado), no hay Node-RED, no
+   hay event bus. Todo dato de sensor
    de planta entra por `backend/iconics/client.mjs`.
 
    **La acotación «de planta» es del 03-09-2026 y tiene dueño**

@@ -338,7 +338,7 @@ Consecuencias concretas para la matriz de capacidades:
 |---|---|---|---|
 | **C02** | Ingesta de sensores | `Implementado` · «sólo REST; sin MQTT/OPC-UA» · Prioridad Baja | **Implementado · sin reserva.** REST sobre ICONICS es la arquitectura, no una etapa intermedia |
 | — | Event bus / Node-RED | «no existe» | **Fuera de alcance por decisión.** El camino de datos es `client.mjs → quality → sistema*.js → estadoMaquina.js` |
-| — | `scripts/plc_opcua.py` | «guion suelto, no está en el camino de datos» | **Correcto, y así se queda.** Es una herramienta de banco de pruebas; no debe entrar al camino de datos |
+| — | `scripts/plc_opcua.py` | «guion suelto, no está en el camino de datos» | **Correcto, y así se queda.** Es una herramienta de banco de pruebas; no debe entrar al camino de datos. *Revocado el 23-09-2026 (Plan 42.5 F5, decisión del usuario): se borró; nadie lo ejecutaba ni lo citaba salvo la documentación* |
 | — | Base de datos / vector DB | «persistencia JSON» | **Fuera de alcance.** Con 5 intervenciones y 44 fragmentos, un JSON con índice incremental es la respuesta proporcionada. Se revisará cuando la bitácora pase de ~1.000 casos, no antes |
 | — | WebSocket | «el frontend sondea REST» | **Fuera de alcance.** El sondeo cubre el caso de uso; un socket es complejidad sin síntoma |
 | **C13** | OCR | `No implementado` | **Fuera de alcance, deliberado.** `documentos.mjs:540-549` lo detecta y lo declara. Mentir sería el fallo; callarse, también. No hace ninguna de las dos |
