@@ -1,7 +1,8 @@
 # HANDOFF — dónde estamos y cómo seguir
 
-**Fecha:** 22-09-2026 (tarde) · **Rama viva:** `Vibraciones1.0` · **HEAD:** el
-cierre del Plan 42 (F4, archivar); `git log -1` lo dice.
+**Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
+`Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
+lo dice.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -248,9 +249,16 @@ embeddings), no un motor externo.
 
 ### Ramas
 
-`Vibraciones1.0` es **la única viva**. Está **393 commits por delante de
-`main`**, y `origin/Vibraciones1.0` coincide con el HEAD local —el trabajo está
-en el remoto—.
+**`UI-Limpieza1.0` es la viva** desde la noche del 22-09-2026: nace de
+`Vibraciones1.0` en el cierre del Plan 42 y lleva el Plan 42.5 (la UI que
+acompaña a las máquinas configuradas, y la limpieza). Su regla sobre el tanque
+es distinta de la de `Vibraciones1.0`: ver CLAUDE.md §1 y el Plan 42.5 §1. **No
+se ha subido al remoto.** `origin/Vibraciones1.0` está en `5529029` (las series
+equivalentes); el commit de PRODUCT.md (`ff7a83c`) y lo de esta rama son
+locales.
+
+`Vibraciones1.0` queda como estaba: **393 commits por delante de `main`** más
+los del Plan 42.
 
 Hay **13 ramas locales y 24 remotas**, todas anteriores. `POR CONFIRMAR` si
 alguna sigue en uso; ninguna se ha tocado en este trabajo.
@@ -259,8 +267,13 @@ alguna sigue en uso; ninguna se ha tocado en este trabajo.
 
 > **Estado a 22-09-2026 (tarde).** El Plan 41 se escribió y se **completó en el
 > día**; con él se archivaron el 32, el 37, el 38 y el 40. El **42** se escribió
-> después y también se completó el mismo día. En `docs/por-completar/` queda
-> **sólo el Plan 33**, y es correcto.
+> después y también se completó el mismo día. En `docs/por-completar/` quedan
+> el **Plan 33** (su F9 espera al tipo del tanque) y el **Plan 42.5**, escrito
+> esa noche en la rama nueva: la «Planta» con histórico y el «Detalle» de
+> activo del tanque, hechos genéricos para cualquier máquina configurada
+> (F1–F2), y después la limpieza: casos y aprendizaje del tanque (F3), sus
+> vistas y pruebas omitidas (F4), y el código que nadie importa (F5). El tanque
+> como máquina configurada será el **Plan 43**, cuando éste termine.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no

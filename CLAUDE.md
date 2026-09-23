@@ -39,6 +39,22 @@ de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.m
 > **Cerrado no es borrado.** Todo lo del tanque sigue en el árbol, comentado o
 > con `.skip`, y cada sitio dice cómo volver. Reabrir es deshacer, no reescribir.
 >
+> ### Rama `UI-Limpieza1.0` (desde el 22-09-2026): el tanque ya no es «el Tanque»
+>
+> Nace de `Vibraciones1.0` con una decisión del usuario: **el tanque se piensa
+> como otra posible máquina configurada**, no como una instalación aparte. La
+> regla de arriba cambia así, y el detalle está en
+> [`docs/por-completar/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md`](docs/por-completar/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md) §1:
+>
+> 1. **El dominio del tanque** (`shared/eva/tanque/`) **sigue sin borrarse**: es
+>    la materia prima del tipo `estacion-de-llenado` del Plan 43. Se lee, se
+>    puede mover; no se destila en esta rama.
+> 2. **Sus vistas y su capa de datos se sustituyen por vistas genéricas de
+>    máquina configurada y se borran**, con las pruebas omitidas que sólo ellas
+>    justificaban. Borrar va **después** de sustituir, nunca antes.
+> 3. **Lo que no es de ninguna máquina y nadie importa se borra ya**, con la
+>    evidencia en el commit.
+>
 > Lo que sigue en este documento describe el proyecto COMPLETO, que es el que
 > vuelve al reabrir.
 
