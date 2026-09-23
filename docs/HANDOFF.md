@@ -406,8 +406,11 @@ embeddings), no un motor externo.
 Tres ramas vivas desde el **23-09-2026**, y su plan, en **§0** («Las ramas, y
 el plan del día de la demo»): `UI-Limpieza1.0` (Moisés), `DemoVibraciones4.0`
 (la de la presentación; sólo recibe merges) y `AjustesGustavo5.0` (Gustavo, el
-asistente). Las tres son locales: **ninguna se ha subido al remoto** sin
-pedirlo. `origin/Vibraciones1.0` sigue en `5529029`.
+asistente). `UI-Limpieza1.0` **sí está en `origin`** (la subió el usuario;
+`origin/UI-Limpieza1.0` va en `9f1c44a` a fecha de hoy). `DemoVibraciones4.0`
+y `AjustesGustavo5.0` nacieron locales el 23-09-2026 y **se suben sólo cuando
+se pida** (CLAUDE.md §6): Gustavo las necesita en el remoto para empezar.
+`origin/Vibraciones1.0` sigue en `5529029`.
 
 Hay además **13 ramas locales y 24 remotas anteriores** (`Moises5–7`,
 `Gustavo5`, `IntegracionMoises6Gustavo5`, `Mejoras-Demo-6.0`, `Demo3.0`,
