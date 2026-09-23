@@ -283,9 +283,12 @@ esta capa — la banda se pide a `shared/eva/`, no se recalcula.
 Con dos instalaciones (tanque, vibraciones) más lo transversal, el nombre de
 archivo/vista se distingue por **máquina**, no por el nombre de la demo:
 
-- `tanque/` — `InicioTanque`, `PlantaTanque`, `RiesgosTanque`, `ControlesTanque`,
-  `MaquetaTanque3D`, `DetalleActivo` (ya es exclusivo del tanque por
-  contenido, no necesita el sufijo).
+- `tanque/` — `InicioTanque`, `RiesgosTanque`, `ControlesTanque`,
+  `MaquetaTanque3D`. (`PlantaTanque` y `DetalleActivo` se retiraron en el
+  Plan 42.5 F4: los sustituyen las vistas genéricas de `maquina/`.)
+- `maquina/` — `PlantaMaquina`, `DetalleMaquina`: para CUALQUIER máquina
+  configurada, dirigidas por su `sistema` y su tipo, sin un `if` por máquina
+  (Plan 42.5 D1).
 - `vibraciones/` — `InicioVibraciones`, `RiesgosVibracion`, `Vibraciones`,
   `Vibraciones3D`. Desde el Plan 40 F2 todas reciben la máquina CONFIGURADA
   que se tiene delante; no hay vista de una vibraciones escrita a mano.

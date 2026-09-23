@@ -50,6 +50,7 @@ import { clavesConTendencia } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
 import { UltimaLectura } from "../../components/base.jsx";
+import { useAhora } from "../../lib/useAhora.js";
 import {
   BandaSenalesConHistoria, EstadoVariables, LimitacionesMaquina, TendenciasMaquina,
 } from "../../components/maquina/tilesMaquina.jsx";
@@ -72,8 +73,10 @@ function PlantaMaquina({ onNavigate }) {
   const { t: traducir } = useTranslation(["machines", "navigation", "errors"]);
   const { theme: t, dark } = useTheme();
 
-  const { sistema, maquina, estado, dominio, lastUpdated, loading, error } = useEstadoDeMaquina();
+  const { sistema, maquina, estado, dominio, lastUpdated, loading, error, fuente } = useEstadoDeMaquina();
   const tipo = tipoDe(maquina?.tipo);
+  // Un solo reloj para toda la vista: ver la cabecera de `useAhora`.
+  const ahora = useAhora();
 
   /* El asistente sabe qué máquina hay en pantalla; sólo el identificador. */
   useEffect(() => (maquina ? declararContextoDeVista({ sistema: maquina.id }) : undefined), [maquina]);
@@ -97,7 +100,19 @@ function PlantaMaquina({ onNavigate }) {
     [tipo, dominio],
   );
 
-  const senales = useMemo(() => estado?.senales ?? [], [estado]);
+  /* Cada señal con la FECHA de su lectura (`receivedAt`, `stale`), que la
+     forma común no lleva y los tiles necesitan para enseñar un valor congelado
+     como su edad y no como cifra (§2.4). `lastUpdated` es la dependencia real
+     de `lecturaDe`: el motor no cambia de identidad al leer. */
+  const senales = useMemo(
+    () =>
+      (estado?.senales ?? []).map((s) => {
+        const l = fuente?.lecturaDe?.(s.clave) ?? null;
+        return l ? { ...s, receivedAt: l.receivedAt, stale: l.stale } : s;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [estado, fuente, lastUpdated],
+  );
   const porClaveSenal = useMemo(() => new Map(senales.map((s) => [s.clave, s])), [senales]);
   const destacadas = claves.map((c) => porClaveSenal.get(c)).filter(Boolean);
 
@@ -174,7 +189,7 @@ function PlantaMaquina({ onNavigate }) {
           {traducir("machines:maquina.planta.historia.title", { count: claves.length })}
         </SectionLabel>
         {claves.length > 0 ? (
-          <BandaSenalesConHistoria senales={destacadas} porClave={porClave} t={t} dark={dark} base={0.05} />
+          <BandaSenalesConHistoria senales={destacadas} porClave={porClave} t={t} dark={dark} ahora={ahora} base={0.05} />
         ) : (
           <AlertBanner type="info" title={traducir("machines:maquina.planta.historia.ningunaTitle")} message={traducir("machines:maquina.planta.historia.ninguna")} />
         )}
@@ -182,7 +197,7 @@ function PlantaMaquina({ onNavigate }) {
         {/* 3 · Qué dice cada variable ahora mismo, con barra donde el tipo declara banda. */}
         <div className="maq-band">
           <div className="maq-full">
-            <EstadoVariables senales={senales} bandaDe={bandaDe} grupos={estado?.grupos ?? []} t={t} dark={dark} delay={0.3} />
+            <EstadoVariables senales={senales} bandaDe={bandaDe} grupos={estado?.grupos ?? []} t={t} dark={dark} ahora={ahora} delay={0.3} />
           </div>
         </div>
 
@@ -199,7 +214,7 @@ function PlantaMaquina({ onNavigate }) {
                   senales={destacadas} porClave={porClave}
                   metaPorClave={errorHistoria ? Object.fromEntries(claves.map((c) => [c, { error: errorHistoria.message }])) : metaPorClave}
                   cobertura={cobertura} horas={VENTANA.horas}
-                  t={t} dark={dark} delay={0.4}
+                  t={t} dark={dark} ahora={ahora} delay={0.4}
                 />
               )}
             </div>

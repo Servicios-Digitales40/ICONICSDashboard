@@ -31,7 +31,7 @@ import { useFormato } from "@/i18n/formato.js";
 import { hasValue } from "@shared/valores.js";
 import { SIN_DATO, fmtNum } from "@/lib/format.js";
 
-import { HISTORIAL, estadoHistorial } from "../../data/comunes/estadoDelDato.js";
+import { HISTORIAL, estadoHistorial, presentarValor } from "../../data/comunes/estadoDelDato.js";
 import { Card, ESCALA, MONO, PuntoEstado, Spark } from "../base.jsx";
 import { estadoColor } from "../paleta.js";
 
@@ -41,10 +41,13 @@ const fmtValor = (senal, v = senal.valor) =>
 
 /* ── Señales con historia: una tarjeta por serie verificada, con su sparkline ── */
 
-function TarjetaSenalConHistoria({ senal, datos, t, dark, delay }) {
+function TarjetaSenalConHistoria({ senal, datos, t, dark, delay, ahora }) {
   const { estado: estadoTexto } = useDominio();
   const color = estadoColor(dark, senal.estado ?? "sin_dato");
   const serie = (datos ?? []).map((p) => p.valor);
+  /* Un valor congelado se enseña como su EDAD, no como cifra (§2.4): ver
+     `presentarValor`. `receivedAt`/`stale` los pone la vista desde la fuente. */
+  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
 
   return (
     <Card t={t} delay={delay} style={{ padding: "14px 16px 14px" }}>
@@ -59,8 +62,11 @@ function TarjetaSenalConHistoria({ senal, datos, t, dark, delay }) {
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-          <span style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: hasValue(senal.valor) ? t.text : t.textFaint, lineHeight: 1 }}>
-            {fmtValor(senal)}
+          <span
+            title={atenuado && senal.receivedAt ? senal.receivedAt.toLocaleString() : undefined}
+            style={{ fontFamily: MONO, fontSize: 22, fontWeight: 700, color: hasValue(senal.valor) && !atenuado ? t.text : t.textFaint, lineHeight: 1 }}
+          >
+            {texto}
           </span>
           <Spark serie={serie} color={color} t={t} delay={delay} />
         </div>
@@ -76,11 +82,11 @@ function TarjetaSenalConHistoria({ senal, datos, t, dark, delay }) {
  * La banda de las series verificadas. `senales` ya viene ordenada por el
  * dominio (`clavesConTendencia`); aquí sólo se pinta una tarjeta por señal.
  */
-export function BandaSenalesConHistoria({ senales, porClave, t, dark, base = 0 }) {
+export function BandaSenalesConHistoria({ senales, porClave, t, dark, ahora = new Date(), base = 0 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16 }}>
       {senales.map((s, i) => (
-        <TarjetaSenalConHistoria key={s.clave} senal={s} datos={porClave?.[s.clave]} t={t} dark={dark} delay={base + i * 0.04} />
+        <TarjetaSenalConHistoria key={s.clave} senal={s} datos={porClave?.[s.clave]} t={t} dark={dark} ahora={ahora} delay={base + i * 0.04} />
       ))}
     </div>
   );
@@ -110,10 +116,11 @@ function BarraDeBanda({ senal, banda, t, dark }) {
   );
 }
 
-function FilaVariable({ senal, banda, t, dark }) {
+function FilaVariable({ senal, banda, t, dark, ahora }) {
   const { estado: estadoTexto } = useDominio();
   const sinDato = !hasValue(senal.valor);
   const color = estadoColor(dark, sinDato ? "sin_dato" : senal.estado ?? "sin_dato");
+  const { texto, atenuado } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
 
   return (
     <li style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderBottom: `1px solid ${t.border}` }}>
@@ -122,8 +129,11 @@ function FilaVariable({ senal, banda, t, dark }) {
         {senal.label}
       </span>
       <BarraDeBanda senal={senal} banda={banda} t={t} dark={dark} />
-      <span style={{ fontFamily: MONO, fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: sinDato ? t.textFaint : t.text, minWidth: 84, textAlign: "right" }}>
-        {fmtValor(senal)}
+      <span
+        title={atenuado && senal.receivedAt ? senal.receivedAt.toLocaleString() : undefined}
+        style={{ fontFamily: MONO, fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: sinDato || atenuado ? t.textFaint : t.text, minWidth: 84, textAlign: "right" }}
+      >
+        {texto}
       </span>
       <span style={{ fontSize: 10.5, color: t.textFaint, minWidth: 54, textAlign: "right" }}>
         {sinDato ? "" : senal.estado ? estadoTexto(senal.estado, "corto") : ""}
@@ -137,7 +147,7 @@ function FilaVariable({ senal, banda, t, dark }) {
  * el variador, las alarmas…) en el orden en que llegan. `bandaDe(senal)` la
  * pone quien conoce el tipo; aquí sólo se pinta si devuelve algo.
  */
-export function EstadoVariables({ senales, bandaDe = () => null, grupos = [], t, dark, delay = 0 }) {
+export function EstadoVariables({ senales, bandaDe = () => null, grupos = [], t, dark, ahora = new Date(), delay = 0 }) {
   const { t: traducir } = useTranslation("machines");
   const conLectura = senales.filter((s) => hasValue(s.valor)).length;
 
@@ -165,7 +175,7 @@ export function EstadoVariables({ senales, bandaDe = () => null, grupos = [], t,
             )}
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {lista.map((s) => (
-                <FilaVariable key={s.clave} senal={s} banda={bandaDe(s)} t={t} dark={dark} />
+                <FilaVariable key={s.clave} senal={s} banda={bandaDe(s)} t={t} dark={dark} ahora={ahora} />
               ))}
             </ul>
           </section>
@@ -177,10 +187,11 @@ export function EstadoVariables({ senales, bandaDe = () => null, grupos = [], t,
 
 /* ── Tendencias: cada serie del historiador con su propia escala ─────── */
 
-function PanelTendenciaMaquina({ senal, datos, error, motivo, t, dark }) {
+function PanelTendenciaMaquina({ senal, datos, error, motivo, t, dark, ahora }) {
   const { t: traducir } = useTranslation("machines");
   const { hora } = useFormato();
   const color = estadoColor(dark, senal.estado ?? "sin_dato");
+  const { texto: valorActual } = presentarValor({ receivedAt: senal.receivedAt, stale: senal.stale, ahora, formateado: fmtValor(senal) });
 
   const filas = (datos ?? []).map((p) => ({ hora: hora(p.t), valor: p.valor }));
   const historial = estadoHistorial({ error, motivo, datos: filas, minimo: 2 });
@@ -191,7 +202,7 @@ function PanelTendenciaMaquina({ senal, datos, error, motivo, t, dark }) {
         <span title={senal.label} style={{ ...ESCALA.etiqueta, color: t.textFaint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {senal.label}
         </span>
-        <span style={{ ...ESCALA.dato, fontSize: 12, color, fontVariantNumeric: "tabular-nums" }}>{fmtValor(senal)}</span>
+        <span style={{ ...ESCALA.dato, fontSize: 12, color, fontVariantNumeric: "tabular-nums" }}>{valorActual}</span>
       </div>
 
       {historial !== HISTORIAL.OK ? (
@@ -228,7 +239,7 @@ function PanelTendenciaMaquina({ senal, datos, error, motivo, t, dark }) {
  * declara siempre: un rango a medias dibujado como curva continua se lee como
  * si la máquina hubiera evolucionado así, cuando lo que hubo fue silencio.
  */
-export function TendenciasMaquina({ senales, porClave, metaPorClave, cobertura, horas, t, dark, delay = 0 }) {
+export function TendenciasMaquina({ senales, porClave, metaPorClave, cobertura, horas, t, dark, ahora = new Date(), delay = 0 }) {
   const { t: traducir } = useTranslation("machines");
   const incompleta = cobertura && cobertura.completa === false;
 
@@ -257,7 +268,7 @@ export function TendenciasMaquina({ senales, porClave, metaPorClave, cobertura, 
           <PanelTendenciaMaquina
             key={s.clave} senal={s} datos={porClave?.[s.clave]}
             error={metaPorClave?.[s.clave]?.error} motivo={metaPorClave?.[s.clave]?.motivo}
-            t={t} dark={dark}
+            t={t} dark={dark} ahora={ahora}
           />
         ))}
       </div>

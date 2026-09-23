@@ -43,7 +43,7 @@ const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones"
 const navConMaquina = () => buildNav(ROUTES, NAV_GROUPS, () => true, [MAQUINA]);
 
 describe("superficie de la aplicación", () => {
-  it("son las treinta y cuatro vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las treinta y dos vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -54,14 +54,14 @@ describe("superficie de la aplicación", () => {
     // PLC_2, y no comparten nada. Antes iban en una sola lista y la
     // separación existía sólo en la cabeza de quien ya la sabía.
     //
-    // `eva-detalle` cierra la lista sin `nav`: no es una pantalla a la que un
-    // operador llegue en frío —¿de qué activo?—, pero sigue siendo superficie
-    // navegable. Si alguien esconde una vista detrás de una bandera, aquí se
-    // ve.
+    // `cierre-diagnostico` cierra la lista sin `nav`: no es una pantalla a la
+    // que un operador llegue en frío, pero sigue siendo superficie navegable.
+    // Si alguien esconde una vista detrás de una bandera, aquí se ve.
+    // (`eva-planta` y `eva-detalle` salieron en el Plan 42.5 F4: las
+    // sustituyen `maq-planta` y `maq-detalle`.)
     expect(ids).toEqual([
       // Estación de llenado — el tanque y su grupo de bombeo.
       "eva-inicio",
-      "eva-planta",
       "eva-riesgos",
       "eva-controles",
       "eva-maqueta",
@@ -149,9 +149,8 @@ describe("superficie de la aplicación", () => {
       "pred-historico",
       "pred-correlacion",
       "pred-pronostico",
-      // Sin `nav`: destinos de detalle, no pantallas a las que se llegue en
+      // Sin `nav`: destino de detalle, no pantalla a la que se llegue en
       // frío desde el sidebar.
-      "eva-detalle",
       "cierre-diagnostico",
     ]);
   });

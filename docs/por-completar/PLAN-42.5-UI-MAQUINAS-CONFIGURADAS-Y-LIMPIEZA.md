@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F3 completadas · F4–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F3 completadas · F4 hecha en su parte segura (el resto espera la decisión del usuario) · F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -893,6 +893,58 @@ caso aquí**: la fuente en vivo (`EvaProvider`, `evaSource`, `hooks.js`,
 `simulador.js`, `transportes.js`) y las puertas `domain/*.js` con consumidor
 —son (b) del inventario de F0.
 
+**F4, la parte segura, hecha (23-09-2026, madrugada).** Lo que de verdad
+pasó:
+
+**Borrado, con su sustituto escrito antes**: `views/tanque/PlantaTanque.jsx`
+→ `PlantaMaquina`; `views/tanque/DetalleActivo.jsx` → `DetalleMaquina`;
+`data/tanque/detalleActivo.js` → `useDetalleMaquina`; `components/tiles.jsx`
+(su único consumidor era `PlantaTanque`) → `components/maquina/tilesMaquina.jsx`;
+`buildModeloEva` y las derivaciones del tanque en `lib/modelo.js` (queda
+`delta`, que usan la tarjeta y el hook genéricos); las rutas `eva-planta` y
+`eva-detalle` con sus claves de `navigation` en es/en, y las dos rutas de la
+entrada `tanque` del registro (`sistemas.js`), que las declaraba.
+
+**Lo que la retirada tocó en las vistas del tanque que quedan**, porque
+apuntaban a las rutas borradas: `InicioTanque` pierde la tarjeta «Gráficas» y
+su CTA principal (el CTA pasa a ser «Ver la Vista 3D en vivo»);
+`MaquetaTanque3D` deja de pasar `onDetalle` a la ficha (la ficha ya
+ocultaba el botón sin él).
+
+**Pruebas**: se borraron `planta-simulada`, `detalle-activo-simulada`,
+`detalle-exportar`, `selector-rango` y `cobertura-declarada`, cada una con su
+espejo ya escrito: `planta-maquina` (14, incluidos el botón «Detalle», el
+corto del estado junto al color y el valor congelado enseñado como su edad),
+`planta-maquina-simulada`, `detalle-maquina` (13, con «Exportar todo» y su
+procedencia), **`detalle-maquina-simulada` (9, nueva)** —el rango en la URL
+ida y vuelta, «atrás/adelante», la insignia «Sesión actual» → «Historiador»,
+y el calendario con «Aplicar», días con muestras y «Cancelar», todo con la
+red cortada— y `grafica-comparada-generica` (4). `edad-dato.test` conserva
+su parte de `DetalleGrid`; `accesibilidad.test` audita ahora `PlantaMaquina`
+y `DetalleMaquina` con axe-core en lugar de las dos del tanque. Siete pruebas
+más que citaban las rutas retiradas se ajustaron (`routes`, `llenado-cerrado`,
+`paleta-comandos`, `topbar-estado-maquina`, `edad-dato-controles`,
+`inicio-simulada`, `secciones-por-maquina`).
+
+**Un hueco que la retirada destapó y se cerró**: los tiles genéricos no
+aplicaban la frescura del dato —un valor congelado se enseñaba como cifra—
+mientras los del tanque sí (`presentarValor`). Ahora `PlantaMaquina` anota en
+cada señal su `receivedAt`/`stale` desde la fuente y las tres bandas lo
+enseñan como su edad al congelarse; `planta-maquina.test` lo afirma.
+
+**Bundle**: `index` **354,4 KB** (355,6 tras F2; 345,5 antes de F1: el
+arranque no vuelve a la cifra anterior porque la capa de datos genérica que
+importa `fuenteDeMaquina` entra en él, ~9 KB, y eso es lo que sustituye a las
+3450 líneas borradas). `DetalleMaquina` diferido 35,0 KB (antes compartía
+trozo con `DetalleActivo`), `PlantaMaquina` 11,5, `charts` 326,4 igual.
+
+**Lo que queda de F4 es la decisión del usuario, sin tocar**: `InicioTanque`,
+`RiesgosTanque`, `ControlesTanque`, `MaquetaTanque3D`, `AlarmasEva` (en el
+menú), `MuroPlanta`, los 11 modelos 3D sólo del tanque y sus pruebas. Se
+borran si el tanque entrará por configuración con vistas genéricas (Plan
+43); si no, quedan cerradas. Las 24 pruebas omitidas dependen todas de la
+fuente en vivo (b) y llevan «para reabrir»; ninguna era de Planta/Detalle.
+
 **Conocimiento que se conserva antes de borrar.** Las cabeceras de
 `DetalleActivo` (las tres versiones del layout), `PlantaTanque` (rejilla de
 12 y ritmo binario), `tiles.jsx` (el mapa contra «Planta · v2») y
@@ -901,15 +953,17 @@ valiendo se copia a la cabecera de la vista genérica **en el commit
 anterior al borrado**, para que el diff del borrado sea sólo borrado.
 
 **Criterios de aceptación.**
-- [ ] Ninguna prueba `.skip` sin dueño: cada omitida está borrada con su
-      vista, reescrita sobre la genérica, o lleva «para reabrir: Plan 43»
-      porque depende de la fuente en vivo.
-- [ ] `verificar-bundle` en verde con `index` **más pequeño** que la cifra
-      anotada en F1, y `charts` anotado.
-- [ ] `verificar-i18n` y `verificar-textos` en verde (las claves de las
-      rutas borradas se van con ellas).
-- [ ] `grep` de `views/tanque/PlantaTanque`, `DetalleActivo`,
-      `detalleActivo.js`, `tiles.jsx` en `src/` devuelve cero.
+- [x] Ninguna prueba `.skip` sin dueño: las de Planta y Detalle del tanque se
+      borraron con su espejo ya escrito; las 24 omitidas que quedan (eran 29;
+      F3 reabrió 5) dependen de la fuente en vivo (b) y llevan «para reabrir».
+- [x] `verificar-bundle` en verde; `index` 354,4 KB, más pequeño que tras F2
+      (355,6) pero no que antes de F1 (345,5): la capa de datos genérica entra
+      en el arranque. La cifra y el porqué, arriba. **Puerta:** frontend **1160** verdes · 24 omitidas (5 archivos del tanque borrados con su espejo, 1 nuevo); los 41 verificadores; lint y types limpios; build en verde.
+- [x] `verificar-i18n` y `verificar-textos` en verde (las claves de las
+      rutas borradas se van con ellas; 1448 claves × 2).
+- [x] `grep` de `views/tanque/PlantaTanque`, `DetalleActivo`,
+      `detalleActivo.js`, `tiles.jsx` en `src/` devuelve cero (código; queda una
+      mención en un comentario de `Vibraciones.jsx`).
 
 ### F5 — Código muerto
 

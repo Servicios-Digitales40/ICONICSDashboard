@@ -235,11 +235,6 @@ export const ROUTES = [
   },
 
   {
-    id: "eva-planta",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/PlantaTanque.jsx")),
-  },
-
-  {
     // Va justo detrás de «Planta» a propósito: contesta la pregunta siguiente.
     // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
     id: "eva-riesgos",
@@ -686,16 +681,12 @@ export const ROUTES = [
   },
 
 
-  {
-    // Sin `nav`: no es una pantalla a la que un operador llegue en frío desde
-    // el sidebar —¿de qué activo?—, sino un destino de detalle. Se llega
-    // desde la ficha de un activo en la Maqueta 3D («Ver detalle completo»),
-    // con `?activo=` en la URL. Genérica para los cuatro activos: ver
-    // `domain/activos.js`.
-    id: "eva-detalle",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/DetalleActivo.jsx")),
-  },
-
+  /*
+   * `eva-planta` y `eva-detalle` —la Planta y el Detalle de activo del
+   * tanque— se retiraron en el Plan 42.5 F4: `maq-planta` y `maq-detalle`
+   * hacen lo mismo para cualquier máquina configurada, y el tanque las
+   * tendrá al entrar por configuración (Plan 43).
+   */
   {
     // Sin `nav`, mismo criterio que `eva-detalle`: se llega con el botón
     // «Cerrar diagnóstico» de una tarjeta de riesgo (Riesgos, del tanque o

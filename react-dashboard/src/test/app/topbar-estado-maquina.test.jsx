@@ -116,7 +116,7 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
    * Para reabrir: quitar el `.skip`.
    */
   it.skip("en las pantallas de la estación de llenado, se ve", async () => {
-    montar("eva-planta");
+    montar("eva-inicio");
     await waitFor(() => {
       expect(screen.getByText(/Encendida|Apagada/i)).toBeTruthy();
     });
@@ -167,7 +167,7 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     // sección se deriva del registro. Con una lista escrita a mano, cerrar la
     // estación de llenado no habría cambiado nada y el indicador seguiría
     // saliendo en sus pantallas. Al reabrir vuelve a valer "sec-llenado".
-    expect(SECCION_DE_PAGINA["eva-planta"] ?? null).toBeNull();
+    expect(SECCION_DE_PAGINA["eva-inicio"] ?? null).toBeNull();
     /*
      * ── LAS DE VIBRACIONES NO TIENEN SECCIÓN FIJA (Plan 40 F2) ───────
      *
@@ -197,11 +197,12 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
      * generales tampoco») es la que lo fija de verdad; ésta sólo verifica de
      * dónde sale la sección.
      *
-     * `eva-detalle` sigue sin `nav`, y por tanto sin sección: el indicador
-     * tampoco debe dársela por supuesta.
+     * `maq-detalle` (Plan 42.5 F2) sigue sin `nav`, y por tanto sin sección:
+     * el indicador tampoco debe dársela por supuesta. (`eva-detalle` salió
+     * del registro en F4.)
      */
     expect(SECCION_DE_PAGINA["eva-bandeja"]).toBe("sec-planta");
     expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-planta");
-    expect(SECCION_DE_PAGINA["eva-detalle"]).toBeNull();
+    expect(SECCION_DE_PAGINA["maq-detalle"]).toBeNull();
   });
 });

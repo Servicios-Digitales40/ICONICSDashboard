@@ -240,7 +240,6 @@ function MaquetaTanque3D({ params, onNavigate }) {
               seleccionado={seleccionado === a.id}
               onSeñalar={setSeñalado}
               onSeleccionar={(id) => setSeleccionado((actual) => (actual === id ? null : id))}
-              onDetalle={() => onNavigate?.("eva-detalle", { activo: a.id })}
               onAlarmas={(id) => onNavigate?.("eva-alarmas", { tab: "vivo", activo: id })}
               detalle
             />

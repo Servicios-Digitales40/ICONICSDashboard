@@ -123,7 +123,8 @@ describe("InicioTanque · VISTAS[].dato: sólo la medida adjunta su señal", () 
   it("las entradas que CUENTAN no adjuntan señal: una cuenta no caduca con el reloj", () => {
     const sistema = sistemaDe(senalDe(FRESCA));
 
-    for (const id of ["eva-planta", "eva-assets"]) {
+    /* `eva-planta` salió de la rejilla en el Plan 42.5 F4; queda la que cuenta. */
+    for (const id of ["eva-assets"]) {
       const dato = REJILLA_VISTAS.find((v) => v.id === id).dato(sistema);
       expect(dato.senal, `${id} no debe adjuntar señal`).toBeUndefined();
     }

@@ -56,7 +56,7 @@
  * los tokens semánticos del resto"). El resto del gradiente sigue en
  * `accent`/`accentSoft`, los tokens de marca de siempre.
  */
-import { ArrowRight, Boxes, Cpu, Factory, Gauge, LayoutDashboard, Monitor, Radio, Server, WifiOff } from "lucide-react";
+import { ArrowRight, Boxes, Cpu, Factory, Gauge, Monitor, Radio, Server, WifiOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
@@ -398,18 +398,12 @@ const REJILLA = `
  * el reloj. Nada fuera de este archivo y sus pruebas la usa — el nombre lleva
  * el prefijo para que quede claro que no es un registro público.
  */
+/*
+ * La tarjeta de «Gráficas» (`eva-planta`) se retiró con la vista en el Plan
+ * 42.5 F4: la Planta genérica de una máquina configurada (`maq-planta`) hace
+ * lo que hacía, y el tanque la tendrá el día que entre por configuración.
+ */
 export const REJILLA_VISTAS = [
-  {
-    id: "eva-planta",
-    Icono: LayoutDashboard,
-    dato: (sistema) => {
-      const { fueraDeLimite, enAviso, enBanda } = sistema.resumen;
-      if (!sistema.resumen.medidas) return null;
-      if (fueraDeLimite > 0) return { clave: "outOfLimits", valores: { count: fueraDeLimite }, estado: "critico" };
-      if (enAviso > 0) return { clave: "warning", valores: { count: enAviso }, estado: "atencion" };
-      return { clave: "inRange", valores: { count: enBanda }, estado: "nominal" };
-    },
-  },
   {
     id: "eva-maqueta",
     Icono: Factory,
@@ -826,16 +820,10 @@ function InicioTanque({ onNavigate }) {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {/*
                 El nombre de cada pantalla se interpola desde `navigation`, que
-                es de donde lo saca el sidebar: un botón que promete «Gráficas»
-                y un menú que dice otra cosa es un error que sólo aparece al
-                traducir. Mismo criterio que el pie de «Riesgos · Vibraciones».
+                es de donde lo saca el sidebar. El CTA principal iba a «Gráficas»
+                (`eva-planta`) hasta el Plan 42.5 F4, que retiró esa vista.
               */}
-              <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => onNavigate?.("eva-planta")}>
-                {traducir("dashboard:home.hero.enter", {
-                  pantalla: traducir("navigation:routes.eva-planta.nav"),
-                })}
-              </Button>
-              <Button variant="ghost" icon={<Factory size={15} />} onClick={() => onNavigate?.("eva-maqueta")}>
+              <Button variant="primary" icon={<Factory size={15} />} onClick={() => onNavigate?.("eva-maqueta")}>
                 {traducir("dashboard:home.hero.see3d", {
                   pantalla: traducir("navigation:routes.eva-maqueta.nav"),
                 })}

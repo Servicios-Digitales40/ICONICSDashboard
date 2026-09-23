@@ -31,7 +31,8 @@ import { ROUTES, DEFAULT_ROUTE } from "@/app/routes/routes.jsx";
 import { NAV, PAGES } from "@/app/routes/index.js";
 
 /** Las cinco vistas de la estación de llenado, más su destino de detalle. */
-const DEL_TANQUE = ["eva-inicio", "eva-planta", "eva-riesgos", "eva-controles", "eva-maqueta"];
+/* `eva-planta` salió del registro en el Plan 42.5 F4: la sustituye `maq-planta`. */
+const DEL_TANQUE = ["eva-inicio", "eva-riesgos", "eva-controles", "eva-maqueta"];
 
 afterEach(() => {
   cleanup();

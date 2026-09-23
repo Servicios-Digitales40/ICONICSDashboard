@@ -12,11 +12,6 @@
       "nav": "Overview",
       "sub": "Industrial water system · live data from ac:TDCON/DEMO/SENSORES/"
     },
-    "eva-planta": {
-      "title": "Trends",
-      "nav": "Trends",
-      "sub": "Industrial water system · the eight signals of ac:TDCON/DEMO/SENSORES/"
-    },
     "eva-riesgos": {
       "title": "Risks",
       "nav": "Risks",
@@ -91,11 +86,6 @@
       "title": "Documentation",
       "nav": "Documentation",
       "sub": "The manuals feeding the assistant's index, and what it can extract from each"
-    },
-    "eva-detalle": {
-      "title": "Asset Detail",
-      "nav": "Detail",
-      "sub": "Every variable, with its value and full history"
     },
     "cierre-diagnostico": {
       "title": "Close Diagnosis",

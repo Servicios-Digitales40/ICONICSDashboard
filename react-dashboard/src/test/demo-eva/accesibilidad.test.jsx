@@ -34,9 +34,41 @@ import { auditarAccesibilidad } from "../a11y.js";
 
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import InicioTanque from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
-import PlantaTanque from "@/Demo-EVA/views/tanque/PlantaTanque.jsx";
 import AssetsEva from "@/Demo-EVA/views/comunes/AssetsEva.jsx";
-import DetalleActivo from "@/Demo-EVA/views/tanque/DetalleActivo.jsx";
+import PlantaMaquina from "@/Demo-EVA/views/maquina/PlantaMaquina.jsx";
+import DetalleMaquina from "@/Demo-EVA/views/maquina/DetalleMaquina.jsx";
+import { crearMaquina } from "@shared/eva/comun/configuracionMaquina.js";
+import { olvidarFuentesDeMaquina } from "@/Demo-EVA/data/comunes/fuenteDeMaquina.js";
+
+/*
+ * Las vistas GENÉRICAS de máquina configurada (Plan 42.5 F1/F2) sustituyen a
+ * `PlantaTanque` y `DetalleActivo` en esta auditoría (F4): misma exigencia
+ * —cero violaciones graves—, montadas punta a punta en «Simulado» sobre una
+ * configurada con series verificadas a medias, como las demás pruebas de
+ * vistas. `useMaquina` se dobla porque el provider real sale a la red.
+ */
+const RAIZ_MAQ = "ac:OTRA/PLANTA/Motor/";
+const CONFIGURADA = crearMaquina({
+  id: "otra-vibraciones", nombre: "Otra máquina", tipo: "vibraciones", plc: "PLC_9 · ua:OTRA", cadenciaMs: 200,
+  assets: [
+    { id: "Motor", pointName: RAIZ_MAQ, rol: "raiz" },
+    { id: "S1", pointName: `${RAIZ_MAQ}S1/`, nombre: "Lado acople" },
+    { id: "S2", pointName: `${RAIZ_MAQ}S2/` },
+  ],
+  variables: [
+    { id: "vRMS_S1", pointName: `${RAIZ_MAQ}S1/vRMS_S1`, historyPointName: "hda:\\O\\vRMS_S1", assetId: "S1", rol: "medida:vRMS" },
+    { id: "aRMS_S1", pointName: `${RAIZ_MAQ}S1/aRMS_S1`, assetId: "S1", rol: "medida:aRMS" },
+    { id: "vRMS_S2", pointName: `${RAIZ_MAQ}S2/vRMS_S2`, historyPointName: "hda:\\O\\vRMS_S2", assetId: "S2", rol: "medida:vRMS" },
+  ],
+});
+for (const v of CONFIGURADA.variables) v.historyVerified = Boolean(v.historyPointName);
+vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", async (importOriginal) => ({
+  ...(await importOriginal()),
+  useMaquina: () => ({
+    id: CONFIGURADA.id, configurada: CONFIGURADA, registro: null,
+    enServicio: true, cerrada: null, enServicioIds: [CONFIGURADA.id],
+  }),
+}));
 
 beforeEach(() => {
   vi.stubEnv("VITE_ICONICS_FAKE", "true");
@@ -45,6 +77,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  olvidarFuentesDeMaquina();
   vi.unstubAllEnvs();
   delete globalThis.fetch;
 });
@@ -105,9 +138,9 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
    * rojo, que es peor que la prueba lenta. El criterio no se toca — sigue
    * exigiendo cero violaciones graves.
    */
-  it("PlantaTanque no tiene violaciones graves", async () => {
-    montarComoLaApp(<PlantaTanque onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
+  it("PlantaMaquina (la Planta genérica) no tiene violaciones graves", async () => {
+    montarComoLaApp(<PlantaMaquina onNavigate={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Estado de las variables")).toBeTruthy(), { timeout: 4_000 });
     await auditarAccesibilidad();
   }, 30_000);
 
@@ -123,11 +156,12 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
    * producción nadie paga. Lo que no se toca es el criterio: sigue exigiendo
    * cero violaciones graves en los cuatro.
    */
-  it("DetalleActivo no tiene violaciones graves, en sus cuatro activos", async () => {
-    for (const activo of ["tanque", "bombeo", "distribucion", "electrico"]) {
+  it("DetalleMaquina (el Detalle genérico) no tiene violaciones graves, en sus dos activos", async () => {
+    for (const activo of ["S1", "S2"]) {
       cleanup();
-      montarComoLaApp(<DetalleActivo params={{ activo }} onNavigate={() => {}} />);
-      await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy());
+      olvidarFuentesDeMaquina();
+      montarComoLaApp(<DetalleMaquina params={{ maquina: CONFIGURADA.id, activo }} onNavigate={() => {}} />);
+      await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy(), { timeout: 4_000 });
       await auditarAccesibilidad();
     }
   }, 30_000);
@@ -152,16 +186,14 @@ describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => 
 const CORTO_ESTADO = /En banda|Aviso|Fuera|Sin dato|Reposo/;
 
 describe("el color de banda no es su único portador (Plan 13, F6)", () => {
-  it("BarraBanda: el corto del estado aparece junto a la marca, en Planta", async () => {
-    // Sólo Planta usa StatSenal/Medidor (BarraBanda); InicioTanque es la
-    // landing y no repite las tarjetas de señal.
-    montarComoLaApp(<PlantaTanque onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0));
-  });
+  /* En la Planta genérica el estado sólo existe donde el tipo declara banda,
+     y en «Simulado» depende del régimen del momento; ese contrato se afirma
+     con estado fijado en `planta-maquina.test.jsx` («el corto acompaña al
+     color»), no aquí. */
 
-  it("BandaValor: el corto del estado aparece bajo cada variable con escala, en el Detalle", async () => {
-    montarComoLaApp(<DetalleActivo params={{ activo: "tanque" }} onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0));
+  it("BandaValor: el corto del estado aparece bajo cada variable con escala, en el Detalle genérico", async () => {
+    montarComoLaApp(<DetalleMaquina params={{ maquina: CONFIGURADA.id, activo: "S1" }} onNavigate={() => {}} />);
+    await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0), { timeout: 4_000 });
   });
 });
 

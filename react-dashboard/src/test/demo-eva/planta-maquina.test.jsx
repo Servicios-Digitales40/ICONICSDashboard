@@ -7,7 +7,7 @@
  * La máquina es la fixture espejo (73 variables, tres apoyos) con las series
  * del catálogo verificadas: 36 de 73, «a medias», que es el caso real.
  */
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const contexto = vi.fn();
@@ -165,6 +165,50 @@ describe("con una máquina de tres apoyos y series verificadas a medias", () => 
     montar();
 
     expect(screen.queryByText(/Requiere atención/)).toBeNull();
+  });
+
+  it("el botón «Detalle» lleva al Detalle de ESTA máquina, sin activo fijo", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+    const onNavigate = vi.fn();
+
+    render(
+      <ThemeProvider>
+        <PlantaMaquina onNavigate={onNavigate} />
+      </ThemeProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Detalle$/ }));
+
+    expect(onNavigate).toHaveBeenCalledWith("maq-detalle", { maquina: configurada.id });
+  });
+
+  it("el corto del estado acompaña al color de cada variable con estado (el color no es su único portador)", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    const conEstado = { ...estado, senales: estado.senales.map((s, i) => (i === 0 ? { ...s, estado: "critico" } : s)) };
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado: conEstado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    montar();
+
+    /* «Fuera» es el corto de `critico` en `machines:status`. */
+    expect(screen.getAllByText("Fuera").length).toBeGreaterThan(0);
+  });
+
+  it("un valor congelado se enseña como su edad, no como una cifra que parece nueva", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    const haceDosMinutos = new Date(Date.now() - 120_000);
+    estadoDeMaquina = {
+      ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: haceDosMinutos, loading: false,
+      fuente: { lecturaDe: () => ({ valor: 1.5, receivedAt: haceDosMinutos, stale: true, motivo: null }) },
+    };
+    series = conSeries(sistema, configurada);
+
+    montar();
+
+    expect(screen.getAllByText(/^hace 2 m$/).length).toBeGreaterThan(0);
+    /* Y ninguna fila enseña «1,5» como si acabara de llegar. */
+    expect(screen.queryAllByText(/^1[.,]5(0+)?\s/).length).toBe(0);
   });
 
   it("las limitaciones del registro se enseñan tal cual, sin recalcular", () => {

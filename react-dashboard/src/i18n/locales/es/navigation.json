@@ -12,11 +12,6 @@
       "nav": "Inicio",
       "sub": "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/"
     },
-    "eva-planta": {
-      "title": "Gráficas",
-      "nav": "Gráficas",
-      "sub": "Sistema de agua industrial · las ocho señales de ac:TDCON/DEMO/SENSORES/"
-    },
     "eva-riesgos": {
       "title": "Riesgos",
       "nav": "Riesgos",
@@ -91,11 +86,6 @@
       "title": "Documentación",
       "nav": "Documentación",
       "sub": "Los manuales que alimentan el índice del asistente, y qué sabe extraer de cada uno"
-    },
-    "eva-detalle": {
-      "title": "Detalle de activo",
-      "nav": "Detalle",
-      "sub": "Cada variable, con su valor y su histórico completo"
     },
     "cierre-diagnostico": {
       "title": "Cerrar diagnóstico",

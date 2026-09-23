@@ -58,7 +58,7 @@ describe("Inicio (landing) en modo simulado", () => {
     expect(fetchTrampa).not.toHaveBeenCalled();
   });
 
-  it("las tres vistas están presentes como tarjetas, ya desde el primer render", () => {
+  it("las dos vistas están presentes como tarjetas, ya desde el primer render", () => {
     cortarLaRed();
 
     montar();
@@ -67,19 +67,21 @@ describe("Inicio (landing) en modo simulado", () => {
     // «Gráficas» y «Maqueta 3D» a «Vista 3D»— cuando el sidebar se partió por
     // sistema. Los ids NO cambiaron: lo que se toca aquí es cómo se llaman en
     // pantalla, no a dónde llevan.
-    for (const nombre of ["Gráficas", "Vista 3D", "Assets"]) {
+    // «Gráficas» (`eva-planta`) se retiró en el Plan 42.5 F4: la sustituye la
+    // Planta genérica de una máquina configurada.
+    for (const nombre of ["Vista 3D", "Assets"]) {
       expect(screen.getByRole("button", { name: new RegExp(`^${nombre}`) })).toBeTruthy();
     }
   });
 
-  it("el CTA entra a Gráficas, y cada tarjeta navega a su propia vista", () => {
+  it("el CTA entra a la Vista 3D, y cada tarjeta navega a su propia vista", () => {
     cortarLaRed();
     const onNavigate = vi.fn();
 
     montar(onNavigate);
 
-    fireEvent.click(screen.getByRole("button", { name: /Entrar a Gráficas/ }));
-    expect(onNavigate).toHaveBeenCalledWith("eva-planta");
+    fireEvent.click(screen.getByRole("button", { name: /Ver la Vista 3D/ }));
+    expect(onNavigate).toHaveBeenCalledWith("eva-maqueta");
 
     fireEvent.click(screen.getByRole("button", { name: /^Assets/ }));
     expect(onNavigate).toHaveBeenCalledWith("eva-assets");
