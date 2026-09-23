@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F2 completadas · F3–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F3 completadas · F4–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -808,6 +808,44 @@ que queda es **de despliegue, de texto y de pruebas**, no de dominio.
    comportamiento esperado y se comprueba en `maquinas.test.mjs` que el
    camino «con casos → desactivar» sigue cubierto con datos falsos.
 
+**F3 hecha (23-09-2026, madrugada).** Lo que de verdad pasó:
+
+1. `purgar-casos-invalidos.mjs` gana `--vaciar-intervenciones`: mismo
+   informe en seco, misma copia `.antes-de-purga-<fecha>.json`, mismo
+   `--ejecutar` deliberado; `hechos` y `propuestas` no se tocan. Probado
+   contra una copia de la bitácora real en un directorio temporal: 13 → 0,
+   la copia conserva las 13, y una segunda pasada dice «ya está vacía». **No
+   se ejecutó sobre `datos/aprendizaje.json` de esta máquina**: es estado
+   del despliegue (D7) y la orden es de quien lo opera; HANDOFF §7 dice cómo.
+   Por eso el primer criterio de aceptación queda como pendiente de esa
+   decisión, no de código.
+2. La copia fantasma `backend/datos/aprendizaje.json` **no era una bitácora
+   olvidada: eran 30 intervenciones de prueba de `vib-motor-03`** que
+   escriben las pruebas de `POST /api/casos` al correr con `cwd = backend/`
+   (`RUTA_APRENDIZAJE` es relativa). El puente real arranca desde la raíz
+   (`node --env-file=.env.local backend/server.mjs`, comprobado en el
+   proceso vivo) y no la ve. Se apartó junto con el residuo
+   `datos/embeddings-cache-casos.json` (200 bytes, de `verificar-casos`);
+   HANDOFF §8 lo cuenta como trampa y **B17** pide la ruta absoluta y
+   `mkdtemp` en esas pruebas.
+3. `assistant:rag.cases.emptyOcultos` (es/en) deja de nombrar «el sistema de
+   vibraciones» y «la estación de llenado»: dice «para esta máquina» y «de
+   otras máquinas». Tres asertos de `casos-solo-en-servicio` que citaban el
+   texto viejo se actualizaron; la vista no cambió de código.
+4. Comentarios reescritos con lo que es cierto hoy: `CasosRag.jsx` (dos
+   bloques que decían «la bitácora tiene 13»), `maquinas.test.mjs` (el «11
+   casos») y la cabecera de `casos-solo-en-servicio`.
+5. `casos-rag.test.jsx` **vuelve entera** (5 pruebas): casos de una
+   configurada (`vib-motor-03`, «Vibración en zona de daño en S1») con
+   `useMaquina` doblado como hacen las demás pruebas de vistas. Las omitidas
+   del frontend pasan de 29 a 24.
+6. El efecto en `DELETE /api/maquinas/:id` (con bitácora vacía toda máquina
+   es borrable) queda anotado en HANDOFF §7 y en el comentario de la prueba.
+
+Lo que NO hizo, y por qué: no tocó el motor ni el índice (las tres guardas
+del índice vacío y `sin_respaldo` ya existían, verificado en F0); no midió
+la narración con `casos: 0` (es un `medir-*`, necesita el LLM).
+
 **Lo que NO se hace**: tocar el motor, el índice ni las guardas (ya están);
 medir la narración con `casos: 0` es un `medir-*` (instrumento, necesita el
 LLM) y se deja anotado como recomendable, no como criterio.
@@ -815,11 +853,14 @@ LLM) y se deja anotado como recomendable, no como criterio.
 **Criterios de aceptación.**
 - [ ] Backend recién arrancado tras el vaciado: `GET /api/casos` → `total: 0`;
       «Casos previos» de `vib-motor-03` dice «ninguna intervención» sin
-      cifra inventada ni mención al tanque.
-- [ ] `verificar-diagnostico`, `verificar-casos`, `verificar-casos-cierre`,
+      cifra inventada ni mención al tanque. **Pendiente de que quien opera el
+      despliegue ejecute el vaciado** (HANDOFF §7); el guion está probado
+      contra una copia y el texto ya no nombra al tanque (prueba).
+- [x] `verificar-diagnostico`, `verificar-casos`, `verificar-casos-cierre`,
       `verificar-calibracion` en verde (no dependían de la bitácora).
-- [ ] `casos-rag.test.jsx` sin `.skip`, 5 pruebas verdes con una configurada.
-- [ ] No existe `backend/datos/aprendizaje.json`; HANDOFF lo dice.
+- [x] `casos-rag.test.jsx` sin `.skip`, 5 pruebas verdes con una configurada.
+- [x] No existe `backend/datos/aprendizaje.json`; HANDOFF lo dice (y B17 pide que
+      la suite deje de crearlo). **Puerta:** frontend **1193** verdes · **24** omitidas (las 5 de Casos previos vuelven); backend 398 + el rojo de entorno (B16); los 41 verificadores; lint y types limpios.
 
 ### F4 — Retirar las vistas del tanque y sus pruebas
 

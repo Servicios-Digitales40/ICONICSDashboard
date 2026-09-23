@@ -24,6 +24,17 @@ import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+/* La vista enseña los casos de LA máquina en contexto (Plan 33 F10): se le
+   pone delante una configurada, como hacen las demás pruebas de vistas. */
+const ID_MAQUINA = "vib-motor-03";
+vi.mock("@/Demo-EVA/data/comunes/MaquinaContext.jsx", async (importOriginal) => {
+  const original = await importOriginal();
+  return {
+    ...original,
+    useMaquina: () => ({ ...original.useMaquina(), id: ID_MAQUINA, enServicioIds: [ID_MAQUINA] }),
+  };
+});
+
 import { ThemeProvider } from "@/theme";
 import CasosRag from "@/Demo-EVA/views/comunes/CasosRag.jsx";
 
@@ -43,15 +54,15 @@ function respuestaJson(cuerpo) {
 const CASO_ACTIVO = {
   id: "interv-aaa-1111",
   fecha: "2026-09-01T19:14:39.038Z",
-  sistema: "tanque",
-  sintoma: "Sobrepresión en la red",
-  causa: "La válvula de alivio no está actuando",
-  solucion: "Se liberó la válvula",
+  sistema: ID_MAQUINA,
+  sintoma: "Vibración en zona de daño en S1",
+  causa: "Desalineación del acoplamiento",
+  solucion: "Se alineó el acoplamiento",
   resuelto: true,
   origen: "Técnico de turno",
-  disparador: { tipo: "riesgo", riesgoId: "sobrepresion" },
-  diagnostico: { propuesta: "consigna-variador-alta", respaldo: "alto" },
-  causaReal: { tipo: "valvula-alivio-no-actua", componente: "Válvula de alivio" },
+  disparador: { tipo: "riesgo", riesgoId: "vibracion-en-alarma" },
+  diagnostico: { propuesta: "rodamiento-desgastado", respaldo: "alto" },
+  causaReal: { tipo: "desalineacion", componente: "Acoplamiento" },
   diagnosticoCorrecto: false,
 };
 
@@ -78,20 +89,18 @@ function montar() {
 }
 
 /*
- * ── OMITIDO: LOS CASOS DE PRUEBA SON DEL TANQUE (rama `Vibraciones1.0`) ──
+ * ── REABIERTA CON UNA MÁQUINA CONFIGURADA (Plan 42.5 F3) ──────────────
  *
- * Esta suite monta «Casos previos» con casos de `sistema: "tanque"` —
- * «Sobrepresión en la red» y compañía— y comprueba que se listan, se archivan
- * y se devuelven. El mecanismo no ha cambiado; lo que cambió es que la vista
- * filtra a máquinas EN SERVICIO, así que esos casos no se pintan.
- *
- * No se reescribe con casos de vibraciones porque la bitácora real no tiene
- * ninguno: inventarlos aquí taparía el hecho que esta rama quiere resolver.
- * El filtro nuevo sí está cubierto, en `casos-solo-en-servicio.test.jsx`.
- *
- * Para reabrir: quitar el `.skip`.
+ * Estuvo omitida desde la rama `Vibraciones1.0`: montaba casos del tanque y
+ * la vista había pasado a filtrar por la máquina en servicio. No se
+ * reescribió entonces con casos de vibraciones «para no tapar el hecho» de
+ * que la bitácora real no tenía ninguno. Ese hecho dejó de ser lo que la rama
+ * quiere resolver —el despliegue puede vaciar la bitácora y llenarla con lo
+ * que cierre sobre configuradas—, así que los casos de prueba son ahora de
+ * una configurada y la suite vuelve a correr entera. El filtro por máquina
+ * sigue cubierto en `casos-solo-en-servicio.test.jsx`.
  */
-describe.skip("RAG · Casos previos", () => {
+describe("RAG · Casos previos", () => {
   it("lista los casos activos y esconde los archivados", async () => {
     globalThis.fetch = vi.fn(() =>
       respuestaJson({ ok: true, total: 2, casos: [CASO_ACTIVO, CASO_ARCHIVADO] })
@@ -99,7 +108,7 @@ describe.skip("RAG · Casos previos", () => {
 
     montar();
 
-    await waitFor(() => expect(screen.getByText("Sobrepresión en la red")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Vibración en zona de daño en S1")).toBeTruthy());
     // El ruido de pruebas está archivado: no puede aparecer entre lo que hoy
     // respalda un diagnóstico.
     expect(screen.queryByText("La bomba falla")).toBeNull();
@@ -111,12 +120,12 @@ describe.skip("RAG · Casos previos", () => {
     );
 
     montar();
-    await waitFor(() => expect(screen.getByText("Sobrepresión en la red")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Vibración en zona de daño en S1")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: /Archivados/ }));
 
     expect(screen.getByText("La bomba falla")).toBeTruthy();
-    expect(screen.queryByText("Sobrepresión en la red")).toBeNull();
+    expect(screen.queryByText("Vibración en zona de daño en S1")).toBeNull();
   });
 
   it("«resuelto» y «diagnóstico acertado» son dos señales distintas", async () => {
@@ -139,7 +148,7 @@ describe.skip("RAG · Casos previos", () => {
     });
 
     montar();
-    await waitFor(() => expect(screen.getByText("Sobrepresión en la red")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Vibración en zona de daño en S1")).toBeTruthy());
 
     fireEvent.click(screen.getByRole("button", { name: /Archivar/ }));
 

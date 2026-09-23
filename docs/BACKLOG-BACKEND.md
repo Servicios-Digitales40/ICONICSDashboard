@@ -652,3 +652,20 @@ una dirección no enrutable de forma inmediata (`http://127.0.0.1:1`), o
 doblar el cliente de ICONICS como hacen las demás pruebas de rutas. Se
 escribe como tarea aparte; no se subió el `timeout` para callarlo
 (CLAUDE.md §6.2).
+
+## B17 · `RUTA_APRENDIZAJE` es relativa al `cwd`, y la suite de backend escribe una bitácora aparte
+
+**Visto el 22-09-2026 por la noche** (Plan 42.5 F3): `backend/datos/aprendizaje.json`
+tenía 30 intervenciones de `vib-motor-03` que nadie registró desde la
+pantalla. Son las pruebas de `POST /api/casos` (`backend/test/rutas/`), que
+corren con `cwd = backend/` y resuelven `join('datos', 'aprendizaje.json')`
+contra esa carpeta. El puente de producción arranca desde la raíz y no las
+ve; pero un backend arrancado desde `backend/` leería ESA bitácora.
+
+**Lo que cuesta.** Un archivo que crece con cada tanda y que parece una
+bitácora real; y la posibilidad de dos bitácoras según el `cwd`.
+
+**El arreglo.** Resolver `RUTA_APRENDIZAJE` contra la raíz del repositorio
+(como hace `backend/config.mjs` con otras rutas) y que las pruebas de casos
+usen un `mkdtemp`, como ya hacen `verificar-casos` y `verificar-herramientas`.
+Se escribe como tarea aparte.

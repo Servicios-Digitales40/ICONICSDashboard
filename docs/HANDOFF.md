@@ -2,7 +2,7 @@
 
 **Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
 `Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1 y F2 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, y la causa del sondeo persistida); falta mirarlas en el navegador contra planta con el backend reiniciado.
+lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F3 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, y el vaciado de la bitácora documentado en §7 sin ejecutarlo); falta mirar las vistas en el navegador contra planta con el backend reiniciado.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -52,7 +52,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1102** pruebas · 29 omitidas |
+| Suite de frontend | **1102** pruebas · 29 omitidas *(a 23-09 madrugada, tras Plan 42.5 F3: 1193 · 24 omitidas)* |
 | Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
@@ -439,6 +439,30 @@ backend **no arranca con `NODE_ENV=production`** si está puesto).
 
 ---
 
+### Vaciar la bitácora de casos en un despliegue (Plan 42.5 F3)
+
+`datos/aprendizaje.json` no está versionado: es estado del despliegue. El de
+esta máquina nació con 13 intervenciones de la estación de llenado (11
+`tanque`, 2 `grupo de bombeo`), y la rama `UI-Limpieza1.0` decidió que
+«Casos previos» se llene con lo que se cierre sobre máquinas configuradas. El
+vaciado es una decisión de quien opera el despliegue, no del repositorio:
+
+```bash
+node scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones             # ver cuántas
+node scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones --ejecutar  # vaciar, con copia
+```
+
+Deja una copia `datos/aprendizaje.json.antes-de-purga-<fecha>.json`; los
+`hechos` y las `propuestas` no se tocan. El índice de casos arranca vacío
+sin fallar (tres guardas: `leerAprendizaje` → almacén vacío, `casos.mjs` →
+`[]`) y el motor puntúa la fuente como `sin_respaldo`, no como caída. La
+caché `datos/embeddings-cache-casos.json` se regenera sola. **No se ha
+ejecutado en esta máquina el 22-09-2026**: se deja a quien decida.
+
+**Efecto que hay que saber**: `DELETE /api/maquinas/:id` desactiva en vez de
+borrar cuando la bitácora tiene casos que nombran la máquina. Con la bitácora
+vacía, toda máquina pasa a ser borrable de verdad.
+
 ## 8. Comportamientos del modelo y trampas conocidas
 
 ### Del modelo
@@ -537,6 +561,16 @@ en silencio**. Se perdió una vuelta entera por eso.
 **El `pkill` puede no matar el backend que crees.** Se perdieron tres
 mediciones concluyendo «mi arreglo no funciona» cuando el puerto seguía
 sirviendo código viejo. **Levanta un puerto propio para medir.**
+
+**Dos bitácoras según desde dónde se arranque.** `RUTA_APRENDIZAJE` es
+`join('datos', 'aprendizaje.json')`, relativa al `cwd`. El puente de
+producción arranca desde la raíz (`node --env-file=.env.local
+backend/server.mjs`) y lee `datos/aprendizaje.json`; pero `cd backend &&
+npm test` corre con `cwd = backend/` y las pruebas de `/api/casos` escriben
+en **`backend/datos/aprendizaje.json`**, que el 22-09-2026 acumulaba 30
+intervenciones de prueba de `vib-motor-03`. Se borró ese día como artefacto;
+si vuelve a aparecer, es la suite, no la planta. Hacer la ruta absoluta y que
+las pruebas usen `mkdtemp` como los verificadores es B17.
 
 ### Incidentes con nombre
 

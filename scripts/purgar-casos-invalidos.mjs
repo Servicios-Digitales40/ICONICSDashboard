@@ -39,6 +39,21 @@
  *
  *   node scripts/purgar-casos-invalidos.mjs             ver qué se borraría
  *   node scripts/purgar-casos-invalidos.mjs --ejecutar   borrar de verdad
+ *
+ * ── `--vaciar-intervenciones` (Plan 42.5 F3, D7) ───────────────────
+ *
+ * Vacía TODAS las intervenciones de la bitácora, no sólo las inválidas, con
+ * la misma copia de seguridad y el mismo `--ejecutar` deliberado. Existe
+ * porque la bitácora de este despliegue nació con 13 casos de la estación de
+ * llenado (11 `tanque`, 2 `grupo de bombeo`) y la rama `UI-Limpieza1.0`
+ * decidió que «Casos previos» se llene con lo que se cierre sobre máquinas
+ * CONFIGURADAS. `hechos` y `propuestas` no se tocan: los hechos iniciales
+ * viven en el código (`HECHOS_INICIALES`) y las propuestas tienen su propio
+ * guion (`revisar-propuestas.mjs`). El índice de casos y su caché de
+ * embeddings se rehacen solos al arrancar.
+ *
+ *   node scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones             ver cuántas
+ *   node scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones --ejecutar  vaciar de verdad
  */
 import { writeFile } from 'node:fs/promises'
 
@@ -54,33 +69,46 @@ function esValido(sistema) {
   return sistema === null || sistema === undefined || SISTEMA_IDS.includes(sistema)
 }
 
+const vaciar = process.argv.includes('--vaciar-intervenciones')
+const ejecutar = process.argv.includes('--ejecutar')
+
 const almacen = await leerAprendizaje()
 const total = almacen.intervenciones.length
 
-const invalidas = almacen.intervenciones.filter((i) => !esValido(i.sistema))
-const validas = almacen.intervenciones.filter((i) => esValido(i.sistema))
+/* Con `--vaciar-intervenciones` TODAS sobran; sin él, sólo las de sistema inválido. */
+const sobrantes = vaciar ? almacen.intervenciones : almacen.intervenciones.filter((i) => !esValido(i.sistema))
+const quedan = vaciar ? [] : almacen.intervenciones.filter((i) => esValido(i.sistema))
 
-console.log(`\n${c.negrita}Purga de casos con sistema inválido${c.reset}`)
+console.log(`\n${c.negrita}${vaciar ? 'Vaciado de la bitácora de intervenciones' : 'Purga de casos con sistema inválido'}${c.reset}`)
 console.log(`${c.gris}${RUTA_APRENDIZAJE} · ${total} intervención(es) en total${c.reset}`)
-console.log(`${c.gris}Sistemas válidos: ${SISTEMA_IDS.join(', ')} (y sin sistema = toda la planta)${c.reset}\n`)
+if (!vaciar) {
+  console.log(`${c.gris}Sistemas válidos: ${SISTEMA_IDS.join(', ')} (y sin sistema = toda la planta)${c.reset}\n`)
+}
 
-if (!invalidas.length) {
-  console.log(`${c.verde}Nada que purgar: todas las intervenciones tienen un \`sistema\` válido.${c.reset}\n`)
+if (!sobrantes.length) {
+  const nada = vaciar ? 'La bitácora ya está vacía.' : 'Nada que purgar: todas las intervenciones tienen un `sistema` válido.'
+  console.log(`${c.verde}${nada}${c.reset}\n`)
   process.exit(0)
 }
 
-console.log(`${c.rojo}${c.negrita}${invalidas.length} de ${total} intervención(es) con un \`sistema\` que no existe:${c.reset}`)
-for (const i of invalidas) {
-  console.log(`\n  ${c.rojo}${i.id}${c.reset}  ${c.gris}${i.fecha}${c.reset}`)
-  console.log(`    sistema: ${c.ambar}"${i.sistema}"${c.reset}`)
-  console.log(`    síntoma: ${i.sintoma}`)
+if (vaciar) {
+  const porSistema = {}
+  for (const i of sobrantes) porSistema[i.sistema ?? '(sin sistema)'] = (porSistema[i.sistema ?? '(sin sistema)'] ?? 0) + 1
+  console.log(`${c.rojo}${c.negrita}${sobrantes.length} intervención(es) se vaciarían:${c.reset}`)
+  for (const [sistema, n] of Object.entries(porSistema)) console.log(`  ${c.ambar}${sistema}${c.reset}: ${n}`)
+  console.log(`${c.gris}${almacen.hechos.length} hecho(s) y ${almacen.propuestas.length} propuesta(s) NO se tocan.${c.reset}`)
+} else {
+  console.log(`${c.rojo}${c.negrita}${sobrantes.length} de ${total} intervención(es) con un \`sistema\` que no existe:${c.reset}`)
+  for (const i of sobrantes) {
+    console.log(`\n  ${c.rojo}${i.id}${c.reset}  ${c.gris}${i.fecha}${c.reset}`)
+    console.log(`    sistema: ${c.ambar}"${i.sistema}"${c.reset}`)
+    console.log(`    síntoma: ${i.sintoma}`)
+  }
 }
 
-const ejecutar = process.argv.includes('--ejecutar')
-
 if (!ejecutar) {
-  console.log(`\n${c.gris}Esto no ha tocado nada. Para purgar de verdad:${c.reset}`)
-  console.log(`  node scripts/purgar-casos-invalidos.mjs --ejecutar\n`)
+  console.log(`\n${c.gris}Esto no ha tocado nada. Para ${vaciar ? 'vaciar' : 'purgar'} de verdad:${c.reset}`)
+  console.log(`  node scripts/purgar-casos-invalidos.mjs ${vaciar ? '--vaciar-intervenciones ' : ''}--ejecutar\n`)
   process.exit(1)
 }
 
@@ -90,8 +118,8 @@ const rutaCopia = `${RUTA_APRENDIZAJE}.antes-de-purga-${marca}.json`
 await writeFile(rutaCopia, JSON.stringify(almacen, null, 2), 'utf8')
 console.log(`\n${c.gris}Copia de seguridad: ${rutaCopia}${c.reset}`)
 
-const purgado = { ...almacen, intervenciones: validas }
+const purgado = { ...almacen, intervenciones: quedan }
 await writeFile(RUTA_APRENDIZAJE, JSON.stringify(purgado, null, 2), 'utf8')
 
-console.log(`${c.verde}${c.negrita}Purgadas ${invalidas.length} intervención(es). Quedan ${validas.length}.${c.reset}`)
+console.log(`${c.verde}${c.negrita}${vaciar ? 'Vaciadas' : 'Purgadas'} ${sobrantes.length} intervención(es). Quedan ${quedan.length}.${c.reset}`)
 console.log(`${c.gris}La copia de seguridad conserva las ${total} originales, por si hace falta revisar alguna.${c.reset}\n`)

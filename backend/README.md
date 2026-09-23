@@ -485,6 +485,11 @@ mira— pero su texto y su fecha siguen intactos en `datos/aprendizaje.json`, y
 manual (`PATCH /api/rag/documentos`) y el que pide «lo que pasó, pasó» en
 `shared/eva/comun/aprendizaje.js`.
 
+Vaciar la bitácora entera —por ejemplo al pasar un despliegue de la estación
+de llenado a máquinas configuradas— es un paso de despliegue, no una ruta:
+`node scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones --ejecutar`,
+con copia de seguridad (Plan 42.5 F3; ver `docs/HANDOFF.md` §7).
+
 El `GET` devuelve **también** las archivadas, porque la pantalla de revisión
 necesita enseñar precisamente lo que el diagnóstico ya no mira para poder
 devolverlo. Todo lo demás que lee la bitácora —incluido lo que ve el

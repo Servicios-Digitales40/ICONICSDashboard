@@ -667,10 +667,12 @@ describe('DELETE /api/maquinas/:id', () => {
   /*
    * ── LA REGLA QUE PROTEGE LA HISTORIA ───────────────────────────────
    *
-   * `datos/aprendizaje.json` trae 11 casos con `sistema: "tanque"`. Una
-   * máquina configurada que se llamara así no se puede crear —el id choca con
-   * el registro—, así que aquí se comprueba el mecanismo por el otro lado: que
-   * la respuesta DIGA por qué no se borró.
+   * La bitácora de este despliegue nació con casos de `sistema: "tanque"`
+   * (Plan 42.5 F3 la puede vaciar), y una máquina configurada que se llamara
+   * así no se puede crear —el id choca con el registro—, así que aquí se
+   * comprueba el mecanismo por el otro lado: que la respuesta DIGA por qué no
+   * se borró. Con la bitácora vacía, toda máquina pasa a ser borrable de
+   * verdad: es el comportamiento esperado, no un fallo.
    *
    * Un 200 que promete un borrado y deja la máquina en disco sería el peor
    * silencio de esta ruta.

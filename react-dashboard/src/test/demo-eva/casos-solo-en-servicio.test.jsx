@@ -5,8 +5,10 @@
  * ── LA DECISIÓN QUE FIJA ────────────────────────────────────────────
  *
  * «Casos previos» no mencionaba el tanque: pintaba el `sistema` de cada caso
- * GUARDADO, y la bitácora real tiene 13 —once del tanque y dos de un
- * «grupo de bombeo» que ya no existe como id— y ninguno de vibraciones.
+ * GUARDADO, y la bitácora real TENÍA entonces 13 —once del tanque y dos de un
+ * «grupo de bombeo» que ya no existe como id— y ninguno de vibraciones. (El
+ * Plan 42.5 F3 dio al despliegue un guion para vaciarla; lo que esta prueba
+ * fija no depende de cuántos haya.)
  *
  * Así que el arreglo no podía ser quitar una referencia: había que decidir qué
  * hacer con historia real. Se filtra la VISTA y no se toca el archivo.
@@ -15,7 +17,7 @@
  *
  * Porque con el filtro puesto la pantalla queda vacía, y el mensaje que ya
  * había —«todavía no hay ninguna intervención registrada»— pasaría a ser
- * FALSO: hay trece, de una máquina que no se está mirando. Es exactamente lo
+ * FALSO: los hay, de una máquina que no se está mirando. Es exactamente lo
  * que §2.4 prohíbe —disfrazar «no se muestra» de «no existe»— y es la parte de
  * este cambio que más fácil sería perder en una refactorización.
  *
@@ -137,11 +139,11 @@ describe("el vacío dice POR QUÉ está vacío", () => {
 
     montar();
 
-    await waitFor(() => expect(screen.getByText(/estación de llenado/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/de otras máquinas/i)).toBeTruthy());
     /* Dice CUÁNTOS hay guardados, no sólo que hay algunos. */
     expect(screen.getByText(/3 casos/)).toBeTruthy();
     /* Y nombra lo que de verdad falta, que es el objetivo de esta rama. */
-    expect(screen.getByText(/sistema de vibraciones/i)).toBeTruthy();
+    expect(screen.getByText(/para esta máquina/i)).toBeTruthy();
   });
 
   it("sin NINGÚN caso guardado, sí dice que la bitácora está vacía", async () => {
@@ -151,6 +153,6 @@ describe("el vacío dice POR QUÉ está vacío", () => {
     montar();
 
     await waitFor(() => expect(screen.getByText(/Todavía no hay ninguna intervención/i)).toBeTruthy());
-    expect(screen.queryByText(/estación de llenado/i)).toBeNull();
+    expect(screen.queryByText(/de otras máquinas/i)).toBeNull();
   });
 });

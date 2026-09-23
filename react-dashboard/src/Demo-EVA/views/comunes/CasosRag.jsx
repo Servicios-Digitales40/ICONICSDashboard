@@ -330,11 +330,12 @@ export default function CasosRag({ params, onNavigate }) {
       /*
        * ── SÓLO LOS DE MÁQUINAS EN SERVICIO (rama `Vibraciones1.0`) ────
        *
-       * La bitácora tiene 13 casos y NINGUNO es de vibraciones: once con
-       * `sistema: "tanque"` y dos con `"grupo de bombeo"` —un id que ya no
-       * existe, de antes de que el registro de sistemas se cerrara—. Con la
-       * estación de llenado cerrada, enseñarlos sería llenar la pantalla de una
-       * máquina que el tablero no está mirando.
+       * Cuando se escribió (17-09-2026) la bitácora tenía 13 casos y NINGUNO
+       * de vibraciones: once con `sistema: "tanque"` y dos con `"grupo de
+       * bombeo"`, un id que ya no existe. Desde el Plan 42.5 F3 el despliegue
+       * puede vaciarla (`purgar-casos-invalidos.mjs --vaciar-intervenciones`)
+       * y la vista sólo enseña los casos de LA máquina que se mira; el filtro
+       * vale igual con la bitácora llena o vacía.
        *
        * Se filtra AQUÍ y no en `visibles` a propósito: los contadores de
        * «activos/archivados» y el mensaje de vacío se calculan sobre
@@ -524,11 +525,10 @@ export default function CasosRag({ params, onNavigate }) {
           >
             {/*
               ── EL VACÍO TIENE QUE DECIR POR QUÉ (§2.4) ──────────────────
-              Con la estación de llenado cerrada, la bitácora tiene 13 casos y
-              ninguno visible. «No hay casos cerrados» sería FALSO: hay trece,
-              de una máquina que no se está mirando. `emptyOcultos` lo dice y
-              nombra lo que de verdad falta —cerrar el primer diagnóstico de
-              vibraciones—, que es uno de los objetivos de esta rama.
+              Si la bitácora tiene casos y ninguno es de esta máquina, «no hay
+              casos cerrados» sería FALSO: los hay, de otra. `emptyOcultos` lo
+              dice sin nombrar a nadie —qué máquina es «la otra» cambia con la
+              configuración (Plan 42.5 F3)— y `empty` cubre la bitácora vacía.
             */}
             {estado.casos.length === 0 && estado.ocultos > 0
               ? traducir("assistant:rag.cases.emptyOcultos", { count: estado.ocultos })
