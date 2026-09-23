@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0 completada · F1–F5 por completar · escrito el 22-09-2026
+**Estado:** F0 completada · F1–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -152,6 +152,88 @@ máquinas configuradas. `datos/aprendizaje.json` es estado del despliegue y no
 está versionado: se documenta cómo vaciarlo, no se toca desde el repo. Los
 embeddings de casos se regeneran solos.
 
+### Decisiones añadidas en la revisión del 22-09-2026 (noche), tras la F0
+
+Salen de leer el código que F1 y F2 dan por hecho. Cada una corrige una
+suposición del plan original que **no era cierta**.
+
+**D8 · La fuente en vivo de una máquina configurada gana la forma común y
+el búfer; no se escribe un tercer motor de sondeo.** `createFuenteDeMaquina`
+(`data/comunes/fuenteDeMaquina.js`) hoy sólo entrega el dominio de
+vibraciones (`canales`, `variador`, `alarmas`): **ni una lectura por
+variable, ni `receivedAt`, ni búfer de sesión**. Una tarjeta genérica
+necesita las tres cosas. Se añaden a la misma instantánea —`estado =
+sistema.estado(valorDe, registro, lastUpdated)` (la forma común de
+`estadoMaquina.js`), `buffer` (`createBufferRodante`, el mismo del tanque) y
+`leerSerie`/`leerSeries` atados a esa máquina— y `subscribeVibracion` sigue
+igual. Es la regla del backlog F2: **un motor por máquina, y la unificación
+es del código, nunca del lote**. El atajo descartado es un `useEstadoDeMaquina`
+que abra su propio `pollingEngine`: serían dos motores sobre los mismos 86
+puntos cada vez que Planta y el banner estén montados a la vez.
+
+**D9 · La tarjeta del Detalle recibe la forma común, adaptada en dominio.**
+`TarjetaVariable` (`components/detalle/DetalleGrid.jsx`) está escrita contra
+la señal del tanque (`key`, `tag`, `historizado`, `escala`, `tipo:
+"booleano"`, `etiquetas`, `subirEsBueno`); la forma común trae `clave`,
+`label`, `banda`, `estado`, `historia`. Ni se reescribe la tarjeta a medias
+ni se le mete un `if`: una función **pura** en `shared/eva/comun/vistaDeMaquina.js`
+—`variablesDeActivo(sistema, maquina, estado, assetId)`— produce lo que la
+tarjeta espera a partir de `metaDe`, `tipo.bandaDe(rol)` y la variable
+configurada, y se prueba en Node sin React. El tanque **no** pasa por ella
+mientras exista: su `detalleActivo.js` ya compone esa forma.
+
+**D10 · Una configurada en origen simulado también tiene historia
+simulada.** No existe `readSerie` para una configurada: sólo el tanque lo
+tiene (`data/tanque/simulador.js`). Sin él, en «Simulado» toda gráfica
+saldría vacía, y las pruebas de vista sin red no podrían enseñar una curva.
+Se escribe **una vez**, genérico, en `lib/iconics/transporteSimulado.js`:
+`readSerie(nombreDePunto, rango)` muestrea `modelo(nombre, ms)` hacia atrás
+sobre la rejilla del rango, con la misma forma `{ datos, motivo, hasMore,
+cobertura }` que el lector real. Es lo que el tanque hace con `valorEn`,
+sin saber de qué máquina es el modelo. **La guarda `esHistorizada` se
+aplica igual en simulado**: una variable sin serie verificada no dibuja nada
+tampoco ahí, o la pantalla simulada prometería lo que la real no da.
+
+**D11 · La causa del sondeo se persiste, con un campo, o no se enseña.**
+D4 pide enseñar «la causa que dejó el sondeo» (`sin-muestras`,
+`serie-compartida`…). Medido: `datos/maquinas.json` guarda `historyVerified`
+y `historyVerifiedComo` en las 86 variables de `vib-motor-03`, y **`sondeo`
+en ninguna** — la causa sólo viaja en la respuesta HTTP de la ficha y se
+pierde al recargar. Dos salidas, y se elige la primera:
+
+- **(elegida)** `crearVariable` declara `historyCausa: null` (el `causa` del
+  sondeo) e `historyCompartidaCon: []`; `sondearSeries.mjs` los escribe
+  junto a `historyVerified`; la ruta de la ficha los lee de ahí. Es un campo
+  aditivo con valor por defecto: una configuración antigua sigue válida.
+  Toca `backend/lib/`, no `backend/ia/`; el asistente no se entera.
+- (descartada) la vista dice sólo «sin serie verificada» y enlaza a
+  Configuración. Es honesto pero obliga a ir a otra pantalla y re-sondear
+  para saber **por qué**, y el porqué ya se calculó una vez.
+
+**D12 · Los componentes «que no saben de qué máquina son» sí sabían de una
+fuente.** `SelectorRango` (el calendario con días con dato) y
+`GraficaComparada` llaman a `useEvaSource()` —la fuente del tanque— y la
+segunda además lee `SENALES[clave].escala`. Ganan lo que les falta **por
+props**: `leerSerie` en el selector, `comparables: [{ clave, label, escala }]`
+y `leerSeries` en la comparada. El tanque se los pasa desde `DetalleActivo`
+hasta que F4 lo borre; la genérica se los pasa desde su fuente. Sin esto,
+«reutilizar tal cual» habría metido la fuente del tanque dentro del Detalle
+de una configurada.
+
+**D13 · La banda de «lo que no se puede decir» entra en Planta.** Es la
+cuarta cosa que `Vibraciones.jsx` ya deja clara en pantalla y el plan no
+había recogido. `sistema.limitaciones` (`construirSistema.js`) ya redacta
+las frases —series declaradas sin verificar, constantes, roles sin cubrir,
+sensores sin leer—; Planta las enseña **tal cual, sin recalcular**, debajo de
+las tendencias. Una pantalla de tendencias que no dice cuáles faltan invita a
+leer 78 curvas como «todo el motor».
+
+**D14 · «Gráficas» convive y se renombra; se decide ya, no en F1.** La
+recomendación de D6 pasa a decisión: `maq-graficas` se queda —bandas ISO,
+vigilancias, contadores son del tipo, no tendencias— y su rótulo pasa a
+«Estado mecánico» en los dos idiomas. Es sólo i18n y evita que el menú
+ofrezca dos entradas que suenan a lo mismo.
+
 ## 3. Las fases
 
 ### F0 — Inventario y la regla nueva · completada el 22-09-2026
@@ -292,122 +374,459 @@ tanque; `GraficaComparada` y `piezas.jsx` sí (23, 24).
 - [x] CLAUDE.md §1 y HANDOFF §1 con la regla de §1 de este plan.
 - [x] Lista de borrado de F5 cerrada, con la evidencia de «nadie lo importa» y dos **[?]** para el usuario (Predicción, `plc_opcua.py`).
 
-### F1 — La lectura del historiador y la «Planta» genérica
+### F1 — La capa de datos genérica y la «Planta» de una máquina configurada
 
 **Objetivo.** `maq-planta`: la máquina configurada de un vistazo, con sus
-tendencias.
+tendencias reales y con lo que no se puede decir dicho en pantalla.
 
-**Cómo.**
-1. D2: `data/comunes/historia.js` y `useSeriesHistoricas(sistema, claves,
-   rango)`. El tanque sigue funcionando pasando el suyo (sus pruebas omitidas
-   no se tocan todavía).
-2. `views/maquina/PlantaMaquina.jsx` con las bandas de D5, sobre los tiles que
-   ya existen (`tiles.jsx`), pasándoles datos derivados del `sistema` y no del
-   modelo del tanque. Lo que un tile necesite «saber» del tanque se generaliza
-   en el tile o se deja fuera; no se copia el tile.
-3. Ruta `maq-planta` por máquina configurada, en su sección.
-4. Decidir **[?]** de D5 (orden de las señales con tendencia) y de D6
-   (convivencia con «Gráficas»), mirándolas con `vib-motor-03` real.
+**Por qué se reescribió esta fase (revisión del 22-09).** El plan original
+suponía que bastaba con «pasar el `sistema`» al lector del historiador y a
+los tiles. Leído el código, faltan tres piezas que nadie había escrito: la
+fuente de una configurada no entrega lecturas por variable ni búfer (D8), no
+hay historia simulada para una configurada (D10) y los tiles de Planta
+(`tiles.jsx`, 1243 líneas) reciben el modelo del tanque (`buildModeloEva`) en
+todas sus bandas. La fase se parte en pasos con su propia prueba, y **el
+primer commit no pinta nada**: deja la capa de datos lista y probada.
 
-**Riesgos.** `tiles.jsx` son 1243 líneas escritas para el tanque; el riesgo es
-acabar con `if (esTanque)` dentro. La regla: si un tile no se puede alimentar
-desde `sistema` + `tipo`, se escribe uno nuevo y pequeño, y el viejo se borra
-en F5 con la vista del tanque.
+**Pasos.**
+
+1. **`data/comunes/historia.js`** (D2). `leerSerie(sistema, clave, rango, {
+   crudo })` y `leerSeries(sistema, claves, rango)`: la misma mecánica de
+   `data/tanque/historia.js` —`resolverRango`, `enRango`, `cobertura`,
+   lotes de `MAX_SERIES_BATCH`, concurrencia acotada— cambiando **sólo** de
+   dónde sale el nombre del punto (`sistema.series.punto(clave)`) y la
+   guarda (`sistema.esHistorizada(clave)` → `SIN_SERIE`; clave que
+   `sistema.metaDe` no conoce → «Señal desconocida»). `rangoAyer`,
+   `rangoSemana` y `rangoPersonalizado` se mudan aquí: son reloj de pared,
+   no son del tanque. **`data/tanque/historia.js` pasa a ser una puerta**
+   que fija `SISTEMA.tanque` como primer argumento y reexporta lo demás, para
+   que `evaSource`, `alarmas.js`, `hooks.js` y sus 7 archivos de prueba
+   sigan iguales hasta F4. Se comprueba **antes de escribir** que
+   `SISTEMA.tanque.series.punto(clave)` devuelve lo mismo que
+   `puntoHistorico(clave)` para las 52 claves (una prueba en Node).
+2. **Historia simulada genérica** (D10). `readSerie(nombre, rango)` en
+   `lib/iconics/transporteSimulado.js`, muestreando `modelo(nombre, ms)`.
+   Respeta `hasMore: false`, `cobertura.completa: true` y deja `motivo`
+   cuando `modelo` devuelve `undefined` («no es de esta máquina»). Se
+   ofrece **sólo si el transporte es simulado**; el real no lo tiene y
+   `leerSerie` cae al historiador, igual que hoy en `evaSource`.
+3. **La fuente gana la forma común** (D8). En `createFuenteDeMaquina`: el
+   `registro` (`construirSistema`) se construye una vez; `instantanea()`
+   añade `estado` (forma común con `senales[]`, `sinLectura`, `recuento`),
+   `lecturaDe(clave)` → `{ valor, receivedAt, stale, motivo }`, y la fuente
+   expone `buffer` (`createBufferRodante` por clave, alimentado en
+   `onUpdate`) y `leerSerie`/`leerSeries` ya resueltos por transporte.
+   `subscribeVibracion` no cambia de forma: las cuatro vistas de
+   vibraciones siguen verdes sin tocarlas.
+4. **Hooks genéricos**, en `data/comunes/`: `useEstadoDeMaquina()` →
+   `{ sistema, maquina, estado, buffer, lastUpdated, loading, error }` a
+   partir de `useMaquina().{registro, configurada}` y la fuente; y
+   `useSeriesDeMaquina(claves, rango)` con el **mismo contrato** que
+   `useSeriesHistoricas` (`porClave`, `metaPorClave`, `filas`, `cobertura`,
+   `hasMore`, `loading`, `error`) pero leyendo de la fuente de la máquina.
+   `unir()` y `claveRango()` se extraen de `hooks.js` a un módulo sin React
+   para no copiarlos. Sin máquina en contexto devuelven la forma vacía y
+   `loading: false`, nunca lanzan (mismo criterio que `useMaquina`).
+5. **`views/maquina/PlantaMaquina.jsx`** con **tiles nuevos y pequeños** en
+   `components/maquina/` sobre `base.jsx` (`Card`, `Cifra`, `Spark`,
+   `PuntoEstado`), `paleta.js` y `piezas.jsx` (`GraficaHistoria`,
+   `GraficaAusente`). No se importa `tiles.jsx`: sus ocho componentes leen
+   el modelo del tanque y el riesgo del `if (esTanque)` es real. Bandas, de
+   arriba abajo:
+   - **Atención**: `tipo.evaluarRiesgos(dominio).activos` (lo que ya calcula
+     `useMaquinasEnVivo`), con botón a `cierre-diagnostico`.
+   - **Señales con historia**: las claves de `sistema.series.historizadas()`
+     cuyo `metaDe(clave).naturaleza === "medida"`, cada una con sparkline
+     del historiador (`VENTANA`) y su delta; orden: el de `tipo.canales`
+     por `assetId`, y dentro, el orden de `tipo.roles`; lo que no cuelga de
+     un apoyo, al final en orden de configuración. **Es la respuesta al
+     [?] de D5**: el tipo ya declara un orden por apoyo; no hace falta un
+     campo nuevo.
+   - **Estado de las variables**: cada `senal` de la forma común con su
+     `estado` y, si `tipo.bandaDe(rol)` existe, la barra contra la banda.
+     Sin banda declarada, sólo el valor: **no se inventa una escala**.
+   - **Tendencias**: las mismas series con escala propia, `cobertura` y
+     `metaPorClave` (hueco es hueco, B14).
+   - **Lo que no se puede decir** (D13): `sistema.limitaciones` tal cual.
+   - Sin titular: vibraciones no declara `senalPrincipal`. La banda existe en
+     el código sólo si `tipo.senalPrincipal` está definido; hoy no lo está
+     en ningún tipo y no se añade.
+6. **Ruta y menú.** `maq-planta` con `porMaquina: { icon, apartado:
+   "visualizacion" }` **detrás de `maq-inicio`** (que conserva
+   `iconoSeccion`). i18n `routes.maq-planta.{title,nav,sub}` en es/en.
+   `maq-graficas` se renombra «Estado mecánico» (D14). Botón «Entrar» de
+   `InicioVibraciones` **no cambia**: sigue a Estado mecánico; Planta se
+   ofrece desde el menú y desde un segundo botón del Inicio.
+7. **Contexto del asistente**: `declararContextoDeVista({ sistema:
+   maquina.id })`, como hace Estado mecánico.
+
+**Riesgos y cómo se cazan.**
+
+- *Generalizar copiando.* La prueba `sin-literales-de-maquina.test.js`
+  (§3.6) falla si `views/maquina/`, `components/maquina/` o
+  `data/comunes/historia.js` contienen `"tanque"`, `"vib-`, `nivelTanque` o
+  `S1`/`S2`/`S3` como literales.
+- *Dos motores por máquina.* Prueba del ciclo de vida (backlog F7, se
+  escribe **aquí**, antes del segundo consumidor): montar `PlantaMaquina` y
+  `EstadoMaquinaBanner` a la vez y afirmar `fuente.stats().ciclos` de una
+  sola fuente; desmontar y comprobar que el motor para.
+- *El historiador de planta ese día* (B14). La vista enseña
+  `tramosConDato/tramos`; una prueba con `cobertura.completa: false` afirma
+  el aviso y que la curva no une los bordes.
+- *Romper el tanque al mover `historia.js`.* Los 7 archivos de prueba que
+  hoy importan `data/tanque/historia.js` **no se tocan en F1** y tienen que
+  seguir verdes con la puerta; si uno cae, la puerta está mal, no la prueba.
+
+**Pruebas nuevas** (todas sin red; ver §3.6 para el patrón):
+- `historia-generica.test.js` (Node): `SIN_SERIE` para una clave no
+  verificada de la fixture espejo; `sistema.series.punto` en la petición;
+  «Señal desconocida»; el recorte `enRango` en crudo; equivalencia con el
+  tanque en las 52 claves.
+- `transporte-simulado-serie.test.js` (Node): `readSerie` devuelve puntos
+  crecientes en `t`, respeta el rango, `undefined` del modelo → `motivo`.
+- `fuente-de-maquina-estado.test.js`: la instantánea trae `estado.senales`
+  con una entrada por variable, `lecturaDe` con `receivedAt`, y el búfer
+  crece con cada `onUpdate`.
+- `planta-maquina.test.jsx` (mock del hook, patrón §3.3 del informe de F0):
+  máquina con **dos activos y series verificadas a medias** → dos apoyos,
+  sparkline sólo en las verificadas, `GraficaAusente` con el motivo en las
+  otras; máquina **sin ninguna verificada** → la banda de tendencias enseña
+  el motivo y ninguna gráfica; riesgo activo → franja de atención; sin
+  máquina en contexto → texto de «elige una máquina», no un error.
+- `planta-maquina-simulada.test.jsx` (punta a punta con red cortada,
+  patrón §3.4): en «Simulado», las verificadas dibujan curva sin que
+  `fetch` se llame.
 
 **Criterios de aceptación.**
 - [ ] `leerSerie(sistema, clave, rango)` se niega con `SIN_SERIE` para una
-      clave no verificada, y para la verificada pide `sistema.series.punto`.
-      Probado con una configurada del falso.
-- [ ] `PlantaMaquina` con `vib-motor-03` contra planta: tendencias de las
-      series verificadas, atención con los riesgos del tipo, sin titular
-      (vibraciones no declara señal principal), sin un solo `if` por máquina.
-- [ ] Ningún `import` de `data/tanque/` ni `domain/senales.js` en lo nuevo.
-- [ ] Pruebas: la vista con una máquina de dos activos y series verificadas
-      a medias; una máquina sin ninguna serie verificada enseña el motivo y
-      no una gráfica vacía.
+      clave no verificada y pide `sistema.series.punto` para la verificada,
+      probado con la fixture espejo en Node.
+- [ ] `data/tanque/historia.js` es una puerta de una función por export;
+      `historia.test.js`, `hooks-historia.test.jsx`, `fuente.test.js`,
+      `simulador.test.js`, `grafica-comparada.test.jsx`, `selector-rango.test.jsx`
+      y `eva.live.test.js` **no cambian** y siguen verdes.
+- [ ] `PlantaMaquina` con `vib-motor-03` contra planta (backend reiniciado):
+      tendencias de las series verificadas, atención con los riesgos del
+      tipo, limitaciones visibles, sin titular, sin un solo literal de
+      máquina (la prueba lo afirma).
+- [ ] En «Simulado», Planta dibuja curvas sin salir a la red (prueba con
+      trampa de `fetch`).
+- [ ] Un solo motor de sondeo por máquina con Planta y el banner montados.
+- [ ] Lint, types, `npm run verificar`, las dos suites; `verificar-bundle`
+      con `index`/`vendor` anotados **antes y después** (la pila de gráficas
+      va al trozo `charts`, que hoy no tiene presupuesto: se anota su cifra
+      para que F4 tenga con qué comparar).
 
-### F2 — El «Detalle» genérico
+**Se comitea en dos**: (a) pasos 1–4 con sus pruebas —capa de datos, nada
+visible—; (b) pasos 5–7. Si (b) hay que revertir, (a) sigue siendo útil para
+F2.
 
-**Objetivo.** `maq-detalle`: pestañas por activo, una tarjeta por variable con
-su gráfica real, rango y CSV, para cualquier máquina configurada.
+### F2 — El «Detalle» de una máquina configurada
 
-**Cómo.** `useDetalleMaquina(sistema, maquina, assetId, rango, enVivo)` en
-`data/comunes/`, con la misma forma que `useDetalleActivo` pero recorriendo
-`maquina.assets` y `variables` (D3), y `historiaReal: null` cuando no hay
-serie verificada (D4). `views/maquina/DetalleMaquina.jsx` sobre `DetalleGrid`,
-`GraficaComparada`, `SelectorRango` y `PanelProcedencia` tal cual. Botón
-«Detalle» en `PlantaMaquina` y «Ver detalle completo» en la ficha de un apoyo
-de `Vibraciones3D`. Decidir **[?]** de D3 (pestaña «Todas»).
+**Objetivo.** `maq-detalle`: pestañas por activo, una tarjeta por variable
+con su gráfica real, rango y CSV, para cualquier máquina configurada; y que
+cada variable sin gráfica diga **por qué**.
+
+**Pasos.**
+
+0. **Persistir la causa del sondeo** (D11). `crearVariable` gana
+   `historyCausa: null` e `historyCompartidaCon: []`; `sondearSeries.mjs`
+   los escribe en cada rama (`sin-muestras`, `serie-compartida` con sus
+   ids, `serie-propia`…) sin tocar `historyVerified` donde hoy no lo toca;
+   la ficha (`maquinasRoutes`) los lee de la variable persistida. Pruebas:
+   `configuracionMaquina` acepta una configuración vieja sin los campos;
+   `verificar-sondeo-series` afirma la causa persistida por rama;
+   `maquinas.test.mjs` afirma que la ficha la devuelve tras recargar.
+   **Se comitea solo**: es backend y tiene su propia puerta.
+1. **`variablesDeActivo(sistema, maquina, estado, assetId)`** en
+   `shared/eva/comun/vistaDeMaquina.js` (D9): para cada variable con ese
+   `assetId` (o sin ninguno, si `assetId === SIN_ACTIVO`), la forma que
+   `TarjetaVariable` espera —`key`, `tag` (`pointName`), `label`, `unidad`,
+   `decimales`, `banda`, `escala` (de `tipo.bandaDe(rol)` o `null`),
+   `historizado` (`esHistorizada`), `historiaCausa`, `tipo`
+   (`"booleano"` si el rol es bandera), `texto`, `naturaleza`, `punto`— y
+   **sin `subirEsBueno`** (nadie lo declara para una configurada; la tarjeta
+   ya lo trata como opcional). Las de `naturaleza: "alarma"` se excluyen,
+   como hace el tanque. Pura y probada en Node con la fixture espejo.
+2. **`useDetalleMaquina(assetId, rango, enVivo)`** en `data/comunes/`, la
+   misma forma que `useDetalleActivo`: `activo`, `activos` (los
+   `maquina.assets` con al menos una variable, más «Sin activo» sólo si hay
+   alguna), `variables` con `historiaReal` (`null` si no verificada;
+   `[]`+`historiaCargando` si sí), `historiaMotivo`/`historiaError`,
+   `bufferVivo`, `deltaBuffer`, `historiaHasMore`, `historiaCobertura`.
+   En «Tiempo real» lee del `buffer` de la fuente y no pide nada al
+   historiador (claves vacías a `useSeriesDeMaquina`).
+3. **Componentes compartidos ganan props** (D12): `SelectorRango` recibe
+   `leerSerie`; `GraficaComparada` recibe `comparables` y `leerSeries`.
+   `DetalleActivo` del tanque se los pasa desde `useEvaSource()` (un cambio
+   de tres líneas, permitido por §1.2) para que sus pruebas sigan verdes
+   hasta F4. La tarjeta muestra la causa persistida con un texto corto por
+   `historyCausa` (i18n) y el enlace a Configuración; sin causa (máquina
+   nunca sondeada) dice «sin sondear».
+4. **`views/maquina/DetalleMaquina.jsx`**: copia la estructura de
+   `DetalleActivo` —rango en el estado de la vista, `leerRangoDeUrl`,
+   `parametrosDeRango`, `exportarTodo` con `armarCSVGeneral`— con
+   `params.maquina` siempre presente en cada `onNavigate`. `leerRangoDeUrl`
+   y `aFechaUrl`/`deFechaUrl` se extraen a `data/comunes/rangoEnUrl.js`
+   para no copiarlos (el tanque los importa desde ahí hasta F4). Pestaña
+   por defecto: el primer asset con variables, en el orden de
+   `maquina.assets`. **[?] D3 «Todas»: NO.** Con `vib-motor-03` una
+   pestaña «Todas» son 86 tarjetas y 78 series en un rango: dos lotes de
+   `MAX_SERIES_BATCH` cada cambio de rango. Se anota la cifra y se deja
+   fuera; si alguien la pide, se mide primero con el historiador real.
+5. **Entradas**: botón «Detalle» en `PlantaMaquina` (`{ maquina, activo:
+   primero }`); «Ver detalle completo» en la ficha de un apoyo de
+   `Vibraciones3D` (`{ maquina, activo: apoyo.id }`). Ruta `maq-detalle` con
+   `porMaquina: { oculta: true }`, el patrón de `maq-riesgos`.
+6. **Contexto del asistente**: `{ sistema: maquina.id, activo, rango }`
+   como `DetalleActivo`.
+
+**Riesgos y cómo se cazan.**
+
+- *Una pestaña vacía o un activo fantasma.* Un asset sin variables no es
+  pestaña (prueba). Un `params.activo` desconocido cae al primero, como el
+  tanque con un `activo` corrupto (prueba).
+- *El CSV de una configurada.* `armarCSVGeneral` recibe `senal` con
+  `label`/`unidad` y `punto`: la nota de procedencia declara **una**
+  máquina; se afirma que el archivo lleva `maquina.nombre` y el `hda:` de
+  cada serie.
+- *Ocho variables sin verificar dibujando una línea plana.* La prueba
+  «serie no verificada → `GraficaAusente` con la causa y sin `<svg>`».
+
+**Pruebas nuevas.**
+- `variables-de-activo.test.js` (Node, fixture espejo con
+  `verificadasDelCatalogo: true` y `false`): forma completa, exclusión de
+  alarmas, «Sin activo», `escala` sólo con `bandaDe`.
+- `detalle-maquina.test.jsx` (mock del hook): pestañas = assets con
+  variables; tarjeta con gráfica sólo en verificadas; causa visible;
+  `params.activo` desconocido → primera; cambio de pestaña conserva el
+  rango en la URL; contexto de vista con `sistema` y `activo`.
+- `detalle-maquina-rango.test.jsx`: `vivo`/`ayer`/`semana`/`personalizado`
+  desde la URL y de vuelta; `personalizado` con fechas corruptas → `vivo`.
+- `detalle-maquina-exportar.test.jsx`: CSV con procedencia de la máquina.
+- Espejo de `selector-rango.test.jsx` y `grafica-comparada.test.jsx` con
+  `leerSerie`/`comparables` por props (las del tanque siguen igual).
+- Backend: las tres del paso 0.
 
 **Criterios de aceptación.**
-- [ ] Con `vib-motor-03`: una pestaña por activo con variables; las 78
-      verificadas con gráfica; las 8 sin verificar con su causa y sin gráfica.
-- [ ] Rango vivo / ayer / semana / personalizado y CSV funcionan igual que en
-      el tanque, y los de la URL (`params`) sobreviven a recargar.
-- [ ] El contexto de vista para el asistente (`declararContextoDeVista`) lleva
-      `sistema` y `activo`, para que «¿cómo va este apoyo?» llegue al apoyo.
-- [ ] Pruebas espejo de las que hoy tiene `DetalleActivo`, sobre una
-      configurada del falso.
+- [ ] Con `vib-motor-03` contra planta: una pestaña por activo con
+      variables; las 78 verificadas con gráfica; las 8 sin verificar con su
+      causa persistida y sin gráfica.
+- [ ] Rango vivo / ayer / semana / personalizado y CSV funcionan como en el
+      tanque, y `params` sobreviven a recargar (`maquina` incluido).
+- [ ] `declararContextoDeVista` lleva `sistema` y `activo`.
+- [ ] Recargar el backend no pierde la causa del sondeo (prueba de ruta).
+- [ ] Ninguna prueba del tanque cambia salvo el paso de props en
+      `DetalleActivo`; todas verdes.
+- [ ] Lint, types, verificadores, dos suites, `verificar-bundle` anotado.
 
 ### F3 — Casos previos y aprendizaje
 
 **Objetivo.** Que «Casos previos» y el aprendizaje sean de las máquinas
-configuradas, y que la semilla del tanque deje de viajar en el código (D7).
+configuradas, sin que el repositorio ni la pantalla den por hecho el tanque.
 
-**Cómo.** La semilla de `casos` pasa a fixture de pruebas; el índice arranca
-vacío; los verificadores que la usan (`verificar-casos`, `verificar-diagnostico`
-y los del asistente) la cargan explícitamente. Documentar en HANDOFF cómo
-vaciar `datos/aprendizaje.json` en un despliegue. Comprobar que el motor de
-diagnóstico con cero casos puntúa `casos: 0` y lo dice, no que falla.
+**Por qué se reescribió esta fase.** El plan decía «la semilla de 13 casos
+pasa a fixture de pruebas; el índice arranca vacío». Medido el 22-09 por la
+noche: **no hay semilla en código**. Los 13 casos (11 `tanque`, 2 `grupo de
+bombeo`) viven en `datos/aprendizaje.json`, que está en `.gitignore`; los
+verificadores ya usan `mkdtemp` desde el Plan 16; el índice vacío ya tiene
+tres guardas y produce `sin_respaldo` (no `caida`) en el motor; y el prompt
+ya prohíbe inventar casos cuando `casosCitados` no viene (03-09-2026). Lo
+que queda es **de despliegue, de texto y de pruebas**, no de dominio.
+
+**Pasos.**
+
+1. **Vaciar la bitácora, con guion y con copia.** `purgar-casos-invalidos.mjs`
+   gana `--vaciar-intervenciones` reutilizando su copia de seguridad
+   (`datos/aprendizaje.json.antes-de-purga-<ISO>.json`); `hechos` y
+   `propuestas` no se tocan (`HECHOS_INICIALES` viven en el código). Se
+   documenta en HANDOFF §7 y en `backend/README.md` como paso de
+   despliegue. `datos/embeddings-cache-casos.json` se borra en el mismo
+   paso: se regenera solo.
+2. **La copia fantasma.** `backend/datos/aprendizaje.json` (9908 bytes, no
+   versionado) existe porque `RUTA_APRENDIZAJE` es relativa al `cwd`. Se
+   borra y se anota en HANDOFF §8 (trampas): **arrancar desde `backend/`
+   lee otra bitácora**. Cambiar la ruta a absoluta es otra tarea (backlog),
+   no ésta.
+3. **Textos.** `assistant:rag.cases.emptyOcultos` (es/en) nombra «el sistema
+   de vibraciones» y «la estación de llenado» en duro; pasa a interpolar el
+   nombre de la máquina en contexto y a contar ocultos sin nombrar de quién
+   son. `verificar-textos` e `i18n` lo comprueban.
+4. **Comentarios que envejecen**: `backend/test/rutas/maquinas.test.mjs`
+   (cita 11), `CasosRag.jsx` (cita 13), `casos-solo-en-servicio.test.jsx`.
+   Se reescriben con lo que es cierto tras el vaciado.
+5. **Las 5 pruebas omitidas de `casos-rag.test.jsx`** se reabren con casos
+   **mockeados** de una configurada (`sistema: "vib-motor-03"`): ya no
+   «tapan el hecho», porque el hecho —que la bitácora real no tiene casos
+   de vibraciones— deja de ser lo que la rama quiere resolver.
+6. **Efecto secundario anotado**: `DELETE /api/maquinas/:id` desactiva en
+   vez de borrar cuando hay casos que nombran la máquina. Con la bitácora
+   vacía, toda máquina pasa a ser borrable. Se anota en HANDOFF §3 como
+   comportamiento esperado y se comprueba en `maquinas.test.mjs` que el
+   camino «con casos → desactivar» sigue cubierto con datos falsos.
+
+**Lo que NO se hace**: tocar el motor, el índice ni las guardas (ya están);
+medir la narración con `casos: 0` es un `medir-*` (instrumento, necesita el
+LLM) y se deja anotado como recomendable, no como criterio.
 
 **Criterios de aceptación.**
-- [ ] Ningún caso del tanque en el índice de un backend recién arrancado.
-- [ ] `diagnostico` sobre `vib-motor-03` con el índice vacío: causas ordenadas
-      por reglas y manuales, «sin casos previos» explícito.
-- [ ] Los verificadores que dependían de la semilla siguen en verde con la
-      fixture.
+- [ ] Backend recién arrancado tras el vaciado: `GET /api/casos` → `total: 0`;
+      «Casos previos» de `vib-motor-03` dice «ninguna intervención» sin
+      cifra inventada ni mención al tanque.
+- [ ] `verificar-diagnostico`, `verificar-casos`, `verificar-casos-cierre`,
+      `verificar-calibracion` en verde (no dependían de la bitácora).
+- [ ] `casos-rag.test.jsx` sin `.skip`, 5 pruebas verdes con una configurada.
+- [ ] No existe `backend/datos/aprendizaje.json`; HANDOFF lo dice.
 
 ### F4 — Retirar las vistas del tanque y sus pruebas
 
-**Objetivo.** Borrar lo que F1 y F2 sustituyen.
+**Objetivo.** Borrar lo que F1 y F2 sustituyen, y sólo eso, con la cifra del
+bundle antes y después.
 
-**Cómo.** `views/tanque/PlantaTanque.jsx` y `DetalleActivo.jsx`,
-`data/tanque/detalleActivo.js` e `historia.js` (ya sustituido por D2), sus
-rutas (`eva-planta`, `eva-detalle`) y las pruebas `.skip` que sólo ellas
-justificaban. Las otras cuatro vistas del tanque (Inicio, Riesgos, Controles,
-Maqueta 3D) **[?]**: se borran si el usuario confirma que el tanque entrará
-por configuración con vistas genéricas (Plan 43 D-vistas), o se quedan
-cerradas hasta entonces. Se decide aquí, no antes.
+**Se borra seguro** (sustituido por F1/F2):
+`views/tanque/PlantaTanque.jsx`, `views/tanque/DetalleActivo.jsx`,
+`data/tanque/detalleActivo.js`, `data/tanque/historia.js` (la puerta: sus
+tres consumidores pasan a `data/comunes/historia.js` con `SISTEMA.tanque`
+mientras la fuente en vivo exista), `components/tiles.jsx` (único consumidor:
+`PlantaTanque`), `buildModeloEva` de `lib/modelo.js` (queda `delta`),
+las rutas `eva-planta` y `eva-detalle` con sus claves i18n, y sus pruebas:
+`planta-simulada`, `detalle-activo-simulada`, `detalle-exportar`,
+`selector-rango`, `grafica-comparada`, `hooks-historia`, `historia.test.js`,
+y las entradas de `accesibilidad.test.jsx` sobre esas dos vistas. Cada una
+**ya tiene su espejo escrito en F1/F2** antes de borrarse; una que no lo
+tenga, no se borra.
+
+**[?] Decisión del usuario, en esta fase:** las otras cuatro vistas del
+tanque (`InicioTanque`, `RiesgosTanque`, `ControlesTanque`,
+`MaquetaTanque3D`), `AlarmasEva` (del tanque y **todavía en el menú**),
+`MuroPlanta`, los 11 modelos 3D sólo del tanque (1868 líneas) y sus pruebas
+(`inicio-simulada`, `controles`, `riesgos-*`, `edad-dato-controles`,
+`prosa-del-dominio`, `riesgos-vocabulario`, `alarmas-eva-vivo`,
+`muro-planta`, `tres-d`, `rotor-3d` en su parte del tanque). Se borran si
+el usuario confirma que el tanque entrará por configuración con vistas
+genéricas (Plan 43); si no, quedan cerradas. **Lo que no se borra en ningún
+caso aquí**: la fuente en vivo (`EvaProvider`, `evaSource`, `hooks.js`,
+`simulador.js`, `transportes.js`) y las puertas `domain/*.js` con consumidor
+—son (b) del inventario de F0.
+
+**Conocimiento que se conserva antes de borrar.** Las cabeceras de
+`DetalleActivo` (las tres versiones del layout), `PlantaTanque` (rejilla de
+12 y ritmo binario), `tiles.jsx` (el mapa contra «Planta · v2») y
+`detalleActivo.js` (`historiaReal: null`, nunca `[]`) se leen y lo que sigue
+valiendo se copia a la cabecera de la vista genérica **en el commit
+anterior al borrado**, para que el diff del borrado sea sólo borrado.
 
 **Criterios de aceptación.**
-- [ ] Las 29 pruebas omitidas: cada una borrada (con la vista que probaba) o
-      reescrita sobre la vista genérica. Ninguna queda en `.skip` sin dueño.
-- [ ] `verificar-bundle` en verde con el `index` **más pequeño** que antes, y
-      la cifra anotada.
+- [ ] Ninguna prueba `.skip` sin dueño: cada omitida está borrada con su
+      vista, reescrita sobre la genérica, o lleva «para reabrir: Plan 43»
+      porque depende de la fuente en vivo.
+- [ ] `verificar-bundle` en verde con `index` **más pequeño** que la cifra
+      anotada en F1, y `charts` anotado.
+- [ ] `verificar-i18n` y `verificar-textos` en verde (las claves de las
+      rutas borradas se van con ellas).
+- [ ] `grep` de `views/tanque/PlantaTanque`, `DetalleActivo`,
+      `detalleActivo.js`, `tiles.jsx` en `src/` devuelve cero.
 
 ### F5 — Código muerto
 
-**Objetivo.** Borrar lo que ninguna máquina, configurada o no, usa.
+**Objetivo.** Borrar lo que ninguna máquina, configurada o no, usa. La lista
+se cerró en F0.
 
-**Lista de partida** (se cierra en F0): `features/data/`; `scripts/plc_opcua.py`;
-el módulo de Predicción entero si el usuario lo confirma (**[?]**: hoy oculto,
-«no se usa en esta demo, para ningún rol»); las puertas de `domain/*.js` cuyo
-único consumidor se haya borrado; los `omitir()` de `verificar-herramientas`
-cuyo motivo desaparezca; CSS y textos de i18n huérfanos (`verificar-textos` e
-`i18n` los cazan).
+**Se borra**: `features/data/` (912 líneas; se actualizan los dos
+comentarios que lo citan en `routes.jsx` y `lib/iconics/index.js`).
 
-**Lo que NO entra aquí**, para que nadie lo borre «de paso»: `shared/eva/tanque/`
-(Plan 43), `REGLAS_TANQUE` y el `switch` del motor (B2, con el tipo),
-`narrarEstadoTanque` (ídem), el transporte falso del tanque (lo usa la puerta
-§5.1 mientras el tipo no exista).
+**[?] Usuario**: `modulos/prediccion/` (1295 líneas, oculto; arrastra
+`lib/queryClient.js` y el `QueryClientProvider` de `App.jsx` sólo si
+`ExploradorAssets` deja de usar react-query, la entrada `prediccion` de
+`shared/modulos.js` con sus asertos en `verificar-modulos`, `sec-prediccion`
+en los dos `navigation.json` y `VITE_PREDICTION_API_BASE`); y
+`scripts/plc_opcua.py` (el Plan 17 decidió conservarlo).
+
+**Se quedan, y por qué**: las 22 `omitir()` de `verificar-herramientas`
+(motivo `CERRADA`: la fuente en vivo del tanque, Plan 43); las puertas
+`domain/*.js` con consumidor; `shared/eva/tanque/` entero; `REGLAS_TANQUE`,
+el `switch` de `lib/maquina.mjs` y `narrarEstadoTanque` (B2); el transporte
+falso del tanque (puerta §5.1).
 
 **Criterios de aceptación.**
 - [ ] Cada borrado con su evidencia en el commit: «nadie lo importa» o «lo
       importaba X, borrado en F4».
 - [ ] Lint, types, `npm run verificar`, las dos suites y la puerta §5.1 en
-      verde. Los conteos nuevos en HANDOFF §1 y §9.
+      verde; conteos nuevos en HANDOFF §1 y §9; `verificar-textos` e `i18n`
+      sin huérfanos.
+
+### 3.6 · QA y contramedidas — la red que acompaña a las cinco fases
+
+**Línea base, medida el 22-09-2026 por la noche** (tras la F0, antes de F1):
+
+| Qué | Resultado |
+|---|---|
+| `npm run lint` | limpio |
+| `npm run types` | limpio |
+| Suite de backend | **399 / 399** verdes (el rojo de entorno de `salud.test.mjs` que citaba HANDOFF no apareció) |
+| Suite de frontend | **1103** verdes · 29 omitidas (109 archivos verdes, 5 omitidos), 131 s con `maxWorkers: 4` |
+| `npm run verificar` | **los 41** en verde (208,6 s); 2 excluidos por diseño |
+| Puerta §5.1 (`verificar-herramientas`, `verificar-chat`) | `verificar-herramientas` **190** correctas (13 sobre configurada) · **22 omitidas** (`CERRADA`); `verificar-chat` **71** correctas |
+| `verificar-bundle` | `index` 345,5 KB / 450 · `vendor` 269,1 / 330 · `charts` **326,4 KB (sin techo)** · `react` 138,6 · `three` 827,2 diferido |
+
+**Puerta de cada fase** (se corre entera, no «lo que toqué»): lint, types,
+`npm run verificar`, las dos suites. La puerta §5.1 se corre además en F2.0
+(toca `backend/lib`) y en F3 y F5 (tocan guiones y i18n que el asistente
+lee). `verificar-bundle` tras un `build` en F1, F2, F4 y F5, con la cifra
+en el commit. **Un rojo nuevo es un defecto** (CLAUDE.md §5.6): esta rama
+tiene parte de la suite omitida a propósito, así que no hay «rojo esperado».
+
+**Contramedidas contra regresión**, cada una con la fase que la instala:
+
+1. **Commit por paso, no por fase, cuando el paso ya prueba algo solo**
+   (F1a/F1b, F2.0/F2). Sin push. Revertir un paso es un `git revert` limpio.
+2. **Las puertas sostienen al tanque hasta F4.** `data/tanque/historia.js`
+   como puerta (F1) y el paso de props en `DetalleActivo` (F2) son los dos
+   únicos toques al código del tanque antes de borrarlo, y las pruebas del
+   tanque **no se modifican** en F1–F3: si una cae, el defecto es de la
+   puerta.
+3. **`sin-literales-de-maquina.test.js`** (F1): lee `views/maquina/`,
+   `components/maquina/`, `data/comunes/historia.js`, `data/comunes/*Maquina*`
+   y falla ante `"tanque"`, `"vib-`, `nivelTanque`, `"S1"`…  Es la única
+   forma barata de cazar «generalizar copiando» en revisión.
+4. **Ciclo de vida del sondeo** (F1, backlog F7): un motor por máquina con
+   dos consumidores montados; el motor para al desmontar el último. Se
+   escribe **antes** de que haya un segundo consumidor de la fuente.
+5. **Trampa de red en simulado** (F1, F2): `fetch` que lanza. Toda vista
+   genérica en «Simulado» tiene una prueba así.
+6. **Hueco es hueco** (F1, F2): pruebas con `cobertura.completa: false`,
+   `motivo: SIN_SERIE`, `error` de petición y `hasMore: true`; en las
+   cuatro la pantalla lo dice y no dibuja una recta ni un cero.
+7. **Compatibilidad de la configuración** (F2.0): una `maquinas.json` sin
+   `historyCausa` carga igual; la ficha muestra «sin sondear», no un error.
+8. **Vaciado con copia** (F3): el guion nunca escribe sin dejar el
+   `.antes-de-purga-*`; prueba en `mkdtemp`.
+9. **Borrar sólo lo sustituido** (F4): antes de borrar un archivo se lista
+   su espejo en el commit; `grep` de los nombres borrados en `src/` = 0.
+10. **Comprobación manual contra planta**, en F1 y F2, con el backend
+    reiniciado (HANDOFF paso 0): `vib-motor-03` en Planta y en Detalle,
+    origen real y simulado, rango de ayer y de semana, un CSV abierto. Lo
+    visto se anota en la fase con fecha; una captura no hace falta, la
+    lista de lo comprobado sí.
+
+**Lo que se mide y se anota, sin umbral nuevo**: `index`/`vendor`/`charts`
+en KB por fase; peticiones al historiador al abrir Detalle con `vib-motor-03`
+(lotes de `MAX_SERIES_BATCH`); tiempo de la suite de frontend (si sube, mirar
+si son `timed out` por contención antes que asertos, CLAUDE.md §5.3).
 
 ## 4. Riesgos
+
+> Cada riesgo de abajo tiene su contramedida numerada en §3.6; aquí queda
+> el porqué, allí el cómo se caza.
+
+- **Escribir un tercer motor de sondeo.** El atajo natural para F1 es un
+  hook que abra su propio `pollingEngine` sobre los puntos de la máquina.
+  Serían dos motores por máquina en cuanto Planta y el banner coincidan.
+  D8 lo prohíbe; la contramedida 4 lo mide.
+- **Enseñar una gráfica simulada como si fuera del historiador.** Con D10,
+  en «Simulado» hay curva. La insignia de origen (`InsigniaOrigen`) y la
+  cinta del origen simulado son lo que evita leerla como planta; la prueba
+  de red cortada afirma que no se mezclan.
 
 - **Generalizar copiando.** El atajo es duplicar `PlantaTanque` y cambiar
   nombres. Cada `if (sistema.id === …)` en una vista genérica es una máquina
@@ -427,5 +846,7 @@ cuyo motivo desaparezca; CSS y textos de i18n huérfanos (`verificar-textos` e
 
 - No convierte el tanque en máquina configurada ni escribe su tipo (Plan 43).
 - No toca el motor de diagnóstico ni el asistente, salvo el contexto de vista.
+  Sí toca `backend/lib/sondearSeries.mjs` y `configuracionMaquina.js` en F2.0
+  (D11): un campo aditivo, con su prueba de compatibilidad.
 - No añade dependencias.
 - No rehace la Vista 3D ni el recorrido/topología: son del tipo.
