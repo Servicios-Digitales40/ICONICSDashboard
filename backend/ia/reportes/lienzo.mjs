@@ -232,7 +232,10 @@ export function dibujarCintillo(doc, marca) {
     const altoNatural = dim ? ANCHO_PAGINA * (dim.alto / dim.ancho) : ALTO_CINTILLO
     doc.save()
     doc.rect(0, 0, ANCHO_PAGINA, ALTO_CINTILLO).clip()
-    doc.image(marca.cintillo, 0, (ALTO_CINTILLO - altoNatural) / 2, { width: ANCHO_PAGINA })
+    /* La imagen ABIERTA una vez (`sellarPaginas`), no el buffer: pdfkit sólo
+       reutiliza una imagen si le llega el mismo objeto; con el buffer incrusta
+       una copia del PNG por página (Plan 44 F3, medido: 358 KB × páginas). */
+    doc.image(marca.cintilloAbierto ?? marca.cintillo, 0, (ALTO_CINTILLO - altoNatural) / 2, { width: ANCHO_PAGINA })
     doc.restore()
     return
   }
@@ -262,10 +265,19 @@ export function dibujarPie(doc, etq, numero, total, folio) {
 export function sellarPaginas(doc, marca, etq, folio) {
   const rango = doc.bufferedPageRange()
   const total = rango.count - 1 // sin contar la portada
+  /*
+   * ── EL CINTILLO SE INCRUSTA UNA VEZ, NO UNA POR PÁGINA ──────────────
+   *
+   * `doc.image(buffer)` abre y registra el PNG cada vez que se llama: un
+   * reporte de ocho páginas llevaba ocho copias de 358 KB del mismo cintillo
+   * (medido el 23-09-2026: 4,4 MB un técnico de la espejo). Abrirlo aquí una
+   * vez y pasar el objeto hace que pdfkit lo referencie desde cada página.
+   */
+  const marcaSellado = marca.cintillo ? { ...marca, cintilloAbierto: doc.openImage(marca.cintillo) } : marca
   for (let i = 1; i < rango.count; i++) {
     doc.switchToPage(rango.start + i)
     sinPaginacion(doc, () => {
-      dibujarCintillo(doc, marca)
+      dibujarCintillo(doc, marcaSellado)
       dibujarPie(doc, etq, i, total, folio)
     })
   }

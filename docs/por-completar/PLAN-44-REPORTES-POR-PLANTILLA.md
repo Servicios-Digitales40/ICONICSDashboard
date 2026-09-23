@@ -457,7 +457,19 @@ que el verificador, una prueba de `generar` y otra de `salud` dieron `timed
 out` a 5 s; solas, la de `generar` tarda 0,5 s (contención, §5.3 de
 `CLAUDE.md`) y la de `salud` es la B16 del backlog. Los tres PDF de la espejo
 salen con 7 secciones con dato (vibraciones: 8 con dato y el espectro sin
-dato, con motivo). Lo que sigue era el objetivo escrito antes de hacerlo:
+dato, con motivo).
+
+**F3.1 · El peso del PDF, medido y corregido.** Los tres PDF de la espejo
+pesaban 4,4 · 4,6 · 5,4 MB. La causa no era el arte (0,25–0,65 MB) sino el
+**cintillo**: `doc.image(buffer)` de pdfkit abre y registra el PNG en cada
+llamada, y el cintillo se estampa en cada página, así que un técnico de
+ocho páginas llevaba ocho copias de 358 KB. Eso explica también los 6–11 MB
+de los catálogos generados antes del plan. `sellarPaginas` abre ahora la
+imagen una vez (`doc.openImage`) y pasa el objeto: 4,4 → **1,76 MB**, 4,6 →
+**2,41**, 5,4 → **2,28**. Lo que queda es el fondo de portada (0,9 MB), el
+banner y el arte. Tiempo por reporte con el transporte falso: 0,3–0,65 s.
+
+Lo que sigue era el objetivo escrito antes de hacerlo:
 
 **Objetivo.** Escribir los tres módulos de plantilla, el argumento `tipo` en
 `generar_reporte` y en `definiciones.mjs` (enum con descripción por valor,
