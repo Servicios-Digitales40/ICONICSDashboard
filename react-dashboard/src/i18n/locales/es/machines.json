@@ -406,7 +406,7 @@
       "assetNamePlaceholder": "Sin nombre: se rotula por su id",
       "assetAlias": "Alias del activo {{id}}",
       "assetAliasPlaceholder": "alias, separados por comas",
-      "assetAliasHint": "Los alias se suman a todas las variables del activo: con «acople chiquito» en S1, «DKW del acople chiquito» encuentra la DKW de ese apoyo.",
+      "assetAliasHint": "Los alias se suman a todas las variables del activo: con «acople chiquito» en S1, «DKW del acople chiquito» encuentra la DKW de ese apoyo. En el activo raíz, el nombre y los alias son de la máquina entera: «¿qué pasa con vivi?».",
       "useSuggestion": "Usar «{{nombre}}»"
     },
     "remove": "Quitar del tablero",

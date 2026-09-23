@@ -70,6 +70,7 @@ import {
   mismoSistema,
   registrarSistema,
   sistemasDeSenal,
+  sistemaPorNombre,
   tieneHistoria,
 } from '../shared/eva/comun/sistemas.js'
 import { construirSistema } from '../shared/eva/comun/construirSistema.js'
@@ -1400,6 +1401,26 @@ await checkAsync('un ALIAS del asset puesto por quien configura encuentra la se�
   assert.equal(exactas[0].clave, 'DKW_S1')
   /* Y el alias de S1 no se le pega a S2. */
   assert.equal(sistemasDeSenal('DKW del acople chiquito').some((x) => x.clave === 'DKW_S2'), false)
+})
+
+await checkAsync('un alias de la MÁQUINA (en su activo raíz) la identifica: «vivi»', async () => {
+  /*
+   * Plan 42.5 F6.6. El usuario puso «vivi» como alias del activo raíz y preguntó
+   * «¿qué es vivi?»: el modelo no sabía qué era y contestó de memoria. La raíz
+   * ES la máquina, así que su alias es de la máquina: `resolverSistema` lo
+   * acepta donde antes exigía el id, y el inventario del prompt lo dice.
+   */
+  const espejo = sistemaPorNombre('vivi')
+  assert.ok(espejo, '«vivi» identifica una máquina')
+  assert.equal(espejo.id, ESPEJO.id)
+  assert.equal(sistemaPorNombre('VIVI')?.id, ESPEJO.id, 'sin distinguir mayúsculas')
+  assert.equal(sistemaPorNombre(ESPEJO.nombre)?.id, ESPEJO.id, 'también por su nombre')
+  assert.equal(sistemaPorNombre('vi'), null, 'un trozo no vale: exacto, no contención')
+
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('estado_del_sistema', { sistema: 'vivi' })
+  assert.doesNotMatch(r.error ?? '', /No hay ningún sistema/i, 'el alias resuelve la máquina')
+  assert.equal(r.error, undefined, 'estado_del_sistema con el alias contesta')
 })
 
 await checkAsync('el nombre corto solo, sin apoyo, devuelve los tres', () => {

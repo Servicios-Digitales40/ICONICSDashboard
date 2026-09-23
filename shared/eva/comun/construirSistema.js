@@ -230,6 +230,13 @@ export function construirSistema(maquina, tipo) {
   return {
     id: maquina.id,
     nombre: maquina.nombre ?? maquina.id,
+    /* Otros nombres por los que alguien pide ESTA máquina (Plan 42.5 F6.6): el
+       nombre y los alias que quien configura le puso al activo RAÍZ. El
+       asistente los resuelve (`sistemaPorNombre`) y los ve en el inventario. */
+    alias: aliasDeMaquina(maquina),
+    /* Los activos con nombre o alias, para que el modelo sepa qué es «acople
+       chiquito» antes de que nadie se lo pregunte. */
+    activos: activosNombrados(maquina),
     maquina: tipo.descripcion ?? tipo.nombre ?? null,
     plc: maquina.plc ?? null,
 
@@ -490,8 +497,15 @@ export function construirSistema(maquina, tipo) {
       if (!v) return [];
       const rol = tipo.roles?.[v.rol] ?? null;
       const derivados = tipo.aliasDe?.(v, v.assetId ? apoyoDe(v.assetId) : null) ?? [];
+      /* El nombre y los alias del ACTIVO de la variable, sea un apoyo del tipo o
+         no (el variador, la torreta): «velocidad vivi», «par del variador». Los
+         de los apoyos ya los compone el tipo; el `Set` quita lo repetido. */
+      const activo = (maquina.assets ?? []).find((a) => a.id === v.assetId) ?? null;
+      const nombresDelActivo = activo ? [activo.nombre, ...(activo.alias ?? [])].filter(Boolean) : [];
+      const nombresDeLaMedida = [rol?.corto, rol?.label].filter(Boolean);
+      const porActivo = nombresDelActivo.flatMap((n) => nombresDeLaMedida.map((m) => `${m} ${n}`));
       return [...new Set(
-        [clave, v.descripcion, etiquetaDeVariable(v), rol?.label, rol?.corto, ...(v.alias ?? []), ...derivados]
+        [clave, v.descripcion, etiquetaDeVariable(v), rol?.label, rol?.corto, ...(v.alias ?? []), ...derivados, ...porActivo]
           .filter(Boolean),
       )];
     },
@@ -703,4 +717,33 @@ export function construirSistema(maquina, tipo) {
       return propias;
     })(),
   };
+}
+
+/**
+ * Los nombres por los que alguien puede pedir la MÁQUINA entera, aparte de su
+ * `id` y su `nombre`: lo que quien configura escribió en el activo raíz (Plan
+ * 42.5 F6.6). Un alias en la raíz es un alias de la máquina —«vivi»— porque la
+ * raíz ES la máquina en el árbol de ICONICS. Sin raíz nombrada, vacío.
+ *
+ * @param {object} maquina  la configuración cruda
+ * @returns {string[]}
+ */
+export function aliasDeMaquina(maquina) {
+  const raiz = (maquina?.assets ?? []).find((a) => a?.rol === "raiz") ?? null;
+  if (!raiz) return [];
+  return [...new Set([raiz.nombre, ...(Array.isArray(raiz.alias) ? raiz.alias : [])].map((n) => String(n ?? "").trim()).filter(Boolean))];
+}
+
+/**
+ * Los activos (sin la raíz) que tienen nombre o alias, en la forma que el
+ * inventario del asistente enseña: para que el modelo sepa qué es «acople
+ * chiquito» y a qué apoyo se refiere.
+ *
+ * @param {object} maquina
+ * @returns {Array<{id: string, nombre: string|null, alias: string[]}>}
+ */
+export function activosNombrados(maquina) {
+  return (maquina?.assets ?? [])
+    .filter((a) => a?.id && a.rol !== "raiz" && (a.nombre || (Array.isArray(a.alias) && a.alias.length)))
+    .map((a) => ({ id: a.id, nombre: a.nombre ?? null, alias: Array.isArray(a.alias) ? a.alias : [] }));
 }

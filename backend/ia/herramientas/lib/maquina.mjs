@@ -21,7 +21,7 @@
  * (`evaluarRiesgosDe`). Las tres herramientas de la familia `maquina/` llaman a
  * las tres en ese orden.
  */
-import { SISTEMA, SISTEMAS } from '../../../../shared/eva/comun/sistemas.js'
+import { SISTEMA, SISTEMAS, sistemaPorNombre } from '../../../../shared/eva/comun/sistemas.js'
 import { evaluarRiesgos } from '../../../../shared/eva/tanque/riesgos.js'
 import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 import { isGoodQuality } from '../../../../shared/quality.js'
@@ -98,10 +98,13 @@ function resolverSistema(id) {
       { sistemas: SISTEMAS.map((s) => ({ sistema: s.id, es: s.nombre })) }
     )
   }
-  const s = SISTEMA[String(id).trim()]
+  /* El id manda; si no es un id, vale el nombre o un alias que quien configuró
+     le puso a la máquina (Plan 42.5 F6.6): «¿qué pasa con vivi?» no tiene por
+     qué costar una ronda para que el error le diga al modelo el id. */
+  const s = SISTEMA[String(id).trim()] ?? sistemaPorNombre(id)
   if (!s) {
-    return fallo(`No hay ningún sistema llamado "${id}" en esta planta.`, {
-      sistemas: SISTEMAS.map((x) => ({ sistema: x.id, es: x.nombre })),
+    return fallo(`No hay ningún sistema llamado "${id}" en esta planta (ni por id, ni por nombre, ni por alias).`, {
+      sistemas: SISTEMAS.map((x) => ({ sistema: x.id, es: x.nombre, alias: x.alias ?? [] })),
     })
   }
 

@@ -455,6 +455,19 @@ function inventarioDeLaPlanta() {
     ]
 
     /*
+     * Los otros nombres de la máquina y de sus activos (Plan 42.5 F6.6): sin
+     * esto, «¿qué es vivi?» no tenía respuesta posible —el modelo no sabía que
+     * «vivi» era esta máquina— y contestaba de memoria.
+     */
+    if (sistema.alias?.length) lineas.push(`  También llamada: ${sistema.alias.join(', ')}.`)
+    if (sistema.activos?.length) {
+      const activos = sistema.activos.map((a) =>
+        `${a.id}${a.nombre ? ` «${a.nombre}»` : ''}${a.alias?.length ? ` (alias: ${a.alias.join(', ')})` : ''}`
+      )
+      lineas.push(`  Activos: ${activos.join('; ')}.`)
+    }
+
+    /*
      * `limitaciones` NO es documentación: es lo que hay que decir en voz alta
      * al contestar sobre esa máquina (ver la cabecera de `sistemas.js`). Van
      * aquí enteras y no resumidas, porque cada una existe por un dato concreto

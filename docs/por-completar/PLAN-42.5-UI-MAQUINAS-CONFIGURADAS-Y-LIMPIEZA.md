@@ -1453,6 +1453,32 @@ hay que leer el resto:
    verificadores y pasaron aisladas y en la tanda siguiente: contención, no
    asertos, CLAUDE.md §5.3.)
 
+6. **F6.6 · El alias de la máquina y el de cualquier activo, y el asistente
+   los conoce** (D15, lo que faltaba). Añadido el 23-09-2026 por la tarde
+   tras probar F6.4 en pantalla: el usuario puso «Vibraciones Chidas» y el
+   alias «vivi» en el activo RAÍZ y preguntó «¿qué es vivi?». El modelo
+   contestó de memoria («52 señales del sistema de agua») y la guarda lo
+   bloqueó. Dos causas: los alias sólo se propagaban a las variables de los
+   apoyos del tipo (S1–S3), no a la raíz ni al variador; y el inventario del
+   prompt no decía ni un nombre de activo, así que «vivi» no era nada para
+   el modelo, y `resolverSistema` sólo aceptaba el id.
+
+   **Hecho.** `construirSistema` expone `alias` (nombre y alias de la raíz:
+   la raíz ES la máquina) y `activos` (los que tienen nombre o alias), y su
+   `aliasDe(clave)` compone también los nombres del activo de cada variable
+   sea del tipo o no («velocidad el variador»). `sistemaPorNombre(texto)` en
+   `sistemas.js`: id, nombre o alias, normalizado pero EXACTO, y `null` si
+   dos máquinas lo reclaman; `resolverSistema` lo usa cuando el id no casa,
+   y las definiciones de las herramientas ya no dicen «el id, no el nombre».
+   El inventario del prompt dice «También llamada: vivi» y «Activos: S1 «Lado
+   acople» (alias: acople chiquito); …», y `sistemas_de_la_planta` los lleva.
+   La espejo tiene `alias: ["vivi"]` en la raíz; `verificar-herramientas`
+   afirma que «vivi» identifica la espejo, que «vi» no, y que
+   `estado_del_sistema(sistema="vivi")` contesta. El editor lo explica en la
+   pista de alias. Lo que NO garantiza esto: que el modelo llame a una
+   herramienta ante «¿qué es vivi?»; sí garantiza que si la llama, la
+   máquina se resuelve, y que el prompt le dice qué es.
+
 **Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
 (incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del
 asistente), build y bundle en F6.1 y F6.5. Comprobación manual contra

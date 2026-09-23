@@ -969,5 +969,31 @@ export function resumenDeSistemas() {
     herramientas: s.herramientas,
     historia: s.historia,
     limitaciones: s.limitaciones,
+    /* Por qué otros nombres se la puede pedir, y qué activos tienen nombre (Plan 42.5 F6.6). */
+    alias: s.alias ?? [],
+    activos: s.activos ?? [],
   }));
+}
+
+/**
+ * La entrada del registro a la que se refiere un texto —su `id`, su `nombre`
+ * o uno de sus `alias`—, o `null` (Plan 42.5 F6.6).
+ *
+ * Comparación normalizada (sin tildes, sin mayúsculas, sin espacios de más),
+ * pero EXACTA: «vivi» encuentra a la máquina cuyo alias es «vivi», y «vi» no
+ * encuentra nada. Y si dos máquinas reclaman el mismo nombre, `null`: elegir
+ * una sería contestar correctamente sobre la máquina equivocada, que es el
+ * fallo que este registro existe para impedir; quien llama lista las dos.
+ *
+ * @param {string} texto
+ * @param {readonly object[]} [lista]  el registro; se inyecta para probarlo
+ * @returns {object|null}
+ */
+export function sistemaPorNombre(texto, lista = SISTEMAS) {
+  const buscado = normalizar(texto);
+  if (!buscado) return null;
+  const candidatas = lista.filter((s) =>
+    [s.id, s.nombre, ...(s.alias ?? [])].some((n) => normalizar(n) === buscado),
+  );
+  return candidatas.length === 1 ? candidatas[0] : null;
 }

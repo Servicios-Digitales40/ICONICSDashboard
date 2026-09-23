@@ -133,7 +133,7 @@ describe("las vistas sin aria- de la auditoría, contra axe-core", () => {
    */
   it("PlantaMaquina (la Planta genérica) no tiene violaciones graves", async () => {
     montarComoLaApp(<PlantaMaquina onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getByText("Estado de las variables")).toBeTruthy(), { timeout: 4_000 });
+    await waitFor(() => expect(screen.getByText("Estado de las variables")).toBeTruthy(), { timeout: ESPERA_MONTAJE });
     await auditarAccesibilidad();
   }, 30_000);
 
@@ -154,7 +154,7 @@ describe("las vistas sin aria- de la auditoría, contra axe-core", () => {
       cleanup();
       olvidarFuentesDeMaquina();
       montarComoLaApp(<DetalleMaquina params={{ maquina: CONFIGURADA.id, activo }} onNavigate={() => {}} />);
-      await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy(), { timeout: 4_000 });
+      await waitFor(() => expect(screen.getByText(/^Detalle ·/)).toBeTruthy(), { timeout: ESPERA_MONTAJE });
       await auditarAccesibilidad();
     }
   }, 30_000);
@@ -175,6 +175,17 @@ describe("las vistas sin aria- de la auditoría, contra axe-core", () => {
   });
 });
 
+/*
+ * Cuánto se espera a que una vista genérica termine de montarse antes de
+ * auditarla. MEDIDO el 23-09-2026: la prueba de `BandaValor` tarda 0,3 s
+ * aislada, y en la tanda completa (`maxWorkers: 4`) agotó dos veces un plazo
+ * de 4 s —`DetalleMaquina` pide sus series, remonta la comparación y carga
+ * Recharts en un worker que compite con otros tres—. No es un aserto que
+ * falle: es un plazo que la contención cruza (CLAUDE.md §5.3). Diez segundos
+ * dejan margen ×30 sobre lo medido aislado sin ocultar un cuelgue real.
+ */
+const ESPERA_MONTAJE = 10_000;
+
 /** Los `corto` de `shared/eva/tanque/estado.js`: nunca colisionan con un nombre de señal. */
 const CORTO_ESTADO = /En banda|Aviso|Fuera|Sin dato|Reposo/;
 
@@ -186,7 +197,7 @@ describe("el color de banda no es su único portador (Plan 13, F6)", () => {
 
   it("BandaValor: el corto del estado aparece bajo cada variable con escala, en el Detalle genérico", async () => {
     montarComoLaApp(<DetalleMaquina params={{ maquina: CONFIGURADA.id, activo: "S1" }} onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0), { timeout: 4_000 });
+    await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0), { timeout: ESPERA_MONTAJE });
   });
 });
 

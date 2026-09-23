@@ -97,3 +97,76 @@ describe("el editor conserva nombre y alias al editar", () => {
     expect(payload.assets[0]).not.toHaveProperty("alias");
   });
 });
+
+describe("el alias de la MÁQUINA vive en su activo raíz (F6.6)", () => {
+  const conRaiz = (raiz, otros = []) => ({
+    id: "m", nombre: "Nuevo-Modor", tipo: "vibraciones",
+    assets: [{ id: "Vibraciones", pointName: "ac:R/", rol: "raiz", ...raiz }, ...otros],
+    variables: [],
+  });
+
+  it("`aliasDeMaquina`: el nombre y los alias de la raíz, limpios; sin raíz nombrada, nada", async () => {
+    const { aliasDeMaquina, activosNombrados } = await import("@shared/eva/comun/construirSistema.js");
+    expect(aliasDeMaquina(conRaiz({ nombre: "Vibraciones Chidas", alias: ["vivi", " vivi "] }))).toEqual(["Vibraciones Chidas", "vivi"]);
+    expect(aliasDeMaquina(conRaiz({ nombre: null, alias: [] }))).toEqual([]);
+    expect(aliasDeMaquina({ assets: [] })).toEqual([]);
+    /* Los activos nombrados excluyen la raíz y los que no tienen nada. */
+    const m = conRaiz({ alias: ["vivi"] }, [
+      { id: "S1", pointName: "ac:R/S1/", rol: "secundario", nombre: "Lado acople", alias: ["acople chiquito"] },
+      { id: "V20", pointName: "ac:R/V20/", rol: "secundario", nombre: null, alias: [] },
+    ]);
+    expect(activosNombrados(m)).toEqual([{ id: "S1", nombre: "Lado acople", alias: ["acople chiquito"] }]);
+  });
+
+  it("el registro de una configurada expone `alias` y `activos`, y el resumen los lleva", () => {
+    const { configurada } = configuracionEspejo({ verificadasDelCatalogo: true });
+    const conVivi = { ...configurada, assets: configurada.assets.map((a) => (a.rol === "raiz" ? { ...a, alias: ["vivi"] } : a)) };
+    const sistema = construirSistema(conVivi, TIPO);
+    expect(sistema.alias).toEqual(["vivi"]);
+    expect(sistema.activos.map((a) => a.id)).toEqual(["S1", "S2", "S3"]);
+  });
+
+  it("el alias de un activo que NO es apoyo del tipo (el variador) también llega a sus variables", () => {
+    /* En la espejo las variables del variador no cuelgan de ningún activo; aquí
+       se cuelgan de un asset V20 con alias, que es como las deja el editor. */
+    const { configurada } = configuracionEspejo({ verificadasDelCatalogo: true });
+    const conVariador = {
+      ...configurada,
+      assets: [...configurada.assets, { id: "V20", pointName: "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/V20/", rol: "secundario", nombre: null, alias: ["el variador"] }],
+      variables: configurada.variables.map((v) => (v.rol?.startsWith("variador:") ? { ...v, assetId: "V20" } : v)),
+    };
+    const sistema = construirSistema(conVariador, TIPO);
+    const delV20 = conVariador.variables.filter((v) => v.assetId === "V20" && v.rol);
+    expect(delV20.length).toBeGreaterThan(0);
+    for (const v of delV20) {
+      expect(sistema.aliasDe(v.id).some((a) => a.endsWith(" el variador")), v.id).toBe(true);
+    }
+  });
+});
+
+describe("sistemaPorNombre", () => {
+  const LISTA = [
+    { id: "vib-motor-03", nombre: "Nuevo-Modor", alias: ["vivi", "Vibraciones Chidas"] },
+    { id: "vib-bomba-07", nombre: "Bomba", alias: ["la bomba"] },
+    { id: "tanque", nombre: "Sistema de agua industrial" },
+  ];
+
+  it("encuentra por id, por nombre y por alias, sin tildes ni mayúsculas, y exacto", async () => {
+    const { sistemaPorNombre } = await import("@shared/eva/comun/sistemas.js");
+    expect(sistemaPorNombre("vib-motor-03", LISTA)?.id).toBe("vib-motor-03");
+    expect(sistemaPorNombre("nuevo-modor", LISTA)?.id).toBe("vib-motor-03");
+    expect(sistemaPorNombre("  VIVI ", LISTA)?.id).toBe("vib-motor-03");
+    expect(sistemaPorNombre("vibraciones chidas", LISTA)?.id).toBe("vib-motor-03");
+    expect(sistemaPorNombre("sistema de agua industrial", LISTA)?.id).toBe("tanque");
+    expect(sistemaPorNombre("vi", LISTA)).toBeNull();
+    expect(sistemaPorNombre("", LISTA)).toBeNull();
+    expect(sistemaPorNombre(null, LISTA)).toBeNull();
+  });
+
+  it("si dos máquinas reclaman el mismo nombre, no elige: null", async () => {
+    const { sistemaPorNombre } = await import("@shared/eva/comun/sistemas.js");
+    const ambigua = [...LISTA, { id: "vib-otro", nombre: "Otro", alias: ["vivi"] }];
+    expect(sistemaPorNombre("vivi", ambigua)).toBeNull();
+    expect(sistemaPorNombre("la bomba", ambigua)?.id).toBe("vib-bomba-07");
+  });
+});

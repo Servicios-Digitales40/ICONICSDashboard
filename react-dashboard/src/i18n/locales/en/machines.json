@@ -406,7 +406,7 @@
       "assetNamePlaceholder": "No name: labelled by its id",
       "assetAlias": "Aliases of asset {{id}}",
       "assetAliasPlaceholder": "aliases, comma-separated",
-      "assetAliasHint": "Aliases apply to every variable of the asset: with “small coupling” on S1, “DKW of the small coupling” finds that bearing's DKW.",
+      "assetAliasHint": "Aliases apply to every variable of the asset: with “small coupling” on S1, “DKW of the small coupling” finds that bearing's DKW. On the root asset, the name and aliases belong to the whole machine: “what's up with vivi?”.",
       "useSuggestion": "Use “{{nombre}}”"
     },
     "remove": "Remove from dashboard",

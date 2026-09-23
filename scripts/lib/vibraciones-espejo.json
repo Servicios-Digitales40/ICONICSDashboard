@@ -50,7 +50,10 @@
         "id": "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/",
         "pointName": "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/",
         "rol": "raiz",
-        "nombre": null
+        "nombre": null,
+        "alias": [
+          "vivi"
+        ]
       },
       {
         "id": "ae:/DEMO VIBRACIONES",
