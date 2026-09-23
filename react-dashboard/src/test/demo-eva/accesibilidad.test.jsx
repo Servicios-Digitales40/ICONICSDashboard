@@ -198,7 +198,11 @@ describe("el color de banda no es su único portador (Plan 13, F6)", () => {
   it("BandaValor: el corto del estado aparece bajo cada variable con escala, en el Detalle genérico", async () => {
     montarComoLaApp(<DetalleMaquina params={{ maquina: CONFIGURADA.id, activo: "S1" }} onNavigate={() => {}} />);
     await waitFor(() => expect(screen.getAllByText(CORTO_ESTADO).length).toBeGreaterThan(0), { timeout: ESPERA_MONTAJE });
-  });
+    /* El plazo de la PRUEBA, no sólo el de la espera: sin él, vitest la corta a
+       los 5 s por defecto antes de que la espera de arriba llegue a los suyos
+       (pasó el 23-09 en tanda completa, 5008 ms). Mismo criterio que sus dos
+       hermanas de axe-core, con 30 s. */
+  }, 30_000);
 });
 
 describe("landmarks: el juego completo, no sólo el que faltaba", () => {

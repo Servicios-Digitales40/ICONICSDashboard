@@ -1491,6 +1491,12 @@ hay que leer el resto:
    misma serie»); y el bloque entero va plegado bajo «N series sin verificar ·
    M verificadas como constante registrada», como las limitaciones (D18), con
    el detalle a un clic.
+   (c) La prueba `BandaValor` de `accesibilidad.test` siguió cayendo en tanda
+   completa tras subir su espera a 10 s: vitest corta la PRUEBA a los 5 s por
+   defecto antes de que esa espera llegue a los suyos (5008 ms medidos).
+   Lleva ahora el mismo plazo explícito de 30 s que sus dos hermanas de
+   axe-core; aislada tarda 0,3 s. El commit de F6.7 dijo «1172 verdes» con
+   esta prueba en rojo: la cifra buena está en el commit siguiente.
 
 **Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
 (incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del
