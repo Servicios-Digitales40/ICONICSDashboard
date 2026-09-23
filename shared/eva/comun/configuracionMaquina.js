@@ -529,3 +529,26 @@ export function capacidadesDe(maquina, tipo = null) {
     capacidades.filter((c) => c === "WRITABLE_VARIABLES" || !posibles || posibles.includes(c)),
   );
 }
+
+/**
+ * Qué herramientas del asistente puede llamar una máquina con estas
+ * capacidades. Derivado, no escrito: una máquina sin serie verificada no
+ * ofrece `historia_de_senal` —ofrecerla y que se niegue después gasta un
+ * turno del modelo para llegar al mismo sitio—.
+ *
+ * Vivía dentro de `construirSistema` (el registro) y la pantalla de
+ * configuración la necesitaba para decir «a qué herramientas tiene acceso
+ * esta máquina» (Plan 42.5 F6, D18): la misma regla en dos sitios sería la
+ * divergencia que `shared/` existe para impedir. Las demás herramientas del
+ * asistente son de planta entera o del tanque; ésta es la lista POR MÁQUINA.
+ *
+ * @param {readonly string[]} capacidades  las de `capacidadesDe`
+ * @returns {string[]}  nombres de herramienta, en el orden en que se ofrecen
+ */
+export function herramientasDeCapacidades(capacidades) {
+  const caps = capacidades ?? [];
+  const lista = ["estado_del_sistema"];
+  if (caps.includes("DIAGNOSTICS")) lista.push("riesgos_activos");
+  if (caps.includes("HISTORICAL_DATA")) lista.push("historia_de_senal");
+  return lista;
+}

@@ -65,6 +65,7 @@ import {
   verificarMaquina,
 } from "@/lib/api/maquinasApi.js";
 import { avisarMaquinasCambiaron } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
+import { herramientasDeCapacidades } from "@shared/eva/comun/configuracionMaquina.js";
 import { PendientesPorCausa, pendientesDeVariables } from "@/Demo-EVA/components/configuracion/PendientesPorCausa.jsx";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
@@ -436,6 +437,9 @@ function FichaDeMaquina({
 
   const conSerie = (maquina.variables ?? []).filter((v) => v.historyVerified).length;
   const limitaciones = maquina.limitaciones ?? [];
+  /* A qué herramientas del asistente tiene acceso ESTA máquina (D18): la
+     misma regla con la que el registro las deriva de sus capacidades. */
+  const herramientas = herramientasDeCapacidades(maquina.capacidades ?? []);
   /* Lo que el sondeo dejó PERSISTIDO: qué series no están verificadas y por
      qué, sin tener que sondear otra vez para saberlo (D17). */
   const persistidas = pendientesDeVariables(maquina.variables ?? []);
@@ -470,22 +474,36 @@ function FichaDeMaquina({
         </div>
       )}
 
-      {limitaciones.length > 0 && (
-        <div style={{ marginTop: 7, display: "flex", gap: 7 }}>
-          <ShieldAlert size={14} style={{ color: t.amber, flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>
-              {traducir("machines:config.limitations")}
-            </div>
-            <ul style={{ margin: "3px 0 0", paddingLeft: 15 }}>
-              {limitaciones.map((linea) => (
-                <li key={linea} style={{ ...textoSuave, marginTop: 2 }}>
-                  {linea}
-                </li>
-              ))}
-            </ul>
-          </div>
+      {/*
+        Las herramientas a la vista y las limitaciones plegadas (D18). Quien
+        configura una máquina quiere saber qué va a poder preguntarle al
+        asistente; las limitaciones —hoy seis o siete líneas, casi todas
+        derivadas— siguen ahí, a un clic, sin tapar la ficha.
+      */}
+      {herramientas.length > 0 && (
+        <div style={{ ...textoSuave, marginTop: 5 }}>
+          <strong style={{ color: t.text, fontWeight: 600 }}>
+            {traducir("machines:config.herramientas.title")}:
+          </strong>{" "}
+          {herramientas.map((h) => traducir(`machines:config.herramientas.nombre.${h}`, { defaultValue: h })).join(" · ")}
+          <div style={{ ...textoSuave, opacity: 0.8, marginTop: 1 }}>{traducir("machines:config.herramientas.nota")}</div>
         </div>
+      )}
+
+      {limitaciones.length > 0 && (
+        <details style={{ marginTop: 7 }}>
+          <summary style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 11.5, fontWeight: 600, color: t.text }}>
+            <ShieldAlert size={14} style={{ color: t.amber, flexShrink: 0 }} />
+            {traducir("machines:config.limitationsSummary", { count: limitaciones.length })}
+          </summary>
+          <ul style={{ margin: "3px 0 0", paddingLeft: 36 }}>
+            {limitaciones.map((linea) => (
+              <li key={linea} style={{ ...textoSuave, marginTop: 2 }}>
+                {linea}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {!sondeo && (persistidas.pendientes.length > 0 || persistidas.constantes.length > 0) && (

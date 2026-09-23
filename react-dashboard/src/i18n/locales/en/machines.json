@@ -307,7 +307,6 @@
     "series": "with verified history",
     "assets": "assets",
     "capabilities": "What it can do",
-    "limitations": "What it cannot do",
     "state": "State",
     "stateUnknown": "Not checked against ICONICS",
     "stateUnknownHint": "Nobody has checked yet whether its points still exist. This is not a failure: it simply has not been checked.",
@@ -417,7 +416,18 @@
     },
     "constantesSummary_one": "{{count}} verified as a recorded constant",
     "constantesSummary_other": "{{count}} verified as recorded constants",
-    "pendientesTitle": "Unverified series, by cause"
+    "pendientesTitle": "Unverified series, by cause",
+    "limitationsSummary_one": "What it cannot do · 1 limitation",
+    "limitationsSummary_other": "What it cannot do · {{count}} limitations",
+    "herramientas": {
+      "title": "Assistant tools for this machine",
+      "nota": "The rest of the assistant's tools belong to the whole plant, not to one machine.",
+      "nombre": {
+        "estado_del_sistema": "Machine status",
+        "riesgos_activos": "Active risks",
+        "historia_de_senal": "Signal history"
+      }
+    }
   },
   "maquina": {
     "planta": {

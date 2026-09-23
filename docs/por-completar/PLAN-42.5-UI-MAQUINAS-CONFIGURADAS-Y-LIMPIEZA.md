@@ -1378,6 +1378,20 @@ hay que leer el resto:
 3. **F6.3 · Configuración** (D18). Limitaciones plegadas;
    `herramientasDe` extraída y probada; el bloque de herramientas con
    rótulos nuevos en es/en.
+
+   **Hecho (23-09-2026, tarde).** `herramientasDeCapacidades(capacidades)` en
+   `configuracionMaquina.js`, junto a `capacidadesDe`; `construirSistema` la
+   usa y una prueba afirma que el registro de la espejo ofrece exactamente esa
+   lista, con y sin series verificadas. La ficha de Configuración pliega «Lo
+   que no puede hacer» en un `<details>` cuyo resumen dice la cuenta («· 6
+   limitaciones»; el texto sigue dentro) y enseña «Herramientas del asistente
+   para esta máquina» con rótulos en presente —Estado de la máquina, Riesgos
+   activos, Historia de una señal— derivados de `maquina.capacidades`, más una
+   línea que dice que las demás son de la planta entera. Con `vib-motor-03`
+   son tres de veintiséis, que es lo que hay. **Puerta:** frontend y backend en
+   verde (cifras en el commit); `verificar-registro-configurado` 39;
+   `verificar-herramientas` 190 + 22 omitidas; lint, types, i18n (1242) y
+   textos limpios.
 4. **F6.4 · Nombre y alias** (D15). Dominio (`crearAsset`,
    `canalesDeMaquina`, `tipo.aliasDe`, `tipo.canales[].sugerencia`),
    esquema HTTP, editor (sección de activos con nombre, alias y

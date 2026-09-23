@@ -555,3 +555,32 @@ describe("lo que el sondeo dejó persistido se lista sin sondear otra vez (F6, D
     expect(screen.queryByText("Series sin verificar, por causa")).toBeNull();
   });
 });
+
+describe("menos texto, y las herramientas a la vista (F6, D18)", () => {
+  it("las limitaciones van plegadas tras un resumen con la cuenta, y siguen en la ficha", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    montar();
+
+    expect(await screen.findByText("Lo que no puede hacer · 1 limitación")).toBeTruthy();
+    /* El texto sigue ahí, dentro del desplegable: plegado no es borrado. */
+    expect(screen.getByText(/NO se evalúan/)).toBeTruthy();
+    expect(screen.getByText("Lo que no puede hacer · 1 limitación").closest("details")).toBeTruthy();
+  });
+
+  it("dice a qué herramientas del asistente tiene acceso la máquina, derivadas de sus capacidades", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
+    montar();
+
+    expect(await screen.findByText(/Herramientas del asistente para esta máquina/)).toBeTruthy();
+    /* CURRENT_DATA + DIAGNOSTICS: estado y riesgos; sin serie verificada, sin historia. */
+    expect(screen.getByText(/Estado de la máquina · Riesgos activos/)).toBeTruthy();
+    expect(screen.queryByText(/Historia de una señal/)).toBeNull();
+    expect(screen.getByText(/son de la planta entera/)).toBeTruthy();
+  });
+
+  it("con serie verificada, también la historia", async () => {
+    listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina({ capacidades: ["CURRENT_DATA", "DIAGNOSTICS", "HISTORICAL_DATA"] })] });
+    montar();
+    expect(await screen.findByText(/Estado de la máquina · Riesgos activos · Historia de una señal/)).toBeTruthy();
+  });
+});

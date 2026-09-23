@@ -52,7 +52,7 @@
  * `backend/ia/indices/maquinas.mjs`, y quien decide meterla en `SISTEMAS` es
  * `registrarSistema()`.
  */
-import { ESTADO_CONFIGURACION, capacidadesDe, permiteEscritura } from "./configuracionMaquina.js";
+import { ESTADO_CONFIGURACION, capacidadesDe, herramientasDeCapacidades, permiteEscritura } from "./configuracionMaquina.js";
 import { dominioDesdeRoles } from "./dominioDesdeRoles.js";
 import { estadoComun, senalComun } from "./estadoMaquina.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "./vistaDeMaquina.js";
@@ -561,20 +561,10 @@ export function construirSistema(maquina, tipo) {
     vocabulario: tipo.vocabulario ?? null,
     rutas: [],
 
-    /**
-     * ── QUÉ PUEDE LLAMAR EL ASISTENTE, DERIVADO ────────────────────
-     *
-     * De las capacidades, no de una lista escrita. Una máquina sin serie
-     * verificada no ofrece `historia_de_senal`: ofrecerla y que se niegue
-     * después gasta un turno del modelo para llegar al mismo sitio.
-     */
-    herramientas: (() => {
-      const caps = capacidadesDe(maquina, tipo);
-      const lista = ["estado_del_sistema"];
-      if (caps.includes("DIAGNOSTICS")) lista.push("riesgos_activos");
-      if (caps.includes("HISTORICAL_DATA")) lista.push("historia_de_senal");
-      return lista;
-    })(),
+    /* Qué puede llamar el asistente, DERIVADO de las capacidades: la regla
+       vive en `herramientasDeCapacidades` porque la pantalla de configuración
+       la enseña también (Plan 42.5 F6, D18). */
+    herramientas: herramientasDeCapacidades(capacidadesDe(maquina, tipo)),
 
     historia: clavesConSerie.length
       ? `${clavesConSerie.length} variable(s) con serie verificada.`

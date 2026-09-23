@@ -307,7 +307,6 @@
     "series": "con serie verificada",
     "assets": "assets",
     "capabilities": "Lo que sabe hacer",
-    "limitations": "Lo que no puede hacer",
     "state": "Estado",
     "stateUnknown": "Sin comprobar contra ICONICS",
     "stateUnknownHint": "Nadie ha mirado todavía si sus puntos siguen existiendo. No es un fallo: es que no se ha comprobado.",
@@ -417,7 +416,18 @@
     },
     "constantesSummary_one": "{{count}} verificada como constante registrada",
     "constantesSummary_other": "{{count}} verificadas como constante registrada",
-    "pendientesTitle": "Series sin verificar, por causa"
+    "pendientesTitle": "Series sin verificar, por causa",
+    "limitationsSummary_one": "Lo que no puede hacer · 1 limitación",
+    "limitationsSummary_other": "Lo que no puede hacer · {{count}} limitaciones",
+    "herramientas": {
+      "title": "Herramientas del asistente para esta máquina",
+      "nota": "Las demás herramientas del asistente son de la planta entera, no de una máquina.",
+      "nombre": {
+        "estado_del_sistema": "Estado de la máquina",
+        "riesgos_activos": "Riesgos activos",
+        "historia_de_senal": "Historia de una señal"
+      }
+    }
   },
   "maquina": {
     "planta": {
