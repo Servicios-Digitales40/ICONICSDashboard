@@ -14,3 +14,21 @@ desde esta carpeta al armar el PDF.
 
 Si un archivo no está, el reporte se genera igual pero sin esa pieza
 (no truena): la regla de la casa es "lo que falta se dice, no se finge".
+
+portadas/  (Plan 44, 23-09-2026)
+---------------------------------
+El arte de la portada de cada TIPO de reporte, con el nombre del tipo:
+
+  portadas/tecnico.png              667x295  banner horizontal (va arriba)
+  portadas/vibraciones.png          426x532  vertical (va a la izquierda)
+  portadas/lectura-de-sensores.png  343x429  vertical
+  portadas/riesgos.png              431x539  vertical
+  portadas/alarmas.png              397x496  vertical
+  portadas/ingenieria.png           505x505  cuadrado (va a la izquierda)
+  portadas/energias.png             469x545  vertical
+  portadas/predicciones.png         438x578  vertical
+
+Misma regla de tolerancia: si falta el arte de un tipo, su portada sale con
+el fondo azul de siempre y el reporte se genera igual. Tienen que ser PNG de
+verdad (pdfkit no lee WebP). La maqueta Word de la que sale cada tipo está
+en docs/plantillas-reportes/.

@@ -100,8 +100,10 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
    (`git merge DemoVibraciones4.0` desde la tuya), no esperar al día de la demo.
 4. **Commit por fase, con la puerta pasada, y sin push sin pedirlo**
    (`CLAUDE.md` §6). Un plan nuevo va a `docs/por-completar/PLAN-N-*.md`
-   (§6.1); el siguiente número libre es el **44** (el 43 está reservado al
-   tanque como configurada).
+   (§6.1); el siguiente número libre es el **45** (el 43 está reservado al
+   tanque como configurada; el **44** —reportes por plantilla— está escrito
+   y toca `backend/ia/`: ver su D11 antes de tocar `definiciones.mjs` o
+   `chat.mjs`).
 
 ### Dónde vive el asistente hoy (para quien va a tocarlo)
 
@@ -426,9 +428,19 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 > este día: Planta y Detalle genéricos, la bitácora vaciada, todas las vistas
 > del tanque borradas, el código muerto fuera, y la F6 con lo que la máquina
 > pidió al mirarla en planta (filtros, mudas listadas, configuración corta,
-> nombre y alias por asset, fuera el muro). En `docs/por-completar/` queda
-> sólo el **Plan 33**. El siguiente número libre es el **44**; el **43** está
+> nombre y alias por asset, fuera el muro). En `docs/por-completar/` quedan
+> el **Plan 33** y el **Plan 44** (reportes por plantilla, escrito ese mismo
+> día con su F0 hecha). El siguiente número libre es el **45**; el **43** está
 > reservado al tanque como máquina configurada.
+
+**`PLAN-44-REPORTES-POR-PLANTILLA.md`** — el usuario entregó ocho maquetas
+Word (técnico, vibraciones, sensores, riesgos, alarmas, ingeniería, energías,
+predicciones) para que `generar_reporte` sepa componer cada tipo. F0 hecha:
+maquetas en `docs/plantillas-reportes/`, arte en `backend/ia/marca/portadas/`,
+decisiones cerradas salvo el criterio de la matriz de riesgos (D15, propuesto).
+F1–F7 por hacer: un compositor por bloques, recolectores deterministas, `tipo`
+como argumento de la herramienta. **Vive en `backend/ia/`**: su D11 dice qué
+archivos calientes toca y cómo avisar.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no

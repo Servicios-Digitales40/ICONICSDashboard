@@ -501,8 +501,10 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
 El **42.5** (la UI de las máquinas configuradas y la limpieza del tanque, con
 su F6 de ajustes tras mirarlo en planta) se completó y archivó el 23-09-2026.
-El único vivo hoy es el **33** (modularidad de máquinas), con su F9 —la
-estación de llenado como configurada— **bloqueada hasta reabrir** la rama. El
+Vivos hoy: el **33** (modularidad de máquinas), con su F9 —la estación de
+llenado como configurada— **bloqueada hasta reabrir** la rama, y el **44**
+(reportes por plantilla: ocho tipos de PDF que el asistente compone desde
+`backend/ia/reportes/`, escrito el 23-09-2026 con su F0 hecha). El
 **42** (verificar una bandera que nunca cambió sin forzarla, desde B13) se
 escribió y se completó el 22-09-2026 por la tarde: midió primero cómo registra
 el historiador una constante y de ahí salió el criterio `registrada-constante`

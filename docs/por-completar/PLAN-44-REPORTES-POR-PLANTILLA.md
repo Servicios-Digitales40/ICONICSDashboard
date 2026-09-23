@@ -1,6 +1,6 @@
 # PLAN 44 — Reportes por plantilla: ocho tipos que el asistente sabe generar
 
-**Estado:** ESCRITO el 23-09-2026 · F0–F7 por completar · tres decisiones abiertas para el usuario (§6)
+**Estado:** F0 completada el 23-09-2026 · F1–F7 por completar · las decisiones de §6 cerradas por el usuario el 23-09-2026, salvo el criterio de la matriz P×I (D15), propuesto y pendiente de su confirmación
 **Rama:** `UI-Limpieza1.0`
 **Origen:** el usuario entregó en `Documentos/Reportes/` ocho carpetas, una por
 tipo de reporte, cada una con un `.docx` de ejemplo (la maqueta) y un `.png`
@@ -70,8 +70,8 @@ Los valores de las maquetas —«Nivel 78 %», «Bomba P-101», «12 críticas»
    las plantillas no corren peligro, pero **no viajan con el repo** y viven
    mezcladas con la salida. Se mueven (F0).
 2. **El arte pesa 4,1 MB entre los ocho** y ya viene reducido (el PNG dentro de
-   cada `.docx` es el mismo a 2,2–2,8 MB). Se versiona el arte, no las
-   maquetas (§2, D6).
+   cada `.docx` es el mismo a 2,2–2,8 MB; las maquetas suman 18,4 MB). Se
+   versionan las dos cosas, cada una donde la usa quien la usa (§2, D6).
 
 ### La máquina contra la que se mide
 
@@ -110,16 +110,62 @@ instalación (se dibujan con su motivo, D3); **bloqueada** si ninguna la tiene.
 | 1 | `tecnico` | **Viable** | Indicadores: las 4 medidas de mayor jerarquía del tipo con su valor y su variación contra el período anterior (`comparar_periodos`). Tendencias y Estadísticas (mín/máx/promedio/unidad/cobertura): `leerSerieEnRango` + `resumirSerie`, como hoy. Análisis técnico (variable / condición / observación / recomendación): estado por banda del dominio + `evidencia` y `accion` de la regla activa. Conclusiones: `sintesisAutomatica` + `explicacion` del modelo, rotulada | Nada bloqueado. Firmas: «Elaboró» lo firma el asistente (D10); Revisó/Aprobó en blanco |
 | 2 | `vibraciones` | **Parcial alto** | Estado general: estado global del dominio (Normal/Atención/Crítico), vRMS máximo del período con su apoyo, banderas activas ahora. Puntos de medición: una fila por apoyo con vRMS, aRMS, aPeak, DKW y estado (las columnas son las medidas del tipo, no los ejes de la maqueta). Tendencias RMS: gráficas de vRMS por apoyo. Diagnóstico: riesgos activos con `evidencia`, `consecuencia` y `norma`. Recomendaciones: `accion` de cada regla activa, prioridad = `nivel` | «Salud equipo 87 %»: no existe un índice de salud; **no se inventa**, va el estado global. Temperatura: no instrumentada. Espectro: el módulo no lo publica; la sección lo dice y muestra las vigilancias `monEspectro*` en vivo. Responsable/fecha: en blanco |
 | 3 | `lectura-de-sensores` | **Viable** | Variables monitoreadas: tarjetas con las medidas y su tag. Lecturas/trazabilidad: tag (`pointName`), variable, rango (la banda del tipo si la declara, si no «—»), lectura, desvío respecto al promedio del período, estado (banda + calidad OPC). Tendencia: gráficas. Calidad de dato: calidad OPC ahora, serie verificada o no y cómo (`historyVerifiedComo`), las QC del módulo | Calibración (última/próxima): no hay dato; la tabla lleva esa columna con «sin registro» y la sección se titula «Calidad de dato» primero. Acciones: en blanco |
-| 4 | `riesgos` | **Parcial** | Principales riesgos: `riesgos_activos` (id, título, nivel, evidencia, estado «activo»), más los **no evaluables** y los **sin comprobar** con su motivo (es lo que el dominio ya separa). Plan de mitigación: `accion` de cada regla + intervenciones registradas para esa máquina (`hechos_de_la_planta`). Riesgo residual: `explicacion` del modelo, rotulada | **La matriz P×I no se puede llenar con verdad**: el motor produce un nivel, no una probabilidad ni un impacto. Se sustituye por «Riesgos por nivel» (crítico / atención / informativo) — **decisión abierta §6.1** |
+| 4 | `riesgos` | **Parcial** | Principales riesgos: `riesgos_activos` (id, título, nivel, evidencia, estado «activo»), más los **no evaluables** y los **sin comprobar** con su motivo (es lo que el dominio ya separa). Plan de mitigación: `accion` de cada regla + intervenciones registradas para esa máquina (`hechos_de_la_planta`). Riesgo residual: `explicacion` del modelo, rotulada | **La matriz P×I no tiene hoy ni P ni I**: el motor produce un nivel. Se propone un criterio declarado para llenarla con verdad (D15); mientras no se confirme, la sección sale como «Riesgos por nivel» |
 | 5 | `alarmas` | **Parcial** | Resumen: banderas y fallos del variador activos ahora, contados por severidad **derivada del rol** (`bandera:alarma` y `variador:fallo` → crítica; `bandera:aviso` y `variador:aviso` → alta; `bandera:offset` → media), y la tabla lo declara. Eventos recientes: flancos de las banderas **con serie verificada** en el período (la cadena de flancos del Plan 42 F3). Distribución: ocurrencias por intervalo de esos flancos. Análisis de causa: por cada bandera activa, el riesgo del motor que la explica | Hoy no hay flancos porque nada ha alarmado: la tabla dirá «sin eventos en el período» y eso es verdad, no un hueco. Sin Alarm Server (500). Plan de acción: en blanco |
 | 6 | `ingenieria` | **Parcial bajo** | Hallazgos técnicos: riesgos activos + hechos vigentes + intervenciones de la máquina, con impacto = `consecuencia` y prioridad = `nivel`. Evidencia/tendencias: gráficas. Indicadores: hallazgos (n), riesgo actual (nivel máximo), señales sin lectura | Avance por disciplina, pendientes, objetivo del proyecto, decisiones de ingeniería, plan de acción: **son de gestión, no de planta**; se dibujan como campos a llenar a mano, y la síntesis lo dice. Es la plantilla con menos dato propio |
-| 7 | `energias` | **Parcial bajo** | Lo que el variador da: potencia (kW), corriente, tensión de salida, bus CC — valor ahora, tendencia y mín/máx/promedio. Demanda máxima = potencia máxima del período | kWh: no hay medidor. Se puede **estimar integrando la potencia del variador** sobre las muestras del período, declarado como estimación con su cobertura — **decisión abierta §6.2**. Flujo/agua, PF, meta, ahorro: sin fuente en esta máquina |
-| 8 | `predicciones` | **Bloqueada hoy** | Nada: `pronostico_de_desgaste` se niega porque el tipo `vibraciones` no declara mecanismos de desgaste; el módulo Predicción es otra fuente (API externa, §2.1: nunca se mezcla) y está oculto | La herramienta **se niega con motivo** («esta máquina no declara mecanismos de desgaste; el tipo tendría que declararlos») en vez de emitir un PDF con secciones vacías. La plantilla se escribe igual para el día en que un tipo lo declare — **decisión abierta §6.3** |
+| 7 | `energias` | **Parcial bajo** | Lo que el variador da: potencia (kW), corriente, tensión de salida, bus CC — valor ahora, tendencia y mín/máx/promedio. Demanda máxima = potencia máxima del período | kWh: no hay medidor. Se **estima integrando la potencia del variador** sobre las muestras del período, declarado como estimación con su cobertura (decidido, §6.2). Flujo/agua, PF, meta, ahorro: sin fuente en esta máquina |
+| 8 | `predicciones` | **Bloqueada hoy** | Nada: `pronostico_de_desgaste` se niega porque el tipo `vibraciones` no declara mecanismos de desgaste; el módulo Predicción es otra fuente (API externa, §2.1: nunca se mezcla) y está oculto | La herramienta **se niega con motivo** («esta máquina no declara mecanismos de desgaste; el tipo tendría que declararlos») en vez de emitir un PDF con secciones vacías. La plantilla se escribe igual para el día en que un tipo lo declare (decidido, §6.3). Vale para TODA configurada: `construirSistema` las registra con `desgaste: null` (línea 557) |
 
 Resumen: tres plantillas salen completas con los datos de hoy (1, 3 y, con
 sus sustituciones dichas, 2), tres salen parciales y honestas (4, 5, 6), una
 parcial baja (7) y una bloqueada (8). **Ninguna necesita una dependencia
 nueva** ni una fuente distinta de ICONICS.
+
+### 1.1 · Para cualquier máquina configurada, no para «la de vibraciones»
+
+Una plantilla nunca nombra una máquina ni una clave de señal: nombra
+**familias de rol** (`medida`, `bandera`, `variador`, `calidad`) y
+**capacidades** (`CURRENT_DATA`, `HISTORICAL_DATA`, `DIAGNOSTICS`), que son
+lo que toda configurada trae de su tipo (`capacidadesDe`, `ROLES`). El
+recolector pregunta al registro qué variables cumplen el rol que la sección
+pide, y si el tipo no tiene esa familia, la sección sale como `ausencia` con
+el nombre del tipo. Así, cuando el tanque entre como `estacion-de-llenado`
+(Plan 43), el reporte técnico saldrá con nivel, caudal y presión sin que este
+plan se toque; y el de vibraciones dirá «este tipo no mide vibración».
+
+Dos cosas que hoy no declara ningún tipo y que la sección correspondiente
+pediría al tipo, no a la máquina:
+
+- **Qué medidas son «las principales»** (los cuatro indicadores del Técnico y
+  de Sensores). Sin declararlo se toman las primeras cuatro medidas del
+  orden del tipo, que en vibraciones es vRMS de cada apoyo y aRMS del
+  primero. Declararlo es una línea por tipo (`indicadores: ["medida:vRMS",
+  "variador:velocidad", …]`) y se propone hacerlo en F3.
+- **El impacto de cada regla** para la matriz de riesgos (D15).
+
+### 1.2 · Qué le dice el técnico al asistente para pedir cada uno
+
+Es la especificación del normalizador `tipoDeReporte(texto)` (D4) y de los
+casos de `verificar-chat`. El modelo elige el `tipo` del enum; el
+normalizador cubre que pase texto libre o un sinónimo.
+
+| `tipo` | Frases que lo piden | Sinónimos que el normalizador entiende |
+|---|---|---|
+| `catalogo` (hoy, por omisión) | «Genérame un reporte», «un PDF de todas las señales de esta semana», «expórtame los datos del motor» | reporte, PDF, exportar, «de todas las señales», «del catálogo» |
+| `tecnico` | «Genérame un reporte técnico sobre el sistema», «el técnico del mes», «technical report of the last week» | técnico, technical, «de planta», «de monitoreo» |
+| `vibraciones` | «Reporte de vibraciones del motor», «el CMS de la última semana», «reporte de condición del rodamiento» | vibraciones, vibración, CMS, «de condición», «de los apoyos» |
+| `lectura-de-sensores` | «Reporte de lectura de sensores», «cómo están leyendo los sensores, en PDF», «reporte de instrumentación» | sensores, lecturas, instrumentación, «calidad de dato», sensor readings |
+| `riesgos` | «Reporte de riesgos de la máquina», «qué riesgos hay, en un PDF», «análisis de riesgos» | riesgos, risk, «matriz de riesgos», mitigación |
+| `alarmas` | «Reporte de alarmas de la última semana», «cuántas alarmas hubo este turno, en reporte», «eventos de alarma» | alarmas, alarms, eventos, avisos, «disparos» |
+| `ingenieria` | «Reporte de ingeniería del sistema», «un reporte de hallazgos técnicos», «engineering report» | ingeniería, engineering, hallazgos, proyecto |
+| `energias` | «Reporte de energía del variador», «cuánto consumió el motor este mes», «reporte de consumo eléctrico» | energía, energías, consumo, eléctrico, kWh, potencia |
+| `predicciones` | «Reporte de predicciones», «pronóstico de fallas en PDF», «cuándo va a fallar, en reporte» | predicción, pronóstico, predictivo, fallas futuras |
+
+Cuando la frase no nombra tipo («hazme un reporte de la máquina») se queda en
+`catalogo`, que es lo de hoy. Cuando nombra dos («un reporte técnico de
+alarmas») el normalizador devuelve ambiguo y la herramienta pregunta, no
+elige. El período y la máquina se resuelven como hasta ahora
+(`resolverVentana`, `resolverSistema`: id, nombre o alias).
 
 ---
 
@@ -173,14 +219,17 @@ AL, ING, ENE) y tres que las maquetas no traen (VIB, RIE, PRE). `catalogo`
 conserva el folio sin prefijo. La cola aleatoria se mantiene: el compositor
 no escribe en disco (cabecera de `generarFolio`).
 
-**D6 · Se versiona el arte, no las maquetas.** Los ocho PNG (4,1 MB) van a
-`backend/ia/marca/portadas/<tipo>.png` y se cargan con la misma tolerancia que
-`cargarMarca`: si falta, la portada sale con el fondo azul de hoy. Los
-`.docx` (≈20 MB entre los ocho, cada uno con el arte a tamaño completo dentro)
-no entran al repo: su contenido está transcrito en §0 y §1 de este plan, que
-es lo que el código necesita, y el usuario los conserva en
-`Documentos/Plantillas/` (fuera de la carpeta de salida, igual de ignorada).
-**Decisión abierta §6.4** si se prefiere versionarlos.
+**D6 · Se versionan las maquetas y el arte, cada cosa donde la usa quien la
+usa.** El arte (ocho PNG, 4,1 MB) va a `backend/ia/marca/portadas/<tipo>.png`,
+porque lo lee el compositor, con la misma tolerancia que `cargarMarca`: si
+falta, la portada sale con el fondo azul de hoy. Las maquetas (ocho `.docx`,
+18,4 MB) van a `docs/plantillas-reportes/<tipo>.docx` con un `LEER.md` que
+las mapea al tipo y al nombre con que se entregaron, porque son la
+**especificación** de cada `plantillas/<tipo>.mjs` y el código no las lee. La
+propuesta inicial era no versionarlas por el peso; el usuario decidió el
+23-09-2026 que «funcionan como plantilla» y tienen que viajar con el repo. La
+regla que lo acompaña: quien cambie una maqueta cambia su módulo en el mismo
+commit.
 
 **D7 · Dos portadas, un compositor.** La maqueta del Técnico lleva el arte
 como banner horizontal arriba; las otras siete, arte vertical a la izquierda
@@ -237,6 +286,31 @@ pdfkit (Helvetica) no los tienen y saldrían como cuadrados. Los triángulos se
 dibujan con `doc.polygon`, verdes o rojos según el signo, con el número al
 lado. `·`, `—`, `°` y `%` sí están en WinAnsi y se siguen escribiendo.
 
+**D15 · La matriz P×I se llena con un criterio declarado, o no se llena.**
+*(Propuesto el 23-09-2026; pendiente de que el usuario lo confirme.)* Hoy el
+motor no produce probabilidad ni impacto: una regla trae `nivel` y una
+`evidencia`. Para poner un riesgo en una celda hacen falta dos números que
+alguien declare, y se propone que salgan así:
+
+- **Impacto (1–5): lo declara la regla del tipo.** Se añade `impacto` a cada
+  regla de `riesgosVibracion.js` (y a las de cualquier tipo futuro). Mientras
+  una regla no lo declare, se deriva del nivel con una tabla escrita una sola
+  vez y citada al pie de la matriz: crítico → 5, atención → 3, informativo →
+  1. Es un criterio nuestro, no una medida, y el PDF lo dice.
+- **Probabilidad (1–5): se OBSERVA en el período.** Es la fracción del tiempo
+  del período en que la condición de la regla estuvo activa, evaluada sobre
+  las series historizadas que la regla necesita (`necesita`): < 1 % → 1,
+  < 5 % → 2, < 20 % → 3, < 50 % → 4, resto → 5. Es una frecuencia medida, no
+  una opinión, y se rotula «probabilidad observada en el período», con la
+  cobertura del historiador al lado.
+- **Una regla cuyas señales no están historizadas no entra en la matriz**:
+  se lista debajo con «sin serie para observar su frecuencia». Ni se le
+  inventa una P ni se la calla.
+
+Alternativa si el usuario no acepta el criterio: la sección se queda como
+«Riesgos por nivel» y la matriz no se dibuja. Lo que **no** se hace en ningún
+caso es pedirle P e I al modelo.
+
 **D14 · Tope de series por plantilla.** El `catalogo` de hoy dibuja todas
 las series de la máquina (36 en la espejo, 74 en planta) y tarda lo que tarde
 el historiador. Las plantillas nuevas piden **lo que su sección declara**:
@@ -248,28 +322,27 @@ dibuja. El tiempo se mide en F7 con `vib-motor-03`.
 
 ## 3. Las fases
 
-### F0 — Ordenar la carpeta, versionar el arte, cerrar las decisiones abiertas
+### F0 — Las maquetas y el arte al repo, y las decisiones cerradas · completada el 23-09-2026
 
-**Objetivo.** Que las plantillas dejen de vivir en la carpeta de salida, que
-el arte viaje con el repo, y que las tres decisiones de §6 tengan respuesta
-antes de escribir código que dependa de ellas.
+**Lo que se hizo.**
+1. Las ocho maquetas se copiaron a `docs/plantillas-reportes/<tipo>.docx`
+   con un `LEER.md` que las mapea al `tipo` y al nombre con que se
+   entregaron (D6, tal como decidió el usuario). El arte, a
+   `backend/ia/marca/portadas/<tipo>.png`, y `marca/LEER.txt` lista los ocho
+   con sus dimensiones y la regla de tolerancia.
+2. Los originales siguen en `Documentos/Reportes/` (ignorada): son del
+   usuario y ahora son copias; puede borrarlos. Los catorce PDF sueltos son
+   salida de `generar_reporte` y la purga los gestiona.
+3. `docs/HANDOFF.md` §0 y §5 y `CLAUDE.md` §6.1 citan el plan; el siguiente
+   número libre pasa a ser el 45.
+4. Las decisiones de §6 quedaron anotadas: energía estimada (sí),
+   predicciones sólo plantilla (sí), maquetas en el repo (sí). La matriz P×I
+   no se pudo hacer porque falta información —P e I no existen en el motor—,
+   y en su lugar se escribió el criterio D15 para que el usuario lo confirme.
 
-**Pasos.**
-1. Mover `Documentos/Reportes/<ocho carpetas>` a `Documentos/Plantillas/`
-   (sigue ignorada por `.gitignore` línea 9; lo hace el usuario o este plan
-   con `git mv`-equivalente fuera del índice). Los catorce PDF sueltos se
-   quedan: son salida, y la purga los gestiona.
-2. Copiar los ocho PNG a `backend/ia/marca/portadas/<tipo>.png` con el nombre
-   del `tipo` (D4) y actualizar `backend/ia/marca/LEER.txt` con la lista y la
-   regla de tolerancia.
-3. Registrar el plan en `docs/HANDOFF.md` §5 («los planes vivos», el número 44
-   deja de estar libre → el siguiente es el 45) y en `CLAUDE.md` §6.1.
-4. Anotar en el plan las respuestas a §6.
-
-**Criterios de aceptación.** Los ocho PNG en el repo con su `IHDR` legible por
-`dimensionesPng`; `Documentos/Reportes/` sólo con PDF; HANDOFF y CLAUDE.md
-citan el plan. Commit: «Plan 44 F0: el arte de las ocho portadas y la carpeta
-de plantillas fuera de la salida».
+**Comprobado.** Ninguno de los dieciséis archivos cae en `.gitignore`; los
+PNG son PNG de verdad (`IHDR` leído) y los `.docx` abren como zip con su
+`word/document.xml`.
 
 ### F1 — El compositor genérico por bloques, sin cambiar el PDF de hoy
 
@@ -346,9 +419,10 @@ diff lo justifica; como mínimo uno por fase.
 
 ### F4 — `riesgos` y `alarmas`, con las sustituciones decididas
 
-**Objetivo.** Los dos módulos con lo que §1 dice: riesgos por nivel en lugar
-de la matriz P×I (según §6.1), no evaluables y sin comprobar como secciones
-propias; alarmas con la severidad derivada del rol y declarada en el pie de
+**Objetivo.** Los dos módulos con lo que §1 dice: la matriz P×I con el
+criterio D15 si el usuario lo confirma (impacto declarado por regla,
+probabilidad observada en el período), o «riesgos por nivel» si no; no
+evaluables y sin comprobar como secciones propias; alarmas con la severidad derivada del rol y declarada en el pie de
 la tabla, flancos del período, ocurrencias por intervalo y análisis de causa
 por el motor.
 
@@ -363,9 +437,12 @@ responsable inventado.
 
 **Objetivo.** Los tres módulos restantes con lo que §1 permite: `ingenieria`
 con hallazgos derivados y campos de gestión en blanco; `energias` con el
-variador (y la integración de kWh sólo si §6.2 lo aprueba, `estimado: true`);
-`predicciones` que **se niega con motivo** mientras el tipo no declare
-mecanismos de desgaste (D12), y emite si algún día los declara.
+variador y los kWh **estimados** por integración de la potencia (`estimado:
+true`, cobertura y nota al pie; decidido en §6.2); `predicciones` **sólo la
+plantilla** (decidido en §6.3): el módulo declarativo completo, probado con
+un modelo de documento sintético, y la herramienta que **se niega con
+motivo** mientras la máquina tenga `desgaste: null` (D12). No se escribe
+ningún recolector de pronóstico en este plan.
 
 **Comprobaciones.** `predicciones` sobre la espejo → `fallo` cuyo texto nombra
 «mecanismos de desgaste» y `capacidades`; `energias` sin la integración →
@@ -429,19 +506,31 @@ no antes.
   descarga desde el chat, como hoy.
 - No numera folios de forma consecutiva.
 
-## 6. Decisiones abiertas para el usuario
+## 6. Decisiones del usuario (23-09-2026)
 
-1. **Riesgos, la matriz P×I.** El motor da `nivel`, no probabilidad × impacto.
-   Propuesta: **sustituirla por «Riesgos por nivel»** (crítico / atención /
-   informativo, con no evaluables y sin comprobar aparte). Alternativa: dibujar
-   la matriz como leyenda vacía y decir que el sistema no la puebla.
-2. **Energías, los kWh.** No hay medidor. Propuesta: **estimar por integración
-   de la potencia del variador** sobre el período, con `estimado: true`, la
-   cobertura y una nota al pie. Alternativa: sólo potencia/corriente/tensión,
-   y «Consumo» como ausencia.
-3. **Predicciones.** Hoy se niega con motivo (D12). Propuesta: **escribir la
-   plantilla igual en F5** para cuando un tipo declare mecanismos de desgaste.
-   Alternativa: sacarla del plan y anotarla en el backlog.
-4. **Las maquetas `.docx`.** Propuesta: **no versionarlas** (≈20 MB; su
-   contenido está en §0–§1) y guardarlas en `Documentos/Plantillas/`.
-   Alternativa: versionarlas en `docs/plantillas-reportes/`.
+1. **Riesgos, la matriz P×I.** El usuario: «en caso de que tengas toda la
+   información, realízalo». **No la hay**: el motor da `nivel`, no
+   probabilidad ni impacto, y ninguna regla declara ninguno de los dos. Lo
+   que se propone para tenerla es D15 (impacto declarado por regla,
+   probabilidad observada en el período). **Pendiente de que lo confirme**;
+   si no, «Riesgos por nivel».
+2. **Energías, los kWh.** **Sí**: estimar por integración de la potencia del
+   variador, declarado como estimación.
+3. **Predicciones.** **Sólo la plantilla**, sin recolector de pronóstico.
+4. **Las maquetas `.docx`.** **Al repo**, en carpeta propia:
+   `docs/plantillas-reportes/` (hecho en F0).
+
+### 6.1 · Qué información haría falta para llenar lo que hoy queda en blanco
+
+Nada de esto bloquea el plan; es lo que convertiría una `ausencia` en dato,
+y de dónde tendría que salir cada cosa:
+
+| Hueco | De dónde saldría | Qué habría que hacer |
+|---|---|---|
+| Impacto de cada riesgo | Del tipo, regla por regla | `impacto` en cada regla (D15); una tarde de criterio de ingeniería por tipo |
+| Fechas de calibración de un sensor | De quien mantiene la planta; ICONICS no las tiene | Un campo opcional por variable en `maquinas.json` (`calibracion: {ultima, proxima}`), editable en la ficha. Es dato de despliegue, no de código |
+| Objetivo, avance por disciplina, responsables, fechas (Ingeniería, planes de acción) | De gestión del proyecto, no de planta | O se dejan en blanco para llenar a mano (lo que hace este plan), o el operador los dicta en la pregunta y van al PDF rotulados «proporcionado por el operador». Lo segundo es un argumento más de la herramienta y se puede añadir después sin tocar el compositor |
+| Temperatura, espectro, ejes (Vibraciones) | De la instrumentación: el SM 1281 no los publica | Sin cambio posible en software |
+| Flujo, factor de potencia, meta de consumo (Energías) | De un tipo con medidor de energía o con caudal (la estación de llenado, Plan 43) | Roles `energia:*` en ese tipo; la plantilla ya los pediría por familia |
+| Pronóstico de fallas (Predicciones) | De un tipo que declare mecanismos de desgaste con historia verificada | Hoy toda configurada nace con `desgaste: null`; declararlos es del Plan 43 o posterior |
+| Nombre de quien elaboró | De la sesión (`request.usuario`) | Una línea en `chat.mjs` (archivo caliente, D10) y otra en el compositor |
