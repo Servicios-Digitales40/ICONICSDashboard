@@ -962,6 +962,125 @@ fuente en vivo (b) y llevan «para reabrir»; ninguna era de Planta/Detalle.
 valiendo se copia a la cabecera de la vista genérica **en el commit
 anterior al borrado**, para que el diff del borrado sea sólo borrado.
 
+#### Conocimiento conservado antes de borrar (23-09-2026)
+
+El usuario decidió el 23-09-2026 que **el resto de las vistas del tanque se
+borra**: el tanque volverá como máquina configurada con vistas genéricas
+(Plan 43), y no se configura en esta rama. Antes de borrarlas se leyeron sus
+cabeceras y comentarios largos, y lo que sigue valiendo para escribir las
+vistas GENÉRICAS de Inicio, Riesgos, Controles, Alarmas, Muro y Vista 3D de
+cualquier máquina configurada queda aquí. Lo que era sólo del tanque —sus
+señales, sus cuatro activos, la geometría del depósito— se va con el código;
+su dominio sigue en `shared/eva/tanque/`.
+
+**Inicio** (`InicioTanque.jsx`)
+- La cifra en vivo del héroe es la prueba de que se está leyendo, no un
+  adorno, y tiene tres estados sin cero de mentira: leyendo (guion), error
+  (frase honesta en coral y «reintenta solo», SIN el latido que se reserva a
+  una señal en alarma: son dos gravedades) o la cuenta real.
+- Cada tarjeta de entrada a otra vista lleva el dato real que esa vista
+  enseña primero, no un icono; sin lectura la franja no aparece. Sólo una
+  MEDIDA caduca con la frescura; una CUENTA («3 en aviso») no (Plan 24 F0).
+- Un sparkline de fondo es una serie real de una magnitud; nunca se inventa
+  historia de un conteo.
+- La única animación en bucle del sistema es la de señal en alarma
+  (`lib/motion.js`): flujos y «paquetes viajando» son disparos únicos por
+  lectura fresca (`key={lastUpdated}`). El reveal por scroll sólo en la
+  sección que vive fuera del primer viewport.
+- El hueco para el botón flotante del asistente se reserva EN VERTICAL
+  (padding-bottom de la última sección), nunca en ancho dentro de una fila
+  ajustada: tres intentos horizontales rompieron otro nodo cada vez.
+  Tarjetas clicables con `:focus-visible`, y bordes/sombras como variables
+  CSS para que el `:hover` de hoja pueda vencer al inline.
+- El «cómo funciona» nombra la cadena real desde el sensor físico y describe
+  el ROL de lo que no tiene marca en vez de inventar fabricante. Cada nivel
+  de flex anidado lleva su `min-width: 0` y un piso legible del texto.
+
+**Riesgos** (`RiesgosTanque.jsx`)
+- Tres zonas: activos (grave primero), «sin riesgo» diciendo CUÁNTAS reglas
+  se comprobaron, y «no evaluables» con qué lectura faltó. Verde y «no lo
+  pude mirar» se pintan distinto.
+- No es el panel de alarmas: las del servidor mandan; aquí se anticipan
+  combinaciones que aún no dispararon, y la pantalla lo dice.
+- Orden de lectura: evidencia medida → consecuencia → acción; en pronóstico,
+  cifra y muestras → mecanismo → consecuencia. La duda sobre el dato de
+  entrada va DENTRO de la tarjeta, en ámbar, no al pie.
+- `informativo` usa el acento, no el ámbar, para que el ámbar no se
+  banalice; un canto lateral de 4 px distingue la severidad a un metro.
+- Lo caro (el pronóstico sobre historia) se pide bajo demanda con un botón
+  que dice qué cuesta, arrancando en el período más corto; el aviso de
+  resolución del agregado es obligatorio («0 %» = nada sostenido, no nada).
+  Las preguntas al asistente viajan con el objeto SIN traducir.
+- Las tarjetas que sólo se pintan cuando algo va mal se EXPORTAN para
+  probarlas: el transporte falso da una instalación sana, y un error ahí
+  sólo aparecería el peor día. Cada riesgo lleva «casos previos» y «cerrar
+  caso».
+
+**Controles** (`ControlesTanque.jsx`)
+- El botón llama al MISMO endpoint que la herramienta del chat y hereda sus
+  guardas y su confirmación por relectura; la vista no reimplementa ninguna.
+- Confirmación de dos pasos en el propio botón (ventana de 4 s), sin modal;
+  el timeout o elegir la otra acción cancela la pendiente.
+- La lectura que la guarda del backend va a mirar se enseña con frescura, y
+  congelada baja de tamaño porque pasa a ser una edad, no una medida:
+  atenuar sin encoger no basta. Es el sitio donde una cifra vieja tiene un
+  accionamiento al lado.
+- Un 401 aquí es el que más importa: pasa por `errorDeRespuesta` para que el
+  token caducado pida volver a entrar. El resultado es un banner éxito/error.
+
+**Vista 3D** (`MaquetaTanque3D.jsx`, `ActivoEnMaqueta.jsx`, `FichaActivo.jsx`,
+`MaquetaHero.jsx`, `lib/layout.js`)
+- Donde se pueda, la geometría ES el dato (el nivel se dibuja en la pieza que
+  tiene el sensor). La ficha es un vistazo con botón al Detalle, no un panel:
+  lo que pide atención completo; si no, hasta cuatro magnitudes destacadas;
+  si no, las que no sean alarma ni crudo; nunca vacía. «N más en el detalle»
+  es texto, no un segundo botón al mismo destino.
+- La ficha es DOM, no geometría: reutiliza el formateo que sabe pintar «—»,
+  hereda el tema y evita `troika`. No escala con la distancia y va anclada
+  por el borde superior (centrada, el `overflow: hidden` la recortaba). Un
+  solo `useAhora()` arriba, pasado como prop.
+- Leyenda sólo con los estados presentes, de peor a mejor; encuadres de
+  cámara como tabla y rótulo por i18n. El resumen 2D vive fuera del canvas
+  como destino del `view-transition`: el `<Html>` de drei no existe en el
+  primer fotograma.
+- Pulsar el suelo cierra la ficha (táctil); `frameloop` bajo demanda salvo
+  estado crítico o giro. Nota de procedencia en pantalla: los colores de las
+  balizas son nuestros. Llegar con `{ activo }` abre ya su ficha.
+- Despachador por tipo de activo con un contrato común (el descriptor). Zona
+  de captura en cilindro invisible: las mallas son muchas y en «sin dato»
+  translúcidas justo cuando más hace falta acertar. Selección con anillo en
+  el suelo sin mover ni escalar el activo; el anillo es el canal sin color y
+  sustituye al destello con `prefers-reduced-motion`. No repetir la misma
+  cifra en dos piezas de la misma escena.
+- El layout son datos, no JSX; un activo se ancla donde está el instrumento
+  que mide, no el recipiente que le da nombre. `posicionDe` devuelve `null`,
+  no (0,0); una prueba exige que no sobre ni falte activo. Sin plano, la
+  disposición reproduce el recorrido del fluido y se dice que no hay
+  exactitud métrica.
+- El héroe decorativo es un `<Canvas>` propio sin `OrbitControls`, con giro a
+  mano en `useFrame` que se para al pasar el puntero; `frameloop` «always»
+  salvo reduced motion; sin WebGL no pinta nada. Mismo ensamblaje y dato que
+  la vista completa, con `detalle={false}`.
+
+**Alarmas** (`AlarmasEva.jsx`)
+- Dos fuentes de «alarma» son dos pestañas, nunca una lista fusionada. Un
+  botón que se sabe que va a fallar es peor que ninguno (el acuse se retiró
+  tras medir el 500 del Alarm Server).
+- «Visto por mí» es una instantánea al montar, sin setter; el badge sólo si
+  es mayor que cero: un «0 sin leer» enseña a no mirar la fila.
+- Honestidad de fila: `desdeAntes` marcado en ámbar, sin duración si sigue
+  activa, nota de procedencia de la lista en pantalla. Se arranca con una
+  selección por defecto: una pantalla vacía con selector se lee como rota.
+- Chips para opciones pocas y fijas; `<select>` para lo que crece con el
+  catálogo. Se guarda el error entero (con `codigo`), no `.message`; las
+  duraciones no pasan por i18n, son unidades.
+
+**Muro** (`MuroPlanta.jsx`, que se queda para las configuradas)
+- Un panel cerrado por máquina, cada uno con su hook, su frescura y su peor
+  veredicto; ninguna cifra se suma entre máquinas y no es un grid que sugiera
+  comparar celda a celda. El peor veredicto es el del dominio de cada tipo,
+  no un cálculo forzado común. «No aplica» no es «0».
+
 **Criterios de aceptación.**
 - [x] Ninguna prueba `.skip` sin dueño: las de Planta y Detalle del tanque se
       borraron con su espejo ya escrito; las 24 omitidas que quedan (eran 29;
