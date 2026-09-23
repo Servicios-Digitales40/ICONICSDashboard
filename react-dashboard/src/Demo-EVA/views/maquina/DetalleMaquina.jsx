@@ -20,6 +20,15 @@
  * rango vive en el estado de la vista y en la URL (`rangoEnUrl.js`): un
  * enlace copiado abre el mismo rango; cambiar de pestaña lo conserva.
  *
+ * «Comparar señales» ofrecía las series verificadas de TODA la máquina —72
+ * chips en `vib-motor-03`— con el argumento de que comparar cruza activos.
+ * Sigue pudiendo cruzarlos, pero ARRANCA con las medidas del activo de la
+ * pestaña y ofrece «toda la máquina» y el interruptor «sólo medidas» (Plan
+ * 42.5 F6, D16), con el mismo filtro de dominio que la Planta. El filtro
+ * viaja en la URL (`filtroEnUrl.js`) y cambiar de pestaña lo devuelve al
+ * activo nuevo. «Exportar todo» sigue exportando TODA la máquina: un CSV no
+ * se mira, se guarda, y ahí sobra es mejor que falta.
+ *
  * ── LO QUE DICE CUANDO FALTA ALGO (D4) ───────────────────────────────
  *
  * Una variable sin serie verificada enseña su valor en vivo y, en vez de una
@@ -36,13 +45,15 @@ import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVist
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useFormato } from "@/i18n/formato.js";
 import { useTheme } from "@/theme";
-import { clavesConTendencia, SIN_ACTIVO } from "@shared/eva/comun/vistaDeMaquina.js";
+import { SIN_ACTIVO, clavesConTendencia, contarPorActivo, filtrarClaves } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
 import { UltimaLectura } from "../../components/base.jsx";
 import { DetalleGrid } from "../../components/detalle/DetalleGrid.jsx";
 import { GraficaComparada } from "../../components/detalle/GraficaComparada.jsx";
 import { SelectorRango } from "../../components/detalle/SelectorRango.jsx";
+import { FiltroDeSeries } from "../../components/maquina/FiltroDeSeries.jsx";
+import { leerFiltroDeUrl, parametrosDeFiltro } from "../../data/comunes/filtroEnUrl.js";
 import {
   PRESETS_RANGO, aFechaUrl, leerRangoDeUrl, parametrosDeRango, rangoPersonalizado,
 } from "../../data/comunes/rangoEnUrl.js";
@@ -96,6 +107,15 @@ function DetalleMaquina({ params, onNavigate }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.rango, params?.desde, params?.hasta]);
 
+  /* El filtro de «Comparar» (D16): por defecto, el activo de la pestaña; un
+     `filtro` de la URL que no sea de esta máquina cae a ese defecto. */
+  const activoPorDefecto = activo?.id ?? null;
+  const filtro = useMemo(() => {
+    const leido = leerFiltroDeUrl(params, { activoPorDefecto });
+    return leido.activo === null || activos.some((a) => a.id === leido.activo) ? leido : { ...leido, activo: activoPorDefecto };
+  }, [params, activos, activoPorDefecto]);
+  const paramsDeFiltro = () => parametrosDeFiltro(filtro, { activoPorDefecto });
+
   const navegarA = (extra) =>
     onNavigate?.("maq-detalle", { maquina: maquina.id, activo: activo?.id, ...extra });
 
@@ -104,7 +124,7 @@ function DetalleMaquina({ params, onNavigate }) {
     setPersonalizado(null);
     const calculador = PRESETS_RANGO[key];
     if (calculador) setRango(calculador());
-    navegarA({ rango: key });
+    navegarA({ rango: key, ...paramsDeFiltro() });
   }
 
   function elegirPersonalizado(diaInicio, diaFin) {
@@ -113,12 +133,15 @@ function DetalleMaquina({ params, onNavigate }) {
     const desde = aFechaUrl(diaInicio);
     const hasta = aFechaUrl(diaFin);
     setPersonalizado({ desde, hasta });
-    navegarA({ rango: "personalizado", desde, hasta });
+    navegarA({ rango: "personalizado", desde, hasta, ...paramsDeFiltro() });
   }
 
-  /* Las series comparables y exportables son las verificadas de TODA la máquina,
-     no las de la pestaña: la comparación cruza activos, como en el tanque. */
-  const comparables = useMemo(() => {
+  const cambiarFiltro = (nuevo) =>
+    navegarA({ ...parametrosDeRango(presetActivo, personalizado), ...parametrosDeFiltro(nuevo, { activoPorDefecto }) });
+
+  /* Las series exportables son las verificadas de TODA la máquina; las
+     comparables, las que deja el filtro (D16). */
+  const comparablesTodas = useMemo(() => {
     if (!sistema || !maquina) return [];
     const porClave = new Map(maquina.variables.map((v) => [v.id ?? v.pointName, v]));
     return clavesConTendencia(sistema, maquina, tipo).map((clave) => {
@@ -133,13 +156,22 @@ function DetalleMaquina({ params, onNavigate }) {
       };
     });
   }, [sistema, maquina, tipo]);
+  const clavesComparables = useMemo(() => comparablesTodas.map((c) => c.clave), [comparablesTodas]);
+  const comparables = useMemo(() => {
+    const visibles = new Set(filtrarClaves(sistema, maquina, clavesComparables, filtro));
+    return comparablesTodas.filter((c) => visibles.has(c.clave));
+  }, [sistema, maquina, comparablesTodas, clavesComparables, filtro]);
+  const conteoPorActivo = useMemo(
+    () => contarPorActivo(maquina, filtrarClaves(sistema, maquina, clavesComparables, { soloMedidas: filtro.soloMedidas })),
+    [sistema, maquina, clavesComparables, filtro.soloMedidas],
+  );
 
   async function exportarTodo() {
     if (!fuente) return;
     setExportandoTodo(true);
     try {
       const series = await Promise.all(
-        comparables.map(async (c) => {
+        comparablesTodas.map(async (c) => {
           const { datos, cobertura, motivo } = await fuente.leerSerie(c.clave, rango);
           return { senal: { corto: c.label, label: c.label, unidad: c.unidad }, datos, cobertura, motivo, punto: c.punto };
         }),
@@ -205,9 +237,16 @@ function DetalleMaquina({ params, onNavigate }) {
         {traducir("machines:detail.title", { activo: activo ? rotuloDe(activo) : "" })}
       </SectionLabel>
 
+      {/* Cambiar de pestaña conserva el rango y el interruptor; el activo del filtro vuelve al de la pestaña nueva. */}
       <Tabs
         items={pestanas} value={activo?.id}
-        onChange={(id) => onNavigate?.("maq-detalle", { maquina: maquina.id, activo: id, ...parametrosDeRango(presetActivo, personalizado) })}
+        onChange={(id) =>
+          onNavigate?.("maq-detalle", {
+            maquina: maquina.id, activo: id,
+            ...parametrosDeRango(presetActivo, personalizado),
+            ...parametrosDeFiltro({ activo: id, soloMedidas: filtro.soloMedidas }, { activoPorDefecto: id }),
+          })
+        }
       />
 
       <div role="tabpanel" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -259,12 +298,19 @@ function DetalleMaquina({ params, onNavigate }) {
         />
       </div>
 
-      {comparables.length >= 2 && (
+      {comparablesTodas.length >= 2 && (
         <>
           <SectionLabel sub={traducir("machines:maquina.detalle.compareSub")}>
             {traducir("machines:compare.title")}
           </SectionLabel>
+          <FiltroDeSeries
+            activos={activos} conteoPorActivo={conteoPorActivo} filtro={filtro} onCambiar={cambiarFiltro}
+            visibles={comparables.length} total={comparablesTodas.length} t={t}
+          />
+          {/* La `key` remonta la gráfica al cambiar el filtro: su selección inicial se
+              calcula al montar, y una selección de otro activo no tendría chips. */}
           <GraficaComparada
+            key={`${filtro.activo ?? "todas"}:${filtro.soloMedidas}`}
             rango={enVivo ? null : rango} t={t} dark={dark}
             comparables={comparables} leerSeries={fuente?.leerSeries}
           />

@@ -1330,6 +1330,30 @@ hay que leer el resto:
    `DetalleMaquina` con «toda la máquina»; URL. Pruebas de vista con la
    fixture espejo: por defecto 12 medidas, un activo deja sus 4, apagar el
    interruptor devuelve las 22 del activo.
+
+   **Hecho (23-09-2026, mediodía).** Dominio: `esRolDeMedida`, `filtrarClaves`
+   y `contarPorActivo` en `vistaDeMaquina.js`, probados en Node con la espejo
+   (34 series con tendencia, 11 medidas: 3 en S1 y 4 en S2 y S3; las 11
+   sueltas son variador y calidades, ninguna medida). URL: `filtroEnUrl.js`
+   (`filtro=<id>|todas`, `series=todas`; lo que coincide con el arranque no
+   viaja), con ida y vuelta probada. Pieza: `components/maquina/FiltroDeSeries.jsx`
+   —chips con la cifra que dejaría cada activo, apagados si dejan cero, y el
+   interruptor con «N de M series» siempre visible—. La Planta filtra las tres
+   bandas por activo y las dos de series por «sólo medidas», y pide al
+   historiador sólo las visibles; un `filtro` que no es de la máquina cae a
+   «toda la máquina». El Detalle arranca «Comparar» con las medidas de la
+   pestaña, ofrece «toda la máquina», conserva el interruptor al cambiar de
+   pestaña y remonta la gráfica con una `key` al cambiar el filtro (su
+   selección inicial se calcula al montar); «Exportar todo» sigue exportando
+   toda la máquina. Con `vib-motor-03` real esto deja 12 paneles de 72.
+
+   De paso, la prueba intermitente del Detalle simulado anotada en
+   `BACKLOG-FRONTEND` (F-detalle-intermitente) se reprodujo aislada (1 de 3):
+   afirmaba «ninguna insignia dice Sesión actual» justo tras ver la PRIMERA
+   «Historiador», y cada tarjeta cambia cuando llega su serie. La afirmación
+   espera ahora al estado final; 4 de 4 en verde. **Puerta:** frontend **1143**
+   verdes · 20 omitidas (+26); backend 399; lint, types, i18n (1227 claves) y
+   textos limpios; build en verde, `index` 326,2 KB (+1,2).
 2. **F6.2 · Mudas y pendientes** (D17). `detalleSinDato` por el hook; lista
    desplegable en el Inicio; ficha de Configuración con pendientes por causa
    desde lo persistido y desde el sondeo. Pruebas: 6 mudas con motivo, la

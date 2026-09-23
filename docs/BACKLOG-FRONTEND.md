@@ -347,3 +347,8 @@ búfer de la sesión y la primera lectura del historiador simulado en
 `useDetalleMaquina`. Pendiente de reproducir con `--repeat` antes de tocar
 nada; si vuelve, mirar el orden en que `SelectorRango` y `useSeriesDe` fijan
 el rango.
+
+**Cerrado el 23-09-2026 (Plan 42.5 F6.1):** se reprodujo aislada (1 de 3). No era
+una carrera del hook: la prueba afirmaba «ninguna insignia dice Sesión actual»
+justo tras ver la PRIMERA «Historiador», y cada tarjeta cambia cuando llega su
+serie. La afirmación espera al estado final.

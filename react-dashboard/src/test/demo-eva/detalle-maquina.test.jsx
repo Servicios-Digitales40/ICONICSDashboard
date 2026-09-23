@@ -39,7 +39,9 @@ vi.mock("@/Demo-EVA/lib/exportar.js", async (importOriginal) => {
 import { ThemeProvider } from "@/theme";
 import DetalleMaquina from "@/Demo-EVA/views/maquina/DetalleMaquina.jsx";
 import { construirSistema } from "@shared/eva/comun/construirSistema.js";
-import { SIN_ACTIVO, activosConVariables, variablesDeActivo } from "@shared/eva/comun/vistaDeMaquina.js";
+import {
+  SIN_ACTIVO, activosConVariables, clavesConTendencia, filtrarClaves, variablesDeActivo,
+} from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
 import * as exportar from "@/Demo-EVA/lib/exportar.js";
@@ -222,5 +224,53 @@ describe("cuando falta algo", () => {
     const panel = screen.getByRole("tabpanel");
     expect(within(panel).getByText(/variables en este activo/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Detalle · Sin activo/ })).toBeTruthy();
+  });
+});
+
+describe("el filtro de «Comparar señales» (F6, D16)", () => {
+  const chipsDeSenal = (sistema, claves) =>
+    claves.map((c) => screen.queryAllByRole("button", { name: sistema.metaDe(c).label }).length);
+
+  it("arranca con las MEDIDAS del activo de la pestaña, y dice cuántas de cuántas", () => {
+    const { configurada, sistema } = conMaquina();
+    const todas = clavesConTendencia(sistema, configurada, TIPO);
+    const delActivo = filtrarClaves(sistema, configurada, todas, { activo: "S2", soloMedidas: true });
+    const deOtro = filtrarClaves(sistema, configurada, todas, { activo: "S1", soloMedidas: true });
+
+    montar({ maquina: configurada.id, activo: "S2", rango: "ayer" });
+
+    expect(delActivo.length).toBeGreaterThan(0);
+    expect(screen.getByText(`${delActivo.length} de ${todas.length} series`)).toBeTruthy();
+    /* Un chip por medida del activo; ninguno de otro apoyo. */
+    for (const n of chipsDeSenal(sistema, delActivo)) expect(n).toBe(1);
+    for (const n of chipsDeSenal(sistema, deOtro)) expect(n).toBe(0);
+  });
+
+  it("«Toda la máquina» navega con `filtro=todas` conservando activo y rango", () => {
+    const { configurada, onNavigate } = { ...conMaquina(), onNavigate: vi.fn() };
+    montar({ maquina: configurada.id, activo: "S2", rango: "ayer" }, onNavigate);
+
+    fireEvent.click(screen.getByRole("button", { name: "Toda la máquina" }));
+
+    expect(onNavigate).toHaveBeenCalledWith("maq-detalle", { maquina: configurada.id, activo: "S2", rango: "ayer", filtro: "todas" });
+  });
+
+  it("con `filtro=todas` y `series=todas` en la URL, la comparación ofrece TODAS las series con tendencia", () => {
+    const { configurada, sistema } = conMaquina();
+    const todas = clavesConTendencia(sistema, configurada, TIPO);
+
+    montar({ maquina: configurada.id, activo: "S2", rango: "ayer", filtro: "todas", series: "todas" });
+
+    expect(screen.getByText(`${todas.length} de ${todas.length} series`)).toBeTruthy();
+    for (const n of chipsDeSenal(sistema, todas)) expect(n).toBe(1);
+  });
+
+  it("cambiar de pestaña devuelve el filtro al activo nuevo y conserva el interruptor y el rango", () => {
+    const { configurada, onNavigate } = { ...conMaquina(), onNavigate: vi.fn() };
+    montar({ maquina: configurada.id, activo: "S2", rango: "ayer", series: "todas" }, onNavigate);
+
+    fireEvent.click(screen.getByRole("tab", { name: configurada.assets.find((a) => a.id === "S3").nombre }));
+
+    expect(onNavigate).toHaveBeenCalledWith("maq-detalle", { maquina: configurada.id, activo: "S3", rango: "ayer", series: "todas" });
   });
 });

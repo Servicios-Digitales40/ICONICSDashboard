@@ -37,6 +37,18 @@
  * limitaciones dice cuántas faltan y por qué. Un rango a medias se declara
  * (`cobertura`). Sin máquina en contexto, la pantalla lo dice; no cae en
  * otra de consuelo.
+ *
+ * ── EL FILTRO (Plan 42.5 F6, D16) ────────────────────────────────────
+ *
+ * Con `vib-motor-03` esta pantalla pintaba 72 tendencias, y sólo 12 eran
+ * medidas: el resto, calidades, vigilancias y variador registrados como
+ * constante. Una buena gráfica se pierde entre setenta. Por eso hay chips de
+ * activo y un interruptor «sólo medidas» que ARRANCA ENCENDIDO, con la cifra
+ * «12 de 72» siempre a la vista. El filtro es dominio (`filtrarClaves`) y
+ * viaja en la URL (`filtroEnUrl.js`): un enlace copiado abre la misma vista.
+ * El activo filtra las tres bandas; «sólo medidas», sólo las dos de series:
+ * el estado en vivo de una calidad sigue importando aunque su gráfica no. Y
+ * al historiador se le piden sólo las series visibles.
  */
 import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -46,15 +58,19 @@ import { AlertBanner, Button, SectionLabel } from "@/components/ui/index.js";
 import { declararContextoDeVista } from "@/features/asistente/lib/contextoDeVista.js";
 import { useMensajeDeError } from "@/i18n/useMensajeDeError.js";
 import { useTheme } from "@/theme";
-import { clavesConTendencia } from "@shared/eva/comun/vistaDeMaquina.js";
+import {
+  SIN_ACTIVO, activosConVariables, clavesConTendencia, contarPorActivo, filtrarClaves,
+} from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
 import { UltimaLectura } from "../../components/base.jsx";
 import { useAhora } from "../../lib/useAhora.js";
+import { FiltroDeSeries } from "../../components/maquina/FiltroDeSeries.jsx";
 import {
   BandaSenalesConHistoria, EstadoVariables, LimitacionesMaquina, TendenciasMaquina,
 } from "../../components/maquina/tilesMaquina.jsx";
 import { TarjetaRiesgo } from "../../components/riesgoVibracion.jsx";
+import { leerFiltroDeUrl, parametrosDeFiltro } from "../../data/comunes/filtroEnUrl.js";
 import { VENTANA } from "../../data/comunes/historia.js";
 import { useEstadoDeMaquina, useSeriesDeMaquina } from "../../data/comunes/useEstadoDeMaquina.js";
 
@@ -67,7 +83,7 @@ const REJILLA = `
 
 const SIN_RIESGOS = Object.freeze({ activos: [], noEvaluables: [], evaluadas: 0 });
 
-function PlantaMaquina({ onNavigate }) {
+function PlantaMaquina({ params, onNavigate }) {
   const mensajeDeError = useMensajeDeError();
   /* `traducir` y no `t`: aquí `t` es el TEMA. Ver la cabecera de `@/i18n`. */
   const { t: traducir } = useTranslation(["machines", "navigation", "errors"]);
@@ -88,12 +104,31 @@ function PlantaMaquina({ onNavigate }) {
     [sistema, maquina, tipo],
   );
 
+  /* El filtro llega por la URL; un `filtro` que no es de ningún activo de esta
+     máquina cae a «toda la máquina» en vez de dejar la pantalla vacía. */
+  const activos = useMemo(() => (maquina ? activosConVariables(maquina) : []), [maquina]);
+  const filtro = useMemo(() => {
+    const leido = leerFiltroDeUrl(params);
+    return leido.activo === null || activos.some((a) => a.id === leido.activo) ? leido : { ...leido, activo: null };
+  }, [params, activos]);
+  const clavesVisibles = useMemo(
+    () => filtrarClaves(sistema, maquina, claves, filtro),
+    [sistema, maquina, claves, filtro],
+  );
+  /* Lo que dejaría cada chip con el interruptor tal como está: la cifra del chip. */
+  const conteoPorActivo = useMemo(
+    () => contarPorActivo(maquina, filtrarClaves(sistema, maquina, claves, { soloMedidas: filtro.soloMedidas })),
+    [sistema, maquina, claves, filtro.soloMedidas],
+  );
+  const cambiarFiltro = (nuevo) => onNavigate?.("maq-planta", { maquina: maquina.id, ...parametrosDeFiltro(nuevo) });
+
   // Las series del historiador se piden UNA vez y se reparten entre la banda
   // de sparklines y la de tendencias: pedirlas por componente serían dos
-  // rondas para dibujar exactamente los mismos puntos.
+  // rondas para dibujar exactamente los mismos puntos. Y sólo las visibles:
+  // filtrar después de pedir setenta sería pagar lo que no se enseña.
   const {
     porClave, metaPorClave, cobertura, loading: cargandoHistoria, error: errorHistoria,
-  } = useSeriesDeMaquina(claves, VENTANA);
+  } = useSeriesDeMaquina(clavesVisibles, VENTANA);
 
   const riesgos = useMemo(
     () => (tipo?.evaluarRiesgos && dominio ? tipo.evaluarRiesgos(dominio) : SIN_RIESGOS),
@@ -114,7 +149,14 @@ function PlantaMaquina({ onNavigate }) {
     [estado, fuente, lastUpdated],
   );
   const porClaveSenal = useMemo(() => new Map(senales.map((s) => [s.clave, s])), [senales]);
-  const destacadas = claves.map((c) => porClaveSenal.get(c)).filter(Boolean);
+  const destacadas = clavesVisibles.map((c) => porClaveSenal.get(c)).filter(Boolean);
+
+  /* El chip de activo también acota el estado en vivo; «sólo medidas», no. */
+  const activoDe = useMemo(
+    () => new Map((maquina?.variables ?? []).map((v) => [v.id ?? v.pointName, v.assetId ?? SIN_ACTIVO])),
+    [maquina],
+  );
+  const senalesVisibles = filtro.activo === null ? senales : senales.filter((s) => activoDe.get(s.clave) === filtro.activo);
 
   /* La banda de un rol la declara el tipo; sin tipo o sin rol, `null` y sin barra. */
   const bandaDe = (senal) => {
@@ -184,25 +226,35 @@ function PlantaMaquina({ onNavigate }) {
           </>
         )}
 
+        {/* El filtro (D16): por activo y «sólo medidas», con la cifra a la vista. */}
+        {claves.length > 0 && (
+          <FiltroDeSeries
+            activos={activos} conteoPorActivo={conteoPorActivo} filtro={filtro} onCambiar={cambiarFiltro}
+            visibles={clavesVisibles.length} total={claves.length} t={t}
+          />
+        )}
+
         {/* 2 · Las series verificadas, cada una con su sparkline. */}
         <SectionLabel sub={traducir("machines:maquina.planta.historia.sub", { horas: VENTANA.horas })}>
-          {traducir("machines:maquina.planta.historia.title", { count: claves.length })}
+          {traducir("machines:maquina.planta.historia.title", { count: clavesVisibles.length })}
         </SectionLabel>
-        {claves.length > 0 ? (
-          <BandaSenalesConHistoria senales={destacadas} porClave={porClave} t={t} dark={dark} ahora={ahora} base={0.05} />
-        ) : (
+        {claves.length === 0 ? (
           <AlertBanner type="info" title={traducir("machines:maquina.planta.historia.ningunaTitle")} message={traducir("machines:maquina.planta.historia.ninguna")} />
+        ) : clavesVisibles.length === 0 ? (
+          <AlertBanner type="info" title={traducir("machines:maquina.filtro.ningunaTitle")} message={traducir("machines:maquina.filtro.ninguna")} />
+        ) : (
+          <BandaSenalesConHistoria senales={destacadas} porClave={porClave} t={t} dark={dark} ahora={ahora} base={0.05} />
         )}
 
         {/* 3 · Qué dice cada variable ahora mismo, con barra donde el tipo declara banda. */}
         <div className="maq-band">
           <div className="maq-full">
-            <EstadoVariables senales={senales} bandaDe={bandaDe} grupos={estado?.grupos ?? []} t={t} dark={dark} ahora={ahora} delay={0.3} />
+            <EstadoVariables senales={senalesVisibles} bandaDe={bandaDe} grupos={estado?.grupos ?? []} t={t} dark={dark} ahora={ahora} delay={0.3} />
           </div>
         </div>
 
         {/* 4 · Cierre: las series del historiador a tamaño real, con la cobertura. */}
-        {claves.length > 0 && (
+        {clavesVisibles.length > 0 && (
           <div className="maq-band">
             <div className="maq-full">
               {cargandoHistoria && !Object.keys(porClave).length ? (
@@ -212,7 +264,7 @@ function PlantaMaquina({ onNavigate }) {
               ) : (
                 <TendenciasMaquina
                   senales={destacadas} porClave={porClave}
-                  metaPorClave={errorHistoria ? Object.fromEntries(claves.map((c) => [c, { error: errorHistoria.message }])) : metaPorClave}
+                  metaPorClave={errorHistoria ? Object.fromEntries(clavesVisibles.map((c) => [c, { error: errorHistoria.message }])) : metaPorClave}
                   cobertura={cobertura} horas={VENTANA.horas}
                   t={t} dark={dark} ahora={ahora} delay={0.4}
                 />

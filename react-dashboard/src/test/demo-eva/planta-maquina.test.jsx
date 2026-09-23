@@ -32,7 +32,7 @@ const seriesPedidas = [];
 import { ThemeProvider } from "@/theme";
 import PlantaMaquina from "@/Demo-EVA/views/maquina/PlantaMaquina.jsx";
 import { construirSistema } from "@shared/eva/comun/construirSistema.js";
-import { clavesConTendencia } from "@shared/eva/comun/vistaDeMaquina.js";
+import { clavesConTendencia, filtrarClaves } from "@shared/eva/comun/vistaDeMaquina.js";
 import { SIN_SERIE } from "@shared/eva/comun/historia.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
 
@@ -67,12 +67,16 @@ function conSeries(sistema, configurada, { puntos = 6, cobertura = null, error =
   return { ...SERIES_VACIAS, porClave, metaPorClave, cobertura, error: error ? new Error(error) : null };
 }
 
-const montar = () =>
+const montar = (params = {}, onNavigate = vi.fn()) =>
   render(
     <ThemeProvider>
-      <PlantaMaquina onNavigate={vi.fn()} />
+      <PlantaMaquina params={params} onNavigate={onNavigate} />
     </ThemeProvider>,
   );
+
+/** Lo que la Planta enseña al arrancar: las MEDIDAS con tendencia (D16, «sólo medidas» encendido). */
+const medidasDe = (sistema, configurada) =>
+  filtrarClaves(sistema, configurada, clavesConTendencia(sistema, configurada, TIPO), { soloMedidas: true });
 
 afterEach(() => {
   cleanup();
@@ -81,9 +85,10 @@ afterEach(() => {
 });
 
 describe("con una máquina de tres apoyos y series verificadas a medias", () => {
-  it("enseña tantas series con historia como verificadas de medida, y declara la máquina al asistente", () => {
+  it("arranca con las MEDIDAS con historia, dice cuántas de cuántas, y declara la máquina al asistente", () => {
     const { configurada, sistema, estado } = maquinaLeida();
     const claves = clavesConTendencia(sistema, configurada, TIPO);
+    const medidas = medidasDe(sistema, configurada);
     estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, dominio: null, lastUpdated: LEIDO, loading: false };
     series = conSeries(sistema, configurada);
 
@@ -91,15 +96,17 @@ describe("con una máquina de tres apoyos y series verificadas a medias", () => 
 
     expect(claves.length).toBeGreaterThan(0);
     expect(claves.length).toBeLessThan(configurada.variables.length); // a medias, de verdad
-    expect(screen.getByText(`${claves.length} series con historia`)).toBeTruthy();
-    /* Las series se piden UNA vez, con exactamente las claves con tendencia. */
-    expect(seriesPedidas[0]).toEqual(claves);
+    expect(medidas.length).toBeLessThan(claves.length); // y el filtro deja menos
+    expect(screen.getByText(`${medidas.length} series con historia`)).toBeTruthy();
+    expect(screen.getByText(`${medidas.length} de ${claves.length} series`)).toBeTruthy();
+    /* Las series se piden UNA vez, con exactamente las claves VISIBLES. */
+    expect(seriesPedidas[0]).toEqual(medidas);
     expect(contexto).toHaveBeenCalledWith({ sistema: configurada.id });
   });
 
-  it("cada serie verificada tiene su sparkline; el estado lista TODAS las variables, también las sin serie", () => {
+  it("cada serie visible tiene su sparkline; el estado lista TODAS las variables, también las sin serie", () => {
     const { configurada, sistema, estado } = maquinaLeida();
-    const claves = clavesConTendencia(sistema, configurada, TIPO);
+    const claves = medidasDe(sistema, configurada);
     estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
     series = conSeries(sistema, configurada);
 
@@ -129,7 +136,7 @@ describe("con una máquina de tres apoyos y series verificadas a medias", () => 
 
   it("un fallo del historiador se dice en cada panel de tendencia, no como una serie vacía", () => {
     const { configurada, sistema, estado } = maquinaLeida();
-    const claves = clavesConTendencia(sistema, configurada, TIPO);
+    const claves = medidasDe(sistema, configurada);
     estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
     series = { ...conSeries(sistema, configurada, { puntos: 0 }), error: new Error("el puente no responde") };
 
@@ -239,6 +246,79 @@ describe("con una máquina de tres apoyos y series verificadas a medias", () => 
     expect(sistema.limitaciones.length).toBeGreaterThan(0);
     expect(screen.getByText("Lo que no se puede decir")).toBeTruthy();
     for (const l of sistema.limitaciones) expect(screen.getByText(l)).toBeTruthy();
+  });
+});
+
+describe("el filtro por activo y «sólo medidas» (F6, D16)", () => {
+  it("un chip de activo navega con `filtro=<id>`; el interruptor apagado, con `series=todas`", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+    const onNavigate = vi.fn();
+
+    montar({}, onNavigate);
+
+    const nombreS1 = configurada.assets.find((a) => a.id === "S1").nombre;
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${nombreS1} · \\d+$`) }));
+    expect(onNavigate).toHaveBeenCalledWith("maq-planta", { maquina: configurada.id, filtro: "S1" });
+
+    fireEvent.click(screen.getByLabelText("Sólo medidas"));
+    expect(onNavigate).toHaveBeenCalledWith("maq-planta", { maquina: configurada.id, series: "todas" });
+  });
+
+  it("con `filtro=S1` sólo se piden y pintan las medidas de ese apoyo, y el estado se acota a él", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    const todas = clavesConTendencia(sistema, configurada, TIPO);
+    const deS1 = filtrarClaves(sistema, configurada, todas, { activo: "S1", soloMedidas: true });
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    const { container } = montar({ filtro: "S1" });
+
+    expect(deS1.length).toBeGreaterThan(0);
+    expect(seriesPedidas[0]).toEqual(deS1);
+    expect(container.querySelectorAll("svg path.trazo-dibujo").length).toBe(deS1.length);
+    expect(screen.getByText(`${deS1.length} de ${todas.length} series`)).toBeTruthy();
+
+    const estadoCard = screen.getByText("Estado de las variables").closest("div");
+    const filas = within(estadoCard.parentElement.parentElement).getAllByRole("listitem");
+    const senalesS1 = estado.senales.filter((s) => configurada.variables.find((v) => v.id === s.clave)?.assetId === "S1");
+    expect(filas.length).toBe(senalesS1.length);
+  });
+
+  it("con `series=todas` vuelven las calidades y el variador: se piden todas las claves con tendencia", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    const todas = clavesConTendencia(sistema, configurada, TIPO);
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    montar({ series: "todas" });
+
+    expect(seriesPedidas[0]).toEqual(todas);
+    expect(screen.getByText(`${todas.length} de ${todas.length} series`)).toBeTruthy();
+  });
+
+  it("un `filtro` que no es de esta máquina cae a toda la máquina, no a una pantalla vacía", () => {
+    const { configurada, sistema, estado } = maquinaLeida();
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    montar({ filtro: "S9" });
+
+    expect(seriesPedidas[0]).toEqual(medidasDe(sistema, configurada));
+    expect(screen.getByRole("button", { name: "Toda la máquina" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("un activo que no deja ninguna serie con el interruptor encendido se ofrece apagado", () => {
+    /* Las variables sueltas (variador, calidades) no son medidas: su chip dice 0 y no se puede pulsar. */
+    const { configurada, sistema, estado } = maquinaLeida();
+    estadoDeMaquina = { ...SIN_MAQUINA, sistema, maquina: configurada, estado, lastUpdated: LEIDO, loading: false };
+    series = conSeries(sistema, configurada);
+
+    montar();
+
+    const sinActivo = screen.getByRole("button", { name: /^Sin activo · 0$/ });
+    expect(sinActivo.disabled).toBe(true);
   });
 });
 

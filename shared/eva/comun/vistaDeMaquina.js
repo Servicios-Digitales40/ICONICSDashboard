@@ -247,3 +247,61 @@ export function variablesDeActivo(sistema, maquina, estado, assetId, tipo = null
     })
     .filter(Boolean);
 }
+
+/**
+ * Si un rol es una MEDIDA del tipo. Los roles se escriben `familia:clave`
+ * (`medida:vRMS`, `calidad:qcVRMS`, `variador:par`): la familia va antes de
+ * los dos puntos, y sólo `medida` es una magnitud física que merece gráfica
+ * por defecto. Una calidad, una vigilancia o un registro del variador tienen
+ * serie, pero enseñarlos junto a las medidas es lo que hacía que una buena
+ * gráfica se perdiera entre otras setenta (Plan 42.5 F6, D16).
+ */
+export const esRolDeMedida = (rol) => typeof rol === "string" && rol.startsWith("medida:");
+
+/**
+ * Filtra una lista de claves por activo y por «sólo medidas» (Plan 42.5 F6,
+ * D16). Es lo que hay detrás de los chips de la Planta y de «Comparar
+ * señales»: dominio, para que las dos pantallas filtren igual y se pruebe en
+ * Node.
+ *
+ * - `activo`: un `assetId`, `SIN_ACTIVO` para las variables sin activo, o
+ *   `null` para toda la máquina.
+ * - `soloMedidas`: deja sólo las claves cuyo rol es de la familia `medida`.
+ *   Una variable sin rol no es una medida: no se adivina.
+ *
+ * El orden de entrada se conserva: es el que decidió `clavesConTendencia`.
+ *
+ * @param {object|null} sistema  el de `construirSistema` (para `metaDe`)
+ * @param {object|null} maquina  la configuración cruda (`variables` con `assetId` y `rol`)
+ * @param {string[]} claves
+ * @param {{ activo?: string|null, soloMedidas?: boolean }} [filtro]
+ * @returns {string[]}
+ */
+export function filtrarClaves(sistema, maquina, claves, { activo = null, soloMedidas = false } = {}) {
+  if (!Array.isArray(claves)) return [];
+  const porClave = new Map((maquina?.variables ?? []).map((v) => [v.id ?? v.pointName, v]));
+  return claves.filter((clave) => {
+    const v = porClave.get(clave);
+    if (activo !== null && activo !== undefined && (v?.assetId ?? SIN_ACTIVO) !== activo) return false;
+    if (soloMedidas && !esRolDeMedida(sistema?.metaDe?.(clave)?.rol ?? v?.rol ?? null)) return false;
+    return true;
+  });
+}
+
+/**
+ * Cuántas de `claves` cuelgan de cada activo (`SIN_ACTIVO` para las sueltas):
+ * la cifra que acompaña a cada chip del filtro, para que se vea qué deja
+ * cada activo ANTES de pulsarlo.
+ *
+ * @returns {Record<string, number>}
+ */
+export function contarPorActivo(maquina, claves) {
+  const porClave = new Map((maquina?.variables ?? []).map((v) => [v.id ?? v.pointName, v]));
+  /** @type {Record<string, number>} */
+  const cuenta = {};
+  for (const clave of claves ?? []) {
+    const id = porClave.get(clave)?.assetId ?? SIN_ACTIVO;
+    cuenta[id] = (cuenta[id] ?? 0) + 1;
+  }
+  return cuenta;
+}

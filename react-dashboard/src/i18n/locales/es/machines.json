@@ -468,6 +468,15 @@
         "sin-sondear": "Todavía no se ha sondeado la serie de esta variable."
       },
       "verDetalle": "Ver detalle completo de {{apoyo}}"
+    },
+    "filtro": {
+      "label": "Filtrar las series",
+      "todaLaMaquina": "Toda la máquina",
+      "soloMedidas": "Sólo medidas",
+      "visibles": "{{visibles}} de {{total}} series",
+      "chip": "{{nombre}} · {{n}}",
+      "ningunaTitle": "Ninguna serie con este filtro",
+      "ninguna": "Elige otro activo o apaga «Sólo medidas» para ver las demás series verificadas."
     }
   }
 }

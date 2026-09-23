@@ -468,6 +468,15 @@
         "sin-sondear": "This variable's series has not been probed yet."
       },
       "verDetalle": "Full detail of {{apoyo}}"
+    },
+    "filtro": {
+      "label": "Filter the series",
+      "todaLaMaquina": "Whole machine",
+      "soloMedidas": "Measurements only",
+      "visibles": "{{visibles}} of {{total}} series",
+      "chip": "{{nombre}} · {{n}}",
+      "ningunaTitle": "No series match this filter",
+      "ninguna": "Pick another asset or turn off “Measurements only” to see the other verified series."
     }
   }
 }

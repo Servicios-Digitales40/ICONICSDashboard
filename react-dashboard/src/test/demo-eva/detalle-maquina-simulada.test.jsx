@@ -147,8 +147,13 @@ describe("«Tiempo real» lee del búfer, «Ayer» del historiador simulado", ()
 
     fireEvent.click(boton("Ayer"));
 
-    await waitFor(() => expect(screen.getAllByText(/^Historiador$/).length).toBeGreaterThan(0), { timeout: 4_000 });
-    expect(screen.queryByText(/Sesión actual/)).toBeNull();
+    /* Cada tarjeta cambia su insignia cuando llega SU serie: la primera puede
+       decir «Historiador» mientras otra sigue en «Sesión actual» un instante.
+       Se espera al estado final, no al primer cambio (falló 1 de 3 el 23-09). */
+    await waitFor(() => {
+      expect(screen.getAllByText(/^Historiador$/).length).toBeGreaterThan(0);
+      expect(screen.queryByText(/Sesión actual/)).toBeNull();
+    }, { timeout: 4_000 });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
