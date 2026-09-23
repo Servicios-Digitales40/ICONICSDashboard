@@ -60,12 +60,12 @@
  * pregunta antes de añadir una ruta es si un operador debe poder abrirla en
  * un monitor sin teclado.
  *
- * Por ese criterio quedó fuera `features/data/`, que hace altas, escrituras y
- * BORRADOS de puntos sueltos. El backend bloquea hoy la escritura
- * (`ICONICS_READ_ONLY`), pero un botón «Eliminar» en un tablero de planta no
- * debe existir aunque no funcione. Su módulo sigue en el árbol sin que nadie
- * lo importe, así que no entra en el bundle; si vuelve, vuelve detrás de
- * autenticación y sin la pestaña de borrado.
+ * Por ese criterio quedó fuera `features/data/`, que hacía altas, escrituras y
+ * BORRADOS de puntos sueltos: un botón «Eliminar» en un tablero de planta no
+ * debe existir aunque el backend bloquee la escritura (`ICONICS_READ_ONLY`).
+ * Estuvo en el árbol sin que nadie lo importara hasta el Plan 42.5 F5, que lo
+ * borró (912 líneas y su namespace `data` de i18n); si algo así vuelve, vuelve
+ * detrás de autenticación, sin la pestaña de borrado, y con su propia ruta.
  *
  * ── QUÉ SE FUE, Y POR QUÉ NO QUEDÓ OCULTO ──────────────────────────
  *

@@ -148,13 +148,12 @@ lib/        derivaciones y formato, sin React salvo donde se indique
 
 components/ los tiles 2D, con la forma de «Planta · v2»
 three-d/    los modelos, su contrato de comportamiento y el layout
-views/      las vistas, hoy una familia por máquina
-
-            Cada máquina duplica hoy sus cinco vistas (Inicio, Gráficas,
-            Riesgos, Controles y 3D). Es la deuda mayor del frontend y está
-            anotada como F1 en `docs/BACKLOG-FRONTEND.md`: la forma común de
-            `estadoMaquina.js` ya existe, así que la pieza que faltaba para
-            parametrizarlas está puesta desde el backend.
+views/      las vistas: tanque/ (las que quedan de la escrita a mano),
+            vibraciones/ (las del tipo, para la máquina configurada que se
+            tiene delante) y maquina/ (Planta y Detalle GENÉRICAS, para
+            cualquier configurada, dirigidas por su `sistema` y su tipo;
+            Plan 42.5). La Planta y el Detalle del tanque se retiraron en el
+            Plan 42.5 F4: el tanque los tendrá al entrar por configuración.
 ```
 
 Las pruebas viven en [`src/test/demo-eva/`](../test/demo-eva/), espejando este

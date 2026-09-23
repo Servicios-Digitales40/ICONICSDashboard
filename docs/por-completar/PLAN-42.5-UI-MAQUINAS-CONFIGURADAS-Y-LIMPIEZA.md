@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F3 completadas · F4 hecha en su parte segura (el resto espera la decisión del usuario) · F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F3 completadas · F4 y F5 hechas en su parte segura (el resto espera la decisión del usuario: las otras vistas del tanque, Predicción y `plc_opcua.py`), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -970,8 +970,18 @@ anterior al borrado**, para que el diff del borrado sea sólo borrado.
 **Objetivo.** Borrar lo que ninguna máquina, configurada o no, usa. La lista
 se cerró en F0.
 
-**Se borra**: `features/data/` (912 líneas; se actualizan los dos
-comentarios que lo citan en `routes.jsx` y `lib/iconics/index.js`).
+**Borrado (23-09-2026, madrugada)**: `features/data/` (912 líneas, 9
+archivos; ningún `import` fuera de la carpeta, comprobado en F0 y otra vez
+antes de borrar) con su namespace `data` de i18n (es/en, 10 claves) y su
+registro en `i18n/index.js`; los dos comentarios que lo citaban
+(`routes.jsx`, `lib/iconics/index.js`) dicen ahora que se borró y por qué.
+Y los cinco bloques de `machines.json` que sólo usaban los tiles del tanque
+retirados en F4 —`attention`, `water`, `signalsState`, `margins`,
+`route`— en los dos idiomas: 1454 → 1413 claves con paridad. La búsqueda de
+huérfanos se hizo con un barrido en Node de todo `src/` (fuera de pruebas)
+por `machines:<bloque>.` y `"<bloque>.`; `verificar-i18n` no la hace, y
+queda anotado que podría. **Puerta:** frontend **1160** verdes · 24 omitidas; los 41
+verificadores (incluida la §5.1); lint y types limpios; `index` 350,3 KB.
 
 **[?] Usuario**: `modulos/prediccion/` (1295 líneas, oculto; arrastra
 `lib/queryClient.js` y el `QueryClientProvider` de `App.jsx` sólo si

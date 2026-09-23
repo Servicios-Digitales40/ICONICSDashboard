@@ -148,9 +148,10 @@ medición, no por intuición.
 - **Frontera de capas.** `shared/` es dominio puro, sin React ni `fetch`, y se
   prueba en Node. Una vista no calcula una banda de riesgo: la pide al
   dominio. Un dato que no llegó se representa como hueco, nunca como cero.
-- **La vista de la máquina configurada**: Inicio, Gráficas, Vista 3D,
-  Hallazgos, Avisos, Casos previos y RAG, más el muro de planta, Configuración
-  y Documentación. Las rutas se declaran en `app/routes/routes.jsx`; el menú
+- **La vista de la máquina configurada**: Inicio, Planta (tendencias del
+  historiador), Estado mecánico, Vista 3D, Detalle por activo, Hallazgos,
+  Avisos, Casos previos y RAG, más el muro de planta, Configuración y
+  Documentación. Las rutas se declaran en `app/routes/routes.jsx`; el menú
   se deriva del registro.
 - Stack fijado por el código: React + Vite, Recharts, three.js con
   @react-three/fiber, lucide-react, i18n es/en; backend Node 24 con Fastify,

@@ -402,7 +402,7 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 
 ```bash
 cd backend && npm test          # 399 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1102 (+29 omitidas) — dominio, vistas, hooks
+cd react-dashboard && npm test  # 1160 (+24 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 

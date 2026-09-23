@@ -278,11 +278,6 @@
     "seeAll": "Ver todo el árbol",
     "backToDemo": "Volver a la demo"
   },
-  "attention": {
-    "title": "Requiere atención",
-    "tip": "Umbral que definimos nosotros, no una alarma de ICONICS: la señal salió de su banda cómoda. No hace falta ninguna acción sobre la instalación real.",
-    "tipAria": "Qué significa este aviso"
-  },
   "signal": {
     "stale": "El puente no ha vuelto a leer este punto recientemente.",
     "noUnit": "Este punto no declara unidad en ICONICS, así que se muestra su tag ({{tag}}) para poder identificarlo. Poner una unidad a ojo sería inventarla.",
@@ -292,46 +287,12 @@
     "historianSamples": "Hay muestras del historiador",
     "rangeGroup": "Rango de tiempo del historiador"
   },
-  "water": {
-    "title": "Estado del sistema de agua",
-    "code": "banda cómoda {{min}}–{{max}} % · marcada en el arco",
-    "driving": "Qué lo está moviendo",
-    "levelTrend": "Nivel · últimas horas, del historiador",
-    "notEnoughSamples": "El historiador aún no tiene suficientes muestras de esta señal.",
-    "arcNoReading": "{{senal}} sin medición",
-    "arcReading": "{{senal}} {{valor}} por ciento"
-  },
   "assetGrid": {
     "title": "Activos de la instalación",
     "code": "{{n}} activos · agrupación propia, el servidor no publica equipos",
     "window": "mini-series: {{ventana}} en esta sesión",
     "alarmsActive_one": "{{count}} alarma activa — ver",
     "alarmsActive_other": "{{count}} alarmas activas — ver"
-  },
-  "signalsState": {
-    "title": "Estado de las señales",
-    "code": "{{total}} señales · {{medidas}} con lectura",
-    "pumping": {
-      "label": "Impulsión",
-      "idle": "En reposo",
-      "running": "En marcha",
-      "idleSub": "caudal y motor a cero",
-      "runningSub": "hay caudal y carga"
-    },
-    "vfdMode": {
-      "label": "Modo del variador"
-    },
-    "idleNote": "Con el sistema parado, el caudal, la presión, la carga del motor y la eficiencia no se evalúan contra su banda: se marcan «en reposo»."
-  },
-  "margins": {
-    "title": "Margen consumido por señal",
-    "code": "0 % es el centro de la banda cómoda · 100 % es tocar el límite · señales en reposo no entran",
-    "empty": "Sin lecturas evaluables todavía.",
-    "lead": "<b>{{senal}}</b> es la señal más cerca de su límite, con <b>{{valor}} %</b> del margen consumido."
-  },
-  "route": {
-    "title": "Recorrido del sistema",
-    "code": "Topología del proceso, no una medición de flujo físico"
   },
   "trends": {
     "title": "Las cuatro señales con historia propia",

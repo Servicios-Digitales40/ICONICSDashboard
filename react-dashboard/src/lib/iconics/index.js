@@ -1,8 +1,9 @@
 /**
  * API pública del cliente ICONICS.
  *
- * Es infraestructura compartida, no de un feature: la consumen `features/data`,
- * el explorador de assets y la sección Demo EVA. Toda la E/S de red de la app
+ * Es infraestructura compartida, no de un feature: la consumen el explorador
+ * de assets, la sección Demo EVA y el banner de estado de máquina (hasta el
+ * Plan 42.5 F5 también `features/data`, ya borrado). Toda la E/S de red de la app
  * pasa por aquí; no hay ningún `fetch(` fuera de `apiClient.js`.
  *
  * Este barril no sabe qué instalación se está mirando. El catálogo de puntos de
@@ -25,7 +26,8 @@ export {
 
 /**
  * `useIconicsPoint` abre un `setInterval` por componente. Sirve para leer un
- * punto suelto (`features/data`), pero no para pintar una instalación entera:
+ * punto suelto (hoy, el banner de estado de máquina), pero no para pintar una
+ * instalación entera:
  * ocho tarjetas serían ocho temporizadores y ocho peticiones por ciclo. Para
  * eso está el motor de polling, que agrupa todo en una sola petición.
  */

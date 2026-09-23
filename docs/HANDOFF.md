@@ -52,18 +52,19 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1102** pruebas · 29 omitidas *(a 23-09 madrugada, tras Plan 42.5 F3: 1193 · 24 omitidas)* |
+| Suite de frontend | **1160** pruebas · 24 omitidas *(a 23-09 madrugada, tras Plan 42.5 F5; eran 1102 · 29 el 22-09)* |
 | Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
-| Bundle | `index` 343,6 KB / 450 · `vendor` 269,1 / 330 · `three` diferido |
+| Bundle | `index` 350,3 KB / 450 · `vendor` 269,1 / 330 · `charts` 326,4 (sin techo) · `three` diferido |
 
 Funcionalmente: el tablero de vibraciones por **máquinas configuradas** (una
-sección por máquina con siete vistas —Inicio, Gráficas, Vista 3D, Hallazgos,
-Avisos, Casos previos, RAG— y un muro de planta), el asistente con sus 26
+sección por máquina con ocho vistas en el menú —Inicio, Planta, Estado
+mecánico, Vista 3D, Hallazgos, Avisos, Casos previos, RAG— más el Detalle
+sin menú (Plan 42.5), y un muro de planta), el asistente con sus 26
 herramientas contestando sobre la configurada que se tiene delante, el motor
 de diagnóstico determinista con las reglas del TIPO, el RAG documental con los
 manuales asignados al tipo, el transporte falso (`ICONICS_FAKE=true`), el
@@ -79,8 +80,10 @@ evalúa con carga. Sin `datos/maquinas.json` el tablero arranca sin
 vibraciones y lo dice.
 
 **Visto en el navegador el 22-09-2026** con `vib-motor-03` recreada contra el
-`bms-server` real: muro, menú, las siete vistas y el asistente. De mirarlo
-salió un defecto del tipo, corregido el mismo día.
+`bms-server` real: muro, menú, las siete vistas de entonces y el asistente. De
+mirarlo salió un defecto del tipo, corregido el mismo día. **Planta y Detalle
+(Plan 42.5) no se han mirado todavía en el navegador**: el backend que corre
+arrancó antes de esos cambios.
 
 ### Qué está a medias
 
@@ -630,7 +633,7 @@ cd react-dashboard && npm test
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
 | Backend | **398 passed** de 399 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1102 passed · 29 skipped** |
+| Frontend | **1160 passed · 24 skipped** *(23-09-2026, tras Plan 42.5 F5)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

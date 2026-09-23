@@ -65,7 +65,6 @@ import esSettings from "./locales/es/settings.json";
 import esValidation from "./locales/es/validation.json";
 import esErrors from "./locales/es/errors.json";
 import esAssistant from "./locales/es/assistant.json";
-import esData from "./locales/es/data.json";
 import esDomain from "./locales/es/domain.json";
 
 import enCommon from "./locales/en/common.json";
@@ -81,7 +80,6 @@ import enSettings from "./locales/en/settings.json";
 import enValidation from "./locales/en/validation.json";
 import enErrors from "./locales/en/errors.json";
 import enAssistant from "./locales/en/assistant.json";
-import enData from "./locales/en/data.json";
 import enDomain from "./locales/en/domain.json";
 
 /**
@@ -107,7 +105,6 @@ export const NAMESPACES = Object.freeze([
   "validation",
   "errors",
   "assistant",
-  "data",
   "prediction",
   "domain",
 ]);
@@ -127,7 +124,6 @@ const resources = {
     validation: esValidation,
     errors: esErrors,
     assistant: esAssistant,
-    data: esData,
     domain: esDomain,
   },
   en: {
@@ -144,7 +140,6 @@ const resources = {
     validation: enValidation,
     errors: enErrors,
     assistant: enAssistant,
-    data: enData,
     domain: enDomain,
   },
 };
