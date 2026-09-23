@@ -181,7 +181,7 @@ const SINONIMOS_DE_ROL = Object.freeze({
  * tipo para el porqué. Sin rol reconocido no hay nada que derivar: `[]`.
  *
  * @param {{rol?: string|null}} variable
- * @param {{id: string, label?: string|null}|null} apoyo  el de `canalesDeMaquina`, o `null`
+ * @param {{id: string, label?: string|null, alias?: string[]}|null} apoyo  el de `canalesDeMaquina`, o `null`
  * @returns {string[]}
  */
 function aliasDeVariable(variable, apoyo) {
@@ -196,6 +196,8 @@ function aliasDeVariable(variable, apoyo) {
   const formas = [
     apoyo.id,
     apoyo.label && apoyo.label !== apoyo.id ? apoyo.label : null,
+    /* Los alias que puso quien configuró («acople chiquito»), D15. */
+    ...(Array.isArray(apoyo.alias) ? apoyo.alias : []),
     numero ? `sensor ${numero}` : null,
     numero ? `apoyo ${numero}` : null,
   ].filter(Boolean);
@@ -587,8 +589,13 @@ export const TIPO_VIBRACIONES = Object.freeze({
    * apoyos (que existen, que se nombran con un sufijo) vale para cualquier
    * motor vigilado por un SM 1281. Cuáles tiene el de hoy —tres, con estas
    * sensibilidades— sigue siendo de la instancia, en `CANALES`.
+   *
+   * `sugerencia` es el nombre que el tipo PROPONE para cada apoyo («Lado
+   * acople») y que el editor ofrece como un botón, sin aplicarlo solo (Plan
+   * 42.5 F6, D15): con dos sensores nadie sabe cuál es el lado libre. El
+   * rótulo real es el `nombre` del asset, o su id.
    */
-  canales: Object.freeze(CANALES.map((c) => Object.freeze({ id: c.id, sufijo: c.sufijo }))),
+  canales: Object.freeze(CANALES.map((c) => Object.freeze({ id: c.id, sufijo: c.sufijo, sugerencia: c.label }))),
 
   /*
    * Los CONTADORES que publica el área de alarmas de un SM 1281 (Plan 37 F2):

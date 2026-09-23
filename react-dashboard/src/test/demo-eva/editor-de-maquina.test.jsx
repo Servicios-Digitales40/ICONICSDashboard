@@ -489,3 +489,59 @@ describe("editar una máquina existente (F3)", () => {
     for (const v of cambios.variables) expect(v).not.toHaveProperty("historyVerified");
   });
 });
+
+describe("nombre y alias por activo (Plan 42.5 F6, D15)", () => {
+  it("al dar de alta, cada activo marcado ofrece nombre y alias; la sugerencia del tipo se aplica con un botón, y todo viaja en el payload", async () => {
+    crearMaquina.mockResolvedValue({ ok: true, maquina: { id: "vib-motor-02", nombre: "Motor 2" }, avisos: [] });
+    montar();
+    fireEvent.change(screen.getByLabelText("Identificador"), { target: { value: "vib-motor-02" } });
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Motor 2" } });
+    fireEvent.change(screen.getByLabelText("PLC"), { target: { value: "PLC_2 · ua:DEMO3" } });
+    await explorar();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar todas las variables de S1/ }));
+    await screen.findByText(/26 variables marcadas/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Incluir los contadores del área" }));
+    await screen.findByText(/28 variables marcadas/);
+
+    /* Sin nombre, el campo está vacío y el tipo ofrece el suyo; no se aplica solo. */
+    expect(screen.getByLabelText("Nombre del activo S1").value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Usar «Lado acople»" }));
+    expect(screen.getByLabelText("Nombre del activo S1").value).toBe("Lado acople");
+    fireEvent.change(screen.getByLabelText("Alias del activo S1"), { target: { value: "acople chiquito, lado del motor" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /Dar de alta la máquina/ }));
+    await waitFor(() => expect(crearMaquina).toHaveBeenCalledTimes(1));
+    const s1 = crearMaquina.mock.calls[0][0].assets.find((a) => a.id === "S1");
+    expect(s1).toMatchObject({ nombre: "Lado acople", alias: ["acople chiquito", "lado del motor"] });
+    /* La raíz, sin detalle, va como siempre. */
+    expect(crearMaquina.mock.calls[0][0].assets[0]).not.toHaveProperty("alias");
+  });
+
+  it("al editar, el nombre y los alias guardados se siembran y sobreviven al PATCH aunque no se toquen", async () => {
+    const guardadaConNombres = {
+      id: "vib-motor-02", nombre: "Motor 2", tipo: "vibraciones", plc: "PLC_2 · ua:DEMO3",
+      arboles: { enVivo: RAIZ, historico: HDA, alarmas: AREA },
+      assets: [
+        { id: "Vibraciones", pointName: RAIZ, rol: "raiz", nombre: null, alias: [] },
+        { id: "S2", pointName: `${RAIZ}S2/`, rol: "secundario", nombre: "Rodamiento intermedio", alias: ["intermedio"] },
+      ],
+      variables: [
+        { id: "vRMS_S2", pointName: `${RAIZ}S2/vRMS_S2`, historyPointName: `${HDA}${B}S2:vRMS_S2`, historyVerified: true, assetId: "S2", rol: "medida:vRMS", acceso: "read" },
+      ],
+    };
+    editarMaquina.mockResolvedValue({ ok: true, maquina: guardadaConNombres, avisos: [] });
+    montar({ maquina: guardadaConNombres });
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de S2/ });
+
+    expect(screen.getByLabelText("Nombre del activo S2").value).toBe("Rodamiento intermedio");
+    expect(screen.getByLabelText("Alias del activo S2").value).toBe("intermedio");
+    /* Con el nombre ya puesto igual que la sugerencia, no se ofrece el botón. */
+    expect(screen.queryByRole("button", { name: "Usar «Rodamiento intermedio»" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
+    await waitFor(() => expect(editarMaquina).toHaveBeenCalledTimes(1));
+    expect(editarMaquina.mock.calls[0][1].assets.find((a) => a.id === "S2")).toMatchObject({
+      nombre: "Rodamiento intermedio", alias: ["intermedio"],
+    });
+  });
+});

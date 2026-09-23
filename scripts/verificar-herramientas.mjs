@@ -1384,6 +1384,24 @@ await checkAsync('un nombre corto como «DKW» encuentra su señal', async () =>
   assert.doesNotMatch(r.error ?? '', /no es una señal del tanque/i)
 })
 
+await checkAsync('un ALIAS del asset puesto por quien configura encuentra la señal: «DKW del acople chiquito»', async () => {
+  /*
+   * Plan 42.5 F6, D15. La espejo lleva `alias: ["acople chiquito"]` en S1, como
+   * lo escribiría el usuario en el editor. El alias es del ACTIVO y se
+   * propaga a todas sus variables por `tipo.aliasDe`, así que ninguna
+   * herramienta cambió: sólo el nombre llega más lejos.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
+  const r = await h.ejecutar('historia_de_senal', { senal: 'DKW del acople chiquito', periodo: 'ayer' })
+  assert.doesNotMatch(r.error ?? '', /no hay ninguna señal/i, 'el alias del apoyo S1 llega a DKW_S1')
+
+  const exactas = sistemasDeSenal('DKW del acople chiquito')
+  assert.equal(exactas.length, 1, 'el alias identifica UNA señal')
+  assert.equal(exactas[0].clave, 'DKW_S1')
+  /* Y el alias de S1 no se le pega a S2. */
+  assert.equal(sistemasDeSenal('DKW del acople chiquito').some((x) => x.clave === 'DKW_S2'), false)
+})
+
 await checkAsync('el nombre corto solo, sin apoyo, devuelve los tres', () => {
   // Reconocer más nombres no puede convertirse en elegir por quien pregunta.
   const dkw = sistemasDeSenal('DKW')

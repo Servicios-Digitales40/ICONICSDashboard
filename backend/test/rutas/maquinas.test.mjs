@@ -683,3 +683,46 @@ describe('DELETE /api/maquinas/:id', () => {
     expect(json(r).codigo).toBe('ERROR_MAQUINA_NO_ENCONTRADA')
   })
 })
+
+describe('assets con nombre y alias (Plan 42.5 F6, D15)', () => {
+  const conApoyo = () => {
+    const m = maquinaValida()
+    m.assets.push({
+      id: 'S1', pointName: 'ac:PRUEBA/vib-motor-02/S1/', rol: 'secundario',
+      nombre: 'Lado acople', alias: [' acople chiquito ', 'acople chiquito', 'lado del motor'],
+    })
+    return m
+  }
+
+  it('el alta guarda nombre y alias limpios, y la edición los conserva o los cambia', async () => {
+    const alta = await app.inject({ method: 'POST', url: '/api/maquinas', payload: conApoyo() })
+    expect([200, 201]).toContain(alta.statusCode)
+    expect(json(alta).maquina.assets.find((a) => a.id === 'S1')).toMatchObject({
+      nombre: 'Lado acople', alias: ['acople chiquito', 'lado del motor'],
+    })
+
+    /* Editar otra cosa mandando los assets tal cual: nada se pierde. */
+    const igual = await app.inject({
+      method: 'PATCH', url: '/api/maquinas/vib-motor-02',
+      payload: { nombre: 'Otro nombre', assets: json(alta).maquina.assets },
+    })
+    expect(igual.statusCode).toBe(200)
+    expect(json(igual).maquina.assets.find((a) => a.id === 'S1')).toMatchObject({
+      nombre: 'Lado acople', alias: ['acople chiquito', 'lado del motor'],
+    })
+
+    const cambiado = await app.inject({
+      method: 'PATCH', url: '/api/maquinas/vib-motor-02',
+      payload: { assets: json(alta).maquina.assets.map((a) => (a.id === 'S1' ? { ...a, alias: ['acople pequeño'] } : a)) },
+    })
+    expect(cambiado.statusCode).toBe(200)
+    expect(json(cambiado).maquina.assets.find((a) => a.id === 'S1').alias).toEqual(['acople pequeño'])
+  })
+
+  it('un alias vacío se rechaza con 400, no se guarda en silencio', async () => {
+    const m = conApoyo()
+    m.assets[1].alias = ['']
+    const r = await app.inject({ method: 'POST', url: '/api/maquinas', payload: m })
+    expect(r.statusCode).toBe(400)
+  })
+})

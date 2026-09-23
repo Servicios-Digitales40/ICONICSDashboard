@@ -172,9 +172,32 @@ export function crearVariable({
   };
 }
 
-/** Un asset nuevo. `rol` distingue la raíz de los demás. */
-export function crearAsset({ id, pointName, rol = "secundario", nombre = null }) {
-  return { id, pointName, rol, nombre: nombre || null };
+/**
+ * Los alias que escribe quien configura, limpios: acepta una lista o un texto
+ * separado por comas o líneas, quita espacios y vacíos, y no repite. Es la
+ * misma regla que `limitacionesLimpias`, para el mismo tipo de campo.
+ *
+ * @param {string[]|string|null|undefined} entrada
+ * @returns {string[]}
+ */
+export function aliasLimpios(entrada) {
+  const lista = Array.isArray(entrada) ? entrada : String(entrada ?? "").split(/[,\n]/);
+  return [...new Set(lista.map((a) => String(a ?? "").trim()).filter(Boolean))];
+}
+
+/**
+ * Un asset nuevo. `rol` distingue la raíz de los demás.
+ *
+ * `nombre` y `alias` los pone quien configura (Plan 42.5 F6, D15): el nombre
+ * es cómo se rotula el activo en pantalla («Lado acople»), y los alias son
+ * otras formas de llamarlo que el asistente tiene que entender («acople
+ * chiquito»). Se propagan a todas las variables del activo al resolver un
+ * nombre (`construirSistema.aliasDe` → `tipo.aliasDe`). El tipo puede
+ * SUGERIR un nombre por apoyo; nunca lo aplica solo: con dos sensores no se
+ * sabe cuál es el lado libre.
+ */
+export function crearAsset({ id, pointName, rol = "secundario", nombre = null, alias = [] }) {
+  return { id, pointName, rol, nombre: nombre || null, alias: aliasLimpios(alias) };
 }
 
 /**

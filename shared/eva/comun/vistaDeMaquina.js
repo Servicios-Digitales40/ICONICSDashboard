@@ -18,11 +18,14 @@
  *
  * ── LO QUE NO INVENTA ─────────────────────────────────────────────
  *
- * El rótulo de un apoyo es su id (`S1`), no «Lado acople»: dónde está montado
- * cada acelerómetro lo sabe quien lo montó, y la configuración no lo pregunta
- * todavía. La sensibilidad y el rodamiento van a `null` por lo mismo. Una
- * vista que los necesite tiene que enseñar el hueco, no un valor de otro
- * motor.
+ * El rótulo de un apoyo es el `nombre` que le puso quien configuró la
+ * máquina («Lado acople») y, si no le puso ninguno, su id (`S1`): dónde está
+ * montado cada acelerómetro lo sabe quien lo montó, y el tipo sólo puede
+ * SUGERIRLO (`tipo.canales[].sugerencia`), nunca aplicarlo. Los `alias` del
+ * asset («acople chiquito») viajan con el apoyo para que el asistente los
+ * resuelva (Plan 42.5 F6, D15). La sensibilidad y el rodamiento van a `null`
+ * por lo mismo. Una vista que los necesite tiene que enseñar el hueco, no un
+ * valor de otro motor.
  */
 
 /**
@@ -35,7 +38,7 @@
  *
  * @param {object} maquina  la configuración
  * @param {object|null} tipo  su tipo (`tipoDe(maquina.tipo)`)
- * @returns {Array<{id: string, sufijo: string, label: string, sensibilidad: null, rodamiento: null}>}
+ * @returns {Array<{id: string, sufijo: string, label: string, alias: string[], sensibilidad: null, rodamiento: null}>}
  */
 export function canalesDeMaquina(maquina, tipo) {
   const canalesDelTipo = tipo?.canales ?? [];
@@ -46,6 +49,7 @@ export function canalesDeMaquina(maquina, tipo) {
   for (const a of maquina?.assets ?? []) if (a?.id) presentes.add(a.id);
 
   const nombreDeAsset = new Map((maquina?.assets ?? []).map((a) => [a?.id, a?.nombre ?? null]));
+  const aliasDeAsset = new Map((maquina?.assets ?? []).map((a) => [a?.id, Array.isArray(a?.alias) ? a.alias : []]));
 
   return canalesDelTipo
     .filter((c) => presentes.has(c.id))
@@ -53,6 +57,7 @@ export function canalesDeMaquina(maquina, tipo) {
       id: c.id,
       sufijo: c.sufijo ?? c.id,
       label: nombreDeAsset.get(c.id) || c.id,
+      alias: aliasDeAsset.get(c.id) ?? [],
       sensibilidad: null,
       rodamiento: null,
     }));

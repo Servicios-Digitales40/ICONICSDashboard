@@ -88,6 +88,7 @@ import {
   carpetaDe,
   compararConArbol,
   configuracionDesdeMarcas,
+  detallesDeAssets,
   hojasBajo,
   marcasDe,
   proponerVariables,
@@ -151,6 +152,11 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
   const [emparejamientos, setEmparejamientos] = useState(() => (maquina ? marcasDe(maquina).emparejamientos : new Map()));
   const [roles, setRoles] = useState(() => (maquina ? marcasDe(maquina).roles : new Map()));
   const [abiertas, setAbiertas] = useState(() => new Set());
+  /* Nombre y alias por asset (Plan 42.5 F6, D15), sembrados de lo guardado
+     para que editar otra cosa no los pierda: el PATCH reemplaza `assets`. */
+  const [detalles, setDetalles] = useState(() => (maquina ? detallesDeAssets(maquina) : {}));
+  const cambiarDetalle = (id, campo, valor) =>
+    setDetalles((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { nombre: "", alias: "" }), [campo]: valor } }));
 
   /* ── La exploración ─────────────────────────────────────────────────── */
 
@@ -266,8 +272,9 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
         arboles: { enVivo: raiz, historico: historico || null, alarmas: area || null },
         variables,
         contadores: [...contadores].map((pointName) => ({ pointName })),
+        detallesDeAsset: detalles,
       }),
-    [formulario, raiz, historico, area, variables, contadores],
+    [formulario, raiz, historico, area, variables, contadores, detalles],
   );
 
   /* La misma validación que aplica el servidor, antes de enviar: es para lo
@@ -496,6 +503,50 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
             <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>
               {tx("summary", { variables: variables.length + contadores.size, series: conSerie, sinRol, activos: activosMarcados })}
             </div>
+
+            {/*
+              Nombre y alias por activo (D15). El nombre rotula el activo en
+              pantalla; los alias son las otras formas de llamarlo que el
+              asistente resuelve, y se suman a todas sus variables. El tipo
+              SUGIERE un nombre por apoyo con un botón: no se aplica solo.
+            */}
+            {payload.assets.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>{tx("assetsTitle")}</div>
+                <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, margin: "2px 0 8px" }}>{tx("assetsHint")}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10 }}>
+                  {payload.assets.map((a) => {
+                    const d = detalles[a.id] ?? { nombre: "", alias: "" };
+                    const sugerencia = tipoObj?.canales?.find((c) => c.id === a.id)?.sugerencia ?? null;
+                    return (
+                      <div key={a.id} style={{ padding: 10, borderRadius: 8, border: `1px solid ${t.border}` }}>
+                        <Mono apagado style={{ fontSize: 11 }}>{a.id}</Mono>
+                        <input
+                          className="field" style={{ ...campo, marginTop: 6 }}
+                          aria-label={tx("assetName", { id: a.id })} placeholder={tx("assetNamePlaceholder")}
+                          value={d.nombre} onChange={(e) => cambiarDetalle(a.id, "nombre", e.target.value)}
+                        />
+                        {sugerencia && d.nombre.trim() !== sugerencia && (
+                          <button
+                            type="button"
+                            onClick={() => cambiarDetalle(a.id, "nombre", sugerencia)}
+                            style={{ marginTop: 6, padding: "4px 10px", borderRadius: 999, fontSize: 11.5, fontWeight: 600, border: `1px solid ${t.border}`, background: "transparent", color: t.textSoft, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
+                          >
+                            {tx("useSuggestion", { nombre: sugerencia })}
+                          </button>
+                        )}
+                        <input
+                          className="field" style={{ ...campo, marginTop: 6 }}
+                          aria-label={tx("assetAlias", { id: a.id })} placeholder={tx("assetAliasPlaceholder")}
+                          value={d.alias} onChange={(e) => cambiarDetalle(a.id, "alias", e.target.value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, marginTop: 6 }}>{tx("assetAliasHint")}</div>
+              </div>
+            )}
 
             {(bloquean.length > 0 || problemasServidor.length > 0) && (
               <div style={{ marginTop: 10 }}>

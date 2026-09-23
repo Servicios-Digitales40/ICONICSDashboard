@@ -62,7 +62,10 @@
         "id": "S1",
         "pointName": "ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/",
         "rol": "secundario",
-        "nombre": "Lado acople"
+        "nombre": "Lado acople",
+        "alias": [
+          "acople chiquito"
+        ]
       },
       {
         "id": "S2",

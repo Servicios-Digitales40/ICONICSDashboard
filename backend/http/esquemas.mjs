@@ -773,6 +773,8 @@ const AssetMaquinaSchema = z.object({
   pointName: z.string().trim().min(1).max(512),
   rol: z.enum(['raiz', 'secundario']).optional(),
   nombre: z.string().trim().max(128).nullish(),
+  /* Otras formas de llamar al activo, que el asistente resuelve (Plan 42.5 F6, D15). */
+  alias: z.array(z.string().trim().min(1).max(128)).max(32).optional(),
 })
 
 /** `POST /api/maquinas` — da de alta una máquina. */

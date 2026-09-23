@@ -54,6 +54,7 @@ import {
   nombreFinal,
   proponerRol,
 } from "./arbolIconics.js";
+import { aliasLimpios } from "./configuracionMaquina.js";
 
 /**
  * La carpeta directa bajo la raíz de la que cuelga un punto en vivo, o `null`
@@ -277,10 +278,36 @@ export function limitacionesLimpias(entrada) {
   return [...new Set(lineas.map((l) => String(l ?? "").trim()).filter(Boolean))];
 }
 
-export function configuracionDesdeMarcas({ formulario, arboles, variables, contadores = [] }) {
+/**
+ * Lo que quien configura escribió de cada asset —nombre y alias— en la forma
+ * del editor: `{ [id]: { nombre, alias } }`, con los alias como texto
+ * separado por comas, que es como se escriben. Sólo los assets que tienen
+ * algo: sembrar vacíos no aporta nada (Plan 42.5 F6, D15).
+ */
+export function detallesDeAssets(maquina) {
+  /** @type {Record<string, {nombre: string, alias: string}>} */
+  const salida = {};
+  for (const a of maquina?.assets ?? []) {
+    const nombre = a?.nombre ?? "";
+    const alias = Array.isArray(a?.alias) ? a.alias.join(", ") : "";
+    if (nombre || alias) salida[a.id] = { nombre, alias };
+  }
+  return salida;
+}
+
+export function configuracionDesdeMarcas({ formulario, arboles, variables, contadores = [], detallesDeAsset = {} }) {
   const raiz = arboles.enVivo;
+  /* Nombre y alias de un asset, si quien configura escribió algo (D15). Un
+     asset sin detalle va como siempre: sin campos que nadie pidió. */
+  const conDetalle = (asset) => {
+    const d = detallesDeAsset?.[asset.id];
+    if (!d) return asset;
+    const nombre = String(d.nombre ?? "").trim();
+    const alias = aliasLimpios(d.alias);
+    return { ...asset, ...(nombre ? { nombre } : {}), ...(alias.length ? { alias } : {}) };
+  };
   const assets = [
-    { id: nombreDeCarpeta(raiz) ?? "raiz", pointName: raiz, rol: "raiz" },
+    conDetalle({ id: nombreDeCarpeta(raiz) ?? "raiz", pointName: raiz, rol: "raiz" }),
   ];
 
   /* Un asset por carpeta marcada, en el orden en que aparecen. */
@@ -292,7 +319,7 @@ export function configuracionDesdeMarcas({ formulario, arboles, variables, conta
     }
   }
   for (const a of carpetas.values()) {
-    assets.push({ id: a.id, pointName: a.pointName, rol: "secundario" });
+    assets.push(conDetalle({ id: a.id, pointName: a.pointName, rol: "secundario" }));
   }
 
   const variablesLimpias = variables.map((v) => ({
@@ -305,7 +332,7 @@ export function configuracionDesdeMarcas({ formulario, arboles, variables, conta
 
   if (arboles.alarmas && contadores.length) {
     const areaId = nombreDeCarpeta(arboles.alarmas) ?? "alarmas";
-    assets.push({ id: areaId, pointName: arboles.alarmas, rol: "secundario" });
+    assets.push(conDetalle({ id: areaId, pointName: arboles.alarmas, rol: "secundario" }));
     for (const c of contadores) {
       variablesLimpias.push({
         id: nombreFinal(c.pointName) ?? c.pointName,

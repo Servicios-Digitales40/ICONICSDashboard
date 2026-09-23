@@ -399,7 +399,15 @@
       "problems": "Fix this before saving",
       "nothingMarked": "No variable is marked.",
       "rootRequired": "The real-time root is required to explore.",
-      "rootNotFound": "Could not explore “{{ruta}}”"
+      "rootNotFound": "Could not explore “{{ruta}}”",
+      "assetsTitle": "Assets: name and aliases",
+      "assetsHint": "The name is how the asset is labelled on screen; without one, its id is used. Aliases are other ways of calling it that the assistant understands.",
+      "assetName": "Name of asset {{id}}",
+      "assetNamePlaceholder": "No name: labelled by its id",
+      "assetAlias": "Aliases of asset {{id}}",
+      "assetAliasPlaceholder": "aliases, comma-separated",
+      "assetAliasHint": "Aliases apply to every variable of the asset: with “small coupling” on S1, “DKW of the small coupling” finds that bearing's DKW.",
+      "useSuggestion": "Use “{{nombre}}”"
     },
     "remove": "Remove from dashboard",
     "removeConfirm": "Remove “{{nombre}}” from the dashboard? If it has previous cases it is deactivated instead of deleted.",

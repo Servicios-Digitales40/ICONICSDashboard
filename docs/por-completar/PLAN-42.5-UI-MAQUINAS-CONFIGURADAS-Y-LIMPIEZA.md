@@ -1399,6 +1399,29 @@ hay que leer el resto:
    `nombresPorAsset`), y el caso «dame el valor de DKW del acople chiquito»
    en `verificar-herramientas` con la espejo. Prueba de regresión: editar
    una máquina con nombres guardados los conserva en el `PATCH`.
+
+   **Hecho (23-09-2026, tarde).** Dominio: `crearAsset` gana `alias` y
+   `aliasLimpios` (lista o texto por comas o líneas, sin vacíos ni repetidos);
+   `canalesDeMaquina` expone `alias` en cada apoyo y su cabecera deja de decir
+   que una configurada se rotula por id; `tipo.canales[].sugerencia` lleva el
+   `label` de `CANALES` que el tipo descartaba, y `aliasDeVariable` compone
+   los alias del apoyo con cada nombre de la medida («DKW acople chiquito»),
+   así que `sistema.aliasDe(clave)` y `sistemasDeSenal` los resuelven sin
+   tocar ninguna herramienta. Editor: `detallesDeAssets(maquina)` siembra
+   nombre y alias de lo guardado y `configuracionDesdeMarcas` los vuelve a
+   poner en cada asset (raíz, carpetas y área), con lo que el `PATCH` —que
+   reemplaza `assets` enteros— ya no los pierde; una sección «Activos: nombre
+   y alias» en el resumen con un campo por asset, un botón «Usar «Lado
+   acople»» con la sugerencia del tipo que nunca se aplica solo, y los alias
+   por comas. Backend: `AssetMaquinaSchema.alias` (1–128 caracteres, hasta 32;
+   uno vacío es 400). La espejo lleva `alias: ["acople chiquito"]` en S1 y
+   `verificar-herramientas` tiene el caso «dame el valor de DKW del acople
+   chiquito»: una sola señal, `DKW_S1`, y S2 no lo hereda. Pruebas nuevas:
+   dominio (6), editor (2: alta con sugerencia y alias; edición que conserva),
+   rutas (2). **Puerta:** frontend **1168** verdes · 20 omitidas (+8); backend
+   **400** + el rojo de entorno de `salud.test` (B16); `verificar-herramientas`
+   **191** + 22 omitidas; los 41 verificadores; lint, types, i18n (1250 claves) y
+   textos limpios; build en verde, `index` 329,0 KB.
 5. **F6.5 · Muro y arranque** (D19). Borrar `MuroPlanta`, su prueba, sus
    claves; ruta `inicio` con `Arranque.jsx` y su prueba (con máquinas →
    `maq-inicio` de la primera, con `replace`; sin máquinas → texto y botón

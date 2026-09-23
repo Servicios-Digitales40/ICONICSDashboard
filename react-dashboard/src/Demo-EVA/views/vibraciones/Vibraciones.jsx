@@ -83,8 +83,9 @@ function TarjetaApoyo({ canal, datos, normaAplicable, t, configurada = false }) 
   const { t: traducir } = useTranslation(["machines", "navigation", "dashboard", "errors"]);
   const { canal: canalTexto, medida: medidaTexto, zonaIso } = useDominio();
   const banda = bandaISO(datos?.vRMS, normaAplicable);
-  /* «Lado acople» es dónde está montado el S1 de la máquina escrita a mano.
-     Una configurada no lo ha dicho: su apoyo se llama como su id. */
+  /* Una configurada rotula el apoyo con el `nombre` que le puso quien la
+     configuró («Lado acople»), o con su id si no le puso ninguno; la escrita a
+     mano, con el diccionario (Plan 42.5 F6, D15). */
   const nombre = configurada ? canal.label : canalTexto(canal.id);
 
   return (
