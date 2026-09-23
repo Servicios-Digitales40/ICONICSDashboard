@@ -2,7 +2,7 @@
 
 **Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
 `Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F3 completadas y F4 en su parte segura** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, el vaciado de la bitácora documentado en §7 sin ejecutarlo, y `PlantaTanque`/`DetalleActivo` retiradas con sus pruebas); falta mirar las vistas en el navegador contra planta con el backend reiniciado, y la decisión del usuario sobre las otras vistas del tanque (Plan 42.5 F4).
+lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F4 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, el vaciado de la bitácora documentado en §7 sin ejecutarlo, y el 23-09 **todas las vistas del tanque borradas** por decisión del usuario: `views/tanque/`, `AlarmasEva`, los 11 modelos 3D del tanque y el panel del tanque del muro; el tanque volverá como configurada en el Plan 43). F5 hecha salvo Predicción y `plc_opcua.py`, que esperan al usuario. Falta mirar Planta y Detalle en el navegador contra planta con el backend reiniciado.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -52,7 +52,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1162** pruebas · 24 omitidas *(a 23-09 por la mañana, tras Plan 42.5 F5; eran 1102 · 29 el 22-09)* |
+| Suite de frontend | **1117** pruebas · 20 omitidas *(a 23-09 por la mañana, tras Plan 42.5 F4 cerrada; eran 1102 · 29 el 22-09)* |
 | Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
@@ -64,7 +64,8 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 Funcionalmente: el tablero de vibraciones por **máquinas configuradas** (una
 sección por máquina con ocho vistas en el menú —Inicio, Planta, Estado
 mecánico, Vista 3D, Hallazgos, Avisos, Casos previos, RAG— más el Detalle
-sin menú (Plan 42.5), y un muro de planta), el asistente con sus 26
+sin menú (Plan 42.5), y un muro de planta con un panel por configurada; el
+tanque ya no tiene vistas), el asistente con sus 26
 herramientas contestando sobre la configurada que se tiene delante, el motor
 de diagnóstico determinista con las reglas del TIPO, el RAG documental con los
 manuales asignados al tipo, el transporte falso (`ICONICS_FAKE=true`), el
@@ -633,7 +634,7 @@ cd react-dashboard && npm test
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
 | Backend | **398 passed** de 399 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1162 passed · 24 skipped** *(23-09-2026, tras Plan 42.5 F5)* |
+| Frontend | **1117 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F4 cerrada)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

@@ -377,10 +377,11 @@ function Aviso({ aviso, t, traducir, traducirCausa, nombreSistema, textoDeRiesgo
         <button
           type="button"
           onClick={() => {
-            /* El tanque tiene su pantalla; cualquier otra máquina es una
-               configurada y viaja como `?maquina=` (Plan 38 F2, Plan 40 F2). */
-            if (sistema === "tanque") onNavigate?.("eva-riesgos");
-            else onNavigate?.("maq-riesgos", { maquina: sistema });
+            /* Toda máquina es una configurada y viaja como `?maquina=` (Plan
+               38 F2, Plan 40 F2). El tanque perdió su pantalla propia en el
+               Plan 42.5 F4; cuando entre por configuración (Plan 43) esta
+               misma línea le sirve. */
+            onNavigate?.("maq-riesgos", { maquina: sistema });
           }}
           style={{
             padding: "9px 13px", borderRadius: 8, cursor: "pointer",

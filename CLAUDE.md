@@ -14,7 +14,8 @@ documentación, y un asistente de IA local contesta sobre su estado, sus
 señales y sus valores, dibuja gráficas, genera reportes y diagnostica con un
 motor determinista. Técnicamente: un puente Node (Fastify) hacia ICONICS y un
 tablero React (Demo EVA) con dos instalaciones de planta (un sistema de agua,
-hoy cerrado, y un sistema de vibraciones como máquina configurada). Detalle
+hoy cerrado y sin vistas propias, y un sistema de vibraciones como máquina
+configurada). Detalle
 de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 
 > ## ⚠ RAMA `Vibraciones1.0`: LA ESTACIÓN DE LLENADO ESTÁ CERRADA
@@ -51,7 +52,10 @@ de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.m
 >    puede mover; no se destila en esta rama.
 > 2. **Sus vistas y su capa de datos se sustituyen por vistas genéricas de
 >    máquina configurada y se borran**, con las pruebas omitidas que sólo ellas
->    justificaban. Borrar va **después** de sustituir, nunca antes.
+>    justificaban. Borrar va **después** de sustituir, nunca antes. **Hecho el
+>    23-09-2026**: no queda ninguna vista del tanque (`views/tanque/` no
+>    existe); su fuente en vivo (`EvaProvider`, `evaSource`, `hooks.js`) sí,
+>    hasta el Plan 43.
 > 3. **Lo que no es de ninguna máquina y nadie importa se borra ya**, con la
 >    evidencia en el commit.
 >
@@ -195,8 +199,8 @@ regla.
 │   └── src/
 │       ├── Demo-EVA/           Todo lo que sabe de las dos máquinas de planta
 │       │   ├── domain/            Puertas (re-export) hacia shared/eva/ — ver §4.2
-│       │   ├── data/               Lectura de red: tanque/, comunes/ y vibraciones/ (por configurada)
-│       │   ├── views/              Presentación: tanque/, comunes/ y vibraciones/ (por configurada)
+│       │   ├── data/               Lectura de red: tanque/ (la fuente en vivo), comunes/ y vibraciones/
+│       │   ├── views/              Presentación: comunes/, maquina/ (genéricas) y vibraciones/ (del tipo)
 │       │   ├── components/         Piezas de presentación de esta demo
 │       │   └── three-d/            Maqueta 3D
 │       ├── modulos/             Módulos que NO se sirven de ICONICS — ver §4.7
@@ -283,9 +287,10 @@ esta capa — la banda se pide a `shared/eva/`, no se recalcula.
 Con dos instalaciones (tanque, vibraciones) más lo transversal, el nombre de
 archivo/vista se distingue por **máquina**, no por el nombre de la demo:
 
-- `tanque/` — `InicioTanque`, `RiesgosTanque`, `ControlesTanque`,
-  `MaquetaTanque3D`. (`PlantaTanque` y `DetalleActivo` se retiraron en el
-  Plan 42.5 F4: los sustituyen las vistas genéricas de `maquina/`.)
+- `tanque/` — **ya no existe en `views/`** (Plan 42.5 F4, 23-09-2026): sus
+  seis vistas se borraron porque el tanque entrará como máquina configurada
+  y usará las genéricas de `maquina/` (Plan 43). Queda `data/tanque/` (la
+  fuente en vivo) y el dominio en `shared/eva/tanque/`.
 - `maquina/` — `PlantaMaquina`, `DetalleMaquina`: para CUALQUIER máquina
   configurada, dirigidas por su `sistema` y su tipo, sin un `if` por máquina
   (Plan 42.5 D1).
@@ -402,7 +407,7 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 
 ```bash
 cd backend && npm test          # 399 — contratos HTTP, config, logger
-cd react-dashboard && npm test  # 1162 (+24 omitidas) — dominio, vistas, hooks
+cd react-dashboard && npm test  # 1117 (+20 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 

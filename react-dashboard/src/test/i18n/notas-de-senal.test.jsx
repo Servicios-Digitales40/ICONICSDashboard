@@ -9,8 +9,8 @@
  *
  * `shared/eva/tanque/senales.js` declara `nota` en siete señales, junto a
  * `label` y `corto`. `useDominio().senal()` ya traducía los dos últimos por
- * clave — pero la ficha de un activo en la maqueta 3D
- * (`three-d/components/FichaActivo.jsx`) y el detalle de una señal
+ * clave — pero la ficha de un activo en la maqueta 3D del tanque (borrada
+ * en el Plan 42.5 F4) y el detalle de una señal
  * (`components/detalle/DetalleGrid.jsx`) pintaban `senal.nota` DIRECTO del
  * catálogo, sin pasar por el puente. Se vio en planta el 09-09-2026: la ficha
  * de «Storage Tank», en inglés, seguía diciendo «El sensor de nivel está

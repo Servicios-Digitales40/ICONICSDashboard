@@ -310,7 +310,6 @@ function ContenidoDelTablero({ t, nav, navigate, muro, cajonAbierto, setCajonAbi
         <Topbar
           page={nav.page}
           onAbrirMenu={() => setCajonAbierto(true)}
-          onAbrirAlarmas={() => navigate("eva-alarmas")}
           muro={muro.activo}
         />
 

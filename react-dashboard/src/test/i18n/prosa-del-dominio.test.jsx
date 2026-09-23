@@ -24,13 +24,19 @@
  * tarjeta. Lo que sí se escribe es la CIFRA —«12.3»— porque es lo que tiene
  * que sobrevivir al viaje, y comprobarla contra el propio dominio no probaría
  * nada.
+ *
+ * Hasta el 23-09-2026 la primera mitad probaba la tarjeta de riesgo del
+ * TANQUE (`RiesgosTanque.jsx`), con sus cifras en crudo formateadas por el
+ * puente y la asimetría del separador decimal entre idiomas. Esa vista se
+ * borró en el Plan 42.5 F4; queda la tarjeta de vibración, que es la que
+ * pinta cualquier máquina configurada. Cuando el tanque entre por
+ * configuración (Plan 43) su prosa pasará por esta misma tarjeta.
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import i18n from "@/i18n";
 import { ThemeProvider, useTheme } from "@/theme";
-import { TarjetaRiesgo } from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
 import { TarjetaRiesgo as TarjetaVibracion } from "@/Demo-EVA/components/riesgoVibracion.jsx";
 import { COMPOSICIONES } from "@/i18n/useProsa.js";
 import { REGLAS as REGLAS_VIBRACION } from "@shared/eva/vibraciones/riesgosVibracion.js";
@@ -40,102 +46,10 @@ afterEach(async () => {
   await i18n.changeLanguage("es");
 });
 
-/**
- * Un riesgo tal y como lo devuelve `evaluarRiesgos`: la prosa ya compuesta en
- * español —lo que consume el backend— y `valores` con las señales EN CRUDO.
- */
-const RIESGO = {
-  id: "derrame",
-  severidad: "critico",
-  titulo: "Riesgo de derrame",
-  evidencia: "El tanque está al 92.4 % y la bomba sigue impulsando (carga del motor 84.1 %).",
-  consecuencia: "Si la bomba no para, el nivel puede alcanzar el rebose y derramar agua en el cubeto.",
-  accion: "Confirmar que el corte por nivel alto está operativo y que el lazo de control responde.",
-  nota: null,
-  valores: { nivelTanque: 92.4, cargaMotor: 84.1 },
-};
-
-/** El texto de una clave de `domain`, en un idioma, según el diccionario. */
-const frase = (idioma, campo) =>
-  i18n.getFixedT(idioma, "domain")(`risks.derrame.${campo}`, { nivelTanque: "", cargaMotor: "" });
-
 function ConTema({ children }) {
   const { theme } = useTheme();
   return children(theme);
 }
-
-const pintar = () =>
-  render(
-    <ThemeProvider>
-      <ConTema>{(t) => <TarjetaRiesgo riesgo={RIESGO} t={t} />}</ConTema>
-    </ThemeProvider>
-  );
-
-describe("la tarjeta de riesgo habla el idioma del tablero", () => {
-  it("[es] sale la prosa del dominio, tal cual", () => {
-    pintar();
-
-    /*
-     * En español NO hay traducción en el diccionario: `es/domain.json` está
-     * vacío a propósito y la frase llega por `defaultValue` desde
-     * `shared/eva/`. Que salga literalmente la del dominio es la prueba de que
-     * esa degradación funciona.
-     */
-    expect(screen.getByText(RIESGO.titulo)).toBeTruthy();
-    expect(screen.getByText(RIESGO.evidencia)).toBeTruthy();
-    expect(screen.getByText(RIESGO.consecuencia)).toBeTruthy();
-  });
-
-  it("[en] sale en inglés, y las cifras siguen ahí", async () => {
-    await i18n.changeLanguage("en");
-    pintar();
-
-    const texto = document.body.textContent;
-
-    /* El titular y la consecuencia, del diccionario. */
-    expect(texto).toContain(frase("en", "titulo"));
-    expect(texto).toContain(frase("en", "consecuencia"));
-
-    /* Y ya no está el español del dominio. */
-    expect(texto).not.toContain(RIESGO.titulo);
-    expect(texto).not.toContain(RIESGO.consecuencia);
-
-    /*
-     * Las cifras son lo que tiene que sobrevivir al viaje: si el evaluador no
-     * emitiera `valores`, o el puente no los pasara, la frase inglesa saldría
-     * con `{{nivelTanque}}` literal.
-     */
-    expect(texto).toContain("92.4");
-    expect(texto).toContain("84.1");
-    expect(texto).not.toMatch(/\{\{/);
-  });
-
-  it("el separador decimal es el del idioma SÓLO donde hay plantilla", async () => {
-    /*
-     * ── UNA ASIMETRÍA QUE CONVIENE TENER FIJADA ────────────────────
-     *
-     * En INGLÉS la frase se recompone desde la plantilla, así que el puente
-     * formatea cada cifra con las `decimales` de su señal y el separador del
-     * idioma. En ESPAÑOL no hay plantilla —`es/domain.json` está vacío a
-     * propósito— y llega la frase que ya compuso el dominio con `toFixed`,
-     * que escribe punto.
-     *
-     * O sea: la tarjeta de riesgo en español dice «92.4» mientras la tarjeta
-     * de señal, dos pantallas más allá, dice «92,4». Es una inconsistencia
-     * real y conocida; el precio de no duplicar el párrafo español en dos
-     * archivos. Se fija aquí para que se vea si alguien la cambia, y está
-     * explicada en la cabecera de `useProsa`.
-     */
-    pintar();
-    expect(document.body.textContent).toContain("92.4");
-    cleanup();
-
-    await i18n.changeLanguage("en");
-    pintar();
-    expect(document.body.textContent).toContain("92.4");
-  });
-});
-
 
 /* ══ La otra máquina ═══════════════════════════════════════════════════ */
 

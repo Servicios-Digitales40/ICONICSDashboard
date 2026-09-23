@@ -174,14 +174,16 @@ describe("useMaquina() con una máquina configurada", () => {
   });
 
   /*
-   * Desde el Plan 40 F2 la única escrita a mano con rutas es el TANQUE (la de
-   * vibraciones se retira); es el que hace de máquina del registro aquí. Se
-   * comprueba por las dos vías: su ruta, y su id pegado en `?maquina=`.
+   * Desde el Plan 40 F2 la única escrita a mano es el TANQUE (la de
+   * vibraciones se retira); es el que hace de máquina del registro aquí. Sus
+   * vistas propias se borraron en el Plan 42.5 F4 y el registro sólo le
+   * atribuye `eva-assets`. Se comprueba por las dos vías: esa ruta, y su id
+   * pegado en `?maquina=`.
    */
   it("la máquina escrita a mano sigue siendo la del registro, aunque exista una configurada homónima", async () => {
     listarMaquinas.mockResolvedValue({ ok: true, maquinas: [configurada("tanque")] });
 
-    montar("eva-inicio", {});
+    montar("eva-assets", {});
 
     await waitFor(() => expect(listarMaquinas).toHaveBeenCalled());
     expect(screen.getByText("registro:tanque")).toBeTruthy();

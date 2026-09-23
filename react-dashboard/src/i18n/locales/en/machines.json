@@ -22,47 +22,11 @@
       "corto": "In Range"
     }
   },
-  "assets": {
-    "tanque": {
-      "label": "Storage Tank",
-      "corto": "Tank",
-      "pregunta": "Is there water, and in what condition?"
-    },
-    "bombeo": {
-      "label": "Pump Set",
-      "corto": "Pumping",
-      "pregunta": "Is it delivering, and who is in control?"
-    },
-    "distribucion": {
-      "label": "Distribution Network",
-      "corto": "Distribution",
-      "pregunta": "Is water going out, and at what pressure?"
-    },
-    "electrico": {
-      "label": "Electrical Supply",
-      "corto": "Electrical",
-      "pregunta": "At what power quality?"
-    }
-  },
   "systems": {
     "tanque": "Industrial Water System"
   },
   "plant": {
     "loadingHistorian": "Reading the historian…"
-  },
-  "controls": {
-    "pump": {
-      "title": "Pump",
-      "sub": "Writes straight to ac:TDCON/DEMO/SEGURIDAD/CONTROL, with the same guards as the assistant"
-    },
-    "turnOn": "Start pump",
-    "turnOff": "Stop pump",
-    "confirmOn": "Confirm start?",
-    "confirmOff": "Confirm stop?",
-    "hint": "The first click asks for confirmation; the second, within a few seconds, runs the command.",
-    "applied": "Command applied",
-    "tankLevel": "Tank Level",
-    "levelNote": "The same reading the server uses to decide whether the pump may start."
   },
   "vibration": {
     "silent": {
@@ -267,10 +231,6 @@
     "historianSamples": "The historian has samples",
     "rangeGroup": "Historian time range"
   },
-  "assetGrid": {
-    "alarmsActive_one": "{{count}} active alarm — view",
-    "alarmsActive_other": "{{count}} active alarms — view"
-  },
   "trends": {
     "code": "last {{horas}} h · from the Data Historian",
     "noHistorian": "the historian could not be queried",
@@ -306,20 +266,6 @@
     "downloadImage": "Download {{senal}} as an image",
     "noSamplesYet": "No samples yet in this session.",
     "noOwnSeries": "No series of its own in the historian. Once there are two readings in this session, it will appear here."
-  },
-  "model3d": {
-    "title": "3D View · {{sistema}}",
-    "sub": "Hover an asset to see it, click it for its signals · each card sits where the instrument that measures it is",
-    "loading": "Reading signals…",
-    "provenance": "Status colours come from local thresholds; ICONICS publishes no status for <b>{{raiz}}</b>. The layout comes from a drawing of the real equipment, with dimensions taken by eye off a perspective view: it is the skid’s, not a dimensioned plan.",
-    "moreInDetail_one": "+{{count}} more in detail view",
-    "moreInDetail_other": "+{{count}} more in detail view",
-    "viewFullDetail": "View full detail",
-    "view": {
-      "isometrica": "Isometric",
-      "superior": "Top",
-      "frontal": "Front"
-    }
   },
   "provenance": {
     "title": "Where does this reading come from?",

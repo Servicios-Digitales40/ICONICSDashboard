@@ -325,3 +325,25 @@ cambiado».
 5. **F2 (la mitad del tanque)** — con la reapertura, no antes
 
 **F1, F3, F4, F5 y F6 están cerrados**; se conservan arriba por su porqué.
+
+## F-frescura · `verificar-frescura` no reconoce los tiles genéricos (23-09-2026)
+
+Tras borrar las vistas del tanque (Plan 42.5 F4) el verificador dice «0
+archivos formatean señales, 0 exentos» y sigue en verde: su heurística busca
+la forma de los tres sitios del tanque, y los tiles genéricos de la Planta de
+una máquina configurada (`components/maquina/tilesMaquina.jsx`) pasan por
+`presentarValor` con otra forma. Hoy lo afirma `planta-maquina.test` (valor
+congelado enseñado como su edad). Pendiente: enseñarle esa forma al
+verificador para que vuelva a vigilar el árbol entero, antes de que alguien
+escriba un tile que se salte la puerta.
+
+## F-detalle-intermitente · `detalle-maquina-simulada` falló una vez en tanda completa (23-09-2026)
+
+«al entrar la insignia dice Sesión actual, y tras elegir Ayer dice
+Historiador, sin red» cayó UNA vez en una tanda completa (en 560 ms, no por
+plazo) y pasó 3 de 3 aislada y en las dos tandas completas siguientes. No es
+contención (CLAUDE.md §5.3: eso da `timed out`); huele a una carrera entre el
+búfer de la sesión y la primera lectura del historiador simulado en
+`useDetalleMaquina`. Pendiente de reproducir con `--repeat` antes de tocar
+nada; si vuelve, mirar el orden en que `SelectorRango` y `useSeriesDe` fijan
+el rango.

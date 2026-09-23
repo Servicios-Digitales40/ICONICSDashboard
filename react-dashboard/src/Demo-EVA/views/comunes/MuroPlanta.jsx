@@ -1,17 +1,16 @@
 /**
- * Vista «Muro de planta» — las dos máquinas a la vez, cada una con lo suyo
- * (Plan 25 F10 · `NUE-09`).
+ * Vista «Muro de planta»: todas las máquinas configuradas a la vez, cada una
+ * con lo suyo (Plan 25 F10 · `NUE-09`; un panel por configurada desde el Plan
+ * 40 F2). Es la pantalla de entrada (`DEFAULT_ROUTE`).
  *
  * ── QUÉ HABÍA, Y QUÉ FALTABA ─────────────────────────────────────────
  *
  * `modoMuro.js` (Plan 13 F8) resuelve CÓMO se pinta un muro: sin cromo, con
  * zoom, con rotación opcional entre `?vistas=a,b,c`. Pero rotar entre vistas
- * es enseñar UNA máquina cada vez — nunca las dos a la vez en la misma
- * pantalla. `LatidoMuro` (Plan 24 F9) demostró que un latido tiene que venir
- * de haber preguntado, pero es del TANQUE (`useSistemaAgua`), no genérico.
- *
- * Esta vista es la que faltaba: un panel por máquina, montados juntos, cada
- * uno con su propio latido, su propio peor veredicto y su propia frescura.
+ * es enseñar UNA máquina cada vez — nunca varias a la vez en la misma
+ * pantalla. Esta vista es la que faltaba: un panel por máquina, montados
+ * juntos, cada uno con su propio latido, su propio peor veredicto y su
+ * propia frescura.
  *
  * ── ES UNA VISTA NORMAL, NAVEGABLE, NO «SÓLO MURO» ────────────────────
  *
@@ -22,41 +21,41 @@
  *
  * ── LA REGLA QUE ESTA VISTA NO PUEDE ROMPER: `NO_COMPARTEN` ───────────
  *
- * Cada panel pide SU hook (`useSistemaAgua`/`useVibracion`), calcula SU
- * frescura y SU peor veredicto, y NINGUNA cifra se suma entre los dos. Un
- * «3 alarmas» que sumara las activas del tanque con las de vibraciones ya
- * rompería la regla, aunque el número saliera bien — las dos instalaciones
- * tienen distinto PLC y no comparten nada (`shared/eva/comun/sistemas.js`).
+ * Cada panel recibe SU entrada de `useMaquinasEnVivo()`, calcula SU frescura
+ * y SU peor veredicto, y NINGUNA cifra se suma entre paneles. Un «3 alarmas»
+ * que sumara dos máquinas ya rompería la regla, aunque el número saliera
+ * bien — cada máquina tiene su PLC y no comparte nada con las demás
+ * (`shared/eva/comun/sistemas.js`).
  *
- * ── POR QUÉ EL PEOR VEREDICTO NO ES EL MISMO CÁLCULO EN LAS DOS ───────
+ * ── EL PEOR VEREDICTO ES EL DE CADA TIPO ──────────────────────────────
  *
- * Tanque: el peor riesgo ACTIVO (`evaluarRiesgos`, mismo motor que Riesgos y
- * la Bandeja de Hallazgos — F0/F6). Vibraciones: la peor zona ISO
- * (`peorZonaDe`, extraída en esta misma fase al descubrir que la copia de F4
- * estaba rota — ver su cabecera en `shared/eva/vibraciones/vibraciones.js`).
- * Son dos preguntas distintas porque son dos dominios distintos; forzar el
- * mismo cálculo en las dos sería inventar una equivalencia que no existe.
+ * Los riesgos vienen ya evaluados con las reglas de su tipo; si no hay
+ * ninguno activo y el tipo sabe de zonas (ISO en vibraciones), se enseña la
+ * peor zona. Forzar el mismo cálculo en tipos distintos sería inventar una
+ * equivalencia que no existe.
  *
- * ── LAS ALARMAS ACTIVAS SÓLO EXISTEN PARA EL TANQUE ───────────────────
+ * ── HASTA EL 23-09-2026 HABÍA UN PANEL FIJO DEL TANQUE ────────────────
  *
- * Las nueve alarmas del catálogo (`naturaleza: "alarma"`) son del tanque; ver
- * `AlarmasEva.jsx` y F3. El panel de vibraciones no dice «0 alarmas» —que
- * afirmaría que se miró y no había ninguna—, dice que no aplica, mismo
- * criterio que el carril «no aplica» de la línea de tiempo (F3).
+ * Con `useSistemaAgua()` y el `evaluarRiesgos` del tanque, y con su conteo
+ * de alarmas del PLC (las nueve del catálogo eran suyas). Se retiró en el
+ * Plan 42.5 F4 con el resto de las vistas del tanque: cuando el tanque entre
+ * como máquina configurada (Plan 43) tendrá aquí su panel como cualquier
+ * otra, sin una rama aparte. Sus alarmas del PLC serán entonces cosa de su
+ * tipo; mientras un tipo no las declare, el panel dice que no aplican, no
+ * «0». Sin ninguna configurada en servicio la pantalla lo dice, en vez de
+ * quedarse en blanco.
  */
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, Bell, Power } from "lucide-react";
+import { AlertTriangle, Power } from "lucide-react";
 
 import { useTheme } from "@/theme";
 import { useAhora } from "../../lib/useAhora.js";
 import { FRESCURA, frescuraDe } from "../../data/comunes/estadoDelDato.js";
 import { fmtAntiguedad } from "@/lib/format.js";
-import { useSistemaAgua } from "../../data/comunes/hooks.js";
 import { useMaquinasEnVivo } from "../../data/comunes/maquinasEnVivo.js";
 import { useProsa } from "@/i18n/useProsa.js";
 import { useDominio } from "@/i18n/useDominio.js";
-import { evaluarRiesgos } from "../../domain/riesgos.js";
 
 const SEVERIDAD_TOKEN = { critico: "coral", atencion: "amber", informativo: "accent" };
 
@@ -79,12 +78,12 @@ export default function MuroPlanta() {
       </header>
 
       {/*
-        Dos paneles, uno por máquina. NO un grid que sugiera que se puede
-        comparar celda a celda: cada uno es una tarjeta cerrada, con su
-        nombre, y nada cruza de una a otra.
+        Un panel por máquina. NO un grid que sugiera que se puede comparar
+        celda a celda: cada uno es una tarjeta cerrada, con su nombre, y nada
+        cruza de una a otra.
       */}
+      {maquinas.length === 0 && <VeredictoVacio t={t} texto={traducir("maintenance:wall.empty")} />}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <PanelTanque nombreSistema={nombreSistema} t={t} traducir={traducir} />
         {maquinas.map((entrada) => (
           <PanelConfigurada
             key={entrada.maquina.id}
@@ -99,7 +98,7 @@ export default function MuroPlanta() {
   );
 }
 
-/** La pastilla de frescura, IGUAL en los dos paneles — es el mismo criterio de `LatidoMuro`, por máquina. */
+/** La pastilla de frescura, IGUAL en todos los paneles — es el mismo criterio de `LatidoMuro`, por máquina. */
 function Frescura({ receivedAt, t, traducir }) {
   const ahora = useAhora();
   const frescura = frescuraDe({ receivedAt, ahora });
@@ -125,46 +124,6 @@ function Frescura({ receivedAt, t, traducir }) {
       <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
       {texto}
     </span>
-  );
-}
-
-function PanelTanque({ nombreSistema, t, traducir }) {
-  const { riesgo: traducirRiesgo } = useProsa();
-  const { sistema, lastUpdated } = useSistemaAgua();
-
-  const { activos } = useMemo(() => evaluarRiesgos(sistema), [sistema]);
-  const peor = activos[0] ?? null; // ya vienen ordenados por severidad (riesgos.js)
-
-  // Cuántas de las nueve alarmas del PLC están activas ahora — el mismo
-  // conteo que ya usa `AlarmasEva.jsx` «En vivo», no uno recalculado aquí.
-  const alarmasActivas = useMemo(
-    () => (sistema?.activos ?? []).reduce((n, a) => n + (a.alarmas?.activas ?? 0), 0),
-    [sistema]
-  );
-
-  return (
-    <Panel
-      titulo={nombreSistema("tanque")}
-      t={t}
-      frescura={<Frescura receivedAt={lastUpdated} t={t} traducir={traducir} />}
-    >
-      {peor ? (
-        <Veredicto
-          t={t}
-          token={SEVERIDAD_TOKEN[peor.severidad] ?? "accent"}
-          texto={traducirRiesgo(peor).titulo}
-        />
-      ) : (
-        <VeredictoVacio t={t} texto={traducir("maintenance:wall.noRisk")} />
-      )}
-
-      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: t.textSoft }}>
-        <Bell size={13} />
-        {alarmasActivas > 0
-          ? traducir("maintenance:wall.alarmsActive", { count: alarmasActivas })
-          : traducir("maintenance:wall.alarmsNone")}
-      </div>
-    </Panel>
   );
 }
 

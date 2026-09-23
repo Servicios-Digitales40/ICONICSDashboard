@@ -20,7 +20,8 @@
  *
  * ── POR QUÉ HACE FALTA, SI YA HAY UN INDICADOR EN CONTROLES ────────
  *
- * `ControlesTanque` ya sabe encender y apagar la bomba, pero su confirmación
+ * `ControlesTanque` (la vista de Controles del tanque, borrada en el Plan 42.5
+ * F4) sabía encender y apagar la bomba, pero su confirmación
  * («Bomba encendida») desaparece con el resultado de la acción — no dice
  * nada de si, media hora después, sigue encendida o alguien la apagó desde
  * otro lado. Sin un estado permanente, la única forma de saberlo era mirar

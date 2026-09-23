@@ -319,14 +319,11 @@ export default function BandejaEva({ onNavigate }) {
 
     /* Una máquina configurada viaja como `?maquina=`: es lo que lee
        `MaquinaProvider` en las rutas que no son de ninguna (Plan 38 F2). El
-       tanque es lo único que no lo es (Plan 40 F2). */
-    const deMaquina = h.sistema === "tanque" ? null : { maquina: h.sistema };
-    if (h.origen === "riesgo") {
-      if (deMaquina) onNavigate?.("maq-riesgos", deMaquina);
-      else onNavigate?.("eva-riesgos");
-    } else {
-      onNavigate?.("cierre-diagnostico", { sistema: h.sistema, riesgoId: h.referencia.riesgoId, ...(deMaquina ?? {}) });
-    }
+       tanque dejó de tener pantalla propia en el Plan 42.5 F4 y entrará por
+       configuración (Plan 43), así que ya no hay un caso aparte. */
+    const deMaquina = { maquina: h.sistema };
+    if (h.origen === "riesgo") onNavigate?.("maq-riesgos", deMaquina);
+    else onNavigate?.("cierre-diagnostico", { sistema: h.sistema, riesgoId: h.referencia.riesgoId, ...deMaquina });
   };
 
   return (

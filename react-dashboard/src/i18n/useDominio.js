@@ -38,7 +38,6 @@ import { useTranslation } from "react-i18next";
 
 import { estadoInfo } from "@shared/eva/tanque/estado.js";
 import { senalInfo } from "@shared/eva/tanque/senales.js";
-import { activoInfo } from "@shared/eva/tanque/activos.js";
 import { resumenDeSistemas } from "@shared/eva/comun/sistemas.js";
 import { useMaquinasConfiguradas } from "@/Demo-EVA/data/comunes/MaquinasConfiguradas.jsx";
 import { CANALES, MEDIDAS, VARIADOR, VIGILANCIAS } from "@shared/eva/vibraciones/vibraciones.js";
@@ -89,15 +88,6 @@ export function useDominio() {
     [t]
   );
 
-  /** El nombre de un activo (Tanque, Bombeo, Distribución, Eléctrico). */
-  const activo = useCallback(
-    (id, variante = "label") => {
-      const info = activoInfo(id);
-      if (!info) return id;
-      return t(`machines:assets.${id}.${variante}`, { defaultValue: info[variante] ?? info.label });
-    },
-    [t]
-  );
 
   /**
    * El nombre de una MÁQUINA: «Sistema de agua industrial», «Vibration
@@ -223,7 +213,7 @@ export function useDominio() {
   );
 
   return {
-    estado, senal, activo, sistema, sistemas,
+    estado, senal, sistema, sistemas,
     canal, medida, lectura, vigilancia, estadoVigilancia, zonaIso,
   };
 }

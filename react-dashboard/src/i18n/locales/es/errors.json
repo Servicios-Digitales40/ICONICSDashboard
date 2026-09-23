@@ -1,19 +1,15 @@
 {
   "titles": {
     "bridgeDown": "El puente no contesta",
-    "pumpCommandFailed": "No se pudo accionar la bomba",
     "caseCloseFailed": "No se pudo cerrar el caso",
     "catalogQueryFailed": "No se pudo consultar el catálogo",
-    "alarmHistoryFailed": "No se pudo leer el historial de alarmas",
     "moduleReadFailed": "No se pudo leer el módulo",
     "logbookReadFailed": "No se pudo leer la bitácora",
-    "plantReadFailed": "No se pudo leer la instalación",
     "uploadFailed": "No se pudo subir",
     "sectionRenderFailed": "No se pudo mostrar esta sección",
     "sectionRenderFailedNamed": "No se pudo mostrar «{{seccion}}»",
     "assetReadFailed": "Error al leer el asset",
     "treeLoadFailed": "No se pudo cargar el árbol",
-    "noServerConnection": "Sin conexión con el servidor por ahora",
     "noModuleConnection": "Sin conexión con el módulo por ahora"
   },
   "codes": {
@@ -66,7 +62,6 @@
     "ERROR_REPORTE_NO_ENCONTRADO": "El reporte ya no está: puede haberse purgado por antigüedad."
   },
   "hints": {
-    "staleBelow": "{{detalle}}. Lo que se ve abajo puede estar desactualizado.",
     "restOfBoardWorks": "El resto del tablero sigue funcionando. Cambia de vista y vuelve para reintentar."
   },
   "actions": {

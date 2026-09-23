@@ -4,17 +4,20 @@ La aplicación, sobre árboles **reales** del servidor ICONICS. Nació sobre uno
 —`ac:TDCON/DEMO/SENSORES/`, la estación de llenado— y hoy sirve **dos máquinas**
 en secciones separadas del sidebar, con una tercera prevista:
 
-> ### ⚠ Rama `Vibraciones1.0`: la estación de llenado está cerrada
+> ### ⚠ La estación de llenado ya no tiene vistas propias
 >
-> Desde el 17-09-2026, **`views/tanque/` y `data/tanque/` no se tocan**. Sus
-> cinco vistas siguen registradas en `routes.jsx` pero sin `nav`, así que la
-> sección entera desaparece del sidebar —`buildNav` la deriva de las rutas que
-> traen `nav`—.
+> Cerrada el 17-09-2026 (rama `Vibraciones1.0`: sus vistas sin `nav`) y
+> **borrada el 23-09-2026** (Plan 42.5 F4, por decisión del usuario):
+> `views/tanque/` no existe, ni `AlarmasEva`, ni los modelos 3D del tanque. El
+> tanque volverá como máquina CONFIGURADA con las vistas genéricas de
+> `maquina/` (Plan 43). Lo que sigue en el árbol y **no se toca**: su dominio
+> (`shared/eva/tanque/`) y su fuente en vivo (`data/tanque/`, `EvaProvider`,
+> `evaSource`, `hooks.js`), que consumen siete piezas comunes.
 >
 > Lo que conviene saber antes de tocar algo de `comunes/`: varias de esas
-> vistas evaluaban LAS DOS máquinas y ahora están acotadas a vibraciones
-> (`BandejaEva`, `AvisosEva`, `CasosRag`, `TurnoEva`, `CuadernoEva`, y la
-> pestaña «En vivo» de `AlarmasEva`). Cada una lleva su bloque «para reabrir».
+> vistas evaluaban LAS DOS máquinas y ahora están acotadas a las configuradas
+> (`BandejaEva`, `AvisosEva`, `CasosRag`, `TurnoEva`, `CuadernoEva`). Cada una
+> lleva su bloque «para reabrir».
 >
 > **El sondeo del tanque se corta en el chrome, no en las vistas.** Arranca por
 > conteo de referencias desde `subscribeSistema` (`data/comunes/evaSource.js`),
@@ -26,7 +29,7 @@ en secciones separadas del sidebar, con una tercera prevista:
 
 | Sección | Máquina | Árbol | Vistas |
 |---|---|---|---|
-| Estación de llenado | Tanque y grupo de bombeo (`PLC_1`) | `ac:TDCON/DEMO/SENSORES/` | 5 |
+| Estación de llenado | Tanque y grupo de bombeo (`PLC_1`) | `ac:TDCON/DEMO/SENSORES/` | 0 (borradas en el Plan 42.5 F4; vuelve como configurada en el Plan 43) |
 | Una por máquina configurada (Plan 40) | Hoy: motor WEG + SIPLUS CMS (`PLC_2`), tipo `vibraciones` | Los que diga su configuración (`ac:TDCON/DEMO_VIBRACIONES/Vibraciones/` y `ae:`) | 7 |
 | General | — | — | 4 |
 
@@ -147,13 +150,13 @@ lib/        derivaciones y formato, sin React salvo donde se indique
   modelo.js   las derivaciones de la vista de Planta
 
 components/ los tiles 2D, con la forma de «Planta · v2»
-three-d/    los modelos, su contrato de comportamiento y el layout
-views/      las vistas: tanque/ (las que quedan de la escrita a mano),
-            vibraciones/ (las del tipo, para la máquina configurada que se
-            tiene delante) y maquina/ (Planta y Detalle GENÉRICAS, para
-            cualquier configurada, dirigidas por su `sistema` y su tipo;
-            Plan 42.5). La Planta y el Detalle del tanque se retiraron en el
-            Plan 42.5 F4: el tanque los tendrá al entrar por configuración.
+three-d/    los modelos del tipo vibraciones y su contrato de comportamiento
+            (los del tanque y su layout se borraron en el Plan 42.5 F4)
+views/      las vistas: vibraciones/ (las del tipo, para la máquina
+            configurada que se tiene delante), maquina/ (Planta y Detalle
+            GENÉRICAS, para cualquier configurada, dirigidas por su `sistema`
+            y su tipo; Plan 42.5) y comunes/. Las del tanque se borraron en
+            el Plan 42.5 F4: las tendrá al entrar por configuración (Plan 43).
 ```
 
 Las pruebas viven en [`src/test/demo-eva/`](../test/demo-eva/), espejando este

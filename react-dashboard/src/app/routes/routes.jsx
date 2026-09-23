@@ -38,7 +38,7 @@
  * Aquí ya no. El encabezado, el subtítulo y la etiqueta del sidebar viven en
  * `i18n/locales/<idioma>/navigation.json`, indexados por ESTE `id`:
  *
- *   "eva-inicio": { "title": …, "nav": …, "sub": … }
+ *   "eva-muro": { "title": …, "nav": …, "sub": … }
  *
  * Así que añadir una ruta son dos ediciones y no una: la entrada aquí y su
  * bloque en los dos idiomas. Se eligió así en vez de dejar el español aquí
@@ -85,10 +85,10 @@
  */
 import { lazy } from "react";
 import {
-  Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
+  Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
   LayoutDashboard, MessageSquareText, NotebookPen, TrendingUp, Waves,
-  /* `Power` se va con la estación de llenado (rama `Vibraciones1.0`): lo usaba
-     `eva-controles`, y `vib-controles` sigue sin `nav`. Vuelve al reabrir.
+  /* `Power` se fue con `eva-controles`, la vista de Controles del tanque,
+     borrada en el Plan 42.5 F4 (el tanque volverá como configurada, Plan 43).
 
      `ShieldAlert` se va con «Riesgos» (Plan 33 F10): esa vista salió del menú
      al unificarse con «Hallazgos». Vuelve si se restaura su `nav`. */
@@ -104,7 +104,8 @@ import {
  * caía en una pantalla fuera del menú. Las máquinas de vibraciones son ahora
  * configuradas y cada una tiene su sección; ninguna es «la» de entrada.
  *
- * Para reabrir la estación de llenado, esto puede volver a `eva-inicio`.
+ * El tanque ya no tiene Inicio propio (Plan 42.5 F4): cuando entre como
+ * máquina configurada (Plan 43) tendrá su sección `maq-*` como las demás.
  */
 export const DEFAULT_ROUTE = "eva-muro";
 
@@ -207,51 +208,17 @@ export const NAV_GROUPS = {
  */
 export const ROUTES = [
   /*
-   * ── LA ESTACIÓN DE LLENADO ESTÁ CERRADA POR MANTENIMIENTO ──────────
+   * ── LA ESTACIÓN DE LLENADO YA NO TIENE VISTAS PROPIAS ──────────────
    *
-   * Rama `Vibraciones1.0`, 17-09-2026. Las cinco vistas del tanque pierden su
-   * `nav` y por tanto su sección entera del sidebar: `buildNav` deriva las
-   * secciones de las rutas que traen `nav`, así que «Estación de llenado»
-   * desaparece sola sin una lista paralela que mantener.
-   *
-   * ── POR QUÉ SIN `nav` Y NO BORRADAS ────────────────────────────────
-   *
-   * Es el patrón que este registro ya usa dos veces —`vib-controles` y
-   * `eva-muro`—: la ruta sigue existiendo y sigue navegable escribiendo su id,
-   * pero no se ofrece. Borrarlas obligaría a reescribirlas para volver, y lo
-   * que se quiere es justo lo contrario: que volver cueste una línea.
-   *
-   * El código del tanque NO se toca en esta rama. Se consulta cuando hace
-   * falta —es el módulo maduro y el espejo del que copiar— y no se modifica.
-   *
-   * **Para reabrir**: devolver el `nav` a estas cinco (los iconos siguen
-   * importados a propósito, ver el bloque de `lucide-react`), poner
-   * `DEFAULT_ROUTE` en `eva-inicio` y volver a montar `EvaProvider` sin acotar
-   * en `App.jsx`. Ver `docs/completados/PLAN-32-VIBRACIONES.md` F1.
+   * Rama `Vibraciones1.0` (17-09-2026): sus cinco vistas perdieron el `nav` y
+   * quedaron registradas sin menú («cerrado no es borrado»). Plan 42.5
+   * (22/23-09-2026): se BORRARON. Primero Planta y Detalle (F4, sustituidas
+   * por `maq-planta` y `maq-detalle`), y el 23-09 Inicio, Riesgos, Controles
+   * y la Maqueta 3D, por decisión del usuario: el tanque vuelve como máquina
+   * CONFIGURADA con las vistas genéricas `maq-*` (Plan 43), no reabriendo
+   * éstas. Su dominio sigue en `shared/eva/tanque/`, y su fuente en vivo
+   * (`EvaProvider`) también, hasta ese plan.
    */
-  {
-    id: "eva-inicio",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/InicioTanque.jsx")),
-  },
-
-  {
-    // Va justo detrás de «Planta» a propósito: contesta la pregunta siguiente.
-    // «Planta» dice qué está pasando; ésta, qué puede pasar si sigue así.
-    id: "eva-riesgos",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/RiesgosTanque.jsx")),
-  },
-
-  {
-    // Detrás de las dos de diagnóstico, pero ANTES de las 3D: es una acción
-    // operativa de primer nivel (encender/apagar la bomba), no un diagnóstico.
-    id: "eva-controles",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/ControlesTanque.jsx")),
-  },
-
-  {
-    id: "eva-maqueta",
-    component: lazy(() => import("@/Demo-EVA/views/tanque/MaquetaTanque3D.jsx")),
-  },
 
   /*
    * ── EL SEGUNDO SISTEMA ──────────────────────────────────────────
@@ -267,27 +234,15 @@ export const ROUTES = [
 
 
 
-  {
-    // Reactivada el 10-09-2026 (Plan 27): dos pestañas, no una. «Historial»
-    // sigue siendo lo de siempre —`GET /api/iconics/alarms`, eventos de
-    // GENESIS64, nunca un semáforo—; «En vivo» es nueva, las ocho señales
-    // `naturaleza: "alarma"` del PLC, que no tienen nada que ver con esa
-    // fuente. Ver la cabecera de `AlarmasEva.jsx`.
-    //
-    // ── ESTUVO OCULTA DEL SIDEBAR (2026-08-31 a 2026-09-10) ─────────────
-    //
-    // El botón de campana del Topbar sondeaba el conteo de eventos cada 30s
-    // en TODAS las pantallas, no sólo en ésta, así que ocultar sólo la
-    // entrada del menú no bastaba para cortar las peticiones — se quitaron
-    // los dos. El botón del Topbar SIGUE comentado a propósito: no se
-    // reactiva sólo porque la página vuelve al menú, sigue sondeando la
-    // fuente equivocada (el historial, no las ocho señales en vivo) y con el
-    // mismo coste. Si se quiere un contador ahí, que cuente
-    // `activo.alarmas.activas` del sistema en vivo, no `useAlarmCount()`.
-    id: "eva-alarmas",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/AlarmasEva.jsx")),
-    nav: { icon: <Bell size={17} />, group: "sec-planta", apartado: "visualizacion" },
-  },
+  /*
+   * ── ALARMAS: SIN VISTA (Plan 42.5 F4, 23-09-2026) ───────────────────
+   *
+   * `eva-alarmas` era del tanque por dentro —sus banderas del PLC en «En
+   * vivo» y el historial de SUS alarmas— y se borró con las demás vistas del
+   * tanque. Una máquina configurada no tiene vista de alarmas todavía: el
+   * Plan 41 F4 lo cerró SIN vista porque el Alarm Server da 500 y sus
+   * banderas nunca alarmaron. Cuando la haya, será genérica (`maq-*`).
+   */
   {
     /*
      * ── POR QUÉ ES UNA VISTA NORMAL, NO «SÓLO MURO» ────────────────────

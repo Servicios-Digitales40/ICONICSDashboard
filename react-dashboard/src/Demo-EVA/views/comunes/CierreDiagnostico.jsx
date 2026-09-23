@@ -455,7 +455,9 @@ export default function CierreDiagnostico({ params, onNavigate }) {
    * pantalla destino tal y como lo pinta el sidebar, en vez de un «Riesgos»
    * escrito aquí que puede dejar de coincidir.
    */
-  const rutaRiesgos = sistemaId === "tanque" ? "eva-riesgos" : "maq-riesgos";
+  /* El tanque perdió su pantalla de Riesgos en el Plan 42.5 F4; entrará por
+     configuración (Plan 43) y usará la genérica como las demás. */
+  const rutaRiesgos = "maq-riesgos";
   const nombreRiesgos = traducir(`navigation:routes.${rutaRiesgos}.nav`);
 
   // Sólo se suscribe a la máquina que corresponde: un caso de vibraciones no

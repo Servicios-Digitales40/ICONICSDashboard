@@ -28,10 +28,6 @@
   "language": {
     "label": "Idioma"
   },
-  "period": {
-    "days_one": "{{count}} día",
-    "days_other": "{{count}} días"
-  },
   "time": {
     "live": "En vivo",
     "connecting": "Conectando…",

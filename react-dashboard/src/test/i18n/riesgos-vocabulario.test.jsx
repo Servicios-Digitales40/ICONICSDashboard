@@ -2,65 +2,45 @@
 /**
  * riesgos-vocabulario.test.jsx
  * ------------------------------------------------------------------
- * Que las DOS tarjetas de riesgo digan lo mismo con las mismas palabras, y
- * que el énfasis de un párrafo sobreviva a la traducción.
+ * Que la tarjeta de riesgo saque su vocabulario del diccionario, y que el
+ * énfasis de un párrafo sobreviva a la traducción.
  *
- * ── POR QUÉ ESTA PRUEBA, HABIENDO YA `riesgos-mismo-layout` ────────
+ * ── POR QUÉ ESTA PRUEBA ─────────────────────────────────────────────
  *
- * Porque aquélla monta las dos PANTALLAS con el transporte falso, y con una
- * instalación sana ninguna de las dos tiene riesgos activos: la rejilla de
- * tarjetas sale vacía y `TarjetaRiesgo` no llega a pintarse nunca. Todo lo
- * que vive dentro de la tarjeta —la etiqueta de severidad, los tres rótulos,
- * los dos botones— estaba sin cubrir, y es justo la mitad que ahora sale de
- * `diagnostics`. Dicho de otro modo: ese código sólo se ejecutaba de verdad
- * el día que hay un problema en planta.
+ * Porque todo lo que vive dentro de la tarjeta —la etiqueta de severidad, los
+ * tres rótulos, los dos botones— sólo se pinta el día que hay un problema en
+ * planta: con el transporte falso la instalación está sana y ninguna pantalla
+ * llega a montarla. Un rótulo sin clave, o una clave sin traducción, no lo
+ * cazaría nadie hasta ese día.
  *
- * No es una precaución teórica. Al traducir `AlarmasEva.jsx` escribí una
- * llamada a `activo(...)` sin cablear su hook: las 589 pruebas siguieron en
- * verde porque ninguna pinta esa vista, y sólo lo destapó abrirla a mano.
+ * No es una precaución teórica. Al traducir la vista de Alarmas del tanque
+ * escribí una llamada a `activo(...)` sin cablear su hook: las 589 pruebas
+ * siguieron en verde porque ninguna pintaba esa vista, y sólo lo destapó
+ * abrirla a mano.
  *
  * ── LO QUE FIJA, Y POR QUÉ ASÍ ─────────────────────────────────────
  *
- * Que las dos tarjetas resuelven la MISMA clave. Los rótulos eran idénticos
- * palabra por palabra en los dos archivos desde antes de existir i18n —dos
- * copias de «Puede romper algo» que nadie iba a editar a la vez—, y el
- * arreglo fue una sola clave en `diagnostics:severity` con dos tablas de
- * color, una por pantalla. La comparación se hace ENTRE las dos tarjetas y no
- * contra un texto escrito aquí, así que la prueba sigue valiendo el día que
- * alguien reescriba la traducción — que es lo que la hace útil y no un
- * duplicado más del diccionario.
+ * Que la tarjeta resuelve las claves de `diagnostics`, comparando contra el
+ * diccionario y no contra un texto escrito aquí: escribir «Puede romper algo»
+ * convertiría esta prueba en otra copia del texto, que es justo lo que las
+ * claves compartidas vinieron a evitar. Hasta el 23-09-2026 comparaba ADEMÁS
+ * las dos tarjetas —la del tanque y la de vibración— entre sí; la del tanque
+ * se borró en el Plan 42.5 F4, y una máquina configurada pinta siempre la
+ * misma tarjeta, así que compartir vocabulario ya no es algo que probar sino
+ * la construcción.
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import i18n, { Enfasis } from "@/i18n";
 import { ThemeProvider, useTheme } from "@/theme";
-import { DataSourceProvider } from "@/lib/datasource";
-import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
 import { TarjetaRiesgo as TarjetaVibracion } from "@/Demo-EVA/components/riesgoVibracion.jsx";
-import RiesgosTanque, { TarjetaRiesgo as TarjetaTanque } from "@/Demo-EVA/views/tanque/RiesgosTanque.jsx";
-
-beforeEach(() => {
-  vi.stubEnv("VITE_ICONICS_FAKE", "true");
-  vi.stubEnv("VITE_ICONICS_CHAOS", "none");
-});
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllEnvs();
-  delete globalThis.fetch;
 });
 
-/* La forma mínima que cada tarjeta necesita. El dato da igual: se miran las palabras. */
-const RIESGO_TANQUE = {
-  id: "prueba-tanque",
-  severidad: "critico",
-  titulo: "Riesgo de prueba",
-  evidencia: "Nivel 12 %",
-  consecuencia: "La bomba puede cavitar",
-  accion: "Revisar la aspiración",
-};
-
+/* La forma mínima que la tarjeta necesita. El dato da igual: se miran las palabras. */
 const RIESGO_VIBRACION = {
   id: "prueba-vibracion",
   nivel: "critico",
@@ -90,58 +70,26 @@ const pintar = (fn) =>
     </ThemeProvider>
   );
 
-describe("las dos tarjetas de riesgo comparten vocabulario", () => {
-  it("la severidad, los tres campos y los botones se escriben IGUAL en las dos", () => {
+describe("la tarjeta de riesgo saca su vocabulario del diccionario", () => {
+  it("la severidad, los tres campos y los botones resuelven su clave de `diagnostics`", () => {
     const vib = pintar((t) => <TarjetaVibracion riesgo={RIESGO_VIBRACION} t={t} />);
-    const textoVibracion = vib.container.textContent;
-    cleanup();
+    const texto = vib.container.textContent;
 
-    const tanque = pintar((t) => <TarjetaTanque riesgo={RIESGO_TANQUE} t={t} />);
-    const textoTanque = tanque.container.textContent;
-
-    /*
-     * No se comprueba QUÉ dice cada rótulo —eso es el diccionario— sino que
-     * las dos digan lo mismo. Escribir aquí «Puede romper algo» convertiría
-     * esta prueba en una tercera copia del texto, que es el problema que se
-     * estaba arreglando.
-     */
     for (const clave of ["severity.critico", "field.measured", "field.mayHappen",
       "field.toCheck", "action.ask", "action.closeCase"]) {
-      const esperado = traducirDirecto(clave);
-      expect(textoVibracion, `vibración: ${clave}`).toContain(esperado);
-      expect(textoTanque, `tanque: ${clave}`).toContain(esperado);
+      expect(texto, clave).toContain(traducirDirecto(clave));
     }
   });
 
-  it("ninguna tarjeta deja una clave sin resolver", () => {
+  it("no deja una clave sin resolver", () => {
     const vib = pintar((t) => <TarjetaVibracion riesgo={RIESGO_VIBRACION} t={t} />);
     expect(vib.container.textContent).not.toMatch(/diagnostics[:.]/);
-    cleanup();
-
-    const tanque = pintar((t) => <TarjetaTanque riesgo={RIESGO_TANQUE} t={t} />);
-    expect(tanque.container.textContent).not.toMatch(/diagnostics[:.]/);
   });
 
   it("la norma se cita por su clave, no concatenada a mano", () => {
     const vib = pintar((t) => <TarjetaVibracion riesgo={RIESGO_VIBRACION} t={t} />);
     /* El código de norma es un identificador: se interpola, no se traduce. */
     expect(vib.container.textContent).toContain("ISO 10816-3");
-  });
-
-  it("la pantalla entera se pinta con todas sus claves resueltas", async () => {
-    render(
-      <ThemeProvider>
-        <DataSourceProvider>
-          <EvaProvider>
-            <RiesgosTanque />
-          </EvaProvider>
-        </DataSourceProvider>
-      </ThemeProvider>
-    );
-
-    await screen.findByText(/Situaciones detectadas/);
-    expect(document.body.textContent).not.toMatch(/diagnostics[:.][a-z]/i);
-    expect(document.body.textContent).not.toMatch(/common[:.]period/i);
   });
 });
 
@@ -184,6 +132,6 @@ describe("Enfasis", () => {
  *
  * No usa `useTranslation` porque esto no es un componente: va directo contra
  * la instancia que `test/setup.js` ya inicializó y fijó en español, que es la
- * misma que usan las dos tarjetas. Así la prueba no repite ningún texto.
+ * misma que usa la tarjeta. Así la prueba no repite ningún texto.
  */
 const traducirDirecto = (clave) => i18n.t(`diagnostics:${clave}`);

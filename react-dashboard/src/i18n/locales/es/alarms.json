@@ -1,30 +1,8 @@
 {
   "sub": "El historial de eventos de la instalación, y el estado en vivo de las alarmas del PLC",
-  "tabs": {
-    "historial": "Historial"
-  },
-  "windows": {
-    "h1": "Última hora",
-    "h6": "6 horas",
-    "h24": "24 horas",
-    "h48": "48 horas"
-  },
   "empty": "Sin eventos en esta ventana.",
-  "emptyForAsset": "Sin eventos en esta ventana para {{activo}}.",
-  "allAssets": "Todos los activos",
   "loading": "Consultando el historial de alarmas…",
-  "vivo": {
-    "sub": "El estado ahora mismo de las alarmas del PLC, agrupadas por activo — a diferencia del Historial, esto sí es un semáforo en vivo.",
-    "loading": "Leyendo el estado de la instalación…",
-    "sinAlarmas": "Sin alarmas activas",
-    "activas_one": "{{count}} alarma activa",
-    "activas_other": "{{count}} alarmas activas"
-  },
-  "unreadBadge": "{{count}} sin leer",
   "history": {
-    "pointLabel": "Alarma",
-    "derivedNote": "Estos eventos se derivan de la serie del historiador (cuándo el bit pasó a 1 y volvió a 0). No son eventos del Alarm Server, así que no traen mensaje, severidad ni acuse.",
-    "fromBefore": "venía de antes",
     "stillActive": "sigue activa"
   }
 }

@@ -38,7 +38,8 @@ const RAIZ_INSTALACION = RAIZ;
  * reabrirlo es descomentar esto y su `useSistemaAgua()`.
  *
  * Mismo criterio y mismos tres estados que ya usa la tarjeta de Planta en el
- * Inicio (`InicioTanque.jsx`, `VISTAS[0].dato`) — un fuera de límite pesa más
+ * Inicio del tanque (`InicioTanque.jsx`, borrado en el Plan 42.5 F4) — un
+ * fuera de límite pesa más
  * que varios en aviso, y sin lectura no hay punto que pintar. Vive aquí y no
  * como import compartido porque son cuatro líneas y las dos vistas ya evalúan
  * `sistema.resumen` de formas ligeramente distintas (aquí no hace falta el

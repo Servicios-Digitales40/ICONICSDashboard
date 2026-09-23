@@ -144,16 +144,14 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     expect(screen.queryByText(/Encendida|Apagada/i)).toBeNull();
   });
 
-  it("en las pantallas generales tampoco: Alarmas y Assets son de las dos", async () => {
+  it("en las pantallas generales tampoco: Avisos y Assets son de todas", async () => {
     // Un indicador de «la máquina» junto al título de una pantalla que habla
     // de las dos elegiría una sin decirlo.
     //
-    // El título por `role`, no `findByText`: desde que la página tiene dos
-    // pestañas (Plan 27), su subtítulo también dice «alarmas» en minúscula
-    // («…el estado en vivo de las alarmas del PLC»), y un texto suelto ya no
-    // basta para distinguir el `<h1>` del resto.
-    montar("eva-alarmas");
-    await screen.findByRole("heading", { name: /Alarmas/i });
+    // El título por `role`, no `findByText`: el subtítulo repite la palabra y
+    // un texto suelto no basta para distinguir el `<h1>` del resto.
+    montar("eva-avisos");
+    await screen.findByRole("heading", { name: /Avisos/i });
     expect(screen.queryByText(/Encendida|Apagada/i)).toBeNull();
   });
 
@@ -202,7 +200,7 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
      * del registro en F4.)
      */
     expect(SECCION_DE_PAGINA["eva-bandeja"]).toBe("sec-planta");
-    expect(SECCION_DE_PAGINA["eva-alarmas"]).toBe("sec-planta");
+    expect(SECCION_DE_PAGINA["eva-avisos"]).toBe("sec-planta");
     expect(SECCION_DE_PAGINA["maq-detalle"]).toBeNull();
   });
 });

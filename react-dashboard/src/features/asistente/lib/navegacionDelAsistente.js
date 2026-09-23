@@ -67,22 +67,23 @@ export function destinoDeHerramienta(nombre, argumentos) {
        * cabecera para por qué no se finge más precisión de la que hay.
        */
       if (!sistema) return null;
-      /* El tanque tiene su pantalla escrita a mano; cualquier otra máquina es
-         una configurada y va a la ruta genérica CON su id (Plan 40 F2). */
-      return sistema === "tanque"
-        ? { ruta: "eva-riesgos" }
-        : { ruta: "maq-riesgos", params: { maquina: sistema } };
+      /* Toda máquina va a la ruta genérica CON su id (Plan 40 F2). El tanque
+         perdió sus pantallas en el Plan 42.5 F4 y, hasta que entre por
+         configuración (Plan 43), no hay adónde llevarlo: `null`, no una ruta
+         que no existe. */
+      if (sistema === "tanque") return null;
+      return { ruta: "maq-riesgos", params: { maquina: sistema } };
 
     case "estado_del_sistema":
       if (!sistema) return null;
-      return sistema === "tanque"
-        ? { ruta: "eva-inicio" }
-        : { ruta: "maq-inicio", params: { maquina: sistema } };
+      if (sistema === "tanque") return null; // mismo motivo que arriba
+      return { ruta: "maq-inicio", params: { maquina: sistema } };
 
     case "controlar_bomba":
-      // No lleva `sistema` en sus argumentos —sólo hay una bomba controlable
-      // hoy—, así que el destino es fijo: la única pantalla de control real.
-      return { ruta: "eva-controles" };
+      // No lleva `sistema`: la única bomba controlable es la del tanque, y su
+      // pantalla de Controles se borró en el Plan 42.5 F4. Sin pantalla no hay
+      // destino; la herramienta sigue accionando igual desde el chat.
+      return null;
 
     default:
       return null;

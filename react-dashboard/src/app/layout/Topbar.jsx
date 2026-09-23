@@ -205,8 +205,8 @@ export function Topbar({ page, onAbrirMenu, muro = false }) {
         </div> */}
 
         {/* Contador de eventos, OCULTO (2026-08-31, sigue así el 10-09-2026):
-            la vista de Alarmas VOLVIÓ al sidebar (Plan 27, `routes.jsx`,
-            entrada `eva-alarmas`), pero este botón no vuelve con ella. Sigue
+            la vista de Alarmas del tanque volvió al sidebar (Plan 27) y
+            se borró con el tanque en el Plan 42.5 F4; este botón no vuelve. Sigue
             sondeando `/api/iconics/alarms` cada 30s en TODAS las pantallas
             —no sólo estando en Alarmas—, y sigue contando el HISTORIAL de
             GENESIS64, que ahora es sólo media página: la pestaña nueva («En

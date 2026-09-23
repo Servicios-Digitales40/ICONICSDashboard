@@ -1,37 +1,11 @@
 {
   "sections": {
-    "sec-llenado": "Estación de llenado",
     "sec-planta": "Planta",
     "sec-general": "General",
     "sec-prediccion": "Predicción",
     "sec-rag": "RAG"
   },
   "routes": {
-    "eva-inicio": {
-      "title": "Inicio",
-      "nav": "Inicio",
-      "sub": "Sistema de agua industrial · datos en vivo de ac:TDCON/DEMO/SENSORES/"
-    },
-    "eva-riesgos": {
-      "title": "Riesgos",
-      "nav": "Riesgos",
-      "sub": "Qué puede pasar según cómo está la instalación ahora · límites estimados por nosotros"
-    },
-    "eva-controles": {
-      "title": "Controles",
-      "nav": "Controles",
-      "sub": "Encendido y apagado directo de la bomba de la instalación"
-    },
-    "eva-maqueta": {
-      "title": "Vista 3D",
-      "nav": "Vista 3D",
-      "sub": "La instalación en miniatura · el nivel del tanque es el dato en vivo"
-    },
-    "eva-alarmas": {
-      "title": "Alarmas",
-      "nav": "Alarmas",
-      "sub": "El historial de eventos, y el estado en vivo de las alarmas del PLC"
-    },
     "eva-assets": {
       "title": "Assets",
       "nav": "Assets",

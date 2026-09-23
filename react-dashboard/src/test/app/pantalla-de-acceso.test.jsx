@@ -49,7 +49,7 @@ afterEach(() => {
 
 describe("sin sesión válida, se ve la pantalla de acceso", () => {
   it("con AUTH_HABILITADA y sin token guardado, bloquea con el formulario", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: true }),
     });
@@ -62,7 +62,7 @@ describe("sin sesión válida, se ve la pantalla de acceso", () => {
   });
 
   it("con AUTH_HABILITADA=false, NO se ve la pantalla — no hace falta sesión", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: false }),
     });
@@ -75,7 +75,7 @@ describe("sin sesión válida, se ve la pantalla de acceso", () => {
 
   it("con sesión válida ya guardada, se pasa directo al tablero", async () => {
     guardarSesion({ token: "el-token", expiraEnMinutos: 700, usuario: { id: "ana", roles: ["operador"] } });
-    irA("/eva-inicio");
+    irA("/eva-muro");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "ana", roles: ["operador"], autenticado: true }, habilitada: true }),
     });
@@ -89,7 +89,7 @@ describe("sin sesión válida, se ve la pantalla de acceso", () => {
 
 describe("entrar con usuario y clave", () => {
   it("un login correcto quita la pantalla y muestra el tablero", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: true }),
       "/api/auth/login": json({
@@ -109,7 +109,7 @@ describe("entrar con usuario y clave", () => {
   });
 
   it("un login rechazado deja la pantalla puesta, con el error", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: true }),
       "/api/auth/login": json({ ok: false, error: "Usuario o contraseña incorrectos.", codigo: "ERROR_CREDENCIALES" }, 401),
@@ -133,7 +133,7 @@ describe("modo muro: un fallo de renovación avisa, NUNCA bloquea", () => {
      * rellenar un formulario. `bloqueando` tiene que ser `false` en muro
      * pase lo que pase con la sesión.
      */
-    irA("/eva-inicio?muro=1");
+    irA("/eva-muro?muro=1");
     backend({
       "/api/auth/yo": json({ ok: true, usuario: { id: "anonimo", roles: ["operador"], autenticado: false }, habilitada: true }),
     });

@@ -161,12 +161,10 @@
   },
   "wall": {
     "title": "Plant wall",
-    "subtitle": "Both machines at once: their worst risk, their active alarms, and whether data keeps arriving.",
+    "subtitle": "Every configured machine at once: its worst risk, and whether data keeps arriving.",
     "noRisk": "No active risks",
     "zone": "Zone {{zona}}",
-    "alarmsActive_one": "{{count}} active alarm",
-    "alarmsActive_other": "{{count}} active alarms",
-    "alarmsNone": "No active alarms",
-    "alarmsNotApplicable": "This machine has no alarms declared in the PLC"
+    "alarmsNotApplicable": "This machine has no alarms declared in the PLC",
+    "empty": "No configured machine in service. Configure one from the ICONICS tree and it will show up here."
   }
 }

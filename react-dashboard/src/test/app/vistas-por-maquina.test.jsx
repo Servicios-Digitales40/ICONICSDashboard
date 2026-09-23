@@ -65,7 +65,7 @@ describe("las vistas que pertenecen a una máquina", () => {
     }
     /* Y ninguna de las de planta entera se cuela en la máquina: dirían que los
        hallazgos de TODAS son de ésta. */
-    for (const id of ["eva-alarmas", "eva-bandeja", "eva-avisos", "rag-casos", "rag-documentacion"]) {
+    for (const id of ["eva-bandeja", "eva-avisos", "rag-casos", "rag-documentacion"]) {
       expect(suyas, `«${id}» es de planta, no de la máquina`).not.toContain(id);
       expect(planta.children.map((c) => c.id), `«${id}» debería colgar de Planta`).toContain(id);
     }

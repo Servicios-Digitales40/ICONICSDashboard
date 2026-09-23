@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F3 completadas · F4 y F5 hechas en su parte segura (el resto espera la decisión del usuario: las otras vistas del tanque, Predicción y `plc_opcua.py`), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F4 completadas (F4 cerrada el 23-09-2026 con la decisión del usuario: fuera todas las vistas del tanque) · F5 hecha salvo dos decisiones pendientes (Predicción y `plc_opcua.py`), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -948,12 +948,71 @@ importa `fuenteDeMaquina` entra en él, ~9 KB, y eso es lo que sustituye a las
 3450 líneas borradas). `DetalleMaquina` diferido 35,0 KB (antes compartía
 trozo con `DetalleActivo`), `PlantaMaquina` 11,5, `charts` 326,4 igual.
 
-**Lo que queda de F4 es la decisión del usuario, sin tocar**: `InicioTanque`,
-`RiesgosTanque`, `ControlesTanque`, `MaquetaTanque3D`, `AlarmasEva` (en el
-menú), `MuroPlanta`, los 11 modelos 3D sólo del tanque y sus pruebas. Se
-borran si el tanque entrará por configuración con vistas genéricas (Plan
-43); si no, quedan cerradas. Las 24 pruebas omitidas dependen todas de la
-fuente en vivo (b) y llevan «para reabrir»; ninguna era de Planta/Detalle.
+**F4, el resto, hecha (23-09-2026, mañana).** El usuario decidió: «F4 es
+correcto, se borrarán porque el tanque tiene que funcionar como máquina
+configurable», sin configurarlo en esta rama. Lo que de verdad pasó:
+
+**Borrado**: `views/tanque/` entero (`InicioTanque`, `RiesgosTanque`,
+`ControlesTanque`, `MaquetaTanque3D`), `views/comunes/AlarmasEva.jsx` (con su
+ruta `eva-alarmas` y su entrada del menú: era del tanque por dentro), los 11
+archivos 3D sólo del tanque (`Armario`, `Bomba`, `Columna`, `Valvula`,
+`Deposito`, `Bastidor`, `Tuberias`, `ActivoEnMaqueta`, `MaquetaHero`,
+`FichaActivo`, `lib/layout.js`), la puerta `domain/activos.js` (se quedó sin
+consumidor) y las rutas `eva-inicio`, `eva-riesgos`, `eva-controles`,
+`eva-maqueta` con sus textos y la sección `sec-llenado` en los dos idiomas.
+Seis pruebas se fueron con lo que probaban (`alarmas-eva`,
+`alarmas-eva-vivo` —4 omitidas—, `controles`, `inicio-simulada`,
+`riesgos-mismo-layout`, `riesgos-pronostico-diferido`); otras 22 se
+ajustaron, y `llenado-cerrado` y `muro-planta` se reescribieron. Con el
+sustituto ya escrito, además, lo que era estrictamente sustitución: nada más.
+El resto de la decisión —Inicio, Riesgos, Controles y 3D genéricos para el
+tanque— es el Plan 43, y el conocimiento que necesita está arriba.
+
+**El inventario de F0 se equivocaba en `MuroPlanta`**: decía «el muro del
+tanque; sin ruta desde el cierre», y es la pantalla de ENTRADA (`eva-muro`,
+`DEFAULT_ROUTE` desde el Plan 40 F2) con un panel por máquina configurada
+más un panel fijo del tanque. No se borra la vista: se borra el panel del
+tanque (`useSistemaAgua` + `evaluarRiesgos` + su conteo de alarmas del PLC)
+y el muro dice algo cuando no hay ninguna configurada en servicio, en vez de
+quedarse en blanco. Cuando el tanque entre por configuración tendrá su panel
+como cualquier otra, sin rama aparte. La prueba se reescribió con DOS
+configuradas para que `NO_COMPARTEN` siga teniendo dos máquinas que no
+cruzar.
+
+**Lo que el código común perdió del tanque**: las ramas
+`sistema === "tanque"` que llevaban a `eva-riesgos`/`eva-inicio` en
+`AvisosEva`, `BandejaEva`, `CierreDiagnostico` y en la navegación del
+asistente (`riesgos_activos`, `estado_del_sistema`, `controlar_bomba`
+devuelven `null` para el tanque: no hay pantalla, y una ruta que no existe
+sería peor); el `activo()` de `useDominio` (sus únicos consumidores eran la
+ficha 3D y Alarmas); el botón de alarmas que `App` pasaba al Topbar hacia una
+ruta que ya no existe. El registro (`sistemas.js`) le deja al tanque sólo
+`eva-assets` en `rutas`, para el vocabulario del dictado. **Lo que NO se
+tocó**, como manda §1: `shared/eva/tanque/`, la fuente en vivo
+(`EvaProvider`, `evaSource`, `hooks.js`, `simulador.js`, `transportes.js`)
+y las puertas con consumidor (`senales`, `riesgos`, `sistema`, `estado`).
+
+**i18n**: la séptima comprobación de `verificar-i18n` cazó las **113 claves**
+que las vistas borradas dejaron sin consumidor —`dashboard:home.*` (el
+héroe y el «cómo funciona» del Inicio), `diagnostics:forecast.*` y
+`trend.*` (el pronóstico de Riesgos), `alarms` casi entero,
+`machines:controls.*`, `model3d.*`, `assets.*`, `maintenance:wall.alarms*`—
+y se borraron con el mismo guion: 1348 → **1220** claves con paridad. Es la
+primera vez que la comprobación trabaja de verdad: sin ella habrían quedado
+en el diccionario como quedaron las 67 de F5.
+
+**Un verificador que se quedó sin objeto**: `verificar-frescura` vigilaba que
+los tres sitios del tanque pasaran por `presentarValor`; hoy dice «0 archivos
+formatean señales» y sigue en verde. Su heurística no reconoce los tiles
+genéricos (`tilesMaquina.jsx`), que sí pasan por la puerta —lo afirma
+`planta-maquina.test`—. Queda anotado en `BACKLOG-FRONTEND` como F-nuevo:
+enseñarle la forma de los tiles genéricos antes de que alguien escriba uno
+que no la use.
+
+**Cifras**: 74 archivos y 6.500 líneas menos en el frontend. **Puerta:**
+frontend **1117** verdes · 20 omitidas (eran 1162 · 24: las 4 omitidas de
+`alarmas-eva-vivo` se fueron con la vista); lint, types, los 41 verificadores,
+la puerta §5.1 (190 + 22 omitidas, 71) y el build en verde; `index` 325,0 KB.
 
 **Conocimiento que se conserva antes de borrar.** Las cabeceras de
 `DetalleActivo` (las tres versiones del layout), `PlantaTanque` (rejilla de

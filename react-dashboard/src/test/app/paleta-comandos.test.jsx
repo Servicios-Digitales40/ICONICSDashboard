@@ -36,7 +36,7 @@ afterEach(cleanup);
 const montar = (onNavigate = () => {}) =>
   render(
     <ThemeProvider>
-      <PaletaComandos onNavigate={onNavigate} paginaActual="eva-inicio" />
+      <PaletaComandos onNavigate={onNavigate} paginaActual="eva-muro" />
     </ThemeProvider>
   );
 

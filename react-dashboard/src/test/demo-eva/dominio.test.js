@@ -33,7 +33,7 @@ import {
   parsePointName,
   pointName,
 } from "@/Demo-EVA/domain/senales.js";
-import { ACTIVOS, ACTIVO_IDS } from "@/Demo-EVA/domain/activos.js";
+import { ACTIVOS, ACTIVO_IDS } from "@shared/eva/tanque/activos.js";
 import { ESTADOS, ESTADOS_ORDEN, enReposo, estadoDeSenal, peor } from "@/Demo-EVA/domain/estado.js";
 import { UMBRALES, bandaDe, margenConsumido } from "@/Demo-EVA/domain/umbrales.js";
 import { SISTEMA_VACIO, createSistema, toBooleano } from "@/Demo-EVA/domain/sistema.js";

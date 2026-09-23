@@ -33,7 +33,7 @@ const montar = (props = {}) =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <Sidebar page="eva-inicio" onNavigate={() => {}} {...props} />
+          <Sidebar page="eva-muro" onNavigate={() => {}} {...props} />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>

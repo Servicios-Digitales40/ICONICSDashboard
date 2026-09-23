@@ -221,7 +221,7 @@ describe("descartar es una preferencia de esta persona, NO una acción sobre pla
     /*
      * La vista de Riesgos de una configurada es genérica (`maq-riesgos`) y lee
      * la máquina de `?maquina=`: sin el parámetro no hablaría de ninguna. El
-     * tanque es lo único que conserva pantalla propia (`eva-riesgos`).
+     * tanque ya no tiene pantalla propia (Plan 42.5 F4).
      */
     enCalma();
     conRiesgos([{ id: "desalineacion", titulo: "Desalineación", severidad: "critico", evidencia: "E" }]);

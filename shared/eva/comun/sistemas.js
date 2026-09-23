@@ -260,13 +260,11 @@ export const SISTEMAS = [
      * exclusivas del tanque, pero mientras la otra máquina no las reclame,
      * darles su vocabulario transcribe mejor que dejarlas sin ninguno.
      */
-    /* `eva-planta` y `eva-detalle` se retiraron en el Plan 42.5 F4: las
-       sustituyen `maq-planta` y `maq-detalle`, que el tanque tendrá al entrar
-       por configuración (Plan 43). */
-    rutas: [
-      "eva-inicio", "eva-riesgos", "eva-controles", "eva-maqueta",
-      "eva-alarmas", "eva-assets",
-    ],
+    /* Todas las vistas propias del tanque se borraron en el Plan 42.5 F4 (el
+       tanque volverá como máquina configurada con las genéricas `maq-*`,
+       Plan 43). Queda `eva-assets` porque, mientras ninguna otra máquina la
+       reclame, darle este vocabulario transcribe mejor que dejarla sin él. */
+    rutas: ["eva-assets"],
     herramientas: [
       "estado_del_sistema",
       "historia_de_senal",

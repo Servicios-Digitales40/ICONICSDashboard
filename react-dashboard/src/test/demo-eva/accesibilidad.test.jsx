@@ -33,7 +33,6 @@ import { DataSourceProvider } from "@/lib/datasource";
 import { auditarAccesibilidad } from "../a11y.js";
 
 import { EvaProvider } from "@/Demo-EVA/data/comunes/EvaProvider.jsx";
-import InicioTanque from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
 import AssetsEva from "@/Demo-EVA/views/comunes/AssetsEva.jsx";
 import PlantaMaquina from "@/Demo-EVA/views/maquina/PlantaMaquina.jsx";
 import DetalleMaquina from "@/Demo-EVA/views/maquina/DetalleMaquina.jsx";
@@ -116,13 +115,7 @@ function montarComoLaApp(vista) {
   );
 }
 
-describe("las cuatro vistas sin aria- de la auditoría, contra axe-core", () => {
-  it("InicioTanque no tiene violaciones graves", async () => {
-    montarComoLaApp(<InicioTanque onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
-    await auditarAccesibilidad();
-  });
-
+describe("las vistas sin aria- de la auditoría, contra axe-core", () => {
   /*
    * Mismo timeout explícito, y por el mismo motivo que el de abajo — aunque
    * aquí sea UNA sola pasada de axe-core.
@@ -199,8 +192,16 @@ describe("el color de banda no es su único portador (Plan 13, F6)", () => {
 
 describe("landmarks: el juego completo, no sólo el que faltaba", () => {
   it("main + header + nav aparecen exactamente una vez cada uno", async () => {
-    montarComoLaApp(<InicioTanque onNavigate={() => {}} />);
-    await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(0));
+    /*
+     * La vista de dentro es la del explorador de Assets porque no aporta
+     * ningún landmark propio; lo que se cuenta es el cromo. La Planta genérica
+     * no sirve aquí: sus tarjetas de riesgo llevan un `<header>` de sección
+     * dentro de cada `<article>` —que NO es un banner, pero este conteo por
+     * etiqueta no distingue—. Hasta el Plan 42.5 F4 se montaba `InicioTanque`.
+     */
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ ok: true, payload: [] }) }));
+    montarComoLaApp(<AssetsEva />);
+    await waitFor(() => expect(screen.getByText(/Assets/)).toBeTruthy());
 
     expect(document.querySelectorAll("main").length).toBe(1);
     expect(document.querySelectorAll("header").length).toBe(1);

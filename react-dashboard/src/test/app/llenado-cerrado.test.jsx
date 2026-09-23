@@ -1,28 +1,33 @@
 // @vitest-environment jsdom
 /**
- * llenado-cerrado.test.jsx — rama `Vibraciones1.0`, F1.
+ * llenado-cerrado.test.jsx — rama `Vibraciones1.0` F1, reescrita en el
+ * Plan 42.5 F4 (23-09-2026).
  *
  * ── QUÉ DEFIENDE ESTA PRUEBA ────────────────────────────────────────
  *
- * Que la estación de llenado está cerrada DE VERDAD, y no sólo escondida del
- * menú. Son tres cosas distintas y sólo la primera es obvia:
+ * Que la estación de llenado no está en el tablero, y que el chrome no paga
+ * su dato. Son tres cosas distintas:
  *
- *  1. **No sale en el sidebar.** Ninguna de sus cinco vistas trae `nav`, así
- *     que su sección entera desaparece —`buildNav` deriva las secciones de las
- *     rutas que la traen—.
+ *  1. **No tiene vistas propias.** Sus cinco rutas (`eva-inicio`,
+ *     `eva-riesgos`, `eva-controles`, `eva-maqueta`, y `eva-alarmas`, que era
+ *     suya por dentro) SALIERON del registro el 23-09-2026 por decisión del
+ *     usuario: el tanque volverá como máquina CONFIGURADA con las vistas
+ *     genéricas `maq-*` (Plan 43). Hasta el 22-09 esta prueba afirmaba lo
+ *     contrario —«cerrado no es borrado», las rutas seguían sin `nav`— porque
+ *     la rama sólo las escondía; la decisión cambió y la prueba con ella. Si
+ *     alguien las devuelve escritas a mano, esto falla: el camino de vuelta
+ *     es la configuración, no reescribir las vistas.
  *  2. **No se pide su dato.** Ésta es la que importa y la que casi se escapa:
- *     ocultar las rutas NO calla la red. El motor de sondeo arranca por
- *     conteo de referencias desde `subscribeSistema` (`evaSource.js`), y el
- *     sidebar —montado en TODAS las pantallas— llamaba a `useSistemaAgua()`
- *     para pintar un punto de estado. Con eso, abrir cualquier vista de
- *     vibraciones seguía leyendo los 52 puntos del tanque cada 3 s.
- *
- *     Es el mismo defecto por el que se retiró el contador de alarmas del
- *     Topbar el 31-08-2026, y la razón de que esta prueba mire las
- *     SUSCRIPCIONES y no el menú.
- *  3. **Las rutas siguen existiendo.** Cerrado no es borrado: se llega
- *     escribiendo el id, y reabrir cuesta devolver un `nav`. Si alguien borra
- *     las vistas, esto falla.
+ *     ocultar o borrar las rutas NO calla la red. El motor de sondeo arranca
+ *     por conteo de referencias desde `subscribeSistema` (`evaSource.js`), y
+ *     el sidebar —montado en TODAS las pantallas— llamaba a `useSistemaAgua()`
+ *     para pintar un punto de estado. Con eso, abrir cualquier vista seguía
+ *     leyendo los 52 puntos del tanque cada 3 s. Es el mismo defecto por el
+ *     que se retiró el contador de alarmas del Topbar el 31-08-2026, y la
+ *     razón de que esta prueba mire las SUSCRIPCIONES y no el menú. La fuente
+ *     en vivo (`EvaProvider`) sigue montada hasta el Plan 43.
+ *  3. **El arranque no cae en una pantalla del tanque.** Es el muro de
+ *     planta, en «Planta».
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -30,9 +35,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ROUTES, DEFAULT_ROUTE } from "@/app/routes/routes.jsx";
 import { NAV, PAGES } from "@/app/routes/index.js";
 
-/** Las cinco vistas de la estación de llenado, más su destino de detalle. */
-/* `eva-planta` salió del registro en el Plan 42.5 F4: la sustituye `maq-planta`. */
-const DEL_TANQUE = ["eva-inicio", "eva-riesgos", "eva-controles", "eva-maqueta"];
+/** Las vistas que la estación de llenado tuvo, y ya no tiene. */
+const DEL_TANQUE = ["eva-inicio", "eva-planta", "eva-detalle", "eva-riesgos", "eva-controles", "eva-maqueta", "eva-alarmas"];
 
 afterEach(() => {
   cleanup();
@@ -40,31 +44,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("la estación de llenado no se ofrece", () => {
-  it("ninguna de sus vistas trae `nav`", () => {
+describe("la estación de llenado no tiene vistas propias", () => {
+  it("ninguna de sus rutas sigue en el registro", () => {
     for (const id of DEL_TANQUE) {
-      const ruta = ROUTES.find((r) => r.id === id);
-      expect(ruta, `"${id}" desapareció del registro`).toBeTruthy();
-      expect(ruta.nav, `"${id}" sigue ofreciéndose en el sidebar`).toBeUndefined();
+      expect(ROUTES.some((r) => r.id === id), `"${id}" volvió al registro: el tanque entra por configuración (Plan 43), no con vistas escritas a mano`).toBe(false);
+      expect(PAGES[id], `"${id}" tiene componente`).toBeUndefined();
     }
   });
 
-  it("su sección desaparece del sidebar, sin lista paralela que mantener", () => {
-    // `buildNav` deriva las secciones de las rutas con `nav`: quitar el `nav`
-    // de las cinco basta para que «Estación de llenado» no exista.
+  it("su sección no existe en el sidebar, sin lista paralela que mantener", () => {
+    // `buildNav` deriva las secciones de las rutas con `nav`: sin rutas del
+    // tanque, «Estación de llenado» no existe.
     expect(NAV.map((n) => n.group ?? n.id)).not.toContain("sec-llenado");
   });
 
-  it("el arranque NO cae en una pantalla cerrada", () => {
+  it("el arranque es el muro de planta, no una pantalla del tanque", () => {
     /*
-     * Era `eva-inicio`, la landing del tanque. Con la máquina cerrada eso
-     * dejaba el arranque en una vista fuera del menú: navegable pero huérfana,
-     * y sondeando una máquina que nadie iba a mirar.
-     *
-     * Fue `vib-inicio` hasta el Plan 40 F2 (21-09-2026): la máquina de
-     * vibraciones escrita a mano salió del registro de rutas, y las de
-     * vibraciones son ahora configuradas, cada una en su sección. Ninguna es
-     * «la» de entrada, así que el arranque es el muro de planta, en «Planta».
+     * Era `eva-inicio`, la landing del tanque; fue `vib-inicio` hasta el Plan
+     * 40 F2 (21-09-2026). Las máquinas son configuradas, cada una en su
+     * sección, y ninguna es «la» de entrada: el arranque es el muro.
      */
     expect(DEFAULT_ROUTE).toBe("eva-muro");
     expect(DEL_TANQUE).not.toContain(DEFAULT_ROUTE);
@@ -73,25 +71,14 @@ describe("la estación de llenado no se ofrece", () => {
   });
 });
 
-describe("cerrado NO es borrado", () => {
-  it("las cinco rutas siguen existiendo y con su componente", () => {
-    // Reabrir tiene que costar devolver un `nav`, no reescribir las vistas.
-    for (const id of DEL_TANQUE) {
-      expect(ROUTES.some((r) => r.id === id), `"${id}" se borró`).toBe(true);
-      expect(PAGES[id], `"${id}" se quedó sin componente`).toBeTruthy();
-    }
-  });
-});
-
 describe("el chrome ya no pide el dato del tanque", () => {
   it("montar el Sidebar no abre ninguna suscripción al sistema del tanque", async () => {
     /*
-     * La comprobación central de esta fase. Se mira la SUSCRIPCIÓN y no un
-     * `fetch`, porque es donde está el mecanismo: `subscribeSistema` es lo que
-     * llama a `motor.start()`, y sin suscriptores el motor no arranca aunque
+     * La comprobación central. Se mira la SUSCRIPCIÓN y no un `fetch`, porque
+     * es donde está el mecanismo: `subscribeSistema` es lo que llama a
+     * `motor.start()`, y sin suscriptores el motor no arranca aunque
      * `EvaProvider` siga montado. Es lo que permite dejar el proveedor en su
-     * sitio —lo necesita quien abra una vista del tanque a mano— y aun así no
-     * pagar su sondeo en las pantallas de vibraciones.
+     * sitio hasta el Plan 43 y aun así no pagar su sondeo en ninguna pantalla.
      */
     const subscribeSistema = vi.fn(() => () => {});
 

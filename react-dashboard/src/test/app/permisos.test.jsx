@@ -71,7 +71,6 @@ describe("el menú se acota al rol", () => {
     expect(menuDe(ROL.VISUALIZADOR).sort()).toEqual([
       /* Planta: lo que se mira, no lo que se decide. `eva-muro` es la entrada
          desde el Plan 40 F2 y por eso SÍ está: es la pantalla de arranque. */
-      "eva-alarmas",
       "eva-assets",
       "eva-muro",
       /* La máquina configurada: su apartado de Visualización, nada más. */
@@ -108,8 +107,6 @@ describe("el menú se acota al rol", () => {
     expect(menu).not.toContain("rag-documentacion");
     expect(menu).not.toContain("maq-casos");
     expect(menu).not.toContain("maq-rag");
-    /* Y lo que acciona la instalación: cerrada con el tanque, sin `nav`. */
-    expect(menu).not.toContain("eva-controles");
   });
 
   it("un operador ve todo lo del visualizador, y además lo suyo", () => {

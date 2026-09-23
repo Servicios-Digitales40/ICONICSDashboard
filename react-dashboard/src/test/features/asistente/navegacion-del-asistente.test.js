@@ -39,14 +39,14 @@ describe("diagnosticar_falla y cerrar_diagnostico van al cierre de diagnóstico"
  * tenía rutas propias (`vib-inicio`, `eva-riesgos-vibracion`). Ya no: toda
  * máquina que no sea el tanque es una CONFIGURADA, y su destino es la ruta
  * genérica de máquina con su id en `params.maquina`. El id de aquí es uno
- * cualquiera; lo que se prueba es que viaja tal cual y que el tanque sigue
- * yendo a sus pantallas propias.
+ * cualquiera; lo que se prueba es que viaja tal cual y que el tanque, sin
+ * pantallas propias desde el Plan 42.5 F4, no manda a ninguna parte.
  */
 const MAQUINA = "vib-motor-03";
 
 describe("riesgos_activos va a la vista de riesgos DE ESE SISTEMA, sin riesgoId", () => {
-  it("tanque va a eva-riesgos", () => {
-    expect(destinoDeHerramienta("riesgos_activos", { sistema: "tanque" })).toEqual({ ruta: "eva-riesgos" });
+  it("el tanque no tiene destino: sus pantallas se borraron en el Plan 42.5 F4 y entrará por configuración", () => {
+    expect(destinoDeHerramienta("riesgos_activos", { sistema: "tanque" })).toBeNull();
   });
 
   it("una máquina configurada va a maq-riesgos CON su id — las dos máquinas NO comparten destino", () => {
@@ -62,8 +62,8 @@ describe("riesgos_activos va a la vista de riesgos DE ESE SISTEMA, sin riesgoId"
      * mencionó el modelo después vive en el RESULTADO de la herramienta, que
      * no viaja por este canal. Aquí sólo hay `sistema`.
      */
-    const d = destinoDeHerramienta("riesgos_activos", { sistema: "tanque" });
-    expect(d.params).toBeUndefined();
+    const d = destinoDeHerramienta("riesgos_activos", { sistema: MAQUINA });
+    expect(d.params.riesgoId).toBeUndefined();
     /* Y en una configurada, `params` lleva SÓLO la máquina. */
     expect(destinoDeHerramienta("riesgos_activos", { sistema: MAQUINA }).params).toEqual({ maquina: MAQUINA });
   });
@@ -74,11 +74,11 @@ describe("riesgos_activos va a la vista de riesgos DE ESE SISTEMA, sin riesgoId"
 });
 
 describe("estado_del_sistema va al Inicio de esa máquina", () => {
-  it("tanque va a eva-inicio", () => {
-    expect(destinoDeHerramienta("estado_del_sistema", { sistema: "tanque" })).toEqual({ ruta: "eva-inicio" });
+  it("el tanque no tiene destino (Plan 42.5 F4)", () => {
+    expect(destinoDeHerramienta("estado_del_sistema", { sistema: "tanque" })).toBeNull();
   });
 
-  it("una máquina configurada va a maq-inicio con su id, NO a eva-inicio", () => {
+  it("una máquina configurada va a maq-inicio con su id", () => {
     // Las dos máquinas no pueden compartir Inicio: mezclaría instalaciones.
     expect(destinoDeHerramienta("estado_del_sistema", { sistema: MAQUINA })).toEqual({
       ruta: "maq-inicio",
@@ -87,10 +87,10 @@ describe("estado_del_sistema va al Inicio de esa máquina", () => {
   });
 });
 
-describe("controlar_bomba tiene destino fijo: no lleva `sistema`", () => {
-  it("siempre va a eva-controles, sin importar `encender`", () => {
-    expect(destinoDeHerramienta("controlar_bomba", { encender: true })).toEqual({ ruta: "eva-controles" });
-    expect(destinoDeHerramienta("controlar_bomba", { encender: false })).toEqual({ ruta: "eva-controles" });
+describe("controlar_bomba no lleva `sistema`, y hoy no tiene pantalla", () => {
+  it("no hay destino, sin importar `encender`: la única pantalla de control era del tanque (borrada en el Plan 42.5 F4)", () => {
+    expect(destinoDeHerramienta("controlar_bomba", { encender: true })).toBeNull();
+    expect(destinoDeHerramienta("controlar_bomba", { encender: false })).toBeNull();
   });
 });
 

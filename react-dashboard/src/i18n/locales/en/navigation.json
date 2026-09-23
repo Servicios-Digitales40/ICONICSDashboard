@@ -1,37 +1,11 @@
 {
   "sections": {
-    "sec-llenado": "Filling Station",
     "sec-planta": "Plant",
     "sec-general": "General",
     "sec-prediccion": "Prediction",
     "sec-rag": "RAG"
   },
   "routes": {
-    "eva-inicio": {
-      "title": "Overview",
-      "nav": "Overview",
-      "sub": "Industrial water system · live data from ac:TDCON/DEMO/SENSORES/"
-    },
-    "eva-riesgos": {
-      "title": "Risks",
-      "nav": "Risks",
-      "sub": "What may happen given the current plant condition · limits estimated in-house"
-    },
-    "eva-controles": {
-      "title": "Controls",
-      "nav": "Controls",
-      "sub": "Direct start and stop of the plant pump"
-    },
-    "eva-maqueta": {
-      "title": "3D View",
-      "nav": "3D View",
-      "sub": "The plant in miniature · tank level is the live value"
-    },
-    "eva-alarmas": {
-      "title": "Alarms",
-      "nav": "Alarms",
-      "sub": "The event history, and the live state of the PLC alarms"
-    },
     "eva-assets": {
       "title": "Assets",
       "nav": "Assets",

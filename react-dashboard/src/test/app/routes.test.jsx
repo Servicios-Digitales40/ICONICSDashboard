@@ -60,18 +60,13 @@ describe("superficie de la aplicación", () => {
     // (`eva-planta` y `eva-detalle` salieron en el Plan 42.5 F4: las
     // sustituyen `maq-planta` y `maq-detalle`.)
     expect(ids).toEqual([
-      // Estación de llenado — el tanque y su grupo de bombeo.
-      "eva-inicio",
-      "eva-riesgos",
-      "eva-controles",
-      "eva-maqueta",
+      // La estación de llenado ya no tiene vistas propias (Plan 42.5 F4).
       // Planta — lo que no es de una máquina concreta. Las cinco rutas de la
       // máquina de vibraciones escrita a mano iban aquí hasta el Plan 40 F2;
       // ver el bloque de arriba.
       //
       // `salud-sistema` es la más «del servidor» de todas: no habla de ninguna
       // instalación, habla del PUENTE (Plan 20 F10).
-      "eva-alarmas",
       "eva-muro",
       // Las de una máquina CONFIGURADA (Plan 37 F1): genéricas, sin `nav`
       // propio. Cada máquina configurada en servicio las reclama en su propia
@@ -311,7 +306,7 @@ describe("el sidebar que sale del registro", () => {
      */
     const planta = NAV.find((n) => n.group === "sec-planta");
     expect(planta.children.map((c) => c.id)).toEqual([
-      "eva-alarmas", "eva-muro",
+      "eva-muro",
       "eva-bandeja", "eva-avisos",
       "rag-casos", "rag-documentacion",
     ]);
@@ -346,12 +341,7 @@ describe("el sidebar que sale del registro", () => {
     // Assets y Configuración son del SERVIDOR, no de una máquina: si alguna
     // acabara dentro de un sistema, estaría diciendo que es sólo de ése.
     //
-    // `eva-alarmas` volvió al sidebar el 10-09-2026 (Plan 27): dos
-    // pestañas, Historial (lo de siempre) y En vivo (las alarmas del PLC).
-    // Estuvo oculta del 2026-08-31 al 2026-09-10 para cortar el sondeo de
-    // `/api/iconics/alarms` que el botón del Topbar hacía en toda la
-    // aplicación — ese botón sigue sin volver, sólo la entrada del menú. Hoy
-    // cuelga de «Planta», no de «General».
+    // `eva-alarmas` (las alarmas del tanque) se borró en el Plan 42.5 F4.
     const general = NAV.find((n) => n.group === "sec-general");
     expect(general.children.map((c) => c.id)).toEqual([
       "eva-assets", "eva-configuracion", "eva-turno",

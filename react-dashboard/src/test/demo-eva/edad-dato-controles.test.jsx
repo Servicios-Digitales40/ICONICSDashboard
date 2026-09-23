@@ -1,38 +1,25 @@
 /**
  * edad-dato-controles.test.jsx
  * ------------------------------------------------------------------
- * Plan 24, F0 (`USO-01`): los tres sitios que enseñaban el valor de una señal
- * SIN decir si era de ahora, y que ahora pasan por `presentarValor()` —
- * `ControlesTanque`, `FichaActivo` y las tarjetas de `InicioTanque`.
+ * Plan 24, F0 (`USO-01`): el CONTRATO de `presentarValor()`, la puerta por la
+ * que pasa todo valor de señal antes de pintarse para decir si es de ahora.
  *
- * Hermano de `edad-dato.test.jsx`, que cubre los que ya lo hacían desde el
- * Plan 13 F2 (`BandaSenales`, `DetalleGrid`, `RejillaActivos`). Mismo criterio
- * en lo que importa: señales construidas con el `createSenal` REAL para que su
- * forma no pueda desincronizarse del contrato, y un `ahora` inyectado en vez de
- * esperar a un reloj.
+ * Nació para los tres sitios que enseñaban el valor SIN decirlo —
+ * `ControlesTanque`, `FichaActivo` y las tarjetas de `InicioTanque`—, los
+ * tres borrados en el Plan 42.5 F4 con el resto de las vistas del tanque. El
+ * contrato sigue vivo: lo usan los tiles genéricos de la Planta de una
+ * máquina configurada (`components/maquina/tilesMaquina.jsx`) y la tarjeta
+ * del Detalle, y `scripts/verificar-frescura.mjs` vigila la forma sintáctica
+ * —que ninguna vista se salte la puerta— sin necesitar jsdom.
  *
- * ── POR QUÉ ESTE HERMANO NO NECESITA jsdom, Y AQUÉL SÍ ──────────────
+ * Hermano de `edad-dato.test.jsx`, que monta componentes porque comprueba el
+ * CABLEADO: que la cifra de la pantalla se sustituya de verdad. Aquí no hay
+ * DOM: señales construidas con el `createSenal` REAL, para que su forma no
+ * pueda desincronizarse del contrato, y un `ahora` inyectado.
  *
- * Porque prueban dos cosas distintas. `edad-dato.test.jsx` monta componentes
- * porque lo que comprueba es el CABLEADO: que la cifra de la pantalla se
- * sustituya de verdad. Aquí no se puede hacer lo mismo con dos de los tres
- * sitios —`ControlesTanque` y `FichaActivo` no exportan sus piezas internas, y
- * montar la vista entera arrastraría red o un Canvas de three.js— así que lo
- * que se prueba es el CONTRATO que las tres comparten, más la distinción de
- * `REJILLA_VISTAS` de la que depende la tercera.
- *
- * La forma sintáctica —que ninguna de las tres se salte la puerta, ahora o en
- * seis meses— la vigila `scripts/verificar-frescura.mjs`, que no necesita jsdom
- * y además cubre los archivos que todavía no existen. Las dos piezas juntas son
- * la cobertura; ninguna sola lo es.
- *
- * ── POR QUÉ `ControlesTanque` ES EL QUE MÁS IMPORTA DE LOS TRES ─────
- *
- * Porque es el único donde la cifra vieja tiene un accionamiento de bomba al
- * lado. La cabecera de esa vista ya dice que el nivel que se ve ahí es el MISMO
- * dato que la guarda de «nivel de tanque alto» del backend está mirando en el
- * momento de encender: con la lectura congelada, el operador y esa guarda
- * deciden sobre dos números distintos.
+ * Lo que fijaba el tercer sitio —que sólo una MEDIDA adjunta su señal y una
+ * CUENTA no caduca con el reloj— quedó escrito en el plan (`PLAN-42.5`, F4,
+ * «Conocimiento conservado») para la Planta genérica.
  */
 import { describe, expect, it } from "vitest";
 
@@ -86,54 +73,5 @@ describe("USO-01: los tres sitios nuevos y el contrato que comparten", () => {
     // caídos.
     const { frescura } = presentarValor({ receivedAt: null, ahora: AHORA, formateado: "—" });
     expect(frescura).toBe(FRESCURA.SIN_DATO);
-  });
-});
-
-/*
- * El tercer sitio de F0 es el que tenía la trampa: en `InicioTanque`, `VISTAS`
- * es una constante de MÓDULO, así que su `dato()` es una función pura llamada
- * fuera del árbol de React y no puede usar un hook. La frescura se aplica en
- * `TarjetaVista`, y `dato()` sólo adjunta la señal cuando hay una medida que
- * pueda caducar.
- *
- * Eso es lo que se prueba aquí, y es una distinción con consecuencia: de las
- * tres entradas de `VISTAS`, dos devuelven CUENTAS («3 en aviso», «8 de 8 con
- * lectura») y una devuelve una MEDIDA («62,5 %»). Una cuenta sigue siendo
- * cierta con la lectura vieja; una medida, no. Atenuar las tres por igual sería
- * mentir en la otra dirección.
- */
-import { REJILLA_VISTAS } from "@/Demo-EVA/views/tanque/InicioTanque.jsx";
-
-/** Un `sistema` mínimo con la forma que `dato()` lee. */
-const sistemaDe = (senal) => ({
-  resumen: { medidas: 1, totalSenales: 1, fueraDeLimite: 0, enAviso: 0, enBanda: 1 },
-  senales: { nivelTanque: senal },
-});
-
-describe("InicioTanque · VISTAS[].dato: sólo la medida adjunta su señal", () => {
-  it("la entrada de la maqueta (una MEDIDA) adjunta la señal, para que la tarjeta pueda atenuarla", () => {
-    const senal = senalDe(CONGELADA);
-    const entrada = REJILLA_VISTAS.find((v) => v.id === "eva-maqueta");
-    const dato = entrada.dato(sistemaDe(senal));
-
-    expect(dato.senal).toBeTruthy();
-    expect(dato.senal.receivedAt).toEqual(senal.receivedAt);
-  });
-
-  it("las entradas que CUENTAN no adjuntan señal: una cuenta no caduca con el reloj", () => {
-    const sistema = sistemaDe(senalDe(FRESCA));
-
-    /* `eva-planta` salió de la rejilla en el Plan 42.5 F4; queda la que cuenta. */
-    for (const id of ["eva-assets"]) {
-      const dato = REJILLA_VISTAS.find((v) => v.id === id).dato(sistema);
-      expect(dato.senal, `${id} no debe adjuntar señal`).toBeUndefined();
-    }
-  });
-
-  it("sin lectura no hay tarjeta de dato, y eso ya era así antes de F0", () => {
-    const sinDato = createSenal({ key: "nivelTanque", valor: null, receivedAt: null });
-    const entrada = REJILLA_VISTAS.find((v) => v.id === "eva-maqueta");
-
-    expect(entrada.dato(sistemaDe(sinDato))).toBeNull();
   });
 });

@@ -51,21 +51,21 @@ afterEach(() => {
 
 describe("una navegación con ruta VÁLIDA mueve la pantalla", () => {
   it("navegarDesdeAsistente(...) hace que App muestre la pantalla pedida", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     render(<App />);
     await screen.findByRole("heading", { level: 1 });
 
     act(() => {
-      navegarDesdeAsistente("eva-riesgos");
+      navegarDesdeAsistente("eva-avisos");
     });
 
     await waitFor(() => {
-      expect(globalThis.location.pathname).toContain("eva-riesgos");
+      expect(globalThis.location.pathname).toContain("eva-avisos");
     });
   });
 
   it("los params viajan a la URL — el cierre de diagnóstico recibe su riesgoId", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     render(<App />);
     await screen.findByRole("heading", { level: 1 });
 
@@ -81,7 +81,7 @@ describe("una navegación con ruta VÁLIDA mueve la pantalla", () => {
 
 describe("una ruta que NO EXISTE no rompe la aplicación", () => {
   it("un id inventado se ignora: la pantalla se queda donde estaba", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     render(<App />);
     await screen.findByRole("heading", { level: 1 });
 
@@ -91,12 +91,12 @@ describe("una ruta que NO EXISTE no rompe la aplicación", () => {
 
     // Nada revienta, y la URL sigue siendo la de antes.
     await new Promise((r) => setTimeout(r, 0));
-    expect(globalThis.location.pathname).toContain("eva-inicio");
+    expect(globalThis.location.pathname).toContain("eva-muro");
     expect(screen.getByRole("heading", { level: 1 })).toBeTruthy();
   });
 
   it("un evento sin `ruta` (detail vacío) tampoco revienta", async () => {
-    irA("/eva-inicio");
+    irA("/eva-muro");
     render(<App />);
     await screen.findByRole("heading", { level: 1 });
 

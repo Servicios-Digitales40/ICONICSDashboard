@@ -6,7 +6,7 @@
  *
  * ── QUÉ DEFIENDE ───────────────────────────────────────────────────
  *
- *  1. **Que la RUTA mande sobre el parámetro.** En `eva-inicio` la máquina es
+ *  1. **Que la RUTA mande sobre el parámetro.** En `eva-assets` la máquina es
  *     el tanque, y un `?maquina=vib-02` pegado a mano no puede cambiar de qué
  *     habla esa pantalla. Al revés, un parámetro olvidado al navegar haría
  *     que una vista del tanque hablara de otra máquina con cifras reales y
@@ -87,8 +87,10 @@ const montar = (page, params = {}) =>
 
 describe("de qué máquina va una navegación", () => {
   it("la saca de la RUTA cuando la ruta es de una máquina", () => {
-    expect(maquinaDeNavegacion({ page: "eva-inicio", params: {} })).toBe("tanque");
-    expect(maquinaDeNavegacion({ page: "eva-riesgos", params: {} })).toBe("tanque");
+    /* `eva-assets` es la única ruta que el registro sigue atribuyendo al
+       tanque: sus vistas propias se borraron en el Plan 42.5 F4. */
+    expect(maquinaDeNavegacion({ page: "eva-assets", params: {} })).toBe("tanque");
+    expect(maquinaDeNavegacion({ page: "eva-inicio", params: {} })).toBeNull();
   });
 
   it("la sección de vibraciones escrita a mano ya no es de ninguna máquina", () => {
@@ -103,7 +105,7 @@ describe("de qué máquina va una navegación", () => {
    * máquina, con cifras reales y sin un error en ningún log.
    */
   it("la RUTA manda sobre el parámetro, no al revés", () => {
-    expect(maquinaDeNavegacion({ page: "eva-inicio", params: { maquina: "vib-motor-03" } })).toBe("tanque");
+    expect(maquinaDeNavegacion({ page: "eva-assets", params: { maquina: "vib-motor-03" } })).toBe("tanque");
   });
 
   it("usa el parámetro sólo cuando la ruta no es de ninguna máquina", () => {
@@ -132,7 +134,7 @@ describe("el contexto", () => {
   });
 
   it("resuelve la entrada del registro escrito a mano por su ruta", () => {
-    montar("eva-inicio");
+    montar("eva-assets");
 
     expect(screen.getByText("id:tanque")).toBeTruthy();
     expect(screen.getByText("registro:tanque")).toBeTruthy();
@@ -157,7 +159,7 @@ describe("el contexto", () => {
    * decir por qué, no simplemente comportarse como si la máquina no existiera.
    */
   it("una máquina cerrada se distingue de una que no existe", () => {
-    montar("eva-inicio");
+    montar("eva-assets");
 
     expect(screen.getByText("id:tanque")).toBeTruthy();
     expect(screen.getByText("registro:tanque")).toBeTruthy();
