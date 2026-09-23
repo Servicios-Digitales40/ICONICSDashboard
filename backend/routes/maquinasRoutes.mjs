@@ -474,6 +474,11 @@ export function registerMaquinasRoutes(
               : {
                   ...v,
                   historyVerified: sondeada.historyVerified,
+                  /* La causa con la que el sondeo llegó al veredicto (Plan 42.5
+                     D11): es lo que el Detalle enseña junto a una variable sin
+                     gráfica, sin volver a sondear. */
+                  historyCausa: sondeada.sondeo?.causa ?? null,
+                  historyCompartidaCon: sondeada.sondeo?.compartidaCon ?? [],
                   /* Cómo quedó verificada (Plan 42 F1); `null` si no lo está. */
                   historyVerifiedComo: sondeada.historyVerified
                     ? (sondeada.historyVerifiedComo ?? null)

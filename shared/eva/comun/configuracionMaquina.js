@@ -149,6 +149,18 @@ export function crearVariable({
      * mientras no esté verificada. Lo pone el sondeo, nunca el cliente.
      */
     historyVerifiedComo: null,
+    /*
+     * Por qué NO tiene serie verificada, con las palabras del sondeo
+     * (`sin-muestras`, `serie-compartida`, `no-se-pudo-leer`…), o cómo sí la
+     * tiene (`serie-propia`, `registrada-constante`…). Plan 42.5 D11: la causa
+     * se calculaba en cada sondeo y sólo viajaba en la respuesta de la ficha;
+     * al recargar se perdía, y el Detalle de la máquina la necesita para decir
+     * POR QUÉ una variable no tiene gráfica sin obligar a re-sondear. Igual
+     * que `historyVerified`, lo pone el sondeo y no el cliente; una
+     * configuración anterior sin el campo carga igual (`null`).
+     */
+    historyCausa: null,
+    historyCompartidaCon: [],
     assetId: assetId || null,
     rol: rol || null,
     alias: Array.isArray(alias) ? alias.filter(Boolean) : [],

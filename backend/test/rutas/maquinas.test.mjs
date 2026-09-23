@@ -601,6 +601,15 @@ describe('POST /api/maquinas/:id/sondear', () => {
     expect(constantes).toHaveLength(cuerpo.resumen.constantes)
     for (const v of constantes) expect(v.historyVerified).toBe(true)
     expect(maquina.variables.find((v) => v.id === 'vRMS_S1').historyVerifiedComo).toBe('serie-propia')
+    /* Y la CAUSA queda persistida con el veredicto (Plan 42.5 D11): la que el
+       sondeo dio para cada variable, verificada o no, sobrevive a recargar. */
+    expect(maquina.variables.find((v) => v.id === 'vRMS_S1').historyCausa).toBe('serie-propia')
+    for (const c of constantes) expect(c.historyCausa).toBe('registrada-constante')
+    for (const p of cuerpo.pendientes) {
+      const persistida = maquina.variables.find((v) => v.id === p.id)
+      expect(persistida.historyCausa).toBe(p.causa)
+      expect(persistida.historyCompartidaCon).toEqual(p.compartidaCon ?? [])
+    }
     expect(maquina.capacidades).toContain('HISTORICAL_DATA')
     const limitacion = maquina.limitaciones.find((l) => /constantes/.test(l) && /REGISTRADAS/.test(l))
     expect(limitacion).toBeTruthy()
@@ -616,6 +625,7 @@ describe('POST /api/maquinas/:id/sondear', () => {
     let r = json(await app.inject({ method: 'PATCH', url: `/api/maquinas/${ID}`, payload: { variables } }))
     const constantes = r.maquina.variables.filter((v) => v.historyVerifiedComo === 'registrada-constante')
     expect(constantes).toHaveLength(sondeo.resumen.constantes)
+    for (const c of constantes) expect(c.historyCausa).toBe('registrada-constante')
 
     const objetivo = variables.find((v) => v.id === constantes[0].id)
     objetivo.historyPointName = 'hda:\\Configuration\\OTRO_GRUPO\\X:Y'
@@ -623,6 +633,9 @@ describe('POST /api/maquinas/:id/sondear', () => {
     const retirada = r.maquina.variables.find((v) => v.id === objetivo.id)
     expect(retirada.historyVerified).toBe(false)
     expect(retirada.historyVerifiedComo).toBe(null)
+    /* La causa se retira con el cómo: lo sondeado fue OTRA serie. */
+    expect(retirada.historyCausa).toBe(null)
+    expect(retirada.historyCompartidaCon).toEqual([])
   })
 
   it('el cliente NO puede declarar el cómo de la verificación', async () => {
@@ -630,9 +643,11 @@ describe('POST /api/maquinas/:id/sondear', () => {
     payload.variables[0].historyPointName = 'hda:inventado'
     payload.variables[0].historyVerified = true
     payload.variables[0].historyVerifiedComo = 'registrada-constante'
+    payload.variables[0].historyCausa = 'serie-propia'
     const { maquina } = json(await app.inject({ method: 'POST', url: '/api/maquinas', payload }))
     expect(maquina.variables[0].historyVerified).toBe(false)
     expect(maquina.variables[0].historyVerifiedComo).toBe(null)
+    expect(maquina.variables[0].historyCausa).toBe(null)
   })
 })
 

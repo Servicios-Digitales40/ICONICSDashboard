@@ -95,6 +95,11 @@ export function fusionarVariables(anteriores, entrantes) {
       historyVerified: mismaSerie ? Boolean(previa.historyVerified) : false,
       /* Viaja con la verificación: es su explicación (Plan 42 F1). */
       historyVerifiedComo: mismaSerie && previa.historyVerified ? (previa.historyVerifiedComo ?? null) : null,
+      /* La causa del sondeo (Plan 42.5 D11) sigue la misma regla que el cómo:
+         vale mientras la serie sea la misma; cambiar el punto histórico la
+         retira, porque lo sondeado fue OTRA serie. */
+      historyCausa: mismaSerie ? (previa.historyCausa ?? null) : null,
+      historyCompartidaCon: mismaSerie ? (previa.historyCompartidaCon ?? []) : [],
       estado: previa.estado ?? nueva.estado,
     }
   })

@@ -56,6 +56,7 @@ import {
   raicesDe,
 } from '../shared/eva/comun/configuracionMaquina.js'
 import { tipoDe } from '../shared/eva/tipos/index.js'
+import { construirSistema } from '../shared/eva/comun/construirSistema.js'
 import { createGestorMaquinas } from '../backend/ia/indices/maquinas.mjs'
 import { logger } from '../backend/logger.mjs'
 
@@ -201,6 +202,23 @@ console.log(`\n${c.negrita}La promesa de historia${c.reset}`)
  */
 await check('una variable nueva NO promete historia', () => {
   assert.equal(crearVariable({ id: 'v', pointName: 'ac:x' }).historyVerified, false)
+})
+
+await check('la causa del sondeo nace vacía y el cliente no la puede declarar (Plan 42.5 D11)', () => {
+  const v = crearVariable({ id: 'v', pointName: 'ac:x', historyCausa: 'serie-propia', historyCompartidaCon: ['otra'] })
+  assert.equal(v.historyCausa, null)
+  assert.deepEqual(v.historyCompartidaCon, [])
+})
+
+await check('una configuración anterior sin historyCausa carga y construye igual', () => {
+  const vieja = { id: 'sin-causa', tipo: 'vibraciones', plc: 'PLC', assets: [], variables: [
+    { id: 'vRMS_S1', pointName: 'ac:x/S1/vRMS_S1', historyPointName: 'hda:x', historyVerified: true, historyVerifiedComo: 'serie-propia', rol: 'medida:vRMS', assetId: 'S1' },
+  ] }
+  const { maquinas } = normalizarConfiguracion({ version: 1, maquinas: [vieja] })
+  assert.equal(maquinas.length, 1)
+  assert.equal(maquinas[0].variables[0].historyCausa, undefined)
+  const sistema = construirSistema(maquinas[0], tipoDe('vibraciones'))
+  assert.deepEqual(sistema.series.historizadas(), ['vRMS_S1'])
 })
 
 await check('HISTORICAL_DATA sólo con variables VERIFICADAS', () => {
