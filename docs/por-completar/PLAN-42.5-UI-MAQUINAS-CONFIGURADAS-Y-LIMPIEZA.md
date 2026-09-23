@@ -993,6 +993,41 @@ por `machines:<bloque>.` y `"<bloque>.`; `verificar-i18n` no la hace, y
 queda anotado que podría. **Puerta:** frontend **1160** verdes · 24 omitidas; los 41
 verificadores (incluida la §5.1); lint y types limpios; `index` 350,3 KB.
 
+**Y la comprobación que ese barrido dejó anotada (23-09-2026, mañana)**:
+`verificar-i18n` tiene una séptima comprobación, «cada clave del diccionario
+la pide alguna pantalla». Recorre el código del frontend y de `shared/`
+(fuera de pruebas y del propio diccionario) y da por pedida una clave si
+aparece como literal entre comillas —con o sin su namespace— o si empieza por
+el trozo fijo de una interpolación o concatenación (`navigation:routes.` en
+`` `navigation:routes.${r.id}.nav` ``); plurales e índices de arreglo se
+buscan por su raíz. Es generosa a propósito con los prefijos dinámicos: antes
+dejar pasar una huérfana que marcar una clave que sí se pinta. Se vio fallar
+antes de borrar nada: **67 claves** sin consumidor, y ninguna de las 67
+apareció al buscarla a mano por familia. Se borraron de los dos idiomas
+(1415 → **1348** claves con paridad):
+
+- `machines` (26): `plant.*`, `detail.*`, `assetGrid.{title,code,window}`,
+  `signal.{noUnit,column,margin,band}`, `trends.title` —los tiles y el
+  Detalle del tanque retirados en F4—, `controls.notBuilt.*`,
+  `vibration.{notBuiltTitle,seeMeasurements,seeRisks}` y
+  `config.{lastChecked,inMenu,inMenuHint}`.
+- `sensors` (13): `quality.*` y `freshness.*` enteros; la frescura se pinta
+  con `common:time.*` desde `base.jsx`.
+- `common` (12): `state.{empty,noResults,unknown,notAvailable,provisional,derived}`,
+  `units.percentSuffix`, `language.{change,current}`,
+  `time.{updatedAt,lastReading,range}`.
+- `errors` (6): cuatro `titles.*` (`tableLoadFailed`, `productListFailed`…
+  eran de `features/data`) y `hints.{bridgeDown,technicalDetail}`.
+- `alarms` (5): `tabs.vivo`, `selectEventAria`, `ack.*`; `assistant` (5):
+  `voice.phase.*`, `notes.copyFailed`.
+
+El borrado lo hizo un guion de un solo uso con la misma heurística, que
+reescribió cada JSON con `JSON.stringify(…, null, 2)` tras comprobar que los
+30 archivos ya estaban en ese formato exacto (el diff es sólo líneas quitadas),
+respetando el final de línea de cada uno. **Puerta:** frontend **1162**
+verdes · 24 omitidas; `verificar-i18n` 21 comprobaciones y `verificar-textos`
+en verde; lint limpio.
+
 **[?] Usuario**: `modulos/prediccion/` (1295 líneas, oculto; arrastra
 `lib/queryClient.js` y el `QueryClientProvider` de `App.jsx` sólo si
 `ExploradorAssets` deja de usar react-query, la entrada `prediccion` de
@@ -1007,11 +1042,13 @@ el `switch` de `lib/maquina.mjs` y `narrarEstadoTanque` (B2); el transporte
 falso del tanque (puerta §5.1).
 
 **Criterios de aceptación.**
-- [ ] Cada borrado con su evidencia en el commit: «nadie lo importa» o «lo
-      importaba X, borrado en F4».
-- [ ] Lint, types, `npm run verificar`, las dos suites y la puerta §5.1 en
+- [x] Cada borrado con su evidencia en el commit: «nadie lo importa» o «lo
+      importaba X, borrado en F4» (`8ad6e52` y el de las 67 claves). Lo que
+      espera al usuario —Predicción y `plc_opcua.py`— sigue arriba con «[?]».
+- [x] Lint, types, `npm run verificar`, las dos suites y la puerta §5.1 en
       verde; conteos nuevos en HANDOFF §1 y §9; `verificar-textos` e `i18n`
-      sin huérfanos.
+      sin huérfanos — y desde el 23-09 «sin huérfanos» lo afirma el propio
+      `verificar-i18n`, no un barrido a mano.
 
 ### 3.6 · QA y contramedidas — la red que acompaña a las cinco fases
 

@@ -145,12 +145,6 @@
     "doneTip": "Te escucho. Se envía solo al callarte, o pulsa para enviar ya.",
     "hangUpAria": "Salir del manos libres",
     "hangUp": "Colgar",
-    "phase": {
-      "parado": "Manos libres listo",
-      "escuchando": "Te escucho… se envía solo cuando dejes de hablar",
-      "pensando": "Entendiendo lo que has dicho…",
-      "hablando": "Contestando en voz alta…"
-    },
     "handsFreeAria": "Hablar con {{nombre}} en manos libres"
   },
   "welcome": {
@@ -160,8 +154,7 @@
   "notes": {
     "cancelledPartial": "Cancelaste la consulta; la respuesta quedó a medias.",
     "cancelled": "Cancelaste la consulta.",
-    "blocked": "Respuesta bloqueada: el modelo no consultó los datos de la planta.",
-    "copyFailed": "El navegador no dejó copiar."
+    "blocked": "Respuesta bloqueada: el modelo no consultó los datos de la planta."
   },
   "chart": {
     "alt": "Evolución de {{titulo}}",

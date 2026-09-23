@@ -52,7 +52,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1160** pruebas · 24 omitidas *(a 23-09 madrugada, tras Plan 42.5 F5; eran 1102 · 29 el 22-09)* |
+| Suite de frontend | **1162** pruebas · 24 omitidas *(a 23-09 por la mañana, tras Plan 42.5 F5; eran 1102 · 29 el 22-09)* |
 | Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
@@ -633,7 +633,7 @@ cd react-dashboard && npm test
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
 | Backend | **398 passed** de 399 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1160 passed · 24 skipped** *(23-09-2026, tras Plan 42.5 F5)* |
+| Frontend | **1162 passed · 24 skipped** *(23-09-2026, tras Plan 42.5 F5)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
@@ -690,7 +690,7 @@ Tres quedan fuera de la tanda: `todo` (es el corredor), `antiguedad-historico`
 | **Máquinas (Planes 33, 34 y 36)** | `maquinas` · `registro-configurado` · `vibraciones-configurada` · `deriva-iconics` · `descubrimiento` · `sondeo-series` · `dominio-configurado` · `punto-historico-vibraciones` · `configurar-desde-arbol` |
 | **Backend** | `backend` · `tls` · `codigos` · `frescura` · `diario-diagnosticos` · `roles` |
 | **Documentos** | `documentos` |
-| **i18n** | `i18n` · `textos` |
+| **i18n** | `i18n` (paridad es/en, interpolaciones, rutas y, desde el 23-09-2026, que ninguna clave se quede sin pantalla que la pida) · `textos` |
 | **Voz** | `voz` · `manos-libres` |
 | **Transporte** | `transporte-falso` |
 

@@ -22,31 +22,17 @@
   },
   "state": {
     "loading": "Cargando…",
-    "empty": "Sin datos",
-    "noResults": "No hay resultados",
-    "unknown": "Desconocido",
-    "notAvailable": "No disponible",
-    "provisional": "provisional",
-    "derived": "derivado",
     "noChange": "sin cambio",
     "retryingAlone": "Vuelve a intentarlo solo, cada pocos segundos"
   },
-  "units": {
-    "percentSuffix": "%"
-  },
   "language": {
-    "label": "Idioma",
-    "change": "Cambiar idioma",
-    "current": "Idioma actual: {{language}}"
+    "label": "Idioma"
   },
   "period": {
     "days_one": "{{count}} día",
     "days_other": "{{count}} días"
   },
   "time": {
-    "updatedAt": "Actualizado {{time}}",
-    "lastReading": "Última lectura",
-    "range": "Del {{from}} al {{to}}",
     "live": "En vivo",
     "connecting": "Conectando…",
     "justNow": "justo ahora",

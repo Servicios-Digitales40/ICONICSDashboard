@@ -1,8 +1,7 @@
 {
   "sub": "The plant event history, and the live state of the PLC alarms",
   "tabs": {
-    "historial": "History",
-    "vivo": "Live"
+    "historial": "History"
   },
   "windows": {
     "h1": "Last hour",
@@ -12,7 +11,6 @@
   },
   "empty": "No events in this window.",
   "emptyForAsset": "No events in this window for {{activo}}.",
-  "selectEventAria": "Select event {{id}}",
   "allAssets": "All assets",
   "loading": "Querying the alarm history…",
   "vivo": {
@@ -21,11 +19,6 @@
     "sinAlarmas": "No active alarms",
     "activas_one": "{{count}} active alarm",
     "activas_other": "{{count}} active alarms"
-  },
-  "ack": {
-    "action": "Acknowledge",
-    "actionCount": "Acknowledge ({{count}})",
-    "confirm": "Sure? Press again"
   },
   "unreadBadge": "{{count}} unread",
   "history": {

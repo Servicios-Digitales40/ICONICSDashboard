@@ -8,7 +8,7 @@
  *
  * Porque aquél comprueba el DICCIONARIO —que los dos idiomas digan las mismas
  * cosas— y no puede saber nada de una frase que nunca llegó al diccionario. Un
- * `<span>Requiere atención</span>` escrito en el JSX pasa las 19
+ * `<span>Requiere atención</span>` escrito en el JSX pasa las 21
  * comprobaciones sin despeinarse: no hay clave que comparar.
  *
  * Y ése resultó ser el modo de fallo real. La migración a i18n se hizo vista

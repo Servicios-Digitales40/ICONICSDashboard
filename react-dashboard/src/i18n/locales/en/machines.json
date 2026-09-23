@@ -48,15 +48,6 @@
     "tanque": "Industrial Water System"
   },
   "plant": {
-    "loading": "Reading the water system…",
-    "highlighted": {
-      "title": "Key Signals",
-      "sub": "The four signals with a history of their own, and their trend"
-    },
-    "trends": {
-      "title": "Trends",
-      "sub": "The historian series, each on its own scale"
-    },
     "loadingHistorian": "Reading the historian…"
   },
   "controls": {
@@ -71,10 +62,6 @@
     "hint": "The first click asks for confirmation; the second, within a few seconds, runs the command.",
     "applied": "Command applied",
     "tankLevel": "Tank Level",
-    "notBuilt": {
-      "title": "This screen has not been built yet",
-      "message": "Start and stop for this machine will live here"
-    },
     "levelNote": "The same reading the server uses to decide whether the pump may start."
   },
   "vibration": {
@@ -157,12 +144,9 @@
     "alarmServer": "ICONICS alarm server",
     "alarmCounters": "The counters of <b>{{area}}</b> are read: which of the 57 configured alarms each one is cannot be known from here — the ICONICS viewer has to be opened.",
     "watchesTitle": "What the module watches",
-    "notBuiltTitle": "Start and stop for the vibration system",
-    "seeMeasurements": "See the machine measurements",
     "withReading": "points delivering a reading, right now",
     "connecting": "connecting to the vibration module…",
     "otherMachineNote": "This is <b>a different machine</b>: its own motor, its own VFD and its own PLC. And this system does not use the historian yet: what you see is the present instant, with no trends.",
-    "seeRisks": "See the risks now",
     "nobodyWatching": "Nobody is watching the bearings",
     "channels": {
       "S1": "Drive end",
@@ -280,22 +264,14 @@
   },
   "signal": {
     "stale": "The bridge has not read this point again recently.",
-    "noUnit": "This point declares no unit in ICONICS, so its tag ({{tag}}) is shown instead so it can be identified. Guessing a unit would mean inventing one.",
-    "column": "Signal",
-    "margin": "margin",
-    "band": "band",
     "historianSamples": "The historian has samples",
     "rangeGroup": "Historian time range"
   },
   "assetGrid": {
-    "title": "Plant assets",
-    "code": "{{n}} assets · our own grouping, the server publishes no equipment",
-    "window": "mini-series: {{ventana}} in this session",
     "alarmsActive_one": "{{count}} active alarm — view",
     "alarmsActive_other": "{{count}} active alarms — view"
   },
   "trends": {
-    "title": "The four signals with a history of their own",
     "code": "last {{horas}} h · from the Data Historian",
     "noHistorian": "the historian could not be queried",
     "notEnough": "not enough samples",
@@ -324,11 +300,6 @@
   },
   "detail": {
     "title": "Detail · {{activo}}",
-    "sub": "The machine in detail: every value with its full history — real where the historian has it, from this session’s buffer where it does not",
-    "compareSub": "The four signals with a history of their own, cross-plotted — the diagnostic question only the assistant answers today",
-    "loadingAsset": "Reading the asset…",
-    "unknownTitle": "Unknown asset",
-    "unknownBody": "There is no asset with id «{{activoId}}».",
     "exportAll": "Export all",
     "partialCoverage": "Only {{conDato}} of the {{tramos}} intervals in the range have a record in the historian.",
     "downloadCsv": "Download {{senal}} as CSV",
@@ -415,7 +386,6 @@
     "stateINVALID": "None of its points exist any more",
     "notSaved": "Could not check: what was known before is kept",
     "missing": "Points that are gone",
-    "lastChecked": "Checked",
     "edit": "Edit variables",
     "editor": {
       "newTitle": "New machine from the ICONICS tree",
@@ -492,9 +462,7 @@
     "removeYes": "Yes, remove",
     "removeNo": "Cancel",
     "removing": "Removing…",
-    "removedHint": "Its section disappears from the menu. If any previous case names it, it stays deactivated and its history remains valid.",
-    "inMenu": "In the menu",
-    "inMenuHint": "Each configured machine has its own section with Home, Charts and 3D View."
+    "removedHint": "Its section disappears from the menu. If any previous case names it, it stays deactivated and its history remains valid."
   },
   "maquina": {
     "planta": {

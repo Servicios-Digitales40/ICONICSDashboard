@@ -145,12 +145,6 @@
     "doneTip": "Listening. It sends on its own when you stop, or press to send now.",
     "hangUpAria": "Leave hands-free",
     "hangUp": "Hang up",
-    "phase": {
-      "parado": "Hands-free ready",
-      "escuchando": "Listening… it sends on its own when you stop speaking",
-      "pensando": "Working out what you said…",
-      "hablando": "Answering out loud…"
-    },
     "handsFreeAria": "Talk to {{nombre}} hands-free"
   },
   "welcome": {
@@ -160,8 +154,7 @@
   "notes": {
     "cancelledPartial": "You cancelled the query; the answer was left half-written.",
     "cancelled": "You cancelled the query.",
-    "blocked": "Answer blocked: the model did not consult the plant data.",
-    "copyFailed": "The browser would not allow copying."
+    "blocked": "Answer blocked: the model did not consult the plant data."
   },
   "chart": {
     "alt": "Trend of {{titulo}}",

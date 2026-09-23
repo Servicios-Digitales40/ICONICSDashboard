@@ -2,12 +2,10 @@
   "titles": {
     "bridgeDown": "The bridge is not responding",
     "pumpCommandFailed": "Unable to operate the pump",
-    "tableLoadFailed": "Unable to load the table",
     "caseCloseFailed": "Unable to close the case",
     "catalogQueryFailed": "Unable to query the catalog",
     "alarmHistoryFailed": "Unable to read the alarm history",
     "moduleReadFailed": "Unable to read the module",
-    "waterSystemReadFailed": "Unable to read the water system",
     "logbookReadFailed": "Unable to read the logbook",
     "plantReadFailed": "Unable to read the plant",
     "uploadFailed": "Upload failed",
@@ -15,8 +13,6 @@
     "sectionRenderFailedNamed": "«{{seccion}}» could not be shown",
     "assetReadFailed": "Error reading the asset",
     "treeLoadFailed": "The tree could not be loaded",
-    "pointReadFailed": "The point could not be read",
-    "productListFailed": "The products could not be listed",
     "noServerConnection": "No connection to the server right now",
     "noModuleConnection": "No connection to the module right now"
   },
@@ -70,8 +66,6 @@
     "ERROR_REPORTE_NO_ENCONTRADO": "The report is gone: it may have been purged by age."
   },
   "hints": {
-    "bridgeDown": "{{detalle}}. If this screen does not load, the problem is not one view: the bridge itself is down.",
-    "technicalDetail": "Technical detail: {{detalle}}",
     "staleBelow": "{{detalle}}. What you see below may be out of date.",
     "restOfBoardWorks": "The rest of the dashboard keeps working. Switch views and come back to retry."
   },

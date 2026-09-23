@@ -35,6 +35,15 @@
  *     lleva título ni subtítulo: los toma de `navigation.json` por su `id`.
  *     Añadir una ruta y olvidar su bloque deja el Topbar pintando
  *     `navigation:routes.lo-que-sea.title`, y esto lo caza antes.
+ *  6. **Ninguna clave sin consumidor.** Al revés que todo lo anterior: texto
+ *     que está en el diccionario y ninguna vista pide. Se añadió el
+ *     23-09-2026 (Plan 42.5 F5) tras retirar las vistas del tanque: sus
+ *     claves se quedaron en `machines.json` y hubo que buscarlas con un
+ *     barrido a mano; el mismo barrido encontró luego 67 más de pantallas
+ *     borradas meses antes. Una clave huérfana no rompe nada, y por eso
+ *     nadie la ve: es trabajo tirado que hay que traducir dos veces cada vez
+ *     que se revisa el glosario. Cómo se decide que una clave tiene
+ *     consumidor está junto a la comprobación.
  *
  * ── LO QUE NO COMPRUEBA ────────────────────────────────────────────
  *
@@ -50,13 +59,19 @@
  * Sin red, sin build. Entra solo en `npm run verificar` (Plan 20 F2).
  */
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const RAIZ_LOCALES = join(AQUI, '..', 'react-dashboard', 'src', 'i18n', 'locales')
 const RUTAS_JSX = join(AQUI, '..', 'react-dashboard', 'src', 'app', 'routes', 'routes.jsx')
+/**
+ * Dónde puede vivir un consumidor de una clave (comprobación 6): el frontend
+ * entero y `shared/`, porque los ids del dominio que `useProsa` traduce en el
+ * namespace `domain` se declaran allí. El backend no lee el diccionario.
+ */
+const RAICES_CON_CONSUMIDORES = [join(AQUI, '..', 'react-dashboard', 'src'), join(AQUI, '..', 'shared')]
 
 const c = {
   verde: '\x1b[32m', rojo: '\x1b[31m', gris: '\x1b[90m',
@@ -362,6 +377,94 @@ check('no sobra en el locale ninguna ruta que ya no exista', () => {
   const sobran = Object.keys(arboles[REFERENCIA]?.navigation?.routes ?? {}).filter(id => !ids.has(id))
 
   assert.ok(sobran.length === 0, `rutas en el locale que no están en el registro: ${sobran.join(', ')}`)
+})
+
+/* ── 7 · Ninguna clave sin consumidor ────────────────────────────────── */
+
+console.log('\n── Nadie guarda texto que ninguna pantalla pide ─────────────')
+
+/**
+ * Los archivos de código donde puede estar la llamada que pide una clave:
+ * `.js`, `.jsx` y `.mjs` bajo las raíces de arriba, fuera de las pruebas y del
+ * propio diccionario. Las pruebas se excluyen a propósito: una prueba que pida
+ * una clave no la convierte en texto que alguien vea en pantalla.
+ */
+function archivosDeCodigo(dir) {
+  const salida = []
+  for (const entrada of readdirSync(dir)) {
+    const ruta = join(dir, entrada)
+    if (statSync(ruta).isDirectory()) {
+      if (['test', 'locales', 'node_modules'].includes(entrada)) continue
+      salida.push(...archivosDeCodigo(ruta))
+    } else if (['.js', '.jsx', '.mjs'].includes(extname(entrada)) && !/\.test\./.test(entrada)) {
+      salida.push(ruta)
+    }
+  }
+  return salida
+}
+
+/**
+ * Cómo se decide que una clave TIENE consumidor. Es una heurística sobre el
+ * texto del código, no un analizador, y se queda deliberadamente en dos
+ * formas porque son las dos que este repo usa:
+ *
+ *   · **Literal.** La clave entera entre comillas o acentos graves, con o sin
+ *     su namespace delante: `traducir("common:actions.save")`,
+ *     `traducirMaquinas("assetGrid.alarmsActive")`. Las variantes de plural
+ *     (`_one`, `_other`) y los índices de arreglo (`suggestions.0`) se buscan
+ *     por su raíz, que es lo que el código escribe.
+ *   · **Prefijo dinámico.** El trozo fijo que precede a una interpolación o a
+ *     una concatenación: `` `navigation:routes.${r.id}.nav` `` deja el prefijo
+ *     `navigation:routes.`, y toda clave que empiece por él cuenta como pedida.
+ *     Es generoso a propósito: prefiere dejar pasar una huérfana bajo un
+ *     prefijo dinámico a marcar como huérfana una clave que sí se pinta.
+ *
+ * Lo que no ve: una clave montada con `join`, con `concat` o leída de un JSON
+ * de datos. Hoy no hay ninguna así; si aparece, se añade su forma aquí o se
+ * escribe con una de las dos de arriba.
+ */
+function consumidoresDeClaves() {
+  const codigo = RAICES_CON_CONSUMIDORES.flatMap(archivosDeCodigo).map(r => readFileSync(r, 'utf8')).join('\n')
+
+  const literales = new Set()
+  for (const m of codigo.matchAll(/["'`]([\w:.-]+)["'`]/g)) literales.add(m[1])
+
+  const prefijos = new Set()
+  for (const m of codigo.matchAll(/["'`]([\w:.-]+?)\$\{/g)) prefijos.add(m[1])
+  for (const m of codigo.matchAll(/["'`]([\w:.-]+?)["'`]\s*\+/g)) prefijos.add(m[1])
+  /* Un prefijo sin punto ni namespace («S», «hda») no nombra ninguna clave. */
+  const prefijosUtiles = [...prefijos].filter(p => p.length >= 3 && /[.:]/.test(p))
+
+  return { literales, prefijosUtiles }
+}
+
+/** Por qué se considera pedida la clave `ns:clave`, o `null` si nadie la pide. */
+function consumidorDe(ns, clave, { literales, prefijosUtiles }) {
+  const raiz = clave.replace(/_(one|other|zero|two|few|many)$/, '').replace(/\.\d+$/, '')
+  for (const candidata of new Set([clave, raiz])) {
+    if (literales.has(candidata) || literales.has(`${ns}:${candidata}`)) return 'literal'
+    for (const prefijo of prefijosUtiles) {
+      const propio = prefijo.includes(':')
+        ? (prefijo.startsWith(`${ns}:`) ? prefijo.slice(ns.length + 1) : null)
+        : prefijo
+      if (propio && candidata.startsWith(propio)) return `prefijo «${prefijo}»`
+    }
+  }
+  return null
+}
+
+check('cada clave del diccionario la pide alguna pantalla', () => {
+  const consumidores = consumidoresDeClaves()
+  const huerfanas = []
+  for (const [ns, arbol] of Object.entries(arboles[REFERENCIA])) {
+    for (const clave of hojas(arbol)) {
+      if (!consumidorDe(ns, clave, consumidores)) huerfanas.push(`${ns}:${clave}`)
+    }
+  }
+  assert.ok(
+    huerfanas.length === 0,
+    `sin consumidor en el código (${huerfanas.length}) — se borran de los ${idiomas.length} idiomas, o se pide de una forma que esta comprobación vea:\n${huerfanas.slice(0, 12).join('\n')}${huerfanas.length > 12 ? '\n…' : ''}`
+  )
 })
 
 /* ── Resultado ───────────────────────────────────────────────────────── */

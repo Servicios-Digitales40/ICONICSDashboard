@@ -2,12 +2,10 @@
   "titles": {
     "bridgeDown": "El puente no contesta",
     "pumpCommandFailed": "No se pudo accionar la bomba",
-    "tableLoadFailed": "No se pudo cargar la tabla",
     "caseCloseFailed": "No se pudo cerrar el caso",
     "catalogQueryFailed": "No se pudo consultar el catálogo",
     "alarmHistoryFailed": "No se pudo leer el historial de alarmas",
     "moduleReadFailed": "No se pudo leer el módulo",
-    "waterSystemReadFailed": "No se pudo leer el sistema de agua",
     "logbookReadFailed": "No se pudo leer la bitácora",
     "plantReadFailed": "No se pudo leer la instalación",
     "uploadFailed": "No se pudo subir",
@@ -15,8 +13,6 @@
     "sectionRenderFailedNamed": "No se pudo mostrar «{{seccion}}»",
     "assetReadFailed": "Error al leer el asset",
     "treeLoadFailed": "No se pudo cargar el árbol",
-    "pointReadFailed": "No se pudo leer el punto",
-    "productListFailed": "No se pudieron listar los productos",
     "noServerConnection": "Sin conexión con el servidor por ahora",
     "noModuleConnection": "Sin conexión con el módulo por ahora"
   },
@@ -70,8 +66,6 @@
     "ERROR_REPORTE_NO_ENCONTRADO": "El reporte ya no está: puede haberse purgado por antigüedad."
   },
   "hints": {
-    "bridgeDown": "{{detalle}}. Si esta pantalla no carga, el problema no es de una vista: es el propio puente el que no está en pie.",
-    "technicalDetail": "Detalle técnico: {{detalle}}",
     "staleBelow": "{{detalle}}. Lo que se ve abajo puede estar desactualizado.",
     "restOfBoardWorks": "El resto del tablero sigue funcionando. Cambia de vista y vuelve para reintentar."
   },

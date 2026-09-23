@@ -48,15 +48,6 @@
     "tanque": "Sistema de agua industrial"
   },
   "plant": {
-    "loading": "Leyendo el sistema de agua…",
-    "highlighted": {
-      "title": "Señales destacadas",
-      "sub": "Las cuatro señales con historia propia, con su tendencia"
-    },
-    "trends": {
-      "title": "Tendencias",
-      "sub": "Las series del historiador, cada una con su propia escala"
-    },
     "loadingHistorian": "Leyendo el historiador…"
   },
   "controls": {
@@ -71,10 +62,6 @@
     "hint": "Un primer clic pide confirmación; el segundo, dentro de unos segundos, ejecuta la acción.",
     "applied": "Acción aplicada",
     "tankLevel": "Nivel del tanque",
-    "notBuilt": {
-      "title": "Esta vista todavía no está construida",
-      "message": "Aquí vivirán el encendido y el apagado de esta máquina"
-    },
     "levelNote": "Mismo dato que usa el servidor para decidir si puede encender la bomba."
   },
   "vibration": {
@@ -157,12 +144,9 @@
     "alarmServer": "Servidor de alarmas de ICONICS",
     "alarmCounters": "Se leen los contadores de <b>{{area}}</b>: cuál de las 57 alarmas configuradas es cada una no se puede saber desde aquí — hay que abrir el visor de ICONICS.",
     "watchesTitle": "Qué vigila el módulo",
-    "notBuiltTitle": "Encendido y apagado del sistema de vibraciones",
-    "seeMeasurements": "Ver las medidas de la máquina",
     "withReading": "puntos que entregan lectura, ahora mismo",
     "connecting": "conectando con el módulo de vibraciones…",
     "otherMachineNote": "Ésta es <b>otra máquina</b>: su propio motor, su propio variador y su propio PLC. Y en este sistema todavía no se usa el histórico: lo que se ve es el instante, sin tendencias.",
-    "seeRisks": "Ver los riesgos ahora",
     "nobodyWatching": "Nadie está vigilando los rodamientos",
     "channels": {
       "S1": "Lado acople",
@@ -280,22 +264,14 @@
   },
   "signal": {
     "stale": "El puente no ha vuelto a leer este punto recientemente.",
-    "noUnit": "Este punto no declara unidad en ICONICS, así que se muestra su tag ({{tag}}) para poder identificarlo. Poner una unidad a ojo sería inventarla.",
-    "column": "Señal",
-    "margin": "margen",
-    "band": "banda",
     "historianSamples": "Hay muestras del historiador",
     "rangeGroup": "Rango de tiempo del historiador"
   },
   "assetGrid": {
-    "title": "Activos de la instalación",
-    "code": "{{n}} activos · agrupación propia, el servidor no publica equipos",
-    "window": "mini-series: {{ventana}} en esta sesión",
     "alarmsActive_one": "{{count}} alarma activa — ver",
     "alarmsActive_other": "{{count}} alarmas activas — ver"
   },
   "trends": {
-    "title": "Las cuatro señales con historia propia",
     "code": "últimas {{horas}} h · del Data Historian",
     "noHistorian": "no se pudo consultar el historiador",
     "notEnough": "sin muestras suficientes",
@@ -324,11 +300,6 @@
   },
   "detail": {
     "title": "Detalle · {{activo}}",
-    "sub": "La máquina en detalle: cada valor con su histórico completo — real cuando el historiador lo tiene, del búfer de esta sesión cuando no",
-    "compareSub": "Las cuatro señales con historia propia, cruzadas — la pregunta de diagnóstico que hoy sólo contesta el asistente",
-    "loadingAsset": "Leyendo el activo…",
-    "unknownTitle": "Activo desconocido",
-    "unknownBody": "No existe un activo con id «{{activoId}}».",
     "exportAll": "Exportar todo",
     "partialCoverage": "Sólo {{conDato}} de los {{tramos}} tramos del rango tienen registro en el historiador.",
     "downloadCsv": "Descargar {{senal}} como CSV",
@@ -415,7 +386,6 @@
     "stateINVALID": "Ninguno de sus puntos existe ya",
     "notSaved": "No se pudo comprobar: se conserva lo que se sabía antes",
     "missing": "Puntos que ya no están",
-    "lastChecked": "Comprobada",
     "edit": "Editar variables",
     "editor": {
       "newTitle": "Nueva máquina desde el árbol de ICONICS",
@@ -492,9 +462,7 @@
     "removeYes": "Sí, quitar",
     "removeNo": "Cancelar",
     "removing": "Quitando…",
-    "removedHint": "Su sección desaparece del menú. Si algún caso previo la nombra, queda desactivada y su historia sigue siendo válida.",
-    "inMenu": "En el menú",
-    "inMenuHint": "Cada máquina configurada tiene su propia sección con Inicio, Gráficas y Vista 3D."
+    "removedHint": "Su sección desaparece del menú. Si algún caso previo la nombra, queda desactivada y su historia sigue siendo válida."
   },
   "maquina": {
     "planta": {

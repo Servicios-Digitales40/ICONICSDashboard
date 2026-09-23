@@ -1,8 +1,7 @@
 {
   "sub": "El historial de eventos de la instalación, y el estado en vivo de las alarmas del PLC",
   "tabs": {
-    "historial": "Historial",
-    "vivo": "En vivo"
+    "historial": "Historial"
   },
   "windows": {
     "h1": "Última hora",
@@ -12,7 +11,6 @@
   },
   "empty": "Sin eventos en esta ventana.",
   "emptyForAsset": "Sin eventos en esta ventana para {{activo}}.",
-  "selectEventAria": "Seleccionar evento {{id}}",
   "allAssets": "Todos los activos",
   "loading": "Consultando el historial de alarmas…",
   "vivo": {
@@ -21,11 +19,6 @@
     "sinAlarmas": "Sin alarmas activas",
     "activas_one": "{{count}} alarma activa",
     "activas_other": "{{count}} alarmas activas"
-  },
-  "ack": {
-    "action": "Reconocer",
-    "actionCount": "Reconocer ({{count}})",
-    "confirm": "¿Seguro? Pulsa otra vez"
   },
   "unreadBadge": "{{count}} sin leer",
   "history": {
