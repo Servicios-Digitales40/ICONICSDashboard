@@ -1,8 +1,6 @@
 # HANDOFF — dónde estamos y cómo seguir
 
-**Fecha:** 22-09-2026 (noche) · **Rama viva:** `UI-Limpieza1.0` (nace de
-`Vibraciones1.0` tras el Plan 42) · **HEAD:** el Plan 42.5 escrito; `git log -1`
-lo dice. **Plan 42.5 F0 completada** (inventario: 34 acoplamientos, lista de F5). El plan se **refinó** esa noche tras leer el código: D8–D14 y la red de QA de §3.6; la línea base medida está allí. **F1–F4 completadas** (la capa de datos genérica, `maq-planta` y `maq-detalle`, la causa del sondeo persistida, el vaciado de la bitácora documentado en §7 sin ejecutarlo, y el 23-09 **todas las vistas del tanque borradas** por decisión del usuario: `views/tanque/`, `AlarmasEva`, los 11 modelos 3D del tanque y el panel del tanque del muro; el tanque volverá como configurada en el Plan 43). F5 cerrada: Predicción se queda oculta por decisión del usuario, `plc_opcua.py` borrado, y la bitácora de casos vaciada en esta máquina el 23-09 (13 → 0, copia en `datos/`; falta reiniciar el backend). Falta mirar Planta y Detalle en el navegador contra planta con el backend reiniciado.
+**Fecha:** 23-09-2026 (tarde) · **Rama viva de Moisés:** `UI-Limpieza1.0` · **Rama de la presentación:** `DemoVibraciones4.0` (nace de ésta el 23-09-2026; sólo recibe merges) · **Rama de Gustavo:** `AjustesGustavo5.0` (nace de la anterior; el asistente). **Plan 42.5 con F0–F6 completadas**; quedan la comprobación manual en el navegador (F1, F2, F6) y el reinicio del backend tras el vaciado (F3). Quien llegue desde una versión antigua empieza por **§0**.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -10,6 +8,142 @@ decidió ya y qué trampas están medidas.
 
 > **Lo marcado `POR CONFIRMAR` no se ha podido verificar contra el repo.** No
 > se da por cierto: se pregunta antes de apoyarse en ello.
+
+---
+
+## 0. Si llegas desde una versión antigua — léelo antes que nada
+
+> Escrito el **23-09-2026** para quien retoma el proyecto desde una rama de
+> hace semanas (Gustavo, `AjustesGustavo5.0`) y para el asistente que le
+> ayude. Resume qué es esto HOY, qué cambió, en qué rama trabaja cada uno y
+> cómo no pisarse. Lo que sigue en §1–§10 es el detalle.
+
+### Qué es esto hoy, en cuatro frases
+
+Una **plataforma de configuración de máquinas** con ICONICS FrameWorX como
+única fuente de planta: se configura una máquina desde el árbol de ICONICS
+(`eva-configuracion`), se verifican sus señales y sus series del historiador,
+y el tablero le pinta sus vistas **genéricas** (Inicio, Planta, Estado
+mecánico, Vista 3D, Detalle, Hallazgos, Avisos, Casos, RAG) sin un `if` por
+máquina. El **asistente** (LLM local por `llama-server`) contesta con
+herramientas deterministas sobre la máquina que se tiene delante; un
+**motor de diagnóstico** determinista puntúa y el modelo sólo redacta. Hoy hay
+**una máquina configurada** en el despliegue (`vib-motor-03`, «Nuevo-Modor»,
+tipo `vibraciones`, 86 variables, 74 series verificadas) y **el tanque ya no
+tiene vistas**: está cerrado y sus pantallas se borraron; volverá como otra
+máquina configurada (Plan 43). Las reglas viven en `CLAUDE.md`; los planes
+completados, con lo que de verdad pasó, en `docs/completados/`.
+
+### Lo que cambió desde las versiones antiguas, por orden
+
+Si tu rama es anterior a septiembre, casi todo lo de abajo es nuevo para ti.
+Cada plan está en `docs/completados/PLAN-N-*.md` con sus fases reescritas
+con lo que pasó; leer el §0 de cada uno basta para situarse.
+
+| Cuándo | Plan | Qué cambió |
+|---|---|---|
+| 03-09 | 19 | **Módulos**: `monitoreo` (ICONICS) y `prediccion` (API externa, oculto). Un módulo declara su fuente; nunca mezcla datos con otra |
+| 04–07-09 | 20 | **Backend**: `autenticar` por ámbito, esquemas Zod por ruta, escritura atómica, banco de evaluación del asistente (`backend/ia/evaluacion/`), 41 verificadores en `npm run verificar` |
+| 08–11-09 | 22–27 | **i18n obligatorio** (es/en, `verificar-i18n` y `verificar-textos`), roles, diario de accionamientos, enlaces firmados de reportes, historización de 45 señales más |
+| 17-09 | 32 | **La estación de llenado se CIERRA**: fuera del menú, sin sondeo, el asistente se niega. Rama `Vibraciones1.0` |
+| 18–21-09 | 33–40 | **Máquinas configuradas**: `datos/maquinas.json` → `construirSistema(maquina, tipo)`; el **tipo** (`shared/eva/tipos/vibraciones.js`) trae roles, reglas, física simulada, vocabulario; el editor configura desde el árbol; el sondeo verifica series; la máquina de vibraciones escrita a mano **se retira** |
+| 21-09 | 35 | **Autenticación ENCENDIDA** (`AUTH_HABILITADA=true`): tres roles, pantalla de acceso, `exigirRol` en toda ruta |
+| 22-09 | 41, 42 | Cierre de Vibraciones 1.0; el criterio `registrada-constante` del sondeo |
+| 22–23-09 | **42.5** | Rama `UI-Limpieza1.0`: Planta y Detalle **genéricos** (`views/maquina/`), la bitácora de casos vaciada, **todas las vistas del tanque borradas**, `features/data` y Predicción fuera del menú, `verificar-i18n` caza claves huérfanas, y la **F6** tras mirarlo en planta: filtros por activo, mudos listados, configuración más corta, **nombre y alias por asset** que el asistente resuelve, el muro borrado y un arranque que desvía a la primera configurada |
+
+Tres cosas que rompen la intuición de quien viene de antes:
+
+- **`vibraciones` ya no es un sistema escrito a mano.** No hay
+  `SISTEMAS.vibraciones`; hay lo que `datos/maquinas.json` diga, registrado al
+  arrancar (`registrarSistema`). Las pruebas y los verificadores usan la
+  **máquina espejo** (`scripts/lib/vibraciones-espejo.json`,
+  `configuracionEspejo()`), no una escrita a mano.
+- **El tanque sigue en el registro pero cerrado** (`cerrado: true` en
+  `sistemas.js`): `resolverSistema` lo niega, 22 comprobaciones de
+  `verificar-herramientas` están omitidas por eso, y su dominio
+  (`shared/eva/tanque/`) no se toca ni se borra.
+- **La autenticación está encendida.** El tablero pide credenciales
+  (`backend/http/plugins/autenticacion.mjs`); las pruebas y los verificadores
+  no la necesitan (`ICONICS_FAKE=true` y `AUTH_HABILITADA` sin definir).
+
+### Las ramas, y el plan del día de la demo
+
+```
+main ─── … ─── Vibraciones1.0 ─── UI-Limpieza1.0 ──(sigue Moisés)──▶
+                                        │
+                                        └── DemoVibraciones4.0 ─(la de la presentación)─▶
+                                                   │
+                                                   └── AjustesGustavo5.0 ─(sigue Gustavo)──▶
+```
+
+| Rama | Quién | Para qué |
+|---|---|---|
+| `UI-Limpieza1.0` | Moisés | Sigue el Plan 42.5 (comprobación en planta) y lo que salga |
+| `DemoVibraciones4.0` | nadie edita | Nace de `UI-Limpieza1.0` el 23-09-2026 (`9f1c44a`). Es la que queda **en el equipo de la presentación**. Sólo recibe merges |
+| `AjustesGustavo5.0` | Gustavo | Nace de `DemoVibraciones4.0`. Su foco: el **asistente** |
+
+**El día de la demo se hace merge de `UI-Limpieza1.0` y de `AjustesGustavo5.0`
+hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
+
+1. **Cada uno en su zona.** Gustavo: `backend/ia/**`, `scripts/verificar-herramientas.mjs`,
+   `verificar-chat.mjs`, `verificar-instrucciones.mjs`, `verificar-evaluacion.mjs`
+   y `react-dashboard/src/i18n/locales/*/assistant.json`. Moisés:
+   `react-dashboard/src/**` salvo lo anterior, `shared/eva/**`, `docs/`.
+2. **Los archivos calientes que tocamos los dos se avisan antes de tocarlos:**
+   `shared/eva/comun/sistemas.js` (registro, `sistemasDeSenal`,
+   `sistemaPorNombre`), `shared/eva/comun/construirSistema.js` (la entrada de
+   una configurada: `aliasDe`, `herramientas`, `limitaciones`),
+   `backend/ia/conversacion/definiciones.mjs` (las 26 herramientas),
+   `backend/ia/conversacion/chat.mjs` (el prompt y el bucle), `CLAUDE.md` y
+   este HANDOFF. Si hay que tocarlos, un commit pequeño y sólo con eso.
+3. **Traer `DemoVibraciones4.0` a tu rama** cada vez que reciba algo
+   (`git merge DemoVibraciones4.0` desde la tuya), no esperar al día de la demo.
+4. **Commit por fase, con la puerta pasada, y sin push sin pedirlo**
+   (`CLAUDE.md` §6). Un plan nuevo va a `docs/por-completar/PLAN-N-*.md`
+   (§6.1); el siguiente número libre es el **44** (el 43 está reservado al
+   tanque como configurada).
+
+### Dónde vive el asistente hoy (para quien va a tocarlo)
+
+| Qué | Dónde |
+|---|---|
+| El bucle: prompt, inventario de la planta, rondas, la guarda que bloquea una respuesta con cifras sin herramienta | `backend/ia/conversacion/chat.mjs` (`inventarioDeLaPlanta`, `avisoDeBloqueo`) |
+| Las 26 herramientas que ve el modelo, con sus esquemas Zod | `backend/ia/conversacion/definiciones.mjs` |
+| Cómo se ejecutan: familias por carpeta, y el índice de señales del tanque | `backend/ia/herramientas/*/index.mjs`, `backend/ia/conversacion/herramientas.mjs` |
+| Resolver de qué máquina va una pregunta (`resolverSistema`: id, nombre o **alias**) y la guarda de «cerrada» | `backend/ia/herramientas/lib/maquina.mjs` |
+| Resolver una señal por texto en las configuradas (`sistemasDeSenal`), y una máquina por nombre (`sistemaPorNombre`) | `shared/eva/comun/sistemas.js` |
+| Los nombres por los que se pide una variable (`aliasDe`: clave, etiqueta, rol, alias de la variable, **nombre y alias de su activo**) | `shared/eva/comun/construirSistema.js` + `tipo.aliasDe` en `shared/eva/tipos/vibraciones.js` |
+| El motor determinista: casos, causas, temporal | `backend/ia/motor/` (leer la cabecera de `diagnostico.mjs` antes) |
+| Búsqueda: BM25, embeddings, manuales, casos | `backend/ia/indices/` |
+| La narración en inglés de lo que el dominio escribe en español | `backend/ia/i18n/narrar*.mjs` |
+| El banco de casos y el juez | `backend/ia/evaluacion/` (`verificar-evaluacion`) |
+| Dictado y voz | `backend/ia/voz.mjs` |
+
+**La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
+
+```bash
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 192 correctas · 22 omitidas
+ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 71
+ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
+```
+
+Levantan el backend entero sin planta y con un `llama-server` falso. Para
+hablar con el asistente de verdad hace falta `llama-server` con `--jinja`
+(§7); sin esa opción el modelo no ve las herramientas y contesta de memoria.
+
+**Lo que hay que saber del estado de datos:** la bitácora de casos
+(`datos/aprendizaje.json`) se **vació** el 23-09 (13 casos del tanque →
+0, copia al lado); `datos/maquinas.json` **no está versionado**: cada equipo
+tiene el suyo, y para las pruebas está la espejo. La máquina real de la demo
+tiene los apoyos rotulados «Lado acople», «Rodamiento intermedio», «Lado
+libre» y puede llevar alias que quien configura escribe en el editor
+(`assets[].nombre`, `assets[].alias`); el asistente los resuelve.
+
+**Lo que NO hay que hacer** (todo está en `CLAUDE.md`, pero es lo que más se
+tienta al retomar): añadir dependencias; poner texto en español dentro del
+JSX (`verificar-textos` lo caza); dejar que el modelo decida una banda, un
+orden o una causa (§2.3); tocar el código del tanque; «arreglar» una prueba
+omitida; subir un techo para callar un rojo sin medirlo antes.
 
 ---
 
@@ -52,10 +186,10 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1166** pruebas · 20 omitidas *(a 23-09 por la tarde, tras Plan 42.5 F6; eran 1102 · 29 el 22-09)* |
-| Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
+| Suite de frontend | **1172** pruebas · 20 omitidas *(a 23-09 por la tarde, tras Plan 42.5 F6.7; eran 1102 · 29 el 22-09)* |
+| Suite de backend | **401** pruebas (400 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **191** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **192** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -269,19 +403,17 @@ embeddings), no un motor externo.
 
 ### Ramas
 
-**`UI-Limpieza1.0` es la viva** desde la noche del 22-09-2026: nace de
-`Vibraciones1.0` en el cierre del Plan 42 y lleva el Plan 42.5 (la UI que
-acompaña a las máquinas configuradas, y la limpieza). Su regla sobre el tanque
-es distinta de la de `Vibraciones1.0`: ver CLAUDE.md §1 y el Plan 42.5 §1. **No
-se ha subido al remoto.** `origin/Vibraciones1.0` está en `5529029` (las series
-equivalentes); el commit de PRODUCT.md (`ff7a83c`) y lo de esta rama son
-locales.
+Tres ramas vivas desde el **23-09-2026**, y su plan, en **§0** («Las ramas, y
+el plan del día de la demo»): `UI-Limpieza1.0` (Moisés), `DemoVibraciones4.0`
+(la de la presentación; sólo recibe merges) y `AjustesGustavo5.0` (Gustavo, el
+asistente). Las tres son locales: **ninguna se ha subido al remoto** sin
+pedirlo. `origin/Vibraciones1.0` sigue en `5529029`.
 
-`Vibraciones1.0` queda como estaba: **393 commits por delante de `main`** más
-los del Plan 42.
-
-Hay **13 ramas locales y 24 remotas**, todas anteriores. `POR CONFIRMAR` si
-alguna sigue en uso; ninguna se ha tocado en este trabajo.
+Hay además **13 ramas locales y 24 remotas anteriores** (`Moises5–7`,
+`Gustavo5`, `IntegracionMoises6Gustavo5`, `Mejoras-Demo-6.0`, `Demo3.0`,
+`Asistente`…). Son de antes de la modularización y del cierre del tanque:
+`POR CONFIRMAR` si alguna sigue en uso; ninguna se ha tocado en este trabajo,
+y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 
 ### Los planes vivos
 
@@ -636,7 +768,7 @@ cd react-dashboard && npm test
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
 | Backend | **400 passed** de 401 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1166 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F6)* |
+| Frontend | **1172 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F6.7)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

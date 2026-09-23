@@ -59,6 +59,15 @@ de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.m
 > 3. **Lo que no es de ninguna máquina y nadie importa se borra ya**, con la
 >    evidencia en el commit.
 >
+> ### Tres ramas desde el 23-09-2026
+>
+> `UI-Limpieza1.0` (Moisés) → `DemoVibraciones4.0` (la de la presentación; no
+> se edita, sólo recibe merges) → `AjustesGustavo5.0` (Gustavo, el asistente).
+> El día de la demo las dos ramas de trabajo se funden en la de la
+> presentación. Quién toca qué, los archivos calientes y cómo sincronizar están
+> en [`docs/HANDOFF.md`](docs/HANDOFF.md) §0. Las reglas de este documento
+> valen igual en las tres.
+
 > Lo que sigue en este documento describe el proyecto COMPLETO, que es el que
 > vuelve al reabrir.
 
