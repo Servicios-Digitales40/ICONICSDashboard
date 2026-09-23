@@ -742,13 +742,14 @@ export const DEFINICIONES = [
     function: {
       name: 'generar_reporte',
       description:
-        'Genera un PDF descargable de UNA máquina: un gráfico por cada señal con historia que se ' +
-        'pida (o TODO el catálogo de esa máquina si no se nombra ninguna) más una tabla con el ' +
-        'valor actual de las que no tienen serie. Úsala para "genera un reporte", "quiero un PDF ' +
-        'de esta semana", "un reporte de todas las señales". Período hasta ~90 días, igual que ' +
-        'historia_de_senal. El enlace de descarga se entrega automáticamente; no lo repitas ni lo ' +
-        'inventes. Cada gráfico YA lleva su interpretación de tendencia — no hace falta pedirla ' +
-        'aparte.',
+        'Genera un PDF descargable de UNA máquina. Sin "tipo": un gráfico por cada señal con historia ' +
+        'que se pida (o TODO el catálogo de esa máquina si no se nombra ninguna) más una tabla con el ' +
+        'valor actual de las que no tienen serie. Con "tipo": el reporte de esa PLANTILLA (técnico, ' +
+        'vibraciones, lectura de sensores…), con sus secciones ya armadas por el sistema. Úsala para ' +
+        '"genera un reporte", "quiero un PDF de esta semana", "un reporte técnico del sistema", "el ' +
+        'reporte de vibraciones del motor". Período hasta ~90 días, igual que historia_de_senal. El ' +
+        'enlace de descarga se entrega automáticamente; no lo repitas ni lo inventes. Cada gráfico YA ' +
+        'lleva su interpretación de tendencia — no hace falta pedirla aparte.',
       parameters: {
         type: 'object',
         properties: {
@@ -781,6 +782,25 @@ export const DEFINICIONES = [
               'Id del sistema, tal como lo devuelve sistemas_de_la_planta. Por omisión "tanque". ' +
               'Sirve para cualquier máquina del registro, incluidas las configuradas: sus rótulos, ' +
               'unidades y bandas los pone su tipo. Un reporte NUNCA mezcla dos máquinas.',
+          },
+          /*
+           * Plan 44 F3. Un enum y no ocho herramientas: compartirían el 90 % de
+           * sus argumentos y llevarían la lista de 26 a 34, que es peor para un
+           * modelo pequeño. El normalizador del backend acepta además texto
+           * libre y sinónimos («CMS», «sensores», «technical»).
+           */
+          tipo: {
+            type: 'string',
+            enum: ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias', 'predicciones'],
+            description:
+              'Qué plantilla de reporte quiere el usuario, si nombra una. OMÍTELO si sólo dijo "un reporte" ' +
+              'o "un PDF de las señales": entonces sale el catálogo entero (equivale a "catalogo"). ' +
+              '"tecnico": resumen operativo, indicadores, tendencias, estadísticas, análisis por activo y ' +
+              'conclusiones. "vibraciones": estado CMS, puntos de medición por apoyo, tendencias RMS, ' +
+              'diagnóstico y recomendaciones. "lectura-de-sensores": lecturas con tag, rango, desvío, ' +
+              'calidad de dato y serie verificada. "riesgos", "alarmas", "ingenieria", "energias" y ' +
+              '"predicciones" están declarados pero todavía no se componen: la herramienta lo dirá con ' +
+              'su motivo; transmítelo tal cual.',
           },
           explicacion: {
             type: 'string',
@@ -1130,6 +1150,9 @@ export const ESQUEMAS = Object.freeze({
     senales: z.array(Texto).optional(),
     periodo: Texto.optional(),
     explicacion: Texto.optional(),
+    /* Plan 44 F3: texto libre a propósito, no el enum; el normalizador de
+       `reportes/plantillas/` entiende sinónimos y se niega con la lista si no. */
+    tipo: Texto.optional(),
     /* Plan 39 F4: ya no pasa sólo por `.passthrough()`; es un argumento con
        nombre, como en las demás herramientas por máquina. */
     sistema: Texto.optional(),

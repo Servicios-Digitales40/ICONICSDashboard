@@ -344,7 +344,7 @@ export function crearHerramientasDeHistoricos({
   leerAprendizajeDe = leerAprendizaje,
 }) {
   const { leerSerie, leerSerieEnRango, leerHistoriaLarga } = historia
-  const { leerMaquina, resolverSistema } = maquina
+  const { leerMaquina, resolverSistema, evaluarRiesgosDe } = maquina
   const SENALES_PRONOSTICO = senalesPronostico
 
   return {
@@ -1390,7 +1390,33 @@ export function crearHerramientasDeHistoricos({
      * `analisis_de_senal`) y pasar aquí su propio comentario, que se imprime
      * aparte y con su procedencia dicha, nunca mezclado con las cifras.
      */
-    async generar_reporte({ senales, periodo, explicacion, sistema } = {}, { idioma = 'es' } = {}) {
+    async generar_reporte({ senales, periodo, explicacion, sistema, tipo: tipoPedido } = {}, { idioma = 'es' } = {}) {
+      /*
+       * ── CON `tipo`, UNA PLANTILLA; SIN ÉL, LO DE SIEMPRE (Plan 44 F3) ─
+       *
+       * «Reporte técnico», «de vibraciones», «de sensores»… los compone
+       * `reportes/generar.mjs` con sus recolectores y sus plantillas. Esta
+       * función sigue siendo el catálogo entero de una máquina, byte a byte
+       * como antes: sin `tipo` —o con "catalogo"— nada de lo que sigue cambia.
+       * Carga perezosa por el mismo motivo que `reporte.mjs`: pdfkit. Se llama
+       * `tipoPedido` porque más abajo `tipo` ya es el TIPO DE MÁQUINA.
+       */
+      if (tipoPedido !== undefined && tipoPedido !== null && String(tipoPedido).trim() && !/^cat[aá]logo$/i.test(String(tipoPedido).trim())) {
+        let generarMod
+        try {
+          generarMod = await import('../../reportes/generar.mjs')
+        } catch (error) {
+          return fallo(
+            'Los reportes PDF no están disponibles ahora mismo: falta instalar las dependencias del ' +
+              `backend. El resto del asistente sigue funcionando. (${error.message})`
+          )
+        }
+        return generarMod.generarReportePorPlantilla(
+          { tipo: tipoPedido, sistema, periodo, explicacion },
+          { idioma, resolverSistema, leerMaquina, evaluarRiesgosDe, leerSerieEnRango, reportes, turnos },
+        )
+      }
+
       const v = resolverVentana(periodo, { turnos, maxHoras: MAX_DIAS_REPORTE * 24 })
       if (v.error) return fallo(v.error)
 

@@ -4452,6 +4452,104 @@ check('las definiciones avisan de que NO toda señal tiene serie propia', () => 
   assert.match(def.function.description, /la herramienta lo dice/i)
 })
 
+/* ── generar_reporte con `tipo`: los reportes por plantilla (Plan 44 F3) ─────────
+ *
+ * En bloque propio y al final a propósito: este archivo es de la zona del
+ * asistente (HANDOFF §0) y así el merge es trivial. Lo que se afirma es el
+ * MANIFIESTO que devuelve la herramienta —qué secciones salieron con dato y
+ * cuáles no, con su motivo— y que el archivo es un PDF; el dibujo en sí se
+ * mira en la F7, contra planta. */
+
+console.log('\n── generar_reporte con tipo (Plan 44) ──────────────────────')
+
+await checkAsync('[plantilla] tipo:"tecnico" sobre la espejo: siete secciones con dato, folio TEC, y el PDF escrito', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar('generar_reporte', {
+    tipo: 'tecnico', sistema: ESPEJO.id, periodo: 'últimas 6 horas',
+  })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.tipo, 'tecnico')
+  assert.equal(r.instalacion, ESPEJO.nombre)
+  assert.match(r.folio, /^TDCON-TEC-\d{8}-[0-9A-F]{4}$/)
+  assert.deepEqual(r.seccionesConDato, [
+    '1. Resumen operativo', '2. Indicadores principales', '3. Tendencias de variables',
+    '4. Estadísticas del período', '5. Análisis técnico', '6. Conclusiones', '7. Firmas',
+  ])
+  assert.equal(r.seccionesSinDato, undefined, 'con el falso en marcha todas las secciones tienen fuente')
+  assert.ok(r.graficas > 0 && r.graficas <= 8, `tope de series por plantilla (D14): ${r.graficas}`)
+  assert.equal(r._adjunto.tipo, 'reporte')
+  assert.match(r._adjunto.titulo, /^REPORTE TÉCNICO — /)
+  const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
+  const contenido = await readFile(join(reportes.dir, `${id}.pdf`))
+  assert.equal(contenido.subarray(0, 4).toString(), '%PDF')
+})
+
+await checkAsync('[plantilla] tipo:"vibraciones": el espectro va como sección SIN dato con su motivo; los puntos de medición y el diagnóstico, con dato', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar('generar_reporte', {
+    tipo: 'reporte de vibraciones', sistema: ESPEJO.id, periodo: 'últimas 6 horas',
+  })
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.tipo, 'vibraciones')
+  assert.match(r.folio, /^TDCON-VIB-/)
+  assert.deepEqual(r.seccionesSinDato.map((x) => x.seccion), ['3. Espectro de vibración'])
+  assert.match(r.seccionesSinDato[0].motivo, /vigilancias del espectro/)
+  assert.ok(r.seccionesConDato.includes('2. Puntos de medición'))
+  assert.ok(r.seccionesConDato.includes('5. Diagnóstico'))
+})
+
+await checkAsync('[plantilla] tipo:"lectura de sensores" (texto libre) normaliza, y en inglés los títulos salen en inglés', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar(
+    'generar_reporte', { tipo: 'lectura de sensores', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, { idioma: 'en' },
+  )
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.tipo, 'lectura-de-sensores')
+  assert.equal(r.reporte, 'SENSOR READINGS REPORT')
+  assert.ok(r.seccionesConDato.includes('4. Calibration and data quality'))
+})
+
+await checkAsync('[plantilla] sin `tipo` la herramienta hace EXACTAMENTE lo de siempre: mismas señales con gráfico que antes del Plan 44', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const h = createHerramientas({ client, reportes })
+  const sinTipo = await h.ejecutar('generar_reporte', { sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  const catalogo = await h.ejecutar('generar_reporte', { sistema: ESPEJO.id, periodo: 'últimas 6 horas', tipo: 'catalogo' })
+  assert.equal(sinTipo.ok, true, sinTipo.error)
+  assert.equal(sinTipo.tipo, undefined, 'la respuesta del catálogo no cambió de forma')
+  assert.deepEqual(catalogo.senalesConGrafico, sinTipo.senalesConGrafico)
+  assert.equal(sinTipo.senalesConGrafico.length, configurada.series.historizadas().length)
+})
+
+await checkAsync('[plantilla] un tipo desconocido lista los tipos; "riesgos" está declarado pero se niega con su motivo y dice cuáles sí', async () => {
+  const reportes = await reportesTmp()
+  const h = createHerramientas({ client: clienteFalso(), reportes })
+  const a = await h.ejecutar('generar_reporte', { tipo: 'bonito', sistema: ESPEJO.id })
+  assert.equal(a.ok, false)
+  assert.match(a.error, /No hay ningún tipo de reporte llamado «bonito»/)
+  assert.ok(a.tipos.includes('lectura-de-sensores'))
+
+  const b = await h.ejecutar('generar_reporte', { tipo: 'riesgos', sistema: ESPEJO.id })
+  assert.equal(b.ok, false)
+  assert.match(b.error, /todavía no se compone/)
+  assert.match(b.error, /probabilidad × impacto/)
+  assert.deepEqual(b.disponibles, ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores'])
+
+  const c = await h.ejecutar('generar_reporte', { tipo: 'técnico de alarmas', sistema: ESPEJO.id })
+  assert.equal(c.ok, false)
+  assert.deepEqual(c.tipos, ['tecnico', 'alarmas'], 'dos tipos en la frase: se pregunta, no se elige')
+})
+
+await checkAsync('[plantilla] el tanque (cerrado) se niega por la guarda de máquina cerrada, no por la plantilla', async () => {
+  const reportes = await reportesTmp()
+  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar('generar_reporte', { tipo: 'tecnico', sistema: 'tanque' })
+  assert.equal(r.ok, false)
+  assert.match(r.error, /cerrad/i)
+})
+
 await checkAsync('el registro no lanza ante una herramienta inventada', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('borrar_planta', {})
 

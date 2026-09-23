@@ -1185,7 +1185,9 @@ export function createHerramientas({
       cuaderno,
       ...(leerAprendizajeDe ? { leerAprendizajeDe } : {}),
       historia: { leerSerie, leerSerieEnRango, leerHistoriaLarga },
-      maquina: { leerMaquina, resolverSistema },
+      /* `evaluarRiesgosDe` desde el Plan 44 F3: los reportes por plantilla
+         (`generar_reporte` con `tipo`) llenan su diagnóstico con las reglas del tipo. */
+      maquina: { leerMaquina, resolverSistema, evaluarRiesgosDe },
       senalesPronostico: SENALES_PRONOSTICO,
       dameHerramientas: () => herramientas,
     }),

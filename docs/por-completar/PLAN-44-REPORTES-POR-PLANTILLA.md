@@ -1,6 +1,6 @@
 # PLAN 44 — Reportes por plantilla: ocho tipos que el asistente sabe generar
 
-**Estado:** F0 completada el 23-09-2026 · F1–F7 por completar · las decisiones de §6 cerradas por el usuario el 23-09-2026, salvo el criterio de la matriz P×I (D15), propuesto y pendiente de su confirmación
+**Estado:** F0–F3 completadas el 23-09-2026 (las tres plantillas con toda la información —técnico, vibraciones, lectura de sensores— se generan; las otras cinco están declaradas y la herramienta explica por qué no salen todavía) · F4–F7 por completar · las decisiones de §6 cerradas por el usuario el 23-09-2026, salvo el criterio de la matriz P×I (D15), propuesto y pendiente de su confirmación
 **Rama:** `UI-Limpieza1.0`
 **Origen:** el usuario entregó en `Documentos/Reportes/` ocho carpetas, una por
 tipo de reporte, cada una con un `.docx` de ejemplo (la maqueta) y un `.png`
@@ -378,9 +378,29 @@ pudo hacer aquí: mirar el PDF a ojo (no hay renderizador en esta máquina);
 quedan dos muestras en el scratchpad de la sesión y la mirada de verdad es
 la F7.
 
-### F2 — Los recolectores deterministas
+### F2 — Los recolectores deterministas · completada el 23-09-2026
 
-**Objetivo.** `backend/ia/reportes/recolectores.mjs` con una función por
+**Lo que se hizo.** `backend/ia/reportes/recolectores.mjs`: piezas puras
+(`medidasDe`, `principalesDe`, `variacionDe`, `desvioPorciento`,
+`peorEstadoDe`, `recuentoDe`, `banderasActivas`, `formatear`) y
+`recolectar()`, que recibe las cuatro fuentes con I/O inyectadas —leer la
+máquina, evaluar riesgos, leer una serie, dibujar— y devuelve un solo objeto
+con el estado, los riesgos, las series leídas (resumen, tendencia,
+cobertura, SVG, interpretación en código), el período anterior de las
+principales, y las banderas activas. Se apartó del diseño de abajo en una
+cosa: no hay ocho recolectores con `{ ok } | { ausente }` sino uno que trae
+todo y **las plantillas deciden qué sección queda ausente**, porque el
+motivo de una ausencia («el módulo no publica espectro») es de la plantilla,
+no del dato. Ocho pruebas en `recolectores.test.mjs`; una la vio fallar el
+propio recolector: sin dominio contaba «una bandera sin lectura» de un
+dominio que no existía, y se corrigió a «sin dominio no se busca».
+
+Los ▲▼ salen de comparar el promedio del período con el del **período
+anterior de la misma duración, pegado al actual**, y sólo para las
+principales con serie; la variación bajo medio decimal es cero, no un
+triángulo. Lo que sigue era el objetivo escrito antes de hacerlo:
+
+`backend/ia/reportes/recolectores.mjs` con una función por
 fuente, todas con la misma forma de salida `{ ok, datos } | { ausente:
 motivo }`, sin dibujar nada:
 
@@ -400,7 +420,44 @@ Cada recolector se prueba con el cliente falso y la espejo
 → `ausente` con motivo que nombre la señal; máquina cerrada → el `fallo` de
 `resolverSistema` sin envolver.
 
-### F3 — Las tres plantillas completas: `tecnico`, `vibraciones`, `lectura-de-sensores`
+### F3 — Las tres plantillas completas: `tecnico`, `vibraciones`, `lectura-de-sensores` · completada el 23-09-2026
+
+**Lo que se hizo.** Los tres módulos en `backend/ia/reportes/plantillas/`
+(cada uno `{ id, folioPrefijo, portada, claves(ctx), documento(d, ctx) }`,
+con `comun.mjs` para lo que comparten), las cinco pendientes declaradas en
+`pendientes.mjs` con su esqueleto de secciones y su motivo en dos idiomas,
+el registro y el normalizador en `plantillas/index.mjs`
+(`tipoDeReporte`: id, sinónimos es/en, «dos tipos» → ambiguo), y el
+orquestador `reportes/generar.mjs`, que la herramienta llama con
+`await import()` cuando llega un `tipo` que no es `catalogo`. El tipo
+`vibraciones` declara `indicadores` por rol (vRMS, aRMS, DKW, velocidad del
+variador); una medida por apoyo sale una vez, la mayor, con el apoyo al lado.
+
+Los cuatro enganches en archivos existentes fueron pequeños: la herramienta
+(`historicos/index.mjs`, un bloque de delegación; el argumento se llama
+`tipoPedido` porque `tipo` ya era el tipo de máquina más abajo), la
+definición (`definiciones.mjs`, el argumento `tipo` con enum y descripción
+por valor, y `Texto.optional()` en el esquema para que el normalizador
+reciba texto libre), el prompt (`chat.mjs`, cuatro líneas), y el cableado
+de `evaluarRiesgosDe` hacia la familia `historicos` en
+`conversacion/herramientas.mjs` (faltaba: lo cazó el verificador, no las
+pruebas unitarias, que inyectan las dependencias).
+
+Sin `sistema`, con una sola configurada en servicio, la elige; con más de
+una, pide que se nombre. El tanque cae en la guarda de máquina cerrada antes
+de llegar a la plantilla. `SISTEMAS_EN_SERVICIO` no sirve para esto: se
+calcula al cargar el módulo y no ve las máquinas registradas después; se
+filtra `SISTEMA` en el momento.
+
+**Medido.** `verificar-herramientas`: 192 → **198** (seis en bloque propio
+al final, D11), 22 omitidas; `verificar-chat` 71 y `verificar-instrucciones`
+en verde tras tocar el prompt; suite del backend 401 → **429** (compositor 6,
+recolectores 8, plantillas 5, generar 9). En una tanda que corrió a la vez
+que el verificador, una prueba de `generar` y otra de `salud` dieron `timed
+out` a 5 s; solas, la de `generar` tarda 0,5 s (contención, §5.3 de
+`CLAUDE.md`) y la de `salud` es la B16 del backlog. Los tres PDF de la espejo
+salen con 7 secciones con dato (vibraciones: 8 con dato y el espectro sin
+dato, con motivo). Lo que sigue era el objetivo escrito antes de hacerlo:
 
 **Objetivo.** Escribir los tres módulos de plantilla, el argumento `tipo` en
 `generar_reporte` y en `definiciones.mjs` (enum con descripción por valor,

@@ -713,6 +713,14 @@ export const TIPO_VIBRACIONES = Object.freeze({
    * `UMBRALES` del tanque (`min`, `avisoMin`, `avisoMax`, `max`) para que
    * `bandaLegible` la lea sin saber de qué máquina viene.
    */
+  /*
+   * Los indicadores principales de un reporte por plantilla (Plan 44 §1.1),
+   * por ROL y en este orden: la velocidad eficaz (la que tiene norma), la
+   * aceleración, el valor de daño y a qué régimen gira. Una medida por apoyo
+   * sale UNA vez —la mayor de los tres— con el apoyo al lado.
+   */
+  indicadores: [rolDe("medida", "vRMS"), rolDe("medida", "aRMS"), rolDe("medida", "DKW"), rolDe("variador", "velocidad")],
+
   bandaDe: (rolId) =>
     rolId === rolDe("medida", "vRMS")
       ? Object.freeze({ min: null, avisoMin: null, avisoMax: LIMITES_ISO.aviso, max: LIMITES_ISO.alarma })

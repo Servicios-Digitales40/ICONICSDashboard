@@ -120,11 +120,12 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 | La narración en inglés de lo que el dominio escribe en español | `backend/ia/i18n/narrar*.mjs` |
 | El banco de casos y el juez | `backend/ia/evaluacion/` (`verificar-evaluacion`) |
 | Dictado y voz | `backend/ia/voz.mjs` |
+| Los reportes PDF (Plan 44): el catálogo de siempre y la conversación en `reporte.mjs`; las plantillas por `tipo`, sus recolectores, el compositor por bloques y el lienzo de marca | `backend/ia/reportes/` (`generar.mjs`, `plantillas/`, `recolectores.mjs`, `compositor.mjs`, `lienzo.mjs`) · arte en `ia/marca/portadas/` · maquetas en `docs/plantillas-reportes/` |
 
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 192 correctas · 22 omitidas
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 198 correctas · 22 omitidas
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 71
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -189,9 +190,9 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | | |
 |---|---|
 | Suite de frontend | **1172** pruebas · 20 omitidas *(a 23-09 por la tarde, tras Plan 42.5 F6.7; eran 1102 · 29 el 22-09)* |
-| Suite de backend | **401** pruebas (400 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») |
+| Suite de backend | **429** pruebas (428 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3; eran 401)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **192** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **198** correctas (13 sobre una configurada, 6 de reportes por plantilla) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -782,7 +783,7 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **400 passed** de 401 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Backend | **428 passed** de 429 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
 | Frontend | **1172 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F6.7)* |
 | Lint y types | sin salida |
 
