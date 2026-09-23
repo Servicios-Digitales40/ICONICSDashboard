@@ -127,13 +127,16 @@
       }
     },
     "views": {
-      "eva-vibraciones": {
+      "maq-graficas": {
         "frase": "Los tres apoyos, sus cuatro medidas y qué vigilancias tiene encendidas el módulo."
+      },
+      "maq-planta": {
+        "frase": "La máquina de un vistazo: qué requiere atención, qué series tienen historia y qué no se puede decir."
       },
       "eva-riesgos-vibracion": {
         "frase": "Qué se deduce de esas medidas, con la evidencia separada de la hipótesis."
       },
-      "vib-3d": {
+      "maq-3d": {
         "frase": "Dónde está montada cada sonda en el tren de rotor, y en qué dirección mide."
       },
       "vib-controles": {
@@ -531,5 +534,40 @@
     "removedHint": "Su sección desaparece del menú. Si algún caso previo la nombra, queda desactivada y su historia sigue siendo válida.",
     "inMenu": "En el menú",
     "inMenuHint": "Cada máquina configurada tiene su propia sección con Inicio, Gráficas y Vista 3D."
+  },
+  "maquina": {
+    "planta": {
+      "loading": "Leyendo la máquina…",
+      "sinMaquina": {
+        "title": "Elige una máquina",
+        "message": "Esta pantalla enseña una máquina configurada. Entra desde su sección del menú."
+      },
+      "sinFuente": {
+        "title": "Esta máquina no se puede pintar",
+        "message": "Su configuración no se pudo construir con los tipos que este programa conoce."
+      },
+      "atencion": {
+        "title": "Requiere atención · {{n}}",
+        "sub": "Lo que las reglas del tipo detectan con las lecturas de ahora"
+      },
+      "historia": {
+        "title_one": "{{count}} serie con historia",
+        "title_other": "{{count}} series con historia",
+        "sub": "Las series verificadas en el historiador, con su tendencia de las últimas {{horas}} h",
+        "ningunaTitle": "Ninguna serie verificada",
+        "ninguna": "Ninguna variable de esta máquina tiene serie verificada en el historiador. Sondea sus series en Configuración para que aparezcan aquí."
+      },
+      "estado": {
+        "title": "Estado de las variables",
+        "code": "{{conLectura}} de {{total}} con lectura"
+      },
+      "tendencias": {
+        "title": "Tendencias"
+      },
+      "limitaciones": {
+        "title": "Lo que no se puede decir",
+        "code": "declarado por la configuración y el sondeo de esta máquina"
+      }
+    }
   }
 }

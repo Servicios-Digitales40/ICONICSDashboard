@@ -43,7 +43,7 @@ const MAQUINA = { id: "vib-motor-03", nombre: "Nuevo-Modor", tipo: "vibraciones"
 const navConMaquina = () => buildNav(ROUTES, NAV_GROUPS, () => true, [MAQUINA]);
 
 describe("superficie de la aplicación", () => {
-  it("son las treinta y dos vistas, agrupadas por MÓDULO y por SISTEMA", () => {
+  it("son las treinta y tres vistas, agrupadas por MÓDULO y por SISTEMA", () => {
     // El array va en el MISMO orden que el sidebar, y eso no es cosmético:
     // `buildNav` coloca cada sección en la posición de su primer hijo, así
     // que un bloque declarado fuera de sitio saldría bien en el menú y
@@ -77,6 +77,9 @@ describe("superficie de la aplicación", () => {
       // propio. Cada máquina configurada en servicio las reclama en su propia
       // sección con `?maquina=<id>`; aquí sólo existen.
       "maq-inicio",
+      // Planta de la máquina (Plan 42.5 F1): la primera vista de configurada
+      // que no está escrita contra vibraciones.
+      "maq-planta",
       "maq-graficas",
       "maq-3d",
       // `maq-riesgos` (Plan 40 F2) existe y se navega con `?maquina=`, pero es
@@ -326,12 +329,12 @@ describe("el sidebar que sale del registro", () => {
      */
     const maquina = navConMaquina().find((n) => n.group === `maq:${MAQUINA.id}`);
     expect(maquina.children.map((c) => c.id)).toEqual([
-      "maq-inicio", "maq-graficas", "maq-3d",
+      "maq-inicio", "maq-planta", "maq-graficas", "maq-3d",
       "maq-hallazgos", "maq-avisos",
       "maq-casos", "maq-rag",
     ]);
     expect(maquina.children.map((c) => c.apartado)).toEqual([
-      "visualizacion", "visualizacion", "visualizacion",
+      "visualizacion", "visualizacion", "visualizacion", "visualizacion",
       "diagnostico", "diagnostico",
       "documentacion", "documentacion",
     ]);

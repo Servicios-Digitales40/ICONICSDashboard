@@ -132,10 +132,15 @@
       "nav": "Home",
       "sub": "Configured machine · what the machine answers right now"
     },
+    "maq-planta": {
+      "title": "Plant",
+      "nav": "Plant",
+      "sub": "Configured machine · at a glance, with its historian trends"
+    },
     "maq-graficas": {
-      "title": "Charts",
-      "nav": "Charts",
-      "sub": "Configured machine · mechanical state, the instant only"
+      "title": "Mechanical state",
+      "nav": "Mechanical state",
+      "sub": "Configured machine · ISO bands, watches and counters, the instant only"
     },
     "maq-3d": {
       "title": "3D View",

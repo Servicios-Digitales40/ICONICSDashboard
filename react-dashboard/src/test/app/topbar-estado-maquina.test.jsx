@@ -128,9 +128,9 @@ describe("Topbar: el indicador de encendido es de UNA máquina", () => {
     // Se espera a que el Topbar termine de pintar antes de afirmar la
     // ausencia: comprobarla sobre un árbol a medio montar la daría por buena
     // aunque el indicador entrara un instante después.
-    await screen.findByRole("heading", { name: /Gráficas/i });
+    await screen.findByRole("heading", { name: /Estado mecánico/i });
     /* Y es la máquina configurada la que se está mirando: su nombre va junto
-       al título, porque «Gráficas» solo no dice de cuál. */
+       al título, porque «Estado mecánico» solo no dice de cuál. */
     expect(screen.getByText(CONFIGURADA.nombre)).toBeTruthy();
     expect(screen.queryByText(/Encendida|Apagada/i)).toBeNull();
   });

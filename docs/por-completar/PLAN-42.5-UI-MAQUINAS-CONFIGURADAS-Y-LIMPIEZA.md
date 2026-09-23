@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0 completada · F1a (capa de datos) completada · F1b–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F1 completadas · F2–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -496,6 +496,49 @@ encontrada al escribirlas: `lecturaDe` tras soltar el último suscriptor
 devuelve «sin dato» porque el motor libera los puntos —es lo correcto
 (`motor-por-sistema.test.js`)—, así que se lee dentro de la suscripción.
 
+**F1b hecha (22-09-2026, noche): pasos 5–7, la «Planta» de una máquina
+configurada.** Lo que de verdad pasó:
+
+5. `views/maquina/PlantaMaquina.jsx` con tiles nuevos en
+   `components/maquina/tilesMaquina.jsx` (banda de series con historia,
+   estado de las variables con barra donde el tipo declara banda, tendencias
+   con cobertura, limitaciones). La franja de atención reutiliza
+   `TarjetaRiesgo` de `components/riesgoVibracion.jsx`: es la tarjeta con la
+   que la vista de riesgos pinta un riesgo de una configurada y hoy es la
+   única que hay. **Deuda anotada**: la tarjeta de riesgo la debería ofrecer
+   el TIPO; `sin-literales-de-maquina.test.js` permite ese import por nombre
+   y sólo ése. El orden de las series (**[?] de D5, cerrado**) es del tipo:
+   por apoyo en el orden de `tipo.canales`, dentro por rol en el orden de
+   `tipo.roles`, lo suelto al final; vive en
+   `shared/eva/comun/vistaDeMaquina.js` (`clavesConTendencia`) y se prueba en
+   Node. Sin titular, como preveía D5.
+6. Ruta `maq-planta` detrás de `maq-inicio` (que conserva `iconoSeccion`),
+   con `porMaquina` y apartado de visualización; i18n en es/en;
+   `maq-graficas` renombrada «Estado mecánico» (D14). En el Inicio, un
+   segundo botón «Entrar a Planta» y su tarjeta en la rejilla. **Hallazgo de
+   paso**: las tarjetas del Inicio buscaban `vibration.views.<ruta>.frase`
+   con los ids anteriores al Plan 40 (`eva-vibraciones`, `vib-3d`) y
+   enseñaban la clave cruda; se renombraron a `maq-graficas`/`maq-3d` en los
+   dos idiomas.
+7. `declararContextoDeVista({ sistema: maquina.id })`; `useEstadoDeMaquina`
+   gana `dominio` (`canales`, `variador`, `alarmas`) para que la vista pida
+   `tipo.evaluarRiesgos` sin volver a la fuente.
+
+Pruebas nuevas: `planta-maquina` (11, hooks doblados, fixture espejo con 36
+de 73 verificadas), `planta-maquina-simulada` (2, red cortada),
+`un-motor-por-maquina` (2: Planta + Estado mecánico abren UN `pollingEngine`;
+al desmontar, los puntos se sueltan), `sin-literales-de-maquina` (uno por
+archivo genérico), `vista-de-maquina-tendencias` (5). Cuatro pruebas
+existentes que enumeran las rutas de máquina se actualizaron con
+`maq-planta`, y el Topbar espera «Estado mecánico».
+
+Dos correcciones que salieron de las pruebas: la primera versión del
+ciclo de vida afirmaba `stats().corriendo === false` al desmontar, y el
+motor no se para al soltar los puntos —los libera y la lectura vuelve a
+«sin dato», que es la regla que ya afirmaba `motor-por-sistema.test.js`—;
+y `estado?.senales ?? []` sin `useMemo` cambiaba de identidad en cada
+render (lo cazó el linter de hooks).
+
 **Riesgos y cómo se cazan.**
 
 - *Generalizar copiando.* La prueba `sin-literales-de-maquina.test.js`
@@ -544,14 +587,19 @@ devuelve «sin dato» porque el motor libera los puntos —es lo correcto
 - [ ] `PlantaMaquina` con `vib-motor-03` contra planta (backend reiniciado):
       tendencias de las series verificadas, atención con los riesgos del
       tipo, limitaciones visibles, sin titular, sin un solo literal de
-      máquina (la prueba lo afirma).
-- [ ] En «Simulado», Planta dibuja curvas sin salir a la red (prueba con
+      máquina (la prueba lo afirma). **Pendiente de mirar en el navegador**:
+      el backend que corre arrancó el 22-09 a las 11:44 y la autenticación
+      está encendida; la comprobación manual queda para la sesión con la
+      pantalla delante (HANDOFF paso 0). Lo que sí está afirmado por prueba:
+      simulado punta a punta, y la fixture espejo con 36 de 73 verificadas.
+- [x] En «Simulado», Planta dibuja curvas sin salir a la red (prueba con
       trampa de `fetch`).
-- [ ] Un solo motor de sondeo por máquina con Planta y el banner montados.
-- [ ] Lint, types, `npm run verificar`, las dos suites; `verificar-bundle`
+- [x] Un solo motor de sondeo por máquina con Planta y «Estado mecánico» montados
+      (`un-motor-por-maquina.test.jsx`).
+- [x] Lint, types, `npm run verificar`, las dos suites; `verificar-bundle`
       con `index`/`vendor` anotados **antes y después** (la pila de gráficas
       va al trozo `charts`, que hoy no tiene presupuesto: se anota su cifra
-      para que F4 tenga con qué comparar).
+      para que F4 tenga con qué comparar). **Tras F1:** `index` 351,3 KB / 450 (+5,8 KB: la capa de datos genérica entra en el arranque porque `fuenteDeMaquina` la importa) · `vendor` 269,1 / 330 (igual) · `charts` 326,4 (igual) · `PlantaMaquina` diferido, 11,5 KB.
 
 **Se comitea en dos**: (a) pasos 1–4 con sus pruebas —capa de datos, nada
 visible—; (b) pasos 5–7. Si (b) hay que revertir, (a) sigue siendo útil para

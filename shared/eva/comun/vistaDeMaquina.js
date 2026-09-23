@@ -84,3 +84,51 @@ export function contadoresDeMaquina(maquina, contadores) {
   }
   return salida;
 }
+
+/**
+ * Qué claves de una máquina configurada llevan TENDENCIA en su Planta, y en
+ * qué orden (Plan 42.5 F1, la respuesta al «[?]» de D5).
+ *
+ * Son las series **verificadas** por el sondeo (`sistema.series.historizadas()`)
+ * que además son una medida (`metaDe(clave).naturaleza === "medida"`): una
+ * bandera o un contador de alarma tienen serie, pero su «tendencia» es un
+ * flanco, no una curva, y va en otra pantalla.
+ *
+ * El orden lo declara el TIPO, no la vista ni un campo nuevo de la
+ * configuración: primero por apoyo, en el orden de `tipo.canales`; dentro del
+ * apoyo, en el orden en que el tipo declara sus `roles`; lo que no cuelga de
+ * ningún apoyo (variador, calidades sueltas) va al final, en el orden de la
+ * configuración. Un tipo sin `canales` deja el orden de la configuración tal
+ * cual. Es dominio: dos vistas que lo dedujeran por su cuenta acabarían con
+ * dos órdenes.
+ *
+ * @param {object} sistema  el que devuelve `construirSistema`
+ * @param {object} maquina  la configuración cruda (`variables` con `assetId` y `rol`)
+ * @param {object|null} tipo
+ * @returns {string[]}  claves, ordenadas
+ */
+export function clavesConTendencia(sistema, maquina, tipo) {
+  if (!sistema?.series?.historizadas || !sistema.metaDe) return [];
+
+  const variables = maquina?.variables ?? [];
+  const porClave = new Map(variables.map((v) => [v.id ?? v.pointName, v]));
+  const posicionConfig = new Map(variables.map((v, i) => [v.id ?? v.pointName, i]));
+  const posicionApoyo = new Map((tipo?.canales ?? []).map((c, i) => [c.id, i]));
+  const posicionRol = new Map(Object.keys(tipo?.roles ?? {}).map((r, i) => [r, i]));
+
+  const orden = (clave) => {
+    const v = porClave.get(clave);
+    const apoyo = v?.assetId != null && posicionApoyo.has(v.assetId) ? posicionApoyo.get(v.assetId) : Infinity;
+    const rol = v?.rol != null && posicionRol.has(v.rol) ? posicionRol.get(v.rol) : Infinity;
+    return [apoyo, rol, posicionConfig.get(clave) ?? Infinity];
+  };
+
+  return sistema.series
+    .historizadas()
+    .filter((clave) => sistema.metaDe(clave)?.naturaleza === "medida")
+    .sort((a, b) => {
+      const [aa, ra, ca] = orden(a);
+      const [ab, rb, cb] = orden(b);
+      return aa - ab || ra - rb || ca - cb;
+    });
+}

@@ -103,7 +103,9 @@ describe("Inicio con una máquina configurada", () => {
     const onNavigate = vi.fn();
     montar(InicioVibraciones, { onNavigate });
 
-    fireEvent.click(screen.getByRole("button", { name: /Entrar/ }));
+    /* Hay dos «Entrar a …» desde el Plan 42.5 F1 (Estado mecánico y Planta); el
+       CTA principal sigue siendo el primero. */
+    fireEvent.click(screen.getByRole("button", { name: /Entrar a Estado mecánico/ }));
     expect(onNavigate).toHaveBeenCalledWith("maq-graficas", { maquina: "vib-motor-03" });
 
     expect(screen.queryByRole("button", { name: /Ver riesgos|riesgos/i })).toBeNull();

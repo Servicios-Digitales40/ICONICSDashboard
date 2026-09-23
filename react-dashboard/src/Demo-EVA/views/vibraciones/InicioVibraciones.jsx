@@ -38,7 +38,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ArrowRight, Box, Cpu, Gauge, LayoutDashboard, Monitor, Radio, Server, ShieldAlert, WifiOff,
+  ArrowRight, Box, Cpu, Gauge, LayoutDashboard, Monitor, Radio, Server, ShieldAlert, TrendingUp, WifiOff,
 } from "lucide-react";
 
 import { Button, SectionLabel } from "@/components/ui/index.js";
@@ -229,6 +229,14 @@ const REJILLA = `
  * máquina «no contesta» es el caso frecuente, no la excepción.
  */
 const VISTAS = [
+  {
+    /* La máquina de un vistazo con sus tendencias (Plan 42.5 F1). Sin dato en
+       la tarjeta: lo que la resume —cuántas series tienen historia— es de la
+       configuración, no de una lectura, y esta rejilla sólo enseña lecturas. */
+    id: "maq-planta",
+    Icono: TrendingUp,
+    dato: () => null,
+  },
   {
     id: "maq-graficas",
     Icono: LayoutDashboard,
@@ -599,6 +607,11 @@ function InicioVibraciones({ onNavigate }) {
               <Button variant="primary" icon={<ArrowRight size={15} />} onClick={() => navegar("maq-graficas")}>
                 {traducir("dashboard:home.hero.enter", {
                   pantalla: traducir("navigation:routes.maq-graficas.nav"),
+                })}
+              </Button>
+              <Button variant="secondary" icon={<TrendingUp size={15} />} onClick={() => navegar("maq-planta")}>
+                {traducir("dashboard:home.hero.enter", {
+                  pantalla: traducir("navigation:routes.maq-planta.nav"),
                 })}
               </Button>
             </div>

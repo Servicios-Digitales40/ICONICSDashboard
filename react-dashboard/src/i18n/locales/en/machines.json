@@ -127,13 +127,16 @@
       }
     },
     "views": {
-      "eva-vibraciones": {
+      "maq-graficas": {
         "frase": "The three bearings, their four measurements, and which watches the module has enabled."
+      },
+      "maq-planta": {
+        "frase": "The machine at a glance: what needs attention, which series have history, and what cannot be said."
       },
       "eva-riesgos-vibracion": {
         "frase": "What those measurements imply, with the evidence kept apart from the hypothesis."
       },
-      "vib-3d": {
+      "maq-3d": {
         "frase": "Where each probe is mounted on the rotor train, and in which direction it measures."
       },
       "vib-controles": {
@@ -531,5 +534,40 @@
     "removedHint": "Its section disappears from the menu. If any previous case names it, it stays deactivated and its history remains valid.",
     "inMenu": "In the menu",
     "inMenuHint": "Each configured machine has its own section with Home, Charts and 3D View."
+  },
+  "maquina": {
+    "planta": {
+      "loading": "Reading the machine…",
+      "sinMaquina": {
+        "title": "Pick a machine",
+        "message": "This screen shows a configured machine. Enter from its section in the menu."
+      },
+      "sinFuente": {
+        "title": "This machine cannot be drawn",
+        "message": "Its configuration could not be built with the types this program knows."
+      },
+      "atencion": {
+        "title": "Needs attention · {{n}}",
+        "sub": "What the type's rules detect with the current readings"
+      },
+      "historia": {
+        "title_one": "{{count}} series with history",
+        "title_other": "{{count}} series with history",
+        "sub": "The series verified in the historian, with their trend over the last {{horas}} h",
+        "ningunaTitle": "No verified series",
+        "ninguna": "No variable of this machine has a verified series in the historian. Probe its series in Configuration so they show up here."
+      },
+      "estado": {
+        "title": "State of the variables",
+        "code": "{{conLectura}} of {{total}} with a reading"
+      },
+      "tendencias": {
+        "title": "Trends"
+      },
+      "limitaciones": {
+        "title": "What cannot be said",
+        "code": "declared by this machine's configuration and probe"
+      }
+    }
   }
 }

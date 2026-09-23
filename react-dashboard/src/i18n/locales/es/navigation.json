@@ -132,10 +132,15 @@
       "nav": "Inicio",
       "sub": "Máquina configurada · qué contesta ahora mismo"
     },
+    "maq-planta": {
+      "title": "Planta",
+      "nav": "Planta",
+      "sub": "Máquina configurada · de un vistazo, con sus tendencias del historiador"
+    },
     "maq-graficas": {
-      "title": "Gráficas",
-      "nav": "Gráficas",
-      "sub": "Máquina configurada · estado mecánico, sólo el instante"
+      "title": "Estado mecánico",
+      "nav": "Estado mecánico",
+      "sub": "Máquina configurada · bandas ISO, vigilancias y contadores, sólo el instante"
     },
     "maq-3d": {
       "title": "Vista 3D",

@@ -34,6 +34,7 @@ const SIN_MAQUINA = Object.freeze({
   sistema: null,
   maquina: null,
   estado: null,
+  dominio: null,
   buffer: null,
   lastUpdated: null,
   loading: false,
@@ -90,6 +91,13 @@ export function useEstadoDeMaquina() {
     sistema: fuente.sistema,
     maquina: configurada,
     estado: instantanea.estado ?? null,
+    /* El dominio del TIPO (`canales`, `variador`, `alarmas`), tal como lo
+       entrega la fuente: es lo que `tipo.evaluarRiesgos` espera. `null` hasta
+       la primera lectura, para que nadie evalúe reglas sobre un `{}` que
+       parecería «todo en orden». */
+    dominio: instantanea.canales
+      ? { canales: instantanea.canales, variador: instantanea.variador, alarmas: instantanea.alarmas }
+      : null,
     buffer: fuente.buffer,
     lastUpdated: instantanea.lastUpdated ?? null,
     loading: instantanea.loading,

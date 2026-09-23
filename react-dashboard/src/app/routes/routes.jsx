@@ -86,7 +86,7 @@
 import { lazy } from "react";
 import {
   Bell, Box, Boxes, BrainCircuit, ClipboardList, Cog, Database, Droplets, Factory, FileText, HeartPulse, Home, Inbox,
-  LayoutDashboard, MessageSquareText, NotebookPen, Waves,
+  LayoutDashboard, MessageSquareText, NotebookPen, TrendingUp, Waves,
   /* `Power` se va con la estación de llenado (rama `Vibraciones1.0`): lo usaba
      `eva-controles`, y `vib-controles` sigue sin `nav`. Vuelve al reabrir.
 
@@ -336,6 +336,19 @@ export const ROUTES = [
     id: "maq-inicio",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
     porMaquina: { icon: <Home size={17} />, iconoSeccion: <Waves size={17} />, apartado: "visualizacion" },
+  },
+  {
+    /*
+     * La máquina de un vistazo, con sus tendencias del historiador (Plan 42.5
+     * F1). Es la primera vista de máquina configurada que NO está escrita
+     * contra vibraciones: recibe el `sistema` del registro y su tipo, y todo
+     * lo que enseña sale de ahí (`views/maquina/`). Convive con «Estado
+     * mecánico» (`maq-graficas`), que enseña lo que es del tipo —bandas ISO,
+     * vigilancias, contadores— y sólo el instante (Plan 42.5 D14).
+     */
+    id: "maq-planta",
+    component: lazy(() => import("@/Demo-EVA/views/maquina/PlantaMaquina.jsx")),
+    porMaquina: { icon: <TrendingUp size={17} />, apartado: "visualizacion" },
   },
   {
     id: "maq-graficas",

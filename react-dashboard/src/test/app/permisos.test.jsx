@@ -78,6 +78,7 @@ describe("el menú se acota al rol", () => {
       "maq-3d",
       "maq-graficas",
       "maq-inicio",
+      "maq-planta",
       /*
        * Las seis de Predicción ya no salen (22-09-2026): se ocultaron del menú
        * —no se usan en esta demo, para NINGÚN rol— quitándoles `nav`. Eran

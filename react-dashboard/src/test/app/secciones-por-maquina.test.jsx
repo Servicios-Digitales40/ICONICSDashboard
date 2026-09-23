@@ -39,7 +39,7 @@ describe("el árbol del menú con máquinas configuradas", () => {
        navega con `?maquina=`, no sale en el menú. Por eso está aquí y no en
        la lista de hijos de la sección de abajo. */
     expect(RUTAS_POR_MAQUINA).toEqual([
-      "maq-inicio", "maq-graficas", "maq-3d", "maq-riesgos",
+      "maq-inicio", "maq-planta", "maq-graficas", "maq-3d", "maq-riesgos",
       "maq-hallazgos", "maq-avisos", "maq-casos", "maq-rag",
     ]);
     const ids = NAV.flatMap((n) => (n.children ?? [n]).map((c) => c.id));
@@ -56,12 +56,12 @@ describe("el árbol del menú con máquinas configuradas", () => {
     for (const s of secciones) {
       expect(s.modulo).toBe("monitoreo");
       expect(s.children.map((c) => c.id)).toEqual([
-        "maq-inicio", "maq-graficas", "maq-3d",
+        "maq-inicio", "maq-planta", "maq-graficas", "maq-3d",
         "maq-hallazgos", "maq-avisos", "maq-casos", "maq-rag",
       ]);
       /* Los tres apartados, en el mismo orden que la máquina escrita a mano. */
       expect(s.children.map((c) => c.apartado)).toEqual([
-        "visualizacion", "visualizacion", "visualizacion",
+        "visualizacion", "visualizacion", "visualizacion", "visualizacion",
         "diagnostico", "diagnostico", "documentacion", "documentacion",
       ]);
     }
