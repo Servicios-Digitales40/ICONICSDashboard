@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0 completada · F1–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0 completada · F1a (capa de datos) completada · F1b–F5 por completar, **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -460,6 +460,42 @@ primer commit no pinta nada**: deja la capa de datos lista y probada.
 7. **Contexto del asistente**: `declararContextoDeVista({ sistema:
    maquina.id })`, como hace Estado mecánico.
 
+**F1a hecha (22-09-2026, noche): pasos 1–4, la capa de datos, sin nada visible.**
+Lo que de verdad pasó, paso a paso:
+
+1. `data/comunes/historia.js` recibe el `sistema`. La guarda de «señal
+   desconocida» no puede usar `metaDe` como decía el plan: la entrada del
+   tanque en el registro **no lo tiene**; se usa `claves()`, que sí existe en
+   las dos. La puerta `data/tanque/historia.js` **no pasa `SISTEMA.tanque`**
+   sino una vista del catálogo vivo (`Object.keys(SENALES)`, `esHistorizada`,
+   `puntoHistorico`): dos pruebas del tanque dan de alta una señal sintética
+   en el catálogo en caliente y el registro fija su lista al cargar. Con
+   `SISTEMA.tanque` fallaban dos pruebas que esta rama no toca; con el
+   catálogo, las 115 de los nueve archivos afectados pasan sin cambiar una
+   línea. La equivalencia registro/catálogo en las 52 claves se afirma en
+   `historia-generica.test.js`.
+2. `readSerie(pointName, rango)` en `lib/iconics/transporteSimulado.js`:
+   muestrea `modelo` hacia atrás, forma `{ datos, motivo, hasMore, cobertura }`,
+   `undefined` del modelo → motivo «no es de esta máquina», `null` → hueco,
+   y comparte latencia y `errorPeticion` con `read()`.
+3. `createFuenteDeMaquina` construye el `sistema` una vez y añade `estado`
+   (forma común) a la instantánea, más `buffer`, `lecturaDe`, `leerSerie`,
+   `leerSeries` y `subscribe` (alias de `subscribeVibracion`, que no cambia).
+   El búfer se alimenta con un `onUpdate` interno, no por suscriptor. La
+   guarda `motivoSinSerie` va antes en los dos caminos.
+4. `useSeriesDe(lector, claves, rango)` es el efecto que era
+   `useSeriesHistoricas`, con el lector por parámetro; `hooks.js` lo llama con
+   `useEvaSource()` y `useEstadoDeMaquina.js` con la fuente de la máquina.
+   `unir` y `claveRango` viven en `seriesUnidas.js`. `useEstadoDeMaquina()`
+   devuelve `{ sistema, maquina, estado, buffer, lastUpdated, loading, error,
+   fuente }` y una fuente que no se puede construir viaja en `error`, no lanza.
+
+Pruebas nuevas: `historia-generica` (9), `transporte-simulado-serie` (7),
+`fuente-de-maquina-estado` (5), `estado-de-maquina-hook` (7). Una trampa
+encontrada al escribirlas: `lecturaDe` tras soltar el último suscriptor
+devuelve «sin dato» porque el motor libera los puntos —es lo correcto
+(`motor-por-sistema.test.js`)—, así que se lee dentro de la suscripción.
+
 **Riesgos y cómo se cazan.**
 
 - *Generalizar copiando.* La prueba `sin-literales-de-maquina.test.js`
@@ -498,10 +534,10 @@ primer commit no pinta nada**: deja la capa de datos lista y probada.
   `fetch` se llame.
 
 **Criterios de aceptación.**
-- [ ] `leerSerie(sistema, clave, rango)` se niega con `SIN_SERIE` para una
+- [x] `leerSerie(sistema, clave, rango)` se niega con `SIN_SERIE` para una
       clave no verificada y pide `sistema.series.punto` para la verificada,
       probado con la fixture espejo en Node.
-- [ ] `data/tanque/historia.js` es una puerta de una función por export;
+- [x] `data/tanque/historia.js` es una puerta de una función por export;
       `historia.test.js`, `hooks-historia.test.jsx`, `fuente.test.js`,
       `simulador.test.js`, `grafica-comparada.test.jsx`, `selector-rango.test.jsx`
       y `eva.live.test.js` **no cambian** y siguen verdes.

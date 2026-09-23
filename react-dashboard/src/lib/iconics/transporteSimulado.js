@@ -42,6 +42,7 @@
  * que NO se pudo leer, y esa mitad es la que separa una pantalla en verde de
  * una pantalla ciega.
  */
+import { MAX_PUNTOS, VENTANA } from "@shared/eva/comun/historia.js";
 import { QUALITY_GOOD, QUALITY_SIN_DATO, QUALITY_UNCERTAIN } from "@shared/quality.js";
 
 import { CAOS_SUAVE } from "./caos.js";
@@ -116,5 +117,81 @@ export function createTransporteSimulado({
     return salida;
   }
 
-  return { read };
+  /**
+   * `{ horas, puntos }` (relativo a `ahora()`) o `{ inicio, fin }` (absoluto) →
+   * el fin, el paso y cuántas muestras. Mismo criterio que el lector real
+   * (`Demo-EVA/data/comunes/historia.js`): un rango absoluto pide `MAX_PUNTOS`.
+   */
+  function resolverRangoSimulado(rango) {
+    if (rango?.inicio instanceof Date && rango?.fin instanceof Date) {
+      const finMs = rango.fin.getTime();
+      const inicioMs = rango.inicio.getTime();
+      return { inicioMs, finMs, pasoMs: (finMs - inicioMs) / MAX_PUNTOS, n: MAX_PUNTOS };
+    }
+    const h = rango?.horas ?? VENTANA.horas;
+    const n = rango?.puntos ?? VENTANA.puntos;
+    const finMs = ahora();
+    return { inicioMs: finMs - h * 3_600_000, finMs, pasoMs: (h * 3_600_000) / n, n };
+  }
+
+  /**
+   * La serie «histórica» de un punto: el mismo `modelo` muestreado hacia
+   * atrás sobre la rejilla del rango (Plan 42.5 F1, D10).
+   *
+   * Existe para que una máquina configurada en origen simulado tenga historia
+   * como la tiene en vivo, con la MISMA forma que devuelve el lector real
+   * —`{ datos, motivo, hasMore, cobertura }`— para que quien pinte no sepa
+   * cuál de los dos contestó. Habla en nombres de punto, como `read()`: la
+   * guarda de «esta clave tiene serie verificada» no es del transporte, es
+   * de quien conoce la máquina, y la aplica la fuente antes de llegar aquí.
+   *
+   * Un punto que el modelo no conoce (`undefined`) vuelve con `motivo` y sin
+   * muestras: no es de esta máquina y no se le inventa una curva. Un instante
+   * en que el modelo no tiene valor (`null`, o no finito) es un hueco de la
+   * rejilla, como los que deja el historiador real y `normalizar` descarta.
+   *
+   * Comparte con `read()` la latencia y el fallo de petición del caos: sin
+   * eso, una gráfica simulada respondería siempre mientras el tile de al lado
+   * cae, algo que el servidor real no promete.
+   */
+  async function readSerie(pointName, rango = VENTANA) {
+    if (chaos.latenciaMs > 0) await espera(chaos.latenciaMs);
+    if (rnd() < chaos.errorPeticion) {
+      throw new Error(`${etiqueta}: fallo simulado de la petición al historiador`);
+    }
+
+    const { inicioMs, finMs, pasoMs, n } = resolverRangoSimulado(rango);
+    const datos = [];
+
+    for (let i = n - 1; i >= 0; i--) {
+      const cierre = finMs - i * pasoMs;
+      const valor = modelo(pointName, cierre);
+      if (valor === undefined) {
+        return {
+          datos: [],
+          motivo: `${etiqueta}: el punto ${pointName} no es de esta máquina`,
+          hasMore: false,
+          cobertura: null,
+        };
+      }
+      if (rnd() < chaos.ausente) continue;
+      if (valor === null || typeof valor !== "number" || !Number.isFinite(valor)) continue;
+      datos.push({ t: new Date(cierre), valor });
+    }
+
+    return {
+      datos,
+      motivo: null,
+      hasMore: false,
+      cobertura: {
+        tramos: 1,
+        tramosConDato: datos.length ? 1 : 0,
+        completa: datos.length > 0,
+        desde: datos.length ? new Date(inicioMs) : null,
+        hasta: datos.length ? new Date(finMs) : null,
+      },
+    };
+  }
+
+  return { read, readSerie };
 }

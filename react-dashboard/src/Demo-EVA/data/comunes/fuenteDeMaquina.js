@@ -35,12 +35,39 @@
  * descriptor por rol y apoyo y el tipo simula, así que una configurada se
  * ve en «Simulado» igual que se veía la escrita a mano. Lo que el tipo no
  * sabe simular (el estado del sensor) sigue siendo hueco, nunca cero.
+ *
+ * ── TAMBIÉN LA FORMA COMÚN, EL BÚFER Y LA HISTORIA (Plan 42.5 F1, D8) ──
+ *
+ * Hasta el 22-09-2026 esta fuente entregaba SÓLO el dominio de vibraciones.
+ * Una vista genérica —Planta, Detalle— necesita además una lectura por
+ * variable con su fecha, el búfer de sesión para «Tiempo real» y un lector
+ * del historiador que sepa de esta máquina. Se añaden AQUÍ, sobre el mismo
+ * motor, y no en un hook aparte que abriera el suyo: serían dos motores
+ * sobre los mismos puntos cada vez que Planta y el banner coincidieran, que
+ * es exactamente lo que «un motor por máquina» prohíbe. `subscribeVibracion`
+ * no cambia de forma; `estado` (la forma común de `estadoMaquina.js`) viaja
+ * en la misma instantánea, y `buffer`, `lecturaDe`, `leerSerie` y
+ * `leerSeries` cuelgan de la fuente.
+ *
+ * Quién lee el pasado se decide aquí y una sola vez, igual que en
+ * `evaSource.js`: el transporte simulado trae su `readSerie`; el real no, y
+ * se cae al historiador por HTTP. La guarda de «tiene serie verificada» se
+ * aplica ANTES en los dos caminos (`motivoSinSerie`): en simulado, una
+ * variable sin serie tampoco dibuja, o la pantalla simulada prometería lo
+ * que la real no da.
  */
 import { createPollingEngine, createRealTransport, createTransporteSimulado, presetCaos, TRANSPORTES } from "@/lib/iconics";
 import { construirSistema } from "@shared/eva/comun/construirSistema.js";
 import { dominioDesdeRoles } from "@shared/eva/comun/dominioDesdeRoles.js";
 import { canalesDeMaquina, contadoresDeMaquina } from "@shared/eva/comun/vistaDeMaquina.js";
 import { tipoDe } from "@shared/eva/tipos/index.js";
+
+import { createBufferRodante } from "../../lib/buffer.js";
+import {
+  leerSerie as leerSerieDelHistoriador,
+  leerSeries as leerSeriesDelHistoriador,
+  motivoSinSerie,
+} from "./historia.js";
 
 /** El transporte de una máquina configurada para un origen dado. */
 export function transporteDeConfigurada(maquina, clase, tipo = tipoDe(maquina?.tipo)) {
@@ -79,6 +106,66 @@ export function createFuenteDeMaquina({ maquina, tipo = tipoDe(maquina?.tipo), t
 
   const puntos = (maquina.variables ?? []).map((v) => v.pointName).filter(Boolean);
   const motor = createPollingEngine({ read: transport.read, intervalMs: intervalMs ?? maquina.cadenciaMs ?? 5000 });
+
+  /* El `sistema` de esta máquina, construido UNA vez: es quien sabe qué
+     claves tienen serie verificada, con qué nombre se piden y cómo se
+     proyecta cada lectura a la forma común. */
+  const sistema = construirSistema(maquina, tipo);
+  const puntoDeClave = new Map((maquina.variables ?? []).map((v) => [v.id ?? v.pointName, v.pointName]));
+  const buffer = createBufferRodante();
+
+  /** La forma común de `estadoMaquina.js` para las lecturas de este instante. */
+  function estadoActual(lastUpdated) {
+    return sistema.estado((punto) => motor.get(punto).value, sistema, lastUpdated);
+  }
+
+  /** `{ valor, receivedAt, stale, motivo }` de una clave, o `null` si no es de esta máquina. */
+  function lecturaDe(clave) {
+    const punto = puntoDeClave.get(clave);
+    if (!punto) return null;
+    const l = motor.get(punto);
+    return { valor: l.value, receivedAt: l.receivedAt, stale: l.stale, motivo: l.motivo ?? null };
+  }
+
+  /** La marca más reciente entre los puntos de la máquina, o `null` si nada llegó. */
+  function ultimaMarca() {
+    let lastUpdated = null;
+    for (const punto of puntos) {
+      const recibido = motor.get(punto).receivedAt;
+      if (recibido && (!lastUpdated || recibido > lastUpdated)) lastUpdated = recibido;
+    }
+    return lastUpdated;
+  }
+
+  /* El búfer se alimenta con CADA lectura del motor, no con cada suscriptor:
+     así «Tiempo real» tiene la misma historia de sesión lo mire una vista o
+     tres. `push` descarta la marca repetida, así que un ciclo sin dato nuevo
+     no duplica el último punto. */
+  motor.onUpdate(() => {
+    const marca = ultimaMarca();
+    if (!marca) return;
+    const estado = estadoActual(marca);
+    buffer.push({ receivedAt: marca, lista: estado.senales.map((s) => ({ key: s.clave, valor: s.valor })) });
+  });
+
+  /**
+   * Quién lee el pasado, decidido una vez por transporte. En los dos caminos
+   * la guarda va primero: una clave sin serie verificada no llega ni al
+   * simulador ni al historiador.
+   */
+  const leerSerie = transport.readSerie
+    ? async (clave, rango, opciones = {}) => {
+        const motivo = motivoSinSerie(sistema, clave);
+        if (motivo) return { datos: [], motivo, hasMore: false, cobertura: null };
+        void opciones; // `crudo` no aplica al simulador: no hay agregado que quitar.
+        return transport.readSerie(puntoDeClave.get(clave), rango);
+      }
+    : (clave, rango, opciones) => leerSerieDelHistoriador(sistema, clave, rango, opciones);
+
+  const leerSeries = transport.readSerie
+    ? async (claves, rango) =>
+        Object.fromEntries(await Promise.all(claves.map(async (c) => [c, await leerSerie(c, rango)])))
+    : (claves, rango) => leerSeriesDelHistoriador(sistema, claves, rango);
   const canalesMeta = canalesDeMaquina(maquina, tipo);
   const contadores = contadoresDeMaquina(maquina, tipo.contadoresAlarma ?? []);
   const leerEstado = tipo.decodificarVigilancia
@@ -97,11 +184,7 @@ export function createFuenteDeMaquina({ maquina, tipo = tipoDe(maquina?.tipo), t
 
     const dominio = dominioDesdeRoles(maquina, tipo, valorDe, { leerEstado, alarmas });
 
-    let lastUpdated = null;
-    for (const punto of puntos) {
-      const recibido = motor.get(punto).receivedAt;
-      if (recibido && (!lastUpdated || recibido > lastUpdated)) lastUpdated = recibido;
-    }
+    const lastUpdated = ultimaMarca();
 
     /*
      * Los puntos mudos son los DE LA MÁQUINA sin lectura. `dominio.sinDato`
@@ -134,6 +217,10 @@ export function createFuenteDeMaquina({ maquina, tipo = tipoDe(maquina?.tipo), t
       detalleSinDato,
       sinDatoPorMotivo: porMotivo,
       puntosPedidos: puntos.length,
+      /* La forma común (Plan 42.5 F1, D8): una señal por variable con valor,
+         estado, banda y `historia`. Es lo que leen las vistas genéricas; las
+         de vibraciones siguen con `canales`/`variador`/`alarmas`. */
+      estado: estadoActual(lastUpdated),
       /* Lo que la vista necesita además del dominio, y que la escrita a mano
          saca de su catálogo. */
       canalesMeta,
@@ -146,20 +233,32 @@ export function createFuenteDeMaquina({ maquina, tipo = tipoDe(maquina?.tipo), t
     };
   }
 
+  function subscribe(cb) {
+    const baja = motor.acquire(puntos);
+    motor.start();
+    const off = motor.onUpdate(() => cb(instantanea()));
+    cb(instantanea());
+    return () => {
+      off();
+      baja();
+    };
+  }
+
   return {
-    subscribeVibracion(cb) {
-      const baja = motor.acquire(puntos);
-      motor.start();
-      const off = motor.onUpdate(() => cb(instantanea()));
-      cb(instantanea());
-      return () => {
-        off();
-        baja();
-      };
-    },
+    /** La instantánea entera (dominio de vibraciones + forma común) en cada lectura. */
+    subscribe,
+    /** El nombre histórico de `subscribe`: lo usan las vistas de vibraciones. */
+    subscribeVibracion: subscribe,
     stop: motor.stop,
     stats: motor.stats,
     puntos: () => puntos,
+    /** El `sistema` del registro para esta máquina (`construirSistema`). */
+    sistema,
+    /** Búfer de sesión por clave, para «Tiempo real» sin historiador. */
+    buffer,
+    lecturaDe,
+    leerSerie,
+    leerSeries,
   };
 }
 

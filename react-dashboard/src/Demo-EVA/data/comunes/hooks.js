@@ -1,5 +1,5 @@
 /**
- * Los hooks que consumen las vistas de Demo EVA. Ninguna vista sabe de dónde
+ * Los hooks que consumen las vistas del TANQUE. Ninguna vista sabe de dónde
  * salen sus datos.
  *
  * El patrón es siempre el mismo: suscribirse al montar y darse de
@@ -12,13 +12,22 @@
  * servidor: con el simulador puesto seguían saliendo a la red mientras el resto
  * de la pantalla leía datos generados. Quién lee el pasado lo decide `evaSource`,
  * una vez, a partir del transporte.
+ *
+ * Desde el Plan 42.5 F1, `useSeriesHistoricas` es `useSeriesDe(fuente, …)` con
+ * la fuente del tanque puesta: el efecto vive en `useSeriesDe.js` y lo comparte
+ * con `useSeriesDeMaquina` (una máquina configurada). Este archivo sigue siendo
+ * de la fuente en vivo del tanque, que se sustituye con el tipo (Plan 43).
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SISTEMA_VACIO } from "../../domain/sistema.js";
 import { SENAL_KEYS } from "../../domain/senales.js";
-import { VENTANA } from "../tanque/historia.js";
+import { VENTANA } from "./historia.js";
 import { useEvaSource } from "./EvaProvider.jsx";
+import { claveRango, unir } from "./seriesUnidas.js";
+import { useSeriesDe } from "./useSeriesDe.js";
+
+export { unir };
 
 const INICIAL = { sistema: SISTEMA_VACIO, loading: true, error: null, lastUpdated: null };
 
@@ -68,22 +77,6 @@ export function useSistemaAgua() {
 }
 
 /**
- * `{ horas, puntos }` o `{ inicio, fin }` → una clave primitiva estable para
- * dependencia de efecto. Un `Date` es un objeto nuevo en cada render aunque
- * represente el mismo instante, así que no puede ir tal cual en un array de
- * dependencias sin refetchear en bucle; esta clave es lo único que compara
- * por VALOR.
- */
-function claveRango(rango) {
-  if (rango?.inicio instanceof Date && rango?.fin instanceof Date) {
-    return `abs:${rango.inicio.getTime()}-${rango.fin.getTime()}`;
-  }
-  const horas = rango?.horas ?? VENTANA.horas;
-  const puntos = rango?.puntos ?? VENTANA.puntos;
-  return `rel:${horas}-${puntos}`;
-}
-
-/**
  * Serie histórica de una señal. No se sondea dentro de un mismo rango: se
  * pide al montar, y otra vez cada vez que el RANGO cambia de valor, porque el
  * pasado ya pedido no cambia y el borde derecho lo cubre el valor en vivo.
@@ -96,7 +89,7 @@ function claveRango(rango) {
  * sea un instante, sería mentir sobre el dato.
  *
  * `motivo` es un texto cuando la señal **no tiene serie propia en el
- * historiador** (ver `data/tanque/historia.js`). No es un error y no debe pintarse
+ * historiador** (ver `data/comunes/historia.js`). No es un error y no debe pintarse
  * como tal: es un hecho de la instalación que la tarjeta tiene que explicar.
  */
 export function useSerieHistorica(clave, rango = VENTANA) {
@@ -165,138 +158,11 @@ export function useSerieHistorica(clave, rango = VENTANA) {
 }
 
 /**
- * Varias series históricas sobre la misma rejilla, unidas por marca de tiempo.
- *
- * Alimenta la gráfica de tendencia de la vista de Planta, que superpone las
- * cuatro señales verificadas. Se unen aquí y no en el componente porque el
- * historiador puede devolver rejillas con huecos distintos por señal, y
- * resolverlo dentro del `render` obligaría a recalcularlo en cada repintado.
+ * Varias series históricas del TANQUE sobre la misma rejilla, unidas por
+ * marca de tiempo. Alimenta la tendencia de Planta y las gráficas del Detalle.
+ * Es `useSeriesDe` con la fuente del tanque: ver ese archivo para el porqué
+ * de cada decisión del efecto.
  */
 export function useSeriesHistoricas(claves, rango = VENTANA) {
-  const source = useEvaSource();
-  const [estado, setEstado] = useState({
-    filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false, cobertura: null,
-  });
-  const clavesAnteriores = useRef(null);
-
-  const clavesKey = claves.join("|");
-  const key = claveRango(rango);
-
-  useEffect(() => {
-    let vivo = true;
-    // Mismo criterio que `useSerieHistorica`: sólo se conserva la rejilla
-    // anterior cuando lo que cambió fue el RANGO, no el conjunto de señales
-    // (cambiar de pestaña no debe dejar ver, ni un instante, las curvas del
-    // activo anterior bajo las tarjetas del nuevo).
-    const mismasClaves = clavesAnteriores.current === clavesKey;
-    clavesAnteriores.current = clavesKey;
-
-    setEstado((prev) =>
-      mismasClaves
-        ? { ...prev, loading: true, error: null }
-        : { filas: [], porClave: {}, metaPorClave: {}, loading: true, error: null, hasMore: false, cobertura: null }
-    );
-
-    const lista = clavesKey ? clavesKey.split("|") : [];
-    if (!lista.length) {
-      setEstado({
-        filas: [], porClave: {}, metaPorClave: {}, loading: false, error: null, hasMore: false, cobertura: null,
-      });
-      return undefined;
-    }
-
-    /*
-     * Antes se descartaba el error de cada señal con
-     * `.catch(() => ({ datos: [], motivo: null, hasMore: false }))`: una
-     * falla de red y un rango genuinamente vacío llegaban indistinguibles a
-     * `porClave`, y `GraficaHistoria` no tenía forma de decir "no se pudo
-     * leer" en vez de "no hay nada aquí". Ahora el motivo de la falla viaja
-     * en `metaPorClave[clave].error`, sin tocar la forma de `porClave` —
-     * `unir()` y el resto de consumidores existentes siguen recibiendo
-     * exactamente los arreglos de puntos que ya esperaban.
-     */
-    /*
-     * UNA llamada para todas las señales, no una por señal.
-     *
-     * Antes esto era un `Promise.all` sobre `leerSerie`, y como el troceado de
-     * una ventana larga vivía en el navegador, cada señal se convertía en
-     * tantas peticiones HTTP como tramos: cinco señales por diez tramos eran
-     * CINCUENTA para pintar una pantalla, y el puente corta en 300 por minuto
-     * y por IP. Ahora `leerSeries` pide la ventana entera y trocea el
-     * servidor. Ver `data/tanque/historia.js` y la ruta `/api/iconics/history/batch`.
-     */
-    source
-      .leerSeries(lista, rango)
-      .then((porSenal) => {
-        if (!vivo) return;
-        const porClave = Object.fromEntries(lista.map((k) => [k, porSenal[k]?.datos ?? []]));
-        const metaPorClave = Object.fromEntries(
-          lista.map((k) => [k, { motivo: porSenal[k]?.motivo ?? null, error: null }])
-        );
-        const valores = lista.map((k) => porSenal[k]).filter(Boolean);
-        const hasMore = valores.some((r) => r.hasMore);
-        // La cobertura es del RANGO, no de cada señal: todas se piden sobre los
-        // mismos tramos, así que la primera que la traiga vale para todas.
-        const cobertura = valores.find((r) => r.cobertura)?.cobertura ?? null;
-        setEstado({ filas: unir(porClave), porClave, metaPorClave, loading: false, error: null, hasMore, cobertura });
-      })
-      .catch((err) => {
-        if (!vivo) return;
-        /*
-         * El fallo es de LA PETICIÓN, así que cae sobre todas las señales: con
-         * una sola llamada ya no hay «esta señal falló y esta no». Se escribe
-         * en `metaPorClave[*].error` —y no como rango vacío— porque una caída
-         * de red y un historiador sin muestras tienen que poder distinguirse
-         * en la gráfica.
-         */
-        /*
-         * En `metaPorClave` se queda el TEXTO: ahí sólo se usa para saber si
-         * hubo fallo (`metaPorClave[k]?.error` como booleano) y para depurar,
-         * no se pinta. El de arriba sí viaja entero, con su código.
-         */
-        const metaPorClave = Object.fromEntries(
-          lista.map((k) => [k, { motivo: null, error: err.message }])
-        );
-        setEstado({
-          filas: [], porClave: {}, metaPorClave,
-          loading: false, error: err, hasMore: false, cobertura: null,
-        });
-      });
-
-    return () => {
-      vivo = false;
-    };
-    // Mismo criterio que `useSerieHistorica`: `key` es el valor de `rango`,
-    // el objeto no va en las dependencias.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, clavesKey, key]);
-
-  return estado;
-}
-
-/**
- * `{ clave: [{t, valor}] }` → `[{ t, hora, clave1, clave2… }]`, ordenado.
- *
- * La marca de tiempo se usa como identidad de fila: el historiador devuelve la
- * misma rejilla para todas las señales cuando se le pide el mismo intervalo, y
- * las que falten en un instante quedan sin clave — que es lo que recharts pinta
- * como corte de línea, y no como una caída a cero.
- */
-export function unir(porClave, locale = "es-MX") {
-  const filas = new Map();
-
-  for (const [clave, datos] of Object.entries(porClave)) {
-    for (const { t, valor } of datos) {
-      const ms = t.getTime();
-      if (!filas.has(ms)) filas.set(ms, { ms, t });
-      filas.get(ms)[clave] = valor;
-    }
-  }
-
-  return [...filas.values()]
-    .sort((a, b) => a.ms - b.ms)
-    .map((f) => ({
-      ...f,
-      hora: f.t.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" }),
-    }));
+  return useSeriesDe(useEvaSource(), claves, rango);
 }
