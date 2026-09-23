@@ -7,10 +7,15 @@ las cabeceras de cada archivo y en `docs/`; aquí sólo el resumen accionable.
 
 ## 1. Qué es esto
 
-Puente Node hacia ICONICS FrameWorX + un dashboard React (Demo EVA) que
-enseña dos instalaciones de planta (un sistema de agua y un sistema de
-vibraciones) y un asistente de IA que responde sobre ellas. Detalle de
-producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
+Una **plataforma de configuración de máquinas con ICONICS FrameWorX como
+única fuente de verdad de planta**: se configura la máquina desde el árbol de
+ICONICS, se verifican sus señales y sus series del historiador, se le asigna
+documentación, y un asistente de IA local contesta sobre su estado, sus
+señales y sus valores, dibuja gráficas, genera reportes y diagnostica con un
+motor determinista. Técnicamente: un puente Node (Fastify) hacia ICONICS y un
+tablero React (Demo EVA) con dos instalaciones de planta (un sistema de agua,
+hoy cerrado, y un sistema de vibraciones como máquina configurada). Detalle
+de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.md).
 
 > ## ⚠ RAMA `Vibraciones1.0`: LA ESTACIÓN DE LLENADO ESTÁ CERRADA
 >
