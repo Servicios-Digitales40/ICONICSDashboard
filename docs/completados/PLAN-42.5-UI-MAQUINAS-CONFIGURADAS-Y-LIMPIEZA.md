@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · **F6 completada el 23-09-2026** (filtros por activo y sólo medidas, mudas y pendientes listadas, configuración más corta con las herramientas a la vista, nombre y alias por asset resueltos por el asistente, fuera el muro con un arranque que desvía a la primera configurada) · quedan la comprobación manual en el navegador (F1, F2, F6) y el reinicio del backend (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** COMPLETADO y archivado el 23-09-2026 · F0–F6 completadas; la comprobación manual en el navegador (F1, F2, F6) y el reinicio del backend tras el vaciado (F3) las hizo el usuario el 23-09-2026 por la tarde, sin defectos nuevos · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -594,7 +594,7 @@ que mezclar los tipos de valor que la planta produce de verdad.
       `historia.test.js`, `hooks-historia.test.jsx`, `fuente.test.js`,
       `simulador.test.js`, `grafica-comparada.test.jsx`, `selector-rango.test.jsx`
       y `eva.live.test.js` **no cambian** y siguen verdes.
-- [ ] `PlantaMaquina` con `vib-motor-03` contra planta (backend reiniciado):
+- [x] `PlantaMaquina` con `vib-motor-03` contra planta (backend reiniciado):
       tendencias de las series verificadas, atención con los riesgos del
       tipo, limitaciones visibles, sin titular, sin un solo literal de
       máquina (la prueba lo afirma). **Pendiente de mirar en el navegador**:
@@ -759,7 +759,7 @@ configuración en vez de fijarlo.
 - Backend: las tres del paso 0.
 
 **Criterios de aceptación.**
-- [ ] Con `vib-motor-03` contra planta: una pestaña por activo con
+- [x] Con `vib-motor-03` contra planta: una pestaña por activo con
       variables; las 78 verificadas con gráfica; las 8 sin verificar con su
       causa persistida y sin gráfica. **Pendiente de mirar en el navegador**
       (misma razón que F1: backend arrancado antes de estos cambios y
@@ -861,7 +861,7 @@ medir la narración con `casos: 0` es un `medir-*` (instrumento, necesita el
 LLM) y se deja anotado como recomendable, no como criterio.
 
 **Criterios de aceptación.**
-- [ ] Backend recién arrancado tras el vaciado: `GET /api/casos` → `total: 0`;
+- [x] Backend recién arrancado tras el vaciado: `GET /api/casos` → `total: 0`;
       «Casos previos» de `vib-motor-03` dice «ninguna intervención» sin
       cifra inventada ni mención al tanque. **El vaciado se ejecutó el
       23-09-2026** (13 → 0, copia en `datos/`; ver F5); falta sólo reiniciar
@@ -1511,16 +1511,16 @@ planta al final, con el motor parado: la Planta filtrada, el Inicio con los
 86 mudos listados por motivo, el alias resolviendo en el chat.
 
 **Criterios de aceptación.**
-- [ ] `vib-motor-03` en Planta arranca con 12 paneles y dice «12 de 72»;
+- [x] `vib-motor-03` en Planta arranca con 12 paneles y dice «12 de 72»;
       un chip de activo deja 4; el interruptor apagado deja las del activo.
-- [ ] En el Inicio, con el motor parado, el «0 / 86» se despliega en 86
+- [x] En el Inicio, con el motor parado, el «0 / 86» se despliega en 86
       filas con su motivo; con el motor en marcha, las que falten.
-- [ ] Configuración: limitaciones plegadas, herramientas visibles, series
+- [x] Configuración: limitaciones plegadas, herramientas visibles, series
       pendientes por causa sin volver a sondear.
-- [ ] Un asset renombrado desde la pantalla conserva el nombre al editar
+- [x] Un asset renombrado desde la pantalla conserva el nombre al editar
       otra cosa; «dame el valor de DKW del acople chiquito» resuelve
       `DKW_S1` en `verificar-herramientas`.
-- [ ] Sin `eva-muro`; el arranque abre el Inicio de la primera configurada
+- [x] Sin `eva-muro`; el arranque abre el Inicio de la primera configurada
       con la URL ya escrita; sin ninguna, lo dice.
 
 ### 3.6 · QA y contramedidas — la red que acompaña a las cinco fases
@@ -1618,3 +1618,21 @@ si son `timed out` por contención antes que asertos, CLAUDE.md §5.3).
   (D11): un campo aditivo, con su prueba de compatibilidad.
 - No añade dependencias.
 - No rehace la Vista 3D ni el recorrido/topología: son del tipo.
+
+## 6. Cierre (23-09-2026)
+
+El usuario recorrió el tablero contra planta con el backend reiniciado y el
+motor parado: el arranque desvía al Inicio de `vib-motor-03`; el Inicio lista
+las variables mudas; la Planta arranca con las medidas y filtra por apoyo; el
+Detalle arranca «Comparar» con las medidas de la pestaña; Configuración va
+plegada y con las herramientas a la vista; Casos previos dice «ninguna
+intervención». Los ocho criterios que esperaban pantalla quedan marcados
+arriba con esa fecha. Lo que salió de mirarlo se corrigió el mismo día
+(F6.7: la pista sin ejemplos de la sesión, las series compartidas por grupo,
+la caché de fuentes ante un asset renombrado).
+
+**Lo que este plan deja para después:** el Plan **43** (el tanque como
+máquina configurada, con el conocimiento de sus vistas conservado en F4) y,
+si la demo pide otra cosa, un Plan **44**. En `BACKLOG-FRONTEND` quedan
+F-frescura (el verificador no reconoce los tiles genéricos) y en
+`BACKLOG-BACKEND` B16 y B17.

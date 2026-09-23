@@ -45,7 +45,7 @@ de producto en [`PRODUCT.md`](PRODUCT.md), de arranque en [`README.md`](README.m
 > Nace de `Vibraciones1.0` con una decisión del usuario: **el tanque se piensa
 > como otra posible máquina configurada**, no como una instalación aparte. La
 > regla de arriba cambia así, y el detalle está en
-> [`docs/por-completar/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md`](docs/por-completar/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md) §1:
+> [`docs/completados/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md`](docs/completados/PLAN-42.5-UI-MAQUINAS-CONFIGURADAS-Y-LIMPIEZA.md) §1:
 >
 > 1. **El dominio del tanque** (`shared/eva/tanque/`) **sigue sin borrarse**: es
 >    la materia prima del tipo `estacion-de-llenado` del Plan 43. Se lee, se
@@ -499,6 +499,8 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
   «hecho ✅» no sirve dentro de seis meses.
 
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
+El **42.5** (la UI de las máquinas configuradas y la limpieza del tanque, con
+su F6 de ajustes tras mirarlo en planta) se completó y archivó el 23-09-2026.
 El único vivo hoy es el **33** (modularidad de máquinas), con su F9 —la
 estación de llenado como configurada— **bloqueada hasta reabrir** la rama. El
 **42** (verificar una bandera que nunca cambió sin forzarla, desde B13) se

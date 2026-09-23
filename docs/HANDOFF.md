@@ -1,6 +1,6 @@
 # HANDOFF — dónde estamos y cómo seguir
 
-**Fecha:** 23-09-2026 (tarde) · **Rama viva de Moisés:** `UI-Limpieza1.0` · **Rama de la presentación:** `DemoVibraciones4.0` (nace de ésta el 23-09-2026; sólo recibe merges) · **Rama de Gustavo:** `AjustesGustavo5.0` (nace de la anterior; el asistente). **Plan 42.5 con F0–F6 completadas**; quedan la comprobación manual en el navegador (F1, F2, F6) y el reinicio del backend tras el vaciado (F3). Quien llegue desde una versión antigua empieza por **§0**.
+**Fecha:** 23-09-2026 (tarde) · **Rama viva de Moisés:** `UI-Limpieza1.0` · **Rama de la presentación:** `DemoVibraciones4.0` (nace de ésta el 23-09-2026; sólo recibe merges) · **Rama de Gustavo:** `AjustesGustavo5.0` (nace de la anterior; el asistente). **Plan 42.5 COMPLETADO y archivado el 23-09-2026** (F0–F6, comprobado en el navegador contra planta esa tarde). Quien llegue desde una versión antigua empieza por **§0**.
 
 Este documento es lo primero que lee una sesión nueva. `CLAUDE.md` dice las
 **reglas**; esto dice el **estado**: qué funciona, qué está a medias, qué se
@@ -216,9 +216,11 @@ vibraciones y lo dice.
 
 **Visto en el navegador el 22-09-2026** con `vib-motor-03` recreada contra el
 `bms-server` real: muro, menú, las siete vistas de entonces y el asistente. De
-mirarlo salió un defecto del tipo, corregido el mismo día. **Planta y Detalle
-(Plan 42.5) no se han mirado todavía en el navegador**: el backend que corre
-arrancó antes de esos cambios.
+mirarlo salió un defecto del tipo, corregido el mismo día. **Visto otra vez el
+23-09-2026 por la tarde**, con el backend reiniciado y el motor parado: el
+arranque, el Inicio con las mudas, la Planta filtrada, el Detalle, Configuración
+y Casos previos del Plan 42.5 F6; sin defectos nuevos (los tres que salieron
+al mirarlo se corrigieron el mismo día, F6.7).
 
 ### Qué está a medias
 
@@ -420,15 +422,13 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 
 ### Los planes vivos
 
-> **Estado a 22-09-2026 (tarde).** El Plan 41 se escribió y se **completó en el
-> día**; con él se archivaron el 32, el 37, el 38 y el 40. El **42** se escribió
-> después y también se completó el mismo día. En `docs/por-completar/` quedan
-> el **Plan 33** (su F9 espera al tipo del tanque) y el **Plan 42.5**, escrito
-> esa noche en la rama nueva: la «Planta» con histórico y el «Detalle» de
-> activo del tanque, hechos genéricos para cualquier máquina configurada
-> (F1–F2), y después la limpieza: casos y aprendizaje del tanque (F3), sus
-> vistas y pruebas omitidas (F4), y el código que nadie importa (F5). El tanque
-> como máquina configurada será el **Plan 43**, cuando éste termine.
+> **Estado a 23-09-2026 (tarde).** El **Plan 42.5** se completó y archivó
+> este día: Planta y Detalle genéricos, la bitácora vaciada, todas las vistas
+> del tanque borradas, el código muerto fuera, y la F6 con lo que la máquina
+> pidió al mirarla en planta (filtros, mudas listadas, configuración corta,
+> nombre y alias por asset, fuera el muro). En `docs/por-completar/` queda
+> sólo el **Plan 33**. El siguiente número libre es el **44**; el **43** está
+> reservado al tanque como máquina configurada.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
