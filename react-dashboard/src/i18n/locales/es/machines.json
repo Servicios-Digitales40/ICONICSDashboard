@@ -509,5 +509,17 @@
       "summary_one": "Ver la variable sin lectura",
       "summary_other": "Ver las {{count}} variables sin lectura"
     }
+  },
+  "arranque": {
+    "buscando": "Buscando la primera máquina configurada en servicio…",
+    "sinMaquinas": {
+      "title": "Ninguna máquina configurada en servicio",
+      "message": "Configura una desde el árbol de ICONICS y el tablero arrancará en ella.",
+      "messageSinPermiso": "Pide a un administrador que configure una desde el árbol de ICONICS; el tablero arrancará en ella.",
+      "configurar": "Ir a Configuración"
+    },
+    "error": {
+      "title": "No se pudo leer la lista de máquinas"
+    }
   }
 }

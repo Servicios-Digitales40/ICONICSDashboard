@@ -52,10 +52,10 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1117** pruebas · 20 omitidas *(a 23-09 por la mañana, tras Plan 42.5 F4 cerrada; eran 1102 · 29 el 22-09)* |
+| Suite de frontend | **1166** pruebas · 20 omitidas *(a 23-09 por la tarde, tras Plan 42.5 F6; eran 1102 · 29 el 22-09)* |
 | Suite de backend | **399** pruebas (398 verdes; el rojo de `salud.test.mjs` es de entorno, ver «Qué está roto») |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **190** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **191** correctas (13 sobre una configurada) · **22 omitidas** (cierre) |
 | `verificar-chat` | **71** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -64,8 +64,8 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 Funcionalmente: el tablero de vibraciones por **máquinas configuradas** (una
 sección por máquina con ocho vistas en el menú —Inicio, Planta, Estado
 mecánico, Vista 3D, Hallazgos, Avisos, Casos previos, RAG— más el Detalle
-sin menú (Plan 42.5), y un muro de planta con un panel por configurada; el
-tanque ya no tiene vistas), el asistente con sus 26
+sin menú (Plan 42.5), y un arranque que abre la primera configurada en
+servicio; el muro se borró y el tanque ya no tiene vistas), el asistente con sus 26
 herramientas contestando sobre la configurada que se tiene delante, el motor
 de diagnóstico determinista con las reglas del TIPO, el RAG documental con los
 manuales asignados al tipo, el transporte falso (`ICONICS_FAKE=true`), el
@@ -635,8 +635,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **398 passed** de 399 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1117 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F4 cerrada)* |
+| Backend | **400 passed** de 401 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Frontend | **1166 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F6)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

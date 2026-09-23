@@ -128,7 +128,7 @@ describe("el Sidebar con una máquina configurada", () => {
   }
 
   it("pinta la sección con el nombre de la máquina y navega con su parámetro", async () => {
-    const { onNavigate, subscribeSistema } = await montarSidebar({ page: "eva-muro" });
+    const { onNavigate, subscribeSistema } = await montarSidebar({ page: "eva-bandeja" });
 
     const seccion = await screen.findByRole("button", { name: /Nuevo-Modor/ });
     expect(seccion).toBeTruthy();

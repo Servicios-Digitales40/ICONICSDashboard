@@ -42,24 +42,33 @@ export function avisarMaquinasCambiaron() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(EVENTO_MAQUINAS_CAMBIARON));
 }
 
-const VACIO = Object.freeze({ maquinas: [], cargando: false, error: null, recargar: () => {} });
+/* Fuera del proveedor no hay nada que esperar: `listo` en verdadero. */
+const VACIO = Object.freeze({ maquinas: [], cargando: false, listo: true, error: null, recargar: () => {} });
 
 const Ctx = createContext(null);
 
 export function MaquinasConfiguradasProvider({ children }) {
   const sesionResuelta = useSesionResuelta();
-  const [estado, setEstado] = useState({ maquinas: [], cargando: false, error: null });
+  /*
+   * `listo` distingue «aún no cargó» de «no hay ninguna» (Plan 42.5 F6, D19):
+   * `cargando` arranca en falso y sólo pasa a verdadero dentro de `recargar`,
+   * así que el primer render veía `{ maquinas: [], cargando: false }` y la
+   * ruta de arranque habría dicho «no hay máquinas» medio segundo antes de
+   * que llegara la lista. Pasa a verdadero tras la PRIMERA respuesta, buena o
+   * mala, y no vuelve atrás.
+   */
+  const [estado, setEstado] = useState({ maquinas: [], cargando: false, listo: false, error: null });
 
   const recargar = useCallback(async () => {
     setEstado((prev) => ({ ...prev, cargando: true }));
     try {
       const r = await listarMaquinas();
       const activas = (r?.maquinas ?? []).filter((m) => m && m.activa !== false);
-      setEstado({ maquinas: activas, cargando: false, error: null });
+      setEstado({ maquinas: activas, cargando: false, listo: true, error: null });
     } catch (error) {
       /* Sin lista no hay secciones de máquina configurada; las escritas a
          mano siguen. El error queda para quien quiera decirlo. */
-      setEstado({ maquinas: [], cargando: false, error });
+      setEstado({ maquinas: [], cargando: false, listo: true, error });
     }
   }, []);
 

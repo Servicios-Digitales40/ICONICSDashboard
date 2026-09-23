@@ -26,8 +26,8 @@
  *     que se retiró el contador de alarmas del Topbar el 31-08-2026, y la
  *     razón de que esta prueba mire las SUSCRIPCIONES y no el menú. La fuente
  *     en vivo (`EvaProvider`) sigue montada hasta el Plan 43.
- *  3. **El arranque no cae en una pantalla del tanque.** Es el muro de
- *     planta, en «Planta».
+ *  3. **El arranque no cae en una pantalla del tanque.** Es el desvío al
+ *     Inicio de la primera máquina configurada (Plan 42.5 F6).
  */
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -58,16 +58,16 @@ describe("la estación de llenado no tiene vistas propias", () => {
     expect(NAV.map((n) => n.group ?? n.id)).not.toContain("sec-llenado");
   });
 
-  it("el arranque es el muro de planta, no una pantalla del tanque", () => {
+  it("el arranque desvía a la primera configurada, no a una pantalla del tanque", () => {
     /*
      * Era `eva-inicio`, la landing del tanque; fue `vib-inicio` hasta el Plan
-     * 40 F2 (21-09-2026). Las máquinas son configuradas, cada una en su
-     * sección, y ninguna es «la» de entrada: el arranque es el muro.
+     * 40 F2 y `eva-muro` hasta el Plan 42.5 F6. Las máquinas son configuradas,
+     * cada una en su sección, y el arranque es un desvío a la primera.
      */
-    expect(DEFAULT_ROUTE).toBe("eva-muro");
+    expect(DEFAULT_ROUTE).toBe("inicio");
     expect(DEL_TANQUE).not.toContain(DEFAULT_ROUTE);
-    const arranque = ROUTES.find((r) => r.id === DEFAULT_ROUTE);
-    expect(arranque?.nav?.group).toBe("sec-planta");
+    expect(PAGES[DEFAULT_ROUTE]).toBeTruthy();
+    expect(ROUTES.find((r) => r.id === DEFAULT_ROUTE)?.nav).toBeUndefined();
   });
 });
 
@@ -111,7 +111,7 @@ describe("el chrome ya no pide el dato del tanque", () => {
 
     render(
       <ThemeProvider>
-        <Sidebar page="eva-muro" onNavigate={() => {}} />
+        <Sidebar page="eva-bandeja" onNavigate={() => {}} />
       </ThemeProvider>
     );
 

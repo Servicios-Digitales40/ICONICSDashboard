@@ -53,7 +53,7 @@ const montarSidebar = () =>
     <ThemeProvider>
       <DataSourceProvider>
         <EvaProvider>
-          <Sidebar page="eva-muro" onNavigate={() => {}} />
+          <Sidebar page="eva-bandeja" onNavigate={() => {}} />
         </EvaProvider>
       </DataSourceProvider>
     </ThemeProvider>

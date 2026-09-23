@@ -69,10 +69,9 @@ describe("el menú se acota al rol", () => {
    */
   it("un visualizador ve EXACTAMENTE las vistas de visualización", () => {
     expect(menuDe(ROL.VISUALIZADOR).sort()).toEqual([
-      /* Planta: lo que se mira, no lo que se decide. `eva-muro` es la entrada
-         desde el Plan 40 F2 y por eso SÍ está: es la pantalla de arranque. */
+      /* Planta: lo que se mira, no lo que se decide. El arranque (`inicio`) no
+         está: es un desvío sin menú (Plan 42.5 F6). */
       "eva-assets",
-      "eva-muro",
       /* La máquina configurada: su apartado de Visualización, nada más. */
       "maq-3d",
       "maq-graficas",
@@ -130,7 +129,7 @@ describe("el menú se acota al rol", () => {
     const ids = menuDe(ROL.OPERADOR);
 
     expect(ids).not.toContain("eva-configuracion");
-    expect(ids).toContain("eva-muro");
+    expect(ids).toContain("eva-assets");
     expect(ids).toContain("maq-inicio");
     expect(ids).toContain("maq-hallazgos");
   });
@@ -196,7 +195,7 @@ describe("el rol de cada página sale del registro", () => {
     /* `undefined` sería indistinguible de una ruta que no existe, y quien lo
        lea trataría un descuido como «es para cualquiera». */
     expect(ROL_DE_PAGINA["maq-inicio"]).toBeNull();
-    expect(ROL_DE_PAGINA["eva-muro"]).toBeNull();
+    expect(ROL_DE_PAGINA["inicio"]).toBeNull();
   });
 });
 

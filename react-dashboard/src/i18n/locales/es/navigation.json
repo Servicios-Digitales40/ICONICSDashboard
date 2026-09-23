@@ -81,11 +81,6 @@
       "nav": "Cuaderno",
       "sub": "Notas de quien está delante de la máquina, con su hora y su autor"
     },
-    "eva-muro": {
-      "title": "Muro de planta",
-      "nav": "Muro",
-      "sub": "Todas las máquinas a la vez, cada una con su estado, sus alarmas y su frescura"
-    },
     "eva-configuracion": {
       "title": "Configuración",
       "nav": "Configuración",
@@ -140,6 +135,11 @@
       "title": "RAG documental",
       "nav": "RAG documental",
       "sub": "Máquina configurada · los manuales que el asistente consulta sobre ella"
+    },
+    "inicio": {
+      "title": "Inicio",
+      "nav": "Inicio",
+      "sub": "El tablero arranca en la primera máquina configurada en servicio"
     }
   },
   "palette": {

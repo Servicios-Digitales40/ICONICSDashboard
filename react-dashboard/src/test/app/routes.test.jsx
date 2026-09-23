@@ -60,14 +60,16 @@ describe("superficie de la aplicación", () => {
     // (`eva-planta` y `eva-detalle` salieron en el Plan 42.5 F4: las
     // sustituyen `maq-planta` y `maq-detalle`.)
     expect(ids).toEqual([
+      // El arranque (Plan 42.5 F6, D19): un desvío a la primera configurada, sin menú.
+      "inicio",
       // La estación de llenado ya no tiene vistas propias (Plan 42.5 F4).
       // Planta — lo que no es de una máquina concreta. Las cinco rutas de la
       // máquina de vibraciones escrita a mano iban aquí hasta el Plan 40 F2;
       // ver el bloque de arriba.
       //
       // `salud-sistema` es la más «del servidor» de todas: no habla de ninguna
-      // instalación, habla del PUENTE (Plan 20 F10).
-      "eva-muro",
+      // instalación, habla del PUENTE (Plan 20 F10). (`eva-muro` iba aquí
+      // hasta el Plan 42.5 F6, que lo borró.)
       // Las de una máquina CONFIGURADA (Plan 37 F1): genéricas, sin `nav`
       // propio. Cada máquina configurada en servicio las reclama en su propia
       // sección con `?maquina=<id>`; aquí sólo existen.
@@ -90,6 +92,10 @@ describe("superficie de la aplicación", () => {
       "maq-avisos",
       "maq-casos",
       "maq-rag",
+      // Hallazgos y Avisos delante de Assets desde el Plan 42.5 F6: el grupo
+      // «Planta» aparece donde está su primer hijo, y el muro que iba ahí se borró.
+      "eva-bandeja",
+      "eva-avisos",
       "eva-assets",
       // `eva-configuracion` (Plan 33 F5) va junto a Assets y no dentro de una
       // máquina: es donde se declara QUÉ máquinas existen, y meterla en una
@@ -102,16 +108,14 @@ describe("superficie de la aplicación", () => {
       "eva-turno",
       // `eva-bandeja` (Plan 25 F6) — igual: un hallazgo puede ser de cualquiera
       // de las dos máquinas, así que la bandeja no es de ninguna.
-      "eva-bandeja",
       // `eva-avisos` (Plan 31 F2) — la otra cara de la bandeja: aquélla es un
       // INVENTARIO y ésta un AVISO. Va justo detrás a propósito, y en General
       // por el mismo motivo: un aviso puede ser de cualquiera de las dos.
-      "eva-avisos",
       // `eva-cuaderno` (Plan 25 F8) — igual: una nota puede ser de cualquiera
       // de las dos, o de ninguna en concreto.
       "eva-cuaderno",
-      // `eva-muro` (Plan 25 F10) — las dos máquinas A LA VEZ, así que tampoco
-      // es de ninguna sola.
+      // `eva-muro` (Plan 25 F10) era de las dos máquinas A LA VEZ, así que
+      // tampoco era de ninguna sola; se borró en el Plan 42.5 F6.
       "salud-sistema",
       // RAG — de dónde saca el asistente lo que sabe fuera de ICONICS. No es
       // de ninguna máquina, por eso tiene su propia sección y no cuelga de
@@ -306,7 +310,6 @@ describe("el sidebar que sale del registro", () => {
      */
     const planta = NAV.find((n) => n.group === "sec-planta");
     expect(planta.children.map((c) => c.id)).toEqual([
-      "eva-muro",
       "eva-bandeja", "eva-avisos",
       "rag-casos", "rag-documentacion",
     ]);
@@ -496,11 +499,20 @@ describe("el sidebar que sale del registro", () => {
     expect(riesgos.nav).toBeUndefined();
   });
 
-  it("la ruta por defecto está visible en el menú", () => {
-    // Es el error clásico al reorganizar secciones: la app arranca en una vista
-    // sin entrada de menú y ninguna queda resaltada, que se lee como que el
-    // sidebar está roto.
+  it("la ruta por defecto es un desvío: existe, no pide rol y no tiene menú", () => {
+    /*
+     * Hasta el Plan 42.5 F6 esto exigía que la ruta de arranque estuviera en
+     * el menú: el error clásico era arrancar en una vista sin entrada y que
+     * nada quedara resaltado. Ahora el arranque NO es una vista en la que
+     * quedarse: espera la lista de configuradas y desvía al Inicio de la
+     * primera (`Arranque.jsx`), así que lo que se exige es que exista, que
+     * cualquiera pueda pasar por él y que no se ofrezca en el menú.
+     */
+    const arranque = ROUTES.find((r) => r.id === DEFAULT_ROUTE);
+    expect(arranque).toBeTruthy();
+    expect(arranque.nav).toBeUndefined();
+    expect(arranque.rol).toBeUndefined();
     const visibles = NAV.flatMap((n) => (n.children ? n.children.map((c) => c.id) : [n.id]));
-    expect(visibles).toContain(DEFAULT_ROUTE);
+    expect(visibles).not.toContain(DEFAULT_ROUTE);
   });
 });

@@ -158,13 +158,5 @@
     "loadError": "The notes could not be read",
     "list": "Notes",
     "empty": "No notes yet."
-  },
-  "wall": {
-    "title": "Plant wall",
-    "subtitle": "Every configured machine at once: its worst risk, and whether data keeps arriving.",
-    "noRisk": "No active risks",
-    "zone": "Zone {{zona}}",
-    "alarmsNotApplicable": "This machine has no alarms declared in the PLC",
-    "empty": "No configured machine in service. Configure one from the ICONICS tree and it will show up here."
   }
 }

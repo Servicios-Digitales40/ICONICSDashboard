@@ -128,3 +128,18 @@ describe("navegación en la URL", () => {
     expect(pagina()).toBe(DEFECTO);
   });
 });
+
+describe("navegar con `replace` (Plan 42.5 F6, D19)", () => {
+  it("sustituye la entrada del historial en vez de apilarla: la ruta de arranque no deja rastro", () => {
+    irA("/dashboard");
+    const antes = globalThis.history.length;
+    render(<Sonda alMontar={(navigate) => (globalThis.__nav = navigate)} />);
+
+    act(() => globalThis.__nav("area-REC", { desde: "arranque" }, { replace: true }));
+
+    expect(pagina()).toBe("area-REC");
+    expect(globalThis.location.pathname).toBe("/area-REC");
+    expect(globalThis.location.search).toBe("?desde=arranque");
+    expect(globalThis.history.length).toBe(antes);
+  });
+});

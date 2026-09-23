@@ -73,7 +73,12 @@ function construirUrl(page, params) {
 /**
  * @param {string[]} rutasValidas ids del registro de rutas
  * @param {string} rutaPorDefecto
- * @returns {[{ page: string, params: object }, (page: string, params?: object) => void]}
+ * `navigate(page, params, { replace })`: con `replace`, la entrada actual del
+ * historial se SUSTITUYE en vez de apilarse. Lo usa la ruta de arranque (Plan
+ * 42.5 F6, D19), que es un desvío al Inicio de la primera máquina: si apilara,
+ * «atrás» volvería al desvío y éste volvería a desviar.
+ *
+ * @returns {[{ page: string, params: object }, (page: string, params?: object, opciones?: { replace?: boolean }) => void]}
  */
 export function useNavegacion(rutasValidas, rutaPorDefecto) {
   const [nav, setNav] = useState(() => leerUbicacion(rutasValidas, rutaPorDefecto));
@@ -97,8 +102,10 @@ export function useNavegacion(rutasValidas, rutaPorDefecto) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const navigate = useCallback((page, params = {}) => {
-    globalThis.history?.pushState(null, "", construirUrl(page, params));
+  const navigate = useCallback((page, params = {}, { replace = false } = {}) => {
+    const url = construirUrl(page, params);
+    if (replace) globalThis.history?.replaceState(null, "", url);
+    else globalThis.history?.pushState(null, "", url);
     setNav({ page, params });
   }, []);
 

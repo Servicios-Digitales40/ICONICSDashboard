@@ -150,7 +150,7 @@ medición, no por intuición.
   dominio. Un dato que no llegó se representa como hueco, nunca como cero.
 - **La vista de la máquina configurada**: Inicio, Planta (tendencias del
   historiador), Estado mecánico, Vista 3D, Detalle por activo, Hallazgos,
-  Avisos, Casos previos y RAG, más el muro de planta, Configuración y
+  Avisos, Casos previos y RAG, más Configuración y
   Documentación. Las rutas se declaran en `app/routes/routes.jsx`; el menú
   se deriva del registro.
 - Stack fijado por el código: React + Vite, Recharts, three.js con

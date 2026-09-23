@@ -38,7 +38,7 @@
  * Aquí ya no. El encabezado, el subtítulo y la etiqueta del sidebar viven en
  * `i18n/locales/<idioma>/navigation.json`, indexados por ESTE `id`:
  *
- *   "eva-muro": { "title": …, "nav": …, "sub": … }
+ *   "inicio": { "title": …, "nav": …, "sub": … }
  *
  * Así que añadir una ruta son dos ediciones y no una: la entrada aquí y su
  * bloque en los dos idiomas. Se eligió así en vez de dejar el español aquí
@@ -97,17 +97,19 @@ import {
 /**
  * Ruta que se muestra al arrancar la app.
  *
- * `eva-muro` desde el Plan 40 F2 (21-09-2026): todas las máquinas a la vez.
- * Fue `vib-inicio` —el Inicio de la máquina de vibraciones escrita a mano—
- * desde la rama `Vibraciones1.0` (17-09-2026), y antes `eva-inicio`, la
- * landing del tanque; con esa máquina cerrada por mantenimiento el arranque
- * caía en una pantalla fuera del menú. Las máquinas de vibraciones son ahora
- * configuradas y cada una tiene su sección; ninguna es «la» de entrada.
+ * `inicio` desde el Plan 42.5 F6 (23-09-2026): un DESVÍO al Inicio de la
+ * primera máquina configurada en servicio (`Arranque.jsx`), sin menú. No es
+ * una pantalla: espera la lista de configuradas y navega con `replace`; sin
+ * ninguna, lo dice y ofrece Configuración a quien puede.
  *
- * El tanque ya no tiene Inicio propio (Plan 42.5 F4): cuando entre como
- * máquina configurada (Plan 43) tendrá su sección `maq-*` como las demás.
+ * Fue `eva-muro` desde el Plan 40 F2 (21-09-2026) —todas las máquinas a la
+ * vez; el usuario no lo encontró útil y se borró en el Plan 42.5 F6—,
+ * `vib-inicio` desde la rama `Vibraciones1.0` (17-09-2026), y antes
+ * `eva-inicio`, la landing del tanque. El tanque ya no tiene Inicio propio
+ * (Plan 42.5 F4): cuando entre como configurada (Plan 43) será una más de
+ * las que este desvío puede elegir.
  */
-export const DEFAULT_ROUTE = "eva-muro";
+export const DEFAULT_ROUTE = "inicio";
 
 /** Cabeceras de los grupos desplegables del sidebar. */
 /**
@@ -208,6 +210,20 @@ export const NAV_GROUPS = {
  */
 export const ROUTES = [
   /*
+   * ── EL ARRANQUE ES UN DESVÍO, NO UNA VISTA (Plan 42.5 F6, D19) ──────
+   *
+   * Sin `nav`: nadie navega a «Inicio» a propósito, la aplicación cae aquí al
+   * entrar por `/` o por una ruta que ya no existe, y de aquí sale al Inicio
+   * de la primera máquina configurada. La prueba «la ruta por defecto está
+   * en el menú» cambió de sentido con esto: lo que se exige ahora es que
+   * exista, no pida rol y no sea una pantalla en la que quedarse.
+   */
+  {
+    id: "inicio",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/Arranque.jsx")),
+  },
+
+  /*
    * ── LA ESTACIÓN DE LLENADO YA NO TIENE VISTAS PROPIAS ──────────────
    *
    * Rama `Vibraciones1.0` (17-09-2026): sus cinco vistas perdieron el `nav` y
@@ -243,26 +259,6 @@ export const ROUTES = [
    * Plan 41 F4 lo cerró SIN vista porque el Alarm Server da 500 y sus
    * banderas nunca alarmaron. Cuando la haya, será genérica (`maq-*`).
    */
-  {
-    /*
-     * ── POR QUÉ ES UNA VISTA NORMAL, NO «SÓLO MURO» ────────────────────
-     *
-     * `?muro=1` es una capa de presentación que le quita el cromo a
-     * CUALQUIER ruta — no hay precedente de una vista que exista sólo para
-     * ese modo, y ésta no rompe el patrón: sirve también fuera de muro, para
-     * ver el resumen de las dos máquinas de un vistazo.
-     *
-     * Oculta del sidebar para esta demo (sin `nav`, ver la cabecera del
-     * archivo) — la ruta sigue existiendo, sólo no aparece en el menú.
-     * Restaurar: devolver `nav: { icon: <Power size={17} />, group: "sec-general" }`.
-     */
-    /* La pantalla de entrada desde el Plan 40 F2: todas las máquinas a la vez.
-       Hasta entonces era una vista sin menú y la entrada era el Inicio de la
-       máquina de vibraciones escrita a mano. */
-    id: "eva-muro",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/MuroPlanta.jsx")),
-    nav: { icon: <Factory size={17} />, group: "sec-planta", apartado: "visualizacion" },
-  },
 
 
   /*
@@ -366,6 +362,54 @@ export const ROUTES = [
     porMaquina: { icon: <FileText size={17} />, apartado: "documentacion" },
   },
 
+  /*
+   * ── «PLANTA» VA DELANTE DE «GENERAL» ────────────────────────────────
+   *
+   * Un grupo del sidebar aparece donde está su PRIMER hijo. Hasta el Plan
+   * 42.5 F6 ese hijo era el muro (`eva-muro`), que se borró; para que
+   * «Planta» no se colara detrás de «General», Hallazgos y Avisos —las dos
+   * de planta entera— van aquí, antes de Assets.
+   */
+  {
+    /*
+     * ── POR QUÉ VA EN «GENERAL», IGUAL QUE «TURNO» ─────────────────────
+     *
+     * Un hallazgo puede ser de cualquiera de las dos máquinas, así que la
+     * bandeja misma no es de ninguna — cuelga aquí por el mismo motivo que
+     * Alarmas, Assets y Turno.
+     */
+    id: "eva-bandeja",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
+    nav: { icon: <Inbox size={17} />, group: "sec-planta", apartado: "diagnostico" },
+  },
+
+  {
+    /*
+     * ── POR QUÉ NO ES UNA PESTAÑA DE «HALLAZGOS» (Plan 31 F2) ──────────
+     *
+     * Porque el tono es distinto y mezclarlos estropea los dos. «Hallazgos» es
+     * un INVENTARIO —una lista que puede ser larga y que se repasa—; esto es un
+     * AVISO —«oye, mira esto»—. Juntos, o la lista larga se lee con la urgencia
+     * del aviso, o el aviso se pierde dentro de una lista.
+     *
+     * Va JUSTO DETRÁS de «Hallazgos» a propósito: son las dos caras de lo
+     * mismo, y el orden dice cuál se mira primero cuando hay prisa.
+     *
+     * En «General» por el mismo motivo que su vecina: un aviso puede ser de
+     * cualquiera de las dos máquinas, así que la vista no es de ninguna.
+     *
+     * Es la única pantalla del tablero que llama a un modelo de lenguaje sin
+     * que nadie haya escrito una pregunta. Por eso su vista explica, en su
+     * cabecera, por qué el diagnóstico se dispara al ABRIRLA y no al activarse
+     * el riesgo.
+     */
+    id: "eva-avisos",
+    rol: "operador",
+    component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
+    nav: { icon: <MessageSquareText size={17} />, group: "sec-planta", apartado: "diagnostico" },
+  },
+
   {
     // Se queda en producción a propósito: es la herramienta con la que se
     // diagnostica un «falta un dato en el panel», navegando el árbol de
@@ -422,46 +466,6 @@ export const ROUTES = [
     rol: "operador",
     component: lazy(() => import("@/Demo-EVA/views/comunes/TurnoEva.jsx")),
     nav: { icon: <ClipboardList size={17} />, group: "sec-general" },
-  },
-
-  {
-    /*
-     * ── POR QUÉ VA EN «GENERAL», IGUAL QUE «TURNO» ─────────────────────
-     *
-     * Un hallazgo puede ser de cualquiera de las dos máquinas, así que la
-     * bandeja misma no es de ninguna — cuelga aquí por el mismo motivo que
-     * Alarmas, Assets y Turno.
-     */
-    id: "eva-bandeja",
-    rol: "operador",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/BandejaEva.jsx")),
-    nav: { icon: <Inbox size={17} />, group: "sec-planta", apartado: "diagnostico" },
-  },
-
-  {
-    /*
-     * ── POR QUÉ NO ES UNA PESTAÑA DE «HALLAZGOS» (Plan 31 F2) ──────────
-     *
-     * Porque el tono es distinto y mezclarlos estropea los dos. «Hallazgos» es
-     * un INVENTARIO —una lista que puede ser larga y que se repasa—; esto es un
-     * AVISO —«oye, mira esto»—. Juntos, o la lista larga se lee con la urgencia
-     * del aviso, o el aviso se pierde dentro de una lista.
-     *
-     * Va JUSTO DETRÁS de «Hallazgos» a propósito: son las dos caras de lo
-     * mismo, y el orden dice cuál se mira primero cuando hay prisa.
-     *
-     * En «General» por el mismo motivo que su vecina: un aviso puede ser de
-     * cualquiera de las dos máquinas, así que la vista no es de ninguna.
-     *
-     * Es la única pantalla del tablero que llama a un modelo de lenguaje sin
-     * que nadie haya escrito una pregunta. Por eso su vista explica, en su
-     * cabecera, por qué el diagnóstico se dispara al ABRIRLA y no al activarse
-     * el riesgo.
-     */
-    id: "eva-avisos",
-    rol: "operador",
-    component: lazy(() => import("@/Demo-EVA/views/comunes/AvisosEva.jsx")),
-    nav: { icon: <MessageSquareText size={17} />, group: "sec-planta", apartado: "diagnostico" },
   },
 
   {
@@ -550,7 +554,7 @@ export const ROUTES = [
    * Las seis vistas del compresor salen del sidebar para TODOS los roles, a
    * petición del usuario: no se van a usar en esta demo.
    *
-   * Se ocultan como se ocultó la estación de llenado y como está `eva-muro`:
+   * Se ocultan como se ocultó la estación de llenado (antes de borrarla):
    * quitando `nav`, no borrando la ruta. Siguen registradas y se abren por
    * URL, así que nada se pierde y volver es devolver una línea a cada una.
    * Borrarlas habría dejado el módulo `prediccion` declarado en

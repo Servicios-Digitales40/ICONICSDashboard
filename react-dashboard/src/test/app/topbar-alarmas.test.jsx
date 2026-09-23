@@ -42,7 +42,7 @@ const montar = (onAbrirAlarmas = () => {}) =>
   render(
     <ThemeProvider>
       <DataSourceProvider>
-        <Topbar page="eva-muro" onAbrirMenu={() => {}} onAbrirAlarmas={onAbrirAlarmas} />
+        <Topbar page="eva-bandeja" onAbrirMenu={() => {}} onAbrirAlarmas={onAbrirAlarmas} />
       </DataSourceProvider>
     </ThemeProvider>
   );

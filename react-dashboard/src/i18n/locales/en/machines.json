@@ -509,5 +509,17 @@
       "summary_one": "Show the variable without a reading",
       "summary_other": "Show the {{count}} variables without a reading"
     }
+  },
+  "arranque": {
+    "buscando": "Looking for the first configured machine in service…",
+    "sinMaquinas": {
+      "title": "No configured machine in service",
+      "message": "Configure one from the ICONICS tree and the board will open on it.",
+      "messageSinPermiso": "Ask an administrator to configure one from the ICONICS tree; the board will open on it.",
+      "configurar": "Go to Configuration"
+    },
+    "error": {
+      "title": "The machine list could not be read"
+    }
   }
 }

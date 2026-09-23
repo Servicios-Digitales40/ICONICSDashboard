@@ -1,6 +1,6 @@
 # PLAN 42.5 — La UI acompaña a las máquinas configuradas, y se limpia lo que ya no sirve
 
-**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · **F6 escrita el 23-09-2026** (lo que la máquina pidió al mirarla en planta: filtros, mudas listadas, configuración más corta, nombre y alias por asset, fuera el muro) · quedan la comprobación manual (F1, F2) y el reinicio del backend (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
+**Estado:** F0–F5 completadas (F4 y F5 cerradas el 23-09-2026 con las decisiones del usuario: fuera todas las vistas del tanque, Predicción se queda oculta, `plc_opcua.py` borrado, bitácora vaciada) · **F6 completada el 23-09-2026** (filtros por activo y sólo medidas, mudas y pendientes listadas, configuración más corta con las herramientas a la vista, nombre y alias por asset resueltos por el asistente, fuera el muro con un arranque que desvía a la primera configurada) · quedan la comprobación manual en el navegador (F1, F2, F6) y el reinicio del backend (F3), **refinadas el 22-09-2026 (noche)** tras leer el código que suponían (D8–D14, §3.6) · escrito el 22-09-2026
 **Rama:** `UI-Limpieza1.0` (nace de `Vibraciones1.0` tras el Plan 42)
 **Origen:** el usuario, al ver la ficha de `vib-motor-03` sondeada: «debería
 poder consultar los históricos mediante gráficas como lo hacíamos con el
@@ -1427,6 +1427,31 @@ hay que leer el resto:
    `maq-inicio` de la primera, con `replace`; sin máquinas → texto y botón
    según rol); `useNavegacion({ replace })`; `listo` en el proveedor; las
    pruebas que usaban `eva-muro` de atrezzo.
+
+   **Hecho (23-09-2026, tarde).** `MuroPlanta.jsx` borrado con su prueba, su
+   ruta `eva-muro` y sus textos (`navigation:routes.eva-muro`,
+   `maintenance:wall.*`); `?muro=1`, `LatidoMuro` y `useMaquinasEnVivo` se
+   quedan, que son otra cosa. `DEFAULT_ROUTE = "inicio"`: una ruta sin menú
+   cuyo componente (`views/comunes/Arranque.jsx`) espera la lista de
+   configuradas y navega con `replace` al `maq-inicio` de la primera en
+   servicio; sin ninguna, lo dice y ofrece Configuración sólo a quien
+   administra (a los demás les dice a quién pedírselo); si la lista no se
+   pudo leer, enseña el error, no «no hay máquinas». Para eso `useNavegacion`
+   gana `navigate(page, params, { replace })` y el proveedor de configuradas
+   gana `listo` (verdadero tras la primera respuesta, buena o mala; fuera del
+   proveedor, verdadero). La prueba «la ruta por defecto está en el menú»
+   cambió de sentido: ahora exige que exista, no pida rol y NO esté en el
+   menú. Un efecto que el inventario no vio: el grupo «Planta» del sidebar
+   aparecía donde estaba su primer hijo, el muro; sin él se colaba detrás de
+   «General». Hallazgos y Avisos van ahora delante de Assets, con la nota en
+   el registro. Nueve pruebas que usaban `eva-muro` de atrezzo pasan a
+   `eva-bandeja`; `navegacion.test` gana el caso de `replace`; `arranque.test`
+   (5) cubre el desvío, la espera, los dos mensajes y el error.
+   **Puerta:** frontend **1166** verdes · 20 omitidas; los 41 verificadores;
+   lint, i18n (1250 claves) y textos limpios; build en verde, `index` 329,1 KB.
+   (Dos pruebas agotaron su plazo en una tanda que corrió a la vez que los
+   verificadores y pasaron aisladas y en la tanda siguiente: contención, no
+   asertos, CLAUDE.md §5.3.)
 
 **Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
 (incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del

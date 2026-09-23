@@ -81,11 +81,6 @@
       "nav": "Notebook",
       "sub": "Notes from whoever is in front of the machine, with their time and author"
     },
-    "eva-muro": {
-      "title": "Plant wall",
-      "nav": "Wall",
-      "sub": "Every machine at once, each with its state, its alarms and its freshness"
-    },
     "eva-configuracion": {
       "title": "Configuration",
       "nav": "Configuration",
@@ -140,6 +135,11 @@
       "title": "Document RAG",
       "nav": "Document RAG",
       "sub": "Configured machine · the manuals the assistant consults about it"
+    },
+    "inicio": {
+      "title": "Home",
+      "nav": "Home",
+      "sub": "The board opens on the first configured machine in service"
     }
   },
   "palette": {

@@ -158,13 +158,5 @@
     "loadError": "No se pudieron leer las notas",
     "list": "Notas",
     "empty": "Todavía no hay ninguna nota."
-  },
-  "wall": {
-    "title": "Muro de planta",
-    "subtitle": "Todas las máquinas configuradas a la vez: su peor riesgo y si el dato sigue llegando.",
-    "noRisk": "Sin riesgos activos",
-    "zone": "Zona {{zona}}",
-    "alarmsNotApplicable": "Esta máquina no tiene alarmas declaradas en el PLC",
-    "empty": "Ninguna máquina configurada en servicio. Configura una desde el árbol de ICONICS y aparecerá aquí."
   }
 }

@@ -80,7 +80,7 @@ function conRiesgos(porMaquina = {}) {
 const montar = () =>
   render(
     <ThemeProvider>
-      <Sidebar page="eva-muro" onNavigate={() => {}} />
+      <Sidebar page="eva-bandeja" onNavigate={() => {}} />
     </ThemeProvider>
   );
 
