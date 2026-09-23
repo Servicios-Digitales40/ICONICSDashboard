@@ -602,6 +602,34 @@ export const TIPO_VIBRACIONES = Object.freeze({
     CONTADORES_ALARMA.map((c) => Object.freeze({ key: c.key, sufijo: c.sufijo, nivel: c.nivel ?? null })),
   ),
 
+  /*
+   * ── SERIES QUE PUEDEN SER IDÉNTICAS SIN SER LA MISMA (Plan 42, 22-09-2026) ─
+   *
+   * El sondeo (`backend/lib/sondearSeries.mjs`) se niega a prometer historia
+   * de dos variables cuyas series coinciden en todos los valores, porque el
+   * historiador ya sirvió una serie con dos nombres (`aPeak_S1`). Pero hay
+   * una familia en la que coincidir es lo ESPERADO: los nueve códigos de
+   * calidad `QC_*` del SM 1281 son un estado del módulo que se publica por
+   * medida y por apoyo, y con los tres sensores sanos valen lo mismo y
+   * cambian a la vez.
+   *
+   * Medido el 22-09-2026 (`scripts/medir-igualdad-en-vivo.mjs`, 60 lecturas
+   * en 3 min): en vivo los nueve llegan como nueve datos SEPARADOS —cada uno
+   * con su propia marca de tiempo— e iguales. Son fuentes distintas que
+   * coinciden, y decidir si la configuración del PLC y del historiador está
+   * bien es de quien los configura, no del tablero. Así que el tipo declara
+   * la familia y el sondeo verifica sus series como REGISTRADAS aunque sean
+   * idénticas entre sí. `aPeak_S1` y `aRMS_S1` no están en ninguna familia y
+   * su cruce se sigue cazando.
+   *
+   * Es una función y no una lista de claves porque se pregunta por PAREJAS
+   * de variables de una máquina configurada, que tiene sus propios ids; lo
+   * que las une es el ROL, que sí es del tipo.
+   */
+  seriesEquivalentes: (a, b) =>
+    typeof a?.rol === "string" && typeof b?.rol === "string" &&
+    a.rol.startsWith("calidad:") && b.rol.startsWith("calidad:"),
+
   /* Las 18 reglas, por referencia. Ver la cabecera: no se copian. */
   reglas: REGLAS,
   evaluarRiesgos: evaluarRiesgosVibracion,

@@ -461,3 +461,41 @@ calibrar contra ella, si algún día se quiere; la vía C nunca fue una fase.
 - No toca el código del tanque (`CLAUDE.md` §1); `eventosDeAlarma` es común.
 - No crea la vista de alarmas de la configurada sin la F3 delante.
 - No añade dependencias.
+
+## 6. Seguimiento del mismo día: «comparten serie con otra»
+
+Al ver la ficha tras el sondeo, el usuario preguntó por las 11 «comparten
+serie con otra» (las nueve `QC_*`, `OUTPUT VOLTS_BMS` y `Numero de arranques`):
+que parezcan iguales no significa que sean la misma; están configuradas para
+recibir datos de fuentes distintas, y decidir eso es del PLC y de ICONICS, no
+del tablero. Tres cosas salieron de ahí, las tres el 22-09-2026 por la noche:
+
+1. **La causa `serie-compartida` dice lo medido.** Decía «el historiador
+   devuelve la MISMA serie que para…», que afirma un cruce. Lo medido es que
+   coinciden todos los valores de las marcas comunes, y eso tiene dos
+   explicaciones que los valores no separan. Ahora dice «indistinguible de»,
+   en el motivo del sondeo y en el rótulo de la ficha (es/en). El criterio no
+   cambió: siguen sin prometer historia.
+
+2. **Se midió en vivo** (`scripts/medir-igualdad-en-vivo.mjs`, 60 lecturas en
+   3 min por `ac:`): las nueve `QC_*` iguales las 60 veces **y cada una con
+   su propia marca de tiempo**. Son nueve datos separados que coinciden. Las
+   dos del variador no tenían dato en vivo; no se pudo comparar.
+
+3. **El tipo declara la familia.** `TIPO_VIBRACIONES.seriesEquivalentes(a, b)`
+   dice que dos variables con rol `calidad:*` pueden tener series idénticas
+   sin ser la misma. La ruta se lo pasa al sondeo (`sonEquivalentes`), y si
+   TODAS las variables con las que una coincide son equivalentes a ella,
+   queda `registrada-equivalente`, verificada. Basta una ajena en el grupo
+   —un `QC` idéntico a un `aRMS`— para que ninguna se exima. `aPeak_S1` y
+   `aRMS_S1` no están en ninguna familia. Por defecto nada es equivalente.
+   Cinco checks más en `verificar-sondeo-series` (39). **Sin nada nuevo en
+   pantalla**, a petición del usuario: las equivalentes cuentan como
+   verificadas y no se rotulan aparte.
+
+**Y lo que pasó al re-sondear tras reiniciar los servidores:** las nueve
+`QC_*` salieron **propias por sí mismas** (34 propias, 44 constantes, 2
+compartidas, 5 sin muestras, 1 sin leer). Sus series ya no coincidían: el
+historiador, reiniciado, las registra distintas. La familia no tuvo que
+actuar y queda para cuando vuelvan a coincidir. Las dos compartidas que
+quedan son las de pocas marcas y valores enteros: B15.

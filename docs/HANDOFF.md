@@ -93,14 +93,27 @@ observar; la regla de cresta sale «no evaluable · en vacío» (en vacío S2 da
 (Plan 42 F0, medido): una bandera constante deja 8 muestras al día frente a
 569 de `vRMS_S1`, y las deja en los minutos en que la recolección rearranca.
 Por eso desde el Plan 42 el sondeo verifica una constante **por sus marcas de
-tiempo** (`registrada-constante`): el último sondeo del 22-09 dio **20
-propias, 38 constantes registradas, 13 compartidas** (las nueve `QC_*`, una
-sola serie, más cuatro con pocas marcas: B15), 11 sin muestras y 3 sin
-variación de 86. Las **once banderas de alarma están verificadas** sin haber
-alarmado nunca. Las «35 sin variación» de la mañana ya no existen; y ojo: las
-constantes que sólo dejan marca al rearrancar entran y salen de la ventana
-de 24 h (50 registradas a las 15:30, 38 a las 16:40). Lo ganado no se
-pierde: el sondeo no baja a `false` lo que ya estaba verificado.
+tiempo** (`registrada-constante`): el último sondeo del 22-09, tras reiniciar
+los servidores, dio **34 propias, 44 constantes registradas, 2 compartidas**
+(`OUTPUT VOLTS_BMS` y `Numero de arranques`, pocas marcas: B15), 5 sin
+muestras y 1 sin leer, de 86. Las **once banderas de alarma están
+verificadas** sin haber alarmado nunca. Las «35 sin variación» de la mañana
+ya no existen; y ojo: las constantes que sólo dejan marca al rearrancar
+entran y salen de la ventana de 24 h (50 registradas a las 15:30, 38 a las
+16:40, 44 tras el reinicio). Lo ganado no se pierde: el sondeo no baja a
+`false` lo que ya estaba verificado.
+
+**Las nueve `QC_*` salían «comparten serie con otra»** hasta el reinicio: sus
+series eran idénticas en todos los valores. En vivo se midió que llegan como
+nueve datos separados, cada uno con su marca (`medir-igualdad-en-vivo`), y el
+usuario lo dejó claro: decidir si dos tags con el mismo valor son la misma
+fuente es del PLC y de ICONICS, no del tablero. El tipo `vibraciones` declara
+ahora las calidades como **series equivalentes** (`seriesEquivalentes`) y el
+sondeo las verifica aunque coincidan (`registrada-equivalente`); `aPeak_S1` y
+`aRMS_S1` no están en ninguna familia y su cruce se sigue cazando. Tras el
+reinicio las nueve salieron **propias por sí mismas**, así que la familia no
+tuvo que actuar; queda para cuando vuelvan a coincidir. La causa
+`serie-compartida` dice ya «indistinguible de», no «devuelve la de otra».
 
 **El Alarm Server de GENESIS64 da 500 a `AlarmHistory`** para cualquier
 punto —del área de vibraciones y del tanque—. Por eso «Alarmas» de la

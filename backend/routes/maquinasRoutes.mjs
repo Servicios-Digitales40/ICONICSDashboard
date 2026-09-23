@@ -429,6 +429,11 @@ export function registerMaquinasRoutes(
       const VENTANAS_HORAS = [24, 72, 7 * 24]
       const hasta = new Date()
 
+      /* Qué series pueden ser idénticas sin ser la misma lo declara el TIPO
+         (Plan 42); un tipo que no lo declare no exime a ninguna. */
+      const tipoDeLaMaquina = tipoDe(maquina.tipo)
+      const sonEquivalentes = tipoDeLaMaquina?.seriesEquivalentes ?? (() => false)
+
       let resultado = null
       let ventanaUsada = null
       for (const horas of VENTANAS_HORAS) {
@@ -437,6 +442,7 @@ export function registerMaquinasRoutes(
           leerSerie: (opciones) => client.readHistory(opciones),
           desde: desde.toISOString(),
           hasta: hasta.toISOString(),
+          sonEquivalentes,
         })
         resultado = intento
         ventanaUsada = horas

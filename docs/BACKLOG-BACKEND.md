@@ -625,3 +625,11 @@ comunes (más de N valores distintos), o una fracción de las marcas totales.
 La cifra tiene que salir de una medida sobre las series reales, no de un
 número redondo. Toca `sondearSeries.mjs` y `verificar-sondeo-series`; se
 escribe antes como fase de un plan.
+
+> **Seguimiento del 22-09-2026 (noche).** Las nueve `QC_*` ya no entran aquí:
+> el tipo las declara `seriesEquivalentes` y el sondeo las verifica aunque
+> coincidan (Plan 42 §6); y tras reiniciar los servidores salieron propias por
+> sí mismas. Quedan `OUTPUT VOLTS_BMS` y `Numero de arranques`, que son
+> exactamente el caso de este punto: 9–14 marcas y valores enteros. En vivo
+> no tenían dato cuando se midió (`medir-igualdad-en-vivo`), así que no se pudo
+> discriminar por esa vía; repetir cuando el variador publique.

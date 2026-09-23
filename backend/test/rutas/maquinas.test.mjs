@@ -589,7 +589,7 @@ describe('POST /api/maquinas/:id/sondear', () => {
     expect(cuerpo.ok).toBe(true)
     expect(cuerpo.resumen.constantes).toBeGreaterThan(0)
     expect(cuerpo.resumen.verificadas).toBeGreaterThan(cuerpo.resumen.constantes)
-    expect(cuerpo.motivo).toMatch(/\d+ propias y \d+ constantes/)
+    expect(cuerpo.motivo).toMatch(/\d+ propias, \d+ constantes/)
     expect(cuerpo.anotado).toBe(true)
     /* Las registradas están verificadas, así que NO van entre las pendientes. */
     expect(cuerpo.pendientes.some((p) => p.causa === 'registrada-constante')).toBe(false)

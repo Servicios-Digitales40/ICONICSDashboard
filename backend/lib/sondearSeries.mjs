@@ -290,9 +290,14 @@ export function registradaPor(constante, testigo) {
  *   `client.readHistory`. Entra por la puerta para poder probar esto sin red.
  * @param {string} deps.desde  inicio de la ventana, ISO
  * @param {string} deps.hasta  fin de la ventana, ISO
+ * @param {(a: object, b: object) => boolean} [deps.sonEquivalentes]  ¿pueden
+ *   estas dos variables tener series idénticas sin ser la misma? Lo declara
+ *   el TIPO (`tipo.seriesEquivalentes`, Plan 42): los nueve códigos de
+ *   calidad del SM 1281 coinciden por diseño. Por defecto, nada lo es, que
+ *   es el valor seguro. Ver «SERIES QUE PUEDEN SER IDÉNTICAS» abajo.
  * @returns {Promise<{estado: string, motivo: string, variables: object[], resumen: object}>}
  */
-export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
+export async function sondearSeries(maquina, { leerSerie, desde, hasta, sonEquivalentes = () => false }) {
   const declaradas = (maquina?.variables ?? []).filter((v) => v?.historyPointName)
 
   if (!declaradas.length) {
@@ -300,7 +305,10 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
       estado: ESTADO_CONFIGURACION.UNKNOWN,
       motivo: 'Ninguna variable declara punto histórico: no hay series que sondear.',
       variables: [],
-      resumen: { total: 0, verificadas: 0, constantes: 0, compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0 },
+      resumen: {
+        total: 0, verificadas: 0, constantes: 0, equivalentes: 0,
+        compartidas: 0, sinVariacion: 0, sinDatos: 0, fallos: 0,
+      },
     }
   }
 
@@ -461,6 +469,35 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
 
     const otras = compartenCon.get(l.variable.id ?? l.variable.pointName) ?? []
     if (otras.length) {
+      /*
+       * ── SERIES QUE PUEDEN SER IDÉNTICAS SIN SER LA MISMA (Plan 42) ──
+       *
+       * Si TODAS las variables con las que coincide son equivalentes a ésta
+       * según el tipo (los nueve `QC_*` del SM 1281 entre sí), coincidir es
+       * lo esperado y no una acusación: la serie queda verificada como
+       * REGISTRADA. Basta una que no lo sea —un `QC_*` idéntico a un
+       * `aRMS`— para que el grupo entero siga siendo `serie-compartida`:
+       * ahí sí hay algo que no cuadra y nadie promete historia.
+       */
+      const variablesPorId = new Map(leidas.map((x) => [idDe(x), x.variable]))
+      const todasEquivalentes = otras.every((id) => sonEquivalentes(l.variable, variablesPorId.get(id)))
+      if (todasEquivalentes) {
+        return {
+          ...base,
+          historyVerified: true,
+          historyVerifiedComo: 'registrada-equivalente',
+          sondeo: {
+            estado: ESTADO_CONFIGURACION.VALID,
+            causa: 'registrada-equivalente',
+            motivo:
+              `Serie registrada, idéntica a la de ${otras.join(', ')}: el tipo declara que estas ` +
+              'variables coinciden por diseño, así que la igualdad no es un cruce. Si el servidor ' +
+              'sirviera una por otra, mientras coincidan no se notaría.',
+            equivalenteA: otras,
+          },
+        }
+      }
+
       return {
         ...base,
         historyVerified: false,
@@ -510,6 +547,7 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
        desglose va en `constantes`, para que la pantalla lo diga aparte. */
     verificadas: variables.filter((v) => v.historyVerified === true).length,
     constantes: porCausa('registrada-constante'),
+    equivalentes: porCausa('registrada-equivalente'),
     compartidas: porCausa('serie-compartida'),
     sinVariacion: porCausa('sin-variacion'),
     sinDatos: porCausa('sin-muestras'),
@@ -531,9 +569,11 @@ export async function sondearSeries(maquina, { leerSerie, desde, hasta }) {
     estado,
     motivo:
       `${resumen.verificadas} de ${resumen.total} series verificadas` +
-      (resumen.constantes
-        ? ` (${resumen.verificadas - resumen.constantes} propias y ${resumen.constantes} constantes ` +
-          'registradas por el historiador). '
+      (resumen.constantes || resumen.equivalentes
+        ? ` (${resumen.verificadas - resumen.constantes - resumen.equivalentes} propias` +
+          (resumen.constantes ? `, ${resumen.constantes} constantes registradas por el historiador` : '') +
+          (resumen.equivalentes ? `, ${resumen.equivalentes} idénticas a otras por diseño del tipo` : '') +
+          '). '
         : ' como propias. ') +
       `${resumen.compartidas} comparten serie con otra, ${resumen.sinVariacion} no varían ` +
       `en la ventana, ${resumen.sinDatos} sin muestras y ${resumen.fallos} no se pudieron leer.`,

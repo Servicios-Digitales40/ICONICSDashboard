@@ -573,9 +573,80 @@ await check('13 · el resumen cuenta las constantes aparte y una máquina de pro
   assert.equal(r.resumen.constantes, 2)
   assert.equal(r.resumen.sinVariacion, 0)
   assert.equal(r.estado, ESTADO_CONFIGURACION.VALID)
-  assert.match(r.motivo, /1 propias y 2 constantes/)
+  assert.match(r.motivo, /1 propias, 2 constantes/)
   /* Y las propias siguen diciendo cómo quedaron. */
   assert.equal(r.variables.find((x) => x.id === 'vRMS').historyVerifiedComo, 'serie-propia')
+})
+
+/* ── Series idénticas por diseño del tipo (Plan 42, seguimiento) ────────── */
+
+console.log(`\n${c.negrita}Las series que el tipo declara equivalentes${c.reset}\n`)
+
+/** Como `v`, con rol. */
+const vRol = (id, rol) => ({ ...v(id), rol })
+/** Lo que declara `TIPO_VIBRACIONES.seriesEquivalentes`: las calidades entre sí. */
+const calidadesEntreSi = (a, b) =>
+  typeof a?.rol === 'string' && typeof b?.rol === 'string' &&
+  a.rol.startsWith('calidad:') && b.rol.startsWith('calidad:')
+const qc = serie(192, 192, 192, 64, 64, 192, 192, 192, 64, 192, 192, 192)
+
+await check('14 · nueve calidades idénticas quedan REGISTRADAS como equivalentes, no compartidas', async () => {
+  const ids = ['QC_1', 'QC_2', 'QC_3', 'QC_4', 'QC_5', 'QC_6', 'QC_7', 'QC_8', 'QC_9']
+  const mapa = Object.fromEntries(ids.map((id) => [`hda:g:${id}`, qc]))
+  const r = await sondearSeries(
+    { variables: ids.map((id) => vRol(id, 'calidad:qc')) },
+    { ...VENTANA, leerSerie: historiadorFalso(mapa), sonEquivalentes: calidadesEntreSi },
+  )
+  assert.equal(r.resumen.equivalentes, 9)
+  assert.equal(r.resumen.compartidas, 0)
+  assert.equal(r.resumen.verificadas, 9)
+  assert.equal(r.estado, ESTADO_CONFIGURACION.VALID)
+  for (const x of r.variables) {
+    assert.equal(x.historyVerified, true)
+    assert.equal(x.historyVerifiedComo, 'registrada-equivalente')
+    assert.equal(x.sondeo.equivalenteA.length, 8)
+    assert.match(x.sondeo.motivo, /por diseño/)
+  }
+  assert.match(r.motivo, /9 idénticas a otras por diseño del tipo/)
+})
+
+await check('15 · sin la declaración del tipo, las mismas nueve siguen siendo `serie-compartida`', async () => {
+  const ids = ['QC_1', 'QC_2', 'QC_3']
+  const mapa = Object.fromEntries(ids.map((id) => [`hda:g:${id}`, qc]))
+  const r = await sondearSeries(
+    { variables: ids.map((id) => vRol(id, 'calidad:qc')) },
+    { ...VENTANA, leerSerie: historiadorFalso(mapa) },
+  )
+  assert.equal(r.resumen.compartidas, 3, 'el valor por defecto es «nada es equivalente»')
+  assert.equal(r.resumen.equivalentes, 0)
+})
+
+await check('16 · `aPeak_S1` idéntica a `aRMS_S1` NO se exime: no son de la familia', async () => {
+  const r = await sondearSeries(
+    { variables: [vRol('aRMS_S1', 'medida:aRMS'), vRol('aPeak_S1', 'medida:aPeak')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:aRMS_S1': propia, 'hda:g:aPeak_S1': propia }), sonEquivalentes: calidadesEntreSi },
+  )
+  assert.equal(r.resumen.compartidas, 2)
+  assert.equal(r.resumen.equivalentes, 0)
+})
+
+await check('17 · una calidad idéntica a una MEDIDA hunde al grupo entero: ahí sí hay algo que no cuadra', async () => {
+  const r = await sondearSeries(
+    { variables: [vRol('QC_1', 'calidad:qc'), vRol('QC_2', 'calidad:qc'), vRol('aRMS_S1', 'medida:aRMS')] },
+    { ...VENTANA, leerSerie: historiadorFalso({ 'hda:g:QC_1': qc, 'hda:g:QC_2': qc, 'hda:g:aRMS_S1': qc }), sonEquivalentes: calidadesEntreSi },
+  )
+  assert.equal(r.resumen.compartidas, 3, 'basta una que no sea de la familia para que ninguna se exima')
+  assert.equal(r.resumen.equivalentes, 0)
+})
+
+await check('18 · el tipo de vibraciones declara equivalentes las calidades, y sólo a ellas', async () => {
+  const { TIPO_VIBRACIONES } = await import('../shared/eva/tipos/vibraciones.js')
+  const eq = TIPO_VIBRACIONES.seriesEquivalentes
+  assert.equal(eq({ rol: 'calidad:qcVRMS' }, { rol: 'calidad:qcDKW' }), true)
+  assert.equal(eq({ rol: 'calidad:qcVRMS' }, { rol: 'medida:aRMS' }), false)
+  assert.equal(eq({ rol: 'medida:aPeak' }, { rol: 'medida:aRMS' }), false)
+  assert.equal(eq({ rol: 'bandera:alarma' }, { rol: 'bandera:alarma' }), false, 'dos banderas iguales NO son equivalentes por diseño')
+  assert.equal(eq({ rol: null }, { rol: null }), false)
 })
 
 /* ── Resumen ─────────────────────────────────────────────────────────── */
