@@ -9,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ThemeProvider, useTheme } from "@/theme";
-import { PendientesPorCausa, pendientesDeVariables } from "@/Demo-EVA/components/configuracion/PendientesPorCausa.jsx";
+import { PendientesPorCausa, agruparCompartidas, pendientesDeVariables } from "@/Demo-EVA/components/configuracion/PendientesPorCausa.jsx";
 
 function ConTema({ children }) {
   const { theme } = useTheme();
@@ -45,6 +45,20 @@ describe("pendientesDeVariables", () => {
   });
 });
 
+describe("agruparCompartidas", () => {
+  it("seis variables que se citan entre sí son UN grupo; dos parejas ajenas, dos grupos", () => {
+    const seis = ["a1", "v1", "a2", "v2", "a3", "v3"];
+    const pendientes = seis.map((id) => ({ id, compartidaCon: seis.filter((x) => x !== id) }));
+    expect(agruparCompartidas(pendientes)).toEqual([seis]);
+    expect(agruparCompartidas([
+      { id: "p", compartidaCon: ["q"] }, { id: "q", compartidaCon: ["p"] },
+      { id: "x", compartidaCon: ["y"] },
+    ])).toEqual([["p", "q"], ["x", "y"]]);
+    /* Una cadena indirecta (a↔b, b↔c) también es un grupo. */
+    expect(agruparCompartidas([{ id: "a", compartidaCon: ["b"] }, { id: "c", compartidaCon: ["b"] }])).toEqual([["a", "b", "c"]]);
+  });
+});
+
 describe("la lista por causa", () => {
   it("agrupa con el texto corto de cada causa, cuenta, y dice con quién se comparte una serie", () => {
     const { pendientes, constantes } = pendientesDeVariables(VARIABLES);
@@ -53,7 +67,9 @@ describe("la lista por causa", () => {
     expect(screen.getByText(/Serie compartida con otra variable · 2/)).toBeTruthy();
     expect(screen.getByText(/No se pudo leer el historiador · 1/)).toBeTruthy();
     expect(screen.getByText(/Sin sondear · 1/)).toBeTruthy();
-    expect(screen.getByText("aPeak_S1 → aRMS_S1")).toBeTruthy();
+    /* Las dos que se comparten son UNA línea, no dos que se citan mutuamente. */
+    expect(screen.getByText("aPeak_S1, aRMS_S1 · 2 comparten la misma serie")).toBeTruthy();
+    expect(screen.queryByText(/→/)).toBeNull();
     expect(screen.getByText("par")).toBeTruthy();
     /* Las constantes, aparte y plegadas: se cuentan en el resumen, y sus ids están dentro. */
     expect(screen.getByText("2 verificadas como constante registrada")).toBeTruthy();

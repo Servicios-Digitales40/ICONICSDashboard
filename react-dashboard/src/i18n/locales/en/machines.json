@@ -406,7 +406,7 @@
       "assetNamePlaceholder": "No name: labelled by its id",
       "assetAlias": "Aliases of asset {{id}}",
       "assetAliasPlaceholder": "aliases, comma-separated",
-      "assetAliasHint": "Aliases apply to every variable of the asset: with “small coupling” on S1, “DKW of the small coupling” finds that bearing's DKW. On the root asset, the name and aliases belong to the whole machine: “what's up with vivi?”.",
+      "assetAliasHint": "Other ways of naming the asset that the assistant understands; they apply to every variable of the asset. On the root asset, the name and aliases belong to the whole machine.",
       "useSuggestion": "Use “{{nombre}}”"
     },
     "remove": "Remove from dashboard",
@@ -424,7 +424,6 @@
     },
     "constantesSummary_one": "{{count}} verified as a recorded constant",
     "constantesSummary_other": "{{count}} verified as recorded constants",
-    "pendientesTitle": "Unverified series, by cause",
     "limitationsSummary_one": "What it cannot do · 1 limitation",
     "limitationsSummary_other": "What it cannot do · {{count}} limitations",
     "herramientas": {
@@ -435,7 +434,11 @@
         "riesgos_activos": "Active risks",
         "historia_de_senal": "Signal history"
       }
-    }
+    },
+    "compartenSerie_one": "{{count}} shares the same series",
+    "compartenSerie_other": "{{count}} share the same series",
+    "pendientesSummary_one": "{{count}} unverified series",
+    "pendientesSummary_other": "{{count}} unverified series"
   },
   "maquina": {
     "planta": {

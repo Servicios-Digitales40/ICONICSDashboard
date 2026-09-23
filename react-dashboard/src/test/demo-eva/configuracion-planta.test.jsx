@@ -336,8 +336,8 @@ describe("el sondeo de series", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Sondear sus series/i }));
 
     /* Con cuál la comparte, no sólo que «hay un problema»: es lo único
-       accionable — dice qué gráfica no hay que creerse. */
-    expect(await screen.findByText(/aPeak_S1 → aRMS_S1/)).toBeTruthy();
+       accionable — dice qué gráfica no hay que creerse. Por GRUPO, una línea. */
+    expect(await screen.findByText("aPeak_S1, aRMS_S1 · 2 comparten la misma serie")).toBeTruthy();
     /* El rótulo del resumen, no el motivo: los dos contienen «1 de 2 series
        verificadas» y `getByText` con eso solo devuelve dos coincidencias. */
     expect(screen.getByText("1 de 2 series verificadas como propias")).toBeTruthy();
@@ -538,12 +538,13 @@ describe("lo que el sondeo dejó persistido se lista sin sondear otra vez (F6, D
 
     montar();
 
-    expect(await screen.findByText("Series sin verificar, por causa")).toBeTruthy();
+    /* Plegado bajo un resumen con las cifras; el detalle sigue en la ficha. */
+    expect(await screen.findByText("3 series sin verificar · 1 verificada como constante registrada")).toBeTruthy();
     expect(screen.getByText(/Serie compartida con otra variable · 1/)).toBeTruthy();
-    expect(screen.getByText("aPeak_S1 → aRMS_S1")).toBeTruthy();
+    expect(screen.getByText("aPeak_S1, aRMS_S1 · 2 comparten la misma serie")).toBeTruthy();
     expect(screen.getByText(/No se pudo leer el historiador · 1/)).toBeTruthy();
     expect(screen.getByText(/Sin sondear · 1/)).toBeTruthy();
-    expect(screen.getByText("1 verificada como constante registrada")).toBeTruthy();
+    expect(screen.getAllByText(/1 verificada como constante registrada/).length).toBeGreaterThan(0);
     /* La verificada como propia no es pendiente ni constante: no sale en la lista. */
     expect(screen.queryByText("vRMS_S1")).toBeNull();
   });
@@ -552,7 +553,7 @@ describe("lo que el sondeo dejó persistido se lista sin sondear otra vez (F6, D
     listarMaquinas.mockResolvedValue({ ok: true, cuantas: 1, maquinas: [maquina()] });
     montar();
     await screen.findByText("Motor conveyor 4");
-    expect(screen.queryByText("Series sin verificar, por causa")).toBeNull();
+    expect(screen.queryByText(/series? sin verificar/)).toBeNull();
   });
 });
 

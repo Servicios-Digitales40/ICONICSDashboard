@@ -50,6 +50,35 @@ export function pendientesDeVariables(variables) {
 }
 
 /**
+ * Las variables cuya serie es indistinguible, agrupadas: cada una trae con
+ * quién la comparte (`compartidaCon`), y dos que se citan —directa o
+ * indirectamente— van al mismo grupo. Cada grupo sale ordenado como llegó.
+ *
+ * @param {Array<{id: string, compartidaCon?: string[]|null}>} pendientes  sólo las de causa `serie-compartida`
+ * @returns {string[][]}
+ */
+export function agruparCompartidas(pendientes) {
+  const grupoDe = new Map();
+  const grupos = [];
+  for (const p of pendientes) {
+    const relacionadas = [p.id, ...(Array.isArray(p.compartidaCon) ? p.compartidaCon : [])];
+    let grupo = relacionadas.map((id) => grupoDe.get(id)).find(Boolean);
+    if (!grupo) { grupo = []; grupos.push(grupo); }
+    for (const id of relacionadas) {
+      const otro = grupoDe.get(id);
+      if (otro && otro !== grupo) {
+        /* Dos grupos que resultan ser uno: se funden en el primero. */
+        for (const x of otro) { if (!grupo.includes(x)) grupo.push(x); grupoDe.set(x, grupo); }
+        otro.length = 0;
+      }
+      if (!grupo.includes(id)) grupo.push(id);
+      grupoDe.set(id, grupo);
+    }
+  }
+  return grupos.filter((g) => g.length);
+}
+
+/**
  * @param {object} props
  * @param {Array<{id: string, causa: string, compartidaCon?: string[]|null}>} props.pendientes
  * @param {string[]} [props.constantes]
@@ -71,6 +100,22 @@ export function PendientesPorCausa({ pendientes, constantes = [], t }) {
 
   if (!ordenadas.length && !constantes.length) return null;
 
+  /*
+   * Las compartidas van por GRUPO, no por variable. Seis variables que
+   * comparten una misma serie son un solo hecho —«estas seis son
+   * indistinguibles»—, y listarlas una a una con las otras cinco al lado lo
+   * repetía seis veces (lo vio el usuario el 23-09-2026). Con una línea por
+   * grupo se lee de un vistazo cuántos grupos hay y quién está en cada uno.
+   */
+  const filasDe = (causa) => {
+    const lista = grupos.get(causa);
+    if (causa !== "serie-compartida") return lista.map((p) => ({ clave: p.id, texto: p.id }));
+    return agruparCompartidas(lista).map((ids) => ({
+      clave: ids.join("|"),
+      texto: `${ids.join(", ")} · ${traducir("config.compartenSerie", { count: ids.length })}`,
+    }));
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {ordenadas.map((causa) => (
@@ -79,11 +124,8 @@ export function PendientesPorCausa({ pendientes, constantes = [], t }) {
             {traducir(`config.causa.${causa}`)} · {grupos.get(causa).length}
           </div>
           <ul style={{ margin: "3px 0 0", paddingLeft: 16 }}>
-            {grupos.get(causa).map((p) => (
-              <li key={p.id} style={mono}>
-                {p.id}
-                {p.compartidaCon?.length ? ` → ${p.compartidaCon.join(", ")}` : ""}
-              </li>
+            {filasDe(causa).map((fila) => (
+              <li key={fila.clave} style={mono}>{fila.texto}</li>
             ))}
           </ul>
         </div>

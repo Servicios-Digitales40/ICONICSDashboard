@@ -506,15 +506,17 @@ function FichaDeMaquina({
         </details>
       )}
 
+      {/* Plegado, como las limitaciones: la cifra a la vista y el detalle a un clic (D17, D18). */}
       {!sondeo && (persistidas.pendientes.length > 0 || persistidas.constantes.length > 0) && (
-        <div style={{ marginTop: 7 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 600, color: t.text }}>
-            {traducir("machines:config.pendientesTitle")}
-          </div>
-          <div style={{ marginTop: 3 }}>
+        <details style={{ marginTop: 7 }}>
+          <summary style={{ cursor: "pointer", fontSize: 11.5, fontWeight: 600, color: t.text }}>
+            {traducir("machines:config.pendientesSummary", { count: persistidas.pendientes.length })}
+            {persistidas.constantes.length > 0 && ` · ${traducir("machines:config.constantesSummary", { count: persistidas.constantes.length })}`}
+          </summary>
+          <div style={{ marginTop: 5 }}>
             <PendientesPorCausa pendientes={persistidas.pendientes} constantes={persistidas.constantes} t={t} />
           </div>
-        </div>
+        </details>
       )}
 
       {/*

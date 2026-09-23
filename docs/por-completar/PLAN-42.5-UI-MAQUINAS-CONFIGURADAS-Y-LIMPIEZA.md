@@ -1479,6 +1479,19 @@ hay que leer el resto:
    herramienta ante «¿qué es vivi?»; sí garantiza que si la llama, la
    máquina se resuelve, y que el prompt le dice qué es.
 
+7. **F6.7 · Dos cosas que el usuario vio en pantalla tras F6.4 y F6.6.** (a)
+   La pista de alias del editor llevaba los ejemplos de la sesión («acople
+   chiquito», «vivi») como si fueran del producto: los textos de la interfaz
+   no cargan ejemplos de una conversación; la pista quedó sin ejemplos
+   concretos, en los dos idiomas. Los nombres siguen sólo en la espejo y en
+   las pruebas, que es donde son datos. (b) La lista de series compartidas
+   repetía el mismo grupo una vez por variable («a → v, a2, v2…» seis veces):
+   `agruparCompartidas` funde las que se citan, directa o indirectamente, en
+   un grupo y la ficha pinta una línea por grupo («a1, v1, … · 6 comparten la
+   misma serie»); y el bloque entero va plegado bajo «N series sin verificar ·
+   M verificadas como constante registrada», como las limitaciones (D18), con
+   el detalle a un clic.
+
 **Puerta de cada paso**: lint, types, las dos suites, `npm run verificar`
 (incluida la §5.1 en F6.3 y F6.4, que tocan texto y resolución del
 asistente), build y bundle en F6.1 y F6.5. Comprobación manual contra

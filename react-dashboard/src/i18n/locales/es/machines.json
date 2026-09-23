@@ -406,7 +406,7 @@
       "assetNamePlaceholder": "Sin nombre: se rotula por su id",
       "assetAlias": "Alias del activo {{id}}",
       "assetAliasPlaceholder": "alias, separados por comas",
-      "assetAliasHint": "Los alias se suman a todas las variables del activo: con «acople chiquito» en S1, «DKW del acople chiquito» encuentra la DKW de ese apoyo. En el activo raíz, el nombre y los alias son de la máquina entera: «¿qué pasa con vivi?».",
+      "assetAliasHint": "Otras formas de nombrar el activo que el asistente entiende; valen para todas sus variables. En el activo raíz, el nombre y los alias son de la máquina entera.",
       "useSuggestion": "Usar «{{nombre}}»"
     },
     "remove": "Quitar del tablero",
@@ -424,7 +424,6 @@
     },
     "constantesSummary_one": "{{count}} verificada como constante registrada",
     "constantesSummary_other": "{{count}} verificadas como constante registrada",
-    "pendientesTitle": "Series sin verificar, por causa",
     "limitationsSummary_one": "Lo que no puede hacer · 1 limitación",
     "limitationsSummary_other": "Lo que no puede hacer · {{count}} limitaciones",
     "herramientas": {
@@ -435,7 +434,11 @@
         "riesgos_activos": "Riesgos activos",
         "historia_de_senal": "Historia de una señal"
       }
-    }
+    },
+    "compartenSerie_one": "{{count}} comparte la misma serie",
+    "compartenSerie_other": "{{count}} comparten la misma serie",
+    "pendientesSummary_one": "{{count}} serie sin verificar",
+    "pendientesSummary_other": "{{count}} series sin verificar"
   },
   "maquina": {
     "planta": {
