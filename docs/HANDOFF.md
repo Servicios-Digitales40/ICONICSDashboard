@@ -126,7 +126,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 134 correctas · 88 omitidas (ver CLAUDE.md §5.1)
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 177 correctas · 45 omitidas (ver CLAUDE.md §5.1)
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -193,7 +193,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | Suite de frontend | **1191** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F4; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
 | Suite de backend | **437** pruebas (436 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F4; eran 433 tras la F3.3)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **134** correctas (13 sobre una configurada, 8 de reportes por plantilla) · **88 omitidas** por el cierre: desde el Plan 44 F3.6 el asistente no tiene ramas del tanque y las comprobaciones que lo usaban de escenario no corren (B19: portarlas a la espejo) |
+| `verificar-herramientas` | **177** correctas (13 sobre una configurada, 8 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |

@@ -726,3 +726,53 @@ da las series. Es trabajo mecánico por comprobación —cambiar el nombre de la
 señal y las cifras esperadas— y conviene hacerlo por familia, con la puerta
 pasada entre cada una. Las ocho de `controlar_bomba` son del tanque de verdad y
 vuelven cuando él vuelva, o se reescriben para la escritura genérica del Plan 43.
+
+**Resuelto el 24-09-2026.** Se portaron **43** comprobaciones, todas marcadas
+con `[espejo]` en su nombre: `verificar-herramientas` pasa de **134 correctas
+y 88 omitidas** a **177 y 45**. Por familia: resolución de nombres (5), idioma
+de las herramientas de serie (3), la forma común del estado (5), historia y
+troceado (7), cobertura y concurrencia (6), `comparar_periodos` (3),
+`valor_en_momento` (3), `tendencia_multiple` (4), `buscar_evento` (3) y
+`alarma_sostenida` (4).
+
+Lo que hizo falta además del cambio mecánico:
+
+- **`espejoFalso()`**, un envoltorio sobre `createFakeIconicsClient` que ANOTA
+  lo que se le pide (`historial`, `lotes`) y permite sustituir la respuesta del
+  historiador. La familia de historia no mira el dato que vuelve sino CÓMO se
+  pidió —cuántas llamadas, con qué agregado, con qué prefijo—, y el
+  `clienteFalso` que llevaba ese registro sólo sabía servir el catálogo del
+  tanque.
+- **Las cinco de resolución no se pudieron «reactivar»**: probaban
+  `resolverSenal`, el índice de nombres escrito a mano que el Plan 44 F3.6
+  borró. Se reescribieron contra `resolverSenalDeSistema`, que **no tenía
+  ninguna comprobación directa** hasta ahora.
+- **Dos comprobaciones cambiaron lo que afirman**, por motivos medidos y
+  escritos en su cuerpo: `perfil_de_senal` ya no compara cifras entre dos
+  llamadas (el transporte falso no es determinista ni con `rnd` fijo, así que
+  medía el azar), y la de la hora local mira que **ninguna marca ISO cruda
+  llegue al modelo**, porque una configurada no publica `leidoA` por esa
+  herramienta.
+
+**Lo que sigue omitido (45).** Son las que de verdad dependen del tanque: las
+ocho de `controlar_bomba` con su guarda de nivel, las de su catálogo escrito a
+mano (`SENALES`, `SENAL_KEYS`), su narración en inglés —cubierta por las vivas
+de vibraciones—, su dossier y los patrones de límite de su manual. Vuelven
+cuando vuelva la estación de llenado, o con la escritura genérica del Plan 43.
+
+## B20 · Las banderas de apoyo declaran decimales distintos según por dónde se pregunte
+
+**Visto el 24-09-2026** (portando B19). `alarma_S1` sale con **1 decimal** por
+`leerMaquina(entrada).estado.senales` y con **0** por `entrada.metaDe(clave)`.
+La causa: los roles de `MEDIDAS` declaran `decimales` y los de `BANDERAS` no,
+así que la ruta del estado cae al valor por omisión de `estadoMaquina.js`
+(`decimales = 1`) mientras `metaDe` sí lo deriva de la familia.
+
+**No hay defecto visible hoy**: ninguna herramienta publica los decimales de
+una bandera, y el reporte usa `metaDe`. Pero son dos respuestas distintas a la
+misma pregunta, y la próxima pieza que lea la primera ruta citará «alarma: 1,0».
+
+**El arreglo.** Declarar `decimales: 0` en los roles de `BANDERAS` del tipo, o
+hacer que `estadoMaquina` no tenga un valor por omisión y exija el del rol. Lo
+segundo es más honesto y más caro. Antes de tocarlo hay que mirar qué cita hoy
+el tablero, porque cambia lo que se ve en pantalla.

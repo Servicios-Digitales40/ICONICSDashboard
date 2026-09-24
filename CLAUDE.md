@@ -390,21 +390,22 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 134 correctas y 88 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 177 correctas y 45 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «134 de 222», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 222. Trece de las 134 son sobre una
+> qué. Ese verde significa «177 de 222», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 222. Trece de las 177 son sobre una
 > máquina **configurada** (Plan 39 F0–F2), y también lo imprime; siete más, en
 > bloque propio al final, son los reportes por plantilla (Plan 44 F3–F4).
 >
-> **Por qué 88 y no 24 (Plan 44 F3.6, 23-09-2026):** el asistente dejó de
-> tener ramas del tanque —índice de nombres, umbrales, catálogo, pronóstico,
-> dossier, motor— y toda herramienta resuelve la máquina por el registro, con
-> la guarda de cerrada. Sesenta y cuatro comprobaciones que usaban el tanque
-> como ESCENARIO (leían sus señales sin nombrar máquina, que antes era la
-> omisión) quedaron omitidas con el motivo del cierre, y doce se portaron a
-> la espejo. Portar las demás a la espejo es la B19 del backlog: es cobertura
-> de mecánica genérica (tramos, cobertura, 502, hora local…) que hoy no corre.
+> **Por qué 45 y no 24 (B19, 24-09-2026):** el Plan 44 F3.6 quitó del
+> asistente las ramas del tanque —índice de nombres, umbrales, catálogo,
+> pronóstico, dossier, motor— y con ellas la máquina POR OMISIÓN. Sesenta y
+> cuatro comprobaciones que usaban el tanque como ESCENARIO se quedaron sin
+> suelo y se omitieron (88 en total). La B19 portó **43** a la máquina
+> espejo, marcadas con `[espejo]` en su nombre: la mecánica genérica
+> —tramos, cobertura, 502, hora local, idioma, flancos— vuelve a correr. Las
+> 45 que siguen omitidas SÍ dependen del tanque: su bomba, su catálogo
+> escrito a mano y su narración, y vuelven cuando vuelva él.
 
 ### 5.2 La tanda completa
 

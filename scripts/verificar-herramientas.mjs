@@ -77,6 +77,10 @@ import { tipoDe } from '../shared/eva/tipos/index.js'
 import { createFakeIconicsClient } from '../backend/iconics/fakeClient.mjs'
 import { configuracionEspejo } from './lib/configuracionEspejo.mjs'
 import { crearAyudantesDeHistoria } from '../backend/ia/herramientas/lib/historia.mjs'
+/* El resolver de señales del Plan 44 F3.6, que sustituyó al índice de nombres
+   escrito a mano del tanque. Lo ejercitan las comprobaciones portadas (B19). */
+import { crearAyudantesDeMaquina } from '../backend/ia/herramientas/lib/maquina.mjs'
+import { crearResolvedorDeSenales } from '../backend/ia/herramientas/lib/senales.mjs'
 import { puntoHistorico as puntoHistoricoVib, puntoMedida } from '../shared/eva/vibraciones/vibraciones.js'
 import { valorVibracionEn } from '../shared/eva/vibraciones/simuladorVibraciones.js'
 
@@ -173,12 +177,18 @@ const CERRADA = 'la estación de llenado está cerrada (rama Vibraciones1.0)'
  * Recibe el cuerpo y NO lo ejecuta: por eso la comprobación sigue escrita,
  * entera y a la vista, en vez de comentada. El día que se reabra la estación
  * de llenado, esto vuelve a ser `checkAsync` con un buscar-y-reemplazar y las
- * veinte vuelven a correr sin reescribir ni una línea.
+ * que quedan vuelven a correr sin reescribir ni una línea.
+ *
+ * ── LO QUE YA NO ESTÁ AQUÍ (B19, 24-09-2026) ───────────────────────
+ *
+ * El Plan 44 F3.6 dejó 88 omitidas, y sólo cuatro nombraban el tanque: las
+ * demás comprobaban MECÁNICA GENÉRICA —tramos, cobertura, 502, hora local,
+ * idioma, flancos— con el tanque de escenario, porque era la máquina por
+ * omisión. Cuarenta y tres se portaron a la espejo y llevan `[espejo]` en su
+ * nombre: 88 omitidas pasaron a 45, y las correctas de 134 a 177. Las que
+ * siguen omitidas son las que de verdad dependen de esa máquina: su bomba,
+ * su catálogo escrito a mano y su narración.
  */
-/* El indice de nombres del tanque se fue con el Plan 44 F3.6; las cinco
-   comprobaciones que lo ejercitaban estan omitidas y su cuerpo lo nombra. */
-const resolverSenal = undefined
-
 function omitirEnvuelto(nombre, _fn) {
   omitir(nombre, CERRADA)
 }
@@ -443,57 +453,117 @@ check('el catálogo que va al prompt no inventa unidades, y sin id es el de la �
 
 console.log('\n── Resolver la señal ───────────────────────────────────────')
 
-omitirEnvuelto('la clave, el tag y los dos rótulos resuelven solos', () => {
-  for (const k of SENAL_KEYS) {
-    const s = SENALES[k]
-    assert.equal(resolverSenal(k), k, `falló la clave "${k}"`)
-    assert.equal(resolverSenal(s.tag), k, `falló el tag "${s.tag}"`)
-    assert.equal(resolverSenal(s.label), k, `falló el rótulo "${s.label}"`)
-    assert.equal(resolverSenal(s.corto), k, `falló el corto "${s.corto}"`)
+/*
+ * ── PORTADAS DEL TANQUE A LA ESPEJO (B19, 24-09-2026) ───────────────
+ *
+ * Las cinco de esta familia probaban `resolverSenal`, el índice de nombres
+ * ESCRITO A MANO del tanque, que el Plan 44 F3.6 borró. No se pueden
+ * «reactivar» reabriendo la estación de llenado: la función no existe.
+ *
+ * Lo que las sustituye es `resolverSenalDeSistema` (`herramientas/lib/
+ * senales.mjs`), que resuelve DENTRO de la máquina del turno y sale del
+ * registro, no de un mapa a mano. Ese resolver no tenía ni una comprobación
+ * directa hasta aquí: se ejercitaba sólo de refilón, a través de las
+ * herramientas.
+ *
+ * Se conserva lo que cada una AFIRMABA —la clave y el rótulo resuelven, el
+ * habla del operador se acepta, lo que no existe no resuelve, una frase
+ * ambigua no elige— contra la espejo y su vocabulario.
+ */
+const { resolverSistema } = crearAyudantesDeMaquina({ client: clienteFalso() })
+const resolver = crearResolvedorDeSenales({ resolverSistema })
+
+/**
+ * El transporte falso de la espejo, ANOTANDO lo que se le pide (B19).
+ *
+ * ── POR QUÉ UN ENVOLTORIO Y NO OTRO CLIENTE FALSO ──────────────────
+ *
+ * Las comprobaciones de la familia de historia no miran el dato que vuelve:
+ * miran CÓMO se pidió —cuántas llamadas, con qué agregado, con qué prefijo,
+ * con qué intervalo—. El `clienteFalso` de este guion lleva ese `historial`,
+ * pero sólo sabe servir el catálogo del tanque, que ya no existe en el
+ * asistente. `createFakeIconicsClient` sí sirve la espejo, y no anota.
+ *
+ * Envolverlo da las dos cosas sin duplicar ninguna: el dato lo sigue
+ * componiendo el falso de verdad, y aquí sólo se apunta la llamada. `historia`
+ * permite además sustituir la respuesta, que es como se prueban el troceado
+ * de rangos largos y el 502 sin depender de cuántas muestras invente el falso.
+ */
+function espejoFalso({ historia = null, limits } = {}) {
+  const base = createFakeIconicsClient(limits ? { limits } : {})
+  const historial = []
+  const lotes = []
+  return {
+    ...base,
+    historial,
+    lotes,
+    async readPoints(puntos) {
+      lotes.push(puntos)
+      return base.readPoints(puntos)
+    },
+    async readHistory(opciones) {
+      historial.push(opciones)
+      return historia ? historia(opciones) : base.readHistory(opciones)
+    },
+  }
+}
+
+check('[espejo] la clave y el rótulo de una señal resuelven solos, dentro de su máquina', () => {
+  for (const clave of ['vRMS_S1', 'aRMS_S2', 'DKW_S3', 'velocidad']) {
+    const porClave = resolver.resolverSenalDeSistema(clave, ESPEJO.id)
+    assert.equal(porClave.ok, true, `falló la clave "${clave}"`)
+    assert.equal(porClave.clave, clave)
+
+    const etiqueta = configurada.etiquetaDe(clave)
+    const porRotulo = resolver.resolverSenalDeSistema(etiqueta, ESPEJO.id)
+    assert.equal(porRotulo.ok, true, `falló el rótulo "${etiqueta}"`)
+    assert.equal(porRotulo.clave, clave, `"${etiqueta}" resolvió a otra señal`)
   }
 })
 
-omitirEnvuelto('se aceptan las formas en que habla un operador', () => {
+check('[espejo] se aceptan las formas en que habla un operador', () => {
+  /* Mayúsculas, espacios de sobra y el nombre del punto de medida en vez de
+     la etiqueta compuesta: nadie escribe «Velocidad eficaz · Lado acople». */
   const formas = {
-    nivelTanque: ['nivel', 'el nivel del tanque', 'NIVEL', ' nivel '],
-    temperaturaTanque: ['temperatura', 'temperatura del agua', 'los grados'],
-    cargaMotor: ['la bomba', 'el motor', 'carga del motor'],
-    flujoInstantaneo: ['caudal', 'el flujo'],
-    presionRelativa: ['presion', 'presión', 'la presión de red'],
-    tensionLinea: ['voltaje', 'tensión', 'la tensión de línea'],
-    eficienciaEnergetica: ['eficiencia', 'eficiencia energética'],
-    modoVdf: ['el variador', 'modo del variador'],
+    vRMS_S1: ['Velocidad eficaz · Lado acople', 'velocidad eficaz del lado acople', '  VELOCIDAD EFICAZ DEL LADO ACOPLE  '],
+    vRMS_S3: ['velocidad eficaz del lado libre'],
+    velocidad: ['velocidad del variador'],
   }
-
   for (const [clave, lista] of Object.entries(formas)) {
     for (const forma of lista) {
-      assert.equal(resolverSenal(forma), clave, `falló "${forma}"`)
+      const r = resolver.resolverSenalDeSistema(forma, ESPEJO.id)
+      assert.equal(r.ok, true, `no resolvió "${forma}"`)
+      assert.equal(r.clave, clave, `"${forma}" resolvió a ${r.clave}`)
     }
   }
 })
 
-omitirEnvuelto('«índice de desviación» resuelve a la tensión, que es lo que entrega', () => {
-  // El tag se llama así pero devuelve ~122, que es una tensión. Quien pregunte
-  // por el nombre del tag está preguntando por esta señal; mandarle un «no
-  // existe» sería mentirle.
-  assert.equal(resolverSenal('índice de desviación de voltaje'), 'tensionLinea')
-  assert.equal(resolverSenal('INDICE_DESVIACION_VOLTAJE'), 'tensionLinea')
-})
-
-omitirEnvuelto('un nombre que no existe NO resuelve a nada', () => {
-  // Sobre todo el vocabulario del tablero anterior: si «OEE» resolviera a
-  // cualquier cosa, el asistente contestaría una señal de agua a una pregunta
-  // de producción.
-  for (const fantasma of ['OEE', 'la Línea 1', 'disponibilidad', 'piezas rechazadas',
-    'el compresor', 'la válvula', '']) {
-    assert.equal(resolverSenal(fantasma), null, `"${fantasma}" no debería resolver`)
+check('[espejo] un nombre que no existe NO resuelve a nada, y lo dice con las que sí', () => {
+  /* El vocabulario del tablero anterior: si «OEE» resolviera a cualquier
+     cosa, el asistente contestaría una señal de vibración a una pregunta de
+     producción. La negativa ofrece las que sí existen para no gastar otra
+     ronda con el modelo. */
+  for (const fantasma of ['OEE', 'la Línea 1', 'disponibilidad', 'piezas rechazadas', '']) {
+    const r = resolver.resolverSenalDeSistema(fantasma, ESPEJO.id)
+    assert.equal(r.ok, false, `"${fantasma}" no debería resolver`)
+    assert.ok(r.error, `"${fantasma}" se niega sin decir por qué`)
   }
 })
 
-omitirEnvuelto('una frase con DOS señales no elige ninguna', () => {
-  // Elegir la primera daría una respuesta correcta sobre la señal equivocada,
-  // que es peor que un error: nadie la revisaría.
-  assert.equal(resolverSenal('compara el nivel y la presion'), null)
+check('[espejo] una frase con DOS señales no elige ninguna', () => {
+  /* Elegir la primera daría una respuesta correcta sobre la señal
+     equivocada, que es peor que un error: nadie la revisaría. */
+  const r = resolver.resolverSenalDeSistema('compara la velocidad eficaz y la aceleración eficaz', ESPEJO.id)
+  assert.equal(r.ok, false, 'una frase con dos señales no puede resolver a una')
+})
+
+check('[espejo] una señal de otra máquina no se sirve como si fuera de ésta', () => {
+  /* Lo que antes hacía el índice del tanque —resolver cualquier nombre
+     conocido— ahora lo acota la máquina del turno. Una señal del tanque
+     (cerrado) no puede colarse en una consulta sobre la espejo. */
+  const r = resolver.resolverSenalDeSistema('nivel del tanque', ESPEJO.id)
+  assert.equal(r.ok, false)
+  assert.ok(/no es una señal|ninguna máquina/i.test(r.error), `el motivo no explica de quién es: ${r.error}`)
 })
 
 /* ── Resolver el período ─────────────────────────────────────────────── */
@@ -1763,58 +1833,99 @@ await omitirEnvuelto('una instalación PARADA no es una instalación en alarma',
   assert.ok(caudal.porQueReposo, 'con su explicación al lado')
 })
 
-await omitirEnvuelto('un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
-  // Sin este filtro el asistente diría «el tanque está al 0 %» de una
-  // instalación llena, que es la peor respuesta posible: parece un dato.
-  const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
+/*
+ * ── LA AUSENCIA NUNCA SE DISFRAZA DE CERO, EN LA ESPEJO (B19) ───────
+ *
+ * Estas comprobaciones son §2.4 de `CLAUDE.md`, el no negociable del
+ * proyecto, y usaban el tanque de escenario. Se portan a la forma COMÚN del
+ * estado (`leerMaquina(entrada).estado.senales`), que es la que hoy
+ * construye toda máquina configurada y la que consumen el reporte, el motor
+ * y las herramientas. `estado_del_sistema` de una configurada devuelve prosa
+ * narrada por el tipo, así que la forma estructurada se mira donde vive.
+ */
+const espejoLeida = async (opciones = {}) => {
+  const { leerMaquina } = crearAyudantesDeMaquina({ client: createFakeIconicsClient({ rnd: () => 0.5, ...opciones }) })
+  const l = await leerMaquina(configurada)
+  assert.equal(l.ok, true, l.error)
+  return l.estado
+}
 
-  const nivel = r.activos.flatMap(a => a.senales).find(s => s.clave === 'nivelTanque')
-  assert.equal(nivel.valor, null, 'mala calidad tiene que ser null')
-  assert.notEqual(nivel.valor, 0, 'y desde luego no un cero')
-  assert.equal(nivel.estado, 'Sin dato')
-  assert.equal(r.recuento.sinDato, 1)
+await checkAsync('[espejo] un valor de MALA CALIDAD es un hueco, nunca un cero', async () => {
+  /* Sin este filtro el asistente diría «la velocidad eficaz es 0 mm/s» de un
+     apoyo que vibra, que es la peor respuesta posible: parece un dato. El
+     transporte falso marca mala calidad con `CAOS.malaCalidad`, así que con
+     `rnd` bajo todas las lecturas salen malas. */
+  const estado = await espejoLeida({ rnd: () => 0 })
+  const conValor = estado.senales.filter((s) => s.valor !== null && s.valor !== undefined)
+
+  assert.equal(conValor.length, 0, 'con toda la calidad mala no puede quedar ni un valor')
+  for (const s of estado.senales) {
+    assert.notEqual(s.valor, 0, `«${s.clave}» salió como cero en vez de hueco`)
+  }
+  assert.ok(estado.sinLectura.length > 0, 'y los puntos sin lectura se cuentan aparte')
 })
 
-await omitirEnvuelto('las unidades que el servidor no declara viajan vacías', async () => {
-  // `flujoInstantaneo` fue el ejemplo hasta el 14-09-2026 (unidad confirmada:
-  // L/min, ver `senales.js`); el registro crudo del variador sigue sin
-  // confirmar y hereda el ejemplo.
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
-  const senales = r.activos.flatMap(a => a.senales)
+await checkAsync('[espejo] una unidad que nadie declara viaja vacía, no inventada', async () => {
+  /* Inventarle una unidad a una señal es inventarse su magnitud: un número
+     en mm/s y el mismo número en m/s² dicen cosas distintas. La que SÍ la
+     tiene declarada la lleva; la que no, la lleva vacía y se nota. */
+  const estado = await espejoLeida()
 
-  const frecuencia = senales.find(s => s.clave === 'frecuenciaSalidaVariador')
-  assert.equal(frecuencia.unidad, null, 'inventarle una unidad sería inventarse la magnitud')
-  assert.ok(frecuencia.nota, 'y hay que decir por qué está vacía')
+  assert.equal(estado.senales.find((s) => s.clave === 'vRMS_S1').unidad, 'mm/s')
+  assert.equal(estado.senales.find((s) => s.clave === 'aRMS_S1').unidad, 'm/s²')
 
-  assert.equal(senales.find(s => s.clave === 'nivelTanque').unidad, '%')
+  for (const s of estado.senales) {
+    assert.ok(
+      s.unidad === null || s.unidad === undefined || typeof s.unidad === 'string',
+      `«${s.clave}» tiene una unidad que no es ni texto ni vacío`,
+    )
+    assert.notEqual(s.unidad, 'undefined', `«${s.clave}» arrastra la cadena "undefined" como unidad`)
+  }
 })
 
-await omitirEnvuelto('el float crudo del PLC se redondea a los decimales del catálogo', async () => {
+await checkAsync('[espejo] cada señal declara los decimales de su rol, para no citar trece', async () => {
   /*
-   * Salió probando contra el servidor REAL, no contra este cliente falso: los
-   * valores de aquí venían ya limpios y no podían enseñarlo. ICONICS entrega
-   * `50.09765625` y `23.258464813232422`, y el modelo los citaba tal cual —«el
-   * tanque está al 50.09765625 %»—. Trece decimales sugieren una exactitud que
-   * el sensor no tiene.
+   * Salió probando contra el servidor REAL: ICONICS entrega `50.09765625` y
+   * `23.258464813232422`, y el modelo los citaba tal cual. Trece decimales
+   * sugieren una exactitud que el sensor no tiene.
+   *
+   * En una configurada los decimales los declara el ROL del tipo, no un
+   * catálogo escrito a mano, así que lo que se comprueba es que viajen con
+   * cada señal —quien narre tiene con qué redondear— y que sean sensatos.
    */
-  const client = clienteFalso({
-    valores: { ...EN_REPOSO, NIVEL_TANQUE: 50.09765625, TEMPERATURA_TANQUE: 23.258464813232422 },
-  })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
-  const senales = r.activos.flatMap(a => a.senales)
+  const estado = await espejoLeida()
+  for (const s of estado.senales) {
+    assert.ok(Number.isInteger(s.decimales), `«${s.clave}» no declara decimales`)
+    assert.ok(s.decimales >= 0 && s.decimales <= 6, `«${s.clave}» declara ${s.decimales} decimales`)
+  }
+  /* Una medida de vibración lleva tres, que es lo que declara su rol. */
+  assert.equal(estado.senales.find((s) => s.clave === 'vRMS_S1').decimales, 3)
 
-  assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, 50.1)
-  assert.equal(senales.find(s => s.clave === 'temperaturaTanque').valor, 23.3)
+  /*
+   * Las banderas de apoyo salen con 1 decimal por esta ruta y con 0 por
+   * `metaDe`: los roles de BANDERAS no declaran `decimales` y el estado cae
+   * al valor por omisión de `estadoMaquina.js`. No se afirma aquí cuál es el
+   * correcto —arreglarlo cambia lo que el asistente cita— y queda como B20.
+   * Lo que sí se exige es que los dos caminos no se contradigan en las
+   * MEDIDAS, que son las que llevan cifras que alguien lee.
+   */
+  for (const s of estado.senales.filter((x) => x.clave.startsWith('vRMS') || x.clave.startsWith('aRMS'))) {
+    assert.equal(s.decimales, configurada.metaDe(s.clave)?.decimales, `«${s.clave}» discrepa entre el estado y metaDe`)
+  }
 })
 
-await omitirEnvuelto('redondear no convierte un hueco ni un booleano en cero', async () => {
-  const client = clienteFalso({ calidad: { NIVEL_TANQUE: 24 } })
-  const r = await createHerramientas({ client }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
-  const senales = r.activos.flatMap(a => a.senales)
+await checkAsync('[espejo] un hueco y un booleano no se confunden con cero', async () => {
+  const estado = await espejoLeida()
+  const sinLectura = estado.senales.filter((s) => s.valor === null || s.valor === undefined)
 
-  assert.equal(senales.find(s => s.clave === 'nivelTanque').valor, null, 'null, no 0')
-  assert.equal(senales.find(s => s.clave === 'modoVdf').valor, false, 'false, no 0')
+  assert.ok(sinLectura.length > 0, 'la espejo tiene puntos sin lectura: son los que importan aquí')
+  for (const s of sinLectura) {
+    assert.notEqual(s.valor, 0, `«${s.clave}» es un hueco y salió como cero`)
+    assert.notEqual(s.valor, false, `«${s.clave}» es un hueco y salió como false`)
+  }
+  /* Y al revés: un booleano apagado es `false`/0 de verdad, no un hueco. */
+  const bandera = estado.senales.find((s) => s.clave === 'alarma_S1')
+  assert.ok(bandera.valor !== null && bandera.valor !== undefined, 'la bandera SÍ tiene lectura')
 })
 
 await omitirEnvuelto('la booleana se dice con su palabra, no con true/false', async () => {
@@ -1858,13 +1969,31 @@ await omitirEnvuelto('el aviso de umbrales viaja en el campo QUE VIGILA la red d
   }
 })
 
-await omitirEnvuelto('la hora de lectura se da legible y en local, no en ISO', async () => {
-  // Medido con el 4B: con un ISO delante lo copió tal cual en la respuesta
-  // («leído a las 2026-08-18T14:48:44.253Z»). Además va en UTC, así que en
-  // España marcaría dos horas menos que el reloj de la pared.
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('estado_del_sistema', { sistema: 'tanque' })
+await checkAsync('[espejo] ninguna marca de tiempo llega al modelo como ISO en crudo', async () => {
+  /*
+   * Medido con el 4B: con un ISO delante lo copió tal cual en la respuesta
+   * («leído a las 2026-08-18T14:48:44.253Z»). Además va en UTC, así que aquí
+   * marcaría seis horas menos que el reloj de la pared.
+   *
+   * La comprobación original miraba `leidoA` del tanque, que lo formateaba a
+   * hora local. Una configurada NO publica esa marca por esta herramienta
+   * (en la capa común `estado.leidoA` sigue siendo ISO, pero no sale de ahí),
+   * así que lo que se exige es lo que de verdad importa: que en TODO lo que
+   * viaja al modelo no aparezca una marca ISO cruda.
+   */
+  const r = await createHerramientas({ client: espejoFalso() }).ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
+  assert.equal(r.ok, true, r.error)
 
-  assert.match(r.leidoA, /^\d{2}:\d{2}:\d{2}$/, `leidoA fue "${r.leidoA}"`)
+  const iso = JSON.stringify(r).match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/g) ?? []
+  assert.deepEqual(iso, [], `una marca ISO se coló en el resultado: ${iso[0]}`)
+
+  /* Y lo mismo por la otra puerta, la que sí da horas: los extremos de una
+     serie viajan con su hora legible, no con su ISO. */
+  const h = await createHerramientas({ client: espejoFalso() })
+    .ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  if (h.ok) {
+    assert.doesNotMatch(String(h.maximoEn), /^\d{4}-\d{2}-\d{2}T/, `maximoEn fue "${h.maximoEn}"`)
+  }
 })
 
 await omitirEnvuelto('la señal que pide atención lleva su banda, para no obligar al modelo a restar', async () => {
@@ -1950,48 +2079,44 @@ await omitirEnvuelto('el modo del variador ya tiene serie (Plan 27 F6)', async (
   assert.equal(client.historial.length, 1)
 })
 
-await omitirEnvuelto('las que SÍ tienen serie se leen con Average y bajo el tope', async () => {
-  const client = clienteFalso()
+await checkAsync('[espejo] las que SÍ tienen serie se leen con Average y por el punto histórico', async () => {
+  const client = espejoFalso()
   const h = createHerramientas({ client })
 
-  for (const nombre of ['nivel', 'temperatura', 'caudal', 'presión']) {
-    const r = await h.ejecutar('historia_de_senal', { senal: nombre, periodo: 'últimas 6 horas' })
-    assert.equal(r.ok, true, `"${nombre}" falló: ${r.error}`)
+  for (const clave of ['vRMS_S1', 'aRMS_S1', 'vRMS_S2', 'velocidad']) {
+    const r = await h.ejecutar('historia_de_senal', { senal: clave, sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+    assert.equal(r.ok, true, `"${clave}" falló: ${r.error}`)
   }
 
   assert.equal(client.historial.length, 4)
   for (const llamada of client.historial) {
-    // `Average` y no `Interpolative`: las señales de este catálogo son
-    // magnitudes instantáneas y ninguna es acumulativa.
+    /* `Average` y no `Interpolative`: son magnitudes instantáneas, ninguna
+       acumulativa. */
     assert.equal(llamada.aggregate, 'Average')
-    // Plan 27 F6: el histórico se pide con hda:, no con el nombre en vivo.
-    assert.ok(llamada.pointName.startsWith('hda:'), 'con hda:, no con ac:')
+    /* Plan 27 F6: el histórico se pide por su punto de archivo, no por el
+       nombre en vivo. En esta máquina el archivo es `hda:`. */
+    assert.ok(llamada.pointName.startsWith('hda:'), `con hda:, no con «${llamada.pointName}»`)
     assert.match(llamada.interval, /^\d{2}:\d{2}:\d{2}$/, 'el intervalo va como HH:MM:SS')
   }
 })
 
-await omitirEnvuelto('un rango largo se trocea (Plan 15 Fase 4): no cae en el patrón "1 muestra de todo el mes"', async () => {
-  // Medido contra el servidor real: una ventana de 30 días pedida en UNA
-  // sola llamada con un intervalo grueso devolvía una única muestra de todo
-  // el mes, sin ningún error — el mismo patrón patológico que documenta
-  // planificar()/trocear(). `leerSerie()` trocea por dentro cuando el rango
-  // lo pide (>14 días con la regla de tramosDe), y aquí se comprueba que
-  // hace VARIAS llamadas (no una) y fusiona sus datos.
+await checkAsync('[espejo] un rango largo se trocea (Plan 15 Fase 4): no cae en el patrón "1 muestra de todo el mes"', async () => {
+  /* Medido contra el servidor real: una ventana de 30 días pedida en UNA
+     sola llamada con un intervalo grueso devolvía una única muestra de todo
+     el mes, sin ningún error — el patrón patológico que documenta
+     planificar()/trocear(). Aquí se comprueba que hace VARIAS llamadas y
+     fusiona sus datos. La respuesta se sustituye para que el recuento no
+     dependa de cuántas muestras invente el transporte falso. */
   let llamadas = 0
-  const client = clienteFalso({
+  const client = espejoFalso({
     historia: async (opciones) => {
       llamadas += 1
-      // Cada tramo trae una muestra propia, con timestamp dentro de su rango
-      // — así se puede comprobar que el orden final está bien fusionado.
-      return {
-        ok: true,
-        data: [{ timestamp: opciones.startDate, value: 50 + llamadas, quality: 0 }],
-      }
+      return { ok: true, data: [{ timestamp: opciones.startDate, value: 1 + llamadas / 100, quality: 0 }] }
     },
   })
 
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', {
-    senal: 'nivel', periodo: 'últimos 30 días',
+    senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimos 30 días',
   })
 
   assert.equal(r.ok, true, `debería tener éxito: ${r.error}`)
@@ -1999,34 +2124,33 @@ await omitirEnvuelto('un rango largo se trocea (Plan 15 Fase 4): no cae en el pa
   assert.equal(r.muestras, llamadas, 'una muestra por tramo, todas fusionadas')
 })
 
-await omitirEnvuelto('un rango largo con tramos parcialmente vacíos no falla si ALGUNO trae dato', async () => {
-  // Reproduce el caso real medido: el historiador sólo tiene datos desde
-  // hace unos días, así que un período de 30 días tiene ~20 tramos vacíos y
-  // unos pocos con dato. Un tramo sin datos no debe invalidar el resto.
+await checkAsync('[espejo] un rango largo con tramos parcialmente vacíos no falla si ALGUNO trae dato', async () => {
+  /* Reproduce el caso real medido: el historiador sólo tiene datos desde hace
+     unos días, así que un período de 30 días tiene ~20 tramos vacíos y unos
+     pocos con dato. Un tramo sin datos no debe invalidar el resto. */
   let llamada = 0
-  const client = clienteFalso({
+  const client = espejoFalso({
     historia: async () => {
       llamada += 1
-      // Sólo la mitad de los tramos "responden" con una muestra.
       return llamada % 2 === 0
-        ? { ok: true, data: [{ timestamp: new Date().toISOString(), value: 55, quality: 0 }] }
+        ? { ok: true, data: [{ timestamp: new Date().toISOString(), value: 1.2, quality: 0 }] }
         : { ok: true, data: [] }
     },
   })
 
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', {
-    senal: 'nivel', periodo: 'últimos 60 días',
+    senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimos 60 días',
   })
 
   assert.equal(r.ok, true, `no debería fallar por tramos parciales: ${r.error}`)
   assert.ok(r.muestras > 0, 'al menos los tramos con dato deben contarse')
 })
 
-await omitirEnvuelto('nunca se piden más muestras de las que el servidor entrega', async () => {
-  // Si se piden más, el servidor recorta y devuelve una serie incompleta SIN
-  // decirlo: el máximo de un día sería el de sus primeras horas.
-  const client = clienteFalso()
-  await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+await checkAsync('[espejo] nunca se piden más muestras de las que el servidor entrega', async () => {
+  /* Si se piden más, el servidor recorta y devuelve una serie incompleta SIN
+     decirlo: el máximo de un día sería el de sus primeras horas. */
+  const client = espejoFalso()
+  await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'ayer' })
 
   const { startDate, endDate, interval } = client.historial[0]
   const segundos = (new Date(endDate) - new Date(startDate)) / 1000
@@ -2036,11 +2160,11 @@ await omitirEnvuelto('nunca se piden más muestras de las que el servidor entreg
   assert.ok(puntos <= MAX_PUNTOS, `pidió ${Math.round(puntos)} puntos, el tope es ${MAX_PUNTOS}`)
 })
 
-await omitirEnvuelto('el resumen trae los extremos CON su hora, y no las muestras crudas', async () => {
-  // Devolverle 24 muestras al modelo y pedirle el mayor es pedirle aritmética,
-  // que es justo lo que el prompt le prohíbe.
-  const r = await createHerramientas({ client: clienteFalso() })
-    .ejecutar('historia_de_senal', { senal: 'nivel del tanque', periodo: 'últimas 6 horas' })
+await checkAsync('[espejo] el resumen trae los extremos CON su hora, y no las muestras crudas', async () => {
+  /* Devolverle 24 muestras al modelo y pedirle el mayor es pedirle aritmética,
+     que es justo lo que el prompt le prohíbe. */
+  const r = await createHerramientas({ client: espejoFalso() })
+    .ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
 
   assert.equal(r.ok, true)
   for (const campo of ['minimo', 'maximo', 'promedio', 'primero', 'ultimo', 'muestras']) {
@@ -2060,9 +2184,11 @@ await omitirEnvuelto('una señal que sólo vale en marcha lo advierte en su hist
   assert.ok(r.avisoReposo, 'el caudal sólo significa algo con la bomba en marcha')
 })
 
-await omitirEnvuelto('sin ninguna muestra se dice, en vez de devolver un resumen de ceros', async () => {
-  const client = clienteFalso({ historia: async () => ({ ok: true, data: [] }) })
-  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
+await checkAsync('[espejo] sin ninguna muestra se dice, en vez de devolver un resumen de ceros', async () => {
+  /* Un resumen de ceros sobre una serie vacía es §2.4 de CLAUDE.md al revés:
+     la ausencia disfrazada del dato más creíble que hay. */
+  const client = espejoFalso({ historia: async () => ({ ok: true, data: [] }) })
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no hay ninguna muestra/i)
@@ -2080,12 +2206,12 @@ await checkAsync('toda la serie de mala calidad es un hueco, no una serie de cer
   assert.equal(r.ok, false, 'una muestra mala no es una muestra')
 })
 
-await omitirEnvuelto('un 502 manda a levantar servicios, no a revisar el historiador', async () => {
-  // Son dos averías que se arreglan en sitios distintos. 500 es «el punto no
-  // está coleccionado»; 502/504 los pone el puente y significan que no se
-  // llegó al servidor.
-  const client = clienteFalso({ historia: async () => ({ ok: false, status: 504 }) })
-  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
+await checkAsync('[espejo] un 502 manda a levantar servicios, no a revisar el historiador', async () => {
+  /* Son dos averías que se arreglan en sitios distintos. 500 es «el punto no
+     está coleccionado»; 502/504 los pone el puente y significan que no se
+     llegó al servidor. */
+  const client = espejoFalso({ historia: async () => ({ ok: false, status: 504 }) })
+  const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no se pudo contactar|GENESIS/i)
@@ -2104,9 +2230,9 @@ await omitirEnvuelto('una señal inventada devuelve el catálogo para corregirse
 
 console.log('\n── comparar_periodos ───────────────────────────────────────')
 
-await omitirEnvuelto('la diferencia la calcula el backend, no el modelo', async () => {
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
-    senal: 'nivel', periodoA: 'últimas 4 horas', periodoB: 'última hora',
+await checkAsync('[espejo] la diferencia la calcula el backend, no el modelo', async () => {
+  const r = await createHerramientas({ client: espejoFalso() }).ejecutar('comparar_periodos', {
+    senal: 'vRMS_S1', sistema: ESPEJO.id, periodoA: 'últimas 4 horas', periodoB: 'última hora',
   })
 
   assert.equal(r.ok, true)
@@ -2115,10 +2241,10 @@ await omitirEnvuelto('la diferencia la calcula el backend, no el modelo', async 
   assert.match(r.nota, /menos/, 'y se dice en qué sentido va la resta')
 })
 
-await omitirEnvuelto('las claves son los períodos YA resueltos, no el texto del modelo', async () => {
-  // Para que redacte con el período real y no con el «ayer» que escribió él.
-  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
-    senal: 'nivel', periodoA: 'última hora', periodoB: 'últimas 2 horas',
+await checkAsync('[espejo] las claves son los períodos YA resueltos, no el texto del modelo', async () => {
+  /* Para que redacte con el período real y no con el «ayer» que escribió él. */
+  const r = await createHerramientas({ client: espejoFalso() }).ejecutar('comparar_periodos', {
+    senal: 'vRMS_S1', sistema: ESPEJO.id, periodoA: 'última hora', periodoB: 'últimas 2 horas',
   })
 
   assert.ok(r['la última hora'], 'falta el período A resuelto')
@@ -2144,15 +2270,15 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
   }
 })
 
-await omitirEnvuelto('comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
+await checkAsync('[espejo] comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
   /*
    * Llama a `historia_de_senal` dos veces por dentro, vía `dameHerramientas()`
    * —no por `ejecutar()`—, así que sin reenviar `idioma` a mano las dos
    * mitades habrían narrado siempre en español pese a pedir inglés.
    */
-  const h = createHerramientas({ client: clienteFalso() })
+  const h = createHerramientas({ client: espejoFalso() })
   const en = await h.ejecutar('comparar_periodos', {
-    senal: 'nivel', periodoA: 'última hora', periodoB: 'últimas 2 horas',
+    senal: 'vRMS_S1', sistema: ESPEJO.id, periodoA: 'última hora', periodoB: 'últimas 2 horas',
   }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
@@ -2176,30 +2302,51 @@ check('bandaLegible() sin idioma sigue en español: no rompe nada existente', ()
 
 console.log('\n── analisis_de_senal / perfil_de_senal: tendencia en inglés ─')
 
-await omitirEnvuelto('analisis_de_senal(idioma: "en") narra la dirección de la tendencia en inglés', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
-  const en = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' }, { idioma: 'en' })
+/* Portadas del tanque a la espejo (B19): la señal cambia, lo que afirman no. */
+await checkAsync('[espejo] analisis_de_senal(idioma: "en") narra la dirección de la tendencia en inglés', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient() })
+  const en = await h.ejecutar('analisis_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, { idioma: 'en' })
 
   assert.equal(en.ok, true, en.error)
   assert.match(en.tendencia.direccion, /steady|rising|falling/)
   assert.doesNotMatch(en.tendencia.direccion, /estable|subiendo|bajando/)
 })
 
-await omitirEnvuelto('sin `idioma`, analisis_de_senal sigue en español: no rompe nada existente', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
-  const r = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
+await checkAsync('[espejo] sin `idioma`, analisis_de_senal sigue en español: no rompe nada existente', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient() })
+  const r = await h.ejecutar('analisis_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
 
   assert.equal(r.ok, true, r.error)
   assert.match(r.tendencia.direccion, /estable|subiendo|bajando/)
 })
 
-await omitirEnvuelto('perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
-  const en = await h.ejecutar('perfil_de_senal', { senal: 'nivel', dias: 14 }, { idioma: 'en' })
+await checkAsync('[espejo] perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {
+  const h = createHerramientas({ client: createFakeIconicsClient() })
+  const en = await h.ejecutar('perfil_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, dias: 14 }, { idioma: 'en' })
+  const es = await h.ejecutar('perfil_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, dias: 14 })
 
   assert.equal(en.ok, true, en.error)
-  assert.match(en.posicionDelActual, /higher than \d+ % of this period's readings/)
-  assert.doesNotMatch(en.aviso, /instalación/i)
+  /* El aviso es la frase larga de esta herramienta —«esto es lo que la planta
+     ha hecho, no lo que es correcto»— y es la que más cuesta traducir bien. */
+  assert.match(en.aviso, /what the plant has actually done|it says what is usual/i)
+  assert.doesNotMatch(en.aviso, /instalación|historiador/i)
+  assert.match(es.aviso, /lo que la instalación ha hecho|lo que es habitual/i)
+
+  /*
+   * Las CIFRAS no se comparan entre las dos llamadas: el transporte falso
+   * simula ausencias y mala calidad, y su serie no es la misma dos veces
+   * seguidas (ni con `rnd` fijo, porque además depende del instante). Un
+   * `deepEqual` aquí mediría el azar y parpadearía. Lo que sí se exige es la
+   * FORMA: los mismos campos, y números en los dos idiomas.
+   */
+  assert.deepEqual(Object.keys(en.percentiles).sort(), Object.keys(es.percentiles).sort())
+  for (const p of Object.values(en.percentiles)) assert.ok(Number.isFinite(p), 'un percentil sin número')
+
+  /* `posicionDelActual` sólo existe con lectura en vivo; si aparece, en
+     inglés. Su ausencia contra el transporte falso no es un fallo. */
+  if (en.posicionDelActual) {
+    assert.match(en.posicionDelActual, /higher than \d+ % of this period's readings/)
+  }
 })
 
 /* ── limites_del_manual (Plan 14 §4) ─────────────────────────────────── */
@@ -2969,14 +3116,14 @@ await checkAsync('sin recorte no se inventa el aviso', async () => {
   assert.equal(r.avisoTruncada, undefined, 'una serie completa no se marca como truncada')
 })
 
-await omitirEnvuelto('valor_en_momento pide el INSTANTE, con sus minutos', async () => {
+await checkAsync('[espejo] valor_en_momento pide el INSTANTE, con sus minutos', async () => {
   /*
    * Los minutos son la pregunta: `resolverPeriodo` los descarta a propósito
    * —y bien, para un tramo—, así que un instante necesita su propio camino.
    * Y el agregado tiene que ser `Interpolative`: `Average` sobre un minuto
    * promedia lo que haya dentro, que ya no es «cuánto marcaba entonces».
    */
-  const client = clienteFalso({
+  const client = espejoFalso({
     historia: ({ startDate }) => ({
       ok: true,
       data: [{ timestamp: startDate, value: 6.1, quality: 0 }],
@@ -2984,9 +3131,9 @@ await omitirEnvuelto('valor_en_momento pide el INSTANTE, con sus minutos', async
   })
 
   const r = await createHerramientas({ client })
-    .ejecutar('valor_en_momento', { senal: 'nivel del tanque', momento: '2026-08-21 a las 11:16' })
+    .ejecutar('valor_en_momento', { senal: 'vRMS_S1', sistema: ESPEJO.id, momento: '2026-08-21 a las 11:16' })
 
-  assert.equal(r.ok, true)
+  assert.equal(r.ok, true, r.error)
   assert.equal(r.valor, 6.1)
   assert.equal(r.exacto, false, 'un valor reconstruido no puede anunciarse como exacto')
 
@@ -2998,13 +3145,14 @@ await omitirEnvuelto('valor_en_momento pide el INSTANTE, con sus minutos', async
   assert.equal(inicio.getMinutes(), 16, 'los minutos NO se redondean a la hora')
 })
 
-await omitirEnvuelto('el sufijo de zona horaria de la planta no rompe la frase', async () => {
-  // «hora mexico» no cambia el instante —el servidor YA está en esa zona—,
-  // pero antes impedía que la frase se reconociera y el operador recibía un
-  // «no entiendo el período» a una pregunta perfectamente formada.
-  const r = await createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] el sufijo de zona horaria de la planta no rompe la frase', async () => {
+  /* «hora mexico» no cambia el instante —el servidor YA está en esa zona—,
+     pero antes impedía que la frase se reconociera y el operador recibía un
+     «no entiendo el período» a una pregunta perfectamente formada. */
+  const r = await createHerramientas({ client: espejoFalso() })
     .ejecutar('historia_de_senal', {
-      senal: 'nivel del tanque',
+      senal: 'vRMS_S1',
+      sistema: ESPEJO.id,
       periodo: 'el 21 de agosto de 2026 a las 11:16am hora mexico',
     })
 
@@ -3031,56 +3179,59 @@ await checkAsync('valor_en_momento sin hora no adivina, y el futuro se rechaza',
   assert.equal(futuro.ok, false, 'el futuro no tiene dato')
 })
 
-await omitirEnvuelto('valor_en_momento respeta la guarda de señales sin historia', async () => {
-  // La misma regla que el resto: sin ella el servidor devuelve la curva de la
-  // temperatura del tanque bajo el nombre de otra señal, y sin dar error.
-  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
-  // se apaga la bandera sólo para esta prueba.
-  SENALES.cargaMotor.historizado = false
-  try {
-    const r = await createHerramientas({ client: clienteFalso() })
-      .ejecutar('valor_en_momento', { senal: 'carga del motor', momento: 'ayer a las 11:16' })
+await checkAsync('[espejo] valor_en_momento respeta la guarda de señales sin historia', async () => {
+  /*
+   * La misma regla que el resto: sin ella el servidor devuelve la curva de
+   * OTRA señal bajo este nombre, y sin dar error.
+   *
+   * `aPeak_S1` EXISTE en esta máquina y no está historizada, que es el caso
+   * que importa. La primera versión de esta portada usó una clave inventada
+   * y pasaba por el motivo equivocado —«no es una señal de esta máquina»—,
+   * comprobando el resolver en vez de la guarda de historia.
+   */
+  assert.ok(configurada.claves().includes('aPeak_S1'), 'la señal del escenario tiene que existir')
+  assert.equal(configurada.esHistorizada('aPeak_S1'), false, 'y no tener serie propia')
 
-    assert.equal(r.ok, false)
-    assert.ok(r.senalesConHistoria, 'tiene que ofrecer las que sí tienen serie')
-  } finally {
-    SENALES.cargaMotor.historizado = true
-  }
+  const r = await createHerramientas({ client: espejoFalso() })
+    .ejecutar('valor_en_momento', { senal: 'aPeak_S1', sistema: ESPEJO.id, momento: 'ayer a las 11:16' })
+
+  assert.equal(r.ok, false, 'una señal sin serie propia no puede dar un valor de archivo')
+  assert.match(r.error, /no tiene serie hist[oó]rica propia/i, `el motivo tiene que ser la historia: ${r.error}`)
 })
 
 /* ── Cobertura: qué significa el recuento de puntos ──────────────────── */
 
 console.log('\n── La cobertura del período ────────────────────────────────')
 
-await omitirEnvuelto('el recuento se llama `puntos`, y `muestras` sigue como alias', async () => {
+await checkAsync('[espejo] el recuento se llama `puntos`, y `muestras` sigue como alias', async () => {
   /*
    * «28 muestras registradas» hacía entender que el sensor midió 28 veces en
    * todo el día; midió decenas de miles. Lo que hay son 28 promedios de 15
    * min. El alias se mantiene porque el frontend ya lo leía.
    */
-  const r = await createHerramientas({ client: clienteFalso() })
-    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+  const r = await createHerramientas({ client: espejoFalso() })
+    .ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'ayer' })
 
-  assert.equal(r.ok, true)
+  assert.equal(r.ok, true, r.error)
   assert.equal(r.puntos, r.muestras, '`puntos` y `muestras` tienen que coincidir')
   assert.equal(r.tramoPorPunto, '15 min', 'hay que decir de cuánto es cada punto')
 })
 
-await omitirEnvuelto('un período con huecos declara su cobertura y advierte del sesgo', async () => {
+await checkAsync('[espejo] un período con huecos declara su cobertura y advierte del sesgo', async () => {
   /*
    * El caso real del 21-08-2026: 28 de 96 tramos con dato, porque la
    * instalación sólo operó de 07:30 a 17:00. El promedio es el de esas horas,
    * no el del día, y sin decirlo se lee como si fuera el del día completo.
    */
-  const client = clienteFalso({
+  const client = espejoFalso({
     historia: ({ startDate }) => {
       const t0 = new Date(startDate).getTime()
-      // Cuatro puntos sueltos donde caben muchos más.
+      /* Cuatro puntos sueltos donde caben muchos más. */
       return {
         ok: true,
         data: [0, 1, 2, 3].map((i) => ({
           timestamp: new Date(t0 + i * 900_000).toISOString(),
-          value: 50 + i,
+          value: 1 + i / 10,
           quality: 0,
         })),
       }
@@ -3088,7 +3239,7 @@ await omitirEnvuelto('un período con huecos declara su cobertura y advierte del
   })
 
   const r = await createHerramientas({ client })
-    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'ayer' })
+    .ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'ayer' })
 
   assert.equal(r.ok, true)
   assert.equal(r.tramosConDato, 4)
@@ -3097,14 +3248,31 @@ await omitirEnvuelto('un período con huecos declara su cobertura y advierte del
   assert.match(r.avisoCobertura, /no del período completo/)
 })
 
-await omitirEnvuelto('sin huecos no se advierte de nada', async () => {
-  // El cliente falso rellena las 24 posiciones de la ventana por defecto: ahí
-  // el promedio SÍ es el del período, y un aviso sobraría.
-  const r = await createHerramientas({ client: clienteFalso() })
-    .ejecutar('historia_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
+await checkAsync('[espejo] sin huecos no se advierte de nada', async () => {
+  /* Con todos los tramos servidos el promedio SÍ es el del período, y un
+     aviso sobraría: advertir siempre enseña a ignorar la advertencia. */
+  const client = espejoFalso({
+    historia: ({ startDate, endDate, interval }) => {
+      const t0 = new Date(startDate).getTime()
+      const t1 = new Date(endDate).getTime()
+      const [hh, mm, ss] = String(interval).split(':').map(Number)
+      const pasoMs = ((hh * 3600) + (mm * 60) + ss) * 1000
+      const n = Math.max(1, Math.round((t1 - t0) / pasoMs))
+      return {
+        ok: true,
+        data: Array.from({ length: n }, (_, i) => ({
+          timestamp: new Date(t0 + i * pasoMs).toISOString(),
+          value: 1 + (i % 5) / 10,
+          quality: 0,
+        })),
+      }
+    },
+  })
+  const r = await createHerramientas({ client })
+    .ejecutar('historia_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
 
-  assert.equal(r.ok, true)
-  assert.equal(r.tramosConDato, r.tramosPosibles, 'la ventana por defecto viene completa')
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.tramosConDato, r.tramosPosibles, 'la ventana servida entera viene completa')
   assert.equal(r.avisoCobertura, undefined, 'sin huecos no se inventa un aviso')
 })
 
@@ -3123,7 +3291,7 @@ await checkAsync('resumirSerie sin rejilla sigue funcionando, sin cobertura', as
 
 console.log('\n── Concurrencia acotada al leer varios días ─────────────────')
 
-await omitirEnvuelto('leerSerieEnRango nunca supera el tope de tramos simultáneos', async () => {
+await checkAsync('[espejo] leerSerieEnRango nunca supera el tope de tramos simultáneos', async () => {
   // `readHistory` cuenta cuántas llamadas están EN VUELO a la vez: sube el
   // contador al entrar, espera un instante (para que las que arrancan juntas
   // se solapen de verdad) y lo baja al salir. Si `leerSerieEnRango` lanzara
@@ -3131,7 +3299,7 @@ await omitirEnvuelto('leerSerieEnRango nunca supera el tope de tramos simultáne
   // pico llegaría a 30; con la cola acotada no debe pasar del tope pedido.
   let enVuelo = 0
   let pico = 0
-  const client = clienteFalso({
+  const client = espejoFalso({
     // Varias muestras por LLAMADA, como el servidor real: con el troceado
     // escalonado (Plan 15 Fase 2) un rango de 30 días son unos pocos tramos
     // anchos, no 30 tramos de un día — un fake que sólo diera una muestra
@@ -3157,19 +3325,19 @@ await omitirEnvuelto('leerSerieEnRango nunca supera el tope de tramos simultáne
   const TOPE = 4
   const r = await createHerramientas({ client, historyConcurrencia: TOPE }).ejecutar(
     'perfil_de_senal',
-    { senal: 'nivel del tanque', dias: 30 }
+    { senal: 'vRMS_S1', sistema: ESPEJO.id, dias: 30 }
   )
 
-  assert.equal(r.ok, true)
+  assert.equal(r.ok, true, r.error)
   assert.ok(pico <= TOPE, `pico de llamadas simultáneas=${pico}, tope=${TOPE}`)
   assert.ok(pico > 1, `pico=${pico}: si es 1, la prueba no está midiendo concurrencia de verdad`)
 })
 
-await omitirEnvuelto('sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
+await checkAsync('[espejo] sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
   let enVuelo = 0
   let pico = 0
   let llamadas = 0
-  const client = clienteFalso({
+  const client = espejoFalso({
     // Mismo criterio que la prueba anterior: varias muestras por llamada,
     // proporcional al tramo pedido, para no quedarse corto de
     // `MIN_MUESTRAS_PERFIL` con los tramos más anchos del troceado
@@ -3192,13 +3360,14 @@ await omitirEnvuelto('sin pasar historyConcurrencia, el valor por defecto sigue 
     },
   })
 
-  // Sin pasar `historyConcurrencia`: el defecto de la propia función (6).
+  /* Sin pasar `historyConcurrencia`: el defecto de la propia función (6). */
   const r = await createHerramientas({ client }).ejecutar('perfil_de_senal', {
-    senal: 'nivel del tanque',
+    senal: 'vRMS_S1',
+    sistema: ESPEJO.id,
     dias: 30,
   })
 
-  assert.equal(r.ok, true)
+  assert.equal(r.ok, true, r.error)
   assert.ok(pico <= 6, `pico=${pico}, defecto=6`)
   // Con el troceado escalonado (Plan 15 Fase 2), 30 días son unos pocos
   // tramos anchos, no 30 tramos de un día — así que "todo de golpe" ya no
@@ -3722,10 +3891,11 @@ await omitirEnvuelto('un campo que no existe en el esquema no rompe la llamada',
 
 console.log('\n── tendencia_multiple ──────────────────────────────────────')
 
-await omitirEnvuelto('varias señales en una sola llamada, cada una con su resumen', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] varias señales en una sola llamada, cada una con su resumen', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
   const r = await h.ejecutar('tendencia_multiple', {
-    senales: ['nivel', 'presión', 'temperatura'],
+    senales: ['vRMS_S1', 'vRMS_S2', 'vRMS_S3'],
+    sistema: ESPEJO.id,
     periodo: 'últimas 6 horas',
   })
 
@@ -3744,10 +3914,11 @@ await omitirEnvuelto('varias señales en una sola llamada, cada una con su resum
  * juntas?» y ésta «¿cómo van?». Colar un coeficiente aquí invitaría a leer una
  * causa donde nadie preguntó por ninguna.
  */
-await omitirEnvuelto('no calcula ninguna relación entre las señales', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] no calcula ninguna relación entre las señales', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
   const r = await h.ejecutar('tendencia_multiple', {
-    senales: ['nivel', 'presión'],
+    senales: ['vRMS_S1', 'vRMS_S2'],
+    sistema: ESPEJO.id,
     periodo: 'últimas 6 horas',
   })
 
@@ -3755,10 +3926,11 @@ await omitirEnvuelto('no calcula ninguna relación entre las señales', async ()
   assert.match(r.nota, /no se ha calculado ninguna relación/i, 'no avisa de que no las calcula')
 })
 
-await omitirEnvuelto('tendencia_multiple(idioma: "en") narra la banda y el aviso de umbrales en inglés', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] tendencia_multiple(idioma: "en") narra la banda y el aviso de umbrales en inglés', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
   const en = await h.ejecutar('tendencia_multiple', {
-    senales: ['nivel', 'presión'],
+    senales: ['vRMS_S1', 'vRMS_S2'],
+    sistema: ESPEJO.id,
     periodo: 'últimas 6 horas',
   }, { idioma: 'en' })
 
@@ -3776,30 +3948,26 @@ await checkAsync('una sola señal se rechaza y remite a historia_de_senal', asyn
   assert.match(r.error, /historia_de_senal/, 'no dice cuál usar para una sola')
 })
 
-await omitirEnvuelto('una señal sin serie propia se rechaza ANTES de leer nada', async () => {
-  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
-  // se apaga la bandera sólo para esta prueba.
-  SENALES.cargaMotor.historizado = false
-  try {
-    const client = clienteFalso()
-    const r = await createHerramientas({ client }).ejecutar('tendencia_multiple', {
-      senales: ['nivel', 'carga del motor'],
-    })
+await checkAsync('[espejo] una señal sin serie propia se rechaza ANTES de leer nada', async () => {
+  /* `aPeak_S1` existe en esta máquina y no está historizada: la guarda tiene
+     que saltar antes de gastar un viaje al historiador. */
+  const client = espejoFalso()
+  const r = await createHerramientas({ client }).ejecutar('tendencia_multiple', {
+    senales: ['vRMS_S1', 'aPeak_S1'],
+    sistema: ESPEJO.id,
+  })
 
-    assert.equal(r.ok, false)
-    assert.match(r.error, /no tiene serie histórica propia/i)
-    assert.equal(client.historial.length, 0, 'salió a la red pese a saber que no podía')
-  } finally {
-    SENALES.cargaMotor.historizado = true
-  }
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
+  assert.equal(client.historial.length, 0, 'salió a la red pese a saber que no podía')
 })
 
 console.log('\n── buscar_evento ───────────────────────────────────────────')
 
-await omitirEnvuelto('encuentra la primera y la última vez que se cruzó el umbral', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] encuentra la primera y la última vez que se cruzó el umbral', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
   const r = await h.ejecutar('buscar_evento', {
-    senal: 'nivel', condicion: 'por debajo de', valor: 200, periodo: 'últimas 6 horas',
+    senal: 'vRMS_S1', sistema: ESPEJO.id, condicion: 'por debajo de', valor: 999, periodo: 'últimas 6 horas',
   })
 
   assert.equal(r.ok, true, r.error)
@@ -3815,10 +3983,10 @@ await omitirEnvuelto('encuentra la primera y la última vez que se cruzó el umb
  * se parecen demasiado, y el modelo acabaría contestando lo segundo cuando lo
  * cierto es lo primero.
  */
-await omitirEnvuelto('«no ocurrió» se distingue de «no hay datos»', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
+await checkAsync('[espejo] «no ocurrió» se distingue de «no hay datos»', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
   const r = await h.ejecutar('buscar_evento', {
-    senal: 'nivel', condicion: 'por debajo de', valor: -999, periodo: 'últimas 6 horas',
+    senal: 'vRMS_S1', sistema: ESPEJO.id, condicion: 'por debajo de', valor: -999, periodo: 'últimas 6 horas',
   })
 
   assert.equal(r.ok, true, r.error)
@@ -3839,36 +4007,29 @@ await checkAsync('una condición que no existe se rechaza con las válidas', asy
   assert.match(r.error, /no tiene un valor admitido|condici/i)
 })
 
-await omitirEnvuelto('sin serie propia no se puede buscar un cruce', async () => {
-  // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
-  // se apaga la bandera sólo para esta prueba.
-  SENALES.cargaMotor.historizado = false
-  try {
-    const h = createHerramientas({ client: clienteFalso() })
-    const r = await h.ejecutar('buscar_evento', {
-      senal: 'carga del motor', condicion: 'por encima de', valor: 5,
-    })
+await checkAsync('[espejo] sin serie propia no se puede buscar un cruce', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
+  const r = await h.ejecutar('buscar_evento', {
+    senal: 'aPeak_S1', sistema: ESPEJO.id, condicion: 'por encima de', valor: 5,
+  })
 
-    assert.equal(r.ok, false)
-    assert.match(r.error, /no tiene serie histórica propia/i)
-  } finally {
-    SENALES.cargaMotor.historizado = true
-  }
+  assert.equal(r.ok, false)
+  assert.match(r.error, /no tiene serie hist[oó]rica propia/i)
 })
 
 console.log('\n── alarma_sostenida ─────────────────────────────────────────')
 
-await omitirEnvuelto('una señal que no es alarma se rechaza, con el nombre de la herramienta correcta', async () => {
-  const h = createHerramientas({ client: clienteFalso() })
-  const r = await h.ejecutar('alarma_sostenida', { alarma: 'nivel del tanque' })
+await checkAsync('[espejo] una señal que no es alarma se rechaza, con el nombre de la herramienta correcta', async () => {
+  const h = createHerramientas({ client: espejoFalso() })
+  const r = await h.ejecutar('alarma_sostenida', { alarma: 'vRMS_S1', sistema: ESPEJO.id })
 
   assert.equal(r.ok, false)
   assert.match(r.error, /no es una alarma/i)
   assert.match(r.error, /historia_de_senal/)
 })
 
-await omitirEnvuelto('un arranque normal (un solo pulso corto) NO se marca sostenido', async () => {
-  const client = clienteFalso({
+await checkAsync('[espejo] un arranque normal (un solo pulso corto) NO se marca sostenido', async () => {
+  const client = espejoFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
       // Un pulso de 60 s cerca del principio de la ventana, y nada más.
@@ -3882,7 +4043,7 @@ await omitirEnvuelto('un arranque normal (un solo pulso corto) NO se marca soste
       }
     },
   })
-  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'falta de presión' })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'alarma_S2', sistema: ESPEJO.id })
 
   assert.equal(r.ok, true)
   assert.equal(r.activaAhora, false)
@@ -3890,8 +4051,8 @@ await omitirEnvuelto('un arranque normal (un solo pulso corto) NO se marca soste
   assert.equal(r.sostenida, false)
 })
 
-await omitirEnvuelto('el patrón del incidente real —parpadeo repetido— SÍ se marca sostenido', async () => {
-  const client = clienteFalso({
+await checkAsync('[espejo] el patrón del incidente real —parpadeo repetido— SÍ se marca sostenido', async () => {
+  const client = espejoFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
       // Cinco pulsos de 40 s cada uno, separados: 200 s activos en total,
@@ -3905,7 +4066,7 @@ await omitirEnvuelto('el patrón del incidente real —parpadeo repetido— SÍ 
       return { ok: true, data }
     },
   })
-  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'bajo flujo' })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'alarma_S2', sistema: ESPEJO.id })
 
   assert.equal(r.ok, true)
   assert.equal(r.eventosEnVentana, 5)
@@ -3914,8 +4075,8 @@ await omitirEnvuelto('el patrón del incidente real —parpadeo repetido— SÍ 
   assert.match(r.interpretacion, /no es un arranque normal/i)
 })
 
-await omitirEnvuelto('sigue activa AHORA MISMO, sin haberse apagado: también sostenida', async () => {
-  const client = clienteFalso({
+await checkAsync('[espejo] sigue activa AHORA MISMO, sin haberse apagado: también sostenida', async () => {
+  const client = espejoFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
       // Entra a los 30 s de la ventana y no vuelve a apagarse.
@@ -3928,14 +4089,14 @@ await omitirEnvuelto('sigue activa AHORA MISMO, sin haberse apagado: también so
       }
     },
   })
-  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'falta de presión' })
+  const r = await createHerramientas({ client }).ejecutar('alarma_sostenida', { alarma: 'alarma_S2', sistema: ESPEJO.id })
 
   assert.equal(r.ok, true)
   assert.equal(r.activaAhora, true)
   assert.equal(r.sostenida, true)
 })
 
-await omitirEnvuelto('alarma_sostenida(idioma: "en") narra en inglés, no sólo acepta el argumento', async () => {
+await checkAsync('[espejo] alarma_sostenida(idioma: "en") narra en inglés, no sólo acepta el argumento', async () => {
   /*
    * ── POR QUÉ ESTA PRUEBA EXISTE ────────────────────────────────────
    *
@@ -3948,7 +4109,7 @@ await omitirEnvuelto('alarma_sostenida(idioma: "en") narra en inglés, no sólo 
    * Ninguna de las cuatro pruebas de arriba pasaba `idioma`, así que el hueco
    * no lo cazaba nada. Ésta lo cierra.
    */
-  const client = clienteFalso({
+  const client = espejoFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
       return {
@@ -3961,7 +4122,7 @@ await omitirEnvuelto('alarma_sostenida(idioma: "en") narra en inglés, no sólo 
     },
   })
   const en = await createHerramientas({ client })
-    .ejecutar('alarma_sostenida', { alarma: 'falta de presión' }, { idioma: 'en' })
+    .ejecutar('alarma_sostenida', { alarma: 'alarma_S2', sistema: ESPEJO.id }, { idioma: 'en' })
 
   assert.equal(en.ok, true)
   assert.match(en.interpretacion, /NOT a normal start-up/)
