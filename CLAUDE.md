@@ -390,10 +390,10 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 178 correctas y 45 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 180 correctas y 45 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «178 de 223», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 223. Trece de las 178 son sobre una
+> qué. Ese verde significa «180 de 225», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 225. Catorce de las 180 son sobre una
 > máquina **configurada** (Plan 39 F0–F2), y también lo imprime; diez más, en
 > bloque propio al final, son los reportes por plantilla (Plan 44 F3–F5).
 >
@@ -427,7 +427,7 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 440 — contratos HTTP, config, logger, reportes por plantilla
+cd backend && npm test          # 442 — contratos HTTP, config, logger, reportes por plantilla
 cd react-dashboard && npm test  # 1192 (+20 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```

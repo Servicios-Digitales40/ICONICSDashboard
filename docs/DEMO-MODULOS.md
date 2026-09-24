@@ -1,5 +1,26 @@
 # Demo EVA — módulos y alcance
 
+> ## ⚠ DOCUMENTO DESACTUALIZADO — no lo uses para saber qué hay hoy
+>
+> Revisado el **24-09-2026** (Plan 45 F4) y **no se reescribe**: describe el
+> proyecto de finales de agosto, y lo que cuenta de entonces sigue siendo
+> cierto de entonces. Se conserva porque explica **por qué** se agruparon así
+> los módulos, que es lo que un documento de alcance aporta después.
+>
+> Lo que ya **no** es verdad, y es lo que más se tienta al leerlo:
+>
+> - **«Hoy hay dos máquinas en planta»**: la estación de llenado está
+>   **cerrada** desde el 17-09-2026 y sus vistas se borraron el 23-09. Hoy hay
+>   una máquina configurada, `vib-motor-03`.
+> - **«22 herramientas»**: son **26**, y una máquina nueva ya no se escribe a
+>   mano: se configura desde `Planta › Configuración`.
+> - Las cifras de señales, series y pruebas son todas de entonces.
+>
+> **Dónde mirar en su lugar:** [`PRODUCT.md`](../PRODUCT.md) para qué es esto y
+> para quién, [`HANDOFF.md`](HANDOFF.md) §1 para el estado real y medido, y
+> [`por-completar/PLAN-45-PROYECTO-LISTO.md`](por-completar/PLAN-45-PROYECTO-LISTO.md)
+> para qué falta.
+
 ## Objetivo
 
 Definir los módulos y submódulos de la demo de cara a la presentación: qué se

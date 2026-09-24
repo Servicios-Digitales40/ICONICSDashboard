@@ -25,31 +25,46 @@ autenticación contra ICONICS, y un frontend en React que consume ese backend.
 
 ## Qué hace
 
-**Dos máquinas, en secciones separadas del sidebar.** Son instalaciones
-distintas —otro motor, otro variador, otro PLC— y por eso no comparten pantalla:
-mezclarlas invitaría a leerlas juntas, y una correlación entre el caudal de una
-y la vibración de la otra uniría dos equipos que no se tocan.
+**Una sección por máquina configurada**, con sus vistas genéricas. Dos máquinas
+distintas no comparten pantalla a propósito: mezclarlas invitaría a leerlas
+juntas, y una correlación entre el caudal de una y la vibración de la otra
+uniría dos equipos que no se tocan.
 
-**Estación de llenado** — ocho señales bajo `ac:TDCON/DEMO/SENSORES/`, cinco de
-ellas con serie histórica verificada:
+Cada máquina trae **Inicio** (qué está pasando ahora), **Planta** y **Estado
+mecánico** (sus señales con la historia que el historiador entrega),
+**Vista 3D**, **Hallazgos**, **Avisos**, **Casos previos** y **Documentación**.
+Ninguna está escrita para una máquina concreta: las dirige el **tipo** de la
+máquina que se tiene delante.
 
-- **Inicio** — qué está pasando ahora, en una pantalla que se explica sola.
-- **Gráficas** — las ocho señales, con la historia que el historiador entrega.
-- **Riesgos** — qué puede pasar si la instalación sigue como está.
-- **Controles** — encender y apagar la bomba.
-- **Vista 3D** — la instalación en miniatura; el nivel del tanque es dato vivo.
+> **La estación de llenado está cerrada por mantenimiento desde el
+> 17-09-2026**, y sus vistas se borraron el 23-09: volverá como otra máquina
+> configurada (Plan 43). Su dominio sigue entero en el árbol —cerrado no es
+> borrado— y el asistente se niega a contestar por ella diciendo por qué.
 
-**Sistema de vibraciones** — motor WEG con módulo SIPLUS CMS, 73 puntos bajo
-`ac:TDCON/Motors/01/` y `ae:`. Mismas cinco vistas, **sin histórico utilizable**:
-sólo el instante, y las herramientas de tendencia se niegan a inventarlo.
+**Sistema de vibraciones** — motor con módulo SIPLUS CMS SM 1281 y variador
+V20, configurado desde el árbol de ICONICS. **Con histórico**: a 24-09-2026,
+62 de sus 76 series están verificadas una a una contra el historiador, las
+gráficas se pintan y los reportes por plantilla las leen. Aquí ponía «sin
+histórico utilizable: sólo el instante»; fue cierto hasta agosto de 2026 y
+dejó de serlo cuando el grupo del historiador empezó a registrar.
 
-**General** — Alarmas, Assets (los puntos con su valor y calidad en crudo,
-navegando el árbol de AssetWorX) y Predicción (beta).
+Lo que sigue sin poderse es **poner plazo a una avería**: la máquina no declara
+mecanismos de desgaste, así que las herramientas de pronóstico se niegan y lo
+explican, en vez de inventarlo.
 
-Quién manda sobre qué máquinas existen es un solo archivo:
-[`shared/eva/sistemas.js`](shared/eva/sistemas.js). Dar de alta una es añadir
-una entrada ahí y su catálogo — el asistente, el simulador y el transporte falso
-se enteran solos. El procedimiento completo está en
+**General** — Assets (los puntos con su valor y calidad en crudo, navegando el
+árbol de AssetWorX), Configuración, Documentación y Salud del sistema. El
+historial de alarmas no tiene vista: el Alarm Server de esta instalación
+responde 500 a `AlarmHistory` para cualquier punto, y una vista que siempre
+diga «cero eventos» afirma algo que no se ha medido.
+
+Quién manda sobre qué máquinas existen es el registro de
+[`shared/eva/comun/sistemas.js`](shared/eva/comun/sistemas.js), pero **dar de
+alta una máquina ya no es editarlo**: se configura desde
+`Planta › Configuración`, marcando sus señales en el árbol de ICONICS, y el
+backend la registra al arrancar y tras cada cambio (`datos/maquinas.json`, que
+no viaja con el repo). El asistente, el simulador y el transporte falso se
+enteran solos. El procedimiento completo está en
 [`shared/README.md`](shared/README.md).
 - **Asistente** — un chat que responde en lenguaje natural consultando ICONICS
   de verdad, con un modelo que corre en el propio servidor. Opcional: sin
@@ -94,7 +109,11 @@ de banda— y duplicarlas las haría divergir. Ver
 
 ## Requisitos
 
-- Node.js 18 o superior
+- **Node.js 24.** No es «18 o superior», que es lo que decía aquí: la versión
+  se declara en [`.nvmrc`](.nvmrc) y los tres `package.json` la repiten como
+  `engines`, así que con otra mayor `npm ci` **se niega a instalar**. El
+  porqué —un lockfile lo escribe una versión de npm y lo consume otra— está en
+  [`CLAUDE.md`](CLAUDE.md) §5.5, con el día que tumbó CI.
 - Acceso a un servidor ICONICS con la API REST de FrameWorX habilitada
 
 ## Puesta en marcha

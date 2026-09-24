@@ -1,6 +1,6 @@
 # PLAN 45 — Dejar el proyecto listo: lo que falta para cerrar Vibraciones como producto
 
-**Estado:** **F0 (auditoría) completada el 24-09-2026** · F1–F6 por completar. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
+**Estado:** **F0, F2 y F4 completadas el 24-09-2026** · F1 (espera D1/D3 y el motor girando), F3 (Gustavo) y F5–F6 por completar. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
 **Rama:** `UI-Limpieza1.0` (Moisés). `DemoVibraciones4.0` recibe el resultado; `AjustesGustavo5.0` es la del asistente (Gustavo). Ver `HANDOFF.md` §0.
 **Origen:** el usuario pidió el 24-09-2026 revisar alcances, capacidades y problemas del proyecto, con pruebas, y después acotó: «no pensemos en la presentación, sino en el contenido del proyecto y en cómo funciona. Quiero dejar el proyecto listo. ¿Qué faltaría?».
 
@@ -235,7 +235,35 @@ Y una de trámite: ¿el plan se comitea tal cual?
 **Criterio de aceptación:** `GET /api/maquinas/vib-motor-03` en `VALID`, seis
 activos con nombre, `/api/health` en `ok`, «Casos previos» con lo decidido.
 
-### F2 · Defectos en la zona de Moisés (`shared/`, rutas, pruebas)
+### F2 · Defectos en la zona de Moisés — **COMPLETADA el 24-09-2026**
+
+**Lo que de verdad pasó**, en tres commits (`51924c4`, `af07611`, `80b187e`,
+`30c6663`). Las cinco se hicieron; dos destaparon cosas que este plan no había
+visto, y una de ellas obligó a arreglar un verificador.
+
+| | Qué se esperaba | Qué pasó |
+|---|---|---|
+| **F2.1** | Aislar los diarios en `montarApp()` | Se hizo, **y el defecto era mayor**: la bitácora no tenía variable de entorno **y su ruta era relativa al `cwd`**, así que el puente (raíz) y la suite (`backend/`) escribían en dos archivos distintos. Se ancló a la raíz y se hizo configurable. **Y arreglarlo rompió `verificar-herramientas`**, que era lo correcto: se aislaba con `process.chdir()` apoyándose justo en ese defecto. `crearHerramientasDeAprendizaje` acepta ahora `ruta`, y la cabecera que decía «no recibe nada a propósito» se corrigió |
+| **F2.2** | `rnd` fijo en la prueba intermitente | Se hizo con una bandera (`ICONICS_FAKE_SIN_CAOS`), porque `createApp` construye su propio cliente y no lo recibe: no había forma de inyectarlo desde la prueba |
+| **F2.3** | Que el texto y la fecha digan la verdad | Se hizo, y el análisis del plan se confirmó leyendo el código: un `UNKNOWN` con fecha **sólo** podía venir del sondeo, porque un fallo real de `/verificar` no se anota nunca |
+| **F2.4** | Reescribir el pie de `estadoVibraciones` | Se hizo, **y salió una tercera cosa**: los puntos mudos se nombran por su **hoja** (`DKW_S1`), no por el tag entero, porque seis rutas completas de ICONICS son cuatrocientos caracteres de prefijo repetido dentro de un texto que el modelo copia. El aviso **inglés** cambió con él |
+| **F2.5** | Exponer `cerrado` | Se hizo. Viaja el **texto del motivo**, no un booleano: el registro lo guarda así porque «cerrado» sin el porqué obliga a inventárselo |
+
+**Lo medido al cerrar:** backend **442/442** (dos pruebas nuevas), frontend
+**1192 · 20 omitidas**, **los 41** verificadores, `verificar-herramientas`
+**180 correctas · 45 omitidas** (eran 178), lint y types limpios. Y lo que
+esta fase existía para arreglar: **tras una tanda entera, ni `datos/` ni
+`backend/datos/` cambian**, comprobado por hash antes y después.
+
+**Las cuatro se vieron fallar antes de darlas por buenas** (`CLAUDE.md` §6.2):
+quitando la aislación, la suite ensucia el despliegue; con `rnd: () => 0`, el
+alta da `INVALID`; sin `fechar: false`, la fecha avanza 383 ms y la limitación
+vuelve; reintroduciendo «OTRA MÁQUINA, no el tanque», la comprobación del aviso
+cae.
+
+---
+
+*El diseño original de la fase, para referencia:*
 
 Un commit por punto, cada uno con su prueba que falla sin él (`CLAUDE.md` §6.2).
 Antes de tocar `shared/eva/**`, la tanda de vibraciones (§5.6).
@@ -285,7 +313,26 @@ desmiente la promesa de «sobre la máquina de delante».
 `medir-asistente-configurada` en 9 de 9 con ninguna respuesta que nombre al
 tanque.
 
-### F4 · La documentación dice lo que el código hace
+### F4 · La documentación dice lo que el código hace — **COMPLETADA el 24-09-2026**
+
+**Lo que se corrigió**, con lo que decía y lo que dice:
+
+| Dónde | Decía | Dice |
+|---|---|---|
+| `HANDOFF.md` §6 | «**Bloqueante:** el historiador de vibraciones no devuelve nada» | «Ninguno», con las 62 series verificadas y los siete reportes medidos contra planta. Se deja escrito el porqué: un bloqueante que ya no lo es hace planificar alrededor de una avería que no existe |
+| `HANDOFF.md` §9 | «190 correctas y 22 omitidas» | 180 y 45, con la cadena de cambios que lo movió y un «si tu tanda no da ese número, compara con el commit» |
+| `HANDOFF.md` §1 | Suite de backend 440; la instalación «gira sin nada acoplado» | 442; y el hecho del 24-09: **el variador estaba apagado** (bus 0 V, `READY TO RUN` 0), más los seis tags del V20 sin fuente, que son la D1 |
+| `HANDOFF.md` §9 (tanda) | Criterio del 22-09 | El del 24-09, y el aviso de que la suite **ya no escribe en `datos/`**: si cambia, es una regresión |
+| `README.md` | «Node.js 18 o superior» | Node 24, con por qué `npm ci` se niega con otra |
+| `README.md` | Vibraciones «sin histórico utilizable: sólo el instante» | 62 de 76 series verificadas; lo que sigue sin poderse es **poner plazo a una avería**, y por qué |
+| `README.md` | Las cinco vistas del tanque, y «dar de alta una es añadir una entrada en `shared/eva/sistemas.js`» | Las vistas genéricas por máquina configurada, el cierre del tanque, y que dar de alta **es configurar desde la pantalla**. (De paso: esa ruta no existe desde el Plan 18; es `shared/eva/comun/sistemas.js`) |
+| `DEMO-MODULOS.md` | 22 herramientas, dos máquinas en planta | **No se reescribe**: lleva una nota de documento desactualizado que dice qué ya no vale y adónde ir. Su valor es el porqué de la agrupación, que sigue siendo cierto |
+| `CLAUDE.md` §5.1 y §5.3 | 178 · 45, backend 440 | 180 · 45, backend 442 |
+| `backend/README.md` | — | Las dos variables nuevas, `APRENDIZAJE_RUTA` e `ICONICS_FAKE_SIN_CAOS`, con el defecto que cada una cierra |
+
+---
+
+*El diseño original de la fase, para referencia:*
 
 Un commit. Lo desactualizado, con línea:
 

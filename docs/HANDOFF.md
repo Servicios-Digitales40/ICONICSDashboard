@@ -191,9 +191,9 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | | |
 |---|---|
 | Suite de frontend | **1192** pruebas · 20 omitidas *(a 24-09-2026, con el Plan 44 completo; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
-| Suite de backend | **440** pruebas, **440 verdes** *(a 24-09-2026, con el Plan 44 completo y la B16 resuelta; eran 437 tras la F4)* |
+| Suite de backend | **442** pruebas, **442 verdes** *(a 24-09-2026 por la tarde, con el Plan 45 F2; eran 440 con el Plan 44 y la B16)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **178** correctas (13 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
+| `verificar-herramientas` | **180** correctas (14 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -243,6 +243,24 @@ suyo (11 del tanque, 2 de «grupo de bombeo»). Es la foto real del módulo.
 las 11:44.
 
 ### Lo que la instalación no permite (no es un defecto del tablero)
+
+> **El 24-09-2026 el motor no giraba y el variador estaba apagado.** Leídos
+> los 76 puntos a las 08:51: `SPEED_BMS` 0, `FREQ OUTPUT` 0, **`DC BUS VOLTS`
+> 0**, `READY TO RUN` 0, `FAULT` 0; en los apoyos, `vRMS` 0,009–0,027 mm/s con
+> calidad buena. Un bus de continua en 0 V no es «en vacío», es **sin
+> alimentar**. No es del tablero, pero condiciona qué se puede verificar: un
+> sondeo del historiador con la máquina parada compara ruido cerca de cero
+> (ver el incidente del 22-09 en §8), así que `aRMS_S3` y `aPeak_S3` no van a
+> ganar su verificación hasta que gire.
+>
+> **Y seis tags del V20 existen sin fuente detrás**: `HorasMarcha`,
+> `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1`,
+> `Corriente fase 2` y `Presion de aspiracion` llegan con calidad
+> `2147483667` (Bad) y sin valor. Por ellos `/api/health` dice `degraded` de
+> forma permanente («70 de 76 trajeron valor») y Salud sale en ámbar. Están
+> declarados —el asistente los nombra uno a uno desde el Plan 45 F2.4— y la
+> decisión de conectarlos o quitarlos de la configuración es **D1 del Plan
+> 45**, no un defecto que arreglar en el código.
 
 **El motor gira sin nada acoplado.** 602 rpm, par ≈ 0 %, 0 kW, 1,4 A de
 magnetización. Las vibraciones que sólo aparecen bajo esfuerzo no se pueden
@@ -528,9 +546,19 @@ del intermitente F10 se hicieron el 22-09 por la tarde; ver los backlogs y §9.)
 
 ### Bloqueantes
 
-**El historiador de vibraciones no devuelve nada.** 0 muestras,
+**Ninguno a 24-09-2026.**
+
+Aquí ponía «El historiador de vibraciones no devuelve nada: 0 muestras,
 `tramosFallidos: 1`. Sin esto no hay Historización, ni `firmaTemporal`, ni
-pronóstico.
+pronóstico». **Dejó de ser cierto y nadie lo bajó de categoría**: hoy
+`vib-motor-03` tiene **62 de 76 series verificadas**, las gráficas se pintan,
+y los siete reportes por plantilla se midieron CONTRA PLANTA leyendo ese
+historiador (Plan 44 F7, 5,4–6,1 s cada uno). El pronóstico sigue sin darse,
+pero por otro motivo —ninguna máquina declara mecanismos de desgaste (Plan 44
+D12)— y eso está declarado, no bloqueado.
+
+Se deja escrito porque un «bloqueante» que ya no lo es cuesta más que un hueco:
+quien retome el proyecto planifica alrededor de una avería que no existe.
 
 ### Conocidos y declarados
 
@@ -810,10 +838,16 @@ ICONICS_FAKE=true node scripts/verificar-herramientas.mjs
 ICONICS_FAKE=true node scripts/verificar-chat.mjs
 ```
 
-**Criterio de éxito:** `verificar-herramientas` imprime **190 correctas y 22
-omitidas**, y «13 de ellas sobre una máquina CONFIGURADA». Las omitidas son
-del cierre y el guion las cuenta a propósito; las catorce son la espejo de
-vibraciones registrada sólo para su bloque (Plan 39 F0–F2).
+**Criterio de éxito a 24-09-2026:** `verificar-herramientas` imprime **180
+correctas y 45 omitidas**, y «14 de ellas sobre una máquina CONFIGURADA». Las
+omitidas son del cierre y el guion las cuenta a propósito; las catorce son la
+espejo de vibraciones, registrada sólo para su bloque (Plan 39 F0–F2).
+
+> Esta línea decía «190 correctas y 22 omitidas», que fue cierto antes del
+> Plan 44 F3.6 (quitó del asistente las ramas del tanque, y con ellas 88
+> comprobaciones se quedaron sin escenario) y de la B19 (portó 43 a la
+> espejo). Las tres del Plan 45 —F2.4 y F2.5— suman las que faltan hasta 180.
+> **Si tu tanda no da ese número, compara con el commit, no con esta línea.**
 
 ### La tanda completa
 
@@ -823,16 +857,22 @@ cd backend && npm test
 cd react-dashboard && npm test
 ```
 
-**Criterio de éxito, medido el 22-09-2026 por la tarde:**
+**Criterio de éxito, medido el 24-09-2026 por la tarde (Plan 45 F2):**
 
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **440 passed** de 440 *(la B16 —`salud.test.mjs` esperando al DNS— se resolvió el 24-09-2026)* |
-| Frontend | **1192 passed · 20 skipped** *(24-09-2026, Plan 44 completo)* |
+| Backend | **442 passed** de 442 |
+| Frontend | **1192 passed · 20 skipped** |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
+
+> **Y la suite ya no escribe en `datos/` (Plan 45 F2.1).** Hasta esa fecha,
+> `cd backend && npm test` sumaba líneas a los tres diarios del despliegue y
+> creaba un **segundo** `backend/datos/aprendizaje.json` que nadie mira —la
+> ruta de la bitácora era relativa al `cwd`—. Si tras una tanda ves que
+> `datos/` cambió, es una regresión de esto, no algo normal.
 
 ### Dar de alta la máquina de vibraciones
 

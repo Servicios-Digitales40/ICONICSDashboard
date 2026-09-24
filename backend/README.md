@@ -42,6 +42,7 @@ plantilla comentada de todas las variables está en
 | `ICONICS_POINT_NAME` | *(vacío)* | Punto que leen `/api/iconics/data` y `/api/context` cuando no se indica otro. |
 | `ICONICS_READ_ONLY` | **`true`** | Deshabilita escritura y *ack* de alarmas. Ver abajo. |
 | `ICONICS_FAKE` | `false` | Transporte simulado (Plan 14 §7.1): sirve las dos máquinas —las ocho señales del tanque y los 73 puntos del sistema de vibraciones con sus contadores de alarma— sin `ICONICS_API_BASE` ni red. Ver `backend/iconics/fakeClient.mjs`. **Nunca en producción.** |
+| `ICONICS_FAKE_SIN_CAOS` | `false` | Quita el caos del transporte falso (1 % de puntos ausentes, 2 % de calidad mala). **Para pruebas que afirman un veredicto**, no para trabajar: el caos existe porque los caminos tristes son la mitad de lo que este backend tiene que hacer bien. Una prueba que comprobaba que una máquina recién dada de alta sale `VALID` fallaba ~2 de cada 100 tandas sin que nada estuviera roto (Plan 45 F2.2). Sólo tiene efecto con `ICONICS_FAKE=true`. |
 
 **Servidor**
 
@@ -140,6 +141,7 @@ qué arrancó la bomba a las tres de la mañana. El porqué de cada cifra está 
 | `DIARIO_ACCIONAMIENTOS` | `datos/diario-accionamientos.jsonl` | Dónde se anota. Relativa a la raíz del proyecto o absoluta — en planta `datos/` puede estar en otro volumen. |
 | `DIARIO_MAX_BYTES` | `8388608` (8 MB) | Tope de tamaño. Al pasarlo se podan las entradas más viejas **y queda una línea diciendo cuántas y hasta cuándo llegaban**. |
 | `DIARIO_DIAS` | `730` (2 años) | Retención. La poda descarta primero por antigüedad y sólo después por tamaño. |
+| `APRENDIZAJE_RUTA` | `datos/aprendizaje.json` | Dónde vive la **bitácora**: hechos confirmados, propuestas de regla e intervenciones cerradas. Relativa a la raíz del proyecto o absoluta, como sus vecinas. Existe desde el Plan 45 F2.1, y no es un ajuste fino: la ruta era relativa al **directorio desde el que se arrancara**, así que el puente (desde la raíz) y `cd backend && npm test` escribían en dos archivos distintos. Hoy se ancla a la raíz, y esto es lo que permite que las pruebas la aíslen. |
 
 **Asistente** (Plan 6)
 
