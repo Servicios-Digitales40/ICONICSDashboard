@@ -137,6 +137,11 @@ export const REGLAS = [
     necesita: ["velocidad"],
     exigeNorma: false,
     nivel: "informativo",
+    /*
+     * Impacto 2/5 (D15). No daña nada: invalida el juicio de ISO. El coste
+     * es quedarse sin criterio, no una avería.
+     */
+    impacto: 2,
     cuando: (d) => d.velocidad < RPM_MINIMA_ISO,
     evidencia: (d) =>
       `El variador entrega ${fmt(d.frecuencia, 2)} Hz y el motor gira a ` +
@@ -168,6 +173,12 @@ export const REGLAS = [
     exigeNorma: false,
     nivel: "informativo",
     /*
+     * Impacto 2/5 (D15). Mismo caso que la anterior, con el veredicto
+     * todavía válido: lo que se pierde es margen de confianza, no la
+     * máquina.
+     */
+    impacto: 2,
+    /*
      * Franja intermedia: la norma SÍ se pronuncia, pero el número llega
      * recortado. Es la situación medida el 25-08-2026 —604 rpm, 20,15 Hz— y
      * merece decirse, porque el veredicto verde que la acompaña es correcto y
@@ -196,6 +207,12 @@ export const REGLAS = [
     necesita: ["velocidad"],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 3/5 (D15). Por debajo del mínimo del módulo las medidas dejan
+     * de significar lo que dicen: se sigue vigilando en apariencia y no en
+     * efecto.
+     */
+    impacto: 3,
     cuando: (d) => d.velocidad > 0 && d.velocidad < RPM_MINIMA_MODULO,
     evidencia: (d) =>
       `${fmt(d.velocidad, 0)} rpm, por debajo de las ${RPM_MINIMA_MODULO} rpm ` +
@@ -215,6 +232,11 @@ export const REGLAS = [
     necesita: ["par"],
     exigeNorma: false,
     nivel: "informativo",
+    /*
+     * Impacto 1/5 (D15). Girar sin carga no deteriora nada. Sólo cambia
+     * cómo hay que leer el resto de las medidas de esa toma.
+     */
+    impacto: 1,
     cuando: (d) => Math.abs(d.par) < PAR_EN_VACIO,
     evidencia: (d) =>
       `El par del variador es ${fmt(d.par, 2)} %` +
@@ -255,6 +277,12 @@ export const REGLAS = [
     necesita: ["aRMS", "aPeak"],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 4/5 (D15). Los golpes en la aceleración son el aviso temprano
+     * de un rodamiento picándose: si se confirma, acaba en cambio de
+     * rodamiento.
+     */
+    impacto: 4,
     evaluable: (d) => {
       if (!hay(d.par)) {
         return {
@@ -329,6 +357,12 @@ export const REGLAS = [
     necesita: ["vRMS"],
     exigeNorma: true,
     nivel: "critico",
+    /*
+     * Impacto 5/5 (D15). Zona D de ISO: la máquina se deteriora mientras
+     * funciona. Es el escenario más caro del catálogo, y el que puede
+     * acabar en parada no programada.
+     */
+    impacto: 5,
     cuando: (d) => d.vRMS > LIMITES_ISO.alarma,
     evidencia: (d) =>
       `Velocidad eficaz ${fmt(d.vRMS, 3)} mm/s, por encima de los ` +
@@ -351,6 +385,12 @@ export const REGLAS = [
     necesita: ["vRMS"],
     exigeNorma: true,
     nivel: "atencion",
+    /*
+     * Impacto 3/5 (D15). Zona C: se puede seguir, pero no indefinidamente.
+     * Acorta vida de rodamientos y acoplamiento; el coste es mantenimiento
+     * adelantado, no rotura.
+     */
+    impacto: 3,
     cuando: (d) => d.vRMS > LIMITES_ISO.aviso && d.vRMS <= LIMITES_ISO.alarma,
     evidencia: (d) =>
       `Velocidad eficaz ${fmt(d.vRMS, 3)} mm/s: zona C de ISO 10816-1 Clase I ` +
@@ -373,6 +413,11 @@ export const REGLAS = [
     necesita: ["alarma"],
     exigeNorma: false,
     nivel: "critico",
+    /*
+     * Impacto 5/5 (D15). El propio módulo declara la alarma con sus
+     * umbrales configurados en planta: mismo peso que la zona D de ISO.
+     */
+    impacto: 5,
     cuando: (d) => d.alarma === true,
     evidencia: () =>
       "El SM 1281 ha activado su salida de alarma para este canal.",
@@ -392,6 +437,11 @@ export const REGLAS = [
     necesita: ["aviso"],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 3/5 (D15). El aviso del módulo es su escalón intermedio,
+     * equivalente a la zona C.
+     */
+    impacto: 3,
     cuando: (d) => d.aviso === true && d.alarma !== true,
     evidencia: () => "El SM 1281 ha activado su salida de aviso para este canal.",
     consecuencia:
@@ -409,6 +459,12 @@ export const REGLAS = [
     necesita: [],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 4/5 (D15). Sin referencia aprendida se pierde la medida que
+     * antes detecta un rodamiento picándose. No rompe nada hoy; deja el
+     * apoyo ciego al daño que más barato sale coger temprano.
+     */
+    impacto: 4,
     /*
      * El DKW es la única medida RELATIVA del módulo: compara el estado actual
      * con una referencia que se aprende con la máquina sana. Sin aprendizaje,
@@ -439,6 +495,11 @@ export const REGLAS = [
     necesita: ["offset"],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 4/5 (D15). Una desviación contamina TODAS las medidas de ese
+     * canal: el riesgo es decidir sobre números malos sin saberlo.
+     */
+    impacto: 4,
     cuando: (d) => Math.abs(d.offset) > 0,
     evidencia: (d) => `Desviación declarada por el módulo: ${fmt(d.offset, 4)}.`,
     expone: ["offset"],
@@ -460,6 +521,11 @@ export const REGLAS = [
     necesita: ["fallo"],
     exigeNorma: false,
     nivel: "critico",
+    /*
+     * Impacto 5/5 (D15). El variador en fallo es la máquina parada o a
+     * punto: impacto de producción inmediato.
+     */
+    impacto: 5,
     cuando: (d) => d.fallo !== 0,
     evidencia: (d) =>
       `\`FAULT_BMS\` vale ${fmt(d.fallo, 0)}` +
@@ -492,6 +558,12 @@ export const REGLAS = [
      * mirando la pantalla: todo lo demás sale en verde exactamente igual.
      */
     nivel: "critico",
+    /*
+     * Impacto 4/5 (D15). Apaga la única vigilancia que distingue un
+     * rodamiento picado de una máquina que vibra un poco más, y su ausencia
+     * no se ve en pantalla.
+     */
+    impacto: 4,
     cuando: (d) => rodamientosApagados(d).length > 0,
     evidencia: (d) => {
       const off = rodamientosApagados(d);
@@ -531,6 +603,12 @@ export const REGLAS = [
     exigeNorma: false,
     nivel: "atencion",
     /*
+     * Impacto 3/5 (D15). El número se publica y parece vigilado. Si sube,
+     * nadie avisa; pero otras medidas del mismo canal siguen cubriendo
+     * parte del hueco.
+     */
+    impacto: 3,
+    /*
      * Una medida en la posición «no se vigila» sigue publicando su número, y
      * ese número se pinta igual de bonito. La diferencia es que nadie va a
      * avisar cuando suba.
@@ -554,6 +632,12 @@ export const REGLAS = [
     necesita: [],
     exigeNorma: false,
     nivel: "critico",
+    /*
+     * Impacto 4/5 (D15). Una vigilancia disparada es el módulo diciendo que
+     * algo cruzó su umbral, con la especificidad de la medida que la
+     * encendió.
+     */
+    impacto: 4,
     cuando: (d) => vigilanciasDisparadas(d).length > 0,
     evidencia: (d) =>
       vigilanciasDisparadas(d)
@@ -592,6 +676,12 @@ export const REGLAS = [
     necesita: [],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 3/5 (D15). El número sigue publicándose y no se distingue del
+     * bueno mirándolo: el riesgo es creerse una medida que el propio módulo
+     * no se cree.
+     */
+    impacto: 3,
     cuando: (d) => confianzasBajas(d).length > 0,
     evidencia: (d) =>
       confianzasBajas(d)
@@ -620,6 +710,11 @@ export const REGLAS = [
     necesita: [],
     exigeNorma: false,
     nivel: "critico",
+    /*
+     * Impacto 4/5 (D15). El servidor de alarmas declara algo activo en el
+     * área. Qué de caro sale depende de cuál sea, y eso el área no lo dice.
+     */
+    impacto: 4,
     cuando: (d) => num(d.alarmas?.activasSinReconocer) > 0 || num(d.alarmas?.activasReconocidas) > 0,
     evidencia: (d) => {
       const sin = num(d.alarmas?.activasSinReconocer);
@@ -681,6 +776,11 @@ export const REGLAS = [
      * activo enseñaría a ignorar el color que sí avisa de uno.
      */
     nivel: "informativo",
+    /*
+     * Impacto 2/5 (D15). La máquina ya está bien: lo que se pierde es la
+     * constancia de que alguien revisara qué pasó.
+     */
+    impacto: 2,
     cuando: (d) =>
       num(d.alarmas?.normalSinReconocer) > 0 &&
       num(d.alarmas?.activasSinReconocer) === 0 &&
@@ -707,6 +807,12 @@ export const REGLAS = [
     necesita: [],
     exigeNorma: false,
     nivel: "atencion",
+    /*
+     * Impacto 4/5 (D15). Un apoyo que vibra mucho más que sus compañeros
+     * apunta a ese rodamiento o a su montaje: localiza el problema antes de
+     * que llegue a zona de alarma.
+     */
+    impacto: 4,
     /*
      * Con dos apoyos no se puede comparar: «uno alto» y «otro bajo» son la
      * misma pareja de números, y no hay tercero que desempate. Se declara no
@@ -879,6 +985,13 @@ function peorApoyo(porCanal) {
  * `noEvaluables` no es relleno: es la lista de lo que NO se ha podido mirar.
  * Una pantalla que enseña cinco riesgos apagados y calla que otros tres no se
  * han evaluado transmite una calma que no le corresponde.
+ *
+ * Cada activo lleva además `impacto` (1–5, lo que la regla declara según D15
+ * del Plan 44) y `necesita`. Los usa el reporte de riesgos para la matriz
+ * probabilidad × impacto: el impacto es lo declarado en la regla, y la
+ * probabilidad la observa el recolector contando cuánto tiempo del período
+ * estuvo activa la condición. Viajan con el riesgo para que quien componga
+ * el PDF no tenga que volver a buscar la regla que lo produjo.
  */
 /**
  * Los datos con que se evalúa una regla de CANAL: lo medido en el apoyo más
@@ -984,6 +1097,14 @@ export function evaluarRiesgosVibracion(estado) {
         canalLabel: canal?.label ?? null,
         titulo: regla.titulo,
         nivel: regla.nivel,
+        /*
+         * El impacto declarado por la regla (D15 del Plan 44) viaja con el
+         * riesgo para que el reporte no tenga que volver a buscar la regla
+         * que lo produjo. `necesita` viaja por lo mismo: es lo que dice si
+         * este riesgo se puede observar en el historiador o no.
+         */
+        impacto: regla.impacto ?? null,
+        necesita: regla.necesita ?? [],
         evidencia: regla.evidencia(datos),
         consecuencia: regla.consecuencia,
         accion: regla.accion,

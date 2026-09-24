@@ -61,7 +61,7 @@ import {
 } from './lienzo.mjs'
 
 /** Los tipos de bloque que este compositor sabe dibujar. */
-export const BLOQUES = Object.freeze(['indicadores', 'tabla', 'graficas', 'texto', 'lista', 'firmas'])
+export const BLOQUES = Object.freeze(['indicadores', 'tabla', 'matriz', 'graficas', 'texto', 'lista', 'firmas'])
 
 const VERDE = '#1E7E34'
 const ROJO = '#C0392B'
@@ -375,6 +375,114 @@ function indicadores(doc, items, etq) {
 }
 
 /**
+ * La rejilla 5×5 de probabilidad × impacto, con los riesgos en sus celdas.
+ *
+ * ── POR QUÉ UN BLOQUE PROPIO Y NO UNA TABLA ────────────────────────
+ *
+ * Porque no es una tabla de datos: es un plano. La posición de una celda ES
+ * el dato —abajo a la izquierda es leve, arriba a la derecha es grave—, y
+ * eso no se puede expresar con columnas declaradas. La maqueta
+ * (`docs/plantillas-reportes/riesgos.docx`) la dibuja con el producto P×I en
+ * cada celda y la fila de impacto creciendo hacia arriba, que es la
+ * convención de toda matriz de riesgo; se reproduce igual.
+ *
+ * Cada celda lleva su producto en gris y, si hay riesgos ahí, cuántos en el
+ * color de la severidad. Debajo va la leyenda de qué riesgo cayó en cada
+ * celda, porque un número solo en una rejilla no dice cuál es.
+ *
+ * @param {{celdas: {id: string, titulo: string, probabilidad: number, impacto: number, severidad: string}[],
+ *   lado: number, ejeX: string, ejeY: string, pie?: string|null}} matriz
+ */
+function matriz(doc, { celdas, lado = 5, ejeX, ejeY, pie }) {
+  const LADO_CELDA = 34
+  const ROTULO = 16 // la banda de los números de eje
+  const ancho = ROTULO + lado * LADO_CELDA
+  const x0 = MARGEN + ROTULO
+  const y0 = doc.y
+
+  /* Cuántos riesgos hay en cada celda, y con qué severidad. */
+  const porCelda = new Map()
+  for (const c of celdas ?? []) {
+    const k = `${c.probabilidad}:${c.impacto}`
+    const antes = porCelda.get(k) ?? { n: 0, severidad: 'informativo' }
+    const peor = ['critico', 'atencion', 'informativo']
+    const severidad = peor.indexOf(c.severidad) < peor.indexOf(antes.severidad) ? c.severidad : antes.severidad
+    porCelda.set(k, { n: antes.n + 1, severidad })
+  }
+
+  /* La rejilla. El impacto crece HACIA ARRIBA: la fila de arriba es i=5. */
+  for (let fila = 0; fila < lado; fila++) {
+    const impacto = lado - fila
+    const y = y0 + fila * LADO_CELDA
+    doc.font('Helvetica').fontSize(8).fillColor(GRIS)
+      .text(String(impacto), MARGEN, y + LADO_CELDA / 2 - 4, { width: ROTULO - 4, align: 'right' })
+
+    for (let col = 0; col < lado; col++) {
+      const probabilidad = col + 1
+      const x = x0 + col * LADO_CELDA
+      const aqui = porCelda.get(`${probabilidad}:${impacto}`)
+      const color = aqui ? colorDeFila({ clave: '', estado: aqui.severidad }) : null
+
+      doc.save()
+      doc.rect(x, y, LADO_CELDA, LADO_CELDA)
+      /* Una celda sin riesgos va en el gris azulado de los recuadros, no en
+         el azul de marca: éste es fondo sobre blanco, no texto sobre azul. */
+      if (color) doc.fillOpacity(0.14).fill(color).fillOpacity(1)
+      else doc.fillColor(CAJA_SUAVE).fill()
+      doc.restore()
+      doc.save().lineWidth(0.5).strokeColor(CLARO).rect(x, y, LADO_CELDA, LADO_CELDA).stroke().restore()
+
+      /* El producto, siempre; el recuento encima cuando hay riesgos ahí. */
+      doc.font('Helvetica').fontSize(7).fillColor(GRIS)
+        .text(String(probabilidad * impacto), x, y + 4, { width: LADO_CELDA, align: 'center' })
+      if (aqui) {
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(color)
+          .text(String(aqui.n), x, y + LADO_CELDA / 2 - 4, { width: LADO_CELDA, align: 'center' })
+      }
+    }
+  }
+
+  /* Los números de probabilidad, debajo. */
+  const yEjeX = y0 + lado * LADO_CELDA + 3
+  for (let col = 0; col < lado; col++) {
+    doc.font('Helvetica').fontSize(8).fillColor(GRIS)
+      .text(String(col + 1), x0 + col * LADO_CELDA, yEjeX, { width: LADO_CELDA, align: 'center' })
+  }
+
+  /* Los rótulos de los ejes. El de impacto va girado, pegado a la rejilla. */
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS)
+    .text(String(ejeX).toUpperCase(), x0, yEjeX + 12, { width: lado * LADO_CELDA, align: 'center' })
+  doc.save()
+    .rotate(-90, { origin: [MARGEN - 4, y0 + (lado * LADO_CELDA) / 2] })
+    .font('Helvetica-Bold').fontSize(7.5).fillColor(GRIS)
+    .text(String(ejeY).toUpperCase(), MARGEN - 4 - 60, y0 + (lado * LADO_CELDA) / 2 - 4, { width: 120, align: 'center' })
+    .restore()
+
+  /* La leyenda, a la derecha de la rejilla: qué riesgo está en qué celda. */
+  const xLeyenda = MARGEN + ancho + 18
+  const anchoLeyenda = ANCHO_TEXTO - ancho - 18
+  let yLeyenda = y0
+  for (const c of celdas ?? []) {
+    if (yLeyenda > y0 + lado * LADO_CELDA - 10) break
+    const color = colorDeFila({ clave: '', estado: c.severidad })
+    doc.save().circle(xLeyenda + 2, yLeyenda + 4, 2.5).fill(color).restore()
+    doc.font('Helvetica').fontSize(8).fillColor(TEXTO)
+      .text(recortar(doc, `${c.titulo} (${c.probabilidad}×${c.impacto})`, anchoLeyenda - 12), xLeyenda + 9, yLeyenda, { lineBreak: false })
+    yLeyenda += 12
+  }
+
+  /* Debajo de la rejilla van, en este orden: los números de probabilidad
+     (+3), el rótulo del eje (+12 sobre ellos) y su alto. El pie arranca tras
+     todo eso, no sobre el rótulo. */
+  doc.y = yEjeX + 12 + 11
+  if (pie) {
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRIS).text(pie, MARGEN, doc.y, { width: ANCHO_TEXTO })
+    doc.moveDown(0.4)
+  }
+  doc.fillColor(TEXTO)
+}
+
+/**
  * Tabla con columnas declaradas. Los anchos son PESOS (proporciones del ancho
  * de texto), la cabecera se repite al cambiar de página, y una fila entra
  * entera o pasa entera. Una fila con `color` (una clave de estado del dominio)
@@ -411,13 +519,22 @@ function tabla(doc, { columnas, filas, pie }, etq) {
   if (doc.y + 60 > LIMITE_INFERIOR) doc.addPage()
   cabecera()
   doc.font('Helvetica').fontSize(9.5)
-  for (const fila of filas) {
+  /* Cuánto ocupa el pie, para que la ÚLTIMA fila no lo deje huérfano en la
+     página siguiente: un pie que explica de dónde salen las columnas, solo
+     al principio de una hoja, no se lee como el pie de nada. */
+  const altoPie = pie
+    ? doc.font('Helvetica-Oblique').fontSize(8.5).heightOfString(pie, { width: ANCHO_TEXTO }) + 6
+    : 0
+
+  for (const [nFila, fila] of filas.entries()) {
+    doc.font('Helvetica').fontSize(9.5)
     const textos = columnas.map((c) => {
       const v = fila.celdas?.[c.clave]
       return v === null || v === undefined || v === '' ? etq.sinValor : String(v)
     })
     const alto = Math.max(...textos.map((t, i) => doc.heightOfString(t, { width: anchos[i] - RELLENO }))) + 6
-    if (doc.y + alto > LIMITE_INFERIOR) {
+    const reserva = nFila === filas.length - 1 ? altoPie : 0
+    if (doc.y + alto + reserva > LIMITE_INFERIOR) {
       doc.addPage()
       cabecera()
       doc.font('Helvetica').fontSize(9.5)
@@ -498,8 +615,14 @@ function firmas(doc, items) {
   items.slice(0, 3).forEach((it, i) => {
     const x = MARGEN + i * (ancho + GAP)
     if (it.nombre) {
+      /* El nombre se apoya EN la línea, creciendo hacia arriba: la firma del
+         asistente ocupa dos renglones y con la `y` fija pisaba la línea. Se
+         recorta a dos, que es lo que cabe sobre ella. */
       doc.font('Helvetica').fontSize(9).fillColor(TEXTO)
-        .text(it.nombre, x, y + 20, { width: ancho, align: 'center' })
+      const renglones = lineas(doc, String(it.nombre), ancho, 2)
+      renglones.forEach((l, k) => {
+        doc.text(l, x, y + 36 - (renglones.length - k) * 11, { width: ancho, align: 'center', lineBreak: false })
+      })
     }
     doc.save().moveTo(x, y + 38).lineTo(x + ancho, y + 38).lineWidth(0.75).strokeColor(GRIS).stroke().restore()
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor(GRIS)
@@ -523,6 +646,7 @@ function alturaMinima(seccion) {
     case 'graficas': return TITULO + (seccion.items?.[0]?.svg ? ALTO_BLOQUE_GRAFICO : 80)
     case 'indicadores': return TITULO + 100
     case 'tabla': return TITULO + 70
+    case 'matriz': return TITULO + 90
     case 'firmas': return TITULO + 70
     default: return TITULO + 40
   }
@@ -533,6 +657,9 @@ function tieneDato(seccion) {
   switch (seccion.bloque) {
     case 'indicadores': return (seccion.items?.length ?? 0) > 0
     case 'tabla': return (seccion.filas?.length ?? 0) > 0 && (seccion.columnas?.length ?? 0) > 0
+    /* La rejilla se dibuja aunque esté vacía sólo si hay algo que situar en
+       ella: una matriz sin un solo riesgo observable no es una matriz. */
+    case 'matriz': return (seccion.celdas?.length ?? 0) > 0
     case 'graficas': return (seccion.items?.length ?? 0) > 0
     case 'texto': return (seccion.parrafos?.length ?? 0) > 0
     case 'lista': return (seccion.items?.length ?? 0) > 0
@@ -601,6 +728,7 @@ export async function componerPorPlantilla({ plantilla, documento, etq }) {
     switch (seccion.bloque) {
       case 'indicadores': indicadores(doc, seccion.items, etq); break
       case 'tabla': tabla(doc, seccion, etq); break
+      case 'matriz': matriz(doc, seccion); break
       case 'graficas': for (const g of seccion.items) dibujarGrafico(doc, g, etq); break
       case 'texto': texto(doc, seccion.parrafos); break
       case 'lista': lista(doc, seccion.items); break

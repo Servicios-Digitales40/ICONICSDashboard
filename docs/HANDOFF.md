@@ -121,11 +121,12 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 | El banco de casos y el juez | `backend/ia/evaluacion/` (`verificar-evaluacion`) |
 | Dictado y voz | `backend/ia/voz.mjs` |
 | Los reportes PDF (Plan 44): el catálogo de siempre y la conversación en `reporte.mjs`; las plantillas por `tipo`, sus recolectores, el compositor por bloques y el lienzo de marca | `backend/ia/reportes/` (`generar.mjs`, `plantillas/`, `recolectores.mjs`, `compositor.mjs`, `lienzo.mjs`) · arte en `ia/marca/portadas/` · maquetas en `docs/plantillas-reportes/` |
+| El criterio de la matriz probabilidad × impacto (Plan 44 D15): la escala, el impacto que declara cada regla del tipo, y la probabilidad OBSERVADA reevaluando la condición sobre las muestras del período. Una regla sin serie que observar sale de la matriz con su motivo, nunca con un número inventado | `shared/eva/comun/matrizRiesgo.js` · `impacto` en cada regla de `shared/eva/vibraciones/riesgosVibracion.js` · `ROL_DE_CLAVE_REQUERIDA` en `shared/eva/tipos/vibraciones.js` |
 
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 133 correctas · 88 omitidas (ver CLAUDE.md §5.1)
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 134 correctas · 88 omitidas (ver CLAUDE.md §5.1)
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -189,10 +190,10 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1180** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F3.3; eran 1172 tras el 42.5 y 1102 · 29 el 22-09)* |
-| Suite de backend | **433** pruebas (432 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3.3; eran 401)* |
+| Suite de frontend | **1191** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F4; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
+| Suite de backend | **437** pruebas (436 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F4; eran 433 tras la F3.3)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **133** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **88 omitidas** por el cierre: desde el Plan 44 F3.6 el asistente no tiene ramas del tanque y las comprobaciones que lo usaban de escenario no corren (B19: portarlas a la espejo) |
+| `verificar-herramientas` | **134** correctas (13 sobre una configurada, 8 de reportes por plantilla) · **88 omitidas** por el cierre: desde el Plan 44 F3.6 el asistente no tiene ramas del tanque y las comprobaciones que lo usaban de escenario no corren (B19: portarlas a la espejo) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -431,17 +432,23 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 > pidió al mirarla en planta (filtros, mudas listadas, configuración corta,
 > nombre y alias por asset, fuera el muro). En `docs/por-completar/` quedan
 > el **Plan 33** y el **Plan 44** (reportes por plantilla, escrito ese mismo
-> día con su F0 hecha). El siguiente número libre es el **45**; el **43** está
+> día; F0–F4 hechas). El siguiente número libre es el **45**; el **43** está
 > reservado al tanque como máquina configurada.
 
 **`PLAN-44-REPORTES-POR-PLANTILLA.md`** — el usuario entregó ocho maquetas
 Word (técnico, vibraciones, sensores, riesgos, alarmas, ingeniería, energías,
-predicciones) para que `generar_reporte` sepa componer cada tipo. F0 hecha:
-maquetas en `docs/plantillas-reportes/`, arte en `backend/ia/marca/portadas/`,
-decisiones cerradas salvo el criterio de la matriz de riesgos (D15, propuesto).
-F1–F7 por hacer: un compositor por bloques, recolectores deterministas, `tipo`
-como argumento de la herramienta. **Vive en `backend/ia/`**: su D11 dice qué
-archivos calientes toca y cómo avisar.
+predicciones) para que `generar_reporte` sepa componer cada tipo. **F0–F4
+completas** (23-09-2026): maquetas en `docs/plantillas-reportes/`, arte en
+`backend/ia/marca/portadas/`, un compositor por bloques
+(`reportes/compositor.mjs`), recolectores deterministas y `tipo` como
+argumento de la herramienta. **Cinco de las ocho ya se componen**: técnico,
+vibraciones, lectura de sensores, riesgos y alarmas; las otras tres se niegan
+con su motivo. **Todas las decisiones de §6 cerradas**, incluida la D15 (la
+matriz P×I: impacto declarado por cada regla del tipo, probabilidad observada
+contando instantes del historiador). **F5–F7 por hacer**: `ingenieria`,
+`energias` (kWh estimados) y `predicciones` (sólo la plantilla); el inglés y
+la documentación; y la vuelta contra planta con `vib-motor-03`. **Vive en
+`backend/ia/`**: su D11 dice qué archivos calientes toca y cómo avisar.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
@@ -681,6 +688,18 @@ contador de alarmas del Topbar (31-08) y el badge de hallazgos (17-09). Las dos
 veces la prueba seguía verde porque miraba lo que se **pinta**, no lo que se
 **suscribe**.
 
+**`normalizar()` espera la forma CRUDA del historiador, y es idempotente sólo
+en apariencia: aplicada dos veces, devuelve cero muestras.** Filtra por
+`quality` y `value` —los campos del servidor— y devuelve `{t, valor}`, que ya
+no tiene ninguno de los dos. `leerSerieEnRango` la aplica una vez
+(`herramientas/lib/historia.mjs`), así que **todo lo que consuma `muestras`
+las recibe ya normalizadas**. El 23-09-2026 (Plan 44 F4) el recolector de
+eventos de alarma la volvió a aplicar: las 48 muestras de cada bandera se
+descartaban y el reporte decía **«ninguna señal cambió de estado en el
+período»**, una frase que afirma una medida con cero medidas detrás. Lo cazó
+abrir el PDF, no una prueba. Si una serie sale misteriosamente vacía, mira
+cuántas veces se normalizó antes de mirar el historiador.
+
 **`hda:` es el ARCHIVO, `ac:` es el VALOR EN VIVO.** Son nombres distintos y
 **no derivan uno del otro**. Confundirlos da 500, no un error que se explique.
 El 09-09 una reorganización rompió el histórico de 12 de 13 ramas del tanque
@@ -802,8 +821,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **432 passed** de 433 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1180 passed · 20 skipped** *(23-09-2026, tras Plan 44 F3.3)* |
+| Backend | **436 passed** de 437 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Frontend | **1191 passed · 20 skipped** *(23-09-2026, tras Plan 44 F4)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

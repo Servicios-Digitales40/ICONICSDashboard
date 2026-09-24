@@ -196,9 +196,75 @@ const ES = {
       notaAcciones: 'Filas en blanco a propósito: las acciones las decide quien lee el reporte, no el sistema.',
       sinSensores: (tipo) => `El tipo «${tipo}» no compone ninguna señal numérica de medida o variador: no hay sensores que listar.`,
     },
+    riesgos: {
+      titulo: 'REPORTE DE RIESGOS',
+      lema: 'Análisis preventivo para una operación segura',
+      secciones: {
+        matriz: '1. Matriz de riesgos',
+        principales: '2. Principales riesgos',
+        sinObservar: '2b. Riesgos que no se pueden situar en la matriz',
+        mitigacion: '3. Plan de mitigación',
+        residual: '4. Riesgo residual / conclusión',
+        firmas: '5. Aprobaciones',
+      },
+      columnas: {
+        riesgo: 'Riesgo', probabilidad: 'Prob.', impacto: 'Impacto', nivel: 'Nivel', estado: 'Estado',
+        punto: 'Punto', evidencia: 'Evidencia', motivo: 'Por qué no se puede observar',
+        numero: 'No.', accion: 'Acción', control: 'Control', responsable: 'Responsable',
+      },
+      ejeProbabilidad: 'Probabilidad observada',
+      ejeImpacto: 'Impacto declarado',
+      activo: 'Activo',
+      pieMatriz:
+        'El impacto (1–5) lo declara cada regla del tipo como criterio de ingeniería. La probabilidad (1–5) se observa: ' +
+        'es la fracción del período en que la condición de la regla estuvo activa en el historiador, no una estimación. ' +
+        'Un riesgo sin serie para observarlo no se sitúa en la rejilla y se lista aparte.',
+      pieHeredado:
+        'Alguna regla no declara su impacto y lo hereda de su nivel (crítico 5, atención 3, informativo 1). Es una equivalencia nuestra, no una medida.',
+      pieMitigacion:
+        'La acción sale de la regla que encendió el riesgo. Control, responsable y estado no salen de planta: se llenan a mano.',
+      sinRiesgos: 'Ninguna regla del tipo está activa en esta máquina: no hay riesgo que situar en la matriz.',
+      fraccionDelPeriodo: (pct, evaluados) => `activo el ${pct} % de ${evaluados} instantes observados`,
+      residualSinCriterio:
+        'El riesgo residual es un juicio de quien acepta el riesgo, no un dato de planta: este reporte no lo calcula. ' +
+        'Debajo va lo observado, para sostener esa decisión.',
+    },
+    alarmas: {
+      titulo: 'REPORTE DE ALARMAS',
+      lema: 'Eventos, severidad y atención',
+      secciones: {
+        resumen: '1. Resumen de alarmas',
+        interpretacion: '1b. Interpretación',
+        eventos: '2. Eventos recientes',
+        distribucion: '3. Distribución por intervalo',
+        causa: '4. Análisis de causa',
+        acciones: '5. Plan de acción',
+        firmas: '6. Firmas',
+      },
+      columnas: {
+        senal: 'Señal', punto: 'Punto', severidad: 'Severidad', estado: 'Estado',
+        cuando: 'Cuándo', evento: 'Evento', intervalo: 'Intervalo', ocurrencias: 'Ocurrencias',
+        causa: 'Riesgo que lo explica', evidencia: 'Evidencia', accion: 'Acción',
+        numero: 'No.', responsable: 'Responsable', fecha: 'Fecha',
+      },
+      severidad: { critica: 'Crítica', alta: 'Alta', media: 'Media' },
+      activa: 'Activa',
+      subida: 'Se activó',
+      bajada: 'Se normalizó',
+      recuento: ({ criticas, altas, medias, total }) =>
+        `${total} señal(es) de alarma activas ahora: ${criticas} crítica(s), ${altas} alta(s), ${medias} media(s).`,
+      sinActivas: 'Ninguna señal de alarma está activa en este momento.',
+      pieSeveridad:
+        /* Con dos puntos y no con una flecha: Helvetica no tiene «→» en
+           WinAnsi y saldría como un par de signos raros (D13 del Plan 44). */
+        'La severidad no la publica el servidor: se deriva del rol de cada señal en el tipo. Alarma y fallo del variador: ' +
+        'crítica; aviso: alta; desviación del sensor: media. Es una convención nuestra, escrita en un solo sitio.',
+      sinEventos: (periodo) => `Ninguna señal de alarma cambió de estado en ${periodo}: no hay eventos que listar, y eso es un hecho medido, no un hueco.`,
+      sinSerieEventos: 'Ninguna de las señales de alarma de esta máquina tiene serie verificada en el historiador: no se pueden reconstruir sus flancos.',
+      sinCausa: 'Ninguna regla del tipo explica las alarmas activas.',
+      pieAcciones: 'Responsable y fecha no salen de planta: se llenan a mano.',
+    },
     pendientes: {
-      riesgos: { titulo: 'REPORTE DE RIESGOS', motivo: 'la matriz probabilidad × impacto necesita un criterio que el usuario tiene que confirmar (Plan 44, D15): el motor da un nivel, no una probabilidad ni un impacto.' },
-      alarmas: { titulo: 'REPORTE DE ALARMAS', motivo: 'está previsto para la F4 del Plan 44: severidad derivada del rol de cada bandera y eventos por flancos de las series verificadas.' },
       ingenieria: { titulo: 'REPORTE DE INGENIERÍA', motivo: 'está previsto para la F5 del Plan 44: hallazgos derivados de riesgos, hechos e intervenciones; lo de gestión queda en blanco.' },
       energias: { titulo: 'REPORTE DE ENERGÍAS, FLUJO Y ELECTRICIDAD', motivo: 'está previsto para la F5 del Plan 44: potencia, corriente y tensión del variador, y los kWh estimados por integración de la potencia, declarados como estimación.' },
       predicciones: { titulo: 'REPORTE DE PREDICCIONES DE ENERGÍA Y FALLAS', motivo: 'ninguna máquina configurada declara mecanismos de desgaste (nacen con desgaste nulo), así que no hay pronóstico que reportar; la plantilla existe para cuando un tipo los declare.' },
@@ -378,9 +444,74 @@ const EN = {
       notaAcciones: 'Blank rows on purpose: actions are decided by whoever reads the report, not by the system.',
       sinSensores: (tipo) => `Type "${tipo}" composes no numeric measure or drive signal: there are no sensors to list.`,
     },
+    riesgos: {
+      titulo: 'RISK REPORT',
+      lema: 'Preventive analysis for safe operation',
+      secciones: {
+        matriz: '1. Risk matrix',
+        principales: '2. Main risks',
+        sinObservar: '2b. Risks that cannot be placed on the matrix',
+        mitigacion: '3. Mitigation plan',
+        residual: '4. Residual risk / conclusion',
+        firmas: '5. Approvals',
+      },
+      columnas: {
+        riesgo: 'Risk', probabilidad: 'Prob.', impacto: 'Impact', nivel: 'Level', estado: 'Status',
+        punto: 'Point', evidencia: 'Evidence', motivo: 'Why it cannot be observed',
+        numero: 'No.', accion: 'Action', control: 'Control', responsable: 'Owner',
+      },
+      ejeProbabilidad: 'Observed probability',
+      ejeImpacto: 'Declared impact',
+      activo: 'Active',
+      pieMatriz:
+        'Impact (1–5) is declared by each rule of the type as an engineering judgement. Probability (1–5) is observed: ' +
+        'it is the fraction of the period during which the rule condition held in the historian, not an estimate. ' +
+        'A risk with no series to observe is left off the grid and listed separately.',
+      pieHeredado:
+        'Some rule does not declare its impact and inherits it from its level (critical 5, attention 3, informational 1). That is our equivalence, not a measurement.',
+      pieMitigacion:
+        'The action comes from the rule that raised the risk. Control, owner and status do not come from the plant: fill them in by hand.',
+      sinRiesgos: 'No rule of the type is active on this machine: there is no risk to place on the matrix.',
+      fraccionDelPeriodo: (pct, evaluados) => `active ${pct} % of ${evaluados} observed instants`,
+      residualSinCriterio:
+        'Residual risk is a judgement by whoever accepts the risk, not plant data: this report does not compute it. ' +
+        'What was observed follows, to support that decision.',
+    },
+    alarmas: {
+      titulo: 'ALARM REPORT',
+      lema: 'Events, severity and response',
+      secciones: {
+        resumen: '1. Alarm summary',
+        interpretacion: '1b. Interpretation',
+        eventos: '2. Recent events',
+        distribucion: '3. Distribution by interval',
+        causa: '4. Root cause analysis',
+        acciones: '5. Action plan',
+        firmas: '6. Signatures',
+      },
+      columnas: {
+        senal: 'Signal', punto: 'Point', severidad: 'Severity', estado: 'Status',
+        cuando: 'When', evento: 'Event', intervalo: 'Interval', ocurrencias: 'Occurrences',
+        causa: 'Risk that explains it', evidencia: 'Evidence', accion: 'Action',
+        numero: 'No.', responsable: 'Owner', fecha: 'Date',
+      },
+      severidad: { critica: 'Critical', alta: 'High', media: 'Medium' },
+      activa: 'Active',
+      subida: 'Raised',
+      bajada: 'Cleared',
+      recuento: ({ criticas, altas, medias, total }) =>
+        `${total} alarm signal(s) active right now: ${criticas} critical, ${altas} high, ${medias} medium.`,
+      sinActivas: 'No alarm signal is active at this moment.',
+      pieSeveridad:
+        /* Colons, not arrows: Helvetica has no «→» in WinAnsi (Plan 44 D13). */
+        'Severity is not published by the server: it is derived from each signal role in the type. Alarm and drive fault: ' +
+        'critical; warning: high; sensor offset: medium. It is our convention, written in a single place.',
+      sinEventos: (periodo) => `No alarm signal changed state during ${periodo}: there are no events to list, and that is a measured fact, not a gap.`,
+      sinSerieEventos: 'None of the alarm signals of this machine has a verified series in the historian: their edges cannot be reconstructed.',
+      sinCausa: 'No rule of the type explains the active alarms.',
+      pieAcciones: 'Owner and date do not come from the plant: fill them in by hand.',
+    },
     pendientes: {
-      riesgos: { titulo: 'RISK REPORT', motivo: 'the probability × impact matrix needs a criterion the user has yet to confirm (Plan 44, D15): the engine yields a level, not a probability or an impact.' },
-      alarmas: { titulo: 'ALARM REPORT', motivo: 'planned for Plan 44 F4: severity derived from each flag\'s role and events from edges of the verified series.' },
       ingenieria: { titulo: 'ENGINEERING REPORT', motivo: 'planned for Plan 44 F5: findings derived from risks, facts and interventions; management fields stay blank.' },
       energias: { titulo: 'ENERGY, FLOW AND ELECTRICITY REPORT', motivo: 'planned for Plan 44 F5: drive power, current and voltage, and kWh estimated by integrating power, declared as an estimate.' },
       predicciones: { titulo: 'ENERGY AND FAILURE PREDICTION REPORT', motivo: 'no configured machine declares wear mechanisms (they are born with null wear), so there is no forecast to report; the template exists for when a type declares them.' },

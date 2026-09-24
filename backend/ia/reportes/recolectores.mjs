@@ -21,10 +21,17 @@
  * (`tipo.indicadores`, por rol); si no declara ninguna, las primeras medidas
  * en el orden con que el tipo compone el estado — nunca una lista escrita
  * aquí para una máquina concreta.
+ *
+ * Y la probabilidad de la matriz de riesgos se OBSERVA contando instantes
+ * del historiador (Plan 44 F4, D15), nunca se estima: una regla que no se
+ * pueda observar sale de la matriz con su motivo en vez de recibir un
+ * número plausible.
  */
 import { downsamplear } from '../herramientas/lib/formato.mjs'
 import { calcularTendencia, describirTendencia, PUNTOS_GRAFICO_REPORTE } from '../conversacion/herramientas.mjs'
 import { resumirSerie } from '../../../shared/eva/comun/historia.js'
+import { observarFrecuencia, armarMatriz } from '../../../shared/eva/comun/matrizRiesgo.js'
+import { eventosDeAlarma } from '../../../shared/eva/comun/eventosDeAlarma.js'
 import { peor } from '../../../shared/eva/tanque/estado.js'
 
 /** La familia de un rol `familia:clave`, o `null`. */
@@ -160,6 +167,175 @@ export function banderasActivas({ estado, tipo }) {
 }
 
 /**
+ * Observa en el historiador con qué frecuencia estuvo activa cada riesgo.
+ *
+ * ── QUÉ SE MIDE, Y QUÉ SE DECLARA NO MEDIBLE ───────────────────────
+ *
+ * Es la mitad observada de la matriz P×I (D15 del Plan 44): el impacto lo
+ * declara la regla, y la probabilidad SE CUENTA aquí, reevaluando la
+ * condición de la regla sobre las muestras del período. Sólo se puede con
+ * las reglas cuyo `necesita` se resuelve a roles con serie propia:
+ *
+ *   · una regla con `necesita: []` mira la configuración del módulo o sus
+ *     vigilancias, no una señal: no hay nada que historizar;
+ *   · una regla de apoyo se observa CON LAS SERIES DE SU APOYO —el riesgo
+ *     salió de ese canal—, no con las del primero que aparezca;
+ *   · si a cualquiera de sus señales le falta serie, la regla no entra en
+ *     la matriz y se dice por qué.
+ *
+ * Devuelve un Map de id de riesgo a `{fraccion, cobertura}` o a `{motivo}`,
+ * que es justo lo que `armarMatriz` espera. Las series se leen una sola vez
+ * por clave aunque varias reglas las compartan.
+ */
+async function observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, historizada, metaDe }) {
+  const activos = riesgos?.activos ?? []
+  if (!activos.length) return new Map()
+
+  const rolDeClave = tipo?.rolDeClaveRequerida ?? {}
+  /* El apoyo de una señal es su `grupo` en el estado común; el del riesgo,
+     su `canal`. Una regla de apoyo se observa con las series de SU apoyo:
+     medir el riesgo de S1 con la vRMS de S2 daría una frecuencia creíble de
+     algo que no pasó ahí. Sin coincidencia no se cae a otro apoyo. */
+  const senalesDe = (rol, canal) => {
+    const delRol = (senales ?? []).filter((s) => metaDe(s.clave)?.rol === rol)
+    const candidatas = canal ? delRol.filter((s) => s.grupo === canal) : delRol
+    return candidatas.map((s) => s.clave)
+  }
+
+  /* Qué claves hacen falta en total, sin repetir: una serie se lee una vez. */
+  const planes = new Map()
+  for (const riesgo of activos) {
+    const necesita = riesgo.necesita ?? []
+    if (!necesita.length) {
+      planes.set(riesgo.id, { motivo: null, claves: null })
+      continue
+    }
+    const porNombre = new Map()
+    let falta = null
+    for (const nombre of necesita) {
+      const rol = rolDeClave[nombre]
+      const candidatas = rol ? senalesDe(rol, riesgo.canal).filter(historizada) : []
+      if (!candidatas.length) { falta = nombre; break }
+      porNombre.set(nombre, candidatas[0])
+    }
+    planes.set(riesgo.id, falta ? { falta } : { claves: porNombre })
+  }
+
+  const necesarias = new Set()
+  for (const plan of planes.values()) {
+    if (plan.claves) for (const clave of plan.claves.values()) necesarias.add(clave)
+  }
+
+  const leidas = new Map()
+  await Promise.all([...necesarias].map(async (clave) => {
+    const { muestras } = await fuentes.leerSerie(clave, ventana)
+    leidas.set(clave, muestras ?? [])
+  }))
+
+  const frecuencias = new Map()
+  for (const riesgo of activos) {
+    const plan = planes.get(riesgo.id)
+    if (!plan.claves) {
+      frecuencias.set(riesgo.id, {
+        motivo: plan.falta
+          ? `sin serie historizada para «${plan.falta}» en este punto`
+          : 'esta regla no mira ninguna señal historizable: depende de la configuración del módulo o de sus vigilancias',
+      })
+      continue
+    }
+    const series = new Map([...plan.claves].map(([nombre, clave]) => [nombre, leidas.get(clave) ?? []]))
+    frecuencias.set(riesgo.id, observarFrecuencia(reglaDe(tipo, riesgo.id) ?? riesgo, series))
+  }
+  return frecuencias
+}
+
+/** La regla que produjo un riesgo, que es quien sabe evaluar su condición. */
+const reglaDe = (tipo, id) => (tipo?.reglas ?? []).find((r) => r.id === id) ?? null
+
+/**
+ * La severidad de una señal de alarma, derivada de su ROL en el tipo.
+ *
+ * El servidor no publica severidad: publica un booleano por señal. La
+ * jerarquía es nuestra y vive sólo aquí (§1 del Plan 44, fila de `alarmas`),
+ * para que el pie del PDF pueda declararla y nadie la reescriba distinta en
+ * otra plantilla. Un rol que no esté en esta tabla sale `media`: es la
+ * lectura conservadora, y no callar la señal es lo que importa.
+ */
+export function severidadDeRol(rol) {
+  if (rol === 'bandera:alarma' || rol === 'variador:fallo') return 'critica'
+  if (rol === 'bandera:aviso' || rol === 'variador:aviso') return 'alta'
+  return 'media'
+}
+
+/**
+ * Los flancos de las señales de alarma en el período, y su distribución.
+ *
+ * ── POR QUÉ PUEDE SALIR VACÍO Y ESO ESTAR BIEN ─────────────────────
+ *
+ * Una señal de alarma que nunca se activó no produce ningún evento. Eso no
+ * es un hueco de dato: es la medida. La plantilla lo dice con esas palabras
+ * («ninguna cambió de estado en el período»), distinto de cuando ninguna
+ * señal tiene serie verificada, que sí es una limitación del historiador y
+ * se dice aparte (D3).
+ *
+ * Sólo se leen las señales de alarma CON SERIE: reconstruir flancos de una
+ * lectura en vivo no se puede, y suponer que estuvo apagada entre dos
+ * lecturas sería inventar los tramos que no se vieron.
+ */
+async function recolectarEventos({ senales, ventana, fuentes, historizada, metaDe }) {
+  const deAlarma = (senales ?? []).filter((s) => {
+    const rol = metaDe(s.clave)?.rol
+    const familia = familiaDe(rol)
+    return familia === 'bandera' || (familia === 'variador' && /fallo|aviso/.test(rol ?? ''))
+  })
+
+  const conSerie = deAlarma.filter((s) => historizada(s.clave))
+  if (!conSerie.length) return { eventos: [], conSerie: 0, sinSerie: deAlarma.length }
+
+  const eventos = []
+  await Promise.all(conSerie.map(async (s) => {
+    const { muestras } = await fuentes.leerSerie(s.clave, ventana)
+    if (!muestras?.length) return
+    /* Ya vienen normalizadas (`{t, valor}`, sin mala calidad): quien lee el
+       historiador las pasa por `normalizar` una vez. Hacerlo aquí otra vez
+       las descartaba TODAS —esa función espera la forma cruda del servidor,
+       `{timestamp, value, quality}`— y la sección salía «sin eventos» como
+       si fuera una medida. */
+    for (const e of eventosDeAlarma(muestras)) {
+      eventos.push({ ...e, clave: s.clave, label: metaDe(s.clave)?.label ?? s.clave, grupo: s.grupo ?? null, severidad: severidadDeRol(metaDe(s.clave)?.rol) })
+    }
+  }))
+
+  eventos.sort((a, b) => b.inicio - a.inicio)
+  return { eventos, conSerie: conSerie.length, sinSerie: deAlarma.length - conSerie.length }
+}
+
+/**
+ * Reparte los eventos en tramos iguales del período.
+ *
+ * El número de tramos sale de la duración —un día en horas, una semana en
+ * días— porque un histograma de 168 barras no se lee y uno de 2 no dice
+ * nada. Cuenta ENTRADAS (flancos 0→1), no tiempo activo: la pregunta de la
+ * sección es «cuántas veces pasó», y el tiempo activo ya lo da la duración
+ * de cada evento en la tabla anterior.
+ */
+export function distribuirEventos(eventos, ventana) {
+  const total = ventana.fin - ventana.inicio
+  if (!total || !eventos?.length) return []
+  const horas = total / 3_600_000
+  const tramos = horas <= 2 ? 4 : horas <= 48 ? Math.ceil(horas / 2) : Math.min(14, Math.ceil(horas / 24))
+  const ancho = total / tramos
+
+  return Array.from({ length: tramos }, (_, i) => {
+    const desde = new Date(ventana.inicio.getTime() + i * ancho)
+    const hasta = new Date(ventana.inicio.getTime() + (i + 1) * ancho)
+    /* `desdeAntes` no cuenta: su flanco de entrada no ocurrió en el período. */
+    const n = eventos.filter((e) => !e.desdeAntes && e.inicio >= desde && e.inicio < hasta).length
+    return { desde, hasta, ocurrencias: n }
+  })
+}
+
+/**
  * Lee UNA serie y la deja lista para la plantilla: resumen, tendencia,
  * cobertura, el SVG y la interpretación en código. Sin muestras, una `nota`
  * y nada más — nunca un resumen vacío.
@@ -235,6 +411,21 @@ export async function recolectar({ entrada, tipo, plantilla, ventana, etq, idiom
     anteriores.set(p.clave, muestras?.length ? resumirSerie(muestras, metaDe(p.clave)?.decimales) : null)
   }))
 
+  /* La matriz P×I sólo la pide `riesgos`, y observar cada regla cuesta una
+     serie más por señal que necesita. Se calcula bajo petición de la
+     plantilla (`plantilla.observaRiesgos`) y no «por si acaso» (D14). */
+  let matriz = null
+  if (plantilla.observaRiesgos && riesgos?.activos?.length) {
+    const frecuencias = await observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, historizada, metaDe })
+    matriz = armarMatriz(riesgos.activos, frecuencias)
+  }
+
+  /* Lo mismo con los flancos: sólo los pide `alarmas`, y son una serie por
+     cada señal de alarma con historia. */
+  const eventos = plantilla.observaEventos
+    ? await recolectarEventos({ senales, ventana, fuentes, historizada, metaDe })
+    : null
+
   return {
     ok: true,
     lectura,
@@ -242,6 +433,8 @@ export async function recolectar({ entrada, tipo, plantilla, ventana, etq, idiom
     senales,
     grupos: estado.grupos ?? [],
     riesgos,
+    matriz,
+    eventos,
     medidas,
     principales,
     series,

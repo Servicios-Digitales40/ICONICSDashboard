@@ -126,7 +126,10 @@ export default {
             { clave: 'variable', titulo: t.columnas.variable, ancho: 2.2 },
             { clave: 'rango', titulo: t.columnas.rango, ancho: 1.6 },
             { clave: 'lectura', titulo: t.columnas.lectura, ancho: 1.2, align: 'right' },
-            { clave: 'desvio', titulo: t.columnas.desvio, ancho: 0.9, align: 'right' },
+            /* 0.9 cortaba «DEVIATION» en inglés («Desvío» sí cabía, y por eso
+               no se vio hasta que la prueba de anchos lo midió en los dos
+               idiomas). */
+            { clave: 'desvio', titulo: t.columnas.desvio, ancho: 1.2, align: 'right' },
             { clave: 'estado', titulo: t.columnas.estado, ancho: 1.2, estado: true },
           ],
           filas: filasLecturas,

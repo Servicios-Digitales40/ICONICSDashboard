@@ -121,6 +121,41 @@ describe('los tres tipos disponibles, sobre la espejo', () => {
     const sin = await generarReportePorPlantilla({ tipo: 'tecnico', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps({ usuario: '  ' }))
     expect(sin.elaboro).toBe('Asistente de planta TDCON · generado automáticamente')
   })
+  it('riesgos: la matriz sitúa lo observable y aparta lo que no tiene serie, con su motivo (F4, D15)', async () => {
+    const r = await generarReportePorPlantilla({ tipo: 'riesgos', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps())
+    expect(r.ok, r.error).toBe(true)
+    expect(r.folio).toMatch(/^TDCON-RIE-/)
+    /* La 2b existe porque hay reglas que miran configuración, no señales: sin
+       serie que observar no se les inventa una probabilidad. */
+    expect(r.seccionesConDato).toContain('2b. Riesgos que no se pueden situar en la matriz')
+    expect(await esPdf(r)).toBe(true)
+  })
+
+  it('riesgos: sin ninguna regla activa no se dibuja una matriz vacía, se dice que no hay riesgo', async () => {
+    /* Todo en banda: ISO no se pronuncia y ninguna regla enciende. */
+    const enBanda = (punto) => (/vRMS_|aRMS|aPeak/.test(punto) ? 0.5 : /SPEED|velocidad/i.test(punto) ? 1480 : 0)
+    const r = await generarReportePorPlantilla(
+      { tipo: 'riesgos', sistema: ESPEJO.id, periodo: 'últimas 6 horas' },
+      deps({ leerMaquina: async (s) => ({ ok: true, estado: s.estado(enBanda, s, '2026-09-23T10:00:00Z'), receivedAt: '2026-09-23T10:00:00Z' }) }),
+    )
+    expect(r.ok, r.error).toBe(true)
+    const matriz = r.seccionesSinDato?.find((s) => /Matriz/.test(s.id ?? '') || /matriz/i.test(s.motivo ?? ''))
+    /* O la matriz sale sin dato, o sale con celdas: lo que NO puede es salir
+       con una rejilla y cero riesgos dentro sin decirlo. */
+    expect(matriz || r.seccionesConDato.some((s) => /Matriz/.test(s))).toBeTruthy()
+  })
+
+  it('alarmas: cuenta por severidad derivada del rol y separa «sin flancos» de «sin serie» (F4)', async () => {
+    const r = await generarReportePorPlantilla({ tipo: 'alarmas', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps())
+    expect(r.ok, r.error).toBe(true)
+    expect(r.folio).toMatch(/^TDCON-AL-/)
+    expect(r.seccionesConDato).toContain('1. Resumen de alarmas')
+    /* Las banderas del arnés están a cero y sus series son planas: ninguna
+       cambió de estado, que es un HECHO, no un hueco del historiador. */
+    const eventos = r.seccionesSinDato?.find((s) => /Eventos/.test(s.id ?? ''))
+    if (eventos) expect(eventos.motivo).toMatch(/no hay eventos que listar|cambió de estado/)
+    expect(await esPdf(r)).toBe(true)
+  })
 })
 
 describe('lo que se niega, y cómo', () => {
@@ -139,11 +174,12 @@ describe('lo que se niega, y cómo', () => {
   })
 
   it('una plantilla declarada pero no compuesta se niega con su motivo y dice cuáles sí', async () => {
-    for (const tipo of ['riesgos', 'alarmas', 'ingenieria', 'energias', 'predicciones']) {
+    /* `riesgos` y `alarmas` salieron de esta lista en la F4: ya se componen. */
+    for (const tipo of ['ingenieria', 'energias', 'predicciones']) {
       const r = await generarReportePorPlantilla({ tipo, sistema: ESPEJO.id }, deps())
       expect(r.ok).toBe(false)
       expect(r.error).toMatch(/todavía no se compone/)
-      expect(r.disponibles).toEqual(['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores'])
+      expect(r.disponibles).toEqual(['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas'])
     }
     const en = await generarReportePorPlantilla({ tipo: 'predictions', sistema: ESPEJO.id }, deps({ idioma: 'en' }))
     expect(en.error).toMatch(/wear mechanisms/)

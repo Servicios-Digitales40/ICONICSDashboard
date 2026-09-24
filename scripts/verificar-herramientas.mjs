@@ -4502,7 +4502,7 @@ await checkAsync('[plantilla] sin `sistema`, catálogo y plantilla van a la ÚNI
   assert.equal(tecnico.sistema, ESPEJO.id)
 })
 
-await checkAsync('[plantilla] un tipo desconocido lista los tipos; "riesgos" está declarado pero se niega con su motivo y dice cuáles sí', async () => {
+await checkAsync('[plantilla] un tipo desconocido lista los tipos; "energias" está declarado pero se niega con su motivo y dice cuáles sí', async () => {
   const reportes = await reportesTmp()
   const h = createHerramientas({ client: clienteFalso(), reportes })
   const a = await h.ejecutar('generar_reporte', { tipo: 'bonito', sistema: ESPEJO.id })
@@ -4510,15 +4510,37 @@ await checkAsync('[plantilla] un tipo desconocido lista los tipos; "riesgos" est
   assert.match(a.error, /No hay ningún tipo de reporte llamado «bonito»/)
   assert.ok(a.tipos.includes('lectura-de-sensores'))
 
-  const b = await h.ejecutar('generar_reporte', { tipo: 'riesgos', sistema: ESPEJO.id })
+  /* El ejemplo era `riesgos` hasta que la F4 lo compuso. `energias` sigue
+     pendiente: su motivo nombra lo que le falta, no un «no disponible». */
+  const b = await h.ejecutar('generar_reporte', { tipo: 'energias', sistema: ESPEJO.id })
   assert.equal(b.ok, false)
   assert.match(b.error, /todavía no se compone/)
-  assert.match(b.error, /probabilidad × impacto/)
-  assert.deepEqual(b.disponibles, ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores'])
+  assert.match(b.error, /kWh|potencia/)
+  assert.deepEqual(b.disponibles, ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas'])
 
   const c = await h.ejecutar('generar_reporte', { tipo: 'técnico de alarmas', sistema: ESPEJO.id })
   assert.equal(c.ok, false)
   assert.deepEqual(c.tipos, ['tecnico', 'alarmas'], 'dos tipos en la frase: se pregunta, no se elige')
+})
+
+await checkAsync('[plantilla] riesgos y alarmas se componen desde la herramienta, con su folio y su PDF (F4)', async () => {
+  const reportes = await reportesTmp()
+  const h = createHerramientas({ client: clienteFalso(), reportes })
+
+  const riesgos = await h.ejecutar('generar_reporte', { tipo: 'riesgos', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  assert.equal(riesgos.ok, true, riesgos.error)
+  assert.match(riesgos.folio, /^TDCON-RIE-/)
+  /* La matriz declara su criterio en el PDF; aquí basta con que la sección
+     de los no observables exista: es la que impide que la rejilla mienta. */
+  assert.ok(
+    riesgos.seccionesConDato.some((s) => /no se pueden situar/i.test(s)),
+    'los riesgos sin serie que observar tienen que salir aparte, no desaparecer',
+  )
+
+  const alarmas = await h.ejecutar('generar_reporte', { tipo: 'alarmas', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+  assert.equal(alarmas.ok, true, alarmas.error)
+  assert.match(alarmas.folio, /^TDCON-AL-/)
+  assert.ok(alarmas.seccionesConDato.some((s) => /Resumen de alarmas/i.test(s)))
 })
 
 await checkAsync('[plantilla] el tanque (cerrado) se niega por la guarda de máquina cerrada, no por la plantilla', async () => {

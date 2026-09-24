@@ -20,26 +20,6 @@
 /** Un esqueleto: qué secciones lleva la maqueta y con qué bloque saldrían. */
 const esqueleto = (secciones) => secciones.map(([id, bloque]) => ({ id, bloque }))
 
-export const riesgos = {
-  id: 'riesgos',
-  folioPrefijo: 'RIE',
-  disponible: false,
-  portada: { arte: 'riesgos', disposicion: 'lateral' },
-  motivo: (etq) => etq.plantillas.pendientes.riesgos.motivo,
-  secciones: esqueleto([['matriz', 'tabla'], ['principales', 'tabla'], ['mitigacion', 'tabla'], ['residual', 'texto'], ['firmas', 'firmas']]),
-  claves: ({ medidas }) => medidas,
-}
-
-export const alarmas = {
-  id: 'alarmas',
-  folioPrefijo: 'AL',
-  disponible: false,
-  portada: { arte: 'alarmas', disposicion: 'lateral' },
-  motivo: (etq) => etq.plantillas.pendientes.alarmas.motivo,
-  secciones: esqueleto([['resumen', 'indicadores'], ['eventos', 'tabla'], ['distribucion', 'graficas'], ['causas', 'tabla'], ['plan', 'tabla'], ['firmas', 'firmas']]),
-  claves: () => [],
-}
-
 export const ingenieria = {
   id: 'ingenieria',
   folioPrefijo: 'ING',

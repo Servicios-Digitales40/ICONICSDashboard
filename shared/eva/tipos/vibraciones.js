@@ -518,6 +518,22 @@ export const ROLES_REQUERIDOS = Object.freeze(
 );
 
 /**
+ * La misma resolución de arriba, pero indexada por clave.
+ *
+ * `ROLES_REQUERIDOS` es una LISTA paralela a `CLAVES_REQUERIDAS`, que es lo
+ * que necesita quien configura una máquina: el conjunto de roles a cubrir.
+ * Quien parte de una regla concreta tiene la pregunta del revés —«esta regla
+ * necesita `vRMS`, ¿qué rol es eso?»— y emparejar las dos listas por índice
+ * en el sitio de uso invita a que alguien las desincronice.
+ *
+ * Lo usa el reporte de riesgos (Plan 44 F4) para saber qué serie leer por
+ * cada `necesita` al observar la frecuencia de una regla.
+ */
+export const ROL_DE_CLAVE_REQUERIDA = Object.freeze(
+  Object.fromEntries(CLAVES_REQUERIDAS.map((clave, i) => [clave, ROLES_REQUERIDOS[i]])),
+);
+
+/**
  * ── LOS UMBRALES DEL TIPO ──────────────────────────────────────────
  *
  * Van aquí y no en la configuración porque **son de la norma, no de la
@@ -562,6 +578,8 @@ export const TIPO_VIBRACIONES = Object.freeze({
 
   roles: ROLES,
   rolesRequeridos: ROLES_REQUERIDOS,
+  /* Por clave de `necesita`, para quien parte de una regla — ver su cabecera. */
+  rolDeClaveRequerida: ROL_DE_CLAVE_REQUERIDA,
   umbrales: UMBRALES,
 
   /*

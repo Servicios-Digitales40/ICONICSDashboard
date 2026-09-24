@@ -1,6 +1,6 @@
 # PLAN 44 — Reportes por plantilla: ocho tipos que el asistente sabe generar
 
-**Estado:** F0–F3 completadas el 23-09-2026 (las tres plantillas con toda la información —técnico, vibraciones, lectura de sensores— se generan; las otras cinco están declaradas y la herramienta explica por qué no salen todavía) · F4–F7 por completar · las decisiones de §6 cerradas por el usuario el 23-09-2026, salvo el criterio de la matriz P×I (D15), propuesto y pendiente de su confirmación
+**Estado:** F0–F4 completadas el 23-09-2026 (cinco plantillas se generan: técnico, vibraciones, lectura de sensores, riesgos y alarmas; las otras tres están declaradas y la herramienta explica por qué no salen todavía) · F5–F7 por completar · TODAS las decisiones de §6 cerradas por el usuario el 23-09-2026, incluido el criterio de la matriz P×I (D15), confirmado esa misma tarde
 **Rama:** `UI-Limpieza1.0`
 **Origen:** el usuario entregó en `Documentos/Reportes/` ocho carpetas, una por
 tipo de reporte, cada una con un `.docx` de ejemplo (la maqueta) y un `.png`
@@ -287,7 +287,7 @@ dibujan con `doc.polygon`, verdes o rojos según el signo, con el número al
 lado. `·`, `—`, `°` y `%` sí están en WinAnsi y se siguen escribiendo.
 
 **D15 · La matriz P×I se llena con un criterio declarado, o no se llena.**
-*(Propuesto el 23-09-2026; pendiente de que el usuario lo confirme.)* Hoy el
+*(Propuesto y CONFIRMADO por el usuario el 23-09-2026; implementado en la F4.)* Hoy el
 motor no produce probabilidad ni impacto: una regla trae `nivel` y una
 `evidencia`. Para poner un riesgo en una celda hacen falta dos números que
 alguien declare, y se propone que salgan así:
@@ -525,21 +525,78 @@ inventa el enlace ni describe secciones que el manifiesto marcó sin dato.
 `CLAUDE.md`) en verde y aviso a Gustavo (D11). Commit por plantilla si el
 diff lo justifica; como mínimo uno por fase.
 
-### F4 — `riesgos` y `alarmas`, con las sustituciones decididas
+### F4 — `riesgos` y `alarmas`, con las sustituciones decididas · completada el 23-09-2026
 
 **Objetivo.** Los dos módulos con lo que §1 dice: la matriz P×I con el
-criterio D15 si el usuario lo confirma (impacto declarado por regla,
-probabilidad observada en el período), o «riesgos por nivel» si no; no
-evaluables y sin comprobar como secciones propias; alarmas con la severidad derivada del rol y declarada en el pie de
-la tabla, flancos del período, ocurrencias por intervalo y análisis de causa
-por el motor.
+criterio D15 (**confirmado por el usuario el 23-09-2026**: «me gusta la idea
+de D15, prosigue»); no evaluables y sin comprobar como secciones propias;
+alarmas con la severidad derivada del rol y declarada en el pie de la tabla,
+flancos del período, ocurrencias por intervalo y análisis de causa por el
+motor.
 
-**Comprobaciones.** Sobre la espejo con el falso «en marcha» y una bandera
-forzada a 1: el resumen cuenta 1 crítica y lo atribuye al rol; sin flancos en
-la ventana, «Eventos recientes» es `ausencia` con «sin eventos en el
-período», no una tabla vacía; un riesgo activo sale con `evidencia` y `accion`
-literales de la regla; el plan de acción lleva filas en blanco y ningún
-responsable inventado.
+**Lo que se hizo.**
+
+- **El criterio, en el dominio y no en el reporte.**
+  `shared/eva/comun/matrizRiesgo.js` (nuevo) tiene la escala, la derivación
+  del impacto desde el nivel, `observarFrecuencia` y `armarMatriz`. Está en
+  `shared/` porque el criterio vale para cualquier tipo, no sólo para el que
+  hoy tiene reglas.
+- **Las 19 reglas de vibraciones declaran `impacto` (1–5)**, cada una con un
+  comentario que dice de dónde sale ese número leyendo su `consecuencia` —no
+  derivado del nivel—. `evaluarRiesgosVibracion` propaga `impacto` y
+  `necesita` con cada activo para que el reporte no tenga que volver a
+  buscar la regla.
+- **La probabilidad se observa reevaluando `cuando`** sobre las muestras del
+  período, no contando cruces de banda: la banda del dominio y la condición
+  de una regla no son lo mismo (una regla de zona C exige estar por encima
+  del aviso **y** por debajo de la alarma). Las señales de `necesita` se
+  resuelven a roles con `ROL_DE_CLAVE_REQUERIDA` (nuevo en el tipo,
+  indexando lo que ya calculaba `ROLES_REQUERIDOS`), y una regla de apoyo se
+  observa con las series de SU apoyo.
+- **Nueve de las diecinueve reglas tienen `necesita: []`** —miran la
+  configuración del módulo o sus vigilancias, no una señal—: no entran en la
+  rejilla y salen en la sección «2b», con el motivo escrito. Es la mitad del
+  trabajo de esta fase: que la matriz no mienta por omisión.
+- **Un bloque `matriz` nuevo en el compositor**, porque no es una tabla de
+  datos sino un plano: la posición ES el dato. Con el producto en cada celda,
+  el recuento en el color de la severidad y la leyenda al lado.
+- **Alarmas** deriva la severidad del rol (`severidadDeRol`, en un solo
+  sitio, declarado al pie), reconstruye flancos con la cadena del Plan 42 y
+  reparte ocurrencias en tramos según la duración del período.
+
+**Defectos que aparecieron, y cómo se cazaron.**
+
+1. **Doble normalización de muestras.** `recolectarEventos` llamaba a
+   `normalizar()` sobre unas muestras que `historia.mjs` ya había
+   normalizado. Esa función espera la forma CRUDA del servidor
+   (`{timestamp, value, quality}`) y descartaba las 48 muestras de cada
+   señal, así que «Eventos recientes» salía **«ninguna señal cambió de
+   estado en el período»** — una frase que afirma una medida, con cero
+   medidas detrás. Lo cazó mirar el PDF, no una prueba.
+2. **Flechas `→` en el texto de severidad**, que salían como `!'` en el PDF.
+   Es exactamente lo que D13 prohíbe, escrito por quien había escrito D13.
+3. **Cinco defectos de layout** vistos a ojo con `render-pdf.ps1`: el fondo
+   de la rejilla usaba `CLARO_TENUE` (que es texto sobre azul, no fondo sobre
+   blanco); el pie de la matriz se solapaba con el rótulo del eje; la firma
+   larga del asistente pisaba su línea; «Rodamiento intermedio» se partía; y
+   el pie del plan de mitigación quedaba huérfano al principio de la página
+   siguiente.
+4. **Títulos de columna cortados** (`IMPAC…`, `SEVERID…`). De aquí salió la
+   contramedida que importa: una **prueba que mide cada título con la misma
+   fuente y el mismo reparto de anchos que usa el dibujo**, en los dos
+   idiomas, y falla si alguno no cabe. Al escribirla cazó de inmediato un
+   corte que llevaba desde la F3 sin que nadie lo viera: «DEVIATION» en la
+   plantilla de sensores en inglés («Desvío» sí cabía, y en español nunca se
+   notó).
+
+**Comprobaciones.** `backend/test/reportes/` 35 (tres nuevas de F4: la matriz
+sitúa lo observable y aparta lo demás; sin reglas activas no se dibuja una
+rejilla vacía; alarmas separa «sin flancos» de «sin serie»).
+`react-dashboard/src/test/demo-eva/matriz-riesgo.test.js` 11, incluida una
+que exige que **todas** las reglas del tipo declaren su impacto.
+`verificar-herramientas` pasa de 133 a **134**: una nueva comprueba que los
+dos tipos se componen desde la herramienta con su folio y su PDF, y la que
+usaba `riesgos` como ejemplo de pendiente usa ahora `energias`.
 
 ### F5 — `ingenieria`, `energias`, `predicciones`
 
@@ -617,11 +674,13 @@ no antes.
 ## 6. Decisiones del usuario (23-09-2026)
 
 1. **Riesgos, la matriz P×I.** El usuario: «en caso de que tengas toda la
-   información, realízalo». **No la hay**: el motor da `nivel`, no
-   probabilidad ni impacto, y ninguna regla declara ninguno de los dos. Lo
-   que se propone para tenerla es D15 (impacto declarado por regla,
-   probabilidad observada en el período). **Pendiente de que lo confirme**;
-   si no, «Riesgos por nivel».
+   información, realízalo». **No la había**: el motor da `nivel`, no
+   probabilidad ni impacto, y ninguna regla declaraba ninguno de los dos. Se
+   propuso D15 (impacto declarado por regla, probabilidad observada en el
+   período) y el usuario lo **confirmó el 23-09-2026** («me gusta la idea de
+   D15, prosigue con el plan»). Implementado en la F4: las 19 reglas de
+   vibraciones declaran su impacto y la probabilidad se cuenta sobre el
+   historiador. La alternativa «Riesgos por nivel» queda descartada.
 2. **Energías, los kWh.** **Sí**: estimar por integración de la potencia del
    variador, declarado como estimación.
 3. **Predicciones.** **Sólo la plantilla**, sin recolector de pronóstico.
@@ -635,7 +694,7 @@ y de dónde tendría que salir cada cosa:
 
 | Hueco | De dónde saldría | Qué habría que hacer |
 |---|---|---|
-| Impacto de cada riesgo | Del tipo, regla por regla | `impacto` en cada regla (D15); una tarde de criterio de ingeniería por tipo |
+| Impacto de cada riesgo | Del tipo, regla por regla | **Hecho (F4, 23-09-2026):** las 19 reglas de `riesgosVibracion.js` declaran `impacto` (1–5) con su porqué escrito al lado; un tipo nuevo que no lo declare hereda del nivel y el PDF lo dice. La probabilidad NO se declara: se observa en el historiador |
 | Fechas de calibración de un sensor | De quien mantiene la planta; ICONICS no las tiene | **Hecho (F3.3, 23-09-2026):** `variables[].calibracion: {ultima, proxima}` en `maquinas.json` (`crearVariable` lo limpia, el esquema de la API exige `AAAA-MM-DD`), sección «Calibración de sensores» en el editor para las variables de medida, el registro lo expone (`variableDe`), y el reporte de sensores lo imprime; sin fecha, «sin registro» |
 | Objetivo, avance por disciplina, responsables, fechas (Ingeniería, planes de acción) | De gestión del proyecto, no de planta | O se dejan en blanco para llenar a mano (lo que hace este plan), o el operador los dicta en la pregunta y van al PDF rotulados «proporcionado por el operador». Lo segundo es un argumento más de la herramienta y se puede añadir después sin tocar el compositor |
 | Temperatura, espectro, ejes (Vibraciones) | De la instrumentación: el SM 1281 no los publica | Sin cambio posible en software |

@@ -91,12 +91,14 @@ describe('componerPorPlantilla', () => {
   })
 
   it('un bloque desconocido es un error de programación, no una sección en blanco', async () => {
+    /* El ejemplo era `matriz` hasta que la F4 la implementó: un bloque que
+       existe no sirve para probar que los que no existen truenan. */
     await expect(componerPorPlantilla({
       plantilla: PLANTILLA,
-      documento: { titulo: 'T', instalacion: 'M', secciones: [{ id: 'x', titulo: 'X', bloque: 'matriz' }] },
+      documento: { titulo: 'T', instalacion: 'M', secciones: [{ id: 'x', titulo: 'X', bloque: 'mapa-de-calor' }] },
       etq,
-    })).rejects.toThrow(/matriz/)
-    expect(BLOQUES).not.toContain('matriz')
+    })).rejects.toThrow(/mapa-de-calor/)
+    expect(BLOQUES).not.toContain('mapa-de-calor')
   })
 })
 
