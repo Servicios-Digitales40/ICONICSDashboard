@@ -964,7 +964,29 @@ export function sistemaDeRuta(hash) {
   return SISTEMAS.find((s) => s.rutas?.includes(ruta))?.id ?? null;
 }
 
-/** Resumen del registro, para que el asistente pueda enumerarlos. */
+/**
+ * Resumen del registro, para que el asistente pueda enumerarlos.
+ *
+ * ── `cerrado` VIAJA, Y ANTES NO (Plan 45 F2.5) ─────────────────────
+ *
+ * Este resumen es lo único que `sistemas_de_la_planta` le da al modelo, y
+ * omitía si una máquina está cerrada por mantenimiento. El resultado, medido
+ * el 24-09-2026 contra el modelo real: a «¿qué máquinas hay?» contestó «en
+ * esta planta hay dos máquinas independientes», y presentó la estación de
+ * llenado —cerrada desde el 17-09, sin vistas, y que toda herramienta niega—
+ * como si se pudiera preguntar por ella.
+ *
+ * No es que el modelo se lo inventara: es que aquí no había nada que dijera
+ * lo contrario. El cierre es una guarda en `resolverSistema()` a propósito
+ * («una regla que importa se pone en el código, no en el prompt»), pero esa
+ * guarda actúa cuando ya se ha preguntado; el inventario es lo que decide qué
+ * se pregunta.
+ *
+ * Se entrega el CAMPO, no una lista filtrada: el filtro es del asistente
+ * —quién enumera qué es suyo— y aquí sólo tiene que estar el dato. Y viaja el
+ * texto entero, no un booleano, por el mismo motivo por el que el registro lo
+ * guarda así: «cerrado» sin el porqué obliga a quien lo lea a inventarse uno.
+ */
 export function resumenDeSistemas() {
   return SISTEMAS.map((s) => ({
     id: s.id,
@@ -975,6 +997,8 @@ export function resumenDeSistemas() {
     herramientas: s.herramientas,
     historia: s.historia,
     limitaciones: s.limitaciones,
+    /* `null` cuando está en servicio, que es lo normal; el motivo, cuando no. */
+    cerrado: s.cerrado ?? null,
     /* Por qué otros nombres se la puede pedir, y qué activos tienen nombre (Plan 42.5 F6.6). */
     alias: s.alias ?? [],
     activos: s.activos ?? [],

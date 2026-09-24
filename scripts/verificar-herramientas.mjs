@@ -762,6 +762,31 @@ await checkAsync('[configurada] sistemas_de_la_planta la lista con su id, su nom
   assert.ok(suya.limitaciones.length > 0, 'una configurada tiene que confesar lo que no sabe hacer')
 })
 
+await checkAsync('sistemas_de_la_planta dice CUÁL está cerrada, y por qué (Plan 45 F2.5)', async () => {
+  /*
+   * El inventario omitía el cierre, y el modelo no puede saber lo que no se le
+   * dice: medido el 24-09-2026 contra el modelo real, a «¿qué máquinas hay?»
+   * contestó «hay dos máquinas independientes» y presentó la estación de
+   * llenado —cerrada, sin vistas, y que toda herramienta niega— como una más.
+   *
+   * La guarda de `resolverSistema()` sigue siendo la que impide contestar por
+   * ella; esto es lo que impide OFRECERLA. Son dos cosas distintas y hacen
+   * falta las dos.
+   */
+  const r = await createHerramientas({ client: clienteFalso() }).ejecutar('sistemas_de_la_planta', {})
+  assert.equal(r.ok, true, r.error)
+
+  const enServicio = r.sistemas.find((s) => s.id === ESPEJO.id)
+  assert.equal(enServicio.cerrado, null, 'una máquina en servicio no puede salir como cerrada')
+
+  const cerrada = r.sistemas.find((s) => s.id === 'tanque')
+  assert.ok(cerrada, 'la cerrada sigue en el inventario: ocultarla no es el arreglo')
+  assert.ok(cerrada.cerrado, 'y tiene que decir que lo está')
+  /* El MOTIVO, no un booleano: «cerrado» a secas obliga a inventarse el porqué. */
+  assert.equal(typeof cerrada.cerrado, 'string')
+  assert.ok(cerrada.cerrado.length > 10, 'el motivo tiene que ser una frase, no una marca')
+})
+
 /*
  * La simulación de vibraciones depende de la HORA: la máquina alterna marcha
  * y paro en un ciclo de diez minutos (`enMarchaVib`), y en paro el variador y
