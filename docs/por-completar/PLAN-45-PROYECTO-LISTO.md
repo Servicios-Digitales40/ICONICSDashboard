@@ -1,6 +1,6 @@
 # PLAN 45 — Dejar el proyecto listo: lo que falta para cerrar Vibraciones como producto
 
-**Estado:** **F0, F2, F3, F4 y F5 completadas el 24-09-2026; F1 hecha salvo dos puntos** · de F1 sólo quedan **F1.1** (espera **D1**) y **F1.4** (espera a que el motor gire); **F6** (merge) al final. D2 y D3 resueltas. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
+**Estado:** **F0, F2, F3, F4 y F5 completadas el 24-09-2026; F1 hecha salvo dos puntos que el usuario APLAZÓ** (F1.1 y F1.4, las dos porque la máquina lleva rato apagada) · **F6 (merge) no se hace todavía, por decisión del usuario: no es necesario aún**. D2 y D3 resueltas; D1 aplazada, con un matiz medido que conviene leer antes de retomarla (ver F1). Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
 **Rama:** `UI-Limpieza1.0` (Moisés). `DemoVibraciones4.0` recibe el resultado; `AjustesGustavo5.0` es la del asistente (Gustavo). Ver `HANDOFF.md` §0.
 **Origen:** el usuario pidió el 24-09-2026 revisar alcances, capacidades y problemas del proyecto, con pruebas, y después acotó: «no pensemos en la presentación, sino en el contenido del proyecto y en cómo funciona. Quiero dejar el proyecto listo. ¿Qué faltaría?».
 
@@ -210,13 +210,46 @@ Lo de §0. Tres decisiones quedan para el usuario:
 
 | # | Decisión | Bloquea |
 |---|---|---|
-| **D1** | Las seis variables del V20 sin fuente (`HorasMarcha`, `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1/2`, `Presion de aspiracion`): ¿se conectan en el PLC/ICONICS, o se quitan de la máquina? Si no hay fecha para conectarlas, quitarlas: un tag que existe sin fuente no es una medida. **Re-medidas el 24-09 a las 17:38: siguen igual** —marca de tiempo fresca, calidad `2147483667`, sin valor—, así que no es algo que se arregle solo | F1.1 |
+| **D1** | Las seis variables del V20 sin fuente (`HorasMarcha`, `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1/2`, `Presion de aspiracion`). **APLAZADA por el usuario el 24-09-2026**: se deja como está y no se quitan. Ver el recuadro de abajo antes de retomarla | F1.1, aplazada |
 | ~~**D2**~~ | **RESUELTA el 24-09-2026.** El usuario avisó a Gustavo y pidió hacerlo nosotros. Se quitó el razonamiento de la pasada de herramientas, medido: 337 s → 226 s en la tanda completa, y acierta más (ver F3.5) | — |
 | ~~**D3**~~ | **RESUELTA el 24-09-2026: purgar.** Ver F1.3 | — |
 
 Y una de trámite: ¿el plan se comitea tal cual?
 
 ### F1 · El despliegue, completo y sin ruido
+
+> ### Lo que el usuario decidió el 24-09-2026 al cerrar la sesión
+>
+> **F1.1 (los seis tags del V20) y F1.4 (sondear con el motor girando) quedan
+> APLAZADAS**, las dos por el mismo motivo declarado: la máquina lleva rato
+> apagada. **F6 (el merge) no se hace todavía**: no es necesario aún.
+>
+> **Sobre F1.4 la hipótesis es correcta y está medida**: con el equipo parado,
+> 71 de 92 variables salen «sin variación» y el sondeo no puede distinguir dos
+> series planas. Eso se arregla solo el día que gire.
+>
+> **Sobre F1.1 hay un matiz que conviene no perder**, porque la próxima sesión
+> puede darlo por resuelto sin mirarlo. Los seis tags **no se comportan como
+> una señal de máquina apagada**. Medido el mismo día, en el MISMO activo
+> `V20`:
+>
+> | | Calidad | Valor |
+> |---|---|---|
+> | 13 tags del variador (`SPEED_BMS`, `TORQUE_BMS`, `CURRENT_BMS`…) | buena (0) | **0** |
+> | Los 6 de D1 | **mala (2147483667)** | **sin valor** |
+>
+> Una máquina apagada publica **cero con calidad buena**, que es lo que hacen
+> sus trece compañeros del mismo equipo. Éstos no publican nada. Y el sondeo
+> dice lo mismo desde el otro lado: cinco salen `sin-muestras` —el historiador
+> tampoco tiene nada suyo— mientras que `Numero de arranques` **sí quedó
+> verificado** como `registrada-constante`, o sea que ése sí tiene serie.
+>
+> **Conclusión, sin decidir nada**: lo más probable es que esos cinco no tengan
+> fuente detrás en el PLC, y que encender el motor no los vaya a despertar. No
+> urge —están declarados, el asistente los nombra uno a uno y nadie los lee
+> como un cero— pero cuando se retome, la pregunta para planta es «¿estos cinco
+> están cableados?», no «¿esperamos a que arranque?».
+
 
 **Objetivo.** Que lo configurado sea exactamente la máquina que hay.
 **Dependencias:** D1, ~~D3~~ (resuelta), y que el motor gire para F1.4.
