@@ -18,7 +18,9 @@
  * No recibe nada. Lee el registro y ya está — igual que `aprendizaje/`, su
  * firma vacía es el dato de que no depende de ICONICS.
  */
-import { NO_COMPARTEN, SISTEMAS, resumenDeSistemas } from '../../../../shared/eva/comun/sistemas.js'
+/* `SISTEMAS` ya no se importa: `cuantos` contaba su longitud —cerradas
+   incluidas— y ahora cuenta las que se pueden consultar (Plan 45 F3.2). */
+import { NO_COMPARTEN, resumenDeSistemas } from '../../../../shared/eva/comun/sistemas.js'
 
 /** La herramienta que enumera las máquinas de la planta. */
 export function crearHerramientasDeRegistro() {
@@ -50,10 +52,38 @@ export function crearHerramientasDeRegistro() {
        * equivocada acabe llevando al sitio bueno. Cuesta una línea de contexto
        * y evita que el usuario se quede sin la respuesta que sí existe.
        */
+      /*
+       * ── LAS CERRADAS SE CUENTAN APARTE (Plan 45 F3.2) ──────────────
+       *
+       * `cuantos` era `SISTEMAS.length` y la lista iban todas, cerradas
+       * incluidas. Medido el 24-09-2026 contra el modelo real: a «¿qué
+       * máquinas hay?» contestó «en esta planta hay dos máquinas
+       * independientes» y presentó la estación de llenado —cerrada desde el
+       * 17-09, sin vistas, y que `resolverSistema()` niega en toda
+       * herramienta— como si se pudiera preguntar por ella.
+       *
+       * No se OCULTAN, y esa es la decisión: ocultarlas dejaría al modelo sin
+       * saber que existen, y entonces una pregunta legítima por el tanque
+       * («¿y la bomba?») se contestaría con un «no existe» que es falso. Lo
+       * que se hace es contarlas aparte y mandar su motivo, para que la
+       * respuesta pueda ser «existe, pero está cerrada por esto».
+       */
+      const enServicio = resumenDeSistemas().filter((s) => !s.cerrado)
+      const cerradas = resumenDeSistemas().filter((s) => s.cerrado)
+
       return {
         ok: true,
-        cuantos: SISTEMAS.length,
-        sistemas: resumenDeSistemas(),
+        cuantos: enServicio.length,
+        sistemas: enServicio,
+        ...(cerradas.length
+          ? {
+            cerradas: cerradas.map((s) => ({ id: s.id, nombre: s.nombre, motivo: s.cerrado })),
+            sobre_las_cerradas:
+              'Estas máquinas EXISTEN pero están cerradas: ninguna herramienta contesta por ' +
+              'ellas. No las cuentes entre las de la planta ni ofrezcas consultarlas; si ' +
+              'preguntan por una, di que está cerrada y por qué.',
+          }
+          : {}),
         si_preguntan_por_lo_que_ya_se_hizo:
           'Esta herramienta NO tiene la bitácora de reparaciones ni los datos confirmados de ' +
           'la instalación. Si la pregunta era «¿qué se hizo con esto?», «¿ya había pasado?» o ' +

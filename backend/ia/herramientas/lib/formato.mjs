@@ -125,14 +125,34 @@ export const avisoDeUmbrales = (idioma = 'es') =>
        * seguridad no se entera, y medido con el 4B eso pasa: contestó «el
        * nivel está fuera de límite» sin decir de quién era el límite.
        */
+      /*
+       * ── DECÍA «PARA UN SISTEMA DE AGUA GENÉRICO» (Plan 45 F3.4) ────
+       *
+       * Este aviso acompaña a CUALQUIER cifra comparada contra una banda, de
+       * la máquina que sea, y nombraba el sistema de agua —que está cerrado
+       * desde el 17-09-2026—. Pegado a un promedio de vibración, decía que sus
+       * límites son «estimaciones para un sistema de agua», que además de
+       * hablar de una máquina que no está, es falso: los de vibraciones salen
+       * de la ISO 10816-1, no de una estimación nuestra.
+       *
+       * La frase se queda con lo que es cierto para todas —que el estado lo
+       * calcula el tablero y no lo publica el servidor— sin decir de qué clase
+       * de instalación son. Las dos versiones conservan a propósito
+       * «estimaciones/estimate», «no confirmados/not confirmed» y «cálculo del
+       * tablero/dashboard's own calculation»: son las palabras que buscan
+       * `DICE_LO_DE_LOS_UMBRALES` y `SAYS_THE_THRESHOLD_THING` en `chat.mjs`
+       * para saber si el modelo ya contó el aviso. Cambiarlas sin mirar esos
+       * dos regex deja la red de seguridad comparando contra un texto que ya
+       * no existe, y eso falla en silencio.
+       */
       aviso: idioma === 'en'
-        ? 'The thresholds used to evaluate each signal are our own estimate for a generic ' +
-          'water system, not ranges confirmed by whoever operates this installation, and the ' +
-          'server does not publish alarms for this tree. The status of each signal is the ' +
-          'dashboard’s own calculation, not ICONICS data.'
-        : 'Los límites con los que se ha evaluado cada señal son estimaciones nuestras para un ' +
-          'sistema de agua genérico, no rangos confirmados por quien opera esta instalación, y ' +
-          'el servidor no publica alarmas para este árbol. El estado de cada señal es un ' +
-          'cálculo del tablero, no un dato de ICONICS.',
+        ? 'The thresholds used to evaluate each signal are our own estimate, not ranges ' +
+          'confirmed by whoever operates this installation, and the server does not publish ' +
+          'alarms for this tree. The status of each signal is the dashboard’s own calculation, ' +
+          'not ICONICS data.'
+        : 'Los límites con los que se ha evaluado cada señal son estimaciones nuestras, no ' +
+          'rangos confirmados por quien opera esta instalación, y el servidor no publica ' +
+          'alarmas para este árbol. El estado de cada señal es un cálculo del tablero, no un ' +
+          'dato de ICONICS.',
     }
     : {}

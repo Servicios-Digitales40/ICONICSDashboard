@@ -838,6 +838,28 @@ await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)'
   assert.match(texto, /--jinja/, 'y, sin ninguna llamada aún, sugiere revisar la bandera')
 })
 
+await check('el aviso de bloqueo NO ofrece la máquina cerrada (Plan 45 F3.1)', async () => {
+  /*
+   * Este texto y el de «no he sabido responder» son de los poquísimos que
+   * llegan LITERALES a la pantalla del operador, sin pasar por el modelo. Los
+   * dos contaban las señales de `SISTEMA.tanque` escrito a mano y decían «la
+   * instalación de agua» / «el sistema de agua»: desde el 17-09-2026 esa
+   * máquina está cerrada y toda herramienta la niega, así que el asistente
+   * ofrecía leer justo lo único que no puede leer.
+   *
+   * Pasó en planta el 23-09 a las 17:30 («¿Qué es vivi?», bloqueada a los 24
+   * s), que es como se encontró.
+   */
+  guion = { contenido: 'El nivel está al 87,3 %.', toolCall: null }
+
+  const { resumen, texto } = await preguntar(chatDePrueba(), '¿qué es vivi?')
+
+  assert.equal(resumen.bloqueada, true)
+  assert.doesNotMatch(texto, /sistema de agua|instalaci[oó]n de agua/i)
+  /* Y sigue diciendo lo accionable, que es para lo que existe. */
+  assert.match(texto, /se[ñn]al/i)
+})
+
 await check('si el modelo YA usó herramientas, el aviso no culpa a --jinja', async () => {
   // Con `--jinja` bien puesto, una respuesta sin consultar significa que la
   // pregunta no encaja en ninguna herramienta —el pasado de una señal que no

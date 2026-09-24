@@ -776,15 +776,21 @@ await checkAsync('sistemas_de_la_planta dice CUÁL está cerrada, y por qué (Pl
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('sistemas_de_la_planta', {})
   assert.equal(r.ok, true, r.error)
 
+  /* `sistemas` son las que SE PUEDEN consultar, y `cuantos` las cuenta a ellas
+     (Plan 45 F3.2): el modelo decía «hay dos máquinas» contando una cerrada. */
+  assert.ok(r.sistemas.every((s) => !s.cerrado), 'ninguna cerrada puede ir entre las de la planta')
+  assert.equal(r.cuantos, r.sistemas.length, '`cuantos` tiene que contar las que se pueden consultar')
   const enServicio = r.sistemas.find((s) => s.id === ESPEJO.id)
-  assert.equal(enServicio.cerrado, null, 'una máquina en servicio no puede salir como cerrada')
+  assert.ok(enServicio, 'la espejo está en servicio y tiene que salir')
 
-  const cerrada = r.sistemas.find((s) => s.id === 'tanque')
-  assert.ok(cerrada, 'la cerrada sigue en el inventario: ocultarla no es el arreglo')
-  assert.ok(cerrada.cerrado, 'y tiene que decir que lo está')
-  /* El MOTIVO, no un booleano: «cerrado» a secas obliga a inventarse el porqué. */
-  assert.equal(typeof cerrada.cerrado, 'string')
-  assert.ok(cerrada.cerrado.length > 10, 'el motivo tiene que ser una frase, no una marca')
+  /* Pero NO se ocultan: sin esto, una pregunta legítima por el tanque se
+     contestaría «no existe», que es falso. Van aparte y con su motivo. */
+  const cerrada = (r.cerradas ?? []).find((s) => s.id === 'tanque')
+  assert.ok(cerrada, 'la cerrada sigue en la respuesta, en su propio campo')
+  assert.ok(cerrada.motivo, 'y tiene que decir por qué lo está')
+  assert.equal(typeof cerrada.motivo, 'string')
+  assert.ok(cerrada.motivo.length > 10, 'el motivo tiene que ser una frase, no una marca')
+  assert.match(r.sobre_las_cerradas, /No las cuentes/)
 })
 
 /*
@@ -2378,6 +2384,32 @@ await checkAsync('[espejo] sin `idioma`, analisis_de_senal sigue en español: no
 
   assert.equal(r.ok, true, r.error)
   assert.match(r.tendencia.direccion, /estable|subiendo|bajando/)
+})
+
+await checkAsync('[espejo] perfil_de_senal pide el valor de AHORA a su máquina, no al tanque (Plan 45 F3.3)', async () => {
+  /*
+   * Era `leerMaquina(SISTEMA.tanque)` fijo: los percentiles salían de la
+   * máquina correcta y el «valor actual» de OTRA. Con el tanque cerrado eso
+   * daba `null` en silencio —la tabla perdía la línea que la convierte en
+   * respuesta— y, si la clave existiera en las dos, habría dado el número de
+   * la máquina equivocada sin avisar.
+   *
+   * `vRMS_S1` es justo una clave que el tanque NO tiene, así que si se leyera
+   * el tanque el actual sería `null`. Se fija el reloj en un instante EN
+   * MARCHA porque parado el simulador no publica, y entonces `null` sería
+   * legítimo y la comprobación no distinguiría una cosa de la otra.
+   */
+  const h = createHerramientas({
+    client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }),
+  })
+  const r = await h.ejecutar('perfil_de_senal', { senal: 'vRMS_S1', sistema: ESPEJO.id, dias: 7 })
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(typeof r.valorActual, 'number', 'el valor de ahora tiene que venir de SU máquina')
+  /* Y situado dentro de su propia distribución, que es para lo que sirve: sin
+     el actual, `posicionDelActual` no se puede calcular y la respuesta se
+     queda en una tabla de percentiles que no dice si esto es raro. */
+  assert.ok(r.posicionDelActual, 'sin valor actual no hay dónde situarlo')
 })
 
 await checkAsync('[espejo] perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {

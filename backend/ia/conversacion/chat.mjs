@@ -1749,7 +1749,7 @@ export function createChat({ config, herramientas }) {
           pregunta: pregunta.slice(0, 120),
           vistaAlgunaLlamada,
         })
-        onEvento({ tipo: 'texto', delta: avisoDeBloqueo(vistaAlgunaLlamada) })
+        onEvento({ tipo: 'texto', delta: avisoDeBloqueo(vistaAlgunaLlamada, contexto) })
         return { herramientas: [], bloqueada: true, turnosRecordados: previos.length, rondas }
       }
 
@@ -1765,7 +1765,7 @@ export function createChat({ config, herramientas }) {
         logger.warn('El modelo no llamó a ninguna herramienta y tampoco escribió nada', {
           pregunta: pregunta.slice(0, 120),
         })
-        onEvento({ tipo: 'texto', delta: noSeQueContestar() })
+        onEvento({ tipo: 'texto', delta: noSeQueContestar(contexto) })
         return {
           herramientas: [], bloqueada: false, sinRedactar: true,
           turnosRecordados: previos.length, rondas,
@@ -1955,19 +1955,64 @@ export function createChat({ config, herramientas }) {
  * Enumera lo que SÍ se puede preguntar en vez de disculparse: es lo único
  * accionable, y la causa más común de llegar aquí es haber pedido un rango.
  *
- * La cifra de señales con historia se CUENTA aquí, no se escribe a mano: es
- * el mismo fallo que arregló `inventarioDeLaPlanta()` (Plan 20 F7) — con el
- * catálogo del tanque escrito a mano decía «las cuatro señales que el
- * historiador guarda: nivel, temperatura, caudal y presión» cuando ya eran
- * 50 de 52 (Plan 27 F6), y ese texto SÍ le llega al usuario en pantalla
- * cuando el modelo se queda mudo.
+ * La cifra de señales con historia se CUENTA, no se escribe a mano: es el
+ * mismo fallo que arregló `inventarioDeLaPlanta()` (Plan 20 F7) — decía «las
+ * cuatro señales que el historiador guarda: nivel, temperatura, caudal y
+ * presión» cuando ya eran 50 de 52 (Plan 27 F6), y ese texto SÍ le llega al
+ * usuario en pantalla cuando el modelo se queda mudo.
+ *
+ * Y desde el Plan 45 F3.1 tampoco se escribe a mano de QUÉ MÁQUINA se cuenta:
+ * la elige `maquinaDeLaQueHablar()`, porque este texto hablaba del tanque, que
+ * está cerrado.
  */
-function noSeQueContestar() {
-  const conSerie = SISTEMA.tanque.claves().filter((c) => SISTEMA.tanque.esHistorizada(c))
+/**
+ * De qué máquina hablan los dos textos de abajo.
+ *
+ * ── POR QUÉ ESTO EXISTE (Plan 45 F3.1) ────────────────────────────
+ *
+ * Los dos decían «la instalación de agua» y contaban las señales de
+ * `SISTEMA.tanque`, escrito a mano. Era correcto cuando el tanque era la única
+ * máquina del asistente; desde el 17-09-2026 está CERRADO —sin vistas, y toda
+ * herramienta lo niega—, así que estos dos textos, que son de los poquísimos
+ * que llegan LITERALES a la pantalla del operador, ofrecían leer una máquina
+ * que no se puede leer.
+ *
+ * El orden es el que tendría quien contesta: la máquina que se tiene DELANTE
+ * si la pantalla la declara, y si no la única en servicio. Con varias en
+ * servicio y sin contexto no se elige una —sería inventar de cuál se habla—:
+ * se contesta en genérico, que es la respuesta honesta.
+ *
+ * `null` cuando no hay ninguna máquina en servicio, que es un despliegue
+ * recién instalado sin configurar: entonces los textos lo dicen así.
+ */
+function maquinaDeLaQueHablar(contexto) {
+  const enServicio = SISTEMAS.filter((s) => !s.cerrado)
+  const deLaPantalla = contexto?.sistema ? enServicio.find((s) => s.id === contexto.sistema) : null
+  if (deLaPantalla) return deLaPantalla
+  return enServicio.length === 1 ? enServicio[0] : null
+}
+
+/** Cuántas señales tiene y cuántas con historia, para las dos frases. */
+function cuantasSenales(sistema) {
+  const claves = sistema.claves()
+  return { total: claves.length, conSerie: claves.filter((c) => sistema.esHistorizada(c)).length }
+}
+
+function noSeQueContestar(contexto = null) {
+  const sistema = maquinaDeLaQueHablar(contexto)
+  if (!sistema) {
+    return (
+      'No he sabido responder a eso. Puedo darte el estado actual de las máquinas configuradas ' +
+      'de esta planta y la evolución de las señales que el historiador guarda, en el período ' +
+      'que quieras. También comparar dos períodos entre sí.'
+    )
+  }
+
+  const { total, conSerie } = cuantasSenales(sistema)
   return (
-    'No he sabido responder a eso. Puedo darte el estado actual de toda la instalación de agua ' +
-    `—sus ${SISTEMA.tanque.claves().length} señales— y la evolución de las ${conSerie.length} ` +
-    'que el historiador guarda. También comparar dos períodos de una de ellas.'
+    `No he sabido responder a eso. Puedo darte el estado actual de ${sistema.nombre} ` +
+    `—sus ${total} señales— y la evolución de las ${conSerie} que el historiador guarda. ` +
+    'También comparar dos períodos de una de ellas.'
   )
 }
 
@@ -1982,15 +2027,26 @@ function noSeQueContestar() {
  * La cifra de señales, igual que en `noSeQueContestar()`, se cuenta y no se
  * escribe a mano: decía «las ocho señales... las cuatro que el historiador
  * guarda» con el catálogo ya en 52 (Plan 27), y este texto también le llega
- * al usuario en pantalla.
+ * al usuario en pantalla. Y la MÁQUINA la elige `maquinaDeLaQueHablar()`
+ * desde el Plan 45 F3.1, por lo mismo: ofrecía leer el sistema de agua, que
+ * está cerrado.
  */
-function avisoDeBloqueo(vistaAlgunaLlamada) {
-  const conSerie = SISTEMA.tanque.claves().filter((c) => SISTEMA.tanque.esHistorizada(c))
+function avisoDeBloqueo(vistaAlgunaLlamada, contexto = null) {
+  const sistema = maquinaDeLaQueHablar(contexto)
+  const queSePuede = sistema
+    ? (() => {
+        const { total, conSerie } = cuantasSenales(sistema)
+        return (
+          `Puedo leer el estado actual de las ${total} señales de ${sistema.nombre}, y la ` +
+          `evolución de las ${conSerie} que el historiador guarda, en el período que quieras.`
+        )
+      })()
+    : 'Puedo leer el estado actual de las máquinas configuradas de esta planta, y la evolución ' +
+      'de las señales que el historiador guarda, en el período que quieras.'
+
   const base =
     'No voy a darte cifras porque no he consultado los datos de la instalación para esta ' +
-    `pregunta. Puedo leer el estado actual de las ${SISTEMA.tanque.claves().length} señales del ` +
-    `sistema de agua, y la evolución de las ${conSerie.length} que el historiador guarda, en el ` +
-    'período que quieras. También comparar dos períodos entre sí.'
+    `pregunta. ${queSePuede} También comparar dos períodos entre sí.`
 
   /*
    * El aviso de `--jinja` solo se añade si el modelo NO ha usado herramientas

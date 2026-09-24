@@ -676,14 +676,34 @@ export function crearHerramientasDeHistoricos({
       const stats = estadisticasBasicas(valores, meta.decimales)
       const p = (q) => redondear(percentil(orden, q), meta.decimales)
 
-      // El valor de ahora, para situarlo dentro de la distribución. Es lo que
-      // convierte el perfil en una respuesta y no en una tabla.
-      // `sistema.senales` es un objeto indexado POR CLAVE, no un array: la
-      // lista plana es `sistema.lista`. Buscarlo con `.find` devolvía siempre
-      // `undefined` y el perfil salía sin el dato de ahora, que es justo lo que
-      // convierte la tabla de percentiles en una respuesta.
-      const lectura = await leerMaquina(SISTEMA.tanque)
-      const actual = lectura.ok ? lectura.estado.dominio.senales[clave]?.valor ?? null : null
+      /*
+       * El valor de ahora, para situarlo dentro de la distribución. Es lo que
+       * convierte el perfil en una respuesta y no en una tabla.
+       *
+       * `sistema.senales` es un objeto indexado POR CLAVE, no un array: la
+       * lista plana es `sistema.lista`. Buscarlo con `.find` devolvía siempre
+       * `undefined` y el perfil salía sin el dato de ahora.
+       *
+       * ── Y SE LEE LA MÁQUINA DEL PERFIL, NO EL TANQUE (Plan 45 F3.3) ──
+       *
+       * Era `leerMaquina(SISTEMA.tanque)` fijo, de cuando el tanque era la
+       * única máquina con historia. El resto de la herramienta ya resolvía
+       * bien —`resolverSenalDeSistema` devuelve el `sistemaId` correcto y la
+       * serie sale de ahí—, así que el perfil de una señal de vibraciones
+       * traía percentiles buenos y un «valor actual» pedido a OTRA máquina:
+       * o `null` (el tanque está cerrado y no entrega), o —si la clave
+       * existiera en las dos— el número equivocado, sin avisar de nada.
+       *
+       * `dominio.senales` no lo tienen todas las entradas; con la forma común
+       * (`estado.senales`, una lista) se cubre cualquier máquina configurada.
+       */
+      const entradaDelPerfil = SISTEMA[sistemaId]
+      const lectura = entradaDelPerfil ? await leerMaquina(entradaDelPerfil) : { ok: false }
+      const actual = lectura.ok
+        ? lectura.estado.dominio?.senales?.[clave]?.valor
+          ?? lectura.estado.senales?.find((s) => s.clave === clave)?.valor
+          ?? null
+        : null
 
       /*
        * Cuántas lecturas hubo POR DEBAJO del valor actual, en tanto por ciento.
