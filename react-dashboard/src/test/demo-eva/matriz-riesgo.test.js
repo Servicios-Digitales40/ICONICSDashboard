@@ -12,6 +12,7 @@ import {
   CORTES_PROBABILIDAD,
   IMPACTO_POR_NIVEL,
   armarMatriz,
+  claveDeRiesgo,
   impactoDeRegla,
   observarFrecuencia,
   probabilidadDeFraccion,
@@ -119,6 +120,35 @@ describe('armarMatriz', () => {
     expect(m.sinObservar[0].id).toBe('c')
     expect(m.sinObservar[0].probabilidad).toBeUndefined()
     expect(m.sinObservar[0].motivo).toMatch(/sin serie/)
+  })
+
+  it('tres apoyos con la MISMA regla son tres riesgos distintos, no uno (F7)', () => {
+    /*
+     * ── EL DEFECTO QUE ESTA PRUEBA FIJA ───────────────────────────
+     *
+     * Una regla de ámbito `canal` se evalúa una vez por apoyo, y los tres
+     * riesgos que produce llevan el MISMO `id` con distinto `canal`. La
+     * matriz los indexaba por `id`, así que los tres compartían entrada:
+     * contra planta (F7) los nueve riesgos del PDF decían «Lado acople» —el
+     * primero— y la frecuencia observada de un apoyo se habría atribuido a
+     * los otros dos, que es peor que el rótulo equivocado.
+     */
+    const mismaRegla = (canal) => ({ id: 'rodamientos-sin-vigilar', canal, titulo: 'Sin vigilar', nivel: 'critico', impacto: 4 })
+    const riesgos = [mismaRegla('S1'), mismaRegla('S2'), mismaRegla('S3')]
+
+    expect(new Set(riesgos.map(claveDeRiesgo)).size, 'las tres claves tienen que ser distintas').toBe(3)
+    expect(claveDeRiesgo(riesgos[0])).toBe('rodamientos-sin-vigilar@S1')
+    /* Una regla de máquina (sin canal) conserva su id a secas. */
+    expect(claveDeRiesgo({ id: 'variador-en-fallo', canal: null })).toBe('variador-en-fallo')
+
+    /* Cada apoyo recibe SU frecuencia, no la del primero. */
+    const m = armarMatriz(riesgos, new Map([
+      ['rodamientos-sin-vigilar@S1', { fraccion: 0.9, cobertura: { evaluados: 10 } }],
+      ['rodamientos-sin-vigilar@S3', { fraccion: 0.005, cobertura: { evaluados: 10 } }],
+    ]))
+    expect(m.celdas.map((c) => [c.canal, c.probabilidad])).toEqual([['S1', 5], ['S3', 1]])
+    /* Y el que no se pudo observar sale con SU canal, no con el del primero. */
+    expect(m.sinObservar.map((s) => s.canal)).toEqual(['S2'])
   })
 
   it('la severidad de una celda sale del producto, no del nivel de la regla', () => {

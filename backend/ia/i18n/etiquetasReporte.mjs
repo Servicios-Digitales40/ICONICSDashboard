@@ -228,6 +228,9 @@ const ES = {
       pieMitigacion:
         'La acción sale de la regla que encendió el riesgo. Control, responsable y estado no salen de planta: se llenan a mano.',
       sinRiesgos: 'Ninguna regla del tipo está activa en esta máquina: no hay riesgo que situar en la matriz.',
+      /* Hay riesgos activos, pero NINGUNO se puede observar en el historiador:
+         la rejilla queda vacía y los riesgos salen en la 2b con su motivo. */
+      ningunoObservable: 'Hay riesgos activos, pero ninguno se puede situar: sus reglas no miran señales con serie en el historiador, así que su frecuencia no se puede observar. Salen abajo, uno por uno, con el motivo de cada uno.',
       fraccionDelPeriodo: (pct, evaluados) => `activo el ${pct} % de ${evaluados} instantes observados`,
       residualSinCriterio:
         'El riesgo residual es un juicio de quien acepta el riesgo, no un dato de planta: este reporte no lo calcula. ' +
@@ -569,6 +572,7 @@ const EN = {
       pieMitigacion:
         'The action comes from the rule that raised the risk. Control, owner and status do not come from the plant: fill them in by hand.',
       sinRiesgos: 'No rule of the type is active on this machine: there is no risk to place on the matrix.',
+      ningunoObservable: 'There are active risks, but none can be placed: their rules do not look at signals with a series in the historian, so their frequency cannot be observed. They are listed below, one by one, with the reason for each.',
       fraccionDelPeriodo: (pct, evaluados) => `active ${pct} % of ${evaluados} observed instants`,
       residualSinCriterio:
         'Residual risk is a judgement by whoever accepts the risk, not plant data: this report does not compute it. ' +

@@ -196,6 +196,24 @@ export function observarFrecuencia(regla, series, { toleranciaMs = 60_000, datos
 }
 
 /**
+ * Lo que identifica a un riesgo: su regla Y el punto donde se disparó.
+ *
+ * ── POR QUÉ EL `id` SOLO NO BASTA ──────────────────────────────────
+ *
+ * Una regla de ámbito `canal` se evalúa una vez por apoyo, y los tres
+ * riesgos que produce llevan el MISMO `id` con distinto `canal`. Indexar por
+ * `id` hace que los tres compartan entrada: en la F7, contra planta, los
+ * nueve riesgos del reporte decían «Lado acople» —el primero— porque un
+ * `find` por id siempre devolvía ése. La frecuencia observada de un apoyo se
+ * habría atribuido a los otros dos, que es peor que el rótulo equivocado.
+ *
+ * Con `canal` nulo (una regla de máquina) la clave es el id a secas.
+ */
+export function claveDeRiesgo(riesgo) {
+  return riesgo?.canal ? `${riesgo.id}@${riesgo.canal}` : String(riesgo?.id ?? "");
+}
+
+/**
  * Arma la matriz a partir de los riesgos y de sus frecuencias observadas.
  *
  * `frecuencias` es un Map de `idRegla` a `{fraccion, cobertura}` — lo que
@@ -212,15 +230,20 @@ export function armarMatriz(riesgos, frecuencias) {
   let algunoHeredado = false;
 
   for (const riesgo of riesgos ?? []) {
+    /* Ver `claveDeRiesgo`: el id NO identifica un riesgo, el par con su
+       canal sí. */
+    const clave = claveDeRiesgo(riesgo);
     const { impacto, declarado } = impactoDeRegla(riesgo);
     if (!declarado) algunoHeredado = true;
 
-    const medida = frecuencias?.get?.(riesgo.id);
+    const medida = frecuencias?.get?.(clave);
     const probabilidad = probabilidadDeFraccion(medida?.fraccion);
 
     if (probabilidad === null) {
       sinObservar.push({
+        clave,
         id: riesgo.id,
+        canal: riesgo.canal ?? null,
         titulo: riesgo.titulo,
         nivel: riesgo.nivel,
         impacto,
@@ -231,7 +254,9 @@ export function armarMatriz(riesgos, frecuencias) {
     }
 
     celdas.push({
+      clave,
       id: riesgo.id,
+      canal: riesgo.canal ?? null,
       titulo: riesgo.titulo,
       nivel: riesgo.nivel,
       impacto,

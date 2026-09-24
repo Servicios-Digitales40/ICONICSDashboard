@@ -30,7 +30,7 @@
 import { downsamplear } from '../herramientas/lib/formato.mjs'
 import { calcularTendencia, describirTendencia, PUNTOS_GRAFICO_REPORTE } from '../conversacion/herramientas.mjs'
 import { resumirSerie } from '../../../shared/eva/comun/historia.js'
-import { observarFrecuencia, armarMatriz } from '../../../shared/eva/comun/matrizRiesgo.js'
+import { observarFrecuencia, armarMatriz, claveDeRiesgo } from '../../../shared/eva/comun/matrizRiesgo.js'
 import { integrarEnergia } from '../../../shared/eva/comun/estadistica.js'
 import { eventosDeAlarma } from '../../../shared/eva/comun/eventosDeAlarma.js'
 import { peor } from '../../../shared/eva/tanque/estado.js'
@@ -208,7 +208,7 @@ async function observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, histo
   for (const riesgo of activos) {
     const necesita = riesgo.necesita ?? []
     if (!necesita.length) {
-      planes.set(riesgo.id, { motivo: null, claves: null })
+      planes.set(claveDeRiesgo(riesgo), { motivo: null, claves: null })
       continue
     }
     const porNombre = new Map()
@@ -219,7 +219,7 @@ async function observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, histo
       if (!candidatas.length) { falta = nombre; break }
       porNombre.set(nombre, candidatas[0])
     }
-    planes.set(riesgo.id, falta ? { falta } : { claves: porNombre })
+    planes.set(claveDeRiesgo(riesgo), falta ? { falta } : { claves: porNombre })
   }
 
   const necesarias = new Set()
@@ -235,9 +235,9 @@ async function observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, histo
 
   const frecuencias = new Map()
   for (const riesgo of activos) {
-    const plan = planes.get(riesgo.id)
+    const plan = planes.get(claveDeRiesgo(riesgo))
     if (!plan.claves) {
-      frecuencias.set(riesgo.id, {
+      frecuencias.set(claveDeRiesgo(riesgo), {
         motivo: plan.falta
           ? `sin serie historizada para «${plan.falta}» en este punto`
           : 'esta regla no mira ninguna señal historizable: depende de la configuración del módulo o de sus vigilancias',
@@ -245,7 +245,7 @@ async function observarRiesgos({ riesgos, senales, tipo, ventana, fuentes, histo
       continue
     }
     const series = new Map([...plan.claves].map(([nombre, clave]) => [nombre, leidas.get(clave) ?? []]))
-    frecuencias.set(riesgo.id, observarFrecuencia(reglaDe(tipo, riesgo.id) ?? riesgo, series))
+    frecuencias.set(claveDeRiesgo(riesgo), observarFrecuencia(reglaDe(tipo, riesgo.id) ?? riesgo, series))
   }
   return frecuencias
 }

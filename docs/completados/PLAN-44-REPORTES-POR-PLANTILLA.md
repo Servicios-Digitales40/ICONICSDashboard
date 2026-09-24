@@ -1,6 +1,6 @@
 # PLAN 44 — Reportes por plantilla: ocho tipos que el asistente sabe generar
 
-**Estado:** F0–F5 completadas (F0–F4 el 23-09-2026, F5 el 24-09-2026). **Siete de las ocho plantillas se generan**: técnico, vibraciones, lectura de sensores, riesgos, alarmas, ingeniería y energías. `predicciones` está escrita entera y deliberadamente apagada: ninguna máquina declara mecanismos de desgaste, así que no hay nada que pronosticar (D12, §6.3) · **F6–F7 por completar** · TODAS las decisiones de §6 cerradas por el usuario, incluido el criterio de la matriz P×I (D15)
+**Estado:** **COMPLETADO el 24-09-2026.** F0–F5 el 23 y 24-09; F6 y F7 el 24-09. **Siete de las ocho plantillas se generan** y están verificadas CONTRA PLANTA (`vib-motor-03`): técnico, vibraciones, lectura de sensores, riesgos, alarmas, ingeniería y energías, en 5,4–6,1 s y 1,7–2,4 MB cada una. `predicciones` está escrita entera y apagada a propósito: ninguna máquina declara mecanismos de desgaste, así que no hay nada que pronosticar (D12, §6.3). Todas las decisiones de §6 cerradas por el usuario, incluida la D15 (matriz P×I) y la §6.2 (kWh estimados por integración, declarados en el PDF)
 **Rama:** `UI-Limpieza1.0`
 **Origen:** el usuario entregó en `Documentos/Reportes/` ocho carpetas, una por
 tipo de reporte, cada una con un `.docx` de ejemplo (la maqueta) y un `.png`
@@ -661,27 +661,86 @@ su «cómo se calculó», y un hallazgo por riesgo activo).
 método. La que usaba `energias` como ejemplo de pendiente usa ahora
 `predicciones`, la única que queda.
 
-### F6 — Inglés, documentación y lo que ve el chat
+### F6 — Inglés, documentación y lo que ve el chat · completada el 24-09-2026
 
-**Objetivo.** Los rótulos EN de las ocho plantillas (las maquetas están en
-español; el inglés lo escribimos nosotros con el mismo criterio que
-`etiquetasReporte.mjs`); el título del adjunto lleva el tipo («Reporte
-técnico — Nuevo-Modor — la última semana») sin tocar `Asistente.jsx` (ya pinta
-`adjunto.titulo`); `docs/HANDOFF.md` §0 (tabla del asistente: dónde viven los
-reportes) y §9 (cuentas nuevas de `verificar-herramientas` y `verificar-chat`),
-`CLAUDE.md` §5.1 (las cuentas), `backend/README.md` (la carpeta de portadas),
-`README.md` (que `Documentos/Plantillas/` no es salida), `marca/LEER.txt`.
+**Objetivo.** Los rótulos EN de las ocho plantillas, el título del adjunto con
+el tipo, y la documentación al día.
 
-### F7 — Contra planta, y cierre
+**Lo que se hizo.**
 
-**Objetivo.** Con el backend contra ICONICS y `vib-motor-03`, pedir los ocho
-desde el chat con frases naturales, abrir los PDF, y medir: **tiempo** por
-plantilla (D14), **tamaño** (el arte añade ~0,5 MB por portada), y que cada
-sección sin dato diga su motivo de verdad y no uno genérico. Lo que salga se
-escribe en el plan tal como pasó, se archiva en `docs/completados/` y se
-actualizan HANDOFF y CLAUDE.md. Si algo se mide mal (una plantilla tarda más
-de lo razonable, un PDF pesa demasiado), se decide **con la medida delante**,
-no antes.
+- **El inglés estaba completo**, y ahora hay una prueba que lo exige:
+  recorre el catálogo español entero y falla si al inglés le falta una clave.
+  No es cosmético — una clave ausente vale `undefined`, y pdfkit escribe
+  «undefined» en el PDF o revienta al medir su ancho. Es justo lo que pasó
+  con `predicciones` en la F5, que tenía su motivo pero no sus rótulos.
+- **Las doce claves que coinciden palabra por palabra** («Variable», «Tag»,
+  «No.», «Prob.», «Control») se listan una a una en esa prueba: se escriben
+  igual en los dos idiomas, y enumerarlas hace que una nueva que SÍ debería
+  traducirse salte a la vista en vez de esconderse entre las legítimas.
+- **El título del adjunto ya llevaba el tipo** desde la F3
+  (`${documento.titulo} — ${entrada.nombre} — ${ventana.etiqueta}`), sin
+  tocar `Asistente.jsx`.
+- **`backend/README.md`** gana la sección «Los reportes por plantilla»: el
+  reparto pieza a pieza —qué sabe cada una y qué NO—, que añadir el noveno
+  tipo es escribir un módulo, y que `predicciones` está apagado a propósito.
+- **`README.md`** dice que `docs/plantillas-reportes/` es **referencia de
+  diseño, no una salida**: no se rellenan los `.docx` ni se emiten.
+
+### F7 — Contra planta, y cierre · completada el 24-09-2026
+
+**Objetivo.** Con el backend contra ICONICS y `vib-motor-03`, generar los
+ocho, abrir los PDF y medir tiempo, tamaño y los motivos de cada ausencia.
+
+**El instrumento.** `scripts/medir-reportes-en-planta.mjs` (nuevo). Es un
+`medir-*`, no un verificador: necesita planta y no devuelve código de error.
+**No pasa por el modelo** a propósito —que elige bien el tipo ya se midió en
+la F3.4, 14 de 14— porque aquí la pregunta es cuánto tarda y cuánto pesa cada
+plantilla leyendo el historiador real, y el modelo añadiría 15–50 s de
+redacción que no se está midiendo.
+
+**Lo medido** (`vib-motor-03`, últimas 24 h, planta real):
+
+| | |
+|---|---|
+| Emitidos | **8 de 9** (`predicciones` se niega, como debe) |
+| Tiempo | mediana **5,5 s**; el más lento `catalogo` con 6,1 s |
+| Tamaño | **1,7–2,4 MB** por PDF |
+| Secciones sin dato y **sin motivo** | **ninguna** |
+
+**El tamaño es el arte, no el compositor.** El fondo de portada pesa 0,95 MB,
+el cintillo 0,37 y el banner 0,31: 1,63 MB fijos antes de dibujar nada, más
+0,25–0,66 de la portada de cada tipo. Son los PNG que entregó el cliente. No
+se toca sin pedirlo: recomprimirlos cambia la marca, y D14 dice que se decide
+con la medida delante — la medida dice que el contenido aporta ~0,2 MB.
+
+**Cuatro defectos que sólo se vieron contra planta.**
+
+1. **Los tres apoyos salían como «Lado acople».** Una regla de ámbito `canal`
+   se evalúa una vez por apoyo y los tres riesgos llevan el MISMO `id` con
+   distinto `canal`; la matriz los indexaba por `id`, así que un `find`
+   siempre devolvía el primero. En la espejo no se vio porque allí las
+   reglas activas eran otras. Lo grave no era el rótulo: **la frecuencia
+   observada de un apoyo se habría atribuido a los otros dos**. Corregido con
+   `claveDeRiesgo` (`id@canal`) en el dominio, y con una prueba que lo fija.
+2. **El motivo de la matriz vacía era el TÍTULO de otra sección.** Salía «2b.
+   Riesgos que no se pueden situar en la matriz» donde debía ir una frase.
+   Ahora dice que hay riesgos activos pero ninguno observable, y por qué.
+3. **«Principales riesgos» decía «no hay riesgo que situar» habiendo ocho
+   activos.** Dos cosas distintas —no haber riesgos y no poder observarlos—
+   contadas como la misma, y la más tranquilizadora.
+4. **Tres filas idénticas en el plan de acción**, una por apoyo, sin decir de
+   cuál. Se añadió la columna «Punto» a los planes de riesgos, alarmas e
+   ingeniería.
+
+De estos, el 1 es el que justifica la fase: ninguna prueba con la espejo lo
+habría encontrado, porque depende de qué reglas estén activas en la máquina
+de verdad.
+
+**Lo que la planta enseñó y no es un defecto.** `energias` no emite consumo
+porque la potencia del variador **no tiene muestras** en el historiador
+—distinto de la espejo, que las simula—, y lo dice con esas palabras.
+`alarmas` no tiene eventos porque ninguna bandera cambió de estado en 24 h, y
+también lo distingue de «no hay serie». Las dos son medidas, no huecos.
 
 ---
 

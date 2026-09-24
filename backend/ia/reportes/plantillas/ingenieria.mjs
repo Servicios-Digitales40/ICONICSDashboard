@@ -74,9 +74,14 @@ export default {
 
     const filasPlan = activos
       .filter((r) => r.accion)
+      /* Con el PUNTO: ver la nota de riesgos (F7). */
       .map((r, i) => ({
         color: r.nivel,
-        celdas: { numero: String(i + 1), accion: r.accion, responsable: null, fecha: null, estado: null },
+        celdas: {
+          numero: String(i + 1),
+          punto: r.canal ? nombreDeGrupo(d.grupos, r.canal, idioma) : c.todaLaMaquina,
+          accion: r.accion, responsable: null, fecha: null, estado: null,
+        },
       }))
 
     return {
@@ -116,10 +121,11 @@ export default {
         { id: 'plan', titulo: t.secciones.plan, bloque: 'tabla',
           columnas: [
             { clave: 'numero', titulo: t.columnas.numero, ancho: 0.6, align: 'right' },
-            { clave: 'accion', titulo: t.columnas.accion, ancho: 3.8 },
-            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.5 },
-            { clave: 'fecha', titulo: t.columnas.fecha, ancho: 1.2 },
-            { clave: 'estado', titulo: t.columnas.estado, ancho: 1.2 },
+            { clave: 'punto', titulo: t.columnas.punto, ancho: 1.4 },
+            { clave: 'accion', titulo: t.columnas.accion, ancho: 3.2 },
+            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.4 },
+            { clave: 'fecha', titulo: t.columnas.fecha, ancho: 1.1 },
+            { clave: 'estado', titulo: t.columnas.estado, ancho: 1.1 },
           ],
           filas: filasPlan,
           pie: t.pieGestion,

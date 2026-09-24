@@ -427,8 +427,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 439 — contratos HTTP, config, logger, reportes por plantilla
-cd react-dashboard && npm test  # 1191 (+20 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 440 — contratos HTTP, config, logger, reportes por plantilla
+cd react-dashboard && npm test  # 1192 (+20 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 
@@ -512,11 +512,12 @@ Un trabajo largo se escribe como `docs/por-completar/PLAN-N-NOMBRE.md`, con:
 El plan **se archiva en `docs/completados/` cuando termina, nunca se borra**.
 El **42.5** (la UI de las máquinas configuradas y la limpieza del tanque, con
 su F6 de ajustes tras mirarlo en planta) se completó y archivó el 23-09-2026.
-Vivos hoy: el **33** (modularidad de máquinas), con su F9 —la estación de
-llenado como configurada— **bloqueada hasta reabrir** la rama, y el **44**
-(reportes por plantilla: ocho tipos de PDF que el asistente compone desde
-`backend/ia/reportes/`, escrito el 23-09-2026, con F0–F5 hechas y siete de
-los ocho tipos generándose ya). El
+Vivo hoy sólo el **33** (modularidad de máquinas), con su F9 —la estación de
+llenado como configurada— **bloqueada hasta reabrir** la rama. El **44**
+(reportes por plantilla) se completó y archivó el 24-09-2026: siete de los
+ocho tipos se generan y están verificados contra planta con `vib-motor-03`;
+el octavo, `predicciones`, está escrito y apagado porque ninguna máquina
+declara mecanismos de desgaste. El
 **42** (verificar una bandera que nunca cambió sin forzarla, desde B13) se
 escribió y se completó el 22-09-2026 por la tarde: midió primero cómo registra
 el historiador una constante y de ahí salió el criterio `registrada-constante`

@@ -78,7 +78,14 @@ se enteran solos. El procedimiento completo está en
 │                       los catálogos de señales, el estado y los umbrales
 ├── scripts/            Verificadores y sondas contra el servidor real
 └── docs/               Planes, y los backlogs de backend y frontend
+    └── plantillas-reportes/  Las ocho maquetas Word de los reportes
 ```
+
+`docs/plantillas-reportes/` guarda los `.docx` que entregó el cliente como
+**referencia de diseño de los PDF que genera el asistente**. No son una
+salida del programa y no se rellenan: el reporte se compone desde
+`backend/ia/reportes/` y sale en PDF. Están versionadas para poder contrastar
+lo que se dibuja con lo que se pidió — ver [`docs/plantillas-reportes/LEER.md`](docs/plantillas-reportes/LEER.md).
 
 `shared/` existe porque el backend y el frontend necesitan las mismas reglas de
 negocio —qué señales hay, cómo se nombra un punto, cuándo una medida está fuera

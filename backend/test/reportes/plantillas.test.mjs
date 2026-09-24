@@ -153,6 +153,58 @@ describe('el registro', () => {
     expect(cabeErrores).toEqual([])
   })
 
+  it('el catálogo inglés tiene TODAS las claves del español, y ninguna es un hueco (F6)', () => {
+    /*
+     * ── POR QUÉ NO BASTA CON MIRAR LOS TÍTULOS ────────────────────
+     *
+     * Una clave que falte en `EN` no truena: `etq.plantillas.x.y` vale
+     * `undefined` y pdfkit escribe «undefined» en el PDF, o lanza al medir
+     * su ancho. Pasó con `predicciones` en la F5, que tenía su entrada en
+     * `pendientes` pero no sus rótulos, y sólo se habría visto el día de
+     * encenderla.
+     *
+     * Las que coinciden palabra por palabra («Variable», «Tag», «No.») NO
+     * son un fallo: se escriben igual en los dos idiomas. Se listan aparte
+     * para que quien añada una clave nueva vea si la suya está ahí por
+     * descuido o porque de verdad no cambia.
+     */
+    const es = etiquetasDeReporte('es').plantillas
+    const en = etiquetasDeReporte('en').plantillas
+    const faltan = []
+    const iguales = []
+
+    const recorrer = (a, b, ruta) => {
+      for (const clave of Object.keys(a)) {
+        if (!(clave in b)) { faltan.push(`${ruta}.${clave}`); continue }
+        if (a[clave] && typeof a[clave] === 'object' && typeof b[clave] === 'object') {
+          recorrer(a[clave], b[clave], `${ruta}.${clave}`)
+        } else if (typeof a[clave] === 'string' && a[clave] === b[clave]) {
+          iguales.push(`${ruta}.${clave}`)
+        }
+      }
+    }
+    recorrer(es, en, 'plantillas')
+
+    expect(faltan, 'claves del catálogo español que el inglés no tiene').toEqual([])
+
+    /* Las que se escriben igual, una por una: si aparece una nueva que SÍ
+       debería traducirse, esta lista la delata. */
+    expect(iguales.sort()).toEqual([
+      'plantillas.alarmas.columnas.numero',
+      'plantillas.energias.columnas.variable',
+      'plantillas.ingenieria.columnas.numero',
+      'plantillas.predicciones.columnas.numero',
+      'plantillas.predicciones.columnas.variable',
+      'plantillas.riesgos.columnas.control',
+      'plantillas.riesgos.columnas.numero',
+      'plantillas.riesgos.columnas.probabilidad',
+      'plantillas.sensores.columnas.no',
+      'plantillas.sensores.columnas.tag',
+      'plantillas.sensores.columnas.variable',
+      'plantillas.tecnico.columnas.variable',
+    ])
+  })
+
   it('«Elaboró» lleva a quien preguntó si hay sesión; sin ella, el asistente (D10, §6.1)', () => {
     const etq = etiquetasDeReporte('es')
     expect(firmasDe(etq, 'moises')[0]).toEqual({ rol: 'Elaboró', nombre: 'moises · vía el asistente de planta TDCON' })

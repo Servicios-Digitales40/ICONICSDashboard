@@ -24,7 +24,7 @@
  * residual) no sale de planta y se deja para llenar a mano (D3).
  */
 import { firmasDe, nombreDeGrupo, parrafosDeCierre } from './comun.mjs'
-import { LADO_MATRIZ } from '../../../../shared/eva/comun/matrizRiesgo.js'
+import { LADO_MATRIZ, claveDeRiesgo } from '../../../../shared/eva/comun/matrizRiesgo.js'
 
 /** El nivel de un riesgo, con el rótulo del catálogo común. */
 const nivelDe = (r, c) => c.nivel[r.nivel] ?? r.nivel
@@ -51,7 +51,7 @@ export default {
 
     /* La fila de un riesgo situado: sus dos números y de dónde salieron. */
     const filaPrincipal = (celda) => {
-      const riesgo = activos.find((r) => r.id === celda.id) ?? {}
+      const riesgo = activos.find((r) => claveDeRiesgo(r) === celda.clave) ?? {}
       const pct = (celda.fraccion * 100).toFixed(celda.fraccion < 0.01 ? 2 : 0)
       return {
         color: celda.severidad,
@@ -69,7 +69,7 @@ export default {
     /* Los que no se pueden situar: se listan con el motivo, nunca con un
        número inventado para que la tabla quede cuadrada. */
     const filasSinObservar = (matriz?.sinObservar ?? []).map((s) => {
-      const riesgo = activos.find((r) => r.id === s.id) ?? {}
+      const riesgo = activos.find((r) => claveDeRiesgo(r) === s.clave) ?? {}
       return {
         color: riesgo.nivel ?? null,
         celdas: {
@@ -86,9 +86,12 @@ export default {
        orden del dominio (lo grave primero). Control y responsable en blanco. */
     const filasMitigacion = activos
       .filter((r) => r.accion)
+      /* Con el PUNTO: una regla de apoyo produce tres riesgos con la misma
+          acción, y sin decir de qué apoyo es cada uno las tres filas parecen
+          un error de copiado (visto contra planta, F7). */
       .map((r, i) => ({
         color: r.nivel,
-        celdas: { numero: String(i + 1), accion: r.accion, control: r.norma ?? null, responsable: null, estado: null },
+        celdas: { numero: String(i + 1), punto: puntoDe(r), accion: r.accion, control: r.norma ?? null, responsable: null, estado: null },
       }))
 
     const pieMatriz = [t.pieMatriz, matriz?.algunoHeredado ? t.pieHeredado : null].filter(Boolean).join(' ')
@@ -106,7 +109,9 @@ export default {
       secciones: [
         { id: 'matriz', titulo: t.secciones.matriz, bloque: 'matriz',
           celdas, lado: LADO_MATRIZ, ejeX: t.ejeProbabilidad, ejeY: t.ejeImpacto, pie: pieMatriz,
-          ...(celdas.length ? {} : { ausente: activos.length ? t.secciones.sinObservar : t.sinRiesgos }) },
+          /* El motivo es una FRASE, no el título de la sección de al lado:
+             con riesgos activos pero ninguno observable, decirlo así. */
+          ...(celdas.length ? {} : { ausente: activos.length ? t.ningunoObservable : t.sinRiesgos }) },
 
         { id: 'principales', titulo: t.secciones.principales, bloque: 'tabla',
           columnas: [
@@ -123,7 +128,10 @@ export default {
             { clave: 'estado', titulo: t.columnas.estado, ancho: 0.9 },
           ],
           filas: celdas.map(filaPrincipal),
-          ...(celdas.length ? {} : { ausente: t.sinRiesgos }) },
+          /* Mismo reparto que la matriz: «no hay riesgos» y «los hay pero
+             ninguno se puede observar» son dos cosas distintas, y decir la
+             primera habiendo cinco activos sería tranquilizar sin motivo. */
+          ...(celdas.length ? {} : { ausente: activos.length ? t.ningunoObservable : t.sinRiesgos }) },
 
         { id: 'sin-observar', titulo: t.secciones.sinObservar, bloque: 'tabla',
           columnas: [
@@ -137,10 +145,11 @@ export default {
 
         { id: 'mitigacion', titulo: t.secciones.mitigacion, bloque: 'tabla',
           columnas: [
-            { clave: 'numero', titulo: t.columnas.numero, ancho: 0.4, align: 'right' },
-            { clave: 'accion', titulo: t.columnas.accion, ancho: 3.6 },
-            { clave: 'control', titulo: t.columnas.control, ancho: 2 },
-            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.4 },
+            { clave: 'numero', titulo: t.columnas.numero, ancho: 0.6, align: 'right' },
+            { clave: 'punto', titulo: t.columnas.punto, ancho: 1.4 },
+            { clave: 'accion', titulo: t.columnas.accion, ancho: 3 },
+            { clave: 'control', titulo: t.columnas.control, ancho: 1.7 },
+            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.6 },
             { clave: 'estado', titulo: t.columnas.estado, ancho: 1 },
           ],
           filas: filasMitigacion,

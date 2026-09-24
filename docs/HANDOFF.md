@@ -190,8 +190,8 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1191** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F4; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
-| Suite de backend | **439** pruebas (438 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 24-09-2026, tras Plan 44 F5; eran 437 tras la F4)* |
+| Suite de frontend | **1192** pruebas · 20 omitidas *(a 24-09-2026, con el Plan 44 completo; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
+| Suite de backend | **440** pruebas (439 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 24-09-2026, con el Plan 44 completo; eran 437 tras la F4)* |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **178** correctas (13 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
 | `verificar-chat` | **72** correctas |
@@ -430,33 +430,10 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 > este día: Planta y Detalle genéricos, la bitácora vaciada, todas las vistas
 > del tanque borradas, el código muerto fuera, y la F6 con lo que la máquina
 > pidió al mirarla en planta (filtros, mudas listadas, configuración corta,
-> nombre y alias por asset, fuera el muro). En `docs/por-completar/` quedan
-> el **Plan 33** y el **Plan 44** (reportes por plantilla, escrito ese mismo
-> día; F0–F4 hechas). El siguiente número libre es el **45**; el **43** está
-> reservado al tanque como máquina configurada.
-
-**`PLAN-44-REPORTES-POR-PLANTILLA.md`** — el usuario entregó ocho maquetas
-Word (técnico, vibraciones, sensores, riesgos, alarmas, ingeniería, energías,
-predicciones) para que `generar_reporte` sepa componer cada tipo. **F0–F5 completas** (F0–F4 el 23-09-2026, F5 el 24-09-2026): maquetas en `docs/plantillas-reportes/`, arte en
-`backend/ia/marca/portadas/`, un compositor por bloques
-(`reportes/compositor.mjs`), recolectores deterministas y `tipo` como
-argumento de la herramienta. **Siete de las ocho ya se componen**: técnico,
-vibraciones, lectura de sensores, riesgos, alarmas, ingeniería y energías.
-**Todas las decisiones de §6 cerradas**, incluida la D15 (la matriz P×I:
-impacto declarado por cada regla del tipo, probabilidad observada contando
-instantes del historiador) y la §6.2 (los kWh se ESTIMAN integrando la
-potencia del variador, y el PDF lleva una sección que dice cómo).
-
-**`predicciones` es el único que no sale, y NO por falta de trabajo**: su
-plantilla está escrita entera. Se niega porque ninguna máquina configurada
-declara mecanismos de desgaste (nacen con `desgaste: null`), así que no hay
-nada que pronosticar. Emitir el PDF con las casillas vacías diría, por el
-mero hecho de existir con ese membrete, que alguien pronosticó (D12).
-
-**F6–F7 por hacer**: repasar el inglés de las ocho y la documentación; y la
-vuelta contra planta con `vib-motor-03`, midiendo tiempo y tamaño por
-plantilla. **Vive en `backend/ia/`**: su D11 dice qué archivos calientes toca
-y cómo avisar.
+> nombre y alias por asset, fuera el muro). En `docs/por-completar/` queda
+> sólo el **Plan 33**: el **44** (reportes por plantilla) se escribió ese
+> mismo día y se completó el 24-09-2026. El siguiente número libre es el
+> **45**; el **43** está reservado al tanque como máquina configurada.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
@@ -464,6 +441,19 @@ se puede hacer sin tocar el código del tanque. Es el final de la rama, no una
 fase.
 
 **Archivados hoy, con su estado reescrito con lo que de verdad pasó:**
+
+- **44** (reportes por plantilla) — escrito el 23-09-2026 y **completado el
+  24-09**. `generar_reporte` recibe un `tipo` y compone el PDF de esa
+  plantilla desde `backend/ia/reportes/`. **Siete de los ocho se generan** y
+  están verificados CONTRA PLANTA (`vib-motor-03`): 5,4–6,1 s y 1,7–2,4 MB
+  cada uno, con `scripts/medir-reportes-en-planta.mjs`. El octavo,
+  `predicciones`, está escrito entero y apagado a propósito: ninguna máquina
+  declara mecanismos de desgaste, y un PDF con las casillas vacías diría —por
+  existir con ese membrete— que alguien pronosticó. Lo que la F7 destapó y la
+  espejo no podía: una regla de apoyo produce tres riesgos con el MISMO `id`,
+  y la matriz los indexaba por él, así que los tres salían como «Lado acople»
+  y la frecuencia de un apoyo se habría atribuido a los otros dos. Corregido
+  con `claveDeRiesgo` (`id@canal`) en el dominio.
 
 - **42** (verificar una bandera que nunca cambió, sin forzarla) — escrito y
   completado el 22-09-2026 por la tarde. F0 midió que el historiador registra
@@ -829,8 +819,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **438 passed** de 439 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1191 passed · 20 skipped** *(23-09-2026, tras Plan 44 F4)* |
+| Backend | **439 passed** de 440 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Frontend | **1192 passed · 20 skipped** *(24-09-2026, Plan 44 completo)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.
@@ -922,6 +912,25 @@ Es un `medir-`, no un `verificar-`: imprime a qué máquina fue cada herramienta
 y no devuelve código de error. Apaga la autenticación **sólo en su proceso**
 (monta la app sin puerto); `medir-asistente.mjs`, que no lo hace, recibe 401
 con `AUTH_HABILITADA=true` y está anotado en el plan.
+
+**Los ocho reportes contra planta** (Plan 44 F7), con tiempo, tamaño y el
+motivo de cada sección sin dato:
+
+```bash
+node --env-file=.env.local scripts/medir-reportes-en-planta.mjs
+```
+
+Medido el 24-09-2026 sobre `vib-motor-03`, 24 h: **8 de 9 emitidos** en
+**5,4–6,1 s** y **1,7–2,4 MB** cada uno, ninguna sección sin dato y sin
+motivo. `predicciones` se niega, que es lo correcto. **NO pasa por el
+modelo** a propósito: que elige bien el tipo ya se mide en
+`medir-tipo-de-reporte.mjs`, y aquí la pregunta es qué cuesta leer el
+historiador real.
+
+El **tamaño es el arte, no el compositor**: el fondo de portada pesa 0,95 MB,
+el cintillo 0,37 y el banner 0,31 —1,63 MB fijos antes de dibujar nada— más
+la portada del tipo. El contenido aporta ~0,2 MB. Recomprimirlos cambia la
+marca del cliente, así que no se toca sin pedirlo.
 
 ### La suite intermitente
 

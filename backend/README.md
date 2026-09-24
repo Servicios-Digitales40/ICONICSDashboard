@@ -285,6 +285,12 @@ backend/
 │   │   ├── historicos/    9 · todo lo que pregunta al pasado
 │   │   ├── documentacion/ 3 · manuales y dossier de síntoma
 │   │   └── diagnostico/   1 · diagnosticar_falla, sobre el motor
+│   ├── reportes/          Los ocho tipos de reporte por plantilla (Plan 44)
+│   │   ├── plantillas/    Una por tipo: qué secciones lleva y de dónde sale cada cifra
+│   │   ├── recolectores.mjs  Lo que una plantilla necesita saber, en código
+│   │   ├── compositor.mjs    Dibuja los bloques; no sabe de contenido
+│   │   └── lienzo.mjs        Marca, folio, cintillo y paginación
+│   ├── marca/             Arte del PDF: las tres piezas de marca y `portadas/<tipo>.png`
 │   ├── reporte.mjs        Composición del PDF (carga diferida)
 │   └── voz.mjs            Whisper
 │
@@ -317,6 +323,44 @@ está como está.
 `ia/` importa además de [`shared/`](../shared/README.md), en la raíz del
 repositorio: las reglas del historiador y el catálogo de tags son las mismas
 que usa el frontend, y tenerlas dos veces las haría divergir.
+
+## Los reportes por plantilla (Plan 44)
+
+`generar_reporte` recibe un `tipo` y compone el PDF de esa plantilla. Los
+ocho tipos salen de las maquetas Word que entregó el cliente, versionadas en
+[`docs/plantillas-reportes/`](../docs/plantillas-reportes/) — **son la
+referencia de diseño, no una salida del programa**: no se rellenan ni se
+emiten `.docx`.
+
+El reparto es el mismo criterio que el de las herramientas, dependencia y no
+tema:
+
+| Pieza | Sabe de | No sabe de |
+|---|---|---|
+| `plantillas/<tipo>.mjs` | qué secciones lleva ese reporte y de dónde sale cada cifra | cómo se dibuja nada |
+| `recolectores.mjs` | leer la máquina, sus riesgos y sus series, y darles forma | qué plantilla lo pidió |
+| `compositor.mjs` | dibujar siete tipos de bloque | qué significa lo que dibuja |
+| `lienzo.mjs` | marca, folio, cintillo, paginación | todo lo demás |
+
+Añadir el noveno tipo es escribir un módulo en `plantillas/` y registrarlo.
+No se toca el compositor.
+
+**Siete de los ocho se generan.** `predicciones` está escrito entero y
+apagado a propósito: ninguna máquina configurada declara mecanismos de
+desgaste, así que no hay nada que pronosticar, y un PDF con las casillas
+vacías diría —por existir con ese membrete— que alguien pronosticó.
+
+**Lo que falta se dibuja con su motivo, no se omite.** Una sección sin fuente
+sale con su título y la razón concreta en gris: «esta máquina no mide caudal»
+no es lo mismo que «el historiador no tiene muestras», y se arreglan en
+sitios distintos. El manifiesto que devuelve la herramienta
+(`seccionesConDato` / `seccionesSinDato`) es lo que el modelo cuenta, para
+que no tenga que leer el PDF.
+
+**El arte** vive en `ia/marca/`: las tres piezas comunes y una portada por
+tipo en `portadas/<tipo>.png`. Si falta alguna, el PDF sale igual sin ella
+—ver `ia/marca/LEER.txt`—. Los PDF emitidos van a `IA_REPORTES_DIR` y se
+sirven por enlace firmado (`REPORTES_SECRETO`).
 
 ## Las herramientas del asistente, por familias
 

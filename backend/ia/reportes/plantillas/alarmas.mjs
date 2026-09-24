@@ -102,9 +102,15 @@ export default {
 
     const filasAcciones = (d.riesgos?.activos ?? [])
       .filter((r) => r.accion)
+      /* Con el PUNTO, por lo mismo que en riesgos: tres apoyos con la misma
+          acción no pueden salir como tres filas idénticas (F7). */
       .map((r, i) => ({
         color: r.nivel,
-        celdas: { numero: String(i + 1), accion: r.accion, responsable: null, fecha: null },
+        celdas: {
+          numero: String(i + 1),
+          punto: r.canal ? nombreDeGrupo(d.grupos, r.canal, idioma) : c.todaLaMaquina,
+          accion: r.accion, responsable: null, fecha: null,
+        },
       }))
 
     return {
@@ -159,9 +165,10 @@ export default {
 
         { id: 'acciones', titulo: t.secciones.acciones, bloque: 'tabla',
           columnas: [
-            { clave: 'numero', titulo: t.columnas.numero, ancho: 0.4, align: 'right' },
-            { clave: 'accion', titulo: t.columnas.accion, ancho: 4 },
-            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.4 },
+            { clave: 'numero', titulo: t.columnas.numero, ancho: 0.6, align: 'right' },
+            { clave: 'punto', titulo: t.columnas.punto, ancho: 1.4 },
+            { clave: 'accion', titulo: t.columnas.accion, ancho: 3.4 },
+            { clave: 'responsable', titulo: t.columnas.responsable, ancho: 1.3 },
             { clave: 'fecha', titulo: t.columnas.fecha, ancho: 1.2 },
           ],
           filas: filasAcciones,
