@@ -167,18 +167,26 @@ commit: el plan se entrega sin comitear.
 El ciclo de `PRODUCT.md`, punto por punto. ✓ = hace lo que dice y está
 medido · ◐ = funciona pero con un resto que desmiente algo · ✗ = falta.
 
+*Actualizada el 24-09-2026 por la tarde, con F2 y F4 cerradas. Lo tachado se
+hizo; lo que queda dice de quién depende.*
+
 | | Promesa | Hoy | Qué falta |
 |---|---|---|---|
-| ✓ | **Configurar** desde el árbol (`ac:`/`hda:`/`ae:`), roles del tipo, nombre y alias por activo, limitaciones | Probado en planta el 22 y 23-09 | Nombrar `V20` y `TORRETA` (F1.2) |
-| ◐ | **Verificar**: cada punto existe, cada serie es la suya | 76/76 `VALID`; 62/76 series | Seis tags sin fuente (F1.1, D1); `aRMS_S3`/`aPeak_S3` sin historia (F1.4); una máquina editada dice «no pudo comprobar» sin haberlo intentado (F2.3) |
+| ◐ | **Configurar** desde el árbol (`ac:`/`hda:`/`ae:`), roles del tipo, nombre y alias por activo, limitaciones | Probado en planta el 22 y 23-09 | Nombrar `V20` y `TORRETA` (F1.2, es del despliegue) |
+| ◐ | **Verificar**: cada punto existe, cada serie es la suya | 76/76 `VALID`; 62/76 series. ~~Una máquina editada decía «no pudo comprobar» sin haberlo intentado~~ → **F2.3 hecha** | Seis tags sin fuente (**D1**); `aRMS_S3`/`aPeak_S3` sin historia, que **necesita el motor girando** (F1.4) |
 | ✓ | **Documentar**: manuales al tipo, búsqueda semántica + BM25 | 3 manuales en `tipo:vibraciones`, índice cargado | — |
-| ◐ | **Consultar**: 26 herramientas sobre la máquina de delante, sin inventar | 9/9 llegan; cita unidades; se niega a lo que no puede | Restos del tanque en seis sitios (F2.4, F3.1–3.4); causa inventada de los puntos mudos (F2.4); 25–71 s por respuesta (F3.5, D2); guarda de URL inventada pendiente (F3.6) |
-| ◐ | **Diagnosticar y aprender**: motor determinista, cierre con causa, casos previos | 19 reglas, cierre probado | La única intervención tiene `causa: null`; hecho y propuestas del tanque en la bitácora (F1.3, D3) |
+| ◐ | **Consultar**: 26 herramientas sobre la máquina de delante, sin inventar | 9/9 llegan; cita unidades; se niega a lo que no puede. ~~El pie nombraba al tanque~~ y ~~la causa de los puntos mudos se inventaba~~ → **F2.4 hecha**; ~~el inventario no decía qué máquina está cerrada~~ → **F2.5 hecha** | Cuatro restos del tanque en `backend/ia/**` y los 25–71 s: **todo F3, zona de Gustavo** |
+| ◐ | **Diagnosticar y aprender**: motor determinista, cierre con causa, casos previos | 19 reglas, cierre probado | La única intervención tiene `causa: null`; hecho y propuestas del tanque en la bitácora (**D3**) |
 | ✓ | **Reportes** por plantilla | 7 de 8 contra planta, 5–6 s | `predicciones` apagado a propósito y declarado (Plan 44 D12) |
-| ✓ | **La ausencia de dato no se disfraza** | Mudas listadas, huecos con motivo | — |
-| ◐ | **Lo que no puede hacer, lo declara** | Alarmas sin vista (Plan 41 F4), sin carga, sin pronóstico: declarados | La declaración de UNKNOWN miente (F2.3); `HANDOFF.md` declara como bloqueante algo que ya no lo es (F4) |
-| ◐ | **La tanda dice la verdad** | 41 verificadores, dos suites | Una prueba intermitente (F2.2); la suite ensucia el despliegue (F2.1) |
+| ✓ | **La ausencia de dato no se disfraza** | Mudas listadas, huecos con motivo, y desde F2.4 **nombradas** | — |
+| ✓ | **Lo que no puede hacer, lo declara** | Alarmas sin vista (Plan 41 F4), sin carga, sin pronóstico. ~~La declaración de UNKNOWN mentía~~ → F2.3; ~~el HANDOFF declaraba un bloqueante que ya no lo era~~ → F4 | — |
+| ✓ | **La tanda dice la verdad** | 41 verificadores, dos suites. ~~Una prueba intermitente~~ → F2.2; ~~la suite y los verificadores ensuciaban el despliegue~~ → F2.1 | — |
 | ✓ | **Cerrado no es borrado** (tanque) | Dominio intacto, vistas borradas, pruebas omitidas con motivo | — |
+
+**Dicho en una línea: de las diez promesas, seis están cerradas y las cuatro
+que quedan no dependen de escribir más código en esta rama.** Dos esperan una
+decisión tuya (D1, D3), una espera a que el motor gire, y la cuarta es el
+asistente, que es de Gustavo.
 
 **Lo que se queda como límite declarado**, y no entra en este plan porque no
 depende del código o ya está decidido:
@@ -249,11 +257,26 @@ visto, y una de ellas obligó a arreglar un verificador.
 | **F2.4** | Reescribir el pie de `estadoVibraciones` | Se hizo, **y salió una tercera cosa**: los puntos mudos se nombran por su **hoja** (`DKW_S1`), no por el tag entero, porque seis rutas completas de ICONICS son cuatrocientos caracteres de prefijo repetido dentro de un texto que el modelo copia. El aviso **inglés** cambió con él |
 | **F2.5** | Exponer `cerrado` | Se hizo. Viaja el **texto del motivo**, no un booleano: el registro lo guarda así porque «cerrado» sin el porqué obliga a inventárselo |
 
+**Y una fuga más, que sólo apareció al medir la tanda ENTERA.** Con la suite ya
+limpia, `npm run verificar` seguía moviendo dos diarios del despliegue en cada
+pasada: `verificar-backend` anotaba accionamientos al acusar alarmas y
+`verificar-chat` una línea por cada pregunta al bucle. Mismo defecto por otra
+puerta —las apps que montan usan las rutas por defecto, que se resuelven contra
+la raíz—, y los dos guiones aislaban ya *algunas* cosas una a una, que es
+exactamente cómo se olvida la siguiente. Ahora declaran los cinco archivos de
+estado en su entorno base.
+
+**La lección, para el siguiente que aísle algo:** comprobar el archivo que
+sospechas no basta. Lo que cierra esto es medir **`datos/` entero por hash
+antes y después de la tanda completa**, que es como apareció cada una de las
+tres fugas.
+
 **Lo medido al cerrar:** backend **442/442** (dos pruebas nuevas), frontend
 **1192 · 20 omitidas**, **los 41** verificadores, `verificar-herramientas`
-**180 correctas · 45 omitidas** (eran 178), lint y types limpios. Y lo que
-esta fase existía para arreglar: **tras una tanda entera, ni `datos/` ni
-`backend/datos/` cambian**, comprobado por hash antes y después.
+**180 correctas · 45 omitidas** (eran 178), `verificar-chat` **72**, lint y
+types limpios, bundle dentro de techo. Y lo que esta fase existía para
+arreglar: **tras `npm test` de backend y `npm run verificar` completos, ni
+`datos/` ni `backend/datos/` cambian**, comprobado por hash.
 
 **Las cuatro se vieron fallar antes de darlas por buenas** (`CLAUDE.md` §6.2):
 quitando la aislación, la suite ensucia el despliegue; con `rnd: () => 0`, el
