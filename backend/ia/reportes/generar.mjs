@@ -57,7 +57,7 @@ function configuradasEnServicio() {
  */
 export async function generarReportePorPlantilla(
   { tipo, sistema, periodo, explicacion } = {},
-  { idioma = 'es', resolverSistema, leerMaquina, evaluarRiesgosDe, leerSerieEnRango, reportes, turnos = {}, ahora = () => new Date() },
+  { idioma = 'es', usuario = null, resolverSistema, leerMaquina, evaluarRiesgosDe, leerSerieEnRango, reportes, turnos = {}, ahora = () => new Date() },
 ) {
   const etq = etiquetasDeReporte(idioma)
 
@@ -134,8 +134,10 @@ export async function generarReportePorPlantilla(
 
   /* Fecha Y hora: un PDF se archiva y se lee otro día; «16:19» solo no dice cuándo. */
   const generadoEl = ahora().toLocaleString(idioma === 'en' ? 'en-US' : 'es-MX', { dateStyle: 'short', timeStyle: 'short' })
+  /* Quién firma «Elaboró»: el id de la sesión que preguntó, si la hay (§6.1). */
+  const firmante = typeof usuario === 'string' && usuario.trim() ? usuario.trim() : null
   const documento = plantilla.documento(d, {
-    etq, idioma, entrada, tipo: tipoObj, ventana, generadoEl,
+    etq, idioma, entrada, tipo: tipoObj, ventana, generadoEl, usuario: firmante,
     explicacion: typeof explicacion === 'string' && explicacion.trim() ? explicacion.trim() : null,
   })
 
@@ -174,6 +176,7 @@ export async function generarReportePorPlantilla(
     periodo: ventana.etiqueta,
     folio,
     paginas,
+    elaboro: firmante ? etq.plantillas.comun.firmaUsuario(firmante) : etq.plantillas.comun.firmaAsistente,
     seccionesConDato: conDato,
     ...(sinDato.length ? { seccionesSinDato: sinDato } : {}),
     graficas: d.series.size,

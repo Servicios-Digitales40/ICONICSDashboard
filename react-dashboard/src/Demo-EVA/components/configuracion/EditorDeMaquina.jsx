@@ -89,6 +89,7 @@ import {
   compararConArbol,
   configuracionDesdeMarcas,
   detallesDeAssets,
+  calibracionesDeVariables,
   hojasBajo,
   marcasDe,
   proponerVariables,
@@ -155,6 +156,11 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
   /* Nombre y alias por asset (Plan 42.5 F6, D15), sembrados de lo guardado
      para que editar otra cosa no los pierda: el PATCH reemplaza `assets`. */
   const [detalles, setDetalles] = useState(() => (maquina ? detallesDeAssets(maquina) : {}));
+  /* Última y próxima calibración por sensor (Plan 44 §6.1): lo que quien
+     configura sabe y el árbol de ICONICS no. Se siembra de lo guardado. */
+  const [calibraciones, setCalibraciones] = useState(() => (maquina ? calibracionesDeVariables(maquina) : {}));
+  const cambiarCalibracion = (id, campo, valor) =>
+    setCalibraciones((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { ultima: "", proxima: "" }), [campo]: valor } }));
   const cambiarDetalle = (id, campo, valor) =>
     setDetalles((prev) => ({ ...prev, [id]: { ...(prev[id] ?? { nombre: "", alias: "" }), [campo]: valor } }));
 
@@ -273,8 +279,9 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
         variables,
         contadores: [...contadores].map((pointName) => ({ pointName })),
         detallesDeAsset: detalles,
+        calibraciones,
       }),
-    [formulario, raiz, historico, area, variables, contadores, detalles],
+    [formulario, raiz, historico, area, variables, contadores, detalles, calibraciones],
   );
 
   /* La misma validación que aplica el servidor, antes de enviar: es para lo
@@ -545,6 +552,39 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
                   })}
                 </div>
                 <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, marginTop: 6 }}>{tx("assetAliasHint")}</div>
+              </div>
+            )}
+
+            {/*
+              Calibración por sensor (Plan 44 §6.1). Sólo las variables con rol
+              de MEDIDA: son las que tienen un sensor detrás. ICONICS no sabe
+              cuándo se calibró; lo anota quien configura, y el reporte de
+              lectura de sensores lo imprime; sin fecha dice «sin registro».
+            */}
+            {payload.variables.some((v) => String(v.rol ?? "").startsWith("medida:")) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>{tx("calibracionTitle")}</div>
+                <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, margin: "2px 0 8px" }}>{tx("calibracionHint")}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 8 }}>
+                  {payload.variables.filter((v) => String(v.rol ?? "").startsWith("medida:")).map((v) => {
+                    const c = calibraciones[v.id] ?? { ultima: "", proxima: "" };
+                    return (
+                      <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, alignItems: "center", padding: "6px 10px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+                        <Mono apagado style={{ fontSize: 11 }}>{v.id}</Mono>
+                        <input
+                          className="field" type="date" style={{ ...campo, width: 140 }}
+                          aria-label={tx("calUltima", { id: v.id })}
+                          value={c.ultima} onChange={(e) => cambiarCalibracion(v.id, "ultima", e.target.value)}
+                        />
+                        <input
+                          className="field" type="date" style={{ ...campo, width: 140 }}
+                          aria-label={tx("calProxima", { id: v.id })}
+                          value={c.proxima} onChange={(e) => cambiarCalibracion(v.id, "proxima", e.target.value)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

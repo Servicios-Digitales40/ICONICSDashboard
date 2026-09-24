@@ -407,7 +407,11 @@
       "assetAlias": "Alias del activo {{id}}",
       "assetAliasPlaceholder": "alias, separados por comas",
       "assetAliasHint": "Otras formas de nombrar el activo que el asistente entiende; valen para todas sus variables. En el activo raíz, el nombre y los alias son de la máquina entera.",
-      "useSuggestion": "Usar «{{nombre}}»"
+      "useSuggestion": "Usar «{{nombre}}»",
+      "calibracionTitle": "Calibración de sensores",
+      "calibracionHint": "Última y próxima calibración de cada sensor. ICONICS no lo sabe: lo anota quien configura, y el reporte de lectura de sensores lo imprime. Sin fecha, el reporte dice «sin registro».",
+      "calUltima": "Última calibración de {{id}}",
+      "calProxima": "Próxima calibración de {{id}}"
     },
     "remove": "Quitar del tablero",
     "removeConfirm": "¿Quitar «{{nombre}}» del tablero? Si tiene casos previos se desactiva en vez de borrarse.",

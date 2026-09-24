@@ -4,14 +4,15 @@
  * monitoreadas, lecturas y trazabilidad, tendencia, calibración y calidad de
  * dato, acciones y cierre.
  *
- * ── CALIBRACIÓN: SIN REGISTRO, Y SE DICE (D3) ───────────────────────
+ * ── CALIBRACIÓN: LA ANOTA QUIEN CONFIGURA, O «SIN REGISTRO» (D3, §6.1) ──
  *
- * La maqueta pide «última calibración» y «próxima». ICONICS no las tiene y
- * ninguna máquina las declara todavía; las dos columnas salen «sin registro»
- * en cada fila, y la sección se apoya en lo que SÍ hay: el código de calidad
- * del módulo por medida, y si la serie de cada señal está verificada por el
- * sondeo o no. Si algún día `maquinas.json` lleva un campo de calibración por
- * variable (§6.1 del plan), es una columna que se llena, no una sección nueva.
+ * La maqueta pide «última calibración» y «próxima». ICONICS no las sabe: las
+ * escribe quien configura la máquina, por sensor, en el editor («Calibración
+ * de sensores»), y viajan en `variables[].calibracion` de `maquinas.json`.
+ * Aquí se leen del registro (`entrada.variableDe`), y donde nadie anotó nada
+ * la celda dice «sin registro»: nunca una fecha inventada. La sección se apoya
+ * además en lo que SÍ hay siempre: el código de calidad del módulo por medida,
+ * y si la serie de cada señal está verificada por el sondeo y cómo.
  */
 import {
   desvioTexto, firmasDe, graficaDe, nombreDeGrupo, parrafosDeCierre, rotuloDeEstado, tarjetaDe,
@@ -45,7 +46,7 @@ export default {
 
   claves: ({ medidas }) => medidas,
 
-  documento(d, { etq, idioma, entrada, tipo, ventana, generadoEl, explicacion }) {
+  documento(d, { etq, idioma, entrada, tipo, ventana, generadoEl, explicacion, usuario }) {
     const t = etq.plantillas.sensores
     const c = etq.plantillas.comun
     const recuento = recuentoDe(d.senales)
@@ -76,13 +77,19 @@ export default {
     const filasCalidad = sensores.map((s) => {
       const rol = d.metaDe(s.clave)?.rol
       const claveMedida = rol?.split(':')[1]
+      /* Lo que la CONFIGURACIÓN sabe de esta variable y el estado no compone:
+         su calibración (la anotó quien configura, §6.1) y cómo quedó verificada
+         su serie. Sin fecha, «sin registro»: nunca una fecha inventada. */
+      const configurada = entrada.variableDe?.(s.clave) ?? null
+      const cal = configurada?.calibracion ?? null
+      const como = configurada?.historyVerifiedComo ?? null
       return {
         celdas: {
           tag: s.tag ?? s.clave,
-          ultima: t.sinRegistro,
-          proxima: t.sinRegistro,
+          ultima: cal?.ultima ?? t.sinRegistro,
+          proxima: cal?.proxima ?? t.sinRegistro,
           calidad: familiaDe(rol) === 'medida' ? calidadDe(d.estado.dominio, s.grupo, claveMedida) : null,
-          serie: d.historizada(s.clave) ? t.serieVerificada : t.serieSinVerificar,
+          serie: d.historizada(s.clave) ? (t.serieVerificadaComo[como] ?? t.serieVerificada) : t.serieSinVerificar,
         },
       }
     })
@@ -150,7 +157,7 @@ export default {
              sistema. El número sí va, para que se pueda citar la fila. */
           filas: [1, 2, 3].map((n) => ({ celdas: { no: String(n), accion: ' ', responsable: ' ', fecha: ' ', estatus: ' ' } })) },
         { id: 'cierre', titulo: t.secciones.cierre, bloque: 'texto', parrafos: parrafosDeCierre({ sintesis, explicacion, etq }) },
-        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq) },
+        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq, usuario) },
       ],
     }
   },

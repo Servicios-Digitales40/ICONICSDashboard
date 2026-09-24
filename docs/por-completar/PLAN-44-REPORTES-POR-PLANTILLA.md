@@ -636,9 +636,23 @@ y de dónde tendría que salir cada cosa:
 | Hueco | De dónde saldría | Qué habría que hacer |
 |---|---|---|
 | Impacto de cada riesgo | Del tipo, regla por regla | `impacto` en cada regla (D15); una tarde de criterio de ingeniería por tipo |
-| Fechas de calibración de un sensor | De quien mantiene la planta; ICONICS no las tiene | Un campo opcional por variable en `maquinas.json` (`calibracion: {ultima, proxima}`), editable en la ficha. Es dato de despliegue, no de código |
+| Fechas de calibración de un sensor | De quien mantiene la planta; ICONICS no las tiene | **Hecho (F3.3, 23-09-2026):** `variables[].calibracion: {ultima, proxima}` en `maquinas.json` (`crearVariable` lo limpia, el esquema de la API exige `AAAA-MM-DD`), sección «Calibración de sensores» en el editor para las variables de medida, el registro lo expone (`variableDe`), y el reporte de sensores lo imprime; sin fecha, «sin registro» |
 | Objetivo, avance por disciplina, responsables, fechas (Ingeniería, planes de acción) | De gestión del proyecto, no de planta | O se dejan en blanco para llenar a mano (lo que hace este plan), o el operador los dicta en la pregunta y van al PDF rotulados «proporcionado por el operador». Lo segundo es un argumento más de la herramienta y se puede añadir después sin tocar el compositor |
 | Temperatura, espectro, ejes (Vibraciones) | De la instrumentación: el SM 1281 no los publica | Sin cambio posible en software |
 | Flujo, factor de potencia, meta de consumo (Energías) | De un tipo con medidor de energía o con caudal (la estación de llenado, Plan 43) | Roles `energia:*` en ese tipo; la plantilla ya los pediría por familia |
 | Pronóstico de fallas (Predicciones) | De un tipo que declare mecanismos de desgaste con historia verificada | Hoy toda configurada nace con `desgaste: null`; declararlos es del Plan 43 o posterior |
-| Nombre de quien elaboró | De la sesión (`request.usuario`) | Una línea en `chat.mjs` (archivo caliente, D10) y otra en el compositor |
+| Nombre de quien elaboró | De la sesión (`request.usuario`) | **Hecho (F3.3):** la ruta pasa `usuario` (el id de la sesión, sólo si está autenticada) a `responder()`, el bucle lo pone en el contexto de toda herramienta junto a `idioma`, y `generar_reporte` firma «Elaboró: <id> · vía el asistente». Sin sesión firma el asistente. Archivos calientes tocados: `chat.mjs` (cuatro líneas), `chatRoutes.mjs` (una) |
+
+Y lo tercero que §1.1 pedía al tipo, **los indicadores principales**, queda
+exigido por prueba: todo tipo registrado declara `indicadores` (de uno a
+cuatro roles suyos), o la suite del backend falla nombrándolo.
+
+**F3.3 · Lo que faltaba de los tres reportes, concretado (23-09-2026).** Los
+tres huecos de arriba que dependían de código y no de planta. Medido:
+`verificar-chat` 71 → 72 (la herramienta recibe `usuario` en su contexto, y
+`null` sin sesión), `verificar-herramientas` 198 (una comprobación afirma
+además quién firma), suite del backend +4 (esquema y ruta de calibración,
+firmas, indicadores por tipo), suite del frontend +7 (el dominio de la
+calibración y el editor). El instrumento `scripts/medir-tipo-de-reporte.mjs`
+mide contra el modelo real si elige bien el `tipo` con las frases de §1.2; su
+resultado está en la F7.

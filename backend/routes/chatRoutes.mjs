@@ -297,6 +297,10 @@ export function registerChatRoutes(fastify, { config, chat, cola, diarioConversa
              * entrada nueva al bucle no se cuela sin validar.
              */
             contexto,
+            /* Quién pregunta, para que un reporte lo firme (Plan 44 §6.1). Sólo
+               con sesión de verdad: el anónimo de la autenticación apagada no
+               firma nada. */
+            usuario: request.usuario?.autenticado ? request.usuario.id : null,
           }),
         })
 

@@ -417,8 +417,8 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 429 — contratos HTTP, config, logger, reportes por plantilla
-cd react-dashboard && npm test  # 1166 (+20 omitidas) — dominio, vistas, hooks
+cd backend && npm test          # 433 — contratos HTTP, config, logger, reportes por plantilla
+cd react-dashboard && npm test  # 1180 (+20 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
 

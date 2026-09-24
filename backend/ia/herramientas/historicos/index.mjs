@@ -1390,7 +1390,7 @@ export function crearHerramientasDeHistoricos({
      * `analisis_de_senal`) y pasar aquí su propio comentario, que se imprime
      * aparte y con su procedencia dicha, nunca mezclado con las cifras.
      */
-    async generar_reporte({ senales, periodo, explicacion, sistema, tipo: tipoPedido } = {}, { idioma = 'es' } = {}) {
+    async generar_reporte({ senales, periodo, explicacion, sistema, tipo: tipoPedido } = {}, { idioma = 'es', usuario = null } = {}) {
       /*
        * ── CON `tipo`, UNA PLANTILLA; SIN ÉL, LO DE SIEMPRE (Plan 44 F3) ─
        *
@@ -1413,7 +1413,7 @@ export function crearHerramientasDeHistoricos({
         }
         return generarMod.generarReportePorPlantilla(
           { tipo: tipoPedido, sistema, periodo, explicacion },
-          { idioma, resolverSistema, leerMaquina, evaluarRiesgosDe, leerSerieEnRango, reportes, turnos },
+          { idioma, usuario, resolverSistema, leerMaquina, evaluarRiesgosDe, leerSerieEnRango, reportes, turnos },
         )
       }
 

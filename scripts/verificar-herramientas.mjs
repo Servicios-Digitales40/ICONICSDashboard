@@ -4504,10 +4504,12 @@ await checkAsync('[plantilla] tipo:"lectura de sensores" (texto libre) normaliza
   const reportes = await reportesTmp()
   const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
   const r = await createHerramientas({ client, reportes }).ejecutar(
-    'generar_reporte', { tipo: 'lectura de sensores', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, { idioma: 'en' },
+    'generar_reporte', { tipo: 'lectura de sensores', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, { idioma: 'en', usuario: 'moises' },
   )
   assert.equal(r.ok, true, r.error)
   assert.equal(r.tipo, 'lectura-de-sensores')
+  /* Quien preguntó firma «Elaboró» (Plan 44 §6.1): el id de su sesión llega por el contexto, como `idioma`. */
+  assert.equal(r.elaboro, 'moises · via the TDCON plant assistant')
   assert.equal(r.reporte, 'SENSOR READINGS REPORT')
   assert.ok(r.seccionesConDato.includes('4. Calibration and data quality'))
 })

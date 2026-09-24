@@ -126,7 +126,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 
 ```bash
 ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 198 correctas · 22 omitidas
-ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 71
+ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
 
@@ -189,11 +189,11 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 
 | | |
 |---|---|
-| Suite de frontend | **1172** pruebas · 20 omitidas *(a 23-09 por la tarde, tras Plan 42.5 F6.7; eran 1102 · 29 el 22-09)* |
-| Suite de backend | **429** pruebas (428 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3; eran 401)* |
+| Suite de frontend | **1180** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F3.3; eran 1172 tras el 42.5 y 1102 · 29 el 22-09)* |
+| Suite de backend | **433** pruebas (432 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3.3; eran 401)* |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **198** correctas (13 sobre una configurada, 6 de reportes por plantilla) · **22 omitidas** (cierre) |
-| `verificar-chat` | **71** correctas |
+| `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
 | Bundle | `index` 350,3 KB / 450 · `vendor` 269,1 / 330 · `charts` 326,4 (sin techo) · `three` diferido |
@@ -783,8 +783,8 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **428 passed** de 429 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
-| Frontend | **1172 passed · 20 skipped** *(23-09-2026, tras Plan 42.5 F6.7)* |
+| Backend | **432 passed** de 433 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Frontend | **1180 passed · 20 skipped** *(23-09-2026, tras Plan 44 F3.3)* |
 | Lint y types | sin salida |
 
 **Un rojo nuevo es un defecto de verdad**: lo del cierre ya está omitido.

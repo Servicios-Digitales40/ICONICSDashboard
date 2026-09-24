@@ -23,7 +23,7 @@ export default {
   /** Las medidas con serie, en el orden del tipo; el recolector corta al tope. */
   claves: ({ medidas }) => medidas,
 
-  documento(d, { etq, idioma, entrada, ventana, generadoEl, explicacion }) {
+  documento(d, { etq, idioma, entrada, ventana, generadoEl, explicacion, usuario }) {
     const t = etq.plantillas.tecnico
     const c = etq.plantillas.comun
     const series = [...d.series.values()]
@@ -116,7 +116,7 @@ export default {
           filas: filasAnalisis,
           pie: t.pieAnalisis },
         { id: 'conclusiones', titulo: t.secciones.conclusiones, bloque: 'texto', parrafos: parrafosDeCierre({ sintesis: conclusion, explicacion, etq }) },
-        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq) },
+        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq, usuario) },
       ],
     }
   },

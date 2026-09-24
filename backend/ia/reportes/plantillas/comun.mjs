@@ -107,10 +107,18 @@ export function riesgosDelCanal(riesgos, canalId) {
   return (riesgos?.activos ?? []).filter((r) => (r.canal ?? null) === (canalId ?? null))
 }
 
-/** El bloque de firmas: quien elabora es el asistente; revisar y aprobar se firma a mano (D10). */
-export function firmasDe(etq) {
+/**
+ * El bloque de firmas. «Elaboró» lleva a quien preguntó si hay sesión (su id,
+ * «vía el asistente»), y si no, el asistente solo (D10, revisada en §6.1 del
+ * plan). Revisar y aprobar se firma a mano.
+ *
+ * @param {object} etq
+ * @param {string|null} [usuario]  el id de la sesión que pidió el reporte
+ */
+export function firmasDe(etq, usuario = null) {
   const c = etq.plantillas.comun
-  return [{ rol: c.elaboro, nombre: c.firmaAsistente }, { rol: c.reviso, nombre: null }, { rol: c.aprobo, nombre: null }]
+  const elaboro = usuario ? c.firmaUsuario(usuario) : c.firmaAsistente
+  return [{ rol: c.elaboro, nombre: elaboro }, { rol: c.reviso, nombre: null }, { rol: c.aprobo, nombre: null }]
 }
 
 /** Los párrafos de cierre: la síntesis en código y, si la hay, la redacción del modelo rotulada (D9). */

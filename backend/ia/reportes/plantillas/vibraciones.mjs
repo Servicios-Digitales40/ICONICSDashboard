@@ -38,7 +38,7 @@ export default {
     ...medidas,
   ],
 
-  documento(d, { etq, idioma, entrada, tipo, ventana, generadoEl, explicacion }) {
+  documento(d, { etq, idioma, entrada, tipo, ventana, generadoEl, explicacion, usuario }) {
     const t = etq.plantillas.vibraciones
     const c = etq.plantillas.comun
     const recuento = recuentoDe(d.senales)
@@ -147,7 +147,7 @@ export default {
           filas: filasRecomendaciones,
           pie: t.pieRecomendaciones,
           ...(filasRecomendaciones.length ? {} : { ausente: d.riesgos ? c.sinRiesgosActivos(d.riesgos.evaluadas, noEvaluables) : c.sinDominio }) },
-        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq) },
+        { id: 'firmas', titulo: t.secciones.firmas, bloque: 'firmas', items: firmasDe(etq, usuario) },
       ],
     }
   },

@@ -110,6 +110,16 @@ describe('los tres tipos disponibles, sobre la espejo', () => {
     const r = await generarReportePorPlantilla({ tipo: 'tecnico', periodo: 'últimas 6 horas' }, deps())
     expect(r.ok, r.error).toBe(true)
     expect(r.sistema).toBe(ESPEJO.id)
+    expect(r.elaboro).toBe('Asistente de planta TDCON · generado automáticamente')
+  })
+
+  it('con el usuario de la sesión en las dependencias, «Elaboró» es él y la respuesta lo dice (§6.1)', async () => {
+    const r = await generarReportePorPlantilla({ tipo: 'tecnico', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps({ usuario: ' moises ' }))
+    expect(r.ok, r.error).toBe(true)
+    expect(r.elaboro).toBe('moises · vía el asistente de planta TDCON')
+    /* Un usuario vacío no firma. */
+    const sin = await generarReportePorPlantilla({ tipo: 'tecnico', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps({ usuario: '  ' }))
+    expect(sin.elaboro).toBe('Asistente de planta TDCON · generado automáticamente')
   })
 })
 

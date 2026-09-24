@@ -162,8 +162,8 @@ const herramientasFalsas = {
     { nombre: 'Nivel del tanque', unidad: '%', activo: 'Tanque de almacenamiento', historia: true, soloEnMarcha: false },
   ],
 
-  async ejecutar(nombre, argumentos) {
-    ejecutadas.push({ nombre, argumentos })
+  async ejecutar(nombre, argumentos, contexto = {}) {
+    ejecutadas.push({ nombre, argumentos, contexto })
 
     // La forma que devuelve `estado_del_sistema`: lo que la reconoce es el
     // array `activos`, y de ahí saca `resumirSinModelo` sus ocho líneas.
@@ -1732,6 +1732,27 @@ await check('una consulta fallida no deja foco', async () => {
     instruccionesDelTurno(), /DE QUÉ SE ESTABA HABLANDO/,
     'una herramienta que falló dejó foco'
   )
+})
+
+/* ── Quién pregunta llega a la herramienta (Plan 44 §6.1) ─────────────── */
+
+console.log('\n── El usuario de la sesión en el contexto de la herramienta ──')
+
+await check('la herramienta recibe en su contexto el usuario que la ruta pasó a responder(); sin él, null', async () => {
+  const chat = chatDePrueba()
+  ejecutadas = []
+  guion = {
+    toolCall: { id: 'u1', type: 'function', function: { name: 'historia_de_senal', arguments: '{"senal":"nivel del tanque"}' } },
+    texto: 'Listo.',
+  }
+  await chat.responder({ pregunta: 'historia del nivel', historial: [], idioma: 'es', usuario: 'moises', onEvento: () => {} })
+  assert.equal(ejecutadas.length, 1)
+  assert.equal(ejecutadas[0].contexto.usuario, 'moises')
+  assert.equal(ejecutadas[0].contexto.idioma, 'es')
+
+  ejecutadas = []
+  await chat.responder({ pregunta: 'historia del nivel', historial: [], idioma: 'es', onEvento: () => {} })
+  assert.equal(ejecutadas[0].contexto.usuario, null, 'sin sesión, la herramienta no recibe un nombre inventado')
 })
 
 /* ── Cierre ──────────────────────────────────────────────────────────── */

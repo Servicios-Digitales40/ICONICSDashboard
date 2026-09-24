@@ -545,3 +545,50 @@ describe("nombre y alias por activo (Plan 42.5 F6, D15)", () => {
     });
   });
 });
+
+describe("calibración por sensor (Plan 44 §6.1)", () => {
+  it("cada variable de medida marcada ofrece última y próxima calibración, y lo escrito viaja en su variable; lo vacío no viaja", async () => {
+    crearMaquina.mockResolvedValue({ ok: true, maquina: { id: "vib-motor-02", nombre: "Motor 2" }, avisos: [] });
+    montar();
+    fireEvent.change(screen.getByLabelText("Identificador"), { target: { value: "vib-motor-02" } });
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Motor 2" } });
+    fireEvent.change(screen.getByLabelText("PLC"), { target: { value: "PLC_2 · ua:DEMO3" } });
+    await explorar();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar todas las variables de S1/ }));
+    await screen.findByText(/26 variables marcadas/);
+
+    fireEvent.change(screen.getByLabelText("Última calibración de vRMS_S1"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Próxima calibración de vRMS_S1"), { target: { value: "2027-03-01" } });
+    /* Una bandera no es un sensor: no se le ofrece calibración. */
+    expect(screen.queryByLabelText("Última calibración de Alarma_S1")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Dar de alta la máquina/ }));
+    await waitFor(() => expect(crearMaquina).toHaveBeenCalledTimes(1));
+    const variables = crearMaquina.mock.calls[0][0].variables;
+    expect(variables.find((v) => v.id === "vRMS_S1").calibracion).toEqual({ ultima: "2026-09-01", proxima: "2027-03-01" });
+    expect(variables.find((v) => v.id === "aRMS_S1")).not.toHaveProperty("calibracion");
+  });
+
+  it("al editar, las fechas guardadas se siembran y sobreviven al PATCH aunque no se toquen", async () => {
+    const guardada = {
+      id: "vib-motor-02", nombre: "Motor 2", tipo: "vibraciones", plc: "PLC_2 · ua:DEMO3",
+      arboles: { enVivo: RAIZ, historico: HDA, alarmas: AREA },
+      assets: [
+        { id: "Vibraciones", pointName: RAIZ, rol: "raiz" },
+        { id: "S2", pointName: `${RAIZ}S2/`, rol: "secundario" },
+      ],
+      variables: [
+        { id: "vRMS_S2", pointName: `${RAIZ}S2/vRMS_S2`, historyPointName: `${HDA}${B}S2:vRMS_S2`, historyVerified: true, assetId: "S2", rol: "medida:vRMS", acceso: "read", calibracion: { ultima: "2026-08-20", proxima: null } },
+      ],
+    };
+    editarMaquina.mockResolvedValue({ ok: true, maquina: guardada, avisos: [] });
+    montar({ maquina: guardada });
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de S2/ });
+    expect(screen.getByLabelText("Última calibración de vRMS_S2").value).toBe("2026-08-20");
+    expect(screen.getByLabelText("Próxima calibración de vRMS_S2").value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
+    await waitFor(() => expect(editarMaquina).toHaveBeenCalledTimes(1));
+    expect(editarMaquina.mock.calls[0][1].variables.find((v) => v.id === "vRMS_S2").calibracion).toEqual({ ultima: "2026-08-20", proxima: null });
+  });
+});

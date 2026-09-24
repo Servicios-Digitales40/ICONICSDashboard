@@ -5,8 +5,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { CATALOGO, PLANTILLAS, TIPOS, TIPOS_DISPONIBLES, plantillaDe, tipoDeReporte } from '../../ia/reportes/plantillas/index.mjs'
+import { firmasDe } from '../../ia/reportes/plantillas/comun.mjs'
 import { BLOQUES } from '../../ia/reportes/compositor.mjs'
 import { etiquetasDeReporte } from '../../ia/i18n/etiquetasReporte.mjs'
+import { TIPOS as TIPOS_DE_MAQUINA } from '../../../shared/eva/tipos/index.js'
 
 describe('tipoDeReporte', () => {
   it('reconoce el id exacto, con guiones o con espacios, y sin acentos ni mayúsculas', () => {
@@ -61,6 +63,25 @@ describe('el registro', () => {
         for (const s of p.secciones) expect(BLOQUES).toContain(s.bloque)
       }
     }
+  })
+
+  it('todo tipo de máquina declara sus indicadores principales, por roles que existen en él (§1.1)', () => {
+    /* Sin esto, las tarjetas caen en «las primeras cuatro medidas» del orden
+       del estado, que no es una decisión de nadie. Un tipo nuevo tiene que
+       decir cuáles son las suyas. */
+    for (const tipo of TIPOS_DE_MAQUINA) {
+      expect(Array.isArray(tipo.indicadores), `${tipo.id} no declara indicadores`).toBe(true)
+      expect(tipo.indicadores.length).toBeGreaterThanOrEqual(1)
+      expect(tipo.indicadores.length).toBeLessThanOrEqual(4)
+      for (const rol of tipo.indicadores) expect(tipo.roles[rol], `${tipo.id}: el indicador ${rol} no es un rol suyo`).toBeTruthy()
+    }
+  })
+
+  it('«Elaboró» lleva a quien preguntó si hay sesión; sin ella, el asistente (D10, §6.1)', () => {
+    const etq = etiquetasDeReporte('es')
+    expect(firmasDe(etq, 'moises')[0]).toEqual({ rol: 'Elaboró', nombre: 'moises · vía el asistente de planta TDCON' })
+    expect(firmasDe(etq)[0]).toEqual({ rol: 'Elaboró', nombre: 'Asistente de planta TDCON · generado automáticamente' })
+    expect(firmasDe(etq, null).slice(1).map((f) => f.nombre)).toEqual([null, null])
   })
 
   it('cada plantilla disponible tiene sus rótulos en los dos idiomas', () => {

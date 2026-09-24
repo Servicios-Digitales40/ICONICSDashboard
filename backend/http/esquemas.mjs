@@ -762,6 +762,12 @@ const VariableMaquinaSchema = z.object({
   assetId: z.string().trim().min(1).max(64).nullish(),
   rol: z.string().trim().min(1).max(64).nullish(),
   alias: z.array(z.string().trim().min(1).max(128)).max(32).optional(),
+  /* Última y próxima calibración del sensor (Plan 44 §6.1), `AAAA-MM-DD`. Lo
+     anota quien configura; una fecha con otra forma es un 400, no un arreglo. */
+  calibracion: z.object({
+    ultima: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullish(),
+    proxima: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha AAAA-MM-DD').nullish(),
+  }).nullish(),
   unidad: z.string().trim().max(32).nullish(),
   descripcion: z.string().trim().max(512).nullish(),
   /* Deny by default: ausente significa lectura. Ver `configuracionMaquina.js`. */

@@ -295,7 +295,26 @@ export function detallesDeAssets(maquina) {
   return salida;
 }
 
-export function configuracionDesdeMarcas({ formulario, arboles, variables, contadores = [], detallesDeAsset = {} }) {
+/**
+ * Las calibraciones guardadas de una máquina, por id de variable y como las
+ * edita el formulario (`{ ultima: "AAAA-MM-DD"|"", proxima: … }`); sólo las
+ * variables que tienen alguna. Espejo de `detallesDeAssets` para la
+ * calibración (Plan 44 §6.1).
+ *
+ * @param {object|null} maquina
+ * @returns {Record<string, {ultima: string, proxima: string}>}
+ */
+export function calibracionesDeVariables(maquina) {
+  /** @type {Record<string, {ultima: string, proxima: string}>} */
+  const salida = {};
+  for (const v of maquina?.variables ?? []) {
+    const c = v?.calibracion;
+    if (c && (c.ultima || c.proxima)) salida[v.id] = { ultima: c.ultima ?? "", proxima: c.proxima ?? "" };
+  }
+  return salida;
+}
+
+export function configuracionDesdeMarcas({ formulario, arboles, variables, contadores = [], detallesDeAsset = {}, calibraciones = {} }) {
   const raiz = arboles.enVivo;
   /* Nombre y alias de un asset, si quien configura escribió algo (D15). Un
      asset sin detalle va como siempre: sin campos que nadie pidió. */
@@ -322,13 +341,21 @@ export function configuracionDesdeMarcas({ formulario, arboles, variables, conta
     assets.push(conDetalle({ id: a.id, pointName: a.pointName, rol: "secundario" }));
   }
 
-  const variablesLimpias = variables.map((v) => ({
-    id: v.id,
-    pointName: v.pointName,
-    historyPointName: v.historyPointName ?? null,
-    assetId: v.assetId ?? null,
-    rol: v.rol ?? null,
-  }));
+  const variablesLimpias = variables.map((v) => {
+    /* La calibración, si quien configura la escribió para esta variable
+       (Plan 44 §6.1). Vacía no viaja: `null` es «sin registro» en toda la cadena. */
+    const cal = calibraciones?.[v.id];
+    const ultima = String(cal?.ultima ?? "").trim();
+    const proxima = String(cal?.proxima ?? "").trim();
+    return {
+      id: v.id,
+      pointName: v.pointName,
+      historyPointName: v.historyPointName ?? null,
+      assetId: v.assetId ?? null,
+      rol: v.rol ?? null,
+      ...(ultima || proxima ? { calibracion: { ultima: ultima || null, proxima: proxima || null } } : {}),
+    };
+  });
 
   if (arboles.alarmas && contadores.length) {
     const areaId = nombreDeCarpeta(arboles.alarmas) ?? "alarmas";

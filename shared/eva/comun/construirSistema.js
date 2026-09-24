@@ -536,6 +536,19 @@ export function construirSistema(maquina, tipo) {
       };
     },
 
+    /**
+     * La variable CONFIGURADA detrás de una clave, tal como está en
+     * `maquinas.json` (punto, serie, rol, activo, calibración, cómo quedó
+     * verificada), o `null`. Para quien necesita lo que la configuración sabe
+     * y el estado no compone: el reporte de sensores (Plan 44 §6.1) lee de
+     * aquí la calibración y si la serie está verificada y cómo. Congelada:
+     * es una vista, no un sitio donde escribir.
+     */
+    variableDe: (clave) => {
+      const v = porClave.get(clave);
+      return v ? Object.freeze({ ...v }) : null;
+    },
+
     esHistorizada: (clave) => clavesConSerie.includes(clave),
 
     series: {

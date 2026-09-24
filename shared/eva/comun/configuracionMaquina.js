@@ -134,11 +134,16 @@ export function crearVariable({
   unidad = null,
   descripcion = null,
   acceso = ACCESO.READ,
+  calibracion = null,
 }) {
   return {
     id,
     pointName,
     historyPointName: historyPointName || null,
+    /* Cuándo se calibró el sensor y cuándo toca (Plan 44 §6.1). Lo anota quien
+       configura; ICONICS no lo sabe. `null` mientras nadie lo anote, y el
+       reporte de sensores lo dice así: «sin registro», nunca una fecha. */
+    calibracion: calibracionLimpia(calibracion),
     historyVerified: false,
     /*
      * CÓMO quedó verificada, cuando lo esté (Plan 42 F1): `serie-propia` —varió
@@ -574,4 +579,28 @@ export function herramientasDeCapacidades(capacidades) {
   if (caps.includes("DIAGNOSTICS")) lista.push("riesgos_activos");
   if (caps.includes("HISTORICAL_DATA")) lista.push("historia_de_senal");
   return lista;
+}
+
+/* ── La calibración de un sensor ─────────────────────────────────── */
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `{ ultima, proxima }` con fechas `AAAA-MM-DD`, o `null` si no hay ninguna.
+ *
+ * Una fecha que no tenga esa forma se descarta (no se «arregla»): la escribe
+ * una persona en el editor y el navegador ya la valida; si llega otra cosa por
+ * la API es un error del cliente, y guardarla rota sería peor que no
+ * guardarla. Un objeto sin ninguna fecha válida es `null`, no `{}`: así «sin
+ * registro» es una sola forma en toda la cadena.
+ *
+ * @param {{ultima?: string|null, proxima?: string|null}|null|undefined} entrada
+ * @returns {{ultima: string|null, proxima: string|null}|null}
+ */
+export function calibracionLimpia(entrada) {
+  if (!entrada || typeof entrada !== "object") return null;
+  const fecha = (v) => (typeof v === "string" && FECHA_ISO.test(v.trim()) ? v.trim() : null);
+  const ultima = fecha(entrada.ultima);
+  const proxima = fecha(entrada.proxima);
+  return ultima || proxima ? { ultima, proxima } : null;
 }

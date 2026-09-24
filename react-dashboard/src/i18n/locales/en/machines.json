@@ -407,7 +407,11 @@
       "assetAlias": "Aliases of asset {{id}}",
       "assetAliasPlaceholder": "aliases, comma-separated",
       "assetAliasHint": "Other ways of naming the asset that the assistant understands; they apply to every variable of the asset. On the root asset, the name and aliases belong to the whole machine.",
-      "useSuggestion": "Use “{{nombre}}”"
+      "useSuggestion": "Use “{{nombre}}”",
+      "calibracionTitle": "Sensor calibration",
+      "calibracionHint": "Last and next calibration of each sensor. ICONICS does not know it: whoever configures the machine writes it down, and the sensor readings report prints it. Without a date the report says \"no record\".",
+      "calUltima": "Last calibration of {{id}}",
+      "calProxima": "Next calibration of {{id}}"
     },
     "remove": "Remove from dashboard",
     "removeConfirm": "Remove “{{nombre}}” from the dashboard? If it has previous cases it is deactivated instead of deleted.",

@@ -726,3 +726,28 @@ describe('assets con nombre y alias (Plan 42.5 F6, D15)', () => {
     expect(r.statusCode).toBe(400)
   })
 })
+
+describe('calibración por variable (Plan 44 §6.1)', () => {
+  it('el alta guarda las fechas, la edición las conserva, y una fecha mal formada es 400', async () => {
+    const m = maquinaValida()
+    m.variables[0].calibracion = { ultima: '2026-09-01', proxima: '2027-03-01' }
+    const alta = await app.inject({ method: 'POST', url: '/api/maquinas', payload: m })
+    expect([200, 201]).toContain(alta.statusCode)
+    const guardada = json(alta).maquina.variables[0]
+    expect(guardada.calibracion).toEqual({ ultima: '2026-09-01', proxima: '2027-03-01' })
+    /* Las demás variables, sin anotar: null, no {}. */
+    for (const v of json(alta).maquina.variables.slice(1)) expect(v.calibracion).toBeNull()
+
+    const igual = await app.inject({
+      method: 'PATCH', url: `/api/maquinas/${m.id}`,
+      payload: { variables: json(alta).maquina.variables.map(({ historyVerified: _h, historyVerifiedComo: _c, historyCausa: _k, historyCompartidaCon: _s, ...v }) => v) },
+    })
+    expect(igual.statusCode).toBe(200)
+    expect(json(igual).maquina.variables[0].calibracion).toEqual({ ultima: '2026-09-01', proxima: '2027-03-01' })
+
+    const mala = maquinaValida()
+    mala.variables[0].calibracion = { ultima: '01/09/2026' }
+    const r = await app.inject({ method: 'POST', url: '/api/maquinas', payload: mala })
+    expect(r.statusCode).toBe(400)
+  })
+})

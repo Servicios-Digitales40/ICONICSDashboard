@@ -1443,6 +1443,10 @@ export function createChat({ config, herramientas }) {
    */
   async function responder({
     pregunta, historial = [], signal, onEvento, idioma = "es", conversacionId, contexto = null,
+    /* Quién pregunta (el id de su sesión), o `null` sin sesión. Viaja a las
+       herramientas en su contexto —como `idioma`— para que un reporte lo firme
+       (Plan 44 §6.1). Ninguna herramienta lo necesita para decidir nada. */
+    usuario = null,
   }) {
     // El catálogo va SIEMPRE en las instrucciones, no en una herramienta: es
     // información fija y barata, y tenerla delante evita que el modelo gaste
@@ -1500,7 +1504,7 @@ export function createChat({ config, herramientas }) {
      * respuestas entre pantallas distintas.
      */
     async function ejecutarConCache(nombre, argumentos, firma) {
-      if (!conversacionId) return herramientas.ejecutar(nombre, argumentos, { idioma })
+      if (!conversacionId) return herramientas.ejecutar(nombre, argumentos, { idioma, usuario })
 
       /*
        * `idioma` entra en la clave de caché (i18n del asistente): el mismo
@@ -1521,7 +1525,7 @@ export function createChat({ config, herramientas }) {
         return guardada.valor
       }
 
-      const resultado = await herramientas.ejecutar(nombre, argumentos, { idioma })
+      const resultado = await herramientas.ejecutar(nombre, argumentos, { idioma, usuario })
 
       const vida = vidaDe(nombre, argumentos, resultado)
       if (vida > 0) {
