@@ -239,6 +239,24 @@ await new Promise(r => fake.listen(0, '127.0.0.1', r))
 const fakeBase = `http://127.0.0.1:${fake.address().port}`
 
 /* ── Backend bajo prueba ─────────────────────────────────────────────── */
+
+/*
+ * Carpeta propia para todo lo que este guion pueda ESCRIBIR (Plan 45 F2.1).
+ *
+ * Sin esto, las apps que monta aquí abajo usan las rutas por defecto, que se
+ * resuelven contra la raíz del proyecto: los bloques que acusan una alarma o
+ * preguntan al asistente iban sumando líneas a los diarios del DESPLIEGUE.
+ * Se vio al cerrar el Plan 45: la suite de backend ya no escribía nada, y la
+ * tanda de verificadores seguía moviendo `datos/diario-accionamientos.jsonl`
+ * y `datos/diario-conversaciones.jsonl`.
+ *
+ * Es el mismo defecto que `backend/test/ayudas.mjs` cerró para la suite,
+ * entrando por otra puerta. Algunos bloques de este archivo ya se aislaban uno
+ * a uno (`iconics-conversaciones-`, `iconics-reportes-http-`); esto lo hace
+ * para todos, que es lo que evita que el siguiente bloque nuevo lo olvide.
+ */
+const dirEstado = await mkdtemp(join(tmpdir(), 'iconics-verificar-backend-'))
+
 /** Entorno base de prueba. Cada bloque lo ajusta con lo que quiere demostrar. */
 const baseEnv = {
   PORT: '0',
@@ -248,6 +266,12 @@ const baseEnv = {
   ICONICS_PASSWORD: 'p',
   ICONICS_POINT_NAME: 'ac:default',
   STATIC_DIR: 'react-dashboard/dist',
+  DIARIO_ACCIONAMIENTOS: join(dirEstado, 'diario-accionamientos.jsonl'),
+  DIARIO_CONVERSACIONES: join(dirEstado, 'diario-conversaciones.jsonl'),
+  DIARIO_DIAGNOSTICOS: join(dirEstado, 'diario-diagnosticos.jsonl'),
+  CUADERNO_RUTA: join(dirEstado, 'cuaderno.jsonl'),
+  APRENDIZAJE_RUTA: join(dirEstado, 'aprendizaje.json'),
+  MAQUINAS_RUTA: join(dirEstado, 'maquinas.json'),
 }
 
 const config = loadConfig({

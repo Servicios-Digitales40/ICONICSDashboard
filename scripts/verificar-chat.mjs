@@ -29,6 +29,7 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { mkdtemp } from 'node:fs/promises'
 import { createApp } from '../backend/app.mjs'
 import { loadConfig } from '../backend/config.mjs'
 import { createChat } from '../backend/ia/conversacion/chat.mjs'
@@ -200,8 +201,32 @@ const herramientasFalsas = {
   },
 }
 
+/*
+ * El entorno que comparten todas las apps de este guion (Plan 45 F2.1).
+ *
+ * Lo que importa aquí es `DIARIO_CONVERSACIONES`: sin él, las rutas por
+ * defecto se resuelven contra la raíz del proyecto y cada pregunta que este
+ * verificador le hace al chat quedaba anotada en el diario del DESPLIEGUE. Se
+ * vio al cerrar el Plan 45: la suite ya no escribía nada y `npm run verificar`
+ * seguía moviendo ese archivo en cada tanda.
+ *
+ * Van los cinco hermanos y no sólo el que escribe hoy: el que se añada mañana
+ * hereda el aislamiento en vez de tener que acordarse.
+ */
+const dirEstado = await mkdtemp(join(tmpdir(), 'iconics-verificar-chat-'))
+const ENTORNO_BASE = {
+  IA_BASE: llamaBase,
+  LOG_LEVEL: 'ERROR',
+  DIARIO_CONVERSACIONES: join(dirEstado, 'diario-conversaciones.jsonl'),
+  DIARIO_ACCIONAMIENTOS: join(dirEstado, 'diario-accionamientos.jsonl'),
+  DIARIO_DIAGNOSTICOS: join(dirEstado, 'diario-diagnosticos.jsonl'),
+  CUADERNO_RUTA: join(dirEstado, 'cuaderno.jsonl'),
+  APRENDIZAJE_RUTA: join(dirEstado, 'aprendizaje.json'),
+  MAQUINAS_RUTA: join(dirEstado, 'maquinas.json'),
+}
+
 function chatDePrueba(extra = {}) {
-  const config = loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR', ...extra })
+  const config = loadConfig({ ...ENTORNO_BASE, ...extra })
   return createChat({ config, herramientas: herramientasFalsas })
 }
 
@@ -520,7 +545,7 @@ await check('un AVISO de la herramienta llega aunque el modelo lo ignore', async
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -551,7 +576,7 @@ await check('el aviso de correlación se reconoce por SU idea, no por la de umbr
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -574,7 +599,7 @@ await check('y si NO lo cuenta, el de correlación sí se añade', async () => {
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -609,7 +634,7 @@ await check('el aviso de umbrales EN INGLÉS se reconoce si el modelo ya lo dijo
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -631,7 +656,7 @@ await check('el aviso de umbrales EN INGLÉS SÍ se añade si el modelo lo ignor
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -655,7 +680,7 @@ await check('el aviso de correlación EN INGLÉS se reconoce por su idea, no por
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -678,7 +703,7 @@ await check('si el modelo NO cuenta el aviso de correlación EN INGLÉS, se aña
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -700,7 +725,7 @@ await check('si el modelo YA contó el aviso, no se repite', async () => {
     }),
   }
   const chat = createChat({
-    config: loadConfig({ IA_BASE: llamaBase, LOG_LEVEL: 'ERROR' }),
+    config: loadConfig(ENTORNO_BASE),
     herramientas: conAviso,
   })
 
@@ -1039,9 +1064,15 @@ console.log('\n── La ruta /api/chat ─────────────�
 /* `MAQUINAS_RUTA` propio y vacío: desde el Plan 38 el backend registra al
    arrancar las máquinas configuradas del archivo, y este guion no puede
    depender de lo que haya en el `datos/maquinas.json` de quien lo corre. */
+/*
+ * Aislaba `MAQUINAS_RUTA` y nada más, así que las apps montadas aquí abajo
+ * anotaban sus preguntas en el diario de conversaciones del DESPLIEGUE
+ * (Plan 45 F2.1). Hereda ahora los cinco archivos de `ENTORNO_BASE`.
+ */
 const baseEnv = {
+  ...ENTORNO_BASE,
+  IA_BASE: '',
   PORT: '0', LOG_LEVEL: 'ERROR', STATIC_DIR: 'react-dashboard/dist',
-  MAQUINAS_RUTA: join(tmpdir(), `verificar-chat-maquinas-${process.pid}.json`),
 }
 
 async function montar(env) {
