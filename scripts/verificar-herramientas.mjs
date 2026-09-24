@@ -2704,9 +2704,12 @@ await checkAsync(
     'se escribe a disco de verdad',
   async () => {
     const reportes = await reportesTmp()
+    /* `sistema` explícito desde el Plan 44 F3.4: sin él entra la ÚNICA configurada
+       en servicio —aquí, la espejo—, no el tanque. Lo que esta comprobación mira
+       es el reparto del catálogo del tanque, así que lo nombra. */
     const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
       'generar_reporte',
-      {}
+      { sistema: 'tanque' }
     )
 
     assert.equal(r.ok, true)
@@ -4524,6 +4527,18 @@ await checkAsync('[plantilla] sin `tipo` la herramienta hace EXACTAMENTE lo de s
   assert.equal(sinTipo.tipo, undefined, 'la respuesta del catálogo no cambió de forma')
   assert.deepEqual(catalogo.senalesConGrafico, sinTipo.senalesConGrafico)
   assert.equal(sinTipo.senalesConGrafico.length, configurada.series.historizadas().length)
+})
+
+await checkAsync('[plantilla] sin `sistema`, catálogo y plantilla van a la ÚNICA configurada en servicio, no al tanque cerrado (medido con el modelo real, F3.4)', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const h = createHerramientas({ client, reportes })
+  const catalogo = await h.ejecutar('generar_reporte', { periodo: 'últimas 6 horas' })
+  assert.equal(catalogo.ok, true, catalogo.error)
+  assert.equal(catalogo.sistema, ESPEJO.id)
+  const tecnico = await h.ejecutar('generar_reporte', { tipo: 'tecnico', periodo: 'últimas 6 horas' })
+  assert.equal(tecnico.ok, true, tecnico.error)
+  assert.equal(tecnico.sistema, ESPEJO.id)
 })
 
 await checkAsync('[plantilla] un tipo desconocido lista los tipos; "riesgos" está declarado pero se niega con su motivo y dice cuáles sí', async () => {

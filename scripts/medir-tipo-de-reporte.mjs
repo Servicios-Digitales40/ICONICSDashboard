@@ -14,6 +14,8 @@
  * Los PDF que genere van a una carpeta temporal, no a la de salida real.
  */
 process.env.AUTH_HABILITADA = 'false'
+/* Sólo la tabla: el registro del backend a stdout taparía lo que se mide. */
+process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error'
 import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -84,13 +86,25 @@ for (const [frase, esperado] of CASOS) {
   const acierto = reporte && (esperado === null ? (normalizado === null) : normalizado === esperado)
   if (reporte) conHerramienta += 1
   if (acierto) aciertos += 1
-  filas.push({ frase, esperado: esperado ?? '(sin tipo)', pedido: reporte ? (pedido ?? '(sin tipo)') : `— sin generar_reporte${otras.length ? ` (llamó ${otras.join(', ')})` : ''}`, ok: Boolean(acierto), ms, status: r.statusCode })
+  /* Lo que la herramienta contestó, según el cierre del turno, y cómo lo
+     redactó el modelo: un tipo bien elegido con un PDF que no salió es otro
+     hallazgo (de la herramienta o de la planta falsa), y se enseña aparte. */
+  const fin = eventos.find((e) => e.tipo === 'fin')
+  const texto = eventos.filter((e) => e.tipo === 'texto').map((e) => e.delta ?? '').join('')
+  filas.push({
+    frase, esperado: esperado ?? '(sin tipo)', pedido: reporte ? (pedido ?? '(sin tipo)') : `— sin generar_reporte${otras.length ? ` (llamó ${otras.join(', ')})` : ''}`,
+    ok: Boolean(acierto), ms, status: r.statusCode, herramientaOk: fin?.ok ?? null, argumentos: reporte?.argumentos ?? null, texto,
+  })
 }
 
 for (const f of filas) {
   const marca = f.ok ? `${c.verde}✓${c.reset}` : `${c.rojo}✗${c.reset}`
   console.log(`  ${marca} «${f.frase}»`)
   console.log(`      ${c.gris}esperado ${f.esperado} · pedido ${f.pedido} · ${f.ms} ms${f.status !== 200 ? ` · HTTP ${f.status}` : ''}${c.reset}`)
+  if (f.argumentos) console.log(`      ${c.gris}argumentos ${JSON.stringify(f.argumentos)}${c.reset}`)
+  if (f.herramientaOk === false) {
+    console.log(`      ${c.amarillo}la herramienta NO devolvió ok; el modelo dijo: ${f.texto.replace(/\s+/g, ' ').slice(0, 320)}${c.reset}`)
+  }
 }
 console.log(`\n${aciertos === CASOS.length ? c.verde : c.amarillo}${c.negrita}${aciertos} de ${CASOS.length} frases con el tipo correcto${c.reset} ${c.gris}(${conHerramienta} llamaron a generar_reporte)${c.reset}`)
 console.log(`${c.gris}Mide, no afirma: un fallo aquí es del modelo o del prompt, no de la herramienta (el normalizador se prueba en backend/test/reportes).${c.reset}\n`)

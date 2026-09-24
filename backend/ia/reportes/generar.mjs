@@ -31,17 +31,16 @@ import { MAX_DIAS_REPORTE, purgarReportesViejos, resolverVentana } from '../conv
 import { fallo } from '../herramientas/lib/respuesta.mjs'
 import { etiquetasDeReporte } from '../i18n/etiquetasReporte.mjs'
 import { renderizarGraficoSerie } from '../../../shared/eva/comun/graficos.js'
-import { SISTEMA } from '../../../shared/eva/comun/sistemas.js'
 import { tipoDe } from '../../../shared/eva/tipos/index.js'
 
 import { componerPorPlantilla } from './compositor.mjs'
 import { recolectar } from './recolectores.mjs'
+import { configuradasEnServicio, sistemaPorOmision } from './sistemaPorOmision.mjs'
 import { CATALOGO, TIPOS, TIPOS_DISPONIBLES, plantillaDe, tipoDeReporte } from './plantillas/index.mjs'
 
-/** Las máquinas configuradas en servicio, ahora (el registro cambia en caliente). */
-function configuradasEnServicio() {
-  return Object.values(SISTEMA).filter((s) => s?.configurada && !s.cerrado)
-}
+/* La máquina por omisión vive en su módulo, sin pdfkit, porque la usa también
+   el catálogo de siempre al arrancar (ver la cabecera de `sistemaPorOmision.mjs`). */
+export { sistemaPorOmision } from './sistemaPorOmision.mjs'
 
 /**
  * @param {{tipo: string, sistema?: string, periodo?: string, explicacion?: string}} args
@@ -86,7 +85,18 @@ export async function generarReportePorPlantilla(
       `El reporte «${etq.plantillas[reconocido.tipo]?.titulo ?? reconocido.tipo}» está declarado pero todavía no ` +
         `se compone: ${plantilla.motivo(etq)} Los que sí se generan hoy: ${TIPOS_DISPONIBLES.join(', ')} (y "${CATALOGO}", ` +
         'el de todas las señales).',
-      { tipo: reconocido.tipo, disponibles: [CATALOGO, ...TIPOS_DISPONIBLES] },
+      {
+        tipo: reconocido.tipo,
+        disponibles: [CATALOGO, ...TIPOS_DISPONIBLES],
+        /* Medido el 23-09-2026: ante esta negativa el modelo real contestó como
+           si hubiera generado OTRO reporte, con un enlace inventado. La nota
+           es para él; la guarda de verdad —un enlace en la respuesta sin
+           adjunto— es del bucle del chat (HANDOFF §8). */
+        nota:
+          'NO se generó ningún PDF y no hay ningún enlace: no digas que generaste otro reporte ni ' +
+          'escribas ninguna URL. Di por qué no sale este tipo, ofrece los disponibles, y si el ' +
+          'usuario quiere uno de ellos, llama a generar_reporte otra vez con ese tipo.',
+      },
     )
   }
 
@@ -98,8 +108,9 @@ export async function generarReportePorPlantilla(
     if (!elegido.ok) return elegido
     entrada = elegido.sistema
   } else {
-    const candidatas = configuradasEnServicio()
-    if (candidatas.length !== 1) {
+    entrada = sistemaPorOmision()
+    if (!entrada) {
+      const candidatas = configuradasEnServicio()
       return fallo(
         candidatas.length
           ? `Hay ${candidatas.length} máquinas configuradas: di de cuál es el reporte (${candidatas.map((s) => s.id).join(', ')}).`
@@ -107,7 +118,6 @@ export async function generarReportePorPlantilla(
         { sistemas: candidatas.map((s) => s.id) },
       )
     }
-    entrada = candidatas[0]
   }
   if (!entrada.configurada || !entrada.metaDe) {
     return fallo(

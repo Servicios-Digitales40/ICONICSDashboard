@@ -107,6 +107,8 @@ import {
 import { resolverInstante } from '../../../../shared/periodo.js'
 
 import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
+/* Sólo la función pura que decide la máquina por omisión: no carga pdfkit. */
+import { sistemaPorOmision } from '../../reportes/sistemaPorOmision.mjs'
 import { fallo } from '../lib/respuesta.mjs'
 import { narrarTendenciaEnIngles } from '../../i18n/narrarTendencia.mjs'
 import { narrarMecanismoEnIngles } from '../../i18n/narrarRiesgo.mjs'
@@ -1479,7 +1481,14 @@ export function crearHerramientasDeHistoricos({
          * `sistema` declarado son SUS claves; sin él, las del tanque, que es
          * lo que hacía antes.
          */
-        sistemaDelReporte = sistema ? String(sistema).trim() : 'tanque'
+        /*
+         * Sin `sistema`: la ÚNICA configurada en servicio si la hay, y si no el
+         * tanque, como antes (Plan 44 F3.4). Medido con el modelo real: cuando la
+         * descripción decía «por omisión tanque», el modelo lo escribía él y el
+         * reporte caía en la máquina cerrada. Con varias configuradas y sin
+         * nombre, el tanque sigue siendo la omisión y se niega, como siempre.
+         */
+        sistemaDelReporte = sistema ? String(sistema).trim() : (sistemaPorOmision()?.id ?? 'tanque')
         const entrada = SISTEMA[sistemaDelReporte]
         if (!entrada) {
           return fallo(`No hay ningún sistema llamado "${sistema}" en esta planta.`, {

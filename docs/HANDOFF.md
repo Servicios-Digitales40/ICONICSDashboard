@@ -125,7 +125,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 198 correctas · 22 omitidas
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 199 correctas · 22 omitidas
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -192,7 +192,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | Suite de frontend | **1180** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F3.3; eran 1172 tras el 42.5 y 1102 · 29 el 22-09)* |
 | Suite de backend | **433** pruebas (432 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3.3; eran 401)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **198** correctas (13 sobre una configurada, 6 de reportes por plantilla) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **199** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **22 omitidas** (cierre) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -629,6 +629,25 @@ EMPEZAR.** Resultado: 0 de 6.
 
 **Corolario:** una regla que importa se pone en el **código**, no en el prompt.
 Por eso el cierre de una máquina es una guarda en `resolverSistema()`.
+
+**Hace lo que dice la descripción del argumento, literalmente.** Medido el
+23-09-2026 con `qwen-3.5-4B` (`scripts/medir-tipo-de-reporte.mjs`): la
+descripción de `sistema` en `generar_reporte` decía «por omisión "tanque"» y
+el modelo escribía `sistema: "tanque"` en 7 de 14 frases en las que nadie
+nombró una máquina; el tanque está cerrado y el reporte se negaba. **Una
+omisión la resuelve el código** (`reportes/sistemaPorOmision.mjs`), y la
+descripción dice «omítelo si el usuario no la nombra». Antes de escribir «por
+omisión X» en una descripción, pregúntate si quieres que el modelo escriba X.
+
+**Tras una herramienta que FALLA puede contestar como si otra hubiera tenido
+éxito, con un enlace inventado.** Mismo día: ante «pronóstico de fallas» la
+herramienta se negó (plantilla pendiente) y el modelo respondió «aquí tienes
+el reporte de vibraciones» con `https://ejemplo.com/…`. La guarda de cifras
+sin herramienta no lo caza: hubo herramienta y no hay cifras. Paliativo: la
+negativa lleva una `nota` para el modelo. **La guarda que falta, en
+`chat.mjs`: una URL en la respuesta sin un adjunto emitido en el turno se
+bloquea igual que una cifra sin herramienta.** Está pendiente y es de la zona
+del asistente (Plan 44 F3.4).
 
 **Un modelo pequeño no encadena bien.** Pedirle «vuelve a llamar añadiendo
 `sistema=...`» no funciona: reintenta con otro nombre o se rinde. Se arregla

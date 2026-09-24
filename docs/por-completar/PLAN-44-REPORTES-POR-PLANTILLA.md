@@ -643,6 +643,58 @@ y de dónde tendría que salir cada cosa:
 | Pronóstico de fallas (Predicciones) | De un tipo que declare mecanismos de desgaste con historia verificada | Hoy toda configurada nace con `desgaste: null`; declararlos es del Plan 43 o posterior |
 | Nombre de quien elaboró | De la sesión (`request.usuario`) | **Hecho (F3.3):** la ruta pasa `usuario` (el id de la sesión, sólo si está autenticada) a `responder()`, el bucle lo pone en el contexto de toda herramienta junto a `idioma`, y `generar_reporte` firma «Elaboró: <id> · vía el asistente». Sin sesión firma el asistente. Archivos calientes tocados: `chat.mjs` (cuatro líneas), `chatRoutes.mjs` (una) |
 
+**F3.4 · Medido con el modelo real, y lo que destapó (23-09-2026, noche).**
+`scripts/medir-tipo-de-reporte.mjs` contra `qwen-3.5-4B` en el `llama-server`
+de la demo, con el transporte falso de ICONICS y la máquina real
+`vib-motor-03`, catorce frases de la tabla §1.2 (doce en español, dos en
+inglés con el tablero en español). Dos corridas antes de corregir nada:
+**14 de 14** y **13 de 14** tipos correctos (la que falló fue una frase en
+inglés a la que el modelo no puso `tipo`), 15–51 s por consulta, siempre
+dos rondas. Elegir el tipo **no es el problema**. Lo que la tabla de aciertos
+tapaba, y el instrumento enseña desde la segunda corrida (imprime los
+argumentos y, si la herramienta no devolvió `ok`, lo que redactó el modelo):
+
+1. **El modelo escribía `sistema: "tanque"` en 7 de 14 frases** en las que el
+   usuario no nombró máquina, y el reporte se negaba por una máquina cerrada
+   que nadie pidió. La causa estaba en la descripción del argumento: «Por
+   omisión "tanque"». El modelo hizo lo que se le dijo. Corregido en dos
+   sitios: la descripción dice ahora que lo omita si el usuario no la nombra,
+   y la omisión la resuelve el **código** (`reportes/sistemaPorOmision.mjs`:
+   la única configurada en servicio; con varias, se pregunta), tanto para
+   las plantillas como para el catálogo de siempre. La comprobación del
+   verificador que pedía el catálogo sin `sistema` y esperaba el tanque
+   nombra ahora al tanque, y hay una nueva que afirma la omisión.
+2. **Ante «Pronóstico de fallas»** la herramienta se negó bien (plantilla
+   pendiente) y el modelo contestó **como si hubiera generado un reporte de
+   vibraciones, con un enlace inventado** (`https://ejemplo.com/…`). La
+   guarda del bucle bloquea cifras sin herramienta, pero aquí hubo
+   herramienta (fallida) y no hay cifras: un enlace sin adjunto pasa. La
+   negativa lleva ahora una `nota` para el modelo («no se generó ningún PDF,
+   no escribas ninguna URL»); la guarda de verdad —**una URL en la respuesta
+   sin un adjunto emitido en el turno se bloquea**— es de `chat.mjs`, zona del
+   asistente, y queda anotada en `HANDOFF.md` §8 para Gustavo.
+3. Al medir se vio también que el **catálogo del tanque sale aunque el tanque
+   esté cerrado** (`SISTEMA['tanque']` directo, sin pasar por
+   `resolverSistema`). Es anterior a este plan (Plan 32) y no se toca aquí;
+   anotado en el backlog del backend.
+4. La palabra «escribas» en la descripción nueva hizo caer la comprobación
+   «sólo una herramienta escribe en la planta», que busca esa raíz en las
+   definiciones. Se cambió la palabra; la comprobación hizo su trabajo.
+
+**Tercera corrida, tras corregir la descripción** (misma noche, mismo
+modelo): **14 de 14** tipos correctos, también la frase en inglés. El
+`sistema: "tanque"` no pedido bajó de **7 a 3** de 14 («¿Cómo están leyendo
+los sensores?», «Cuánto consumió el motor este mes», «Technical report of the
+machine»): la descripción ya no lo sugiere, pero el inventario del prompt
+sigue listando el tanque y el modelo a veces lo elige por ser el primero.
+Eso ya es del prompt (zona del asistente), no de la herramienta; con la
+omisión resuelta en código, las 11 restantes salieron de la única máquina en
+servicio. **Ningún enlace inventado** en esta corrida: ante «pronóstico de
+fallas» el modelo dijo que la máquina no declara mecanismos de desgaste y
+ofreció los tipos disponibles. Sigue siendo una corrida, no una garantía; la
+guarda de URL sin adjunto sigue pendiente en `chat.mjs`. Tiempos: 16–31 s por
+consulta.
+
 Y lo tercero que §1.1 pedía al tipo, **los indicadores principales**, queda
 exigido por prueba: todo tipo registrado declara `indicadores` (de uno a
 cuatro roles suyos), o la suite del backend falla nombrándolo.

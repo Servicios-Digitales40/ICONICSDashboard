@@ -779,9 +779,11 @@ export const DEFINICIONES = [
           sistema: {
             type: 'string',
             description:
-              'Id del sistema, tal como lo devuelve sistemas_de_la_planta. Por omisión "tanque". ' +
-              'Sirve para cualquier máquina del registro, incluidas las configuradas: sus rótulos, ' +
-              'unidades y bandas los pone su tipo. Un reporte NUNCA mezcla dos máquinas.',
+              'Id, nombre o alias de la máquina, tal como lo devuelve sistemas_de_la_planta, SÓLO si ' +
+              'el usuario la nombra. Si no la nombra, OMÍTELO: entra la única máquina en servicio. No ' +
+              'pongas "tanque" por tu cuenta: está cerrada y la herramienta se negará. Sirve para ' +
+              'cualquier máquina del registro, incluidas las configuradas: sus rótulos, unidades y ' +
+              'bandas los pone su tipo. Un reporte NUNCA mezcla dos máquinas.',
           },
           /*
            * Plan 44 F3. Un enum y no ocho herramientas: compartirían el 90 % de

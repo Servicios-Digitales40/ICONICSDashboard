@@ -669,3 +669,23 @@ bitácora real; y la posibilidad de dos bitácoras según el `cwd`.
 (como hace `backend/config.mjs` con otras rutas) y que las pruebas de casos
 usen un `mkdtemp`, como ya hacen `verificar-casos` y `verificar-herramientas`.
 Se escribe como tarea aparte.
+
+## B18 · El catálogo de `generar_reporte` del tanque sale aunque el tanque esté cerrado
+
+**Visto el 23-09-2026 por la noche** (Plan 44 F3.4, midiendo con el modelo
+real): «Expórtame todas las señales de esta semana en PDF» llegó con
+`sistema: "tanque"` y el PDF **salió**, con las 52 señales del tanque servidas
+por el transporte falso. El camino del catálogo (`historicos/index.mjs`,
+`generar_reporte` sin `tipo`) toma `SISTEMA[sistemaDelReporte]` directamente y
+no pasa por `resolverSistema()`, que es donde vive la guarda de máquina
+cerrada (Plan 32). Las plantillas (`reportes/generar.mjs`) sí pasan por ella y
+se niegan.
+
+**Por qué no se tocó en el Plan 44.** Es anterior al plan y está en la zona
+del asistente; el plan sólo quitó la causa más frecuente —que el modelo
+escribiera «tanque» por omisión— resolviendo la omisión en código
+(`reportes/sistemaPorOmision.mjs`).
+
+**El arreglo.** Que el catálogo resuelva la máquina con `resolverSistema()`
+como las demás herramientas por máquina, y que la comprobación «señales por
+defecto» del verificador quede omitida por el cierre, como sus 22 hermanas.
