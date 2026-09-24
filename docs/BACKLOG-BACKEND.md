@@ -693,6 +693,29 @@ bitácora real; y la posibilidad de dos bitácoras según el `cwd`.
 usen un `mkdtemp`, como ya hacen `verificar-casos` y `verificar-herramientas`.
 Se escribe como tarea aparte.
 
+**HECHO el 24-09-2026 (Plan 45 F2.1), y era más grande de lo que decía aquí.**
+La ruta se ancló a la raíz del proyecto y **además** se hizo configurable
+(`APRENDIZAJE_RUTA` → `config.diario.aprendizaje.ruta`), porque anclarla sola
+no permitía a las pruebas apuntar a otro sitio. `montarApp()` la aísla ahora
+junto a los **tres diarios y el cuaderno**, que tenían el mismo problema por
+otra vía: se resuelven contra `PROJECT_ROOT`, así que la suite sumaba líneas
+a los del despliegue —2 441 de las 2 630 entradas del diario de
+conversaciones eran suyas—.
+
+Dos cosas que este apunte no había visto:
+
+- **La cabecera de `casos.test.mjs` estaba construida sobre el defecto.**
+  Decía que aislarlo era imposible «porque no tiene variable de entorno», y de
+  ahí que el archivo evitara a propósito probar ninguna escritura. Lo que
+  faltaba no era una prueba menos: era la variable. Entró el `POST` de punta a
+  punta que no había.
+- **Arreglarlo rompió `verificar-herramientas`**, que es lo que tenía que
+  pasar: se aislaba con `process.chdir()` apoyándose justo en que la ruta
+  fuera relativa. `crearHerramientasDeAprendizaje` acepta ahora `ruta`.
+
+**Medido al cerrar:** tras una tanda entera, ni `datos/` ni `backend/datos/`
+cambian (comprobado por hash antes y después).
+
 ## B18 · El catálogo de `generar_reporte` del tanque sale aunque el tanque esté cerrado
 
 **Visto el 23-09-2026 por la noche** (Plan 44 F3.4, midiendo con el modelo
@@ -814,3 +837,22 @@ período. La maqueta no lo dice y el usuario no lo ha pedido.
 
 **Mientras tanto**, la prueba de `generar.test.mjs` afirma el formato
 (`TDCON-TEC-\d{8}-`) y no una fecha concreta, con esta B21 citada al lado.
+
+## B22 · Una prueba afirmaba un veredicto contra el transporte falso — **HECHO (24-09-2026)**
+
+**Visto el 24-09-2026** (Plan 45 F0, auditando): `registro-configurado.test ›
+el alta automática de punta a punta` esperaba `estado === 'VALID'` y devolvía
+`DEGRADED` **1 de cada 3 tandas** de ese archivo solo. No era del código: el
+transporte falso deja caer un 1 % de los puntos a propósito (`CAOS.ausente`),
+y con dos puntos declarados eso sale unas 2 de cada 100 veces.
+
+`HANDOFF.md` §8 ya lo avisaba con estas palabras: «afirmar un veredicto contra
+el falso produce pruebas intermitentes». El remedio que ya usaban los
+verificadores era `rnd: () => 0.99`, pero **no se podía aplicar desde una
+prueba de rutas**: `createApp` construye su propio cliente y no lo recibe.
+
+**El arreglo.** `ICONICS_FAKE_SIN_CAOS`, que la prueba pide en su `montarApp`.
+No se apaga sola en pruebas: las de huecos y calidad mala siguen queriendo el
+caos, que existe porque los caminos tristes son la mitad de lo que este backend
+tiene que hacer bien. Cinco tandas seguidas en verde tras el cambio; vista
+fallar antes con `rnd: () => 0`.

@@ -366,6 +366,13 @@ va a buscar, no sólo en un plan.
 3. Los **backlogs**: volcar lo que este plan no hace (B14, B15, F7/F8 del
    backlog de frontend, la B17 si F2.1 no la cierra entera).
 
+**F5.3 hecha el 24-09-2026.** La **B17 sí quedó cerrada entera** por F2.1, y se
+marcó así con lo que el apunte no había visto: que la cabecera de
+`casos.test.mjs` estaba construida sobre el defecto, y que arreglarlo rompió
+`verificar-herramientas`. Se abrió la **B22** para la prueba que afirmaba un
+veredicto contra el transporte falso, que no tenía entrada. B14, B15 y F7/F8
+siguen abiertas y no las toca este plan.
+
 ### F6 · Merge y etiqueta
 
 Cuando F1–F4 estén verdes: traer a `UI-Limpieza1.0` lo que Gustavo haya
