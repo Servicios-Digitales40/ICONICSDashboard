@@ -561,32 +561,79 @@ export default function EditorDeMaquina({ maquina = null, tipos = [], otrosIds =
               cuándo se calibró; lo anota quien configura, y el reporte de
               lectura de sensores lo imprime; sin fecha dice «sin registro».
             */}
-            {payload.variables.some((v) => String(v.rol ?? "").startsWith("medida:")) && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ ...textoSuave, fontWeight: 600, color: t.text }}>{tx("calibracionTitle")}</div>
-                <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, margin: "2px 0 8px" }}>{tx("calibracionHint")}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 8 }}>
-                  {payload.variables.filter((v) => String(v.rol ?? "").startsWith("medida:")).map((v) => {
-                    const c = calibraciones[v.id] ?? { ultima: "", proxima: "" };
-                    return (
-                      <div key={v.id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6, alignItems: "center", padding: "6px 10px", borderRadius: 8, border: `1px solid ${t.border}` }}>
-                        <Mono apagado style={{ fontSize: 11 }}>{v.id}</Mono>
-                        <input
-                          className="field" type="date" style={{ ...campo, width: 140 }}
-                          aria-label={tx("calUltima", { id: v.id })}
-                          value={c.ultima} onChange={(e) => cambiarCalibracion(v.id, "ultima", e.target.value)}
-                        />
-                        <input
-                          className="field" type="date" style={{ ...campo, width: 140 }}
-                          aria-label={tx("calProxima", { id: v.id })}
-                          value={c.proxima} onChange={(e) => cambiarCalibracion(v.id, "proxima", e.target.value)}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {payload.variables.some((v) => String(v.rol ?? "").startsWith("medida:")) && (() => {
+              const deMedida = payload.variables.filter((v) => String(v.rol ?? "").startsWith("medida:"));
+              const anotadas = deMedida.filter((v) => {
+                const c = calibraciones[v.id];
+                return c?.ultima || c?.proxima;
+              }).length;
+
+              return (
+                /*
+                 * ── PLEGADA, Y ABIERTA SÓLO SI HAY ALGO DENTRO ──────────
+                 *
+                 * Son dos fechas por sensor de medida —once parejas en la
+                 * máquina de vibraciones— y casi siempre están vacías, porque
+                 * ICONICS no las sabe y hay que teclearlas a mano. Desplegadas
+                 * ocupaban más que el resto del formulario junto y empujaban
+                 * «Guardar cambios» fuera de la pantalla, así que lo primero
+                 * que se veía al configurar una máquina era un muro de campos
+                 * que nadie iba a rellenar ese día.
+                 *
+                 * Se pliega, NO se esconde: la sección del reporte de lectura
+                 * de sensores sigue existiendo y sigue diciendo «sin registro»
+                 * donde nadie anotó nada. Un campo escondido dejaría esa
+                 * columna sin forma de rellenarse, que es peor que ocuparla.
+                 *
+                 * `open` cuando YA hay alguna fecha: si alguien se molestó en
+                 * anotarlas, esconderlas al volver a editar sería esconder su
+                 * trabajo. Y el recuento va en el resumen para que plegada siga
+                 * diciendo lo que hay dentro — un desplegable que no dice qué
+                 * contiene obliga a abrirlo para saber si importa.
+                 *
+                 * `<details>` y no un panel propio, por lo mismo que
+                 * `PanelProcedencia`: trae el plegado accesible, el teclado y
+                 * el anuncio de estado sin una línea de JS.
+                 */
+                <details open={anotadas > 0} style={{ marginTop: 12, borderTop: `1px solid ${t.border}`, paddingTop: 10 }}>
+                  <summary style={{ cursor: "pointer", listStyle: "revert", ...textoSuave, fontWeight: 600, color: t.text }}>
+                    {tx("calibracionTitle")}
+                    <span style={{ ...textoSuave, fontSize: 11, fontWeight: 400, color: t.textFaint, marginLeft: 8 }}>
+                      {tx("calibracionResumen", { anotadas, total: deMedida.length })}
+                    </span>
+                  </summary>
+                  <div style={{ ...textoSuave, fontSize: 11, color: t.textFaint, margin: "6px 0 8px" }}>{tx("calibracionHint")}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 8 }}>
+                    {deMedida.map((v) => {
+                      const c = calibraciones[v.id] ?? { ultima: "", proxima: "" };
+                      return (
+                        /*
+                         * `minmax(0, 1fr)` en la primera columna y no `1fr`: con
+                         * `1fr` la clave no puede encogerse por debajo de su
+                         * contenido —es el mínimo automático de la rejilla—, así
+                         * que en una columna estrecha empujaba a los dos campos
+                         * de fecha y `aPeak_S1` se partía en vertical, una letra
+                         * por línea. Se vio en pantalla.
+                         */
+                        <div key={v.id} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: 6, alignItems: "center", padding: "6px 10px", borderRadius: 8, border: `1px solid ${t.border}` }}>
+                          <Mono apagado style={{ fontSize: 11, overflowWrap: "anywhere" }}>{v.id}</Mono>
+                          <input
+                            className="field" type="date" style={{ ...campo, width: 140 }}
+                            aria-label={tx("calUltima", { id: v.id })}
+                            value={c.ultima} onChange={(e) => cambiarCalibracion(v.id, "ultima", e.target.value)}
+                          />
+                          <input
+                            className="field" type="date" style={{ ...campo, width: 140 }}
+                            aria-label={tx("calProxima", { id: v.id })}
+                            value={c.proxima} onChange={(e) => cambiarCalibracion(v.id, "proxima", e.target.value)}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            })()}
 
             {(bloquean.length > 0 || problemasServidor.length > 0) && (
               <div style={{ marginTop: 10 }}>

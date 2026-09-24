@@ -352,3 +352,26 @@ el rango.
 una carrera del hook: la prueba afirmaba «ninguna insignia dice Sesión actual»
 justo tras ver la PRIMERA «Historiador», y cada tarjeta cambia cuando llega su
 serie. La afirmación espera al estado final.
+
+## F-accesibilidad-intermitente · `BandaValor` cae por PLAZO en tanda completa (24-09-2026)
+
+«BandaValor: el corto del estado aparece bajo cada variable con escala, en el
+Detalle genérico» (`accesibilidad.test.jsx`) cayó **2 de 4 tandas completas** el
+24-09-2026, siempre por **`timed out in 10036ms`** y nunca por un aserto. El
+archivo entero **pasa aislado en 4,8 s**, y las dos tandas siguientes pasaron.
+
+**Que sea por plazo y no por aserto es el dato**: `CLAUDE.md` §5.3 dice que ése
+es el modo de fallo de la **contención**, no el del código. Esta prueba monta el
+Detalle genérico entero —el componente más pesado de la suite— y en tanda
+completa compite con los otros 120 archivos.
+
+**No se ha vuelto a subir el techo, a propósito.** Ya se subió el 23-09-2026
+(`9f1c44a`: de 5 s por defecto a 10 s explícitos) y sigue cayendo, así que subir
+otra vez sería la segunda sin medición — el límite que el propio proyecto se
+puso (`CLAUDE.md` §6.2). Lo que toca antes es MEDIR: cuánto tarda de verdad ese
+render aislado contra en tanda, y si lo que espera se puede afirmar sobre menos
+árbol.
+
+**Qué NO es.** No es el cambio del desplegable de calibración del Plan 45: esta
+prueba no toca el editor de máquinas, y falla igual con ese cambio guardado
+aparte.

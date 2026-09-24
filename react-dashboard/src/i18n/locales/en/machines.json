@@ -409,6 +409,7 @@
       "assetAliasHint": "Other ways of naming the asset that the assistant understands; they apply to every variable of the asset. On the root asset, the name and aliases belong to the whole machine.",
       "useSuggestion": "Use “{{nombre}}”",
       "calibracionTitle": "Sensor calibration",
+      "calibracionResumen": "{{anotadas}} of {{total}} with a recorded date",
       "calibracionHint": "Last and next calibration of each sensor. ICONICS does not know it: whoever configures the machine writes it down, and the sensor readings report prints it. Without a date the report says \"no record\".",
       "calUltima": "Last calibration of {{id}}",
       "calProxima": "Next calibration of {{id}}"

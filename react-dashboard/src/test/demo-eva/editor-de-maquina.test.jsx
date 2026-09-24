@@ -569,6 +569,33 @@ describe("calibración por sensor (Plan 44 §6.1)", () => {
     expect(variables.find((v) => v.id === "aRMS_S1")).not.toHaveProperty("calibracion");
   });
 
+  it("la sección llega PLEGADA cuando no hay ninguna fecha, y dice cuántas hay (Plan 45)", async () => {
+    /*
+     * Son dos campos por sensor de medida —once parejas en una máquina de
+     * vibraciones— y casi siempre están vacíos, porque ICONICS no sabe esas
+     * fechas y hay que teclearlas. Desplegados ocupaban más que el resto del
+     * formulario y empujaban «Guardar cambios» fuera de la pantalla.
+     *
+     * Plegada, no escondida: el reporte de lectura de sensores sigue
+     * imprimiendo su sección, y un campo sin forma de rellenarse sería peor
+     * que uno que ocupa. Por eso se comprueba que los campos SIGUEN estando.
+     */
+    montar();
+    fireEvent.change(screen.getByLabelText("Identificador"), { target: { value: "vib-motor-02" } });
+    await explorar();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar todas las variables de S1/ }));
+    await screen.findByText(/26 variables marcadas/);
+
+    const seccion = screen.getByText("Calibración de sensores").closest("details");
+    expect(seccion).toBeTruthy();
+    expect(seccion.open).toBe(false);
+    /* Plegada sigue diciendo qué hay dentro: un desplegable mudo obliga a
+       abrirlo para saber si importa. */
+    expect(seccion.textContent).toMatch(/0 de \d+ con fecha anotada/);
+    /* Y el campo existe, sólo que no se ve. */
+    expect(screen.getByLabelText("Última calibración de vRMS_S1")).toBeTruthy();
+  });
+
   it("al editar, las fechas guardadas se siembran y sobreviven al PATCH aunque no se toquen", async () => {
     const guardada = {
       id: "vib-motor-02", nombre: "Motor 2", tipo: "vibraciones", plc: "PLC_2 · ua:DEMO3",
@@ -586,6 +613,12 @@ describe("calibración por sensor (Plan 44 §6.1)", () => {
     await screen.findByRole("checkbox", { name: /Marcar todas las variables de S2/ });
     expect(screen.getByLabelText("Última calibración de vRMS_S2").value).toBe("2026-08-20");
     expect(screen.getByLabelText("Próxima calibración de vRMS_S2").value).toBe("");
+
+    /* Y aquí SÍ llega abierta: si alguien se molestó en anotar una fecha,
+       esconderla al volver a editar sería esconder su trabajo (Plan 45). */
+    const seccion = screen.getByText("Calibración de sensores").closest("details");
+    expect(seccion.open).toBe(true);
+    expect(seccion.textContent).toMatch(/1 de 1 con fecha anotada/);
 
     fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
     await waitFor(() => expect(editarMaquina).toHaveBeenCalledTimes(1));
