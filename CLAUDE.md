@@ -383,17 +383,17 @@ estas dos tienen que pasar. No son parte de «la tanda»: son la puerta.
 
 ```bash
 ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # cada herramienta
-ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
+ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo (75)
 ```
 
 `ICONICS_FAKE=true` levanta el backend entero —tablero, historiador,
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 180 correctas y 45 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 181 correctas y 45 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «180 de 225», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 225. Catorce de las 180 son sobre una
+> qué. Ese verde significa «181 de 226», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 226. Catorce de las 181 son sobre una
 > máquina **configurada** (Plan 39 F0–F2), y también lo imprime; diez más, en
 > bloque propio al final, son los reportes por plantilla (Plan 44 F3–F5).
 >

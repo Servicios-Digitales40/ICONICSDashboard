@@ -1,6 +1,6 @@
 # PLAN 45 — Dejar el proyecto listo: lo que falta para cerrar Vibraciones como producto
 
-**Estado:** **F0, F2, F4, F5.3 y F1.3 completadas el 24-09-2026** · F1 pendiente sólo de **D1** y de que el motor gire (D3 resuelta: se purgó), F3 y F5–F6 por completar. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
+**Estado:** **F0, F2, F3, F4, F5.3 y F1.3 completadas el 24-09-2026** · queda **F1** (pendiente sólo de **D1** y de que el motor gire) y **F6** (merge). D2 y D3 resueltas. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
 **Rama:** `UI-Limpieza1.0` (Moisés). `DemoVibraciones4.0` recibe el resultado; `AjustesGustavo5.0` es la del asistente (Gustavo). Ver `HANDOFF.md` §0.
 **Origen:** el usuario pidió el 24-09-2026 revisar alcances, capacidades y problemas del proyecto, con pruebas, y después acotó: «no pensemos en la presentación, sino en el contenido del proyecto y en cómo funciona. Quiero dejar el proyecto listo. ¿Qué faltaría?».
 
@@ -175,7 +175,7 @@ hizo; lo que queda dice de quién depende.*
 | ◐ | **Configurar** desde el árbol (`ac:`/`hda:`/`ae:`), roles del tipo, nombre y alias por activo, limitaciones | Probado en planta el 22 y 23-09 | Nombrar `V20` y `TORRETA` (F1.2, es del despliegue) |
 | ◐ | **Verificar**: cada punto existe, cada serie es la suya | 76/76 `VALID`; 62/76 series. ~~Una máquina editada decía «no pudo comprobar» sin haberlo intentado~~ → **F2.3 hecha** | Seis tags sin fuente (**D1**); `aRMS_S3`/`aPeak_S3` sin historia, que **necesita el motor girando** (F1.4) |
 | ✓ | **Documentar**: manuales al tipo, búsqueda semántica + BM25 | 3 manuales en `tipo:vibraciones`, índice cargado | — |
-| ◐ | **Consultar**: 26 herramientas sobre la máquina de delante, sin inventar | 9/9 llegan; cita unidades; se niega a lo que no puede. ~~El pie nombraba al tanque~~ y ~~la causa de los puntos mudos se inventaba~~ → **F2.4 hecha**; ~~el inventario no decía qué máquina está cerrada~~ → **F2.5 hecha** | Cuatro restos del tanque en `backend/ia/**` y los 25–71 s: **todo F3, zona de Gustavo** |
+| ✓ | **Consultar**: 26 herramientas sobre la máquina de delante, sin inventar | Cita unidades y se niega a lo que no puede. ~~El pie nombraba al tanque~~, ~~la causa de los mudos se inventaba~~, ~~el inventario callaba qué máquina está cerrada~~, ~~cuatro textos más hablaban del sistema de agua~~, ~~un enlace inventado no se desmentía~~ → **F2.4, F2.5 y F3 enteras**. Y de 25–71 s a **226 s la tanda completa** (eran 337) | — |
 | ◐ | **Diagnosticar y aprender**: motor determinista, cierre con causa, casos previos | 19 reglas, cierre probado | La única intervención tiene `causa: null`; hecho y propuestas del tanque en la bitácora (**D3**) |
 | ✓ | **Reportes** por plantilla | 7 de 8 contra planta, 5–6 s | `predicciones` apagado a propósito y declarado (Plan 44 D12) |
 | ✓ | **La ausencia de dato no se disfraza** | Mudas listadas, huecos con motivo, y desde F2.4 **nombradas** | — |
@@ -183,10 +183,10 @@ hizo; lo que queda dice de quién depende.*
 | ✓ | **La tanda dice la verdad** | 41 verificadores, dos suites. ~~Una prueba intermitente~~ → F2.2; ~~la suite y los verificadores ensuciaban el despliegue~~ → F2.1 | — |
 | ✓ | **Cerrado no es borrado** (tanque) | Dominio intacto, vistas borradas, pruebas omitidas con motivo | — |
 
-**Dicho en una línea: de las diez promesas, seis están cerradas y las cuatro
-que quedan no dependen de escribir más código en esta rama.** Dos esperan una
-decisión tuya (D1, D3), una espera a que el motor gire, y la cuarta es el
-asistente, que es de Gustavo.
+**Dicho en una línea: de las diez promesas, siete están cerradas y las tres que
+quedan no dependen de escribir más código.** Una espera la decisión **D1** (los
+seis tags del V20), otra a que **el motor gire**, y la tercera es nombrar dos
+activos en la pantalla de configuración. Ninguna es código.
 
 **Lo que se queda como límite declarado**, y no entra en este plan porque no
 depende del código o ya está decidido:
@@ -211,7 +211,7 @@ Lo de §0. Tres decisiones quedan para el usuario:
 | # | Decisión | Bloquea |
 |---|---|---|
 | **D1** | Las seis variables del V20 sin fuente (`HorasMarcha`, `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1/2`, `Presion de aspiracion`): ¿se conectan en el PLC/ICONICS, o se quitan de la máquina? Si no hay fecha para conectarlas, quitarlas: un tag que existe sin fuente no es una medida. **Re-medidas el 24-09 a las 17:38: siguen igual** —marca de tiempo fresca, calidad `2147483667`, sin valor—, así que no es algo que se arregle solo | F1.1 |
-| **D2** | Presupuesto del asistente: ¿Gustavo mide `pensar` acotado e `IA_MAX_PASOS` menor esta semana, o se acepta 25–71 s como está? Es su zona | F3.5 |
+| ~~**D2**~~ | **RESUELTA el 24-09-2026.** El usuario avisó a Gustavo y pidió hacerlo nosotros. Se quitó el razonamiento de la pasada de herramientas, medido: 337 s → 226 s en la tanda completa, y acierta más (ver F3.5) | — |
 | ~~**D3**~~ | **RESUELTA el 24-09-2026: purgar.** Ver F1.3 | — |
 
 Y una de trámite: ¿el plan se comitea tal cual?
@@ -353,7 +353,46 @@ Antes de tocar `shared/eva/**`, la tanda de vibraciones (§5.6).
 **Criterio de aceptación:** las tres suites y `npm run verificar` verdes
 **tres tandas seguidas** (por F2.2), sin cambios en `datos/` tras correrlas.
 
-### F3 · El asistente (zona de Gustavo; aquí se entrega la lista, no se toca)
+### F3 · El asistente — **COMPLETADA el 24-09-2026**
+
+> **Cambió de dueño a mitad del plan.** Esta fase se escribió como «lista para
+> Gustavo, aquí no se toca». El usuario avisó a Gustavo y pidió hacerla
+> nosotros, así que se hizo entera, en dos commits (`c96fa8e`, `09f20c6`,
+> `c9df31d`).
+
+**Lo que de verdad pasó**, punto por punto:
+
+| | Qué se esperaba | Qué pasó |
+|---|---|---|
+| **F3.1** | Derivar el texto de la máquina en servicio | Hecho con `maquinaDeLaQueHablar()`: la de la pantalla si el contexto la declara, la única en servicio si no, y **genérico cuando hay varias** — elegir una sin contexto sería inventar de cuál se habla |
+| **F3.2** | Filtrar las cerradas del inventario | Hecho, **pero no filtrando**: van en su propio campo con su motivo. Ocultarlas haría que una pregunta legítima por el tanque se contestara «no existe», que es falso. Medido después: el modelo pasó de «hay dos máquinas independientes» a «hay dos máquinas instaladas, pero una está cerrada por mantenimiento» |
+| **F3.3** | Usar `SISTEMA[sistemaId]` | Hecho. El campo del valor actual se llama `valorActual`, no `actual`: la primera versión de la comprobación miraba un campo que no existe y pasaba en verde sin comprobar nada |
+| **F3.4** | Redactar el aviso por tipo o genérico | Genérico. Y se descubrió que además de nombrar una máquina cerrada era **falso** para vibraciones: sus límites salen de la ISO 10816-1, no de «una estimación nuestra» |
+| **F3.5** | Probar `pensar` acotado | **Se quitó del todo**, con la medición de abajo. Tanda completa contra planta: **337 s → 226 s** |
+| **F3.6** | La guarda de URL inventada | Hecha. **Desmiente, no bloquea**: el texto sale en streaming, así que cuando la guarda corre el enlace ya está en pantalla |
+
+**Dos cosas que este plan no había previsto y salieron al hacerlo:**
+
+- **`verificar-chat` tenía una comprobación que afirmaba lo contrario de lo
+  medido**: «se piensa para ELEGIR la herramienta y no para redactar», con el
+  motivo «elegir herramienta y convertir fechas es donde el razonamiento
+  sirve». Estaba escrita como un hecho y era una suposición. Se reescribió con
+  la medición, y ahora protege que nadie lo encienda sin volver a medir.
+- **El instrumento bajó de 9/9 a 8/9, y no es una regresión.** El caso del
+  reporte omite el argumento `sistema`, que es **exactamente lo que su
+  descripción le ordena** cuando el usuario no nombra máquina (Plan 44 F3.4);
+  el código resuelve la omisión con la única en servicio. Se abrió el PDF
+  generado para comprobarlo: 33 páginas, «Motor Vibraciones», 62 de 62
+  gráficos. **El instrumento puntúa la LLAMADA, no el resultado**, y conviene
+  saberlo antes de leer su marcador como una nota.
+
+**Verde al cerrar:** `verificar-chat` **75** (eran 72), `verificar-herramientas`
+**181** (eran 180), los 41 verificadores, backend 442, frontend 1192, lint y
+types limpios. Las cinco comprobaciones nuevas, vistas fallar antes.
+
+---
+
+*El diseño original de la fase, para referencia:*
 
 Todo en `backend/ia/**`, con línea y reproducción. Prioridad por lo que
 desmiente la promesa de «sobre la máquina de delante».

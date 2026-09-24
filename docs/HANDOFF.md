@@ -127,7 +127,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 
 ```bash
 ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 178 correctas · 45 omitidas (ver CLAUDE.md §5.1)
-ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
+ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 75
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
 
@@ -193,8 +193,8 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | Suite de frontend | **1192** pruebas · 20 omitidas *(a 24-09-2026, con el Plan 44 completo; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
 | Suite de backend | **442** pruebas, **442 verdes** *(a 24-09-2026 por la tarde, con el Plan 45 F2; eran 440 con el Plan 44 y la B16)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **180** correctas (14 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
-| `verificar-chat` | **72** correctas |
+| `verificar-herramientas` | **181** correctas (14 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
+| `verificar-chat` | **75** correctas *(24-09-2026, Plan 45 F3: dos del enlace inventado y una del aviso de bloqueo)* |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
 | Bundle | `index` 350,3 KB / 450 · `vendor` 269,1 / 330 · `charts` 326,4 (sin techo) · `three` diferido |
@@ -662,6 +662,25 @@ vacía, toda máquina pasa a ser borrable de verdad.
 ## 8. Comportamientos del modelo y trampas conocidas
 
 ### Del modelo
+
+**RAZONAR PARA ELEGIR HERRAMIENTA LE HACE ACERTAR MENOS.** Es lo más
+contraintuitivo de esta lista, y por eso va primero. Medido el 24-09-2026
+(Plan 45 F3.5) contra `qwen-3.5-4B` con el catálogo real de 26 herramientas:
+
+| | Con `enable_thinking` | Sin él |
+|---|---|---|
+| «¿cómo está la máquina X?», cinco veces | **acierta 1 de 5** | **5 de 5** |
+| Cuatro preguntas reales | 6,6 / 2,1 / 6,7 / 5,6 s | 1,1 / 1,0 / 1,8 / 1,3 s |
+| Una pregunta de redacción | 33,6 s, gasta los 1536 tokens del tope | 1,4 s, 54 tokens |
+| Tanda completa (`medir-asistente-configurada`) | 337 s | **226 s** |
+
+Las cuatro fallidas llaman a `sistemas_de_la_planta` —enumerar la planta— en
+vez de leer la máquina. La explicación que encaja: **el razonamiento largo le
+da ocasión de RECONSIDERAR una elección que ya tenía bien.**
+
+Así que `pasadaConHerramientas` va con `pensar: false` desde ese día, y
+`verificar-chat` lo vigila. **Si se cambia de modelo, esto es lo primero que
+hay que volver a medir** — no es una propiedad del código, es de este modelo.
 
 **No obedece una instrucción que compita con una plantilla cercana.** Medido:
 el narrador abrió **6 de cada 6** respuestas con «no pude consultar los
