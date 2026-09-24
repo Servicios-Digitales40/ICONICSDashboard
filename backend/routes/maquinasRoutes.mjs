@@ -491,6 +491,12 @@ export function registerMaquinasRoutes(
         await gestorMaquinas.anotarRevision(maquina.id, {
           estado: maquina.estado ?? ESTADO_CONFIGURACION.UNKNOWN,
           variables,
+          /* Y tampoco la FECHA de revisión, por el mismo motivo por el que no
+             se toca el estado: sondear no es revisar. Estamparla convertía una
+             máquina editada y sondeada en una que decía «la última revisión no
+             pudo comprobarla contra ICONICS» sin que nadie lo hubiera
+             intentado (Plan 45 F2.3; el porqué largo está en `anotarRevision`). */
+          fechar: false,
         })
       }
 

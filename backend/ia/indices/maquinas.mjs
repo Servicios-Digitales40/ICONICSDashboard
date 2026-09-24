@@ -362,8 +362,26 @@ export function createGestorMaquinas({ ruta }) {
    * Lo calcula `lib/verificarConfiguracion.mjs`; aquí sólo se guarda. Separarlo
    * es lo que permite que este módulo no necesite red — y que la comprobación
    * se pueda probar sin tocar disco.
+   *
+   * ── `fechar: false` ES PARA EL SONDEO (Plan 45 F2.3) ───────────────
+   *
+   * `revisada` significa «alguien miró esta máquina contra ICONICS y éste fue
+   * el veredicto», y es la fecha que `construirSistema` cita en la limitación
+   * que el asistente lee en voz alta. El SONDEO de series no produce ese
+   * veredicto: dice si cada serie es la suya, no si la configuración sigue
+   * siendo cierta —lo pone su propia ruta, que por eso reenvía el `estado`
+   * anterior sin tocarlo—. Pero al llamar aquí estampaba la fecha igual.
+   *
+   * El efecto, medido el 24-09-2026 sobre `vib-motor-03`: una máquina editada
+   * (que vuelve a `UNKNOWN` por diseño) y luego sondeada quedaba con
+   * `UNKNOWN` + `revisada` de hoy, y de ahí salía «La última revisión
+   * (2026-09-24) no pudo comprobar esta máquina contra ICONICS», que es la
+   * frase de un corte de red. No lo hubo: nadie lo intentó. Y un fallo de
+   * verdad de `/verificar` no puede producirla, porque ese caso NO se anota
+   * a propósito (`maquinasRoutes.mjs`, «un UNKNOWN no pisa lo que ya se
+   * sabía»). O sea que la frase sólo podía ser mentira.
    */
-  async function anotarRevision(id, { estado, variables = null }, ahora = new Date()) {
+  async function anotarRevision(id, { estado, variables = null, fechar = true }, ahora = new Date()) {
     return conCandado(ruta, async () => {
       const config = await leer()
       const i = config.maquinas.findIndex(m => m.id === id)
@@ -372,7 +390,7 @@ export function createGestorMaquinas({ ruta }) {
       config.maquinas[i] = {
         ...config.maquinas[i],
         estado,
-        revisada: ahora.toISOString(),
+        ...(fechar ? { revisada: ahora.toISOString() } : {}),
         ...(variables ? { variables } : {}),
       }
       await escribirJsonAtomico(ruta, config)

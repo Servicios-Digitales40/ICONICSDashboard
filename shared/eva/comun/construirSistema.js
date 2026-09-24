@@ -650,10 +650,28 @@ export function construirSistema(maquina, tipo) {
       const dia = maquina.revisada ? String(maquina.revisada).slice(0, 10) : null;
       const estadoRevision = maquina.estado ?? ESTADO_CONFIGURACION.UNKNOWN;
       if (estadoRevision === ESTADO_CONFIGURACION.UNKNOWN) {
+        /*
+         * ── LAS DOS FRASES DE `UNKNOWN` (corregido, Plan 45 F2.3) ─────
+         *
+         * Con fecha, esto decía «La última revisión (día) NO PUDO COMPROBAR
+         * esta máquina contra ICONICS», que es la frase de un corte de red. Y
+         * un corte de red no puede producir este estado: cuando `/verificar`
+         * no alcanza el servidor, la ruta devuelve `UNKNOWN` y **no lo anota**
+         * a propósito, para no pisar un `VALID` anterior que sigue siendo la
+         * mejor información que hay.
+         *
+         * Así que un `UNKNOWN` con fecha sólo podía venir de haber EDITADO la
+         * máquina —`editar()` retira el veredicto cuando cambia qué lee, que
+         * es correcto— y haberla sondeado después, porque el sondeo estampaba
+         * la fecha sin revisar nada. Eso ya no pasa (`fechar: false`), pero el
+         * texto tenía que dejar de afirmar una avería que nadie observó: lo
+         * que hay es una configuración que cambió y nadie volvió a contrastar.
+         */
         propias.push(
           dia
-            ? `La última revisión (${dia}) no pudo comprobar esta máquina contra ICONICS: no se ` +
-              `sabe si sus ${total} puntos siguen existiendo. Lo que se lea de ella no está contrastado.`
+            ? `Sin comprobar contra ICONICS desde que cambió su lista de variables: la última ` +
+              `revisión es del ${dia} y ya no habla de esta configuración. No se sabe si sus ` +
+              `${total} puntos existen; lo que se lea de ella no está contrastado.`
             : `Sin revisar todavía: ${total} puntos declarados, ninguno comprobado contra ICONICS. ` +
               "Lo que se lea de ella no está contrastado con el árbol del servidor.",
         );

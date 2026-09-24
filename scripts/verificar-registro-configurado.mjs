@@ -497,10 +497,22 @@ check('sin revisar (UNKNOWN, sin fecha): lo dice, con cuántos puntos', () => {
   assert.ok(e.limitaciones.some((l) => /Sin revisar todavía: 2 puntos declarados/.test(l)))
 })
 
-check('UNKNOWN con fecha: la última revisión no pudo comprobarla', () => {
+/*
+ * Esta comprobación esperaba «La última revisión (día) NO PUDO COMPROBAR esta
+ * máquina contra ICONICS», y con ella daba por bueno un texto que el código no
+ * puede producir honestamente (Plan 45 F2.3): un fallo de red deja `UNKNOWN`
+ * SIN anotar, a propósito. Un `UNKNOWN` con fecha sólo sale de editar la
+ * máquina —que retira el veredicto— y sondearla después. Eso es una
+ * configuración sin contrastar, no una avería observada, y así se dice.
+ */
+check('UNKNOWN con fecha: se editó y nadie la volvió a comprobar', () => {
   const m = { ...configuracion('sin-red', 'ac:SN/'), estado: 'UNKNOWN', revisada: '2026-09-21T08:00:00.000Z' }
   const e = construirSistema(m, tipoDe('vibraciones'))
-  assert.ok(e.limitaciones.some((l) => /La última revisión \(2026-09-21\) no pudo comprobar/.test(l)))
+  assert.ok(e.limitaciones.some((l) => /Sin comprobar contra ICONICS desde que cambió su lista de variables/.test(l)))
+  assert.ok(e.limitaciones.some((l) => /la última revisión es del 2026-09-21/.test(l)))
+  /* Y NO dice que se intentara y fallara: eso sería afirmar una avería que
+     nadie observó, que es lo que este arreglo quitó. */
+  assert.ok(!e.limitaciones.some((l) => /no pudo comprobar/.test(l)))
   assert.ok(!e.limitaciones.some((l) => /Sin revisar todavía/.test(l)))
 })
 

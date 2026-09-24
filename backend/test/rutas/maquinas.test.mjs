@@ -616,6 +616,48 @@ describe('POST /api/maquinas/:id/sondear', () => {
     expect(limitacion).toContain(constantes[0].id)
   })
 
+  it('sondear NO fecha una revisión que no hizo: la limitación no inventa un fallo de red (Plan 45 F2.3)', async () => {
+    /*
+     * La secuencia que lo destapó en el despliegue el 24-09-2026: una máquina
+     * comprobada (VALID), editada —lo que retira el veredicto a propósito— y
+     * sondeada después. El sondeo estampaba `revisada`, así que quedaba
+     * `UNKNOWN` CON fecha, y de ahí salía «La última revisión (día) no pudo
+     * comprobar esta máquina contra ICONICS»: la frase de un corte de red que
+     * nadie sufrió. El asistente la citaba en cada respuesta.
+     *
+     * No podía venir de un fallo real: cuando `/verificar` no alcanza el
+     * servidor, la ruta devuelve `UNKNOWN` y NO lo anota, justamente para no
+     * pisar lo que ya se sabía.
+     */
+    await app.inject({ method: 'POST', url: '/api/maquinas', payload: espejo() })
+
+    const comprobada = json(await app.inject({ method: 'POST', url: `/api/maquinas/${ID}/verificar` }))
+    expect(comprobada.anotado).toBe(true)
+    const { maquina: revisada } = json(await app.inject({ method: 'GET', url: `/api/maquinas/${ID}` }))
+    const fechaDeLaRevision = revisada.revisada
+    expect(fechaDeLaRevision).toBeTruthy()
+
+    // Editar qué lee: el veredicto ya no habla de esta configuración.
+    const { variables } = espejo()
+    const editada = json(await app.inject({
+      method: 'PATCH',
+      url: `/api/maquinas/${ID}`,
+      payload: { variables: variables.slice(0, -1) },
+    }))
+    expect(editada.maquina.estado).toBe('UNKNOWN')
+
+    await app.inject({ method: 'POST', url: `/api/maquinas/${ID}/sondear` })
+
+    const { maquina } = json(await app.inject({ method: 'GET', url: `/api/maquinas/${ID}` }))
+    // El sondeo no toca la fecha: sigue siendo la de la revisión de verdad.
+    expect(maquina.revisada).toBe(fechaDeLaRevision)
+    // Y la limitación dice lo que pasó, no una avería inventada.
+    expect(maquina.limitaciones.some((l) => /no pudo comprobar/.test(l))).toBe(false)
+    expect(
+      maquina.limitaciones.some((l) => /Sin comprobar contra ICONICS desde que cambió su lista/.test(l))
+    ).toBe(true)
+  })
+
   it('editar la máquina CONSERVA el cómo de la verificación; cambiar el punto histórico lo retira', async () => {
     await app.inject({ method: 'POST', url: '/api/maquinas', payload: espejo() })
     const sondeo = json(await app.inject({ method: 'POST', url: `/api/maquinas/${ID}/sondear` }))
