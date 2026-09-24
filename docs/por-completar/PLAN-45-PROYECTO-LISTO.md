@@ -364,13 +364,57 @@ desmiente la promesa de «sobre la máquina de delante».
 | 1 | **F3.2** `sistemas_de_la_planta` enumera el tanque cerrado | `registro/index.mjs:56` | «¿qué máquinas hay?» → «dos máquinas». Con F2.5, filtrar por `!cerrado` o decir que está cerrada |
 | 2 | **F3.3** `perfil_de_senal` lee `SISTEMA.tanque` para «el valor de ahora» | `historicos/index.mjs:685` | Usar `SISTEMA[sistemaId]` |
 | 2 | **F3.4** `avisoDeUmbrales` «sistema de agua genérico» | `lib/formato.mjs:133` | Redactar por tipo, o genérico |
-| 2 | **F3.5** Tiempo por respuesta 25–71 s (D2) | `chat.mjs:1340` `pensar: true`; `.env.local` `IA_MAX_PASOS=20`, `IA_MAX_TOKENS=1536` | `medir-asistente-configurada.mjs` antes y después. La caché de prefijo ya funciona; el coste es razonamiento y rondas. Probar `pensar` acotado y `IA_MAX_PASOS` en 3–5 (el caso «manual» hizo 13 llamadas) |
+| **1** | **F3.5** Tiempo por respuesta 25–71 s (D2). **Medido el 24-09 por la tarde contra el modelo real: la causa es `pensar: true`, y quitarlo no sólo acelera, ACIERTA MÁS.** Ver el recuadro de abajo | `chat.mjs:1340` `pensar: true`; `.env.local` `IA_MAX_PASOS=20`, `IA_MAX_TOKENS=1536` | `medir-asistente-configurada.mjs` antes y después |
 | 3 | **F3.6** Guarda de URL inventada (pendiente del Plan 44 F3.4) | `chat.mjs` | Una URL en la respuesta sin adjunto emitido en el turno se bloquea como una cifra sin herramienta |
 | 3 | **F3.7** Tras F1.1 y F2.4, re-medir juntos `verificar-herramientas` y `medir-asistente-configurada` | | |
 
 **Criterio de aceptación:** la puerta (`CLAUDE.md` §5.1) verde, y
 `medir-asistente-configurada` en 9 de 9 con ninguna respuesta que nombre al
 tanque.
+
+> ### Lo que se midió de F3.5 el 24-09-2026 por la tarde
+>
+> Contra el modelo real (`qwen-3.5-4B`) y **con el catálogo de las 26
+> herramientas de verdad**, no con uno de juguete. Dos tandas.
+>
+> **Cuánto cuesta razonar**, con una pregunta de redacción pura:
+>
+> | | Tiempo | Tokens generados | Razonamiento |
+> |---|---|---|---|
+> | `enable_thinking: true` | **33,6 s** | 1536 (el tope entero) | 5 930 caracteres |
+> | `enable_thinking: false` | **1,4 s** | 54 | — |
+>
+> El razonamiento **se come el presupuesto entero** (`max_tokens` cubre las dos
+> cosas, como ya avisa la cabecera de `llamarModelo`). No es que piense un poco
+> más: es que gasta los 1536 tokens pensando.
+>
+> **Y en la pasada que importa —elegir herramienta—**, cuatro preguntas reales:
+>
+> | Pregunta | Con `pensar` | Sin `pensar` |
+> |---|---|---|
+> | estado | 6,6 s → **`sistemas_de_la_planta`** ✗ | 1,1 s → `estado_del_sistema` ✓ |
+> | riesgos | 2,1 s → `riesgos_activos` ✓ | 1,0 s → `riesgos_activos` ✓ |
+> | historia | 6,7 s → `historia_de_senal` ✓ | 1,8 s → `historia_de_senal` ✓ |
+> | manual | 5,6 s → `limites_del_manual` ✓ | 1,3 s → `limites_del_manual` ✓ |
+>
+> Lo de «estado» no fue casualidad. Repetido **cinco veces cada uno**:
+>
+> - **con `pensar`: acierta 1 de 5** (las otras cuatro se van a
+>   `sistemas_de_la_planta`, que es enumerar la planta en vez de leer la
+>   máquina);
+> - **sin `pensar`: acierta 5 de 5.**
+>
+> **La conclusión, y es más fuerte de lo que este plan suponía:** `pensar: true`
+> en la pasada de herramientas no está comprando precisión a cambio de tiempo.
+> Está costando tiempo **y** precisión. El razonamiento largo le da al modelo
+> ocasión de reconsiderar una elección que ya tenía bien.
+>
+> **Lo que NO prueba esto**, y por eso el cambio no se hace aquí: que quitarlo
+> sea seguro en el bucle completo, con el prompt real, el contexto de pantalla
+> y varias rondas encadenadas. Eso lo dice `medir-asistente-configurada.mjs`
+> (9 de 9 hoy) y `verificar-chat` (72), que es la puerta. Es media hora de
+> trabajo con el instrumento delante, no una suposición — pero es la zona de
+> Gustavo y **se le pasa medido**, que es justo lo que le ahorra la mitad.
 
 ### F4 · La documentación dice lo que el código hace — **COMPLETADA el 24-09-2026**
 
