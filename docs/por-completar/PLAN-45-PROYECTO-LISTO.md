@@ -1,6 +1,6 @@
 # PLAN 45 — Dejar el proyecto listo: lo que falta para cerrar Vibraciones como producto
 
-**Estado:** **F0, F2 y F4 completadas el 24-09-2026** · F1 (espera D1/D3 y el motor girando), F3 (Gustavo) y F5–F6 por completar. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
+**Estado:** **F0, F2, F4, F5.3 y F1.3 completadas el 24-09-2026** · F1 pendiente sólo de **D1** y de que el motor gire (D3 resuelta: se purgó), F3 y F5–F6 por completar. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
 **Rama:** `UI-Limpieza1.0` (Moisés). `DemoVibraciones4.0` recibe el resultado; `AjustesGustavo5.0` es la del asistente (Gustavo). Ver `HANDOFF.md` §0.
 **Origen:** el usuario pidió el 24-09-2026 revisar alcances, capacidades y problemas del proyecto, con pruebas, y después acotó: «no pensemos en la presentación, sino en el contenido del proyecto y en cómo funciona. Quiero dejar el proyecto listo. ¿Qué faltaría?».
 
@@ -210,28 +210,64 @@ Lo de §0. Tres decisiones quedan para el usuario:
 
 | # | Decisión | Bloquea |
 |---|---|---|
-| **D1** | Las seis variables del V20 sin fuente (`HorasMarcha`, `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1/2`, `Presion de aspiracion`): ¿se conectan en el PLC/ICONICS, o se quitan de la máquina? Si no hay fecha para conectarlas, quitarlas: un tag que existe sin fuente no es una medida | F1.1 |
+| **D1** | Las seis variables del V20 sin fuente (`HorasMarcha`, `Numero de arranques`, `Temperaturadeldevanado`, `Corriente fase 1/2`, `Presion de aspiracion`): ¿se conectan en el PLC/ICONICS, o se quitan de la máquina? Si no hay fecha para conectarlas, quitarlas: un tag que existe sin fuente no es una medida. **Re-medidas el 24-09 a las 17:38: siguen igual** —marca de tiempo fresca, calidad `2147483667`, sin valor—, así que no es algo que se arregle solo | F1.1 |
 | **D2** | Presupuesto del asistente: ¿Gustavo mide `pensar` acotado e `IA_MAX_PASOS` menor esta semana, o se acepta 25–71 s como está? Es su zona | F3.5 |
-| **D3** | La bitácora: ¿se cierra bien la intervención de `vib-motor-03` (o se purga) y se purgan el hecho y las cinco propuestas del tanque? | F1.3 |
+| ~~**D3**~~ | **RESUELTA el 24-09-2026: purgar.** Ver F1.3 | — |
 
 Y una de trámite: ¿el plan se comitea tal cual?
 
 ### F1 · El despliegue, completo y sin ruido
 
 **Objetivo.** Que lo configurado sea exactamente la máquina que hay.
-**Dependencias:** D1, D3, y que el motor gire para F1.4. **Sin commit**
-(`datos/` no se versiona).
+**Dependencias:** D1, ~~D3~~ (resuelta), y que el motor gire para F1.4.
+**Sin commit** (`datos/` no se versiona).
+
+> **El motor sigue apagado, confirmado por el usuario el 24-09-2026 por la
+> tarde.** F1.4 —ganar la verificación de `aRMS_S3` y `aPeak_S3`— queda en
+> espera de que gire; no es algo que se pueda forzar desde aquí.
+>
+> **Y un matiz que conviene no confundir con una avería.** Midiendo a las
+> 17:38 (UTC), 52 de los 76 puntos traían marca de tiempo de **las 15:02** y
+> sólo 24 venían frescos. No es que el servidor esté caído: los 52 son las
+> **banderas, los `MonState` y los códigos de calidad**, que el historiador y
+> el propio OPC **sólo refrescan cuando cambian** (es lo mismo que midió el
+> Plan 42 F0 para el historiador). Los que sí cambian —`vRMS`, `aRMS`,
+> `aPeak`, `DKW`, las velocidades— llegaban con la marca del segundo.
+>
+> Dicho de otro modo: **una marca de tiempo vieja en una bandera no es un dato
+> viejo, es una bandera que no ha cambiado.** Quien mire esto por primera vez
+> puede leerlo como que el servidor sirve datos de hace tres horas, y no es
+> eso.
 
 1. **Las seis variables sin fuente** (D1). Si se quitan: editor → la máquina
    vuelve a `UNKNOWN` por diseño → **Verificar** → `VALID` con 70. Evidencia:
    `/api/health` en `ok`; el pie del asistente deja de contar puntos mudos.
 2. **Nombrar `V20` y `TORRETA`** en el editor. Evidencia: Planta y el
    asistente los llaman por su nombre.
-3. **La bitácora** (D3): cerrar la intervención desde Cierre de diagnóstico
-   con su causa, o purgarla con
+3. **La bitácora** (D3) — **HECHO el 24-09-2026, 17:36.** El usuario decidió
+   purgar. Y al ir a hacerlo no había una intervención sino **tres**: la de
+   `vib-motor-03` sin causa, más **dos del tanque escritas esa misma tarde a
+   las 16:36 y 16:39** por `verificar-herramientas`, antes de que la
+   continuación de F2.1 aislara los verificadores. Prueba de que aquella fuga
+   ensuciaba de verdad, y no sólo los diarios.
+
+   Las tres se fueron con
    `scripts/purgar-casos-invalidos.mjs --vaciar-intervenciones --ejecutar`
-   (deja copia). Para el hecho y las propuestas del tanque no hay guion: se
-   edita `datos/aprendizaje.json` con copia al lado y se anota aquí.
+   (copia en `aprendizaje.json.antes-de-purga-2026-09-24T17-36-44-359Z.json`).
+   Las **cinco propuestas** —las dos de temperatura del tanque duplicadas, la
+   de carga con bajo caudal— se borraron aparte, con su propia copia
+   (`…antes-de-purga-propuestas-2026-09-24T17-36-58-219Z.json`), porque no hay
+   guion para ellas.
+
+   **El hecho de los 220 V se CONSERVA**, y es la única decisión de criterio
+   aquí: su `sistema` es `suministro eléctrico`, no `tanque`. Es la tensión de
+   la acometida, que alimenta también al motor de vibraciones; borrarlo por
+   venir de la época del tanque habría tirado un dato que sigue siendo cierto
+   y que ninguna máquina puede deducir sola.
+
+   **Comprobado** contra un backend real: `GET /api/casos` devuelve
+   `{ total: 0 }` y el índice de casos arranca sin fallar, que es lo que la
+   nota de `HANDOFF.md` §7 advierte que hay que mirar tras un vaciado.
 4. **Sondear con el motor girando**. Evidencia: `aRMS_S3` y `aPeak_S3`
    verificadas; «sin verificar» baja de 14 a las constantes que no dejaron
    marca en la ventana, y ninguna «compartida».
