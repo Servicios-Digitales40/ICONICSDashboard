@@ -443,7 +443,30 @@ console.log('\n── La máquina configurada (Plan 39 F0) ───────
 
 console.log('\n── Razonamiento (Qwen y similares) ─────────────────────────')
 
-await check('se piensa para ELEGIR la herramienta y no para redactar', async () => {
+await check('NO se piensa en ninguna de las dos pasadas (Plan 45 F3.5)', async () => {
+  /*
+   * ── ESTA COMPROBACIÓN AFIRMABA LO CONTRARIO, Y ERA UNA SUPOSICIÓN ──
+   *
+   * Decía «se piensa para ELEGIR la herramienta y no para redactar», con el
+   * motivo «elegir herramienta y convertir fechas es donde el razonamiento
+   * sirve». Suena razonable y estaba escrito como si fuera un hecho medido.
+   * No lo era.
+   *
+   * Medido el 24-09-2026 contra `qwen-3.5-4B` con el catálogo REAL de 26
+   * herramientas, el razonamiento en esa pasada cuesta tiempo Y precisión:
+   *
+   *   · «¿cómo está la máquina X ahora mismo?», cinco veces cada uno:
+   *     CON pensar acierta 1 de 5 —las otras cuatro llaman a
+   *     `sistemas_de_la_planta`, o sea enumeran la planta en vez de leer la
+   *     máquina—; SIN pensar, 5 de 5;
+   *   · cuatro preguntas reales: 6,6 / 2,1 / 6,7 / 5,6 s con razonamiento
+   *     contra 1,1 / 1,0 / 1,8 / 1,3 s sin él;
+   *   · y en la tanda completa de `medir-asistente-configurada`, 337 s → 226 s.
+   *
+   * Lo que protege ahora: que nadie vuelva a encender el razonamiento sin
+   * volver a medir. Si algún día se enciende, este texto dice con qué
+   * comparar.
+   */
   peticiones = []
   guion = {
     toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
@@ -456,8 +479,8 @@ await check('se piensa para ELEGIR la herramienta y no para redactar', async () 
   const conHerramientas = peticiones.find(p => p.tools)
   const redactando = peticiones.find(p => p.stream)
 
-  assert.equal(conHerramientas.chat_template_kwargs.enable_thinking, true,
-    'elegir herramienta y convertir fechas es donde el razonamiento sirve')
+  assert.equal(conHerramientas.chat_template_kwargs.enable_thinking, false,
+    'razonar para elegir herramienta acierta MENOS: 1 de 5 contra 5 de 5 (Plan 45 F3.5)')
   assert.equal(redactando.chat_template_kwargs.enable_thinking, false,
     'redactar con el dato delante no necesita pensar, y pensar se come el presupuesto')
 })

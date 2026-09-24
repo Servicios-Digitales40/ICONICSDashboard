@@ -1332,12 +1332,43 @@ export function createChat({ config, herramientas }) {
       })
     }
 
+    /*
+     * ── SIN RAZONAR, Y ESTO ESTÁ MEDIDO (Plan 45 F3.5) ────────────────
+     *
+     * Era `pensar: true`, con `RESERVA_RAZONAMIENTO` encima del presupuesto
+     * para que el razonamiento no truncara la llamada a la herramienta. La
+     * suposición de fondo era la de siempre: razonar cuesta tiempo y compra
+     * precisión al elegir entre 26 herramientas.
+     *
+     * Medido el 24-09-2026 contra `qwen-3.5-4B` y con el catálogo REAL, no
+     * compra nada. Cuesta las dos cosas:
+     *
+     *   · una pregunta de redacción pura: 33,6 s con razonamiento —gastando
+     *     los 1536 tokens del tope ENTEROS, 5 930 caracteres de razonamiento—
+     *     contra 1,4 s sin él;
+     *   · eligiendo herramienta, cuatro preguntas reales: 6,6 / 2,1 / 6,7 /
+     *     5,6 s con razonamiento, contra 1,1 / 1,0 / 1,8 / 1,3 s sin él;
+     *   · y lo que decidió el cambio: «¿cómo está la máquina X ahora mismo?»
+     *     repetida CINCO veces. Con razonamiento acierta **1 de 5** —las
+     *     otras cuatro llaman a `sistemas_de_la_planta`, que es enumerar la
+     *     planta en vez de leer la máquina—. Sin razonar, **5 de 5**.
+     *
+     * La explicación que encaja con eso: el razonamiento largo le da ocasión
+     * de RECONSIDERAR una elección que ya tenía bien. No es que piense mejor,
+     * es que se lo piensa dos veces y la segunda acierta menos.
+     *
+     * Se conserva `RESERVA_RAZONAMIENTO` en el tope a propósito: es holgura
+     * que no cuesta nada si no se usa —`max_tokens` es un techo, no una
+     * reserva— y evita que un modelo que SÍ razone por su cuenta (otro preset
+     * del `.ini`) trunque la llamada. El día que se cambie de modelo, este
+     * bloque es lo que hay que volver a medir, no lo que hay que creer.
+     */
     const respuesta = await llamarModelo({
       messages,
       tools: definiciones,
       stream: false,
       signal,
-      pensar: true,
+      pensar: false,
       tope: maxTokens + RESERVA_RAZONAMIENTO,
     })
 
