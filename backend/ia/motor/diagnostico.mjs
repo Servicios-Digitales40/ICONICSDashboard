@@ -45,18 +45,12 @@
  */
 import { causaRealDe } from '../../../shared/eva/comun/aprendizaje.js'
 import { causasDe, porQueSinCausas } from '../../../shared/eva/comun/causas.js'
-import { REGLAS as REGLAS_TANQUE } from '../../../shared/eva/tanque/riesgos.js'
 import { SISTEMA } from '../../../shared/eva/comun/sistemas.js'
 import { tipoDe } from '../../../shared/eva/tipos/index.js'
 import { isGoodQuality } from '../../../shared/quality.js'
 import { logger } from '../../logger.mjs'
 import { construirSnapshot } from './snapshot.mjs'
 
-/* Sólo el tanque sigue escrito a mano (Plan 40 F1): las demás máquinas
-   traen sus reglas por TIPO, ver `reglasDe`. */
-const REGLAS_POR_SISTEMA = {
-  tanque: REGLAS_TANQUE,
-}
 
 /**
  * Las frases de evidencia que ESCRIBE ESTE MOTOR, por su clave.
@@ -303,11 +297,11 @@ function esFuerte(resultado) {
  *
  * ── LAS CONFIGURADAS TRAEN SUS REGLAS POR EL TIPO (Plan 38 F1) ─────
  *
- * `REGLAS_POR_SISTEMA` va por id de máquina y sólo conoce las dos escritas a
- * mano. Una máquina configurada (`vib-motor-03`) no está ahí y no tiene por
- * qué estarlo: sus reglas son las de su TIPO, que ya viajan por referencia en
- * `tipoDe(tipo).reglas`. Se mira primero el id —las escritas a mano no
- * declaran tipo— y después el tipo de la entrada del registro.
+ * Del REGISTRO, sin tabla por id de máquina (Plan 44 F3.6): una configurada
+ * trae sus reglas por su TIPO (`tipoDe(tipo).reglas`), y una entrada escrita
+ * a mano las declara ella misma (`entrada.reglas`). Hasta el 23-09-2026 aquí
+ * había un `REGLAS_POR_SISTEMA = { tanque: … }`; se fue con el resto de
+ * específicos del asistente.
  *
  * `convencion` dice cómo componen la frase de datos: las reglas del tanque
  * esperan las lecturas crudas más los umbrales; las de vibración devuelven lo
@@ -316,11 +310,10 @@ function esFuerte(resultado) {
  * convención equivocada sin dar error.
  */
 function reglasDe(sistema) {
-  if (REGLAS_POR_SISTEMA[sistema]) {
-    return { reglas: REGLAS_POR_SISTEMA[sistema], convencion: sistema }
-  }
-  const tipo = tipoDe(SISTEMA[sistema]?.tipo)
+  const entrada = SISTEMA[sistema]
+  const tipo = tipoDe(entrada?.tipo)
   if (tipo?.reglas) return { reglas: tipo.reglas, convencion: tipo.id }
+  if (entrada?.reglas?.length) return { reglas: entrada.reglas, convencion: sistema }
   return null
 }
 

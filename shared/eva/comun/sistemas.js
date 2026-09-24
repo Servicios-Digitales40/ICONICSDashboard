@@ -116,6 +116,7 @@ import {
 import { valorDePunto } from "../tanque/simulador.js";
 import { estadoDelTanque, resumenTanqueParaAsistente } from "../tanque/estadoTanque.js";
 import { MECANISMOS } from "./pronostico.js";
+import { REGLAS as REGLAS_TANQUE, evaluarRiesgos as evaluarRiesgosTanque } from "../tanque/riesgos.js";
 /*
  * ── LA MÁQUINA DE VIBRACIONES YA NO ESTÁ ESCRITA AQUÍ (Plan 40 F3) ─
  *
@@ -220,6 +221,11 @@ export const SISTEMAS = [
     },
     /** Mecanismos de desgaste acumulado, para el pronóstico. */
     desgaste: MECANISMOS,
+    /* Sus reglas y cómo se evalúan, DECLARADAS en la entrada (Plan 44 F3.6):
+       el motor y las herramientas del asistente ya no tienen una tabla «si es
+       el tanque…»; leen esto del registro, como de cualquier configurada. */
+    reglas: REGLAS_TANQUE,
+    evaluarRiesgos: evaluarRiesgosTanque,
     cadenciaMs: 3_000,
     mide: [
       "nivel y temperatura del tanque",

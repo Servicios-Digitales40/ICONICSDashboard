@@ -301,6 +301,20 @@ const c = {
 let passed = 0
 const fallos = []
 
+/*
+ * Omitir, dejando constancia: la comprobación sigue escrita entera y NO corre.
+ * Mismo criterio que en `verificar-herramientas`: lo que se deja de mirar se
+ * cuenta y se dice al final. Hoy las omitidas son las de accionar la bomba del
+ * tanque: desde el Plan 44 F3.6 la herramienta pasa por la guarda de máquina
+ * cerrada y el contrato HTTP responde 409 con el motivo del cierre.
+ */
+const omitidas = []
+const CERRADA = 'la estación de llenado está cerrada (rama Vibraciones1.0): la bomba no se acciona'
+function omitirEnvuelto(nombre, _comprobacion) {
+  omitidas.push(nombre)
+  console.log(`  ${c.gris}○ ${nombre} — ${CERRADA}${c.reset}`)
+}
+
 function check(nombre, comprobacion) {
   try {
     comprobacion()
@@ -1086,7 +1100,11 @@ console.log('\n── Control de la bomba (Controles) ────────�
   })
 
   const encendido = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
-  check('nivel normal + encender:true → 200, confirma con relectura', () => {
+  check('con el tanque cerrado, accionar la bomba responde 409 y dice que está cerrada (Plan 44 F3.6)', () => {
+    assert.equal(encendido.status, 409)
+    assert.match(encendido.body.error, /cerrad/i)
+  })
+  omitirEnvuelto('nivel normal + encender:true → 200, confirma con relectura', () => {
     assert.equal(encendido.status, 200)
     assert.equal(encendido.body.ok, true)
     assert.equal(encendido.body.accion, 'encendida')
@@ -1094,14 +1112,14 @@ console.log('\n── Control de la bomba (Controles) ────────�
   })
 
   const apagado = await call(controlBase, '/api/control/bomba', postJson({ encender: false }))
-  check('apagar → 200 (apagar nunca mira el nivel)', () => {
+  omitirEnvuelto('apagar → 200 (apagar nunca mira el nivel)', () => {
     assert.equal(apagado.status, 200)
     assert.equal(apagado.body.accion, 'apagada')
   })
 
   nivelTanque = 92 // por encima de UMBRALES.nivelTanque.avisoMax (90)
   const nivelAlto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
-  check('nivel alto + encender:true → 409, sin llegar a escribir', () => {
+  omitirEnvuelto('nivel alto + encender:true → 409, sin llegar a escribir', () => {
     assert.equal(nivelAlto.status, 409)
     assert.equal(nivelAlto.body.ok, false)
     assert.match(nivelAlto.body.error, /tanque está al/)
@@ -1110,7 +1128,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
 
   controlIgnoraEscritura = true
   const sinEfecto = await call(controlBase, '/api/control/bomba', postJson({ encender: true }))
-  check('la escritura se acepta pero la relectura no confirma → 409', () => {
+  omitirEnvuelto('la escritura se acepta pero la relectura no confirma → 409', () => {
     assert.equal(sinEfecto.status, 409)
     assert.match(sinEfecto.body.error, /no ha tenido efecto real/)
   })
@@ -1130,7 +1148,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.ok(anotado.every(e => typeof e.instante === 'string'))
   })
 
-  check('la orden cumplida anota el valor releído y si coincide, no sólo que se pidió', () => {
+  omitirEnvuelto('la orden cumplida anota el valor releído y si coincide, no sólo que se pidió', () => {
     const cumplida = anotado.find(e => e.resultado === 'cumplida' && e.accion === 'encender')
     assert.ok(cumplida, 'no hay línea de la orden cumplida')
     assert.equal(cumplida.valorPedido, true)
@@ -1141,7 +1159,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     assert.ok(Number.isInteger(cumplida.intentos), 'no se anotó cuántas relecturas costó')
   })
 
-  check('el RECHAZO por la guarda de nivel deja constancia, con su motivo', () => {
+  omitirEnvuelto('el RECHAZO por la guarda de nivel deja constancia, con su motivo', () => {
     const rechazo = anotado.find(e => e.resultado === 'rechazada' && /tanque está al/.test(e.motivo ?? ''))
     assert.ok(rechazo, 'la orden rechazada por nivel alto no dejó línea')
     assert.equal(rechazo.accion, 'encender')
@@ -1165,7 +1183,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
     DIARIO_ACCIONAMIENTOS: rutaDiario,
   })
   const bloqueado = await call(soloLectura, '/api/control/bomba', postJson({ encender: true }))
-  check('ICONICS_READ_ONLY=true → 403, menciona la causa', () => {
+  omitirEnvuelto('ICONICS_READ_ONLY=true → 403, menciona la causa', () => {
     assert.equal(bloqueado.status, 403)
     assert.match(bloqueado.body.error, /ICONICS_READ_ONLY/)
   })
@@ -1173,7 +1191,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
   // `check` es síncrono a propósito (ver su definición): lo que hay que leer
   // del disco se lee ANTES, o una promesa rechazada dentro pasaría por buena.
   const conBloqueo = await leerDiario()
-  check('el intento bloqueado por solo lectura también se anota', () => {
+  omitirEnvuelto('el intento bloqueado por solo lectura también se anota', () => {
     const ultima = conBloqueo.at(-1)
     assert.equal(ultima.resultado, 'rechazada')
     assert.match(ultima.motivo, /ICONICS_READ_ONLY/)
@@ -1185,7 +1203,7 @@ console.log('\n── Control de la bomba (Controles) ────────�
   // el archivo entero dejaría de parsearse.
   await appendFile(rutaDiario, '{"instante":"2026-09-07T00:00:00.000Z","resu')
   const trasElCorte = await leerDiario()
-  check('una línea a medias no se lleva por delante las anteriores', () => {
+  omitirEnvuelto('una línea a medias no se lleva por delante las anteriores', () => {
     assert.ok(trasElCorte.length >= 5, 'se perdieron entradas por una línea cortada')
     assert.equal(trasElCorte.at(-1).tipo, 'ilegible')
     assert.equal(trasElCorte[0].resultado, 'cumplida', 'la primera entrada dejó de leerse')
@@ -1225,4 +1243,7 @@ if (fallos.length) {
 }
 
 console.log(`${c.verde}${c.negrita}${passed} comprobaciones correctas: el contrato del backend se mantiene.${c.reset}`)
+if (omitidas.length) {
+  console.log(`${c.gris}${c.negrita}${omitidas.length} omitida(s) — no se comprobaron: ${CERRADA}${c.reset}`)
+}
 process.exit(0)

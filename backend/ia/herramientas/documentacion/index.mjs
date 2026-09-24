@@ -28,7 +28,6 @@
  * de un manual que no ha leído se lo inventa con total aplomo, y eso en una
  * planta es peor que no contestar.
  */
-import { SENALES, esHistorizada, historizadas, senalInfo } from '../../../../shared/eva/tanque/senales.js'
 /* `sistemaValido` conoce los sistemas declarados y acepta vacío como «toda la
  * planta»; es el mismo validador que usa el manifiesto de manuales, para que
  * el asistente y la pantalla midan «sistema válido» con la misma vara. */
@@ -36,6 +35,7 @@ import { sistemaValido } from '../../../../shared/eva/comun/manuales.js'
 /* Quién reclama un nombre de señal, preguntando al REGISTRO y no a un
    catálogo concreto. Devuelve una lista y nunca elige — Plan 33 F7. */
 import { SISTEMA, sistemasDeSenal } from '../../../../shared/eva/comun/sistemas.js'
+import { sistemaPorOmision } from '../../reportes/sistemaPorOmision.mjs'
 import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 import { fallo } from '../lib/respuesta.mjs'
 import { compararConLimites } from '../lib/limites.mjs'
@@ -49,7 +49,6 @@ import { compararConLimites } from '../lib/limites.mjs'
  * que el día que la resolución de nombres se parametrice por máquina se vea
  * de un vistazo qué hay que tocar.
  */
-const SISTEMA_DEL_DOSSIER = 'tanque'
 /*
  * `resolverSenal` y `senalesMencionadas` viven todavía en `herramientas.mjs`:
  * son el índice de nombres del tanque, con sus sinónimos, y sacarlos es parte
@@ -59,9 +58,6 @@ const SISTEMA_DEL_DOSSIER = 'tanque'
  */
 import {
   normalizarTexto,
-  resolverSenal,
-  senalDesconocida,
-  senalesMencionadas,
   trocearEnOraciones,
 } from '../../conversacion/herramientas.mjs'
 
@@ -95,26 +91,6 @@ const NUMERO_UNIDAD =
 /** Cuántos caracteres a cada lado de la palabra de límite se miran buscando un número. */
 const VENTANA_CANDIDATO = 40
 
-/**
- * La palabra ancla de una señal, para `extraerCandidatosLimite`: SÓLO la
- * primera palabra distintiva de su rótulo («carga» de «Carga de trabajo del
- * motor», «tensión» de «Tensión de línea»), no el rótulo entero ni sus
- * sinónimos.
- *
- * ── POR QUÉ UNA SOLA, Y POR QUÉ NO LOS SINÓNIMOS ───────────────────
- *
- * Se probó con todas las palabras del rótulo más `SINONIMOS[clave]`, y falló
- * por generosa: «motor» aparece en la frase de casi cualquier señal —«con el
- * motor encendido o apagado» describe la condición de la temperatura, no un
- * límite de la carga— así que un ancla tan común dejaba pasar el «25 °C» de
- * la temperatura como si fuera un límite de la carga del motor. La primera
- * palabra del rótulo es la más distintiva de las que tiene cada señal
- * («carga», «tensión», «caudal», «presión»…) y ninguna se repite entre
- * señales del catálogo.
- */
-function anclaDeSenal(clave) {
-  return anclaGenerica(SENALES[clave].label)
-}
 
 /** La misma regla, para una etiqueta cualquiera: la primera palabra con cuerpo. */
 function anclaGenerica(label) {
@@ -241,7 +217,24 @@ function extraerCandidatosLimite(texto, anclas = []) {
  * @param {object|null} args.indiceDocumentos  índice BM25 de `ia/indices/documentos.mjs`
  * @param {() => object} args.dameHerramientas  el catálogo ya ensamblado
  */
-export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas }) {
+/**
+ * Las señales de una máquina que un texto nombra: por clave, etiqueta o alias
+ * declarados en su entrada, con cuatro caracteres al menos para no disparar
+ * con fragmentos. Sustituye al `senalesMencionadas` del índice del tanque
+ * (Plan 44 F3.6): mismo criterio, para cualquier máquina del registro.
+ */
+function senalesMencionadasEn(entrada, texto) {
+  const t = normalizarTexto(texto)
+  const claves = []
+  for (const k of entrada.claves()) {
+    const nombres = [k, entrada.etiquetaDe?.(k), ...(entrada.aliasDe?.(k) ?? [])]
+      .map(normalizarTexto).filter((n) => n.length >= 4)
+    if (nombres.some((n) => t.includes(n))) claves.push(k)
+  }
+  return claves
+}
+
+export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas, resolverSistema, leerMaquina }) {
   return {
     /**
      * Busca en la documentación de planta.
@@ -431,10 +424,17 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        * Lo que sigue sin poderse es una entrada sin `metaDe`: sin etiqueta ni
        * rol no hay con qué buscar, y se dice.
        */
+      if (!sistemaDeLaSenal) {
+        return fallo(
+          `No hay ninguna señal llamada «${senal}» en ninguna máquina de esta planta. Sus señales se ` +
+            'llaman como las enseña estado_del_sistema, o pide los sistemas con sistemas_de_la_planta.',
+          { sistemas: Object.keys(SISTEMA) },
+        )
+      }
       let meta
       let anclas
       let consulta
-      if (sistemaDeLaSenal && sistemaDeLaSenal !== 'tanque') {
+      {
         const entrada = SISTEMA[sistemaDeLaSenal]
         const propia = entrada?.metaDe?.(encontrado.clave) ?? null
         if (!propia) {
@@ -454,15 +454,6 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
         consulta =
           `${[propia.label, ...terminos, rol?.norma ?? ''].filter(Boolean).join(' ')} ` +
           'maximo minimo limite admisible no debe exceder rango'
-      } else {
-        const clave = resolverSenal(senal)
-        if (!clave) return senalDesconocida(senal, { paraHistoria: true })
-        meta = senalInfo(clave)
-        anclas = anclaDeSenal(clave)
-        // Se sesga la consulta hacia palabras de límite además del nombre de la
-        // señal: BM25 es léxico, así que sin estas palabras en la consulta
-        // puntuaría igual una página que sólo menciona la señal de pasada.
-        consulta = `${meta.label} maximo minimo limite admisible no debe exceder rango`
       }
       /*
        * ── EL SISTEMA NO SE PREGUNTA AQUÍ: SE SABE ─────────────────────
@@ -495,7 +486,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        */
       const resultados = await indiceDocumentos.buscar(consulta, {
         top: 5,
-        sistema: sistemaDeLaSenal ?? 'tanque',
+        sistema: sistemaDeLaSenal,
       })
 
       if (!resultados.length) {
@@ -529,7 +520,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       return {
         ok: true,
         senal: meta.label,
-        sistema: sistemaDeLaSenal ?? 'tanque',
+        sistema: sistemaDeLaSenal,
         unidadDeclaradaEnICONICS: meta.unidad || null,
         // Seis, mismo tope que las coincidencias de correlacionar_senales: de
         // sobra para que el modelo elija entre candidatos que no cuadran, sin
@@ -580,7 +571,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
      * nunca las mezcla: eso es lo que pide `chat.mjs` al distinguir MEDIDO de
      * HIPÓTESIS al redactar un diagnóstico.
      */
-    async diagnostico({ sintoma, periodo, sistema = SISTEMA_DEL_DOSSIER } = {}) {
+    async diagnostico({ sintoma, periodo, sistema } = {}) {
       if (!sintoma || !sintoma.trim()) {
         return fallo(
           'Necesito una descripción del síntoma o la avería a diagnosticar: qué pasó, y si lo ' +
@@ -604,38 +595,37 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
        * resolución de nombres siga sin parametrizar por máquina (ver la nota de
        * los imports de este archivo).
        */
-      if (sistema !== SISTEMA_DEL_DOSSIER) {
-        /*
-         * Se niega POR CAPACIDAD, no por id (Plan 39 F3): el dossier encadena
-         * `senalesMencionadas` e `historizadas()` del catálogo del tanque, y un
-         * tipo tendría que declarar su equivalente —qué señales nombra un
-         * síntoma, cuáles tienen historia— para que se pudiera componer. Hoy
-         * ningún tipo lo declara, y el mensaje dice qué faltaría en vez de
-         * fingir que la máquina no existe.
-         */
-        const entrada = SISTEMA[String(sistema).trim()]
-        const porTipo = entrada?.tipo
-          ? ` La máquina «${sistema}» es del tipo «${entrada.tipo}», y ese tipo no declara dossier ` +
-            '(qué señales nombra un síntoma y cuáles tienen historia).'
-          : ''
-        return fallo(
-          `El dossier compuesto sólo cubre "${SISTEMA_DEL_DOSSIER}" hoy: su catálogo de señales ` +
-            `es el de esa máquina.${porTipo} Para "${sistema}", usa diagnosticar_falla con el id de un ` +
-            `riesgo activo —da causas ya puntuadas—, limites_del_manual para un límite concreto, ` +
-            `o pide estado_del_sistema, historia_de_senal y consultar_documentacion por separado ` +
-            `con ese sistema.`
-        )
+      /*
+       * La máquina: la nombrada (con la guarda de cerrada) o la única en
+       * servicio. El dossier estuvo acotado al tanque hasta el Plan 44 F3.6;
+       * ahora todo lo que usa —qué señales nombra el síntoma, cuáles tienen
+       * historia, cómo se llaman— sale de su entrada del registro.
+       */
+      let elegido
+      if (sistema !== undefined && sistema !== null && String(sistema).trim()) {
+        elegido = resolverSistema(sistema)
+      } else {
+        const unica = sistemaPorOmision()
+        elegido = unica ? { ok: true, sistema: unica } : fallo('No hay ninguna máquina configurada en servicio de la que hacer un dossier.')
       }
+      if (!elegido.ok) return elegido
+      const entrada = elegido.sistema
+      const id = entrada.id
+      const etiqueta = (k) => entrada.etiquetaDe?.(k) ?? k
 
-      const mencionadas = senalesMencionadas(sintoma)
-      // Sin ninguna señal nombrada en el síntoma, se parte de las cuatro que
-      // tienen historia: son las únicas sobre las que se puede medir una
-      // tendencia o una correlación, así que no hay nada que ganar
-      // adivinando entre las otras cuatro sin ningún indicio textual.
-      const claves = (mencionadas.length ? mencionadas : historizadas()).slice(0, 4)
-      const historiadas = claves.filter(esHistorizada)
+      const mencionadas = senalesMencionadasEn(entrada, sintoma)
+      // Sin ninguna señal nombrada en el síntoma, se parte de las que tienen
+      // historia: son las únicas sobre las que se puede medir una tendencia o
+      // una correlación, así que no hay nada que ganar adivinando entre las
+      // demás sin ningún indicio textual.
+      const conSerie = entrada.series?.historizadas?.() ?? []
+      const claves = (mencionadas.length ? mencionadas : conSerie).slice(0, 4)
+      const historiadas = claves.filter((k) => entrada.esHistorizada(k))
 
-      const [estado, historias, correlacion, documentacion] = await Promise.all([
+      const [lectura, estado, historias, correlacion, documentacion] = await Promise.all([
+        /* La forma COMUN del estado (clave, valor, unidad, leidoA), para comparar
+           con los limites del manual sin depender de como cada tipo se cuenta al modelo. */
+        leerMaquina(entrada),
         /*
          * ── EL `sistema` QUE FALTABA ──────────────────────────────────
          *
@@ -653,25 +643,25 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
          * Es la pata que la descripción de esta herramienta promete primero:
          * «reúne el estado actual, la historia…».
          */
-        dameHerramientas().estado_del_sistema({ sistema }),
+        dameHerramientas().estado_del_sistema({ sistema: id }),
 
         Promise.all(historiadas.map(async k => ({
           clave: k,
-          resultado: await dameHerramientas().historia_de_senal({ senal: SENALES[k].label, periodo }),
+          resultado: await dameHerramientas().historia_de_senal({ senal: etiqueta(k), periodo, sistema: id }),
         }))),
 
         // La correlación exige DOS señales con historia; con una o ninguna no
         // se pide, y se dice el motivo en vez de dejar el hueco sin explicar.
         historiadas.length >= 2
           ? dameHerramientas().correlacionar_senales({
-            senales: historiadas.map(k => SENALES[k].label), periodo,
+            senales: historiadas.map(etiqueta), periodo, sistema: id,
           })
           : Promise.resolve(null),
 
         indiceDocumentos
           ? Promise.all(claves.map(async k => ({
             clave: k,
-            resultado: await dameHerramientas().limites_del_manual({ senal: SENALES[k].label }),
+            resultado: await dameHerramientas().limites_del_manual({ senal: etiqueta(k), sistema: id }),
           })))
           : Promise.resolve(null),
       ])
@@ -682,13 +672,14 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
       return {
         ok: true,
         sintoma,
-        senalesConsideradas: claves.map(k => SENALES[k].label),
+        sistema: id,
+        maquina: entrada.nombre,
+        senalesConsideradas: claves.map(etiqueta),
         ...(mencionadas.length === 0
           ? {
             nota:
-                'El síntoma no nombraba ninguna señal por su nombre, así que se han mirado las ' +
-                'cuatro que tienen historia: nivel del tanque, temperatura del tanque, caudal y ' +
-                'presión.',
+                `El síntoma no nombraba ninguna señal de «${entrada.nombre}» por su nombre, así que se ` +
+                `han mirado las ${claves.length} primeras con historia: ${claves.map(etiqueta).join(', ')}.`,
           }
           : {}),
 
@@ -702,12 +693,12 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
             }
             : { error: estado.error },
 
-          historia: historiasOk.map(h => ({ senal: SENALES[h.clave].label, ...h.resultado })),
+          historia: historiasOk.map(h => ({ senal: etiqueta(h.clave), ...h.resultado })),
           ...(historias.length > historiasOk.length
             ? {
               historiaSinDatos: historias
                 .filter(h => !h.resultado.ok)
-                .map(h => ({ senal: SENALES[h.clave].label, motivo: h.resultado.error ?? h.resultado.motivo })),
+                .map(h => ({ senal: etiqueta(h.clave), motivo: h.resultado.error ?? h.resultado.motivo })),
             }
             : {}),
 
@@ -719,7 +710,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
 
         documentacion: documentacion
           ? {
-            porSenal: documentacionOk.map(d => ({ senal: SENALES[d.clave].label, ...d.resultado })),
+            porSenal: documentacionOk.map(d => ({ senal: etiqueta(d.clave), ...d.resultado })),
             ...(documentacionOk.length
               ? {
                 comoRedactar:
@@ -732,7 +723,7 @@ export function crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerrami
           : 'Este servidor no tiene documentación de planta cargada (falta IA_DOCS_DIR).',
 
         // El cálculo que de verdad ahorra razonamiento: ver la cabecera.
-        excesosSobreLimite: compararConLimites(estado, historiasOk, documentacionOk),
+        excesosSobreLimite: compararConLimites(lectura?.ok ? lectura.estado : null, historiasOk, documentacionOk),
 
         comoRedactar:
           'Separa SIEMPRE lo MEDIDO (estadoAhora, historia, correlacion — viene de ICONICS) de lo ' +

@@ -133,6 +133,14 @@ sustituirlo es ahora un cambio local y visible.
 registro, sin él el índice del tanque. Funciona y está documentado como
 transición, pero es un tercer sitio donde se decide lo mismo.
 
+**Resuelto el 23-09-2026 (Plan 44 F3.6) por ausencia de índice.** El índice del
+tanque (`SINONIMOS`, `resolverSenal`, `senalesMencionadas`, `senalDesconocida`)
+se borró del asistente; toda señal se resuelve DENTRO de la máquina del turno
+con lo que declara el registro (clave, etiqueta y alias de cada máquina), en
+`backend/ia/herramientas/lib/senales.mjs`. Los sinónimos del tanque escritos a
+mano volverán, si vuelven, como `alias` de su configuración cuando entre como
+máquina configurada (Plan 43): es exactamente el sitio que este apunte pedía.
+
 **El síntoma.** Quien pregunta por «la bomba» o «el voltaje» acierta en el
 tanque —tiene sinónimos— y quien pregunta por un equivalente coloquial de
 vibraciones, no: `sistemasDeSenal("vibración del motor")` devuelve `[]`.
@@ -699,3 +707,22 @@ bandas salen del registro y del tipo. Se fueron `senalInfo`, `UMBRALES`,
 con ellos. Las dos comprobaciones que sólo el tanque justificaba («señales
 por defecto», «una lista explícita de señales») quedaron omitidas con el
 motivo del cierre, como sus 22 hermanas; las demás miran a la espejo.
+
+## B19 · Sesenta y cuatro comprobaciones de herramientas usaban el tanque como escenario y hoy no corren
+
+**Visto el 23-09-2026** (Plan 44 F3.6). Al quitar del asistente las ramas del
+tanque —la omisión «sin `sistema`, el tanque» era la que las hacía pasar—,
+`verificar-herramientas` bajó de 197 correctas y 24 omitidas a **133 y 88**.
+Las 64 nuevas omitidas no comprueban el tanque: comprueban mecánica genérica
+(tramos de `leerSerieEnRango`, cobertura, 502, hora local, truncado,
+`comparar_periodos`, `analisis_de_senal`, `perfil_de_senal`, `buscar_evento`,
+`alarma_sostenida`, los patrones de límite del manual, la bomba) con las
+señales y el cliente falso del tanque. Están escritas enteras y a la vista,
+con `omitirEnvuelto`, como las 24 anteriores.
+
+**El arreglo.** Portarlas a la espejo: `createFakeIconicsClient` sirve sus
+puntos y su historiador, y `configuracionEspejo({ verificadasDelCatalogo: true })`
+da las series. Es trabajo mecánico por comprobación —cambiar el nombre de la
+señal y las cifras esperadas— y conviene hacerlo por familia, con la puerta
+pasada entre cada una. Las ocho de `controlar_bomba` son del tanque de verdad y
+vuelven cuando él vuelva, o se reescriben para la escritura genérica del Plan 43.

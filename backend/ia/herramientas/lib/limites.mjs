@@ -53,12 +53,13 @@
  * Esas palabras siguen viajando en `documentacion.candidatos` para que el
  * modelo las lea, sólo no alimentan la resta automática.
  */
+/* `estado` es la forma COMUN de `leerMaquina` (`senales[]` con clave, label, valor,
+   unidad; `leidoA`), no la respuesta de `estado_del_sistema` al modelo, que cada
+   tipo redacta a su manera (Plan 44 F3.6). */
 export function compararConLimites(estado, historiasOk, documentacionOk) {
   const candidatosPorClave = new Map(documentacionOk.map(d => [d.clave, d.resultado.candidatos ?? []]))
   const historiaPorClave = new Map(historiasOk.map(h => [h.clave, h.resultado]))
-  const senalesActuales = estado?.ok
-    ? new Map(estado.activos.flatMap(a => a.senales).map(s => [s.clave, s]))
-    : new Map()
+  const senalesActuales = new Map((estado?.senales ?? []).map(s => [s.clave, s]))
 
   const registrar = (excesos, { senal, valor, unidad, cuando, fuente, c }) => {
     const esMinimo = /^m[íi]nim/.test(c.palabraLimite)
@@ -103,7 +104,7 @@ export function compararConLimites(estado, historiasOk, documentacionOk) {
       // en vivo en vez de una fecha del historiador.
       const actual = senalesActuales.get(clave)
       if (!actual) continue
-      registrar(excesos, { senal: actual.senal, valor: actual.valor, unidad: actual.unidad, cuando: estado.leidoA, fuente: 'lectura en vivo', c })
+      registrar(excesos, { senal: actual.label ?? actual.senal, valor: actual.valor, unidad: actual.unidad, cuando: estado?.leidoA ?? null, fuente: 'lectura en vivo', c })
     }
   }
 

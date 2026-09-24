@@ -711,6 +711,66 @@ motivo del cierre (22 → 24); tres se movieron a la espejo. **197** correctas.
 El dominio del tanque (`shared/eva/tanque/`) sigue sin tocarse: lo que se fue
 es el uso que el asistente hacía de él en este camino.
 
+**F3.6 · El asistente sin específicos (23-09-2026, noche).** El usuario, tras
+la F3.5: «todo tiene que funcionar con máquinas configurables, no debería
+haber específicos». Inventario: importaba `shared/eva/tanque/` el resolvedor
+de nombres del bucle (`SINONIMOS`, `resolverSenal`, `senalDesconocida`,
+`catalogoBreve`), la familia de históricos (`senalInfo`, `UMBRALES`,
+`esHistorizada`, el pronóstico con sus seis señales), la de documentación
+(`limites_del_manual` y el dossier acotado al tanque), `lib/maquina`
+(`evaluarRiesgos`) y el motor (`REGLAS_POR_SISTEMA`). Lo que se hizo:
+
+- **El contrato del registro crece en dos campos** y ya no hay tabla por id
+  en ningún sitio: `bandaDe(clave)` (la banda que el tipo declara para el
+  rol) y `reglas` (las del tipo; la entrada del tanque declara las suyas y su
+  `evaluarRiesgos` en `sistemas.js`, un solo sitio, el suyo).
+  `evaluarPronostico` recibe los mecanismos como parámetro.
+- **`herramientas/lib/senales.mjs`** (nuevo): la señal se resuelve DENTRO de
+  la máquina del turno —id, nombre o alias, con la guarda de cerrada— o de la
+  única en servicio; su meta, su banda y sus series salen de la entrada. Una
+  de otra máquina «no es de ésta», y se dice de quién es y si está cerrada.
+  Por construcción ya no hay «cruce de máquinas» que detectar después.
+- **El índice de nombres del tanque se borró** del bucle (B3 del backlog,
+  cerrado por ausencia). El catálogo del prompt sin contexto es el de la única
+  máquina en servicio. `comparacionConLaBanda` recibe la banda, no la clave.
+- **Históricos**: `pronostico_de_desgaste` lee los mecanismos y sus señales de
+  la entrada (y se niega si ninguna tiene serie); `valor_en_momento` pedía al
+  historiador el TAG EN VIVO del tanque (`pointName(clave)`) y ahora el punto
+  histórico que declara la entrada, que era además un defecto para las
+  configuradas; las bandas de `historia_de_senal`, `grafico_de_senal`,
+  `perfil_de_senal` y las listas «con historia» de todas las negativas salen
+  del registro.
+- **Documentación**: `limites_del_manual` busca acotado a la máquina de la
+  señal, sea cual sea; el dossier `diagnostico` sirve a cualquier máquina
+  (las señales que el síntoma nombra se buscan por clave, etiqueta y alias de
+  su entrada; los excesos contra el manual se comparan con la forma común de
+  `leerMaquina`, no con la redacción que cada tipo hace para el modelo).
+- **`controlar_bomba`** pasa por `resolverSistema('tanque')`: cerrado, se niega
+  y se anota. Sigue siendo la del tanque porque su guarda de nivel es de su
+  dominio; una escritura genérica sobre `acceso: write` es del Plan 43.
+- `diagnosticar_falla` ofrece el dossier a cualquier máquina; las dos
+  descripciones que decían «por omisión tanque» ya no lo dicen.
+
+**Medido.** Lint y `types` limpios; suite del backend 433 (la B16 aparte);
+`verificar-chat` 72, `instrucciones`, `diagnostico` 59, `documentos` 26,
+`intencion`, `inyeccion`, `manos-libres`, `casos-cierre`,
+`diario-diagnosticos`, `narrador`, `evaluacion` en verde.
+`verificar-herramientas`: **197 → 133 correctas, 24 → 88 omitidas**. Doce
+comprobaciones se portaron a la semántica nueva o a la espejo; **64 que
+usaban el tanque como escenario** (la omisión «sin sistema, el tanque» era lo
+que las hacía pasar) quedaron omitidas con el motivo del cierre, escritas
+enteras. Es cobertura de mecánica genérica que hoy no corre y hay que portar
+a la espejo: **B19**. En `verificar-backend`, las nueve comprobaciones del
+contrato HTTP de la bomba (`POST /api/control/bomba`) quedaron omitidas con el
+mismo motivo —el guion ganó su `omitirEnvuelto`— y una nueva afirma lo que
+pasa hoy: con el tanque cerrado, accionar la bomba responde 409 y lo dice
+(73 correctas · 9 omitidas). La tanda de `npm run verificar`: 41 de 41.
+Suite del frontend: 1180, sin cambios. Lo que sigue importando del tanque en
+el backend: su entrada del registro (`sistemas.js`, con `reglas` y
+`evaluarRiesgos` nuevos), las etiquetas de estado de `tanque/estado.js`
+(dominio común de hecho), `toBooleano` en la bomba y la narración inglesa
+`narrarEstadoTanque.mjs`.
+
 Y lo tercero que §1.1 pedía al tipo, **los indicadores principales**, queda
 exigido por prueba: todo tipo registrado declara `indicadores` (de uno a
 cuatro roles suyos), o la suite del backend falla nombrándolo.

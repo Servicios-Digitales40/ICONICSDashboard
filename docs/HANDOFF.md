@@ -59,7 +59,7 @@ Tres cosas que rompen la intuición de quien viene de antes:
   **máquina espejo** (`scripts/lib/vibraciones-espejo.json`,
   `configuracionEspejo()`), no una escrita a mano.
 - **El tanque sigue en el registro pero cerrado** (`cerrado: true` en
-  `sistemas.js`): `resolverSistema` lo niega, 24 comprobaciones de
+  `sistemas.js`): `resolverSistema` lo niega, 88 comprobaciones de
   `verificar-herramientas` están omitidas por eso, y su dominio
   (`shared/eva/tanque/`) no se toca ni se borra.
 - **La autenticación está encendida.** El tablero pide credenciales
@@ -113,7 +113,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 | Las 26 herramientas que ve el modelo, con sus esquemas Zod | `backend/ia/conversacion/definiciones.mjs` |
 | Cómo se ejecutan: familias por carpeta, y el índice de señales del tanque | `backend/ia/herramientas/*/index.mjs`, `backend/ia/conversacion/herramientas.mjs` |
 | Resolver de qué máquina va una pregunta (`resolverSistema`: id, nombre o **alias**) y la guarda de «cerrada» | `backend/ia/herramientas/lib/maquina.mjs` |
-| Resolver una señal por texto en las configuradas (`sistemasDeSenal`), y una máquina por nombre (`sistemaPorNombre`) | `shared/eva/comun/sistemas.js` |
+| Resolver una señal por texto DENTRO de la máquina del turno (id, nombre o alias; sin ella, la única en servicio), con su meta y su banda desde el registro; y una máquina por nombre (`sistemaPorNombre`). Desde el Plan 44 F3.6 no hay índice de nombres de ninguna máquina en el asistente | `backend/ia/herramientas/lib/senales.mjs` (`crearResolvedorDeSenales`) · `backend/ia/reportes/sistemaPorOmision.mjs` · `shared/eva/comun/sistemas.js` (`sistemasDeSenal`, `sistemaPorNombre`) |
 | Los nombres por los que se pide una variable (`aliasDe`: clave, etiqueta, rol, alias de la variable, **nombre y alias de su activo**) | `shared/eva/comun/construirSistema.js` + `tipo.aliasDe` en `shared/eva/tipos/vibraciones.js` |
 | El motor determinista: casos, causas, temporal | `backend/ia/motor/` (leer la cabecera de `diagnostico.mjs` antes) |
 | Búsqueda: BM25, embeddings, manuales, casos | `backend/ia/indices/` |
@@ -125,7 +125,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 197 correctas · 24 omitidas
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 133 correctas · 88 omitidas (ver CLAUDE.md §5.1)
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -192,7 +192,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | Suite de frontend | **1180** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F3.3; eran 1172 tras el 42.5 y 1102 · 29 el 22-09)* |
 | Suite de backend | **433** pruebas (432 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3.3; eran 401)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **197** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **24 omitidas** (cierre; las dos últimas, el catálogo del tanque en `generar_reporte`, Plan 44 F3.5) |
+| `verificar-herramientas` | **133** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **88 omitidas** por el cierre: desde el Plan 44 F3.6 el asistente no tiene ramas del tanque y las comprobaciones que lo usaban de escenario no corren (B19: portarlas a la espejo) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |

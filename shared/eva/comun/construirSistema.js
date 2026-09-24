@@ -549,6 +549,21 @@ export function construirSistema(maquina, tipo) {
       return v ? Object.freeze({ ...v }) : null;
     },
 
+    /**
+     * La banda con que se juzga una clave —`{min, avisoMin, avisoMax, max}`—
+     * si su TIPO la declara para su rol, o `null` (Plan 44 F3.6). Es lo que
+     * las herramientas del asistente ponen bajo una curva o citan junto a una
+     * cifra; antes lo sacaban de los umbrales del tanque escritos a mano.
+     */
+    bandaDe: (clave) => {
+      const v = porClave.get(clave);
+      return v?.rol ? (tipo.bandaDe?.(v.rol) ?? null) : null;
+    },
+
+    /* Las reglas de riesgo son las del tipo: el motor de diagnóstico las lee
+       de aquí y no de una tabla por id de máquina (Plan 44 F3.6). */
+    reglas: tipo.reglas ?? [],
+
     esHistorizada: (clave) => clavesConSerie.includes(clave),
 
     series: {

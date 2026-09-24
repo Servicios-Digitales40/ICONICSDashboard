@@ -67,17 +67,9 @@ import {
   normalizar,
   resumirSerie,
 } from '../../../../shared/eva/comun/historia.js'
-/* `SENAL_KEYS` se fue en el Plan 33 F7: `generar_reporte` era su último
-   consumidor, y ahora las claves salen del registro de la máquina pedida
-   (`entrada.claves()`) en vez de la lista del tanque. */
-import {
-  SENALES,
-  esHistorizada,
-  historizadas,
-  pointName,
-  senalInfo,
-} from '../../../../shared/eva/tanque/senales.js'
-import { UMBRALES } from '../../../../shared/eva/comun/umbrales.js'
+/* Sin catálogo del tanque desde el Plan 44 F3.6: rótulos, series y bandas
+   salen de la entrada del registro de la máquina pedida (`lib/senales.mjs`). */
+import { crearResolvedorDeSenales } from '../lib/senales.mjs'
 import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 /* La etiqueta humana de un estado de la forma común («nominal» → «Normal»).
    Vive con el tanque porque nació allí, pero las claves son las de
@@ -90,7 +82,6 @@ import { leerAprendizaje } from '../aprendizaje/index.mjs'
 import {
   NO_COMPARTEN,
   SISTEMA,
-  sistemasDeSenal,
   tieneHistoria,
 } from '../../../../shared/eva/comun/sistemas.js'
 import { resolverInstante } from '../../../../shared/periodo.js'
@@ -122,191 +113,11 @@ import {
   percentil,
   purgarReportesViejos,
   redondear,
-  resolverSenal,
   resolverVentana,
   resta,
   segundosDeHora,
-  senalDesconocida,
 } from '../../conversacion/herramientas.mjs'
 
-/**
- * Una señal pedida por su nombre → su clave, dentro de la máquina que toque.
- *
- * ── POR QUÉ EXISTE ESTA FUNCIÓN ────────────────────────────────────
- *
- * Porque hay dos catálogos y sólo uno tiene resolvedor con sinónimos. El del
- * tanque acepta «la bomba», «el voltaje» o «cuánta agua»; el de las demás
- * máquinas se resuelve por el registro, con la clave o la etiqueta.
- *
- * Sin `sistema` se resuelve contra el TANQUE, exactamente como antes: ninguna
- * llamada existente cambia. Con `sistema`, contra el catálogo de esa máquina.
- *
- * Es una solución de transición y conviene que se note: lo bueno es un solo
- * índice de nombres, por máquina, con los sinónimos de cada una (B3 del
- * backlog). Mientras eso no exista, esto es lo que permite que el asistente
- * pregunte por la historia de las vibraciones sin inventarse un segundo índice.
- *
- * Devuelve `{ ok: true, clave, meta, sistemaId, historizada, conSerie }` o el
- * `fallo()` que corresponda — con la lista de máquinas si el id no existe.
- */
-function resolverSenalDeSistema(senal, sistemaId) {
-  const id = sistemaId ? String(sistemaId).trim() : 'tanque'
-  const s = SISTEMA[id]
-  if (!s) {
-    return fallo(`No hay ningún sistema llamado "${sistemaId}" en esta planta.`, {
-      sistemas: Object.keys(SISTEMA),
-    })
-  }
-
-  /* El tanque conserva su índice con sinónimos: es el que sabe que «la bomba»
-     es la carga del motor. Para las demás máquinas se busca en el registro. */
-  if (id === 'tanque') {
-    const clave = resolverSenal(senal)
-
-    /*
-     * ── SI EL NOMBRE YA DICE DE QUÉ MÁQUINA ES, NO SE PIDE OTRA VEZ ──
-     *
-     * Sin `sistema` se resuelve contra el tanque, y una señal de otra máquina
-     * caía en `senalDesconocida`, que devuelve «vuelve a llamar añadiendo
-     * sistema="vibraciones"». La instrucción es correcta y el modelo de 4B
-     * **no la sigue**: medido tres veces con la misma pregunta —el promedio de
-     * ayer de la velocidad eficaz del lado acople— reintentó con otro nombre,
-     * consultó otras herramientas y acabó contestando que no podía dar un dato
-     * que el historiador tenía.
-     *
-     * Que un modelo pequeño no encadene bien no es algo que se arregle
-     * escribiendo mejor el error: se arregla no necesitando el reintento.
-     * `«Velocidad eficaz · Lado acople»` sólo existe en una máquina, así que
-     * pedir el id además del nombre es ceremonia — la respuesta es la misma.
-     *
-     * Sólo cuando es INEQUÍVOCA. Si el nombre encaja en varias máquinas o en
-     * varias señales de una, se sigue preguntando: elegir por quien pregunta
-     * es cómo se contesta correctamente sobre la instalación equivocada, y eso
-     * no cambia porque el modelo sea pequeño.
-     */
-    if (!clave) {
-      const enOtras = sistemasDeSenal(senal)
-      if (enOtras.length === 1 && enOtras[0].sistema !== 'tanque') {
-        return resolverSenalDeSistema(senal, enOtras[0].sistema)
-      }
-      return senalDesconocida(senal, { paraHistoria: true })
-    }
-
-    /*
-     * ── Y SI EL REGISTRO DICE QUE ES DE OTRA MÁQUINA, GANA EL REGISTRO ──
-     *
-     * El bloque de arriba sólo consultaba al registro cuando el índice del
-     * tanque NO resolvía. Ese «sólo» era el agujero, y no era teórico: medido
-     * el 11-09-2026, **10 de las 42 etiquetas de vibraciones resolvían a una
-     * señal del tanque**.
-     *
-     *   resolverSenal('Velocidad eficaz · Lado acople')  →  'velocidadMotor'
-     *   sistemasDeSenal(mismo nombre)                    →  vibraciones:vRMS_S1
-     *
-     * El índice del tanque no acierta por nombre propio sino por su respaldo
-     * de CONTENCIÓN: la frase contiene «velocidad», que es una entrada suya, y
-     * como dentro del tanque no hay empate la da por buena. El registro, que
-     * conoce las dos máquinas, sabe que ese nombre completo sólo existe en
-     * una — y nunca se le preguntaba.
-     *
-     * La consecuencia era la peor de este proyecto: `correlacionar_senales`
-     * cruzaba una señal del tanque con una de vibraciones y la guarda de
-     * `NO_COMPARTEN` no saltaba, porque para el código las dos eran del
-     * tanque. La respuesta salía `ok: true`, con la señal de la otra máquina
-     * renombrada a «Velocidad calculada del motor». Cifras reales de la
-     * máquina equivocada, sin un error en ninguna parte.
-     *
-     * La prueba que cubría el cruce usaba claves técnicas (`vRMS_S1`), que no
-     * colisionan, así que pasaba. Con el nombre que escribe un operador,
-     * fallaba.
-     *
-     * Se corrige aquí y no en `resolverSenal` a propósito: el índice del
-     * tanque no está haciendo nada malo —resuelve bien DENTRO de su máquina, y
-     * su respaldo por contención es el que hace que «el nivel del tanque ahora
-     * mismo» funcione—. Lo que faltaba es que, habiendo dos catálogos, alguien
-     * arbitre entre ellos. Unificarlos de verdad es B3 del backlog; esto es la
-     * guarda que impide que el bug siga vivo mientras tanto.
-     */
-    const enRegistro = sistemasDeSenal(senal)
-    const inequivocaDeOtra =
-      enRegistro.length === 1 && enRegistro[0].sistema !== 'tanque'
-
-    if (inequivocaDeOtra) {
-      return resolverSenalDeSistema(senal, enRegistro[0].sistema)
-    }
-
-    return {
-      ok: true,
-      clave,
-      meta: senalInfo(clave),
-      sistemaId: id,
-      historizada: esHistorizada(clave),
-      conSerie: historizadas().map((k) => SENALES[k].label),
-    }
-  }
-
-  const encontrados = sistemasDeSenal(senal).filter((x) => x.sistema === id)
-  if (!encontrados.length) {
-    return fallo(
-      `«${senal}» no es una señal de «${s.nombre}». Sus señales se llaman como las enseña ` +
-        `estado_del_sistema(sistema="${id}").`,
-      { sistema: id }
-    )
-  }
-  if (encontrados.length > 1) {
-    /* El mismo criterio que en el resto del proyecto: elegir una es como se
-       contesta correctamente sobre el punto de medida equivocado. */
-    return fallo(
-      `«${senal}» no identifica UNA señal de «${s.nombre}»: encaja con ${encontrados.length} ` +
-        `(${encontrados.map((x) => s.etiquetaDe(x.clave) ?? x.clave).join('; ')}). Pregunta cuál.`,
-      { sistema: id, claves: encontrados.map((x) => x.clave) }
-    )
-  }
-
-  const { clave } = encontrados[0]
-  return {
-    ok: true,
-    clave,
-    /* Rótulo, unidad, decimales y naturaleza: los sabe la máquina (Plan 39
-       F2). Hasta entonces aquí iba `unidad: ''` para todo lo que no fuera el
-       tanque, y el modelo citaba la velocidad eficaz sin «mm/s». */
-    meta: metaDe(clave, id),
-    sistemaId: id,
-    historizada: s.esHistorizada(clave),
-    conSerie: s.series.historizadas().map((k) => s.etiquetaDe(k) ?? k),
-  }
-}
-
-/**
- * Metadatos de presentación de una clave, venga de la máquina que venga.
- *
- * `senalInfo` es del catálogo del tanque y devuelve `null` para una clave de
- * otra: al parametrizar `correlacionar_senales` eso reventaba con «Cannot read
- * properties of null». Aquí se pregunta primero a la máquina que la reclama.
- *
- * Los `decimales` importan más de lo que parece: ICONICS entrega el float
- * crudo del PLC y un modelo de lenguaje lo cita tal cual. Trece decimales
- * sugieren una exactitud que el sensor no tiene.
- */
-function metaDe(clave, sistemaId) {
-  if (sistemaId === 'tanque') return senalInfo(clave)
-
-  const s = SISTEMA[sistemaId]
-  /*
-   * La máquina lo sabe (`metaDe`, Plan 39 F2): la escrita a mano desde su
-   * catálogo, una configurada desde su variable y su rol. Sin ello —una
-   * entrada antigua o una clave que no es suya— se cae al rótulo solo, con
-   * la unidad VACÍA y no inventada: es lo que había hasta hoy.
-   */
-  return (
-    s?.metaDe?.(clave) ?? {
-      label: s?.etiquetaDe(clave) ?? clave,
-      unidad: '',
-      decimales: 3,
-      naturaleza: 'medida',
-    }
-  )
-}
 
 /**
  * Las nueve herramientas de historia.
@@ -322,7 +133,6 @@ function metaDe(clave, sistemaId) {
  * @param {object} args.reportes   carpeta y purga de los PDF
  * @param {object} args.historia   ayudantes de `lib/historia.mjs`
  * @param {object} args.maquina    ayudantes de `lib/maquina.mjs`
- * @param {string[]} args.senalesPronostico  claves con serie propia verificada
  * @param {object} [args.cuaderno] el cuaderno de planta (Plan 25 F8), para que
  *   `resumen_de_turno` pueda citar notas reales — `null` si no está montado.
  * @param {Function} [args.leerAprendizajeDe] `leerAprendizaje` de
@@ -331,12 +141,15 @@ function metaDe(clave, sistemaId) {
  *   real, que cambia con cada intervención registrada en producción.
  */
 export function crearHerramientasDeHistoricos({
-  client, turnos, reportes, historia, maquina, senalesPronostico, dameHerramientas, cuaderno = null,
+  client, turnos, reportes, historia, maquina, dameHerramientas, cuaderno = null,
   leerAprendizajeDe = leerAprendizaje,
 }) {
   const { leerSerie, leerSerieEnRango, leerHistoriaLarga } = historia
   const { leerMaquina, resolverSistema, evaluarRiesgosDe } = maquina
-  const SENALES_PRONOSTICO = senalesPronostico
+  /* Nombres, metas y bandas por el registro, sin catálogo de ninguna máquina
+     escrito aquí (Plan 44 F3.6). */
+  const { sistemaDe, resolverSenalDeSistema, metaDe, bandaDe, extraBanda, conSeriePorOmision } =
+    crearResolvedorDeSenales({ resolverSistema })
 
   return {
     /**
@@ -347,7 +160,7 @@ export function crearHerramientasDeHistoricos({
      * es el modelo quien va a redactar la frase final y el error caro es que
      * convierta «horas estimadas de exposición» en «le quedan dos años».
      */
-    async pronostico_de_desgaste({ sistema = 'tanque', dias = 30 } = {}, { idioma = 'es' } = {}) {
+    async pronostico_de_desgaste({ sistema, dias = 30 } = {}, { idioma = 'es' } = {}) {
       /*
        * ── LA GUARDA DEL PUNTO 3 DEL ALTA ─────────────────────────────
        *
@@ -361,23 +174,15 @@ export function crearHerramientasDeHistoricos({
        * catálogo del tanque y contestado sobre el agua — correctamente, y
        * sobre la máquina equivocada.
        *
-       * `sistema` sí tiene defecto aquí, al contrario que en las otras: esta
-       * herramienta sólo la puede servir una máquina hoy, y exigir el argumento
-       * para una única respuesta posible sería ceremonia.
+       * Sin `sistema` entra la única configurada en servicio, como en las demás
+       * herramientas por máquina (Plan 44 F3.6); los mecanismos y las señales
+       * que necesitan los declara la entrada del registro (`desgaste`).
        */
-      const elegido = resolverSistema(sistema)
+      const elegido = sistemaDe(sistema)
       if (!elegido.ok) return elegido
 
-      /*
-       * El orden de las dos guardas importa, y es éste a propósito.
-       *
-       * Primero se contesta por CAPACIDAD —«esta máquina no tiene histórico ni
-       * mecanismos»—, que es la razón de dominio y la que le sirve a quien
-       * pregunta. La de abajo es una limitación NUESTRA, del código sin
-       * parametrizar, y sólo se alcanza cuando la máquina sí podría tener
-       * pronóstico. Al revés, una máquina sin histórico recibiría una excusa
-       * de implementación en vez de la verdad sobre sus datos.
-       */
+      /* Se contesta por CAPACIDAD —«esta máquina no tiene histórico ni
+         mecanismos»—, que es la razón de dominio y la que le sirve a quien pregunta. */
       if (!elegido.sistema.desgaste || !tieneHistoria(elegido.sistema.id)) {
         return fallo(
           `«${elegido.sistema.nombre}» no tiene pronóstico de desgaste. ${elegido.sistema.series.nota} ` +
@@ -407,24 +212,26 @@ export function crearHerramientasDeHistoricos({
        * No se borra al generalizarlo; se cae sola cuando `SENALES_PRONOSTICO`
        * salga del registro, porque entonces dejará de haber un `id` que citar.
        */
-      if (elegido.sistema.id !== 'tanque') {
-        return fallo(
-          `El pronóstico de desgaste todavía está escrito contra el catálogo del tanque, así que ` +
-            `NO puede servir a «${elegido.sistema.nombre}» aunque declare histórico. Contestar ` +
-            'con estas señales sería hablar de otra máquina. Da su estado de AHORA con ' +
-            `estado_del_sistema(sistema="${elegido.sistema.id}").`,
-          { sistema: elegido.sistema.id, motivo: 'herramienta no parametrizada' }
-        )
-      }
-
       const d = Math.max(1, Math.min(90, Number(dias) || 30))
       const fin = new Date()
       const inicio = new Date(fin.getTime() - d * 86400000)
 
-      const claves = SENALES_PRONOSTICO.filter((k) => esHistorizada(k))
+      /* Los mecanismos y las señales que necesitan los declara la ENTRADA
+         (`desgaste`); sólo entran las que tienen serie propia. */
+      const mecanismos = elegido.sistema.desgaste
+      const claves = [...new Set(mecanismos.flatMap((m) => m.necesita ?? []))]
+        .filter((k) => elegido.sistema.esHistorizada(k))
+      if (!claves.length) {
+        return fallo(
+          `«${elegido.sistema.nombre}» declara mecanismos de desgaste, pero ninguna de las señales que ` +
+            'necesitan tiene serie propia en esta máquina: no hay exposición que contar. Puedes dar su estado ' +
+            `de AHORA con estado_del_sistema(sistema="${elegido.sistema.id}"), pero no afirmes ninguna tendencia.`,
+          { sistema: elegido.sistema.id, mecanismos: mecanismos.map((m) => m.id) }
+        )
+      }
       const series = {}
       for (const k of claves) {
-        const r = await leerSerieEnRango(k, { inicio, fin })
+        const r = await leerSerieEnRango(k, { inicio, fin }, elegido.sistema.id)
         series[k] = r?.muestras ?? []
       }
 
@@ -442,11 +249,11 @@ export function crearHerramientasDeHistoricos({
         return fila
       })
 
-      const r = evaluarPronostico(filas, d * 24)
+      const r = evaluarPronostico(filas, d * 24, mecanismos)
 
       return {
         ok: true,
-        sistema: 'Tanque y grupo de bombeo',
+        sistema: elegido.sistema.nombre,
         ventana_dias: d,
         muestras: r.muestras,
         mecanismos: r.activos.map((x) => {
@@ -513,9 +320,9 @@ export function crearHerramientasDeHistoricos({
        * voltaje»); el de las demás máquinas se resuelve por el registro. Son
        * dos resolvedores distintos y unificarlos es B3 del backlog.
        *
-       * Mientras tanto, `sistema` elige cuál se usa. Sin argumento se sigue
-       * resolviendo contra el tanque, que es lo que hacía siempre: ninguna
-       * llamada existente cambia de comportamiento.
+       * Desde el Plan 44 F3.6 hay UN resolvedor (lib/senales.mjs): la señal se
+       * busca dentro de la máquina pedida, y sin argumento dentro de la única
+       * configurada en servicio. Ningún índice de ninguna máquina vive aquí.
        */
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
@@ -532,7 +339,7 @@ export function crearHerramientasDeHistoricos({
       if (!historizada) {
         return fallo(
           `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
-            `Pedírsela devolvería la curva de otra señal —la temperatura del tanque— sin avisar, ` +
+            `Pedírsela devolvería la serie de otra señal sin avisar, ` +
             `así que no se pide. Sí se puede dar su valor actual con estado_del_sistema.`,
           {
             senalesConHistoria: conSerie,
@@ -579,7 +386,7 @@ export function crearHerramientasDeHistoricos({
         unidad: meta.unidad || null,
         ...resumen,
         ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
+        ...extraBanda(clave, sistemaId, idioma),
         ...(meta.nota ? { nota: meta.nota } : {}),
         ...(meta.soloEnMarcha
           ? {
@@ -624,7 +431,7 @@ export function crearHerramientasDeHistoricos({
     async valor_en_momento({ senal, momento, sistema } = {}, { idioma = 'es' } = {}) {
       const resuelto = resolverSenalDeSistema(senal, sistema)
       if (!resuelto.ok) return resuelto
-      const { clave, meta, historizada } = resuelto
+      const { clave, meta, sistemaId, historizada } = resuelto
 
       // La misma guarda de catálogo que el resto, y por el mismo motivo: sin
       // ella el servidor devuelve la curva de otra señal sin dar error.
@@ -632,7 +439,7 @@ export function crearHerramientasDeHistoricos({
         return fallo(
           `${meta.label} no tiene serie histórica propia en este servidor. ${SIN_SERIE} ` +
             `Sí se puede dar su valor actual con estado_del_sistema.`,
-          { senalesConHistoria: historizadas().map(k => SENALES[k].label), senalPedida: meta.label }
+          { senalesConHistoria: resuelto.conSerie, senalPedida: meta.label }
         )
       }
 
@@ -645,7 +452,9 @@ export function crearHerramientasDeHistoricos({
        * que así el único punto que vuelve es el del momento exacto.
        */
       const r = await client.readHistory({
-        pointName: pointName(clave),
+        /* El punto HISTORICO que declara la entrada, no el tag en vivo del
+           catalogo del tanque que iba aqui hasta el Plan 44 F3.6. */
+        pointName: SISTEMA[sistemaId].series.punto(clave),
         startDate: m.instante.toISOString(),
         endDate: new Date(m.instante.getTime() + 60_000).toISOString(),
         aggregate: 'Interpolative',
@@ -684,7 +493,7 @@ export function crearHerramientasDeHistoricos({
           'Es el valor vigente en ese instante, reconstruido por el historiador entre las dos ' +
           'muestras que lo rodean. Cítalo como el valor de ese momento; no lo llames mínimo, ' +
           'máximo ni promedio, que son de un tramo y esto es un punto.',
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
+        ...extraBanda(clave, sistemaId, idioma),
         ...(meta.nota ? { nota2: meta.nota } : {}),
         ...avisoDeUmbrales(idioma),
       }
@@ -703,7 +512,7 @@ export function crearHerramientasDeHistoricos({
       const { clave, sistemaId } = resuelto
 
       /* El `sistema` viaja a las dos llamadas: sin él, la de dentro volvería a
-         resolver contra el tanque y las dos mitades de la comparación podrían
+         resolver contra la máquina por omisión y las dos mitades de la comparación podrían
          hablar de máquinas distintas. `idioma` viaja igual (i18n del
          asistente): sin reenviarlo, las dos mitades de la comparación
          narrarían siempre en español aunque toda la conversación fuera en
@@ -716,7 +525,7 @@ export function crearHerramientasDeHistoricos({
       if (!a.ok) return a
       if (!b.ok) return b
 
-      const meta = senalInfo(clave)
+      const meta = metaDe(clave, sistemaId)
 
       return {
         ok: true,
@@ -843,7 +652,7 @@ export function crearHerramientasDeHistoricos({
         return fallo(
           `${meta.label} no tiene serie histórica propia, así que no se puede perfilar. ` +
             `${SIN_SERIE} Su valor actual sí se puede dar con estado_del_sistema.`,
-          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+          { senalesConHistoria: resuelto.conSerie }
         )
       }
 
@@ -938,7 +747,7 @@ export function crearHerramientasDeHistoricos({
          * quedarse en un comentario de código: si la instalación pasa la mitad
          * del tiempo fuera de su «banda normal», el problema es la banda.
          */
-        ...(UMBRALES[clave] ? comparacionConLaBanda(clave, orden, idioma) : {}),
+        ...(bandaDe(clave, sistemaId) ? comparacionConLaBanda(bandaDe(clave, sistemaId), orden, idioma) : {}),
 
         /*
          * El aviso que evita el error de lectura más probable de esta
@@ -1015,7 +824,7 @@ export function crearHerramientasDeHistoricos({
       if (lista.length < 2) {
         return fallo(
           'Para correlacionar hacen falta al menos DOS señales. Dime cuáles quieres comparar.',
-          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+          { senalesConHistoria: conSeriePorOmision(sistema) }
         )
       }
 
@@ -1302,7 +1111,7 @@ export function crearHerramientasDeHistoricos({
         svg = renderizarGraficoSerie(serie.datos, {
           titulo: meta.label,
           unidad: meta.unidad || null,
-          banda: UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null,
+          banda: extraBanda(clave, sistemaId, idioma).banda ?? null,
         })
       } catch (error) {
         // El caso conocido es una sola muestra válida en la ventana. Se cuenta
@@ -1420,8 +1229,8 @@ export function crearHerramientasDeHistoricos({
        * redactada como si la señal no existiera, teniendo serie.
        *
        * Ahora pasa por `resolverSenalDeSistema`, el mismo resolvedor que ya
-       * usan las otras trece herramientas de este archivo. Sin `sistema` sigue
-       * cayendo al tanque, así que ninguna llamada existente cambia.
+       * usan las otras trece herramientas de este archivo. Sin sistema entra la
+       * única configurada en servicio (Plan 44 F3.4 y F3.6).
        *
        * ── POR QUÉ EL REPORTE ES DE UNA SOLA MÁQUINA ───────────────────
        *
@@ -1749,7 +1558,7 @@ export function crearHerramientasDeHistoricos({
         return fallo(
           'Para una tendencia múltiple hacen falta al menos DOS señales. Para una sola, usa ' +
             'historia_de_senal.',
-          { senalesConHistoria: historizadas().map(k => SENALES[k].label) }
+          { senalesConHistoria: conSeriePorOmision(sistema) }
         )
       }
       if (lista.length > 4) {
@@ -1825,7 +1634,7 @@ export function crearHerramientasDeHistoricos({
                   `o todas vinieron con mala calidad.`,
             }),
           ...(series[i].truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-          ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
+          ...extraBanda(clave, sistemaId, idioma),
         }
       })
 
@@ -1986,7 +1795,7 @@ export function crearHerramientasDeHistoricos({
           `distintos: un solo suceso de unos minutos deja muchas muestras seguidas. Descríbelo ` +
           `como un episodio entre la primera y la última vez, salvo que estén muy separadas.`,
         ...(serie.truncada ? { avisoTruncada: AVISO_TRUNCADA } : {}),
-        ...(UMBRALES[clave] ? { banda: bandaLegible(UMBRALES[clave], idioma) } : {}),
+        ...extraBanda(clave, sistemaId, idioma),
         ...avisoDeUmbrales(idioma),
       }
     },

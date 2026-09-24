@@ -404,6 +404,20 @@ export function crearHerramientasDeMaquina({ client, readOnly, maquina, diario =
 
       const accionPedida = encender ? 'encender' : 'apagar'
 
+      /*
+       * La bomba es del tanque, y el tanque pasa por la misma guarda que
+       * cualquier máquina del registro (Plan 44 F3.6): cerrado, se niega y se
+       * anota como rechazada. Esta herramienta sigue siendo la del tanque
+       * porque su seguridad —no encender con el nivel alto— es de su dominio;
+       * una escritura genérica sobre una variable `acceso: write` de una
+       * configurada es decisión del Plan 43, no un renombre de ésta.
+       */
+      const duena = resolverSistema('tanque')
+      if (!duena.ok) {
+        await anotarAccionamiento({ resultado: 'rechazada', accion: accionPedida, motivo: duena.error }, yaAnota)
+        return duena
+      }
+
       if (readOnly) {
         const motivo =
           'El puente ICONICS está en modo solo lectura (ICONICS_READ_ONLY=true), así que no puedo ' +

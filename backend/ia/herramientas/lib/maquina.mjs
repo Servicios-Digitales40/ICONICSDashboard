@@ -22,7 +22,6 @@
  * las tres en ese orden.
  */
 import { SISTEMA, SISTEMAS, sistemaPorNombre } from '../../../../shared/eva/comun/sistemas.js'
-import { evaluarRiesgos } from '../../../../shared/eva/tanque/riesgos.js'
 import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 import { isGoodQuality } from '../../../../shared/quality.js'
 import { fallo } from './respuesta.mjs'
@@ -179,58 +178,20 @@ function resolverSistema(id) {
  * que la salvaguarda lee.
  */
 function evaluarRiesgosDe(sistema, estado) {
-  /*
-   * ── UNA MÁQUINA SIN FORMA DE DOMINIO NO SE EVALÚA (Plan 33 F3) ────
-   *
-   * Las máquinas CONFIGURADAS traen `dominio: null` a propósito: tienen una
-   * lista plana de variables con su rol, no la forma que esperan los motores
-   * de reglas (`{canales, variador, alarmas}` en vibraciones, el `Sistema` del
-   * tanque). Ver `shared/eva/comun/construirSistema.js`.
-   *
-   * Sin esta guarda, ese `null` llegaría al motor y **no daría error**: medido
-   * el 18-09-2026, `evaluarRiesgosVibracion(null)` devuelve TRES riesgos
-   * activos —los tres `dkw-sin-referencia`, una regla que dispara ante la
-   * AUSENCIA de dato—. La regla es correcta; lo falso sería afirmar esos tres
-   * riesgos sobre tres apoyos que la máquina configurada no ha declarado.
-   *
-   * Se devuelve `evaluadas: 0`, que es lo que `riesgos_activos` ya convierte
-   * en un fallo explícito en vez de un «ninguna: se pudieron evaluar todas las
-   * reglas». Ver el bloque de abajo sobre el `default`.
-   */
   if (!estado?.dominio) {
     return { activos: [], noEvaluables: [], evaluadas: 0 }
   }
 
-  /*
-   * ── UNA CONFIGURADA SE EVALÚA CON LAS REGLAS DE SU TIPO (Plan 38 F1) ─
-   *
-   * Una máquina configurada trae `tipo`, y el tipo trae `evaluarRiesgos` por
-   * referencia; su dominio ya tiene la forma que ese motor espera (Plan 34
-   * F3). Sin esta rama caía en el `default` y el asistente decía «no se pudo
-   * evaluar ninguna regla» de una máquina que sí las tiene.
-   *
-   * El `switch` de abajo conocía también `vibraciones` escrita a mano; desde
-   * el Plan 40 F1 esa máquina sólo existe configurada y entra por aquí. El
-   * tanque sigue escrito a mano hasta que la rama lo reabra (Plan 33 F9).
-   */
-  if (sistema.configurada && sistema.tipo) {
-    const tipo = tipoDe(sistema.tipo)
-    if (tipo?.evaluarRiesgos) return tipo.evaluarRiesgos(estado.dominio)
-  }
-
-  switch (sistema.id) {
-    case 'tanque':
-      return evaluarRiesgos(estado.dominio)
-    default:
-      return { activos: [], noEvaluables: [], evaluadas: 0 }
-  }
+  /* Por el TIPO si lo tiene (toda configurada), y si no por lo que la entrada
+     declare ella misma (Plan 44 F3.6). Ninguna tabla por id de máquina: una
+     entrada que no declare cómo evaluarse no se evalúa, y se ve en
+     `evaluadas: 0`. */
+  const tipo = sistema.configurada && sistema.tipo ? tipoDe(sistema.tipo) : null
+  if (tipo?.evaluarRiesgos) return tipo.evaluarRiesgos(estado.dominio)
+  if (typeof sistema.evaluarRiesgos === 'function') return sistema.evaluarRiesgos(estado.dominio)
+  return { activos: [], noEvaluables: [], evaluadas: 0 }
 }
 
-/**
- * Una llamada SUELTA a `readHistory`, sin trocear — la pieza de más abajo
- * de `leerSerie()`. Existe separada porque tanto una ventana corta (un
- * único tramo) como cada tramo de una ventana larga acaban aquí.
- */
 
   return { leerMaquina, resolverSistema, evaluarRiesgosDe }
 }

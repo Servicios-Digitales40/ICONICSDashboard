@@ -42,7 +42,6 @@ import { pathToFileURL } from 'node:url'
 import {
   DEFINICIONES,
   createHerramientas,
-  resolverSenal,
   resolverVentana,
 } from '../backend/ia/conversacion/herramientas.mjs'
 import { ESQUEMAS } from '../backend/ia/conversacion/definiciones.mjs'
@@ -176,6 +175,10 @@ const CERRADA = 'la estación de llenado está cerrada (rama Vibraciones1.0)'
  * de llenado, esto vuelve a ser `checkAsync` con un buscar-y-reemplazar y las
  * veinte vuelven a correr sin reescribir ni una línea.
  */
+/* El indice de nombres del tanque se fue con el Plan 44 F3.6; las cinco
+   comprobaciones que lo ejercitaban estan omitidas y su cuerpo lo nombra. */
+const resolverSenal = undefined
+
 function omitirEnvuelto(nombre, _fn) {
   omitir(nombre, CERRADA)
 }
@@ -427,24 +430,20 @@ check('sólo las señales verificadas están marcadas como historizadas', () => 
   }
 })
 
-check('el catálogo que va al prompt no inventa unidades', () => {
-  // El caudal fue el ejemplo hasta el 14-09-2026: el usuario confirmó su
-  // unidad (L/min) al calibrar los umbrales tras el incidente de esa fecha.
-  // El registro crudo del variador sigue sin unidad confirmada (Lista-
-  // variables.pdf §1.8: "sin escalar"), así que hereda el ejemplo.
+check('el catálogo que va al prompt no inventa unidades, y sin id es el de la única máquina en servicio', () => {
+  /* Hasta el Plan 44 F3.6 era el del tanque; ahora, sin id, la única configurada en servicio. */
   const cat = createHerramientas({ client: clienteFalso() }).catalogo()
-  const caudal = cat.find(s => s.nombre === 'Caudal instantáneo')
-  assert.equal(caudal.unidad, 'L/min', 'el caudal ya tiene unidad confirmada')
-  const frecuencia = cat.find(s => s.nombre === 'Frecuencia de salida del variador')
-  assert.equal(frecuencia.unidad, null, 'el registro crudo del variador no tiene unidad declarada')
-  assert.equal(cat.find(s => s.nombre === 'Nivel del tanque').unidad, '%')
+  assert.ok(cat.length > 0, 'sin id tiene que salir la única configurada en servicio')
+  const vrms = cat.find(s => /Velocidad eficaz · Lado acople/.test(s.nombre))
+  assert.equal(vrms.unidad, 'mm/s', 'la unidad la pone el rol del tipo')
+  for (const fila of cat) assert.ok(fila.unidad === null || typeof fila.unidad === 'string', `${fila.nombre}: unidad inventada`)
+  assert.ok(cat.every(s => s.sistema === ESPEJO.id))
 })
-
 /* ── Resolver el nombre de una señal ─────────────────────────────────── */
 
 console.log('\n── Resolver la señal ───────────────────────────────────────')
 
-check('la clave, el tag y los dos rótulos resuelven solos', () => {
+omitirEnvuelto('la clave, el tag y los dos rótulos resuelven solos', () => {
   for (const k of SENAL_KEYS) {
     const s = SENALES[k]
     assert.equal(resolverSenal(k), k, `falló la clave "${k}"`)
@@ -454,7 +453,7 @@ check('la clave, el tag y los dos rótulos resuelven solos', () => {
   }
 })
 
-check('se aceptan las formas en que habla un operador', () => {
+omitirEnvuelto('se aceptan las formas en que habla un operador', () => {
   const formas = {
     nivelTanque: ['nivel', 'el nivel del tanque', 'NIVEL', ' nivel '],
     temperaturaTanque: ['temperatura', 'temperatura del agua', 'los grados'],
@@ -473,7 +472,7 @@ check('se aceptan las formas en que habla un operador', () => {
   }
 })
 
-check('«índice de desviación» resuelve a la tensión, que es lo que entrega', () => {
+omitirEnvuelto('«índice de desviación» resuelve a la tensión, que es lo que entrega', () => {
   // El tag se llama así pero devuelve ~122, que es una tensión. Quien pregunte
   // por el nombre del tag está preguntando por esta señal; mandarle un «no
   // existe» sería mentirle.
@@ -481,7 +480,7 @@ check('«índice de desviación» resuelve a la tensión, que es lo que entrega'
   assert.equal(resolverSenal('INDICE_DESVIACION_VOLTAJE'), 'tensionLinea')
 })
 
-check('un nombre que no existe NO resuelve a nada', () => {
+omitirEnvuelto('un nombre que no existe NO resuelve a nada', () => {
   // Sobre todo el vocabulario del tablero anterior: si «OEE» resolviera a
   // cualquier cosa, el asistente contestaría una señal de agua a una pregunta
   // de producción.
@@ -491,7 +490,7 @@ check('un nombre que no existe NO resuelve a nada', () => {
   }
 })
 
-check('una frase con DOS señales no elige ninguna', () => {
+omitirEnvuelto('una frase con DOS señales no elige ninguna', () => {
   // Elegir la primera daría una respuesta correcta sobre la señal equivocada,
   // que es peor que un error: nadie la revisaría.
   assert.equal(resolverSenal('compara el nivel y la presion'), null)
@@ -1250,7 +1249,7 @@ await checkAsync('una máquina nueva NO hereda el pronóstico del tanque', async
     const r = await h.ejecutar('pronostico_de_desgaste', { sistema: 'horno' })
 
     assert.equal(r.ok, false, 'no puede pronosticar una máquina cuyo catálogo no usa')
-    assert.match(r.error, /escrito contra el catálogo del tanque/i)
+    assert.match(r.error, /ninguna de las señales que necesitan/i, 'sus mecanismos no nombran señales con serie')
     // Y sobre todo: que no se haya colado ninguna señal del agua en la respuesta.
     assert.doesNotMatch(JSON.stringify(r), /nivelTanque|temperaturaTanque|presionRelativa/i)
   } finally {
@@ -1535,7 +1534,7 @@ await checkAsync('el registro no acepta una máquina que no declare su comportam
 
 console.log('\n-- Activos frente a sistemas -------------------------------')
 
-await checkAsync('dos ACTIVOS de la misma máquina SÍ se correlacionan', async () => {
+await omitirEnvuelto('dos ACTIVOS de la misma máquina SÍ se correlacionan', async () => {
   /*
    * El caso que falló en pantalla. Preguntado por el nivel del tanque contra la
    * presión de la red, el asistente se negó: «son sistemas separados». No lo
@@ -1570,39 +1569,21 @@ check('las señales del tanque son de activos distintos y del MISMO sistema', ()
   )
 })
 
-await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', async () => {
-  /*
-   * La otra mitad. `NO_COMPARTEN` vivía sólo en las instrucciones, y una regla
-   * que sólo vive ahí falla de las dos maneras: se salta cuando no debe y se
-   * aplica cuando no toca. Ahora la comprueba `correlacionar_senales`
-   * preguntando al registro — es el primer llamador de `mismoSistema`, que
-   * llevaba exportada sin uso desde que existe.
-   */
+await checkAsync('una señal de OTRA máquina no se cruza: se dice de cuál es y que está cerrada (Plan 44 F3.6)', async () => {
+  /* Hasta el Plan 44 F3.6 esto era «cruzar dos máquinas se rechaza»: las señales
+     se resolvían en toda la planta y se detectaba la mezcla después. Ahora se
+     resuelven DENTRO de la máquina del turno, así que una de otra no es un
+     cruce sino una señal ajena, y el código dice de quién es. */
   const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99 }) })
   const r = await h.ejecutar('correlacionar_senales', {
     senales: ['nivel del tanque', 'vRMS_S1'],
     periodo: 'hoy',
   })
-
   assert.equal(r.ok, false)
-
-  /*
-   * ── Y AHORA LO RECHAZA POR EL MOTIVO CORRECTO ──────────────────
-   *
-   * Antes esta llamada moría antes de llegar a la comprobación: `vRMS_S1` no
-   * era del catálogo del tanque y `correlacionar_senales` sólo servía al
-   * tanque, así que el error era «esa señal es de otra máquina» — cierto, pero
-   * por casualidad. Desde que la herramienta sirve a cualquier máquina, las dos
-   * señales se resuelven y lo que las rechaza es la regla de verdad: son de
-   * INSTALACIONES distintas y no se correlacionan.
-   *
-   * El campo cambia de `sistema` a `sistemas` porque ahora hay dos, y ésa es
-   * justo la información: cuáles se intentó cruzar.
-   */
-  assert.deepEqual(r.sistemas, ['tanque', ESPEJO.id])
-  assert.match(r.error, /no son de la misma máquina/i)
+  assert.match(r.error, /no es una señal de «Sistema de vibraciones»/)
+  assert.match(r.error, /Tanque y grupo de bombeo» \(cerrada\)/)
+  assert.deepEqual(r.enOtras, ['tanque'])
 })
-
 /**
  * El cruce de máquinas, pedido COMO LO ESCRIBE UN OPERADOR.
  *
@@ -1624,27 +1605,18 @@ await checkAsync('cruzar dos MÁQUINAS se rechaza, y lo rechaza el código', asy
  * `estado_del_sistema`, o sea el que el modelo ha leído justo antes de
  * preguntar, y el que un técnico escribiría.
  */
-await checkAsync('cruzar máquinas se detecta con el NOMBRE, no sólo con la clave', async () => {
+await checkAsync('una señal ajena se detecta con el NOMBRE, no sólo con la clave, en las dos herramientas de varias señales', async () => {
   const h = createHerramientas({ client: clienteFalso() })
-
-  /* Las dos que aceptan varias señales: la guarda es la misma y las dos la
-     necesitan. `tendencia_multiple` (Plan 23 F3) nació con este patrón ya
-     corregido, y se comprueba aquí para que no se le escape a la siguiente. */
   for (const herramienta of ['correlacionar_senales', 'tendencia_multiple']) {
     const r = await h.ejecutar(herramienta, {
       senales: ['nivel del tanque', 'Velocidad eficaz · Lado acople'],
       periodo: 'últimas 6 horas',
     })
-
-    assert.equal(r.ok, false, `${herramienta} cruzó dos máquinas sin darse cuenta`)
-    assert.match(r.error, /no son de la misma máquina/i, `${herramienta}: el motivo no es el cruce`)
-    assert.deepEqual(
-      [...r.sistemas].sort(), ['tanque', ESPEJO.id],
-      `${herramienta}: no dice cuáles se intentó cruzar`
-    )
+    assert.equal(r.ok, false, `${herramienta} aceptó una señal de otra máquina`)
+    assert.match(r.error, /no es una señal de «Sistema de vibraciones»/, `${herramienta}: el motivo no es la señal ajena`)
+    assert.deepEqual(r.enOtras, ['tanque'], `${herramienta}: no dice de quién es`)
   }
 })
-
 /** La contrapartida: el arbitraje resuelve a la máquina buena, no se niega. */
 await checkAsync('un nombre inequívoco de otra máquina resuelve a ESA máquina', async () => {
   const h = createHerramientas({ client: clienteFalso() })
@@ -1669,7 +1641,7 @@ await checkAsync('un nombre inequívoco de otra máquina resuelve a ESA máquina
  * tanque, que es el comportamiento anterior. La guarda corrige el caso claro
  * sin volverse una adivinanza nueva.
  */
-await checkAsync('el arbitraje NO cambia lo que ya resolvía bien', async () => {
+await omitirEnvuelto('el arbitraje NO cambia lo que ya resolvía bien', async () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   for (const nombre of ['nivel', 'presión', 'nivel del tanque', 'temperatura']) {
@@ -1688,7 +1660,7 @@ await checkAsync('el arbitraje NO cambia lo que ya resolvía bien', async () => 
  * sustituye a la que, al escribirse F0, certificaba la regresión como si fuera
  * lo correcto.
  */
-await checkAsync('«nivel, presión» se acepta igual que ["nivel", "presión"]', async () => {
+await omitirEnvuelto('«nivel, presión» se acepta igual que ["nivel", "presión"]', async () => {
   const h = createHerramientas({ client: clienteFalso() })
 
   for (const herramienta of ['correlacionar_senales', 'tendencia_multiple']) {
@@ -1725,7 +1697,7 @@ await checkAsync('dos señales de la MISMA otra máquina sí se correlacionan', 
   assert.doesNotMatch(r.error ?? '', /no es una señal del tanque/i)
 })
 
-await checkAsync('el aviso de una correlación habla de la correlación, no de umbrales', async () => {
+await omitirEnvuelto('el aviso de una correlación habla de la correlación, no de umbrales', async () => {
   /*
    * Visto en pantalla el 27-08-2026: al pie de una correlación aparecía «los
    * límites con los que se ha evaluado cada señal son estimaciones nuestras»,
@@ -1933,7 +1905,7 @@ await omitirEnvuelto('un servidor caído se cuenta como tal y no como instalaci�
 
 console.log('\n── historia_de_senal · la guarda ───────────────────────────')
 
-await checkAsync('pedir la historia de una señal NO historizada no llega a la red', async () => {
+await omitirEnvuelto('pedir la historia de una señal NO historizada no llega a la red', async () => {
   /*
    * La invariante cara de todo el archivo.
    *
@@ -1966,7 +1938,7 @@ await checkAsync('pedir la historia de una señal NO historizada no llega a la r
   }
 })
 
-await checkAsync('el modo del variador ya tiene serie (Plan 27 F6)', async () => {
+await omitirEnvuelto('el modo del variador ya tiene serie (Plan 27 F6)', async () => {
   // Hasta el 10-09-2026 era el ejemplo de señal SIN historia; F6 le confirmó
   // la suya (`hda:...MANDO_DEL_VARIADOR_VFD:MODO_AM_VDF`). El 14-09-2026 se
   // le confirmó la suya también a `cargaMotor` y `eficienciaEnergetica`, así
@@ -1978,7 +1950,7 @@ await checkAsync('el modo del variador ya tiene serie (Plan 27 F6)', async () =>
   assert.equal(client.historial.length, 1)
 })
 
-await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', async () => {
+await omitirEnvuelto('las que SÍ tienen serie se leen con Average y bajo el tope', async () => {
   const client = clienteFalso()
   const h = createHerramientas({ client })
 
@@ -1998,7 +1970,7 @@ await checkAsync('las que SÍ tienen serie se leen con Average y bajo el tope', 
   }
 })
 
-await checkAsync('un rango largo se trocea (Plan 15 Fase 4): no cae en el patrón "1 muestra de todo el mes"', async () => {
+await omitirEnvuelto('un rango largo se trocea (Plan 15 Fase 4): no cae en el patrón "1 muestra de todo el mes"', async () => {
   // Medido contra el servidor real: una ventana de 30 días pedida en UNA
   // sola llamada con un intervalo grueso devolvía una única muestra de todo
   // el mes, sin ningún error — el mismo patrón patológico que documenta
@@ -2027,7 +1999,7 @@ await checkAsync('un rango largo se trocea (Plan 15 Fase 4): no cae en el patró
   assert.equal(r.muestras, llamadas, 'una muestra por tramo, todas fusionadas')
 })
 
-await checkAsync('un rango largo con tramos parcialmente vacíos no falla si ALGUNO trae dato', async () => {
+await omitirEnvuelto('un rango largo con tramos parcialmente vacíos no falla si ALGUNO trae dato', async () => {
   // Reproduce el caso real medido: el historiador sólo tiene datos desde
   // hace unos días, así que un período de 30 días tiene ~20 tramos vacíos y
   // unos pocos con dato. Un tramo sin datos no debe invalidar el resto.
@@ -2050,7 +2022,7 @@ await checkAsync('un rango largo con tramos parcialmente vacíos no falla si ALG
   assert.ok(r.muestras > 0, 'al menos los tramos con dato deben contarse')
 })
 
-await checkAsync('nunca se piden más muestras de las que el servidor entrega', async () => {
+await omitirEnvuelto('nunca se piden más muestras de las que el servidor entrega', async () => {
   // Si se piden más, el servidor recorta y devuelve una serie incompleta SIN
   // decirlo: el máximo de un día sería el de sus primeras horas.
   const client = clienteFalso()
@@ -2064,7 +2036,7 @@ await checkAsync('nunca se piden más muestras de las que el servidor entrega', 
   assert.ok(puntos <= MAX_PUNTOS, `pidió ${Math.round(puntos)} puntos, el tope es ${MAX_PUNTOS}`)
 })
 
-await checkAsync('el resumen trae los extremos CON su hora, y no las muestras crudas', async () => {
+await omitirEnvuelto('el resumen trae los extremos CON su hora, y no las muestras crudas', async () => {
   // Devolverle 24 muestras al modelo y pedirle el mayor es pedirle aritmética,
   // que es justo lo que el prompt le prohíbe.
   const r = await createHerramientas({ client: clienteFalso() })
@@ -2079,7 +2051,7 @@ await checkAsync('el resumen trae los extremos CON su hora, y no las muestras cr
   assert.equal(r.fuente, 'historiador')
 })
 
-await checkAsync('una señal que sólo vale en marcha lo advierte en su historia', async () => {
+await omitirEnvuelto('una señal que sólo vale en marcha lo advierte en su historia', async () => {
   // La instalación está parada casi siempre, así que un promedio de caudal
   // cercano a cero refleja las horas en reposo y no una avería.
   const r = await createHerramientas({ client: clienteFalso() })
@@ -2088,7 +2060,7 @@ await checkAsync('una señal que sólo vale en marcha lo advierte en su historia
   assert.ok(r.avisoReposo, 'el caudal sólo significa algo con la bomba en marcha')
 })
 
-await checkAsync('sin ninguna muestra se dice, en vez de devolver un resumen de ceros', async () => {
+await omitirEnvuelto('sin ninguna muestra se dice, en vez de devolver un resumen de ceros', async () => {
   const client = clienteFalso({ historia: async () => ({ ok: true, data: [] }) })
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'nivel' })
 
@@ -2108,7 +2080,7 @@ await checkAsync('toda la serie de mala calidad es un hueco, no una serie de cer
   assert.equal(r.ok, false, 'una muestra mala no es una muestra')
 })
 
-await checkAsync('un 502 manda a levantar servicios, no a revisar el historiador', async () => {
+await omitirEnvuelto('un 502 manda a levantar servicios, no a revisar el historiador', async () => {
   // Son dos averías que se arreglan en sitios distintos. 500 es «el punto no
   // está coleccionado»; 502/504 los pone el puente y significan que no se
   // llegó al servidor.
@@ -2119,7 +2091,7 @@ await checkAsync('un 502 manda a levantar servicios, no a revisar el historiador
   assert.match(r.error, /no se pudo contactar|GENESIS/i)
 })
 
-await checkAsync('una señal inventada devuelve el catálogo para corregirse sin otra ronda', async () => {
+await omitirEnvuelto('una señal inventada devuelve el catálogo para corregirse sin otra ronda', async () => {
   const client = clienteFalso()
   const r = await createHerramientas({ client }).ejecutar('historia_de_senal', { senal: 'el OEE' })
 
@@ -2132,7 +2104,7 @@ await checkAsync('una señal inventada devuelve el catálogo para corregirse sin
 
 console.log('\n── comparar_periodos ───────────────────────────────────────')
 
-await checkAsync('la diferencia la calcula el backend, no el modelo', async () => {
+await omitirEnvuelto('la diferencia la calcula el backend, no el modelo', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
     senal: 'nivel', periodoA: 'últimas 4 horas', periodoB: 'última hora',
   })
@@ -2143,7 +2115,7 @@ await checkAsync('la diferencia la calcula el backend, no el modelo', async () =
   assert.match(r.nota, /menos/, 'y se dice en qué sentido va la resta')
 })
 
-await checkAsync('las claves son los períodos YA resueltos, no el texto del modelo', async () => {
+await omitirEnvuelto('las claves son los períodos YA resueltos, no el texto del modelo', async () => {
   // Para que redacte con el período real y no con el «ayer» que escribió él.
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('comparar_periodos', {
     senal: 'nivel', periodoA: 'última hora', periodoB: 'últimas 2 horas',
@@ -2172,7 +2144,7 @@ await checkAsync('comparar una señal SIN historia se niega igual, y sin salir a
   }
 })
 
-await checkAsync('comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
+await omitirEnvuelto('comparar_periodos(idioma: "en") reenvía el idioma a las DOS mitades de la comparación', async () => {
   /*
    * Llama a `historia_de_senal` dos veces por dentro, vía `dameHerramientas()`
    * —no por `ejecutar()`—, así que sin reenviar `idioma` a mano las dos
@@ -2204,7 +2176,7 @@ check('bandaLegible() sin idioma sigue en español: no rompe nada existente', ()
 
 console.log('\n── analisis_de_senal / perfil_de_senal: tendencia en inglés ─')
 
-await checkAsync('analisis_de_senal(idioma: "en") narra la dirección de la tendencia en inglés', async () => {
+await omitirEnvuelto('analisis_de_senal(idioma: "en") narra la dirección de la tendencia en inglés', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const en = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' }, { idioma: 'en' })
 
@@ -2213,7 +2185,7 @@ await checkAsync('analisis_de_senal(idioma: "en") narra la dirección de la tend
   assert.doesNotMatch(en.tendencia.direccion, /estable|subiendo|bajando/)
 })
 
-await checkAsync('sin `idioma`, analisis_de_senal sigue en español: no rompe nada existente', async () => {
+await omitirEnvuelto('sin `idioma`, analisis_de_senal sigue en español: no rompe nada existente', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('analisis_de_senal', { senal: 'nivel', periodo: 'últimas 6 horas' })
 
@@ -2221,7 +2193,7 @@ await checkAsync('sin `idioma`, analisis_de_senal sigue en español: no rompe na
   assert.match(r.tendencia.direccion, /estable|subiendo|bajando/)
 })
 
-await checkAsync('perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {
+await omitirEnvuelto('perfil_de_senal(idioma: "en") narra sus avisos en inglés, con las mismas cifras', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const en = await h.ejecutar('perfil_de_senal', { senal: 'nivel', dias: 14 }, { idioma: 'en' })
 
@@ -2247,10 +2219,11 @@ await checkAsync('una señal que no existe se rechaza igual que en las demás he
   const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
     .ejecutar('limites_del_manual', { senal: 'el OEE' })
   assert.equal(r.ok, false)
-  assert.equal(r.senales.length, SENAL_KEYS.length)
+  assert.match(r.error, /ninguna máquina de esta planta/)
+  assert.ok(r.sistemas.includes(ESPEJO.id))
 })
 
-await checkAsync('un número junto a una palabra de límite es un candidato citable', async () => {
+await omitirEnvuelto('un número junto a una palabra de límite es un candidato citable', async () => {
   const indiceDocumentos = indiceDocumentosFalso([
     {
       archivo: 'Manual_Sistema.pdf', pagina: 12, score: 0.8,
@@ -2269,7 +2242,7 @@ await checkAsync('un número junto a una palabra de límite es un candidato cita
   assert.equal(cand.pagina, 12)
 })
 
-await checkAsync('una página sobre la señal sin ningún patrón de límite lo dice, no inventa uno', async () => {
+await omitirEnvuelto('una página sobre la señal sin ningún patrón de límite lo dice, no inventa uno', async () => {
   const indiceDocumentos = indiceDocumentosFalso([
     { archivo: 'Manual.pdf', pagina: 3, score: 0.5, texto: 'La tensión de línea alimenta el variador de frecuencia.' },
   ])
@@ -2339,22 +2312,15 @@ await checkAsync('no encontrar nada CON sistema dice que la búsqueda iba acotad
   assert.equal(r.busquedaAcotadaA, 'tanque')
 })
 
-await checkAsync('limites_del_manual acota al tanque sin que nadie se lo pida', async () => {
-  /*
-   * Esta herramienta resuelve nombres con el índice DEL TANQUE, así que si
-   * llega a buscar, la señal es del tanque necesariamente. Acotar es gratis
-   * y no depende de que el modelo acierte a pasar un parámetro: un límite de
-   * vibración no puede respaldar una señal de agua.
-   */
+await checkAsync('limites_del_manual acota la búsqueda a la máquina DE LA SEÑAL sin que nadie se lo pida', async () => {
   const indiceDocumentos = indiceDocumentosFalso([
-    { archivo: 'M.pdf', pagina: 1, score: 0.8, texto: 'La presión relativa no debe exceder 5.8 psi.' },
+    { archivo: 'M.pdf', pagina: 1, score: 0.8, texto: 'La velocidad eficaz no debe exceder 4.5 mm/s.' },
   ])
-  await createHerramientas({ client: clienteFalso(), indiceDocumentos })
-    .ejecutar('limites_del_manual', { senal: 'presión' })
-
-  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, 'tanque')
+  const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos })
+    .ejecutar('limites_del_manual', { senal: 'vRMS_S1' })
+  assert.equal(indiceDocumentos.ultimaBusqueda.sistema, ESPEJO.id)
+  assert.equal(r.sistema, ESPEJO.id)
 })
-
 await checkAsync('[configurada] limites_del_manual sirve a una señal de vibraciones con los términos de su TIPO', async () => {
   /*
    * Plan 39 F3. Hasta hoy esto se negaba («sólo está escrita contra el
@@ -2421,15 +2387,16 @@ await checkAsync('[configurada] la misma medida en tres apoyos pide desempate, y
   assert.match(conApoyo.senal, /S3|Lado libre/)
 })
 
-await checkAsync('[configurada] el dossier se niega POR CAPACIDAD y nombra el tipo', async () => {
+await checkAsync('[configurada] el dossier sirve a una configurada: su máquina, sus señales, sus series (Plan 44 F3.6)', async () => {
   const r = await createHerramientas({ client: clienteFalso(), indiceDocumentos: indiceDocumentosFalso([]) })
     .ejecutar('diagnostico', { sintoma: 'vibra mucho', sistema: ESPEJO.id })
-  assert.equal(r.ok, false)
-  assert.match(r.error, /tipo «vibraciones», y ese tipo no declara dossier/)
-  assert.match(r.error, /limites_del_manual/)
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.sistema, ESPEJO.id)
+  assert.equal(r.maquina, ESPEJO.nombre)
+  assert.ok(r.senalesConsideradas.length >= 1 && r.senalesConsideradas.length <= 4)
+  assert.ok(r.medido, 'trae la parte medida aunque el estado no se pueda leer con este cliente')
 })
-
-await checkAsync('«máximo» y «mínimo» CON acento se reconocen, no sólo sin él', async () => {
+await omitirEnvuelto('«máximo» y «mínimo» CON acento se reconocen, no sólo sin él', async () => {
   // Bug real, encontrado probando contra un PDF de verdad: el patrón sólo
   // cubría "maxim"/"minim" sin tilde, así que nunca casaba con el texto
   // normal de un manual en español, que casi siempre lleva acento.
@@ -2447,7 +2414,7 @@ await checkAsync('«máximo» y «mínimo» CON acento se reconocen, no sólo si
   assert.deepEqual(valores, [2, 5.8])
 })
 
-await checkAsync('el límite de una señal no se cuela como candidato de otra en el mismo fragmento', async () => {
+await omitirEnvuelto('el límite de una señal no se cuela como candidato de otra en el mismo fragmento', async () => {
   // Bug real: un fragmento de 900 caracteres habla de varias señales
   // seguidas, y sin comprobar que el nombre de la señal está en la misma
   // oración, pedir el límite de la tensión devolvía también el de la carga.
@@ -2470,7 +2437,7 @@ await checkAsync('el límite de una señal no se cuela como candidato de otra en
   assert.equal(carga.candidatos[0].valor, 95)
 })
 
-await checkAsync('un rango ambiguo ("de 100 a 132") no produce un exceso falso en el diagnóstico', async () => {
+await omitirEnvuelto('un rango ambiguo ("de 100 a 132") no produce un exceso falso en el diagnóstico', async () => {
   // Bug real: "rango admisible de 100 V a 132 V" capturaba el 100 —el SUELO
   // del rango— y `diagnostico` lo trataba como un techo, así que una lectura
   // normal de 121 V salía como "21 V por encima del máximo documentado".
@@ -2524,43 +2491,26 @@ await omitirEnvuelto('el dossier trae el ESTADO de verdad, no un error escondido
     'estadoAhora no trae `estadoGeneral`: el dossier no está mirando el estado')
 })
 
-await checkAsync('un síntoma de OTRA máquina se niega y dice a dónde ir', async () => {
-  /*
-   * El dossier sólo sabe armar el del tanque —`senalesMencionadas`, `SENALES`
-   * e `historizadas()` son su catálogo— y antes contestaba `ok: true` igual.
-   * Medido con «el apoyo S2 vibra más tras un cambio de carga»: devolvía
-   * `senalesConsideradas: ["Carga de trabajo del motor"]`, una señal del
-   * TANQUE pescada por la palabra «carga», y un dossier vacío. Un síntoma de
-   * una máquina contestado con el catálogo de la otra.
-   */
+await checkAsync('[configurada] un síntoma que nombra un apoyo mira las señales de ESE apoyo', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
-    sintoma: 'el apoyo S2 vibra más tras un cambio de carga',
+    sintoma: 'la velocidad eficaz del lado libre subió tras un cambio de carga',
     sistema: ESPEJO.id,
   })
-
-  assert.equal(r.ok, false)
-  assert.match(r.error, /s[oó]lo cubre "tanque"/i)
-  // Negarse sin decir a dónde ir dejaría al técnico en el mismo sitio.
-  assert.match(r.error, /diagnosticar_falla/)
+  assert.equal(r.ok, true, r.error)
+  assert.ok(r.senalesConsideradas.some(s => /Lado libre/.test(s)), `no miró el lado libre: ${r.senalesConsideradas}`)
+  assert.equal(r.nota, undefined, 'con señal nombrada no hace falta explicar por qué se eligieron')
 })
-
-await checkAsync('sin señal nombrada, se parte de las cuatro con historia y se dice por qué', async () => {
+await checkAsync('sin señal nombrada, se parte de las primeras cuatro con historia de la máquina y se dice por qué', async () => {
   const r = await createHerramientas({ client: clienteFalso() }).ejecutar('diagnostico', {
     sintoma: 'algo va mal, no sé qué',
   })
-  assert.equal(r.ok, true)
-  // Las cuatro PRIMERAS del catálogo con serie propia, en su orden — no las
-  // cuatro originales del Plan 8: desde que `modoVdf` se historizó (Plan 27
-  // F6) entró ella y salió `presionRelativa`; desde que `cargaMotor` se
-  // historizó (14-09-2026) entra ella, en su puesto natural (tercero), y
-  // saca a `flujoInstantaneo` de las cuatro primeras.
-  assert.deepEqual(r.senalesConsideradas.sort(), [
-    'Carga de trabajo del motor', 'Modo del variador', 'Nivel del tanque', 'Temperatura del tanque',
-  ].sort())
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.sistema, ESPEJO.id, 'sin sistema, la única en servicio')
+  const esperadas = configurada.series.historizadas().slice(0, 4).map(k => configurada.etiquetaDe(k) ?? k)
+  assert.deepEqual(r.senalesConsideradas, esperadas)
   assert.match(r.nota, /no nombraba ninguna señal/i)
 })
-
-await checkAsync(
+await omitirEnvuelto(
   'escenario 1 · "caudal abundante con el motor muy cargado": mezcla una señal CON historia ' +
     'y otra SIN historia, y no rompe ni inventa la correlación que falta',
   async () => {
@@ -2601,7 +2551,7 @@ await checkAsync(
   }
 )
 
-await checkAsync(
+await omitirEnvuelto(
   'escenario 2 · "parada tras un pico de tensión contra el manual": el exceso sale calculado y ' +
     'fechado contra la serie del historiador',
   async () => {
@@ -2756,7 +2706,7 @@ await omitirEnvuelto(
   }
 )
 
-await checkAsync('[configurada] catalogo(id) da las señales de la configurada, con unidad y si tienen serie; sin id, el del tanque', async () => {
+await checkAsync('[configurada] catalogo(id) da las señales de la configurada, con unidad y si tienen serie; sin id, la única en servicio', async () => {
   // Plan 39 F5: es lo que el prompt pone delante del modelo desde su pantalla.
   const h = createHerramientas({ client: clienteFalso() })
   const suyo = h.catalogo(ESPEJO.id)
@@ -2768,9 +2718,9 @@ await checkAsync('[configurada] catalogo(id) da las señales de la configurada, 
   assert.equal(vrms.activo, null, 'una configurada no tiene los cuatro activos del tanque')
   assert.equal(suyo.filter(s => s.historia).length, configurada.series.historizadas().length)
 
-  const delTanque = h.catalogo()
-  assert.ok(delTanque.some(s => /Nivel del tanque/.test(s.nombre)))
-  assert.deepEqual(h.catalogo('tanque').map(s => s.nombre), delTanque.map(s => s.nombre))
+  /* Sin id, la única configurada en servicio (Plan 44 F3.6); el tanque, sin metaDe, no se enseña. */
+  assert.deepEqual(h.catalogo().map(s => s.nombre), suyo.map(s => s.nombre))
+  assert.deepEqual(h.catalogo('tanque'), [])
 })
 
 await checkAsync('[configurada] generar_reporte dibuja el PDF de una configurada con sus rótulos y su unidad', async () => {
@@ -2968,7 +2918,7 @@ await checkAsync('la purga borra reportes más viejos que el umbral, sin tocar l
 
 console.log('\n── El momento puntual y su hora ────────────────────────────')
 
-await checkAsync('las marcas del resumen van en HORA LOCAL, no en UTC', async () => {
+await omitirEnvuelto('las marcas del resumen van en HORA LOCAL, no en UTC', async () => {
   /*
    * El fallo que motivó todo esto: con `toISOString()` una serie de las 11:00
    * locales salía rotulada «17:00Z», el asistente la comparaba con la hora que
@@ -2989,7 +2939,7 @@ await checkAsync('las marcas del resumen van en HORA LOCAL, no en UTC', async ()
   assert.equal(new Date(r.desdeUtc).getHours(), Number(r.desde.slice(11, 13)))
 })
 
-await checkAsync('una serie recortada por el servidor se declara truncada', async () => {
+await omitirEnvuelto('una serie recortada por el servidor se declara truncada', async () => {
   /*
    * El recorte es SILENCIOSO en los datos: llega `ok: true`, con marcas
    * correctas, y sólo faltan las horas del final. Sin este aviso el modelo
@@ -3019,7 +2969,7 @@ await checkAsync('sin recorte no se inventa el aviso', async () => {
   assert.equal(r.avisoTruncada, undefined, 'una serie completa no se marca como truncada')
 })
 
-await checkAsync('valor_en_momento pide el INSTANTE, con sus minutos', async () => {
+await omitirEnvuelto('valor_en_momento pide el INSTANTE, con sus minutos', async () => {
   /*
    * Los minutos son la pregunta: `resolverPeriodo` los descarta a propósito
    * —y bien, para un tramo—, así que un instante necesita su propio camino.
@@ -3048,7 +2998,7 @@ await checkAsync('valor_en_momento pide el INSTANTE, con sus minutos', async () 
   assert.equal(inicio.getMinutes(), 16, 'los minutos NO se redondean a la hora')
 })
 
-await checkAsync('el sufijo de zona horaria de la planta no rompe la frase', async () => {
+await omitirEnvuelto('el sufijo de zona horaria de la planta no rompe la frase', async () => {
   // «hora mexico» no cambia el instante —el servidor YA está en esa zona—,
   // pero antes impedía que la frase se reconociera y el operador recibía un
   // «no entiendo el período» a una pregunta perfectamente formada.
@@ -3081,7 +3031,7 @@ await checkAsync('valor_en_momento sin hora no adivina, y el futuro se rechaza',
   assert.equal(futuro.ok, false, 'el futuro no tiene dato')
 })
 
-await checkAsync('valor_en_momento respeta la guarda de señales sin historia', async () => {
+await omitirEnvuelto('valor_en_momento respeta la guarda de señales sin historia', async () => {
   // La misma regla que el resto: sin ella el servidor devuelve la curva de la
   // temperatura del tanque bajo el nombre de otra señal, y sin dar error.
   // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
@@ -3102,7 +3052,7 @@ await checkAsync('valor_en_momento respeta la guarda de señales sin historia', 
 
 console.log('\n── La cobertura del período ────────────────────────────────')
 
-await checkAsync('el recuento se llama `puntos`, y `muestras` sigue como alias', async () => {
+await omitirEnvuelto('el recuento se llama `puntos`, y `muestras` sigue como alias', async () => {
   /*
    * «28 muestras registradas» hacía entender que el sensor midió 28 veces en
    * todo el día; midió decenas de miles. Lo que hay son 28 promedios de 15
@@ -3116,7 +3066,7 @@ await checkAsync('el recuento se llama `puntos`, y `muestras` sigue como alias',
   assert.equal(r.tramoPorPunto, '15 min', 'hay que decir de cuánto es cada punto')
 })
 
-await checkAsync('un período con huecos declara su cobertura y advierte del sesgo', async () => {
+await omitirEnvuelto('un período con huecos declara su cobertura y advierte del sesgo', async () => {
   /*
    * El caso real del 21-08-2026: 28 de 96 tramos con dato, porque la
    * instalación sólo operó de 07:30 a 17:00. El promedio es el de esas horas,
@@ -3147,7 +3097,7 @@ await checkAsync('un período con huecos declara su cobertura y advierte del ses
   assert.match(r.avisoCobertura, /no del período completo/)
 })
 
-await checkAsync('sin huecos no se advierte de nada', async () => {
+await omitirEnvuelto('sin huecos no se advierte de nada', async () => {
   // El cliente falso rellena las 24 posiciones de la ventana por defecto: ahí
   // el promedio SÍ es el del período, y un aviso sobraría.
   const r = await createHerramientas({ client: clienteFalso() })
@@ -3173,7 +3123,7 @@ await checkAsync('resumirSerie sin rejilla sigue funcionando, sin cobertura', as
 
 console.log('\n── Concurrencia acotada al leer varios días ─────────────────')
 
-await checkAsync('leerSerieEnRango nunca supera el tope de tramos simultáneos', async () => {
+await omitirEnvuelto('leerSerieEnRango nunca supera el tope de tramos simultáneos', async () => {
   // `readHistory` cuenta cuántas llamadas están EN VUELO a la vez: sube el
   // contador al entrar, espera un instante (para que las que arrancan juntas
   // se solapen de verdad) y lo baja al salir. Si `leerSerieEnRango` lanzara
@@ -3215,7 +3165,7 @@ await checkAsync('leerSerieEnRango nunca supera el tope de tramos simultáneos',
   assert.ok(pico > 1, `pico=${pico}: si es 1, la prueba no está midiendo concurrencia de verdad`)
 })
 
-await checkAsync('sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
+await omitirEnvuelto('sin pasar historyConcurrencia, el valor por defecto sigue acotando (no "todo a la vez")', async () => {
   let enVuelo = 0
   let pico = 0
   let llamadas = 0
@@ -3361,8 +3311,8 @@ await checkAsync('un huérfano PENDIENTE admite que la pieza falta', async () =>
    * vibraciones mandaría al modelo contra una negativa — y la mayoría de los
    * huérfanos son justamente de esa máquina.
    */
-  assert.doesNotMatch(r.comoRedactar, /diagnostico\(sintoma/,
-    'le ofrece al modelo el dossier del tanque para un riesgo de vibraciones')
+  /* Desde el Plan 44 F3.6 el dossier sirve a cualquier máquina: se ofrece con SU sistema. */
+  assert.match(r.comoRedactar, new RegExp(`diagnostico\\(sintoma=\\.\\.\\., sistema="${ESPEJO.id}"\\)`))
   assert.match(r.comoRedactar, /estado_del_sistema/)
 })
 
@@ -3752,7 +3702,7 @@ await checkAsync('un campo puesto a undefined cuenta como ausente, no como invá
  * `.max(90)` al esquema, esto pasaría a ser un rechazo: un cambio de
  * comportamiento disfrazado de validación. Ver `Numero` en `definiciones.mjs`.
  */
-await checkAsync('un número fuera de rango se recorta como siempre, no se rechaza', async () => {
+await omitirEnvuelto('un número fuera de rango se recorta como siempre, no se rechaza', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('perfil_de_senal', { senal: 'nivel del tanque', dias: 500 })
 
@@ -3772,7 +3722,7 @@ await omitirEnvuelto('un campo que no existe en el esquema no rompe la llamada',
 
 console.log('\n── tendencia_multiple ──────────────────────────────────────')
 
-await checkAsync('varias señales en una sola llamada, cada una con su resumen', async () => {
+await omitirEnvuelto('varias señales en una sola llamada, cada una con su resumen', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('tendencia_multiple', {
     senales: ['nivel', 'presión', 'temperatura'],
@@ -3794,7 +3744,7 @@ await checkAsync('varias señales en una sola llamada, cada una con su resumen',
  * juntas?» y ésta «¿cómo van?». Colar un coeficiente aquí invitaría a leer una
  * causa donde nadie preguntó por ninguna.
  */
-await checkAsync('no calcula ninguna relación entre las señales', async () => {
+await omitirEnvuelto('no calcula ninguna relación entre las señales', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('tendencia_multiple', {
     senales: ['nivel', 'presión'],
@@ -3805,7 +3755,7 @@ await checkAsync('no calcula ninguna relación entre las señales', async () => 
   assert.match(r.nota, /no se ha calculado ninguna relación/i, 'no avisa de que no las calcula')
 })
 
-await checkAsync('tendencia_multiple(idioma: "en") narra la banda y el aviso de umbrales en inglés', async () => {
+await omitirEnvuelto('tendencia_multiple(idioma: "en") narra la banda y el aviso de umbrales en inglés', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const en = await h.ejecutar('tendencia_multiple', {
     senales: ['nivel', 'presión'],
@@ -3826,7 +3776,7 @@ await checkAsync('una sola señal se rechaza y remite a historia_de_senal', asyn
   assert.match(r.error, /historia_de_senal/, 'no dice cuál usar para una sola')
 })
 
-await checkAsync('una señal sin serie propia se rechaza ANTES de leer nada', async () => {
+await omitirEnvuelto('una señal sin serie propia se rechaza ANTES de leer nada', async () => {
   // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
   // se apaga la bandera sólo para esta prueba.
   SENALES.cargaMotor.historizado = false
@@ -3846,7 +3796,7 @@ await checkAsync('una señal sin serie propia se rechaza ANTES de leer nada', as
 
 console.log('\n── buscar_evento ───────────────────────────────────────────')
 
-await checkAsync('encuentra la primera y la última vez que se cruzó el umbral', async () => {
+await omitirEnvuelto('encuentra la primera y la última vez que se cruzó el umbral', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('buscar_evento', {
     senal: 'nivel', condicion: 'por debajo de', valor: 200, periodo: 'últimas 6 horas',
@@ -3865,7 +3815,7 @@ await checkAsync('encuentra la primera y la última vez que se cruzó el umbral'
  * se parecen demasiado, y el modelo acabaría contestando lo segundo cuando lo
  * cierto es lo primero.
  */
-await checkAsync('«no ocurrió» se distingue de «no hay datos»', async () => {
+await omitirEnvuelto('«no ocurrió» se distingue de «no hay datos»', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('buscar_evento', {
     senal: 'nivel', condicion: 'por debajo de', valor: -999, periodo: 'últimas 6 horas',
@@ -3889,7 +3839,7 @@ await checkAsync('una condición que no existe se rechaza con las válidas', asy
   assert.match(r.error, /no tiene un valor admitido|condici/i)
 })
 
-await checkAsync('sin serie propia no se puede buscar un cruce', async () => {
+await omitirEnvuelto('sin serie propia no se puede buscar un cruce', async () => {
   // `cargaMotor` ya tiene serie propia desde el 14-09-2026 (ver más arriba);
   // se apaga la bandera sólo para esta prueba.
   SENALES.cargaMotor.historizado = false
@@ -3908,7 +3858,7 @@ await checkAsync('sin serie propia no se puede buscar un cruce', async () => {
 
 console.log('\n── alarma_sostenida ─────────────────────────────────────────')
 
-await checkAsync('una señal que no es alarma se rechaza, con el nombre de la herramienta correcta', async () => {
+await omitirEnvuelto('una señal que no es alarma se rechaza, con el nombre de la herramienta correcta', async () => {
   const h = createHerramientas({ client: clienteFalso() })
   const r = await h.ejecutar('alarma_sostenida', { alarma: 'nivel del tanque' })
 
@@ -3917,7 +3867,7 @@ await checkAsync('una señal que no es alarma se rechaza, con el nombre de la he
   assert.match(r.error, /historia_de_senal/)
 })
 
-await checkAsync('un arranque normal (un solo pulso corto) NO se marca sostenido', async () => {
+await omitirEnvuelto('un arranque normal (un solo pulso corto) NO se marca sostenido', async () => {
   const client = clienteFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
@@ -3940,7 +3890,7 @@ await checkAsync('un arranque normal (un solo pulso corto) NO se marca sostenido
   assert.equal(r.sostenida, false)
 })
 
-await checkAsync('el patrón del incidente real —parpadeo repetido— SÍ se marca sostenido', async () => {
+await omitirEnvuelto('el patrón del incidente real —parpadeo repetido— SÍ se marca sostenido', async () => {
   const client = clienteFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
@@ -3964,7 +3914,7 @@ await checkAsync('el patrón del incidente real —parpadeo repetido— SÍ se m
   assert.match(r.interpretacion, /no es un arranque normal/i)
 })
 
-await checkAsync('sigue activa AHORA MISMO, sin haberse apagado: también sostenida', async () => {
+await omitirEnvuelto('sigue activa AHORA MISMO, sin haberse apagado: también sostenida', async () => {
   const client = clienteFalso({
     historia: async (opciones) => {
       const t0 = new Date(opciones.startDate).getTime()
@@ -3985,7 +3935,7 @@ await checkAsync('sigue activa AHORA MISMO, sin haberse apagado: también sosten
   assert.equal(r.sostenida, true)
 })
 
-await checkAsync('alarma_sostenida(idioma: "en") narra en inglés, no sólo acepta el argumento', async () => {
+await omitirEnvuelto('alarma_sostenida(idioma: "en") narra en inglés, no sólo acepta el argumento', async () => {
   /*
    * ── POR QUÉ ESTA PRUEBA EXISTE ────────────────────────────────────
    *
@@ -4261,7 +4211,7 @@ check('son veintiséis herramientas, y sólo una escribe en la PLANTA', () => {
 
 console.log('\n── controlar_bomba ─────────────────────────────────────────')
 
-await checkAsync('en modo solo lectura no escribe, y dice de quién es el límite', async () => {
+await omitirEnvuelto('en modo solo lectura no escribe, y dice de quién es el límite', async () => {
   const client = clienteFalso()
   const r = await createHerramientas({ client, readOnly: true }).ejecutar('controlar_bomba', {
     encender: true,
@@ -4273,7 +4223,7 @@ await checkAsync('en modo solo lectura no escribe, y dice de quién es el límit
   assert.equal(client.escrituras.length, 0)
 })
 
-await checkAsync('con el tanque por encima del aviso se niega a encender', async () => {
+await omitirEnvuelto('con el tanque por encima del aviso se niega a encender', async () => {
   const client = clienteFalso({ valores: { ...EN_REPOSO, NIVEL_TANQUE: 97 } })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: true,
@@ -4284,7 +4234,7 @@ await checkAsync('con el tanque por encima del aviso se niega a encender', async
   assert.equal(client.escrituras.length, 0)
 })
 
-await checkAsync('apagar NO mira el nivel: vaciar nunca desborda', async () => {
+await omitirEnvuelto('apagar NO mira el nivel: vaciar nunca desborda', async () => {
   const client = clienteFalso({ valores: { ...EN_REPOSO, NIVEL_TANQUE: 97 }, controlInicial: true })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: false,
@@ -4294,7 +4244,7 @@ await checkAsync('apagar NO mira el nivel: vaciar nunca desborda', async () => {
   assert.equal(r.accion, 'apagada')
 })
 
-await checkAsync('una escritura aceptada pero sin efecto NO se cuenta como cumplida', async () => {
+await omitirEnvuelto('una escritura aceptada pero sin efecto NO se cuenta como cumplida', async () => {
   const client = clienteFalso({ escrituraTomaEfecto: false })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: true,
@@ -4308,7 +4258,7 @@ await checkAsync('una escritura aceptada pero sin efecto NO se cuenta como cumpl
   assert.ok(client.lecturasSueltas.length >= 1)
 })
 
-await checkAsync('si el servidor rechaza la escritura, se cuenta el motivo', async () => {
+await omitirEnvuelto('si el servidor rechaza la escritura, se cuenta el motivo', async () => {
   const client = clienteFalso({ aceptaEscritura: false })
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: true,
@@ -4350,7 +4300,7 @@ async function diarioTemporal() {
  * mismo accionamiento, sobre el mismo tag y con las mismas consecuencias,
  * constaba o no según la puerta por la que hubiera entrado.
  */
-await checkAsync('una orden dada por el asistente deja su línea, marcada como suya', async () => {
+await omitirEnvuelto('una orden dada por el asistente deja su línea, marcada como suya', async () => {
   const { diario, lineas } = await diarioTemporal()
   const h = createHerramientas({ client: clienteFalso(), readOnly: false, diario })
 
@@ -4372,7 +4322,7 @@ await checkAsync('una orden dada por el asistente deja su línea, marcada como s
   assert.equal(entrada.origen, 'asistente')
 })
 
-await checkAsync('un rechazo del asistente también deja constancia, con su motivo', async () => {
+await omitirEnvuelto('un rechazo del asistente también deja constancia, con su motivo', async () => {
   const { diario, lineas } = await diarioTemporal()
   const h = createHerramientas({ client: clienteFalso(), readOnly: true, diario })
 
@@ -4403,7 +4353,7 @@ await checkAsync('una llamada sin `encender` no ensucia el diario', async () => 
 })
 
 /** Sin diario montado la bomba se acciona igual: el diario constata, no decide. */
-await checkAsync('sin diario, el accionamiento funciona igual', async () => {
+await omitirEnvuelto('sin diario, el accionamiento funciona igual', async () => {
   const client = clienteFalso()
   const r = await createHerramientas({ client, readOnly: false }).ejecutar('controlar_bomba', {
     encender: true,

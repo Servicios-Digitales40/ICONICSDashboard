@@ -327,8 +327,9 @@ export const DEFINICIONES = [
           sistema: {
             type: 'string',
             description:
-              'Id del sistema. Por omisión "tanque", HOY la única máquina a la que esta ' +
-              'herramienta puede contestar: las demás reciben un error que explica por qué.',
+              'Id, nombre o alias de la máquina. Omítelo si el usuario no la nombra: entra la única ' +
+              'en servicio. Sólo contesta para una máquina que declare mecanismos de desgaste e ' +
+              'histórico; si no los tiene, la herramienta lo dice y hay que transmitirlo tal cual.',
           },
           dias: {
             type: 'number',
@@ -678,8 +679,8 @@ export const DEFINICIONES = [
           sistema: {
             type: 'string',
             description:
-              'Id del sistema, para desambiguar si el nombre de la alarma existe en más de una ' +
-              'máquina. Por omisión "tanque", la única a la que esta herramienta puede contestar.',
+              'Id, nombre o alias de la máquina, para desambiguar si el nombre de la alarma existe ' +
+              'en más de una. Omítelo si el usuario no la nombra: entra la única en servicio.',
           },
         },
         required: ['alarma'],

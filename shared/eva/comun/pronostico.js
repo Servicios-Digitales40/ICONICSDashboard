@@ -236,7 +236,7 @@ function impulsandoEn(fila) {
  *   `muestras` — filas con marca de tiempo utilizable.
  *   `provisional` — si los umbrales usados son estimaciones nuestras.
  */
-export function evaluarPronostico(filas, horasVentana) {
+export function evaluarPronostico(filas, horasVentana, mecanismos = MECANISMOS) {
   const rejilla = Array.isArray(filas) ? filas : [];
   const ventana = hay(horasVentana) && horasVentana > 0 ? horasVentana : 0;
 
@@ -244,7 +244,10 @@ export function evaluarPronostico(filas, horasVentana) {
   const sinExposicion = [];
   const noEvaluables = [];
 
-  for (const m of MECANISMOS) {
+  /* Los mecanismos son un parámetro (Plan 44 F3.6): cada máquina declara los
+     suyos en su entrada del registro (`desgaste`); por omisión, los del tanque
+     que este archivo describe. */
+  for (const m of mecanismos) {
     // Muestras en las que TODAS las señales que el mecanismo necesita tienen
     // lectura. Una muestra a la que le falta una no se puede juzgar, y no se
     // juzga: no cuenta en el denominador.

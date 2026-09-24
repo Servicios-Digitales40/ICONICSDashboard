@@ -133,17 +133,11 @@ export function crearHerramientasDeDiagnostico({ motorDiagnostico }) {
                 'cargado" sería falso. '
               : 'Aquí sí es una pieza que nos falta: dilo, sin dramatizarlo y sin prometer ' +
                 'cuándo estará. ') +
-            /*
-             * La sugerencia depende de la MÁQUINA desde que el dossier
-             * compuesto se acotó al tanque: ofrecérselo para un riesgo de
-             * vibraciones mandaría al modelo contra una negativa, y la
-             * mayoría de los huérfanos son justamente de esa máquina.
-             */
-            (sistema === 'tanque'
-              ? 'Si el técnico quiere seguir, tú puedes llamar a diagnostico(sintoma=...) para un ' +
-                'dossier de datos y manual sobre el síntoma, o a consultar_documentacion'
-              : 'Si el técnico quiere seguir, tú puedes llamar a estado_del_sistema e ' +
-                'historia_de_senal para esa máquina, o a consultar_documentacion acotada a ella') +
+            /* El dossier compuesto sirve a cualquier máquina del registro desde
+               el Plan 44 F3.6, así que la sugerencia es la misma para todas. */
+            `Si el técnico quiere seguir, tú puedes llamar a diagnostico(sintoma=..., sistema="${sistema}") ` +
+            'para un dossier de datos y manual sobre el síntoma, a estado_del_sistema e ' +
+            'historia_de_senal para esa máquina, o a consultar_documentacion acotada a ella' +
             ' — hazlo tú, no se lo pidas a él, y no menciones los nombres de las herramientas ' +
             'en tu respuesta.',
         }

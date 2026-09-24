@@ -390,14 +390,21 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 197 correctas y 24 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 133 correctas y 88 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «197 de 221», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 221. Trece de las 197 son sobre una
+> qué. Ese verde significa «133 de 221», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 221. Trece de las 133 son sobre una
 > máquina **configurada** (Plan 39 F0–F2), y también lo imprime; siete más, en
-> bloque propio al final, son los reportes por plantilla (Plan 44 F3). Las dos
-> últimas omitidas son el catálogo del tanque en `generar_reporte`, que desde
-> el Plan 44 F3.5 se dibuja sólo desde el registro y se niega con el cierre.
+> bloque propio al final, son los reportes por plantilla (Plan 44 F3).
+>
+> **Por qué 88 y no 24 (Plan 44 F3.6, 23-09-2026):** el asistente dejó de
+> tener ramas del tanque —índice de nombres, umbrales, catálogo, pronóstico,
+> dossier, motor— y toda herramienta resuelve la máquina por el registro, con
+> la guarda de cerrada. Sesenta y cuatro comprobaciones que usaban el tanque
+> como ESCENARIO (leían sus señales sin nombrar máquina, que antes era la
+> omisión) quedaron omitidas con el motivo del cierre, y doce se portaron a
+> la espejo. Portar las demás a la espejo es la B19 del backlog: es cobertura
+> de mecánica genérica (tramos, cobertura, 502, hora local…) que hoy no corre.
 
 ### 5.2 La tanda completa
 
@@ -464,7 +471,7 @@ de Node, se cambia `.nvmrc` y se regeneran los tres locks **con esa versión**.
 - Un cambio en `shared/eva/` corre los verificadores de **ambas** instalaciones
   si el archivo es común.
 - **En esta rama parte de la suite está OMITIDA a propósito** (29 pruebas de
-  frontend y 24 comprobaciones de herramientas). Por eso **un rojo nuevo es un
+  frontend y 88 comprobaciones de herramientas). Por eso **un rojo nuevo es un
   defecto de verdad**. Y si una prueba falla por depender del tanque, se omite
   con su motivo — no se arregla tocando esa máquina (§1).
 

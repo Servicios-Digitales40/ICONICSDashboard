@@ -132,17 +132,11 @@
  * linter el 04-09-2026 (Plan 20 F1) y aquí quedan sólo los que se usan.
  */
 import { regresionLineal } from '../../../shared/eva/comun/estadistica.js'
-import { SENALES, SENAL_KEYS } from '../../../shared/eva/tanque/senales.js'
-import { ACTIVOS } from '../../../shared/eva/tanque/activos.js'
-import { UMBRALES } from '../../../shared/eva/comun/umbrales.js'
+/* Sin catálogo del tanque desde el Plan 44 F3.6: el prompt y las negativas
+   hablan de la máquina del registro que toque (`reportes/sistemaPorOmision.mjs`). */
+import { sistemaPorOmision } from '../reportes/sistemaPorOmision.mjs'
 import { VENTANA } from '../../../shared/eva/comun/historia.js'
-import {
-  SISTEMA,
-  SISTEMAS,
-  SISTEMA_IDS,
-  sistemasDeSenal,
-  tieneHistoria,
-} from '../../../shared/eva/comun/sistemas.js'
+import { SISTEMA } from '../../../shared/eva/comun/sistemas.js'
 import { isoLocal, resolverPeriodo } from '../../../shared/periodo.js'
 import { readdir, stat, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -497,249 +491,15 @@ export function normalizarTexto(texto) {
  * índice de desviación» está preguntando por esta señal aunque el rótulo de la
  * pantalla diga otra cosa, y mandarle un «no existe» sería mentirle.
  */
-const SINONIMOS = {
-  nivelTanque: ['nivel', 'nivel del tanque', 'tanque', 'llenado', 'agua', 'cuanta agua'],
-  temperaturaTanque: ['temperatura', 'temperatura del agua', 'temp', 'grados', 'calor'],
-  cargaMotor: ['carga', 'carga del motor', 'motor', 'bomba', 'bombeo', 'esfuerzo del motor'],
-  modoVdf: ['modo', 'vdf', 'variador', 'modo del variador', 'automatico', 'manual', 'modo am'],
-  flujoInstantaneo: ['caudal', 'flujo', 'caudal instantaneo', 'litros', 'cuanta agua sale'],
-  presionRelativa: ['presion', 'presion relativa', 'bares', 'presion de red'],
-  tensionLinea: ['tension', 'voltaje', 'tension de linea', 'volts', 'voltios', 'red electrica',
-    'indice de desviacion', 'indice de desviacion de voltaje', 'desviacion de voltaje'],
-  eficienciaEnergetica: ['eficiencia', 'eficiencia energetica', 'kpi', 'rendimiento energetico',
-    'consumo'],
-}
-
-/**
- * Índice de nombres → clave de señal.
- *
- * Entran solas las cuatro formas que ya existen en el catálogo —la clave, el
- * tag, el rótulo largo y el corto—, de modo que **renombrar una señal actualiza
- * el índice sin tocar este archivo**. Los sinónimos se añaden encima.
+/*
+ * Aquí vivió hasta el 23-09-2026 el índice de nombres del TANQUE —sus
+ * sinónimos escritos a mano, `resolverSenal`, `senalesMencionadas`,
+ * `senalDesconocida`, `catalogoBreve`—. Se fue con el Plan 44 F3.6: los
+ * nombres de toda máquina los conoce el registro (`sistemasDeSenal`, con la
+ * etiqueta y los alias que declare cada una) y los resuelve
+ * `herramientas/lib/senales.mjs`. El B3 del backlog que pedía «un solo índice
+ * de nombres, por máquina» queda cerrado por ausencia de índice.
  */
-function construirIndice() {
-  const indice = new Map()
-  const registrar = (clave, key) => {
-    const k = normalizarTexto(clave)
-    if (k && !indice.has(k)) indice.set(k, key)
-  }
-
-  for (const key of SENAL_KEYS) {
-    const s = SENALES[key]
-    registrar(key, key)          // nivelTanque
-    registrar(s.tag, key)        // NIVEL_TANQUE
-    registrar(s.label, key)      // Nivel del tanque
-    registrar(s.corto, key)      // Nivel
-    for (const alias of SINONIMOS[key] ?? []) registrar(alias, key)
-  }
-  return indice
-}
-
-const INDICE_SENALES = construirIndice()
-
-/** Nombre escrito por una persona → clave de señal, o `null`. */
-export function resolverSenal(texto) {
-  const k = normalizarTexto(texto)
-  if (!k) return null
-
-  const exacto = INDICE_SENALES.get(k)
-  if (exacto) return exacto
-
-  /*
-   * Respaldo por CONTENCIÓN, y sólo si una entrada gana sin empate.
-   *
-   * Cubre lo que el modelo escribe de más —«el nivel del tanque ahora mismo»,
-   * «temperatura del tanque en °C»— sin abrir la puerta a la adivinanza: si
-   * la frase contiene dos nombres de señal distintos no se elige ninguno, se
-   * pregunta. Elegir el primero en un «compara el nivel y la presión» daría
-   * una respuesta correcta sobre la señal equivocada, que es peor que un error.
-   */
-  const candidatas = new Set()
-  for (const [nombre, key] of INDICE_SENALES) {
-    // Se exigen 4 caracteres para no disparar con fragmentos como «kpi» o «vdf»
-    // metidos dentro de otra palabra.
-    if (nombre.length >= 4 && k.includes(nombre)) candidatas.add(key)
-  }
-
-  return candidatas.size === 1 ? [...candidatas][0] : null
-}
-
-/**
- * Todas las señales que se nombran dentro de una frase libre, no sólo una.
- *
- * Es el mismo respaldo por contención de `resolverSenal` —sin acentos, sin
- * signos, con el umbral de 4 caracteres para no disparar con «vdf» o «kpi»
- * sueltos dentro de otra palabra— pero sin la regla del empate: un síntoma
- * como «caudal abundante por sobretensión progresiva» nombra DOS señales a
- * propósito, y `diagnostico` necesita las dos, no ninguna.
- */
-export function senalesMencionadas(texto) {
-  const t = normalizarTexto(texto)
-  const claves = new Set()
-  for (const [nombre, key] of INDICE_SENALES) {
-    if (nombre.length >= 4 && t.includes(nombre)) claves.add(key)
-  }
-  return [...claves]
-}
-
-/** Catálogo breve que viaja DENTRO del error, para que el reintento no gaste otra ronda. */
-function catalogoBreve() {
-  return SENAL_KEYS.map(k => ({
-    senal: SENALES[k].label,
-    clave: k,
-    historia: SENALES[k].historizado,
-  }))
-}
-
-/** El error de señal no reconocida, siempre con la lista de las que sí existen. */
-/**
- * El fallo de «esa señal no es de aquí» — y la puerta por la que pasan las
- * OCHO herramientas que reciben un nombre de señal.
- *
- * ── POR QUÉ MIRA ANTES EN LAS DEMÁS MÁQUINAS ───────────────────────
- *
- * Porque el mensaje de antes era falso desde que hay dos instalaciones:
- * «sólo existen las ocho de la lista» es cierto del tanque y mentira de la
- * planta. Preguntado por la velocidad eficaz de un apoyo, el asistente
- * contestaba que esa señal no existe — y existe, sólo que en la otra máquina.
- *
- * Ahora se busca en el registro entero y se contesta lo que de verdad pasa,
- * que son tres casos distintos y sólo uno es un error:
- *
- *   · es de otra máquina Y esa máquina tiene historia → se dice cuál es, para
- *     que el modelo repita la llamada con el sistema correcto
- *   · es de otra máquina y esa máquina NO tiene historia → se dice, con la
- *     nota de por qué. Es el punto 3 del alta: una máquina sin serie propia se
- *     niega a contestar tendencias en vez de inventarlas
- *   · no es de ninguna → el error de siempre, ahora sí verdadero
- *
- * Es una sola función y arregla las ocho herramientas a la vez, que es la
- * ventaja de que todas resuelvan el nombre por el mismo sitio.
- */
-export function senalDesconocida(texto, { paraHistoria = false } = {}) {
-  const enOtras = sistemasDeSenal(texto)
-
-  if (enOtras.length === 1) {
-    const { sistema, clave } = enOtras[0]
-    const s = SISTEMA[sistema]
-
-    if (paraHistoria && !tieneHistoria(sistema)) {
-      return fallo(
-        `«${texto}» es del sistema «${s.nombre}» (${s.plc}), que NO tiene histórico utilizable. ` +
-          `${s.series.nota} Puedes dar su valor de AHORA con estado_del_sistema(sistema="${sistema}"), ` +
-          'pero no afirmes ninguna tendencia ni pongas plazo a una avería.',
-        { sistema, clave, con_historia: false }
-      )
-    }
-
-    /*
-     * ── NO SE MANDA A UNA PUERTA QUE NO EXISTE ─────────────────────
-     *
-     * Este mensaje decía «vuelve a llamar indicando ese sistema». Sólo TRES
-     * de las diecinueve herramientas aceptan `sistema` —`estado_del_sistema`,
-     * `riesgos_activos` y `pronostico_de_desgaste`—, y ninguna de las ocho de
-     * señal que pasan por aquí lo hace. El modelo obedecía, repetía la llamada
-     * con un argumento que la herramienta ignora, volvía a caer en este mismo
-     * error, y se gastaban turnos en un bucle del que la instrucción era la
-     * causa.
-     *
-     * Se le dice lo que SÍ puede llamar, y eso CAMBIÓ el 28-08-2026:
-     * `historia_de_senal` ya acepta `sistema`, así que para una señal de otra
-     * máquina que tenga serie la salida es repetir la MISMA llamada con el id,
-     * no rendirse y pedir el valor de ahora.
-     *
-     * Mandarlo a `estado_del_sistema` cuando la serie existe cuesta la
-     * respuesta entera: preguntado por el promedio de ayer de la velocidad
-     * eficaz, el modelo leyó «esta herramienta sólo sirve al tanque»,
-     * consultó el estado en vivo y contestó que no podía dar el promedio —de
-     * un dato que el historiador tenía—.
-     *
-     * Por eso se distinguen los dos casos: con serie se reintenta, sin serie
-     * se ofrece el instante.
-     */
-    /* `tieneHistoria` es de la MÁQUINA; `esHistorizada` es de la SEÑAL. Hacen
-       falta las dos: vibraciones tiene serie para 40 de sus 73 puntos, así que
-       preguntar por la máquina dice «sí» incluso de una señal que no la tiene
-       —`aPeak_S1`— y el reintento se estrellaría contra la guarda de dentro. */
-    if (!paraHistoria || (tieneHistoria(sistema) && s.esHistorizada(clave))) {
-      return fallo(
-        `«${texto}» no es una señal del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
-          `OTRA MÁQUINA. Vuelve a llamar a ESTA MISMA herramienta añadiendo ` +
-          `sistema="${sistema}".`,
-        { sistema, clave, con_historia: true }
-      )
-    }
-
-    return fallo(
-      `«${texto}» no es una señal del tanque: es del sistema «${s.nombre}» (${s.plc}), que es ` +
-        `OTRA MÁQUINA, y esa máquina no tiene serie para esta señal. ${s.series.nota} ` +
-        `Puedes dar su valor de AHORA con estado_del_sistema(sistema="${sistema}").`,
-      { sistema, clave, con_historia: false }
-    )
-  }
-
-  if (enOtras.length > 1) {
-    /*
-     * ── DOS AMBIGÜEDADES DISTINTAS, Y NO SE ARREGLAN IGUAL ─────────
-     *
-     * Este mensaje sólo contemplaba una: dos MÁQUINAS que reclaman el mismo
-     * nombre. Pero desde que el registro reconoce nombres parciales —«velocidad
-     * eficaz» encaja en los tres apoyos de la misma máquina— la ambigüedad
-     * frecuente es la de DENTRO de un sistema, y decirle al modelo «pregunta de
-     * qué sistema se trata» ante tres claves de la misma máquina le pide
-     * desambiguar por el eje equivocado: contestaría «del sistema de
-     * vibraciones» y seguiría sin saber de qué apoyo.
-     *
-     * Se distinguen, porque la pregunta que hay que hacerle al operador es
-     * distinta en cada caso.
-     */
-    const maquinas = [...new Set(enOtras.map((x) => x.sistema))]
-
-    if (maquinas.length > 1) {
-      return fallo(
-        `«${texto}» existe en más de un sistema (${maquinas.join(', ')}), y no son la misma ` +
-          'máquina. Pregunta de cuál se trata antes de contestar.',
-        { sistemas: enOtras }
-      )
-    }
-
-    const s = SISTEMA[maquinas[0]]
-    return fallo(
-      `«${texto}» no identifica UNA señal de «${s.nombre}»: encaja con ${enOtras.length} ` +
-        `(${enOtras.map((x) => s.etiquetaDe(x.clave) ?? x.clave).join('; ')}). Pregunta cuál de ` +
-        'ellas antes de contestar: son puntos de medida distintos y sus valores no son el mismo.',
-      { sistema: s.id, claves: enOtras.map((x) => x.clave) }
-    )
-  }
-
-  /*
-   * ── EL ÚLTIMO MENSAJE TAMBIÉN HABLABA SÓLO DEL TANQUE ──────────────
-   *
-   * Decía «sólo existen las ocho de la lista, y no hay más puntos bajo
-   * ac:TDCON/DEMO/SENSORES/». Las dos mitades son ciertas del tanque y falsas
-   * de la planta, y este es el camino por el que se sale cuando el nombre no
-   * se reconoce en NINGUNA máquina — justo cuando menos se puede afirmar que
-   * la única lista que importa es la de una.
-   *
-   * Se arregló la rama de «es de otra máquina» y se dejó ésta con la frase
-   * vieja. El síntoma es peor aquí: allí el modelo recibía el sistema correcto
-   * y reintentaba; aquí recibe un catálogo de ocho señales y concluye que la
-   * planta tiene ocho.
-   *
-   * Ahora el error dice de qué máquinas se ha buscado y cuántas señales tiene
-   * cada una, y el catálogo del tanque viaja aparte y nombrado como suyo.
-   */
-  return fallo(
-    `No hay ninguna señal llamada "${texto}" en ninguna máquina de esta planta. Se ha buscado en ` +
-      SISTEMAS.map((s) => `«${s.nombre}» (${s.claves().length} señales)`).join(' y ') +
-      '. Comprueba el nombre, o pide los sistemas con sistemas_de_la_planta.',
-    /* `senales` sigue siendo el catálogo del tanque y conserva su nombre: es
-       lo que ya leen las herramientas y las pruebas, y renombrarlo no arregla
-       nada que el texto del error no arregle. Lo que faltaba era decir que hay
-       más máquinas, y eso entra al lado. */
-    { senales: catalogoBreve(), sistemas: SISTEMA_IDS }
-  )
-}
 
 /* ── Resolver el período ─────────────────────────────────────────────── */
 
@@ -1153,10 +913,6 @@ export function createHerramientas({
    * "esfuerzo-sin-resultado" de `pronostico.js`, que la necesita, ya se
    * puede evaluar.
    */
-  const SENALES_PRONOSTICO = [
-    'nivelTanque', 'temperaturaTanque', 'presionRelativa', 'tensionLinea', 'flujoInstantaneo',
-    'cargaMotor',
-  ]
 
   const herramientas = {
     /*
@@ -1188,7 +944,6 @@ export function createHerramientas({
       /* `evaluarRiesgosDe` desde el Plan 44 F3: los reportes por plantilla
          (`generar_reporte` con `tipo`) llenan su diagnóstico con las reglas del tipo. */
       maquina: { leerMaquina, resolverSistema, evaluarRiesgosDe },
-      senalesPronostico: SENALES_PRONOSTICO,
       dameHerramientas: () => herramientas,
     }),
 
@@ -1204,7 +959,7 @@ export function createHerramientas({
      * Al repartir por familias, el orden es lo primero que se rompe: basta con
      * mezclar un grupo donde no iba. Aquí se respeta el que había.
      */
-    ...crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas: () => herramientas }),
+    ...crearHerramientasDeDocumentacion({ indiceDocumentos, dameHerramientas: () => herramientas, resolverSistema, leerMaquina }),
 
     /*
      * `diagnosticar_falla` va al final, junto a las de documentación: es,
@@ -1236,7 +991,9 @@ export function createHerramientas({
    * tanque, y la etiqueta ya lleva su apoyo («Velocidad eficaz · Lado acople»).
    */
   function catalogo(sistemaId = null) {
-    const entrada = sistemaId ? SISTEMA[String(sistemaId).trim()] : null
+    /* Sin id, la única configurada en servicio: es la que el modelo tiene que
+       ver en su prompt cuando nadie le ha dicho de qué máquina se habla. */
+    const entrada = sistemaId ? SISTEMA[String(sistemaId).trim()] : sistemaPorOmision()
     if (entrada?.metaDe) {
       return entrada.claves().map(k => {
         const meta = entrada.metaDe(k)
@@ -1250,16 +1007,8 @@ export function createHerramientas({
         }
       })
     }
-    return SENAL_KEYS.map(k => {
-      const s = SENALES[k]
-      return {
-        nombre: s.label,
-        unidad: s.unidad || null,
-        activo: ACTIVOS[s.activo].label,
-        historia: s.historizado,
-        soloEnMarcha: s.soloEnMarcha,
-      }
-    })
+    /* Una entrada sin metaDe no puede enseñarse al modelo con unidad ni serie. */
+    return []
   }
 
   /**
@@ -1418,8 +1167,9 @@ export function percentil(ordenados, q) {
  * respeta su banda, callar es lo correcto: el operador no necesita leer que
  * todo encaja.
  */
-export function comparacionConLaBanda(clave, ordenados, idioma = 'es') {
-  const u = UMBRALES[clave]
+export function comparacionConLaBanda(u, ordenados, idioma = 'es') {
+  /* `u` es la banda que declara la máquina (`entrada.bandaDe`), no un umbral
+     buscado aquí por clave (Plan 44 F3.6). */
   if (!u) return {}
 
   const n = ordenados.length
