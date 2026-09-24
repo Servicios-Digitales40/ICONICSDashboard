@@ -1055,8 +1055,43 @@ await checkAsync('estado_del_sistema(idioma: "en") de VIBRACIONES narra el nombr
   assert.match(en.apoyos[0], /RMS velocity/)
   assert.doesNotMatch(en.apoyos[0], /Lado acople|velocidad eficaz/)
   assert.match(en.servidor_de_alarmas.detalle, /Only area counters are available/)
-  assert.match(en.aviso, /ANOTHER MACHINE, not the tank/)
+  assert.match(en.aviso, /There IS history of its measurements/)
+  /* Y el aviso inglés dejó de abrir con «ANOTHER MACHINE, not the tank», igual
+     que el español (Plan 45 F2.4): las dos mitades del mismo aviso tienen que
+     decir lo mismo en los dos idiomas. */
+  assert.doesNotMatch(en.aviso, /ANOTHER MACHINE|not the tank/)
   assert.doesNotMatch(en.aviso, /OTRA MÁQUINA/)
+})
+
+await checkAsync('el aviso de estado no nombra la máquina cerrada, y los puntos mudos van por su id (Plan 45 F2.4)', async () => {
+  /*
+   * El aviso viaja DENTRO del resultado de la herramienta, donde el modelo lo
+   * lee con más peso que una instrucción, y lo copia literal al final de cada
+   * respuesta de estado (medido el 24-09-2026 contra el modelo real). Dos
+   * cosas hacía mal:
+   *
+   *  · abría con «OTRA MÁQUINA, no el tanque», que introduce el nombre de una
+   *    máquina cerrada en una respuesta donde nadie la mencionó. Lo que evita
+   *    de verdad cruzar dos PLC es `NO_COMPARTEN`, que es código;
+   *  · daba los puntos mudos CONTADOS y no nombrados, y el modelo rellenó el
+   *    hueco: «probablemente alarmas o contadores del servidor de alarmas».
+   *    Eran los del variador.
+   */
+  const h = createHerramientas({ client: createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha }) })
+  const r = await h.ejecutar('estado_del_sistema', { sistema: ESPEJO.id })
+  assert.equal(r.ok, true, r.error)
+
+  assert.doesNotMatch(r.aviso, /OTRA MÁQUINA|no el tanque/)
+  /* Lo que el aviso SÍ tiene que seguir diciendo: qué se puede pedir y qué no. */
+  assert.match(r.aviso, /SÍ hay histórico/)
+  assert.match(r.aviso, /poner plazo a una avería/)
+
+  /* Y si hay mudos, van por su id y con la orden de no suponer de quién son. */
+  assert.ok(Array.isArray(r.cuales_sin_lectura), 'los mudos tienen que viajar como lista')
+  if (r.puntos_sin_lectura > 0) {
+    assert.match(r.aviso, /no supongas/)
+    for (const id of r.cuales_sin_lectura.slice(0, 8)) assert.ok(r.aviso.includes(id), `el aviso no nombra ${id}`)
+  }
 })
 
 await checkAsync('riesgos_activos(idioma: "en") de vibraciones traduce «apoyos» agrupados, y el aviso completo', async () => {

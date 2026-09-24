@@ -258,6 +258,14 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
   const { riesgos, agrupar } = ctx;
   const { canales, variador, alarmas } = estado.dominio;
   const sinLectura = estado.sinLectura.length;
+  /*
+   * Los puntos mudos por su HOJA. Quien llama los cuenta sobre los
+   * `pointName` completos, y un aviso que el modelo copia literal no puede
+   * llevar seis rutas de ICONICS enteras: es el mismo nombre de carpeta
+   * repetido seis veces. La hoja (`DKW_S1`) es lo que una persona reconoce y
+   * lo que el resto de este resumen ya usa.
+   */
+  const mudos = estado.sinLectura.map((p) => String(p).split(/[/\\:]/).pop());
   /* Los apoyos de la máquina que se está contando (Plan 39 F1); la escrita a
      mano los trae de `CANALES` y sale igual que siempre. */
   const apoyos = estado.apoyos ?? CANALES;
@@ -334,6 +342,16 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
 
     puntos_sin_lectura: sinLectura,
     /*
+     * CUÁLES, no sólo cuántos: ver el aviso justo debajo.
+     *
+     * Por su HOJA y no por el tag entero: quien llama los cuenta sobre los
+     * `pointName` completos (`ac:TDCON/DEMO_VIBRACIONES/Vibraciones/S1/DKW_S1`),
+     * y seis de ésos son cuatrocientos caracteres de prefijo repetido dentro
+     * de un aviso que el modelo copia. La hoja es lo que una persona reconoce
+     * y lo que el resto del resumen ya usa.
+     */
+    cuales_sin_lectura: mudos,
+    /*
      * ── ESTE AVISO DECÍA «SIN HISTÓRICO UTILIZABLE» ────────────────
      *
      * Y dejó de ser verdad el 28-08-2026, cuando el grupo DEMO 3 empezó a
@@ -347,15 +365,40 @@ export function resumenVibracionesParaAsistente(estado, ctx = {}) {
      * declarados no hay pronóstico. Se puede contar cómo ha evolucionado una
      * medida; no se puede poner plazo a una avería. Esa mitad se conserva,
      * porque es la que evita la respuesta que más convence y más daño hace.
+     *
+     * ── Y EMPEZABA POR «OTRA MÁQUINA, NO EL TANQUE» (Plan 45 F2.4) ──
+     *
+     * Esa apertura nació cuando el asistente servía las dos instalaciones a la
+     * vez y el riesgo real era cruzar el caudal de una con la vibración de la
+     * otra. Desde el 17-09-2026 la estación de llenado está cerrada y no tiene
+     * vistas, así que la frase pasó a hacer lo contrario de lo que pretendía:
+     * el modelo la copia literal al final de cada respuesta de estado —medido
+     * el 24-09-2026— y nombra, para negarla, una máquina que quien pregunta no
+     * ha mencionado. Advertir de un cruce imposible sólo consigue introducir
+     * el término que se quería mantener fuera.
+     *
+     * Lo que protege de verdad ya no depende de este texto: `NO_COMPARTEN` en
+     * el registro impide cruzar dos máquinas de distinto PLC, y es código. El
+     * aviso se queda con lo que sólo él puede decir —qué SE puede pedir de
+     * esta máquina y qué no—, sin nombrar a ninguna otra.
+     *
+     * ── Y NOMBRA LOS PUNTOS MUDOS (mismo plan) ─────────────────────
+     *
+     * Decía «6 de 76 puntos no entregan lectura» y ahí se paraba. El modelo,
+     * que tiene que redactar algo, rellenó el hueco: «probablemente alarmas o
+     * contadores del servidor de alarmas». Eran los seis del variador. Un
+     * hueco en un dato que el modelo ve es una invitación a inventar la causa,
+     * y la lista la tenemos aquí: se da.
      */
     aviso:
-      "OTRA MÁQUINA, no el tanque: no relaciones estas vibraciones con su caudal, presión " +
-      "ni nivel. SÍ hay histórico de sus medidas, banderas y variador: se puede consultar con " +
+      "SÍ hay histórico de sus medidas, banderas y variador: se puede consultar con " +
       `historia_de_senal(sistema="${estado.sistema ?? "vibraciones"}"). Lo que NO se puede es poner plazo a una ` +
       "avería: esta máquina no tiene mecanismos de desgaste declarados." +
       (sinLectura > 0
-        ? ` Ahora mismo ${sinLectura} de ${estado.puntosPedidos} puntos no entregan lectura: eso no ` +
-          "es una máquina tranquila, es una máquina callada."
+        ? ` Ahora mismo ${sinLectura} de ${estado.puntosPedidos} puntos no entregan lectura ` +
+          `(${mudos.slice(0, 8).join(", ")}${sinLectura > 8 ? "…" : ""}): eso no ` +
+          "es una máquina tranquila, es una máquina callada. Son ésos y no otros: no supongas " +
+          "de qué equipo son ni por qué callan."
         : ""),
   };
 }

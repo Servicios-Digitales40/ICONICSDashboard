@@ -116,16 +116,26 @@ function narrarSinComprobar(noEvaluables, sinComprobarEspanol) {
   return `${noEvaluables.length} rules could not be evaluated due to missing readings: ${titulos}`;
 }
 
-function narrarAvisoVibraciones(avisoEspanol, sinLectura, puntosPedidos, sistema) {
+/*
+ * Espejo exacto de `aviso` en `shared/eva/vibraciones/estadoVibraciones.js`:
+ * cuando aquél cambia, éste cambia con él o las dos mitades del mismo aviso
+ * dicen cosas distintas según el idioma. Plan 45 F2.4 quitó de las dos la
+ * apertura «OTRA MÁQUINA, no el tanque» —nombraba, para negarla, una máquina
+ * cerrada que quien pregunta no mencionó— y añadió CUÁLES son los puntos
+ * mudos, porque darlos sólo contados hacía que el modelo inventara de qué
+ * equipo eran. El porqué largo está allí.
+ */
+function narrarAvisoVibraciones(avisoEspanol, sinLectura, puntosPedidos, sistema, cuales = []) {
   if (!avisoEspanol) return avisoEspanol;
   const base =
-    "ANOTHER MACHINE, not the tank: do not relate these vibrations to its flow, pressure or " +
-    "level. There IS history of its measurements, flags and drive: it can be queried with " +
+    "There IS history of its measurements, flags and drive: it can be queried with " +
     `historia_de_senal(sistema="${sistema}"). What CANNOT be done is put a timeframe on a ` +
     "failure: this machine has no declared wear mechanisms.";
+  const lista = cuales.slice(0, 8).join(", ");
   const coda = sinLectura > 0
-    ? ` Right now ${sinLectura} of ${puntosPedidos} points are not returning a reading: that is ` +
-      "not a quiet machine, it is a silent one."
+    ? ` Right now ${sinLectura} of ${puntosPedidos} points are not returning a reading ` +
+      `(${lista}${sinLectura > 8 ? "…" : ""}): that is not a quiet machine, it is a silent one. ` +
+      "Those and no others: do not assume which equipment they belong to or why they are silent."
     : "";
   return base + coda;
 }
@@ -173,6 +183,12 @@ export function narrarResumenVibracionesEnIngles(resumen, estado, riesgosYaNarra
     },
     norma: `ISO 10816-1 Class I: warning ${LIMITES_ISO.aviso} mm/s, alarm ${LIMITES_ISO.alarma} mm/s`,
     sin_comprobar: narrarSinComprobar(riesgosYaNarrados?.noEvaluables, resumen.sin_comprobar),
-    aviso: narrarAvisoVibraciones(resumen.aviso, resumen.puntos_sin_lectura, estado?.puntosPedidos, estado?.sistema ?? resumen.sistema),
+    aviso: narrarAvisoVibraciones(
+      resumen.aviso,
+      resumen.puntos_sin_lectura,
+      estado?.puntosPedidos,
+      estado?.sistema ?? resumen.sistema,
+      resumen.cuales_sin_lectura ?? [],
+    ),
   };
 }
