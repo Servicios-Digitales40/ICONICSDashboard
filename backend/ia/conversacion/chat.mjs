@@ -258,6 +258,37 @@ function contieneCifras(texto) {
 }
 
 /**
+ * ¿La respuesta ofrece un ENLACE que este turno no ha emitido?
+ *
+ * ── EL INCIDENTE QUE LA JUSTIFICA (Plan 44 F3.4 · hecha en el 45 F3.6) ──
+ *
+ * Medido el 23-09-2026: ante «pronóstico de fallas en PDF» la herramienta se
+ * NEGÓ —esa plantilla está apagada porque la máquina no declara mecanismos de
+ * desgaste— y el modelo contestó «aquí tienes el reporte de vibraciones» con
+ * `https://ejemplo.com/…`. Un enlace inventado, detrás de una negativa.
+ *
+ * La guarda de cifras no lo caza y no es un descuido suyo: hubo herramienta
+ * —luego no aplica— y no hay cifras que bloquear. Son dos formas distintas de
+ * la misma mentira, y hacían falta las dos.
+ *
+ * ── QUÉ CUENTA COMO ENLACE, Y POR QUÉ TAN POCO ─────────────────────
+ *
+ * Sólo `http://` y `https://` explícitos. NO se busca «descarga» ni «aquí
+ * tienes», que son palabras legítimas cuando el adjunto sí salió, ni dominios
+ * sueltos: `bms-server` o `ISO 10816-1` aparecen en respuestas correctas, y
+ * bloquear una respuesta buena cuesta más que dejar pasar una rara.
+ *
+ * Los enlaces que el backend sí produce viajan como ADJUNTO, en su propio
+ * evento y con su URL firmada (`chatRoutes.mjs`), no dentro del texto: el
+ * modelo nunca necesita escribir uno. Por eso un `http` en la prosa sin
+ * adjunto emitido es, sin excepción conocida, inventado.
+ */
+function enlaceSinAdjunto(texto, huboAdjunto) {
+  if (huboAdjunto) return false
+  return /https?:\/\//i.test(String(texto ?? ''))
+}
+
+/**
  * Envuelve el texto que viene de un MANUAL, para que no se lea como una orden.
  *
  * ── EL PROBLEMA, DICHO SIN ADORNOS ─────────────────────────────────
@@ -1595,6 +1626,16 @@ export function createChat({ config, herramientas }) {
      */
     let huboTextoAjeno = false
 
+    /*
+     * Si el turno llegó a EMITIR un adjunto (un PDF, una gráfica).
+     *
+     * Lo vigila la guarda de enlaces inventados del final: un enlace en la
+     * respuesta sin un adjunto emitido en este turno no puede ser verdad, y
+     * un enlace que no lleva a ninguna parte es peor que no darlo. Ver
+     * `enlaceSinAdjunto()` (Plan 45 F3.6).
+     */
+    let huboAdjunto = false
+
     const estados = estadosDe(idioma)
     for (let paso = 0; paso < maxPasos; paso++) {
       rondas += 1
@@ -1728,7 +1769,10 @@ export function createChat({ config, herramientas }) {
         // `useAsistente.js` sólo enruta a `onAdjunto` cuando `tipo` es
         // exactamente "adjunto": el adjunto entero se perdía en silencio, sin
         // error en ningún lado. Anidarlo bajo `adjunto` es inequívoco.
-        for (const adjunto of adjuntos) onEvento({ tipo: 'adjunto', adjunto })
+        for (const adjunto of adjuntos) {
+          huboAdjunto = true
+          onEvento({ tipo: 'adjunto', adjunto })
+        }
 
         // Una repetición no se apunta en la traza ni cuenta como consulta: no
         // se leyó nada. Enseñarla al operador como una línea más de procedencia
@@ -1862,6 +1906,36 @@ export function createChat({ config, herramientas }) {
     const avisos = [...new Set(resultados.map(r => r.resultado?.aviso).filter(Boolean))]
     for (const aviso of avisos) {
       if (!mencionaElAviso(texto, aviso, idioma)) onEvento({ tipo: 'texto', delta: `\n\n⚠ ${aviso}` })
+    }
+
+    /*
+     * ── UN ENLACE QUE NADIE EMITIÓ (Plan 45 F3.6) ────────────────────
+     *
+     * Se DESMIENTE, no se bloquea, y la diferencia es de mecánica, no de
+     * criterio: `pasadaRedactando` emite el texto en streaming según llega,
+     * así que cuando esto corre el enlace ya está en la pantalla del
+     * operador. Retirarlo no es una opción; lo que sí se puede es que no se
+     * quede ahí como la última palabra.
+     *
+     * El aviso nombra el problema —que ese enlace no existe— y dice qué hacer
+     * para tener uno de verdad, que es lo único accionable. Se registra en el
+     * log porque un modelo que empieza a inventar enlaces es una señal que
+     * conviene ver acumulada, no de una en una.
+     */
+    if (enlaceSinAdjunto(texto, huboAdjunto)) {
+      logger.warn('El modelo ofreció un enlace sin que este turno emitiera ningún adjunto', {
+        pregunta: pregunta.slice(0, 120),
+        herramientas: ejecutadas,
+      })
+      onEvento({
+        tipo: 'texto',
+        delta: idioma === 'en'
+          ? '\n\n⚠ The link above does not exist: no file was produced in this turn. ' +
+            'Ask for the report again, naming what you need; if a tool refused, its reason is above.'
+          : '\n\n⚠ El enlace de arriba no existe: en este turno no se generó ningún archivo. ' +
+            'Vuelve a pedir el reporte diciendo qué necesitas; si una herramienta se negó, su ' +
+            'motivo está más arriba.',
+      })
     }
 
     /*

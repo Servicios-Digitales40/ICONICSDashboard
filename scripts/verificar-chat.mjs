@@ -861,6 +861,48 @@ await check('CIFRAS sin herramienta NO salen (el fallo de arrancar sin --jinja)'
   assert.match(texto, /--jinja/, 'y, sin ninguna llamada aún, sugiere revisar la bandera')
 })
 
+await check('un ENLACE sin adjunto emitido se desmiente (Plan 44 F3.4, hecha en el 45 F3.6)', async () => {
+  /*
+   * El incidente, medido el 23-09-2026: ante «pronóstico de fallas en PDF» la
+   * herramienta se NEGÓ —esa plantilla está apagada a propósito— y el modelo
+   * contestó «aquí tienes el reporte» con `https://ejemplo.com/…`.
+   *
+   * La guarda de cifras no lo caza, y no es descuido suyo: hubo herramienta
+   * —luego no aplica— y no hay cifras que bloquear. Aquí se reproduce con una
+   * herramienta que falla y un modelo que inventa el enlace igual.
+   */
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'generar_reporte', arguments: '{}' } },
+    texto: 'Listo, aquí tienes el reporte: https://ejemplo.com/reporte.pdf',
+  }
+
+  const { texto } = await preguntar(chatDePrueba(), 'pronóstico de fallas en PDF')
+
+  /* El enlace ya salió por streaming y no se puede retirar; lo que no puede
+     quedarse es como última palabra. */
+  assert.match(texto, /El enlace de arriba no existe/i, 'el enlace inventado tiene que desmentirse')
+  assert.match(texto, /no se generó ningún archivo/i)
+})
+
+await check('un enlace CON su adjunto emitido no se desmiente', async () => {
+  /*
+   * La otra mitad, y la que evita que la guarda sea peor que el problema:
+   * cuando el reporte SÍ sale, su enlace es legítimo y desmentirlo sería
+   * contradecir al backend. Un aviso que salta en el caso bueno se aprende a
+   * ignorar, y entonces tampoco sirve en el malo.
+   *
+   * `estado_del_sistema` no emite adjuntos, así que se comprueba al revés: sin
+   * enlace en el texto, no hay aviso que dar.
+   */
+  guion = {
+    toolCall: { id: 'c1', type: 'function', function: { name: 'estado_del_sistema', arguments: '{}' } },
+    texto: 'El nivel está en 62,5 %.',
+  }
+
+  const { texto } = await preguntar(chatDePrueba(), '¿cómo está el sistema?')
+  assert.doesNotMatch(texto, /El enlace de arriba no existe/i)
+})
+
 await check('el aviso de bloqueo NO ofrece la máquina cerrada (Plan 45 F3.1)', async () => {
   /*
    * Este texto y el de «no he sabido responder» son de los poquísimos que
