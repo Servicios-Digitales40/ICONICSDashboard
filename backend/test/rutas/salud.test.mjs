@@ -350,9 +350,26 @@ describe('salud — tener la variable puesta NO es estar funcionando', () => {
 
 describe('salud — contestar no es entregar datos', () => {
   it('sin ninguna lectura todavía, lo DICE en vez de pintarlo mal', async () => {
-    // Un puente recién arrancado sin pantallas abiertas no ha leído nada, y eso
-    // no es una avería. `null` no es cero.
-    const { app } = await montarApp({ ICONICS_FAKE: 'false', ICONICS_API_BASE: 'https://planta.local/api' })
+    /*
+     * Un puente recién arrancado sin pantallas abiertas no ha leído nada, y
+     * eso no es una avería. `null` no es cero.
+     *
+     * ── POR QUÉ 127.0.0.1:1 Y NO UN NOMBRE INVENTADO (B16) ──────────
+     *
+     * Esta prueba usaba `https://planta.local/api`, el nombre de mentira del
+     * resto de la suite. La diferencia es que aquí `/api/health` SÍ sale a
+     * preguntar, y las otras sólo usan esa URL como config válida sin pedirla
+     * nunca. Preguntar por un nombre que no existe cuesta lo que tarde el
+     * resolver DNS de la máquina en rendirse: medido el 24-09-2026, **5.720
+     * ms**, contra el `timeout` de 5.000 de vitest. De ahí un rojo que iba y
+     * venía con la red y que no decía nada del código.
+     *
+     * El puerto 1 en loopback no resuelve nada y rechaza la conexión en el
+     * acto (ECONNREFUSED), que es exactamente el estado que esta prueba
+     * quiere: un ICONICS configurado y no alcanzable. No se subió el timeout
+     * (CLAUDE.md §6.2: un techo no se sube para callar un rojo).
+     */
+    const { app } = await montarApp({ ICONICS_FAKE: 'false', ICONICS_API_BASE: 'http://127.0.0.1:1/api' })
     const { servicios } = json(await app.inject({ method: 'GET', url: '/api/health' }))
 
     expect(servicios.datos.ultimaLectura).toBeNull()

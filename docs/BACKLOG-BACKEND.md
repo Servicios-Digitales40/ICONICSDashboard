@@ -661,6 +661,21 @@ doblar el cliente de ICONICS como hacen las demás pruebas de rutas. Se
 escribe como tarea aparte; no se subió el `timeout` para callarlo
 (CLAUDE.md §6.2).
 
+**RESUELTO el 24-09-2026.** `ICONICS_API_BASE` pasa a `http://127.0.0.1:1/api`:
+el puerto 1 en loopback no resuelve nada y rechaza la conexión en el acto
+(ECONNREFUSED), que es el mismo estado que la prueba quería —ICONICS
+configurado y NO alcanzable— sin depender de la red.
+
+Medido antes de tocar nada: `planta.local` tardaba **5.720 ms** en dar
+ENOTFOUND contra un `timeout` de 5.000. Después: la prueba entera corre en
+**2,8 s** y, rompiendo el aserto a propósito, falla en **12 ms** en vez de
+esperar cinco segundos a rendirse. Tres tandas seguidas de la suite completa
+en **440/440**.
+
+Por qué sólo fallaba ésta y no las otras cinco que usan `planta.local`: las
+demás la usan como URL válida en la config y **nunca la piden**. Ésta sí
+llama a `/api/health`, que sale a preguntar.
+
 ## B17 · `RUTA_APRENDIZAJE` es relativa al `cwd`, y la suite de backend escribe una bitácora aparte
 
 **Visto el 22-09-2026 por la noche** (Plan 42.5 F3): `backend/datos/aprendizaje.json`

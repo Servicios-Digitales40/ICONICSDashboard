@@ -191,7 +191,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | | |
 |---|---|
 | Suite de frontend | **1192** pruebas · 20 omitidas *(a 24-09-2026, con el Plan 44 completo; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
-| Suite de backend | **440** pruebas (439 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 24-09-2026, con el Plan 44 completo; eran 437 tras la F4)* |
+| Suite de backend | **440** pruebas, **440 verdes** *(a 24-09-2026, con el Plan 44 completo y la B16 resuelta; eran 437 tras la F4)* |
 | Verificadores | **los 41** de `npm run verificar` |
 | `verificar-herramientas` | **178** correctas (13 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
 | `verificar-chat` | **72** correctas |
@@ -286,13 +286,22 @@ para una configurada; la vista se hará cuando una bandera cambie de verdad
 
 ### Qué está roto
 
-**Un rojo en backend que no es del código, visto el 22-09 a las 16:25:**
-`salud.test.mjs › sin ninguna lectura todavía, lo DICE en vez de pintarlo mal`
-cae por **tiempo (5 s)**, también solo y también **sin los cambios del Plan
-42** (`git stash` y repetir). En el log aparece una lectura real de
-`ac:TDCON/DEMO/NIVEL_TANQUE` contra ICONICS que recibe la página de
-reautenticación: la prueba está saliendo a la red desde este entorno. Por
-confirmar si es la variable de entorno de la sesión o la prueba; no se tocó.
+**El rojo de `salud.test.mjs` está RESUELTO (24-09-2026, B16).** Durante dos
+días se anotó aquí como «un rojo que no es del código»: `sin ninguna lectura
+todavía, lo DICE en vez de pintarlo mal` caía por tiempo (5 s), sola y en la
+suite, con y sin los cambios de la rama.
+
+**No era del entorno: era de la prueba.** Montaba el puente contra
+`https://planta.local/api` —el nombre de mentira que usa media suite— y pedía
+`/api/health`, que **sí sale a preguntar**. Las otras cinco pruebas que usan
+ese nombre nunca lo piden: les basta como URL válida en la config. Medido
+antes de tocar nada: el DNS tardaba **5.720 ms** en dar ENOTFOUND, contra un
+`timeout` de 5.000. Por eso iba y venía con la red.
+
+Ahora usa `http://127.0.0.1:1/api`: el puerto 1 en loopback rechaza la
+conexión en el acto, que es el MISMO estado que la prueba quería —ICONICS
+configurado y no alcanzable— sin depender de la red. La suite de backend va
+**440/440**, tres tandas seguidas. No se subió el `timeout` (CLAUDE.md §6.2).
 
 El otro rojo conocido es intermitente y **no es contención**:
 `fuente-de-maquina.test.js` cae a veces en el subconjunto `demo-eva` con un
@@ -819,7 +828,7 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **439 passed** de 440 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Backend | **440 passed** de 440 *(la B16 —`salud.test.mjs` esperando al DNS— se resolvió el 24-09-2026)* |
 | Frontend | **1192 passed · 20 skipped** *(24-09-2026, Plan 44 completo)* |
 | Lint y types | sin salida |
 
