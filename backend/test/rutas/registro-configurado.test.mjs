@@ -107,7 +107,18 @@ describe('al arrancar', () => {
 
 describe('en caliente', () => {
   beforeEach(async () => {
-    ;({ app } = await montarApp({ MAQUINAS_RUTA: join(carpeta, 'maquinas.json') }))
+    /*
+     * `ICONICS_FAKE_SIN_CAOS` porque la prueba de aquí abajo afirma un
+     * VEREDICTO (`estado === 'VALID'`), y el falso deja caer un 1 % de los
+     * puntos a propósito: con dos puntos declarados, ~2 de cada 100 tandas
+     * salían `DEGRADED` sin que nada estuviera roto. Medido el 24-09-2026:
+     * 1 de cada 3 tandas de este archivo solo. El porqué completo está en
+     * `config.mjs`, junto a la bandera (Plan 45 F2.2).
+     */
+    ;({ app } = await montarApp({
+      MAQUINAS_RUTA: join(carpeta, 'maquinas.json'),
+      ICONICS_FAKE_SIN_CAOS: 'true',
+    }))
   })
 
   it('el alta automática de punta a punta: crear → «sin revisar» → comprobar → la limitación se va → contesta (Plan 39 F6)', async () => {

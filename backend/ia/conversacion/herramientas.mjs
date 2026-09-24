@@ -882,6 +882,19 @@ export function createHerramientas({
 
   // Sólo para pruebas: ver el JSDoc de `crearHerramientasDeHistoricos`.
   leerAprendizajeDe,
+
+  /**
+   * Dónde escriben la bitácora `registrar_intervencion`, `cerrar_diagnostico`,
+   * `recordar_hecho` y `proponer_regla`. Omitirla usa la de fábrica
+   * (`datos/aprendizaje.json` de la raíz del proyecto), que es lo correcto en
+   * producción.
+   *
+   * La pasa `verificar-herramientas.mjs` para probar el camino de ÉXITO de
+   * `cerrar_diagnostico` contra un archivo temporal. Antes no podía: hacía
+   * `process.chdir()` y se apoyaba en que la ruta por defecto fuese relativa
+   * al `cwd`, que es justo el defecto que el Plan 45 F2.1 quitó.
+   */
+  rutaAprendizaje,
 } = {}) {
   if (!client?.readPoints) {
     throw new Error('createHerramientas requiere el cliente de ICONICS')
@@ -924,7 +937,7 @@ export function createHerramientas({
      * `verificar-herramientas` lo detecta en el acto, porque compara lo que se
      * le anuncia al modelo contra lo que se puede ejecutar.
      */
-    ...crearHerramientasDeAprendizaje(),
+    ...crearHerramientasDeAprendizaje(rutaAprendizaje ? { ruta: rutaAprendizaje } : {}),
     /* El registro va aquí porque `sistemas_de_la_planta` abre el catálogo: es
        la que el modelo tiene que encontrar cuando no sabe de qué máquina le
        hablan, y el orden del catálogo es lo primero que lee. */

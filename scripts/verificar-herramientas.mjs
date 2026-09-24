@@ -35,7 +35,7 @@
  * Código de salida: 0 si todo se cumple, 1 si algo falla.
  */
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, readdir, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -3697,17 +3697,27 @@ await checkAsync(
   async () => {
     /*
      * Único test de este archivo que toca disco de verdad, y a propósito:
-     * `crearHerramientasDeAprendizaje()` no acepta una `ruta` propia —es
-     * deliberado, ver la cabecera de `herramientas/aprendizaje/index.mjs`—,
-     * así que verificar el camino de ÉXITO completo (no sólo el rechazo)
-     * exige escribir donde la herramienta de verdad escribe. Se aísla con
-     * un directorio de trabajo temporal, nunca con el `datos/` real.
+     * verificar el camino de ÉXITO completo (no sólo el rechazo) exige
+     * escribir donde la herramienta de verdad escribe.
+     *
+     * ── SE AÍSLA CON UNA RUTA, NO CON UN `chdir` (Plan 45 F2.1) ──────
+     *
+     * Aquí había un `process.chdir()` a una carpeta temporal, porque la
+     * factoría no aceptaba una `ruta` propia y la de fábrica era RELATIVA al
+     * directorio de trabajo. Funcionaba por el mismo motivo por el que la
+     * suite de backend escribía en `backend/datos/aprendizaje.json` en vez de
+     * en el de la raíz: la ruta cambiaba según desde dónde se ejecutara.
+     *
+     * Arreglado eso, el `chdir` dejó de aislar nada —esta comprobación falló,
+     * que es exactamente lo que tenía que pasar— y lo correcto es pedir la
+     * ruta. El `cwd` del proceso ya no se toca.
      */
-    const cwdOriginal = process.cwd()
     const dirTemporal = await mkdtemp(join(tmpdir(), 'verificar-cerrar-diagnostico-'))
-    process.chdir(dirTemporal)
+    const rutaAprendizaje = join(dirTemporal, 'aprendizaje.json')
     try {
-      const r = await createHerramientas({ client: clienteFalso() }).ejecutar('cerrar_diagnostico', {
+      const r = await createHerramientas({
+        client: clienteFalso(), rutaAprendizaje,
+      }).ejecutar('cerrar_diagnostico', {
         sistema: 'tanque',
         riesgoId: 'bomba-sin-salida',
         causaId: 'sin-recirculacion-minima',
@@ -3721,7 +3731,7 @@ await checkAsync(
       // decir que no, no quedarse sin decidir.
       assert.equal(r.diagnostico_correcto, false)
 
-      const bruto = JSON.parse(await readFile(join('datos', 'aprendizaje.json'), 'utf8'))
+      const bruto = JSON.parse(await readFile(rutaAprendizaje, 'utf8'))
       assert.equal(bruto.intervenciones.length, 1)
       const guardado = bruto.intervenciones[0]
       assert.equal(guardado.causaReal.tipo, 'sin-recirculacion-minima')
@@ -3734,7 +3744,10 @@ await checkAsync(
       // de texto — y la usa para confirmar/refutar la causa que corresponde.
       const { createIndiceCasos } = await import('../backend/ia/motor/casos.mjs')
       const { createMotorDiagnostico } = await import('../backend/ia/motor/diagnostico.mjs')
-      const indiceCasos = createIndiceCasos({})
+      /* El índice lee la MISMA bitácora temporal: es lo que hace que esto
+         compruebe el camino entero —guardar y luego encontrar— y no dos
+         mitades contra archivos distintos. */
+      const indiceCasos = createIndiceCasos({ rutaAprendizaje })
       const motor = createMotorDiagnostico({ indiceCasos })
       const resultado = await motor.diagnosticar({ sistema: 'tanque', riesgoId: 'bomba-sin-salida' })
 
@@ -3743,7 +3756,7 @@ await checkAsync(
       assert.ok(confirmada.respaldo.casos > 0, 'la causa confirmada por cerrar_diagnostico debía sumar')
       assert.ok(refutada.respaldo.casos < 0, 'la causa que el sistema propuso mal debía restar')
     } finally {
-      process.chdir(cwdOriginal)
+      await rm(dirTemporal, { recursive: true, force: true })
     }
   }
 )

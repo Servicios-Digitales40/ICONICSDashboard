@@ -171,7 +171,14 @@ export async function createApp(config) {
   }
 
   const client = config.iconics.fake
-    ? createFakeIconicsClient({ limits: config.limits })
+    ? createFakeIconicsClient({
+        limits: config.limits,
+        /* `0.99` deja las dos tiradas de caos del falso siempre por encima de
+           su umbral, que es como ya lo pedían los verificadores. Ver
+           `iconics.fakeSinCaos` en `config.mjs` para por qué una prueba que
+           afirma un veredicto lo necesita. */
+        ...(config.iconics.fakeSinCaos ? { rnd: () => 0.99 } : {}),
+      })
     : createIconicsClient(config, authenticator)
 
   // El asistente se monta siempre, pero sin `IA_BASE` sus rutas responden
@@ -687,7 +694,7 @@ export async function createApp(config) {
     registerVozRoutes(instancia, { config, voz })
     registerReportesRoutes(instancia, { config })
     registerRagRoutes(instancia, { config, indiceDocumentos, gestorManuales })
-    registerCasosRoutes(instancia)
+    registerCasosRoutes(instancia, { rutaAprendizaje: config.diario.aprendizaje.ruta })
     /*
      * El contador de casos entra POR LA PUERTA y no lo consulta la ruta por su
      * cuenta: así el CRUD de configuración no necesita el motor de casos para

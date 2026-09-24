@@ -775,6 +775,31 @@ function readMaquinasRuta(rawValue) {
   )
 }
 
+/**
+ * Dónde vive la BITÁCORA de aprendizaje: hechos, propuestas e intervenciones
+ * (`datos/aprendizaje.json`).
+ *
+ * ── POR QUÉ ESTO PASÓ A SER CONFIGURABLE (Plan 45 F2.1) ────────────
+ *
+ * Porque no lo era: la ruta vivía como una constante RELATIVA en
+ * `ia/herramientas/aprendizaje/index.mjs` (`join('datos','aprendizaje.json')`),
+ * resuelta contra el `cwd` de quien arrancara. El puente arranca desde la raíz
+ * y lee `datos/aprendizaje.json`; `cd backend && npm test` corre con
+ * `cwd = backend/`, así que las pruebas de `/api/casos` escribían en
+ * `backend/datos/aprendizaje.json` —30 intervenciones de prueba el 22-09-2026,
+ * otras 16 el 24-09—. Se borraba a mano y volvía a la siguiente tanda.
+ *
+ * Ahora se resuelve contra `PROJECT_ROOT` como sus cuatro hermanas, así que no
+ * depende del `cwd`, y las pruebas la apuntan a una carpeta temporal en vez de
+ * a la bitácora del despliegue de quien las corre.
+ */
+function readAprendizajeRuta(rawValue) {
+  const relativaOAbsoluta = rawValue || join('datos', 'aprendizaje.json')
+  return normalize(
+    isAbsolute(relativaOAbsoluta) ? relativaOAbsoluta : join(PROJECT_ROOT, relativaOAbsoluta)
+  )
+}
+
 /** Dónde vive el diario de diagnósticos (Plan 28 F2). Mismo criterio que sus
  *  tres hermanos: en `datos/`, que está en `.gitignore` porque es estado que
  *  el backend genera en marcha, no código. */
@@ -919,6 +944,34 @@ export function loadConfig(env = process.env) {
        * qué cliente construir.
        */
       fake: iconicsFake,
+      /**
+       * Quita el CAOS del transporte falso: sin puntos que desaparecen ni
+       * calidad mala aleatoria (Plan 45 F2.2).
+       *
+       * ── POR QUÉ HACE FALTA, Y POR QUÉ NO ES «APAGAR LA REALIDAD» ────
+       *
+       * El falso reproduce a propósito los fallos del servidor real —1 % de
+       * puntos ausentes, 2 % de calidad mala— porque los caminos tristes son
+       * la mitad de lo que este backend tiene que hacer bien. Eso está bien
+       * para una prueba que mide CÓMO SE COMPORTA ante un hueco.
+       *
+       * Rompe la prueba que afirma un VEREDICTO. `registro-configurada.test`
+       * comprueba que una máquina recién dada de alta sale `VALID`: con dos
+       * puntos declarados y un 1 % de ausencia por punto, ~2 de cada 100
+       * tandas salían `DEGRADED` y el rojo no era del código. Medido el
+       * 24-09-2026: falla 1 de cada 3 tandas de ese archivo solo.
+       *
+       * `HANDOFF.md` §8 ya lo avisaba —«afirmar un veredicto contra el falso
+       * produce pruebas intermitentes»— y el remedio que ya usaban las
+       * herramientas era `rnd: () => 0.99`, que deja el caos siempre por
+       * debajo del umbral. Esto lo hace alcanzable desde una app montada, que
+       * es lo único que no se podía hacer: `createApp` construye su cliente y
+       * no lo recibe.
+       *
+       * NO se apaga solo por estar en pruebas: lo pide quien lo necesita. Las
+       * pruebas de huecos y de calidad mala siguen queriendo el caos.
+       */
+      fakeSinCaos: readBoolean('ICONICS_FAKE_SIN_CAOS', env.ICONICS_FAKE_SIN_CAOS, false),
       // Con el transporte falso no hace falta ICONICS_API_BASE: no hay a
       // dónde conectarse. Misma regla que ICONICS_READ_ONLY: el peligro (usar
       // datos inventados) se pide a propósito con la otra variable, no con
@@ -1210,6 +1263,20 @@ export function loadConfig(env = process.env) {
           'CUADERNO_MAX_BYTES', env.CUADERNO_MAX_BYTES, MAX_BYTES_DIARIO, 1024
         ),
         dias: readInteger('CUADERNO_DIAS', env.CUADERNO_DIAS, DIAS_RETENCION, 1),
+      }),
+
+      /**
+       * La BITÁCORA de aprendizaje (Plan 45 F2.1): hechos, propuestas e
+       * intervenciones cerradas.
+       *
+       * No lleva `maxBytes` ni `dias` como sus vecinas de arriba, y no es un
+       * olvido: las otras son JSONL que sólo crecen y hay que podar, y ésta es
+       * un JSON que se reescribe entero —lo que se da de baja se archiva, no
+       * se purga por antigüedad—. Lo único que comparte con ellas es de dónde
+       * sale la ruta.
+       */
+      aprendizaje: Object.freeze({
+        ruta: readAprendizajeRuta(env.APRENDIZAJE_RUTA),
       }),
 
       /**

@@ -54,6 +54,28 @@ export async function montarApp(extra = {}) {
      * configuradas pasan su propia ruta en `extra`.
      */
     MAQUINAS_RUTA: join(reportesDir, 'maquinas.json'),
+    /*
+     * ── LOS CUATRO ARCHIVOS DE `datos/`, EN LA CARPETA TEMPORAL ──────
+     *
+     * Mismo motivo que `MAQUINAS_RUTA` de arriba, y con un historial peor:
+     * sin esto, `cd backend && npm test` escribía en el despliegue DE VERDAD
+     * de quien corriera la suite. Los tres diarios se resuelven contra
+     * `PROJECT_ROOT` (`config.mjs`), así que las pruebas de chat, control y
+     * diagnóstico iban sumando líneas a `datos/*.jsonl`: el 24-09-2026,
+     * 2 441 de las 2 630 entradas del diario de conversaciones eran de la
+     * suite. La bitácora era peor todavía: su ruta era RELATIVA al `cwd`, así
+     * que las pruebas de `/api/casos` escribían en un SEGUNDO archivo,
+     * `backend/datos/aprendizaje.json`, que nadie mira y que había que borrar
+     * a mano cada pocos días (Plan 45 F2.1; la ruta ya es absoluta).
+     *
+     * Ninguna prueba necesitaba ese acoplamiento: las que comprueban lo que
+     * se anotó leen el archivo por la ruta que ellas mismas pasan.
+     */
+    DIARIO_ACCIONAMIENTOS: join(reportesDir, 'diario-accionamientos.jsonl'),
+    DIARIO_CONVERSACIONES: join(reportesDir, 'diario-conversaciones.jsonl'),
+    DIARIO_DIAGNOSTICOS: join(reportesDir, 'diario-diagnosticos.jsonl'),
+    CUADERNO_RUTA: join(reportesDir, 'cuaderno.jsonl'),
+    APRENDIZAJE_RUTA: join(reportesDir, 'aprendizaje.json'),
     ...extra,
   })
 

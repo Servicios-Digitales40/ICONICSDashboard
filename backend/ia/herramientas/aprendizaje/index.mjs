@@ -14,9 +14,12 @@
  * `shared/eva/comun/causas.js` — una función pura, no un servidor).
  *
  * Eso las hace de las primeras del reparto (Fase 1). Esta factoría no recibe
- * `client`, ni `turnos`, ni concurrencia: no recibe nada. Si algún día una de
- * ellas necesitara leer del servidor, la firma de abajo tendría que cambiar
- * —y ese cambio de firma es justo la señal de que el grupo dejó de ser cerrado.
+ * `client`, ni `turnos`, ni concurrencia: ningún servicio. Lo único que acepta
+ * es `ruta` —dónde está ese archivo—, que no es un servicio sino el mismo dato
+ * que `leerAprendizaje` y `registrarCaso` ya tomaban (Plan 45 F2.1; el porqué
+ * está en la propia factoría). Si algún día una de ellas necesitara leer del
+ * servidor, la firma tendría que crecer de verdad —y ese cambio sería la señal
+ * de que el grupo dejó de ser cerrado.
  *
  * ── LA REGLA QUE ESTE GRUPO PROTEGE ────────────────────────────────
  *
@@ -48,6 +51,7 @@ import { readFile } from 'node:fs/promises'
 
 import { conCandado, escribirJsonAtomico } from '../../../lib/jsonAtomico.mjs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import {
   almacenVacio,
@@ -85,8 +89,25 @@ import { fallo } from '../lib/respuesta.mjs'
  * acabó en la raíz del repositorio mientras `revisar-propuestas.mjs` lo
  * buscaba en `datos/`: el asistente guardaba y el revisor no veía nada, sin
  * un solo error por ningún lado. Todas las puntas usan esta misma constante.
+ *
+ * ── Y ABSOLUTA DESDE EL PLAN 45 F2.1, NO RELATIVA AL `cwd` ─────────
+ *
+ * Era `join('datos','aprendizaje.json')`, que se resuelve contra el
+ * directorio desde el que se arranque. El puente arranca desde la raíz y leía
+ * `datos/aprendizaje.json`; `cd backend && npm test` corre con
+ * `cwd = backend/`, así que las pruebas de `/api/casos` escribían sus
+ * intervenciones en `backend/datos/aprendizaje.json` —30 el 22-09-2026,
+ * otras 16 el 24-09—. Se borraba a mano y volvía a la siguiente tanda, porque
+ * el archivo que la suite ensuciaba no era el que nadie miraba.
+ *
+ * Anclada a la raíz del proyecto, las dos puntas leen el MISMO archivo se
+ * arranque desde donde se arranque. Quien quiera otro sitio lo pasa por
+ * `ruta` —es lo que hace `config.diario.aprendizaje.ruta`, que además admite
+ * `APRENDIZAJE_RUTA` del entorno—; lo que ya no puede pasar es que el sitio
+ * cambie solo según quién ejecute.
  */
-export const RUTA_APRENDIZAJE = join('datos', 'aprendizaje.json')
+const RAIZ_PROYECTO = fileURLToPath(new URL('../../../../', import.meta.url))
+export const RUTA_APRENDIZAJE = join(RAIZ_PROYECTO, 'datos', 'aprendizaje.json')
 
 /**
  * `ruta` es opcional —por defecto `RUTA_APRENDIZAJE`— para que
@@ -252,10 +273,28 @@ export async function archivarCaso(id, { archivado = true, ruta = RUTA_APRENDIZA
 /**
  * Las tres herramientas de aprendizaje.
  *
- * No recibe nada a propósito: ver la cabecera. Devuelve el mismo objeto
- * `{ nombre: fn }` que el ensamblador mezcla con el de las demás familias.
+ * Devuelve el mismo objeto `{ nombre: fn }` que el ensamblador mezcla con el
+ * de las demás familias.
+ *
+ * ── LA ÚNICA COSA QUE RECIBE, Y POR QUÉ (Plan 45 F2.1) ─────────────
+ *
+ * Aquí ponía «no recibe nada a propósito»: ni `client`, ni `turnos`, ni
+ * concurrencia, porque su materia prima es un archivo. Eso sigue valiendo
+ * para todo lo que sea un SERVICIO — y `ruta` no lo es: es dónde está ese
+ * archivo, el mismo dato que `leerAprendizaje` y `registrarCaso` ya aceptan.
+ *
+ * Que no lo aceptara tenía un coste medido: `verificar-herramientas.mjs`
+ * necesitaba probar el camino de ÉXITO de `cerrar_diagnostico` sin tocar la
+ * bitácora real, y la única forma que le quedaba era `process.chdir()` a una
+ * carpeta temporal, apoyándose en que la ruta por defecto fuera relativa al
+ * `cwd`. Es decir, la prueba dependía del defecto que la F2.1 arregla.
+ *
+ * Omitirla sigue usando la de fábrica, así que el ensamblador no cambia.
+ *
+ * @param {object} [opciones]
+ * @param {string} [opciones.ruta] Dónde vive la bitácora.
  */
-export function crearHerramientasDeAprendizaje() {
+export function crearHerramientasDeAprendizaje({ ruta = RUTA_APRENDIZAJE } = {}) {
   return {
     /**
      * ── LO QUE YA SE SABE DE ESTA PLANTA ──────────────────────────────
@@ -270,7 +309,7 @@ export function crearHerramientasDeAprendizaje() {
      * suponer, y suponerlas mal es gratis.
      */
     async hechos_de_la_planta({ sistema = null } = {}) {
-      const almacen = await leerAprendizaje()
+      const almacen = await leerAprendizaje(ruta)
       const todos = hechosVigentes(almacen)
       const hechos = sistema ? todos.filter((h) => h.sistema === sistema || h.sistema === null) : todos
 
@@ -354,7 +393,7 @@ export function crearHerramientasDeAprendizaje() {
       }
 
       const nueva = crearIntervencion({ sintoma: s, solucion: q, causa, sistema, resuelto, origen }, new Date())
-      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
+      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva), ruta)
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
       const almacen = guardado.almacen
 
@@ -493,7 +532,7 @@ export function crearHerramientasDeAprendizaje() {
           ? { diagnostico: { propuesta }, diagnosticoCorrecto: causaRealTipo === propuesta }
           : {}),
       }, new Date())
-      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
+      const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva), ruta)
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
 
       return {
@@ -554,7 +593,7 @@ export function crearHerramientasDeAprendizaje() {
           { sintoma: texto, solucion: texto, sistema, origen: origen ?? 'el usuario' },
           new Date(),
         )
-        const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva))
+        const guardado = await modificarAprendizaje(a => a.intervenciones.push(nueva), ruta)
         if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
         const almacen = guardado.almacen
         return {
@@ -576,7 +615,7 @@ export function crearHerramientasDeAprendizaje() {
       }
 
       const nuevo = crearHecho({ hecho: texto, sistema, origen }, new Date())
-      const guardado = await modificarAprendizaje(a => a.hechos.push(nuevo))
+      const guardado = await modificarAprendizaje(a => a.hechos.push(nuevo), ruta)
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
       const almacen = guardado.almacen
 
@@ -620,7 +659,7 @@ export function crearHerramientasDeAprendizaje() {
       }
 
       const p = crearPropuesta(datos, new Date())
-      const guardado = await modificarAprendizaje(a => a.propuestas.push(p))
+      const guardado = await modificarAprendizaje(a => a.propuestas.push(p), ruta)
       if (!guardado.ok) return fallo(`No se pudo guardar: ${guardado.error}`)
       const almacen = guardado.almacen
 

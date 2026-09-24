@@ -33,7 +33,19 @@ import { archivarCaso, listarCasos, registrarCaso } from '../ia/herramientas/apr
 import { ArchivarCasoSchema, CasoPorIdParamsSchema, CrearCasoSchema } from '../http/esquemas.mjs'
 import { CODIGOS, responderError } from '../http/codigos.mjs'
 
-export function registerCasosRoutes(fastify) {
+/**
+ * @param {import('fastify').FastifyInstance} fastify
+ * @param {object} [opciones]
+ * @param {string} [opciones.rutaAprendizaje] Dónde vive la bitácora. Llega de
+ *   `config.diario.aprendizaje.ruta` (Plan 45 F2.1). Omitirla usa la de fábrica,
+ *   que es la del despliegue: **las pruebas tienen que pasarla**, o escriben
+ *   sus intervenciones en la bitácora de quien las corre. Ése era el defecto.
+ */
+export function registerCasosRoutes(fastify, { rutaAprendizaje } = {}) {
+  /* `undefined` significa «la de fábrica» en las tres funciones del almacén,
+     así que no hace falta un `if` en cada llamada. */
+  const donde = rutaAprendizaje ? { ruta: rutaAprendizaje } : {}
+
   /**
    * La bitácora entera, para la pantalla de revisión (`CasosRag.jsx`).
    *
@@ -49,7 +61,7 @@ export function registerCasosRoutes(fastify) {
   fastify.get(
     '/api/casos',
     { onRequest: [fastify.autenticar, fastify.exigirRol('visualizador')] }, async () => {
-    const casos = await listarCasos()
+    const casos = await listarCasos(donde)
     return { ok: true, total: casos.length, casos }
   })
 
@@ -75,7 +87,7 @@ export function registerCasosRoutes(fastify) {
     },
     async (request, reply) => {
       const { archivado } = request.body
-      const resultado = await archivarCaso(request.params.id, { archivado })
+      const resultado = await archivarCaso(request.params.id, { archivado, ...donde })
 
       if (!resultado.ok) {
         return responderError(reply, 500, CODIGOS.ERROR_BITACORA, resultado.error)
@@ -109,7 +121,7 @@ export function registerCasosRoutes(fastify) {
         // petición, no "el usuario" a secas — mismo criterio que
         // `subidoPor` en `ragRoutes.mjs`.
         origen: request.body.origen ?? request.usuario?.id ?? 'el usuario',
-      })
+      }, donde)
 
       if (!resultado.ok) {
         return responderError(reply, 500, CODIGOS.ERROR_BITACORA, resultado.error)
