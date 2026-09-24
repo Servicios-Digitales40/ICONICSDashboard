@@ -59,7 +59,7 @@ Tres cosas que rompen la intuición de quien viene de antes:
   **máquina espejo** (`scripts/lib/vibraciones-espejo.json`,
   `configuracionEspejo()`), no una escrita a mano.
 - **El tanque sigue en el registro pero cerrado** (`cerrado: true` en
-  `sistemas.js`): `resolverSistema` lo niega, 22 comprobaciones de
+  `sistemas.js`): `resolverSistema` lo niega, 24 comprobaciones de
   `verificar-herramientas` están omitidas por eso, y su dominio
   (`shared/eva/tanque/`) no se toca ni se borra.
 - **La autenticación está encendida.** El tablero pide credenciales
@@ -125,7 +125,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 199 correctas · 22 omitidas
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 197 correctas · 24 omitidas
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -192,7 +192,7 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | Suite de frontend | **1180** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F3.3; eran 1172 tras el 42.5 y 1102 · 29 el 22-09)* |
 | Suite de backend | **433** pruebas (432 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F3.3; eran 401)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **199** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **22 omitidas** (cierre) |
+| `verificar-herramientas` | **197** correctas (13 sobre una configurada, 7 de reportes por plantilla) · **24 omitidas** (cierre; las dos últimas, el catálogo del tanque en `generar_reporte`, Plan 44 F3.5) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |

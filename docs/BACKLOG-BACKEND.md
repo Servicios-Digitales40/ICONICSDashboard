@@ -689,3 +689,13 @@ escribiera «tanque» por omisión— resolviendo la omisión en código
 **El arreglo.** Que el catálogo resuelva la máquina con `resolverSistema()`
 como las demás herramientas por máquina, y que la comprobación «señales por
 defecto» del verificador quede omitida por el cierre, como sus 22 hermanas.
+
+**Resuelto el 23-09-2026 (Plan 44 F3.5), la misma noche.** El usuario pidió
+seguir quitando lo del tanque: el catálogo de `generar_reporte` resuelve
+ahora la máquina con `resolverSistema()` (id, nombre o alias, con la guarda
+de cerrada) o toma la única configurada en servicio, y sus rótulos, series y
+bandas salen del registro y del tipo. Se fueron `senalInfo`, `UMBRALES`,
+`esHistorizada` y el estado del tanque de ese camino, y `claveDeEtiqueta`
+con ellos. Las dos comprobaciones que sólo el tanque justificaba («señales
+por defecto», «una lista explícita de señales») quedaron omitidas con el
+motivo del cierre, como sus 22 hermanas; las demás miran a la espejo.

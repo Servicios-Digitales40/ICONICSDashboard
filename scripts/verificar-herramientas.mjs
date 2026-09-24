@@ -2699,7 +2699,7 @@ await checkAsync('sin carpeta de reportes configurada, se niega con un error cla
   assert.match(r.error, /no están configurados/i)
 })
 
-await checkAsync(
+await omitirEnvuelto(
   'señales por defecto: las que tienen historia como gráfico, el resto en tabla, y el PDF ' +
     'se escribe a disco de verdad',
   async () => {
@@ -2821,13 +2821,20 @@ await checkAsync('[configurada] sin señales, el reporte trae TODAS las suyas: l
   assert.ok(iApoyo >= 0 && iVariador > iApoyo, `el variador (${iVariador}) tenía que ir después de los apoyos (${iApoyo})`)
 })
 
-await checkAsync('[configurada] un reporte no mezcla una señal del tanque con una de la configurada', async () => {
+await checkAsync('[configurada] un reporte es de UNA máquina por construcción: una señal de otra se dice y se omite, no se mezcla (Plan 44 F3.5)', async () => {
+  /* Hasta el 23-09-2026 esto pedía `nivel` (del tanque) y `vRMS_S1` y esperaba
+     «no mezcla dos máquinas». Ahora las señales se resuelven DENTRO de la
+     máquina del reporte —la única en servicio, sin nombrarla—, así que `nivel`
+     no es suya: se reporta como no reconocida y el PDF sale con la otra. */
   const reportes = await reportesTmp()
-  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar('generar_reporte', {
-    senales: ['nivel', 'vRMS_S1'],
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar('generar_reporte', {
+    senales: ['nivel', 'vRMS_S1'], periodo: 'últimas 6 horas',
   })
-  assert.equal(r.ok, false)
-  assert.match(r.error, /no mezcla dos máquinas/)
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.sistema, ESPEJO.id)
+  assert.deepEqual(r.senalesConGrafico, ['Velocidad eficaz · Lado acople'])
+  assert.ok(r.notas.some((n) => /no se reconocieron.*nivel/i.test(n)), 'la del tanque se dice, no se calla')
 })
 
 /**
@@ -2864,14 +2871,16 @@ await checkAsync('generar_reporte(idioma: "en") compone el PDF en inglés (i18n 
    * mirando lo que el modelo narra — hay que abrir el propio PDF.
    */
   const reportes = await reportesTmp()
-  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
+  /* Sobre la espejo desde el Plan 44 F3.5: el catálogo ya no tiene rama del tanque. */
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar(
     'generar_reporte',
-    { senales: ['nivel', 'carga del motor'] },
+    { senales: ['vRMS_S1', 'aRMS_S2'], sistema: ESPEJO.id, periodo: 'últimas 6 horas' },
     { idioma: 'en' }
   )
 
   assert.equal(r.ok, true, r.error)
-  assert.equal(r.instalacion, 'Industrial water system', 'la respuesta al modelo también se traduce')
+  assert.equal(r.instalacion, ESPEJO.nombre, 'la portada lleva el nombre de la máquina en cualquier idioma')
 
   const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
   const pdf = await readFile(join(reportes.dir, `${id}.pdf`))
@@ -2885,13 +2894,14 @@ await checkAsync('generar_reporte(idioma: "en") compone el PDF en inglés (i18n 
 
 await checkAsync('sin `idioma`, generar_reporte sigue en español: no rompe nada existente', async () => {
   const reportes = await reportesTmp()
-  const r = await createHerramientas({ client: clienteFalso(), reportes }).ejecutar(
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar(
     'generar_reporte',
-    { senales: ['nivel', 'carga del motor'] }
+    { senales: ['vRMS_S1', 'aRMS_S2'], sistema: ESPEJO.id, periodo: 'últimas 6 horas' }
   )
 
   assert.equal(r.ok, true, r.error)
-  assert.equal(r.instalacion, 'Sistema de agua industrial')
+  assert.equal(r.instalacion, ESPEJO.nombre)
 
   const id = new URL(`http://x${r._adjunto.url}`).searchParams.get('id')
   const pdf = await readFile(join(reportes.dir, `${id}.pdf`))
@@ -2899,7 +2909,7 @@ await checkAsync('sin `idioma`, generar_reporte sigue en español: no rompe nada
   assert.match(texto, /REPORTE T[EÉ]CNICO/, 'el título en español tiene que seguir saliendo por defecto')
 })
 
-await checkAsync('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
+await omitirEnvuelto('una lista explícita de señales: sólo esas entran, no las ocho', async () => {
   // Una CON historia (gráfico) y otra SIN ella (tabla). La tensión servía de
   // ejemplo de «sin historia» hasta que pasó a tener la suya el 24-08-2026,
   // y la carga del motor hasta el 14-09-2026 — ver más arriba. Ya no queda
@@ -2920,12 +2930,13 @@ await checkAsync('una lista explícita de señales: sólo esas entran, no las oc
 })
 
 await checkAsync('una señal inventada en la lista se ignora y se reporta, no rompe el reporte', async () => {
-  const r = await createHerramientas({ client: clienteFalso(), reportes: await reportesTmp() }).ejecutar(
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes: await reportesTmp() }).ejecutar(
     'generar_reporte',
-    { senales: ['nivel', 'xyzzy inexistente'] }
+    { senales: ['vRMS_S1', 'xyzzy inexistente'], sistema: ESPEJO.id, periodo: 'últimas 6 horas' }
   )
-  assert.equal(r.ok, true)
-  assert.deepEqual(r.senalesConGrafico, ['Nivel del tanque'])
+  assert.equal(r.ok, true, r.error)
+  assert.deepEqual(r.senalesConGrafico, ['Velocidad eficaz · Lado acople'])
   assert.ok(r.notas.some(n => /no se reconocieron/i.test(n)))
 })
 

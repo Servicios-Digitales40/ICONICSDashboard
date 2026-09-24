@@ -390,12 +390,14 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 198 correctas y 22 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 197 correctas y 24 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «198 de 220», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 220. Trece de las 198 son sobre una
-> máquina **configurada** (Plan 39 F0–F2), y también lo imprime; seis más, en
-> bloque propio al final, son los reportes por plantilla (Plan 44 F3).
+> qué. Ese verde significa «197 de 221», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 221. Trece de las 197 son sobre una
+> máquina **configurada** (Plan 39 F0–F2), y también lo imprime; siete más, en
+> bloque propio al final, son los reportes por plantilla (Plan 44 F3). Las dos
+> últimas omitidas son el catálogo del tanque en `generar_reporte`, que desde
+> el Plan 44 F3.5 se dibuja sólo desde el registro y se niega con el cierre.
 
 ### 5.2 La tanda completa
 
@@ -462,7 +464,7 @@ de Node, se cambia `.nvmrc` y se regeneran los tres locks **con esa versión**.
 - Un cambio en `shared/eva/` corre los verificadores de **ambas** instalaciones
   si el archivo es común.
 - **En esta rama parte de la suite está OMITIDA a propósito** (29 pruebas de
-  frontend y 22 comprobaciones de herramientas). Por eso **un rojo nuevo es un
+  frontend y 24 comprobaciones de herramientas). Por eso **un rojo nuevo es un
   defecto de verdad**. Y si una prueba falla por depender del tanque, se omite
   con su motivo — no se arregla tocando esa máquina (§1).
 

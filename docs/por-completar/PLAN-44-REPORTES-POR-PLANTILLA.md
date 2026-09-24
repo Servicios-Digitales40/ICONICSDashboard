@@ -695,6 +695,22 @@ ofreció los tipos disponibles. Sigue siendo una corrida, no una garantía; la
 guarda de URL sin adjunto sigue pendiente en `chat.mjs`. Tiempos: 16–31 s por
 consulta.
 
+**F3.5 · El catálogo también sale del registro (23-09-2026, noche).** El
+usuario, al leer B18: «elimina también el catálogo del tanque; ¿no íbamos a
+seguir quitando lo del tanque?». Sí. El camino sin `tipo` de `generar_reporte`
+tenía su rama del tanque escrita a mano —`senalInfo`, `UMBRALES`,
+`esHistorizada` de `tanque/senales.js` y el estado del tanque para la tabla— y
+tomaba `SISTEMA[id]` directo, sin la guarda de cerrada. Ahora resuelve la
+máquina como las demás herramientas (`resolverSistema`: id, nombre o alias, y
+se niega si está cerrada) o toma la única configurada en servicio; rótulos,
+series y bandas salen de la entrada y de su tipo. La comprobación «no mezcla
+dos máquinas» dejó de tener sentido —las señales se resuelven dentro de la
+máquina del reporte, así que una de otra se dice y se omite— y se reescribió
+así. Dos comprobaciones que sólo el tanque justificaba se omitieron con el
+motivo del cierre (22 → 24); tres se movieron a la espejo. **197** correctas.
+El dominio del tanque (`shared/eva/tanque/`) sigue sin tocarse: lo que se fue
+es el uso que el asistente hacía de él en este camino.
+
 Y lo tercero que §1.1 pedía al tipo, **los indicadores principales**, queda
 exigido por prueba: todo tipo registrado declara `indicadores` (de uno a
 cuatro roles suyos), o la suite del backend falla nombrándolo.

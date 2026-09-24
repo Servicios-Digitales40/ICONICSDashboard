@@ -82,19 +82,8 @@ import { tipoDe } from '../../../../shared/eva/tipos/index.js'
 /* La etiqueta humana de un estado de la forma común («nominal» → «Normal»).
    Vive con el tanque porque nació allí, pero las claves son las de
    `senalComun` y las usa también el tipo de vibraciones. */
-import { ESTADOS, estadoInfo } from '../../../../shared/eva/tanque/estado.js'
+import { estadoInfo } from '../../../../shared/eva/tanque/estado.js'
 
-/**
- * La CLAVE de estado a partir de su etiqueta («Fuera de límite» → `critico`),
- * o `null` si no es una etiqueta del dominio. Existe porque las señales del
- * tanque llegan a `generar_reporte` ya descritas para el modelo —con el
- * rótulo y sin la clave—, y el PDF colorea por clave (B11): recuperarla aquí
- * por la etiqueta exacta es lo único que no exige tocar el tanque.
- */
-function claveDeEtiqueta(etiqueta) {
-  if (typeof etiqueta !== 'string') return null
-  return Object.values(ESTADOS).find((e) => e.label === etiqueta)?.key ?? null
-}
 import { evaluarPronostico } from '../../../../shared/eva/comun/pronostico.js'
 import { intervencionesRecientes } from '../../../../shared/eva/comun/aprendizaje.js'
 import { leerAprendizaje } from '../aprendizaje/index.mjs'
@@ -108,7 +97,7 @@ import { resolverInstante } from '../../../../shared/periodo.js'
 
 import { avisoDeUmbrales, bandaLegible, downsamplear } from '../lib/formato.mjs'
 /* Sólo la función pura que decide la máquina por omisión: no carga pdfkit. */
-import { sistemaPorOmision } from '../../reportes/sistemaPorOmision.mjs'
+import { configuradasEnServicio, sistemaPorOmision } from '../../reportes/sistemaPorOmision.mjs'
 import { fallo } from '../lib/respuesta.mjs'
 import { narrarTendenciaEnIngles } from '../../i18n/narrarTendencia.mjs'
 import { narrarMecanismoEnIngles } from '../../i18n/narrarRiesgo.mjs'
@@ -1442,142 +1431,102 @@ export function crearHerramientasDeHistoricos({
        * recuerda que esas dos curvas no se pueden comparar. Si las señales
        * pedidas son de máquinas distintas, se niega y lo dice.
        */
-      let claves
-      let sistemaDelReporte = null
-      const desconocidas = []
+      /*
+       * ── LA MÁQUINA, POR EL REGISTRO (Plan 44 F3.5) ───────────────────
+       *
+       * Hasta el 23-09-2026 este camino tenía su rama del tanque escrita a
+       * mano —`senalInfo`, `UMBRALES` y `esHistorizada` de `tanque/senales.js`,
+       * y el estado del tanque para la tabla— y tomaba `SISTEMA[id]` directo,
+       * sin pasar por `resolverSistema`: el catálogo del tanque salía aunque
+       * el tanque estuviera cerrado (B18). El tanque ya no es «el Tanque» sino
+       * otra posible máquina configurada (Plan 43), así que el catálogo se
+       * dibuja SÓLO desde el registro: la máquina nombrada —id, nombre o alias,
+       * con la guarda de cerrada— o la única configurada en servicio, y sus
+       * rótulos, series y bandas los pone su entrada y su tipo.
+       *
+       * Un reporte es de UNA máquina por construcción: las señales pedidas se
+       * resuelven dentro de ella, así que «mezclar dos máquinas» ya no puede
+       * pasar y dejó de comprobarse aquí. Una señal que no sea suya se dice y
+       * se omite, como siempre.
+       */
+      let entrada
+      if (sistema !== undefined && sistema !== null && String(sistema).trim()) {
+        const elegido = resolverSistema(sistema)
+        if (!elegido.ok) return elegido
+        entrada = elegido.sistema
+      } else {
+        entrada = sistemaPorOmision()
+        if (!entrada) {
+          const enServicio = configuradasEnServicio().map((s) => s.id)
+          return fallo(
+            enServicio.length
+              ? `Hay ${enServicio.length} máquinas configuradas: di de cuál es el reporte (${enServicio.join(', ')}).`
+              : 'No hay ninguna máquina configurada en servicio de la que hacer un reporte.',
+            { sistemas: enServicio }
+          )
+        }
+      }
+      const sistemaDelReporte = entrada.id
+      /* Sin `metaDe` no hay etiqueta ni unidad por señal, y un PDF sin rótulos
+         no se emite. Toda configurada lo trae; una entrada escrita a mano que
+         vuelva al registro tendrá que traerlo también. */
+      if (!entrada.metaDe) {
+        return fallo(
+          `«${entrada.nombre}» no declara metaDe(): sin etiqueta ni unidad por señal no se puede rotular un PDF. ` +
+            `Sus datos sí se pueden dar en la conversación: historia_de_senal(sistema="${sistemaDelReporte}").`,
+          { sistema: sistemaDelReporte }
+        )
+      }
 
+      let claves
+      const desconocidas = []
       if (senales && senales.length) {
         claves = []
         for (const nombre of senales) {
-          const r = resolverSenalDeSistema(nombre, sistema)
+          const r = resolverSenalDeSistema(nombre, sistemaDelReporte)
           if (!r.ok) {
             desconocidas.push(nombre)
             continue
           }
-
-          if (sistemaDelReporte && r.sistemaId !== sistemaDelReporte) {
-            return fallo(
-              `«${nombre}» es de «${r.sistemaId}» y las anteriores de ` +
-                `«${sistemaDelReporte}». Un reporte no mezcla dos máquinas: son instalaciones ` +
-                'separadas, y en un PDF esa mezcla sobrevive a la conversación que la explicaba. ' +
-                'Pide un reporte por máquina.',
-              { sistemas: [sistemaDelReporte, r.sistemaId] }
-            )
-          }
-
-          sistemaDelReporte = r.sistemaId
           claves.push(r.clave)
         }
-
         if (!claves.length) {
           return fallo(
-            `Ninguna de las señales pedidas se reconoce: ${desconocidas.join(', ')}. El catálogo ` +
-              'está en tus instrucciones.'
+            `Ninguna de las señales pedidas se reconoce en «${entrada.nombre}»: ${desconocidas.join(', ')}. ` +
+              'El catálogo está en tus instrucciones.'
           )
         }
       } else {
-        /*
-         * Sin señales se manda el catálogo entero de la máquina pedida. Con
-         * `sistema` declarado son SUS claves; sin él, las del tanque, que es
-         * lo que hacía antes.
-         */
-        /*
-         * Sin `sistema`: la ÚNICA configurada en servicio si la hay, y si no el
-         * tanque, como antes (Plan 44 F3.4). Medido con el modelo real: cuando la
-         * descripción decía «por omisión tanque», el modelo lo escribía él y el
-         * reporte caía en la máquina cerrada. Con varias configuradas y sin
-         * nombre, el tanque sigue siendo la omisión y se niega, como siempre.
-         */
-        sistemaDelReporte = sistema ? String(sistema).trim() : (sistemaPorOmision()?.id ?? 'tanque')
-        const entrada = SISTEMA[sistemaDelReporte]
-        if (!entrada) {
-          return fallo(`No hay ningún sistema llamado "${sistema}" en esta planta.`, {
-            sistemas: Object.keys(SISTEMA),
-          })
-        }
-        /* El tanque: sus 52 señales tienen serie, así que «todas» y «las
-           historizadas» coinciden. Una configurada, no: entra entera —lo que
-           tiene serie como gráfico, el resto en tabla, como promete la
-           descripción— y más abajo se queda con lo que su tipo sabe leer. */
-        claves = sistemaDelReporte === 'tanque'
-          ? entrada.claves().filter((k) => entrada.esHistorizada(k))
-          : entrada.claves()
+        /* Sin señales, la máquina entera: lo que tiene serie como gráfico, el
+           resto en tabla, y más abajo se queda con lo que su tipo sabe leer. */
+        claves = entrada.claves()
       }
 
-      /*
-       * ── Y EL CUERPO DE ABAJO SIGUE SIENDO DEL TANQUE ────────────────
-       *
-       * Misma situación —y misma guarda— que `pronostico_de_desgaste` unas
-       * líneas más arriba: `esHistorizada`, `senalInfo`, `UMBRALES` y
-       * `leerSerieEnRango` salen de `tanque/senales.js` e `historia.js`. Nada
-       * de eso mira de qué máquina es la clave.
-       *
-       * Lo que F7 arregla es la RESOLUCIÓN del nombre: antes, pedir el reporte
-       * de una señal de vibraciones caía en «ninguna de las señales pedidas se
-       * reconoce», una negativa redactada como si la señal no existiera
-       * teniendo serie. Ahora se reconoce, se sabe de quién es, y se dice por
-       * qué no se puede dibujar todavía.
-       *
-       * Sin esta guarda el arreglo sería peor que el defecto: una clave de
-       * vibraciones entraría a `senalInfo` —que no la conoce—, y el PDF saldría
-       * con rótulos vacíos o con la señal del agua que ocupe esa posición.
-       *
-       * Se cae sola cuando el dibujo salga del registro en vez del catálogo.
-       */
-      /*
-       * ── DE QUÉ MÁQUINA ES EL PDF, Y QUIÉN LO ROTULA (Plan 39 F4) ─────
-       *
-       * Hasta el 22-09-2026 esto se negaba para toda máquina que no fuera el
-       * tanque: los rótulos salían de `senalInfo`, las series de
-       * `esHistorizada` y las bandas de `UMBRALES`, todo de SU catálogo. Una
-       * configurada trae lo mismo por otro camino: la etiqueta, la unidad y
-       * los decimales los sabe su entrada (`metaDe`), qué series tiene lo
-       * dice ella (`esHistorizada`), y la banda bajo la curva la declara su
-       * TIPO por rol (`bandaDe`), que sólo la da a lo que tiene norma detrás.
-       * El del tanque sigue siendo el suyo, sin tocar.
-       *
-       * Lo que sigue sin poderse es una entrada sin `metaDe`: sin etiqueta ni
-       * unidad por señal no se puede rotular un PDF, y se dice.
-       */
-      const esTanque = sistemaDelReporte === 'tanque'
-      const entrada = SISTEMA[sistemaDelReporte]
-      if (!esTanque && !entrada?.metaDe) {
-        return fallo(
-          `«${sistemaDelReporte}» no declara metaDe(): sin etiqueta ni unidad por señal no se ` +
-            `puede rotular un PDF. Sus datos sí se pueden dar en la conversación: ` +
-            `historia_de_senal(sistema="${sistemaDelReporte}").`,
-          { sistema: sistemaDelReporte }
-        )
-      }
-      const tipo = esTanque ? null : tipoDe(entrada.tipo)
-      const metaDeReporte = (clave) => (esTanque ? senalInfo(clave) : metaDe(clave, sistemaDelReporte))
-      const historizada = (clave) => (esTanque ? esHistorizada(clave) : entrada.esHistorizada(clave))
+      const tipo = tipoDe(entrada.tipo)
+      const metaDeReporte = (clave) => metaDe(clave, sistemaDelReporte)
+      const historizada = (clave) => entrada.esHistorizada(clave)
+      /* La banda bajo la curva la declara el TIPO por rol, sólo donde hay norma. */
       const bandaDe = (clave) => {
-        if (esTanque) return UMBRALES[clave] ? bandaLegible(UMBRALES[clave], idioma) : null
         const u = tipo?.bandaDe?.(metaDeReporte(clave)?.rol) ?? null
         return u ? bandaLegible(u, idioma) : null
       }
-      const instalacion = esTanque ? etiquetasDeReporte(idioma).instalacion : entrada.nombre
+      const instalacion = entrada.nombre
 
       /*
-       * Una configurada se lee UNA vez: su estado da el ORDEN de las señales
-       * —apoyos, variador, alarmas, el que compone su tipo— y el valor actual
-       * de las que no tienen serie. Sin esto los gráficos saldrían en el orden
-       * del `maquinas.json`, que es el del árbol de ICONICS, no el de leer.
+       * Se lee UNA vez: su estado da el ORDEN de las señales —el que compone su
+       * tipo (apoyos, variador, alarmas), no el del árbol de ICONICS— y el
+       * valor actual de las que no tienen serie.
        */
-      let lecturaConfigurada = null
-      if (!esTanque) {
-        lecturaConfigurada = await leerMaquina(entrada)
-        const orden = new Map(
-          (lecturaConfigurada.ok ? lecturaConfigurada.estado.senales : []).map((s, i) => [s.clave, i])
-        )
-        claves = [...claves].sort((a, b) => (orden.get(a) ?? 1e9) - (orden.get(b) ?? 1e9))
-        /* Sin señales pedidas entra «toda la máquina», pero sólo lo que tiene
-           serie o lo que el tipo compone en su estado: una variable sin rol no
-           tiene rótulo ni lectura que enseñar, y una fila «sin dato» de algo
-           que sí tiene valor en vivo sería mentir. */
-        if (!senales?.length) claves = claves.filter((k) => historizada(k) || orden.has(k))
-      }
+      const lecturaConfigurada = await leerMaquina(entrada)
+      const orden = new Map(
+        (lecturaConfigurada.ok ? lecturaConfigurada.estado.senales : []).map((s, i) => [s.clave, i])
+      )
+      claves = [...claves].sort((a, b) => (orden.get(a) ?? 1e9) - (orden.get(b) ?? 1e9))
+      /* Sin señales pedidas entra «toda la máquina», pero sólo lo que tiene
+         serie o lo que el tipo compone en su estado: una variable sin rol no
+         tiene rótulo ni lectura que enseñar, y una fila «sin dato» de algo
+         que sí tiene valor en vivo sería mentir. */
+      if (!senales?.length) claves = claves.filter((k) => historizada(k) || orden.has(k))
 
       const historizadasPedidas = claves.filter(historizada)
       const sinHistoriaPedidas = claves.filter(c => !historizada(c))
@@ -1672,7 +1621,7 @@ export function crearHerramientasDeHistoricos({
         : []
 
       let tablaActual = []
-      if (sinHistoriaPedidas.length && !esTanque) {
+      if (sinHistoriaPedidas.length) {
         /* El valor actual sale de la lectura de arriba, con la forma común
            (`estado.senales`): la etiqueta, la unidad y el estado los puso el
            tipo al componer el estado. */
@@ -1685,31 +1634,6 @@ export function crearHerramientasDeHistoricos({
               /* La etiqueta, no la clave interna: «Normal», no «nominal». Sin
                  estado no hay criterio, y se dice con un guion, no con «en banda». */
               ? { senal: s.label, valor: s.valor, unidad: s.unidad || null, estado: s.estado ? estadoInfo(s.estado).label : '—', clave: s.estado ?? null }
-              : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato, clave: 'sin_dato' }
-          })
-        } else {
-          notas.push(idioma === 'en'
-            ? 'Could not read the current value of the signals with no history.'
-            : 'No se pudo leer el valor actual de las señales sin historia.')
-        }
-      } else if (sinHistoriaPedidas.length) {
-        /*
-         * `sistema` es OBLIGATORIO desde que estas herramientas sirven a
-         * cualquier máquina del registro: llamar sin él devuelve un fallo, y
-         * el reporte caía al respaldo «sin dato» sin decir por qué. El reporte
-         * es del tanque —sus señales salen de `SENAL_KEYS`— así que se nombra.
-         * `idioma` se reenvía aunque el tanque no lo use en su `resumen()`
-         * (ver el mismo comentario en `estado_del_sistema` de `maquina/index.mjs`):
-         * esta llamada es directa, vía `dameHerramientas()`, no por `ejecutar()`.
-         */
-        const estado = await dameHerramientas().estado_del_sistema({ sistema: 'tanque' }, { idioma })
-        if (estado.ok) {
-          const todas = estado.activos.flatMap(a => a.senales)
-          tablaActual = sinHistoriaPedidas.map(clave => {
-            const meta = senalInfo(clave)
-            const s = todas.find(x => x.clave === clave)
-            return s
-              ? { senal: s.senal, valor: s.valor, unidad: s.unidad, estado: s.estado, clave: claveDeEtiqueta(s.estado) }
               : { senal: meta.label, valor: null, unidad: meta.unidad || null, estado: etiquetasDeReporte(idioma).sinDato, clave: 'sin_dato' }
           })
         } else {
@@ -1788,7 +1712,7 @@ export function crearHerramientasDeHistoricos({
           tipo: 'reporte',
           formato: 'pdf',
           url: `/api/reportes?id=${id}`,
-          titulo: esTanque ? `Reporte — ${v.etiqueta}` : `Reporte — ${entrada.nombre} — ${v.etiqueta}`,
+          titulo: `Reporte — ${entrada.nombre} — ${v.etiqueta}`,
         },
       }
     },
