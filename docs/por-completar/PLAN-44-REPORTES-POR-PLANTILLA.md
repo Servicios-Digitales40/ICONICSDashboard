@@ -1,6 +1,6 @@
 # PLAN 44 — Reportes por plantilla: ocho tipos que el asistente sabe generar
 
-**Estado:** F0–F4 completadas el 23-09-2026 (cinco plantillas se generan: técnico, vibraciones, lectura de sensores, riesgos y alarmas; las otras tres están declaradas y la herramienta explica por qué no salen todavía) · F5–F7 por completar · TODAS las decisiones de §6 cerradas por el usuario el 23-09-2026, incluido el criterio de la matriz P×I (D15), confirmado esa misma tarde
+**Estado:** F0–F5 completadas (F0–F4 el 23-09-2026, F5 el 24-09-2026). **Siete de las ocho plantillas se generan**: técnico, vibraciones, lectura de sensores, riesgos, alarmas, ingeniería y energías. `predicciones` está escrita entera y deliberadamente apagada: ninguna máquina declara mecanismos de desgaste, así que no hay nada que pronosticar (D12, §6.3) · **F6–F7 por completar** · TODAS las decisiones de §6 cerradas por el usuario, incluido el criterio de la matriz P×I (D15)
 **Rama:** `UI-Limpieza1.0`
 **Origen:** el usuario entregó en `Documentos/Reportes/` ocho carpetas, una por
 tipo de reporte, cada una con un `.docx` de ejemplo (la maqueta) y un `.png`
@@ -598,21 +598,68 @@ que exige que **todas** las reglas del tipo declaren su impacto.
 dos tipos se componen desde la herramienta con su folio y su PDF, y la que
 usaba `riesgos` como ejemplo de pendiente usa ahora `energias`.
 
-### F5 — `ingenieria`, `energias`, `predicciones`
+### F5 — `ingenieria`, `energias`, `predicciones` · completada el 24-09-2026
 
 **Objetivo.** Los tres módulos restantes con lo que §1 permite: `ingenieria`
 con hallazgos derivados y campos de gestión en blanco; `energias` con el
-variador y los kWh **estimados** por integración de la potencia (`estimado:
-true`, cobertura y nota al pie; decidido en §6.2); `predicciones` **sólo la
-plantilla** (decidido en §6.3): el módulo declarativo completo, probado con
-un modelo de documento sintético, y la herramienta que **se niega con
-motivo** mientras la máquina tenga `desgaste: null` (D12). No se escribe
-ningún recolector de pronóstico en este plan.
+variador y los kWh **estimados** por integración de la potencia (§6.2);
+`predicciones` **sólo la plantilla** (§6.3), con la herramienta que **se
+niega con motivo** mientras la máquina tenga `desgaste: null` (D12).
 
-**Comprobaciones.** `predicciones` sobre la espejo → `fallo` cuyo texto nombra
-«mecanismos de desgaste» y `capacidades`; `energias` sin la integración →
-secciones de flujo/PF/meta como `ausencia`; `ingenieria` → indicadores de
-hallazgos con `n` igual a riesgos activos + hechos + intervenciones.
+**Lo que se hizo.**
+
+- **`integrarEnergia`, en el dominio** (`shared/eva/comun/estadistica.js`):
+  regla del trapecio sobre la serie de potencia. Devuelve `estimado: true`,
+  los tramos integrados y los huecos que dejó fuera. No cuesta ninguna
+  lectura de más — la serie ya la pide `claves()`.
+- **El hueco largo no se puentea**, y el umbral se MIDE: cuatro veces la
+  separación mediana de la propia serie. Un número fijo no servía porque la
+  cadencia depende del rango (`leerSerieEnRango` trocea, y un mes llega con
+  un punto por hora): 15 minutos clavados habrían declarado hueco un reporte
+  mensual entero y devuelto cero.
+- **`ingenieria`** mapea cada regla activa del motor a un hallazgo técnico,
+  con su `consecuencia` por impacto y su `nivel` por prioridad. Avance por
+  disciplina, pendientes y objetivo del proyecto salen en blanco con el pie
+  que dice que son de gestión, no de planta.
+- **`energias`** distingue sus tres carencias en vez de dar un genérico «sin
+  datos»: no hay caudal (kWh/m³), no hay reactiva (factor de potencia) y no
+  hay referencia con la que comparar (oportunidades de ahorro). Son tres
+  frases distintas porque se arreglan en tres sitios distintos.
+- **`predicciones`** queda escrita entera y apagada. Su cabecera explica por
+  qué no basta con dibujar las casillas vacías: un reporte de predicciones
+  sin predicciones no dice nada verdadero — dice, por existir con ese
+  membrete, que alguien pronosticó.
+- **`pendientes.mjs` desaparece**: ya no quedaban plantillas sin módulo
+  propio.
+
+**Defectos que aparecieron.**
+
+1. **Dos muestras separadas seis horas validaban su propio hueco.** Con tan
+   pocas separaciones la mediana ES el hueco, así que el umbral medido lo
+   aceptaba y devolvía 60 kWh de un período del que no se sabía nada. Por
+   debajo de cuatro tramos se cae a la rejilla habitual (15 min), que es una
+   afirmación sobre esta planta y no sobre los datos que llegaron.
+2. **Cinco títulos de columna cortados**, los cinco cazados por la prueba de
+   anchos que salió de la F4 — ninguno se vio a ojo. Se amplió además para
+   cubrir las plantillas que tienen `documento` aunque no estén disponibles:
+   los anchos de `predicciones` estaban mal y se habrían descubierto el día
+   de encenderla.
+3. **«Síntesis del sistema» encabezando una nota de método.** Se añadieron
+   dos rótulos comunes, `metodo` y `carencia`: un párrafo que explica cómo se
+   obtuvo algo, o por qué falta, no es una síntesis del estado.
+4. **`predicciones` no tenía rótulos propios**, sólo su entrada en
+   `pendientes`. Su `documento` los usa, así que el día de encenderla habría
+   salido `undefined` en mitad del PDF.
+5. **El folio usa la fecha real, no el `ahora` inyectado** (B21). Lo destapó
+   el cambio de día: una prueba que afirmaba `20260923` pasó todo el día que
+   se escribió y se puso roja a la mañana siguiente sin que nadie tocara
+   nada. Fuera del alcance de esta fase; la prueba afirma ahora el formato.
+
+**Comprobaciones.** `backend/test/reportes/` 37 (dos nuevas: los kWh llevan
+su «cómo se calculó», y un hallazgo por riesgo activo).
+`verificar-herramientas` 178, con una nueva que exige esa misma sección de
+método. La que usaba `energias` como ejemplo de pendiente usa ahora
+`predicciones`, la única que queda.
 
 ### F6 — Inglés, documentación y lo que ve el chat
 

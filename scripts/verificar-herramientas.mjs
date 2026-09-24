@@ -4663,7 +4663,7 @@ await checkAsync('[plantilla] sin `sistema`, catálogo y plantilla van a la ÚNI
   assert.equal(tecnico.sistema, ESPEJO.id)
 })
 
-await checkAsync('[plantilla] un tipo desconocido lista los tipos; "energias" está declarado pero se niega con su motivo y dice cuáles sí', async () => {
+await checkAsync('[plantilla] un tipo desconocido lista los tipos; "predicciones" está declarado pero se niega con su motivo y dice cuáles sí', async () => {
   const reportes = await reportesTmp()
   const h = createHerramientas({ client: clienteFalso(), reportes })
   const a = await h.ejecutar('generar_reporte', { tipo: 'bonito', sistema: ESPEJO.id })
@@ -4671,17 +4671,34 @@ await checkAsync('[plantilla] un tipo desconocido lista los tipos; "energias" es
   assert.match(a.error, /No hay ningún tipo de reporte llamado «bonito»/)
   assert.ok(a.tipos.includes('lectura-de-sensores'))
 
-  /* El ejemplo era `riesgos` hasta que la F4 lo compuso. `energias` sigue
-     pendiente: su motivo nombra lo que le falta, no un «no disponible». */
-  const b = await h.ejecutar('generar_reporte', { tipo: 'energias', sistema: ESPEJO.id })
+  /* El ejemplo fue `riesgos` hasta la F4 y `energias` hasta la F5. Queda
+     `predicciones`, y NO por falta de trabajo: su plantilla está escrita
+     entera. Se niega porque no hay mecanismos de desgaste que pronosticar,
+     y su motivo lo dice con esas palabras. */
+  const b = await h.ejecutar('generar_reporte', { tipo: 'predicciones', sistema: ESPEJO.id })
   assert.equal(b.ok, false)
   assert.match(b.error, /todavía no se compone/)
-  assert.match(b.error, /kWh|potencia/)
-  assert.deepEqual(b.disponibles, ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas'])
+  assert.match(b.error, /mecanismos de desgaste/)
+  assert.deepEqual(b.disponibles, ['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias'])
 
   const c = await h.ejecutar('generar_reporte', { tipo: 'técnico de alarmas', sistema: ESPEJO.id })
   assert.equal(c.ok, false)
   assert.deepEqual(c.tipos, ['tecnico', 'alarmas'], 'dos tipos en la frase: se pregunta, no se elige')
+})
+
+await checkAsync('[plantilla] energias ESTIMA los kWh integrando la potencia, y el PDF lo declara (F5)', async () => {
+  const reportes = await reportesTmp()
+  const h = createHerramientas({ client: clienteFalso(), reportes })
+  const r = await h.ejecutar('generar_reporte', { tipo: 'energias', sistema: ESPEJO.id, periodo: 'últimas 6 horas' })
+
+  assert.equal(r.ok, true, r.error)
+  assert.match(r.folio, /^TDCON-ENE-/)
+  /* La sección que explica CÓMO se calculó no puede faltar: sin ella el
+     número es indistinguible de la lectura de un contador (§6.2). */
+  assert.ok(
+    r.seccionesConDato.some((x) => /Cómo se calculó/i.test(x)),
+    'los kWh estimados tienen que ir acompañados de cómo se obtuvieron',
+  )
 })
 
 await checkAsync('[plantilla] riesgos y alarmas se componen desde la herramienta, con su folio y su PDF (F4)', async () => {

@@ -208,3 +208,89 @@ export function describirCorrelacion(r) {
   if (fuerza < 0.2) return `relación ${grado}: se movieron de forma independiente`
   return `relación ${grado} y ${r > 0 ? 'en el mismo sentido' : 'en sentidos opuestos'}`
 }
+/**
+ * Energía acumulada (kWh) integrando una serie de potencia (kW).
+ *
+ * ── POR QUÉ ESTO ES UNA ESTIMACIÓN, Y SE DICE ──────────────────────
+ *
+ * Esta planta NO tiene medidor de energía. Lo que hay es la potencia que
+ * publica el variador, y los kWh salen de integrarla en el tiempo: regla del
+ * trapecio entre muestras consecutivas. Es aritmética honesta sobre un dato
+ * real, pero NO es una lectura: un medidor cuenta lo que pasó entre muestra y
+ * muestra, y esto supone que la potencia varió linealmente. El usuario lo
+ * aceptó así el 23-09-2026 (Plan 44 §6.2) **con la condición de declararlo**,
+ * y por eso el resultado viaja con `estimado: true` y su cobertura.
+ *
+ * ── EL HUECO LARGO NO SE PUENTEA ───────────────────────────────────
+ *
+ * Entre dos muestras separadas por mucho más de lo normal no se integra: se
+ * cuenta como hueco y se descuenta de la cobertura. Es la diferencia entre
+ * «no sé qué pasó esas seis horas» y «supongo que siguió igual», y suponerlo
+ * puede inventar megavatios-hora enteros — el §2.4 de `CLAUDE.md` aplicado a
+ * una integral.
+ *
+ * «Mucho más de lo normal» se MIDE, no se fija: el umbral es cuatro veces la
+ * separación mediana de esta serie. Un número fijo no sirve porque la
+ * cadencia depende del rango pedido —`leerSerieEnRango` trocea, y un mes
+ * llega con un punto cada hora o más—, así que 15 minutos clavados habrían
+ * declarado hueco TODO un reporte mensual y devuelto cero. Se toma la
+ * mediana y no la media porque un solo hueco enorme arrastra la media y se
+ * auto-justifica. `huecoMaxMs` permite fijarlo cuando se conoce la cadencia.
+ *
+ * @param {{t: Date, valor: number}[]} puntos  serie de potencia ya normalizada
+ * @param {{huecoMaxMs?: number}} [opciones]
+ * @returns {{kWh: number, estimado: true, tramos: number, huecos: number,
+ *   cubiertoMs: number, huecoMs: number}|null}  `null` si no hay dos muestras
+ *   que integrar: una sola potencia no dice cuánta energía pasó.
+ */
+export function integrarEnergia(puntos, { huecoMaxMs = null } = {}) {
+  const serie = (Array.isArray(puntos) ? puntos : [])
+    .filter((p) => p?.t && Number.isFinite(Number(p.valor)))
+    .map((p) => ({ t: p.t instanceof Date ? p.t.getTime() : new Date(p.t).getTime(), v: Number(p.valor) }))
+    .filter((p) => Number.isFinite(p.t))
+    .sort((a, b) => a.t - b.t)
+
+  if (serie.length < 2) return null
+
+  /* El umbral de hueco, medido sobre la propia serie (ver la cabecera). */
+  const separaciones = []
+  for (let i = 1; i < serie.length; i++) {
+    const dt = serie[i].t - serie[i - 1].t
+    if (dt > 0) separaciones.push(dt)
+  }
+  if (!separaciones.length) return null
+
+  /*
+   * Con muy pocas separaciones la mediana NO dice cuál es la cadencia normal:
+   * con dos muestras separadas seis horas, la mediana ES esas seis horas y el
+   * hueco se valida a sí mismo —devolvía 60 kWh de un período del que no se
+   * sabe nada—. Por debajo de cuatro tramos se cae a la rejilla habitual del
+   * historiador (15 min), que es una afirmación sobre ESTA planta y no sobre
+   * los datos que llegaron.
+   */
+  const corte = huecoMaxMs
+    ?? (separaciones.length >= 4 ? Math.max(4 * mediana(separaciones), 60_000) : 15 * 60_000)
+
+  let kWh = 0
+  let tramos = 0
+  let huecos = 0
+  let cubiertoMs = 0
+  let huecoMs = 0
+
+  for (let i = 1; i < serie.length; i++) {
+    const dt = serie[i].t - serie[i - 1].t
+    if (dt <= 0) continue
+    if (dt > corte) {
+      huecos += 1
+      huecoMs += dt
+      continue
+    }
+    /* Trapecio: la potencia media del tramo por su duración en horas. */
+    kWh += ((serie[i].v + serie[i - 1].v) / 2) * (dt / 3_600_000)
+    tramos += 1
+    cubiertoMs += dt
+  }
+
+  if (!tramos) return null
+  return { kWh, estimado: true, tramos, huecos, cubiertoMs, huecoMs }
+}

@@ -18,7 +18,9 @@ import vibraciones from './vibraciones.mjs'
 import lecturaDeSensores from './lectura-de-sensores.mjs'
 import riesgos from './riesgos.mjs'
 import alarmas from './alarmas.mjs'
-import { energias, ingenieria, predicciones } from './pendientes.mjs'
+import ingenieria from './ingenieria.mjs'
+import energias from './energias.mjs'
+import predicciones from './predicciones.mjs'
 
 /** El tipo de siempre: todas las señales de la máquina, sin plantilla. */
 export const CATALOGO = 'catalogo'

@@ -390,12 +390,12 @@ ICONICS_FAKE=true node scripts/verificar-chat.mjs           # el bucle completo
 asistente— **sin red a planta y sin `ICONICS_API_BASE`**. Los dos guiones
 montan además un `llama-server` falso, así que corren en cualquier máquina.
 
-> **Hoy `verificar-herramientas` reporta 177 correctas y 45 OMITIDAS** (la
+> **Hoy `verificar-herramientas` reporta 178 correctas y 45 OMITIDAS** (la
 > estación de llenado está cerrada, §1). El guion imprime cuántas omitió y por
-> qué. Ese verde significa «177 de 222», y está dicho a propósito para que
-> nadie lo lea como si hubiera mirado las 222. Trece de las 177 son sobre una
-> máquina **configurada** (Plan 39 F0–F2), y también lo imprime; siete más, en
-> bloque propio al final, son los reportes por plantilla (Plan 44 F3–F4).
+> qué. Ese verde significa «178 de 223», y está dicho a propósito para que
+> nadie lo lea como si hubiera mirado las 223. Trece de las 178 son sobre una
+> máquina **configurada** (Plan 39 F0–F2), y también lo imprime; diez más, en
+> bloque propio al final, son los reportes por plantilla (Plan 44 F3–F5).
 >
 > **Por qué 45 y no 24 (B19, 24-09-2026):** el Plan 44 F3.6 quitó del
 > asistente las ramas del tanque —índice de nombres, umbrales, catálogo,
@@ -427,7 +427,7 @@ paralelos, para que el rojo diga DÓNDE sin abrir el registro.
 ### 5.3 Las suites
 
 ```bash
-cd backend && npm test          # 437 — contratos HTTP, config, logger, reportes por plantilla
+cd backend && npm test          # 439 — contratos HTTP, config, logger, reportes por plantilla
 cd react-dashboard && npm test  # 1191 (+20 omitidas) — dominio, vistas, hooks
 cd react-dashboard && npm run build && node ../scripts/verificar-bundle.mjs
 ```
@@ -515,7 +515,7 @@ su F6 de ajustes tras mirarlo en planta) se completó y archivó el 23-09-2026.
 Vivos hoy: el **33** (modularidad de máquinas), con su F9 —la estación de
 llenado como configurada— **bloqueada hasta reabrir** la rama, y el **44**
 (reportes por plantilla: ocho tipos de PDF que el asistente compone desde
-`backend/ia/reportes/`, escrito el 23-09-2026, con F0–F4 hechas y cinco de
+`backend/ia/reportes/`, escrito el 23-09-2026, con F0–F5 hechas y siete de
 los ocho tipos generándose ya). El
 **42** (verificar una bandera que nunca cambió sin forzarla, desde B13) se
 escribió y se completó el 22-09-2026 por la tarde: midió primero cómo registra

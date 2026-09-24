@@ -65,9 +65,9 @@ describe('tipoDeReporte', () => {
 })
 
 describe('el registro', () => {
-  it('nueve tipos, el catálogo primero; cinco disponibles hoy y tres declaradas con motivo en los dos idiomas', () => {
+  it('nueve tipos, el catálogo primero; siete disponibles hoy y una declarada con motivo en los dos idiomas', () => {
     expect(TIPOS).toEqual([CATALOGO, 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias', 'predicciones'])
-    expect(TIPOS_DISPONIBLES).toEqual(['tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas'])
+    expect(TIPOS_DISPONIBLES).toEqual(['tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias'])
     expect(plantillaDe(CATALOGO)).toBeNull()
     for (const [id, p] of Object.entries(PLANTILLAS)) {
       expect(p.id).toBe(id)
@@ -122,7 +122,10 @@ describe('el registro', () => {
 
     for (const idioma of ['es', 'en']) {
       const etq = etiquetasDeReporte(idioma)
-      for (const p of Object.values(PLANTILLAS).filter((x) => x.disponible)) {
+      /* Incluye las que NO están disponibles pero ya tienen `documento`:
+         `predicciones` se encenderá el día que un tipo declare desgaste, y
+         sus anchos deben estar bien desde ahora, no descubrirse entonces. */
+      for (const p of Object.values(PLANTILLAS).filter((x) => typeof x.documento === 'function')) {
         /* Un documento con lo mínimo: sólo interesan `columnas`, que no
            dependen de los datos. */
         const secciones = p.documento(DATOS_VACIOS, {
@@ -160,7 +163,7 @@ describe('el registro', () => {
   it('cada plantilla disponible tiene sus rótulos en los dos idiomas', () => {
     for (const idioma of ['es', 'en']) {
       const etq = etiquetasDeReporte(idioma)
-      for (const clave of ['tecnico', 'vibraciones', 'sensores', 'riesgos', 'alarmas']) {
+      for (const clave of ['tecnico', 'vibraciones', 'sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias', 'predicciones']) {
         expect(etq.plantillas[clave].titulo).toMatch(/[A-Z]/)
         expect(Object.keys(etq.plantillas[clave].secciones).length).toBeGreaterThanOrEqual(5)
       }

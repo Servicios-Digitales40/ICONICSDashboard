@@ -31,6 +31,7 @@ import { downsamplear } from '../herramientas/lib/formato.mjs'
 import { calcularTendencia, describirTendencia, PUNTOS_GRAFICO_REPORTE } from '../conversacion/herramientas.mjs'
 import { resumirSerie } from '../../../shared/eva/comun/historia.js'
 import { observarFrecuencia, armarMatriz } from '../../../shared/eva/comun/matrizRiesgo.js'
+import { integrarEnergia } from '../../../shared/eva/comun/estadistica.js'
 import { eventosDeAlarma } from '../../../shared/eva/comun/eventosDeAlarma.js'
 import { peor } from '../../../shared/eva/tanque/estado.js'
 
@@ -426,6 +427,22 @@ export async function recolectar({ entrada, tipo, plantilla, ventana, etq, idiom
     ? await recolectarEventos({ senales, ventana, fuentes, historizada, metaDe })
     : null
 
+  /*
+   * Los kWh ESTIMADOS, integrando la potencia del variador (Plan 44 §6.2).
+   * No cuesta ninguna lectura: la serie de potencia ya está leída si la
+   * plantilla la pidió en `claves()`. Sin esa serie no hay energía, y la
+   * sección lo dirá — no se integra la corriente ni se inventa un cos φ.
+   */
+  let energia = null
+  if (plantilla.estimaEnergia) {
+    const clavePotencia = senales.map((s) => s.clave).find((k) => metaDe(k)?.rol === 'variador:potencia')
+    const serie = clavePotencia ? series.get(clavePotencia) : null
+    const integrada = serie?.muestras?.length ? integrarEnergia(serie.muestras) : null
+    energia = integrada
+      ? { ...integrada, clave: clavePotencia, unidad: metaDe(clavePotencia)?.unidad ?? 'kW' }
+      : { kWh: null, motivo: clavePotencia ? 'sinMuestras' : 'sinPotencia', clave: clavePotencia ?? null }
+  }
+
   return {
     ok: true,
     lectura,
@@ -435,6 +452,7 @@ export async function recolectar({ entrada, tipo, plantilla, ventana, etq, idiom
     riesgos,
     matriz,
     eventos,
+    energia,
     medidas,
     principales,
     series,

@@ -64,7 +64,8 @@ describe('los tres tipos disponibles, sobre la espejo', () => {
     expect(r.tipo).toBe('tecnico')
     expect(r.reporte).toBe('REPORTE TÉCNICO')
     expect(r.instalacion).toBe(ESPEJO.nombre)
-    expect(r.folio).toMatch(/^TDCON-TEC-20260923-/)
+    /* La fecha del folio es la REAL, no la inyectada en `ahora`: ver B21. */
+    expect(r.folio).toMatch(/^TDCON-TEC-\d{8}-/)
     expect(r.paginas).toBeGreaterThanOrEqual(3)
     expect(r.seccionesConDato).toEqual([
       '1. Resumen operativo', '2. Indicadores principales', '3. Tendencias de variables',
@@ -145,6 +146,26 @@ describe('los tres tipos disponibles, sobre la espejo', () => {
     expect(matriz || r.seccionesConDato.some((s) => /Matriz/.test(s))).toBeTruthy()
   })
 
+  it('energias: los kWh se ESTIMAN integrando la potencia, y el PDF lo declara (F5, §6.2)', async () => {
+    const r = await generarReportePorPlantilla({ tipo: 'energias', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps())
+    expect(r.ok, r.error).toBe(true)
+    expect(r.folio).toMatch(/^TDCON-ENE-/)
+    /* La sección que explica CÓMO se calculó no puede faltar: sin ella el
+       número es indistinguible de la lectura de un contador. */
+    expect(r.seccionesConDato).toContain('1b. Cómo se calculó')
+    /* Y lo que esta máquina no mide sale con su motivo, no en blanco. */
+    expect(r.seccionesConDato).toContain('4. Eficiencia del sistema')
+    expect(await esPdf(r)).toBe(true)
+  })
+
+  it('ingenieria: un hallazgo por riesgo activo; lo de gestión queda en blanco y se dice (F5)', async () => {
+    const r = await generarReportePorPlantilla({ tipo: 'ingenieria', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps())
+    expect(r.ok, r.error).toBe(true)
+    expect(r.folio).toMatch(/^TDCON-ING-/)
+    expect(r.seccionesConDato).toContain('3. Hallazgos técnicos')
+    expect(await esPdf(r)).toBe(true)
+  })
+
   it('alarmas: cuenta por severidad derivada del rol y separa «sin flancos» de «sin serie» (F4)', async () => {
     const r = await generarReportePorPlantilla({ tipo: 'alarmas', sistema: ESPEJO.id, periodo: 'últimas 6 horas' }, deps())
     expect(r.ok, r.error).toBe(true)
@@ -174,12 +195,15 @@ describe('lo que se niega, y cómo', () => {
   })
 
   it('una plantilla declarada pero no compuesta se niega con su motivo y dice cuáles sí', async () => {
-    /* `riesgos` y `alarmas` salieron de esta lista en la F4: ya se componen. */
-    for (const tipo of ['ingenieria', 'energias', 'predicciones']) {
+    /* Sólo queda `predicciones`, y NO por falta de trabajo: su plantilla está
+       escrita entera. Se niega porque ninguna máquina declara mecanismos de
+       desgaste, así que no hay nada que pronosticar (D12, §6.3). */
+    for (const tipo of ['predicciones']) {
       const r = await generarReportePorPlantilla({ tipo, sistema: ESPEJO.id }, deps())
       expect(r.ok).toBe(false)
       expect(r.error).toMatch(/todavía no se compone/)
-      expect(r.disponibles).toEqual(['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas'])
+      expect(r.error).toMatch(/mecanismos de desgaste/)
+      expect(r.disponibles).toEqual(['catalogo', 'tecnico', 'vibraciones', 'lectura-de-sensores', 'riesgos', 'alarmas', 'ingenieria', 'energias'])
     }
     const en = await generarReportePorPlantilla({ tipo: 'predictions', sistema: ESPEJO.id }, deps({ idioma: 'en' }))
     expect(en.error).toMatch(/wear mechanisms/)

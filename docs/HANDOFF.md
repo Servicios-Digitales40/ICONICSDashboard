@@ -126,7 +126,7 @@ hacia `DemoVibraciones4.0`.** Para que ese merge sea barato:
 **La puerta antes de tocar el modelo, el prompt o una herramienta** (§9):
 
 ```bash
-ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 177 correctas · 45 omitidas (ver CLAUDE.md §5.1)
+ICONICS_FAKE=true node scripts/verificar-herramientas.mjs   # 178 correctas · 45 omitidas (ver CLAUDE.md §5.1)
 ICONICS_FAKE=true node scripts/verificar-chat.mjs           # 72
 ICONICS_FAKE=true node scripts/verificar-instrucciones.mjs  # el prompt dice lo que el registro dice
 ```
@@ -191,9 +191,9 @@ La regla 2 (las pruebas omitidas no se arreglan) sigue igual.
 | | |
 |---|---|
 | Suite de frontend | **1191** pruebas · 20 omitidas *(a 23-09 por la noche, tras Plan 44 F4; eran 1180 tras la F3.3 y 1102 · 29 el 22-09)* |
-| Suite de backend | **437** pruebas (436 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 23-09 por la noche, tras Plan 44 F4; eran 433 tras la F3.3)* |
+| Suite de backend | **439** pruebas (438 verdes seguras; `salud.test.mjs` a veces cae por entorno, ver «Qué está roto») *(a 24-09-2026, tras Plan 44 F5; eran 437 tras la F4)* |
 | Verificadores | **los 41** de `npm run verificar` |
-| `verificar-herramientas` | **177** correctas (13 sobre una configurada, 8 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
+| `verificar-herramientas` | **178** correctas (13 sobre una configurada, 10 de reportes por plantilla, 43 portadas del tanque a la espejo en la B19) · **45 omitidas** por el cierre. La B19 se resolvió el 24-09-2026: de las 88 que dejó el Plan 44 F3.6, 43 eran mecánica genérica con el tanque de escenario y ya corren sobre la espejo; las 45 restantes sí dependen de esa máquina (su bomba, su catálogo escrito a mano, su narración) |
 | `verificar-chat` | **72** correctas |
 | `verificar-riesgos-vibracion` | **46** · **19 reglas** sobre 3 apoyos |
 | Lint y types | limpios |
@@ -437,18 +437,26 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 
 **`PLAN-44-REPORTES-POR-PLANTILLA.md`** — el usuario entregó ocho maquetas
 Word (técnico, vibraciones, sensores, riesgos, alarmas, ingeniería, energías,
-predicciones) para que `generar_reporte` sepa componer cada tipo. **F0–F4
-completas** (23-09-2026): maquetas en `docs/plantillas-reportes/`, arte en
+predicciones) para que `generar_reporte` sepa componer cada tipo. **F0–F5 completas** (F0–F4 el 23-09-2026, F5 el 24-09-2026): maquetas en `docs/plantillas-reportes/`, arte en
 `backend/ia/marca/portadas/`, un compositor por bloques
 (`reportes/compositor.mjs`), recolectores deterministas y `tipo` como
-argumento de la herramienta. **Cinco de las ocho ya se componen**: técnico,
-vibraciones, lectura de sensores, riesgos y alarmas; las otras tres se niegan
-con su motivo. **Todas las decisiones de §6 cerradas**, incluida la D15 (la
-matriz P×I: impacto declarado por cada regla del tipo, probabilidad observada
-contando instantes del historiador). **F5–F7 por hacer**: `ingenieria`,
-`energias` (kWh estimados) y `predicciones` (sólo la plantilla); el inglés y
-la documentación; y la vuelta contra planta con `vib-motor-03`. **Vive en
-`backend/ia/`**: su D11 dice qué archivos calientes toca y cómo avisar.
+argumento de la herramienta. **Siete de las ocho ya se componen**: técnico,
+vibraciones, lectura de sensores, riesgos, alarmas, ingeniería y energías.
+**Todas las decisiones de §6 cerradas**, incluida la D15 (la matriz P×I:
+impacto declarado por cada regla del tipo, probabilidad observada contando
+instantes del historiador) y la §6.2 (los kWh se ESTIMAN integrando la
+potencia del variador, y el PDF lleva una sección que dice cómo).
+
+**`predicciones` es el único que no sale, y NO por falta de trabajo**: su
+plantilla está escrita entera. Se niega porque ninguna máquina configurada
+declara mecanismos de desgaste (nacen con `desgaste: null`), así que no hay
+nada que pronosticar. Emitir el PDF con las casillas vacías diría, por el
+mero hecho de existir con ese membrete, que alguien pronosticó (D12).
+
+**F6–F7 por hacer**: repasar el inglés de las ocho y la documentación; y la
+vuelta contra planta con `vib-motor-03`, midiendo tiempo y tamaño por
+plantilla. **Vive en `backend/ia/`**: su D11 dice qué archivos calientes toca
+y cómo avisar.
 
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
@@ -821,7 +829,7 @@ cd react-dashboard && npm test
 | | Esperado |
 |---|---|
 | `npm run verificar` | **Los 41 pasaron** (`sondeo-series` 34 · `vibraciones-configurada` 40) |
-| Backend | **436 passed** de 437 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
+| Backend | **438 passed** de 439 (ver «Qué está roto» en §1 sobre `salud.test.mjs`) |
 | Frontend | **1191 passed · 20 skipped** *(23-09-2026, tras Plan 44 F4)* |
 | Lint y types | sin salida |
 

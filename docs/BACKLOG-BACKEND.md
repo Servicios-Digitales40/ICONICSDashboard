@@ -776,3 +776,26 @@ misma pregunta, y la próxima pieza que lea la primera ruta citará «alarma: 1,
 hacer que `estadoMaquina` no tenga un valor por omisión y exija el del rol. Lo
 segundo es más honesto y más caro. Antes de tocarlo hay que mirar qué cita hoy
 el tablero, porque cambia lo que se ve en pantalla.
+
+## B21 · El folio de un reporte lleva la fecha de HOY, no la del período
+
+**Visto el 24-09-2026** (Plan 44 F5, al cambiar de día a medianoche).
+`componerPorPlantilla` genera el folio con `generarFolio(new Date(), …)`
+(`compositor.mjs`), así que ignora el `ahora` que `generarReportePorPlantilla`
+recibe e inyecta en todo lo demás. Una prueba que afirmaba
+`TDCON-TEC-20260923-` pasó durante todo el día que se escribió y se puso roja
+al día siguiente sin que nadie tocara nada.
+
+**Qué significa.** Dos cosas distintas comparten el número: el folio dice
+cuándo se EMITIÓ el documento, y el reporte habla de un PERÍODO que puede ser
+otro. Un reporte del turno de noche pedido a las 00:30 se folia con el día
+siguiente. No es incorrecto —un folio es la fecha de emisión— pero hoy no se
+puede decidir, porque el `ahora` inyectable no llega ahí.
+
+**El arreglo.** Pasar `ahora` al compositor y que el folio salga de él. Es una
+línea, pero antes hay que decidir qué fecha se quiere en el folio: la de
+emisión (lo de hoy, con `ahora` respetado en las pruebas) o la del fin del
+período. La maqueta no lo dice y el usuario no lo ha pedido.
+
+**Mientras tanto**, la prueba de `generar.test.mjs` afirma el formato
+(`TDCON-TEC-\d{8}-`) y no una fecha concreta, con esta B21 citada al lado.
