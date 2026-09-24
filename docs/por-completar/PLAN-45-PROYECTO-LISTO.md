@@ -1,6 +1,6 @@
 # PLAN 45 — Dejar el proyecto listo: lo que falta para cerrar Vibraciones como producto
 
-**Estado:** **F0, F2, F3, F4, F5.3 y F1.3 completadas el 24-09-2026** · queda **F1** (pendiente sólo de **D1** y de que el motor gire) y **F6** (merge). D2 y D3 resueltas. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
+**Estado:** **F0, F2, F3, F4 y F5 completadas el 24-09-2026; F1 hecha salvo dos puntos** · de F1 sólo quedan **F1.1** (espera **D1**) y **F1.4** (espera a que el motor gire); **F6** (merge) al final. D2 y D3 resueltas. Fecha objetivo: **29-09-2026**. Lo de §0 está **medido** contra el repo, contra la planta real (`bms-server`) y contra el modelo real (`qwen-3.5-4B` en `10.10.17.18`); lo que es una suposición lo dice.
 **Rama:** `UI-Limpieza1.0` (Moisés). `DemoVibraciones4.0` recibe el resultado; `AjustesGustavo5.0` es la del asistente (Gustavo). Ver `HANDOFF.md` §0.
 **Origen:** el usuario pidió el 24-09-2026 revisar alcances, capacidades y problemas del proyecto, con pruebas, y después acotó: «no pensemos en la presentación, sino en el contenido del proyecto y en cómo funciona. Quiero dejar el proyecto listo. ¿Qué faltaría?».
 
@@ -242,8 +242,27 @@ Y una de trámite: ¿el plan se comitea tal cual?
 1. **Las seis variables sin fuente** (D1). Si se quitan: editor → la máquina
    vuelve a `UNKNOWN` por diseño → **Verificar** → `VALID` con 70. Evidencia:
    `/api/health` en `ok`; el pie del asistente deja de contar puntos mudos.
-2. **Nombrar `V20` y `TORRETA`** en el editor. Evidencia: Planta y el
-   asistente los llaman por su nombre.
+2. **Nombrar `V20` y `TORRETA`** en el editor — **HECHO el 24-09-2026** por el
+   usuario: `V20` → «Variador», `TORRETA` → «Torreta». Comprobado en
+   `datos/maquinas.json`; `activosNombrados()` los devuelve, así que el
+   asistente ya resuelve «velocidad del variador».
+
+   **Y entró una máquina más de la que este plan no sabía: `Jaritza`**, un
+   analizador de red con **16 variables** (ocho en L1 y ocho en L2), que sube
+   la máquina de 76 a **92**. Verificado contra ICONICS el mismo día: 92 de 92
+   presentes, las 16 leen en vivo con calidad buena. Tres cosas suyas quedan
+   dichas, no pendientes:
+
+   - **su activo se quedó sin nombre**, como estaban `V20` y `TORRETA` antes;
+     mismo efecto, mismo arreglo de un minuto;
+   - **sus 16 variables no tienen rol, y es correcto**: el tipo es
+     `vibraciones` y no reconoce medidas eléctricas de un analizador. La
+     pantalla lo dice («el tipo no reconoce ninguna de sus variables»). Se leen
+     y se grafican; no entran en reglas de riesgo ni en el estado mecánico;
+   - **13 de sus 16 series quedaron verificadas** tras el sondeo del usuario a
+     las 19:24. En un sondeo anterior, con el equipo en cero, salían 0 de 16
+     por «sin variación» —igual que 71 variables de toda la máquina—, que es
+     el mismo motivo por el que `aRMS_S3` y `aPeak_S3` esperan a que gire.
 3. **La bitácora** (D3) — **HECHO el 24-09-2026, 17:36.** El usuario decidió
    purgar. Y al ir a hacerlo no había una intervención sino **tres**: la de
    `vib-motor-03` sin causa, más **dos del tanque escritas esa misma tarde a
@@ -268,13 +287,33 @@ Y una de trámite: ¿el plan se comitea tal cual?
    **Comprobado** contra un backend real: `GET /api/casos` devuelve
    `{ total: 0 }` y el índice de casos arranca sin fallar, que es lo que la
    nota de `HANDOFF.md` §7 advierte que hay que mirar tras un vaciado.
-4. **Sondear con el motor girando**. Evidencia: `aRMS_S3` y `aPeak_S3`
-   verificadas; «sin verificar» baja de 14 a las constantes que no dejaron
-   marca en la ventana, y ninguna «compartida».
-5. **Vaciar los diarios de prueba** (`datos/diario-conversaciones.jsonl`,
-   `datos/diario-diagnosticos.jsonl`, copia al lado) y borrar
-   `backend/datos/aprendizaje.json`. Hasta F2.1, no correr `npm test` del
-   backend en el equipo que sirve.
+4. **Sondear con el motor girando** — **PENDIENTE, y es lo único de F1 que no
+   se puede forzar desde aquí.** Evidencia que se busca: `aRMS_S3` y
+   `aPeak_S3` verificadas, y ninguna «compartida».
+
+   **Estado a 24-09-2026, 19:24** (sondeo del usuario, con el motor parado):
+   **81 de 92 series verificadas** —63 como `registrada-constante`, 18 como
+   `serie-propia`— y la máquina en `VALID`. Es mejor de lo que este plan
+   registró en §0 (62 de 76), porque entró Jaritza y porque el criterio por
+   marcas de tiempo gana las constantes sin que nada cambie de valor. Lo que
+   sigue sin poderse es distinguir dos series planas entre sí: ésas necesitan
+   que el equipo mida algo distinto de cero.
+5. **Vaciar los diarios de prueba** — **HECHO el 24-09-2026, 19:28.** No se
+   vaciaron enteros: se quitó **sólo lo de prueba** y se conservó lo real, que
+   es historial de la instalación y no basura.
+
+   | | Antes | Después |
+   |---|---|---|
+   | `diario-conversaciones.jsonl` | 2 772 | **228** (las de `modelo-de-prueba` y `local` fuera) |
+   | `diario-diagnosticos.jsonl` | 2 773 | **95** (los `huerfano: true` fuera) |
+
+   El **92 %** era ruido de la suite y de los verificadores, acumulado hasta
+   que F2.1 los aisló. Copia de los dos al lado
+   (`…antes-de-limpiar-2026-09-24T19-28-21-810Z.jsonl`), y comprobado después
+   que las 323 líneas que quedan son JSON válido.
+
+   `backend/datos/aprendizaje.json` ya no existe: F2.1 lo cerró de raíz y no
+   ha vuelto a aparecer en ninguna tanda desde entonces.
 
 **Criterio de aceptación:** `GET /api/maquinas/vib-motor-03` en `VALID`, seis
 activos con nombre, `/api/health` en `ok`, «Casos previos» con lo decidido.
@@ -493,7 +532,7 @@ Un commit. Lo desactualizado, con línea:
 **Criterio de aceptación:** ninguna cifra de pruebas en los tres documentos
 distinta de la que imprime la tanda ese día.
 
-### F5 · Cierre: lo que queda declarado
+### F5 · Cierre: lo que queda declarado — **COMPLETADA el 24-09-2026**
 
 **Objetivo.** Que cada límite de §1 esté escrito en el sitio donde alguien lo
 va a buscar, no sólo en un plan.
@@ -503,8 +542,13 @@ va a buscar, no sólo en un plan.
    una regla del tipo que sale como riesgo «Crítico»; si el equipo no lo va a
    activar, la limitación lo dice y el asistente lo cita como configuración,
    no como avería) — decisión del usuario.
-2. **Alarmas**: la ficha de la máquina o Inicio dicen ya por qué no hay
-   historial (Plan 41 F4). Comprobar que el texto sigue siendo cierto.
+2. **Alarmas** — **COMPROBADO el 24-09-2026, y sigue siendo cierto.** El texto
+   que la interfaz enseña («se leen los contadores del área: cuál de las 57
+   alarmas configuradas es cada una no se puede saber desde aquí») y el que el
+   asistente cita (`estadoVibraciones.js`) afirman lo mismo, y la causa se
+   volvió a medir contra planta: `GET /api/iconics/alarms` para un punto de
+   vibraciones devuelve **500, `ICONICS AlarmHistory request failed`**. Es lo
+   que cerró el Plan 41 F4 sin vista, y no ha cambiado.
 3. Los **backlogs**: volcar lo que este plan no hace (B14, B15, F7/F8 del
    backlog de frontend, la B17 si F2.1 no la cierra entera).
 
