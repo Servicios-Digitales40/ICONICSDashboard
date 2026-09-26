@@ -546,5 +546,10 @@
     "reference": "La franja es una referencia de confort, no un umbral de alarma",
     "comfortRange": "Referencia de confort: {{desde}}–{{hasta}} {{unidad}}",
     "empty": "Esta máquina no declara ninguna señal todavía."
+  },
+  "types": {
+    "vibraciones": "Vigilancia de vibraciones",
+    "sensado": "Sensado de planta",
+    "estacion-de-llenado": "Estación de llenado"
   }
 }

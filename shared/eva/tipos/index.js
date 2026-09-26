@@ -37,19 +37,22 @@
  * Y hoy no lo consume nadie salvo sus pruebas: F1 es una extracción, y una
  * extracción que cambia el comportamiento no se distingue de una regresión.
  */
+import { TIPO_ESTACION_LLENADO } from "./estacionLlenado.js";
 import { TIPO_SENSADO } from "./sensado.js";
 import { TIPO_VIBRACIONES } from "./vibraciones.js";
 
 /**
  * Los tipos que este programa sabe interpretar.
  *
- * `estacionLlenado` NO está, y su ausencia es deliberada: extraerlo exigiría
- * tocar el código del tanque, que la rama `Vibraciones1.0` prohíbe
- * (`CLAUDE.md` §1, regla 1). Entra en la F9 del Plan 33, detrás de la
- * reapertura. Mientras tanto, el tanque sigue funcionando como siempre: su
- * entrada de `SISTEMAS` está escrita a mano y no necesita tipo.
+ * ── `estacion-de-llenado` YA ESTÁ (Plan 46 F7, 26-09-2026) ────────
  *
- * ── DOS TIPOS, Y NO HACEN LO MISMO (Plan 46 F2, 24-09-2026) ───────
+ * Esta nota decía que su ausencia era deliberada, «porque extraerlo exigiría
+ * tocar el código del tanque». Se extrajo sin tocarlo: el tipo
+ * (`estacionLlenado.js`) IMPORTA de `tanque/` y no modifica ni una línea suya,
+ * que es exactamente lo que la regla de la rama pide —se consulta cuanto haga
+ * falta, no se edita—. La F9 del Plan 33 queda cubierta por esta vía.
+ *
+ * ── TRES TIPOS, Y NO HACEN LO MISMO ──────────────────────────────
  *
  * `sensado` es el primer tipo OBSERVADOR: no diagnostica, y por eso no
  * declara reglas ni `DIAGNOSTICS`. Hasta la F1 de ese plan eso era ilegal
@@ -57,9 +60,14 @@ import { TIPO_VIBRACIONES } from "./vibraciones.js";
  * comprueba es la coherencia entre lo que un tipo promete y lo que trae.
  *
  * Tenerlos juntos es lo que da sentido al índice: quien pregunta `tipoDe(id)`
- * no tiene que saber cuál de los dos juzga y cuál sólo mira.
+ * no tiene que saber cuál juzga y cuál sólo mira.
+ *
+ * Y los dos que juzgan no lo hacen igual: `vibraciones` reparte sus medidas
+ * por APOYOS —tres acelerómetros de la misma pieza— y `estacion-de-llenado`
+ * por ACTIVOS —el depósito, el grupo de bombeo, la red—, que son partes
+ * distintas de una instalación. De ahí que el segundo no declare `canales`.
  */
-export const TIPOS = Object.freeze([TIPO_VIBRACIONES, TIPO_SENSADO]);
+export const TIPOS = Object.freeze([TIPO_VIBRACIONES, TIPO_SENSADO, TIPO_ESTACION_LLENADO]);
 
 /** Tipo por id. */
 export const TIPO = Object.freeze(Object.fromEntries(TIPOS.map((t) => [t.id, t])));

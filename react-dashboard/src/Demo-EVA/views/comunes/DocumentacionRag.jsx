@@ -569,9 +569,24 @@ export default function DocumentacionRag({ params, onNavigate }) {
    */
   const sistemas = [
     ...sistemasTraducidos(),
+    /*
+     * ── EL NOMBRE DEL TIPO SE TRADUCE (Plan 46 F7) ──────────────────
+     *
+     * `tp.nombre` es el rótulo que el TIPO declara, y está en español: el
+     * dominio no sabe de idiomas. Usarlo tal cual metía «Estación de llenado»
+     * en un tablero en inglés, que es el mismo defecto que el Plan 38 arregló
+     * para las MÁQUINAS con `machines:systems` — lo cazó la prueba de paridad
+     * de RAG al entrar el tercer tipo.
+     *
+     * El `defaultValue` deja que un tipo nuevo salga con su nombre propio en
+     * vez de con su id crudo mientras nadie le escriba la clave: se lee peor
+     * que traducido y muchísimo mejor que `estacion-de-llenado`.
+     */
     ...TIPOS.map((tp) => ({
       id: alcanceDeTipo(tp.id),
-      nombre: traducir("assistant:rag.docs.byType", { tipo: tp.nombre }),
+      nombre: traducir("assistant:rag.docs.byType", {
+        tipo: traducir(`machines:types.${tp.id}`, { defaultValue: tp.nombre }),
+      }),
     })),
   ];
   const sistemasPorId = new Map(sistemas.map((s) => [s.id, s.nombre]));

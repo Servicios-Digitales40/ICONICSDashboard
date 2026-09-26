@@ -546,5 +546,10 @@
     "reference": "The band is a comfort reference, not an alarm threshold",
     "comfortRange": "Comfort reference: {{desde}}–{{hasta}} {{unidad}}",
     "empty": "This machine does not declare any signal yet."
+  },
+  "types": {
+    "vibraciones": "Vibration monitoring",
+    "sensado": "Plant sensing",
+    "estacion-de-llenado": "Filling station"
   }
 }

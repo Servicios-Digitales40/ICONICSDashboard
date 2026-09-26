@@ -84,8 +84,21 @@ describe("el índice de tipos", () => {
     expect(tipoDe(undefined)).toBeNull();
   });
 
-  it("NO declara la estación de llenado: su extracción es de la F9", () => {
-    expect(TIPO_IDS).not.toContain("estacionLlenado");
+  /*
+   * ── LA ESTACIÓN DE LLENADO YA ESTÁ (Plan 46 F7, 26-09-2026) ───────
+   *
+   * Esta prueba afirmaba lo contrario —«NO declara la estación de llenado: su
+   * extracción es de la F9»— y pasaba por CASUALIDAD: comprobaba el id
+   * `estacionLlenado` y el tipo se llama `estacion-de-llenado`, así que habría
+   * seguido en verde mientras afirmaba algo falso.
+   *
+   * Se sustituye por lo que ahora hay que defender: que el tipo existe y que
+   * su id es el que usa la configuración de una máquina. Un id distinto del
+   * que espera `maquinas.json` deja la máquina sin tipo reconocible.
+   */
+  it("declara la estación de llenado con el id que usa la configuración", () => {
+    expect(TIPO_IDS).toContain("estacion-de-llenado");
+    expect(tipoDe("estacion-de-llenado")).toBe(TIPO["estacion-de-llenado"]);
   });
 
   it("el resumen viaja como datos, sin reglas ni funciones", () => {
@@ -256,5 +269,70 @@ describe("lo que las reglas necesitan", () => {
         ).toBe(esperado);
       }
     }
+  });
+});
+
+/*
+ * ── EL TIPO DEL TANQUE SE COMPONE, NO SE TRANSCRIBE (Plan 46 F7) ─────
+ *
+ * `estacion-de-llenado` se extrajo de `shared/eva/tanque/` -3.393 lineas-
+ * SIN tocar ni una de ellas, que es lo que la regla de la rama pide: se
+ * consulta cuanto haga falta, no se edita.
+ *
+ * Lo que se fija aqui es que sea COMPOSICION y no copia. Una transcripcion
+ * pasaria un `toEqual` y se iria a destiempo en cuanto alguien tocara una de
+ * las dos listas; la identidad de referencia solo la pasa lo importado.
+ */
+describe("el tipo estacion-de-llenado compone el dominio del tanque", () => {
+  it("expone LAS MISMAS reglas que el modulo del tanque, por referencia", async () => {
+    const { REGLAS } = await import("@shared/eva/tanque/riesgos.js");
+    expect(TIPO["estacion-de-llenado"].reglas).toBe(REGLAS);
+  });
+
+  it("sus roles salen del CATALOGO, no de una lista escrita a mano", async () => {
+    const { SENAL_KEYS } = await import("@shared/eva/tanque/senales.js");
+    const t = TIPO["estacion-de-llenado"];
+
+    /* Una senal nueva en el catalogo aparece aqui sola: es lo que evita que
+       las dos listas se separen. */
+    expect(Object.keys(t.roles)).toHaveLength(SENAL_KEYS.length);
+    for (const clave of SENAL_KEYS) {
+      expect(t.rolesDeClave(clave).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("sus roles REQUERIDOS salen del `necesita` de las reglas", async () => {
+    const { REGLAS } = await import("@shared/eva/tanque/riesgos.js");
+    const t = TIPO["estacion-de-llenado"];
+    const claves = new Set(REGLAS.flatMap((r) => r.necesita ?? []));
+
+    /*
+     * Escribirlos a mano seria una segunda lista que se queda vieja en cuanto
+     * alguien anade una regla, y el fallo no se veria: la maquina se daria de
+     * alta "completa" y sus reglas nunca se evaluarian.
+     */
+    expect(t.rolesRequeridos).toHaveLength(claves.size);
+    for (const rol of t.rolesRequeridos) {
+      expect(t.roles[rol], `${rol} no esta entre los roles del tipo`).toBeTruthy();
+    }
+  });
+
+  it("reparte por ACTIVOS y no por apoyos: no declara canales", () => {
+    const t = TIPO["estacion-de-llenado"];
+
+    /* Sus partes -el deposito, el grupo de bombeo, la red- son partes
+       DISTINTAS de una instalacion, no tres vistas de la misma pieza como los
+       tres acelerometros de un motor. */
+    expect(t.canales).toBeUndefined();
+    expect(t.activos.length).toBeGreaterThan(0);
+    expect(t.activos.map((a) => a.id)).toContain("tanque");
+  });
+
+  it("declara DIAGNOSTICS y ALARMS, que es lo que lo separa de un observador", () => {
+    const t = TIPO["estacion-de-llenado"];
+    expect(t.capacidadesPosibles).toContain("DIAGNOSTICS");
+    expect(t.capacidadesPosibles).toContain("ALARMS");
+    /* Y la coherencia que el indice exige: promete diagnostico Y trae reglas. */
+    expect(t.reglas.length).toBeGreaterThan(0);
   });
 });
