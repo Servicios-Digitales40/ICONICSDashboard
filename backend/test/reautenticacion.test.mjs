@@ -222,3 +222,64 @@ describe('cuando ICONICS pide reautenticación, el puente se renueva solo', () =
     }
   })
 })
+
+/*
+ * ── LA URL NO SIEMPRE ES UNA CADENA (Plan 46 F4.1, corregido) ────────
+ *
+ * `withParams()` devuelve un objeto `URL`, y `fetch` lo acepta igual que una
+ * cadena. El reintento de arriba preguntaba `url.startsWith(...)` para saber
+ * si la peticion escribe, y sobre un `URL` eso LANZA.
+ *
+ * El defecto no se veia nunca... hasta que una lectura hecha con `withParams`
+ * -`browse`, `readPoint`, `readHistory`, `search`- llegaba a la rama de la
+ * reautenticacion. Entonces el TypeError tumbaba la peticion con un 502 y el
+ * mensaje culpaba a la RED: «revisa que el servidor sea alcanzable», con el
+ * servidor perfectamente.
+ *
+ * Las tres pruebas de arriba no lo cazaron porque `readPoints` construye su
+ * url como cadena literal. Esta usa `browse`, que es de las que no.
+ */
+describe('una lectura cuya url es un objeto URL', () => {
+  it('browse() sobrevive a la reautenticacion: se renueva y reintenta, sin TypeError', async () => {
+    let peticiones = 0
+    const srv = createServer((req, res) => {
+      /* Solo cuentan las de datos: el navegador del arbol pide /Data/Browse. */
+      peticiones++
+      if (peticiones <= 1) {
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(PAGINA_DE_LOGIN)
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify([{ pointName: 'ac:TDCON', shortName: 'TDCON' }]))
+    })
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+
+    try {
+      const config = loadConfig({
+        ICONICS_API_BASE: `http://127.0.0.1:${srv.address().port}/fwxapi/rest/v1`,
+        ICONICS_USERNAME: 'u', ICONICS_PASSWORD: 'p', ICONICS_POINT_NAME: 'ac:x',
+        LOG_LEVEL: 'ERROR', PORT: '0',
+      })
+      let invalidaciones = 0
+      const auth = {
+        authorizationHeaders: async () => ({}),
+        hasValidToken: () => true,
+        invalidarToken: () => { invalidaciones++ },
+      }
+      const cliente = createIconicsClient(config, auth)
+
+      const sobre = await cliente.browse('ac:')
+
+      /*
+       * Lo que se afirma: que NO revienta. Con el defecto puesto esto daba
+       * `ok: false` con un 502 y «url.startsWith is not a function» dentro.
+       */
+      expect(sobre.ok).toBe(true)
+      expect(invalidaciones).toBe(1)
+      expect(peticiones).toBe(2)
+    } finally {
+      await new Promise(r => srv.close(r))
+    }
+  })
+})

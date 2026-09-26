@@ -232,7 +232,25 @@ export function createIconicsClient(config, authenticator) {
          * `POST /Data`. Filtrar por `method === 'GET'` habría dejado fuera
          * justo el caso principal. Los que escriben son dos y están nombrados.
          */
-        const escribe = url.startsWith(endpoints.dataWrite) || url.startsWith(endpoints.alarmState)
+        /*
+         * `String(url)` y no `url` a secas: `withParams()` devuelve un objeto
+         * `URL`, no una cadena. `fetch` acepta las dos cosas, así que el
+         * defecto no se veía hasta que ALGUIEN llegaba a esta rama —la de la
+         * reautenticación— y ahí `url.startsWith` lanzaba un TypeError que
+         * tumbaba la petición entera con un 502.
+         *
+         * Lo encontró el usuario al levantar el proyecto en otra máquina el
+         * 26-09-2026: `browse('ac:')` moría con «url.startsWith is not a
+         * function» y el mensaje culpaba a la red —«revisa que el servidor sea
+         * alcanzable»— cuando el servidor estaba perfectamente.
+         *
+         * Las pruebas de la F4.1 no lo cazaron porque `readPoints` construye
+         * su url como cadena literal; las que pasan por `withParams` son
+         * `readPoint`, `readHistory`, `browse` y `search`.
+         */
+        const comoTexto = String(url)
+        const escribe =
+          comoTexto.startsWith(endpoints.dataWrite) || comoTexto.startsWith(endpoints.alarmState)
         const esLectura = !escribe
         if (!sinReintentar && esLectura && typeof authenticator.invalidarToken === 'function') {
           logger.warn(
