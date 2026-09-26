@@ -4846,6 +4846,170 @@ check('sin cliente de ICONICS, el fallo es en el arranque y dice qué falta', ()
 
 /* ── Resumen ─────────────────────────────────────────────────────────── */
 
+
+/* ─────────────────────────────────────────────────────────────────────
+ * UNA MÁQUINA QUE SÓLO OBSERVA (Plan 46 F5)
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * Todo lo de arriba se comprueba contra la espejo de VIBRACIONES, que
+ * diagnostica. `sensado` es el primer tipo que no, y lo que hay que fijar es
+ * distinto: no que conteste bien sobre riesgos, sino que **no se invente uno**
+ * y que aun así sepa decir lo que mide.
+ *
+ * Se registra su propia máquina —cuatro tomas independientes, diez variables,
+ * ninguna serie verificada— porque la espejo no puede representar esto: sus
+ * tags llevan el apoyo en el nombre y su tipo trae 19 reglas.
+ */
+const SENSADO = {
+  id: 'sensado-prueba',
+  nombre: 'Sensado de prueba',
+  tipo: 'sensado',
+  plc: 'PLC_X',
+  assets: [
+    { id: 'DONA3', pointName: 'ac:TDCON/PRUEBA_SENSORES/DONA3/', rol: 'raiz', nombre: 'Dona trifásica', alias: [] },
+    { id: 'AMB', pointName: 'ac:TDCON/PRUEBA_SENSORES/AMB/', rol: 'secundario', nombre: 'Ambiente', alias: [] },
+  ],
+  variables: [
+    { id: 'L1', pointName: 'ac:TDCON/PRUEBA_SENSORES/DONA3/LINEA_1', rol: 'electrica:corrienteL1', assetId: 'DONA3', unidad: 'A', acceso: 'read', estado: 'VALID', historyPointName: null, historyVerified: false, alias: [] },
+    { id: 'CO2', pointName: 'ac:TDCON/PRUEBA_SENSORES/AMB/CO2', rol: 'ambiente:co2', assetId: 'AMB', unidad: 'ppm', acceso: 'read', estado: 'VALID', historyPointName: null, historyVerified: false, alias: [] },
+  ],
+  cadenciaMs: 5000,
+  limitaciones: [],
+  estado: 'VALID',
+}
+const sensado = registrarSistema(construirSistema(SENSADO, tipoDe('sensado')))
+
+await checkAsync('[sensado] el reporte de lectura de sensores se genera, y declara lo que NO puede decir (Plan 46 F6)', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar(
+    'generar_reporte', { tipo: 'lectura de sensores', sistema: sensado.id, periodo: 'últimas 6 horas' },
+  )
+
+  assert.equal(r.ok, true, r.error)
+  assert.equal(r.tipo, 'lectura-de-sensores')
+
+  /*
+   * Lo que de verdad importa de este reporte: que las secciones que NO puede
+   * llenar salgan con su MOTIVO escrito, no en blanco ni con un cero.
+   * Ninguna serie de esta máquina está verificada (Plan 46 F3: las diez son
+   * constantes y no hay testigo), así que la tendencia no se puede dibujar —
+   * y el PDF tiene que decir por qué (`CLAUDE.md` §2.4 y §2.5).
+   */
+  assert.ok(Array.isArray(r.seccionesSinDato))
+  for (const s of r.seccionesSinDato) {
+    assert.ok(s.motivo && s.motivo.length > 10, `«${s.seccion}» sale vacía SIN decir por qué`)
+  }
+
+  /* Y lo que sí hay —el instante— se cuenta: un reporte que no dijera nada de
+     una máquina que lee diez señales no serviría para nada. */
+  assert.ok(r.seccionesConDato.length > 0, 'algo tiene que contar: la máquina lee')
+})
+
+await checkAsync('[sensado] NO se le ofrece un reporte de vibraciones: no es una máquina de ese tipo', async () => {
+  const reportes = await reportesTmp()
+  const client = createFakeIconicsClient({ rnd: () => 0.99, ahora: () => instanteEnMarcha })
+  const r = await createHerramientas({ client, reportes }).ejecutar(
+    'generar_reporte', { tipo: 'reporte de vibraciones', sistema: sensado.id, periodo: 'últimas 6 horas' },
+  )
+
+  /*
+   * Puede salir bien (con todo vacío y su motivo) o negarse. Lo que NO puede
+   * es inventarse bandas ISO, zonas o un diagnóstico de un motor que no hay.
+   */
+  if (r.ok) {
+    const texto = JSON.stringify(r)
+    assert.ok(!/zona [ABCD]\b/.test(texto), 'no puede asignar una zona ISO a una máquina sin vibración')
+    assert.ok(r.seccionesSinDato.length > 0, 'si no puede llenarlas, tiene que declararlo')
+  }
+})
+
+console.log()
+console.log(`${c.negrita}── Una máquina que sólo observa (Plan 46 F5) ──${c.reset}`)
+
+check('[sensado] el asistente la ve en el registro, con su nombre', () => {
+  assert.equal(sensado.id, 'sensado-prueba')
+  assert.equal(sensado.nombre, 'Sensado de prueba')
+  assert.ok(!sensado.cerrado, 'una máquina en servicio no se niega')
+})
+
+check('[sensado] NO se le ofrece diagnóstico: la herramienta ni aparece', () => {
+  /*
+   * La lista de herramientas se DERIVA de las capacidades (Plan 33 §6), y el
+   * tipo observador no declara DIAGNOSTICS. Ofrecer una herramienta que luego
+   * se niega gasta un turno del modelo para llegar al mismo sitio.
+   */
+  assert.ok(!sensado.herramientas.includes('diagnosticar_falla'))
+  assert.ok(!sensado.herramientas.includes('riesgos_activos'))
+  assert.ok(sensado.herramientas.includes('estado_del_sistema'), 'lo que SÍ sabe hacer sigue ofrecido')
+})
+
+check('[sensado] sin serie verificada tampoco se ofrece historia', () => {
+  /* Ninguna de sus variables tiene serie: prometerla sería el fallo que
+     `capacidadesDe` existe para no cometer. */
+  assert.ok(!sensado.herramientas.includes('historia_de_senal'))
+})
+
+check('[sensado] su estado trae las señales con su familia y su unidad', () => {
+  const est = sensado.estado((punto) => (punto.endsWith('LINEA_1') ? 12.5 : 640), sensado, new Date())
+
+  assert.equal(est.senales.length, 2)
+  const l1 = est.senales.find((s) => s.rol === 'electrica:corrienteL1')
+  assert.equal(l1.familia, 'electrica')
+  assert.equal(l1.unidad, 'A')
+  assert.equal(l1.valor, 12.5)
+  /*
+   * `general` es null y NO es un hueco por rellenar: un tipo que no
+   * diagnostica no tiene «estado general» que ofrecer, y fabricar uno
+   * —«NORMAL» porque nada falló— afirmaría que se ha comprobado algo.
+   */
+  assert.equal(est.general, null)
+})
+
+check('[sensado] un punto mudo sale como HUECO, nunca como cero', () => {
+  const est = sensado.estado(() => null, sensado, new Date())
+
+  for (const s of est.senales) {
+    assert.equal(s.valor, null, `${s.label} tendría que venir sin valor`)
+    assert.equal(s.sinDato, true)
+    assert.ok(s.motivo, 'un hueco sin motivo no se puede explicar')
+  }
+  assert.equal(est.recuento.conDato, 0)
+  assert.equal(est.recuento.sinDato, 2)
+})
+
+check('[sensado] el resumen le PROHÍBE al modelo juzgar, y lo dice en su texto', () => {
+  const est = sensado.estado(() => 5, sensado, new Date())
+  const r = tipoDe('sensado').resumen(est)
+
+  /*
+   * El aviso viaja DENTRO del resumen y no en el prompt general porque es de
+   * este tipo: quien lo lea tiene que saber que no hay veredicto que pedir.
+   */
+  assert.match(r.aviso, /sólo OBSERVA/i)
+  assert.match(r.aviso, /no digas si están bien o mal/i)
+  assert.ok(Array.isArray(r.electrica) && r.electrica.length === 1)
+  assert.ok(Array.isArray(r.ambiente) && r.ambiente.length === 1)
+  assert.equal(r.total, 2)
+})
+
+check('[sensado] el resumen cuenta los huecos aparte, sin disfrazarlos', () => {
+  const est = sensado.estado(() => null, sensado, new Date())
+  const r = tipoDe('sensado').resumen(est)
+
+  assert.equal(r.sin_dato, 2)
+  /* Y cada línea dice que falta, en vez de omitir la señal: omitirla se leería
+     como «esta máquina no mide eso». */
+  assert.ok(r.electrica.every((l) => /sin dato/i.test(l)))
+})
+
+check('[sensado] su tipo no produce riesgos ni con lecturas delante', () => {
+  const tipo = tipoDe('sensado')
+  const r = tipo.evaluarRiesgos({ canales: {}, variador: {}, alarmas: null })
+  assert.deepEqual(r.activos, [])
+  assert.equal(r.provisional, false, '«provisional» sonaría a pendiente, y es una decisión')
+})
+
 console.log()
 if (fallos.length) {
   console.log(`${c.rojo}${c.negrita}${fallos.length} comprobación(es) fallida(s)${c.reset}`)

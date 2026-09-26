@@ -51,11 +51,32 @@ export default {
     const c = etq.plantillas.comun
     const recuento = recuentoDe(d.senales)
 
-    /* Los «sensores»: toda señal numérica que el estado compone con familia
-       `medida` o `variador` (lo booleano y los contadores no son un sensor). */
+    /*
+     * Los «sensores»: toda señal NUMÉRICA que no sea una bandera ni un
+     * contador de alarmas.
+     *
+     * ── POR QUÉ NO SE LISTAN LAS FAMILIAS (Plan 46 F6) ───────────────
+     *
+     * Esto preguntaba `fam === 'medida' || fam === 'variador'`, que son las
+     * familias del tipo `vibraciones`. La plantilla decía ser genérica y en
+     * realidad sólo conocía un tipo: con `sensado` delante —familias
+     * `electrica`, `ambiente` y `optica`— no pasaba ni una señal, y el PDF
+     * salía diciendo «no hay sensores que listar» de una máquina que lee diez.
+     * Medido el 26-09-2026 generando el reporte contra planta.
+     *
+     * El criterio correcto no es «de qué familia es» —eso obliga a esta
+     * plantilla a conocer cada tipo que exista, y el siguiente se vuelve a
+     * olvidar— sino **qué clase de señal es**: un reporte de lecturas lista
+     * lo que tiene un número y una unidad. Lo booleano (banderas) y los
+     * contadores del área no son un sensor, y ésos sí se excluyen por lo que
+     * son.
+     */
     const sensores = d.senales.filter((s) => {
-      const fam = familiaDe(d.metaDe(s.clave)?.rol)
-      return (fam === 'medida' || fam === 'variador') && d.metaDe(s.clave)?.naturaleza !== 'alarma'
+      const meta = d.metaDe(s.clave)
+      if (meta?.naturaleza === 'alarma' || meta?.naturaleza === 'bandera') return false
+      /* Una señal sin lectura ENTRA: su fila dice «sin dato», que es
+         precisamente lo que un reporte de lecturas tiene que declarar. */
+      return s.valor === null || s.valor === undefined || Number.isFinite(Number(s.valor))
     })
 
     const filasLecturas = sensores.map((s) => {
