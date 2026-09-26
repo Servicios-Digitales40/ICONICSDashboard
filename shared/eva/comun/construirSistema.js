@@ -175,6 +175,26 @@ export function construirSistema(maquina, tipo) {
       tag: v.pointName,
       label: etiquetaDeVariable(v),
       historia: clavesConSerie.includes(clave),
+      /*
+       * ── LA UNIDAD Y EL ACTIVO VIAJAN TAMBIÉN (Plan 46 F4.2) ────────
+       *
+       * `unidad` la pone quien configura la máquina, variable por variable, y
+       * un tipo no puede saberla: el servidor no la publica (los assets de
+       * `DEMO_SENSORES` devuelven `.Attributes` vacío) y dos instalaciones del
+       * mismo tipo pueden medir en unidades distintas. Sin esto, un tipo que
+       * compone su propio estado —`sensado`— pintaba los números sin unidad
+       * aunque estuviera anotada en `maquinas.json`.
+       *
+       * `assetId` es de qué toma cuelga. `vibraciones` no lo necesitaba porque
+       * su resolvedor ya recibe los apoyos aparte (`opciones.apoyos`), pero un
+       * tipo cuyos activos NO son apoyos de una misma pieza no tiene esa vía,
+       * y sin el activo no se pueden agrupar cuatro sensores independientes.
+       *
+       * Los dos son campos nuevos y opcionales: quien no los lea —el tipo de
+       * vibraciones— no cambia en nada.
+       */
+      unidad: v.unidad ?? null,
+      assetId: v.assetId ?? null,
     };
   };
 
@@ -623,6 +643,27 @@ export function construirSistema(maquina, tipo) {
     limitaciones: (() => {
       const propias = [...(maquina.limitaciones ?? [])];
 
+      /*
+       * ── NO SE REPITE LO QUE YA VIENE DENTRO (Plan 46 F4.2) ─────────
+       *
+       * `maquina.limitaciones` debería traer sólo las que escribió una persona
+       * —la API las separa en `limitacionesPropias` justo para eso—, pero la
+       * ruta de la API devuelve en `limitaciones` las propias YA MEZCLADAS con
+       * las derivadas. Cuando el frontend reconstruye el sistema con esa
+       * máquina, las derivadas vuelven a añadirse y salen dos veces: medido el
+       * 26-09-2026 en la pantalla de Planta de `sensado-01`, tres limitaciones
+       * pintadas seis veces.
+       *
+       * Se deduplica al final en vez de perseguir a cada llamador: una
+       * limitación repetida no aporta nada en ningún caso, y quien las lee
+       * —una persona en pantalla, o el asistente al citarlas— no gana nada con
+       * la repetición. Arreglarlo aquí cubre también al siguiente que
+       * reconstruya un sistema a partir de uno servido.
+       *
+       * El orden se conserva: quien mira espera leerlas como se redactaron.
+       * Se deduplica al final, donde está el `return`.
+       */
+
       /* Los roles que las reglas necesitan y la configuración no cubre. Sin
          esto, el asistente diría «no hay riesgos» de una máquina cuyas reglas
          nunca se evaluaron. */
@@ -760,7 +801,9 @@ export function construirSistema(maquina, tipo) {
         );
       }
 
-      return propias;
+      /* Ver `yaEsta` arriba: una máquina servida por la API ya trae dentro las
+         derivadas, y reconstruirla las añadiría por segunda vez. */
+      return propias.filter((l, i) => propias.indexOf(l) === i);
     })(),
   };
 }

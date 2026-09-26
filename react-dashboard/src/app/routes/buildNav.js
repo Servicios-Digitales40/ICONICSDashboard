@@ -71,14 +71,67 @@ export function buildNav(routes, groups, puede = () => true, maquinas = []) {
   /* `oculta`: existe por máquina y se navega por id con `?maquina=`, pero no
      sale en el menú (Riesgos, unificada en Hallazgos — Plan 33 F10, Plan 40 F2). */
   const porMaquina = routes.filter((r) => r.porMaquina && !r.porMaquina.oculta && (!r.rol || puede(r.rol)));
+
+  /*
+   * ── NO TODA MÁQUINA TIENE TODAS LAS VISTAS (Plan 46 F4) ───────────
+   *
+   * Hasta el 26-09-2026 cada máquina configurada recibía las MISMAS rutas,
+   * porque todas eran del mismo tipo y la pregunta no se había planteado. Con
+   * `sensado` sí se plantea: un conjunto de sensores sueltos no tiene maqueta
+   * 3D que enseñar ni «estado mecánico» que juzgar, y ofrecer esas entradas
+   * llevaría a una pantalla que no puede pintar nada.
+   *
+   * La ruta declara qué capacidad NECESITA (`porMaquina.requiere`) y se
+   * compara contra lo que el TIPO de esa máquina dice saber servir
+   * (`capacidadesPosibles`). Sin `requiere`, la ruta vale para cualquier
+   * máquina — que es el caso de casi todas, y por eso el filtro no se nota en
+   * vibraciones.
+   *
+   * ── POR QUÉ `capacidadesPosibles` Y NO LAS DERIVADAS ──────────────
+   *
+   * Porque son preguntas distintas, y usar las derivadas rompería vibraciones.
+   * `capacidadesDe()` deriva sólo cuatro —`CURRENT_DATA`, `HISTORICAL_DATA`,
+   * `DIAGNOSTICS`, `WRITABLE_VARIABLES`— a partir de lo CONFIGURADO. `VIEW_3D`
+   * y `ALARMS` no se derivan de nada, así que ninguna máquina las lleva nunca
+   * en su lista derivada: filtrar por ahí le quitaría la Vista 3D al motor,
+   * que sí la tiene.
+   *
+   * Lo que esta pregunta necesita es «¿este TIPO de máquina tiene esta vista?»,
+   * y eso es exactamente lo que `capacidadesPosibles` declara desde el Plan 33.
+   * Una entrada de menú es una puerta, no una promesa de contenido: que la
+   * vista tenga datos hoy es cosa suya y ya lo dice cuando no los hay.
+   *
+   * Se decide con la capacidad y NO con el id del tipo a propósito: un `if
+   * (tipo === "sensado")` en el menú es el condicional por máquina que el Plan
+   * 42.5 D1 sacó de las vistas, y volvería a entrar por la puerta de atrás.
+   *
+   * ── QUIÉN RESUELVE EL TIPO ────────────────────────────────────────
+   *
+   * Este archivo no lo importa: su cabecera dice que vive sin imports con
+   * alias para ser JS puro ejecutable en node, y eso es lo que permite
+   * verificarlo. Así que la máquina llega con sus `capacidadesPosibles` ya
+   * resueltas por quien sí conoce el registro de tipos (`navParaRol`).
+   */
+  const sirveA = (ruta, maquina) => {
+    const requiere = ruta.porMaquina?.requiere;
+    if (!requiere) return true;
+    const posibles = maquina?.capacidadesPosibles ?? null;
+    /* Sin tipo reconocible no se esconde nada: una máquina cuyo tipo ya no
+       existe es un problema de configuración que se ve en su ficha, y dejarla
+       además sin menú lo haría más difícil de encontrar, no más seguro. */
+    return !posibles || posibles.includes(requiere);
+  };
+
   for (const m of maquinas ?? []) {
-    if (!m?.id || !porMaquina.length) continue;
+    if (!m?.id) continue;
+    const suyas = porMaquina.filter((r) => sirveA(r, m));
+    if (!suyas.length) continue;
     items.push({
       group: `maq:${m.id}`,
       label: m.nombre ?? m.id,
-      icon: porMaquina[0].porMaquina.iconoSeccion ?? porMaquina[0].porMaquina.icon,
+      icon: suyas[0].porMaquina.iconoSeccion ?? suyas[0].porMaquina.icon,
       modulo: "monitoreo",
-      children: porMaquina.map((r) => ({
+      children: suyas.map((r) => ({
         id: r.id,
         icon: r.porMaquina.icon,
         apartado: r.porMaquina.apartado ?? null,

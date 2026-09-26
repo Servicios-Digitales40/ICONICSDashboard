@@ -582,3 +582,79 @@ console.log(
   `\n${c.verde}${c.negrita}${passed} comprobaciones correctas: una máquina configurada se ` +
     `comporta como una escrita a mano.${c.reset}`
 )
+
+
+/*
+ * ── LO QUE SE VIO AL MIRAR SENSADO EN PANTALLA (Plan 46 F4.2) ────────
+ *
+ * Tres defectos que sólo aparecen con un tipo que compone su propio estado y
+ * cuyos activos NO son apoyos de una misma pieza. Los tres eran silenciosos:
+ * la pantalla pintaba algo, sólo que lo equivocado.
+ */
+check('el resolvedor se pregunta por la CLAVE del rol, y trae unidad y activo', () => {
+  const maquina = {
+    id: 'sen', nombre: 'Sensado', tipo: 'sensado', plc: 'X',
+    assets: [{ id: 'A', pointName: 'ac:R/A/', rol: 'raiz' }],
+    variables: [{
+      id: 'LINEA_1', pointName: 'ac:R/A/LINEA_1', rol: 'electrica:corrienteL1',
+      assetId: 'A', unidad: 'A', acceso: 'read', estado: 'VALID',
+      historyPointName: null, historyVerified: false,
+    }],
+    cadenciaMs: 5000,
+  }
+  const sistema = construirSistema(maquina, tipoDe('sensado'))
+  const est = sistema.estado(() => 12.5, sistema, new Date())
+
+  const s = est.senales.find(x => x.rol === 'electrica:corrienteL1')
+  assert.ok(s, 'la señal la emite el TIPO, no el camino genérico de rescate')
+  /*
+   * Lo que separa «lo emitió el tipo» de «lo rescató el genérico»: sólo el
+   * primero trae familia, escala y banda. Sin esto el estado parecía correcto
+   * —diez señales con su valor— y la vista, que filtra por familia, no
+   * encontraba ninguna.
+   */
+  assert.equal(s.familia, 'electrica', 'sin familia, la vista no puede agrupar')
+  assert.deepEqual(s.escala, [0, 100], 'la escala sale del ROL, no de la lectura')
+  assert.equal(s.unidad, 'A', 'la unidad la pone quien configura y tiene que viajar')
+  assert.equal(s.assetId, 'A', 'sin el activo no se pueden agrupar tomas independientes')
+})
+
+check('una máquina reconstruida NO repite sus limitaciones', () => {
+  const maquina = {
+    id: 'sen2', nombre: 'Sensado', tipo: 'sensado', plc: 'X',
+    assets: [{ id: 'A', pointName: 'ac:R2/A/', rol: 'raiz' }],
+    variables: [{
+      id: 'CO2', pointName: 'ac:R2/A/CO2', rol: 'ambiente:co2', assetId: 'A',
+      acceso: 'read', estado: 'VALID', historyPointName: null, historyVerified: false,
+    }],
+    cadenciaMs: 5000,
+  }
+  const primera = construirSistema(maquina, tipoDe('sensado')).limitaciones
+  assert.ok(primera.length > 0, 'una máquina sin series verificadas SÍ tiene limitaciones que declarar')
+
+  /*
+   * La API devuelve `limitaciones` con las propias YA MEZCLADAS con las
+   * derivadas. El frontend reconstruye el sistema con esa máquina, y sin esto
+   * las derivadas se añadían por segunda vez: medido en la pantalla de Planta,
+   * tres limitaciones pintadas seis veces.
+   */
+  const segunda = construirSistema({ ...maquina, limitaciones: primera }, tipoDe('sensado')).limitaciones
+  assert.equal(segunda.length, primera.length, 'reconstruir no puede duplicar lo que ya venía dentro')
+  assert.deepEqual(segunda, primera, 'y el orden se conserva: se leen como se redactaron')
+})
+
+check('un tipo observador no produce ni un riesgo, ni siquiera con lecturas', () => {
+  const tipo = tipoDe('sensado')
+  /*
+   * El defecto que esto fija estaba en la VISTA de Avisos, que llamaba
+   * directamente a `evaluarRiesgosVibracion` sin mirar el tipo y le colgaba a
+   * Sensado un «el valor de daño no tiene referencia aprendida» — un
+   * diagnóstico de motor sobre una máquina que no mide daño. Aquí se fija la
+   * mitad del dominio: su tipo no evalúa nada, pase lo que pase.
+   */
+  const r = tipo.evaluarRiesgos({ canales: {}, variador: {}, alarmas: null })
+  assert.deepEqual(r.activos, [], 'un observador no diagnostica')
+  assert.equal(r.provisional, false, 'y no lo declara «provisional», que sonaría a pendiente')
+  assert.equal(tipo.reglas.length, 0)
+  assert.ok(!tipo.capacidadesPosibles.includes('DIAGNOSTICS'))
+})

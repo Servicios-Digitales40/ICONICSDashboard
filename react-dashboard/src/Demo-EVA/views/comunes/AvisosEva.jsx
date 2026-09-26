@@ -54,6 +54,7 @@ import { useDominio } from "@/i18n/useDominio.js";
 import { useTheme } from "@/theme";
 import { obtenerDiagnosticoNarrado } from "@/lib/api/casosApi.js";
 import { ESTADO_AVISO, marcarVisto, reconciliarAvisos } from "@shared/eva/comun/avisos.js";
+import { tipoDe } from "@shared/eva/tipos/index.js";
 
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { useSistemaAgua } from "../../data/comunes/hooks.js"; */
@@ -61,7 +62,13 @@ import { useMaquinasEnVivo } from "../../data/comunes/maquinasEnVivo.js";
 import { useDominioVibracion } from "../../data/vibraciones/vibracion.js";
 /* Cerrado con la estación de llenado (rama `Vibraciones1.0`):
    import { evaluarRiesgos } from "../../domain/riesgos.js"; */
+/* Sigue importado, pero ya no es la regla por omisión: sólo se usa cuando la
+   máquina llega SIN tipo. Ver el reparto más abajo (Plan 46 F4.2). */
 import { evaluarRiesgosVibracion } from "../../domain/riesgosVibracion.js";
+
+/* Una sola instancia: una lista nueva en cada render volvería a disparar los
+   memos que dependen de ella. */
+const SIN_RIESGOS = Object.freeze([]);
 
 const SEVERIDAD_TOKEN = {
   critico: { token: "coral", suave: "coralSoft", Icono: AlertTriangle },
@@ -452,16 +459,49 @@ export default function AvisosEva({ onNavigate }) {
   const { canales, variador, alarmas, maquina } = useDominioVibracion();
   const planta = useMaquinasEnVivo();
 
-  const { activos: activosVibracion } = useMemo(
-    () => evaluarRiesgosVibracion({ canales, variador, alarmas }),
-    [canales, variador, alarmas]
+  /*
+   * ── LAS REGLAS LAS PONE EL TIPO, NO ESTA VISTA (Plan 46 F4.2) ──────
+   *
+   * Esto llamaba SIEMPRE a `evaluarRiesgosVibracion`, y funcionaba mientras
+   * todas las máquinas configuradas fueran motores. Con `sensado` delante
+   * producía un aviso inventado —«el valor de daño no tiene referencia
+   * aprendida»— sobre una máquina que no mide daño, no tiene apoyos y
+   * **declara que no diagnostica**. Un diagnóstico falso atribuido a una
+   * máquina es peor que ninguno: manda a revisar algo que no existe.
+   *
+   * Ahora se le pregunta a su tipo. Uno que no evalúa —un observador— devuelve
+   * la lista vacía y la pantalla dice «no hay hallazgos», que es la verdad.
+   *
+   * ── SIN TIPO RECONOCIBLE SE EVALÚA COMO ANTES ─────────────────────
+   *
+   * `useDominioVibracion()` entrega un dominio de vibraciones —apoyos,
+   * variador, alarmas—, y hoy sólo lo produce para máquinas de ese tipo. Si
+   * la máquina llega sin `tipo` (una fixture, una forma antigua), caer en «no
+   * hay riesgos» ESCONDERÍA avisos reales de un motor, que es peor que el
+   * defecto que esto arregla: el aviso de más se lee y se descarta; el de
+   * menos no se ve.
+   *
+   * Así que el reparto es: hay tipo → manda el tipo; no hay tipo → se evalúa
+   * como siempre, porque el dominio que llega es el de vibraciones.
+   */
+  const tipoDeLaMaquina = tipoDe(maquina?.tipo);
+
+  const { activos: activosDeLaMaquina } = useMemo(
+    () => {
+      if (tipoDeLaMaquina?.evaluarRiesgos) {
+        return tipoDeLaMaquina.evaluarRiesgos({ canales, variador, alarmas });
+      }
+      if (!maquina?.tipo) return evaluarRiesgosVibracion({ canales, variador, alarmas });
+      return { activos: SIN_RIESGOS };
+    },
+    [tipoDeLaMaquina, maquina, canales, variador, alarmas]
   );
 
   const riesgosPorSistema = useMemo(
     () => (maquina
-      ? [{ sistema: maquina.id, activos: activosVibracion }]
+      ? [{ sistema: maquina.id, activos: activosDeLaMaquina }]
       : planta.map((e) => ({ sistema: e.maquina.id, activos: e.riesgos.activos }))),
-    [maquina, activosVibracion, planta]
+    [maquina, activosDeLaMaquina, planta]
   );
 
   const idioma = i18n.language?.startsWith("en") ? "en" : "es";

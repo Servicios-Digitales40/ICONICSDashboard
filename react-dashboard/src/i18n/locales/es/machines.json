@@ -529,5 +529,22 @@
     "error": {
       "title": "No se pudo leer la lista de máquinas"
     }
+  },
+  "sensing": {
+    "subtitle": "{{conDato}} de {{total}} señales con lectura",
+    "current": "Corriente",
+    "currentSub": "Lo que mide cada dona",
+    "threePhase": "Dona trifásica",
+    "threePhaseNote": "La corriente que entra desde la calle, por línea.",
+    "singlePhase": "Dona monofásica",
+    "singlePhaseNote": "La corriente de las luminarias.",
+    "ambient": "Ambiente",
+    "ambientSub": "Lecturas del sensor de sala",
+    "light": "Iluminación",
+    "lightSub": "El sensor que está en la demo",
+    "noData": "sin dato",
+    "reference": "La franja es una referencia de confort, no un umbral de alarma",
+    "comfortRange": "Referencia de confort: {{desde}}–{{hasta}} {{unidad}}",
+    "empty": "Esta máquina no declara ninguna señal todavía."
   }
 }

@@ -279,8 +279,15 @@ export const ROUTES = [
    * `iconoSeccion` el de la sección de la máquina.
    */
   {
+    /*
+     * La portada de la máquina. Hay UNA por tipo, y la elige el tipo (Plan 46
+     * F4): `InicioVibraciones` habla de apoyos, velocidad eficaz y un hero 3D
+     * del rotor; `InicioSensado` enseña las tomas de planta de un vistazo.
+     * Sin este reparto, una máquina de sensores abría con la portada de un
+     * motor y todas sus cifras en blanco.
+     */
     id: "maq-inicio",
-    component: lazy(() => import("@/Demo-EVA/views/vibraciones/InicioVibraciones.jsx")),
+    component: lazy(() => import("@/Demo-EVA/views/maquina/InicioDeMaquina.jsx")),
     porMaquina: { icon: <Home size={17} />, iconoSeccion: <Waves size={17} />, apartado: "visualizacion" },
   },
   {
@@ -297,14 +304,20 @@ export const ROUTES = [
     porMaquina: { icon: <TrendingUp size={17} />, apartado: "visualizacion" },
   },
   {
+    /*
+     * `requiere` (Plan 46 F4): la vista del TIPO que juzga —bandas ISO,
+     * vigilancias, zonas—. Una máquina que sólo observa no tiene nada que
+     * enseñar aquí, así que no se le ofrece la entrada.
+     */
     id: "maq-graficas",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones.jsx")),
-    porMaquina: { icon: <LayoutDashboard size={17} />, apartado: "visualizacion" },
+    porMaquina: { icon: <LayoutDashboard size={17} />, apartado: "visualizacion", requiere: "DIAGNOSTICS" },
   },
   {
+    /* Sin maqueta no hay vista 3D: `sensado` son cuatro sensores sueltos. */
     id: "maq-3d",
     component: lazy(() => import("@/Demo-EVA/views/vibraciones/Vibraciones3D.jsx")),
-    porMaquina: { icon: <Box size={17} />, apartado: "visualizacion" },
+    porMaquina: { icon: <Box size={17} />, apartado: "visualizacion", requiere: "VIEW_3D" },
   },
   {
     /*

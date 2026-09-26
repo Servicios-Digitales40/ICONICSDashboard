@@ -5,6 +5,8 @@
  * mantenían a mano, así que `App.jsx`, `Sidebar.jsx` y `Topbar.jsx` solo
  * cambian de dónde importan.
  */
+import { tipoDe } from "@shared/eva/tipos/index.js";
+
 import { ROUTES, NAV_GROUPS, DEFAULT_ROUTE } from "./routes.jsx";
 import { buildNav } from "./buildNav.js";
 
@@ -71,7 +73,30 @@ export const NAV = buildNav(ROUTES, NAV_GROUPS);
  * falta para evitarlo. Quien la use dentro de un componente puede memoizarla
  * si mide que hace falta (`CLAUDE.md` §4.8).
  */
-export const navParaRol = (puede, maquinas = []) => buildNav(ROUTES, NAV_GROUPS, puede, maquinas);
+/*
+ * ── EL TIPO SE RESUELVE AQUÍ, NO EN `buildNav` (Plan 46 F4) ────────
+ *
+ * `buildNav` filtra las vistas de cada máquina por la capacidad que cada ruta
+ * declara necesitar (`porMaquina.requiere`), y para eso necesita saber qué
+ * sabe servir el TIPO de esa máquina. Pero su cabecera dice que vive sin
+ * imports con alias para ser JS puro ejecutable en node —que es lo que permite
+ * verificar el orden del menú sin montar la aplicación—, así que el registro
+ * de tipos no puede entrar allí.
+ *
+ * Se resuelve en este paso, que ya es el que conoce el resto del tejado: a
+ * `buildNav` le llega cada máquina con sus `capacidadesPosibles` ya puestas y
+ * él sólo compara dos listas.
+ */
+export const navParaRol = (puede, maquinas = []) =>
+  buildNav(
+    ROUTES,
+    NAV_GROUPS,
+    puede,
+    (maquinas ?? []).map((m) => ({
+      ...m,
+      capacidadesPosibles: tipoDe(m?.tipo)?.capacidadesPosibles ?? null,
+    })),
+  );
 
 /**
  * Las rutas que se ofrecen POR MÁQUINA configurada (Plan 37 F1): no tienen

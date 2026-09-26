@@ -529,5 +529,22 @@
     "error": {
       "title": "The machine list could not be read"
     }
+  },
+  "sensing": {
+    "subtitle": "{{conDato}} of {{total}} signals reading",
+    "current": "Current",
+    "currentSub": "What each clamp measures",
+    "threePhase": "Three-phase clamp",
+    "threePhaseNote": "Incoming mains current, per line.",
+    "singlePhase": "Single-phase clamp",
+    "singlePhaseNote": "Lighting circuit current.",
+    "ambient": "Ambient",
+    "ambientSub": "Room sensor readings",
+    "light": "Lighting",
+    "lightSub": "The sensor placed in the demo",
+    "noData": "no data",
+    "reference": "The band is a comfort reference, not an alarm threshold",
+    "comfortRange": "Comfort reference: {{desde}}–{{hasta}} {{unidad}}",
+    "empty": "This machine does not declare any signal yet."
   }
 }

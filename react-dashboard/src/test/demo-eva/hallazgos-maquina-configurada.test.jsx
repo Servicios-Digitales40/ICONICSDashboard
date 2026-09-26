@@ -116,3 +116,57 @@ describe("Avisos con una máquina configurada", () => {
     );
   });
 });
+
+
+/*
+ * ── UN OBSERVADOR NO RECIBE AVISOS DE MOTOR (Plan 46 F4.2) ───────────
+ *
+ * Con `sensado-01` delante, esta vista pintaba «El valor de daño no tiene
+ * referencia aprendida»: un diagnóstico de vibraciones colgado de una máquina
+ * que no mide daño, no tiene apoyos y **declara que no diagnostica**. Salía de
+ * que la vista llamaba SIEMPRE a `evaluarRiesgosVibracion` sin mirar el tipo.
+ *
+ * Un aviso inventado es peor que ninguno: manda a revisar algo que no existe.
+ */
+describe("Avisos con una máquina que sólo observa", () => {
+  /* El mismo dominio de vibraciones en alarma que arriba: si la vista lo
+     evaluara igualmente, saldría un aviso. Lo que cambia es el TIPO. */
+  const OBSERVADORA = {
+    ...CONFIGURADA,
+    maquina: { id: "sensado-01", nombre: "Sensado TDCON", tipo: "sensado", configurada: true, area: null },
+  };
+
+  it("no inventa un diagnóstico de vibraciones sobre una máquina de sensores", async () => {
+    dominio = OBSERVADORA;
+    montar(AvisosEva);
+
+    /*
+     * Se espera a que la vista ASIENTE antes de afirmar la ausencia: un
+     * `queryByText` inmediato sobre una lista aún vacía pasa siempre, y esa
+     * prueba no valdría nada. El vacío declarado es la señal de que ya pintó.
+     */
+    expect(await screen.findByText(/Nada que avisar/i)).toBeTruthy();
+
+    /* Lo que de verdad se afirma: NINGÚN riesgo de vibraciones. */
+    expect(screen.queryByText(/valor de daño/i)).toBeNull();
+    expect(screen.queryByText(/referencia aprendida/i)).toBeNull();
+    expect(screen.queryByText(/Vibración en zona de daño/i)).toBeNull();
+    /* Y no se gasta una llamada al modelo narrando lo que no existe. */
+    expect(obtenerDiagnosticoNarrado).not.toHaveBeenCalled();
+  });
+
+  it("la misma máquina SIN tipo sí se evalúa: no se esconden avisos de un motor", async () => {
+    /*
+     * El reverso, y por qué el arreglo no es «si no hay tipo, no hay riesgos».
+     * Una máquina que llega sin `tipo` entrega un dominio de vibraciones, y
+     * callarla escondería avisos REALES. El aviso de más se lee y se descarta;
+     * el de menos no se ve.
+     */
+    dominio = { ...CONFIGURADA, maquina: { ...CONFIGURADA.maquina } };
+    montar(AvisosEva);
+
+    /* Varios, no uno: el motor en alarma dispara más de una regla. Lo que se
+       afirma es que NO se calló ninguna. */
+    expect((await screen.findAllByText(/valor de daño|vibración/i)).length).toBeGreaterThan(0);
+  });
+});
