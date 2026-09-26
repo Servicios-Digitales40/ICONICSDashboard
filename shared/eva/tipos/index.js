@@ -11,7 +11,7 @@
  *   SISTEMA  una MÁQUINA concreta de planta (`comun/sistemas.js`).
  *            Hoy `tanque` y `vibraciones`.
  *   TIPO     de qué CLASE es una máquina. Sus reglas, su física, su norma.
- *            Hoy `vibraciones`.
+ *            Hoy `vibraciones` (juzga) y `sensado` (sólo observa).
  *
  * La diferencia entre SISTEMA y TIPO es la que abre esta fase: el sistema
  * `vibraciones` es el motor que hay montado —con su raíz `ac:TDCON/DEMO_VIBRACIONES/Vibraciones/`
@@ -37,6 +37,7 @@
  * Y hoy no lo consume nadie salvo sus pruebas: F1 es una extracción, y una
  * extracción que cambia el comportamiento no se distingue de una regresión.
  */
+import { TIPO_SENSADO } from "./sensado.js";
 import { TIPO_VIBRACIONES } from "./vibraciones.js";
 
 /**
@@ -47,8 +48,18 @@ import { TIPO_VIBRACIONES } from "./vibraciones.js";
  * (`CLAUDE.md` §1, regla 1). Entra en la F9 del Plan 33, detrás de la
  * reapertura. Mientras tanto, el tanque sigue funcionando como siempre: su
  * entrada de `SISTEMAS` está escrita a mano y no necesita tipo.
+ *
+ * ── DOS TIPOS, Y NO HACEN LO MISMO (Plan 46 F2, 24-09-2026) ───────
+ *
+ * `sensado` es el primer tipo OBSERVADOR: no diagnostica, y por eso no
+ * declara reglas ni `DIAGNOSTICS`. Hasta la F1 de ese plan eso era ilegal
+ * —la validación de abajo exigía reglas a todo tipo— y ahora lo que se
+ * comprueba es la coherencia entre lo que un tipo promete y lo que trae.
+ *
+ * Tenerlos juntos es lo que da sentido al índice: quien pregunta `tipoDe(id)`
+ * no tiene que saber cuál de los dos juzga y cuál sólo mira.
  */
-export const TIPOS = Object.freeze([TIPO_VIBRACIONES]);
+export const TIPOS = Object.freeze([TIPO_VIBRACIONES, TIPO_SENSADO]);
 
 /** Tipo por id. */
 export const TIPO = Object.freeze(Object.fromEntries(TIPOS.map((t) => [t.id, t])));
@@ -109,10 +120,57 @@ function validarTipos() {
       throw new Error(`tipos/index.js: «${t.id}» no declara ${falta.join(", ")}`);
     }
 
-    if (!t.reglas.length) {
+    /*
+     * ── DIAGNOSTICAR ES UNA OPCIÓN, NO UN REQUISITO (Plan 46 F1) ───────
+     *
+     * Hasta el 24-09-2026 esto exigía reglas a TODO tipo, con este motivo:
+     * «un tipo sin reglas produce máquinas que se dan de alta como
+     * diagnosticables y nunca dicen nada». El motivo era cierto cuando se
+     * escribió, y **ese error sigue aquí abajo** para quien lo merece.
+     *
+     * Lo que cambió es que ese daño ya no puede ocurrir por descuido:
+     * `capacidadesDe()` (en `comun/configuracionMaquina.js`) sólo enciende
+     * `DIAGNOSTICS` si `tipo.reglas.length`, y esa derivación llegó DESPUÉS
+     * que esta guarda. Así que exigir reglas a todo el mundo ya no protegía
+     * de nada nuevo, y a cambio prohibía un tipo legítimo: **el que sólo
+     * observa**, sin bandas ni causas, como `sensado` — cuatro sensores de
+     * corriente, ambiente e iluminación cuyo valor es que se vean, no que se
+     * diagnostiquen.
+     *
+     * La pregunta pasa de «¿tiene reglas?» a «¿lo que PROMETE y lo que TRAE
+     * concuerdan?»:
+     *
+     *   declara DIAGNOSTICS  →  tiene que traer reglas   (el error de antes)
+     *   no lo declara        →  es un observador, y pasa
+     *
+     * El tipo dice así en su propia declaración si diagnostica, y esto lo
+     * comprueba en vez de suponerlo. Un tipo que no declara
+     * `capacidadesPosibles` se trata como antes —se le exigen reglas—, para
+     * que olvidar el campo no se convierta en una forma silenciosa de saltarse
+     * la comprobación.
+     */
+    const prometeDiagnostico = t.capacidadesPosibles
+      ? t.capacidadesPosibles.includes("DIAGNOSTICS")
+      : true;
+
+    if (prometeDiagnostico && !t.reglas.length) {
       throw new Error(
         `tipos/index.js: «${t.id}» no declara ninguna regla. Un tipo sin reglas produce ` +
-          "máquinas que se dan de alta como diagnosticables y nunca dicen nada.",
+          "máquinas que se dan de alta como diagnosticables y nunca dicen nada. " +
+          "Si es un tipo que sólo observa, quita DIAGNOSTICS de sus capacidadesPosibles.",
+      );
+    }
+
+    /*
+     * El reverso: declarar reglas y NO prometer diagnóstico deja 18 reglas
+     * escritas que jamás se evalúan, porque la capacidad nunca se enciende.
+     * Es el mismo desajuste al revés, y calla igual de bien.
+     */
+    if (!prometeDiagnostico && t.reglas.length) {
+      throw new Error(
+        `tipos/index.js: «${t.id}» declara ${t.reglas.length} regla(s) pero no incluye ` +
+          "DIAGNOSTICS en capacidadesPosibles, así que no se evaluarían nunca. " +
+          "Añade la capacidad, o quita las reglas.",
       );
     }
 

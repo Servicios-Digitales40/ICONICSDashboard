@@ -103,7 +103,32 @@ describe("el índice de tipos", () => {
         expect(t[campo], `${t.id} no declara ${campo}`).toBeTruthy();
       }
       expect(typeof t.evaluarRiesgos).toBe("function");
-      expect(t.reglas.length).toBeGreaterThan(0);
+    }
+  });
+
+  /*
+   * ── DIAGNOSTICAR ES UNA OPCIÓN (Plan 46 F1, 24-09-2026) ────────────
+   *
+   * Esto decía `expect(t.reglas.length).toBeGreaterThan(0)` dentro de la
+   * prueba de arriba, porque hasta ese día el índice exigía reglas a TODO
+   * tipo. Con `sensado` —el primero que sólo observa— esa afirmación pasó a
+   * ser falsa, y lo que hay que comprobar es lo que el índice comprueba
+   * ahora: que lo que un tipo PROMETE y lo que TRAE concuerden.
+   *
+   * No se relajó la comprobación, se le cambió la pregunta. El caso que antes
+   * cazaba —un tipo diagnosticable y mudo— lo sigue cazando la primera rama.
+   */
+  it("un tipo trae reglas si y sólo si promete DIAGNOSTICS", () => {
+    for (const t of TIPOS) {
+      const promete = t.capacidadesPosibles
+        ? t.capacidadesPosibles.includes("DIAGNOSTICS")
+        : true;
+
+      if (promete) {
+        expect(t.reglas.length, `${t.id} promete DIAGNOSTICS y no trae reglas`).toBeGreaterThan(0);
+      } else {
+        expect(t.reglas.length, `${t.id} trae reglas que nunca se evaluarían`).toBe(0);
+      }
     }
   });
 
