@@ -1,6 +1,6 @@
 # Plan 46 — Dos máquinas más para la demo: el tanque como configurada, y «Sensado»
 
-**Estado:** **F1 y F2 completadas el 24-09-2026 · F3, F4, F4.1, F4.2, F5 y F6 completadas el 26-09-2026 · F6.1 y F6.2 (lo que sólo se vio en pantalla) · F7 (el tanque) y F8 (las pantallas) por completar.** Nace de un aviso
+**Estado:** **F1 y F2 completadas el 24-09-2026 · F3, F4, F4.1, F4.2, F5 y F6 completadas el 26-09-2026 · F6.1, F6.2 y F6.3 (lo que sólo se vio en pantalla) · F7 (el tanque) y F8 (las pantallas) por completar.** Nace de un aviso
 de última hora: la demo manejará **dos máquinas más** de las previstas. Ninguna
 de las dos se escribe como código: las dos entran por **máquinas configuradas**,
 que es justo la capacidad que los Planes 33, 37, 39 y 40 dejaron lista y que
@@ -929,6 +929,45 @@ se puede interpretar: 2 sobre 0–2000 y 2 sobre 0–10 se ven igual.
 **Tres pruebas nuevas** (extremos en la tarjeta, rango en la dona, advertencia
 una sola vez). Frontend **1212**; cayó la intermitente de
 `detalle-maquina-simulada` ya documentada, que pasa aislada 9/9.
+
+### F6.3 · El sondeo guardaba la PEOR de sus tres ventanas — ✅ **26-09-2026**
+
+La ficha decía «**10 sin muestras en el historiador**» de unas series que sí
+tienen muestras. El usuario insistió —«el historian sí debería estar
+funcionando»— y tenía razón.
+
+**Primero descarté mal.** Culpé a la sesión de ICONICS: su backend llevaba 51
+minutos arrancado, de antes del arreglo de la F4.1. Reinició, y **seguía
+igual**. El diagnóstico era plausible y estaba equivocado.
+
+**La causa real.** La ruta prueba tres ventanas —24 h, 72 h, 7 días— y
+guardaba `intento` en cada vuelta, cortando sólo si algo **verificó**. Con una
+máquina cuyas series no pueden verificarse —diez constantes, sin testigo— nunca
+cortaba, así que se quedaba con la **última**: la de 7 días.
+
+```
+ 24 h  -> sinVariacion: 10 · sinDatos:  0    (hay dato, es plano)
+ 72 h  -> sinVariacion: 10 · sinDatos:  0
+168 h  -> sinVariacion:  0 · sinDatos: 10    <- se guardaba ÉSTA
+```
+
+> **Lo que hacía daño no era el fallo, era el diagnóstico equivocado.** «Sin
+> muestras» manda a revisar el historiador; «sin variación» dice la verdad —la
+> señal no se mueve— y no pide arreglar nada.
+
+**La cabecera de esa misma función ya decía la intención**: «se usa la primera
+que traiga **material suficiente para comparar**». El código medía
+verificación, no material. Ahora se queda con la ventana que más series trajo
+con dato, y verificar sigue siendo el corte porque es lo mejor que puede pasar.
+
+**Sin regresión en vibraciones**: 60/92 verificadas antes y después, medido
+contra planta en la misma corrida.
+
+**Qué se verá ahora** al sondear Sensado: «10 sin variación en la ventana» en
+vez de «10 sin muestras». Sigue sin verificarse —y es correcto: con valores
+constantes el sondeo no puede distinguir una serie de otra, y se niega a
+prometer historia que no puede sostener—. Se resolverá solo en cuanto planta
+mande valores que se muevan.
 
 ### F7 · El tanque como configurada — §5.3
 

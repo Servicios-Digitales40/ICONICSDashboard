@@ -658,3 +658,52 @@ check('un tipo observador no produce ni un riesgo, ni siquiera con lecturas', ()
   assert.equal(tipo.reglas.length, 0)
   assert.ok(!tipo.capacidadesPosibles.includes('DIAGNOSTICS'))
 })
+
+/*
+ * ── EL SONDEO SE QUEDA LA MEJOR VENTANA, NO LA ÚLTIMA (Plan 46 F6.3) ─
+ *
+ * La ruta prueba tres ventanas —24 h, 72 h, 7 días— y hasta el 26-09-2026
+ * guardaba `intento` en cada vuelta, cortando sólo si algo VERIFICÓ. Con una
+ * máquina cuyas series no pueden verificarse -diez constantes, sin testigo-
+ * ninguna ventana cortaba, así que se guardaba la ÚLTIMA: la de 7 días.
+ *
+ * Medido contra planta con `sensado-01`:
+ *
+ *     24 h  -> sinVariacion: 10 · sinDatos:  0   (hay dato, es plano)
+ *    168 h  -> sinVariacion:  0 · sinDatos: 10   (se guardaba ÉSTA)
+ *
+ * La ficha decía «10 sin muestras en el historiador» de unas series que SÍ
+ * tienen muestras, y ese diagnóstico manda a revisar el historiador cuando lo
+ * que pasa es que la señal no se mueve. Aquí se fija el CRITERIO de elección,
+ * que es dominio de la decisión aunque viva en la ruta.
+ */
+check('entre dos ventanas, se elige la que trae MÁS series con dato', () => {
+  /* El criterio, tal cual lo aplica la ruta. */
+  const conDato = (r) => r.resumen.total - r.resumen.sinDatos - r.resumen.fallos
+
+  const corta = { resumen: { total: 10, sinDatos: 0, fallos: 0, sinVariacion: 10, verificadas: 0 } }
+  const ancha = { resumen: { total: 10, sinDatos: 10, fallos: 0, sinVariacion: 0, verificadas: 0 } }
+
+  assert.equal(conDato(corta), 10, 'la de 24 h trae las diez con dato')
+  assert.equal(conDato(ancha), 0, 'la de 7 días no trae ninguna')
+
+  /* El bucle, con el criterio nuevo: la ancha NO debe desbancar a la corta. */
+  let elegida = null
+  for (const intento of [corta, ancha]) {
+    if (!elegida || conDato(intento) > conDato(elegida)) elegida = intento
+    if (intento.resumen.verificadas > 0) { elegida = intento; break }
+  }
+  assert.equal(elegida, corta, 'se queda la que trae material, no la última')
+
+  /*
+   * Y el reverso, que es por lo que el corte por `verificadas` sigue ahí:
+   * verificar es lo mejor que puede pasar y corta la búsqueda.
+   */
+  const verifica = { resumen: { total: 10, sinDatos: 5, fallos: 0, sinVariacion: 0, verificadas: 5 } }
+  let segunda = null
+  for (const intento of [corta, verifica]) {
+    if (!segunda || conDato(intento) > conDato(segunda)) segunda = intento
+    if (intento.resumen.verificadas > 0) { segunda = intento; break }
+  }
+  assert.equal(segunda, verifica, 'una ventana que verifica manda sobre una que sólo trae dato')
+})

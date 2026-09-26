@@ -444,12 +444,42 @@ export function registerMaquinasRoutes(
           hasta: hasta.toISOString(),
           sonEquivalentes,
         })
-        resultado = intento
-        ventanaUsada = horas
-        /* Suficiente para opinar: alguna serie verificó. Si ninguna lo hizo
-           —máquina parada, o sin registro— se prueba una ventana más ancha
-           antes de rendirse. */
-        if (intento.resumen.verificadas > 0) break
+        /*
+         * ── SE QUEDA LA MEJOR, NO LA ÚLTIMA (Plan 46 F6.3) ────────────
+         *
+         * Esto guardaba `intento` en cada vuelta y sólo cortaba si algo
+         * VERIFICÓ. Con una máquina cuyas series no pueden verificarse —diez
+         * constantes, sin testigo— ninguna ventana cortaba nunca, así que se
+         * guardaba la ÚLTIMA: la de 7 días, que es la peor de las tres.
+         *
+         * Medido en `sensado-01` el 26-09-2026:
+         *
+         *     24 h  -> sinVariacion: 10 · sinDatos:  0   (hay dato, es plano)
+         *     72 h  -> sinVariacion: 10 · sinDatos:  0
+         *    168 h  -> sinVariacion:  0 · sinDatos: 10   (se guardaba ÉSTA)
+         *
+         * La ficha decía «10 sin muestras en el historiador» de unas series
+         * que SÍ tienen muestras. El diagnóstico equivocado manda a revisar el
+         * historiador cuando lo que pasa es que la señal no se mueve.
+         *
+         * La cabecera de arriba ya decía la intención —«se usa la primera que
+         * traiga MATERIAL SUFICIENTE PARA COMPARAR»— y el código no la cumplía:
+         * medía verificación, no material. Ahora se queda con la ventana que
+         * más series trajo con dato, y a igualdad manda la más RECIENTE, que
+         * es lo que aquella cabecera argumenta.
+         */
+        const conDato = (r) => r.resumen.total - r.resumen.sinDatos - r.resumen.fallos
+        if (!resultado || conDato(intento) > conDato(resultado)) {
+          resultado = intento
+          ventanaUsada = horas
+        }
+        /* Verificar sigue siendo el corte: es lo mejor que puede pasar y no
+           hay motivo para seguir buscando. */
+        if (intento.resumen.verificadas > 0) {
+          resultado = intento
+          ventanaUsada = horas
+          break
+        }
       }
 
       request.log.info(
