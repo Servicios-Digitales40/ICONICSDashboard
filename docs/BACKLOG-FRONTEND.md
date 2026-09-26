@@ -375,3 +375,143 @@ render aislado contra en tanda, y si lo que espera se puede afirmar sobre menos
 **Qué NO es.** No es el cambio del desplegable de calibración del Plan 45: esta
 prueba no toca el editor de máquinas, y falla igual con ese cambio guardado
 aparte.
+
+## F-rag-sistema-cerrado · el selector de alcance de RAG ofrece una máquina cerrada (24-09-2026)
+
+En **Documentación → RAG documental**, tanto el `<select>` de cada manual como
+el de la zona de carga ofrecen «Sistema de agua industrial», que está **cerrada
+por mantenimiento** desde el 17-09-2026 (`CLAUDE.md` §1). Se puede, por tanto,
+asignar un manual nuevo a una máquina que el asistente se niega a mirar: el
+documento se indexa, queda aislado a ese sistema y **no lo recupera nadie**.
+
+**Por qué pasa.** `DocumentacionRag.jsx` es el ÚNICO consumidor de
+`useDominio().sistemas()`, y esa función mapea `resumenDeSistemas()` entero, sin
+filtrar por `cerrado`. Sus tres vistas hermanas —`CasosRag`, `CuadernoEva`,
+`TurnoEva`— no construyen la lista ahí: usan `enServicioIds` de `useMaquina()`,
+que sí excluye las cerradas. La pieza para filtrar **ya existe**
+(`SISTEMAS_EN_SERVICIO`, y `resumenDeSistemas()` emite `cerrado` desde el Plan
+45 F2.5); simplemente esta vista no la usa.
+
+**Cuidado al arreglarlo — son dos cosas distintas:**
+
+1. **Ofrecer** una máquina cerrada para un documento NUEVO es el defecto.
+2. **Nombrar** la de un documento que YA está asignado a ella no lo es. Los
+   tres manuales del tanque del manifiesto (`Manual_Operacion_Sistema_Bombeo`,
+   `Anexo_Limites_Proteccion`, `XA02114TEN_0324-00`) tienen que seguir diciendo
+   de qué máquina son. Si se filtra la lista sin más, su `<select>` se queda sin
+   la opción que tiene puesta y la fila mentirá sobre su propio alcance.
+
+Lo mínimo que cumple las dos: filtrar por `cerrado` **salvo el valor actual del
+propio manual**, y marcar ése como cerrado en su etiqueta. `sistema(id)` —el
+singular— no se toca: siete vistas lo usan para resolver nombres ya asignados y
+debe seguir resolviendo el de una cerrada.
+
+**No se arregla aquí**: el Plan 45 está cerrado y esto no es una regresión suya
+—es anterior, del día que se cerró el tanque—, así que entra por la puerta del
+backlog y no de paso (`CLAUDE.md` §6.2).
+
+## F-simuladas-intermitentes · dos pruebas de máquina simulada caen por PLAZO, alternándose (24-09-2026)
+
+En las dos tandas completas de la F2 del Plan 46 cayó **una sola** prueba cada
+vez, y **fue una distinta en cada tanda**:
+
+| Tanda | Cayó | Modo |
+|---|---|---|
+| 1.ª | `planta-maquina-simulada` › «las dos series verificadas dibujan su sparkline…» | `timed out in 5000ms` |
+| 2.ª | `detalle-maquina-simulada` › «al entrar la insignia dice Sesión actual…» | plazo |
+
+**Las dos pasan aisladas**, juntas y a la primera (11/11 en ~1 s). Que el nombre
+cambie entre tandas y que el modo sea **plazo y no aserto** es exactamente la
+firma que `CLAUDE.md` §5.3 describe para la **contención**, no para un defecto
+del código.
+
+**No es el Plan 46.** La F1/F2 tocan `shared/eva/tipos/`, que estas dos pruebas
+no importan: montan Planta y Detalle genéricos con origen simulado. La prueba
+que sí cambió (`tipos.test.js`) pasa 19/19 aislada y en tanda.
+
+**Es la tercera de la misma familia**, tras `F-detalle-intermitente` (cerrada el
+23-09) y `F-accesibilidad-intermitente` (24-09). Las tres son vistas pesadas que
+caen por plazo sólo en tanda completa. **Eso ya no parece casualidad**: conviene
+tratarlas como un solo problema de contención con `maxWorkers: 4` y medir el
+coste real de montar esas vistas, en vez de subir un techo más
+(`CLAUDE.md` §6.2 — ya se subió uno el 23-09 y siguió cayendo).
+
+**Qué medir primero:** cuánto tarda cada una de las tres aislada contra en
+tanda, y si el árbol que montan se puede reducir sin perder lo que afirman.
+
+
+## F-rol-ambiguo-tapado · con el nombre repetido, el selector de ROL no se puede usar (24-09-2026)
+
+Al configurar `sensado-01` (Plan 46 F3), la variable `DONA_MONOFASICA/LINEA_1`
+**no se pudo asignar a ningún rol desde la pantalla**: quedó `sin rol` y su
+desplegable ofrecía «Varios tags con este nombre», que es **otra cosa** — la
+lista de tags del HISTORIADOR, no la de roles.
+
+**Por qué pasa.** `LINEA_1` existe en dos carpetas (`DONA_CORRIENTE_TRIFASICA` y
+`DONA_MONOFASICA`), así que se disparan DOS ambigüedades a la vez sobre la
+misma fila, y en `FilaHoja` (`EditorDeMaquina.jsx`) cada una pinta su propio
+`<select>`:
+
+| Ambigüedad | Condición | Qué ofrece |
+|---|---|---|
+| **de rol** | `v.rolCandidatos.length > 1` | los roles candidatos del tipo |
+| **de serie** | `procedencia === "ambiguo-en-historiador"` | los tags `hda:` con ese nombre |
+
+Las dos son correctas por separado y **el dominio resuelve bien las dos**:
+`tipo.rolesDeTag('LINEA_1')` devuelve los dos roles candidatos, y
+`emparejarPorNombre` declara la ambigüedad del historiador en vez de elegir al
+azar. El defecto es **de presentación**: en la práctica se ve un solo control
+y el de serie tapa al de rol, así que la fila no se puede completar.
+
+**Por qué no se había visto.** Hasta hoy la única máquina configurada era de
+vibraciones, y sus tags llevan el apoyo en el nombre (`vRMS_S1`, `vRMS_S2`):
+nunca se repiten entre carpetas. Un tipo cuyos assets son **tomas
+independientes** —cuatro sensores distintos— hace que repetir el nombre sea lo
+normal, no la excepción. Es el primer tipo así (Plan 46 §3), de ahí que aparezca
+ahora.
+
+**ARREGLADO el 24-09-2026 (Plan 46 F3.1).** La causa no era un `if` que lo
+ocultara —por eso no se veía leyendo la condición—: los dos `<select>` SÍ se
+renderizaban, pero `Fila` es un flex sin envoltura y el nombre lleva `flex: 1`;
+con dos controles de 160 px el de rol se comprimía hasta no poder usarse.
+
+El arreglo es de tres líneas: la fila **envuelve** cuando se dan las dos
+ambigüedades a la vez, y **ninguno de los dos selectores se encoge**
+(`flexShrink: 0`). No se colapsaron en un control único, a propósito: son dos
+preguntas distintas —qué ES la variable, y qué serie le corresponde— y fundirlas
+obligaría a responder la segunda para poder contestar la primera.
+
+**Se descartó un cambio de paso**: rotular las opciones con el `label` del tipo
+(«Corriente monofásica») en vez del id crudo. Se probó, se vio que rompía una
+prueba que afirma el id, y se revirtió — mejora la lectura pero nadie lo pidió y
+esta fase existía para desbloquear la configuración (`CLAUDE.md` §6.2). **Queda
+como mejora pendiente**, con el aviso de que al hacerla hay que actualizar
+`editor-de-maquina.test.jsx` («propone el rol por el nombre del tag»).
+
+**Cubierto por dos pruebas** con un árbol de tipo `sensado` propio —el de
+vibraciones no sirve: sus tags llevan el apoyo en el nombre y nunca se repiten—.
+Vistas fallar a propósito revirtiendo el `flexShrink`.
+
+### Y había UNA SEGUNDA causa, en el dominio (26-09-2026)
+
+El arreglo de arriba desbloqueó el alta, pero al **reabrir** una máquina ya
+guardada la variable seguía diciendo «sin rol» y **ya ni siquiera salía el
+desplegable**. Distinto síntoma, distinta causa:
+
+`marcasDe()` (`shared/eva/comun/configurarDesdeArbol.js`) metía en su mapa `roles`
+**todas** las variables, con `null` las que no tenían rol. El editor pregunta
+`roles.has(punto)` para saber si una persona ya decidió algo, así que ese `null`
+guardado respondía «sí, se decidió que ninguno»: la propuesta del tipo no se
+aplicaba y el selector no se ofrecía. **Una variable guardada sin rol quedaba
+sin arreglo posible desde la pantalla.**
+
+Ahora `roles` lleva sólo las que SÍ tienen rol, y `has()` vuelve a significar
+«alguien decidió esto». Es dominio, no presentación, y por eso la comprobación
+vive en `scripts/verificar-configurar-desde-arbol.mjs` (23 comprobaciones),
+vista fallar a propósito.
+
+**La lección, que vale para el resto del proyecto:** `null` en un mapa cuya
+pregunta es `has()` son dos afirmaciones distintas colapsadas en una —«no hay
+valor» y «el valor es ninguno»—. Es el mismo error de forma que `CLAUDE.md` §2.4
+prohíbe con los datos de planta («la ausencia de dato nunca se disfraza de
+cero»), aplicado a una decisión de configuración en vez de a una lectura.

@@ -462,6 +462,19 @@ y **no se parte de ellas**: se parte de `DemoVibraciones4.0`.
 > mismo día y se completó el 24-09-2026. El siguiente número libre es el
 > **45**; el **43** está reservado al tanque como máquina configurada.
 
+**`PLAN-46-DOS-MAQUINAS-MAS.md`** — escrito el 24-09-2026 y **por completar**.
+De última hora: la demo maneja **dos máquinas más**, las dos como CONFIGURADAS,
+no como código. Una es **Sensado** (cuatro activos nuevos: corriente trifásica y
+monofásica, ambiente, iluminación) **sin riesgos ni alarmas, sólo visualización**;
+la otra es **el tanque**, que vuelve reconfigurado y absorbe la F9 del Plan 33.
+Trae además el reparto de las **8 pantallas** de la demo (§8).
+
+> **Lo que hay que leer de ese plan aunque no se vaya a tocar: su §2.**
+> Un tipo sin reglas **hoy impide que el proceso arranque**
+> (`validarTipos()` lanza), y eso bloquea a Sensado antes de empezar. Está
+> medido, no supuesto. Su §1 es además la descripción verificada del **flujo
+> completo de alta de una máquina**, que no estaba escrita en un solo sitio.
+
 **`PLAN-33-MODULARIDAD-MAQUINAS.md`** — F1–F8 y F10 completas. Queda **F9**
 (estación de llenado como máquina configurada), **bloqueada por la rama**: no
 se puede hacer sin tocar el código del tanque. Es el final de la rama, no una
