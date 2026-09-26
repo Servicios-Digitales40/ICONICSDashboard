@@ -625,3 +625,85 @@ describe("calibración por sensor (Plan 44 §6.1)", () => {
     expect(editarMaquina.mock.calls[0][1].variables.find((v) => v.id === "vRMS_S2").calibracion).toEqual({ ultima: "2026-08-20", proxima: null });
   });
 });
+
+
+/*
+ * ── DOS AMBIGÜEDADES EN LA MISMA FILA (Plan 46 F3, 24-09-2026) ───────
+ *
+ * Un tipo cuyos assets son TOMAS INDEPENDIENTES —cuatro sensores distintos,
+ * no cuatro apoyos del mismo motor— repite nombres de tag entre carpetas con
+ * toda normalidad. `sensado` es el primero así, y al configurarlo apareció el
+ * defecto: `LINEA_1` existe en dos donas, así que la misma fila dispara la
+ * ambigüedad de ROL y la de SERIE a la vez, y el desplegable de rol quedaba
+ * comprimido hasta no poder usarse. La variable no se podía completar.
+ *
+ * El árbol de vibraciones de arriba NO sirve para esto: sus tags llevan el
+ * apoyo en el nombre (`vRMS_S1`) y nunca se repiten. De ahí un árbol propio.
+ */
+describe("una variable con DOS ambigüedades a la vez (Plan 46 F3)", () => {
+  const R = "ac:TDCON/DEMO_SENSORES/";
+  const H = `hda:${B}Configuration${B}DEMO_SENSORES`;
+
+  /* `LINEA_1` en las dos donas, en vivo Y en el historiador. */
+  const ARBOL_SENSORES = {
+    [R]: [carpeta(R, "DONA_CORRIENTE_TRIFASICA"), carpeta(R, "DONA_MONOFASICA")],
+    [`${R}DONA_CORRIENTE_TRIFASICA/`]: ["LINEA_1", "LINEA_2"].map((n) => hoja(`${R}DONA_CORRIENTE_TRIFASICA/`, n)),
+    [`${R}DONA_MONOFASICA/`]: [hoja(`${R}DONA_MONOFASICA/`, "LINEA_1")],
+    [H]: [carpetaHda(H, "DONA_CORRIENTE_TRIFASICA"), carpetaHda(H, "DONA_MONOFASICA")],
+    [`${H}${B}DONA_CORRIENTE_TRIFASICA`]: [
+      tag(`${H}${B}DONA_CORRIENTE_TRIFASICA`, "LINEA_1"),
+      tag(`${H}${B}DONA_CORRIENTE_TRIFASICA`, "LINEA_2"),
+    ],
+    [`${H}${B}DONA_MONOFASICA`]: [tag(`${H}${B}DONA_MONOFASICA`, "LINEA_1")],
+  };
+
+  const tiposSensado = [
+    { id: "sensado", nombre: "Sensado de planta", descripcion: "", reglas: 0, rolesRequeridos: [], capacidadesPosibles: ["CURRENT_DATA"] },
+  ];
+
+  async function explorarSensores() {
+    fireEvent.change(screen.getByLabelText(/Raíz en tiempo real/), { target: { value: R } });
+    fireEvent.change(screen.getByLabelText(/Grupo del historiador/), { target: { value: H } });
+    fireEvent.click(screen.getByRole("button", { name: /Explorar los tres árboles/ }));
+    await screen.findByRole("checkbox", { name: /Marcar todas las variables de DONA_MONOFASICA/ });
+  }
+
+  beforeEach(() => servirArbol(ARBOL_SENSORES));
+
+  /*
+   * La afirmación es sobre lo que se puede USAR, no sobre lo que existe en el
+   * DOM: el defecto no ocultaba el control, lo comprimía. Un `getBy` a secas
+   * pasaba con el defecto puesto, que es justo la prueba que no sirve.
+   */
+  it("el desplegable de ROL se puede usar aunque la serie también sea ambigua", async () => {
+    montar({ tipos: tiposSensado });
+    await explorarSensores();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar todas las variables de DONA_MONOFASICA/ }));
+    await screen.findByRole("checkbox", { name: "LINEA_1" });
+
+    const selectorDeRol = screen.getByLabelText("Elige el rol");
+    expect(selectorDeRol).toBeTruthy();
+    /* No se encoge: es la pregunta que hay que poder contestar. */
+    expect(selectorDeRol.style.flexShrink).toBe("0");
+
+    /* Y los DOS candidatos están, con su id tal cual se guarda. */
+    const valores = [...selectorDeRol.options].map((o) => o.value).filter(Boolean);
+    expect(valores).toContain("electrica:corrienteL1");
+    expect(valores).toContain("electrica:corrienteMono");
+
+    /* El de la serie sigue estando: son dos preguntas, no una. */
+    expect(screen.getByLabelText("Varios tags con este nombre: elige uno")).toBeTruthy();
+  });
+
+  it("elegir el rol lo fija, y la fila deja de estar «sin rol»", async () => {
+    montar({ tipos: tiposSensado });
+    await explorarSensores();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar todas las variables de DONA_MONOFASICA/ }));
+    await screen.findByRole("checkbox", { name: "LINEA_1" });
+
+    fireEvent.change(screen.getByLabelText("Elige el rol"), { target: { value: "electrica:corrienteMono" } });
+
+    expect(await screen.findByText("electrica:corrienteMono")).toBeTruthy();
+    expect(screen.queryByLabelText("Elige el rol")).toBeNull();
+  });
+});

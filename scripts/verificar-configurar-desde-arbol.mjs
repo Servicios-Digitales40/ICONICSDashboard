@@ -337,6 +337,37 @@ check('las marcas de una máquina guardada separan vivos de contadores y conserv
   assert.equal(roles.get(`${RAIZ}S1/vRMS_S1`), 'medida:vRMS')
 })
 
+/*
+ * ── UN ROL AUSENTE NO ES UNA DECISIÓN (Plan 46 F3, 26-09-2026) ───────
+ *
+ * `marcasDe` metía en `roles` TODAS las variables, con `null` las que no
+ * tenían rol. El editor pregunta `roles.has(punto)` para saber si una persona
+ * ya decidió algo, así que ese `null` respondía «sí, se decidió que ninguno»:
+ * el desplegable no se ofrecía y la variable se quedaba sin rol para siempre.
+ *
+ * Pasó de verdad con `sensado-01`: `DONA_MONOFASICA/LINEA_1` es ambigua
+ * —`LINEA_1` está en las dos donas— y una vez guardada sin rol, la pantalla ya
+ * no dejaba arreglarla.
+ */
+check('una variable guardada SIN rol no cuenta como decisión tomada, y se puede elegir al reabrir', () => {
+  const m = guardada()
+  const sinRol = m.variables[0].pointName
+  m.variables[0].rol = null
+
+  const { roles } = marcasDe(m)
+  assert.equal(roles.has(sinRol), false, 'sin rol no se anota: `has()` significa «alguien lo decidió»')
+  assert.ok(roles.size > 0, 'y las que SÍ tienen rol se conservan')
+
+  /* Y al reproponer, esa variable vuelve a recibir la propuesta del tipo en
+     vez de quedarse clavada en el `null` guardado. */
+  const { vivos, emparejamientos } = marcasDe(m)
+  const variables = proponerVariables({
+    raiz: RAIZ, marcados: vivos, tagsHistoricos: [], emparejamientos, roles, tipo: TIPO,
+  })
+  const v = variables.find((x) => x.pointName === sinRol)
+  assert.ok(v.rol !== null || v.rolCandidatos.length > 0, 'o se propone un rol, o hay candidatos que ofrecer')
+})
+
 check('abrir y volver a proponer sin tocar nada reproduce la misma configuración', () => {
   const m = guardada()
   const { vivos, emparejamientos, roles } = marcasDe(m)

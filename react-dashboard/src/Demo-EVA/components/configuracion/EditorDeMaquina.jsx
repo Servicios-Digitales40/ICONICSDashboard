@@ -843,14 +843,57 @@ function FilaHoja({ tx, t, hoja, nivel, marcada, variable, roles, onHoja, onRol,
     ? tagsHda.filter((tag) => nombreFinal(tag) === nombreFinal(v.pointName))
     : [];
 
+  /*
+   * ── DOS AMBIGÜEDADES EN LA MISMA FILA (Plan 46 F3, 24-09-2026) ─────
+   *
+   * Una variable puede disparar las DOS a la vez, y hasta hoy eso dejaba la
+   * fila sin poder completarse. Pasó al configurar `sensado-01`:
+   * `DONA_MONOFASICA/LINEA_1` se quedaba «sin rol» y el único desplegable
+   * visible era el de la serie, que pregunta otra cosa.
+   *
+   *   de ROL    dos roles candidatos      ¿qué ES esta variable?
+   *   de SERIE  dos tags con ese nombre   ¿qué serie le corresponde?
+   *
+   * Los dos `<select>` se renderizaban, pero `Fila` es un flex sin envoltura
+   * y el nombre lleva `flex: 1`: con dos controles de 160 px el de rol se
+   * comprimía hasta no poder usarse. No era un `if` que lo ocultara — por eso
+   * no se veía leyendo la condición.
+   *
+   * No se colapsan en un control único: son dos preguntas distintas, y
+   * fundirlas obligaría a responder la de la serie para poder responder la
+   * del rol. Lo que se hace es dejar que la fila envuelva y que el rol NO se
+   * encoja, porque sin rol la serie no importa.
+   *
+   * Por qué no había salido antes: los tags de vibraciones llevan el apoyo en
+   * el nombre (`vRMS_S1`), así que nunca se repiten entre carpetas. `sensado`
+   * es el primer tipo cuyos assets son tomas independientes, donde repetir el
+   * nombre es lo normal.
+   */
+  const dobleAmbiguedad = Boolean(ambiguo && candidatosTag.length > 1);
+
   return (
-    <Fila nivel={nivel} resaltada={marcada}>
+    <Fila nivel={nivel} resaltada={marcada} style={dobleAmbiguedad ? { flexWrap: "wrap", rowGap: 4 } : undefined}>
       <Casilla marcada={marcada} etiqueta={corto} onChange={() => onHoja(hoja.pointName)} />
-      <Mono apagado={!marcada} style={{ flex: 1 }}>{corto}</Mono>
+      <Mono apagado={!marcada} style={{ flex: 1, minWidth: 0 }}>{corto}</Mono>
 
       {v && (ambiguo ? (
-        <select aria-label={tx("ambiguousRole")} style={selector} value="" onChange={(e) => onRol(v.pointName, e.target.value)}>
+        <select
+          aria-label={tx("ambiguousRole")}
+          /* `flexShrink: 0`: es la pregunta que hay que poder contestar. */
+          style={{ ...selector, flexShrink: 0 }}
+          value=""
+          onChange={(e) => onRol(v.pointName, e.target.value)}
+        >
           <option value="">{tx("ambiguousRole")}</option>
+          {/*
+            El id crudo (`electrica:corrienteMono`) y no la etiqueta del tipo:
+            es lo que se guarda, es lo que las pruebas afirman y es lo que se
+            puede buscar en `maquinas.json` cuando algo no cuadra. Rotularlo
+            con el `label` se probó y se descartó aquí — mejora la lectura pero
+            es un cambio de presentación que nadie pidió, y esta fase existe
+            para desbloquear la configuración (`CLAUDE.md` §6.2: no
+            refactorizar fuera del alcance). Anotado en el backlog de frontend.
+          */}
           {v.rolCandidatos.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
       ) : (
@@ -862,7 +905,12 @@ function FilaHoja({ tx, t, hoja, nivel, marcada, variable, roles, onHoja, onRol,
           <Link2 size={13} />
         </span>
       ) : candidatosTag.length > 1 ? (
-        <select aria-label={tx("ambiguous")} style={selector} value="" onChange={(e) => onEmparejar(v.pointName, e.target.value)}>
+        <select
+          aria-label={tx("ambiguous")}
+          style={{ ...selector, flexShrink: 0 }}
+          value=""
+          onChange={(e) => onEmparejar(v.pointName, e.target.value)}
+        >
           <option value="">{tx("ambiguous")}</option>
           {candidatosTag.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
         </select>

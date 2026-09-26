@@ -430,6 +430,24 @@ export function arbolesDe(maquina) {
  * una persona ya decidió —el punto histórico y el rol— como decisiones a
  * mano, para que abrir y guardar sin tocar nada no cambie la máquina.
  *
+ * ── UN ROL AUSENTE NO ES UNA DECISIÓN (Plan 46 F3, 26-09-2026) ─────
+ *
+ * `roles` sólo lleva las variables que SÍ tienen rol. Antes entraban todas,
+ * con `null` las que no lo tenían, y eso las dejaba sin arreglo posible desde
+ * la pantalla: el editor pregunta `roles.has(pointName)` para saber si ya se
+ * decidió algo, y un `null` guardado respondía «sí, se decidió que ninguno».
+ * El desplegable de rol no se ofrecía y la variable se quedaba «sin rol» para
+ * siempre.
+ *
+ * Pasó con `sensado-01`: `DONA_MONOFASICA/LINEA_1` es ambigua —`LINEA_1`
+ * existe en las dos donas— y se guardó sin rol. Al reabrir, la pantalla ya no
+ * dejaba elegirlo. **El mapa distingue ahora «lo eligió una persona» de «no
+ * hay nada elegido»**, que es la distinción que `has()` necesita para
+ * significar algo.
+ *
+ * Quien consuma esto y quiera el rol efectivo debe leer la variable, no este
+ * mapa: aquí sólo están las decisiones manuales que mandan sobre la propuesta.
+ *
  * @param {object} maquina
  */
 export function marcasDe(maquina) {
@@ -447,7 +465,9 @@ export function marcasDe(maquina) {
     }
     vivos.push(v.pointName);
     emparejamientos.set(v.pointName, v.historyPointName ?? null);
-    roles.set(v.pointName, v.rol ?? null);
+    /* Ver la cabecera: sin rol no se anota nada, para que `has()` siga
+       queriendo decir «alguien decidió esto». */
+    if (v.rol) roles.set(v.pointName, v.rol);
   }
 
   return { vivos, contadores, emparejamientos, roles };
