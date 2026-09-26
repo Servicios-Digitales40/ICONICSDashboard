@@ -16,6 +16,12 @@ Documentos/Reportes/
 # codigo de este repositorio: es documentacion de UNA instalacion concreta,
 # y puede llevar informacion que no corresponde subir a un repositorio
 # compartido.
+#
+# Su `.manifiesto.json` TAMPOCO se versiona, y se penso (26-09-2026): solo
+# lleva metadatos -que archivo es de que maquina- pero apunta a seis PDF que
+# no estarian en otra instalacion, asi que por si solo deja el RAG senalando
+# al vacio. Para migrar el RAG hay que copiar la carpeta ENTERA, manifiesto
+# incluido; no sirve de nada llevarse el indice sin lo indexado.
 Documentacion/
 
 # Paquetes de release: se generan desde el codigo, no se versionan.
@@ -47,4 +53,33 @@ Thumbs.db
 # asistente va aprendiendo. Lo DURADERO no vive aqui: cuando un hecho
 # demuestra que vale, se sube a HECHOS_INICIALES en shared/eva/aprendizaje.js,
 # donde pasa por revision como cualquier otro codigo.
-datos/
+#
+# Se ignora el CONTENIDO y no el directorio (`datos/*` y no `datos/`): git no
+# mira dentro de un directorio excluido, asi que con `datos/` la excepcion de
+# abajo no se aplicaria nunca -comprobado el 26-09-2026 con `git add -n`-.
+datos/*
+
+# `datos/` a secas cubria tambien `backend/datos/` -un patron sin barra
+# inicial casa en cualquier nivel-. Al acotarlo a `datos/*` dejo de hacerlo,
+# asi que se nombra aparte: son las caches del indexador, 22 MB que se
+# regeneran solos.
+backend/datos/
+
+# --- Excepcion: la CONFIGURACION de las maquinas si se versiona (26-09-2026)
+#
+# `maquinas.json` no es "lo que el backend genera en marcha": es lo que una
+# persona configuro desde la pantalla -que assets, que variables, que rol
+# tiene cada una, que series se verificaron-. Reproducirlo a mano en otra
+# instalacion son dos horas de clics, y sin el la demo no arranca.
+#
+# Se versiona SOLO ese archivo. Lo demas de `datos/` sigue fuera y con
+# motivo:
+#   · embeddings-cache.json    22 MB que git guardaria ENTEROS en cada
+#                              cambio, y que se regeneran solos
+#   · diario-*.jsonl           se anexan en cada consulta: versionarlos da
+#                              conflictos en cada pull, linea a linea
+#   · *.antes-de-*             copias de seguridad de purgas, de esta maquina
+#
+# Ojo si se edita desde dos sitios: este archivo lo reescribe entero el
+# backend al guardar, asi que dos personas configurando a la vez chocan.
+!datos/maquinas.json
