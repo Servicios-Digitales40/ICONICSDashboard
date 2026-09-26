@@ -127,7 +127,12 @@ export function createIconicsClient(config, authenticator) {
    *   iba mal.
    * @param {object} [options.meta]      Contexto adicional para la traza.
    */
-  async function request({ url, method = 'GET', headers = {}, json, failure, event, describir, meta = {} }) {
+  async function request({
+    url, method = 'GET', headers = {}, json, failure, event, describir, meta = {},
+    /* Lo pone el propio `request` al reintentar tras una reautenticación; nadie
+       más lo pasa. Ver la rama de `esPaginaDeReautenticacion`. */
+    sinReintentar = false,
+  }) {
     const startedAt = Date.now()
 
     try {
@@ -194,11 +199,60 @@ export function createIconicsClient(config, authenticator) {
        * contestado, y lo que hace que quien llame lo trate como lo que es.
        */
       if (esPaginaDeReautenticacion(payload)) {
+        /*
+         * ── SE RENUEVA Y SE REINTENTA, UNA VEZ (Plan 46 F4.1) ──────────
+         *
+         * Hasta el 26-09-2026 esto sólo INFORMABA, y el mensaje acababa en
+         * «las lecturas seguirán vacías hasta que se renueve el token» — que
+         * era cierto y describía un callejón sin salida: nadie lo renovaba.
+         * `hasValidToken()` mira nuestro reloj, así que el puente seguía
+         * mandando el mismo token muerto **hasta una hora**, y la única cura
+         * era reiniciarlo (lo decía `systemRoutes.mjs`, con razón).
+         *
+         * Ahora se tira el token y se repite la petición. La segunda sale con
+         * uno recién pedido, que es justo lo que el servidor está reclamando.
+         *
+         * ── POR QUÉ UNA SOLA VEZ, Y POR QUÉ NO SIEMPRE ────────────────
+         *
+         * `sinReintentar` corta la recursión: con el servidor de seguridad
+         * caído, las dos respuestas serían la página de login, y reintentar en
+         * bucle multiplicaría la carga contra un servidor que ya va mal
+         * —además de dejar cada lectura colgada el doble—. Un intento
+         * distingue «la sesión se cayó» (se arregla) de «el servidor está mal»
+         * (se reporta, como antes).
+         *
+         * **No se reintenta una ESCRITURA.** Repetir algo que quizá sí llegó a
+         * ejecutarse accionaría la planta dos veces, y ese riesgo no lo
+         * compensa ahorrar un mensaje de error. `writePoint` ya tiene su propio
+         * camino de confirmación por relectura.
+         *
+         * Lo que separa lectura de escritura es el ENDPOINT, no el verbo, y
+         * conviene no confundirlos: la lectura en lote —la que aparece en los
+         * registros con «92 señales», y el caso que motivó todo esto— es un
+         * `POST /Data`. Filtrar por `method === 'GET'` habría dejado fuera
+         * justo el caso principal. Los que escriben son dos y están nombrados.
+         */
+        const escribe = url.startsWith(endpoints.dataWrite) || url.startsWith(endpoints.alarmState)
+        const esLectura = !escribe
+        if (!sinReintentar && esLectura && typeof authenticator.invalidarToken === 'function') {
+          logger.warn(
+            `ICONICS devolvió la página de reautenticación para ${event ?? 'la petición'}: ` +
+              'la sesión caducó del lado del servidor. Se renueva el token y se reintenta una vez.',
+            { ...meta, status: response.status, durationMs }
+          )
+          authenticator.invalidarToken()
+          return request({
+            url, method, headers, json, failure, event, describir, meta,
+            sinReintentar: true,
+          })
+        }
+
         logger.error(
           `ICONICS devolvió la página de reautenticación en vez de datos para ` +
-            `${event ?? 'la petición'}: la sesión caducó del lado del servidor. ` +
-            'Las lecturas seguirán vacías hasta que se renueve el token.',
-          { ...meta, status: response.status, durationMs }
+            `${event ?? 'la petición'}: la sesión caducó del lado del servidor` +
+            `${sinReintentar ? ', y el reintento con un token nuevo tampoco se aceptó' : ''}. ` +
+            'Revisa si el servicio de seguridad de ICONICS está en marcha.',
+          { ...meta, status: response.status, durationMs, reintentado: Boolean(sinReintentar) }
         )
         return {
           ok: false,

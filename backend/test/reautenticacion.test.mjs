@@ -114,3 +114,111 @@ describe('un ICONICS con la sesión caducada', () => {
     expect(tarjeta.detalle).toMatch(/reiniciando el puente/i)
   })
 })
+
+
+/*
+ * ── SE RENUEVA Y SE REINTENTA, UNA VEZ (Plan 46 F4.1, 26-09-2026) ────
+ *
+ * Las pruebas de arriba fijan que la página de login NO se trata como un dato.
+ * Eso seguía dejando un callejón sin salida: nadie renovaba el token, y como
+ * `hasValidToken()` mira NUESTRO reloj, el puente seguía mandando el mismo
+ * token muerto hasta una hora. La única cura era reiniciarlo.
+ *
+ * Aquí se comprueba lo que cierra ese hueco, y también sus dos límites: que no
+ * entre en bucle, y que NO reintente una escritura.
+ */
+describe('cuando ICONICS pide reautenticación, el puente se renueva solo', () => {
+  /** Devuelve la página de login las `fallos` primeras veces, y datos después. */
+  function servidorQueSeRecupera(fallos) {
+    let peticiones = 0
+    const srv = createServer((_req, res) => {
+      peticiones++
+      if (peticiones <= fallos) {
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(PAGINA_DE_LOGIN)
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify([{ pointName: 'ac:x', value: '7', quality: 0, timestamp: new Date().toISOString() }]))
+    })
+    return { srv, peticiones: () => peticiones }
+  }
+
+  /** Cuenta cuántas veces le tiraron el token. */
+  function autenticadorQueCuenta() {
+    let invalidaciones = 0
+    return {
+      authorizationHeaders: async () => ({}),
+      hasValidToken: () => true,
+      invalidarToken: () => { invalidaciones++ },
+      invalidaciones: () => invalidaciones,
+    }
+  }
+
+  async function montar(fallos) {
+    const { srv, peticiones } = servidorQueSeRecupera(fallos)
+    await new Promise(r => srv.listen(0, '127.0.0.1', r))
+    const config = loadConfig({
+      ICONICS_API_BASE: `http://127.0.0.1:${srv.address().port}/fwxapi/rest/v1`,
+      ICONICS_USERNAME: 'u', ICONICS_PASSWORD: 'p', ICONICS_POINT_NAME: 'ac:x',
+      LOG_LEVEL: 'ERROR', PORT: '0',
+    })
+    const auth = autenticadorQueCuenta()
+    return { client: createIconicsClient(config, auth), auth, srv, peticiones }
+  }
+
+  it('una sesión caída se arregla sola: tira el token, reintenta y la lectura sale', async () => {
+    const { client, auth, srv, peticiones } = await montar(1)
+    try {
+      const sobre = await client.readPoints(['ac:x'])
+
+      expect(sobre.ok).toBe(true)
+      expect(sobre.reautenticacion).toBeUndefined()
+      /* Dos viajes al servidor y UNA invalidación: ésa es la firma del
+         reintento. Sin él serían un viaje y cero. */
+      expect(peticiones()).toBe(2)
+      expect(auth.invalidaciones()).toBe(1)
+    } finally {
+      await new Promise(r => srv.close(r))
+    }
+  })
+
+  it('si el reintento tampoco se acepta, se reporta y NO entra en bucle', async () => {
+    const { client, auth, srv, peticiones } = await montar(99)
+    try {
+      const sobre = await client.readPoints(['ac:x'])
+
+      expect(sobre.ok).toBe(false)
+      expect(sobre.status).toBe(401)
+      expect(sobre.reautenticacion).toBe(true)
+      /* Exactamente dos: el intento y su reintento. Un bucle daría muchas más
+         y machacaría un servidor que ya va mal. */
+      expect(peticiones()).toBe(2)
+      expect(auth.invalidaciones()).toBe(1)
+    } finally {
+      await new Promise(r => srv.close(r))
+    }
+  })
+
+  /*
+   * El límite que importa de verdad. Repetir una escritura que quizá SÍ llegó
+   * a ejecutarse accionaría la planta dos veces, y eso no lo compensa ahorrar
+   * un mensaje de error.
+   *
+   * Ojo al detalle que hace falta acertar: la lectura en lote es un
+   * `POST /Data`, así que lo que separa lectura de escritura es el ENDPOINT y
+   * no el verbo.
+   */
+  it('una ESCRITURA no se reintenta: la planta no se acciona dos veces', async () => {
+    const { client, auth, srv, peticiones } = await montar(99)
+    try {
+      const sobre = await client.writePoints([{ pointName: 'ac:x', value: 1 }], { confirmar: false })
+
+      expect(sobre.ok).toBe(false)
+      expect(peticiones()).toBe(1)
+      expect(auth.invalidaciones()).toBe(0)
+    } finally {
+      await new Promise(r => srv.close(r))
+    }
+  })
+})

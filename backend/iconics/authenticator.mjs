@@ -199,6 +199,32 @@ export function createAuthenticator(config) {
     return Boolean(accessToken) && Date.now() < expiresAtMs
   }
 
+  /**
+   * Tirar el token porque el SERVIDOR ya no lo acepta — Plan 46 F4.1.
+   *
+   * ── POR QUÉ HACE FALTA, SI YA CADUCAN SOLOS ───────────────────────
+   *
+   * Porque `hasValidToken()` mira NUESTRO reloj, no al servidor. Si ICONICS
+   * invalida la sesión de su lado antes de que llegue la hora —se reinicia el
+   * servicio, se recicla el pool de IIS, alguien cierra la sesión—, el puente
+   * sigue mandando un token que cree bueno **hasta una hora**, y todas las
+   * lecturas vuelven vacías mientras tanto. Medido el 26-09-2026: el servidor
+   * devuelve la página de login con un 200 y nadie renovaba nada.
+   *
+   * La verdad sobre si un token vale la tiene la RESPUESTA, no el reloj. Esto
+   * es lo que deja que quien la recibe actúe en consecuencia.
+   *
+   * `refreshToken` se tira también: si la sesión murió en el servidor, el
+   * refresco cuelga de la misma sesión y lo normal es que lo rechace. Dejarlo
+   * gastaría un viaje de red para que fallara y caer al login completo de
+   * todas formas.
+   */
+  function invalidarToken() {
+    accessToken = ''
+    refreshToken = ''
+    expiresAtMs = 0
+  }
+
   function storeTokens(tokens) {
     accessToken = tokens.access_token
     if (tokens.refresh_token) refreshToken = tokens.refresh_token
@@ -294,5 +320,5 @@ export function createAuthenticator(config) {
     }
   }
 
-  return { authorizationHeaders, hasValidToken }
+  return { authorizationHeaders, hasValidToken, invalidarToken }
 }
